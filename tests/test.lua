@@ -1839,7 +1839,8 @@ do
 	for _, f in ipairs(UIParent._children) do
 		if f.Text and f.shownAt and f:IsShown() and (f.Text:GetText() or ""):find("shares", 1, true) then notice = f end
 	end
-	check(notice and notice.Text:GetText():find(ItemLink(19019), 1, true) and #SOUNDS == sounds, "and a notice on screen, without a sound")
+	check(notice and notice.Text:GetText():find(ItemLink(19019), 1, true) and #SOUNDS == sounds + 1 and SOUNDS[#SOUNDS] == 3081,
+		"and a notice on screen, with the whisper sound")
 	Advance(6)
 	check(not notice:IsShown(), "which goes away by itself")
 	pmark = #PRINTED + 1

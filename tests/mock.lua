@@ -894,7 +894,7 @@ C_Map.GetMapInfo = function(mapID) return MAP_NAMES[mapID] and { mapID = mapID, 
 C_Map.GetMapInfoAtPosition = function(mapID, x, y) -- the zone under a spot of a continent map
 	if mapID == 1415 and x >= 0.25 and x <= 0.5 and y >= 0.25 and y <= 0.5 then return C_Map.GetMapInfo(1429) end
 end
-SOUNDKIT = { MAP_PING = 3175 }
+SOUNDKIT = { MAP_PING = 3175, TELL_MESSAGE = 3081 }
 function OpenWorldMap(mapID) -- the canvas refreshes every provider when it opens or changes map
 	WorldMapFrame.mapID = mapID or WorldMapFrame.mapID
 	WorldMapFrame:Show()

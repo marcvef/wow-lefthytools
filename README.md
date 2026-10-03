@@ -129,7 +129,7 @@ minimap, and you on theirs, without being in a group.
   ("Anna died in Duskwood - Raven Hill, fighting Stitches.").
 - **Show an item:** **Ctrl+right-click** an item (bags, character, bank, loot, chat links) and
   your friends get "Anna shares [item]" as a clickable link in chat and as a notice on screen,
-  without a sound. Handy for "anyone need this?". (For gear, Ctrl+click also opens the game's
+  with the whisper sound, so it isn't missed. Handy for "anyone need this?". (For gear, Ctrl+click also opens the game's
   preview, as always.)
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.

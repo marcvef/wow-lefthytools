@@ -6,8 +6,8 @@ local B = ns.Beacon
 
 -- Item sharing: Ctrl+right-click an item (bags, character, bank, loot, merchant, quest rewards,
 -- chat links: everything that goes through Blizzard's HandleModifiedItemClick) and every friend
--- with Beacon gets "Anna shares [item]" in chat, as a clickable link, and as a silent notice on
--- screen. Handy for "does anyone need this?".
+-- with Beacon gets "Anna shares [item]" in chat, as a clickable link, and as a notice on screen
+-- with the whisper sound. Handy for "does anyone need this?".
 --
 -- The click is a post-hook on HandleModifiedItemClick, so Blizzard's own handling runs first and
 -- stays untainted (for gear, Ctrl+click also opens the game's preview, as always).
@@ -65,7 +65,7 @@ if type(HandleModifiedItemClick) == "function" then
 end
 
 ---------------------------------------------------------------------------
--- Receiving: a chat line with the link and a notice on screen, no sound
+-- Receiving: a chat line with the link, a notice on screen and the whisper sound (easy to miss otherwise)
 ---------------------------------------------------------------------------
 
 local notice
@@ -122,6 +122,7 @@ function B.ReceiveItem(peer, itemString)
 		end
 		M:Print(("%s shares %s."):format(name, link))
 		ShowNotice(L["%s shares %s"]:format(name, link))
+		PlaySound(SOUNDKIT and SOUNDKIT.TELL_MESSAGE or 3081) -- the whisper sound
 	end)
 	B.Notify("item", peer, { itemString = itemString })
 end

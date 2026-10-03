@@ -1039,7 +1039,7 @@ function M:BuildOptions(o)
 	o:Checkbox("deathAlert", L["Tell me when a friend dies"],
 		L["A chat line when a friend dies: where, and what they were fighting."])
 	o:Checkbox("shareItems", L["Show items to friends"],
-		L["Ctrl+right-click an item (bags, character, bank, loot, chat links) to show it to your friends: they get it as a link in chat and as a notice on screen, without a sound. Items they show you arrive the same way."])
+		L["Ctrl+right-click an item (bags, character, bank, loot, chat links) to show it to your friends: they get it as a link in chat and as a notice on screen, with the whisper sound. Items they show you arrive the same way."])
 	o:Checkbox("pings", L["Map pings"],
 		L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."])
 

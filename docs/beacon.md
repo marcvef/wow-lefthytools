@@ -179,7 +179,7 @@ as it always did (that can't be stopped without replacing Blizzard's function). 
 build the link in their own language: `Item:CreateFromItemLink` + `ContinueOnItemLoad` (the
 client asks the server for unknown items, then the callback runs), then `C_Item.GetItemInfo`.
 They get a chat line "Anna shares [item]." with the clickable link and a notice at the top of
-the screen (4 s, then fading), with no sound. Setting `shareItems` switches both directions.
+the screen (4 s, then fading), and the whisper sound (`SOUNDKIT.TELL_MESSAGE`), so it isn't missed. Setting `shareItems` switches both directions.
 
 ## Level progress
 
