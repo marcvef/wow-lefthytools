@@ -228,6 +228,7 @@ L["Gentle chime"] = "Leises Glockenspiel"
 
 -- Beacon tooltip on a friend's dot
 L["Level %d"] = "Level %d"
+L["Level %d (%d%%)"] = "Level %d (%d %%)"
 L["In your group"] = "In deiner Gruppe"
 L["Dead"] = "Tot"
 L["Ghost"] = "Geist"

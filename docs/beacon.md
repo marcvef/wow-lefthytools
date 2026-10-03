@@ -25,7 +25,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `P2;<continent>;<north>;<west>;<uiMapID>` map ping,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
-  `C2;<count>` enemies on them in combat, `Q2` switched off. A build that doesn't
+  `C2;<count>` enemies on them in combat, `X2;<percent>` progress on their level, `Q2` switched
+  off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
@@ -141,6 +142,14 @@ starts at 0, so a fight without nameplates sends nothing). If the game keeps thr
 mobs with a nameplate (enemy nameplates on, in nameplate range) are counted. Receivers keep
 `peer.mobs` until a state without the combat flag clears it; the dot shows the number at its
 bottom right, the tooltip "Fighting Hogger and 2 more" / "In combat with 3 enemies".
+
+## Level progress
+
+`X2;<percent>`: whole percent of the current level (`UnitXP / UnitXPMax`, at most 99), empty at
+max level (`IsPlayerAtEffectiveMaxLevel`) or with `share` off. `PLAYER_XP_UPDATE` and
+`PLAYER_LEVEL_UP` only set a flag; the tick checks at most every 2 s and sends only when the
+message differs (a kill rarely moves the whole percent). Hellos are answered with it. Tooltip:
+"Level 20 (64%)", or just the level without it.
 
 ## Tracked quest
 

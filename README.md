@@ -119,7 +119,8 @@ minimap, and you on theirs, without being in a group.
   how many enemies are on them (counted from the nameplates they see). On the minimap
   the dots glide smoothly; friends out of range wait faded at the edge, so you see which
   way they are.
-- **Hover a dot** for name (with AFK/DND), BattleTag, level, zone and subzone, who
+- **Hover a dot** for name (with AFK/DND), BattleTag, level and progress on it ("Level 20
+  (64%)"), zone and subzone, who
   they're fighting, the quest they're tracking with their progress (and whether you have it
   too), and how far away they are and in which direction ("240 yd north-east").
 - **Death alerts:** a chat line when a friend dies, with where and what they were fighting

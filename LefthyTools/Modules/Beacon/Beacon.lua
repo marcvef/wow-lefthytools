@@ -32,6 +32,9 @@ local L = ns.L
 --   C2;<count>          in combat: how many enemies have me on their threat list (counted on the
 --                       nameplates the game shows). Sent when it changes, at most once a second;
 --                       a state without C clears it.
+--   X2;<percent>        progress on my current level (0-99), empty at max level or with sharing
+--                       off. Sent when the whole percent changes (at most every XP_GAP seconds)
+--                       and with every answer.
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil), so new kinds can be
 -- added without breaking older friends.
@@ -62,6 +65,7 @@ local PING_GAP = 2           -- map pings accepted from one friend at most this 
 local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed) at most this often
 local HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW = 6, 60 -- Chronicle highlights accepted from one friend
 local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
+local XP_GAP = 2             -- my level progress is checked (and sent if changed) at most this often
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
@@ -133,8 +137,9 @@ local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
 local sweepRequested, validateRequested, statusDirty = false, false, false
 local groupChanged = true -- re-check which friends are in my group on the next tick
 local questDirty = true   -- my tracked quest may have changed
-local lastSweep, lastValidate, lastCheck, lastSent, lastExpire, lastRefresh, lastQuestCheck
-local lastState, lastQuest
+local xpDirty = true      -- my experience may have changed
+local lastSweep, lastValidate, lastCheck, lastSent, lastExpire, lastRefresh, lastQuestCheck, lastXPCheck
+local lastState, lastQuest, lastXP
 local tokens, pausedUntil = SEND_BURST, 0
 -- Friends' data changed: the world map redraws on the next tick (at most twice a second, and
 -- only while open), the minimap on the next frame so gliding dots start right away.
@@ -146,8 +151,8 @@ end
 
 local function ResetTimers()
 	lastSweep, lastValidate, lastCheck, lastSent = -math.huge, -math.huge, -math.huge, -math.huge
-	lastExpire, lastRefresh, lastQuestCheck = 0, -math.huge, -math.huge
-	lastState, lastQuest, questDirty = nil, nil, true
+	lastExpire, lastRefresh, lastQuestCheck, lastXPCheck = 0, -math.huge, -math.huge, -math.huge
+	lastState, lastQuest, questDirty, lastXP, xpDirty = nil, nil, true, nil, true
 end
 ResetTimers()
 
@@ -327,6 +332,32 @@ local function SendCountIfChanged(now)
 	if count and count ~= lastCount then
 		lastCount = count
 		B.QueueToPeers(("C%s;%d"):format(VERSION, math.min(count, 99)))
+	end
+end
+
+local NO_XP = "X" .. VERSION .. ";"
+
+-- Progress on my current level in whole percent; none at max level or with sharing off.
+local function CurrentXP()
+	if not M.db.share or (IsPlayerAtEffectiveMaxLevel and IsPlayerAtEffectiveMaxLevel()) then
+		return NO_XP
+	end
+	local xp, xpMax = UnitXP("player"), UnitXPMax("player")
+	if issecretvalue and (issecretvalue(xp) or issecretvalue(xpMax)) or not xpMax or xpMax <= 0 then
+		return NO_XP
+	end
+	return ("X%s;%d"):format(VERSION, math.min(99, math.floor(xp / xpMax * 100)))
+end
+
+local function SendXPIfChanged(now)
+	if not xpDirty or now - lastXPCheck < XP_GAP then
+		return
+	end
+	xpDirty, lastXPCheck = false, now
+	local message = CurrentXP()
+	if message ~= lastXP then
+		lastXP = message
+		B.QueueToPeers(message)
 	end
 end
 
@@ -581,6 +612,11 @@ local function Parse(text)
 		if count then
 			return "C", tonumber(count)
 		end
+	elseif kind == "X" then
+		local percent = rest:match("^;(%d?%d?)$")
+		if percent then
+			return "X", tonumber(percent) -- nil: not shared
+		end
 	end
 	return nil
 end
@@ -684,6 +720,10 @@ local function OnMessage(text, senderID)
 		peer.mobs = a
 		peer.rev = peer.rev + 1
 		Changed()
+	elseif kind == "X" then
+		peer.xpPercent = a
+		peer.rev = peer.rev + 1
+		Changed()
 	elseif kind == "E" then
 		if not guard.highlightWindow or now - guard.highlightWindow >= HIGHLIGHT_WINDOW then
 			guard.highlightWindow, guard.highlights = now, 0
@@ -711,6 +751,9 @@ local function OnMessage(text, senderID)
 		B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40)) -- my LefthyTools build
 		if lastQuest and lastQuest ~= NO_QUEST then
 			B.Queue(senderID, lastQuest)
+		end
+		if lastXP and lastXP ~= NO_XP then
+			B.Queue(senderID, lastXP)
 		end
 	end
 end
@@ -746,6 +789,7 @@ local function Tick(now, elapsed)
 	SendStateIfChanged(now)
 	SendQuestIfChanged(now)
 	SendCountIfChanged(now)
+	SendXPIfChanged(now)
 	Drain(now, elapsed)
 
 	while dings[1] do
@@ -837,7 +881,8 @@ local function MarkQuestDirty() questDirty = true end
 handlers.QUEST_LOG_UPDATE = MarkQuestDirty
 handlers.QUEST_WATCH_LIST_CHANGED = MarkQuestDirty
 handlers.SUPER_TRACKING_CHANGED = MarkQuestDirty
-handlers.PLAYER_LEVEL_UP = function(level) pendingLevel = level end
+handlers.PLAYER_LEVEL_UP = function(level) pendingLevel, xpDirty = level, true end
+handlers.PLAYER_XP_UPDATE = function() xpDirty = true end
 
 local function MarkStatusDirty() statusDirty = true end
 for _, event in ipairs({ "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_DEAD", "PLAYER_ALIVE",
@@ -908,6 +953,7 @@ end
 function M:OnSettingChanged()
 	statusDirty, lastCheck = true, -math.huge -- e.g. sharing switched: tell friends right away
 	questDirty, lastQuestCheck = true, -math.huge
+	xpDirty, lastXPCheck = true, -math.huge
 	Changed()
 	if B.OnSettingChanged then
 		B.OnSettingChanged() -- Ding.lua: a newly picked level-up sound is played

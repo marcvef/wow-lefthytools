@@ -133,7 +133,9 @@ function B.ShowTooltip(owner, peer)
 		GameTooltip:AddLine(L["In your group"], GROUP_R, GROUP_G, GROUP_B)
 	end
 	local level = game and game.characterLevel or peer.level
-	if level then
+	if level and peer.xpPercent then
+		GameTooltip:AddLine(L["Level %d (%d%%)"]:format(level, peer.xpPercent), 1, 1, 1) -- with their progress on it
+	elseif level then
 		GameTooltip:AddLine(L["Level %d"]:format(level), 1, 1, 1)
 	end
 	local area = game and game.areaName or peer.area

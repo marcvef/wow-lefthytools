@@ -1213,7 +1213,7 @@ for i = 1, 30 do Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;;;;;", "WHISPER", 10
 Advance(0.15)
 local burst = #GAMEDATA - mark + 1
 check(burst >= 5 and burst <= 12, "rate limit: about 10 messages at once, got " .. burst)
-Advance(6) -- 30 friends x (version + state) at 10 messages a second
+Advance(9.5) -- 30 friends x (version + state + level progress) at 10 messages a second
 local answered = 0
 for i = 1, 30 do if #sentTo(100 + i, mark, "S2;") == 1 then answered = answered + 1 end end
 check(answered == 30, "the rest follow within a few seconds, got " .. answered)
@@ -1652,6 +1652,53 @@ do
 	anna("S2;;0;260.0;750.0;Goldshire;")
 	Advance(0.6)
 	check(not pin.Count.shown and tooltipHas("Level 20") and not tooltipHas("In combat with 1 enemy"), "fight over: the count goes")
+	pin:OnMouseLeave()
+	WorldMapFrame:Hide()
+end
+
+section("Beacon: level progress")
+do
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(0.2)
+	mark = #GAMEDATA + 1
+	XP.current = 3000
+	Fire("PLAYER_XP_UPDATE")
+	check(#sentTo(11, mark, "X2;") == 0, "nothing sent inside the event handler")
+	Advance(2.2)
+	check(sentTo(11, mark, "X2;")[1] == "X2;50", "my progress on this level goes to friends, got " .. tostring(sentTo(11, mark, "X2;")[1]))
+	XP.current = 3010
+	for _ = 1, 10 do Fire("PLAYER_XP_UPDATE"); Advance(0.3) end
+	check(#sentTo(11, mark, "X2;") == 1, "only when the whole percent changes")
+	XP.current = 3700
+	Fire("PLAYER_XP_UPDATE")
+	Advance(2.2)
+	check(sentTo(11, mark, "X2;")[2] == "X2;61", "61%")
+	local hmark = #GAMEDATA + 1
+	Advance(5)
+	anna("H2")
+	Advance(0.15)
+	check(sentTo(11, hmark, "X2;")[1] == "X2;61", "a hello is answered with it too")
+	B("share"):SetValue(false)
+	Advance(0.3)
+	check(last(sentTo(11, hmark, "X2;")) == "X2;", "sharing off: friends are told it's not shared")
+	B("share"):SetValue(true)
+	Advance(0.3)
+	XP.current = 1500
+	Fire("PLAYER_XP_UPDATE")
+	Advance(2.2)
+
+	OpenWorldMap(1429)
+	anna("X2;64")
+	Advance(0.6)
+	local pin = pinOf(11)
+	pin:OnMouseEnter()
+	check(tooltipHas("Level 20 (64%)"), "her tooltip: level and progress, got " .. table.concat(TOOLTIP.lines, " | "))
+	anna("X2;abc")
+	Advance(0.6)
+	check(tooltipHas("Level 20 (64%)"), "malformed: ignored")
+	anna("X2;")
+	Advance(0.6)
+	check(tooltipHas("Level 20"), "not shared: just the level")
 	pin:OnMouseLeave()
 	WorldMapFrame:Hide()
 end

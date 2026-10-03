@@ -43,4 +43,7 @@ ns.CHANGELOG = {
 	{ id = 13, version = "0.5.0",
 		en = "Beacon: a friend's dot shows how many enemies are on them in combat, and the tooltip says \"Fighting Hogger and 2 more\".",
 		de = "Beacon: Der Punkt eines Freundes zeigt im Kampf, wie viele Gegner an ihm dran sind, und der Tooltip sagt „Kämpft gegen Hogger und 2 weitere“." },
+	{ id = 14, version = "0.5.0",
+		en = "Beacon: a friend's tooltip shows their progress on the current level, e.g. \"Level 20 (64%)\".",
+		de = "Beacon: Der Tooltip eines Freundes zeigt seinen Fortschritt im aktuellen Level, z. B. „Level 20 (64 %)“." },
 }
