@@ -87,6 +87,15 @@ function B.AddHandover(itemString, link, winner, guid, gameAccountID)
 	if realm and realm ~= "" and realm ~= GetRealmName() then
 		mailName = winner .. "-" .. realm:gsub("[%s%-]", "")
 	end
+	-- Rolled again: only the newest winner keeps it reserved.
+	for i = #list, 1, -1 do
+		if list[i].itemID == itemID then
+			local old = table.remove(list, i)
+			if old.winner ~= winner then
+				M:Print(("%s is no longer reserved for %s."):format(link or ("item " .. itemID), old.winner))
+			end
+		end
+	end
 	list[#list + 1] = { itemID = itemID, link = link, winner = winner, mailName = mailName, guid = guid, at = time() }
 	while #list > MAX do
 		table.remove(list, 1)

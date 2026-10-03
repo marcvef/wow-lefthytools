@@ -2155,6 +2155,19 @@ do
 	check(#owed == 0, "mailed to the winner (name with realm): gone")
 	MAIL_ITEMS = {}
 
+	-- Rolled again: only the newest winner keeps it reserved.
+	wipe(owed)
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12", 12)
+	pmark = #PRINTED + 1
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Anna", "Player-1-11", 11)
+	check(#owed == 1 and owed[1].winner == "Anna" and printedSince(pmark):find(ItemLink(1179) .. " is no longer reserved for Bob.", 1, true),
+		"rolled again: only the newest winner, and I'm told who no longer has it")
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:1179::::::::20:::::")
+	check(tooltipHas("Won by Anna: still to hand over") and not tooltipHas("Won by Bob: still to hand over"), "its tooltip names only them")
+	GameTooltip:Hide()
+	wipe(owed)
+
 	-- Reserved items: a border in the bags; at a vendor, right-click asks first.
 	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12", 12)
 	BAGS[0] = { [3] = 1179, [5] = 6948 }

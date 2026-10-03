@@ -226,8 +226,9 @@ aren't shared.
 
 When my offer has a winner, `B.AddHandover` saves `{ itemID, link, winner, mailName, guid, at }`
 in `LefthyToolsDB.handover`: the item is reserved for them. The winner's GUID comes from their
-answer's peer; `mailName` is "Name-Realm" when Battle.net says their realm isn't mine. At most 20
-entries, dropped after 7 days at load. A `TooltipDataProcessor` post-call for item tooltips adds
+answer's peer; `mailName` is "Name-Realm" when Battle.net says their realm isn't mine. One entry
+per item ID: rolled again, the newest winner replaces the old one (chat says who no longer has it;
+a roll nobody wins changes nothing). At most 20 entries, dropped after 7 days at load. A `TooltipDataProcessor` post-call for item tooltips adds
 "Won by Anna: still to hand over" to every tooltip of that item ID; it returns right away while
 nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` is needed.
 
