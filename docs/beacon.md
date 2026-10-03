@@ -227,9 +227,14 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
 
 When my offer has a winner, `B.AddHandover` saves `{ itemID, link, winner, mailName, guid, at }`
 in `LefthyToolsDB.handover`: the item is reserved for them. The winner's GUID comes from their
-answer's peer; `mailName` is "Name-Realm" when Battle.net says their realm isn't mine. One entry
-per item ID: rolled again, the newest winner replaces the old one (chat says who no longer has it;
-a roll nobody wins changes nothing). At most 20 entries, dropped after 7 days at load. A `TooltipDataProcessor` post-call for item tooltips adds
+answer's peer; `mailName` is "Name-Realm" when Battle.net says their realm isn't mine. An offer from
+the bags (or bank) records the copy's own GUID (`C_Item.GetItemGUID` of the clicked location) as
+`itemGUID`: the reservation follows that copy, so two copies won by two people are two entries, and
+the tooltip (its data's `guid`), the bag border and the vendor question only apply to that copy.
+Offers without a location (chat links) reserve any copy of the item. Rolled again (same copy, or
+same item when copies aren't known), the newest winner replaces the old one (chat says who no
+longer has it; a roll nobody wins changes nothing). "Sell anyway" ends a copy's reservation, and
+an any-copy one only with the last copy. At most 20 entries, dropped after 7 days at load. A `TooltipDataProcessor` post-call for item tooltips adds
 "Won by Anna: still to hand over" to every tooltip of that item ID; it returns right away while
 nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` is needed.
 

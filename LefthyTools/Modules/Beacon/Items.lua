@@ -318,7 +318,7 @@ local function Finish(call)
 				guid, account = a.guid, gameAccountID
 			end
 		end
-		B.AddHandover(call.itemString, call.link, winner, guid, account)
+		B.AddHandover(call.itemString, call.link, winner, guid, account, call.itemGUID)
 		M:Print(("its tooltip reminds you until you trade or mail it to %s."):format(winner))
 	end
 end
@@ -386,8 +386,9 @@ end
 ---------------------------------------------------------------------------
 
 -- offer: friends can say Need or Pass, and it's rolled out (Ctrl+Shift+right-click); otherwise
--- they just see it (Ctrl+right-click).
-function B.ShareItem(link, offer)
+-- they just see it (Ctrl+right-click). location: where the item is, if known; an offered bag item's
+-- own GUID lets its reservation follow that copy (Handover.lua).
+function B.ShareItem(link, offer, location)
 	local itemString = ItemString(link)
 	if not (M.enabled and M.db.shareItems and itemString) then
 		return
@@ -414,8 +415,13 @@ function B.ShareItem(link, offer)
 	repeat
 		id = math.random(1, 99999)
 	until not calls["me:" .. id]
-	local call = { id = id, mine = true, link = link, itemString = itemString, recipients = recipients,
-		answers = {}, state = "open", ends = now + CALL_TIME }
+	local itemGUID
+	if location and location.IsBagAndSlot and location:IsBagAndSlot() and C_Item.GetItemGUID then
+		local ok, guid = pcall(C_Item.GetItemGUID, location)
+		itemGUID = ok and type(guid) == "string" and not (issecretvalue and issecretvalue(guid)) and guid or nil
+	end
+	local call = { id = id, mine = true, link = link, itemString = itemString, itemGUID = itemGUID,
+		recipients = recipients, answers = {}, state = "open", ends = now + CALL_TIME }
 	calls["me:" .. id] = call
 	B.QueueToPeers(("I%s;%s;%d"):format(B.VERSION, itemString, id))
 	M:Print(("offered %s to %d friend(s): they can say Need or Pass."):format(link, count))

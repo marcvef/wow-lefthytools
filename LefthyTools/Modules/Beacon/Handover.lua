@@ -67,6 +67,34 @@ local function EntryFor(itemID)
 	end
 end
 
+-- The item GUID in a bag slot (each copy has its own), or nil.
+local function SlotGUID(bag, slot)
+	if not (ItemLocation and C_Item.GetItemGUID) then
+		return nil
+	end
+	local ok, guid = pcall(C_Item.GetItemGUID, ItemLocation:CreateFromBagAndSlot(bag, slot))
+	return ok and type(guid) == "string" and Readable(guid) and guid or nil
+end
+
+-- The reservation for the item in this bag slot. One made for a known copy (offered from the bags)
+-- only fits that copy; one without (offered from a chat link) fits every copy.
+local function EntryForSlot(bag, slot, itemID)
+	local slotGUID
+	for _, entry in ipairs(list or {}) do
+		if entry.itemID == itemID then
+			if not entry.itemGUID then
+				return entry
+			end
+			if slotGUID == nil then
+				slotGUID = SlotGUID(bag, slot) or false
+			end
+			if entry.itemGUID == slotGUID then
+				return entry
+			end
+		end
+	end
+end
+
 local function Remove(entry)
 	for i, e in ipairs(list or {}) do
 		if e == entry then
@@ -87,8 +115,8 @@ local function Soon(what, value)
 end
 
 -- From Items.lua: my offer has a winner. gameAccountID: theirs, for their realm (mail needs it
--- when it isn't mine).
-function B.AddHandover(itemString, link, winner, guid, gameAccountID)
+-- when it isn't mine). itemGUID: the offered copy's own GUID when it came from the bags.
+function B.AddHandover(itemString, link, winner, guid, gameAccountID, itemGUID)
 	local itemID = tonumber(itemString and itemString:match("^(%d+)"))
 	if not (list and itemID and winner) then
 		return
@@ -99,16 +127,19 @@ function B.AddHandover(itemString, link, winner, guid, gameAccountID)
 	if realm and realm ~= "" and realm ~= GetRealmName() then
 		mailName = winner .. "-" .. realm:gsub("[%s%-]", "")
 	end
-	-- Rolled again: only the newest winner keeps it reserved.
+	-- Rolled again: only the newest winner keeps it reserved. The same copy (same GUID), or, when
+	-- copies aren't known, the same item; another copy of the same item is a reservation of its own.
 	for i = #list, 1, -1 do
-		if list[i].itemID == itemID then
-			local old = table.remove(list, i)
+		local old = list[i]
+		if old.itemID == itemID and old.itemGUID == itemGUID then
+			table.remove(list, i)
 			if old.winner ~= winner then
 				M:Print(("%s is no longer reserved for %s."):format(link or ("item " .. itemID), old.winner))
 			end
 		end
 	end
-	list[#list + 1] = { itemID = itemID, link = link, winner = winner, mailName = mailName, guid = guid, at = time() }
+	list[#list + 1] = { itemID = itemID, link = link, winner = winner, mailName = mailName, guid = guid,
+		itemGUID = itemGUID, at = time() }
 	while #list > MAX do
 		table.remove(list, 1)
 	end
@@ -155,8 +186,11 @@ local function OnItemTooltip(tooltip, data)
 	if not (list and list[1] and M.enabled and data) or not Readable(data.id) then
 		return
 	end
+	-- A bag item's tooltip knows its copy (data.guid): only that copy's winner. Chat links and the
+	-- like don't: every winner of this item.
+	local copy = Readable(data.guid) and data.guid or nil
 	for _, entry in ipairs(list) do
-		if entry.itemID == data.id then
+		if entry.itemID == data.id and not (copy and entry.itemGUID and entry.itemGUID ~= copy) then
 			tooltip:AddLine(L["Won by %s: still to hand over"]:format(entry.winner), LINE_R, LINE_G, LINE_B)
 		end
 	end
@@ -178,10 +212,17 @@ local function SellAnyway()
 	if not (merchantOpen and C_Container.GetContainerItemID(bag, slot) == itemID) then
 		return -- the vendor closed or the item moved meanwhile
 	end
-	Remove(entry) -- not reserved any more: no warning when it leaves the bags
-	counts[itemID] = nil
+	local link = entry.link or ("item " .. itemID)
+	local left = (C_Item.GetItemCount and C_Item.GetItemCount(itemID) or 1) - 1
+	-- A reservation for this very copy ends; one for "any copy" ends only with the last copy.
+	if entry.itemGUID or left <= 0 then
+		Remove(entry)
+		M:Print(("sold %s, which %s had won; it's no longer reserved."):format(link, entry.winner))
+	else
+		M:Print(("sold one %s; another one is still reserved for %s."):format(link, entry.winner))
+	end
+	counts[itemID] = left -- this sale was meant: no "is gone" warning for it
 	C_Container.UseContainerItem(bag, slot)
-	M:Print(("sold %s, which %s had won; it's no longer reserved."):format(entry.link or ("item " .. itemID), entry.winner))
 	Soon("bags")
 end
 
@@ -251,11 +292,11 @@ local function GuardOnClick(guard, mouseButton)
 		return
 	end
 	local itemID = C_Container.GetContainerItemID(bag, slot)
-	local entry = itemID and EntryFor(itemID)
+	local entry = itemID and EntryForSlot(bag, slot, itemID)
 	if entry then
 		Confirm(bag, slot, itemID, entry)
 	elseif merchantOpen and itemID then
-		C_Container.UseContainerItem(bag, slot) -- no longer reserved: sell, as the click meant
+		C_Container.UseContainerItem(bag, slot) -- not (or no longer) reserved: sell, as the click meant
 	end
 end
 
@@ -334,8 +375,9 @@ local function MarkBag(frame)
 		return
 	end
 	for _, button in frame:EnumerateValidItems() do
-		local itemID = any and C_Container.GetContainerItemID(button:GetBagID(), button:GetID())
-		if itemID and EntryFor(itemID) then
+		local bag, slot = button:GetBagID(), button:GetID()
+		local itemID = any and C_Container.GetContainerItemID(bag, slot)
+		if itemID and EntryForSlot(bag, slot, itemID) then
 			Border(button):Show()
 			marked[button] = true
 			local guard = merchantOpen and Guard(button) or button.LefthyToolsSellGuard

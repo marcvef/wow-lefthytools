@@ -990,15 +990,15 @@ GameTooltip = {
 	Show = function() TOOLTIP.shown = true end,
 	Hide = function() TOOLTIP.shown = false end,
 	IsOwned = function(_, frame) return TOOLTIP.shown and TOOLTIP.owner == frame end,
-	SetBagItem = function(self, bag, slot)
+	SetBagItem = function(self, bag, slot) -- its data knows the copy (guid)
 		local id = BAGS[bag] and BAGS[bag][slot]
-		if id then self:SetHyperlink("item:" .. id) end
+		if id then self:SetHyperlink("item:" .. id, C_Item.GetItemGUID(ItemLocation:CreateFromBagAndSlot(bag, slot))) end
 	end,
-	SetHyperlink = function(self, link)
+	SetHyperlink = function(self, link, guid)
 		TOOLTIP.link, TOOLTIP.shown = link, true
 		local id = tonumber(link:match("item:(%d+)"))
 		for _, call in ipairs(TOOLTIP_POSTCALLS) do
-			if id and call[1] == Enum.TooltipDataType.Item then call[2](self, { type = call[1], id = id }) end
+			if id and call[1] == Enum.TooltipDataType.Item then call[2](self, { type = call[1], id = id, guid = guid }) end
 		end
 	end,
 }

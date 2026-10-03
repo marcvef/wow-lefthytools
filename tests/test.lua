@@ -2109,7 +2109,8 @@ do
 	lefthy("beacon handover")
 	check(PRINTED[#PRINTED]:find("nothing to hand over", 1, true), "/lefthy beacon handover: nothing yet")
 	pmark = #PRINTED + 1
-	ctrlRight(ItemLink(6948), true)
+	BAGS[0] = { [3] = 6948 }
+	ctrlRight(ItemLink(6948), true, ItemLocation:CreateFromBagAndSlot(0, 3)) -- from the bags
 	Advance(0.15)
 	local giveaway
 	for _, call in pairs(BB.calls) do if call.mine and call.state == "open" then giveaway = call end end
@@ -2117,8 +2118,10 @@ do
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "N2;" .. giveaway.id .. ";0", "WHISPER", 12)
 	Advance(0.3)
 	check(#owed == 1 and owed[1].itemID == 6948 and owed[1].winner == "Anna" and owed[1].guid == "Player-1-11"
+		and owed[1].itemGUID == "Item-0-3"
 		and printedSince(pmark):find("its tooltip reminds you until you trade or mail it to Anna.", 1, true),
-		"Anna won my item: noted, and I'm told")
+		"Anna won my item: noted (this very copy), and I'm told")
+	BAGS = { [0] = {} }
 	GameTooltip:SetOwner(UIParent)
 	GameTooltip:SetHyperlink("item:6948::::::::20:::::")
 	check(tooltipHas("Won by Anna: still to hand over"), "its tooltip says so")
@@ -2199,7 +2202,25 @@ do
 	GameTooltip:SetHyperlink("item:1179::::::::20:::::")
 	check(tooltipHas("Won by Anna: still to hand over") and not tooltipHas("Won by Bob: still to hand over"), "its tooltip names only them")
 	GameTooltip:Hide()
+	-- Two copies of an item, offered from the bags and won by two people: two reservations.
 	wipe(owed)
+	BAGS[0] = { [3] = 1155, [4] = 1155 }
+	pmark = #PRINTED + 1
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Anna", "Player-1-11", 11, "Item-0-3")
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12, "Item-0-4")
+	check(#owed == 2 and not printedSince(pmark):find("no longer reserved", 1, true), "two copies won by two people: both reserved")
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetBagItem(0, 3)
+	check(tooltipHas("Won by Anna: still to hand over") and not tooltipHas("Won by Bob: still to hand over"), "each copy's tooltip names its winner")
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:1155::::::::20:::::")
+	check(tooltipHas("Won by Anna: still to hand over") and tooltipHas("Won by Bob: still to hand over"), "a link (no copy known) names both")
+	GameTooltip:Hide()
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12, "Item-0-3")
+	check(#owed == 2 and owed[1].winner == "Bob" and owed[2].winner == "Bob" and printedSince(pmark):find("no longer reserved for Anna", 1, true),
+		"one copy rolled again: only that one changes hands")
+	wipe(owed)
+	BAGS = { [0] = {} }
 
 	-- Reserved items: a border in the bags; at a vendor, right-click asks first.
 	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12", 12)
@@ -2235,6 +2256,33 @@ do
 	Advance(0.1)
 	check(SOLD[#SOLD] == 1179 and #owed == 0 and not bagButtons[3].LefthyToolsReserved:IsShown() and not guard:IsShown()
 		and printedSince(pmark):find("no longer reserved", 1, true), "Sell anyway: sold, no longer reserved, border and guard gone")
+	-- Two copies, one of them reserved: only that one has a border and asks.
+	BAGS[0][8], BAGS[0][9] = 1155, 1155
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Anna", "Player-1-11", 11, "Item-0-8")
+	Advance(0.1)
+	check(bagButtons[8].LefthyToolsReserved:IsShown() and bagButtons[8].LefthyToolsSellGuard:IsShown()
+		and not (bagButtons[9].LefthyToolsReserved and bagButtons[9].LefthyToolsReserved:IsShown())
+		and not (bagButtons[9].LefthyToolsSellGuard and bagButtons[9].LefthyToolsSellGuard:IsShown()),
+		"two copies, one reserved: only that one has a border and asks")
+	bagButtons[8].LefthyToolsSellGuard:Click("RightButton")
+	dlg.Sell:Click()
+	Advance(0.1)
+	check(SOLD[#SOLD] == 1155 and BAGS[0][8] == nil and #owed == 0, "Sell anyway on it: sold, reservation over")
+	-- Reserved without a known copy (offered from a link), two copies: selling one keeps it.
+	BAGS[0][8] = 1155
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12)
+	Advance(0.1)
+	check(bagButtons[8].LefthyToolsReserved:IsShown() and bagButtons[9].LefthyToolsReserved:IsShown(), "any copy reserved: both have a border")
+	pmark = #PRINTED + 1
+	bagButtons[8].LefthyToolsSellGuard:Click("RightButton")
+	dlg.Sell:Click()
+	Advance(0.1)
+	check(BAGS[0][8] == nil and #owed == 1 and printedSince(pmark):find("another one is still reserved for Bob", 1, true),
+		"selling one of two: the other is still reserved")
+	bagButtons[9].LefthyToolsSellGuard:Click("RightButton")
+	dlg.Sell:Click()
+	Advance(0.1)
+	check(BAGS[0][9] == nil and #owed == 0, "selling the last one: reservation over")
 	Fire("MERCHANT_CLOSED")
 	-- Gone another way (dragged onto the vendor, a bag addon): how to buy it back.
 	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", 11)
