@@ -1142,7 +1142,7 @@ function M:BuildOptions(o)
 	o:Checkbox("deathAlert", L["Tell me when a friend dies"],
 		L["A chat line when a friend dies: where, and what they were fighting."])
 	o:Checkbox("shareItems", L["Show items to friends"],
-		L["Ctrl+right-click an item that can be traded (bags, bank, loot, chat links) to show it to your friends: they see it at the top of the screen, with the whisper sound. Ctrl+Shift+right-click offers it: they can say Need or Pass, and if several need it, it is rolled out. The item stays reserved for the winner until you hand it over."])
+		L["Ctrl+right-click any item (bags, bank, character, loot, chat links) to show it to your friends: they see it at the top of the screen, with the whisper sound. Ctrl+Shift+right-click offers an item you can trade: they can say Need or Pass, and if several need it, it is rolled out. The item stays reserved for the winner until you hand it over."])
 	o:Button(L["Hand-over reminders"], L["Clear"], function() B.HandoverCommand("clear") end,
 		L["Items you offered and someone won stay reserved until you trade or mail them to the winner: a tooltip line, a bag border, a question at vendors. This forgets all of them, in case one is stuck. /lefthy beacon handover lists them."])
 	o:Checkbox("pings", L["Map pings"],

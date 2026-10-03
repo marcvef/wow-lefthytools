@@ -1878,52 +1878,64 @@ do
 	Advance(0.15)
 	check(#sentTo(11, mark, "I2;") == 1, "Ctrl+left-click and plain clicks don't share")
 
-	-- Only items that can change hands.
+	-- Any item can be shown; only items that can change hands can be offered.
 	Advance(3)
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
-	ctrlRight(ItemLink(19019)) -- a chat link to a Bind on Pickup item
+	local function offers() -- offers carry a call id at the end
+		local n = 0
+		for _, m in ipairs(sentTo(11, mark, "I2;")) do if m:find(";%d+$") then n = n + 1 end end
+		return n
+	end
+	ctrlRight(ItemLink(19019), true) -- offering a chat link to a Bind on Pickup item
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 0 and printedSince(pmark):find(ItemLink(19019) .. " is soulbound or can't be traded", 1, true),
-		"a Bind on Pickup item (chat link, loot window): not shared, and I'm told why")
+	check(offers() == 0 and printedSince(pmark):find(ItemLink(19019) .. " is soulbound or can't be traded: it can't be offered", 1, true),
+		"a Bind on Pickup item (chat link, loot window): not offered, and I'm told why")
+	ctrlRight(ItemLink(19019)) -- just showing it
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 1 and offers() == 0, "showing it works: any item can be shown")
+	Advance(3)
 	BAGS[0] = { [2] = 1155 }
 	MOCK_FOCUS = ContainerFrameCombinedBags.buttons[2]
 	BOUND[2] = true -- worn once: bound now
-	ctrlRight(ItemLink(1155))
+	ctrlRight(ItemLink(1155), true)
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 0, "a soulbound item in the bags: not shared")
+	check(offers() == 0, "a soulbound item in the bags: not offered")
 	BAG_TOOLTIP[2] = { "Rod of the Sleepwalker",
 		"You may trade this item with players that were also eligible to loot this item for the next 1 hour 52 min." }
-	ctrlRight(ItemLink(1155))
+	ctrlRight(ItemLink(1155), true)
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 1, "soulbound, but its loot trade timer still runs: shared")
+	check(offers() == 1, "soulbound, but its loot trade timer still runs: offered")
 	BOUND[2], BAG_TOOLTIP[2] = nil, nil
 	Advance(3)
-	ctrlRight(ItemLink(1155))
+	ctrlRight(ItemLink(1155), true)
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 2, "Bind on Equip, not bound yet: shared")
+	check(offers() == 2, "Bind on Equip, not bound yet: offered")
 	MOCK_FOCUS = CreateFrame("Button")
 	MOCK_FOCUS:SetID(16)
 	EQUIPPED[16] = 1155
 	Advance(3)
-	ctrlRight(ItemLink(1155))
+	ctrlRight(ItemLink(1155), true)
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 2, "a worn item: not shared")
+	check(offers() == 2, "a worn item: not offered")
 	-- With the location Blizzard passes (bags, bank, character frame), the mouse doesn't matter.
 	MOCK_FOCUS = nil
 	BAGS[6] = { [1] = 1155 } -- a bank bag
 	BOUND[1] = true
-	ctrlRight(ItemLink(1155), false, ItemLocation:CreateFromBagAndSlot(6, 1))
+	ctrlRight(ItemLink(1155), true, ItemLocation:CreateFromBagAndSlot(6, 1))
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 2, "a soulbound item in the bank: not shared")
+	check(offers() == 2, "a soulbound item in the bank: not offered")
 	BOUND[1] = nil
-	ctrlRight(ItemLink(1155), false, ItemLocation:CreateFromBagAndSlot(6, 1))
+	ctrlRight(ItemLink(1155), true, ItemLocation:CreateFromBagAndSlot(6, 1))
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 3, "not bound yet, in the bank: shared")
+	check(offers() == 3, "not bound yet, in the bank: offered")
 	Advance(3)
-	ctrlRight(ItemLink(1155), false, ItemLocation:CreateFromEquipmentSlot(16))
+	ctrlRight(ItemLink(1155), true, ItemLocation:CreateFromEquipmentSlot(16))
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 3, "worn, clicked on the character frame: not shared")
+	check(offers() == 3, "worn, clicked on the character frame: not offered")
 	MOCK_FOCUS, EQUIPPED, BAGS = nil, {}, { [0] = {} }
+	Advance(30) -- nobody answers: the offers run out and fade
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 12)
 	Advance(3)
 
 	pmark = #PRINTED + 1

@@ -184,7 +184,8 @@ handling runs first and untainted; for gear Ctrl+click also opens the game's pre
 puts the link into an open chat box, as always (that can't be stopped without replacing
 Blizzard's function). At most one share every 3 s.
 
-Only items that can change hands are shared (`Shareable` in Items.lua); otherwise chat says why.
+Any item can be shown (Ctrl+right-click). Only items that can change hands can be offered
+(Ctrl+Shift+right-click; `Shareable` in Items.lua); otherwise chat says why.
 Bags, the bank and the character frame pass the item's location as `HandleModifiedItemClick`'s
 second argument (Handover.lua's sell guard passes its slot's); other callers (bag addons) get the
 bag slot under the mouse (`GetMouseFoci`) if it holds this link. With a location:

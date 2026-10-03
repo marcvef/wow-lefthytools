@@ -440,10 +440,10 @@ function Answer(call, need)
 	Draw(call)
 end
 
--- Only items that can change hands are shared: not soulbound (unless the loot trade timer still
--- runs: "You may trade this item with players that were also eligible..."), not bound to the
--- account, not quest items. A bag item is asked directly (the clicked slot is the mouse focus);
--- a worn item is bound; anything else (chat links, the loot window) goes by its bind type.
+-- Only items that can change hands are offered (any item can be shown): not soulbound (unless the
+-- loot trade timer still runs: "You may trade this item with players that were also eligible..."),
+-- not bound to the account, not quest items. A bag item is asked directly (its location); a worn
+-- item is bound; anything else (chat links, the loot window) goes by its bind type.
 local NO_TRADE_BIND = { [1] = true, [4] = true, [7] = true, [8] = true, [9] = true } -- Enum.ItemBind
 local ALWAYS_BOUND = { [4] = true, [7] = true, [8] = true, [9] = true } -- quest, account
 
@@ -507,12 +507,15 @@ local function OnModifiedItemClick(link, itemLocation)
 		if not (M.enabled and M.db.shareItems) then
 			return
 		end
+		-- Showing works for any item; offering (with Shift: they roll for it) only for one that can
+		-- change hands.
+		local offer = IsShiftKeyDown()
 		local location = Location(link, itemLocation)
-		if not Shareable(link, location) then
-			M:Print(("%s is soulbound or can't be traded: nothing to share."):format(link))
+		if offer and not Shareable(link, location) then
+			M:Print(("%s is soulbound or can't be traded: it can't be offered (Ctrl+right-click still shows it)."):format(link))
 			return
 		end
-		B.ShareItem(link, IsShiftKeyDown(), location) -- with Shift: let them roll for it
+		B.ShareItem(link, offer, location)
 	end
 end
 
