@@ -686,6 +686,11 @@ check(math.abs(annaPin.x - 0.25) < 1e-6 and math.abs(annaPin.y - 0.75) < 1e-6, "
 local c = annaPin.Dot.color
 check(c and math.abs(c[1] - 0.25) < 1e-6 and math.abs(c[3] - 0.92) < 1e-6, "in mage blue")
 check(annaPin.frameLevelType == "PIN_FRAME_LEVEL_GROUP_MEMBER", "drawn at the same level as party dots")
+STATE.combat = true
+OpenWorldMap(1414); OpenWorldMap(1429) -- dots are released and acquired again, in combat
+check(#PINS == 2 and #BLOCKED == 0, "opening the map in combat creates dots without blocked actions, got " .. table.concat(BLOCKED, ", "))
+STATE.combat = false
+annaPin = pinOf(11)
 check(annaPin.Ring.color[1] == 0 and not annaPin.Skull.shown and not annaPin.Pulse:IsPlaying(), "normal look: dark ring, no skull")
 annaPin:OnMouseEnter()
 local function tooltipHas(text) for _, l in ipairs(TOOLTIP.lines) do if l == text then return true end end return false end

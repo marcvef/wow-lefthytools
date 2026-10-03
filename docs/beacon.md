@@ -64,7 +64,10 @@ A `MapCanvasDataProviderMixin` provider on `WorldMapFrame` with pins from the
 `LefthyToolsBeaconPinTemplate` XML template. `AcquirePin` pools by template name, calls the
 mixin's `OnLoad` once for new pins and wires `OnMouseEnter`/`OnMouseLeave`; the template must not
 define OnEnter/OnLeave scripts (the canvas asserts). `enableMouseMotion` only, so clicks pass
-through. Taint-safe because MapCanvas runs provider calls through `secureexecuterange`. Pins are
+through. Provider code still runs as addon code (also from our own refresh), so it must not call
+protected functions: `AcquirePin` calls `pin:CheckMouseButtonPassthrough`, whose base version
+uses the protected `SetPassThroughButtons` (blocked in combat), so the pin mixin replaces it with
+an empty function (as HereBeDragons-Pins does). Pins are
 kept per friend and updated in place (`RemovePin` only when a friend disappears), so a hovered dot
 keeps its tooltip. Refreshed at most twice a second, only while the map is open.
 

@@ -179,6 +179,12 @@ function LefthyToolsBeaconPinMixin:OnMouseLeave()
 	GameTooltip:Hide()
 end
 
+-- AcquirePin calls this on every acquire, and the base version uses SetPassThroughButtons,
+-- which is protected: from addon code in combat it raises ADDON_ACTION_BLOCKED. Our pins don't
+-- take clicks at all (enableMouseMotion only), so every click reaches the map anyway.
+function LefthyToolsBeaconPinMixin:CheckMouseButtonPassthrough()
+end
+
 local provider = CreateFromMixins(MapCanvasDataProviderMixin)
 local mapPins = {} -- gameAccountID -> pin on the open map
 local providerAdded = false

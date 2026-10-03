@@ -197,6 +197,7 @@ end
 UIParent = CreateFrame("Frame", "UIParent")
 
 ERRORS = {}
+BLOCKED = {} -- protected calls the game would block (ADDON_ACTION_BLOCKED)
 function geterrorhandler()
 	return function(err)
 		ERRORS[#ERRORS + 1] = tostring(err)
@@ -586,6 +587,12 @@ MapCanvasPinMixin = {
 	UseFrameLevelType = function(self, level) self.frameLevelType = level end,
 	SetScalingLimits = function() end,
 	SetPosition = function(self, x, y) self.x, self.y = x, y end,
+	-- Like MapCanvas_DataProviderBase.lua: SetPassThroughButtons is protected, so calling it from
+	-- addon code in combat is blocked by the game.
+	CheckMouseButtonPassthrough = function(self) self:SetPassThroughButtons() end,
+	SetPassThroughButtons = function()
+		if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SetPassThroughButtons" end
+	end,
 }
 PIN_MIXINS = { LefthyToolsBeaconPinTemplate = "LefthyToolsBeaconPinMixin" }
 PINS = {} -- currently acquired pins
@@ -609,6 +616,7 @@ function WorldMapFrame:AcquirePin(template, ...)
 	pin.pinTemplate = template
 	PINS[#PINS + 1] = pin
 	pin:OnAcquired(...)
+	pin:CheckMouseButtonPassthrough("RightButton") -- Blizzard does this on every acquire
 	return pin
 end
 function WorldMapFrame:RemovePin(pin)
