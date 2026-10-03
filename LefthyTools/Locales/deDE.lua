@@ -114,6 +114,17 @@ L["While you're AFK the interface disappears and a panel shows your character, h
 L["Circle the camera"] = "Kamera kreisen lassen"
 L["The camera slowly circles your character while the AFK screen is up."] =
 	"Die Kamera kreist langsam um deinen Charakter, solange der AFK-Bildschirm zu sehen ist."
+L["Flights"] = "Flüge"
+L["Cinematic flights"] = "Flüge im Kinomodus"
+L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. Whispers and party chat show as subtitles. Landing, a click, opening a window or typing in chat brings everything back."] =
+	"Auf einer Flugroute blendet das Interface aus, schwarze Balken schieben sich wie im Kino ins Bild, und eine Titelkarte zeigt dein Ziel und jedes Gebiet, das du überfliegst. Flüsternachrichten und Gruppenchat erscheinen als Untertitel. Landen, ein Klick, ein geöffnetes Fenster oder Tippen im Chat bringt alles zurück."
+L["Move the camera"] = "Kamera bewegen"
+L["During the flight the camera pulls back and slowly circles you; it returns when you land."] =
+	"Während des Flugs fährt die Kamera zurück und kreist langsam um dich; bei der Landung kommt sie zurück."
+L["Next stop"] = "Nächster Halt"
+L["Levels %d-%d"] = "Level %d-%d"
+L["%s is here"] = "%s ist hier"
+L["%s are here"] = "%s sind hier"
 L["Move, or click anywhere, to come back."] = "Beweg dich oder klick irgendwohin, um zurückzukommen."
 L["AFK"] = "AFK"
 L["Level %d %s %s"] = "Level %d %s %s"

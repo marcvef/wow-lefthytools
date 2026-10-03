@@ -10,7 +10,7 @@ local data = ns.MirageData -- the window lists Mirage uses to tell whether the U
 -- friends are online and where. Moving, combat, a popup that needs you (ready check, invite,
 -- trade, ...), opening a window or a click brings everything back.
 --
--- The interface is hidden with UIParent:SetAlpha(0), not Hide(): SetAlpha isn't protected, so
+-- The interface is hidden with UIParent:SetAlpha(0) (ns.HideInterface), not Hide(): SetAlpha isn't protected, so
 -- the screen can be left at any moment, also when combat starts (Hide/Show on UIParent is blocked
 -- in combat). The panel is a frame without a parent, so it stays visible, and it takes mouse
 -- clicks, so nothing invisible underneath can be clicked by accident.
@@ -41,7 +41,7 @@ driver:Hide()
 AFK.driver = driver
 local events = CreateFrame("Frame")
 local shown, dismissed, checkPending, leaveNow = false, false, false, false
-local since, savedAlpha, spinning
+local since, spinning
 local sincePoll, sinceRefresh = 0, 0
 local whispers, lastWhisper = 0, nil
 local news = {} -- friends' level-ups and deaths while away: { kind, name, classFile, data }
@@ -243,9 +243,7 @@ local function Show()
 	shown, since, leaveNow = true, GetTime(), false
 	whispers, lastWhisper = 0, nil
 	wipe(news)
-	local alpha = UIParent:GetAlpha()
-	savedAlpha = (type(alpha) == "number" and not issecret(alpha)) and alpha or 1
-	UIParent:SetAlpha(0)
+	ns.HideInterface("afk", true) -- Tweaks.lua (shared with cinematic flights)
 	screen:SetScale(UIParent:GetScale())
 	screen.Model:SetUnit("player") -- current gear
 	screen.Model:SetFacing(0.6)
@@ -263,7 +261,7 @@ end
 -- keeps the screen away until the next time you go AFK.
 local function Leave(back)
 	shown = false
-	UIParent:SetAlpha(savedAlpha or 1)
+	ns.HideInterface("afk", false)
 	StopSpin()
 	screen:Hide()
 	dismissed = not back

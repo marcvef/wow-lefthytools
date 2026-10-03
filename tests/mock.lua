@@ -206,6 +206,11 @@ local function NewAnimationGroup()
 	end
 	function g:Stop() self.playing = false end
 	function g:IsPlaying() return self.playing end
+	function g:SetScript(k, fn) self.scripts = self.scripts or {}; self.scripts[k] = fn end
+	function g:Finish() -- tests: the animation ran to its end
+		self.playing = false
+		if self.scripts and self.scripts.OnFinished then self.scripts.OnFinished(self) end
+	end
 	return g
 end
 function FrameMethods:CreateAnimationGroup() return NewAnimationGroup() end
@@ -275,6 +280,9 @@ function FrameMethods:CreateFontString()
 	function fs:SetWidth(w) self.width = w end
 	function fs:SetHeight(h) self.height = h end
 	function fs:SetFontObject(f) self.font = f end
+	function fs:SetFont(path, size, flags) self.fontFile, self.fontSize = path, size; return true end
+	function fs:SetShadowOffset(x, y) self.shadow = { x, y } end
+	function fs:SetShadowColor() end
 	function fs:SetTextScale(s) self.textScale = s end
 	function fs:SetAlpha(a) self.alpha = a end
 	function fs:SetShown(s) self.shown = s and true or false end
@@ -526,9 +534,16 @@ function GetAchievementInfo(id) return id, "Level 20", 10, true, 10, 3, 26, "", 
 PROFESSIONS = {} -- { { name, level }, ... }
 function GetProfessions() return PROFESSIONS[1] and 1 or nil, PROFESSIONS[2] and 2 or nil end
 function GetProfessionInfo(i) local p = PROFESSIONS[i]; if p then return p.name, 4000 + i, p.level, 300 end end
-CAMERA = { spinning = false, stops = 0 }
+CAMERA = { spinning = false, stops = 0, zoom = 10 }
 function MoveViewLeftStart(speed) CAMERA.spinning, CAMERA.speed = true, speed end
 function MoveViewLeftStop() CAMERA.spinning, CAMERA.stops = false, CAMERA.stops + 1 end
+function GetCameraZoom() return CAMERA.zoom end
+function CameraZoomOut(d) CAMERA.zoom = CAMERA.zoom + d end
+function CameraZoomIn(d) CAMERA.zoom = math.max(0, CAMERA.zoom - d) end
+-- Flight paths: TakeTaxiNode(slot) is what the flight map calls; TAXI_NODES[slot] = "Place, Zone".
+TAXI_NODES, TAXI_TAKEN = {}, {}
+function TakeTaxiNode(slot) TAXI_TAKEN[#TAXI_TAKEN + 1] = slot end
+function TaxiNodeName(slot) return TAXI_NODES[slot] end
 SOUNDS = {}
 function PlaySound(id) SOUNDS[#SOUNDS + 1] = id; return MOCK_SOUND_MISSING ~= id, #SOUNDS end -- willPlay, handle
 STOPPED_SOUNDS = {}
@@ -972,7 +987,12 @@ end
 function IsAltKeyDown() return STATE.alt == true end
 function IsModifiedClick() return STATE.alt == true or STATE.ctrl == true or STATE.shift == true end
 MAP_NAMES = { [1429] = "Elwynn Forest", [1415] = "Eastern Kingdoms", [1414] = "Kalimdor" }
-C_Map.GetMapInfo = function(mapID) return MAP_NAMES[mapID] and { mapID = mapID, name = MAP_NAMES[mapID] } end
+MAP_PARENTS, MAP_TYPES = { [1429] = 1415 }, { [1415] = 2, [1414] = 2, [1429] = 3 } -- 2 = continent, 3 = zone
+MAP_LEVELS = { [1429] = { 1, 10 } }
+C_Map.GetMapInfo = function(mapID)
+	return MAP_NAMES[mapID] and { mapID = mapID, name = MAP_NAMES[mapID], parentMapID = MAP_PARENTS[mapID], mapType = MAP_TYPES[mapID] }
+end
+C_Map.GetMapLevels = function(mapID) local l = MAP_LEVELS[mapID]; if l then return l[1], l[2], 0, 0 end return 0, 0, 0, 0 end
 C_Map.GetMapInfoAtPosition = function(mapID, x, y) -- the zone under a spot of a continent map
 	if mapID == 1415 and x >= 0.25 and x <= 0.5 and y >= 0.25 and y <= 0.5 then return C_Map.GetMapInfo(1429) end
 end

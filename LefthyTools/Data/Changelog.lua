@@ -96,5 +96,8 @@ ns.CHANGELOG = {
 	{ id = 30, version = "0.5.0", module = "beacon",
 		en = { "Only tradeable items", "Soulbound, quest and account-bound items aren't shared or offered: nobody could get them anyway." },
 		de = { "Nur handelbare Items", "Seelengebundene, Quest- und accountgebundene Items werden nicht geteilt oder angeboten: Keiner könnte sie bekommen." } },
+	{ id = 31, version = "0.5.0", module = "tweaks",
+		en = { "Cinematic flights", "On a flight path the interface fades out, black bars slide in, the camera circles, and title cards name each zone you fly into. Whispers show as subtitles." },
+		de = { "Flüge im Kinomodus", "Auf einer Flugroute blendet das Interface aus, schwarze Balken kommen ins Bild, die Kamera kreist, und Titelkarten zeigen jedes überflogene Gebiet. Flüsternachrichten erscheinen als Untertitel." } },
 	-- New entries go here, at the end.
 }

@@ -20,6 +20,8 @@ local M = LT:NewModule("tweaks", {
 		foreverQuests = true,
 		afkScreen = true,      -- AFK.lua
 		afkSpin = true,
+		cinematicFlights = true, -- Flight.lua
+		flightCamera = true,
 	},
 })
 
@@ -33,6 +35,53 @@ function M:OnInitialize()
 end
 
 local active = {} -- tweak key -> currently applied
+
+---------------------------------------------------------------------------
+-- Hiding the whole interface (the AFK screen, cinematic flights)
+--
+-- UIParent:SetAlpha, not Hide: SetAlpha isn't protected, so the interface can come back at any
+-- moment, in combat too. Several tweaks may want it hidden at once (owner keys); it comes back,
+-- to the alpha it had, when none does. fade: seconds to get there; an OnUpdate runs only then.
+---------------------------------------------------------------------------
+
+local hiders, restoreAlpha = {}, nil
+local fader = CreateFrame("Frame")
+fader:Hide()
+local fadeFrom, fadeTo, fadeTime, fadeElapsed = 1, 1, 1, 0
+
+local function CurrentAlpha()
+	local alpha = UIParent:GetAlpha()
+	return (type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha))) and alpha or 1
+end
+
+fader:SetScript("OnUpdate", function(self, elapsed)
+	fadeElapsed = fadeElapsed + elapsed
+	local p = math.min(fadeElapsed / fadeTime, 1)
+	UIParent:SetAlpha(fadeFrom + (fadeTo - fadeFrom) * p)
+	if p >= 1 then
+		self:Hide()
+	end
+end)
+
+function ns.HideInterface(owner, hide, fade)
+	local before = next(hiders) ~= nil
+	hiders[owner] = hide and true or nil
+	local now = next(hiders) ~= nil
+	if before == now then
+		return
+	end
+	if now and not fader:IsShown() then
+		restoreAlpha = CurrentAlpha() -- (mid-fade back, the alpha from before still holds)
+	end
+	local target = now and 0 or (restoreAlpha or 1)
+	if fade and fade > 0 then
+		fadeFrom, fadeTo, fadeTime, fadeElapsed = CurrentAlpha(), target, fade, 0
+		fader:Show()
+	else
+		fader:Hide()
+		UIParent:SetAlpha(target)
+	end
+end
 
 ---------------------------------------------------------------------------
 -- 1. Always show health / power values on unit frames
@@ -374,6 +423,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyForeverQuests(on) end }, -- ForeverQuests.lua
 	{ key = "afkScreen", command = "afk", label = "AFK screen",
 		apply = function(on) ns.ApplyAFKScreen(on) end }, -- AFK.lua
+	{ key = "cinematicFlights", command = "flights", label = "Cinematic flights",
+		apply = function(on) ns.ApplyCinematicFlights(on) end }, -- Flight.lua
 }
 
 local function Reconcile()
@@ -444,6 +495,11 @@ function M:BuildOptions(o)
 		L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."])
 	o:Checkbox("afkSpin", L["Circle the camera"],
 		L["The camera slowly circles your character while the AFK screen is up."])
+	o:Header(L["Flights"])
+	o:Checkbox("cinematicFlights", L["Cinematic flights"],
+		L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. Whispers and party chat show as subtitles. Landing, a click, opening a window or typing in chat brings everything back."])
+	o:Checkbox("flightCamera", L["Move the camera"],
+		L["During the flight the camera pulls back and slowly circles you; it returns when you land."])
 end
 
 function M:OnSlashCommand(msg)

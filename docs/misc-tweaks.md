@@ -134,8 +134,10 @@ progress, "In your group"; zone - subzone (`B.WhereText`) and distance and direc
 (`B.DistanceText`); and what they're doing: dead/ghost or fighting X (and N more, from `C2`), and
 their tracked quest with its progress or "Ready to turn in", in or out of combat.
 
-- **Hiding:** `UIParent:SetAlpha(0)`, restored to the previous alpha. Not `Hide()`: Hide/Show on
-  UIParent is blocked in combat, SetAlpha never is, so leaving always works. The panel
+- **Hiding:** `UIParent:SetAlpha(0)` through `ns.HideInterface("afk", ...)` (Tweaks.lua, shared
+  with cinematic flights: the interface comes back, to the alpha it had, only when no owner wants
+  it hidden). Not `Hide()`: Hide/Show on UIParent is blocked in combat, SetAlpha never is, so
+  leaving always works. The panel
   (`LefthyToolsAFKFrame`) has no parent (stays visible), sits in `FULLSCREEN_DIALOG` and takes
   mouse clicks, so nothing invisible can be clicked; a click leaves (on the next frame).
 - **Leaving:** the AFK flag goes, combat, moving, typing (keyboard focus), a window or bag
@@ -151,3 +153,32 @@ their tracked quest with its progress or "Ready to turn in", in or out of combat
   and updates the texts once a second (remainder carried over, times rounded).
 - **Reload mid-circle:** `db.afkSpinning` is set while the camera circles; `AFK.Enable` (the tweak being
   applied at login) stops the camera if it's still set.
+
+## cinematicFlights: flights like a film (Flight.lua)
+
+On a flight path (`UnitOnTaxi("player")`) the interface fades out over 1.5 s (`ns.HideInterface`
+with a fade: an OnUpdate only while fading), black letterbox bars (11% of the screen each) fade in,
+and a title card in the upper middle names where you're going: header "Next stop", the place in
+the quest font (`Fonts\MORPHEUS.TTF`, 46, shadowed), a thin gold line, the zone below. Every new
+zone on the way (`ZONE_CHANGED_NEW_AREA`) gets a card: the continent (walking `parentMapID` up
+to a continent map) as header, the zone name, and below its level range (`C_Map.GetMapLevels`,
+when known) and the Beacon friends who are in that zone (Battle.net `areaName`). Cards fade in,
+hold, fade out and drift slightly closer (one animation group, `SetToFinalAlpha`). Whispers,
+Battle.net whispers and party chat show as subtitles in the lower bar (the last two, 8 s each;
+secret texts are skipped).
+
+- **Destination:** a post-hook on `TakeTaxiNode(slot)` (the flight map and the old taxi window
+  both call it) keeps `TaxiNodeName(slot)` ("Sentinel Hill, Westfall"). The zone you take off in
+  gets no card of its own. After a `/reload` mid-flight the current zone's card stands in.
+- **Camera** (setting `flightCamera`): `CameraZoomOut(12)` from the saved `GetCameraZoom()` and
+  `MoveViewLeftStart(0.015)`; on leaving `MoveViewLeftStop()` and `CameraZoomIn` back to the saved
+  zoom. `db.flightOrbit` / `db.flightZoom` survive a `/reload` mid-flight: `Flight.Enable` stops the
+  circling and, on the ground, puts the zoom back (in the air it keeps the zoom from before).
+- **Leaving:** landing (`UnitOnTaxi` false; `PLAYER_CONTROL_GAINED` wakes the driver) fades
+  everything back. A click on the screen (it takes clicks, so nothing invisible gets clicked), a
+  window or bag opening (more open than at takeoff, from Mirage's window lists), typing in chat,
+  combat, or a popup that needs you (ready check, invite, LFG, duel, summon, cinematic) brings the
+  interface back at once and keeps it for the rest of that flight.
+- **Cost:** nothing on the ground: `PLAYER_CONTROL_LOST` and `PLAYER_ENTERING_WORLD` show the
+  driver, which looks for the taxi 4x a second for 3 s and hides itself. In the air it checks 4x a
+  second (landing, leaving, zone cards, subtitles); the bars and cards fade by animation.

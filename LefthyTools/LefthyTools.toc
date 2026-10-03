@@ -31,6 +31,7 @@ Modules\Tweaks\Tweaks.lua
 Modules\Tweaks\ComboPoints.lua
 Modules\Tweaks\ForeverQuests.lua
 Modules\Tweaks\AFK.lua
+Modules\Tweaks\Flight.lua
 
 Modules\Beacon\Beacon.lua
 Modules\Beacon\Dots.lua

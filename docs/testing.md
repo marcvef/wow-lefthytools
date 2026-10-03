@@ -33,6 +33,11 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    character, timer, time, XP, Beacon friends. Get whispered: it's counted. Press W: everything
    is back at once and the camera stops. `/afk` again, get attacked: back instantly, no "action
    blocked". `/afk`, then `/reload`: the camera doesn't keep circling.
+   Cinematic flights (Misc Tweaks): take a flight path: the interface fades out, black bars come
+   in, "Next stop / <place> / <zone>" appears, the camera pulls back and circles. Each zone on the
+   way gets a card (continent, level range, friends there). Get whispered: a subtitle in the
+   bottom bar. Land: everything fades back, the camera returns to its old distance. On the next
+   flight click the screen or press M: the interface is back at once for that flight.
    Per element: set the minimap's slider to 50%: it stays half visible while the rest fades.
 9. Watch for Lua errors (`/console scriptErrors 1`), especially "action blocked" taint in combat.
    `/lefthy errors` lists LefthyTools' own errors from all sessions (also with the error display

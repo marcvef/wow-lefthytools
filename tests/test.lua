@@ -2414,6 +2414,121 @@ do
 	Advance(1.2)
 end
 
+section("Misc Tweaks: cinematic flights")
+do
+	local TDB = LefthyToolsDB.settings.tweaks
+	check(TDB.cinematicFlights == true and TDB.flightCamera == true and REGISTERED_SETTINGS.LefthyTools_tweaks_cinematicFlights
+		and REGISTERED_SETTINGS.LefthyTools_tweaks_flightCamera, "on by default, with checkboxes")
+	local uiW, uiH = UIParent:GetWidth(), UIParent:GetHeight()
+	UIParent:SetSize(1920, 1080)
+	anna("H2") -- a friend online, in Elwynn Forest
+	Advance(0.2)
+	TAXI_NODES[3] = "Sentinel Hill, Westfall"
+	TakeTaxiNode(3) -- picked on the flight map
+	ZONE, CAMERA.zoom = "Stormwind City", 10
+	Fire("PLAYER_CONTROL_LOST") -- a stun, say: no taxi
+	Advance(0.5)
+	check(UIParent:GetAlpha() == 1 and not (LefthyToolsFlightFrame and LefthyToolsFlightFrame:IsShown()), "losing control without a flight: nothing")
+	Advance(3)
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(0.3)
+	local film = LefthyToolsFlightFrame
+	check(film and film:IsShown() and film._mouseEnabled and film.Top.height == 119 and film.Bottom.height == 119,
+		"on the flight: black bars top and bottom (11% of the screen), the screen takes clicks")
+	local alphaMidway = UIParent:GetAlpha()
+	check(alphaMidway > 0 and alphaMidway < 1, "the interface fades out, got " .. alphaMidway)
+	Advance(1.5)
+	check(UIParent:GetAlpha() == 0, "... and is gone")
+	local card = film.Card
+	check(card and card.Title:GetText() == "Sentinel Hill" and card.Sub:GetText() == "Westfall" and card.Header:GetText() == "Next stop"
+		and card.Title.fontFile == "Fonts\\MORPHEUS.TTF" and card.Anim.plays == 1, "a title card: the destination")
+	check(CAMERA.zoom == 22 and CAMERA.spinning and CAMERA.speed == 0.015, "the camera pulls back and slowly circles")
+	-- A zone on the way, with its level range and a friend who is there.
+	ZONE = "Elwynn Forest"
+	Fire("ZONE_CHANGED_NEW_AREA")
+	Advance(0.3)
+	check(card.Title:GetText() == "Elwynn Forest" and card.Header:GetText() == "Eastern Kingdoms"
+		and card.Sub:GetText():find("Levels 1-10", 1, true) and card.Sub:GetText():find("Anna|r, |cffc79c6eBob|r are here", 1, true)
+		and card.Anim.plays == 2,
+		"each new zone gets a card: continent, levels, friends there, got " .. tostring(card.Sub:GetText()))
+	Fire("ZONE_CHANGED_NEW_AREA") -- same zone again
+	Advance(0.3)
+	check(card.Anim.plays == 2, "the same zone again: no new card")
+	-- Whispers and party chat as subtitles.
+	Fire("CHAT_MSG_WHISPER", "where are you?", "Bob-Realmy")
+	Fire("CHAT_MSG_PARTY", "pull in 5", "Anna")
+	Advance(0.3)
+	check(film.Subtitles:GetText() == "|cffff80ff[Bob]|r where are you?\n|cffaaaaff[Anna]|r pull in 5", "subtitles, got " .. tostring(film.Subtitles:GetText()))
+	Advance(8)
+	check(film.Subtitles:GetText() == "", "they fade after a few seconds")
+	-- Landing: everything back.
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.3)
+	check(not film._mouseEnabled and CAMERA.zoom == 10 and not CAMERA.spinning, "landed: the camera comes back, clicks go through")
+	Advance(1.5)
+	check(UIParent:GetAlpha() == 1, "and the interface fades back in")
+	film.FadeOut:Finish()
+	check(not film:IsShown(), "the bars fade away")
+	check(not ns.CinematicFlight.driver:IsShown(), "on the ground nothing runs")
+	-- A click mid-flight: the interface for the rest of that flight.
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(2)
+	check(film:IsShown() and UIParent:GetAlpha() == 0, "the next flight")
+	film._scripts.OnMouseDown(film)
+	Advance(0.05)
+	check(not film:IsShown() and UIParent:GetAlpha() == 1 and CAMERA.zoom == 10, "a click: everything back at once")
+	Advance(2)
+	check(not film:IsShown(), "and it stays back for this flight")
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.5)
+	-- Opening the map mid-flight.
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(2)
+	OpenWorldMap(1429)
+	Advance(0.3)
+	check(not film:IsShown() and UIParent:GetAlpha() == 1, "opening the map mid-flight: the interface is back")
+	WorldMapFrame:Hide()
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.5)
+	-- A /reload mid-flight: the camera was left pulled back and circling.
+	TDB.flightZoom, TDB.flightOrbit, CAMERA.zoom, CAMERA.spinning = 10, true, 22, true
+	lefthy("tweaks flights off")
+	Advance(0.1)
+	lefthy("tweaks flights on")
+	Advance(0.1)
+	check(CAMERA.zoom == 10 and not CAMERA.spinning and TDB.flightZoom == nil, "after a /reload on the ground: the camera is put back")
+	-- With the AFK screen at the same time, the interface stays hidden until both are done.
+	ns.HideInterface("afk", true)
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(2)
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(2)
+	check(UIParent:GetAlpha() == 0, "landing while the AFK screen still hides it: still hidden")
+	ns.HideInterface("afk", false)
+	check(UIParent:GetAlpha() == 1, "both done: back")
+	lefthy("tweaks flights off")
+	Advance(0.1)
+	check(TDB.cinematicFlights == false, "/lefthy tweaks flights off")
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(2)
+	check(UIParent:GetAlpha() == 1, "off: flights stay normal")
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	lefthy("tweaks flights on")
+	Advance(0.5)
+	UIParent:SetSize(uiW, uiH)
+	ZONE = "Elwynn Forest"
+end
+
 section("Chronicle: recording")
 local CH, CDB = ns.Chronicle, LefthyToolsChronicleDB
 local me = CDB and CDB.chars["Lefthy-Realmy"]
