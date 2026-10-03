@@ -5,20 +5,24 @@ local M = LT:GetModule("tweaks")
 local data = ns.MirageData -- the window lists, to notice a window being opened
 
 -- Cinematic flights (a Misc Tweak; works without Mirage): on a flight path the interface fades
--- out, black bars slide in like a film, the camera pulls back and slowly circles, and a title card
--- names your destination and every zone you fly into (its level range, and Beacon friends who are
--- there). Whispers and party chat show as subtitles in the lower bar. Landing brings everything
--- back.
+-- out, thin black bars fade in like a film, and a title card names your destination and every
+-- zone you fly into (its level range, and Beacon friends who are there). The bottom bar shows the
+-- time left to landing; whispers and party chat show as subtitles just above it. Landing brings
+-- everything back.
 --
--- The screen doesn't take clicks: dragging the camera works as always, and the circling waits
--- while a mouse button is down and resumes when you let go. Opening a window (map, bags, ...) or
--- typing in chat pauses the film (the interface is back at once) and it resumes by itself once
--- that's done. Combat or a popup that needs you ends it for the rest of that flight.
+-- The screen doesn't take clicks, so the camera can be dragged as always. Opening a window (map,
+-- bags, ...) or typing in chat pauses the film (the interface is back at once) and it resumes by
+-- itself once that's done. Combat or a popup that needs you ends it for the rest of that flight.
+--
+-- Flight time: the game doesn't tell, so every completed flight's time is kept per route
+-- (LefthyToolsDB.flightTimes, "From > To") and counted down exactly the next time. A route flown
+-- for the first time is estimated from the straight distance between its two flight points
+-- (C_TaxiMap node positions on the taxi map, C_Map.GetMapWorldSize) and the seconds per yard
+-- your flights took so far (LefthyToolsDB.flightPace), shown as "about".
 --
 -- The interface is hidden with ns.HideInterface (Tweaks.lua: UIParent's alpha, shared with the AFK
 -- screen). The destination comes from a post-hook on TakeTaxiNode (both the flight map and the old
--- taxi window call it) and TaxiNodeName. For the flight the camera may zoom further out
--- (cameraDistanceMaxZoomFactor), so the pull-back shows even when you're zoomed out all the way.
+-- taxi window call it) and TaxiNodeName.
 --
 -- Cost: nothing on the ground. PLAYER_CONTROL_LOST (a flight starting) or PLAYER_ENTERING_WORLD
 -- shows the driver, which looks for UnitOnTaxi for a few seconds and hides itself; during a
@@ -27,13 +31,12 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 local FADE = 1.5            -- seconds for the interface and the bars
 local POLL = 0.25
 local START_WAIT = 3        -- seconds after losing control to look for the taxi
-local RESUME_DELAY = 2      -- seconds after a window closes or a mouse button is let go
-local PULL_BACK = 12        -- yards the camera moves out
-local ORBIT_SPEED = 0.06    -- MoveViewLeftStart speed (x cameraYawMoveSpeed): a circle in ~50 s
-local ZOOM_CVAR, WIDE_ZOOM = "cameraDistanceMaxZoomFactor", 2.6 -- the game's widest
+local RESUME_DELAY = 2      -- seconds after a window closes or typing ends
 local CARD_IN, CARD_HOLD, CARD_OUT = 1.2, 3.5, 1.5
 local SUBTITLE_TIME, MAX_SUBTITLES = 8, 2
 local BAR = 0.05            -- letterbox bar height, part of the screen height
+local DEFAULT_PACE = 1.15 / 30 -- seconds per yard of straight distance before any flight is timed
+local MIN_FLIGHT, MAX_FLIGHT = 10, 1800 -- timed flights outside this are left out
 local TITLE_FONT = "Fonts\\MORPHEUS.TTF"
 local CHAT_COLOURS = {
 	CHAT_MSG_WHISPER = "|cffff80ff", CHAT_MSG_BN_WHISPER = "|cff00faf6",
@@ -52,16 +55,17 @@ local driver = CreateFrame("Frame")
 driver:Hide()
 Flight.driver = driver
 local events = CreateFrame("Frame")
--- flying: the film is on for this flight (shown, or paused for a window); dismissed: ended for the
--- rest of this flight (combat, a popup).
+-- flying: on a flight with the film engaged (shown, or paused for a window); dismissed: the film
+-- ended for the rest of this flight (combat, a popup), only the flight's time is still taken.
 local flying, shown, dismissed, leaveNow, zoneChanged, chatChanged = false, false, false, false, false, false
 local lookUntil      -- after losing control: look for the taxi until then
-local destination    -- "Sentinel Hill, Westfall", from TakeTaxiNode
+local picked         -- from TakeTaxiNode: { name = "Sentinel Hill, Westfall", route, distance }
+local trip           -- this flight: { route, distance, started, known, estimate }
 local lastZone, baseline -- baseline: the fewest windows open this flight (the taxi map closes at takeoff)
-local resumeAt, orbitAt  -- paused: when to resume; the circling: when to go on after a mouse drag
-local sincePoll = 0
+local resumeAt
+local sincePoll, shownSecond = 0, nil
 local subtitles = {} -- { text, at }
-local savedZoom, orbiting
+local saved -- LefthyToolsDB: flightTimes, flightPace
 
 local function Readable(value)
 	return value ~= nil and not (issecretvalue and issecretvalue(value))
@@ -102,8 +106,69 @@ local function Windows()
 	return count
 end
 
+local function Clock(seconds)
+	seconds = math.max(0, math.floor(seconds + 0.5))
+	local h, m, s = math.floor(seconds / 3600), math.floor(seconds / 60) % 60, seconds % 60
+	if h > 0 then
+		return ("%d:%02d:%02d"):format(h, m, s)
+	end
+	return ("%d:%02d"):format(m, s)
+end
+
 ---------------------------------------------------------------------------
--- The screen: letterbox bars, subtitles, title cards
+-- The route picked on the taxi map: its name, and the straight distance to it
+---------------------------------------------------------------------------
+
+local function PickRoute(slot)
+	local name = TaxiNodeName and TaxiNodeName(slot)
+	if not (Readable(name) and type(name) == "string") then
+		return nil
+	end
+	local route = { name = name }
+	local ok = pcall(function()
+		local mapID = GetTaxiMapID and GetTaxiMapID()
+		local nodes = mapID and C_TaxiMap and C_TaxiMap.GetAllTaxiNodes(mapID)
+		local here, there
+		local current = Enum.FlightPathState and Enum.FlightPathState.Current or 0
+		for _, node in ipairs(nodes or {}) do
+			if node.state == current then
+				here = node
+			elseif node.slotIndex == slot then
+				there = node
+			end
+		end
+		if here and Readable(here.name) then
+			route.route = here.name .. " > " .. name
+		end
+		local width, height = C_Map.GetMapWorldSize(mapID)
+		if here and there and (width or 0) > 0 and (height or 0) > 0 then
+			local dx = (there.position.x - here.position.x) * width
+			local dy = (there.position.y - here.position.y) * height
+			route.distance = math.sqrt(dx * dx + dy * dy)
+		end
+	end)
+	if not (ok and route.route) then
+		-- Without the taxi map's nodes: from where you stand.
+		route.route = (GetRealZoneText() or "?") .. "/" .. (GetSubZoneText() or "") .. " > " .. name
+	end
+	return route
+end
+
+-- The flight is over: its time for this route, and the pace for estimating new ones.
+local function RecordTrip()
+	local seconds = trip and trip.route and trip.started and GetTime() - trip.started
+	if not (saved and seconds and seconds >= MIN_FLIGHT and seconds <= MAX_FLIGHT) then
+		return
+	end
+	saved.flightTimes[trip.route] = math.floor(seconds + 0.5)
+	if trip.distance and trip.distance > 0 then
+		local pace = seconds / trip.distance
+		saved.flightPace = saved.flightPace and (saved.flightPace * 0.7 + pace * 0.3) or pace
+	end
+end
+
+---------------------------------------------------------------------------
+-- The screen: letterbox bars, the time left, subtitles, title cards
 ---------------------------------------------------------------------------
 
 local function Fade(region, from, to, duration)
@@ -137,8 +202,12 @@ local function Build()
 			screen:Hide()
 		end
 	end)
+	-- The time left, in the bottom bar; subtitles just above it, over the picture.
+	screen.Timer = screen:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	screen.Timer:SetPoint("CENTER", screen.Bottom, "CENTER")
+	screen.Timer:SetTextColor(0.85, 0.82, 0.75)
 	screen.Subtitles = screen:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-	screen.Subtitles:SetPoint("CENTER", screen.Bottom, "CENTER")
+	screen.Subtitles:SetPoint("BOTTOM", screen.Bottom, "TOP", 0, 10)
 	screen.Subtitles:SetWidth(900)
 	screen.Subtitles:SetSpacing(4)
 
@@ -254,69 +323,36 @@ local function UpdateSubtitles()
 	screen.Subtitles:SetText(table.concat(lines, "\n"))
 end
 
----------------------------------------------------------------------------
--- The camera: pulled back and circling, put back on landing (also after a /reload mid-flight)
----------------------------------------------------------------------------
-
-local function OrbitStart()
-	if M.db.flightCamera and not orbiting and MoveViewLeftStart then
-		MoveViewLeftStart(ORBIT_SPEED)
-		orbiting = true
-		M.db.flightOrbit = true
-	end
-end
-
-local function OrbitStop()
-	if orbiting and MoveViewLeftStop then
-		MoveViewLeftStop()
-	end
-	orbiting, M.db.flightOrbit = false, nil
-end
-
--- Once per flight: room to zoom out further, the pull-back, the circling.
-local function CameraStart()
-	if not M.db.flightCamera then
+-- "Landing in 1:42" (timed before), "Landing in about 2:10" (estimated), nothing if unknown
+-- (a /reload mid-flight). Set only when the second changes.
+local function UpdateTimer()
+	local total = trip and (trip.known or trip.estimate)
+	if not (total and trip.started) then
+		screen.Timer:SetText("")
 		return
 	end
-	local factor = GetCVar and tonumber(GetCVar(ZOOM_CVAR))
-	if factor and factor < WIDE_ZOOM and not M.db.flightMaxZoom then
-		M.db.flightMaxZoom = factor -- (a /reload mid-flight keeps the one from before)
-		SetCVar(ZOOM_CVAR, WIDE_ZOOM)
+	local left = total - (GetTime() - trip.started)
+	local second = math.floor(left + 0.5)
+	if second == shownSecond then
+		return
 	end
-	local zoom = GetCameraZoom and GetCameraZoom()
-	if not savedZoom and Readable(zoom) and CameraZoomOut then -- (after a /reload mid-flight it's out already)
-		savedZoom = zoom
-		M.db.flightZoom = zoom
-		CameraZoomOut(PULL_BACK)
+	shownSecond = second
+	if second <= 0 then
+		screen.Timer:SetText(L["Landing any moment"])
+	elseif trip.known then
+		screen.Timer:SetText(L["Landing in %s"]:format(Clock(left)))
+	else
+		screen.Timer:SetText(L["Landing in about %s"]:format(Clock(left)))
 	end
-	OrbitStart()
-end
-
-local function CameraStop()
-	OrbitStop()
-	local zoom = GetCameraZoom and GetCameraZoom()
-	if savedZoom and Readable(zoom) and CameraZoomIn and zoom > savedZoom then
-		CameraZoomIn(zoom - savedZoom)
-	end
-	savedZoom, M.db.flightZoom = nil, nil
-	if M.db.flightMaxZoom and SetCVar then
-		SetCVar(ZOOM_CVAR, M.db.flightMaxZoom)
-	end
-	M.db.flightMaxZoom = nil
-end
-
-local function MouseDown()
-	return IsMouseButtonDown and (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))
-		or (IsMouselooking and IsMouselooking())
 end
 
 ---------------------------------------------------------------------------
--- Starting and leaving
+-- Starting, pausing and leaving
 ---------------------------------------------------------------------------
 
--- The film on screen: the interface fades out, the bars in, the camera circles.
+-- The film on screen: the interface fades out, the bars in.
 local function Show()
-	shown, resumeAt, orbitAt = true, nil, nil
+	shown, resumeAt, shownSecond = true, nil, nil
 	screen:SetScale(UIParent:GetScale())
 	local barHeight = math.floor(UIParent:GetHeight() * BAR + 0.5)
 	screen.Top:SetHeight(barHeight)
@@ -326,8 +362,8 @@ local function Show()
 	screen:Show()
 	screen.FadeIn:Play()
 	UpdateSubtitles()
+	UpdateTimer()
 	ns.HideInterface("flight", true, FADE)
-	OrbitStart()
 end
 
 -- The interface back at once (a window, typing): paused until that's done.
@@ -338,7 +374,6 @@ local function Pause()
 	card.Anim:Stop()
 	card:SetAlpha(0)
 	ns.HideInterface("flight", false)
-	OrbitStop()
 end
 
 local function Start()
@@ -349,23 +384,30 @@ local function Start()
 	sincePoll, lastZone = 0, nil
 	wipe(subtitles)
 	baseline = Windows()
-	CameraStart()
+	trip = nil
+	if picked then
+		trip = { route = picked.route, distance = picked.distance, started = GetTime() }
+		trip.known = saved and saved.flightTimes[picked.route]
+		if not trip.known and picked.distance then
+			trip.estimate = picked.distance * (saved and saved.flightPace or DEFAULT_PACE)
+		end
+	end
 	Show()
-	if destination then
-		local place, area = destination:match("^(.-),%s*(.+)$")
-		ShowCard(L["Next stop"], place or destination, area)
-		destination = nil
+	if picked then
+		local place, area = picked.name:match("^(.-),%s*(.+)$")
+		ShowCard(L["Next stop"], place or picked.name, area)
+		picked = nil
 		lastZone = GetZoneText() -- the zone you take off in gets no card of its own
 	else
 		ZoneCard() -- after a /reload or a loading screen mid-flight
 	end
 end
 
--- landed: the flight is over (everything fades back); otherwise (combat, a popup, switched off)
--- the interface is back at once and stays for the rest of this flight.
-local function Leave(landed)
+-- The film ends: landing fades everything back; anything else (combat, a popup, switched off)
+-- brings the interface back at once, for the rest of this flight.
+local function EndFilm(landed)
 	local wasShown = shown
-	flying, shown, dismissed = false, false, not landed
+	flying, shown = false, false
 	screen.FadeIn:Stop()
 	if wasShown and landed then
 		screen.FadeOut:Play() -- hides the screen when done
@@ -375,7 +417,6 @@ local function Leave(landed)
 	card.Anim:Stop()
 	card:SetAlpha(0)
 	ns.HideInterface("flight", false, (wasShown and landed) and FADE or 0)
-	CameraStop()
 end
 
 local function ShouldStart()
@@ -388,15 +429,29 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 		return
 	end
 	sincePoll = 0
+	if dismissed and trip then
+		-- The film was ended: only the flight's time is still taken.
+		if not OnTaxi() then
+			RecordTrip()
+			trip = nil
+			self:Hide()
+		end
+		return
+	end
 	if flying then
 		if not OnTaxi() then
-			Leave(true)
+			RecordTrip()
+			trip = nil
+			EndFilm(true)
 			self:Hide()
 			return
 		end
 		if leaveNow or not (M.enabled and M.db.cinematicFlights) or InCombat() then
-			Leave(false)
-			self:Hide()
+			EndFilm(false)
+			dismissed = true
+			if not trip then
+				self:Hide()
+			end
 			return
 		end
 		local now = GetTime()
@@ -417,14 +472,6 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 		if not shown then
 			return
 		end
-		-- You're moving the camera yourself: the circling waits until you let go.
-		if MouseDown() then
-			OrbitStop()
-			orbitAt = now + RESUME_DELAY
-		elseif orbitAt and now >= orbitAt then
-			orbitAt = nil
-			OrbitStart()
-		end
 		if zoneChanged then
 			zoneChanged = false
 			ZoneCard()
@@ -433,6 +480,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 			chatChanged = false
 			UpdateSubtitles()
 		end
+		UpdateTimer()
 		return
 	end
 	if ShouldStart() then
@@ -450,11 +498,10 @@ end
 
 events:SetScript("OnEvent", function(_, event, ...)
 	if event == "PLAYER_CONTROL_LOST" then
-		dismissed = false -- a new flight
+		dismissed, trip = false, nil -- a new flight
 		Look()
 	elseif event == "PLAYER_CONTROL_GAINED" then
-		dismissed = false
-		if flying then
+		if flying or trip then
 			driver:Show() -- landed: the driver notices on its next check
 		end
 	elseif event == "PLAYER_ENTERING_WORLD" then
@@ -480,14 +527,38 @@ end)
 
 if type(TakeTaxiNode) == "function" then
 	hooksecurefunc("TakeTaxiNode", function(slot)
-		local name = TaxiNodeName and TaxiNodeName(slot)
-		destination = Readable(name) and type(name) == "string" and name or nil
+		picked = PickRoute(slot)
 	end)
 end
+
+table.insert(LT.onLoad, function(db)
+	db.flightTimes = type(db.flightTimes) == "table" and db.flightTimes or {}
+	if type(db.flightPace) ~= "number" then
+		db.flightPace = nil
+	end
+	saved = db
+end)
 
 ---------------------------------------------------------------------------
 -- Switched by Tweaks.lua (on the next frame after the setting or the module changes)
 ---------------------------------------------------------------------------
+
+-- The first version moved the camera; one left circling or zoomed out (a /reload mid-flight) is
+-- put back once, and its settings go.
+local function CleanUpCamera()
+	local db = M.db
+	if db.flightOrbit and MoveViewLeftStop then
+		MoveViewLeftStop()
+	end
+	local zoom = GetCameraZoom and GetCameraZoom()
+	if db.flightZoom and Readable(zoom) and CameraZoomIn and zoom > db.flightZoom then
+		CameraZoomIn(zoom - db.flightZoom)
+	end
+	if db.flightMaxZoom and SetCVar then
+		SetCVar("cameraDistanceMaxZoomFactor", db.flightMaxZoom)
+	end
+	db.flightOrbit, db.flightZoom, db.flightMaxZoom, db.flightCamera = nil, nil, nil, nil
+end
 
 function Flight.Enable()
 	for _, event in ipairs({ "PLAYER_CONTROL_LOST", "PLAYER_CONTROL_GAINED", "PLAYER_ENTERING_WORLD",
@@ -498,15 +569,7 @@ function Flight.Enable()
 	for _, event in ipairs(LEAVE_EVENTS) do
 		pcall(events.RegisterEvent, events, event)
 	end
-	-- The UI was reloaded mid-flight: the camera is still circling, pulled back and allowed further.
-	if M.db.flightOrbit and MoveViewLeftStop then
-		MoveViewLeftStop()
-	end
-	M.db.flightOrbit = nil
-	savedZoom = M.db.flightZoom -- the zoom from before that flight: put back when it ends
-	if (M.db.flightZoom or M.db.flightMaxZoom) and not OnTaxi() then
-		CameraStop()
-	end
+	CleanUpCamera()
 	dismissed = false
 	Look() -- maybe on a flight already (switched on, or a reload)
 end
@@ -514,9 +577,9 @@ end
 function Flight.Disable()
 	events:UnregisterAllEvents()
 	if flying then
-		Leave(false)
+		EndFilm(false)
 	end
-	dismissed, lookUntil = false, nil
+	dismissed, lookUntil, trip = false, nil, nil
 	driver:Hide()
 end
 

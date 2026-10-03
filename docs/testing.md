@@ -34,10 +34,10 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    is back at once and the camera stops. `/afk` again, get attacked: back instantly, no "action
    blocked". `/afk`, then `/reload`: the camera doesn't keep circling.
    Cinematic flights (Misc Tweaks): take a flight path: the interface fades out, black bars come
-   in, "Next stop / <place> / <zone>" appears, the camera pulls back and circles. Each zone on the
-   way gets a card (continent, level range, friends there). Get whispered: a subtitle in the
-   bottom bar. Land: everything fades back, the camera returns to its old distance. On the next
-   flight drag the camera: the circling stops and starts again 2 s after you let go. Press M: the
+   in, "Next stop / <place> / <zone>" appears, the bottom bar says "Landing in about m:ss". Each zone
+   on the way gets a card (continent, level range, friends there). Get whispered: a subtitle just
+   above the bottom bar. The camera stays where you put it and can be dragged. Land: everything
+   fades back. Fly the same route again: "Landing in m:ss" counts down exactly. Press M: the
    interface is back; close the map and the film returns 2 s later. A ready check ends it.
    Per element: set the minimap's slider to 50%: it stays half visible while the rest fades.
 9. Watch for Lua errors (`/console scriptErrors 1`), especially "action blocked" taint in combat.

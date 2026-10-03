@@ -163,29 +163,35 @@ the quest font (`Fonts\MORPHEUS.TTF`, 46, shadowed), a thin gold line, the zone 
 zone on the way (`ZONE_CHANGED_NEW_AREA`) gets a card: the continent (walking `parentMapID` up
 to a continent map) as header, the zone name, and below its level range (`C_Map.GetMapLevels`,
 when known) and the Beacon friends who are in that zone (Battle.net `areaName`). Cards fade in,
-hold, fade out and drift slightly closer (one animation group, `SetToFinalAlpha`). Whispers,
-Battle.net whispers and party chat show as subtitles in the lower bar (the last two, 8 s each;
-secret texts are skipped).
+hold, fade out and drift slightly closer (one animation group, `SetToFinalAlpha`). The bottom bar
+shows the time left to landing; whispers, Battle.net whispers and party chat show as subtitles
+just above it, over the picture (the last two, 8 s each; secret texts are skipped). The camera is
+left alone (a first version pulled it back and circled; that was removed).
 
 - **Destination:** a post-hook on `TakeTaxiNode(slot)` (the flight map and the old taxi window
   both call it) keeps `TaxiNodeName(slot)` ("Sentinel Hill, Westfall"). The zone you take off in
   gets no card of its own. After a `/reload` mid-flight the current zone's card stands in.
-- **Camera** (setting `flightCamera`): the zoom limit `cameraDistanceMaxZoomFactor` goes up to 2.6
-  for the flight (so the pull-back shows even fully zoomed out), `CameraZoomOut(12)` from the saved
-  `GetCameraZoom()`, and `MoveViewLeftStart(0.06)`: a multiple of `cameraYawMoveSpeed`, about one
-  circle in 50 s at 120 (0.015 was too slow to notice from a moving mount). On landing
-  `MoveViewLeftStop()`, `CameraZoomIn` back to the saved zoom, and the old limit. `db.flightOrbit`
-  / `db.flightZoom` / `db.flightMaxZoom` survive a `/reload` mid-flight: `Flight.Enable` stops the
-  circling and, on the ground, puts zoom and limit back (in the air it keeps them for landing).
-- **Your own camera:** the screen doesn't take clicks, so dragging the camera works as always.
-  While a mouse button is down (`IsMouseButtonDown`, `IsMouselooking`) the circling stops; 2 s
-  after letting go it starts again.
+- **Time left:** the game doesn't tell. The same hook reads the taxi map (`GetTaxiMapID`,
+  `C_TaxiMap.GetAllTaxiNodes`): the node you're at (state `Current`) names the route ("From >
+  To") and both nodes' positions give the straight distance (`C_Map.GetMapWorldSize`). Each
+  flight that lands is timed (10 s to 30 min, also when the film was ended early) and kept per
+  route in `LefthyToolsDB.flightTimes`: the next flight on it counts down exactly ("Landing in
+  1:42"). A new route is estimated from the distance and `LefthyToolsDB.flightPace`, seconds per
+  yard learned from timed flights (70/30 running average; 1.15/30 before the first): "Landing in
+  about 2:10". Past it: "Landing any moment". Without a picked route (a `/reload` mid-flight)
+  nothing is shown. The text is set only when the second changes.
+- **Your camera:** the screen doesn't take clicks, so dragging the camera works as always.
+  `Flight.Enable` puts back once what the first version may have left after a `/reload` mid-flight
+  (`db.flightOrbit`, `db.flightZoom`, `db.flightMaxZoom`: circling, zoom, zoom limit) and drops
+  those keys and the old `flightCamera` setting.
 - **Pausing:** a window or bag opening (more open than the fewest this flight, from Mirage's
-  window lists) or typing in chat brings the interface back at once and stops the circling; 2 s
-  after it's closed or done, the film fades back in (a zone crossed meanwhile gets its card then).
+  window lists) or typing in chat brings the interface back at once; 2 s after it's closed or
+  done, the film fades back in (a zone crossed meanwhile gets its card then).
 - **Leaving:** landing (`UnitOnTaxi` false; `PLAYER_CONTROL_GAINED` wakes the driver) fades
   everything back. Combat or a popup that needs you (ready check, invite, LFG, duel, summon,
-  cinematic) brings the interface back at once and keeps it for the rest of that flight.
+  cinematic) brings the interface back at once and keeps it for the rest of that flight (the
+  driver only goes on checking for the landing, to time the flight).
 - **Cost:** nothing on the ground: `PLAYER_CONTROL_LOST` and `PLAYER_ENTERING_WORLD` show the
   driver, which looks for the taxi 4x a second for 3 s and hides itself. In the air it checks 4x a
-  second (landing, leaving, zone cards, subtitles); the bars and cards fade by animation.
+  second (landing, leaving, zone cards, subtitles, the time left); the bars and cards fade by
+  animation.

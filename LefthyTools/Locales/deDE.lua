@@ -116,11 +116,11 @@ L["The camera slowly circles your character while the AFK screen is up."] =
 	"Die Kamera kreist langsam um deinen Charakter, solange der AFK-Bildschirm zu sehen ist."
 L["Flights"] = "Flüge"
 L["Cinematic flights"] = "Flüge im Kinomodus"
-L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. Whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."] =
-	"Auf einer Flugroute blendet das Interface aus, schwarze Balken schieben sich wie im Kino ins Bild, und eine Titelkarte zeigt dein Ziel und jedes Gebiet, das du überfliegst. Flüsternachrichten und Gruppenchat erscheinen als Untertitel. Ein geöffnetes Fenster oder Tippen im Chat pausiert ihn, bis du fertig bist; die Landung bringt alles zurück."
-L["Move the camera"] = "Kamera bewegen"
-L["During the flight the camera pulls back and slowly circles you; it returns when you land."] =
-	"Während des Flugs fährt die Kamera zurück und kreist langsam um dich; bei der Landung kommt sie zurück."
+L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. The bottom bar shows the time left to landing, and whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."] =
+	"Auf einer Flugroute blendet das Interface aus, schwarze Balken schieben sich wie im Kino ins Bild, und eine Titelkarte zeigt dein Ziel und jedes Gebiet, das du überfliegst. Der untere Balken zeigt die Zeit bis zur Landung, Flüsternachrichten und Gruppenchat erscheinen als Untertitel. Ein geöffnetes Fenster oder Tippen im Chat pausiert ihn, bis du fertig bist; die Landung bringt alles zurück."
+L["Landing in %s"] = "Landung in %s"
+L["Landing in about %s"] = "Landung in etwa %s"
+L["Landing any moment"] = "Landung jeden Moment"
 L["Next stop"] = "Nächster Halt"
 L["Levels %d-%d"] = "Level %d-%d"
 L["%s is here"] = "%s ist hier"

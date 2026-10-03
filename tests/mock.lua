@@ -538,14 +538,16 @@ CAMERA = { spinning = false, stops = 0, zoom = 10 }
 function MoveViewLeftStart(speed) CAMERA.spinning, CAMERA.speed = true, speed end
 function MoveViewLeftStop() CAMERA.spinning, CAMERA.stops = false, CAMERA.stops + 1 end
 function GetCameraZoom() return CAMERA.zoom end
-MOUSE_DOWN = {} -- buttons held: MOUSE_DOWN.RightButton = true
-function IsMouseButtonDown(button) return MOUSE_DOWN[button] == true end
 function CameraZoomOut(d) CAMERA.zoom = CAMERA.zoom + d end
 function CameraZoomIn(d) CAMERA.zoom = math.max(0, CAMERA.zoom - d) end
 -- Flight paths: TakeTaxiNode(slot) is what the flight map calls; TAXI_NODES[slot] = "Place, Zone".
 TAXI_NODES, TAXI_TAKEN = {}, {}
 function TakeTaxiNode(slot) TAXI_TAKEN[#TAXI_TAKEN + 1] = slot end
 function TaxiNodeName(slot) return TAXI_NODES[slot] end
+-- The taxi map's nodes (C_TaxiMap.GetAllTaxiNodes): { name, state (0 = where you are), slotIndex, position }.
+TAXI_MAP_ID, TAXI_MAP_NODES, MAP_SIZES = 1415, {}, { [1415] = { 10000, 10000 } }
+function GetTaxiMapID() return TAXI_MAP_ID end
+C_TaxiMap = { GetAllTaxiNodes = function(mapID) return mapID == TAXI_MAP_ID and TAXI_MAP_NODES or {} end }
 SOUNDS = {}
 function PlaySound(id) SOUNDS[#SOUNDS + 1] = id; return MOCK_SOUND_MISSING ~= id, #SOUNDS end -- willPlay, handle
 STOPPED_SOUNDS = {}
@@ -994,6 +996,7 @@ MAP_LEVELS = { [1429] = { 1, 10 } }
 C_Map.GetMapInfo = function(mapID)
 	return MAP_NAMES[mapID] and { mapID = mapID, name = MAP_NAMES[mapID], parentMapID = MAP_PARENTS[mapID], mapType = MAP_TYPES[mapID] }
 end
+C_Map.GetMapWorldSize = function(mapID) local s = MAP_SIZES[mapID]; if s then return s[1], s[2] end return 0, 0 end
 C_Map.GetMapLevels = function(mapID) local l = MAP_LEVELS[mapID]; if l then return l[1], l[2], 0, 0 end return 0, 0, 0, 0 end
 C_Map.GetMapInfoAtPosition = function(mapID, x, y) -- the zone under a spot of a continent map
 	if mapID == 1415 and x >= 0.25 and x <= 0.5 and y >= 0.25 and y <= 0.5 then return C_Map.GetMapInfo(1429) end

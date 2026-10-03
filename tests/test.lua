@@ -2429,15 +2429,22 @@ end
 section("Misc Tweaks: cinematic flights")
 do
 	local TDB = LefthyToolsDB.settings.tweaks
-	check(TDB.cinematicFlights == true and TDB.flightCamera == true and REGISTERED_SETTINGS.LefthyTools_tweaks_cinematicFlights
-		and REGISTERED_SETTINGS.LefthyTools_tweaks_flightCamera, "on by default, with checkboxes")
+	check(TDB.cinematicFlights == true and REGISTERED_SETTINGS.LefthyTools_tweaks_cinematicFlights
+		and not REGISTERED_SETTINGS.LefthyTools_tweaks_flightCamera, "on by default, with a checkbox (no camera option)")
 	local uiW, uiH = UIParent:GetWidth(), UIParent:GetHeight()
 	UIParent:SetSize(1920, 1080)
 	anna("H2") -- a friend online, in Elwynn Forest
 	Advance(0.2)
+	-- The flight map: where you are (state 0) and the destination, 1118 yd apart in a straight line.
+	TAXI_MAP_NODES = {
+		{ name = "Stormwind, Elwynn", state = 0, slotIndex = 1, position = CreateVector2D(0.5, 0.5) },
+		{ name = "Sentinel Hill, Westfall", state = 1, slotIndex = 3, position = CreateVector2D(0.45, 0.6) },
+	}
 	TAXI_NODES[3] = "Sentinel Hill, Westfall"
+	local route = "Stormwind, Elwynn > Sentinel Hill, Westfall"
+	LefthyToolsDB.flightTimes[route], LefthyToolsDB.flightPace = nil, nil
 	TakeTaxiNode(3) -- picked on the flight map
-	ZONE, CAMERA.zoom = "Stormwind City", 10
+	ZONE, CAMERA.zoom, CAMERA.spinning = "Stormwind City", 10, false
 	Fire("PLAYER_CONTROL_LOST") -- a stun, say: no taxi
 	Advance(0.5)
 	check(UIParent:GetAlpha() == 1 and not (LefthyToolsFlightFrame and LefthyToolsFlightFrame:IsShown()), "losing control without a flight: nothing")
@@ -2448,6 +2455,8 @@ do
 	local film = LefthyToolsFlightFrame
 	check(film and film:IsShown() and not film._mouseEnabled and film.Top.height == 54 and film.Bottom.height == 54,
 		"on the flight: thin black bars top and bottom (5% of the screen); clicks and camera drags go through")
+	check(film.Timer:GetText() == "Landing in about 0:43",
+		"a first flight on this route: the time left, estimated from the distance, got " .. tostring(film.Timer:GetText()))
 	local alphaMidway = UIParent:GetAlpha()
 	check(alphaMidway > 0 and alphaMidway < 1, "the interface fades out, got " .. alphaMidway)
 	Advance(1.5)
@@ -2455,17 +2464,7 @@ do
 	local card = film.Card
 	check(card and card.Title:GetText() == "Sentinel Hill" and card.Sub:GetText() == "Westfall" and card.Header:GetText() == "Next stop"
 		and card.Title.fontFile == "Fonts\\MORPHEUS.TTF" and card.Anim.plays == 1, "a title card: the destination")
-	check(CAMERA.zoom == 22 and CAMERA.spinning and CAMERA.speed == 0.06 and CVARS.cameraDistanceMaxZoomFactor == "2.6",
-		"the camera may go further out, pulls back and circles")
-	-- Moving the camera yourself: the circling waits until you let go.
-	MOUSE_DOWN.RightButton = true
-	Advance(0.3)
-	check(not CAMERA.spinning and film:IsShown() and UIParent:GetAlpha() == 0, "dragging the camera: the circling stops, the film stays")
-	MOUSE_DOWN.RightButton = nil
-	Advance(1)
-	check(not CAMERA.spinning, "just let go: not yet")
-	Advance(1.5)
-	check(CAMERA.spinning and CAMERA.speed == 0.06, "a moment later it circles again")
+	check(CAMERA.zoom == 10 and not CAMERA.spinning, "the camera is left alone")
 	-- A zone on the way, with its level range and a friend who is there.
 	ZONE = "Elwynn Forest"
 	Fire("ZONE_CHANGED_NEW_AREA")
@@ -2482,35 +2481,41 @@ do
 	Fire("CHAT_MSG_PARTY", "pull in 5", "Anna")
 	Advance(0.3)
 	check(film.Subtitles:GetText() == "|cffff80ff[Bob]|r where are you?\n|cffaaaaff[Anna]|r pull in 5", "subtitles, got " .. tostring(film.Subtitles:GetText()))
+	check(film.Timer:GetText() == "Landing in about 0:40", "the time left counts down, got " .. tostring(film.Timer:GetText()))
 	Advance(8)
-	check(film.Subtitles:GetText() == "", "they fade after a few seconds")
-	-- Landing: everything back.
+	check(film.Subtitles:GetText() == "", "subtitles fade after a few seconds")
+	Advance(35)
+	check(film.Timer:GetText() == "Landing any moment", "past the estimate: any moment")
+	-- Landing: everything back, and this route's time is kept.
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(0.3)
-	check(CAMERA.zoom == 10 and not CAMERA.spinning and CVARS.cameraDistanceMaxZoomFactor == "1.9",
-		"landed: the camera comes back, the zoom limit too")
+	local took = LefthyToolsDB.flightTimes[route]
+	check(took and took >= 44 and took <= 48 and LefthyToolsDB.flightPace
+		and math.abs(LefthyToolsDB.flightPace - took / 1118.03) < 0.001,
+		"landed: the flight's time is kept for the route, the pace learned, got " .. tostring(took) .. ", pace " .. tostring(LefthyToolsDB.flightPace))
 	Advance(1.5)
 	check(UIParent:GetAlpha() == 1, "and the interface fades back in")
 	film.FadeOut:Finish()
 	check(not film:IsShown(), "the bars fade away")
 	check(not ns.CinematicFlight.driver:IsShown(), "on the ground nothing runs")
-	-- Opening the map mid-flight pauses the film; closing it brings the film back.
+	-- The same route again: counted down exactly. Opening the map pauses the film; closing it brings it back.
+	TakeTaxiNode(3)
 	TRAVEL.taxi = true
 	Fire("PLAYER_CONTROL_LOST")
 	Advance(2)
 	check(film:IsShown() and UIParent:GetAlpha() == 0, "the next flight")
+	check(film.Timer:GetText() == ("Landing in 0:%02d"):format(took - 2), "the same route: an exact countdown, got " .. tostring(film.Timer:GetText()))
 	OpenWorldMap(1429)
 	Advance(0.3)
-	check(not film:IsShown() and UIParent:GetAlpha() == 1 and not CAMERA.spinning and CAMERA.zoom == 22,
-		"opening the map: the interface is back at once, the camera holds still")
+	check(not film:IsShown() and UIParent:GetAlpha() == 1, "opening the map: the interface is back at once")
 	Advance(3)
 	check(not film:IsShown(), "while it's open the film waits")
 	WorldMapFrame:Hide()
 	Advance(1)
 	check(not film:IsShown(), "just closed: not yet")
 	Advance(1.5)
-	check(film:IsShown() and CAMERA.spinning, "a moment later the film is back")
+	check(film:IsShown(), "a moment later the film is back")
 	Advance(1.5)
 	check(UIParent:GetAlpha() == 0, "... the interface faded out again")
 	-- Typing in chat pauses it the same way.
@@ -2520,29 +2525,33 @@ do
 	ACTIVE_CHAT_EDIT_BOX = nil
 	Advance(2.5)
 	check(film:IsShown(), "done typing: the film again")
-	-- A popup that needs you ends it for this flight.
+	-- A popup that needs you ends it for this flight; the flight is still timed.
 	Fire("READY_CHECK")
 	Advance(0.05)
-	check(not film:IsShown() and UIParent:GetAlpha() == 1 and CAMERA.zoom == 10, "a ready check: everything back at once")
+	check(not film:IsShown() and UIParent:GetAlpha() == 1, "a ready check: everything back at once")
 	Advance(4)
 	check(not film:IsShown(), "and it stays back for this flight")
+	Advance(20)
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(0.5)
-	-- A /reload mid-flight: the camera was left pulled back, circling and allowed further.
-	TDB.flightZoom, TDB.flightOrbit, TDB.flightMaxZoom, CAMERA.zoom, CAMERA.spinning = 10, true, 1.9, 22, true
+	check(math.abs(LefthyToolsDB.flightTimes[route] - 36) <= 2 and not ns.CinematicFlight.driver:IsShown(),
+		"landed: that flight's time is kept too, got " .. tostring(LefthyToolsDB.flightTimes[route]))
+	-- The first version moved the camera: one left zoomed out or circling (a /reload mid-flight) is put back once.
+	TDB.flightZoom, TDB.flightOrbit, TDB.flightMaxZoom, TDB.flightCamera, CAMERA.zoom, CAMERA.spinning = 10, true, 1.9, true, 22, true
 	CVARS.cameraDistanceMaxZoomFactor = "2.6"
 	lefthy("tweaks flights off")
 	Advance(0.1)
 	lefthy("tweaks flights on")
 	Advance(0.1)
-	check(CAMERA.zoom == 10 and not CAMERA.spinning and TDB.flightZoom == nil and CVARS.cameraDistanceMaxZoomFactor == "1.9",
-		"after a /reload on the ground: the camera and its zoom limit are put back")
+	check(CAMERA.zoom == 10 and not CAMERA.spinning and CVARS.cameraDistanceMaxZoomFactor == "1.9"
+		and TDB.flightZoom == nil and TDB.flightCamera == nil, "the old camera settings: put back and gone")
 	-- With the AFK screen at the same time, the interface stays hidden until both are done.
 	ns.HideInterface("afk", true)
 	TRAVEL.taxi = true
 	Fire("PLAYER_CONTROL_LOST")
 	Advance(2)
+	check(film.Timer:GetText() == "", "a flight not picked on the map (a reload mid-flight): no time shown")
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(2)
@@ -2563,6 +2572,7 @@ do
 	UIParent:SetSize(uiW, uiH)
 	ZONE = "Elwynn Forest"
 end
+
 
 section("Chronicle: recording")
 local CH, CDB = ns.Chronicle, LefthyToolsChronicleDB
