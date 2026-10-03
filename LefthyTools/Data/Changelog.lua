@@ -108,5 +108,8 @@ ns.CHANGELOG = {
 	{ id = 34, version = "0.5.0", module = "general",
 		en = { "Gamepad mode: no blocked role checks", "In gamepad mode a role check's Accept could be blocked after using LefthyTools' dropdowns or opening its settings from a command. Its dropdowns are its own now, the level-up sound is a slider, and in gamepad mode the settings are opened from the game menu." },
 		de = { "Gamepad-Modus: Rollenabfrage klappt", "Im Gamepad-Modus konnte das Annehmen einer Rollenabfrage blockiert werden, nachdem ein Dropdown von LefthyTools benutzt oder die Einstellungen per Befehl geöffnet wurden. Die Dropdowns sind jetzt eigene, der Level-Up-Sound ist ein Schieberegler, und im Gamepad-Modus öffnet man die Einstellungen über das Spielmenü." } },
+	{ id = 35, version = "0.5.0", module = "beacon",
+		en = { "Friends' versions", "A friend's version no longer shows as \"0.3.0 or older\" after Beacon lost track of them for a moment." },
+		de = { "Versionen von Freunden", "Die Version eines Freundes steht nicht mehr als „0.3.0 oder älter“ da, nachdem Beacon ihn kurz aus den Augen verloren hat." } },
 	-- New entries go here, at the end.
 }

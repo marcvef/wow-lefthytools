@@ -788,6 +788,13 @@ local function OnMessage(text, senderID)
 		otherVersion[senderID] = nil
 		answer = true              -- they just found us: they need my state too
 		validateRequested = true   -- fetch name and class on the next tick
+		-- Back after I'd forgotten them (65 s of silence, a loading screen): their version, quest
+		-- and progress only come in answers, and they don't see me as new. A hello asks for them
+		-- (low priority: after the answers that are owed).
+		if kind ~= "H" and (not helloAt[senderID] or now - helloAt[senderID] >= ANSWER_GAP) then
+			helloAt[senderID] = now
+			B.QueueLow(senderID, "H" .. VERSION)
+		end
 	end
 	peer.seen = now
 	if kind == "H" then

@@ -1314,6 +1314,19 @@ Advance(0.15)
 vmark = #PRINTED + 1
 lefthy("version")
 check(printedSince(vmark):find("a friend has the newer 0.5.0", 1, true), "/lefthy version mentions it too")
+-- Forgotten and back (65 s of silence, a loading screen, Beacon off and on): their version only
+-- comes in answers, and they don't see me as new, so I greet them and they answer.
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 11)
+Advance(0.15)
+check(not peers()[11], "(Anna is forgotten)")
+local hmark = #GAMEDATA + 1
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 11)
+Advance(0.15)
+check(peers()[11] and peers()[11].version == nil and sentTo(11, hmark, "H2")[1] == "H2",
+	"back with an ordinary message: I greet them, so they answer with their version")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11)
+Advance(0.15)
+check(peers()[11].version == "0.5.0" and #sentTo(11, hmark, "H2") == 1, "and it's known again (one hello)")
 
 section("Beacon: death alerts")
 check(BDB.deathAlert == true and B("deathAlert") ~= nil, "a setting, on by default")

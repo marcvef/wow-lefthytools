@@ -64,8 +64,11 @@ heartbeat every 20 s; status events (combat, death, target, zone) send early but
 second. Standing still out of combat costs one ~30-byte message per friend per 20 s. All sends go
 through one token bucket (10/s, burst 10). Incoming: at most 20 messages per second per friend
 (flood guard), level-ups at most one per 10 s per friend. Peers silent for 65 s (three
-heartbeats) are forgotten. `/lefthy beacon status` prints sent/received per minute and throttle
-hits.
+heartbeats) are forgotten. A forgotten friend who comes back with anything but a hello gets a
+hello from me (low priority, at most every 5 s): their version, tracked quest and level progress
+only come in answers, and they don't see me as new, so without it their version stayed unknown
+("0.3.0 or older") until one of us reloaded. `/lefthy beacon status` prints sent/received per
+minute and throttle hits.
 
 ## Positions
 
