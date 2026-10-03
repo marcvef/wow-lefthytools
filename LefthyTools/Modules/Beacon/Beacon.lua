@@ -57,6 +57,7 @@ local M = LT:NewModule("beacon", {
 		showFriends = true,
 		showMinimap = true,
 		minimapEdge = true,
+		showGroup = true,
 		dingAnnounce = true,
 		dingText = "",
 		dingShow = true,
@@ -91,6 +92,7 @@ local newerNoticeShown = false -- that notice comes once per login
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
 
 local sweepRequested, validateRequested, statusDirty = false, false, false
+local groupChanged = true -- re-check which friends are in my group on the next tick
 local lastSweep, lastValidate, lastCheck, lastSent, lastExpire, lastRefresh
 local lastState
 local tokens, pausedUntil = SEND_BURST, 0
@@ -145,9 +147,37 @@ function B.IsInMyGroup(guid)
 	return check ~= nil and check(guid) == true
 end
 
--- Friends in my group are left to Blizzard, which already shows them on both maps.
+-- The friend's unit token while they're in my group (party1-4 / raid1-40), else nil.
+local function FindGroupUnit(guid)
+	if not (guid and B.IsInMyGroup(guid)) then
+		return nil
+	end
+	local raid = IsInRaid()
+	for i = 1, raid and 40 or 4 do
+		local unit = (raid and "raid" or "party") .. i
+		local unitGuid = UnitGUID(unit)
+		if unitGuid == guid and not (issecretvalue and issecretvalue(unitGuid)) then
+			return unit
+		end
+	end
+	return nil
+end
+
+-- Re-checks who of my friends is in my group (on roster changes, on the next tick).
+local function UpdateGroupUnits()
+	for _, peer in pairs(peers) do
+		local unit = FindGroupUnit(peer.guid)
+		if unit ~= peer.groupUnit then
+			peer.groupUnit = unit
+			peer.rev = peer.rev + 1
+		end
+	end
+end
+
+-- Friends in my group are drawn too (marked as group members), unless "show group" is off;
+-- Blizzard draws its own dot for them, ours goes on top and adds the tooltip.
 function B.IsShown(peer)
-	return peer.name and peer.hasPos and not (peer.guid and B.IsInMyGroup(peer.guid))
+	return peer.name and peer.hasPos and (M.db.showGroup or not peer.groupUnit)
 end
 
 -- Where a friend's minimap dot is right now: gliding from the previous report to the latest
@@ -361,6 +391,7 @@ local function Validate(now)
 			Forget(gameAccountID)
 		end
 	end
+	groupChanged = true -- names/GUIDs may be new: check them against my group too
 end
 
 local function Expire(now)
@@ -519,6 +550,11 @@ local function Tick(now, elapsed)
 	if now - lastSweep >= SWEEP_INTERVAL or (sweepRequested and now - lastSweep >= SWEEP_COALESCE) then
 		Sweep(now)
 	end
+	if groupChanged then
+		groupChanged = false
+		UpdateGroupUnits()
+		Changed()
+	end
 	if pendingLevel then
 		local level = pendingLevel
 		pendingLevel = nil
@@ -567,6 +603,9 @@ local function OnUpdate(_, elapsed)
 	if B.UpdateMinimap then
 		B.UpdateMinimap(now) -- every frame, but returns at once unless a dot has to move
 	end
+	if B.UpdateWorldMapGroupPins then
+		B.UpdateWorldMapGroupPins() -- only does something with the map open and group friends on it
+	end
 end
 
 local handlers = B.handlers
@@ -584,7 +623,7 @@ handlers.BN_FRIEND_ACCOUNT_OFFLINE = handlers.BN_FRIEND_INFO_CHANGED
 handlers.PLAYER_ENTERING_WORLD = function()
 	sweepRequested, statusDirty, lastSweep, lastState = true, true, -math.huge, nil
 end
-handlers.GROUP_ROSTER_UPDATE = function() Changed() end
+handlers.GROUP_ROSTER_UPDATE = function() groupChanged = true end
 handlers.PLAYER_LEVEL_UP = function(level) pendingLevel = level end
 
 local function MarkStatusDirty() statusDirty = true end
@@ -680,6 +719,8 @@ function M:BuildOptions(o)
 		L["The same dots on the minimap. Friends in your group are already shown by the game."])
 	o:Checkbox("minimapEdge", L["Keep far-away friends at the minimap edge"],
 		L["Friends beyond the minimap's range stay faded at its edge, so you can see which way they are."])
+	o:Checkbox("showGroup", L["Show friends in my group too"],
+		L["Friends in your group keep their Beacon dot, with a blue ring, on top of the game's own group dot, and the tooltip says they're in your group. Off: only the game's dot."])
 
 	if B.BuildDingOptions then
 		B.BuildDingOptions(o)

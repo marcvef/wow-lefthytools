@@ -93,8 +93,18 @@ returns at once unless the own position, facing, zoom, a glide or the data chang
 - **Look** (both maps): black ring + class-colour dot (`C_ClassColor.GetClassColor`), masked round
   with `Interface\CharacterFrame\TempPortraitAlphaMask`; dead: the skull
   `Interface\TargetingFrame\UI-TargetingFrame-Skull` (60% for ghosts); in combat: red ring with a
-  BOUNCE alpha animation. Restyled only when the friend's `rev` changed. Group members are skipped
-  on both maps (`IsGUIDInGroup(playerGuid)`); Blizzard draws them.
+  BOUNCE alpha animation. Restyled only when the friend's `rev` changed.
+- **Friends in my group** (`showGroup`, on by default): Blizzard draws its own group dot for them
+  (one engine `UnitPositionFrame`, `GroupMembersDataProvider`, frame level
+  `PIN_FRAME_LEVEL_GROUP_MEMBER`). Ours stays on top of it: our pins use
+  `PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER`, the next level up, with a blue ring (combat red
+  and the skull still win) and "In your group" in the tooltip. `peer.groupUnit` (party1-4 /
+  raid1-40, matched by `UnitGUID` against the friend's `playerGuid`, checked with
+  `C_PartyInfo.IsGUIDInGroup`) is refreshed on the tick after `GROUP_ROSTER_UPDATE` and after
+  each Battle.net check. Their position is live, not the last Beacon report:
+  `C_Map.GetPlayerMapPosition(mapID, unit)` (works for group members) on the world map, updated
+  every frame while the map is open (`B.UpdateWorldMapGroupPins`), and `UnitPosition(unit)` on the
+  minimap. Off: they're left to Blizzard's dot as before.
 - **Tooltip:** name in class colour (+ `<AFK>`/`<DND>`), BattleTag without the number (from
   `C_BattleNet.GetAccountInfoByGUID`, which also gives the current level and zone), level, zone -
   subzone, dead/ghost, in combat / fighting X, and distance + 8-way direction (German: "m" and

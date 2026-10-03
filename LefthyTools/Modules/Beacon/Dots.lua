@@ -24,6 +24,7 @@ local EDGE_INSET = 5   -- pixels between an edge dot's centre and the minimap bo
 local EDGE_ALPHA = 0.6
 local BNET_BLUE_R, BNET_BLUE_G, BNET_BLUE_B = 0.51, 0.773, 1
 local STATUS_R, STATUS_G, STATUS_B = 1, 0.3, 0.3
+local GROUP_R, GROUP_G, GROUP_B = 0.3, 0.65, 1 -- ring and tooltip line for friends in my group
 local atan2 = math.atan2 or math.atan
 
 ---------------------------------------------------------------------------
@@ -72,7 +73,11 @@ local function StyleDot(frame, peer)
 		end
 	else
 		frame.Pulse:Stop()
-		frame.Ring:SetColorTexture(0, 0, 0, 0.85)
+		if peer.groupUnit then
+			frame.Ring:SetColorTexture(GROUP_R, GROUP_G, GROUP_B, 1) -- in my group: blue ring
+		else
+			frame.Ring:SetColorTexture(0, 0, 0, 0.85)
+		end
 	end
 end
 
@@ -112,6 +117,9 @@ function B.ShowTooltip(owner, peer)
 	local battleTag = account and account.battleTag and account.battleTag:match("^[^#]+")
 	if battleTag then
 		GameTooltip:AddLine(battleTag, BNET_BLUE_R, BNET_BLUE_G, BNET_BLUE_B)
+	end
+	if peer.groupUnit then
+		GameTooltip:AddLine(L["In your group"], GROUP_R, GROUP_G, GROUP_B)
 	end
 	local level = game and game.characterLevel or peer.level
 	if level then
@@ -159,7 +167,8 @@ end
 LefthyToolsBeaconPinMixin = CreateFromMixins(MapCanvasPinMixin)
 
 function LefthyToolsBeaconPinMixin:OnLoad()
-	self:UseFrameLevelType("PIN_FRAME_LEVEL_GROUP_MEMBER")
+	-- Just above Blizzard's group member dots, so a friend in my group shows our marked dot.
+	self:UseFrameLevelType("PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER")
 	self:SetScalingLimits(1, 1.0, 1.2)
 	BuildDot(self)
 end
@@ -191,6 +200,17 @@ local providerAdded = false
 local vector = CreateVector2D(0, 0) -- reused for every conversion
 
 local function MapPosition(peer, mapID)
+	-- In my group: the live position, the same one Blizzard's group dot uses, so ours sits exactly
+	-- on top of it instead of trailing a few seconds behind.
+	if peer.groupUnit then
+		local pos = C_Map.GetPlayerMapPosition(mapID, peer.groupUnit)
+		if pos then
+			local x, y = pos:GetXY()
+			if x >= 0 and x <= 1 and y >= 0 and y <= 1 then
+				return x, y
+			end
+		end
+	end
 	vector:SetXY(peer.north, peer.west)
 	local uiMapID, mapPos = C_Map.GetMapPosFromWorldPos(peer.continent, vector, mapID)
 	if uiMapID ~= mapID or not mapPos then
@@ -311,6 +331,13 @@ local function PlaceMinimapPins(now, continent, north, west, half, radius, facin
 		local x, y, edge
 		if B.IsShown(peer) and peer.continent == continent then
 			local peerNorth, peerWest, moving = B.DrawnPosition(peer, now)
+			if peer.groupUnit then
+				-- In my group: live position, right on top of Blizzard's own blip; redraw every frame.
+				local liveNorth, liveWest, _, liveContinent = UnitPosition(peer.groupUnit)
+				if liveNorth and liveContinent == continent then
+					peerNorth, peerWest, moving = liveNorth, liveWest, true
+				end
+			end
 			gliding = gliding or moving
 			local east, up = (west - peerWest) * scale, (peerNorth - north) * scale
 			x, y = east * cos + up * sin, up * cos - east * sin -- rotated so my facing points up
@@ -379,6 +406,26 @@ end
 ---------------------------------------------------------------------------
 -- Hooks for Beacon.lua
 ---------------------------------------------------------------------------
+
+-- Called every frame by the driver while friends are known: dots of friends in my group follow
+-- their live position on the open world map, like Blizzard's group dot underneath.
+function B.UpdateWorldMapGroupPins()
+	if not (providerAdded and WorldMapFrame:IsShown() and next(mapPins)) then
+		return
+	end
+	local mapID = WorldMapFrame:GetMapID()
+	for gameAccountID, pin in pairs(mapPins) do
+		local peer = B.peers[gameAccountID]
+		local pos = peer and peer.groupUnit and mapID and C_Map.GetPlayerMapPosition(mapID, peer.groupUnit)
+		if pos then
+			local x, y = pos:GetXY()
+			if x >= 0 and x <= 1 and y >= 0 and y <= 1 and (x ~= pin.liveX or y ~= pin.liveY) then
+				pin.liveX, pin.liveY = x, y
+				pin:SetPosition(x, y)
+			end
+		end
+	end
+end
 
 function B.RefreshMaps()
 	if providerAdded and WorldMapFrame:IsShown() then

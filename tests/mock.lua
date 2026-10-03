@@ -540,6 +540,12 @@ GROUP_GUIDS = {}
 -- Only the C_PartyInfo version: the global IsGUIDInGroup is a deprecated fallback that clients
 -- without "loadDeprecationFallbacks" don't have.
 C_PartyInfo = { IsGUIDInGroup = function(guid) return GROUP_GUIDS[guid] == true end }
+-- Group units: unit token -> { guid, continent, north, west } (their live position)
+PARTY = {}
+function UnitGUID(unit)
+	if unit == "player" then return "Player-1-0" end
+	return PARTY[unit] and PARTY[unit].guid
+end
 function CreateVector2D(x, y)
 	return { x = x, y = y, GetXY = function(self) return self.x, self.y end,
 		SetXY = function(self, nx, ny) self.x, self.y = nx, ny end }
@@ -565,8 +571,16 @@ function WorldFromMap(mapID, x, y) -- -> continent, north, west
 end
 C_Map = {
 	GetBestMapForUnit = function() return PLAYER_MAP end,
-	GetPlayerMapPosition = function(mapID)
+	GetPlayerMapPosition = function(mapID, unit)
 		if STATE.inInstance then return nil end
+		local member = unit and unit ~= "player" and PARTY[unit]
+		if member then -- works for party members too, on whatever map is asked for
+			local m = MAPS[mapID]
+			if not m or m.continent ~= member.continent then return nil end
+			return CreateVector2D((m.left - member.west) / m.width, (m.top - member.north) / m.height)
+		elseif unit and unit ~= "player" then
+			return nil
+		end
 		return CreateVector2D(PLAYER_POS[1], PLAYER_POS[2])
 	end,
 	GetWorldPosFromMapPos = function(mapID, pos)
@@ -582,7 +596,12 @@ C_Map = {
 UNIT_POSITION_CALLS = 0
 MOCK_UNITPOS_OFFSET = 0 -- non-zero: UnitPosition disagrees with the map route
 function UnitPosition(unit)
-	if unit ~= "player" or STATE.inInstance then return nil end
+	if STATE.inInstance then return nil end
+	if PARTY[unit] then
+		local member = PARTY[unit]
+		return member.north, member.west, 0, member.continent
+	end
+	if unit ~= "player" then return nil end
 	UNIT_POSITION_CALLS = UNIT_POSITION_CALLS + 1
 	local continent, north, west = WorldFromMap(PLAYER_MAP, PLAYER_POS[1], PLAYER_POS[2])
 	return north + MOCK_UNITPOS_OFFSET, west, 0, continent

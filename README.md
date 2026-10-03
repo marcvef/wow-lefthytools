@@ -120,8 +120,10 @@ minimap, and you on theirs, without being in a group.
   20 seconds. All messages go through a rate limit.
 - **Who sees you:** only Battle.net friends who also run LefthyTools 0.3.0 or newer
   with Beacon on. Friends without the addon never get more than a short hello.
+- **Friends in your group** keep their dot, with a **blue ring**, right on top of the game's
+  own group dot, and the tooltip says "In your group" (switch this off to see only the
+  game's dot).
 - **Not shown:**
-  - friends in your group (the game already shows them),
   - anyone in a dungeon or raid (the game hides positions there),
   - friends on another continent than the map you're looking at,
   - health: the game keeps health hidden from addons in Forever.
@@ -133,6 +135,7 @@ minimap, and you on theirs, without being in a group.
 | Show friends on the world map | on | |
 | Show friends on the minimap | on | |
 | Keep far-away friends at the minimap edge | on | |
+| Show friends in my group too | on | |
 | Tell my friends when I level up | on | |
 | Level-up message (`{name}` and `{level}` are filled in) | empty: default text | `/lefthy beacon ding <text>`, `ding reset` |
 | Test your message: **Preview** | | `/lefthy beacon ding test` |

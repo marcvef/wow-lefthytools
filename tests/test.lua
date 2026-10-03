@@ -744,7 +744,7 @@ check(#PINS == 2 and annaPin and pinOf(12), "map open: Anna's and Bob's dots")
 check(math.abs(annaPin.x - 0.25) < 1e-6 and math.abs(annaPin.y - 0.75) < 1e-6, "at her position on the zone map")
 local c = annaPin.Dot.color
 check(c and math.abs(c[1] - 0.25) < 1e-6 and math.abs(c[3] - 0.92) < 1e-6, "in mage blue")
-check(annaPin.frameLevelType == "PIN_FRAME_LEVEL_GROUP_MEMBER", "drawn at the same level as party dots")
+check(annaPin.frameLevelType == "PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER", "drawn just above Blizzard's group member dots")
 STATE.combat = true
 OpenWorldMap(1414); OpenWorldMap(1429) -- dots are released and acquired again, in combat
 check(#PINS == 2 and #BLOCKED == 0, "opening the map in combat creates dots without blocked actions, got " .. table.concat(BLOCKED, ", "))
@@ -790,10 +790,29 @@ check(TOOLTIP.title == "Anna <AFK>" and not annaPin.Skull.shown, "alive again; A
 annaPin:OnMouseLeave()
 BN_FRIENDS[1][1].isGameAFK = false
 GROUP_GUIDS["Player-1-11"] = true
+PARTY.party1 = { guid = "Player-1-11", continent = 0, north = 300, west = 700 } -- her live position
+GROUP = "party"
 Fire("GROUP_ROSTER_UPDATE")
 Advance(0.6)
-check(#PINS == 1 and pinOf(12), "Anna joined the group: the game shows her, our dot goes away")
-GROUP_GUIDS["Player-1-11"] = nil
+annaPin = pinOf(11)
+check(#PINS == 2 and annaPin, "Anna joined the group: her Beacon dot stays")
+check(math.abs(annaPin.x - 0.3) < 1e-6 and math.abs(annaPin.y - 0.7) < 1e-6,
+	"at her live group position (where Blizzard's dot is), not her last Beacon report")
+check(annaPin.Ring.color[3] == 1 and annaPin.Ring.color[1] < 0.5, "marked as a group member: blue ring")
+annaPin:OnMouseEnter()
+check(tooltipHas("In your group"), "tooltip: in your group")
+annaPin:OnMouseLeave()
+PARTY.party1.north = 320
+Advance(0.05)
+check(math.abs(annaPin.y - 0.68) < 1e-6, "follows her live position every frame while the map is open")
+B("showGroup"):SetValue(false)
+Advance(0.6)
+check(#PINS == 1 and pinOf(12), "'show friends in my group too' off: only Blizzard's dot")
+B("showGroup"):SetValue(true)
+GROUP_GUIDS["Player-1-11"], PARTY.party1, GROUP = nil, nil, "none"
+Fire("GROUP_ROSTER_UPDATE")
+Advance(0.6)
+check(#PINS == 2 and pinOf(11) and pinOf(11).Ring.color[1] == 0, "left the group: a normal dot again")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;;;;;", "WHISPER", 12)
 Advance(0.6)
 check(#PINS == 1 and pinOf(11), "Bob went into a dungeon (no position): his dot goes away")
@@ -862,10 +881,23 @@ BB.GetMinimapPins()[11]._scripts.OnEnter(mm[11])
 check(TOOLTIP.title == "Anna" and tooltipHas("Fighting Hogger") and tooltipHas("50 yd north"), "same tooltip on the minimap")
 mm[11]._scripts.OnLeave(mm[11])
 GROUP_GUIDS["Player-1-11"] = true
+PARTY.party1 = { guid = "Player-1-11", continent = 0, north = 560, west = 490 } -- live: 60 yd N, 10 yd E
+GROUP = "party"
 Fire("GROUP_ROSTER_UPDATE")
 Advance(0.6)
-check(not mm[11], "group members are left to Blizzard's minimap dots")
-GROUP_GUIDS["Player-1-11"] = nil
+rel, x, y = at(mm[11])
+check(mm[11] and math.abs(x - 7) < 1e-6 and math.abs(y - 42) < 1e-6,
+	"group member on the minimap: at her live position, got " .. tostring(x) .. ", " .. tostring(y))
+check(mm[11].Ring.color[1] == 1 and mm[11].Pulse:IsPlaying(), "in combat the red ring still wins over the group ring")
+PARTY.party1.north = 570
+Advance(0.05)
+rel, x, y = at(mm[11])
+check(math.abs(y - 49) < 1e-6, "and follows her every frame")
+B("showGroup"):SetValue(false)
+Advance(0.6)
+check(not mm[11], "'show friends in my group too' off: left to Blizzard's minimap blip")
+B("showGroup"):SetValue(true)
+GROUP_GUIDS["Player-1-11"], PARTY.party1, GROUP = nil, nil, "none"
 Fire("GROUP_ROSTER_UPDATE")
 Advance(0.6)
 B("showMinimap"):SetValue(false)

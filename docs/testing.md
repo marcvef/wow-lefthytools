@@ -41,6 +41,8 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     `/lefthy beacon status` lists them. Their dot moves on the zone and continent map and glides on
     the minimap, in their class colour; hover shows name, BattleTag, level, zone, distance. They
     pull a mob: red pulsing ring, "Fighting <mob>". They die: skull. Rotate Minimap on: dots keep
-    the right direction. Invite them: our dot goes away (Blizzard's party pin takes over).
+    the right direction. Invite them: their dot gets a blue ring and sits exactly on Blizzard's
+    group dot on both maps, moving along live; the tooltip says "In your group". With "Show
+    friends in my group too" off, only Blizzard's dot is left.
     Level-ups: `/lefthy beacon sound` to try the sounds, `/lefthy beacon ding test` for the message.
     Traffic in `/lefthy beacon status` stays at a few messages per minute while standing still.

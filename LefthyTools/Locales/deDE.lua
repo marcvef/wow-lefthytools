@@ -121,6 +121,9 @@ L["Dots in their class colour, a skull when they're dead and a red ring in comba
 L["Show friends on the minimap"] = "Freunde auf der Minimap zeigen"
 L["The same dots on the minimap. Friends in your group are already shown by the game."] =
 	"Dieselben Punkte auf der Minimap. Freunde in deiner Gruppe zeigt das Spiel schon selbst."
+L["Show friends in my group too"] = "Freunde in meiner Gruppe auch zeigen"
+L["Friends in your group keep their Beacon dot, with a blue ring, on top of the game's own group dot, and the tooltip says they're in your group. Off: only the game's dot."] =
+	"Freunde in deiner Gruppe behalten ihren Beacon-Punkt, mit blauem Ring, über dem Gruppenpunkt des Spiels, und der Tooltip zeigt, dass sie in deiner Gruppe sind. Aus: nur der Punkt des Spiels."
 L["Keep far-away friends at the minimap edge"] = "Entfernte Freunde am Minimap-Rand zeigen"
 L["Friends beyond the minimap's range stay faded at its edge, so you can see which way they are."] =
 	"Freunde außerhalb der Minimap-Reichweite bleiben blass am Rand, damit du siehst, in welcher Richtung sie sind."
@@ -151,6 +154,7 @@ L["Gentle chime"] = "Leises Glockenspiel"
 
 -- Beacon tooltip on a friend's dot
 L["Level %d"] = "Level %d"
+L["In your group"] = "In deiner Gruppe"
 L["Dead"] = "Tot"
 L["Ghost"] = "Geist"
 L["In combat"] = "Im Kampf"
