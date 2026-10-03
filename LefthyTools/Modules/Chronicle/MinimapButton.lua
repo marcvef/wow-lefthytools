@@ -93,9 +93,11 @@ local function Create()
 		OnLeave(self)
 		self:SetScript("OnUpdate", OnDragUpdate)
 	end)
-	button:SetScript("OnDragStop", function(self)
+	local function StopDrag(self)
 		self:SetScript("OnUpdate", nil)
-	end)
+	end
+	button:SetScript("OnDragStop", StopDrag)
+	button:SetScript("OnHide", StopDrag) -- hidden mid-drag (Mirage, the minimap key): no OnDragStop may come
 end
 
 -- After login, switching Chronicle on or off and the setting (always on the next frame).

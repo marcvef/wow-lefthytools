@@ -2794,6 +2794,10 @@ do
 	_, _, _, bx, by = mmb:GetPoint(1)
 	check(CH.module.db.minimapAngle == 90 and math.abs(bx) < 0.01 and math.abs(by - 75) < 0.01 and not mmb._scripts.OnUpdate,
 		"dragging moves it along the edge, saved; nothing runs once dropped")
+	mmb._scripts.OnDragStart(mmb)
+	check(mmb._scripts.OnUpdate, "dragging again")
+	mmb._scripts.OnHide(mmb) -- the minimap hidden mid-drag (Mirage, the minimap key): no OnDragStop
+	check(not mmb._scripts.OnUpdate, "hidden mid-drag: it stops following the cursor")
 	lefthy("chronicle minimap")
 	Advance(0.05)
 	check(not mmb:IsShown() and CH.module.db.minimapButton == false, "/chronicle minimap hides it")
