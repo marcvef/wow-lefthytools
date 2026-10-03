@@ -445,7 +445,8 @@ local function Evaluate()
 	if r then
 		lastActivity = now
 	end
-	local active = (now - lastActivity) < db.delay
+	-- A reason (combat, target, window, ...) always keeps it visible, also with a delay of 0.
+	local active = r ~= nil or (now - lastActivity) < db.delay
 
 	local okChat, chatTyping = pcall(ChatActive)
 	chatTyping = okChat and chatTyping
