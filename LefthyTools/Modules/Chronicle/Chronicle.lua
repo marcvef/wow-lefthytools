@@ -779,6 +779,14 @@ local EVENTS = {
 
 local listening = false
 
+-- MinimapButton.lua's, looked up when it runs: after an update that added that file, a /reload
+-- doesn't load it (only a restart does), and C_Timer.After must never get nil.
+local function UpdateMinimapButton()
+	if C.UpdateMinimapButton then
+		C.UpdateMinimapButton()
+	end
+end
+
 function M:OnEnable()
 	LefthyToolsChronicleDB = type(LefthyToolsChronicleDB) == "table" and LefthyToolsChronicleDB or {}
 	store = LefthyToolsChronicleDB
@@ -821,7 +829,7 @@ function M:OnEnable()
 	end
 	lastTick, sinceTick = GetTime(), 0
 	driver:Show()
-	C_Timer.After(0, C.UpdateMinimapButton) -- MinimapButton.lua
+	C_Timer.After(0, UpdateMinimapButton) -- MinimapButton.lua
 end
 
 function M:OnDisable()
@@ -831,11 +839,11 @@ function M:OnDisable()
 	if C.window then
 		C.window:Hide()
 	end
-	C_Timer.After(0, C.UpdateMinimapButton)
+	C_Timer.After(0, UpdateMinimapButton)
 end
 
 function M:OnSettingChanged()
-	C_Timer.After(0, C.UpdateMinimapButton) -- the minimap button's checkbox
+	C_Timer.After(0, UpdateMinimapButton) -- the minimap button's checkbox
 end
 
 ---------------------------------------------------------------------------
