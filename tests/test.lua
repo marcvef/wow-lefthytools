@@ -6,6 +6,10 @@ local function near(a, b, eps) return math.abs(a - b) <= (eps or 0.01) end
 local function a(name) return _G[name]:GetAlpha() end
 local function section(t) io.write("\n== " .. t .. "\n") end
 
+-- Globals that exist before the addon loads (the mock); anything new at the end must be ours.
+local globalsBefore = {}
+for k in pairs(_G) do globalsBefore[k] = true end
+
 -- Load the addon like the client would: TOC order, each file gets (addonName, ns).
 local ns = {}
 for _, file in ipairs(SOURCES) do
@@ -1094,5 +1098,16 @@ Advance(0.15)
 check(next(WorldMapFrame.providers) ~= nil, "on again: back on the map")
 
 check(#ERRORS == 0, "no errors reported through the error handler")
+
+-- A forgotten `local` leaks a global, which in game can clash with other addons. Ours start with
+-- LefthyTools (incl. mixins); SLASH_/BINDING_ names and the tests' own MOCK_* knobs are all caps.
+local leaked = {}
+for k in pairs(_G) do
+	if not globalsBefore[k] and type(k) == "string" and not k:match("^[A-Z][A-Z0-9_]*$") and not k:match("^LefthyTools") then
+		leaked[#leaked + 1] = k
+	end
+end
+table.sort(leaked)
+check(#leaked == 0, "no accidental globals, found: " .. table.concat(leaked, ", "))
 io.write(string.format("\n%d passed, %d failed\n", passes, failures))
 if failures > 0 then error("tests failed") end
