@@ -431,6 +431,36 @@ S("fadedAlpha"):SetValue(0.5)
 Advance(0.5)
 check(near(a("MainActionBar"), 0.5, 0.02), "settings panel change applies live")
 
+section("fade strength per element")
+local row = CHECKBOX_SLIDERS.LefthyTools_mirage_group_minimap
+check(row and row.checkbox == S("group_minimap") and row.slider == S("alpha_minimap") and row.cbLabel == "Minimap",
+	"each element: its checkbox and its own opacity slider in one row")
+check(MDB.groupAlpha.minimap == 0.5 and MDB.groupAlpha.chat == 0.5 and S("alpha_chat").uiUpdates > 0,
+	"'Faded opacity' sets every element (and an open settings page shows it)")
+S("alpha_minimap"):SetValue(0.8)
+Advance(0.5)
+check(near(a("MinimapCluster"), 0.8, 0.02) and near(a("MainActionBar"), 0.5, 0.02), "one element can stay more visible than the rest")
+mirage("group actionbars 10")
+Advance(1)
+check(near(MDB.groupAlpha.actionbars, 0.1) and near(a("MainActionBar"), 0.1, 0.02) and S("alpha_actionbars").uiUpdates > 0,
+	"/mirage group actionbars 10, through the setting")
+mirage("alpha 0")
+Advance(3)
+check(near(a("MinimapCluster"), 0) and near(a("MainActionBar"), 0) and not Minimap:IsShown(),
+	"'Faded opacity' again: every element follows, the minimap hides its quest areas at 0%")
+S("alpha_minimap"):SetValue(0.3)
+Advance(1)
+check(Minimap:IsShown() and near(a("MinimapCluster"), 0.3, 0.02), "a minimap fading to 30% stays shown")
+S("alpha_minimap"):SetValue(0)
+Advance(1.5)
+check(not Minimap:IsShown(), "and at 0% it hides again")
+local sameUpdates = S("alpha_chat").uiUpdates
+mirage("delay 5")
+check(S("alpha_chat").uiUpdates == sameUpdates, "other settings leave the element opacities alone")
+mirage("alpha 50") -- as before this section
+Advance(1)
+check(Minimap:IsShown(), "minimap back at 50%")
+
 section("Misc Tweaks: framework")
 local Tweaks = LT:GetModule("tweaks")
 local TDB = LefthyToolsDB.settings.tweaks

@@ -64,6 +64,24 @@ function Builder:Slider(key, name, tooltip, minValue, maxValue, step, formatter,
 	return setting
 end
 
+-- A checkbox and a slider in one row (Blizzard's CreateSettingsCheckboxSliderInitializer); the
+-- slider is greyed out while the checkbox is off. cbOpts/sliderOpts as for Register.
+function Builder:CheckboxSlider(cbKey, cbName, cbTooltip, sliderKey, sliderName, sliderTooltip, minValue, maxValue, step,
+		formatter, cbOpts, sliderOpts)
+	local cbSetting = self:Register(cbKey, cbName, "boolean", cbOpts)
+	local sliderSetting = self:Register(sliderKey, sliderName, "number", sliderOpts)
+	local options = Settings.CreateSliderOptions(minValue, maxValue, step)
+	options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, formatter)
+	if CreateSettingsCheckboxSliderInitializer then
+		self.layout:AddInitializer(CreateSettingsCheckboxSliderInitializer(cbSetting, cbName, cbTooltip,
+			sliderSetting, options, sliderName, sliderTooltip))
+	else
+		Settings.CreateCheckbox(self.category, cbSetting, cbTooltip)
+		Settings.CreateSlider(self.category, sliderSetting, options, sliderTooltip)
+	end
+	return cbSetting, sliderSetting
+end
+
 -- Free text. Blizzard's settings list has no text field, so this uses our own list element
 -- (LefthyToolsSettingsTextTemplate in Options.xml). opts.maxLetters limits the length.
 function Builder:TextInput(key, name, tooltip, opts)

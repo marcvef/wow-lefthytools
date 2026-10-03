@@ -31,4 +31,7 @@ ns.CHANGELOG = {
 	{ id = 9, version = "0.5.0",
 		en = "Beacon: a friend's tooltip shows the quest they're tracking, their progress, and whether you have it too.",
 		de = "Beacon: Der Tooltip eines Freundes zeigt die Quest, die er verfolgt, seinen Fortschritt und ob du sie auch hast." },
+	{ id = 10, version = "0.5.0",
+		en = "Mirage: each element has its own faded opacity, e.g. the minimap only down to 50% while the rest disappears.",
+		de = "Mirage: Jedes Element hat seine eigene Deckkraft beim Ausblenden, z. B. die Minimap nur bis 50 %, während der Rest verschwindet." },
 }

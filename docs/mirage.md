@@ -59,7 +59,15 @@ Mirage fades the default HUD when the player is out of combat and idle (like Dun
 - **Controller UI:** see [forever-platform.md](forever-platform.md); Mirage polls the "in use"
   signals.
 
+- **Fade strength per element:** each group fades to its own `db.groupAlpha[key]`. The settings
+  page shows each group as one row with Blizzard's `CreateSettingsCheckboxSliderInitializer`
+  (checkbox = `groups[key]`, slider = `groupAlpha[key]`, greyed out while unticked;
+  `Builder:CheckboxSlider`). The general "Faded opacity" (`db.fadedAlpha`) sets every group:
+  `OnSettingChanged` notices it changed (`lastFadedAlpha`) and writes each group through its
+  setting object, so an open page follows. Older settings are migrated once
+  (`groupAlphaMigrated`): every group starts at the old `fadedAlpha`. The minimap's quest-area
+  hiding needs the *minimap's* own value at 0.
+
 ## Ideas
 
-- Per-group settings: faded alpha per group; keep minimap/objectives semi-visible.
 - Non-goal: nameplates. They belong to WorldFrame, not UIParent, and are forbidden in instances.

@@ -433,6 +433,12 @@ C_Texture = { GetAtlasInfo = function(atlas)
 	if MOCK_NO_RETAIL_ATLAS and atlas:find("^uf%-roguecp") then return nil end
 	return { width = 20, height = 20 }
 end }
+CHECKBOX_SLIDERS = {} -- checkbox variable -> { checkbox, slider, cbLabel, sliderLabel } (one settings row)
+function CreateSettingsCheckboxSliderInitializer(cbSetting, cbLabel, cbTooltip, sliderSetting, options, sliderLabel, sliderTooltip)
+	cbSetting.tooltip, sliderSetting.tooltip = cbTooltip, sliderTooltip
+	CHECKBOX_SLIDERS[cbSetting.variable] = { checkbox = cbSetting, slider = sliderSetting, cbLabel = cbLabel, sliderLabel = sliderLabel }
+	return { AddSearchTags = function() end }
+end
 SETTINGS_BUTTONS = {} -- name -> { text, onClick, tooltip }
 function CreateSettingsButtonInitializer(name, text, onClick, tooltip, addSearchTags)
 	assert(addSearchTags ~= nil, "Blizzard asserts addSearchTags is given")

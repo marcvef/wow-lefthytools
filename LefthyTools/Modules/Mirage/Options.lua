@@ -20,7 +20,7 @@ function M:BuildOptions(o)
 		L["How long the interface takes to come back."],
 		0, 2, 0.05, Seconds)
 	o:Slider("fadedAlpha", L["Faded opacity"],
-		L["Opacity of faded elements. 0% hides them completely."],
+		L["Opacity of faded elements. 0% hides them completely. Sets every element at once; change single elements under Elements to fade."],
 		0, 1, 0.05, Percent)
 
 	o:Header(L["Keep the interface visible"])
@@ -44,10 +44,14 @@ function M:BuildOptions(o)
 
 	o:Header(L["Elements to fade"])
 	for _, g in ipairs(data.GROUPS) do
-		o:Checkbox(g.key, g.label, nil, { tbl = self.db.groups, default = self.defaults.groups[g.key], id = "group_" .. g.key })
+		o:CheckboxSlider(g.key, g.label, L["Fade this element when idle."],
+			g.key, L["Faded opacity"], L["How much of this element stays visible when faded. 0% hides it."],
+			0, 1, 0.05, Percent,
+			{ tbl = self.db.groups, default = self.defaults.groups[g.key], id = "group_" .. g.key },
+			{ tbl = self.db.groupAlpha, default = self.defaults.groupAlpha[g.key], id = "alpha_" .. g.key })
 	end
 	o:Checkbox("hideMinimapWhenFaded", L["Also hide minimap quest areas"],
-		L["Quest areas on the minimap ignore transparency, so the minimap is hidden once it has faded out. Only applies with 0% faded opacity."])
+		L["Quest areas on the minimap ignore transparency, so the minimap is hidden once it has faded out. Only applies when the minimap fades to 0%."])
 	o:Slider("minimapHideAt", L["Hide quest areas at"],
 		L["Minimap opacity at which the minimap and its quest areas are hidden during the fade-out. 0% waits until the fade has finished."],
 		0, 1, 0.01, Percent)
@@ -63,9 +67,9 @@ local HELP = {
 	"/mirage delay <seconds> - idle time before fading starts",
 	"/mirage fade <seconds> - how long the fade-out takes",
 	"/mirage fadein <seconds> - how long the fade-in takes",
-	"/mirage alpha <0-100> - faded opacity in percent",
+	"/mirage alpha <0-100> - faded opacity in percent, for every element",
 	"/mirage overlay <0-100> - minimap opacity at which its quest areas are hidden",
-	"/mirage groups - list elements; /mirage group <name> on|off",
+	"/mirage groups - list elements; /mirage group <name> on|off|<0-100> (faded opacity of one element)",
 	"/mirage status - show what's keeping the interface visible",
 	"/mirage reset - restore defaults",
 }
@@ -87,8 +91,9 @@ end
 
 local function ListGroups()
 	for _, g in ipairs(data.GROUPS) do
-		M:Print(string.format("  %s%s|r - %s (%d frames)",
-			M.db.groups[g.key] and "|cff80ff80" or "|cffff8080", g.key, g.label, #M:GetGroup(g.key).live))
+		M:Print(string.format("  %s%s|r - %s (%d frames, fades to %s)",
+			M.db.groups[g.key] and "|cff80ff80" or "|cffff8080", g.key, g.label, #M:GetGroup(g.key).live,
+			Percent(M.db.groupAlpha[g.key])))
 	end
 end
 
@@ -114,7 +119,7 @@ local function Status()
 	for _, g in ipairs(data.GROUPS) do
 		local group = M:GetGroup(g.key)
 		M:Print(string.format("  %s: %d frames, alpha %.2f%s", g.key, #group.live, group.alpha,
-			db.groups[g.key] and "" or " (not faded)"))
+			db.groups[g.key] and (", fades to " .. Percent(db.groupAlpha[g.key])) or " (not faded)"))
 	end
 end
 
@@ -142,6 +147,12 @@ function M:OnSlashCommand(msg)
 		if not arg or self.db.groups[arg] == nil then
 			self:Print("unknown element. Choose one of:")
 			ListGroups()
+			return
+		end
+		local percent = tonumber(arg2)
+		if percent then
+			LT:SetModuleSetting(self, "alpha_" .. arg, math.max(0, math.min(100, percent)) / 100, self.db.groupAlpha, arg)
+			self:Print(arg .. " fades to " .. Percent(self.db.groupAlpha[arg]) .. ".")
 			return
 		end
 		local on

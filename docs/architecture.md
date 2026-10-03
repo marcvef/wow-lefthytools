@@ -144,7 +144,8 @@ Every setting the builder registers is kept in `module.settings[id]`. Code that 
 like a click would: an open settings page shows the new value and `OnSettingChanged` runs. Writing
 `m.db` directly would leave the panel showing the old value.
 
-The builder handed to `BuildOptions` has `Header`, `Checkbox`, `Slider`, `Dropdown`
+The builder handed to `BuildOptions` has `Header`, `Checkbox`, `Slider`, `CheckboxSlider` (both in
+one row, Blizzard's `CreateSettingsCheckboxSliderInitializer`), `Dropdown`
 (`{ { value, label }, ... }` via `Settings.CreateControlTextContainer`), `Button` (wraps
 `CreateSettingsButtonInitializer`; its `addSearchTags` argument is asserted non-nil) and
 `TextInput`. Blizzard's list has no text control, so `TextInput` uses `Core/Options.xml`'s

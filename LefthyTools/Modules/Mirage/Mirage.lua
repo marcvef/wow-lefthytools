@@ -14,7 +14,8 @@ local defaults = {
 	delay = 5,           -- seconds without activity before fading starts
 	fadeOutTime = 1.5,   -- seconds a full fade-out takes
 	fadeInTime = 0.25,   -- seconds a full fade-in takes
-	fadedAlpha = 0,      -- opacity when faded (0 = invisible, like Dune)
+	fadedAlpha = 0,      -- opacity when faded (0 = invisible, like Dune); sets every groupAlpha
+	groupAlpha = {},     -- per group: its opacity when faded
 	mouseover = true,
 	showWithTarget = true,
 	hostileTargetOnly = false,
@@ -29,6 +30,7 @@ local defaults = {
 }
 for _, g in ipairs(data.GROUPS) do
 	defaults.groups[g.key] = g.default ~= false
+	defaults.groupAlpha[g.key] = defaults.fadedAlpha
 end
 
 local M = LT:NewModule("mirage", {
@@ -180,7 +182,7 @@ local function SyncMinimap(g)
 		return
 	end
 	local wantHidden = M.enabled and db.hideMinimapWhenFaded and db.groups.minimap
-		and db.fadedAlpha == 0 and g.to == 0 and g.alpha <= db.minimapHideAt
+		and db.groupAlpha.minimap == 0 and g.to == 0 and g.alpha <= db.minimapHideAt
 	if wantHidden then
 		if not minimapHiddenByUs and mm:IsShown() then
 			mm:Hide()
@@ -482,7 +484,7 @@ local function Evaluate()
 			end
 			show = active or now < g.holdUntil or (g.key == "chat" and chatTyping)
 		end
-		FadeTo(g, show and 1 or db.fadedAlpha)
+		FadeTo(g, show and 1 or db.groupAlpha[g.key])
 	end
 	-- Shows the minimap as soon as it starts fading in, and applies setting changes.
 	SyncMinimap(groupByKey.minimap)
@@ -573,7 +575,18 @@ function M:Refresh()
 	end
 end
 
+-- "Faded opacity" sets every element's own faded opacity; each can then be changed on its own.
+-- Through the settings, so an open settings page shows the new values.
+local lastFadedAlpha
 function M:OnSettingChanged()
+	if db.fadedAlpha ~= lastFadedAlpha then
+		lastFadedAlpha = db.fadedAlpha
+		for _, g in ipairs(groups) do
+			if db.groupAlpha[g.key] ~= db.fadedAlpha then
+				LT:SetModuleSetting(self, "alpha_" .. g.key, db.fadedAlpha, db.groupAlpha, g.key)
+			end
+		end
+	end
 	self:Refresh()
 end
 
@@ -627,6 +640,14 @@ local PLAYER_EVENTS = {
 
 function M:OnInitialize()
 	db = self.db
+	-- Settings from before per-element opacity: every element starts at the one faded opacity.
+	if not db.groupAlphaMigrated then
+		db.groupAlphaMigrated = true
+		for key in pairs(db.groupAlpha) do
+			db.groupAlpha[key] = db.fadedAlpha
+		end
+	end
+	lastFadedAlpha = db.fadedAlpha
 end
 
 function M:OnEnable()

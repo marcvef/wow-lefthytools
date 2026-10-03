@@ -61,8 +61,8 @@ L["How long the fade-out takes once it starts."] = "Wie lange das Ausblenden dau
 L["Fade-in duration"] = "Dauer des Einblendens"
 L["How long the interface takes to come back."] = "Wie lange das Interface braucht, um wieder zu erscheinen."
 L["Faded opacity"] = "Deckkraft (ausgeblendet)"
-L["Opacity of faded elements. 0% hides them completely."] =
-	"Deckkraft ausgeblendeter Elemente. Bei 0 % sind sie komplett unsichtbar."
+L["Opacity of faded elements. 0% hides them completely. Sets every element at once; change single elements under Elements to fade."] =
+	"Deckkraft ausgeblendeter Elemente. Bei 0 % sind sie komplett unsichtbar. Stellt alle Elemente auf einmal ein; einzelne Elemente änderst du unter Elemente zum Ausblenden."
 
 L["Keep the interface visible"] = "Interface sichtbar lassen"
 L["While you have a target"] = "Solange du ein Ziel hast"
@@ -90,9 +90,12 @@ L["Whispers, party, raid, guild and instance messages briefly reveal the chat."]
 	"Flüster-, Gruppen-, Raid-, Gilden- und Instanznachrichten blenden den Chat kurz ein."
 
 L["Elements to fade"] = "Elemente zum Ausblenden"
+L["Fade this element when idle."] = "Dieses Element ausblenden, wenn du inaktiv bist."
+L["How much of this element stays visible when faded. 0% hides it."] =
+	"Wie viel von diesem Element beim Ausblenden sichtbar bleibt. Bei 0 % ist es ganz weg."
 L["Also hide minimap quest areas"] = "Questgebiete auf der Minimap auch ausblenden"
-L["Quest areas on the minimap ignore transparency, so the minimap is hidden once it has faded out. Only applies with 0% faded opacity."] =
-	"Questgebiete auf der Minimap ignorieren Transparenz, deshalb wird die Minimap ganz versteckt, sobald sie ausgeblendet ist. Gilt nur bei 0 % Deckkraft (ausgeblendet)."
+L["Quest areas on the minimap ignore transparency, so the minimap is hidden once it has faded out. Only applies when the minimap fades to 0%."] =
+	"Questgebiete auf der Minimap ignorieren Transparenz, deshalb wird die Minimap ganz versteckt, sobald sie ausgeblendet ist. Gilt nur, wenn die Minimap auf 0 % ausgeblendet wird."
 L["Hide quest areas at"] = "Questgebiete verstecken bei"
 L["Minimap opacity at which the minimap and its quest areas are hidden during the fade-out. 0% waits until the fade has finished."] =
 	"Deckkraft der Minimap, bei der Minimap und Questgebiete beim Ausblenden versteckt werden. Bei 0 % erst, wenn das Ausblenden fertig ist."
