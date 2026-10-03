@@ -277,6 +277,14 @@ lefthy("mirage status")
 lefthy("mirage")
 check(OPENED_CATEGORY == Mirage.category:GetID(), "/lefthy mirage opens Mirage's page")
 
+section("switching off after an engine-side alpha change")
+STATE.target = true; Fire("PLAYER_TARGET_CHANGED"); Advance(1) -- HUD fully visible
+AnimateAlpha(VehicleSeatIndicator, 1) -- an animation reveals a frame Mirage adopted at alpha 0
+lefthy("disable mirage"); Advance(0.6)
+check(near(a("VehicleSeatIndicator"), 1), "switching off keeps what the animation set, got " .. a("VehicleSeatIndicator"))
+lefthy("enable mirage"); Advance(0.3)
+STATE.target = false; Fire("PLAYER_TARGET_CHANGED")
+
 section("slash commands")
 mirage("fade 3")
 check(MDB.fadeOutTime == 3, "/mirage fade 3")
@@ -647,6 +655,7 @@ check(#GameDataTo(11, mark) == 0, "no sending inside the event handler")
 Advance(0.15)
 check(GameDataTo(11, mark)[1] == "S2;;0;500.0;500.0;Goldshire;",
 	"Anna answered: my state goes out right away, got " .. tostring(GameDataTo(11, mark)[1]))
+Advance(1) -- the Battle.net lookup is coalesced to once a second
 check(peers()[11] and peers()[11].name == "Anna" and peers()[11].classFile == "MAGE", "her name and class come from Battle.net")
 mark = #GAMEDATA + 1
 Advance(15)

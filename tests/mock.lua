@@ -374,6 +374,8 @@ function AnimateAlpha(frame, value) frame._alpha = value end -- engine-side alph
 -- A faded frame that starts at alpha 0 and gets revealed by an animation later.
 CreateFrame("Frame", "DurabilityFrame", UIParent)
 DurabilityFrame._alpha = 0
+CreateFrame("Frame", "VehicleSeatIndicator", UIParent) -- also starts hidden by alpha
+VehicleSeatIndicator._alpha = 0
 
 -- CVars (status text)
 CVARS = { statusText = "0", statusTextDisplay = "PERCENT", rotateMinimap = "0" }

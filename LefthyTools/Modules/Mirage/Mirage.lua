@@ -135,6 +135,7 @@ end
 local function Release(frame)
 	owner[frame] = nil
 	if not secret[frame] then
+		SyncBase(frame) -- an animation may have changed it while the group was fully visible
 		SetRaw(frame, base[frame] or 1)
 	end
 end
