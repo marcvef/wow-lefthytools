@@ -1040,9 +1040,14 @@ Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 12)
 Advance(0.15)
 check(not peers()[12] and peers()[11], "a friend switching Beacon off (Q2) is forgotten")
 mark = #GAMEDATA + 1
+MOCK_SEND_RESULT = 3 -- the server is throttling right now
 lefthy("disable beacon")
-check(GameDataTo(11, mark)[1] == "Q2", "switching Beacon off tells friends")
-Advance(0.05)
+check(#GameDataTo(11, mark) == 0, "switching off sends nothing inside the settings callback")
+Advance(1)
+check(#GameDataTo(11, mark) == 0, "throttled: the goodbye waits")
+MOCK_SEND_RESULT = nil
+Advance(3)
+check(GameDataTo(11, mark)[1] == "Q2", "... and then tells friends (through the rate limiter, not lost)")
 check(next(WorldMapFrame.providers) == nil and next(BB.GetMinimapPins()) == nil, "and removes the dots from both maps")
 mark = #GAMEDATA + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 11)

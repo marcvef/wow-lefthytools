@@ -41,6 +41,7 @@ local THROTTLE_PAUSE = 2     -- the server said slow down: pause sending this lo
 local INBOX_LIMIT = 20       -- messages per second accepted from one friend
 local DING_GAP = 10          -- level-up messages accepted from one friend at most this often
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
+local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
 local TICK = 0.1
 local REFRESH_THROTTLE = 0.5
@@ -577,6 +578,19 @@ end)
 
 local prefixRegistered = false
 
+-- Switched off: only the goodbyes are left. They go through the rate limiter like everything
+-- else (the server throttles bursts), from the next frame on, until sent or FAREWELL_TIMEOUT.
+local farewellUntil
+local function FarewellUpdate(_, elapsed)
+	local now = GetTime()
+	Drain(now, elapsed)
+	if not outbox[1] or now > farewellUntil then
+		wipe(outbox)
+		farewellUntil = nil
+		driver:SetScript("OnUpdate", nil)
+	end
+end
+
 function M:OnEnable()
 	if not prefixRegistered then
 		prefixRegistered = true
@@ -586,6 +600,8 @@ function M:OnEnable()
 		pcall(events.RegisterEvent, events, event)
 	end
 	ResetTimers()
+	wipe(outbox) -- goodbyes still pending from switching off just before: no longer true
+	farewellUntil = nil
 	tokens, pausedUntil, sinceTick = SEND_BURST, 0, 0
 	stats.sent, stats.received, stats.throttled, stats.since = 0, 0, 0, GetTime()
 	driver:SetScript("OnUpdate", OnUpdate)
@@ -595,16 +611,19 @@ function M:OnEnable()
 end
 
 function M:OnDisable()
-	for gameAccountID in pairs(peers) do
-		SendNow(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
-	end
 	events:UnregisterAllEvents()
-	driver:SetScript("OnUpdate", nil)
-	for _, t in ipairs({ peers, helloAt, otherVersion, owed, outbox, inbox, dings }) do
+	wipe(outbox)
+	wipe(owed)
+	for gameAccountID in pairs(peers) do
+		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
+	end
+	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil
 	B.dirty = false
+	farewellUntil = GetTime() + FAREWELL_TIMEOUT
+	driver:SetScript("OnUpdate", outbox[1] and FarewellUpdate or nil)
 	if B.Detach then
 		C_Timer.After(0, B.Detach) -- removes the dots too
 	end
