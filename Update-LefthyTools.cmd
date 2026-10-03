@@ -68,6 +68,20 @@ param(
 		return $null
 	}
 
+	# When it was last played: the newest of the files the game writes (settings, logs).
+	function Get-LastPlayed([string]$dir) {
+		$newest = [datetime]::MinValue
+		foreach ($path in 'WTF\Config.wtf', 'Logs', 'WTF\Account', 'Cache') {
+			$item = Get-Item -LiteralPath (Join-Path $dir $path) -ErrorAction SilentlyContinue
+			if ($item -and $item.LastWriteTime -gt $newest) { $newest = $item.LastWriteTime }
+		}
+		return $newest
+	}
+
+	# Every WoW: Forever folder found (the remembered one, Battle.net's list of installs, the usual
+	# places on every drive). With more than one (an old copy, a second drive), the one played
+	# most recently wins, and all are listed: an update into a folder the game doesn't use changes
+	# nothing in game.
 	function Find-ForeverFolder {
 		$candidates = New-Object System.Collections.Generic.List[string]
 		if (Test-Path -LiteralPath $Remembered) { $candidates.Add((Get-Content -LiteralPath $Remembered -TotalCount 1)) }
@@ -83,11 +97,24 @@ param(
 				$candidates.Add((Join-Path (Join-Path $drive.Root $parent) 'World of Warcraft'))
 			}
 		}
+		$found = New-Object System.Collections.Generic.List[string]
 		foreach ($candidate in $candidates) {
-			$found = Resolve-ForeverFolder $candidate
-			if ($found) { return $found }
+			$dir = Resolve-ForeverFolder $candidate
+			if ($dir) {
+				$full = (Get-Item -LiteralPath $dir).FullName.TrimEnd('\')
+				if (-not ($found | Where-Object { $_ -eq $full })) { $found.Add($full) }
+			}
 		}
-		return $null
+		if ($found.Count -eq 0) { return $null }
+		if ($found.Count -eq 1) { return $found[0] }
+		$best = $found | Sort-Object { Get-LastPlayed $_ } -Descending | Select-Object -First 1
+		Write-Host 'WoW: Forever was found in more than one place:' -ForegroundColor Yellow
+		foreach ($dir in $found) {
+			$mark = if ($dir -eq $best) { '  <- played most recently, installing here' } else { '' }
+			Write-Host ("  {0}  (last played {1:yyyy-MM-dd HH:mm}){2}" -f $dir, (Get-LastPlayed $dir), $mark)
+		}
+		Write-Host 'Another one? Run it again with -GameDir "<that folder>".'
+		return $best
 	}
 
 	function Get-TocVersion([string]$toc) {
@@ -100,6 +127,32 @@ param(
 	function Get-TocFiles([string]$toc) {
 		if (-not (Test-Path -LiteralPath $toc)) { return @() }
 		return @([IO.File]::ReadAllLines($toc) | Where-Object { $_.Trim() -and $_ -notmatch '^\s*#' } | ForEach-Object { $_.Trim() })
+	}
+
+	# After copying: every file of the download arrived intact (same SHA-256; the TOC is left out,
+	# its version line is stamped on install) and every file the TOC loads is there.
+	function Test-Install([string]$source, [string]$target) {
+		$problems = New-Object System.Collections.Generic.List[string]
+		$root = (Get-Item -LiteralPath $source).FullName.TrimEnd('\')
+		$count = 0
+		foreach ($file in Get-ChildItem -LiteralPath $source -Recurse -File) {
+			$count++
+			$relative = $file.FullName.Substring($root.Length + 1)
+			$copy = Join-Path $target $relative
+			if (-not (Test-Path -LiteralPath $copy -PathType Leaf)) {
+				$problems.Add("missing: $relative")
+			} elseif ($relative -ne "$Name.toc") {
+				$want = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+				$have = (Get-FileHash -LiteralPath $copy -Algorithm SHA256).Hash
+				if ($want -ne $have) { $problems.Add("damaged: $relative") }
+			}
+		}
+		foreach ($entry in Get-TocFiles (Join-Path $target "$Name.toc")) {
+			if (-not (Test-Path -LiteralPath (Join-Path $target $entry) -PathType Leaf)) {
+				$problems.Add("in the TOC but not installed: $entry")
+			}
+		}
+		return @{ Problems = $problems; Count = $count }
 	}
 
 	function Set-TocVersion([string]$toc, [string]$version) {
@@ -242,14 +295,24 @@ param(
 		} else {
 			Copy-Item -LiteralPath $build.Addon -Destination $target -Recurse
 			Set-TocVersion $targetToc $build.Version
+			$check = Test-Install $build.Addon $target
+			if ($check.Problems.Count -gt 0) {
+				foreach ($problem in $check.Problems) { Write-Host "  $problem" -ForegroundColor Red }
+				throw ("The installed files don't match the download ($($check.Problems.Count) problem(s)). Run it again;" +
+					' if it keeps happening, an antivirus may be blocking files in the AddOns folder.')
+			}
 			$from = if ($installed) { "$installed -> " } else { '' }
 			Write-Host "LefthyTools $from$($build.Version) installed in $target" -ForegroundColor Green
+			Write-Host "Checked: all $($check.Count) files arrived intact (SHA-256), and every file the game loads is there."
 		}
 		$added = if ($null -ne $oldFiles) { @(Get-TocFiles $targetToc | Where-Object { $oldFiles -notcontains $_ }) } else { @() }
 		if ($added.Count -gt 0) {
 			Write-Host "This update adds files ($($added -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
 		} else {
 			Write-Host 'In game, type /reload. If something seems missing afterwards, restart the game once.'
+		}
+		if (-not $Link) {
+			Write-Host "Check in game: /lefthy version should say $($build.Version)."
 		}
 	} finally {
 		Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
