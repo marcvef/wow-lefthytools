@@ -42,9 +42,21 @@ local function Readable(value)
 	return value ~= nil and not (issecretvalue and issecretvalue(value))
 end
 
--- "Anna" from "Anna" or "Anna-Realm".
+-- "Anna" from "Anna", "Anna-Realm" or "Anna Surname" (Forever's display names add surnames).
 local function BaseName(name)
-	return Readable(name) and type(name) == "string" and name:match("^[^%-]+") or nil
+	return Readable(name) and type(name) == "string" and name:match("^[^%s%-]+") or nil
+end
+
+-- The same character, however it was typed ("anna", "Anna-Realm").
+local function SameName(a, b)
+	a, b = BaseName(a), BaseName(b)
+	if not (a and b) then
+		return false
+	end
+	if strcmputf8i then
+		return strcmputf8i(a, b) == 0
+	end
+	return a:lower() == b:lower()
 end
 
 local function EntryFor(itemID)
@@ -111,7 +123,7 @@ local function HandedOver(itemID, name, guid)
 			if guid and entry.guid then
 				match = guid == entry.guid
 			elseif name then
-				match = BaseName(entry.winner) == name
+				match = SameName(entry.winner, name)
 			else
 				match = true
 			end
@@ -421,8 +433,11 @@ local function CheckMail()
 		end
 		return
 	end
-	local name = BaseName(typed)
-	if not winners[name or ""] then
+	local forThem = false
+	for winner in pairs(winners) do
+		forThem = forThem or SameName(winner, typed)
+	end
+	if not forThem then
 		local key = typed .. ":" .. table.concat(ids, ",")
 		if mailWarned ~= key then
 			mailWarned = key
@@ -451,7 +466,9 @@ local handlers = {}
 
 function handlers.TRADE_SHOW()
 	local guid = UnitGUID("NPC")
-	trade.name, trade.guid = BaseName(GetUnitName("NPC", false)), Readable(guid) and guid or nil
+	-- UnitName's first return is the bare name (its second is a surname in Forever, not a realm).
+	local name = UnitName("NPC")
+	trade.name, trade.guid = BaseName(name), Readable(guid) and guid or nil
 	wipe(trade.items)
 	if list and list[1] then
 		Soon("tradeNudge")
@@ -535,7 +552,7 @@ Run = function()
 	if work.tradeNudge then
 		local owed = {}
 		for _, entry in ipairs(list or {}) do
-			if (trade.guid and entry.guid and trade.guid == entry.guid) or (trade.name and BaseName(entry.winner) == trade.name) then
+			if (trade.guid and entry.guid and trade.guid == entry.guid) or SameName(entry.winner, trade.name) then
 				owed[#owed + 1] = entry.link or ("item " .. entry.itemID)
 			end
 		end

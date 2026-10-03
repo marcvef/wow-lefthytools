@@ -408,6 +408,7 @@ function UnitIsDeadOrGhost() return STATE.dead end
 function UnitIsGhost() return STATE.ghost == true end
 function UnitName(unit)
 	if unit == "player" then return "Lefthy" end
+	if unit == "NPC" then return TRADE_PARTNER, TRADE_SURNAME end -- Forever: the second return is a surname
 	if unit == "target" and STATE.target then return STATE.targetName or "Hogger" end
 end
 PLAYER_CLASS = "ROGUE"
@@ -1011,7 +1012,12 @@ TooltipDataProcessor = { AddTooltipPostCall = function(kind, fn) TOOLTIP_POSTCAL
 TRADE_PARTNER, TRADE_ITEMS, MAIL_ITEMS, MAILS_SENT = nil, {}, {}, {}
 ERR_TRADE_COMPLETE = "Trade complete."
 ATTACHMENTS_MAX_SEND = 12
-function GetUnitName(unit) if unit == "NPC" then return TRADE_PARTNER end return UnitName(unit) end
+-- Forever's GetUnitName adds the surname ("Anna Smith").
+function GetUnitName(unit)
+	local name, surname = UnitName(unit)
+	return surname and (name .. " " .. surname) or name
+end
+function strcmputf8i(a, b) a, b = a:lower(), b:lower(); return a == b and 0 or (a < b and -1 or 1) end
 function GetTradePlayerItemLink(slot) return TRADE_ITEMS[slot] end
 function HasSendMailItem(slot) return MAIL_ITEMS[slot] ~= nil end
 function GetSendMailItem(slot) if MAIL_ITEMS[slot] then return "Item", MAIL_ITEMS[slot] end end

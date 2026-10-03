@@ -2156,6 +2156,18 @@ do
 	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
 	Advance(0.1)
 	check(#owed == 0 and printedSince(pmark):find(ItemLink(6948) .. " handed over to Anna.", 1, true), "traded to the winner: the reminder is gone")
+	-- A partner with a surname and no GUID: still her.
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", nil)
+	TRADE_PARTNER, TRADE_SURNAME, PARTY.NPC, TRADE_ITEMS = "Anna", "Smith", nil, {}
+	pmark = #PRINTED + 1
+	Fire("TRADE_SHOW")
+	Advance(0.1)
+	check(printedSince(pmark):find("Anna won " .. ItemLink(6948), 1, true), "a trade partner with a surname (no GUID): still matched")
+	TRADE_ITEMS = { ItemLink(6948) }
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 1)
+	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
+	check(#owed == 0, "... and handed over")
+	TRADE_SURNAME = nil
 	TRADE_PARTNER, PARTY.NPC, TRADE_ITEMS = nil, nil, {}
 	-- Mail.
 	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
@@ -2170,6 +2182,10 @@ do
 	SendMail("Bob-Realmy", "yours", "")
 	Fire("MAIL_SEND_SUCCESS")
 	check(#owed == 0, "mailed to the winner (name with realm): gone")
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
+	SendMail("bob", "yours", "")
+	Fire("MAIL_SEND_SUCCESS")
+	check(#owed == 0, "the name typed in lower case: still them")
 	MAIL_ITEMS = {}
 
 	-- Rolled again: only the newest winner keeps it reserved.
@@ -2261,6 +2277,10 @@ do
 	Advance(0.1)
 	check(SendMailNameEditBox:GetText() == "Anna" and printedSince(pmark):find("mail to Anna: they won " .. ItemLink(6948), 1, true),
 		"attaching a reserved item fills in its winner")
+	SendMailNameEditBox:SetText("anna")
+	Fire("MAIL_SEND_INFO_UPDATE")
+	Advance(0.1)
+	check(not printedSince(pmark):find("heads up", 1, true), "her name in lower case: no warning")
 	SendMailNameEditBox:SetText("Bob")
 	Fire("MAIL_SEND_INFO_UPDATE")
 	Advance(0.1)

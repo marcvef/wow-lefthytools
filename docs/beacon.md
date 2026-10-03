@@ -258,7 +258,7 @@ nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` 
   attachments for one winner and an empty recipient field fill in `mailName` (chat says so);
   another name in the field gets one warning per name and attachment set.
 
-- **Trade:** `TRADE_SHOW` reads the partner (`GetUnitName("NPC")`, `UnitGUID("NPC")`) and, if they
+- **Trade:** `TRADE_SHOW` reads the partner (`UnitName("NPC")`, whose second return is a surname in Forever, and `UnitGUID("NPC")`) and, if they
   won something, says so in chat ("Anna won [item]: put it in the trade."). `TRADE_PLAYER_ITEM_CHANGED`
   / `TRADE_ACCEPT_UPDATE` read my slots 1-6 (`GetTradePlayerItemLink`; slot 7 is "will not be
   traded"). `UI_INFO_MESSAGE` with `ERR_TRADE_COMPLETE` removes the matching reminders; it can come
@@ -266,7 +266,7 @@ nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` 
 - **Mail:** a post-hook on `SendMail` keeps the recipient and the attachments' item IDs
   (`HasSendMailItem` / `GetSendMailItem`); `MAIL_SEND_SUCCESS` removes the matching reminders,
   `MAIL_FAILED` drops the snapshot.
-- **Matching:** by GUID when both are known, else by name without realm; if the game won't say
+- **Matching:** by GUID when both are known, else by name, ignoring case, realm and surname (`strcmputf8i`); if the game won't say
   (a secret value), the item counts as handed over. An item given to anyone else keeps its line.
   Chat output waits for the next frame (`C_Timer.After(0)`), never inside the event handler.
 - `/lefthy beacon handover` lists what's owed, `/lefthy beacon handover clear` (or the Clear
