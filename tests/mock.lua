@@ -86,6 +86,7 @@ function FrameMethods:GetObjectType() return "Frame" end
 -- positioning / dragging (bags)
 function FrameMethods:SetScale(s) self._scale = s end
 function FrameMethods:GetScale() return self._scale or 1 end
+function FrameMethods:GetEffectiveScale() return self._scale or 1 end
 function FrameMethods:ClearAllPoints() self._points = {} end
 function FrameMethods:SetPoint(...) self._points = self._points or {}; self._points[#self._points + 1] = { ... } end
 function FrameMethods:GetPoint(i) local p = (self._points or {})[i or 1]; if p then return unpack(p) end end
@@ -827,6 +828,10 @@ WorldMapFrame:Hide()
 WorldMapFrame.mapID = 1429
 WorldMapFrame.providers = {}
 function WorldMapFrame:GetMapID() return self.mapID end
+-- The canvas the pins sit on: 1000 x 1000 at scale 1, so on map 1429 (1000 yd wide) 1 yd = 1 pixel.
+WorldMapFrame.canvas = CreateFrame("Frame", nil, WorldMapFrame)
+WorldMapFrame.canvas:SetSize(1000, 1000)
+function WorldMapFrame:GetCanvas() return self.canvas end
 function WorldMapFrame:AddDataProvider(p) self.providers[p] = true; p:OnAdded(self) end
 function WorldMapFrame:RemoveDataProvider(p) self.providers[p] = nil; p:OnRemoved(self) end
 function WorldMapFrame:AcquirePin(template, ...)

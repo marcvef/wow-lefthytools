@@ -99,6 +99,22 @@ returns at once unless the own position, facing, zoom, a glide or the data chang
 (`B.minimapDirty`), and only calls `SetPoint` when the offset changed. Hover via
 `SetMouseMotionEnabled(true)` / `SetMouseClickEnabled(false)`, so minimap pings still work.
 
+## Dots on top of each other
+
+Friends standing together would hide each other's dot, and only the top one could be hovered.
+`B.Spread` groups dots whose centres are closer than 0.8 x the dot size, measured in screen
+pixels (world map: map units x canvas width/height x the canvas' effective scale, dot size =
+14 x the pin's effective scale, so it holds at every zoom; minimap: its own pixel offsets, dot
+size 10). Each group is spread around its middle: two side by side (0.4 x the size from the
+middle), more in a small ring; the order is by gameAccountID, so dots don't swap. Each pin keeps
+its group (`pin.group`); hovering any of them shows all of them in one tooltip (the hovered
+friend first, the others below with their name as a line), and an open tooltip is rebuilt when
+anyone in it changes (`Signature`: the revs of everyone in it). World map: the spread is
+recomputed on every refresh and on zoom (`OnCanvasScaleChanged`); friends in my group keep the
+offset on their live position (`pin.fanX/fanY`). Minimap: the per-frame update first checks for
+any overlap without making tables (`AnyOverlap`) and only then groups; the per-dot records are
+reused.
+
 ## Dots and tooltip
 
 - **Look** (both maps): black ring + class-colour dot (`C_ClassColor.GetClassColor`), masked round

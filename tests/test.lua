@@ -1753,6 +1753,45 @@ do
 	Advance(0.3)
 end
 
+section("Beacon: friends on top of each other")
+do
+	local function bob(state) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", state, "WHISPER", 12) end
+	PLAYER_POS = { 0.5, 0.5 } -- me: north 500, west 500
+	anna("S2;;0;520.0;500.0;Goldshire;")
+	bob("S2;;0;520.0;500.0;Goldshire;") -- the same spot, 20 yd north of me
+	Advance(1.2)
+	OpenWorldMap(1429)
+	Advance(0.6)
+	local a, b = pinOf(11), pinOf(12)
+	check(a and b and math.abs(a.y - b.y) < 1e-9 and math.abs((b.x - a.x) * 1000 - 11.2) < 0.01 and math.abs((a.x + b.x) / 2 - 0.5) < 1e-6,
+		"two friends on one spot: their dots sit side by side around it (map: 1 yd = 1 px here), got "
+		.. tostring(a and a.x) .. " / " .. tostring(b and b.x))
+	a:OnMouseEnter()
+	check(TOOLTIP.title == "Anna" and tooltipHas("Bob") and tooltipHas("Level 20"), "hovering either shows both")
+	bob("S2;C;0;520.0;500.0;Goldshire;Hogger")
+	Advance(0.6)
+	check(tooltipHas("Fighting Hogger"), "the open tooltip follows the other one too")
+	a:OnMouseLeave()
+	b:OnMouseEnter()
+	check(TOOLTIP.title == "Bob" and tooltipHas("Anna"), "the hovered one comes first")
+	b:OnMouseLeave()
+	bob("S2;;0;380.0;500.0;Goldshire;") -- 140 yd apart now
+	Advance(0.6)
+	check(math.abs(pinOf(11).x - 0.5) < 1e-6 and not pinOf(11).group and not pinOf(12).group, "apart again: exact positions")
+	bob("S2;;0;520.0;500.0;Goldshire;")
+	Advance(0.6)
+	WorldMapFrame:Hide()
+	Advance(0.6)
+	local mm = BB.GetMinimapPins()
+	local _, _, _, ax, ay = mm[11]:GetPoint(1)
+	local _, _, _, bx, by = mm[12]:GetPoint(1)
+	check(math.abs(bx - ax - 8) < 1e-6 and math.abs(ay - by) < 1e-6 and math.abs((ax + bx) / 2) < 1e-6,
+		"on the minimap too, got " .. tostring(ax) .. " / " .. tostring(bx))
+	mm[12]._scripts.OnEnter(mm[12])
+	check(TOOLTIP.title == "Bob" and tooltipHas("Anna"), "and hovering shows both")
+	mm[12]._scripts.OnLeave(mm[12])
+end
+
 section("Beacon: a busy fight doesn't pile up messages")
 do
 	anna("S2;;0;260.0;750.0;Goldshire;")

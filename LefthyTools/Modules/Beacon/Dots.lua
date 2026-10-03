@@ -19,6 +19,7 @@ local B = ns.Beacon
 local PIN_TEMPLATE = "LefthyToolsBeaconPinTemplate"
 local ROUND_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
+local PIN_SIZE = 14 -- the world map pin's size (LefthyToolsBeaconPinTemplate in Beacon.xml)
 local MINIMAP_DOT_SIZE = 10
 local EDGE_INSET = 5   -- pixels between an edge dot's centre and the minimap border
 local EDGE_ALPHA = 0.6
@@ -113,7 +114,74 @@ local function DistanceText(peer)
 	return peer.hasPos and B.DistanceText(peer.continent, peer.north, peer.west) or nil
 end
 
-function B.ShowTooltip(owner, peer)
+---------------------------------------------------------------------------
+-- Dots on top of each other
+--
+-- Friends standing together would hide each other's dot, and only the top one could be hovered.
+-- Dots whose centres are closer than OVERLAP x their size (measured in screen pixels, so it works
+-- at any zoom) form a group: they're spread around the group's middle so every colour shows, and
+-- hovering any of them shows all of them in one tooltip.
+---------------------------------------------------------------------------
+
+local OVERLAP = 0.8
+
+-- Whether any two of items = { { x, y }, ... } (pixels) overlap; no tables made, for the per-frame
+-- minimap update.
+local function AnyOverlap(items, count, size)
+	local limit = (size * OVERLAP) ^ 2
+	for i = 1, count - 1 do
+		for j = i + 1, count do
+			local dx, dy = items[i].x - items[j].x, items[i].y - items[j].y
+			if dx * dx + dy * dy < limit then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- items = { { key, x, y }, ... } in pixels. Sets item.dx, item.dy (pixels to move it) and
+-- item.group (the keys of its group, nil when alone). Groups keep a fixed order (by key), so the
+-- dots don't swap places from one update to the next.
+function B.Spread(items, size)
+	table.sort(items, function(a, b) return a.key < b.key end)
+	local groups, limit = {}, (size * OVERLAP) ^ 2
+	for _, item in ipairs(items) do
+		item.dx, item.dy, item.group = 0, 0, nil
+		local home
+		for _, g in ipairs(groups) do
+			local dx, dy = item.x - g[1].x, item.y - g[1].y
+			if dx * dx + dy * dy < limit then
+				home = g
+				break
+			end
+		end
+		if home then
+			home[#home + 1] = item
+		else
+			groups[#groups + 1] = { item }
+		end
+	end
+	for _, g in ipairs(groups) do
+		local n = #g
+		if n > 1 then
+			local mx, my, keys = 0, 0, {}
+			for i, item in ipairs(g) do
+				mx, my, keys[i] = mx + item.x / n, my + item.y / n, item.key
+			end
+			local radius = size * (n == 2 and 0.4 or 0.55) -- two side by side, more in a small ring
+			for i, item in ipairs(g) do
+				local angle = math.pi + (i - 1) * 2 * math.pi / n -- the first one on the left
+				item.dx = mx + math.cos(angle) * radius - item.x
+				item.dy = my + math.sin(angle) * radius - item.y
+				item.group = keys
+			end
+		end
+	end
+end
+
+-- One friend's lines; the first friend's name is the tooltip title, the others' follow below.
+local function AddPeer(peer, first)
 	-- AFK/DND, level and zone straight from Battle.net, so they're current.
 	local account = peer.guid and C_BattleNet.GetAccountInfoByGUID and C_BattleNet.GetAccountInfoByGUID(peer.guid)
 	local game = account and account.gameAccountInfo
@@ -123,8 +191,12 @@ function B.ShowTooltip(owner, peer)
 	elseif game and game.isGameBusy then
 		title = title .. " <DND>"
 	end
-	GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-	GameTooltip:SetText(title, B.ClassColor(peer.classFile))
+	if first then
+		GameTooltip:SetText(title, B.ClassColor(peer.classFile))
+	else
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine(title, B.ClassColor(peer.classFile))
+	end
 	local battleTag = account and account.battleTag and account.battleTag:match("^[^#]+")
 	if battleTag then
 		GameTooltip:AddLine(battleTag, BNET_BLUE_R, BNET_BLUE_G, BNET_BLUE_B)
@@ -179,7 +251,37 @@ function B.ShowTooltip(owner, peer)
 	if distance then
 		GameTooltip:AddLine(distance, 0.75, 0.75, 0.75)
 	end
+end
+
+-- What the tooltip shows, as a string: changes when anyone in it changed.
+local function Signature(peer, group)
+	local sig = tostring(peer.rev)
+	for _, key in ipairs(group or {}) do
+		local other = B.peers[key]
+		sig = sig .. "," .. key .. ":" .. (other and other.rev or "-")
+	end
+	return sig
+end
+
+-- The hovered friend first, then everyone whose dot is on top of theirs (group).
+function B.ShowTooltip(owner, peer, group)
+	GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+	AddPeer(peer, true)
+	for _, key in ipairs(group or {}) do
+		local other = B.peers[key]
+		if other and other ~= peer and other.name then
+			AddPeer(other, false)
+		end
+	end
 	GameTooltip:Show()
+	owner.tooltipSig = Signature(peer, group)
+end
+
+-- An open tooltip on this dot follows changes of anyone in it (cheap when nothing changed).
+local function RefreshTooltip(frame, peer)
+	if GameTooltip:IsOwned(frame) and Signature(peer, frame.group) ~= frame.tooltipSig then
+		B.ShowTooltip(frame, peer, frame.group)
+	end
 end
 
 -- Restyles a dot only when its friend's data changed (or the frame now shows someone else).
@@ -189,9 +291,6 @@ local function Restyle(frame, peer)
 	end
 	frame.styledPeer, frame.styledRev = peer, peer.rev
 	StyleDot(frame, peer)
-	if GameTooltip:IsOwned(frame) then
-		B.ShowTooltip(frame, peer)
-	end
 end
 
 ---------------------------------------------------------------------------
@@ -214,7 +313,7 @@ end
 function LefthyToolsBeaconPinMixin:OnMouseEnter()
 	local peer = B.peers[self.gameAccountID]
 	if peer then
-		B.ShowTooltip(self, peer)
+		B.ShowTooltip(self, peer, self.group)
 	end
 end
 
@@ -264,38 +363,53 @@ end
 function provider:RefreshAllData()
 	local map = self:GetMap()
 	local mapID = map:GetMapID()
-	local show = M.enabled and M.db.showFriends and mapID
-	for gameAccountID, pin in pairs(mapPins) do
-		local peer = show and B.peers[gameAccountID]
-		local x, y
-		if peer and B.IsShown(peer) then
-			x, y = MapPosition(peer, mapID)
+	local placed, wanted = {}, {}
+	if M.enabled and M.db.showFriends and mapID then
+		for gameAccountID, peer in pairs(B.peers) do
+			if B.IsShown(peer) then
+				local x, y = MapPosition(peer, mapID)
+				if x then
+					placed[#placed + 1] = { key = gameAccountID, peer = peer, nx = x, ny = y }
+					wanted[gameAccountID] = true
+				end
+			end
 		end
-		if x then
-			pin:SetPosition(x, y)
-			Restyle(pin, peer)
-		else
+	end
+	for gameAccountID, pin in pairs(mapPins) do
+		if not wanted[gameAccountID] then
 			map:RemovePin(pin)
 			mapPins[gameAccountID] = nil
 		end
 	end
-	if not show then
+	if not placed[1] then
 		return
 	end
-	for gameAccountID, peer in pairs(B.peers) do
-		if not mapPins[gameAccountID] and B.IsShown(peer) then
-			local x, y = MapPosition(peer, mapID)
-			if x then
-				local pin = map:AcquirePin(PIN_TEMPLATE, gameAccountID)
-				mapPins[gameAccountID] = pin
-				pin:SetPosition(x, y)
-				Restyle(pin, peer)
-			end
-		end
+	-- Map units to screen pixels at the current zoom, to find dots that really overlap.
+	local canvas = map:GetCanvas()
+	local scale = canvas:GetEffectiveScale()
+	local pxW, pxH = canvas:GetWidth() * scale, canvas:GetHeight() * scale
+	for _, item in ipairs(placed) do
+		item.pin = mapPins[item.key] or map:AcquirePin(PIN_TEMPLATE, item.key)
+		mapPins[item.key] = item.pin
+		item.x, item.y = item.nx * pxW, item.ny * pxH
+	end
+	B.Spread(placed, PIN_SIZE * placed[1].pin:GetEffectiveScale())
+	for _, item in ipairs(placed) do
+		local pin = item.pin
+		pin.fanX, pin.fanY = pxW > 0 and item.dx / pxW or 0, pxH > 0 and item.dy / pxH or 0
+		pin.group = item.group
+		pin:SetPosition(item.nx + pin.fanX, item.ny + pin.fanY)
+		Restyle(pin, item.peer)
+		RefreshTooltip(pin, item.peer)
 	end
 end
 
 function provider:OnMapChanged()
+	self:RefreshAllData()
+end
+
+-- Zooming changes which dots overlap on screen.
+function provider:OnCanvasScaleChanged()
 	self:RefreshAllData()
 end
 
@@ -307,11 +421,12 @@ local minimapPins = {} -- gameAccountID -> frame
 local sparePins = {}
 local gliding = false
 local drawn = {} -- what the minimap dots were last placed for
+local placed = {} -- this update's dots: { key, peer, x, y, edge, dx, dy, group }, reused
 
 local function MinimapPinOnEnter(self)
 	local peer = B.peers[self.gameAccountID]
 	if peer then
-		B.ShowTooltip(self, peer)
+		B.ShowTooltip(self, peer, self.group)
 	end
 end
 
@@ -377,6 +492,7 @@ local function PlaceMinimapPins(now, continent, north, west, half, radius, facin
 	view.square = GetMinimapShape and GetMinimapShape() == "SQUARE"
 	view.limit = half - EDGE_INSET
 	gliding = false
+	local count = 0
 	for gameAccountID, peer in pairs(B.peers) do
 		local x, y, edge
 		if B.IsShown(peer) and peer.continent == continent then
@@ -392,20 +508,37 @@ local function PlaceMinimapPins(now, continent, north, west, half, radius, facin
 			x, y, edge = B.MinimapOffset(peerNorth, peerWest)
 		end
 		if x then
-			local pin = minimapPins[gameAccountID] or AcquireMinimapPin(gameAccountID)
-			if pin.x ~= x or pin.y ~= y then
-				pin.x, pin.y = x, y
-				pin:ClearAllPoints()
-				pin:SetPoint("CENTER", Minimap, "CENTER", x, y)
-			end
-			if pin.edge ~= edge then
-				pin.edge = edge
-				pin:SetAlpha(edge and EDGE_ALPHA or 1)
-			end
-			Restyle(pin, peer)
+			count = count + 1
+			local item = placed[count] or {} -- reused: this runs every frame while something moves
+			placed[count] = item
+			item.key, item.peer, item.x, item.y, item.edge = gameAccountID, peer, x, y, edge
+			item.dx, item.dy, item.group = 0, 0, nil
 		elseif minimapPins[gameAccountID] then
 			ReleaseMinimapPin(gameAccountID)
 		end
+	end
+	for i = count + 1, #placed do
+		placed[i] = nil
+	end
+	if AnyOverlap(placed, count, MINIMAP_DOT_SIZE) then
+		B.Spread(placed, MINIMAP_DOT_SIZE) -- only when dots really overlap
+	end
+	for i = 1, count do
+		local item = placed[i]
+		local pin = minimapPins[item.key] or AcquireMinimapPin(item.key)
+		local x, y = item.x + item.dx, item.y + item.dy
+		if pin.x ~= x or pin.y ~= y then
+			pin.x, pin.y = x, y
+			pin:ClearAllPoints()
+			pin:SetPoint("CENTER", Minimap, "CENTER", x, y)
+		end
+		if pin.edge ~= item.edge then
+			pin.edge = item.edge
+			pin:SetAlpha(item.edge and EDGE_ALPHA or 1)
+		end
+		pin.group = item.group
+		Restyle(pin, item.peer)
+		RefreshTooltip(pin, item.peer)
 	end
 	for gameAccountID in pairs(minimapPins) do
 		if not B.peers[gameAccountID] then
@@ -472,7 +605,7 @@ function B.UpdateWorldMapGroupPins()
 			local x, y = pos:GetXY()
 			if x >= 0 and x <= 1 and y >= 0 and y <= 1 and (x ~= pin.liveX or y ~= pin.liveY) then
 				pin.liveX, pin.liveY = x, y
-				pin:SetPosition(x, y)
+				pin:SetPosition(x + (pin.fanX or 0), y + (pin.fanY or 0)) -- spread from a dot on top of it
 			end
 		end
 	end
