@@ -370,6 +370,11 @@ L["Deadliest foes"] = "Gefährlichste Gegner"
 L["No deaths yet."] = "Noch keine Tode."
 L["On the road"] = "Unterwegs"
 L["Loot by quality"] = "Loot nach Qualität"
+L["(friend)"] = "(Freund)"
+L["Last 7 days"] = "Letzte 7 Tage"
+L["You"] = "Du"
+L["You and %s, last 7 days"] = "Du und %s, letzte 7 Tage"
+L["Latest news"] = "Neueste Ereignisse"
 
 -- A friend's level-up with no message of their own: shown in your language
 L["{name} reached level {level}!"] = "{name} hat Level {level} erreicht!"

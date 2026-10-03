@@ -318,6 +318,9 @@ end
 ---------------------------------------------------------------------------
 
 -- Characters: this one first, then the others by name.
+-- On the Graphs page the arrows also step through friends who sent their days ("friend:Name").
+local FRIEND = "friend:"
+
 local function Keys()
 	local keys, current = {}, C.CurrentKey()
 	for key in pairs(C.Store().chars) do
@@ -327,7 +330,36 @@ local function Keys()
 	end
 	table.sort(keys)
 	table.insert(keys, 1, current)
+	if tab == "graphs" then
+		local names = {}
+		for name in pairs(C.Store().friendStats or {}) do
+			names[#names + 1] = name
+		end
+		table.sort(names)
+		for _, name in ipairs(names) do
+			keys[#keys + 1] = FRIEND .. name
+		end
+	end
 	return keys
+end
+
+-- A friend's latest feed entries, with their date, for their graphs page.
+graphState.newsLines = function(name)
+	local lines, feed = {}, C.Store().friends
+	for i = #feed, 1, -1 do
+		local f = feed[i]
+		if f.name == name then
+			local e = FriendEvent(f)
+			local line = e and LineFor(e)
+			if line then
+				lines[#lines + 1] = "|cff999999" .. date(L["%Y-%m-%d"], f.t) .. "|r  " .. line
+				if #lines == 6 then
+					break
+				end
+			end
+		end
+	end
+	return lines
 end
 
 local Refresh
@@ -391,12 +423,22 @@ end
 -- keepScroll: a refresh of the same page.
 function Refresh(keepScroll)
 	local keys = Keys()
+	local friendName = selectedKey and selectedKey:match("^" .. FRIEND .. "(.+)$")
+	local friend = friendName and tab == "graphs" and C.Store().friendStats[friendName]
+	if friendName and not friend then
+		selectedKey, friendName = nil, nil -- friends only have graphs
+	end
 	selectedKey = selectedKey or keys[1]
-	local c = C.Store().chars[selectedKey] or C.Char()
-	C.Fill(c)
-	local name = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r"
-	frame.CharName:SetText(name .. "  |cffcccccc" .. L["Level %d"]:format(c.level or 0)
-		.. ((c.realm and c.realm ~= GetRealmName()) and (" - " .. c.realm) or "") .. "|r")
+	local c = not friend and (C.Store().chars[selectedKey] or C.Char())
+	if friend then
+		frame.CharName:SetText(LT.Window.ClassColorCode(friend.classFile) .. friendName .. "|r  |cff80c0ff"
+			.. L["(friend)"] .. "|r  |cffcccccc" .. (friend.level and L["Level %d"]:format(friend.level) or "") .. "|r")
+	else
+		C.Fill(c)
+		local name = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r"
+		frame.CharName:SetText(name .. "  |cffcccccc" .. L["Level %d"]:format(c.level or 0)
+			.. ((c.realm and c.realm ~= GetRealmName()) and (" - " .. c.realm) or "") .. "|r")
+	end
 	frame.Prev:SetEnabled(#keys > 1)
 	frame.Next:SetEnabled(#keys > 1)
 	for key, button in pairs(frame.Tabs) do
@@ -414,7 +456,9 @@ function Refresh(keepScroll)
 	if tab == "graphs" then
 		frame.Text:SetText("")
 		frame.Values:SetText("")
-		frame.Content:SetHeight(C.Graphs.Draw(frame.Canvas, frame.Content:GetWidth(), c, graphState))
+		local width = frame.Content:GetWidth()
+		frame.Content:SetHeight(friend and C.Graphs.DrawFriend(frame.Canvas, width, friend, friendName, C.Char(), graphState)
+			or C.Graphs.Draw(frame.Canvas, width, c, graphState))
 		if not keepScroll then
 			frame.Scroll:SetVerticalScroll(0)
 		end

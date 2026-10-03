@@ -29,6 +29,9 @@ local GOLD_MILESTONES = { 1, 10, 50, 100, 250, 500, 1000, 2500, 5000, 10000 }
 local PROFESSION_MILESTONES = { 75, 150, 225, 300 }
 local COPPER_PER_GOLD = 10000
 local DAILY_DAYS = 60        -- days of per-day counters kept (the graphs show 14)
+local SHARE_DAYS = 7         -- days a friend gets from me when they show up
+local SHARE_GAP = 300        -- today's numbers go to friends at most this often (if they changed)
+local FRIEND_DAYS = 30       -- days of friends' numbers kept
 local SAMPLE_STEP, SAMPLE_MAX = 60, 240 -- the session curve: a point a minute, at most 240
 local issecret = issecretvalue or function() return false end
 
@@ -103,14 +106,14 @@ local function Share(kind, a, b)
 	shareQueue[#shareQueue + 1] = { kind, a, b }
 end
 
--- Per day (for the graphs): daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths }.
-local DAILY = { played = true, xp = true, quests = true, kills = true, deaths = true }
+-- Per day (for the graphs): daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels }.
+local DAILY = { played = true, xp = true, quests = true, kills = true, deaths = true, levels = true }
 
 local function Today()
 	local day = date("%Y-%m-%d")
 	local bucket = char.daily[day]
 	if not bucket then
-		bucket = { played = 0, xp = 0, quests = 0, kills = 0, deaths = 0 }
+		bucket = { played = 0, xp = 0, quests = 0, kills = 0, deaths = 0, levels = 0 }
 		char.daily[day] = bucket
 	end
 	return bucket
@@ -121,7 +124,7 @@ local function Add(stat, amount)
 	char.stats[stat] = char.stats[stat] + amount
 	if DAILY[stat] then
 		local bucket = Today()
-		bucket[stat] = bucket[stat] + amount
+		bucket[stat] = (bucket[stat] or 0) + amount -- older buckets lack newer fields
 	end
 	C.dirty = true
 end
@@ -568,6 +571,8 @@ local function TrackTarget(now)
 	end
 end
 
+local ShareDays -- below, with the friends' part
+
 local function Tick(now, elapsed)
 	C.ticks = C.ticks + 1
 	local stats = char.stats
@@ -589,6 +594,7 @@ local function Tick(now, elapsed)
 	end
 	TrackTravel()
 	TrackTarget(now)
+	ShareDays(now)
 	while shareQueue[1] do
 		local item = table.remove(shareQueue, 1)
 		local beacon = LT:GetModule("beacon")
@@ -656,11 +662,87 @@ local function AddToFeed(entry)
 	C.feedDirty = true
 end
 
+---------------------------------------------------------------------------
+-- My days for friends' graphs (through Beacon), and theirs
+---------------------------------------------------------------------------
+
+local sentDaily = {} -- day -> the message last sent to everyone
+local lastDailyShare = -math.huge
+
+local function SharingOn()
+	local beacon = LT:GetModule("beacon")
+	return M.db.share and beacon and beacon.enabled and ns.Beacon ~= nil
+end
+
+-- D2;<YYYYMMDD>;<minutes>;<xp>;<quests>;<kills>;<deaths>;<levels> for one of my days, or nil.
+local function DailyMessage(day)
+	local b = char.daily[day]
+	if not b then
+		return nil
+	end
+	return ("D%s;%s;%d;%d;%d;%d;%d;%d"):format(ns.Beacon.VERSION, (day:gsub("-", "")),
+		math.min(1440, math.floor((b.played or 0) / 60)), math.floor(b.xp or 0), b.quests or 0, b.kills or 0,
+		b.deaths or 0, b.levels or 0)
+end
+
+-- On the tick, at most every SHARE_GAP: today's and yesterday's numbers to everyone, if changed.
+function ShareDays(now)
+	if now - lastDailyShare < SHARE_GAP or not SharingOn() then
+		return
+	end
+	lastDailyShare = now
+	for _, t in ipairs({ time() - 86400, time() }) do
+		local day = date("%Y-%m-%d", t)
+		local message = DailyMessage(day)
+		if message and message ~= sentDaily[day] then
+			sentDaily[day] = message
+			ns.Beacon.QueueLowToPeers(message) -- never ahead of live data
+		end
+	end
+end
+
+-- A friend just showed up: my last SHARE_DAYS days, for their graphs.
+local function SendDaysTo(gameAccountID)
+	if not SharingOn() then
+		return
+	end
+	for i = SHARE_DAYS - 1, 0, -1 do
+		local message = DailyMessage(date("%Y-%m-%d", time() - i * 86400))
+		if message then
+			ns.Beacon.QueueLow(gameAccountID, message)
+		end
+	end
+end
+
+-- A day of a friend's numbers: store.friendStats[name] = { classFile, level, updated, days }.
+local function StoreFriendDay(peer, day)
+	local friends = store.friendStats
+	local f = friends[peer.name] or { days = {} }
+	friends[peer.name] = f
+	f.classFile, f.level, f.updated = peer.classFile, peer.level, time()
+	f.days[day.day] = { played = day.played, xp = day.xp, quests = day.quests, kills = day.kills,
+		deaths = day.deaths, levels = day.levels }
+	local oldest = date("%Y-%m-%d", time() - FRIEND_DAYS * 86400)
+	for d in pairs(f.days) do
+		if d < oldest then
+			f.days[d] = nil
+		end
+	end
+	C.dirty = true -- the graphs
+end
+
 -- Highlights that only go into the feed: they'd be too chatty as chat lines.
 local FEED_ONLY = { quest = true, zone = true }
 
 local function OnFriendEvent(kind, peer, data)
 	if not (M.enabled and store and peer.name) then
+		return
+	end
+	if kind == "known" then
+		SendDaysTo(data.id)
+		return
+	elseif kind == "daily" then
+		StoreFriendDay(peer, data)
 		return
 	end
 	local entry = { t = time(), name = peer.name, classFile = peer.classFile }
@@ -698,6 +780,7 @@ function M:OnEnable()
 	store = LefthyToolsChronicleDB
 	store.chars = type(store.chars) == "table" and store.chars or {}
 	store.friends = type(store.friends) == "table" and store.friends or {}
+	store.friendStats = type(store.friendStats) == "table" and store.friendStats or {}
 	local name, realm = UnitName("player"), GetRealmName()
 	charKey = name .. "-" .. (realm or "")
 	char = store.chars[charKey] or NewChar()

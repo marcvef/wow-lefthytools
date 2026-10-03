@@ -102,6 +102,11 @@ button greyed out:
   the road and Loot by quality (one split bar each, with a legend). Drawn with plain textures
   (`SetGradient` for the bars), line objects (`CreateLine`) and font strings from pools
   (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first draw.
+- **Friends' graphs:** on the Graphs page the arrows go on past your own characters to every
+  friend who sent their days (`store.friendStats[name]`; other pages fall back to your own
+  character). Their page: Last 14 days (the same bars from their days), Last 7 days (six tiles:
+  time, XP, levels, quests, killing blows, deaths), You and <name> (two bars per number, you in
+  gold, them in blue) and Latest news (their last 6 feed entries with date).
 - **Friends:** "Online now" first: every Beacon friend in up to three lines (`B.FriendLines` in
   Beacon's `Alerts.lua`, shared with the AFK screen: name, AFK, level and progress, group; zone
   and distance; what they're fighting and their quest), then "What they did": the feed, as
@@ -113,6 +118,17 @@ Redrawn on the tick only while open, and only the open page when its own data ch
 lines), `C.feedDirty` for Friends, `C.dirty` (counters) for Statistics, which also refreshes
 every 5 s for the time and distance. Graphs: a change is remembered and drawn at most every 10 s,
 otherwise every 30 s (the session curve). A redraw keeps the scroll position.
+
+## Days for friends' graphs
+
+Battle.net messages only arrive while both are online, so each friend's own Chronicle sends its
+numbers: `D2;<YYYYMMDD>;<minutes played>;<xp>;<quests>;<kills>;<deaths>;<levels>` (about 45
+bytes). When Beacon reports a friend as `known` (their name became known), they get my last 7
+days; every 5 minutes today's and yesterday's go to everyone if they changed. Both go through
+Beacon's low-priority queue (`B.QueueLow`): sent only when no message, state or answer waits,
+so they never delay live data. Beacon accepts up to 20 days per friend per minute and checks the
+ranges (minutes at most 1440); Chronicle keeps 30 days per friend in `store.friendStats`. Covered
+by the "Share highlights with friends" setting.
 
 ## Cost, and what goes over the network
 

@@ -413,13 +413,8 @@ local function Loot(canvas, x, y, w, h, c)
 	end
 end
 
--- Draws the whole page for record c; state.metric is the 14-day chart's metric, state.buttons
--- the four metric buttons (created by the window). Returns the page height.
-function G.Draw(canvas, width, c, state)
-	canvas:Reset()
-	local y = 0
-	local h, ix, iy = Days(canvas, 0, y, width, c, state.metric)
-	-- The metric buttons sit in the card's header row.
+-- The 14-day chart's metric buttons sit in its header row.
+local function PlaceButtons(canvas, ix, iy, state)
 	for i, metric in ipairs(METRICS) do
 		local button = state.buttons[metric]
 		button:ClearAllPoints()
@@ -427,6 +422,15 @@ function G.Draw(canvas, width, c, state)
 		button:SetEnabled(metric ~= state.metric)
 		button:Show()
 	end
+end
+
+-- Draws the whole page for record c; state.metric is the 14-day chart's metric, state.buttons
+-- the four metric buttons (created by the window). Returns the page height.
+function G.Draw(canvas, width, c, state)
+	canvas:Reset()
+	local y = 0
+	local h, ix, iy = Days(canvas, 0, y, width, c, state.metric)
+	PlaceButtons(canvas, ix, iy, state)
 	y = y + h + CARD_GAP
 	if c == C.Char() then -- a session only exists for the character you're playing
 		y = y + Session(canvas, 0, y, width, c) + CARD_GAP
@@ -439,6 +443,106 @@ function G.Draw(canvas, width, c, state)
 	Travel(canvas, 0, y, half, 90, c)
 	Loot(canvas, half + CARD_GAP, y, half, 90, c)
 	return y + 90 + 4
+end
+
+---------------------------------------------------------------------------
+-- A friend's page: from the days they send (Chronicle's D2 messages through Beacon), so it also
+-- covers the time you weren't online
+---------------------------------------------------------------------------
+
+local MY_COLOR = { 1, 0.78, 0.2 }
+local THEIR_COLOR = BAR_BLUE
+local WEEK = { "played", "xp", "levels", "quests", "kills", "deaths" }
+
+local function Sum(days, count)
+	local sum = { played = 0, xp = 0, levels = 0, quests = 0, kills = 0, deaths = 0 }
+	for i = 0, count - 1 do
+		local b = days[date("%Y-%m-%d", time() - i * 86400)]
+		if b then
+			for key in pairs(sum) do
+				sum[key] = sum[key] + (b[key] or 0)
+			end
+		end
+	end
+	return sum
+end
+
+local function Label(key)
+	if METRIC_LABEL[key] then
+		return METRIC_LABEL[key]()
+	end
+	return key == "levels" and L["Levels"] or L["Deaths"]
+end
+
+-- Six numbers for the last 7 days, as tiles.
+local function Week(canvas, x, y, w, days)
+	local h = 84
+	local ix, iy, iw = Card(canvas, x, y, w, h, L["Last 7 days"])
+	local sum = Sum(days, 7)
+	local tileW = iw / #WEEK
+	for i, key in ipairs(WEEK) do
+		local tx = ix + (i - 1) * tileW
+		canvas:Rect(tx + 2, iy, tileW - 4, 46, 1, 1, 1, 0.04, "BORDER")
+		canvas:Text(MetricText(key, sum[key]), tx, iy + 6, "GameFontHighlightLarge", "CENTER", tileW)
+		canvas:Text(Label(key), tx, iy + 30, "GameFontNormalSmall", "CENTER", tileW)
+	end
+	return h
+end
+
+-- You and them over the last 7 days, two bars per number.
+local function Versus(canvas, x, y, w, mine, theirs, name)
+	local rows = { "played", "xp", "quests", "kills" }
+	local rowH = 32
+	local h = HEADER + 4 + #rows * rowH + PAD
+	local function Hex(c)
+		return ("%02x%02x%02x"):format(math.floor(c[1] * 255), math.floor(c[2] * 255), math.floor(c[3] * 255))
+	end
+	local note = ("|cff%s%s|r   |cff%s%s|r"):format(Hex(MY_COLOR), L["You"], Hex(THEIR_COLOR), name)
+	local ix, iy, iw = Card(canvas, x, y, w, h, L["You and %s, last 7 days"]:format(name), note)
+	local labelW, valueW = iw * 0.22, 80
+	local barW = iw - labelW - valueW
+	for i, key in ipairs(rows) do
+		local ry = iy + (i - 1) * rowH
+		canvas:Text(Label(key), ix, ry + 9, "GameFontHighlightSmall", "LEFT", labelW - 4)
+		local max = math.max(mine[key], theirs[key])
+		for j, side in ipairs({ { mine[key], MY_COLOR }, { theirs[key], THEIR_COLOR } }) do
+			local by = ry + (j - 1) * 13
+			canvas:Rect(ix + labelW, by, barW, 11, 1, 1, 1, 0.05, "BORDER")
+			if max > 0 and side[1] > 0 then
+				canvas:Bar(ix + labelW, by, barW * side[1] / max, 11, side[2])
+			end
+			canvas:Text(MetricText(key, side[1]), ix + labelW + barW + 6, by, "GameFontHighlightSmall", "LEFT", valueW - 6)
+		end
+	end
+	return h
+end
+
+-- Their latest entries from the friends' feed.
+local function News(canvas, x, y, w, lines)
+	local lineH = 15
+	local h = HEADER + 4 + math.max(#lines, 1) * lineH + PAD
+	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Latest news"])
+	if #lines == 0 then
+		Empty(canvas, ix, iy, iw, ih, L["Nothing recorded yet."])
+	end
+	for i, line in ipairs(lines) do
+		canvas:Text(line, ix, iy + (i - 1) * lineH, "GameFontHighlightSmall", "LEFT", iw)
+	end
+	return h
+end
+
+-- Draws a friend's page: friend = Chronicle's store.friendStats[name], me = my record (for the
+-- comparison); state as for G.Draw, plus state.newsLines(name) from the window.
+function G.DrawFriend(canvas, width, friend, name, me, state)
+	canvas:Reset()
+	local y = 0
+	local h, ix, iy = Days(canvas, 0, y, width, { daily = friend.days }, state.metric)
+	PlaceButtons(canvas, ix, iy, state)
+	y = y + h + CARD_GAP
+	y = y + Week(canvas, 0, y, width, friend.days) + CARD_GAP
+	y = y + Versus(canvas, 0, y, width, Sum(me.daily, 7), Sum(friend.days, 7), name) + CARD_GAP
+	y = y + News(canvas, 0, y, width, state.newsLines and state.newsLines(name) or {})
+	return y + 4
 end
 
 G.METRICS = METRICS

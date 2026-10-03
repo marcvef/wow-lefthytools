@@ -66,5 +66,8 @@ ns.CHANGELOG = {
 	{ id = 20, version = "0.5.0", module = "chronicle",
 		en = { "Friends page", "Shows who's online now and what they're doing, then their news: now also quests, new zones and coming online." },
 		de = { "Freunde-Seite", "Zeigt, wer gerade online ist und was er macht, dann ihre Neuigkeiten: jetzt auch Quests, neue Gebiete und wann sie online kommen." } },
+	{ id = 21, version = "0.5.0", module = "chronicle",
+		en = { "Friends' graphs", "On the Graphs page the arrows also show your friends: their last 14 days, their week, you and them side by side." },
+		de = { "Grafiken von Freunden", "Auf der Grafiken-Seite zeigen die Pfeile auch deine Freunde: ihre letzten 14 Tage, ihre Woche, du und sie im Vergleich." } },
 	-- New entries go here, at the end.
 }

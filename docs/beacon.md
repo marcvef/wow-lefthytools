@@ -26,7 +26,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
   `C2;<count>` enemies on them in combat, `X2;<percent>` progress on their level,
-  `I2;<item string>` an item shown to friends, `Q2` switched off. A build that doesn't
+  `I2;<item string>` an item shown to friends, `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
+  friends' graphs (see chronicle.md), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
@@ -49,6 +50,9 @@ dropped at once. `BN_FRIEND_INFO_CHANGED` fires whenever *any* friend changes zo
 it must never trigger a full friend-list walk.
 
 ## Traffic (never lag the client)
+
+Bulk data (Chronicle's days for friends' graphs) goes into a low-priority queue (`B.QueueLow`)
+that `Drain` only empties when no one-off message and no state is waiting.
 
 Values that only matter in their newest form (tracked quest `T2`, enemy count `C2`, level
 progress `X2`) replace a message of the same kind still waiting in the queue for that friend

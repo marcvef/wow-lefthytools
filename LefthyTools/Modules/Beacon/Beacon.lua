@@ -33,6 +33,9 @@ local L = ns.L
 --                       nameplates the game shows). Sent when it changes, at most once a second;
 --                       a state without C clears it.
 --   I2;<item string>    an item I show my friends (Ctrl+right-click, Items.lua)
+--   D2;<YYYYMMDD>;<minutes played>;<xp>;<quests>;<kills>;<deaths>;<levels>
+--                       a day of my Chronicle statistics, for friends' graphs: my last 7 days
+--                       when a friend shows up, then today's at most every 5 minutes if changed
 --   X2;<percent>        progress on my current level (0-99), empty at max level or with sharing
 --                       off. Sent when the whole percent changes (at most every XP_GAP seconds)
 --                       and with every answer.
@@ -69,6 +72,7 @@ local ONLINE_QUIET = 60      -- friends found in the first minute were online al
 local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
 local XP_GAP = 2             -- my level progress is checked (and sent if changed) at most this often
 local ITEM_GAP = 3           -- shared items accepted from one friend at most this often
+local DAILY_LIMIT = 20       -- Chronicle days accepted from one friend per minute (7 arrive at once)
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true, quest = true, zone = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
@@ -129,12 +133,14 @@ local helloAt = {}      -- gameAccountID -> when we last greeted them
 local otherVersion = {} -- gameAccountID -> protocol version of a friend on another LefthyTools version
 local owed = {}         -- gameAccountID -> true: send them my current state
 local outbox = {}       -- { gameAccountID, message }: one-off messages, sent before states
+local lowOutbox = {}    -- the same, sent only when nothing else waits (bulk data)
 local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt }: spam guards
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
 local pingsIn = {}      -- { gameAccountID, continent, north, west, mapID } received, shown on the next tick
 local highlightsIn = {} -- { gameAccountID, kind, a, b } received, passed on on the next tick
 local itemsIn = {}      -- { gameAccountID, item string } received, shown on the next tick
+local dailyIn = {}      -- { gameAccountID, { day, played, xp, ... } }: friends' days, for Chronicle
 local comings = {}      -- { "online" | "offline", peer }: told to listeners on the next tick
 local enabledAt = 0
 local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on the next tick
@@ -469,22 +475,45 @@ local function Drain(now, elapsed)
 		table.remove(outbox, 1)
 		tokens = tokens - 1
 	end
-	if tokens < 1 or not next(owed) then
-		return
-	end
-	local state = CurrentState()
-	for gameAccountID in pairs(owed) do
-		if tokens < 1 then
-			return
+	if tokens >= 1 and next(owed) then
+		local state = CurrentState()
+		for gameAccountID in pairs(owed) do
+			if tokens < 1 then
+				return
+			end
+			if peers[gameAccountID] then
+				if not SendNow(gameAccountID, state) then
+					pausedUntil, stats.throttled = now + THROTTLE_PAUSE, stats.throttled + 1
+					return
+				end
+				tokens = tokens - 1
+			end
+			owed[gameAccountID] = nil
 		end
-		if peers[gameAccountID] then
-			if not SendNow(gameAccountID, state) then
+	end
+	-- Bulk data (Chronicle's days for friends' graphs) only goes when nothing else waits, so it
+	-- never delays positions, states or anything someone clicked.
+	while tokens >= 1 and lowOutbox[1] and not outbox[1] and not next(owed) do
+		local item = lowOutbox[1]
+		if peers[item[1]] then
+			if not SendNow(item[1], item[2]) then
 				pausedUntil, stats.throttled = now + THROTTLE_PAUSE, stats.throttled + 1
 				return
 			end
 			tokens = tokens - 1
 		end
-		owed[gameAccountID] = nil
+		table.remove(lowOutbox, 1)
+	end
+end
+
+-- Low priority (see Drain): sent when nothing else is waiting.
+function B.QueueLow(gameAccountID, message)
+	lowOutbox[#lowOutbox + 1] = { gameAccountID, message }
+end
+
+function B.QueueLowToPeers(message)
+	for gameAccountID in pairs(peers) do
+		B.QueueLow(gameAccountID, message)
 	end
 end
 
@@ -520,8 +549,12 @@ local function CopyInfo(peer, info)
 		peer.rev = peer.rev + 1
 		Changed()
 	end
-	if not peer.name and info.characterName and GetTime() - enabledAt > ONLINE_QUIET then
-		comings[#comings + 1] = { "online", peer } -- someone just came online with LefthyTools
+	if not peer.name and info.characterName then
+		-- "known": a friend with LefthyTools is here now (Chronicle sends them its last days).
+		comings[#comings + 1] = { "known", peer, { id = info.gameAccountID } }
+		if GetTime() - enabledAt > ONLINE_QUIET then
+			comings[#comings + 1] = { "online", peer } -- someone just came online with LefthyTools
+		end
 	end
 	peer.name, peer.classFile, peer.guid = info.characterName, info.classFilename, info.playerGuid
 	peer.level, peer.area = info.characterLevel, info.areaName
@@ -651,6 +684,13 @@ local function Parse(text)
 		if itemString then
 			return "I", itemString
 		end
+	elseif kind == "D" then
+		local y, mo, d, played, xp, quests, kills, deaths, levels =
+			rest:match("^;(%d%d%d%d)(%d%d)(%d%d);(%d+);(%d+);(%d+);(%d+);(%d+);(%d+)$")
+		if y and tonumber(played) <= 1440 and #xp <= 9 and #quests <= 5 and #kills <= 6 and #deaths <= 4 and #levels <= 3 then
+			return "D", { day = y .. "-" .. mo .. "-" .. d, played = tonumber(played) * 60, xp = tonumber(xp),
+				quests = tonumber(quests), kills = tonumber(kills), deaths = tonumber(deaths), levels = tonumber(levels) }
+		end
 	end
 	return nil
 end
@@ -763,6 +803,14 @@ local function OnMessage(text, senderID)
 			guard.itemAt = now
 			itemsIn[#itemsIn + 1] = { senderID, a }
 		end
+	elseif kind == "D" then
+		if not guard.dailyWindow or now - guard.dailyWindow >= 60 then
+			guard.dailyWindow, guard.daily = now, 0
+		end
+		if guard.daily < DAILY_LIMIT then
+			guard.daily = guard.daily + 1
+			dailyIn[#dailyIn + 1] = { senderID, a }
+		end
 	elseif kind == "E" then
 		if not guard.highlightWindow or now - guard.highlightWindow >= HIGHLIGHT_WINDOW then
 			guard.highlightWindow, guard.highlights = now, 0
@@ -854,7 +902,14 @@ local function Tick(now, elapsed)
 	end
 	while comings[1] do
 		local item = table.remove(comings, 1)
-		B.Notify(item[1], item[2], {})
+		B.Notify(item[1], item[2], item[3] or {})
+	end
+	while dailyIn[1] do
+		local item = table.remove(dailyIn, 1)
+		local peer = peers[item[1]]
+		if peer and peer.name then
+			B.Notify("daily", peer, item[2])
+		end
 	end
 	while itemsIn[1] do
 		local item = table.remove(itemsIn, 1)
@@ -972,6 +1027,7 @@ function M:OnEnable()
 	end
 	ResetTimers()
 	wipe(outbox) -- goodbyes still pending from switching off just before: no longer true
+	wipe(lowOutbox)
 	farewellUntil = nil
 	tokens, pausedUntil, sinceTick = SEND_BURST, 0, 0
 	stats.sent, stats.received, stats.throttled, stats.since = 0, 0, 0, GetTime()
@@ -986,10 +1042,12 @@ function M:OnDisable()
 	events:UnregisterAllEvents()
 	wipe(outbox)
 	wipe(owed)
+	wipe(lowOutbox)
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn, comings, B.pings, plates }) do
+	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn, dailyIn,
+			comings, B.pings, plates }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil

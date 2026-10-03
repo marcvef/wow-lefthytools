@@ -2128,9 +2128,29 @@ do
 	anna("Q2") -- she switches Beacon off (or logs off)
 	Advance(0.15)
 	check(feed[#feed].k == "offline" and feed[#feed].name == "Anna", "a friend going offline is in the feed")
+	local dmark = #GAMEDATA + 1
 	anna("H2")
 	Advance(1.2)
 	check(feed[#feed].k == "online" and feed[#feed].name == "Anna", "and coming back online")
+	Advance(2)
+	local days = sentTo(11, dmark, "D2;")
+	check(#days >= 1 and days[#days]:find("^D2;20300515;%d+;%d+;%d+;%d+;%d+;%d+$"),
+		"a friend who shows up gets my last days for their graphs, got " .. table.concat(days, " | "))
+	anna("D2;20300514;90;5000;3;20;1;1")
+	anna("D2;20300515;30;1200;2;8;0;0")
+	anna("D2;2030051;1;1;1;1;1;1")
+	anna("D2;20300513;2000;1;1;1;1;1") -- more minutes than a day has
+	Advance(0.15)
+	local annaStats = CDB.friendStats.Anna
+	check(annaStats and annaStats.days["2030-05-14"].played == 5400 and annaStats.days["2030-05-14"].xp == 5000
+		and annaStats.days["2030-05-15"].quests == 2 and not annaStats.days["2030-05-13"] and annaStats.classFile == "MAGE",
+		"and I keep theirs (malformed days are dropped)")
+	dmark = #GAMEDATA + 1
+	for _ = 1, 11 do -- 5 minutes; she keeps sending her heartbeat meanwhile
+		anna("S2;;0;260.0;750.0;Goldshire;")
+		Advance(30)
+	end
+	check(sentTo(11, dmark, "D2;20300515;")[1], "today's numbers go out again every 5 minutes while they change")
 	Advance(15)
 	anna("L2;24;")
 	Advance(0.15)
@@ -2227,7 +2247,19 @@ do
 	win.Next:Click()
 	check(not drawnText("This session") and drawnText("|cff888888Level up once with Chronicle on to see this.|r"),
 		"another character's graphs: no session, and a hint where there's no data yet")
-	win.Prev:Click()
+	win.Next:Click() -- past my characters: friends who sent me their days
+	local function drawnContaining(text)
+		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return true end end
+	end
+	check(win.CharName:GetText():find("Anna|r  |cff80c0ff(friend)", 1, true) and drawnText("Last 7 days")
+		and drawnText("You and Anna, last 7 days") and drawnText("2h 0m") and drawnContaining("Completed The Defias Brotherhood"),
+		"a friend's graphs: their days, their week, you and them, their latest news")
+	local annaDay = hoverWith(date("%Y-%m-%d", time() - 86400))
+	check(annaDay and annaDay.lines[2]:find("5000", 1, true), "their 14 days, from what they sent, got " .. tostring(annaDay and annaDay.lines[2]))
+	win.Tabs.timeline:Click()
+	check(win.CharName:GetText():find("Lefthy", 1, true), "friends only have graphs: other pages show your own characters")
+	win.Tabs.graphs:Click()
+	check(win.CharName:GetText():find("Lefthy", 1, true), "back on the Graphs page: still your own character")
 	win.Tabs.timeline:Click()
 	win.Next:Click()
 	check(win.CharName:GetText():find("Alty", 1, true) and win.Text:GetText():find("Level 12", 1, true), "your other characters' journals")
