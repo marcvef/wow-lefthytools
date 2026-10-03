@@ -26,9 +26,10 @@ compartment, or type `/lefthy` (short: `/lt`).
 
 Key bindings are under Options → Keybindings → AddOns → LefthyTools.
 
-**Language:** the settings pages follow the game client's language. They're available in
-English and German (German on a `deDE` client). Chat commands and chat messages stay English,
-except the quest announcements your party reads.
+**Language:** the settings pages and Beacon's tooltips follow the game client's language. They're
+available in English and German (German on a `deDE` client). Chat commands and chat messages stay
+English, except what others see or what's meant for everyone: the quest announcements your party
+reads and the default level-up message.
 
 ## Install
 
