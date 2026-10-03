@@ -289,11 +289,17 @@ Settings = {
 		local s = { variable = variable, category = cat, name = name }
 		function s:SetValueChangedCallback(fn) self.cb = fn end
 		function s:GetValue() return tbl[key] end
+		s.uiUpdates = 0 -- how often an open settings page would have been told about a change
 		function s:SetValue(v)
 			if tbl[key] ~= v then
 				tbl[key] = v
+				self.uiUpdates = self.uiUpdates + 1
 				if self.cb then self.cb(self, v) end
 			end
+		end
+		function s:NotifyUpdate()
+			self.uiUpdates = self.uiUpdates + 1
+			if self.cb then self.cb(self, tbl[key]) end
 		end
 		REGISTERED_SETTINGS[variable] = s
 		return s

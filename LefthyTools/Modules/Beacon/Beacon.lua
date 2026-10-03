@@ -704,7 +704,7 @@ function M:OnSlashCommand(msg)
 	elseif cmd == "interval" then
 		local n = tonumber(arg)
 		if n then
-			self.db.interval = math.max(1, math.min(10, math.floor(n + 0.5)))
+			LT:SetModuleSetting(self, "interval", math.max(1, math.min(10, math.floor(n + 0.5))))
 		end
 		self:Print("update interval: " .. LT.Options.Seconds(self.db.interval) .. ".")
 	elseif cmd == "sound" and B.SoundCommand then

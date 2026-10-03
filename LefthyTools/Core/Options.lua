@@ -44,6 +44,9 @@ function Builder:Register(key, name, varType, opts)
 	local variable = "LefthyTools_" .. self.module.key .. "_" .. (opts.id or key)
 	local setting = Settings.RegisterAddOnSetting(self.category, variable, key, tbl, varType or type(default), name, default)
 	setting:SetValueChangedCallback(self.onChange)
+	-- Kept so slash commands and resets go through the setting too (LT:SetModuleSetting).
+	self.module.settings = self.module.settings or {}
+	self.module.settings[opts.id or key] = setting
 	return setting
 end
 

@@ -76,9 +76,8 @@ local function SetNumber(key, value, minValue, maxValue, label, formatter)
 		M:Print(label .. " is " .. formatter(M.db[key]) .. ".")
 		return
 	end
-	M.db[key] = math.max(minValue, math.min(maxValue, n))
+	LT:SetModuleSetting(M, key, math.max(minValue, math.min(maxValue, n))) -- runs OnSettingChanged
 	M:Print(label .. " set to " .. formatter(M.db[key]) .. ".")
-	M:Refresh()
 end
 
 local function SetPercent(key, value, label)
@@ -145,15 +144,16 @@ function M:OnSlashCommand(msg)
 			ListGroups()
 			return
 		end
+		local on
 		if arg2 == "on" then
-			self.db.groups[arg] = true
+			on = true
 		elseif arg2 == "off" then
-			self.db.groups[arg] = false
+			on = false
 		else
-			self.db.groups[arg] = not self.db.groups[arg]
+			on = not self.db.groups[arg]
 		end
+		LT:SetModuleSetting(self, "group_" .. arg, on, self.db.groups, arg)
 		self:Print(arg .. (self.db.groups[arg] and " will fade." or " stays visible."))
-		self:Refresh()
 	elseif cmd == "status" then
 		Status()
 	elseif cmd == "reset" then

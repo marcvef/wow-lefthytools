@@ -96,6 +96,20 @@ function LT:ResetModuleSettings(m)
 	ApplyDefaults(m.db, m.defaults)
 end
 
+-- Changes a setting the way its checkbox or slider would: through the setting object, so an
+-- open settings page shows the new value and OnSettingChanged runs. id is the setting's id
+-- (its key, or the opts.id given to the builder); tbl/key say where it lives if there is no
+-- settings panel (default m.db[id]).
+function LT:SetModuleSetting(m, id, value, tbl, key)
+	local setting = m.settings and m.settings[id]
+	if setting then
+		setting:SetValue(value)
+	else
+		(tbl or m.db)[key or id] = value
+		SafeCall(m, "OnSettingChanged")
+	end
+end
+
 ---------------------------------------------------------------------------
 -- Enable / disable
 ---------------------------------------------------------------------------

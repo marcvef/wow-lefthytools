@@ -62,6 +62,11 @@ Blizzard's official pattern (`Blizzard_Settings_Shared/Blizzard_ImplementationRe
 per module, and only the parent goes to `RegisterAddOnCategory`. Setting variables are
 `LefthyTools_<module>_<id>`; module switches are `LefthyTools_module_<key>`.
 
+Every setting the builder registers is kept in `module.settings[id]`. Code that changes a setting
+(slash commands) uses `LT:SetModuleSetting(m, id, value)`, which goes through the setting object
+like a click would: an open settings page shows the new value and `OnSettingChanged` runs. Writing
+`m.db` directly would leave the panel showing the old value.
+
 The builder handed to `BuildOptions` has `Header`, `Checkbox`, `Slider`, `Dropdown`
 (`{ { value, label }, ... }` via `Settings.CreateControlTextContainer`), `Button` (wraps
 `CreateSettingsButtonInitializer`; its `addSearchTags` argument is asserted non-nil) and

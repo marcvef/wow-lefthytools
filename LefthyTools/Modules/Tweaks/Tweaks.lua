@@ -446,9 +446,9 @@ function M:OnSlashCommand(msg)
 				else
 					on = not self.db[tweak.key]
 				end
-				self.db[tweak.key] = on
-				self:Print(tweak.label .. (on and ": on." or ": off."))
-				RequestReconcile()
+				LT:SetModuleSetting(self, tweak.key, on) -- the checkbox follows; OnSettingChanged reconciles
+				self:Print(tweak.label .. (on and ": on." or ": off.")
+					.. (self.enabled and "" or " (Misc Tweaks itself is off: /lefthy enable tweaks)"))
 				return
 			end
 		end
