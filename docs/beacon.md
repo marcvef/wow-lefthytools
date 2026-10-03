@@ -25,7 +25,7 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `P2;<continent>;<north>;<west>;<uiMapID>` map ping,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
-  `Q2` switched off. A build that doesn't
+  `C2;<count>` enemies on them in combat, `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
@@ -129,6 +129,18 @@ like all chat output; zone from Battle.net, subzone from the state) when `deathA
 `B.Notify(kind, peer, data)` tells other modules about friends' events on the driver tick:
 `"level"` (`{ level }`), `"death"` (`{ where, foe, level }`) and `"highlight"` (`{ kind, a, b }`),
 also when the chat line or toast is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
+
+## How many enemies
+
+In combat the sender counts the enemies that have them on their threat list: nameplate units
+(kept in a set from `NAME_PLATE_UNIT_ADDED`/`REMOVED`, the handlers only touch the set) that
+`UnitCanAttack` and for which `UnitThreatSituation("player", unit)` isn't nil. Once a second at
+most, only in combat and with `share` on; `C2;<count>` goes out when the number changes (a fight
+starts at 0, so a fight without nameplates sends nothing). If the game keeps threat secret
+(`SecretWhenUnitThreatStateRestricted`, e.g. in some instances) there's no count. Limits: only
+mobs with a nameplate (enemy nameplates on, in nameplate range) are counted. Receivers keep
+`peer.mobs` until a state without the combat flag clears it; the dot shows the number at its
+bottom right, the tooltip "Fighting Hogger and 2 more" / "In combat with 3 enemies".
 
 ## Tracked quest
 

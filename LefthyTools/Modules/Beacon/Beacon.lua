@@ -29,6 +29,9 @@ local L = ns.L
 --                       QUEST_GAP seconds) and with every answer.
 --   E2;<kind>;<a>;<b>   a Chronicle highlight (boss, rare, dungeon, loot, mount, achievement, quests,
 --                       gold, profession) with up to two text fields; see Chronicle.lua
+--   C2;<count>          in combat: how many enemies have me on their threat list (counted on the
+--                       nameplates the game shows). Sent when it changes, at most once a second;
+--                       a state without C clears it.
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil), so new kinds can be
 -- added without breaking older friends.
@@ -58,6 +61,7 @@ local DEATH_GAP = 10         -- death alerts for one friend at most this often
 local PING_GAP = 2           -- map pings accepted from one friend at most this often
 local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed) at most this often
 local HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW = 6, 60 -- Chronicle highlights accepted from one friend
+local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
@@ -285,6 +289,45 @@ local function CurrentState()
 		position = ("%d;%.1f;%.1f"):format(continent, north, west)
 	end
 	return ("S%s;%s;%s;%s;%s"):format(VERSION, flags, position, B.Clean(GetSubZoneText(), 48), target)
+end
+
+-- Enemies fighting me: nameplate units (tracked from NAME_PLATE_UNIT_ADDED/REMOVED) that can be
+-- attacked and have me on their threat list. Needs enemy nameplates on; mobs without a nameplate
+-- (out of range, nameplates off) aren't counted. nil when the game keeps threat secret.
+local plates = {}
+local lastCount, lastCountCheck = 0, -math.huge
+
+local function EnemyCount()
+	local count = 0
+	for unit in pairs(plates) do
+		if UnitCanAttack("player", unit) then
+			local threat = UnitThreatSituation("player", unit)
+			if issecretvalue and issecretvalue(threat) then
+				return nil
+			end
+			if threat then
+				count = count + 1
+			end
+		end
+	end
+	return count
+end
+
+-- On the tick, only in combat (and only with sharing on): tell friends when the number changes.
+local function SendCountIfChanged(now)
+	if not (M.db.share and UnitAffectingCombat("player")) then
+		lastCount = 0 -- friends drop the count when the fight ends; the next one starts at 0
+		return
+	end
+	if now - lastCountCheck < COUNT_GAP then
+		return
+	end
+	lastCountCheck = now
+	local count = EnemyCount()
+	if count and count ~= lastCount then
+		lastCount = count
+		B.QueueToPeers(("C%s;%d"):format(VERSION, math.min(count, 99)))
+	end
 end
 
 local NO_QUEST = "T" .. VERSION .. ";0;;;"
@@ -533,6 +576,11 @@ local function Parse(text)
 		if highlight and HIGHLIGHTS[highlight] then
 			return "E", highlight, a, b
 		end
+	elseif kind == "C" then
+		local count = rest:match("^;(%d%d?)$")
+		if count then
+			return "C", tonumber(count)
+		end
 	end
 	return nil
 end
@@ -545,6 +593,9 @@ local function ApplyState(peer, now, flags, continent, north, west, subzone, tar
 	local foe = peer.combat and peer.target ~= "" and peer.target or nil
 	peer.dead, peer.ghost = flags:find("D", 1, true) ~= nil, flags:find("G", 1, true) ~= nil
 	peer.combat = flags:find("C", 1, true) ~= nil
+	if not peer.combat then
+		peer.mobs = nil -- the fight is over
+	end
 	peer.subzone, peer.target = B.Clean(subzone, 48), B.Clean(target, 48)
 	peer.stateSeen = true
 	if continent then
@@ -629,6 +680,10 @@ local function OnMessage(text, senderID)
 		peer.quest = a > 0 and title ~= "" and { id = a, done = b, title = title, objective = B.Clean(d, 64) } or nil
 		peer.rev = peer.rev + 1
 		Changed() -- an open tooltip shows it
+	elseif kind == "C" then
+		peer.mobs = a
+		peer.rev = peer.rev + 1
+		Changed()
 	elseif kind == "E" then
 		if not guard.highlightWindow or now - guard.highlightWindow >= HIGHLIGHT_WINDOW then
 			guard.highlightWindow, guard.highlights = now, 0
@@ -690,6 +745,7 @@ local function Tick(now, elapsed)
 	end
 	SendStateIfChanged(now)
 	SendQuestIfChanged(now)
+	SendCountIfChanged(now)
 	Drain(now, elapsed)
 
 	while dings[1] do
@@ -775,6 +831,8 @@ handlers.PLAYER_ENTERING_WORLD = function()
 	sweepRequested, statusDirty, lastSweep, lastState = true, true, -math.huge, nil
 end
 handlers.GROUP_ROSTER_UPDATE = function() groupChanged = true end
+handlers.NAME_PLATE_UNIT_ADDED = function(unit) plates[unit] = true end
+handlers.NAME_PLATE_UNIT_REMOVED = function(unit) plates[unit] = nil end
 local function MarkQuestDirty() questDirty = true end
 handlers.QUEST_LOG_UPDATE = MarkQuestDirty
 handlers.QUEST_WATCH_LIST_CHANGED = MarkQuestDirty
@@ -835,7 +893,7 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, B.pings }) do
+	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, B.pings, plates }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil

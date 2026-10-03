@@ -57,6 +57,10 @@ local function BuildDot(frame)
 	fade:SetToAlpha(0.25)
 	fade:SetDuration(0.5)
 	frame.Pulse:SetLooping("BOUNCE")
+	-- In combat: how many enemies are on them.
+	frame.Count = frame:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+	frame.Count:SetPoint("CENTER", frame, "BOTTOMRIGHT", 1, 1)
+	frame.Count:Hide()
 end
 
 local function StyleDot(frame, peer)
@@ -66,6 +70,9 @@ local function StyleDot(frame, peer)
 	frame.Ring:SetShown(not dead)
 	frame.Dot:SetShown(not dead)
 	frame.Dot:SetColorTexture(B.ClassColor(peer.classFile))
+	local mobs = peer.combat and not dead and peer.mobs or 0
+	frame.Count:SetText(mobs > 0 and tostring(mobs) or "")
+	frame.Count:SetShown(mobs > 0)
 	if peer.combat and not dead then
 		frame.Ring:SetColorTexture(1, 0.15, 0.1, 1)
 		if not frame.Pulse:IsPlaying() then
@@ -142,8 +149,17 @@ function B.ShowTooltip(owner, peer)
 		GameTooltip:AddLine(L["Dead"], STATUS_R, STATUS_G, STATUS_B)
 	end
 	if peer.combat then
-		GameTooltip:AddLine(peer.target ~= "" and L["Fighting %s"]:format(peer.target) or L["In combat"],
-			STATUS_R, STATUS_G, STATUS_B)
+		local mobs, text = peer.mobs or 0, nil
+		if peer.target ~= "" then
+			text = mobs > 1 and L["Fighting %s and %d more"]:format(peer.target, mobs - 1) or L["Fighting %s"]:format(peer.target)
+		elseif mobs > 1 then
+			text = L["In combat with %d enemies"]:format(mobs)
+		elseif mobs == 1 then
+			text = L["In combat with 1 enemy"]
+		else
+			text = L["In combat"]
+		end
+		GameTooltip:AddLine(text, STATUS_R, STATUS_G, STATUS_B)
 	end
 	local quest = peer.quest
 	if quest then

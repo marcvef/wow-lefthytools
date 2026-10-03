@@ -371,6 +371,8 @@ function IsSwimming() return TRAVEL.swimming end
 function IsMounted() return TRAVEL.mounted end
 function IsFlying() return TRAVEL.flying end
 function UnitOnTaxi() return TRAVEL.taxi end
+THREAT = {} -- nameplate unit -> UnitThreatSituation("player", unit): nil (not on its list), 0-3, or SECRET
+function UnitThreatSituation(unit, mob) if unit == "player" then return THREAT[mob] end end
 TARGET_CLASS = "normal"
 function UnitClassification(unit) return unit == "target" and TARGET_CLASS or "normal" end
 function UnitIsPlayer(unit) return unit == "player" end

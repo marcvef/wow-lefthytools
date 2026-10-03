@@ -115,7 +115,8 @@ Your Battle.net friends who also run LefthyTools show up as dots on your world m
 minimap, and you on theirs, without being in a group.
 
 - **Dots** are in the friend's class colour. A **skull** means they're dead (faded: a
-  ghost on the way back), a **red pulsing ring** means they're in combat. On the minimap
+  ghost on the way back), a **red pulsing ring** means they're in combat, and a **number**
+  how many enemies are on them (counted from the nameplates they see). On the minimap
   the dots glide smoothly; friends out of range wait faded at the edge, so you see which
   way they are.
 - **Hover a dot** for name (with AFK/DND), BattleTag, level, zone and subzone, who

@@ -1593,6 +1593,69 @@ lefthy("beacon sound 1")
 Advance(0.05)
 check(#SOUNDS == soundMark + 2, "picking the current one again still plays it")
 
+section("Beacon: how many enemies")
+do
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(1.2)
+	for i = 1, 3 do Fire("NAME_PLATE_UNIT_ADDED", "nameplate" .. i) end
+	THREAT = { nameplate1 = 3, nameplate2 = 0 } -- two mobs have me on their list, the third doesn't
+	mark = #GAMEDATA + 1
+	STATE.combat = true
+	Fire("PLAYER_REGEN_DISABLED")
+	Advance(1.2)
+	check(sentTo(11, mark, "C2;")[1] == "C2;2", "in combat: how many enemies are on me, got " .. tostring(sentTo(11, mark, "C2;")[1]))
+	Advance(3)
+	check(#sentTo(11, mark, "C2;") == 1, "unchanged: nothing more")
+	THREAT.nameplate3 = 1
+	Advance(1.1)
+	check(sentTo(11, mark, "C2;")[2] == "C2;3", "a third one joins")
+	THREAT.nameplate1 = SECRET
+	Advance(2.2)
+	check(#sentTo(11, mark, "C2;") == 2, "threat kept secret: no count")
+	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate1")
+	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate2")
+	Advance(1.1)
+	check(sentTo(11, mark, "C2;")[3] == "C2;1", "nameplates gone (dead or out of range): fewer")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	Advance(3)
+	check(#sentTo(11, mark, "C2;") == 3, "out of combat: nothing (the state says the fight is over)")
+	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate3")
+	THREAT = {}
+	mark = #GAMEDATA + 1
+	STATE.combat = true
+	Fire("PLAYER_REGEN_DISABLED")
+	Advance(2.2)
+	check(#sentTo(11, mark, "C2;") == 0, "a fight without nameplates: nothing sent")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	Advance(1.2)
+
+	OpenWorldMap(1429)
+	anna("S2;C;0;260.0;750.0;Goldshire;Stitches")
+	anna("C2;3")
+	Advance(0.6)
+	local pin = pinOf(11)
+	pin:OnMouseEnter()
+	check(tooltipHas("Fighting Stitches and 2 more") and pin.Count.shown and pin.Count.text == "3",
+		"her dot: a 3, and the tooltip says it, got " .. table.concat(TOOLTIP.lines, " | "))
+	anna("S2;C;0;260.0;750.0;Goldshire;")
+	anna("C2;4")
+	Advance(0.6)
+	check(tooltipHas("In combat with 4 enemies"), "no target: how many")
+	anna("C2;1")
+	Advance(0.6)
+	check(tooltipHas("In combat with 1 enemy"), "one")
+	anna("C2;abc")
+	Advance(0.6)
+	check(peers()[11].mobs == 1, "malformed counts are ignored")
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(0.6)
+	check(not pin.Count.shown and tooltipHas("Level 20") and not tooltipHas("In combat with 1 enemy"), "fight over: the count goes")
+	pin:OnMouseLeave()
+	WorldMapFrame:Hide()
+end
+
 section("Chronicle: recording")
 local CH, CDB = ns.Chronicle, LefthyToolsChronicleDB
 local me = CDB and CDB.chars["Lefthy-Realmy"]

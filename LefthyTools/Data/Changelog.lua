@@ -40,4 +40,7 @@ ns.CHANGELOG = {
 	{ id = 12, version = "0.5.0",
 		en = "New module Chronicle: a journal for each character that writes itself (level-ups, deaths, dungeons, bosses, rares, loot, mounts, milestones), lots of statistics, and what your friends did. Open it with /chronicle.",
 		de = "Neues Modul Chronicle: ein Tagebuch für jeden Charakter, das sich von selbst schreibt (Level-Ups, Tode, Dungeons, Bosse, Rares, Loot, Mounts, Meilensteine), viele Statistiken und was deine Freunde erlebt haben. Öffnen mit /chronicle." },
+	{ id = 13, version = "0.5.0",
+		en = "Beacon: a friend's dot shows how many enemies are on them in combat, and the tooltip says \"Fighting Hogger and 2 more\".",
+		de = "Beacon: Der Punkt eines Freundes zeigt im Kampf, wie viele Gegner an ihm dran sind, und der Tooltip sagt „Kämpft gegen Hogger und 2 weitere“." },
 }
