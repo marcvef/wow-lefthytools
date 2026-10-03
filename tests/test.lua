@@ -2766,6 +2766,12 @@ do
 	Advance(1.1)
 	check(me.stats.sessions == 2 and CH.Session().played < 5 and me.stats.longestSession == longest,
 		"switched on long after the last session: a new one, not the old one going on for days")
+	lefthy("disable chronicle")
+	me.session.last, me.session.start = nil, time() - 3 * 86400 -- from a version that didn't stamp it yet
+	lefthy("enable chronicle")
+	Advance(1.1)
+	check(me.stats.sessions == 3 and CH.Session().played < 5 and me.stats.longestSession == longest,
+		"a session without the stamp goes by its start: days old, so a new one")
 
 	-- The minimap button.
 	local mmb = CH.MinimapButton()

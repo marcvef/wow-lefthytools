@@ -810,7 +810,8 @@ function M:OnEnable()
 	-- A new character, or Chronicle switched on mid-game after being off: the session it knows
 	-- ended long ago (a /reload or switching it off and on keeps it; those take seconds).
 	local session = char.session
-	if not session or (session.last and time() - session.last > SESSION_GAP) then
+	-- (Sessions from before the stamp existed go by their start.)
+	if not session or time() - (session.last or session.start or 0) > SESSION_GAP then
 		StartSession()
 		sessionJustStarted = true
 	end
