@@ -37,7 +37,8 @@ reads and the default level-up message.
 
 1. Download [Update-LefthyTools.cmd](https://github.com/marcvef/wow-lefthytools/raw/main/Update-LefthyTools.cmd)
    (if the browser shows the text instead: right-click the link → *Save link as*) and keep it,
-   e.g. on your desktop.
+   e.g. on your desktop. It's the whole installer in one file, so you can pass it on to
+   friends as it is.
 2. Double-click it. It finds your WoW: Forever folder, downloads the latest LefthyTools from
    this page and installs it. If Windows asks whether to run it, choose *Run* (or *More info* →
    *Run anyway*). If it can't find the game, it asks for your `World of Warcraft` folder once.

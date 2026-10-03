@@ -7,7 +7,9 @@
 1. reads the file list from the TOC and checks each Lua file's syntax as Lua 5.1 (luaparse);
 2. checks translations: every `L["..."]` used in code has a German entry and every German entry is
    used (comment lines are ignored);
-3. runs the addon in fengari (Lua 5.3) against `tests/mock.lua`, which fakes the WoW API: once as
+3. checks that `Update-LefthyTools.cmd` is the current build of `install.ps1`
+   (`npm run build-installer` regenerates it);
+4. runs the addon in fengari (Lua 5.3) against `tests/mock.lua`, which fakes the WoW API: once as
    an English client (`tests/test.lua`) and once as German (`tests/test_de.lua`, which also fails
    on formal terms, translated module names and runtime translation fallbacks).
 

@@ -46,6 +46,17 @@ for (const localeFile of localeFiles) {
 }
 if (!ok) process.exit(1);
 
+// 2b) The players' one-file installer must be install.ps1 with the batch header (tools/build-installer.js).
+if (!process.argv[2]) {
+  const installer = require("../tools/build-installer.js");
+  const current = fs.existsSync(installer.target) ? fs.readFileSync(installer.target, "utf8") : "";
+  if (current !== installer.build()) {
+    console.log("Update-LefthyTools.cmd is out of date with install.ps1: run `npm run build-installer`");
+    process.exit(1);
+  }
+  console.log("installer ok: Update-LefthyTools.cmd matches install.ps1");
+}
+
 // 3) Behavioural tests, each in a fresh Lua state. SOURCES = { { name, src }, ... } in TOC order.
 function runSuite(scripts) {
   const L = lauxlib.luaL_newstate();

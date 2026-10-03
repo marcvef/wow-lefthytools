@@ -1,6 +1,7 @@
 # LefthyTools installer and updater for WoW: Forever (Windows).
 #
-# Players: double-click Update-LefthyTools.cmd, or paste this into PowerShell:
+# Players: double-click Update-LefthyTools.cmd, a standalone copy of this script (built by
+#   `npm run build-installer`), or paste this into PowerShell:
 #     irm https://raw.githubusercontent.com/marcvef/wow-lefthytools/main/install.ps1 | iex
 #   It downloads the latest LefthyTools from GitHub and installs it into WoW: Forever's AddOns
 #   folder. Run it again any time to update. Settings are kept (they live in the WTF folder).
@@ -225,4 +226,5 @@ param(
 	} finally {
 		Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 	}
-} -GameDir $GameDir -Link $Link -Download $Download -Force $Force -ScriptRoot $PSScriptRoot
+} -GameDir $GameDir -Link $Link -Download $Download -Force $Force `
+	-ScriptRoot $(if ($PSScriptRoot) { $PSScriptRoot } else { $env:LEFTHYTOOLS_INSTALLER_DIR }) # set by the .cmd

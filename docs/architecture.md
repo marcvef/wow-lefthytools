@@ -28,17 +28,26 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Beacon.xml  world map pin template (LefthyToolsBeaconPinTemplate)
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
+tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
-Update-LefthyTools.cmd       double-click wrapper for players: runs the current install.ps1 from GitHub
+Update-LefthyTools.cmd       players' one-file installer: batch header + install.ps1 (generated)
 ```
 
 ## Installing, updating, versions
 
 `install.ps1` is both the players' installer/updater and the dev installer:
 
-- **Players** run it through `Update-LefthyTools.cmd` (double-click; the `.cmd` never changes: it
-  runs `irm https://raw.githubusercontent.com/marcvef/wow-lefthytools/main/install.ps1 | iex`) or
-  that one-liner. With no checkout next to the script it downloads the repo:
+- **Players** double-click `Update-LefthyTools.cmd`, a standalone copy of `install.ps1` that can
+  be passed around on its own, or run
+  `irm https://raw.githubusercontent.com/marcvef/wow-lefthytools/main/install.ps1 | iex`.
+  The `.cmd` is a batch/PowerShell hybrid built by `tools/build-installer.js`: cmd.exe reads
+  `<# :` as a label and runs only the batch header, which loads the whole file into PowerShell as
+  a script block; PowerShell skips the header as a `<# ... #>` comment. The header passes the
+  file's folder in `LEFTHYTOOLS_INSTALLER_DIR` (a script block has no `$PSScriptRoot`). After
+  editing `install.ps1`, run `npm run build-installer`; `npm test` fails while the `.cmd` is out
+  of date, and the build fails on non-ASCII text in `install.ps1` (cmd.exe reads the file in the
+  console code page). Copies of an older `.cmd` keep working, they only run the code they carry.
+  With no checkout next to the script it downloads the repo:
   `api.github.com/repos/.../commits/main` for the commit, `codeload.github.com/.../zip/<sha>` for
   the files (if the API is unavailable, `zip/refs/heads/main`; git archive stores the commit id
   as the zip comment), and `compare/v<base>...<sha>` for the commit count. No GitHub releases

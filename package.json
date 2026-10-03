@@ -3,7 +3,8 @@
   "private": true,
   "description": "Dev tooling for the LefthyTools WoW: Forever addon (syntax check + mocked smoke test)",
   "scripts": {
-    "test": "node tests/run.js"
+    "test": "node tests/run.js",
+    "build-installer": "node tools/build-installer.js"
   },
   "devDependencies": {
     "fengari": "^0.1.4",
