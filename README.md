@@ -49,7 +49,7 @@ reads and the default level-up message.
 2. Double-click it. It finds your WoW: Forever folder, downloads the latest LefthyTools from
    this page and installs it. If Windows asks whether to run it, choose *Run* (or *More info* →
    *Run anyway*). If it can't find the game, it asks for your `World of Warcraft` folder once.
-3. In game, type `/reload`.
+3. In game, type `/reload`. If the installer says the update adds files, restart the game instead.
 
 To **update**, double-click it again: it installs the latest version, or tells you that you
 already have it. Your settings are kept. `/lefthy version` shows what you're running, and Beacon
