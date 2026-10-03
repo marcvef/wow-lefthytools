@@ -90,7 +90,7 @@ The personal resource display has no class resource in Forever (see
     Classic quests (3382, 8193, 8249).
   - `LATER_CLASSIC_QUEST_IDS`: in both tables with ID >= 10000 (about 1,050). Original Classic's
     quests all have IDs below 10000; Era's client also carries the content added since (Season of
-    Discovery, Hardcore, Anniversary: IDs 55296 to 91889), and so does Forever's. Players never saw
+    Discovery, Hardcore, Anniversary: IDs 55296 to 91354), and so does Forever's. Players never saw
     those in original Classic, and some are given out in Forever, so they get the marker too. The
     first version marked only the first list, and players met unmarked quests they didn't know.
 
