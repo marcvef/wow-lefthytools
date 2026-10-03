@@ -33,10 +33,11 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
 11. Misc Tweaks: player/target bars show `current / max` without hovering; a dragged bag reopens
     where it was left. In a party, finishing a quest objective posts `[Quest]: 10/10 ...` with a
     star icon; finishing the quest posts `quest complete!`.
-12. New Forever quests: open the quest log with a quest from a new Forever area (e.g. the Skyborne
-    start): a small glowing NEW left of its title, none on old Classic quests; hovering adds "New in
-    WoW: Forever" to the tooltip. Talk to a quest giver of such a quest: the quest window shows the
-    badge in its top right corner when accepting and when turning in.
+12. New Forever quests: in the quest log, a coloured NEW right after the name of quests from new
+    Forever content (e.g. the Skyborne start), none on old Classic quests, and no icon covered;
+    hovering adds "New in WoW: Forever" to the tooltip. Open the quest: NEW after the title in the
+    details. Accept and turn one in: NEW after the title in the quest window. A very long title
+    shows NEW at the right end of its entry instead (no overlap with the next entry).
 13. Combo points (rogue, personal resource display on): 5 empty sockets under its bars (retail art;
     classic gems mean the `uf-roguecp` atlases are missing). Gems fill green → red with the slash
     animation; at full they breathe; a finisher bursts them out. Narrow the bars and hide the power

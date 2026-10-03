@@ -631,48 +631,59 @@ section("Misc Tweaks: quests that are new in WoW: Forever")
 check(TDB.foreverQuests == true and REGISTERED_SETTINGS.LefthyTools_tweaks_foreverQuests, "on by default, with a checkbox")
 check(ns.IsForeverQuest(86574) and ns.IsForeverQuest(99411) and not ns.IsForeverQuest(86575)
 	and not ns.IsForeverQuest(176) and not ns.IsForeverQuest(8193), "the generated list: Forever's own quests, not Classic ones")
+local MARK = " |cff4de1ffNEW|r"
 local savedQuests = QUESTS
 local hogger = { id = 176, title = "Wanted: Hogger", objectives = {} }
 local foreverQuest = { id = 86574, title = "A Forever quest", objectives = {} }
 QUESTS = { hogger, foreverQuest }
 QuestLogQuests_Update()
-local logBadges = ns.GetForeverQuestBadges()
 local function titleButton(id) for _, b in ipairs(QUEST_LOG_BUTTONS) do if b.questID == id then return b end end end
-local function logBadge(id) local b = titleButton(id); return b and logBadges[b] end
-check(logBadge(86574) and logBadge(86574):IsShown() and logBadge(86574).Label.text == "NEW", "quest log: a NEW badge on the Forever quest")
-check(logBadge(86574):GetParent() == titleButton(86574), "... on that quest's own title button, right after Blizzard filled the list")
-check(not (logBadge(176) and logBadge(176):IsShown()), "... not on a Classic quest")
+check(titleButton(86574).Text:GetText() == "A Forever quest" .. MARK, "quest log: NEW right after the Forever quest's name")
+check(titleButton(176).Text:GetText() == "Wanted: Hogger", "... nothing on a Classic quest")
 QUESTS = { foreverQuest, hogger } -- the pool hands the buttons out in a different order
 QuestLogQuests_Update()
-check(logBadge(86574) and logBadge(86574):IsShown() and not (logBadge(176) and logBadge(176):IsShown()),
-	"reused title buttons don't keep a stale badge")
+check(titleButton(86574).Text:GetText() == "A Forever quest" .. MARK and titleButton(176).Text:GetText() == "Wanted: Hogger",
+	"reused title buttons: the marker follows the quest")
 local forButton = titleButton(86574)
 GameTooltip:SetOwner(forButton); TOOLTIP.shown = true -- Blizzard's own OnEnter shows the quest tooltip
 forButton._scripts.OnEnter(forButton)
-local tipLines = table.concat(TOOLTIP.lines, "|")
-check(tipLines:find("New in WoW: Forever", 1, true), "hovering the quest adds a line explaining the badge")
+check(table.concat(TOOLTIP.lines, "|"):find("New in WoW: Forever", 1, true), "hovering the quest adds a line explaining NEW")
 GameTooltip:Hide()
-DIALOG_QUEST = 86574; QuestFrame:Show()
-Fire("QUEST_DETAIL")
-local _, dialogBadge = ns.GetForeverQuestBadges()
-check(not (dialogBadge and dialogBadge:IsShown()), "nothing inside the event handler")
-Advance(0.05)
-_, dialogBadge = ns.GetForeverQuestBadges()
-check(dialogBadge and dialogBadge:IsShown() and dialogBadge.Label.text == "New in WoW: Forever", "quest dialog: accepting a Forever quest")
-DIALOG_QUEST = 176; Fire("QUEST_PROGRESS"); Advance(0.05)
-check(not dialogBadge:IsShown(), "a Classic quest: no badge")
-DIALOG_QUEST = 86574; Fire("QUEST_COMPLETE"); Advance(0.05)
-check(dialogBadge:IsShown(), "turning in a Forever quest: badge")
-QuestFrame:Hide(); DIALOG_QUEST = nil; Fire("QUEST_FINISHED"); Advance(0.05)
-check(not dialogBadge:IsShown(), "dialog closed: badge gone")
-lefthy("tweaks newquests off"); Advance(0.05)
+-- A title that would need another line with the marker: Blizzard already sized the entry.
+local longQuest = { id = 86576, title = string.rep("x", 31), objectives = {} } -- 31 chars = 1 line, +4 = 2
+QUESTS = { longQuest }
 QuestLogQuests_Update()
-check(not (logBadge(86574) and logBadge(86574):IsShown()) and TDB.foreverQuests == false, "/lefthy tweaks newquests off: no badges")
-DIALOG_QUEST = 86574; QuestFrame:Show(); Fire("QUEST_DETAIL"); Advance(0.05)
-check(not dialogBadge:IsShown(), "... also not in the dialog")
-QuestFrame:Hide(); DIALOG_QUEST = nil
+local spare = ns.GetForeverQuestLabels()[titleButton(86576)]
+check(titleButton(86576).Text:GetText() == longQuest.title and spare and spare:IsShown(),
+	"a long title keeps its line count: NEW goes to the free spot at the end of the entry instead")
+QUESTS = { foreverQuest }
+QuestLogQuests_Update()
+check(not spare:IsShown() and titleButton(86574).Text:GetText() == "A Forever quest" .. MARK,
+	"that spare label goes away when the button shows another quest")
+-- Details in the quest log, and the quest window.
+SELECTED_QUEST = 86574
+QuestInfo_Display({ questLog = true })
+check(QuestInfoTitleHeader:GetText() == "A Forever quest" .. MARK, "quest details in the log: NEW after the title")
+QUESTS = { hogger, foreverQuest }
+DIALOG_QUEST = 176
+QuestInfo_Display({ questLog = false })
+check(QuestInfoTitleHeader:GetText() == "Wanted: Hogger", "quest window, Classic quest: no marker")
+DIALOG_QUEST = 86574
+QuestInfo_Display({ questLog = false })
+check(QuestInfoTitleHeader:GetText() == "A Forever quest" .. MARK, "quest window, accepting or turning in a Forever quest: NEW")
+QuestFrameProgressPanel:Show()
+check(QuestProgressTitleText:GetText() == "A Forever quest" .. MARK, "... also on the progress page")
+QuestFrameProgressPanel:Hide()
+lefthy("tweaks newquests off"); Advance(0.05)
+check(TDB.foreverQuests == false and titleButton(86574).Text:GetText() == "A Forever quest"
+	and QuestInfoTitleHeader:GetText() == "A Forever quest", "/lefthy tweaks newquests off: the open log and window lose the marker")
+QuestLogQuests_Update()
+QuestInfo_Display({ questLog = false })
+check(titleButton(86574).Text:GetText() == "A Forever quest" and QuestInfoTitleHeader:GetText() == "A Forever quest",
+	"... and stay unmarked")
 lefthy("tweaks newquests on"); Advance(0.05)
-check(logBadge(86574):IsShown(), "on again: the open quest log is marked right away")
+check(titleButton(86574).Text:GetText() == "A Forever quest" .. MARK, "on again: the open quest log is marked right away")
+DIALOG_QUEST, SELECTED_QUEST = nil, nil
 QUESTS = savedQuests
 
 section("Misc Tweaks: module switch and /lefthy tweaks")

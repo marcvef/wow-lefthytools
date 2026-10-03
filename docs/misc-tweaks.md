@@ -91,17 +91,22 @@ The personal resource display has no class resource in Forever (see
   a beta product on wago.tools (version 1.60.x); the script picks the newest one. Regenerate the
   list when Forever gets new builds. Stored as comma-separated IDs and ranges, parsed on first use.
   Caveat: quests without a completion bit aren't in `QuestV2`, so a few new quests may be missing.
+- **Marker:** a coloured `NEW_CAPS` ("NEW", "NEU" on German clients) right after the quest's name,
+  as part of the title text. A first version put a glowing badge left of the quest log titles; it
+  covered the icon there and wasn't in the quest details, so it was replaced.
 - **Quest log:** Forever uses the Mainline quest log (`QuestMapFrame`, title buttons from
   `QuestScrollFrame.titleFramePool`, template `QuestLogTitleTemplate`). A post-hook on
-  `QuestLogQuests_Update` puts our own badge frame (Blizzard's "new" look: `NEW_CAPS` with the
-  `collections-newglow` glow) left of each new quest's title, anchored to the button's `Text`, in
-  the 31 px gap Blizzard only uses for bonus objective icons (`TaskIcon`). Buttons are pooled and
-  reused, so every update hides all badges and shows the ones for the quests now on the buttons;
-  that happens in the post-hook itself, so a reused button never shows a stale badge for a frame.
-  Each title button gets one `HookScript("OnEnter")` that adds "New in WoW: Forever" to the quest
-  tooltip Blizzard just showed.
-- **Quest dialog:** `QUEST_DETAIL` (accept), `QUEST_PROGRESS`, `QUEST_COMPLETE` (turn in) and
-  `QUEST_FINISHED` schedule an update on the next frame, which shows a "New in WoW: Forever" badge
-  in `QuestFrame`'s top right corner when `GetQuestID()` is on the list.
+  `QuestLogQuests_Update` appends the marker to each new quest's `button.Text`. Blizzard sizes the
+  entry (`8 + button.Text:GetHeight()`) before the hook runs, so the marker is only appended if
+  `GetNumLines()` stays the same; otherwise our own small label goes to the right end of the entry,
+  in front of the track checkbox, where Forever never shows the quest type icon
+  (`QuestUtilsOverrides.questTagIconHidden`). Blizzard rewrites every title on each update and the
+  hook re-marks the pooled buttons right away; switching off strips the marker. Each title button
+  gets one `HookScript("OnEnter")` that adds "New in WoW: Forever" to the quest tooltip.
+- **Quest details and quest window:** a post-hook on `QuestInfo_Display` (it fills the shared
+  `QuestInfoTitleHeader` for the log details and the quest window's accept and reward pages; the
+  quest is `C_QuestLog.GetSelectedQuest()` or `GetQuestID()`) and a `HookScript("OnShow")` on
+  `QuestFrameProgressPanel` (its own `QuestProgressTitleText`) append the marker. These titles
+  may wrap: the elements below are anchored to them.
 - Not marked (yet): the gossip/greeting quest lists of NPCs with several quests, and the
   objective tracker.

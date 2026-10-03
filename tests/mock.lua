@@ -72,7 +72,11 @@ function FrameMethods:IsVisible()
 	while f do if not f._shown then return false end f = f._parent end
 	return true
 end
-function FrameMethods:Show() self._shown = true end
+function FrameMethods:Show()
+	local wasShown = self._shown
+	self._shown = true
+	if not wasShown and self._scripts.OnShow then self._scripts.OnShow(self) end
+end
 function FrameMethods:Hide() self._shown = false end
 function FrameMethods:IsMouseOver() return self._mouse == true end
 function FrameMethods:IsForbidden() return false end
@@ -189,6 +193,15 @@ function FrameMethods:CreateFontString()
 	function fs:GetText() return self.text end
 	function fs:GetStringWidth() return #(self.text or "") * 6 end
 	function fs:SetTextColor() end
+	fs.shown = true
+	function fs:Show() self.shown = true end
+	function fs:Hide() self.shown = false end
+	function fs:IsShown() return self.shown end
+	-- 6 px per visible character, wrapping at MOCK_LINE_WIDTH (escape codes take no space).
+	function fs:GetNumLines()
+		local plain = (self.text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+		return math.max(1, math.ceil(#plain * 6 / (MOCK_LINE_WIDTH or 200)))
+	end
 	return fs
 end
 
@@ -716,6 +729,7 @@ function QuestLogQuests_Update() -- Blizzard: release all, then acquire a button
 		if not b then
 			b = CreateFrame("Button", nil, QuestScrollFrame)
 			b.Text = b:CreateFontString()
+			b.Checkbox = CreateFrame("Frame", nil, b)
 		end
 		b.questID = q.id
 		b.Text:SetText(q.title)
@@ -727,6 +741,21 @@ CreateFrame("Frame", "QuestFrame", UIParent)
 QuestFrame:Hide()
 DIALOG_QUEST = nil
 function GetQuestID() return DIALOG_QUEST end
+SELECTED_QUEST = nil -- the quest whose details the quest log shows
+C_QuestLog.GetSelectedQuest = function() return SELECTED_QUEST end
+-- QuestInfo_Display fills the shared title for the quest window (detail, reward) and the log details.
+CreateFrame("Frame", "QuestInfoFrame", UIParent)
+QuestInfoTitleHeader = QuestInfoFrame:CreateFontString()
+local function TitleOf(id) for _, q in ipairs(QUESTS) do if q.id == id then return q.title end end return "?" end
+function QuestInfo_Display(template)
+	QuestInfoFrame.questLog = template.questLog
+	QuestInfoTitleHeader:SetText(TitleOf(template.questLog and SELECTED_QUEST or DIALOG_QUEST))
+end
+-- The "progress" page has its own title, set in its OnShow script.
+CreateFrame("Frame", "QuestFrameProgressPanel", QuestFrame)
+QuestProgressTitleText = QuestFrameProgressPanel:CreateFontString()
+QuestFrameProgressPanel:Hide()
+QuestFrameProgressPanel:SetScript("OnShow", function() QuestProgressTitleText:SetText(TitleOf(DIALOG_QUEST)) end)
 
 -- Forever controller UI
 CreateFrame("Frame", "GamepadMainActionBarFrame", UIParent)
