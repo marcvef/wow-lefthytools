@@ -132,9 +132,16 @@ function B.ClassColor(classFile)
 	return 1, 1, 1
 end
 
+-- C_PartyInfo.IsGUIDInGroup; the global IsGUIDInGroup only exists while the client's
+-- "loadDeprecationFallbacks" setting is on (Blizzard_DeprecatedPartyInfo).
+function B.IsInMyGroup(guid)
+	local check = C_PartyInfo and C_PartyInfo.IsGUIDInGroup or IsGUIDInGroup
+	return check ~= nil and check(guid) == true
+end
+
 -- Friends in my group are left to Blizzard, which already shows them on both maps.
 function B.IsShown(peer)
-	return peer.name and peer.hasPos and not (peer.guid and IsGUIDInGroup and IsGUIDInGroup(peer.guid))
+	return peer.name and peer.hasPos and not (peer.guid and B.IsInMyGroup(peer.guid))
 end
 
 -- Where a friend's minimap dot is right now: gliding from the previous report to the latest

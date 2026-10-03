@@ -520,7 +520,9 @@ C_ClassColor = { GetClassColor = function(c)
 	if t then return { GetRGB = function() return t[1], t[2], t[3] end } end
 end }
 GROUP_GUIDS = {}
-function IsGUIDInGroup(guid) return GROUP_GUIDS[guid] == true end
+-- Only the C_PartyInfo version: the global IsGUIDInGroup is a deprecated fallback that clients
+-- without "loadDeprecationFallbacks" don't have.
+C_PartyInfo = { IsGUIDInGroup = function(guid) return GROUP_GUIDS[guid] == true end }
 function CreateVector2D(x, y)
 	return { x = x, y = y, GetXY = function(self) return self.x, self.y end,
 		SetXY = function(self, nx, ny) self.x, self.y = nx, ny end }
