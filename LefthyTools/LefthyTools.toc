@@ -2,7 +2,7 @@
 ## Title: LefthyTools
 ## Notes: Small interface tools for WoW: Forever: Mirage (fades the interface when idle), Misc Tweaks, and Beacon (friends on your map).
 ## Author: lefthy
-## Version: 0.3.0
+## Version: 0.4.0
 ## SavedVariables: LefthyToolsDB
 ## IconTexture: Interface\Icons\INV_Misc_Wrench_01
 ## AddonCompartmentFunc: LefthyTools_OnAddonCompartmentClick
