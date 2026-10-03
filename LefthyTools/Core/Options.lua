@@ -94,8 +94,9 @@ function Builder:Button(name, buttonText, onClick, tooltip)
 end
 
 -- The text field's list element, built on Blizzard's SettingsControlMixin (Init subscribes
--- OnSettingValueChanged to the setting). Commits when focus leaves (Enter, Tab or a click
--- elsewhere); Escape restores the saved text.
+-- OnSettingValueChanged to the setting). Commits when focus leaves: Enter, or a click elsewhere
+-- (GLOBAL_MOUSE_DOWN clears keyboard focus). Tab does nothing here: InputBoxTemplate's
+-- EditBox_OnTabPressed needs a nextEditBox. Escape restores the saved text.
 LefthyToolsSettingsTextMixin = CreateFromMixins(SettingsControlMixin or {})
 
 function LefthyToolsSettingsTextMixin:OnLoad()
