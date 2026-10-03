@@ -149,8 +149,10 @@ tick `Alerts.lua` prints "<skull> Anna died in Duskwood - Raven Hill, fighting S
 like all chat output; zone from Battle.net, subzone from the state) when `deathAlert` is on.
 
 `B.Notify(kind, peer, data)` tells other modules about friends' events on the driver tick:
-`"level"` (`{ level }`), `"death"` (`{ where, foe, level }`) and `"highlight"` (`{ kind, a, b }`),
-also when the chat line or toast is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
+`"level"` (`{ level }`), `"death"` (`{ where, foe, level }`), `"highlight"` (`{ kind, a, b }`),
+`"item"` (`{ itemString }`), and `"online"`/`"offline"` (a friend's name became known more than
+a minute after Beacon started / a known friend was forgotten), also when the chat line or toast
+is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
 
 ## How many enemies
 

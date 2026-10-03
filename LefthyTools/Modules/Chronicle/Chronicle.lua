@@ -262,6 +262,11 @@ function handlers.QUEST_TURNED_IN(questID, xpReward)
 		Record("quests", { count = hit })
 		Share("quests", hit)
 	end
+	-- Every quest goes to friends' feeds (not their chat): what you're up to.
+	local title = C_QuestLog.GetTitleForQuestID(questID)
+	if type(title) == "string" and not issecret(title) then
+		Share("quest", title)
+	end
 end
 
 function handlers.PLAYER_XP_UPDATE()
@@ -476,6 +481,7 @@ local function CheckZone()
 	if zone and zone ~= "" and not char.seen.zones[zone] then
 		char.seen.zones[zone] = true
 		Record("zone", { zone = zone })
+		Share("zone", zone) -- friends' feeds only
 	end
 	local inInstance, instanceType = IsInInstance()
 	if inInstance and (instanceType == "party" or instanceType == "raid") then
@@ -650,6 +656,9 @@ local function AddToFeed(entry)
 	C.feedDirty = true
 end
 
+-- Highlights that only go into the feed: they'd be too chatty as chat lines.
+local FEED_ONLY = { quest = true, zone = true }
+
 local function OnFriendEvent(kind, peer, data)
 	if not (M.enabled and store and peer.name) then
 		return
@@ -659,9 +668,11 @@ local function OnFriendEvent(kind, peer, data)
 		entry.k, entry.level = "level", data.level
 	elseif kind == "death" then
 		entry.k, entry.where, entry.foe = "death", data.where, data.foe
-	elseif kind == "highlight" and CHAT[data.kind] then
+	elseif kind == "online" or kind == "offline" then
+		entry.k = kind
+	elseif kind == "highlight" and (CHAT[data.kind] or FEED_ONLY[data.kind]) then
 		entry.k, entry.a, entry.b = data.kind, data.a, data.b
-		if M.db.friendsChat then
+		if M.db.friendsChat and CHAT[data.kind] then
 			M:Print(("%s%s|r %s"):format(LT.Window.ClassColorCode(peer.classFile), peer.name, CHAT[data.kind](data.a, data.b)))
 		end
 	else

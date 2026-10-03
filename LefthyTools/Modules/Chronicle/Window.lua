@@ -30,6 +30,9 @@ local ICONS = {
 	quests = "Interface\\Icons\\INV_Misc_Note_01",
 	gold = "Interface\\Icons\\INV_Misc_Coin_01",
 	profession = "Interface\\Icons\\INV_Misc_Gear_01",
+	quest = "Interface\\Icons\\INV_Misc_Note_02",
+	online = "Interface\\FriendsFrame\\StatusIcon-Online",
+	offline = "Interface\\FriendsFrame\\StatusIcon-Offline",
 }
 
 local frame
@@ -90,6 +93,9 @@ local TEXT = {
 	profession = function(e)
 		return e.level and L["%s: skill %d"]:format(e.name, e.level) or L["Learned %s"]:format(e.name)
 	end,
+	quest = function(e) return L["Completed %s"]:format(e.name) end, -- friends' feed only
+	online = function() return L["Came online"] end,
+	offline = function() return L["Went offline"] end,
 }
 
 -- A friend's feed entry as an event of the same shape (highlights arrive as two text fields).
@@ -107,6 +113,10 @@ local function FriendEvent(f)
 		quests = { count = tonumber(a) },
 		gold = { gold = tonumber(a) },
 		profession = { name = a, level = tonumber(b) },
+		quest = { name = a },
+		zone = { zone = a },
+		online = {},
+		offline = {},
 	}
 	local e = shapes[f.k]
 	if e then
@@ -123,8 +133,8 @@ local function LineFor(e, who)
 	return date("%H:%M", e.t) .. "  " .. Icon(e) .. " " .. (who and (who .. ": ") or "") .. text
 end
 
--- Newest first, a heading per day.
-local function Journal(list, toLine)
+-- Newest first, a heading per day. empty: the text when there's nothing.
+local function Journal(list, toLine, empty)
 	local lines, lastDay = {}, nil
 	local first = math.max(1, #list - TIMELINE_SHOW + 1)
 	for i = #list, first, -1 do
@@ -146,7 +156,7 @@ local function Journal(list, toLine)
 		lines[#lines + 1] = "|cff999999" .. L["... and %d older entries"]:format(first - 1) .. "|r"
 	end
 	if #lines == 0 then
-		lines[1] = "|cff999999" .. L["Nothing recorded yet."] .. "|r"
+		lines[1] = "|cff999999" .. (empty or L["Nothing recorded yet."]) .. "|r"
 	end
 	return table.concat(lines, "\n")
 end
@@ -155,11 +165,28 @@ local function Timeline(c)
 	return Journal(c.events, function(e) return LineFor(e), e.t end)
 end
 
+-- Who's online right now (each friend in a few lines, from Beacon), then what they did.
 local function Friends()
-	return Journal(C.Store().friends, function(f)
+	local lines = { "|cffffd200" .. L["Online now"] .. "|r" }
+	local beacon = LT:GetModule("beacon")
+	local list = beacon and beacon.enabled and ns.Beacon and ns.Beacon.FriendList() or {}
+	if #list == 0 then
+		lines[#lines + 1] = "|cff999999" .. (beacon and beacon.enabled and L["No friends with LefthyTools online"]
+			or L["Unknown (Beacon is off)"]) .. "|r"
+	end
+	for i, friend in ipairs(list) do
+		if i > 1 then
+			lines[#lines + 1] = " "
+		end
+		ns.Beacon.FriendLines(lines, friend.peer, friend.id)
+	end
+	lines[#lines + 1] = ""
+	lines[#lines + 1] = "|cffffd200" .. L["What they did"] .. "|r"
+	lines[#lines + 1] = Journal(C.Store().friends, function(f)
 		local e = FriendEvent(f)
 		return e and LineFor(e, LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r"), f.t
-	end)
+	end, L["Your friends' level-ups, deaths, quests, new zones, dungeons, bosses, rares, epic loot, mounts and milestones show up here, and when they come online. They need an up-to-date LefthyTools for most of it."])
+	return table.concat(lines, "\n")
 end
 
 ---------------------------------------------------------------------------
@@ -400,6 +427,7 @@ function Refresh(keepScroll)
 	else
 		frame:SetBodyText(tab == "friends" and Friends() or Timeline(c), keepScroll)
 		frame.Values:SetText("")
+		lastStatsRefresh = GetTime() -- the friends page refreshes every few seconds too
 	end
 end
 
@@ -430,7 +458,7 @@ function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
 	if tab == "timeline" then
 		redraw = eventsChanged
 	elseif tab == "friends" then
-		redraw = feedChanged
+		redraw = feedChanged or now - lastStatsRefresh >= STATS_REFRESH -- "online now" changes all the time
 	elseif tab == "graphs" then
 		graphsPending = graphsPending or statsChanged or eventsChanged -- kept until the next draw
 		local since = now - lastGraphsRefresh

@@ -2109,7 +2109,27 @@ do
 	check(printedSince(pmark):find("Anna|r defeated Hogger (Elwynn Forest).", 1, true), "with a chat line")
 	for i = 1, 10 do anna("E2;rare;Rare" .. i .. ";Duskwood") end
 	Advance(0.15)
-	check(#feed == before + 6, "at most 6 highlights a minute from one friend, got " .. (#feed - before))
+	check(#feed == before + 10, "at most 10 highlights a minute from one friend, got " .. (#feed - before))
+	Advance(60)
+	pmark = #PRINTED + 1
+	anna("E2;quest;The Defias Brotherhood;")
+	anna("E2;zone;Westfall;")
+	Advance(0.15)
+	check(feed[#feed - 1].k == "quest" and feed[#feed].k == "zone" and feed[#feed].a == "Westfall"
+		and not printedSince(pmark):find("Westfall", 1, true) and not printedSince(pmark):find("Defias", 1, true),
+		"friends' quests and new zones go into the feed, not into chat")
+	QUESTS = { { id = 500, title = "The Defias Brotherhood", objectives = {} } }
+	mark = #GAMEDATA + 1
+	Fire("QUEST_TURNED_IN", 500, 0, 0)
+	Advance(1.2)
+	check(sentTo(11, mark, "E2;quest;")[1] == "E2;quest;The Defias Brotherhood;", "my quests go to my friends' feeds")
+	QUESTS = {}
+	anna("Q2") -- she switches Beacon off (or logs off)
+	Advance(0.15)
+	check(feed[#feed].k == "offline" and feed[#feed].name == "Anna", "a friend going offline is in the feed")
+	anna("H2")
+	Advance(1.2)
+	check(feed[#feed].k == "online" and feed[#feed].name == "Anna", "and coming back online")
 	Advance(15)
 	anna("L2;24;")
 	Advance(0.15)
@@ -2154,8 +2174,13 @@ do
 		"values: deadliest foe, /played as days and hours")
 	check(not win.Tabs.stats:IsEnabled() and win.Tabs.timeline:IsEnabled(), "the open page's button is greyed out")
 	win.Tabs.friends:Click()
-	check(win.Text:GetText():find("Anna|r: ", 1, true) and win.Text:GetText():find("Defeated Hogger (Elwynn Forest)", 1, true),
+	local friendsPage = win.Text:GetText()
+	check(friendsPage:find("Anna|r: ", 1, true) and friendsPage:find("Defeated Hogger (Elwynn Forest)", 1, true),
 		"friends: their highlights")
+	check(friendsPage:find("|cffffd200Online now|r\n|cff40c7ebAnna|r  |cffccccccLevel 20", 1, true)
+		and friendsPage:find("Came online", 1, true) and friendsPage:find("Completed The Defias Brotherhood", 1, true)
+		and friendsPage:find("Discovered Westfall", 1, true),
+		"friends: who's online now and what they're doing, then what happened, got\n" .. friendsPage)
 	me.daily[date("%Y-%m-%d", time() - 86400)] = { played = 3600, xp = 5000, quests = 3, kills = 20, deaths = 0 }
 	me.daily[date("%Y-%m-%d", time() - 20 * 86400)] = { played = 99, xp = 1, quests = 1, kills = 1, deaths = 0 }
 	local draws, draw = 0, CH.Graphs.Draw

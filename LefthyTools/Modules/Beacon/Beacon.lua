@@ -64,12 +64,13 @@ local DING_GAP = 10          -- level-up messages accepted from one friend at mo
 local DEATH_GAP = 10         -- death alerts for one friend at most this often
 local PING_GAP = 2           -- map pings accepted from one friend at most this often
 local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed) at most this often
-local HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW = 6, 60 -- Chronicle highlights accepted from one friend
+local HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW = 10, 60 -- Chronicle highlights accepted from one friend
+local ONLINE_QUIET = 60      -- friends found in the first minute were online already: not news
 local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
 local XP_GAP = 2             -- my level progress is checked (and sent if changed) at most this often
 local ITEM_GAP = 3           -- shared items accepted from one friend at most this often
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
-	quests = true, gold = true, profession = true }
+	quests = true, gold = true, profession = true, quest = true, zone = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
@@ -134,6 +135,8 @@ local deaths = {}       -- { gameAccountID, foe }: friends who just died, told o
 local pingsIn = {}      -- { gameAccountID, continent, north, west, mapID } received, shown on the next tick
 local highlightsIn = {} -- { gameAccountID, kind, a, b } received, passed on on the next tick
 local itemsIn = {}      -- { gameAccountID, item string } received, shown on the next tick
+local comings = {}      -- { "online" | "offline", peer }: told to listeners on the next tick
+local enabledAt = 0
 local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on the next tick
 local newerNoticeShown = false -- that notice comes once per login
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
@@ -517,14 +520,21 @@ local function CopyInfo(peer, info)
 		peer.rev = peer.rev + 1
 		Changed()
 	end
+	if not peer.name and info.characterName and GetTime() - enabledAt > ONLINE_QUIET then
+		comings[#comings + 1] = { "online", peer } -- someone just came online with LefthyTools
+	end
 	peer.name, peer.classFile, peer.guid = info.characterName, info.classFilename, info.playerGuid
 	peer.level, peer.area = info.characterLevel, info.areaName
 end
 
 local function Forget(gameAccountID)
-	if peers[gameAccountID] then
+	local peer = peers[gameAccountID]
+	if peer then
 		peers[gameAccountID] = nil
 		Changed()
+		if peer.name then
+			comings[#comings + 1] = { "offline", peer }
+		end
 	end
 	owed[gameAccountID] = nil
 end
@@ -842,6 +852,10 @@ local function Tick(now, elapsed)
 			B.ReceivePing(peer, ping[1], ping[2], ping[3], ping[4], ping[5])
 		end
 	end
+	while comings[1] do
+		local item = table.remove(comings, 1)
+		B.Notify(item[1], item[2], {})
+	end
 	while itemsIn[1] do
 		local item = table.remove(itemsIn, 1)
 		local peer = peers[item[1]]
@@ -961,6 +975,7 @@ function M:OnEnable()
 	farewellUntil = nil
 	tokens, pausedUntil, sinceTick = SEND_BURST, 0, 0
 	stats.sent, stats.received, stats.throttled, stats.since = 0, 0, 0, GetTime()
+	enabledAt = GetTime()
 	driver:SetScript("OnUpdate", OnUpdate)
 	if B.Attach then
 		C_Timer.After(0, B.Attach)
@@ -974,7 +989,7 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn, B.pings, plates }) do
+	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn, comings, B.pings, plates }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil

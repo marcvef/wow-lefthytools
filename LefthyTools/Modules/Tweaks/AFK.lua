@@ -155,77 +155,20 @@ local function NewsLine(item)
 	return item.data.text and (who .. ": " .. item.data.text) or nil
 end
 
--- What a friend is doing right now: dead, or fighting (and how many), and the quest they track.
-local function Doing(peer)
-	local parts = {}
-	if peer.ghost then
-		parts[#parts + 1] = "|cffff5050" .. L["Ghost"] .. "|r"
-	elseif peer.dead then
-		parts[#parts + 1] = "|cffff5050" .. L["Dead"] .. "|r"
-	elseif peer.combat then
-		local mobs, text = peer.mobs or 0, nil
-		if peer.target and peer.target ~= "" then
-			text = mobs > 1 and L["Fighting %s and %d more"]:format(peer.target, mobs - 1) or L["Fighting %s"]:format(peer.target)
-		elseif mobs > 1 then
-			text = L["In combat with %d enemies"]:format(mobs)
-		elseif mobs == 1 then
-			text = L["In combat with 1 enemy"]
-		else
-			text = L["In combat"]
-		end
-		parts[#parts + 1] = "|cffff5050" .. text .. "|r"
-	end
-	local quest = peer.quest
-	if quest then
-		local progress = quest.done and L["Ready to turn in"] or (quest.objective ~= "" and quest.objective or nil)
-		parts[#parts + 1] = "|cffffd200" .. L["Quest: %s"]:format(quest.title) .. "|r"
-			.. (progress and ("|cffcccccc - " .. progress .. "|r") or "")
-	end
-	return #parts > 0 and table.concat(parts, "  ") or nil
-end
-
--- Each Beacon friend: name (AFK too?), level and progress, group; where, and how far; what they do.
+-- Each Beacon friend (Beacon's B.FriendLines: who, where, what they're doing), up to MAX_FRIENDS.
 local function FriendLines(lines)
 	local beacon = LT:GetModule("beacon")
 	local B = ns.Beacon
-	local peers = beacon and beacon.enabled and B and B.peers
-	local list = {}
-	for gameAccountID, peer in pairs(peers or {}) do
-		if peer.name then
-			list[#list + 1] = { id = gameAccountID, peer = peer }
-		end
-	end
-	table.sort(list, function(a, b) return a.peer.name < b.peer.name end)
+	local list = beacon and beacon.enabled and B and B.FriendList() or {}
 	lines[#lines + 1] = "|cffffd200" .. L["Friends online"] .. "|r"
 	if #list == 0 then
 		lines[#lines + 1] = "|cff999999" .. L["No friends with LefthyTools online"] .. "|r"
 	end
 	for i = 1, math.min(#list, MAX_FRIENDS) do
-		local peer, id = list[i].peer, list[i].id
-		local info = C_BattleNet.GetGameAccountInfoByID(id)
-		local level = info and info.characterLevel or peer.level
-		local head = ColouredName(peer.name, peer.classFile)
-		if info and info.isGameAFK then
-			head = head .. " |cff999999<AFK>|r"
-		end
-		if level then
-			head = head .. "  |cffcccccc" .. (peer.xpPercent and L["Level %d (%d%%)"]:format(level, peer.xpPercent)
-				or L["Level %d"]:format(level)) .. "|r"
-		end
-		if peer.groupUnit then
-			head = head .. "  |cff4da6ff" .. L["In your group"] .. "|r"
-		end
 		if i > 1 then
 			lines[#lines + 1] = " "
 		end
-		lines[#lines + 1] = head
-		local where = (B.WhereText and B.WhereText(peer, id)) or peer.area or "?"
-		local distance = peer.hasPos and B.DistanceText and B.DistanceText(peer.continent, peer.north, peer.west)
-		lines[#lines + 1] = "|cffaaaaaa" .. where .. (distance and (", " .. distance) or "") .. "|r"
-		local doing = Doing(peer)
-		if doing then
-			lines[#lines + 1] = doing
-		end
+		B.FriendLines(lines, list[i].peer, list[i].id)
 	end
 	if #list > MAX_FRIENDS then
 		lines[#lines + 1] = " "

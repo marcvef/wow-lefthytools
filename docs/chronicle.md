@@ -70,11 +70,15 @@ driver hidden.
 Highlights go to friends through Beacon (`ns.Beacon.ShareHighlight`, on the tick, only with
 Beacon on and `share` on) as `E2;<kind>;<a>;<b>`: boss (name, instance), rare (name, zone),
 dungeon (name), loot (name, quality; epic and better only), mount (name), achievement (name),
-quests (count), gold (amount), profession (name, level). Zones, pets, toys and blue loot stay
-private (too chatty). Beacon accepts at most 6 highlights per friend per minute and only known
-kinds, and passes them on as `B.Notify("highlight", peer, { kind, a, b })`. Chronicle's listener
-puts them, and Beacon's `level` and `death` events, into the feed, and prints a chat line for
-highlights (English, `friendsChat`). Friends' level-ups and deaths already have their own lines.
+quests (count), gold (amount), profession (name, level), and for the feed only (no chat line)
+quest (every quest turned in: its title) and zone (first visit). Pets, toys and blue loot stay
+private. Beacon accepts at most 10 highlights per friend per minute and only known kinds, and
+passes them on as `B.Notify("highlight", peer, { kind, a, b })`. Chronicle's listener puts them,
+and Beacon's `level`, `death`, `online` and `offline` events, into the feed, and prints a chat
+line for highlights except quest and zone (English, `friendsChat`). Friends' level-ups and deaths
+already have their own lines. `online`: a friend's name became known more than a minute after
+Beacon started (friends already online at login aren't news); `offline`: a known friend was
+forgotten (went offline, silent for 65 s, or switched Beacon off).
 
 ## Window
 
@@ -98,7 +102,11 @@ button greyed out:
   the road and Loot by quality (one split bar each, with a legend). Drawn with plain textures
   (`SetGradient` for the bars), line objects (`CreateLine`) and font strings from pools
   (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first draw.
-- **Friends:** the feed, as "Name: text".
+- **Friends:** "Online now" first: every Beacon friend in up to three lines (`B.FriendLines` in
+  Beacon's `Alerts.lua`, shared with the AFK screen: name, AFK, level and progress, group; zone
+  and distance; what they're fighting and their quest), then "What they did": the feed, as
+  "Name: text", with a hint about what will appear while it's empty. Redrawn when the feed
+  changes and every 5 s (the online part changes all the time).
 
 Redrawn on the tick only while open, and only the open page when its own data changed:
 `C.eventsDirty` for the timeline (a kill only changes a counter, so it doesn't rebuild 250

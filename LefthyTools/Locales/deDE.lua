@@ -350,6 +350,13 @@ L["Pets"] = "Pets"
 L["Toys"] = "Spielzeuge"
 L["Achievements"] = "Erfolge"
 L["Counted since %s."] = "Gezählt seit %s."
+L["Online now"] = "Gerade online"
+L["What they did"] = "Was sie erlebt haben"
+L["Your friends' level-ups, deaths, quests, new zones, dungeons, bosses, rares, epic loot, mounts and milestones show up here, and when they come online. They need an up-to-date LefthyTools for most of it."] =
+	"Hier erscheinen Level-Ups, Tode, Quests, neue Gebiete, Dungeons, Bosse, Rares, epischer Loot, Mounts und Meilensteine deiner Freunde, und wann sie online kommen. Für das meiste brauchen sie ein aktuelles LefthyTools."
+L["Completed %s"] = "%s abgeschlossen"
+L["Came online"] = "Ist online gekommen"
+L["Went offline"] = "Ist offline gegangen"
 -- Chronicle graphs
 L["Graphs"] = "Grafiken"
 L["Last 14 days"] = "Letzte 14 Tage"

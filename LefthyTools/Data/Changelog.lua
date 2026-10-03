@@ -63,5 +63,8 @@ ns.CHANGELOG = {
 	{ id = 19, version = "0.5.0", module = "beacon",
 		en = { "Show an item", "Ctrl+right-click an item: your friends get it as a link in chat and a notice on screen, without a sound." },
 		de = { "Item zeigen", "Strg+Rechtsklick auf ein Item: Deine Freunde bekommen es als Link im Chat und als Hinweis auf dem Bildschirm, ohne Sound." } },
+	{ id = 20, version = "0.5.0", module = "chronicle",
+		en = { "Friends page", "Shows who's online now and what they're doing, then their news: now also quests, new zones and coming online." },
+		de = { "Freunde-Seite", "Zeigt, wer gerade online ist und was er macht, dann ihre Neuigkeiten: jetzt auch Quests, neue Gebiete und wann sie online kommen." } },
 	-- New entries go here, at the end.
 }
