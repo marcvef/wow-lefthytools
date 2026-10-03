@@ -94,6 +94,10 @@ function LT:ResetModuleSettings(m)
 		end
 	end
 	ApplyDefaults(m.db, m.defaults)
+	-- Tell an open settings page about every reset value (it would keep showing the old ones).
+	for _, setting in pairs(m.settings or {}) do
+		setting:NotifyUpdate()
+	end
 end
 
 -- Changes a setting the way its checkbox or slider would: through the setting object, so an

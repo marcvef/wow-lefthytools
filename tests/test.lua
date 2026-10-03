@@ -325,8 +325,11 @@ check(Mirage.enabled, "/mirage on")
 mirage("status")
 mirage("")
 check(OPENED_CATEGORY == Mirage.category:GetID(), "/mirage opens Mirage's settings page")
+local delayUpdates, chatUpdates = S("delay").uiUpdates, S("group_chat").uiUpdates
 mirage("reset")
 check(MDB.fadeOutTime == 1.5 and MDB.groups.chat == true and MDB.delay == 5, "/mirage reset")
+check(S("delay").uiUpdates > delayUpdates and S("group_chat").uiUpdates > chatUpdates,
+	"/mirage reset tells an open settings page about every reset value")
 check(MDB.groups.reticle == false, "/mirage reset keeps per-group defaults")
 check(MDB.minimapHideAt == 0, "/mirage reset restores the quest area threshold")
 check(LefthyToolsDB.settings.mirage == MDB, "reset keeps the same settings table")
