@@ -206,7 +206,9 @@ window) it goes by the 14th return of `C_Item.GetItemInfo`, the bind type: on pi
 account-bound items aren't shared. An empty slot (no link) is ignored.
 
 - **Messages:** `I2;<item string>[;<call id>]` (what follows `item:` in the link: id, enchant,
-  suffix, ...; at most 200 bytes; the call id only when offered), `N2;<call id>;<1|0>` (a
+  suffix, ...; numeric fields only: a crafted item's crafter GUID, `Player-<realm>-<id>`, is left
+  empty, since every build's check takes only digits, `-` and `:`; at most 200 bytes; the call id
+  only when offered), `N2;<call id>;<1|0>` (a
   friend's Need or Pass, to the sharer), `R2;<call id>;<name>:<roll>,...` (the verdict, from the
   sharer to everyone: highest roll first, roll 0 = the only Need, nothing = nobody).
 - **Referee:** the sharer's client. The call ends after 20 s or when every friend who got it has

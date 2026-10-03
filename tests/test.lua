@@ -1909,6 +1909,18 @@ do
 	Advance(0.15)
 	check(#sentTo(11, mark, "I2;") == 1 and printedSince(pmark):find("can't read this item's link", 1, true)
 		and printedSince(pmark):find("||Hitem:abc", 1, true), "an unreadable link: a message with the link, nothing sent")
+	-- A crafted item's link carries the crafter's GUID: shown anyway, without it (every build's
+	-- message check only takes numbers).
+	ctrlRight("|cnIQ3:|Hitem:1155::::::::25:1490:::::::::Player-1234-0ABCDEF0:|h[Rod of the Sleepwalker]|h|r")
+	Advance(0.15)
+	check(sentTo(11, mark, "I2;")[2] == "I2;1155::::::::25:1490::::::::::",
+		"a crafted item: shown, the crafter's GUID left out, got " .. tostring(sentTo(11, mark, "I2;")[2]))
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "I2;1155::::::::25:1490::::::::::", "WHISPER", 12)
+	Advance(0.15)
+	local craftedShown
+	for _, call in pairs(BB.calls) do if call.itemString == "1155::::::::25:1490::::::::::" then craftedShown = call end end
+	check(craftedShown, "and a friend receives it")
+	Advance(9)
 	-- The same without a click: /lefthy beacon show | offer <item>.
 	pmark = #PRINTED + 1
 	lefthy("beacon show")
@@ -1918,7 +1930,7 @@ do
 		"/lefthy beacon offer a Bind on Pickup item: refused")
 	lefthy("beacon show " .. ItemLink(19019))
 	Advance(0.15)
-	check(sentTo(11, mark, "I2;")[2] == "I2;19019::::::::20:::::", "/lefthy beacon show <item>: shown, soulbound or not")
+	check(sentTo(11, mark, "I2;")[3] == "I2;19019::::::::20:::::", "/lefthy beacon show <item>: shown, soulbound or not")
 	Advance(3)
 	mark = #GAMEDATA + 1
 	STATE.ctrl, MOCK_BUTTON = true, "LeftButton"

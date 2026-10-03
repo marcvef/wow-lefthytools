@@ -111,5 +111,8 @@ ns.CHANGELOG = {
 	{ id = 35, version = "0.5.0", module = "beacon",
 		en = { "Friends' versions", "A friend's version no longer shows as \"0.3.0 or older\" after Beacon lost track of them for a moment." },
 		de = { "Versionen von Freunden", "Die Version eines Freundes steht nicht mehr als „0.3.0 oder älter“ da, nachdem Beacon ihn kurz aus den Augen verloren hat." } },
+	{ id = 36, version = "0.5.0", module = "beacon",
+		en = { "Crafted items", "Crafted items (their links name the crafter) can be shown and offered too." },
+		de = { "Hergestellte Items", "Hergestellte Items (ihr Link nennt den Hersteller) lassen sich jetzt auch zeigen und anbieten." } },
 	-- New entries go here, at the end.
 }

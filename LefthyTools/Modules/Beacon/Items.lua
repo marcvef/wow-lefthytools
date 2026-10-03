@@ -46,9 +46,20 @@ local calls = {}
 B.calls = calls
 
 -- "12345:0:0:..." from an item link, or nil.
+-- Only the numeric fields travel: a crafted item's link carries the crafter's GUID
+-- ("...:Player-1234-0ABCDEF0:"), which every build's message check rejects and nobody needs to see
+-- the item, so that field goes empty.
 local function ItemString(link)
-	local itemString = type(link) == "string" and link:match("|Hitem:([%-%d:]+)|h")
-	if itemString and #itemString <= 200 then
+	local raw = type(link) == "string" and link:match("|Hitem:([^|]+)|h")
+	if not raw then
+		return nil
+	end
+	local fields = {}
+	for field in (raw .. ":"):gmatch("([^:]*):") do
+		fields[#fields + 1] = field:match("^%-?%d*$") and field or ""
+	end
+	local itemString = table.concat(fields, ":")
+	if #itemString <= 200 and itemString:match("^%d+") then
 		return itemString
 	end
 end
