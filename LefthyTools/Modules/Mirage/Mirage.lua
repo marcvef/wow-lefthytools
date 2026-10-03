@@ -615,6 +615,7 @@ end
 
 function M:ResetSettings()
 	LT:ResetModuleSettings(self)
+	db.groupAlphaMigrated = true -- fresh settings: nothing to migrate at the next login
 	self:Refresh()
 end
 

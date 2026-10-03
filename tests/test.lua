@@ -396,6 +396,9 @@ check(S("delay").uiUpdates > delayUpdates and S("group_chat").uiUpdates > chatUp
 check(MDB.groups.reticle == false, "/mirage reset keeps per-group defaults")
 check(MDB.minimapHideAt == 0, "/mirage reset restores the quest area threshold")
 check(LefthyToolsDB.settings.mirage == MDB, "reset keeps the same settings table")
+MDB.groupAlpha.minimap = 0.5
+Mirage:OnInitialize() -- the next login
+check(MDB.groupAlpha.minimap == 0.5, "after a reset the next login keeps per-element opacity (no second migration)")
 
 section("idle delay 0")
 mirage("delay 0")
