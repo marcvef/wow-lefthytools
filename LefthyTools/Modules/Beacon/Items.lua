@@ -460,28 +460,37 @@ local function HasTradeTimer(bag, slot)
 	return false
 end
 
-local function Shareable(link)
-	local bindType = select(14, C_Item.GetItemInfo(link))
+-- Where the clicked item is: Blizzard passes its location from bags, the bank and the character
+-- frame; for other callers (bag addons) the bag slot under the mouse, if it holds this link.
+local function Location(link, itemLocation)
+	if itemLocation and itemLocation.IsValid and itemLocation:IsValid() then
+		return itemLocation
+	end
 	local focus = GetMouseFoci and GetMouseFoci()[1] or (GetMouseFocus and GetMouseFocus())
 	if focus and focus.IsForbidden and focus:IsForbidden() then
-		focus = nil
-	end
-	if focus and focus.isSellGuard then
-		focus = focus:GetParent() -- Handover.lua's guard over a reserved bag slot
+		return nil
 	end
 	local bag = focus and focus.GetBagID and focus:GetBagID()
-	if bag and C_Container.GetContainerItemLink(bag, focus:GetID()) == link then
-		local slot = focus:GetID()
-		local info = C_Container.GetContainerItemInfo(bag, slot)
-		if (info and info.isBound) or ALWAYS_BOUND[bindType] then
-			return HasTradeTimer(bag, slot)
-		end
-		return true
+	if bag and ItemLocation and C_Container.GetContainerItemLink(bag, focus:GetID()) == link then
+		return ItemLocation:CreateFromBagAndSlot(bag, focus:GetID())
 	end
-	if focus and not bag and focus.GetID and GetInventoryItemLink("player", focus:GetID()) == link then
+	if focus and not bag and focus.GetID and ItemLocation and GetInventoryItemLink("player", focus:GetID()) == link then
+		return ItemLocation:CreateFromEquipmentSlot(focus:GetID())
+	end
+end
+
+local function Shareable(link, location)
+	local bindType = select(14, C_Item.GetItemInfo(link))
+	if not location then
+		return not NO_TRADE_BIND[bindType] -- a chat link, the loot window: by its bind type
+	end
+	if location:IsEquipmentSlot() then
 		return false -- worn: equipping binds it
 	end
-	return not NO_TRADE_BIND[bindType]
+	if C_Item.IsBound(location) or ALWAYS_BOUND[bindType] then
+		return location:IsBagAndSlot() and HasTradeTimer(location:GetBagAndSlot()) or false
+	end
+	return true
 end
 
 local function OnModifiedItemClick(link, itemLocation)
@@ -492,11 +501,12 @@ local function OnModifiedItemClick(link, itemLocation)
 		if not (M.enabled and M.db.shareItems) then
 			return
 		end
-		if not Shareable(link) then
+		local location = Location(link, itemLocation)
+		if not Shareable(link, location) then
 			M:Print(("%s is soulbound or can't be traded: nothing to share."):format(link))
 			return
 		end
-		B.ShareItem(link, IsShiftKeyDown()) -- with Shift: let them roll for it
+		B.ShareItem(link, IsShiftKeyDown(), location) -- with Shift: let them roll for it
 	end
 end
 

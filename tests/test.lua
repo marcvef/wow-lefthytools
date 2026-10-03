@@ -1844,9 +1844,9 @@ end
 
 section("Beacon: showing and offering items")
 do
-	local function ctrlRight(link, shift)
+	local function ctrlRight(link, shift, location)
 		STATE.ctrl, STATE.shift, MOCK_BUTTON = true, shift == true, "RightButton"
-		HandleModifiedItemClick(link)
+		HandleModifiedItemClick(link, location)
 		STATE.ctrl, STATE.shift = false, false
 	end
 	local function soundsSince(n)
@@ -1908,6 +1908,21 @@ do
 	ctrlRight(ItemLink(1155))
 	Advance(0.15)
 	check(#sentTo(11, mark, "I2;") == 2, "a worn item: not shared")
+	-- With the location Blizzard passes (bags, bank, character frame), the mouse doesn't matter.
+	MOCK_FOCUS = nil
+	BAGS[6] = { [1] = 1155 } -- a bank bag
+	BOUND[1] = true
+	ctrlRight(ItemLink(1155), false, ItemLocation:CreateFromBagAndSlot(6, 1))
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 2, "a soulbound item in the bank: not shared")
+	BOUND[1] = nil
+	ctrlRight(ItemLink(1155), false, ItemLocation:CreateFromBagAndSlot(6, 1))
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 3, "not bound yet, in the bank: shared")
+	Advance(3)
+	ctrlRight(ItemLink(1155), false, ItemLocation:CreateFromEquipmentSlot(16))
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 3, "worn, clicked on the character frame: not shared")
 	MOCK_FOCUS, EQUIPPED, BAGS = nil, {}, { [0] = {} }
 	Advance(3)
 

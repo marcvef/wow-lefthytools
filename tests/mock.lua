@@ -492,7 +492,27 @@ ITEMS[19019].bind, ITEMS[1155].bind = 1, 2 -- Thunderfury binds on pickup, the r
 MOCK_FOCUS, EQUIPPED, BOUND, BAG_TOOLTIP = nil, {}, {}, {}
 function GetMouseFoci() return { MOCK_FOCUS } end
 function GetInventoryItemLink(unit, slot) return unit == "player" and EQUIPPED[slot] and ItemLink(EQUIPPED[slot]) or nil end
-BIND_TRADE_TIME_REMAINING = "You may trade this item with players that were also eligible to loot this item for the next %s."
+-- Item locations (bag and slot, or an equipment slot), bound state and instance GUIDs per slot.
+ITEM_GUIDS = {} -- [bag .. ":" .. slot] = guid; default "Item-<bag>-<slot>"
+local locationMethods = {
+	IsValid = function(s)
+		if s.equip then return EQUIPPED[s.equip] ~= nil end
+		return BAGS[s.bag] ~= nil and BAGS[s.bag][s.slot] ~= nil
+	end,
+	IsBagAndSlot = function(s) return s.bag ~= nil end,
+	GetBagAndSlot = function(s) return s.bag, s.slot end,
+	IsEquipmentSlot = function(s) return s.equip ~= nil end,
+}
+ItemLocation = {
+	CreateFromBagAndSlot = function(_, bag, slot) return setmetatable({ bag = bag, slot = slot }, { __index = locationMethods }) end,
+	CreateFromEquipmentSlot = function(_, slot) return setmetatable({ equip = slot }, { __index = locationMethods }) end,
+}
+C_Item.IsBound = function(loc) return loc.equip ~= nil or BOUND[loc.slot] == true end
+C_Item.GetItemGUID = function(loc)
+	if not loc.bag then return nil end
+	return ITEM_GUIDS[loc.bag .. ":" .. loc.slot] or ("Item-" .. loc.bag .. "-" .. loc.slot)
+end
+BIND_TRADE_TIME_REMAINING ="You may trade this item with players that were also eligible to loot this item for the next %s."
 C_TooltipInfo = { GetBagItem = function(bag, slot)
 	local lines = {}
 	for i, text in ipairs(BAG_TOOLTIP[slot] or {}) do lines[i] = { leftText = text } end

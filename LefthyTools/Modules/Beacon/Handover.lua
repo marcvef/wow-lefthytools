@@ -234,7 +234,7 @@ local function GuardOnClick(guard, mouseButton)
 	if IsModifiedClick() then -- Ctrl+right-click shows it to friends, as anywhere else
 		local link = C_Container.GetContainerItemLink(bag, slot)
 		if link then
-			HandleModifiedItemClick(link)
+			HandleModifiedItemClick(link, ItemLocation and ItemLocation:CreateFromBagAndSlot(bag, slot))
 		end
 		return
 	end
@@ -272,7 +272,6 @@ local function Guard(button)
 		return guard
 	end
 	guard = CreateFrame("Button", nil, button)
-	guard.isSellGuard = true -- Items.lua looks through it to the slot
 	guard:SetAllPoints()
 	guard:SetFrameLevel(button:GetFrameLevel() + 10)
 	guard:RegisterForClicks("RightButtonUp")
