@@ -1,11 +1,11 @@
 local _, ns = ...
 local LT = ns.LT
 local L = ns.L
-local M = LT:GetModule("mirage")
-local data = ns.MirageData
+local M = LT:GetModule("tweaks")
+local data = ns.MirageData -- the window lists Mirage uses to tell whether the UI is in use
 
--- AFK screen: while you're away (/afk or the game's auto-AFK) the interface disappears, the camera
--- slowly circles your character, and a panel shows your character, how long you've been away,
+-- AFK screen (a Misc Tweak; works without Mirage): while you're away (/afk or the game's
+-- auto-AFK) the interface disappears, the camera slowly circles your character, and a panel shows your character, how long you've been away,
 -- the time, your level progress, whispers and friends' news since then, and which Beacon
 -- friends are online and where. Moving, combat, a popup that needs you (ready check, invite,
 -- trade, ...), opening a window or a click brings everything back.
@@ -31,7 +31,7 @@ local LEAVE_EVENTS = {   -- things that need the interface right away
 local issecret = issecretvalue or function() return false end
 
 local AFK = {}
-ns.MirageAFK = AFK
+ns.AFKScreen = AFK
 -- Other modules add lines to the panel: function() return { "line", ... } end (Chronicle).
 AFK.sections = {}
 
@@ -355,7 +355,7 @@ local function OnFriendEvent(kind, peer, eventData)
 end
 
 ---------------------------------------------------------------------------
--- Mirage switches it on and off with itself
+-- Switched by Tweaks.lua (on the next frame after the setting or the module changes)
 ---------------------------------------------------------------------------
 
 function AFK.Enable()
@@ -373,6 +373,7 @@ function AFK.Enable()
 		MoveViewLeftStop() -- the UI was reloaded while the camera was circling
 		M.db.afkSpinning = nil
 	end
+	dismissed = false
 	checkPending = true -- maybe AFK already (switched on, or a reload)
 	driver:Show()
 end
@@ -382,10 +383,20 @@ function AFK.Disable()
 	if shown then
 		Leave(false)
 	end
-	checkPending = false
+	-- Switched off: the next time it's on, the next AFK shows it again (the event that would have
+	-- cleared this, coming back from AFK, isn't listened to while off).
+	dismissed, checkPending = false, false
 	driver:Hide()
 end
 
 function AFK.IsShown()
 	return shown
+end
+
+function ns.ApplyAFKScreen(on)
+	if on then
+		AFK.Enable()
+	else
+		AFK.Disable()
+	end
 end

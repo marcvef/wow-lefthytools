@@ -110,3 +110,30 @@ The personal resource display has no class resource in Forever (see
   may wrap: the elements below are anchored to them.
 - Not marked (yet): the gossip/greeting quest lists of NPCs with several quests, and the
   objective tracker.
+
+## afkScreen: the AFK screen (AFK.lua)
+
+While the player is AFK (`UnitIsAFK("player")`; `/afk` or the auto-AFK), the
+interface disappears and a panel shows the character (`PlayerModel` with `SetUnit("player")`),
+time away, clock, zone, level progress and rested XP, whispers since then, friends' level-ups and
+deaths while away (a `ns.Beacon.listeners` entry), Beacon friends online with level, zone and
+status, and lines other modules add through `ns.AFKScreen.sections` (Chronicle's session). The
+camera circles with `MoveViewLeftStart(0.03)` (setting `afkSpin`).
+
+- **Hiding:** `UIParent:SetAlpha(0)`, restored to the previous alpha. Not `Hide()`: Hide/Show on
+  UIParent is blocked in combat, SetAlpha never is, so leaving always works. The panel
+  (`LefthyToolsAFKFrame`) has no parent (stays visible), sits in `FULLSCREEN_DIALOG` and takes
+  mouse clicks, so nothing invisible can be clicked; a click leaves (on the next frame).
+- **Leaving:** the AFK flag goes, combat, moving, typing (keyboard focus), a window or bag
+  opening, death, or an event that needs the player (ready check, party invite, LFG proposal,
+  trade, duel, summon, resurrect, cinematic). Leaving while still flagged AFK keeps the screen
+  away until the next AFK. Not shown in combat, dead or with a window open. Switching the tweak
+  (or Misc Tweaks) off clears that, so the next AFK after switching it on shows it again.
+- **History:** it started as part of Mirage; `M:OnInitialize` moves a saved `afkScreen`/`afkSpin`
+  from Mirage's settings once. It reuses Mirage's window lists (`ns.MirageData`) to tell whether a
+  window is open, which works with Mirage off too.
+- **Cost:** nothing while not AFK: the driver frame is hidden; `PLAYER_FLAGS_CHANGED` shows it
+  for one check on the next frame. While the screen is up it checks 4x a second whether to leave
+  and updates the texts once a second (remainder carried over, times rounded).
+- **Reload mid-circle:** `db.afkSpinning` is set while the camera circles; `AFK.Enable` (the tweak being
+  applied at login) stops the camera if it's still set.

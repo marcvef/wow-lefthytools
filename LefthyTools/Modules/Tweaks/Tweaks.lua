@@ -18,8 +18,19 @@ local M = LT:NewModule("tweaks", {
 		comboPoints = true,
 		comboColors = true,
 		foreverQuests = true,
+		afkScreen = true,      -- AFK.lua
+		afkSpin = true,
 	},
 })
+
+-- The AFK screen used to be part of Mirage: a choice made there carries over once.
+function M:OnInitialize()
+	local mirage = LT.db.settings.mirage
+	if type(mirage) == "table" and mirage.afkScreen ~= nil then
+		self.db.afkScreen, self.db.afkSpin = mirage.afkScreen == true, mirage.afkSpin ~= false
+		mirage.afkScreen, mirage.afkSpin, mirage.afkSpinning = nil, nil, nil
+	end
+end
 
 local active = {} -- tweak key -> currently applied
 
@@ -361,6 +372,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyComboColors(on) end },
 	{ key = "foreverQuests", command = "newquests", label = "Mark quests that are new in WoW: Forever",
 		apply = function(on) ns.ApplyForeverQuests(on) end }, -- ForeverQuests.lua
+	{ key = "afkScreen", command = "afk", label = "AFK screen",
+		apply = function(on) ns.ApplyAFKScreen(on) end }, -- AFK.lua
 }
 
 local function Reconcile()
@@ -426,6 +439,11 @@ function M:BuildOptions(o)
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
 	o:Checkbox("foreverQuests", L["Mark quests that are new in WoW: Forever"],
 		L["WoW: Forever adds over a thousand quests to the Classic world. They get a NEW right after their name: in the quest log (hover for details), in the quest details and in the quest window when you accept or turn one in."])
+	o:Header(L["AFK screen"])
+	o:Checkbox("afkScreen", L["AFK screen"],
+		L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."])
+	o:Checkbox("afkSpin", L["Circle the camera"],
+		L["The camera slowly circles your character while the AFK screen is up."])
 end
 
 function M:OnSlashCommand(msg)
@@ -459,7 +477,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | afk [on|off] - switch a tweak")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 	end
 end

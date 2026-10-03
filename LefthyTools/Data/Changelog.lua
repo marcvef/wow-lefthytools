@@ -36,7 +36,7 @@ ns.CHANGELOG = {
 	{ id = 10, version = "0.5.0", module = "mirage",
 		en = { "Fade strength per element", "Each element fades to its own opacity, e.g. the minimap only down to 50% while the rest disappears." },
 		de = { "Ausblenden pro Element", "Jedes Element hat seine eigene Deckkraft beim Ausblenden, z. B. die Minimap nur bis 50 %, während der Rest verschwindet." } },
-	{ id = 11, version = "0.5.0", module = "mirage",
+	{ id = 11, version = "0.5.0", module = "tweaks",
 		en = { "AFK screen", "While you're away the interface disappears, the camera circles your character, and a panel shows time away, whispers, friends' news and who's online." },
 		de = { "AFK-Bildschirm", "Während du weg bist, verschwindet das Interface, die Kamera kreist um deinen Charakter und eine Leiste zeigt die Zeit, Flüsternachrichten, Neuigkeiten von Freunden und wer online ist." } },
 	{ id = 12, version = "0.5.0", module = "chronicle",

@@ -97,6 +97,7 @@ LefthyTools → Misc Tweaks**, and all are on by default.
 | Mark quests that are new in WoW: Forever | Forever adds over a thousand quests to the Classic world. They get a **NEW** right after their name in the quest log (hover the quest for an explanation), in the quest details and in the quest window when you accept or turn one in. The list of these quests comes from the game's own quest tables (about 1,800 quests). | `/lefthy tweaks newquests on\|off` |
 | Movable bags | Drag a bag by its title bar or any empty spot. It reopens where you left it. A plain click on the title still opens the bag menu. | `/lefthy tweaks bags on\|off` |
 | Announce quest progress in party chat | Like Questie: when you finish a quest objective, your character posts it in party chat, e.g. `[Kobold Camp Cleanup]: 10/10 Kobold Vermin slain`. When that completes the whole quest, you get one `[Quest]: quest complete!` line instead. Posts in party chat (instance chat in dungeon groups), never solo or in raids. Quests already done when accepted stay quiet. | `/lefthy tweaks quests on\|off` |
+| AFK screen | While you're AFK, the interface disappears, the camera slowly circles your character (*Circle the camera*, on), and a panel shows your character, how long you've been away, the time, your level progress, whispers and friends' news since then, your session (with Chronicle on) and your Beacon friends: where they are, what they're doing and which quest they're on. Moving, combat, a ready check or invite, opening a window, or a click brings everything back. Works without Mirage. | `/lefthy tweaks afk on\|off` |
 
 ```
 /lefthy tweaks             open the Misc Tweaks settings
@@ -212,14 +213,8 @@ once a second, so it costs nothing you'd notice.
 ## Mirage
 
 Fades the interface away when you're out of combat and not using it, and brings it
-back the moment you are.
-
-**AFK screen:** while you're AFK, the interface disappears, the camera slowly circles your
-character, and a panel at the bottom shows your character, how long you've been away, the
-time, your level progress, whispers and friends' news since then, your session (with
-Chronicle on) and which Beacon friends are online and where. Moving, combat, a ready check
-or invite, opening a window, or a click brings everything back. Settings: *AFK screen* and
-*Circle the camera* (both on, while Mirage is on).
+back the moment you are. (The AFK screen is a [Misc Tweak](#misc-tweaks) and works without
+Mirage.)
 
 ### What fades
 

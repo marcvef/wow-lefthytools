@@ -796,8 +796,8 @@ function C.SessionLine(english)
 	return L["This session: %s played, %s XP, %d quests, %d kills"]:format(C.Duration(s.played), C.Number(s.xp), s.quests, s.kills)
 end
 
-if ns.MirageAFK then
-	table.insert(ns.MirageAFK.sections, function()
+if ns.AFKScreen then
+	table.insert(ns.AFKScreen.sections, function()
 		return M.enabled and { C.SessionLine() } or nil
 	end)
 end

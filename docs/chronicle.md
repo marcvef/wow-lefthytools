@@ -111,4 +111,4 @@ otherwise every 30 s (the session curve). A redraw keeps the scroll position.
 The 1-second tick is local only: a few cheap API reads (position, target), adding up counters,
 and a session point per minute. Nothing is sent from it except highlights, which are rare (a few
 per hour at most) and go through Beacon's rate limiter like everything else. The AFK screen shows a session line
-(`ns.MirageAFK.sections`).
+(`ns.AFKScreen.sections`).

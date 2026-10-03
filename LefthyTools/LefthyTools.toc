@@ -26,11 +26,11 @@ Data\ForeverQuests.lua
 Modules\Mirage\Groups.lua
 Modules\Mirage\Mirage.lua
 Modules\Mirage\Options.lua
-Modules\Mirage\AFK.lua
 
 Modules\Tweaks\Tweaks.lua
 Modules\Tweaks\ComboPoints.lua
 Modules\Tweaks\ForeverQuests.lua
+Modules\Tweaks\AFK.lua
 
 Modules\Beacon\Beacon.lua
 Modules\Beacon\Dots.lua

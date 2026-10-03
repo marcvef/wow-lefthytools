@@ -8,7 +8,8 @@ io.write("\n== German client (deDE)\n")
 MOCK_LOCALE = "deDE"
 -- This player switched Mirage on in an earlier session: the saved choice beats the default (off).
 -- They also set 40% faded opacity before there was one per element.
-LefthyToolsDB = { modules = { mirage = true }, settings = { mirage = { fadedAlpha = 0.4 } } }
+-- And they had switched the AFK screen off back when it was part of Mirage.
+LefthyToolsDB = { modules = { mirage = true }, settings = { mirage = { fadedAlpha = 0.4, afkScreen = false } } }
 MOCK_NO_RETAIL_ATLAS = true -- a client without retail's combo point art: classic gems instead
 local ns = {}
 for _, file in ipairs(SOURCES) do
@@ -32,6 +33,7 @@ check(LT:GetModule("mirage").enabled, "a saved 'Mirage on' survives the new defa
 local mdb = LefthyToolsDB.settings.mirage
 check(mdb.groupAlpha.chat == 0.4 and mdb.groupAlpha.minimap == 0.4 and mdb.fadedAlpha == 0.4,
 	"an older faded opacity becomes every element's own")
+check(LefthyToolsDB.settings.tweaks.afkScreen == false and mdb.afkScreen == nil, "the AFK screen choice moves from Mirage to Misc Tweaks")
 local comboRow, comboPips, comboStyle = ns.GetComboPointRow()
 check(comboRow and comboStyle == "classic" and comboPips[1].Socket and comboPips[1].Socket.path == "Interface\\ComboFrame\\ComboPoint"
 	and not comboPips[1].Slash, "no retail combo point art in the client: the classic target-frame gems")
