@@ -2052,6 +2052,82 @@ do
 		"Anna answers both at once: both count")
 	Advance(30)
 
+	-- A won item's tooltip reminds me until it's handed over: traded or mailed to the winner.
+	local owed = LefthyToolsDB.handover
+	check(type(owed) == "table", "the reminders are saved")
+	wipe(owed)
+	lefthy("beacon handover")
+	check(PRINTED[#PRINTED]:find("nothing to hand over", 1, true), "/lefthy beacon handover: nothing yet")
+	pmark = #PRINTED + 1
+	ctrlRight(ItemLink(6948), true)
+	Advance(0.15)
+	local giveaway
+	for _, call in pairs(BB.calls) do if call.mine and call.state == "open" then giveaway = call end end
+	anna("N2;" .. giveaway.id .. ";1")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "N2;" .. giveaway.id .. ";0", "WHISPER", 12)
+	Advance(0.3)
+	check(#owed == 1 and owed[1].itemID == 6948 and owed[1].winner == "Anna" and owed[1].guid == "Player-1-11"
+		and printedSince(pmark):find("its tooltip reminds you until you trade or mail it to Anna.", 1, true),
+		"Anna won my item: noted, and I'm told")
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:6948::::::::20:::::")
+	check(tooltipHas("Won by Anna: still to hand over"), "its tooltip says so")
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:1155::::::::20:::::")
+	check(not tooltipHas("Won by"), "other items' tooltips don't")
+	GameTooltip:Hide()
+	-- Traded to Bob: still owed, and no nudge.
+	TRADE_PARTNER, PARTY.NPC = "Bob", { guid = "Player-1-12" }
+	pmark = #PRINTED + 1
+	Fire("TRADE_SHOW")
+	TRADE_ITEMS = { ItemLink(6948) }
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 1)
+	Fire("TRADE_ACCEPT_UPDATE", 1, 1)
+	Fire("TRADE_CLOSED")
+	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
+	Advance(0.1)
+	check(#owed == 1 and not printedSince(pmark):find("put it in", 1, true), "traded to someone else: still owed, no nudge")
+	-- Trading with Anna: a nudge; she gets it: gone.
+	TRADE_PARTNER, PARTY.NPC, TRADE_ITEMS = "Anna", { guid = "Player-1-11" }, {}
+	pmark = #PRINTED + 1
+	Fire("TRADE_SHOW")
+	check(not printedSince(pmark):find("put it in", 1, true), "nothing printed inside the event handler")
+	Advance(0.1)
+	check(printedSince(pmark):find("Anna won " .. ItemLink(6948) .. ": put it in the trade.", 1, true), "trading with the winner: a nudge in chat")
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 2)
+	Fire("TRADE_CLOSED")
+	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
+	check(#owed == 1, "a trade without the item: still owed")
+	Fire("TRADE_SHOW")
+	TRADE_ITEMS = { nil, ItemLink(6948) }
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 2)
+	Fire("TRADE_ACCEPT_UPDATE", 1, 1)
+	Fire("TRADE_CLOSED")
+	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
+	Advance(0.1)
+	check(#owed == 0 and printedSince(pmark):find(ItemLink(6948) .. " handed over to Anna.", 1, true), "traded to the winner: the reminder is gone")
+	TRADE_PARTNER, PARTY.NPC, TRADE_ITEMS = nil, nil, {}
+	-- Mail.
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
+	MAIL_ITEMS = { 1179 }
+	SendMail("Anna", "hi", "")
+	Fire("MAIL_SEND_SUCCESS")
+	check(#owed == 1, "mailed to someone else: still owed")
+	SendMail("Bob-Realmy", "yours", "")
+	Fire("MAIL_FAILED")
+	Fire("MAIL_SEND_SUCCESS") -- a later, unrelated mail
+	check(#owed == 1, "a mail that failed: still owed")
+	SendMail("Bob-Realmy", "yours", "")
+	Fire("MAIL_SEND_SUCCESS")
+	check(#owed == 0, "mailed to the winner (name with realm): gone")
+	MAIL_ITEMS = {}
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
+	lefthy("beacon handover")
+	check(printedSince(#PRINTED - 1):find(ItemLink(1179) .. " to Bob", 1, true), "/lefthy beacon handover lists what's owed")
+	lefthy("beacon handover clear")
+	check(#owed == 0, "/lefthy beacon handover clear")
+	Advance(10)
+
 	-- An item that only loads after sharing was switched off: no notice.
 	pmark = #PRINTED + 1
 	MOCK_ITEM_UNCACHED = 6948

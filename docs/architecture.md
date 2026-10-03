@@ -33,6 +33,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
   Modules/Beacon/Alerts.lua  death alerts
   Modules/Beacon/Pings.lua   map pings: Alt+click, markers on both maps
+  Modules/Beacon/Items.lua   showing and offering items (Need / Pass, the roll)
+  Modules/Beacon/Handover.lua  tooltip reminder for won items until traded or mailed
   Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
   Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, sharing, /chronicle
   Modules/Chronicle/Graphs.lua     the Graphs page: pooled canvas (bars, lines, text) and its cards

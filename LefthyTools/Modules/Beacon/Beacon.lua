@@ -1204,6 +1204,8 @@ function M:OnSlashCommand(msg)
 		B.SoundCommand(arg)
 	elseif cmd == "ding" and B.DingCommand then
 		B.DingCommand(arg)
+	elseif cmd == "handover" and B.HandoverCommand then
+		B.HandoverCommand(arg)
 	else
 		self:Print("/lefthy beacon - open settings")
 		self:Print("/lefthy beacon status - friends with LefthyTools, their last update and the message traffic")
@@ -1211,5 +1213,6 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy beacon ping - show your friends where you stand (or Alt+click the world map)")
 		self:Print("/lefthy beacon ding <text> | reset | test - your level-up message; {name} and {level} are filled in")
 		self:Print("/lefthy beacon sound [<number>] - list the level-up sounds, or pick one and hear it")
+		self:Print("/lefthy beacon handover [clear] - items you offered that winners still have to get")
 	end
 end

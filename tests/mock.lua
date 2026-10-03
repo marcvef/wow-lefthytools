@@ -915,8 +915,29 @@ GameTooltip = {
 	Show = function() TOOLTIP.shown = true end,
 	Hide = function() TOOLTIP.shown = false end,
 	IsOwned = function(_, frame) return TOOLTIP.shown and TOOLTIP.owner == frame end,
-	SetHyperlink = function(_, link) TOOLTIP.link, TOOLTIP.shown = link, true end,
+	SetHyperlink = function(self, link)
+		TOOLTIP.link, TOOLTIP.shown = link, true
+		local id = tonumber(link:match("item:(%d+)"))
+		for _, call in ipairs(TOOLTIP_POSTCALLS) do
+			if id and call[1] == Enum.TooltipDataType.Item then call[2](self, { type = call[1], id = id }) end
+		end
+	end,
 }
+-- Tooltip post-calls: run by SetHyperlink before the tooltip is shown, as the game's data processor does.
+TOOLTIP_POSTCALLS = {}
+Enum.TooltipDataType = { Item = 0, Unit = 2 }
+TooltipDataProcessor = { AddTooltipPostCall = function(kind, fn) TOOLTIP_POSTCALLS[#TOOLTIP_POSTCALLS + 1] = { kind, fn } end }
+
+-- Trading and mail: TRADE_PARTNER is "NPC" (its GUID via PARTY.NPC), TRADE_ITEMS / MAIL_ITEMS hold
+-- my item links / item IDs per slot.
+TRADE_PARTNER, TRADE_ITEMS, MAIL_ITEMS, MAILS_SENT = nil, {}, {}, {}
+ERR_TRADE_COMPLETE = "Trade complete."
+ATTACHMENTS_MAX_SEND = 12
+function GetUnitName(unit) if unit == "NPC" then return TRADE_PARTNER end return UnitName(unit) end
+function GetTradePlayerItemLink(slot) return TRADE_ITEMS[slot] end
+function HasSendMailItem(slot) return MAIL_ITEMS[slot] ~= nil end
+function GetSendMailItem(slot) if MAIL_ITEMS[slot] then return "Item", MAIL_ITEMS[slot] end end
+function SendMail(recipient) MAILS_SENT[#MAILS_SENT + 1] = recipient end
 
 -- Personal resource display (Forever leaves its class resource frame out) and combo points.
 CreateFrame("Frame", "PersonalResourceDisplayFrame", UIParent)

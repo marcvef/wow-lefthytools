@@ -310,6 +310,17 @@ local function Finish(call)
 	else
 		M:Print(("%s gets %s."):format(winner, call.link))
 	end
+	if call.mine and B.AddHandover then
+		-- My item: its tooltip reminds me until it's traded or mailed to them (Handover.lua).
+		local guid
+		for _, a in pairs(call.answers) do
+			if a.name == winner then
+				guid = a.guid
+			end
+		end
+		B.AddHandover(call.itemString, call.link, winner, guid)
+		M:Print(("its tooltip reminds you until you trade or mail it to %s."):format(winner))
+	end
 end
 
 local function StartResult(call, result)
@@ -482,7 +493,7 @@ function B.ReceiveAnswer(peer, gameAccountID, callID, need)
 	if not call or call.state ~= "open" or not call.recipients[gameAccountID] or call.answers[gameAccountID] then
 		return
 	end
-	call.answers[gameAccountID] = { name = B.Clean(peer.name, 48), need = need }
+	call.answers[gameAccountID] = { name = B.Clean(peer.name, 48), need = need, guid = peer.guid }
 	Draw(call)
 end
 

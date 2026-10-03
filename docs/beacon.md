@@ -213,6 +213,27 @@ Blizzard's function). At most one share every 3 s.
   (`B.UpdateCalls`), and only while a notice is up.
 - Setting `shareItems` switches sending and showing.
 
+### Hand-over reminder (Handover.lua)
+
+When my offer has a winner, `B.AddHandover` saves `{ itemID, link, winner, guid, at }` in
+`LefthyToolsDB.handover` (the winner's GUID comes from their answer's peer; at most 20 entries,
+dropped after 7 days at load). A `TooltipDataProcessor` post-call for item tooltips adds "Won by
+Anna: still to hand over" to every tooltip of that item ID; it returns right away while nothing is
+owed, and post-calls run before the tooltip is sized, so no `Show()` is needed.
+
+- **Trade:** `TRADE_SHOW` reads the partner (`GetUnitName("NPC")`, `UnitGUID("NPC")`) and, if they
+  won something, says so in chat ("Anna won [item]: put it in the trade."). `TRADE_PLAYER_ITEM_CHANGED`
+  / `TRADE_ACCEPT_UPDATE` read my slots 1-6 (`GetTradePlayerItemLink`; slot 7 is "will not be
+  traded"). `UI_INFO_MESSAGE` with `ERR_TRADE_COMPLETE` removes the matching reminders; it can come
+  after `TRADE_CLOSED`, so the snapshot lives until the next `TRADE_SHOW`.
+- **Mail:** a post-hook on `SendMail` keeps the recipient and the attachments' item IDs
+  (`HasSendMailItem` / `GetSendMailItem`); `MAIL_SEND_SUCCESS` removes the matching reminders,
+  `MAIL_FAILED` drops the snapshot.
+- **Matching:** by GUID when both are known, else by name without realm; if the game won't say
+  (a secret value), the item counts as handed over. An item given to anyone else keeps its line.
+  Chat output waits for the next frame (`C_Timer.After(0)`), never inside the event handler.
+- `/lefthy beacon handover` lists what's owed, `/lefthy beacon handover clear` forgets it.
+
 ## Level progress
 
 `X2;<percent>`: whole percent of the current level (`UnitXP / UnitXPMax`, at most 99), empty at

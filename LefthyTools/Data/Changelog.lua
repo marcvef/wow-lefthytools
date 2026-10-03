@@ -81,5 +81,8 @@ ns.CHANGELOG = {
 	{ id = 25, version = "0.5.0", module = "beacon",
 		en = { "Item tooltips in notices", "Hover a shared or offered item at the top of the screen to see its tooltip. Shift-click links it, Ctrl-click previews it." },
 		de = { "Item-Tooltips in Hinweisen", "Mouseover über ein geteiltes oder angebotenes Item oben auf dem Bildschirm zeigt seinen Tooltip. Umschalt+Klick verlinkt es, Strg+Klick zeigt die Vorschau." } },
+	{ id = 26, version = "0.5.0", module = "beacon",
+		en = { "Hand-over reminder", "An item you offered and someone won says so on its tooltip until you trade or mail it to them. Opening a trade with the winner reminds you too." },
+		de = { "Übergabe-Erinnerung", "Ein Item, das du angeboten und jemand gewonnen hat, zeigt das im Tooltip, bis du es ihm per Handel oder Post gibst. Ein Handel mit dem Gewinner erinnert dich auch." } },
 	-- New entries go here, at the end.
 }

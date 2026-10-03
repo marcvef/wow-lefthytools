@@ -66,6 +66,11 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     zone under the cursor. A plain click still zooms/navigates as before, also in combat.
     They track a quest: their tooltip shows it with progress within a few seconds, "Ready to
     turn in" when done, "You have this quest too" if it's in your log.
+    Items: Ctrl+right-click one in your bags: they see "<you> shares [item]" at the top, one line,
+    no box, and hovering it shows the item's tooltip. Ctrl+Shift+right-click: they get Need and
+    Pass; once someone wins, the item's tooltip in your bags says "Won by <them>: still to hand
+    over", opening a trade with them says so in chat, and trading (or mailing) it to them removes
+    the line. `/lefthy beacon handover` lists what's still owed.
 15. Chronicle: `/chronicle` opens the journal; the zone you're in is "discovered". Kill a few
     mobs, loot a green, turn in a quest, jump, ride: the Statistics page counts them (time and
     distance update every few seconds). Enter a dungeon: "First visit"; kill a boss: one entry.
