@@ -30,6 +30,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Tweaks/Flight.lua  cinematic flights (a tweak): letterbox, title cards, subtitles, camera
   Data/Changelog.lua         what's new: one entry per player-visible change, English and German
   Data/ForeverQuests.lua     generated list of those quests (tools/update-forever-quests.ps1)
+  Data/FlightPaths.lua       generated length of every flight path (tools/update-flight-paths.ps1)
   Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
@@ -44,6 +45,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Chronicle/MinimapButton.lua  the book button on the minimap's edge
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
+tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
 Update-LefthyTools.cmd       players' one-file installer: batch header + install.ps1 (generated)

@@ -2600,6 +2600,50 @@ do
 	Advance(0.5)
 	check(math.abs(LefthyToolsDB.flightTimes[route] - 36) <= 2 and not ns.CinematicFlight.driver:IsShown(),
 		"landed: that flight's time is kept too, got " .. tostring(LefthyToolsDB.flightTimes[route]))
+	-- With the flight path data (Data/FlightPaths.lua, the client's own paths): a route's real
+	-- length, all its legs, at ~29.9 yd/s. Real node IDs: Undercity 11, Tarren Mill 13, Hammerfall 17.
+	TAXI_MAP_NODES = {
+		{ name = "Undercity, Tirisfal", state = 0, slotIndex = 1, nodeID = 11, position = CreateVector2D(0.5, 0.5) },
+		{ name = "Tarren Mill, Hillsbrad", state = 1, slotIndex = 3, nodeID = 13, position = CreateVector2D(0.55, 0.6) },
+		{ name = "Hammerfall, Arathi", state = 1, slotIndex = 4, nodeID = 17, position = CreateVector2D(0.6, 0.7) },
+	}
+	TAXI_NODES[3], TAXI_NODES[4] = "Tarren Mill, Hillsbrad", "Hammerfall, Arathi"
+	TAXI_ROUTES = { [3] = { { 1, 3 } }, [4] = { { 1, 3 }, { 3, 4 } } }
+	LefthyToolsDB.flightPathPace = nil
+	TakeTaxiNode(4) -- two legs: Undercity > Tarren Mill > Hammerfall, 4222 + 3532 yd
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(0.3)
+	check(film.Timer:GetText() == "Landing in 4:19", "a route never flown: its real length, all legs, no \"about\", got " .. tostring(film.Timer:GetText()))
+	Advance(270)
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.5)
+	check(LefthyToolsDB.flightPathPace and math.abs(LefthyToolsDB.flightPathPace - (0.7 / 29.9 + 0.3 * 271 / 7754)) < 0.0005,
+		"landed a bit later: the pace learns from it, got " .. tostring(LefthyToolsDB.flightPathPace))
+	-- A route flown at another speed (some of Forever's own) keeps its own time and doesn't skew the pace.
+	local pace = LefthyToolsDB.flightPathPace
+	TakeTaxiNode(3)
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(70) -- 4222 yd in 70 s: much faster than the rest
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.5)
+	check(LefthyToolsDB.flightPathPace == pace and math.abs(LefthyToolsDB.flightTimes["Undercity, Tirisfal > Tarren Mill, Hillsbrad"] - 70) <= 1,
+		"an odd one: its time is kept, the pace isn't moved")
+	-- A leg the data doesn't know: the straight line again, "about".
+	TAXI_ROUTES[4] = { { 1, 3 }, { 3, 99 } }
+	LefthyToolsDB.flightTimes["Undercity, Tirisfal > Hammerfall, Arathi"] = nil
+	TakeTaxiNode(4)
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(0.3)
+	check(film.Timer:GetText():find("^Landing in about "), "a leg not in the data: the straight-line estimate, got " .. tostring(film.Timer:GetText()))
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.5)
+	TAXI_ROUTES = {}
 	-- The first version moved the camera: one left zoomed out or circling (a /reload mid-flight) is put back once.
 	TDB.flightZoom, TDB.flightOrbit, TDB.flightMaxZoom, TDB.flightCamera, CAMERA.zoom, CAMERA.spinning = 10, true, 1.9, true, 22, true
 	CVARS.cameraDistanceMaxZoomFactor = "2.6"

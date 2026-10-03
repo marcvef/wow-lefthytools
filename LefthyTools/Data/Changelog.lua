@@ -114,5 +114,8 @@ ns.CHANGELOG = {
 	{ id = 36, version = "0.5.0", module = "beacon",
 		en = { "Crafted items", "Crafted items (their links name the crafter) can be shown and offered too." },
 		de = { "Hergestellte Items", "Hergestellte Items (ihr Link nennt den Hersteller) lassen sich jetzt auch zeigen und anbieten." } },
+	{ id = 37, version = "0.5.0", module = "tweaks",
+		en = { "Accurate flight times", "The time left on a flight comes from the game's own flight path data (every leg, every curve), and is exact once you've flown that route." },
+		de = { "Genaue Flugzeiten", "Die Restflugzeit kommt aus den Flugrouten-Daten des Spiels (jede Etappe, jede Kurve) und ist exakt, sobald du die Route einmal geflogen bist." } },
 	-- New entries go here, at the end.
 }

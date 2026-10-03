@@ -14,11 +14,13 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 -- bags, ...) or typing in chat pauses the film (the interface is back at once) and it resumes by
 -- itself once that's done. Combat or a popup that needs you ends it for the rest of that flight.
 --
--- Flight time: the game doesn't tell, so every completed flight's time is kept per route
--- (LefthyToolsDB.flightTimes, "From > To") and counted down exactly the next time. A route flown
--- for the first time is estimated from the straight distance between its two flight points
--- (C_TaxiMap node positions on the taxi map, C_Map.GetMapWorldSize) and the seconds per yard
--- your flights took so far (LefthyToolsDB.flightPace), shown as "about".
+-- Flight time: the game doesn't tell. Best first:
+--   * a route flown before: its time (LefthyToolsDB.flightTimes, "From > To"), counted down exactly;
+--   * its length along the real flight path: the flight's legs (GetNumRoutes / TaxiGetNodeSlot)
+--     looked up in Data/FlightPaths.lua (from the client's TaxiPath / TaxiPathNode tables), at
+--     ~29.9 yd/s, learned from your flights (LefthyToolsDB.flightPathPace), plus waits on the way;
+--   * only if a leg isn't known: the straight distance between the two flight points (C_TaxiMap
+--     node positions, C_Map.GetMapWorldSize) at a learned pace (flightPace), shown as "about".
 --
 -- The interface is hidden with ns.HideInterface (Tweaks.lua: UIParent's alpha, shared with the AFK
 -- screen). The destination comes from a post-hook on TakeTaxiNode (both the flight map and the old
@@ -35,7 +37,8 @@ local RESUME_DELAY = 2      -- seconds after a window closes or typing ends
 local CARD_IN, CARD_HOLD, CARD_OUT = 1.2, 3.5, 1.5
 local SUBTITLE_TIME, MAX_SUBTITLES = 8, 2
 local BAR = 0.05            -- letterbox bar height, part of the screen height
-local DEFAULT_PACE = 1.15 / 30 -- seconds per yard of straight distance before any flight is timed
+local PATH_PACE = 1 / 29.9  -- seconds per yard along a flight path (classic routes fly ~29.9 yd/s)
+local DEFAULT_PACE = 1.15 / 30 -- seconds per yard of straight distance (the fallback) before any flight is timed
 local MIN_FLIGHT, MAX_FLIGHT = 10, 1800 -- timed flights outside this are left out
 local TITLE_FONT = "Fonts\\MORPHEUS.TTF"
 local CHAT_COLOURS = {
@@ -65,7 +68,7 @@ local lastZone, baseline -- baseline: the fewest windows open this flight (the t
 local resumeAt
 local sincePoll, shownSecond = 0, nil
 local subtitles = {} -- { text, at }
-local saved -- LefthyToolsDB: flightTimes, flightPace
+local saved -- LefthyToolsDB: flightTimes, flightPathPace, flightPace
 
 local function Readable(value)
 	return value ~= nil and not (issecretvalue and issecretvalue(value))
@@ -116,8 +119,31 @@ local function Clock(seconds)
 end
 
 ---------------------------------------------------------------------------
--- The route picked on the taxi map: its name, and the straight distance to it
+-- The route picked on the taxi map: its name, its length along the real flight path, and the
+-- straight distance to it
 ---------------------------------------------------------------------------
+
+-- The flight's length along its real path: its legs (GetNumRoutes / TaxiGetNodeSlot, as the old
+-- taxi window draws them), each looked up in Data/FlightPaths.lua (generated from the client's
+-- own flight path tables). nil if any leg isn't known.
+local function PathLength(slot, nodeBySlot)
+	local paths = ns.FLIGHT_PATHS
+	local legs = paths and GetNumRoutes and TaxiGetNodeSlot and GetNumRoutes(slot)
+	if not (type(legs) == "number" and legs > 0) then
+		return nil
+	end
+	local yards, waits = 0, 0
+	for leg = 1, legs do
+		local from = nodeBySlot[TaxiGetNodeSlot(slot, leg, true)]
+		local to = nodeBySlot[TaxiGetNodeSlot(slot, leg, false)]
+		local path = from and to and paths[from .. ">" .. to]
+		if not path then
+			return nil
+		end
+		yards, waits = yards + path[1], waits + path[2]
+	end
+	return yards, waits
+end
 
 local function PickRoute(slot)
 	local name = TaxiNodeName and TaxiNodeName(slot)
@@ -129,8 +155,10 @@ local function PickRoute(slot)
 		local mapID = GetTaxiMapID and GetTaxiMapID()
 		local nodes = mapID and C_TaxiMap and C_TaxiMap.GetAllTaxiNodes(mapID)
 		local here, there
+		local nodeBySlot = {}
 		local current = Enum.FlightPathState and Enum.FlightPathState.Current or 0
 		for _, node in ipairs(nodes or {}) do
+			nodeBySlot[node.slotIndex] = node.nodeID
 			if node.state == current then
 				here = node
 			elseif node.slotIndex == slot then
@@ -140,6 +168,7 @@ local function PickRoute(slot)
 		if here and Readable(here.name) then
 			route.route = here.name .. " > " .. name
 		end
+		route.pathYards, route.pathWait = PathLength(slot, nodeBySlot)
 		local width, height = C_Map.GetMapWorldSize(mapID)
 		if here and there and (width or 0) > 0 and (height or 0) > 0 then
 			local dx = (there.position.x - here.position.x) * width
@@ -154,13 +183,22 @@ local function PickRoute(slot)
 	return route
 end
 
--- The flight is over: its time for this route, and the pace for estimating new ones.
+-- The flight is over: its time for this route, and the paces for estimating new ones. The path
+-- pace only learns from flights near it (within 25%): a route flown at another speed (some of
+-- Forever's own) has its own time kept and shouldn't skew the rest.
 local function RecordTrip()
 	local seconds = trip and trip.route and trip.started and GetTime() - trip.started
 	if not (saved and seconds and seconds >= MIN_FLIGHT and seconds <= MAX_FLIGHT) then
 		return
 	end
 	saved.flightTimes[trip.route] = math.floor(seconds + 0.5)
+	if trip.pathYards and trip.pathYards > 0 then
+		local pace = math.max(seconds - (trip.pathWait or 0), 1) / trip.pathYards
+		local current = saved.flightPathPace or PATH_PACE
+		if pace > current * 0.8 and pace < current * 1.25 then
+			saved.flightPathPace = current * 0.7 + pace * 0.3
+		end
+	end
 	if trip.distance and trip.distance > 0 then
 		local pace = seconds / trip.distance
 		saved.flightPace = saved.flightPace and (saved.flightPace * 0.7 + pace * 0.3) or pace
@@ -323,8 +361,9 @@ local function UpdateSubtitles()
 	screen.Subtitles:SetText(table.concat(lines, "\n"))
 end
 
--- "Landing in 1:42" (timed before), "Landing in about 2:10" (estimated), nothing if unknown
--- (a /reload mid-flight). Set only when the second changes.
+-- "Landing in 1:42" (timed before, or from the flight path's length), "Landing in about 2:10"
+-- (only the straight distance known), nothing if unknown (a /reload mid-flight). Set only when
+-- the second changes.
 local function UpdateTimer()
 	local total = trip and (trip.known or trip.estimate)
 	if not (total and trip.started) then
@@ -339,7 +378,7 @@ local function UpdateTimer()
 	shownSecond = second
 	if second <= 0 then
 		screen.Timer:SetText(L["Landing any moment"])
-	elseif trip.known then
+	elseif trip.known or trip.pathYards then
 		screen.Timer:SetText(L["Landing in %s"]:format(Clock(left)))
 	else
 		screen.Timer:SetText(L["Landing in about %s"]:format(Clock(left)))
@@ -386,9 +425,13 @@ local function Start()
 	baseline = Windows()
 	trip = nil
 	if picked then
-		trip = { route = picked.route, distance = picked.distance, started = GetTime() }
+		trip = { route = picked.route, distance = picked.distance, pathYards = picked.pathYards,
+			pathWait = picked.pathWait, started = GetTime() }
+		-- Best first: this route's own time; its length along the flight path; the straight line.
 		trip.known = saved and saved.flightTimes[picked.route]
-		if not trip.known and picked.distance then
+		if picked.pathYards then
+			trip.estimate = picked.pathYards * (saved and saved.flightPathPace or PATH_PACE) + (picked.pathWait or 0)
+		elseif picked.distance then
 			trip.estimate = picked.distance * (saved and saved.flightPace or DEFAULT_PACE)
 		end
 	end
@@ -533,8 +576,10 @@ end
 
 table.insert(LT.onLoad, function(db)
 	db.flightTimes = type(db.flightTimes) == "table" and db.flightTimes or {}
-	if type(db.flightPace) ~= "number" then
-		db.flightPace = nil
+	for _, key in ipairs({ "flightPace", "flightPathPace" }) do
+		if type(db[key]) ~= "number" then
+			db[key] = nil
+		end
 	end
 	saved = db
 end)

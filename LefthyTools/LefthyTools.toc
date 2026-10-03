@@ -21,6 +21,7 @@ Core\Options.xml
 # Data
 Data\Changelog.lua
 Data\ForeverQuests.lua
+Data\FlightPaths.lua
 
 # Modules
 Modules\Mirage\Groups.lua

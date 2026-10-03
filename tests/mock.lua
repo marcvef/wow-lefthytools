@@ -547,6 +547,13 @@ function TaxiNodeName(slot) return TAXI_NODES[slot] end
 -- The taxi map's nodes (C_TaxiMap.GetAllTaxiNodes): { name, state (0 = where you are), slotIndex, position }.
 TAXI_MAP_ID, TAXI_MAP_NODES, MAP_SIZES = 1415, {}, { [1415] = { 10000, 10000 } }
 function GetTaxiMapID() return TAXI_MAP_ID end
+-- A flight's legs, as GetNumRoutes / TaxiGetNodeSlot tell: [destination slot] = { { from slot, to slot }, ... }.
+TAXI_ROUTES = {}
+function GetNumRoutes(slot) return TAXI_ROUTES[slot] and #TAXI_ROUTES[slot] or 0 end
+function TaxiGetNodeSlot(slot, leg, isSource)
+	local l = TAXI_ROUTES[slot] and TAXI_ROUTES[slot][leg]
+	return l and (isSource and l[1] or l[2])
+end
 C_TaxiMap = { GetAllTaxiNodes = function(mapID) return mapID == TAXI_MAP_ID and TAXI_MAP_NODES or {} end }
 SOUNDS = {}
 function PlaySound(id) SOUNDS[#SOUNDS + 1] = id; return MOCK_SOUND_MISSING ~= id, #SOUNDS end -- willPlay, handle
