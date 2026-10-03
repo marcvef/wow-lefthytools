@@ -2263,6 +2263,11 @@ do
 	check(printedSince(#PRINTED - 1):find(ItemLink(1179) .. " to Bob", 1, true), "/lefthy beacon handover lists what's owed")
 	lefthy("beacon handover clear")
 	check(#owed == 0, "/lefthy beacon handover clear")
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
+	local clearButton = SETTINGS_BUTTONS["Hand-over reminders"]
+	check(clearButton and clearButton.text == "Clear", "a Clear button on Beacon's settings page")
+	clearButton.onClick()
+	check(#owed == 0, "... that forgets them too")
 	Advance(10)
 
 	-- An item that only loads after sharing was switched off: no notice.

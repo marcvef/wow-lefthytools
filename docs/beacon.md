@@ -268,7 +268,8 @@ nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` 
 - **Matching:** by GUID when both are known, else by name without realm; if the game won't say
   (a secret value), the item counts as handed over. An item given to anyone else keeps its line.
   Chat output waits for the next frame (`C_Timer.After(0)`), never inside the event handler.
-- `/lefthy beacon handover` lists what's owed, `/lefthy beacon handover clear` forgets it.
+- `/lefthy beacon handover` lists what's owed, `/lefthy beacon handover clear` (or the Clear
+  button "Hand-over reminders" on Beacon's settings page) forgets it.
 
 ## Level progress
 
