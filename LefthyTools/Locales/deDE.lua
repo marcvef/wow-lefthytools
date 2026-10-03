@@ -202,6 +202,10 @@ L["Alerts"] = "Meldungen"
 L["Tell me when a friend dies"] = "Melden, wenn ein Freund stirbt"
 L["A chat line when a friend dies: where, and what they were fighting."] =
 	"Eine Chatzeile, wenn ein Freund stirbt: wo, und wogegen er gekämpft hat."
+L["Show items to friends"] = "Items Freunden zeigen"
+L["Ctrl+right-click an item (bags, character, bank, loot, chat links) to show it to your friends: they get it as a link in chat and as a notice on screen, without a sound. Items they show you arrive the same way."] =
+	"Strg+Rechtsklick auf ein Item (Taschen, Charakter, Bank, Loot, Chat-Links) zeigt es deinen Freunden: Sie bekommen es als Link im Chat und als Hinweis auf dem Bildschirm, ohne Sound. Items, die sie dir zeigen, kommen genauso an."
+L["%s shares %s"] = "%s zeigt %s"
 L["Map pings"] = "Karten-Pings"
 L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."] =
 	"Alt+Klick auf die Weltkarte zeigt deinen Freunden eine Stelle: eine Markierung auf ihren Karten für eine Minute, mit Sound. Ihre Pings erscheinen auf deinen Karten. /lefthy beacon ping pingt die Stelle, an der du stehst."

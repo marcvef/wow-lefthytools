@@ -127,6 +127,10 @@ minimap, and you on theirs, without being in a group.
   too), and how far away they are and in which direction ("240 yd north-east").
 - **Death alerts:** a chat line when a friend dies, with where and what they were fighting
   ("Anna died in Duskwood - Raven Hill, fighting Stitches.").
+- **Show an item:** **Ctrl+right-click** an item (bags, character, bank, loot, chat links) and
+  your friends get "Anna shares [item]" as a clickable link in chat and as a notice on screen,
+  without a sound. Handy for "anyone need this?". (For gear, Ctrl+click also opens the game's
+  preview, as always.)
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.
   `/lefthy beacon ping` pings where you stand.
@@ -159,6 +163,7 @@ minimap, and you on theirs, without being in a group.
 | Keep far-away friends at the minimap edge | on | |
 | Show friends in my group too | on | |
 | Tell me when a friend dies | on | |
+| Show items to friends (Ctrl+right-click) | on | |
 | Map pings (Alt+click on the world map) | on | `/lefthy beacon ping` |
 | Tell my friends when I level up | on | |
 | Level-up message (`{name}` and `{level}` are filled in) | empty: default text | `/lefthy beacon ding <text>`, `ding reset` |

@@ -32,6 +32,7 @@ local L = ns.L
 --   C2;<count>          in combat: how many enemies have me on their threat list (counted on the
 --                       nameplates the game shows). Sent when it changes, at most once a second;
 --                       a state without C clears it.
+--   I2;<item string>    an item I show my friends (Ctrl+right-click, Items.lua)
 --   X2;<percent>        progress on my current level (0-99), empty at max level or with sharing
 --                       off. Sent when the whole percent changes (at most every XP_GAP seconds)
 --                       and with every answer.
@@ -66,6 +67,7 @@ local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed
 local HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW = 6, 60 -- Chronicle highlights accepted from one friend
 local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
 local XP_GAP = 2             -- my level progress is checked (and sent if changed) at most this often
+local ITEM_GAP = 3           -- shared items accepted from one friend at most this often
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
@@ -87,6 +89,7 @@ local M = LT:NewModule("beacon", {
 		showGroup = true,
 		deathAlert = true,
 		pings = true,
+		shareItems = true,
 		dingAnnounce = true,
 		dingText = "",
 		dingShow = true,
@@ -130,6 +133,7 @@ local dings = {}        -- { gameAccountID, level, text } received, shown on the
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
 local pingsIn = {}      -- { gameAccountID, continent, north, west, mapID } received, shown on the next tick
 local highlightsIn = {} -- { gameAccountID, kind, a, b } received, passed on on the next tick
+local itemsIn = {}      -- { gameAccountID, item string } received, shown on the next tick
 local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on the next tick
 local newerNoticeShown = false -- that notice comes once per login
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
@@ -632,6 +636,11 @@ local function Parse(text)
 		if percent then
 			return "X", tonumber(percent) -- nil: not shared
 		end
+	elseif kind == "I" then
+		local itemString = rest:match("^;(%d+[%-%d:]*)$")
+		if itemString then
+			return "I", itemString
+		end
 	end
 	return nil
 end
@@ -739,6 +748,11 @@ local function OnMessage(text, senderID)
 		peer.xpPercent = a
 		peer.rev = peer.rev + 1
 		Changed()
+	elseif kind == "I" then
+		if not guard.itemAt or now - guard.itemAt >= ITEM_GAP then
+			guard.itemAt = now
+			itemsIn[#itemsIn + 1] = { senderID, a }
+		end
 	elseif kind == "E" then
 		if not guard.highlightWindow or now - guard.highlightWindow >= HIGHLIGHT_WINDOW then
 			guard.highlightWindow, guard.highlights = now, 0
@@ -826,6 +840,13 @@ local function Tick(now, elapsed)
 		local peer = peers[ping[1]]
 		if peer and peer.name and B.ReceivePing then
 			B.ReceivePing(peer, ping[1], ping[2], ping[3], ping[4], ping[5])
+		end
+	end
+	while itemsIn[1] do
+		local item = table.remove(itemsIn, 1)
+		local peer = peers[item[1]]
+		if peer and peer.name and B.ReceiveItem then
+			B.ReceiveItem(peer, item[2])
 		end
 	end
 	while highlightsIn[1] do
@@ -953,7 +974,7 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, B.pings, plates }) do
+	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn, B.pings, plates }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil
@@ -1002,6 +1023,8 @@ function M:BuildOptions(o)
 	o:Header(L["Alerts"])
 	o:Checkbox("deathAlert", L["Tell me when a friend dies"],
 		L["A chat line when a friend dies: where, and what they were fighting."])
+	o:Checkbox("shareItems", L["Show items to friends"],
+		L["Ctrl+right-click an item (bags, character, bank, loot, chat links) to show it to your friends: they get it as a link in chat and as a notice on screen, without a sound. Items they show you arrive the same way."])
 	o:Checkbox("pings", L["Map pings"],
 		L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."])
 

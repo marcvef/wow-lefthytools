@@ -419,6 +419,28 @@ LOOT_ITEM_SELF = "You receive loot: %s."
 LOOT_ITEM_SELF_MULTIPLE = "You receive loot: %sx%d."
 LOOT_ITEM_PUSHED_SELF = "You receive item: %s."
 LOOT_ITEM_PUSHED_SELF_MULTIPLE = "You receive item: %sx%d."
+-- Item clicks (HandleModifiedItemClick: every modified click on an item ends up here) and loading.
+STATE.ctrl, STATE.shift = false, false
+MOCK_BUTTON = "LeftButton"
+DRESSUPS = 0
+function HandleModifiedItemClick(link) if IsControlKeyDown() then DRESSUPS = DRESSUPS + 1 end return false end
+function GetMouseButtonClicked() return MOCK_BUTTON end
+function IsControlKeyDown() return STATE.ctrl == true end
+function IsShiftKeyDown() return STATE.shift == true end
+PENDING_ITEM_LOADS = {} -- items the client still has to ask the server for (MOCK_ITEM_UNCACHED)
+Item = { CreateFromItemLink = function(_, itemLink)
+	local id = tonumber(itemLink:match("item:(%d+)"))
+	return {
+		IsItemEmpty = function() return not ITEMS[id] end,
+		ContinueOnItemLoad = function(_, callback)
+			if MOCK_ITEM_UNCACHED == id then table.insert(PENDING_ITEM_LOADS, callback) else callback() end
+		end,
+	}
+end }
+C_Item.GetItemInfo = function(itemLink)
+	local id = tonumber(tostring(itemLink):match("item:(%d+)"))
+	if ITEMS[id] and MOCK_ITEM_UNCACHED ~= id then return ITEMS[id].name, ItemLink(id) end
+end
 C_MountJournal = { GetMountInfoByID = function(id) return id == 6 and "Brown Horse" or nil end }
 C_PetJournal = { GetPetInfoByPetID = function() return 40, nil, 1, 0, 100, 1, false, "Black Kingsnake" end }
 C_ToyBox = { GetToyInfo = function(id) return id, "Toy Train Set", 2000 end }

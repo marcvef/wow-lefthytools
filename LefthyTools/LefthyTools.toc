@@ -37,6 +37,7 @@ Modules\Beacon\Dots.lua
 Modules\Beacon\Ding.lua
 Modules\Beacon\Alerts.lua
 Modules\Beacon\Pings.lua
+Modules\Beacon\Items.lua
 Modules\Beacon\Beacon.xml
 
 Modules\Chronicle\Chronicle.lua

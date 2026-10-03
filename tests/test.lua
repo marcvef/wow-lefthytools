@@ -1802,6 +1802,72 @@ do
 	mm[12]._scripts.OnLeave(mm[12])
 end
 
+section("Beacon: showing items to friends")
+do
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(0.3)
+	check(BDB.shareItems == true and B("shareItems") ~= nil, "a setting, on by default")
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	STATE.ctrl, MOCK_BUTTON = true, "RightButton"
+	local dressups = DRESSUPS
+	HandleModifiedItemClick(ItemLink(1155)) -- Ctrl+right-click on an item, anywhere
+	check(DRESSUPS == dressups + 1, "Blizzard's own handling runs first")
+	Advance(0.15)
+	check(sentTo(11, mark, "I2;")[1] == "I2;1155::::::::20:::::", "the item goes to my friends, got " .. tostring(sentTo(11, mark, "I2;")[1]))
+	check(printedSince(pmark):find("shared " .. ItemLink(1155) .. " with ", 1, true) and printedSince(pmark):find(" friend(s).", 1, true),
+		"and I'm told, got " .. printedSince(pmark))
+	HandleModifiedItemClick(ItemLink(1155))
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 1, "at most one every 3 s")
+	Advance(3)
+	MOCK_BUTTON = "LeftButton"
+	HandleModifiedItemClick(ItemLink(1155)) -- Ctrl+left-click: the game's preview, nothing else
+	STATE.shift, MOCK_BUTTON = true, "RightButton"
+	HandleModifiedItemClick(ItemLink(1155)) -- Ctrl+Shift+right-click: not ours either
+	STATE.shift, STATE.ctrl = false, false
+	HandleModifiedItemClick(ItemLink(1155)) -- no modifier
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 1, "only Ctrl+right-click shares")
+
+	pmark = #PRINTED + 1
+	local sounds = #SOUNDS
+	anna("I2;19019::::::::20:::::")
+	check(#PRINTED < pmark, "receiving: nothing inside the event handler")
+	Advance(0.15)
+	check(printedSince(pmark):find("Anna|r shares " .. ItemLink(19019) .. ".", 1, true), "a chat line with the link, got " .. printedSince(pmark))
+	local notice
+	for _, f in ipairs(UIParent._children) do
+		if f.Text and f.shownAt and f:IsShown() and (f.Text:GetText() or ""):find("shares", 1, true) then notice = f end
+	end
+	check(notice and notice.Text:GetText():find(ItemLink(19019), 1, true) and #SOUNDS == sounds, "and a notice on screen, without a sound")
+	Advance(6)
+	check(not notice:IsShown(), "which goes away by itself")
+	pmark = #PRINTED + 1
+	MOCK_ITEM_UNCACHED = 6948
+	anna("I2;6948::::::::20:::::")
+	Advance(0.15)
+	check(not printedSince(pmark):find("shares", 1, true), "an item the client doesn't know yet: it waits for it")
+	MOCK_ITEM_UNCACHED = nil
+	for _, callback in ipairs(PENDING_ITEM_LOADS) do callback() end
+	PENDING_ITEM_LOADS = {}
+	check(printedSince(pmark):find("Anna|r shares " .. ItemLink(6948), 1, true), "... and shows it once it's loaded")
+	pmark = #PRINTED + 1
+	anna("I2;1179::::::::20:::::")
+	anna("I2;abc")
+	Advance(0.15)
+	check(not printedSince(pmark):find("shares", 1, true), "another one within 3 s and malformed ones are ignored")
+	Advance(3)
+	B("shareItems"):SetValue(false)
+	anna("I2;1179::::::::20:::::")
+	mark = #GAMEDATA + 1
+	STATE.ctrl, MOCK_BUTTON = true, "RightButton"
+	HandleModifiedItemClick(ItemLink(1155))
+	STATE.ctrl = false
+	Advance(0.15)
+	check(not printedSince(pmark):find("shares", 1, true) and #sentTo(11, mark, "I2;") == 0, "switched off: nothing shown, nothing sent")
+	B("shareItems"):SetValue(true)
+end
+
 section("Beacon: a busy fight doesn't pile up messages")
 do
 	anna("S2;;0;260.0;750.0;Goldshire;")

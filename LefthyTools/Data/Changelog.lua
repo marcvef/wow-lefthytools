@@ -60,5 +60,8 @@ ns.CHANGELOG = {
 	{ id = 18, version = "0.5.0", module = "general",
 		en = { "Who runs which version", "Hover Updates on the settings overview: your build and every friend's, marked newer, same or older." },
 		de = { "Wer welche Version hat", "Mouseover über Updates in der Übersicht: dein Stand und der jedes Freundes, markiert als neuer, gleich oder älter." } },
+	{ id = 19, version = "0.5.0", module = "beacon",
+		en = { "Show an item", "Ctrl+right-click an item: your friends get it as a link in chat and a notice on screen, without a sound." },
+		de = { "Item zeigen", "Strg+Rechtsklick auf ein Item: Deine Freunde bekommen es als Link im Chat und als Hinweis auf dem Bildschirm, ohne Sound." } },
 	-- New entries go here, at the end.
 }
