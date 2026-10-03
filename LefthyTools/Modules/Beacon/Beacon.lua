@@ -27,6 +27,8 @@ local L = ns.L
 --                       the tooltip: done 1 = ready to turn in, objective = the first unfinished
 --                       one. questID 0 = none or not shared. Sent when it changes (at most every
 --                       QUEST_GAP seconds) and with every answer.
+--   E2;<kind>;<a>;<b>   a Chronicle highlight (boss, rare, dungeon, loot, mount, achievement, quests,
+--                       gold, profession) with up to two text fields; see Chronicle.lua
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil), so new kinds can be
 -- added without breaking older friends.
@@ -55,6 +57,9 @@ local DING_GAP = 10          -- level-up messages accepted from one friend at mo
 local DEATH_GAP = 10         -- death alerts for one friend at most this often
 local PING_GAP = 2           -- map pings accepted from one friend at most this often
 local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed) at most this often
+local HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW = 6, 60 -- Chronicle highlights accepted from one friend
+local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
+	quests = true, gold = true, profession = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
@@ -116,6 +121,7 @@ local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt 
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
 local pingsIn = {}      -- { gameAccountID, continent, north, west, mapID } received, shown on the next tick
+local highlightsIn = {} -- { gameAccountID, kind, a, b } received, passed on on the next tick
 local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on the next tick
 local newerNoticeShown = false -- that notice comes once per login
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
@@ -522,6 +528,11 @@ local function Parse(text)
 		if questID then
 			return "T", tonumber(questID), done == "1", title, objective
 		end
+	elseif kind == "E" then
+		local highlight, a, b = rest:match("^;(%l+);([^;]*);([^;]*)$")
+		if highlight and HIGHLIGHTS[highlight] then
+			return "E", highlight, a, b
+		end
 	end
 	return nil
 end
@@ -618,6 +629,14 @@ local function OnMessage(text, senderID)
 		peer.quest = a > 0 and title ~= "" and { id = a, done = b, title = title, objective = B.Clean(d, 64) } or nil
 		peer.rev = peer.rev + 1
 		Changed() -- an open tooltip shows it
+	elseif kind == "E" then
+		if not guard.highlightWindow or now - guard.highlightWindow >= HIGHLIGHT_WINDOW then
+			guard.highlightWindow, guard.highlights = now, 0
+		end
+		if guard.highlights < HIGHLIGHT_LIMIT then
+			guard.highlights = guard.highlights + 1
+			highlightsIn[#highlightsIn + 1] = { senderID, a, B.Clean(b, 64), B.Clean(c, 64) }
+		end
 	elseif kind == "P" then
 		if M.db.pings and (not guard.pingAt or now - guard.pingAt >= PING_GAP) then
 			guard.pingAt = now
@@ -692,6 +711,13 @@ local function Tick(now, elapsed)
 		local peer = peers[ping[1]]
 		if peer and peer.name and B.ReceivePing then
 			B.ReceivePing(peer, ping[1], ping[2], ping[3], ping[4], ping[5])
+		end
+	end
+	while highlightsIn[1] do
+		local item = table.remove(highlightsIn, 1)
+		local peer = peers[item[1]]
+		if peer and peer.name then
+			B.Notify("highlight", peer, { kind = item[2], a = item[3], b = item[4] })
 		end
 	end
 	if B.UpdatePings then
@@ -809,7 +835,7 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, B.pings }) do
+	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, B.pings }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil
@@ -867,6 +893,13 @@ end
 
 function M:GetPeers()
 	return peers
+end
+
+-- A Chronicle highlight for every friend with Beacon (Chronicle.lua calls this on its tick).
+function B.ShareHighlight(kind, a, b)
+	if M.enabled and HIGHLIGHTS[kind] then
+		B.QueueToPeers(("E%s;%s;%s;%s"):format(VERSION, kind, B.Clean(tostring(a or ""), 64), B.Clean(tostring(b or ""), 64)))
+	end
 end
 
 local function StatusWords(peer)

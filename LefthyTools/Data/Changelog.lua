@@ -37,4 +37,7 @@ ns.CHANGELOG = {
 	{ id = 11, version = "0.5.0",
 		en = "Mirage: AFK screen. While you're away the interface disappears, the camera circles your character, and a panel shows how long you've been away, whispers, friends' news and who's online.",
 		de = "Mirage: AFK-Bildschirm. Während du weg bist, verschwindet das Interface, die Kamera kreist um deinen Charakter und eine Leiste zeigt, wie lange du weg bist, Flüsternachrichten, Neuigkeiten von Freunden und wer online ist." },
+	{ id = 12, version = "0.5.0",
+		en = "New module Chronicle: a journal for each character that writes itself (level-ups, deaths, dungeons, bosses, rares, loot, mounts, milestones), lots of statistics, and what your friends did. Open it with /chronicle.",
+		de = "Neues Modul Chronicle: ein Tagebuch für jeden Charakter, das sich von selbst schreibt (Level-Ups, Tode, Dungeons, Bosse, Rares, Loot, Mounts, Meilensteine), viele Statistiken und was deine Freunde erlebt haben. Öffnen mit /chronicle." },
 }

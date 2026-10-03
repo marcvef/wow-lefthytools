@@ -1,0 +1,93 @@
+# Chronicle design
+
+A journal per character, kept automatically, plus statistics and a feed of what friends with
+LefthyTools did. Files: `Modules/Chronicle/Chronicle.lua` (recording, sharing, session,
+settings, `/chronicle`) and `Window.lua` (the window). They share `ns.Chronicle` (`C`).
+
+## Data
+
+`LefthyToolsChronicleDB` (account-wide saved variable, so every character's journal can be
+browsed from any character):
+
+- `chars["Name-Realm"]`: `name, realm, classFile, race, level, first` (when Chronicle first saw
+  it), `events` (the timeline, oldest first, at most 1000), `stats` (counters, below),
+  `zoneTime[zone]`, `killers[name]`, `levelTimes[level]`, `fastestLevel`, `levelStart`,
+  `professions[name]`, `seen = { zones, dungeons, bosses, rares }` (rares by GUID: one spawn
+  counts once), `days[YYYY-MM-DD]`, `session = { start, stats, money }`, `playedTotal` (what
+  `/played` last said; Chronicle never asks itself, that would print in chat).
+- `friends`: the feed, `{ t, name, classFile, k, ... }`, oldest first, at most 300.
+
+`C.Fill` completes a record (records from older versions lack newer stats); every record is
+filled before it's shown.
+
+## Recording
+
+Handlers only count or append; nothing in them draws or sends.
+
+| Entry (`k`) | Source |
+|---|---|
+| `level` (+ how long the level took, in time played) | `PLAYER_LEVEL_UP` |
+| `death` (zone, subzone, foe, level) | `PLAYER_DEAD`; foe = your last attackable target while in combat, if within 15 s (the tick notes it) |
+| `zone` (first visit) | tick after `ZONE_CHANGED_NEW_AREA` / `PLAYER_ENTERING_WORLD`, `GetRealZoneText` |
+| `dungeon` (first visit; every entry counts as a run) | same, `IsInInstance` party/raid + `GetInstanceInfo` |
+| `boss` (first kill of each; every kill counted) | `ENCOUNTER_END` with success, or `BOSS_KILL`; the same name within 30 s counts once |
+| `rare` | your target is rare/rareelite/worldboss, not a player, dead and not someone else's tap (`UnitIsTapDenied`), checked on the tick; also `PARTY_KILL` on your target |
+| `loot` (blue and better; with the item's icon) | `CHAT_MSG_LOOT` matched against `LOOT_ITEM_SELF(_MULTIPLE)` and `LOOT_ITEM_PUSHED_SELF(_MULTIPLE)` turned into patterns, so only your own loot, in any client language; quality from `C_Item.GetItemQualityByID`, else the link's `|cnIQ<n>:` |
+| `mount`, `pet`, `toy` | `NEW_MOUNT_ADDED`, `NEW_PET_ADDED`, `NEW_TOY_ADDED` |
+| `achievement` | `ACHIEVEMENT_EARNED` (not `alreadyEarned`) |
+| `quests` milestones (10, 25, 50, 100, 250, ...) | `QUEST_TURNED_IN` |
+| `gold` milestones (1, 10, 50, 100, 250, ... gold held at once) | `PLAYER_MONEY` |
+| `profession` (learned; 75/150/225/300) | tick after `SKILL_LINES_CHANGED`, `GetProfessions`/`GetProfessionInfo`; the first scan is a baseline |
+
+Counters (`stats`): played (the tick), sessions, levels, quests, foreverQuests
+(`ns.IsForeverQuest`), questXP, xp (`PLAYER_XP_UPDATE` deltas, also across a level-up), kills
+(`PARTY_KILL` with you as the attacker), rares, bosses, dungeonRuns, deaths, moneyIn/moneyOut/
+maxMoney, loot2/3/4 (green/blue/epic+, counts included), jumps (post-hook on
+`JumpOrAscendStart`, not while swimming or flying), walked/ridden/swum/flown (the tick:
+`UnitPosition` distance since the last tick, by `UnitOnTaxi`, `IsSwimming`, `IsMounted`; more than
+150 yd in a second is a teleport and not counted; nothing in instances), flights, mounts, pets,
+toys, achievements, longestSession. Secret values (GUIDs, names, chat text in an encounter) are
+skipped.
+
+**Session:** starts at a real login (`PLAYER_ENTERING_WORLD` with `isInitialLogin`), or when a
+character has none yet (then the login's PEW doesn't start a second one); a `/reload` continues
+it. A snapshot of the counters and the gold at the start gives the session's numbers
+(`C.Session`): time, XP, levels, quests, kills, deaths, gold change, distance.
+
+## Cost
+
+One driver, 1 tick per second while the module is on: time played and per zone, one
+`UnitPosition`, the target check, the zone/profession re-checks only when flagged, sharing, and
+`C.OnTick` for the window (returns at once unless it's open). Switched off: events unregistered,
+driver hidden.
+
+## Friends and sharing
+
+Highlights go to friends through Beacon (`ns.Beacon.ShareHighlight`, on the tick, only with
+Beacon on and `share` on) as `E2;<kind>;<a>;<b>`: boss (name, instance), rare (name, zone),
+dungeon (name), loot (name, quality; epic and better only), mount (name), achievement (name),
+quests (count), gold (amount), profession (name, level). Zones, pets, toys and blue loot stay
+private (too chatty). Beacon accepts at most 6 highlights per friend per minute and only known
+kinds, and passes them on as `B.Notify("highlight", peer, { kind, a, b })`. Chronicle's listener
+puts them, and Beacon's `level` and `death` events, into the feed, and prints a chat line for
+highlights (English, `friendsChat`). Friends' level-ups and deaths already have their own lines.
+
+## Window
+
+`LefthyToolsChronicleFrame` (Core/Window.lua's template), opened with `/chronicle`,
+`/lefthy chronicle`, the settings button or the key binding `LEFTHYTOOLS_CHRONICLE_TOGGLE`.
+A character switcher (this one first, then the others by name), and three pages, the open one's
+button greyed out:
+
+- **Timeline:** newest first, a heading per day (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an
+  inline icon (the item's or achievement's own where known) and the localized text. At most 250
+  entries drawn, the rest summarized in one line.
+- **Statistics:** sections This session (current character only), Character, Quests, Exploring,
+  Combat, Travel, Gold and loot, Collections. Labels and values are two font strings with the
+  same number of lines (values right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h`,
+  distance in km, gold with `GetMoneyString`.
+- **Friends:** the feed, as "Name: text".
+
+Redrawn on the tick only while open and only when something changed (`C.dirty`), the statistics
+page also every 5 s; a redraw keeps the scroll position. The AFK screen shows a session line
+(`ns.MirageAFK.sections`).

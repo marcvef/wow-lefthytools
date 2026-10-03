@@ -1593,6 +1593,306 @@ lefthy("beacon sound 1")
 Advance(0.05)
 check(#SOUNDS == soundMark + 2, "picking the current one again still plays it")
 
+section("Chronicle: recording")
+local CH, CDB = ns.Chronicle, LefthyToolsChronicleDB
+local me = CDB and CDB.chars["Lefthy-Realmy"]
+local function lastEvent(kind)
+	for i = #me.events, 1, -1 do if me.events[i].k == kind then return me.events[i] end end
+end
+local function friendsOnline() -- mocked friends only talk when told to; Beacon forgets them after 65 s
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(0.15)
+end
+do
+	check(LT:GetModule("chronicle").enabled and me and me.classFile == "ROGUE" and me.race == "Human" and me.realm == "Realmy",
+		"on by default; a record for this character")
+	check(me.stats.sessions == 1, "one session since login, got " .. tostring(me.stats.sessions))
+	Fire("PLAYER_ENTERING_WORLD", false, true) -- a /reload
+	check(me.stats.sessions == 1, "a /reload continues the session")
+	local ticks = CH.ticks
+	Advance(5)
+	check(CH.ticks - ticks >= 4 and CH.ticks - ticks <= 6, "it ticks once a second, got " .. (CH.ticks - ticks))
+	local played = me.stats.played
+	Advance(10)
+	check(math.abs(me.stats.played - played - 10) < 1.1, "time played counts")
+	check(me.seen.zones["Elwynn Forest"] and lastEvent("zone"), "the zone you're in is discovered")
+	check(lastEvent("level") and lastEvent("level").level == 21, "the level-ups so far are in it")
+	local levels = me.stats.levels
+	Fire("PLAYER_LEVEL_UP", 22)
+	Advance(100)
+	Fire("PLAYER_LEVEL_UP", 23)
+	local lv = lastEvent("level")
+	check(lv.level == 23 and lv.zone == "Elwynn Forest" and lv.took and math.abs(lv.took - 100) < 2 and me.stats.levels == levels + 2,
+		"a level-up: where, and how long the level took, got " .. tostring(lv.took))
+
+	STATE.combat, STATE.target, STATE.targetName = true, true, "Hogger"
+	Advance(1.1)
+	STATE.combat, STATE.target, STATE.dead = false, false, true
+	Fire("PLAYER_DEAD")
+	local death = lastEvent("death")
+	check(death and death.foe == "Hogger" and death.zone == "Elwynn Forest" and death.sub == "Goldshire" and me.killers.Hogger == 1,
+		"a death: where, and what you were fighting")
+	STATE.dead = false
+	Fire("PLAYER_ALIVE")
+
+	local quests = me.stats.quests
+	Fire("QUEST_TURNED_IN", 176, 450, 100)
+	Fire("QUEST_TURNED_IN", 86574, 900, 0) -- new in WoW: Forever
+	check(me.stats.quests == quests + 2 and me.stats.foreverQuests == 1 and me.stats.questXP == 1350,
+		"quests turned in, the new-in-Forever ones counted too")
+	me.stats.quests = 9
+	friendsOnline()
+	mark = #GAMEDATA + 1
+	Fire("QUEST_TURNED_IN", 177, 100, 0)
+	check(lastEvent("quests") and lastEvent("quests").count == 10, "milestone: 10 quests")
+	Advance(1.2)
+	check(sentTo(11, mark, "E2;")[1] == "E2;quests;10;", "milestones go to friends, got " .. tostring(sentTo(11, mark, "E2;")[1]))
+
+	local kills = me.stats.kills
+	Fire("PARTY_KILL", "Player-1-0", "Creature-0-5")
+	Fire("PARTY_KILL", "Player-1-11", "Creature-0-6")
+	Fire("PARTY_KILL", SECRET, "Creature-0-7")
+	check(me.stats.kills == kills + 1, "my killing blows count; others' and secret ones don't")
+
+	STATE.target, STATE.targetName, STATE.targetGUID, TARGET_CLASS, STATE.targetDead = true, "Mor'Ladim", "Creature-0-77", "rareelite", true
+	friendsOnline()
+	mark = #GAMEDATA + 1
+	Advance(1.1)
+	local rare = lastEvent("rare")
+	check(rare and rare.name == "Mor'Ladim" and rare.zone == "Elwynn Forest" and me.stats.rares == 1, "a rare dies while targeted")
+	Advance(2)
+	check(me.stats.rares == 1, "once per spawn")
+	check(sentTo(11, mark, "E2;")[1] == "E2;rare;Mor'Ladim;Elwynn Forest", "and friends hear about it")
+	STATE.tapDenied, STATE.targetGUID = true, "Creature-0-78"
+	Advance(1.1)
+	check(me.stats.rares == 1, "someone else's tap isn't your kill")
+	STATE.target, STATE.targetDead, STATE.targetGUID, TARGET_CLASS, STATE.targetName, STATE.tapDenied = false, false, nil, "normal", nil, false
+
+	INSTANCE = { name = "The Deadmines", type = "party" }
+	friendsOnline()
+	mark = #GAMEDATA + 1
+	Fire("ZONE_CHANGED_NEW_AREA")
+	Advance(1.1)
+	check(lastEvent("dungeon") and lastEvent("dungeon").name == "The Deadmines" and me.stats.dungeonRuns == 1, "first visit to a dungeon")
+	Fire("ENCOUNTER_END", 1, "Edwin VanCleef", 1, 5, 1)
+	Fire("BOSS_KILL", 1, "Edwin VanCleef")
+	Fire("ENCOUNTER_END", 2, "Cookie", 1, 5, 0) -- a wipe
+	check(me.stats.bosses == 1 and lastEvent("boss").name == "Edwin VanCleef" and lastEvent("boss").instance == "The Deadmines",
+		"a boss kill counts once (ENCOUNTER_END and BOSS_KILL both report it), a wipe not at all")
+	Advance(1.2)
+	local shared = table.concat(sentTo(11, mark, "E2;"), " | ")
+	check(shared:find("E2;dungeon;The Deadmines;", 1, true) and shared:find("E2;boss;Edwin VanCleef;The Deadmines", 1, true),
+		"both go to friends, got " .. shared)
+	INSTANCE = nil
+	Fire("ZONE_CHANGED_NEW_AREA")
+	Advance(1.1)
+	INSTANCE = { name = "The Deadmines", type = "party" }
+	Fire("ZONE_CHANGED_NEW_AREA")
+	Advance(1.1)
+	local dungeonEntries = 0
+	for _, e in ipairs(me.events) do if e.k == "dungeon" then dungeonEntries = dungeonEntries + 1 end end
+	check(me.stats.dungeonRuns == 2 and dungeonEntries == 1, "a second run is counted, but isn't news")
+	INSTANCE = nil
+	ZONE = "Westfall"
+	Fire("ZONE_CHANGED_NEW_AREA")
+	Advance(5.1)
+	check(lastEvent("zone").zone == "Westfall" and me.zoneTime.Westfall >= 3, "a new zone is discovered; time per zone counts")
+	ZONE = "Elwynn Forest"
+	Fire("ZONE_CHANGED_NEW_AREA")
+	Advance(1.1)
+
+	friendsOnline()
+	mark = #GAMEDATA + 1
+	MONEY = MONEY + 1500000
+	Fire("PLAYER_MONEY")
+	MONEY = MONEY - 2000
+	Fire("PLAYER_MONEY")
+	check(me.stats.moneyIn == 1500000 and me.stats.moneyOut == 2000 and me.stats.maxMoney == 1552000, "gold earned, spent, most at once")
+	check(lastEvent("gold") and lastEvent("gold").gold == 100, "milestone: 100 gold")
+	Advance(1.2)
+	check(sentTo(11, mark, "E2;")[1] == "E2;gold;100;", "shared")
+
+	friendsOnline()
+	mark = #GAMEDATA + 1
+	Fire("CHAT_MSG_LOOT", "You receive loot: " .. ItemLink(1155) .. ".", "Lefthy")
+	Fire("CHAT_MSG_LOOT", "You receive loot: " .. ItemLink(2075) .. "x3.", "Lefthy")
+	Fire("CHAT_MSG_LOOT", "Anna receives loot: " .. ItemLink(19019) .. ".", "Anna")
+	Fire("CHAT_MSG_LOOT", SECRET, "Lefthy")
+	Fire("CHAT_MSG_LOOT", "You receive item: " .. ItemLink(19019) .. ".", "Lefthy")
+	check(me.stats.loot3 == 1 and me.stats.loot2 == 3 and me.stats.loot4 == 1, "my loot by quality (x3 counts three), not others'")
+	check(lastEvent("loot").name == "Thunderfury" and lastEvent("loot").quality == 5 and lastEvent("loot").icon == 20019,
+		"blue and better loot goes in the journal, with its icon")
+	Advance(1.2)
+	check(sentTo(11, mark, "E2;")[1] == "E2;loot;Thunderfury;5", "epic and better loot is shared")
+
+	Fire("NEW_MOUNT_ADDED", 6)
+	Fire("NEW_PET_ADDED", "BattlePet-0-1")
+	Fire("NEW_TOY_ADDED", 44606)
+	Fire("ACHIEVEMENT_EARNED", 6, false)
+	Fire("ACHIEVEMENT_EARNED", 7, true) -- earned on another character before
+	check(me.stats.mounts == 1 and me.stats.pets == 1 and me.stats.toys == 1 and me.stats.achievements == 1
+		and lastEvent("mount").name == "Brown Horse" and lastEvent("pet").name == "Black Kingsnake"
+		and lastEvent("toy").name == "Toy Train Set" and lastEvent("achievement").name == "Level 20", "collections and achievements")
+
+	local jumps = me.stats.jumps
+	JumpOrAscendStart()
+	JumpOrAscendStart()
+	TRAVEL.swimming = true
+	JumpOrAscendStart()
+	TRAVEL.swimming = false
+	check(me.stats.jumps == jumps + 2 and JUMPS >= 3, "jumps (swimming up doesn't count)")
+
+	local walked, ridden = me.stats.walked, me.stats.ridden
+	for i = 1, 6 do PLAYER_POS = { 0.5 + i * 0.005, 0.5 }; Advance(1) end -- 5 yd a second
+	check(me.stats.walked - walked >= 20 and me.stats.walked - walked <= 31, "distance on foot, got " .. (me.stats.walked - walked))
+	TRAVEL.mounted = true
+	for i = 1, 4 do PLAYER_POS = { 0.53 + i * 0.01, 0.5 }; Advance(1) end
+	TRAVEL.mounted = false
+	check(me.stats.ridden - ridden >= 30, "riding")
+	local flights = me.stats.flights
+	TRAVEL.taxi = true
+	for i = 1, 3 do PLAYER_POS = { 0.57, 0.5 - i * 0.03 }; Advance(1) end
+	TRAVEL.taxi = false
+	check(me.stats.flights == flights + 1 and me.stats.flown >= 50, "flight paths and their distance")
+	walked = me.stats.walked
+	PLAYER_POS = { 0.95, 0.95 } -- hearthstone
+	Advance(1.1)
+	check(me.stats.walked == walked, "a teleport isn't travel")
+	PLAYER_POS = { 0.5, 0.5 }
+	Advance(1.1)
+
+	PROFESSIONS = { { name = "Mining", level = 70 } }
+	Fire("SKILL_LINES_CHANGED")
+	Advance(1.1)
+	check(lastEvent("profession") and lastEvent("profession").name == "Mining" and not lastEvent("profession").level, "a new profession")
+	friendsOnline()
+	mark = #GAMEDATA + 1
+	PROFESSIONS[1].level = 76
+	Fire("SKILL_LINES_CHANGED")
+	Advance(1.1)
+	check(lastEvent("profession").level == 75, "profession milestone: 75")
+	Advance(1.2)
+	check(sentTo(11, mark, "E2;")[1] == "E2;profession;Mining;75", "shared")
+	PROFESSIONS = {}
+
+	local xp = me.stats.xp
+	XP.current = 1800
+	Fire("PLAYER_XP_UPDATE")
+	PLAYER_LEVEL, XP.current = 20, 200
+	Fire("PLAYER_XP_UPDATE")
+	check(me.stats.xp == xp + 300 + 4400, "experience, also across a level-up, got " .. (me.stats.xp - xp))
+	PLAYER_LEVEL = 19
+	Fire("TIME_PLAYED_MSG", 360000, 3600)
+	check(me.playedTotal == 360000, "what /played said is kept")
+
+	local session = CH.Session()
+	check(session.levels >= 2 and session.quests >= 3 and session.deaths >= 1 and session.money == 1498000,
+		"this session: levels, quests, deaths, gold")
+	pmark = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_CHRONICLE("session")
+	check(printedSince(pmark):find("this session: ", 1, true), "/chronicle session")
+end
+
+section("Chronicle: friends")
+do
+	anna("H2") -- Anna is around (and known by name) again
+	Advance(1.2)
+	local feed = CDB.friends
+	local before = #feed
+	pmark = #PRINTED + 1
+	Advance(60) -- a fresh highlight window for Anna
+	anna("E2;boss;Hogger;Elwynn Forest")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "E2;hack;x;y", "WHISPER", 11)
+	check(#feed == before, "nothing recorded inside the event handler")
+	Advance(0.15)
+	check(#feed == before + 1 and feed[#feed].k == "boss" and feed[#feed].name == "Anna" and feed[#feed].a == "Hogger",
+		"a friend's highlight goes into the feed (unknown kinds are dropped)")
+	check(printedSince(pmark):find("Anna|r defeated Hogger (Elwynn Forest).", 1, true), "with a chat line")
+	for i = 1, 10 do anna("E2;rare;Rare" .. i .. ";Duskwood") end
+	Advance(0.15)
+	check(#feed == before + 6, "at most 6 highlights a minute from one friend, got " .. (#feed - before))
+	Advance(15)
+	anna("L2;24;")
+	Advance(0.15)
+	check(feed[#feed].k == "level" and feed[#feed].level == 24, "friends' level-ups land in the feed too")
+	REGISTERED_SETTINGS.LefthyTools_chronicle_friendsChat:SetValue(false)
+	Advance(60)
+	pmark = #PRINTED + 1
+	anna("E2;mount;Brown Horse;")
+	Advance(0.15)
+	check(feed[#feed].k == "mount" and not printedSince(pmark):find("new mount", 1, true), "'show in chat' off: only the feed")
+	REGISTERED_SETTINGS.LefthyTools_chronicle_friendsChat:SetValue(true)
+	REGISTERED_SETTINGS.LefthyTools_chronicle_share:SetValue(false)
+	mark = #GAMEDATA + 1
+	Fire("NEW_MOUNT_ADDED", 6)
+	Advance(1.2)
+	check(#sentTo(11, mark, "E2;") == 0, "'share highlights' off: nothing sent")
+	REGISTERED_SETTINGS.LefthyTools_chronicle_share:SetValue(true)
+end
+
+section("Chronicle: window")
+do
+	lefthy("chronicle")
+	local win = LefthyToolsChronicleFrame
+	check(win and win:IsShown() and win.Tabs.timeline and not win.Tabs.timeline:IsEnabled(), "/lefthy chronicle opens it on the timeline")
+	local text = win.Text:GetText()
+	for _, expected in ipairs({ "|cffffd2002026-10-03|r", "Level 23 - Elwynn Forest (took 1m)", "Died to Hogger - Elwynn Forest - Goldshire (level 19)",
+			"Defeated Edwin VanCleef (The Deadmines)", "Killed the rare Mor'Ladim - Elwynn Forest", "First visit: The Deadmines",
+			"Discovered Westfall", "10 quests completed", "Reached 100 gold", "Looted " .. ItemLink(19019), "New mount: Brown Horse",
+			"Achievement: Level 20", "Mining: skill 75", "Learned Mining" }) do
+		check(text:find(expected, 1, true), "timeline: " .. expected)
+	end
+	check(text:find("New mount: Brown Horse", 1, true) < text:find("Learned Mining", 1, true), "newest first")
+	win.Tabs.stats:Click()
+	local labels, values = win.Text:GetText(), win.Values:GetText()
+	local function lines(s) local n = 1 for _ in s:gmatch("\n") do n = n + 1 end return n end
+	check(lines(labels) == lines(values), "statistics: labels and values line up")
+	for _, expected in ipairs({ "This session", "Killing blows", "Deadliest foe", "Rare elites killed", "Bosses defeated", "Dungeon runs",
+			"Favourite zone", "On foot", "Flight paths", "Jumps", "Most gold at once", "Epic items", "Mounts", "Time played (/played)" }) do
+		check(labels:find(expected, 1, true), "statistics: " .. expected)
+	end
+	check(values:find("Hogger (1)", 1, true) and values:find("100h 0m", 1, true) == nil and values:find("4d 4h", 1, true),
+		"values: deadliest foe, /played as days and hours")
+	check(not win.Tabs.stats:IsEnabled() and win.Tabs.timeline:IsEnabled(), "the open page's button is greyed out")
+	win.Tabs.friends:Click()
+	check(win.Text:GetText():find("Anna|r: ", 1, true) and win.Text:GetText():find("Defeated Hogger (Elwynn Forest)", 1, true),
+		"friends: their highlights")
+	CDB.chars["Alty-Realmy"] = { name = "Alty", realm = "Realmy", classFile = "MAGE", level = 12,
+		events = { { t = time(), k = "level", level = 12 } } }
+	win.Tabs.timeline:Click()
+	win.Next:Click()
+	check(win.CharName:GetText():find("Alty", 1, true) and win.Text:GetText():find("Level 12", 1, true), "your other characters' journals")
+	win.Tabs.stats:Click()
+	check(win.Values:GetText() ~= "" and not win.Text:GetText():find("This session", 1, true), "and their statistics (no session)")
+	win.Tabs.timeline:Click()
+	win.Prev:Click()
+	check(win.CharName:GetText():find("Lefthy", 1, true), "back to this character")
+	Fire("NEW_TOY_ADDED", 1)
+	Advance(1.1)
+	check(win.Text:GetText():find("New toy: Toy Train Set", 1, true), "the open window follows new entries within a second")
+	win:Hide()
+	check(BINDING_NAME_LEFTHYTOOLS_CHRONICLE_TOGGLE == "Chronicle: open or close the journal", "a key binding")
+	LT:GetModule("chronicle"):Toggle()
+	check(win:IsShown(), "the key binding opens it")
+	LT:GetModule("chronicle"):Toggle()
+	check(not win:IsShown(), "and closes it")
+	afk(true)
+	Advance(1.1)
+	check(LefthyToolsAFKFrame.Info:GetText():find("This session: ", 1, true), "the AFK screen shows the session")
+	afk(false)
+	Advance(0.3)
+	for _ = 1, 1100 do Fire("NEW_TOY_ADDED", 1) end
+	check(#me.events == 1000, "at most 1000 entries per character, got " .. #me.events)
+	lefthy("disable chronicle")
+	local quests = me.stats.quests
+	local ticks = CH.ticks
+	Fire("QUEST_TURNED_IN", 1, 0, 0)
+	Advance(3)
+	check(me.stats.quests == quests and CH.ticks == ticks, "switched off: nothing recorded, nothing runs")
+	lefthy("enable chronicle")
+	check(me.stats.sessions == 1, "switching it back on continues the session")
+end
+
 section("Beacon: leaving")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 12)
 Advance(0.15)

@@ -23,7 +23,9 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   C combat; position empty in instances or with sharing off; target only in combat),
   `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`),
   `P2;<continent>;<north>;<west>;<uiMapID>` map ping,
-  `T2;<questID>;<done>;<title>;<objective>` tracked quest, `Q2` switched off. A build that doesn't
+  `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
+  highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
+  `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
@@ -125,8 +127,8 @@ tick `Alerts.lua` prints "<skull> Anna died in Duskwood - Raven Hill, fighting S
 like all chat output; zone from Battle.net, subzone from the state) when `deathAlert` is on.
 
 `B.Notify(kind, peer, data)` tells other modules about friends' events on the driver tick:
-`"level"` (`{ level }`) and `"death"` (`{ where, foe, level }`), also when the chat line or toast
-is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
+`"level"` (`{ level }`), `"death"` (`{ where, foe, level }`) and `"highlight"` (`{ kind, a, b }`),
+also when the chat line or toast is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
 
 ## Tracked quest
 

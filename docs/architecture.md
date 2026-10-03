@@ -1,7 +1,8 @@
 # Architecture
 
 LefthyTools is one addon made of switchable modules: **Mirage** (fades the HUD when idle),
-**Misc Tweaks** (small fixes) and **Beacon** (Battle.net friends on the map). User-facing docs are
+**Misc Tweaks** (small fixes), **Beacon** (Battle.net friends on the map) and **Chronicle** (a
+journal per character). User-facing docs are
 in the [README](../README.md); this file covers how the code is organised.
 
 ## Layout
@@ -30,7 +31,11 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
-  Modules/Beacon/Beacon.xml  world map pin template (LefthyToolsBeaconPinTemplate)
+  Modules/Beacon/Alerts.lua  death alerts
+  Modules/Beacon/Pings.lua   map pings: Alt+click, markers on both maps
+  Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
+  Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, sharing, /chronicle
+  Modules/Chronicle/Window.lua     the journal window (timeline, statistics, friends)
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)

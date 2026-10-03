@@ -1,0 +1,409 @@
+local _, ns = ...
+local LT = ns.LT
+local L = ns.L
+local C = ns.Chronicle
+local M = C.module
+
+-- The Chronicle window: a character switcher and three pages. Timeline (this character's
+-- journal, newest first, by day), Statistics (session and lifetime, labels left and values right
+-- in two text blocks of the same line count) and Friends (what friends with LefthyTools did).
+-- Built on first open; redrawn only while open and only when something changed (the Statistics
+-- page also every few seconds, for the time and distance counters).
+
+local TIMELINE_SHOW = 250  -- entries drawn; older ones are summarized in one line
+local STATS_REFRESH = 5
+local TAB_WIDTH = 100
+
+local ICONS = {
+	level = "Interface\\Icons\\Achievement_Level_10",
+	death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
+	zone = "Interface\\Icons\\INV_Misc_Map_01",
+	dungeon = "Interface\\Icons\\INV_Misc_Key_14",
+	boss = "Interface\\Icons\\INV_Misc_Head_Dragon_01",
+	rare = "Interface\\Icons\\Ability_Hunter_SniperShot",
+	loot = "Interface\\Icons\\INV_Misc_Bag_10",
+	mount = "Interface\\Icons\\Ability_Mount_RidingHorse",
+	pet = "Interface\\Icons\\INV_Box_PetCarrier_01",
+	toy = "Interface\\Icons\\INV_Misc_Toy_10",
+	achievement = "Interface\\Icons\\Achievement_General",
+	quests = "Interface\\Icons\\INV_Misc_Note_01",
+	gold = "Interface\\Icons\\INV_Misc_Coin_01",
+	profession = "Interface\\Icons\\INV_Misc_Gear_01",
+}
+
+local frame
+local tab = "timeline"
+local selectedKey
+local lastStatsRefresh = 0
+
+local function Icon(e)
+	return ("|T%s:14:14:0:0:64:64:5:59:5:59|t"):format(tostring(e.icon or ICONS[e.k] or ICONS.quests))
+end
+
+local function Where(zone, sub)
+	if zone and zone ~= "" and sub then
+		return zone .. " - " .. sub
+	end
+	return (zone ~= "" and zone) or sub
+end
+
+-- One timeline line (localized), for my events and friends' alike.
+local TEXT = {
+	level = function(e)
+		local text = L["Level %d"]:format(e.level or 0)
+		if e.zone and e.zone ~= "" then
+			text = text .. " - " .. e.zone
+		end
+		if e.took then
+			text = text .. " " .. L["(took %s)"]:format(C.Duration(e.took))
+		end
+		return text
+	end,
+	death = function(e)
+		local text = e.foe and L["Died to %s"]:format(e.foe) or L["Died"]
+		local where = Where(e.zone, e.sub)
+		if where then
+			text = text .. " - " .. where
+		end
+		if e.level then
+			text = text .. " " .. L["(level %d)"]:format(e.level)
+		end
+		return text
+	end,
+	zone = function(e) return L["Discovered %s"]:format(e.zone) end,
+	dungeon = function(e) return L["First visit: %s"]:format(e.name) end,
+	boss = function(e)
+		return L["Defeated %s"]:format(e.name) .. ((e.instance and e.instance ~= "") and (" (" .. e.instance .. ")") or "")
+	end,
+	rare = function(e)
+		return L["Killed the rare %s"]:format(e.name) .. ((e.zone and e.zone ~= "") and (" - " .. e.zone) or "")
+	end,
+	loot = function(e) return L["Looted %s"]:format(e.link or C.QualityText(e.name or "?", e.quality)) end,
+	mount = function(e) return L["New mount: %s"]:format(e.name) end,
+	pet = function(e) return L["New pet: %s"]:format(e.name) end,
+	toy = function(e) return L["New toy: %s"]:format(e.name) end,
+	achievement = function(e) return L["Achievement: %s"]:format(e.name) end,
+	quests = function(e) return L["%s quests completed"]:format(C.Number(e.count)) end,
+	gold = function(e) return L["Reached %s gold"]:format(C.Number(e.gold)) end,
+	profession = function(e)
+		return e.level and L["%s: skill %d"]:format(e.name, e.level) or L["Learned %s"]:format(e.name)
+	end,
+}
+
+-- A friend's feed entry as an event of the same shape (highlights arrive as two text fields).
+local function FriendEvent(f)
+	local a, b = f.a, f.b
+	local shapes = {
+		level = { level = f.level },
+		death = { foe = f.foe, zone = f.where },
+		boss = { name = a, instance = b },
+		rare = { name = a, zone = b },
+		dungeon = { name = a },
+		loot = { name = a, quality = tonumber(b) },
+		mount = { name = a },
+		achievement = { name = a },
+		quests = { count = tonumber(a) },
+		gold = { gold = tonumber(a) },
+		profession = { name = a, level = tonumber(b) },
+	}
+	local e = shapes[f.k]
+	if e then
+		e.k, e.t = f.k, f.t
+	end
+	return e
+end
+
+local function LineFor(e, who)
+	local text = TEXT[e.k] and TEXT[e.k](e)
+	if not text then
+		return nil
+	end
+	return date("%H:%M", e.t) .. "  " .. Icon(e) .. " " .. (who and (who .. ": ") or "") .. text
+end
+
+-- Newest first, a heading per day.
+local function Journal(list, toLine)
+	local lines, lastDay = {}, nil
+	local first = math.max(1, #list - TIMELINE_SHOW + 1)
+	for i = #list, first, -1 do
+		local line, t = toLine(list[i])
+		if line then
+			local day = date(L["%Y-%m-%d"], t)
+			if day ~= lastDay then
+				if lastDay then
+					lines[#lines + 1] = ""
+				end
+				lines[#lines + 1] = "|cffffd200" .. day .. "|r"
+				lastDay = day
+			end
+			lines[#lines + 1] = line
+		end
+	end
+	if first > 1 then
+		lines[#lines + 1] = ""
+		lines[#lines + 1] = "|cff999999" .. L["... and %d older entries"]:format(first - 1) .. "|r"
+	end
+	if #lines == 0 then
+		lines[1] = "|cff999999" .. L["Nothing recorded yet."] .. "|r"
+	end
+	return table.concat(lines, "\n")
+end
+
+local function Timeline(c)
+	return Journal(c.events, function(e) return LineFor(e), e.t end)
+end
+
+local function Friends()
+	return Journal(C.Store().friends, function(f)
+		local e = FriendEvent(f)
+		return e and LineFor(e, LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r"), f.t
+	end)
+end
+
+---------------------------------------------------------------------------
+-- Statistics
+---------------------------------------------------------------------------
+
+local function Count(t)
+	local n = 0
+	for _ in pairs(t or {}) do
+		n = n + 1
+	end
+	return n
+end
+
+-- The key with the highest value (ties: alphabetically first, so it doesn't change randomly).
+local function Top(t)
+	local best, most
+	for key, value in pairs(t or {}) do
+		if not most or value > most or (value == most and key < best) then
+			best, most = key, value
+		end
+	end
+	return best, most
+end
+
+local function Statistics(c)
+	local labels, values = {}, {}
+	local function Section(title)
+		if #labels > 0 then
+			labels[#labels + 1], values[#values + 1] = "", ""
+		end
+		labels[#labels + 1], values[#values + 1] = "|cffffd200" .. title .. "|r", ""
+	end
+	local function Row(label, value)
+		labels[#labels + 1], values[#values + 1] = label, "|cffffffff" .. tostring(value) .. "|r"
+	end
+	local s = c.stats
+	local current = c == C.Char()
+
+	if current then
+		local session = C.Session()
+		if session then
+			Section(L["This session"])
+			Row(L["Time"], C.Duration(session.played))
+			Row(L["Experience"], C.Number(session.xp))
+			Row(L["Levels"], session.levels)
+			Row(L["Quests"], session.quests)
+			Row(L["Killing blows"], session.kills)
+			Row(L["Deaths"], session.deaths)
+			Row(L["Gold"], C.Money(session.money))
+			Row(L["Distance"], C.Distance(session.distance))
+		end
+	end
+
+	Section(L["Character"])
+	Row(L["Level"], c.level or "?")
+	Row(L["Time played (since Chronicle)"], C.Duration(s.played))
+	if c.playedTotal then
+		Row(L["Time played (/played)"], C.Duration(c.playedTotal))
+	end
+	Row(L["Days played"], Count(c.days))
+	Row(L["Sessions"], s.sessions)
+	Row(L["Longest session"], C.Duration(s.longestSession))
+	if c.fastestLevel then
+		local total, levels = 0, 0
+		for _, seconds in pairs(c.levelTimes) do
+			total, levels = total + seconds, levels + 1
+		end
+		Row(L["Fastest level"], C.Duration(c.fastestLevel))
+		Row(L["Average per level"], C.Duration(total / math.max(levels, 1)))
+	end
+
+	Section(L["Quests"])
+	Row(L["Quests completed"], C.Number(s.quests))
+	Row(L["New in WoW: Forever"], C.Number(s.foreverQuests))
+	Row(L["Experience earned"], C.Number(s.xp))
+	Row(L["Experience from quests"], C.Number(s.questXP))
+
+	Section(L["Exploring"])
+	Row(L["Zones discovered"], Count(c.seen.zones))
+	local zone, seconds = Top(c.zoneTime)
+	if zone then
+		Row(L["Favourite zone"], ("%s (%s)"):format(zone, C.Duration(seconds)))
+	end
+	Row(L["Dungeons seen"], Count(c.seen.dungeons))
+	Row(L["Dungeon runs"], s.dungeonRuns)
+
+	Section(L["Combat"])
+	Row(L["Killing blows"], C.Number(s.kills))
+	Row(L["Rare elites killed"], s.rares)
+	Row(L["Bosses defeated"], s.bosses)
+	Row(L["Deaths"], s.deaths)
+	local foe, times = Top(c.killers)
+	if foe then
+		Row(L["Deadliest foe"], ("%s (%d)"):format(foe, times))
+	end
+
+	Section(L["Travel"])
+	Row(L["On foot"], C.Distance(s.walked))
+	Row(L["Riding"], C.Distance(s.ridden))
+	Row(L["Swimming"], C.Distance(s.swum))
+	Row(L["Flight paths"], ("%d, %s"):format(s.flights, C.Distance(s.flown)))
+	Row(L["Jumps"], C.Number(s.jumps))
+
+	Section(L["Gold and loot"])
+	if current then
+		Row(L["Gold now"], C.Money(GetMoney()))
+	end
+	Row(L["Most gold at once"], C.Money(s.maxMoney))
+	Row(L["Gold earned"], C.Money(s.moneyIn))
+	Row(L["Gold spent"], C.Money(s.moneyOut))
+	Row(C.QualityText(L["Uncommon items"], 2), C.Number(s.loot2))
+	Row(C.QualityText(L["Rare items"], 3), C.Number(s.loot3))
+	Row(C.QualityText(L["Epic items"], 4), C.Number(s.loot4))
+
+	Section(L["Collections"])
+	Row(L["Mounts"], s.mounts)
+	Row(L["Pets"], s.pets)
+	Row(L["Toys"], s.toys)
+	Row(L["Achievements"], s.achievements)
+
+	labels[#labels + 1], values[#values + 1] = "", ""
+	labels[#labels + 1], values[#values + 1] = "|cff999999" .. L["Counted since %s."]:format(date(L["%Y-%m-%d"], c.first)) .. "|r", ""
+	return table.concat(labels, "\n"), table.concat(values, "\n")
+end
+
+---------------------------------------------------------------------------
+-- The window
+---------------------------------------------------------------------------
+
+-- Characters: this one first, then the others by name.
+local function Keys()
+	local keys, current = {}, C.CurrentKey()
+	for key in pairs(C.Store().chars) do
+		if key ~= current then
+			keys[#keys + 1] = key
+		end
+	end
+	table.sort(keys)
+	table.insert(keys, 1, current)
+	return keys
+end
+
+local Refresh
+
+local function Step(delta)
+	local keys = Keys()
+	local index = 1
+	for i, key in ipairs(keys) do
+		if key == selectedKey then
+			index = i
+		end
+	end
+	selectedKey = keys[(index - 1 + delta) % #keys + 1]
+	Refresh()
+end
+
+local function Build()
+	frame = LT.Window.Create("LefthyToolsChronicleFrame", "Chronicle", 640, 560)
+	C.window = frame
+	LT.Window.AddText(frame)
+	frame.Values = frame.Content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	frame.Values:SetPoint("TOPRIGHT")
+	frame.Values:SetJustifyH("RIGHT")
+	frame.Values:SetJustifyV("TOP")
+	frame.Values:SetSpacing(2)
+
+	frame.Prev = LT.Window.AddButton(frame, "<", function() Step(-1) end, { "TOPLEFT", frame, "TOPLEFT", 12, -30 })
+	frame.Prev:SetSize(26, 22)
+	frame.Next = LT.Window.AddButton(frame, ">", function() Step(1) end, { "TOPLEFT", frame, "TOPLEFT", 40, -30 })
+	frame.Next:SetSize(26, 22)
+	frame.CharName = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	frame.CharName:SetPoint("TOPLEFT", 74, -34)
+	frame.CharName:SetJustifyH("LEFT")
+
+	frame.Tabs = {}
+	for i, info in ipairs({ { "friends", L["Friends"] }, { "stats", L["Statistics"] }, { "timeline", L["Timeline"] } }) do
+		local key = info[1]
+		local button = LT.Window.AddButton(frame, info[2], function()
+			tab = key
+			Refresh()
+		end, { "TOPRIGHT", frame, "TOPRIGHT", -10 - (i - 1) * (TAB_WIDTH + 4), -30 })
+		button:SetSize(TAB_WIDTH, 22)
+		frame.Tabs[key] = button
+	end
+	frame:SetScript("OnHide", function() selectedKey = nil end)
+end
+
+-- keepScroll: a refresh of the same page.
+function Refresh(keepScroll)
+	local keys = Keys()
+	selectedKey = selectedKey or keys[1]
+	local c = C.Store().chars[selectedKey] or C.Char()
+	C.Fill(c)
+	local name = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r"
+	frame.CharName:SetText(name .. "  |cffcccccc" .. L["Level %d"]:format(c.level or 0)
+		.. ((c.realm and c.realm ~= GetRealmName()) and (" - " .. c.realm) or "") .. "|r")
+	frame.Prev:SetEnabled(#keys > 1)
+	frame.Next:SetEnabled(#keys > 1)
+	for key, button in pairs(frame.Tabs) do
+		button:SetEnabled(key ~= tab) -- the open page's button is greyed out
+	end
+	frame.CharName:SetShown(tab ~= "friends")
+	frame.Prev:SetShown(tab ~= "friends")
+	frame.Next:SetShown(tab ~= "friends")
+	if tab == "stats" then
+		local labels, values = Statistics(c)
+		frame:SetBodyText(labels, keepScroll)
+		frame.Values:SetText(values)
+		lastStatsRefresh = GetTime()
+	else
+		frame:SetBodyText(tab == "friends" and Friends() or Timeline(c), keepScroll)
+		frame.Values:SetText("")
+	end
+end
+
+function C.Toggle()
+	if not M.enabled then
+		return
+	end
+	if not frame then
+		Build()
+	end
+	if frame:IsShown() then
+		frame:Hide()
+		return
+	end
+	selectedKey = C.CurrentKey()
+	Refresh()
+	frame:Show()
+end
+
+-- Chronicle's 1-second tick.
+function C.OnTick(now, changed)
+	if not (frame and frame:IsShown()) then
+		return
+	end
+	if changed or (tab == "stats" and now - lastStatsRefresh >= STATS_REFRESH) then
+		Refresh(true)
+	end
+end
+
+-- For tests.
+function C.ShowPage(page)
+	tab = page
+	if frame and frame:IsShown() then
+		Refresh()
+	end
+end

@@ -52,10 +52,13 @@ function Window.AddText(frame)
 	text:SetJustifyV("TOP")
 	text:SetSpacing(2)
 	frame.Scroll, frame.Content, frame.Text = scroll, content, text
-	function frame.SetBodyText(_, value)
+	-- keepScroll: a refresh of the same page, so the reader's place stays.
+	function frame.SetBodyText(_, value, keepScroll)
 		text:SetText(value)
 		content:SetHeight(math.max(text:GetStringHeight() + 4, 10))
-		scroll:SetVerticalScroll(0)
+		if not keepScroll then
+			scroll:SetVerticalScroll(0)
+		end
 	end
 	return text
 end

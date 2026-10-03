@@ -8,6 +8,7 @@ module you can switch on or off.
 | [Mirage](#mirage) | Fades the interface away when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD. **Off by default**: switch it on on the overview page |
 | [Misc Tweaks](#misc-tweaks) | Small fixes, each switchable: always-visible health/power values, combo points on the personal resource display, movable bags, quest progress in party chat, markers for quests new in WoW: Forever |
 | [Beacon](#beacon) | Battle.net friends who also use LefthyTools see each other on the world map and minimap, with status and level-up messages, without needing a group |
+| [Chronicle](#chronicle) | A journal for each character that writes itself: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, lots of statistics, and what your friends did |
 
 ## Settings
 
@@ -168,6 +169,38 @@ when their last position arrived, and how many messages were sent and received p
 with how to update. Friends on a much older LefthyTools (before 0.3.0) can't see you at all
 and are listed with a hint to update. Switching Beacon off on the overview page stops
 everything and removes your dot from your friends' maps.
+
+---
+
+## Chronicle
+
+A journal for each of your characters that writes itself. Open it with `/chronicle`, the
+button on its settings page, or a key binding (*Chronicle: open or close the journal*).
+
+- **Timeline**, newest first, by day: level-ups (and how long each level took), deaths (where,
+  and what killed you), zones discovered, first visits to dungeons, bosses defeated, rare
+  elites killed, blue and better loot, new mounts, pets and toys, achievements, professions
+  learned and their milestones, and milestones for quests (10, 25, 50, 100, ...) and gold
+  (1, 10, 50, 100, ...).
+- **Statistics**, for this session and the character: time played, days played, sessions,
+  fastest and average level, quests (and how many were new in WoW: Forever), experience,
+  zones discovered and your favourite zone, dungeon runs, killing blows, rare elites, bosses,
+  deaths and your deadliest foe, distance on foot, riding, swimming and on flight paths, jumps,
+  gold earned, spent and the most you ever had, loot by quality, mounts, pets, toys and
+  achievements.
+- **Friends:** what your Battle.net friends with LefthyTools did: their level-ups, deaths and
+  highlights (bosses, rares, first dungeon visits, epic loot, mounts, achievements and
+  milestones). Your own highlights go to them the same way (needs Beacon).
+- **All your characters:** switch with the arrows at the top.
+- `/chronicle session` prints this session in one line; the AFK screen shows it too.
+
+Everything counts from when Chronicle first saw a character. It's recorded in the background
+once a second, so it costs nothing you'd notice.
+
+| Setting | Default |
+|---|---|
+| Share highlights with friends | on |
+| Show friends' highlights in chat | on |
 
 ---
 

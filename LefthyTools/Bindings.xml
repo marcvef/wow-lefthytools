@@ -5,4 +5,7 @@
 	<Binding name="LEFTHYTOOLS_MIRAGE_PEEK" runOnUp="true" category="ADDONS">
 		LefthyTools:GetModule("mirage"):SetPeek(keystate == "down")
 	</Binding>
+	<Binding name="LEFTHYTOOLS_CHRONICLE_TOGGLE" category="ADDONS">
+		LefthyTools:GetModule("chronicle"):Toggle()
+	</Binding>
 </Bindings>

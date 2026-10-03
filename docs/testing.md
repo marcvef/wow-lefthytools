@@ -64,4 +64,10 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     zone under the cursor. A plain click still zooms/navigates as before, also in combat.
     They track a quest: their tooltip shows it with progress within a few seconds, "Ready to
     turn in" when done, "You have this quest too" if it's in your log.
+15. Chronicle: `/chronicle` opens the journal; the zone you're in is "discovered". Kill a few
+    mobs, loot a green, turn in a quest, jump, ride: the Statistics page counts them (time and
+    distance update every few seconds). Enter a dungeon: "First visit"; kill a boss: one entry.
+    Die to a mob: "Died to <mob>". `/reload`: the session continues (Sessions stays). Log in a
+    second character: the arrows switch between both journals. With a friend: their level-up
+    and a highlight (e.g. a boss) appear under Friends and in chat. `/chronicle session`.
     Traffic in `/lefthy beacon status` stays at a few messages per minute while standing still.

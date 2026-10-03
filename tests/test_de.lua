@@ -98,6 +98,16 @@ check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()
 	"an existing install sees what's new after the update, in German")
 LefthyToolsNewsFrame:Hide()
 
+LT:GetModule("chronicle"):Toggle()
+local cw = LefthyToolsChronicleFrame
+check(cw and cw:IsShown() and cw.Tabs.timeline:GetText() == "Zeitleiste" and cw.Tabs.friends:GetText() == "Freunde"
+	and cw.Text:GetText():find("|cffffd20003.10.2026|r", 1, true) and cw.Text:GetText():find("Elwynn Forest entdeckt", 1, true),
+	"Chronicle in German, with German dates, got " .. tostring(cw and cw.Text:GetText()))
+cw.Tabs.stats:Click()
+check(cw.Text:GetText():find("Todesstöße", 1, true) and cw.Text:GetText():find("Diese Session", 1, true), "Chronicle statistics in German")
+cw:Hide()
+check(LT:GetModule("chronicle").category.name == "Chronicle", "Chronicle's name isn't translated either")
+
 LT.Errors.Show()
 check(LefthyToolsErrorsFrame.TitleContainer.TitleText:GetText() == "LefthyTools-Fehler", "error window in German")
 LefthyToolsErrorsFrame:Hide()

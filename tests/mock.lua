@@ -349,7 +349,8 @@ function UnitName(unit)
 end
 PLAYER_CLASS = "ROGUE"
 function UnitClass(unit) if unit == "player" then return PLAYER_CLASS:sub(1, 1) .. PLAYER_CLASS:sub(2):lower(), PLAYER_CLASS end end
-function UnitLevel(unit) if unit == "player" then return 19 end end
+PLAYER_LEVEL = 19
+function UnitLevel(unit) if unit == "player" then return PLAYER_LEVEL end end
 SUBZONE = "Goldshire"
 function GetSubZoneText() return SUBZONE end
 ZONE = "Elwynn Forest"
@@ -361,6 +362,47 @@ function UnitXP(unit) return unit == "player" and XP.current or 0 end
 function UnitXPMax(unit) return unit == "player" and XP.max or 0 end
 function GetXPExhaustion() return XP.rested end
 function UnitIsAFK(unit) return unit == "player" and STATE.afk == true end
+-- Chronicle: realm, money, travel, target classification, instances, collections, professions.
+function GetRealmName() return "Realmy" end
+MONEY = 52000 -- 5g 20s
+function GetMoney() return MONEY end
+TRAVEL = { swimming = false, mounted = false, taxi = false, flying = false }
+function IsSwimming() return TRAVEL.swimming end
+function IsMounted() return TRAVEL.mounted end
+function IsFlying() return TRAVEL.flying end
+function UnitOnTaxi() return TRAVEL.taxi end
+TARGET_CLASS = "normal"
+function UnitClassification(unit) return unit == "target" and TARGET_CLASS or "normal" end
+function UnitIsPlayer(unit) return unit == "player" end
+function UnitIsTapDenied() return STATE.tapDenied == true end
+INSTANCE = nil -- { name, type } while inside
+function IsInInstance() if INSTANCE then return true, INSTANCE.type end return false, "none" end
+function GetInstanceInfo() if INSTANCE then return INSTANCE.name, INSTANCE.type end return ZONE, "none" end
+JUMPS = 0
+function JumpOrAscendStart() JUMPS = JUMPS + 1 end
+ITEMS = { [19019] = { name = "Thunderfury", quality = 5 }, [2589] = { name = "Linen Cloth", quality = 1 },
+	[6948] = { name = "Hearthstone", quality = 1 }, [1179] = { name = "Ice Cold Milk", quality = 1 },
+	[2075] = { name = "Priest's Mace", quality = 2 }, [1155] = { name = "Rod of the Sleepwalker", quality = 3 } }
+C_Item = {
+	GetItemQualityByID = function(id) return ITEMS[id] and ITEMS[id].quality end,
+	GetItemIconByID = function(id) return ITEMS[id] and 1000 + id end,
+	GetItemQualityColor = function(q) local hex = ({ [2] = "ff1eff00", [3] = "ff0070dd", [4] = "ffa335ee", [5] = "ffff8000" })[q] or "ffffffff"; return 1, 1, 1, hex end,
+}
+function ItemLink(id, count) -- what CHAT_MSG_LOOT carries
+	local q = ITEMS[id].quality
+	return ("|cnIQ%d:|Hitem:%d::::::::20:::::|h[%s]|h|r"):format(q, id, ITEMS[id].name)
+end
+LOOT_ITEM_SELF = "You receive loot: %s."
+LOOT_ITEM_SELF_MULTIPLE = "You receive loot: %sx%d."
+LOOT_ITEM_PUSHED_SELF = "You receive item: %s."
+LOOT_ITEM_PUSHED_SELF_MULTIPLE = "You receive item: %sx%d."
+C_MountJournal = { GetMountInfoByID = function(id) return id == 6 and "Brown Horse" or nil end }
+C_PetJournal = { GetPetInfoByPetID = function() return 40, nil, 1, 0, 100, 1, false, "Black Kingsnake" end }
+C_ToyBox = { GetToyInfo = function(id) return id, "Toy Train Set", 2000 end }
+function GetAchievementInfo(id) return id, "Level 20", 10, true, 10, 3, 26, "", 0, 3000 end
+PROFESSIONS = {} -- { { name, level }, ... }
+function GetProfessions() return PROFESSIONS[1] and 1 or nil, PROFESSIONS[2] and 2 or nil end
+function GetProfessionInfo(i) local p = PROFESSIONS[i]; if p then return p.name, 4000 + i, p.level, 300 end end
 CAMERA = { spinning = false, stops = 0 }
 function MoveViewLeftStart(speed) CAMERA.spinning, CAMERA.speed = true, speed end
 function MoveViewLeftStop() CAMERA.spinning, CAMERA.stops = false, CAMERA.stops + 1 end
@@ -665,6 +707,7 @@ C_PartyInfo = { IsGUIDInGroup = function(guid) return GROUP_GUIDS[guid] == true 
 PARTY = {}
 function UnitGUID(unit)
 	if unit == "player" then return "Player-1-0" end
+	if unit == "target" then return STATE.target and (STATE.targetGUID or "Creature-0-1") or nil end
 	return PARTY[unit] and PARTY[unit].guid
 end
 function CreateVector2D(x, y)

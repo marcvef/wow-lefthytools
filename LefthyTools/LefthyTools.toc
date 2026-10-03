@@ -1,9 +1,9 @@
 ## Interface: 16001
 ## Title: LefthyTools
-## Notes: Small interface tools for WoW: Forever: Mirage (fades the interface when idle), Misc Tweaks, and Beacon (friends on your map).
+## Notes: Small interface tools for WoW: Forever: Mirage (fades the interface when idle), Misc Tweaks, Beacon (friends on your map) and Chronicle (your journal).
 ## Author: lefthy
 ## Version: 0.4.0
-## SavedVariables: LefthyToolsDB
+## SavedVariables: LefthyToolsDB, LefthyToolsChronicleDB
 ## IconTexture: Interface\Icons\INV_Misc_Wrench_01
 ## AddonCompartmentFunc: LefthyTools_OnAddonCompartmentClick
 
@@ -38,3 +38,6 @@ Modules\Beacon\Ding.lua
 Modules\Beacon\Alerts.lua
 Modules\Beacon\Pings.lua
 Modules\Beacon\Beacon.xml
+
+Modules\Chronicle\Chronicle.lua
+Modules\Chronicle\Window.lua
