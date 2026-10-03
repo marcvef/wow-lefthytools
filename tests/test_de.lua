@@ -94,7 +94,7 @@ check(S("LefthyTools_beacon_dingText").name == "Level-Up-Nachricht" and SETTINGS
 
 check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()
 	and LefthyToolsNewsFrame.TitleContainer.TitleText:GetText() == "Neu in LefthyTools"
-	and LefthyToolsNewsFrame.Text:GetText():find(ns.CHANGELOG[1].de, 1, true),
+	and LefthyToolsNewsFrame.plain:find(ns.CHANGELOG[1].de[1], 1, true) and LefthyToolsNewsFrame.plain:find("\nAllgemein\n", 1, true),
 	"an existing install sees what's new after the update, in German")
 LefthyToolsNewsFrame:Hide()
 

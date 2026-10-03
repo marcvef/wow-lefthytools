@@ -106,13 +106,19 @@ variables ready) and `LT.onLogin`.
 
 ## What's new (Core/WhatsNew.lua, Data/Changelog.lua)
 
-`ns.CHANGELOG` lists every change players notice: `{ id, version, en, de }`, ids 1, 2, 3, ... in
-order (the tests check that, and that both texts are there). Ids instead of versions, because
+`ns.CHANGELOG` lists every change players notice: `{ id, version, module, en = { title,
+sentence }, de = { title, sentence } }`, ids 1, 2, 3, ... in order; module is `mirage`, `tweaks`,
+`beacon`, `chronicle` or `general` (the tests check all of that, and titles stay short). The
+window groups them: per version (newest first) a large gold heading with a divider, then a
+section per module in a fixed order (Mirage, Misc Tweaks, Beacon, Chronicle, General; module
+names untranslated), then each entry as a bullet with its title and, below it in grey, the
+sentence; wrapped lines stay under the text. Drawn with pooled font strings (`Render`);
+`WhatsNew.Text` gives the same as plain text. Ids instead of versions, because
 builds between releases (`0.4.0-12-g...`) have news too. `LefthyToolsDB.changelogSeen` is the
 highest id shown: a fresh install (`LT.freshInstall`: no saved variables before) starts with
 everything seen, an older install without the field sees every entry once. Three seconds after
-login (later if in combat) the window lists the unseen entries, newest first under a heading per
-version ("0.5.0 (in development)" while the installed build is older), and marks them seen. "All
+login (later if in combat) the window lists the unseen entries ("0.5.0 (in development)" while
+the installed build is older than that version) and marks them seen. "All
 changes", `/lefthy news` and the overview's What's new button show the whole list. **Add an
 entry, in English and German, with every change players notice.**
 

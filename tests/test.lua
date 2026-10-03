@@ -2062,12 +2062,16 @@ check(next(WorldMapFrame.providers) ~= nil, "on again: back on the map")
 
 section("what's new")
 local news = ns.CHANGELOG
+local MODULES = { mirage = true, tweaks = true, beacon = true, chronicle = true, general = true }
 local goodData = #news > 0
 for i, e in ipairs(news) do
-	goodData = goodData and e.id == i and type(e.en) == "string" and e.en ~= "" and type(e.de) == "string" and e.de ~= ""
-		and LT.ParseVersion(e.version) ~= nil
+	goodData = goodData and e.id == i and LT.ParseVersion(e.version) ~= nil and MODULES[e.module]
+	for _, lang in ipairs({ e.en, e.de }) do
+		goodData = goodData and type(lang) == "table" and type(lang[1]) == "string" and lang[1] ~= ""
+			and type(lang[2]) == "string" and lang[2] ~= "" and #lang[1] <= 40
+	end
 end
-check(goodData, "changelog: ids 1, 2, 3, ... in order, each with a version and English and German text")
+check(goodData, "changelog: ids 1, 2, 3, ... in order, each with a version, a module, and a short title and a sentence in English and German")
 check(LT.freshInstall and not (LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()),
 	"a new install doesn't get a what's-new window")
 LefthyToolsDB.changelogSeen = #news - 2 -- two entries arrived with an update
@@ -2077,18 +2081,37 @@ Advance(4)
 check(not (LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()), "not in combat")
 STATE.combat = false
 Advance(5)
-local newsText = LefthyToolsNewsFrame and LefthyToolsNewsFrame.Text:GetText() or ""
+local newsText = LefthyToolsNewsFrame and LefthyToolsNewsFrame.plain or ""
 check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown(), "after combat: the window opens by itself")
-check(newsText:find(news[#news].en, 1, true) and newsText:find(news[#news - 1].en, 1, true)
-	and not newsText:find(news[#news - 2].en, 1, true), "only the entries not seen yet")
+check(newsText:find(news[#news].en[1], 1, true) and newsText:find(news[#news - 1].en[1], 1, true)
+	and not newsText:find(news[#news - 2].en[1], 1, true), "only the entries not seen yet")
 check(newsText:find("LefthyTools 0.5.0 (in development)", 1, true), "a version still in development is marked, got " .. newsText)
 check(LefthyToolsDB.changelogSeen == #news, "and they count as seen")
 check(LefthyToolsNewsFrame.Subtitle:GetText():find("0.4.0-3-gabc1234", 1, true), "the window shows the installed build")
 LefthyToolsNewsFrame.AllButton:Click()
-check(LefthyToolsNewsFrame.Text:GetText():find(news[1].en, 1, true) and not LefthyToolsNewsFrame.AllButton:IsShown(), "'All changes' shows everything")
+newsText = LefthyToolsNewsFrame.plain
+check(newsText:find(news[1].en[1], 1, true) and not LefthyToolsNewsFrame.AllButton:IsShown(), "'All changes' shows everything")
+local order = {}
+for _, heading in ipairs({ "Mirage", "Misc Tweaks", "Beacon", "Chronicle", "General" }) do
+	local _, count = newsText:gsub("\n" .. heading .. "\n", "")
+	order[#order + 1] = count == 1 and newsText:find("\n" .. heading .. "\n", 1, true) or -1
+end
+check(order[1] > 0 and order[1] < order[2] and order[2] < order[3] and order[3] < order[4] and order[4] < order[5],
+	"grouped by module, each heading once, in a fixed order, got\n" .. newsText)
+check(newsText:find("\nBeacon\n- Friends in your group: ", 1, true) and newsText:find("- Level progress: ", 1, true),
+	"each entry: a short title and a sentence")
+local drawn = {}
+for _, fs in ipairs(LefthyToolsNewsFrame.fontPool) do if fs:IsShown() then drawn[#drawn + 1] = fs:GetText() end end
+local entryDrawn, bullets = false, 0
+for _, text in ipairs(drawn) do
+	if text == "Death alerts\n|cffbbbbbb" .. news[7].en[2] .. "|r" then entryDrawn = true end
+	if text:find("•", 1, true) then bullets = bullets + 1 end
+end
+check(entryDrawn and bullets == #news and LefthyToolsNewsFrame.dividerPool[1]:IsShown(),
+	"drawn as a heading with a divider, module headings, and a bullet, title and sentence per entry")
 LefthyToolsNewsFrame:Hide()
 lefthy("news")
-check(LefthyToolsNewsFrame:IsShown() and LefthyToolsNewsFrame.Text:GetText():find(news[1].en, 1, true), "/lefthy news")
+check(LefthyToolsNewsFrame:IsShown() and LefthyToolsNewsFrame.plain:find(news[1].en[1], 1, true), "/lefthy news")
 LefthyToolsNewsFrame:Hide()
 SETTINGS_BUTTONS["What's new"].onClick()
 check(LefthyToolsNewsFrame:IsShown(), "the settings overview's What's new button")

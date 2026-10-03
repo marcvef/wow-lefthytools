@@ -45,6 +45,7 @@ L["What's new in LefthyTools"] = "Neu in LefthyTools"
 L["All changes"] = "Alle Änderungen"
 L["You have LefthyTools %s."] = "Du hast LefthyTools %s."
 L["%s (in development)"] = "%s (in Arbeit)"
+L["General"] = "Allgemein"
 
 -- Mirage
 L["Fades the interface when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD."] =
