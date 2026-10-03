@@ -48,6 +48,8 @@ local M = LT:NewModule("chronicle", {
 	defaults = {
 		share = true,
 		friendsChat = true,
+		minimapButton = true,
+		minimapAngle = 210, -- degrees, 0 = right, counter-clockwise: the lower left
 	},
 })
 
@@ -819,6 +821,7 @@ function M:OnEnable()
 	end
 	lastTick, sinceTick = GetTime(), 0
 	driver:Show()
+	C_Timer.After(0, C.UpdateMinimapButton) -- MinimapButton.lua
 end
 
 function M:OnDisable()
@@ -828,6 +831,11 @@ function M:OnDisable()
 	if C.window then
 		C.window:Hide()
 	end
+	C_Timer.After(0, C.UpdateMinimapButton)
+end
+
+function M:OnSettingChanged()
+	C_Timer.After(0, C.UpdateMinimapButton) -- the minimap button's checkbox
 end
 
 ---------------------------------------------------------------------------
@@ -916,6 +924,8 @@ function M:BuildOptions(o)
 	o:Header(L["Journal"])
 	o:Button(L["Open the journal"], L["Open"], function() M:Toggle() end,
 		L["Your timeline, your statistics and your friends' news. Also /chronicle or a key binding."])
+	o:Checkbox("minimapButton", L["Minimap button"],
+		L["A button on the edge of the minimap: click opens the journal, right-click these settings. Drag it to move it."])
 end
 
 function M:OnSlashCommand(msg)
@@ -926,9 +936,13 @@ function M:OnSlashCommand(msg)
 		self:Print(C.SessionLine(true) or "no session yet.")
 	elseif cmd == "settings" or cmd == "options" then
 		LT:OpenSettings(self)
+	elseif cmd == "minimap" then
+		LT:SetModuleSetting(self, "minimapButton", not self.db.minimapButton)
+		self:Print("minimap button " .. (self.db.minimapButton and "on." or "off."))
 	else
 		self:Print("/chronicle - open or close the journal")
 		self:Print("/chronicle session - this session in one line")
+		self:Print("/chronicle minimap - show or hide the minimap button")
 		self:Print("/chronicle settings - Chronicle's settings")
 	end
 end

@@ -126,6 +126,10 @@ function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
 function FrameMethods:RegisterForClicks(...) self._clicks = { ... } end
+function FrameMethods:SetHighlightTexture(t) self._highlight = t end
+function FrameMethods:GetCenter() return self._centerX, self._centerY end -- set by tests where needed
+CURSOR = { x = 0, y = 0 }
+function GetCursorPosition() return CURSOR.x, CURSOR.y end
 function FrameMethods:SetID(id) self._id = id end
 function FrameMethods:GetID() return self._id or 0 end
 -- Protected: blocked by the game in combat.

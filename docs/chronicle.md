@@ -85,7 +85,17 @@ forgotten (went offline, silent for 65 s, or switched Beacon off).
 ## Window
 
 `LefthyToolsChronicleFrame` (Core/Window.lua's template), opened with `/chronicle`,
-`/lefthy chronicle`, the settings button or the key binding `LEFTHYTOOLS_CHRONICLE_TOGGLE`.
+`/lefthy chronicle`, the settings button, the key binding `LEFTHYTOOLS_CHRONICLE_TOGGLE` or the
+minimap button.
+
+**Minimap button** (`MinimapButton.lua`, setting `minimapButton`, on by default; `/chronicle
+minimap` switches it): a child of `Minimap` (so it hides and fades with it) in the usual addon
+look (`MiniMap-TrackingBorder`, `UI-Minimap-Background`, a book icon), `Minimap:GetWidth() / 2 + 5`
+from the centre at the saved `minimapAngle` (degrees, 210 = lower left; square minimaps: on the
+square's edge). Click toggles the journal, right-click opens the settings, the tooltip shows this
+session. Dragging sets an `OnUpdate` that turns the cursor position into the angle and removes it
+on drop. Created on first use; Chronicle's enable/disable and the setting update it on the next
+frame.
 A dropdown at the top left (Blizzard_Menu's `WowStyle1DropdownTemplate`, `SetupMenu` with radios):
 "Characters" (this one first, then the others by name, "Name  Level 20", other realms named), then
 "Friends" who sent their days ("(friend)"). Picking a friend opens the Graphs page, the only one

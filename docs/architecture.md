@@ -39,6 +39,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, sharing, /chronicle
   Modules/Chronicle/Graphs.lua     the Graphs page: pooled canvas (bars, lines, text) and its cards
   Modules/Chronicle/Window.lua     the journal window (timeline, statistics, graphs, friends)
+  Modules/Chronicle/MinimapButton.lua  the book button on the minimap's edge
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)

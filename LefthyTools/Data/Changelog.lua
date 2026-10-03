@@ -90,5 +90,8 @@ ns.CHANGELOG = {
 	{ id = 28, version = "0.5.0", module = "chronicle",
 		en = { "Pick from a list", "A dropdown at the top lists your characters and your friends, instead of stepping through them with arrows." },
 		de = { "Auswahl aus einer Liste", "Ein Dropdown oben listet deine Charaktere und deine Freunde, statt sie mit Pfeilen durchzublättern." } },
+	{ id = 29, version = "0.5.0", module = "chronicle",
+		en = { "Minimap button", "A book on the edge of the minimap opens the journal; right-click for the settings, drag it to move it." },
+		de = { "Minimap-Button", "Ein Buch am Rand der Minimap öffnet das Tagebuch; Rechtsklick für die Einstellungen, zum Verschieben ziehen." } },
 	-- New entries go here, at the end.
 }

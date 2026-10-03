@@ -190,8 +190,10 @@ everything and removes your dot from your friends' maps.
 
 ## Chronicle
 
-A journal for each of your characters that writes itself. Open it with `/chronicle`, the
-button on its settings page, or a key binding (*Chronicle: open or close the journal*).
+A journal for each of your characters that writes itself. Open it with the **book button on the
+minimap** (drag it along the edge; right-click for the settings; `/chronicle minimap` hides it),
+`/chronicle`, the button on its settings page, or a key binding (*Chronicle: open or close the
+journal*).
 
 - **Timeline**, newest first, by day: level-ups (and how long each level took), deaths (where,
   and what killed you), zones discovered, first visits to dungeons, bosses defeated, rare

@@ -74,7 +74,8 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     gone); dragging it onto the vendor warns in chat to buy it back. At a mailbox, attaching it
     fills in their name. Opening a trade with them says so in chat, and trading (or mailing) it to
     them removes the line and the border. `/lefthy beacon handover` lists what's still owed.
-15. Chronicle: `/chronicle` opens the journal; the zone you're in is "discovered". Kill a few
+15. Chronicle: the book button on the minimap's edge opens and closes the journal (right-click:
+    settings; drag it around the edge, it stays there after `/reload`); `/chronicle` too; the zone you're in is "discovered". Kill a few
     mobs, loot a green, turn in a quest, jump, ride: the Statistics page counts them (time and
     distance update every few seconds). Enter a dungeon: "First visit"; kill a boss: one entry.
     Die to a mob: "Died to <mob>". `/reload`: the session continues (Sessions stays). Log in a

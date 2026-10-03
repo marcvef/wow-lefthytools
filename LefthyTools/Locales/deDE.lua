@@ -287,6 +287,12 @@ L["A chat line when a friend shares a highlight. They're always in Chronicle's F
 	"Eine Chatzeile, wenn ein Freund ein Highlight teilt. Im Freunde-Tab von Chronicle stehen sie immer."
 L["Journal"] = "Tagebuch"
 L["Open the journal"] = "Tagebuch öffnen"
+L["Minimap button"] = "Minimap-Button"
+L["A button on the edge of the minimap: click opens the journal, right-click these settings. Drag it to move it."] =
+	"Ein Button am Rand der Minimap: Klick öffnet das Tagebuch, Rechtsklick diese Einstellungen. Zum Verschieben ziehen."
+L["Click: open or close the journal"] = "Klick: Tagebuch öffnen oder schließen"
+L["Right-click: settings"] = "Rechtsklick: Einstellungen"
+L["Drag: move it along the minimap"] = "Ziehen: am Rand der Minimap verschieben"
 L["Open"] = "Öffnen"
 L["Your timeline, your statistics and your friends' news. Also /chronicle or a key binding."] =
 	"Deine Zeitleiste, deine Statistiken und die Neuigkeiten deiner Freunde. Auch mit /chronicle oder einer Tastenbelegung."

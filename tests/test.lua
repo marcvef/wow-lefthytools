@@ -2704,6 +2704,46 @@ do
 	Advance(1.1)
 	check(me.stats.sessions == 2 and CH.Session().played < 5 and me.stats.longestSession == longest,
 		"switched on long after the last session: a new one, not the old one going on for days")
+
+	-- The minimap button.
+	local mmb = CH.MinimapButton()
+	check(mmb and mmb:IsShown() and mmb:GetParent() == Minimap and CH.module.db.minimapButton == true,
+		"a minimap button, on by default")
+	local _, _, _, bx, by = mmb:GetPoint(1)
+	check(math.abs(math.sqrt(bx * bx + by * by) - 75) < 0.01 and bx < 0 and by < 0, "on the minimap's edge, lower left")
+	local journal = LefthyToolsChronicleFrame
+	journal:Hide()
+	mmb:Click("LeftButton")
+	check(journal:IsShown(), "click: the journal opens")
+	mmb:Click("LeftButton")
+	check(not journal:IsShown(), "click again: it closes")
+	mmb:Click("RightButton")
+	check(OPENED_CATEGORY == CH.module.category:GetID(), "right-click: Chronicle's settings")
+	mmb._scripts.OnEnter(mmb)
+	check(TOOLTIP.title == "Chronicle" and (TOOLTIP.lines[1] or ""):find("^This session: ")
+		and tooltipHas("Click: open or close the journal") and tooltipHas("Right-click: settings"),
+		"hovering: this session and what the clicks do")
+	mmb._scripts.OnLeave(mmb)
+	Minimap._centerX, Minimap._centerY = 500, 500
+	CURSOR.x, CURSOR.y = 500, 640 -- straight above the minimap
+	mmb._scripts.OnDragStart(mmb)
+	Advance(0.05)
+	mmb._scripts.OnDragStop(mmb)
+	_, _, _, bx, by = mmb:GetPoint(1)
+	check(CH.module.db.minimapAngle == 90 and math.abs(bx) < 0.01 and math.abs(by - 75) < 0.01 and not mmb._scripts.OnUpdate,
+		"dragging moves it along the edge, saved; nothing runs once dropped")
+	lefthy("chronicle minimap")
+	Advance(0.05)
+	check(not mmb:IsShown() and CH.module.db.minimapButton == false, "/chronicle minimap hides it")
+	lefthy("chronicle minimap")
+	Advance(0.05)
+	check(mmb:IsShown(), "and shows it again")
+	lefthy("disable chronicle")
+	Advance(0.05)
+	check(not mmb:IsShown(), "Chronicle off: no button")
+	lefthy("enable chronicle")
+	Advance(0.05)
+	check(mmb:IsShown(), "on again: back")
 end
 
 section("Beacon: leaving")
