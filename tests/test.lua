@@ -1301,7 +1301,9 @@ Advance(1.1)
 check(LefthyToolsAFKFrame:IsShown() and LefthyToolsAFKFrame.Info:GetText():find("While you were away|r\n", 1, true)
 	and LefthyToolsAFKFrame.Info:GetText():find("Anna|r died, fighting Stitches", 1, true),
 	"the AFK screen: 'While you were away' lists it, got " .. LefthyToolsAFKFrame.Info:GetText())
-check(LefthyToolsAFKFrame.Friends:GetText():find("Anna|r (20) - Elwynn Forest |cffff5050(dead)", 1, true),
+check(LefthyToolsAFKFrame.Friends:GetText():find("Anna|r  |cffccccccLevel 20|r", 1, true)
+	and LefthyToolsAFKFrame.Friends:GetText():find("Elwynn Forest - Raven Hill", 1, true)
+	and LefthyToolsAFKFrame.Friends:GetText():find("|cffff5050Dead|r", 1, true),
 	"and the friends online, with their zone and status, got " .. LefthyToolsAFKFrame.Friends:GetText())
 afk(false)
 Advance(0.3)
@@ -1718,6 +1720,37 @@ do
 	check(tooltipHas("Level 20"), "not shared: just the level")
 	pin:OnMouseLeave()
 	WorldMapFrame:Hide()
+end
+
+section("AFK screen: what friends are doing")
+do
+	anna("S2;C;0;260.0;750.0;Raven Hill;Stitches")
+	anna("C2;3")
+	anna("X2;64")
+	anna("T2;176;0;Wanted: Hogger;Huge Gnoll Claw: 0/1")
+	Advance(0.3)
+	afk(true)
+	Advance(1.1)
+	local text = LefthyToolsAFKFrame.Friends:GetText()
+	check(text:find("Anna|r  |cffccccccLevel 20 (64%)|r", 1, true) and text:find("Elwynn Forest - Raven Hill", 1, true)
+		and text:find("Fighting Stitches and 2 more", 1, true)
+		and text:find("Quest: Wanted: Hogger|r|cffcccccc - Huge Gnoll Claw: 0/1", 1, true),
+		"each friend: level and progress, where, whom and how many they fight, their quest, got\n" .. text)
+	anna("S2;;0;260.0;750.0;Raven Hill;")
+	anna("T2;176;1;Wanted: Hogger;")
+	Advance(1.1)
+	text = LefthyToolsAFKFrame.Friends:GetText()
+	check(not text:find("Fighting", 1, true) and text:find("Quest: Wanted: Hogger|r|cffcccccc - Ready to turn in", 1, true),
+		"out of combat: still what they're doing")
+	BN_FRIENDS[1][1].isGameAFK = true
+	Advance(1.1)
+	check(LefthyToolsAFKFrame.Friends:GetText():find("Anna|r |cff999999<AFK>|r", 1, true), "friends who are AFK too")
+	BN_FRIENDS[1][1].isGameAFK = false
+	afk(false)
+	Advance(0.3)
+	anna("X2;")
+	anna("T2;0;;;")
+	Advance(0.3)
 end
 
 section("Beacon: a busy fight doesn't pile up messages")

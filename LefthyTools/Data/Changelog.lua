@@ -51,4 +51,8 @@ ns.CHANGELOG = {
 	{ id = 15, version = "0.5.0", module = "chronicle",
 		en = { "Graphs", "A new page: the last 14 days, this session's XP curve, time per level, favourite zones, deadliest foes, travel and loot." },
 		de = { "Grafiken", "Eine neue Seite: die letzten 14 Tage, die EP-Kurve der Session, Zeit pro Level, Lieblingsgebiete, gefährlichste Gegner, Reisen und Loot." } },
+	{ id = 16, version = "0.5.0", module = "tweaks",
+		en = { "AFK screen: friends in detail", "For each friend: level and progress, where they are and how far, whom they're fighting, and their quest." },
+		de = { "AFK-Bildschirm: Freunde im Detail", "Für jeden Freund: Level und Fortschritt, wo er ist und wie weit weg, wogegen er kämpft und seine Quest." } },
+	-- New entries go here, at the end.
 }

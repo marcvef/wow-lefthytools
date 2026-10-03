@@ -116,9 +116,13 @@ The personal resource display has no class resource in Forever (see
 While the player is AFK (`UnitIsAFK("player")`; `/afk` or the auto-AFK), the
 interface disappears and a panel shows the character (`PlayerModel` with `SetUnit("player")`),
 time away, clock, zone, level progress and rested XP, whispers since then, friends' level-ups and
-deaths while away (a `ns.Beacon.listeners` entry), Beacon friends online with level, zone and
-status, and lines other modules add through `ns.AFKScreen.sections` (Chronicle's session). The
-camera circles with `MoveViewLeftStart(0.03)` (setting `afkSpin`).
+deaths while away (a `ns.Beacon.listeners` entry), and lines other modules add through
+`ns.AFKScreen.sections` (Chronicle's session). The camera circles with `MoveViewLeftStart(0.03)`
+(setting `afkSpin`). Beacon friends (up to 5, by name) get up to three lines each, all from what
+Beacon already knows (nothing extra is sent): name (`<AFK>` from Battle.net), level and level
+progress, "In your group"; zone - subzone (`B.WhereText`) and distance and direction
+(`B.DistanceText`); and what they're doing: dead/ghost or fighting X (and N more, from `C2`), and
+their tracked quest with its progress or "Ready to turn in", in or out of combat.
 
 - **Hiding:** `UIParent:SetAlpha(0)`, restored to the previous alpha. Not `Hide()`: Hide/Show on
   UIParent is blocked in combat, SetAlpha never is, so leaving always works. The panel

@@ -121,8 +121,6 @@ L["%s died, fighting %s"] = "%s ist gestorben, im Kampf gegen %s"
 L["%s died"] = "%s ist gestorben"
 L["Friends online"] = "Freunde online"
 L["No friends with LefthyTools online"] = "Keine Freunde mit LefthyTools online"
-L["(dead)"] = "(tot)"
-L["(in combat)"] = "(im Kampf)"
 L["and %d more"] = "und %d weitere"
 
 -- Mirage element groups
