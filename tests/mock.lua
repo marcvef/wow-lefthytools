@@ -279,11 +279,11 @@ UIParent = CreateFrame("Frame", "UIParent")
 UISpecialFrames = {}
 function ButtonFrameTemplate_HidePortrait(f) f._noPortrait = true end
 
--- Wall clock: 2026-10-03 12:00 plus the mock's game time.
-MOCK_EPOCH = os.time({ year = 2026, month = 10, day = 3, hour = 12, min = 0, sec = 0 })
+-- Wall clock: a fixed day (2030-05-15 12:00) plus the mock's game time.
+MOCK_EPOCH = os.time({ year = 2030, month = 5, day = 15, hour = 12, min = 0, sec = 0 })
 function time() return MOCK_EPOCH + math.floor(now) end
 function date(fmt, t) return os.date(fmt, t or time()) end
-function GetBuildInfo() return "1.60.1", "70205", "Oct 1 2026", 16001 end
+function GetBuildInfo() return "1.60.1", "70205", "Jan 1 2030", 16001 end
 function debugstack() return debug.traceback("", 2) end
 
 -- Blizzard_ScriptErrorsFrame: every Lua error reaches DisplayMessageInternal (also with the error

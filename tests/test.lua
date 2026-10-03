@@ -1970,7 +1970,7 @@ do
 	local win = LefthyToolsChronicleFrame
 	check(win and win:IsShown() and win.Tabs.timeline and not win.Tabs.timeline:IsEnabled(), "/lefthy chronicle opens it on the timeline")
 	local text = win.Text:GetText()
-	for _, expected in ipairs({ "|cffffd2002026-10-03|r", "Level 23 - Elwynn Forest (took 1m)", "Died to Hogger - Elwynn Forest - Goldshire (level 19)",
+	for _, expected in ipairs({ "|cffffd2002030-05-15|r", "Level 23 - Elwynn Forest (took 1m)", "Died to Hogger - Elwynn Forest - Goldshire (level 19)",
 			"Defeated Edwin VanCleef (The Deadmines)", "Killed the rare Mor'Ladim - Elwynn Forest", "First visit: The Deadmines",
 			"Discovered Westfall", "10 quests completed", "Reached 100 gold", "Looted " .. ItemLink(19019), "New mount: Brown Horse",
 			"Achievement: Level 20", "Mining: skill 75", "Learned Mining" }) do
