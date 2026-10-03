@@ -6,7 +6,7 @@ local B = ns.Beacon
 
 -- Item sharing: Ctrl+right-click an item (bags, character, bank, loot, merchant, quest rewards,
 -- chat links: everything that goes through Blizzard's HandleModifiedItemClick) and every friend
--- with Beacon gets a big notice with the item and the whisper sound. Ctrl+Shift+right-click
+-- with Beacon gets "Anna shares [item]" at the top of the screen and the whisper sound. Ctrl+Shift+right-click
 -- offers it: the notice gets Need and Pass buttons, and after CALL_TIME seconds, or once
 -- everyone answered, the sharer's client decides:
 -- nobody, one Need (they get it), or several: everyone sees a drumroll (the bonus roll spinner
@@ -67,10 +67,20 @@ end
 
 local framePool, shown = {}, {}
 
+-- No box: one line of shadowed text with the icon in it, like the game's own messages at the top
+-- of the screen. Offers get the answers, Need / Pass and a timer underneath.
+local TOP_Y, GAP = -220, 10 -- under the level-up toast
+local LINE_HEIGHT, OFFER_HEIGHT = 22, 76
+local TEXT_SCALE = 1.15
+local BUTTON_WIDTH, BUTTON_GAP = 96, 8
+local TIMER_WIDTH = 2 * BUTTON_WIDTH + BUTTON_GAP
+
 local function Layout()
-	for i, frame in ipairs(shown) do
+	local y = TOP_Y
+	for _, frame in ipairs(shown) do
 		frame:ClearAllPoints()
-		frame:SetPoint("TOP", UIParent, "TOP", 0, -120 - (i - 1) * 132)
+		frame:SetPoint("TOP", UIParent, "TOP", 0, y)
+		y = y - frame:GetHeight() - GAP
 	end
 end
 
@@ -94,61 +104,61 @@ local Answer -- below
 
 local function NewFrame()
 	local f = CreateFrame("Frame", nil, UIParent)
-	f:SetSize(440, 120)
+	f:SetSize(600, LINE_HEIGHT)
 	f:SetFrameStrata("HIGH")
-	local bg = f:CreateTexture(nil, "BACKGROUND")
-	bg:SetAllPoints()
-	bg:SetColorTexture(0, 0, 0, 0.78)
-	local top = f:CreateTexture(nil, "BORDER")
-	top:SetPoint("TOPLEFT")
-	top:SetPoint("TOPRIGHT")
-	top:SetHeight(2)
-	top:SetColorTexture(1, 0.82, 0, 0.8)
-	f.Accent = top
-	f.Icon = f:CreateTexture(nil, "ARTWORK")
-	f.Icon:SetSize(52, 52)
-	f.Icon:SetPoint("TOPLEFT", 12, -12)
-	f.Who = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	f.Who:SetPoint("TOPLEFT", 76, -10)
-	f.Who:SetJustifyH("LEFT")
-	f.Item = f:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-	f.Item:SetPoint("TOPLEFT", 76, -34)
-	f.Item:SetWidth(350)
-	f.Item:SetJustifyH("LEFT")
-	f.Item:SetWordWrap(false)
+	-- "[icon] Anna shares [item]": one line, as wide as it needs.
+	f.Line = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	f.Line:SetPoint("TOP")
+	f.Line:SetWordWrap(false)
+	f.Line:SetTextScale(TEXT_SCALE)
 	f.Status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	f.Status:SetPoint("TOPLEFT", 76, -66)
-	f.Status:SetWidth(350)
-	f.Status:SetJustifyH("LEFT")
-	-- The result: rolls, and the winner in big letters that pop in.
+	f.Status:SetPoint("TOP", 0, -26)
+	f.Status:SetWidth(580)
+	f.Status:SetWordWrap(false)
+	f.Need = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	f.Need:SetSize(BUTTON_WIDTH, 24)
+	f.Need:SetPoint("TOPRIGHT", f, "TOP", -BUTTON_GAP / 2, -46)
+	f.Need:SetText(("|T%s:16:16|t %s"):format(NEED_ICON, L["Need"]))
+	f.Need:SetScript("OnClick", function() Answer(f.call, true) end)
+	f.Pass = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	f.Pass:SetSize(BUTTON_WIDTH, 24)
+	f.Pass:SetPoint("TOPLEFT", f, "TOP", BUTTON_GAP / 2, -46)
+	f.Pass:SetText(("|T%s:16:16|t %s"):format(PASS_ICON, L["Pass"]))
+	f.Pass:SetScript("OnClick", function() Answer(f.call, false) end)
+	f.Timer = f:CreateTexture(nil, "ARTWORK")
+	f.Timer:SetPoint("TOPLEFT", f.Need, "BOTTOMLEFT", 0, -3)
+	f.Timer:SetHeight(2)
+	f.Timer:SetColorTexture(1, 0.82, 0, 0.9)
+	-- The winner, where the buttons were, popping in (scaled around its own centre).
 	f.Result = CreateFrame("Frame", nil, f)
-	f.Result:SetAllPoints()
+	f.Result:SetSize(500, 28)
+	f.Result:SetPoint("TOP", 0, -44)
 	f.Winner = f.Result:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-	f.Winner:SetPoint("BOTTOM", f, "BOTTOM", 0, 12)
+	f.Winner:SetAllPoints()
 	f.Pop = f.Result:CreateAnimationGroup()
 	local grow = f.Pop:CreateAnimation("Scale")
-	grow:SetScaleFrom(1.8, 1.8)
+	grow:SetScaleFrom(1.5, 1.5)
 	grow:SetScaleTo(1, 1)
-	grow:SetDuration(0.35)
+	grow:SetDuration(0.3)
 	local appear = f.Pop:CreateAnimation("Alpha")
 	appear:SetFromAlpha(0)
 	appear:SetToAlpha(1)
 	appear:SetDuration(0.2)
-	f.Need = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	f.Need:SetSize(110, 28)
-	f.Need:SetPoint("BOTTOMLEFT", 76, 12)
-	f.Need:SetText(("|T%s:18:18|t %s"):format(NEED_ICON, L["Need"]))
-	f.Need:SetScript("OnClick", function() Answer(f.call, true) end)
-	f.Pass = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-	f.Pass:SetSize(110, 28)
-	f.Pass:SetPoint("LEFT", f.Need, "RIGHT", 10, 0)
-	f.Pass:SetText(("|T%s:18:18|t %s"):format(PASS_ICON, L["Pass"]))
-	f.Pass:SetScript("OnClick", function() Answer(f.call, false) end)
-	f.Timer = f:CreateTexture(nil, "ARTWORK")
-	f.Timer:SetPoint("BOTTOMLEFT")
-	f.Timer:SetHeight(3)
-	f.Timer:SetColorTexture(1, 0.82, 0, 0.9)
 	return f
+end
+
+-- "[icon] You offer [item]", "[icon] Anna offers [item]" or "[icon] Anna shares [item]".
+local function Headline(call)
+	local itemID = tonumber(call.itemString:match("^(%d+)"))
+	local icon = C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID) or 134400
+	local text
+	if call.mine then
+		text = L["You offer %s"]:format(call.link)
+	else
+		local who = Coloured(call.fromName, call.fromClass)
+		text = (call.id and L["%s offers %s"] or L["%s shares %s"]):format(who, call.link)
+	end
+	return ("|T%s:0|t %s"):format(icon, text)
 end
 
 local function FrameFor(call)
@@ -171,10 +181,8 @@ local function FrameFor(call)
 	frame:SetAlpha(1)
 	frame.Winner:SetText("")
 	frame.Status:SetText("")
-	local itemID = tonumber(call.itemString:match("^(%d+)"))
-	frame.Icon:SetTexture(C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID) or 134400)
-	frame.Who:SetText(call.mine and L["You offer"] or L["%s shares"]:format(Coloured(call.fromName, call.fromClass)))
-	frame.Item:SetText(call.link)
+	frame.Line:SetText(Headline(call))
+	frame:SetHeight(call.id and OFFER_HEIGHT or LINE_HEIGHT)
 	shown[#shown + 1] = frame
 	Layout()
 	frame:Show()
@@ -463,7 +471,7 @@ function B.UpdateCalls(now)
 		if call.state == "open" then
 			if f and call.id then
 				local total = call.mine and CALL_TIME or CALL_TIME + 5
-				f.Timer:SetWidth(math.max(1, 440 * math.max(0, call.ends - now) / total))
+				f.Timer:SetWidth(math.max(1, TIMER_WIDTH * math.max(0, call.ends - now) / total))
 			end
 			local everyone = call.mine
 			if everyone then

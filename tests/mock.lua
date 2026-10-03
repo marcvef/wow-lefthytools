@@ -217,8 +217,11 @@ local function NewTexture()
 	function t:SetDesaturated(d) self.desaturated = d end
 	return t
 end
-function FrameMethods:CreateTexture()
+function FrameMethods:CreateTexture(_, layer)
 	local t = NewTexture()
+	t.layer = layer
+	self._textures = self._textures or {}
+	self._textures[#self._textures + 1] = t
 	function t:SetDrawLayer(layer) self.layer = layer end
 	function t:SetGradient(orientation, from, to) self.gradient = { orientation, from, to } end
 	return t

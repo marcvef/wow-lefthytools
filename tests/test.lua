@@ -1862,9 +1862,13 @@ do
 	check(printedSince(pmark):find("Anna|r shares " .. ItemLink(19019) .. ".", 1, true), "a chat line with the link")
 	local shown
 	for _, call in pairs(BB.calls) do if call.frame and call.frame:IsShown() then shown = call.frame end end
-	check(shown and shown.Item:GetText() == ItemLink(19019) and shown.Who:GetText():find("Anna|r shares", 1, true)
+	check(shown and shown.Line:GetText():find("^|T%d+:0|t ") and shown.Line:GetText():find("Anna|r shares " .. ItemLink(19019), 1, true)
 		and not shown.Need:IsShown() and SOUNDS[#SOUNDS] == 3081 and #SOUNDS == sounds + 1,
-		"a big notice with the item (no buttons when just shown) and the whisper sound")
+		"a notice with the icon and the item (no buttons when just shown) and the whisper sound")
+	local boxes = 0
+	for _, t in ipairs(shown._textures or {}) do if t.layer == "BACKGROUND" or t.layer == "BORDER" then boxes = boxes + 1 end end
+	check(boxes == 0 and not shown.Line:GetText():find("\n", 1, true) and shown:GetHeight() <= 24
+		and shown.Line.textScale <= 1.2, "one line of text, not too big, no box behind it")
 	Advance(9)
 	check(not shown:IsShown(), "it goes away by itself")
 	pmark = #PRINTED + 1
@@ -1891,7 +1895,8 @@ do
 	local callID = offer and tonumber(offer:match("^I2;1155::::::::20:::::;(%d+)$"))
 	check(callID and sentTo(12, mark, "I2;")[1] == offer, "Ctrl+Shift+right-click offers it to everyone, with a call id, got " .. tostring(offer))
 	local mine = callID and BB.calls["me:" .. callID]
-	check(mine and mine.frame:IsShown() and mine.frame.Who:GetText() == "You offer" and mine.frame.Status:GetText():find("Waiting", 1, true),
+	check(mine and mine.frame:IsShown() and mine.frame.Line:GetText():find("|t You offer " .. ItemLink(1155), 1, true)
+		and mine.frame.Status:GetText():find("Waiting", 1, true),
 		"my notice: waiting for their answers")
 	anna("N2;" .. callID .. ";1")
 	Advance(0.15)
@@ -1971,10 +1976,10 @@ do
 	local fourth, oldest = BB.calls["12:7004"], BB.calls["11:7001"]
 	check(spareFrame and fourth and fourth.frame == spareFrame and not showOnly.frame and oldest.frame and oldest.frame:IsShown(),
 		"a fourth notice takes the frame of one that's only shown, not of an open offer")
-	check(fourth.frame.Item:GetText() == ItemLink(1155) and fourth.frame.Who:GetText():find("Bob|r shares", 1, true)
-		and fourth.frame.Need:IsShown(), "... filled in for the new one")
+	check(fourth.frame.Line:GetText():find("Bob|r offers " .. ItemLink(1155), 1, true) and fourth.frame.Need:IsShown(),
+		"... filled in for the new one (a friend's offer says so)")
 	Advance(6.5)
-	check(not BB.calls[showKey] and fourth.frame and fourth.frame:IsShown() and fourth.frame.Item:GetText() == ItemLink(1155),
+	check(not BB.calls[showKey] and fourth.frame and fourth.frame:IsShown() and fourth.frame.Line:GetText():find(ItemLink(1155), 1, true),
 		"the one that gave up its frame runs out without touching it")
 	Advance(30)
 	check(not next(BB.calls), "all of them run out")

@@ -188,14 +188,18 @@ Blizzard's function). At most one share every 3 s.
 - **Referee:** the sharer's client. The call ends after 20 s or when every friend who got it has
   answered (one answer each, no changing it). Several Needs: a roll 1-100 each, ties rolled again.
   Verdicts from anyone but the sharer are ignored.
-- **Receiving:** at most one share per friend per 3 s; answers and verdicts at most every 0.2 s.
-  The link is built in the receiver's language: `Item:CreateFromItemLink` + `ContinueOnItemLoad`
-  (the client asks the server for unknown items), then `C_Item.GetItemInfo`. A chat line "Anna
-  shares [item]." and the whisper sound (`SOUNDKIT.TELL_MESSAGE`).
-- **The notice** (one frame per call, up to 3 stacked at the top, the oldest makes room): the
-  item's icon, "Anna shares" / "You offer", the item in big letters, Need and Pass buttons (group
-  loot dice and pass icons) and a shrinking timer bar for offers; the sharer sees the answers
-  live. Results: nobody (grey), one Need ("Bob wins!"), or a roll: the bonus roll spinner sound
+- **Receiving:** at most one share per friend per 2 s (they send one per 3 s; the margin is for
+  their queue and the network); answers and verdicts at most 10 per friend per 10 s. The link is
+  built in the receiver's language: `Item:CreateFromItemLink` + `ContinueOnItemLoad` (the client
+  asks the server for unknown items), then `C_Item.GetItemInfo`; nothing is shown if Beacon or the
+  setting was switched off meanwhile. A chat line "Anna shares [item]." and the whisper sound
+  (`SOUNDKIT.TELL_MESSAGE`).
+- **The notice** (one frame per call, up to 3 stacked under the level-up toast; a finished one,
+  else the oldest, makes room and is unlinked from its call): no box, one line of shadowed text
+  (`GameFontNormalLarge` at 1.15) with the item's icon inline: "Anna shares [item]", "Anna offers
+  [item]" or "You offer [item]". Offers add a status line, Need and Pass buttons (group loot dice
+  and pass icons) and a thin timer bar underneath; the sharer sees the answers live. Results:
+  nobody (grey), one Need ("Bob wins!"), or a roll: the bonus roll spinner sound
   (`UI_BONUS_LOOT_ROLL_START` + the looping `..._LOOP`, stopped with `StopSound`) while the numbers
   whirl for 2.5 s, then `..._END`, the final rolls, the winner popping in (scale + alpha
   animation) with `UI_EPICLOOT_TOAST`, and a chat line "Anna wins [item] with 87 (Bob 12).". A
