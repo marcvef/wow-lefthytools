@@ -2685,9 +2685,20 @@ do
 	local generated = picker._generated
 	Advance(12)
 	check(picker._generated == generated, "the menu isn't rebuilt on every refresh")
+	-- Pooled textures: a gradient (bars, the session curve's fill) never stays on a plain rectangle.
+	local function strayGradients()
+		local n = 0
+		for i = 1, canvas.used.tex do
+			local t = canvas.pools.tex[i]
+			if t.gradient and not t.hasGradient then n = n + 1 end
+		end
+		return n
+	end
+	check(drawnText("This session") and strayGradients() == 0, "my graphs, with the session curve")
 	picker:Pick("Alty")
 	check(not drawnText("This session") and drawnText("|cff888888Level up once with Chronicle on to see this.|r")
 		and picker:GetText():find("Alty", 1, true), "another character's graphs: no session, and a hint where there's no data yet")
+	check(strayGradients() == 0, "no bar or curve gradient left on the textures they reused, got " .. strayGradients())
 	picker:Pick("Anna")
 	local function drawnContaining(text)
 		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return true end end

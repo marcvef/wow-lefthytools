@@ -77,13 +77,18 @@ function Canvas:Rect(x, y, w, h, r, g, b, a, layer)
 	return t
 end
 
+-- A vertical gradient on a texture from Rect (marked, so Rect resets it when the texture is reused).
+function Canvas:Gradient(t, bottom, top)
+	t:SetGradient("VERTICAL", bottom, top)
+	t.hasGradient = true
+	return t
+end
+
 -- A bar that is brighter at the top.
 function Canvas:Bar(x, y, w, h, color, alpha)
 	local t = self:Rect(x, y, w, h, 1, 1, 1, 1)
 	local r, g, b = color[1], color[2], color[3]
-	t:SetGradient("VERTICAL", CreateColor(r * 0.45, g * 0.45, b * 0.45, alpha or 0.9), CreateColor(r, g, b, alpha or 1))
-	t.hasGradient = true
-	return t
+	return self:Gradient(t, CreateColor(r * 0.45, g * 0.45, b * 0.45, alpha or 0.9), CreateColor(r, g, b, alpha or 1))
 end
 
 function Canvas:Line(x1, y1, x2, y2, color, thickness)
@@ -242,7 +247,7 @@ local function Curve(canvas, x, y, w, h, points, color)
 		local px, py = At(p)
 		local colW = w / columns
 		local t = canvas:Rect(x + (i - 1) * colW, py, colW + 0.5, y + h - py, 1, 1, 1, 1)
-		t:SetGradient("VERTICAL", CreateColor(color[1], color[2], color[3], 0), CreateColor(color[1], color[2], color[3], 0.3))
+		canvas:Gradient(t, CreateColor(color[1], color[2], color[3], 0), CreateColor(color[1], color[2], color[3], 0.3))
 	end
 	for i = 2, #points do
 		local x1, y1 = At(points[i - 1])
