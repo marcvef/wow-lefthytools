@@ -48,4 +48,7 @@ ns.CHANGELOG = {
 	{ id = 14, version = "0.5.0", module = "beacon",
 		en = { "Level progress", "A friend's tooltip shows how far they are into their level, e.g. \"Level 20 (64%)\"." },
 		de = { "Level-Fortschritt", "Der Tooltip eines Freundes zeigt, wie weit er im Level ist, z. B. „Level 20 (64 %)“." } },
+	{ id = 15, version = "0.5.0", module = "chronicle",
+		en = { "Graphs", "A new page: the last 14 days, this session's XP curve, time per level, favourite zones, deadliest foes, travel and loot." },
+		de = { "Grafiken", "Eine neue Seite: die letzten 14 Tage, die EP-Kurve der Session, Zeit pro Level, Lieblingsgebiete, gefährlichste Gegner, Reisen und Loot." } },
 }

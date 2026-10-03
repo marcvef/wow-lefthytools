@@ -28,6 +28,8 @@ local QUEST_MILESTONES = { 10, 25, 50, 100, 250, 500, 750, 1000, 1500, 2000, 250
 local GOLD_MILESTONES = { 1, 10, 50, 100, 250, 500, 1000, 2500, 5000, 10000 }
 local PROFESSION_MILESTONES = { 75, 150, 225, 300 }
 local COPPER_PER_GOLD = 10000
+local DAILY_DAYS = 60        -- days of per-day counters kept (the graphs show 14)
+local SAMPLE_STEP, SAMPLE_MAX = 60, 240 -- the session curve: a point a minute, at most 240
 local issecret = issecretvalue or function() return false end
 
 local STAT_KEYS = {
@@ -68,12 +70,12 @@ C.ticks = 0 -- for tests: the driver ticks once a second
 
 local function NewChar()
 	local c = { events = {}, stats = {}, zoneTime = {}, killers = {}, levelTimes = {}, professions = {},
-		seen = { zones = {}, dungeons = {}, bosses = {}, rares = {} }, days = {}, first = time() }
+		seen = { zones = {}, dungeons = {}, bosses = {}, rares = {} }, days = {}, daily = {}, first = time() }
 	return c
 end
 
 local function Fill(c)
-	for _, key in ipairs({ "events", "stats", "zoneTime", "killers", "levelTimes", "professions", "seen", "days" }) do
+	for _, key in ipairs({ "events", "stats", "zoneTime", "killers", "levelTimes", "professions", "seen", "days", "daily" }) do
 		c[key] = type(c[key]) == "table" and c[key] or {}
 	end
 	for _, key in ipairs({ "zones", "dungeons", "bosses", "rares" }) do
@@ -101,9 +103,61 @@ local function Share(kind, a, b)
 	shareQueue[#shareQueue + 1] = { kind, a, b }
 end
 
+-- Per day (for the graphs): daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths }.
+local DAILY = { played = true, xp = true, quests = true, kills = true, deaths = true }
+
+local function Today()
+	local day = date("%Y-%m-%d")
+	local bucket = char.daily[day]
+	if not bucket then
+		bucket = { played = 0, xp = 0, quests = 0, kills = 0, deaths = 0 }
+		char.daily[day] = bucket
+	end
+	return bucket
+end
+
 local function Add(stat, amount)
-	char.stats[stat] = char.stats[stat] + (amount or 1)
+	amount = amount or 1
+	char.stats[stat] = char.stats[stat] + amount
+	if DAILY[stat] then
+		local bucket = Today()
+		bucket[stat] = bucket[stat] + amount
+	end
 	C.dirty = true
+end
+
+-- Keeps the last DAILY_DAYS days.
+local function PruneDaily()
+	local oldest = date("%Y-%m-%d", time() - DAILY_DAYS * 86400)
+	for day in pairs(char.daily) do
+		if day < oldest then -- ISO dates sort as text
+			char.daily[day] = nil
+		end
+	end
+end
+
+-- This session as a curve for the graphs: { played, xp, money } every `step` seconds of play
+-- (60 s; when it gets long, every other point goes and the step doubles, so it stays small).
+local function SampleSession()
+	local s = char.session
+	if not s then
+		return
+	end
+	s.series = s.series or {}
+	s.step = s.step or SAMPLE_STEP
+	local played = char.stats.played - s.stats.played
+	local lastPoint = s.series[#s.series]
+	if lastPoint and played - lastPoint.played < s.step then
+		return
+	end
+	s.series[#s.series + 1] = { played = played, xp = char.stats.xp - s.stats.xp, money = GetMoney() - (s.money or 0) }
+	if #s.series > SAMPLE_MAX then
+		local kept = {}
+		for i = 1, #s.series, 2 do
+			kept[#kept + 1] = s.series[i]
+		end
+		s.series, s.step = kept, s.step * 2
+	end
 end
 
 local function ZoneAndSubzone()
@@ -512,6 +566,9 @@ local function Tick(now, elapsed)
 	C.ticks = C.ticks + 1
 	local stats = char.stats
 	stats.played = stats.played + elapsed
+	local today = Today()
+	today.played = today.played + elapsed
+	SampleSession()
 	if zone then
 		char.zoneTime[zone] = (char.zoneTime[zone] or 0) + elapsed
 	end
@@ -648,6 +705,7 @@ function M:OnEnable()
 		StartSession() -- a new character, or Chronicle switched on mid-session
 		sessionJustStarted = true
 	end
+	PruneDaily()
 
 	for _, event in ipairs(EVENTS) do
 		pcall(events.RegisterEvent, events, event)

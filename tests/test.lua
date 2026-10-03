@@ -1991,8 +1991,52 @@ do
 	win.Tabs.friends:Click()
 	check(win.Text:GetText():find("Anna|r: ", 1, true) and win.Text:GetText():find("Defeated Hogger (Elwynn Forest)", 1, true),
 		"friends: their highlights")
+	me.daily[date("%Y-%m-%d", time() - 86400)] = { played = 3600, xp = 5000, quests = 3, kills = 20, deaths = 0 }
+	me.daily[date("%Y-%m-%d", time() - 20 * 86400)] = { played = 99, xp = 1, quests = 1, kills = 1, deaths = 0 }
+	local draws, draw = 0, CH.Graphs.Draw
+	CH.Graphs.Draw = function(...) draws = draws + 1; return draw(...) end
+	win.Tabs.graphs:Click()
+	local canvas = win.Canvas
+	local function hoverWith(title)
+		for i = 1, canvas.used.hover do
+			local f = canvas.pools.hover[i]
+			if f.lines[1] == title then return f end
+		end
+	end
+	local function drawnText(text)
+		for i = 1, canvas.used.text do if canvas.pools.text[i]:GetText() == text then return true end end
+	end
+	check(draws == 1 and win.Text:GetText() == "" and not win.Tabs.graphs:IsEnabled() and canvas.used.tex > 30,
+		"the Graphs page draws its cards")
+	local yesterday = hoverWith(date("%Y-%m-%d", time() - 86400))
+	check(yesterday and yesterday.lines[2] == "Time: 1h 0m" and not hoverWith(date("%Y-%m-%d", time() - 20 * 86400)),
+		"last 14 days: a bar per day with its value on hover (older days aren't shown)")
+	yesterday._scripts.OnEnter(yesterday)
+	check(TOOLTIP.shown and TOOLTIP.title == yesterday.lines[1] and tooltipHas("Time: 1h 0m"), "hovering a bar shows it")
+	yesterday._scripts.OnLeave(yesterday)
+	local xpButton -- the metric buttons live on the page
+	for _, child in ipairs(win.Content._children) do if child:GetText() == "Experience" then xpButton = child end end
+	xpButton:Click()
+	check(not xpButton:IsEnabled() and hoverWith(date("%Y-%m-%d", time() - 86400)).lines[2] == "Experience: 5000",
+		"switching the 14-day chart to experience")
+	check(canvas.used.line >= 2 and drawnText("This session"), "this session: an XP curve")
+	local level22 = hoverWith("Level 22")
+	check(level22 and level22.lines[2] == "1m", "time per level: a bar per level")
+	check(drawnText("Elwynn Forest") and drawnText("Hogger"), "favourite zones and deadliest foes")
+	check(hoverWith("On foot") and hoverWith("Epic items"), "travel and loot split bars")
+	draws = 0
+	Fire("PARTY_KILL", "Player-1-0", "Creature-0-100")
+	Advance(2.2)
+	check(draws == 0, "a change doesn't redraw the graphs right away")
+	Advance(10)
+	check(draws == 1, "but within 10 s (at most once)")
+	CH.Graphs.Draw = draw
 	CDB.chars["Alty-Realmy"] = { name = "Alty", realm = "Realmy", classFile = "MAGE", level = 12,
 		events = { { t = time(), k = "level", level = 12 } } }
+	win.Next:Click()
+	check(not drawnText("This session") and drawnText("|cff888888Level up once with Chronicle on to see this.|r"),
+		"another character's graphs: no session, and a hint where there's no data yet")
+	win.Prev:Click()
 	win.Tabs.timeline:Click()
 	win.Next:Click()
 	check(win.CharName:GetText():find("Alty", 1, true) and win.Text:GetText():find("Level 12", 1, true), "your other characters' journals")

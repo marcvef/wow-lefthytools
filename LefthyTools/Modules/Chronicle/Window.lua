@@ -12,7 +12,8 @@ local M = C.module
 
 local TIMELINE_SHOW = 250  -- entries drawn; older ones are summarized in one line
 local STATS_REFRESH = 5
-local TAB_WIDTH = 100
+local GRAPHS_MIN_GAP, GRAPHS_REFRESH = 10, 30 -- graphs: redraw on changes at most every 10 s, else every 30 s
+local TAB_WIDTH = 92
 
 local ICONS = {
 	level = "Interface\\Icons\\Achievement_Level_10",
@@ -34,7 +35,8 @@ local ICONS = {
 local frame
 local tab = "timeline"
 local selectedKey
-local lastStatsRefresh = 0
+local lastStatsRefresh, lastGraphsRefresh, graphsPending = 0, 0, false
+local graphState = { metric = "played", buttons = {} }
 
 local function Icon(e)
 	return ("|T%s:14:14:0:0:64:64:5:59:5:59|t"):format(tostring(e.icon or ICONS[e.k] or ICONS.quests))
@@ -316,9 +318,21 @@ local function Step(delta)
 end
 
 local function Build()
-	frame = LT.Window.Create("LefthyToolsChronicleFrame", "Chronicle", 640, 560)
+	frame = LT.Window.Create("LefthyToolsChronicleFrame", "Chronicle", 680, 580)
 	C.window = frame
 	LT.Window.AddText(frame)
+	frame.Canvas = C.Graphs.NewCanvas(frame.Content)
+	for _, metric in ipairs(C.Graphs.METRICS) do
+		local button = CreateFrame("Button", nil, frame.Content, "UIPanelButtonTemplate")
+		button:SetSize(80, 18)
+		button:SetText(C.Graphs.METRIC_LABEL[metric]())
+		button:SetScript("OnClick", function()
+			graphState.metric = metric
+			Refresh(true)
+		end)
+		button:Hide()
+		graphState.buttons[metric] = button
+	end
 	frame.Values = frame.Content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	frame.Values:SetPoint("TOPRIGHT")
 	frame.Values:SetJustifyH("RIGHT")
@@ -334,7 +348,8 @@ local function Build()
 	frame.CharName:SetJustifyH("LEFT")
 
 	frame.Tabs = {}
-	for i, info in ipairs({ { "friends", L["Friends"] }, { "stats", L["Statistics"] }, { "timeline", L["Timeline"] } }) do
+	for i, info in ipairs({ { "friends", L["Friends"] }, { "graphs", L["Graphs"] }, { "stats", L["Statistics"] },
+			{ "timeline", L["Timeline"] } }) do
 		local key = info[1]
 		local button = LT.Window.AddButton(frame, info[2], function()
 			tab = key
@@ -363,7 +378,21 @@ function Refresh(keepScroll)
 	frame.CharName:SetShown(tab ~= "friends")
 	frame.Prev:SetShown(tab ~= "friends")
 	frame.Next:SetShown(tab ~= "friends")
-	if tab == "stats" then
+	if tab ~= "graphs" then
+		frame.Canvas:Reset()
+		for _, button in pairs(graphState.buttons) do
+			button:Hide()
+		end
+	end
+	if tab == "graphs" then
+		frame.Text:SetText("")
+		frame.Values:SetText("")
+		frame.Content:SetHeight(C.Graphs.Draw(frame.Canvas, frame.Content:GetWidth(), c, graphState))
+		if not keepScroll then
+			frame.Scroll:SetVerticalScroll(0)
+		end
+		lastGraphsRefresh, graphsPending = GetTime(), false
+	elseif tab == "stats" then
 		local labels, values = Statistics(c)
 		frame:SetBodyText(labels, keepScroll)
 		frame.Values:SetText(values)
@@ -402,6 +431,10 @@ function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
 		redraw = eventsChanged
 	elseif tab == "friends" then
 		redraw = feedChanged
+	elseif tab == "graphs" then
+		graphsPending = graphsPending or statsChanged or eventsChanged -- kept until the next draw
+		local since = now - lastGraphsRefresh
+		redraw = (graphsPending and since >= GRAPHS_MIN_GAP) or since >= GRAPHS_REFRESH
 	else
 		redraw = statsChanged or eventsChanged or now - lastStatsRefresh >= STATS_REFRESH
 	end

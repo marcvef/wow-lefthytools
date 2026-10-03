@@ -17,6 +17,10 @@ browsed from any character):
   `/played` last said; Chronicle never asks itself, that would print in chat).
 - `friends`: the feed, `{ t, name, classFile, k, ... }`, oldest first, at most 300.
 
+For the graphs: `daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths }` (kept 60 days;
+`Add` and the tick fill today's bucket), and `session.series`, a point `{ played, xp, money }` per
+minute of play (at most 240: when full, every other point goes and the step doubles).
+
 `C.Fill` completes a record (records from older versions lack newer stats); every record is
 filled before it's shown.
 
@@ -86,10 +90,25 @@ button greyed out:
   Combat, Travel, Gold and loot, Collections. Labels and values are two font strings with the
   same number of lines (values right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h`,
   distance in km, gold with `GetMoneyString`.
+- **Graphs** (`Graphs.lua`): cards on the scroll content. Last 14 days (bars per day from
+  `daily`, buttons switch between time, XP, quests and killing blows; today in gold; hover shows
+  the date and value), This session (the session curve: a line with a gradient fill, plus XP per
+  hour; current character only), Time per level (a bar per level from `levelTimes`, up to 20,
+  green = fast to red = slow), Favourite zones and Deadliest foes (horizontal bars, top 5), On
+  the road and Loot by quality (one split bar each, with a legend). Drawn with plain textures
+  (`SetGradient` for the bars), line objects (`CreateLine`) and font strings from pools
+  (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first draw.
 - **Friends:** the feed, as "Name: text".
 
 Redrawn on the tick only while open, and only the open page when its own data changed:
 `C.eventsDirty` for the timeline (a kill only changes a counter, so it doesn't rebuild 250
 lines), `C.feedDirty` for Friends, `C.dirty` (counters) for Statistics, which also refreshes
-every 5 s for the time and distance; a redraw keeps the scroll position. The AFK screen shows a session line
+every 5 s for the time and distance. Graphs: a change is remembered and drawn at most every 10 s,
+otherwise every 30 s (the session curve). A redraw keeps the scroll position.
+
+## Cost, and what goes over the network
+
+The 1-second tick is local only: a few cheap API reads (position, target), adding up counters,
+and a session point per minute. Nothing is sent from it except highlights, which are rare (a few
+per hour at most) and go through Beacon's rate limiter like everything else. The AFK screen shows a session line
 (`ns.MirageAFK.sections`).

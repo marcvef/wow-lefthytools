@@ -216,7 +216,27 @@ local function NewTexture()
 	function t:SetDesaturated(d) self.desaturated = d end
 	return t
 end
-function FrameMethods:CreateTexture() return NewTexture() end
+function FrameMethods:CreateTexture()
+	local t = NewTexture()
+	function t:SetDrawLayer(layer) self.layer = layer end
+	function t:SetGradient(orientation, from, to) self.gradient = { orientation, from, to } end
+	return t
+end
+-- Line objects (graphs)
+LINES_CREATED = 0
+function FrameMethods:CreateLine()
+	LINES_CREATED = LINES_CREATED + 1
+	local l = { shown = true }
+	function l:SetStartPoint(_, _, x, y) self.from = { x, y } end
+	function l:SetEndPoint(_, _, x, y) self.to = { x, y } end
+	function l:SetThickness(t) self.thickness = t end
+	function l:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
+	function l:Show() self.shown = true end
+	function l:Hide() self.shown = false end
+	function l:IsShown() return self.shown end
+	return l
+end
+function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
 function FrameMethods:CreateMaskTexture() return NewTexture() end
 function FrameMethods:CreateFontString()
 	local fs = {}

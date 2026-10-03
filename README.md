@@ -190,6 +190,9 @@ button on its settings page, or a key binding (*Chronicle: open or close the jou
   deaths and your deadliest foe, distance on foot, riding, swimming and on flight paths, jumps,
   gold earned, spent and the most you ever had, loot by quality, mounts, pets, toys and
   achievements.
+- **Graphs:** the last 14 days (time played, XP, quests or kills per day), this session's XP
+  curve with XP per hour, how long each level took (green fast, red slow), your favourite zones
+  and deadliest foes, how you travel, and your loot by quality. Hover a bar for its value.
 - **Friends:** what your Battle.net friends with LefthyTools did: their level-ups, deaths and
   highlights (bosses, rares, first dungeon visits, epic loot, mounts, achievements and
   milestones). Your own highlights go to them the same way (needs Beacon).
