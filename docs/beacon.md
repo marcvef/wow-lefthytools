@@ -184,6 +184,12 @@ handling runs first and untainted; for gear Ctrl+click also opens the game's pre
 puts the link into an open chat box, as always (that can't be stopped without replacing
 Blizzard's function). At most one share every 3 s.
 
+Every way a click can't share says so in chat (Beacon off, "Show items to friends" off, one share
+per 3 s, no friends online, a link it can't read: printed with its escape codes), since a silent
+click looks broken. `/lefthy beacon show <item>` and `/lefthy beacon offer <item>` (Shift-click
+the item into the chat box) do the same without a click, for items no click reaches (bag addons
+that don't call `HandleModifiedItemClick`, gamepad); without a location, offers go by bind type.
+
 Any item can be shown (Ctrl+right-click). Only items that can change hands can be offered
 (Ctrl+Shift+right-click; `Shareable` in Items.lua); otherwise chat says why.
 Bags, the bank and the character frame pass the item's location as `HandleModifiedItemClick`'s

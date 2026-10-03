@@ -102,5 +102,8 @@ ns.CHANGELOG = {
 	{ id = 32, version = "0.5.0", module = "chronicle",
 		en = { "Martin tracker", "The statistics count your AFK time: how long, how often, the longest stretch, and a verdict." },
 		de = { "Martin-Tracker", "Die Statistiken zählen deine AFK-Zeit: wie lange, wie oft, die längste Zeit am Stück, und ein Urteil." } },
+	{ id = 33, version = "0.5.0", module = "beacon",
+		en = { "Share by command", "/lefthy beacon show or offer, then Shift-click the item into the chat box. And when an item can't be shared, chat says why." },
+		de = { "Teilen per Befehl", "/lefthy beacon show oder offer, dann das Item mit Umschalt+Klick in den Chat einfügen. Und wenn ein Item nicht geteilt werden kann, sagt der Chat warum." } },
 	-- New entries go here, at the end.
 }

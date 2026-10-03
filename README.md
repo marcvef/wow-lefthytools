@@ -139,6 +139,9 @@ minimap, and you on theirs, without being in a group.
   reminds you in chat, and attaching it to a mail fills in their name (`/lefthy beacon handover`
   lists what you still owe). (For gear, Ctrl+click also opens the
   game's preview, as always.)
+- **Without a click:** `/lefthy beacon show` or `/lefthy beacon offer`, then Shift-click the
+  item into the chat box, for when a click doesn't reach it (some bag addons, gamepad). If an
+  item can't be shared, chat always says why.
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.
   `/lefthy beacon ping` pings where you stand.

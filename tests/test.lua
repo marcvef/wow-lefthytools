@@ -1869,14 +1869,33 @@ do
 	check(printedSince(pmark):find("shared " .. ItemLink(1155) .. " with ", 1, true), "and I'm told")
 	ctrlRight(ItemLink(1155))
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 1, "at most one every 3 s")
+	check(#sentTo(11, mark, "I2;") == 1 and printedSince(pmark):find("one item every 3 seconds: try again in a moment", 1, true),
+		"at most one every 3 s, and I'm told")
 	Advance(3)
+	-- A link that can't be read: said so, with the link, instead of nothing happening.
+	pmark = #PRINTED + 1
+	ctrlRight("|cff0070dd|Hitem:abc|h[Odd Staff]|h|r")
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 1 and printedSince(pmark):find("can't read this item's link", 1, true)
+		and printedSince(pmark):find("||Hitem:abc", 1, true), "an unreadable link: a message with the link, nothing sent")
+	-- The same without a click: /lefthy beacon show | offer <item>.
+	pmark = #PRINTED + 1
+	lefthy("beacon show")
+	check(printedSince(pmark):find("Shift-click the item into the chat box", 1, true), "/lefthy beacon show without an item: how to use it")
+	lefthy("beacon offer " .. ItemLink(19019))
+	check(printedSince(pmark):find(ItemLink(19019) .. " is soulbound or can't be traded: it can't be offered", 1, true),
+		"/lefthy beacon offer a Bind on Pickup item: refused")
+	lefthy("beacon show " .. ItemLink(19019))
+	Advance(0.15)
+	check(sentTo(11, mark, "I2;")[2] == "I2;19019::::::::20:::::", "/lefthy beacon show <item>: shown, soulbound or not")
+	Advance(3)
+	mark = #GAMEDATA + 1
 	STATE.ctrl, MOCK_BUTTON = true, "LeftButton"
 	HandleModifiedItemClick(ItemLink(1155)) -- Ctrl+left-click: the game's preview, nothing else
 	STATE.ctrl, MOCK_BUTTON = false, "RightButton"
 	HandleModifiedItemClick(ItemLink(1155)) -- no modifier
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 1, "Ctrl+left-click and plain clicks don't share")
+	check(#sentTo(11, mark, "I2;") == 0, "Ctrl+left-click and plain clicks don't share")
 
 	-- Any item can be shown; only items that can change hands can be offered.
 	Advance(3)
@@ -2398,7 +2417,8 @@ do
 	mark = #GAMEDATA + 1
 	ctrlRight(ItemLink(1155))
 	Advance(0.15)
-	check(not printedSince(pmark):find("shares", 1, true) and #sentTo(11, mark, "I2;") == 0, "switched off: nothing shown, nothing sent")
+	check(not printedSince(pmark):find("shares", 1, true) and #sentTo(11, mark, "I2;") == 0
+		and printedSince(pmark):find("showing items is off in Beacon's settings", 1, true), "switched off: nothing shown, nothing sent, and I'm told why")
 	B("shareItems"):SetValue(true)
 end
 

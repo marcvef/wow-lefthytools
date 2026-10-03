@@ -388,13 +388,23 @@ end
 -- offer: friends can say Need or Pass, and it's rolled out (Ctrl+Shift+right-click); otherwise
 -- they just see it (Ctrl+right-click). location: where the item is, if known; an offered bag item's
 -- own GUID lets its reservation follow that copy (Handover.lua).
+-- Every way this can't share says so in chat: a silent click looks like a bug.
 function B.ShareItem(link, offer, location)
+	if not M.enabled then
+		M:Print("Beacon is off: switch it on (/lefthy enable beacon) to show items to friends.")
+		return
+	elseif not M.db.shareItems then
+		M:Print("showing items is off in Beacon's settings (Show items to friends).")
+		return
+	end
 	local itemString = ItemString(link)
-	if not (M.enabled and M.db.shareItems and itemString) then
+	if not itemString then
+		M:Print(("can't read this item's link, so it can't be shared: %s"):format(tostring(link):gsub("|", "||")))
 		return
 	end
 	local now = GetTime()
 	if now - lastSent < SEND_GAP then
+		M:Print(("one item every %d seconds: try again in a moment."):format(SEND_GAP))
 		return
 	end
 	local recipients, count = {}, 0
@@ -504,9 +514,6 @@ local function OnModifiedItemClick(link, itemLocation)
 		return -- an empty slot: Blizzard calls this with no link
 	end
 	if GetMouseButtonClicked() == "RightButton" and IsControlKeyDown() and not IsAltKeyDown() then
-		if not (M.enabled and M.db.shareItems) then
-			return
-		end
 		-- Showing works for any item; offering (with Shift: they roll for it) only for one that can
 		-- change hands.
 		local offer = IsShiftKeyDown()
@@ -517,6 +524,22 @@ local function OnModifiedItemClick(link, itemLocation)
 		end
 		B.ShareItem(link, offer, location)
 	end
+end
+
+-- /lefthy beacon show <item> | offer <item>: the same without a click (Shift-click the item into
+-- the chat box for its link), for items no click reaches (bag addons, gamepad).
+function B.ShareCommand(cmd, arg)
+	local link = arg and arg:match("|c.-|Hitem:.-|h.-|h|r") or (arg and arg:match("|Hitem:.-|h.-|h"))
+	if not link then
+		M:Print(("/lefthy beacon %s <item> - Shift-click the item into the chat box after the command."):format(cmd))
+		return
+	end
+	local offer = cmd == "offer"
+	if offer and not Shareable(link, nil) then
+		M:Print(("%s is soulbound or can't be traded: it can't be offered (/lefthy beacon show still shows it)."):format(link))
+		return
+	end
+	B.ShareItem(link, offer, nil)
 end
 
 if type(HandleModifiedItemClick) == "function" then
