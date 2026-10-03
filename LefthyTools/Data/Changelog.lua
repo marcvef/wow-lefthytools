@@ -34,4 +34,7 @@ ns.CHANGELOG = {
 	{ id = 10, version = "0.5.0",
 		en = "Mirage: each element has its own faded opacity, e.g. the minimap only down to 50% while the rest disappears.",
 		de = "Mirage: Jedes Element hat seine eigene Deckkraft beim Ausblenden, z. B. die Minimap nur bis 50 %, während der Rest verschwindet." },
+	{ id = 11, version = "0.5.0",
+		en = "Mirage: AFK screen. While you're away the interface disappears, the camera circles your character, and a panel shows how long you've been away, whispers, friends' news and who's online.",
+		de = "Mirage: AFK-Bildschirm. Während du weg bist, verschwindet das Interface, die Kamera kreist um deinen Charakter und eine Leiste zeigt, wie lange du weg bist, Flüsternachrichten, Neuigkeiten von Freunden und wer online ist." },
 }

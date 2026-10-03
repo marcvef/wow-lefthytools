@@ -461,6 +461,93 @@ mirage("alpha 50") -- as before this section
 Advance(1)
 check(Minimap:IsShown(), "minimap back at 50%")
 
+section("AFK screen")
+local AFK = ns.MirageAFK
+local function afk(on) STATE.afk = on; Fire("PLAYER_FLAGS_CHANGED", "player") end
+check(MDB.afkScreen and MDB.afkSpin and S("afkScreen") and S("afkSpin"), "settings, on by default")
+Advance(0.1)
+check(not AFK.driver:IsShown(), "not AFK: nothing runs at all")
+afk(true)
+check(UIParent:GetAlpha() == 1 and not LefthyToolsAFKFrame, "nothing happens inside the event handler")
+Advance(0.05)
+local afkScreen = LefthyToolsAFKFrame
+check(afkScreen and afkScreen:IsShown() and UIParent:GetAlpha() == 0, "AFK: the interface disappears, the AFK screen shows")
+check(afkScreen:GetParent() == nil and afkScreen._mouseEnabled and afkScreen._strata == "FULLSCREEN_DIALOG",
+	"the screen isn't part of the interface, sits on top and catches clicks")
+check(CAMERA.spinning and CAMERA.speed < 0.1, "the camera slowly circles")
+check(afkScreen.Model._unit == "player", "your character")
+check(afkScreen.Name:GetText():find("Lefthy|r", 1, true) and afkScreen.Name:GetText():find("Level 19 Human Rogue", 1, true),
+	"name, level, race and class, got " .. afkScreen.Name:GetText())
+local afkInfo = afkScreen.Info:GetText()
+check(afkInfo:find("Elwynn Forest - Goldshire", 1, true) and afkInfo:find("Time: 12:", 1, true)
+	and afkInfo:find("Level progress: 25%, rested: 20%", 1, true), "zone, time, level progress, got " .. afkInfo)
+check(afkScreen.Friends:GetText():find("No friends with LefthyTools online", 1, true), "friends: none online yet")
+Advance(65.5)
+check(afkScreen.Title:GetText():find("1:05", 1, true), "the timer counts (once a second), got " .. afkScreen.Title:GetText())
+Fire("CHAT_MSG_WHISPER", "you there?", "Anna-Realm")
+Advance(1.1)
+check(afkScreen.Info:GetText():find("Whispers: 1 (last from Anna)", 1, true), "whispers while away")
+STATE.moving = true
+Advance(0.3)
+check(not afkScreen:IsShown() and UIParent:GetAlpha() == 1 and not CAMERA.spinning, "moving brings everything back, the camera stops")
+STATE.moving = false
+Advance(1)
+check(not afkScreen:IsShown() and not AFK.driver:IsShown(), "still flagged AFK, but you were back: it stays away, nothing runs")
+afk(false)
+Advance(0.1)
+afk(true)
+Advance(0.05)
+check(afkScreen:IsShown(), "the next AFK shows it again")
+STATE.combat = true
+Fire("PLAYER_REGEN_DISABLED")
+Advance(0.02)
+check(not afkScreen:IsShown() and UIParent:GetAlpha() == 1, "combat: back on the next frame (SetAlpha works in combat)")
+afk(false)
+afk(true)
+Advance(0.1)
+check(not afkScreen:IsShown(), "not while in combat")
+STATE.combat = false
+afk(false)
+afk(true)
+Advance(0.05)
+afkScreen._scripts.OnMouseDown(afkScreen, "LeftButton")
+Advance(0.02)
+check(not afkScreen:IsShown() and UIParent:GetAlpha() == 1, "a click brings everything back")
+afk(false)
+afk(true)
+Advance(0.05)
+Fire("READY_CHECK", "Anna", 30)
+Advance(0.02)
+check(not afkScreen:IsShown(), "a ready check needs you: back")
+afk(false)
+afk(true)
+Advance(0.05)
+afk(false)
+Advance(0.3)
+check(not afkScreen:IsShown() and UIParent:GetAlpha() == 1 and not AFK.driver:IsShown(), "no longer AFK: back, nothing runs")
+S("afkSpin"):SetValue(false)
+afk(true)
+Advance(0.05)
+check(afkScreen:IsShown() and not CAMERA.spinning, "camera circling off")
+S("afkSpin"):SetValue(true)
+lefthy("disable mirage")
+Advance(0.05)
+check(not afkScreen:IsShown() and UIParent:GetAlpha() == 1, "Mirage off while AFK: back")
+afk(false)
+S("afkScreen"):SetValue(false)
+lefthy("enable mirage")
+afk(true)
+Advance(0.3)
+check(not afkScreen:IsShown(), "AFK screen off: nothing")
+afk(false)
+S("afkScreen"):SetValue(true)
+MDB.afkSpinning, CAMERA.spinning = true, true -- a /reload while the camera was circling
+local stops = CAMERA.stops
+lefthy("disable mirage")
+lefthy("enable mirage")
+check(CAMERA.stops == stops + 1 and not CAMERA.spinning and not MDB.afkSpinning, "after a reload mid-circle the camera is stopped")
+Advance(8) -- let the HUD settle again
+
 section("Misc Tweaks: framework")
 local Tweaks = LT:GetModule("tweaks")
 local TDB = LefthyToolsDB.settings.tweaks
@@ -1180,6 +1267,8 @@ local heard = {} -- what other modules (Chronicle) are told
 table.insert(BB.listeners, function(kind, peer, data) heard[#heard + 1] = { kind = kind, name = peer.name, data = data } end)
 local function anna(state) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", state, "WHISPER", 11) end
 Advance(10)
+afk(true) -- away while it happens: the AFK screen lists it
+Advance(0.05)
 anna("S2;C;0;260.0;750.0;Raven Hill;Stitches")
 Advance(1.2)
 pmark = #PRINTED + 1
@@ -1191,6 +1280,14 @@ check(deathLine:find("Anna|r died in Elwynn Forest - Raven Hill, fighting Stitch
 	"a chat line: who died, where, and what they were fighting, got " .. deathLine)
 check(heard[#heard] and heard[#heard].kind == "death" and heard[#heard].name == "Anna" and heard[#heard].data.foe == "Stitches"
 	and heard[#heard].data.where == "Elwynn Forest - Raven Hill", "other modules hear about it")
+Advance(1.1)
+check(LefthyToolsAFKFrame:IsShown() and LefthyToolsAFKFrame.Info:GetText():find("While you were away|r\n", 1, true)
+	and LefthyToolsAFKFrame.Info:GetText():find("Anna|r died, fighting Stitches", 1, true),
+	"the AFK screen: 'While you were away' lists it, got " .. LefthyToolsAFKFrame.Info:GetText())
+check(LefthyToolsAFKFrame.Friends:GetText():find("Anna|r (20) - Elwynn Forest |cffff5050(dead)", 1, true),
+	"and the friends online, with their zone and status, got " .. LefthyToolsAFKFrame.Friends:GetText())
+afk(false)
+Advance(0.3)
 pmark = #PRINTED + 1
 anna("S2;G;0;260.0;750.0;Raven Hill;")
 Advance(1.2)

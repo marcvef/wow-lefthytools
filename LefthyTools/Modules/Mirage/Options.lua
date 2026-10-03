@@ -55,6 +55,12 @@ function M:BuildOptions(o)
 	o:Slider("minimapHideAt", L["Hide quest areas at"],
 		L["Minimap opacity at which the minimap and its quest areas are hidden during the fade-out. 0% waits until the fade has finished."],
 		0, 1, 0.01, Percent)
+
+	o:Header(L["AFK screen"])
+	o:Checkbox("afkScreen", L["AFK screen"],
+		L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."])
+	o:Checkbox("afkSpin", L["Circle the camera"],
+		L["The camera slowly circles your character while the AFK screen is up."])
 end
 
 ---------------------------------------------------------------------------

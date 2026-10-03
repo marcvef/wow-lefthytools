@@ -29,6 +29,11 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
 6. Get a whisper: chat reveals for 10 s. Press Enter to type: chat stays visible.
 7. Drag a spell from the spellbook: bars are visible.
 8. Untick Mirage (or the toggle keybinding): everything fades back in and stays.
+   AFK screen (Mirage on): `/afk`: the interface goes, the camera circles, the panel shows your
+   character, timer, time, XP, Beacon friends. Get whispered: it's counted. Press W: everything
+   is back at once and the camera stops. `/afk` again, get attacked: back instantly, no "action
+   blocked". `/afk`, then `/reload`: the camera doesn't keep circling.
+   Per element: set the minimap's slider to 50%: it stays half visible while the rest fades.
 9. Watch for Lua errors (`/console scriptErrors 1`), especially "action blocked" taint in combat.
    `/lefthy errors` lists LefthyTools' own errors from all sessions (also with the error display
    off); `/run error("x")` from chat must *not* show up there (not ours).

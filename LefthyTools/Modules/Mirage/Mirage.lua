@@ -26,6 +26,8 @@ local defaults = {
 	chatOnMessage = true,
 	hideMinimapWhenFaded = true,
 	minimapHideAt = 0,   -- minimap opacity at which it's hidden during the fade-out (0 = at the end)
+	afkScreen = true,    -- AFK.lua
+	afkSpin = true,
 	groups = {},
 }
 for _, g in ipairs(data.GROUPS) do
@@ -679,10 +681,16 @@ function M:OnEnable()
 	rebuildAt = 0 -- adopt frames on the next frame
 	RequestEvaluate()
 	driver:SetScript("OnUpdate", OnUpdate)
+	if ns.MirageAFK then
+		ns.MirageAFK.Enable()
+	end
 end
 
 function M:OnDisable()
 	events:UnregisterAllEvents()
+	if ns.MirageAFK then
+		ns.MirageAFK.Disable()
+	end
 	peek = false
 	castingCast, channeling = false, false
 	rebuildAt = nil

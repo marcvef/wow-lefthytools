@@ -26,6 +26,7 @@ Data\ForeverQuests.lua
 Modules\Mirage\Groups.lua
 Modules\Mirage\Mirage.lua
 Modules\Mirage\Options.lua
+Modules\Mirage\AFK.lua
 
 Modules\Tweaks\Tweaks.lua
 Modules\Tweaks\ComboPoints.lua

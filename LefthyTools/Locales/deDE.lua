@@ -100,6 +100,30 @@ L["Hide quest areas at"] = "Questgebiete verstecken bei"
 L["Minimap opacity at which the minimap and its quest areas are hidden during the fade-out. 0% waits until the fade has finished."] =
 	"Deckkraft der Minimap, bei der Minimap und Questgebiete beim Ausblenden versteckt werden. Bei 0 % erst, wenn das Ausblenden fertig ist."
 
+-- Mirage: AFK screen
+L["AFK screen"] = "AFK-Bildschirm"
+L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."] =
+	"Solange du AFK bist, verschwindet das Interface und eine Leiste zeigt deinen Charakter, wie lange du weg bist, Flüsternachrichten, Neuigkeiten von Freunden und welche Freunde online sind. Bewegen, Kampf, ein Bereitschaftscheck oder ein Klick holt alles zurück."
+L["Circle the camera"] = "Kamera kreisen lassen"
+L["The camera slowly circles your character while the AFK screen is up."] =
+	"Die Kamera kreist langsam um deinen Charakter, solange der AFK-Bildschirm zu sehen ist."
+L["Move, or click anywhere, to come back."] = "Beweg dich oder klick irgendwohin, um zurückzukommen."
+L["AFK"] = "AFK"
+L["Level %d %s %s"] = "Level %d %s %s"
+L["Time: %s"] = "Uhrzeit: %s"
+L["Level progress: %d%%"] = "Level-Fortschritt: %d %%"
+L["rested: %d%%"] = "erholt: %d %%"
+L["Whispers: %d (last from %s)"] = "Flüsternachrichten: %d (zuletzt von %s)"
+L["While you were away"] = "Während du weg warst"
+L["%s reached level %d"] = "%s hat Level %d erreicht"
+L["%s died, fighting %s"] = "%s ist gestorben, im Kampf gegen %s"
+L["%s died"] = "%s ist gestorben"
+L["Friends online"] = "Freunde online"
+L["No friends with LefthyTools online"] = "Keine Freunde mit LefthyTools online"
+L["(dead)"] = "(tot)"
+L["(in combat)"] = "(im Kampf)"
+L["and %d more"] = "und %d weitere"
+
 -- Mirage element groups
 L["Action bars"] = "Aktionsleisten"
 L["Controller action bars & button legend"] = "Controller-Aktionsleisten & Tastenhinweise"

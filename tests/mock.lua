@@ -124,6 +124,10 @@ function FrameMethods:SetFrameStrata(s) self._strata = s end
 function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
+function FrameMethods:SetAllPoints(rel) self._points = { { "TOPLEFT", rel }, { "BOTTOMRIGHT", rel } } end
+-- PlayerModel
+function FrameMethods:SetUnit(unit) self._unit = unit end
+function FrameMethods:SetFacing(f) self._facing = f end
 function FrameMethods:SetToplevel() end
 -- Buttons and edit boxes
 function FrameMethods:SetText(text)
@@ -206,6 +210,8 @@ local function NewTexture()
 	function t:SetBlendMode(mode) self.blend = mode end
 	function t:ClearAllPoints() self.points = {} end
 	function t:SetSize(w, h) self.width, self.height = w, h end
+	function t:SetHeight(h) self.height = h end
+	function t:SetWidth(w) self.width = w end
 	function t:SetTexCoord(...) self.coords = { ... } end
 	function t:SetDesaturated(d) self.desaturated = d end
 	return t
@@ -346,6 +352,18 @@ function UnitClass(unit) if unit == "player" then return PLAYER_CLASS:sub(1, 1) 
 function UnitLevel(unit) if unit == "player" then return 19 end end
 SUBZONE = "Goldshire"
 function GetSubZoneText() return SUBZONE end
+ZONE = "Elwynn Forest"
+function GetZoneText() return ZONE end
+function GetRealZoneText() return ZONE end
+function UnitRace(unit) if unit == "player" then return "Human", "Human" end end
+XP = { current = 1500, max = 6000, rested = 1200 }
+function UnitXP(unit) return unit == "player" and XP.current or 0 end
+function UnitXPMax(unit) return unit == "player" and XP.max or 0 end
+function GetXPExhaustion() return XP.rested end
+function UnitIsAFK(unit) return unit == "player" and STATE.afk == true end
+CAMERA = { spinning = false, stops = 0 }
+function MoveViewLeftStart(speed) CAMERA.spinning, CAMERA.speed = true, speed end
+function MoveViewLeftStop() CAMERA.spinning, CAMERA.stops = false, CAMERA.stops + 1 end
 SOUNDS = {}
 function PlaySound(id) SOUNDS[#SOUNDS + 1] = id; return MOCK_SOUND_MISSING ~= id end
 function UnitInVehicle() return false end

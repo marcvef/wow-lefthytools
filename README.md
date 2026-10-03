@@ -176,6 +176,13 @@ everything and removes your dot from your friends' maps.
 Fades the interface away when you're out of combat and not using it, and brings it
 back the moment you are.
 
+**AFK screen:** while you're AFK, the interface disappears, the camera slowly circles your
+character, and a panel at the bottom shows your character, how long you've been away, the
+time, your level progress, whispers and friends' news since then, your session (with
+Chronicle on) and which Beacon friends are online and where. Moving, combat, a ready check
+or invite, opening a window, or a click brings everything back. Settings: *AFK screen* and
+*Circle the camera* (both on, while Mirage is on).
+
 ### What fades
 
 Each element group fades as a unit and can be switched off individually:

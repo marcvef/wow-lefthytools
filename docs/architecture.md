@@ -21,6 +21,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Mirage/Groups.lua  frame names per group, window list, chat events (edit to add frames)
   Modules/Mirage/Mirage.lua  engine: frame adoption + alpha hooks, visibility, fading, events
   Modules/Mirage/Options.lua settings page, /mirage, keybinding labels
+  Modules/Mirage/AFK.lua     AFK screen: interface hidden, camera circling, a panel with news
   Modules/Tweaks/Tweaks.lua  Misc Tweaks: status text, movable bags, quest announcements
   Modules/Tweaks/ComboPoints.lua  combo points on the personal resource display
   Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever
