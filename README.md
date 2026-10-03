@@ -14,7 +14,9 @@ module you can switch on or off.
 Open **Options → AddOns → LefthyTools**, click LefthyTools in the minimap's addon
 compartment, or type `/lefthy` (short: `/lt`).
 
-- **LefthyTools** (overview): a switch for each module.
+- **LefthyTools** (overview): a switch for each module, and an **Info** section with your
+  version and whether a newer one is out. LefthyTools can't go online itself, so it knows about
+  updates from Battle.net friends who run it (Beacon).
 - One page per module below it, e.g. **LefthyTools → Mirage**.
 
 ```

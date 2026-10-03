@@ -289,11 +289,13 @@ ACTIVE_CHAT_EDIT_BOX = nil
 -- Settings API
 REGISTERED_SETTINGS = {}
 CATEGORIES = {}
+LAYOUTS = {} -- category name -> the initializers added to its layout (rows on that page)
 local function NewCategory(name, parent)
 	local id = #CATEGORIES + 100
 	local cat = { name = name, parent = parent, GetID = function() return id end }
 	CATEGORIES[#CATEGORIES + 1] = cat
-	return cat, { AddInitializer = function() end }
+	LAYOUTS[name] = {}
+	return cat, { AddInitializer = function(_, initializer) table.insert(LAYOUTS[name], initializer) end }
 end
 ADDON_CATEGORIES = {}
 SUBCATEGORIES_USED = 0
@@ -332,6 +334,9 @@ Settings = {
 	OpenToCategory = function(id) OPENED_CATEGORY = id end,
 	CreateSettingInitializerData = function(setting, options, tooltip)
 		return { setting = setting, name = setting.name, options = options or {}, tooltip = tooltip }
+	end,
+	CreateElementInitializer = function(template, data)
+		return { template = template, data = data, GetData = function(self) return self.data end }
 	end,
 	CreateControlTextContainer = function()
 		local c = { data = {} }

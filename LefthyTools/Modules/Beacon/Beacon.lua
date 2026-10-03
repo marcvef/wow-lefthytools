@@ -522,6 +522,7 @@ local function OnMessage(text, senderID)
 		end
 	elseif kind == "V" then
 		peer.version = a
+		LT:NoteFriendVersion(a) -- the settings overview shows it
 		if not newerNoticeShown and LT.CompareVersions(a, LT.version) == 1 then
 			newerFrom = senderID -- told on the next tick, once their name is known
 		end

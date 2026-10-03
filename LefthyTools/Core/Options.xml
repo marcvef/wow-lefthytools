@@ -19,4 +19,25 @@
 			<OnLoad method="OnLoad"/>
 		</Scripts>
 	</Frame>
+
+	<!--
+		Read-only info row (version, update status) on the overview page: label on the left half,
+		value from the middle. Mixin in Options.lua.
+	-->
+	<Frame name="LefthyToolsSettingsInfoTemplate" inherits="SettingsListElementTemplate" mixin="LefthyToolsSettingsInfoMixin" virtual="true">
+		<Size x="280" y="26"/>
+		<Layers>
+			<Layer level="OVERLAY">
+				<FontString parentKey="Value" inherits="GameFontHighlight" justifyH="LEFT" wordwrap="false">
+					<Anchors>
+						<Anchor point="LEFT" relativePoint="CENTER" x="-34" y="0"/>
+						<Anchor point="RIGHT" x="-10" y="0"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad method="OnLoad"/>
+		</Scripts>
+	</Frame>
 </Ui>

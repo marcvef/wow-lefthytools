@@ -60,7 +60,13 @@ Update-LefthyTools.cmd       double-click wrapper for players: runs the current 
 features, then tag that commit. Between tags a build is `X.Y.Z-N-gHASH` (N commits after the
 tag), written into the installed TOC by the installer; `X.Y.Z-gHASH` when N is unknown.
 `LT.version` reads it, `LT.CompareVersions` orders builds, `/lefthy version` shows it, and Beacon
-tells friends on older builds to update.
+tells friends on older builds to update. Beacon also reports every friend's build to
+`LT:NoteFriendVersion`, which keeps the newest one above ours in `LT.newerVersion`: addons can't go
+online, so friends are the only source. The overview settings page has an Info section with two
+read-only rows (`LefthyToolsSettingsInfoTemplate` in `Core/Options.xml`, a list element built on
+`SettingsListElementMixin` whose `Init` reads the value each time the row is shown): Version, and
+Updates (`Options.UpdateStatus`: newer version available / up to date compared with N friends /
+unknown, no friend with LefthyTools online or Beacon off).
 
 ## Module framework (Core/)
 

@@ -1062,9 +1062,19 @@ for id in pairs(peers()) do if id > 100 then extras = extras + 1 end end
 check(extras == 0, "friends that left the friend list are forgotten")
 
 section("Beacon: a friend with a newer LefthyTools")
+local function infoRow(name)
+	for _, init in ipairs(LAYOUTS["LefthyTools"]) do
+		if init.template == "LefthyToolsSettingsInfoTemplate" and init.data.name == name then return init end
+	end
+end
+local function updateStatus() return infoRow("Updates").data.getValue() end
+check(infoRow("Version") and infoRow("Version").data.getValue() == "0.4.0-3-gabc1234", "settings overview: Info section with the installed version")
+check(updateStatus():find("Unknown (no friend with LefthyTools online)", 1, true),
+	"update status before any friend told us their version, got " .. updateStatus())
 local vmark = #PRINTED + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.3.9-50-gaaaaaaa", "WHISPER", 11) -- older than mine
 Advance(0.15)
+check(updateStatus():find("Up to date (compared with 1 friend(s))", 1, true), "a friend on an older build: up to date, got " .. updateStatus())
 check(not printedSince(vmark):find("newer LefthyTools", 1, true), "a friend on an older build: no notice here (they get one)")
 check(peers()[11].version == "0.3.9-50-gaaaaaaa", "their version is remembered")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.4.0-9-gbbbbbbb", "WHISPER", 11)
@@ -1083,6 +1093,10 @@ check(peers()[11].version == "0.5.0", "a malformed version message is ignored")
 vmark = #PRINTED + 1
 lefthy("beacon status")
 check(printedSince(vmark):find("LefthyTools 0.5.0", 1, true), "/lefthy beacon status shows each friend's version")
+check(updateStatus():find("Newer version available: 0.5.0", 1, true), "settings overview: the newest version seen from a friend, got " .. updateStatus())
+vmark = #PRINTED + 1
+lefthy("version")
+check(printedSince(vmark):find("a friend has the newer 0.5.0", 1, true), "/lefthy version mentions it too")
 
 section("Beacon: level-ups")
 lefthy("beacon ding {name} hit {level}, drinks on me!")
@@ -1229,6 +1243,10 @@ mark = #GAMEDATA + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 11)
 Advance(5)
 check(#GameDataTo(11, mark) == 0, "while off: no answers, no positions")
+local seenNewer = LT.newerVersion
+LT.newerVersion = nil
+check(updateStatus():find("Unknown (Beacon is off)", 1, true), "update status with Beacon off: unknown")
+LT.newerVersion = seenNewer
 lefthy("enable beacon")
 Advance(0.15)
 check(next(WorldMapFrame.providers) ~= nil, "on again: back on the map")

@@ -51,6 +51,15 @@ function LT.ParseVersion(v)
 	return tonumber(major), tonumber(minor), tonumber(patch), count
 end
 
+-- The newest LefthyTools build seen from a friend (Beacon), if newer than ours. Addons can't go
+-- online, so friends are the only way to learn about updates.
+function LT:NoteFriendVersion(version)
+	if LT.CompareVersions(version, LT.version) == 1
+		and (not LT.newerVersion or LT.CompareVersions(version, LT.newerVersion) == 1) then
+		LT.newerVersion = version
+	end
+end
+
 -- 1 if a is newer than b, -1 if older, 0 if the same; nil if that can't be told.
 function LT.CompareVersions(a, b)
 	local a1, a2, a3, ac = LT.ParseVersion(a)

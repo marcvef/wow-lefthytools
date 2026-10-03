@@ -149,6 +149,53 @@ end
 -- category is passed to RegisterAddOnCategory.
 ---------------------------------------------------------------------------
 
+---------------------------------------------------------------------------
+-- Info rows on the overview page (version, updates): a label, and a value that is read every
+-- time the settings list shows the row (Init), so it's current whenever the page is opened.
+-- Template in Options.xml.
+---------------------------------------------------------------------------
+
+LefthyToolsSettingsInfoMixin = CreateFromMixins(SettingsListElementMixin or {})
+
+function LefthyToolsSettingsInfoMixin:OnLoad()
+	SettingsListElementMixin.OnLoad(self)
+end
+
+function LefthyToolsSettingsInfoMixin:Init(initializer)
+	SettingsListElementMixin.Init(self, initializer)
+	local ok, value = pcall(initializer:GetData().getValue)
+	self.Value:SetText(ok and value or "?")
+end
+
+local GREEN, ORANGE, GRAY = "|cff80ff80", "|cffffa040", "|cffa0a0a0"
+
+-- Addons can't go online: what Beacon heard from friends who run LefthyTools is all there is.
+function Options.UpdateStatus()
+	if LT.newerVersion then
+		return ORANGE .. L["Newer version available: %s"]:format(LT.newerVersion) .. "|r"
+	end
+	local beacon = LT:GetModule("beacon")
+	if not (beacon and beacon.enabled) then
+		return GRAY .. L["Unknown (Beacon is off)"] .. "|r"
+	end
+	local compared = 0
+	for _, peer in pairs(beacon:GetPeers()) do
+		if peer.version then
+			compared = compared + 1
+		end
+	end
+	if compared == 0 then
+		return GRAY .. L["Unknown (no friend with LefthyTools online)"] .. "|r"
+	end
+	return GREEN .. L["Up to date (compared with %d friend(s))"]:format(compared) .. "|r"
+end
+
+local function AddInfoRow(layout, name, tooltip, getValue)
+	local initializer = Settings.CreateElementInitializer("LefthyToolsSettingsInfoTemplate",
+		{ name = name, tooltip = tooltip, getValue = getValue })
+	layout:AddInitializer(initializer)
+end
+
 function ns.SetupOptions()
 	if not (Settings and Settings.RegisterVerticalLayoutCategory) then
 		return
@@ -168,6 +215,14 @@ function ns.SetupOptions()
 			m.description .. "\n\n" .. L["Settings: LefthyTools > %s"]:format(m.title))
 		m.enabledSetting = setting
 	end
+
+	layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(L["Info"]))
+	AddInfoRow(layout, L["Version"],
+		L["The installed LefthyTools build. 0.4.0 is a release, 0.4.0-3-g1a2b3c4 is three changes after it."],
+		function() return LT.version end)
+	AddInfoRow(layout, L["Updates"],
+		L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload."],
+		Options.UpdateStatus)
 
 	for _, m in ipairs(LT.modules) do
 		if type(m.BuildOptions) == "function" then
@@ -233,7 +288,8 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 	elseif cmd == "modules" or cmd == "list" then
 		ListModules()
 	elseif cmd == "version" then
-		LT.Print("version " .. LT.version .. ". To update, run Update-LefthyTools.cmd again, then /reload.")
+		LT.Print("version " .. LT.version .. (LT.newerVersion and (", a friend has the newer " .. LT.newerVersion) or "")
+			.. ". To update, run Update-LefthyTools.cmd again, then /reload.")
 	elseif (cmd == "enable" or cmd == "disable" or cmd == "toggle") and target then
 		if cmd == "toggle" then
 			LT:ToggleModule(target.key)
