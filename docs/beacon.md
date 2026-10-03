@@ -274,6 +274,9 @@ nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` 
 - **Matching:** by GUID when both are known, else by name, ignoring case, realm and surname (`strcmputf8i`); if the game won't say
   (a secret value), the item counts as handed over. An item given to anyone else keeps its line.
   Chat output waits for the next frame (`C_Timer.After(0)`), never inside the event handler.
+- **Beacon off:** borders, vendor guards and the question go (`B.HandoverRefresh` on the next
+  frame after switching), and the warnings, trade nudges and mail help stay quiet; trades and
+  mails to the winner still end reservations, and they come back when Beacon does.
 - `/lefthy beacon handover` lists what's owed, `/lefthy beacon handover clear` (or the Clear
   button "Hand-over reminders" on Beacon's settings page) forgets it.
 

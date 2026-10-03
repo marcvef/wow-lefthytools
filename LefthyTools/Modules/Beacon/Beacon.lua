@@ -1072,6 +1072,9 @@ function M:OnEnable()
 	if B.Attach then
 		C_Timer.After(0, B.Attach)
 	end
+	if B.HandoverRefresh then
+		C_Timer.After(0, B.HandoverRefresh) -- reserved items' borders
+	end
 end
 
 function M:OnDisable()
@@ -1095,6 +1098,9 @@ function M:OnDisable()
 	end
 	if B.ReleaseCalls then
 		C_Timer.After(0, B.ReleaseCalls) -- open Need / Pass notices
+	end
+	if B.HandoverRefresh then
+		C_Timer.After(0, B.HandoverRefresh) -- reserved items: borders, vendor guards and question go
 	end
 end
 

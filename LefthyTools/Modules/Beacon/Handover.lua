@@ -580,7 +580,10 @@ Run = function()
 		dialog:Hide()
 	end
 	if work.bags then
-		RefreshBags()
+		RefreshBags() -- also takes borders and guards away while Beacon is off
+	end
+	if not M.enabled then
+		return -- Beacon off: no warnings, nudges or mail help (trades and mails still end reservations)
 	end
 	if work.count then
 		CountReserved(false)
@@ -650,6 +653,14 @@ table.insert(LT.onLoad, function(db)
 end)
 
 table.insert(LT.onLogin, HookBags)
+
+-- Beacon switched on or off (on the next frame): borders and vendor guards follow, the question goes.
+function B.HandoverRefresh()
+	if not M.enabled and dialog then
+		dialog:Hide()
+	end
+	RefreshBags()
+end
 
 function B.HandoverCommand(arg)
 	if arg == "clear" then
