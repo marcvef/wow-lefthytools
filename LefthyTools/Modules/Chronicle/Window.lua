@@ -317,8 +317,9 @@ end
 -- The window
 ---------------------------------------------------------------------------
 
--- Characters: this one first, then the others by name.
--- On the Graphs page the arrows also step through friends who sent their days ("friend:Name").
+-- The dropdown at the top left: my characters (this one first, then the others by name), then
+-- friends who sent me their days ("friend:Name"; friends only have graphs, so picking one opens
+-- the Graphs page).
 local FRIEND = "friend:"
 
 local function Keys()
@@ -330,17 +331,29 @@ local function Keys()
 	end
 	table.sort(keys)
 	table.insert(keys, 1, current)
-	if tab == "graphs" then
-		local names = {}
-		for name in pairs(C.Store().friendStats or {}) do
-			names[#names + 1] = name
-		end
-		table.sort(names)
-		for _, name in ipairs(names) do
-			keys[#keys + 1] = FRIEND .. name
-		end
-	end
 	return keys
+end
+
+local function FriendNames()
+	local names = {}
+	for name in pairs(C.Store().friendStats or {}) do
+		names[#names + 1] = name
+	end
+	table.sort(names)
+	return names
+end
+
+-- "Name  Level 20" in class colour; friends marked, other realms named.
+local function Label(key)
+	local friendName = key:match("^" .. FRIEND .. "(.+)$")
+	if friendName then
+		local f = C.Store().friendStats[friendName] or {}
+		return LT.Window.ClassColorCode(f.classFile) .. friendName .. "|r  |cffcccccc"
+			.. (f.level and L["Level %d"]:format(f.level) or "") .. "|r  |cff80c0ff" .. L["(friend)"] .. "|r"
+	end
+	local c = C.Store().chars[key] or {}
+	return LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r  |cffcccccc" .. L["Level %d"]:format(c.level or 0)
+		.. ((c.realm and c.realm ~= GetRealmName()) and (" - " .. c.realm) or "") .. "|r"
 end
 
 -- A friend's latest feed entries, with their date, for their graphs page.
@@ -364,16 +377,31 @@ end
 
 local Refresh
 
-local function Step(delta)
-	local keys = Keys()
-	local index = 1
-	for i, key in ipairs(keys) do
-		if key == selectedKey then
-			index = i
+local function IsSelected(key)
+	return key == selectedKey
+end
+
+local function Select(key)
+	selectedKey = key
+	if key:find("^" .. FRIEND) then
+		tab = "graphs"
+	end
+	Refresh()
+end
+
+local function PickerMenu(_, root)
+	root:CreateTitle(L["Characters"])
+	for _, key in ipairs(Keys()) do
+		root:CreateRadio(Label(key), IsSelected, Select, key)
+	end
+	local names = FriendNames()
+	if names[1] then
+		root:CreateDivider()
+		root:CreateTitle(L["Friends"])
+		for _, name in ipairs(names) do
+			root:CreateRadio(Label(FRIEND .. name), IsSelected, Select, FRIEND .. name)
 		end
 	end
-	selectedKey = keys[(index - 1 + delta) % #keys + 1]
-	Refresh()
 end
 
 local function Build()
@@ -398,13 +426,11 @@ local function Build()
 	frame.Values:SetJustifyV("TOP")
 	frame.Values:SetSpacing(2)
 
-	frame.Prev = LT.Window.AddButton(frame, "<", function() Step(-1) end, { "TOPLEFT", frame, "TOPLEFT", 12, -30 })
-	frame.Prev:SetSize(26, 22)
-	frame.Next = LT.Window.AddButton(frame, ">", function() Step(1) end, { "TOPLEFT", frame, "TOPLEFT", 40, -30 })
-	frame.Next:SetSize(26, 22)
-	frame.CharName = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	frame.CharName:SetPoint("TOPLEFT", 74, -34)
-	frame.CharName:SetJustifyH("LEFT")
+	-- Blizzard's dropdown (Blizzard_Menu); its text is the picked radio's label.
+	frame.Picker = CreateFrame("DropdownButton", nil, frame, "WowStyle1DropdownTemplate")
+	frame.Picker:SetPoint("TOPLEFT", 14, -30)
+	frame.Picker:SetWidth(240)
+	frame.Picker:SetupMenu(PickerMenu)
 
 	frame.Tabs = {}
 	for i, info in ipairs({ { "friends", L["Friends"] }, { "graphs", L["Graphs"] }, { "stats", L["Statistics"] },
@@ -430,23 +456,19 @@ function Refresh(keepScroll)
 	end
 	selectedKey = selectedKey or keys[1]
 	local c = not friend and (C.Store().chars[selectedKey] or C.Char())
-	if friend then
-		frame.CharName:SetText(LT.Window.ClassColorCode(friend.classFile) .. friendName .. "|r  |cff80c0ff"
-			.. L["(friend)"] .. "|r  |cffcccccc" .. (friend.level and L["Level %d"]:format(friend.level) or "") .. "|r")
-	else
+	if c then
 		C.Fill(c)
-		local name = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r"
-		frame.CharName:SetText(name .. "  |cffcccccc" .. L["Level %d"]:format(c.level or 0)
-			.. ((c.realm and c.realm ~= GetRealmName()) and (" - " .. c.realm) or "") .. "|r")
 	end
-	frame.Prev:SetEnabled(#keys > 1)
-	frame.Next:SetEnabled(#keys > 1)
+	-- The dropdown's text follows the pick; its menu is rebuilt only when that or the lists change.
+	local picked = Label(selectedKey) .. "#" .. #keys .. "#" .. #FriendNames()
+	if frame.Picker.picked ~= picked then
+		frame.Picker.picked = picked
+		frame.Picker:GenerateMenu()
+	end
 	for key, button in pairs(frame.Tabs) do
 		button:SetEnabled(key ~= tab) -- the open page's button is greyed out
 	end
-	frame.CharName:SetShown(tab ~= "friends")
-	frame.Prev:SetShown(tab ~= "friends")
-	frame.Next:SetShown(tab ~= "friends")
+	frame.Picker:SetShown(tab ~= "friends")
 	if tab ~= "graphs" then
 		frame.Canvas:Reset()
 		for _, button in pairs(graphState.buttons) do

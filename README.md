@@ -207,12 +207,12 @@ button on its settings page, or a key binding (*Chronicle: open or close the jou
 - **Graphs:** the last 14 days (time played, XP, quests or kills per day), this session's XP
   curve with XP per hour, how long each level took (green fast, red slow), your favourite zones
   and deadliest foes, how you travel, and your loot by quality. Hover a bar for its value.
-  The arrows also go to your **friends**: their last 14 days, their week in numbers, you and
-  them side by side, and their latest news, also for the time you weren't online.
+  Pick one of your **friends** in the dropdown at the top: their last 14 days, their week in
+  numbers, you and them side by side, and their latest news, also for the time you weren't online.
 - **Friends:** what your Battle.net friends with LefthyTools did: their level-ups, deaths and
   highlights (bosses, rares, first dungeon visits, epic loot, mounts, achievements and
   milestones). Your own highlights go to them the same way (needs Beacon).
-- **All your characters:** switch with the arrows at the top.
+- **All your characters:** pick one in the dropdown at the top.
 - `/chronicle session` prints this session in one line; the AFK screen shows it too.
 
 Everything counts from when Chronicle first saw a character. It's recorded in the background

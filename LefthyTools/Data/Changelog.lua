@@ -67,8 +67,8 @@ ns.CHANGELOG = {
 		en = { "Friends page", "Shows who's online now and what they're doing, then their news: now also quests, new zones and coming online." },
 		de = { "Freunde-Seite", "Zeigt, wer gerade online ist und was er macht, dann ihre Neuigkeiten: jetzt auch Quests, neue Gebiete und wann sie online kommen." } },
 	{ id = 21, version = "0.5.0", module = "chronicle",
-		en = { "Friends' graphs", "On the Graphs page the arrows also show your friends: their last 14 days, their week, you and them side by side." },
-		de = { "Grafiken von Freunden", "Auf der Grafiken-Seite zeigen die Pfeile auch deine Freunde: ihre letzten 14 Tage, ihre Woche, du und sie im Vergleich." } },
+		en = { "Friends' graphs", "Pick a friend in the dropdown at the top: their last 14 days, their week, you and them side by side." },
+		de = { "Grafiken von Freunden", "Wähle einen Freund im Dropdown oben: seine letzten 14 Tage, seine Woche, du und er im Vergleich." } },
 	{ id = 22, version = "0.5.0", module = "beacon",
 		en = { "Need or Pass", "Ctrl+Shift+right-click offers an item: friends say Need or Pass, and if several need it, it's rolled out with a drumroll and the winner in big letters." },
 		de = { "Bedarf oder Passen", "Strg+Umschalt+Rechtsklick bietet ein Item an: Freunde wählen Bedarf oder Passen, und wenn mehrere Bedarf haben, wird mit Trommelwirbel gewürfelt und der Gewinner groß angezeigt." } },
@@ -87,5 +87,8 @@ ns.CHANGELOG = {
 	{ id = 27, version = "0.5.0", module = "beacon",
 		en = { "Reserved items", "A won item gets an orange border in your bags, a vendor asks before selling it, and attaching it to a mail fills in the winner's name." },
 		de = { "Reservierte Items", "Ein gewonnenes Item bekommt einen orangen Rahmen in den Taschen, beim Händler kommt vor dem Verkauf eine Rückfrage, und beim Anhängen an eine Post wird der Name des Gewinners eingetragen." } },
+	{ id = 28, version = "0.5.0", module = "chronicle",
+		en = { "Pick from a list", "A dropdown at the top lists your characters and your friends, instead of stepping through them with arrows." },
+		de = { "Auswahl aus einer Liste", "Ein Dropdown oben listet deine Charaktere und deine Freunde, statt sie mit Pfeilen durchzublättern." } },
 	-- New entries go here, at the end.
 }

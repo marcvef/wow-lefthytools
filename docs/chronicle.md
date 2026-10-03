@@ -86,8 +86,12 @@ forgotten (went offline, silent for 65 s, or switched Beacon off).
 
 `LefthyToolsChronicleFrame` (Core/Window.lua's template), opened with `/chronicle`,
 `/lefthy chronicle`, the settings button or the key binding `LEFTHYTOOLS_CHRONICLE_TOGGLE`.
-A character switcher (this one first, then the others by name), and three pages, the open one's
-button greyed out:
+A dropdown at the top left (Blizzard_Menu's `WowStyle1DropdownTemplate`, `SetupMenu` with radios):
+"Characters" (this one first, then the others by name, "Name  Level 20", other realms named), then
+"Friends" who sent their days ("(friend)"). Picking a friend opens the Graphs page, the only one
+friends have. The menu is rebuilt (`GenerateMenu`, which also sets the dropdown's text) only when
+the pick or the lists change, not on every refresh. Hidden on the Friends page. Then the pages,
+the open one's button greyed out:
 
 - **Timeline:** newest first, a heading per day (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an
   inline icon (the item's or achievement's own where known) and the localized text. At most 250
@@ -104,9 +108,8 @@ button greyed out:
   the road and Loot by quality (one split bar each, with a legend). Drawn with plain textures
   (`SetGradient` for the bars), line objects (`CreateLine`) and font strings from pools
   (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first draw.
-- **Friends' graphs:** on the Graphs page the arrows go on past your own characters to every
-  friend who sent their days (`store.friendStats[name]`; other pages fall back to your own
-  character). Their page: Last 14 days (the same bars from their days), Last 7 days (six tiles:
+- **Friends' graphs:** the dropdown lists every friend who sent their days
+  (`store.friendStats[name]`; other pages fall back to your own character). Their page: Last 14 days (the same bars from their days), Last 7 days (six tiles:
   time, XP, levels, quests, killing blows, deaths), You and <name> (two bars per number, you in
   gold, them in blue) and Latest news (their last 6 feed entries with date).
 - **Friends:** "Online now" first: every Beacon friend in up to three lines (`B.FriendLines` in

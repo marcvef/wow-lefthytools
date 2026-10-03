@@ -298,6 +298,28 @@ local function ApplyTemplate(f, template)
 		f.CloseButton:SetScript("OnClick", function() f:Hide() end)
 	elseif template:find("ScrollFrameTemplate", 1, true) then
 		f.ScrollBar = CreateFrame("Slider", nil, f)
+	elseif template:find("WowStyle1DropdownTemplate", 1, true) then
+		-- Blizzard_Menu's dropdown: SetupMenu keeps the generator, GenerateMenu runs it (the text is
+		-- the selected radio's); Pick(text) chooses the radio whose label contains text, like a click.
+		function f:SetupMenu(generator) self._generator = generator; self:GenerateMenu() end
+		function f:GenerateMenu()
+			local entries, root = {}, {}
+			function root:CreateTitle(text) entries[#entries + 1] = { kind = "title", text = text } end
+			function root:CreateDivider() entries[#entries + 1] = { kind = "divider" } end
+			function root:CreateRadio(text, isSelected, setSelected, data)
+				entries[#entries + 1] = { kind = "radio", text = text, isSelected = isSelected, setSelected = setSelected, data = data }
+			end
+			self._generator(self, root)
+			self._entries, self._generated = entries, (self._generated or 0) + 1
+			self._text = nil
+			for _, e in ipairs(entries) do if e.kind == "radio" and e.isSelected(e.data) then self._text = e.text end end
+		end
+		function f:Pick(text)
+			self:GenerateMenu() -- the menu is built when it opens
+			for _, e in ipairs(self._entries) do
+				if e.kind == "radio" and e.text:find(text, 1, true) then e.setSelected(e.data) return true end
+			end
+		end
 	end
 end
 

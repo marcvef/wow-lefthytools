@@ -2624,30 +2624,47 @@ do
 	CH.Graphs.Draw = draw
 	CDB.chars["Alty-Realmy"] = { name = "Alty", realm = "Realmy", classFile = "MAGE", level = 12,
 		events = { { t = time(), k = "level", level = 12 } } }
-	win.Next:Click()
-	check(not drawnText("This session") and drawnText("|cff888888Level up once with Chronicle on to see this.|r"),
-		"another character's graphs: no session, and a hint where there's no data yet")
-	win.Next:Click() -- past my characters: friends who sent me their days
+	local picker = win.Picker
+	local menu = {}
+	picker:GenerateMenu()
+	for _, e in ipairs(picker._entries) do menu[#menu + 1] = e.kind == "radio" and e.text:match("|c%x%x%x%x%x%x%x%x(%a+)|r") or e.text or "-" end
+	check(table.concat(menu, ",") == "Characters,Lefthy,Alty,-,Friends,Anna",
+		"a dropdown: my characters (this one first), then friends who sent their days, got " .. table.concat(menu, ","))
+	check(picker:GetText():find("Lefthy|r  |cffccccccLevel ", 1, true), "it shows who's picked")
+	local generated = picker._generated
+	Advance(12)
+	check(picker._generated == generated, "the menu isn't rebuilt on every refresh")
+	picker:Pick("Alty")
+	check(not drawnText("This session") and drawnText("|cff888888Level up once with Chronicle on to see this.|r")
+		and picker:GetText():find("Alty", 1, true), "another character's graphs: no session, and a hint where there's no data yet")
+	picker:Pick("Anna")
 	local function drawnContaining(text)
 		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return true end end
 	end
-	check(win.CharName:GetText():find("Anna|r  |cff80c0ff(friend)", 1, true) and drawnText("Last 7 days")
+	check(picker:GetText():find("Anna|r  |cffccccccLevel 20|r  |cff80c0ff(friend)", 1, true) and drawnText("Last 7 days")
 		and drawnText("You and Anna, last 7 days") and drawnText("2h 0m") and drawnContaining("Completed The Defias Brotherhood"),
 		"a friend's graphs: their days, their week, you and them, their latest news")
 	local annaDay = hoverWith(date("%Y-%m-%d", time() - 86400))
 	check(annaDay and annaDay.lines[2]:find("5000", 1, true), "their 14 days, from what they sent, got " .. tostring(annaDay and annaDay.lines[2]))
 	win.Tabs.timeline:Click()
-	check(win.CharName:GetText():find("Lefthy", 1, true), "friends only have graphs: other pages show your own characters")
+	check(picker:GetText():find("Lefthy", 1, true), "friends only have graphs: other pages show your own characters")
 	win.Tabs.graphs:Click()
-	check(win.CharName:GetText():find("Lefthy", 1, true), "back on the Graphs page: still your own character")
+	check(picker:GetText():find("Lefthy", 1, true), "back on the Graphs page: still your own character")
 	win.Tabs.timeline:Click()
-	win.Next:Click()
-	check(win.CharName:GetText():find("Alty", 1, true) and win.Text:GetText():find("Level 12", 1, true), "your other characters' journals")
+	picker:Pick("Anna")
+	check(not win.Tabs.graphs:IsEnabled() and picker:GetText():find("Anna", 1, true) and drawnText("Last 7 days"),
+		"picking a friend on another page opens their graphs")
+	win.Tabs.friends:Click()
+	check(not picker:IsShown(), "the Friends page has no dropdown")
+	win.Tabs.timeline:Click()
+	check(picker:IsShown(), "the others do")
+	picker:Pick("Alty")
+	check(picker:GetText():find("Alty", 1, true) and win.Text:GetText():find("Level 12", 1, true), "your other characters' journals")
 	win.Tabs.stats:Click()
 	check(win.Values:GetText() ~= "" and not win.Text:GetText():find("This session", 1, true), "and their statistics (no session)")
 	win.Tabs.timeline:Click()
-	win.Prev:Click()
-	check(win.CharName:GetText():find("Lefthy", 1, true), "back to this character")
+	picker:Pick("Lefthy")
+	check(picker:GetText():find("Lefthy", 1, true) and win.Text:GetText():find("Level 20", 1, true), "back to this character")
 	local redraws, setBody = 0, win.SetBodyText
 	win.SetBodyText = function(...) redraws = redraws + 1; return setBody(...) end
 	Advance(1.1)

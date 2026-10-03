@@ -78,6 +78,7 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     mobs, loot a green, turn in a quest, jump, ride: the Statistics page counts them (time and
     distance update every few seconds). Enter a dungeon: "First visit"; kill a boss: one entry.
     Die to a mob: "Died to <mob>". `/reload`: the session continues (Sessions stays). Log in a
-    second character: the arrows switch between both journals. With a friend: their level-up
+    second character: the dropdown at the top left lists both (and friends who sent their days;
+    picking one opens their graphs). With a friend: their level-up
     and a highlight (e.g. a boss) appear under Friends and in chat. `/chronicle session`.
     Traffic in `/lefthy beacon status` stays at a few messages per minute while standing still.
