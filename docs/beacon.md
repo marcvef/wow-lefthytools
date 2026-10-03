@@ -21,7 +21,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
 - **Protocol v2** (`;`-separated; the digit after the kind is the version): `H2` hello,
   `S2;<flags>;<continent>;<north>;<west>;<subzone>;<target>` state (flags D dead, G ghost,
   C combat; position empty in instances or with sharing off; target only in combat),
-  `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`),
+  `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`; with every answer, and to every
+  friend every 10 minutes, low priority),
   `P2;<continent>;<north>;<west>;<uiMapID>` map ping,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),

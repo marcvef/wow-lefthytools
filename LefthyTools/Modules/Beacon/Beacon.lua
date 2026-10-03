@@ -83,6 +83,7 @@ local DAILY_LIMIT = 20       -- Chronicle days accepted from one friend per minu
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true, quest = true, zone = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
+local VERSION_EVERY = 600    -- my version goes to every friend this often too (besides answers)
 local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
 local TICK = 0.1
@@ -160,6 +161,7 @@ local questDirty = true   -- my tracked quest may have changed
 local xpDirty = true      -- my experience may have changed
 local lastSweep, lastValidate, lastCheck, lastSent, lastExpire, lastRefresh, lastQuestCheck, lastXPCheck
 local lastState, lastQuest, lastXP
+local lastVersionSent = 0 -- my version to every friend every VERSION_EVERY seconds too
 local tokens, pausedUntil = SEND_BURST, 0
 -- Friends' data changed: the world map redraws on the next tick (at most twice a second, and
 -- only while open), the minimap on the next frame so gliding dots start right away.
@@ -537,6 +539,12 @@ local function SendStateIfChanged(now)
 		for gameAccountID in pairs(peers) do
 			owed[gameAccountID] = true
 		end
+	end
+	-- Versions go with answers; this makes sure no friend's view of mine stays unknown or old
+	-- whatever got lost (low priority: after everything else).
+	if now - lastVersionSent >= VERSION_EVERY then
+		lastVersionSent = now
+		B.QueueLowToPeers("V" .. VERSION .. ";" .. B.Clean(LT.version, 40))
 	end
 end
 
@@ -1072,6 +1080,7 @@ function M:OnEnable()
 	wipe(outbox) -- goodbyes still pending from switching off just before: no longer true
 	wipe(lowOutbox)
 	farewellUntil = nil
+	lastVersionSent = GetTime() -- the answers at the start carry it; the repeat comes later
 	tokens, pausedUntil, sinceTick = SEND_BURST, 0, 0
 	stats.sent, stats.received, stats.throttled, stats.since = 0, 0, 0, GetTime()
 	enabledAt = GetTime()

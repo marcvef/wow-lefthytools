@@ -1327,6 +1327,14 @@ check(peers()[11] and peers()[11].version == nil and sentTo(11, hmark, "H2")[1] 
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11)
 Advance(0.15)
 check(peers()[11].version == "0.5.0" and #sentTo(11, hmark, "H2") == 1, "and it's known again (one hello)")
+-- My version also goes to every friend every 10 minutes, whatever happened to the answers.
+local versionMark = #GAMEDATA + 1
+for _ = 1, 21 do
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 11) -- Anna stays around
+	Advance(30)
+end
+local repeats = sentTo(11, versionMark, "V2;")
+check(#repeats == 1 and repeats[1] == "V2;0.4.0-3-gabc1234", "my version, repeated once in 10 minutes, got " .. #repeats)
 
 section("Beacon: death alerts")
 check(BDB.deathAlert == true and B("deathAlert") ~= nil, "a setting, on by default")
