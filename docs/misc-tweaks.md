@@ -157,7 +157,7 @@ their tracked quest with its progress or "Ready to turn in", in or out of combat
 ## cinematicFlights: flights like a film (Flight.lua)
 
 On a flight path (`UnitOnTaxi("player")`) the interface fades out over 1.5 s (`ns.HideInterface`
-with a fade: an OnUpdate only while fading), black letterbox bars (11% of the screen each) fade in,
+with a fade: an OnUpdate only while fading), thin black letterbox bars (5% of the screen each) fade in,
 and a title card in the upper middle names where you're going: header "Next stop", the place in
 the quest font (`Fonts\MORPHEUS.TTF`, 46, shadowed), a thin gold line, the zone below. Every new
 zone on the way (`ZONE_CHANGED_NEW_AREA`) gets a card: the continent (walking `parentMapID` up
@@ -170,15 +170,22 @@ secret texts are skipped).
 - **Destination:** a post-hook on `TakeTaxiNode(slot)` (the flight map and the old taxi window
   both call it) keeps `TaxiNodeName(slot)` ("Sentinel Hill, Westfall"). The zone you take off in
   gets no card of its own. After a `/reload` mid-flight the current zone's card stands in.
-- **Camera** (setting `flightCamera`): `CameraZoomOut(12)` from the saved `GetCameraZoom()` and
-  `MoveViewLeftStart(0.015)`; on leaving `MoveViewLeftStop()` and `CameraZoomIn` back to the saved
-  zoom. `db.flightOrbit` / `db.flightZoom` survive a `/reload` mid-flight: `Flight.Enable` stops the
-  circling and, on the ground, puts the zoom back (in the air it keeps the zoom from before).
+- **Camera** (setting `flightCamera`): the zoom limit `cameraDistanceMaxZoomFactor` goes up to 2.6
+  for the flight (so the pull-back shows even fully zoomed out), `CameraZoomOut(12)` from the saved
+  `GetCameraZoom()`, and `MoveViewLeftStart(0.06)`: a multiple of `cameraYawMoveSpeed`, about one
+  circle in 50 s at 120 (0.015 was too slow to notice from a moving mount). On landing
+  `MoveViewLeftStop()`, `CameraZoomIn` back to the saved zoom, and the old limit. `db.flightOrbit`
+  / `db.flightZoom` / `db.flightMaxZoom` survive a `/reload` mid-flight: `Flight.Enable` stops the
+  circling and, on the ground, puts zoom and limit back (in the air it keeps them for landing).
+- **Your own camera:** the screen doesn't take clicks, so dragging the camera works as always.
+  While a mouse button is down (`IsMouseButtonDown`, `IsMouselooking`) the circling stops; 2 s
+  after letting go it starts again.
+- **Pausing:** a window or bag opening (more open than the fewest this flight, from Mirage's
+  window lists) or typing in chat brings the interface back at once and stops the circling; 2 s
+  after it's closed or done, the film fades back in (a zone crossed meanwhile gets its card then).
 - **Leaving:** landing (`UnitOnTaxi` false; `PLAYER_CONTROL_GAINED` wakes the driver) fades
-  everything back. A click on the screen (it takes clicks, so nothing invisible gets clicked), a
-  window or bag opening (more open than at takeoff, from Mirage's window lists), typing in chat,
-  combat, or a popup that needs you (ready check, invite, LFG, duel, summon, cinematic) brings the
-  interface back at once and keeps it for the rest of that flight.
+  everything back. Combat or a popup that needs you (ready check, invite, LFG, duel, summon,
+  cinematic) brings the interface back at once and keeps it for the rest of that flight.
 - **Cost:** nothing on the ground: `PLAYER_CONTROL_LOST` and `PLAYER_ENTERING_WORLD` show the
   driver, which looks for the taxi 4x a second for 3 s and hides itself. In the air it checks 4x a
   second (landing, leaving, zone cards, subtitles); the bars and cards fade by animation.

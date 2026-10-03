@@ -497,7 +497,7 @@ function M:BuildOptions(o)
 		L["The camera slowly circles your character while the AFK screen is up."])
 	o:Header(L["Flights"])
 	o:Checkbox("cinematicFlights", L["Cinematic flights"],
-		L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. Whispers and party chat show as subtitles. Landing, a click, opening a window or typing in chat brings everything back."])
+		L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. Whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."])
 	o:Checkbox("flightCamera", L["Move the camera"],
 		L["During the flight the camera pulls back and slowly circles you; it returns when you land."])
 end

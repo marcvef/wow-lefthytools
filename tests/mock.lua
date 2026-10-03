@@ -538,6 +538,8 @@ CAMERA = { spinning = false, stops = 0, zoom = 10 }
 function MoveViewLeftStart(speed) CAMERA.spinning, CAMERA.speed = true, speed end
 function MoveViewLeftStop() CAMERA.spinning, CAMERA.stops = false, CAMERA.stops + 1 end
 function GetCameraZoom() return CAMERA.zoom end
+MOUSE_DOWN = {} -- buttons held: MOUSE_DOWN.RightButton = true
+function IsMouseButtonDown(button) return MOUSE_DOWN[button] == true end
 function CameraZoomOut(d) CAMERA.zoom = CAMERA.zoom + d end
 function CameraZoomIn(d) CAMERA.zoom = math.max(0, CAMERA.zoom - d) end
 -- Flight paths: TakeTaxiNode(slot) is what the flight map calls; TAXI_NODES[slot] = "Place, Zone".
@@ -691,7 +693,7 @@ CreateFrame("Frame", "VehicleSeatIndicator", UIParent) -- also starts hidden by 
 VehicleSeatIndicator._alpha = 0
 
 -- CVars (status text)
-CVARS = { statusText = "0", statusTextDisplay = "PERCENT", rotateMinimap = "0" }
+CVARS = { statusText = "0", statusTextDisplay = "PERCENT", rotateMinimap = "0", cameraDistanceMaxZoomFactor = "1.9" }
 function GetCVar(k) return CVARS[k] end
 function GetCVarBool(k) return CVARS[k] == "1" end
 function SetCVar(k, v) CVARS[k] = tostring(v) end

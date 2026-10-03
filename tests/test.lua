@@ -2434,8 +2434,8 @@ do
 	Fire("PLAYER_CONTROL_LOST")
 	Advance(0.3)
 	local film = LefthyToolsFlightFrame
-	check(film and film:IsShown() and film._mouseEnabled and film.Top.height == 119 and film.Bottom.height == 119,
-		"on the flight: black bars top and bottom (11% of the screen), the screen takes clicks")
+	check(film and film:IsShown() and not film._mouseEnabled and film.Top.height == 54 and film.Bottom.height == 54,
+		"on the flight: thin black bars top and bottom (5% of the screen); clicks and camera drags go through")
 	local alphaMidway = UIParent:GetAlpha()
 	check(alphaMidway > 0 and alphaMidway < 1, "the interface fades out, got " .. alphaMidway)
 	Advance(1.5)
@@ -2443,7 +2443,17 @@ do
 	local card = film.Card
 	check(card and card.Title:GetText() == "Sentinel Hill" and card.Sub:GetText() == "Westfall" and card.Header:GetText() == "Next stop"
 		and card.Title.fontFile == "Fonts\\MORPHEUS.TTF" and card.Anim.plays == 1, "a title card: the destination")
-	check(CAMERA.zoom == 22 and CAMERA.spinning and CAMERA.speed == 0.015, "the camera pulls back and slowly circles")
+	check(CAMERA.zoom == 22 and CAMERA.spinning and CAMERA.speed == 0.06 and CVARS.cameraDistanceMaxZoomFactor == "2.6",
+		"the camera may go further out, pulls back and circles")
+	-- Moving the camera yourself: the circling waits until you let go.
+	MOUSE_DOWN.RightButton = true
+	Advance(0.3)
+	check(not CAMERA.spinning and film:IsShown() and UIParent:GetAlpha() == 0, "dragging the camera: the circling stops, the film stays")
+	MOUSE_DOWN.RightButton = nil
+	Advance(1)
+	check(not CAMERA.spinning, "just let go: not yet")
+	Advance(1.5)
+	check(CAMERA.spinning and CAMERA.speed == 0.06, "a moment later it circles again")
 	-- A zone on the way, with its level range and a friend who is there.
 	ZONE = "Elwynn Forest"
 	Fire("ZONE_CHANGED_NEW_AREA")
@@ -2466,43 +2476,56 @@ do
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(0.3)
-	check(not film._mouseEnabled and CAMERA.zoom == 10 and not CAMERA.spinning, "landed: the camera comes back, clicks go through")
+	check(CAMERA.zoom == 10 and not CAMERA.spinning and CVARS.cameraDistanceMaxZoomFactor == "1.9",
+		"landed: the camera comes back, the zoom limit too")
 	Advance(1.5)
 	check(UIParent:GetAlpha() == 1, "and the interface fades back in")
 	film.FadeOut:Finish()
 	check(not film:IsShown(), "the bars fade away")
 	check(not ns.CinematicFlight.driver:IsShown(), "on the ground nothing runs")
-	-- A click mid-flight: the interface for the rest of that flight.
+	-- Opening the map mid-flight pauses the film; closing it brings the film back.
 	TRAVEL.taxi = true
 	Fire("PLAYER_CONTROL_LOST")
 	Advance(2)
 	check(film:IsShown() and UIParent:GetAlpha() == 0, "the next flight")
-	film._scripts.OnMouseDown(film)
+	OpenWorldMap(1429)
+	Advance(0.3)
+	check(not film:IsShown() and UIParent:GetAlpha() == 1 and not CAMERA.spinning and CAMERA.zoom == 22,
+		"opening the map: the interface is back at once, the camera holds still")
+	Advance(3)
+	check(not film:IsShown(), "while it's open the film waits")
+	WorldMapFrame:Hide()
+	Advance(1)
+	check(not film:IsShown(), "just closed: not yet")
+	Advance(1.5)
+	check(film:IsShown() and CAMERA.spinning, "a moment later the film is back")
+	Advance(1.5)
+	check(UIParent:GetAlpha() == 0, "... the interface faded out again")
+	-- Typing in chat pauses it the same way.
+	ACTIVE_CHAT_EDIT_BOX = {}
+	Advance(0.3)
+	check(not film:IsShown() and UIParent:GetAlpha() == 1, "typing: the interface is back")
+	ACTIVE_CHAT_EDIT_BOX = nil
+	Advance(2.5)
+	check(film:IsShown(), "done typing: the film again")
+	-- A popup that needs you ends it for this flight.
+	Fire("READY_CHECK")
 	Advance(0.05)
-	check(not film:IsShown() and UIParent:GetAlpha() == 1 and CAMERA.zoom == 10, "a click: everything back at once")
-	Advance(2)
+	check(not film:IsShown() and UIParent:GetAlpha() == 1 and CAMERA.zoom == 10, "a ready check: everything back at once")
+	Advance(4)
 	check(not film:IsShown(), "and it stays back for this flight")
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(0.5)
-	-- Opening the map mid-flight.
-	TRAVEL.taxi = true
-	Fire("PLAYER_CONTROL_LOST")
-	Advance(2)
-	OpenWorldMap(1429)
-	Advance(0.3)
-	check(not film:IsShown() and UIParent:GetAlpha() == 1, "opening the map mid-flight: the interface is back")
-	WorldMapFrame:Hide()
-	TRAVEL.taxi = false
-	Fire("PLAYER_CONTROL_GAINED")
-	Advance(0.5)
-	-- A /reload mid-flight: the camera was left pulled back and circling.
-	TDB.flightZoom, TDB.flightOrbit, CAMERA.zoom, CAMERA.spinning = 10, true, 22, true
+	-- A /reload mid-flight: the camera was left pulled back, circling and allowed further.
+	TDB.flightZoom, TDB.flightOrbit, TDB.flightMaxZoom, CAMERA.zoom, CAMERA.spinning = 10, true, 1.9, 22, true
+	CVARS.cameraDistanceMaxZoomFactor = "2.6"
 	lefthy("tweaks flights off")
 	Advance(0.1)
 	lefthy("tweaks flights on")
 	Advance(0.1)
-	check(CAMERA.zoom == 10 and not CAMERA.spinning and TDB.flightZoom == nil, "after a /reload on the ground: the camera is put back")
+	check(CAMERA.zoom == 10 and not CAMERA.spinning and TDB.flightZoom == nil and CVARS.cameraDistanceMaxZoomFactor == "1.9",
+		"after a /reload on the ground: the camera and its zoom limit are put back")
 	-- With the AFK screen at the same time, the interface stays hidden until both are done.
 	ns.HideInterface("afk", true)
 	TRAVEL.taxi = true

@@ -8,25 +8,32 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 -- out, black bars slide in like a film, the camera pulls back and slowly circles, and a title card
 -- names your destination and every zone you fly into (its level range, and Beacon friends who are
 -- there). Whispers and party chat show as subtitles in the lower bar. Landing brings everything
--- back; so do a click, opening a window (map, bags, ...), typing in chat, combat or a popup that
--- needs you, for the rest of that flight.
+-- back.
+--
+-- The screen doesn't take clicks: dragging the camera works as always, and the circling waits
+-- while a mouse button is down and resumes when you let go. Opening a window (map, bags, ...) or
+-- typing in chat pauses the film (the interface is back at once) and it resumes by itself once
+-- that's done. Combat or a popup that needs you ends it for the rest of that flight.
 --
 -- The interface is hidden with ns.HideInterface (Tweaks.lua: UIParent's alpha, shared with the AFK
 -- screen). The destination comes from a post-hook on TakeTaxiNode (both the flight map and the old
--- taxi window call it) and TaxiNodeName.
+-- taxi window call it) and TaxiNodeName. For the flight the camera may zoom further out
+-- (cameraDistanceMaxZoomFactor), so the pull-back shows even when you're zoomed out all the way.
 --
 -- Cost: nothing on the ground. PLAYER_CONTROL_LOST (a flight starting) or PLAYER_ENTERING_WORLD
 -- shows the driver, which looks for UnitOnTaxi for a few seconds and hides itself; during a
--- flight it checks 4x a second whether to leave. The bars and title cards fade by animation.
+-- flight it checks 4x a second. The bars and title cards fade by animation.
 
 local FADE = 1.5            -- seconds for the interface and the bars
 local POLL = 0.25
 local START_WAIT = 3        -- seconds after losing control to look for the taxi
+local RESUME_DELAY = 2      -- seconds after a window closes or a mouse button is let go
 local PULL_BACK = 12        -- yards the camera moves out
-local ORBIT_SPEED = 0.015   -- MoveViewLeftStart speed: slower than the AFK screen's
+local ORBIT_SPEED = 0.06    -- MoveViewLeftStart speed (x cameraYawMoveSpeed): a circle in ~50 s
+local ZOOM_CVAR, WIDE_ZOOM = "cameraDistanceMaxZoomFactor", 2.6 -- the game's widest
 local CARD_IN, CARD_HOLD, CARD_OUT = 1.2, 3.5, 1.5
 local SUBTITLE_TIME, MAX_SUBTITLES = 8, 2
-local BAR = 0.11            -- letterbox bar height, part of the screen height
+local BAR = 0.05            -- letterbox bar height, part of the screen height
 local TITLE_FONT = "Fonts\\MORPHEUS.TTF"
 local CHAT_COLOURS = {
 	CHAT_MSG_WHISPER = "|cffff80ff", CHAT_MSG_BN_WHISPER = "|cff00faf6",
@@ -45,10 +52,13 @@ local driver = CreateFrame("Frame")
 driver:Hide()
 Flight.driver = driver
 local events = CreateFrame("Frame")
-local flying, dismissed, leaveNow, zoneChanged, chatChanged = false, false, false, false, false
+-- flying: the film is on for this flight (shown, or paused for a window); dismissed: ended for the
+-- rest of this flight (combat, a popup).
+local flying, shown, dismissed, leaveNow, zoneChanged, chatChanged = false, false, false, false, false, false
 local lookUntil      -- after losing control: look for the taxi until then
 local destination    -- "Sentinel Hill, Westfall", from TakeTaxiNode
-local lastZone, windowsAtStart
+local lastZone, baseline -- baseline: the fewest windows open this flight (the taxi map closes at takeoff)
+local resumeAt, orbitAt  -- paused: when to resume; the circling: when to go on after a mouse drag
 local sincePoll = 0
 local subtitles = {} -- { text, at }
 local savedZoom, orbiting
@@ -110,9 +120,7 @@ local function Build()
 	screen = CreateFrame("Frame", "LefthyToolsFlightFrame") -- no parent: stays while UIParent is invisible
 	screen:SetFrameStrata("FULLSCREEN")
 	screen:SetAllPoints(UIParent)
-	screen:SetScript("OnMouseDown", function()
-		leaveNow = true -- the interface comes back on the next frame, not inside the click
-	end)
+	screen:EnableMouse(false) -- clicks and camera drags go through
 	screen:Hide()
 	screen.Top = screen:CreateTexture(nil, "BACKGROUND")
 	screen.Top:SetPoint("TOPLEFT")
@@ -250,9 +258,30 @@ end
 -- The camera: pulled back and circling, put back on landing (also after a /reload mid-flight)
 ---------------------------------------------------------------------------
 
+local function OrbitStart()
+	if M.db.flightCamera and not orbiting and MoveViewLeftStart then
+		MoveViewLeftStart(ORBIT_SPEED)
+		orbiting = true
+		M.db.flightOrbit = true
+	end
+end
+
+local function OrbitStop()
+	if orbiting and MoveViewLeftStop then
+		MoveViewLeftStop()
+	end
+	orbiting, M.db.flightOrbit = false, nil
+end
+
+-- Once per flight: room to zoom out further, the pull-back, the circling.
 local function CameraStart()
 	if not M.db.flightCamera then
 		return
+	end
+	local factor = GetCVar and tonumber(GetCVar(ZOOM_CVAR))
+	if factor and factor < WIDE_ZOOM and not M.db.flightMaxZoom then
+		M.db.flightMaxZoom = factor -- (a /reload mid-flight keeps the one from before)
+		SetCVar(ZOOM_CVAR, WIDE_ZOOM)
 	end
 	local zoom = GetCameraZoom and GetCameraZoom()
 	if not savedZoom and Readable(zoom) and CameraZoomOut then -- (after a /reload mid-flight it's out already)
@@ -260,28 +289,57 @@ local function CameraStart()
 		M.db.flightZoom = zoom
 		CameraZoomOut(PULL_BACK)
 	end
-	if MoveViewLeftStart then
-		MoveViewLeftStart(ORBIT_SPEED)
-		orbiting = true
-		M.db.flightOrbit = true
-	end
+	OrbitStart()
 end
 
 local function CameraStop()
-	if orbiting and MoveViewLeftStop then
-		MoveViewLeftStop()
-	end
-	orbiting, M.db.flightOrbit = false, nil
+	OrbitStop()
 	local zoom = GetCameraZoom and GetCameraZoom()
 	if savedZoom and Readable(zoom) and CameraZoomIn and zoom > savedZoom then
 		CameraZoomIn(zoom - savedZoom)
 	end
 	savedZoom, M.db.flightZoom = nil, nil
+	if M.db.flightMaxZoom and SetCVar then
+		SetCVar(ZOOM_CVAR, M.db.flightMaxZoom)
+	end
+	M.db.flightMaxZoom = nil
+end
+
+local function MouseDown()
+	return IsMouseButtonDown and (IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton"))
+		or (IsMouselooking and IsMouselooking())
 end
 
 ---------------------------------------------------------------------------
 -- Starting and leaving
 ---------------------------------------------------------------------------
+
+-- The film on screen: the interface fades out, the bars in, the camera circles.
+local function Show()
+	shown, resumeAt, orbitAt = true, nil, nil
+	screen:SetScale(UIParent:GetScale())
+	local barHeight = math.floor(UIParent:GetHeight() * BAR + 0.5)
+	screen.Top:SetHeight(barHeight)
+	screen.Bottom:SetHeight(barHeight)
+	screen.FadeOut:Stop()
+	screen:SetAlpha(0)
+	screen:Show()
+	screen.FadeIn:Play()
+	UpdateSubtitles()
+	ns.HideInterface("flight", true, FADE)
+	OrbitStart()
+end
+
+-- The interface back at once (a window, typing): paused until that's done.
+local function Pause()
+	shown, resumeAt = false, nil
+	screen.FadeIn:Stop()
+	screen:Hide()
+	card.Anim:Stop()
+	card:SetAlpha(0)
+	ns.HideInterface("flight", false)
+	OrbitStop()
+end
 
 local function Start()
 	if not screen then
@@ -290,19 +348,9 @@ local function Start()
 	flying, leaveNow, zoneChanged, chatChanged = true, false, false, false
 	sincePoll, lastZone = 0, nil
 	wipe(subtitles)
-	windowsAtStart = Windows()
-	screen:SetScale(UIParent:GetScale())
-	local barHeight = math.floor(UIParent:GetHeight() * BAR + 0.5)
-	screen.Top:SetHeight(barHeight)
-	screen.Bottom:SetHeight(barHeight)
-	screen:EnableMouse(true) -- nothing invisible underneath gets clicked by accident
-	screen.FadeOut:Stop()
-	screen:SetAlpha(0)
-	screen:Show()
-	screen.FadeIn:Play()
-	UpdateSubtitles()
-	ns.HideInterface("flight", true, FADE)
+	baseline = Windows()
 	CameraStart()
+	Show()
 	if destination then
 		local place, area = destination:match("^(.-),%s*(.+)$")
 		ShowCard(L["Next stop"], place or destination, area)
@@ -313,20 +361,20 @@ local function Start()
 	end
 end
 
--- landed: the flight is over; anything else (a click, a window, ...) keeps the interface for the
--- rest of this flight.
+-- landed: the flight is over (everything fades back); otherwise (combat, a popup, switched off)
+-- the interface is back at once and stays for the rest of this flight.
 local function Leave(landed)
-	flying, dismissed = false, not landed
-	screen:EnableMouse(false)
+	local wasShown = shown
+	flying, shown, dismissed = false, false, not landed
 	screen.FadeIn:Stop()
-	if landed then
+	if wasShown and landed then
 		screen.FadeOut:Play() -- hides the screen when done
 	else
 		screen:Hide()
 	end
 	card.Anim:Stop()
 	card:SetAlpha(0)
-	ns.HideInterface("flight", false, landed and FADE or 0)
+	ns.HideInterface("flight", false, (wasShown and landed) and FADE or 0)
 	CameraStop()
 end
 
@@ -346,12 +394,36 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 			self:Hide()
 			return
 		end
-		windowsAtStart = math.min(windowsAtStart, Windows())
-		if leaveNow or not (M.enabled and M.db.cinematicFlights) or InCombat() or ChatActive()
-				or Windows() > windowsAtStart then
+		if leaveNow or not (M.enabled and M.db.cinematicFlights) or InCombat() then
 			Leave(false)
 			self:Hide()
 			return
+		end
+		local now = GetTime()
+		local windows = Windows()
+		baseline = math.min(baseline, windows)
+		local busy = ChatActive() or windows > baseline
+		if shown and busy then
+			Pause()
+		elseif not shown then
+			if busy then
+				resumeAt = nil
+			elseif not resumeAt then
+				resumeAt = now + RESUME_DELAY
+			elseif now >= resumeAt then
+				Show()
+			end
+		end
+		if not shown then
+			return
+		end
+		-- You're moving the camera yourself: the circling waits until you let go.
+		if MouseDown() then
+			OrbitStop()
+			orbitAt = now + RESUME_DELAY
+		elseif orbitAt and now >= orbitAt then
+			orbitAt = nil
+			OrbitStart()
 		end
 		if zoneChanged then
 			zoneChanged = false
@@ -426,16 +498,14 @@ function Flight.Enable()
 	for _, event in ipairs(LEAVE_EVENTS) do
 		pcall(events.RegisterEvent, events, event)
 	end
-	-- The UI was reloaded mid-flight: the camera is still circling and pulled back.
+	-- The UI was reloaded mid-flight: the camera is still circling, pulled back and allowed further.
 	if M.db.flightOrbit and MoveViewLeftStop then
 		MoveViewLeftStop()
 	end
 	M.db.flightOrbit = nil
-	if M.db.flightZoom then
-		savedZoom = M.db.flightZoom -- the zoom from before that flight: put back when it ends
-		if not OnTaxi() then
-			CameraStop()
-		end
+	savedZoom = M.db.flightZoom -- the zoom from before that flight: put back when it ends
+	if (M.db.flightZoom or M.db.flightMaxZoom) and not OnTaxi() then
+		CameraStop()
 	end
 	dismissed = false
 	Look() -- maybe on a flight already (switched on, or a reload)
