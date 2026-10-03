@@ -41,6 +41,8 @@ except the quest announcements your party reads.
 The installer also removes the old standalone `Mirage` addon, which is now part of
 LefthyTools. After installing or updating, type `/reload` in game.
 
+How it works inside (for developers): see [docs/](docs/architecture.md).
+
 ## Known limitations (Forever beta)
 
 - **Closing the settings panel can freeze the game in gamepad mode.** With the
