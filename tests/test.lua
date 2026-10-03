@@ -1957,6 +1957,55 @@ do
 		"nobody answered within 20 s: nobody needs it")
 	Advance(9)
 
+	-- Four notices at once: three fit. A finished one makes room and lets go of its frame for good.
+	anna("I2;1179::::::::20:::::;7001")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "I2;6948::::::::20:::::", "WHISPER", 12) -- Bob just shows one
+	Advance(2.1)
+	anna("I2;19019::::::::20:::::;7003")
+	Advance(0.15)
+	local showOnly, showKey
+	for key, call in pairs(BB.calls) do if call.from == 12 and not call.id then showOnly, showKey = call, key end end
+	local spareFrame = showOnly and showOnly.frame
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "I2;1155::::::::20:::::;7004", "WHISPER", 12)
+	Advance(0.15)
+	local fourth, oldest = BB.calls["12:7004"], BB.calls["11:7001"]
+	check(spareFrame and fourth and fourth.frame == spareFrame and not showOnly.frame and oldest.frame and oldest.frame:IsShown(),
+		"a fourth notice takes the frame of one that's only shown, not of an open offer")
+	check(fourth.frame.Item:GetText() == ItemLink(1155) and fourth.frame.Who:GetText():find("Bob|r shares", 1, true)
+		and fourth.frame.Need:IsShown(), "... filled in for the new one")
+	Advance(6.5)
+	check(not BB.calls[showKey] and fourth.frame and fourth.frame:IsShown() and fourth.frame.Item:GetText() == ItemLink(1155),
+		"the one that gave up its frame runs out without touching it")
+	Advance(30)
+	check(not next(BB.calls), "all of them run out")
+
+	-- Answers to two of my offers in the same moment: both count.
+	ctrlRight(ItemLink(1155), true)
+	Advance(3.1)
+	ctrlRight(ItemLink(6948), true)
+	Advance(0.15)
+	local myCalls = {}
+	for _, call in pairs(BB.calls) do if call.mine then myCalls[#myCalls + 1] = call end end
+	check(#myCalls == 2, "two offers of mine")
+	anna("N2;" .. myCalls[1].id .. ";1")
+	anna("N2;" .. myCalls[2].id .. ";0")
+	Advance(0.15)
+	check(myCalls[1].answers[11] and myCalls[1].answers[11].need and myCalls[2].answers[11] and not myCalls[2].answers[11].need,
+		"Anna answers both at once: both count")
+	Advance(30)
+
+	-- An item that only loads after sharing was switched off: no notice.
+	pmark = #PRINTED + 1
+	MOCK_ITEM_UNCACHED = 6948
+	anna("I2;6948::::::::20:::::")
+	Advance(0.15)
+	B("shareItems"):SetValue(false)
+	MOCK_ITEM_UNCACHED = nil
+	for _, callback in ipairs(PENDING_ITEM_LOADS) do callback() end
+	PENDING_ITEM_LOADS = {}
+	check(not printedSince(pmark):find("shares", 1, true) and not next(BB.calls), "an item that loads after sharing was switched off: no notice")
+	B("shareItems"):SetValue(true)
+
 	B("shareItems"):SetValue(false)
 	pmark = #PRINTED + 1
 	anna("I2;1179::::::::20:::::")

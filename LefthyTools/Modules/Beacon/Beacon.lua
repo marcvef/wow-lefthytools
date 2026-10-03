@@ -76,7 +76,9 @@ local HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW = 10, 60 -- Chronicle highlights accepte
 local ONLINE_QUIET = 60      -- friends found in the first minute were online already: not news
 local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
 local XP_GAP = 2             -- my level progress is checked (and sent if changed) at most this often
-local ITEM_GAP = 3           -- shared items accepted from one friend at most this often
+local ITEM_GAP = 2           -- shared items accepted from one friend at most this often (they send
+                             -- at most every 3 s; the margin is for their queue and the network)
+local CALL_LIMIT, CALL_WINDOW = 10, 10 -- Need / Pass answers and verdicts accepted from one friend
 local DAILY_LIMIT = 20       -- Chronicle days accepted from one friend per minute (7 arrive at once)
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true, quest = true, zone = true }
@@ -820,8 +822,12 @@ local function OnMessage(text, senderID)
 			itemsIn[#itemsIn + 1] = { "item", senderID, a, b }
 		end
 	elseif kind == "N" or kind == "R" then
-		if not guard.callAt or now - guard.callAt >= 0.2 then -- answers and verdicts: a few per call
-			guard.callAt = now
+		-- One per call each way; a count per window, so two in the same moment both count.
+		if not guard.callWindow or now - guard.callWindow >= CALL_WINDOW then
+			guard.callWindow, guard.calls = now, 0
+		end
+		if guard.calls < CALL_LIMIT then
+			guard.calls = guard.calls + 1
 			itemsIn[#itemsIn + 1] = { kind == "N" and "answer" or "result", senderID, a, b }
 		end
 	elseif kind == "D" then

@@ -76,6 +76,9 @@ end
 
 local function Release(frame)
 	frame:Hide()
+	if frame.call then
+		frame.call.frame = nil -- the call gets a frame again if it needs one (FrameFor)
+	end
 	frame.call = nil
 	for i, f in ipairs(shown) do
 		if f == frame then
@@ -153,17 +156,43 @@ local function FrameFor(call)
 		return call.frame
 	end
 	if #shown >= MAX_FRAMES then
-		Release(shown[1]) -- the oldest makes room
+		-- The oldest finished one makes room, or else the oldest.
+		local victim = shown[1]
+		for _, f in ipairs(shown) do
+			if f.call and f.call.state == "done" then
+				victim = f
+				break
+			end
+		end
+		Release(victim)
 	end
 	local frame = table.remove(framePool) or NewFrame()
 	frame.call, call.frame = call, frame
 	frame:SetAlpha(1)
 	frame.Winner:SetText("")
 	frame.Status:SetText("")
+	local itemID = tonumber(call.itemString:match("^(%d+)"))
+	frame.Icon:SetTexture(C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID) or 134400)
+	frame.Who:SetText(call.mine and L["You offer"] or L["%s shares"]:format(Coloured(call.fromName, call.fromClass)))
+	frame.Item:SetText(call.link)
 	shown[#shown + 1] = frame
 	Layout()
 	frame:Show()
 	return frame
+end
+
+-- Stores a call; one already under that key gives up its notice.
+local function Put(key, call)
+	local old = calls[key]
+	if old then
+		if old.sound and StopSound then
+			StopSound(old.sound)
+		end
+		if old.frame then
+			Release(old.frame)
+		end
+	end
+	calls[key] = call
 end
 
 local function Answers(call)
@@ -178,10 +207,6 @@ end
 -- Fills the notice for the call's current state.
 local function Draw(call)
 	local f = FrameFor(call)
-	local itemID = tonumber(call.itemString:match("^(%d+)"))
-	f.Icon:SetTexture(C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID) or 134400)
-	f.Who:SetText(call.mine and L["You offer"] or L["%s shares"]:format(Coloured(call.fromName, call.fromClass)))
-	f.Item:SetText(call.link)
 	local open = call.state == "open"
 	f.Need:SetShown(open and not call.mine and call.id ~= nil and call.myAnswer == nil)
 	f.Pass:SetShown(open and not call.mine and call.id ~= nil and call.myAnswer == nil)
@@ -332,7 +357,10 @@ function B.ShareItem(link, offer)
 		M:Print(("shared %s with %d friend(s)."):format(link, count))
 		return
 	end
-	local id = math.random(1, 99999)
+	local id
+	repeat
+		id = math.random(1, 99999)
+	until not calls["me:" .. id]
 	local call = { id = id, mine = true, link = link, itemString = itemString, recipients = recipients,
 		answers = {}, state = "open", ends = now + CALL_TIME }
 	calls["me:" .. id] = call
@@ -388,7 +416,8 @@ function B.ReceiveItem(peer, gameAccountID, itemString, callID)
 		return
 	end
 	WithLink(itemString, function(link)
-		if not link then
+		-- (Loading can take a moment: Beacon or the setting may be off by then.)
+		if not (link and M.enabled and M.db.shareItems) then
 			return
 		end
 		M:Print(("%s shares %s."):format(Coloured(peer.name, peer.classFile), link))
@@ -398,7 +427,7 @@ function B.ReceiveItem(peer, gameAccountID, itemString, callID)
 		if not callID then
 			call.state, call.doneAt = "done", now -- just showing it: no buttons, fades after a while
 		end
-		calls[gameAccountID .. ":" .. (callID or ("x" .. now))] = call
+		Put(gameAccountID .. ":" .. (callID or ("x" .. now)), call)
 		Draw(call)
 		PlaySound(SOUND.call)
 	end)
