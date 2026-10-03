@@ -21,7 +21,10 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
 - **Protocol v2** (`;`-separated; the digit after the kind is the version): `H2` hello,
   `S2;<flags>;<continent>;<north>;<west>;<subzone>;<target>` state (flags D dead, G ghost,
   C combat; position empty in instances or with sharing off; target only in combat),
-  `L2;<level>;<text>` level-up, `Q2` switched off. A hello is answered with the state. A message
+  `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`), `Q2`
+  switched off. A hello is answered with the version and the state (at most every 5 s per friend);
+  if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
+  telling them to run `Update-LefthyTools.cmd`. Builds before 0.4.0 ignore `V2`. A message
   with another version marks the sender in `otherVersion` (shown by `/lefthy beacon status`)
   instead of making them a peer; v1 (0.2.0) and v2 can't see each other. `Parse` validates the
   whole message *before* touching state, so a malformed message doesn't register its sender.

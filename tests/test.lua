@@ -685,8 +685,14 @@ mark = #GAMEDATA + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;250.0;750.0;Goldshire;", "WHISPER", 11) -- Anna answers
 check(#GameDataTo(11, mark) == 0, "no sending inside the event handler")
 Advance(0.15)
-check(GameDataTo(11, mark)[1] == "S2;;0;500.0;500.0;Goldshire;",
-	"Anna answered: my state goes out right away, got " .. tostring(GameDataTo(11, mark)[1]))
+local function sentTo(id, from, prefix) -- messages to id since `from` that start with prefix
+	local list = {}
+	for _, m in ipairs(GameDataTo(id, from)) do if m:sub(1, #prefix) == prefix then list[#list + 1] = m end end
+	return list
+end
+check(sentTo(11, mark, "S2;")[1] == "S2;;0;500.0;500.0;Goldshire;",
+	"Anna answered: my state goes out right away, got " .. tostring(sentTo(11, mark, "S2;")[1]))
+check(sentTo(11, mark, "V2;")[1] == "V2;0.4.0-3-gabc1234", "... together with my LefthyTools version")
 Advance(1) -- the Battle.net lookup is coalesced to once a second
 check(peers()[11] and peers()[11].name == "Anna" and peers()[11].classFile == "MAGE", "her name and class come from Battle.net")
 mark = #GAMEDATA + 1
@@ -705,7 +711,7 @@ check(#GameDataTo(11, mark) == 2, "and again every 3 s while moving")
 mark = #GAMEDATA + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 12) -- Bob starts the addon and says hello
 Advance(0.15)
-check((GameDataTo(12, mark)[1] or ""):sub(1, 3) == "S2;", "a hello is answered with my state")
+check(#sentTo(12, mark, "S2;") == 1 and #sentTo(12, mark, "V2;") == 1, "a hello is answered with my state and version")
 Fire("BN_CHAT_MSG_ADDON", "OtherAddon", "S2;;0;1;1;;", "WHISPER", 14)
 for _, bad in ipairs({ "garbage", "S2;bad", "S2;;0;abc;1;;", "S2;;0;1;;;", "S2;x;0;1;1;;", "H2extra" }) do
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", bad, "WHISPER", 14)
@@ -953,14 +959,39 @@ for i = 1, 30 do Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;;;;;", "WHISPER", 10
 Advance(0.15)
 local burst = #GAMEDATA - mark + 1
 check(burst >= 5 and burst <= 12, "rate limit: about 10 messages at once, got " .. burst)
-Advance(3)
-check(#GAMEDATA - mark + 1 >= 30, "the rest follow within a few seconds")
+Advance(6) -- 30 friends x (version + state) at 10 messages a second
+local answered = 0
+for i = 1, 30 do if #sentTo(100 + i, mark, "S2;") == 1 then answered = answered + 1 end end
+check(answered == 30, "the rest follow within a few seconds, got " .. answered)
 for i = 1, 30 do BN_FRIENDS[#BN_FRIENDS] = nil end
 Fire("BN_FRIEND_INFO_CHANGED")
 Advance(1.2)
 local extras = 0
 for id in pairs(peers()) do if id > 100 then extras = extras + 1 end end
 check(extras == 0, "friends that left the friend list are forgotten")
+
+section("Beacon: a friend with a newer LefthyTools")
+local vmark = #PRINTED + 1
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.3.9-50-gaaaaaaa", "WHISPER", 11) -- older than mine
+Advance(0.15)
+check(not printedSince(vmark):find("newer LefthyTools", 1, true), "a friend on an older build: no notice here (they get one)")
+check(peers()[11].version == "0.3.9-50-gaaaaaaa", "their version is remembered")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.4.0-9-gbbbbbbb", "WHISPER", 11)
+check(not printedSince(vmark):find("newer LefthyTools", 1, true), "nothing printed inside the event handler")
+Advance(0.15)
+local notice = printedSince(vmark)
+check(notice:find("Anna has a newer LefthyTools (0.4.0-9-gbbbbbbb, you have 0.4.0-3-gabc1234)", 1, true)
+	and notice:find("Update-LefthyTools.cmd", 1, true), "a friend on a newer build: told how to update, got " .. notice)
+vmark = #PRINTED + 1
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11)
+Advance(0.15)
+check(not printedSince(vmark):find("newer LefthyTools", 1, true), "only once per login")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;not a version!", "WHISPER", 11)
+Advance(0.15)
+check(peers()[11].version == "0.5.0", "a malformed version message is ignored")
+vmark = #PRINTED + 1
+lefthy("beacon status")
+check(printedSince(vmark):find("LefthyTools 0.5.0", 1, true), "/lefthy beacon status shows each friend's version")
 
 section("Beacon: level-ups")
 lefthy("beacon ding {name} hit {level}, drinks on me!")
@@ -1022,7 +1053,8 @@ for _ = 1, 8 do
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 11)
 	Advance(0.3)
 end
-check(#GameDataTo(11, mark) <= 1, "repeated hellos get at most one answer per 5 s, got " .. #GameDataTo(11, mark))
+check(#sentTo(11, mark, "S2;") <= 1 and #sentTo(11, mark, "V2;") <= 1,
+	"repeated hellos get at most one answer per 5 s, got " .. #GameDataTo(11, mark) .. " messages")
 Advance(10)
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;22;", "WHISPER", 11)
 Advance(0.15)

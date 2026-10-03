@@ -18,6 +18,8 @@ local L = ns.L
 --                       position (C_Map.GetWorldPosFromMapPos), empty in dungeons/raids or with
 --                       sharing off; <target> is who I'm fighting, only while in combat.
 --   L2;<level>;<text>   I levelled up; <text> is my own level-up message (empty = their default)
+--   V2;<version>        my LefthyTools build (LT.version), sent with every answer; a friend on an
+--                       older build gets told once per login. Builds before 0.4.0 ignore it.
 --   Q2                  module switched off: forget me
 --
 -- Keeping it light: the state is only sent when it changed (checked every <interval> seconds,
@@ -84,6 +86,8 @@ local owed = {}         -- gameAccountID -> true: send them my current state
 local outbox = {}       -- { gameAccountID, message }: one-off messages, sent before states
 local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt }: spam guards
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
+local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on the next tick
+local newerNoticeShown = false -- that notice comes once per login
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
 
 local sweepRequested, validateRequested, statusDirty = false, false, false
@@ -402,6 +406,11 @@ local function Parse(text)
 		if level then
 			return "L", tonumber(level), message
 		end
+	elseif kind == "V" then
+		local version = rest:match("^;([%w%.%-]+)$")
+		if version and #version <= 40 then
+			return "V", version
+		end
 	end
 	return nil
 end
@@ -480,11 +489,17 @@ local function OnMessage(text, senderID)
 			guard.dingAt = now
 			dings[#dings + 1] = { senderID, a, b }
 		end
+	elseif kind == "V" then
+		peer.version = a
+		if not newerNoticeShown and LT.CompareVersions(a, LT.version) == 1 then
+			newerFrom = senderID -- told on the next tick, once their name is known
+		end
 	end
 	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget.
 	if answer and (not guard.answeredAt or now - guard.answeredAt >= ANSWER_GAP) then
 		guard.answeredAt = now
 		owed[senderID] = true
+		B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40)) -- my LefthyTools build
 	end
 end
 
@@ -520,6 +535,15 @@ local function Tick(now, elapsed)
 		if peer and peer.name and B.ShowDing then
 			B.ShowDing(peer, ding[2], ding[3])
 		end
+	end
+	-- A friend runs a newer LefthyTools: say so once per login (a /reload counts as one).
+	local newer = newerFrom and peers[newerFrom]
+	if newer and newer.name and not newerNoticeShown then
+		newerNoticeShown, newerFrom = true, nil
+		M:Print(string.format("%s has a newer LefthyTools (%s, you have %s). To update, run "
+			.. "Update-LefthyTools.cmd again, then /reload.", newer.name, newer.version, LT.version))
+	elseif newerFrom and not peers[newerFrom] then
+		newerFrom = nil
 	end
 	if now - lastExpire >= 1 then
 		Expire(now)
@@ -688,9 +712,10 @@ function M:OnSlashCommand(msg)
 		local count, now = 0, GetTime()
 		for gameAccountID, peer in pairs(peers) do
 			count = count + 1
-			self:Print(string.format("  %s - %s%s", peer.name or ("#" .. gameAccountID),
+			self:Print(string.format("  %s - %s%s, LefthyTools %s", peer.name or ("#" .. gameAccountID),
 				peer.hasPos and string.format("position %.0f s ago", now - peer.posTime)
-					or "no position (dungeon, raid or not sharing)", StatusWords(peer)))
+					or "no position (dungeon, raid or not sharing)", StatusWords(peer),
+				peer.version or "0.3.0 or older"))
 		end
 		for gameAccountID, version in pairs(otherVersion) do
 			local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
