@@ -44,7 +44,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     star icon; finishing the quest posts `quest complete!`.
 12. New Forever quests: in the quest log, a coloured NEW right after the name of quests from new
     Forever content (e.g. the Skyborne start), none on old Classic quests, and no icon covered;
-    hovering adds "New in WoW: Forever" to the tooltip. Open the quest: NEW after the title in the
+    hovering adds "New in WoW: Forever" to the tooltip. Quests you don't know from original
+    Classic but from its later seasons: NEW too, the tooltip says "Not in the original Classic
+    (from its later seasons)". Open the quest: NEW after the title in the
     details. Accept and turn one in: NEW after the title in the quest window. A very long title
     shows NEW at the right end of its entry instead (no overlap with the next entry).
 13. Combo points (rogue, personal resource display on): 5 empty sockets under its bars (retail art;

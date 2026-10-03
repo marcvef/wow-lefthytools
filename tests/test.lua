@@ -811,6 +811,10 @@ section("Misc Tweaks: quests that are new in WoW: Forever")
 check(TDB.foreverQuests == true and REGISTERED_SETTINGS.LefthyTools_tweaks_foreverQuests, "on by default, with a checkbox")
 check(ns.IsForeverQuest(86574) and ns.IsForeverQuest(99411) and not ns.IsForeverQuest(86575)
 	and not ns.IsForeverQuest(176) and not ns.IsForeverQuest(8193), "the generated list: Forever's own quests, not Classic ones")
+check(ns.IsMarkedQuest(86574) and ns.IsMarkedQuest(77568) and ns.IsMarkedQuest(55296) and not ns.IsMarkedQuest(176)
+	and not ns.IsMarkedQuest(8193) and not ns.IsMarkedQuest(86575),
+	"later Classic quests (Season of Discovery and the like, in Forever's client too) get the marker as well")
+check(not ns.IsForeverQuest(77568), "... but don't count as new in Forever (Chronicle's statistic)")
 local MARK = " |cff4de1ffNEW|r"
 local savedQuests = QUESTS
 local hogger = { id = 176, title = "Wanted: Hogger", objectives = {} }
@@ -829,6 +833,19 @@ GameTooltip:SetOwner(forButton); TOOLTIP.shown = true -- Blizzard's own OnEnter 
 forButton._scripts.OnEnter(forButton)
 check(table.concat(TOOLTIP.lines, "|"):find("New in WoW: Forever", 1, true), "hovering the quest adds a line explaining NEW")
 GameTooltip:Hide()
+local seasonQuest = { id = 77568, title = "A season quest", objectives = {} }
+QUESTS = { seasonQuest }
+QuestLogQuests_Update()
+local seasonButton = titleButton(77568)
+check(seasonButton.Text:GetText() == "A season quest" .. MARK, "a later Classic quest: NEW too")
+GameTooltip:SetOwner(seasonButton); TOOLTIP.shown = true
+seasonButton._scripts.OnEnter(seasonButton)
+local seasonTip = table.concat(TOOLTIP.lines, "|")
+check(seasonTip:find("Not in the original Classic", 1, true) and not seasonTip:find("New in WoW: Forever", 1, true),
+	"... and its tooltip says where it's from")
+GameTooltip:Hide()
+QUESTS = { foreverQuest, hogger }
+QuestLogQuests_Update()
 -- A title that would need another line with the marker: Blizzard already sized the entry.
 local longQuest = { id = 86576, title = string.rep("x", 31), objectives = {} } -- 31 chars = 1 line, +4 = 2
 QUESTS = { longQuest }

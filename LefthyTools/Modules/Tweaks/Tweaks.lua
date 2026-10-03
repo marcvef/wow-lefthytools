@@ -438,7 +438,7 @@ function M:BuildOptions(o)
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
 	o:Checkbox("foreverQuests", L["Mark quests that are new in WoW: Forever"],
-		L["WoW: Forever adds over a thousand quests to the Classic world. They get a NEW right after their name: in the quest log (hover for details), in the quest details and in the quest window when you accept or turn one in."])
+		L["WoW: Forever adds over a thousand quests to the Classic world, plus about as many from Classic's later seasons that original Classic never had. They get a NEW right after their name: in the quest log (hover for details), in the quest details and in the quest window when you accept or turn one in."])
 	o:Header(L["AFK screen"])
 	o:Checkbox("afkScreen", L["AFK screen"],
 		L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."])

@@ -75,5 +75,8 @@ ns.CHANGELOG = {
 	{ id = 23, version = "0.5.0", module = "general",
 		en = { "Bigger and bolder", "Shared items, level-ups and the AFK screen's friends list are bigger now, and level-ups pop in." },
 		de = { "Größer und auffälliger", "Geteilte Items, Level-Ups und die Freundesliste auf dem AFK-Bildschirm sind jetzt größer, und Level-Ups ploppen auf." } },
+	{ id = 24, version = "0.5.0", module = "tweaks",
+		en = { "More new quests marked", "NEW now also shows on the quests from Classic's later seasons that Forever brings along: original Classic never had them either." },
+		de = { "Mehr neue Quests markiert", "NEU steht jetzt auch an den Quests aus den späteren Seasons von Classic, die Forever mitbringt: Die gab es im ursprünglichen Classic auch nicht." } },
 	-- New entries go here, at the end.
 }

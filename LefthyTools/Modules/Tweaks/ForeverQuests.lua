@@ -5,10 +5,13 @@ local L = ns.L
 --
 -- Forever adds over a thousand quests to the Classic world, and the client has no flag for them,
 -- so Data/ForeverQuests.lua lists them (generated from the client's quest tables by
--- tools/update-forever-quests.ps1). The marker is a coloured "NEW" (Blizzard's NEW_CAPS, so
--- "NEU" on a German client) right after the quest's name:
+-- tools/update-forever-quests.ps1). It also lists the later Classic quests (Season of Discovery,
+-- Hardcore, Anniversary) Forever's client carries: never in original Classic either, so they're
+-- marked too. The marker is a coloured "NEW" (Blizzard's NEW_CAPS, so "NEU" on a German client)
+-- right after the quest's name:
 --   * quest log: appended to the title of the entry (post-hook on QuestLogQuests_Update);
---     hovering the entry adds "New in WoW: Forever" to its tooltip;
+--     hovering the entry adds "New in WoW: Forever" (or "Not in the original Classic") to its
+--     tooltip;
 --   * quest details in the log and the quest window (accept, turn in): appended to the title
 --     (post-hook on QuestInfo_Display), and on the "progress" page of the quest window
 --     (QuestFrameProgressPanel's OnShow).
@@ -20,23 +23,33 @@ local L = ns.L
 local MARKER_COLOR = "|cff4de1ff"
 local TIP_R, TIP_G, TIP_B = 0.3, 0.88, 1
 
-local newQuests -- questID -> true, parsed on first use
+local NEW_IN_FOREVER, LATER_CLASSIC = 1, 2
+local newQuests -- questID -> NEW_IN_FOREVER or LATER_CLASSIC, parsed on first use
 local active = false
 local spareLabels = {}   -- quest log title button -> our "NEW" label for long titles
 local hookedButtons = {}
 local hooked = false
 
-local function IsNew(questID)
+-- Which kind of new a quest is, or nil for original Classic quests. Two lists (Data/ForeverQuests.lua):
+-- new in WoW: Forever, and later Classic content (Season of Discovery, Hardcore, Anniversary) that
+-- Forever has too; both were never in original Classic, so both get the marker.
+local function Kind(questID)
 	if not newQuests then
 		newQuests = {}
-		for first, last in (ns.FOREVER_QUEST_IDS or ""):gmatch("(%d+)%-?(%d*)") do
-			first = tonumber(first)
-			for id = first, tonumber(last) or first do
-				newQuests[id] = true
+		for _, list in ipairs({ { ns.LATER_CLASSIC_QUEST_IDS, LATER_CLASSIC }, { ns.FOREVER_QUEST_IDS, NEW_IN_FOREVER } }) do
+			for first, last in (list[1] or ""):gmatch("(%d+)%-?(%d*)") do
+				first = tonumber(first)
+				for id = first, tonumber(last) or first do
+					newQuests[id] = list[2]
+				end
 			end
 		end
 	end
-	return type(questID) == "number" and newQuests[questID] == true
+	return type(questID) == "number" and newQuests[questID] or nil
+end
+
+local function IsNew(questID)
+	return Kind(questID) ~= nil
 end
 
 local function Marker()
@@ -78,8 +91,10 @@ end
 ---------------------------------------------------------------------------
 
 local function AddTooltipLine(button)
-	if active and IsNew(button.questID) and GameTooltip:IsOwned(button) then
-		GameTooltip:AddLine(L["New in WoW: Forever"], TIP_R, TIP_G, TIP_B)
+	local kind = active and Kind(button.questID)
+	if kind and GameTooltip:IsOwned(button) then
+		GameTooltip:AddLine(kind == NEW_IN_FOREVER and L["New in WoW: Forever"] or L["Not in the original Classic (from its later seasons)"],
+			TIP_R, TIP_G, TIP_B)
 		GameTooltip:Show()
 	end
 end
@@ -189,8 +204,13 @@ function ns.ApplyForeverQuests(on)
 	UpdateProgressTitle()
 end
 
--- For tests.
+-- New in WoW: Forever itself (Chronicle counts those); later Classic quests don't count.
 function ns.IsForeverQuest(questID)
+	return Kind(questID) == NEW_IN_FOREVER
+end
+
+-- For tests: whether a quest gets the marker.
+function ns.IsMarkedQuest(questID)
 	return IsNew(questID)
 end
 
