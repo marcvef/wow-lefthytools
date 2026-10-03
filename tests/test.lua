@@ -1297,6 +1297,42 @@ lefthy("enable beacon")
 Advance(0.15)
 check(next(WorldMapFrame.providers) ~= nil, "on again: back on the map")
 
+section("what's new")
+local news = ns.CHANGELOG
+local goodData = #news > 0
+for i, e in ipairs(news) do
+	goodData = goodData and e.id == i and type(e.en) == "string" and e.en ~= "" and type(e.de) == "string" and e.de ~= ""
+		and LT.ParseVersion(e.version) ~= nil
+end
+check(goodData, "changelog: ids 1, 2, 3, ... in order, each with a version and English and German text")
+check(LT.freshInstall and not (LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()),
+	"a new install doesn't get a what's-new window")
+LefthyToolsDB.changelogSeen = #news - 2 -- two entries arrived with an update
+STATE.combat = true
+LT.WhatsNew.Schedule()
+Advance(4)
+check(not (LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()), "not in combat")
+STATE.combat = false
+Advance(5)
+local newsText = LefthyToolsNewsFrame and LefthyToolsNewsFrame.Text:GetText() or ""
+check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown(), "after combat: the window opens by itself")
+check(newsText:find(news[#news].en, 1, true) and newsText:find(news[#news - 1].en, 1, true)
+	and not newsText:find(news[#news - 2].en, 1, true), "only the entries not seen yet")
+check(newsText:find("LefthyTools 0.5.0 (in development)", 1, true), "a version still in development is marked, got " .. newsText)
+check(LefthyToolsDB.changelogSeen == #news, "and they count as seen")
+check(LefthyToolsNewsFrame.Subtitle:GetText():find("0.4.0-3-gabc1234", 1, true), "the window shows the installed build")
+LefthyToolsNewsFrame.AllButton:Click()
+check(LefthyToolsNewsFrame.Text:GetText():find(news[1].en, 1, true) and not LefthyToolsNewsFrame.AllButton:IsShown(), "'All changes' shows everything")
+LefthyToolsNewsFrame:Hide()
+lefthy("news")
+check(LefthyToolsNewsFrame:IsShown() and LefthyToolsNewsFrame.Text:GetText():find(news[1].en, 1, true), "/lefthy news")
+LefthyToolsNewsFrame:Hide()
+SETTINGS_BUTTONS["What's new"].onClick()
+check(LefthyToolsNewsFrame:IsShown(), "the settings overview's What's new button")
+LefthyToolsNewsFrame:Hide()
+Advance(10)
+check(not LefthyToolsNewsFrame:IsShown(), "nothing new: it doesn't open again")
+
 check(#ERRORS == 0, "no errors reported through the error handler")
 
 -- A forgotten `local` leaks a global, which in game can clash with other addons. Ours start with

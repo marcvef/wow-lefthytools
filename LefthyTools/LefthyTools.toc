@@ -14,10 +14,12 @@ Locales\deDE.lua
 Core\Core.lua
 Core\Window.lua
 Core\Errors.lua
+Core\WhatsNew.lua
 Core\Options.lua
 Core\Options.xml
 
 # Data
+Data\Changelog.lua
 Data\ForeverQuests.lua
 
 # Modules

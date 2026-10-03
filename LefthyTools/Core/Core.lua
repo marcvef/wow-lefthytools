@@ -221,6 +221,7 @@ events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
 events:SetScript("OnEvent", function(_, event, arg)
 	if event == "ADDON_LOADED" and arg == ADDON then
+		LT.freshInstall = type(LefthyToolsDB) ~= "table" -- no saved settings yet: a new install
 		LefthyToolsDB = type(LefthyToolsDB) == "table" and LefthyToolsDB or {}
 		local db = LefthyToolsDB
 		db.modules = type(db.modules) == "table" and db.modules or {}

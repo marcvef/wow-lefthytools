@@ -88,6 +88,12 @@ check(PRINTED[#PRINTED] and PRINTED[#PRINTED]:find("Anna|r hat Level 21 erreicht
 check(S("LefthyTools_beacon_dingText").name == "Level-Up-Nachricht" and SETTINGS_BUTTONS["Nachricht testen"],
 	"level-up settings are German")
 
+check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()
+	and LefthyToolsNewsFrame.TitleContainer.TitleText:GetText() == "Neu in LefthyTools"
+	and LefthyToolsNewsFrame.Text:GetText():find(ns.CHANGELOG[1].de, 1, true),
+	"an existing install sees what's new after the update, in German")
+LefthyToolsNewsFrame:Hide()
+
 LT.Errors.Show()
 check(LefthyToolsErrorsFrame.TitleContainer.TitleText:GetText() == "LefthyTools-Fehler", "error window in German")
 LefthyToolsErrorsFrame:Hide()

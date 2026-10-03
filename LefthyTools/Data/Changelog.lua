@@ -1,0 +1,25 @@
+local _, ns = ...
+
+-- What's new, shown once after an update (Core/WhatsNew.lua). Add an entry with every change
+-- players notice, with the next id and the version it will ship in; never renumber. en/de: the
+-- text in English and German (the window follows the client language).
+ns.CHANGELOG = {
+	{ id = 1, version = "0.5.0",
+		en = "Beacon: friends in your group keep their dot, with a blue ring, right on top of the game's group dot, and the tooltip says they're in your group.",
+		de = "Beacon: Freunde in deiner Gruppe behalten ihren Punkt, mit blauem Ring, direkt über dem Gruppenpunkt des Spiels, und der Tooltip sagt, dass sie in deiner Gruppe sind." },
+	{ id = 2, version = "0.5.0",
+		en = "Misc Tweaks: quests that are new in WoW: Forever get a NEW after their name in the quest log, the quest details and the quest window.",
+		de = "Misc Tweaks: Quests, die neu in WoW: Forever sind, bekommen ein NEU hinter ihrem Namen, im Questlog, in den Questdetails und im Questfenster." },
+	{ id = 3, version = "0.5.0",
+		en = "The settings overview shows your version and whether a friend has a newer one.",
+		de = "Die Übersicht in den Einstellungen zeigt deine Version und ob ein Freund eine neuere hat." },
+	{ id = 4, version = "0.5.0",
+		en = "Update-LefthyTools.cmd is now one file on its own: pass it on to friends as it is.",
+		de = "Update-LefthyTools.cmd ist jetzt eine einzelne Datei: Du kannst sie einfach so an Freunde weitergeben." },
+	{ id = 5, version = "0.5.0",
+		en = "LefthyTools keeps its own errors, also with the game's error display off. /lefthy errors shows them ready to copy.",
+		de = "LefthyTools merkt sich seine eigenen Fehler, auch wenn die Fehleranzeige des Spiels aus ist. /lefthy errors zeigt sie zum Kopieren an." },
+	{ id = 6, version = "0.5.0",
+		en = "This window: after an update it shows what's new. /lefthy news shows all changes again.",
+		de = "Dieses Fenster: Nach einem Update zeigt es, was neu ist. /lefthy news zeigt alle Änderungen nochmal." },
+}

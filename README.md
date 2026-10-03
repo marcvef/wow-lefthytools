@@ -25,6 +25,7 @@ compartment, or type `/lefthy` (short: `/lt`).
 /lefthy enable | disable <module>  switch a module, e.g. /lefthy disable mirage
 /lefthy <module> ...               module commands, e.g. /lefthy mirage status
 /lefthy errors [clear]             LefthyTools' own errors, ready to copy
+/lefthy news                       what's new (also opens by itself once after an update)
 ```
 
 **If something breaks:** LefthyTools keeps its own Lua errors, also across sessions and with

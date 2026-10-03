@@ -15,6 +15,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Core/Core.lua              module registry, saved settings, enable/disable lifecycle
   Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
+  Core/WhatsNew.lua          what's-new window after an update, /lefthy news (entries: Data/Changelog.lua)
   Core/Options.lua           settings panel (overview + one page per module), option builder, /lefthy
   Core/Options.xml           text field row for the settings list (Builder:TextInput)
   Modules/Mirage/Groups.lua  frame names per group, window list, chat events (edit to add frames)
@@ -23,6 +24,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Tweaks/Tweaks.lua  Misc Tweaks: status text, movable bags, quest announcements
   Modules/Tweaks/ComboPoints.lua  combo points on the personal resource display
   Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever
+  Data/Changelog.lua         what's new: one entry per player-visible change, English and German
   Data/ForeverQuests.lua     generated list of those quests (tools/update-forever-quests.ps1)
   Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
@@ -95,6 +97,18 @@ inside the error handler). `/lefthy errors` shows a plain-text report (build, cl
 newest first) in a read-only edit box to copy; `/lefthy errors clear` empties it; the overview's
 Info section shows the count. Core parts that aren't modules hook in through `LT.onLoad` (saved
 variables ready) and `LT.onLogin`.
+
+## What's new (Core/WhatsNew.lua, Data/Changelog.lua)
+
+`ns.CHANGELOG` lists every change players notice: `{ id, version, en, de }`, ids 1, 2, 3, ... in
+order (the tests check that, and that both texts are there). Ids instead of versions, because
+builds between releases (`0.4.0-12-g...`) have news too. `LefthyToolsDB.changelogSeen` is the
+highest id shown: a fresh install (`LT.freshInstall`: no saved variables before) starts with
+everything seen, an older install without the field sees every entry once. Three seconds after
+login (later if in combat) the window lists the unseen entries, newest first under a heading per
+version ("0.5.0 (in development)" while the installed build is older), and marks them seen. "All
+changes", `/lefthy news` and the overview's What's new button show the whole list. **Add an
+entry, in English and German, with every change players notice.**
 
 ## Module framework (Core/)
 

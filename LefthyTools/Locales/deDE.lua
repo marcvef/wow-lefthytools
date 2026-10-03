@@ -36,6 +36,16 @@ L["Click into the text, press Ctrl+A and then Ctrl+C to copy it, and send it to 
 	"In den Text klicken, Strg+A und dann Strg+C drücken, um ihn zu kopieren, und ihn dem schicken, von dem du LefthyTools hast."
 L["Clear"] = "Löschen"
 
+-- What's new
+L["What's new"] = "Neuigkeiten"
+L["Show"] = "Anzeigen"
+L["Every change to LefthyTools, newest first. After an update this opens by itself once."] =
+	"Alle Änderungen an LefthyTools, die neuesten zuerst. Nach einem Update öffnet sich das einmal von selbst."
+L["What's new in LefthyTools"] = "Neu in LefthyTools"
+L["All changes"] = "Alle Änderungen"
+L["You have LefthyTools %s."] = "Du hast LefthyTools %s."
+L["%s (in development)"] = "%s (in Arbeit)"
+
 -- Mirage
 L["Fades the interface when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD."] =
 	"Blendet das Interface aus, wenn du nicht im Kampf bist und es gerade nicht benutzt, wie das Dynamic HUD in Dune: Awakening."

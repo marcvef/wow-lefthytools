@@ -231,6 +231,8 @@ function ns.SetupOptions()
 	AddInfoRow(layout, L["Updates"],
 		L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload."],
 		Options.UpdateStatus)
+	layout:AddInitializer(CreateSettingsButtonInitializer(L["What's new"], L["Show"], function() LT.WhatsNew.Show(false) end,
+		L["Every change to LefthyTools, newest first. After an update this opens by itself once."], true))
 	AddInfoRow(layout, L["Errors"],
 		L["LefthyTools' own Lua errors, kept across sessions. /lefthy errors shows them ready to copy, /lefthy errors clear removes them."],
 		Options.ErrorStatus)
@@ -303,6 +305,8 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 			.. ". To update, run Update-LefthyTools.cmd again, then /reload.")
 	elseif cmd == "errors" then
 		LT.Errors.Command(rest)
+	elseif cmd == "news" or cmd == "whatsnew" or cmd == "changelog" then
+		LT.WhatsNew.Show(false)
 	elseif (cmd == "enable" or cmd == "disable" or cmd == "toggle") and target then
 		if cmd == "toggle" then
 			LT:ToggleModule(target.key)
@@ -321,6 +325,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		LT.Print("/lefthy modules - list modules")
 		LT.Print("/lefthy version - the installed LefthyTools version")
 		LT.Print("/lefthy errors [clear] - LefthyTools' own errors, ready to copy")
+		LT.Print("/lefthy news - what's new in LefthyTools")
 		LT.Print("/lefthy enable | disable | toggle <module>")
 		LT.Print("/lefthy <module> ... - module commands, e.g. /lefthy mirage status")
 	end
