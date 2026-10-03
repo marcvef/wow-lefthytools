@@ -1876,6 +1876,39 @@ do
 	Advance(0.15)
 	check(#sentTo(11, mark, "I2;") == 1, "Ctrl+left-click and plain clicks don't share")
 
+	-- Only items that can change hands.
+	Advance(3)
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	ctrlRight(ItemLink(19019)) -- a chat link to a Bind on Pickup item
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 0 and printedSince(pmark):find(ItemLink(19019) .. " is soulbound or can't be traded", 1, true),
+		"a Bind on Pickup item (chat link, loot window): not shared, and I'm told why")
+	BAGS[0] = { [2] = 1155 }
+	MOCK_FOCUS = ContainerFrameCombinedBags.buttons[2]
+	BOUND[2] = true -- worn once: bound now
+	ctrlRight(ItemLink(1155))
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 0, "a soulbound item in the bags: not shared")
+	BAG_TOOLTIP[2] = { "Rod of the Sleepwalker",
+		"You may trade this item with players that were also eligible to loot this item for the next 1 hour 52 min." }
+	ctrlRight(ItemLink(1155))
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 1, "soulbound, but its loot trade timer still runs: shared")
+	BOUND[2], BAG_TOOLTIP[2] = nil, nil
+	Advance(3)
+	ctrlRight(ItemLink(1155))
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 2, "Bind on Equip, not bound yet: shared")
+	MOCK_FOCUS = CreateFrame("Button")
+	MOCK_FOCUS:SetID(16)
+	EQUIPPED[16] = 1155
+	Advance(3)
+	ctrlRight(ItemLink(1155))
+	Advance(0.15)
+	check(#sentTo(11, mark, "I2;") == 2, "a worn item: not shared")
+	MOCK_FOCUS, EQUIPPED, BAGS = nil, {}, { [0] = {} }
+	Advance(3)
+
 	pmark = #PRINTED + 1
 	local sounds = #SOUNDS
 	anna("I2;19019::::::::20:::::")

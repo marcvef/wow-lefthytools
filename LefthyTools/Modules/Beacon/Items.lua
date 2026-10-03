@@ -434,8 +434,65 @@ function Answer(call, need)
 	Draw(call)
 end
 
+-- Only items that can change hands are shared: not soulbound (unless the loot trade timer still
+-- runs: "You may trade this item with players that were also eligible..."), not bound to the
+-- account, not quest items. A bag item is asked directly (the clicked slot is the mouse focus);
+-- a worn item is bound; anything else (chat links, the loot window) goes by its bind type.
+local NO_TRADE_BIND = { [1] = true, [4] = true, [7] = true, [8] = true, [9] = true } -- Enum.ItemBind
+local ALWAYS_BOUND = { [4] = true, [7] = true, [8] = true, [9] = true } -- quest, account
+
+local tradeTimerPattern
+local function HasTradeTimer(bag, slot)
+	if not (C_TooltipInfo and C_TooltipInfo.GetBagItem and BIND_TRADE_TIME_REMAINING) then
+		return false
+	end
+	if not tradeTimerPattern then
+		local escaped = BIND_TRADE_TIME_REMAINING:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")
+		tradeTimerPattern = "^" .. escaped:gsub("%%%%s", ".+") -- "%s" (escaped "%%s"): the time
+	end
+	local data = C_TooltipInfo.GetBagItem(bag, slot)
+	for _, line in ipairs(data and data.lines or {}) do
+		local text = line.leftText
+		if type(text) == "string" and not (issecretvalue and issecretvalue(text)) and text:find(tradeTimerPattern) then
+			return true
+		end
+	end
+	return false
+end
+
+local function Shareable(link)
+	local bindType = select(14, C_Item.GetItemInfo(link))
+	local focus = GetMouseFoci and GetMouseFoci()[1] or (GetMouseFocus and GetMouseFocus())
+	if focus and focus.IsForbidden and focus:IsForbidden() then
+		focus = nil
+	end
+	if focus and focus.isSellGuard then
+		focus = focus:GetParent() -- Handover.lua's guard over a reserved bag slot
+	end
+	local bag = focus and focus.GetBagID and focus:GetBagID()
+	if bag and C_Container.GetContainerItemLink(bag, focus:GetID()) == link then
+		local slot = focus:GetID()
+		local info = C_Container.GetContainerItemInfo(bag, slot)
+		if (info and info.isBound) or ALWAYS_BOUND[bindType] then
+			return HasTradeTimer(bag, slot)
+		end
+		return true
+	end
+	if focus and not bag and focus.GetID and GetInventoryItemLink("player", focus:GetID()) == link then
+		return false -- worn: equipping binds it
+	end
+	return not NO_TRADE_BIND[bindType]
+end
+
 local function OnModifiedItemClick(link)
 	if GetMouseButtonClicked() == "RightButton" and IsControlKeyDown() and not IsAltKeyDown() then
+		if not (M.enabled and M.db.shareItems) then
+			return
+		end
+		if not Shareable(link) then
+			M:Print(("%s is soulbound or can't be traded: nothing to share."):format(link))
+			return
+		end
 		B.ShareItem(link, IsShiftKeyDown()) -- with Shift: let them roll for it
 	end
 end

@@ -481,8 +481,22 @@ Item = { CreateFromItemLink = function(_, itemLink)
 end }
 C_Item.GetItemInfo = function(itemLink)
 	local id = tonumber(tostring(itemLink):match("item:(%d+)"))
-	if ITEMS[id] and MOCK_ITEM_UNCACHED ~= id then return ITEMS[id].name, ItemLink(id) end
+	if ITEMS[id] and MOCK_ITEM_UNCACHED ~= id then
+		-- name, link, ..., the 14th: bindType (ITEMS[id].bind: 1 = on pickup, 2 = on equip)
+		return ITEMS[id].name, ItemLink(id), ITEMS[id].quality, 1, 1, "", "", 1, "", 0, 0, 0, 0, ITEMS[id].bind or 0
+	end
 end
+ITEMS[19019].bind, ITEMS[1155].bind = 1, 2 -- Thunderfury binds on pickup, the rod on equip
+-- What the mouse is over (GetMouseFoci), worn items, and per bag slot: bound, tooltip lines.
+MOCK_FOCUS, EQUIPPED, BOUND, BAG_TOOLTIP = nil, {}, {}, {}
+function GetMouseFoci() return { MOCK_FOCUS } end
+function GetInventoryItemLink(unit, slot) return unit == "player" and EQUIPPED[slot] and ItemLink(EQUIPPED[slot]) or nil end
+BIND_TRADE_TIME_REMAINING = "You may trade this item with players that were also eligible to loot this item for the next %s."
+C_TooltipInfo = { GetBagItem = function(bag, slot)
+	local lines = {}
+	for i, text in ipairs(BAG_TOOLTIP[slot] or {}) do lines[i] = { leftText = text } end
+	return { lines = lines }
+end }
 C_MountJournal = { GetMountInfoByID = function(id) return id == 6 and "Brown Horse" or nil end }
 C_PetJournal = { GetPetInfoByPetID = function() return 40, nil, 1, 0, 100, 1, false, "Black Kingsnake" end }
 C_ToyBox = { GetToyInfo = function(id) return id, "Toy Train Set", 2000 end }
@@ -992,6 +1006,10 @@ BAGS, SOLD, PICKED_UP = { [0] = {} }, {}, {}
 C_Container = {
 	GetContainerItemID = function(bag, slot) return BAGS[bag] and BAGS[bag][slot] end,
 	GetContainerItemLink = function(bag, slot) local id = BAGS[bag] and BAGS[bag][slot]; return id and ItemLink(id) end,
+	GetContainerItemInfo = function(bag, slot)
+		local id = BAGS[bag] and BAGS[bag][slot]
+		return id and { itemID = id, hyperlink = ItemLink(id), isBound = BOUND[slot] == true } or nil
+	end,
 	UseContainerItem = function(bag, slot) SOLD[#SOLD + 1] = BAGS[bag][slot]; BAGS[bag][slot] = nil end,
 	PickupContainerItem = function(bag, slot) PICKED_UP[#PICKED_UP + 1] = BAGS[bag][slot] end,
 }

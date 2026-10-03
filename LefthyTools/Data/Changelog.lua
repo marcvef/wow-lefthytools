@@ -93,5 +93,8 @@ ns.CHANGELOG = {
 	{ id = 29, version = "0.5.0", module = "chronicle",
 		en = { "Minimap button", "A book on the edge of the minimap opens the journal; right-click for the settings, drag it to move it." },
 		de = { "Minimap-Button", "Ein Buch am Rand der Minimap öffnet das Tagebuch; Rechtsklick für die Einstellungen, zum Verschieben ziehen." } },
+	{ id = 30, version = "0.5.0", module = "beacon",
+		en = { "Only tradeable items", "Soulbound, quest and account-bound items aren't shared or offered: nobody could get them anyway." },
+		de = { "Nur handelbare Items", "Seelengebundene, Quest- und accountgebundene Items werden nicht geteilt oder angeboten: Keiner könnte sie bekommen." } },
 	-- New entries go here, at the end.
 }

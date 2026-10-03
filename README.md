@@ -127,7 +127,8 @@ minimap, and you on theirs, without being in a group.
   too), and how far away they are and in which direction ("240 yd north-east").
 - **Death alerts:** a chat line when a friend dies, with where and what they were fighting
   ("Anna died in Duskwood - Raven Hill, fighting Stitches.").
-- **Show an item:** **Ctrl+right-click** an item (bags, character, bank, loot, chat links) and
+- **Show an item:** **Ctrl+right-click** an item that can be traded (not soulbound; bags, bank,
+  loot, chat links) and
   your friends see "Anna shares [item]" at the top of the screen with the whisper sound (hover it
   for the item's tooltip), plus a clickable link in chat.
 - **Offer an item:** **Ctrl+Shift+right-click** instead, and they get **Need** and **Pass**

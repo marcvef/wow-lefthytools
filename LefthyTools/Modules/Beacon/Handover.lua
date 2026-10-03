@@ -263,6 +263,7 @@ local function Guard(button)
 		return guard
 	end
 	guard = CreateFrame("Button", nil, button)
+	guard.isSellGuard = true -- Items.lua looks through it to the slot
 	guard:SetAllPoints()
 	guard:SetFrameLevel(button:GetFrameLevel() + 10)
 	guard:RegisterForClicks("RightButtonUp")

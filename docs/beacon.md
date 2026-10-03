@@ -184,6 +184,15 @@ handling runs first and untainted; for gear Ctrl+click also opens the game's pre
 puts the link into an open chat box, as always (that can't be stopped without replacing
 Blizzard's function). At most one share every 3 s.
 
+Only items that can change hands are shared (`Shareable` in Items.lua); otherwise chat says why.
+A bag item is asked directly: the mouse focus (`GetMouseFoci`; through Handover.lua's sell guard
+to its slot) is the clicked bag button, so `C_Container.GetContainerItemInfo(bag, slot).isBound`
+tells; a bound one still counts while its loot trade timer runs (a tooltip line matching
+`BIND_TRADE_TIME_REMAINING`, from `C_TooltipInfo.GetBagItem`). A worn item (the focus' ID is an
+equipment slot holding this link) is bound. Anything else (chat links, the loot window) goes by
+the 14th return of `C_Item.GetItemInfo`, the bind type: on pickup, quest and account-bound items
+aren't shared.
+
 - **Messages:** `I2;<item string>[;<call id>]` (what follows `item:` in the link: id, enchant,
   suffix, ...; at most 200 bytes; the call id only when offered), `N2;<call id>;<1|0>` (a
   friend's Need or Pass, to the sharer), `R2;<call id>;<name>:<roll>,...` (the verdict, from the
