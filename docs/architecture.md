@@ -25,13 +25,39 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
   Modules/Beacon/Beacon.xml  world map pin template (LefthyToolsBeaconPinTemplate)
 tests/                       fengari (Lua VM in JS) harness, see testing.md
-install.ps1                  copy (default) or -Link junction into AddOns; finds the game folder itself
+install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
+Update-LefthyTools.cmd       double-click wrapper for players: runs the current install.ps1 from GitHub
 ```
 
-`install.ps1` locates WoW: Forever (`World of Warcraft\_classic_beta_`) through Battle.net's
-`product.db`, then common folders on every drive; `-GameDir` overrides it. It also removes the
-old standalone `Mirage` addon. After installing, `/reload` in game; new files in the TOC may need
-a client restart.
+## Installing, updating, versions
+
+`install.ps1` is both the players' installer/updater and the dev installer:
+
+- **Players** run it through `Update-LefthyTools.cmd` (double-click; the `.cmd` never changes: it
+  runs `irm https://raw.githubusercontent.com/marcvef/wow-lefthytools/main/install.ps1 | iex`) or
+  that one-liner. With no checkout next to the script it downloads the repo:
+  `api.github.com/repos/.../commits/main` for the commit, `codeload.github.com/.../zip/<sha>` for
+  the files (if the API is unavailable, `zip/refs/heads/main`; git archive stores the commit id
+  as the zip comment), and `compare/v<base>...<sha>` for the commit count. No GitHub releases
+  and no login; unauthenticated API calls are limited to 60 per hour per IP, two per update.
+- **From a clone:** installs the checkout (`-Link`: junction for live editing, `-Download`: the
+  GitHub version), version from `git describe --tags --long --dirty --match v[0-9]*`.
+- It finds WoW: Forever (`World of Warcraft\_classic_beta_`) via a remembered path
+  (`%LOCALAPPDATA%\LefthyTools\game-folder.txt`), Battle.net's `product.db`, then common folders
+  on every drive, else asks; `-GameDir` overrides it. It replaces `Interface\AddOns\LefthyTools`
+  (settings live in `WTF`, untouched), removes the old standalone `Mirage` addon, and skips the
+  install if that exact version is already there (`-Force` reinstalls).
+- Everything runs inside a script block, so `irm | iex` in someone's PowerShell window leaves no
+  variables or preference changes behind. TLS 1.2 is enabled for old Windows PowerShell setups;
+  the progress bar is off (it slows downloads a lot in PowerShell 5). `.gitattributes` keeps the
+  `.cmd` byte-for-byte with CRLF, also when downloaded raw.
+
+**Versions** (Lustre style): the repo's TOC holds the base version `X.Y.Z`, tagged `vX.Y.Z`
+(lightweight tag, pushed with `git push --tags`). Bump the patch for fixes, the minor for
+features, then tag that commit. Between tags a build is `X.Y.Z-N-gHASH` (N commits after the
+tag), written into the installed TOC by the installer; `X.Y.Z-gHASH` when N is unknown.
+`LT.version` reads it, `LT.CompareVersions` orders builds, `/lefthy version` shows it, and Beacon
+tells friends on older builds to update.
 
 ## Module framework (Core/)
 

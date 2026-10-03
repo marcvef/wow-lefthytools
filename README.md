@@ -31,18 +31,40 @@ available in English and German (German on a `deDE` client). Chat commands and c
 English, except what others see or what's meant for everyone: the quest announcements your party
 reads and the default level-up message.
 
-## Install
+## Install and update (Windows)
+
+1. Download [Update-LefthyTools.cmd](https://github.com/marcvef/wow-lefthytools/raw/main/Update-LefthyTools.cmd)
+   (if the browser shows the text instead: right-click the link → *Save link as*) and keep it,
+   e.g. on your desktop.
+2. Double-click it. It finds your WoW: Forever folder, downloads the latest LefthyTools from
+   this page and installs it. If Windows asks whether to run it, choose *Run* (or *More info* →
+   *Run anyway*). If it can't find the game, it asks for your `World of Warcraft` folder once.
+3. In game, type `/reload`.
+
+To **update**, double-click it again: it installs the latest version, or tells you that you
+already have it. Your settings are kept. `/lefthy version` shows what you're running, and Beacon
+tells you when a friend has a newer one.
+
+Without the file, the same in PowerShell:
 
 ```powershell
-.\install.ps1          # copies LefthyTools into WoW: Forever's Interface\AddOns (found automatically)
-.\install.ps1 -Link    # dev mode: junction to this folder, so edits only need /reload
+irm https://raw.githubusercontent.com/marcvef/wow-lefthytools/main/install.ps1 | iex
+```
+
+**Versions** look like `0.4.0` (a release) or `0.4.0-3-g1a2b3c4`: three changes after 0.4.0,
+at commit `1a2b3c4`.
+
+### From a clone of this repo
+
+```powershell
+.\install.ps1            # install this checkout (version stamped from git)
+.\install.ps1 -Link      # dev mode: junction to this folder, so edits only need /reload
+.\install.ps1 -Download  # install the latest version from GitHub instead
 .\install.ps1 -GameDir "D:\...\World of Warcraft\_classic_beta_"   # if it isn't found
 ```
 
 The installer also removes the old standalone `Mirage` addon, which is now part of
-LefthyTools. After installing or updating, type `/reload` in game.
-
-How it works inside (for developers): see [docs/](docs/architecture.md).
+LefthyTools. How it works inside (for developers): see [docs/](docs/architecture.md).
 
 ## Known limitations (Forever beta)
 

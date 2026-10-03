@@ -1,0 +1,2 @@
+# Batch files need CRLF, also when downloaded raw from GitHub: store them byte-for-byte.
+*.cmd -text
