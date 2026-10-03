@@ -256,6 +256,7 @@ function FrameMethods:CreateFontString()
 	function fs:SetWidth(w) self.width = w end
 	function fs:SetHeight(h) self.height = h end
 	function fs:SetFontObject(f) self.font = f end
+	function fs:SetTextScale(s) self.textScale = s end
 	function fs:SetAlpha(a) self.alpha = a end
 	function fs:SetShown(s) self.shown = s and true or false end
 	fs.shown = true
@@ -452,7 +453,9 @@ CAMERA = { spinning = false, stops = 0 }
 function MoveViewLeftStart(speed) CAMERA.spinning, CAMERA.speed = true, speed end
 function MoveViewLeftStop() CAMERA.spinning, CAMERA.stops = false, CAMERA.stops + 1 end
 SOUNDS = {}
-function PlaySound(id) SOUNDS[#SOUNDS + 1] = id; return MOCK_SOUND_MISSING ~= id end
+function PlaySound(id) SOUNDS[#SOUNDS + 1] = id; return MOCK_SOUND_MISSING ~= id, #SOUNDS end -- willPlay, handle
+STOPPED_SOUNDS = {}
+function StopSound(handle) STOPPED_SOUNDS[#STOPPED_SOUNDS + 1] = handle end
 function UnitInVehicle() return false end
 function HasVehicleActionBar() return false end
 function HasOverrideActionBar() return false end

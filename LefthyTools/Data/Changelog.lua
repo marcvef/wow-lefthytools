@@ -69,5 +69,11 @@ ns.CHANGELOG = {
 	{ id = 21, version = "0.5.0", module = "chronicle",
 		en = { "Friends' graphs", "On the Graphs page the arrows also show your friends: their last 14 days, their week, you and them side by side." },
 		de = { "Grafiken von Freunden", "Auf der Grafiken-Seite zeigen die Pfeile auch deine Freunde: ihre letzten 14 Tage, ihre Woche, du und sie im Vergleich." } },
+	{ id = 22, version = "0.5.0", module = "beacon",
+		en = { "Need or Pass", "Ctrl+Shift+right-click offers an item: friends say Need or Pass, and if several need it, it's rolled out with a drumroll and the winner in big letters." },
+		de = { "Bedarf oder Passen", "Strg+Umschalt+Rechtsklick bietet ein Item an: Freunde wählen Bedarf oder Passen, und wenn mehrere Bedarf haben, wird mit Trommelwirbel gewürfelt und der Gewinner groß angezeigt." } },
+	{ id = 23, version = "0.5.0", module = "general",
+		en = { "Bigger and bolder", "Shared items, level-ups and the AFK screen's friends list are bigger now, and level-ups pop in." },
+		de = { "Größer und auffälliger", "Geteilte Items, Level-Ups und die Freundesliste auf dem AFK-Bildschirm sind jetzt größer, und Level-Ups ploppen auf." } },
 	-- New entries go here, at the end.
 }

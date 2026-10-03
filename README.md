@@ -128,9 +128,11 @@ minimap, and you on theirs, without being in a group.
 - **Death alerts:** a chat line when a friend dies, with where and what they were fighting
   ("Anna died in Duskwood - Raven Hill, fighting Stitches.").
 - **Show an item:** **Ctrl+right-click** an item (bags, character, bank, loot, chat links) and
-  your friends get "Anna shares [item]" as a clickable link in chat and as a notice on screen,
-  with the whisper sound, so it isn't missed. Handy for "anyone need this?". (For gear, Ctrl+click also opens the game's
-  preview, as always.)
+  your friends see it big on screen with the whisper sound, plus a clickable link in chat.
+- **Offer an item:** **Ctrl+Shift+right-click** instead, and they get **Need** and **Pass**
+  buttons. One Need gets it; several Needs are rolled out, with a drumroll, whirling numbers and
+  the winner popping up in big gold letters with a fanfare. (For gear, Ctrl+click also opens the
+  game's preview, as always.)
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.
   `/lefthy beacon ping` pings where you stand.

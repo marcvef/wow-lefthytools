@@ -55,17 +55,27 @@ end
 local function ShowToast(text)
 	if not toast then
 		toast = CreateFrame("Frame", nil, UIParent)
-		toast:SetSize(800, 40)
+		toast:SetSize(900, 56)
 		toast:SetPoint("TOP", UIParent, "TOP", 0, -160)
 		toast:SetFrameStrata("HIGH")
 		toast.Text = toast:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
 		toast.Text:SetAllPoints()
+		if toast.Text.SetTextScale then
+			toast.Text:SetTextScale(1.4) -- big: it's a party
+		end
+		-- It pops in: from big to its size.
+		toast.Pop = toast:CreateAnimationGroup()
+		local grow = toast.Pop:CreateAnimation("Scale")
+		grow:SetScaleFrom(1.7, 1.7)
+		grow:SetScaleTo(1, 1)
+		grow:SetDuration(0.35)
 		toast:SetScript("OnUpdate", ToastOnUpdate)
 	end
 	toast.Text:SetText(text)
 	toast.shownAt = GetTime()
 	toast:SetAlpha(1)
 	toast:Show()
+	toast.Pop:Play()
 end
 
 local function PlayDingSound()

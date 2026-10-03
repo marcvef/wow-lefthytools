@@ -203,9 +203,19 @@ L["Tell me when a friend dies"] = "Melden, wenn ein Freund stirbt"
 L["A chat line when a friend dies: where, and what they were fighting."] =
 	"Eine Chatzeile, wenn ein Freund stirbt: wo, und wogegen er gekämpft hat."
 L["Show items to friends"] = "Items Freunden zeigen"
-L["Ctrl+right-click an item (bags, character, bank, loot, chat links) to show it to your friends: they get it as a link in chat and as a notice on screen, with the whisper sound. Items they show you arrive the same way."] =
-	"Strg+Rechtsklick auf ein Item (Taschen, Charakter, Bank, Loot, Chat-Links) zeigt es deinen Freunden: Sie bekommen es als Link im Chat und als Hinweis auf dem Bildschirm, mit dem Flüster-Sound. Items, die sie dir zeigen, kommen genauso an."
-L["%s shares %s"] = "%s zeigt %s"
+L["Ctrl+right-click an item (bags, character, bank, loot, chat links) to show it to your friends: they see it big on screen, with the whisper sound. Ctrl+Shift+right-click offers it: they can say Need or Pass, and if several need it, it is rolled out."] =
+	"Strg+Rechtsklick auf ein Item (Taschen, Charakter, Bank, Loot, Chat-Links) zeigt es deinen Freunden: Sie sehen es groß auf dem Bildschirm, mit dem Flüster-Sound. Strg+Umschalt+Rechtsklick bietet es an: Sie können Bedarf oder Passen wählen, und wenn mehrere Bedarf haben, wird gewürfelt."
+L["%s shares"] = "%s zeigt"
+L["Need"] = "Bedarf"
+L["Pass"] = "Passen"
+L["You offer"] = "Du bietest an"
+L["Waiting for your friends..."] = "Warte auf deine Freunde ..."
+L["You need it. Fingers crossed!"] = "Du hast Bedarf. Daumen drücken!"
+L["You passed."] = "Du hast gepasst."
+L["Nobody needs it."] = "Keiner braucht es."
+L["You win!"] = "Du gewinnst!"
+L["%s wins!"] = "%s gewinnt!"
+L["Rolling..."] = "Es wird gewürfelt ..."
 L["Map pings"] = "Karten-Pings"
 L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."] =
 	"Alt+Klick auf die Weltkarte zeigt deinen Freunden eine Stelle: eine Markierung auf ihren Karten für eine Minute, mit Sound. Ihre Pings erscheinen auf deinen Karten. /lefthy beacon ping pingt die Stelle, an der du stehst."

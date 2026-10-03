@@ -1538,6 +1538,7 @@ check(heard[#heard].kind == "level" and heard[#heard].data.level == 21, "other m
 local toastFrame
 for _, f in ipairs(UIParent._children) do if f.Text and f.shownAt then toastFrame = f end end
 check(toastFrame and toastFrame:IsShown() and toastFrame.Text.text:find("is now 21!", 1, true), "big text on screen")
+check(toastFrame.Text.textScale == 1.4 and toastFrame.Pop.plays > 0, "extra big, and it pops in")
 Advance(7)
 check(not toastFrame:IsShown(), "and it fades out after a few seconds")
 pmark = #PRINTED + 1
@@ -1802,47 +1803,53 @@ do
 	mm[12]._scripts.OnLeave(mm[12])
 end
 
-section("Beacon: showing items to friends")
+section("Beacon: showing and offering items")
 do
+	local function ctrlRight(link, shift)
+		STATE.ctrl, STATE.shift, MOCK_BUTTON = true, shift == true, "RightButton"
+		HandleModifiedItemClick(link)
+		STATE.ctrl, STATE.shift = false, false
+	end
+	local function soundsSince(n)
+		local list = {}
+		for i = n + 1, #SOUNDS do list[#list + 1] = SOUNDS[i] end
+		return "," .. table.concat(list, ",") .. ","
+	end
 	anna("S2;;0;260.0;750.0;Goldshire;")
-	Advance(0.3)
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 12)
+	Advance(1.2)
 	check(BDB.shareItems == true and B("shareItems") ~= nil, "a setting, on by default")
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
-	STATE.ctrl, MOCK_BUTTON = true, "RightButton"
 	local dressups = DRESSUPS
-	HandleModifiedItemClick(ItemLink(1155)) -- Ctrl+right-click on an item, anywhere
+	ctrlRight(ItemLink(1155))
 	check(DRESSUPS == dressups + 1, "Blizzard's own handling runs first")
 	Advance(0.15)
-	check(sentTo(11, mark, "I2;")[1] == "I2;1155::::::::20:::::", "the item goes to my friends, got " .. tostring(sentTo(11, mark, "I2;")[1]))
-	check(printedSince(pmark):find("shared " .. ItemLink(1155) .. " with ", 1, true) and printedSince(pmark):find(" friend(s).", 1, true),
-		"and I'm told, got " .. printedSince(pmark))
-	HandleModifiedItemClick(ItemLink(1155))
+	check(sentTo(11, mark, "I2;")[1] == "I2;1155::::::::20:::::", "Ctrl+right-click shows the item to my friends, got " .. tostring(sentTo(11, mark, "I2;")[1]))
+	check(printedSince(pmark):find("shared " .. ItemLink(1155) .. " with ", 1, true), "and I'm told")
+	ctrlRight(ItemLink(1155))
 	Advance(0.15)
 	check(#sentTo(11, mark, "I2;") == 1, "at most one every 3 s")
 	Advance(3)
-	MOCK_BUTTON = "LeftButton"
+	STATE.ctrl, MOCK_BUTTON = true, "LeftButton"
 	HandleModifiedItemClick(ItemLink(1155)) -- Ctrl+left-click: the game's preview, nothing else
-	STATE.shift, MOCK_BUTTON = true, "RightButton"
-	HandleModifiedItemClick(ItemLink(1155)) -- Ctrl+Shift+right-click: not ours either
-	STATE.shift, STATE.ctrl = false, false
+	STATE.ctrl, MOCK_BUTTON = false, "RightButton"
 	HandleModifiedItemClick(ItemLink(1155)) -- no modifier
 	Advance(0.15)
-	check(#sentTo(11, mark, "I2;") == 1, "only Ctrl+right-click shares")
+	check(#sentTo(11, mark, "I2;") == 1, "Ctrl+left-click and plain clicks don't share")
 
 	pmark = #PRINTED + 1
 	local sounds = #SOUNDS
 	anna("I2;19019::::::::20:::::")
 	check(#PRINTED < pmark, "receiving: nothing inside the event handler")
 	Advance(0.15)
-	check(printedSince(pmark):find("Anna|r shares " .. ItemLink(19019) .. ".", 1, true), "a chat line with the link, got " .. printedSince(pmark))
-	local notice
-	for _, f in ipairs(UIParent._children) do
-		if f.Text and f.shownAt and f:IsShown() and (f.Text:GetText() or ""):find("shares", 1, true) then notice = f end
-	end
-	check(notice and notice.Text:GetText():find(ItemLink(19019), 1, true) and #SOUNDS == sounds + 1 and SOUNDS[#SOUNDS] == 3081,
-		"and a notice on screen, with the whisper sound")
-	Advance(6)
-	check(not notice:IsShown(), "which goes away by itself")
+	check(printedSince(pmark):find("Anna|r shares " .. ItemLink(19019) .. ".", 1, true), "a chat line with the link")
+	local shown
+	for _, call in pairs(BB.calls) do if call.frame and call.frame:IsShown() then shown = call.frame end end
+	check(shown and shown.Item:GetText() == ItemLink(19019) and shown.Who:GetText():find("Anna|r shares", 1, true)
+		and not shown.Need:IsShown() and SOUNDS[#SOUNDS] == 3081 and #SOUNDS == sounds + 1,
+		"a big notice with the item (no buttons when just shown) and the whisper sound")
+	Advance(9)
+	check(not shown:IsShown(), "it goes away by itself")
 	pmark = #PRINTED + 1
 	MOCK_ITEM_UNCACHED = 6948
 	anna("I2;6948::::::::20:::::")
@@ -1857,13 +1864,87 @@ do
 	anna("I2;abc")
 	Advance(0.15)
 	check(not printedSince(pmark):find("shares", 1, true), "another one within 3 s and malformed ones are ignored")
-	Advance(3)
+	Advance(9)
+
+	-- Offering: Ctrl+Shift+right-click. Both friends need it: a roll.
+	mark, pmark, sounds = #GAMEDATA + 1, #PRINTED + 1, #SOUNDS
+	ctrlRight(ItemLink(1155), true)
+	Advance(0.15)
+	local offer = sentTo(11, mark, "I2;")[1]
+	local callID = offer and tonumber(offer:match("^I2;1155::::::::20:::::;(%d+)$"))
+	check(callID and sentTo(12, mark, "I2;")[1] == offer, "Ctrl+Shift+right-click offers it to everyone, with a call id, got " .. tostring(offer))
+	local mine = callID and BB.calls["me:" .. callID]
+	check(mine and mine.frame:IsShown() and mine.frame.Who:GetText() == "You offer" and mine.frame.Status:GetText():find("Waiting", 1, true),
+		"my notice: waiting for their answers")
+	anna("N2;" .. callID .. ";1")
+	Advance(0.15)
+	check(mine.frame.Status:GetText():find("Anna: |cff40ff40Need", 1, true), "answers show up live")
+	anna("N2;" .. callID .. ";0") -- she can't change her mind
+	local verdictMark = #GAMEDATA + 1
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "N2;" .. callID .. ";1", "WHISPER", 12) -- Bob needs it too
+	Advance(0.3)
+	local verdict = sentTo(11, verdictMark, "R2;")[1]
+	check(verdict and verdict:find("^R2;" .. callID .. ";%a+:%d+,%a+:%d+$") and sentTo(12, verdictMark, "R2;")[1] == verdict,
+		"everyone answered: rolled right away, the verdict goes to everyone, got " .. tostring(verdict))
+	local winner, top, second = verdict:match("^R2;%d+;(%a+):(%d+),%a+:(%d+)$")
+	check(winner == "Anna" or winner == "Bob", "the two who needed it")
+	check(tonumber(top) > tonumber(second), "highest first, never a tie")
+	check(mine.state == "rolling" and mine.frame.Winner:GetText():find("Rolling", 1, true)
+		and soundsSince(sounds):find(",31579,31580,", 1, true), "a drumroll: the bonus roll spinner, numbers whirling")
+	Advance(2.6)
+	check(mine.state == "done" and #STOPPED_SOUNDS > 0 and soundsSince(sounds):find(",31581,31578,", 1, true),
+		"then the spinner stops and a fanfare plays")
+	check(mine.frame.Winner:GetText():find(winner .. " wins!", 1, true)
+		and printedSince(pmark):find(winner .. " wins " .. ItemLink(1155) .. " with " .. top, 1, true),
+		"the winner in big letters, and in chat")
+	Advance(9)
+	check(not mine.frame, "and after a while it's gone")
+
+	-- A friend's offer: Need / Pass. I need it and win.
+	mark = #GAMEDATA + 1
+	anna("I2;1179::::::::20:::::;4242")
+	Advance(0.15)
+	local theirs = BB.calls["11:4242"]
+	check(theirs and theirs.frame.Need:IsShown() and theirs.frame.Pass:IsShown() and theirs.frame.Timer:IsShown(),
+		"a friend's offer: Need and Pass buttons and a timer")
+	theirs.frame.Need:Click()
+	Advance(0.15)
+	check(sentTo(11, mark, "N2;")[1] == "N2;4242;1" and not theirs.frame.Need:IsShown()
+		and theirs.frame.Status:GetText():find("Fingers crossed", 1, true), "Need: my answer goes to her")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "R2;4242;Bob:99", "WHISPER", 12)
+	Advance(0.15)
+	check(theirs.state == "open", "a verdict from someone else than the sharer is ignored")
+	anna("R2;4242;Lefthy:87,Bob:12")
+	Advance(0.15)
+	check(theirs.state == "rolling", "her verdict: the drumroll here too")
+	Advance(2.6)
+	check(theirs.frame.Winner:GetText():find("You win!", 1, true) and theirs.frame.Status:GetText():find("Lefthy  87", 1, true),
+		"and I won")
+	Advance(9)
+
+	-- Only one needs it: no roll. Nobody: nobody.
+	anna("I2;6948::::::::20:::::;5151")
+	Advance(0.15)
+	BB.calls["11:5151"].frame.Pass:Click()
+	anna("R2;5151;Bob:0")
+	Advance(0.15)
+	local single = BB.calls["11:5151"]
+	check(single.state == "done" and single.frame.Winner:GetText():find("Bob wins!", 1, true), "a single Need: they get it, no roll")
+	Advance(9)
+	ctrlRight(ItemLink(1155), true)
+	Advance(0.15)
+	local open
+	for _, call in pairs(BB.calls) do if call.mine and call.state == "open" then open = call end end
+	Advance(21)
+	check(open and open.state == "done" and open.frame.Status:GetText():find("Nobody needs it.", 1, true),
+		"nobody answered within 20 s: nobody needs it")
+	Advance(9)
+
 	B("shareItems"):SetValue(false)
+	pmark = #PRINTED + 1
 	anna("I2;1179::::::::20:::::")
 	mark = #GAMEDATA + 1
-	STATE.ctrl, MOCK_BUTTON = true, "RightButton"
-	HandleModifiedItemClick(ItemLink(1155))
-	STATE.ctrl = false
+	ctrlRight(ItemLink(1155))
 	Advance(0.15)
 	check(not printedSince(pmark):find("shares", 1, true) and #sentTo(11, mark, "I2;") == 0, "switched off: nothing shown, nothing sent")
 	B("shareItems"):SetValue(true)

@@ -26,7 +26,7 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
   `C2;<count>` enemies on them in combat, `X2;<percent>` progress on their level,
-  `I2;<item string>` an item shown to friends, `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
+  `I2;<item string>[;<call id>]` an item shown or offered, `N2`/`R2` Need / Pass and the verdict, `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
   friends' graphs (see chronicle.md), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
@@ -170,20 +170,38 @@ mobs with a nameplate (enemy nameplates on, in nameplate range) are counted. Rec
 `peer.mobs` until a state without the combat flag clears it; the dot shows the number at its
 bottom right, the tooltip "Fighting Hogger and 2 more" / "In combat with 3 enemies".
 
-## Showing items (Items.lua)
+## Showing and offering items (Items.lua)
 
-Ctrl+right-click on an item shows it to every friend with Beacon. Every modified click on an
-item (bags, character slots, bank, loot, merchant, quest rewards, chat links: about 60 callers)
-goes through Blizzard's `HandleModifiedItemClick(link, itemLocation)`; a `hooksecurefunc`
-post-hook there checks `GetMouseButtonClicked() == "RightButton"` with Ctrl and no Shift/Alt.
-Blizzard's handling runs first and untainted; for gear Ctrl+click also opens the game's preview,
-as it always did (that can't be stopped without replacing Blizzard's function). Sends
-`I2;<item string>` (what follows `item:` in the link: id, enchant, suffix, ...; digits, `-` and
-`:` only, at most 200 bytes), at most every 3 s. Receivers (at most one per friend per 3 s)
-build the link in their own language: `Item:CreateFromItemLink` + `ContinueOnItemLoad` (the
-client asks the server for unknown items, then the callback runs), then `C_Item.GetItemInfo`.
-They get a chat line "Anna shares [item]." with the clickable link and a notice at the top of
-the screen (4 s, then fading), and the whisper sound (`SOUNDKIT.TELL_MESSAGE`), so it isn't missed. Setting `shareItems` switches both directions.
+Ctrl+right-click on an item shows it to every friend with Beacon; Ctrl+Shift+right-click offers
+it (Need / Pass, rolled out). Every modified click on an item (bags, character slots, bank,
+loot, merchant, quest rewards, chat links: about 60 callers) goes through Blizzard's
+`HandleModifiedItemClick(link, itemLocation)`; a `hooksecurefunc` post-hook there checks
+`GetMouseButtonClicked() == "RightButton"` with Ctrl and no Alt (Shift = offer). Blizzard's
+handling runs first and untainted; for gear Ctrl+click also opens the game's preview, and Shift
+puts the link into an open chat box, as always (that can't be stopped without replacing
+Blizzard's function). At most one share every 3 s.
+
+- **Messages:** `I2;<item string>[;<call id>]` (what follows `item:` in the link: id, enchant,
+  suffix, ...; at most 200 bytes; the call id only when offered), `N2;<call id>;<1|0>` (a
+  friend's Need or Pass, to the sharer), `R2;<call id>;<name>:<roll>,...` (the verdict, from the
+  sharer to everyone: highest roll first, roll 0 = the only Need, nothing = nobody).
+- **Referee:** the sharer's client. The call ends after 20 s or when every friend who got it has
+  answered (one answer each, no changing it). Several Needs: a roll 1-100 each, ties rolled again.
+  Verdicts from anyone but the sharer are ignored.
+- **Receiving:** at most one share per friend per 3 s; answers and verdicts at most every 0.2 s.
+  The link is built in the receiver's language: `Item:CreateFromItemLink` + `ContinueOnItemLoad`
+  (the client asks the server for unknown items), then `C_Item.GetItemInfo`. A chat line "Anna
+  shares [item]." and the whisper sound (`SOUNDKIT.TELL_MESSAGE`).
+- **The notice** (one frame per call, up to 3 stacked at the top, the oldest makes room): the
+  item's icon, "Anna shares" / "You offer", the item in big letters, Need and Pass buttons (group
+  loot dice and pass icons) and a shrinking timer bar for offers; the sharer sees the answers
+  live. Results: nobody (grey), one Need ("Bob wins!"), or a roll: the bonus roll spinner sound
+  (`UI_BONUS_LOOT_ROLL_START` + the looping `..._LOOP`, stopped with `StopSound`) while the numbers
+  whirl for 2.5 s, then `..._END`, the final rolls, the winner popping in (scale + alpha
+  animation) with `UI_EPICLOOT_TOAST`, and a chat line "Anna wins [item] with 87 (Bob 12).". A
+  shown-only item fades after 7 s; results stay 7 s too. All of it runs on Beacon's tick
+  (`B.UpdateCalls`), and only while a notice is up.
+- Setting `shareItems` switches sending and showing.
 
 ## Level progress
 

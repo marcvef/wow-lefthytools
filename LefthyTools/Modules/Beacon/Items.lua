@@ -6,18 +6,44 @@ local B = ns.Beacon
 
 -- Item sharing: Ctrl+right-click an item (bags, character, bank, loot, merchant, quest rewards,
 -- chat links: everything that goes through Blizzard's HandleModifiedItemClick) and every friend
--- with Beacon gets "Anna shares [item]" in chat, as a clickable link, and as a notice on screen
--- with the whisper sound. Handy for "does anyone need this?".
+-- with Beacon gets a big notice with the item and the whisper sound. Ctrl+Shift+right-click
+-- offers it: the notice gets Need and Pass buttons, and after CALL_TIME seconds, or once
+-- everyone answered, the sharer's client decides:
+-- nobody, one Need (they get it), or several: everyone sees a drumroll (the bonus roll spinner
+-- sound, numbers whirling) and then the rolls, with the winner in big gold letters and a fanfare.
 --
--- The click is a post-hook on HandleModifiedItemClick, so Blizzard's own handling runs first and
+-- Messages: I2;<item string>;<call id> (the share; without the id from older builds: no
+-- buttons), N2;<call id>;<1 = need | 0 = pass> (to the sharer), R2;<call id>;<name>:<roll>,...
+-- (the result to everyone, highest first; roll 0 = the only one, no roll needed). The sharer's
+-- client is the referee: it rolls 1-100 per Need and rolls ties again.
+--
+-- The click is a post-hook on HandleModifiedItemClick: Blizzard's own handling runs first and
 -- stays untainted (for gear, Ctrl+click also opens the game's preview, as always).
--- Message: I2;<item string> (the part after "item:" of the link: id, enchant, suffix, ...), so
--- receivers build a real link in their own language; their client loads the item if needed.
 
-local SEND_GAP = 3       -- my shares at most this often
-local NOTICE_TIME, NOTICE_FADE = 4, 1
+local SEND_GAP = 3        -- my shares at most this often
+local CALL_TIME = 20      -- seconds to answer Need or Pass
+local ROLL_TIME = 2.5     -- the drumroll
+local SHOW_RESULT = 7     -- how long the result stays before the notice fades
+local FADE = 1
+local MAX_FRAMES = 3      -- calls shown at once (stacked)
+local NEED_ICON = "Interface\\Buttons\\UI-GroupLoot-Dice-Up"
+local PASS_ICON = "Interface\\Buttons\\UI-GroupLoot-Pass-Up"
+local SOUND = {
+	call = SOUNDKIT and SOUNDKIT.TELL_MESSAGE or 3081,              -- the whisper sound
+	rollStart = SOUNDKIT and SOUNDKIT.UI_BONUS_LOOT_ROLL_START or 31579,
+	rollLoop = SOUNDKIT and SOUNDKIT.UI_BONUS_LOOT_ROLL_LOOP or 31580,
+	rollEnd = SOUNDKIT and SOUNDKIT.UI_BONUS_LOOT_ROLL_END or 31581,
+	win = SOUNDKIT and SOUNDKIT.UI_EPICLOOT_TOAST or 31578,
+	need = SOUNDKIT and SOUNDKIT.UI_NEED_ROLL_POSITIVE or 229319,
+}
 
 local lastSent = -math.huge
+-- calls[key] = { id, mine, from (gameAccountID), fromName, link, itemString, ends, recipients,
+--   answers = { [gameAccountID] = { name, need } }, myAnswer, state = "open" | "rolling" | "done",
+--   result = { { name, roll }, ... }, frame }
+-- key: "me:<id>" for mine, "<gameAccountID>:<id>" for a friend's.
+local calls = {}
+B.calls = calls
 
 -- "12345:0:0:..." from an item link, or nil.
 local function ItemString(link)
@@ -27,15 +53,263 @@ local function ItemString(link)
 	end
 end
 
-local function Peers()
-	local count = 0
-	for _ in pairs(B.peers) do
-		count = count + 1
-	end
-	return count
+local function Coloured(name, classFile)
+	return LT.Window.ClassColorCode(classFile) .. (name or "?") .. "|r"
 end
 
-function B.ShareItem(link)
+local function MyName()
+	return UnitName("player")
+end
+
+---------------------------------------------------------------------------
+-- The notice: one frame per call, stacked at the top of the screen
+---------------------------------------------------------------------------
+
+local framePool, shown = {}, {}
+
+local function Layout()
+	for i, frame in ipairs(shown) do
+		frame:ClearAllPoints()
+		frame:SetPoint("TOP", UIParent, "TOP", 0, -120 - (i - 1) * 132)
+	end
+end
+
+local function Release(frame)
+	frame:Hide()
+	frame.call = nil
+	for i, f in ipairs(shown) do
+		if f == frame then
+			table.remove(shown, i)
+			break
+		end
+	end
+	framePool[#framePool + 1] = frame
+	Layout()
+end
+
+local Answer -- below
+
+local function NewFrame()
+	local f = CreateFrame("Frame", nil, UIParent)
+	f:SetSize(440, 120)
+	f:SetFrameStrata("HIGH")
+	local bg = f:CreateTexture(nil, "BACKGROUND")
+	bg:SetAllPoints()
+	bg:SetColorTexture(0, 0, 0, 0.78)
+	local top = f:CreateTexture(nil, "BORDER")
+	top:SetPoint("TOPLEFT")
+	top:SetPoint("TOPRIGHT")
+	top:SetHeight(2)
+	top:SetColorTexture(1, 0.82, 0, 0.8)
+	f.Accent = top
+	f.Icon = f:CreateTexture(nil, "ARTWORK")
+	f.Icon:SetSize(52, 52)
+	f.Icon:SetPoint("TOPLEFT", 12, -12)
+	f.Who = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	f.Who:SetPoint("TOPLEFT", 76, -10)
+	f.Who:SetJustifyH("LEFT")
+	f.Item = f:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+	f.Item:SetPoint("TOPLEFT", 76, -34)
+	f.Item:SetWidth(350)
+	f.Item:SetJustifyH("LEFT")
+	f.Item:SetWordWrap(false)
+	f.Status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	f.Status:SetPoint("TOPLEFT", 76, -66)
+	f.Status:SetWidth(350)
+	f.Status:SetJustifyH("LEFT")
+	-- The result: rolls, and the winner in big letters that pop in.
+	f.Result = CreateFrame("Frame", nil, f)
+	f.Result:SetAllPoints()
+	f.Winner = f.Result:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+	f.Winner:SetPoint("BOTTOM", f, "BOTTOM", 0, 12)
+	f.Pop = f.Result:CreateAnimationGroup()
+	local grow = f.Pop:CreateAnimation("Scale")
+	grow:SetScaleFrom(1.8, 1.8)
+	grow:SetScaleTo(1, 1)
+	grow:SetDuration(0.35)
+	local appear = f.Pop:CreateAnimation("Alpha")
+	appear:SetFromAlpha(0)
+	appear:SetToAlpha(1)
+	appear:SetDuration(0.2)
+	f.Need = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	f.Need:SetSize(110, 28)
+	f.Need:SetPoint("BOTTOMLEFT", 76, 12)
+	f.Need:SetText(("|T%s:18:18|t %s"):format(NEED_ICON, L["Need"]))
+	f.Need:SetScript("OnClick", function() Answer(f.call, true) end)
+	f.Pass = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	f.Pass:SetSize(110, 28)
+	f.Pass:SetPoint("LEFT", f.Need, "RIGHT", 10, 0)
+	f.Pass:SetText(("|T%s:18:18|t %s"):format(PASS_ICON, L["Pass"]))
+	f.Pass:SetScript("OnClick", function() Answer(f.call, false) end)
+	f.Timer = f:CreateTexture(nil, "ARTWORK")
+	f.Timer:SetPoint("BOTTOMLEFT")
+	f.Timer:SetHeight(3)
+	f.Timer:SetColorTexture(1, 0.82, 0, 0.9)
+	return f
+end
+
+local function FrameFor(call)
+	if call.frame then
+		return call.frame
+	end
+	if #shown >= MAX_FRAMES then
+		Release(shown[1]) -- the oldest makes room
+	end
+	local frame = table.remove(framePool) or NewFrame()
+	frame.call, call.frame = call, frame
+	frame:SetAlpha(1)
+	frame.Winner:SetText("")
+	frame.Status:SetText("")
+	shown[#shown + 1] = frame
+	Layout()
+	frame:Show()
+	return frame
+end
+
+local function Answers(call)
+	local parts = {}
+	for _, a in pairs(call.answers) do
+		parts[#parts + 1] = a.name .. ": " .. (a.need and ("|cff40ff40" .. L["Need"] .. "|r") or ("|cffaaaaaa" .. L["Pass"] .. "|r"))
+	end
+	table.sort(parts)
+	return table.concat(parts, "   ")
+end
+
+-- Fills the notice for the call's current state.
+local function Draw(call)
+	local f = FrameFor(call)
+	local itemID = tonumber(call.itemString:match("^(%d+)"))
+	f.Icon:SetTexture(C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID) or 134400)
+	f.Who:SetText(call.mine and L["You offer"] or L["%s shares"]:format(Coloured(call.fromName, call.fromClass)))
+	f.Item:SetText(call.link)
+	local open = call.state == "open"
+	f.Need:SetShown(open and not call.mine and call.id ~= nil and call.myAnswer == nil)
+	f.Pass:SetShown(open and not call.mine and call.id ~= nil and call.myAnswer == nil)
+	f.Timer:SetShown(open and call.id ~= nil)
+	if open then
+		if call.mine then
+			f.Status:SetText(next(call.answers) and Answers(call) or ("|cffaaaaaa" .. L["Waiting for your friends..."] .. "|r"))
+		elseif call.myAnswer ~= nil then
+			f.Status:SetText(call.myAnswer and ("|cff40ff40" .. L["You need it. Fingers crossed!"] .. "|r")
+				or ("|cffaaaaaa" .. L["You passed."] .. "|r"))
+		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- Results: nobody, one Need, or a roll with a drumroll
+---------------------------------------------------------------------------
+
+local function WinnerText(name)
+	if name == MyName() then
+		return L["You win!"]
+	end
+	return L["%s wins!"]:format(name)
+end
+
+local function RollLines(call, rolls)
+	local lines = {}
+	for i, entry in ipairs(call.result) do
+		local roll = rolls and rolls[i] or entry.roll
+		local colour = (not rolls and i == 1) and "|cffffd200" or "|cffffffff"
+		lines[#lines + 1] = ("%s%s  %d|r"):format(colour, entry.name, roll)
+	end
+	return table.concat(lines, "    ")
+end
+
+local function Finish(call)
+	call.state, call.doneAt = "done", GetTime()
+	local f = FrameFor(call)
+	local result = call.result
+	f.Need:Hide()
+	f.Pass:Hide()
+	f.Timer:Hide()
+	if #result == 0 then
+		f.Status:SetText("|cffaaaaaa" .. L["Nobody needs it."] .. "|r")
+		M:Print(("nobody needs %s."):format(call.link))
+		return
+	end
+	local winner = result[1].name
+	f.Status:SetText(#result > 1 and RollLines(call) or "")
+	f.Winner:SetText("|cffffd200" .. WinnerText(winner) .. "|r")
+	f.Pop:Play()
+	PlaySound(SOUND.win)
+	if #result > 1 then
+		local others = {}
+		for i = 2, #result do
+			others[#others + 1] = ("%s %d"):format(result[i].name, result[i].roll)
+		end
+		M:Print(("%s wins %s with %d (%s)."):format(winner, call.link, result[1].roll, table.concat(others, ", ")))
+	else
+		M:Print(("%s gets %s."):format(winner, call.link))
+	end
+end
+
+local function StartResult(call, result)
+	call.result = result
+	if #result > 1 then
+		call.state, call.rollEnds = "rolling", GetTime() + ROLL_TIME
+		local f = FrameFor(call)
+		f.Need:Hide()
+		f.Pass:Hide()
+		f.Timer:Hide()
+		f.Winner:SetText("|cffffd200" .. L["Rolling..."] .. "|r")
+		PlaySound(SOUND.rollStart)
+		local _, handle = PlaySound(SOUND.rollLoop)
+		call.sound = handle
+	else
+		Finish(call)
+	end
+end
+
+-- "Anna:87,Bob:12" -> { { name, roll }, ... }
+local function ParseResult(text)
+	local result = {}
+	for name, roll in text:gmatch("([^,:]+):(%d+)") do
+		result[#result + 1] = { name = name, roll = tonumber(roll) }
+	end
+	return result
+end
+
+-- My call is over: roll for everyone who needs it and tell everyone.
+local function Decide(call)
+	local needers = {}
+	for _, a in pairs(call.answers) do
+		if a.need then
+			needers[#needers + 1] = a.name
+		end
+	end
+	table.sort(needers)
+	local result = {}
+	if #needers == 1 then
+		result[1] = { name = needers[1], roll = 0 }
+	elseif #needers > 1 then
+		local taken = {}
+		for _, name in ipairs(needers) do
+			local roll
+			repeat
+				roll = math.random(1, 100)
+			until not taken[roll] -- no ties
+			taken[roll] = true
+			result[#result + 1] = { name = name, roll = roll }
+		end
+		table.sort(result, function(a, b) return a.roll > b.roll end)
+	end
+	local entries = {}
+	for _, entry in ipairs(result) do
+		entries[#entries + 1] = entry.name .. ":" .. entry.roll
+	end
+	B.QueueToPeers(("R%s;%d;%s"):format(B.VERSION, call.id, table.concat(entries, ",")))
+	StartResult(call, result)
+end
+
+---------------------------------------------------------------------------
+-- Sharing and answering
+---------------------------------------------------------------------------
+
+-- offer: friends can say Need or Pass, and it's rolled out (Ctrl+Shift+right-click); otherwise
+-- they just see it (Ctrl+right-click).
+function B.ShareItem(link, offer)
 	local itemString = ItemString(link)
 	if not (M.enabled and M.db.shareItems and itemString) then
 		return
@@ -44,19 +318,44 @@ function B.ShareItem(link)
 	if now - lastSent < SEND_GAP then
 		return
 	end
-	local count = Peers()
+	local recipients, count = {}, 0
+	for gameAccountID in pairs(B.peers) do
+		recipients[gameAccountID], count = true, count + 1
+	end
 	if count == 0 then
 		M:Print("no friends with LefthyTools online to show it to.")
 		return
 	end
 	lastSent = now
-	B.QueueToPeers(("I%s;%s"):format(B.VERSION, itemString))
-	M:Print(("shared %s with %d friend(s)."):format(link, count))
+	if not offer then
+		B.QueueToPeers(("I%s;%s"):format(B.VERSION, itemString))
+		M:Print(("shared %s with %d friend(s)."):format(link, count))
+		return
+	end
+	local id = math.random(1, 99999)
+	local call = { id = id, mine = true, link = link, itemString = itemString, recipients = recipients,
+		answers = {}, state = "open", ends = now + CALL_TIME }
+	calls["me:" .. id] = call
+	B.QueueToPeers(("I%s;%s;%d"):format(B.VERSION, itemString, id))
+	M:Print(("offered %s to %d friend(s): they can say Need or Pass."):format(link, count))
+	Draw(call)
+end
+
+function Answer(call, need)
+	if not call or call.mine or call.state ~= "open" or call.myAnswer ~= nil then
+		return
+	end
+	call.myAnswer = need
+	B.Queue(call.from, ("N%s;%d;%d"):format(B.VERSION, call.id, need and 1 or 0))
+	if need then
+		PlaySound(SOUND.need)
+	end
+	Draw(call)
 end
 
 local function OnModifiedItemClick(link)
-	if GetMouseButtonClicked() == "RightButton" and IsControlKeyDown() and not IsShiftKeyDown() and not IsAltKeyDown() then
-		B.ShareItem(link)
+	if GetMouseButtonClicked() == "RightButton" and IsControlKeyDown() and not IsAltKeyDown() then
+		B.ShareItem(link, IsShiftKeyDown()) -- with Shift: let them roll for it
 	end
 end
 
@@ -65,35 +364,8 @@ if type(HandleModifiedItemClick) == "function" then
 end
 
 ---------------------------------------------------------------------------
--- Receiving: a chat line with the link, a notice on screen and the whisper sound (easy to miss otherwise)
+-- From friends (on Beacon's tick)
 ---------------------------------------------------------------------------
-
-local notice
-
-local function NoticeOnUpdate(self)
-	local age = GetTime() - self.shownAt
-	if age >= NOTICE_TIME + NOTICE_FADE then
-		self:Hide()
-	elseif age > NOTICE_TIME then
-		self:SetAlpha(1 - (age - NOTICE_TIME) / NOTICE_FADE)
-	end
-end
-
-local function ShowNotice(text)
-	if not notice then
-		notice = CreateFrame("Frame", nil, UIParent)
-		notice:SetSize(800, 30)
-		notice:SetPoint("TOP", UIParent, "TOP", 0, -205) -- under the level-up toast
-		notice:SetFrameStrata("HIGH")
-		notice.Text = notice:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-		notice.Text:SetAllPoints()
-		notice:SetScript("OnUpdate", NoticeOnUpdate)
-	end
-	notice.Text:SetText(text)
-	notice.shownAt = GetTime()
-	notice:SetAlpha(1)
-	notice:Show()
-end
 
 -- A real link in this client's language, once the item is loaded (it may have to be asked for).
 local function WithLink(itemString, callback)
@@ -110,19 +382,114 @@ local function WithLink(itemString, callback)
 	end
 end
 
--- A friend's I message, on the driver tick.
-function B.ReceiveItem(peer, itemString)
+-- A friend's share (callID nil from builds without Need / Pass).
+function B.ReceiveItem(peer, gameAccountID, itemString, callID)
 	if not M.db.shareItems then
 		return
 	end
-	local name = LT.Window.ClassColorCode(peer.classFile) .. peer.name .. "|r"
 	WithLink(itemString, function(link)
 		if not link then
 			return
 		end
-		M:Print(("%s shares %s."):format(name, link))
-		ShowNotice(L["%s shares %s"]:format(name, link))
-		PlaySound(SOUNDKIT and SOUNDKIT.TELL_MESSAGE or 3081) -- the whisper sound
+		M:Print(("%s shares %s."):format(Coloured(peer.name, peer.classFile), link))
+		local now = GetTime()
+		local call = { id = callID, from = gameAccountID, fromName = peer.name, fromClass = peer.classFile, link = link,
+			itemString = itemString, answers = {}, state = "open", ends = now + CALL_TIME + 5 }
+		if not callID then
+			call.state, call.doneAt = "done", now -- just showing it: no buttons, fades after a while
+		end
+		calls[gameAccountID .. ":" .. (callID or ("x" .. now))] = call
+		Draw(call)
+		PlaySound(SOUND.call)
 	end)
 	B.Notify("item", peer, { itemString = itemString })
+end
+
+-- A friend answers my call.
+function B.ReceiveAnswer(peer, gameAccountID, callID, need)
+	local call = calls["me:" .. callID]
+	if not call or call.state ~= "open" or not call.recipients[gameAccountID] or call.answers[gameAccountID] then
+		return
+	end
+	call.answers[gameAccountID] = { name = B.Clean(peer.name, 48), need = need }
+	Draw(call)
+end
+
+-- The sharer's verdict on a call I got.
+function B.ReceiveResult(peer, gameAccountID, callID, text)
+	local call = calls[gameAccountID .. ":" .. callID]
+	if not call or call.state ~= "open" then
+		return
+	end
+	StartResult(call, ParseResult(text))
+end
+
+-- Beacon's tick: timers, the drumroll, fading out.
+function B.UpdateCalls(now)
+	if not next(calls) then
+		return
+	end
+	for key, call in pairs(calls) do
+		local f = call.frame
+		if call.state == "open" then
+			if f and call.id then
+				local total = call.mine and CALL_TIME or CALL_TIME + 5
+				f.Timer:SetWidth(math.max(1, 440 * math.max(0, call.ends - now) / total))
+			end
+			local everyone = call.mine
+			if everyone then
+				for id in pairs(call.recipients) do
+					if not call.answers[id] then
+						everyone = false
+						break
+					end
+				end
+			end
+			if call.mine and (now >= call.ends or everyone) then
+				Decide(call)
+			elseif not call.mine and now >= call.ends then
+				-- no verdict came (they went offline): let it go
+				call.state, call.doneAt = "done", now - SHOW_RESULT + 2
+			end
+		elseif call.state == "rolling" then
+			if now >= call.rollEnds then
+				if call.sound and StopSound then
+					StopSound(call.sound)
+				end
+				PlaySound(SOUND.rollEnd)
+				Finish(call)
+			elseif f then
+				local rolls = {}
+				for i = 1, #call.result do
+					rolls[i] = math.random(1, 100) -- whirling numbers
+				end
+				f.Status:SetText(RollLines(call, rolls))
+			end
+		elseif call.state == "done" then
+			local age = now - call.doneAt
+			if f then
+				if age >= SHOW_RESULT + FADE then
+					Release(f)
+					call.frame = nil
+				elseif age > SHOW_RESULT then
+					f:SetAlpha(1 - (age - SHOW_RESULT) / FADE)
+				end
+			end
+			if age >= SHOW_RESULT + FADE then
+				calls[key] = nil
+			end
+		end
+	end
+end
+
+function B.ReleaseCalls()
+	for key, call in pairs(calls) do
+		if call.sound and StopSound then
+			StopSound(call.sound)
+		end
+		if call.frame then
+			Release(call.frame)
+		end
+		calls[key] = nil
+	end
 end

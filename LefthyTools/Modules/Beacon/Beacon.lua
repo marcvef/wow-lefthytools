@@ -32,7 +32,12 @@ local L = ns.L
 --   C2;<count>          in combat: how many enemies have me on their threat list (counted on the
 --                       nameplates the game shows). Sent when it changes, at most once a second;
 --                       a state without C clears it.
---   I2;<item string>    an item I show my friends (Ctrl+right-click, Items.lua)
+--   I2;<item string>[;<call id>]
+--                       an item I show my friends (Ctrl+right-click, Items.lua); with a call id
+--                       (Ctrl+Shift+right-click) they can say Need or Pass:
+--   N2;<call id>;<1|0>  my Need (1) or Pass (0) for a friend's item, to them
+--   R2;<call id>;<name>:<roll>,...
+--                       the verdict on my item, to everyone: highest roll first (0 = no roll)
 --   D2;<YYYYMMDD>;<minutes played>;<xp>;<quests>;<kills>;<deaths>;<levels>
 --                       a day of my Chronicle statistics, for friends' graphs: my last 7 days
 --                       when a friend shows up, then today's at most every 5 minutes if changed
@@ -139,7 +144,7 @@ local dings = {}        -- { gameAccountID, level, text } received, shown on the
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
 local pingsIn = {}      -- { gameAccountID, continent, north, west, mapID } received, shown on the next tick
 local highlightsIn = {} -- { gameAccountID, kind, a, b } received, passed on on the next tick
-local itemsIn = {}      -- { gameAccountID, item string } received, shown on the next tick
+local itemsIn = {}      -- { "item" | "answer" | "result", gameAccountID, ... } for Items.lua, next tick
 local dailyIn = {}      -- { gameAccountID, { day, played, xp, ... } }: friends' days, for Chronicle
 local comings = {}      -- { "online" | "offline", peer }: told to listeners on the next tick
 local enabledAt = 0
@@ -680,9 +685,20 @@ local function Parse(text)
 			return "X", tonumber(percent) -- nil: not shared
 		end
 	elseif kind == "I" then
-		local itemString = rest:match("^;(%d+[%-%d:]*)$")
+		local itemString, callID = rest:match("^;(%d+[%-%d:]*);(%d+)$")
+		itemString = itemString or rest:match("^;(%d+[%-%d:]*)$")
 		if itemString then
-			return "I", itemString
+			return "I", itemString, tonumber(callID) -- no call id: just showing it
+		end
+	elseif kind == "N" then
+		local callID, need = rest:match("^;(%d+);([01])$")
+		if callID then
+			return "N", tonumber(callID), need == "1"
+		end
+	elseif kind == "R" then
+		local callID, result = rest:match("^;(%d+);([^;]*)$")
+		if callID and #result <= 200 then
+			return "R", tonumber(callID), result
 		end
 	elseif kind == "D" then
 		local y, mo, d, played, xp, quests, kills, deaths, levels =
@@ -801,7 +817,12 @@ local function OnMessage(text, senderID)
 	elseif kind == "I" then
 		if not guard.itemAt or now - guard.itemAt >= ITEM_GAP then
 			guard.itemAt = now
-			itemsIn[#itemsIn + 1] = { senderID, a }
+			itemsIn[#itemsIn + 1] = { "item", senderID, a, b }
+		end
+	elseif kind == "N" or kind == "R" then
+		if not guard.callAt or now - guard.callAt >= 0.2 then -- answers and verdicts: a few per call
+			guard.callAt = now
+			itemsIn[#itemsIn + 1] = { kind == "N" and "answer" or "result", senderID, a, b }
 		end
 	elseif kind == "D" then
 		if not guard.dailyWindow or now - guard.dailyWindow >= 60 then
@@ -911,12 +932,21 @@ local function Tick(now, elapsed)
 			B.Notify("daily", peer, item[2])
 		end
 	end
-	while itemsIn[1] do
+	while itemsIn[1] do -- Items.lua: shared items, Need / Pass answers, roll results
 		local item = table.remove(itemsIn, 1)
-		local peer = peers[item[1]]
+		local peer = peers[item[2]]
 		if peer and peer.name and B.ReceiveItem then
-			B.ReceiveItem(peer, item[2])
+			if item[1] == "item" then
+				B.ReceiveItem(peer, item[2], item[3], item[4])
+			elseif item[1] == "answer" then
+				B.ReceiveAnswer(peer, item[2], item[3], item[4])
+			else
+				B.ReceiveResult(peer, item[2], item[3], item[4])
+			end
 		end
+	end
+	if B.UpdateCalls then
+		B.UpdateCalls(now)
 	end
 	while highlightsIn[1] do
 		local item = table.remove(highlightsIn, 1)
@@ -1057,6 +1087,9 @@ function M:OnDisable()
 	if B.Detach then
 		C_Timer.After(0, B.Detach) -- removes the dots too
 	end
+	if B.ReleaseCalls then
+		C_Timer.After(0, B.ReleaseCalls) -- open Need / Pass notices
+	end
 end
 
 function M:OnSettingChanged()
@@ -1097,7 +1130,7 @@ function M:BuildOptions(o)
 	o:Checkbox("deathAlert", L["Tell me when a friend dies"],
 		L["A chat line when a friend dies: where, and what they were fighting."])
 	o:Checkbox("shareItems", L["Show items to friends"],
-		L["Ctrl+right-click an item (bags, character, bank, loot, chat links) to show it to your friends: they get it as a link in chat and as a notice on screen, with the whisper sound. Items they show you arrive the same way."])
+		L["Ctrl+right-click an item (bags, character, bank, loot, chat links) to show it to your friends: they see it big on screen, with the whisper sound. Ctrl+Shift+right-click offers it: they can say Need or Pass, and if several need it, it is rolled out."])
 	o:Checkbox("pings", L["Map pings"],
 		L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."])
 
