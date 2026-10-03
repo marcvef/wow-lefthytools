@@ -312,13 +312,13 @@ local function Finish(call)
 	end
 	if call.mine and B.AddHandover then
 		-- My item: its tooltip reminds me until it's traded or mailed to them (Handover.lua).
-		local guid
-		for _, a in pairs(call.answers) do
+		local guid, account
+		for gameAccountID, a in pairs(call.answers) do
 			if a.name == winner then
-				guid = a.guid
+				guid, account = a.guid, gameAccountID
 			end
 		end
-		B.AddHandover(call.itemString, call.link, winner, guid)
+		B.AddHandover(call.itemString, call.link, winner, guid, account)
 		M:Print(("its tooltip reminds you until you trade or mail it to %s."):format(winner))
 	end
 end

@@ -125,6 +125,18 @@ function FrameMethods:SetFrameStrata(s) self._strata = s end
 function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
+function FrameMethods:RegisterForClicks(...) self._clicks = { ... } end
+function FrameMethods:SetID(id) self._id = id end
+function FrameMethods:GetID() return self._id or 0 end
+-- Protected: blocked by the game in combat.
+function FrameMethods:SetPassThroughButtons(...)
+	if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SetPassThroughButtons" return end
+	self._passThrough = { ... }
+end
+function FrameMethods:SetPropagateMouseMotion(p)
+	if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SetPropagateMouseMotion" return end
+	self._propagateMotion = p
+end
 function FrameMethods:SetAllPoints(rel) self._points = { { "TOPLEFT", rel }, { "BOTTOMRIGHT", rel } } end
 -- PlayerModel
 function FrameMethods:SetUnit(unit) self._unit = unit end
@@ -637,6 +649,7 @@ end
 function OpenBags() -- what Blizzard does when the bag opens
 	ContainerFrameCombinedBags:Show()
 	UpdateContainerFrameAnchors()
+	if ContainerFrameCombinedBags.UpdateItems then ContainerFrameCombinedBags:UpdateItems() end
 end
 function CloseBags() ContainerFrameCombinedBags:Hide() end
 
@@ -915,6 +928,10 @@ GameTooltip = {
 	Show = function() TOOLTIP.shown = true end,
 	Hide = function() TOOLTIP.shown = false end,
 	IsOwned = function(_, frame) return TOOLTIP.shown and TOOLTIP.owner == frame end,
+	SetBagItem = function(self, bag, slot)
+		local id = BAGS[bag] and BAGS[bag][slot]
+		if id then self:SetHyperlink("item:" .. id) end
+	end,
 	SetHyperlink = function(self, link)
 		TOOLTIP.link, TOOLTIP.shown = link, true
 		local id = tonumber(link:match("item:(%d+)"))
@@ -938,6 +955,35 @@ function GetTradePlayerItemLink(slot) return TRADE_ITEMS[slot] end
 function HasSendMailItem(slot) return MAIL_ITEMS[slot] ~= nil end
 function GetSendMailItem(slot) if MAIL_ITEMS[slot] then return "Item", MAIL_ITEMS[slot] end end
 function SendMail(recipient) MAILS_SENT[#MAILS_SENT + 1] = recipient end
+SendMailFrame = CreateFrame("Frame", "SendMailFrame", UIParent)
+SendMailFrame:Hide()
+SendMailNameEditBox = CreateFrame("EditBox", "SendMailNameEditBox", SendMailFrame)
+SendMailNameEditBox:SetText("")
+
+-- Bag contents: BAGS[bag][slot] = itemID. The combined bag (above) gets a button per slot of bag 0;
+-- Blizzard's UpdateItems runs over EnumerateValidItems whenever the bag opens or changes.
+BAGS, SOLD, PICKED_UP = { [0] = {} }, {}, {}
+C_Container = {
+	GetContainerItemID = function(bag, slot) return BAGS[bag] and BAGS[bag][slot] end,
+	GetContainerItemLink = function(bag, slot) local id = BAGS[bag] and BAGS[bag][slot]; return id and ItemLink(id) end,
+	UseContainerItem = function(bag, slot) SOLD[#SOLD + 1] = BAGS[bag][slot]; BAGS[bag][slot] = nil end,
+	PickupContainerItem = function(bag, slot) PICKED_UP[#PICKED_UP + 1] = BAGS[bag][slot] end,
+}
+C_Item.GetItemCount = function(itemID)
+	local n = 0
+	for _, slots in pairs(BAGS) do for _, id in pairs(slots) do if id == itemID then n = n + 1 end end end
+	return n
+end
+ContainerFrameCombinedBags.buttons = {}
+for slot = 1, 16 do
+	local b = CreateFrame("Button", nil, ContainerFrameCombinedBags)
+	b:SetSize(37, 37)
+	b:SetID(slot)
+	function b:GetBagID() return 0 end
+	ContainerFrameCombinedBags.buttons[slot] = b
+end
+function ContainerFrameCombinedBags:EnumerateValidItems() return ipairs(self.buttons) end
+function ContainerFrameCombinedBags:UpdateItems() end -- Blizzard's own drawing: nothing to do here
 
 -- Personal resource display (Forever leaves its class resource frame out) and combo points.
 CreateFrame("Frame", "PersonalResourceDisplayFrame", UIParent)

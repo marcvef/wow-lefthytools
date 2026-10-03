@@ -69,8 +69,11 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     Items: Ctrl+right-click one in your bags: they see "<you> shares [item]" at the top, one line,
     no box, and hovering it shows the item's tooltip. Ctrl+Shift+right-click: they get Need and
     Pass; once someone wins, the item's tooltip in your bags says "Won by <them>: still to hand
-    over", opening a trade with them says so in chat, and trading (or mailing) it to them removes
-    the line. `/lefthy beacon handover` lists what's still owed.
+    over" and its slot has an orange border. At a vendor: hovering and dragging it work as usual,
+    right-clicking asks "Sell it anyway?" (Keep it: nothing happens; Sell anyway: sold, border
+    gone); dragging it onto the vendor warns in chat to buy it back. At a mailbox, attaching it
+    fills in their name. Opening a trade with them says so in chat, and trading (or mailing) it to
+    them removes the line and the border. `/lefthy beacon handover` lists what's still owed.
 15. Chronicle: `/chronicle` opens the journal; the zone you're in is "discovered". Kill a few
     mobs, loot a green, turn in a quest, jump, ride: the Statistics page counts them (time and
     distance update every few seconds). Enter a dungeon: "First visit"; kill a boss: one entry.

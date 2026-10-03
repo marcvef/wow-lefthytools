@@ -133,8 +133,10 @@ minimap, and you on theirs, without being in a group.
 - **Offer an item:** **Ctrl+Shift+right-click** instead, and they get **Need** and **Pass**
   buttons under it. One Need gets it; several Needs are rolled out, with a drumroll, whirling
   numbers and the winner popping up in gold letters with a fanfare. Until you trade or mail it
-  to the winner, the item's tooltip says "Won by Anna: still to hand over", and opening a trade
-  with them reminds you in chat (`/lefthy beacon handover` lists what you still owe). (For gear, Ctrl+click also opens the
+  to the winner, the item is reserved for them: its tooltip says "Won by Anna: still to hand
+  over", its bag slot has an orange border, a vendor asks before selling it, a trade with them
+  reminds you in chat, and attaching it to a mail fills in their name (`/lefthy beacon handover`
+  lists what you still owe). (For gear, Ctrl+click also opens the
   game's preview, as always.)
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.

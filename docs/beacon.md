@@ -215,11 +215,37 @@ Blizzard's function). At most one share every 3 s.
 
 ### Hand-over reminder (Handover.lua)
 
-When my offer has a winner, `B.AddHandover` saves `{ itemID, link, winner, guid, at }` in
-`LefthyToolsDB.handover` (the winner's GUID comes from their answer's peer; at most 20 entries,
-dropped after 7 days at load). A `TooltipDataProcessor` post-call for item tooltips adds "Won by
-Anna: still to hand over" to every tooltip of that item ID; it returns right away while nothing is
-owed, and post-calls run before the tooltip is sized, so no `Show()` is needed.
+When my offer has a winner, `B.AddHandover` saves `{ itemID, link, winner, mailName, guid, at }`
+in `LefthyToolsDB.handover`: the item is reserved for them. The winner's GUID comes from their
+answer's peer; `mailName` is "Name-Realm" when Battle.net says their realm isn't mine. At most 20
+entries, dropped after 7 days at load. A `TooltipDataProcessor` post-call for item tooltips adds
+"Won by Anna: still to hand over" to every tooltip of that item ID; it returns right away while
+nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` is needed.
+
+- **Bag border:** a post-hook on each bag frame's `UpdateItems` (`ContainerFrameCombinedBags` and
+  `ContainerFrameContainer.ContainerFrames`, hooked at login; the mixin is copied into the frames,
+  so hooking `ContainerFrameMixin` wouldn't reach them) walks `EnumerateValidItems` and puts an
+  orange glow (`UI-ActionButton-Border`, ADD blend) on reserved slots. It returns right away while
+  nothing is reserved or marked. List changes and the vendor opening or closing redraw open bags on
+  the next frame.
+- **Vendor question:** right-clicking a bag item at a vendor sells it inside Blizzard's own click
+  handler (`C_Container.UseContainerItem`), which can't be stopped from outside. So while a vendor
+  is open, an invisible button sits over each reserved slot: `SetPassThroughButtons("LeftButton")`
+  lets left-clicks and drags reach the slot, `SetPropagateMouseMotion(true)` lets hovering reach it
+  (tooltip, highlight). Both are protected in combat, so the button is made out of combat only (if
+  either fails, it picks the item up and shows the tooltip itself). A right-click opens our own
+  popup (`DialogBorderTemplate`, Escape closes it, not `StaticPopup`, to stay out of Blizzard's
+  popup taint): "[item] is reserved for Anna: they won it. Sell it anyway?" with an alert sound.
+  "Sell anyway" checks that the vendor is still open and the item still in that slot, ends the
+  reservation and sells it (`UseContainerItem` is free to call). Ctrl/Shift+right-clicks go to
+  `HandleModifiedItemClick` as usual.
+- **Sold another way** (dragged onto the vendor, a bag addon): at `MERCHANT_SHOW` the reserved
+  items are counted (`C_Item.GetItemCount`); `BAG_UPDATE_DELAYED` while the vendor is open
+  recounts on the next frame and, if one went, warns in chat with an alert sound: buy it back on
+  the Buyback tab.
+- **Mail:** `MAIL_SEND_INFO_UPDATE` (attachments changed) checks on the next frame: reserved
+  attachments for one winner and an empty recipient field fill in `mailName` (chat says so);
+  another name in the field gets one warning per name and attachment set.
 
 - **Trade:** `TRADE_SHOW` reads the partner (`GetUnitName("NPC")`, `UnitGUID("NPC")`) and, if they
   won something, says so in chat ("Anna won [item]: put it in the trade."). `TRADE_PLAYER_ITEM_CHANGED`

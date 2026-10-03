@@ -84,5 +84,8 @@ ns.CHANGELOG = {
 	{ id = 26, version = "0.5.0", module = "beacon",
 		en = { "Hand-over reminder", "An item you offered and someone won says so on its tooltip until you trade or mail it to them. Opening a trade with the winner reminds you too." },
 		de = { "Übergabe-Erinnerung", "Ein Item, das du angeboten und jemand gewonnen hat, zeigt das im Tooltip, bis du es ihm per Handel oder Post gibst. Ein Handel mit dem Gewinner erinnert dich auch." } },
+	{ id = 27, version = "0.5.0", module = "beacon",
+		en = { "Reserved items", "A won item gets an orange border in your bags, a vendor asks before selling it, and attaching it to a mail fills in the winner's name." },
+		de = { "Reservierte Items", "Ein gewonnenes Item bekommt einen orangen Rahmen in den Taschen, beim Händler kommt vor dem Verkauf eine Rückfrage, und beim Anhängen an eine Post wird der Name des Gewinners eingetragen." } },
 	-- New entries go here, at the end.
 }

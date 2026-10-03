@@ -2121,6 +2121,97 @@ do
 	Fire("MAIL_SEND_SUCCESS")
 	check(#owed == 0, "mailed to the winner (name with realm): gone")
 	MAIL_ITEMS = {}
+
+	-- Reserved items: a border in the bags; at a vendor, right-click asks first.
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12", 12)
+	BAGS[0] = { [3] = 1179, [5] = 6948 }
+	OpenBags()
+	Advance(0.1)
+	local bagButtons = ContainerFrameCombinedBags.buttons
+	check(bagButtons[3].LefthyToolsReserved and bagButtons[3].LefthyToolsReserved:IsShown() and not bagButtons[5].LefthyToolsReserved
+		and not bagButtons[3].LefthyToolsSellGuard, "a reserved item's bag slot gets a border, other slots don't")
+	Fire("MERCHANT_SHOW")
+	Advance(0.1)
+	local guard = bagButtons[3].LefthyToolsSellGuard
+	check(guard and guard:IsShown() and guard._passThrough[1] == "LeftButton" and guard._propagateMotion == true
+		and not bagButtons[5].LefthyToolsSellGuard, "at a vendor: a guard over the slot, left-clicks and hovering pass through")
+	local soundsBefore = #SOUNDS
+	guard:Click("RightButton")
+	local dlg = LefthyToolsSellReservedDialog
+	check(dlg and dlg:IsShown() and dlg.Text:GetText():find(ItemLink(1179) .. " is reserved for Bob: they won it. Sell it anyway?", 1, true)
+		and #SOLD == 0 and #SOUNDS == soundsBefore + 1, "right-click: a question (with an alert sound) instead of selling")
+	dlg.Keep:Click()
+	check(not dlg:IsShown() and #SOLD == 0 and BAGS[0][3] == 1179, "Keep it: nothing sold")
+	Advance(3) -- the last share was a moment ago
+	STATE.ctrl = true
+	MOCK_BUTTON = "RightButton"
+	local shares = #sentTo(11, 1, "I2;")
+	guard:Click("RightButton")
+	STATE.ctrl = false
+	Advance(0.15)
+	check(not dlg:IsShown() and #sentTo(11, 1, "I2;") == shares + 1, "Ctrl+right-click still shows it to friends, no question")
+	guard:Click("RightButton")
+	pmark = #PRINTED + 1
+	dlg.Sell:Click()
+	Advance(0.1)
+	check(SOLD[#SOLD] == 1179 and #owed == 0 and not bagButtons[3].LefthyToolsReserved:IsShown() and not guard:IsShown()
+		and printedSince(pmark):find("no longer reserved", 1, true), "Sell anyway: sold, no longer reserved, border and guard gone")
+	Fire("MERCHANT_CLOSED")
+	-- Gone another way (dragged onto the vendor, a bag addon): how to buy it back.
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", 11)
+	Fire("MERCHANT_SHOW")
+	Advance(0.1)
+	pmark = #PRINTED + 1
+	BAGS[0][5] = nil
+	Fire("BAG_UPDATE_DELAYED")
+	Advance(0.1)
+	check(printedSince(pmark):find(ItemLink(6948) .. ", which Anna won, is gone: if you sold it, buy it back", 1, true),
+		"a reserved item gone at a vendor: a warning while it can be bought back")
+	Fire("MERCHANT_CLOSED")
+	Advance(0.1)
+	-- In combat no guard is made (pass-through can't be set then).
+	wipe(owed)
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12)
+	BAGS[0][7] = 1155
+	local blocked = #BLOCKED
+	STATE.combat = true
+	Fire("MERCHANT_SHOW")
+	Advance(0.1)
+	check(not bagButtons[7].LefthyToolsSellGuard and #BLOCKED == blocked and bagButtons[7].LefthyToolsReserved:IsShown(),
+		"in combat: the border, but no guard (nothing blocked)")
+	STATE.combat = false
+	Fire("MERCHANT_CLOSED")
+	Advance(0.1)
+	-- Mail: attaching it fills in the winner.
+	wipe(owed)
+	BN_FRIENDS[1][1].realmName = "Argent Dawn"
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", 11)
+	BN_FRIENDS[1][1].realmName = nil
+	check(owed[1].mailName == "Anna-ArgentDawn", "a winner on another realm: mailed as Name-Realm")
+	owed[1].mailName = "Anna"
+	SendMailFrame:Show()
+	SendMailNameEditBox:SetText("")
+	MAIL_ITEMS = { 6948 }
+	pmark = #PRINTED + 1
+	Fire("MAIL_SEND_INFO_UPDATE")
+	check(SendMailNameEditBox:GetText() == "", "nothing done inside the event handler")
+	Advance(0.1)
+	check(SendMailNameEditBox:GetText() == "Anna" and printedSince(pmark):find("mail to Anna: they won " .. ItemLink(6948), 1, true),
+		"attaching a reserved item fills in its winner")
+	SendMailNameEditBox:SetText("Bob")
+	Fire("MAIL_SEND_INFO_UPDATE")
+	Advance(0.1)
+	Fire("MAIL_SEND_INFO_UPDATE")
+	Advance(0.1)
+	local _, warnings = printedSince(pmark):gsub("is reserved for Anna, not Bob", "")
+	check(SendMailNameEditBox:GetText() == "Bob" and warnings == 1, "another name typed: kept, with one warning")
+	SendMailFrame:Hide()
+	MAIL_ITEMS = {}
+	wipe(owed)
+	BAGS = { [0] = {} }
+	ContainerFrameCombinedBags:Hide()
+	Advance(0.1)
+
 	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
 	lefthy("beacon handover")
 	check(printedSince(#PRINTED - 1):find(ItemLink(1179) .. " to Bob", 1, true), "/lefthy beacon handover lists what's owed")
