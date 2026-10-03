@@ -39,6 +39,12 @@ end
 
 function GetLocale() return MOCK_LOCALE or "enUS" end
 
+-- TOC metadata; the installer stamps the exact build into "Version".
+MOCK_VERSION = "0.4.0-3-gabc1234"
+C_AddOns = { GetAddOnMetadata = function(addon, field)
+	if addon == "LefthyTools" and field == "Version" then return MOCK_VERSION end
+end }
+
 -- secret values: a table marked SECRET
 SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
 function issecretvalue(v) return v == SECRET end

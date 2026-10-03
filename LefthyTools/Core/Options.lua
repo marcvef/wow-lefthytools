@@ -232,6 +232,8 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		LT:OpenSettings()
 	elseif cmd == "modules" or cmd == "list" then
 		ListModules()
+	elseif cmd == "version" then
+		LT.Print("version " .. LT.version .. ". To update, run Update-LefthyTools.cmd again, then /reload.")
 	elseif (cmd == "enable" or cmd == "disable" or cmd == "toggle") and target then
 		if cmd == "toggle" then
 			LT:ToggleModule(target.key)
@@ -248,6 +250,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 	else
 		LT.Print("/lefthy - open settings")
 		LT.Print("/lefthy modules - list modules")
+		LT.Print("/lefthy version - the installed LefthyTools version")
 		LT.Print("/lefthy enable | disable | toggle <module>")
 		LT.Print("/lefthy <module> ... - module commands, e.g. /lefthy mirage status")
 	end

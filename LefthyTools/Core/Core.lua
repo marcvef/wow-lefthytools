@@ -22,6 +22,54 @@ function LT.Print(msg, source)
 end
 
 ---------------------------------------------------------------------------
+-- Version. The repo's TOC holds the base version (e.g. 0.3.0, git tag v0.3.0); install.ps1
+-- writes the exact build into the installed copy, like `git describe`:
+--   0.3.0               the tagged commit itself
+--   0.3.0-12-g1a2b3c4   12 commits later (comparable: more commits = newer)
+--   0.3.0-g1a2b3c4      commit count unknown (GitHub couldn't be asked)
+--   ...-dirty / -dev    a development install
+---------------------------------------------------------------------------
+
+local GetMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+LT.version = GetMetadata and GetMetadata(ADDON, "Version") or "?"
+
+-- major, minor, patch, commits since that version (nil if unknown); nil if not a version.
+function LT.ParseVersion(v)
+	if type(v) ~= "string" then
+		return nil
+	end
+	local major, minor, patch, rest = v:match("^(%d+)%.(%d+)%.(%d+)(.*)$")
+	if not major then
+		return nil
+	end
+	local count
+	if rest == "" then
+		count = 0
+	else
+		count = tonumber(rest:match("^%-(%d+)%-g%x+"))
+	end
+	return tonumber(major), tonumber(minor), tonumber(patch), count
+end
+
+-- 1 if a is newer than b, -1 if older, 0 if the same; nil if that can't be told.
+function LT.CompareVersions(a, b)
+	local a1, a2, a3, ac = LT.ParseVersion(a)
+	local b1, b2, b3, bc = LT.ParseVersion(b)
+	if not a1 or not b1 then
+		return nil
+	end
+	for _, pair in ipairs({ { a1, b1 }, { a2, b2 }, { a3, b3 } }) do
+		if pair[1] ~= pair[2] then
+			return pair[1] > pair[2] and 1 or -1
+		end
+	end
+	if ac == nil or bc == nil then
+		return nil
+	end
+	return ac > bc and 1 or (ac < bc and -1 or 0)
+end
+
+---------------------------------------------------------------------------
 -- Modules
 ---------------------------------------------------------------------------
 

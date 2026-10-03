@@ -28,6 +28,19 @@ local mirage = SlashCmdList.LEFTHYTOOLS_MIRAGE
 local lefthy = SlashCmdList.LEFTHYTOOLS
 local function S(id) return REGISTERED_SETTINGS["LefthyTools_mirage_" .. id] end
 
+section("version")
+check(LT.version == "0.4.0-3-gabc1234", "version comes from the installed TOC")
+local function cmp(a, b) return LT.CompareVersions(a, b) end
+check(cmp("0.4.0-5-gaaaaaaa", "0.4.0-3-gbbbbbbb") == 1 and cmp("0.4.0", "0.4.0-1-gaaaaaaa") == -1,
+	"more commits since the same version = newer")
+check(cmp("0.10.0", "0.9.9-40-gaaaaaaa") == 1 and cmp("1.0.0", "0.99.0") == 1, "numeric, not alphabetical")
+check(cmp("0.4.0-gaaaaaaa", "0.4.0-3-gbbbbbbb") == nil and cmp("0.5.0-gaaaaaaa", "0.4.0-3-gbbbbbbb") == 1,
+	"unknown commit count: only the base version can be compared")
+check(cmp("0.4.0-2-gaaaaaaa-dirty", "0.4.0-1-gbbbbbbb") == 1 and cmp("garbage", "0.4.0") == nil, "dev builds and nonsense")
+local versionMark = #PRINTED + 1
+lefthy("version")
+check(PRINTED[versionMark] and PRINTED[versionMark]:find("0.4.0-3-gabc1234", 1, true), "/lefthy version")
+
 section("framework")
 check(Mirage and not Mirage.enabled and LefthyToolsDB.modules.mirage == false, "Mirage is off by default (opt-in)")
 check(LT:GetModule("tweaks").enabled and LT:GetModule("beacon").enabled, "the other modules are on by default")
