@@ -958,6 +958,18 @@ pmark = #PRINTED + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;22;", "WHISPER", 11)
 Advance(0.15)
 check(#PRINTED < pmark, "a second level-up message within 10 s is ignored (spam guard)")
+for _ = 1, 3 do -- switching Beacon off and on in between doesn't reset the guard
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 11)
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;22;", "WHISPER", 11)
+	Advance(1.2)
+end
+check(#PRINTED < pmark, "... also when the friend sends Q2 in between")
+mark = #GAMEDATA + 1
+for _ = 1, 8 do
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 11)
+	Advance(0.3)
+end
+check(#GameDataTo(11, mark) <= 1, "repeated hellos get at most one answer per 5 s, got " .. #GameDataTo(11, mark))
 Advance(10)
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;22;", "WHISPER", 11)
 Advance(0.15)

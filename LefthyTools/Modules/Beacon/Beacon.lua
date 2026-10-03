@@ -40,6 +40,7 @@ local SEND_RATE, SEND_BURST = 10, 10 -- messages per second, across all friends
 local THROTTLE_PAUSE = 2     -- the server said slow down: pause sending this long
 local INBOX_LIMIT = 20       -- messages per second accepted from one friend
 local DING_GAP = 10          -- level-up messages accepted from one friend at most this often
+local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
 local TICK = 0.1
 local REFRESH_THROTTLE = 0.5
@@ -80,7 +81,7 @@ local helloAt = {}      -- gameAccountID -> when we last greeted them
 local otherVersion = {} -- gameAccountID -> protocol version of a friend on another LefthyTools version
 local owed = {}         -- gameAccountID -> true: send them my current state
 local outbox = {}       -- { gameAccountID, message }: one-off messages, sent before states
-local inbox = {}        -- gameAccountID -> { count, windowStart }: flood guard
+local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt }: spam guards
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
 
@@ -432,13 +433,17 @@ local function OnMessage(text, senderID)
 		return
 	end
 	local now = GetTime()
-	local rate = inbox[senderID]
-	if not rate or now - rate[2] >= 1 then
-		rate = { 0, now }
-		inbox[senderID] = rate
+	-- Per sender, kept even when the peer is forgotten (so "Q2" can't reset the guards).
+	local guard = inbox[senderID]
+	if not guard then
+		guard = { count = 0, window = now }
+		inbox[senderID] = guard
 	end
-	rate[1] = rate[1] + 1
-	if rate[1] > INBOX_LIMIT then
+	if now - guard.window >= 1 then
+		guard.count, guard.window = 0, now
+	end
+	guard.count = guard.count + 1
+	if guard.count > INBOX_LIMIT then
 		return -- a friend's client gone haywire can't flood us
 	end
 
@@ -456,23 +461,29 @@ local function OnMessage(text, senderID)
 	end
 
 	local peer = peers[senderID]
+	local answer = false
 	if not peer then
 		peer = { seen = now, rev = 0, hasPos = false, glide = 0 }
 		peers[senderID] = peer
 		otherVersion[senderID] = nil
-		owed[senderID] = true      -- they just found us: they need my state too
+		answer = true              -- they just found us: they need my state too
 		validateRequested = true   -- fetch name and class on the next tick
 	end
 	peer.seen = now
 	if kind == "H" then
-		owed[senderID] = true      -- they (re)started the addon: answer with my state
+		answer = true              -- they (re)started the addon: answer with my state
 	elseif kind == "S" then
 		ApplyState(peer, now, a, b, c, d, e, f)
 	elseif kind == "L" then
-		if not peer.dingAt or now - peer.dingAt >= DING_GAP then
-			peer.dingAt = now
+		if not guard.dingAt or now - guard.dingAt >= DING_GAP then
+			guard.dingAt = now
 			dings[#dings + 1] = { senderID, a, b }
 		end
+	end
+	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget.
+	if answer and (not guard.answeredAt or now - guard.answeredAt >= ANSWER_GAP) then
+		guard.answeredAt = now
+		owed[senderID] = true
 	end
 end
 
