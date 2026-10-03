@@ -107,7 +107,10 @@ the open one's button greyed out:
   inline icon (the item's or achievement's own where known) and the localized text. At most 250
   entries drawn, the rest summarized in one line.
 - **Statistics:** sections This session (current character only), Character, Quests, Exploring,
-  Combat, Travel, Gold and loot, Collections. Labels and values are two font strings with the
+  Combat, Travel, Gold and loot, Collections, Martin tracker (AFK time: `stats.afk`, `afkTimes`,
+  `longestAfk`, counted on the tick from `UnitIsAFK("player")`; its share of `played`, this
+  session's, and a verdict: under 5% "Always there", 15% "Takes a break now and then", 30%
+  "Coffee enthusiast", above "Practically Martin"). Labels and values are two font strings with the
   same number of lines (values right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h`,
   distance in km, gold with `GetMoneyString`.
 - **Graphs** (`Graphs.lua`): cards on the scroll content. Last 14 days (bars per day from

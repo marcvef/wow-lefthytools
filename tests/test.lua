@@ -2713,6 +2713,21 @@ do
 	for i = 1, 3 do PLAYER_POS = { 0.57, 0.5 - i * 0.03 }; Advance(1) end
 	TRAVEL.taxi = false
 	check(me.stats.flights == flights + 1 and me.stats.flown >= 50, "flight paths and their distance")
+	-- The Martin tracker: time AFK (the flag, read on the tick), how often, the longest stretch.
+	local afkBefore, timesBefore, longestBefore = me.stats.afk, me.stats.afkTimes, me.stats.longestAfk
+	STATE.afk = true
+	Advance(30)
+	STATE.afk = false
+	Advance(2)
+	STATE.afk = true
+	Advance(10)
+	STATE.afk = false
+	Advance(2)
+	check(math.abs(me.stats.afk - afkBefore - 40) <= 2 and me.stats.afkTimes == timesBefore + 2
+		and math.abs(me.stats.longestAfk - math.max(longestBefore, 30)) <= 1.5,
+		"AFK time counted: 40 s in two stretches, the longest kept (earlier tests were AFK longer), got "
+		.. me.stats.afk - afkBefore .. ", " .. me.stats.afkTimes - timesBefore .. ", " .. me.stats.longestAfk)
+	check(math.abs(CH.Session().afk - (me.stats.afk - me.session.stats.afk)) < 0.01 and CH.Session().afk >= 39, "and per session")
 	walked = me.stats.walked
 	PLAYER_POS = { 0.95, 0.95 } -- hearthstone
 	Advance(1.1)
@@ -2847,11 +2862,16 @@ do
 	local function lines(s) local n = 1 for _ in s:gmatch("\n") do n = n + 1 end return n end
 	check(lines(labels) == lines(values), "statistics: labels and values line up")
 	for _, expected in ipairs({ "This session", "Killing blows", "Deadliest foe", "Rare elites killed", "Bosses defeated", "Dungeon runs",
-			"Favourite zone", "On foot", "Flight paths", "Jumps", "Most gold at once", "Epic items", "Mounts", "Time played (/played)" }) do
+			"Favourite zone", "On foot", "Flight paths", "Jumps", "Most gold at once", "Epic items", "Mounts", "Time played (/played)",
+			"Martin tracker", "Time AFK", "Share of time played", "Times AFK", "Longest AFK", "AFK this session", "Verdict" }) do
 		check(labels:find(expected, 1, true), "statistics: " .. expected)
 	end
 	check(values:find("Hogger (1)", 1, true) and values:find("100h 0m", 1, true) == nil and values:find("4d 4h", 1, true),
 		"values: deadliest foe, /played as days and hours")
+	local verdicts = { "Always there", "Takes a break now and then", "Coffee enthusiast", "Practically Martin" }
+	local verdict
+	for _, v in ipairs(verdicts) do if values:find(v, 1, true) then verdict = v end end
+	check(verdict and labels:find("Martin tracker", 1, true), "the Martin tracker, with a verdict: " .. tostring(verdict))
 	check(not win.Tabs.stats:IsEnabled() and win.Tabs.timeline:IsEnabled(), "the open page's button is greyed out")
 	win.Tabs.friends:Click()
 	local friendsPage = win.Text:GetText()

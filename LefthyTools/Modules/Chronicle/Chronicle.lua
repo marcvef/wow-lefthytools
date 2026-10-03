@@ -40,6 +40,7 @@ local STAT_KEYS = {
 	"played", "sessions", "levels", "quests", "foreverQuests", "questXP", "xp", "kills", "rares", "bosses",
 	"dungeonRuns", "deaths", "moneyIn", "moneyOut", "maxMoney", "loot2", "loot3", "loot4", "jumps",
 	"walked", "ridden", "swum", "flown", "flights", "mounts", "pets", "toys", "achievements", "longestSession",
+	"afk", "afkTimes", "longestAfk", -- the Martin tracker
 }
 
 local M = LT:NewModule("chronicle", {
@@ -58,6 +59,7 @@ ns.Chronicle = C
 
 local store, char, charKey
 local lastTick, sinceTick = 0, 0
+local afkStreak -- seconds AFK in a row, nil while not AFK
 local lastFoe, lastFoeAt
 local lastXP, lastXPMax, lastLevel
 local lastMoney
@@ -206,7 +208,7 @@ function C.Session(c)
 	return {
 		played = diff("played"), xp = diff("xp"), levels = diff("levels"), quests = diff("quests"),
 		kills = diff("kills"), deaths = diff("deaths"), money = (c == char and GetMoney() or s.money) - (s.money or 0),
-		distance = diff("walked") + diff("ridden") + diff("swum") + diff("flown"),
+		distance = diff("walked") + diff("ridden") + diff("swum") + diff("flown"), afk = diff("afk"),
 	}
 end
 
@@ -589,6 +591,19 @@ local function Tick(now, elapsed)
 	if char.session then
 		char.session.last = time()
 		stats.longestSession = math.max(stats.longestSession, char.session.last - char.session.start)
+	end
+	-- The Martin tracker: time spent AFK, how often, the longest stretch.
+	local afk = UnitIsAFK("player")
+	if not issecret(afk) and afk == true then
+		if not afkStreak then
+			afkStreak = 0
+			stats.afkTimes = stats.afkTimes + 1
+		end
+		afkStreak = afkStreak + elapsed
+		stats.afk = stats.afk + elapsed
+		stats.longestAfk = math.max(stats.longestAfk, afkStreak)
+	else
+		afkStreak = nil
 	end
 	if zoneDirty then
 		CheckZone()

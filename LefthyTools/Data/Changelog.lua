@@ -99,5 +99,8 @@ ns.CHANGELOG = {
 	{ id = 31, version = "0.5.0", module = "tweaks",
 		en = { "Cinematic flights", "On a flight path the interface fades out, black bars slide in, the camera circles, and title cards name each zone you fly into. Whispers show as subtitles." },
 		de = { "Flüge im Kinomodus", "Auf einer Flugroute blendet das Interface aus, schwarze Balken kommen ins Bild, die Kamera kreist, und Titelkarten zeigen jedes überflogene Gebiet. Flüsternachrichten erscheinen als Untertitel." } },
+	{ id = 32, version = "0.5.0", module = "chronicle",
+		en = { "Martin tracker", "The statistics count your AFK time: how long, how often, the longest stretch, and a verdict." },
+		de = { "Martin-Tracker", "Die Statistiken zählen deine AFK-Zeit: wie lange, wie oft, die längste Zeit am Stück, und ein Urteil." } },
 	-- New entries go here, at the end.
 }

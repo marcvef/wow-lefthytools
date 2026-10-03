@@ -207,7 +207,9 @@ journal*).
   zones discovered and your favourite zone, dungeon runs, killing blows, rare elites, bosses,
   deaths and your deadliest foe, distance on foot, riding, swimming and on flight paths, jumps,
   gold earned, spent and the most you ever had, loot by quality, mounts, pets, toys and
-  achievements.
+  achievements. And the **Martin tracker**: how long you've been AFK, its share of your play
+  time, how often and the longest stretch, with a verdict from "Always there" to "Practically
+  Martin".
 - **Graphs:** the last 14 days (time played, XP, quests or kills per day), this session's XP
   curve with XP per hour, how long each level took (green fast, red slow), your favourite zones
   and deadliest foes, how you travel, and your loot by quality. Hover a bar for its value.

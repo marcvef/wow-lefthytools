@@ -308,6 +308,23 @@ local function Statistics(c)
 	Row(L["Toys"], s.toys)
 	Row(L["Achievements"], s.achievements)
 
+	-- Time spent AFK, with a verdict by its share of the time played.
+	Section(L["Martin tracker"])
+	local share = s.played > 0 and s.afk / s.played or 0
+	Row(L["Time AFK"], C.Duration(s.afk))
+	Row(L["Share of time played"], ("%d%%"):format(math.floor(share * 100 + 0.5)))
+	Row(L["Times AFK"], s.afkTimes)
+	Row(L["Longest AFK"], C.Duration(s.longestAfk))
+	if current then
+		local session = C.Session()
+		if session then
+			Row(L["AFK this session"], C.Duration(session.afk))
+		end
+	end
+	local verdict = share < 0.05 and L["Always there"] or share < 0.15 and L["Takes a break now and then"]
+		or share < 0.3 and L["Coffee enthusiast"] or L["Practically Martin"]
+	Row(L["Verdict"], verdict)
+
 	labels[#labels + 1], values[#values + 1] = "", ""
 	labels[#labels + 1], values[#values + 1] = "|cff999999" .. L["Counted since %s."]:format(date(L["%Y-%m-%d"], c.first)) .. "|r", ""
 	return table.concat(labels, "\n"), table.concat(values, "\n")
