@@ -1,0 +1,14 @@
+# Dependencies (restore with npm install)
+node_modules/
+package-lock.json
+
+# This repo is public: never commit credentials or personal notes
+.env*
+tokens.json
+CLAUDE.md
+CLAUDE.local.md
+
+# OS / editor noise
+Thumbs.db
+desktop.ini
+.DS_Store

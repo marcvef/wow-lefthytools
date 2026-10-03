@@ -1,0 +1,11 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
+..\..\..\Blizzard_SharedXML\UI.xsd">
+	<!--
+		World map pin for a friend's position. The map canvas pools these by template name
+		(MapCanvasMixin:AcquirePin), calls the mixin's OnLoad itself and wires OnMouseEnter /
+		OnMouseLeave, so no scripts here. Hover only: clicks fall through to the map.
+	-->
+	<Frame name="LefthyToolsBeaconPinTemplate" mixin="LefthyToolsBeaconPinMixin" enableMouseMotion="true" virtual="true">
+		<Size x="14" y="14"/>
+	</Frame>
+</Ui>

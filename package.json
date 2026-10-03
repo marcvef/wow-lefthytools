@@ -1,0 +1,12 @@
+{
+  "name": "lefthytools",
+  "private": true,
+  "description": "Dev tooling for the LefthyTools WoW: Forever addon (syntax check + mocked smoke test)",
+  "scripts": {
+    "test": "node tests/run.js"
+  },
+  "devDependencies": {
+    "fengari": "^0.1.4",
+    "luaparse": "^0.3.1"
+  }
+}

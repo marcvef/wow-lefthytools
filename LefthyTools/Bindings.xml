@@ -1,0 +1,8 @@
+<Bindings>
+	<Binding name="LEFTHYTOOLS_MIRAGE_TOGGLE" header="LEFTHYTOOLS" category="ADDONS">
+		LefthyTools:ToggleModule("mirage")
+	</Binding>
+	<Binding name="LEFTHYTOOLS_MIRAGE_PEEK" runOnUp="true" category="ADDONS">
+		LefthyTools:GetModule("mirage"):SetPeek(keystate == "down")
+	</Binding>
+</Bindings>
