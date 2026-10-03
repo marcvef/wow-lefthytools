@@ -17,6 +17,10 @@ LT.modules = {}
 local moduleByKey = {}
 local loggedIn = false
 
+-- Core parts that aren't modules (Errors.lua, ...): onLoad(db) runs once the saved variables are
+-- there, before the modules initialize; onLogin() at PLAYER_LOGIN, before the modules start.
+LT.onLoad, LT.onLogin = {}, {}
+
 function LT.Print(msg, source)
 	print("|cffe0b060" .. (source or "LefthyTools") .. "|r: " .. msg)
 end
@@ -222,6 +226,12 @@ events:SetScript("OnEvent", function(_, event, arg)
 		db.modules = type(db.modules) == "table" and db.modules or {}
 		db.settings = type(db.settings) == "table" and db.settings or {}
 		LT.db = db
+		for _, fn in ipairs(LT.onLoad) do
+			local ok, err = pcall(fn, db)
+			if not ok then
+				geterrorhandler()(err)
+			end
+		end
 
 		for _, m in ipairs(LT.modules) do
 			if type(db.modules[m.key]) ~= "boolean" then
@@ -236,6 +246,12 @@ events:SetScript("OnEvent", function(_, event, arg)
 		ns.SetupOptions()
 	elseif event == "PLAYER_LOGIN" then
 		loggedIn = true
+		for _, fn in ipairs(LT.onLogin) do
+			local ok, err = pcall(fn)
+			if not ok then
+				geterrorhandler()(err)
+			end
+		end
 		for _, m in ipairs(LT.modules) do
 			if LT.db.modules[m.key] then
 				m.enabled = true

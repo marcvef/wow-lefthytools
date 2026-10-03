@@ -25,6 +25,17 @@ L["Up to date (compared with %d friend(s))"] = "Aktuell (verglichen mit %d Freun
 L["Modules"] ="Module"
 L["Settings: LefthyTools > %s"] = "Einstellungen: LefthyTools > %s"
 
+-- Error catcher
+L["Errors"] = "Fehler"
+L["LefthyTools' own Lua errors, kept across sessions. /lefthy errors shows them ready to copy, /lefthy errors clear removes them."] =
+	"Lua-Fehler von LefthyTools selbst, auch über mehrere Sessions gespeichert. /lefthy errors zeigt sie zum Kopieren an, /lefthy errors clear löscht sie."
+L["None"] = "Keine"
+L["%d (type /lefthy errors)"] = "%d (/lefthy errors eingeben)"
+L["LefthyTools errors"] = "LefthyTools-Fehler"
+L["Click into the text, press Ctrl+A and then Ctrl+C to copy it, and send it to whoever gave you LefthyTools."] =
+	"In den Text klicken, Strg+A und dann Strg+C drücken, um ihn zu kopieren, und ihn dem schicken, von dem du LefthyTools hast."
+L["Clear"] = "Löschen"
+
 -- Mirage
 L["Fades the interface when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD."] =
 	"Blendet das Interface aus, wenn du nicht im Kampf bist und es gerade nicht benutzt, wie das Dynamic HUD in Dune: Awakening."

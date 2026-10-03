@@ -15,8 +15,8 @@ Open **Options → AddOns → LefthyTools**, click LefthyTools in the minimap's 
 compartment, or type `/lefthy` (short: `/lt`).
 
 - **LefthyTools** (overview): a switch for each module, and an **Info** section with your
-  version and whether a newer one is out. LefthyTools can't go online itself, so it knows about
-  updates from Battle.net friends who run it (Beacon).
+  version, whether a newer one is out, and LefthyTools errors. LefthyTools can't go online
+  itself, so it knows about updates from Battle.net friends who run it (Beacon).
 - One page per module below it, e.g. **LefthyTools → Mirage**.
 
 ```
@@ -24,7 +24,12 @@ compartment, or type `/lefthy` (short: `/lt`).
 /lefthy modules                    list modules and whether they're on
 /lefthy enable | disable <module>  switch a module, e.g. /lefthy disable mirage
 /lefthy <module> ...               module commands, e.g. /lefthy mirage status
+/lefthy errors [clear]             LefthyTools' own errors, ready to copy
 ```
+
+**If something breaks:** LefthyTools keeps its own Lua errors, also across sessions and with
+Blizzard's error display off, and says so once in chat. Type `/lefthy errors`, click into the
+text, press Ctrl+A and Ctrl+C, and send it to whoever gave you LefthyTools.
 
 Key bindings are under Options → Keybindings → AddOns → LefthyTools.
 

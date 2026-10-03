@@ -123,6 +123,31 @@ function FrameMethods:GetFrameLevel() return self._level or 1 end
 function FrameMethods:SetFrameStrata(s) self._strata = s end
 function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
+function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
+function FrameMethods:SetToplevel() end
+-- Buttons and edit boxes
+function FrameMethods:SetText(text)
+	self._text = text
+	if self._kind == "EditBox" and self._scripts.OnTextChanged then self._scripts.OnTextChanged(self, false) end
+end
+function FrameMethods:GetText() return self._text end
+function FrameMethods:Click(button) if self._scripts.OnClick then self._scripts.OnClick(self, button or "LeftButton") end end
+function FrameMethods:SetEnabled(e) self._enabled = e end
+function FrameMethods:IsEnabled() return self._enabled ~= false end
+function FrameMethods:SetMultiLine(m) self._multiLine = m end
+function FrameMethods:SetAutoFocus(a) self._autoFocus = a end
+function FrameMethods:SetFontObject(f) self._font = f end
+function FrameMethods:HighlightText() self._highlighted = true end
+function FrameMethods:SetFocus() self._focus = true end
+function FrameMethods:ClearFocus() self._focus = false end
+function FrameMethods:HasFocus() return self._focus == true end
+function FrameMethods:SetMaxLetters(n) self._maxLetters = n end
+function FrameMethods:SetCursorPosition() end
+-- Scroll frames
+function FrameMethods:SetScrollChild(child) self._scrollChild = child end
+function FrameMethods:GetScrollChild() return self._scrollChild end
+function FrameMethods:SetVerticalScroll(v) self._scroll = v end
+function FrameMethods:GetVerticalScroll() return self._scroll or 0 end
 -- Animation groups. With SetToFinalAlpha(true), Play() jumps straight to the end state: each
 -- target gets the toAlpha of its last-ending Alpha step (what the game shows once it's done).
 local function NewAnimationGroup()
@@ -189,10 +214,21 @@ function FrameMethods:CreateFontString()
 	local fs = {}
 	function fs:SetAllPoints() end
 	function fs:SetPoint() end
+	function fs:ClearAllPoints() end
 	function fs:SetText(text) self.text = text end
 	function fs:GetText() return self.text end
 	function fs:GetStringWidth() return #(self.text or "") * 6 end
-	function fs:SetTextColor() end
+	function fs:GetStringHeight() local n = 1 for _ in (self.text or ""):gmatch("\n") do n = n + 1 end return n * 14 end
+	function fs:SetTextColor(r, g, b) self.color = { r, g, b } end
+	function fs:SetJustifyH(j) self.justifyH = j end
+	function fs:SetJustifyV(j) self.justifyV = j end
+	function fs:SetSpacing() end
+	function fs:SetWordWrap() end
+	function fs:SetWidth(w) self.width = w end
+	function fs:SetHeight(h) self.height = h end
+	function fs:SetFontObject(f) self.font = f end
+	function fs:SetAlpha(a) self.alpha = a end
+	function fs:SetShown(s) self.shown = s and true or false end
 	fs.shown = true
 	function fs:Show() self.shown = true end
 	function fs:Hide() self.shown = false end
@@ -205,17 +241,50 @@ function FrameMethods:CreateFontString()
 	return fs
 end
 
-function CreateFrame(_, name, parent)
-	local f = setmetatable({ _scripts = {}, _units = {}, _alpha = 1, _shown = true, _parent = parent, _name = name }, FrameMethods)
+-- What the Blizzard templates the addon uses add to a frame.
+local function ApplyTemplate(f, template)
+	f._template = template
+	if template:find("ButtonFrameTemplate", 1, true) then
+		f.TitleContainer = CreateFrame("Frame", nil, f)
+		f.TitleContainer.TitleText = f.TitleContainer:CreateFontString()
+		function f:SetTitle(title) self.TitleContainer.TitleText:SetText(title) end
+		f.Inset = CreateFrame("Frame", nil, f)
+		f.CloseButton = CreateFrame("Button", nil, f)
+		f.CloseButton:SetScript("OnClick", function() f:Hide() end)
+	elseif template:find("ScrollFrameTemplate", 1, true) then
+		f.ScrollBar = CreateFrame("Slider", nil, f)
+	end
+end
+
+function CreateFrame(kind, name, parent, template)
+	local f = setmetatable({ _scripts = {}, _units = {}, _alpha = 1, _shown = true, _parent = parent, _name = name, _kind = kind }, FrameMethods)
 	if name then _G[name] = f end
 	if parent then
 		parent._children = parent._children or {}
 		parent._children[#parent._children + 1] = f
 	end
 	allFrames[#allFrames + 1] = f
+	if template then ApplyTemplate(f, template) end
 	return f
 end
 UIParent = CreateFrame("Frame", "UIParent")
+UISpecialFrames = {}
+function ButtonFrameTemplate_HidePortrait(f) f._noPortrait = true end
+
+-- Wall clock: 2026-10-03 12:00 plus the mock's game time.
+MOCK_EPOCH = os.time({ year = 2026, month = 10, day = 3, hour = 12, min = 0, sec = 0 })
+function time() return MOCK_EPOCH + math.floor(now) end
+function date(fmt, t) return os.date(fmt, t or time()) end
+function GetBuildInfo() return "1.60.1", "70205", "Oct 1 2026", 16001 end
+function debugstack() return debug.traceback("", 2) end
+
+-- Blizzard_ScriptErrorsFrame: every Lua error reaches DisplayMessageInternal (also with the error
+-- display off), like through Blizzard's HandleLuaError.
+CreateFrame("Frame", "ScriptErrorsFrame", UIParent)
+SCRIPT_ERRORS = {}
+function ScriptErrorsFrame:DisplayMessageInternal(message, messageType, stack)
+	SCRIPT_ERRORS[#SCRIPT_ERRORS + 1] = { message = message, messageType = messageType, stack = stack }
+end
 
 ERRORS = {}
 BLOCKED = {} -- protected calls the game would block (ADDON_ACTION_BLOCKED)
@@ -223,6 +292,7 @@ function geterrorhandler()
 	return function(err)
 		ERRORS[#ERRORS + 1] = tostring(err)
 		io.write("    [error handler] " .. tostring(err) .. "\n")
+		ScriptErrorsFrame:DisplayMessageInternal(tostring(err), 0, debug.traceback("", 2))
 	end
 end
 

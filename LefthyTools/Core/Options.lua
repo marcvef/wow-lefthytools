@@ -190,6 +190,14 @@ function Options.UpdateStatus()
 	return GREEN .. L["Up to date (compared with %d friend(s))"]:format(compared) .. "|r"
 end
 
+function Options.ErrorStatus()
+	local count = LT.Errors.Count()
+	if count == 0 then
+		return GREEN .. L["None"] .. "|r"
+	end
+	return ORANGE .. L["%d (type /lefthy errors)"]:format(count) .. "|r"
+end
+
 local function AddInfoRow(layout, name, tooltip, getValue)
 	local initializer = Settings.CreateElementInitializer("LefthyToolsSettingsInfoTemplate",
 		{ name = name, tooltip = tooltip, getValue = getValue })
@@ -223,6 +231,9 @@ function ns.SetupOptions()
 	AddInfoRow(layout, L["Updates"],
 		L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload."],
 		Options.UpdateStatus)
+	AddInfoRow(layout, L["Errors"],
+		L["LefthyTools' own Lua errors, kept across sessions. /lefthy errors shows them ready to copy, /lefthy errors clear removes them."],
+		Options.ErrorStatus)
 
 	for _, m in ipairs(LT.modules) do
 		if type(m.BuildOptions) == "function" then
@@ -290,6 +301,8 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 	elseif cmd == "version" then
 		LT.Print("version " .. LT.version .. (LT.newerVersion and (", a friend has the newer " .. LT.newerVersion) or "")
 			.. ". To update, run Update-LefthyTools.cmd again, then /reload.")
+	elseif cmd == "errors" then
+		LT.Errors.Command(rest)
 	elseif (cmd == "enable" or cmd == "disable" or cmd == "toggle") and target then
 		if cmd == "toggle" then
 			LT:ToggleModule(target.key)
@@ -307,6 +320,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		LT.Print("/lefthy - open settings")
 		LT.Print("/lefthy modules - list modules")
 		LT.Print("/lefthy version - the installed LefthyTools version")
+		LT.Print("/lefthy errors [clear] - LefthyTools' own errors, ready to copy")
 		LT.Print("/lefthy enable | disable | toggle <module>")
 		LT.Print("/lefthy <module> ... - module commands, e.g. /lefthy mirage status")
 	end

@@ -12,6 +12,8 @@
 Core\Locale.lua
 Locales\deDE.lua
 Core\Core.lua
+Core\Window.lua
+Core\Errors.lua
 Core\Options.lua
 Core\Options.xml
 

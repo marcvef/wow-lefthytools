@@ -30,6 +30,8 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
 7. Drag a spell from the spellbook: bars are visible.
 8. Untick Mirage (or the toggle keybinding): everything fades back in and stays.
 9. Watch for Lua errors (`/console scriptErrors 1`), especially "action blocked" taint in combat.
+   `/lefthy errors` lists LefthyTools' own errors from all sessions (also with the error display
+   off); `/run error("x")` from chat must *not* show up there (not ours).
 10. Controller: the bar cluster and legend fade when idle; holding a trigger brings them back
     instantly; HUD mode, the radial menu and open bar flyouts keep them visible.
 11. Misc Tweaks: player/target bars show `current / max` without hovering; a dragged bag reopens

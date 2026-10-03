@@ -13,7 +13,7 @@ for k in pairs(_G) do globalsBefore[k] = true end
 -- Load the addon like the client would: TOC order, each file gets (addonName, ns).
 local ns = {}
 for _, file in ipairs(SOURCES) do
-	local chunk = assert(load(file.src, "@" .. file.name))
+	local chunk = assert(load(file.src, "@Interface/AddOns/LefthyTools/" .. file.name)) -- named like in game
 	chunk("LefthyTools", ns)
 end
 Fire("ADDON_LOADED", "LefthyTools")
@@ -54,6 +54,52 @@ check(Mirage.category and Mirage.category.parent == LT.category and Mirage.categ
 	"Mirage has its own sub-page under LefthyTools")
 check(#ADDON_CATEGORIES == 1 and ADDON_CATEGORIES[1] == LT.category,
 	"only the parent category is registered as an addon category")
+
+section("error catcher")
+local function errorRow() -- the overview's "Errors" info row
+	for _, init in ipairs(LAYOUTS["LefthyTools"]) do
+		if init.template == "LefthyToolsSettingsInfoTemplate" and init.data.name == "Errors" then return init.data.getValue() end
+	end
+end
+local errorsBefore, emark = #ERRORS, #PRINTED + 1
+check(LefthyToolsDB.errors and #LefthyToolsDB.errors == 0 and errorRow():find("None", 1, true), "no errors yet, the overview says so")
+local ours = "Interface/AddOns/LefthyTools/Modules/Beacon/Beacon.lua:42: attempt to index a nil value (field 'peer')"
+geterrorhandler()(ours)
+geterrorhandler()(ours)
+local kept = LefthyToolsDB.errors
+check(#kept == 1 and kept[1].msg == ours and kept[1].count == 2 and kept[1].kind == "error" and kept[1].version == "0.4.0-3-gabc1234",
+	"our error is kept once, counted twice, with the build it happened in")
+geterrorhandler()("Interface/AddOns/SomeoneElse/Main.lua:1: oops")
+check(#kept == 1, "another addon's error isn't ours")
+ScriptErrorsFrame:DisplayMessageInternal("Interface/AddOns/Blizzard_MapCanvas/MapCanvas.lua:9: bad argument", 0,
+	"[Interface/AddOns/Blizzard_MapCanvas/MapCanvas.lua]:9: in function 'AcquirePin'\n[Interface/AddOns/LefthyTools/Modules/Beacon/Dots.lua]:255: in function 'RefreshAllData'")
+check(#kept == 2 and kept[2].stack:find("Dots.lua", 1, true), "a Blizzard error with our code in the stack is ours too")
+ScriptErrorsFrame:DisplayMessageInternal(SECRET, 0, SECRET)
+check(#kept == 2, "a secret error message is left alone")
+Advance(0.05)
+local notices = 0
+for i = emark, #PRINTED do if PRINTED[i]:find("Type /lefthy errors", 1, true) then notices = notices + 1 end end
+check(notices == 1, "one chat notice per session (not from inside the error handler), got " .. notices)
+Fire("ADDON_ACTION_BLOCKED", "LefthyTools", "SetPassThroughButtons")
+Fire("ADDON_ACTION_BLOCKED", "OtherAddon", "CastSpellByName")
+check(#kept == 3 and kept[3].kind == "blocked" and kept[3].msg:find("SetPassThroughButtons", 1, true), "blocked actions of ours are kept too")
+check(errorRow():find("3 (type /lefthy errors)", 1, true), "the overview shows how many")
+lefthy("errors")
+local errWindow = LefthyToolsErrorsFrame
+local report = errWindow and errWindow.Box:GetText() or ""
+check(errWindow and errWindow:IsShown(), "/lefthy errors opens the error window")
+check(report:find("LefthyTools 0.4.0-3-gabc1234 | WoW 1.60.1.70205 (16001) | enUS", 1, true)
+	and report:find("[1] blocked", 1, true) and report:find("[3] error, 2x", 1, true) and report:find(ours, 1, true),
+	"the report: build, client, every error newest first, got\n" .. report)
+check(not report:find("|c", 1, true), "plain text, no colour codes")
+check(#UISpecialFrames > 0 and UISpecialFrames[#UISpecialFrames] == "LefthyToolsErrorsFrame", "Escape closes it")
+for i = 1, 30 do geterrorhandler()("Interface/AddOns/LefthyTools/Core/Core.lua:" .. i .. ": test " .. i) end
+check(#kept == 25 and kept[25].msg:find("test 30", 1, true) and not kept[1].msg:find(ours, 1, true), "at most 25 kept, the oldest go")
+lefthy("errors clear")
+check(#LefthyToolsDB.errors == 0 and errorRow():find("None", 1, true), "/lefthy errors clear")
+check(errWindow.Box:GetText():find("No errors.", 1, true), "the open window follows")
+errWindow:Hide()
+for i = #ERRORS, errorsBefore + 1, -1 do table.remove(ERRORS, i) end -- the test's own errors
 
 section("discovery")
 local ab = Mirage:GetGroup("actionbars")

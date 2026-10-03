@@ -11,7 +11,7 @@ LefthyToolsDB = { modules = { mirage = true } }
 MOCK_NO_RETAIL_ATLAS = true -- a client without retail's combo point art: classic gems instead
 local ns = {}
 for _, file in ipairs(SOURCES) do
-	local chunk = assert(load(file.src, "@" .. file.name))
+	local chunk = assert(load(file.src, "@Interface/AddOns/LefthyTools/" .. file.name)) -- named like in game
 	chunk("LefthyTools", ns)
 end
 Fire("ADDON_LOADED", "LefthyTools")
@@ -87,6 +87,10 @@ check(PRINTED[#PRINTED] and PRINTED[#PRINTED]:find("Anna|r hat Level 21 erreicht
 	"a friend's level-up without their own text uses the German default")
 check(S("LefthyTools_beacon_dingText").name == "Level-Up-Nachricht" and SETTINGS_BUTTONS["Nachricht testen"],
 	"level-up settings are German")
+
+LT.Errors.Show()
+check(LefthyToolsErrorsFrame.TitleContainer.TitleText:GetText() == "LefthyTools-Fehler", "error window in German")
+LefthyToolsErrorsFrame:Hide()
 
 SlashCmdList.LEFTHYTOOLS_MIRAGE("status")
 check(#ns.L_MISSING == 0 and next(ns.L_MISSING) == nil, "chat commands don't look up settings texts")

@@ -13,6 +13,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Core/Locale.lua            ns.L localization table (English keys, falls back to English)
   Locales/deDE.lua           German settings texts (loaded only on a deDE client)
   Core/Core.lua              module registry, saved settings, enable/disable lifecycle
+  Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons
+  Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
   Core/Options.lua           settings panel (overview + one page per module), option builder, /lefthy
   Core/Options.xml           text field row for the settings list (Builder:TextInput)
   Modules/Mirage/Groups.lua  frame names per group, window list, chat events (edit to add frames)
@@ -76,6 +78,23 @@ read-only rows (`LefthyToolsSettingsInfoTemplate` in `Core/Options.xml`, a list 
 `SettingsListElementMixin` whose `Init` reads the value each time the row is shown): Version, and
 Updates (`Options.UpdateStatus`: newer version available / up to date compared with N friends /
 unknown, no friend with LefthyTools online or Beacon off).
+
+## Error catcher (Core/Errors.lua)
+
+Every Lua error goes through Blizzard's handler (`Blizzard_ScriptErrors`: `HandleLuaError`, which
+only Blizzard code may extend with `AddLuaErrorHandler`) to
+`ScriptErrorsFrame:DisplayMessageInternal(message, messageType, stack, locals)`, also with "Show
+Lua errors" off. A `hooksecurefunc` post-hook there sees each error with its stack, without
+replacing the error handler. Errors whose message or stack contains `AddOns/LefthyTools/` are kept
+in `LefthyToolsDB.errors` (at most 25, the same message counted instead of repeated, with the
+build and first/last time), and so are `ADDON_ACTION_BLOCKED`/`FORBIDDEN` events naming
+LefthyTools. Secret messages are skipped; locals are never kept (they can hold chat text). The
+hook body runs in `pcall`, so it can't cause errors itself. Errors before the saved variables load
+wait in a list; the first one per session prints one chat line, on the next frame (never from
+inside the error handler). `/lefthy errors` shows a plain-text report (build, client, every error
+newest first) in a read-only edit box to copy; `/lefthy errors clear` empties it; the overview's
+Info section shows the count. Core parts that aren't modules hook in through `LT.onLoad` (saved
+variables ready) and `LT.onLogin`.
 
 ## Module framework (Core/)
 
