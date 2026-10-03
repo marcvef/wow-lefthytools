@@ -54,8 +54,10 @@ toys, achievements, longestSession. Secret values (GUIDs, names, chat text in an
 skipped.
 
 **Session:** starts at a real login (`PLAYER_ENTERING_WORLD` with `isInitialLogin`), or when a
-character has none yet (then the login's PEW doesn't start a second one); a `/reload` continues
-it. A snapshot of the counters and the gold at the start gives the session's numbers
+character has none yet, or when Chronicle is switched on more than 5 minutes after its session's
+last tick (`session.last`, stamped every tick: Chronicle was off at login and switched on later);
+in those cases the login's PEW doesn't start a second one. A `/reload`, or switching it off and on,
+continues it. A snapshot of the counters and the gold at the start gives the session's numbers
 (`C.Session`): time, XP, levels, quests, kills, deaths, gold change, distance.
 
 ## Cost

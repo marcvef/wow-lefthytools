@@ -2481,6 +2481,14 @@ do
 	check(me.stats.quests == quests and CH.ticks == ticks, "switched off: nothing recorded, nothing runs")
 	lefthy("enable chronicle")
 	check(me.stats.sessions == 1, "switching it back on continues the session")
+	Advance(1.1)
+	lefthy("disable chronicle")
+	me.session.last = time() - 3 * 86400 -- as if it was off at login and the session is from days ago
+	local longest = me.stats.longestSession
+	lefthy("enable chronicle")
+	Advance(1.1)
+	check(me.stats.sessions == 2 and CH.Session().played < 5 and me.stats.longestSession == longest,
+		"switched on long after the last session: a new one, not the old one going on for days")
 end
 
 section("Beacon: leaving")

@@ -33,6 +33,7 @@ local SHARE_DAYS = 7         -- days a friend gets from me when they show up
 local SHARE_GAP = 300        -- today's numbers go to friends at most this often (if they changed)
 local FRIEND_DAYS = 30       -- days of friends' numbers kept
 local SAMPLE_STEP, SAMPLE_MAX = 60, 240 -- the session curve: a point a minute, at most 240
+local SESSION_GAP = 300 -- switched on after this long without a tick: a new session
 local issecret = issecretvalue or function() return false end
 
 local STAT_KEYS = {
@@ -584,7 +585,8 @@ local function Tick(now, elapsed)
 		char.zoneTime[zone] = (char.zoneTime[zone] or 0) + elapsed
 	end
 	if char.session then
-		stats.longestSession = math.max(stats.longestSession, time() - char.session.start)
+		char.session.last = time()
+		stats.longestSession = math.max(stats.longestSession, char.session.last - char.session.start)
 	end
 	if zoneDirty then
 		CheckZone()
@@ -795,8 +797,11 @@ function M:OnEnable()
 	handlers.PLAYER_XP_UPDATE() -- the starting point for counting experience
 	zoneDirty, professionsDirty, lastPos.continent = true, true, nil
 	sessionJustStarted = false
-	if not char.session then
-		StartSession() -- a new character, or Chronicle switched on mid-session
+	-- A new character, or Chronicle switched on mid-game after being off: the session it knows
+	-- ended long ago (a /reload or switching it off and on keeps it; those take seconds).
+	local session = char.session
+	if not session or (session.last and time() - session.last > SESSION_GAP) then
+		StartSession()
 		sessionJustStarted = true
 	end
 	PruneDaily()
