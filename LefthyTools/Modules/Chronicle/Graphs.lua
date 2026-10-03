@@ -70,6 +70,10 @@ function Canvas:Rect(x, y, w, h, r, g, b, a, layer)
 	t:SetPoint("TOPLEFT", self.parent, "TOPLEFT", x, -y)
 	t:SetSize(math.max(w, 0.1), math.max(h, 0.1))
 	t:SetColorTexture(r, g, b, a or 1)
+	if t.hasGradient then -- it was a bar last time: the gradient outlives SetColorTexture
+		t:SetVertexColor(1, 1, 1, 1)
+		t.hasGradient = nil
+	end
 	return t
 end
 
@@ -78,6 +82,7 @@ function Canvas:Bar(x, y, w, h, color, alpha)
 	local t = self:Rect(x, y, w, h, 1, 1, 1, 1)
 	local r, g, b = color[1], color[2], color[3]
 	t:SetGradient("VERTICAL", CreateColor(r * 0.45, g * 0.45, b * 0.45, alpha or 0.9), CreateColor(r, g, b, alpha or 1))
+	t.hasGradient = true
 	return t
 end
 

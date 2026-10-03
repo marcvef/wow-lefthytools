@@ -2390,6 +2390,14 @@ do
 	end
 	check(draws == 1 and win.Text:GetText() == "" and not win.Tabs.graphs:IsEnabled() and canvas.used.tex > 30,
 		"the Graphs page draws its cards")
+	do
+		local scratch = CH.Graphs.NewCanvas(CreateFrame("Frame"))
+		local bar = scratch:Bar(0, 0, 10, 10, { 1, 0, 0 })
+		scratch:Reset()
+		local rect = scratch:Rect(0, 0, 5, 5, 0.2, 0.2, 0.2, 1)
+		check(rect == bar and not rect.gradient and rect.color[1] == 0.2,
+			"a texture that was a bar and is now a plain rectangle loses the bar's gradient")
+	end
 	local yesterday = hoverWith(date("%Y-%m-%d", time() - 86400))
 	check(yesterday and yesterday.lines[2] == "Time: 1h 0m" and not hoverWith(date("%Y-%m-%d", time() - 20 * 86400)),
 		"last 14 days: a bar per day with its value on hover (older days aren't shown)")

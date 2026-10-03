@@ -207,7 +207,7 @@ local function NewTexture()
 	function t:SetAlpha(a) self.alpha = a end
 	function t:CreateAnimationGroup() return NewAnimationGroup() end
 	function t:SetAtlas(atlas) self.atlas, self.color = atlas, nil end
-	function t:SetVertexColor(r, g, b, a) self.vertex = { r, g, b, a } end
+	function t:SetVertexColor(r, g, b, a) self.vertex, self.gradient = { r, g, b, a }, nil end -- replaces a gradient
 	function t:SetBlendMode(mode) self.blend = mode end
 	function t:ClearAllPoints() self.points = {} end
 	function t:SetSize(w, h) self.width, self.height = w, h end
