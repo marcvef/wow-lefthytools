@@ -86,7 +86,9 @@ online, so friends are the only source. The overview settings page has an Info s
 read-only rows (`LefthyToolsSettingsInfoTemplate` in `Core/Options.xml`, a list element built on
 `SettingsListElementMixin` whose `Init` reads the value each time the row is shown): Version, and
 Updates (`Options.UpdateStatus`: newer version available / up to date compared with N friends /
-unknown, no friend with LefthyTools online or Beacon off).
+unknown, no friend with LefthyTools online or Beacon off). The Updates row's tooltip is a
+function (`Options.UpdateTooltip`; `Settings.InitTooltip` calls a function tooltip each time it
+opens): your build, then every Beacon friend's build marked newer / same / older.
 
 ## Error catcher (Core/Errors.lua)
 

@@ -208,6 +208,42 @@ function Options.UpdateStatus()
 	return GREEN .. L["Up to date (compared with %d friend(s))"]:format(compared) .. "|r"
 end
 
+-- The Updates row's tooltip, built each time it opens: my build and every Beacon friend's.
+function Options.UpdateTooltip()
+	local lines = {
+		L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload."],
+		"",
+		L["You: %s"]:format(LT.version),
+	}
+	local beacon = LT:GetModule("beacon")
+	if not (beacon and beacon.enabled) then
+		lines[#lines + 1] = GRAY .. L["Unknown (Beacon is off)"] .. "|r"
+		return table.concat(lines, "\n")
+	end
+	local list = {}
+	for _, peer in pairs(beacon:GetPeers()) do
+		if peer.name then
+			list[#list + 1] = peer
+		end
+	end
+	table.sort(list, function(a, b) return a.name < b.name end)
+	if #list == 0 then
+		lines[#lines + 1] = GRAY .. L["No friend with LefthyTools online right now."] .. "|r"
+	end
+	for _, peer in ipairs(list) do
+		local name = LT.Window.ClassColorCode(peer.classFile) .. peer.name .. "|r"
+		if not peer.version then
+			lines[#lines + 1] = name .. ": " .. GRAY .. L["0.3.0 or older"] .. "|r"
+		else
+			local compared = LT.CompareVersions(peer.version, LT.version)
+			local state = compared == 1 and (ORANGE .. L["newer"]) or compared == -1 and (GRAY .. L["older"])
+				or compared == 0 and (GREEN .. L["same"]) or ""
+			lines[#lines + 1] = ("%s: %s  %s|r"):format(name, peer.version, state)
+		end
+	end
+	return table.concat(lines, "\n")
+end
+
 function Options.ErrorStatus()
 	local count = LT.Errors.Count()
 	if count == 0 then
@@ -246,9 +282,7 @@ function ns.SetupOptions()
 	AddInfoRow(layout, L["Version"],
 		L["The installed LefthyTools build. 0.4.0 is a release, 0.4.0-3-g1a2b3c4 is three changes after it."],
 		function() return LT.version end)
-	AddInfoRow(layout, L["Updates"],
-		L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload."],
-		Options.UpdateStatus)
+	AddInfoRow(layout, L["Updates"], Options.UpdateTooltip, Options.UpdateStatus) -- a tooltip function: built on hover
 	layout:AddInitializer(CreateSettingsButtonInitializer(L["What's new"], L["Show"], function() LT.WhatsNew.Show(false) end,
 		L["Every change to LefthyTools, newest first. After an update this opens by itself once."], true))
 	AddInfoRow(layout, L["Errors"],

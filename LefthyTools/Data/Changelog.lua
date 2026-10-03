@@ -57,5 +57,8 @@ ns.CHANGELOG = {
 	{ id = 17, version = "0.5.0", module = "beacon",
 		en = { "Friends on the same spot", "Their dots move slightly apart so both show, and hovering either one shows both." },
 		de = { "Freunde an derselben Stelle", "Ihre Punkte rücken etwas auseinander, damit beide zu sehen sind, und der Tooltip zeigt beide." } },
+	{ id = 18, version = "0.5.0", module = "general",
+		en = { "Who runs which version", "Hover Updates on the settings overview: your build and every friend's, marked newer, same or older." },
+		de = { "Wer welche Version hat", "Mouseover über Updates in der Übersicht: dein Stand und der jedes Freundes, markiert als neuer, gleich oder älter." } },
 	-- New entries go here, at the end.
 }

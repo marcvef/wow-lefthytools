@@ -1274,6 +1274,16 @@ vmark = #PRINTED + 1
 lefthy("beacon status")
 check(printedSince(vmark):find("LefthyTools 0.5.0", 1, true), "/lefthy beacon status shows each friend's version")
 check(updateStatus():find("Newer version available: 0.5.0", 1, true), "settings overview: the newest version seen from a friend, got " .. updateStatus())
+local updatesTip = infoRow("Updates").data.tooltip
+check(type(updatesTip) == "function", "the Updates tooltip is built when it opens")
+local tip = updatesTip()
+check(tip:find("You: 0.4.0-3-gabc1234", 1, true) and tip:find("Anna|r: 0.5.0  |cffffa040newer", 1, true),
+	"it lists my build and each friend's, marked newer / same / older, got\n" .. tip)
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.4.0-3-gabc1234", "WHISPER", 11)
+Advance(0.15)
+check(updatesTip():find("Anna|r: 0.4.0-3-gabc1234  |cff80ff80same", 1, true), "same build")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11) -- back to what the next checks expect
+Advance(0.15)
 vmark = #PRINTED + 1
 lefthy("version")
 check(printedSince(vmark):find("a friend has the newer 0.5.0", 1, true), "/lefthy version mentions it too")
