@@ -2296,6 +2296,19 @@ do
 		"a reserved item gone at a vendor: a warning while it can be bought back")
 	Fire("MERCHANT_CLOSED")
 	Advance(0.1)
+	-- Won while already at a vendor (nothing reserved when it opened): watched too.
+	wipe(owed)
+	BAGS[0][5] = 6948
+	Fire("MERCHANT_SHOW")
+	Advance(0.1)
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", 11)
+	pmark = #PRINTED + 1
+	BAGS[0][5] = nil
+	Fire("BAG_UPDATE_DELAYED")
+	Advance(0.1)
+	check(printedSince(pmark):find("which Anna won, is gone", 1, true), "reserved while at the vendor, then gone: the warning too")
+	Fire("MERCHANT_CLOSED")
+	Advance(0.1)
 	-- In combat no guard is made (pass-through can't be set then).
 	wipe(owed)
 	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12)

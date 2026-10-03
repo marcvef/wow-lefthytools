@@ -140,6 +140,9 @@ function B.AddHandover(itemString, link, winner, guid, gameAccountID, itemGUID)
 	end
 	list[#list + 1] = { itemID = itemID, link = link, winner = winner, mailName = mailName, guid = guid,
 		itemGUID = itemGUID, at = time() }
+	if merchantOpen and C_Item.GetItemCount then
+		counts[itemID] = C_Item.GetItemCount(itemID) -- won while at a vendor: watched from now on
+	end
 	while #list > MAX do
 		table.remove(list, 1)
 	end
