@@ -469,6 +469,10 @@ function B.UpdateCalls(now)
 	for key, call in pairs(calls) do
 		local f = call.frame
 		if call.state == "open" then
+			if not f and #shown < MAX_FRAMES then
+				Draw(call) -- it made room for a newer one earlier: back, buttons and all
+				f = call.frame
+			end
 			if f and call.id then
 				local total = call.mine and CALL_TIME or CALL_TIME + 5
 				f.Timer:SetWidth(math.max(1, TIMER_WIDTH * math.max(0, call.ends - now) / total))
@@ -487,6 +491,11 @@ function B.UpdateCalls(now)
 			elseif not call.mine and now >= call.ends then
 				-- no verdict came (they went offline): let it go
 				call.state, call.doneAt = "done", now - SHOW_RESULT + 2
+				if f then
+					f.Need:Hide()
+					f.Pass:Hide()
+					f.Timer:Hide()
+				end
 			end
 		elseif call.state == "rolling" then
 			if now >= call.rollEnds then

@@ -1984,6 +1984,25 @@ do
 	Advance(30)
 	check(not next(BB.calls), "all of them run out")
 
+	-- Four open offers: the oldest makes room, and comes back with its buttons once there's room.
+	anna("I2;1179::::::::20:::::;8001")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "I2;6948::::::::20:::::;8002", "WHISPER", 12)
+	Advance(2.1)
+	anna("I2;19019::::::::20:::::;8003")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "I2;1155::::::::20:::::;8004", "WHISPER", 12)
+	Advance(0.15)
+	local pushedOut = BB.calls["11:8001"]
+	check(pushedOut and not pushedOut.frame and BB.calls["12:8004"].frame, "the oldest open offer made room")
+	anna("R2;8003;") -- nobody needed hers
+	Advance(9)
+	check(pushedOut.frame and pushedOut.frame:IsShown() and pushedOut.frame.Need:IsShown()
+		and pushedOut.frame.Line:GetText():find(ItemLink(1179), 1, true), "once there's room it's back, with Need and Pass")
+	Advance(14) -- no verdict from Anna: it runs out
+	check(pushedOut.state == "done" and pushedOut.frame and not pushedOut.frame.Need:IsShown() and not pushedOut.frame.Timer:IsShown(),
+		"an offer that runs out without a verdict loses its buttons right away")
+	Advance(10)
+	check(not next(BB.calls), "and all of them go")
+
 	-- Answers to two of my offers in the same moment: both count.
 	ctrlRight(ItemLink(1155), true)
 	Advance(3.1)
