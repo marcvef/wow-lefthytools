@@ -42,6 +42,7 @@ local SEND_RATE, SEND_BURST = 10, 10 -- messages per second, across all friends
 local THROTTLE_PAUSE = 2     -- the server said slow down: pause sending this long
 local INBOX_LIMIT = 20       -- messages per second accepted from one friend
 local DING_GAP = 10          -- level-up messages accepted from one friend at most this often
+local DEATH_GAP = 10         -- death alerts for one friend at most this often
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
@@ -58,6 +59,7 @@ local M = LT:NewModule("beacon", {
 		showMinimap = true,
 		minimapEdge = true,
 		showGroup = true,
+		deathAlert = true,
 		dingAnnounce = true,
 		dingText = "",
 		dingShow = true,
@@ -66,9 +68,20 @@ local M = LT:NewModule("beacon", {
 	},
 })
 
--- Shared with Dots.lua and Ding.lua.
-local B = { module = M, VERSION = VERSION, handlers = {} }
+-- Shared with Dots.lua, Ding.lua and Alerts.lua.
+local B = { module = M, VERSION = VERSION, handlers = {}, listeners = {} }
 ns.Beacon = B
+
+-- Things that happened to a friend ("level", "death", ...), for other modules (Chronicle):
+-- table.insert(ns.Beacon.listeners, function(kind, peer, data) ... end). Called on the driver tick.
+function B.Notify(kind, peer, data)
+	for _, listener in ipairs(B.listeners) do
+		local ok, err = pcall(listener, kind, peer, data)
+		if not ok then
+			geterrorhandler()(err)
+		end
+	end
+end
 
 -- peers[gameAccountID] = {
 --   seen                             time of their last message
@@ -87,6 +100,7 @@ local owed = {}         -- gameAccountID -> true: send them my current state
 local outbox = {}       -- { gameAccountID, message }: one-off messages, sent before states
 local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt }: spam guards
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
+local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
 local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on the next tick
 local newerNoticeShown = false -- that notice comes once per login
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
@@ -446,10 +460,16 @@ local function Parse(text)
 	return nil
 end
 
+-- Returns true and who they were fighting (or nil) when this state says they just died.
 local function ApplyState(peer, now, flags, continent, north, west, subzone, target)
+	local wasAlive = peer.stateSeen and not (peer.dead or peer.ghost)
+	-- Their killer: whom they were fighting in their last state before this one. A long fight
+	-- sends no new state, so the time since then doesn't matter.
+	local foe = peer.combat and peer.target ~= "" and peer.target or nil
 	peer.dead, peer.ghost = flags:find("D", 1, true) ~= nil, flags:find("G", 1, true) ~= nil
 	peer.combat = flags:find("C", 1, true) ~= nil
 	peer.subzone, peer.target = B.Clean(subzone, 48), B.Clean(target, 48)
+	peer.stateSeen = true
 	if continent then
 		local fromNorth, fromWest, glide = north, west, 0
 		if peer.hasPos and peer.continent == continent then
@@ -467,6 +487,9 @@ local function ApplyState(peer, now, flags, continent, north, west, subzone, tar
 	end
 	peer.rev = peer.rev + 1
 	Changed()
+	if wasAlive and (peer.dead or peer.ghost) then
+		return true, foe
+	end
 end
 
 local function OnMessage(text, senderID)
@@ -514,7 +537,11 @@ local function OnMessage(text, senderID)
 	if kind == "H" then
 		answer = true              -- they (re)started the addon: answer with my state
 	elseif kind == "S" then
-		ApplyState(peer, now, a, b, c, d, e, f)
+		local died, foe = ApplyState(peer, now, a, b, c, d, e, f)
+		if died and (not guard.deathAt or now - guard.deathAt >= DEATH_GAP) then
+			guard.deathAt = now
+			deaths[#deaths + 1] = { senderID, foe }
+		end
 	elseif kind == "L" then
 		if not guard.dingAt or now - guard.dingAt >= DING_GAP then
 			guard.dingAt = now
@@ -571,6 +598,13 @@ local function Tick(now, elapsed)
 		local peer = peers[ding[1]]
 		if peer and peer.name and B.ShowDing then
 			B.ShowDing(peer, ding[2], ding[3])
+		end
+	end
+	while deaths[1] do
+		local death = table.remove(deaths, 1)
+		local peer = peers[death[1]]
+		if peer and peer.name and B.ShowDeath then
+			B.ShowDeath(peer, death[1], death[2])
 		end
 	end
 	-- A friend runs a newer LefthyTools: say so once per login (a /reload counts as one).
@@ -681,7 +715,7 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings }) do
+	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil
@@ -722,6 +756,10 @@ function M:BuildOptions(o)
 		L["Friends beyond the minimap's range stay faded at its edge, so you can see which way they are."])
 	o:Checkbox("showGroup", L["Show friends in my group too"],
 		L["Friends in your group keep their Beacon dot, with a blue ring, on top of the game's own group dot, and the tooltip says they're in your group. Off: only the game's dot."])
+
+	o:Header(L["Alerts"])
+	o:Checkbox("deathAlert", L["Tell me when a friend dies"],
+		L["A chat line when a friend dies: where, and what they were fighting."])
 
 	if B.BuildDingOptions then
 		B.BuildDingOptions(o)

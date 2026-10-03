@@ -1144,6 +1144,56 @@ vmark = #PRINTED + 1
 lefthy("version")
 check(printedSince(vmark):find("a friend has the newer 0.5.0", 1, true), "/lefthy version mentions it too")
 
+section("Beacon: death alerts")
+check(BDB.deathAlert == true and B("deathAlert") ~= nil, "a setting, on by default")
+local heard = {} -- what other modules (Chronicle) are told
+table.insert(BB.listeners, function(kind, peer, data) heard[#heard + 1] = { kind = kind, name = peer.name, data = data } end)
+local function anna(state) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", state, "WHISPER", 11) end
+Advance(10)
+anna("S2;C;0;260.0;750.0;Raven Hill;Stitches")
+Advance(1.2)
+pmark = #PRINTED + 1
+anna("S2;D;0;260.0;750.0;Raven Hill;")
+check(#PRINTED < pmark, "nothing printed inside the event handler")
+Advance(0.15)
+local deathLine = printedSince(pmark)
+check(deathLine:find("Anna|r died in Elwynn Forest - Raven Hill, fighting Stitches.", 1, true),
+	"a chat line: who died, where, and what they were fighting, got " .. deathLine)
+check(heard[#heard] and heard[#heard].kind == "death" and heard[#heard].name == "Anna" and heard[#heard].data.foe == "Stitches"
+	and heard[#heard].data.where == "Elwynn Forest - Raven Hill", "other modules hear about it")
+pmark = #PRINTED + 1
+anna("S2;G;0;260.0;750.0;Raven Hill;")
+Advance(1.2)
+anna("S2;;0;260.0;750.0;Raven Hill;")
+Advance(1.2)
+check(not printedSince(pmark):find("died", 1, true), "releasing and coming back: no more alerts")
+anna("S2;D;0;260.0;750.0;Raven Hill;")
+Advance(0.15)
+check(not printedSince(pmark):find("died", 1, true), "dying again within 10 s: not repeated")
+Advance(10)
+anna("S2;;0;260.0;750.0;Raven Hill;")
+Advance(1.2)
+anna("S2;D;0;260.0;750.0;Raven Hill;")
+Advance(0.15)
+check(printedSince(pmark):find("Anna|r died in Elwynn Forest - Raven Hill.", 1, true), "died out of combat (a fall): no killer")
+Advance(10)
+pmark = #PRINTED + 1
+anna("Q2")
+anna("S2;D;0;260.0;750.0;Raven Hill;")
+Advance(1.2)
+check(not printedSince(pmark):find("died", 1, true), "already dead when first heard of: no alert")
+anna("S2;;0;260.0;750.0;Raven Hill;")
+Advance(1.2)
+B("deathAlert"):SetValue(false)
+Advance(10)
+local heardBefore = #heard
+anna("S2;D;0;260.0;750.0;Raven Hill;")
+Advance(0.15)
+check(not printedSince(pmark):find("died", 1, true) and #heard == heardBefore + 1, "alerts off: no chat line (other modules still hear it)")
+B("deathAlert"):SetValue(true)
+anna("S2;;0;260.0;750.0;Goldshire;")
+Advance(1.2)
+
 section("Beacon: level-ups")
 lefthy("beacon ding {name} hit {level}, drinks on me!")
 check(BDB.dingText == "{name} hit {level}, drinks on me!" and B("dingText"):GetValue() == BDB.dingText,
@@ -1184,6 +1234,7 @@ local shown = printedSince(pmark)
 check(shown:find("Anna|r is now 21!", 1, true) ~= nil and shown:find("|cff40c7eb", 1, true) ~= nil,
 	"Anna's own message, her name in class colour, got " .. shown)
 check(SOUNDS[#SOUNDS] == 50111 and #SOUNDS == soundMark + 1, "with the picked sound (default: boss defeated fanfare, not the level-up fanfare)")
+check(heard[#heard].kind == "level" and heard[#heard].data.level == 21, "other modules hear about level-ups too")
 local toastFrame
 for _, f in ipairs(UIParent._children) do if f.Text and f.shownAt then toastFrame = f end end
 check(toastFrame and toastFrame:IsShown() and toastFrame.Text.text:find("is now 21!", 1, true), "big text on screen")

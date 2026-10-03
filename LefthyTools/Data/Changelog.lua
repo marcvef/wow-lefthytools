@@ -22,4 +22,7 @@ ns.CHANGELOG = {
 	{ id = 6, version = "0.5.0",
 		en = "This window: after an update it shows what's new. /lefthy news shows all changes again.",
 		de = "Dieses Fenster: Nach einem Update zeigt es, was neu ist. /lefthy news zeigt alle Änderungen nochmal." },
+	{ id = 7, version = "0.5.0",
+		en = "Beacon: a chat line when a friend dies, with where and what they were fighting.",
+		de = "Beacon: Eine Chatzeile, wenn ein Freund stirbt, mit Ort und wogegen er gekämpft hat." },
 }

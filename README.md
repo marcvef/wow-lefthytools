@@ -119,6 +119,8 @@ minimap, and you on theirs, without being in a group.
   way they are.
 - **Hover a dot** for name (with AFK/DND), BattleTag, level, zone and subzone, who
   they're fighting, and how far away they are and in which direction ("240 yd north-east").
+- **Death alerts:** a chat line when a friend dies, with where and what they were fighting
+  ("Anna died in Duskwood - Raven Hill, fighting Stitches.").
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see
   "Anna reached level 21!" in their own language.
@@ -146,6 +148,7 @@ minimap, and you on theirs, without being in a group.
 | Show friends on the minimap | on | |
 | Keep far-away friends at the minimap edge | on | |
 | Show friends in my group too | on | |
+| Tell me when a friend dies | on | |
 | Tell my friends when I level up | on | |
 | Level-up message (`{name}` and `{level}` are filled in) | empty: default text | `/lefthy beacon ding <text>`, `ding reset` |
 | Test your message: **Preview** | | `/lefthy beacon ding test` |

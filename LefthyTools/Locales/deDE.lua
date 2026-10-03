@@ -163,6 +163,10 @@ L["Friends in your group keep their Beacon dot, with a blue ring, on top of the 
 L["Keep far-away friends at the minimap edge"] = "Entfernte Freunde am Minimap-Rand zeigen"
 L["Friends beyond the minimap's range stay faded at its edge, so you can see which way they are."] =
 	"Freunde außerhalb der Minimap-Reichweite bleiben blass am Rand, damit du siehst, in welcher Richtung sie sind."
+L["Alerts"] = "Meldungen"
+L["Tell me when a friend dies"] = "Melden, wenn ein Freund stirbt"
+L["A chat line when a friend dies: where, and what they were fighting."] =
+	"Eine Chatzeile, wenn ein Freund stirbt: wo, und wogegen er gekämpft hat."
 L["Level-ups"] = "Level-Ups"
 L["Tell my friends when I level up"] = "Freunden meine Level-Ups melden"
 L["Battle.net friends who also use LefthyTools see your level-up message."] =

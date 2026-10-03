@@ -6,7 +6,7 @@ Battle.net friends; each player writes their own level-up message.
 
 Files: `Beacon.lua` (module, protocol, rate limiter, settings, `/lefthy beacon`), `Dots.lua` (dot
 look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages, toast, sounds),
-`Beacon.xml` (world map pin template). They share state through `ns.Beacon` (`B`): `B.peers`,
+`Alerts.lua` (death alerts), `Beacon.xml` (world map pin template). They share state through `ns.Beacon` (`B`): `B.peers`,
 `B.Clean`, `B.QueueToPeers`, `B.MyWorldPosition`, and hooks the other files set (`B.RefreshMaps`,
 `B.UpdateMinimap`, `B.Attach`/`B.Detach`, `B.ShowDing`, `B.AnnounceLevel`, `B.OnSettingChanged`).
 
@@ -110,6 +110,20 @@ returns at once unless the own position, facing, zoom, a glide or the data chang
   subzone, dead/ghost, in combat / fighting X, and distance + 8-way direction (German: "m" and
   "nördlich" etc.). No race/class (the colour says it). Health can't be shared (secret);
   a secret target name becomes "".
+
+## Death alerts and listeners
+
+`ApplyState` notices a friend going from alive to dead or ghost (only after a first state from
+them, so someone already dead when first heard of isn't announced) and returns whom they were
+fighting: the target of their *previous* state if it was a combat state. A long fight sends no
+new state, so the time since then doesn't matter; dying out of combat (a fall) has no killer. At
+most one alert per friend per 10 s (kept in the inbox guard, so `Q2` can't reset it). On the next
+tick `Alerts.lua` prints "<skull> Anna died in Duskwood - Raven Hill, fighting Stitches." (English,
+like all chat output; zone from Battle.net, subzone from the state) when `deathAlert` is on.
+
+`B.Notify(kind, peer, data)` tells other modules about friends' events on the driver tick:
+`"level"` (`{ level }`) and `"death"` (`{ where, foe, level }`), also when the chat line or toast
+is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
 
 ## Level-ups
 

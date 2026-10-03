@@ -104,6 +104,7 @@ function B.ShowDing(peer, level, text)
 	if M.db.dingShow then
 		Announce(peer.name, peer.classFile, level, B.Clean(text, TEXT_MAX))
 	end
+	B.Notify("level", peer, { level = level })
 end
 
 function B.BuildDingOptions(o)
