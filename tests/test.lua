@@ -627,6 +627,54 @@ lefthy("tweaks combo on"); Advance(0.05)
 check(row:IsShown() and fullCount() == 3, "/lefthy tweaks combo on")
 COMBO.points, STATE.target = 0, false
 
+section("Misc Tweaks: quests that are new in WoW: Forever")
+check(TDB.foreverQuests == true and REGISTERED_SETTINGS.LefthyTools_tweaks_foreverQuests, "on by default, with a checkbox")
+check(ns.IsForeverQuest(86574) and ns.IsForeverQuest(99411) and not ns.IsForeverQuest(86575)
+	and not ns.IsForeverQuest(176) and not ns.IsForeverQuest(8193), "the generated list: Forever's own quests, not Classic ones")
+local savedQuests = QUESTS
+local hogger = { id = 176, title = "Wanted: Hogger", objectives = {} }
+local foreverQuest = { id = 86574, title = "A Forever quest", objectives = {} }
+QUESTS = { hogger, foreverQuest }
+QuestLogQuests_Update()
+local logBadges = ns.GetForeverQuestBadges()
+local function titleButton(id) for _, b in ipairs(QUEST_LOG_BUTTONS) do if b.questID == id then return b end end end
+local function logBadge(id) local b = titleButton(id); return b and logBadges[b] end
+check(logBadge(86574) and logBadge(86574):IsShown() and logBadge(86574).Label.text == "NEW", "quest log: a NEW badge on the Forever quest")
+check(logBadge(86574):GetParent() == titleButton(86574), "... on that quest's own title button, right after Blizzard filled the list")
+check(not (logBadge(176) and logBadge(176):IsShown()), "... not on a Classic quest")
+QUESTS = { foreverQuest, hogger } -- the pool hands the buttons out in a different order
+QuestLogQuests_Update()
+check(logBadge(86574) and logBadge(86574):IsShown() and not (logBadge(176) and logBadge(176):IsShown()),
+	"reused title buttons don't keep a stale badge")
+local forButton = titleButton(86574)
+GameTooltip:SetOwner(forButton); TOOLTIP.shown = true -- Blizzard's own OnEnter shows the quest tooltip
+forButton._scripts.OnEnter(forButton)
+local tipLines = table.concat(TOOLTIP.lines, "|")
+check(tipLines:find("New in WoW: Forever", 1, true), "hovering the quest adds a line explaining the badge")
+GameTooltip:Hide()
+DIALOG_QUEST = 86574; QuestFrame:Show()
+Fire("QUEST_DETAIL")
+local _, dialogBadge = ns.GetForeverQuestBadges()
+check(not (dialogBadge and dialogBadge:IsShown()), "nothing inside the event handler")
+Advance(0.05)
+_, dialogBadge = ns.GetForeverQuestBadges()
+check(dialogBadge and dialogBadge:IsShown() and dialogBadge.Label.text == "New in WoW: Forever", "quest dialog: accepting a Forever quest")
+DIALOG_QUEST = 176; Fire("QUEST_PROGRESS"); Advance(0.05)
+check(not dialogBadge:IsShown(), "a Classic quest: no badge")
+DIALOG_QUEST = 86574; Fire("QUEST_COMPLETE"); Advance(0.05)
+check(dialogBadge:IsShown(), "turning in a Forever quest: badge")
+QuestFrame:Hide(); DIALOG_QUEST = nil; Fire("QUEST_FINISHED"); Advance(0.05)
+check(not dialogBadge:IsShown(), "dialog closed: badge gone")
+lefthy("tweaks newquests off"); Advance(0.05)
+QuestLogQuests_Update()
+check(not (logBadge(86574) and logBadge(86574):IsShown()) and TDB.foreverQuests == false, "/lefthy tweaks newquests off: no badges")
+DIALOG_QUEST = 86574; QuestFrame:Show(); Fire("QUEST_DETAIL"); Advance(0.05)
+check(not dialogBadge:IsShown(), "... also not in the dialog")
+QuestFrame:Hide(); DIALOG_QUEST = nil
+lefthy("tweaks newquests on"); Advance(0.05)
+check(logBadge(86574):IsShown(), "on again: the open quest log is marked right away")
+QUESTS = savedQuests
+
 section("Misc Tweaks: module switch and /lefthy tweaks")
 REGISTERED_SETTINGS.LefthyTools_module_tweaks:SetValue(false); Advance(0.05)
 check(not Tweaks.enabled and CVARS.statusText == "0" and CVARS.statusTextDisplay == "PERCENT",

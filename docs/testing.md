@@ -33,11 +33,15 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
 11. Misc Tweaks: player/target bars show `current / max` without hovering; a dragged bag reopens
     where it was left. In a party, finishing a quest objective posts `[Quest]: 10/10 ...` with a
     star icon; finishing the quest posts `quest complete!`.
-12. Combo points (rogue, personal resource display on): 5 empty sockets under its bars (retail art;
+12. New Forever quests: open the quest log with a quest from a new Forever area (e.g. the Skyborne
+    start): a small glowing NEW left of its title, none on old Classic quests; hovering adds "New in
+    WoW: Forever" to the tooltip. Talk to a quest giver of such a quest: the quest window shows the
+    badge in its top right corner when accepting and when turning in.
+13. Combo points (rogue, personal resource display on): 5 empty sockets under its bars (retail art;
     classic gems mean the `uf-roguecp` atlases are missing). Gems fill green → red with the slash
     animation; at full they breathe; a finisher bursts them out. Narrow the bars and hide the power
     bar in Edit Mode: the row follows. Switching target empties the row.
-13. Beacon (needs a Battle.net friend on Forever with the same LefthyTools): within ~30 s
+14. Beacon (needs a Battle.net friend on Forever with the same LefthyTools): within ~30 s
     `/lefthy beacon status` lists them. Their dot moves on the zone and continent map and glides on
     the minimap, in their class colour; hover shows name, BattleTag, level, zone, distance. They
     pull a mob: red pulsing ring, "Fighting <mob>". They die: skull. Rotate Minimap on: dots keep

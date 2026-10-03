@@ -17,6 +17,7 @@ local M = LT:NewModule("tweaks", {
 		questAnnounce = true,
 		comboPoints = true,
 		comboColors = true,
+		foreverQuests = true,
 	},
 })
 
@@ -358,6 +359,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyComboPoints(on) end }, -- ComboPoints.lua
 	{ key = "comboColors", command = "combocolors", label = "Colour combo points by count",
 		apply = function(on) ns.ApplyComboColors(on) end },
+	{ key = "foreverQuests", command = "newquests", label = "Mark quests that are new in WoW: Forever",
+		apply = function(on) ns.ApplyForeverQuests(on) end }, -- ForeverQuests.lua
 }
 
 local function Reconcile()
@@ -421,6 +424,8 @@ function M:BuildOptions(o)
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
+	o:Checkbox("foreverQuests", L["Mark quests that are new in WoW: Forever"],
+		L["WoW: Forever adds over a thousand quests to the Classic world. They get a NEW badge in the quest log (hover the quest for details), and the quest window says so when you accept or turn one in."])
 end
 
 function M:OnSlashCommand(msg)
@@ -454,7 +459,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | quests | combo | combocolors [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors [on|off] - switch a tweak")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 	end
 end

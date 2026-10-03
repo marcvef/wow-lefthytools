@@ -187,6 +187,8 @@ function FrameMethods:CreateFontString()
 	function fs:SetPoint() end
 	function fs:SetText(text) self.text = text end
 	function fs:GetText() return self.text end
+	function fs:GetStringWidth() return #(self.text or "") * 6 end
+	function fs:SetTextColor() end
 	return fs
 end
 
@@ -696,6 +698,35 @@ function GetComboPoints(unit, target)
 end
 function UnitPowerMax(unit, powerType) if powerType == Enum.PowerType.ComboPoints then return COMBO.max end return 100 end
 function UnitPowerType() return POWER_TYPE, POWER_TYPE == 3 and "ENERGY" or "MANA" end
+
+-- Quest log (QuestMapFrame's pooled title buttons) and the quest dialog.
+NEW_CAPS = "NEW"
+CreateFrame("Frame", "QuestScrollFrame", UIParent)
+QUEST_LOG_BUTTONS = {} -- the active title buttons; ShowQuestLog() fills them like Blizzard does
+QuestScrollFrame.titleFramePool = { EnumerateActive = function()
+	local i = 0
+	return function() i = i + 1; return QUEST_LOG_BUTTONS[i] end
+end }
+local spareTitleButtons = {}
+function QuestLogQuests_Update() -- Blizzard: release all, then acquire a button per quest
+	for _, b in ipairs(QUEST_LOG_BUTTONS) do b:Hide(); spareTitleButtons[#spareTitleButtons + 1] = b end
+	wipe(QUEST_LOG_BUTTONS)
+	for _, q in ipairs(QUESTS) do
+		local b = table.remove(spareTitleButtons)
+		if not b then
+			b = CreateFrame("Button", nil, QuestScrollFrame)
+			b.Text = b:CreateFontString()
+		end
+		b.questID = q.id
+		b.Text:SetText(q.title)
+		b:Show()
+		QUEST_LOG_BUTTONS[#QUEST_LOG_BUTTONS + 1] = b
+	end
+end
+CreateFrame("Frame", "QuestFrame", UIParent)
+QuestFrame:Hide()
+DIALOG_QUEST = nil
+function GetQuestID() return DIALOG_QUEST end
 
 -- Forever controller UI
 CreateFrame("Frame", "GamepadMainActionBarFrame", UIParent)

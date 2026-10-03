@@ -97,6 +97,10 @@ L["Announce quest progress in party chat"] = "Questfortschritt im Gruppenchat po
 L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."] =
 	"Wenn du in einer Gruppe ein Questziel oder eine ganze Quest abschließt, postet dein Charakter das im Gruppenchat, so wie Questie. Nicht solo und nicht im Raid."
 
+L["Mark quests that are new in WoW: Forever"] = "Quests markieren, die neu in WoW: Forever sind"
+L["WoW: Forever adds over a thousand quests to the Classic world. They get a NEW badge in the quest log (hover the quest for details), and the quest window says so when you accept or turn one in."] =
+	"WoW: Forever bringt über tausend neue Quests in die Classic-Welt. Sie bekommen im Questlog eine NEU-Markierung (Mouseover über die Quest für Details), und das Questfenster zeigt es beim Annehmen und Abgeben an."
+L["New in WoW: Forever"] = "Neu in WoW: Forever"
 L["Combo points on the personal resource display"] = "Combopunkte an der persönlichen Ressourcenanzeige"
 L["Forever's personal resource display leaves combo points out. This adds them under its bars in retail's style, with Blizzard's animations; at full points they glow. Rogues, and druids in Cat Form. Shows when the personal resource display does."] =
 	"Die persönliche Ressourcenanzeige in Forever zeigt keine Combopunkte. Das hier fügt sie unter ihren Balken hinzu, im Retail-Look mit Blizzards Animationen; bei vollen Punkten leuchten sie. Für Schurken und Druiden in Katzengestalt. Sichtbar, wenn die persönliche Ressourcenanzeige es ist."

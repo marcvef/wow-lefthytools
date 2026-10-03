@@ -20,11 +20,14 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Mirage/Options.lua settings page, /mirage, keybinding labels
   Modules/Tweaks/Tweaks.lua  Misc Tweaks: status text, movable bags, quest announcements
   Modules/Tweaks/ComboPoints.lua  combo points on the personal resource display
+  Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever
+  Data/ForeverQuests.lua     generated list of those quests (tools/update-forever-quests.ps1)
   Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
   Modules/Beacon/Beacon.xml  world map pin template (LefthyToolsBeaconPinTemplate)
 tests/                       fengari (Lua VM in JS) harness, see testing.md
+tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
 Update-LefthyTools.cmd       double-click wrapper for players: runs the current install.ps1 from GitHub
 ```

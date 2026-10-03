@@ -15,6 +15,9 @@ Core\Core.lua
 Core\Options.lua
 Core\Options.xml
 
+# Data
+Data\ForeverQuests.lua
+
 # Modules
 Modules\Mirage\Groups.lua
 Modules\Mirage\Mirage.lua
@@ -22,6 +25,7 @@ Modules\Mirage\Options.lua
 
 Modules\Tweaks\Tweaks.lua
 Modules\Tweaks\ComboPoints.lua
+Modules\Tweaks\ForeverQuests.lua
 
 Modules\Beacon\Beacon.lua
 Modules\Beacon\Dots.lua

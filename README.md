@@ -6,7 +6,7 @@ module you can switch on or off.
 | Module | What it does |
 |---|---|
 | [Mirage](#mirage) | Fades the interface away when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD. **Off by default**: switch it on on the overview page |
-| [Misc Tweaks](#misc-tweaks) | Small fixes, each switchable: always-visible health/power values, combo points on the personal resource display, movable bags, quest progress in party chat |
+| [Misc Tweaks](#misc-tweaks) | Small fixes, each switchable: always-visible health/power values, combo points on the personal resource display, movable bags, quest progress in party chat, markers for quests new in WoW: Forever |
 | [Beacon](#beacon) | Battle.net friends who also use LefthyTools see each other on the world map and minimap, with status and level-up messages, without needing a group |
 
 ## Settings
@@ -84,6 +84,7 @@ LefthyTools → Misc Tweaks**, and all are on by default.
 | Always show health & power values | Health and power bars show `current / max` all the time, not only on mouseover. This applies to every unit frame (player, target, focus, pet, party). It's the same as Blizzard's Options → Interface → Status Text set to Numeric. Switching it off restores your previous Status Text setting. | `/lefthy tweaks statustext on\|off` |
 | Combo points on the personal resource display | Forever's personal resource display (the bars under your character) leaves combo points out. This adds them under its bars in retail's style: red gems in sockets, with Blizzard's slash-and-glow animation when you gain a point and a burst when you spend them. At full points the gems breathe: finisher ready. It moves, scales, hides and fades with the display and follows its Edit Mode settings. Rogues, and druids in Cat Form. | `/lefthy tweaks combo on\|off` |
 | Colour combo points by count | The gems change colour with the number of points: green with one, through yellow and orange, to red at full. Off: retail's red. | `/lefthy tweaks combocolors on\|off` |
+| Mark quests that are new in WoW: Forever | Forever adds over a thousand quests to the Classic world. They get a small **NEW** badge in the quest log (hover the quest for an explanation), and the quest window shows "New in WoW: Forever" when you accept or turn one in. The list of these quests comes from the game's own quest tables (about 1,800 quests). | `/lefthy tweaks newquests on\|off` |
 | Movable bags | Drag a bag by its title bar or any empty spot. It reopens where you left it. A plain click on the title still opens the bag menu. | `/lefthy tweaks bags on\|off` |
 | Announce quest progress in party chat | Like Questie: when you finish a quest objective, your character posts it in party chat, e.g. `[Kobold Camp Cleanup]: 10/10 Kobold Vermin slain`. When that completes the whole quest, you get one `[Quest]: quest complete!` line instead. Posts in party chat (instance chat in dungeon groups), never solo or in raids. Quests already done when accepted stay quiet. | `/lefthy tweaks quests on\|off` |
 
