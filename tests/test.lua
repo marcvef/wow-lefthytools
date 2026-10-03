@@ -1891,8 +1891,20 @@ do
 	for _, t in ipairs(shown._textures or {}) do if t.layer == "BACKGROUND" or t.layer == "BORDER" then boxes = boxes + 1 end end
 	check(boxes == 0 and not shown.Line:GetText():find("\n", 1, true) and shown:GetHeight() <= 24
 		and shown.Line.textScale <= 1.2, "one line of text, not too big, no box behind it")
+	shown.Hover._scripts.OnEnter(shown.Hover)
+	check(TOOLTIP.shown and TOOLTIP.owner == shown.Hover and TOOLTIP.link == "item:19019::::::::20:::::",
+		"hovering the line shows the item's tooltip")
+	shown.Hover._scripts.OnLeave(shown.Hover)
+	check(not TOOLTIP.shown, "... and moving away hides it")
+	local dressed = DRESSUPS
+	shown.Hover._scripts.OnClick(shown.Hover)
+	STATE.ctrl = true
+	shown.Hover._scripts.OnClick(shown.Hover)
+	STATE.ctrl = false
+	check(DRESSUPS == dressed + 1, "a plain click does nothing, Ctrl-click previews it (the game's item click handling)")
+	shown.Hover._scripts.OnEnter(shown.Hover)
 	Advance(9)
-	check(not shown:IsShown(), "it goes away by itself")
+	check(not shown:IsShown() and not TOOLTIP.shown, "it goes away by itself, its tooltip too if it was still up")
 	pmark = #PRINTED + 1
 	MOCK_ITEM_UNCACHED = 6948
 	anna("I2;6948::::::::20:::::")

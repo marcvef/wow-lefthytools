@@ -85,6 +85,9 @@ local function Layout()
 end
 
 local function Release(frame)
+	if GameTooltip:IsOwned(frame.Hover) then
+		GameTooltip:Hide()
+	end
 	frame:Hide()
 	if frame.call then
 		frame.call.frame = nil -- the call gets a frame again if it needs one (FrameFor)
@@ -102,6 +105,30 @@ end
 
 local Answer -- below
 
+-- Hovering the line shows the item's tooltip, as on an item in the bags.
+local function HoverOnEnter(hover)
+	local call = hover:GetParent().call
+	if call then
+		GameTooltip:SetOwner(hover, "ANCHOR_RIGHT")
+		GameTooltip:SetHyperlink("item:" .. call.itemString)
+		GameTooltip:Show()
+	end
+end
+
+local function HoverOnLeave(hover)
+	if GameTooltip:IsOwned(hover) then
+		GameTooltip:Hide()
+	end
+end
+
+-- Shift-click links it in chat, Ctrl-click previews it: the game's own item click handling.
+local function HoverOnClick(hover)
+	local call = hover:GetParent().call
+	if call and IsModifiedClick() then
+		HandleModifiedItemClick(call.link)
+	end
+end
+
 local function NewFrame()
 	local f = CreateFrame("Frame", nil, UIParent)
 	f:SetSize(600, LINE_HEIGHT)
@@ -111,7 +138,14 @@ local function NewFrame()
 	f.Line:SetPoint("TOP")
 	f.Line:SetWordWrap(false)
 	f.Line:SetTextScale(TEXT_SCALE)
-	f.Status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	-- An invisible button over the line (it's as wide as its text): the item's tooltip on hover.
+	-- Frame hyperlinks would be the other way, but SetHyperlinksEnabled is protected in Forever.
+	f.Hover = CreateFrame("Button", nil, f)
+	f.Hover:SetAllPoints(f.Line)
+	f.Hover:SetScript("OnEnter", HoverOnEnter)
+	f.Hover:SetScript("OnLeave", HoverOnLeave)
+	f.Hover:SetScript("OnClick", HoverOnClick)
+	f.Status =f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	f.Status:SetPoint("TOP", 0, -26)
 	f.Status:SetWidth(580)
 	f.Status:SetWordWrap(false)

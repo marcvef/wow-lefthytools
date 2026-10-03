@@ -200,7 +200,10 @@ Blizzard's function). At most one share every 3 s.
 - **The notice** (one frame per call, up to 3 stacked under the level-up toast; a finished one,
   else the oldest, makes room and is unlinked from its call): no box, one line of shadowed text
   (`GameFontNormalLarge` at 1.15) with the item's icon inline: "Anna shares [item]", "Anna offers
-  [item]" or "You offer [item]". Offers add a status line, Need and Pass buttons (group loot dice
+  [item]" or "You offer [item]". An invisible button over the line (`SetAllPoints` on the font
+  string, so it's as wide as the text) shows the item's tooltip on hover (`GameTooltip:SetHyperlink`)
+  and passes Shift/Ctrl-clicks to `HandleModifiedItemClick`; frame hyperlinks
+  (`SetHyperlinksEnabled`) are protected in Forever. Offers add a status line, Need and Pass buttons (group loot dice
   and pass icons) and a thin timer bar underneath; the sharer sees the answers live. Results:
   nobody (grey), one Need ("Bob wins!"), or a roll: the bonus roll spinner sound
   (`UI_BONUS_LOOT_ROLL_START` + the looping `..._LOOP`, stopped with `StopSound`) while the numbers

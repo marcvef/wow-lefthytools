@@ -895,6 +895,7 @@ function ClickWorldMap(button) -- what the engine does on mouse down over the ma
 	if onDown then onDown(WorldMapFrame.ScrollContainer, button or "LeftButton") end
 end
 function IsAltKeyDown() return STATE.alt == true end
+function IsModifiedClick() return STATE.alt == true or STATE.ctrl == true or STATE.shift == true end
 MAP_NAMES = { [1429] = "Elwynn Forest", [1415] = "Eastern Kingdoms", [1414] = "Kalimdor" }
 C_Map.GetMapInfo = function(mapID) return MAP_NAMES[mapID] and { mapID = mapID, name = MAP_NAMES[mapID] } end
 C_Map.GetMapInfoAtPosition = function(mapID, x, y) -- the zone under a spot of a continent map
@@ -914,6 +915,7 @@ GameTooltip = {
 	Show = function() TOOLTIP.shown = true end,
 	Hide = function() TOOLTIP.shown = false end,
 	IsOwned = function(_, frame) return TOOLTIP.shown and TOOLTIP.owner == frame end,
+	SetHyperlink = function(_, link) TOOLTIP.link, TOOLTIP.shown = link, true end,
 }
 
 -- Personal resource display (Forever leaves its class resource frame out) and combo points.

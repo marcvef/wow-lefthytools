@@ -128,8 +128,8 @@ minimap, and you on theirs, without being in a group.
 - **Death alerts:** a chat line when a friend dies, with where and what they were fighting
   ("Anna died in Duskwood - Raven Hill, fighting Stitches.").
 - **Show an item:** **Ctrl+right-click** an item (bags, character, bank, loot, chat links) and
-  your friends see "Anna shares [item]" at the top of the screen with the whisper sound, plus a
-  clickable link in chat.
+  your friends see "Anna shares [item]" at the top of the screen with the whisper sound (hover it
+  for the item's tooltip), plus a clickable link in chat.
 - **Offer an item:** **Ctrl+Shift+right-click** instead, and they get **Need** and **Pass**
   buttons under it. One Need gets it; several Needs are rolled out, with a drumroll, whirling
   numbers and the winner popping up in gold letters with a fanfare. (For gear, Ctrl+click also opens the

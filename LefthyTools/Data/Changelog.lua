@@ -78,5 +78,8 @@ ns.CHANGELOG = {
 	{ id = 24, version = "0.5.0", module = "tweaks",
 		en = { "More new quests marked", "NEW now also shows on the quests from Classic's later seasons that Forever brings along: original Classic never had them either." },
 		de = { "Mehr neue Quests markiert", "NEU steht jetzt auch an den Quests aus den späteren Seasons von Classic, die Forever mitbringt: Die gab es im ursprünglichen Classic auch nicht." } },
+	{ id = 25, version = "0.5.0", module = "beacon",
+		en = { "Item tooltips in notices", "Hover a shared or offered item at the top of the screen to see its tooltip. Shift-click links it, Ctrl-click previews it." },
+		de = { "Item-Tooltips in Hinweisen", "Mouseover über ein geteiltes oder angebotenes Item oben auf dem Bildschirm zeigt seinen Tooltip. Umschalt+Klick verlinkt es, Strg+Klick zeigt die Vorschau." } },
 	-- New entries go here, at the end.
 }
