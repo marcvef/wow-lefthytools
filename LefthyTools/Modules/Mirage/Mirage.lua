@@ -153,6 +153,15 @@ end
 ---------------------------------------------------------------------------
 
 local minimapHiddenByUs = false
+-- The player pressed Toggle Minimap while we had it hidden. Blizzard's ToggleMinimap then shows
+-- it (it looked hidden), but the player saw a faded minimap and meant "off".
+local toggledWhileHidden = false
+
+local function OnToggleMinimap()
+	if M.enabled and minimapHiddenByUs then
+		toggledWhileHidden = true -- handled by the driver's next evaluation, not inside Blizzard's call
+	end
+end
 
 local function SyncMinimap(g)
 	local mm = Minimap
@@ -160,6 +169,14 @@ local function SyncMinimap(g)
 		return
 	end
 	if mm:IsProtected() and InCombatLockdown() then
+		return
+	end
+	if toggledWhileHidden then
+		-- Off by the player's choice now: hidden, but not by us, so we never show it again.
+		toggledWhileHidden, minimapHiddenByUs = false, false
+		if mm:IsShown() then
+			mm:Hide()
+		end
 		return
 	end
 	local wantHidden = M.enabled and db.hideMinimapWhenFaded and db.groups.minimap
@@ -620,6 +637,9 @@ function M:OnEnable()
 			if type(_G[name]) == "function" then
 				hooksecurefunc(name, function() M:RequestRebuild() end)
 			end
+		end
+		if type(ToggleMinimap) == "function" then
+			hooksecurefunc("ToggleMinimap", OnToggleMinimap)
 		end
 	end
 

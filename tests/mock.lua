@@ -350,6 +350,9 @@ PlayerFrame._alpha = 0.8 -- Edit Mode opacity 80%
 CreateFrame("Frame", "TargetFrame", UIParent)
 CreateFrame("Frame", "MinimapCluster", UIParent)
 CreateFrame("Frame", "Minimap", MinimapCluster) -- engine-drawn quest blobs live in here
+function ToggleMinimap() -- Blizzard_Minimap: the Toggle Minimap key
+	if Minimap:IsShown() then Minimap:Hide() else Minimap:Show() end
+end
 CreateFrame("Frame", "BuffFrame", UIParent)
 CreateFrame("Frame", "ObjectiveTrackerFrame", UIParent)
 CreateFrame("Frame", "GeneralDockManager", UIParent)
