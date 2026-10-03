@@ -82,6 +82,12 @@ param(
 		return $null
 	}
 
+	# The files a TOC loads (every line that isn't empty or a comment).
+	function Get-TocFiles([string]$toc) {
+		if (-not (Test-Path -LiteralPath $toc)) { return @() }
+		return @([IO.File]::ReadAllLines($toc) | Where-Object { $_.Trim() -and $_ -notmatch '^\s*#' } | ForEach-Object { $_.Trim() })
+	}
+
 	function Set-TocVersion([string]$toc, [string]$version) {
 		$lines = [IO.File]::ReadAllLines($toc) | ForEach-Object { if ($_ -match '^## Version:') { "## Version: $version" } else { $_ } }
 		[IO.File]::WriteAllLines($toc, [string[]]$lines, (New-Object Text.UTF8Encoding $false))
@@ -212,6 +218,9 @@ param(
 			return
 		}
 
+		# The game only loads files that are new to the TOC after a restart (a /reload into such an
+		# update can even freeze the client), so say so when there are any.
+		$oldFiles = if ($installed) { Get-TocFiles $targetToc } else { $null }
 		Remove-AddonFolder $target
 		if ($Link) {
 			New-Item -ItemType Junction -Path $target -Target $build.Addon | Out-Null
@@ -222,7 +231,12 @@ param(
 			$from = if ($installed) { "$installed -> " } else { '' }
 			Write-Host "LefthyTools $from$($build.Version) installed in $target" -ForegroundColor Green
 		}
-		Write-Host 'In game, type /reload. If something seems missing afterwards, restart the game once.'
+		$added = if ($null -ne $oldFiles) { @(Get-TocFiles $targetToc | Where-Object { $oldFiles -notcontains $_ }) } else { @() }
+		if ($added.Count -gt 0) {
+			Write-Host "This update adds files ($($added -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
+		} else {
+			Write-Host 'In game, type /reload. If something seems missing afterwards, restart the game once.'
+		}
 	} finally {
 		Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 	}
