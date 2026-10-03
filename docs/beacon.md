@@ -117,7 +117,10 @@ anyone in it changes (`Signature`: the revs of everyone in it). World map: the s
 recomputed on every refresh and on zoom (`OnCanvasScaleChanged`); friends in my group keep the
 offset on their live position (`pin.fanX/fanY`). Minimap: the per-frame update first checks for
 any overlap without making tables (`AnyOverlap`) and only then groups; the per-dot records are
-reused.
+reused. The grouping depends only on where the dots are relative to each other, so it's cached
+(`SpreadMinimap`: offsets relative to the dot with the lowest key) and reused while those stay
+within a pixel: walking, or friends in my group walking together (their dots redraw every frame),
+make no tables; only dots moving apart or together work it out again.
 
 ## Dots and tooltip
 

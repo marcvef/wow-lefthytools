@@ -486,6 +486,51 @@ function B.MinimapOffset(theirNorth, theirWest)
 	return x, y, false
 end
 
+-- The minimap's last spread. It only depends on where the dots are relative to each other, so
+-- while that stays within a pixel (I walk, or friends walk together) it's reused instead of being
+-- worked out, with its tables, every frame. key -> { rx, ry (relative to the lowest key), dx, dy,
+-- group, stamp }.
+local spreadCache, spreadCount, spreadStamp = {}, 0, 0
+
+local function SpreadMinimap(items, count)
+	local ref = items[1]
+	for i = 2, count do
+		if items[i].key < ref.key then
+			ref = items[i]
+		end
+	end
+	local hit = count == spreadCount
+	for i = 1, count do
+		local item = items[i]
+		local c = spreadCache[item.key]
+		if not (hit and c and math.abs(item.x - ref.x - c.rx) < 1 and math.abs(item.y - ref.y - c.ry) < 1) then
+			hit = false
+			break
+		end
+	end
+	if hit then
+		for i = 1, count do
+			local item = items[i]
+			local c = spreadCache[item.key]
+			item.dx, item.dy, item.group = c.dx, c.dy, c.group
+		end
+		return
+	end
+	B.Spread(items, MINIMAP_DOT_SIZE)
+	spreadStamp, spreadCount = spreadStamp + 1, count
+	for i = 1, count do
+		local item = items[i]
+		local c = spreadCache[item.key] or {}
+		spreadCache[item.key] = c
+		c.rx, c.ry, c.dx, c.dy, c.group, c.stamp = item.x - ref.x, item.y - ref.y, item.dx, item.dy, item.group, spreadStamp
+	end
+	for key, c in pairs(spreadCache) do
+		if c.stamp ~= spreadStamp then
+			spreadCache[key] = nil
+		end
+	end
+end
+
 local function PlaceMinimapPins(now, continent, north, west, half, radius, facing)
 	view.north, view.west, view.scale = north, west, half / radius
 	view.sin, view.cos = math.sin(facing), math.cos(facing)
@@ -521,7 +566,7 @@ local function PlaceMinimapPins(now, continent, north, west, half, radius, facin
 		placed[i] = nil
 	end
 	if AnyOverlap(placed, count, MINIMAP_DOT_SIZE) then
-		B.Spread(placed, MINIMAP_DOT_SIZE) -- only when dots really overlap
+		SpreadMinimap(placed, count) -- only when dots really overlap
 	end
 	for i = 1, count do
 		local item = placed[i]

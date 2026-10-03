@@ -1821,6 +1821,25 @@ do
 	mm[12]._scripts.OnEnter(mm[12])
 	check(TOOLTIP.title == "Bob" and tooltipHas("Anna"), "and hovering shows both")
 	mm[12]._scripts.OnLeave(mm[12])
+	local spreads, spread = 0, BB.Spread
+	BB.Spread = function(...) spreads = spreads + 1; return spread(...) end
+	for i = 1, 10 do
+		PLAYER_POS = { 0.5, 0.5 + i * 0.002 } -- I walk: both dots move on the minimap, but not apart
+		Advance(0.05)
+	end
+	_, _, _, ax, ay = mm[11]:GetPoint(1)
+	_, _, _, bx, by = mm[12]:GetPoint(1)
+	check(spreads == 0 and math.abs(bx - ax - 8) < 1e-6 and math.abs(ay - by) < 1e-6,
+		"while I walk, the spread is reused instead of worked out every frame, got " .. spreads)
+	bob("S2;;0;525.0;500.0;Goldshire;") -- Bob steps 5 yd north (3.5 px here): still overlapping
+	Advance(1.2)
+	_, _, _, ax, ay = mm[11]:GetPoint(1)
+	_, _, _, bx, by = mm[12]:GetPoint(1)
+	check(spreads >= 1 and math.abs(by - ay) < 1 and math.abs(bx - ax - 8) < 1,
+		"one of them moving: worked out again (still side by side, within a pixel), got " .. spreads .. ", " .. (by - ay))
+	BB.Spread = spread
+	PLAYER_POS = { 0.5, 0.5 }
+	Advance(0.6)
 end
 
 section("Beacon: showing and offering items")
