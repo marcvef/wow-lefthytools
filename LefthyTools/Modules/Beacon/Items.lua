@@ -484,7 +484,10 @@ local function Shareable(link)
 	return not NO_TRADE_BIND[bindType]
 end
 
-local function OnModifiedItemClick(link)
+local function OnModifiedItemClick(link, itemLocation)
+	if type(link) ~= "string" then
+		return -- an empty slot: Blizzard calls this with no link
+	end
 	if GetMouseButtonClicked() == "RightButton" and IsControlKeyDown() and not IsAltKeyDown() then
 		if not (M.enabled and M.db.shareItems) then
 			return

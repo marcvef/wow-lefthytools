@@ -1862,6 +1862,8 @@ do
 	local dressups = DRESSUPS
 	ctrlRight(ItemLink(1155))
 	check(DRESSUPS == dressups + 1, "Blizzard's own handling runs first")
+	local emptyOk, emptyErr = pcall(ctrlRight, nil) -- an empty slot: Blizzard passes no link
+	check(emptyOk, "Ctrl+right-click on an empty slot: no error, got " .. tostring(emptyErr))
 	Advance(0.15)
 	check(sentTo(11, mark, "I2;")[1] == "I2;1155::::::::20:::::", "Ctrl+right-click shows the item to my friends, got " .. tostring(sentTo(11, mark, "I2;")[1]))
 	check(printedSince(pmark):find("shared " .. ItemLink(1155) .. " with ", 1, true), "and I'm told")

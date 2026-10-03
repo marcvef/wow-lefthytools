@@ -480,6 +480,7 @@ Item = { CreateFromItemLink = function(_, itemLink)
 	}
 end }
 C_Item.GetItemInfo = function(itemLink)
+	assert(itemLink ~= nil, "Usage: local itemInfo = C_Item.GetItemInfo(itemInfo)") -- not nilable, like the game's
 	local id = tonumber(tostring(itemLink):match("item:(%d+)"))
 	if ITEMS[id] and MOCK_ITEM_UNCACHED ~= id then
 		-- name, link, ..., the 14th: bindType (ITEMS[id].bind: 1 = on pickup, 2 = on equip)
