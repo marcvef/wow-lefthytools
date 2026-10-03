@@ -18,7 +18,8 @@ local L = ns.L
 --                       position (C_Map.GetWorldPosFromMapPos), empty in dungeons/raids or with
 --                       sharing off; <target> is who I'm fighting, only while in combat.
 --   L2;<level>;<text>   I levelled up; <text> is my own level-up message (empty = their default)
---   V2;<version>        my LefthyTools build (LT.version), sent with every answer; a friend on an
+--   V2;<version>        my LefthyTools build (LT.version), sent with every answer and to every
+--                       friend every VERSION_EVERY seconds (low priority); a friend on an
 --                       older build gets told once per login. Builds before 0.4.0 ignore it.
 --   P2;<continent>;<north>;<west>;<uiMapID>
 --                       a map ping (Pings.lua): "look here", shown on friends' maps for a minute
