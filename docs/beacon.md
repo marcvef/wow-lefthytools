@@ -15,8 +15,9 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
 - Addons have no network access, so there's no server. Messages go through
   `C_BattleNet.SendGameData(gameAccountID, "LTBeacon", data)` and the `BN_CHAT_MSG_ADDON` event
   (prefix, text, channel, senderID = sender's gameAccountID); the prefix is registered with
-  `C_ChatInfo.RegisterAddonMessagePrefix`. Result `AddonMessageThrottle` (3) pauses sending for
-  2 s and keeps the message; other failures drop it (the next state or heartbeat covers it).
+  `C_ChatInfo.RegisterAddonMessagePrefix`. Results `AddonMessageThrottle` (3) and
+  `AddOnMessageLockdown` (11) pause sending for 2 s and keep the message (so a level-up isn't
+  lost); other failures (e.g. `TargetOffline`) drop it (the next state or heartbeat covers it).
 - **Protocol v2** (`;`-separated; the digit after the kind is the version): `H2` hello,
   `S2;<flags>;<continent>;<north>;<west>;<subzone>;<target>` state (flags D dead, G ghost,
   C combat; position empty in instances or with sharing off; target only in combat),

@@ -219,13 +219,18 @@ end
 -- Sending: everything goes through the rate limiter in Drain()
 ---------------------------------------------------------------------------
 
-local THROTTLED = Enum and Enum.SendAddonMessageResult and Enum.SendAddonMessageResult.AddonMessageThrottle or 3
+local RESULT = Enum and Enum.SendAddonMessageResult or {}
+-- Temporary refusals: keep the message and try again after a pause.
+local RETRY_LATER = {
+	[RESULT.AddonMessageThrottle or 3] = true,  -- the server asked us to slow down
+	[RESULT.AddOnMessageLockdown or 11] = true, -- addon messages are locked for now (e.g. encounters)
+}
 
--- false: the server asked us to slow down, try again later. Other failures (lockdown, friend
--- went offline) just drop the message; the next state or heartbeat covers it.
+-- false: try again later. Other failures (friend went offline, ...) drop the message; the next
+-- state or heartbeat covers states, and a friend who is gone doesn't need the rest.
 local function SendNow(gameAccountID, message)
 	local ok, result = pcall(C_BattleNet.SendGameData, gameAccountID, PREFIX, message)
-	if ok and result == THROTTLED then
+	if ok and RETRY_LATER[result] then
 		return false
 	end
 	stats.sent = stats.sent + 1

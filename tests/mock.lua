@@ -506,7 +506,7 @@ C_BattleNet = {
 		return 0
 	end,
 }
-Enum = { SendAddonMessageResult = { Success = 0, AddonMessageThrottle = 3 } }
+Enum = { SendAddonMessageResult = { Success = 0, AddonMessageThrottle = 3, AddOnMessageLockdown = 11, TargetOffline = 12 } }
 function GameDataTo(id, startIndex) -- messages sent to one account since startIndex
 	local list = {}
 	for i = startIndex or 1, #GAMEDATA do if GAMEDATA[i].id == id then list[#list + 1] = GAMEDATA[i].data end end

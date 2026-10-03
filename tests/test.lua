@@ -921,6 +921,16 @@ check(#GameDataTo(11, mark) == 0, "nothing sent inside the event handler")
 Advance(0.15)
 check(GameDataTo(11, mark)[1] == "L2;20;{name} hit {level}, drinks on me!" and GameDataTo(12, mark)[1] == GameDataTo(11, mark)[1],
 	"my level-up goes to every friend with my own text, got " .. tostring(GameDataTo(11, mark)[1]))
+mark = #GAMEDATA + 1
+MOCK_SEND_RESULT = 11 -- addon messages locked (e.g. during an encounter)
+Fire("PLAYER_LEVEL_UP", 21)
+Advance(1)
+check(#GameDataTo(11, mark) == 0, "level-up during an addon message lockdown: nothing gets through")
+MOCK_SEND_RESULT = nil
+Advance(3)
+local delivered = false
+for _, m in ipairs(GameDataTo(11, mark)) do if m:find("^L2;21;") then delivered = true end end
+check(delivered, "... and it's delivered once the lockdown ends instead of being lost")
 B("dingAnnounce"):SetValue(false)
 mark = #GAMEDATA + 1
 Fire("PLAYER_LEVEL_UP", 21)
