@@ -121,6 +121,9 @@ minimap, and you on theirs, without being in a group.
   they're fighting, and how far away they are and in which direction ("240 yd north-east").
 - **Death alerts:** a chat line when a friend dies, with where and what they were fighting
   ("Anna died in Duskwood - Raven Hill, fighting Stitches.").
+- **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
+  rippling marker on their world map and minimap for a minute, a chat line and a ping sound.
+  `/lefthy beacon ping` pings where you stand.
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see
   "Anna reached level 21!" in their own language.
@@ -149,6 +152,7 @@ minimap, and you on theirs, without being in a group.
 | Keep far-away friends at the minimap edge | on | |
 | Show friends in my group too | on | |
 | Tell me when a friend dies | on | |
+| Map pings (Alt+click on the world map) | on | `/lefthy beacon ping` |
 | Tell my friends when I level up | on | |
 | Level-up message (`{name}` and `{level}` are filled in) | empty: default text | `/lefthy beacon ding <text>`, `ding reset` |
 | Test your message: **Preview** | | `/lefthy beacon ding test` |

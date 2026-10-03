@@ -54,4 +54,7 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     group dot on both maps, moving along live; the tooltip says "In your group". With "Show
     friends in my group too" off, only Blizzard's dot is left.
     Level-ups: `/lefthy beacon sound` to try the sounds, `/lefthy beacon ding test` for the message.
+    They die: a chat line with zone and what they fought. Alt+click your world map: they get a
+    rippling marker on both maps, a chat line and a sound; on a continent map the line names the
+    zone under the cursor. A plain click still zooms/navigates as before, also in combat.
     Traffic in `/lefthy beacon status` stays at a few messages per minute while standing still.

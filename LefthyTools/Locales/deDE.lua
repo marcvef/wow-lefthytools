@@ -167,6 +167,10 @@ L["Alerts"] = "Meldungen"
 L["Tell me when a friend dies"] = "Melden, wenn ein Freund stirbt"
 L["A chat line when a friend dies: where, and what they were fighting."] =
 	"Eine Chatzeile, wenn ein Freund stirbt: wo, und wogegen er gekämpft hat."
+L["Map pings"] = "Karten-Pings"
+L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."] =
+	"Alt+Klick auf die Weltkarte zeigt deinen Freunden eine Stelle: eine Markierung auf ihren Karten für eine Minute, mit Sound. Ihre Pings erscheinen auf deinen Karten. /lefthy beacon ping pingt die Stelle, an der du stehst."
+L["Map ping, %d s ago"] = "Karten-Ping, vor %d s"
 L["Level-ups"] = "Level-Ups"
 L["Tell my friends when I level up"] = "Freunden meine Level-Ups melden"
 L["Battle.net friends who also use LefthyTools see your level-up message."] =

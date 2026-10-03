@@ -1194,6 +1194,80 @@ B("deathAlert"):SetValue(true)
 anna("S2;;0;260.0;750.0;Goldshire;")
 Advance(1.2)
 
+section("Beacon: map pings")
+check(BDB.pings == true and B("pings") ~= nil, "a setting, on by default")
+local function pingPin(key)
+	for _, p in ipairs(PINS) do if p.pinTemplate == "LefthyToolsBeaconPingPinTemplate" and p.key == key then return p end end
+end
+PLAYER_POS = { 0.5, 0.5 } -- me: north 500, west 500
+OpenWorldMap(1429)
+Advance(0.2)
+mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+MOCK_CURSOR = { 0.25, 0.75 }
+ClickWorldMap()
+Advance(0.15)
+check(#sentTo(11, mark, "P2;") == 0, "a click without Alt doesn't ping")
+STATE.alt = true
+ClickWorldMap()
+Advance(0.15)
+check(sentTo(11, mark, "P2;")[1] == "P2;0;250.0;750.0;1429", "Alt+click: the spot goes to my friends, got " .. tostring(sentTo(11, mark, "P2;")[1]))
+check(printedSince(pmark):find("pinged Elwynn Forest for 1 friend(s).", 1, true) and SOUNDS[#SOUNDS] == 3175,
+	"with a chat line and the map ping sound")
+Advance(0.15)
+local myPing = pingPin("me")
+check(myPing and math.abs(myPing.x - 0.25) < 1e-6 and math.abs(myPing.y - 0.75) < 1e-6 and myPing.RippleAnim:IsPlaying(),
+	"my own marker on my map, rippling")
+check(myPing.Icon.atlas == "Ping_Marker_Icon_NonThreat", "the game's 'look here' ping icon")
+ClickWorldMap()
+Advance(0.15)
+check(#sentTo(11, mark, "P2;") == 1, "at most one ping every 1.5 s")
+Advance(2)
+OpenWorldMap(1415)
+MOCK_CURSOR = { 0.375, 0.375 } -- inside Elwynn on the continent map: north 500, west 500
+ClickWorldMap()
+STATE.alt = false
+Advance(0.15)
+check(sentTo(11, mark, "P2;")[2] == "P2;0;500.0;500.0;1429", "on a continent map the zone under the cursor names the spot")
+OpenWorldMap(1429)
+pmark = #PRINTED + 1
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "P2;0;550.0;500.0;1429", "WHISPER", 11)
+check(#PRINTED < pmark, "receiving: nothing printed inside the event handler")
+Advance(0.15)
+check(printedSince(pmark):find("Anna|r pinged a spot in Elwynn Forest: see your map.", 1, true) and SOUNDS[#SOUNDS] == 3175,
+	"a friend's ping: chat line and sound, got " .. printedSince(pmark))
+Advance(0.15)
+local annaPing = pingPin(11)
+check(annaPing and math.abs(annaPing.x - 0.5) < 1e-6 and math.abs(annaPing.y - 0.45) < 1e-6
+	and math.abs(annaPing.Ripple.color[3] - 0.92) < 1e-6, "her marker on my map, rippling in her class colour")
+annaPing:OnMouseEnter()
+check(TOOLTIP.title == "Anna" and tooltipHas("Map ping, 0 s ago") and tooltipHas("Elwynn Forest") and tooltipHas("50 yd north"),
+	"tooltip: whose ping, how old, where, how far, got " .. table.concat(TOOLTIP.lines, " | "))
+annaPing:OnMouseLeave()
+local mmPings = BB.GetMinimapPings()
+local _, _, _, pingX, pingY = mmPings[11]:GetPoint(1)
+check(math.abs(pingX) < 1e-6 and math.abs(pingY - 35) < 1e-6 and mmPings[11]:GetParent() == Minimap, "and on the minimap, 50 yd north")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "P2;0;100.0;100.0;1429", "WHISPER", 11)
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "P2;0;abc;1;1429", "WHISPER", 11)
+Advance(0.15)
+check(BB.pings[11].north == 550, "another ping within 2 s and malformed pings are ignored")
+Advance(51)
+check(annaPing:GetAlpha() < 1 and not annaPing.RippleAnim:IsPlaying(), "after a while: the ripple stops and the marker fades")
+Advance(10)
+check(not BB.pings[11] and not pingPin(11) and not mmPings[11], "after a minute it's gone from both maps")
+B("pings"):SetValue(false)
+mark = #GAMEDATA + 1
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "P2;0;550.0;500.0;1429", "WHISPER", 11)
+STATE.alt = true
+ClickWorldMap()
+STATE.alt = false
+Advance(2.5)
+check(not BB.pings[11] and #sentTo(11, mark, "P2;") == 0, "pings off: none shown, none sent")
+B("pings"):SetValue(true)
+lefthy("beacon ping")
+Advance(0.15)
+check(sentTo(11, mark, "P2;")[1] == "P2;0;500.0;500.0;1429", "/lefthy beacon ping: where I stand")
+WorldMapFrame:Hide()
+
 section("Beacon: level-ups")
 lefthy("beacon ding {name} hit {level}, drinks on me!")
 check(BDB.dingText == "{name} hit {level}, drinks on me!" and B("dingText"):GetValue() == BDB.dingText,

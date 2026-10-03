@@ -6,7 +6,7 @@ Battle.net friends; each player writes their own level-up message.
 
 Files: `Beacon.lua` (module, protocol, rate limiter, settings, `/lefthy beacon`), `Dots.lua` (dot
 look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages, toast, sounds),
-`Alerts.lua` (death alerts), `Beacon.xml` (world map pin template). They share state through `ns.Beacon` (`B`): `B.peers`,
+`Alerts.lua` (death alerts), `Pings.lua` (map pings), `Beacon.xml` (world map pin templates). They share state through `ns.Beacon` (`B`): `B.peers`,
 `B.Clean`, `B.QueueToPeers`, `B.MyWorldPosition`, and hooks the other files set (`B.RefreshMaps`,
 `B.UpdateMinimap`, `B.Attach`/`B.Detach`, `B.ShowDing`, `B.AnnounceLevel`, `B.OnSettingChanged`).
 
@@ -21,8 +21,10 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
 - **Protocol v2** (`;`-separated; the digit after the kind is the version): `H2` hello,
   `S2;<flags>;<continent>;<north>;<west>;<subzone>;<target>` state (flags D dead, G ghost,
   C combat; position empty in instances or with sharing off; target only in combat),
-  `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`), `Q2`
-  switched off. A hello is answered with the version and the state (at most every 5 s per friend);
+  `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`),
+  `P2;<continent>;<north>;<west>;<uiMapID>` map ping, `Q2` switched off. A build that doesn't
+  know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
+  don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
   telling them to run `Update-LefthyTools.cmd`. Builds before 0.4.0 ignore `V2`. A message
   with another version marks the sender in `otherVersion` (shown by `/lefthy beacon status`)
@@ -124,6 +126,30 @@ like all chat output; zone from Battle.net, subzone from the state) when `deathA
 `B.Notify(kind, peer, data)` tells other modules about friends' events on the driver tick:
 `"level"` (`{ level }`) and `"death"` (`{ where, foe, level }`), also when the chat line or toast
 is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
+
+## Map pings
+
+Alt+click on the world map (or `/lefthy beacon ping` for where you stand) sends
+`P2;<continent>;<north>;<west>;<uiMapID>` to every peer: the world position as in the state
+message, and the zone for its name (`C_Map.GetMapInfoAtPosition` picks the zone under the cursor
+on a continent map; receivers name it with `C_Map.GetMapInfo` in their own language). The click
+is caught with `WorldMapFrame.ScrollContainer:HookScript("OnMouseDown")`: a post-hook, so
+Blizzard's click handling (canvas click handlers, navigation, zoom) runs first and untainted;
+mouse *down* because mouse up may zoom into the zone and move what's under the cursor. Not a
+canvas click handler: those run inside Blizzard's click code, which would carry on tainted.
+Own pings at most every 1.5 s; received ones at most one per friend per 2 s, malformed ones
+dropped by `Parse`.
+
+Every ping (`B.pings[gameAccountID or "me"]`, a newer one from the same sender replaces it) shows
+for 60 s on the world map (own data provider, `LefthyToolsBeaconPingPinTemplate`) and the minimap
+(frames placed by `Dots.lua`'s minimap update through `B.MinimapOffset`, the same projection and
+edge rule as the dots): the game's "look here" ping icon (`Ping_Marker_Icon_NonThreat`; a plain
+round marker if the atlas is missing) over a ripple in the sender's class colour (scale + alpha
+animation, first 10 s), fading out over the last 10 s. Hover: whose, how old, zone, distance.
+Receiving prints "Anna pinged a spot in Elwynn Forest: see your map." and plays
+`SOUNDKIT.MAP_PING`. `B.UpdatePings` on the driver tick expires and fades them and redraws the open
+map when the list changed. Setting `pings` switches sending, showing and the Alt+click off (the
+hook stays, it checks the setting).
 
 ## Level-ups
 

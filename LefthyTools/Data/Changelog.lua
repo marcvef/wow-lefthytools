@@ -25,4 +25,7 @@ ns.CHANGELOG = {
 	{ id = 7, version = "0.5.0",
 		en = "Beacon: a chat line when a friend dies, with where and what they were fighting.",
 		de = "Beacon: Eine Chatzeile, wenn ein Freund stirbt, mit Ort und wogegen er gekämpft hat." },
+	{ id = 8, version = "0.5.0",
+		en = "Beacon: Alt+click on the world map shows your friends a spot, with a marker on their maps for a minute. /lefthy beacon ping pings where you stand.",
+		de = "Beacon: Alt+Klick auf die Weltkarte zeigt deinen Freunden eine Stelle, mit einer Markierung auf ihren Karten für eine Minute. /lefthy beacon ping pingt die Stelle, an der du stehst." },
 }

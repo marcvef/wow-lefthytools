@@ -8,4 +8,8 @@
 	<Frame name="LefthyToolsBeaconPinTemplate" mixin="LefthyToolsBeaconPinMixin" enableMouseMotion="true" virtual="true">
 		<Size x="14" y="14"/>
 	</Frame>
+	<!-- A map ping (Pings.lua): same rules as the friend pin. -->
+	<Frame name="LefthyToolsBeaconPingPinTemplate" mixin="LefthyToolsBeaconPingPinMixin" enableMouseMotion="true" virtual="true">
+		<Size x="20" y="20"/>
+	</Frame>
 </Ui>

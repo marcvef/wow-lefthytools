@@ -87,19 +87,23 @@ end
 
 local DIRECTIONS = { L["north"], L["north-east"], L["east"], L["south-east"], L["south"], L["south-west"], L["west"], L["north-west"] }
 
--- "240 yd north-east" from me to them, or nil when we're not on the same continent.
-local function DistanceText(peer)
+-- "240 yd north-east" from me to a world position, or nil when it's on another continent.
+function B.DistanceText(theirContinent, theirNorth, theirWest)
 	local continent, north, west = B.MyWorldPosition()
-	if not continent or not peer.hasPos or peer.continent ~= continent then
+	if not continent or theirContinent ~= continent then
 		return nil
 	end
-	local dNorth, dEast = peer.north - north, west - peer.west
+	local dNorth, dEast = theirNorth - north, west - theirWest
 	local yards = math.sqrt(dNorth * dNorth + dEast * dEast)
 	if yards < 5 then
 		return L["Right next to you"]
 	end
 	local sector = math.floor(atan2(dEast, dNorth) / (math.pi / 4) + 0.5) % 8 + 1
 	return L["%d yd %s"]:format(math.floor(yards / 5 + 0.5) * 5, DIRECTIONS[sector])
+end
+
+local function DistanceText(peer)
+	return peer.hasPos and B.DistanceText(peer.continent, peer.north, peer.west) or nil
 end
 
 function B.ShowTooltip(owner, peer)
@@ -321,11 +325,27 @@ local function ReleaseAllMinimapPins()
 	end
 end
 
+-- Where a world position goes on the minimap: pixels from its centre, and whether it's clamped to
+-- the edge; nil if it's out of range and far-away friends aren't kept at the edge.
+local view = {}
+function B.MinimapOffset(theirNorth, theirWest)
+	local east, up = (view.west - theirWest) * view.scale, (theirNorth - view.north) * view.scale
+	local x, y = east * view.cos + up * view.sin, up * view.cos - east * view.sin -- my facing points up
+	local reach = view.square and math.max(math.abs(x), math.abs(y)) or math.sqrt(x * x + y * y)
+	local edge = reach > view.limit
+	if edge and M.db.minimapEdge then
+		return x * view.limit / reach, y * view.limit / reach, true
+	elseif edge then
+		return nil
+	end
+	return x, y, false
+end
+
 local function PlaceMinimapPins(now, continent, north, west, half, radius, facing)
-	local scale = half / radius
-	local sin, cos = math.sin(facing), math.cos(facing)
-	local square = GetMinimapShape and GetMinimapShape() == "SQUARE"
-	local limit = half - EDGE_INSET
+	view.north, view.west, view.scale = north, west, half / radius
+	view.sin, view.cos = math.sin(facing), math.cos(facing)
+	view.square = GetMinimapShape and GetMinimapShape() == "SQUARE"
+	view.limit = half - EDGE_INSET
 	gliding = false
 	for gameAccountID, peer in pairs(B.peers) do
 		local x, y, edge
@@ -339,15 +359,7 @@ local function PlaceMinimapPins(now, continent, north, west, half, radius, facin
 				end
 			end
 			gliding = gliding or moving
-			local east, up = (west - peerWest) * scale, (peerNorth - north) * scale
-			x, y = east * cos + up * sin, up * cos - east * sin -- rotated so my facing points up
-			local reach = square and math.max(math.abs(x), math.abs(y)) or math.sqrt(x * x + y * y)
-			edge = reach > limit
-			if edge and M.db.minimapEdge then
-				x, y = x * limit / reach, y * limit / reach
-			elseif edge then
-				x = nil
-			end
+			x, y, edge = B.MinimapOffset(peerNorth, peerWest)
 		end
 		if x then
 			local pin = minimapPins[gameAccountID] or AcquireMinimapPin(gameAccountID)
@@ -370,13 +382,19 @@ local function PlaceMinimapPins(now, continent, north, west, half, radius, facin
 			ReleaseMinimapPin(gameAccountID)
 		end
 	end
+	if B.PlaceMinimapPings then
+		B.PlaceMinimapPings(continent) -- Pings.lua, with the same view
+	end
 end
 
 -- Called every frame by the driver; returns right away unless a dot has to move.
 function B.UpdateMinimap(now)
-	if not (M.db.showMinimap and Minimap and next(B.peers)) then
+	if not (M.db.showMinimap and Minimap and (next(B.peers) or next(B.pings))) then
 		if next(minimapPins) then
 			ReleaseAllMinimapPins()
+		end
+		if B.ReleaseMinimapPings then
+			B.ReleaseMinimapPings()
 		end
 		return
 	end
@@ -389,6 +407,9 @@ function B.UpdateMinimap(now)
 	if not continent or not radius or radius <= 0 then
 		if next(minimapPins) then
 			ReleaseAllMinimapPins()
+		end
+		if B.ReleaseMinimapPings then
+			B.ReleaseMinimapPings()
 		end
 		return
 	end
@@ -440,14 +461,23 @@ function B.Attach()
 	end
 	WorldMapFrame:AddDataProvider(provider)
 	providerAdded = true
+	if B.AttachPings then
+		B.AttachPings()
+	end
 end
 
 function B.Detach()
 	if providerAdded and not M.enabled then
 		WorldMapFrame:RemoveDataProvider(provider) -- removes the pins too
 		providerAdded = false
+		if B.DetachPings then
+			B.DetachPings()
+		end
 	end
 	ReleaseAllMinimapPins()
+	if B.ReleaseMinimapPings then
+		B.ReleaseMinimapPings()
+	end
 end
 
 function B.handlers.ADDON_LOADED(name)

@@ -20,6 +20,11 @@ local L = ns.L
 --   L2;<level>;<text>   I levelled up; <text> is my own level-up message (empty = their default)
 --   V2;<version>        my LefthyTools build (LT.version), sent with every answer; a friend on an
 --                       older build gets told once per login. Builds before 0.4.0 ignore it.
+--   P2;<continent>;<north>;<west>;<uiMapID>
+--                       a map ping (Pings.lua): "look here", shown on friends' maps for a minute
+--
+-- Builds that don't know a message kind ignore it (Parse returns nil), so new kinds can be
+-- added without breaking older friends.
 --   Q2                  module switched off: forget me
 --
 -- Keeping it light: the state is only sent when it changed (checked every <interval> seconds,
@@ -43,6 +48,7 @@ local THROTTLE_PAUSE = 2     -- the server said slow down: pause sending this lo
 local INBOX_LIMIT = 20       -- messages per second accepted from one friend
 local DING_GAP = 10          -- level-up messages accepted from one friend at most this often
 local DEATH_GAP = 10         -- death alerts for one friend at most this often
+local PING_GAP = 2           -- map pings accepted from one friend at most this often
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
@@ -60,6 +66,7 @@ local M = LT:NewModule("beacon", {
 		minimapEdge = true,
 		showGroup = true,
 		deathAlert = true,
+		pings = true,
 		dingAnnounce = true,
 		dingText = "",
 		dingShow = true,
@@ -69,7 +76,7 @@ local M = LT:NewModule("beacon", {
 })
 
 -- Shared with Dots.lua, Ding.lua and Alerts.lua.
-local B = { module = M, VERSION = VERSION, handlers = {}, listeners = {} }
+local B = { module = M, VERSION = VERSION, handlers = {}, listeners = {}, pings = {} }
 ns.Beacon = B
 
 -- Things that happened to a friend ("level", "death", ...), for other modules (Chronicle):
@@ -101,6 +108,7 @@ local outbox = {}       -- { gameAccountID, message }: one-off messages, sent be
 local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt }: spam guards
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
+local pingsIn = {}      -- { gameAccountID, continent, north, west, mapID } received, shown on the next tick
 local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on the next tick
 local newerNoticeShown = false -- that notice comes once per login
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
@@ -456,6 +464,11 @@ local function Parse(text)
 		if version and #version <= 40 then
 			return "V", version
 		end
+	elseif kind == "P" then
+		local continent, north, west, mapID = rest:match("^;(%d+);(%-?%d+%.?%d*);(%-?%d+%.?%d*);(%d+)$")
+		if continent then
+			return "P", tonumber(continent), tonumber(north), tonumber(west), tonumber(mapID)
+		end
 	end
 	return nil
 end
@@ -547,6 +560,11 @@ local function OnMessage(text, senderID)
 			guard.dingAt = now
 			dings[#dings + 1] = { senderID, a, b }
 		end
+	elseif kind == "P" then
+		if M.db.pings and (not guard.pingAt or now - guard.pingAt >= PING_GAP) then
+			guard.pingAt = now
+			pingsIn[#pingsIn + 1] = { senderID, a, b, c, d }
+		end
 	elseif kind == "V" then
 		peer.version = a
 		LT:NoteFriendVersion(a) -- the settings overview shows it
@@ -606,6 +624,16 @@ local function Tick(now, elapsed)
 		if peer and peer.name and B.ShowDeath then
 			B.ShowDeath(peer, death[1], death[2])
 		end
+	end
+	while pingsIn[1] do
+		local ping = table.remove(pingsIn, 1)
+		local peer = peers[ping[1]]
+		if peer and peer.name and B.ReceivePing then
+			B.ReceivePing(peer, ping[1], ping[2], ping[3], ping[4], ping[5])
+		end
+	end
+	if B.UpdatePings then
+		B.UpdatePings(now)
 	end
 	-- A friend runs a newer LefthyTools: say so once per login (a /reload counts as one).
 	local newer = newerFrom and peers[newerFrom]
@@ -715,7 +743,7 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths }) do
+	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, B.pings }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil
@@ -760,6 +788,8 @@ function M:BuildOptions(o)
 	o:Header(L["Alerts"])
 	o:Checkbox("deathAlert", L["Tell me when a friend dies"],
 		L["A chat line when a friend dies: where, and what they were fighting."])
+	o:Checkbox("pings", L["Map pings"],
+		L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."])
 
 	if B.BuildDingOptions then
 		B.BuildDingOptions(o)
@@ -812,6 +842,8 @@ function M:OnSlashCommand(msg)
 			LT:SetModuleSetting(self, "interval", math.max(1, math.min(10, math.floor(n + 0.5))))
 		end
 		self:Print("update interval: " .. LT.Options.Seconds(self.db.interval) .. ".")
+	elseif cmd == "ping" and B.PingMe then
+		B.PingMe()
 	elseif cmd == "sound" and B.SoundCommand then
 		B.SoundCommand(arg)
 	elseif cmd == "ding" and B.DingCommand then
@@ -820,6 +852,7 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy beacon - open settings")
 		self:Print("/lefthy beacon status - friends with LefthyTools, their last update and the message traffic")
 		self:Print("/lefthy beacon interval <1-10> - seconds between position updates while moving")
+		self:Print("/lefthy beacon ping - show your friends where you stand (or Alt+click the world map)")
 		self:Print("/lefthy beacon ding <text> | reset | test - your level-up message; {name} and {level} are filled in")
 		self:Print("/lefthy beacon sound [<number>] - list the level-up sounds, or pick one and hear it")
 	end

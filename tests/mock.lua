@@ -160,6 +160,8 @@ local function NewAnimationGroup()
 		function a:SetStartDelay(v) self.delay = v end
 		function a:SetDuration(v) self.duration = v end
 		function a:SetOrder() end
+		function a:SetScaleFrom(x, y) self.scaleFrom = { x, y } end
+		function a:SetScaleTo(x, y) self.scaleTo = { x, y } end
 		for _, m in ipairs({ "SetFlipBookRows", "SetFlipBookColumns", "SetFlipBookFrames", "SetFlipBookFrameWidth", "SetFlipBookFrameHeight" }) do
 			a[m] = function() end
 		end
@@ -722,10 +724,10 @@ MapCanvasPinMixin = {
 		if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SetPassThroughButtons" end
 	end,
 }
-PIN_MIXINS = { LefthyToolsBeaconPinTemplate = "LefthyToolsBeaconPinMixin" }
+PIN_MIXINS = { LefthyToolsBeaconPinTemplate = "LefthyToolsBeaconPinMixin", LefthyToolsBeaconPingPinTemplate = "LefthyToolsBeaconPingPinMixin" }
 PINS = {} -- currently acquired pins
 PINS_CREATED = 0
-local pinPool = {}
+local pinPools = {} -- one pool per template, like MapCanvasMixin
 CreateFrame("Frame", "WorldMapFrame", UIParent)
 WorldMapFrame:Hide()
 WorldMapFrame.mapID = 1429
@@ -734,7 +736,8 @@ function WorldMapFrame:GetMapID() return self.mapID end
 function WorldMapFrame:AddDataProvider(p) self.providers[p] = true; p:OnAdded(self) end
 function WorldMapFrame:RemoveDataProvider(p) self.providers[p] = nil; p:OnRemoved(self) end
 function WorldMapFrame:AcquirePin(template, ...)
-	local pin = table.remove(pinPool)
+	pinPools[template] = pinPools[template] or {}
+	local pin = table.remove(pinPools[template])
 	if not pin then
 		pin = CreateFrame("Frame", nil, self)
 		for k, v in pairs(_G[PIN_MIXINS[template]]) do pin[k] = v end
@@ -749,13 +752,28 @@ function WorldMapFrame:AcquirePin(template, ...)
 end
 function WorldMapFrame:RemovePin(pin)
 	for i = #PINS, 1, -1 do if PINS[i] == pin then table.remove(PINS, i) end end
-	pinPool[#pinPool + 1] = pin
+	table.insert(pinPools[pin.pinTemplate], pin)
 end
 function WorldMapFrame:RemoveAllPinsByTemplate(template)
 	for i = #PINS, 1, -1 do
-		if PINS[i].pinTemplate == template then pinPool[#pinPool + 1] = table.remove(PINS, i) end
+		if PINS[i].pinTemplate == template then table.insert(pinPools[template], table.remove(PINS, i)) end
 	end
 end
+-- Clicks land on the canvas' scroll container; the cursor is in map coordinates (0-1).
+WorldMapFrame.ScrollContainer = CreateFrame("Frame", nil, WorldMapFrame)
+MOCK_CURSOR = { 0.5, 0.5 }
+function WorldMapFrame:GetNormalizedCursorPosition() return MOCK_CURSOR[1], MOCK_CURSOR[2] end
+function ClickWorldMap(button) -- what the engine does on mouse down over the map
+	local onDown = WorldMapFrame.ScrollContainer._scripts.OnMouseDown
+	if onDown then onDown(WorldMapFrame.ScrollContainer, button or "LeftButton") end
+end
+function IsAltKeyDown() return STATE.alt == true end
+MAP_NAMES = { [1429] = "Elwynn Forest", [1415] = "Eastern Kingdoms", [1414] = "Kalimdor" }
+C_Map.GetMapInfo = function(mapID) return MAP_NAMES[mapID] and { mapID = mapID, name = MAP_NAMES[mapID] } end
+C_Map.GetMapInfoAtPosition = function(mapID, x, y) -- the zone under a spot of a continent map
+	if mapID == 1415 and x >= 0.25 and x <= 0.5 and y >= 0.25 and y <= 0.5 then return C_Map.GetMapInfo(1429) end
+end
+SOUNDKIT = { MAP_PING = 3175 }
 function OpenWorldMap(mapID) -- the canvas refreshes every provider when it opens or changes map
 	WorldMapFrame.mapID = mapID or WorldMapFrame.mapID
 	WorldMapFrame:Show()
