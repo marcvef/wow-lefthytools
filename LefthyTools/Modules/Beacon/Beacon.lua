@@ -22,6 +22,11 @@ local L = ns.L
 --                       older build gets told once per login. Builds before 0.4.0 ignore it.
 --   P2;<continent>;<north>;<west>;<uiMapID>
 --                       a map ping (Pings.lua): "look here", shown on friends' maps for a minute
+--   T2;<questID>;<done>;<title>;<objective>
+--                       the quest I'm tracking (super-tracked, else the first watched one), for
+--                       the tooltip: done 1 = ready to turn in, objective = the first unfinished
+--                       one. questID 0 = none or not shared. Sent when it changes (at most every
+--                       QUEST_GAP seconds) and with every answer.
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil), so new kinds can be
 -- added without breaking older friends.
@@ -49,6 +54,7 @@ local INBOX_LIMIT = 20       -- messages per second accepted from one friend
 local DING_GAP = 10          -- level-up messages accepted from one friend at most this often
 local DEATH_GAP = 10         -- death alerts for one friend at most this often
 local PING_GAP = 2           -- map pings accepted from one friend at most this often
+local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed) at most this often
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
@@ -60,6 +66,7 @@ local M = LT:NewModule("beacon", {
 	description = L["Shares your position with Battle.net friends who also use LefthyTools and shows theirs on the world map and minimap, in their class colour."],
 	defaults = {
 		share = true,
+		shareQuest = true,
 		interval = 3,
 		showFriends = true,
 		showMinimap = true,
@@ -115,8 +122,9 @@ local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
 
 local sweepRequested, validateRequested, statusDirty = false, false, false
 local groupChanged = true -- re-check which friends are in my group on the next tick
-local lastSweep, lastValidate, lastCheck, lastSent, lastExpire, lastRefresh
-local lastState
+local questDirty = true   -- my tracked quest may have changed
+local lastSweep, lastValidate, lastCheck, lastSent, lastExpire, lastRefresh, lastQuestCheck
+local lastState, lastQuest
 local tokens, pausedUntil = SEND_BURST, 0
 -- Friends' data changed: the world map redraws on the next tick (at most twice a second, and
 -- only while open), the minimap on the next frame so gliding dots start right away.
@@ -128,8 +136,8 @@ end
 
 local function ResetTimers()
 	lastSweep, lastValidate, lastCheck, lastSent = -math.huge, -math.huge, -math.huge, -math.huge
-	lastExpire, lastRefresh = 0, -math.huge
-	lastState = nil
+	lastExpire, lastRefresh, lastQuestCheck = 0, -math.huge, -math.huge
+	lastState, lastQuest, questDirty = nil, nil, true
 end
 ResetTimers()
 
@@ -271,6 +279,46 @@ local function CurrentState()
 		position = ("%d;%.1f;%.1f"):format(continent, north, west)
 	end
 	return ("S%s;%s;%s;%s;%s"):format(VERSION, flags, position, B.Clean(GetSubZoneText(), 48), target)
+end
+
+local NO_QUEST = "T" .. VERSION .. ";0;;;"
+
+-- The quest I'm tracking: the super-tracked one (the arrow), else the first on the tracker.
+local function CurrentQuest()
+	if not M.db.shareQuest then
+		return NO_QUEST
+	end
+	local questID = C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID()
+	if not questID or questID == 0 then
+		questID = C_QuestLog.GetQuestIDForQuestWatchIndex and C_QuestLog.GetQuestIDForQuestWatchIndex(1)
+	end
+	local title = type(questID) == "number" and questID > 0 and C_QuestLog.GetTitleForQuestID(questID)
+	if not title then
+		return NO_QUEST
+	end
+	local done, objective = C_QuestLog.IsComplete(questID), ""
+	if not done then
+		for _, o in ipairs(C_QuestLog.GetQuestObjectives(questID) or {}) do
+			if not o.finished and type(o.text) == "string" and o.text ~= "" then
+				objective = o.text
+				break
+			end
+		end
+	end
+	return ("T%s;%d;%s;%s;%s"):format(VERSION, questID, done and "1" or "0", B.Clean(title, 64), B.Clean(objective, 64))
+end
+
+-- On the tick: tell friends when my tracked quest or its progress changed.
+local function SendQuestIfChanged(now)
+	if not questDirty or now - lastQuestCheck < QUEST_GAP then
+		return
+	end
+	questDirty, lastQuestCheck = false, now
+	local quest = CurrentQuest()
+	if quest ~= lastQuest then
+		lastQuest = quest
+		B.QueueToPeers(quest)
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -469,6 +517,11 @@ local function Parse(text)
 		if continent then
 			return "P", tonumber(continent), tonumber(north), tonumber(west), tonumber(mapID)
 		end
+	elseif kind == "T" then
+		local questID, done, title, objective = rest:match("^;(%d+);([01]?);([^;]*);([^;]*)$")
+		if questID then
+			return "T", tonumber(questID), done == "1", title, objective
+		end
 	end
 	return nil
 end
@@ -560,6 +613,11 @@ local function OnMessage(text, senderID)
 			guard.dingAt = now
 			dings[#dings + 1] = { senderID, a, b }
 		end
+	elseif kind == "T" then
+		local title = B.Clean(c, 64)
+		peer.quest = a > 0 and title ~= "" and { id = a, done = b, title = title, objective = B.Clean(d, 64) } or nil
+		peer.rev = peer.rev + 1
+		Changed() -- an open tooltip shows it
 	elseif kind == "P" then
 		if M.db.pings and (not guard.pingAt or now - guard.pingAt >= PING_GAP) then
 			guard.pingAt = now
@@ -577,6 +635,9 @@ local function OnMessage(text, senderID)
 		guard.answeredAt = now
 		owed[senderID] = true
 		B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40)) -- my LefthyTools build
+		if lastQuest and lastQuest ~= NO_QUEST then
+			B.Queue(senderID, lastQuest)
+		end
 	end
 end
 
@@ -609,6 +670,7 @@ local function Tick(now, elapsed)
 		end
 	end
 	SendStateIfChanged(now)
+	SendQuestIfChanged(now)
 	Drain(now, elapsed)
 
 	while dings[1] do
@@ -687,6 +749,10 @@ handlers.PLAYER_ENTERING_WORLD = function()
 	sweepRequested, statusDirty, lastSweep, lastState = true, true, -math.huge, nil
 end
 handlers.GROUP_ROSTER_UPDATE = function() groupChanged = true end
+local function MarkQuestDirty() questDirty = true end
+handlers.QUEST_LOG_UPDATE = MarkQuestDirty
+handlers.QUEST_WATCH_LIST_CHANGED = MarkQuestDirty
+handlers.SUPER_TRACKING_CHANGED = MarkQuestDirty
 handlers.PLAYER_LEVEL_UP = function(level) pendingLevel = level end
 
 local function MarkStatusDirty() statusDirty = true end
@@ -757,6 +823,7 @@ end
 
 function M:OnSettingChanged()
 	statusDirty, lastCheck = true, -math.huge -- e.g. sharing switched: tell friends right away
+	questDirty, lastQuestCheck = true, -math.huge
 	Changed()
 	if B.OnSettingChanged then
 		B.OnSettingChanged() -- Ding.lua: a newly picked level-up sound is played
@@ -771,6 +838,8 @@ function M:BuildOptions(o)
 	o:Header(L["Sharing"])
 	o:Checkbox("share", L["Share my position"],
 		L["Battle.net friends who also use LefthyTools see you on their maps, and whether you're dead or in combat. Not available in dungeons and raids."])
+	o:Checkbox("shareQuest", L["Share the quest I'm tracking"],
+		L["Friends see the quest you're tracking, and your progress, when they hover your dot."])
 	o:Slider("interval", L["Update interval"],
 		L["How often your position is sent while you move. Standing still sends almost nothing."],
 		1, 10, 1, LT.Options.Seconds)

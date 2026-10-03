@@ -1268,6 +1268,76 @@ Advance(0.15)
 check(sentTo(11, mark, "P2;")[1] == "P2;0;500.0;500.0;1429", "/lefthy beacon ping: where I stand")
 WorldMapFrame:Hide()
 
+section("Beacon: tracked quest")
+check(BDB.shareQuest == true and B("shareQuest") ~= nil, "a setting, on by default")
+QUESTS = {
+	{ id = 176, title = 'Wanted: "Hogger"', objectives = { { text = "Huge Gnoll Claw: 0/1", finished = false } } },
+	{ id = 177, title = "Kobold Camp Cleanup", objectives = { { text = "Kobold Vermin slain: 4/10", finished = false } } },
+}
+WATCHED = { 176, 177 }
+mark = #GAMEDATA + 1
+Fire("QUEST_WATCH_LIST_CHANGED")
+check(#sentTo(11, mark, "T2;") == 0, "nothing sent inside the event handler")
+Advance(2.2)
+check(sentTo(11, mark, "T2;")[1] == 'T2;176;0;Wanted: "Hogger";Huge Gnoll Claw: 0/1',
+	"the first quest on my tracker goes to my friends, got " .. tostring(sentTo(11, mark, "T2;")[1]))
+for _ = 1, 20 do
+	Fire("QUEST_LOG_UPDATE")
+	Advance(0.1)
+end
+check(#sentTo(11, mark, "T2;") == 1, "the quest log updates often: nothing more sent while nothing changed")
+QUESTS[1].objectives[1] = { text = "Huge Gnoll Claw: 1/1", finished = true }
+Fire("QUEST_LOG_UPDATE")
+Advance(2.2)
+check(sentTo(11, mark, "T2;")[2] == 'T2;176;1;Wanted: "Hogger";', "ready to turn in")
+SUPER_TRACKED = 177
+Fire("SUPER_TRACKING_CHANGED")
+Advance(2.2)
+check(sentTo(11, mark, "T2;")[3] == "T2;177;0;Kobold Camp Cleanup;Kobold Vermin slain: 4/10", "the super-tracked quest wins")
+local tmark = #GAMEDATA + 1
+for i = 5, 9 do
+	QUESTS[2].objectives[1].text = "Kobold Vermin slain: " .. i .. "/10"
+	Fire("QUEST_LOG_UPDATE")
+	Advance(0.2)
+end
+check(#sentTo(11, tmark, "T2;") <= 1, "progress goes out at most every 2 s, got " .. #sentTo(11, tmark, "T2;"))
+Advance(2.2)
+check(last(sentTo(11, tmark, "T2;")):find("9/10$") ~= nil, "and the latest progress follows")
+tmark = #GAMEDATA + 1
+anna("H2")
+Advance(0.15)
+check(sentTo(11, tmark, "T2;")[1] == "T2;177;0;Kobold Camp Cleanup;Kobold Vermin slain: 9/10", "a hello is answered with my quest too")
+B("shareQuest"):SetValue(false)
+Advance(0.2)
+check(last(sentTo(11, tmark, "T2;")) == "T2;0;;;", "not shared: friends are told there's none")
+B("shareQuest"):SetValue(true)
+Advance(0.2)
+OpenWorldMap(1429)
+anna("T2;176;0;Wanted: Hogger;Huge Gnoll Claw: 0/1")
+Advance(0.6)
+pinOf(11):OnMouseEnter()
+check(tooltipHas("Quest: Wanted: Hogger") and tooltipHas("  Huge Gnoll Claw: 0/1") and tooltipHas("  You have this quest too"),
+	"tooltip: their quest, their progress, and that I have it too, got " .. table.concat(TOOLTIP.lines, " | "))
+anna("T2;176;1;Wanted: Hogger;")
+Advance(0.6)
+check(tooltipHas("  Ready to turn in"), "the open tooltip follows: ready to turn in")
+anna("T2;900;0;Some Other Quest;Thing: 1/2")
+Advance(0.6)
+check(tooltipHas("Quest: Some Other Quest") and not tooltipHas("  You have this quest too"), "a quest I don't have")
+anna("T2;abc;0;x;y")
+Advance(0.6)
+check(peers()[11].quest and peers()[11].quest.id == 900, "malformed quest messages are ignored")
+anna("T2;0;;;")
+Advance(0.6)
+local questLine = false
+for _, l in ipairs(TOOLTIP.lines) do if l:find("^Quest: ") then questLine = true end end
+check(not questLine, "none tracked: no quest lines")
+pinOf(11):OnMouseLeave()
+WorldMapFrame:Hide()
+QUESTS, WATCHED, SUPER_TRACKED = {}, {}, 0
+Fire("QUEST_LOG_UPDATE")
+Advance(2.2)
+
 section("Beacon: level-ups")
 lefthy("beacon ding {name} hit {level}, drinks on me!")
 check(BDB.dingText == "{name} hit {level}, drinks on me!" and B("dingText"):GetValue() == BDB.dingText,

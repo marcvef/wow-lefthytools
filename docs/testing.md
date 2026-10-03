@@ -57,4 +57,6 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     They die: a chat line with zone and what they fought. Alt+click your world map: they get a
     rippling marker on both maps, a chat line and a sound; on a continent map the line names the
     zone under the cursor. A plain click still zooms/navigates as before, also in combat.
+    They track a quest: their tooltip shows it with progress within a few seconds, "Ready to
+    turn in" when done, "You have this quest too" if it's in your log.
     Traffic in `/lefthy beacon status` stays at a few messages per minute while standing still.

@@ -559,6 +559,11 @@ C_QuestLog = {
 	GetLogIndexForQuestID = function(id) return FindQuest(id) and 1 or nil end,
 }
 function GetQuestLink(id) local q = FindQuest(id); return q and ("[" .. q.title .. "]") end
+-- The objective tracker: WATCHED = { questID, ... }; SUPER_TRACKED = the quest with the arrow (0 = none).
+WATCHED, SUPER_TRACKED = {}, 0
+C_QuestLog.GetQuestIDForQuestWatchIndex = function(i) return WATCHED[i] end
+C_QuestLog.GetNumQuestWatches = function() return #WATCHED end
+C_SuperTrack = { GetSuperTrackedQuestID = function() return SUPER_TRACKED end }
 GROUP = "none" -- "none" | "party" | "instance" | "raid"
 LE_PARTY_CATEGORY_HOME, LE_PARTY_CATEGORY_INSTANCE = 1, 2
 function IsInRaid() return GROUP == "raid" end

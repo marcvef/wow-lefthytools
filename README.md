@@ -118,7 +118,8 @@ minimap, and you on theirs, without being in a group.
   the dots glide smoothly; friends out of range wait faded at the edge, so you see which
   way they are.
 - **Hover a dot** for name (with AFK/DND), BattleTag, level, zone and subzone, who
-  they're fighting, and how far away they are and in which direction ("240 yd north-east").
+  they're fighting, the quest they're tracking with their progress (and whether you have it
+  too), and how far away they are and in which direction ("240 yd north-east").
 - **Death alerts:** a chat line when a friend dies, with where and what they were fighting
   ("Anna died in Duskwood - Raven Hill, fighting Stitches.").
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
@@ -146,6 +147,7 @@ minimap, and you on theirs, without being in a group.
 | Setting | Default | Command |
 |---|---|---|
 | Share my position | on | |
+| Share the quest I'm tracking | on | |
 | Update interval (while moving) | 3 s | `/lefthy beacon interval <1-10>` |
 | Show friends on the world map | on | |
 | Show friends on the minimap | on | |

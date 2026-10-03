@@ -22,7 +22,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `S2;<flags>;<continent>;<north>;<west>;<subzone>;<target>` state (flags D dead, G ghost,
   C combat; position empty in instances or with sharing off; target only in combat),
   `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`),
-  `P2;<continent>;<north>;<west>;<uiMapID>` map ping, `Q2` switched off. A build that doesn't
+  `P2;<continent>;<north>;<west>;<uiMapID>` map ping,
+  `T2;<questID>;<done>;<title>;<objective>` tracked quest, `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
@@ -109,7 +110,7 @@ returns at once unless the own position, facing, zoom, a glide or the data chang
   minimap. Off: they're left to Blizzard's dot as before.
 - **Tooltip:** name in class colour (+ `<AFK>`/`<DND>`), BattleTag without the number (from
   `C_BattleNet.GetAccountInfoByGUID`, which also gives the current level and zone), level, zone -
-  subzone, dead/ghost, in combat / fighting X, and distance + 8-way direction (German: "m" and
+  subzone, dead/ghost, in combat / fighting X, tracked quest, and distance + 8-way direction (German: "m" and
   "nördlich" etc.). No race/class (the colour says it). Health can't be shared (secret);
   a secret target name becomes "".
 
@@ -126,6 +127,20 @@ like all chat output; zone from Battle.net, subzone from the state) when `deathA
 `B.Notify(kind, peer, data)` tells other modules about friends' events on the driver tick:
 `"level"` (`{ level }`) and `"death"` (`{ where, foe, level }`), also when the chat line or toast
 is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
+
+## Tracked quest
+
+The quest a friend is on, for the tooltip: the super-tracked one (`C_SuperTrack.
+GetSuperTrackedQuestID`, the arrow), else the first on the tracker
+(`C_QuestLog.GetQuestIDForQuestWatchIndex(1)`), as `T2;<questID>;<done>;<title>;<objective>`:
+done 1 = ready to turn in (`C_QuestLog.IsComplete`), objective = the first unfinished one's text,
+title and objective cleaned to 64 bytes; `T2;0;;;` = none, or `shareQuest` off. Its own message
+rather than more `S2` fields: older builds parse `S2` strictly and would drop the whole state.
+`QUEST_LOG_UPDATE` (which fires often), `QUEST_WATCH_LIST_CHANGED` and `SUPER_TRACKING_CHANGED`
+only set a flag; the tick builds the message at most every 2 s and sends it only when it
+differs from the last one. A hello is answered with it too. Tooltip: "Quest: <title>" in gold,
+then the objective or "Ready to turn in", and "You have this quest too" when it's in my log
+(`C_QuestLog.GetLogIndexForQuestID`).
 
 ## Map pings
 

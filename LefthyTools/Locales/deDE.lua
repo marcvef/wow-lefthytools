@@ -147,6 +147,9 @@ L["Sharing"] = "Teilen"
 L["Share my position"] = "Meine Position teilen"
 L["Battle.net friends who also use LefthyTools see you on their maps, and whether you're dead or in combat. Not available in dungeons and raids."] =
 	"Battle.net-Freunde mit LefthyTools sehen dich auf ihren Karten, und ob du tot oder im Kampf bist. In Dungeons und Raids nicht verfügbar."
+L["Share the quest I'm tracking"] = "Meine verfolgte Quest teilen"
+L["Friends see the quest you're tracking, and your progress, when they hover your dot."] =
+	"Freunde sehen die Quest, die du verfolgst, und deinen Fortschritt, wenn sie mit der Maus über deinen Punkt fahren."
 L["Update interval"] = "Update-Intervall"
 L["How often your position is sent while you move. Standing still sends almost nothing."] =
 	"Wie oft deine Position gesendet wird, während du dich bewegst. Wer stillsteht, sendet fast nichts."
@@ -204,6 +207,9 @@ L["Ghost"] = "Geist"
 L["In combat"] = "Im Kampf"
 L["Fighting %s"] = "Kämpft gegen %s"
 L["Right next to you"] = "Direkt bei dir"
+L["Quest: %s"] = "Quest: %s"
+L["Ready to turn in"] = "Bereit zum Abgeben"
+L["You have this quest too"] = "Die Quest hast du auch"
 L["%d yd %s"] = "%d m %s" -- the German client says Meter for yards
 L["north"] = "nördlich"
 L["north-east"] = "nordöstlich"

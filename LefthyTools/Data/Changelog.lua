@@ -28,4 +28,7 @@ ns.CHANGELOG = {
 	{ id = 8, version = "0.5.0",
 		en = "Beacon: Alt+click on the world map shows your friends a spot, with a marker on their maps for a minute. /lefthy beacon ping pings where you stand.",
 		de = "Beacon: Alt+Klick auf die Weltkarte zeigt deinen Freunden eine Stelle, mit einer Markierung auf ihren Karten für eine Minute. /lefthy beacon ping pingt die Stelle, an der du stehst." },
+	{ id = 9, version = "0.5.0",
+		en = "Beacon: a friend's tooltip shows the quest they're tracking, their progress, and whether you have it too.",
+		de = "Beacon: Der Tooltip eines Freundes zeigt die Quest, die er verfolgt, seinen Fortschritt und ob du sie auch hast." },
 }

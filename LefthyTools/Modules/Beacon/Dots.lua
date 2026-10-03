@@ -145,6 +145,18 @@ function B.ShowTooltip(owner, peer)
 		GameTooltip:AddLine(peer.target ~= "" and L["Fighting %s"]:format(peer.target) or L["In combat"],
 			STATUS_R, STATUS_G, STATUS_B)
 	end
+	local quest = peer.quest
+	if quest then
+		GameTooltip:AddLine(L["Quest: %s"]:format(quest.title), 1, 0.82, 0)
+		if quest.done then
+			GameTooltip:AddLine("  " .. L["Ready to turn in"], 0.3, 1, 0.3)
+		elseif quest.objective ~= "" then
+			GameTooltip:AddLine("  " .. quest.objective, 0.85, 0.85, 0.85)
+		end
+		if C_QuestLog.GetLogIndexForQuestID(quest.id) then
+			GameTooltip:AddLine("  " .. L["You have this quest too"], GROUP_R, GROUP_G, GROUP_B)
+		end
+	end
 	local distance = DistanceText(peer)
 	if distance then
 		GameTooltip:AddLine(distance, 0.75, 0.75, 0.75)
