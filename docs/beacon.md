@@ -50,6 +50,11 @@ it must never trigger a full friend-list walk.
 
 ## Traffic (never lag the client)
 
+Values that only matter in their newest form (tracked quest `T2`, enemy count `C2`, level
+progress `X2`) replace a message of the same kind still waiting in the queue for that friend
+instead of lining up behind it (`B.QueueToPeers(message, true)`), so a busy fight or a throttle
+can't build a backlog in front of position updates.
+
 The state is checked every `interval` s (1-10, default 3) and only sent when it changed, plus a
 heartbeat every 20 s; status events (combat, death, target, zone) send early but at most once a
 second. Standing still out of combat costs one ~30-byte message per friend per 20 s. All sends go

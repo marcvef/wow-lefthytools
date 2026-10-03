@@ -1703,6 +1703,30 @@ do
 	WorldMapFrame:Hide()
 end
 
+section("Beacon: a busy fight doesn't pile up messages")
+do
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(0.2)
+	mark = #GAMEDATA + 1
+	MOCK_SEND_RESULT = 3 -- the server is throttling: everything waits in the queue
+	STATE.combat = true
+	Fire("PLAYER_REGEN_DISABLED")
+	for i = 1, 4 do
+		THREAT["nameplate" .. i] = 1
+		Fire("NAME_PLATE_UNIT_ADDED", "nameplate" .. i)
+		Advance(1.05)
+	end
+	MOCK_SEND_RESULT = nil
+	Advance(3)
+	local counts = sentTo(11, mark, "C2;")
+	check(#counts == 1 and counts[1] == "C2;4", "only the newest count goes out once the queue moves, got " .. table.concat(counts, ","))
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	for i = 1, 4 do Fire("NAME_PLATE_UNIT_REMOVED", "nameplate" .. i) end
+	THREAT = {}
+	Advance(1.2)
+end
+
 section("Chronicle: recording")
 local CH, CDB = ns.Chronicle, LefthyToolsChronicleDB
 local me = CDB and CDB.chars["Lefthy-Realmy"]
@@ -1764,15 +1788,15 @@ do
 	Fire("PARTY_KILL", SECRET, "Creature-0-7")
 	check(me.stats.kills == kills + 1, "my killing blows count; others' and secret ones don't")
 
-	STATE.target, STATE.targetName, STATE.targetGUID, TARGET_CLASS, STATE.targetDead = true, "Mor'Ladim", "Creature-0-77", "rareelite", true
 	friendsOnline()
+	STATE.target, STATE.targetName, STATE.targetGUID, TARGET_CLASS, STATE.targetDead = true, "Mor'Ladim", "Creature-0-77", "rareelite", true
 	mark = #GAMEDATA + 1
 	Advance(1.1)
 	local rare = lastEvent("rare")
 	check(rare and rare.name == "Mor'Ladim" and rare.zone == "Elwynn Forest" and me.stats.rares == 1, "a rare dies while targeted")
 	Advance(2)
 	check(me.stats.rares == 1, "once per spawn")
-	check(sentTo(11, mark, "E2;")[1] == "E2;rare;Mor'Ladim;Elwynn Forest", "and friends hear about it")
+	check(sentTo(11, mark, "E2;")[1] == "E2;rare;Mor'Ladim;Elwynn Forest", "and friends hear about it, got " .. table.concat(GameDataTo(11, mark), " | ") .. " peer: " .. tostring(peers()[11]))
 	STATE.tapDenied, STATE.targetGUID = true, "Creature-0-78"
 	Advance(1.1)
 	check(me.stats.rares == 1, "someone else's tap isn't your kill")

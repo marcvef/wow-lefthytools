@@ -331,7 +331,7 @@ local function SendCountIfChanged(now)
 	local count = EnemyCount()
 	if count and count ~= lastCount then
 		lastCount = count
-		B.QueueToPeers(("C%s;%d"):format(VERSION, math.min(count, 99)))
+		B.QueueToPeers(("C%s;%d"):format(VERSION, math.min(count, 99)), true)
 	end
 end
 
@@ -357,7 +357,7 @@ local function SendXPIfChanged(now)
 	local message = CurrentXP()
 	if message ~= lastXP then
 		lastXP = message
-		B.QueueToPeers(message)
+		B.QueueToPeers(message, true)
 	end
 end
 
@@ -397,7 +397,7 @@ local function SendQuestIfChanged(now)
 	local quest = CurrentQuest()
 	if quest ~= lastQuest then
 		lastQuest = quest
-		B.QueueToPeers(quest)
+		B.QueueToPeers(quest, true)
 	end
 end
 
@@ -427,9 +427,24 @@ function B.Queue(gameAccountID, message)
 	outbox[#outbox + 1] = { gameAccountID, message }
 end
 
-function B.QueueToPeers(message)
+-- latest: a value that only matters in its newest form (tracked quest, enemy count, level
+-- progress). If one of the same kind is still waiting for that friend, it's replaced instead of
+-- queued behind it, so a busy fight can't pile them up in front of position updates.
+function B.QueueToPeers(message, latest)
+	local kind = latest and message:sub(1, 1)
 	for gameAccountID in pairs(peers) do
-		B.Queue(gameAccountID, message)
+		local replaced = false
+		if latest then
+			for _, item in ipairs(outbox) do
+				if item[1] == gameAccountID and item[2]:sub(1, 1) == kind then
+					item[2], replaced = message, true
+					break
+				end
+			end
+		end
+		if not replaced then
+			B.Queue(gameAccountID, message)
+		end
 	end
 end
 
