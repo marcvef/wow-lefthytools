@@ -390,12 +390,22 @@ function C.Toggle()
 	frame:Show()
 end
 
--- Chronicle's 1-second tick.
-function C.OnTick(now, changed)
+-- Chronicle's 1-second tick: counters, timeline entries or the friends' feed changed since the
+-- last one. Only the open page is redrawn, and only if its data changed (a kill updates a
+-- counter, not the timeline).
+function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
 	if not (frame and frame:IsShown()) then
 		return
 	end
-	if changed or (tab == "stats" and now - lastStatsRefresh >= STATS_REFRESH) then
+	local redraw
+	if tab == "timeline" then
+		redraw = eventsChanged
+	elseif tab == "friends" then
+		redraw = feedChanged
+	else
+		redraw = statsChanged or eventsChanged or now - lastStatsRefresh >= STATS_REFRESH
+	end
+	if redraw then
 		Refresh(true)
 	end
 end

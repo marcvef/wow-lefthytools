@@ -2001,9 +2001,16 @@ do
 	win.Tabs.timeline:Click()
 	win.Prev:Click()
 	check(win.CharName:GetText():find("Lefthy", 1, true), "back to this character")
+	local redraws, setBody = 0, win.SetBodyText
+	win.SetBodyText = function(...) redraws = redraws + 1; return setBody(...) end
+	Advance(1.1)
+	Fire("PARTY_KILL", "Player-1-0", "Creature-0-99")
+	Advance(3)
+	check(redraws == 0, "a kill changes a counter, not the timeline: no redraw, got " .. redraws)
 	Fire("NEW_TOY_ADDED", 1)
 	Advance(1.1)
-	check(win.Text:GetText():find("New toy: Toy Train Set", 1, true), "the open window follows new entries within a second")
+	check(redraws == 1 and win.Text:GetText():find("New toy: Toy Train Set", 1, true), "the open window follows new entries within a second")
+	win.SetBodyText = setBody
 	win:Hide()
 	check(BINDING_NAME_LEFTHYTOOLS_CHRONICLE_TOGGLE == "Chronicle: open or close the journal", "a key binding")
 	LT:GetModule("chronicle"):Toggle()

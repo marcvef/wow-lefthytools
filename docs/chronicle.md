@@ -88,6 +88,8 @@ button greyed out:
   distance in km, gold with `GetMoneyString`.
 - **Friends:** the feed, as "Name: text".
 
-Redrawn on the tick only while open and only when something changed (`C.dirty`), the statistics
-page also every 5 s; a redraw keeps the scroll position. The AFK screen shows a session line
+Redrawn on the tick only while open, and only the open page when its own data changed:
+`C.eventsDirty` for the timeline (a kill only changes a counter, so it doesn't rebuild 250
+lines), `C.feedDirty` for Friends, `C.dirty` (counters) for Statistics, which also refreshes
+every 5 s for the time and distance; a redraw keeps the scroll position. The AFK screen shows a session line
 (`ns.MirageAFK.sections`).

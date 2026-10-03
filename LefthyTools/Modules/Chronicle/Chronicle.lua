@@ -93,7 +93,7 @@ local function Record(kind, fields)
 	if #events > EVENTS_MAX then
 		table.remove(events, 1)
 	end
-	C.dirty = true
+	C.dirty, C.eventsDirty = true, true
 	return fields
 end
 
@@ -534,9 +534,10 @@ local function Tick(now, elapsed)
 		end
 	end
 	if C.OnTick then
-		C.OnTick(now, C.dirty) -- Window.lua: redraws only while open, and only on changes
+		-- Window.lua: redraws only while open, and only the page whose data changed.
+		C.OnTick(now, C.dirty, C.eventsDirty, C.feedDirty)
 	end
-	C.dirty = false
+	C.dirty, C.eventsDirty, C.feedDirty = false, false, false
 end
 
 local driver = CreateFrame("Frame")
@@ -589,7 +590,7 @@ local function AddToFeed(entry)
 	if #feed > FEED_MAX then
 		table.remove(feed, 1)
 	end
-	C.dirty = true
+	C.feedDirty = true
 end
 
 local function OnFriendEvent(kind, peer, data)
