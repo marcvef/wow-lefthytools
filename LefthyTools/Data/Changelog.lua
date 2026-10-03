@@ -105,5 +105,8 @@ ns.CHANGELOG = {
 	{ id = 33, version = "0.5.0", module = "beacon",
 		en = { "Share by command", "/lefthy beacon show or offer, then Shift-click the item into the chat box. And when an item can't be shared, chat says why." },
 		de = { "Teilen per Befehl", "/lefthy beacon show oder offer, dann das Item mit Umschalt+Klick in den Chat einfügen. Und wenn ein Item nicht geteilt werden kann, sagt der Chat warum." } },
+	{ id = 34, version = "0.5.0", module = "general",
+		en = { "Gamepad mode: no blocked role checks", "In gamepad mode a role check's Accept could be blocked after using LefthyTools' dropdowns or opening its settings from a command. Its dropdowns are its own now, the level-up sound is a slider, and in gamepad mode the settings are opened from the game menu." },
+		de = { "Gamepad-Modus: Rollenabfrage klappt", "Im Gamepad-Modus konnte das Annehmen einer Rollenabfrage blockiert werden, nachdem ein Dropdown von LefthyTools benutzt oder die Einstellungen per Befehl geöffnet wurden. Die Dropdowns sind jetzt eigene, der Level-Up-Sound ist ein Schieberegler, und im Gamepad-Modus öffnet man die Einstellungen über das Spielmenü." } },
 	-- New entries go here, at the end.
 }

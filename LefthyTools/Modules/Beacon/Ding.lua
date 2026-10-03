@@ -134,7 +134,7 @@ function B.BuildDingOptions(o)
 	for _, sound in ipairs(SOUNDS) do
 		values[#values + 1] = { sound.kit, sound.label }
 	end
-	B.dingSoundSetting = o:Dropdown("dingSoundKit", L["Level-up sound"],
+	B.dingSoundSetting = o:Choice("dingSoundKit", L["Level-up sound"],
 		L["The sound for a friend's level-up. Picking one plays it."], values)
 	B.lastSoundKit = M.db.dingSoundKit
 end
@@ -153,7 +153,7 @@ function B.SoundCommand(arg)
 	local pick = index and SOUNDS[index]
 	if pick then
 		if M.db.dingSoundKit ~= pick.kit and B.dingSoundSetting then
-			B.dingSoundSetting:SetValue(pick.kit) -- keeps the panel in sync; B.OnSettingChanged plays it
+			B.dingSoundSetting:SetValue(index) -- the slider's position; keeps the panel in sync, B.OnSettingChanged plays it
 		else
 			M.db.dingSoundKit, B.lastSoundKit = pick.kit, pick.kit
 			PlayDingSound()

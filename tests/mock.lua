@@ -604,8 +604,32 @@ Settings = {
 		return s
 	end,
 	CreateCheckbox = function(_, setting, tooltip) setting.tooltip = tooltip end,
-	CreateSlider = function(_, setting, _, tooltip) setting.tooltip = tooltip end,
-	CreateSliderOptions = function() return { SetLabelFormatter = function(self, _, fn) assert(type(fn(0.5)) == "string") end } end,
+	CreateSlider = function(_, setting, options, tooltip) setting.tooltip, setting.sliderOptions = tooltip, options end,
+	CreateSliderOptions = function(minValue, maxValue, step)
+		return { min = minValue, max = maxValue, step = step,
+			SetLabelFormatter = function(self, _, fn) assert(type(fn(0.5)) == "string"); self.formatter = fn end }
+	end,
+	-- A setting with its own getter and setter (Builder:Choice keeps a value, the slider an index).
+	RegisterProxySetting = function(cat, variable, vtype, name, default, getValue, setValue)
+		assert(type(getValue) == "function" and type(setValue) == "function" and vtype == type(default), "bad proxy setting " .. variable)
+		assert(not REGISTERED_SETTINGS[variable], "duplicate variable " .. variable)
+		local s = { variable = variable, category = cat, name = name, proxy = true, uiUpdates = 0 }
+		function s:SetValueChangedCallback(fn) self.cb = fn end
+		function s:GetValue() return getValue() end
+		function s:SetValue(v)
+			if getValue() ~= v then
+				setValue(v)
+				self.uiUpdates = self.uiUpdates + 1
+				if self.cb then self.cb(self, v) end
+			end
+		end
+		function s:NotifyUpdate()
+			self.uiUpdates = self.uiUpdates + 1
+			if self.cb then self.cb(self, getValue()) end
+		end
+		REGISTERED_SETTINGS[variable] = s
+		return s
+	end,
 	RegisterAddOnCategory = function(cat) ADDON_CATEGORIES[#ADDON_CATEGORIES + 1] = cat end,
 	OpenToCategory = function(id) OPENED_CATEGORY = id end,
 	CreateSettingInitializerData = function(setting, options, tooltip)
@@ -1151,7 +1175,8 @@ CreateFrame("Frame", "GamepadHudMode", UIParent)
 GamepadHudMode:Hide()
 CreateFrame("Frame", "GamepadRadial", UIParent)
 GamepadRadial:Hide()
-GAMEPAD_STATE = { hudMod = false, targetMod = false }
+GAMEPAD_STATE = { hudMod = false, targetMod = false, ui = false }
+InputUtil = { IsGamepadUIEnabled = function() return GAMEPAD_STATE.ui end } -- gamepad mode's UI
 GamepadMode = {
 	IsHUDBindingModifierDown = function() return GAMEPAD_STATE.hudMod end,
 	IsTargetingModifierDown = function() return GAMEPAD_STATE.targetMod end,

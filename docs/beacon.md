@@ -338,7 +338,7 @@ hook stays, it checks the setting).
 `PLAYER_LEVEL_UP` → `L2` to every peer with the own `dingText` (empty = each receiver's localized
 default "{name} reached level {level}!"; the text is edited in a settings text field or with
 `/lefthy beacon ding`). Receiving: a toast (own frame, `GameFontNormalHuge`, top centre, 5 s +
-1.5 s fade), a chat line, and the sound picked in the "Level-up sound" dropdown (`dingSoundKit`),
+1.5 s fade), a chat line, and the sound picked on the "Level-up sound" slider (`dingSoundKit`, `Builder:Choice`),
 falling back to 18019 (`UI_BNET_TOAST`) if `PlaySound` returns false. `{name}` becomes the
 class-coloured name. Sounds offered are ones Forever's own UI plays, so the client has them: boss
 defeated fanfare 50111 (default; `BossBannerToast.lua`), world quest complete 73277, legendary

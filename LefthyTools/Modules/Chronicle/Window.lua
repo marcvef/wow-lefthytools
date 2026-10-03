@@ -394,10 +394,6 @@ end
 
 local Refresh
 
-local function IsSelected(key)
-	return key == selectedKey
-end
-
 local function Select(key)
 	selectedKey = key
 	if key:find("^" .. FRIEND) then
@@ -406,19 +402,22 @@ local function Select(key)
 	Refresh()
 end
 
-local function PickerMenu(_, root)
-	root:CreateTitle(L["Characters"])
+-- The picker's list, built when it opens (Core/Window.lua's own dropdown, not Blizzard's menu).
+local function PickerEntries()
+	local items = { { title = L["Characters"] } }
 	for _, key in ipairs(Keys()) do
-		root:CreateRadio(Label(key), IsSelected, Select, key)
+		items[#items + 1] = { text = Label(key), value = key, selected = key == selectedKey }
 	end
 	local names = FriendNames()
 	if names[1] then
-		root:CreateDivider()
-		root:CreateTitle(L["Friends"])
+		items[#items + 1] = { divider = true }
+		items[#items + 1] = { title = L["Friends"] }
 		for _, name in ipairs(names) do
-			root:CreateRadio(Label(FRIEND .. name), IsSelected, Select, FRIEND .. name)
+			local key = FRIEND .. name
+			items[#items + 1] = { text = Label(key), value = key, selected = key == selectedKey }
 		end
 	end
+	return items
 end
 
 local function Build()
@@ -443,11 +442,8 @@ local function Build()
 	frame.Values:SetJustifyV("TOP")
 	frame.Values:SetSpacing(2)
 
-	-- Blizzard's dropdown (Blizzard_Menu); its text is the picked radio's label.
-	frame.Picker = CreateFrame("DropdownButton", nil, frame, "WowStyle1DropdownTemplate")
+	frame.Picker = LT.Window.AddPicker(frame, 240, PickerEntries, Select)
 	frame.Picker:SetPoint("TOPLEFT", 14, -30)
-	frame.Picker:SetWidth(240)
-	frame.Picker:SetupMenu(PickerMenu)
 
 	frame.Tabs = {}
 	for i, info in ipairs({ { "friends", L["Friends"] }, { "graphs", L["Graphs"] }, { "stats", L["Statistics"] },
@@ -476,12 +472,7 @@ function Refresh(keepScroll)
 	if c then
 		C.Fill(c)
 	end
-	-- The dropdown's text follows the pick; its menu is rebuilt only when that or the lists change.
-	local picked = Label(selectedKey) .. "#" .. #keys .. "#" .. #FriendNames()
-	if frame.Picker.picked ~= picked then
-		frame.Picker.picked = picked
-		frame.Picker:GenerateMenu()
-	end
+	frame.Picker:SetLabel(Label(selectedKey)) -- (its list is built only when it opens)
 	for key, button in pairs(frame.Tabs) do
 		button:SetEnabled(key ~= tab) -- the open page's button is greyed out
 	end

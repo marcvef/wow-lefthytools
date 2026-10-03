@@ -345,6 +345,13 @@ lefthy("enable mirage")
 check(Mirage.enabled, "/lefthy enable mirage")
 lefthy("")
 check(OPENED_CATEGORY == LT.category:GetID(), "/lefthy opens the overview")
+-- Gamepad mode: opening the panel from addon code would taint its focus manager (a role check's
+-- Accept then gets blocked), so it says where to find the settings instead.
+OPENED_CATEGORY, GAMEPAD_STATE.ui = nil, true
+lefthy("")
+check(OPENED_CATEGORY == nil and (PRINTED[#PRINTED] or ""):find("in gamepad mode, open the settings from the game menu", 1, true),
+	"gamepad mode: /lefthy points to the game menu instead of opening the panel")
+GAMEPAD_STATE.ui = false
 lefthy("modules")
 lefthy("mirage status")
 lefthy("mirage")
@@ -1616,15 +1623,18 @@ check(BDB.dingText == "", "/lefthy beacon ding reset")
 pmark = #PRINTED + 1
 lefthy("beacon ding test")
 check(printedSince(pmark):find("Lefthy|r reached level 20!", 1, true) ~= nil, "/lefthy beacon ding test")
-local choices = DROPDOWNS.LefthyTools_beacon_dingSoundKit
-check(BDB.dingSoundKit == 50111 and choices and #choices == 6 and choices[1].label == "Boss defeated fanfare",
-	"level-up sound: a dropdown of 6 sounds, boss defeated fanfare by default")
+-- A slider whose label names the sound (no dropdown: a Blizzard menu from addon settings taints gamepad mode).
+local soundSlider = B("dingSoundKit")
+local soundOptions = soundSlider and soundSlider.sliderOptions
+check(soundSlider and soundSlider.proxy and not DROPDOWNS.LefthyTools_beacon_dingSoundKit and BDB.dingSoundKit == 50111
+	and soundSlider:GetValue() == 1 and soundOptions.min == 1 and soundOptions.max == 6 and soundOptions.formatter(1) == "Boss defeated fanfare",
+	"level-up sound: a slider over 6 sounds that names them, boss defeated fanfare by default")
 local hasLevelUpFanfare = false
-for _, c in ipairs(choices) do if c.value == 888 then hasLevelUpFanfare = true end end
+for i = 1, 6 do if soundOptions.formatter(i):find("Level up", 1, true) then hasLevelUpFanfare = true end end
 check(not hasLevelUpFanfare, "the player's own level-up fanfare isn't offered (it sounds like you levelled)")
 soundMark = #SOUNDS
-B("dingSoundKit"):SetValue(73277)
-check(#SOUNDS == soundMark, "picking a sound plays nothing inside the settings callback")
+soundSlider:SetValue(2)
+check(BDB.dingSoundKit == 73277 and #SOUNDS == soundMark, "sliding to the second: its sound kit is kept; nothing plays inside the settings callback")
 Advance(0.05)
 check(#SOUNDS == soundMark + 1 and SOUNDS[#SOUNDS] == 73277, "picking a sound plays it")
 Advance(10)
@@ -2973,16 +2983,34 @@ do
 	CH.Graphs.Draw = draw
 	CDB.chars["Alty-Realmy"] = { name = "Alty", realm = "Realmy", classFile = "MAGE", level = 12,
 		events = { { t = time(), k = "level", level = 12 } } }
+	-- The picker: our own dropdown (a Blizzard menu opened from addon code taints gamepad mode).
 	local picker = win.Picker
-	local menu = {}
-	picker:GenerateMenu()
-	for _, e in ipairs(picker._entries) do menu[#menu + 1] = e.kind == "radio" and e.text:match("|c%x%x%x%x%x%x%x%x(%a+)|r") or e.text or "-" end
-	check(table.concat(menu, ",") == "Characters,Lefthy,Alty,-,Friends,Anna",
-		"a dropdown: my characters (this one first), then friends who sent their days, got " .. table.concat(menu, ","))
-	check(picker:GetText():find("Lefthy|r  |cffccccccLevel ", 1, true), "it shows who's picked")
-	local generated = picker._generated
+	picker.GetText = function(self) return self.Label:GetText() end
+	picker.Pick = function(self, name) -- open it and click the entry with that name
+		self:Click()
+		for i = 1, self.List.count do
+			local row = self.List.rows[i]
+			if row.kind == "entry" and row.Text:GetText():find(name, 1, true) then row:Click() return end
+		end
+		error("no entry " .. name)
+	end
+	check(picker._kind == "Button" and not picker._template, "the picker is a plain button of ours, not Blizzard's DropdownButton")
+	local built = picker.List.builds
 	Advance(12)
-	check(picker._generated == generated, "the menu isn't rebuilt on every refresh")
+	check(picker.List.builds == built, "its list isn't built on refreshes, only when it opens")
+	picker:Click()
+	local menu = {}
+	for i = 1, picker.List.count do
+		local row = picker.List.rows[i]
+		menu[#menu + 1] = row.kind == "divider" and "-" or row.Text:GetText():match("|c%x%x%x%x%x%x%x%x(%a+)|r")
+	end
+	check(picker.List:IsShown() and table.concat(menu, ",") == "Characters,Lefthy,Alty,-,Friends,Anna",
+		"a click opens the list: my characters (this one first), then friends who sent their days, got " .. table.concat(menu, ","))
+	check(picker.List.rows[2].Check.shown and not picker.List.rows[3].Check.shown and not picker.List.rows[1]._mouseEnabled,
+		"the picked one is ticked; headings can't be clicked")
+	picker.List:GetScript("OnEvent")(picker.List, "GLOBAL_MOUSE_DOWN")
+	check(not picker.List:IsShown(), "a click elsewhere closes it")
+	check(picker:GetText():find("Lefthy|r  |cffccccccLevel ", 1, true), "it shows who's picked")
 	-- Pooled textures: a gradient (bars, the session curve's fill) never stays on a plain rectangle.
 	local function strayGradients()
 		local n = 0

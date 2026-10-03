@@ -96,11 +96,11 @@ square's edge). Click toggles the journal, right-click opens the settings, the t
 session. Dragging sets an `OnUpdate` that turns the cursor position into the angle and removes it
 on drop. Created on first use; Chronicle's enable/disable and the setting update it on the next
 frame.
-A dropdown at the top left (Blizzard_Menu's `WowStyle1DropdownTemplate`, `SetupMenu` with radios):
-"Characters" (this one first, then the others by name, "Name  Level 20", other realms named), then
-"Friends" who sent their days ("(friend)"). Picking a friend opens the Graphs page, the only one
-friends have. The menu is rebuilt (`GenerateMenu`, which also sets the dropdown's text) only when
-the pick or the lists change, not on every refresh. Hidden on the Friends page. Then the pages,
+A dropdown at the top left (`LT.Window.AddPicker`, our own: a Blizzard menu opened from addon code
+taints gamepad mode, see forever-platform.md): "Characters" (this one first, then the others by
+name, "Name  Level 20", other realms named), then "Friends" who sent their days ("(friend)"), the
+picked one ticked. Picking a friend opens the Graphs page, the only one friends have. The list is
+built when it opens; a refresh only sets the button's text. A click elsewhere closes it. Hidden on the Friends page. Then the pages,
 the open one's button greyed out:
 
 - **Timeline:** newest first, a heading per day (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an

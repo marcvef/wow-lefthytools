@@ -53,6 +53,26 @@ addons is still open. With gamepad mode on, the close path goes through
 `TransitionBackOpeningPanel` → `ToggleGameMenu()`. Workaround: change settings with gamepad mode
 off, or use the slash commands.
 
+## Gamepad mode and taint: no Blizzard menus, no panel opening from addon code
+
+Seen as `ADDON_ACTION_BLOCKED: UnitSetRoleEnum()` (a role check's Accept, `RolePoll.lua`). In
+gamepad mode the focus manager (`Blizzard_GamepadSharedUtility/FrameControlsManager.lua`) keeps
+state about what's on screen, fed by `EventRegistry` callbacks that run in the caller's
+execution:
+
+- `MenuProxy.OnShow` / `OnClose` (`Blizzard_Menu`): any Blizzard menu opening. A menu opened from
+  an addon's dropdown (an addon-made `WowStyle1DropdownTemplate`, or a settings dropdown with an
+  addon's options) runs tainted, even though `Blizzard_Menu` calls the generator through
+  `securecallfunction`: the click already read the addon's fields.
+- `UIParentPanelManager.ShowUIPanel` / `HideUIPanel`: `ShowUIPanel` broadcasts it outside the
+  secure delegate, so `Settings.OpenToCategory` called by addon code taints it too.
+
+`FrameShown` returns at once unless `InputUtil.IsGamepadUIEnabled()`, so only gamepad mode is
+affected. Once tainted, protected clicks routed through the manager later (gamepad confirm on a
+popup) are blocked. LefthyTools therefore: uses its own dropdown (`LT.Window.AddPicker`), shows
+choices in settings as named sliders (`Builder:Choice`, a proxy setting), and in gamepad mode
+`LT:OpenSettings` prints the way through the game menu instead of opening the panel.
+
 ## Getting the real UI source
 
 The community mirror has a `forever` branch matching the live build (`version.txt`):

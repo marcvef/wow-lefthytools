@@ -14,7 +14,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Core/Locale.lua            ns.L localization table (English keys, falls back to English)
   Locales/deDE.lua           German settings texts (loaded only on a deDE client)
   Core/Core.lua              module registry, saved settings, enable/disable lifecycle
-  Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons
+  Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons,
+                             and our own dropdown (AddPicker)
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
   Core/WhatsNew.lua          what's-new window after an update, /lefthy news (entries: Data/Changelog.lua)
   Core/Options.lua           settings panel (overview + one page per module), option builder, /lefthy
@@ -164,8 +165,9 @@ like a click would: an open settings page shows the new value and `OnSettingChan
 `m.db` directly would leave the panel showing the old value.
 
 The builder handed to `BuildOptions` has `Header`, `Checkbox`, `Slider`, `CheckboxSlider` (both in
-one row, Blizzard's `CreateSettingsCheckboxSliderInitializer`), `Dropdown`
-(`{ { value, label }, ... }` via `Settings.CreateControlTextContainer`), `Button` (wraps
+one row, Blizzard's `CreateSettingsCheckboxSliderInitializer`), `Choice` (one of
+`{ { value, label }, ... }` as a slider whose label names it: a proxy setting maps the db's value
+to the slider's position; not a dropdown, see forever-platform.md on gamepad mode), `Button` (wraps
 `CreateSettingsButtonInitializer`; its `addSearchTags` argument is asserted non-nil) and
 `TextInput`. Blizzard's list has no text control, so `TextInput` uses `Core/Options.xml`'s
 `LefthyToolsSettingsTextTemplate` (inherits `SettingsListElementTemplate`, mixin built on

@@ -93,17 +93,45 @@ function Builder:TextInput(key, name, tooltip, opts)
 	return setting
 end
 
+-- One of a few values, as a slider whose label names the value; the module's db keeps the value
+-- itself (a proxy setting maps it to the slider's position). Not a dropdown: a Blizzard menu
+-- opened from addon settings taints gamepad mode's focus manager, and a protected click through
+-- it later (a role check's Accept) is blocked; see LT.Window.AddPicker.
 -- values: { { value, label }, ... } in display order.
-function Builder:Dropdown(key, name, tooltip, values, opts)
-	local setting = self:Register(key, name, nil, opts)
-	local function GetOptions()
-		local container = Settings.CreateControlTextContainer()
-		for _, v in ipairs(values) do
-			container:Add(v[1], v[2])
-		end
-		return container:GetData()
+function Builder:Choice(key, name, tooltip, values, opts)
+	opts = opts or {}
+	local tbl = opts.tbl or self.module.db
+	local default = opts.default
+	if default == nil then
+		default = self.module.defaults[key]
 	end
-	Settings.CreateDropdown(self.category, setting, GetOptions, tooltip)
+	local function IndexOf(value)
+		for i, v in ipairs(values) do
+			if v[1] == value then
+				return i
+			end
+		end
+	end
+	local function Get()
+		return IndexOf(tbl[key]) or IndexOf(default) or 1
+	end
+	local function Set(index)
+		local v = values[math.floor(index + 0.5)]
+		if v then
+			tbl[key] = v[1]
+		end
+	end
+	local variable = "LefthyTools_" .. self.module.key .. "_" .. (opts.id or key)
+	local setting = Settings.RegisterProxySetting(self.category, variable, "number", name, IndexOf(default) or 1, Get, Set)
+	setting:SetValueChangedCallback(self.onChange)
+	self.module.settings = self.module.settings or {}
+	self.module.settings[opts.id or key] = setting
+	local options = Settings.CreateSliderOptions(1, #values, 1)
+	options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(index)
+		local v = values[math.floor(index + 0.5)]
+		return v and v[2] or ""
+	end)
+	Settings.CreateSlider(self.category, setting, options, tooltip)
 	return setting
 end
 
@@ -317,6 +345,15 @@ function LT:OpenSettings(m)
 	end
 	if InCombatLockdown() then
 		LT.Print("can't open settings in combat.")
+		return
+	end
+	-- In gamepad mode the settings can't be opened from addon code safely: ShowUIPanel tells the
+	-- gamepad's focus manager (FrameControlsManager) about the panel from our code, which taints
+	-- it, and a protected click through it later (a role check's Accept) is blocked. The game
+	-- menu's own way there is fine.
+	if InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() then
+		LT.Print("in gamepad mode, open the settings from the game menu: Options > AddOns > LefthyTools"
+			.. " (opening them from an addon would block the next role check).")
 		return
 	end
 	Settings.OpenToCategory(target:GetID())
