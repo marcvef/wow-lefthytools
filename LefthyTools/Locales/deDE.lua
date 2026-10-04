@@ -117,6 +117,12 @@ L["Flights"] = "Flüge"
 L["Cinematic flights"] = "Flüge im Kinomodus"
 L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. The bottom bar shows the time left to landing, and whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."] =
 	"Auf einer Flugroute blendet das Interface aus, schwarze Balken schieben sich wie im Kino ins Bild, und eine Titelkarte zeigt dein Ziel und jedes Gebiet, das du überfliegst. Der untere Balken zeigt die Zeit bis zur Landung, Flüsternachrichten und Gruppenchat erscheinen als Untertitel. Ein geöffnetes Fenster oder Tippen im Chat pausiert ihn, bis du fertig bist; die Landung bringt alles zurück."
+L["What a flight hides"] = "Was ein Flug ausblendet"
+L["Everything: the whole interface, other addons included. Chosen elements: only the ones ticked below, the rest stays (other addons too). Works with Mirage on or off."] =
+	"Alles: das ganze Interface, andere Addons eingeschlossen. Ausgewählte Elemente: nur die unten angehakten, der Rest bleibt (auch andere Addons). Klappt mit Mirage an oder aus."
+L["Everything"] = "Alles"
+L["Chosen elements"] = "Ausgewählte Elemente"
+L["Hidden during flights (with \"Chosen elements\")."] = "Während Flügen ausgeblendet (bei „Ausgewählte Elemente“)."
 L["Landing in %s"] = "Landung in %s"
 L["Landing in about %s"] = "Landung in etwa %s"
 L["Landing any moment"] = "Landung jeden Moment"

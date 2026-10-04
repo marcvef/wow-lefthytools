@@ -26,6 +26,14 @@ local M = LT:NewModule("tweaks", {
 		afkScreen = true,      -- AFK.lua
 		afkSpin = true,
 		cinematicFlights = true, -- Flight.lua
+		flightHide = "all",    -- "all": the whole interface | "chosen": the elements in flightGroups
+		flightGroups = (function() -- Mirage's groups (Groups.lua), all hidden until unticked
+			local hide = {}
+			for _, g in ipairs(ns.MirageData.GROUPS) do
+				hide[g.key] = true
+			end
+			return hide
+		end)(),
 	},
 })
 
@@ -517,6 +525,13 @@ function M:BuildOptions(o)
 	o:Header(L["Flights"])
 	o:Checkbox("cinematicFlights", L["Cinematic flights"],
 		L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. The bottom bar shows the time left to landing, and whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."])
+	o:Choice("flightHide", L["What a flight hides"],
+		L["Everything: the whole interface, other addons included. Chosen elements: only the ones ticked below, the rest stays (other addons too). Works with Mirage on or off."],
+		{ { "all", L["Everything"] }, { "chosen", L["Chosen elements"] } })
+	for _, g in ipairs(ns.MirageData.GROUPS) do
+		o:Checkbox(g.key, g.label, L["Hidden during flights (with \"Chosen elements\")."],
+			{ tbl = self.db.flightGroups, default = true, id = "flightGroup_" .. g.key })
+	end
 end
 
 function M:OnSlashCommand(msg)

@@ -25,8 +25,10 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 --     node positions, C_Map.GetMapWorldSize) at a learned pace (flightPace), shown as "about".
 --
 -- The interface is hidden with ns.HideInterface (Tweaks.lua: UIParent's alpha, shared with the AFK
--- screen). The destination comes from a post-hook on TakeTaxiNode (both the flight map and the old
--- taxi window call it) and TaxiNodeName.
+-- screen), or, with the setting flightHide on "chosen", only the chosen elements (flightGroups:
+-- Mirage's groups) through Mirage's engine (Mirage:HideGroups, also with Mirage off). The
+-- destination comes from a post-hook on TakeTaxiNode (both the flight map and the old taxi window
+-- call it) and TaxiNodeName.
 --
 -- Cost: nothing on the ground. PLAYER_CONTROL_LOST (a flight starting) or PLAYER_ENTERING_WORLD
 -- shows the driver, which looks for UnitOnTaxi for a few seconds and hides itself; during a
@@ -397,6 +399,19 @@ end
 -- Starting, pausing and leaving
 ---------------------------------------------------------------------------
 
+-- Everything (UIParent's alpha), or only the chosen elements (Mirage's groups); fade: seconds.
+-- Giving back undoes whichever was used, so a setting changed meanwhile can't leave anything hidden.
+local groupsHidden = false
+local function HideUI(hide, fade)
+	local chosen = hide and M.db.flightHide == "chosen"
+	ns.HideInterface("flight", hide and not chosen, fade)
+	local mirage = LT:GetModule("mirage")
+	if mirage and mirage.HideGroups and (chosen or groupsHidden) then
+		mirage:HideGroups("flight", chosen and M.db.flightGroups or nil, fade)
+		groupsHidden = chosen
+	end
+end
+
 -- The film on screen: the interface fades out, the bars in.
 local function Show()
 	shown, resumeAt, shownSecond = true, nil, nil
@@ -410,7 +425,7 @@ local function Show()
 	screen.FadeIn:Play()
 	UpdateSubtitles()
 	UpdateTimer()
-	ns.HideInterface("flight", true, FADE)
+	HideUI(true, FADE)
 end
 
 -- The interface back at once (a window, typing): paused until that's done.
@@ -420,7 +435,7 @@ local function Pause()
 	screen:Hide()
 	card.Anim:Stop()
 	card:SetAlpha(0)
-	ns.HideInterface("flight", false)
+	HideUI(false, 0)
 end
 
 local function Start()
@@ -467,7 +482,7 @@ local function EndFilm(landed)
 	end
 	card.Anim:Stop()
 	card:SetAlpha(0)
-	ns.HideInterface("flight", false, (wasShown and landed) and FADE or 0)
+	HideUI(false, (wasShown and landed) and FADE or 0)
 end
 
 local function ShouldStart()

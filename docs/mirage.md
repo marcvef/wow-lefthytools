@@ -68,6 +68,14 @@ Mirage fades the default HUD when the player is out of combat and idle (like Dun
   (`groupAlphaMigrated`): every group starts at the old `fadedAlpha`. The minimap's quest-area
   hiding needs the *minimap's* own value at 0.
 
+- **Hiding for other parts** (`M:HideGroups(owner, { [key] = true } | nil, fade)`, used by
+  cinematic flights): those groups fade to 0 over `fade` seconds (0: at once) and stay there,
+  beating everything else (`OverrideHidden` in `Evaluate`); nil gives them back. It works with
+  Mirage off: the engine adopts the frames (`Rebuild`) and runs the driver just for this, with
+  `stopping` set, so once no owner hides anything and every group is back at 1, `FinishStopping`
+  hands the frames back and the driver stops. A hidden minimap group also hides the `Minimap`
+  frame at 0 (its quest areas ignore alpha), shown again as it starts fading in.
+
 ## Ideas
 
 - Non-goal: nameplates. They belong to WorldFrame, not UIParent, and are forbidden in instances.

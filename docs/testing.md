@@ -43,6 +43,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    A Beacon friend Ctrl+right-clicks an item while you fly: "Anna shares [item]" as a subtitle.
    They Ctrl+Shift+right-click one: the interface comes back with Need / Pass; answer, and 2 s
    later the film resumes; the winner ("[item]: Anna wins!") comes as a subtitle.
+   Settings, Flights, "What a flight hides" on Chosen elements, untick Chat: on the next flight
+   the ticked elements fade out (minimap included, quest areas too), chat stays, other addons stay;
+   landing brings everything back at its own opacity. Try with Mirage on and off.
    Per element: set the minimap's slider to 50%: it stays half visible while the rest fades.
 9. Watch for Lua errors (`/console scriptErrors 1`), especially "action blocked" taint in combat.
    `/lefthy errors` lists LefthyTools' own errors from all sessions (also with the error display

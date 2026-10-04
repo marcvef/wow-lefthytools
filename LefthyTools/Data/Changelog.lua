@@ -137,5 +137,8 @@ ns.CHANGELOG = {
 	{ id = 43, module = "tweaks",
 		en = { "Item news while flying", "On a cinematic flight, items your friends show and who won an offer appear as subtitles; an offer waiting for your Need or Pass brings the interface back." },
 		de = { "Item-News beim Fliegen", "Auf einem Flug im Kinomodus erscheinen Items, die deine Freunde zeigen, und wer ein Angebot gewonnen hat, als Untertitel; ein Angebot, das auf dein Bedarf oder Passen wartet, holt das Interface zurück." } },
+	{ id = 44, module = "tweaks",
+		en = { "Choose what a flight hides", "Cinematic flights can hide only the elements you pick (the same list as Mirage's), so chat or the minimap can stay." },
+		de = { "Wählen, was ein Flug ausblendet", "Flüge im Kinomodus können nur die Elemente ausblenden, die du auswählst (dieselbe Liste wie bei Mirage), damit z. B. Chat oder Minimap bleiben." } },
 	-- New entries go here, at the end.
 }

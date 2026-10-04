@@ -256,6 +256,11 @@ left alone (a first version pulled it back and circled; that was removed).
   (`ns.Beacon.AwaitingAnswer()`: its buttons are on the hidden interface) brings the interface
   back at once; 2 s after it's closed, done or answered, the film fades back in (a zone crossed
   meanwhile gets its card then).
+- **What it hides** (`flightHide`, a `Builder:Choice`): "all", the whole interface through
+  `ns.HideInterface` (UIParent's alpha: other addons too), or "chosen", only the elements ticked in
+  `flightGroups` (one checkbox per Mirage group, all ticked by default) through
+  `Mirage:HideGroups("flight", set, fade)`, so the rest (other addons too) stays. Both are undone
+  on giving back, whatever the setting says by then.
 - **Beacon's item news:** the notices sit on the interface, so `Flight.Subtitle(text)` lets
   Items.lua add a friend's share ("[icon] Anna shares [item]") and an offer's outcome ("[item]:
   Bob wins!", "Nobody needs it.") to the subtitles, like whispers.

@@ -2789,6 +2789,45 @@ do
 	ZONE = "Elwynn Forest"
 end
 
+section("Misc Tweaks: what a flight hides")
+do
+	local TDB = LefthyToolsDB.settings.tweaks
+	local function T(id) return REGISTERED_SETTINGS["LefthyTools_tweaks_" .. id] end
+	check(TDB.flightHide == "all" and TDB.flightGroups.chat == true and TDB.flightGroups.actionbars == true
+		and T("flightHide") and T("flightGroup_chat") and T("flightGroup_minimap"), "default: everything; every element ticked")
+	local mirageWasOn = Mirage.enabled
+	if mirageWasOn then
+		lefthy("disable mirage")
+		Advance(3)
+	end
+	local barsBefore, playerBefore = a("MainActionBar"), a("PlayerFrame")
+	T("flightHide"):SetValue(2) -- chosen elements
+	T("flightGroup_chat"):SetValue(false)
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(2.5)
+	check(LefthyToolsFlightFrame:IsShown() and UIParent:GetAlpha() == 1 and a("MainActionBar") == 0 and a("PlayerFrame") == 0
+		and a("ChatFrame1") == 1, "chosen elements, Mirage off: those go (action bars, unit frames), chat stays")
+	check(not Minimap:IsShown(), "... a hidden minimap is taken away altogether (its quest areas ignore opacity)")
+	ACTIVE_CHAT_EDIT_BOX = {}
+	Advance(0.3)
+	check(a("MainActionBar") == barsBefore and Minimap:IsShown(), "typing: back at once")
+	ACTIVE_CHAT_EDIT_BOX = nil
+	Advance(4.5)
+	check(a("MainActionBar") == 0, "done typing: hidden again")
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(2.5)
+	check(a("MainActionBar") == barsBefore and a("PlayerFrame") == playerBefore and Minimap:IsShown(),
+		"landed: everything back at its own opacity (Edit Mode's, too)")
+	T("flightHide"):SetValue(1)
+	T("flightGroup_chat"):SetValue(true)
+	if mirageWasOn then
+		lefthy("enable mirage")
+		Advance(0.5)
+	end
+end
+
 section("Misc Tweaks: quests on continent and world maps")
 do
 	local TDB = LefthyToolsDB.settings.tweaks

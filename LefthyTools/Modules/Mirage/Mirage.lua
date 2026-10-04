@@ -62,6 +62,20 @@ for _, g in ipairs(groups) do
 	g.holdUntil = 0
 end
 
+-- Other parts hiding groups for a while (cinematic flights: M:HideGroups), with Mirage on or off:
+-- owner -> { [group key] = true }. Hidden there beats everything else.
+local overrides = {}
+local pendingFade -- seconds for the fades the latest HideGroups call starts (nil: Mirage's own)
+
+local function OverrideHidden(key)
+	for _, set in pairs(overrides) do
+		if set[key] then
+			return true
+		end
+	end
+	return false
+end
+
 ---------------------------------------------------------------------------
 -- Alpha ownership
 --
@@ -181,8 +195,9 @@ local function SyncMinimap(g)
 		end
 		return
 	end
-	local wantHidden = M.enabled and db.hideMinimapWhenFaded and db.groups.minimap
-		and db.groupAlpha.minimap == 0 and g.to == 0 and g.alpha <= db.minimapHideAt
+	local wantHidden = (M.enabled and db.hideMinimapWhenFaded and db.groups.minimap
+		and db.groupAlpha.minimap == 0 and g.to == 0 and g.alpha <= db.minimapHideAt)
+		or (OverrideHidden("minimap") and g.to == 0 and g.alpha <= 0) -- (its quest areas ignore alpha)
 	if wantHidden then
 		if not minimapHiddenByUs and mm:IsShown() then
 			mm:Hide()
@@ -431,12 +446,12 @@ end
 -- frame. Blizzard's PlayerMovementFrameFader follows the same rule.
 ---------------------------------------------------------------------------
 
-local function FadeTo(g, to)
+local function FadeTo(g, to, duration)
 	if g.to == to then
 		return
 	end
 	g.from, g.to, g.t = g.alpha, to, 0
-	local full = to > g.alpha and db.fadeInTime or db.fadeOutTime
+	local full = duration or (to > g.alpha and db.fadeInTime or db.fadeOutTime)
 	-- Partial fades (e.g. interrupted halfway) take proportionally less time.
 	g.dur = full * abs(to - g.alpha)
 end
@@ -471,20 +486,26 @@ local function Evaluate()
 	local okChat, chatTyping = pcall(ChatActive)
 	chatTyping = okChat and chatTyping
 
+	local fade = pendingFade
+	pendingFade = nil
 	for _, g in ipairs(groups) do
 		local show
-		if not M.enabled or peek or not db.groups[g.key] then
-			show = true
+		if OverrideHidden(g.key) then
+			FadeTo(g, 0, fade)
 		else
-			if db.mouseover then
-				local okHover, hovered = pcall(GroupHovered, g)
-				if okHover and hovered then
-					g.holdUntil = max(g.holdUntil, now + MOUSE_LINGER)
+			if not M.enabled or peek or not db.groups[g.key] then
+				show = true
+			else
+				if db.mouseover then
+					local okHover, hovered = pcall(GroupHovered, g)
+					if okHover and hovered then
+						g.holdUntil = max(g.holdUntil, now + MOUSE_LINGER)
+					end
 				end
+				show = active or now < g.holdUntil or (g.key == "chat" and chatTyping)
 			end
-			show = active or now < g.holdUntil or (g.key == "chat" and chatTyping)
+			FadeTo(g, show and 1 or db.groupAlpha[g.key], fade)
 		end
-		FadeTo(g, show and 1 or db.groupAlpha[g.key])
 	end
 	-- Shows the minimap as soon as it starts fading in, and applies setting changes.
 	SyncMinimap(groupByKey.minimap)
@@ -501,6 +522,9 @@ local function RequestEvaluate()
 end
 
 local function FinishStopping()
+	if next(overrides) then
+		return -- another part still has groups hidden
+	end
 	for i = 1, #groups do
 		local g = groups[i]
 		if g.alpha ~= 1 or g.to ~= 1 then
@@ -611,6 +635,32 @@ end
 
 function M:GetGroup(key)
 	return groupByKey[key]
+end
+
+-- Another part hides some groups for a while (cinematic flights), whether Mirage is on or off:
+-- hidden = { [group key] = true } or nil to give them back; fade = seconds for the change (0: at
+-- once). With Mirage off the engine runs just for this and hands the frames back afterwards.
+function M:HideGroups(ownerKey, hidden, fade)
+	local set
+	for key, on in pairs(hidden or {}) do
+		if on and groupByKey[key] then
+			set = set or {}
+			set[key] = true
+		end
+	end
+	overrides[ownerKey] = set
+	pendingFade = fade
+	if not db then
+		return
+	end
+	if set and not driver:GetScript("OnUpdate") then
+		self:Rebuild() -- Mirage is off: adopt the frames now
+		driver:SetScript("OnUpdate", OnUpdate)
+	end
+	if not self.enabled and driver:GetScript("OnUpdate") then
+		stopping = true -- once nothing is hidden any more, hand the frames back and go idle
+	end
+	RequestEvaluate()
 end
 
 function M:ResetSettings()
