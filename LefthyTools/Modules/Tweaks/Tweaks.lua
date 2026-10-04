@@ -530,7 +530,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | afk [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | afk | flights [on|off] - switch a tweak")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 	end
 end

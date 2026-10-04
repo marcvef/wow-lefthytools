@@ -905,7 +905,17 @@ check(CVARS.statusText == "0" and TDB.statusText == false and REGISTERED_SETTING
 	"/lefthy tweaks statustext off, through the setting (an open settings page follows)")
 lefthy("tweaks statustext on"); Advance(0.05)
 check(CVARS.statusText == "1", "/lefthy tweaks statustext on")
+local statusMark = #PRINTED + 1
 lefthy("tweaks status")
+local helpMark = #PRINTED + 1
+lefthy("tweaks help")
+local helpText, missingWords = table.concat(PRINTED, "\n", helpMark), {}
+for i = statusMark, helpMark - 1 do
+	local word = PRINTED[i]:match("%((%w+)%)$")
+	if word and not helpText:find(word, 1, true) then missingWords[#missingWords + 1] = word end
+end
+check(helpMark - statusMark >= 8 and #missingWords == 0,
+	"/lefthy tweaks help names every tweak's word, missing: " .. table.concat(missingWords, ", "))
 check(Mirage.enabled, "Mirage is unaffected by the tweaks module")
 
 section("Beacon: setup")
