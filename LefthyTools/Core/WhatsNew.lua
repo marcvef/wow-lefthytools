@@ -26,6 +26,7 @@ local function LatestID()
 	end
 	return latest
 end
+WhatsNew.LatestID = LatestID -- (Beacon asks friends on newer builds for what's new after it)
 
 -- { title, sentence } in the client's language.
 local function EntryText(entry)

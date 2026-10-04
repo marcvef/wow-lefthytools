@@ -78,7 +78,8 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     Updates (both on this build or newer): when one of you has a newer build, the other gets one
     notice per login that ends with "then /reload (no restart needed)" or, if that build adds
     files, "then restart the game"; the settings overview's Updates row says "(needs a game
-    restart)" then.
+    restart)" then. Below it, "What's coming:" and one line per change in their build
+    ("Misc Tweaks: ..."), in your client's language.
     Level-ups: `/lefthy beacon sound` to try the sounds, `/lefthy beacon ding test` for the message.
     They die: a chat line with zone and what they fought. Alt+click your world map: they get a
     rippling marker on both maps, a chat line and a sound; on a continent map the line names the

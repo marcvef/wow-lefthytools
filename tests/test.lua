@@ -1294,17 +1294,55 @@ Advance(0.15)
 check(updateStatus():find("Up to date (compared with 1 friend(s))", 1, true), "a friend on an older build: up to date, got " .. updateStatus())
 check(not printedSince(vmark):find("newer LefthyTools", 1, true), "a friend on an older build: no notice here (they get one)")
 check(peers()[11].version == "0.3.9-50-gaaaaaaa", "their version is remembered")
+local newsMark = #GAMEDATA + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "F2;0123abcd", "WHISPER", 11) -- their build loads other files than mine
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.4.0-9-gbbbbbbb", "WHISPER", 11)
 check(not printedSince(vmark):find("newer LefthyTools", 1, true), "nothing printed inside the event handler")
 Advance(0.15)
+check(sentTo(11, newsMark, "U2;")[1] == "U2;" .. LT.WhatsNew.LatestID() .. ";en",
+	"I ask them what's new in their build after my newest changelog entry, in my language")
+-- They answer: one line per change (newest few, oldest first), then the end, with how many older ones they left out.
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "W2;140;tweaks;Quests on the moon", "WHISPER", 11)
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "W2;141;stargazer;A whole new module", "WHISPER", 11)
+Advance(1)
+check(not printedSince(vmark):find("newer LefthyTools", 1, true), "the notice waits until their news are complete")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "W2;0;;3", "WHISPER", 11)
+Advance(0.15)
 local notice = printedSince(vmark)
+check(notice:find("What's coming:\n   |cffffd200•|r Misc Tweaks: Quests on the moon\n   |cffffd200•|r stargazer: A whole new module\n"
+	.. "   |cffffd200•|r and 3 more", 1, true), "... then lists them, one line each (a module I don't have yet by its key), got\n" .. notice)
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "W2;142;tweaks;Unasked news", "WHISPER", 11)
+Advance(0.15)
+check(not printedSince(vmark):find("Unasked news", 1, true), "news nobody asked for are ignored")
 check(notice:find("Anna has a newer LefthyTools (0.4.0-9-gbbbbbbb, you have 0.4.0-3-gabc1234)", 1, true)
 	and notice:find("run Update-LefthyTools.cmd again, then restart the game: this update adds files, a /reload isn't enough.", 1, true),
 	"a friend on a newer build that loads other files: told to update and restart the game, got " .. notice)
 check(LT.UpdateHint(LT.FILES):find("then /reload (no restart needed).", 1, true)
 	and LT.UpdateHint(nil):find("then /reload (or restart the game if the updater says so).", 1, true),
 	"the same files: a /reload is enough; a build that doesn't say: the updater tells")
+-- And the other way round: Bob's build is older and asks what's new in mine.
+do
+local askMark = #GAMEDATA + 1
+local latest = LT.WhatsNew.LatestID()
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "U2;" .. (latest - 2) .. ";de", "WHISPER", 12)
+Advance(0.3)
+local answer = sentTo(12, askMark, "W2;")
+local newest = ns.CHANGELOG[#ns.CHANGELOG]
+check(#answer == 3 and answer[2] == ("W2;%d;%s;%s"):format(newest.id, newest.module, newest.de[1]) and answer[3] == "W2;0;;0",
+	"a friend on an older build asks: my newer entries, in their language, then the end, got " .. table.concat(answer, " | "))
+askMark = #GAMEDATA + 1
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "U2;0;en", "WHISPER", 12)
+Advance(0.3)
+check(#sentTo(12, askMark, "W2;") == 0, "... at most once a minute per friend")
+Advance(30)
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 11) -- (Anna stays around)
+Advance(30)
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "U2;0;en", "WHISPER", 12)
+Advance(1.5)
+answer = sentTo(12, askMark, "W2;")
+check(#answer == 9 and answer[8]:find(newest.en[1], 1, true) and answer[9] == "W2;0;;" .. (#ns.CHANGELOG - 8),
+	"a long way behind: the 8 newest, and how many older ones were left out, got " .. #answer)
+end
 vmark = #PRINTED + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11)
 Advance(0.15)
@@ -1359,13 +1397,14 @@ for _ = 1, 21 do
 end
 local repeats = sentTo(11, versionMark, "V2;")
 check(#repeats == 1 and repeats[1] == "V2;0.4.0-3-gabc1234", "my version, repeated once in 10 minutes, got " .. #repeats)
-local filesRepeats, toAnna = sentTo(11, versionMark, "F2;"), GameDataTo(11, versionMark)
-local filesAt, versionAt
-for i, message in ipairs(toAnna) do
-	if message:find("^F2;") then filesAt = i elseif message:find("^V2;") then versionAt = i end
+do
+	local filesRepeats, filesAt, versionAt = sentTo(11, versionMark, "F2;"), nil, nil
+	for i, message in ipairs(GameDataTo(11, versionMark)) do
+		if message:find("^F2;") then filesAt = i elseif message:find("^V2;") then versionAt = i end
+	end
+	check(#filesRepeats == 1 and filesRepeats[1] == "F2;" .. LT.FILES and filesAt and versionAt and filesAt < versionAt,
+		"... with my files just before it")
 end
-check(#filesRepeats == 1 and filesRepeats[1] == "F2;" .. LT.FILES and filesAt and versionAt and filesAt < versionAt,
-	"... with my files just before it")
 
 section("Beacon: death alerts")
 check(BDB.deathAlert == true and B("deathAlert") ~= nil, "a setting, on by default")

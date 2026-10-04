@@ -123,5 +123,8 @@ ns.CHANGELOG = {
 	{ id = 39, version = "0.5.0", module = "general",
 		en = { "Update notice: reload or restart", "When a friend has a newer LefthyTools, the notice says whether a /reload is enough after updating or the game needs a restart. Works with friends on this build or newer." },
 		de = { "Update-Hinweis: Reload oder Neustart", "Hat ein Freund ein neueres LefthyTools, sagt der Hinweis, ob nach dem Update ein /reload reicht oder das Spiel neu starten muss. Klappt mit Freunden ab dieser Version." } },
+	{ id = 40, version = "0.5.0", module = "general",
+		en = { "What's coming", "The update notice lists what's new in your friend's build, one line per change." },
+		de = { "Was kommt", "Der Update-Hinweis zeigt, was in der Version deines Freundes neu ist, eine Zeile pro Änderung." } },
 	-- New entries go here, at the end.
 }

@@ -94,6 +94,19 @@ check(PRINTED[#PRINTED] and PRINTED[#PRINTED]:find("Anna|r hat Level 21 erreicht
 check(S("LefthyTools_beacon_dingText").name == "Level-Up-Nachricht" and SETTINGS_BUTTONS["Nachricht testen"],
 	"level-up settings are German")
 
+-- A friend on a newer build whose LefthyTools doesn't send its news: the notice comes anyway.
+local newsMark, printMark = #GAMEDATA + 1, #PRINTED
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;9.0.0", "WHISPER", 11)
+Advance(0.2)
+local asked
+for i = newsMark, #GAMEDATA do if GAMEDATA[i].id == 11 and GAMEDATA[i].data:find("^U2;") then asked = GAMEDATA[i].data end end
+check(asked and asked:find(";de$"), "asking a friend on a newer build what's new: in German, got " .. tostring(asked))
+check(#PRINTED == printMark, "the notice waits for their news")
+Advance(5)
+local notice = table.concat(PRINTED, "\n", printMark + 1)
+check(notice:find("Anna has a newer LefthyTools (9.0.0", 1, true) and notice:find("restart the game if the updater says so", 1, true)
+	and not notice:find("What's coming", 1, true), "no news from them within 5 s: the notice without them, got " .. notice)
+
 check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()
 	and LefthyToolsNewsFrame.TitleContainer.TitleText:GetText() == "Neu in LefthyTools"
 	and LefthyToolsNewsFrame.plain:find(ns.CHANGELOG[1].de[1], 1, true) and LefthyToolsNewsFrame.plain:find("\nAllgemein\n", 1, true),

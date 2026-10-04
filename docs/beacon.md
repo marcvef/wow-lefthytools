@@ -24,7 +24,11 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`; with every answer, and to every
   friend every 10 minutes, low priority), `F2;<files>` just before each `V2`: which files that
   build loads (`LT.FILES`, see architecture.md), so the notice can say restart or `/reload` (a
-  message of its own because older builds reject a `V2` with another field),
+  message of its own because older builds reject a `V2` with another field), `U2;<after>;<de|en>`
+  "what's new in your build after changelog id <after>", sent once per login to the first friend
+  seen on a newer build, answered with `W2;<id>;<module>;<title>` per entry (the newest 8 above
+  <after>, oldest first, title in the asker's language) and `W2;0;;<left out>` (at most once a
+  minute per friend; only the friend asked is listened to, at most 8 lines),
   `P2;<continent>;<north>;<west>;<uiMapID>` map ping,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
@@ -34,7 +38,9 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
-  telling them to run `Update-LefthyTools.cmd`, then `/reload` or restart the game. Builds
+  telling them to run `Update-LefthyTools.cmd`, then `/reload` or restart the game, followed by
+  "What's coming:" and one line per change (module: title, "and N more"). The notice waits for
+  the `W2` end, at most 5 s (builds before this one don't answer `U2`). Builds
   before 0.4.0 ignore `V2`. A message
   with another version marks the sender in `otherVersion` (shown by `/lefthy beacon status`)
   instead of making them a peer; v1 (0.2.0) and v2 can't see each other. `Parse` validates the

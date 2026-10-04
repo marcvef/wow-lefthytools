@@ -190,7 +190,9 @@ minimap, and you on theirs, without being in a group.
 `/lefthy beacon status` lists friends with LefthyTools online, their LefthyTools version,
 when their last position arrived, and how many messages were sent and received per minute.
 **Update notice:** if a friend runs a newer LefthyTools than you, you're told once per login,
-with how to update. Friends on a much older LefthyTools (before 0.3.0) can't see you at all
+with how to update, whether a `/reload` is enough or the game needs a restart, and what's
+coming: one line per change (the newest eight). This needs both of you on 0.5.0 or newer.
+Friends on a much older LefthyTools (before 0.3.0) can't see you at all
 and are listed with a hint to update. Switching Beacon off on the overview page stops
 everything and removes your dot from your friends' maps.
 

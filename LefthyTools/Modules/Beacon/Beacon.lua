@@ -24,6 +24,11 @@ local L = ns.L
 --   F2;<files>          which files my build loads (LT.FILES), sent just before every V2: a friend
 --                       updating to it learns whether a /reload is enough or the game needs a
 --                       restart. (Its own message: older builds reject a V2 with more fields.)
+--   U2;<after>;<de|en>  to a friend on a newer build: what's new in it after my newest changelog
+--                       id (Data/Changelog.lua), in my language. Answered with
+--   W2;<id>;<module>;<title>
+--                       one changelog entry each (the newest NEWS_LINES, oldest first), then
+--                       W2;0;;<left out> to end. The update notice lists them, one line each.
 --   P2;<continent>;<north>;<west>;<uiMapID>
 --                       a map ping (Pings.lua): "look here", shown on friends' maps for a minute
 --   T2;<questID>;<done>;<title>;<objective>
@@ -88,6 +93,9 @@ local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, moun
 	quests = true, gold = true, profession = true, quest = true, zone = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local VERSION_EVERY = 600    -- my version goes to every friend this often too (besides answers)
+local NEWS_LINES = 8         -- what's new in a friend's newer build: at most this many changes
+local NEWS_WAIT = 5          -- the update notice waits this long for them (older builds don't send any)
+local NEWS_GAP = 60          -- tell one friend what's new in mine at most this often
 local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
 local GLIDE_SNAP = 300       -- a jump this far (yards) is a teleport: no gliding
 local TICK = 0.1
@@ -155,8 +163,11 @@ local itemsIn = {}      -- { "item" | "answer" | "result", gameAccountID, ... } 
 local dailyIn = {}      -- { gameAccountID, { day, played, xp, ... } }: friends' days, for Chronicle
 local comings = {}      -- { "online" | "offline", peer }: told to listeners on the next tick
 local enabledAt = 0
-local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on the next tick
+local newerFrom         -- gameAccountID of a friend with a newer LefthyTools, told on a tick
+local newerAt = 0       -- when their version came (the notice waits up to NEWS_WAIT for their news)
+local news              -- what's new in their build: { lines = { { module, title } }, more, done }
 local newerNoticeShown = false -- that notice comes once per login
+local newsAsked = {}    -- { gameAccountID, after id, language }: friends who asked what's new in mine
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
 
 local sweepRequested, validateRequested, statusDirty = false, false, false
@@ -679,6 +690,16 @@ local function Parse(text)
 		if files and #files <= 16 then
 			return "F", files
 		end
+	elseif kind == "U" then
+		local after, language = rest:match("^;(%d+);(%l%l)$")
+		if after then
+			return "U", tonumber(after), language
+		end
+	elseif kind == "W" then
+		local id, module, title = rest:match("^;(%d+);(%l*);([^;]*)$")
+		if id then
+			return "W", tonumber(id), module, title
+		end
 	elseif kind == "P" then
 		local continent, north, west, mapID = rest:match("^;(%d+);(%-?%d+%.?%d*);(%-?%d+%.?%d*);(%d+)$")
 		if continent then
@@ -881,8 +902,23 @@ local function OnMessage(text, senderID)
 	elseif kind == "V" then
 		peer.version = a
 		LT:NoteFriendVersion(a, peer.files) -- the settings overview shows it
-		if not newerNoticeShown and LT.CompareVersions(a, LT.version) == 1 then
-			newerFrom = senderID -- told on the next tick, once their name is known
+		if not newerNoticeShown and not newerFrom and LT.CompareVersions(a, LT.version) == 1 then
+			-- Told on a tick, once their name is known and their news are in: ask what's new.
+			newerFrom, newerAt, news = senderID, now, { lines = {}, more = 0 }
+			B.Queue(senderID, ("U%s;%d;%s"):format(VERSION, LT.WhatsNew.LatestID(), ns.LOCALE == "deDE" and "de" or "en"))
+		end
+	elseif kind == "U" then
+		if not guard.newsAt or now - guard.newsAt >= NEWS_GAP then
+			guard.newsAt = now
+			newsAsked[#newsAsked + 1] = { senderID, a, b }
+		end
+	elseif kind == "W" then
+		if news and senderID == newerFrom and not news.done then -- only the news I asked for
+			if a == 0 then
+				news.done, news.more = true, tonumber(c) or 0
+			elseif #news.lines < NEWS_LINES then
+				news.lines[#news.lines + 1] = { module = b, title = B.Clean(c, 80) }
+			end
 		end
 	end
 	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget.
@@ -896,6 +932,50 @@ local function OnMessage(text, senderID)
 		end
 		if lastXP and lastXP ~= NO_XP then
 			B.Queue(senderID, lastXP)
+		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- Updates: a friend on a newer build, and what's new in it
+---------------------------------------------------------------------------
+
+-- A friend asked what's new in my build after their newest changelog id: my newest entries
+-- above it, one message each (oldest first), then the end with how many older ones were left out.
+local function SendNews(gameAccountID, after, language)
+	local entries = {}
+	for _, entry in ipairs(ns.CHANGELOG or {}) do
+		if entry.id > after then
+			entries[#entries + 1] = entry
+		end
+	end
+	table.sort(entries, function(x, y) return x.id < y.id end)
+	local first = math.max(1, #entries - NEWS_LINES + 1)
+	for i = first, #entries do
+		local entry = entries[i]
+		local text = (language == "de" and entry.de or entry.en)[1]
+		B.Queue(gameAccountID, ("W%s;%d;%s;%s"):format(VERSION, entry.id, entry.module or "general", B.Clean(text, 80)))
+	end
+	B.Queue(gameAccountID, ("W%s;0;;%d"):format(VERSION, first - 1))
+end
+
+local function ModuleTitle(key)
+	local m = key ~= "general" and key ~= "" and LT:GetModule(key)
+	return m and m.title or (key ~= "general" and key ~= "" and key) or "LefthyTools" -- (a module newer than mine: its key)
+end
+
+-- Once per login (a /reload counts as one): who has a newer build, whether a /reload is enough,
+-- and one line per change in it.
+local function ShowUpdateNotice(friend)
+	M:Print(string.format("%s has a newer LefthyTools (%s, you have %s). %s", friend.name, friend.version,
+		LT.version, LT.UpdateHint(friend.files)))
+	if news and #news.lines > 0 then
+		M:Print("What's coming:")
+		for _, line in ipairs(news.lines) do
+			print("   |cffffd200•|r " .. ModuleTitle(line.module) .. ": " .. line.title)
+		end
+		if news.more > 0 then
+			print(("   |cffffd200•|r and %d more (/lefthy news lists everything once you've updated)"):format(news.more))
 		end
 	end
 end
@@ -992,14 +1072,18 @@ local function Tick(now, elapsed)
 	if B.UpdatePings then
 		B.UpdatePings(now)
 	end
-	-- A friend runs a newer LefthyTools: say so once per login (a /reload counts as one).
+	-- A friend runs a newer LefthyTools: say so once their news are in (or NEWS_WAIT has passed).
 	local newer = newerFrom and peers[newerFrom]
-	if newer and newer.name and not newerNoticeShown then
+	if newer and newer.name and not newerNoticeShown and (news.done or now - newerAt >= NEWS_WAIT) then
 		newerNoticeShown, newerFrom = true, nil
-		M:Print(string.format("%s has a newer LefthyTools (%s, you have %s). %s", newer.name, newer.version,
-			LT.version, LT.UpdateHint(newer.files)))
+		ShowUpdateNotice(newer)
+		news = nil
 	elseif newerFrom and not peers[newerFrom] then
-		newerFrom = nil
+		newerFrom, news = nil, nil
+	end
+	while #newsAsked > 0 do
+		local asked = table.remove(newsAsked, 1)
+		SendNews(asked[1], asked[2], asked[3])
 	end
 	if now - lastExpire >= 1 then
 		Expire(now)
