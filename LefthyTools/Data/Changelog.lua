@@ -134,5 +134,8 @@ ns.CHANGELOG = {
 	{ id = 42, module = "general",
 		en = { "Errors: a button", "The settings overview opens LefthyTools' error list with a Show button instead of telling you a command." },
 		de = { "Fehler: ein Button", "Die Übersicht in den Einstellungen öffnet die Fehlerliste von LefthyTools mit einem Anzeigen-Button, statt dir einen Befehl zu nennen." } },
+	{ id = 43, module = "tweaks",
+		en = { "Item news while flying", "On a cinematic flight, items your friends show and who won an offer appear as subtitles; an offer waiting for your Need or Pass brings the interface back." },
+		de = { "Item-News beim Fliegen", "Auf einem Flug im Kinomodus erscheinen Items, die deine Freunde zeigen, und wer ein Angebot gewonnen hat, als Untertitel; ein Angebot, das auf dein Bedarf oder Passen wartet, holt das Interface zurück." } },
 	-- New entries go here, at the end.
 }

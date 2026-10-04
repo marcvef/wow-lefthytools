@@ -11,8 +11,10 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 -- everything back.
 --
 -- The screen doesn't take clicks, so the camera can be dragged as always. Opening a window (map,
--- bags, ...) or typing in chat pauses the film (the interface is back at once) and it resumes by
--- itself once that's done. Combat or a popup that needs you ends it for the rest of that flight.
+-- bags, ...), typing in chat or a friend's item offer waiting for your Need or Pass (Beacon) pauses
+-- the film (the interface is back at once) and it resumes by itself once that's done. Combat or a
+-- popup that needs you ends it for the rest of that flight. Friends' item shares and the outcome
+-- of offers come in as subtitles too (Flight.Subtitle, from Beacon's Items.lua).
 --
 -- Flight time: the game doesn't tell. Best first:
 --   * a route flown before: its time (LefthyToolsDB.flightTimes, "From > To"), counted down exactly;
@@ -85,6 +87,12 @@ end
 
 local function ChatActive()
 	return ACTIVE_CHAT_EDIT_BOX ~= nil or (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus() ~= nil)
+end
+
+-- A friend's item offer waiting for my Need or Pass: its buttons are on the interface.
+local function OfferWaiting()
+	local beacon = ns.Beacon
+	return beacon and beacon.AwaitingAnswer and beacon.AwaitingAnswer() or false
 end
 
 -- How many windows are open (the taxi map closing as you take off is fine; one opening isn't).
@@ -500,7 +508,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 		local now = GetTime()
 		local windows = Windows()
 		baseline = math.min(baseline, windows)
-		local busy = ChatActive() or windows > baseline
+		local busy = ChatActive() or windows > baseline or OfferWaiting()
 		if shown and busy then
 			Pause()
 		elseif not shown then
@@ -539,6 +547,25 @@ local function Look()
 	driver:Show()
 end
 
+-- The newest few lines, each for SUBTITLE_TIME seconds; drawn on the next check.
+local function AddSubtitle(text)
+	subtitles[#subtitles + 1] = { text = text, at = GetTime() }
+	while #subtitles > MAX_SUBTITLES do
+		table.remove(subtitles, 1)
+	end
+	chatChanged = true
+end
+
+-- Other parts' news while the interface is hidden (Beacon: a friend's item share, an offer's
+-- outcome). True if it's shown, i.e. on a flight with the film.
+function Flight.Subtitle(text)
+	if not flying or not Readable(text) then
+		return false
+	end
+	AddSubtitle(text)
+	return true
+end
+
 events:SetScript("OnEvent", function(_, event, ...)
 	if event == "PLAYER_CONTROL_LOST" then
 		dismissed, trip = false, nil -- a new flight
@@ -557,11 +584,7 @@ events:SetScript("OnEvent", function(_, event, ...)
 			if event ~= "CHAT_MSG_BN_WHISPER" then
 				sender = sender:gsub("%-.*$", "") -- without the realm
 			end
-			subtitles[#subtitles + 1] = { text = CHAT_COLOURS[event] .. "[" .. sender .. "]|r " .. text, at = GetTime() }
-			while #subtitles > MAX_SUBTITLES do
-				table.remove(subtitles, 1)
-			end
-			chatChanged = true
+			AddSubtitle(CHAT_COLOURS[event] .. "[" .. sender .. "]|r " .. text)
 		end
 	elseif flying then
 		leaveNow = true -- combat or a popup: back on the next check

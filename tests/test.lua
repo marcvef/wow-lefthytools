@@ -2717,7 +2717,25 @@ do
 	TakeTaxiNode(3)
 	TRAVEL.taxi = true
 	Fire("PLAYER_CONTROL_LOST")
-	Advance(70) -- 4222 yd in 70 s: much faster than the rest
+	-- On the way: a friend's item share is a subtitle; an offer pauses the film so its buttons show.
+	anna("H2")
+	Advance(2)
+	anna("I2;1179::::::::20:::::")
+	Advance(0.3)
+	check(film:IsShown() and film.Subtitles:GetText():find("Anna|r shares", 1, true),
+		"a friend shows an item: a subtitle, got " .. tostring(film.Subtitles:GetText()))
+	Advance(2.1)
+	anna("I2;6948::::::::20:::::;6161")
+	Advance(0.3)
+	check(not film:IsShown() and UIParent:GetAlpha() == 1 and BB.calls["11:6161"].frame.Need:IsShown(),
+		"a friend's offer: the film pauses for its Need and Pass buttons")
+	BB.calls["11:6161"].frame.Pass:Click()
+	Advance(2.5)
+	check(film:IsShown(), "answered: the film comes back")
+	anna("R2;6161;Bob:0")
+	Advance(0.3)
+	check(film.Subtitles:GetText():find("Bob wins!", 1, true), "and the outcome comes as a subtitle, got " .. tostring(film.Subtitles:GetText()))
+	Advance(62.5) -- 4222 yd in 70 s: much faster than the rest
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(0.5)

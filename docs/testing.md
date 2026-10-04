@@ -40,6 +40,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    above the bottom bar. The camera stays where you put it and can be dragged. Land: everything
    fades back. Fly the same route again: "Landing in m:ss" counts down exactly. Press M: the
    interface is back; close the map and the film returns 2 s later. A ready check ends it.
+   A Beacon friend Ctrl+right-clicks an item while you fly: "Anna shares [item]" as a subtitle.
+   They Ctrl+Shift+right-click one: the interface comes back with Need / Pass; answer, and 2 s
+   later the film resumes; the winner ("[item]: Anna wins!") comes as a subtitle.
    Per element: set the minimap's slider to 50%: it stays half visible while the rest fades.
 9. Watch for Lua errors (`/console scriptErrors 1`), especially "action blocked" taint in combat.
    `/lefthy errors` lists LefthyTools' own errors from all sessions (also with the error display

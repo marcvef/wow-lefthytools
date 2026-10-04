@@ -252,8 +252,13 @@ left alone (a first version pulled it back and circled; that was removed).
   (`db.flightOrbit`, `db.flightZoom`, `db.flightMaxZoom`: circling, zoom, zoom limit) and drops
   those keys and the old `flightCamera` setting.
 - **Pausing:** a window or bag opening (more open than the fewest this flight, from Mirage's
-  window lists) or typing in chat brings the interface back at once; 2 s after it's closed or
-  done, the film fades back in (a zone crossed meanwhile gets its card then).
+  window lists), typing in chat, or a friend's item offer waiting for my Need or Pass
+  (`ns.Beacon.AwaitingAnswer()`: its buttons are on the hidden interface) brings the interface
+  back at once; 2 s after it's closed, done or answered, the film fades back in (a zone crossed
+  meanwhile gets its card then).
+- **Beacon's item news:** the notices sit on the interface, so `Flight.Subtitle(text)` lets
+  Items.lua add a friend's share ("[icon] Anna shares [item]") and an offer's outcome ("[item]:
+  Bob wins!", "Nobody needs it.") to the subtitles, like whispers.
 - **Leaving:** landing (`UnitOnTaxi` false; `PLAYER_CONTROL_GAINED` wakes the driver) fades
   everything back. Combat or a popup that needs you (ready check, invite, LFG, duel, summon,
   cinematic) brings the interface back at once and keeps it for the rest of that flight (the

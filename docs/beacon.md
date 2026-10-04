@@ -243,6 +243,10 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   animation) with `UI_EPICLOOT_TOAST`, and a chat line "Anna wins [item] with 87 (Bob 12).". A
   shown-only item fades after 7 s; results stay 7 s too. All of it runs on Beacon's tick
   (`B.UpdateCalls`), and only while a notice is up.
+- **On a cinematic flight** (Misc Tweaks) the interface, notices included, is hidden: a friend's
+  share and every offer's outcome also go to the flight's subtitles (`ns.CinematicFlight.Subtitle`),
+  and `B.AwaitingAnswer()` (a friend's open offer without my answer) makes the film pause so the
+  Need and Pass buttons show.
 - Setting `shareItems` switches sending and showing.
 
 ### Hand-over reminder (Handover.lua)

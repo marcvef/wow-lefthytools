@@ -192,10 +192,13 @@ local function NewFrame()
 	return f
 end
 
+local function Icon(call)
+	local itemID = tonumber(call.itemString:match("^(%d+)"))
+	return ("|T%s:0|t"):format(C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID) or 134400)
+end
+
 -- "[icon] You offer [item]", "[icon] Anna offers [item]" or "[icon] Anna shares [item]".
 local function Headline(call)
-	local itemID = tonumber(call.itemString:match("^(%d+)"))
-	local icon = C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID) or 134400
 	local text
 	if call.mine then
 		text = L["You offer %s"]:format(call.link)
@@ -203,7 +206,17 @@ local function Headline(call)
 		local who = Coloured(call.fromName, call.fromClass)
 		text = (call.id and L["%s offers %s"] or L["%s shares %s"]):format(who, call.link)
 	end
-	return ("|T%s:0|t %s"):format(icon, text)
+	return Icon(call) .. " " .. text
+end
+
+-- On a cinematic flight (Misc Tweaks) the notices are hidden with the interface: shares and the
+-- outcome of offers go into its subtitles as well. An offer waiting for my answer pauses the film
+-- instead (B.AwaitingAnswer), so its buttons show.
+local function FlightSubtitle(text)
+	local flight = ns.CinematicFlight
+	if flight and flight.Subtitle then
+		flight.Subtitle(text)
+	end
 end
 
 local function FrameFor(call)
@@ -305,11 +318,13 @@ local function Finish(call)
 	if #result == 0 then
 		f.Status:SetText("|cffaaaaaa" .. L["Nobody needs it."] .. "|r")
 		M:Print(("nobody needs %s."):format(call.link))
+		FlightSubtitle(("%s %s: %s"):format(Icon(call), call.link, L["Nobody needs it."]))
 		return
 	end
 	local winner = result[1].name
 	f.Status:SetText(#result > 1 and RollLines(call) or "")
 	f.Winner:SetText("|cffffd200" .. WinnerText(winner) .. "|r")
+	FlightSubtitle(("%s %s: |cffffd200%s|r"):format(Icon(call), call.link, WinnerText(winner)))
 	f.Pop:Play()
 	PlaySound(SOUND.win)
 	if #result > 1 then
@@ -596,8 +611,21 @@ function B.ReceiveItem(peer, gameAccountID, itemString, callID)
 		Put(gameAccountID .. ":" .. (callID or ("x" .. now)), call)
 		Draw(call)
 		PlaySound(SOUND.call)
+		if not callID then
+			FlightSubtitle(Headline(call))
+		end
 	end)
 	B.Notify("item", peer, { itemString = itemString })
+end
+
+-- A friend's offer still waiting for my Need or Pass (a cinematic flight pauses for it).
+function B.AwaitingAnswer()
+	for _, call in pairs(calls) do
+		if not call.mine and call.id and call.state == "open" and call.myAnswer == nil then
+			return true
+		end
+	end
+	return false
 end
 
 -- A friend answers my call.
