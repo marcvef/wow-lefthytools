@@ -628,8 +628,8 @@ function B.ReceiveItem(peer, gameAccountID, itemString, callID)
 		if not callID then
 			FlightSubtitle(Headline(call))
 		end
+		B.Notify("item", peer, { itemString = itemString, link = link, offer = callID ~= nil }) -- (the AFK screen)
 	end)
-	B.Notify("item", peer, { itemString = itemString })
 end
 
 -- An announcement (Chat.lua; peer nil: mine) in the notice stack, like a shared item, for a little

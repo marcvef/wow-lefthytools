@@ -75,9 +75,11 @@ function B.ReceiveChat(peer, text)
 	if not M.db.lefthyChat then
 		return
 	end
-	local line = ChatLine(peer.name, peer.classFile, B.Clean(text, TEXT_BYTES))
+	text = B.Clean(text, TEXT_BYTES)
+	local line = ChatLine(peer.name, peer.classFile, text)
 	print(line)
 	FlightSubtitle(line)
+	B.Notify("chat", peer, { text = text }) -- (the AFK screen)
 end
 
 function B.ReceiveAnnouncement(peer, text)
@@ -87,6 +89,7 @@ function B.ReceiveAnnouncement(peer, text)
 	text = B.Clean(text, TEXT_BYTES)
 	print(ChatLine(peer.name, peer.classFile, text)) -- in the chat window too, for the record
 	B.ShowAnnouncement(peer, text)
+	B.Notify("announce", peer, { text = text })
 end
 
 -- /l like /g or /p; /lchat in case another addon has /l.

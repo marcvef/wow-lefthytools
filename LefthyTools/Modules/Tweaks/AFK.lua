@@ -44,7 +44,7 @@ local shown, dismissed, checkPending, leaveNow = false, false, false, false
 local since, spinning
 local sincePoll, sinceRefresh = 0, 0
 local whispers, lastWhisper = 0, nil
-local news = {} -- friends' level-ups and deaths while away: { kind, name, classFile, data }
+local news = {} -- friends' news while away (OnFriendEvent): { kind, name, classFile, data }
 local listening = false
 
 local function IsAFK()
@@ -145,12 +145,26 @@ local function ColouredName(name, classFile)
 	return LT.Window.ClassColorCode(classFile) .. (name or "?") .. "|r"
 end
 
+-- A friend's text, cut so a line doesn't grow the panel much.
+local function Short(text)
+	if #text > 90 then
+		text = text:sub(1, 87):gsub("[\192-\255][\128-\191]*$", "") .. "..."
+	end
+	return text
+end
+
 local function NewsLine(item)
 	local who = ColouredName(item.name, item.classFile)
 	if item.kind == "level" then
 		return L["%s reached level %d"]:format(who, item.data.level or 0)
 	elseif item.kind == "death" then
 		return item.data.foe and L["%s died, fighting %s"]:format(who, item.data.foe) or L["%s died"]:format(who)
+	elseif item.kind == "item" and item.data.link then -- Beacon: shown or offered (a click brings back its buttons)
+		return (item.data.offer and L["%s offers %s"] or L["%s shares %s"]):format(who, item.data.link)
+	elseif item.kind == "chat" and item.data.text then -- Lefthy chat
+		return "|cffffb84d[Lefthy]|r " .. who .. ": " .. Short(item.data.text)
+	elseif item.kind == "announce" and item.data.text then
+		return who .. ": |cffffd200" .. Short(item.data.text) .. "|r"
 	end
 	return item.data.text and (who .. ": " .. item.data.text) or nil
 end
@@ -333,9 +347,11 @@ events:SetScript("OnEvent", function(_, event, ...)
 	end
 end)
 
--- Friends' news while away, from Beacon (its listeners run on Beacon's tick).
+-- Friends' news while away, from Beacon (its listeners run on Beacon's tick): level-ups, deaths,
+-- items shown or offered, Lefthy chat lines and announcements (the notices are hidden too).
+local NEWS_KINDS = { level = true, death = true, item = true, chat = true, announce = true }
 local function OnFriendEvent(kind, peer, eventData)
-	if shown and (kind == "level" or kind == "death") then
+	if shown and NEWS_KINDS[kind] then
 		news[#news + 1] = { kind = kind, name = peer.name, classFile = peer.classFile, data = eventData or {} }
 		while #news > MAX_NEWS do
 			table.remove(news, 1)

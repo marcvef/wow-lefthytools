@@ -180,8 +180,10 @@ choices are `Builder:Choice` sliders (no dropdowns, see forever-platform.md).
 
 While the player is AFK (`UnitIsAFK("player")`; `/afk` or the auto-AFK), the
 interface disappears and a panel shows the character (`PlayerModel` with `SetUnit("player")`),
-time away, clock, zone, level progress and rested XP, whispers since then, friends' level-ups and
-deaths while away (a `ns.Beacon.listeners` entry), and lines other modules add through
+time away, clock, zone, level progress and rested XP, whispers since then, friends' news while
+away (a `ns.Beacon.listeners` entry: level-ups, deaths, and, because their notices are hidden with
+the interface, items shown or offered, Lefthy chat lines and announcements, the text cut at 90
+bytes; the newest 6), and lines other modules add through
 `ns.AFKScreen.sections` (Chronicle's session). The camera circles with `MoveViewLeftStart(0.03)`
 (setting `afkSpin`). Beacon friends (up to 5, by name) get up to three lines each, all from what
 Beacon already knows (nothing extra is sent): name (`<AFK>` from Battle.net), level and level

@@ -2617,6 +2617,25 @@ do
 		and printedSince(pmark):find("Lefthy chat is off", 1, true), "switched off: nothing shown or sent, and I'm told why")
 	B("announcements"):SetValue(true)
 	B("lefthyChat"):SetValue(true)
+	-- While I'm AFK the notices are hidden with the interface: the AFK screen lists them.
+	Advance(3.5)
+	afk(true)
+	Advance(1.1)
+	anna("I2;1179::::::::20:::::")
+	Advance(2.1)
+	anna("I2;6948::::::::20:::::;7171")
+	anna("M2;brb, getting coffee")
+	anna("A2;Raid in 10!")
+	Advance(1.1)
+	local info = LefthyToolsAFKFrame.Info:GetText()
+	check(LefthyToolsAFKFrame:IsShown() and info:find("While you were away", 1, true) and info:find("Anna|r shares", 1, true)
+		and info:find("Anna|r offers", 1, true) and info:find("[Lefthy]|r ", 1, true) and info:find("|r: brb, getting coffee", 1, true)
+		and info:find("|r: |cffffd200Raid in 10!", 1, true),
+		"AFK: items shown and offered, Lefthy chat and announcements are listed, got\n" .. info)
+	afk(false)
+	Advance(0.3)
+	BB.calls["11:7171"].frame.Pass:Click() -- back: the offer's buttons are there
+	Advance(0.2)
 end
 
 section("Beacon: a busy fight doesn't pile up messages")
@@ -3699,8 +3718,9 @@ STATE.combat = false
 Advance(5)
 local newsText = LefthyToolsNewsFrame and LefthyToolsNewsFrame.plain or ""
 check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown(), "after combat: the window opens by itself")
-check(newsText:find(news[#news].en[1], 1, true) and newsText:find(news[#news - 1].en[1], 1, true)
-	and not newsText:find(news[#news - 2].en[1], 1, true), "only the entries not seen yet")
+local function entryLine(e) return "- " .. e.en[1] .. ": " .. e.en[2] end -- (another entry's text may name a title)
+check(newsText:find(entryLine(news[#news]), 1, true) and newsText:find(entryLine(news[#news - 1]), 1, true)
+	and not newsText:find(entryLine(news[#news - 2]), 1, true), "only the entries not seen yet")
 check(news[#news].version or newsText:sub(1, 29) == "LefthyTools 0.4.0-3-gabc1234\n",
 	"entries since the last tagged version: under the installed build (no made-up version), got " .. newsText)
 check(LefthyToolsDB.changelogSeen == #news, "and they count as seen")

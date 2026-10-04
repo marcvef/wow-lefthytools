@@ -171,7 +171,8 @@ like all chat output; zone from Battle.net, subzone from the state) when `deathA
 
 `B.Notify(kind, peer, data)` tells other modules about friends' events on the driver tick:
 `"level"` (`{ level }`), `"death"` (`{ where, foe, level }`), `"highlight"` (`{ kind, a, b }`),
-`"item"` (`{ itemString }`), and `"online"`/`"offline"` (a friend's name became known more than
+`"item"` (`{ itemString, link, offer }`, once the link has loaded and only while shown),
+`"chat"` and `"announce"` (`{ text }`, only while shown), and `"online"`/`"offline"` (a friend's name became known more than
 a minute after Beacon started / a known friend was forgotten), also when the chat line or toast
 is switched off. Register with `table.insert(ns.Beacon.listeners, fn)`.
 

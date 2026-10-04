@@ -33,7 +33,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    AFK screen (Misc Tweaks, also with Mirage off): `/afk`: the interface goes, the camera circles, the panel shows your
    character, timer, time, XP, Beacon friends. Get whispered: it's counted. Press W: everything
    is back at once and the camera stops. `/afk` again, get attacked: back instantly, no "action
-   blocked". `/afk`, then `/reload`: the camera doesn't keep circling.
+   blocked". `/afk`, then `/reload`: the camera doesn't keep circling. While AFK, a Beacon friend
+   shows or offers an item, writes in Lefthy chat or announces something: each is listed under
+   "While you were away"; after an offer, a click brings back its Need / Pass buttons.
    Cinematic flights (Misc Tweaks): take a flight path: the interface fades out, black bars come
    in, "Next stop / <place> / <zone>" appears, the bottom bar says "Landing in about m:ss". Each zone
    on the way gets a card (continent, level range, friends there). Get whispered: a subtitle just

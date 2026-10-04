@@ -146,5 +146,8 @@ ns.CHANGELOG = {
 	{ id = 46, module = "beacon",
 		en = { "Announcements", "/lefthy announce <text> puts a line in the middle of your friends' screens, like a shared item." },
 		de = { "Ankündigungen", "/lefthy announce <Text> zeigt eine Zeile in der Bildschirmmitte deiner Freunde, wie ein geteiltes Item." } },
+	{ id = 47, module = "tweaks",
+		en = { "More news on the AFK screen", "Items your friends show or offer, Lefthy chat lines and announcements are listed while you're away; after an offer, a click brings back its buttons." },
+		de = { "Mehr News auf dem AFK-Bildschirm", "Items, die deine Freunde zeigen oder anbieten, Lefthy-Chat und Ankündigungen werden aufgelistet, während du weg bist; nach einem Angebot holt ein Klick seine Buttons zurück." } },
 	-- New entries go here, at the end.
 }
