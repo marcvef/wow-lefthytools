@@ -807,7 +807,16 @@ function GetQuestLink(id) local q = FindQuest(id); return q and ("[" .. q.title 
 WATCHED, SUPER_TRACKED = {}, 0
 C_QuestLog.GetQuestIDForQuestWatchIndex = function(i) return WATCHED[i] end
 C_QuestLog.GetNumQuestWatches = function() return #WATCHED end
-C_SuperTrack = { GetSuperTrackedQuestID = function() return SUPER_TRACKED end }
+C_SuperTrack = {
+	GetSuperTrackedQuestID = function() return SUPER_TRACKED end,
+	SetSuperTrackedQuestID = function(id) SUPER_TRACKED = id end,
+	ClearAllSuperTracked = function() SUPER_TRACKED = 0 end,
+}
+C_QuestLog.GetQuestWatchType = function(id) for _, w in ipairs(WATCHED) do if w == id then return 0 end end end
+C_QuestLog.AddQuestWatch = function(id) if not C_QuestLog.GetQuestWatchType(id) then WATCHED[#WATCHED + 1] = id end end
+C_QuestLog.RemoveQuestWatch = function(id)
+	for i = #WATCHED, 1, -1 do if WATCHED[i] == id then table.remove(WATCHED, i) end end
+end
 GROUP = "none" -- "none" | "party" | "instance" | "raid"
 LE_PARTY_CATEGORY_HOME, LE_PARTY_CATEGORY_INSTANCE = 1, 2
 function IsInRaid() return GROUP == "raid" end
@@ -971,11 +980,14 @@ MapCanvasPinMixin = {
 	SetIgnoreGlobalPinScale = function() end,
 	SetPosition = function(self, x, y) self.x, self.y = x, y end,
 	GetMap = function() return WorldMapFrame end,
+	-- A click on a pin that takes clicks (the canvas wires OnMouseUp to this).
+	OnClick = function(self, ...) if self.OnMouseClickAction then self:OnMouseClickAction(...) end end,
 	-- Like MapCanvas_DataProviderBase.lua: SetPassThroughButtons is protected, so calling it from
 	-- addon code in combat is blocked by the game.
 	CheckMouseButtonPassthrough = function(self) self:SetPassThroughButtons() end,
-	SetPassThroughButtons = function()
-		if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SetPassThroughButtons" end
+	SetPassThroughButtons = function(self, ...)
+		if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SetPassThroughButtons" return end
+		self._passThrough = { ... }
 	end,
 }
 PIN_MIXINS = { LefthyToolsBeaconPinTemplate = "LefthyToolsBeaconPinMixin", LefthyToolsBeaconPingPinTemplate = "LefthyToolsBeaconPingPinMixin",

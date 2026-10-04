@@ -59,8 +59,11 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     Quests on the map: with a few quests in the log, open the map and zoom out to the continent:
     every quest has Blizzard's icon at the spot the zone map shows, and its area sits on the right
     spot of its zone (compare one with the zone map; the outline shouldn't be much thicker). Hover
-    an icon: title, zone, what's left or "Ready to turn in". A click on an icon still zooms into
-    the zone, also in combat. Zoom out to the world map: the same, smaller. Settings, Misc Tweaks,
+    an icon: title, zone, what's left or "Ready to turn in". Click an icon: the quest is selected
+    (arrow, tracked, its area shows; Blizzard's own icon replaces ours on the continent), click
+    it again: unselected; Shift-click: untracked; right-click on an icon zooms out; also in combat,
+    no "action blocked". Setting "Click an icon to select its quest" off: a click zooms into the
+    zone. Gamepad mode: the A button zooms in as before. Zoom out to the world map: the same, smaller. Settings, Misc Tweaks,
     Quests: "On continent maps" on Icons: no areas, hovering an icon shows its area; Areas; Nothing.
     "Quest areas on zone maps" on All quests: every quest's area on a zone map. Open a quest's
     details on the map: only that quest. The map's filter menu, quest objectives off: all gone.

@@ -200,6 +200,47 @@ local function AcquireArea(map, mapID, zone, questIDs)
 	return pin
 end
 
+-- Redraws an open map on the next frame (after a click: not while the clicked pin is busy).
+local function RefreshSoon()
+	C_Timer.After(0, function()
+		if attached and WorldMapFrame:IsShown() then
+			provider:RefreshAllData()
+		end
+	end)
+end
+
+-- A click on an icon does what it does on zone maps (POIButtonMixin:OnClick): it selects the
+-- quest (waypoint arrow, its area on the map; tracked if it wasn't), or unselects the selected
+-- one. Shift-click on a tracked quest stops tracking it; with the chat box open, its link goes in.
+local function SelectQuest(self, button)
+	local questID = button == "LeftButton" and self.quest and self.quest.questID
+	if not questID then
+		return
+	end
+	if questID == C_SuperTrack.GetSuperTrackedQuestID() then
+		PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF or 857)
+		C_SuperTrack.ClearAllSuperTracked()
+		RefreshSoon()
+		return
+	end
+	PlaySound(SOUNDKIT and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or 856)
+	if ChatFrameUtil and ChatFrameUtil.TryInsertQuestLinkForQuestID and ChatFrameUtil.TryInsertQuestLinkForQuestID(questID) then
+		return
+	end
+	if C_QuestLog.GetQuestWatchType(questID) ~= nil then
+		if IsShiftKeyDown() then
+			if not (QuestUtil and QuestUtil.CanRemoveQuestWatch) or QuestUtil.CanRemoveQuestWatch() then
+				C_QuestLog.RemoveQuestWatch(questID)
+			end
+			return
+		end
+	else
+		C_QuestLog.AddQuestWatch(questID)
+	end
+	C_SuperTrack.SetSuperTrackedQuestID(questID)
+	RefreshSoon()
+end
+
 LefthyToolsQuestMapPinMixin = CreateFromMixins(MapCanvasPinMixin)
 
 function LefthyToolsQuestMapPinMixin:OnLoad()
@@ -220,6 +261,12 @@ function LefthyToolsQuestMapPinMixin:OnAcquired(quest, index)
 	else
 		SetArt(self.Icon, "Quest-In-Progress-Icon-yellow", "Interface\\GossipFrame\\AvailableQuestIcon")
 	end
+	-- Clicks select the quest (setting questMapClick), else they reach the map, which zooms in.
+	-- Not with a controller: its button "clicks" pins from inside Blizzard's own code
+	-- (WorldMapMixin:GamepadMapClick), which would then go on, tainted, to change the map.
+	local clickable = M.db.questMapClick and not (InputUtil and InputUtil.IsGamepadUIEnabled())
+	self.OnMouseClickAction = clickable and SelectQuest or nil -- (the map canvas calls it from OnClick)
+	self:SetMouseClickEnabled(clickable and true or false)
 end
 
 function LefthyToolsQuestMapPinMixin:OnMouseEnter()
@@ -252,7 +299,7 @@ function LefthyToolsQuestMapPinMixin:OnMouseEnter()
 	GameTooltip:Show()
 	-- With icons only, the hovered quest's area shows (on zone maps Blizzard does that too).
 	local _, areas = Wanted(map:GetMapID())
-	if not areas and not hoverArea then
+	if not areas and not hoverArea and questID ~= C_SuperTrack.GetSuperTrackedQuestID() then -- (the selected one's is there)
 		hoverArea = AcquireArea(map, map:GetMapID(), quest.zone, { questID })
 	end
 end
@@ -262,10 +309,13 @@ function LefthyToolsQuestMapPinMixin:OnMouseLeave()
 	HideHoverArea() -- (also runs while a redraw releases this pin: no self:GetMap() then)
 end
 
--- AcquirePin calls this on every acquire, and the base version uses the protected
--- SetPassThroughButtons (blocked in combat). These pins take no clicks: they reach the map, which
--- zooms in as usual.
+-- AcquirePin calls this on every acquire: right-clicks go through to the map (zoom out), as on
+-- Blizzard's pins. SetPassThroughButtons is protected in combat, so it's set once, outside it.
 function LefthyToolsQuestMapPinMixin:CheckMouseButtonPassthrough()
+	if not self.passesRightClicks and not InCombatLockdown() then
+		self:SetPassThroughButtons("RightButton")
+		self.passesRightClicks = true
+	end
 end
 
 -- Like Blizzard's QuestBlobPinMixin, without the mouse.
@@ -310,20 +360,25 @@ function provider:RefreshAllData()
 	-- Blizzard already shows the selected quest: its icon on continent maps, its area on zone maps.
 	local selected = C_SuperTrack.GetSuperTrackedQuestID()
 	local continent = C_Map.GetMapInfo(mapID).mapType == MAP_TYPE.Continent
-	if areas then
-		local byZone, zones = {}, {}
-		for _, quest in ipairs(quests) do
-			if not (isZone and quest.questID == selected) then
-				if not byZone[quest.zone] then
-					byZone[quest.zone] = {}
-					zones[#zones + 1] = quest.zone
-				end
-				table.insert(byZone[quest.zone], quest.questID)
+	-- Areas: every quest's; with icons only, the selected quest's, as zone maps show it.
+	local byZone, zones = {}, {}
+	for _, quest in ipairs(quests) do
+		local draw
+		if isZone then
+			draw = quest.questID ~= selected
+		else
+			draw = areas or quest.questID == selected
+		end
+		if draw then
+			if not byZone[quest.zone] then
+				byZone[quest.zone] = {}
+				zones[#zones + 1] = quest.zone
 			end
+			table.insert(byZone[quest.zone], quest.questID)
 		end
-		for _, zone in ipairs(zones) do
-			AcquireArea(map, mapID, zone, byZone[zone])
-		end
+	end
+	for _, zone in ipairs(zones) do
+		AcquireArea(map, mapID, zone, byZone[zone])
 	end
 	if icons then
 		local shown = {}

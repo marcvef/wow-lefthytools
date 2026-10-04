@@ -22,6 +22,7 @@ local M = LT:NewModule("tweaks", {
 		questMapContinent = "both", -- "off" | "icons" | "areas" | "both"
 		questMapWorld = "both",
 		questMapZone = "blizzard", -- "blizzard" (the selected quest's area) | "areas" (every quest's)
+		questMapClick = true,  -- clicking an icon selects its quest (off: the map zooms in)
 		afkScreen = true,      -- AFK.lua
 		afkSpin = true,
 		cinematicFlights = true, -- Flight.lua
@@ -503,6 +504,8 @@ function M:BuildOptions(o)
 		L["What continent maps like Kalimdor show of your quests. With icons only, hovering one shows its area."], shown)
 	o:Choice("questMapWorld", L["On the world map"],
 		L["What the map of the whole world shows of your quests."], shown)
+	o:Checkbox("questMapClick", L["Click an icon to select its quest"],
+		L["As on zone maps: clicking a quest's icon selects that quest (waypoint arrow, its area on the map, and it's tracked if it wasn't); clicking it again unselects it, Shift-click stops tracking it. Off: a click zooms into the zone. With a controller, the button always zooms in."])
 	o:Choice("questMapZone", L["Quest areas on zone maps"],
 		L["Blizzard shows only the area of your selected quest. All quests: the areas of every quest in the zone, like Questie."],
 		{ { "blizzard", L["Selected quest"] }, { "areas", L["All quests"] } })

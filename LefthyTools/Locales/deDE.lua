@@ -190,6 +190,9 @@ L["What continent maps like Kalimdor show of your quests. With icons only, hover
 	"Was Kontinentkarten wie Kalimdor von deinen Quests zeigen. Nur mit Icons zeigt ein Mouseover das Gebiet der Quest."
 L["On the world map"] = "Auf der Weltkarte"
 L["What the map of the whole world shows of your quests."] = "Was die Karte der ganzen Welt von deinen Quests zeigt."
+L["Click an icon to select its quest"] = "Klick auf ein Icon wählt die Quest aus"
+L["As on zone maps: clicking a quest's icon selects that quest (waypoint arrow, its area on the map, and it's tracked if it wasn't); clicking it again unselects it, Shift-click stops tracking it. Off: a click zooms into the zone. With a controller, the button always zooms in."] =
+	"Wie auf Zonenkarten: Ein Klick auf das Icon einer Quest wählt sie aus (Wegpunktpfeil, ihr Gebiet auf der Karte, und sie wird verfolgt, falls nicht schon); nochmal klicken hebt die Auswahl auf, Umschalt+Klick beendet das Verfolgen. Aus: Ein Klick zoomt in die Zone. Mit Controller zoomt die Taste immer hinein."
 L["Quest areas on zone maps"] = "Questgebiete auf Zonenkarten"
 L["Blizzard shows only the area of your selected quest. All quests: the areas of every quest in the zone, like Questie."] =
 	"Blizzard zeigt nur das Gebiet deiner ausgewählten Quest. Alle Quests: die Gebiete aller Quests in der Zone, wie bei Questie."

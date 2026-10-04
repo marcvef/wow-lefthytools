@@ -2816,6 +2816,47 @@ do
 		and iconOf(101).frameLevelType == "PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST", "... the world map shows it, marked as selected")
 	SUPER_TRACKED = 0
 
+	-- Clicking an icon selects its quest, as on zone maps.
+	local savedWatched = WATCHED
+	WATCHED = {}
+	OpenWorldMap(1415)
+	check(TDB.questMapClick == true and T("questMapClick") and iconOf(102)._click == true
+		and iconOf(102)._passThrough and iconOf(102)._passThrough[1] == "RightButton",
+		"icons take left clicks (a setting, on); right-clicks go through to the map, which zooms out")
+	local soundMark = #SOUNDS
+	iconOf(102):OnClick("LeftButton")
+	check(SUPER_TRACKED == 102 and WATCHED[1] == 102 and #SOUNDS == soundMark + 1, "a click selects the quest and tracks it, with a click sound")
+	Advance(0.05)
+	check(not iconOf(102) and #PinsOf(ICONS) == 2, "... the map is redrawn right away: on continent maps Blizzard shows the selected quest's icon")
+	OpenWorldMap(947)
+	iconOf(102):OnClick("LeftButton")
+	check(SUPER_TRACKED == 0 and WATCHED[1] == 102, "clicking the selected quest unselects it (it stays tracked)")
+	STATE.shift = true
+	iconOf(102):OnClick("LeftButton")
+	STATE.shift = false
+	check(SUPER_TRACKED == 0 and #WATCHED == 0, "Shift-click on a tracked quest stops tracking it")
+	iconOf(101):OnClick("RightButton")
+	check(SUPER_TRACKED == 0, "a right-click doesn't select")
+	T("questMapContinent"):SetValue(2) -- icons only
+	SUPER_TRACKED = 101
+	OpenWorldMap(1415)
+	check(#PinsOf(AREAS) == 1 and areaOf(1429).blobs[1] == 101 and #areaOf(1429).blobs == 1,
+		"icons only: the selected quest's area still shows, as on zone maps")
+	SUPER_TRACKED = 0
+	T("questMapContinent"):SetValue(4)
+	T("questMapClick"):SetValue(false)
+	OpenWorldMap(1415)
+	iconOf(102):OnClick("LeftButton")
+	check(iconOf(102)._click == false and SUPER_TRACKED == 0, "setting off: icons take no clicks, a click zooms the map in")
+	T("questMapClick"):SetValue(true)
+	GAMEPAD_STATE.ui = true
+	OpenWorldMap(1415)
+	check(iconOf(102)._click == false and not iconOf(102).OnMouseClickAction,
+		"gamepad mode: no click action (the controller's button would run it inside Blizzard's map code)")
+	GAMEPAD_STATE.ui = false
+	WATCHED = savedWatched
+	Advance(0.6)
+
 	T("questMapContinent"):SetValue(2) -- the slider: icons only
 	check(TDB.questMapContinent == "icons", "continent maps: icons only")
 	OpenWorldMap(1415)
@@ -3524,12 +3565,14 @@ LefthyToolsNewsFrame.AllButton:Click()
 newsText = LefthyToolsNewsFrame.plain
 check(newsText:find(news[1].en[1], 1, true) and not LefthyToolsNewsFrame.AllButton:IsShown(), "'All changes' shows everything")
 local order = {}
+local release = newsText:sub((newsText:find("LefthyTools 0.5.0", 1, true))) -- (newer versions come first)
 for _, heading in ipairs({ "Mirage", "Misc Tweaks", "Beacon", "Chronicle", "General" }) do
-	local _, count = newsText:gsub("\n" .. heading .. "\n", "")
-	order[#order + 1] = count == 1 and newsText:find("\n" .. heading .. "\n", 1, true) or -1
+	local _, count = release:gsub("\n" .. heading .. "\n", "")
+	order[#order + 1] = count == 1 and release:find("\n" .. heading .. "\n", 1, true) or -1
 end
 check(order[1] > 0 and order[1] < order[2] and order[2] < order[3] and order[3] < order[4] and order[4] < order[5],
-	"grouped by module, each heading once, in a fixed order, got\n" .. newsText)
+	"in a version: grouped by module, each heading once, in a fixed order, got\n" .. newsText)
+check(newsText:find("LefthyTools 0.6.0", 1, true) < newsText:find("LefthyTools 0.5.0", 1, true), "the newest version first")
 check(newsText:find("\nBeacon\n- Friends in your group: ", 1, true) and newsText:find("- Level progress: ", 1, true),
 	"each entry: a short title and a sentence")
 local drawn = {}

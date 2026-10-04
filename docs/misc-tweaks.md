@@ -129,8 +129,8 @@ an icon per quest, `QuestBlobDataProvider` the area ("blob") of the selected (su
 hovered or focused quest. On a continent map it shows only the selected quest's icon, on the world
 map nothing. A `MapCanvasDataProviderMixin` provider on `WorldMapFrame` adds them, per zoom level:
 `questMapContinent` and `questMapWorld` ("off", "icons", "areas", "both"; default both) and
-`questMapZone` ("blizzard", or "areas": every quest's area). The settings are `Builder:Choice`
-sliders (no dropdowns, see forever-platform.md).
+`questMapZone` ("blizzard", or "areas": every quest's area), and `questMapClick` (a checkbox). The
+choices are `Builder:Choice` sliders (no dropdowns, see forever-platform.md).
 
 - **Which quests, where:** `C_QuestLog.GetQuestsOnMap(zone)` for every zone on the shown map
   (`C_Map.GetMapChildrenInfo(map, Zone, true)`), the same list the zone map draws; each spot is
@@ -146,11 +146,24 @@ sliders (no dropdowns, see forever-platform.md).
   `POIButton.lua` at 80%: `UI-QuestPoi-QuestNumber` (`-SuperTracked` for the selected quest) behind
   `Quest-In-Progress-Icon-yellow` or `UI-QuestIcon-TurnIn-Normal`; frame levels
   `PIN_FRAME_LEVEL_ACTIVE_QUEST` / `_SUPER_TRACKED_QUEST`. Icons that would cover each other are
-  spread with Blizzard's `WorldMapPOIQuantizerMixin` (75 cells high, as on zone maps). Hover only
-  (`enableMouseMotion`), so a click zooms the map in as usual; `CheckMouseButtonPassthrough` is
-  emptied as for Beacon's pins. Tooltip: title (with level and difficulty colour through
-  `SetQuestTitleLevelAndDifficultyColor`, as the map's options say), zone, unfinished objectives or
-  "Ready to turn in". With icons only, hovering one draws its area until the mouse leaves.
+  spread with Blizzard's `WorldMapPOIQuantizerMixin` (75 cells high, as on zone maps). Tooltip:
+  title (with level and difficulty colour through `SetQuestTitleLevelAndDifficultyColor`, as the
+  map's options say), zone, unfinished objectives or "Ready to turn in". With icons only, hovering
+  one draws its area until the mouse leaves, and the selected quest's area is always drawn (zone
+  maps show it too).
+- **Clicks** (`questMapClick`, on): a left click does what `POIButtonMixin:OnClick` does on zone
+  maps: select the quest (`C_SuperTrack.SetSuperTrackedQuestID`, tracked with
+  `C_QuestLog.AddQuestWatch` if it wasn't), unselect the selected one (`ClearAllSuperTracked`),
+  Shift-click on a tracked quest stops tracking it, and with the chat box open the quest link goes
+  in (`ChatFrameUtil.TryInsertQuestLinkForQuestID`); then the map redraws on the next frame. The
+  template takes clicks (`enableMouse`, so `AcquirePin` wires `OnMouseUp` to `OnClick`, which calls
+  `OnMouseClickAction`); `OnAcquired` sets `OnMouseClickAction` and `SetMouseClickEnabled` from
+  the setting, so with it off clicks reach the map and it zooms in. Right-clicks pass through
+  (`SetPassThroughButtons("RightButton")` in `CheckMouseButtonPassthrough`, once and only out of
+  combat: it's protected in combat). **Not in gamepad mode:** the controller's button calls
+  `ClickHoveredPins` from `WorldMapMixin:GamepadMapClick`, which then navigates the map; our action
+  running inside it would leave that navigation (and the pins it acquires, with protected
+  `SetPassThroughButtons`) tainted, so there the pins take no clicks and the button zooms in.
 - **Areas:** the engine draws quest blobs into a `QuestPOIFrame` for one `uiMapID` (`SetMapID`,
   `DrawBlob(questID, true)`), filling the frame. `LefthyToolsQuestAreaPinTemplate` is one, set up
   like Blizzard's `QuestBlobPinMixin` (blob textures, fill 128, border 192); each zone with quests

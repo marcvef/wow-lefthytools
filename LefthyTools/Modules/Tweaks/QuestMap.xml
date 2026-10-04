@@ -2,10 +2,11 @@
 ..\..\..\Blizzard_SharedXML\UI.xsd">
 	<!--
 		Quest icons on continent and world maps (QuestMap.lua). Like Beacon's pins: the map canvas
-		pools them by template name, calls the mixin's OnLoad and wires OnMouseEnter / OnMouseLeave,
-		so no scripts here. Hover only: clicks fall through to the map.
+		pools them by template name, calls the mixin's OnLoad and wires OnMouseEnter / OnMouseLeave
+		and the clicks (only for pins that take clicks when created), so no scripts here. A left
+		click selects the quest; OnAcquired switches clicks off when that setting is off.
 	-->
-	<Frame name="LefthyToolsQuestMapPinTemplate" mixin="LefthyToolsQuestMapPinMixin" enableMouseMotion="true" virtual="true">
+	<Frame name="LefthyToolsQuestMapPinTemplate" mixin="LefthyToolsQuestMapPinMixin" enableMouse="true" virtual="true">
 		<Size x="16" y="16"/>
 	</Frame>
 	<!-- One zone's quest areas, drawn by the engine like Blizzard's QuestBlobPinTemplate. No mouse. -->
