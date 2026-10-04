@@ -1289,7 +1289,7 @@ function M:BuildOptions(o)
 	o:Checkbox("lefthyChat", L["Lefthy chat"],
 		L["A chat for your Battle.net friends with LefthyTools, like guild or party chat: /l <text> sends a line, and theirs show in your chat window."])
 	o:Checkbox("announcements", L["Announcements"],
-		L["/lefthy announce <text> puts a line in the middle of your friends' screens, like a shared item, with the whisper sound. Theirs show on yours."])
+		L["/la <text> (or /lefthy announce <text>) puts a line in the middle of your friends' screens, like a shared item, with the whisper sound. Theirs show on yours."])
 	o:Checkbox("pings", L["Map pings"],
 		L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."])
 
@@ -1372,6 +1372,6 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy beacon offer <item> - offer it for Need or Pass, like Ctrl+Shift+right-click")
 		self:Print("/lefthy beacon handover [clear] - items you offered that winners still have to get")
 		self:Print("/l <text> - Lefthy chat: a line for every friend with LefthyTools, like guild chat")
-		self:Print("/lefthy announce <text> - a line in the middle of your friends' screens")
+		self:Print("/la <text> (or /lefthy announce <text>) - a line in the middle of your friends' screens")
 	end
 end

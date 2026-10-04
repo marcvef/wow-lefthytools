@@ -2617,6 +2617,10 @@ do
 		and printedSince(pmark):find("Lefthy chat is off", 1, true), "switched off: nothing shown or sent, and I'm told why")
 	B("announcements"):SetValue(true)
 	B("lefthyChat"):SetValue(true)
+	mark = #GAMEDATA + 1
+	SlashCmdList.LEFTHYTOOLS_ANNOUNCE("pull in 5")
+	Advance(0.15)
+	check(sentTo(11, mark, "A2;")[1] == "A2;pull in 5", "/la: announcing the short way")
 	-- While I'm AFK the notices are hidden with the interface: the AFK screen lists them.
 	Advance(3.5)
 	afk(true)

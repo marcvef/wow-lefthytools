@@ -436,7 +436,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		LT.Print("/lefthy version - the installed LefthyTools version")
 		LT.Print("/lefthy errors [clear] - LefthyTools' own errors, ready to copy")
 		LT.Print("/lefthy news - what's new in LefthyTools")
-		LT.Print("/lefthy announce <text> - a line in the middle of your Beacon friends' screens (/l <text>: Lefthy chat)")
+		LT.Print("/lefthy announce <text> (or /la) - a line in the middle of your Beacon friends' screens (/l <text>: Lefthy chat)")
 		LT.Print("/lefthy enable | disable | toggle <module>")
 		LT.Print("/lefthy <module> ... - module commands, e.g. /lefthy mirage status")
 	end

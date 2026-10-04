@@ -5,7 +5,7 @@ local B = ns.Beacon
 
 -- Lefthy chat: a chat for your Battle.net friends with LefthyTools, like guild or party chat.
 -- /l <text> sends a line (M2;<text>), and every friend's chat window shows "[Lefthy] [Anna]: text".
--- Announcements (/lefthy announce <text>, A2;<text>) go to the middle of their screens instead, in
+-- Announcements (/la or /lefthy announce <text>, A2;<text>) go to the middle of their screens instead, in
 -- the notice stack of shared items (Items.lua: B.ShowAnnouncement), with the whisper sound. Both
 -- also come as subtitles on a cinematic flight. Settings lefthyChat and announcements switch
 -- sending and showing. The text goes through B.Clean (no colour codes, separators or escapes).
@@ -32,7 +32,7 @@ local function Send(kind, text)
 	text = B.Clean(strtrim(text or ""):gsub('^"(.*)"$', "%1"), TEXT_BYTES) -- /lefthy announce "text"
 	if text == "" then
 		M:Print(kind == "chat" and "/l <text> sends a line to every friend with LefthyTools."
-			or "/lefthy announce <text> puts a line in the middle of your friends' screens.")
+			or "/la <text> (or /lefthy announce <text>) puts a line in the middle of your friends' screens.")
 		return
 	end
 	if not M.enabled then
@@ -92,7 +92,9 @@ function B.ReceiveAnnouncement(peer, text)
 	B.Notify("announce", peer, { text = text })
 end
 
--- /l like /g or /p; /lchat in case another addon has /l.
+-- /l like /g or /p; /lchat in case another addon has /l. /la: /lefthy announce.
 SLASH_LEFTHYTOOLS_CHAT1 = "/l"
 SLASH_LEFTHYTOOLS_CHAT2 = "/lchat"
 SlashCmdList.LEFTHYTOOLS_CHAT = B.SendChat
+SLASH_LEFTHYTOOLS_ANNOUNCE1 = "/la"
+SlashCmdList.LEFTHYTOOLS_ANNOUNCE = B.Announce

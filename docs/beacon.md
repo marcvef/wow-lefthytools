@@ -258,7 +258,7 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   window, the sender too, like guild chat. A custom slash command can't be a sticky chat type, so
   every line needs `/l`. At most 5 lines per 5 s are taken from one friend; sending at most every
   0.5 s.
-- **Announcements** (`/lefthy announce <text>`, quotes optional; setting `announcements`):
+- **Announcements** (`/la <text>` or `/lefthy announce <text>`, quotes optional; setting `announcements`):
   `A2;<text>`; `B.ShowAnnouncement` puts "Name: text" into the notice stack of shared items
   (`call.message`, already "done", `hold` 10 s instead of 7; the line wraps at 700 px), with the
   whisper sound for friends' and a chat line. At most one per 3 s each way.

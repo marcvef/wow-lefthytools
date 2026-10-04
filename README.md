@@ -148,7 +148,7 @@ minimap, and you on theirs, without being in a group.
   item can't be shared, chat always says why.
 - **Lefthy chat:** `/l <text>`, like `/g` or `/p`: a chat line for all your friends with
   LefthyTools, shown in their chat windows as `[Lefthy] [Anna]: text`.
-- **Announcements:** `/lefthy announce <text>` puts the line in the middle of their screens,
+- **Announcements:** `/la <text>` (or `/lefthy announce <text>`) puts the line in the middle of their screens,
   where shared items show, with the whisper sound (and in their chat). On a cinematic flight
   both come as subtitles.
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
@@ -185,7 +185,7 @@ minimap, and you on theirs, without being in a group.
 | Tell me when a friend dies | on | |
 | Show items to friends (Ctrl+right-click) | on | |
 | Lefthy chat | on | `/l <text>` |
-| Announcements | on | `/lefthy announce <text>` |
+| Announcements | on | `/la <text>`, `/lefthy announce <text>` |
 | Map pings (Alt+click on the world map) | on | `/lefthy beacon ping` |
 | Tell my friends when I level up | on | |
 | Level-up message (`{name}` and `{level}` are filled in) | empty: default text | `/lefthy beacon ding <text>`, `ding reset` |
