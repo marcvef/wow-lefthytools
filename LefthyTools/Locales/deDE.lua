@@ -261,6 +261,12 @@ L["Won by %s: still to hand over"] = "Gewonnen von %s: noch zu übergeben"
 L["%s is reserved for %s: they won it. Sell it anyway?"] = "%s ist für %s reserviert (gewonnen). Trotzdem verkaufen?"
 L["Sell anyway"] = "Trotzdem verkaufen"
 L["Keep it"] = "Behalten"
+L["Lefthy chat"] = "Lefthy-Chat"
+L["A chat for your Battle.net friends with LefthyTools, like guild or party chat: /l <text> sends a line, and theirs show in your chat window."] =
+	"Ein Chat für deine Battle.net-Freunde mit LefthyTools, wie Gilden- oder Gruppenchat: /l <Text> schickt eine Zeile, ihre erscheinen in deinem Chatfenster."
+L["Announcements"] = "Ankündigungen"
+L["/lefthy announce <text> puts a line in the middle of your friends' screens, like a shared item, with the whisper sound. Theirs show on yours."] =
+	"/lefthy announce <Text> zeigt eine Zeile in der Bildschirmmitte deiner Freunde, wie ein geteiltes Item, mit dem Flüstersound. Ihre erscheinen bei dir."
 L["Map pings"] = "Karten-Pings"
 L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."] =
 	"Alt+Klick auf die Weltkarte zeigt deinen Freunden eine Stelle: eine Markierung auf ihren Karten für eine Minute, mit Sound. Ihre Pings erscheinen auf deinen Karten. /lefthy beacon ping pingt die Stelle, an der du stehst."

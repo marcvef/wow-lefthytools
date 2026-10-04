@@ -415,6 +415,8 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		LT.Errors.Command(rest)
 	elseif cmd == "news" or cmd == "whatsnew" or cmd == "changelog" then
 		LT.WhatsNew.Show(false)
+	elseif cmd == "announce" and ns.Beacon and ns.Beacon.Announce then
+		ns.Beacon.Announce(rest) -- Beacon's Chat.lua: the middle of every friend's screen
 	elseif (cmd == "enable" or cmd == "disable" or cmd == "toggle") and target then
 		if cmd == "toggle" then
 			LT:ToggleModule(target.key)
@@ -434,6 +436,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		LT.Print("/lefthy version - the installed LefthyTools version")
 		LT.Print("/lefthy errors [clear] - LefthyTools' own errors, ready to copy")
 		LT.Print("/lefthy news - what's new in LefthyTools")
+		LT.Print("/lefthy announce <text> - a line in the middle of your Beacon friends' screens (/l <text>: Lefthy chat)")
 		LT.Print("/lefthy enable | disable | toggle <module>")
 		LT.Print("/lefthy <module> ... - module commands, e.g. /lefthy mirage status")
 	end

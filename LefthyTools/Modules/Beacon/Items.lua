@@ -83,6 +83,8 @@ local framePool, shown = {}, {}
 local TOP_Y, GAP = -220, 10 -- under the level-up toast
 local LINE_HEIGHT, OFFER_HEIGHT = 22, 76
 local TEXT_SCALE = 1.15
+local MESSAGE_WIDTH = 700 -- announcements wrap at this width
+local ANNOUNCE_TIME = 10  -- and stay this long
 local BUTTON_WIDTH, BUTTON_GAP = 96, 8
 local TIMER_WIDTH = 2 * BUTTON_WIDTH + BUTTON_GAP
 
@@ -119,7 +121,7 @@ local Answer -- below
 -- Hovering the line shows the item's tooltip, as on an item in the bags.
 local function HoverOnEnter(hover)
 	local call = hover:GetParent().call
-	if call then
+	if call and call.itemString then
 		GameTooltip:SetOwner(hover, "ANCHOR_RIGHT")
 		GameTooltip:SetHyperlink("item:" .. call.itemString)
 		GameTooltip:Show()
@@ -135,7 +137,7 @@ end
 -- Shift-click links it in chat, Ctrl-click previews it: the game's own item click handling.
 local function HoverOnClick(hover)
 	local call = hover:GetParent().call
-	if call and IsModifiedClick() then
+	if call and call.link and IsModifiedClick() then
 		HandleModifiedItemClick(call.link)
 	end
 end
@@ -197,8 +199,16 @@ local function Icon(call)
 	return ("|T%s:0|t"):format(C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID) or 134400)
 end
 
--- "[icon] You offer [item]", "[icon] Anna offers [item]" or "[icon] Anna shares [item]".
+-- "[icon] You offer [item]", "[icon] Anna offers [item]" or "[icon] Anna shares [item]"; an
+-- announcement (Chat.lua): "Anna: text".
 local function Headline(call)
+	if call.message then
+		local name, classFile = call.fromName, call.fromClass
+		if call.mine then
+			name, classFile = MyName(), select(2, UnitClass("player"))
+		end
+		return Coloured(name, classFile) .. ": " .. call.message
+	end
 	local text
 	if call.mine then
 		text = L["You offer %s"]:format(call.link)
@@ -239,8 +249,12 @@ local function FrameFor(call)
 	frame:SetAlpha(1)
 	frame.Winner:SetText("")
 	frame.Status:SetText("")
+	-- Items: one line, as wide as it needs (0: no width set). Announcements may wrap.
+	frame.Line:SetWidth(call.message and MESSAGE_WIDTH or 0)
+	frame.Line:SetWordWrap(call.message ~= nil)
 	frame.Line:SetText(Headline(call))
-	frame:SetHeight(call.id and OFFER_HEIGHT or LINE_HEIGHT)
+	frame:SetHeight(call.id and OFFER_HEIGHT
+		or (call.message and math.max(LINE_HEIGHT, frame.Line:GetStringHeight() * TEXT_SCALE + 4)) or LINE_HEIGHT)
 	shown[#shown + 1] = frame
 	Layout()
 	frame:Show()
@@ -618,6 +632,21 @@ function B.ReceiveItem(peer, gameAccountID, itemString, callID)
 	B.Notify("item", peer, { itemString = itemString })
 end
 
+-- An announcement (Chat.lua; peer nil: mine) in the notice stack, like a shared item, for a little
+-- longer. A friend's comes with the whisper sound, and as a subtitle on a cinematic flight.
+local announced = 0
+function B.ShowAnnouncement(peer, text)
+	announced = announced + 1
+	local call = { message = text, mine = peer == nil, fromName = peer and peer.name, fromClass = peer and peer.classFile,
+		state = "done", doneAt = GetTime(), hold = ANNOUNCE_TIME }
+	Put("announce:" .. announced, call)
+	Draw(call)
+	if peer then
+		PlaySound(SOUND.call)
+		FlightSubtitle(Headline(call))
+	end
+end
+
 -- A friend's offer still waiting for my Need or Pass (a cinematic flight pauses for it).
 function B.AwaitingAnswer()
 	for _, call in pairs(calls) do
@@ -698,16 +727,16 @@ function B.UpdateCalls(now)
 				f.Status:SetText(RollLines(call, rolls))
 			end
 		elseif call.state == "done" then
-			local age = now - call.doneAt
+			local age, hold = now - call.doneAt, call.hold or SHOW_RESULT
 			if f then
-				if age >= SHOW_RESULT + FADE then
+				if age >= hold + FADE then
 					Release(f)
 					call.frame = nil
-				elseif age > SHOW_RESULT then
-					f:SetAlpha(1 - (age - SHOW_RESULT) / FADE)
+				elseif age > hold then
+					f:SetAlpha(1 - (age - hold) / FADE)
 				end
 			end
-			if age >= SHOW_RESULT + FADE then
+			if age >= hold + FADE then
 				calls[key] = nil
 			end
 		end

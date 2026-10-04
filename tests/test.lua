@@ -2556,6 +2556,69 @@ do
 	B("shareItems"):SetValue(true)
 end
 
+section("Beacon: Lefthy chat and announcements")
+do
+	check(BDB.lefthyChat == true and BDB.announcements == true and B("lefthyChat") and B("announcements"),
+		"both on by default, each with a checkbox")
+	anna("H2")
+	Advance(0.2)
+	local mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_CHAT("anyone up for Deadmines?")
+	Advance(0.15)
+	check(sentTo(11, mark, "M2;")[1] == "M2;anyone up for Deadmines?", "/l sends the line to my friends")
+	check(printedSince(pmark):find("[Lefthy] [|r", 1, true) and printedSince(pmark):find("Lefthy|r|cffffb84d]: anyone up for Deadmines?", 1, true),
+		"... and shows it in my chat window, like guild chat, got " .. printedSince(pmark))
+	pmark = #PRINTED + 1
+	anna("M2;sure, 5 min")
+	Advance(0.15)
+	check(printedSince(pmark):find("Anna|r|cffffb84d]: sure, 5 min", 1, true), "a friend's line in my chat window")
+	pmark = #PRINTED + 1
+	for i = 1, 8 do anna("M2;spam " .. i) end
+	Advance(0.15)
+	local spam = 0
+	for i = pmark, #PRINTED do if PRINTED[i]:find("spam", 1, true) then spam = spam + 1 end end
+	check(spam == 4, "a flood: at most 5 lines per 5 seconds from one friend, got " .. spam)
+	mark = #GAMEDATA + 1
+	Advance(1)
+	SlashCmdList.LEFTHYTOOLS_CHAT("|cffff0000red|r; sneaky")
+	Advance(0.15)
+	check(sentTo(11, mark, "M2;")[1] == "M2;red sneaky", "colour codes and separators are taken out")
+	-- Announcements: the middle of the screen.
+	Advance(5)
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	lefthy('announce "Ony in 10 minutes, meet at the flight master"')
+	Advance(0.15)
+	check(sentTo(11, mark, "A2;")[1] == "A2;Ony in 10 minutes, meet at the flight master",
+		"/lefthy announce: the line goes to my friends (quotes optional), got " .. tostring(sentTo(11, mark, "A2;")[1]))
+	local mine, theirs
+	for _, call in pairs(BB.calls) do if call.message and call.mine then mine = call end end
+	check(mine and mine.frame and mine.frame.Line:GetText():find("|r: Ony in 10 minutes", 1, true), "... and shows in my notices too")
+	local soundMark = #SOUNDS
+	anna("A2;Boss down, loot time!")
+	Advance(0.15)
+	for _, call in pairs(BB.calls) do if call.message and not call.mine then theirs = call end end
+	check(theirs and theirs.frame:IsShown() and theirs.frame.Line:GetText():find("Anna|r: Boss down, loot time!", 1, true)
+		and #SOUNDS > soundMark and not theirs.frame.Need:IsShown() and printedSince(pmark):find("]: Boss down, loot time!", 1, true),
+		"a friend's announcement: in the middle of my screen with the whisper sound (and in chat), no buttons")
+	Advance(9)
+	check(theirs.frame and theirs.frame:IsShown(), "it stays for 10 seconds ...")
+	Advance(2.5)
+	check(not theirs.frame and not next(BB.calls), "... then fades away")
+	B("announcements"):SetValue(false)
+	B("lefthyChat"):SetValue(false)
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	anna("A2;hello?")
+	anna("M2;hello??")
+	lefthy("announce hi")
+	SlashCmdList.LEFTHYTOOLS_CHAT("hi")
+	Advance(0.15)
+	check(not printedSince(pmark):find("hello?", 1, true) and not next(BB.calls) and #sentTo(11, mark, "A2;") == 0
+		and #sentTo(11, mark, "M2;") == 0 and printedSince(pmark):find("announcements are off", 1, true)
+		and printedSince(pmark):find("Lefthy chat is off", 1, true), "switched off: nothing shown or sent, and I'm told why")
+	B("announcements"):SetValue(true)
+	B("lefthyChat"):SetValue(true)
+end
+
 section("Beacon: a busy fight doesn't pile up messages")
 do
 	anna("S2;;0;260.0;750.0;Goldshire;")

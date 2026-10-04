@@ -140,5 +140,11 @@ ns.CHANGELOG = {
 	{ id = 44, module = "tweaks",
 		en = { "Choose what a flight hides", "Cinematic flights can hide only the elements you pick (the same list as Mirage's), so chat or the minimap can stay." },
 		de = { "Wählen, was ein Flug ausblendet", "Flüge im Kinomodus können nur die Elemente ausblenden, die du auswählst (dieselbe Liste wie bei Mirage), damit z. B. Chat oder Minimap bleiben." } },
+	{ id = 45, module = "beacon",
+		en = { "Lefthy chat", "/l <text>, like guild or party chat: a line in the chat window of every friend with LefthyTools." },
+		de = { "Lefthy-Chat", "/l <Text>, wie Gilden- oder Gruppenchat: eine Zeile im Chatfenster aller Freunde mit LefthyTools." } },
+	{ id = 46, module = "beacon",
+		en = { "Announcements", "/lefthy announce <text> puts a line in the middle of your friends' screens, like a shared item." },
+		de = { "Ankündigungen", "/lefthy announce <Text> zeigt eine Zeile in der Bildschirmmitte deiner Freunde, wie ein geteiltes Item." } },
 	-- New entries go here, at the end.
 }

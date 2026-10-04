@@ -43,6 +43,7 @@ Modules\Beacon\Alerts.lua
 Modules\Beacon\Pings.lua
 Modules\Beacon\Items.lua
 Modules\Beacon\Handover.lua
+Modules\Beacon\Chat.lua
 Modules\Beacon\Beacon.xml
 
 Modules\Chronicle\Chronicle.lua

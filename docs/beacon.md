@@ -33,7 +33,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
   `C2;<count>` enemies on them in combat, `X2;<percent>` progress on their level,
-  `I2;<item string>[;<call id>]` an item shown or offered, `N2`/`R2` Need / Pass and the verdict, `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
+  `I2;<item string>[;<call id>]` an item shown or offered, `N2`/`R2` Need / Pass and the verdict,
+  `M2;<text>` a Lefthy chat line, `A2;<text>` an announcement (see below), `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
   friends' graphs (see chronicle.md), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
@@ -248,6 +249,21 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   and `B.AwaitingAnswer()` (a friend's open offer without my answer) makes the film pause so the
   Need and Pass buttons show.
 - Setting `shareItems` switches sending and showing.
+
+### Lefthy chat and announcements (Chat.lua)
+
+- **Lefthy chat** (`/l <text>`, also `/lchat`; setting `lefthyChat`): `M2;<text>` to every peer;
+  everyone prints `[Lefthy] [Name]: text` (orange, the name in its class colour) to the chat
+  window, the sender too, like guild chat. A custom slash command can't be a sticky chat type, so
+  every line needs `/l`. At most 5 lines per 5 s are taken from one friend; sending at most every
+  0.5 s.
+- **Announcements** (`/lefthy announce <text>`, quotes optional; setting `announcements`):
+  `A2;<text>`; `B.ShowAnnouncement` puts "Name: text" into the notice stack of shared items
+  (`call.message`, already "done", `hold` 10 s instead of 7; the line wraps at 700 px), with the
+  whisper sound for friends' and a chat line. At most one per 3 s each way.
+- Text goes through `B.Clean` (200 bytes): no colour codes, `|`, `;` or control characters.
+  Both go to the cinematic flight's subtitles too. Each setting switches sending and showing; with
+  one off, a send says why.
 
 ### Hand-over reminder (Handover.lua)
 

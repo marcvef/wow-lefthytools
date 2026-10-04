@@ -24,6 +24,8 @@ local L = ns.L
 --   F2;<files>          which files my build loads (LT.FILES), sent just before every V2: a friend
 --                       updating to it learns whether a /reload is enough or the game needs a
 --                       restart. (Its own message: older builds reject a V2 with more fields.)
+--   M2;<text>           a Lefthy chat line (/l), to everyone (Chat.lua)
+--   A2;<text>           an announcement for the middle of everyone's screen (/lefthy announce)
 --   U2;<after>;<de|en>  to a friend on a newer build: what's new in it after my newest changelog
 --                       id (Data/Changelog.lua), in my language. Answered with
 --   W2;<id>;<module>;<title>
@@ -93,6 +95,8 @@ local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, moun
 	quests = true, gold = true, profession = true, quest = true, zone = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local VERSION_EVERY = 600    -- my version goes to every friend this often too (besides answers)
+local CHAT_LIMIT, CHAT_WINDOW = 5, 5 -- Lefthy chat lines accepted from one friend (a burst of 5 per 5 s)
+local ANNOUNCE_GAP = 3       -- announcements from one friend at most this often
 local NEWS_LINES = 8         -- what's new in a friend's newer build: at most this many changes
 local NEWS_WAIT = 5          -- the update notice waits this long for them (older builds don't send any)
 local NEWS_GAP = 60          -- tell one friend what's new in mine at most this often
@@ -115,6 +119,8 @@ local M = LT:NewModule("beacon", {
 		deathAlert = true,
 		pings = true,
 		shareItems = true,
+		lefthyChat = true,    -- Chat.lua: /l lines in the chat window
+		announcements = true, -- /lefthy announce: lines in the middle of the screen
 		dingAnnounce = true,
 		dingText = "",
 		dingShow = true,
@@ -685,6 +691,11 @@ local function Parse(text)
 		if version and #version <= 40 then
 			return "V", version
 		end
+	elseif kind == "M" or kind == "A" then
+		local text = rest:match("^;([^;]+)$")
+		if text and #text <= 220 then
+			return kind, text
+		end
 	elseif kind == "F" then
 		local files = rest:match("^;(%x+)$")
 		if files and #files <= 16 then
@@ -866,6 +877,19 @@ local function OnMessage(text, senderID)
 		if not guard.itemAt or now - guard.itemAt >= ITEM_GAP then
 			guard.itemAt = now
 			itemsIn[#itemsIn + 1] = { "item", senderID, a, b }
+		end
+	elseif kind == "M" then
+		if not guard.chatWindow or now - guard.chatWindow >= CHAT_WINDOW then
+			guard.chatWindow, guard.chatLines = now, 0
+		end
+		if guard.chatLines < CHAT_LIMIT then
+			guard.chatLines = guard.chatLines + 1
+			itemsIn[#itemsIn + 1] = { "chat", senderID, a }
+		end
+	elseif kind == "A" then
+		if not guard.announceAt or now - guard.announceAt >= ANNOUNCE_GAP then
+			guard.announceAt = now
+			itemsIn[#itemsIn + 1] = { "announce", senderID, a }
 		end
 	elseif kind == "N" or kind == "R" then
 		-- One per call each way; a count per window, so two in the same moment both count.
@@ -1052,6 +1076,10 @@ local function Tick(now, elapsed)
 		if peer and peer.name and B.ReceiveItem then
 			if item[1] == "item" then
 				B.ReceiveItem(peer, item[2], item[3], item[4])
+			elseif item[1] == "chat" then
+				B.ReceiveChat(peer, item[3]) -- Chat.lua
+			elseif item[1] == "announce" then
+				B.ReceiveAnnouncement(peer, item[3])
 			elseif item[1] == "answer" then
 				B.ReceiveAnswer(peer, item[2], item[3], item[4])
 			else
@@ -1258,6 +1286,10 @@ function M:BuildOptions(o)
 		L["Ctrl+right-click any item (bags, bank, character, loot, chat links) to show it to your friends: they see it at the top of the screen, with the whisper sound. Ctrl+Shift+right-click offers an item you can trade: they can say Need or Pass, and if several need it, it is rolled out. The item stays reserved for the winner until you hand it over."])
 	o:Button(L["Hand-over reminders"], L["Clear"], function() B.HandoverCommand("clear") end,
 		L["Items you offered and someone won stay reserved until you trade or mail them to the winner: a tooltip line, a bag border, a question at vendors. This forgets all of them, in case one is stuck. /lefthy beacon handover lists them."])
+	o:Checkbox("lefthyChat", L["Lefthy chat"],
+		L["A chat for your Battle.net friends with LefthyTools, like guild or party chat: /l <text> sends a line, and theirs show in your chat window."])
+	o:Checkbox("announcements", L["Announcements"],
+		L["/lefthy announce <text> puts a line in the middle of your friends' screens, like a shared item, with the whisper sound. Theirs show on yours."])
 	o:Checkbox("pings", L["Map pings"],
 		L["Alt+click on the world map shows your friends a spot: a marker on their maps for a minute, with a sound. Their pings show up on your maps. /lefthy beacon ping pings where you stand."])
 
@@ -1339,5 +1371,7 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy beacon show <item> - show an item to friends, like Ctrl+right-click (Shift-click it into the chat box)")
 		self:Print("/lefthy beacon offer <item> - offer it for Need or Pass, like Ctrl+Shift+right-click")
 		self:Print("/lefthy beacon handover [clear] - items you offered that winners still have to get")
+		self:Print("/l <text> - Lefthy chat: a line for every friend with LefthyTools, like guild chat")
+		self:Print("/lefthy announce <text> - a line in the middle of your friends' screens")
 	end
 end
