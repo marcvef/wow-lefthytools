@@ -177,6 +177,23 @@ L["WoW: Forever adds over a thousand quests to the Classic world, plus about as 
 	"WoW: Forever bringt über tausend neue Quests in die Classic-Welt, dazu etwa genauso viele aus den späteren Seasons von Classic, die es im ursprünglichen Classic nie gab. Sie bekommen ein NEU direkt hinter ihrem Namen: im Questlog (Mouseover für Details), in den Questdetails und im Questfenster beim Annehmen und Abgeben."
 L["New in WoW: Forever"] = "Neu in WoW: Forever"
 L["Not in the original Classic (from its later seasons)"] = "Nicht im ursprünglichen Classic (aus den späteren Seasons)"
+L["Quests on continent and world maps"] = "Quests auf Kontinent- und Weltkarte"
+L["Blizzard's world map shows your quests only on zone maps. This shows them on continent maps and the world map too: an icon where to go (hover it for the objectives) and the area where the mobs and items are. Choose below what each zoom level shows. The map's own filter for quest objectives hides them as well."] =
+	"Blizzards Weltkarte zeigt deine Quests nur auf Zonenkarten. Das hier zeigt sie auch auf Kontinentkarten und der Weltkarte: ein Icon, wo du hinmusst (Mouseover zeigt die Questziele), und das Gebiet, in dem die Mobs und Items sind. Unten wählst du, was jede Zoomstufe zeigt. Der Filter für Questziele im Kartenmenü blendet sie ebenfalls aus."
+L["Nothing"] = "Nichts"
+L["Icons"] = "Icons"
+L["Areas"] = "Gebiete"
+L["Icons and areas"] = "Icons und Gebiete"
+L["On continent maps"] = "Auf Kontinentkarten"
+L["What continent maps like Kalimdor show of your quests. With icons only, hovering one shows its area."] =
+	"Was Kontinentkarten wie Kalimdor von deinen Quests zeigen. Nur mit Icons zeigt ein Mouseover das Gebiet der Quest."
+L["On the world map"] = "Auf der Weltkarte"
+L["What the map of the whole world shows of your quests."] = "Was die Karte der ganzen Welt von deinen Quests zeigt."
+L["Quest areas on zone maps"] = "Questgebiete auf Zonenkarten"
+L["Blizzard shows only the area of your selected quest. All quests: the areas of every quest in the zone, like Questie."] =
+	"Blizzard zeigt nur das Gebiet deiner ausgewählten Quest. Alle Quests: die Gebiete aller Quests in der Zone, wie bei Questie."
+L["Selected quest"] = "Ausgewählte Quest"
+L["All quests"] = "Alle Quests"
 L["Combo points on the personal resource display"] = "Combopunkte an der persönlichen Ressourcenanzeige"
 L["Forever's personal resource display leaves combo points out. This adds them under its bars in retail's style, with Blizzard's animations; at full points they glow. Rogues, and druids in Cat Form. Shows when the personal resource display does."] =
 	"Die persönliche Ressourcenanzeige in Forever zeigt keine Combopunkte. Das hier fügt sie unter ihren Balken hinzu, im Retail-Look mit Blizzards Animationen; bei vollen Punkten leuchten sie. Für Schurken und Druiden in Katzengestalt. Sichtbar, wenn die persönliche Ressourcenanzeige es ist."

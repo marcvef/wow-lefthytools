@@ -55,6 +55,14 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     (from its later seasons)". Open the quest: NEW after the title in the
     details. Accept and turn one in: NEW after the title in the quest window. A very long title
     shows NEW at the right end of its entry instead (no overlap with the next entry).
+    Quests on the map: with a few quests in the log, open the map and zoom out to the continent:
+    every quest has Blizzard's icon at the spot the zone map shows, and its area sits on the right
+    spot of its zone (compare one with the zone map; the outline shouldn't be much thicker). Hover
+    an icon: title, zone, what's left or "Ready to turn in". A click on an icon still zooms into
+    the zone, also in combat. Zoom out to the world map: the same, smaller. Settings, Misc Tweaks,
+    Quests: "On continent maps" on Icons: no areas, hovering an icon shows its area; Areas; Nothing.
+    "Quest areas on zone maps" on All quests: every quest's area on a zone map. Open a quest's
+    details on the map: only that quest. The map's filter menu, quest objectives off: all gone.
 13. Combo points (rogue, personal resource display on): 5 empty sockets under its bars (retail art;
     classic gems mean the `uf-roguecp` atlases are missing). Gems fill green → red with the slash
     animation; at full they breathe; a finisher bursts them out. Narrow the bars and hide the power

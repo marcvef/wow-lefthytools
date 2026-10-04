@@ -121,6 +121,48 @@ The personal resource display has no class resource in Forever (see
 - Not marked (yet): the gossip/greeting quest lists of NPCs with several quests, and the
   objective tracker.
 
+## questMap: quests on continent and world maps (QuestMap.lua)
+
+Blizzard's world map draws the quests in your log on zone maps only
+(`MapUtil.ShouldMapTypeShowQuests` is false for World, Continent and Cosmic): `QuestDataProvider`
+an icon per quest, `QuestBlobDataProvider` the area ("blob") of the selected (super-tracked),
+hovered or focused quest. On a continent map it shows only the selected quest's icon, on the world
+map nothing. A `MapCanvasDataProviderMixin` provider on `WorldMapFrame` adds them, per zoom level:
+`questMapContinent` and `questMapWorld` ("off", "icons", "areas", "both"; default both) and
+`questMapZone` ("blizzard", or "areas": every quest's area). The settings are `Builder:Choice`
+sliders (no dropdowns, see forever-platform.md).
+
+- **Which quests, where:** `C_QuestLog.GetQuestsOnMap(zone)` for every zone on the shown map
+  (`C_Map.GetMapChildrenInfo(map, Zone, true)`), the same list the zone map draws; each spot is
+  carried over with the zone's rectangle on the shown map (`C_Map.GetMapRectOnMap`, kept per pair:
+  maps don't move). If a map has no direct rectangle on the shown one (a zone on the world map),
+  it's composed through its parents. A zone reports quests of zones inside it (a city) too, with
+  that map's `mapID`: those are taken from the inner zone only. Filters as Blizzard's
+  `ShouldShowQuest`: no map indicator, world or bonus quests; with a quest's details open
+  (`QuestMapFrame_GetFocusedQuestID`) only that one. The selected quest's icon is left out on
+  continent maps (Blizzard draws it there), its area on zone maps. The map's own filter (CVar
+  `questPOI`, "quest objectives") switches everything off, like Blizzard's.
+- **Icons:** pins from `LefthyToolsQuestMapPinTemplate` (QuestMap.xml), Blizzard's art from
+  `POIButton.lua` at 80%: `UI-QuestPoi-QuestNumber` (`-SuperTracked` for the selected quest) behind
+  `Quest-In-Progress-Icon-yellow` or `UI-QuestIcon-TurnIn-Normal`; frame levels
+  `PIN_FRAME_LEVEL_ACTIVE_QUEST` / `_SUPER_TRACKED_QUEST`. Icons that would cover each other are
+  spread with Blizzard's `WorldMapPOIQuantizerMixin` (75 cells high, as on zone maps). Hover only
+  (`enableMouseMotion`), so a click zooms the map in as usual; `CheckMouseButtonPassthrough` is
+  emptied as for Beacon's pins. Tooltip: title (with level and difficulty colour through
+  `SetQuestTitleLevelAndDifficultyColor`, as the map's options say), zone, unfinished objectives or
+  "Ready to turn in". With icons only, hovering one draws its area until the mouse leaves.
+- **Areas:** the engine draws quest blobs into a `QuestPOIFrame` for one `uiMapID` (`SetMapID`,
+  `DrawBlob(questID, true)`), filling the frame. `LefthyToolsQuestAreaPinTemplate` is one, set up
+  like Blizzard's `QuestBlobPinMixin` (blob textures, fill 128, border 192); each zone with quests
+  gets its own, set to that zone, sized to the zone's rectangle on the canvas
+  (`DenormalizeHorizontalSize`) and centred on it. No mouse.
+- **Cost:** nothing while the map is closed: the provider registers its events (`QUEST_LOG_UPDATE`,
+  `QUEST_POI_UPDATE`, `QUEST_WATCH_LIST_CHANGED`, `SUPER_TRACKING_CHANGED`, `CVAR_UPDATE`) in
+  `OnShow` and drops them in `OnHide`. While it's open an event queues one redraw 0.5 s later; a
+  burst of events makes one. A redraw asks each zone once (about 25 on a continent).
+- **Unverified in game:** whether `QuestPOIFrame` draws a zone's blob correctly in a frame that
+  small, and how thick the border looks there (`SetBorderScalar`).
+
 ## afkScreen: the AFK screen (AFK.lua)
 
 While the player is AFK (`UnitIsAFK("player")`; `/afk` or the auto-AFK), the

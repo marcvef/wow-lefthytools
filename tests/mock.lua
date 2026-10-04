@@ -236,6 +236,7 @@ local function NewTexture()
 	function t:SetWidth(w) self.width = w end
 	function t:SetTexCoord(...) self.coords = { ... } end
 	function t:SetDesaturated(d) self.desaturated = d end
+	function t:SetScale(s) self.scale = s end
 	return t
 end
 function FrameMethods:CreateTexture(_, layer)
@@ -726,7 +727,8 @@ CreateFrame("Frame", "VehicleSeatIndicator", UIParent) -- also starts hidden by 
 VehicleSeatIndicator._alpha = 0
 
 -- CVars (status text)
-CVARS = { statusText = "0", statusTextDisplay = "PERCENT", rotateMinimap = "0", cameraDistanceMaxZoomFactor = "1.9" }
+CVARS = { statusText = "0", statusTextDisplay = "PERCENT", rotateMinimap = "0", cameraDistanceMaxZoomFactor = "1.9",
+	questPOI = "1" } -- the world map's "quest objectives" filter
 function GetCVar(k) return CVARS[k] end
 function GetCVarBool(k) return CVARS[k] == "1" end
 function SetCVar(k, v) CVARS[k] = tostring(v) end
@@ -960,11 +962,15 @@ MapCanvasDataProviderMixin = {
 	RemoveAllData = function() end,
 	RefreshAllData = function() end,
 	OnMapChanged = function(self) self:RefreshAllData() end,
+	OnShow = function() end, -- the canvas calls these when the map opens and closes
+	OnHide = function() end,
 }
 MapCanvasPinMixin = {
 	UseFrameLevelType = function(self, level) self.frameLevelType = level end,
 	SetScalingLimits = function() end,
+	SetIgnoreGlobalPinScale = function() end,
 	SetPosition = function(self, x, y) self.x, self.y = x, y end,
+	GetMap = function() return WorldMapFrame end,
 	-- Like MapCanvas_DataProviderBase.lua: SetPassThroughButtons is protected, so calling it from
 	-- addon code in combat is blocked by the game.
 	CheckMouseButtonPassthrough = function(self) self:SetPassThroughButtons() end,
@@ -972,7 +978,18 @@ MapCanvasPinMixin = {
 		if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SetPassThroughButtons" end
 	end,
 }
-PIN_MIXINS = { LefthyToolsBeaconPinTemplate = "LefthyToolsBeaconPinMixin", LefthyToolsBeaconPingPinTemplate = "LefthyToolsBeaconPingPinMixin" }
+PIN_MIXINS = { LefthyToolsBeaconPinTemplate = "LefthyToolsBeaconPinMixin", LefthyToolsBeaconPingPinTemplate = "LefthyToolsBeaconPingPinMixin",
+	LefthyToolsQuestMapPinTemplate = "LefthyToolsQuestMapPinMixin", LefthyToolsQuestAreaPinTemplate = "LefthyToolsQuestAreaPinMixin" }
+-- The engine's quest area frame (QuestPOIFrame): pin.blobs = the quests it draws, for pin.mapID.
+local QuestPOIFrameMethods = {
+	SetMapID = function(self, mapID) self.mapID = mapID end,
+	DrawNone = function(self) self.blobs = {} end,
+	DrawBlob = function(self, questID, draw) if draw then self.blobs[#self.blobs + 1] = questID end end,
+}
+for _, m in ipairs({ "SetFillTexture", "SetBorderTexture", "SetFillAlpha", "SetBorderAlpha", "SetBorderScalar" }) do
+	QuestPOIFrameMethods[m] = function() end
+end
+PIN_TYPES = { LefthyToolsQuestAreaPinTemplate = QuestPOIFrameMethods }
 PINS = {} -- currently acquired pins
 PINS_CREATED = 0
 local pinPools = {} -- one pool per template, like MapCanvasMixin
@@ -992,25 +1009,44 @@ function WorldMapFrame:AcquirePin(template, ...)
 	local pin = table.remove(pinPools[template])
 	if not pin then
 		pin = CreateFrame("Frame", nil, self)
+		for k, v in pairs(PIN_TYPES[template] or {}) do pin[k] = v end
 		for k, v in pairs(_G[PIN_MIXINS[template]]) do pin[k] = v end
 		pin:OnLoad() -- the canvas calls OnLoad once, for new pins only
 		PINS_CREATED = PINS_CREATED + 1
 	end
 	pin.pinTemplate = template
 	PINS[#PINS + 1] = pin
-	pin:OnAcquired(...)
+	pin:Show()
+	if pin.OnAcquired then pin:OnAcquired(...) end
 	pin:CheckMouseButtonPassthrough("RightButton") -- Blizzard does this on every acquire
 	return pin
 end
 function WorldMapFrame:RemovePin(pin)
 	for i = #PINS, 1, -1 do if PINS[i] == pin then table.remove(PINS, i) end end
+	pin:Hide()
 	table.insert(pinPools[pin.pinTemplate], pin)
 end
 function WorldMapFrame:RemoveAllPinsByTemplate(template)
 	for i = #PINS, 1, -1 do
-		if PINS[i].pinTemplate == template then table.insert(pinPools[template], table.remove(PINS, i)) end
+		if PINS[i].pinTemplate == template then
+			PINS[i]:Hide()
+			table.insert(pinPools[template], table.remove(PINS, i))
+		end
 	end
 end
+function WorldMapFrame:Hide() -- closing the map: the canvas tells every provider
+	local closing = self:IsShown()
+	FrameMethods.Hide(self)
+	if closing then for p in pairs(self.providers) do p:OnHide() end end
+end
+function PinsOf(template) -- the acquired pins of one template, in acquire order
+	local list = {}
+	for _, pin in ipairs(PINS) do if pin.pinTemplate == template then list[#list + 1] = pin end end
+	return list
+end
+-- Canvas units: the mock canvas is 1000 x 1000.
+function WorldMapFrame:DenormalizeHorizontalSize(size) return size * 1000 end
+function WorldMapFrame:DenormalizeVerticalSize(size) return size * 1000 end
 -- Clicks land on the canvas' scroll container; the cursor is in map coordinates (0-1).
 WorldMapFrame.ScrollContainer = CreateFrame("Frame", nil, WorldMapFrame)
 MOCK_CURSOR = { 0.5, 0.5 }
@@ -1032,11 +1068,53 @@ C_Map.GetMapLevels = function(mapID) local l = MAP_LEVELS[mapID]; if l then retu
 C_Map.GetMapInfoAtPosition = function(mapID, x, y) -- the zone under a spot of a continent map
 	if mapID == 1415 and x >= 0.25 and x <= 0.5 and y >= 0.25 and y <= 0.5 then return C_Map.GetMapInfo(1429) end
 end
+-- More maps for quests on the map: Westfall (another zone), Stormwind City (a zone inside Elwynn
+-- Forest) and the world map above both continents. Enum.UIMapType as in the game.
+Enum.UIMapType = { Cosmic = 0, World = 1, Continent = 2, Zone = 3, Dungeon = 4, Micro = 5, Orphan = 6 }
+MAPS[1436] = { continent = 0, top = 0, left = 1500, width = 1000, height = 1000 }
+MAPS[1453] = { continent = 0, top = 900, left = 900, width = 200, height = 200 }
+MAP_NAMES[1436], MAP_NAMES[1453], MAP_NAMES[947] = "Westfall", "Stormwind City", "Azeroth"
+MAP_PARENTS[1436], MAP_PARENTS[1453], MAP_PARENTS[1415], MAP_PARENTS[1414] = 1415, 1429, 947, 947
+MAP_TYPES[1436], MAP_TYPES[1453], MAP_TYPES[947] = 3, 3, 1
+-- Rectangles of one map on another: worked out from the world coordinates on one continent; the
+-- world map has none, so the continents' rectangles on it are given (and zones aren't, as when
+-- the game has no direct answer).
+MAP_RECTS = { [1415] = { [947] = { 0.5, 0.9, 0.1, 0.7 } }, [1414] = { [947] = { 0.05, 0.4, 0.1, 0.8 } } }
+C_Map.GetMapRectOnMap = function(mapID, topID)
+	local r = MAP_RECTS[mapID] and MAP_RECTS[mapID][topID]
+	if r then return r[1], r[2], r[3], r[4] end
+	local m, top = MAPS[mapID], MAPS[topID]
+	if mapID == topID or not (m and top and m.continent == top.continent) then return nil end
+	return (top.left - m.left) / top.width, (top.left - m.left + m.width) / top.width,
+		(top.top - m.top) / top.height, (top.top - m.top + m.height) / top.height
+end
+C_Map.GetMapChildrenInfo = function(mapID, mapType, allDescendants)
+	local list = {}
+	for id, parent in pairs(MAP_PARENTS) do
+		local p = parent
+		while allDescendants and p and p ~= mapID do p = MAP_PARENTS[p] end
+		if p == mapID and (not mapType or MAP_TYPES[id] == mapType) then list[#list + 1] = C_Map.GetMapInfo(id) end
+	end
+	table.sort(list, function(x, y) return x.mapID < y.mapID end)
+	return list
+end
+-- What each map's quest icons are: QUESTS_ON_MAP[mapID] = { { questID, x, y [, mapID] }, ... } (mapID: a
+-- map inside it the quest is really on, like the game reports quests in a city on its zone).
+QUESTS_ON_MAP = {}
+C_QuestLog.GetQuestsOnMap = function(mapID)
+	local list = {}
+	for _, q in ipairs(QUESTS_ON_MAP[mapID] or {}) do
+		list[#list + 1] = { questID = q[1], x = q[2], y = q[3], mapID = q[4] or mapID, isMapIndicatorQuest = false }
+	end
+	return list
+end
 SOUNDKIT = { MAP_PING = 3175, TELL_MESSAGE = 3081 }
 function OpenWorldMap(mapID) -- the canvas refreshes every provider when it opens or changes map
 	WorldMapFrame.mapID = mapID or WorldMapFrame.mapID
+	local opening = not WorldMapFrame:IsShown()
 	WorldMapFrame:Show()
 	for p in pairs(WorldMapFrame.providers) do p:OnMapChanged() end
+	if opening then for p in pairs(WorldMapFrame.providers) do p:OnShow() end end
 end
 TOOLTIP = { lines = {} }
 GameTooltip = {

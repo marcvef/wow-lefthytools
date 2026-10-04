@@ -18,6 +18,10 @@ local M = LT:NewModule("tweaks", {
 		comboPoints = true,
 		comboColors = true,
 		foreverQuests = true,
+		questMap = true,       -- QuestMap.lua
+		questMapContinent = "both", -- "off" | "icons" | "areas" | "both"
+		questMapWorld = "both",
+		questMapZone = "blizzard", -- "blizzard" (the selected quest's area) | "areas" (every quest's)
 		afkScreen = true,      -- AFK.lua
 		afkSpin = true,
 		cinematicFlights = true, -- Flight.lua
@@ -420,6 +424,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyComboColors(on) end },
 	{ key = "foreverQuests", command = "newquests", label = "Mark quests that are new in WoW: Forever",
 		apply = function(on) ns.ApplyForeverQuests(on) end }, -- ForeverQuests.lua
+	{ key = "questMap", command = "questmap", label = "Quests on continent and world maps",
+		apply = function(on) ns.ApplyQuestMap(on) end }, -- QuestMap.lua
 	{ key = "afkScreen", command = "afk", label = "AFK screen",
 		apply = function(on) ns.ApplyAFKScreen(on) end }, -- AFK.lua
 	{ key = "cinematicFlights", command = "flights", label = "Cinematic flights",
@@ -463,6 +469,7 @@ end
 
 function M:OnSettingChanged()
 	RequestReconcile()
+	ns.RefreshQuestMap() -- what each zoom level shows
 end
 
 function M:IsTweakActive(key)
@@ -489,6 +496,16 @@ function M:BuildOptions(o)
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
 	o:Checkbox("foreverQuests", L["Mark quests that are new in WoW: Forever"],
 		L["WoW: Forever adds over a thousand quests to the Classic world, plus about as many from Classic's later seasons that original Classic never had. They get a NEW right after their name: in the quest log (hover for details), in the quest details and in the quest window when you accept or turn one in."])
+	o:Checkbox("questMap", L["Quests on continent and world maps"],
+		L["Blizzard's world map shows your quests only on zone maps. This shows them on continent maps and the world map too: an icon where to go (hover it for the objectives) and the area where the mobs and items are. Choose below what each zoom level shows. The map's own filter for quest objectives hides them as well."])
+	local shown = { { "off", L["Nothing"] }, { "icons", L["Icons"] }, { "areas", L["Areas"] }, { "both", L["Icons and areas"] } }
+	o:Choice("questMapContinent", L["On continent maps"],
+		L["What continent maps like Kalimdor show of your quests. With icons only, hovering one shows its area."], shown)
+	o:Choice("questMapWorld", L["On the world map"],
+		L["What the map of the whole world shows of your quests."], shown)
+	o:Choice("questMapZone", L["Quest areas on zone maps"],
+		L["Blizzard shows only the area of your selected quest. All quests: the areas of every quest in the zone, like Questie."],
+		{ { "blizzard", L["Selected quest"] }, { "areas", L["All quests"] } })
 	o:Header(L["AFK screen"])
 	o:Checkbox("afkScreen", L["AFK screen"],
 		L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."])
@@ -530,7 +547,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | afk | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | questmap | afk | flights [on|off] - switch a tweak")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 	end
 end

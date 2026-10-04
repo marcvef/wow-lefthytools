@@ -117,5 +117,8 @@ ns.CHANGELOG = {
 	{ id = 37, version = "0.5.0", module = "tweaks",
 		en = { "Accurate flight times", "The time left on a flight comes from the game's own flight path data (every leg, every curve), and is exact once you've flown that route." },
 		de = { "Genaue Flugzeiten", "Die Restflugzeit kommt aus den Flugrouten-Daten des Spiels (jede Etappe, jede Kurve) und ist exakt, sobald du die Route einmal geflogen bist." } },
+	{ id = 38, version = "0.5.0", module = "tweaks",
+		en = { "Quests on continent and world maps", "Your quests show on continent maps and the world map too: icons where to go, and the areas of their objectives. The settings choose what each zoom level shows." },
+		de = { "Quests auf Kontinent- und Weltkarte", "Deine Quests erscheinen auch auf Kontinentkarten und der Weltkarte: Icons, wo du hinmusst, und die Gebiete ihrer Questziele. In den Einstellungen wählst du, was jede Zoomstufe zeigt." } },
 	-- New entries go here, at the end.
 }

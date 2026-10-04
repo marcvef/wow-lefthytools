@@ -33,6 +33,8 @@ Modules\Tweaks\ComboPoints.lua
 Modules\Tweaks\ForeverQuests.lua
 Modules\Tweaks\AFK.lua
 Modules\Tweaks\Flight.lua
+Modules\Tweaks\QuestMap.lua
+Modules\Tweaks\QuestMap.xml
 
 Modules\Beacon\Beacon.lua
 Modules\Beacon\Dots.lua
