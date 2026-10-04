@@ -1,10 +1,12 @@
 local _, ns = ...
 
 -- What's new, shown once after an update (Core/WhatsNew.lua). Add an entry with every change
--- players notice: the next id (never renumber), the version it ships in, the module it belongs
--- to (mirage, tweaks, beacon, chronicle; general for the addon as a whole), and a short title
--- plus one sentence, in English and German (the window follows the client language). The
--- window groups entries by version and module; within a module they keep this order.
+-- players notice: the next id (never renumber), the module it belongs to (mirage, tweaks,
+-- beacon, chronicle; general for the addon as a whole), and a short title plus one sentence, in
+-- English and German (the window follows the client language). No version until one is tagged
+-- (Lustre style: versions are tags, builds in between are X.Y.Z-N-gHASH); the commit that tags a
+-- release gives its entries that version. The window groups entries by version and module;
+-- within a module they keep this order.
 ns.CHANGELOG = {
 	{ id = 1, version = "0.5.0", module = "beacon",
 		en = { "Friends in your group", "Their dot stays, with a blue ring, right on top of the game's group dot, and the tooltip says they're in your group." },
@@ -126,10 +128,10 @@ ns.CHANGELOG = {
 	{ id = 40, version = "0.5.0", module = "general",
 		en = { "What's coming", "The update notice lists what's new in your friend's build, one line per change." },
 		de = { "Was kommt", "Der Update-Hinweis zeigt, was in der Version deines Freundes neu ist, eine Zeile pro Änderung." } },
-	{ id = 41, version = "0.5.1", module = "tweaks",
+	{ id = 41, module = "tweaks",
 		en = { "Select quests on the big maps", "Click a quest's icon on a continent or the world map to select it, as on zone maps. A setting turns it off." },
 		de = { "Quests auf großen Karten auswählen", "Ein Klick auf das Icon einer Quest auf Kontinent- oder Weltkarte wählt sie aus, wie auf Zonenkarten. Lässt sich abschalten." } },
-	{ id = 42, version = "0.5.1", module = "general",
+	{ id = 42, module = "general",
 		en = { "Errors: a button", "The settings overview opens LefthyTools' error list with a Show button instead of telling you a command." },
 		de = { "Fehler: ein Button", "Die Übersicht in den Einstellungen öffnet die Fehlerliste von LefthyTools mit einem Anzeigen-Button, statt dir einen Befehl zu nennen." } },
 	-- New entries go here, at the end.

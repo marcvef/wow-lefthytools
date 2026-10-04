@@ -50,7 +50,6 @@ L["Every change to LefthyTools, newest first. After an update this opens by itse
 L["What's new in LefthyTools"] = "Neu in LefthyTools"
 L["All changes"] = "Alle Änderungen"
 L["You have LefthyTools %s."] = "Du hast LefthyTools %s."
-L["%s (in development)"] = "%s (in Arbeit)"
 L["General"] = "Allgemein"
 
 -- Mirage

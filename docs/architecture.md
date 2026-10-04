@@ -85,10 +85,11 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
   `.cmd` byte-for-byte with CRLF, also when downloaded raw.
 
 **Versions** (Lustre style): the repo's TOC holds the base version `X.Y.Z`, tagged `vX.Y.Z`
-(lightweight tag, pushed with `git push --tags`). Releases step the patch (0.5.0, 0.5.1, 0.5.2,
-...), features included; a new minor version (0.6.0) is a deliberate bigger step, not automatic.
-Bump the TOC, then tag that commit. Changelog entries made after a tag carry the next patch
-version. Between tags a build is `X.Y.Z-N-gHASH` (N commits after the
+(lightweight tag, pushed with `git push --tags`). A version exists only once it's tagged, and only
+when the player who owns the project asks for one (patch for fixes, minor for features, their
+call); never pick the next version number in advance. Between tags the builds are just
+`X.Y.Z-N-gHASH`. The release commit bumps the TOC and gives the changelog entries since the last
+tag that version; until then they have none. Between tags a build is `X.Y.Z-N-gHASH` (N commits after the
 tag), written into the installed TOC by the installer; `X.Y.Z-gHASH` when N is unknown.
 `LT.version` reads it, `LT.CompareVersions` orders builds, `/lefthy version` shows it, and Beacon
 tells friends on older builds to update. Beacon also reports every friend's build to
@@ -142,8 +143,9 @@ sentence; wrapped lines stay under the text. Drawn with pooled font strings (`Re
 builds between releases (`0.4.0-12-g...`) have news too. `LefthyToolsDB.changelogSeen` is the
 highest id shown: a fresh install (`LT.freshInstall`: no saved variables before) starts with
 everything seen, an older install without the field sees every entry once. Three seconds after
-login (later if in combat) the window lists the unseen entries ("0.5.0 (in development)" while
-the installed build is older than that version) and marks them seen. "All
+login (later if in combat) the window lists the unseen entries and marks them seen. Entries
+without a version (made after the last tag) come first, under the installed build
+(`LefthyTools 0.5.0-4-g1a2b3c4`); the release commit gives them the new version. "All
 changes", `/lefthy news` and the overview's What's new button show the whole list. **Add an
 entry, in English and German, with every change players notice.**
 

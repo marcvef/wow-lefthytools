@@ -38,37 +38,35 @@ local function SectionTitle(key)
 	return m and m.title or L["General"] -- module names are never translated
 end
 
--- "0.5.0", or "0.5.0 (in development)" while the installed build is older than that version.
-local function VersionLabel(version)
-	local a1, a2, a3 = LT.ParseVersion(version)
-	local b1, b2, b3 = LT.ParseVersion(LT.version)
-	if a1 and b1 and (a1 > b1 or a1 == b1 and (a2 > b2 or a2 == b2 and a3 > b3)) then
-		return L["%s (in development)"]:format(version)
-	end
-	return version
-end
-
 -- The entries with an id above `after` as a list of lines: { kind = "version" | "section" |
 -- "entry", text, title }. Versions newest first; in each, a section per module in SECTIONS order;
--- in each section, the entries in the order they were added.
+-- in each section, the entries in the order they were added. Entries without a version came after
+-- the last release (versions exist only once tagged, builds in between are X.Y.Z-N-gHASH): they
+-- come first, under the installed build.
 function WhatsNew.Lines(after)
 	local versions, byVersion = {}, {}
 	for _, entry in ipairs(ns.CHANGELOG or {}) do
 		if entry.id > after then
-			local v = byVersion[entry.version]
+			local versionKey = entry.version or ""
+			local v = byVersion[versionKey]
 			if not v then
 				v = { version = entry.version, sections = {} }
-				byVersion[entry.version], versions[#versions + 1] = v, v
+				byVersion[versionKey], versions[#versions + 1] = v, v
 			end
 			local key = entry.module or "general"
 			v.sections[key] = v.sections[key] or {}
 			table.insert(v.sections[key], entry)
 		end
 	end
-	table.sort(versions, function(a, b) return LT.CompareVersions(a.version, b.version) == 1 end)
+	table.sort(versions, function(a, b)
+		if not (a.version and b.version) then
+			return b.version ~= nil and a.version == nil
+		end
+		return LT.CompareVersions(a.version, b.version) == 1
+	end)
 	local lines = {}
 	for _, v in ipairs(versions) do
-		lines[#lines + 1] = { kind = "version", text = "LefthyTools " .. VersionLabel(v.version) }
+		lines[#lines + 1] = { kind = "version", text = "LefthyTools " .. (v.version or LT.version) }
 		for _, key in ipairs(SECTIONS) do
 			for i, entry in ipairs(v.sections[key] or {}) do
 				if i == 1 then

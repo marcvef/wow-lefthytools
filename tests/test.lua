@@ -3559,13 +3559,15 @@ local news = ns.CHANGELOG
 local MODULES = { mirage = true, tweaks = true, beacon = true, chronicle = true, general = true }
 local goodData = #news > 0
 for i, e in ipairs(news) do
-	goodData = goodData and e.id == i and LT.ParseVersion(e.version) ~= nil and MODULES[e.module]
+	goodData = goodData and e.id == i and (e.version == nil or LT.ParseVersion(e.version) ~= nil) and MODULES[e.module]
+	-- Lustre style: a version only once tagged, so no versioned entry after an unversioned one.
+	goodData = goodData and not (e.version and i > 1 and news[i - 1].version == nil)
 	for _, lang in ipairs({ e.en, e.de }) do
 		goodData = goodData and type(lang) == "table" and type(lang[1]) == "string" and lang[1] ~= ""
 			and type(lang[2]) == "string" and lang[2] ~= "" and #lang[1] <= 40
 	end
 end
-check(goodData, "changelog: ids 1, 2, 3, ... in order, each with a version, a module, and a short title and a sentence in English and German")
+check(goodData, "changelog: ids 1, 2, 3, ... in order, each with a tagged version (or none yet), a module, and a short title and a sentence in English and German")
 check(LT.freshInstall and not (LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()),
 	"a new install doesn't get a what's-new window")
 LefthyToolsDB.changelogSeen = #news - 2 -- two entries arrived with an update
@@ -3579,8 +3581,8 @@ local newsText = LefthyToolsNewsFrame and LefthyToolsNewsFrame.plain or ""
 check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown(), "after combat: the window opens by itself")
 check(newsText:find(news[#news].en[1], 1, true) and newsText:find(news[#news - 1].en[1], 1, true)
 	and not newsText:find(news[#news - 2].en[1], 1, true), "only the entries not seen yet")
-check(newsText:find("LefthyTools " .. news[#news].version .. " (in development)", 1, true),
-	"a version still in development is marked, got " .. newsText)
+check(news[#news].version or newsText:sub(1, 29) == "LefthyTools 0.4.0-3-gabc1234\n",
+	"entries since the last tagged version: under the installed build (no made-up version), got " .. newsText)
 check(LefthyToolsDB.changelogSeen == #news, "and they count as seen")
 check(LefthyToolsNewsFrame.Subtitle:GetText():find("0.4.0-3-gabc1234", 1, true), "the window shows the installed build")
 LefthyToolsNewsFrame.AllButton:Click()
@@ -3594,7 +3596,8 @@ for _, heading in ipairs({ "Mirage", "Misc Tweaks", "Beacon", "Chronicle", "Gene
 end
 check(order[1] > 0 and order[1] < order[2] and order[2] < order[3] and order[3] < order[4] and order[4] < order[5],
 	"in a version: grouped by module, each heading once, in a fixed order, got\n" .. newsText)
-check(newsText:find("LefthyTools 0.5.1", 1, true) < newsText:find("LefthyTools 0.5.0", 1, true), "the newest version first")
+check(newsText:find("LefthyTools 0.4.0-3-gabc1234", 1, true) < newsText:find("LefthyTools 0.5.0", 1, true),
+	"the newest first: what came after the last tag, then the tagged versions")
 check(newsText:find("\nBeacon\n- Friends in your group: ", 1, true) and newsText:find("- Level progress: ", 1, true),
 	"each entry: a short title and a sentence")
 local drawn = {}
