@@ -2672,6 +2672,24 @@ do
 	check(sentTo(11, mark, "M2;")[4] == "M2;from guild mode", "... and the line goes to Lefthy chat")
 	TypeChat("/s back to say")
 	check(SENT_CHAT[#SENT_CHAT].type == "SAY" and SENT_CHAT[#SENT_CHAT].text == "back to say", "/s: back to say")
+	-- A soft tick when a friend writes: once for a burst, not for my own lines, a setting.
+	local ticks = #SOUNDS
+	anna("M2;one")
+	anna("M2;two")
+	Advance(0.15)
+	SlashCmdList.LEFTHYTOOLS_CHAT("mine")
+	Advance(0.15)
+	local soft = 0
+	for i = ticks + 1, #SOUNDS do if SOUNDS[i] == 826 then soft = soft + 1 end end
+	check(BDB.lefthyChatSound == true and B("lefthyChatSound") and soft == 1,
+		"a friend's lines: one soft tick for the burst, none for mine (a setting, on), got " .. soft)
+	B("lefthyChatSound"):SetValue(false)
+	Advance(2)
+	ticks = #SOUNDS
+	anna("M2;three")
+	Advance(0.15)
+	check(#SOUNDS == ticks, "switched off: silent")
+	B("lefthyChatSound"):SetValue(true)
 	-- While I'm AFK the notices are hidden with the interface: the AFK screen lists them.
 	Advance(3.5)
 	afk(true)
@@ -2724,7 +2742,8 @@ do
 		and not REGISTERED_SETTINGS.LefthyTools_tweaks_flightCamera, "on by default, with a checkbox (no camera option)")
 	local uiW, uiH = UIParent:GetWidth(), UIParent:GetHeight()
 	UIParent:SetSize(1920, 1080)
-	anna("H2") -- a friend online, in Elwynn Forest
+	anna("H2") -- friends online, in Elwynn Forest (whatever earlier tests took long enough to forget)
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 12)
 	Advance(0.2)
 	-- The flight map: where you are (state 0) and the destination, 1118 yd apart in a straight line.
 	TAXI_MAP_NODES = {

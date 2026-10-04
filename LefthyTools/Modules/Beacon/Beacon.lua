@@ -120,6 +120,7 @@ local M = LT:NewModule("beacon", {
 		pings = true,
 		shareItems = true,
 		lefthyChat = true,    -- Chat.lua: /l lines in the chat window
+		lefthyChatSound = true, -- a soft tick when a friend writes there
 		announcements = true, -- /lefthy announce: lines in the middle of the screen
 		dingAnnounce = true,
 		dingText = "",
@@ -1288,6 +1289,8 @@ function M:BuildOptions(o)
 		L["Items you offered and someone won stay reserved until you trade or mail them to the winner: a tooltip line, a bag border, a question at vendors. This forgets all of them, in case one is stuck. /lefthy beacon handover lists them."])
 	o:Checkbox("lefthyChat", L["Lefthy chat"],
 		L["A chat for your Battle.net friends with LefthyTools, like guild or party chat: /l <text> sends a line, and theirs show in your chat window."])
+	o:Checkbox("lefthyChatSound", L["Soft sound for Lefthy chat"],
+		L["A quiet tick when a friend writes in Lefthy chat."])
 	o:Checkbox("announcements", L["Announcements"],
 		L["/la <text> (or /lefthy announce <text>) puts a line in the middle of your friends' screens, like a shared item, with the whisper sound. Theirs show on yours."])
 	o:Checkbox("pings", L["Map pings"],

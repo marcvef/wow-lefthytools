@@ -264,6 +264,8 @@ L["Keep it"] = "Behalten"
 L["Lefthy chat"] = "Lefthy-Chat"
 L["A chat for your Battle.net friends with LefthyTools, like guild or party chat: /l <text> sends a line, and theirs show in your chat window."] =
 	"Ein Chat für deine Battle.net-Freunde mit LefthyTools, wie Gilden- oder Gruppenchat: /l <Text> schickt eine Zeile, ihre erscheinen in deinem Chatfenster."
+L["Soft sound for Lefthy chat"] = "Leiser Sound beim Lefthy-Chat"
+L["A quiet tick when a friend writes in Lefthy chat."] = "Ein leises Ticken, wenn ein Freund im Lefthy-Chat schreibt."
 L["Announcements"] = "Ankündigungen"
 L["/la <text> (or /lefthy announce <text>) puts a line in the middle of your friends' screens, like a shared item, with the whisper sound. Theirs show on yours."] =
 	"/la <Text> (oder /lefthy announce <Text>) zeigt eine Zeile in der Bildschirmmitte deiner Freunde, wie ein geteiltes Item, mit dem Flüstersound. Ihre erscheinen bei dir."

@@ -256,7 +256,8 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
 - **Lefthy chat** (`/l <text>`, also `/lchat`; setting `lefthyChat`): `M2;<text>` to every peer;
   everyone prints `[Lefthy] [Name]: text` (orange, the name in its class colour) to the chat
   window, the sender too, like guild chat. At most 5 lines per 5 s are taken from one friend;
-  sending at most every 0.5 s.
+  sending at most every 0.5 s. A friend's line plays a very soft tick (`SOUNDKIT.IG_CHAT_SCROLL_UP`
+  on the SFX channel, at most every 1.5 s, never for my own; setting `lefthyChatSound`).
 - **Sticky, like `/g`:** the box can't get a chat type of ours (`ChatTypeInfo` and
   `hash_ChatTypeInfoList` are Blizzard's; writing to them would taint everyone's chat). Instead
   `/l` (in a chat box: the slash handler gets the edit box) or typing `/l ` (a post-hook on the

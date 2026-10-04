@@ -16,6 +16,9 @@ local TEXT_BYTES = 200
 local CHAT_COLOUR = "|cffffb84d"
 local SEND_GAP = { chat = 0.5, announce = 3 }
 local lastSent = { chat = -math.huge, announce = -math.huge }
+local CHAT_SOUND = SOUNDKIT and SOUNDKIT.IG_CHAT_SCROLL_UP or 826 -- a very soft tick (setting lefthyChatSound)
+local SOUND_GAP = 1.5 -- a burst of lines ticks once
+local lastSound = -math.huge
 
 -- Before sending: item links become {item:12345:...}, other links their text; colour codes,
 -- textures and atlases go. Trailing empty fields are dropped (the item is the same).
@@ -122,6 +125,11 @@ function B.ReceiveChat(peer, text)
 		end
 		local line = ChatLine(peer.name, peer.classFile, shown)
 		print(line)
+		local now = GetTime()
+		if M.db.lefthyChatSound and now - lastSound >= SOUND_GAP then
+			lastSound = now
+			PlaySound(CHAT_SOUND, "SFX")
+		end
 		FlightSubtitle(line)
 		B.Notify("chat", peer, { text = shown }) -- (the AFK screen)
 	end)

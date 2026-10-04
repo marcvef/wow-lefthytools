@@ -147,8 +147,9 @@ minimap, and you on theirs, without being in a group.
   item into the chat box, for when a click doesn't reach it (some bag addons, gamepad). If an
   item can't be shared, chat always says why.
 - **Lefthy chat:** `/l <text>`, like `/g` or `/p`: a chat line for all your friends with
-  LefthyTools, shown in their chat windows as `[Lefthy] [Anna]: text`. Item links work. The chat
-  box stays on it ("Lefthy:") until you switch with `/s`, `/g`, `/p`, ...
+  LefthyTools, shown in their chat windows as `[Lefthy] [Anna]: text`, with a soft tick (can be
+  switched off). Item links work. The chat box stays on it ("Lefthy:") until you switch with
+  `/s`, `/g`, `/p`, ...
 - **Announcements:** `/la <text>` (or `/lefthy announce <text>`) puts the line in the middle of their screens,
   where shared items show, with the whisper sound (and in their chat). On a cinematic flight
   both come as subtitles.
@@ -186,6 +187,7 @@ minimap, and you on theirs, without being in a group.
 | Tell me when a friend dies | on | |
 | Show items to friends (Ctrl+right-click) | on | |
 | Lefthy chat | on | `/l <text>` |
+| Soft sound for Lefthy chat | on | |
 | Announcements | on | `/la <text>`, `/lefthy announce <text>` |
 | Map pings (Alt+click on the world map) | on | `/lefthy beacon ping` |
 | Tell my friends when I level up | on | |
