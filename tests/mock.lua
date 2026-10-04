@@ -574,6 +574,8 @@ ACTIVE_CHAT_EDIT_BOX = nil
 REGISTERED_SETTINGS = {}
 CATEGORIES = {}
 LAYOUTS = {} -- category name -> the initializers added to its layout (rows on that page)
+-- The base of a settings list row (Blizzard_Settings_Shared): Init keeps the row's data.
+SettingsListElementMixin = { OnLoad = function() end, Init = function(self, initializer) self.data = initializer:GetData() end }
 local function NewCategory(name, parent)
 	local id = #CATEGORIES + 100
 	local cat = { name = name, parent = parent, GetID = function() return id end }

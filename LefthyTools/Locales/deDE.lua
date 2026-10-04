@@ -34,10 +34,9 @@ L["Settings: LefthyTools > %s"] = "Einstellungen: LefthyTools > %s"
 
 -- Error catcher
 L["Errors"] = "Fehler"
-L["LefthyTools' own Lua errors, kept across sessions. /lefthy errors shows them ready to copy, /lefthy errors clear removes them."] =
-	"Lua-Fehler von LefthyTools selbst, auch über mehrere Sessions gespeichert. /lefthy errors zeigt sie zum Kopieren an, /lefthy errors clear löscht sie."
+L["LefthyTools' own Lua errors, kept across sessions until you clear them. Show lists them, ready to copy; the list can clear them too."] =
+	"Lua-Fehler von LefthyTools selbst, über mehrere Sessions gespeichert, bis du sie löschst. „Anzeigen“ listet sie zum Kopieren auf; dort kannst du sie auch löschen."
 L["None"] = "Keine"
-L["%d (type /lefthy errors)"] = "%d (/lefthy errors eingeben)"
 L["LefthyTools errors"] = "LefthyTools-Fehler"
 L["Click into the text, press Ctrl+A and then Ctrl+C to copy it, and send it to whoever gave you LefthyTools."] =
 	"In den Text klicken, Strg+A und dann Strg+C drücken, um ihn zu kopieren, und ihn dem schicken, von dem du LefthyTools hast."

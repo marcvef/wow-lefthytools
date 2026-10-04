@@ -83,7 +83,27 @@ check(notices == 1, "one chat notice per session (not from inside the error hand
 Fire("ADDON_ACTION_BLOCKED", "LefthyTools", "SetPassThroughButtons")
 Fire("ADDON_ACTION_BLOCKED", "OtherAddon", "CastSpellByName")
 check(#kept == 3 and kept[3].kind == "blocked" and kept[3].msg:find("SetPassThroughButtons", 1, true), "blocked actions of ours are kept too")
-check(errorRow():find("3 (type /lefthy errors)", 1, true), "the overview shows how many")
+local function renderRow(name) -- an overview info row, built the way the settings list builds it
+	for _, init in ipairs(LAYOUTS["LefthyTools"]) do
+		if init.template == "LefthyToolsSettingsInfoTemplate" and init.data.name == name then
+			local row = CreateFrame("Frame")
+			for k, v in pairs(LefthyToolsSettingsInfoMixin) do row[k] = v end
+			row.Value = row:CreateFontString()
+			row:OnLoad()
+			row:Init(init)
+			return row
+		end
+	end
+end
+do
+	local row = renderRow("Errors")
+	check(row.Value:GetText():find("3", 1, true) and not row.Value:GetText():find("/lefthy", 1, true)
+		and row.Button:IsShown() and row.Button:GetText() == "Show", "the overview shows how many, with a Show button (nothing to type)")
+	row.Button:Click()
+	check(LefthyToolsErrorsFrame and LefthyToolsErrorsFrame:IsShown(), "the button opens the error list")
+	LefthyToolsErrorsFrame:Hide()
+	check(not renderRow("Version").Button:IsShown(), "rows without a button don't show one")
+end
 lefthy("errors")
 local errWindow = LefthyToolsErrorsFrame
 local report = errWindow and errWindow.Box:GetText() or ""
@@ -96,7 +116,8 @@ check(#UISpecialFrames > 0 and UISpecialFrames[#UISpecialFrames] == "LefthyTools
 for i = 1, 30 do geterrorhandler()("Interface/AddOns/LefthyTools/Core/Core.lua:" .. i .. ": test " .. i) end
 check(#kept == 25 and kept[25].msg:find("test 30", 1, true) and not kept[1].msg:find(ours, 1, true), "at most 25 kept, the oldest go")
 lefthy("errors clear")
-check(#LefthyToolsDB.errors == 0 and errorRow():find("None", 1, true), "/lefthy errors clear")
+check(#LefthyToolsDB.errors == 0 and errorRow():find("None", 1, true) and not renderRow("Errors").Button:IsShown(),
+	"/lefthy errors clear (and the Show button goes)")
 check(errWindow.Box:GetText():find("No errors.", 1, true), "the open window follows")
 errWindow:Hide()
 for i = #ERRORS, errorsBefore + 1, -1 do table.remove(ERRORS, i) end -- the test's own errors
@@ -3558,7 +3579,8 @@ local newsText = LefthyToolsNewsFrame and LefthyToolsNewsFrame.plain or ""
 check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown(), "after combat: the window opens by itself")
 check(newsText:find(news[#news].en[1], 1, true) and newsText:find(news[#news - 1].en[1], 1, true)
 	and not newsText:find(news[#news - 2].en[1], 1, true), "only the entries not seen yet")
-check(newsText:find("LefthyTools 0.5.0 (in development)", 1, true), "a version still in development is marked, got " .. newsText)
+check(newsText:find("LefthyTools " .. news[#news].version .. " (in development)", 1, true),
+	"a version still in development is marked, got " .. newsText)
 check(LefthyToolsDB.changelogSeen == #news, "and they count as seen")
 check(LefthyToolsNewsFrame.Subtitle:GetText():find("0.4.0-3-gabc1234", 1, true), "the window shows the installed build")
 LefthyToolsNewsFrame.AllButton:Click()

@@ -124,8 +124,9 @@ LefthyTools. Secret messages are skipped; locals are never kept (they can hold c
 hook body runs in `pcall`, so it can't cause errors itself. Errors before the saved variables load
 wait in a list; the first one per session prints one chat line, on the next frame (never from
 inside the error handler). `/lefthy errors` shows a plain-text report (build, client, every error
-newest first) in a read-only edit box to copy; `/lefthy errors clear` empties it; the overview's
-Info section shows the count. Core parts that aren't modules hook in through `LT.onLoad` (saved
+newest first) in a read-only edit box to copy; `/lefthy errors clear` (or the window's Clear)
+empties it; the overview's Info section shows the count, with a Show button that opens the report
+while there is one (info rows take an optional `button = { text, onClick, shown }`). Core parts that aren't modules hook in through `LT.onLoad` (saved
 variables ready) and `LT.onLogin`.
 
 ## What's new (Core/WhatsNew.lua, Data/Changelog.lua)

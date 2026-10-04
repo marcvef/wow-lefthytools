@@ -198,19 +198,35 @@ end
 ---------------------------------------------------------------------------
 -- Info rows on the overview page (version, updates): a label, and a value that is read every
 -- time the settings list shows the row (Init), so it's current whenever the page is opened.
--- Template in Options.xml.
+-- Optionally a button at the right end (data.button = { text, onClick, shown }). Template in
+-- Options.xml.
 ---------------------------------------------------------------------------
 
 LefthyToolsSettingsInfoMixin = CreateFromMixins(SettingsListElementMixin or {})
 
 function LefthyToolsSettingsInfoMixin:OnLoad()
 	SettingsListElementMixin.OnLoad(self)
+	self.Button = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
+	self.Button:SetSize(100, 22)
+	self.Button:SetPoint("RIGHT", self, "RIGHT", -10, 0)
+	self.Button:SetScript("OnClick", function()
+		if self.button then
+			self.button.onClick()
+		end
+	end)
 end
 
 function LefthyToolsSettingsInfoMixin:Init(initializer)
 	SettingsListElementMixin.Init(self, initializer)
-	local ok, value = pcall(initializer:GetData().getValue)
+	local data = initializer:GetData()
+	local ok, value = pcall(data.getValue)
 	self.Value:SetText(ok and value or "?")
+	self.button = data.button -- (rows are pooled: another row may have had one)
+	local shown = data.button and (not data.button.shown or data.button.shown())
+	self.Button:SetShown(shown and true or false)
+	if shown then
+		self.Button:SetText(data.button.text)
+	end
 end
 
 local GREEN, ORANGE, GRAY = "|cff80ff80", "|cffffa040", "|cffa0a0a0"
@@ -279,12 +295,12 @@ function Options.ErrorStatus()
 	if count == 0 then
 		return GREEN .. L["None"] .. "|r"
 	end
-	return ORANGE .. L["%d (type /lefthy errors)"]:format(count) .. "|r"
+	return ORANGE .. count .. "|r"
 end
 
-local function AddInfoRow(layout, name, tooltip, getValue)
+local function AddInfoRow(layout, name, tooltip, getValue, button)
 	local initializer = Settings.CreateElementInitializer("LefthyToolsSettingsInfoTemplate",
-		{ name = name, tooltip = tooltip, getValue = getValue })
+		{ name = name, tooltip = tooltip, getValue = getValue, button = button })
 	layout:AddInitializer(initializer)
 end
 
@@ -316,8 +332,9 @@ function ns.SetupOptions()
 	layout:AddInitializer(CreateSettingsButtonInitializer(L["What's new"], L["Show"], function() LT.WhatsNew.Show(false) end,
 		L["Every change to LefthyTools, newest first. After an update this opens by itself once."], true))
 	AddInfoRow(layout, L["Errors"],
-		L["LefthyTools' own Lua errors, kept across sessions. /lefthy errors shows them ready to copy, /lefthy errors clear removes them."],
-		Options.ErrorStatus)
+		L["LefthyTools' own Lua errors, kept across sessions until you clear them. Show lists them, ready to copy; the list can clear them too."],
+		Options.ErrorStatus,
+		{ text = L["Show"], onClick = function() LT.Errors.Show() end, shown = function() return LT.Errors.Count() > 0 end })
 
 	for _, m in ipairs(LT.modules) do
 		if type(m.BuildOptions) == "function" then

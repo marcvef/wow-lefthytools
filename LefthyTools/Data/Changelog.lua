@@ -129,5 +129,8 @@ ns.CHANGELOG = {
 	{ id = 41, version = "0.5.1", module = "tweaks",
 		en = { "Select quests on the big maps", "Click a quest's icon on a continent or the world map to select it, as on zone maps. A setting turns it off." },
 		de = { "Quests auf großen Karten auswählen", "Ein Klick auf das Icon einer Quest auf Kontinent- oder Weltkarte wählt sie aus, wie auf Zonenkarten. Lässt sich abschalten." } },
+	{ id = 42, version = "0.5.1", module = "general",
+		en = { "Errors: a button", "The settings overview opens LefthyTools' error list with a Show button instead of telling you a command." },
+		de = { "Fehler: ein Button", "Die Übersicht in den Einstellungen öffnet die Fehlerliste von LefthyTools mit einem Anzeigen-Button, statt dir einen Befehl zu nennen." } },
 	-- New entries go here, at the end.
 }
