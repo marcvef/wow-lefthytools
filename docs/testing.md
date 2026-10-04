@@ -117,6 +117,8 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     distance update every few seconds). Enter a dungeon: "First visit"; kill a boss: one entry.
     Die to a mob: "Died to <mob>". `/reload`: the session continues (Sessions stays). Log in a
     second character: the dropdown at the top left lists both (and friends who sent their days;
-    picking one opens their graphs). With a friend: their level-up
+    picking one opens their graphs). Graphs: "Time AFK" shows AFK time per day and its share of
+    the time played; a friend's page (both on this build) has an AFK tile and an AFK row next to
+    yours. With a friend: their level-up
     and a highlight (e.g. a boss) appear under Friends and in chat. `/chronicle session`.
     Traffic in `/lefthy beacon status` stays at a few messages per minute while standing still.

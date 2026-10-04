@@ -3338,6 +3338,7 @@ do
 		"AFK time counted: 40 s in two stretches, the longest kept (earlier tests were AFK longer), got "
 		.. me.stats.afk - afkBefore .. ", " .. me.stats.afkTimes - timesBefore .. ", " .. me.stats.longestAfk)
 	check(math.abs(CH.Session().afk - (me.stats.afk - me.session.stats.afk)) < 0.01 and CH.Session().afk >= 39, "and per session")
+	check((me.daily[date("%Y-%m-%d")].afk or 0) >= 39, "and per day (for the graphs)")
 	walked = me.stats.walked
 	PLAYER_POS = { 0.95, 0.95 } -- hearthstone
 	Advance(1.1)
@@ -3413,6 +3414,7 @@ do
 	Advance(0.15)
 	check(feed[#feed].k == "offline" and feed[#feed].name == "Anna", "a friend going offline is in the feed")
 	local dmark = #GAMEDATA + 1
+	me.daily["2030-05-15"].afk = 600 -- 10 minutes AFK today
 	anna("H2")
 	Advance(1.2)
 	check(feed[#feed].k == "online" and feed[#feed].name == "Anna", "and coming back online")
@@ -3420,15 +3422,23 @@ do
 	local days = sentTo(11, dmark, "D2;")
 	check(#days >= 1 and days[#days]:find("^D2;20300515;%d+;%d+;%d+;%d+;%d+;%d+$"),
 		"a friend who shows up gets my last days for their graphs, got " .. table.concat(days, " | "))
+	check(sentTo(11, dmark, "K2;")[1] == "K2;20300515;10", "... and each day's AFK time, in a message of its own (older builds ignore it)")
 	anna("D2;20300514;90;5000;3;20;1;1")
+	anna("K2;20300514;45")
 	anna("D2;20300515;30;1200;2;8;0;0")
 	anna("D2;2030051;1;1;1;1;1;1")
 	anna("D2;20300513;2000;1;1;1;1;1") -- more minutes than a day has
+	anna("K2;20300512;9999")
 	Advance(0.15)
 	local annaStats = CDB.friendStats.Anna
 	check(annaStats and annaStats.days["2030-05-14"].played == 5400 and annaStats.days["2030-05-14"].xp == 5000
 		and annaStats.days["2030-05-15"].quests == 2 and not annaStats.days["2030-05-13"] and annaStats.classFile == "MAGE",
 		"and I keep theirs (malformed days are dropped)")
+	check(annaStats.days["2030-05-14"].afk == 2700 and not annaStats.days["2030-05-12"], "their AFK time joins the day")
+	annaStats.days["2030-05-14"].played = nil -- (to see it written again)
+	anna("D2;20300514;90;5000;3;20;1;1") -- the day again, later
+	Advance(0.15)
+	check(annaStats.days["2030-05-14"].played == 5400 and annaStats.days["2030-05-14"].afk == 2700, "the day sent again keeps its AFK time")
 	dmark = #GAMEDATA + 1
 	for _ = 1, 11 do -- 5 minutes; she keeps sending her heartbeat meanwhile
 		anna("S2;;0;260.0;750.0;Goldshire;")
@@ -3491,7 +3501,7 @@ do
 		and friendsPage:find("Came online", 1, true) and friendsPage:find("Completed The Defias Brotherhood", 1, true)
 		and friendsPage:find("Discovered Westfall", 1, true),
 		"friends: who's online now and what they're doing, then what happened, got\n" .. friendsPage)
-	me.daily[date("%Y-%m-%d", time() - 86400)] = { played = 3600, xp = 5000, quests = 3, kills = 20, deaths = 0 }
+	me.daily[date("%Y-%m-%d", time() - 86400)] = { played = 3600, xp = 5000, quests = 3, kills = 20, deaths = 0, afk = 900 }
 	me.daily[date("%Y-%m-%d", time() - 20 * 86400)] = { played = 99, xp = 1, quests = 1, kills = 1, deaths = 0 }
 	local draws, draw = 0, CH.Graphs.Draw
 	CH.Graphs.Draw = function(...) draws = draws + 1; return draw(...) end
@@ -3527,6 +3537,17 @@ do
 	xpButton:Click()
 	check(not xpButton:IsEnabled() and hoverWith(date("%Y-%m-%d", time() - 86400)).lines[2] == "Experience: 5000",
 		"switching the 14-day chart to experience")
+	local afkButton
+	for _, child in ipairs(win.Content._children) do if child:GetText() == "Time AFK" then afkButton = child end end
+	afkButton:Click()
+	local afkNote
+	for i = 1, canvas.used.text do
+		local text = canvas.pools.text[i]:GetText() or ""
+		if text:find("^Time AFK: ") then afkNote = text end
+	end
+	check(hoverWith(date("%Y-%m-%d", time() - 86400)).lines[2] == "Time AFK: 15m" and afkNote and afkNote:find("% of time played)", 1, true),
+		"the Martin tracker on the graphs: AFK per day, and its share of the time played, got " .. tostring(afkNote))
+	xpButton:Click()
 	check(canvas.used.line >= 2 and drawnText("This session"), "this session: an XP curve")
 	local level22 = hoverWith("Level 22")
 	check(level22 and level22.lines[2] == "1m", "time per level: a bar per level")
@@ -3592,6 +3613,7 @@ do
 		"a friend's graphs: their days, their week, you and them, their latest news")
 	local annaDay = hoverWith(date("%Y-%m-%d", time() - 86400))
 	check(annaDay and annaDay.lines[2]:find("5000", 1, true), "their 14 days, from what they sent, got " .. tostring(annaDay and annaDay.lines[2]))
+	check(drawnText("Time AFK") and drawnText("45m"), "... their AFK time too: a tile for the week and a row next to mine")
 	win.Tabs.timeline:Click()
 	check(picker:GetText():find("Lefthy", 1, true), "friends only have graphs: other pages show your own characters")
 	win.Tabs.graphs:Click()

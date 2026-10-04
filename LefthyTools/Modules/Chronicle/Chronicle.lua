@@ -111,14 +111,14 @@ local function Share(kind, a, b)
 	shareQueue[#shareQueue + 1] = { kind, a, b }
 end
 
--- Per day (for the graphs): daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels }.
-local DAILY = { played = true, xp = true, quests = true, kills = true, deaths = true, levels = true }
+-- Per day (for the graphs): daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels, afk }.
+local DAILY = { played = true, xp = true, quests = true, kills = true, deaths = true, levels = true, afk = true }
 
 local function Today()
 	local day = date("%Y-%m-%d")
 	local bucket = char.daily[day]
 	if not bucket then
-		bucket = { played = 0, xp = 0, quests = 0, kills = 0, deaths = 0, levels = 0 }
+		bucket = { played = 0, xp = 0, quests = 0, kills = 0, deaths = 0, levels = 0, afk = 0 }
 		char.daily[day] = bucket
 	end
 	return bucket
@@ -600,7 +600,7 @@ local function Tick(now, elapsed)
 			stats.afkTimes = stats.afkTimes + 1
 		end
 		afkStreak = afkStreak + elapsed
-		stats.afk = stats.afk + elapsed
+		Add("afk", elapsed) -- (per day too, for the graphs)
 		stats.longestAfk = math.max(stats.longestAfk, afkStreak)
 	else
 		afkStreak = nil
@@ -704,6 +704,16 @@ local function DailyMessage(day)
 		b.deaths or 0, b.levels or 0)
 end
 
+-- K2;<YYYYMMDD>;<minutes AFK> for one of my days, or nil (none). Its own message, sent after the
+-- day's D2: builds before it reject a D2 with another field, and ignore a kind they don't know.
+local function AfkMessage(day)
+	local b = char.daily[day]
+	local minutes = b and math.min(1440, math.floor((b.afk or 0) / 60)) or 0
+	if minutes > 0 then
+		return ("K%s;%s;%d"):format(ns.Beacon.VERSION, (day:gsub("-", "")), minutes)
+	end
+end
+
 -- On the tick, at most every SHARE_GAP: today's and yesterday's numbers to everyone, if changed.
 function ShareDays(now)
 	if now - lastDailyShare < SHARE_GAP or not SharingOn() then
@@ -712,10 +722,12 @@ function ShareDays(now)
 	lastDailyShare = now
 	for _, t in ipairs({ time() - 86400, time() }) do
 		local day = date("%Y-%m-%d", t)
-		local message = DailyMessage(day)
-		if message and message ~= sentDaily[day] then
-			sentDaily[day] = message
-			ns.Beacon.QueueLowToPeers(message) -- never ahead of live data
+		for _, message in ipairs({ DailyMessage(day) or false, AfkMessage(day) or false }) do
+			local key = message and (day .. message:sub(1, 1))
+			if message and message ~= sentDaily[key] then
+				sentDaily[key] = message
+				ns.Beacon.QueueLowToPeers(message) -- never ahead of live data
+			end
 		end
 	end
 end
@@ -726,21 +738,30 @@ local function SendDaysTo(gameAccountID)
 		return
 	end
 	for i = SHARE_DAYS - 1, 0, -1 do
-		local message = DailyMessage(date("%Y-%m-%d", time() - i * 86400))
-		if message then
-			ns.Beacon.QueueLow(gameAccountID, message)
+		local day = date("%Y-%m-%d", time() - i * 86400)
+		for _, message in ipairs({ DailyMessage(day) or false, AfkMessage(day) or false }) do
+			if message then
+				ns.Beacon.QueueLow(gameAccountID, message)
+			end
 		end
 	end
 end
 
--- A day of a friend's numbers: store.friendStats[name] = { classFile, level, updated, days }.
+-- A day of a friend's numbers (D2), or just its AFK time (K2: day.afk only):
+-- store.friendStats[name] = { classFile, level, updated, days }. Either keeps what the other set.
 local function StoreFriendDay(peer, day)
 	local friends = store.friendStats
 	local f = friends[peer.name] or { days = {} }
 	friends[peer.name] = f
 	f.classFile, f.level, f.updated = peer.classFile, peer.level, time()
-	f.days[day.day] = { played = day.played, xp = day.xp, quests = day.quests, kills = day.kills,
-		deaths = day.deaths, levels = day.levels }
+	local old = f.days[day.day] or {}
+	if day.played == nil then
+		old.afk = day.afk
+		f.days[day.day] = old
+	else
+		f.days[day.day] = { played = day.played, xp = day.xp, quests = day.quests, kills = day.kills,
+			deaths = day.deaths, levels = day.levels, afk = old.afk }
+	end
 	local oldest = date("%Y-%m-%d", time() - FRIEND_DAYS * 86400)
 	for d in pairs(f.days) do
 		if d < oldest then

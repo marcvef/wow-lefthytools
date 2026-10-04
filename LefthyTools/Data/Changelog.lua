@@ -149,5 +149,8 @@ ns.CHANGELOG = {
 	{ id = 47, module = "tweaks",
 		en = { "More news on the AFK screen", "Items your friends show or offer, Lefthy chat lines and announcements are listed while you're away; after an offer, a click brings back its buttons." },
 		de = { "Mehr News auf dem AFK-Bildschirm", "Items, die deine Freunde zeigen oder anbieten, Lefthy-Chat und Ankündigungen werden aufgelistet, während du weg bist; nach einem Angebot holt ein Klick seine Buttons zurück." } },
+	{ id = 48, module = "chronicle",
+		en = { "AFK time on the graphs", "The Martin tracker on the Graphs page: AFK time per day and its share of your play time, and your friends' AFK time next to yours." },
+		de = { "AFK-Zeit in den Graphen", "Der Martin-Tracker auf der Graphen-Seite: AFK-Zeit pro Tag und ihr Anteil an deiner Spielzeit, und die AFK-Zeit deiner Freunde neben deiner." } },
 	-- New entries go here, at the end.
 }

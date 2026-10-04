@@ -24,6 +24,9 @@ local L = ns.L
 --   F2;<files>          which files my build loads (LT.FILES), sent just before every V2: a friend
 --                       updating to it learns whether a /reload is enough or the game needs a
 --                       restart. (Its own message: older builds reject a V2 with more fields.)
+--   K2;<YYYYMMDD>;<minutes AFK>
+--                       that day's AFK time, sent after its D2 (Chronicle; its own message because
+--                       older builds reject a D2 with another field)
 --   M2;<text>           a Lefthy chat line (/l), to everyone (Chat.lua)
 --   A2;<text>           an announcement for the middle of everyone's screen (/lefthy announce)
 --   U2;<after>;<de|en>  to a friend on a newer build: what's new in it after my newest changelog
@@ -90,7 +93,7 @@ local XP_GAP = 2             -- my level progress is checked (and sent if change
 local ITEM_GAP = 2           -- shared items accepted from one friend at most this often (they send
                              -- at most every 3 s; the margin is for their queue and the network)
 local CALL_LIMIT, CALL_WINDOW = 10, 10 -- Need / Pass answers and verdicts accepted from one friend
-local DAILY_LIMIT = 20       -- Chronicle days accepted from one friend per minute (7 arrive at once)
+local DAILY_LIMIT = 30       -- Chronicle days accepted from one friend per minute (7 + their AFK times arrive at once)
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true, quest = true, zone = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
@@ -760,6 +763,11 @@ local function Parse(text)
 			return "D", { day = y .. "-" .. mo .. "-" .. d, played = tonumber(played) * 60, xp = tonumber(xp),
 				quests = tonumber(quests), kills = tonumber(kills), deaths = tonumber(deaths), levels = tonumber(levels) }
 		end
+	elseif kind == "K" then
+		local y, mo, d, minutes = rest:match("^;(%d%d%d%d)(%d%d)(%d%d);(%d+)$")
+		if y and #minutes <= 4 and tonumber(minutes) <= 1440 then
+			return "K", { day = y .. "-" .. mo .. "-" .. d, afk = tonumber(minutes) * 60 }
+		end
 	end
 	return nil
 end
@@ -901,7 +909,7 @@ local function OnMessage(text, senderID)
 			guard.calls = guard.calls + 1
 			itemsIn[#itemsIn + 1] = { kind == "N" and "answer" or "result", senderID, a, b }
 		end
-	elseif kind == "D" then
+	elseif kind == "D" or kind == "K" then -- (K: a day's AFK time, merged into that day)
 		if not guard.dailyWindow or now - guard.dailyWindow >= 60 then
 			guard.dailyWindow, guard.daily = now, 0
 		end

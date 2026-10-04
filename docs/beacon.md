@@ -34,7 +34,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
   `C2;<count>` enemies on them in combat, `X2;<percent>` progress on their level,
   `I2;<item string>[;<call id>]` an item shown or offered, `N2`/`R2` Need / Pass and the verdict,
-  `M2;<text>` a Lefthy chat line, `A2;<text>` an announcement (see below), `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
+  `M2;<text>` a Lefthy chat line, `A2;<text>` an announcement (see below), `K2;<YYYYMMDD>;<minutes>`
+  a day's AFK time (Chronicle), `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
   friends' graphs (see chronicle.md), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);

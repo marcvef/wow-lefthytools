@@ -8,7 +8,7 @@ local C = ns.Chronicle
 -- a pool and is reused on the next draw, so redrawing creates nothing new once the page has been
 -- drawn; the window draws the page only when it's opened and at most every few seconds after.
 --
---   Last 14 days      bars per day: time played, XP, quests or kills (buttons switch)
+--   Last 14 days      bars per day: time played, XP, quests, kills or time AFK (buttons switch)
 --   This session      XP over the session, a line with a soft fill under it
 --   Time per level    a bar per level, green (fast) to red (slow)
 --   Favourite zones | Deadliest foes        horizontal bars
@@ -22,7 +22,7 @@ local BAR_TODAY = { 1, 0.78, 0.2 }
 local LINE_COLOR = { 0.35, 0.85, 0.45 }
 local DAYS = 14
 local LEVELS = 20
-local METRICS = { "played", "xp", "quests", "kills" }
+local METRICS = { "played", "xp", "quests", "kills", "afk" }
 
 local G = {}
 C.Graphs = G
@@ -271,26 +271,30 @@ local METRIC_LABEL = {
 	xp = function() return L["Experience"] end,
 	quests = function() return L["Quests"] end,
 	kills = function() return L["Killing blows"] end,
+	afk = function() return L["Time AFK"] end, -- the Martin tracker
 }
 
 local function MetricText(metric, value)
-	return metric == "played" and C.Duration(value) or C.Number(value)
+	return (metric == "played" or metric == "afk") and C.Duration(value) or C.Number(value)
 end
 
 local function Days(canvas, x, y, w, c, metric)
 	local h = 170
-	local items, total = {}, 0
+	local items, total, played = {}, 0, 0
 	local now = time()
 	for i = DAYS - 1, 0, -1 do
 		local t = now - i * 86400
 		local day = date("%Y-%m-%d", t)
 		local value = (c.daily[day] or {})[metric] or 0
-		total = total + value
+		total, played = total + value, played + ((c.daily[day] or {}).played or 0)
 		items[#items + 1] = { value = value, label = date("%d", t), color = i == 0 and BAR_TODAY or nil,
 			tooltip = { date(L["%Y-%m-%d"], t), METRIC_LABEL[metric]() .. ": " .. MetricText(metric, value) } }
 	end
-	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Last 14 days"],
-		METRIC_LABEL[metric]() .. ": " .. MetricText(metric, total))
+	local note = METRIC_LABEL[metric]() .. ": " .. MetricText(metric, total)
+	if metric == "afk" and played > 0 then -- the Martin tracker's number: AFK as a share of time played
+		note = note .. "  " .. L["(%d%% of time played)"]:format(math.floor(total / played * 100 + 0.5))
+	end
+	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Last 14 days"], note)
 	Bars(canvas, ix, iy + 22, iw, ih - 22, items, BAR_BLUE)
 	return h, ix, iy
 end
@@ -462,10 +466,10 @@ end
 
 local MY_COLOR = { 1, 0.78, 0.2 }
 local THEIR_COLOR = BAR_BLUE
-local WEEK = { "played", "xp", "levels", "quests", "kills", "deaths" }
+local WEEK = { "played", "xp", "levels", "quests", "kills", "deaths", "afk" }
 
 local function Sum(days, count)
-	local sum = { played = 0, xp = 0, levels = 0, quests = 0, kills = 0, deaths = 0 }
+	local sum = { played = 0, xp = 0, levels = 0, quests = 0, kills = 0, deaths = 0, afk = 0 }
 	for i = 0, count - 1 do
 		local b = days[date("%Y-%m-%d", time() - i * 86400)]
 		if b then
@@ -484,7 +488,7 @@ local function Label(key)
 	return key == "levels" and L["Levels"] or L["Deaths"]
 end
 
--- Six numbers for the last 7 days, as tiles.
+-- Seven numbers for the last 7 days, as tiles.
 local function Week(canvas, x, y, w, days)
 	local h = 84
 	local ix, iy, iw = Card(canvas, x, y, w, h, L["Last 7 days"])
@@ -501,7 +505,7 @@ end
 
 -- You and them over the last 7 days, two bars per number.
 local function Versus(canvas, x, y, w, mine, theirs, name)
-	local rows = { "played", "xp", "quests", "kills" }
+	local rows = { "played", "xp", "quests", "kills", "afk" }
 	local rowH = 32
 	local h = HEADER + 4 + #rows * rowH + PAD
 	local function Hex(c)

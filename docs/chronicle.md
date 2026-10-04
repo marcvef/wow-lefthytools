@@ -17,7 +17,7 @@ browsed from any character):
   `/played` last said; Chronicle never asks itself, that would print in chat).
 - `friends`: the feed, `{ t, name, classFile, k, ... }`, oldest first, at most 300.
 
-For the graphs: `daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths }` (kept 60 days;
+For the graphs: `daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels, afk }` (kept 60 days;
 `Add` and the tick fill today's bucket), and `session.series`, a point `{ played, xp, money }` per
 minute of play (at most 240: when full, every other point goes and the step doubles).
 
@@ -114,17 +114,19 @@ the open one's button greyed out:
   same number of lines (values right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h`,
   distance in km, gold with `GetMoneyString`.
 - **Graphs** (`Graphs.lua`): cards on the scroll content. Last 14 days (bars per day from
-  `daily`, buttons switch between time, XP, quests and killing blows; today in gold; hover shows
-  the date and value), This session (the session curve: a line with a gradient fill, plus XP per
+  `daily`, buttons switch between time, XP, quests, killing blows and time AFK, the Martin
+  tracker, whose note adds its share of the time played; today in gold; hover shows the date and
+  value), This session (the session curve: a line with a gradient fill, plus XP per
   hour; current character only), Time per level (a bar per level from `levelTimes`, up to 20,
   green = fast to red = slow), Favourite zones and Deadliest foes (horizontal bars, top 5), On
   the road and Loot by quality (one split bar each, with a legend). Drawn with plain textures
   (`SetGradient` for the bars), line objects (`CreateLine`) and font strings from pools
   (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first draw.
 - **Friends' graphs:** the dropdown lists every friend who sent their days
-  (`store.friendStats[name]`; other pages fall back to your own character). Their page: Last 14 days (the same bars from their days), Last 7 days (six tiles:
-  time, XP, levels, quests, killing blows, deaths), You and <name> (two bars per number, you in
-  gold, them in blue) and Latest news (their last 6 feed entries with date).
+  (`store.friendStats[name]`; other pages fall back to your own character). Their page: Last 14 days (the same bars from their days), Last 7 days (seven tiles:
+  time, XP, levels, quests, killing blows, deaths, time AFK), You and <name> (two bars per number:
+  time, XP, quests, kills, AFK; you in gold, them in blue) and Latest news (their last 6 feed
+  entries with date).
 - **Friends:** "Online now" first: every Beacon friend in up to three lines (`B.FriendLines` in
   Beacon's `Alerts.lua`, shared with the AFK screen: name, AFK, level and progress, group; zone
   and distance; what they're fighting and their quest), then "What they did": the feed, as
@@ -141,12 +143,15 @@ otherwise every 30 s (the session curve). A redraw keeps the scroll position.
 
 Battle.net messages only arrive while both are online, so each friend's own Chronicle sends its
 numbers: `D2;<YYYYMMDD>;<minutes played>;<xp>;<quests>;<kills>;<deaths>;<levels>` (about 45
-bytes). When Beacon reports a friend as `known` (their name became known), they get my last 7
-days; every 5 minutes today's and yesterday's go to everyone if they changed. Both go through
-Beacon's low-priority queue (`B.QueueLow`): sent only when no message, state or answer waits,
-so they never delay live data. Beacon accepts up to 20 days per friend per minute and checks the
-ranges (minutes at most 1440); Chronicle keeps 30 days per friend in `store.friendStats`. Covered
-by the "Share highlights with friends" setting.
+bytes), and after it `K2;<YYYYMMDD>;<minutes AFK>` when that day had any AFK time (its own
+message: builds before it reject a `D2` with another field and ignore kinds they don't know).
+`StoreFriendDay` merges them: a `K2` sets only the day's `afk`, a `D2` keeps it. When Beacon
+reports a friend as `known` (their name became known), they get my last 7 days; every 5 minutes
+today's and yesterday's go to everyone if they changed (each message compared on its own). Both
+go through Beacon's low-priority queue (`B.QueueLow`): sent only when no message, state or answer
+waits, so they never delay live data. Beacon accepts up to 30 day messages per friend per minute
+and checks the ranges (minutes at most 1440); Chronicle keeps 30 days per friend in
+`store.friendStats`. Covered by the "Share highlights with friends" setting.
 
 ## Cost, and what goes over the network
 

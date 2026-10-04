@@ -228,11 +228,13 @@ journal*).
   achievements. And the **Martin tracker**: how long you've been AFK, its share of your play
   time, how often and the longest stretch, with a verdict from "Always there" to "Practically
   Martin".
-- **Graphs:** the last 14 days (time played, XP, quests or kills per day), this session's XP
+- **Graphs:** the last 14 days (time played, XP, quests, kills or time AFK per day, with its
+  share of your play time), this session's XP
   curve with XP per hour, how long each level took (green fast, red slow), your favourite zones
   and deadliest foes, how you travel, and your loot by quality. Hover a bar for its value.
   Pick one of your **friends** in the dropdown at the top: their last 14 days, their week in
-  numbers, you and them side by side, and their latest news, also for the time you weren't online.
+  numbers, you and them side by side (AFK time too), and their latest news, also for the time you
+  weren't online.
 - **Friends:** what your Battle.net friends with LefthyTools did: their level-ups, deaths and
   highlights (bosses, rares, first dungeon visits, epic loot, mounts, achievements and
   milestones). Your own highlights go to them the same way (needs Beacon).
