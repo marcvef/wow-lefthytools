@@ -22,7 +22,9 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `S2;<flags>;<continent>;<north>;<west>;<subzone>;<target>` state (flags D dead, G ghost,
   C combat; position empty in instances or with sharing off; target only in combat),
   `L2;<level>;<text>` level-up, `V2;<version>` the sender's LefthyTools build (`LT.version`; with every answer, and to every
-  friend every 10 minutes, low priority),
+  friend every 10 minutes, low priority), `F2;<files>` just before each `V2`: which files that
+  build loads (`LT.FILES`, see architecture.md), so the notice can say restart or `/reload` (a
+  message of its own because older builds reject a `V2` with another field),
   `P2;<continent>;<north>;<west>;<uiMapID>` map ping,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
@@ -32,7 +34,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
-  telling them to run `Update-LefthyTools.cmd`. Builds before 0.4.0 ignore `V2`. A message
+  telling them to run `Update-LefthyTools.cmd`, then `/reload` or restart the game. Builds
+  before 0.4.0 ignore `V2`. A message
   with another version marks the sender in `otherVersion` (shown by `/lefthy beacon status`)
   instead of making them a peer; v1 (0.2.0) and v2 can't see each other. `Parse` validates the
   whole message *before* touching state, so a malformed message doesn't register its sender.

@@ -1267,7 +1267,7 @@ for i = 1, 30 do Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;;;;;", "WHISPER", 10
 Advance(0.15)
 local burst = #GAMEDATA - mark + 1
 check(burst >= 5 and burst <= 12, "rate limit: about 10 messages at once, got " .. burst)
-Advance(9.5) -- 30 friends x (version + state + level progress) at 10 messages a second
+Advance(12.5) -- 30 friends x (files + version + state + level progress) at 10 messages a second
 local answered = 0
 for i = 1, 30 do if #sentTo(100 + i, mark, "S2;") == 1 then answered = answered + 1 end end
 check(answered == 30, "the rest follow within a few seconds, got " .. answered)
@@ -1294,12 +1294,17 @@ Advance(0.15)
 check(updateStatus():find("Up to date (compared with 1 friend(s))", 1, true), "a friend on an older build: up to date, got " .. updateStatus())
 check(not printedSince(vmark):find("newer LefthyTools", 1, true), "a friend on an older build: no notice here (they get one)")
 check(peers()[11].version == "0.3.9-50-gaaaaaaa", "their version is remembered")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "F2;0123abcd", "WHISPER", 11) -- their build loads other files than mine
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.4.0-9-gbbbbbbb", "WHISPER", 11)
 check(not printedSince(vmark):find("newer LefthyTools", 1, true), "nothing printed inside the event handler")
 Advance(0.15)
 local notice = printedSince(vmark)
 check(notice:find("Anna has a newer LefthyTools (0.4.0-9-gbbbbbbb, you have 0.4.0-3-gabc1234)", 1, true)
-	and notice:find("Update-LefthyTools.cmd", 1, true), "a friend on a newer build: told how to update, got " .. notice)
+	and notice:find("run Update-LefthyTools.cmd again, then restart the game: this update adds files, a /reload isn't enough.", 1, true),
+	"a friend on a newer build that loads other files: told to update and restart the game, got " .. notice)
+check(LT.UpdateHint(LT.FILES):find("then /reload (no restart needed).", 1, true)
+	and LT.UpdateHint(nil):find("then /reload (or restart the game if the updater says so).", 1, true),
+	"the same files: a /reload is enough; a build that doesn't say: the updater tells")
 vmark = #PRINTED + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11)
 Advance(0.15)
@@ -1310,7 +1315,8 @@ check(peers()[11].version == "0.5.0", "a malformed version message is ignored")
 vmark = #PRINTED + 1
 lefthy("beacon status")
 check(printedSince(vmark):find("LefthyTools 0.5.0", 1, true), "/lefthy beacon status shows each friend's version")
-check(updateStatus():find("Newer version available: 0.5.0", 1, true), "settings overview: the newest version seen from a friend, got " .. updateStatus())
+check(updateStatus():find("Newer version available: 0.5.0 (needs a game restart)", 1, true),
+	"settings overview: the newest version seen from a friend, and that it needs a restart, got " .. updateStatus())
 local updatesTip = infoRow("Updates").data.tooltip
 check(type(updatesTip) == "function", "the Updates tooltip is built when it opens")
 local tip = updatesTip()
@@ -1323,7 +1329,15 @@ Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11) -- back to what
 Advance(0.15)
 vmark = #PRINTED + 1
 lefthy("version")
-check(printedSince(vmark):find("a friend has the newer 0.5.0", 1, true), "/lefthy version mentions it too")
+check(printedSince(vmark):find("a friend has the newer 0.5.0. To update, run Update-LefthyTools.cmd again, then restart the game", 1, true),
+	"/lefthy version mentions it too, with the restart, got " .. printedSince(vmark))
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "F2;" .. LT.FILES, "WHISPER", 11) -- the same files as mine after all
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11)
+Advance(0.15)
+vmark = #PRINTED + 1
+lefthy("version")
+check(printedSince(vmark):find("then /reload (no restart needed)", 1, true) and not updateStatus():find("restart", 1, true),
+	"a newer build with the same files: a /reload is enough")
 -- Forgotten and back (65 s of silence, a loading screen, Beacon off and on): their version only
 -- comes in answers, and they don't see me as new, so I greet them and they answer.
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 11)
@@ -1345,6 +1359,13 @@ for _ = 1, 21 do
 end
 local repeats = sentTo(11, versionMark, "V2;")
 check(#repeats == 1 and repeats[1] == "V2;0.4.0-3-gabc1234", "my version, repeated once in 10 minutes, got " .. #repeats)
+local filesRepeats, toAnna = sentTo(11, versionMark, "F2;"), GameDataTo(11, versionMark)
+local filesAt, versionAt
+for i, message in ipairs(toAnna) do
+	if message:find("^F2;") then filesAt = i elseif message:find("^V2;") then versionAt = i end
+end
+check(#filesRepeats == 1 and filesRepeats[1] == "F2;" .. LT.FILES and filesAt and versionAt and filesAt < versionAt,
+	"... with my files just before it")
 
 section("Beacon: death alerts")
 check(BDB.deathAlert == true and B("deathAlert") ~= nil, "a setting, on by default")

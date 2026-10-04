@@ -218,7 +218,9 @@ local GREEN, ORANGE, GRAY = "|cff80ff80", "|cffffa040", "|cffa0a0a0"
 -- Addons can't go online: what Beacon heard from friends who run LefthyTools is all there is.
 function Options.UpdateStatus()
 	if LT.newerVersion then
-		return ORANGE .. L["Newer version available: %s"]:format(LT.newerVersion) .. "|r"
+		local restart = LT.newerFiles and LT.newerFiles ~= LT.FILES
+		local text = restart and L["Newer version available: %s (needs a game restart)"] or L["Newer version available: %s"]
+		return ORANGE .. text:format(LT.newerVersion) .. "|r"
 	end
 	local beacon = LT:GetModule("beacon")
 	if not (beacon and beacon.enabled) then
@@ -239,7 +241,7 @@ end
 -- The Updates row's tooltip, built each time it opens: my build and every Beacon friend's.
 function Options.UpdateTooltip()
 	local lines = {
-		L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload."],
+		L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload, or restart the game if the update adds files (it says so)."],
 		"",
 		L["You: %s"]:format(LT.version),
 	}
@@ -391,7 +393,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		ListModules()
 	elseif cmd == "version" then
 		LT.Print("version " .. LT.version .. (LT.newerVersion and (", a friend has the newer " .. LT.newerVersion) or "")
-			.. ". To update, run Update-LefthyTools.cmd again, then /reload.")
+			.. ". " .. LT.UpdateHint(LT.newerVersion and LT.newerFiles))
 	elseif cmd == "errors" then
 		LT.Errors.Command(rest)
 	elseif cmd == "news" or cmd == "whatsnew" or cmd == "changelog" then

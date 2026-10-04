@@ -16,9 +16,10 @@ L["Version"] = "Version"
 L["The installed LefthyTools build. 0.4.0 is a release, 0.4.0-3-g1a2b3c4 is three changes after it."] =
 	"Der installierte Stand von LefthyTools. 0.4.0 ist ein Release, 0.4.0-3-g1a2b3c4 drei Änderungen danach."
 L["Updates"] = "Updates"
-L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload."] =
-	"LefthyTools kann selbst nicht online nachsehen: Von neueren Versionen erfährt es über Battle.net-Freunde, die es auch nutzen (Beacon). Zum Updaten Update-LefthyTools.cmd nochmal starten, dann /reload."
+L["LefthyTools can't go online itself: it learns about newer versions from Battle.net friends who use it (Beacon). To update, run Update-LefthyTools.cmd again, then /reload, or restart the game if the update adds files (it says so)."] =
+	"LefthyTools kann selbst nicht online nachsehen: Von neueren Versionen erfährt es über Battle.net-Freunde, die es auch nutzen (Beacon). Zum Updaten Update-LefthyTools.cmd nochmal starten, dann /reload, oder das Spiel neu starten, wenn das Update neue Dateien bringt (das steht dann dabei)."
 L["Newer version available: %s"] = "Neuere Version verfügbar: %s"
+L["Newer version available: %s (needs a game restart)"] = "Neuere Version verfügbar: %s (braucht einen Neustart des Spiels)"
 L["Unknown (Beacon is off)"] = "Unbekannt (Beacon ist aus)"
 L["Unknown (no friend with LefthyTools online)"] = "Unbekannt (kein Freund mit LefthyTools online)"
 L["Up to date (compared with %d friend(s))"] = "Aktuell (verglichen mit %d Freund(en))"

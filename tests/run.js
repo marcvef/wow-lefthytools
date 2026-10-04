@@ -46,6 +46,18 @@ for (const localeFile of localeFiles) {
 }
 if (!ok) process.exit(1);
 
+// 2a) LT.FILES (Core/Core.lua) names the files the game loads, so a friend updating to this build
+//     learns whether a /reload is enough: a hash of the TOC's file lines and saved variables.
+const tocLoads = toc.split(/\r?\n/).map((line) => line.trim())
+  .filter((line) => (line && !line.startsWith("#")) || /^##\s*SavedVariables/i.test(line));
+const filesId = require("crypto").createHash("sha1").update(tocLoads.join("\n")).digest("hex").slice(0, 8);
+const filesConst = (sources["Core/Core.lua"].match(/^LT\.FILES = "(\w+)"/m) || [])[1];
+if (filesConst !== filesId) {
+  console.log(`The TOC's files changed: set LT.FILES = "${filesId}" in Core/Core.lua (it says "${filesConst}")`);
+  process.exit(1);
+}
+console.log(`files ok: LT.FILES = ${filesId}`);
+
 // 2b) The players' one-file installer must be install.ps1 with the batch header (tools/build-installer.js).
 if (!process.argv[2]) {
   const installer = require("../tools/build-installer.js");

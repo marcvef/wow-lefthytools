@@ -21,6 +21,9 @@ local L = ns.L
 --   V2;<version>        my LefthyTools build (LT.version), sent with every answer and to every
 --                       friend every VERSION_EVERY seconds (low priority); a friend on an
 --                       older build gets told once per login. Builds before 0.4.0 ignore it.
+--   F2;<files>          which files my build loads (LT.FILES), sent just before every V2: a friend
+--                       updating to it learns whether a /reload is enough or the game needs a
+--                       restart. (Its own message: older builds reject a V2 with more fields.)
 --   P2;<continent>;<north>;<west>;<uiMapID>
 --                       a map ping (Pings.lua): "look here", shown on friends' maps for a minute
 --   T2;<questID>;<done>;<title>;<objective>
@@ -545,6 +548,7 @@ local function SendStateIfChanged(now)
 	-- whatever got lost (low priority: after everything else).
 	if now - lastVersionSent >= VERSION_EVERY then
 		lastVersionSent = now
+		B.QueueLowToPeers("F" .. VERSION .. ";" .. LT.FILES)
 		B.QueueLowToPeers("V" .. VERSION .. ";" .. B.Clean(LT.version, 40))
 	end
 end
@@ -669,6 +673,11 @@ local function Parse(text)
 		local version = rest:match("^;([%w%.%-]+)$")
 		if version and #version <= 40 then
 			return "V", version
+		end
+	elseif kind == "F" then
+		local files = rest:match("^;(%x+)$")
+		if files and #files <= 16 then
+			return "F", files
 		end
 	elseif kind == "P" then
 		local continent, north, west, mapID = rest:match("^;(%d+);(%-?%d+%.?%d*);(%-?%d+%.?%d*);(%d+)$")
@@ -867,9 +876,11 @@ local function OnMessage(text, senderID)
 			guard.pingAt = now
 			pingsIn[#pingsIn + 1] = { senderID, a, b, c, d }
 		end
+	elseif kind == "F" then
+		peer.files = a -- (comes just before their version)
 	elseif kind == "V" then
 		peer.version = a
-		LT:NoteFriendVersion(a) -- the settings overview shows it
+		LT:NoteFriendVersion(a, peer.files) -- the settings overview shows it
 		if not newerNoticeShown and LT.CompareVersions(a, LT.version) == 1 then
 			newerFrom = senderID -- told on the next tick, once their name is known
 		end
@@ -878,7 +889,8 @@ local function OnMessage(text, senderID)
 	if answer and (not guard.answeredAt or now - guard.answeredAt >= ANSWER_GAP) then
 		guard.answeredAt = now
 		owed[senderID] = true
-		B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40)) -- my LefthyTools build
+		B.Queue(senderID, "F" .. VERSION .. ";" .. LT.FILES) -- my LefthyTools build and its files
+		B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40))
 		if lastQuest and lastQuest ~= NO_QUEST then
 			B.Queue(senderID, lastQuest)
 		end
@@ -984,8 +996,8 @@ local function Tick(now, elapsed)
 	local newer = newerFrom and peers[newerFrom]
 	if newer and newer.name and not newerNoticeShown then
 		newerNoticeShown, newerFrom = true, nil
-		M:Print(string.format("%s has a newer LefthyTools (%s, you have %s). To update, run "
-			.. "Update-LefthyTools.cmd again, then /reload.", newer.name, newer.version, LT.version))
+		M:Print(string.format("%s has a newer LefthyTools (%s, you have %s). %s", newer.name, newer.version,
+			LT.version, LT.UpdateHint(newer.files)))
 	elseif newerFrom and not peers[newerFrom] then
 		newerFrom = nil
 	end

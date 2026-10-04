@@ -120,5 +120,8 @@ ns.CHANGELOG = {
 	{ id = 38, version = "0.5.0", module = "tweaks",
 		en = { "Quests on continent and world maps", "Your quests show on continent maps and the world map too: icons where to go, and the areas of their objectives. The settings choose what each zoom level shows." },
 		de = { "Quests auf Kontinent- und Weltkarte", "Deine Quests erscheinen auch auf Kontinentkarten und der Weltkarte: Icons, wo du hinmusst, und die Gebiete ihrer Questziele. In den Einstellungen wählst du, was jede Zoomstufe zeigt." } },
+	{ id = 39, version = "0.5.0", module = "general",
+		en = { "Update notice: reload or restart", "When a friend has a newer LefthyTools, the notice says whether a /reload is enough after updating or the game needs a restart. Works with friends on this build or newer." },
+		de = { "Update-Hinweis: Reload oder Neustart", "Hat ein Freund ein neueres LefthyTools, sagt der Hinweis, ob nach dem Update ein /reload reicht oder das Spiel neu starten muss. Klappt mit Freunden ab dieser Version." } },
 	-- New entries go here, at the end.
 }

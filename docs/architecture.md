@@ -99,6 +99,16 @@ unknown, no friend with LefthyTools online or Beacon off). The Updates row's too
 function (`Options.UpdateTooltip`; `Settings.InitTooltip` calls a function tooltip each time it
 opens): your build, then every Beacon friend's build marked newer / same / older.
 
+**Reload or restart:** the game reads a TOC only at startup, so an update that adds or removes
+files (or saved variables) needs a restart; everything else a `/reload`. `LT.FILES`
+(`Core/Core.lua`) is a hash of the TOC's file lines and `## SavedVariables` lines (SHA-1, first 8
+hex digits); `npm test` fails with the right value when the TOC changed, so set it then. Beacon
+sends it (`F2`) before every `V2`; `LT:NoteFriendVersion(version, files)` keeps the newest
+build's files in `LT.newerFiles`, and `LT.UpdateHint(files)` words the advice: restart when they
+differ from ours, `/reload` when they match, "or restart if the updater says so" when the friend's
+build doesn't send them. The friend notice, `/lefthy version` and the Updates row use it.
+`install.ps1` independently says "restart" when an update adds files.
+
 ## Error catcher (Core/Errors.lua)
 
 Every Lua error goes through Blizzard's handler (`Blizzard_ScriptErrors`: `HandleLuaError`, which

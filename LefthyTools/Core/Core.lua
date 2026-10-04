@@ -55,13 +55,32 @@ function LT.ParseVersion(v)
 	return tonumber(major), tonumber(minor), tonumber(patch), count
 end
 
--- The newest LefthyTools build seen from a friend (Beacon), if newer than ours. Addons can't go
--- online, so friends are the only way to learn about updates.
-function LT:NoteFriendVersion(version)
+-- Which files the game loads for LefthyTools (the TOC's files and saved variables), as a short
+-- hash; npm test checks it against the TOC. The game reads the TOC only at startup, so an update
+-- that changes it needs a restart, any other a /reload. Friends send theirs with their version.
+LT.FILES = "2e4fc17e"
+
+-- The newest LefthyTools build seen from a friend (Beacon), if newer than ours, and its FILES
+-- (nil if that friend's build doesn't send them). Addons can't go online, so friends are the
+-- only way to learn about updates.
+function LT:NoteFriendVersion(version, files)
 	if LT.CompareVersions(version, LT.version) == 1
 		and (not LT.newerVersion or LT.CompareVersions(version, LT.newerVersion) == 1) then
-		LT.newerVersion = version
+		LT.newerVersion, LT.newerFiles = version, files
+	elseif version == LT.newerVersion and files then
+		LT.newerFiles = files
 	end
+end
+
+-- How to update to a friend's build with these FILES (nil: unknown). Chat text.
+function LT.UpdateHint(files)
+	local run = "To update, run Update-LefthyTools.cmd again, then "
+	if files and files ~= LT.FILES then
+		return run .. "restart the game: this update adds files, a /reload isn't enough."
+	elseif files then
+		return run .. "/reload (no restart needed)."
+	end
+	return run .. "/reload (or restart the game if the updater says so)."
 end
 
 -- 1 if a is newer than b, -1 if older, 0 if the same; nil if that can't be told.

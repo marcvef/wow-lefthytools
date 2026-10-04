@@ -7,8 +7,9 @@
 1. reads the file list from the TOC and checks each Lua file's syntax as Lua 5.1 (luaparse);
 2. checks translations: every `L["..."]` used in code has a German entry and every German entry is
    used (comment lines are ignored);
-3. checks that `Update-LefthyTools.cmd` is the current build of `install.ps1`
-   (`npm run build-installer` regenerates it);
+3. checks that `LT.FILES` in `Core/Core.lua` matches the TOC's files and saved variables (it
+   prints the value to set after adding or removing a file), and that `Update-LefthyTools.cmd`
+   is the current build of `install.ps1` (`npm run build-installer` regenerates it);
 4. runs the addon in fengari (Lua 5.3) against `tests/mock.lua`, which fakes the WoW API: once as
    an English client (`tests/test.lua`) and once as German (`tests/test_de.lua`, which also fails
    on formal terms, translated module names and runtime translation fallbacks).
@@ -74,6 +75,10 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     the right direction. Invite them: their dot gets a blue ring and sits exactly on Blizzard's
     group dot on both maps, moving along live; the tooltip says "In your group". With "Show
     friends in my group too" off, only Blizzard's dot is left.
+    Updates (both on this build or newer): when one of you has a newer build, the other gets one
+    notice per login that ends with "then /reload (no restart needed)" or, if that build adds
+    files, "then restart the game"; the settings overview's Updates row says "(needs a game
+    restart)" then.
     Level-ups: `/lefthy beacon sound` to try the sounds, `/lefthy beacon ding test` for the message.
     They die: a chat line with zone and what they fought. Alt+click your world map: they get a
     rippling marker on both maps, a chat line and a sound; on a continent map the line names the
