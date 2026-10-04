@@ -2639,6 +2639,39 @@ do
 	PENDING_ITEM_LOADS = {}
 	check(printedSince(pmark):find("Anna|r|cffffb84d]: need " .. ItemLink(19019) .. "?", 1, true),
 		"... and comes with a real link once it's loaded, got " .. printedSince(pmark))
+	-- Sticky /l: the chat box stays on Lefthy chat, like /g, until another chat type.
+	local box, header = ChatFrame1EditBox, ChatFrame1EditBoxHeader
+	Advance(1)
+	mark = #GAMEDATA + 1
+	TypeChat("/l first line")
+	Advance(0.6)
+	check(sentTo(11, mark, "M2;")[1] == "M2;first line", "/l in the chat box: sent")
+	box:UpdateHeader() -- the box opens again
+	check(header:GetText() == "Lefthy: " and header.color[2] == 0.72 and box._inset > 15,
+		"the box stays on Lefthy chat, and its header says so, got " .. tostring(header:GetText()))
+	local said = #SENT_CHAT
+	TypeChat("second line, no /l")
+	Advance(0.6)
+	check(sentTo(11, mark, "M2;")[2] == "M2;second line, no /l" and #SENT_CHAT == said and box._history == "second line, no /l",
+		"a plain line goes to Lefthy chat, not to /say (and into the box's history)")
+	TypeChat("/w Bob psst")
+	check(SENT_CHAT[#SENT_CHAT].type == "WHISPER", "a whisper goes out as a whisper")
+	TypeChat("third")
+	Advance(0.6)
+	check(sentTo(11, mark, "M2;")[3] == "M2;third", "... and Lefthy chat stays (whispers aren't sticky)")
+	TypeChat("/g hi guild")
+	check(SENT_CHAT[#SENT_CHAT].type == "GUILD" and SENT_CHAT[#SENT_CHAT].text == "hi guild", "/g: to the guild")
+	box:UpdateHeader()
+	TypeChat("guild again")
+	check(header:GetText() == "GUILD: " and SENT_CHAT[#SENT_CHAT].type == "GUILD" and #sentTo(11, mark, "M2;") == 3,
+		"another sticky chat type ends Lefthy mode, as /p after /g does")
+	TypeChatSpace("/l ")
+	check(box:GetText() == "" and header:GetText() == "Lefthy: ", "typing /l and a space switches the box at once, like /g")
+	TypeChat("from guild mode")
+	Advance(0.6)
+	check(sentTo(11, mark, "M2;")[4] == "M2;from guild mode", "... and the line goes to Lefthy chat")
+	TypeChat("/s back to say")
+	check(SENT_CHAT[#SENT_CHAT].type == "SAY" and SENT_CHAT[#SENT_CHAT].text == "back to say", "/s: back to say")
 	-- While I'm AFK the notices are hidden with the interface: the AFK screen lists them.
 	Advance(3.5)
 	afk(true)

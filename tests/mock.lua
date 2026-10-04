@@ -279,6 +279,7 @@ function FrameMethods:CreateFontString()
 	function fs:SetSpacing() end
 	function fs:SetWordWrap() end
 	function fs:SetWidth(w) self.width = w end
+	function fs:GetWidth() return (self.width or 0) > 0 and self.width or self:GetStringWidth() end -- 0: as wide as the text
 	function fs:SetHeight(h) self.height = h end
 	function fs:SetFontObject(f) self.font = f end
 	function fs:SetFont(path, size, flags) self.fontFile, self.fontSize = path, size; return true end
@@ -1280,3 +1281,83 @@ GamepadMode = {
 	IsHUDBindingModifierDown = function() return GAMEPAD_STATE.hudMod end,
 	IsTargetingModifierDown = function() return GAMEPAD_STATE.targetMod end,
 }
+
+-- The chat box (Blizzard_ChatFrameBase), cut down to its flow: ChatFrame1EditBox with a chat type
+-- and a sticky type. TypeChat(text) types a line and presses Enter: a chat type command (/s, /g,
+-- ...) switches the type, a slash command runs, anything else fires the pre-send event and goes to
+-- the box's chat type (SENT_CHAT). TypeChatSpace(text) types up to a space (ParseText(0)).
+NUM_CHAT_WINDOWS = 1
+ChatTypeInfo = { SAY = { sticky = 1 }, GUILD = { sticky = 1 }, PARTY = { sticky = 1 }, CHANNEL = { sticky = 1 },
+	WHISPER = { sticky = 0 } }
+hash_ChatTypeInfoList = { ["/S"] = "SAY", ["/G"] = "GUILD", ["/P"] = "PARTY", ["/W"] = "WHISPER" }
+EventRegistry = { callbacks = {} }
+function EventRegistry:RegisterCallback(event, fn, owner)
+	self.callbacks[event] = self.callbacks[event] or {}
+	table.insert(self.callbacks[event], { fn, owner })
+end
+function EventRegistry:TriggerEvent(event, ...)
+	for _, c in ipairs(self.callbacks[event] or {}) do c[1](c[2], ...) end
+end
+local chatBox = CreateFrame("EditBox", "ChatFrame1EditBox", ChatFrame1)
+chatBox.chatFrame = ChatFrame1
+chatBox._chatType, chatBox._sticky = "SAY", "SAY"
+ChatFrame1EditBoxHeader = chatBox:CreateFontString()
+ChatFrame1EditBoxHeaderSuffix = chatBox:CreateFontString()
+function chatBox:GetChatType() return self._chatType end
+function chatBox:SetChatType(t) self._chatType = t end
+function chatBox:GetStickyType() return self._sticky end
+function chatBox:SetStickyType(t) self._sticky = t end
+function chatBox:UpdateHeader()
+	ChatFrame1EditBoxHeader:SetText(self._chatType .. ": ")
+	ChatFrame1EditBoxHeader:SetTextColor(1, 1, 1)
+end
+function chatBox:UpdateLanguageHeader() return 0 end
+function chatBox:SetTextInsets(left) self._inset = left end
+function chatBox:SetTextColor(r, g, b) self._color = { r, g, b } end
+function chatBox:AddHistoryLine(text) self._history = text end
+function chatBox:HandleChatType(msg, command, send)
+	local chatType = hash_ChatTypeInfoList[command]
+	if chatType then
+		self:SetChatType(chatType)
+		self:SetText(msg)
+		self:UpdateHeader()
+		return true
+	end
+	return false
+end
+function chatBox:ClearChat() self:SetChatType(self._sticky); self:SetText("") end
+SENT_CHAT = {}
+local function SlashHandler(command)
+	for key, value in pairs(_G) do
+		local name = type(key) == "string" and type(value) == "string" and key:match("^SLASH_(.-)%d+$")
+		if name and value:upper() == command then return SlashCmdList[name] end
+	end
+end
+local function Split(text)
+	return (text:match("^(/[^%s]+)") or ""):upper(), text:match("^/[^%s]+%s+(.*)$") or ""
+end
+function TypeChat(text)
+	chatBox:SetText(text)
+	if text:sub(1, 1) == "/" then
+		local command, msg = Split(text)
+		if not chatBox:HandleChatType(msg, command, 1) then
+			local handler = SlashHandler(command)
+			if handler then
+				handler(strtrim(msg), chatBox)
+				chatBox:ClearChat()
+				return
+			end
+		end
+	end
+	EventRegistry:TriggerEvent("ChatFrame.OnEditBoxPreSendText", chatBox)
+	local line = chatBox:GetText()
+	if line:find("%S") then SENT_CHAT[#SENT_CHAT + 1] = { type = chatBox:GetChatType(), text = line } end
+	local info = ChatTypeInfo[chatBox:GetChatType()]
+	if info and info.sticky == 1 then chatBox:SetStickyType(chatBox:GetChatType()) end
+	chatBox:ClearChat()
+end
+function TypeChatSpace(text)
+	chatBox:SetText(text)
+	local command, msg = Split(text)
+	chatBox:HandleChatType(msg, command, 0)
+end
