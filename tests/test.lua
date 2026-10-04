@@ -2621,6 +2621,24 @@ do
 	SlashCmdList.LEFTHYTOOLS_ANNOUNCE("pull in 5")
 	Advance(0.15)
 	check(sentTo(11, mark, "A2;")[1] == "A2;pull in 5", "/la: announcing the short way")
+	-- Item links: they travel as their numbers and each client builds the link again.
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_CHAT("look: " .. ItemLink(1155) .. " and |cffffff00|Hquest:176:10|h[Wanted: Hogger]|h|r")
+	Advance(0.15)
+	check(sentTo(11, mark, "M2;")[1] == "M2;look: {item:1155::::::::20} and [Wanted: Hogger]",
+		"an item link goes as its numbers, another link as its text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	check(printedSince(pmark):find("]: look: " .. ItemLink(1155) .. " and [Wanted: Hogger]", 1, true),
+		"my own line shows the link, got " .. printedSince(pmark))
+	pmark = #PRINTED + 1
+	MOCK_ITEM_UNCACHED = 19019 -- not in my item cache yet
+	anna("M2;need {item:19019::::::::20}?")
+	Advance(0.15)
+	check(not printedSince(pmark):find("need", 1, true), "an item I don't have cached: the line waits for it")
+	MOCK_ITEM_UNCACHED = nil
+	for _, callback in ipairs(PENDING_ITEM_LOADS) do callback() end
+	PENDING_ITEM_LOADS = {}
+	check(printedSince(pmark):find("Anna|r|cffffb84d]: need " .. ItemLink(19019) .. "?", 1, true),
+		"... and comes with a real link once it's loaded, got " .. printedSince(pmark))
 	-- While I'm AFK the notices are hidden with the interface: the AFK screen lists them.
 	Advance(3.5)
 	afk(true)

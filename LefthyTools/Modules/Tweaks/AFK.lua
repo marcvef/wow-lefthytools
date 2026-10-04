@@ -145,8 +145,12 @@ local function ColouredName(name, classFile)
 	return LT.Window.ClassColorCode(classFile) .. (name or "?") .. "|r"
 end
 
--- A friend's text, cut so a line doesn't grow the panel much.
+-- A friend's text, cut so a line doesn't grow the panel much (links and colours go first, so
+-- nothing is cut in half).
 local function Short(text)
+	if #text > 90 then
+		text = text:gsub("|H.-|h(.-)|h", "%1"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:|]*:", ""):gsub("|r", "")
+	end
 	if #text > 90 then
 		text = text:sub(1, 87):gsub("[\192-\255][\128-\191]*$", "") .. "..."
 	end

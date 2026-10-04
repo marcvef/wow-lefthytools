@@ -262,7 +262,13 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   `A2;<text>`; `B.ShowAnnouncement` puts "Name: text" into the notice stack of shared items
   (`call.message`, already "done", `hold` 10 s instead of 7; the line wraps at 700 px), with the
   whisper sound for friends' and a chat line. At most one per 3 s each way.
-- Text goes through `B.Clean` (200 bytes): no colour codes, `|`, `;` or control characters.
+- Text goes through `B.Clean` (200 bytes): no colour codes, `|`, `;` or control characters. So
+  links are packed first (`PackLinks`): an item link becomes `{item:<numbers>}` (`B.ItemString`:
+  numeric fields only, as for shared items; trailing empty fields dropped), any other link its
+  "[text]", and colour codes, textures and atlases go; a token cut in half by the size limit is
+  dropped. The receiver (and the sender, for its own echo) rebuilds the links from its item cache
+  (`UnpackLinks` via `B.WithLink`, in its own language); a line waits until unknown items have
+  loaded.
   Both go to the cinematic flight's subtitles too. Each setting switches sending and showing; with
   one off, a send says why.
 

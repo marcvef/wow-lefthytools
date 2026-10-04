@@ -604,6 +604,7 @@ local function WithLink(itemString, callback)
 		callback(link)
 	end
 end
+B.WithLink, B.ItemString = WithLink, ItemString -- (Chat.lua: item links in Lefthy chat)
 
 -- A friend's share (callID nil from builds without Need / Pass).
 function B.ReceiveItem(peer, gameAccountID, itemString, callID)
