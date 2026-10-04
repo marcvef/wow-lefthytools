@@ -3572,7 +3572,7 @@ for _, heading in ipairs({ "Mirage", "Misc Tweaks", "Beacon", "Chronicle", "Gene
 end
 check(order[1] > 0 and order[1] < order[2] and order[2] < order[3] and order[3] < order[4] and order[4] < order[5],
 	"in a version: grouped by module, each heading once, in a fixed order, got\n" .. newsText)
-check(newsText:find("LefthyTools 0.6.0", 1, true) < newsText:find("LefthyTools 0.5.0", 1, true), "the newest version first")
+check(newsText:find("LefthyTools 0.5.1", 1, true) < newsText:find("LefthyTools 0.5.0", 1, true), "the newest version first")
 check(newsText:find("\nBeacon\n- Friends in your group: ", 1, true) and newsText:find("- Level progress: ", 1, true),
 	"each entry: a short title and a sentence")
 local drawn = {}

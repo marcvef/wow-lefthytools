@@ -126,7 +126,7 @@ ns.CHANGELOG = {
 	{ id = 40, version = "0.5.0", module = "general",
 		en = { "What's coming", "The update notice lists what's new in your friend's build, one line per change." },
 		de = { "Was kommt", "Der Update-Hinweis zeigt, was in der Version deines Freundes neu ist, eine Zeile pro Änderung." } },
-	{ id = 41, version = "0.6.0", module = "tweaks",
+	{ id = 41, version = "0.5.1", module = "tweaks",
 		en = { "Select quests on the big maps", "Click a quest's icon on a continent or the world map to select it, as on zone maps. A setting turns it off." },
 		de = { "Quests auf großen Karten auswählen", "Ein Klick auf das Icon einer Quest auf Kontinent- oder Weltkarte wählt sie aus, wie auf Zonenkarten. Lässt sich abschalten." } },
 	-- New entries go here, at the end.

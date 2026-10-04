@@ -85,8 +85,10 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
   `.cmd` byte-for-byte with CRLF, also when downloaded raw.
 
 **Versions** (Lustre style): the repo's TOC holds the base version `X.Y.Z`, tagged `vX.Y.Z`
-(lightweight tag, pushed with `git push --tags`). Bump the patch for fixes, the minor for
-features, then tag that commit. Between tags a build is `X.Y.Z-N-gHASH` (N commits after the
+(lightweight tag, pushed with `git push --tags`). Releases step the patch (0.5.0, 0.5.1, 0.5.2,
+...), features included; a new minor version (0.6.0) is a deliberate bigger step, not automatic.
+Bump the TOC, then tag that commit. Changelog entries made after a tag carry the next patch
+version. Between tags a build is `X.Y.Z-N-gHASH` (N commits after the
 tag), written into the installed TOC by the installer; `X.Y.Z-gHASH` when N is unknown.
 `LT.version` reads it, `LT.CompareVersions` orders builds, `/lefthy version` shows it, and Beacon
 tells friends on older builds to update. Beacon also reports every friend's build to
