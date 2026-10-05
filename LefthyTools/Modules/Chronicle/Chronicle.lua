@@ -111,6 +111,13 @@ local function Share(kind, a, b)
 	shareQueue[#shareQueue + 1] = { kind, a, b }
 end
 
+-- Noon of the day `back` days before today (negative: ahead), by the calendar: stepping back
+-- 86400 s at a time skips or repeats a day around a daylight saving change.
+function C.DayAgo(back)
+	local t = date("*t")
+	return time({ year = t.year, month = t.month, day = t.day - back, hour = 12 })
+end
+
 -- Per day (for the graphs): daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels, afk }.
 local DAILY = { played = true, xp = true, quests = true, kills = true, deaths = true, levels = true, afk = true }
 
@@ -136,7 +143,7 @@ end
 
 -- Keeps the last DAILY_DAYS days.
 local function PruneDaily()
-	local oldest = date("%Y-%m-%d", time() - DAILY_DAYS * 86400)
+	local oldest = date("%Y-%m-%d", C.DayAgo(DAILY_DAYS))
 	for day in pairs(char.daily) do
 		if day < oldest then -- ISO dates sort as text
 			char.daily[day] = nil
@@ -774,7 +781,7 @@ function ShareDays(now)
 		return
 	end
 	lastDailyShare = now
-	for _, t in ipairs({ time() - 86400, time() }) do
+	for _, t in ipairs({ C.DayAgo(1), C.DayAgo(0) }) do
 		local day = date("%Y-%m-%d", t)
 		for _, message in ipairs({ DailyMessage(day) or false, AfkMessage(day) or false }) do
 			local key = message and (day .. message:sub(1, 1))
@@ -792,7 +799,7 @@ local function SendDaysTo(gameAccountID)
 		return
 	end
 	for i = SHARE_DAYS - 1, 0, -1 do
-		local day = date("%Y-%m-%d", time() - i * 86400)
+		local day = date("%Y-%m-%d", C.DayAgo(i))
 		for _, message in ipairs({ DailyMessage(day) or false, AfkMessage(day) or false }) do
 			if message then
 				ns.Beacon.QueueLow(gameAccountID, message)
@@ -816,7 +823,7 @@ local function StoreFriendDay(peer, day)
 		f.days[day.day] = { played = day.played, xp = day.xp, quests = day.quests, kills = day.kills,
 			deaths = day.deaths, levels = day.levels, afk = old.afk }
 	end
-	local oldest = date("%Y-%m-%d", time() - FRIEND_DAYS * 86400)
+	local oldest = date("%Y-%m-%d", C.DayAgo(FRIEND_DAYS))
 	for d in pairs(f.days) do
 		if d < oldest then
 			f.days[d] = nil

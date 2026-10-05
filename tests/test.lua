@@ -4013,6 +4013,14 @@ do
 	end
 	check(questShares == 5 and bossShared, "8 quests in a minute: 5 go to friends' feeds, the boss after them still goes, got " .. questShares)
 	QUESTS = savedQuests
+	-- Days by the calendar (stepping 86400 s skips or repeats one around a daylight saving change).
+	local days, ok = {}, true
+	for i = 0, 13 do days[i] = date("%Y-%m-%d", C.DayAgo(i)) end
+	for i = 1, 13 do
+		local t = date("*t", C.DayAgo(i - 1))
+		ok = ok and days[i] == date("%Y-%m-%d", time({ year = t.year, month = t.month, day = t.day - 1, hour = 12 }))
+	end
+	check(ok and days[0] == date("%Y-%m-%d"), "14 days back, each the calendar day before the next")
 end
 
 section("Beacon: leaving")

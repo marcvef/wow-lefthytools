@@ -281,9 +281,8 @@ end
 local function Days(canvas, x, y, w, c, metric)
 	local h = 170
 	local items, total, played = {}, 0, 0
-	local now = time()
 	for i = DAYS - 1, 0, -1 do
-		local t = now - i * 86400
+		local t = C.DayAgo(i)
 		local day = date("%Y-%m-%d", t)
 		local value = (c.daily[day] or {})[metric] or 0
 		total, played = total + value, played + ((c.daily[day] or {}).played or 0)
@@ -471,7 +470,7 @@ local WEEK = { "played", "xp", "levels", "quests", "kills", "deaths", "afk" }
 local function Sum(days, count)
 	local sum = { played = 0, xp = 0, levels = 0, quests = 0, kills = 0, deaths = 0, afk = 0 }
 	for i = 0, count - 1 do
-		local b = days[date("%Y-%m-%d", time() - i * 86400)]
+		local b = days[date("%Y-%m-%d", C.DayAgo(i))]
 		if b then
 			for key in pairs(sum) do
 				sum[key] = sum[key] + (b[key] or 0)
