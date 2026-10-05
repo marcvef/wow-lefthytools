@@ -173,5 +173,8 @@ ns.CHANGELOG = {
 	{ id = 55, module = "chronicle",
 		en = { "More exact numbers", "Raid bosses aren't rares, a /reload in a dungeon or in the air isn't counted twice, dungeons aren't zones, and the graphs keep their days around clock changes." },
 		de = { "Genauere Zahlen", "Raidbosse sind keine Rares, ein /reload im Dungeon oder in der Luft zählt nicht doppelt, Dungeons sind keine Gebiete, und die Grafiken behalten ihre Tage bei der Zeitumstellung." } },
+	{ id = 56, module = "tweaks",
+		en = { "Fixes for flights, bags and level-ups", "Typing as a flight starts no longer skips the film, bags you didn't move stay on screen, and level-up gains leave buffs out." },
+		de = { "Fixes für Flüge, Taschen und Level-Ups", "Tippen beim Abflug lässt den Kinomodus nicht mehr ausfallen, nicht verschobene Taschen bleiben im Bild, und Level-Up-Werte lassen Buffs weg." } },
 	-- New entries go here, at the end.
 }
