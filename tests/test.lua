@@ -3849,6 +3849,10 @@ do
 		"a long list goes on in a second column (every row stays on screen), got x " .. tostring(lastX))
 	picker.List:Hide()
 	for i = 1, 24 do CDB.friendStats["Friend" .. i] = nil end
+	picker:Click()
+	picker:Hide() -- (its window closing hides it)
+	picker:Show()
+	check(not picker.List:IsShown(), "the window closing closes the list: it doesn't come back open")
 	-- Pooled textures: a gradient (bars, the session curve's fill) never stays on a plain rectangle.
 	local function strayGradients()
 		local n = 0

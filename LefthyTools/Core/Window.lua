@@ -227,6 +227,8 @@ function Window.AddPicker(parent, width, entries, onPick)
 	end)
 	list:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
 	list:SetScript("OnHide", function(self) self:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
+	-- Its window closing (Escape) closes the list too, or it would come back open with the window.
+	picker:HookScript("OnHide", function() list:Hide() end)
 	list:SetScript("OnEvent", function(self)
 		if not (self:IsMouseOver() or picker:IsMouseOver()) then
 			self:Hide() -- a click somewhere else
