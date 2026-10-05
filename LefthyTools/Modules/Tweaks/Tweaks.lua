@@ -285,9 +285,10 @@ end
 ---------------------------------------------------------------------------
 
 local ANNOUNCE_MARKER = "{rt1} " -- star icon, like Questie
+local ANNOUNCE_MAX_AGE = 10       -- seconds a line waits for a chat lockdown to lift; then it's old news
 local questEvents = CreateFrame("Frame")
 local questState = {}    -- questID -> { complete = bool, objectives = { [i] = finished } }
-local announceQueue = {}
+local announceQueue = {} -- { text, at }
 local scanScheduled, flushScheduled = false, false
 
 local function AnnounceChannel()
@@ -305,6 +306,10 @@ end
 
 local function FlushAnnouncements()
 	flushScheduled = false
+	local now = GetTime()
+	while announceQueue[1] and now - announceQueue[1].at > ANNOUNCE_MAX_AGE do
+		table.remove(announceQueue, 1) -- a lockdown that lasts (a whole dungeon): old news by now
+	end
 	if #announceQueue == 0 then
 		return
 	end
@@ -317,8 +322,8 @@ local function FlushAnnouncements()
 	local channel = AnnounceChannel()
 	if channel then
 		local send = (chat and chat.SendChatMessage) or SendChatMessage
-		for _, message in ipairs(announceQueue) do
-			pcall(send, message, channel)
+		for _, item in ipairs(announceQueue) do
+			pcall(send, item.text, channel)
 		end
 	end
 	wipe(announceQueue)
@@ -328,7 +333,7 @@ local function Announce(message)
 	if not AnnounceChannel() then
 		return
 	end
-	announceQueue[#announceQueue + 1] = ANNOUNCE_MARKER .. message
+	announceQueue[#announceQueue + 1] = { text = ANNOUNCE_MARKER .. message, at = GetTime() }
 	if not flushScheduled then
 		flushScheduled = true
 		C_Timer.After(0, FlushAnnouncements)

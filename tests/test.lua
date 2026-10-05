@@ -733,6 +733,15 @@ check(#SENT == 4, "held while the client locks down addon chat")
 STATE.chatLockdown = false
 Advance(1.2)
 check(#SENT == 5 and SENT[5].msg:find("Locked Quest", 1, true), "sent once the lockdown lifts")
+STATE.chatLockdown = true -- a lockdown that lasts (a whole dungeon run)
+QUESTS[8] = Q(108, "Long Locked Quest", "0/1 V")
+QuestUpdate(); Finish(QUESTS[8], 1, "1/1 V"); QuestUpdate()
+Advance(15)
+STATE.chatLockdown = false
+Advance(1.2)
+check(#SENT == 5, "a line that waited longer than 10 s is old news: dropped, not sent late")
+table.remove(QUESTS, 8)
+QuestUpdate()
 
 table.remove(QUESTS, 1) -- turned in
 Fire("QUEST_TURNED_IN", 101)
