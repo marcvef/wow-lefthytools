@@ -1143,6 +1143,7 @@ local function TryShow()
 	TakeSnapshot()
 	M.db.levelUps[CharKey()] = gains
 	Show(Collect(gains.level, gains, false))
+	SetPinned(false) -- a new level-up starts unpinned (also after a pinned one stepped aside for a fight)
 end
 
 local function QueueShow(delay)

@@ -4327,6 +4327,15 @@ do
 	Fire("PLAYER_REGEN_ENABLED")
 	Advance(1.2)
 	check(shown() and W.pinned and W:GetAlpha() == 1, "after the fight it's back, still pinned")
+	STATE.combat = true
+	Fire("PLAYER_REGEN_DISABLED")
+	Fire("PLAYER_LEVEL_UP", PLAYER_LEVEL, 10, 0, 1, 0, 1, 1, 1, 1)
+	Advance(2)
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	Advance(1.2)
+	check(shown() and not W.pinned and W.Timer.shown, "a level-up during that fight: its window starts unpinned")
+	W.Pin:Click() -- (pinned again for the arrows below)
 	-- The arrows: what other levels bring.
 	local level = W.Number:GetText()
 	W.Next:Click()
