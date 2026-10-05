@@ -295,8 +295,10 @@ end
 
 -- The map route (verified in game) is what we send. The minimap needs my position every frame
 -- while moving; UnitPosition gives it without creating tables, so it's used once it has been
--- seen to agree with the map route (HereBeDragons relies on the two matching).
+-- seen to agree with the map route (HereBeDragons relies on the two matching), checked again
+-- after every loading screen (another continent or instance).
 local unitPositionAgrees = false
+local issecret = issecretvalue or function() return false end
 
 local function MapRoutePosition()
 	local mapID = C_Map.GetBestMapForUnit("player")
@@ -311,8 +313,8 @@ local function MapRoutePosition()
 	local north, west = worldPos:GetXY()
 	if UnitPosition and not unitPositionAgrees then
 		local uNorth, uWest, _, uContinent = UnitPosition("player")
-		unitPositionAgrees = uNorth ~= nil and uContinent == continent
-			and math.abs(uNorth - north) < 2 and math.abs(uWest - west) < 2
+		unitPositionAgrees = uNorth ~= nil and not (issecret(uNorth) or issecret(uWest) or issecret(uContinent))
+			and uContinent == continent and math.abs(uNorth - north) < 2 and math.abs(uWest - west) < 2
 	end
 	return continent, north, west
 end
@@ -321,7 +323,7 @@ end
 function B.MyWorldPosition()
 	if unitPositionAgrees then
 		local north, west, _, continent = UnitPosition("player")
-		if north then
+		if north and not (issecret(north) or issecret(west) or issecret(continent)) then
 			return continent, north, west
 		end
 	end
@@ -1209,6 +1211,7 @@ handlers.BN_FRIEND_INFO_CHANGED = function() validateRequested = true end
 handlers.BN_FRIEND_ACCOUNT_OFFLINE = handlers.BN_FRIEND_INFO_CHANGED
 handlers.PLAYER_ENTERING_WORLD = function()
 	sweepRequested, statusDirty, lastSweep, lastState = true, true, -math.huge, nil
+	unitPositionAgrees = false
 end
 handlers.GROUP_ROSTER_UPDATE = function() groupChanged = true end
 handlers.NAME_PLATE_UNIT_ADDED = function(unit) plates[unit] = true end
