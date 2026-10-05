@@ -120,6 +120,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     types `/lefthy report test`: their chat says "1 report(s) sent to <you>", yours "<friend> sent
     a LefthyTools error report", and `/lefthy reports` shows it with their build, language, realm,
     faction and the last links they clicked (a profession link: whether its window opened).
+    A friend clicks your profession link and nothing opens: a report comes by itself with what
+    their game said, their server id against yours, whether their client knows you, realm and
+    faction. `/lefthy beacon status`: every friend's realm and faction next to yours.
     Level-ups: `/lefthy beacon sound` to try the sounds, `/lefthy beacon ding test` for the message.
     They die: a chat line with zone and what they fought. Alt+click your world map: they get a
     rippling marker on both maps, a chat line and a sound; on a continent map the line names the

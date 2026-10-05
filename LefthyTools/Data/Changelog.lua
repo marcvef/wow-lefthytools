@@ -165,7 +165,7 @@ ns.CHANGELOG = {
 		en = { "Take a ping back", "Alt+click your own ping on the world map (or /lefthy beacon ping clear) and it's gone, for your friends too." },
 		de = { "Einen Ping zurücknehmen", "Alt+Klick auf deinen eigenen Ping auf der Weltkarte (oder /lefthy beacon ping clear), und er ist weg, auch bei deinen Freunden." } },
 	{ id = 53, module = "beacon",
-		en = { "Error reports to a friend", "LefthyTools errors go to friends who collect them, and /lefthy report <what happened> sends one in your own words." },
-		de = { "Fehlerberichte an einen Freund", "LefthyTools-Fehler gehen an Freunde, die sie sammeln, und /lefthy report <was passiert ist> schickt einen in deinen eigenen Worten." } },
+		en = { "Error reports to a friend", "LefthyTools errors and profession links that open nothing go to friends who collect them; /lefthy report <what happened> sends one in your own words." },
+		de = { "Fehlerberichte an einen Freund", "LefthyTools-Fehler und Berufslinks, die nichts öffnen, gehen an Freunde, die sie sammeln; /lefthy report <was passiert ist> schickt einen in deinen eigenen Worten." } },
 	-- New entries go here, at the end.
 }

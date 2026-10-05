@@ -95,6 +95,9 @@ local function HandReport(text)
 		lines[#lines + 1] = "Last links clicked:"
 		for _, click in ipairs(clicks) do
 			lines[#lines + 1] = ("  %s %s -> %s"):format(click.at, click.link, click.result or "clicked")
+			if click.linker then
+				lines[#lines + 1] = ("    linker: %s / me: %s / the game: %s"):format(click.linker, click.me or "?", click.events or "?")
+			end
 		end
 	end
 	local errors = LT.Errors.Count()
@@ -292,8 +295,38 @@ function B.TickReports(now)
 end
 
 ---------------------------------------------------------------------------
--- Links clicked, for hand-written reports: which kind, and whether a window opened
+-- Links clicked, for reports: which kind, and whether a window opened
+--
+-- A profession link (trade:<GUID>:<spell>:<skill line>) is the game engine's business: Blizzard's
+-- UI only hands it to ItemRefTooltip:SetHyperlink, the client asks the server for the linker's
+-- recipes, and the profession window opens when they come; if the server says no, nothing
+-- happens and no Lua error is raised. So for such a click we note what might matter (the linker's
+-- server id against mine, whether this client knows the linker, their realm and faction from
+-- Battle.net, combat, a modifier) and listen for 3 s to what the game says (UI error and info
+-- messages, system messages, the trade skill events). If nothing opened, that goes to friends who
+-- collect reports by itself (once per session).
 ---------------------------------------------------------------------------
+
+local WATCH_TIME = 3
+local WATCH_EVENTS = { "UI_ERROR_MESSAGE", "UI_INFO_MESSAGE", "CHAT_MSG_SYSTEM", "TRADE_SKILL_SHOW",
+	"TRADE_SKILL_DATA_SOURCE_CHANGED", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_CLOSE" }
+local issecret = issecretvalue or function() return false end
+local watcher = CreateFrame("Frame")
+local watching -- the click being watched: { events = { ... } }
+local linkFailureSent = false
+
+watcher:SetScript("OnEvent", function(_, event, a, b)
+	if not watching or #watching.events >= 12 then
+		return
+	end
+	local text = event == "CHAT_MSG_SYSTEM" and a or b
+	if type(text) ~= "string" then
+		text = nil
+	elseif issecret(text) then
+		text = "(secret)"
+	end
+	watching.events[#watching.events + 1] = event .. (text and (": " .. text:sub(1, 80)) or "")
+end)
 
 local function Opened(kind)
 	if kind == "trade" or kind == "enchant" then
@@ -302,6 +335,41 @@ local function Opened(kind)
 	elseif kind == "worldmap" then
 		return C_Map.HasUserWaypoint and C_Map.HasUserWaypoint() and "the waypoint is set" or "no waypoint"
 	end
+end
+
+local function ServerID(guid)
+	return type(guid) == "string" and guid:match("^Player%-(%d+)%-") or nil
+end
+
+-- What this client knows about whoever linked it (the GUID in a profession link).
+local function Linker(guid)
+	local mine = UnitGUID("player")
+	if guid == mine then
+		return "my own link"
+	end
+	local parts = { ("their server id %s, mine %s"):format(ServerID(guid) or "?", ServerID(mine) or "?") }
+	local ok, _, _, _, _, _, name, realm = pcall(GetPlayerInfoByGUID, guid)
+	if ok and type(name) == "string" and name ~= "" and not issecret(name) then
+		parts[#parts + 1] = ("this client knows them (%s%s)"):format(name, (type(realm) == "string" and realm ~= "") and ("-" .. realm) or "")
+	else
+		parts[#parts + 1] = "this client doesn't know them"
+	end
+	for gameAccountID, peer in pairs(M:GetPeers()) do
+		if peer.guid == guid then
+			local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
+			parts[#parts + 1] = ("Beacon friend %s on %s, %s"):format(peer.name or "?", info and info.realmName or "?",
+				info and info.factionName or "?")
+		end
+	end
+	return table.concat(parts, " - ")
+end
+
+local function LinkReport(click)
+	return table.concat({ "Profession link: " .. Context(),
+		("Clicked %s at %s -> %s"):format(click.link, click.at, click.result or "?"),
+		"Linker: " .. (click.linker or "?"),
+		"Me: " .. (click.me or "?"),
+		"What the game did: " .. (click.events or "nothing") }, "\n")
 end
 
 local function OnLinkClicked(link)
@@ -314,8 +382,29 @@ local function OnLinkClicked(link)
 		table.remove(clicks, 1)
 	end
 	local kind = link:match("^(%a+):")
-	if kind == "trade" or kind == "enchant" or kind == "worldmap" then
+	if kind == "worldmap" then
 		C_Timer.After(2, function() click.result = Opened(kind) end)
+	elseif kind == "trade" or kind == "enchant" then
+		click.linker = Linker(link:match("^trade:(Player%-[%w%-]+)") or "?")
+		click.me = ("%s, %s%s%s"):format(GetRealmName() or "?", UnitFactionGroup("player") or "?",
+			InCombatLockdown() and ", in combat" or "", (IsModifiedClick and IsModifiedClick()) and ", a modified click" or "")
+		watching = { events = {} }
+		for _, event in ipairs(WATCH_EVENTS) do
+			pcall(watcher.RegisterEvent, watcher, event)
+		end
+		local watched = watching
+		C_Timer.After(WATCH_TIME, function()
+			if watching == watched then
+				watcher:UnregisterAllEvents()
+				watching = nil
+			end
+			click.result = Opened(kind)
+			click.events = #watched.events > 0 and table.concat(watched.events, " / ") or "nothing"
+			if click.result == "nothing opened" and not linkFailureSent and M.enabled and M.db.sendReports then
+				linkFailureSent = true
+				Keep(LinkReport(click)) -- goes out on the tick
+			end
+		end)
 	end
 end
 

@@ -2522,7 +2522,7 @@ do
 	wipe(owed)
 	BN_FRIENDS[1][1].realmName = "Argent Dawn"
 	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", 11)
-	BN_FRIENDS[1][1].realmName = nil
+	BN_FRIENDS[1][1].realmName = "Realmy"
 	check(owed[1].mailName == "Anna-ArgentDawn", "a winner on another realm: mailed as Name-Realm")
 	owed[1].mailName = "Anna"
 	SendMailFrame:Show()
@@ -2773,27 +2773,77 @@ do
 	check(BDB.sendReports == true and BDB.collectReports == false and B("sendReports") and B("collectReports")
 		and SETTINGS_BUTTONS["Friends' error reports"], "sending on, collecting off, by default; a button for the collected ones")
 	wipe(LefthyToolsDB.reportsOut or {})
-	-- A link clicked before: the report says what happened.
-	SetItemRef("trade:Player-1-0000ABCD:3908:197", "[Tailoring]", "LeftButton")
-	Advance(2.1)
-	-- Nobody collects: a hand-written report waits.
+	local function bobAlive() -- (friends silent for over a minute are forgotten)
+		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 12)
+		anna("S2;;0;260.0;750.0;Goldshire;")
+	end
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 12)
+	Advance(1.2)
+	-- Anna's profession link, clicked: nothing opens, the game says why; that's a report by itself.
+	SetItemRef("trade:Player-1-11:2259:171", "[Alchemy]", "LeftButton")
+	Fire("UI_ERROR_MESSAGE", 51, "That player is on another realm.")
+	Advance(3.1)
+	check(#LefthyToolsDB.reportsOut == 1, "a profession link that opened nothing: kept as a report")
+	-- Nobody collects: a hand-written report waits too.
 	pmark = #PRINTED + 1
 	lefthy("report the profession link does nothing")
-	check(printedSince(pmark):find("report kept", 1, true) and #LefthyToolsDB.reportsOut == 1, "nobody collects: the report waits")
+	check(printedSince(pmark):find("report kept", 1, true) and #LefthyToolsDB.reportsOut == 2, "nobody collects: the reports wait")
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 	anna("Y2;1")
 	Advance(3)
-	local parts = sentTo(11, mark, "Z2;")
-	check(#parts >= 2 and parts[1]:find("^Z2;%d+;1;" .. #parts .. ";Report: LefthyTools ") and #LefthyToolsDB.reportsOut == 0
-		and printedSince(pmark):find("1 report(s) sent to Anna", 1, true),
-		"Anna collects: it goes to her, in parts, and I'm told, got " .. tostring(parts[1]))
+	local byID = {}
+	for _, p in ipairs(sentTo(11, mark, "Z2;")) do
+		local id, n, text = p:match("^Z2;(%d+);(%d+);%d+;(.*)$")
+		byID[id] = byID[id] or {}
+		byID[id][tonumber(n)] = text
+	end
+	local texts = {}
+	for _, list in pairs(byID) do texts[#texts + 1] = table.concat(list) end
+	table.sort(texts)
+	check(#texts == 2 and #LefthyToolsDB.reportsOut == 0 and printedSince(pmark):find("2 report(s) sent to Anna", 1, true),
+		"Anna collects: both go to her, in parts, and I'm told")
 	check(#sentTo(12, mark, "Z2;") == 0, "only to friends who collect")
-	local whole = {}
-	for _, p in ipairs(parts) do whole[#whole + 1] = p:match("^Z2;%d+;%d+;%d+;(.*)$") end
-	whole = table.concat(whole)
-	check(whole:find("What happened: the profession link does nothing", 1, true) and whole:find(", Realmy, Alliance, ", 1, true)
-		and whole:find("trade:Player-1-0000ABCD:3908:197 -> nothing opened", 1, true) and whole:find("^", 1, true)
-		and not whole:find("\n", 1, true), "with my words, build, realm, faction and the link I clicked (nothing opened); lines as ^")
+	local linkReport, handReport = texts[1], texts[2] -- ("Profession link: ..." sorts before "Report: ...")
+	check(linkReport:find("^Profession link: LefthyTools ") and linkReport:find("Clicked trade:Player-1-11:2259:171 at ", 1, true)
+		and linkReport:find(" -> nothing opened^", 1, true)
+		and linkReport:find("their server id 1, mine 1 - this client doesn't know them - Beacon friend Anna on Realmy, Alliance", 1, true)
+		and linkReport:find("Me: Realmy, Alliance", 1, true)
+		and linkReport:find("UI_ERROR_MESSAGE: That player is on another realm.", 1, true),
+		"the profession link report: the linker's server, whether I know them, their realm and faction, mine, what the game said, got " .. linkReport)
+	check(handReport:find("What happened: the profession link does nothing", 1, true) and handReport:find(", Realmy, Alliance, ", 1, true)
+		and handReport:find("trade:Player-1-11:2259:171 -> nothing opened", 1, true) and handReport:find("linker: their server id 1", 1, true)
+		and handReport:find("^", 1, true) and not handReport:find("\n", 1, true),
+		"the hand-written one: my words, build, realm, faction and the link I clicked; lines as ^")
+	mark = #GAMEDATA + 1
+	KNOWN_PLAYERS["Player-1-11"] = { "Anna", "" }
+	SetItemRef("trade:Player-1-11:2259:171", "[Alchemy]", "LeftButton")
+	Advance(5.5)
+	check(#sentTo(11, mark, "Z2;") == 0 and #LefthyToolsDB.reportsOut == 0, "a second one this session: no second report")
+	KNOWN_PLAYERS = {}
+	bobAlive()
+	Advance(0.3)
+	-- /lefthy beacon status: realm and faction of every friend and mine, to compare.
+	pmark = #PRINTED + 1
+	lefthy("beacon status")
+	check(printedSince(pmark):find("Anna (Realmy, Alliance) - ", 1, true) and printedSince(pmark):find("you (Realmy, Alliance), LefthyTools ", 1, true),
+		"status: each friend's realm and faction, and mine")
+	-- A link other than an item, to a friend on a build from before link tokens: I'm told, once.
+	local peerList = BB.module:GetPeers()
+	local annaVersion, bobVersion = peerList[11].version, peerList[12] and peerList[12].version
+	peerList[11].version = "0.5.0-20-g99df530"
+	if peerList[12] then peerList[12].version = "0.5.0-15-g4322f60" end
+	Advance(1)
+	pmark = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_CHAT("my |cffffd000|Htrade:Player-1-0:2259:171|h[Alchemy]|h|r")
+	Advance(0.6)
+	check(peerList[12] and printedSince(pmark):find("Bob has an older LefthyTools", 1, true) and not printedSince(pmark):find("Anna has", 1, true),
+		"a friend on an older build: named (links reach them as text), got " .. printedSince(pmark))
+	pmark = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_CHAT("again |cffffd000|Htrade:Player-1-0:2259:171|h[Alchemy]|h|r")
+	Advance(0.6)
+	check(not printedSince(pmark):find("older LefthyTools", 1, true), "only once")
+	peerList[11].version = annaVersion
+	if peerList[12] then peerList[12].version = bobVersion end
 	-- An error goes by itself, once per session.
 	mark = #GAMEDATA + 1
 	LT.Errors.Add("error", "Interface/AddOns/LefthyTools/Core/Core.lua:9: something broke", "the stack")
@@ -2812,6 +2862,8 @@ do
 	anna("Y2;0")
 
 	-- Collecting: friends are told, and their reports arrive whole.
+	bobAlive()
+	Advance(0.3)
 	mark = #GAMEDATA + 1
 	B("collectReports"):SetValue(true)
 	Advance(0.5)
@@ -2825,10 +2877,9 @@ do
 		and printedSince(pmark):find("Anna sent a LefthyTools error report: /lefthy reports shows it.", 1, true),
 		"a friend's report, put together (parts in any order), and a chat line")
 	anna("Z2;8;1;3;first part")
-	for _ = 1, 5 do -- (friends silent for over a minute are forgotten)
+	for _ = 1, 5 do
 		Advance(25)
-		anna("S2;;0;260.0;750.0;Goldshire;")
-		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 12)
+		bobAlive()
 	end
 	check(reports[#reports].text == "first part[part 2 of 3 missing][part 3 of 3 missing]", "parts that never came: kept with a note")
 	lefthy("reports")

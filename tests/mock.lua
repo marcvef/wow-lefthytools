@@ -458,6 +458,12 @@ function SetPortraitTexture(texture, unit) texture.portrait = unit end
 -- A link clicked in chat (ItemRef.lua): nothing opens here.
 LINKS_CLICKED = {}
 function SetItemRef(link) LINKS_CLICKED[#LINKS_CLICKED + 1] = link end
+-- Players this client knows (name cache): [guid] = { name, realm }.
+KNOWN_PLAYERS = {}
+function GetPlayerInfoByGUID(guid)
+	local p = KNOWN_PLAYERS[guid]
+	if p then return "Mage", "MAGE", "Human", "Human", 3, p[1], p[2] end
+end
 -- Dungeons that open at a level (the dungeon finder): [level] = { names }.
 UNLOCKED_DUNGEONS = {}
 C_PlayerInfo = { GetInstancesUnlockedAtLevel = function(level, isRaid)
@@ -909,7 +915,7 @@ BNET_CLIENT_WOW, WOW_PROJECT_ID = "WoW", 1
 local function WoWAccount(id, name, class, extra)
 	local a = { gameAccountID = id, isOnline = true, clientProgram = "WoW", wowProjectID = 1, isInCurrentRegion = true,
 		characterName = name, classFilename = class, characterLevel = 20, areaName = "Elwynn Forest",
-		playerGuid = "Player-1-" .. id, isGameAFK = false, isGameBusy = false }
+		playerGuid = "Player-1-" .. id, isGameAFK = false, isGameBusy = false, realmName = "Realmy", factionName = "Alliance" }
 	for k, v in pairs(extra or {}) do a[k] = v end
 	return a
 end

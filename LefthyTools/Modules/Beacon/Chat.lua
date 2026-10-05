@@ -106,6 +106,29 @@ local function ChatLine(name, classFile, text)
 		CHAT_COLOUR, text)
 end
 
+-- Links other than items arrive as links from this build on (0.5.0-16: the token with its
+-- colour); older builds show the token as text. Whoever is older gets named once (per build).
+local LINKS_SINCE = "0.5.0-16-g5d0608d"
+local warnedOld = {} -- "<name>/<their version>" -> true
+local function WarnOldFriends(text)
+	if not text:find("{%a+:[^}]*%[") then
+		return
+	end
+	local names = {}
+	for _, peer in pairs(M:GetPeers()) do
+		local key = peer.name and (peer.name .. "/" .. tostring(peer.version))
+		if key and not warnedOld[key] and LT.CompareVersions(peer.version or "0.0.0", LINKS_SINCE) == -1 then
+			warnedOld[key] = true
+			names[#names + 1] = peer.name
+		end
+	end
+	if #names > 0 then
+		table.sort(names)
+		M:Print(("%s %s an older LefthyTools (%s): links other than items reach them as text until they update.")
+			:format(table.concat(names, ", "), #names == 1 and "has" or "have", "/lefthy beacon status"))
+	end
+end
+
 local function FlightSubtitle(text)
 	local flight = ns.CinematicFlight
 	if flight and flight.Subtitle then
@@ -141,6 +164,7 @@ local function Send(kind, text)
 	end
 	lastSent[kind] = now
 	B.QueueToPeers(((kind == "chat" and "M" or "A") .. "%s;%s"):format(B.VERSION, text))
+	WarnOldFriends(text)
 	UnpackLinks(text, function(shown) -- what my friends see
 		if kind == "chat" then
 			local _, classFile = UnitClass("player")

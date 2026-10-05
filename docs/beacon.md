@@ -434,6 +434,19 @@ sessions) until a collector is online; every 2 s the tick sends all waiting ones
 collector online, as `Z2` parts (up to 16 of 180 bytes; colour codes, `|` and `;` removed,
 newlines as `^`) at low priority, and prints "N report(s) sent to Anna".
 
+Profession links get a closer look, since the game handles them itself: Blizzard's UI only passes
+a `trade:<GUID>:<spell>:<skill line>` link to `ItemRefTooltip:SetHyperlink`, the client asks the
+server for the linker's recipes and the profession window opens when they arrive; if the server
+says no, nothing happens and no Lua error is raised (items and spells, shown from the client's
+own data, aren't affected). On such a click Reports.lua notes the linker's server id (from the
+GUID) against mine, whether this client knows the linker (`GetPlayerInfoByGUID`), the linker's
+realm and faction if they're a Beacon friend (Battle.net game account info), my realm, faction,
+combat and modifier keys, and listens 3 s to `UI_ERROR_MESSAGE`, `UI_INFO_MESSAGE`,
+`CHAT_MSG_SYSTEM` and the trade skill events. If no profession window opened, that's a report by
+itself (once per session). `/lefthy beacon status` lists each friend's realm and faction and mine,
+to compare who can open profession links with who can't. Sending a link other than an item to a
+friend on a build before 0.5.0-16 (links arrive as tokens, shown as text there) names them once.
+
 Collecting: parts are put together per sender and report id (in any order; at most 60 parts per
 friend per minute); complete ones, or after 120 s with "[part n of m missing]", are kept in
 `LefthyToolsDB.friendReports` (newest 40) with the sender's name and time, and a chat line says

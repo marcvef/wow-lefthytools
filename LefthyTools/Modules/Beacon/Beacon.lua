@@ -1396,11 +1396,14 @@ function M:OnSlashCommand(msg)
 		local count, now = 0, GetTime()
 		for gameAccountID, peer in pairs(peers) do
 			count = count + 1
-			self:Print(string.format("  %s - %s%s, LefthyTools %s", peer.name or ("#" .. gameAccountID),
+			local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
+			self:Print(string.format("  %s (%s, %s) - %s%s, LefthyTools %s", peer.name or ("#" .. gameAccountID),
+				info and info.realmName or "?", info and info.factionName or "?",
 				peer.hasPos and string.format("position %.0f s ago", now - peer.posTime)
 					or "no position (dungeon, raid or not sharing)", StatusWords(peer),
 				peer.version or "0.3.0 or older"))
 		end
+		self:Print(string.format("  you (%s, %s), LefthyTools %s", GetRealmName() or "?", UnitFactionGroup("player") or "?", LT.version))
 		for gameAccountID, version in pairs(otherVersion) do
 			local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
 			self:Print(string.format("  %s runs another LefthyTools version (Beacon %s, you have %s): update both to the same version.",
