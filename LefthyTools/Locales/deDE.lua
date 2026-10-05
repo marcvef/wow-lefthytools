@@ -189,6 +189,9 @@ L["Cinematic flights"] = "Flüge im Kinomodus"
 L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. The bottom bar shows the time left to landing, and whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."] =
 	"Auf einer Flugroute blendet das Interface aus, schwarze Balken schieben sich wie im Kino ins Bild, und eine Titelkarte zeigt dein Ziel und jedes Gebiet, das du überfliegst. Der untere Balken zeigt die Zeit bis zur Landung, Flüsternachrichten und Gruppenchat erscheinen als Untertitel. Ein geöffnetes Fenster oder Tippen im Chat pausiert ihn, bis du fertig bist; die Landung bringt alles zurück."
 L["What a flight hides"] = "Was ein Flug ausblendet"
+L["Friends in the top bar"] = "Freunde im oberen Balken"
+L["The top black bar shows what your Beacon friends are doing: a line each with their level, where they are, and whom they're fighting or which quest they're on. With more than two friends it goes through them in turn."] =
+	"Der obere schwarze Balken zeigt, was deine Beacon-Freunde gerade machen: eine Zeile pro Freund mit Level, wo sie sind und gegen wen sie kämpfen oder an welcher Quest sie sind. Bei mehr als zwei Freunden wechseln sie sich ab."
 L["Everything: the whole interface, other addons included. Chosen elements: only the ones ticked below, the rest stays (other addons too). Works with Mirage on or off."] =
 	"Alles: das ganze Interface, andere Addons eingeschlossen. Ausgewählte Elemente: nur die unten angehakten, der Rest bleibt (auch andere Addons). Klappt mit Mirage an oder aus."
 L["Everything"] = "Alles"

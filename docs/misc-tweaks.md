@@ -293,7 +293,10 @@ their tracked quest with its progress or "Ready to turn in", in or out of combat
 ## cinematicFlights: flights like a film (Flight.lua)
 
 On a flight path (`UnitOnTaxi("player")`) the interface fades out over 1.5 s (`ns.HideInterface`
-with a fade: an OnUpdate only while fading), thin black letterbox bars (5% of the screen each) fade in,
+with a fade: an OnUpdate only while fading), black letterbox bars (7% of the screen each) fade in
+(the top one shows what Beacon friends are doing, setting `flightFriends`: `B.FriendLines` per
+friend joined into one line, name and level, where, fighting or their quest; two at a time, the
+next two every 8 s; refreshed every 2 s while the film is shown),
 and a title card in the upper middle names where you're going: header "Next stop", the place in
 the quest font (`Fonts\MORPHEUS.TTF`, 46, shadowed), a thin gold line, the zone below. Every new
 zone on the way (`ZONE_CHANGED_NEW_AREA`) gets a card: the continent (walking `parentMapID` up

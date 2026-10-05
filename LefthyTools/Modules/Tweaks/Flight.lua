@@ -6,9 +6,10 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 
 -- Cinematic flights (a Misc Tweak; works without Mirage): on a flight path the interface fades
 -- out, thin black bars fade in like a film, and a title card names your destination and every
--- zone you fly into (its level range, and Beacon friends who are there). The bottom bar shows the
--- time left to landing; whispers and party chat show as subtitles just above it. Landing brings
--- everything back.
+-- zone you fly into (its level range, and Beacon friends who are there). The top bar shows what
+-- Beacon friends are doing (a line each: name, level, where, fighting or their quest; setting
+-- flightFriends), the bottom bar the time left to landing; whispers and party chat show as
+-- subtitles just above it. Landing brings everything back.
 --
 -- The screen doesn't take clicks, so the camera can be dragged as always. Opening a window (map,
 -- bags, ...), typing in chat or a friend's item offer waiting for your Need or Pass (Beacon) pauses
@@ -40,7 +41,9 @@ local START_WAIT = 3        -- seconds after losing control to look for the taxi
 local RESUME_DELAY = 2      -- seconds after a window closes or typing ends
 local CARD_IN, CARD_HOLD, CARD_OUT = 1.2, 3.5, 1.5
 local SUBTITLE_TIME, MAX_SUBTITLES = 8, 2
-local BAR = 0.05            -- letterbox bar height, part of the screen height
+local BAR = 0.07            -- letterbox bar height, part of the screen height
+local FRIENDS_EVERY = 2     -- seconds between updates of the friends in the top bar
+local FRIENDS_PER_PAGE, FRIENDS_PAGE_TIME = 2, 8 -- more friends: pages, one after another
 local PATH_PACE = 1 / 29.9  -- seconds per yard along a flight path (classic routes fly ~29.9 yd/s)
 local DEFAULT_PACE = 1.15 / 30 -- seconds per yard of straight distance (the fallback) before any flight is timed
 local MIN_FLIGHT, MAX_FLIGHT = 10, 1800 -- timed flights outside this are left out
@@ -258,6 +261,13 @@ local function Build()
 	screen.Subtitles:SetPoint("BOTTOM", screen.Bottom, "TOP", 0, 10)
 	screen.Subtitles:SetWidth(900)
 	screen.Subtitles:SetSpacing(4)
+	-- What Beacon friends are doing, in the top bar: one line each.
+	screen.Friends = screen:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	screen.Friends:SetPoint("CENTER", screen.Top, "CENTER")
+	screen.Friends:SetJustifyH("CENTER")
+	screen.Friends:SetSpacing(4)
+	screen.Friends:SetWordWrap(false)
+	screen.Friends:SetTextColor(0.85, 0.82, 0.75)
 
 	-- The title card, in the upper middle: a small header, the name in the quest font, a thin
 	-- gold line and a subtitle. It fades in, holds, fades out, drifting slightly closer.
@@ -359,6 +369,30 @@ local function ZoneCard()
 	ShowCard(Continent(mapID), zone, table.concat(parts, "   |cff888888·|r   "))
 end
 
+-- The top bar: Beacon friends, one line each (Beacon's own summary of them: name, level, where,
+-- what they're doing), a page of FRIENDS_PER_PAGE at a time.
+local friendsAt = -math.huge
+local function UpdateFriends(now)
+	friendsAt = now
+	local beacon = LT:GetModule("beacon")
+	local B = ns.Beacon
+	local list = M.db.flightFriends and beacon and beacon.enabled and B and B.FriendList and B.FriendList() or {}
+	if #list == 0 then
+		screen.Friends:SetText("")
+		return
+	end
+	local pages = math.ceil(#list / FRIENDS_PER_PAGE)
+	local page = math.floor(now / FRIENDS_PAGE_TIME) % pages
+	local lines = {}
+	for i = page * FRIENDS_PER_PAGE + 1, math.min(#list, (page + 1) * FRIENDS_PER_PAGE) do
+		local parts = {}
+		B.FriendLines(parts, list[i].peer, list[i].id)
+		lines[#lines + 1] = table.concat(parts, "   |cff888888·|r   ")
+	end
+	screen.Friends:SetText(table.concat(lines, "\n"))
+end
+Flight.UpdateFriends = UpdateFriends -- (tests)
+
 local function UpdateSubtitles()
 	local now = GetTime()
 	while subtitles[1] and now - subtitles[1].at > SUBTITLE_TIME do
@@ -419,12 +453,14 @@ local function Show()
 	local barHeight = math.floor(UIParent:GetHeight() * BAR + 0.5)
 	screen.Top:SetHeight(barHeight)
 	screen.Bottom:SetHeight(barHeight)
+	screen.Friends:SetWidth(math.max(200, UIParent:GetWidth() - 80))
 	screen.FadeOut:Stop()
 	screen:SetAlpha(0)
 	screen:Show()
 	screen.FadeIn:Play()
 	UpdateSubtitles()
 	UpdateTimer()
+	UpdateFriends(GetTime())
 	HideUI(true, FADE)
 end
 
@@ -547,6 +583,9 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 			UpdateSubtitles()
 		end
 		UpdateTimer()
+		if now - friendsAt >= FRIENDS_EVERY then
+			UpdateFriends(now)
+		end
 		return
 	end
 	if ShouldStart() then

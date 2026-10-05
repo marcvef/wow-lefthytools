@@ -37,7 +37,8 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    shows or offers an item, writes in Lefthy chat or announces something: each is listed under
    "While you were away"; after an offer, a click brings back its Need / Pass buttons.
    Cinematic flights (Misc Tweaks): take a flight path: the interface fades out, black bars come
-   in, "Next stop / <place> / <zone>" appears, the bottom bar says "Landing in about m:ss". Each zone
+   in (the top one lists your Beacon friends, a line each: level, zone, fighting or their quest;
+   with three or more, they take turns every 8 s), "Next stop / <place> / <zone>" appears, the bottom bar says "Landing in about m:ss". Each zone
    on the way gets a card (continent, level range, friends there). Get whispered: a subtitle just
    above the bottom bar. The camera stays where you put it and can be dragged. Land: everything
    fades back. Fly the same route again: "Landing in m:ss" counts down exactly. Press M: the

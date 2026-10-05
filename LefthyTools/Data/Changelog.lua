@@ -167,5 +167,8 @@ ns.CHANGELOG = {
 	{ id = 53, module = "beacon",
 		en = { "Error reports to a friend", "LefthyTools errors and profession links that open nothing go to friends who collect them; /lefthy report <what happened> sends one in your own words." },
 		de = { "Fehlerberichte an einen Freund", "LefthyTools-Fehler und Berufslinks, die nichts öffnen, gehen an Freunde, die sie sammeln; /lefthy report <was passiert ist> schickt einen in deinen eigenen Worten." } },
+	{ id = 54, module = "tweaks",
+		en = { "Friends on your flight", "The top bar of a cinematic flight shows what your Beacon friends are doing: level, where they are, whom they're fighting or their quest." },
+		de = { "Freunde auf deinem Flug", "Der obere Balken eines Flugs im Kinomodus zeigt, was deine Beacon-Freunde machen: Level, wo sie sind, gegen wen sie kämpfen oder ihre Quest." } },
 	-- New entries go here, at the end.
 }

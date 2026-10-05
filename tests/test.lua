@@ -2949,8 +2949,8 @@ do
 	Fire("PLAYER_CONTROL_LOST")
 	Advance(0.3)
 	local film = LefthyToolsFlightFrame
-	check(film and film:IsShown() and not film._mouseEnabled and film.Top.height == 54 and film.Bottom.height == 54,
-		"on the flight: thin black bars top and bottom (5% of the screen); clicks and camera drags go through")
+	check(film and film:IsShown() and not film._mouseEnabled and film.Top.height == 76 and film.Bottom.height == 76,
+		"on the flight: black bars top and bottom (7% of the screen, room for friends' lines); clicks and camera drags go through")
 	check(film.Timer:GetText() == "Landing in about 0:43",
 		"a first flight on this route: the time left, estimated from the distance, got " .. tostring(film.Timer:GetText()))
 	local alphaMidway = UIParent:GetAlpha()
@@ -3001,6 +3001,13 @@ do
 	Fire("PLAYER_CONTROL_LOST")
 	Advance(2)
 	check(film:IsShown() and UIParent:GetAlpha() == 0, "the next flight")
+	local friendsText = film.Friends:GetText() or ""
+	check(friendsText:find("Anna", 1, true) and friendsText:find("Bob", 1, true) and select(2, friendsText:gsub("\n", "")) == 1
+		and friendsText:find("Level 20", 1, true), "the top bar: my Beacon friends, a line each, with level and where, got " .. friendsText)
+	LefthyToolsDB.settings.tweaks.flightFriends = false
+	ns.CinematicFlight.UpdateFriends(GetTime())
+	check(film.Friends:GetText() == "", "setting off: the top bar stays black")
+	LefthyToolsDB.settings.tweaks.flightFriends = true
 	check(film.Timer:GetText() == ("Landing in 0:%02d"):format(took - 2), "the same route: an exact countdown, got " .. tostring(film.Timer:GetText()))
 	OpenWorldMap(1429)
 	Advance(0.3)
