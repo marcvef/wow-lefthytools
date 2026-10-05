@@ -5,11 +5,13 @@ local M = LT:GetModule("tweaks")
 
 -- Level-up window (a Misc Tweak), like the level-up screens of old RPGs: your portrait and the
 -- new level, what each stat gained (counting up from the old value), the spells your class
--- trainer now has for you (Data/ClassSpells.lua, hover one for its tooltip), talent points, a
--- class quest that opens at this level, new dungeons, how long the last level took (Chronicle)
--- and where your friends are (Beacon). It comes a moment after the level-up, once Blizzard's own
--- level-up banner is gone, never in combat (it waits), and closes by itself after a while (not
--- while the mouse is on it), with Escape, its X, or when a fight starts.
+-- trainer now has for you (Data/ClassSpells.lua, hover one for its tooltip), a new row of talents,
+-- talent points, a class quest that opens at this level, new dungeons, how long the last level
+-- took (Chronicle) and where your friends are (Beacon). It comes a moment after the level-up,
+-- once Blizzard's own level-up banner is gone, never in combat (it waits), and closes by itself
+-- after a while (not while the mouse is on it), with Escape, its X, or when a fight starts.
+-- Pinned (the pin, or dragging it) it stays until closed and steps aside during fights; the
+-- arrows next to the level browse what other levels bring.
 --
 -- Stat gains: the base stats (UnitStat) compared with the last snapshot (taken at login and at
 -- every level-up), so Spirit is there too; PLAYER_LEVEL_UP's own numbers (Strength to Intellect)
@@ -17,17 +19,26 @@ local M = LT:GetModule("tweaks")
 -- (maximum health is a secret value on Forever). The last real gains are kept per character
 -- (levelUps), so the settings' preview shows them for your current level.
 --
+-- Talents: Forever has classic's talent trees on retail's trait system: one trait tree per class
+-- with a node group per talent tree (C_Traits.GetGroupDisplayInfoByTreeID), each with its spent
+-- points. A tree's rows are its nodes' heights (posY); row N needs 5 * (N - 1) points in that tree,
+-- so it opens at level 10 + 5 * (N - 1) if every point goes there. Level 10 shows the first row of
+-- every tree; later row levels the new row of the tree with the most points. Talents (and higher
+-- ranks of a talent you don't have, by name) are left out of the trainer's list.
+--
 -- Cost: nothing until a level-up. The window's OnUpdate (count-ups, fading, closing by itself)
--- runs only while it's on screen.
+-- runs only while it's on screen; the talent tree is read when the window is filled.
 
 local SHOW_DELAY = 1.5     -- seconds after the level-up (Blizzard's banner and fanfare first)
 local TOAST_WAIT = 8       -- at most this long for Blizzard's level-up banner to go away
-local HOLD = 25            -- seconds on screen before it closes by itself
+local HOLD = 25            -- seconds on screen before it closes by itself (unless pinned)
 local FADE_IN, FADE_OUT = 0.3, 0.4
 local COUNT_START, COUNT_TIME, COUNT_STAGGER = 0.6, 0.7, 0.09 -- stats count up one after another
 local WIDTH = 440
 local COLUMN = 180          -- a stat cell; two side by side
 local ICON, ICON_GAP, ICONS_PER_ROW, MAX_ICONS = 36, 8, 8, 16
+local TALENT_ICON, TALENT_X, TALENTS_PER_ROW = 32, 140, 7
+local FIRST_TALENT_LEVEL, TALENT_ROW_POINTS = 10, 5
 local TITLE_FONT = "Fonts\\MORPHEUS.TTF"
 local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local DOT = "|A:levelup-dot-gold:12:12|a "
@@ -66,6 +77,15 @@ end
 
 local function CharKey()
 	return (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?")
+end
+
+-- The highest level to browse to: Forever's cap (60, the class spell data's end), or yours if higher.
+local function MaxLevel()
+	local cap = Num(GetMaxLevelForPlayerExpansion and GetMaxLevelForPlayerExpansion())
+	if not cap or cap > 60 then
+		cap = 60
+	end
+	return math.max(cap, UnitLevel("player") or 1)
 end
 
 -- The five base stats (without gear and buffs), or nil while they're secret.
@@ -110,18 +130,140 @@ local function RaceAllowed(mask)
 	return math.floor(mask / 2 ^ (raceID - 1)) % 2 == 1
 end
 
+local function SpellName(spellID)
+	local info = C_Spell.GetSpellInfo(spellID)
+	return info and info.name, info and info.iconID
+end
+
+-- The talent tree: { trees = { { name, icon, order, spent, nodes = { { spellID, row, posX, maxRanks,
+-- ranks } } } }, spells = { [spellID] = true }, names = { [name] = { spellIDs } } }, or nil.
+local function Talents()
+	if not (C_Traits and C_Traits.GetConfigInfo and C_Traits.GetTreeNodes and C_Traits.GetGroupDisplayInfoByTreeID) then
+		return nil
+	end
+	local configID = C_ClassTalents and C_ClassTalents.GetActiveConfigID and C_ClassTalents.GetActiveConfigID()
+	if not configID and C_SpecializationInfo and C_SpecializationInfo.GetCombatConfigIDForSpecGroup then
+		configID = C_SpecializationInfo.GetCombatConfigIDForSpecGroup(C_SpecializationInfo.GetActiveSpecGroup())
+	end
+	local config = configID and C_Traits.GetConfigInfo(configID)
+	local treeID = config and config.treeIDs and config.treeIDs[1]
+	if not treeID then
+		return nil
+	end
+	local byGroup, groupIDs, result = {}, {}, { trees = {}, spells = {}, names = {} }
+	for _, group in ipairs(C_Traits.GetGroupDisplayInfoByTreeID(treeID) or {}) do
+		local tree = { name = group.displayName, icon = group.icon, order = group.orderIndex or 0, spent = 0, nodes = {} }
+		byGroup[group.groupID] = tree
+		groupIDs[#groupIDs + 1] = group.groupID
+		result.trees[#result.trees + 1] = tree
+	end
+	for _, info in ipairs(C_Traits.GetGroupCurrencyInfo and C_Traits.GetGroupCurrencyInfo(configID, groupIDs) or {}) do
+		local tree = byGroup[info.traitNodeGroupID]
+		local currency = info.currencyInfos and info.currencyInfos[1]
+		if tree and currency then
+			tree.spent = Num(currency.spent) or 0
+		end
+	end
+	for _, nodeID in ipairs(C_Traits.GetTreeNodes(treeID) or {}) do
+		local node = C_Traits.GetNodeInfo(configID, nodeID)
+		local tree
+		for _, groupID in ipairs(node and node.groupIDs or {}) do
+			tree = tree or byGroup[groupID]
+		end
+		for _, entryID in ipairs(node and node.entryIDs or {}) do
+			local entry = C_Traits.GetEntryInfo(configID, entryID)
+			local definition = entry and entry.definitionID and C_Traits.GetDefinitionInfo(entry.definitionID)
+			local spellID = definition and definition.spellID
+			if spellID then
+				result.spells[spellID] = true
+				local name = SpellName(spellID)
+				if name then
+					result.names[name] = result.names[name] or {}
+					table.insert(result.names[name], spellID)
+				end
+				if tree then
+					tree.nodes[#tree.nodes + 1] = { spellID = spellID, posX = node.posX or 0, posY = node.posY or 0,
+						maxRanks = node.maxRanks or 1, ranks = node.ranksPurchased or 0, tree = tree.name }
+				end
+			end
+		end
+	end
+	-- Rows: each tree's node heights, top to bottom.
+	for _, tree in ipairs(result.trees) do
+		local heights, seen = {}, {}
+		for _, node in ipairs(tree.nodes) do
+			if not seen[node.posY] then
+				seen[node.posY] = true
+				heights[#heights + 1] = node.posY
+			end
+		end
+		table.sort(heights)
+		for row, y in ipairs(heights) do
+			seen[y] = row
+		end
+		for _, node in ipairs(tree.nodes) do
+			node.row = seen[node.posY]
+		end
+	end
+	table.sort(result.trees, function(a, b) return a.order < b.order end)
+	return result
+end
+
+-- The talent row that opens at this level: { row, groups = { { name, icon, nodes } } }, or nil.
+local function TalentRow(level, talents)
+	if not talents or level < FIRST_TALENT_LEVEL or (level - FIRST_TALENT_LEVEL) % TALENT_ROW_POINTS ~= 0 then
+		return nil
+	end
+	local row = (level - FIRST_TALENT_LEVEL) / TALENT_ROW_POINTS + 1
+	local chosen = {}
+	if row == 1 then
+		chosen = talents.trees
+	else
+		local most = 0
+		for _, tree in ipairs(talents.trees) do
+			most = math.max(most, tree.spent)
+		end
+		for _, tree in ipairs(talents.trees) do
+			if most > 0 and tree.spent == most then
+				chosen[#chosen + 1] = tree
+			end
+		end
+	end
+	local groups = {}
+	for _, tree in ipairs(chosen) do
+		local nodes = {}
+		for _, node in ipairs(tree.nodes) do
+			if node.row == row then
+				nodes[#nodes + 1] = node
+			end
+		end
+		table.sort(nodes, function(a, b) return a.posX < b.posX end)
+		if #nodes > 0 then
+			groups[#groups + 1] = { name = tree.name, icon = tree.icon, nodes = nodes }
+		end
+	end
+	return #groups > 0 and { row = row, groups = groups } or nil
+end
+
 -- The trainer's spells for this level: new ones first, then higher ranks. all: known ones too.
-local function Spells(level, all)
+-- Talents aren't the trainer's; neither are higher ranks of a talent you don't have.
+local function Spells(level, all, talents)
 	local _, classFile = UnitClass("player")
 	local byLevel = ns.CLASS_SPELLS and ns.CLASS_SPELLS[classFile]
 	local list = {}
 	for _, id in ipairs(byLevel and byLevel[level] or {}) do
 		local need = ns.CLASS_SPELL_NEEDS[id]
-		if RaceAllowed(ns.CLASS_SPELL_RACES[id]) and (not need or Known(need)) then
+		local name, icon = SpellName(id)
+		local talentRanks = talents and name and talents.names[name]
+		local haveTalent = not talentRanks
+		for _, talentSpell in ipairs(talentRanks or {}) do
+			haveTalent = haveTalent or Known(talentSpell)
+		end
+		if name and RaceAllowed(ns.CLASS_SPELL_RACES[id]) and (not need or Known(need))
+			and not (talents and talents.spells[id]) and haveTalent then
 			local known = Known(id)
-			local info = C_Spell.GetSpellInfo(id)
-			if info and info.name and (all or not known) then
-				list[#list + 1] = { id = id, name = info.name, icon = info.iconID, rank = ns.CLASS_SPELL_RANK[id], known = known }
+			if all or not known then
+				list[#list + 1] = { id = id, name = name, icon = icon, rank = ns.CLASS_SPELL_RANK[id], known = known }
 			end
 		end
 	end
@@ -253,18 +395,25 @@ local function Section()
 	return s
 end
 
-local function SpellTooltip(button)
-	local spell = button.spell
-	if not spell then
+local function IconTooltip(button)
+	local spell, talent = button.spell, button.talent
+	if not (spell or talent) then
 		return
 	end
 	GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
+	local spellID = spell and spell.id or talent.spellID
 	if GameTooltip.SetSpellByID then
-		GameTooltip:SetSpellByID(spell.id)
+		GameTooltip:SetSpellByID(spellID)
 	else
-		GameTooltip:SetText(spell.name, 1, 1, 1)
+		GameTooltip:SetText(SpellName(spellID) or "?", 1, 1, 1)
 	end
-	if spell.known then
+	if talent then
+		GameTooltip:AddLine(L["Talent in %s, row %d: up to %d points"]:format(talent.tree or "?", talent.row or 0,
+			talent.maxRanks or 1), GOLD[1], GOLD[2], GOLD[3])
+		if talent.ranks > 0 then
+			GameTooltip:AddLine(L["You have %d of them."]:format(talent.ranks), 0.3, 1, 0.3)
+		end
+	elseif spell.known then
 		GameTooltip:AddLine(L["You know this one already."], 0.6, 0.6, 0.6)
 	elseif spell.rank then
 		GameTooltip:AddLine(L["Rank %d: an upgrade from your class trainer"]:format(spell.rank), 0.3, 1, 0.3)
@@ -274,9 +423,9 @@ local function SpellTooltip(button)
 	GameTooltip:Show()
 end
 
-local function IconButton()
+local function IconButton(size)
 	local b = CreateFrame("Button", nil, win)
-	b:SetSize(ICON, ICON)
+	b:SetSize(size, size)
 	b.Icon = b:CreateTexture(nil, "ARTWORK")
 	b.Icon:SetAllPoints()
 	b.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
@@ -288,7 +437,7 @@ local function IconButton()
 	b.New = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	b.New:SetPoint("BOTTOM", b, "TOP", 0, 1)
 	b.New:SetTextColor(0.3, 1, 0.3)
-	b:SetScript("OnEnter", SpellTooltip)
+	b:SetScript("OnEnter", IconTooltip)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	b.Pop = b:CreateAnimationGroup()
 	local grow = b.Pop:CreateAnimation("Scale")
@@ -305,7 +454,26 @@ local function IconButton()
 	return b
 end
 
-local Close
+-- An arrow next to the level (the spell book's page arrows): the level before or after.
+local function ArrowButton(direction)
+	local b = CreateFrame("Button", nil, win)
+	b:SetSize(28, 28)
+	local page = direction < 0 and "Prev" or "Next"
+	b:SetNormalTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. page .. "Page-Up")
+	b:SetPushedTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. page .. "Page-Down")
+	b:SetDisabledTexture("Interface\\Buttons\\UI-SpellbookIcon-" .. page .. "Page-Disabled")
+	b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+	b:SetScript("OnClick", function() LevelUp.Browse(win.data.level + direction) end)
+	b:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText(L["What level %d brings"]:format(win.data.level + direction), 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	return b
+end
+
+local Close, SetPinned
 
 local function Build()
 	win = CreateFrame("Frame", "LefthyToolsLevelUpFrame", UIParent)
@@ -314,10 +482,21 @@ local function Build()
 	win:SetFrameStrata("DIALOG")
 	win:SetClampedToScreen(true)
 	win:EnableMouse(true)
+	win:SetMovable(true)
+	win:RegisterForDrag("LeftButton")
+	win:SetScript("OnDragStart", function(self)
+		SetPinned(true) -- moved somewhere: you want to keep it
+		self:StartMoving()
+	end)
+	win:SetScript("OnDragStop", function(self)
+		self:StopMovingOrSizing()
+		self:SetUserPlaced(false)
+	end)
 	win:Hide()
 	if UISpecialFrames then
 		table.insert(UISpecialFrames, "LefthyToolsLevelUpFrame") -- Escape closes it
 	end
+	LT.Window.Register("LefthyToolsLevelUpFrame") -- a flight pauses for it, Mirage stays up
 
 	-- Dark, warmer towards the bottom; a soft gold glow at the top; gold bars top and bottom.
 	local bg = win:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -345,10 +524,25 @@ local function Build()
 	win.Close = CreateFrame("Button", nil, win, "UIPanelCloseButtonNoScripts")
 	win.Close:SetPoint("TOPRIGHT", -2, -6)
 	win.Close:SetScript("OnClick", function() Close() end)
+	-- The pin: keeps it open (also while you look around other levels).
+	win.Pin = CreateFrame("Button", nil, win)
+	win.Pin:SetSize(22, 22)
+	win.Pin:SetPoint("RIGHT", win.Close, "LEFT", -2, 0)
+	win.Pin.Icon = win.Pin:CreateTexture(nil, "ARTWORK")
+	win.Pin.Icon:SetAllPoints()
+	Art(win.Pin.Icon, "Waypoint-MapPin-ChatIcon", 1, 0.82, 0.3, 1)
+	win.Pin:SetScript("OnClick", function() SetPinned(not win.pinned) end)
+	win.Pin:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:SetText(win.pinned and L["Pinned: it stays until you close it"] or L["Pin it: it stays until you close it"], 1, 1, 1)
+		GameTooltip:AddLine(L["Pinned, it steps aside during a fight and comes back after. Drag it to move it."], 0.8, 0.8, 0.8, true)
+		GameTooltip:Show()
+	end)
+	win.Pin:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	win.Tag = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	win.Tag:SetPoint("TOPLEFT", 12, -12)
 	win.Tag:SetJustifyH("LEFT")
-	win.Tag:SetWidth(WIDTH - 60)
+	win.Tag:SetWidth(WIDTH - 90)
 
 	-- The portrait: round, in a gold ring, with a glow that breathes behind it.
 	local face = CreateFrame("Frame", nil, win)
@@ -430,6 +624,11 @@ local function Build()
 	shineOut:SetStartDelay(1.0)
 	shineOut:SetTarget(win.Shine)
 	win.Shine.Sweep:SetToFinalAlpha(true)
+	-- Arrows on both sides of the number: other levels.
+	win.Prev = ArrowButton(-1)
+	win.Prev:SetPoint("RIGHT", number, "LEFT", 6, -2)
+	win.Next = ArrowButton(1)
+	win.Next:SetPoint("LEFT", number, "RIGHT", -6, -2)
 
 	win.Name = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
 	win.Name:SetPoint("TOP", number, "BOTTOM", 0, -2)
@@ -437,7 +636,7 @@ local function Build()
 	win.Took:SetPoint("TOP", win.Name, "BOTTOM", 0, -5)
 	win.Took:SetTextColor(0.7, 0.7, 0.7)
 
-	win.StatsTitle, win.SpellsTitle, win.UnlockTitle = Section(), Section(), Section()
+	win.StatsTitle, win.SpellsTitle, win.TalentsTitle, win.UnlockTitle = Section(), Section(), Section(), Section()
 	win.Cells = {}
 	for i = 1, 8 do
 		local cell = {}
@@ -448,7 +647,7 @@ local function Build()
 		cell.Value:SetJustifyH("RIGHT")
 		win.Cells[i] = cell
 	end
-	win.Icons = {}
+	win.Icons, win.TalentIcons, win.TalentLabels = {}, {}, {}
 	win.SpellNote = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	win.Unlocks = win:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	win.Unlocks:SetJustifyH("LEFT")
@@ -466,11 +665,30 @@ local function Build()
 	win:SetScript("OnHide", function(self) -- also Escape
 		self.Face.Breathe:Stop()
 		self.closing = nil
-		if GameTooltip:IsOwned(self) or (self.Icons[1] and GameTooltip:IsOwned(self.Icons[1])) then
-			GameTooltip:Hide()
+		if not self.stepAside then
+			SetPinned(false) -- closed: the next one starts unpinned
 		end
+		self.stepAside = nil
+		GameTooltip:Hide()
 	end)
 end
+
+function SetPinned(on)
+	if not win then
+		return
+	end
+	win.pinned = on and true or false
+	win.Pin.Icon:SetDesaturated(not win.pinned)
+	win.Pin:SetAlpha(win.pinned and 1 or 0.55)
+	win.Timer:SetShown(not win.pinned)
+	if win.pinned then
+		win.closing = nil
+		win:SetAlpha(1)
+	else
+		win.left = HOLD
+	end
+end
+LevelUp.SetPinned = SetPinned
 
 ---------------------------------------------------------------------------
 -- Filling it in
@@ -502,6 +720,9 @@ end
 
 local function StatRows(gains)
 	local rows = {}
+	if not gains then
+		return rows
+	end
 	if gains.health and gains.health > 0 then
 		rows[#rows + 1] = { label = L["Health"], delta = gains.health }
 	end
@@ -524,9 +745,9 @@ end
 
 local function UnlockLines(data)
 	local lines = {}
-	local talents = data.gains.talents
+	local talents = data.gains and data.gains.talents
 	if talents and talents > 0 then
-		lines[#lines + 1] = DOT .. (data.level == 10 and L["Talents unlocked: +1 talent point"]
+		lines[#lines + 1] = DOT .. (data.level == FIRST_TALENT_LEVEL and L["Talents unlocked: +1 talent point"]
 			or talents == 1 and L["+1 talent point"] or L["+%d talent points"]:format(talents))
 	end
 	if data.quest then
@@ -539,17 +760,42 @@ local function UnlockLines(data)
 	return lines
 end
 
+local function TagText(data)
+	if data.browse then
+		local mine = UnitLevel("player") or 0
+		if data.level > mine then
+			return L["Coming up: what level %d brings"]:format(data.level)
+		elseif data.level < mine then
+			return L["Looking back: what level %d brought"]:format(data.level)
+		end
+		return L["Your level"]
+	elseif data.preview then
+		return data.example and L["Preview, with example gains (your next level-up shows the real ones)"] or L["Preview"]
+	end
+	return ""
+end
+
+local function PlaceIcon(b, icon, x, y)
+	b:ClearAllPoints()
+	b:SetPoint("TOPLEFT", win, "TOPLEFT", x, y)
+	b.Icon:SetTexture(icon)
+	b:SetAlpha(0)
+	b.Pop:Stop()
+	b:Show()
+end
+
 local function Fill(data)
 	local className, classFile = UnitClass("player")
 	local race = UnitRace("player")
 	local y = -22 - 84 - 10 -- below the portrait
 
 	win.data = data
-	win.Tag:SetText(data.preview and (data.example and L["Preview, with example gains (your next level-up shows the real ones)"]
-		or L["Preview"]) or "")
+	win.Tag:SetText(TagText(data))
 	SetPortraitTexture(win.Face.Portrait, "player")
 	win.LevelLabel:SetText(L["LEVEL"])
 	win.Number:SetText(data.level)
+	win.Prev:SetEnabled(data.level > 2)
+	win.Next:SetEnabled(data.level < MaxLevel())
 	win.Name:SetText(LT.Window.ClassColorCode(classFile) .. (UnitName("player") or "") .. "|r  |cffbbbbbb"
 		.. (race or "") .. " " .. (className or "") .. "|r")
 	y = y - 14 - 68 - 22
@@ -573,12 +819,16 @@ local function Fill(data)
 		win.Took:Hide()
 	end
 
-	-- Stats, two to a row.
-	y = y - 16
+	-- Stats, two to a row (only for a level-up of yours: browsing other levels has none).
 	local rows = StatRows(data.gains)
 	win.rows = rows
-	win.StatsTitle:Place(y, L["Stats gained"])
-	y = y - 24
+	if #rows > 0 then
+		y = y - 16
+		win.StatsTitle:Place(y, L["Stats gained"])
+		y = y - 24
+	else
+		win.StatsTitle:Hide()
+	end
 	for i, cell in ipairs(win.Cells) do
 		local row = rows[i]
 		if row then
@@ -589,7 +839,7 @@ local function Fill(data)
 			cell.Label:SetText(row.label)
 			cell.Value:ClearAllPoints()
 			cell.Value:SetPoint("TOPRIGHT", win, "TOPLEFT", x + COLUMN, rowY)
-			cell.Value:SetText(CellText(row, 0))
+			cell.Value:SetText(CellText(row, data.browse and 1 or 0))
 			cell.Label:Show()
 			cell.Value:Show()
 		else
@@ -600,6 +850,7 @@ local function Fill(data)
 	y = y - math.ceil(#rows / 2) * 22 - 10
 
 	-- Spells from the trainer.
+	local popAt = 1.0
 	for _, b in ipairs(win.Icons) do
 		b:Hide()
 		b.spell = nil
@@ -612,16 +863,14 @@ local function Fill(data)
 		local shown = math.min(#spells, MAX_ICONS)
 		for i = 1, shown do
 			local spell = spells[i]
-			local b = win.Icons[i] or IconButton()
+			local b = win.Icons[i] or IconButton(ICON)
 			win.Icons[i] = b
 			local inRow = math.min(ICONS_PER_ROW, shown - math.floor((i - 1) / ICONS_PER_ROW) * ICONS_PER_ROW)
 			local col = (i - 1) % ICONS_PER_ROW
 			local rowWidth = inRow * ICON + (inRow - 1) * ICON_GAP
-			b:ClearAllPoints()
-			b:SetPoint("TOPLEFT", win, "TOPLEFT", (WIDTH - rowWidth) / 2 + col * (ICON + ICON_GAP),
+			PlaceIcon(b, spell.icon, (WIDTH - rowWidth) / 2 + col * (ICON + ICON_GAP),
 				y - math.floor((i - 1) / ICONS_PER_ROW) * (ICON + 20))
 			b.spell = spell
-			b.Icon:SetTexture(spell.icon)
 			b.Icon:SetDesaturated(spell.known)
 			b.Rank:SetText(spell.rank or "")
 			b.New:SetText((not spell.rank and not spell.known) and L["NEW"] or "")
@@ -630,12 +879,10 @@ local function Fill(data)
 			else
 				b.Border:SetVertexColor(GOLD[1], GOLD[2], GOLD[3])
 			end
-			b:SetAlpha(0)
 			b.Appear:SetToAlpha(spell.known and 0.45 or 1)
-			b.Pop:Stop()
-			b:Show()
-			b.delay = 1.0 + i * 0.05
+			b.delay = popAt + i * 0.05
 		end
+		popAt = popAt + shown * 0.05
 		y = y - math.ceil(shown / ICONS_PER_ROW) * (ICON + 20) + 10
 		local allKnown = true
 		for _, spell in ipairs(spells) do
@@ -657,7 +904,53 @@ local function Fill(data)
 		win.SpellNote:Hide()
 	end
 
-	-- Also unlocked: talents, a class quest, dungeons.
+	-- A new talent row: per tree, its name and the row's talents.
+	for _, b in ipairs(win.TalentIcons) do
+		b:Hide()
+		b.talent = nil
+	end
+	for _, label in ipairs(win.TalentLabels) do
+		label:Hide()
+	end
+	local talentRow = data.talentRow
+	if talentRow then
+		y = y - 6
+		win.TalentsTitle:Place(y, talentRow.row == 1 and L["Talents unlocked"] or L["New talent row (row %d)"]:format(talentRow.row))
+		y = y - 26
+		local n = 0
+		for g, group in ipairs(talentRow.groups) do
+			local label = win.TalentLabels[g] or win:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			win.TalentLabels[g] = label
+			label:SetJustifyH("RIGHT")
+			label:SetWidth(TALENT_X - 40)
+			label:ClearAllPoints()
+			label:SetPoint("RIGHT", win, "TOPLEFT", TALENT_X - 10, y - TALENT_ICON / 2)
+			label:SetText((group.icon and ("|T" .. group.icon .. ":14:14|t ") or "") .. (group.name or ""))
+			label:Show()
+			for i, node in ipairs(group.nodes) do
+				if i > TALENTS_PER_ROW then
+					break
+				end
+				n = n + 1
+				local b = win.TalentIcons[n] or IconButton(TALENT_ICON)
+				win.TalentIcons[n] = b
+				PlaceIcon(b, (select(2, SpellName(node.spellID))), TALENT_X + (i - 1) * (TALENT_ICON + 8), y)
+				b.talent = node
+				b.Icon:SetDesaturated(false)
+				b.Rank:SetText(node.maxRanks > 1 and node.maxRanks or "")
+				b.New:SetText("")
+				b.Border:SetVertexColor(0.55, 0.85, 1)
+				b.Appear:SetToAlpha(1)
+				b.delay = popAt + n * 0.05
+			end
+			y = y - TALENT_ICON - 8
+		end
+		y = y - 8
+	else
+		win.TalentsTitle:Hide()
+	end
+
+	-- Also unlocked: talent points, a class quest, dungeons.
 	local lines = UnlockLines(data)
 	if #lines > 0 then
 		y = y - 6
@@ -671,6 +964,13 @@ local function Fill(data)
 	else
 		win.UnlockTitle:Hide()
 		win.Unlocks:Hide()
+	end
+	if data.browse and #spells == 0 and not talentRow and #lines == 0 then
+		win.SpellNote:SetText(L["Nothing new at this level."])
+		win.SpellNote:ClearAllPoints()
+		win.SpellNote:SetPoint("TOP", win, "TOP", 0, y - 6)
+		win.SpellNote:Show()
+		y = y - 28
 	end
 
 	-- Friends at the bottom.
@@ -694,19 +994,30 @@ end
 -- Showing, counting up, closing
 ---------------------------------------------------------------------------
 
-local function Show(data)
+-- quiet: no fade-in, gold bars or count-ups (browsing, or back after a fight).
+local function Show(data, quiet)
 	if not win then
 		Build()
+		SetPinned(false)
 	end
 	Fill(data)
-	win.t, win.left, win.closing, win.counted = 0, HOLD, nil, false
-	win:SetAlpha(0)
+	win.t, win.left, win.closing, win.counted, win.awayForFight = quiet and 10 or 0, HOLD, nil, false, nil
+	if quiet then
+		for _, b in ipairs(win.Icons) do
+			b.delay = b.spell and 0 or nil
+		end
+		for _, b in ipairs(win.TalentIcons) do
+			b.delay = b.talent and 0 or nil
+		end
+	else
+		win:SetAlpha(0)
+		win.TopBar.Grow:Play()
+		win.BottomBar.Grow:Play()
+		win.Shine.Sweep:Play()
+	end
 	win:Show()
-	win.TopBar.Grow:Play()
-	win.BottomBar.Grow:Play()
 	win.NumberFrame:SetAlpha(0)
 	win.NumberFrame.Punch:Play()
-	win.Shine.Sweep:Play()
 	win.Face.Breathe:Play()
 	LevelUp.shown = data
 end
@@ -731,7 +1042,7 @@ function LevelUp.OnUpdate(self, elapsed)
 		return
 	end
 	self:SetAlpha(math.min(1, self.t / FADE_IN))
-	-- Stats count up one after another; spell icons pop in after them.
+	-- Stats count up one after another; icons pop in after them.
 	if not self.counted then
 		local done = true
 		for i, row in ipairs(self.rows) do
@@ -744,18 +1055,20 @@ function LevelUp.OnUpdate(self, elapsed)
 				self.Cells[i].Value:SetText(CellText(row, p))
 			end
 		end
-		for _, b in ipairs(self.Icons) do
-			if b.spell and b.delay and self.t >= b.delay then
-				b.delay = nil
-				b.Pop:Play()
-			elseif b.delay then
-				done = false
+		for _, list in ipairs({ self.Icons, self.TalentIcons }) do
+			for _, b in ipairs(list) do
+				if (b.spell or b.talent) and b.delay and self.t >= b.delay then
+					b.delay = nil
+					b.Pop:Play()
+				elseif b.delay then
+					done = false
+				end
 			end
 		end
 		self.counted = done
 	end
-	-- It stays while the mouse is on it; otherwise it closes by itself.
-	if self:IsMouseOver() then
+	-- Pinned, or the mouse on it: it stays; otherwise it closes by itself.
+	if self.pinned or self:IsMouseOver() then
 		self.left = HOLD
 	else
 		self.left = self.left - elapsed
@@ -766,20 +1079,35 @@ function LevelUp.OnUpdate(self, elapsed)
 	self.Timer:SetWidth(math.max(1, (WIDTH - 60) * self.left / HOLD))
 end
 
--- Everything for the window at `level`; gains = { health, power, talents, stats = { 5 deltas } }.
+-- Everything for the window at `level`; gains = { health, power, talents, stats = { 5 deltas } }
+-- (nil when browsing another level).
 local function Collect(level, gains, preview)
 	local _, classFile = UnitClass("player")
 	local chronicle = ns.Chronicle
+	local talents = Talents()
 	return {
 		level = level,
 		gains = gains,
 		preview = preview,
-		spells = Spells(level, preview),
+		spells = Spells(level, preview, talents),
+		talentRow = TalentRow(level, talents),
 		quest = CLASS_QUESTS[classFile] and CLASS_QUESTS[classFile][level],
 		dungeons = Dungeons(level),
-		report = chronicle and chronicle.LevelReport and chronicle.LevelReport(level),
+		report = gains and chronicle and chronicle.LevelReport and chronicle.LevelReport(level),
 		friends = Friends(),
 	}
+end
+
+-- The arrows: what another level brings (spells, known ones greyed out; talents; class quest).
+-- Browsing pins the window.
+function LevelUp.Browse(level)
+	level = math.max(2, math.min(MaxLevel(), level))
+	local mine = UnitLevel("player")
+	local record = M.db.levelUps[CharKey()]
+	local data = Collect(level, (level == mine and record and record.level == level) and record or nil, true)
+	data.browse = true
+	Show(data, true)
+	SetPinned(true)
 end
 
 local function TryShow()
@@ -824,6 +1152,14 @@ local function QueueShow(delay)
 	end
 end
 
+-- A pinned window steps aside for a fight and comes back after it.
+local function BackAfterFight()
+	if win and win.awayForFight and not InCombat() and M:IsTweakActive("levelUp") and not win:IsShown() then
+		Show(win.data, true)
+		SetPinned(true)
+	end
+end
+
 events:SetScript("OnEvent", function(_, event, ...)
 	if event == "PLAYER_LEVEL_UP" then
 		local level, health, power, talents, _, str, agi, sta, int = ...
@@ -837,9 +1173,16 @@ events:SetScript("OnEvent", function(_, event, ...)
 	elseif event == "PLAYER_REGEN_ENABLED" then
 		if pending then
 			QueueShow(1)
+		elseif win and win.awayForFight then
+			C_Timer.After(1, BackAfterFight)
 		end
 	elseif event == "PLAYER_REGEN_DISABLED" then
-		Close(true)
+		if win and win:IsShown() and win.pinned then
+			win.awayForFight, win.stepAside = true, true
+			win:Hide()
+		else
+			Close(true)
+		end
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		C_Timer.After(1, TakeSnapshot)
 	end
@@ -857,7 +1200,7 @@ function LevelUp.Preview()
 	local example = not (gains and gains.level == level)
 	if example then
 		local _, token = UnitPowerType("player")
-		gains = { level = level, health = 15 + math.floor(level * 0.8), talents = level >= 10 and 1 or 0,
+		gains = { level = level, health = 15 + math.floor(level * 0.8), talents = level >= FIRST_TALENT_LEVEL and 1 or 0,
 			power = token == "MANA" and 10 + math.floor(level * 0.6) or nil, stats = { 1, 1, 1, 1, 1 } }
 	end
 	local data = Collect(level, gains, true)
@@ -875,6 +1218,7 @@ function ns.ApplyLevelUp(on)
 		events:UnregisterAllEvents()
 		pending = nil
 		if win then
+			win.awayForFight = nil
 			win:Hide()
 		end
 	end

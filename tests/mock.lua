@@ -77,7 +77,11 @@ function FrameMethods:Show()
 	self._shown = true
 	if not wasShown and self._scripts.OnShow then self._scripts.OnShow(self) end
 end
-function FrameMethods:Hide() self._shown = false end
+function FrameMethods:Hide()
+	local wasShown = self._shown
+	self._shown = false
+	if wasShown and self._scripts.OnHide then self._scripts.OnHide(self) end
+end
 function FrameMethods:IsMouseOver() return self._mouse == true end
 function FrameMethods:IsForbidden() return false end
 function FrameMethods:IsProtected() return false end
@@ -127,6 +131,9 @@ function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
 function FrameMethods:RegisterForClicks(...) self._clicks = { ... } end
 function FrameMethods:SetHighlightTexture(t) self._highlight = t end
+function FrameMethods:SetNormalTexture(t) self._normal = t end
+function FrameMethods:SetPushedTexture(t) self._pushed = t end
+function FrameMethods:SetDisabledTexture(t) self._disabled = t end
 function FrameMethods:GetCenter() return self._centerX, self._centerY end -- set by tests where needed
 CURSOR = { x = 0, y = 0 }
 function GetCursorPosition() return CURSOR.x, CURSOR.y end
@@ -444,7 +451,8 @@ end
 -- Spells: KNOWN_SPELLS[id] = true for spells the player knows; names and icons are made up.
 KNOWN_SPELLS = {}
 function IsPlayerSpell(id) return KNOWN_SPELLS[id] == true end
-C_Spell = { GetSpellInfo = function(id) return { name = "Spell " .. id, iconID = 100000 + id, spellID = id } end }
+SPELL_NAMES = {} -- [id] = a name of its own (default "Spell <id>")
+C_Spell = { GetSpellInfo = function(id) return { name = SPELL_NAMES[id] or ("Spell " .. id), iconID = 100000 + id, spellID = id } end }
 function SetPortraitTexture(texture, unit) texture.portrait = unit end
 -- Dungeons that open at a level (the dungeon finder): [level] = { names }.
 UNLOCKED_DUNGEONS = {}
@@ -454,6 +462,40 @@ C_PlayerInfo = { GetInstancesUnlockedAtLevel = function(level, isRaid)
 	return ids
 end }
 function GetLFGDungeonInfo(id) local list = UNLOCKED_DUNGEONS[math.floor(id / 100)]; return list and list[id % 100] end
+-- Talents as Forever has them: one trait tree, a node group per talent tree with its spent points.
+-- TALENT_NODES[nodeID] = { group, row, col, spellID, maxRanks, ranks }; rows are 600 apart (posY).
+TALENT_GROUPS = { { groupID = 1, displayName = "Assassination", icon = 501, orderIndex = 0 },
+	{ groupID = 2, displayName = "Combat", icon = 502, orderIndex = 1 }, { groupID = 3, displayName = "Subtlety", icon = 503, orderIndex = 2 } }
+TALENT_SPENT, TALENT_NODES = { 0, 0, 0 }, {}
+for g = 1, 3 do
+	for row = 1, 7 do
+		for col = 1, 2 do
+			TALENT_NODES[g * 1000 + row * 10 + col] = { group = g, row = row, col = col, spellID = 900000 + g * 1000 + row * 10 + col, maxRanks = col == 1 and 5 or 1 }
+		end
+	end
+end
+C_ClassTalents = { GetActiveConfigID = function() return 7 end }
+C_Traits = {
+	GetConfigInfo = function(id) return { ID = id, treeIDs = { 77 } } end,
+	GetGroupDisplayInfoByTreeID = function() return TALENT_GROUPS end,
+	GetGroupCurrencyInfo = function(_, ids)
+		local out = {}
+		for _, id in ipairs(ids) do out[#out + 1] = { traitNodeGroupID = id, currencyInfos = { { spent = TALENT_SPENT[id] } } } end
+		return out
+	end,
+	GetTreeNodes = function()
+		local ids = {}
+		for id in pairs(TALENT_NODES) do ids[#ids + 1] = id end
+		table.sort(ids)
+		return ids
+	end,
+	GetNodeInfo = function(_, id)
+		local n = TALENT_NODES[id]
+		return n and { ID = id, posX = n.col * 600, posY = n.row * 600, groupIDs = { n.group }, entryIDs = { id }, maxRanks = n.maxRanks, ranksPurchased = n.ranks or 0 }
+	end,
+	GetEntryInfo = function(_, id) return { definitionID = id, maxRanks = 1 } end,
+	GetDefinitionInfo = function(id) local n = TALENT_NODES[id]; return { spellID = n and n.spellID } end,
+}
 XP = { current = 1500, max = 6000, rested = 1200 }
 function UnitXP(unit) return unit == "player" and XP.current or 0 end
 function UnitXPMax(unit) return unit == "player" and XP.max or 0 end

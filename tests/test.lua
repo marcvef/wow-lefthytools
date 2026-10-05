@@ -3951,6 +3951,89 @@ do
 	check(#icons() == #rogue20 and known == 2, "the preview lists every spell of the level, known ones greyed out")
 	W:Hide()
 
+	-- Talents: level 10 opens the first row of every tree; later, the next row of the tree with the most points.
+	local function talentParts()
+		local labels, list = {}, {}
+		for _, l in ipairs(W.TalentLabels) do if l:IsShown() then labels[#labels + 1] = plain(l:GetText()) end end
+		for _, b in ipairs(W.TalentIcons) do if b:IsShown() and b.talent then list[#list + 1] = b end end
+		return labels, list
+	end
+	KNOWN_SPELLS = {}
+	PLAYER_LEVEL = 10
+	Fire("PLAYER_LEVEL_UP", 10, 20, 0, 1, 0, 1, 1, 1, 0)
+	Advance(2)
+	local labels, talentIcons = talentParts()
+	check(shown() and W.TalentsTitle.Text:GetText() == "Talents unlocked" and #labels == 3 and labels[1]:find("Assassination", 1, true)
+		and labels[3]:find("Subtlety", 1, true) and #talentIcons == 6, "level 10: the first row of every talent tree, got " .. #talentIcons .. " talents")
+	talentIcons[1]:GetScript("OnEnter")(talentIcons[1])
+	check(TOOLTIP.spell == 901011 and tostring(TOOLTIP.lines[1]):find("Talent in Assassination, row 1: up to 5 points", 1, true),
+		"hovering one: the talent, its tree, row and points")
+	talentIcons[1]:GetScript("OnLeave")(talentIcons[1])
+	check(plain(W.Unlocks:GetText()):find("Talents unlocked: +1 talent point", 1, true), "and the first talent point")
+	W:Hide()
+	TALENT_SPENT[1] = 5
+	PLAYER_LEVEL = 15
+	Fire("PLAYER_LEVEL_UP", 15, 20, 0, 1, 0, 1, 1, 1, 0)
+	Advance(2)
+	labels, talentIcons = talentParts()
+	check(W.TalentsTitle.Text:GetText() == "New talent row (row 2)" and #labels == 1 and labels[1]:find("Assassination", 1, true)
+		and #talentIcons == 2 and talentIcons[1].talent.row == 2, "level 15: the second row of the tree with my points")
+	W:Hide()
+	-- A talent isn't the trainer's (like Templar's Bulwark), nor a rank of a talent I don't have.
+	TALENT_SPENT[1] = 10
+	PLAYER_LEVEL = 20
+	TALENT_NODES[1031].spellID = rogue20[1]
+	SPELL_NAMES[901032], SPELL_NAMES[rogue20[2]] = "Templar's Bulwark", "Templar's Bulwark"
+	Fire("PLAYER_LEVEL_UP", 20, 30, 0, 1, 0, 1, 2, 1, 0)
+	Advance(2)
+	local listed = {}
+	for _, b in ipairs(icons()) do listed[b.spell.id] = true end
+	check(#icons() == #rogue20 - 2 and not listed[rogue20[1]] and not listed[rogue20[2]],
+		"a talent's spell and a higher rank of a talent I don't have: not at the trainer")
+	W:Hide()
+	KNOWN_SPELLS[901032] = true
+	lefthy("tweaks levelup test")
+	listed = {}
+	for _, b in ipairs(icons()) do listed[b.spell.id] = true end
+	check(listed[rogue20[2]] and not listed[rogue20[1]], "with the talent, its next rank is at the trainer")
+	W:Hide()
+	TALENT_NODES[1031].spellID, SPELL_NAMES, KNOWN_SPELLS, TALENT_SPENT = 901031, {}, {}, { 0, 0, 0 }
+
+	-- Pinned: it stays until closed, and steps aside during a fight.
+	lefthy("tweaks levelup test")
+	check(not W.pinned and W.Timer.shown, "a new window starts unpinned, with its timer line")
+	W.Pin:Click()
+	check(W.pinned and not W.Timer.shown, "the pin keeps it (no timer line)")
+	Advance(30)
+	check(shown(), "pinned: still there after 30 s")
+	STATE.combat = true
+	Fire("PLAYER_REGEN_DISABLED")
+	check(not shown(), "a fight: it steps aside")
+	Advance(2)
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	Advance(1.2)
+	check(shown() and W.pinned and W:GetAlpha() == 1, "after the fight it's back, still pinned")
+	-- The arrows: what other levels bring.
+	local level = W.Number:GetText()
+	W.Next:Click()
+	check(W.Number:GetText() == level + 1 and plain(W.Tag:GetText()):find("Coming up: what level " .. (level + 1), 1, true)
+		and not W.StatsTitle.Text:IsShown(), "next level: what it brings, no stats")
+	W.Prev:Click()
+	W.Prev:Click()
+	check(W.Number:GetText() == level - 1 and plain(W.Tag:GetText()):find("Looking back", 1, true), "and back")
+	W.Close:Click()
+	Advance(0.5)
+	check(not shown() and not W.pinned, "closed: gone, and the next one starts unpinned")
+	lefthy("tweaks levelup test")
+	W:GetScript("OnDragStart")(W)
+	W:GetScript("OnDragStop")(W)
+	check(W.pinned, "moving it pins it")
+	W:Hide()
+	W.Next:Click()
+	check(shown() and W.pinned, "browsing pins it too")
+	W:Hide()
+
 	T("levelUp"):SetValue(false)
 	Advance(0.1)
 	Fire("PLAYER_LEVEL_UP", 21, 31, 0, 1, 0, 1, 1, 1, 1)

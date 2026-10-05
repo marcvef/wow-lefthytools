@@ -197,8 +197,11 @@ strata, a child of UIParent) shows:
 - **New at your class trainer:** `ns.CLASS_SPELLS[class][level]` (Data/ClassSpells.lua, made by
   `tools/update-class-spells.js` from the client's SkillLineAbility, SpellLevels, Talent and
   TalentTab tables on wago.tools) minus spells the player knows (`C_SpellBook.IsSpellKnown`,
-  `IsPlayerSpell`), spells for other races (`CLASS_SPELL_RACES`, bit `raceID - 1`) and higher
-  ranks of talents the player doesn't have (`CLASS_SPELL_NEEDS`). Icons (up to 16, 8 a row) pop
+  `IsPlayerSpell`), spells for other races (`CLASS_SPELL_RACES`, bit `raceID - 1`), higher
+  ranks of classic talents the player doesn't have (`CLASS_SPELL_NEEDS`), and, from the live
+  talent tree (below), every talent's own spell (Forever's new talents, like Templar's Bulwark,
+  sit in the class skill lines too) and spells named like a talent the player doesn't have (its
+  higher ranks). Icons (up to 16, 8 a row) pop
   in after the stats; new ones have a gold border and NEW above, upgrades their rank number
   (`CLASS_SPELL_RANK`); hovering shows `GameTooltip:SetSpellByID`. The generator keeps
   trainable spells (AcquireMethod 0) from level 2 and counts the starting ones (AcquireMethod 2)
@@ -207,6 +210,18 @@ strata, a child of UIParent) shows:
   (IDs 395000-469999; Forever's own spells have new IDs) and a second spell of the same name at
   the same level (a spell and its channel). Forever adds spells of its own (Ice Lance, Penance,
   Lava Burst, ...), and they're in.
+- **Talents:** Forever has classic's trees on retail's trait system: the active config
+  (`C_ClassTalents.GetActiveConfigID`, else `C_SpecializationInfo.GetCombatConfigIDForSpecGroup`),
+  its tree (`C_Traits.GetConfigInfo().treeIDs[1]`), one node group per talent tree
+  (`C_Traits.GetGroupDisplayInfoByTreeID`: name, icon, order) with its spent points
+  (`C_Traits.GetGroupCurrencyInfo`), and nodes (`GetTreeNodes`, `GetNodeInfo`: `posX`, `posY`,
+  `groupIDs`, `maxRanks`, `ranksPurchased`; entries to definitions to `spellID`). A tree's rows
+  are its distinct `posY`, top first; row N needs 5 * (N - 1) points in that tree, so it opens at
+  level 10 + 5 * (N - 1) if every point goes there. On those levels a section shows the row's
+  talents: at 10 the first row of every tree, later the new row of the tree(s) with the most
+  points (none while nothing is spent), per tree its icon and name and the talents (blue border,
+  the number of ranks in the corner; hover: the spell, "Talent in Fire, row 5: up to 5 points").
+  Read when the window is filled, not kept.
 - **Also unlocked:** talent points (the event's `numNewTalents`; "Talents unlocked" at 10), a
   class quest from a short hand-made list of classic's (`CLASS_QUESTS`: warrior stances, the
   hunter's pet, rogue poisons, shaman totems, warlock demons, druid forms, paladin Redemption, the
@@ -217,6 +232,15 @@ strata, a child of UIParent) shows:
   that shrinks until the window closes by itself (25 s; it stays while the mouse is on it). It
   fades out; Escape (`UISpecialFrames`) and the X close it at once, a fight starting
   (`PLAYER_REGEN_DISABLED`) fast.
+- **Pinned** (the pin next to the X, or dragging the window; closing unpins): no timer, it stays
+  until closed. A fight starting hides it (`stepAside`, so it stays pinned) and it comes back 1 s
+  after `PLAYER_REGEN_ENABLED`, without the intro.
+- **Browsing:** the arrows beside the level (the spell book's page arrows) show what another
+  level brings (2 to 60, or your level if higher): its trainer spells (all of them, known ones
+  greyed out), its talent row, class quest and dungeons; no stats, except your own level with
+  your last gains. The corner says "Coming up" or "Looking back". Browsing pins the window.
+- It counts as an open window (`LT.Window.Register`): a cinematic flight pauses for it, Mirage
+  keeps the interface up.
 
 The last real gains are kept per character (`levelUps["Name-Realm"]`); the *Preview* button and
 `/lefthy tweaks levelup test` show the window for the current level with them, or with example
@@ -227,8 +251,9 @@ spell of the level, known ones greyed out.
   window's OnUpdate (fade, count-ups, the close timer) runs only while it's on screen; the glow,
   bars, punch and shine are animation groups.
 - **Unverified in game:** that Forever's payload is retail's (`level, healthDelta, powerDelta,
-  numNewTalents, numNewPvpTalentSlots, strength, agility, stamina, intellect`), the atlases, and
-  whether Forever's trainers still teach exactly what the client's tables say.
+  numNewTalents, numNewPvpTalentSlots, strength, agility, stamina, intellect`), the atlases,
+  whether Forever's trainers still teach exactly what the client's tables say, and the trait
+  calls on Forever's talent tree (row order by `posY`, the group IDs on the nodes).
 
 ## afkScreen: the AFK screen (AFK.lua)
 

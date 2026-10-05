@@ -66,7 +66,12 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     too), the spells your trainer has (compare with the trainer: nothing you know, nothing
     missing), talent point, "Level N took ..." with Chronicle on. Level up in a fight: it waits
     until the fight is over. A fight starting closes it; Escape and the X close it; with the mouse
-    on it, it stays, otherwise it goes after 25 s.
+    on it, it stays, otherwise it goes after 25 s. No talents in the trainer's list (a paladin's
+    Templar's Bulwark at 30 shows under talents instead). At 10: "Talents unlocked" with the first
+    row of all three trees (hover: tree, row, points); at 15, 20, ...: the next row of the tree
+    with the most points. Click the pin: it stays past 25 s; pull a mob: it goes, and comes back
+    after the fight. Drag it: pinned too. The arrows: the levels before and after ("Coming up" /
+    "Looking back", their spells and talent rows).
 12. New Forever quests: in the quest log, a coloured NEW right after the name of quests from new
     Forever content (e.g. the Skyborne start), none on old Classic quests, and no icon covered;
     hovering adds "New in WoW: Forever" to the tooltip. Quests you don't know from original
