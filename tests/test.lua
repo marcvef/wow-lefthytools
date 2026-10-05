@@ -3479,6 +3479,7 @@ do
 	Fire("ZONE_CHANGED_NEW_AREA")
 	Advance(1.1)
 	check(lastEvent("dungeon") and lastEvent("dungeon").name == "The Deadmines" and me.stats.dungeonRuns == 1, "first visit to a dungeon")
+	check(not me.seen.zones["The Deadmines"] and lastEvent("zone").zone ~= "The Deadmines", "... and not a zone discovered as well")
 	Fire("ENCOUNTER_END", 1, "Edwin VanCleef", 1, 5, 1)
 	Fire("BOSS_KILL", 1, "Edwin VanCleef")
 	Fire("ENCOUNTER_END", 2, "Cookie", 1, 5, 0) -- a wipe

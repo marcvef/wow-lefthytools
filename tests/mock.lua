@@ -439,7 +439,7 @@ SUBZONE = "Goldshire"
 function GetSubZoneText() return SUBZONE end
 ZONE = "Elwynn Forest"
 function GetZoneText() return ZONE end
-function GetRealZoneText() return ZONE end
+function GetRealZoneText() return INSTANCE and INSTANCE.name or ZONE end -- (inside an instance: its name, like the game)
 function UnitRace(unit) if unit == "player" then return "Human", "Human", 1 end end
 function UnitFactionGroup(unit) if unit == "player" then return "Alliance", "Alliance" end end
 -- Stats: [index] = { base, effective } (Strength, Agility, Stamina, Intellect, Spirit); SECRET for a secret value.

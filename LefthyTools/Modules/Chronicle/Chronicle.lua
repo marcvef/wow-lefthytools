@@ -526,12 +526,13 @@ end
 local function CheckZone()
 	zoneDirty = false
 	zone = GetRealZoneText()
-	if zone and zone ~= "" and not char.seen.zones[zone] then
+	local inInstance, instanceType = IsInInstance()
+	-- (Inside a dungeon, raid or battleground the "zone" is the instance: a first visit, not a zone.)
+	if zone and zone ~= "" and not inInstance and not char.seen.zones[zone] then
 		char.seen.zones[zone] = true
 		Record("zone", { zone = zone })
 		Share("zone", zone) -- friends' feeds only
 	end
-	local inInstance, instanceType = IsInInstance()
 	if inInstance and (instanceType == "party" or instanceType == "raid") then
 		local name = GetInstanceInfo()
 		-- (kept in the record: a /reload or a disconnect inside isn't another run)
