@@ -3789,6 +3789,134 @@ BAGS = { [0] = {} }
 CloseBags()
 Advance(0.1)
 
+section("Misc Tweaks: level-up window")
+do
+	local TDB = LefthyToolsDB.settings.tweaks
+	local function T(id) return REGISTERED_SETTINGS["LefthyTools_tweaks_" .. id] end
+	local LU = ns.LevelUp
+	local function plain(s) return (tostring(s or "")):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") end
+	local function shown() return LefthyToolsLevelUpFrame ~= nil and LefthyToolsLevelUpFrame:IsShown() end
+	local function cells()
+		local out = {}
+		for _, c in ipairs(LefthyToolsLevelUpFrame.Cells) do
+			if c.Label:IsShown() then out[c.Label:GetText()] = plain(c.Value:GetText()) end
+		end
+		return out
+	end
+	local function icons()
+		local out = {}
+		for _, b in ipairs(LefthyToolsLevelUpFrame.Icons) do if b:IsShown() and b.spell then out[#out + 1] = b end end
+		return out
+	end
+	check(TDB.levelUp == true and T("levelUp") and SETTINGS_BUTTONS["Show the level-up window"], "on by default, with a checkbox and a preview button")
+	if LefthyToolsLevelUpFrame then LefthyToolsLevelUpFrame:Hide() end
+
+	-- A rogue goes from 19 to 20: base stats +1 Str, +2 Agi, +1 Sta, +0 Int, +1 Spi (Spirit: only the snapshot knows).
+	PLAYER_LEVEL = 19
+	LU.TakeSnapshot()
+	PLAYER_LEVEL = 20
+	STATS = { { 41, 46 }, { 62, 72 }, { 51, 59 }, { 25, 25 }, { 31, 33 } }
+	local rogue20 = ns.CLASS_SPELLS.ROGUE[20]
+	KNOWN_SPELLS[rogue20[1]] = true -- one of them already learned
+	UNLOCKED_DUNGEONS[20] = { "Shadowfang Keep" }
+	Fire("PLAYER_LEVEL_UP", 20, 30, 0, 1, 0, 1, 2, 1, 0)
+	check(not shown(), "nothing inside the event")
+	Advance(0.5)
+	check(not shown(), "not right away: Blizzard's banner and fanfare first")
+	Advance(1.2)
+	local W = LefthyToolsLevelUpFrame
+	check(shown() and W.Number:GetText() == 20 and W.Face.Portrait.portrait == "player", "1.5 s later: the window, with my portrait and level 20")
+	check(W:GetAlpha() < 1 and W.NumberFrame.Punch.plays > 0 and W.TopBar.Grow.plays > 0, "it fades in, the gold bars grow and the number punches in")
+	Advance(2)
+	local c = cells()
+	check(c.Health == "+30" and c.Strength == "45 > 46  +1" and c.Agility == "70 > 72  +2" and c.Spirit == "32 > 33  +1"
+		and c.Intellect == "25" and c.Energy == nil, "stats counted up: old > new and the gain (Spirit too), health; no energy for a rogue")
+	local list = icons()
+	check(#list == #rogue20 - 1 and list[1].spell.id ~= rogue20[1], "the trainer's new spells for level 20, without the known one")
+	local newOnes, ranked = 0, 0
+	for _, b in ipairs(list) do
+		if b.spell.rank then
+			if b.Rank:GetText() == b.spell.rank then ranked = ranked + 1 end
+		elseif b.New:GetText() == "NEW" then
+			newOnes = newOnes + 1
+		end
+	end
+	check(newOnes + ranked == #list and W:GetAlpha() == 1, "new spells marked NEW, upgrades with their rank")
+	list[1]:GetScript("OnEnter")(list[1])
+	check(TOOLTIP.spell == list[1].spell.id and TOOLTIP.shown, "hovering an icon shows the spell's tooltip")
+	list[1]:GetScript("OnLeave")(list[1])
+	local unlocks = plain(W.Unlocks:GetText())
+	check(unlocks:find("+1 talent point", 1, true) and unlocks:find("Class quest: Poisons", 1, true)
+		and unlocks:find("New dungeons: Shadowfang Keep", 1, true), "talent point, the rogue's poison quest and the new dungeon, got " .. unlocks)
+	check(W.Took:IsShown() and W.Took:GetText():find("Level 19 took", 1, true), "how long level 19 took (Chronicle)")
+	check(TDB.levelUps["Lefthy-Realmy"].level == 20 and TDB.levelUps["Lefthy-Realmy"].stats[5] == 1, "the gains are kept for the preview")
+	local inList = false
+	for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsLevelUpFrame" then inList = true end end
+	check(inList, "Escape closes it")
+	W._mouse = true
+	Advance(30)
+	check(shown(), "it stays while the mouse is on it")
+	W._mouse = false
+	Advance(26)
+	check(not shown(), "and closes by itself after a while")
+
+	-- In combat: it waits; a fight starting closes it.
+	PLAYER_LEVEL = 21
+	STATE.combat = true
+	Fire("PLAYER_LEVEL_UP", 21, 31, 0, 1, 0, 1, 1, 1, 1)
+	Advance(4)
+	check(not shown(), "a level-up in combat: no window yet")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	Advance(1.2)
+	check(shown() and W.Number:GetText() == 21, "after the fight: there it is")
+	STATE.combat = true
+	Fire("PLAYER_REGEN_DISABLED")
+	Advance(0.1)
+	check(not shown(), "a fight starting closes it")
+	STATE.combat = false
+
+	-- Blizzard's level-up banner first.
+	CreateFrame("Frame", "EventToastManagerFrame")
+	Fire("PLAYER_LEVEL_UP", 21, 31, 0, 1, 0, 1, 1, 1, 1)
+	Advance(3)
+	check(not shown(), "while Blizzard's level-up banner is up: it waits")
+	EventToastManagerFrame:Hide()
+	Advance(0.6)
+	check(shown(), "and comes once the banner is gone")
+	_G.EventToastManagerFrame = nil
+	W:Hide()
+
+	-- The preview: the window for my current level.
+	SETTINGS_BUTTONS["Show the level-up window"].onClick()
+	check(shown() and W.Number:GetText() == 21 and plain(W.Tag:GetText()) == "Preview", "preview button: my level, my last gains")
+	Advance(2)
+	check(cells().Strength == "45 > 46  +1" and cells().Spirit == "33",
+		"... and its numbers: the event's own when the base stats didn't move (no Spirit gain then), got " .. tostring(cells().Spirit))
+	W:Hide()
+	wipe(TDB.levelUps)
+	lefthy("tweaks levelup test")
+	check(shown() and plain(W.Tag:GetText()):find("example", 1, true), "/lefthy tweaks levelup test, no level-up yet: example gains, said so")
+	W:Hide()
+	PLAYER_LEVEL = 20
+	KNOWN_SPELLS[rogue20[2]] = true
+	lefthy("tweaks levelup test")
+	local known = 0
+	for _, b in ipairs(icons()) do if b.spell.known and b.Icon.desaturated then known = known + 1 end end
+	check(#icons() == #rogue20 and known == 2, "the preview lists every spell of the level, known ones greyed out")
+	W:Hide()
+
+	T("levelUp"):SetValue(false)
+	Advance(0.1)
+	Fire("PLAYER_LEVEL_UP", 21, 31, 0, 1, 0, 1, 1, 1, 1)
+	Advance(3)
+	check(not shown(), "switched off: no window")
+	T("levelUp"):SetValue(true)
+	Advance(0.1)
+	PLAYER_LEVEL, KNOWN_SPELLS, UNLOCKED_DUNGEONS = 19, {}, {}
+	STATS = { { 40, 45 }, { 60, 70 }, { 50, 58 }, { 25, 25 }, { 30, 32 } }
+end
+
 section("what's new")
 local news = ns.CHANGELOG
 local MODULES = { mirage = true, tweaks = true, beacon = true, chronicle = true, general = true }

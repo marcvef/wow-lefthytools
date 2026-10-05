@@ -152,5 +152,8 @@ ns.CHANGELOG = {
 	{ id = 48, module = "chronicle",
 		en = { "AFK time on the graphs", "The Martin tracker on the Graphs page: AFK time per day and its share of your play time, and your friends' AFK time next to yours." },
 		de = { "AFK-Zeit in den Graphen", "Der Martin-Tracker auf der Graphen-Seite: AFK-Zeit pro Tag und ihr Anteil an deiner Spielzeit, und die AFK-Zeit deiner Freunde neben deiner." } },
+	{ id = 49, module = "tweaks",
+		en = { "Level-up window", "Like in old RPGs: each level-up shows your stat gains, the new spells at your class trainer, talent points and class quests. Settings has a preview." },
+		de = { "Level-Up-Fenster", "Wie in alten RPGs: Jedes Level-Up zeigt deine neuen Werte, die neuen Zauber bei deinem Klassenlehrer, Talentpunkte und Klassenquests. In den Einstellungen gibt's eine Vorschau." } },
 	-- New entries go here, at the end.
 }

@@ -28,11 +28,13 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever
   Modules/Tweaks/AFK.lua     AFK screen (a tweak): interface hidden, camera circling, a panel with news
   Modules/Tweaks/Flight.lua  cinematic flights (a tweak): letterbox, title cards, subtitles, time left
+  Modules/Tweaks/LevelUp.lua  level-up window (a tweak): stat gains, trainer spells, class quests
   Modules/Tweaks/QuestMap.lua  quests on continent and world maps: icons and areas (world map provider)
   Modules/Tweaks/QuestMap.xml  its world map pin templates (quest icon, quest area)
   Data/Changelog.lua         what's new: one entry per player-visible change, English and German
   Data/ForeverQuests.lua     generated list of those quests (tools/update-forever-quests.ps1)
   Data/FlightPaths.lua       generated length of every flight path (tools/update-flight-paths.ps1)
+  Data/ClassSpells.lua       generated trainer spells per class and level (tools/update-class-spells.js)
   Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
@@ -49,6 +51,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
+tools/update-class-spells.js     regenerates Data/ClassSpells.lua from wago.tools (node)
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
 Update-LefthyTools.cmd       players' one-file installer: batch header + install.ps1 (generated)

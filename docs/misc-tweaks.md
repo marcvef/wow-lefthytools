@@ -176,6 +176,60 @@ choices are `Builder:Choice` sliders (no dropdowns, see forever-platform.md).
 - **Unverified in game:** whether `QuestPOIFrame` draws a zone's blob correctly in a frame that
   small, and how thick the border looks there (`SetBorderScalar`).
 
+## levelUp: the level-up window (LevelUp.lua)
+
+A moment after `PLAYER_LEVEL_UP` (1.5 s, then it waits while `EventToastManagerFrame`, Blizzard's
+level-up banner, is shown, at most 8 s; never in combat: `PLAYER_REGEN_ENABLED` brings it 1 s
+after the fight) a window in the middle of the screen (`LefthyToolsLevelUpFrame`, `DIALOG`
+strata, a child of UIParent) shows:
+
+- **Header:** the portrait (`SetPortraitTexture`, round through `TempPortraitAlphaMask`, in a gold
+  ring of two masked circles, a breathing `GarrLanding-CircleGlow` behind), "LEVEL" and the new
+  level in the quest font (64), which punches in (scale 1.9 to 1) with a `challenges-bannershine`
+  sweep, name in class colour, race and class, and Chronicle's `C.LevelReport(level)`: how long the
+  level before took, its kills and quests, "your fastest level yet" (of at least three timed).
+- **Stats gained:** health and power (`healthDelta` / `powerDelta` from the event: maximum health
+  is a secret value, so only the gain), then Strength to Spirit as "old > new +gain", counting up
+  one after another. The gains are the base stats (`UnitStat`'s first value) against a snapshot
+  from the level before (taken when the tweak is applied, 1 s after `PLAYER_ENTERING_WORLD` and
+  after each level-up), which also covers Spirit (the event has no Spirit); without a matching
+  snapshot, or if the base stats haven't moved yet, the event's Strength to Intellect.
+- **New at your class trainer:** `ns.CLASS_SPELLS[class][level]` (Data/ClassSpells.lua, made by
+  `tools/update-class-spells.js` from the client's SkillLineAbility, SpellLevels, Talent and
+  TalentTab tables on wago.tools) minus spells the player knows (`C_SpellBook.IsSpellKnown`,
+  `IsPlayerSpell`), spells for other races (`CLASS_SPELL_RACES`, bit `raceID - 1`) and higher
+  ranks of talents the player doesn't have (`CLASS_SPELL_NEEDS`). Icons (up to 16, 8 a row) pop
+  in after the stats; new ones have a gold border and NEW above, upgrades their rank number
+  (`CLASS_SPELL_RANK`); hovering shows `GameTooltip:SetSpellByID`. The generator keeps
+  trainable spells (AcquireMethod 0) from level 2 and counts the starting ones (AcquireMethod 2)
+  for the ranks; it leaves out talents, multi-rank talents' effects (same name), "... Effect" /
+  "... Passive" spells, three talent procs without a named talent, Season of Discovery runes
+  (IDs 395000-469999; Forever's own spells have new IDs) and a second spell of the same name at
+  the same level (a spell and its channel). Forever adds spells of its own (Ice Lance, Penance,
+  Lava Burst, ...), and they're in.
+- **Also unlocked:** talent points (the event's `numNewTalents`; "Talents unlocked" at 10), a
+  class quest from a short hand-made list of classic's (`CLASS_QUESTS`: warrior stances, the
+  hunter's pet, rogue poisons, shaman totems, warlock demons, druid forms, paladin Redemption, the
+  60 epic mounts; "your class trainer can point you to it"), and new dungeons
+  (`C_PlayerInfo.GetInstancesUnlockedAtLevel` and `GetLFGDungeonInfo`, where the client has
+  them).
+- **Footer:** Beacon friends with their levels (up to four, highest first) and a thin gold line
+  that shrinks until the window closes by itself (25 s; it stays while the mouse is on it). It
+  fades out; Escape (`UISpecialFrames`) and the X close it at once, a fight starting
+  (`PLAYER_REGEN_DISABLED`) fast.
+
+The last real gains are kept per character (`levelUps["Name-Realm"]`); the *Preview* button and
+`/lefthy tweaks levelup test` show the window for the current level with them, or with example
+gains (said in the corner) when the last level-up was to another level. The preview lists every
+spell of the level, known ones greyed out.
+
+- **Cost:** nothing until a level-up: the events only note the numbers and start a timer. The
+  window's OnUpdate (fade, count-ups, the close timer) runs only while it's on screen; the glow,
+  bars, punch and shine are animation groups.
+- **Unverified in game:** that Forever's payload is retail's (`level, healthDelta, powerDelta,
+  numNewTalents, numNewPvpTalentSlots, strength, agility, stamina, intellect`), the atlases, and
+  whether Forever's trainers still teach exactly what the client's tables say.
+
 ## afkScreen: the AFK screen (AFK.lua)
 
 While the player is AFK (`UnitIsAFK("player")`; `/afk` or the auto-AFK), the

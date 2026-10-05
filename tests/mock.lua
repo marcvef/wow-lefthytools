@@ -183,6 +183,9 @@ local function NewAnimationGroup()
 		function a:SetOrder() end
 		function a:SetScaleFrom(x, y) self.scaleFrom = { x, y } end
 		function a:SetScaleTo(x, y) self.scaleTo = { x, y } end
+		function a:SetOffset(x, y) self.offset = { x, y } end
+		function a:SetOrigin() end
+		function a:SetSmoothing(s) self.smoothing = s end
 		for _, m in ipairs({ "SetFlipBookRows", "SetFlipBookColumns", "SetFlipBookFrames", "SetFlipBookFrameWidth", "SetFlipBookFrameHeight" }) do
 			a[m] = function() end
 		end
@@ -430,7 +433,27 @@ function GetSubZoneText() return SUBZONE end
 ZONE = "Elwynn Forest"
 function GetZoneText() return ZONE end
 function GetRealZoneText() return ZONE end
-function UnitRace(unit) if unit == "player" then return "Human", "Human" end end
+function UnitRace(unit) if unit == "player" then return "Human", "Human", 1 end end
+-- Stats: [index] = { base, effective } (Strength, Agility, Stamina, Intellect, Spirit); SECRET for a secret value.
+STATS = { { 40, 45 }, { 60, 70 }, { 50, 58 }, { 25, 25 }, { 30, 32 } }
+function UnitStat(unit, i)
+	local s = unit == "player" and STATS[i]
+	if s == SECRET then return SECRET, SECRET, 0, 0 end
+	if s then return s[1], s[2], s[2] - s[1], 0 end
+end
+-- Spells: KNOWN_SPELLS[id] = true for spells the player knows; names and icons are made up.
+KNOWN_SPELLS = {}
+function IsPlayerSpell(id) return KNOWN_SPELLS[id] == true end
+C_Spell = { GetSpellInfo = function(id) return { name = "Spell " .. id, iconID = 100000 + id, spellID = id } end }
+function SetPortraitTexture(texture, unit) texture.portrait = unit end
+-- Dungeons that open at a level (the dungeon finder): [level] = { names }.
+UNLOCKED_DUNGEONS = {}
+C_PlayerInfo = { GetInstancesUnlockedAtLevel = function(level, isRaid)
+	local ids = {}
+	for i, name in ipairs(UNLOCKED_DUNGEONS[level] or {}) do if not isRaid then ids[#ids + 1] = level * 100 + i end end
+	return ids
+end }
+function GetLFGDungeonInfo(id) local list = UNLOCKED_DUNGEONS[math.floor(id / 100)]; return list and list[id % 100] end
 XP = { current = 1500, max = 6000, rested = 1200 }
 function UnitXP(unit) return unit == "player" and XP.current or 0 end
 function UnitXPMax(unit) return unit == "player" and XP.max or 0 end
@@ -1139,6 +1162,7 @@ GameTooltip = {
 	Show = function() TOOLTIP.shown = true end,
 	Hide = function() TOOLTIP.shown = false end,
 	IsOwned = function(_, frame) return TOOLTIP.shown and TOOLTIP.owner == frame end,
+	SetSpellByID = function(_, id) TOOLTIP.spell, TOOLTIP.title = id, "Spell " .. id end,
 	SetBagItem = function(self, bag, slot) -- its data knows the copy (guid)
 		local id = BAGS[bag] and BAGS[bag][slot]
 		if id then self:SetHyperlink("item:" .. id, C_Item.GetItemGUID(ItemLocation:CreateFromBagAndSlot(bag, slot))) end

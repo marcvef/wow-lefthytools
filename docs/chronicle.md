@@ -12,7 +12,8 @@ browsed from any character):
 - `chars["Name-Realm"]`: `name, realm, classFile, race, level, first` (when Chronicle first saw
   it), `events` (the timeline, oldest first, at most 1000), `stats` (counters, below),
   `zoneTime[zone]`, `killers[name]`, `levelTimes[level]`, `fastestLevel`, `levelStart`,
-  `professions[name]`, `seen = { zones, dungeons, bosses, rares }` (rares by GUID: one spawn
+  `levelCounts[level] = { kills, quests }` (during that level; `levelFrom` holds the counters at
+  the level's start), `professions[name]`, `seen = { zones, dungeons, bosses, rares }` (rares by GUID: one spawn
   counts once), `days[YYYY-MM-DD]`, `session = { start, stats, money }`, `playedTotal` (what
   `/played` last said; Chronicle never asks itself, that would print in chat).
 - `friends`: the feed, `{ t, name, classFile, k, ... }`, oldest first, at most 300.
@@ -23,6 +24,10 @@ minute of play (at most 240: when full, every other point goes and the step doub
 
 `C.Fill` completes a record (records from older versions lack newer stats); every record is
 filled before it's shown.
+
+`C.LevelReport(level)` gives the level-up window (Misc Tweaks) the level before `level`:
+`{ took, kills, quests, fastest }` from `levelTimes` and `levelCounts`, or nil while Chronicle is
+off or that level wasn't timed.
 
 ## Recording
 

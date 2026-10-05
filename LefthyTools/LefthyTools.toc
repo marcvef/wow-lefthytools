@@ -22,6 +22,7 @@ Core\Options.xml
 Data\Changelog.lua
 Data\ForeverQuests.lua
 Data\FlightPaths.lua
+Data\ClassSpells.lua
 
 # Modules
 Modules\Mirage\Groups.lua
@@ -33,6 +34,7 @@ Modules\Tweaks\ComboPoints.lua
 Modules\Tweaks\ForeverQuests.lua
 Modules\Tweaks\AFK.lua
 Modules\Tweaks\Flight.lua
+Modules\Tweaks\LevelUp.lua
 Modules\Tweaks\QuestMap.lua
 Modules\Tweaks\QuestMap.xml
 

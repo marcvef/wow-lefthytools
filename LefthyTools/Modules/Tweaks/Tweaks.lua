@@ -25,6 +25,8 @@ local M = LT:NewModule("tweaks", {
 		questMapClick = true,  -- clicking an icon selects its quest (off: the map zooms in)
 		afkScreen = true,      -- AFK.lua
 		afkSpin = true,
+		levelUp = true,        -- LevelUp.lua
+		levelUps = {},         -- "Name-Realm" -> the last level-up's gains (the preview shows them)
 		cinematicFlights = true, -- Flight.lua
 		flightHide = "all",    -- "all": the whole interface | "chosen": the elements in flightGroups
 		flightGroups = (function() -- Mirage's groups (Groups.lua), all hidden until unticked
@@ -437,6 +439,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyQuestMap(on) end }, -- QuestMap.lua
 	{ key = "afkScreen", command = "afk", label = "AFK screen",
 		apply = function(on) ns.ApplyAFKScreen(on) end }, -- AFK.lua
+	{ key = "levelUp", command = "levelup", label = "Level-up window",
+		apply = function(on) ns.ApplyLevelUp(on) end }, -- LevelUp.lua
 	{ key = "cinematicFlights", command = "flights", label = "Cinematic flights",
 		apply = function(on) ns.ApplyCinematicFlights(on) end }, -- Flight.lua
 }
@@ -517,6 +521,11 @@ function M:BuildOptions(o)
 	o:Choice("questMapZone", L["Quest areas on zone maps"],
 		L["Blizzard shows only the area of your selected quest. All quests: the areas of every quest in the zone, like Questie."],
 		{ { "blizzard", L["Selected quest"] }, { "areas", L["All quests"] } })
+	o:Header(L["Level-ups"])
+	o:Checkbox("levelUp", L["Level-up window"],
+		L["Like in old RPGs: when you level up, a window shows what each stat gained, the new spells at your class trainer (hover one for its tooltip), talent points, a class quest that opens at this level and how long the last level took. It waits until a fight is over and closes by itself."])
+	o:Button(L["Show the level-up window"], L["Preview"], function() ns.LevelUp.Preview() end,
+		L["Shows the window for your current level, with the gains of your last level-up (example numbers if there was none yet)."])
 	o:Header(L["AFK screen"])
 	o:Checkbox("afkScreen", L["AFK screen"],
 		L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."])
@@ -541,6 +550,8 @@ function M:OnSlashCommand(msg)
 	elseif cmd == "resetbags" then
 		self:ResetBagPositions()
 		self:Print("bag positions reset.")
+	elseif cmd == "levelup" and arg == "test" then
+		ns.LevelUp.Preview()
 	elseif cmd == "status" then
 		for _, tweak in ipairs(TWEAKS) do
 			self:Print(string.format("  %s%s|r (%s)", active[tweak.key] and "|cff80ff80" or "|cffff8080",
@@ -565,7 +576,8 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | questmap | afk | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | questmap | afk | levelup | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks levelup test - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 	end
 end

@@ -77,13 +77,14 @@ C.ticks = 0 -- for tests: the driver ticks once a second
 ---------------------------------------------------------------------------
 
 local function NewChar()
-	local c = { events = {}, stats = {}, zoneTime = {}, killers = {}, levelTimes = {}, professions = {},
+	local c = { events = {}, stats = {}, zoneTime = {}, killers = {}, levelTimes = {}, levelCounts = {}, professions = {},
 		seen = { zones = {}, dungeons = {}, bosses = {}, rares = {} }, days = {}, daily = {}, first = time() }
 	return c
 end
 
 local function Fill(c)
-	for _, key in ipairs({ "events", "stats", "zoneTime", "killers", "levelTimes", "professions", "seen", "days", "daily" }) do
+	for _, key in ipairs({ "events", "stats", "zoneTime", "killers", "levelTimes", "levelCounts", "professions", "seen",
+		"days", "daily" }) do
 		c[key] = type(c[key]) == "table" and c[key] or {}
 	end
 	for _, key in ipairs({ "zones", "dungeons", "bosses", "rares" }) do
@@ -212,6 +213,25 @@ function C.Session(c)
 	}
 end
 
+-- The level before `level`, for the level-up window: { took (seconds played), kills, quests,
+-- fastest (the quickest level so far, of at least three timed ones) }, or nil if not recorded.
+function C.LevelReport(level)
+	if not (M.enabled and char) then
+		return nil
+	end
+	local took = char.levelTimes[level - 1]
+	if not took then
+		return nil
+	end
+	local counts = char.levelCounts[level - 1] or {}
+	local timed = 0
+	for _ in pairs(char.levelTimes) do
+		timed = timed + 1
+	end
+	return { took = took, kills = counts.kills, quests = counts.quests,
+		fastest = timed >= 3 and took <= (char.fastestLevel or took) }
+end
+
 ---------------------------------------------------------------------------
 -- Events (record only; the tick does anything that shows or sends)
 ---------------------------------------------------------------------------
@@ -239,6 +259,12 @@ function handlers.PLAYER_LEVEL_UP(level)
 			char.fastestLevel = took
 		end
 	end
+	-- Kills and quests during the level that just ended (the level-up window shows them).
+	local s, from = char.stats, char.levelFrom
+	if from then
+		char.levelCounts[level - 1] = { kills = s.kills - (from.kills or 0), quests = s.quests - (from.quests or 0) }
+	end
+	char.levelFrom = { kills = s.kills, quests = s.quests }
 	char.levelStart = char.stats.played
 	char.level = level
 	Add("levels")

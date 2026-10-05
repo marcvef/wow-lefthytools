@@ -57,6 +57,15 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
 11. Misc Tweaks: player/target bars show `current / max` without hovering; a dragged bag reopens
     where it was left. In a party, finishing a quest objective posts `[Quest]: 10/10 ...` with a
     star icon; finishing the quest posts `quest complete!`.
+    Level-up window: Settings, Misc Tweaks, Level-ups, *Preview*: the window for your level (the
+    corner says "example gains" until your first real level-up). Check the look: gold bars that
+    grow, round portrait in a gold ring with a glow, the number punching in with a shine, stats
+    counting up, spell icons popping in (hover: tooltip; NEW or a rank number), the class quest
+    line on its level. Then level up for real: after Blizzard's banner, the real gains (Spirit
+    too), the spells your trainer has (compare with the trainer: nothing you know, nothing
+    missing), talent point, "Level N took ..." with Chronicle on. Level up in a fight: it waits
+    until the fight is over. A fight starting closes it; Escape and the X close it; with the mouse
+    on it, it stays, otherwise it goes after 25 s.
 12. New Forever quests: in the quest log, a coloured NEW right after the name of quests from new
     Forever content (e.g. the Skyborne start), none on old Classic quests, and no icon covered;
     hovering adds "New in WoW: Forever" to the tooltip. Quests you don't know from original
