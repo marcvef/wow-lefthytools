@@ -8,7 +8,8 @@ local B = ns.Beacon
 -- Beacon (P2;<continent>;<north>;<west>;<uiMapID>, a world position like the state message, and
 -- the zone for its name). Everyone's world map and minimap show a marker there for a minute:
 -- the game's ping icon with a ripple in the sender's class colour. Receivers also get a chat line
--- and the map ping sound. `/lefthy beacon ping` pings where you stand.
+-- (with the game's map pin link for the spot: a click puts your waypoint arrow there) and the map
+-- ping sound. `/lefthy beacon ping` pings where you stand.
 --
 -- The click is caught with a post-hook (HookScript) on the map's scroll container: Blizzard's
 -- own click handling runs first and untouched. Mouse down, not up: on mouse up the map may zoom
@@ -98,11 +99,30 @@ function B.PingMe()
 	B.SendPing(continent, north, west, C_Map.GetBestMapForUnit("player"))
 end
 
+-- The game's map pin link for that spot on the zone map (a click sets your waypoint arrow there
+-- and opens the map), or nil where the game has no pins.
+local function PinLink(continent, north, west, mapID)
+	if not (mapID and mapID > 0) or (C_Map.CanSetUserWaypointOnMap and not C_Map.CanSetUserWaypointOnMap(mapID)) then
+		return nil
+	end
+	local uiMapID, pos = C_Map.GetMapPosFromWorldPos(continent, CreateVector2D(north, west), mapID)
+	local x, y
+	if uiMapID == mapID and pos then
+		x, y = pos:GetXY()
+	end
+	if not x or x < 0 or x > 1 or y < 0 or y > 1 then
+		return nil
+	end
+	return ("|cffffff00|Hworldmap:%d:%d:%d|h[%s]|h|r"):format(mapID, math.floor(x * 10000 + 0.5), math.floor(y * 10000 + 0.5),
+		MAP_PIN_HYPERLINK or L["Map pin"])
+end
+
 -- A friend's P message, on the driver tick.
 function B.ReceivePing(peer, gameAccountID, continent, north, west, mapID)
 	AddPing(gameAccountID, peer.name, peer.classFile, continent, north, west, mapID)
-	M:Print(("%s%s|r pinged a spot%s: see your map."):format(LT.Window.ClassColorCode(peer.classFile), peer.name,
-		ZoneName(mapID) and (" in " .. ZoneName(mapID)) or ""))
+	local pin = PinLink(continent, north, west, mapID)
+	M:Print(("%s%s|r pinged a spot%s: see your map.%s"):format(LT.Window.ClassColorCode(peer.classFile), peer.name,
+		ZoneName(mapID) and (" in " .. ZoneName(mapID)) or "", pin and (" " .. pin) or ""))
 	PingSound()
 end
 

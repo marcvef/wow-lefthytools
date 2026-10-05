@@ -149,7 +149,7 @@ minimap, and you on theirs, without being in a group.
   item can't be shared, chat always says why.
 - **Lefthy chat:** `/l <text>`, like `/g` or `/p`: a chat line for all your friends with
   LefthyTools, shown in their chat windows as `[Lefthy] [Anna]: text`, with a soft tick (can be
-  switched off). Links work and can be clicked: items, professions, spells, quests,
+  switched off). Links work and can be clicked: items, map pins, professions, spells, quests,
   achievements and the like. The chat box stays on it ("Lefthy:") until you switch with
   `/s`, `/g`, `/p`, ...
 - **Announcements:** `/la <text>` (or `/lefthy announce <text>`) puts the line in the middle of their screens,
@@ -157,6 +157,7 @@ minimap, and you on theirs, without being in a group.
   both come as subtitles.
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.
+  The chat line has a map pin: click it and your waypoint arrow points there.
   `/lefthy beacon ping` pings where you stand.
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see

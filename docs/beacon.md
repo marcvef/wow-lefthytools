@@ -276,15 +276,19 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   whisper sound for friends' and a chat line. At most one per 3 s each way.
 - Text goes through `B.Clean` (200 bytes): no colour codes, `|`, `;` or control characters. So
   links are packed first (`PackLinks`): an item link becomes `{item:<numbers>}` (`B.ItemString`:
-  numeric fields only, as for shared items; trailing empty fields dropped); professions (`trade`),
-  enchants, spells, talents, mounts, quests, achievements, journal entries and currencies become
-  `{<type>:<data>[<text>]}` (data only letters, digits and `:-_.+/=`, text without brackets or
-  braces; the text stays in the sender's language); any other link its "[text]"; colour codes,
-  textures and atlases go; a token cut in half by the size limit is dropped. The receiver (and
-  the sender, for its own echo) rebuilds the links: `Relink` the listed kinds, in their usual
-  colour (`LINK_COLOURS`; an unknown kind stays text), items from its item cache (`UnpackLinks`
-  via `B.WithLink`, in its own language); a line waits until unknown items have loaded. Builds
-  before this show the new tokens as plain text.
+  numeric fields only, as for shared items; trailing empty fields dropped); map pins
+  (`worldmap`), professions (`trade`), enchants, spells, talents, mounts, quests, achievements,
+  journal entries, currencies, battle pets, transmog, keystones, ... (`LINK_KINDS`) become
+  `{<type>:<data>[<text>]<rrggbb>}`: data only letters, digits and `:-_.+/=`; the text without
+  textures and atlases (the map pin's icon), brackets, braces or escapes, in the sender's
+  language; the link's colour (`|cffrrggbb` before `|H`; none for `|cn` colour names). Any other
+  link becomes its "[text]"; colour codes, textures and atlases go; a token cut in half by the
+  size limit is dropped. The receiver (and the sender, for its own echo) rebuilds the links:
+  `Relink` the listed kinds, in the sent colour or the kind's usual one (an unknown kind stays
+  text); a map pin gets this client's `MAP_PIN_HYPERLINK` (icon and text) back, so a click sets
+  the waypoint; items from the item cache (`UnpackLinks` via `B.WithLink`, in its own language);
+  a line waits until unknown items have loaded. Builds before this show the new tokens as plain
+  text.
   Both go to the cinematic flight's subtitles too. Each setting switches sending and showing; with
   one off, a send says why.
 
@@ -386,8 +390,11 @@ for 60 s on the world map (own data provider, `LefthyToolsBeaconPingPinTemplate`
 edge rule as the dots): the game's "look here" ping icon (`Ping_Marker_Icon_NonThreat`; a plain
 round marker if the atlas is missing) over a ripple in the sender's class colour (scale + alpha
 animation, first 10 s), fading out over the last 10 s. Hover: whose, how old, zone, distance.
-Receiving prints "Anna pinged a spot in Elwynn Forest: see your map." and plays
-`SOUNDKIT.MAP_PING`. `B.UpdatePings` on the driver tick expires and fades them and redraws the open
+Receiving prints "Anna pinged a spot in Elwynn Forest: see your map. [Map Pin Location]" and plays
+`SOUNDKIT.MAP_PING`; the last part is the game's own map pin link for the spot on the zone map
+(`worldmap:<uiMapID>:<x*10000>:<y*10000>`, text `MAP_PIN_HYPERLINK`; left out where
+`C_Map.CanSetUserWaypointOnMap` says no), so a click sets the waypoint arrow there and opens the
+map. `B.UpdatePings` on the driver tick expires and fades them and redraws the open
 map when the list changed. Setting `pings` switches sending, showing and the Alt+click off (the
 hook stays, it checks the setting).
 

@@ -10,9 +10,10 @@ local B = ns.Beacon
 -- also come as subtitles on a cinematic flight. Settings lefthyChat and announcements switch
 -- sending and showing. The text goes through B.Clean (no colour codes, separators or escapes), so
 -- item links travel as {item:<numbers>} (B.ItemString: only the numeric fields) and each client
--- builds the link again in its own language (B.WithLink). Professions, spells, quests,
--- achievements and a few more travel as {<type>:<data>[<text>]} (the text in the sender's
--- language) and become clickable links again (LINK_COLOURS); any other link keeps its "[text]".
+-- builds the link again in its own language (B.WithLink). Map pins, professions, spells, quests,
+-- achievements and the other kinds players link (LINK_KINDS) travel as
+-- {<type>:<data>[<text>]<colour>} (the text in the sender's language) and become clickable links
+-- again, in their own colour; any other link keeps its "[text]".
 
 local TEXT_BYTES = 200
 local CHAT_COLOUR = "|cffffb84d"
@@ -22,40 +23,56 @@ local CHAT_SOUND = SOUNDKIT and SOUNDKIT.IG_CHAT_SCROLL_UP or 826 -- a very soft
 local SOUND_GAP = 1.5 -- a burst of lines ticks once
 local lastSound = -math.huge
 
--- The links that travel besides items, in the colour the game gives them. Their data may only hold
--- these characters (GUIDs, numbers, a profession's base64), their text no brackets or braces.
-local LINK_COLOURS = { trade = "ffffd000", enchant = "ffffd000", spell = "ff71d5ff", talent = "ff71d5ff",
-	mount = "ff71d5ff", quest = "ffffff00", achievement = "ffffff00", journal = "ff66bbff", currency = "ffffffff" }
+-- The kinds of links that travel besides items (what players link in chat), with the colour the
+-- game gives them for a link that comes without one. Their data may only hold these characters
+-- (GUIDs, numbers, a profession's base64), their text no brackets, braces or escapes.
+local LINK_KINDS = {
+	worldmap = "ffffff00", trade = "ffffd000", enchant = "ffffd000", spell = "ff71d5ff", talent = "ff71d5ff",
+	mount = "ff71d5ff", quest = "ffffff00", achievement = "ffffff00", journal = "ff66bbff", currency = "ffffffff",
+	battlepet = "ff0070dd", battlePetAbil = "ff4e96f7", transmogappearance = "ffff80ff", transmogset = "ffff80ff",
+	transmogillusion = "ffff80ff", instancelock = "ffff8000", keystone = "ffa335ee", dungeonScore = "ffffffff",
+	worldquest = "ffffd100", eventpoi = "ffffd100", calendarEvent = "ffffd100", talentbuild = "ffffd100",
+}
 local LINK_DATA = "[%w:%-_%.%+/=]"
-local LINK_TOKEN = "{(%a+)(:" .. LINK_DATA .. "*)%[([^%[%]{}]*)%]}"
+local LINK_TOKEN = "{(%a+)(:" .. LINK_DATA .. "*)%[([^%[%]{}]*)%](%x*)}"
+-- A map pin's text has the game's pin icon in it; each client puts its own back (MAP_PIN_HYPERLINK).
+local PIN_ICON = "|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a "
+
+local function Token(colour, data, shown)
+	local kind = data:match("^(%a+):")
+	if kind == "item" then
+		local itemString = B.ItemString and B.ItemString("|H" .. data .. "|h")
+		return itemString and ("{item:" .. itemString:gsub(":+$", "") .. "}") or ""
+	end
+	local label = (shown:match("^%[(.*)%]$") or shown):gsub("|T.-|t", ""):gsub("|A.-|a", "")
+	label = strtrim((label:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:|]*:", ""):gsub("|r", "")))
+	if kind and LINK_KINDS[kind] and data:find("^" .. LINK_DATA .. "+$") and not label:find("[%[%]{}|]") then
+		return "{" .. data .. "[" .. label .. "]" .. (colour and colour:sub(3) or "") .. "}"
+	end
+	return "[" .. label .. "]"
+end
 
 -- Before sending: item links become {item:12345:...} (trailing empty fields dropped: the item is
--- the same), the other kinds above {trade:...[Tailoring]}, any other link its text; colour codes,
+-- the same), the kinds above {trade:...[Tailoring]ffd000}, any other link its text; colour codes,
 -- textures and atlases go.
 local function PackLinks(text)
-	text = text:gsub("|H([^|]*)|h(.-)|h", function(data, shown)
-		local kind = data:match("^(%a+):")
-		if kind == "item" then
-			local itemString = B.ItemString and B.ItemString("|H" .. data .. "|h")
-			return itemString and ("{item:" .. itemString:gsub(":+$", "") .. "}") or ""
-		end
-		local label = shown:match("^%[(.*)%]$") or shown
-		if kind and LINK_COLOURS[kind] and data:find("^" .. LINK_DATA .. "+$") and not label:find("[%[%]{}]") then
-			return "{" .. data .. "[" .. label .. "]}"
-		end
-		return shown
-	end)
+	text = text:gsub("|c(%x%x%x%x%x%x%x%x)|H([^|]*)|h(.-)|h|r", Token)
+	text = text:gsub("|H([^|]*)|h(.-)|h", function(data, shown) return Token(nil, data, shown) end)
 	text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:|]*:", ""):gsub("|r", "")
 	return (text:gsub("|T.-|t", ""):gsub("|A.-|a", ""))
 end
 
--- {trade:...[Tailoring]} back into a clickable link.
+-- {trade:...[Tailoring]ffd000} back into a clickable link.
 local function Relink(text)
-	return (text:gsub(LINK_TOKEN, function(kind, data, label)
-		local colour = LINK_COLOURS[kind]
-		if colour then
-			return "|c" .. colour .. "|H" .. kind .. data .. "|h[" .. label .. "]|h|r"
+	return (text:gsub(LINK_TOKEN, function(kind, data, label, colour)
+		if not LINK_KINDS[kind] then
+			return nil
 		end
+		colour = #colour == 6 and ("ff" .. colour) or LINK_KINDS[kind]
+		if kind == "worldmap" then
+			label = MAP_PIN_HYPERLINK or (PIN_ICON .. label)
+		end
+		return "|c" .. colour .. "|H" .. kind .. data .. "|h[" .. label .. "]|h|r"
 	end))
 end
 

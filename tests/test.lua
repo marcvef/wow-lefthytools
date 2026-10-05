@@ -1530,6 +1530,8 @@ check(#PRINTED < pmark, "receiving: nothing printed inside the event handler")
 Advance(0.15)
 check(printedSince(pmark):find("Anna|r pinged a spot in Elwynn Forest: see your map.", 1, true) and SOUNDS[#SOUNDS] == 3175,
 	"a friend's ping: chat line and sound, got " .. printedSince(pmark))
+check(printedSince(pmark):find("map. |cffffff00|Hworldmap:1429:5000:4500|h[Map pin]|h|r", 1, true),
+	"with the game's map pin link for the spot (a click sets the waypoint), got " .. printedSince(pmark))
 Advance(0.15)
 local annaPing = pingPin(11)
 check(annaPing and math.abs(annaPing.x - 0.5) < 1e-6 and math.abs(annaPing.y - 0.45) < 1e-6
@@ -2625,8 +2627,8 @@ do
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("look: " .. ItemLink(1155) .. " and |cffffff00|Hquest:176:10|h[Wanted: Hogger]|h|r")
 	Advance(0.15)
-	check(sentTo(11, mark, "M2;")[1] == "M2;look: {item:1155::::::::20} and {quest:176:10[Wanted: Hogger]}",
-		"an item link goes as its numbers, a quest link as its data and text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	check(sentTo(11, mark, "M2;")[1] == "M2;look: {item:1155::::::::20} and {quest:176:10[Wanted: Hogger]ffff00}",
+		"an item link goes as its numbers, a quest link as its data, text and colour, got " .. tostring(sentTo(11, mark, "M2;")[1]))
 	check(printedSince(pmark):find("]: look: " .. ItemLink(1155) .. " and |cffffff00|Hquest:176:10|h[Wanted: Hogger]|h|r", 1, true),
 		"my own line shows both links, got " .. printedSince(pmark))
 	-- Professions (and spells, achievements, ...): clickable on the other side too.
@@ -2634,10 +2636,19 @@ do
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("my |cffffd000|Htrade:Player-1-0000ABCD:3908:197|h[Tailoring]|h|r, not |cff00ff00|Hgarrmission:12|h[Mission]|h|r")
 	Advance(0.15)
-	check(sentTo(11, mark, "M2;")[1] == "M2;my {trade:Player-1-0000ABCD:3908:197[Tailoring]}, not [Mission]",
-		"a profession link goes as its data and text; a kind not on the list as its text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	check(sentTo(11, mark, "M2;")[1] == "M2;my {trade:Player-1-0000ABCD:3908:197[Tailoring]ffd000}, not [Mission]",
+		"a profession link goes as its data, text and colour; a kind not on the list as its text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
 	check(printedSince(pmark):find("my |cffffd000|Htrade:Player-1-0000ABCD:3908:197|h[Tailoring]|h|r, not [Mission]", 1, true),
 		"my own line: the profession as a link, got " .. printedSince(pmark))
+	-- A map pin (Shift-click on the pin): its icon goes, each client puts its own back.
+	Advance(0.6)
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_CHAT("here |cffffff00|Hworldmap:1429:4924:5568|h[|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a Map Pin Location]|h|r")
+	Advance(0.15)
+	check(sentTo(11, mark, "M2;")[1] == "M2;here {worldmap:1429:4924:5568[Map Pin Location]ffff00}",
+		"a map pin goes as its map, spot and text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	check(printedSince(pmark):find("here |cffffff00|Hworldmap:1429:4924:5568|h[|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a Map Pin Location]|h|r", 1, true),
+		"and comes back as a clickable map pin with its icon, got " .. printedSince(pmark))
 	pmark = #PRINTED + 1
 	anna("M2;{trade:Player-1-0000EEEE:2259:171[Alchemy]} and {spell:133:0[Fireball]} {garrmission:12[x]} {spell:133 0[y]}")
 	Advance(0.15)

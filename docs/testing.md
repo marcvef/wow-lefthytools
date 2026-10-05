@@ -104,14 +104,16 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     lines show in yours. Open the chat box again: it says "Lefthy:" in orange, and a plain line
     goes to Lefthy chat; `/g` (or `/s`, `/p`) switches back, a whisper doesn't. Typing `/l ` with a
     space switches at once. Shift-click an item into a `/l` line: friends get a working link. The
-    same with your profession (the link on its window), a spell from the spellbook and a quest:
-    each is clickable in your line and theirs (the profession opens its recipe list). A
+    same with your profession (the link on its window), a spell from the spellbook, a quest and a
+    map pin (Ctrl+click the map, then Shift-click the pin): each is clickable in your line and
+    theirs (the profession opens its recipe list, the pin sets the waypoint, with its icon). A
     friend's line ticks softly (once for a quick burst); untick "Soft sound for Lefthy chat": silent. `/la meet at the flight master` (or `/lefthy announce "..."`): on their screen in the
     middle (where shared items show), with the whisper sound, for 10 s; yours too.
     Level-ups: `/lefthy beacon sound` to try the sounds, `/lefthy beacon ding test` for the message.
     They die: a chat line with zone and what they fought. Alt+click your world map: they get a
     rippling marker on both maps, a chat line and a sound; on a continent map the line names the
-    zone under the cursor. A plain click still zooms/navigates as before, also in combat.
+    zone under the cursor; clicking the map pin at the end of their line sets their waypoint arrow
+    to the spot. A plain click still zooms/navigates as before, also in combat.
     They track a quest: their tooltip shows it with progress within a few seconds, "Ready to
     turn in" when done, "You have this quest too" if it's in your log.
     Items: Ctrl+right-click one in your bags: they see "<you> shares [item]" at the top, one line,
