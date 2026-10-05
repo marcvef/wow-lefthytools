@@ -698,6 +698,16 @@ function M:OnInitialize()
 			db.groupAlpha[key] = db.fadedAlpha
 		end
 	end
+	-- An element that comes with a later build starts at the player's faded opacity, like the
+	-- others did (the defaults filled in its key with the default opacity before this runs).
+	local first = type(db.groupsSeen) ~= "table" or next(db.groupsSeen) == nil -- (a reset empties it)
+	db.groupsSeen = type(db.groupsSeen) == "table" and db.groupsSeen or {}
+	for _, g in ipairs(data.GROUPS) do
+		if not first and not db.groupsSeen[g.key] then
+			db.groupAlpha[g.key] = db.fadedAlpha
+		end
+		db.groupsSeen[g.key] = true
+	end
 	lastFadedAlpha = db.fadedAlpha
 end
 

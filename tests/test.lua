@@ -391,6 +391,15 @@ mirage("fade 3")
 check(MDB.fadeOutTime == 3, "/mirage fade 3")
 mirage("delay 60")
 check(MDB.delay == 30, "/mirage delay 60: the slider's limit (30 s), so the settings page can show it")
+do -- An element new in a later build starts at the player's faded opacity (not the default's).
+	local chatAlpha, fadedAlpha, barsAlpha = MDB.groupAlpha.chat, MDB.fadedAlpha, MDB.groupAlpha.actionbars
+	MDB.fadedAlpha, MDB.groupsSeen.chat, MDB.groupAlpha.chat = 0.45, nil, 0
+	Mirage:OnInitialize()
+	check(MDB.groupAlpha.chat == 0.45 and MDB.groupsSeen.chat and MDB.groupAlpha.actionbars == barsAlpha,
+		"a new element: the player's faded opacity; the known ones keep theirs")
+	MDB.groupAlpha.chat, MDB.fadedAlpha = chatAlpha, fadedAlpha
+	Mirage:OnInitialize()
+end
 mirage("delay 2")
 check(MDB.delay == 2 and S("delay").uiUpdates > 0, "/mirage delay 2, through the setting (an open settings page follows)")
 mirage("alpha 20")
