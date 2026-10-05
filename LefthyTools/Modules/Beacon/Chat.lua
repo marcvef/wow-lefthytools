@@ -44,7 +44,9 @@ local PIN_ICON = "|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a "
 
 -- What a build understands of the links in a line: 4 every kind above with its colour (0.5.0-16
 -- on), 3 the kinds of 0.5.0-15 without colour, 2 only items (0.5.0-10 on), 1 none (older, or a
--- friend whose version hasn't arrived yet): links as their "[text]".
+-- friend whose version hasn't arrived yet): links as their "[text]". A 0.5.0 build without its
+-- commit count (0.5.0-g1a2b3c4: the updater couldn't ask GitHub) counts as new: it's a download
+-- of the latest, and friends update.
 local FULL = 4
 local LINK_BUILDS = { { "0.5.0-16-g5d0608d", 4 }, { "0.5.0-15-g4322f60", 3 }, { "0.5.0-10-gbb4ebdb", 2 } }
 local KINDS_15 = { trade = true, enchant = true, spell = true, talent = true, mount = true, quest = true,
@@ -55,6 +57,8 @@ local function LinkLevel(version)
 		local order = version and LT.CompareVersions(version, build[1])
 		if order and order >= 0 then
 			return build[2]
+		elseif order == nil and LT.ParseVersion(version) then
+			return FULL -- (the same base, commit count unknown)
 		end
 	end
 	return 1
@@ -132,7 +136,7 @@ local function ChatLine(name, classFile, text)
 end
 
 -- A friend whose build turns fewer links back into links than mine sent (they get "[text]"
--- instead) is named once (per build).
+-- instead) is named once (per build). Not before their version is known: that's not old.
 local warnedOld = {} -- "<name>/<their version>" -> true
 local function WarnOldFriends(text)
 	if not text:find("{%a+:[^}]*%[") then
@@ -140,7 +144,7 @@ local function WarnOldFriends(text)
 	end
 	local names = {}
 	for _, peer in pairs(M:GetPeers()) do
-		local key = peer.name and (peer.name .. "/" .. tostring(peer.version))
+		local key = peer.name and peer.version and (peer.name .. "/" .. peer.version)
 		if key and not warnedOld[key] and LinkLevel(peer.version) < FULL then
 			warnedOld[key] = true
 			names[#names + 1] = peer.name

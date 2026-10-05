@@ -2759,6 +2759,9 @@ do
 			{ "0.5.0-12-gbb4062c", "M2;[Tailoring] {item:1155::::::::20} [Map Pin Location]", "0.5.0-10 to -14: items only" },
 			{ "0.5.0-9-gda764bc", "M2;[Tailoring] [Rod of the Sleepwalker] [Map Pin Location]", "older: every link as its text" },
 			{ nil, "M2;[Tailoring] [Rod of the Sleepwalker] [Map Pin Location]", "version not known yet: text too" },
+			{ "0.5.0-g1a2b3c4", "M2;{trade:Player-1-0000ABCD:3908:197[Tailoring]ffd000} {item:1155::::::::20} {worldmap:1429:4924:5568[Map Pin Location]ffff00}",
+				"commit count unknown (the updater couldn't ask GitHub): a download of the latest, the full line" },
+			{ "0.4.2-g1a2b3c4", "M2;[Tailoring] [Rod of the Sleepwalker] [Map Pin Location]", "... but not on an older base" },
 		}) do
 			chatPeers[12].version = case[1]
 			Advance(0.6)
@@ -2935,6 +2938,16 @@ do
 	SlashCmdList.LEFTHYTOOLS_CHAT("again |cffffd000|Htrade:Player-1-0:2259:171|h[Alchemy]|h|r")
 	Advance(0.6)
 	check(not printedSince(pmark):find("older LefthyTools", 1, true), "only once")
+	if peerList[12] then
+		for _, case in ipairs({ { nil, "a friend whose version hasn't come yet: not called old" },
+			{ "0.5.0-g5ae6ba6", "nor one whose commit count is unknown" } }) do
+			peerList[12].version = case[1]
+			pmark = #PRINTED + 1
+			SlashCmdList.LEFTHYTOOLS_CHAT("and |cffffd000|Htrade:Player-1-0:2259:171|h[Alchemy]|h|r")
+			Advance(0.6)
+			check(not printedSince(pmark):find("older LefthyTools", 1, true), case[2])
+		end
+	end
 	peerList[11].version = annaVersion
 	if peerList[12] then peerList[12].version = bobVersion end
 	-- An error goes by itself, once per session.
