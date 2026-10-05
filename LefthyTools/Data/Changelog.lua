@@ -170,5 +170,8 @@ ns.CHANGELOG = {
 	{ id = 54, module = "tweaks",
 		en = { "Friends on your flight", "The top bar of a cinematic flight shows what your Beacon friends are doing: level, where they are, whom they're fighting or their quest." },
 		de = { "Freunde auf deinem Flug", "Der obere Balken eines Flugs im Kinomodus zeigt, was deine Beacon-Freunde machen: Level, wo sie sind, gegen wen sie kämpfen oder ihre Quest." } },
+	{ id = 55, module = "chronicle",
+		en = { "More exact numbers", "Raid bosses aren't rares, a /reload in a dungeon or in the air isn't counted twice, dungeons aren't zones, and the graphs keep their days around clock changes." },
+		de = { "Genauere Zahlen", "Raidbosse sind keine Rares, ein /reload im Dungeon oder in der Luft zählt nicht doppelt, Dungeons sind keine Gebiete, und die Grafiken behalten ihre Tage bei der Zeitumstellung." } },
 	-- New entries go here, at the end.
 }
