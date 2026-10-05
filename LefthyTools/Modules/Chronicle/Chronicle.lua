@@ -871,7 +871,12 @@ function M:OnEnable()
 	Fill(char)
 	local _, classFile = UnitClass("player")
 	char.name, char.realm, char.classFile, char.race = name, realm, classFile, UnitRace("player")
-	char.level = UnitLevel("player")
+	local level = UnitLevel("player")
+	if char.level and char.level ~= level then
+		-- Levelled where Chronicle didn't see it (off, another PC): this level's start is unknown.
+		char.levelStart, char.levelFrom = nil, nil
+	end
+	char.level = level
 	lastMoney = GetMoney()
 	char.stats.maxMoney = math.max(char.stats.maxMoney, lastMoney)
 	lastXP, lastXPMax, lastLevel = nil, nil, nil

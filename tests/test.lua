@@ -3981,6 +3981,14 @@ do
 	C.OnTick = onTick
 	check(C.ticks - ticks <= 4 and c.stats.played - played <= 4,
 		"an error in the tick: still once a second, no time made up, got " .. (C.ticks - ticks) .. " ticks")
+	-- Levelled while Chronicle was off: the new level's time doesn't count from the old level's start.
+	c.level, c.levelStart, c.levelFrom = PLAYER_LEVEL - 1, c.stats.played - 100, { kills = 0, quests = 0 }
+	lefthy("disable chronicle")
+	Advance(0.3)
+	lefthy("enable chronicle")
+	Advance(0.3)
+	check(c.level == PLAYER_LEVEL and c.levelStart == nil and c.levelFrom == nil, "a level-up Chronicle missed: that level's start is unknown")
+	c.levelStart, c.levelFrom = c.stats.played - 50, { kills = 0, quests = 0 } -- (the level-up window's tests time this level)
 end
 
 section("Beacon: leaving")
