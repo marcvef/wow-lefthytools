@@ -1003,8 +1003,13 @@ function C.Money(copper)
 	return ("%s%dg %ds %dc"):format(sign, math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100)
 end
 
-function C.Distance(yards)
-	return L["%.1f km"]:format((yards or 0) * 0.9144 / 1000)
+-- "12.3 km" ("12,3 km" in German; chat lines, which stay English, ask for the point).
+function C.Distance(yards, english)
+	local text = ("%.1f km"):format((yards or 0) * 0.9144 / 1000)
+	if ns.DECIMAL_COMMA and not english then
+		text = text:gsub("%.", ",")
+	end
+	return text
 end
 
 -- This session in one line, for the AFK screen (localized) or chat (English).
@@ -1015,7 +1020,7 @@ function C.SessionLine(english)
 	end
 	if english then
 		return ("this session: %s played, %s XP, %d level(s), %d quest(s), %d killing blow(s), %d death(s), %s, %s gold.")
-			:format(C.Duration(s.played), C.Number(s.xp), s.levels, s.quests, s.kills, s.deaths, C.Distance(s.distance),
+			:format(C.Duration(s.played), C.Number(s.xp), s.levels, s.quests, s.kills, s.deaths, C.Distance(s.distance, true),
 				C.Money(s.money))
 	end
 	return L["This session: %s played, %s XP, %d quests, %d kills"]:format(C.Duration(s.played), C.Number(s.xp), s.quests, s.kills)

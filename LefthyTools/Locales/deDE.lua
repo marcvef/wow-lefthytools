@@ -433,7 +433,6 @@ L["Your timeline, your statistics and your friends' news. Also /chronicle or a k
 	"Deine Zeitleiste, deine Statistiken und die Neuigkeiten deiner Freunde. Auch mit /chronicle oder einer Tastenbelegung."
 L["Chronicle: open or close the journal"] = "Chronicle: Tagebuch öffnen/schließen"
 L["This session: %s played, %s XP, %d quests, %d kills"] = "Diese Session: %s gespielt, %s EP, %d Quests, %d Kills"
-L["%.1f km"] = "%.1f km"
 -- Chronicle window
 L["Timeline"] = "Zeitleiste"
 L["Statistics"] = "Statistiken"

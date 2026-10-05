@@ -129,6 +129,8 @@ LefthyToolsErrorsFrame:Hide()
 
 SlashCmdList.LEFTHYTOOLS_MIRAGE("status")
 check(#ns.L_MISSING == 0 and next(ns.L_MISSING) == nil, "chat commands don't look up settings texts")
+check(ns.Chronicle.Distance(1500) == "1,4 km" and ns.Chronicle.Distance(1500, true) == "1.4 km",
+	"distances with a decimal comma (chat lines, which stay English, with a point)")
 check(#ERRORS == 0, "no errors reported through the error handler")
 
 io.write(string.format("\n%d passed, %d failed (German)\n", passes, failures))
