@@ -3960,6 +3960,19 @@ do
 	check(mmb:IsShown(), "on again: back")
 end
 
+section("Chronicle: a broken tick doesn't run every frame")
+do
+	local C = ns.Chronicle
+	local c = C.Store().chars["Lefthy-Realmy"]
+	local ticks, played = C.ticks, c.stats.played
+	local onTick = C.OnTick
+	C.OnTick = function() error("a broken redraw") end
+	for _ = 1, 180 do pcall(Advance, 1 / 60) end
+	C.OnTick = onTick
+	check(C.ticks - ticks <= 4 and c.stats.played - played <= 4,
+		"an error in the tick: still once a second, no time made up, got " .. (C.ticks - ticks) .. " ticks")
+end
+
 section("Beacon: leaving")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 12)
 Advance(0.15)

@@ -660,8 +660,9 @@ driver:SetScript("OnUpdate", function(_, elapsed)
 	sinceTick = sinceTick + elapsed
 	if sinceTick >= TICK then
 		local now = GetTime()
-		Tick(now, now - lastTick)
-		lastTick, sinceTick = now, 0
+		local since = now - lastTick
+		lastTick, sinceTick = now, 0 -- first: an error in the tick must not make it run every frame
+		Tick(now, since)
 	end
 end)
 
