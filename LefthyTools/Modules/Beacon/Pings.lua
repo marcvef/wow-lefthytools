@@ -19,7 +19,7 @@ local B = ns.Beacon
 local PING_TIME = 60     -- seconds a marker stays
 local RIPPLE_TIME = 10   -- the ripple runs this long, then the marker just sits there
 local FADE_TIME = 10     -- and fades out over its last seconds
-local SEND_GAP = 1.5     -- my own pings at most this often
+local SEND_GAP = 2.5     -- my own pings at most this often (friends take one per 2 s: Beacon's PING_GAP)
 local EDGE_ALPHA = 0.6
 local PIN_TEMPLATE = "LefthyToolsBeaconPingPinTemplate"
 local MARKER_ATLAS = "Ping_Marker_Icon_NonThreat" -- the game's "look here" ping
@@ -71,6 +71,7 @@ end
 function B.SendPing(continent, north, west, mapID)
 	local now = GetTime()
 	if now - lastSent < SEND_GAP then
+		M:Print("not so fast: ping again in a moment.") -- (friends would drop it)
 		return
 	end
 	local count = 0

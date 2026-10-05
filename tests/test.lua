@@ -1557,10 +1557,16 @@ local myPing = pingPin("me")
 check(myPing and math.abs(myPing.x - 0.25) < 1e-6 and math.abs(myPing.y - 0.75) < 1e-6 and myPing.RippleAnim:IsPlaying(),
 	"my own marker on my map, rippling")
 check(myPing.Icon.atlas == "Ping_Marker_Icon_NonThreat", "the game's 'look here' ping icon")
+pmark = #PRINTED + 1
 ClickWorldMap()
 Advance(0.15)
-check(#sentTo(11, mark, "P2;") == 1, "at most one ping every 1.5 s")
+check(#sentTo(11, mark, "P2;") == 1 and printedSince(pmark):find("not so fast", 1, true),
+	"at most one ping every 2.5 s (friends drop more than one per 2 s), and it says so")
 Advance(2)
+ClickWorldMap()
+Advance(0.15)
+check(#sentTo(11, mark, "P2;") == 1, "still too soon 2.3 s later")
+Advance(0.3)
 OpenWorldMap(1415)
 MOCK_CURSOR = { 0.375, 0.375 } -- inside Elwynn on the continent map: north 500, west 500
 ClickWorldMap()
