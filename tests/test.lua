@@ -4021,6 +4021,13 @@ do
 		ok = ok and days[i] == date("%Y-%m-%d", time({ year = t.year, month = t.month, day = t.day - 1, hour = 12 }))
 	end
 	check(ok and days[0] == date("%Y-%m-%d"), "14 days back, each the calendar day before the next")
+	-- A friend's day from the future (a wrong clock) isn't kept: it would never be pruned.
+	anna("D2;20990101;10;100;1;1;0;0")
+	anna("D2;" .. date("%Y%m%d") .. ";11;100;1;1;0;0")
+	Advance(1.5)
+	local annaStats = C.Store().friendStats.Anna
+	check(annaStats and annaStats.days[date("%Y-%m-%d")] and not annaStats.days["2099-01-01"],
+		"a friend's day after tomorrow is ignored (today's is kept)")
 end
 
 section("Beacon: leaving")

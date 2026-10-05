@@ -811,6 +811,9 @@ end
 -- A day of a friend's numbers (D2), or just its AFK time (K2: day.afk only):
 -- store.friendStats[name] = { classFile, level, updated, days }. Either keeps what the other set.
 local function StoreFriendDay(peer, day)
+	if day.day > date("%Y-%m-%d", C.DayAgo(-1)) then
+		return -- a day after tomorrow (a wrong clock): it would never be pruned
+	end
 	local friends = store.friendStats
 	local f = friends[peer.name] or { days = {} }
 	friends[peer.name] = f
