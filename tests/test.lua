@@ -4034,6 +4034,18 @@ do
 	c.days[today], c.daily[today] = nil, nil
 	Advance(1.1)
 	check(c.days[today] == true, "a day the session runs into counts as played")
+	-- A /reload mid-flight isn't another flight.
+	local flights = c.stats.flights
+	TRAVEL.taxi = true
+	Advance(1.1)
+	check(c.stats.flights == flights + 1, "taking off counts a flight")
+	lefthy("disable chronicle")
+	Advance(0.3)
+	lefthy("enable chronicle")
+	Advance(2.2)
+	check(c.stats.flights == flights + 1, "a /reload in the air doesn't count another")
+	TRAVEL.taxi = false
+	Advance(1.1)
 end
 
 section("Beacon: leaving")

@@ -647,6 +647,9 @@ local function Tick(now, elapsed)
 	local today = Today()
 	today.played = today.played + elapsed
 	SampleSession()
+	if zoneDirty then
+		CheckZone() -- first: a loading screen's time goes to the zone you arrived in
+	end
 	if zone then
 		char.zoneTime[zone] = (char.zoneTime[zone] or 0) + elapsed
 	end
@@ -666,9 +669,6 @@ local function Tick(now, elapsed)
 		stats.longestAfk = math.max(stats.longestAfk, afkStreak)
 	else
 		afkStreak = nil
-	end
-	if zoneDirty then
-		CheckZone()
 	end
 	if professionsDirty then
 		CheckProfessions()
@@ -913,6 +913,8 @@ function M:OnEnable()
 	lastXP, lastXPMax, lastLevel = nil, nil, nil
 	handlers.PLAYER_XP_UPDATE() -- the starting point for counting experience
 	zoneDirty, professionsDirty, lastPos.continent = true, true, nil
+	local taxi = UnitOnTaxi("player")
+	onTaxi = not issecret(taxi) and taxi == true -- (a /reload mid-flight isn't another flight)
 	sessionJustStarted = false
 	-- A new character, or Chronicle switched on mid-game after being off: the session it knows
 	-- ended long ago (a /reload or switching it off and on keeps it; those take seconds).
