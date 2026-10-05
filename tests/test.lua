@@ -2856,6 +2856,23 @@ do
 	check(film:IsShown(), "a moment later the film is back")
 	Advance(1.5)
 	check(UIParent:GetAlpha() == 0, "... the interface faded out again")
+	-- The settings panel and LefthyTools' own windows (Chronicle, what's new, ...) count too.
+	SettingsPanel:Show()
+	Advance(0.3)
+	check(not film:IsShown() and UIParent:GetAlpha() == 1, "the settings panel: the interface is back")
+	Advance(3)
+	check(not film:IsShown(), "and the film waits while it's open")
+	SettingsPanel:Hide()
+	Advance(2.5)
+	check(film:IsShown(), "settings closed: the film again")
+	SlashCmdList.LEFTHYTOOLS_CHRONICLE("")
+	Advance(0.3)
+	check(LefthyToolsChronicleFrame:IsShown() and not film:IsShown() and UIParent:GetAlpha() == 1, "the Chronicle window: the interface is back")
+	Advance(3)
+	check(not film:IsShown(), "and the film waits while it's open")
+	LefthyToolsChronicleFrame:Hide()
+	Advance(2.5)
+	check(film:IsShown(), "Chronicle closed: the film again")
 	-- Typing in chat pauses it the same way.
 	ACTIVE_CHAT_EDIT_BOX = {}
 	Advance(0.3)
@@ -2869,7 +2886,7 @@ do
 	check(not film:IsShown() and UIParent:GetAlpha() == 1, "a ready check: everything back at once")
 	Advance(4)
 	check(not film:IsShown(), "and it stays back for this flight")
-	Advance(20)
+	Advance(8.4) -- (36 s in the air, with the windows above)
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(0.5)

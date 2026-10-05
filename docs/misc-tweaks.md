@@ -308,7 +308,8 @@ left alone (a first version pulled it back and circled; that was removed).
   (`db.flightOrbit`, `db.flightZoom`, `db.flightMaxZoom`: circling, zoom, zoom limit) and drops
   those keys and the old `flightCamera` setting.
 - **Pausing:** a window or bag opening (more open than the fewest this flight, from Mirage's
-  window lists), typing in chat, or a friend's item offer waiting for my Need or Pass
+  window lists: Blizzard's, the settings panel, and LefthyTools' own windows such as Chronicle,
+  which add themselves with `LT.Window.Register`), typing in chat, or a friend's item offer waiting for my Need or Pass
   (`ns.Beacon.AwaitingAnswer()`: its buttons are on the hidden interface) brings the interface
   back at once; 2 s after it's closed, done or answered, the film fades back in (a zone crossed
   meanwhile gets its card then).

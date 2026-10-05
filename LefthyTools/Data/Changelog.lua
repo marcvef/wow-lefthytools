@@ -158,5 +158,8 @@ ns.CHANGELOG = {
 	{ id = 50, module = "beacon",
 		en = { "A map pin with every ping", "A friend's map ping comes with the game's map pin in its chat line: click it and your waypoint arrow points there." },
 		de = { "Kartenmarkierung bei jedem Ping", "Der Karten-Ping eines Freundes bringt in seiner Chatzeile die Kartenmarkierung des Spiels mit: Ein Klick, und dein Wegpunktpfeil zeigt dorthin." } },
+	{ id = 51, module = "tweaks",
+		en = { "Flights wait for Chronicle", "A cinematic flight now pauses for LefthyTools' own windows too (Chronicle, what's new, errors), like it does for bags and the map." },
+		de = { "Flüge warten auf Chronicle", "Ein Flug im Kinomodus pausiert jetzt auch für die Fenster von LefthyTools (Chronicle, Neuigkeiten, Fehler), wie für Taschen und die Karte." } },
 	-- New entries go here, at the end.
 }

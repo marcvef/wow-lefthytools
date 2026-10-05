@@ -1031,6 +1031,7 @@ PIN_TYPES = { LefthyToolsQuestAreaPinTemplate = QuestPOIFrameMethods }
 PINS = {} -- currently acquired pins
 PINS_CREATED = 0
 local pinPools = {} -- one pool per template, like MapCanvasMixin
+CreateFrame("Frame", "SettingsPanel", UIParent):Hide()
 CreateFrame("Frame", "WorldMapFrame", UIParent)
 WorldMapFrame:Hide()
 WorldMapFrame.mapID = 1429

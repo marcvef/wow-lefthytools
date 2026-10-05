@@ -8,6 +8,15 @@ local LT = ns.LT
 local Window = {}
 LT.Window = Window
 
+-- A window of ours counts as "using the interface", like Blizzard's (ns.MirageData.WINDOWS): a
+-- cinematic flight pauses for it, Mirage keeps the interface up and the AFK screen stays away.
+function Window.Register(name)
+	local data = ns.MirageData
+	if data and data.WINDOWS then
+		table.insert(data.WINDOWS, name)
+	end
+end
+
 function Window.Create(name, title, width, height)
 	local frame = CreateFrame("Frame", name, UIParent, "ButtonFrameTemplate")
 	if ButtonFrameTemplate_HidePortrait then
@@ -27,6 +36,7 @@ function Window.Create(name, title, width, height)
 		frame:SetTitle(title)
 	end
 	table.insert(UISpecialFrames, name) -- Escape closes it
+	Window.Register(name)
 	frame:Hide()
 	return frame
 end

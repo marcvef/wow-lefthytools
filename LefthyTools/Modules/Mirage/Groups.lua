@@ -137,7 +137,8 @@ data.GROUPS = {
 
 -- Windows that count as "using the UI". Most Blizzard windows register with the
 -- UIParent panel manager and are caught via GetUIPanel(); these are extras that
--- don't, or might not, in this client.
+-- don't, or might not, in this client. LefthyTools' own windows add themselves
+-- (LT.Window.Register) when they're built.
 data.WINDOWS = {
 	"WorldMapFrame", "GameMenuFrame", "SettingsPanel", "KeyBindingFrame", "AddonList",
 	"LootFrame", "CharacterFrame", "PlayerSpellsFrame", "SpellBookFrame",
