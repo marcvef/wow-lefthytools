@@ -64,9 +64,9 @@ end
 local HELP = {
 	"/mirage - open settings",
 	"/mirage on | off | toggle - enable or disable the module",
-	"/mirage delay <seconds> - idle time before fading starts",
-	"/mirage fade <seconds> - how long the fade-out takes",
-	"/mirage fadein <seconds> - how long the fade-in takes",
+	"/mirage delay <0-30 seconds> - idle time before fading starts",
+	"/mirage fade <0-10 seconds> - how long the fade-out takes",
+	"/mirage fadein <0-2 seconds> - how long the fade-in takes",
 	"/mirage alpha <0-100> - faded opacity in percent, for every element",
 	"/mirage overlay <0-100> - minimap opacity at which its quest areas are hidden",
 	"/mirage groups - list elements; /mirage group <name> on|off|<0-100> (faded opacity of one element)",
@@ -131,12 +131,13 @@ function M:OnSlashCommand(msg)
 		LT:SetModuleEnabled(self.key, cmd == "on")
 	elseif cmd == "toggle" then
 		LT:ToggleModule(self.key)
+	-- (the sliders' ranges: a value beyond them would be clamped and written back by an open settings page)
 	elseif cmd == "delay" then
-		SetNumber("delay", arg, 0, 300, "Idle delay", Seconds)
+		SetNumber("delay", arg, 0, 30, "Idle delay", Seconds)
 	elseif cmd == "fade" or cmd == "fadeout" then
-		SetNumber("fadeOutTime", arg, 0, 60, "Fade-out duration", Seconds)
+		SetNumber("fadeOutTime", arg, 0, 10, "Fade-out duration", Seconds)
 	elseif cmd == "fadein" then
-		SetNumber("fadeInTime", arg, 0, 10, "Fade-in duration", Seconds)
+		SetNumber("fadeInTime", arg, 0, 2, "Fade-in duration", Seconds)
 	elseif cmd == "alpha" then
 		SetPercent("fadedAlpha", arg, "Faded opacity")
 	elseif cmd == "overlay" then

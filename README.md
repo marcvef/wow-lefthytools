@@ -331,9 +331,9 @@ Some elements also reveal on their own for a few seconds:
 
 | Setting | Default | Command |
 |---|---|---|
-| Idle delay: inactivity before fading starts | 5 s | `/mirage delay <seconds>` |
-| Fade-out duration: how long the fade takes | 1.5 s | `/mirage fade <seconds>` |
-| Fade-in duration | 0.25 s | `/mirage fadein <seconds>` |
+| Idle delay: inactivity before fading starts (0–30 s) | 5 s | `/mirage delay <seconds>` |
+| Fade-out duration: how long the fade takes (0–10 s) | 1.5 s | `/mirage fade <seconds>` |
+| Fade-in duration (0–2 s) | 0.25 s | `/mirage fadein <seconds>` |
 | Faded opacity: sets every element at once | 0% | `/mirage alpha <0-100>` |
 | Elements to fade: per element a switch and its own faded opacity, e.g. minimap only down to 50% | on, 0% | `/mirage group <name> on\|off\|<0-100>` |
 | Hide quest areas at: minimap opacity at which the minimap and its quest overlay are hidden (only when the minimap fades to 0%) | 0% | `/mirage overlay <0-100>` |
