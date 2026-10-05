@@ -605,6 +605,18 @@ AFK.Enable() -- what the login after a /reload does
 Advance(0.05)
 check(CAMERA.stops == stops + 1 and not CAMERA.spinning and not LefthyToolsDB.settings.tweaks.afkSpinning,
 	"after a reload mid-circle the camera is stopped")
+do -- A narrower screen (a big UI scale): the two columns get narrower instead of overlapping.
+	local width = UIParent:GetWidth()
+	UIParent:SetWidth(1100)
+	afk(true)
+	Advance(0.1)
+	local info, friends = LefthyToolsAFKFrame.Info.width, LefthyToolsAFKFrame.Friends.width
+	check(LefthyToolsAFKFrame:IsShown() and 300 + info + 20 <= 1100 - 40 - friends,
+		"1100 wide: info ends before the friends begin, got " .. info .. " and " .. friends)
+	afk(false)
+	Advance(0.1)
+	UIParent:SetWidth(width)
+end
 Advance(8) -- let the HUD settle again
 
 section("Misc Tweaks: framework")

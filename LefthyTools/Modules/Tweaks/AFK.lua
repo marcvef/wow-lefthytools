@@ -263,6 +263,12 @@ local function Show()
 	wipe(news)
 	ns.HideInterface("afk", true) -- Tweaks.lua (shared with cinematic flights)
 	screen:SetScale(UIParent:GetScale())
+	-- The two columns share what's right of the model (x 300 to the right edge, 40 margin, 20 gap):
+	-- on a narrower screen (a big UI scale) they get narrower instead of running into each other.
+	local room = math.max(400, (UIParent:GetWidth() or 0) - 300 - 40 - 20)
+	local infoWidth = math.min(420, math.floor(room * 0.49))
+	screen.Info:SetWidth(infoWidth)
+	screen.Friends:SetWidth(math.min(440, room - infoWidth))
 	screen.Model:SetUnit("player") -- current gear
 	screen.Model:SetFacing(0.6)
 	screen:Show()
