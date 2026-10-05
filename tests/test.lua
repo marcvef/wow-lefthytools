@@ -2980,6 +2980,27 @@ do
 	check(#sentTo(11, mark, "Z2;") == 0, "sending off: errors stay here")
 	B("sendReports"):SetValue(true)
 	LT.Errors.Clear()
+	-- A backlog goes over a few minutes, each report whole: friends take 60 parts a minute.
+	local function minute()
+		for _ = 1, 3 do
+			Advance(22)
+			bobAlive()
+		end
+	end
+	minute()
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	for i = 1, 6 do lefthy("report " .. ("a long story, number " .. i .. ". "):rep(150)) end
+	Advance(5) -- (the queue lets 10 a second go)
+	check(#sentTo(11, mark, "Z2;") == 32 and #LefthyToolsDB.reportsOut == 4, "six long reports (16 parts each): two go now, got "
+		.. #sentTo(11, mark, "Z2;") .. " parts")
+	pmark = #PRINTED + 1
+	minute()
+	check(#sentTo(11, mark, "Z2;") == 64 and #LefthyToolsDB.reportsOut == 2
+		and printedSince(pmark):find("2 report(s) sent to Anna (they collect LefthyTools error reports), 2 more in a moment.", 1, true),
+		"two more a minute later, and I'm told more are coming")
+	minute()
+	local parts = sentTo(11, mark, "Z2;")
+	check(#parts == 96 and #LefthyToolsDB.reportsOut == 0 and parts[96]:find("^Z2;%d+;16;16;"), "and the last two: each one whole")
 	anna("Y2;0")
 
 	-- Collecting: friends are told, and their reports arrive whole.

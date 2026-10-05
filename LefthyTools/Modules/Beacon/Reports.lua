@@ -23,12 +23,15 @@ local PART_BYTES, MAX_PARTS = 180, 16
 local KEEP_COLLECTED, KEEP_WAITING = 40, 10
 local ASSEMBLE_WAIT = 120 -- seconds before a report with parts missing is kept as it is
 local FLUSH_GAP = 2
+-- Friends take 60 parts a minute from one friend (Beacon's REPORT_PARTS): mine stay well under.
+local PARTS_PER_MINUTE, SENT_WINDOW = 45, 65
 local CLICKS = 8          -- the last links clicked, for hand-written reports
 
 local assembling = {}     -- "<sender>:<id>" -> { sender, id, of, parts = {}, at }
 local errorsIn = {}       -- errors caught this session, waiting to become reports
 local clicks = {}         -- { at, link, result }
 local lastFlush = -math.huge
+local sentParts = {}      -- { at, count } per report sent lately
 local announced           -- what friends were last told about collecting
 
 local function Saved(key)
@@ -127,10 +130,9 @@ local function Parts(text)
 	return parts
 end
 
-local function Send(text, to)
+local function Send(parts, to)
 	local db = LT.db
 	db.reportSeq = ((tonumber(db.reportSeq) or 0) % 9999) + 1
-	local parts = Parts(text)
 	for _, gameAccountID in ipairs(to) do
 		for n, part in ipairs(parts) do
 			B.QueueLow(gameAccountID, ("Z%s;%d;%d;%d;%s"):format(B.VERSION, db.reportSeq, n, #parts, part))
@@ -138,22 +140,48 @@ local function Send(text, to)
 	end
 end
 
--- Waiting reports go to every collector who is online; told in chat.
+-- Parts sent in the last SENT_WINDOW seconds (the old ones forgotten).
+local function RecentParts(now)
+	local total = 0
+	for i = #sentParts, 1, -1 do
+		if now - sentParts[i].at >= SENT_WINDOW then
+			table.remove(sentParts, i)
+		else
+			total = total + sentParts[i].count
+		end
+	end
+	return total
+end
+
+-- Waiting reports go to every collector who is online, oldest first, as many as friends take in a
+-- minute (a backlog goes over a few minutes, each report whole); told in chat.
 local function Flush()
 	local waiting = Saved("reportsOut")
 	local to = Collectors()
 	if #waiting == 0 or #to == 0 then
 		return
 	end
-	for _, report in ipairs(waiting) do
-		Send(report.text, to)
+	local now = GetTime()
+	local room, sent = PARTS_PER_MINUTE - RecentParts(now), 0
+	while waiting[1] do
+		local parts = Parts(waiting[1].text)
+		if #parts > room then
+			break
+		end
+		Send(parts, to)
+		room, sent = room - #parts, sent + 1
+		sentParts[#sentParts + 1] = { at = now, count = #parts }
+		table.remove(waiting, 1)
+	end
+	if sent == 0 then
+		return
 	end
 	local names = {}
 	for _, gameAccountID in ipairs(to) do
 		names[#names + 1] = NameOf(gameAccountID)
 	end
-	M:Print(("%d report(s) sent to %s (they collect LefthyTools error reports)."):format(#waiting, table.concat(names, ", ")))
-	wipe(waiting)
+	M:Print(("%d report(s) sent to %s (they collect LefthyTools error reports)%s."):format(sent, table.concat(names, ", "),
+		#waiting > 0 and (", %d more in a moment"):format(#waiting) or ""))
 end
 
 local function Keep(text)
