@@ -176,5 +176,8 @@ ns.CHANGELOG = {
 	{ id = 56, module = "tweaks",
 		en = { "Fixes for flights, bags and level-ups", "Typing as a flight starts no longer skips the film, bags you didn't move stay on screen, and level-up gains leave buffs out." },
 		de = { "Fixes für Flüge, Taschen und Level-Ups", "Tippen beim Abflug lässt den Kinomodus nicht mehr ausfallen, nicht verschobene Taschen bleiben im Bild, und Level-Up-Werte lassen Buffs weg." } },
+	{ id = 57, module = "beacon",
+		en = { "Nothing lost between friends", "Pings, Lefthy chat, announcements and error reports never go out faster than friends take them, long roll results reach everyone, chat lines arrive in order, friends on a current build aren't called old anymore, and Ctrl-click in gamepad mode can't block a role check." },
+		de = { "Nichts geht mehr verloren", "Pings, Lefthy-Chat, Ankündigungen und Fehlerberichte gehen nie schneller raus, als Freunde sie annehmen, lange Würfelergebnisse erreichen alle, Chatzeilen kommen in der richtigen Reihenfolge, Freunde mit aktueller Version gelten nicht mehr als veraltet, und Strg-Klick im Gamepad-Modus kann keinen Rollencheck mehr blockieren." } },
 	-- New entries go here, at the end.
 }
