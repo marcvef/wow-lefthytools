@@ -3088,6 +3088,11 @@ do
 	check(not film:IsShown() and UIParent:GetAlpha() == 1, "a ready check: everything back at once")
 	Advance(4)
 	check(not film:IsShown(), "and it stays back for this flight")
+	local taxiChecks, onTaxi = 0, UnitOnTaxi
+	UnitOnTaxi = function(...) taxiChecks = taxiChecks + 1; return onTaxi(...) end
+	Advance(1)
+	UnitOnTaxi = onTaxi
+	check(taxiChecks <= 8, "ended for this flight: the driver checks a few times a second, not every frame, got " .. taxiChecks)
 	Advance(8.4) -- (36 s in the air, with the windows above)
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")

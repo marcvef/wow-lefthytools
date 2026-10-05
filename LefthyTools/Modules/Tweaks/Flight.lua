@@ -509,7 +509,7 @@ end
 -- brings the interface back at once, for the rest of this flight.
 local function EndFilm(landed)
 	local wasShown = shown
-	flying, shown = false, false
+	flying, shown, leaveNow = false, false, false -- (leaveNow would keep the driver checking every frame)
 	screen.FadeIn:Stop()
 	if wasShown and landed then
 		screen.FadeOut:Play() -- hides the screen when done
