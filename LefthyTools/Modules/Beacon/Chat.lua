@@ -14,6 +14,10 @@ local B = ns.Beacon
 -- achievements and the other kinds players link (LINK_KINDS) travel as
 -- {<type>:<data>[<text>]<colour>} (the text in the sender's language) and become clickable links
 -- again, in their own colour; any other link keeps its "[text]".
+--
+-- Friends on older builds get what theirs understands (LinkLevel, from their version): links as
+-- tokens only where their build turns them back into links, everything else as "[text]", the way
+-- it reached them before.
 
 local TEXT_BYTES = 200
 local CHAT_COLOUR = "|cffffb84d"
@@ -38,26 +42,47 @@ local LINK_TOKEN = "{(%a+)(:" .. LINK_DATA .. "*)%[([^%[%]{}]*)%](%x*)}"
 -- A map pin's text has the game's pin icon in it; each client puts its own back (MAP_PIN_HYPERLINK).
 local PIN_ICON = "|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a "
 
-local function Token(colour, data, shown)
+-- What a build understands of the links in a line: 4 every kind above with its colour (0.5.0-16
+-- on), 3 the kinds of 0.5.0-15 without colour, 2 only items (0.5.0-10 on), 1 none (older, or a
+-- friend whose version hasn't arrived yet): links as their "[text]".
+local FULL = 4
+local LINK_BUILDS = { { "0.5.0-16-g5d0608d", 4 }, { "0.5.0-15-g4322f60", 3 }, { "0.5.0-10-gbb4ebdb", 2 } }
+local KINDS_15 = { trade = true, enchant = true, spell = true, talent = true, mount = true, quest = true,
+	achievement = true, journal = true, currency = true }
+
+local function LinkLevel(version)
+	for _, build in ipairs(LINK_BUILDS) do
+		local order = version and LT.CompareVersions(version, build[1])
+		if order and order >= 0 then
+			return build[2]
+		end
+	end
+	return 1
+end
+
+local function Token(level, colour, data, shown)
 	local kind = data:match("^(%a+):")
-	if kind == "item" then
+	local label = (shown:match("^%[(.*)%]$") or shown):gsub("|T.-|t", ""):gsub("|A.-|a", "")
+	label = strtrim((label:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:|]*:", ""):gsub("|r", "")))
+	if kind == "item" and level >= 2 then
 		local itemString = B.ItemString and B.ItemString("|H" .. data .. "|h")
 		return itemString and ("{item:" .. itemString:gsub(":+$", "") .. "}") or ""
 	end
-	local label = (shown:match("^%[(.*)%]$") or shown):gsub("|T.-|t", ""):gsub("|A.-|a", "")
-	label = strtrim((label:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:|]*:", ""):gsub("|r", "")))
-	if kind and LINK_KINDS[kind] and data:find("^" .. LINK_DATA .. "+$") and not label:find("[%[%]{}|]") then
-		return "{" .. data .. "[" .. label .. "]" .. (colour and colour:sub(3) or "") .. "}"
+	if kind and LINK_KINDS[kind] and data:find("^" .. LINK_DATA .. "+$") and not label:find("[%[%]{}|]")
+		and (level >= 4 or (level == 3 and KINDS_15[kind])) then
+		return "{" .. data .. "[" .. label .. "]" .. ((level >= 4 and colour) and colour:sub(3) or "") .. "}"
 	end
 	return "[" .. label .. "]"
 end
 
 -- Before sending: item links become {item:12345:...} (trailing empty fields dropped: the item is
 -- the same), the kinds above {trade:...[Tailoring]ffd000}, any other link its text; colour codes,
--- textures and atlases go.
-local function PackLinks(text)
-	text = text:gsub("|c(%x%x%x%x%x%x%x%x)|H([^|]*)|h(.-)|h|r", Token)
-	text = text:gsub("|H([^|]*)|h(.-)|h", function(data, shown) return Token(nil, data, shown) end)
+-- textures and atlases go. level: what the receiving build understands (LinkLevel).
+local function PackLinks(text, level)
+	text = text:gsub("|c(%x%x%x%x%x%x%x%x)|H([^|]*)|h(.-)|h|r", function(colour, data, shown)
+		return Token(level, colour, data, shown)
+	end)
+	text = text:gsub("|H([^|]*)|h(.-)|h", function(data, shown) return Token(level, nil, data, shown) end)
 	text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:|]*:", ""):gsub("|r", "")
 	return (text:gsub("|T.-|t", ""):gsub("|A.-|a", ""))
 end
@@ -106,9 +131,8 @@ local function ChatLine(name, classFile, text)
 		CHAT_COLOUR, text)
 end
 
--- Links other than items arrive as links from this build on (0.5.0-16: the token with its
--- colour); older builds show the token as text. Whoever is older gets named once (per build).
-local LINKS_SINCE = "0.5.0-16-g5d0608d"
+-- A friend whose build turns fewer links back into links than mine sent (they get "[text]"
+-- instead) is named once (per build).
 local warnedOld = {} -- "<name>/<their version>" -> true
 local function WarnOldFriends(text)
 	if not text:find("{%a+:[^}]*%[") then
@@ -117,7 +141,7 @@ local function WarnOldFriends(text)
 	local names = {}
 	for _, peer in pairs(M:GetPeers()) do
 		local key = peer.name and (peer.name .. "/" .. tostring(peer.version))
-		if key and not warnedOld[key] and LT.CompareVersions(peer.version or "0.0.0", LINKS_SINCE) == -1 then
+		if key and not warnedOld[key] and LinkLevel(peer.version) < FULL then
 			warnedOld[key] = true
 			names[#names + 1] = peer.name
 		end
@@ -137,9 +161,16 @@ local function FlightSubtitle(text)
 end
 
 local function Send(kind, text)
-	text = PackLinks(strtrim(text or ""):gsub('^"(.*)"$', "%1")) -- /lefthy announce "text"
-	-- (cut to size: a link cut in half goes)
-	text = B.Clean(text, TEXT_BYTES):gsub("{%a+:[^}]*$", "")
+	local raw = (strtrim(text or ""):gsub('^"(.*)"$', "%1")) -- /lefthy announce "text"
+	local packed = {} -- level -> the line as that build gets it
+	local function Packed(level)
+		if not packed[level] then
+			-- (cut to size: a link cut in half goes)
+			packed[level] = (B.Clean(PackLinks(raw, level), TEXT_BYTES):gsub("{%a+:[^}]*$", ""))
+		end
+		return packed[level]
+	end
+	text = Packed(FULL)
 	if not M.enabled then
 		M:Print("Beacon is off: /lefthy enable beacon.")
 		return
@@ -163,7 +194,13 @@ local function Send(kind, text)
 		return
 	end
 	lastSent[kind] = now
-	B.QueueToPeers(((kind == "chat" and "M" or "A") .. "%s;%s"):format(B.VERSION, text))
+	local prefix = (kind == "chat" and "M" or "A") .. B.VERSION .. ";"
+	for gameAccountID, peer in pairs(M:GetPeers()) do
+		local line = Packed(LinkLevel(peer.version))
+		if line ~= "" then
+			B.Queue(gameAccountID, prefix .. line)
+		end
+	end
 	WarnOldFriends(text)
 	UnpackLinks(text, function(shown) -- what my friends see
 		if kind == "chat" then

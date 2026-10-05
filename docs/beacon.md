@@ -288,8 +288,13 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   `Relink` the listed kinds, in the sent colour or the kind's usual one (an unknown kind stays
   text); a map pin gets this client's `MAP_PIN_HYPERLINK` (icon and text) back, so a click sets
   the waypoint; items from the item cache (`UnpackLinks` via `B.WithLink`, in its own language);
-  a line waits until unknown items have loaded. Builds before this show the new tokens as plain
-  text.
+  a line waits until unknown items have loaded. Each friend gets the line their build understands
+  (`LinkLevel` from their `V2` version, one queue entry per friend): from 0.5.0-16 everything; 0.5.0-15
+  the nine kinds it knows (trade, enchant, spell, talent, mount, quest, achievement, journal,
+  currency) as tokens without colour; 0.5.0-10 to -14 items only; older builds, or a friend whose
+  version hasn't arrived yet, every link as "[text]", as before link tokens. So no build ever shows
+  a token as raw text. Sending such a line names friends who get less than the full line, once
+  per friend and build.
   Both go to the cinematic flight's subtitles too. Each setting switches sending and showing; with
   one off, a send says why.
 

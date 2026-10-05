@@ -2653,6 +2653,9 @@ do
 	Advance(0.15)
 	check(sentTo(11, mark, "A2;")[1] == "A2;pull in 5", "/la: announcing the short way")
 	-- Item links: they travel as their numbers and each client builds the link again.
+	local chatPeers = BB.module:GetPeers()
+	local annaWas = chatPeers[11].version
+	chatPeers[11].version = "0.5.0-21-g51edb8a" -- (a build that knows every link token)
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("look: " .. ItemLink(1155) .. " and |cffffff00|Hquest:176:10|h[Wanted: Hogger]|h|r")
 	Advance(0.15)
@@ -2678,6 +2681,29 @@ do
 		"a map pin goes as its map, spot and text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
 	check(printedSince(pmark):find("here |cffffff00|Hworldmap:1429:4924:5568|h[|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a Map Pin Location]|h|r", 1, true),
 		"and comes back as a clickable map pin with its icon, got " .. printedSince(pmark))
+	-- Friends on older builds get what theirs understands: never a token it would show as text.
+	if chatPeers[12] then
+		local line = "|cffffd000|Htrade:Player-1-0000ABCD:3908:197|h[Tailoring]|h|r " .. ItemLink(1155)
+			.. " |cffffff00|Hworldmap:1429:4924:5568|h[|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a Map Pin Location]|h|r"
+		local bobWas = chatPeers[12].version
+		for _, case in ipairs({
+			{ "0.5.0-15-g4322f60", "M2;{trade:Player-1-0000ABCD:3908:197[Tailoring]} {item:1155::::::::20} [Map Pin Location]",
+				"0.5.0-15: its kinds as tokens without colour, a map pin as text" },
+			{ "0.5.0-12-gbb4062c", "M2;[Tailoring] {item:1155::::::::20} [Map Pin Location]", "0.5.0-10 to -14: items only" },
+			{ "0.5.0-9-gda764bc", "M2;[Tailoring] [Rod of the Sleepwalker] [Map Pin Location]", "older: every link as its text" },
+			{ nil, "M2;[Tailoring] [Rod of the Sleepwalker] [Map Pin Location]", "version not known yet: text too" },
+		}) do
+			chatPeers[12].version = case[1]
+			Advance(0.6)
+			mark = #GAMEDATA + 1
+			SlashCmdList.LEFTHYTOOLS_CHAT(line)
+			Advance(0.15)
+			check(sentTo(12, mark, "M2;")[1] == case[2], "Bob on " .. tostring(case[1]) .. ": " .. case[3] .. ", got " .. tostring(sentTo(12, mark, "M2;")[1]))
+			check(sentTo(11, mark, "M2;")[1]:find("{trade:Player-1-0000ABCD:3908:197[Tailoring]ffd000}", 1, true), "... Anna, on a new build, gets the full line")
+		end
+		chatPeers[12].version = bobWas
+	end
+	chatPeers[11].version = annaWas
 	pmark = #PRINTED + 1
 	anna("M2;{trade:Player-1-0000EEEE:2259:171[Alchemy]} and {spell:133:0[Fireball]} {garrmission:12[x]} {spell:133 0[y]}")
 	Advance(0.15)
@@ -2831,7 +2857,7 @@ do
 	local peerList = BB.module:GetPeers()
 	local annaVersion, bobVersion = peerList[11].version, peerList[12] and peerList[12].version
 	peerList[11].version = "0.5.0-20-g99df530"
-	if peerList[12] then peerList[12].version = "0.5.0-15-g4322f60" end
+	if peerList[12] then peerList[12].version = "0.5.0-14-g5ae6ba6" end
 	Advance(1)
 	pmark = #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("my |cffffd000|Htrade:Player-1-0:2259:171|h[Alchemy]|h|r")
