@@ -37,6 +37,9 @@ local L = ns.L
 --   P2;<continent>;<north>;<west>;<uiMapID>
 --                       a map ping (Pings.lua): "look here", shown on friends' maps for a minute
 --   G2                  my map ping is gone (taken back before its minute is up)
+--   Y2;<1|0>            I collect friends' error reports (or stopped); with every answer while on
+--   Z2;<id>;<n>;<of>;<text>
+--                       part n of an error report for a friend who collects them (Reports.lua)
 --   T2;<questID>;<done>;<title>;<objective>
 --                       the quest I'm tracking (super-tracked, else the first watched one), for
 --                       the tooltip: done 1 = ready to turn in, objective = the first unfinished
@@ -95,6 +98,7 @@ local ITEM_GAP = 2           -- shared items accepted from one friend at most th
                              -- at most every 3 s; the margin is for their queue and the network)
 local CALL_LIMIT, CALL_WINDOW = 10, 10 -- Need / Pass answers and verdicts accepted from one friend
 local DAILY_LIMIT = 30       -- Chronicle days accepted from one friend per minute (7 + their AFK times arrive at once)
+local REPORT_PARTS = 60      -- error report parts accepted from one friend per minute (a report has up to 16)
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true, quest = true, zone = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
@@ -131,6 +135,8 @@ local M = LT:NewModule("beacon", {
 		dingShow = true,
 		dingSound = true,
 		dingSoundKit = 50111, -- boss defeated fanfare (Ding.lua lists the choices)
+		sendReports = true,   -- Reports.lua: my LefthyTools errors to friends who collect them
+		collectReports = false, -- and theirs to me
 	},
 })
 
@@ -769,6 +775,17 @@ local function Parse(text)
 		if y and #minutes <= 4 and tonumber(minutes) <= 1440 then
 			return "K", { day = y .. "-" .. mo .. "-" .. d, afk = tonumber(minutes) * 60 }
 		end
+	elseif kind == "Y" then
+		local on = rest:match("^;([01])$")
+		if on then
+			return "Y", on == "1"
+		end
+	elseif kind == "Z" then
+		local id, n, of, text = rest:match("^;(%d+);(%d+);(%d+);([^;]*)$")
+		n, of = tonumber(n), tonumber(of)
+		if id and #id <= 4 and n >= 1 and n <= of and of <= 16 and #text <= 200 then
+			return "Z", tonumber(id), n, of, text
+		end
 	end
 	return nil
 end
@@ -940,6 +957,18 @@ local function OnMessage(text, senderID)
 		if B.RemovePing then
 			B.RemovePing(senderID)
 		end
+	elseif kind == "Y" then
+		peer.collects = a -- Reports.lua sends my error reports to them
+	elseif kind == "Z" then
+		if M.db.collectReports and B.ReceiveReportPart then
+			if not guard.reportWindow or now - guard.reportWindow >= 60 then
+				guard.reportWindow, guard.reportParts = now, 0
+			end
+			if guard.reportParts < REPORT_PARTS then
+				guard.reportParts = guard.reportParts + 1
+				B.ReceiveReportPart(senderID, a, b, c, d)
+			end
+		end
 	elseif kind == "F" then
 		peer.files = a -- (comes just before their version)
 	elseif kind == "V" then
@@ -970,6 +999,10 @@ local function OnMessage(text, senderID)
 		owed[senderID] = true
 		B.Queue(senderID, "F" .. VERSION .. ";" .. LT.FILES) -- my LefthyTools build and its files
 		B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40))
+		local collector = B.CollectorMessage and B.CollectorMessage()
+		if collector then
+			B.Queue(senderID, collector) -- I collect error reports
+		end
 		if lastQuest and lastQuest ~= NO_QUEST then
 			B.Queue(senderID, lastQuest)
 		end
@@ -1118,6 +1151,9 @@ local function Tick(now, elapsed)
 	end
 	if B.UpdatePings then
 		B.UpdatePings(now)
+	end
+	if B.TickReports then
+		B.TickReports(now)
 	end
 	-- A friend runs a newer LefthyTools: say so once their news are in (or NEWS_WAIT has passed).
 	local newer = newerFrom and peers[newerFrom]
@@ -1317,6 +1353,14 @@ function M:BuildOptions(o)
 	if B.BuildDingOptions then
 		B.BuildDingOptions(o)
 	end
+
+	o:Header(L["Error reports"])
+	o:Checkbox("sendReports", L["Send my LefthyTools errors to friends who collect them"],
+		L["When LefthyTools has an error, it goes to your Battle.net friends who collect error reports (each error once per session), so whoever looks after LefthyTools can fix it. /lefthy report <what happened> sends a report in your own words."])
+	o:Checkbox("collectReports", L["Collect my friends' error reports"],
+		L["Your friends' LefthyTools send you their errors and the reports they write (/lefthy report). /lefthy reports shows them, ready to copy."])
+	o:Button(L["Friends' error reports"], L["Show"], function() B.ShowReports() end,
+		L["The reports your friends sent you, newest first, ready to copy. /lefthy reports does the same."])
 end
 
 function M:GetPeers()

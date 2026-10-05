@@ -163,6 +163,12 @@ minimap, and you on theirs, without being in a group.
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see
   "Anna reached level 21!" in their own language.
+- **Error reports:** whoever looks after LefthyTools switches on *Collect my friends' error
+  reports*. Then LefthyTools errors on their friends' computers reach them by themselves (each
+  error once per session; a chat line says where it went), and anyone can write one:
+  `/lefthy report <what happened>` adds the LefthyTools and WoW build, language, realm, faction
+  and the last links clicked. Reports wait until a collector is online; `/lefthy reports` shows
+  the collected ones, ready to copy.
 - **No server needed:** everything goes through the game's own Battle.net addon
   messages. Each player's LefthyTools sends their own position and status to friends
   who have the addon.
@@ -200,6 +206,8 @@ minimap, and you on theirs, without being in a group.
 | Show my friends' level-ups | on | |
 | Play a sound | on | |
 | Level-up sound: boss defeated fanfare, world quest complete, legendary loot, epic loot, scenario complete or a gentle chime. Picking one plays it | boss defeated fanfare | `/lefthy beacon sound [<number>]` |
+| Send my LefthyTools errors to friends who collect them | on | `/lefthy report <what happened>` |
+| Collect my friends' error reports | off | `/lefthy reports` |
 
 `/lefthy beacon status` lists friends with LefthyTools online, their LefthyTools version,
 when their last position arrived, and how many messages were sent and received per minute.

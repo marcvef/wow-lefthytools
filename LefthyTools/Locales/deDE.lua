@@ -345,6 +345,18 @@ L["Alt+click on the world map shows your friends a spot: a marker on their maps 
 	"Alt+Klick auf die Weltkarte zeigt deinen Freunden eine Stelle: eine Markierung auf ihren Karten für eine Minute, mit Sound. Ihre Pings erscheinen auf deinen Karten. /lefthy beacon ping pingt die Stelle, an der du stehst."
 L["Map ping, %d s ago"] = "Karten-Ping, vor %d s"
 L["Map pin"] = "Kartenmarkierung"
+L["Error reports"] = "Fehlerberichte"
+L["Send my LefthyTools errors to friends who collect them"] = "Meine LefthyTools-Fehler an Freunde schicken, die sie sammeln"
+L["When LefthyTools has an error, it goes to your Battle.net friends who collect error reports (each error once per session), so whoever looks after LefthyTools can fix it. /lefthy report <what happened> sends a report in your own words."] =
+	"Hat LefthyTools einen Fehler, geht er an deine Battle.net-Freunde, die Fehlerberichte sammeln (jeder Fehler einmal pro Session), damit sich darum gekümmert werden kann. /lefthy report <was passiert ist> schickt einen Bericht in deinen eigenen Worten."
+L["Collect my friends' error reports"] = "Fehlerberichte meiner Freunde sammeln"
+L["Your friends' LefthyTools send you their errors and the reports they write (/lefthy report). /lefthy reports shows them, ready to copy."] =
+	"Das LefthyTools deiner Freunde schickt dir ihre Fehler und die Berichte, die sie schreiben (/lefthy report). /lefthy reports zeigt sie, fertig zum Kopieren."
+L["Friends' error reports"] = "Fehlerberichte von Freunden"
+L["The reports your friends sent you, newest first, ready to copy. /lefthy reports does the same."] =
+	"Die Berichte, die deine Freunde dir geschickt haben, die neuesten zuerst, fertig zum Kopieren. /lefthy reports macht dasselbe."
+L["No reports from friends yet."] = "Noch keine Berichte von Freunden."
+L["Click into the text, press Ctrl+A and then Ctrl+C to copy it."] = "Klick in den Text, drück Strg+A und dann Strg+C, um ihn zu kopieren."
 L["Alt+click it on the world map to take it back."] = "Alt+Klick darauf auf der Weltkarte nimmt ihn zurück."
 L["Level-ups"] = "Level-Ups"
 L["Tell my friends when I level up"] = "Freunden meine Level-Ups melden"

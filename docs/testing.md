@@ -116,6 +116,10 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     theirs (the profession opens its recipe list, the pin sets the waypoint, with its icon). A
     friend's line ticks softly (once for a quick burst); untick "Soft sound for Lefthy chat": silent. `/la meet at the flight master` (or `/lefthy announce "..."`): on their screen in the
     middle (where shared items show), with the whisper sound, for 10 s; yours too.
+    Error reports: switch on "Collect my friends' error reports" (Beacon settings). Your friend
+    types `/lefthy report test`: their chat says "1 report(s) sent to <you>", yours "<friend> sent
+    a LefthyTools error report", and `/lefthy reports` shows it with their build, language, realm,
+    faction and the last links they clicked (a profession link: whether its window opened).
     Level-ups: `/lefthy beacon sound` to try the sounds, `/lefthy beacon ding test` for the message.
     They die: a chat line with zone and what they fought. Alt+click your world map: they get a
     rippling marker on both maps, a chat line and a sound; on a continent map the line names the

@@ -43,6 +43,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Items.lua   showing and offering items (Need / Pass, the roll)
   Modules/Beacon/Handover.lua  tooltip reminder for won items until traded or mailed
   Modules/Beacon/Chat.lua    Lefthy chat (/l) and announcements (/lefthy announce)
+  Modules/Beacon/Reports.lua error reports to friends who collect them (/lefthy report, /lefthy reports)
   Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
   Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, sharing, /chronicle
   Modules/Chronicle/Graphs.lua     the Graphs page: pooled canvas (bars, lines, text) and its cards

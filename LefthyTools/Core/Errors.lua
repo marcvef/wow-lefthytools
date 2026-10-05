@@ -3,7 +3,8 @@ local LT = ns.LT
 local L = ns.L
 
 -- Error catcher: LefthyTools' own Lua errors and blocked actions are kept in LefthyToolsDB.errors,
--- across sessions, so players can copy them with /lefthy errors and send them along.
+-- across sessions, so players can copy them with /lefthy errors and send them along. Each error new
+-- in a session also goes to Errors.listeners (Beacon sends it to friends who collect reports).
 --
 -- Every Lua error goes through Blizzard's handler (Blizzard_ScriptErrors: HandleLuaError) to
 -- ScriptErrorsFrame:DisplayMessageInternal(message, messageType, stack, locals), also with "Show
@@ -18,10 +19,26 @@ local issecret = issecretvalue or function() return false end
 
 local Errors = {}
 LT.Errors = Errors
+-- function(entry), on the next frame: an error new this session (Beacon's Reports.lua sends it to
+-- friends who collect error reports).
+Errors.listeners = {}
 
 local pending = {} -- caught before the saved variables are loaded
 local list         -- LefthyToolsDB.errors, oldest first
 local loggedIn, noticeShown, caughtBeforeLogin = false, false, false
+local toldThisSession = {} -- message -> true
+
+local function Tell(entry)
+	if toldThisSession[entry.msg] then
+		return
+	end
+	toldThisSession[entry.msg] = true
+	C_Timer.After(0, function() -- not from inside the error handler
+		for _, listener in ipairs(Errors.listeners) do
+			pcall(listener, entry)
+		end
+	end)
+end
 
 local function IsOurs(text)
 	return text:find("AddOns[/\\]LefthyTools[/\\]") ~= nil
@@ -79,6 +96,7 @@ function Errors.Add(kind, message, stack)
 	end
 	caughtBeforeLogin = caughtBeforeLogin or not loggedIn
 	Notify()
+	Tell(entry)
 end
 
 local function OnDisplayMessage(_, message, messageType, stack)

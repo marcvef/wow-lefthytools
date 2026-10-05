@@ -36,7 +36,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `I2;<item string>[;<call id>]` an item shown or offered, `N2`/`R2` Need / Pass and the verdict,
   `M2;<text>` a Lefthy chat line, `A2;<text>` an announcement (see below), `K2;<YYYYMMDD>;<minutes>`
   a day's AFK time (Chronicle), `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
-  friends' graphs (see chronicle.md), `Q2` switched off. A build that doesn't
+  friends' graphs (see chronicle.md), `Y2;<1|0>` I collect error reports (or stopped),
+  `Z2;<id>;<n>;<of>;<text>` part of an error report (see "Error reports"), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
@@ -413,6 +414,31 @@ defeated fanfare 50111 (default; `BossBannerToast.lua`), world quest complete 73
 loot 63971, epic loot 31578, scenario complete 31754, garrison follower chime 46893. Not offered:
 the level-up fanfare 888, which sounds like the player levelled. Picking one plays it on the next
 frame.
+
+## Error reports (Reports.lua)
+
+For whoever looks after LefthyTools: they switch on `collectReports` ("Collect my friends' error
+reports", off by default), and their client says so with every hello answer (`Y2;1`, after `V2`)
+and to everyone when it's switched (`Y2;1` / `Y2;0`, from the tick). Receivers mark that peer
+`collects`. No name or BattleTag is built in.
+
+Sending (`sendReports`, on by default): every LefthyTools error new this session
+(`LT.Errors.listeners`, told on the next frame) becomes a report on the tick: a context line
+(LefthyTools version and `LT.FILES`, WoW build, client language, realm, faction, level and class),
+kind, count, first time, message and stack. `/lefthy report <what happened>` adds a hand-written
+one: the player's words, the context, Beacon on/off and friends with their versions, the last 8
+links clicked (a post-hook on `SetItemRef`: the link and, for professions/enchants after 2 s,
+whether `ProfessionsFrame`/`TradeSkillFrame` opened; for map pins whether a waypoint is set) and
+how many errors are kept. Reports wait in `LefthyToolsDB.reportsOut` (at most 10, across
+sessions) until a collector is online; every 2 s the tick sends all waiting ones to every
+collector online, as `Z2` parts (up to 16 of 180 bytes; colour codes, `|` and `;` removed,
+newlines as `^`) at low priority, and prints "N report(s) sent to Anna".
+
+Collecting: parts are put together per sender and report id (in any order; at most 60 parts per
+friend per minute); complete ones, or after 120 s with "[part n of m missing]", are kept in
+`LefthyToolsDB.friendReports` (newest 40) with the sender's name and time, and a chat line says
+so. `/lefthy reports` (or the settings button) shows them newest first in a copy box, with Clear.
+Not collecting: parts are ignored.
 
 ## Open questions (check in game)
 

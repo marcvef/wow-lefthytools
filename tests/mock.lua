@@ -441,6 +441,7 @@ ZONE = "Elwynn Forest"
 function GetZoneText() return ZONE end
 function GetRealZoneText() return ZONE end
 function UnitRace(unit) if unit == "player" then return "Human", "Human", 1 end end
+function UnitFactionGroup(unit) if unit == "player" then return "Alliance", "Alliance" end end
 -- Stats: [index] = { base, effective } (Strength, Agility, Stamina, Intellect, Spirit); SECRET for a secret value.
 STATS = { { 40, 45 }, { 60, 70 }, { 50, 58 }, { 25, 25 }, { 30, 32 } }
 function UnitStat(unit, i)
@@ -454,6 +455,9 @@ function IsPlayerSpell(id) return KNOWN_SPELLS[id] == true end
 SPELL_NAMES = {} -- [id] = a name of its own (default "Spell <id>")
 C_Spell = { GetSpellInfo = function(id) return { name = SPELL_NAMES[id] or ("Spell " .. id), iconID = 100000 + id, spellID = id } end }
 function SetPortraitTexture(texture, unit) texture.portrait = unit end
+-- A link clicked in chat (ItemRef.lua): nothing opens here.
+LINKS_CLICKED = {}
+function SetItemRef(link) LINKS_CLICKED[#LINKS_CLICKED + 1] = link end
 -- Dungeons that open at a level (the dungeon finder): [level] = { names }.
 UNLOCKED_DUNGEONS = {}
 C_PlayerInfo = { GetInstancesUnlockedAtLevel = function(level, isRaid)

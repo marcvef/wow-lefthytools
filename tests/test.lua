@@ -2768,6 +2768,84 @@ do
 	Advance(0.2)
 end
 
+section("Beacon: error reports")
+do
+	check(BDB.sendReports == true and BDB.collectReports == false and B("sendReports") and B("collectReports")
+		and SETTINGS_BUTTONS["Friends' error reports"], "sending on, collecting off, by default; a button for the collected ones")
+	wipe(LefthyToolsDB.reportsOut or {})
+	-- A link clicked before: the report says what happened.
+	SetItemRef("trade:Player-1-0000ABCD:3908:197", "[Tailoring]", "LeftButton")
+	Advance(2.1)
+	-- Nobody collects: a hand-written report waits.
+	pmark = #PRINTED + 1
+	lefthy("report the profession link does nothing")
+	check(printedSince(pmark):find("report kept", 1, true) and #LefthyToolsDB.reportsOut == 1, "nobody collects: the report waits")
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	anna("Y2;1")
+	Advance(3)
+	local parts = sentTo(11, mark, "Z2;")
+	check(#parts >= 2 and parts[1]:find("^Z2;%d+;1;" .. #parts .. ";Report: LefthyTools ") and #LefthyToolsDB.reportsOut == 0
+		and printedSince(pmark):find("1 report(s) sent to Anna", 1, true),
+		"Anna collects: it goes to her, in parts, and I'm told, got " .. tostring(parts[1]))
+	check(#sentTo(12, mark, "Z2;") == 0, "only to friends who collect")
+	local whole = {}
+	for _, p in ipairs(parts) do whole[#whole + 1] = p:match("^Z2;%d+;%d+;%d+;(.*)$") end
+	whole = table.concat(whole)
+	check(whole:find("What happened: the profession link does nothing", 1, true) and whole:find(", Realmy, Alliance, ", 1, true)
+		and whole:find("trade:Player-1-0000ABCD:3908:197 -> nothing opened", 1, true) and whole:find("^", 1, true)
+		and not whole:find("\n", 1, true), "with my words, build, realm, faction and the link I clicked (nothing opened); lines as ^")
+	-- An error goes by itself, once per session.
+	mark = #GAMEDATA + 1
+	LT.Errors.Add("error", "Interface/AddOns/LefthyTools/Core/Core.lua:9: something broke", "the stack")
+	LT.Errors.Add("error", "Interface/AddOns/LefthyTools/Core/Core.lua:9: something broke", "the stack")
+	Advance(3)
+	local first = sentTo(11, mark, "Z2;")[1] or ""
+	check(first:find(";1;%d+;Error: LefthyTools ") and #sentTo(11, mark, "Z2;") <= 3,
+		"a LefthyTools error goes to her by itself, once, got " .. first)
+	B("sendReports"):SetValue(false)
+	mark = #GAMEDATA + 1
+	LT.Errors.Add("error", "Interface/AddOns/LefthyTools/Core/Core.lua:10: another one", "")
+	Advance(3)
+	check(#sentTo(11, mark, "Z2;") == 0, "sending off: errors stay here")
+	B("sendReports"):SetValue(true)
+	LT.Errors.Clear()
+	anna("Y2;0")
+
+	-- Collecting: friends are told, and their reports arrive whole.
+	mark = #GAMEDATA + 1
+	B("collectReports"):SetValue(true)
+	Advance(0.5)
+	check(sentTo(11, mark, "Y2;1")[1] and sentTo(12, mark, "Y2;1")[1], "switched on: my friends are told I collect")
+	pmark = #PRINTED + 1
+	anna("Z2;7;2;2; and more")
+	anna("Z2;7;1;2;Error | LefthyTools 0.5.0^line two")
+	Advance(0.3)
+	local reports = LefthyToolsDB.friendReports
+	check(reports[#reports].from == "Anna" and reports[#reports].text == "Error | LefthyTools 0.5.0\nline two and more"
+		and printedSince(pmark):find("Anna sent a LefthyTools error report: /lefthy reports shows it.", 1, true),
+		"a friend's report, put together (parts in any order), and a chat line")
+	anna("Z2;8;1;3;first part")
+	for _ = 1, 5 do -- (friends silent for over a minute are forgotten)
+		Advance(25)
+		anna("S2;;0;260.0;750.0;Goldshire;")
+		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 12)
+	end
+	check(reports[#reports].text == "first part[part 2 of 3 missing][part 3 of 3 missing]", "parts that never came: kept with a note")
+	lefthy("reports")
+	check(LefthyToolsReportsFrame:IsShown() and BB.ReportsText():find("from Anna", 1, true)
+		and BB.ReportsText():find("line two and more", 1, true), "/lefthy reports: all of them, ready to copy")
+	LefthyToolsReportsFrame:Hide()
+	mark = #GAMEDATA + 1
+	B("collectReports"):SetValue(false)
+	Advance(0.5)
+	check(sentTo(11, mark, "Y2;0")[1], "switched off: told too")
+	local count = #reports
+	anna("Z2;9;1;1;ignored")
+	Advance(0.3)
+	check(#reports == count, "not collecting: friends' reports are ignored")
+	wipe(reports)
+end
+
 section("Beacon: a busy fight doesn't pile up messages")
 do
 	anna("S2;;0;260.0;750.0;Goldshire;")
