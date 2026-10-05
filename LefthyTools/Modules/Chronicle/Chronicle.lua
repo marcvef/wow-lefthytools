@@ -30,6 +30,7 @@ local PROFESSION_MILESTONES = { 75, 150, 225, 300 }
 local COPPER_PER_GOLD = 10000
 local DAILY_DAYS = 60        -- days of per-day counters kept (the graphs show 14)
 local SHARE_DAYS = 7         -- days a friend gets from me when they show up
+local SHARE_AGAIN = 600      -- back sooner (a /reload, a shaky connection): only today, they keep the rest
 local SHARE_GAP = 300        -- today's numbers go to friends at most this often (if they changed)
 local FRIEND_DAYS = 30       -- days of friends' numbers kept
 local SAMPLE_STEP, SAMPLE_MAX = 60, 240 -- the session curve: a point a minute, at most 240
@@ -796,11 +797,17 @@ function ShareDays(now)
 end
 
 -- A friend just showed up: my last SHARE_DAYS days, for their graphs.
+local daysSentAt = {} -- gameAccountID -> GetTime() of the last full week
 local function SendDaysTo(gameAccountID)
 	if not SharingOn() then
 		return
 	end
-	for i = SHARE_DAYS - 1, 0, -1 do
+	local now = GetTime()
+	local again = daysSentAt[gameAccountID] and now - daysSentAt[gameAccountID] < SHARE_AGAIN
+	if not again then
+		daysSentAt[gameAccountID] = now
+	end
+	for i = again and 0 or SHARE_DAYS - 1, 0, -1 do
 		local day = date("%Y-%m-%d", C.DayAgo(i))
 		for _, message in ipairs({ DailyMessage(day) or false, AfkMessage(day) or false }) do
 			if message then

@@ -3859,6 +3859,18 @@ do
 	check(#days >= 1 and days[#days]:find("^D2;20300515;%d+;%d+;%d+;%d+;%d+;%d+$"),
 		"a friend who shows up gets my last days for their graphs, got " .. table.concat(days, " | "))
 	check(sentTo(11, dmark, "K2;")[1] == "K2;20300515;10", "... and each day's AFK time, in a message of its own (older builds ignore it)")
+	do -- back again soon (a /reload): she has the week, only today goes
+		local feedWas = #feed
+		anna("Q2")
+		Advance(0.15)
+		local again = #GAMEDATA + 1
+		anna("H2")
+		Advance(3.2)
+		local sent = sentTo(11, again, "D2;")
+		check(#sent == 1 and sent[1]:find("^D2;20300515;") and #sentTo(11, again, "K2;") == 1,
+			"a friend back within 10 minutes: only today, not the whole week again, got " .. table.concat(sent, " | "))
+		while #feed > feedWas do table.remove(feed) end -- (her offline and online lines: the later checks count on her news)
+	end
 	anna("D2;20300514;90;5000;3;20;1;1")
 	anna("K2;20300514;45")
 	anna("D2;20300515;30;1200;2;8;0;0")
