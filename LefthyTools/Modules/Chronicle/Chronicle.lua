@@ -354,7 +354,7 @@ function handlers.PARTY_KILL(attackerGUID, targetGUID)
 	end
 	Add("kills")
 	local targetNow = UnitGUID("target")
-	if targetGUID == targetNow and not issecret(targetNow) and IsRareTarget() then
+	if not issecret(targetNow) and targetGUID == targetNow and IsRareTarget() then -- (a secret can't be compared)
 		local name = UnitName("target")
 		if not issecret(name) then
 			RecordRare(targetGUID, name)
