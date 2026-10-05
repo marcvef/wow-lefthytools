@@ -192,8 +192,14 @@ local function OnBagsAnchored()
 	if not BagsActive() then
 		return
 	end
+	local anyMoved = next(M.db.bagPositions) ~= nil
 	for _, frame in ipairs(ContainerFrames()) do
 		ApplySavedPosition(frame)
+		-- Blizzard stacks each separate bag on the one before: bags not moved hang off a moved one
+		-- (above a backpack dragged to the top, off the screen). Kept on the screen.
+		if anyMoved and frame:IsShown() and CanMove(frame) then
+			frame:SetClampedToScreen(true)
+		end
 	end
 end
 

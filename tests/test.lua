@@ -656,6 +656,10 @@ do -- In gamepad mode the menu stays: closing a Blizzard menu from addon code ta
 	BAG_TITLE_ROUTER._scripts.OnDragStop(BAG_TITLE_ROUTER)
 	GAMEPAD_STATE.ui = false
 	check(MENUS_CLOSED == closed, "gamepad mode: dragging doesn't close Blizzard's menu from our code")
+	ContainerFrame1:Show()
+	UpdateContainerFrameAnchors()
+	check(ContainerFrame1._clamped == true, "a bag not moved while another one is: kept on the screen")
+	ContainerFrame1:Hide()
 end
 CloseBags(); OpenBags()
 local point, _, _, x, y = ContainerFrameCombinedBags:GetPoint(1)
