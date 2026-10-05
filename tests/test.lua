@@ -3994,6 +3994,25 @@ do
 	Advance(0.3)
 	check(c.level == PLAYER_LEVEL and c.levelStart == nil and c.levelFrom == nil, "a level-up Chronicle missed: that level's start is unknown")
 	c.levelStart, c.levelFrom = c.stats.played - 50, { kills = 0, quests = 0 } -- (the level-up window's tests time this level)
+	-- A quest hub doesn't use up friends' highlight budget: at most 5 feed-only shares a minute.
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 11)
+	Advance(1.2)
+	local savedQuests = QUESTS
+	QUESTS = {}
+	for i = 1, 8 do QUESTS[i] = { id = 7000 + i, title = "Hub quest " .. i, objectives = {} } end
+	local mark = #GAMEDATA + 1
+	for i = 1, 8 do Fire("QUEST_TURNED_IN", 7000 + i, 100) end
+	INSTANCE = { name = "The Deadmines", type = "party" }
+	Fire("ENCOUNTER_END", 3, "Mr. Smite", 1, 5, 1)
+	INSTANCE = nil
+	Advance(1.5)
+	local questShares, bossShared = 0, false
+	for _, m in ipairs(GameDataTo(11, mark)) do
+		if m:find("^E2;quest;") then questShares = questShares + 1 end
+		if m:find("^E2;boss;Mr. Smite") then bossShared = true end
+	end
+	check(questShares == 5 and bossShared, "8 quests in a minute: 5 go to friends' feeds, the boss after them still goes, got " .. questShares)
+	QUESTS = savedQuests
 end
 
 section("Beacon: leaving")

@@ -612,6 +612,25 @@ end
 
 local ShareDays -- below, with the friends' part
 
+-- Friends take at most 10 highlights a minute from one friend (Beacon). Feed-only ones (every quest
+-- turned in, every new zone) take at most FEED_SHARES of them, so a quest hub can't crowd out a boss
+-- or epic loot in the same minute.
+local FEED_SHARE_KINDS, FEED_SHARES, FEED_WINDOW = { quest = true, zone = true }, 5, 60
+local feedShares = {} -- times of the last feed-only shares
+local function FeedBudget(kind, now)
+	if not FEED_SHARE_KINDS[kind] then
+		return true
+	end
+	while feedShares[1] and now - feedShares[1] >= FEED_WINDOW do
+		table.remove(feedShares, 1)
+	end
+	if #feedShares >= FEED_SHARES then
+		return false
+	end
+	feedShares[#feedShares + 1] = now
+	return true
+end
+
 local function Tick(now, elapsed)
 	C.ticks = C.ticks + 1
 	local stats = char.stats
@@ -651,7 +670,7 @@ local function Tick(now, elapsed)
 	while shareQueue[1] do
 		local item = table.remove(shareQueue, 1)
 		local beacon = LT:GetModule("beacon")
-		if M.db.share and beacon and beacon.enabled and ns.Beacon and ns.Beacon.ShareHighlight then
+		if M.db.share and beacon and beacon.enabled and ns.Beacon and ns.Beacon.ShareHighlight and FeedBudget(item[1], now) then
 			ns.Beacon.ShareHighlight(item[1], item[2], item[3])
 		end
 	end
