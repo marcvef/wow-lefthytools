@@ -117,6 +117,7 @@ end
 -- { text, value, selected }; onPick(value) runs when an entry is clicked. A click anywhere else
 -- closes it (GLOBAL_MOUSE_DOWN, listened to only while it's open).
 local PICKER_ROW = 20
+local PICKER_ROWS = 18 -- a longer list goes on in another column, so every row stays on screen
 
 function Window.AddPicker(parent, width, entries, onPick)
 	local picker = CreateFrame("Button", nil, parent)
@@ -161,9 +162,7 @@ function Window.AddPicker(parent, width, entries, onPick)
 		local row = list.rows[i]
 		if not row then
 			row = CreateFrame("Button", nil, list)
-			row:SetHeight(PICKER_ROW)
-			row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * PICKER_ROW)
-			row:SetPoint("RIGHT", -4, 0)
+			row:SetSize(width - 8, PICKER_ROW)
 			row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight")
 			row.Check = row:CreateTexture(nil, "ARTWORK")
 			row.Check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
@@ -192,8 +191,13 @@ function Window.AddPicker(parent, width, entries, onPick)
 
 	function picker:Open()
 		local items = entries()
+		local columns = math.max(1, math.ceil(#items / PICKER_ROWS))
+		local perColumn = math.max(1, math.ceil(#items / columns))
 		for i, item in ipairs(items) do
 			local row = Row(i)
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", list, "TOPLEFT", 4 + math.floor((i - 1) / perColumn) * width,
+				-4 - ((i - 1) % perColumn) * PICKER_ROW)
 			row.kind = item.title and "title" or item.divider and "divider" or "entry"
 			row.value = item.value
 			row.Text:SetText(item.title and ("|cffffd200" .. item.title .. "|r") or item.text or "")
@@ -206,7 +210,7 @@ function Window.AddPicker(parent, width, entries, onPick)
 			list.rows[i]:Hide()
 		end
 		list.count, list.builds = #items, list.builds + 1
-		list:SetHeight(#items * PICKER_ROW + 8)
+		list:SetSize(width * columns, perColumn * PICKER_ROW + 8)
 		list:Show()
 	end
 

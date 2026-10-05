@@ -895,6 +895,17 @@ function M:OnEnable()
 	store.chars = type(store.chars) == "table" and store.chars or {}
 	store.friends = type(store.friends) == "table" and store.friends or {}
 	store.friendStats = type(store.friendStats) == "table" and store.friendStats or {}
+	-- Friends whose days have all run out (30 days) leave the dropdown.
+	local oldest = date("%Y-%m-%d", C.DayAgo(FRIEND_DAYS))
+	for friendName, f in pairs(store.friendStats) do
+		local any = false
+		for day in pairs(type(f.days) == "table" and f.days or {}) do
+			any = any or day >= oldest
+		end
+		if not any then
+			store.friendStats[friendName] = nil
+		end
+	end
 	local name, realm = UnitName("player"), GetRealmName()
 	charKey = name .. "-" .. (realm or "")
 	char = store.chars[charKey] or NewChar()

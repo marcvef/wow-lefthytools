@@ -3842,6 +3842,13 @@ do
 	picker.List:GetScript("OnEvent")(picker.List, "GLOBAL_MOUSE_DOWN")
 	check(not picker.List:IsShown(), "a click elsewhere closes it")
 	check(picker:GetText():find("Lefthy|r  |cffccccccLevel ", 1, true), "it shows who's picked")
+	for i = 1, 24 do CDB.friendStats["Friend" .. i] = { classFile = "MAGE", level = 10, days = { [date("%Y-%m-%d")] = { played = 60 } } } end
+	picker:Click()
+	local _, _, _, lastX = picker.List.rows[picker.List.count]:GetPoint(1)
+	check(picker.List.count > 18 and lastX > 200 and picker.List:GetWidth() >= 480,
+		"a long list goes on in a second column (every row stays on screen), got x " .. tostring(lastX))
+	picker.List:Hide()
+	for i = 1, 24 do CDB.friendStats["Friend" .. i] = nil end
 	-- Pooled textures: a gradient (bars, the session curve's fill) never stays on a plain rectangle.
 	local function strayGradients()
 		local n = 0
@@ -3989,11 +3996,13 @@ do
 		"an error in the tick: still once a second, no time made up, got " .. (C.ticks - ticks) .. " ticks")
 	-- Levelled while Chronicle was off: the new level's time doesn't count from the old level's start.
 	c.level, c.levelStart, c.levelFrom = PLAYER_LEVEL - 1, c.stats.played - 100, { kills = 0, quests = 0 }
+	C.Store().friendStats.Gone = { classFile = "MAGE", level = 10, days = { ["2020-01-01"] = { played = 60 } } }
 	lefthy("disable chronicle")
 	Advance(0.3)
 	lefthy("enable chronicle")
 	Advance(0.3)
 	check(c.level == PLAYER_LEVEL and c.levelStart == nil and c.levelFrom == nil, "a level-up Chronicle missed: that level's start is unknown")
+	check(not C.Store().friendStats.Gone, "a friend whose days have all run out leaves the dropdown")
 	c.levelStart, c.levelFrom = c.stats.played - 50, { kills = 0, quests = 0 } -- (the level-up window's tests time this level)
 	-- A quest hub doesn't use up friends' highlight budget: at most 5 feed-only shares a minute.
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 11)
