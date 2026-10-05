@@ -637,6 +637,14 @@ ContainerFrameCombinedBags._dropAt = { left = 300, top = 700 }
 BAG_TITLE_ROUTER._scripts.OnDragStop(BAG_TITLE_ROUTER)
 local saved = TDB.bagPositions.combined
 check(saved and saved.left == 300 and saved.top == 700 and ContainerFrameCombinedBags._userPlaced == false, "position saved")
+do -- In gamepad mode the menu stays: closing a Blizzard menu from addon code taints the controller's focus manager.
+	local closed = MENUS_CLOSED
+	GAMEPAD_STATE.ui = true
+	BAG_TITLE_ROUTER._scripts.OnDragStart(BAG_TITLE_ROUTER)
+	BAG_TITLE_ROUTER._scripts.OnDragStop(BAG_TITLE_ROUTER)
+	GAMEPAD_STATE.ui = false
+	check(MENUS_CLOSED == closed, "gamepad mode: dragging doesn't close Blizzard's menu from our code")
+end
 CloseBags(); OpenBags()
 local point, _, _, x, y = ContainerFrameCombinedBags:GetPoint(1)
 check(point == "TOPLEFT" and x == 300 and y == 700, "reopens where it was left instead of Blizzard's spot")

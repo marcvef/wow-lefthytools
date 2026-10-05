@@ -201,8 +201,9 @@ local function StartDrag(frame)
 	if not BagsActive() or not CanMove(frame) then
 		return
 	end
-	-- The title bar opens the bag menu on mouse down; a drag shouldn't leave it open.
-	if Menu and Menu.GetManager then
+	-- The title bar opens the bag menu on mouse down; a drag shouldn't leave it open. Not in gamepad
+	-- mode: a menu closed from addon code taints the controller's focus manager (forever-platform.md).
+	if Menu and Menu.GetManager and not (InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled()) then
 		pcall(function() Menu.GetManager():CloseMenus() end)
 	end
 	frame:SetMovable(true)
