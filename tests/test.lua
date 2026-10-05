@@ -2292,6 +2292,23 @@ do
 		"nobody answered within 20 s: nobody needs it")
 	Advance(9)
 
+	-- Many long names: the verdict is cut to what friends take (200 bytes), the winner first.
+	ctrlRight(ItemLink(1155), true)
+	Advance(0.15)
+	local big
+	for _, call in pairs(BB.calls) do if call.mine and call.state == "open" then big = call end end
+	for i = 1, 4 do
+		big.recipients[100 + i] = true
+		big.answers[100 + i] = { name = ("x"):rep(47) .. i, need = true }
+	end
+	anna("N2;" .. big.id .. ";1")
+	verdictMark = #GAMEDATA + 1
+	Advance(21)
+	local cut = (sentTo(11, verdictMark, "R2;")[1] or ""):match("^R2;%d+;(.*)$")
+	check(cut and #cut <= 200 and #big.result == 5 and cut:find("^" .. big.result[1].name .. ":" .. big.result[1].roll .. ","),
+		"too long for friends: cut, the winner first (I still see all five), got " .. tostring(cut and #cut))
+	Advance(9)
+
 	-- Four notices at once: three fit. A finished one makes room and lets go of its frame for good.
 	anna("I2;1179::::::::20:::::;7001")
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "I2;6948::::::::20:::::", "WHISPER", 12) -- Bob just shows one

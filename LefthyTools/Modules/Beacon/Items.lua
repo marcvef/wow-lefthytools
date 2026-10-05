@@ -23,6 +23,7 @@ local B = ns.Beacon
 local SEND_GAP = 3        -- my shares at most this often
 local CALL_TIME = 20      -- seconds to answer Need or Pass
 local ROLL_TIME = 2.5     -- the drumroll
+local RESULT_BYTES = 200  -- the longest verdict friends take (Beacon's parser)
 local SHOW_RESULT = 7     -- how long the result stays before the notice fades
 local FADE = 1
 local MAX_FRAMES = 3      -- calls shown at once (stacked)
@@ -416,9 +417,15 @@ local function Decide(call)
 		end
 		table.sort(result, function(a, b) return a.roll > b.roll end)
 	end
-	local entries = {}
+	-- Friends drop a verdict over RESULT_BYTES: the winner first, the others as they fit.
+	local entries, size = {}, 0
 	for _, entry in ipairs(result) do
-		entries[#entries + 1] = entry.name .. ":" .. entry.roll
+		local text = entry.name .. ":" .. entry.roll
+		size = size + #text + (#entries > 0 and 1 or 0)
+		if size > RESULT_BYTES then
+			break
+		end
+		entries[#entries + 1] = text
 	end
 	B.QueueToPeers(("R%s;%d;%s"):format(B.VERSION, call.id, table.concat(entries, ",")))
 	StartResult(call, result)
