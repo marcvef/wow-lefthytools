@@ -3497,6 +3497,16 @@ do
 	local dungeonEntries = 0
 	for _, e in ipairs(me.events) do if e.k == "dungeon" then dungeonEntries = dungeonEntries + 1 end end
 	check(me.stats.dungeonRuns == 2 and dungeonEntries == 1, "a second run is counted, but isn't news")
+	-- A dungeon or raid boss ("worldboss" in Classic) isn't a rare; a world boss outdoors is.
+	STATE.target, STATE.targetName, STATE.targetGUID, TARGET_CLASS, STATE.targetDead = true, "Edwin VanCleef", "Creature-0-90", "worldboss", true
+	local raresBefore = me.stats.rares
+	Advance(1.1)
+	check(me.stats.rares == raresBefore, "a boss in a dungeon isn't a rare kill")
+	INSTANCE = nil
+	STATE.targetGUID, STATE.targetName = "Creature-0-91", "Azuregos"
+	Advance(1.1)
+	check(me.stats.rares == raresBefore + 1, "a world boss outdoors is")
+	STATE.target, STATE.targetDead, STATE.targetGUID, TARGET_CLASS, STATE.targetName = false, false, nil, "normal", nil
 	INSTANCE = nil
 	ZONE = "Westfall"
 	Fire("ZONE_CHANGED_NEW_AREA")

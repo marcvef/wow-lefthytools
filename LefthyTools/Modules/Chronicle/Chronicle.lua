@@ -328,10 +328,18 @@ local function RecordRare(guid, name)
 	Share("rare", name, area)
 end
 
+-- Rares, and world bosses outdoors: inside dungeons and raids "worldboss" is how Classic marks
+-- their bosses (counted as bosses instead).
 local function IsRareTarget()
 	local class = UnitClassification("target")
-	return not issecret(class) and (class == "rare" or class == "rareelite" or class == "worldboss")
-		and not UnitIsPlayer("target")
+	if issecret(class) or UnitIsPlayer("target") then
+		return false
+	end
+	if class == "worldboss" then
+		local inInstance, instanceType = IsInInstance()
+		return not (inInstance and (instanceType == "party" or instanceType == "raid"))
+	end
+	return class == "rare" or class == "rareelite"
 end
 
 function handlers.PARTY_KILL(attackerGUID, targetGUID)
