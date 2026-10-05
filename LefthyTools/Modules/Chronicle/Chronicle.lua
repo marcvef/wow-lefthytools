@@ -65,7 +65,6 @@ local lastXP, lastXPMax, lastLevel
 local lastMoney
 local lastPos = {}
 local onTaxi = false
-local currentInstance
 local zone
 local zoneDirty, professionsDirty = true, true
 local lastBossName, lastBossAt
@@ -528,8 +527,9 @@ local function CheckZone()
 	local inInstance, instanceType = IsInInstance()
 	if inInstance and (instanceType == "party" or instanceType == "raid") then
 		local name = GetInstanceInfo()
-		if name and name ~= currentInstance then
-			currentInstance = name
+		-- (kept in the record: a /reload or a disconnect inside isn't another run)
+		if name and name ~= char.instance then
+			char.instance = name
 			Add("dungeonRuns")
 			if not char.seen.dungeons[name] then
 				char.seen.dungeons[name] = true
@@ -538,7 +538,7 @@ local function CheckZone()
 			end
 		end
 	elseif not inInstance then
-		currentInstance = nil
+		char.instance = nil
 	end
 end
 
