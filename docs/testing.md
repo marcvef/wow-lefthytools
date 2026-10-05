@@ -58,8 +58,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
 11. Misc Tweaks: player/target bars show `current / max` without hovering; a dragged bag reopens
     where it was left. In a party, finishing a quest objective posts `[Quest]: 10/10 ...` with a
     star icon; finishing the quest posts `quest complete!`.
-    Level-up window: Settings, Misc Tweaks, Level-ups, *Preview*: the window for your level (the
-    corner says "example gains" until your first real level-up). Check the look: gold bars that
+    Level-up window: `/levelup` (or Settings, Misc Tweaks, Level-ups, *Preview*): the window for
+    your level (the corner says "example gains" until your first real level-up, then "Your last
+    level-up, once more"), with the red X at the top right next to the pin. Check the look: gold bars that
     grow, round portrait in a gold ring with a glow, the number punching in with a shine, stats
     counting up, spell icons popping in (hover: tooltip; NEW or a rank number), the class quest
     line on its level. Then level up for real: after Blizzard's banner, the real gains (Spirit
@@ -119,7 +120,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     They die: a chat line with zone and what they fought. Alt+click your world map: they get a
     rippling marker on both maps, a chat line and a sound; on a continent map the line names the
     zone under the cursor; clicking the map pin at the end of their line sets their waypoint arrow
-    to the spot. A plain click still zooms/navigates as before, also in combat.
+    to the spot. Hover your own marker: "Alt+click ... to take it back"; Alt+click it: gone from
+    your maps and theirs, no new ping (`/lefthy beacon ping clear` too). A plain click still
+    zooms/navigates as before, also in combat.
     They track a quest: their tooltip shows it with progress within a few seconds, "Ready to
     turn in" when done, "You have this quest too" if it's in your log.
     Items: Ctrl+right-click one in your bags: they see "<you> shares [item]" at the top, one line,

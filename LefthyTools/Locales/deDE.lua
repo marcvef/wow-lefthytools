@@ -111,9 +111,10 @@ L["Level-up window"] = "Level-Up-Fenster"
 L["Like in old RPGs: when you level up, a window shows what each stat gained, the new spells at your class trainer (hover one for its tooltip), talent points, a class quest that opens at this level and how long the last level took. It waits until a fight is over and closes by itself."] =
 	"Wie in alten RPGs: Steigst du ein Level auf, zeigt ein Fenster, was jeder Wert dazugewonnen hat, die neuen Zauber bei deinem Klassenlehrer (Mouseover zeigt den Tooltip), Talentpunkte, eine Klassenquest, die mit diesem Level beginnt, und wie lange das letzte Level gedauert hat. Es wartet, bis ein Kampf vorbei ist, und schließt sich von selbst."
 L["Show the level-up window"] = "Level-Up-Fenster zeigen"
-L["Shows the window for your current level, with the gains of your last level-up (example numbers if there was none yet)."] =
-	"Zeigt das Fenster für dein aktuelles Level, mit den Werten deines letzten Level-Ups (Beispielzahlen, wenn es noch keins gab)."
+L["Shows the window for your current level, with the gains of your last level-up (example numbers if there was none yet). /levelup does the same."] =
+	"Zeigt das Fenster für dein aktuelles Level, mit den Werten deines letzten Level-Ups (Beispielzahlen, wenn es noch keins gab). /levelup macht dasselbe."
 L["Preview, with example gains (your next level-up shows the real ones)"] = "Vorschau mit Beispielwerten (dein nächstes Level-Up zeigt die echten)"
+L["Your last level-up, once more"] = "Dein letztes Level-Up, noch einmal"
 L["Not in combat."] = "Nicht im Kampf."
 L["LEVEL"] = "LEVEL"
 L["Level %d took %s"] = "Level %d hat %s gedauert"
@@ -344,6 +345,7 @@ L["Alt+click on the world map shows your friends a spot: a marker on their maps 
 	"Alt+Klick auf die Weltkarte zeigt deinen Freunden eine Stelle: eine Markierung auf ihren Karten für eine Minute, mit Sound. Ihre Pings erscheinen auf deinen Karten. /lefthy beacon ping pingt die Stelle, an der du stehst."
 L["Map ping, %d s ago"] = "Karten-Ping, vor %d s"
 L["Map pin"] = "Kartenmarkierung"
+L["Alt+click it on the world map to take it back."] = "Alt+Klick darauf auf der Weltkarte nimmt ihn zurück."
 L["Level-ups"] = "Level-Ups"
 L["Tell my friends when I level up"] = "Freunden meine Level-Ups melden"
 L["Battle.net friends who also use LefthyTools see your level-up message."] =

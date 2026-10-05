@@ -9,7 +9,8 @@ local B = ns.Beacon
 -- the zone for its name). Everyone's world map and minimap show a marker there for a minute:
 -- the game's ping icon with a ripple in the sender's class colour. Receivers also get a chat line
 -- (with the game's map pin link for the spot: a click puts your waypoint arrow there) and the map
--- ping sound. `/lefthy beacon ping` pings where you stand.
+-- ping sound. `/lefthy beacon ping` pings where you stand. Alt+click on your own marker (or
+-- `/lefthy beacon ping clear`) takes it back before its minute is up, for everyone (G2).
 --
 -- The click is caught with a post-hook (HookScript) on the map's scroll container: Blizzard's
 -- own click handling runs first and untouched. Mouse down, not up: on mouse up the map may zoom
@@ -42,6 +43,25 @@ local function AddPing(key, name, classFile, continent, north, west, mapID)
 	pings[key] = { name = name, classFile = classFile, continent = continent, north = north, west = west,
 		mapID = mapID, at = GetTime() }
 	B.pingsDirty, B.minimapDirty = true, true
+end
+
+-- A ping taken back (mine, or a friend's G2): gone from both maps on the next tick.
+function B.RemovePing(key)
+	if pings[key] then
+		pings[key] = nil
+		B.pingsDirty, B.minimapDirty = true, true
+	end
+end
+
+-- Alt+click on my own marker, or /lefthy beacon ping clear: my ping goes, for everyone.
+function B.ClearMyPing()
+	if not pings.me then
+		M:Print("you have no ping out.")
+		return
+	end
+	B.RemovePing("me")
+	B.QueueToPeers("G" .. B.VERSION)
+	M:Print("ping taken back.")
 end
 
 ---------------------------------------------------------------------------
@@ -189,6 +209,9 @@ local function ShowPingTooltip(owner, ping)
 	if distance then
 		GameTooltip:AddLine(distance, 0.75, 0.75, 0.75)
 	end
+	if owner.key == "me" then
+		GameTooltip:AddLine(L["Alt+click it on the world map to take it back."], 0.5, 0.8, 1)
+	end
 	GameTooltip:Show()
 end
 
@@ -285,7 +308,12 @@ end
 
 local function OnMapMouseDown(_, button)
 	if button == "LeftButton" and IsAltKeyDown() and M.enabled and M.db.pings then
-		B.PingMapPosition(WorldMapFrame:GetMapID(), WorldMapFrame:GetNormalizedCursorPosition())
+		local mine = mapPins.me
+		if mine and mine:IsShown() and mine:IsMouseOver() then
+			B.ClearMyPing() -- on my own marker: take it back
+		else
+			B.PingMapPosition(WorldMapFrame:GetMapID(), WorldMapFrame:GetNormalizedCursorPosition())
+		end
 	end
 end
 

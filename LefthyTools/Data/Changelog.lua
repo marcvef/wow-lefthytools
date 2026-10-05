@@ -153,13 +153,16 @@ ns.CHANGELOG = {
 		en = { "AFK time on the graphs", "The Martin tracker on the Graphs page: AFK time per day and its share of your play time, and your friends' AFK time next to yours." },
 		de = { "AFK-Zeit in den Graphen", "Der Martin-Tracker auf der Graphen-Seite: AFK-Zeit pro Tag und ihr Anteil an deiner Spielzeit, und die AFK-Zeit deiner Freunde neben deiner." } },
 	{ id = 49, module = "tweaks",
-		en = { "Level-up window", "Like in old RPGs: each level-up shows your stat gains, the new spells at your class trainer, a new talent row and class quests. Pin it to keep it; arrows browse other levels." },
-		de = { "Level-Up-Fenster", "Wie in alten RPGs: Jedes Level-Up zeigt deine neuen Werte, die neuen Zauber bei deinem Klassenlehrer, eine neue Talentreihe und Klassenquests. Anpinnen hält es offen; Pfeile blättern durch andere Level." } },
+		en = { "Level-up window", "Like in old RPGs: each level-up shows your stat gains, the new spells at your class trainer, a new talent row and class quests. Pin it to keep it; arrows browse other levels; /levelup shows it again." },
+		de = { "Level-Up-Fenster", "Wie in alten RPGs: Jedes Level-Up zeigt deine neuen Werte, die neuen Zauber bei deinem Klassenlehrer, eine neue Talentreihe und Klassenquests. Anpinnen hält es offen; Pfeile blättern durch andere Level; /levelup zeigt es wieder." } },
 	{ id = 50, module = "beacon",
 		en = { "A map pin with every ping", "A friend's map ping comes with the game's map pin in its chat line: click it and your waypoint arrow points there." },
 		de = { "Kartenmarkierung bei jedem Ping", "Der Karten-Ping eines Freundes bringt in seiner Chatzeile die Kartenmarkierung des Spiels mit: Ein Klick, und dein Wegpunktpfeil zeigt dorthin." } },
 	{ id = 51, module = "tweaks",
 		en = { "Flights wait for Chronicle", "A cinematic flight now pauses for LefthyTools' own windows too (Chronicle, what's new, errors), like it does for bags and the map." },
 		de = { "Flüge warten auf Chronicle", "Ein Flug im Kinomodus pausiert jetzt auch für die Fenster von LefthyTools (Chronicle, Neuigkeiten, Fehler), wie für Taschen und die Karte." } },
+	{ id = 52, module = "beacon",
+		en = { "Take a ping back", "Alt+click your own ping on the world map (or /lefthy beacon ping clear) and it's gone, for your friends too." },
+		de = { "Einen Ping zurücknehmen", "Alt+Klick auf deinen eigenen Ping auf der Weltkarte (oder /lefthy beacon ping clear), und er ist weg, auch bei deinen Freunden." } },
 	-- New entries go here, at the end.
 }

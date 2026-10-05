@@ -242,10 +242,10 @@ strata, a child of UIParent) shows:
 - It counts as an open window (`LT.Window.Register`): a cinematic flight pauses for it, Mirage
   keeps the interface up.
 
-The last real gains are kept per character (`levelUps["Name-Realm"]`); the *Preview* button and
-`/lefthy tweaks levelup test` show the window for the current level with them, or with example
-gains (said in the corner) when the last level-up was to another level. The preview lists every
-spell of the level, known ones greyed out.
+The last real gains are kept per character (`levelUps["Name-Realm"]`); `/levelup`, the *Preview*
+button and `/lefthy tweaks levelup test` show the window for the current level with them ("Your
+last level-up, once more" in the corner), or with example gains (said in the corner) when the
+last level-up was to another level. They list every spell of the level, known ones greyed out.
 
 - **Cost:** nothing until a level-up: the events only note the numbers and start a timer. The
   window's OnUpdate (fade, count-ups, the close timer) runs only while it's on screen; the glow,

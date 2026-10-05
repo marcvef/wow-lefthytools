@@ -525,7 +525,7 @@ function M:BuildOptions(o)
 	o:Checkbox("levelUp", L["Level-up window"],
 		L["Like in old RPGs: when you level up, a window shows what each stat gained, the new spells at your class trainer (hover one for its tooltip), talent points, a class quest that opens at this level and how long the last level took. It waits until a fight is over and closes by itself."])
 	o:Button(L["Show the level-up window"], L["Preview"], function() ns.LevelUp.Preview() end,
-		L["Shows the window for your current level, with the gains of your last level-up (example numbers if there was none yet)."])
+		L["Shows the window for your current level, with the gains of your last level-up (example numbers if there was none yet). /levelup does the same."])
 	o:Header(L["AFK screen"])
 	o:Checkbox("afkScreen", L["AFK screen"],
 		L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."])
@@ -577,7 +577,7 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
 		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | questmap | afk | levelup | flights [on|off] - switch a tweak")
-		self:Print("/lefthy tweaks levelup test - show the level-up window for your current level")
+		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 	end
 end

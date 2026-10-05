@@ -36,6 +36,7 @@ local L = ns.L
 --                       W2;0;;<left out> to end. The update notice lists them, one line each.
 --   P2;<continent>;<north>;<west>;<uiMapID>
 --                       a map ping (Pings.lua): "look here", shown on friends' maps for a minute
+--   G2                  my map ping is gone (taken back before its minute is up)
 --   T2;<questID>;<done>;<title>;<objective>
 --                       the quest I'm tracking (super-tracked, else the first watched one), for
 --                       the tooltip: done 1 = ready to turn in, objective = the first unfinished
@@ -671,7 +672,7 @@ local function Parse(text)
 		return nil
 	elseif version ~= VERSION then
 		return "version", version
-	elseif (kind == "H" or kind == "Q") and rest == "" then
+	elseif (kind == "H" or kind == "Q" or kind == "G") and rest == "" then
 		return kind
 	elseif kind == "S" then
 		local flags, continent, north, west, subzone, target =
@@ -929,6 +930,15 @@ local function OnMessage(text, senderID)
 		if M.db.pings and (not guard.pingAt or now - guard.pingAt >= PING_GAP) then
 			guard.pingAt = now
 			pingsIn[#pingsIn + 1] = { senderID, a, b, c, d }
+		end
+	elseif kind == "G" then
+		for i = #pingsIn, 1, -1 do -- (one still waiting for the tick goes too)
+			if pingsIn[i][1] == senderID then
+				table.remove(pingsIn, i)
+			end
+		end
+		if B.RemovePing then
+			B.RemovePing(senderID)
 		end
 	elseif kind == "F" then
 		peer.files = a -- (comes just before their version)
@@ -1362,6 +1372,8 @@ function M:OnSlashCommand(msg)
 			LT:SetModuleSetting(self, "interval", math.max(1, math.min(10, math.floor(n + 0.5))))
 		end
 		self:Print("update interval: " .. LT.Options.Seconds(self.db.interval) .. ".")
+	elseif cmd == "ping" and arg == "clear" and B.ClearMyPing then
+		B.ClearMyPing()
 	elseif cmd == "ping" and B.PingMe then
 		B.PingMe()
 	elseif cmd == "sound" and B.SoundCommand then
@@ -1377,6 +1389,7 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy beacon status - friends with LefthyTools, their last update and the message traffic")
 		self:Print("/lefthy beacon interval <1-10> - seconds between position updates while moving")
 		self:Print("/lefthy beacon ping - show your friends where you stand (or Alt+click the world map)")
+		self:Print("/lefthy beacon ping clear - take your ping back (or Alt+click it on the world map)")
 		self:Print("/lefthy beacon ding <text> | reset | test - your level-up message; {name} and {level} are filled in")
 		self:Print("/lefthy beacon sound [<number>] - list the level-up sounds, or pick one and hear it")
 		self:Print("/lefthy beacon show <item> - show an item to friends, like Ctrl+right-click (Shift-click it into the chat box)")

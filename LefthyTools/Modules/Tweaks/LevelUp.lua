@@ -770,7 +770,7 @@ local function TagText(data)
 		end
 		return L["Your level"]
 	elseif data.preview then
-		return data.example and L["Preview, with example gains (your next level-up shows the real ones)"] or L["Preview"]
+		return data.example and L["Preview, with example gains (your next level-up shows the real ones)"] or L["Your last level-up, once more"]
 	end
 	return ""
 end
@@ -1207,6 +1207,10 @@ function LevelUp.Preview()
 	data.example = example
 	Show(data)
 end
+
+-- /levelup: the window again, for your current level.
+SLASH_LEFTHYTOOLS_LEVELUP1 = "/levelup"
+SlashCmdList.LEFTHYTOOLS_LEVELUP = function() LevelUp.Preview() end
 
 function ns.ApplyLevelUp(on)
 	if on then

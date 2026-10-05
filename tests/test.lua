@@ -1563,6 +1563,35 @@ B("pings"):SetValue(true)
 lefthy("beacon ping")
 Advance(0.15)
 check(sentTo(11, mark, "P2;")[1] == "P2;0;500.0;500.0;1429", "/lefthy beacon ping: where I stand")
+-- Taking it back: Alt+click on my own marker (or /lefthy beacon ping clear), for everyone.
+Advance(2)
+local mine = pingPin("me")
+mine:OnMouseEnter()
+check(tooltipHas("Alt+click it on the world map to take it back."), "my own marker's tooltip says how to take it back")
+mine:OnMouseLeave()
+mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+mine._mouse, STATE.alt = true, true
+ClickWorldMap()
+mine._mouse, STATE.alt = false, false
+Advance(0.15)
+check(not BB.pings.me and #sentTo(11, mark, "P2;") == 0 and sentTo(11, mark, "G2")[1] == "G2"
+	and printedSince(pmark):find("ping taken back.", 1, true), "Alt+click on my own marker: taken back and my friends told, no new ping")
+Advance(0.15)
+check(not pingPin("me") and not BB.GetMinimapPings().me, "gone from my maps")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "P2;0;550.0;500.0;1429", "WHISPER", 11)
+Advance(0.15)
+check(BB.pings[11] and pingPin(11), "Anna pings")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "G2", "WHISPER", 11)
+Advance(0.15)
+check(not BB.pings[11] and not pingPin(11) and not BB.GetMinimapPings()[11], "... and takes it back: gone from both maps")
+lefthy("beacon ping")
+Advance(0.15)
+lefthy("beacon ping clear")
+Advance(0.15)
+check(not BB.pings.me and not pingPin("me"), "/lefthy beacon ping clear")
+pmark = #PRINTED + 1
+lefthy("beacon ping clear")
+check(printedSince(pmark):find("no ping out", 1, true), "nothing to take back: said so")
 WorldMapFrame:Hide()
 
 section("Beacon: tracked quest")
@@ -3934,7 +3963,12 @@ do
 
 	-- The preview: the window for my current level.
 	SETTINGS_BUTTONS["Show the level-up window"].onClick()
-	check(shown() and W.Number:GetText() == 21 and plain(W.Tag:GetText()) == "Preview", "preview button: my level, my last gains")
+	check(shown() and W.Number:GetText() == 21 and plain(W.Tag:GetText()) == "Your last level-up, once more",
+		"preview button: my level, my last gains")
+	check(W.Close:IsShown() and W.Close._template == "UIPanelCloseButtonNoScripts", "with Blizzard's red X at the top")
+	W:Hide()
+	SlashCmdList.LEFTHYTOOLS_LEVELUP("")
+	check(shown() and W.Number:GetText() == 21, "/levelup: the same, one quick command")
 	Advance(2)
 	check(cells().Strength == "45 > 46  +1" and cells().Spirit == "33",
 		"... and its numbers: the event's own when the base stats didn't move (no Spirit gain then), got " .. tostring(cells().Spirit))

@@ -29,7 +29,7 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   seen on a newer build, answered with `W2;<id>;<module>;<title>` per entry (the newest 8 above
   <after>, oldest first, title in the asker's language) and `W2;0;;<left out>` (at most once a
   minute per friend; only the friend asked is listened to, at most 8 lines),
-  `P2;<continent>;<north>;<west>;<uiMapID>` map ping,
+  `P2;<continent>;<north>;<west>;<uiMapID>` map ping, `G2` my ping taken back,
   `T2;<questID>;<done>;<title>;<objective>` tracked quest, `E2;<kind>;<a>;<b>` a Chronicle
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
   `C2;<count>` enemies on them in combat, `X2;<percent>` progress on their level,
@@ -394,7 +394,10 @@ Receiving prints "Anna pinged a spot in Elwynn Forest: see your map. [Map Pin Lo
 `SOUNDKIT.MAP_PING`; the last part is the game's own map pin link for the spot on the zone map
 (`worldmap:<uiMapID>:<x*10000>:<y*10000>`, text `MAP_PIN_HYPERLINK`; left out where
 `C_Map.CanSetUserWaypointOnMap` says no), so a click sets the waypoint arrow there and opens the
-map. `B.UpdatePings` on the driver tick expires and fades them and redraws the open
+map. Alt+click on my own marker (the world map hook checks whether the `"me"` pin is under the
+mouse first; the markers take only mouse motion, so the click reaches the map) or
+`/lefthy beacon ping clear` takes it back: removed here and `G2` to everyone, whose clients drop
+my ping (and one still waiting for their tick). My marker's tooltip says so. `B.UpdatePings` on the driver tick expires and fades them and redraws the open
 map when the list changed. Setting `pings` switches sending, showing and the Alt+click off (the
 hook stays, it checks the setting).
 
