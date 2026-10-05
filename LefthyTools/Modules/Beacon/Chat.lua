@@ -110,7 +110,7 @@ end
 
 -- After receiving: the tokens back into links; items from this client's item cache (unknown
 -- items are asked for first, so callback may come a moment later).
-local function UnpackLinks(text, callback)
+local function UnpackLinks(text, callback, wait)
 	text = Relink(text)
 	local wanted = {}
 	for itemString in text:gmatch("{item:([%d:%-]+)}") do
@@ -120,16 +120,42 @@ local function UnpackLinks(text, callback)
 		callback(text)
 		return
 	end
-	local links, pending = {}, #wanted
+	local links, pending, done = {}, #wanted, false
+	local function Finish()
+		if not done then
+			done = true
+			callback((text:gsub("{item:([%d:%-]+)}", function(s) return links[s] or "[?]" end)))
+		end
+	end
 	for _, itemString in ipairs(wanted) do
 		B.WithLink(itemString, function(link)
 			links[itemString] = link or false
 			pending = pending - 1
 			if pending == 0 then
-				callback((text:gsub("{item:([%d:%-]+)}", function(s) return links[s] or "[?]" end)))
+				Finish()
 			end
 		end)
 	end
+	if wait and not done then
+		C_Timer.After(wait, Finish) -- (an item that never loads: "[?]")
+	end
+end
+
+-- Friends' lines in the order they came, though an item in one may have to load first: the
+-- lines after it wait (at most LOAD_WAIT seconds).
+local LOAD_WAIT = 3
+local arriving = {} -- { show, shown } oldest first
+
+local function InOrder(text, show)
+	local entry = { show = show }
+	arriving[#arriving + 1] = entry
+	UnpackLinks(text, function(shown)
+		entry.shown = shown
+		while arriving[1] and arriving[1].shown do
+			local first = table.remove(arriving, 1)
+			first.show(first.shown)
+		end
+	end, LOAD_WAIT)
 end
 
 -- "[Lefthy] [Anna]: text", the name in its class colour.
@@ -236,7 +262,7 @@ function B.ReceiveChat(peer, text)
 	if not M.db.lefthyChat then
 		return
 	end
-	UnpackLinks(B.Clean(text, TEXT_BYTES), function(shown)
+	InOrder(B.Clean(text, TEXT_BYTES), function(shown)
 		if not (M.enabled and M.db.lefthyChat) then
 			return -- (switched off while an item was loading)
 		end
@@ -256,7 +282,7 @@ function B.ReceiveAnnouncement(peer, text)
 	if not M.db.announcements then
 		return
 	end
-	UnpackLinks(B.Clean(text, TEXT_BYTES), function(shown)
+	InOrder(B.Clean(text, TEXT_BYTES), function(shown)
 		if not (M.enabled and M.db.announcements) then
 			return
 		end

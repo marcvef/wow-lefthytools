@@ -2815,12 +2815,25 @@ do
 	MOCK_ITEM_UNCACHED = 19019 -- not in my item cache yet
 	anna("M2;need {item:19019::::::::20}?")
 	Advance(0.15)
-	check(not printedSince(pmark):find("need", 1, true), "an item I don't have cached: the line waits for it")
+	anna("M2;anyone?")
+	Advance(0.15)
+	check(not printedSince(pmark):find("need", 1, true) and not printedSince(pmark):find("anyone", 1, true),
+		"an item I don't have cached: the line waits for it, and her next line behind it")
 	MOCK_ITEM_UNCACHED = nil
 	for _, callback in ipairs(PENDING_ITEM_LOADS) do callback() end
 	PENDING_ITEM_LOADS = {}
-	check(printedSince(pmark):find("Anna|r|cffffb84d]: need " .. ItemLink(19019) .. "?", 1, true),
-		"... and comes with a real link once it's loaded, got " .. printedSince(pmark))
+	local shownAll = printedSince(pmark)
+	local needAt, anyoneAt = shownAll:find("Anna|r|cffffb84d]: need " .. ItemLink(19019) .. "?", 1, true), shownAll:find("anyone?", 1, true)
+	check(needAt and anyoneAt and needAt < anyoneAt,
+		"... and comes with a real link once it's loaded, then the next one: in the order she wrote them, got " .. shownAll)
+	pmark = #PRINTED + 1
+	MOCK_ITEM_UNCACHED = 19019
+	anna("M2;{item:19019::::::::20} never loads")
+	Advance(2.5)
+	check(not printedSince(pmark):find("never loads", 1, true), "an item that takes long: waited for ...")
+	Advance(0.7)
+	check(printedSince(pmark):find("]: [?] never loads", 1, true), "... 3 seconds at most, then the line comes without it")
+	MOCK_ITEM_UNCACHED, PENDING_ITEM_LOADS = nil, {}
 	-- Sticky /l: the chat box stays on Lefthy chat, like /g, until another chat type.
 	local box, header = ChatFrame1EditBox, ChatFrame1EditBoxHeader
 	Advance(6) -- (my last chat lines out of the way: 5 per 6 s)
