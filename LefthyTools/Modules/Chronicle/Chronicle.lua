@@ -127,6 +127,7 @@ local function Today()
 	if not bucket then
 		bucket = { played = 0, xp = 0, quests = 0, kills = 0, deaths = 0, levels = 0, afk = 0 }
 		char.daily[day] = bucket
+		char.days[day] = true -- a day played (also when a session runs past midnight)
 	end
 	return bucket
 end

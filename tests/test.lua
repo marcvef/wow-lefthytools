@@ -4029,6 +4029,11 @@ do
 	local annaStats = C.Store().friendStats.Anna
 	check(annaStats and annaStats.days[date("%Y-%m-%d")] and not annaStats.days["2099-01-01"],
 		"a friend's day after tomorrow is ignored (today's is kept)")
+	-- A session past midnight: the new day counts as a day played.
+	local today = date("%Y-%m-%d")
+	c.days[today], c.daily[today] = nil, nil
+	Advance(1.1)
+	check(c.days[today] == true, "a day the session runs into counts as played")
 end
 
 section("Beacon: leaving")
