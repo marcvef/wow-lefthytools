@@ -197,7 +197,7 @@ function B.ReceiveReportPart(sender, id, n, of, text)
 		report = { sender = sender, id = id, of = of, parts = {}, at = GetTime() }
 		assembling[key] = report
 	end
-	report.parts[n] = text
+	report.parts[n] = (text:gsub("[|%c]", "")) -- (senders never send these: no escape codes in my window)
 end
 
 local function Store(report)

@@ -380,11 +380,14 @@ local function StartResult(call, result)
 	end
 end
 
--- "Anna:87,Bob:12" -> { { name, roll }, ... }
+-- "Anna:87,Bob:12" -> { { name, roll }, ... } (names cleaned: they end up in frames and chat)
 local function ParseResult(text)
 	local result = {}
 	for name, roll in text:gmatch("([^,:]+):(%d+)") do
-		result[#result + 1] = { name = name, roll = tonumber(roll) }
+		name = B.Clean(name, 48)
+		if name ~= "" then
+			result[#result + 1] = { name = name, roll = tonumber(roll) }
+		end
 	end
 	return result
 end

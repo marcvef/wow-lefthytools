@@ -2266,12 +2266,12 @@ do
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "R2;4242;Bob:99", "WHISPER", 12)
 	Advance(0.15)
 	check(theirs.state == "open", "a verdict from someone else than the sharer is ignored")
-	anna("R2;4242;Lefthy:87,Bob:12")
+	anna("R2;4242;|cffff0000Lefthy|r:87,Bob:12")
 	Advance(0.15)
 	check(theirs.state == "rolling", "her verdict: the drumroll here too")
 	Advance(2.6)
-	check(theirs.frame.Winner:GetText():find("You win!", 1, true) and theirs.frame.Status:GetText():find("Lefthy  87", 1, true),
-		"and I won")
+	check(theirs.frame.Winner:GetText():find("You win!", 1, true) and theirs.frame.Status:GetText():find("Lefthy  87", 1, true)
+		and not theirs.frame.Status:GetText():find("ff0000", 1, true), "and I won (names in a verdict cleaned of escape codes)")
 	Advance(9)
 
 	-- Only one needs it: no roll. Nobody: nobody.
@@ -2946,12 +2946,12 @@ do
 	check(sentTo(11, mark, "Y2;1")[1] and sentTo(12, mark, "Y2;1")[1], "switched on: my friends are told I collect")
 	pmark = #PRINTED + 1
 	anna("Z2;7;2;2; and more")
-	anna("Z2;7;1;2;Error | LefthyTools 0.5.0^line two")
+	anna("Z2;7;1;2;Error, |cffff0000LefthyTools|r 0.5.0^line two")
 	Advance(0.3)
 	local reports = LefthyToolsDB.friendReports
-	check(reports[#reports].from == "Anna" and reports[#reports].text == "Error | LefthyTools 0.5.0\nline two and more"
+	check(reports[#reports].from == "Anna" and reports[#reports].text == "Error, cffff0000LefthyToolsr 0.5.0\nline two and more"
 		and printedSince(pmark):find("Anna sent a LefthyTools error report: /lefthy reports shows it.", 1, true),
-		"a friend's report, put together (parts in any order), and a chat line")
+		"a friend's report, put together (parts in any order, no escape codes), and a chat line")
 	anna("Z2;8;1;3;first part")
 	for _ = 1, 5 do
 		Advance(25)
