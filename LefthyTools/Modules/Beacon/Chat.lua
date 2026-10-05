@@ -21,8 +21,11 @@ local B = ns.Beacon
 
 local TEXT_BYTES = 200
 local CHAT_COLOUR = "|cffffb84d"
-local SEND_GAP = { chat = 0.5, announce = 3 }
-local lastSent = { chat = -math.huge, announce = -math.huge }
+-- Friends take 5 lines per 5 s and an announcement per 3 s from me (Beacon's CHAT_LIMIT and
+-- ANNOUNCE_GAP); mine stay under that, with a second to spare for the way there.
+local SEND_LIMIT = { chat = 5, announce = 1 } -- at most this many
+local SEND_WINDOW = { chat = 6, announce = 4 } -- in any this many seconds
+local sentAt = { chat = {}, announce = {} } -- my last ones, oldest first
 local CHAT_SOUND = SOUNDKIT and SOUNDKIT.IG_CHAT_SCROLL_UP or 826 -- a very soft tick (setting lefthyChatSound)
 local SOUND_GAP = 1.5 -- a burst of lines ticks once
 local lastSound = -math.huge
@@ -189,7 +192,8 @@ local function Send(kind, text)
 		return
 	end
 	local now = GetTime()
-	if now - lastSent[kind] < SEND_GAP[kind] then
+	local times, limit = sentAt[kind], SEND_LIMIT[kind]
+	if #times >= limit and now - times[#times - limit + 1] < SEND_WINDOW[kind] then
 		M:Print("not so fast: try again in a moment.")
 		return
 	end
@@ -197,7 +201,10 @@ local function Send(kind, text)
 		M:Print("no friends with LefthyTools online.")
 		return
 	end
-	lastSent[kind] = now
+	times[#times + 1] = now
+	if #times > limit then
+		table.remove(times, 1)
+	end
 	local prefix = (kind == "chat" and "M" or "A") .. B.VERSION .. ";"
 	for gameAccountID, peer in pairs(M:GetPeers()) do
 		local line = Packed(LinkLevel(peer.version))

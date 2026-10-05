@@ -2681,6 +2681,21 @@ do
 	SlashCmdList.LEFTHYTOOLS_CHAT("|cffff0000red|r; sneaky")
 	Advance(0.15)
 	check(sentTo(11, mark, "M2;")[1] == "M2;red sneaky", "colour codes and separators are taken out")
+	-- Mine stay within what friends take (5 lines per 5 s, an announcement per 3 s), with room to spare.
+	Advance(6)
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	for i = 1, 6 do SlashCmdList.LEFTHYTOOLS_CHAT("quick " .. i) end
+	Advance(0.15)
+	check(#sentTo(11, mark, "M2;") == 5 and printedSince(pmark):find("not so fast", 1, true), "at most 5 lines in 6 s, and I'm told")
+	Advance(6)
+	SlashCmdList.LEFTHYTOOLS_CHAT("quick 7")
+	Advance(0.15)
+	check(#sentTo(11, mark, "M2;") == 6, "a moment later: on again")
+	lefthy("announce one")
+	Advance(3.5)
+	lefthy("announce two")
+	Advance(0.15)
+	check(#sentTo(11, mark, "A2;") == 1, "one announcement in 4 s")
 	-- Announcements: the middle of the screen.
 	Advance(5)
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
@@ -2731,7 +2746,7 @@ do
 	check(printedSince(pmark):find("]: look: " .. ItemLink(1155) .. " and |cffffff00|Hquest:176:10|h[Wanted: Hogger]|h|r", 1, true),
 		"my own line shows both links, got " .. printedSince(pmark))
 	-- Professions (and spells, achievements, ...): clickable on the other side too.
-	Advance(0.6)
+	Advance(1.1)
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("my |cffffd000|Htrade:Player-1-0000ABCD:3908:197|h[Tailoring]|h|r, not |cff00ff00|Hgarrmission:12|h[Mission]|h|r")
 	Advance(0.15)
@@ -2740,7 +2755,7 @@ do
 	check(printedSince(pmark):find("my |cffffd000|Htrade:Player-1-0000ABCD:3908:197|h[Tailoring]|h|r, not [Mission]", 1, true),
 		"my own line: the profession as a link, got " .. printedSince(pmark))
 	-- A map pin (Shift-click on the pin): its icon goes, each client puts its own back.
-	Advance(0.6)
+	Advance(1.1)
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("here |cffffff00|Hworldmap:1429:4924:5568|h[|A:Waypoint-MapPin-ChatIcon:13:13:0:0|a Map Pin Location]|h|r")
 	Advance(0.15)
@@ -2764,7 +2779,7 @@ do
 			{ "0.4.2-g1a2b3c4", "M2;[Tailoring] [Rod of the Sleepwalker] [Map Pin Location]", "... but not on an older base" },
 		}) do
 			chatPeers[12].version = case[1]
-			Advance(0.6)
+			Advance(1.1)
 			mark = #GAMEDATA + 1
 			SlashCmdList.LEFTHYTOOLS_CHAT(line)
 			Advance(0.15)
@@ -2794,7 +2809,7 @@ do
 		"... and comes with a real link once it's loaded, got " .. printedSince(pmark))
 	-- Sticky /l: the chat box stays on Lefthy chat, like /g, until another chat type.
 	local box, header = ChatFrame1EditBox, ChatFrame1EditBoxHeader
-	Advance(1)
+	Advance(6) -- (my last chat lines out of the way: 5 per 6 s)
 	mark = #GAMEDATA + 1
 	TypeChat("/l first line")
 	Advance(0.6)
