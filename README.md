@@ -149,7 +149,8 @@ minimap, and you on theirs, without being in a group.
   item can't be shared, chat always says why.
 - **Lefthy chat:** `/l <text>`, like `/g` or `/p`: a chat line for all your friends with
   LefthyTools, shown in their chat windows as `[Lefthy] [Anna]: text`, with a soft tick (can be
-  switched off). Item links work. The chat box stays on it ("Lefthy:") until you switch with
+  switched off). Links work and can be clicked: items, professions, spells, quests,
+  achievements and the like. The chat box stays on it ("Lefthy:") until you switch with
   `/s`, `/g`, `/p`, ...
 - **Announcements:** `/la <text>` (or `/lefthy announce <text>`) puts the line in the middle of their screens,
   where shared items show, with the whisper sound (and in their chat). On a cinematic flight

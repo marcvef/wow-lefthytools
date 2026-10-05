@@ -10,7 +10,9 @@ local B = ns.Beacon
 -- also come as subtitles on a cinematic flight. Settings lefthyChat and announcements switch
 -- sending and showing. The text goes through B.Clean (no colour codes, separators or escapes), so
 -- item links travel as {item:<numbers>} (B.ItemString: only the numeric fields) and each client
--- builds the link again in its own language (B.WithLink); other links keep their "[text]".
+-- builds the link again in its own language (B.WithLink). Professions, spells, quests,
+-- achievements and a few more travel as {<type>:<data>[<text>]} (the text in the sender's
+-- language) and become clickable links again (LINK_COLOURS); any other link keeps its "[text]".
 
 local TEXT_BYTES = 200
 local CHAT_COLOUR = "|cffffb84d"
@@ -20,21 +22,47 @@ local CHAT_SOUND = SOUNDKIT and SOUNDKIT.IG_CHAT_SCROLL_UP or 826 -- a very soft
 local SOUND_GAP = 1.5 -- a burst of lines ticks once
 local lastSound = -math.huge
 
--- Before sending: item links become {item:12345:...}, other links their text; colour codes,
--- textures and atlases go. Trailing empty fields are dropped (the item is the same).
+-- The links that travel besides items, in the colour the game gives them. Their data may only hold
+-- these characters (GUIDs, numbers, a profession's base64), their text no brackets or braces.
+local LINK_COLOURS = { trade = "ffffd000", enchant = "ffffd000", spell = "ff71d5ff", talent = "ff71d5ff",
+	mount = "ff71d5ff", quest = "ffffff00", achievement = "ffffff00", journal = "ff66bbff", currency = "ffffffff" }
+local LINK_DATA = "[%w:%-_%.%+/=]"
+local LINK_TOKEN = "{(%a+)(:" .. LINK_DATA .. "*)%[([^%[%]{}]*)%]}"
+
+-- Before sending: item links become {item:12345:...} (trailing empty fields dropped: the item is
+-- the same), the other kinds above {trade:...[Tailoring]}, any other link its text; colour codes,
+-- textures and atlases go.
 local function PackLinks(text)
-	text = text:gsub("|Hitem:([^|]+)|h.-|h", function(data)
-		local itemString = B.ItemString and B.ItemString("|Hitem:" .. data .. "|h")
-		return itemString and ("{item:" .. itemString:gsub(":+$", "") .. "}") or ""
+	text = text:gsub("|H([^|]*)|h(.-)|h", function(data, shown)
+		local kind = data:match("^(%a+):")
+		if kind == "item" then
+			local itemString = B.ItemString and B.ItemString("|H" .. data .. "|h")
+			return itemString and ("{item:" .. itemString:gsub(":+$", "") .. "}") or ""
+		end
+		local label = shown:match("^%[(.*)%]$") or shown
+		if kind and LINK_COLOURS[kind] and data:find("^" .. LINK_DATA .. "+$") and not label:find("[%[%]{}]") then
+			return "{" .. data .. "[" .. label .. "]}"
+		end
+		return shown
 	end)
-	text = text:gsub("|H[^|]*|h(.-)|h", "%1")
 	text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:|]*:", ""):gsub("|r", "")
 	return (text:gsub("|T.-|t", ""):gsub("|A.-|a", ""))
 end
 
--- After receiving: {item:...} back into links, from this client's item cache (unknown items are
--- asked for first, so callback may come a moment later).
+-- {trade:...[Tailoring]} back into a clickable link.
+local function Relink(text)
+	return (text:gsub(LINK_TOKEN, function(kind, data, label)
+		local colour = LINK_COLOURS[kind]
+		if colour then
+			return "|c" .. colour .. "|H" .. kind .. data .. "|h[" .. label .. "]|h|r"
+		end
+	end))
+end
+
+-- After receiving: the tokens back into links; items from this client's item cache (unknown
+-- items are asked for first, so callback may come a moment later).
 local function UnpackLinks(text, callback)
+	text = Relink(text)
 	local wanted = {}
 	for itemString in text:gmatch("{item:([%d:%-]+)}") do
 		wanted[#wanted + 1] = itemString
@@ -70,8 +98,8 @@ end
 
 local function Send(kind, text)
 	text = PackLinks(strtrim(text or ""):gsub('^"(.*)"$', "%1")) -- /lefthy announce "text"
-	-- (cut to size: an item cut in half goes)
-	text = B.Clean(text, TEXT_BYTES):gsub("{item:[%d:%-]*$", "")
+	-- (cut to size: a link cut in half goes)
+	text = B.Clean(text, TEXT_BYTES):gsub("{%a+:[^}]*$", "")
 	if not M.enabled then
 		M:Print("Beacon is off: /lefthy enable beacon.")
 		return

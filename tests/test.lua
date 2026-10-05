@@ -2625,10 +2625,27 @@ do
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("look: " .. ItemLink(1155) .. " and |cffffff00|Hquest:176:10|h[Wanted: Hogger]|h|r")
 	Advance(0.15)
-	check(sentTo(11, mark, "M2;")[1] == "M2;look: {item:1155::::::::20} and [Wanted: Hogger]",
-		"an item link goes as its numbers, another link as its text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
-	check(printedSince(pmark):find("]: look: " .. ItemLink(1155) .. " and [Wanted: Hogger]", 1, true),
-		"my own line shows the link, got " .. printedSince(pmark))
+	check(sentTo(11, mark, "M2;")[1] == "M2;look: {item:1155::::::::20} and {quest:176:10[Wanted: Hogger]}",
+		"an item link goes as its numbers, a quest link as its data and text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	check(printedSince(pmark):find("]: look: " .. ItemLink(1155) .. " and |cffffff00|Hquest:176:10|h[Wanted: Hogger]|h|r", 1, true),
+		"my own line shows both links, got " .. printedSince(pmark))
+	-- Professions (and spells, achievements, ...): clickable on the other side too.
+	Advance(0.6)
+	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_CHAT("my |cffffd000|Htrade:Player-1-0000ABCD:3908:197|h[Tailoring]|h|r, not |cff00ff00|Hgarrmission:12|h[Mission]|h|r")
+	Advance(0.15)
+	check(sentTo(11, mark, "M2;")[1] == "M2;my {trade:Player-1-0000ABCD:3908:197[Tailoring]}, not [Mission]",
+		"a profession link goes as its data and text; a kind not on the list as its text, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	check(printedSince(pmark):find("my |cffffd000|Htrade:Player-1-0000ABCD:3908:197|h[Tailoring]|h|r, not [Mission]", 1, true),
+		"my own line: the profession as a link, got " .. printedSince(pmark))
+	pmark = #PRINTED + 1
+	anna("M2;{trade:Player-1-0000EEEE:2259:171[Alchemy]} and {spell:133:0[Fireball]} {garrmission:12[x]} {spell:133 0[y]}")
+	Advance(0.15)
+	local got = printedSince(pmark)
+	check(got:find("|cffffd000|Htrade:Player-1-0000EEEE:2259:171|h[Alchemy]|h|r and |cff71d5ff|Hspell:133:0|h[Fireball]|h|r", 1, true)
+		and got:find("{garrmission:12[x]} {spell:133 0[y]}", 1, true),
+		"a friend's profession and spell links are clickable; other kinds and broken data stay plain text, got " .. got)
+	Advance(0.6)
 	pmark = #PRINTED + 1
 	MOCK_ITEM_UNCACHED = 19019 -- not in my item cache yet
 	anna("M2;need {item:19019::::::::20}?")

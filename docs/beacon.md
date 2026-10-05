@@ -276,11 +276,15 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   whisper sound for friends' and a chat line. At most one per 3 s each way.
 - Text goes through `B.Clean` (200 bytes): no colour codes, `|`, `;` or control characters. So
   links are packed first (`PackLinks`): an item link becomes `{item:<numbers>}` (`B.ItemString`:
-  numeric fields only, as for shared items; trailing empty fields dropped), any other link its
-  "[text]", and colour codes, textures and atlases go; a token cut in half by the size limit is
-  dropped. The receiver (and the sender, for its own echo) rebuilds the links from its item cache
-  (`UnpackLinks` via `B.WithLink`, in its own language); a line waits until unknown items have
-  loaded.
+  numeric fields only, as for shared items; trailing empty fields dropped); professions (`trade`),
+  enchants, spells, talents, mounts, quests, achievements, journal entries and currencies become
+  `{<type>:<data>[<text>]}` (data only letters, digits and `:-_.+/=`, text without brackets or
+  braces; the text stays in the sender's language); any other link its "[text]"; colour codes,
+  textures and atlases go; a token cut in half by the size limit is dropped. The receiver (and
+  the sender, for its own echo) rebuilds the links: `Relink` the listed kinds, in their usual
+  colour (`LINK_COLOURS`; an unknown kind stays text), items from its item cache (`UnpackLinks`
+  via `B.WithLink`, in its own language); a line waits until unknown items have loaded. Builds
+  before this show the new tokens as plain text.
   Both go to the cinematic flight's subtitles too. Each setting switches sending and showing; with
   one off, a send says why.
 
