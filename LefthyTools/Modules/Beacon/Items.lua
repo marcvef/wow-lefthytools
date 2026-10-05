@@ -139,7 +139,7 @@ end
 local function HoverOnClick(hover)
 	local call = hover:GetParent().call
 	if call and call.link and IsModifiedClick() then
-		HandleModifiedItemClick(call.link)
+		B.ModifiedItemClick(call.link)
 	end
 end
 
@@ -594,6 +594,18 @@ end
 
 if type(HandleModifiedItemClick) == "function" then
 	hooksecurefunc("HandleModifiedItemClick", OnModifiedItemClick)
+end
+
+-- The game's item click from our own frames (a notice's item, the bag guard). In gamepad mode not
+-- the dressing room: it opens with ShowUIPanel, which from addon code taints the gamepad's focus
+-- manager and blocks a protected click later (see Options.lua); showing it to friends still works.
+function B.ModifiedItemClick(link, itemLocation)
+	if InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled()
+		and IsModifiedClick("DRESSUP") and not IsModifiedClick("CHATLINK") then
+		OnModifiedItemClick(link, itemLocation)
+		return
+	end
+	HandleModifiedItemClick(link, itemLocation)
 end
 
 ---------------------------------------------------------------------------

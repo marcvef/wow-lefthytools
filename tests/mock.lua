@@ -1148,7 +1148,11 @@ function ClickWorldMap(button) -- what the engine does on mouse down over the ma
 	if onDown then onDown(WorldMapFrame.ScrollContainer, button or "LeftButton") end
 end
 function IsAltKeyDown() return STATE.alt == true end
-function IsModifiedClick() return STATE.alt == true or STATE.ctrl == true or STATE.shift == true end
+local MODIFIED_CLICKS = { CHATLINK = "shift", DRESSUP = "ctrl" } -- (the game's default bindings)
+function IsModifiedClick(action)
+	if MODIFIED_CLICKS[action] then return STATE[MODIFIED_CLICKS[action]] == true end
+	return STATE.alt == true or STATE.ctrl == true or STATE.shift == true
+end
 MAP_NAMES = { [1429] = "Elwynn Forest", [1415] = "Eastern Kingdoms", [1414] = "Kalimdor" }
 MAP_PARENTS, MAP_TYPES = { [1429] = 1415 }, { [1415] = 2, [1414] = 2, [1429] = 3 } -- 2 = continent, 3 = zone
 MAP_LEVELS = { [1429] = { 1, 10 } }

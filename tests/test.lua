@@ -2198,6 +2198,10 @@ do
 	shown.Hover._scripts.OnClick(shown.Hover)
 	STATE.ctrl = false
 	check(DRESSUPS == dressed + 1, "a plain click does nothing, Ctrl-click previews it (the game's item click handling)")
+	GAMEPAD_STATE.ui, STATE.ctrl = true, true
+	shown.Hover._scripts.OnClick(shown.Hover)
+	GAMEPAD_STATE.ui, STATE.ctrl = false, false
+	check(DRESSUPS == dressed + 1, "in gamepad mode no dressing room from here (it would taint the gamepad's focus)")
 	shown.Hover._scripts.OnEnter(shown.Hover)
 	Advance(9)
 	check(not shown:IsShown() and not TOOLTIP.shown, "it goes away by itself, its tooltip too if it was still up")
@@ -2513,6 +2517,16 @@ do
 	STATE.ctrl = false
 	Advance(0.15)
 	check(not dlg:IsShown() and #sentTo(11, 1, "I2;") == shares + 1, "Ctrl+right-click still shows it to friends, no question")
+	Advance(3)
+	do
+		local dressed = DRESSUPS
+		GAMEPAD_STATE.ui, STATE.ctrl, MOCK_BUTTON = true, true, "RightButton"
+		guard:Click("RightButton")
+		GAMEPAD_STATE.ui, STATE.ctrl = false, false
+		Advance(0.15)
+		check(not dlg:IsShown() and #sentTo(11, 1, "I2;") == shares + 2 and DRESSUPS == dressed,
+			"in gamepad mode too, without the dressing room (it would taint the gamepad's focus)")
+	end
 	guard:Click("RightButton")
 	pmark = #PRINTED + 1
 	dlg.Sell:Click()
