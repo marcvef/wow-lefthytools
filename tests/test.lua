@@ -4336,6 +4336,15 @@ do
 	Advance(1.2)
 	check(shown() and not W.pinned and W.Timer.shown, "a level-up during that fight: its window starts unpinned")
 	W.Pin:Click() -- (pinned again for the arrows below)
+	-- A buff that came between two levels isn't a gain: the base stats are what's compared.
+	LU.TakeSnapshot()
+	local spiritWas = STATS[5]
+	STATS[5] = { spiritWas[1], spiritWas[2] + 8 }
+	Fire("PLAYER_LEVEL_UP", PLAYER_LEVEL, 10, 0, 1, 0, 1, 1, 1, 1)
+	Advance(3.5)
+	check(cells().Spirit == tostring(spiritWas[2] + 8), "a buff since the last level isn't counted as a gain, got " .. tostring(cells().Spirit))
+	STATS[5] = spiritWas
+	W.Pin:Click()
 	-- The arrows: what other levels bring.
 	local level = W.Number:GetText()
 	W.Next:Click()

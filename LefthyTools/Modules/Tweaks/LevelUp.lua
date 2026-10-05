@@ -88,14 +88,17 @@ local function MaxLevel()
 	return math.max(cap, UnitLevel("player") or 1)
 end
 
--- The five base stats (without gear and buffs), or nil while they're secret.
+-- The five base stats (without gear and buffs: UnitStat's value minus its plus and minus parts, as
+-- Blizzard's character sheet works it out), or nil while they're secret.
 local function BaseStats()
 	local base = {}
 	for i = 1, 5 do
-		base[i] = Num((UnitStat("player", i)))
-		if not base[i] then
+		local stat, _, posBuff, negBuff = UnitStat("player", i)
+		stat, posBuff, negBuff = Num(stat), Num(posBuff), Num(negBuff)
+		if not (stat and posBuff and negBuff) then
 			return nil
 		end
+		base[i] = stat - posBuff - negBuff
 	end
 	return base
 end

@@ -443,11 +443,12 @@ function GetRealZoneText() return INSTANCE and INSTANCE.name or ZONE end -- (ins
 function UnitRace(unit) if unit == "player" then return "Human", "Human", 1 end end
 function UnitFactionGroup(unit) if unit == "player" then return "Alliance", "Alliance" end end
 -- Stats: [index] = { base, effective } (Strength, Agility, Stamina, Intellect, Spirit); SECRET for a secret value.
+-- Like the client: the value with gear and buffs twice, then the plus and minus parts (base = value - plus - minus).
 STATS = { { 40, 45 }, { 60, 70 }, { 50, 58 }, { 25, 25 }, { 30, 32 } }
 function UnitStat(unit, i)
 	local s = unit == "player" and STATS[i]
 	if s == SECRET then return SECRET, SECRET, 0, 0 end
-	if s then return s[1], s[2], s[2] - s[1], 0 end
+	if s then return s[2], s[2], s[2] - s[1], 0 end
 end
 -- Spells: KNOWN_SPELLS[id] = true for spells the player knows; names and icons are made up.
 KNOWN_SPELLS = {}
