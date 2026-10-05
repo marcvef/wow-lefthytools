@@ -73,6 +73,7 @@ local picked         -- from TakeTaxiNode: { name = "Sentinel Hill, Westfall", r
 local trip           -- this flight: { route, distance, started, known, estimate }
 local lastZone, baseline -- baseline: the fewest windows open this flight (the taxi map closes at takeoff)
 local resumeAt
+local takeoffAt      -- when control was lost for this flight; nil if the film didn't see the takeoff
 local sincePoll, shownSecond = 0, nil
 local subtitles = {} -- { text, at }
 local saved -- LefthyToolsDB: flightTimes, flightPathPace, flightPace
@@ -200,7 +201,7 @@ end
 -- pace only learns from flights near it (within 25%): a route flown at another speed (some of
 -- Forever's own) has its own time kept and shouldn't skew the rest.
 local function RecordTrip()
-	local seconds = trip and trip.route and trip.started and GetTime() - trip.started
+	local seconds = trip and trip.route and trip.fromTakeoff and trip.started and GetTime() - trip.started
 	if not (saved and seconds and seconds >= MIN_FLIGHT and seconds <= MAX_FLIGHT) then
 		return
 	end
@@ -484,8 +485,10 @@ local function Start()
 	baseline = Windows()
 	trip = nil
 	if picked then
+		-- Timed from the takeoff (also when the film starts late); not kept if it didn't see it.
 		trip = { route = picked.route, distance = picked.distance, pathYards = picked.pathYards,
-			pathWait = picked.pathWait, started = GetTime() }
+			pathWait = picked.pathWait, started = takeoffAt or GetTime(), fromTakeoff = takeoffAt ~= nil }
+		takeoffAt = nil -- (used up: a later start can't take an old takeoff)
 		-- Best first: this route's own time; its length along the flight path; the straight line.
 		trip.known = saved and saved.flightTimes[picked.route]
 		if picked.pathYards then
@@ -590,6 +593,8 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 	end
 	if ShouldStart() then
 		Start()
+	elseif M.enabled and M.db.cinematicFlights and not dismissed and not InCombat() and OnTaxi() then
+		-- In the air, but typing in chat: keep looking (4x a second) and start once that's done.
 	elseif not lookUntil or GetTime() > lookUntil then
 		lookUntil = nil
 		self:Hide() -- on the ground: nothing to do until the next flight
@@ -623,6 +628,7 @@ end
 events:SetScript("OnEvent", function(_, event, ...)
 	if event == "PLAYER_CONTROL_LOST" then
 		dismissed, trip = false, nil -- a new flight
+		takeoffAt = GetTime() -- (the film may start later: typing in chat at takeoff)
 		Look()
 	elseif event == "PLAYER_CONTROL_GAINED" then
 		if flying or trip then
@@ -701,7 +707,7 @@ function Flight.Disable()
 	if flying then
 		EndFilm(false)
 	end
-	dismissed, lookUntil, trip = false, nil, nil
+	dismissed, lookUntil, trip, takeoffAt = false, nil, nil, nil
 	driver:Hide()
 end
 

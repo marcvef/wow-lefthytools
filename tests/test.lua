@@ -3205,6 +3205,55 @@ do
 	ZONE = "Elwynn Forest"
 end
 
+section("Misc Tweaks: a flight that starts while typing")
+do
+	TAXI_NODES[3] = "Sentinel Hill, Westfall"
+	TAXI_MAP_NODES = {
+		{ name = "Stormwind, Elwynn", state = 0, slotIndex = 1, position = CreateVector2D(0.5, 0.5) },
+		{ name = "Sentinel Hill, Westfall", state = 1, slotIndex = 3, position = CreateVector2D(0.45, 0.6) },
+	}
+	local route = "Stormwind, Elwynn > Sentinel Hill, Westfall"
+	LefthyToolsDB.flightTimes[route] = nil
+	local film = LefthyToolsFlightFrame
+	if film:IsShown() then film.FadeOut:Finish() end
+	ACTIVE_CHAT_EDIT_BOX = {} -- still typing as the flight starts
+	TakeTaxiNode(3)
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(6)
+	check(not film:IsShown(), "typing at takeoff: no film yet")
+	ACTIVE_CHAT_EDIT_BOX = nil
+	Advance(0.5)
+	check(film:IsShown(), "done typing (6 s in): the film starts after all")
+	Advance(20)
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.5)
+	local took = LefthyToolsDB.flightTimes[route]
+	check(took and took >= 26 and took <= 27, "and the flight is timed from the takeoff, got " .. tostring(took))
+	Advance(2)
+	film.FadeOut:Finish()
+	-- Switched on in the air: the film comes, but a flight it didn't see from the takeoff isn't kept.
+	LefthyToolsDB.flightTimes[route] = nil
+	lefthy("tweaks flights off")
+	Advance(0.2)
+	TakeTaxiNode(3)
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(5)
+	lefthy("tweaks flights on")
+	Advance(0.5)
+	Fire("PLAYER_ENTERING_WORLD", false, false) -- (as if the film looked again)
+	Advance(0.5)
+	Advance(20)
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.5)
+	check(LefthyToolsDB.flightTimes[route] == nil, "a flight the film joined late isn't kept as the route's time")
+	Advance(2)
+	if film:IsShown() then film.FadeOut:Finish() end
+end
+
 section("Misc Tweaks: what a flight hides")
 do
 	local TDB = LefthyToolsDB.settings.tweaks
