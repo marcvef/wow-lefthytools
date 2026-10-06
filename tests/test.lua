@@ -3135,12 +3135,26 @@ do
 		"/lefthy stream me: my own surroundings, live")
 	check(math.abs(thug.tx) < 0.01 and thug.ty > 0 and thug.ty < 15, "a mob in the middle of my screen, close: just ahead of me")
 	check(pillager.tx < 0 and math.sqrt(pillager.tx ^ 2 + pillager.ty ^ 2) > 30, "one left on my screen, further away: ahead to the left")
-	check(gnoll.ty < 0 and gnoll.Body.alpha < 1, "one without a nameplate on screen: behind me, faint")
+	check(gnoll.ty < 0 and gnoll.Body.alpha < 1 and win.Hint:IsShown(),
+		"one without a direction: spread out (alone: behind me), faint, and the window says directions are guessed")
 	check(win.Status:GetText():find("1 on you", 1, true) and win.Status:GetText():find("3 near", 1, true)
 		and win.Status:GetText():find("Defias Pillager casts Fireball", 1, true), "the bottom line, got " .. tostring(win.Status:GetText()))
 	gnoll._scripts.OnEnter(gnoll)
-	check(TOOLTIP.title == "Gnoll (14)" and tooltipHas("direction unknown: its nameplate isn't on screen"), "hover: what's known about it")
+	check(TOOLTIP.title == "Gnoll (14)" and tooltipHas("direction unknown"), "hover: what's known about it")
 	gnoll._scripts.OnLeave(gnoll)
+	-- My target beyond nameplate range: shown all the same, ahead (I face what I fight), on the rim.
+	MOBS.target, STATE.target = { name = "Far Kodo", level = 26, yards = 60, guid = "Creature-0-far" }, true
+	Advance(0.6)
+	local kodo = dot("Far Kodo")
+	check(kodo and math.abs(kodo.tx) < 0.01 and kodo.ty > 100 and used() == 4, "my target beyond nameplate range: shown, ahead, on the rim")
+	kodo._scripts.OnEnter(kodo)
+	check(tooltipHas("more than 30 yd away") and tooltipHas("your target"), "... further than the range checks reach, and it's my target")
+	kodo._scripts.OnLeave(kodo)
+	MOBS.target, STATE.target = nil, false
+	MOBS.nameplate3 = nil
+	Advance(0.6)
+	check(not win.Hint:IsShown(), "every mob with a direction: no word about guessing")
+	MOBS.nameplate3 = { name = "Gnoll", level = 14, yards = 35 }
 	MOBS.nameplate1 = nil
 	Advance(0.6)
 	check(not dot("Defias Thug") and used() == 2, "a mob gone: its dot goes")
@@ -3150,6 +3164,7 @@ do
 
 	-- The test: what answers, in and out of combat.
 	MOBS.nameplate1 = { name = "Defias Thug", level = 15, combat = true, attacking = true, yards = 4, x = 0.5, y = 0.45 }
+	MOBS.nameplate2.plateError = "can't measure this region" -- (like the first test on Forever)
 	pmark = #PRINTED + 1
 	lefthy("stream test")
 	check(printedSince(pmark):find("fight stream test: 60 s of notes", 1, true), "/lefthy stream test: it starts and says what to do")
@@ -3167,10 +3182,17 @@ do
 	check(has("UnitName: value 180 | value 180") and has("e.g. Defias Thug; Defias Pillager") and has("UnitHealth: hidden 180 | hidden 180")
 		and has("UnitGUID: value 180 | value 180\n") and has("UnitPosition(player): value 60 | value 60\n"),
 		"what answers and what's hidden, in and out of combat, with examples (none of GUIDs and my position)")
-	check(has("spell Throw (30 yd): true 120, false 60 | true 120, false 60") and has("item 835 (about 30 yd): nil 180 | true 120, false 60")
-		and has("CheckInteractDistance 3 (10 yd): error 180 |"), "each range check, in and out of combat")
-	check(has("nameplate position: nil 60, onscreen 120 |") and has("Distance: 2 of 14 range checks answered in combat, 5 only out of combat."),
-		"nameplate spots and a short summary, got\n" .. report)
+	check(has("spell Throw (30 yd): true 120, false 60 | true 120, false 60") and has("item 835 (30 yd): nil 180 | true 120, false 60")
+		and has("CheckInteractDistance 3 (10 yd): error 180 |") and has("e.g. CheckInteractDistance: blocked in combat"),
+		"each range check, in and out of combat, with what the errors say")
+	check(has("item 18904 (range to measure): nil 180 | true 180   -> more than 30 yd") and has("item 4941 (range to measure): nil 180 | nil 180\n"),
+		"items of unknown range: measured against the others")
+	check(has("nameplate position: GetCenter: nil 60, onscreen 60, error 60 |") and has("e.g. 0.50,0.45; can't measure this region")
+		and has("nameplate.UnitFrame: GetCenter: value 60, error 60 |") and has("own frame anchored to it: GetCenter: nil 120 |"),
+		"nameplate positions, with what the errors say, and other ways to read them")
+	check(has("Distance: 2 of 7 range checks of known range answered in combat, 5 only out of combat.")
+		and has("readable in combat: GetNamePlateForUnit(<unit>, includeForbidden), nameplate: IsVisible"),
+		"a short summary, got\n" .. report)
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
 	LefthyToolsStreamTestsFrame:Hide()

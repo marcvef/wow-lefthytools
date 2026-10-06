@@ -1477,11 +1477,17 @@ function UnitReaction(u) if MOBS[u] then return 2 end end
 function UnitCreatureType(u) if MOBS[u] then return "Humanoid", 7 end end
 function GetScreenWidth() return 1920 end
 function GetScreenHeight() return 1080 end
-C_NamePlate = { GetNamePlateForUnit = function(u)
+C_NamePlate = { GetNamePlateForUnit = function(u) -- mob.plateError: reading its position fails, like on Forever
 	local mob = MOBS[u]
 	if not (mob and mob.x) then return nil end
-	return { GetCenter = function() return mob.x * 1920, mob.y * 1080 end, GetEffectiveScale = function() return 1 end,
-		IsForbidden = function() return false end }
+	local function center()
+		if mob.plateError then error(mob.plateError, 0) end
+		return mob.x * 1920, mob.y * 1080
+	end
+	return { GetCenter = center, GetEffectiveScale = function() return 1 end, IsForbidden = function() return false end,
+		IsVisible = function() return true end, GetLeft = function() return (center()) - 50 end,
+		GetRect = function() local x, y = center(); return x - 50, y - 10, 100, 20 end, GetPoint = function() return "CENTER" end,
+		UnitFrame = { GetCenter = center } }
 end }
 -- The spellbook: one line; harmful spells with their range (0: melee), one passive.
 SPELL_RANGES = { [1752] = 0, [2764] = 30 } -- Sinister Strike, Throw
@@ -1505,7 +1511,7 @@ C_Spell.IsSpellInRange = function(id, u)
 	local range = SPELL_RANGES[id] > 0 and SPELL_RANGES[id] or 5
 	return mob.yards <= range
 end
-ITEM_RANGES = { [37727] = 5, [835] = 30 } -- the rest: items this client doesn't know
+ITEM_RANGES = { [10645] = 20, [835] = 30, [18904] = 35 } -- the rest: items this client doesn't know
 C_Item.RequestLoadItemDataByID = function() end
 C_Item.IsItemInRange = function(id, u)
 	local mob = MOBS[u]

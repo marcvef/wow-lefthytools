@@ -31,7 +31,7 @@ local KEEP_TESTS = 3
 local EXAMPLES = 3       -- example answers per line of a report
 local OUTER_YARDS = 40   -- the window's outer ring
 local RINGS = { 40, 30, 20, 10 }
-local WIDTH, HEIGHT, RADAR = 250, 300, 220
+local WIDTH, HEIGHT, RADAR = 250, 320, 220
 local MAX_DOTS = 20
 local NAMES = 4          -- the nearest mobs show their name
 local GLIDE = 6          -- how fast dots glide to their new spot
@@ -42,11 +42,13 @@ local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
 local GOLD = { 1, 0.82, 0.3 }
 local issecret = issecretvalue or function() return false end
 
--- Items with a known use range (as LibRangeCheck lists them): C_Item.IsItemInRange works without
--- owning them, if the game knows the item. CheckInteractDistance: duel, trade, inspect.
-local RANGE_ITEMS = { { 37727, 5 }, { 34368, 8 }, { 32321, 10 }, { 33069, 15 }, { 10645, 20 },
-	{ 24268, 25 }, { 835, 30 }, { 24269, 35 }, { 28767, 40 } }
-local INTERACT = { { 3, 10 }, { 2, 11 }, { 1, 28 } }
+-- Items with a known use range: C_Item.IsItemInRange works without owning them, if the game knows
+-- the item (Forever knows classic-era ones: the first test showed these two answering in combat).
+local RANGE_ITEMS = { { 10645, 20 }, { 835, 30 } } -- Gnomish Death Ray, Large Rope Net
+-- Classic-era items used on a target whose range isn't known yet: the test measures it against the
+-- checks of known range (between the longest a unit was beyond and the shortest it was within).
+local CANDIDATE_ITEMS = { 4941, 10720, 18904, 7734, 1127, 2091, 13289, 17202, 8149, 17626, 4945, 18640 }
+local INTERACT = { { 3, 10 }, { 2, 11 }, { 1, 28 } } -- CheckInteractDistance: duel, trade, inspect
 
 local UNITS, TARGETS = {}, {}
 for i = 1, MAX_UNITS do
@@ -85,7 +87,8 @@ local function Value(path, ...)
 	return v
 end
 
--- Harmful spells you know, one per range (melee counts as 5 yd), shortest first.
+-- Harmful spells you know, two per range (one may not work on every mob, like Soothe Animal), melee
+-- counted as 5 yd, shortest first.
 local function RangeSpells()
 	local list, seen = {}, {}
 	local book = C_SpellBook
@@ -102,8 +105,8 @@ local function RangeSpells()
 				local id = item and item.itemType == spellType and not item.isPassive and item.spellID
 				local spell = id and C_Spell.IsSpellHarmful(id) and C_Spell.GetSpellInfo(id)
 				local yards = spell and (spell.maxRange > 0 and spell.maxRange or 5)
-				if yards and not seen[yards] and #list < 6 then
-					seen[yards] = true
+				if yards and (seen[yards] or 0) < 2 and #list < 10 then
+					seen[yards] = (seen[yards] or 0) + 1
 					list[#list + 1] = { id = id, name = spell.name, yards = yards }
 				end
 			end
@@ -113,8 +116,9 @@ local function RangeSpells()
 	return list
 end
 
--- Every way to tell how far a hostile unit is: { label, yards, path, arg, unitFirst }.
-local function RangeChecks()
+-- Every way to tell how far a hostile unit is: { label, yards, path, arg, unitFirst }; with
+-- candidates (the test), also the items whose range is still to be measured (yards nil).
+local function RangeChecks(candidates)
 	local checks = {}
 	local ok, spells = pcall(RangeSpells)
 	for _, spell in ipairs(ok and spells or {}) do
@@ -126,8 +130,14 @@ local function RangeChecks()
 		if load then
 			pcall(load, item[1])
 		end
-		checks[#checks + 1] = { label = ("item %d (about %d yd)"):format(item[1], item[2]), yards = item[2],
+		checks[#checks + 1] = { label = ("item %d (%d yd)"):format(item[1], item[2]), yards = item[2],
 			path = "C_Item.IsItemInRange", arg = item[1] }
+	end
+	for _, id in ipairs(candidates and CANDIDATE_ITEMS or {}) do
+		if load then
+			pcall(load, id)
+		end
+		checks[#checks + 1] = { label = ("item %d (range to measure)"):format(id), path = "C_Item.IsItemInRange", arg = id }
 	end
 	for _, interact in ipairs(INTERACT) do
 		checks[#checks + 1] = { label = ("CheckInteractDistance %d (%d yd)"):format(interact[1], interact[2]),
@@ -148,16 +158,19 @@ local function RangeAnswer(check, unit)
 	return pcall(f, check.arg, unit)
 end
 
--- About how far a hostile unit is, from the range checks that answer; nil if none does.
+-- About how far a hostile unit is, from the range checks of known range that answer (nil if none
+-- does); and, when it's beyond all of them, how far that is at least.
 local function Yards(unit, checks)
 	local near, far -- the shortest range it's within, the longest it's beyond
 	for _, check in ipairs(checks) do
-		local ok, v = RangeAnswer(check, unit)
-		if ok and not issecret(v) then
-			if v == true and (not near or check.yards < near) then
-				near = check.yards
-			elseif v == false and (not far or check.yards > far) then
-				far = check.yards
+		if check.yards then
+			local ok, v = RangeAnswer(check, unit)
+			if ok and not issecret(v) then
+				if v == true and (not near or check.yards < near) then
+					near = check.yards
+				elseif v == false and (not far or check.yards > far) then
+					far = check.yards
+				end
 			end
 		end
 	end
@@ -166,14 +179,19 @@ local function Yards(unit, checks)
 	elseif near then
 		return near * 0.6
 	elseif far then
-		return math.min(far + 5, OUTER_YARDS)
+		return math.min(far + 5, OUTER_YARDS), far
 	end
 	return nil
 end
 
+-- An error message without the file and line in front.
+local function ErrorText(err)
+	return (tostring(err):gsub("^[^:]*:%d+: ", ""))
+end
+
 -- Where a unit's nameplate is on the screen (0-1 from the left and from the bottom), and what
 -- kind of answer that was: "onscreen", "offscreen", "nil" (no nameplate), "hidden", "forbidden",
--- "error" or "missing".
+-- "error" (and its message) or "missing".
 local function PlateSpot(unit)
 	local f = Api("C_NamePlate.GetNamePlateForUnit")
 	if not f then
@@ -181,7 +199,7 @@ local function PlateSpot(unit)
 	end
 	local ok, plate = pcall(f, unit)
 	if not ok then
-		return "error"
+		return "error", nil, nil, ErrorText(plate)
 	elseif issecret(plate) then
 		return "hidden"
 	elseif not plate then
@@ -192,7 +210,7 @@ local function PlateSpot(unit)
 	local x, y, scale
 	ok, x, y = pcall(plate.GetCenter, plate)
 	if not ok then
-		return "error"
+		return "error", nil, nil, ErrorText(x)
 	elseif issecret(x) or issecret(y) then
 		return "hidden"
 	elseif not x then
@@ -256,6 +274,33 @@ local UNIT_CHECKS = {
 local KINDS = { "true", "false", "value", "nil", "hidden", "forbidden", "onscreen", "offscreen", "error", "missing" }
 local NO_EXAMPLES = { UnitGUID = true, ["UnitPosition(player)"] = true } -- (not needed, and not for a report)
 
+-- Other ways to find where a nameplate is (GetCenter failed in the first test): which of them the
+-- game allows. f(plate) runs in a pcall.
+local anchorProbe -- a frame of ours, anchored to the nameplate for a moment
+local PLATE_PROBES = {
+	{ "GetNamePlateForUnit(<unit>, includeForbidden)", function(_, unit)
+		return C_NamePlate.GetNamePlateForUnit(unit, true) ~= nil
+	end },
+	{ "nameplate: IsVisible", function(plate) return plate:IsVisible() end },
+	{ "nameplate: GetLeft", function(plate) return plate:GetLeft() end },
+	{ "nameplate: GetRect", function(plate) return plate:GetRect() end },
+	{ "nameplate: GetPoint", function(plate) return plate:GetPoint(1) end },
+	{ "nameplate: GetEffectiveScale", function(plate) return plate:GetEffectiveScale() end },
+	{ "nameplate.UnitFrame: GetCenter", function(plate) return plate.UnitFrame and plate.UnitFrame:GetCenter() end },
+	{ "own frame anchored to it: GetCenter", function(plate)
+		if not anchorProbe then
+			anchorProbe = CreateFrame("Frame", nil, UIParent)
+			anchorProbe:Hide() -- (a hidden frame still has a position)
+		end
+		anchorProbe:SetSize(1, 1)
+		anchorProbe:ClearAllPoints()
+		anchorProbe:SetPoint("CENTER", plate, "CENTER")
+		local x = anchorProbe:GetCenter()
+		anchorProbe:ClearAllPoints()
+		return x
+	end },
+}
+
 local test -- the running test
 local testDriver = CreateFrame("Frame")
 local resultsWindow
@@ -283,7 +328,7 @@ local function Note(label, phase, kind, example)
 	end
 	line[phase][kind] = (line[phase][kind] or 0) + 1
 	if example ~= nil and #line.examples < EXAMPLES then
-		example = tostring(example):sub(1, 40)
+		example = tostring(example):sub(1, 100)
 		for _, seen in ipairs(line.examples) do
 			if seen == example then
 				return
@@ -306,7 +351,39 @@ local function Check(label, phase, path, call, unit)
 		ok, v = pcall(f, unit)
 	end
 	local kind = KindOf(ok, v)
-	Note(label, phase, kind, kind == "value" and not NO_EXAMPLES[label] and v or nil)
+	if kind == "error" then
+		Note(label, phase, kind, ErrorText(v))
+	else
+		Note(label, phase, kind, kind == "value" and not NO_EXAMPLES[label] and v or nil)
+	end
+end
+
+-- A range check's answer for the report; known ranges also narrow down where the unit is
+-- (test.within, test.beyond), for measuring the candidates' ranges.
+local function NoteRange(check, phase, unit)
+	local ok, v = RangeAnswer(check, unit)
+	local kind = KindOf(ok, v)
+	Note(check.label, phase, kind, kind == "error" and ErrorText(v) or nil)
+	if check.yards then
+		if kind == "true" and (not test.within or check.yards < test.within) then
+			test.within = check.yards
+		elseif kind == "false" and (not test.beyond or check.yards > test.beyond) then
+			test.beyond = check.yards
+		end
+	end
+	check.answer = kind
+end
+
+-- A candidate's range: more than the longest known range a unit was beyond while it said yes,
+-- less than the shortest one it was within while it said no.
+local function Measure(check)
+	local bounds = test.bounds[check.label] or {}
+	test.bounds[check.label] = bounds
+	if check.answer == "true" and test.beyond then
+		bounds.more = math.max(bounds.more or 0, test.beyond)
+	elseif check.answer == "false" and test.within then
+		bounds.less = math.min(bounds.less or math.huge, test.within)
+	end
 end
 
 local function Look()
@@ -315,7 +392,13 @@ local function Look()
 	Check("GetPlayerFacing", phase, "GetPlayerFacing", function(f) return f() end)
 	Check("UnitPosition(player)", phase, "UnitPosition", nil, "player")
 	if Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target") then
-		Note("your target's nameplate", phase, (PlateSpot("target")))
+		local spot, _, _, err = PlateSpot("target")
+		Note("your target's nameplate", phase, spot, err)
+		if spot == "nil" then -- (beyond nameplate range, or turned away): how far, from the range checks
+			local yards, beyond = Yards("target", test.checks)
+			Note("your target without a nameplate: distance", phase, yards and "value" or "nil",
+				beyond and ("more than %d yd"):format(beyond) or yards and ("about %d yd"):format(yards) or nil)
+		end
 	end
 	local units = 0
 	for i = 1, MAX_UNITS do
@@ -325,11 +408,23 @@ local function Look()
 			for _, c in ipairs(UNIT_CHECKS) do
 				Check(c[1], phase, c[2], c[3], unit)
 			end
-			local spot, nx, ny = PlateSpot(unit)
-			Note("nameplate position", phase, spot, nx and ("%.2f,%.2f"):format(nx, ny))
+			local spot, nx, ny, err = PlateSpot(unit)
+			Note("nameplate position: GetCenter", phase, spot, err or (nx and ("%.2f,%.2f"):format(nx, ny)))
+			local plate = Value("C_NamePlate.GetNamePlateForUnit", unit)
+			if plate then
+				for _, probe in ipairs(PLATE_PROBES) do
+					Check(probe[1], phase, "C_NamePlate.GetNamePlateForUnit", function() return probe[2](plate, unit) end)
+				end
+			end
 			if Value("UnitCanAttack", "player", unit) then
+				test.within, test.beyond = nil, nil
 				for _, check in ipairs(test.checks) do
-					Note(check.label, phase, KindOf(RangeAnswer(check, unit)))
+					NoteRange(check, phase, unit)
+				end
+				for _, check in ipairs(test.checks) do
+					if not check.yards then
+						Measure(check)
+					end
 				end
 			end
 		end
@@ -357,22 +452,32 @@ end
 
 -- A few lines on what it means, for a quick look.
 local function Summary()
-	local lines, answered, calmOnly = {}, 0, 0
+	local lines, answered, calmOnly, known = {}, 0, 0, 0
 	for _, check in ipairs(test.checks) do
-		local line = test.lines[check.label]
-		if Sum(line, "combat", "true", "false") > 0 then
-			answered = answered + 1
-		elseif Sum(line, "calm", "true", "false") > 0 then
-			calmOnly = calmOnly + 1
+		if check.yards then
+			known = known + 1
+			local line = test.lines[check.label]
+			if Sum(line, "combat", "true", "false") > 0 then
+				answered = answered + 1
+			elseif Sum(line, "calm", "true", "false") > 0 then
+				calmOnly = calmOnly + 1
+			end
 		end
 	end
-	lines[#lines + 1] = ("Distance: %d of %d range checks answered in combat, %d only out of combat."):format(answered,
-		#test.checks, calmOnly)
-	local spots, target = test.lines["nameplate position"], test.lines["your target's nameplate"]
-	lines[#lines + 1] = ("Direction: nameplates on screen %d, off screen %d, hidden or forbidden %d (in combat);"
-		.. " your target without a nameplate %d of %d looks."):format(Sum(spots, "combat", "onscreen"),
-		Sum(spots, "combat", "offscreen"), Sum(spots, "combat", "hidden", "forbidden"),
-		Sum(target, "combat", "nil") + Sum(target, "calm", "nil"),
+	lines[#lines + 1] = ("Distance: %d of %d range checks of known range answered in combat, %d only out of combat."):format(
+		answered, known, calmOnly)
+	local spots, target = test.lines["nameplate position: GetCenter"], test.lines["your target's nameplate"]
+	local readable = {}
+	for _, probe in ipairs(PLATE_PROBES) do
+		local line = test.lines[probe[1]]
+		if Sum(line, "combat", "value", "true") > 0 then
+			readable[#readable + 1] = probe[1]
+		end
+	end
+	lines[#lines + 1] = ("Direction: nameplates on screen %d, off screen %d, hidden %d, errors %d (in combat);"
+		.. " readable in combat: %s; your target without a nameplate %d of %d looks."):format(Sum(spots, "combat", "onscreen"),
+		Sum(spots, "combat", "offscreen"), Sum(spots, "combat", "hidden", "forbidden"), Sum(spots, "combat", "error"),
+		#readable > 0 and table.concat(readable, ", ") or "nothing", Sum(target, "combat", "nil") + Sum(target, "calm", "nil"),
 		Sum(target, "combat", unpack(KINDS)) + Sum(target, "calm", unpack(KINDS)))
 	local targets = test.lines["targets me: UnitIsUnit(<unit>target, player)"]
 	lines[#lines + 1] = ("Who attacks you: answered %d times in combat, hidden %d."):format(
@@ -395,9 +500,14 @@ local function Report()
 		"Answers in combat | out of combat (value = something readable, nil = nothing, hidden = secret):",
 	}
 	for _, label in ipairs(test.order) do
-		local line = test.lines[label]
-		lines[#lines + 1] = ("%s: %s | %s%s"):format(label, Counts(line.combat), Counts(line.calm),
-			#line.examples > 0 and ("   e.g. " .. table.concat(line.examples, "; ")) or "")
+		local line, bounds = test.lines[label], test.bounds[label]
+		local measured = ""
+		if bounds and (bounds.more or bounds.less) then
+			measured = ("   -> %s"):format(bounds.more and bounds.less and ("between %d and %d yd"):format(bounds.more, bounds.less)
+				or bounds.more and ("more than %d yd"):format(bounds.more) or ("less than %d yd"):format(bounds.less))
+		end
+		lines[#lines + 1] = ("%s: %s | %s%s%s"):format(label, Counts(line.combat), Counts(line.calm),
+			#line.examples > 0 and ("   e.g. " .. table.concat(line.examples, "; ")) or "", measured)
 	end
 	lines[#lines + 1] = ""
 	for _, line in ipairs(Summary()) do
@@ -438,6 +548,9 @@ end
 
 local function StopTest(save)
 	testDriver:SetScript("OnUpdate", nil)
+	if anchorProbe then
+		anchorProbe:ClearAllPoints() -- (not left hanging on a nameplate)
+	end
 	if save and test then
 		local list = Saved("streamTests")
 		list[#list + 1] = { at = test.context.at, text = Report() }
@@ -467,8 +580,8 @@ local function StartTest()
 	local wow, build = GetBuildInfo()
 	local _, classFile = UnitClass("player")
 	local inInstance, instanceType = IsInInstance()
-	test = { started = GetTime(), ends = GetTime() + TEST_TIME, nextLook = 0, checks = RangeChecks(),
-		looks = { combat = 0, calm = 0 }, lines = {}, order = {}, most = 0,
+	test = { started = GetTime(), ends = GetTime() + TEST_TIME, nextLook = 0, checks = RangeChecks(true),
+		looks = { combat = 0, calm = 0 }, lines = {}, order = {}, most = 0, bounds = {},
 		context = { at = date("%Y-%m-%d %H:%M"), wow = tostring(wow), build = tostring(build), locale = GetLocale(),
 			class = classFile or "?", level = tostring(UnitLevel("player") or "?"), zone = GetRealZoneText() or "?",
 			where = inInstance and tostring(instanceType) or "open world", plates = tostring(GetCVar("nameplateShowEnemies")),
@@ -541,9 +654,13 @@ local function DotOnEnter(dot)
 			GameTooltip:AddLine(L["casting %s"]:format(mob.casting), 0.8, 0.6, 1)
 		end
 	end
-	GameTooltip:AddLine(mob.yards and L["about %d yd"]:format(mob.yards) or L["distance unknown"], 0.8, 0.8, 0.8)
+	GameTooltip:AddLine(mob.beyond and L["more than %d yd away"]:format(mob.beyond)
+		or mob.yards and L["about %d yd"]:format(mob.yards) or L["distance unknown"], 0.8, 0.8, 0.8)
+	if mob.target then
+		GameTooltip:AddLine(mode == "preview" and L["%s's target"]:format(PREVIEW_FRIEND) or L["your target"], 0.8, 0.8, 0.8)
+	end
 	if not mob.angle then
-		GameTooltip:AddLine(L["direction unknown: its nameplate isn't on screen"], 0.6, 0.6, 0.6, true)
+		GameTooltip:AddLine(L["direction unknown"], 0.6, 0.6, 0.6, true)
 	end
 	GameTooltip:Show()
 end
@@ -598,15 +715,42 @@ function B.StreamDots()
 	return dots
 end
 
--- Where a mob goes on the radar (up = ahead): its distance and direction; without a direction,
--- behind, spread out a little, and faint.
-local function Spot(mob, n)
-	local r = (mob.yards and math.min(mob.yards, OUTER_YARDS) or OUTER_YARDS * 0.85) / OUTER_YARDS * (RADAR / 2 - 8)
-	local angle = mob.angle or (math.pi + ((n % 5) - 2) * 0.35)
+-- Where a mob goes on the radar (up = ahead): its distance (beyond every check: on the rim) and
+-- direction; without a direction, where Spread put it (faint).
+local function Spot(mob)
+	local yards = mob.beyond and OUTER_YARDS or mob.yards and math.min(mob.yards, OUTER_YARDS) or OUTER_YARDS * 0.85
+	local r = yards / OUTER_YARDS * (RADAR / 2 - 8)
+	local angle = mob.angle or mob.spread or 0
 	return math.sin(angle) * r, math.cos(angle) * r
 end
 
-local function Style(dot, mob, n, named)
+-- Mobs without a direction: your target ahead (you face what you fight), the others spread evenly
+-- around, in a steady order so they don't swap places from look to look.
+local unplaced = {}
+local function ByKey(a, b)
+	return tostring(a.key) < tostring(b.key)
+end
+local function Spread() -- true if any mob's direction is a guess
+	wipe(unplaced)
+	local guessed = false
+	for _, mob in ipairs(mobs) do
+		guessed = guessed or not mob.angle
+		if mob.angle then
+			mob.spread = nil
+		elseif mob.target then
+			mob.spread = 0
+		else
+			unplaced[#unplaced + 1] = mob
+		end
+	end
+	table.sort(unplaced, ByKey)
+	for k, mob in ipairs(unplaced) do
+		mob.spread = 2 * math.pi * k / (#unplaced + 1)
+	end
+	return guessed
+end
+
+local function Style(dot, mob, named)
 	dot.mob = mob
 	local r, g, b = 0.65, 0.65, 0.65 -- nearby, not fighting
 	if mob.attacking then
@@ -637,7 +781,7 @@ local function Style(dot, mob, n, named)
 		dot.deadAt = nil
 		dot:SetAlpha(1)
 	end
-	dot.tx, dot.ty = Spot(mob, n)
+	dot.tx, dot.ty = Spot(mob)
 	if dot.fresh then
 		dot.x, dot.y, dot.fresh = dot.tx, dot.ty, nil
 		dot:ClearAllPoints()
@@ -653,6 +797,7 @@ end
 -- The mobs onto the dots: a dot follows its mob from look to look, so it glides.
 local function Apply()
 	table.sort(mobs, Nearer)
+	win.Hint:SetShown(Spread() and mode == "me")
 	for _, dot in ipairs(dots) do
 		dot.seen = false
 	end
@@ -667,7 +812,7 @@ local function Apply()
 			dotFor[mob.key] = dot
 		end
 		dot.seen = true
-		Style(dot, mob, n, n <= NAMES and not mob.dead)
+		Style(dot, mob, n <= NAMES and not mob.dead)
 	end
 	for _, dot in ipairs(dots) do
 		if dot.key and not dot.seen then
@@ -704,7 +849,7 @@ local function PreviewMob(n, key, name, level, class)
 	local mob = preview[n] or {}
 	preview[n] = mob
 	mob.key, mob.name, mob.level, mob.class = key, name, level, class
-	mob.dead, mob.combat, mob.attacking, mob.casting = false, false, false, nil
+	mob.dead, mob.combat, mob.attacking, mob.casting, mob.target = false, false, false, nil, false
 	return mob
 end
 
@@ -712,7 +857,7 @@ local function FeedPreview()
 	local t = clock % PREVIEW_LOOP
 	wipe(mobs)
 	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite")
-	leader.combat, leader.attacking = t > 2, t > 2
+	leader.combat, leader.attacking, leader.target = t > 2, t > 2, true
 	leader.yards, leader.angle = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
 	leader.casting = (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
 	mobs[#mobs + 1] = leader
@@ -735,28 +880,41 @@ local function FeedPreview()
 	mobs[#mobs + 1] = rare
 end
 
--- "me": the mobs with a nameplate around you, as the game tells them.
+-- "me": the mobs with a nameplate around you, as the game tells them, and your target (also beyond
+-- nameplate range: you can target further than nameplates reach).
+local function Fill(n, unit, unitTarget, targetKey)
+	local mob = looks[n] or {}
+	looks[n] = mob
+	mob.key = Value("UnitGUID", unit) or unit
+	mob.name = Value("UnitName", unit) or "?"
+	mob.level = Value("UnitLevel", unit)
+	mob.class = Value("UnitClassification", unit)
+	mob.dead = Value("UnitIsDead", unit) == true
+	mob.combat = Value("UnitAffectingCombat", unit) == true
+	mob.attacking = Value("UnitIsUnit", unitTarget, "player") == true
+	mob.casting = Value("UnitCastingInfo", unit) or Value("UnitChannelInfo", unit)
+	mob.yards, mob.beyond = Yards(unit, checks)
+	local spot, nx = PlateSpot(unit)
+	mob.angle = spot == "onscreen" and Bearing(nx, tanHalf) or nil
+	mob.target = targetKey ~= nil and mob.key == targetKey
+	mobs[n] = mob
+	return mob.target
+end
+
 local function FeedMe()
-	local n = 0
+	local n, targetShown = 0, false
+	local targetKey = Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target")
+		and (Value("UnitGUID", "target") or "target") or nil
 	for i = 1, MAX_UNITS do
 		local unit = UNITS[i]
-		if Value("UnitExists", unit) and Value("UnitCanAttack", "player", unit) and n < MAX_DOTS then
+		if n < MAX_DOTS and Value("UnitExists", unit) and Value("UnitCanAttack", "player", unit) then
 			n = n + 1
-			local mob = looks[n] or {}
-			looks[n] = mob
-			mob.key = Value("UnitGUID", unit) or unit
-			mob.name = Value("UnitName", unit) or "?"
-			mob.level = Value("UnitLevel", unit)
-			mob.class = Value("UnitClassification", unit)
-			mob.dead = Value("UnitIsDead", unit) == true
-			mob.combat = Value("UnitAffectingCombat", unit) == true
-			mob.attacking = Value("UnitIsUnit", TARGETS[i], "player") == true
-			mob.casting = Value("UnitCastingInfo", unit) or Value("UnitChannelInfo", unit)
-			mob.yards = Yards(unit, checks)
-			local spot, nx = PlateSpot(unit)
-			mob.angle = spot == "onscreen" and Bearing(nx, tanHalf) or nil
-			mobs[n] = mob
+			targetShown = Fill(n, unit, TARGETS[i], targetKey) or targetShown
 		end
+	end
+	if targetKey and not targetShown and n < MAX_DOTS then
+		n = n + 1
+		Fill(n, "target", "targettarget", targetKey)
 	end
 	for i = #mobs, n + 1, -1 do
 		mobs[i] = nil
@@ -894,6 +1052,12 @@ local function Build()
 	win.Status = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	win.Status:SetPoint("BOTTOM", 0, 12)
 	win.Status:SetWidth(WIDTH - 20)
+	-- Said when directions are guesses (the game gives none for some mobs).
+	win.Hint = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	win.Hint:SetPoint("BOTTOM", win.Status, "TOP", 0, 4)
+	win.Hint:SetWidth(WIDTH - 20)
+	win.Hint:SetText(L["No directions: target ahead, others spread out."])
+	win.Hint:Hide()
 end
 
 local function OpenWindow(newMode)

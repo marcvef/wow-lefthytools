@@ -478,15 +478,29 @@ checks answer for hostile units in combat, and where nameplates are on the scree
   call (unit info, `GetPlayerFacing`, the nameplate's spot via `C_NamePlate.GetNamePlateForUnit`
   and `GetCenter`, every range check) how often it answered true, false, a value, nothing, hidden
   (secret), forbidden, on or off screen, an error or missing, in and out of combat, with a few
-  examples (none for GUIDs and the player's position), and a short summary. Range checks: harmful
-  spells you know (one per range, melee as 5 yd), items of known range (as LibRangeCheck lists them;
-  `C_Item.IsItemInRange` works without owning them) and `CheckInteractDistance` 1-3. Kept in
-  `LefthyToolsDB.streamTests` (the last 3); `/lefthy stream results` shows them in a copy box.
+  examples (error messages too; none for GUIDs and the player's position), and a short summary.
+  Range checks: harmful spells you know (two per range, melee as 5 yd), items of known range
+  (`C_Item.IsItemInRange` works without owning them, for items the client knows) and
+  `CheckInteractDistance` 1-3. Kept in `LefthyToolsDB.streamTests` (the last 3); `/lefthy stream
+  results` shows them in a copy box.
+- First test on Forever (1.60.1.70235, open world): range checks answer in combat (spells,
+  `CheckInteractDistance`, items 10645 at 20 yd and 835 at 30 yd; the TBC items LibRangeCheck lists
+  aren't in the client), who a mob targets and threat are readable in combat, health is hidden,
+  and `GetCenter` on a nameplate fails with an error, in and out of combat. So the second test also
+  tries other ways to read a nameplate's spot (`includeForbidden`, `GetLeft`, `GetRect`,
+  `GetPoint`, the plate's `UnitFrame`, a frame of ours anchored to the plate), measures classic
+  items of unknown range against the known ones (between the longest range a unit was beyond while
+  the item said yes and the shortest it was within while it said no), and notes how far the target
+  is when it has no nameplate.
 - `/lefthy stream preview`: the window with made-up mobs around a made-up friend, on a 24 s loop.
 - `/lefthy stream me`: the window with your own surroundings, live. Up is where the camera looks:
   a mob's direction is `atan((x - 0.5) * 2 * tan(fov / 2))` from its nameplate's spot across the
   screen (`cameraFov`, taken as horizontal, default 90); its distance lies between the longest
-  range it's beyond and the shortest it's within. No nameplate on screen: behind you, faint.
+  range it's beyond and the shortest it's within. Your target shows too when it's beyond nameplate
+  range (you can target further than nameplates reach); beyond every check, on the rim ("more than
+  30 yd away"). Without a direction a mob is faint: your target ahead (you face what you fight),
+  the others spread evenly around, in a steady order; a line in the window says directions are
+  guessed.
 
 The window (250 x 300, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
 you in the middle, a dot per mob (red: attacking you, orange: in combat, grey: not; gold ring:
