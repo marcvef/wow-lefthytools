@@ -19,8 +19,9 @@ local B = ns.Beacon
 -- hidden. Found by the tests on Forever: range checks answer in combat (harmful spells you know,
 -- items of known range, CheckInteractDistance), so distances work; where a nameplate is on the
 -- screen can't be read at all ("Can't measure restricted regions"), so there's no left or right.
--- But a mob has a nameplate only while it's on your screen: the window looks the way your camera
--- does (up = ahead) and puts those ahead, see Spread.
+-- But a mob has a nameplate only while it's on your screen, and your own place and facing are
+-- exact: the window learns where mobs are as you move and turn (see "Learning where the mobs are").
+-- Up is where you face.
 --
 -- Cost: nothing unless a test runs or the window is open. Then a look at up to 40 nameplate
 -- units every half second; the window's OnUpdate (only while it's shown) glides at most 20 dots.
@@ -44,13 +45,13 @@ local GOLD = { 1, 0.82, 0.3 }
 local issecret = issecretvalue or function() return false end
 
 -- Items with a known use range: C_Item.IsItemInRange works without owning them, if the game knows
--- the item (Forever knows classic-era ones, and they answer in combat). 8149 and 17626 measured by
--- the second test (between 5 and 10 yd, between 11 and 20 yd).
-local RANGE_ITEMS = { { 8149, 8 }, { 17626, 15 }, { 10645, 20 }, { 835, 30 } }
+-- the item (Forever knows classic-era ones, and they answer in combat). Measured by the tests:
+-- 8149 between 5 and 10 yd, 17626 between 11 and 20, 13289 between 20 and 28.
+local RANGE_ITEMS = { { 8149, 8 }, { 17626, 15 }, { 10645, 20 }, { 13289, 24 }, { 835, 30 } }
 -- Classic-era items used on a target whose range isn't known yet: the test measures it against the
 -- checks of known range (between the longest a unit was beyond and the shortest it was within).
--- So far all of them are more than 20 yd: a mob further than 30 yd tells more.
-local CANDIDATE_ITEMS = { 4941, 10720, 18904, 7734, 2091, 13289, 17202, 4945 }
+-- So far 18904 and 4945 are more than 30 yd, the others more than 28: a mob further away tells more.
+local CANDIDATE_ITEMS = { 18904, 4945, 4941, 10720, 7734, 2091, 17202 }
 local INTERACT = { { 3, 10 }, { 2, 11 }, { 1, 28 } } -- CheckInteractDistance: duel, trade, inspect
 
 local UNITS, TARGETS = {}, {}
@@ -161,10 +162,10 @@ local function RangeAnswer(check, unit)
 	return pcall(f, check.arg, unit)
 end
 
--- About how far a hostile unit is, from the range checks of known range that answer (nil if none
--- does); and, when it's beyond all of them, how far that is at least.
-local function Yards(unit, checks)
-	local near, far -- the shortest range it's within, the longest it's beyond
+-- The shortest known range a hostile unit is within, and the longest it's beyond (nil: none of the
+-- range checks of known range answered that way).
+local function Bounds(unit, checks)
+	local near, far
 	for _, check in ipairs(checks) do
 		if check.yards then
 			local ok, v = RangeAnswer(check, unit)
@@ -177,6 +178,11 @@ local function Yards(unit, checks)
 			end
 		end
 	end
+	return near, far
+end
+
+-- About how far that is (nil: not known); and, when it's beyond every check, how far at least.
+local function YardsFrom(near, far)
 	if near and far and far < near then
 		return (near + far) / 2
 	elseif near then
@@ -185,6 +191,10 @@ local function Yards(unit, checks)
 		return math.min(far + 5, OUTER_YARDS), far
 	end
 	return nil
+end
+
+local function Yards(unit, checks)
+	return YardsFrom(Bounds(unit, checks))
 end
 
 -- An error message without the file and line in front.
@@ -255,6 +265,7 @@ local UNIT_CHECKS = {
 	{ "UnitCreatureType", "UnitCreatureType" },
 	{ "targets me: UnitIsUnit(<unit>target, player)", "UnitIsUnit", function(f, u) return f(u .. "target", "player") end },
 	{ "threat: UnitThreatSituation(player, <unit>)", "UnitThreatSituation", function(f, u) return f("player", u) end },
+	{ "is the soft target: UnitIsUnit(<unit>, softenemy)", "UnitIsUnit", function(f, u) return f(u, "softenemy") end },
 	{ "casting: UnitCastingInfo", "UnitCastingInfo" },
 	{ "channeling: UnitChannelInfo", "UnitChannelInfo" },
 	{ "UnitHealth", "UnitHealth" },
@@ -359,11 +370,39 @@ local function Measure(check)
 	end
 end
 
+-- A nameplate's size against how far its mob is (from the range checks just asked): if it shrinks
+-- with distance, it tells the distance exactly. Your target's apart (the game may draw it bigger).
+local SIZE_BANDS = { { 8, "up to 8 yd" }, { 15, "8-15 yd" }, { 24, "15-24 yd" }, { 30, "24-30 yd" }, { math.huge, "beyond 30 yd" } }
+local function NoteSize(plate, isTarget)
+	local ok, scale = pcall(plate.GetEffectiveScale, plate)
+	local within, beyond = test.within, test.beyond
+	if not ok or issecret(scale) or not (within or beyond) then
+		return
+	end
+	local yards = within and beyond and (within + beyond) / 2 or within and within * 0.6 or beyond + 5
+	local label
+	for _, band in ipairs(SIZE_BANDS) do
+		if yards <= band[1] then
+			label = band[2]
+			break
+		end
+	end
+	label = (isTarget and "your target " or "") .. label
+	local size = test.sizes[label]
+	if not size then
+		size = { n = 0, sum = 0, low = scale, high = scale }
+		test.sizes[label] = size
+	end
+	size.n, size.sum = size.n + 1, size.sum + scale
+	size.low, size.high = math.min(size.low, scale), math.max(size.high, scale)
+end
+
 local function Look()
 	local phase = Value("UnitAffectingCombat", "player") and "combat" or "calm"
 	test.looks[phase] = test.looks[phase] + 1
 	Check("GetPlayerFacing", phase, "GetPlayerFacing", function(f) return f() end)
 	Check("UnitPosition(player)", phase, "UnitPosition", nil, "player")
+	Check("soft target: UnitExists(softenemy)", phase, "UnitExists", nil, "softenemy")
 	if Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target") then
 		local spot, _, _, err = PlateSpot("target")
 		Note("your target's nameplate", phase, spot, err)
@@ -398,6 +437,9 @@ local function Look()
 					if not check.yards then
 						Measure(check)
 					end
+				end
+				if plate then
+					NoteSize(plate, Value("UnitIsUnit", unit, "target") == true)
 				end
 			end
 		end
@@ -469,6 +511,8 @@ local function Report()
 		("%s, %d s: %d looks, %d of them in combat; up to %d nameplates at once"):format(c.at,
 			math.floor(GetTime() - test.started + 0.5), test.looks.combat + test.looks.calm, test.looks.combat, test.most),
 		("Settings: enemy nameplates %s, nameplate distance %s, camera field of view %s"):format(c.plates, c.distance, c.fov),
+		("Soft targeting: enemy %s, arc %s, range %s, gamepad mode %s; nameplate scale %s to %s (from %s to %s yd), target %s")
+			:format(c.soft, c.softArc, c.softRange, c.gamepad, c.maxScale, c.minScale, c.maxScaleAt, c.minScaleAt, c.targetScale),
 		"",
 		"Answers in combat | out of combat (value = something readable, nil = nothing, hidden = secret):",
 	}
@@ -481,6 +525,18 @@ local function Report()
 		end
 		lines[#lines + 1] = ("%s: %s | %s%s%s"):format(label, Counts(line.combat), Counts(line.calm),
 			#line.examples > 0 and ("   e.g. " .. table.concat(line.examples, "; ")) or "", measured)
+	end
+	local sizes = {}
+	for _, prefix in ipairs({ "", "your target " }) do
+		for _, band in ipairs(SIZE_BANDS) do
+			local size = test.sizes[prefix .. band[2]]
+			if size then
+				sizes[#sizes + 1] = ("%s%s %.3f (%.3f-%.3f, %d)"):format(prefix, band[2], size.sum / size.n, size.low, size.high, size.n)
+			end
+		end
+	end
+	if #sizes > 0 then
+		lines[#lines + 1] = "nameplate size by distance (average, lowest-highest, looks): " .. table.concat(sizes, "; ")
 	end
 	lines[#lines + 1] = ""
 	for _, line in ipairs(Summary()) do
@@ -551,11 +607,17 @@ local function StartTest()
 	local _, classFile = UnitClass("player")
 	local inInstance, instanceType = IsInInstance()
 	test = { started = GetTime(), ends = GetTime() + TEST_TIME, nextLook = 0, checks = RangeChecks(true),
-		looks = { combat = 0, calm = 0 }, lines = {}, order = {}, most = 0, bounds = {},
+		looks = { combat = 0, calm = 0 }, lines = {}, order = {}, most = 0, bounds = {}, sizes = {},
 		context = { at = date("%Y-%m-%d %H:%M"), wow = tostring(wow), build = tostring(build), locale = GetLocale(),
 			class = classFile or "?", level = tostring(UnitLevel("player") or "?"), zone = GetRealZoneText() or "?",
 			where = inInstance and tostring(instanceType) or "open world", plates = tostring(GetCVar("nameplateShowEnemies")),
-			distance = tostring(GetCVar("nameplateMaxDistance")), fov = tostring(GetCVar("cameraFov")) } }
+			distance = tostring(GetCVar("nameplateMaxDistance")), fov = tostring(GetCVar("cameraFov")),
+			soft = tostring(GetCVar("SoftTargetEnemy")), softArc = tostring(GetCVar("SoftTargetEnemyArc")),
+			softRange = tostring(GetCVar("SoftTargetEnemyRange")),
+			gamepad = tostring(InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() or false),
+			maxScale = tostring(GetCVar("nameplateMaxScale")), minScale = tostring(GetCVar("nameplateMinScale")),
+			maxScaleAt = tostring(GetCVar("nameplateMaxScaleDistance")), minScaleAt = tostring(GetCVar("nameplateMinScaleDistance")),
+			targetScale = tostring(GetCVar("nameplateSelectedScale")) } }
 	testDriver:SetScript("OnUpdate", TestUpdate)
 	M:Print(("fight stream test: %d s of notes on what the game tells addons about the mobs around you. Fight a few"
 		.. " mobs; once, turn your camera away from your target for a few seconds. /lefthy stream test again stops it early.")
@@ -625,12 +687,15 @@ local function DotOnEnter(dot)
 		end
 	end
 	GameTooltip:AddLine(mob.beyond and L["more than %d yd away"]:format(mob.beyond)
-		or mob.yards and L["about %d yd"]:format(mob.yards) or L["distance unknown"], 0.8, 0.8, 0.8)
+		or mob.yards and L["about %d yd"]:format(math.floor(mob.yards + 0.5)) or L["distance unknown"], 0.8, 0.8, 0.8)
 	if mob.target then
 		GameTooltip:AddLine(mode == "preview" and L["%s's target"]:format(PREVIEW_FRIEND) or L["your target"], 0.8, 0.8, 0.8)
 	end
-	if not mob.angle then
-		GameTooltip:AddLine(L["direction unknown"], 0.6, 0.6, 0.6, true)
+	if mob.remembered then
+		GameTooltip:AddLine(L["off your screen for %d s"]:format(math.floor(mob.age + 0.5)), 0.6, 0.6, 0.6)
+	end
+	if (mob.sure or 1) < 0.6 then
+		GameTooltip:AddLine(L["direction still unsure: move and turn"], 0.6, 0.6, 0.6, true)
 	end
 	GameTooltip:Show()
 end
@@ -685,54 +750,217 @@ function B.StreamDots()
 	return dots
 end
 
--- Where a mob goes on the radar (up = ahead): its distance (beyond every check: on the rim) and
--- direction; without a direction, where Spread put it (faint).
+-- Where a mob goes on the radar (up = where you face): its direction (radians, right of ahead) and
+-- distance (beyond every check: on the rim).
 local function Spot(mob)
 	local yards = mob.beyond and OUTER_YARDS or mob.yards and math.min(mob.yards, OUTER_YARDS) or OUTER_YARDS * 0.85
 	local r = yards / OUTER_YARDS * (RADAR / 2 - 8)
-	local angle = mob.angle or mob.spread or 0
+	local angle = mob.angle or 0
 	return math.sin(angle) * r, math.cos(angle) * r
 end
 
--- Mobs without a direction (the game lets no addon measure where a nameplate is). What is known: a
--- mob has a nameplate only while it's on your screen (the second test: the target lost its
--- nameplate at 15 yd when turned away), so those are ahead, within the camera's view: your target
--- among them straight ahead, the others to its left and right, in a steady order so they don't swap
--- places (which side is a guess). Your target without a nameplate: behind you if it's nearer than
--- nameplates reach, otherwise far ahead. Anything else without a direction (the preview): behind.
-local VIEW = math.rad(35) -- how far left and right on-screen mobs spread (the camera sees about 45)
-local plateReach = 40     -- nameplateMaxDistance, read when the window opens
-local ahead = {}
-local function ByKey(a, b)
-	return tostring(a.key) < tostring(b.key)
+---------------------------------------------------------------------------
+-- Learning where the mobs are ("me")
+--
+-- The game gives addons no direction to a mob (nameplates can't be measured), but every look says
+-- something, and that adds up. Each mob is a cloud of SPOTS possible places in the world (kept by
+-- GUID); every look keeps only the places that fit what's known now:
+--   * how far it is: between the longest range it's beyond and the shortest it's within (with
+--     SLACK: ranges count from the mob's edge);
+--   * a mob with a nameplate is on your screen: within VIEW of where you face (the camera mostly
+--     looks where your character faces);
+--   * your target without a nameplate, nearer than nameplates reach: outside that view;
+--   * the soft target (gamepad mode: the enemy the game picks in front of you): within SOFT;
+--   * a mob that left your screen (still remembered for REMEMBER seconds): outside the view.
+-- Your own place and facing are exact, so walking and turning narrow the cloud down: a mob that
+-- stays on screen while you turn right is on your right; one that drops off as you turn left was on
+-- the right. Between looks every place drifts a little (mobs move; one attacking you comes closer).
+-- When too few places fit any more (it ran, the camera looked elsewhere), the cloud starts over
+-- from what's known now. The dot sits in the cloud's middle: solid when the cloud points one way,
+-- faint when it's still spread out.
+---------------------------------------------------------------------------
+
+local SPOTS = 48
+local VIEW = math.rad(50)   -- the camera's view, either side of where you face, with some slack
+local SOFT = math.rad(30)   -- the soft target's arc, either side, with some slack
+local SLACK = 2             -- yards
+local FAR = 60              -- yards: further than anything is looked at
+local DRIFT = 1             -- yards a place may wander per look
+local CHASE = 3             -- yards a mob attacking you comes closer per look, at most
+local REMEMBER = 8          -- seconds a mob that left your screen stays, fading
+local MIN_KEPT = 6          -- fewer places still fit: start over
+local plateReach = 40       -- nameplateMaxDistance, read when the window opens
+local atan2 = math.atan2 or math.atan -- (Lua 5.1 / 5.3)
+local clouds = {}           -- mob key -> { north = {}, west = {}, seenAt, info (the mob as last seen) }
+local here = {}             -- this look: north, west, cos, sin (of your facing), facing
+
+-- A place in the world as seen from here, where you face up: x (right), y (ahead). The same turn as
+-- the minimap's (Dots.lua, B.MinimapOffset).
+local function Relative(north, west)
+	local east, up = here.west - west, north - here.north
+	return east * here.cos + up * here.sin, up * here.cos - east * here.sin
 end
-local function Spread() -- true if any mob's direction is a guess
-	wipe(ahead)
-	local guessed, targetAhead = false, false
-	for _, mob in ipairs(mobs) do
-		guessed = guessed or not mob.angle
-		if mob.angle then
-			mob.spread = nil
-		elseif mob.target and mob.onScreen then
-			mob.spread, targetAhead = 0, true
-		elseif mob.target then
-			mob.spread = (mob.beyond or not mob.yards or mob.yards >= plateReach) and 0 or math.pi
-		elseif mob.onScreen then
-			ahead[#ahead + 1] = mob
-		else
-			mob.spread = math.pi
+
+-- And back: x (right), y (ahead) from here, as a place in the world.
+local function World(x, y)
+	local east, up = x * here.cos - y * here.sin, x * here.sin + y * here.cos
+	return here.north + up, here.west - east
+end
+
+-- Does a place (x, y from here) fit what's known: between lo and hi yards away, and on the side
+-- ("view", "soft", "away" or nil: any)?
+local function Fits(x, y, lo, hi, side)
+	local d = math.sqrt(x * x + y * y)
+	if d < lo or d > hi then
+		return false
+	elseif not (side and here.facing) then
+		return true
+	end
+	local off = math.abs(atan2(x, y)) -- 0 straight ahead, pi behind
+	if side == "soft" then
+		return off <= SOFT
+	elseif side == "view" then
+		return off <= VIEW
+	end
+	return off >= VIEW * 0.8 -- "away"
+end
+
+-- A new place that fits.
+local function Seed(cloud, i, lo, hi, side)
+	local d = lo + math.random() * (hi - lo)
+	local a
+	if side == "soft" then
+		a = (math.random() * 2 - 1) * SOFT
+	elseif side == "view" then
+		a = (math.random() * 2 - 1) * VIEW
+	elseif side == "away" then
+		a = VIEW + math.random() * (2 * math.pi - 2 * VIEW)
+	else
+		a = (math.random() * 2 - 1) * math.pi
+	end
+	cloud.north[i], cloud.west[i] = World(math.sin(a) * d, math.cos(a) * d)
+end
+
+-- One look: drift, keep what fits, refill from that (or start over).
+local function Learn(cloud, lo, hi, side, chase)
+	local north, west = cloud.north, cloud.west
+	local kept = 0
+	for i = 1, #north do
+		local x, y = Relative(north[i] + (math.random() * 2 - 1) * DRIFT, west[i] + (math.random() * 2 - 1) * DRIFT)
+		local d = math.sqrt(x * x + y * y)
+		if chase and d > 4 then -- (attacking you: on its way)
+			local step = math.min(CHASE, d - 3) / d
+			x, y = x - x * step, y - y * step
+		end
+		if Fits(x, y, lo, hi, side) then
+			kept = kept + 1
+			north[kept], west[kept] = World(x, y)
 		end
 	end
-	table.sort(ahead, ByKey)
-	local n = #ahead
-	for i, mob in ipairs(ahead) do
-		if targetAhead then -- left, right, further left, ...
-			mob.spread = (i % 2 == 1 and -1 or 1) * math.ceil(i / 2) * VIEW / math.ceil(n / 2)
-		else
-			mob.spread = n == 1 and 0 or (-VIEW + 2 * VIEW * (i - 1) / (n - 1))
+	if kept < MIN_KEPT then
+		for i = 1, SPOTS do
+			Seed(cloud, i, lo, hi, side)
+		end
+		return
+	end
+	for i = kept + 1, SPOTS do
+		local j = math.random(kept)
+		north[i], west[i] = north[j] + (math.random() - 0.5), west[j] + (math.random() - 0.5)
+	end
+end
+
+-- The cloud's middle: direction (radians, right of ahead), mean distance, and how sure, 0 to 1:
+-- how closely its places point the same way (spread over the whole view, about 50 degrees either
+-- side, is still unsure; within about 15 degrees, sure).
+local function Estimate(cloud)
+	local sx, sy, sd, n = 0, 0, 0, #cloud.north
+	for i = 1, n do
+		local x, y = Relative(cloud.north[i], cloud.west[i])
+		local d = math.sqrt(x * x + y * y)
+		if d > 0 then
+			sx, sy = sx + x / d, sy + y / d
+		end
+		sd = sd + d
+	end
+	local together = math.sqrt(sx * sx + sy * sy) / n -- 1: all one way, 0: all around
+	return atan2(sx, sy), sd / n, math.max(0, math.min(1, (together - 0.85) / 0.14))
+end
+
+-- What a mob's distance says: lo to hi yards.
+local function Band(near, far, onScreen)
+	local lo = far and math.max(0, far - SLACK) or 0
+	local hi = near and near + SLACK or onScreen and plateReach + 5 or FAR
+	if lo > hi then
+		lo = math.max(0, hi - SLACK)
+	end
+	return lo, hi
+end
+
+-- This look's place and facing (no place, in an instance: learning goes by turning only).
+local function Here()
+	local ok, north, west = pcall(UnitPosition, "player")
+	if not ok or issecret(north) or issecret(west) or not north then
+		north, west = 0, 0
+	end
+	local facing = Value("GetPlayerFacing")
+	here.north, here.west, here.facing = north, west, facing
+	here.cos, here.sin = math.cos(facing or 0), math.sin(facing or 0)
+end
+
+-- A mob seen now: its cloud learns, and it gets its direction and how sure that is.
+local function LearnSeen(mob, now)
+	local cloud = clouds[mob.key]
+	if not cloud then
+		cloud = { north = {}, west = {} }
+		clouds[mob.key] = cloud
+	end
+	cloud.seenAt = now
+	local lo, hi = Band(mob.near, mob.far, mob.onScreen)
+	local side
+	if mob.soft then
+		side = "soft"
+	elseif mob.onScreen then
+		side = "view"
+	elseif mob.yards and not mob.beyond and mob.yards < plateReach then
+		side = "away" -- (your target, without a nameplate though near: you turned away from it)
+	end
+	if #cloud.north == 0 then
+		for i = 1, SPOTS do
+			Seed(cloud, i, lo, hi, side or "view") -- (a far target: most likely where you look)
 		end
 	end
-	return guessed
+	Learn(cloud, lo, hi, side, mob.attacking)
+	mob.angle, mob.est, mob.sure = Estimate(cloud)
+	local info = cloud.info or {} -- (its own copy: the look's tables are reused)
+	cloud.info = info
+	info.name, info.level, info.class, info.combat, info.attacking = mob.name, mob.level, mob.class, mob.combat, mob.attacking
+	info.dead, info.est = mob.dead, mob.est
+end
+
+-- Mobs that left your screen (not dead): remembered a while, outside your view, fading. Appended
+-- to mobs from n + 1; returns the new count.
+local function Remember(n, now)
+	for key, cloud in pairs(clouds) do
+		if cloud.seenAt ~= now then
+			local age = now - cloud.seenAt
+			local info = cloud.info
+			if age > REMEMBER or info.dead or n >= MAX_DOTS then
+				clouds[key] = nil
+			else
+				Learn(cloud, 0, FAR, info.est and info.est < plateReach - 3 and "away" or nil, false)
+				local ghost = cloud.ghost or {}
+				cloud.ghost = ghost
+				ghost.key, ghost.name, ghost.level, ghost.class = key, info.name, info.level, info.class
+				ghost.combat, ghost.attacking, ghost.target, ghost.casting, ghost.dead = info.combat, info.attacking, false, nil, false
+				ghost.angle, ghost.est, ghost.sure = Estimate(cloud)
+				ghost.yards, ghost.beyond, ghost.remembered, ghost.age = ghost.est, nil, true, age
+				ghost.fade = 1 - age / REMEMBER
+				n = n + 1
+				mobs[n] = ghost
+			end
+		end
+	end
+	return n
 end
 
 local function Style(dot, mob, named)
@@ -744,7 +972,8 @@ local function Style(dot, mob, named)
 		r, g, b = 1, 0.6, 0.15
 	end
 	dot.Body:SetColorTexture(r, g, b, 1)
-	dot.Body:SetAlpha(mob.angle and 1 or 0.45)
+	dot.Body:SetAlpha((0.3 + 0.7 * (mob.sure or 1)) * (mob.fade or 1)) -- solid when sure; remembered ones fade
+	dot.Name:SetAlpha(mob.fade or 1)
 	dot.Body:SetShown(not mob.dead)
 	dot.Skull:SetShown(mob.dead)
 	local class = mob.class
@@ -782,7 +1011,7 @@ end
 -- The mobs onto the dots: a dot follows its mob from look to look, so it glides.
 local function Apply()
 	table.sort(mobs, Nearer)
-	win.Hint:SetShown(Spread() and mode == "me")
+	win.Hint:SetShown(mode == "me")
 	for _, dot in ipairs(dots) do
 		dot.seen = false
 	end
@@ -834,7 +1063,7 @@ local function PreviewMob(n, key, name, level, class)
 	local mob = preview[n] or {}
 	preview[n] = mob
 	mob.key, mob.name, mob.level, mob.class = key, name, level, class
-	mob.dead, mob.combat, mob.attacking, mob.casting, mob.target = false, false, false, nil, false
+	mob.dead, mob.combat, mob.attacking, mob.casting, mob.target, mob.sure = false, false, false, nil, false, 1
 	return mob
 end
 
@@ -858,7 +1087,7 @@ local function FeedPreview()
 	mage.casting = (t % 6 < 2) and L["Frostbolt"] or nil
 	mobs[#mobs + 1] = mage
 	local gnoll = PreviewMob(4, "gnoll", L["Gnoll"], 14, "normal")
-	gnoll.yards, gnoll.angle = 32 + 3 * math.sin(t * 0.4), nil -- behind: no nameplate on screen
+	gnoll.yards, gnoll.angle, gnoll.sure = 32 + 3 * math.sin(t * 0.4), 2.9, 0.25 -- behind, not sure yet: faint
 	mobs[#mobs + 1] = gnoll
 	local rare = PreviewMob(5, "rare", L["Greyfang"], 17, "rare")
 	rare.yards, rare.angle = 37, 2.4 + 0.1 * math.sin(t * 0.5)
@@ -867,7 +1096,7 @@ end
 
 -- "me": the mobs with a nameplate around you (on your screen), as the game tells them, and your
 -- target (also without one: turned away, or further than nameplates reach).
-local function Fill(n, unit, unitTarget, targetKey, onScreen)
+local function Fill(n, unit, unitTarget, targetKey, onScreen, now)
 	local mob = looks[n] or {}
 	looks[n] = mob
 	mob.key = Value("UnitGUID", unit) or unit
@@ -878,28 +1107,33 @@ local function Fill(n, unit, unitTarget, targetKey, onScreen)
 	mob.combat = Value("UnitAffectingCombat", unit) == true
 	mob.attacking = Value("UnitIsUnit", unitTarget, "player") == true
 	mob.casting = Value("UnitCastingInfo", unit) or Value("UnitChannelInfo", unit)
-	mob.yards, mob.beyond = Yards(unit, checks)
-	mob.angle, mob.onScreen = nil, onScreen -- (no direction: see Spread)
+	mob.near, mob.far = Bounds(unit, checks)
+	mob.yards, mob.beyond = YardsFrom(mob.near, mob.far)
+	mob.onScreen, mob.soft = onScreen, Value("UnitIsUnit", unit, "softenemy") == true
 	mob.target = targetKey ~= nil and mob.key == targetKey
+	mob.remembered, mob.fade = nil, nil
+	LearnSeen(mob, now)
 	mobs[n] = mob
 	return mob.target
 end
 
 local function FeedMe()
-	local n, targetShown = 0, false
+	local n, targetShown, now = 0, false, GetTime()
+	Here()
 	local targetKey = Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target")
 		and (Value("UnitGUID", "target") or "target") or nil
 	for i = 1, MAX_UNITS do
 		local unit = UNITS[i]
 		if n < MAX_DOTS and Value("UnitExists", unit) and Value("UnitCanAttack", "player", unit) then
 			n = n + 1
-			targetShown = Fill(n, unit, TARGETS[i], targetKey, true) or targetShown
+			targetShown = Fill(n, unit, TARGETS[i], targetKey, true, now) or targetShown
 		end
 	end
 	if targetKey and not targetShown and n < MAX_DOTS then
 		n = n + 1
-		Fill(n, "target", "targettarget", targetKey, false)
+		Fill(n, "target", "targettarget", targetKey, false, now)
 	end
+	n = Remember(n, now)
 	for i = #mobs, n + 1, -1 do
 		mobs[i] = nil
 	end
@@ -956,6 +1190,7 @@ local function Build()
 	win:SetScript("OnHide", function()
 		ReleaseAll()
 		wipe(mobs)
+		wipe(clouds)
 		GameTooltip:Hide()
 	end)
 	win:Hide()
@@ -1040,7 +1275,7 @@ local function Build()
 	win.Hint = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	win.Hint:SetPoint("BOTTOM", win.Status, "TOP", 0, 4)
 	win.Hint:SetWidth(WIDTH - 20)
-	win.Hint:SetText(L["Ahead or behind is real, left and right are guessed."])
+	win.Hint:SetText(L["Move and turn: faint dots find their place."])
 	win.Hint:Hide()
 end
 
@@ -1058,6 +1293,7 @@ local function OpenWindow(newMode)
 		win.Live.Text:SetText(L["DEMO"])
 	else
 		checks, plateReach = RangeChecks(), tonumber(GetCVar("nameplateMaxDistance")) or 40
+		wipe(clouds)
 		name = UnitName("player")
 		local _, file = UnitClass("player")
 		classFile = file

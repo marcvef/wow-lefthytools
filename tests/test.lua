@@ -3134,40 +3134,77 @@ do
 	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3,
 		"/lefthy stream me: my own surroundings, live")
 	local function radius(d) return math.sqrt(d.tx ^ 2 + d.ty ^ 2) end
-	check(thug.ty > 0 and pillager.ty > 0 and gnoll.ty > 0 and thug.tx < 0 and gnoll.tx > 0 and math.abs(pillager.tx) < 0.01,
-		"mobs with a nameplate are on my screen: all ahead, spread left and right in a steady order (the side is a guess)")
+	check(thug.ty > 0 and pillager.ty > 0 and gnoll.ty > 0, "mobs with a nameplate are on my screen: ahead")
 	check(radius(thug) < 15 and radius(pillager) > 30 and radius(pillager) < 80 and radius(gnoll) > 100,
 		"at their distance: close, further, beyond every check (on the rim)")
-	check(gnoll.Body.alpha < 1 and win.Hint:IsShown() and win.Hint:GetText() == "Ahead or behind is real, left and right are guessed.",
-		"faint, and the window says what's guessed")
+	check(gnoll.Body.alpha < 0.6 and win.Hint:IsShown() and win.Hint:GetText() == "Move and turn: faint dots find their place.",
+		"faint while left or right isn't known yet, and the window says how it learns")
 	check(win.Status:GetText():find("1 on you", 1, true) and win.Status:GetText():find("3 near", 1, true)
 		and win.Status:GetText():find("Defias Pillager casts Fireball", 1, true), "the bottom line, got " .. tostring(win.Status:GetText()))
 	gnoll._scripts.OnEnter(gnoll)
-	check(TOOLTIP.title == "Gnoll (14)" and tooltipHas("direction unknown") and tooltipHas("more than 30 yd away"), "hover: what's known about it")
+	check(TOOLTIP.title == "Gnoll (14)" and tooltipHas("direction still unsure: move and turn") and tooltipHas("more than 30 yd away"),
+		"hover: what's known about it")
 	gnoll._scripts.OnLeave(gnoll)
-	-- My target with a nameplate: straight ahead, the others to its sides.
-	MOBS.nameplate2.guid = "Creature-0-pillager"
-	MOBS.target, STATE.target = MOBS.nameplate2, true
-	Advance(0.6)
-	pillager, thug, gnoll = dot("Defias Pillager"), dot("Defias Thug"), dot("Gnoll")
-	check(math.abs(pillager.tx) < 0.01 and pillager.ty > 0 and thug.tx < 0 and gnoll.tx > 0 and thug.ty > 0 and used() == 3,
-		"my target among them: straight ahead, the others left and right of it")
-	-- My target without a nameplate: turned away (behind me), or further than nameplates reach (far ahead).
-	MOBS.target = { name = "Kodo", level = 26, yards = 15, guid = "Creature-0-kodo" }
+	pillager._scripts.OnEnter(pillager)
+	check(tooltipHas("about 24 yd"), "a distance between two checks: in the middle")
+	pillager._scripts.OnLeave(pillager)
+	-- My target without a nameplate though near: I turned away from it, so it's behind me. Further
+	-- than nameplates reach: no telling, so at first where I look.
+	MOBS.target, STATE.target = { name = "Kodo", level = 26, yards = 15, guid = "Creature-0-kodo" }, true
 	Advance(0.6)
 	local kodo = dot("Kodo")
-	check(kodo and kodo.ty < 0 and math.abs(kodo.tx) < 0.01 and used() == 4, "my target near but without a nameplate: behind me")
-	MOBS.target.yards = 60
-	Advance(0.6)
-	check(math.abs(kodo.tx) < 0.01 and kodo.ty > 100, "my target beyond nameplate range: far ahead, on the rim")
+	check(kodo and kodo.ty < 0 and used() == 4, "my target near but without a nameplate: behind me")
 	kodo._scripts.OnEnter(kodo)
-	check(tooltipHas("more than 30 yd away") and tooltipHas("your target"), "... further than the range checks reach, and it's my target")
+	check(tooltipHas("your target"), "... and it says it's my target")
 	kodo._scripts.OnLeave(kodo)
+	MOBS.target = { name = "Far Kodo", level = 26, yards = 60, guid = "Creature-0-far" }
+	Advance(0.6)
+	local far = dot("Far Kodo")
+	check(far and far.ty > 0 and radius(far) > 100, "a target beyond nameplate range: where I look, on the rim")
+	far._scripts.OnEnter(far)
+	check(tooltipHas("more than 30 yd away"), "... further than the range checks reach")
+	far._scripts.OnLeave(far)
 	MOBS.target, STATE.target = nil, false
-	MOBS.nameplate2.guid = nil
 	MOBS.nameplate1 = nil
 	Advance(0.6)
-	check(not dot("Defias Thug") and used() == 2, "a mob gone: its dot goes")
+	thug = dot("Defias Thug")
+	check(thug and thug.mob.remembered and thug.Body.alpha < 1, "a mob gone from my screen: remembered a while, fading")
+	thug._scripts.OnEnter(thug)
+	check(tooltipHas("off your screen for 1 s") or tooltipHas("off your screen for 0 s"), "... and it says so")
+	thug._scripts.OnLeave(thug)
+	Advance(8)
+	check(not dot("Defias Thug") and not dot("Kodo") and used() == 2, "after a while the ones not seen again are gone")
+
+	-- Learning: two gnolls 20 yd ahead, one 30 degrees to the left, one to the right. Looking left and
+	-- right tells which is which (nameplates come and go, the soft target is the one straight ahead).
+	math.randomseed(7)
+	MOBS, FACING = {}, 0
+	local hereNorth, hereWest = UnitPosition("player")
+	MOBS.nameplate1 = { name = "Left Gnoll", level = 14, guid = "Creature-0-left", north = hereNorth + 17.32, west = hereWest + 10 }
+	MOBS.nameplate2 = { name = "Right Gnoll", level = 14, guid = "Creature-0-right", north = hereNorth + 17.32, west = hereWest - 10 }
+	Advance(0.6)
+	local left, right = dot("Left Gnoll"), dot("Right Gnoll")
+	check(left and right and left.mob.sure < 0.5 and right.mob.sure < 0.5 and left.ty > 0 and right.ty > 0,
+		"two mobs ahead: which is left and which right isn't known yet")
+	FACING = math.rad(40)
+	Advance(2)
+	check(left.mob.soft and right.mob.remembered, "looking left: the left one straight ahead (the soft target), the right one off my screen")
+	FACING = math.rad(-40)
+	Advance(2)
+	FACING = 0
+	Advance(1)
+	left, right = dot("Left Gnoll"), dot("Right Gnoll")
+	check(left.tx < 0 and right.tx > 0 and left.mob.sure > 0.6 and right.mob.sure > 0.6,
+		("looking left and right taught it: each on its side, and sure, got %.1f (%.2f), %.1f (%.2f)"):format(left.tx,
+			left.mob.sure, right.tx, right.mob.sure))
+	MOBS, FACING = {}, 0
+	Advance(9)
+	MOBS = {
+		nameplate2 = { name = "Defias Pillager", level = 16, class = "elite", combat = true, casting = "Fireball", yards = 25, x = 0.25, y = 0.6 },
+		nameplate3 = { name = "Gnoll", level = 14, yards = 35 },
+	}
+	Advance(0.6)
+	check(used() == 2, "two mobs again")
 	B("fightStream"):SetValue(false)
 	check(not win:IsShown(), "switched off: the window closes")
 	B("fightStream"):SetValue(true)
@@ -3200,7 +3237,10 @@ do
 	check(has("nameplate position: GetCenter: nil 60, onscreen 60, error 60 |") and has("e.g. 0.50,0.45; can't measure this region")
 		and has("nameplate: IsVisible: true 120 | true 120") and has("nameplate: GetEffectiveScale: value 120 | value 120"),
 		"nameplate positions, with what the errors say, and what else a nameplate tells")
-	check(has("Distance: 2 of 9 range checks of known range answered in combat, 5 only out of combat.")
+	check(has("soft target: UnitExists(softenemy): false 60 | false 60") and has("is the soft target: UnitIsUnit(<unit>, softenemy): false 180 | false 180")
+		and has("Soft targeting: enemy ") and has("nameplate size by distance (average, lowest-highest, looks): up to 8 yd 1.000 (1.000-1.000, 120);"),
+		"the soft target, its settings, and nameplate sizes by distance, got\n" .. report)
+	check(has("Distance: 2 of 10 range checks of known range answered in combat, 5 only out of combat.")
 		and has("readable in combat: nameplate: IsVisible, nameplate: GetEffectiveScale"),
 		"a short summary, got\n" .. report)
 	lefthy("stream results")

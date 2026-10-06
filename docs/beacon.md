@@ -499,16 +499,31 @@ checks answer for hostile units in combat, and where nameplates are on the scree
   on your screen (the target lost its nameplate at 15 yd when turned away). Measured: item 8149
   between 5 and 10 yd (used as 8), 17626 between 11 and 20 yd (used as 15); the other candidates
   are all more than 20 yd (a mob further than 30 yd would tell more).
+- Third test: 13289 between 20 and 28 yd (used as 24); 18904 and 4945 more than 30. The fourth
+  test records the soft target (`UnitIsUnit(<unit>, "softenemy")`: gamepad mode sets
+  `SoftTargetEnemy` 1 and `SoftTargetEnemyArc` 1, a narrow arc in front of the character), the
+  soft-target and nameplate-scale CVars, and nameplate sizes (`GetEffectiveScale`) by distance band
+  (your target apart), to see whether size tells the distance exactly.
 - `/lefthy stream preview`: the window with made-up mobs around a made-up friend, on a 24 s loop.
-- `/lefthy stream me`: the window with your own surroundings, live. Up is where the camera looks.
-  A mob's distance lies between the longest range it's beyond and the shortest it's within;
-  beyond every check, on the rim ("more than 30 yd away"). Mobs with a nameplate are on screen, so
-  ahead: your target among them straight ahead, the others spread left and right (within 35
-  degrees, in a steady order by GUID; which side is a guess). Your target shows also without a
-  nameplate: behind you if it's nearer than `nameplateMaxDistance` (you turned away), otherwise far
-  ahead. Dots are faint, and a line says "Ahead or behind is real, left and right are guessed."
+- `/lefthy stream me`: the window with your own surroundings, live, learning where the mobs are.
+  Up is where you face. A mob's distance lies between the longest range it's beyond and the
+  shortest it's within; beyond every check, on the rim ("more than 30 yd away"). Its direction is
+  learned: each mob is a cloud of 48 possible places in the world (by GUID), and every look keeps
+  the places that fit: the distance band (2 yd slack), on screen = within 50 degrees of your
+  facing, the soft target = within 30, your target without a nameplate though nearer than
+  `nameplateMaxDistance` = outside the view. Your own place (`UnitPosition`) and facing are exact,
+  so moving and turning narrow the cloud: a mob that stays on screen as you turn right is on the
+  right; one that drops off as you turn left was on the right; distances changing as you walk
+  triangulate. Places drift 1 yd per look (3 yd closer for a mob attacking you); fewer than 6 fit:
+  the cloud starts over. The dot sits at the cloud's middle; how sure (how closely its places point
+  one way: spread over the whole view is unsure, within about 15 degrees is sure) sets how solid it
+  is. Mobs that left the screen stay 8 s, fading, outside the view. A new target beyond nameplate
+  range starts where you look. A line says "Move and turn: faint dots find their place." The
+  camera is assumed to look where the character faces (true while moving; turning the camera alone
+  misleads it until the cloud starts over). In an instance, without your place, it learns by
+  turning only.
 
-The window (250 x 300, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
+The window (250 x 320, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
 you in the middle, a dot per mob (red: attacking you, orange: in combat, grey: not; gold ring:
 elite, silver: rare; a purple glow while casting; a skull that fades when it dies), names for the
 4 nearest, a tooltip per dot, and a bottom line ("2 on you · 5 near · X casts Y"). Dots follow

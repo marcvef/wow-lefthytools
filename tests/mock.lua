@@ -1449,13 +1449,40 @@ end
 
 -- Mobs with a nameplate (Beacon's fight stream): MOBS["nameplate1"] = { name, level, class, dead,
 -- combat, attacking (its target is me), casting, yards, x, y (its nameplate's spot, 0-1 across and
--- up the screen; nil: no nameplate frame), guid }. Range calls answer by yards. Like retail, items
--- don't answer for hostile units in combat, and CheckInteractDistance fails there.
+-- up the screen; nil: no nameplate frame), guid, north, west }. Range calls answer by yards. Like
+-- retail, items don't answer for hostile units in combat, and CheckInteractDistance fails there.
+-- A mob with a place in the world (north, west): its distance follows from where I stand, and its
+-- nameplate unit exists only while it's on my screen (within 45 degrees of where I face, 41 yd).
 MOBS = {}
+local function Placed(mob) -- yards, on my screen, how far off ahead (radians)
+	if not mob.north then return mob.yards, true, 0 end
+	local n, w = UnitPosition("player")
+	local east, up = w - mob.west, mob.north - n
+	local c, s = math.cos(FACING), math.sin(FACING)
+	local x, y = east * c + up * s, up * c - east * s
+	local d, off = math.sqrt(x * x + y * y), math.abs(math.atan(x, y))
+	return d, d <= 41 and off <= math.rad(45), off
+end
+function MobYards(mob) return (Placed(mob)) end
+-- The soft target (gamepad mode): the mob on my screen nearest to straight ahead, within 20 degrees.
+function SoftEnemy()
+	local best, bestOff
+	for u, mob in pairs(MOBS) do
+		if u ~= "target" and mob.north then
+			local _, on, off = Placed(mob)
+			if on and off <= math.rad(20) and (not bestOff or off < bestOff) then best, bestOff = u, off end
+		end
+	end
+	return best
+end
 local baseUnit = { UnitExists = UnitExists, UnitName = UnitName, UnitLevel = UnitLevel, UnitIsDead = UnitIsDead,
 	UnitCanAttack = UnitCanAttack, UnitAffectingCombat = UnitAffectingCombat, UnitClassification = UnitClassification,
 	UnitGUID = UnitGUID }
-function UnitExists(u) if MOBS[u] then return true end return baseUnit.UnitExists(u) end
+function UnitExists(u)
+	if u == "softenemy" then return SoftEnemy() ~= nil end
+	if MOBS[u] then return u == "target" or select(2, Placed(MOBS[u])) end
+	return baseUnit.UnitExists(u)
+end
 function UnitName(u) if MOBS[u] then return MOBS[u].name end return baseUnit.UnitName(u) end
 function UnitLevel(u) if MOBS[u] then return MOBS[u].level end return baseUnit.UnitLevel(u) end
 function UnitIsDead(u) if MOBS[u] then return MOBS[u].dead == true end return baseUnit.UnitIsDead(u) end
@@ -1464,6 +1491,7 @@ function UnitAffectingCombat(u) if MOBS[u] then return MOBS[u].combat == true en
 function UnitClassification(u) if MOBS[u] then return MOBS[u].class or "normal" end return baseUnit.UnitClassification(u) end
 function UnitGUID(u) if MOBS[u] then return MOBS[u].guid or ("Creature-0-" .. u) end return baseUnit.UnitGUID(u) end
 function UnitIsUnit(a, b)
+	if b == "softenemy" then return SoftEnemy() == a end
 	local mob = MOBS[(a:gsub("target$", ""))]
 	if mob and a:find("target$") then return b == "player" and mob.attacking == true end
 	return a == b
@@ -1507,20 +1535,20 @@ end
 C_Spell.IsSpellHarmful = function(id) return SPELL_RANGES[id] ~= nil end
 C_Spell.IsSpellInRange = function(id, u)
 	local mob = MOBS[u]
-	if not (mob and mob.yards and SPELL_RANGES[id]) then return nil end
+	if not (mob and MobYards(mob) and SPELL_RANGES[id]) then return nil end
 	local range = SPELL_RANGES[id] > 0 and SPELL_RANGES[id] or 5
-	return mob.yards <= range
+	return MobYards(mob) <= range
 end
 ITEM_RANGES = { [10645] = 20, [835] = 30, [18904] = 35 } -- the rest: items this client doesn't know
 C_Item.RequestLoadItemDataByID = function() end
 C_Item.IsItemInRange = function(id, u)
 	local mob = MOBS[u]
-	if not (mob and mob.yards and ITEM_RANGES[id]) or STATE.combat then return nil end
-	return mob.yards <= ITEM_RANGES[id]
+	if not (mob and MobYards(mob) and ITEM_RANGES[id]) or STATE.combat then return nil end
+	return MobYards(mob) <= ITEM_RANGES[id]
 end
 function CheckInteractDistance(u, i)
 	if STATE.combat then error("CheckInteractDistance: blocked in combat") end
 	local mob = MOBS[u]
-	return mob ~= nil and mob.yards ~= nil and mob.yards <= ({ 28, 11, 10 })[i]
+	return mob ~= nil and MobYards(mob) ~= nil and MobYards(mob) <= ({ 28, 11, 10 })[i]
 end
 CVARS.cameraFov, CVARS.nameplateShowEnemies, CVARS.nameplateMaxDistance = "90", "1", "41"
