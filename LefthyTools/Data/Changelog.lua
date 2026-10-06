@@ -179,5 +179,8 @@ ns.CHANGELOG = {
 	{ id = 57, module = "beacon",
 		en = { "Nothing lost between friends", "Pings, Lefthy chat, announcements and error reports never go out faster than friends take them, long roll results reach everyone, chat lines arrive in order, friends on a current build aren't called old anymore, and Ctrl-click in gamepad mode can't block a role check." },
 		de = { "Nichts geht mehr verloren", "Pings, Lefthy-Chat, Ankündigungen und Fehlerberichte gehen nie schneller raus, als Freunde sie annehmen, lange Würfelergebnisse erreichen alle, Chatzeilen kommen in der richtigen Reihenfolge, Freunde mit aktueller Version gelten nicht mehr als veraltet, und Strg-Klick im Gamepad-Modus kann keinen Rollencheck mehr blockieren." } },
+	{ id = 58, module = "tweaks",
+		en = { "Friends on your flight, tidier", "The top bar shows each friend in three lines that stay put: who and where, their quest, and their fight, which fades in and out." },
+		de = { "Freunde im Flug, aufgeräumt", "Der obere Balken zeigt jeden Freund in drei festen Zeilen: wer und wo, die Quest und der Kampf, der ein- und ausblendet." } },
 	-- New entries go here, at the end.
 }
