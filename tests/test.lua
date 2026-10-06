@@ -3296,13 +3296,32 @@ do
 	Fire("PLAYER_CONTROL_LOST")
 	Advance(2)
 	check(film:IsShown() and UIParent:GetAlpha() == 0, "the next flight")
-	local friendsText = film.Friends:GetText() or ""
-	check(friendsText:find("Anna", 1, true) and friendsText:find("Bob", 1, true) and select(2, friendsText:gsub("\n", "")) == 1
-		and friendsText:find("Level 20", 1, true), "the top bar: my Beacon friends, a line each, with level and where, got " .. friendsText)
-	LefthyToolsDB.settings.tweaks.flightFriends = false
-	ns.CinematicFlight.UpdateFriends(GetTime())
-	check(film.Friends:GetText() == "", "setting off: the top bar stays black")
-	LefthyToolsDB.settings.tweaks.flightFriends = true
+	do -- The top bar: friends side by side, three lines each that keep their place.
+		local anna, bob = film.FriendColumns[1], film.FriendColumns[2]
+		local function y(line) return line._points and line._points[1] and line._points[1][5] end
+		local function x(line) return line._points and line._points[1] and line._points[1][4] end
+		check(anna.Who:GetText():find("Anna", 1, true) and anna.Who:GetText():find("Level 20", 1, true)
+			and bob.Who:GetText():find("Bob", 1, true) and x(anna.Who) < 0 and x(bob.Who) > 0,
+			"the top bar: my Beacon friends side by side, name, level and where first, got " .. anna.Who:GetText())
+		check(y(anna.Who) > 0 and y(anna.Quest) == 0 and y(anna.Fight) < 0, "three lines: who and where, quest, fighting")
+		local fadeIns = anna.FightIn.plays
+		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "T2;176;0;Wanted: Hogger;Hogger slain: 0/1", "WHISPER", 11)
+		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;C;0;260.0;750.0;Goldshire;Hogger", "WHISPER", 11)
+		ns.CinematicFlight.UpdateFriends(GetTime())
+		check(anna.Quest:GetText():find("Quest: Wanted: Hogger", 1, true) and anna.Fight:GetText():find("Fighting Hogger", 1, true)
+			and anna.FightIn.plays == fadeIns + 1 and anna.Fight:GetAlpha() == 1 and y(anna.Who) > 0 and y(anna.Quest) == 0,
+			"her quest on its own line; a fight fades in on the third, nothing else moves, got " .. tostring(anna.Fight:GetText()))
+		ns.CinematicFlight.UpdateFriends(GetTime())
+		check(anna.FightIn.plays == fadeIns + 1, "still fighting: no new fade")
+		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 11)
+		ns.CinematicFlight.UpdateFriends(GetTime())
+		check(anna.FightOut.plays == 1 and anna.Fight:GetAlpha() == 0 and anna.Fight:GetText():find("Fighting Hogger", 1, true),
+			"the fight over: the line fades out (its words stay while it does)")
+		LefthyToolsDB.settings.tweaks.flightFriends = false
+		ns.CinematicFlight.UpdateFriends(GetTime())
+		check(anna.Who:GetText() == "" and anna.Quest:GetText() == "" and bob.Who:GetText() == "", "setting off: the top bar stays black")
+		LefthyToolsDB.settings.tweaks.flightFriends = true
+	end
 	check(film.Timer:GetText() == ("Landing in 0:%02d"):format(took - 2), "the same route: an exact countdown, got " .. tostring(film.Timer:GetText()))
 	OpenWorldMap(1429)
 	Advance(0.3)

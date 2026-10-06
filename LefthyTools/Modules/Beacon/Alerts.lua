@@ -41,15 +41,15 @@ function B.FriendList()
 	return list
 end
 
--- What a friend is doing right now: dead, or fighting (and how many), and the quest they track.
-local function Doing(peer)
-	local parts = {}
+-- Dead, or fighting (and whom, how many), in red; nil when neither.
+local function FightText(peer)
+	local text
 	if peer.ghost then
-		parts[#parts + 1] = "|cffff5050" .. L["Ghost"] .. "|r"
+		text = L["Ghost"]
 	elseif peer.dead then
-		parts[#parts + 1] = "|cffff5050" .. L["Dead"] .. "|r"
+		text = L["Dead"]
 	elseif peer.combat then
-		local mobs, text = peer.mobs or 0, nil
+		local mobs = peer.mobs or 0
 		if peer.target and peer.target ~= "" then
 			text = mobs > 1 and L["Fighting %s and %d more"]:format(peer.target, mobs - 1) or L["Fighting %s"]:format(peer.target)
 		elseif mobs > 1 then
@@ -59,21 +59,31 @@ local function Doing(peer)
 		else
 			text = L["In combat"]
 		end
-		parts[#parts + 1] = "|cffff5050" .. text .. "|r"
 	end
-	local quest = peer.quest
-	if quest then
-		local progress = quest.done and L["Ready to turn in"] or (quest.objective ~= "" and quest.objective or nil)
-		parts[#parts + 1] = "|cffffd200" .. L["Quest: %s"]:format(quest.title) .. "|r"
-			.. (progress and ("|cffcccccc - " .. progress .. "|r") or "")
-	end
-	return #parts > 0 and table.concat(parts, "  ") or nil
+	return text and ("|cffff5050" .. text .. "|r")
 end
 
--- Appends up to three lines to `lines`: name (and <AFK>), level and progress, "In your group";
--- zone - subzone and distance; what they're doing (only when there's something).
-function B.FriendLines(lines, peer, gameAccountID)
-	local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
+-- The quest they track, and how far along; nil when none.
+local function QuestText(peer)
+	local quest = peer.quest
+	if not quest then
+		return nil
+	end
+	local progress = quest.done and L["Ready to turn in"] or (quest.objective ~= "" and quest.objective or nil)
+	return "|cffffd200" .. L["Quest: %s"]:format(quest.title) .. "|r" .. (progress and ("|cffcccccc - " .. progress .. "|r") or "")
+end
+
+-- What a friend is doing right now: dead, or fighting, and the quest they track.
+local function Doing(peer)
+	local fight, quest = FightText(peer), QuestText(peer)
+	if fight and quest then
+		return fight .. "  " .. quest
+	end
+	return fight or quest
+end
+
+-- Name (and <AFK>), level and progress, "In your group".
+local function Head(peer, info)
 	local level = info and info.characterLevel or peer.level
 	local head = ColouredName(peer)
 	if info and info.isGameAFK then
@@ -86,14 +96,33 @@ function B.FriendLines(lines, peer, gameAccountID)
 	if peer.groupUnit then
 		head = head .. "  |cff4da6ff" .. L["In your group"] .. "|r"
 	end
-	lines[#lines + 1] = head
+	return head
+end
+
+-- Zone - subzone and distance, in grey.
+local function Where(peer, gameAccountID)
 	local where = B.WhereText(peer, gameAccountID) or "?"
 	local distance = peer.hasPos and B.DistanceText and B.DistanceText(peer.continent, peer.north, peer.west)
-	lines[#lines + 1] = "|cffaaaaaa" .. where .. (distance and (", " .. distance) or "") .. "|r"
+	return "|cffaaaaaa" .. where .. (distance and (", " .. distance) or "") .. "|r"
+end
+
+-- Appends up to three lines to `lines`: name (and <AFK>), level and progress, "In your group";
+-- zone - subzone and distance; what they're doing (only when there's something).
+function B.FriendLines(lines, peer, gameAccountID)
+	local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
+	lines[#lines + 1] = Head(peer, info)
+	lines[#lines + 1] = Where(peer, gameAccountID)
 	local doing = Doing(peer)
 	if doing then
 		lines[#lines + 1] = doing
 	end
+end
+
+-- A friend in three parts that keep their place (the cinematic flight's top bar): who and where;
+-- the quest they track (nil: none); fighting or dead (nil: neither).
+function B.FriendRows(peer, gameAccountID)
+	local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
+	return Head(peer, info) .. "   |cff888888·|r   " .. Where(peer, gameAccountID), QuestText(peer), FightText(peer)
 end
 
 -- A friend just died; foe is whom they were fighting, if anyone. On the driver tick.

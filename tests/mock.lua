@@ -178,8 +178,8 @@ function FrameMethods:SetVerticalScroll(v) self._scroll = v end
 function FrameMethods:GetVerticalScroll() return self._scroll or 0 end
 -- Animation groups. With SetToFinalAlpha(true), Play() jumps straight to the end state: each
 -- target gets the toAlpha of its last-ending Alpha step (what the game shows once it's done).
-local function NewAnimationGroup()
-	local g = { playing = false, anims = {}, plays = 0 }
+local function NewAnimationGroup(owner) -- (an animation without a target animates its owner, like the game)
+	local g = { playing = false, anims = {}, plays = 0, owner = owner }
 	function g:CreateAnimation(kind)
 		local a = { kind = kind }
 		function a:SetTarget(t) self.target = t end
@@ -206,9 +206,10 @@ local function NewAnimationGroup()
 		if self.final then
 			local ends, last = {}, {}
 			for _, a in ipairs(self.anims) do
-				if a.target and a.to ~= nil then
+				local target = a.target or self.owner
+				if target and a.to ~= nil then
 					local e = (a.delay or 0) + (a.duration or 0)
-					if not ends[a.target] or e >= ends[a.target] then ends[a.target], last[a.target] = e, a.to end
+					if not ends[target] or e >= ends[target] then ends[target], last[target] = e, a.to end
 				end
 			end
 			for target, alpha in pairs(last) do target:SetAlpha(alpha) end
@@ -223,7 +224,7 @@ local function NewAnimationGroup()
 	end
 	return g
 end
-function FrameMethods:CreateAnimationGroup() return NewAnimationGroup() end
+function FrameMethods:CreateAnimationGroup() return NewAnimationGroup(self) end
 local function NewTexture()
 	local t = { shown = true, alpha = 1 }
 	function t:SetAllPoints() end
@@ -236,7 +237,7 @@ local function NewTexture()
 	function t:Hide() self.shown = false end
 	function t:IsShown() return self.shown end
 	function t:SetAlpha(a) self.alpha = a end
-	function t:CreateAnimationGroup() return NewAnimationGroup() end
+	function t:CreateAnimationGroup() return NewAnimationGroup(self) end
 	function t:SetAtlas(atlas) self.atlas, self.color = atlas, nil end
 	function t:SetVertexColor(r, g, b, a) self.vertex, self.gradient = { r, g, b, a }, nil end -- replaces a gradient
 	function t:SetBlendMode(mode) self.blend = mode end
@@ -277,8 +278,8 @@ function FrameMethods:CreateMaskTexture() return NewTexture() end
 function FrameMethods:CreateFontString()
 	local fs = {}
 	function fs:SetAllPoints() end
-	function fs:SetPoint() end
-	function fs:ClearAllPoints() end
+	function fs:SetPoint(...) self._points = self._points or {}; self._points[#self._points + 1] = { ... } end
+	function fs:ClearAllPoints() self._points = {} end
 	function fs:SetText(text) self.text = text end
 	function fs:GetText() return self.text end
 	function fs:GetStringWidth() return #(self.text or "") * 6 end
@@ -297,6 +298,8 @@ function FrameMethods:CreateFontString()
 	function fs:SetShadowColor() end
 	function fs:SetTextScale(s) self.textScale = s end
 	function fs:SetAlpha(a) self.alpha = a end
+	function fs:GetAlpha() return self.alpha or 1 end
+	function fs:CreateAnimationGroup() return NewAnimationGroup(self) end
 	function fs:SetShown(s) self.shown = s and true or false end
 	fs.shown = true
 	function fs:Show() self.shown = true end

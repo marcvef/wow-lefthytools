@@ -7,9 +7,10 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 -- Cinematic flights (a Misc Tweak; works without Mirage): on a flight path the interface fades
 -- out, thin black bars fade in like a film, and a title card names your destination and every
 -- zone you fly into (its level range, and Beacon friends who are there). The top bar shows what
--- Beacon friends are doing (a line each: name, level, where, fighting or their quest; setting
--- flightFriends), the bottom bar the time left to landing; whispers and party chat show as
--- subtitles just above it. Landing brings everything back.
+-- Beacon friends are doing (side by side, three lines each that keep their place: name, level and
+-- where; their quest; fighting or dead, fading in and out; setting flightFriends), the bottom bar
+-- the time left to landing; whispers and party chat show as subtitles just above it. Landing
+-- brings everything back.
 --
 -- The screen doesn't take clicks, so the camera can be dragged as always. Opening a window (map,
 -- bags, ...), typing in chat or a friend's item offer waiting for your Need or Pass (Beacon) pauses
@@ -43,7 +44,9 @@ local CARD_IN, CARD_HOLD, CARD_OUT = 1.2, 3.5, 1.5
 local SUBTITLE_TIME, MAX_SUBTITLES = 8, 2
 local BAR = 0.07            -- letterbox bar height, part of the screen height
 local FRIENDS_EVERY = 2     -- seconds between updates of the friends in the top bar
-local FRIENDS_PER_PAGE, FRIENDS_PAGE_TIME = 2, 8 -- more friends: pages, one after another
+local FRIENDS_PER_PAGE, FRIENDS_PAGE_TIME = 2, 8 -- side by side; more friends: pages, one after another
+local FRIEND_ROWS = { "Who", "Quest", "Fight" } -- a friend's three lines, top to bottom
+local FIGHT_FADE = 0.6      -- their fighting line fades in and out
 local PATH_PACE = 1 / 29.9  -- seconds per yard along a flight path (classic routes fly ~29.9 yd/s)
 local DEFAULT_PACE = 1.15 / 30 -- seconds per yard of straight distance (the fallback) before any flight is timed
 local MIN_FLIGHT, MAX_FLIGHT = 10, 1800 -- timed flights outside this are left out
@@ -262,13 +265,23 @@ local function Build()
 	screen.Subtitles:SetPoint("BOTTOM", screen.Bottom, "TOP", 0, 10)
 	screen.Subtitles:SetWidth(900)
 	screen.Subtitles:SetSpacing(4)
-	-- What Beacon friends are doing, in the top bar: one line each.
-	screen.Friends = screen:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	screen.Friends:SetPoint("CENTER", screen.Top, "CENTER")
-	screen.Friends:SetJustifyH("CENTER")
-	screen.Friends:SetSpacing(4)
-	screen.Friends:SetWordWrap(false)
-	screen.Friends:SetTextColor(0.85, 0.82, 0.75)
+	-- What Beacon friends are doing, in the top bar: a column each, three lines that keep their
+	-- place (who and where, their quest, fighting or dead); the last fades in and out.
+	screen.FriendColumns = {}
+	for i = 1, FRIENDS_PER_PAGE do
+		local column = {}
+		for _, key in ipairs(FRIEND_ROWS) do
+			local line = screen:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			line:SetJustifyH("CENTER")
+			line:SetWordWrap(false)
+			line:SetTextColor(0.85, 0.82, 0.75)
+			column[key] = line
+		end
+		column.Fight:SetAlpha(0)
+		column.FightIn = Fade(column.Fight, 0, 1, FIGHT_FADE)
+		column.FightOut = Fade(column.Fight, 1, 0, FIGHT_FADE)
+		screen.FriendColumns[i] = column
+	end
 
 	-- The title card, in the upper middle: a small header, the name in the quest font, a thin
 	-- gold line and a subtitle. It fades in, holds, fades out, drifting slightly closer.
@@ -370,27 +383,62 @@ local function ZoneCard()
 	ShowCard(Continent(mapID), zone, table.concat(parts, "   |cff888888·|r   "))
 end
 
--- The top bar: Beacon friends, one line each (Beacon's own summary of them: name, level, where,
--- what they're doing), a page of FRIENDS_PER_PAGE at a time.
+-- The top bar: Beacon friends side by side (FRIENDS_PER_PAGE at a time, pages after that), each in
+-- three lines that keep their place (Beacon's B.FriendRows): who and where, their quest, fighting or
+-- dead. The fighting line fades in when it starts and out when it's over.
 local friendsAt = -math.huge
+local rowGap = 15 -- between the lines; Show fits it to the bar
+
+local function SetFight(column, key, text)
+	if key ~= column.key then -- another friend in this column: no fading from the last one
+		column.key, column.fighting = key, text ~= nil
+		column.FightIn:Stop()
+		column.FightOut:Stop()
+		column.Fight:SetText(text or "")
+		column.Fight:SetAlpha(text and 1 or 0)
+	elseif text then
+		column.Fight:SetText(text)
+		if not column.fighting then
+			column.fighting = true
+			column.FightOut:Stop()
+			column.FightIn:Play()
+		end
+	elseif column.fighting then
+		column.fighting = false -- (the last words stay while they fade)
+		column.FightIn:Stop()
+		column.FightOut:Play()
+	end
+end
+
 local function UpdateFriends(now)
 	friendsAt = now
 	local beacon = LT:GetModule("beacon")
 	local B = ns.Beacon
-	local list = M.db.flightFriends and beacon and beacon.enabled and B and B.FriendList and B.FriendList() or {}
-	if #list == 0 then
-		screen.Friends:SetText("")
-		return
+	local list = M.db.flightFriends and beacon and beacon.enabled and B and B.FriendRows and B.FriendList() or {}
+	local first, count = 1, 0
+	if #list > 0 then
+		local pages = math.ceil(#list / FRIENDS_PER_PAGE)
+		first = (math.floor(now / FRIENDS_PAGE_TIME) % pages) * FRIENDS_PER_PAGE + 1
+		count = math.min(#list - first + 1, FRIENDS_PER_PAGE)
 	end
-	local pages = math.ceil(#list / FRIENDS_PER_PAGE)
-	local page = math.floor(now / FRIENDS_PAGE_TIME) % pages
-	local lines = {}
-	for i = page * FRIENDS_PER_PAGE + 1, math.min(#list, (page + 1) * FRIENDS_PER_PAGE) do
-		local parts = {}
-		B.FriendLines(parts, list[i].peer, list[i].id)
-		lines[#lines + 1] = table.concat(parts, "   |cff888888·|r   ")
+	local width = math.max(200, UIParent:GetWidth() - 80) / math.max(count, 1)
+	for i, column in ipairs(screen.FriendColumns) do
+		local entry = i <= count and list[first + i - 1] or nil
+		local who, quest, fight
+		if entry then
+			who, quest, fight = B.FriendRows(entry.peer, entry.id)
+		end
+		local x = (i - (count + 1) / 2) * width
+		for row, key in ipairs(FRIEND_ROWS) do
+			local line = column[key]
+			line:ClearAllPoints()
+			line:SetPoint("CENTER", screen.Top, "CENTER", x, (2 - row) * rowGap)
+			line:SetWidth(width - 20)
+		end
+		column.Who:SetText(who or "")
+		column.Quest:SetText(quest or "")
+		SetFight(column, entry and entry.id, fight)
 	end
-	screen.Friends:SetText(table.concat(lines, "\n"))
 end
 Flight.UpdateFriends = UpdateFriends -- (tests)
 
@@ -454,7 +502,7 @@ local function Show()
 	local barHeight = math.floor(UIParent:GetHeight() * BAR + 0.5)
 	screen.Top:SetHeight(barHeight)
 	screen.Bottom:SetHeight(barHeight)
-	screen.Friends:SetWidth(math.max(200, UIParent:GetWidth() - 80))
+	rowGap = math.max(10, math.min(15, math.floor((barHeight - 16) / 2))) -- three lines in the top bar
 	screen.FadeOut:Stop()
 	screen:SetAlpha(0)
 	screen:Show()
