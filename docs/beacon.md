@@ -459,6 +459,42 @@ friend per minute); complete ones, or after 120 s with "[part n of m missing]", 
 so. `/lefthy reports` (or the settings button) shows them newest first in a copy box, with Clear.
 Not collecting: parts are ignored.
 
+## Fight stream (Stream.lua, a test)
+
+The idea: a small view of a friend's fight from above (them in the middle, the mobs around them,
+how far, who attacks, who casts), e.g. during your flight. How it goes between friends isn't
+decided, so nothing is sent yet; everything sits behind `fightStream` ("Fight stream (test)", off
+by default), and `/lefthy stream` (or `/lefthy beacon stream`) refuses while it's off.
+
+Known from the API docs (1.60.1): `UnitHealth`, `UnitHealthPercent` and `GetRaidTargetIndex` are
+always secret, `UnitPosition` answers for group members only, the combat log is closed to addons
+(`COMBAT_LOG_EVENT_UNFILTERED` has restrictions), and the damage meter
+(`C_DamageMeter.GetCombatSessionFromType`) is secret in combat. Readable: name, level,
+classification, dead, combat, reaction; who a mob targets (`UnitIsUnit(<unit>target, "player")`),
+threat and casting are secret only while restricted. Unknown until tested in game: whether range
+checks answer for hostile units in combat, and where nameplates are on the screen.
+
+- `/lefthy stream test`: 60 s of notes, a look every 0.5 s at `nameplate1`..`nameplate40`: per
+  call (unit info, `GetPlayerFacing`, the nameplate's spot via `C_NamePlate.GetNamePlateForUnit`
+  and `GetCenter`, every range check) how often it answered true, false, a value, nothing, hidden
+  (secret), forbidden, on or off screen, an error or missing, in and out of combat, with a few
+  examples (none for GUIDs and the player's position), and a short summary. Range checks: harmful
+  spells you know (one per range, melee as 5 yd), items of known range (as LibRangeCheck lists them;
+  `C_Item.IsItemInRange` works without owning them) and `CheckInteractDistance` 1-3. Kept in
+  `LefthyToolsDB.streamTests` (the last 3); `/lefthy stream results` shows them in a copy box.
+- `/lefthy stream preview`: the window with made-up mobs around a made-up friend, on a 24 s loop.
+- `/lefthy stream me`: the window with your own surroundings, live. Up is where the camera looks:
+  a mob's direction is `atan((x - 0.5) * 2 * tan(fov / 2))` from its nameplate's spot across the
+  screen (`cameraFov`, taken as horizontal, default 90); its distance lies between the longest
+  range it's beyond and the shortest it's within. No nameplate on screen: behind you, faint.
+
+The window (250 x 300, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
+you in the middle, a dot per mob (red: attacking you, orange: in combat, grey: not; gold ring:
+elite, silver: rare; a purple glow while casting; a skull that fades when it dies), names for the
+4 nearest, a tooltip per dot, and a bottom line ("2 on you · 5 near · X casts Y"). Dots follow
+their mob (by GUID) and glide to new spots. Cost: nothing unless a test runs or the window is
+open; its OnUpdate runs only while it's shown.
+
 ## Open questions (check in game)
 
 - The settings text field (custom list element), `SendGameData` limits, and whether

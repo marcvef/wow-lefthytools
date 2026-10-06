@@ -3079,6 +3079,119 @@ do
 	wipe(reports)
 end
 
+section("Beacon: fight stream (a test)")
+do
+	check(BDB.fightStream == false and B("fightStream") and SETTINGS_BUTTONS["Fight stream window"]
+		and SETTINGS_BUTTONS["What the game tells addons"] and SETTINGS_BUTTONS["Test results"]
+		and SETTINGS_BUTTONS["Your own fight, live"], "off by default, a checkbox and its buttons")
+	local pmark = #PRINTED + 1
+	lefthy("stream preview")
+	lefthy("beacon stream me")
+	check(not (LefthyToolsStreamFrame and LefthyToolsStreamFrame:IsShown()) and not LefthyToolsDB.streamTests
+		and select(2, printedSince(pmark):gsub("is a test and off", "")) == 2, "off: nothing opens, and I'm told how to switch it on")
+	B("fightStream"):SetValue(true)
+	local function dot(name)
+		for _, d in ipairs(BB.StreamDots()) do if d.key and d.mob.name == name then return d end end
+	end
+	local function used()
+		local n = 0
+		for _, d in ipairs(BB.StreamDots()) do if d.key and d:IsShown() then n = n + 1 end end
+		return n
+	end
+
+	-- The preview: made-up mobs around a made-up friend.
+	lefthy("stream preview")
+	Advance(0.6)
+	local win = LefthyToolsStreamFrame
+	check(win and win:IsShown() and win.Title:GetText():find("Anna", 1, true) and win.Live.Text:GetText() == "DEMO"
+		and used() == 5, "/lefthy stream preview: the window, a friend and five mobs")
+	local leader, gnoll = dot("Bandit leader"), dot("Gnoll")
+	check(leader.Ring:IsShown() and gnoll.ty < 0 and gnoll.Body.alpha < 1 and not gnoll.Ring:IsShown(),
+		"an elite has a gold ring; a mob without a direction sits behind, faint")
+	local before = leader.tx * leader.tx + leader.ty * leader.ty
+	Advance(3)
+	check(leader.tx * leader.tx + leader.ty * leader.ty < before and math.abs(leader.x - leader.tx) < 3,
+		"mobs move, and their dots glide after them")
+	check(win.Status:GetText():find("on Anna", 1, true) and win.Status:GetText():find("near", 1, true), "the bottom line: how many on her, how many near")
+	Advance(12)
+	local bandit = dot("Bandit")
+	check(bandit and bandit.Skull:IsShown() and not bandit.Body:IsShown(), "a mob that dies: a skull ...")
+	Advance(2.5)
+	check(bandit:GetAlpha() < 0.5, "... that fades")
+	win.Close:Click()
+	check(not win:IsShown() and used() == 0, "the X closes it, its dots let go")
+
+	-- "me": the mobs around me, as the game tells them.
+	MOBS = {
+		nameplate1 = { name = "Defias Thug", level = 15, combat = true, attacking = true, yards = 4, x = 0.5, y = 0.45 },
+		nameplate2 = { name = "Defias Pillager", level = 16, class = "elite", combat = true, casting = "Fireball", yards = 25, x = 0.25, y = 0.6 },
+		nameplate3 = { name = "Gnoll", level = 14, yards = 35 }, -- no nameplate frame: no direction
+	}
+	lefthy("stream me")
+	Advance(0.6)
+	local thug, pillager = dot("Defias Thug"), dot("Defias Pillager")
+	gnoll = dot("Gnoll")
+	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3,
+		"/lefthy stream me: my own surroundings, live")
+	check(math.abs(thug.tx) < 0.01 and thug.ty > 0 and thug.ty < 15, "a mob in the middle of my screen, close: just ahead of me")
+	check(pillager.tx < 0 and math.sqrt(pillager.tx ^ 2 + pillager.ty ^ 2) > 30, "one left on my screen, further away: ahead to the left")
+	check(gnoll.ty < 0 and gnoll.Body.alpha < 1, "one without a nameplate on screen: behind me, faint")
+	check(win.Status:GetText():find("1 on you", 1, true) and win.Status:GetText():find("3 near", 1, true)
+		and win.Status:GetText():find("Defias Pillager casts Fireball", 1, true), "the bottom line, got " .. tostring(win.Status:GetText()))
+	gnoll._scripts.OnEnter(gnoll)
+	check(TOOLTIP.title == "Gnoll (14)" and tooltipHas("direction unknown: its nameplate isn't on screen"), "hover: what's known about it")
+	gnoll._scripts.OnLeave(gnoll)
+	MOBS.nameplate1 = nil
+	Advance(0.6)
+	check(not dot("Defias Thug") and used() == 2, "a mob gone: its dot goes")
+	B("fightStream"):SetValue(false)
+	check(not win:IsShown(), "switched off: the window closes")
+	B("fightStream"):SetValue(true)
+
+	-- The test: what answers, in and out of combat.
+	MOBS.nameplate1 = { name = "Defias Thug", level = 15, combat = true, attacking = true, yards = 4, x = 0.5, y = 0.45 }
+	pmark = #PRINTED + 1
+	lefthy("stream test")
+	check(printedSince(pmark):find("fight stream test: 60 s of notes", 1, true), "/lefthy stream test: it starts and says what to do")
+	STATE.combat = true
+	Advance(30)
+	STATE.combat = false
+	pmark = #PRINTED + 1
+	Advance(30.5)
+	local tests = LefthyToolsDB.streamTests
+	local report = tests and tests[1] and tests[1].text or ""
+	check(#tests == 1 and printedSince(pmark):find("fight stream test done", 1, true), "after a minute: done, kept, and I'm told")
+	local function has(text) return report:find(text, 1, true) ~= nil end
+	check(has("Fight stream test: LefthyTools ") and has("(open world)") and has("up to 3 nameplates at once")
+		and has("Settings: enemy nameplates 1, nameplate distance 41, camera field of view 90"), "the report: where, when, the settings")
+	check(has("UnitName: value 180 | value 180") and has("e.g. Defias Thug; Defias Pillager") and has("UnitHealth: hidden 180 | hidden 180")
+		and has("UnitGUID: value 180 | value 180\n") and has("UnitPosition(player): value 60 | value 60\n"),
+		"what answers and what's hidden, in and out of combat, with examples (none of GUIDs and my position)")
+	check(has("spell Throw (30 yd): true 120, false 60 | true 120, false 60") and has("item 835 (about 30 yd): nil 180 | true 120, false 60")
+		and has("CheckInteractDistance 3 (10 yd): error 180 |"), "each range check, in and out of combat")
+	check(has("nameplate position: nil 60, onscreen 120 |") and has("Distance: 2 of 14 range checks answered in combat, 5 only out of combat."),
+		"nameplate spots and a short summary, got\n" .. report)
+	lefthy("stream results")
+	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
+	LefthyToolsStreamTestsFrame:Hide()
+	pmark = #PRINTED + 1
+	lefthy("stream test")
+	Advance(2)
+	lefthy("stream test")
+	check(#tests == 2 and printedSince(pmark):find("fight stream test stopped", 1, true), "again while it runs: stopped early, kept")
+	for _ = 1, 2 do
+		lefthy("stream test")
+		Advance(1)
+		lefthy("stream test")
+	end
+	check(#tests == 3, "the last three are kept")
+	lefthy("stream test")
+	B("fightStream"):SetValue(false)
+	Advance(61)
+	check(#tests == 3, "switched off: a running test stops, unsaved")
+	MOBS = {}
+end
+
 section("Beacon: a busy fight doesn't pile up messages")
 do
 	anna("S2;;0;260.0;750.0;Goldshire;")

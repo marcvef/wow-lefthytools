@@ -421,6 +421,8 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		ns.Beacon.ReportCommand(rest) -- Beacon's Reports.lua: to friends who collect error reports
 	elseif cmd == "reports" and ns.Beacon and ns.Beacon.ShowReports then
 		ns.Beacon.ShowReports()
+	elseif cmd == "stream" and ns.Beacon and ns.Beacon.StreamCommand then
+		ns.Beacon.StreamCommand(rest) -- Beacon's Stream.lua: a test behind its setting
 	elseif (cmd == "enable" or cmd == "disable" or cmd == "toggle") and target then
 		if cmd == "toggle" then
 			LT:ToggleModule(target.key)

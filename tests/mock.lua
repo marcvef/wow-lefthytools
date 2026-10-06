@@ -1443,3 +1443,75 @@ function TypeChatSpace(text)
 	local command, msg = Split(text)
 	chatBox:HandleChatType(msg, command, 0)
 end
+
+-- Mobs with a nameplate (Beacon's fight stream): MOBS["nameplate1"] = { name, level, class, dead,
+-- combat, attacking (its target is me), casting, yards, x, y (its nameplate's spot, 0-1 across and
+-- up the screen; nil: no nameplate frame), guid }. Range calls answer by yards. Like retail, items
+-- don't answer for hostile units in combat, and CheckInteractDistance fails there.
+MOBS = {}
+local baseUnit = { UnitExists = UnitExists, UnitName = UnitName, UnitLevel = UnitLevel, UnitIsDead = UnitIsDead,
+	UnitCanAttack = UnitCanAttack, UnitAffectingCombat = UnitAffectingCombat, UnitClassification = UnitClassification,
+	UnitGUID = UnitGUID }
+function UnitExists(u) if MOBS[u] then return true end return baseUnit.UnitExists(u) end
+function UnitName(u) if MOBS[u] then return MOBS[u].name end return baseUnit.UnitName(u) end
+function UnitLevel(u) if MOBS[u] then return MOBS[u].level end return baseUnit.UnitLevel(u) end
+function UnitIsDead(u) if MOBS[u] then return MOBS[u].dead == true end return baseUnit.UnitIsDead(u) end
+function UnitCanAttack(a, u) if MOBS[u] then return true end return baseUnit.UnitCanAttack(a, u) end
+function UnitAffectingCombat(u) if MOBS[u] then return MOBS[u].combat == true end return baseUnit.UnitAffectingCombat(u) end
+function UnitClassification(u) if MOBS[u] then return MOBS[u].class or "normal" end return baseUnit.UnitClassification(u) end
+function UnitGUID(u) if MOBS[u] then return MOBS[u].guid or ("Creature-0-" .. u) end return baseUnit.UnitGUID(u) end
+function UnitIsUnit(a, b)
+	local mob = MOBS[(a:gsub("target$", ""))]
+	if mob and a:find("target$") then return b == "player" and mob.attacking == true end
+	return a == b
+end
+function UnitCastingInfo(u) if MOBS[u] and MOBS[u].casting then return MOBS[u].casting end end
+function UnitChannelInfo() return nil end
+function UnitHealth() return SECRET end -- (Forever: always secret)
+function UnitHealthPercent() return SECRET end
+function GetRaidTargetIndex() return SECRET end
+function UnitReaction(u) if MOBS[u] then return 2 end end
+function UnitCreatureType(u) if MOBS[u] then return "Humanoid", 7 end end
+function GetScreenWidth() return 1920 end
+function GetScreenHeight() return 1080 end
+C_NamePlate = { GetNamePlateForUnit = function(u)
+	local mob = MOBS[u]
+	if not (mob and mob.x) then return nil end
+	return { GetCenter = function() return mob.x * 1920, mob.y * 1080 end, GetEffectiveScale = function() return 1 end,
+		IsForbidden = function() return false end }
+end }
+-- The spellbook: one line; harmful spells with their range (0: melee), one passive.
+SPELL_RANGES = { [1752] = 0, [2764] = 30 } -- Sinister Strike, Throw
+SPELL_NAMES[1752], SPELL_NAMES[2764] = "Sinister Strike", "Throw"
+BOOK = { { spellID = 1752, itemType = 1, isPassive = false }, { spellID = 2764, itemType = 1, isPassive = false },
+	{ spellID = 9999, itemType = 1, isPassive = true } }
+C_SpellBook = C_SpellBook or {}
+C_SpellBook.GetNumSpellBookSkillLines = function() return 1 end
+C_SpellBook.GetSpellBookSkillLineInfo = function(i) if i == 1 then return { itemIndexOffset = 0, numSpellBookItems = #BOOK, shouldHide = false } end end
+C_SpellBook.GetSpellBookItemInfo = function(slot) return BOOK[slot] end
+local baseSpellInfo = C_Spell.GetSpellInfo
+C_Spell.GetSpellInfo = function(id)
+	local info = baseSpellInfo(id)
+	info.minRange, info.maxRange = 0, SPELL_RANGES[id] or 0
+	return info
+end
+C_Spell.IsSpellHarmful = function(id) return SPELL_RANGES[id] ~= nil end
+C_Spell.IsSpellInRange = function(id, u)
+	local mob = MOBS[u]
+	if not (mob and mob.yards and SPELL_RANGES[id]) then return nil end
+	local range = SPELL_RANGES[id] > 0 and SPELL_RANGES[id] or 5
+	return mob.yards <= range
+end
+ITEM_RANGES = { [37727] = 5, [835] = 30 } -- the rest: items this client doesn't know
+C_Item.RequestLoadItemDataByID = function() end
+C_Item.IsItemInRange = function(id, u)
+	local mob = MOBS[u]
+	if not (mob and mob.yards and ITEM_RANGES[id]) or STATE.combat then return nil end
+	return mob.yards <= ITEM_RANGES[id]
+end
+function CheckInteractDistance(u, i)
+	if STATE.combat then error("CheckInteractDistance: blocked in combat") end
+	local mob = MOBS[u]
+	return mob ~= nil and mob.yards ~= nil and mob.yards <= ({ 28, 11, 10 })[i]
+end
+CVARS.cameraFov, CVARS.nameplateShowEnemies, CVARS.nameplateMaxDistance = "90", "1", "41"

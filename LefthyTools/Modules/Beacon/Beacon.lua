@@ -137,6 +137,7 @@ local M = LT:NewModule("beacon", {
 		dingSoundKit = 50111, -- boss defeated fanfare (Ding.lua lists the choices)
 		sendReports = true,   -- Reports.lua: my LefthyTools errors to friends who collect them
 		collectReports = false, -- and theirs to me
+		fightStream = false,  -- Stream.lua: a test, nothing goes to friends yet
 	},
 })
 
@@ -1311,6 +1312,9 @@ function M:OnSettingChanged()
 	if B.OnSettingChanged then
 		B.OnSettingChanged() -- Ding.lua: a newly picked level-up sound is played
 	end
+	if B.StreamSettingChanged then
+		B.StreamSettingChanged() -- Stream.lua: switched off, its test and window stop
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -1364,6 +1368,18 @@ function M:BuildOptions(o)
 		L["Your friends' LefthyTools send you their errors and the reports they write (/lefthy report). /lefthy reports shows them, ready to copy."])
 	o:Button(L["Friends' error reports"], L["Show"], function() B.ShowReports() end,
 		L["The reports your friends sent you, newest first, ready to copy. /lefthy reports does the same."])
+
+	o:Header(L["Fight stream (test)"])
+	o:Checkbox("fightStream", L["Fight stream (test)"],
+		L["A test for a feature in the making: a small live view of a fight from above. Nothing goes to friends yet. Switched on, the buttons below (and /lefthy stream) work."])
+	o:Button(L["Fight stream window"], L["Preview"], function() B.StreamCommand("preview") end,
+		L["The window with made-up mobs moving around. /lefthy stream preview does the same."])
+	o:Button(L["Your own fight, live"], L["Show"], function() B.StreamCommand("me") end,
+		L["The window with the mobs around you, as LefthyTools sees them: compare it with your screen. /lefthy stream me does the same."])
+	o:Button(L["What the game tells addons"], L["Start"], function() B.StreamCommand("test") end,
+		L["A minute of notes while you fight: what the game tells addons about the mobs around you. /lefthy stream test does the same; /lefthy stream results shows the notes, ready to copy."])
+	o:Button(L["Test results"], L["Show"], function() B.StreamCommand("results") end,
+		L["The notes of the last tests, ready to copy. /lefthy stream results does the same."])
 end
 
 function M:GetPeers()
@@ -1434,6 +1450,8 @@ function M:OnSlashCommand(msg)
 		B.HandoverCommand(arg)
 	elseif (cmd == "show" or cmd == "offer") and B.ShareCommand then
 		B.ShareCommand(cmd, arg)
+	elseif cmd == "stream" and B.StreamCommand then
+		B.StreamCommand(arg)
 	else
 		self:Print("/lefthy beacon - open settings")
 		self:Print("/lefthy beacon status - friends with LefthyTools, their last update and the message traffic")
