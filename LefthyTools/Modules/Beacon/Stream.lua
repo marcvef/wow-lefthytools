@@ -16,10 +16,11 @@ local B = ns.Beacon
 --
 -- Known from the API docs (1.60.1): health is always hidden (secret), mob positions aren't there
 -- (UnitPosition answers for group members only), the combat log is closed, raid markers are
--- hidden. The window looks the way your camera does (up = ahead): a mob's direction comes from
--- where its nameplate is on the screen, its distance from range checks (harmful spells you know,
--- items of known range, CheckInteractDistance). Whether those answer in combat is what the test
--- is for.
+-- hidden. Found by the tests on Forever: range checks answer in combat (harmful spells you know,
+-- items of known range, CheckInteractDistance), so distances work; where a nameplate is on the
+-- screen can't be read at all ("Can't measure restricted regions"), so there's no left or right.
+-- But a mob has a nameplate only while it's on your screen: the window looks the way your camera
+-- does (up = ahead) and puts those ahead, see Spread.
 --
 -- Cost: nothing unless a test runs or the window is open. Then a look at up to 40 nameplate
 -- units every half second; the window's OnUpdate (only while it's shown) glides at most 20 dots.
@@ -43,11 +44,13 @@ local GOLD = { 1, 0.82, 0.3 }
 local issecret = issecretvalue or function() return false end
 
 -- Items with a known use range: C_Item.IsItemInRange works without owning them, if the game knows
--- the item (Forever knows classic-era ones: the first test showed these two answering in combat).
-local RANGE_ITEMS = { { 10645, 20 }, { 835, 30 } } -- Gnomish Death Ray, Large Rope Net
+-- the item (Forever knows classic-era ones, and they answer in combat). 8149 and 17626 measured by
+-- the second test (between 5 and 10 yd, between 11 and 20 yd).
+local RANGE_ITEMS = { { 8149, 8 }, { 17626, 15 }, { 10645, 20 }, { 835, 30 } }
 -- Classic-era items used on a target whose range isn't known yet: the test measures it against the
 -- checks of known range (between the longest a unit was beyond and the shortest it was within).
-local CANDIDATE_ITEMS = { 4941, 10720, 18904, 7734, 1127, 2091, 13289, 17202, 8149, 17626, 4945, 18640 }
+-- So far all of them are more than 20 yd: a mob further than 30 yd tells more.
+local CANDIDATE_ITEMS = { 4941, 10720, 18904, 7734, 2091, 13289, 17202, 4945 }
 local INTERACT = { { 3, 10 }, { 2, 11 }, { 1, 28 } } -- CheckInteractDistance: duel, trade, inspect
 
 local UNITS, TARGETS = {}, {}
@@ -225,17 +228,6 @@ local function PlateSpot(unit)
 	return (nx < 0 or nx > 1 or ny < 0 or ny > 1) and "offscreen" or "onscreen", nx, ny
 end
 
--- The camera's horizontal field of view (cameraFov, degrees): how far left or right of ahead the
--- screen's edges are.
-local function TanHalfFov()
-	local fov = tonumber(GetCVar and GetCVar("cameraFov") or nil) or 90
-	return math.tan(math.rad(fov) / 2)
-end
-
--- Left (negative) or right of ahead, in radians, from a nameplate's spot across the screen.
-local function Bearing(nx, tanHalf)
-	return math.atan((nx - 0.5) * 2 * tanHalf)
-end
 
 local function Saved(key)
 	local db = LT.db
@@ -274,31 +266,12 @@ local UNIT_CHECKS = {
 local KINDS = { "true", "false", "value", "nil", "hidden", "forbidden", "onscreen", "offscreen", "error", "missing" }
 local NO_EXAMPLES = { UnitGUID = true, ["UnitPosition(player)"] = true } -- (not needed, and not for a report)
 
--- Other ways to find where a nameplate is (GetCenter failed in the first test): which of them the
--- game allows. f(plate) runs in a pcall.
-local anchorProbe -- a frame of ours, anchored to the nameplate for a moment
+-- More about a nameplate. The second test showed that no position can be read (GetCenter,
+-- GetLeft, GetRect, GetPoint, the plate's UnitFrame, a frame anchored to it: "Can't measure
+-- restricted regions"), so only what does answer is asked now. f(plate) runs in a pcall.
 local PLATE_PROBES = {
-	{ "GetNamePlateForUnit(<unit>, includeForbidden)", function(_, unit)
-		return C_NamePlate.GetNamePlateForUnit(unit, true) ~= nil
-	end },
 	{ "nameplate: IsVisible", function(plate) return plate:IsVisible() end },
-	{ "nameplate: GetLeft", function(plate) return plate:GetLeft() end },
-	{ "nameplate: GetRect", function(plate) return plate:GetRect() end },
-	{ "nameplate: GetPoint", function(plate) return plate:GetPoint(1) end },
 	{ "nameplate: GetEffectiveScale", function(plate) return plate:GetEffectiveScale() end },
-	{ "nameplate.UnitFrame: GetCenter", function(plate) return plate.UnitFrame and plate.UnitFrame:GetCenter() end },
-	{ "own frame anchored to it: GetCenter", function(plate)
-		if not anchorProbe then
-			anchorProbe = CreateFrame("Frame", nil, UIParent)
-			anchorProbe:Hide() -- (a hidden frame still has a position)
-		end
-		anchorProbe:SetSize(1, 1)
-		anchorProbe:ClearAllPoints()
-		anchorProbe:SetPoint("CENTER", plate, "CENTER")
-		local x = anchorProbe:GetCenter()
-		anchorProbe:ClearAllPoints()
-		return x
-	end },
 }
 
 local test -- the running test
@@ -548,9 +521,6 @@ end
 
 local function StopTest(save)
 	testDriver:SetScript("OnUpdate", nil)
-	if anchorProbe then
-		anchorProbe:ClearAllPoints() -- (not left hanging on a nameplate)
-	end
 	if save and test then
 		local list = Saved("streamTests")
 		list[#list + 1] = { at = test.context.at, text = Report() }
@@ -604,7 +574,7 @@ local mode         -- "preview" or "me"
 local dots, dotFor = {}, {} -- the pool; mob key -> its dot
 local mobs = {}    -- what the window shows now: { key, name, level, class, dead, combat, attacking, casting, yards, angle }
 local looks = {}   -- "me": reused tables, one per nameplate
-local checks, tanHalf -- "me": set when it opens
+local checks -- "me": set when it opens
 local clock, nextFeed = 0, 0
 
 local PREVIEW_FRIEND, PREVIEW_CLASS = "Anna", "MAGE"
@@ -724,28 +694,43 @@ local function Spot(mob)
 	return math.sin(angle) * r, math.cos(angle) * r
 end
 
--- Mobs without a direction: your target ahead (you face what you fight), the others spread evenly
--- around, in a steady order so they don't swap places from look to look.
-local unplaced = {}
+-- Mobs without a direction (the game lets no addon measure where a nameplate is). What is known: a
+-- mob has a nameplate only while it's on your screen (the second test: the target lost its
+-- nameplate at 15 yd when turned away), so those are ahead, within the camera's view: your target
+-- among them straight ahead, the others to its left and right, in a steady order so they don't swap
+-- places (which side is a guess). Your target without a nameplate: behind you if it's nearer than
+-- nameplates reach, otherwise far ahead. Anything else without a direction (the preview): behind.
+local VIEW = math.rad(35) -- how far left and right on-screen mobs spread (the camera sees about 45)
+local plateReach = 40     -- nameplateMaxDistance, read when the window opens
+local ahead = {}
 local function ByKey(a, b)
 	return tostring(a.key) < tostring(b.key)
 end
 local function Spread() -- true if any mob's direction is a guess
-	wipe(unplaced)
-	local guessed = false
+	wipe(ahead)
+	local guessed, targetAhead = false, false
 	for _, mob in ipairs(mobs) do
 		guessed = guessed or not mob.angle
 		if mob.angle then
 			mob.spread = nil
+		elseif mob.target and mob.onScreen then
+			mob.spread, targetAhead = 0, true
 		elseif mob.target then
-			mob.spread = 0
+			mob.spread = (mob.beyond or not mob.yards or mob.yards >= plateReach) and 0 or math.pi
+		elseif mob.onScreen then
+			ahead[#ahead + 1] = mob
 		else
-			unplaced[#unplaced + 1] = mob
+			mob.spread = math.pi
 		end
 	end
-	table.sort(unplaced, ByKey)
-	for k, mob in ipairs(unplaced) do
-		mob.spread = 2 * math.pi * k / (#unplaced + 1)
+	table.sort(ahead, ByKey)
+	local n = #ahead
+	for i, mob in ipairs(ahead) do
+		if targetAhead then -- left, right, further left, ...
+			mob.spread = (i % 2 == 1 and -1 or 1) * math.ceil(i / 2) * VIEW / math.ceil(n / 2)
+		else
+			mob.spread = n == 1 and 0 or (-VIEW + 2 * VIEW * (i - 1) / (n - 1))
+		end
 	end
 	return guessed
 end
@@ -880,9 +865,9 @@ local function FeedPreview()
 	mobs[#mobs + 1] = rare
 end
 
--- "me": the mobs with a nameplate around you, as the game tells them, and your target (also beyond
--- nameplate range: you can target further than nameplates reach).
-local function Fill(n, unit, unitTarget, targetKey)
+-- "me": the mobs with a nameplate around you (on your screen), as the game tells them, and your
+-- target (also without one: turned away, or further than nameplates reach).
+local function Fill(n, unit, unitTarget, targetKey, onScreen)
 	local mob = looks[n] or {}
 	looks[n] = mob
 	mob.key = Value("UnitGUID", unit) or unit
@@ -894,8 +879,7 @@ local function Fill(n, unit, unitTarget, targetKey)
 	mob.attacking = Value("UnitIsUnit", unitTarget, "player") == true
 	mob.casting = Value("UnitCastingInfo", unit) or Value("UnitChannelInfo", unit)
 	mob.yards, mob.beyond = Yards(unit, checks)
-	local spot, nx = PlateSpot(unit)
-	mob.angle = spot == "onscreen" and Bearing(nx, tanHalf) or nil
+	mob.angle, mob.onScreen = nil, onScreen -- (no direction: see Spread)
 	mob.target = targetKey ~= nil and mob.key == targetKey
 	mobs[n] = mob
 	return mob.target
@@ -909,12 +893,12 @@ local function FeedMe()
 		local unit = UNITS[i]
 		if n < MAX_DOTS and Value("UnitExists", unit) and Value("UnitCanAttack", "player", unit) then
 			n = n + 1
-			targetShown = Fill(n, unit, TARGETS[i], targetKey) or targetShown
+			targetShown = Fill(n, unit, TARGETS[i], targetKey, true) or targetShown
 		end
 	end
 	if targetKey and not targetShown and n < MAX_DOTS then
 		n = n + 1
-		Fill(n, "target", "targettarget", targetKey)
+		Fill(n, "target", "targettarget", targetKey, false)
 	end
 	for i = #mobs, n + 1, -1 do
 		mobs[i] = nil
@@ -1056,7 +1040,7 @@ local function Build()
 	win.Hint = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	win.Hint:SetPoint("BOTTOM", win.Status, "TOP", 0, 4)
 	win.Hint:SetWidth(WIDTH - 20)
-	win.Hint:SetText(L["No directions: target ahead, others spread out."])
+	win.Hint:SetText(L["Ahead or behind is real, left and right are guessed."])
 	win.Hint:Hide()
 end
 
@@ -1073,7 +1057,7 @@ local function OpenWindow(newMode)
 		win.Where:SetText(L["Westfall"])
 		win.Live.Text:SetText(L["DEMO"])
 	else
-		checks, tanHalf = RangeChecks(), TanHalfFov()
+		checks, plateReach = RangeChecks(), tonumber(GetCVar("nameplateMaxDistance")) or 40
 		name = UnitName("player")
 		local _, file = UnitClass("player")
 		classFile = file

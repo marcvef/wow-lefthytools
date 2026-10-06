@@ -492,15 +492,21 @@ checks answer for hostile units in combat, and where nameplates are on the scree
   items of unknown range against the known ones (between the longest range a unit was beyond while
   the item said yes and the shortest it was within while it said no), and notes how far the target
   is when it has no nameplate.
+- Second test: every way to measure a nameplate fails ("Action[FrameMeasurement] failed
+  because[Can't measure restricted regions]", in and out of combat, also for the plate's
+  `UnitFrame` and a frame of ours anchored to it); `IsVisible` and `GetEffectiveScale` answer. So
+  addons get **no left or right** for mobs. What is known: a mob has a nameplate only while it's
+  on your screen (the target lost its nameplate at 15 yd when turned away). Measured: item 8149
+  between 5 and 10 yd (used as 8), 17626 between 11 and 20 yd (used as 15); the other candidates
+  are all more than 20 yd (a mob further than 30 yd would tell more).
 - `/lefthy stream preview`: the window with made-up mobs around a made-up friend, on a 24 s loop.
-- `/lefthy stream me`: the window with your own surroundings, live. Up is where the camera looks:
-  a mob's direction is `atan((x - 0.5) * 2 * tan(fov / 2))` from its nameplate's spot across the
-  screen (`cameraFov`, taken as horizontal, default 90); its distance lies between the longest
-  range it's beyond and the shortest it's within. Your target shows too when it's beyond nameplate
-  range (you can target further than nameplates reach); beyond every check, on the rim ("more than
-  30 yd away"). Without a direction a mob is faint: your target ahead (you face what you fight),
-  the others spread evenly around, in a steady order; a line in the window says directions are
-  guessed.
+- `/lefthy stream me`: the window with your own surroundings, live. Up is where the camera looks.
+  A mob's distance lies between the longest range it's beyond and the shortest it's within;
+  beyond every check, on the rim ("more than 30 yd away"). Mobs with a nameplate are on screen, so
+  ahead: your target among them straight ahead, the others spread left and right (within 35
+  degrees, in a steady order by GUID; which side is a guess). Your target shows also without a
+  nameplate: behind you if it's nearer than `nameplateMaxDistance` (you turned away), otherwise far
+  ahead. Dots are faint, and a line says "Ahead or behind is real, left and right are guessed."
 
 The window (250 x 300, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
 you in the middle, a dot per mob (red: attacking you, orange: in combat, grey: not; gold ring:

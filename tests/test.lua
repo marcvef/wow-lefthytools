@@ -3104,7 +3104,7 @@ do
 	Advance(0.6)
 	local win = LefthyToolsStreamFrame
 	check(win and win:IsShown() and win.Title:GetText():find("Anna", 1, true) and win.Live.Text:GetText() == "DEMO"
-		and used() == 5, "/lefthy stream preview: the window, a friend and five mobs")
+		and used() == 5 and not win.Hint:IsShown(), "/lefthy stream preview: the window, a friend and five mobs (no word about guessing)")
 	local leader, gnoll = dot("Bandit leader"), dot("Gnoll")
 	check(leader.Ring:IsShown() and gnoll.ty < 0 and gnoll.Body.alpha < 1 and not gnoll.Ring:IsShown(),
 		"an elite has a gold ring; a mob without a direction sits behind, faint")
@@ -3133,28 +3133,38 @@ do
 	gnoll = dot("Gnoll")
 	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3,
 		"/lefthy stream me: my own surroundings, live")
-	check(math.abs(thug.tx) < 0.01 and thug.ty > 0 and thug.ty < 15, "a mob in the middle of my screen, close: just ahead of me")
-	check(pillager.tx < 0 and math.sqrt(pillager.tx ^ 2 + pillager.ty ^ 2) > 30, "one left on my screen, further away: ahead to the left")
-	check(gnoll.ty < 0 and gnoll.Body.alpha < 1 and win.Hint:IsShown(),
-		"one without a direction: spread out (alone: behind me), faint, and the window says directions are guessed")
+	local function radius(d) return math.sqrt(d.tx ^ 2 + d.ty ^ 2) end
+	check(thug.ty > 0 and pillager.ty > 0 and gnoll.ty > 0 and thug.tx < 0 and gnoll.tx > 0 and math.abs(pillager.tx) < 0.01,
+		"mobs with a nameplate are on my screen: all ahead, spread left and right in a steady order (the side is a guess)")
+	check(radius(thug) < 15 and radius(pillager) > 30 and radius(pillager) < 80 and radius(gnoll) > 100,
+		"at their distance: close, further, beyond every check (on the rim)")
+	check(gnoll.Body.alpha < 1 and win.Hint:IsShown() and win.Hint:GetText() == "Ahead or behind is real, left and right are guessed.",
+		"faint, and the window says what's guessed")
 	check(win.Status:GetText():find("1 on you", 1, true) and win.Status:GetText():find("3 near", 1, true)
 		and win.Status:GetText():find("Defias Pillager casts Fireball", 1, true), "the bottom line, got " .. tostring(win.Status:GetText()))
 	gnoll._scripts.OnEnter(gnoll)
-	check(TOOLTIP.title == "Gnoll (14)" and tooltipHas("direction unknown"), "hover: what's known about it")
+	check(TOOLTIP.title == "Gnoll (14)" and tooltipHas("direction unknown") and tooltipHas("more than 30 yd away"), "hover: what's known about it")
 	gnoll._scripts.OnLeave(gnoll)
-	-- My target beyond nameplate range: shown all the same, ahead (I face what I fight), on the rim.
-	MOBS.target, STATE.target = { name = "Far Kodo", level = 26, yards = 60, guid = "Creature-0-far" }, true
+	-- My target with a nameplate: straight ahead, the others to its sides.
+	MOBS.nameplate2.guid = "Creature-0-pillager"
+	MOBS.target, STATE.target = MOBS.nameplate2, true
 	Advance(0.6)
-	local kodo = dot("Far Kodo")
-	check(kodo and math.abs(kodo.tx) < 0.01 and kodo.ty > 100 and used() == 4, "my target beyond nameplate range: shown, ahead, on the rim")
+	pillager, thug, gnoll = dot("Defias Pillager"), dot("Defias Thug"), dot("Gnoll")
+	check(math.abs(pillager.tx) < 0.01 and pillager.ty > 0 and thug.tx < 0 and gnoll.tx > 0 and thug.ty > 0 and used() == 3,
+		"my target among them: straight ahead, the others left and right of it")
+	-- My target without a nameplate: turned away (behind me), or further than nameplates reach (far ahead).
+	MOBS.target = { name = "Kodo", level = 26, yards = 15, guid = "Creature-0-kodo" }
+	Advance(0.6)
+	local kodo = dot("Kodo")
+	check(kodo and kodo.ty < 0 and math.abs(kodo.tx) < 0.01 and used() == 4, "my target near but without a nameplate: behind me")
+	MOBS.target.yards = 60
+	Advance(0.6)
+	check(math.abs(kodo.tx) < 0.01 and kodo.ty > 100, "my target beyond nameplate range: far ahead, on the rim")
 	kodo._scripts.OnEnter(kodo)
 	check(tooltipHas("more than 30 yd away") and tooltipHas("your target"), "... further than the range checks reach, and it's my target")
 	kodo._scripts.OnLeave(kodo)
 	MOBS.target, STATE.target = nil, false
-	MOBS.nameplate3 = nil
-	Advance(0.6)
-	check(not win.Hint:IsShown(), "every mob with a direction: no word about guessing")
-	MOBS.nameplate3 = { name = "Gnoll", level = 14, yards = 35 }
+	MOBS.nameplate2.guid = nil
 	MOBS.nameplate1 = nil
 	Advance(0.6)
 	check(not dot("Defias Thug") and used() == 2, "a mob gone: its dot goes")
@@ -3188,10 +3198,10 @@ do
 	check(has("item 18904 (range to measure): nil 180 | true 180   -> more than 30 yd") and has("item 4941 (range to measure): nil 180 | nil 180\n"),
 		"items of unknown range: measured against the others")
 	check(has("nameplate position: GetCenter: nil 60, onscreen 60, error 60 |") and has("e.g. 0.50,0.45; can't measure this region")
-		and has("nameplate.UnitFrame: GetCenter: value 60, error 60 |") and has("own frame anchored to it: GetCenter: nil 120 |"),
-		"nameplate positions, with what the errors say, and other ways to read them")
-	check(has("Distance: 2 of 7 range checks of known range answered in combat, 5 only out of combat.")
-		and has("readable in combat: GetNamePlateForUnit(<unit>, includeForbidden), nameplate: IsVisible"),
+		and has("nameplate: IsVisible: true 120 | true 120") and has("nameplate: GetEffectiveScale: value 120 | value 120"),
+		"nameplate positions, with what the errors say, and what else a nameplate tells")
+	check(has("Distance: 2 of 9 range checks of known range answered in combat, 5 only out of combat.")
+		and has("readable in combat: nameplate: IsVisible, nameplate: GetEffectiveScale"),
 		"a short summary, got\n" .. report)
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
