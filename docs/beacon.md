@@ -435,9 +435,10 @@ one: the player's words, the context, Beacon on/off and friends with their versi
 links clicked (a post-hook on `SetItemRef`: the link and, for professions/enchants after 2 s,
 whether `ProfessionsFrame`/`TradeSkillFrame` opened; for map pins whether a waypoint is set) and
 how many errors are kept. Reports wait in `LefthyToolsDB.reportsOut` (at most 10, across
-sessions) until a collector is online; every 2 s the tick sends all waiting ones to every
-collector online, as `Z2` parts (up to 16 of 180 bytes; colour codes, `|` and `;` removed,
-newlines as `^`) at low priority, and prints "N report(s) sent to Anna".
+sessions) until a collector is online; every 2 s the tick sends waiting ones to every collector
+online, oldest first and each one whole, as `Z2` parts (up to 16 of 180 bytes; colour codes, `|`
+and `;` removed, newlines as `^`) at low priority, at most 45 parts in any 65 s (collectors take
+60 a minute from each friend), and prints "N report(s) sent to Anna" (", M more in a moment").
 
 Profession links get a closer look, since the game handles them itself: Blizzard's UI only passes
 a `trade:<GUID>:<spell>:<skill line>` link to `ItemRefTooltip:SetHyperlink`, the client asks the
