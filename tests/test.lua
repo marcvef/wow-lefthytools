@@ -697,9 +697,13 @@ do
 	ContainerFrameCombinedBags:Show()
 	ContainerFrameCombinedBags:UpdateSearchBox()
 	local p1, rel, p2, x, y = BagItemAutoSortButton:GetPoint(1)
-	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags and p1 == "TOPRIGHT"
-		and rel == ContainerFrameCombinedBags and x == -9 and y == -34,
-		"mouse and keyboard (Blizzard hides it since the patch): back, top right of the bags")
+	local s1, srel, s2, sx, sy = BagItemSearchBox:GetPoint(1)
+	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags and p1 == "TOPLEFT"
+		and rel == ContainerFrameCombinedBags and x == 38 and y == -34 and sx == 74 and sy == -37 and BagItemSearchBox:GetWidth() == 98,
+		"mouse and keyboard (Blizzard hides it since the patch): back, at the left of the search row (the search box moved over)")
+	ContainerFrameCombinedBags:UpdateSearchBox()
+	ContainerFrameCombinedBags:UpdateSearchBox()
+	check(BagItemSearchBox:GetWidth() == 98 and select(4, BagItemSearchBox:GetPoint(1)) == 74, "Blizzard's updates again: still the same, not narrower each time")
 	GAMEPAD_STATE.ui = true
 	ContainerFrameCombinedBags:UpdateSearchBox()
 	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags, "gamepad mode: there too")
@@ -709,7 +713,8 @@ do
 	ContainerFrameCombinedBags:Show() -- (opening the bags: also when UpdateSearchBox isn't called)
 	check(BagItemAutoSortButton:IsShown(), "opening the bags: there")
 	lefthy("tweaks bagsort off"); Advance(0.05)
-	check(TDB.gamepadBagSort == false and not BagItemAutoSortButton:IsShown(), "/lefthy tweaks bagsort off: hidden again, as Blizzard has it")
+	check(TDB.gamepadBagSort == false and not BagItemAutoSortButton:IsShown() and BagItemSearchBox:GetWidth() == 130
+		and select(4, BagItemSearchBox:GetPoint(1)) == 42, "/lefthy tweaks bagsort off: hidden again, the search box as Blizzard has it")
 	ContainerFrameCombinedBags:UpdateSearchBox()
 	check(not BagItemAutoSortButton:IsShown(), "... and stays so")
 	lefthy("tweaks bagsort on"); Advance(0.05)

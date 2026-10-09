@@ -323,6 +323,20 @@ local function SortButton()
 	return ownSortButton
 end
 
+local SORT_ROOM = 32 -- the search box moves this far right (and gets as much narrower) for the button
+
+-- The search box's width as Blizzard set it (we narrow it; Blizzard may set it again on an update).
+local function SearchWidth(search)
+	local width = search:GetWidth()
+	if search.lefthyWidth and math.abs(width - search.lefthyWidth) < 0.5 then
+		return width + SORT_ROOM -- (still ours)
+	end
+	return width
+end
+
+-- The button goes at the left end of the search row (top right something of Forever's sits where
+-- Blizzard had it): where the search box starts, the box moved right to make room. Blizzard puts
+-- the box back on each update, and this runs after it.
 local function ShowSortButton(frame)
 	if not (M.enabled and M.db.gamepadBagSort and frame:IsShown()) then
 		return
@@ -331,7 +345,23 @@ local function ShowSortButton(frame)
 		local button = SortButton()
 		button:SetParent(frame)
 		button:ClearAllPoints()
-		button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -9, -34)
+		local search = BagItemSearchBox
+		local point, relative, relativePoint, x, y
+		if search and search:IsShown() and search:GetParent() == frame and search:GetNumPoints() == 1 then
+			point, relative, relativePoint, x, y = search:GetPoint(1)
+		end
+		if point == "TOPLEFT" and relative == frame and relativePoint == "TOPLEFT" then
+			local width = SearchWidth(search)
+			search:ClearAllPoints()
+			search:SetPoint("TOPLEFT", frame, "TOPLEFT", x + SORT_ROOM, y)
+			search.lefthyWidth = math.max(40, width - SORT_ROOM)
+			search:SetWidth(search.lefthyWidth)
+			button:SetPoint("TOPLEFT", frame, "TOPLEFT", x - 4, y + 3)
+		elseif search and search:IsShown() and search:GetParent() == frame then
+			button:SetPoint("RIGHT", search, "LEFT", -6, 0)
+		else
+			button:SetPoint("TOPLEFT", frame, "TOPLEFT", 38, -34)
+		end
 		button:SetFrameLevel(frame:GetFrameLevel() + 10)
 		button:Show()
 	end
@@ -349,6 +379,10 @@ local function ApplyGamepadBagSort(on)
 		if on then
 			ShowSortButton(frame)
 		elseif frame:IsShown() and frame.UpdateSearchBox then
+			if BagItemSearchBox and BagItemSearchBox.lefthyWidth then
+				BagItemSearchBox:SetWidth(SearchWidth(BagItemSearchBox)) -- (its width back)
+				BagItemSearchBox.lefthyWidth = nil
+			end
 			frame:UpdateSearchBox() -- off: as Blizzard has it
 		end
 	end
@@ -600,7 +634,7 @@ function M:BuildOptions(o)
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])
 	o:Checkbox("gamepadBagSort", L["Clean-up button on the bags"],
-		L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, top right of the backpack."])
+		L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, at the left of the bags' search box."])
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])

@@ -38,11 +38,15 @@ hid it in gamepad mode only, where the gamepad bag bar, `GamepadBagBar`, offered
 bag's menu; 70291 also stopped showing that bar on the bags). So nobody had a way to clean up. A
 `hooksecurefunc` on each bag frame's `UpdateSearchBox` and a `HookScript("OnShow")` (in case that
 function isn't called any more; `ContainerFrames()`: the combined bags and every
-`ContainerFrameN`) show the button on the backpack or the combined bags, where Blizzard used to put
-it (TOPRIGHT -9, -34), above the frame. Blizzard's click handler is untouched
+`ContainerFrameN`) show the button on the backpack or the combined bags, at the left end of the search row: where
+the search box starts (Blizzard's TOPLEFT point, "x - 4, y + 3"), the search box moved right by 32 px
+and made as much narrower (its width as Blizzard set it is told apart from ours, so repeated updates
+don't shrink it again). Blizzard's old spot (TOPRIGHT -9, -34) collides with something of
+Forever's frame art. If the search box isn't anchored that way: left of it; without one: TOPLEFT
+38, -34. Above the frame. Blizzard's click handler is untouched
 (`C_Container.SortBags`). A client without `BagItemAutoSortButton` gets ours
 (`LefthyToolsBagSortButton`: the `bags-button-autosort-up` atlas, the sorting sound,
-`C_Container.SortBags`). Off: `UpdateSearchBox` again (as Blizzard has it), ours hidden. The key
+`C_Container.SortBags`). Off: the search box's width back, `UpdateSearchBox` again (as Blizzard has it), ours hidden. The key
 still says gamepad (it began there).
 
 ## questAnnounce: quest progress in party chat

@@ -281,8 +281,8 @@ L["A small combo point gem, like the personal resource display's, right of your 
 	"Ein kleiner Combopunkt wie in der persönlichen Ressourcenanzeige, rechts neben dem Level deines Ziels und etwas darunter, in der Farbe deiner Punkte, mit ihrer Anzahl. Nur solange du Punkte darauf hast. Für Schurken und Druiden in Katzengestalt."
 L["Colour combo points by count"] = "Combopunkte nach Anzahl färben"
 L["Clean-up button on the bags"] = "Aufräumen-Knopf an den Taschen"
-L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, top right of the backpack."] =
-	"Seit dem letzten Forever-Patch fehlt der Aufräumen-Knopf der Taschen, mit Maus und Tastatur wie im Gamepad-Modus. Das holt ihn zurück, oben rechts am Rucksack."
+L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, at the left of the bags' search box."] =
+	"Seit dem letzten Forever-Patch fehlt der Aufräumen-Knopf der Taschen, mit Maus und Tastatur wie im Gamepad-Modus. Das holt ihn zurück, links neben das Suchfeld der Taschen."
 L["Clean up bags"] = "Taschen aufräumen"
 L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
 	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und der Punkt an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."

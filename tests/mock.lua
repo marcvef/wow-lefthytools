@@ -94,6 +94,7 @@ function FrameMethods:GetEffectiveScale() return self._scale or 1 end
 function FrameMethods:ClearAllPoints() self._points = {} end
 function FrameMethods:SetPoint(...) self._points = self._points or {}; self._points[#self._points + 1] = { ... } end
 function FrameMethods:GetPoint(i) local p = (self._points or {})[i or 1]; if p then return unpack(p) end end
+function FrameMethods:GetNumPoints() return #(self._points or {}) end
 function FrameMethods:GetLeft() local p = (self._points or {})[1]; if p and p[1] == "TOPLEFT" then return p[4] end end
 function FrameMethods:GetTop() local p = (self._points or {})[1]; if p and p[1] == "TOPLEFT" then return p[5] end end
 function FrameMethods:SetParent(p) self._parent = p end
@@ -837,9 +838,15 @@ ContainerFrameContainer.ContainerFrames = { ContainerFrame1 }
 -- without gamepad mode (MOCK_SORT_SHOWN: like before, shown without gamepad mode).
 CreateFrame("Button", "BagItemAutoSortButton", UIParent)
 BagItemAutoSortButton:Hide()
+CreateFrame("EditBox", "BagItemSearchBox", UIParent) -- (Blizzard puts it on the backpack or the combined bags)
+BagItemSearchBox:SetSize(130, 20)
 for _, f in ipairs({ ContainerFrameCombinedBags, ContainerFrame1 }) do
 	function f:IsBackpack() return self == ContainerFrame1 end
 	function f:UpdateSearchBox()
+		BagItemSearchBox:SetParent(self)
+		BagItemSearchBox:ClearAllPoints()
+		BagItemSearchBox:SetPoint("TOPLEFT", self, "TOPLEFT", 42, -37)
+		BagItemSearchBox:Show()
 		local button = _G.BagItemAutoSortButton
 		if not button then return end
 		if GAMEPAD_STATE.ui or not MOCK_SORT_SHOWN then
