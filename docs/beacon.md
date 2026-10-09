@@ -450,9 +450,16 @@ own data, aren't affected). On such a click Reports.lua notes the linker's serve
 GUID) against mine, whether this client knows the linker (`GetPlayerInfoByGUID`), the linker's
 realm and faction if they're a Beacon friend (Battle.net game account info), my realm, faction,
 combat and modifier keys, and listens 3 s to `UI_ERROR_MESSAGE`, `UI_INFO_MESSAGE`,
-`CHAT_MSG_SYSTEM` and the trade skill events. If no profession window opened, that's a report by
-itself (once per session). `/lefthy beacon status` lists each friend's realm and faction and mine,
-to compare who can open profession links with who can't. Sending a link other than an item to a
+`CHAT_MSG_SYSTEM` and the trade skill events; on `TRADE_SKILL_DATA_SOURCE_CHANGED`, `LIST_UPDATE`
+and `SHOW` it also notes what `C_TradeSkillUI` holds right then (linked, how many recipes, the
+profession, ready) and which profession window exists. If no profession window opened, that's a
+report by itself (once per session). `/lefthy beacon status` lists each friend's realm and faction
+and mine, to compare who can open profession links with who can't. Found so far (1.60.1.70291):
+links from another realm (ClassicBetaPvE2 vs Classic Beta PvE) open nothing; even a player's own
+link, in any chat, goes `DATA_SOURCE_CHANGED`, `LIST_UPDATE`, `CLOSE`, `CLOSE` without
+`TRADE_SKILL_SHOW`: the game closes it again, not LefthyTools (nothing of ours closes profession
+windows). The probe is to show whether the recipes are there for that moment (then a window of
+our own could list them). Sending a link other than an item to a
 friend on a build before 0.5.0-16 (links arrive as tokens, shown as text there) names them once.
 
 Collecting: parts are put together per sender and report id (in any order; at most 60 parts per

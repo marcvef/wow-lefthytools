@@ -343,6 +343,39 @@ local watcher = CreateFrame("Frame")
 local watching -- the click being watched: { events = { ... } }
 local linkFailureSent = false
 
+-- What the profession API holds right now (when its data comes, before the game closes it again):
+-- linked or own, how many recipes, which profession, ready; and which profession window exists.
+-- (First reports: own links too go DATA_SOURCE_CHANGED, LIST_UPDATE, CLOSE, CLOSE, never SHOW.)
+local function TradeProbe()
+	local api = C_TradeSkillUI
+	if type(api) ~= "table" then
+		return "no C_TradeSkillUI"
+	end
+	local parts = {}
+	local function Try(label, f)
+		if type(f) ~= "function" then
+			parts[#parts + 1] = label .. " missing"
+			return
+		end
+		local ok, v = pcall(f)
+		if not ok then
+			parts[#parts + 1] = label .. " error"
+		elseif issecret(v) then
+			parts[#parts + 1] = label .. " secret"
+		elseif type(v) == "table" then
+			parts[#parts + 1] = label .. " " .. (label == "recipes" and #v or tostring(v.professionName or v.parentProfessionName or "?"))
+		else
+			parts[#parts + 1] = label .. " " .. tostring(v)
+		end
+	end
+	Try("linked", api.IsTradeSkillLinked)
+	Try("recipes", api.GetAllRecipeIDs)
+	Try("profession", api.GetBaseProfessionInfo)
+	Try("ready", api.IsTradeSkillReady)
+	parts[#parts + 1] = "window " .. (ProfessionsFrame and "ProfessionsFrame" or TradeSkillFrame and "TradeSkillFrame" or "not loaded")
+	return table.concat(parts, ", ")
+end
+
 watcher:SetScript("OnEvent", function(_, event, a, b)
 	if not watching or #watching.events >= 12 then
 		return
@@ -353,7 +386,9 @@ watcher:SetScript("OnEvent", function(_, event, a, b)
 	elseif issecret(text) then
 		text = "(secret)"
 	end
-	watching.events[#watching.events + 1] = event .. (text and (": " .. text:sub(1, 80)) or "")
+	local probe = (event == "TRADE_SKILL_DATA_SOURCE_CHANGED" or event == "TRADE_SKILL_LIST_UPDATE" or event == "TRADE_SKILL_SHOW")
+		and (" (" .. TradeProbe() .. ")") or ""
+	watching.events[#watching.events + 1] = event .. (text and (": " .. text:sub(1, 80)) or "") .. probe
 end)
 
 local function Opened(kind)
