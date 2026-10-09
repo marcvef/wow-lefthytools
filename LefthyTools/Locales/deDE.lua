@@ -277,8 +277,8 @@ L["Blizzard shows only the area of your selected quest. All quests: the areas of
 L["Selected quest"] = "Ausgewählte Quest"
 L["All quests"] = "Alle Quests"
 L["Combo points on your target's nameplate"] = "Combopunkte an der Namensplakette deines Ziels"
-L["A small dot right of your target's level, in the colour of your combo points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."] =
-	"Ein kleiner Punkt rechts neben dem Level deines Ziels, in der Farbe deiner Combopunkte, mit ihrer Anzahl. Nur solange du Punkte darauf hast. Für Schurken und Druiden in Katzengestalt."
+L["A small combo point gem, like the personal resource display's, right of your target's level and a little below it, in the colour of your points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."] =
+	"Ein kleiner Combopunkt wie in der persönlichen Ressourcenanzeige, rechts neben dem Level deines Ziels und etwas darunter, in der Farbe deiner Punkte, mit ihrer Anzahl. Nur solange du Punkte darauf hast. Für Schurken und Druiden in Katzengestalt."
 L["Colour combo points by count"] = "Combopunkte nach Anzahl färben"
 L["Clean-up button on the bags"] = "Aufräumen-Knopf an den Taschen"
 L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, top right of the backpack."] =

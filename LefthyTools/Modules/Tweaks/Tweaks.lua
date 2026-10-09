@@ -595,7 +595,7 @@ function M:BuildOptions(o)
 	o:Checkbox("comboColors", L["Colour combo points by count"],
 		L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."])
 	o:Checkbox("comboNameplate", L["Combo points on your target's nameplate"],
-		L["A small dot right of your target's level, in the colour of your combo points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."])
+		L["A small combo point gem, like the personal resource display's, right of your target's level and a little below it, in the colour of your points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."])
 	o:Header(L["Bags"])
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])

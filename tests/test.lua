@@ -852,7 +852,8 @@ do
 	lefthy("tweaks combocolors on"); Advance(0.05)
 	check(points[1].IconUncharged.desaturated and near(points[1].LefthyToolsBoost, 0.15, 1, 0.15), "on again: 1 point, green")
 
-	-- The dot on my target's nameplate, right of its level: coloured by count, the number at its corner.
+	-- The gem on my target's nameplate, right of its level and a little lower (clear of the buffs): the display's
+	-- look, coloured by count, the number at its corner.
 	MOBS.target = { name = "Hogger", level = 11, x = 0.5, y = 0.5 }
 	COMBO.points = 3
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
@@ -863,22 +864,26 @@ do
 	local plate = MOBS.target.unitFrame
 	local point = dot and dot._points[#dot._points]
 	check(dot and dot:IsShown() and dot:GetParent() == plate and point[1] == "LEFT" and point[2] == plate.PlayerLevelDiffFrame
-		and point[3] == "RIGHT" and tostring(dot.Number:GetText()) == "3" and dot.Body.color[1] == 1 and math.abs(dot.Body.color[2] - 0.9) < 0.01,
-		"3 points: a yellow dot on my target's nameplate, right of its level, with a 3")
+		and point[3] == "RIGHT" and point[5] == -6 and tostring(dot.Number:GetText()) == "3" and near(dot.Boost, 1, 0.9, 0)
+		and dot.Gem.desaturated and dot.Boost.shown,
+		"3 points: a yellow gem on my target's nameplate, right of its level, a little lower, with a 3")
+	check(dot.Gem.atlas == "uf-roguecp-icon-red" and dot.Socket.atlas == "uf-roguecp-bg" and dot.Shadow.atlas == "uf-roguecp-bg-shadow"
+		and dot.Boost.blend == "ADD" and near(dot.Gem, 1, 0.925, 0.25), "in the personal display's look: socket, gem, shadow, the bright copy")
 	Fire("UNIT_POWER_FREQUENT", "player", "ENERGY")
 	plate.PlayerLevelDiffFrame:Hide()
 	COMBO.points = 5
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
 	Advance(0.05)
 	point = dot._points[#dot._points]
-	check(point[2] == plate.HealthBarsContainer and tostring(dot.Number:GetText()) == "5" and math.abs(dot.Body.color[2] - 0.1) < 0.01,
+	check(point[2] == plate.HealthBarsContainer and point[5] == -6 and tostring(dot.Number:GetText()) == "5" and near(dot.Boost, 1, 0.1, 0.05),
 		"no level shown: right of the health bar; 5 points: red")
 	plate.PlayerLevelDiffFrame:Show()
 	lefthy("tweaks combocolors off"); Advance(0.05)
 	COMBO.points = 2
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
 	Advance(0.05)
-	check(dot:IsShown() and math.abs(dot.Body.color[2] - 0.1) < 0.01 and tostring(dot.Number:GetText()) == "2", "colouring off: always red")
+	check(dot:IsShown() and not dot.Gem.desaturated and near(dot.Gem, 1, 1, 1) and not dot.Boost.shown and tostring(dot.Number:GetText()) == "2",
+		"colouring off: Blizzard's red gem")
 	lefthy("tweaks combocolors on"); Advance(0.05)
 	MOBS.target.x = nil -- (its nameplate gone: off screen)
 	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate1")

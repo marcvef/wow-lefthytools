@@ -13,10 +13,11 @@ local _, ns = ...
 --     so the tinted parts are desaturated first; a desaturated red gem is dark grey, so tinting
 --     alone looked muted: an additive copy of each gem in the same colour (our own texture on the
 --     point, its alpha following Blizzard's gem through the animations) keeps it bright.
---   * A dot on your target's nameplate (comboNameplate), right of the mob's level: one round dot
---     in the colour of the count (red with colouring off) and the number small at its corner.
---     Only while you have points on that target. It's our own frame, put on the nameplate (it
---     shows, fades and scales with it) and found again whenever the target or the nameplates change.
+--   * A gem on your target's nameplate (comboNameplate), right of the mob's level and a little
+--     below it (clear of the buffs and debuffs): one gem in the display's own look, tinted like
+--     it (Blizzard's red with colouring off), and the number small at its corner. Only while you
+--     have points on that target. It's our own frame, put on the nameplate (it shows, fades and
+--     scales with it) and found again whenever the target or the nameplates change.
 --
 -- Nothing of Blizzard's is replaced; the only hooks are hooksecurefunc post-hooks. Updates run on
 -- the next frame, never inside an event.
@@ -30,7 +31,8 @@ local GEM_ATLAS = "uf-roguecp-icon-red"
 local FOLLOW_TIME = 1 -- seconds the copies follow Blizzard's gems after a change (its animations are shorter)
 local GREEN, YELLOW, RED = { 0.15, 1, 0.15 }, { 1, 0.9, 0 }, { 1, 0.1, 0.05 }
 local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
-local DOT_SIZE = 10
+local DOT_SIZE = 15  -- the nameplate gem (the display's are 20)
+local DOT_DOWN = -6  -- below the level's middle: clear of the buffs and debuffs above the bar
 local issecret = issecretvalue or function() return false end
 
 local colorByCount = false -- switched by Tweaks.lua (ns.ApplyComboColors), on by default
@@ -167,20 +169,56 @@ end
 -- The dot on your target's nameplate
 ---------------------------------------------------------------------------
 
+-- One gem in the display's look (retail's uf-roguecp-* atlases: a shadow, the lit socket, the gem
+-- and, when coloured, the additive copy that keeps the tint bright), smaller. Without those
+-- atlases: a plain round dot.
 local function BuildDot()
 	dot = CreateFrame("Frame")
 	dot:SetSize(DOT_SIZE, DOT_SIZE)
-	dot.Body = dot:CreateTexture(nil, "ARTWORK")
-	dot.Body:SetAllPoints()
-	local mask = dot:CreateMaskTexture()
-	mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-	mask:SetAllPoints()
-	dot.Body:AddMaskTexture(mask)
-	dot.Number = dot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	dot.Number:SetPoint("BOTTOMLEFT", dot, "TOPRIGHT", -3, -5) -- like a footnote
-	dot.Number:SetTextScale(0.8)
-	dot.Number:SetShadowOffset(1, -1)
+	if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(GEM_ATLAS) then
+		dot.Shadow = dot:CreateTexture(nil, "BACKGROUND", nil, 0)
+		dot.Shadow:SetAtlas("uf-roguecp-bg-shadow")
+		dot.Shadow:SetSize(DOT_SIZE, DOT_SIZE)
+		dot.Shadow:SetPoint("CENTER", 0, -3)
+		dot.Socket = dot:CreateTexture(nil, "BACKGROUND", nil, 2)
+		dot.Socket:SetAtlas("uf-roguecp-bg")
+		dot.Socket:SetAllPoints()
+		dot.Gem = dot:CreateTexture(nil, "ARTWORK", nil, 1)
+		dot.Gem:SetAtlas(GEM_ATLAS)
+		dot.Gem:SetAllPoints()
+		dot.Boost = dot:CreateTexture(nil, "ARTWORK", nil, 2)
+		dot.Boost:SetAtlas(GEM_ATLAS)
+		dot.Boost:SetAllPoints()
+		dot.Boost:SetBlendMode("ADD")
+		dot.Boost:SetDesaturated(true)
+	else
+		dot.Gem = dot:CreateTexture(nil, "ARTWORK")
+		dot.Gem:SetAllPoints()
+		local mask = dot:CreateMaskTexture()
+		mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+		mask:SetAllPoints()
+		dot.Gem:AddMaskTexture(mask)
+		dot.round = true
+	end
+	dot.Number = dot:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+	dot.Number:SetPoint("LEFT", dot, "TOPRIGHT", -3, -2) -- like a footnote
 	dot:Hide()
+end
+
+-- The gem in a colour (r == nil: Blizzard's red), tinted like the display's (Recolor).
+local function StyleDot(r, g, b)
+	if dot.round then
+		dot.Gem:SetColorTexture(r or RED[1], g or RED[2], b or RED[3], 1)
+		return
+	end
+	local tinted = r ~= nil
+	for _, texture in ipairs({ dot.Gem, dot.Socket }) do
+		texture:SetDesaturated(tinted)
+		local lift = tinted and 0.25 or 0
+		texture:SetVertexColor((r or 1) + (1 - (r or 1)) * lift, (g or 1) + (1 - (g or 1)) * lift, (b or 1) + (1 - (b or 1)) * lift)
+	end
+	dot.Boost:SetVertexColor(r or 1, g or 1, b or 1)
+	dot.Boost:SetShown(tinted)
 end
 
 -- The nameplate of your target (its unit frame), if it has one addons may touch.
@@ -214,9 +252,9 @@ local function UpdateDot()
 		end
 		dot:ClearAllPoints()
 		if level and level:IsShown() then
-			dot:SetPoint("LEFT", level, "RIGHT", 3, 0)
+			dot:SetPoint("LEFT", level, "RIGHT", 2, DOT_DOWN)
 		else
-			dot:SetPoint("LEFT", plate.HealthBarsContainer or plate, "RIGHT", 4, 0)
+			dot:SetPoint("LEFT", plate.HealthBarsContainer or plate, "RIGHT", 3, DOT_DOWN)
 		end
 		dot:SetFrameLevel(plate:GetFrameLevel() + 60) -- (over the level frame: 50)
 	end)
@@ -224,11 +262,11 @@ local function UpdateDot()
 		dot:Hide()
 		return
 	end
-	local r, g, b = RED[1], RED[2], RED[3]
 	if colorByCount then
-		r, g, b = CountColor(points, MaxPoints())
+		StyleDot(CountColor(points, MaxPoints()))
+	else
+		StyleDot(nil)
 	end
-	dot.Body:SetColorTexture(r, g, b, 1)
 	dot.Number:SetText(points)
 	dot:Show()
 end
