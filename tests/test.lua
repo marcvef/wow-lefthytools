@@ -691,6 +691,28 @@ lefthy("tweaks resetbags")
 check(ContainerFrameCombinedBags:GetPoint(1) == "BOTTOMRIGHT" and next(TDB.bagPositions) == nil, "/lefthy tweaks resetbags")
 CloseBags()
 
+section("Misc Tweaks: the bags' clean-up button in gamepad mode")
+do
+	check(TDB.gamepadBagSort == true and T("gamepadBagSort"), "on by default, with a checkbox")
+	ContainerFrameCombinedBags:Show()
+	ContainerFrameCombinedBags:UpdateSearchBox()
+	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags,
+		"without gamepad mode: Blizzard's own button, untouched")
+	GAMEPAD_STATE.ui = true
+	ContainerFrameCombinedBags:UpdateSearchBox()
+	local p1, rel, p2, x, y = BagItemAutoSortButton:GetPoint(1)
+	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags and p1 == "TOPRIGHT"
+		and rel == ContainerFrameCombinedBags and x == -9 and y == -34, "gamepad mode (Blizzard hides it): back, top right of the bags")
+	lefthy("tweaks bagsort off"); Advance(0.05)
+	check(TDB.gamepadBagSort == false and not BagItemAutoSortButton:IsShown(), "/lefthy tweaks bagsort off: hidden again, as Blizzard has it")
+	ContainerFrameCombinedBags:UpdateSearchBox()
+	check(not BagItemAutoSortButton:IsShown(), "... and stays so")
+	lefthy("tweaks bagsort on"); Advance(0.05)
+	check(BagItemAutoSortButton:IsShown(), "on again: back at once")
+	GAMEPAD_STATE.ui = false
+	ContainerFrameCombinedBags:Hide()
+end
+
 section("Misc Tweaks: quest progress in party chat")
 check(T("questAnnounce"), "checkbox for quest announcements")
 local function QuestUpdate() Fire("QUEST_LOG_UPDATE"); Advance(0.5) end

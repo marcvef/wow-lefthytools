@@ -30,6 +30,17 @@ A gamepad sort button was tried and dropped: controller mode already has "Clean 
 backpack's menu (`Gamepad_SetupMenuOptions`), and `ContainerFrameMixin:UpdateSearchBox()` hides
 `BagItemAutoSortButton` in gamepad mode, where `GamepadBagBar` covers its spot.
 
+## gamepadBagSort: the bags' clean-up button in gamepad mode
+
+Blizzard's `ContainerFrameMixin:UpdateSearchBox` hides the search box and the clean-up button
+(`BagItemAutoSortButton`) in gamepad mode. Up to 1.60.1.70245 the gamepad bag bar (`GamepadBagBar`,
+shown on the combined bags from that same function) offered clean-up in each bag's menu; 70291
+rebuilt that bar and no longer shows it there, so gamepad players had no way to clean up. A
+`hooksecurefunc` on each bag frame's `UpdateSearchBox` (`ContainerFrames()`: the combined bags
+and every `ContainerFrameN`) shows Blizzard's own button again in gamepad mode, on the backpack or
+the combined bags, where Blizzard puts it without gamepad mode (TOPRIGHT -9, -34). Off: hidden
+again (as Blizzard has it). Blizzard's click handler is untouched (`C_Container.SortBags`).
+
 ## questAnnounce: quest progress in party chat
 
 Modelled on Questie's `Modules/QuestieAnnounce.lua`: an objective is announced only when it goes

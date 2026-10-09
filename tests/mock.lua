@@ -833,6 +833,23 @@ ContainerFrame1:Hide()
 function ContainerFrame1:IsCombinedBagContainer() return false end
 function ContainerFrame1:GetBagID() return 0 end
 ContainerFrameContainer.ContainerFrames = { ContainerFrame1 }
+-- The clean-up button: Blizzard puts it on the backpack (or the combined bags) and hides it in
+-- gamepad mode (ContainerFrameMixin:UpdateSearchBox).
+CreateFrame("Button", "BagItemAutoSortButton", UIParent)
+BagItemAutoSortButton:Hide()
+for _, f in ipairs({ ContainerFrameCombinedBags, ContainerFrame1 }) do
+	function f:IsBackpack() return self == ContainerFrame1 end
+	function f:UpdateSearchBox()
+		if GAMEPAD_STATE.ui then
+			BagItemAutoSortButton:ClearAllPoints()
+			BagItemAutoSortButton:Hide()
+		else
+			BagItemAutoSortButton:SetParent(self)
+			BagItemAutoSortButton:SetPoint("TOPRIGHT", self, "TOPRIGHT", -9, -34)
+			BagItemAutoSortButton:Show()
+		end
+	end
+end
 ANCHOR_CALLS = 0
 function UpdateContainerFrameAnchors()
 	ANCHOR_CALLS = ANCHOR_CALLS + 1

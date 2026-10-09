@@ -280,6 +280,9 @@ L["Combo points on your target's nameplate"] = "Combopunkte an der Namensplakett
 L["A small dot right of your target's level, in the colour of your combo points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."] =
 	"Ein kleiner Punkt rechts neben dem Level deines Ziels, in der Farbe deiner Combopunkte, mit ihrer Anzahl. Nur solange du Punkte darauf hast. Für Schurken und Druiden in Katzengestalt."
 L["Colour combo points by count"] = "Combopunkte nach Anzahl färben"
+L["Clean-up button on the bags in gamepad mode"] = "Aufräumen-Knopf an den Taschen im Gamepad-Modus"
+L["In gamepad mode Blizzard hides the bags' clean-up button, and since Forever's latest patch there's no other way to clean up there. This puts Blizzard's button back, top right of the backpack."] =
+	"Im Gamepad-Modus blendet Blizzard den Aufräumen-Knopf der Taschen aus, und seit dem letzten Forever-Patch gibt es dort keinen anderen Weg zum Aufräumen. Das holt Blizzards Knopf zurück, oben rechts am Rucksack."
 L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
 	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und der Punkt an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."
 

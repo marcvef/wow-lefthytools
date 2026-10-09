@@ -12,6 +12,7 @@ local M = LT:NewModule("tweaks", {
 	defaults = {
 		statusText = true,
 		movableBags = true,
+		gamepadBagSort = true,
 		bagPositions = {},     -- key ("combined" / "bag<id>") -> { left, top } in UIParent units
 		savedStatusText = {},  -- CVar values to restore when statusText is switched off
 		questAnnounce = true,
@@ -276,6 +277,45 @@ function M:ResetBagPositions()
 	end
 end
 
+-- The bags' clean-up button in gamepad mode. Blizzard hides the backpack's clean-up button
+-- (BagItemAutoSortButton) in gamepad mode (ContainerFrameMixin:UpdateSearchBox); its gamepad bag
+-- bar offered clean-up in each bag's menu, but since Forever 1.60.1.70291 that bar doesn't show on
+-- the bags any more, so there was no way to clean up. A post-hook on each bag frame's
+-- UpdateSearchBox puts Blizzard's own button back where it sits without gamepad mode.
+local sortHooked = {}
+
+local function GamepadUI()
+	return InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled()
+end
+
+local function ShowSortButton(frame)
+	local button = BagItemAutoSortButton
+	if not (button and M.enabled and M.db.gamepadBagSort and GamepadUI()) then
+		return
+	end
+	if (frame.IsBackpack and frame:IsBackpack()) or (frame.IsCombinedBagContainer and frame:IsCombinedBagContainer()) then
+		button:SetParent(frame)
+		button:ClearAllPoints()
+		button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -9, -34)
+		button:Show()
+	end
+end
+
+local function ApplyGamepadBagSort(on)
+	for _, frame in ipairs(ContainerFrames()) do
+		if on and frame.UpdateSearchBox and not sortHooked[frame] then
+			sortHooked[frame] = true
+			hooksecurefunc(frame, "UpdateSearchBox", ShowSortButton)
+		end
+		if on and frame:IsShown() then
+			ShowSortButton(frame)
+		end
+	end
+	if not on and BagItemAutoSortButton and GamepadUI() then
+		BagItemAutoSortButton:Hide() -- (as Blizzard has it in gamepad mode)
+	end
+end
+
 ---------------------------------------------------------------------------
 -- 3. Announce quest progress in party chat (like Questie's QuestieAnnounce)
 --
@@ -441,6 +481,7 @@ end
 local TWEAKS = {
 	{ key = "statusText", command = "statustext", label = "Always show health & power values", apply = ApplyStatusText },
 	{ key = "movableBags", command = "bags", label = "Movable bags", apply = ApplyMovableBags },
+	{ key = "gamepadBagSort", command = "bagsort", label = "Clean-up button on the bags in gamepad mode", apply = ApplyGamepadBagSort },
 	{ key = "questAnnounce", command = "quests", label = "Announce quest progress in party chat", apply = ApplyQuestAnnounce },
 	{ key = "comboNameplate", command = "combo", label = "Combo points on your target's nameplate",
 		apply = function(on) ns.ApplyComboNameplate(on) end }, -- ComboPoints.lua
@@ -517,6 +558,8 @@ function M:BuildOptions(o)
 	o:Header(L["Bags"])
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])
+	o:Checkbox("gamepadBagSort", L["Clean-up button on the bags in gamepad mode"],
+		L["In gamepad mode Blizzard hides the bags' clean-up button, and since Forever's latest patch there's no other way to clean up there. This puts Blizzard's button back, top right of the backpack."])
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
@@ -591,7 +634,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | quests | newquests | combo | combocolors | questmap | afk | levelup | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | bagsort | quests | newquests | combo | combocolors | questmap | afk | levelup | flights [on|off] - switch a tweak")
 		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 	end
