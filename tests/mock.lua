@@ -123,6 +123,7 @@ end
 function FrameMethods:SetHeight(h) self:SetSize(self._width, h) end
 function FrameMethods:SetWidth(w) self:SetSize(w, self._height) end
 function FrameMethods:GetWidth() return self._width or 0 end
+function FrameMethods:GetSize() return self._width or 0, self._height or 0 end
 function FrameMethods:GetHeight() return self._height or 0 end
 function FrameMethods:SetFrameLevel(l) self._level = l end
 function FrameMethods:GetFrameLevel() return self._level or 1 end
@@ -233,10 +234,17 @@ local function NewAnimationGroup(owner) -- (an animation without a target animat
 	return g
 end
 function FrameMethods:CreateAnimationGroup() return NewAnimationGroup(self) end
+function FrameMethods:GetRegions() return unpack(self._textures or {}) end
 local function NewTexture()
 	local t = { shown = true, alpha = 1 }
 	function t:SetAllPoints() end
-	function t:SetPoint() end
+	function t:SetPoint(...) self.points = self.points or {}; self.points[#self.points + 1] = { ... } end
+	function t:GetPoint(i) local p = (self.points or {})[i or 1]; if p then return unpack(p) end end
+	function t:GetSize() return self.width or 0, self.height or 0 end
+	function t:GetAtlas() return self.atlas end
+	function t:SetDrawLayer(layer, sub) self.layer, self.sublevel = layer, sub end
+	function t:GetDrawLayer() return self.layer, self.sublevel or 0 end
+	function t:GetObjectType() return "Texture" end
 	function t:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
 	function t:SetTexture(path) self.path = path end
 	function t:AddMaskTexture() end
@@ -1347,7 +1355,16 @@ PersonalResourceDisplayFrame:SetSize(200, 30)
 PersonalResourceDisplayFrame.PowerBar = CreateFrame("StatusBar", nil, PersonalResourceDisplayFrame)
 PersonalResourceDisplayFrame.PowerBar:SetSize(200, 10)
 function PersonalResourceDisplayFrame:GetBarPadding() return 4 end
-COMBO_POINT_PARTS = { "BGShadow", "BGActive", "BGInactive", "BGGlow", "IconUncharged", "FXUncharged", "FrameGlow", "SlashFBUncharged" }
+COMBO_POINT_PARTS = { "BGShadow", "BGActive", "BGInactive", "BGGlow", "IconUncharged", "FXUncharged", "FrameGlow", "SlashFBUncharged", "Border" }
+-- How a point looks (retail's RogueComboPointTemplate as far as known; Border: a part the
+-- nameplate gem must copy although LefthyTools doesn't know it by name).
+COMBO_POINT_LOOK = {
+	BGShadow = { atlas = "uf-roguecp-bg-shadow", layer = "BACKGROUND", sub = 0, y = -4 },
+	BGInactive = { atlas = "uf-roguecp-bg-dis", layer = "BACKGROUND", sub = 1 },
+	BGActive = { atlas = "uf-roguecp-bg", layer = "BACKGROUND", sub = 2 },
+	IconUncharged = { atlas = "uf-roguecp-icon-red", layer = "ARTWORK", sub = 1, w = 16, h = 16 },
+	Border = { atlas = "uf-roguecp-frame", layer = "OVERLAY", sub = 0, w = 24, h = 24 },
+}
 function PersonalResourceDisplayFrame:SetupClassBar()
 	local bar = self.classFrame
 	if not bar then -- (built once, its UpdatePower from the template's mixin)
@@ -1361,7 +1378,16 @@ function PersonalResourceDisplayFrame:SetupClassBar()
 	bar.classResourceButtonTable = {}
 	for i = 1, COMBO.max do
 		local point = CreateFrame("Frame", nil, bar)
-		for _, key in ipairs(COMBO_POINT_PARTS) do point[key] = point:CreateTexture(nil, "ARTWORK") end
+		point:SetSize(20, 20)
+		for _, key in ipairs(COMBO_POINT_PARTS) do
+			local look = COMBO_POINT_LOOK[key] or {}
+			local texture = point:CreateTexture(nil, look.layer or "ARTWORK")
+			texture:SetDrawLayer(look.layer or "ARTWORK", look.sub or 0)
+			texture:SetAtlas(look.atlas or ("uf-roguecp-" .. key:lower()))
+			texture:SetSize(look.w or 20, look.h or 20)
+			texture:SetPoint("CENTER", point, "CENTER", 0, look.y or 0)
+			point[key] = texture
+		end
 		bar.classResourceButtonTable[i] = point
 	end
 	bar:UpdatePower()

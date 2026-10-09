@@ -31,8 +31,8 @@ local GEM_ATLAS = "uf-roguecp-icon-red"
 local FOLLOW_TIME = 1 -- seconds the copies follow Blizzard's gems after a change (its animations are shorter)
 local GREEN, YELLOW, RED = { 0.15, 1, 0.15 }, { 1, 0.9, 0 }, { 1, 0.1, 0.05 }
 local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
-local DOT_SIZE = 15  -- the nameplate gem (the display's are 20)
-local DOT_DOWN = -6  -- below the level's middle: clear of the buffs and debuffs above the bar
+local DOT_SIZE = 12  -- the nameplate gem's default size (the display's are 20); a slider changes it
+local DOT_DOWN = -6  -- default: below the level's middle, clear of the buffs and debuffs above the bar
 local issecret = issecretvalue or function() return false end
 
 local colorByCount = false -- switched by Tweaks.lua (ns.ApplyComboColors), on by default
@@ -169,28 +169,118 @@ end
 -- The dot on your target's nameplate
 ---------------------------------------------------------------------------
 
--- One gem in the display's look (retail's uf-roguecp-* atlases: a shadow, the lit socket, the gem
--- and, when coloured, the additive copy that keeps the tint bright), smaller. Without those
--- atlases: a plain round dot.
+-- One gem in the display's own look. Copied from a point of Blizzard's bar when the display has one
+-- (every base layer it draws: its atlases, layers, sizes and offsets, the socket with its border
+-- included; not the effects, glows and slashes, nor the blue charged gem); otherwise retail's
+-- RogueComboPointTemplate layers below. Sizes and offsets are kept as parts of the point's size, so
+-- the gem scales to the chosen size. Without those atlases at all: a plain round dot.
+local PARTS = {
+	{ key = "BGShadow", atlas = "uf-roguecp-bg-shadow", layer = "BACKGROUND", sub = 0, w = 1, h = 1, x = 0, y = -0.15 },
+	{ key = "BGInactive", atlas = "uf-roguecp-bg-dis", layer = "BACKGROUND", sub = 1, w = 1, h = 1, x = 0, y = 0 },
+	{ key = "BGActive", atlas = "uf-roguecp-bg", layer = "BACKGROUND", sub = 2, w = 1, h = 1, x = 0, y = 0 },
+	{ key = "IconUncharged", atlas = GEM_ATLAS, layer = "ARTWORK", sub = 1, w = 1, h = 1, x = 0, y = 0 },
+}
+local SKIP = { "FX", "Slash", "Glow", "Boost", "LefthyTools", "Charged" }
+
+local function KeyOf(point, region)
+	for key, value in pairs(point) do
+		if value == region and type(key) == "string" then
+			return key
+		end
+	end
+end
+
+local function Skipped(key)
+	for _, word in ipairs(SKIP) do
+		if key:find(word, 1, true) and not (word == "Charged" and key:find("Uncharged", 1, true)) then
+			return true
+		end
+	end
+	return false
+end
+
+-- The base layers of a point on Blizzard's bar, as parts of its size; nil without one.
+local function PartsFromDisplay()
+	local bar = Bar()
+	local point = bar and bar.classResourceButtonTable and bar.classResourceButtonTable[1]
+	if not (point and point.GetRegions) then
+		return nil
+	end
+	local ok, pw, ph = pcall(point.GetSize, point)
+	if not ok or issecret(pw) or issecret(ph) or not pw or pw <= 0 or not ph or ph <= 0 then
+		return nil
+	end
+	local parts = {}
+	for _, region in ipairs({ point:GetRegions() }) do
+		local key = region.GetObjectType and region:GetObjectType() == "Texture" and KeyOf(point, region)
+		local atlas = key and not Skipped(key) and region.GetAtlas and region:GetAtlas()
+		if atlas and not issecret(atlas) then
+			local layer, sub = region:GetDrawLayer()
+			local okSize, w, h = pcall(region.GetSize, region)
+			local anchor, _, _, x, y = region:GetPoint(1)
+			if okSize and not issecret(w) and w and w > 0 and h and h > 0 then
+				local centred = anchor == "CENTER" and not issecret(x)
+				parts[#parts + 1] = { key = key, atlas = atlas, layer = layer or "ARTWORK", sub = sub or 0, w = w / pw, h = h / ph,
+					x = centred and (x or 0) / pw or 0, y = centred and (y or 0) / ph or 0 }
+			end
+		end
+	end
+	return #parts > 0 and parts or nil
+end
+
+-- The gem's textures for a list of parts (reused by key; ones not in the list hidden).
+local function LayDot(parts, fromDisplay)
+	dot.parts = dot.parts or {}
+	for _, texture in pairs(dot.parts) do
+		texture:Hide()
+	end
+	for _, part in ipairs(parts) do
+		local texture = dot.parts[part.key]
+		if not texture then
+			texture = dot:CreateTexture(nil, part.layer, nil, part.sub)
+			dot.parts[part.key] = texture
+		end
+		texture:SetDrawLayer(part.layer, part.sub)
+		texture:SetAtlas(part.atlas)
+		texture.part = part
+		texture:Show()
+	end
+	dot.Gem, dot.Socket = dot.parts.IconUncharged, dot.parts.BGActive
+	if dot.Gem and not dot.Boost then
+		dot.Boost = dot:CreateTexture(nil, "ARTWORK", nil, 7)
+		dot.Boost:SetAtlas(GEM_ATLAS)
+		dot.Boost:SetBlendMode("ADD")
+		dot.Boost:SetDesaturated(true)
+	end
+	dot.fromDisplay = fromDisplay
+end
+
+-- Size and place every part (size: the gem's in pixels).
+local function SizeDot(size)
+	dot:SetSize(size, size)
+	for _, texture in pairs(dot.parts or {}) do
+		local part = texture.part
+		texture:ClearAllPoints()
+		texture:SetSize(size * part.w, size * part.h)
+		texture:SetPoint("CENTER", dot, "CENTER", size * part.x, size * part.y)
+	end
+	if dot.Boost and dot.Gem then
+		dot.Boost:ClearAllPoints()
+		dot.Boost:SetAllPoints(dot.Gem)
+	end
+	if dot.round then
+		dot.Gem:SetAllPoints()
+	end
+end
+
 local function BuildDot()
 	dot = CreateFrame("Frame")
 	dot:SetSize(DOT_SIZE, DOT_SIZE)
-	if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(GEM_ATLAS) then
-		dot.Shadow = dot:CreateTexture(nil, "BACKGROUND", nil, 0)
-		dot.Shadow:SetAtlas("uf-roguecp-bg-shadow")
-		dot.Shadow:SetSize(DOT_SIZE, DOT_SIZE)
-		dot.Shadow:SetPoint("CENTER", 0, -3)
-		dot.Socket = dot:CreateTexture(nil, "BACKGROUND", nil, 2)
-		dot.Socket:SetAtlas("uf-roguecp-bg")
-		dot.Socket:SetAllPoints()
-		dot.Gem = dot:CreateTexture(nil, "ARTWORK", nil, 1)
-		dot.Gem:SetAtlas(GEM_ATLAS)
-		dot.Gem:SetAllPoints()
-		dot.Boost = dot:CreateTexture(nil, "ARTWORK", nil, 2)
-		dot.Boost:SetAtlas(GEM_ATLAS)
-		dot.Boost:SetAllPoints()
-		dot.Boost:SetBlendMode("ADD")
-		dot.Boost:SetDesaturated(true)
+	local fromDisplay = PartsFromDisplay()
+	if fromDisplay then
+		LayDot(fromDisplay, true)
+	elseif C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(GEM_ATLAS) then
+		LayDot(PARTS, false)
 	else
 		dot.Gem = dot:CreateTexture(nil, "ARTWORK")
 		dot.Gem:SetAllPoints()
@@ -201,7 +291,7 @@ local function BuildDot()
 		dot.round = true
 	end
 	dot.Number = dot:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-	dot.Number:SetPoint("LEFT", dot, "TOPRIGHT", -3, -2) -- like a footnote
+	dot.Number:SetPoint("LEFT", dot, "TOPRIGHT", -2, -2) -- like a footnote
 	dot:Hide()
 end
 
@@ -217,8 +307,10 @@ local function StyleDot(r, g, b)
 		local lift = tinted and 0.25 or 0
 		texture:SetVertexColor((r or 1) + (1 - (r or 1)) * lift, (g or 1) + (1 - (g or 1)) * lift, (b or 1) + (1 - (b or 1)) * lift)
 	end
-	dot.Boost:SetVertexColor(r or 1, g or 1, b or 1)
-	dot.Boost:SetShown(tinted)
+	if dot.Boost then
+		dot.Boost:SetVertexColor(r or 1, g or 1, b or 1)
+		dot.Boost:SetShown(tinted)
+	end
 end
 
 -- The nameplate of your target (its unit frame), if it has one addons may touch.
@@ -233,8 +325,20 @@ local function TargetPlate()
 	return plate.UnitFrame
 end
 
+-- Where and how big (Misc Tweaks' sliders): x, y from the spot right of the level, size in pixels.
+local function Placement()
+	local tweaks = ns.LT:GetModule("tweaks")
+	local db = tweaks and tweaks.db or {}
+	return tonumber(db.comboNameplateX) or 2, tonumber(db.comboNameplateY) or DOT_DOWN, tonumber(db.comboNameplateSize) or DOT_SIZE
+end
+
+local previewUntil = 0 -- the sliders moved: shown a while on the target, also without points
+
 local function UpdateDot()
 	local points = onNameplate and CurrentPoints()
+	if points == 0 and onNameplate and GetTime() < previewUntil then
+		points = MaxPoints()
+	end
 	local plate = points and points > 0 and TargetPlate()
 	if not plate then
 		if dot then
@@ -244,7 +348,14 @@ local function UpdateDot()
 	end
 	if not dot then
 		BuildDot()
+	elseif not dot.fromDisplay and not dot.round then
+		local fromDisplay = PartsFromDisplay() -- (the display's bar came after the gem was built)
+		if fromDisplay then
+			LayDot(fromDisplay, true)
+		end
 	end
+	local x, y, size = Placement()
+	SizeDot(size)
 	local level = plate.PlayerLevelDiffFrame
 	local ok = pcall(function()
 		if dot:GetParent() ~= plate then
@@ -252,9 +363,9 @@ local function UpdateDot()
 		end
 		dot:ClearAllPoints()
 		if level and level:IsShown() then
-			dot:SetPoint("LEFT", level, "RIGHT", 2, DOT_DOWN)
+			dot:SetPoint("LEFT", level, "RIGHT", x, y)
 		else
-			dot:SetPoint("LEFT", plate.HealthBarsContainer or plate, "RIGHT", 3, DOT_DOWN)
+			dot:SetPoint("LEFT", plate.HealthBarsContainer or plate, "RIGHT", x + 1, y)
 		end
 		dot:SetFrameLevel(plate:GetFrameLevel() + 60) -- (over the level frame: 50)
 	end)
@@ -329,6 +440,14 @@ function ns.ApplyComboNameplate(on)
 	onNameplate = on
 	Listen()
 	UpdateDot()
+end
+
+-- The position or size sliders moved: the gem shows on your target for a few seconds (full points
+-- if you have none), so you see where it goes.
+function ns.PreviewComboNameplate()
+	previewUntil = GetTime() + 5
+	UpdateDot()
+	C_Timer.After(5.1, UpdateDot)
 end
 
 -- For tests.

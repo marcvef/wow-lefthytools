@@ -290,6 +290,13 @@ L["Clean-up button on the bags"] = "Aufräumen-Knopf an den Taschen"
 L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, at the left of the bags' search box."] =
 	"Seit dem letzten Forever-Patch fehlt der Aufräumen-Knopf der Taschen, mit Maus und Tastatur wie im Gamepad-Modus. Das holt ihn zurück, links neben das Suchfeld der Taschen."
 L["Clean up bags"] = "Taschen aufräumen"
+L["Combo gem: left and right"] = "Combopunkt: links und rechts"
+L["Pixels right of your target's level (negative: to the left). While you move a slider, the gem shows on your target's nameplate for a few seconds."] =
+	"Pixel rechts neben dem Level deines Ziels (negativ: nach links). Während du einen Regler bewegst, zeigt sich der Combopunkt ein paar Sekunden an der Namensplakette deines Ziels."
+L["Combo gem: up and down"] = "Combopunkt: hoch und runter"
+L["Pixels above the middle of your target's level (negative: below)."] = "Pixel über der Mitte des Levels deines Ziels (negativ: darunter)."
+L["Combo gem: size"] = "Combopunkt: Größe"
+L["The gem's size in pixels (the personal resource display's are 20)."] = "Die Größe in Pixeln (in der persönlichen Ressourcenanzeige sind es 20)."
 L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
 	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und der Punkt an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."
 

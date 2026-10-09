@@ -83,18 +83,25 @@ display (the old `comboPoints` tweak) is gone; its saved value is simply no long
   each update (its gain and spend animations are shorter); glows, burst and slash switch to ADD
   while tinted; the plain gem and the lit socket get their tint lifted 25% towards white. At 0
   points the colour stays for the burst. Off: Blizzard's colours and blending back.
-- **Nameplate gem** (`comboNameplate`, on): one gem in the personal display's look, 15 px: the
-  shadow (`uf-roguecp-bg-shadow`, 3 px lower), the lit socket (`uf-roguecp-bg`), the gem
-  (`uf-roguecp-icon-red`) and its additive copy, tinted exactly like the display's (gem and socket
-  desaturated with the count's colour lifted 25% towards white, the copy in the full colour;
-  colouring off: Blizzard's red, no copy). Without those atlases: a round dot in the colour. The
-  number (`NumberFontNormalSmall`) at its top right corner. On the target's nameplate: our own
-  frame, parented to the plate's `UnitFrame` (it shows, fades and scales with it), LEFT to the
-  RIGHT of `PlayerLevelDiffFrame` (Camelot's level box right of the health bars) when that shows,
-  else of `HealthBarsContainer`, 6 px below its middle (the first version sat level with it and
-  its number ran into the buffs and debuffs above the bar), frame level above the level frame
-  (50). Only while there are points; found again on target, nameplate added/removed, combo and
-  power changes (next frame). A forbidden or missing nameplate, or secret points: no gem.
+- **Nameplate gem** (`comboNameplate`, on): one gem in the personal display's look, copied from a
+  point of Blizzard's bar when the display has one (`PartsFromDisplay`: every texture of the point
+  with an atlas, by its key on the point, except effects: keys with FX, Slash, Glow, Charged but not
+  Uncharged; its atlas, draw layer and sublevel, size and CENTER offset kept as parts of the point's
+  size), so the socket with its border looks exactly like the display's; built again from the display
+  once its bar exists if the gem came first. Without a bar: retail's layers (`uf-roguecp-bg-shadow`,
+  `-bg-dis`, `-bg`, `-icon-red`); without those atlases: a round dot. Tinted exactly like the
+  display's (gem and lit socket desaturated with the count's colour lifted 25% towards white, an
+  additive copy of the gem in the full colour; the rest untouched; colouring off: Blizzard's red, no
+  copy). The number (`NumberFontNormalSmall`) at its top right corner. Size and place: sliders
+  `comboNameplateSize` (6-30 px, default 12; the display's are 20), `comboNameplateX` (-60..60,
+  default 2) and `comboNameplateY` (-40..40, default -6: below the level's middle, clear of the
+  buffs and debuffs above the bar), from LEFT at the RIGHT of `PlayerLevelDiffFrame` (Camelot's level
+  box right of the health bars) when that shows, else of `HealthBarsContainer`. Moving a slider
+  shows the gem on the target for 5 s (full points if there are none: `ns.PreviewComboNameplate`).
+  Our own frame, parented to the plate's `UnitFrame` (it shows, fades and scales with it), frame
+  level above the level frame (50). Only while there are points; found again on target, nameplate
+  added/removed, combo and power changes (next frame). A forbidden or missing nameplate, or secret
+  points: no gem.
 
 ## foreverQuests: mark quests that are new in WoW: Forever (ForeverQuests.lua)
 

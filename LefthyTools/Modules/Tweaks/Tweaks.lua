@@ -17,6 +17,9 @@ local M = LT:NewModule("tweaks", {
 		savedStatusText = {},  -- CVar values to restore when statusText is switched off
 		questAnnounce = true,
 		comboNameplate = true, -- (comboPoints, our own row under the personal resource display, is gone: Blizzard has its own now)
+		comboNameplateX = 2,   -- the gem: pixels right of the target's level ...
+		comboNameplateY = -6,  -- ... up (below its middle by default: clear of the buffs and debuffs)
+		comboNameplateSize = 12, -- and its size in pixels (the display's gems are 20)
 		comboColors = true,
 		foreverQuests = true,
 		questMap = true,       -- QuestMap.lua
@@ -609,9 +612,16 @@ function M:OnDisable()
 	RequestReconcile()
 end
 
+local lastPlacement
 function M:OnSettingChanged()
 	RequestReconcile()
 	ns.RefreshQuestMap() -- what each zoom level shows
+	-- The combo gem's sliders: show it on the target for a moment, wherever it now goes.
+	local placement = ("%s,%s,%s"):format(self.db.comboNameplateX, self.db.comboNameplateY, self.db.comboNameplateSize)
+	if lastPlacement and placement ~= lastPlacement and active.comboNameplate and ns.PreviewComboNameplate then
+		ns.PreviewComboNameplate()
+	end
+	lastPlacement = placement
 end
 
 function M:IsTweakActive(key)
@@ -630,6 +640,14 @@ function M:BuildOptions(o)
 		L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."])
 	o:Checkbox("comboNameplate", L["Combo points on your target's nameplate"],
 		L["A small combo point gem, like the personal resource display's, right of your target's level and a little below it, in the colour of your points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."])
+	local function Pixels(v) return ("%d px"):format(math.floor((tonumber(v) or 0) + 0.5)) end
+	o:Slider("comboNameplateX", L["Combo gem: left and right"],
+		L["Pixels right of your target's level (negative: to the left). While you move a slider, the gem shows on your target's nameplate for a few seconds."],
+		-60, 60, 1, Pixels)
+	o:Slider("comboNameplateY", L["Combo gem: up and down"],
+		L["Pixels above the middle of your target's level (negative: below)."], -40, 40, 1, Pixels)
+	o:Slider("comboNameplateSize", L["Combo gem: size"], L["The gem's size in pixels (the personal resource display's are 20)."],
+		6, 30, 1, Pixels)
 	o:Header(L["Bags"])
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])

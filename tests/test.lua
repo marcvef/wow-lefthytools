@@ -913,8 +913,37 @@ do
 		and point[3] == "RIGHT" and point[5] == -6 and tostring(dot.Number:GetText()) == "3" and near(dot.Boost, 1, 0.9, 0)
 		and dot.Gem.desaturated and dot.Boost.shown,
 		"3 points: a yellow gem on my target's nameplate, right of its level, a little lower, with a 3")
-	check(dot.Gem.atlas == "uf-roguecp-icon-red" and dot.Socket.atlas == "uf-roguecp-bg" and dot.Shadow.atlas == "uf-roguecp-bg-shadow"
-		and dot.Boost.blend == "ADD" and near(dot.Gem, 1, 0.925, 0.25), "in the personal display's look: socket, gem, shadow, the bright copy")
+	local parts = dot.parts
+	check(dot.fromDisplay and parts.Border and parts.Border.atlas == "uf-roguecp-frame" and parts.Border.shown
+		and parts.BGInactive.atlas == "uf-roguecp-bg-dis" and parts.BGShadow.atlas == "uf-roguecp-bg-shadow"
+		and dot.Gem.atlas == "uf-roguecp-icon-red" and dot.Socket.atlas == "uf-roguecp-bg"
+		and not parts.FXUncharged and not parts.BGGlow and not parts.SlashFBUncharged and not parts.FrameGlow,
+		"copied from a point of the personal display: every base layer, the border too (not its effects)")
+	check(dot.Boost.blend == "ADD" and near(dot.Gem, 1, 0.925, 0.25) and not parts.BGInactive.desaturated and parts.Border.vertex == nil,
+		"tinted like the display: the gem and lit socket, a bright copy; the empty socket and border keep their look")
+	check(dot:GetWidth() == 12 and math.abs(dot.Gem.width - 12 * 16 / 20) < 0.01 and point[4] == 2,
+		"smaller: 12 px, each part in proportion; 2 px right of the level")
+	-- Its place and size: three sliders, and a preview on the target while they move.
+	T("comboNameplateX"):SetValue(10)
+	T("comboNameplateY"):SetValue(4)
+	T("comboNameplateSize"):SetValue(20)
+	Advance(0.05)
+	point = dot._points[#dot._points]
+	check(TDB.comboNameplateSize == 20 and point[4] == 10 and point[5] == 4 and dot:GetWidth() == 20 and math.abs(dot.Gem.width - 16) < 0.01,
+		"the sliders: 10 right, 4 up, 20 px")
+	COMBO.points = 0
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	T("comboNameplateX"):SetValue(11)
+	Advance(0.05)
+	check(dot:IsShown() and tostring(dot.Number:GetText()) == "5", "moving a slider without points: the gem shows a moment (full points), to see where")
+	Advance(5.2)
+	check(not dot:IsShown(), "then it goes")
+	T("comboNameplateX"):SetValue(2)
+	T("comboNameplateY"):SetValue(-6)
+	T("comboNameplateSize"):SetValue(12)
+	COMBO.points = 3
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	Advance(5.3)
 	Fire("UNIT_POWER_FREQUENT", "player", "ENERGY")
 	plate.PlayerLevelDiffFrame:Hide()
 	COMBO.points = 5
@@ -1380,7 +1409,7 @@ Advance(1.2)
 check((last(GameDataTo(11, mark)) or ""):find("^S2;;;;;") ~= nil, "in a dungeon: no position")
 mark = #GAMEDATA + 1
 Advance(12)
-check(#GameDataTo(11, mark) == 0, "and nothing more while inside")
+check(#sentTo(11, mark, "S2;") == 0, "and no more states while inside") -- (a journal summary may still go)
 STATE.inInstance = false
 Fire("ZONE_CHANGED_NEW_AREA")
 Advance(1.2)
