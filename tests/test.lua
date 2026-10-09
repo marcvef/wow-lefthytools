@@ -3199,6 +3199,28 @@ do
 			left.mob.sure, right.tx, right.mob.sure))
 	MOBS, FACING = {}, 0
 	Advance(9)
+
+	-- In combat the game keeps my target's nameplate at the screen's edge while it's behind me, so
+	-- then its nameplate says nothing; my own casts do (a spell that went off: in front; "Target
+	-- needs to be in front of you": behind).
+	math.randomseed(11)
+	local hn, hw = UnitPosition("player")
+	MOBS.nameplate1 = { name = "Hyena", level = 26, guid = "Creature-0-hyena", north = hn - 15, west = hw, pinned = true,
+		combat = true, attacking = true }
+	MOBS.target, STATE.target, STATE.combat = MOBS.nameplate1, true, true
+	Advance(0.6)
+	local hyena = dot("Hyena")
+	check(hyena and hyena.mob.target and hyena.mob.sure < 0.5, "my target behind me, its nameplate kept on screen in combat: not put in front")
+	SPELL_FAILED_UNIT_NOT_INFRONT = "Target needs to be in front of you."
+	Fire("UI_ERROR_MESSAGE", 50, SPELL_FAILED_UNIT_NOT_INFRONT)
+	Advance(1)
+	check(hyena.ty < 0, "\"Target needs to be in front of you\": behind me, got " .. hyena.ty)
+	FACING = math.pi -- turned around to face it
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-1", 2764)
+	Advance(1)
+	check(hyena.ty > 0, "turned around, a spell cast at it: in front, got " .. hyena.ty)
+	MOBS, FACING, STATE.target, STATE.combat = {}, 0, false, false
+	Advance(9)
 	MOBS = {
 		nameplate2 = { name = "Defias Pillager", level = 16, class = "elite", combat = true, casting = "Fireball", yards = 25, x = 0.25, y = 0.6 },
 		nameplate3 = { name = "Gnoll", level = 14, yards = 35 },
@@ -4097,7 +4119,9 @@ do
 		anna("H2")
 		Advance(3.2)
 		local sent = sentTo(11, again, "D2;")
-		check(#sent == 1 and sent[1]:find("^D2;20300515;") and #sentTo(11, again, "K2;") == 1,
+		local onlyToday = #sent >= 1
+		for _, m in ipairs(sent) do onlyToday = onlyToday and m:find("^D2;20300515;") ~= nil end -- (today's regular share may come too)
+		check(onlyToday and #sentTo(11, again, "K2;") >= 1,
 			"a friend back within 10 minutes: only today, not the whole week again, got " .. table.concat(sent, " | "))
 		while #feed > feedWas do table.remove(feed) end -- (her offline and online lines: the later checks count on her news)
 	end

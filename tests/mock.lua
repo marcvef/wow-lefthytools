@@ -1480,7 +1480,7 @@ local baseUnit = { UnitExists = UnitExists, UnitName = UnitName, UnitLevel = Uni
 	UnitGUID = UnitGUID }
 function UnitExists(u)
 	if u == "softenemy" then return SoftEnemy() ~= nil end
-	if MOBS[u] then return u == "target" or select(2, Placed(MOBS[u])) end
+	if MOBS[u] then return u == "target" or MOBS[u].pinned or select(2, Placed(MOBS[u])) end -- (pinned: kept on screen in combat)
 	return baseUnit.UnitExists(u)
 end
 function UnitName(u) if MOBS[u] then return MOBS[u].name end return baseUnit.UnitName(u) end

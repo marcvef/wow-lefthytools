@@ -511,8 +511,8 @@ local function Report()
 		("%s, %d s: %d looks, %d of them in combat; up to %d nameplates at once"):format(c.at,
 			math.floor(GetTime() - test.started + 0.5), test.looks.combat + test.looks.calm, test.looks.combat, test.most),
 		("Settings: enemy nameplates %s, nameplate distance %s, camera field of view %s"):format(c.plates, c.distance, c.fov),
-		("Soft targeting: enemy %s, arc %s, range %s, gamepad mode %s; nameplate scale %s to %s (from %s to %s yd), target %s")
-			:format(c.soft, c.softArc, c.softRange, c.gamepad, c.maxScale, c.minScale, c.maxScaleAt, c.minScaleAt, c.targetScale),
+		("Soft targeting: enemy %s, arc %s, range %s, gamepad mode %s; nameplate scale %s to %s (from %s to %s yd), target %s; target nameplate kept on screen in combat %s")
+			:format(c.soft, c.softArc, c.softRange, c.gamepad, c.maxScale, c.minScale, c.maxScaleAt, c.minScaleAt, c.targetScale, c.radial),
 		"",
 		"Answers in combat | out of combat (value = something readable, nil = nothing, hidden = secret):",
 	}
@@ -617,7 +617,8 @@ local function StartTest()
 			gamepad = tostring(InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() or false),
 			maxScale = tostring(GetCVar("nameplateMaxScale")), minScale = tostring(GetCVar("nameplateMinScale")),
 			maxScaleAt = tostring(GetCVar("nameplateMaxScaleDistance")), minScaleAt = tostring(GetCVar("nameplateMinScaleDistance")),
-			targetScale = tostring(GetCVar("nameplateSelectedScale")) } }
+			targetScale = tostring(GetCVar("nameplateSelectedScale")),
+			radial = tostring(GetCVar("nameplateTargetRadialPosition")) } }
 	testDriver:SetScript("OnUpdate", TestUpdate)
 	M:Print(("fight stream test: %d s of notes on what the game tells addons about the mobs around you. Fight a few"
 		.. " mobs; once, turn your camera away from your target for a few seconds. /lefthy stream test again stops it early.")
@@ -782,7 +783,9 @@ end
 
 local SPOTS = 48
 local VIEW = math.rad(50)   -- the camera's view, either side of where you face, with some slack
-local SOFT = math.rad(30)   -- the soft target's arc, either side, with some slack
+local SOFT_ARCS = { [0] = math.rad(15), [1] = math.rad(35) } -- SoftTargetEnemyArc: 0 narrow, 1 front, 2 anywhere
+local FRONT = math.rad(110) -- a spell you cast at it needs it in front (180 degrees), with slack
+local HINT_TIME = 1.5       -- seconds a cast (or "not in front") still counts
 local SLACK = 2             -- yards
 local FAR = 60              -- yards: further than anything is looked at
 local DRIFT = 1             -- yards a place may wander per look
@@ -790,6 +793,10 @@ local CHASE = 3             -- yards a mob attacking you comes closer per look, 
 local REMEMBER = 8          -- seconds a mob that left your screen stays, fading
 local MIN_KEPT = 6          -- fewer places still fit: start over
 local plateReach = 40       -- nameplateMaxDistance, read when the window opens
+local soft                  -- the soft target's arc (nil: wide, tells nothing), read when the window opens
+local pinned = 1            -- nameplateTargetRadialPosition: in combat, 1 keeps your target's nameplate
+                            -- on screen (at its edge) when it's behind you, 2 every mob's in combat
+local hint                  -- { side = "front" or "back", at }: from your own casts at your target
 local atan2 = math.atan2 or math.atan -- (Lua 5.1 / 5.3)
 local clouds = {}           -- mob key -> { north = {}, west = {}, seenAt, info (the mob as last seen) }
 local here = {}             -- this look: north, west, cos, sin (of your facing), facing
@@ -818,9 +825,13 @@ local function Fits(x, y, lo, hi, side)
 	end
 	local off = math.abs(atan2(x, y)) -- 0 straight ahead, pi behind
 	if side == "soft" then
-		return off <= SOFT
+		return off <= soft
 	elseif side == "view" then
 		return off <= VIEW
+	elseif side == "front" then
+		return off <= FRONT
+	elseif side == "back" then
+		return off >= math.pi - FRONT
 	end
 	return off >= VIEW * 0.8 -- "away"
 end
@@ -830,9 +841,13 @@ local function Seed(cloud, i, lo, hi, side)
 	local d = lo + math.random() * (hi - lo)
 	local a
 	if side == "soft" then
-		a = (math.random() * 2 - 1) * SOFT
+		a = (math.random() * 2 - 1) * soft
 	elseif side == "view" then
 		a = (math.random() * 2 - 1) * VIEW
+	elseif side == "front" then
+		a = (math.random() * 2 - 1) * FRONT
+	elseif side == "back" then
+		a = math.pi + (math.random() * 2 - 1) * FRONT
 	elseif side == "away" then
 		a = VIEW + math.random() * (2 * math.pi - 2 * VIEW)
 	else
@@ -904,8 +919,29 @@ local function Here()
 	end
 	local facing = Value("GetPlayerFacing")
 	here.north, here.west, here.facing = north, west, facing
+	here.combat, here.now = Value("UnitAffectingCombat", "player") == true, GetTime()
 	here.cos, here.sin = math.cos(facing or 0), math.sin(facing or 0)
 end
+
+-- Your own casts at your target tell where it is: a harmful spell that went off needed it in front
+-- of you; "Target needs to be in front of you" (or facing the wrong way) means it's behind. Only
+-- listened to while the window shows your surroundings.
+local castWatch = CreateFrame("Frame")
+castWatch:SetScript("OnEvent", function(_, event, a, b, c)
+	local side
+	if event == "UNIT_SPELLCAST_SUCCEEDED" then -- unit, castGUID, spellID
+		if a == "player" and not issecret(c) and c and Value("C_Spell.IsSpellHarmful", c)
+			and Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target") then
+			side = "front"
+		end
+	elseif not issecret(b) and b and (b == SPELL_FAILED_UNIT_NOT_INFRONT or b == ERR_BADATTACKFACING) then
+		side = "back" -- UI_ERROR_MESSAGE: errorType, message
+	end
+	if side then
+		hint = hint or {}
+		hint.side, hint.at = side, GetTime()
+	end
+end)
 
 -- A mob seen now: its cloud learns, and it gets its direction and how sure that is.
 local function LearnSeen(mob, now)
@@ -916,17 +952,24 @@ local function LearnSeen(mob, now)
 	end
 	cloud.seenAt = now
 	local lo, hi = Band(mob.near, mob.far, mob.onScreen)
+	-- In combat the game may keep a nameplate at the screen's edge while its mob is behind you (your
+	-- target, or every mob in combat: nameplateTargetRadialPosition), so then it says nothing.
+	local pinnedNow = here.combat and (mob.target and pinned >= 1 or mob.combat and pinned >= 2)
 	local side
-	if mob.soft then
+	if mob.soft and soft then
 		side = "soft"
-	elseif mob.onScreen then
+	elseif mob.onScreen and not pinnedNow then
 		side = "view"
-	elseif mob.yards and not mob.beyond and mob.yards < plateReach then
+	elseif mob.target and hint and here.now - hint.at <= HINT_TIME then
+		side = hint.side -- (a spell you just cast at it: in front; "not in front": behind)
+	elseif not mob.onScreen and mob.yards and not mob.beyond and mob.yards < plateReach then
 		side = "away" -- (your target, without a nameplate though near: you turned away from it)
 	end
 	if #cloud.north == 0 then
+		-- (a far target without a nameplate: most likely where you look; a pinned one: anywhere)
+		local seed = side or (not mob.onScreen and mob.beyond and "view") or nil
 		for i = 1, SPOTS do
-			Seed(cloud, i, lo, hi, side or "view") -- (a far target: most likely where you look)
+			Seed(cloud, i, lo, hi, seed)
 		end
 	end
 	Learn(cloud, lo, hi, side, mob.attacking)
@@ -1191,6 +1234,7 @@ local function Build()
 		ReleaseAll()
 		wipe(mobs)
 		wipe(clouds)
+		castWatch:UnregisterAllEvents()
 		GameTooltip:Hide()
 	end)
 	win:Hide()
@@ -1291,9 +1335,14 @@ local function OpenWindow(newMode)
 		name, classFile = PREVIEW_FRIEND, PREVIEW_CLASS
 		win.Where:SetText(L["Westfall"])
 		win.Live.Text:SetText(L["DEMO"])
+		castWatch:UnregisterAllEvents()
 	else
 		checks, plateReach = RangeChecks(), tonumber(GetCVar("nameplateMaxDistance")) or 40
 		wipe(clouds)
+		soft = GetCVar("SoftTargetEnemy") == "1" and SOFT_ARCS[tonumber(GetCVar("SoftTargetEnemyArc"))] or nil
+		pinned, hint = tonumber(GetCVar("nameplateTargetRadialPosition")) or 1, nil
+		castWatch:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+		castWatch:RegisterEvent("UI_ERROR_MESSAGE")
 		name = UnitName("player")
 		local _, file = UnitClass("player")
 		classFile = file

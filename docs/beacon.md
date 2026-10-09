@@ -518,7 +518,16 @@ checks answer for hostile units in combat, and where nameplates are on the scree
   the cloud starts over. The dot sits at the cloud's middle; how sure (how closely its places point
   one way: spread over the whole view is unsure, within about 15 degrees is sure) sets how solid it
   is. Mobs that left the screen stay 8 s, fading, outside the view. A new target beyond nameplate
-  range starts where you look. A line says "Move and turn: faint dots find their place." The
+  range starts where you look. Fifth test (mouse and keyboard): in combat your target always had a
+  nameplate, also while behind you, so in combat the game keeps the target's nameplate at the
+  screen's edge (`nameplateTargetRadialPosition`: 1 the target, 2 every mob in combat); then its
+  nameplate says nothing, and a new pinned target starts spread all around. The soft target's arc
+  comes from `SoftTargetEnemyArc` (0 narrow: 15 degrees, 1: 35, 2 wide: tells nothing; mouse and
+  keyboard had 2). Your own casts help with your target: a harmful spell that went off
+  (`UNIT_SPELLCAST_SUCCEEDED`) needs it in front (within 110 degrees), "Target needs to be in
+  front of you" / "You are facing the wrong way!" (`UI_ERROR_MESSAGE`) means behind; each counts
+  for 1.5 s (listened to only while the window shows you). Nameplate size doesn't tell distance
+  (others 0.600, your target about 0.900). A line says "Move and turn: faint dots find their place." The
   camera is assumed to look where the character faces (true while moving; turning the camera alone
   misleads it until the cloud starts over). In an instance, without your place, it learns by
   turning only.
