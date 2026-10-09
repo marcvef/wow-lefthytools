@@ -652,6 +652,7 @@ end)
 local shared
 function B.StreamStart()
 	shared = M.db.streamShare and true or false
+	C_Timer.After(0, function() S.UpdateButton() end) -- (StreamButton.lua: the minimap button)
 end
 
 -- A setting changed: friends hear whether they can watch me; not sharing any more drops my watchers.
@@ -666,6 +667,7 @@ function B.StreamSettingChanged()
 		WatchersChanged()
 	end
 	UpdateIndicator()
+	S.UpdateButton()
 end
 
 -- Beacon switched off: every stream closes, nobody watches me any more.
@@ -679,6 +681,7 @@ function B.StreamStop()
 	UpdateIndicator()
 	ticker:Hide()
 	shared = nil
+	S.UpdateButton()
 end
 
 -- For tests.

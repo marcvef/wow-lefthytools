@@ -3583,6 +3583,31 @@ do
 	check(BB.StreamFlightStart() == nil and not S.IsWatching(11) and not S.IsWatching(12), "setting off: no stream on flights")
 	B("streamFlights"):SetValue(true)
 
+	-- The minimap button: a click lists the friends who share; picking one opens their stream.
+	Advance(0.1)
+	local sb = S.Button()
+	check(BDB.streamButton == true and sb and sb:IsShown() and sb:GetParent() == Minimap and not sb.Live:IsShown(),
+		"a spyglass on the minimap's edge")
+	sb._scripts.OnClick(sb, "LeftButton")
+	local rows = sb.List.rows
+	check(sb.List:IsShown() and rows[1].Text:GetText():find("Stream", 1, true) and rows[2].Text:GetText():find("Anna", 1, true)
+		and rows[3].Text:GetText():find("Bob", 1, true) and rows[5].Text:GetText() == "Your own stream" and not (rows[6] and rows[6]:IsShown()),
+		"click: Stream, the friends who share, your own stream")
+	rows[2]:Click()
+	check(S.IsWatching(11) and sb.Live:IsShown() and not sb.List:IsShown(), "picked: her stream opens, a red dot on the button")
+	sb._scripts.OnClick(sb, "LeftButton")
+	check(rows[2].Check:IsShown() and not rows[3].Check:IsShown() and rows[6]:IsShown() and rows[6].Text:GetText() == "Close all streams",
+		"open again: she's ticked, and all can be closed")
+	rows[6]:Click()
+	check(not S.IsWatching(11) and not sb.Live:IsShown(), "closed")
+	sb._scripts.OnEnter(sb)
+	check(TOOLTIP.title == "Fight stream" and tooltipHas("Click: watch a friend's fight"), "hover: what it does")
+	sb._scripts.OnLeave(sb)
+	B("streamButton"):SetValue(false)
+	check(not sb:IsShown(), "setting off: gone")
+	B("streamButton"):SetValue(true)
+	check(sb:IsShown(), "on again")
+
 	-- She goes offline while I watch her.
 	S.OpenFriend(11, "command")
 	pmark = #PRINTED + 1

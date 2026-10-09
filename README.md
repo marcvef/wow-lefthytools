@@ -164,7 +164,8 @@ minimap, and you on theirs, without being in a group.
 - **Fight stream:** watch a friend's fight live, in a small window: them in the middle on the
   map of the place, the mobs around them (how far, which way, who attacks them, who casts), what
   they're casting, their mana or rage. **Click a friend's dot on the world map** (again to close),
-  or `/lefthy stream watch <name>`. On a cinematic flight one friend's fight opens by itself (the
+  or `/lefthy stream watch <name>`, or click the **spyglass on the minimap**: it lists the friends
+  who share their fights, pick one. On a cinematic flight one friend's fight opens by itself (the
   one fighting), and the top bar has a Watch button next to each friend. Drag the window's corner
   to resize it. While friends watch you, a tiny red dot with their number sits right of the
   calendar button at the minimap. `/lefthy stream me` shows what they see; the game tells addons
@@ -222,6 +223,7 @@ minimap, and you on theirs, without being in a group.
 | Show when friends watch me | on | |
 | Friends' fights on flights | on | |
 | Click a friend on the world map to watch | on | `/lefthy stream watch <name>`, `stop [<name>]` |
+| Minimap button for fight streams (drag it along the edge) | on | |
 | Stream window: **Preview** | | `/lefthy stream preview` |
 
 `/lefthy beacon status` lists friends with LefthyTools online, their LefthyTools version,

@@ -15,7 +15,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Locales/deDE.lua           German settings texts (loaded only on a deDE client)
   Core/Core.lua              module registry, saved settings, enable/disable lifecycle
   Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons,
-                             and our own dropdown (AddPicker)
+                             our own popup list and dropdown (PopupList, AddPicker), minimap
+                             buttons (MinimapButton)
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
   Core/WhatsNew.lua          what's-new window after an update, /lefthy news (entries: Data/Changelog.lua)
   Core/Options.lua           settings panel (overview + one page per module), option builder, /lefthy
@@ -35,6 +36,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Data/ForeverQuests.lua     generated list of those quests (tools/update-forever-quests.ps1)
   Data/FlightPaths.lua       generated length of every flight path (tools/update-flight-paths.ps1)
   Data/ClassSpells.lua       generated trainer spells per class and level (tools/update-class-spells.js)
+  Data/MinimapTiles.lua      generated minimap tile file IDs (tools/update-minimap-tiles.js)
   Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
@@ -44,6 +46,11 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Handover.lua  tooltip reminder for won items until traded or mailed
   Modules/Beacon/Chat.lua    Lefthy chat (/l) and announcements (/lefthy announce)
   Modules/Beacon/Reports.lua error reports to friends who collect them (/lefthy report, /lefthy reports)
+  Modules/Beacon/Stream.lua  fight stream: asking the game, the test, /lefthy stream
+  Modules/Beacon/StreamSense.lua  fight stream: what's around you (learning mob directions)
+  Modules/Beacon/StreamView.lua   fight stream windows (yours, the preview, friends')
+  Modules/Beacon/StreamNet.lua    fight stream between friends (kind O), the being-watched dot
+  Modules/Beacon/StreamButton.lua the spyglass minimap button: friends to watch
   Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
   Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, sharing, /chronicle
   Modules/Chronicle/Graphs.lua     the Graphs page: pooled canvas (bars, lines, text) and its cards

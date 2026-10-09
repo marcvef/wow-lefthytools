@@ -94,7 +94,8 @@ forgotten (went offline, silent for 65 s, or switched Beacon off).
 minimap button.
 
 **Minimap button** (`MinimapButton.lua`, setting `minimapButton`, on by default; `/chronicle
-minimap` switches it): a child of `Minimap` (so it hides and fades with it) in the usual addon
+minimap` switches it), made by `LT.Window.MinimapButton` (Core/Window.lua, shared with Beacon's
+stream button): a child of `Minimap` (so it hides and fades with it) in the usual addon
 look (`MiniMap-TrackingBorder`, `UI-Minimap-Background`, a book icon), `Minimap:GetWidth() / 2 + 5`
 from the centre at the saved `minimapAngle` (degrees, 210 = lower left; square minimaps: on the
 square's edge). Click toggles the journal, right-click opens the settings, the tooltip shows this

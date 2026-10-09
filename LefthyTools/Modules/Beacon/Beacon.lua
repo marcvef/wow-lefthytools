@@ -145,6 +145,8 @@ local M = LT:NewModule("beacon", {
 		streamWatchedDot = true, -- a small red dot by the minimap while someone watches
 		streamFlights = true, -- a cinematic flight opens a friend's stream
 		streamMapClick = true, -- clicking a friend's world map dot opens their stream
+		streamButton = true,  -- StreamButton.lua: a minimap button listing friends to watch
+		streamButtonAngle = 235, -- degrees, 0 = right, counter-clockwise: below Chronicle's book
 	},
 })
 
@@ -1427,6 +1429,8 @@ function M:BuildOptions(o)
 		L["A cinematic flight (Misc Tweaks) opens the stream of one friend who is fighting (or anyone, if nobody is). The top bar has a button for each friend to open or close theirs; they close when you land."])
 	o:Checkbox("streamMapClick", L["Click a friend on the world map to watch"],
 		L["Clicking a friend's dot on the world map opens their stream; clicking it again closes it. /lefthy stream watch <name> does the same."])
+	o:Checkbox("streamButton", L["Minimap button for fight streams"],
+		L["A spyglass on the edge of the minimap: click it for the friends who share their fights, and pick one to watch (or close their stream). A red dot on it while you watch someone. Drag it to move it."])
 	o:Button(L["Your own stream"], L["Show"], function() B.StreamCommand("me") end,
 		L["What friends see when they watch you, live. /lefthy stream me does the same."])
 	o:Button(L["Stream window"], L["Preview"], function() B.StreamCommand("preview") end,

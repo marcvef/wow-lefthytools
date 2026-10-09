@@ -4,38 +4,12 @@ local L = ns.L
 local C = ns.Chronicle
 local M = C.module
 
--- Chronicle's minimap button: a round button on the minimap's edge in the usual addon look
--- (tracking border, dark background, a book). Click opens or closes the journal, right-click
--- opens Chronicle's settings, dragging moves it along the edge (the angle is saved). It's a child
--- of the Minimap, so it hides and fades with it (Mirage). An OnUpdate runs only while dragging.
+-- Chronicle's minimap button (Core/Window.lua's LT.Window.MinimapButton: the usual addon look, a
+-- child of the Minimap, dragged along its edge): a book. Click opens or closes the journal,
+-- right-click opens Chronicle's settings; the tooltip shows this session.
 
 local ICON = "Interface\\Icons\\INV_Misc_Book_09"
-local atan2 = math.atan2 or math.atan -- WoW's Lua 5.1 / the tests' Lua 5.3
 local button
-
-local function Place()
-	local angle = math.rad(M.db.minimapAngle or 210)
-	local x, y = math.cos(angle), math.sin(angle)
-	if GetMinimapShape and GetMinimapShape() == "SQUARE" then
-		local edge = math.max(math.abs(x), math.abs(y))
-		x, y = x / edge, y / edge -- onto the square's edge
-	end
-	local radius = Minimap:GetWidth() / 2 + 5
-	button:ClearAllPoints()
-	button:SetPoint("CENTER", Minimap, "CENTER", x * radius, y * radius)
-end
-
--- Degrees from the minimap's centre to the cursor: 0 = right, counter-clockwise.
-local function OnDragUpdate()
-	local mx, my = Minimap:GetCenter()
-	if not mx then
-		return
-	end
-	local scale = Minimap:GetEffectiveScale()
-	local cx, cy = GetCursorPosition()
-	M.db.minimapAngle = math.floor(math.deg(atan2(cy / scale - my, cx / scale - mx)) % 360 + 0.5)
-	Place()
-end
 
 local function OnEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
@@ -44,20 +18,17 @@ local function OnEnter(self)
 	if session then
 		GameTooltip:AddLine(session, 1, 1, 1, true)
 	end
+	local news = C.UnseenCount and C.UnseenCount() or 0
+	if news > 0 then
+		GameTooltip:AddLine(L["%d new from friends"]:format(news), 0.5, 0.8, 1)
+	end
 	GameTooltip:AddLine(L["Click: open or close the journal"], 0.8, 0.8, 0.8)
 	GameTooltip:AddLine(L["Right-click: settings"], 0.8, 0.8, 0.8)
 	GameTooltip:AddLine(L["Drag: move it along the minimap"], 0.8, 0.8, 0.8)
 	GameTooltip:Show()
 end
 
-local function OnLeave(self)
-	if GameTooltip:IsOwned(self) then
-		GameTooltip:Hide()
-	end
-end
-
-local function OnClick(self, mouseButton)
-	OnLeave(self)
+local function OnClick(_, mouseButton)
 	if mouseButton == "RightButton" then
 		LT:OpenSettings(M)
 	else
@@ -65,52 +36,33 @@ local function OnClick(self, mouseButton)
 	end
 end
 
-local function Create()
-	button = CreateFrame("Button", "LefthyToolsChronicleMinimapButton", Minimap)
-	button:SetSize(31, 31)
-	button:SetFrameStrata("MEDIUM")
-	button:SetFrameLevel(8)
-	button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-	button:RegisterForDrag("LeftButton")
-	button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-	local background = button:CreateTexture(nil, "BACKGROUND")
-	background:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-	background:SetSize(20, 20)
-	background:SetPoint("TOPLEFT", 7, -5)
-	button.Icon = button:CreateTexture(nil, "ARTWORK")
-	button.Icon:SetTexture(ICON)
-	button.Icon:SetSize(17, 17)
-	button.Icon:SetPoint("TOPLEFT", 7, -6)
-	button.Icon:SetTexCoord(0.05, 0.95, 0.05, 0.95)
-	local border = button:CreateTexture(nil, "OVERLAY")
-	border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-	border:SetSize(53, 53)
-	border:SetPoint("TOPLEFT")
-	button:SetScript("OnEnter", OnEnter)
-	button:SetScript("OnLeave", OnLeave)
-	button:SetScript("OnClick", OnClick)
-	button:SetScript("OnDragStart", function(self)
-		OnLeave(self)
-		self:SetScript("OnUpdate", OnDragUpdate)
-	end)
-	local function StopDrag(self)
-		self:SetScript("OnUpdate", nil)
-	end
-	button:SetScript("OnDragStop", StopDrag)
-	button:SetScript("OnHide", StopDrag) -- hidden mid-drag (Mirage, the minimap key): no OnDragStop may come
-end
-
 -- After login, switching Chronicle on or off and the setting (always on the next frame).
 function C.UpdateMinimapButton()
 	local show = M.enabled and M.db.minimapButton and Minimap ~= nil
 	if show and not button then
-		Create()
+		button = LT.Window.MinimapButton("LefthyToolsChronicleMinimapButton", { icon = ICON, db = M.db,
+			angleKey = "minimapAngle", angle = 210, onClick = OnClick, onEnter = OnEnter })
+		-- New from friends since the journal was last open: a small blue dot.
+		button.New = button:CreateTexture(nil, "OVERLAY", nil, 2)
+		button.New:SetSize(8, 8)
+		button.New:SetPoint("TOPRIGHT", -5, -4)
+		button.New:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+		button.New:SetVertexColor(0.35, 0.7, 1)
+		button.New:Hide()
 	end
 	if button then
 		button:SetShown(show)
 		if show then
-			Place()
+			button:Place()
 		end
+		C.UpdateNewDot()
+	end
+end
+
+-- The blue dot: friends' news the journal hasn't shown yet.
+function C.UpdateNewDot()
+	if button then
+		button.New:SetShown((C.UnseenCount and C.UnseenCount() or 0) > 0)
 	end
 end
 

@@ -52,6 +52,7 @@ Modules\Beacon\Stream.lua
 Modules\Beacon\StreamSense.lua
 Modules\Beacon\StreamView.lua
 Modules\Beacon\StreamNet.lua
+Modules\Beacon\StreamButton.lua
 Modules\Beacon\Beacon.xml
 
 Modules\Chronicle\Chronicle.lua

@@ -969,6 +969,7 @@ function S.OpenFriend(id, origin)
 	view.win.Hint:Hide()
 	Start(view)
 	S.Watch(id, true)
+	S.UpdateButton() -- (StreamButton.lua: its red dot)
 	return view
 end
 
@@ -985,6 +986,7 @@ function S.CloseView(key)
 		S.Watch(view.id, false)
 		views[key] = nil
 		spare[#spare + 1] = view
+		S.UpdateButton()
 	elseif view.kind == "me" then
 		S.SenseNeed("me", false)
 	end
