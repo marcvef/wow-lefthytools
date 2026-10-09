@@ -3530,7 +3530,7 @@ do
 	mark = #GAMEDATA + 1
 	Advance(4.1)
 	local quiet = #sentTo(11, mark, "O2;f;")
-	check(quiet >= 2 and quiet <= 3, "nothing going on: a frame every 2 s (where I am), got " .. quiet)
+	check(quiet >= 3 and quiet <= 5, "nothing going on: a frame every second (where I am), got " .. quiet)
 	Advance(13)
 	check(not watched:IsShown() and not S.SenseRunning(), "no word from her for 12 s: gone; the dot goes, the sensor stops")
 	anna("O2;w;1")

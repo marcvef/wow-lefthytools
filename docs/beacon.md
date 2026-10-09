@@ -547,7 +547,7 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   12 s is dropped. Frames from someone I don't watch (after my `/reload`) are answered with `w;0`
   (at most every 10 s). Not sharing: `w;1` is ignored.
 - `O2;f;<frame>` to watchers only, after each look of the sensor: every 0.5 s per watcher (all
-  watchers together at most 4 a second), every 2 s when nothing's going on (no mobs, no cast, not
+  watchers together at most 4 a second), every second when nothing's going on (no mobs, no cast, not
   in combat). A waiting frame for the same friend is replaced (`B.QueueLatest`), never piled up.
   Frame: `continent;uiMapID;north;west;facing(degrees);state[cdg];power(M/R/E/F + %);form spellID;
   cast spellID,elapsed,total (tenths)[,c];recent spellID,seconds ago/...;mobs`, mobs
