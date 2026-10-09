@@ -527,7 +527,11 @@ checks answer for hostile units in combat, and where nameplates are on the scree
   (`UNIT_SPELLCAST_SUCCEEDED`) needs it in front (within 110 degrees), "Target needs to be in
   front of you" / "You are facing the wrong way!" (`UI_ERROR_MESSAGE`) means behind; each counts
   for 1.5 s (listened to only while the window shows you). Nameplate size doesn't tell distance
-  (others 0.600, your target about 0.900). A line says "Move and turn: faint dots find their place." The
+  (others 0.600, your target about 0.900). Sixth test: `nameplateTargetRadialPosition` was 0 and the
+  target still had a nameplate in every look in combat, so your target's nameplate never counts
+  (in or out of combat); a cast at it comes first. The test notes your casts and the game's error
+  messages (with their words). The label over the radar says "you face": up is where your
+  character faces, not the camera. A line says "Move and turn: faint dots find their place." The
   camera is assumed to look where the character faces (true while moving; turning the camera alone
   misleads it until the cloud starts over). In an instance, without your place, it learns by
   turning only.

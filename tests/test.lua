@@ -3239,6 +3239,8 @@ do
 	check(printedSince(pmark):find("fight stream test: 60 s of notes", 1, true), "/lefthy stream test: it starts and says what to do")
 	STATE.combat = true
 	Advance(30)
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-2", 2764) -- (no target: doesn't tell where it is)
+	Fire("UI_ERROR_MESSAGE", 50, SPELL_FAILED_UNIT_NOT_INFRONT)
 	STATE.combat = false
 	pmark = #PRINTED + 1
 	Advance(30.5)
@@ -3262,6 +3264,9 @@ do
 	check(has("soft target: UnitExists(softenemy): false 60 | false 60") and has("is the soft target: UnitIsUnit(<unit>, softenemy): false 180 | false 180")
 		and has("Soft targeting: enemy ") and has("nameplate size by distance (average, lowest-highest, looks): up to 8 yd 1.000 (1.000-1.000, 120);"),
 		"the soft target, its settings, and nameplate sizes by distance, got\n" .. report)
+	check(has("your casts: UNIT_SPELLCAST_SUCCEEDED (true: harmful, at a hostile target): false 1 |")
+		and has("the game's error messages: UI_ERROR_MESSAGE (true: not in front): true 1 | -   e.g. Target needs to be in front of you."),
+		"my casts and the game's error messages, with their words, got\n" .. report)
 	check(has("Distance: 2 of 10 range checks of known range answered in combat, 5 only out of combat.")
 		and has("readable in combat: nameplate: IsVisible, nameplate: GetEffectiveScale"),
 		"a short summary, got\n" .. report)

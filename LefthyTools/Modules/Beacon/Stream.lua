@@ -287,6 +287,19 @@ local PLATE_PROBES = {
 
 local test -- the running test
 local testDriver = CreateFrame("Frame")
+
+-- Your own casts and the game's error messages (the learning below uses them for your target; the
+-- test notes them): listened to only while the test runs or the window shows you.
+local castWatch = CreateFrame("Frame")
+local watching = { test = false, me = false }
+local function Rewatch()
+	if watching.test or watching.me then
+		castWatch:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+		castWatch:RegisterEvent("UI_ERROR_MESSAGE")
+	else
+		castWatch:UnregisterAllEvents()
+	end
+end
 local resultsWindow
 
 local function KindOf(ok, v)
@@ -577,6 +590,8 @@ end
 
 local function StopTest(save)
 	testDriver:SetScript("OnUpdate", nil)
+	watching.test = false
+	Rewatch()
 	if save and test then
 		local list = Saved("streamTests")
 		list[#list + 1] = { at = test.context.at, text = Report() }
@@ -620,6 +635,8 @@ local function StartTest()
 			targetScale = tostring(GetCVar("nameplateSelectedScale")),
 			radial = tostring(GetCVar("nameplateTargetRadialPosition")) } }
 	testDriver:SetScript("OnUpdate", TestUpdate)
+	watching.test = true
+	Rewatch()
 	M:Print(("fight stream test: %d s of notes on what the game tells addons about the mobs around you. Fight a few"
 		.. " mobs; once, turn your camera away from your target for a few seconds. /lefthy stream test again stops it early.")
 		:format(TEST_TIME))
@@ -794,8 +811,8 @@ local REMEMBER = 8          -- seconds a mob that left your screen stays, fading
 local MIN_KEPT = 6          -- fewer places still fit: start over
 local plateReach = 40       -- nameplateMaxDistance, read when the window opens
 local soft                  -- the soft target's arc (nil: wide, tells nothing), read when the window opens
-local pinned = 1            -- nameplateTargetRadialPosition: in combat, 1 keeps your target's nameplate
-                            -- on screen (at its edge) when it's behind you, 2 every mob's in combat
+local pinned = 1            -- nameplateTargetRadialPosition: 2 keeps every mob's nameplate in combat on
+                            -- screen (at its edge) while it's behind you
 local hint                  -- { side = "front" or "back", at }: from your own casts at your target
 local atan2 = math.atan2 or math.atan -- (Lua 5.1 / 5.3)
 local clouds = {}           -- mob key -> { north = {}, west = {}, seenAt, info (the mob as last seen) }
@@ -924,18 +941,32 @@ local function Here()
 end
 
 -- Your own casts at your target tell where it is: a harmful spell that went off needed it in front
--- of you; "Target needs to be in front of you" (or facing the wrong way) means it's behind. Only
--- listened to while the window shows your surroundings.
-local castWatch = CreateFrame("Frame")
+-- of you; "Target needs to be in front of you" (or facing the wrong way) means it's behind. The
+-- test notes what came (to see that these events answer, and the errors' exact words).
 castWatch:SetScript("OnEvent", function(_, event, a, b, c)
 	local side
 	if event == "UNIT_SPELLCAST_SUCCEEDED" then -- unit, castGUID, spellID
-		if a == "player" and not issecret(c) and c and Value("C_Spell.IsSpellHarmful", c)
-			and Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target") then
+		if a ~= "player" then
+			return
+		end
+		local harmful = not issecret(c) and c and Value("C_Spell.IsSpellHarmful", c)
+		if harmful and Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target") then
 			side = "front"
 		end
-	elseif not issecret(b) and b and (b == SPELL_FAILED_UNIT_NOT_INFRONT or b == ERR_BADATTACKFACING) then
-		side = "back" -- UI_ERROR_MESSAGE: errorType, message
+		if test then
+			Note("your casts: UNIT_SPELLCAST_SUCCEEDED (true: harmful, at a hostile target)",
+				Value("UnitAffectingCombat", "player") and "combat" or "calm", issecret(c) and "hidden" or tostring(side == "front"),
+				not issecret(c) and c and Value("C_Spell.GetSpellName", c) or nil)
+		end
+	else -- UI_ERROR_MESSAGE: errorType, message
+		if not issecret(b) and b and (b == SPELL_FAILED_UNIT_NOT_INFRONT or b == ERR_BADATTACKFACING) then
+			side = "back"
+		end
+		if test then
+			Note("the game's error messages: UI_ERROR_MESSAGE (true: not in front)",
+				Value("UnitAffectingCombat", "player") and "combat" or "calm", issecret(b) and "hidden" or tostring(side == "back"),
+				not issecret(b) and b or nil)
+		end
 	end
 	if side then
 		hint = hint or {}
@@ -952,21 +983,22 @@ local function LearnSeen(mob, now)
 	end
 	cloud.seenAt = now
 	local lo, hi = Band(mob.near, mob.far, mob.onScreen)
-	-- In combat the game may keep a nameplate at the screen's edge while its mob is behind you (your
-	-- target, or every mob in combat: nameplateTargetRadialPosition), so then it says nothing.
-	local pinnedNow = here.combat and (mob.target and pinned >= 1 or mob.combat and pinned >= 2)
+	-- Your target's nameplate says nothing: the game keeps it up while the mob is behind the camera
+	-- too (the fifth and sixth tests: always there in combat, whatever nameplateTargetRadialPosition
+	-- says). With that setting on 2, every mob's in combat neither.
+	local plateSays = mob.onScreen and not mob.target and not (here.combat and mob.combat and pinned >= 2)
 	local side
-	if mob.soft and soft then
-		side = "soft"
-	elseif mob.onScreen and not pinnedNow then
-		side = "view"
-	elseif mob.target and hint and here.now - hint.at <= HINT_TIME then
+	if mob.target and hint and here.now - hint.at <= HINT_TIME then
 		side = hint.side -- (a spell you just cast at it: in front; "not in front": behind)
+	elseif mob.soft and soft then
+		side = "soft"
+	elseif plateSays then
+		side = "view"
 	elseif not mob.onScreen and mob.yards and not mob.beyond and mob.yards < plateReach then
 		side = "away" -- (your target, without a nameplate though near: you turned away from it)
 	end
 	if #cloud.north == 0 then
-		-- (a far target without a nameplate: most likely where you look; a pinned one: anywhere)
+		-- (a far target without a nameplate: most likely where you look; your target: anywhere)
 		local seed = side or (not mob.onScreen and mob.beyond and "view") or nil
 		for i = 1, SPOTS do
 			Seed(cloud, i, lo, hi, seed)
@@ -1234,7 +1266,8 @@ local function Build()
 		ReleaseAll()
 		wipe(mobs)
 		wipe(clouds)
-		castWatch:UnregisterAllEvents()
+		watching.me = false
+		Rewatch()
 		GameTooltip:Hide()
 	end)
 	win:Hide()
@@ -1304,7 +1337,7 @@ local function Build()
 	end
 	local ahead = radar:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	ahead:SetPoint("BOTTOM", radar, "TOP", 0, 1)
-	ahead:SetText(L["ahead"])
+	ahead:SetText(L["you face"])
 	local meDot = Circle(radar, "OVERLAY", 1, 7) -- (also there if this client lacks the arrow)
 	meDot:SetColorTexture(1, 1, 1, 0.9)
 	local me = radar:CreateTexture(nil, "OVERLAY", nil, 2)
@@ -1335,14 +1368,15 @@ local function OpenWindow(newMode)
 		name, classFile = PREVIEW_FRIEND, PREVIEW_CLASS
 		win.Where:SetText(L["Westfall"])
 		win.Live.Text:SetText(L["DEMO"])
-		castWatch:UnregisterAllEvents()
+		watching.me = false
+		Rewatch()
 	else
 		checks, plateReach = RangeChecks(), tonumber(GetCVar("nameplateMaxDistance")) or 40
 		wipe(clouds)
 		soft = GetCVar("SoftTargetEnemy") == "1" and SOFT_ARCS[tonumber(GetCVar("SoftTargetEnemyArc"))] or nil
 		pinned, hint = tonumber(GetCVar("nameplateTargetRadialPosition")) or 1, nil
-		castWatch:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
-		castWatch:RegisterEvent("UI_ERROR_MESSAGE")
+		watching.me = true
+		Rewatch()
 		name = UnitName("player")
 		local _, file = UnitClass("player")
 		classFile = file
