@@ -203,5 +203,8 @@ ns.CHANGELOG = {
 	{ id = 65, module = "chronicle",
 		en = { "AFK and jumps: for all your characters", "Some numbers are about the player, not the character: the Martin tracker (time AFK) and jumps now count all your characters together, in a new All your characters section of the statistics. The Compare page and the leaderboards go per person too: an alt's quests, kills and time count for its player." },
 		de = { "AFK und Sprünge: alle Charaktere", "Manche Zahlen gehören zum Spieler, nicht zum Charakter: der Martin-Tracker (Zeit AFK) und die Sprünge zählen jetzt alle deine Charaktere zusammen, in einem neuen Abschnitt Alle deine Charaktere in der Statistik. Die Vergleich-Seite und die Bestenlisten gehen auch nach Person: Quests, Kills und Zeit eines Twinks zählen für seinen Spieler." } },
+	{ id = 66, module = "mirage",
+		en = { "Mirage: pause from the minimap", "A button on the minimap's edge while Mirage is on: click it to pause fading (the interface stays, the icon greys out), click again to fade when idle again. Right-click opens Mirage's settings. /mirage pause does the same." },
+		de = { "Mirage: Pause an der Minimap", "Ein Button am Rand der Minimap, solange Mirage an ist: ein Klick pausiert das Ausblenden (das Interface bleibt, das Symbol wird grau), ein zweiter blendet wieder aus, wenn du nichts tust. Rechtsklick öffnet die Einstellungen von Mirage. /mirage pause macht dasselbe." } },
 	-- New entries go here, at the end.
 }
