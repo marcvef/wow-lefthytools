@@ -7,9 +7,10 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 -- Cinematic flights (a Misc Tweak; works without Mirage): on a flight path the interface fades
 -- out, thin black bars fade in like a film, and a title card names your destination and every
 -- zone you fly into (its level range, and Beacon friends who are there). The top bar shows what
--- Beacon friends are doing (side by side, three lines each that keep their place: name, level and
--- where; their quest; fighting or dead, fading in and out; setting flightFriends), the bottom bar
--- the time left to landing; whispers and party chat show as subtitles just above it. Landing
+-- Beacon friends are doing (three side by side, three lines each that keep their place: name,
+-- level and where; their quest; fighting or dead, fading in and out; setting flightFriends; a
+-- fourth to sixth go into the bottom bar), the bottom bar the time left to landing (at its right
+-- end while friends are there); whispers and party chat show as subtitles just above it. Landing
 -- brings everything back. With Beacon's streamFlights, the film opens one friend's fight stream at
 -- takeoff (the busiest), each friend in the top bar has a Watch / Live button for theirs, and
 -- those streams close at landing.
@@ -46,7 +47,9 @@ local CARD_IN, CARD_HOLD, CARD_OUT = 1.2, 3.5, 1.5
 local SUBTITLE_TIME, MAX_SUBTITLES = 8, 2
 local BAR = 0.07            -- letterbox bar height, part of the screen height
 local FRIENDS_EVERY = 2     -- seconds between updates of the friends in the top bar
-local FRIENDS_PER_PAGE, FRIENDS_PAGE_TIME = 2, 8 -- side by side; more friends: pages, one after another
+local FRIENDS_PER_PAGE, FRIENDS_PAGE_TIME = 6, 8 -- side by side; more friends: pages, one after another
+local PER_BAR = 3           -- friends in the top bar; more go into the bottom one
+local TIMER_ROOM = 220      -- the bottom bar's right end, kept for the time left while friends are there
 local FRIEND_ROWS = { "Who", "Quest", "Fight" } -- a friend's three lines, top to bottom
 local FIGHT_FADE = 0.6      -- their fighting line fades in and out
 local PATH_PACE = 1 / 29.9  -- seconds per yard along a flight path (classic routes fly ~29.9 yd/s)
@@ -253,6 +256,49 @@ local function StyleWatch(watch)
 	end
 end
 
+-- A link in the subtitles: its tooltip (ours: the game's is on the hidden interface), and on a click
+-- the interface back (the film pauses while the item's window or tooltip is open) and the link
+-- opened like in chat (items with a modifier as Beacon's notices do: no dressing room from addon
+-- code in gamepad mode).
+local linkOpened = false -- a subtitle's link was clicked: the film waits while what it opened shows
+local Pause
+
+local function LinkEnter(self, link)
+	local tip = screen.Tooltip
+	tip:SetOwner(self, "ANCHOR_TOP")
+	if pcall(tip.SetHyperlink, tip, link) then
+		tip:Show()
+	else
+		tip:Hide() -- (a link without a tooltip: a map pin, a profession)
+	end
+end
+
+local function LinkLeave()
+	screen.Tooltip:Hide()
+end
+
+local function LinkClick(_, link, text, button)
+	screen.Tooltip:Hide()
+	linkOpened = true
+	if shown then
+		Pause()
+	end
+	local B = ns.Beacon
+	if type(link) == "string" and link:find("^item:") and IsModifiedClick() and B and B.ModifiedItemClick then
+		B.ModifiedItemClick(text or link)
+	else
+		SetItemRef(link, text, button)
+	end
+end
+
+-- Still open from such a click: the item's tooltip (the dressing room counts as a window anyway).
+local function LinkOpen()
+	if linkOpened and not (ItemRefTooltip and ItemRefTooltip:IsShown()) then
+		linkOpened = false
+	end
+	return linkOpened
+end
+
 local function Build()
 	screen = CreateFrame("Frame", "LefthyToolsFlightFrame") -- no parent: stays while UIParent is invisible
 	screen:SetFrameStrata("FULLSCREEN")
@@ -278,10 +324,27 @@ local function Build()
 	screen.Timer = screen:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	screen.Timer:SetPoint("CENTER", screen.Bottom, "CENTER")
 	screen.Timer:SetTextColor(0.85, 0.82, 0.75)
-	screen.Subtitles = screen:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-	screen.Subtitles:SetPoint("BOTTOM", screen.Bottom, "TOP", 0, 10)
+	-- The subtitles sit in a frame of their own that takes the mouse only while a line has a link
+	-- (a friend's shared item, a link in Lefthy chat), so camera drags still go through elsewhere:
+	-- hovering the link shows a tooltip of ours above the film (the game's own sits on the hidden
+	-- interface), a click brings the interface back and opens it like a chat link.
+	local lines = CreateFrame("Frame", nil, screen)
+	screen.SubtitleFrame = lines
+	lines:SetSize(900, 20)
+	lines:SetPoint("BOTTOM", screen.Bottom, "TOP", 0, 10)
+	lines:EnableMouse(false)
+	if lines.SetHyperlinksEnabled then
+		lines:SetHyperlinksEnabled(true)
+	end
+	lines:SetScript("OnHyperlinkEnter", LinkEnter)
+	lines:SetScript("OnHyperlinkLeave", LinkLeave)
+	lines:SetScript("OnHyperlinkClick", LinkClick)
+	screen.Subtitles = lines:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
+	screen.Subtitles:SetPoint("BOTTOM")
 	screen.Subtitles:SetWidth(900)
 	screen.Subtitles:SetSpacing(4)
+	screen.Tooltip = CreateFrame("GameTooltip", "LefthyToolsFlightTooltip", screen, "GameTooltipTemplate")
+	screen.Tooltip:SetFrameStrata("TOOLTIP")
 	-- What Beacon friends are doing, in the top bar: a column each, three lines that keep their
 	-- place (who and where, their quest, fighting or dead); the last fades in and out.
 	screen.FriendColumns = {}
@@ -463,18 +526,35 @@ local function UpdateFriends(now)
 		first = (math.floor(now / FRIENDS_PAGE_TIME) % pages) * FRIENDS_PER_PAGE + 1
 		count = math.min(#list - first + 1, FRIENDS_PER_PAGE)
 	end
-	local width = math.max(200, UIParent:GetWidth() - 80) / math.max(count, 1)
+	-- Three in the top bar, the rest in the bottom one; there the time left moves to the right end
+	-- and the friends share what's left of the bar.
+	local top = math.min(count, PER_BAR)
+	local bottom = count - top
+	local full = math.max(200, UIParent:GetWidth() - 80)
+	screen.Timer:ClearAllPoints()
+	if bottom > 0 then
+		screen.Timer:SetPoint("RIGHT", screen.Bottom, "RIGHT", -24, 0)
+	else
+		screen.Timer:SetPoint("CENTER", screen.Bottom, "CENTER")
+	end
 	for i, column in ipairs(screen.FriendColumns) do
 		local entry = i <= count and list[first + i - 1] or nil
 		local who, quest, fight
 		if entry then
 			who, quest, fight = B.FriendRows(entry.peer, entry.id)
 		end
-		local x = (i - (count + 1) / 2) * width
+		local inBottom = i > PER_BAR
+		local bar = inBottom and screen.Bottom or screen.Top
+		local barCount = math.max(inBottom and bottom or top, 1)
+		local barWidth = inBottom and full - TIMER_ROOM or full
+		local width = barWidth / barCount
+		local slot = inBottom and i - PER_BAR or i
+		local x = (slot - (barCount + 1) / 2) * width - (inBottom and TIMER_ROOM / 2 or 0)
+		column.bar, column.x, column.width = bar, x, width
 		for row, key in ipairs(FRIEND_ROWS) do
 			local line = column[key]
 			line:ClearAllPoints()
-			line:SetPoint("CENTER", screen.Top, "CENTER", x, (2 - row) * rowGap)
+			line:SetPoint("CENTER", bar, "CENTER", x, (2 - row) * rowGap)
 			line:SetWidth(width - 20)
 		end
 		column.Who:SetText(who or "")
@@ -486,7 +566,7 @@ local function UpdateFriends(now)
 		if watch.id then
 			local half = math.min(column.Who:GetStringWidth() or 0, width - 20) / 2
 			watch:ClearAllPoints()
-			watch:SetPoint("LEFT", screen.Top, "CENTER", x + half + 10, rowGap)
+			watch:SetPoint("LEFT", bar, "CENTER", x + half + 10, rowGap)
 			StyleWatch(watch)
 			watch:Show()
 		else
@@ -505,7 +585,14 @@ local function UpdateSubtitles()
 	for i = math.max(1, #subtitles - MAX_SUBTITLES + 1), #subtitles do
 		lines[#lines + 1] = subtitles[i].text
 	end
-	screen.Subtitles:SetText(table.concat(lines, "\n"))
+	local text = table.concat(lines, "\n")
+	screen.Subtitles:SetText(text)
+	-- The mouse only while there's a link to hover or click (elsewhere the camera keeps it).
+	screen.SubtitleFrame:SetHeight(math.max(20, (screen.Subtitles:GetStringHeight() or 0) + 4))
+	screen.SubtitleFrame:EnableMouse(text:find("|H", 1, true) ~= nil)
+	if not text:find("|H", 1, true) then
+		screen.Tooltip:Hide()
+	end
 end
 
 -- "Landing in 1:42" (timed before, or from the flight path's length), "Landing in about 2:10"
@@ -567,8 +654,9 @@ local function Show()
 	HideUI(true, FADE)
 end
 
--- The interface back at once (a window, typing): paused until that's done.
-local function Pause()
+-- The interface back at once (a window, typing): paused until that's done. (Declared above, for a
+-- click on a subtitle's link.)
+function Pause()
 	shown, resumeAt = false, nil
 	screen.FadeIn:Stop()
 	screen:Hide()
@@ -674,7 +762,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 		local now = GetTime()
 		local windows = Windows()
 		baseline = math.min(baseline, windows)
-		local busy = ChatActive() or windows > baseline or OfferWaiting()
+		local busy = ChatActive() or windows > baseline or OfferWaiting() or LinkOpen()
 		if shown and busy then
 			Pause()
 		elseif not shown then

@@ -130,6 +130,13 @@ function FrameMethods:SetFrameStrata(s) self._strata = s end
 function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
+function FrameMethods:SetHyperlinksEnabled(e) self._hyperlinks = e end
+-- Tooltips made with CreateFrame("GameTooltip"): what they were asked to show.
+function FrameMethods:SetOwner(owner, anchor) self._owner, self._anchor = owner, anchor end
+function FrameMethods:SetHyperlink(link)
+	if not link:find("^item:") and not link:find("^spell:") then error("unknown link type") end
+	self._hyperlink = link
+end
 function FrameMethods:RegisterForClicks(...) self._clicks = { ... } end
 function FrameMethods:SetHighlightTexture(t) self._highlight = t end
 function FrameMethods:SetNormalTexture(t) self._normal = t end
@@ -464,7 +471,12 @@ C_Spell = { GetSpellInfo = function(id) return { name = SPELL_NAMES[id] or ("Spe
 function SetPortraitTexture(texture, unit) texture.portrait = unit end
 -- A link clicked in chat (ItemRef.lua): nothing opens here.
 LINKS_CLICKED = {}
-function SetItemRef(link) LINKS_CLICKED[#LINKS_CLICKED + 1] = link end
+function SetItemRef(link)
+	LINKS_CLICKED[#LINKS_CLICKED + 1] = link
+	if ItemRefTooltip and link:find("^item:") then ItemRefTooltip:Show() end -- (the item's sticky tooltip)
+end
+CreateFrame("GameTooltip", "ItemRefTooltip", UIParent)
+ItemRefTooltip:Hide()
 -- Players this client knows (name cache): [guid] = { name, realm }.
 KNOWN_PLAYERS = {}
 function GetPlayerInfoByGUID(guid)

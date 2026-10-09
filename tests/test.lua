@@ -3843,6 +3843,23 @@ do
 		check(BB.StreamIsWatching(11) and anna.Watch.Text:GetText() == "Live", "clicked: her stream opens, the button says Live")
 		anna.Watch:Click()
 		check(not BB.StreamIsWatching(11) and anna.Watch.Text:GetText() == "Watch", "clicked again: closed")
+		-- Five friends: three in the top bar, two in the bottom one, the time left then at its right end.
+		local realList, realRows = BB.FriendList, BB.FriendRows
+		BB.FriendList = function()
+			local list = {}
+			for i = 1, 5 do list[i] = { id = 900 + i, peer = { name = "F" .. i, classFile = "MAGE" } } end
+			return list
+		end
+		BB.FriendRows = function(peer) return peer.name, "", nil end
+		ns.CinematicFlight.UpdateFriends(GetTime())
+		local columns = film.FriendColumns
+		local function bar(i) return columns[i].Who._points[1][2] end
+		check(#columns == 6 and bar(1) == film.Top and bar(3) == film.Top and bar(4) == film.Bottom and bar(5) == film.Bottom
+			and columns[5].Who:GetText() == "F5" and columns[6].Who:GetText() == "" and film.Timer._points[1][1] == "RIGHT",
+			"five friends: three on top, two in the bottom bar, the time left at its right end")
+		BB.FriendList, BB.FriendRows = realList, realRows
+		ns.CinematicFlight.UpdateFriends(GetTime())
+		check(film.Timer._points[1][1] == "CENTER", "two again: all on top, the time left back in the middle")
 		LefthyToolsDB.settings.beacon.streamFlights = false
 		ns.CinematicFlight.UpdateFriends(GetTime())
 		check(not anna.Watch:IsShown(), "streams on flights off: no buttons")
@@ -3940,6 +3957,25 @@ do
 	Advance(0.3)
 	check(film:IsShown() and film.Subtitles:GetText():find("Anna|r shares", 1, true),
 		"a friend shows an item: a subtitle, got " .. tostring(film.Subtitles:GetText()))
+	do -- The item in it: hover for its tooltip (ours, above the film), click to open it.
+		local lines = film.SubtitleFrame
+		check(lines._mouseEnabled and lines._hyperlinks, "a line with a link: the subtitles take the mouse (only then)")
+		local link = film.Subtitles:GetText():match("|H(item:[^|]+)|h")
+		lines._scripts.OnHyperlinkEnter(lines, link, "[Item]")
+		check(link and film.Tooltip:IsShown() and film.Tooltip._hyperlink == link and film.Tooltip._strata == "TOOLTIP",
+			"hovering the item: its tooltip, above the film")
+		lines._scripts.OnHyperlinkLeave(lines)
+		check(not film.Tooltip:IsShown(), "and away")
+		lines._scripts.OnHyperlinkClick(lines, link, "[Item]", "LeftButton")
+		Advance(0.3)
+		check(not film:IsShown() and UIParent:GetAlpha() == 1 and ItemRefTooltip:IsShown() and LINKS_CLICKED[#LINKS_CLICKED] == link,
+			"a click: the interface back, the item opens")
+		Advance(3)
+		check(not film:IsShown(), "the film waits while it's open")
+		ItemRefTooltip:Hide()
+		Advance(2.6)
+		check(film:IsShown(), "closed: the film comes back")
+	end
 	Advance(2.1)
 	anna("I2;6948::::::::20:::::;6161")
 	Advance(0.3)
@@ -3951,7 +3987,7 @@ do
 	anna("R2;6161;Bob:0")
 	Advance(0.3)
 	check(film.Subtitles:GetText():find("Bob wins!", 1, true), "and the outcome comes as a subtitle, got " .. tostring(film.Subtitles:GetText()))
-	Advance(62.5) -- 4222 yd in 70 s: much faster than the rest
+	Advance(56.6) -- 4222 yd in 70 s: much faster than the rest (5.9 s went to the item link above)
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(0.5)

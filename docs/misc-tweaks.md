@@ -311,9 +311,10 @@ their tracked quest with its progress or "Ready to turn in", in or out of combat
 
 On a flight path (`UnitOnTaxi("player")`) the interface fades out over 1.5 s (`ns.HideInterface`
 with a fade: an OnUpdate only while fading), black letterbox bars (7% of the screen each) fade in
-(the top one shows what Beacon friends are doing, setting `flightFriends`: `B.FriendLines` per
-friend joined into one line, name and level, where, fighting or their quest; two at a time, the
-next two every 8 s; refreshed every 2 s while the film is shown),
+(the bars show what Beacon friends are doing, setting `flightFriends`: `B.FriendRows` per friend in
+three lines, who and where, their quest, fighting or dead; three side by side in the top bar, a
+fourth to sixth in the bottom one, whose time left then moves to its right end (220 px kept for
+it); more than six: pages of six every 8 s; refreshed every 2 s while the film is shown),
 and a title card in the upper middle names where you're going: header "Next stop", the place in
 the quest font (`Fonts\MORPHEUS.TTF`, 46, shadowed), a thin gold line, the zone below. Every new
 zone on the way (`ZONE_CHANGED_NEW_AREA`) gets a card: the continent (walking `parentMapID` up
@@ -366,6 +367,15 @@ left alone (a first version pulled it back and circled; that was removed).
 - **Beacon's item news:** the notices sit on the interface, so `Flight.Subtitle(text)` lets
   Items.lua add a friend's share ("[icon] Anna shares [item]") and an offer's outcome ("[item]:
   Bob wins!", "Nobody needs it.") to the subtitles, like whispers.
+- **Links in subtitles** (shared items, links in Lefthy chat): the subtitles sit in a frame of their
+  own (`SubtitleFrame`, `SetHyperlinksEnabled`) that takes the mouse only while a line has a link,
+  so camera drags go through everywhere else. Hovering a link shows our own tooltip
+  (`LefthyToolsFlightTooltip`, a `GameTooltipTemplate` on the film at TOOLTIP strata: the game's
+  `GameTooltip` sits on the hidden interface); links without a tooltip (map pins) show none. A click
+  pauses the film (the interface is back) and opens the link like a chat link (`SetItemRef`; an item
+  with a modifier through Beacon's `B.ModifiedItemClick`: no dressing room from addon code in
+  gamepad mode); the film waits while `ItemRefTooltip` shows (the dressing room counts as a window)
+  and resumes 2 s after.
 - **Friends' fight streams** (Beacon setting `streamFlights`, see beacon.md "Fight stream"): at
   takeoff (`Start`) `B.StreamFlightStart()` opens one friend's stream (the busiest, else a random
   one who can be watched); in the top bar, right of each such friend's name, a small button
