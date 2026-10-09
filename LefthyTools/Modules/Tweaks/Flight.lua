@@ -10,7 +10,9 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 -- Beacon friends are doing (side by side, three lines each that keep their place: name, level and
 -- where; their quest; fighting or dead, fading in and out; setting flightFriends), the bottom bar
 -- the time left to landing; whispers and party chat show as subtitles just above it. Landing
--- brings everything back.
+-- brings everything back. With Beacon's streamFlights, the film opens one friend's fight stream at
+-- takeoff (the busiest), each friend in the top bar has a Watch / Live button for theirs, and
+-- those streams close at landing.
 --
 -- The screen doesn't take clicks, so the camera can be dragged as always. Opening a window (map,
 -- bags, ...), typing in chat or a friend's item offer waiting for your Need or Pass (Beacon) pauses
@@ -236,6 +238,21 @@ local function Fade(region, from, to, duration)
 	return group
 end
 
+-- A friend's stream button: a red dot and "Live" while it's open, grey and "Watch" while not.
+local function StyleWatch(watch)
+	local B = ns.Beacon
+	local open = watch.id and B and B.StreamIsWatching and B.StreamIsWatching(watch.id)
+	if open then
+		watch.Dot:SetColorTexture(1, 0.2, 0.15, 1)
+		watch.Text:SetText(L["Live"])
+		watch.Text:SetTextColor(1, 0.35, 0.3)
+	else
+		watch.Dot:SetColorTexture(0.6, 0.6, 0.6, 1)
+		watch.Text:SetText(L["Watch"])
+		watch.Text:SetTextColor(0.85, 0.82, 0.75)
+	end
+end
+
 local function Build()
 	screen = CreateFrame("Frame", "LefthyToolsFlightFrame") -- no parent: stays while UIParent is invisible
 	screen:SetFrameStrata("FULLSCREEN")
@@ -280,6 +297,31 @@ local function Build()
 		column.Fight:SetAlpha(0)
 		column.FightIn = Fade(column.Fight, 0, 1, FIGHT_FADE)
 		column.FightOut = Fade(column.Fight, 1, 0, FIGHT_FADE)
+		-- Right of their name: their fight stream, open or closed (Beacon's StreamNet.lua).
+		local watch = CreateFrame("Button", nil, screen)
+		watch:SetSize(60, 14)
+		watch:EnableMouse(true)
+		watch.Dot = watch:CreateTexture(nil, "OVERLAY")
+		watch.Dot:SetSize(6, 6)
+		watch.Dot:SetPoint("LEFT")
+		local mask = watch:CreateMaskTexture()
+		mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+		mask:SetAllPoints(watch.Dot)
+		watch.Dot:AddMaskTexture(mask)
+		watch.Text = watch:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		watch.Text:SetPoint("LEFT", watch.Dot, "RIGHT", 3, 0)
+		watch:SetScript("OnClick", function(self)
+			local B = ns.Beacon
+			if self.id and B and B.StreamToggle then
+				B.StreamToggle(self.id, "flight")
+				StyleWatch(self)
+			end
+		end)
+		watch:SetScript("OnEnter", function(self) self.Text:SetAlpha(1) end)
+		watch:SetScript("OnLeave", function(self) self.Text:SetAlpha(0.75) end)
+		watch.Text:SetAlpha(0.75)
+		watch:Hide()
+		column.Watch = watch
 		screen.FriendColumns[i] = column
 	end
 
@@ -438,6 +480,18 @@ local function UpdateFriends(now)
 		column.Who:SetText(who or "")
 		column.Quest:SetText(quest or "")
 		SetFight(column, entry and entry.id, fight)
+		-- Their stream's button, right of their name (only for friends who can be watched).
+		local watch = column.Watch
+		watch.id = entry and beacon.db.streamFlights and B.StreamCanWatch and B.StreamCanWatch(entry.id) and entry.id or nil
+		if watch.id then
+			local half = math.min(column.Who:GetStringWidth() or 0, width - 20) / 2
+			watch:ClearAllPoints()
+			watch:SetPoint("LEFT", screen.Top, "CENTER", x + half + 10, rowGap)
+			StyleWatch(watch)
+			watch:Show()
+		else
+			watch:Hide()
+		end
 	end
 end
 Flight.UpdateFriends = UpdateFriends -- (tests)
@@ -554,6 +608,12 @@ local function Start()
 	else
 		ZoneCard() -- after a /reload or a loading screen mid-flight
 	end
+	-- One friend's fight, picked now (Beacon setting streamFlights); the top bar opens others.
+	local B = ns.Beacon
+	if B and B.StreamFlightStart then
+		B.StreamFlightStart()
+		UpdateFriends(GetTime())
+	end
 end
 
 -- The film ends: landing fades everything back; anything else (combat, a popup, switched off)
@@ -570,6 +630,10 @@ local function EndFilm(landed)
 	card.Anim:Stop()
 	card:SetAlpha(0)
 	HideUI(false, (wasShown and landed) and FADE or 0)
+	local B = ns.Beacon
+	if B and B.StreamFlightEnd then
+		B.StreamFlightEnd() -- friends' streams opened on this flight close
+	end
 end
 
 local function ShouldStart()

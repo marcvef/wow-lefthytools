@@ -273,6 +273,12 @@ function B.ShowTooltip(owner, peer, group)
 			AddPeer(other, false)
 		end
 	end
+	-- On the world map: a click opens (or closes) the hovered friend's fight stream.
+	local id = owner.gameAccountID
+	if owner.streamHint and M.db.streamMapClick and B.StreamCanWatch and (B.StreamCanWatch(id) or B.StreamIsWatching(id)) then
+		GameTooltip:AddLine(B.StreamIsWatching(id) and L["Click: close their fight stream"] or L["Click: watch their fight"],
+			0.5, 0.8, 1)
+	end
 	GameTooltip:Show()
 	owner.tooltipSig = Signature(peer, group)
 end
@@ -303,6 +309,7 @@ function LefthyToolsBeaconPinMixin:OnLoad()
 	-- Just above Blizzard's group member dots, so a friend in my group shows our marked dot.
 	self:UseFrameLevelType("PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER")
 	self:SetScalingLimits(1, 1.0, 1.2)
+	self.streamHint = true -- (the tooltip says a click opens their stream)
 	BuildDot(self)
 end
 
@@ -663,12 +670,39 @@ function B.RefreshMaps()
 	B.minimapDirty = true
 end
 
+-- A plain left click on a friend's dot opens or closes their fight stream (StreamNet.lua). The pins
+-- don't take clicks (see CheckMouseButtonPassthrough), so the map gets the click and this hook
+-- looks which dot is under the mouse; the map does what it always does with a click.
+local mapClickHooked = false
+local function OnMapMouseDown(_, button)
+	if button ~= "LeftButton" or IsAltKeyDown() or IsControlKeyDown() or IsShiftKeyDown()
+		or not (M.enabled and M.db.streamMapClick and B.StreamToggle) then
+		return
+	end
+	for id, pin in pairs(mapPins) do
+		if pin:IsShown() and pin:IsMouseOver() then
+			local peer = B.peers[id]
+			if peer and (B.StreamCanWatch(id) or B.StreamIsWatching(id)) then
+				B.StreamToggle(id, "map")
+				if GameTooltip:IsOwned(pin) then
+					B.ShowTooltip(pin, peer, pin.group) -- (its hint changes)
+				end
+			end
+			return
+		end
+	end
+end
+
 function B.Attach()
 	if providerAdded or not M.enabled or not (WorldMapFrame and WorldMapFrame.AddDataProvider) then
 		return
 	end
 	WorldMapFrame:AddDataProvider(provider)
 	providerAdded = true
+	if not mapClickHooked and WorldMapFrame.ScrollContainer then
+		mapClickHooked = true -- a hook stays for good; it checks whether Beacon and the setting are on
+		WorldMapFrame.ScrollContainer:HookScript("OnMouseDown", OnMapMouseDown)
+	end
 	if B.AttachPings then
 		B.AttachPings()
 	end

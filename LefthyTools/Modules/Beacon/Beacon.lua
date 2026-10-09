@@ -62,6 +62,8 @@ local L = ns.L
 --   X2;<percent>        progress on my current level (0-99), empty at max level or with sharing
 --                       off. Sent when the whole percent changes (at most every XP_GAP seconds)
 --                       and with every answer.
+--   O2;<word>;<...>     the fight stream (StreamNet.lua): h I can be watched (with every answer),
+--                       w I watch you, f what's around me (to watchers only), n a mob's name
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil), so new kinds can be
 -- added without breaking older friends.
@@ -99,6 +101,8 @@ local ITEM_GAP = 2           -- shared items accepted from one friend at most th
 local CALL_LIMIT, CALL_WINDOW = 10, 10 -- Need / Pass answers and verdicts accepted from one friend
 local DAILY_LIMIT = 30       -- Chronicle days accepted from one friend per minute (7 + their AFK times arrive at once)
 local REPORT_PARTS = 60      -- error report parts accepted from one friend per minute (a report has up to 16)
+local STREAM_LIMIT, STREAM_WINDOW = 80, 10 -- fight stream messages accepted from one friend (2 frames a
+                             -- second, mob names, keepalives)
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
 	quests = true, gold = true, profession = true, quest = true, zone = true }
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
@@ -137,7 +141,10 @@ local M = LT:NewModule("beacon", {
 		dingSoundKit = 50111, -- boss defeated fanfare (Ding.lua lists the choices)
 		sendReports = true,   -- Reports.lua: my LefthyTools errors to friends who collect them
 		collectReports = false, -- and theirs to me
-		fightStream = false,  -- Stream.lua: a test, nothing goes to friends yet
+		streamShare = true,   -- Stream*.lua: friends can watch my fights
+		streamWatchedDot = true, -- a small red dot by the minimap while someone watches
+		streamFlights = true, -- a cinematic flight opens a friend's stream
+		streamMapClick = true, -- clicking a friend's world map dot opens their stream
 	},
 })
 
@@ -505,6 +512,23 @@ function B.QueueToPeers(message, latest)
 	end
 end
 
+-- One friend, a message that only matters in its newest form (a fight stream frame): one still
+-- waiting that starts the same (prefix) is replaced where it is; behind: dropped, and this one
+-- goes to the end (after messages it needs, queued just before it).
+function B.QueueLatest(gameAccountID, message, prefix, behind)
+	for i, item in ipairs(outbox) do
+		if item[1] == gameAccountID and item[2]:sub(1, #prefix) == prefix then
+			if not behind then
+				item[2] = message
+				return
+			end
+			table.remove(outbox, i)
+			break
+		end
+	end
+	B.Queue(gameAccountID, message)
+end
+
 local function Drain(now, elapsed)
 	tokens = math.min(SEND_BURST, tokens + elapsed * SEND_RATE)
 	if now < pausedUntil then
@@ -621,6 +645,9 @@ local function Forget(gameAccountID)
 		end
 	end
 	owed[gameAccountID] = nil
+	if B.StreamForget then
+		B.StreamForget(gameAccountID, peer) -- (watching them, or they me)
+	end
 end
 
 -- Walks the friend list: greets online WoW friends we don't know yet. Runs once a minute and
@@ -788,6 +815,11 @@ local function Parse(text)
 		n, of = tonumber(n), tonumber(of)
 		if id and #id <= 4 and n >= 1 and n <= of and of <= 16 and #text <= 200 then
 			return "Z", tonumber(id), n, of, text
+		end
+	elseif kind == "O" then
+		local word, more = rest:match("^;(%l);(.*)$")
+		if word and #more <= 250 then
+			return "O", word, more
 		end
 	end
 	return nil
@@ -972,6 +1004,14 @@ local function OnMessage(text, senderID)
 				B.ReceiveReportPart(senderID, a, b, c, d)
 			end
 		end
+	elseif kind == "O" then
+		if not guard.streamWindow or now - guard.streamWindow >= STREAM_WINDOW then
+			guard.streamWindow, guard.streamCount = now, 0
+		end
+		guard.streamCount = guard.streamCount + 1
+		if guard.streamCount <= STREAM_LIMIT and B.ReceiveStream then
+			B.ReceiveStream(senderID, a, b)
+		end
 	elseif kind == "F" then
 		peer.files = a -- (comes just before their version)
 	elseif kind == "V" then
@@ -1005,6 +1045,9 @@ local function OnMessage(text, senderID)
 		local collector = B.CollectorMessage and B.CollectorMessage()
 		if collector then
 			B.Queue(senderID, collector) -- I collect error reports
+		end
+		if B.StreamHello then
+			B.QueueLow(senderID, B.StreamHello()) -- whether they can watch my fights (after the rest)
 		end
 		if lastQuest and lastQuest ~= NO_QUEST then
 			B.Queue(senderID, lastQuest)
@@ -1275,6 +1318,9 @@ function M:OnEnable()
 	if B.HandoverRefresh then
 		C_Timer.After(0, B.HandoverRefresh) -- reserved items' borders
 	end
+	if B.StreamStart then
+		B.StreamStart()
+	end
 end
 
 function M:OnDisable()
@@ -1302,6 +1348,9 @@ function M:OnDisable()
 	if B.HandoverRefresh then
 		C_Timer.After(0, B.HandoverRefresh) -- reserved items: borders, vendor guards and question go
 	end
+	if B.StreamStop then
+		B.StreamStop() -- streams close, nobody watches me
+	end
 end
 
 function M:OnSettingChanged()
@@ -1313,7 +1362,7 @@ function M:OnSettingChanged()
 		B.OnSettingChanged() -- Ding.lua: a newly picked level-up sound is played
 	end
 	if B.StreamSettingChanged then
-		B.StreamSettingChanged() -- Stream.lua: switched off, its test and window stop
+		B.StreamSettingChanged() -- StreamNet.lua: friends hear whether they can watch me
 	end
 end
 
@@ -1369,17 +1418,19 @@ function M:BuildOptions(o)
 	o:Button(L["Friends' error reports"], L["Show"], function() B.ShowReports() end,
 		L["The reports your friends sent you, newest first, ready to copy. /lefthy reports does the same."])
 
-	o:Header(L["Fight stream (test)"])
-	o:Checkbox("fightStream", L["Fight stream (test)"],
-		L["A test for a feature in the making: a small live view of a fight from above. Nothing goes to friends yet. Switched on, the buttons below (and /lefthy stream) work."])
-	o:Button(L["Fight stream window"], L["Preview"], function() B.StreamCommand("preview") end,
-		L["The window with made-up mobs moving around. /lefthy stream preview does the same."])
-	o:Button(L["Your own fight, live"], L["Show"], function() B.StreamCommand("me") end,
-		L["The window with the mobs around you, as LefthyTools sees them: compare it with your screen. /lefthy stream me does the same."])
-	o:Button(L["What the game tells addons"], L["Start"], function() B.StreamCommand("test") end,
-		L["A minute of notes while you fight: what the game tells addons about the mobs around you. /lefthy stream test does the same; /lefthy stream results shows the notes, ready to copy."])
-	o:Button(L["Test results"], L["Show"], function() B.StreamCommand("results") end,
-		L["The notes of the last tests, ready to copy. /lefthy stream results does the same."])
+	o:Header(L["Fight stream"])
+	o:Checkbox("streamShare", L["Friends can watch my fights"],
+		L["Friends with LefthyTools can open a small live view of your fight: you in the middle, the mobs around you on the map, what you're casting. Only while someone watches is anything sent."])
+	o:Checkbox("streamWatchedDot", L["Show when friends watch me"],
+		L["A tiny red dot with the number of watchers right of the calendar button at the minimap. Hover it to see who."])
+	o:Checkbox("streamFlights", L["Friends' fights on flights"],
+		L["A cinematic flight (Misc Tweaks) opens the stream of one friend who is fighting (or anyone, if nobody is). The top bar has a button for each friend to open or close theirs; they close when you land."])
+	o:Checkbox("streamMapClick", L["Click a friend on the world map to watch"],
+		L["Clicking a friend's dot on the world map opens their stream; clicking it again closes it. /lefthy stream watch <name> does the same."])
+	o:Button(L["Your own stream"], L["Show"], function() B.StreamCommand("me") end,
+		L["What friends see when they watch you, live. /lefthy stream me does the same."])
+	o:Button(L["Stream window"], L["Preview"], function() B.StreamCommand("preview") end,
+		L["The window with a made-up fight. Drag it to move it, the corner at the bottom right to resize it. /lefthy stream preview does the same."])
 end
 
 function M:GetPeers()

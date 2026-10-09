@@ -3087,24 +3087,24 @@ do
 	wipe(reports)
 end
 
-section("Beacon: fight stream (a test)")
+section("Beacon: fight stream")
 do
-	check(BDB.fightStream == false and B("fightStream") and SETTINGS_BUTTONS["Fight stream window"]
-		and SETTINGS_BUTTONS["What the game tells addons"] and SETTINGS_BUTTONS["Test results"]
-		and SETTINGS_BUTTONS["Your own fight, live"], "off by default, a checkbox and its buttons")
-	local pmark = #PRINTED + 1
-	lefthy("stream preview")
-	lefthy("beacon stream me")
-	check(not (LefthyToolsStreamFrame and LefthyToolsStreamFrame:IsShown()) and not LefthyToolsDB.streamTests
-		and select(2, printedSince(pmark):gsub("is a test and off", "")) == 2, "off: nothing opens, and I'm told how to switch it on")
-	B("fightStream"):SetValue(true)
-	local function dot(name)
-		for _, d in ipairs(BB.StreamDots()) do if d.key and d.mob.name == name then return d end end
+	check(BDB.streamShare == true and BDB.streamWatchedDot == true and BDB.streamFlights == true and BDB.streamMapClick == true
+		and B("streamShare") and B("streamWatchedDot") and B("streamFlights") and B("streamMapClick") and not B("fightStream")
+		and SETTINGS_BUTTONS["Your own stream"] and SETTINGS_BUTTONS["Stream window"],
+		"on by default (friends can watch my fights), its settings and buttons; the test switch is gone")
+	local S = BB.Stream
+	local function dot(name, key)
+		for _, d in ipairs(BB.StreamDots(key)) do if d.key and d.mob.name == name then return d end end
 	end
-	local function used()
+	local function used(key)
 		local n = 0
-		for _, d in ipairs(BB.StreamDots()) do if d.key and d:IsShown() then n = n + 1 end end
+		for _, d in ipairs(BB.StreamDots(key)) do if d.key and d:IsShown() then n = n + 1 end end
 		return n
+	end
+	local function tooltipFind(text)
+		for _, l in ipairs(TOOLTIP.lines) do if l:find(text, 1, true) then return true end end
+		return false
 	end
 
 	-- The preview: made-up mobs around a made-up friend.
@@ -3117,15 +3117,36 @@ do
 	local win = LefthyToolsStreamFrame
 	check(win and win:IsShown() and win.Title:GetText():find("Anna", 1, true) and win.Live.Text:GetText() == "DEMO"
 		and used() == 5 and not win.Hint:IsShown(), "/lefthy stream preview: the window, a friend and five mobs (no word about guessing)")
+	check(math.abs(win._scale - 0.8) < 0.001 and win._strata == "HIGH", "compact: four fifths of its old size")
 	local leader, gnoll = dot("Bandit leader"), dot("Gnoll")
 	check(leader.Ring:IsShown() and gnoll.ty < 0 and gnoll.Body.alpha < 1 and not gnoll.Ring:IsShown(),
 		"an elite has a gold ring; a mob without a direction sits behind, faint")
+	check(win.Power:IsShown() and win.Power.color[3] == 1, "her mana, a thin blue bar under where she is")
+	-- Resizing: the corner at the bottom right; the size is kept, the top left corner stays.
+	do
+		local p = win._points[1]
+		local left, top = p[4] * win._scale, p[5] * win._scale
+		CURSOR.x, CURSOR.y = 500, 300
+		win.Grip._scripts.OnMouseDown(win.Grip)
+		CURSOR.x = 550
+		win.Grip._scripts.OnUpdate(win.Grip, 0.05)
+		win.Grip._scripts.OnMouseUp(win.Grip)
+		p = win._points[1]
+		check(math.abs(win._scale - 1) < 0.001 and math.abs(LefthyToolsDB.streamWindows.me - 1) < 0.001 and not win.Grip._scripts.OnUpdate
+			and math.abs(p[4] * win._scale - left) < 0.01 and math.abs(p[5] * win._scale - top) < 0.01,
+			"dragging the corner: bigger, kept for next time, its top left corner where it was")
+		win.Grip._scripts.OnMouseDown(win.Grip)
+		CURSOR.x = 500
+		win.Grip._scripts.OnUpdate(win.Grip, 0.05)
+		win.Grip._scripts.OnMouseUp(win.Grip)
+		check(math.abs(win._scale - 0.8) < 0.001 and math.abs(LefthyToolsDB.streamWindows.me - 0.8) < 0.001, "and back")
+	end
 	-- The map under it, to scale (a yard on the map is a yard on the rings), where I stand in the
 	-- middle: the minimap's own tiles (3 x 3 of the world's 533 yd grid; here made-up file IDs) ...
 	local px = (220 / 2 - 8) / 40 -- pixels per yard
-	local function shownTiles()
+	local function shownTiles(w)
 		local list = {}
-		for _, t in ipairs(win.Map._textures or {}) do if t.shown and t.path then list[#list + 1] = t end end
+		for _, t in ipairs((w or win).Map._textures or {}) do if t.shown and t.path then list[#list + 1] = t end end
 		return list
 	end
 	local hereN, hereW = UnitPosition("player")
@@ -3154,6 +3175,7 @@ do
 	Advance(3)
 	check(leader.tx * leader.tx + leader.ty * leader.ty < before and math.abs(leader.x - leader.tx) < 3,
 		"mobs move, and their dots glide after them")
+	check(leader.Target:IsShown() and leader.Name:GetText() == "Bandit leader 16", "her target: a white ring, named with its level")
 	check(win.Status:GetText():find("on Anna", 1, true) and win.Status:GetText():find("near", 1, true), "the bottom line: how many on her, how many near")
 	Advance(12)
 	local bandit = dot("Bandit")
@@ -3173,8 +3195,8 @@ do
 	Advance(0.6)
 	local thug, pillager = dot("Defias Thug"), dot("Defias Pillager")
 	gnoll = dot("Gnoll")
-	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3,
-		"/lefthy stream me: my own surroundings, live")
+	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3
+		and S.SenseRunning(), "/lefthy stream me: my own surroundings, live")
 	check(act.Name:GetText() == "" and not act.Icon:IsShown() and not act.Recent[1]:IsShown(), "not casting yet: the row is empty (the preview's spells are gone)")
 	-- The map moves with me, my arrow turns with me.
 	do
@@ -3196,7 +3218,7 @@ do
 		Advance(0.6)
 	end
 	-- What I'm doing: the spell I'm casting (right away, on its start), then in the row of the last ones.
-	PLAYER_CAST = { name = "Wrath", icon = 136006, start = GetTime() * 1000, finish = (GetTime() + 1.5) * 1000 }
+	PLAYER_CAST = { name = "Wrath", icon = 136006, start = GetTime() * 1000, finish = (GetTime() + 1.5) * 1000, spellID = 5176 }
 	Fire("UNIT_SPELLCAST_START", "player", "Cast-3", 5176)
 	Advance(0.05)
 	check(act.Name:GetText() == "Wrath" and act.Icon.path == 136006 and act.Bar.width < 10, "casting: the spell, at once, its bar just started")
@@ -3231,7 +3253,7 @@ do
 	MOBS.target, STATE.target = { name = "Kodo", level = 26, yards = 15, guid = "Creature-0-kodo" }, true
 	Advance(0.6)
 	local kodo = dot("Kodo")
-	check(kodo and kodo.ty < 0 and used() == 4, "my target near but without a nameplate: behind me")
+	check(kodo and kodo.ty < 0 and used() == 4 and kodo.Target:IsShown(), "my target near but without a nameplate: behind me, ringed")
 	kodo._scripts.OnEnter(kodo)
 	check(tooltipHas("your target"), "... and it says it's my target")
 	kodo._scripts.OnLeave(kodo)
@@ -3297,6 +3319,13 @@ do
 	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-1", 2764)
 	Advance(1)
 	check(hyena.ty < 0 and math.abs(hyena.tx) < 40, "turned around to it, a spell cast at it: still south of me (north is up), now where I face, got " .. hyena.ty)
+	-- Dead: a skull where I stand, my name greyed.
+	STATE.dead = true
+	Advance(0.6)
+	check(win.MeSkull:IsShown() and not win.Me:IsShown() and win.Title:GetText():find("dead", 1, true), "dead: a skull in the middle")
+	STATE.dead = false
+	Advance(0.6)
+	check(not win.MeSkull:IsShown() and win.Me:IsShown(), "alive again: my arrow")
 	MOBS, FACING, STATE.target, STATE.combat = {}, 0, false, false
 	Advance(9)
 	MOBS = {
@@ -3305,9 +3334,8 @@ do
 	}
 	Advance(0.6)
 	check(used() == 2, "two mobs again")
-	B("fightStream"):SetValue(false)
-	check(not win:IsShown(), "switched off: the window closes")
-	B("fightStream"):SetValue(true)
+	win.Close:Click()
+	check(not win:IsShown() and not S.SenseRunning(), "closed: the sensor stops")
 
 	-- The test: what answers, in and out of combat.
 	MOBS.nameplate1 = { name = "Defias Thug", level = 15, combat = true, attacking = true, yards = 4, x = 0.5, y = 0.45 }
@@ -3334,20 +3362,14 @@ do
 	check(has("spell Throw (30 yd): true 120, false 60 | true 120, false 60") and has("item 835 (30 yd): nil 180 | true 120, false 60")
 		and has("CheckInteractDistance 3 (10 yd): error 180 |") and has("e.g. CheckInteractDistance: blocked in combat"),
 		"each range check, in and out of combat, with what the errors say")
-	check(has("item 18904 (range to measure): nil 180 | true 180   -> more than 30 yd") and has("item 4941 (range to measure): nil 180 | nil 180\n"),
-		"items of unknown range: measured against the others")
-	check(has("nameplate position: GetCenter: nil 60, onscreen 60, error 60 |") and has("e.g. 0.50,0.45; can't measure this region")
-		and has("nameplate: IsVisible: true 120 | true 120") and has("nameplate: GetEffectiveScale: value 120 | value 120"),
-		"nameplate positions, with what the errors say, and what else a nameplate tells")
+	check(has("nameplate position: GetCenter: nil 60, onscreen 60, error 60 |") and has("e.g. 0.50,0.45; can't measure this region"),
+		"nameplate positions, with what the errors say")
 	check(has("soft target: UnitExists(softenemy): false 60 | false 60") and has("is the soft target: UnitIsUnit(<unit>, softenemy): false 180 | false 180")
-		and has("Soft targeting: enemy ") and has("nameplate size by distance (average, lowest-highest, looks): up to 8 yd 1.000 (1.000-1.000, 120);"),
-		"the soft target, its settings, and nameplate sizes by distance, got\n" .. report)
+		and has("Soft targeting: enemy "), "the soft target and its settings, got\n" .. report)
 	check(has("your casts: UNIT_SPELLCAST_SUCCEEDED (true: harmful, at a hostile target): false 1 |")
 		and has("the game's error messages: UI_ERROR_MESSAGE (true: not in front): true 1 | -   e.g. Target needs to be in front of you."),
 		"my casts and the game's error messages, with their words, got\n" .. report)
-	check(has("Distance: 2 of 10 range checks of known range answered in combat, 5 only out of combat.")
-		and has("readable in combat: nameplate: IsVisible, nameplate: GetEffectiveScale"),
-		"a short summary, got\n" .. report)
+	check(has("Distance: 2 of 10 range checks answered in combat, 5 only out of combat."), "a short summary, got\n" .. report)
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
 	LefthyToolsStreamTestsFrame:Hide()
@@ -3362,11 +3384,198 @@ do
 		lefthy("stream test")
 	end
 	check(#tests == 3, "the last three are kept")
-	lefthy("stream test")
-	B("fightStream"):SetValue(false)
-	Advance(61)
-	check(#tests == 3, "switched off: a running test stops, unsaved")
 	MOBS = {}
+
+	-- Between friends. Anna's LefthyTools says she can be watched; Bob's doesn't (older).
+	local function bob(text) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", text, "WHISPER", 12) end
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	bob("S2;;0;260.0;750.0;Goldshire;")
+	Advance(6)
+	mark = #GAMEDATA + 1
+	anna("H2")
+	Advance(1)
+	check(sentTo(11, mark, "O2;h;1")[1], "my answers tell friends they can watch my fights")
+	anna("O2;h;1")
+	pmark = #PRINTED + 1
+	lefthy("stream watch bob")
+	check(printedSince(pmark):find("Bob can't be watched", 1, true) and not S.IsWatching(12), "Bob's LefthyTools is older: he can't be watched, and I'm told why")
+	lefthy("stream watch nobody")
+	check(printedSince(pmark):find("no friend called nobody", 1, true), "an unknown name: said so")
+	mark = #GAMEDATA + 1
+	lefthy("stream watch anna")
+	Advance(0.6)
+	local fwin = LefthyToolsStreamFriend1
+	check(fwin and fwin:IsShown() and S.IsWatching(11) and sentTo(11, mark, "O2;w;1")[1],
+		"/lefthy stream watch anna: her window opens, and she's told I watch")
+	check(fwin._strata == "FULLSCREEN_DIALOG" and math.abs(fwin._scale - 0.55) < 0.001 and fwin._points[1][1] == "TOPLEFT"
+		and fwin._points[1][4] < 40, "small, at the top left, above everything (also a flight's film)")
+	check(fwin.Status:GetText() == "Waiting for Anna's stream...", "nothing from her yet: waiting")
+	-- Her frames: mob names first (once), then what's around her twice a second.
+	anna("O2;n;1;16;Defias Pillager")
+	anna("O2;f;0;1429;260;750;90;c;M40;;133,10,25;116,3/122,6;1,45,20,9,actes,133/2,180,30,4,cb")
+	Advance(0.6)
+	local fpill, other = dot("Defias Pillager", 11), dot("?", 11)
+	check(fwin.Title:GetText():find("Anna", 1, true) and used(11) == 2 and fpill and other and fwin.Map:IsShown(),
+		"her fight on her map: two mobs, one not named yet")
+	check(fpill.tx > 0 and fpill.ty > 0 and math.abs(radius(fpill) - 20 * px) < 0.5 and fpill.Ring:IsShown()
+		and fpill.Target:IsShown() and fpill.casting, "north-east of her at 20 yd: elite, her target, casting")
+	check(other.ty < 0 and math.abs(radius(other) - 40 * px) < 0.5 and other.Body.alpha < 0.8,
+		"south, beyond the range checks: on the rim, faint (unsure)")
+	check(fwin.Act.Name:GetText() == "Spell 133" and fwin.Act.Recent[1].path == 100116 and fwin.Act.Recent[2].path == 100122
+		and fwin.Power:IsShown() and math.abs(fwin.Me.rotation - math.pi / 2) < 0.01,
+		"what she's doing: her cast, her last spells (newest first), her mana; her arrow turned")
+	check(fwin.Status:GetText():find("1 on Anna", 1, true) and fwin.Status:GetText():find("Defias Pillager casts Spell 133", 1, true),
+		"the bottom line, got " .. tostring(fwin.Status:GetText()))
+	fpill._scripts.OnEnter(fpill)
+	check(TOOLTIP.title == "Defias Pillager (16)" and tooltipHas("attacking Anna") and tooltipHas("Anna's target")
+		and tooltipHas("about 20 yd") and not tooltipHas("direction still unsure"), "hover: about her mob")
+	fpill._scripts.OnLeave(fpill)
+	mark = #GAMEDATA + 1
+	Advance(6)
+	check(#sentTo(11, mark, "O2;w;1") == 1, "every 5 s: still watching")
+	check(fwin.Status:GetText() == "Waiting for Anna's stream...", "no frames for a while: waiting again")
+	mark = #GAMEDATA + 1
+	bob("O2;f;0;1429;260;750;0;;;;;;")
+	bob("O2;f;0;1429;260;750;0;;;;;;")
+	Advance(0.3)
+	check(#sentTo(12, mark, "O2;w;0") == 1, "frames from someone I don't watch (after my /reload, say): told once to stop")
+
+	-- Anna watches me: the sensor runs, a small red dot with 1 right of the calendar button, frames
+	-- go to her (only her), each mob's name once.
+	MOBS = {
+		nameplate1 = { name = "Defias Thug", level = 15, combat = true, attacking = true, yards = 4, x = 0.5, y = 0.45 },
+		nameplate2 = { name = "Defias Pillager", level = 16, class = "elite", combat = true, casting = "Fireball", castID = 133, yards = 25, x = 0.25, y = 0.6 },
+	}
+	mark = #GAMEDATA + 1
+	anna("O2;w;1")
+	Advance(0.1)
+	local watched = LefthyToolsStreamWatched
+	check(S.SenseRunning() and watched and watched:IsShown() and watched.Count:GetText() == "1", "Anna watches me: a small red dot and 1")
+	watched._scripts.OnEnter(watched)
+	check(TOOLTIP.title == "Watching your fights" and tooltipFind("Anna"), "hover: who")
+	watched._scripts.OnLeave(watched)
+	Advance(1.1)
+	local frames, names = sentTo(11, mark, "O2;f;"), sentTo(11, mark, "O2;n;")
+	check(#frames >= 2 and #names == 2 and #sentTo(12, mark, "O2;") == 0,
+		"frames go to her twice a second, each mob's name once, nothing to Bob, got " .. #frames .. " frames, " .. #names .. " names")
+	check((names[1] .. names[2]):find(";15;Defias Thug", 1, true), "a name with its level")
+	local fields = {}
+	for f in (frames[#frames]:sub(6) .. ";"):gmatch("([^;]*);") do fields[#fields + 1] = f end
+	check(#fields == 11 and fields[1] == "0" and #frames[#frames] <= 250 and fields[11]:find(",133$"),
+		"a frame: where I am, how I face, and the mobs (the caster with its spell), got " .. frames[#frames])
+	-- What I send is what she sees: my frames, fed back as hers.
+	for _, m in ipairs(names) do anna(m) end
+	anna(frames[#frames])
+	Advance(0.6)
+	local back = dot("Defias Pillager", 11)
+	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown(),
+		"what I send is what she sees: my mobs, named, the spell named in her client's language")
+	anna("O2;w;1")
+	MOBS = {}
+	Advance(9) -- (the remembered ones fade first)
+	anna("O2;w;1")
+	mark = #GAMEDATA + 1
+	Advance(4.1)
+	local quiet = #sentTo(11, mark, "O2;f;")
+	check(quiet >= 2 and quiet <= 3, "nothing going on: a frame every 2 s (where I am), got " .. quiet)
+	Advance(13)
+	check(not watched:IsShown() and not S.SenseRunning(), "no word from her for 12 s: gone; the dot goes, the sensor stops")
+	anna("O2;w;1")
+	Advance(0.6)
+	check(watched:IsShown() and S.SenseRunning(), "she's back")
+	B("streamWatchedDot"):SetValue(false)
+	check(not watched:IsShown() and S.SenseRunning(), "the dot switched off: hidden (she still watches)")
+	B("streamWatchedDot"):SetValue(true)
+	check(watched:IsShown(), "on again")
+	anna("O2;w;0")
+	Advance(0.1)
+	check(not watched:IsShown() and not S.SenseRunning(), "she stopped: at once")
+	mark = #GAMEDATA + 1
+	B("streamShare"):SetValue(false)
+	Advance(0.5)
+	check(sentTo(11, mark, "O2;h;0")[1] and sentTo(12, mark, "O2;h;0")[1], "not sharing any more: every friend is told")
+	anna("O2;w;1")
+	Advance(0.6)
+	check(not S.SenseRunning() and not watched:IsShown() and #sentTo(11, mark, "O2;f;") == 0, "... and nobody can watch")
+	B("streamShare"):SetValue(true)
+	Advance(0.5)
+	check(sentTo(11, mark, "O2;h;1")[1], "on again: told too")
+
+	-- She stops sharing while I watch her.
+	pmark = #PRINTED + 1
+	mark = #GAMEDATA + 1
+	anna("O2;h;0")
+	Advance(1.1)
+	check(not fwin:IsShown() and not S.IsWatching(11) and printedSince(pmark):find("Anna stopped sharing their fights.", 1, true)
+		and sentTo(11, mark, "O2;w;0")[1], "she stops sharing: her window closes, I'm told")
+	anna("O2;h;1")
+
+	-- The world map: a click on her dot opens her stream, again closes it.
+	OpenWorldMap(1429)
+	local pin = pinOf(11)
+	pin._mouse = true
+	pin:OnMouseEnter()
+	check(tooltipHas("Click: watch their fight"), "her dot's tooltip: a click watches her")
+	ClickWorldMap()
+	check(S.IsWatching(11) and fwin:IsShown() and tooltipHas("Click: close their fight stream"), "clicked: her stream opens; the tooltip says how to close it")
+	STATE.shift = true
+	ClickWorldMap()
+	STATE.shift = false
+	check(S.IsWatching(11), "with Shift: nothing")
+	ClickWorldMap()
+	check(not S.IsWatching(11), "clicked again: closed")
+	pin._mouse = false
+	pin:OnMouseLeave()
+	local bobPin = pinOf(12)
+	bobPin._mouse = true
+	bobPin:OnMouseEnter()
+	ClickWorldMap()
+	check(not tooltipHas("Click: watch their fight") and not S.IsWatching(12), "Bob can't be watched: no hint, a click does nothing")
+	bobPin._mouse = false
+	bobPin:OnMouseLeave()
+	B("streamMapClick"):SetValue(false)
+	pin._mouse = true
+	ClickWorldMap()
+	check(not S.IsWatching(11), "setting off: clicks don't open streams")
+	pin._mouse = false
+	B("streamMapClick"):SetValue(true)
+	WorldMapFrame:Hide()
+
+	-- Flights: the friend with the most going on; more from the top bar; they close on landing.
+	bob("O2;h;1")
+	anna("S2;C;0;260.0;750.0;Goldshire;Hogger")
+	anna("C2;3")
+	Advance(0.3)
+	check(BB.StreamFlightStart() == 11 and S.IsWatching(11) and not S.IsWatching(12), "a flight: the friend in a fight is picked")
+	check(BB.StreamToggle(12, "flight") and S.IsWatching(12) and LefthyToolsStreamFriend2 and LefthyToolsStreamFriend2:IsShown()
+		and LefthyToolsStreamFriend2._points[1][4] > fwin._points[1][4] + 100, "another opens beside it")
+	BB.StreamFlightEnd()
+	check(not S.IsWatching(11) and not S.IsWatching(12) and not fwin:IsShown(), "landed: the flight's streams close")
+	S.OpenFriend(11, "map")
+	BB.StreamFlightEnd()
+	check(S.IsWatching(11), "one opened on the map stays")
+	lefthy("stream stop")
+	check(not S.IsWatching(11), "/lefthy stream stop: every stream closes")
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(0.3)
+	local pick = BB.StreamFlightStart()
+	check((pick == 11 or pick == 12) and S.IsWatching(pick), "nobody fighting: anyone who can be watched")
+	BB.StreamFlightEnd()
+	B("streamFlights"):SetValue(false)
+	check(BB.StreamFlightStart() == nil and not S.IsWatching(11) and not S.IsWatching(12), "setting off: no stream on flights")
+	B("streamFlights"):SetValue(true)
+
+	-- She goes offline while I watch her.
+	S.OpenFriend(11, "command")
+	pmark = #PRINTED + 1
+	BN_FRIENDS[1][1].isOnline = false
+	Fire("BN_FRIEND_ACCOUNT_OFFLINE", 1, false)
+	Advance(2.2)
+	check(not S.IsWatching(11) and not fwin:IsShown() and printedSince(pmark):find("Anna went offline: their stream closed.", 1, true),
+		"she went offline: her stream closes, I'm told")
+	BN_FRIENDS[1][1].isOnline = true
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(1.2)
 	ns.MINIMAP_TILES = realTiles
 end
 
@@ -3403,6 +3612,8 @@ do
 	UIParent:SetSize(1920, 1080)
 	anna("H2") -- friends online, in Elwynn Forest (whatever earlier tests took long enough to forget)
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 12)
+	anna("O2;h;1") -- (Anna can be watched, Bob not)
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "O2;h;0", "WHISPER", 12)
 	Advance(0.2)
 	-- The flight map: where you are (state 0) and the destination, 1118 yd apart in a straight line.
 	TAXI_MAP_NODES = {
@@ -3426,6 +3637,8 @@ do
 		"on the flight: black bars top and bottom (7% of the screen, room for friends' lines); clicks and camera drags go through")
 	check(film.Timer:GetText() == "Landing in about 0:43",
 		"a first flight on this route: the time left, estimated from the distance, got " .. tostring(film.Timer:GetText()))
+	check(BB.StreamIsWatching(11) and not BB.StreamIsWatching(12) and film.FriendColumns[1].Watch.Text:GetText() == "Live",
+		"takeoff: the stream of a friend who can be watched opens (Live in the top bar)")
 	local alphaMidway = UIParent:GetAlpha()
 	check(alphaMidway > 0 and alphaMidway < 1, "the interface fades out, got " .. alphaMidway)
 	Advance(1.5)
@@ -3463,6 +3676,7 @@ do
 	check(took and took >= 44 and took <= 48 and LefthyToolsDB.flightPace
 		and math.abs(LefthyToolsDB.flightPace - took / 1118.03) < 0.001,
 		"landed: the flight's time is kept for the route, the pace learned, got " .. tostring(took) .. ", pace " .. tostring(LefthyToolsDB.flightPace))
+	check(not BB.StreamIsWatching(11), "landed: the flight's stream closes")
 	Advance(1.5)
 	check(UIParent:GetAlpha() == 1, "and the interface fades back in")
 	film.FadeOut:Finish()
@@ -3495,9 +3709,23 @@ do
 		ns.CinematicFlight.UpdateFriends(GetTime())
 		check(anna.FightOut.plays == 1 and anna.Fight:GetAlpha() == 0 and anna.Fight:GetText():find("Fighting Hogger", 1, true),
 			"the fight over: the line fades out (its words stay while it does)")
+		-- Right of a friend's name: their fight stream, Watch / Live (none for Bob: he can't be watched).
+		BB.Stream.StopWatching("")
+		ns.CinematicFlight.UpdateFriends(GetTime())
+		check(anna.Watch:IsShown() and anna.Watch.Text:GetText() == "Watch" and not bob.Watch:IsShown()
+			and anna.Watch._points[1][4] > x(anna.Who), "Watch right of her name; Bob can't be watched: no button")
+		anna.Watch:Click()
+		check(BB.StreamIsWatching(11) and anna.Watch.Text:GetText() == "Live", "clicked: her stream opens, the button says Live")
+		anna.Watch:Click()
+		check(not BB.StreamIsWatching(11) and anna.Watch.Text:GetText() == "Watch", "clicked again: closed")
+		LefthyToolsDB.settings.beacon.streamFlights = false
+		ns.CinematicFlight.UpdateFriends(GetTime())
+		check(not anna.Watch:IsShown(), "streams on flights off: no buttons")
+		LefthyToolsDB.settings.beacon.streamFlights = true
 		LefthyToolsDB.settings.tweaks.flightFriends = false
 		ns.CinematicFlight.UpdateFriends(GetTime())
-		check(anna.Who:GetText() == "" and anna.Quest:GetText() == "" and bob.Who:GetText() == "", "setting off: the top bar stays black")
+		check(anna.Who:GetText() == "" and anna.Quest:GetText() == "" and bob.Who:GetText() == "" and not anna.Watch:IsShown(),
+			"setting off: the top bar stays black")
 		LefthyToolsDB.settings.tweaks.flightFriends = true
 	end
 	check(film.Timer:GetText() == ("Landing in 0:%02d"):format(took - 2), "the same route: an exact countdown, got " .. tostring(film.Timer:GetText()))

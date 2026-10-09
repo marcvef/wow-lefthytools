@@ -554,23 +554,36 @@ L["{name} reached level {level}!"] = "{name} hat Level {level} erreicht!"
 -- Party chat announcements (party members read these, so they follow the client language too)
 L["%s: quest complete!"] = "%s: Quest erledigt!"
 
--- Beacon: fight stream (a test behind its setting)
-L["Fight stream (test)"] = "Kampf-Stream (Test)"
-L["A test for a feature in the making: a small live view of a fight from above. Nothing goes to friends yet. Switched on, the buttons below (and /lefthy stream) work."] =
-	"Ein Test für ein Feature, das gerade entsteht: eine kleine Live-Ansicht eines Kampfes von oben. Noch geht nichts an Freunde. Eingeschaltet funktionieren die Buttons darunter (und /lefthy stream)."
-L["Fight stream window"] = "Kampf-Stream-Fenster"
-L["The window with made-up mobs moving around. /lefthy stream preview does the same."] =
-	"Das Fenster mit ausgedachten Mobs, die sich bewegen. /lefthy stream preview macht dasselbe."
-L["Your own fight, live"] = "Dein eigener Kampf, live"
-L["The window with the mobs around you, as LefthyTools sees them: compare it with your screen. /lefthy stream me does the same."] =
-	"Das Fenster mit den Mobs um dich herum, so wie LefthyTools sie sieht: vergleich es mit deinem Bildschirm. /lefthy stream me macht dasselbe."
-L["What the game tells addons"] = "Was das Spiel Addons verrät"
-L["Start"] = "Starten"
-L["A minute of notes while you fight: what the game tells addons about the mobs around you. /lefthy stream test does the same; /lefthy stream results shows the notes, ready to copy."] =
-	"Eine Minute Notizen, während du kämpfst: was das Spiel Addons über die Mobs um dich herum verrät. /lefthy stream test macht dasselbe; /lefthy stream results zeigt die Notizen zum Kopieren."
-L["Test results"] = "Testergebnisse"
-L["The notes of the last tests, ready to copy. /lefthy stream results does the same."] =
-	"Die Notizen der letzten Tests zum Kopieren. /lefthy stream results macht dasselbe."
+-- Beacon: fight stream
+L["Fight stream"] = "Kampf-Stream"
+L["Friends can watch my fights"] = "Freunde dürfen meine Kämpfe sehen"
+L["Friends with LefthyTools can open a small live view of your fight: you in the middle, the mobs around you on the map, what you're casting. Only while someone watches is anything sent."] =
+	"Freunde mit LefthyTools können eine kleine Live-Ansicht deines Kampfes öffnen: du in der Mitte, die Mobs um dich herum auf der Karte, was du gerade wirkst. Nur solange jemand zuschaut, wird etwas gesendet."
+L["Show when friends watch me"] = "Zeigen, wenn Freunde zuschauen"
+L["A tiny red dot with the number of watchers right of the calendar button at the minimap. Hover it to see who."] =
+	"Ein winziger roter Punkt mit der Zahl der Zuschauer rechts vom Kalender-Button an der Minimap. Mit der Maus drüber siehst du, wer."
+L["Friends' fights on flights"] = "Kämpfe von Freunden auf Flügen"
+L["A cinematic flight (Misc Tweaks) opens the stream of one friend who is fighting (or anyone, if nobody is). The top bar has a button for each friend to open or close theirs; they close when you land."] =
+	"Ein Flug im Kinomodus (Misc Tweaks) öffnet den Stream eines Freundes, der gerade kämpft (oder irgendeines, wenn keiner kämpft). Die obere Leiste hat für jeden Freund einen Button zum Öffnen und Schließen; bei der Landung gehen sie zu."
+L["Click a friend on the world map to watch"] = "Freund auf der Weltkarte anklicken zum Zuschauen"
+L["Clicking a friend's dot on the world map opens their stream; clicking it again closes it. /lefthy stream watch <name> does the same."] =
+	"Ein Klick auf den Punkt eines Freundes auf der Weltkarte öffnet seinen Stream, ein zweiter Klick schließt ihn. /lefthy stream watch <name> macht dasselbe."
+L["Your own stream"] = "Dein eigener Stream"
+L["What friends see when they watch you, live. /lefthy stream me does the same."] =
+	"Was Freunde sehen, wenn sie dir zuschauen, live. /lefthy stream me macht dasselbe."
+L["Stream window"] = "Stream-Fenster"
+L["The window with a made-up fight. Drag it to move it, the corner at the bottom right to resize it. /lefthy stream preview does the same."] =
+	"Das Fenster mit einem ausgedachten Kampf. Zieh es, um es zu verschieben, und die Ecke unten rechts, um die Größe zu ändern. /lefthy stream preview macht dasselbe."
+L["Click: watch their fight"] = "Klick: beim Kampf zuschauen"
+L["Click: close their fight stream"] = "Klick: Kampf-Stream schließen"
+L["Watch"] = "Zuschauen"
+L["Live"] = "Live"
+L["Watching your fights"] = "Schauen dir zu"
+L["Beacon settings: Friends can watch my fights."] = "Beacon-Einstellungen: Freunde dürfen meine Kämpfe sehen."
+L["Waiting for %s's stream..."] = "Warte auf den Stream von %s ..."
+L["%s: off screen for %d s"] = "%s: seit %d s nicht im Bild"
+L["direction still unsure"] = "Richtung noch unsicher"
+L["a spell"] = "einen Zauber"
 L["Fight stream tests"] = "Kampf-Stream-Tests"
 L["No test yet: /lefthy stream test."] = "Noch kein Test: /lefthy stream test."
 L["LIVE"] = "LIVE"

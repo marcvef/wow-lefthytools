@@ -141,6 +141,16 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     gone); dragging it onto the vendor warns in chat to buy it back. At a mailbox, attaching it
     fills in their name. Opening a trade with them says so in chat, and trading (or mailing) it to
     them removes the line and the border. `/lefthy beacon handover` lists what's still owed.
+    Fight stream (both on this build): hover their world map dot: "Click: watch their fight";
+    click it: their window at the top left (small; drag it, drag its bottom right corner to
+    resize, a second window goes beside it); their map, their arrow turning, the mobs they fight,
+    their cast and mana. On your side a tiny red dot with "1" right of the calendar button (hover:
+    who). Click the dot again (or the X): closed, and your red dot goes within 12 s at most. They
+    untick "Friends can watch my fights": your window closes with a chat line. Take a flight with
+    "Cinematic flights" on while they fight: their stream opens by itself; the top bar has
+    Watch / Live right of each friend's name; landing closes them. `/lefthy stream me`: what they
+    see of you. Watch the traffic in `/lefthy beacon status` while watching (about 2 messages a
+    second from them).
 15. Chronicle: the book button on the minimap's edge opens and closes the journal (right-click:
     settings; drag it around the edge, it stays there after `/reload`); `/chronicle` too; the zone you're in is "discovered". Kill a few
     mobs, loot a green, turn in a quest, jump, ride: the Statistics page counts them (time and

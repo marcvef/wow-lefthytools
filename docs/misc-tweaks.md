@@ -353,6 +353,12 @@ left alone (a first version pulled it back and circled; that was removed).
 - **Beacon's item news:** the notices sit on the interface, so `Flight.Subtitle(text)` lets
   Items.lua add a friend's share ("[icon] Anna shares [item]") and an offer's outcome ("[item]:
   Bob wins!", "Nobody needs it.") to the subtitles, like whispers.
+- **Friends' fight streams** (Beacon setting `streamFlights`, see beacon.md "Fight stream"): at
+  takeoff (`Start`) `B.StreamFlightStart()` opens one friend's stream (the busiest, else a random
+  one who can be watched); in the top bar, right of each such friend's name, a small button
+  (`column.Watch`: grey dot "Watch", red dot "Live") opens or closes theirs; the windows float
+  above the film (no parent, `FULLSCREEN_DIALOG`) and don't pause it. When the film ends
+  (`EndFilm`), `B.StreamFlightEnd()` closes the ones opened on the flight.
 - **Leaving:** landing (`UnitOnTaxi` false; `PLAYER_CONTROL_GAINED` wakes the driver) fades
   everything back. Combat or a popup that needs you (ready check, invite, LFG, duel, summon,
   cinematic) brings the interface back at once and keeps it for the rest of that flight (the

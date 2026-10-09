@@ -1536,10 +1536,14 @@ function UnitIsUnit(a, b)
 	if mob and a:find("target$") then return b == "player" and mob.attacking == true end
 	return a == b
 end
--- PLAYER_CAST = { name, icon, start, finish (ms) }: what I'm casting now.
+-- PLAYER_CAST = { name, icon, start, finish (ms), spellID }: what I'm casting now. A mob's casting
+-- (a name) with castID: the spell's ID (9th, like the game).
 function UnitCastingInfo(u)
-	if u == "player" and PLAYER_CAST then return PLAYER_CAST.name, PLAYER_CAST.name, PLAYER_CAST.icon, PLAYER_CAST.start, PLAYER_CAST.finish end
-	if MOBS[u] and MOBS[u].casting then return MOBS[u].casting end
+	if u == "player" and PLAYER_CAST then
+		return PLAYER_CAST.name, PLAYER_CAST.name, PLAYER_CAST.icon, PLAYER_CAST.start, PLAYER_CAST.finish, false, "Cast-9", false,
+			PLAYER_CAST.spellID
+	end
+	if MOBS[u] and MOBS[u].casting then return MOBS[u].casting, nil, nil, nil, nil, false, nil, false, MOBS[u].castID end
 end
 function UnitChannelInfo() return nil end
 function UnitHealth() return SECRET end -- (Forever: always secret)

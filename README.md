@@ -160,6 +160,15 @@ minimap, and you on theirs, without being in a group.
   The chat line has a map pin: click it and your waypoint arrow points there.
   `/lefthy beacon ping` pings where you stand. A ping goes away after a minute; **Alt+click
   your own marker** (or `/lefthy beacon ping clear`) takes it back sooner, for everyone.
+- **Fight stream:** watch a friend's fight live, in a small window: them in the middle on the
+  map of the place, the mobs around them (how far, which way, who attacks them, who casts), what
+  they're casting, their mana or rage. **Click a friend's dot on the world map** (again to close),
+  or `/lefthy stream watch <name>`. On a cinematic flight one friend's fight opens by itself (the
+  one fighting), and the top bar has a Watch button next to each friend. Drag the window's corner
+  to resize it. While friends watch you, a tiny red dot with their number sits right of the
+  calendar button at the minimap. `/lefthy stream me` shows what they see; the game tells addons
+  only how far a mob is, so the directions are learned as you move and turn (faint dots are still
+  unsure).
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see
   "Anna reached level 21!" in their own language.
@@ -208,6 +217,11 @@ minimap, and you on theirs, without being in a group.
 | Level-up sound: boss defeated fanfare, world quest complete, legendary loot, epic loot, scenario complete or a gentle chime. Picking one plays it | boss defeated fanfare | `/lefthy beacon sound [<number>]` |
 | Send my LefthyTools errors to friends who collect them | on | `/lefthy report <what happened>` |
 | Collect my friends' error reports | off | `/lefthy reports` |
+| Friends can watch my fights | on | `/lefthy stream me` (what they see) |
+| Show when friends watch me | on | |
+| Friends' fights on flights | on | |
+| Click a friend on the world map to watch | on | `/lefthy stream watch <name>`, `stop [<name>]` |
+| Stream window: **Preview** | | `/lefthy stream preview` |
 
 `/lefthy beacon status` lists friends with LefthyTools online, their LefthyTools version,
 when their last position arrived, and how many messages were sent and received per minute.

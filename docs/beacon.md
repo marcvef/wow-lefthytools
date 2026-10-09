@@ -6,7 +6,8 @@ Battle.net friends; each player writes their own level-up message.
 
 Files: `Beacon.lua` (module, protocol, rate limiter, settings, `/lefthy beacon`), `Dots.lua` (dot
 look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages, toast, sounds),
-`Alerts.lua` (death alerts), `Pings.lua` (map pings), `Beacon.xml` (world map pin templates). They share state through `ns.Beacon` (`B`): `B.peers`,
+`Alerts.lua` (death alerts), `Pings.lua` (map pings), `Stream*.lua` (the fight stream), `Beacon.xml`
+(world map pin templates). They share state through `ns.Beacon` (`B`): `B.peers`,
 `B.Clean`, `B.QueueToPeers`, `B.MyWorldPosition`, and hooks the other files set (`B.RefreshMaps`,
 `B.UpdateMinimap`, `B.Attach`/`B.Detach`, `B.ShowDing`, `B.AnnounceLevel`, `B.OnSettingChanged`).
 
@@ -37,7 +38,8 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   `M2;<text>` a Lefthy chat line, `A2;<text>` an announcement (see below), `K2;<YYYYMMDD>;<minutes>`
   a day's AFK time (Chronicle), `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
   friends' graphs (see chronicle.md), `Y2;<1|0>` I collect error reports (or stopped),
-  `Z2;<id>;<n>;<of>;<text>` part of an error report (see "Error reports"), `Q2` switched off. A build that doesn't
+  `Z2;<id>;<n>;<of>;<text>` part of an error report (see "Error reports"), `O2;<h|w|f|n>;...`
+  the fight stream (see "Fight stream"), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
@@ -459,109 +461,105 @@ friend per minute); complete ones, or after 120 s with "[part n of m missing]", 
 so. `/lefthy reports` (or the settings button) shows them newest first in a copy box, with Clear.
 Not collecting: parts are ignored.
 
-## Fight stream (Stream.lua, a test)
+## Fight stream (Stream.lua, StreamSense.lua, StreamView.lua, StreamNet.lua)
 
-The idea: a small view of a friend's fight from above (them in the middle, the mobs around them,
-how far, who attacks, who casts), e.g. during your flight. How it goes between friends isn't
-decided, so nothing is sent yet; everything sits behind `fightStream` ("Fight stream (test)", off
-by default), and `/lefthy stream` (or `/lefthy beacon stream`) refuses while it's off.
+A small live view of a friend's fight from above: them in the middle on the map of the place, the
+mobs around them (how far, which way, who attacks, who casts), what they're casting. Watch any
+friend who shares (`streamShare`, "Friends can watch my fights", on by default): `/lefthy stream
+watch <name>`, a click on their world map dot (`streamMapClick`), or a cinematic flight
+(`streamFlights`). Files:
+
+- `Stream.lua`: asking the game (`B.Stream` = `S`: `S.Api`, `S.Value`, range checks, `S.Bounds`,
+  `S.YardsFrom`), the test (`/lefthy stream test` / `results`), the commands.
+- `StreamSense.lua`: the sensor, your own picture (`S.Sensed()`), looked at every 0.5 s while
+  someone needs it (`S.SenseNeed("me" | "stream", on)`: your window, friends watching you).
+- `StreamView.lua`: the windows (`S.OpenView("me" | "preview")`, `S.OpenFriend(id, origin)`,
+  `S.CloseView`, `S.ToggleFriend`, `S.CloseFlightViews`).
+- `StreamNet.lua`: between friends (protocol below), the "being watched" dot, flights.
 
 Known from the API docs (1.60.1): `UnitHealth`, `UnitHealthPercent` and `GetRaidTargetIndex` are
-always secret, `UnitPosition` answers for group members only, the combat log is closed to addons
-(`COMBAT_LOG_EVENT_UNFILTERED` has restrictions), and the damage meter
-(`C_DamageMeter.GetCombatSessionFromType`) is secret in combat. Readable: name, level,
-classification, dead, combat, reaction; who a mob targets (`UnitIsUnit(<unit>target, "player")`),
-threat and casting are secret only while restricted. Unknown until tested in game: whether range
-checks answer for hostile units in combat, and where nameplates are on the screen.
+always secret, `UnitPosition` answers for group members only, the combat log is closed to addons.
+Found by the tests on Forever (`/lefthy stream test`: 60 s of notes on what answers, in and out of
+combat, kept in `LefthyToolsDB.streamTests`, the last 3): range checks answer in combat (harmful
+spells you know, two per range, melee as 5 yd; items of known range via `C_Item.IsItemInRange`:
+8149 5-10 yd (used as 8), 17626 11-20 (15), 10645 20, 13289 20-28 (24), 835 30;
+`CheckInteractDistance` 3/2/1 = 10/11/28 yd); every way to measure where a nameplate is on the
+screen fails ("Can't measure restricted regions"); a mob has a nameplate only while it's on your
+screen; your own place and facing are exact; nameplate size doesn't tell distance; in combat the
+game keeps your target's nameplate up while it's behind you. So distances come from the range
+checks (beyond 30 yd: on the rim, "more than 30 yd away"; 40 yd is the outer ring) and directions
+are **learned**.
 
-- `/lefthy stream test`: 60 s of notes, a look every 0.5 s at `nameplate1`..`nameplate40`: per
-  call (unit info, `GetPlayerFacing`, the nameplate's spot via `C_NamePlate.GetNamePlateForUnit`
-  and `GetCenter`, every range check) how often it answered true, false, a value, nothing, hidden
-  (secret), forbidden, on or off screen, an error or missing, in and out of combat, with a few
-  examples (error messages too; none for GUIDs and the player's position), and a short summary.
-  Range checks: harmful spells you know (two per range, melee as 5 yd), items of known range
-  (`C_Item.IsItemInRange` works without owning them, for items the client knows) and
-  `CheckInteractDistance` 1-3. Kept in `LefthyToolsDB.streamTests` (the last 3); `/lefthy stream
-  results` shows them in a copy box.
-- First test on Forever (1.60.1.70235, open world): range checks answer in combat (spells,
-  `CheckInteractDistance`, items 10645 at 20 yd and 835 at 30 yd; the TBC items LibRangeCheck lists
-  aren't in the client), who a mob targets and threat are readable in combat, health is hidden,
-  and `GetCenter` on a nameplate fails with an error, in and out of combat. So the second test also
-  tries other ways to read a nameplate's spot (`includeForbidden`, `GetLeft`, `GetRect`,
-  `GetPoint`, the plate's `UnitFrame`, a frame of ours anchored to the plate), measures classic
-  items of unknown range against the known ones (between the longest range a unit was beyond while
-  the item said yes and the shortest it was within while it said no), and notes how far the target
-  is when it has no nameplate.
-- Second test: every way to measure a nameplate fails ("Action[FrameMeasurement] failed
-  because[Can't measure restricted regions]", in and out of combat, also for the plate's
-  `UnitFrame` and a frame of ours anchored to it); `IsVisible` and `GetEffectiveScale` answer. So
-  addons get **no left or right** for mobs. What is known: a mob has a nameplate only while it's
-  on your screen (the target lost its nameplate at 15 yd when turned away). Measured: item 8149
-  between 5 and 10 yd (used as 8), 17626 between 11 and 20 yd (used as 15); the other candidates
-  are all more than 20 yd (a mob further than 30 yd would tell more).
-- Third test: 13289 between 20 and 28 yd (used as 24); 18904 and 4945 more than 30. The fourth
-  test records the soft target (`UnitIsUnit(<unit>, "softenemy")`: gamepad mode sets
-  `SoftTargetEnemy` 1 and `SoftTargetEnemyArc` 1, a narrow arc in front of the character), the
-  soft-target and nameplate-scale CVars, and nameplate sizes (`GetEffectiveScale`) by distance band
-  (your target apart), to see whether size tells the distance exactly.
-- `/lefthy stream preview`: the window with made-up mobs around a made-up friend, on a 24 s loop.
-- `/lefthy stream me`: the window with your own surroundings, live, learning where the mobs are.
-  Up is where you face. A mob's distance lies between the longest range it's beyond and the
-  shortest it's within; beyond every check, on the rim ("more than 30 yd away"). Its direction is
-  learned: each mob is a cloud of 48 possible places in the world (by GUID), and every look keeps
-  the places that fit: the distance band (2 yd slack), on screen = within 50 degrees of your
-  facing, the soft target = within 30, your target without a nameplate though nearer than
-  `nameplateMaxDistance` = outside the view. Your own place (`UnitPosition`) and facing are exact,
-  so moving and turning narrow the cloud: a mob that stays on screen as you turn right is on the
-  right; one that drops off as you turn left was on the right; distances changing as you walk
-  triangulate. Places drift 1 yd per look (3 yd closer for a mob attacking you); fewer than 6 fit:
-  the cloud starts over. The dot sits at the cloud's middle; how sure (how closely its places point
-  one way: spread over the whole view is unsure, within about 15 degrees is sure) sets how solid it
-  is. Mobs that left the screen stay 8 s, fading, outside the view. A new target beyond nameplate
-  range starts where you look. Fifth test (mouse and keyboard): in combat your target always had a
-  nameplate, also while behind you, so in combat the game keeps the target's nameplate at the
-  screen's edge (`nameplateTargetRadialPosition`: 1 the target, 2 every mob in combat); then its
-  nameplate says nothing, and a new pinned target starts spread all around. The soft target's arc
-  comes from `SoftTargetEnemyArc` (0 narrow: 15 degrees, 1: 35, 2 wide: tells nothing; mouse and
-  keyboard had 2). Your own casts help with your target: a harmful spell that went off
-  (`UNIT_SPELLCAST_SUCCEEDED`) needs it in front (within 110 degrees), "Target needs to be in
-  front of you" / "You are facing the wrong way!" (`UI_ERROR_MESSAGE`) means behind; each counts
-  for 1.5 s (listened to only while the window shows you). Nameplate size doesn't tell distance
-  (others 0.600, your target about 0.900). Sixth test: `nameplateTargetRadialPosition` was 0 and the
-  target still had a nameplate in every look in combat, so your target's nameplate never counts
-  (in or out of combat); a cast at it comes first. The test notes your casts and the game's error
-  messages (with their words). The label over the radar says "you face": up is where your
-  character faces, not the camera. A line says "Move and turn: faint dots find their place." The
-  camera is assumed to look where the character faces (true while moving; turning the camera alone
-  misleads it until the cloud starts over). In an instance, without your place, it learns by
-  turning only.
+**Learning a direction** (StreamSense.lua): each mob is a cloud of 48 possible places in the world
+(by GUID); every look keeps the places that fit: the distance band (2 yd slack); a nameplate = on
+screen = within 50 degrees of your facing (your target's nameplate never counts); the soft target
+within its arc (`SoftTargetEnemyArc` 0: 15 degrees, 1: 35, 2: tells nothing); your target without
+a nameplate though nearer than `nameplateMaxDistance`: outside the view; a harmful spell of yours
+that went off at your target (`UNIT_SPELLCAST_SUCCEEDED`): in front (110 degrees); "Target needs to
+be in front of you" / "You are facing the wrong way!" (`UI_ERROR_MESSAGE`): behind (both count for
+1.5 s). Moving and turning narrow the cloud (a mob that stays on screen as you turn right is on the
+right). Places drift 1 yd per look (3 yd closer for one attacking you); fewer than 6 fit: start
+over. The dot sits at the cloud's middle; how closely its places point one way is how sure (faint
+while unsure). Mobs that left the screen stay 8 s, fading, outside the view. The camera is assumed
+to look where the character faces. In an instance (no place) it learns by turning only. The
+picture also has your cast (`UnitCastingInfo` / `UnitChannelInfo`, read every look and at once on
+the cast events), your last 5 spells, power (`UnitPowerType`: mana, rage, energy, focus) and form
+(`GetShapeshiftForm`).
 
-The map under the radar, north up (frames can't turn, so the map can't either; your arrow turns
-with `GetPlayerFacing` via `SetRotation`, and the mobs' learned places are turned to north up),
-to scale: one scale (2.55 px per yard: 102 px for 40 yd) for the rings, the dots and the map. Where
-`Data/MinimapTiles.lua` has tiles for your continent (`UnitPosition`'s instance ID: 0 Eastern
-Kingdoms, 1 Kalimdor; `node tools/update-minimap-tiles.js` from wago.tools' file list of a Forever
-build), the minimap's own terrain tiles: `world/minimaps/<continent>/mapX_Y.blp`, 256 px for
-533.33 yd, X = floor(32 - west / 533.33), Y = floor(32 - north / 533.33); the 3 x 3 around you,
-laid again when you step onto another tile. Otherwise the world map's art of your zone
-(`C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid like `Blizzard_MapCanvasDetailLayer`,
-placed by the map's corners from `C_Map.GetWorldPosFromMapPos`). Either cut round (a mask), a
-little darker, the rings as thin lines on top; it moves every frame with `UnitPosition`. Without a
-place (an instance) or art: the plain rings (faint discs). Whether the client lets addons show the
-minimap tiles is to be seen in game.
+**The window** (StreamView.lua; 250 x 368 at scale 1): the map under a radar, north up, to scale
+(2.55 px per yard for rings, dots and map): the minimap's own terrain tiles where
+`Data/MinimapTiles.lua` has them (`world/minimaps/<continent>/mapX_Y.blp`, 256 px for 533.33 yd,
+X = floor(32 - west / 533.33), Y = floor(32 - north / 533.33), the 3 x 3 around; `node
+tools/update-minimap-tiles.js` from wago.tools' file list), else the world map's art of the zone
+(`C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, laid like `Blizzard_MapCanvasDetailLayer`),
+else plain rings; cut round, a little darker. In the middle an arrow turning with their facing (a
+skull when dead, the name greyed). A dot per mob (red: attacking them, orange: in combat, grey:
+not; gold ring: elite, silver: rare; white ring and a yellow name: their target; purple glow:
+casting; a skull that fades: dead; faint: direction unsure), names for the 4 nearest and the
+target, a tooltip per dot. Top: name (class colour), where, a thin power bar, the form's icon,
+"LIVE" (a breathing red dot) or "DEMO". Under the radar: the spell being cast with its bar, the
+last spells fading over 12 s. Bottom: "2 on Anna · 5 near · X casts Y"; a friend's stream with no
+frame for 6 s says "Waiting for Anna's stream...". Dots follow their mob and glide; a friend's map
+glides between their frames. Drag to move; the grip at the bottom right resizes (0.35 to 1.3;
+kept per kind in `LefthyToolsDB.streamWindows`: `me`, `friend`). Yours (`LefthyToolsStreamFrame`,
+"me" or the preview, scale 0.8, right of the middle) lives in the interface and pauses a cinematic
+flight like any LefthyTools window. Friends' windows (`LefthyToolsStreamFriend1..`, scale 0.55)
+have no parent (scaled with UIParent's scale themselves), `FULLSCREEN_DIALOG` strata, so they float
+above a flight's film without pausing it; they open side by side from the top left (the first free
+place), several at once. Escape or the X closes any. Frames are kept for reuse.
 
-The window (250 x 350, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
-you in the middle, a dot per mob (red: attacking you, orange: in combat, grey: not; gold ring:
-elite, silver: rare; a purple glow while casting; a skull that fades when it dies), names for the
-4 nearest, a tooltip per dot, and a bottom line ("2 on you · 5 near · X casts Y"). Dots follow
-their mob (by GUID) and glide to new spots. Under the radar, what you're doing: the spell you're
-casting or channelling (`UnitCastingInfo` / `UnitChannelInfo` on "player": icon, name, a bar that
-fills while casting and empties while channelling; read every look and at once on
-`UNIT_SPELLCAST_START` / `STOP` / `CHANNEL_START` / `CHANNEL_STOP`), and on the right the last 5
-spells you cast (`UNIT_SPELLCAST_SUCCEEDED`, icons from `C_Spell.GetSpellInfo`, newest first, fading
-over 12 s). The preview shows the made-up friend casting Fireball every 4 s. Cost: nothing unless a
-test runs or the window is open; its OnUpdate runs only while it's shown, the cast events
-(`RegisterUnitEvent` for "player") only while the window shows you or a test runs.
+**Between friends** (StreamNet.lua), kind `O` (older builds ignore it):
+
+- `O2;h;<1|0>` I can be watched: low priority with every answer, and to everyone when
+  `streamShare` changes. Only friends who said 1 (`peer.streamable`) can be watched.
+- `O2;w;<1|0>` to a friend: I watch you, again every 5 s; 0 = stopped. A watcher not heard from for
+  12 s is dropped. Frames from someone I don't watch (after my `/reload`) are answered with `w;0`
+  (at most every 10 s). Not sharing: `w;1` is ignored.
+- `O2;f;<frame>` to watchers only, after each look of the sensor: every 0.5 s per watcher (all
+  watchers together at most 4 a second), every 2 s when nothing's going on (no mobs, no cast, not
+  in combat). A waiting frame for the same friend is replaced (`B.QueueLatest`), never piled up.
+  Frame: `continent;uiMapID;north;west;facing(degrees);state[cdg];power(M/R/E/F + %);form spellID;
+  cast spellID,elapsed,total (tenths)[,c];recent spellID,seconds ago/...;mobs`, mobs
+  `id,degrees from north,yards,sure 0-9,flags[,cast spellID]/...` (flags: a attacking them, c in
+  combat, t their target, d dead, e elite, x rare elite, r rare, m off their screen, b beyond (yards =
+  the range it's beyond), s casting). Mobs that matter first (target, attacking, in combat,
+  nearest) until 245 bytes; the message stays under 255.
+- `O2;n;<id>;<level>;<name>` a mob's name (40 bytes), once per watcher before the first frame with
+  that id (ids 1-999 per GUID, reused after 60 s).
+
+Spells go as IDs; the watcher's client names them in its own language. Guard: 80 `O` messages per
+friend per 10 s. Watching: the sensor runs only while someone watches you (or your own window is
+open). Being watched: a tiny red dot and the count right of the minimap's calendar button
+(`GameTimeFrame`; `streamWatchedDot`), hover for who. A friend who stops sharing (`h;0`) or goes
+offline: their window closes with a chat line. Beacon switched off: every stream closes.
+
+**Flights** (`streamFlights`, Flight.lua): at takeoff one friend's stream opens: the one in combat
+with the most mobs on them (`peer.combat`, `peer.mobs`), else a random one who can be watched. Each
+friend in the top bar who can be watched has a small button right of their name ("Watch" grey /
+"Live" red) to open or close theirs. Streams opened on the flight close when the film ends.
+**World map** (`streamMapClick`, Dots.lua): a plain left click on a friend's dot opens or closes
+their stream (a hook on the map's `ScrollContainer` `OnMouseDown`; the pins themselves take no
+clicks), and the dot's tooltip says so. `/lefthy stream stop [<name>]` closes them.
 
 ## Open questions (check in game)
 

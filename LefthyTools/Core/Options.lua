@@ -422,7 +422,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 	elseif cmd == "reports" and ns.Beacon and ns.Beacon.ShowReports then
 		ns.Beacon.ShowReports()
 	elseif cmd == "stream" and ns.Beacon and ns.Beacon.StreamCommand then
-		ns.Beacon.StreamCommand(rest) -- Beacon's Stream.lua: a test behind its setting
+		ns.Beacon.StreamCommand(rest) -- Beacon's fight stream: watch a friend, your own, the preview
 	elseif (cmd == "enable" or cmd == "disable" or cmd == "toggle") and target then
 		if cmd == "toggle" then
 			LT:ToggleModule(target.key)
@@ -445,6 +445,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 		LT.Print("/lefthy reports - the reports your friends sent you")
 		LT.Print("/lefthy news - what's new in LefthyTools")
 		LT.Print("/lefthy announce <text> (or /la) - a line in the middle of your Beacon friends' screens (/l <text>: Lefthy chat)")
+		LT.Print("/lefthy stream watch <name> | stop | me | preview - a Beacon friend's fight, live (more: /lefthy stream)")
 		LT.Print("/lefthy enable | disable | toggle <module>")
 		LT.Print("/lefthy <module> ... - module commands, e.g. /lefthy mirage status")
 	end
