@@ -185,5 +185,8 @@ ns.CHANGELOG = {
 	{ id = 59, module = "tweaks",
 		en = { "Combo points: coloured, on your target", "Forever's personal resource display shows combo points now, so LefthyTools' own row is gone: the colouring by count goes onto Blizzard's. New: a small dot right of your target's level on its nameplate, in that colour, with the number of points." },
 		de = { "Combopunkte: gefärbt, an deinem Ziel", "Die persönliche Ressourcenanzeige in Forever zeigt jetzt Combopunkte, deshalb ist die eigene Reihe von LefthyTools weg: das Färben nach Anzahl gilt jetzt für Blizzards. Neu: ein kleiner Punkt rechts neben dem Level an der Namensplakette deines Ziels, in dieser Farbe, mit der Anzahl der Punkte." } },
+	{ id = 60, module = "tweaks",
+		en = { "Clean-up button back in gamepad mode", "Forever's latest patch left gamepad players without a way to clean up their bags. Blizzard's clean-up button is back, top right of the backpack." },
+		de = { "Aufräumen-Knopf im Gamepad zurück", "Mit dem letzten Forever-Patch gab es im Gamepad-Modus keinen Weg mehr, die Taschen aufzuräumen. Blizzards Aufräumen-Knopf ist zurück, oben rechts am Rucksack." } },
 	-- New entries go here, at the end.
 }
