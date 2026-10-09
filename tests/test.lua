@@ -773,114 +773,100 @@ QuestUpdate()
 check(#SENT == 5, "switching on again doesn't re-announce what's already done")
 GROUP = "none"
 
-section("Misc Tweaks: combo points on the personal resource display")
-local PRD = PersonalResourceDisplayFrame
-local row, pips, comboStyle = ns.GetComboPointRow()
-check(TDB.comboPoints == true and REGISTERED_SETTINGS.LefthyTools_tweaks_comboPoints, "on by default, with a checkbox")
-check(row and row:GetParent() == PRD and row:IsShown(), "a row inside the personal resource display (rogue)")
-check(comboStyle == "retail", "retail's rogue combo point art when the client has it")
-local p1, rel, p2, x, y = row:GetPoint(1)
-check(p1 == "TOP" and rel == PRD and p2 == "BOTTOM" and x == 0 and y == -6, "centred under the display's lowest bar")
-check(#pips == 5 and row:GetWidth() == 108 and row:GetScale() == 1, "5 points, 20 px each with 2 px gaps")
-check(pips[1].Shadow and pips[1].Slash.width == 43 and pips[1].Icon.atlas == "uf-roguecp-icon-red", "retail layers: shadow, sockets, gem, effects")
-local function isFull(i) return pips[i].Icon.alpha == 1 and pips[i].Active.alpha == 1 and pips[i].Inactive.alpha == 0 end
-local function isEmpty(i) return pips[i].Icon.alpha == 0 and pips[i].Active.alpha == 0 and pips[i].Inactive.alpha == 1 end
-local function fullCount() local n = 0 for i = 1, 5 do if isFull(i) then n = n + 1 end end return n end
-check(isEmpty(1) and isEmpty(5) and pips[1].Gain.plays == 0 and pips[1].Spend.plays == 0,
-	"no combo points: empty sockets, no animation on the first draw")
-STATE.target, COMBO.points = true, 2
-Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-check(fullCount() == 0, "nothing drawn inside the event handler")
-Advance(0.05)
-check(isFull(1) and isFull(2) and isEmpty(3), "2 points: two lit gems")
-check(pips[2].Gain.plays == 1 and pips[3].Gain.plays == 0, "gaining a point plays Blizzard's gain animation (slash, glow)")
-local function tint(i, key) local v = pips[i][key or "IconBoost"].vertex; return v[1], v[2], v[3] end -- the full colour
-local function near3(i, r, g, b, key) local x, y, z = tint(i, key); return math.abs(x - r) < 0.01 and math.abs(y - g) < 0.01 and math.abs(z - b) < 0.01 end
-check(pips[1].Icon.desaturated and near3(1, 0.575, 0.95, 0.075) and near3(2, 0.575, 0.95, 0.075)
-	and near3(2, 0.575, 0.95, 0.075, "Slash") and near3(2, 0.68125, 0.9625, 0.30625, "Icon")
-	and near3(2, 0.68125, 0.9625, 0.30625, "Active"),
-	"2 of 5: every gem and its effects tinted yellow-green (plain gem and socket a quarter lighter)")
-check(not pips[1].Inactive.desaturated and pips[1].Shadow.vertex == nil, "empty sockets and the shadow keep their own look")
-check(pips[1].IconBoost.shown and pips[1].IconBoost.blend == "ADD" and pips[1].IconBoost.alpha == 1
-	and near3(1, 0.575, 0.95, 0.075, "IconBoost") and pips[3].IconBoost.alpha == 0,
-	"an additive copy of each lit gem in the same colour keeps the colours bright")
-check(pips[1].Glow.blend == "ADD" and pips[1].FrameGlow.blend == "ADD" and pips[1].Active.blend == "BLEND",
-	"glows blend additively while coloured; the socket doesn't")
-COMBO.points = 3
-Fire("UNIT_POWER_FREQUENT", "player", "ENERGY")
-Advance(0.05)
-check(fullCount() == 2, "energy ticks don't redraw")
-COMBO.points = 5
-Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-Advance(0.05)
-check(fullCount() == 5 and pips[1].Ready:IsPlaying() and pips[5].Ready:IsPlaying() and pips[1].Gain.plays == 1,
-	"all 5: every gem glows and breathes (finisher ready); already lit gems don't replay")
-check(near3(1, 1, 0.1, 0.05) and near3(5, 1, 0.1, 0.05), "all 5: red")
-COMBO.points = 0
-Fire("PLAYER_TARGET_CHANGED")
-Advance(0.05)
-check(isEmpty(1) and isEmpty(5) and pips[1].Spend.plays == 1 and not pips[1].Ready:IsPlaying(),
-	"new target: points gone, each gem bursts out (spend animation)")
-check(near3(1, 1, 0.1, 0.05, "Burst"), "the burst keeps the colour the gems had")
-COMBO.max = 6
-Fire("UNIT_MAXPOWER", "player", "COMBO_POINTS")
-Advance(0.05)
-check(pips[6] and pips[6]:IsShown() and row:GetWidth() == 130 and pips[6].Spend.plays == 0 and pips[6].Inactive.alpha == 1,
-	"6 max combo points: a sixth socket, without a burst")
-PRD:SetSize(100, 30)
-Advance(0.05)
-check(math.abs(row:GetScale() - 100 / 130) < 1e-6, "narrow bars (Edit Mode): the row shrinks to fit")
-PRD:SetSize(200, 30)
-Advance(0.05)
-check(row:GetScale() == 1, "and grows back, never past its normal size")
-COMBO.max = 5
-Fire("UNIT_MAXPOWER", "player", "COMBO_POINTS")
-Advance(0.05)
-check(not pips[6]:IsShown() and row:GetWidth() == 108, "back to 5")
-PLAYER_CLASS, POWER_TYPE = "DRUID", 0
-Fire("UNIT_DISPLAYPOWER", "player")
-Advance(0.05)
-check(not row:IsShown(), "druid in caster form: no combo points")
-POWER_TYPE = 3
-COMBO.points = 2
-Fire("UNIT_DISPLAYPOWER", "player")
-Advance(0.05)
-check(row:IsShown() and fullCount() == 2 and pips[2].Gain.plays == 1, "druid in Cat Form: combo points, shown without replaying animations")
-PLAYER_CLASS = "MAGE"
-Fire("PLAYER_ENTERING_WORLD")
-Advance(0.05)
-check(not row:IsShown(), "other classes: nothing")
-PLAYER_CLASS = "ROGUE"
-COMBO.points = SECRET
-Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-Advance(0.05)
-check(not row:IsShown(), "secret combo points: the row hides instead of erroring")
-COMBO.points = 1
-Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-Advance(0.05)
-check(row:IsShown() and fullCount() == 1, "readable again: back")
-check(near3(1, 0.15, 1, 0.15), "1 point: green")
-COMBO.points = 3
-Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-Advance(0.05)
-check(near3(1, 1, 0.9, 0) and near3(3, 1, 0.9, 0), "3 of 5: yellow, the earlier gems recoloured too")
-lefthy("tweaks combocolors off"); Advance(0.05)
-check(TDB.comboColors == false and not pips[1].Icon.desaturated and near3(1, 1, 1, 1), "/lefthy tweaks combocolors off: retail's red art")
-check(not pips[1].IconBoost.shown and pips[1].Glow.blend == "BLEND", "... without the boost and with retail's blending")
-lefthy("tweaks combocolors on"); Advance(0.05)
-check(pips[1].Icon.desaturated and near3(1, 1, 0.9, 0), "and on again")
-COMBO.points = 1
-Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-Advance(0.05)
-lefthy("tweaks combo off"); Advance(0.05)
-check(not row:IsShown() and TDB.comboPoints == false, "/lefthy tweaks combo off")
-COMBO.points = 3
-Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-Advance(0.05)
-check(not row:IsShown(), "and stays off")
-lefthy("tweaks combo on"); Advance(0.05)
-check(row:IsShown() and fullCount() == 3, "/lefthy tweaks combo on")
-COMBO.points, STATE.target = 0, false
+section("Misc Tweaks: combo points")
+do
+	local PRD = PersonalResourceDisplayFrame
+	check(TDB.comboColors == true and TDB.comboNameplate == true and REGISTERED_SETTINGS.LefthyTools_tweaks_comboColors
+		and REGISTERED_SETTINGS.LefthyTools_tweaks_comboNameplate and not REGISTERED_SETTINGS.LefthyTools_tweaks_comboPoints,
+		"colouring and the nameplate dot on by default, each with a checkbox; our own row is gone (Blizzard has its own)")
+	-- Blizzard's bar (the display builds it itself): coloured by count after each of its updates.
+	PRD:SetupClassBar()
+	local points = PRD.classFrame.classResourceButtonTable
+	local function near(texture, r, g, b)
+		local v = texture and texture.vertex
+		return v and math.abs(v[1] - r) < 0.01 and math.abs(v[2] - g) < 0.01 and math.abs(v[3] - b) < 0.01
+	end
+	STATE.target, COMBO.points = true, 2
+	PRD.classFrame:UpdatePower()
+	check(points[1].IconUncharged.desaturated and near(points[1].LefthyToolsBoost, 0.575, 0.95, 0.075)
+		and near(points[2].SlashFBUncharged, 0.575, 0.95, 0.075) and near(points[1].IconUncharged, 0.68125, 0.9625, 0.30625)
+		and near(points[2].BGActive, 0.68125, 0.9625, 0.30625),
+		"2 of 5: Blizzard's gems and their effects tinted yellow-green right after its update (gem and socket a quarter lighter)")
+	check(not points[1].BGInactive.desaturated and points[1].BGShadow.vertex == nil, "empty sockets and the shadow keep their look")
+	check(points[1].LefthyToolsBoost.blend == "ADD" and points[1].BGGlow.blend == "ADD" and points[1].BGActive.blend == nil,
+		"an additive copy of each gem and additive glows keep the colours bright; the socket blends as Blizzard's")
+	Advance(0.05)
+	check(points[1].LefthyToolsBoost.alpha == 1 and points[3].LefthyToolsBoost.alpha == 0, "the copies follow Blizzard's gems")
+	COMBO.points = 5
+	PRD.classFrame:UpdatePower()
+	check(near(points[1].LefthyToolsBoost, 1, 0.1, 0.05) and near(points[5].LefthyToolsBoost, 1, 0.1, 0.05), "all 5: red")
+	COMBO.points = 0
+	PRD.classFrame:UpdatePower()
+	check(near(points[1].LefthyToolsBoost, 1, 0.1, 0.05), "spent: the gems keep their colour while they burst out")
+	lefthy("tweaks combocolors off"); Advance(0.05)
+	check(TDB.comboColors == false and not points[1].IconUncharged.desaturated and near(points[1].IconUncharged, 1, 1, 1)
+		and not points[1].LefthyToolsBoost.shown and points[1].BGGlow.blend == "BLEND", "/lefthy tweaks combocolors off: Blizzard's red")
+	COMBO.points = 1
+	PRD.classFrame:UpdatePower()
+	check(not points[1].IconUncharged.desaturated, "... and stays so")
+	lefthy("tweaks combocolors on"); Advance(0.05)
+	check(points[1].IconUncharged.desaturated and near(points[1].LefthyToolsBoost, 0.15, 1, 0.15), "on again: 1 point, green")
+
+	-- The dot on my target's nameplate, right of its level: coloured by count, the number at its corner.
+	MOBS.target = { name = "Hogger", level = 11, x = 0.5, y = 0.5 }
+	COMBO.points = 3
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	local dot = ns.GetComboDot()
+	check(not (dot and dot:IsShown()), "nothing done inside the event")
+	Advance(0.05)
+	dot = ns.GetComboDot()
+	local plate = MOBS.target.unitFrame
+	local point = dot and dot._points[#dot._points]
+	check(dot and dot:IsShown() and dot:GetParent() == plate and point[1] == "LEFT" and point[2] == plate.PlayerLevelDiffFrame
+		and point[3] == "RIGHT" and tostring(dot.Number:GetText()) == "3" and dot.Body.color[1] == 1 and math.abs(dot.Body.color[2] - 0.9) < 0.01,
+		"3 points: a yellow dot on my target's nameplate, right of its level, with a 3")
+	Fire("UNIT_POWER_FREQUENT", "player", "ENERGY")
+	plate.PlayerLevelDiffFrame:Hide()
+	COMBO.points = 5
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	Advance(0.05)
+	point = dot._points[#dot._points]
+	check(point[2] == plate.HealthBarsContainer and tostring(dot.Number:GetText()) == "5" and math.abs(dot.Body.color[2] - 0.1) < 0.01,
+		"no level shown: right of the health bar; 5 points: red")
+	plate.PlayerLevelDiffFrame:Show()
+	lefthy("tweaks combocolors off"); Advance(0.05)
+	COMBO.points = 2
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	Advance(0.05)
+	check(dot:IsShown() and math.abs(dot.Body.color[2] - 0.1) < 0.01 and tostring(dot.Number:GetText()) == "2", "colouring off: always red")
+	lefthy("tweaks combocolors on"); Advance(0.05)
+	MOBS.target.x = nil -- (its nameplate gone: off screen)
+	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate1")
+	Advance(0.05)
+	check(not dot:IsShown(), "my target without a nameplate: no dot")
+	MOBS.target.x = 0.5
+	Fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
+	Advance(0.05)
+	check(dot:IsShown(), "its nameplate back: the dot too")
+	COMBO.points = 0
+	Fire("PLAYER_TARGET_CHANGED")
+	Advance(0.05)
+	check(not dot:IsShown(), "no points: no dot")
+	COMBO.points = SECRET
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	Advance(0.05)
+	check(not dot:IsShown(), "secret points: no dot, no error")
+	COMBO.points = 2
+	lefthy("tweaks combo off"); Advance(0.05)
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	Advance(0.05)
+	check(TDB.comboNameplate == false and not dot:IsShown(), "/lefthy tweaks combo off: no dot")
+	lefthy("tweaks combo on"); Advance(0.05)
+	check(dot:IsShown(), "/lefthy tweaks combo on")
+	MOBS, COMBO.points, STATE.target = {}, 0, false
+	Fire("PLAYER_TARGET_CHANGED")
+	Advance(0.05)
+end
 
 section("Misc Tweaks: quests that are new in WoW: Forever")
 check(TDB.foreverQuests == true and REGISTERED_SETTINGS.LefthyTools_tweaks_foreverQuests, "on by default, with a checkbox")
@@ -962,7 +948,7 @@ section("Misc Tweaks: module switch and /lefthy tweaks")
 REGISTERED_SETTINGS.LefthyTools_module_tweaks:SetValue(false); Advance(0.05)
 check(not Tweaks.enabled and CVARS.statusText == "0" and CVARS.statusTextDisplay == "PERCENT",
 	"disabling the module undoes its tweaks")
-check(not row:IsShown(), "including the combo points")
+check(not (ns.GetComboDot() and ns.GetComboDot():IsShown()), "including the combo points' dot")
 lefthy("enable tweaks"); Advance(0.05)
 check(Tweaks.enabled and CVARS.statusText == "1", "enabling re-applies them")
 lefthy("tweaks statustext off"); Advance(0.05)

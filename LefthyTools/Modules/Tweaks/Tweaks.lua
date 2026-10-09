@@ -4,7 +4,7 @@ local L = ns.L
 
 -- Misc Tweaks: small annoyances fixed, each switchable on its own. All tweaks default to on
 -- (chosen while the Forever beta still dropped SavedVariables on restart).
--- The combo point tweak lives in ComboPoints.lua.
+-- The combo point tweaks live in ComboPoints.lua.
 
 local M = LT:NewModule("tweaks", {
 	title = "Misc Tweaks", -- module names are never translated
@@ -15,7 +15,7 @@ local M = LT:NewModule("tweaks", {
 		bagPositions = {},     -- key ("combined" / "bag<id>") -> { left, top } in UIParent units
 		savedStatusText = {},  -- CVar values to restore when statusText is switched off
 		questAnnounce = true,
-		comboPoints = true,
+		comboNameplate = true, -- (comboPoints, our own row under the personal resource display, is gone: Blizzard has its own now)
 		comboColors = true,
 		foreverQuests = true,
 		questMap = true,       -- QuestMap.lua
@@ -442,8 +442,8 @@ local TWEAKS = {
 	{ key = "statusText", command = "statustext", label = "Always show health & power values", apply = ApplyStatusText },
 	{ key = "movableBags", command = "bags", label = "Movable bags", apply = ApplyMovableBags },
 	{ key = "questAnnounce", command = "quests", label = "Announce quest progress in party chat", apply = ApplyQuestAnnounce },
-	{ key = "comboPoints", command = "combo", label = "Combo points on the personal resource display",
-		apply = function(on) ns.ApplyComboPoints(on) end }, -- ComboPoints.lua
+	{ key = "comboNameplate", command = "combo", label = "Combo points on your target's nameplate",
+		apply = function(on) ns.ApplyComboNameplate(on) end }, -- ComboPoints.lua
 	{ key = "comboColors", command = "combocolors", label = "Colour combo points by count",
 		apply = function(on) ns.ApplyComboColors(on) end },
 	{ key = "foreverQuests", command = "newquests", label = "Mark quests that are new in WoW: Forever",
@@ -510,10 +510,10 @@ function M:BuildOptions(o)
 	o:Header(L["Unit frames"])
 	o:Checkbox("statusText", L["Always show health & power values"],
 		L["Show current / max on the health and power bars all the time instead of only on mouseover. Applies to every unit frame (player, target, focus, pet, party), like Blizzard's Options > Interface > Status Text set to Numeric."])
-	o:Checkbox("comboPoints", L["Combo points on the personal resource display"],
-		L["Forever's personal resource display leaves combo points out. This adds them under its bars in retail's style, with Blizzard's animations; at full points they glow. Rogues, and druids in Cat Form. Shows when the personal resource display does."])
 	o:Checkbox("comboColors", L["Colour combo points by count"],
-		L["Green with one point, through yellow and orange, to red at full points. Off: retail's red."])
+		L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."])
+	o:Checkbox("comboNameplate", L["Combo points on your target's nameplate"],
+		L["A small dot right of your target's level, in the colour of your combo points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."])
 	o:Header(L["Bags"])
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])

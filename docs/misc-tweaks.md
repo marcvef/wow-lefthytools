@@ -44,40 +44,33 @@ nothing solo or in a raid. Sent via `C_ChatInfo.SendChatMessage`; messages queue
 `C_ChatInfo.InChatMessagingLockdown()` is true, retried every second (no event when it ends).
 These lines go through `L` because party members read them.
 
-## comboPoints: combo points on the personal resource display (ComboPoints.lua)
+## Combo points (ComboPoints.lua): colour by count, and a dot on the target's nameplate
 
-The personal resource display has no class resource in Forever (see
-[forever-platform.md](forever-platform.md)). We add our own child row instead of touching its
-`ClassFrameContainer` (Blizzard's `UpdateFrameHeight` / `UpdateAdditionalBarAnchors` read it).
+Since build 1.60.1.70291 Blizzard's personal resource display shows combo points itself: the
+Camelot override of `GetClassFrameInfo()` builds retail's `RogueComboPointBarTemplate` (rogues) and
+`DruidComboPointBarTemplate` (druids, shown in Cat Form), both with `TargetBoundComboPointBarMixin`
+(`GetComboPoints("player", "target")`, updated on target and `COMBO_TARGET_CHANGED`), and retail's
+`RogueComboPointTemplate` points in `classFrame.classResourceButtonTable`. Our own row under the
+display (the old `comboPoints` tweak) is gone; its saved value is simply no longer read.
 
-- **Placement:** centred TOP to the display's BOTTOM, `GetBarPadding()` + 2 apart. Blizzard sizes
-  the frame's height to the visible bars (`UpdateFrameHeight`), so hidden health/power bars are
-  handled for free, and its width to the Edit Mode bar width (`UpdateBarWidth`); the row shrinks
-  (`SetScale`) when the bars are narrower than the points. A `HookScript("OnSizeChanged")` on the
-  display and `EDIT_MODE_LAYOUTS_UPDATED` re-lay it out. As a child it moves, scales, hides and
-  fades (Mirage) with the display.
-- **Data:** `GetComboPoints("player", "target")` (target-bound, as `ComboFrame` reads them), max
-  `UnitPowerMax("player", Enum.PowerType.ComboPoints)` (up to 10). A secret value hides the row.
-  `UNIT_POWER_FREQUENT` fires for every energy tick, so only `powerToken == "COMBO_POINTS"`
-  schedules a redraw. Rogues always; druids when their power type is energy (Cat Form).
-- **Look:** retail's `RogueComboPointTemplate` rebuilt in Lua (Camelot doesn't load
-  `RogueComboPointBar.xml`): 20 px points, 2 px gaps; layers `uf-roguecp-bg-shadow`, `-bg-dis`
-  (empty socket), `-bg` (lit socket and glow), `-icon-red` (gem), `-fx-red` (spend burst),
-  `-frame-glow`, `-slash-red` (43x43 flipbook, 3x6 grid, 17 frames, 0.57 s). Gain and spend
-  animations copy the timings of `unchargedEmptyToUnchargedFull` / `unchargedFullToUnchargedEmpty`.
-  At full points every gem's frame glow breathes (BOUNCE 0.15-0.7, 0.6 s). The first draw, a row
-  coming back (shapeshift) and new sockets don't animate. If
-  `C_Texture.GetAtlasInfo("uf-roguecp-icon-red")` fails, the classic target-frame gems are used
-  (`Interface\ComboFrame\ComboPoint`: socket 0-0.375, gem 0.375-0.5625, shine 0.5625-1 with ADD,
-  like `ComboPointTemplate`) at 1.25x with the same logic.
-- **Colour by count** (`comboColors`, its own tweak entry): green (0.15, 1, 0.15) at one point →
-  yellow (1, 0.9, 0) → red (1, 0.1, 0.05) at full, over `(points - 1) / (max - 1)`. The art is red,
-  so the coloured layers are `SetDesaturated(true)` + `SetVertexColor`d; empty socket and shadow
-  keep their look. A desaturated red gem is dark grey and vertex colours can't exceed 1, so
-  `IconBoost`, an ADD-blended copy of the gem with the same tint and alpha animation, brightens
-  it; glows/burst/slash switch to ADD while tinted; the plain gem and lit socket get their tint
-  lifted 25% towards white (`LIGHTEN`). Recoloured before the gain animation plays; at 0 points
-  the colour stays for the burst.
+- **Colour by count** (`comboColors`, on): green (0.15, 1, 0.15) at one point -> yellow (1, 0.9, 0)
+  -> red (1, 0.1, 0.05) at full, over `(points - 1) / (max - 1)`, on Blizzard's points. A
+  `hooksecurefunc` on the display's `SetupClassBar` finds the bar, one on the bar's `UpdatePower`
+  recolours after each of Blizzard's updates. The red parts (`BGActive`, `BGGlow`, `IconUncharged`,
+  `FXUncharged`, `FrameGlow`, `SlashFBUncharged`) are `SetDesaturated(true)` + `SetVertexColor`d;
+  the empty socket (`BGInactive`) and `BGShadow` keep their look. A desaturated red gem is dark grey
+  and vertex colours can't exceed 1, so each point gets our own ADD-blended copy of the gem
+  (`LefthyToolsBoost`, same tint) whose alpha follows Blizzard's `IconUncharged` for a second after
+  each update (its gain and spend animations are shorter); glows, burst and slash switch to ADD
+  while tinted; the plain gem and the lit socket get their tint lifted 25% towards white. At 0
+  points the colour stays for the burst. Off: Blizzard's colours and blending back.
+- **Nameplate dot** (`comboNameplate`, on): one round dot (10 px, the colour of the count; red with
+  colouring off) with the number small at its top right corner, on the target's nameplate: our
+  own frame, parented to the plate's `UnitFrame` (it shows, fades and scales with it), LEFT to the
+  RIGHT of `PlayerLevelDiffFrame` (Camelot's level box right of the health bars) when that shows,
+  else of `HealthBarsContainer`, frame level above the level frame (50). Only while there are
+  points; found again on target, nameplate added/removed, combo and power changes (next frame).
+  A forbidden or missing nameplate, or secret points: no dot.
 
 ## foreverQuests: mark quests that are new in WoW: Forever (ForeverQuests.lua)
 

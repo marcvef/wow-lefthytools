@@ -276,12 +276,12 @@ L["Blizzard shows only the area of your selected quest. All quests: the areas of
 	"Blizzard zeigt nur das Gebiet deiner ausgewählten Quest. Alle Quests: die Gebiete aller Quests in der Zone, wie bei Questie."
 L["Selected quest"] = "Ausgewählte Quest"
 L["All quests"] = "Alle Quests"
-L["Combo points on the personal resource display"] = "Combopunkte an der persönlichen Ressourcenanzeige"
-L["Forever's personal resource display leaves combo points out. This adds them under its bars in retail's style, with Blizzard's animations; at full points they glow. Rogues, and druids in Cat Form. Shows when the personal resource display does."] =
-	"Die persönliche Ressourcenanzeige in Forever zeigt keine Combopunkte. Das hier fügt sie unter ihren Balken hinzu, im Retail-Look mit Blizzards Animationen; bei vollen Punkten leuchten sie. Für Schurken und Druiden in Katzengestalt. Sichtbar, wenn die persönliche Ressourcenanzeige es ist."
+L["Combo points on your target's nameplate"] = "Combopunkte an der Namensplakette deines Ziels"
+L["A small dot right of your target's level, in the colour of your combo points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."] =
+	"Ein kleiner Punkt rechts neben dem Level deines Ziels, in der Farbe deiner Combopunkte, mit ihrer Anzahl. Nur solange du Punkte darauf hast. Für Schurken und Druiden in Katzengestalt."
 L["Colour combo points by count"] = "Combopunkte nach Anzahl färben"
-L["Green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
-	"Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."
+L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
+	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und der Punkt an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."
 
 -- Beacon
 L["Shares your position with Battle.net friends who also use LefthyTools and shows theirs on the world map and minimap, in their class colour."] =

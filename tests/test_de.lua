@@ -34,9 +34,7 @@ local mdb = LefthyToolsDB.settings.mirage
 check(mdb.groupAlpha.chat == 0.4 and mdb.groupAlpha.minimap == 0.4 and mdb.fadedAlpha == 0.4,
 	"an older faded opacity becomes every element's own")
 check(LefthyToolsDB.settings.tweaks.afkScreen == false and mdb.afkScreen == nil, "the AFK screen choice moves from Mirage to Misc Tweaks")
-local comboRow, comboPips, comboStyle = ns.GetComboPointRow()
-check(comboRow and comboStyle == "classic" and comboPips[1].Socket and comboPips[1].Socket.path == "Interface\\ComboFrame\\ComboPoint"
-	and not comboPips[1].Slash, "no retail combo point art in the client: the classic target-frame gems")
+check(S("LefthyTools_tweaks_comboNameplate").name == "Combopunkte an der Namensplakette deines Ziels", "combo point dot setting in German")
 check(S("LefthyTools_beacon_dingSoundKit").name == "Level-Up-Sound", "level-up sound dropdown in German")
 check(LT:GetModule("mirage").category.name == "Mirage" and LT:GetModule("tweaks").category.name == "Misc Tweaks"
 	and LT:GetModule("beacon").category.name == "Beacon", "module names are never translated")

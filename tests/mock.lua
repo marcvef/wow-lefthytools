@@ -237,6 +237,7 @@ local function NewTexture()
 	function t:Hide() self.shown = false end
 	function t:IsShown() return self.shown end
 	function t:SetAlpha(a) self.alpha = a end
+	function t:GetAlpha() return self.alpha end
 	function t:CreateAnimationGroup() return NewAnimationGroup(self) end
 	function t:SetAtlas(atlas) self.atlas, self.color = atlas, nil end
 	function t:SetVertexColor(r, g, b, a) self.vertex, self.gradient = { r, g, b, a }, nil end -- replaces a gradient
@@ -1291,12 +1292,33 @@ end
 function ContainerFrameCombinedBags:EnumerateValidItems() return ipairs(self.buttons) end
 function ContainerFrameCombinedBags:UpdateItems() end -- Blizzard's own drawing: nothing to do here
 
--- Personal resource display (Forever leaves its class resource frame out) and combo points.
+-- Personal resource display: Forever builds retail's combo point bar on it (RogueComboPointBarTemplate,
+-- bound to the target): classFrame.classResourceButtonTable, a point per max combo point, each with
+-- retail's textures; UpdatePower lights the gems (Blizzard animates them).
 CreateFrame("Frame", "PersonalResourceDisplayFrame", UIParent)
 PersonalResourceDisplayFrame:SetSize(200, 30)
 PersonalResourceDisplayFrame.PowerBar = CreateFrame("StatusBar", nil, PersonalResourceDisplayFrame)
 PersonalResourceDisplayFrame.PowerBar:SetSize(200, 10)
 function PersonalResourceDisplayFrame:GetBarPadding() return 4 end
+COMBO_POINT_PARTS = { "BGShadow", "BGActive", "BGInactive", "BGGlow", "IconUncharged", "FXUncharged", "FrameGlow", "SlashFBUncharged" }
+function PersonalResourceDisplayFrame:SetupClassBar()
+	local bar = self.classFrame
+	if not bar then -- (built once, its UpdatePower from the template's mixin)
+		bar = CreateFrame("Frame", nil, self)
+		self.classFrame = bar
+		function bar:UpdatePower()
+			local points = GetComboPoints("player", "target")
+			for i, point in ipairs(self.classResourceButtonTable) do point.IconUncharged:SetAlpha(i <= points and 1 or 0) end
+		end
+	end
+	bar.classResourceButtonTable = {}
+	for i = 1, COMBO.max do
+		local point = CreateFrame("Frame", nil, bar)
+		for _, key in ipairs(COMBO_POINT_PARTS) do point[key] = point:CreateTexture(nil, "ARTWORK") end
+		bar.classResourceButtonTable[i] = point
+	end
+	bar:UpdatePower()
+end
 Enum.PowerType = { Mana = 0, Energy = 3, ComboPoints = 4 }
 COMBO = { points = 0, max = 5 }
 POWER_TYPE = 3 -- energy
@@ -1510,6 +1532,16 @@ function UnitReaction(u) if MOBS[u] then return 2 end end
 function UnitCreatureType(u) if MOBS[u] then return "Humanoid", 7 end end
 function GetScreenWidth() return 1920 end
 function GetScreenHeight() return 1080 end
+-- A nameplate's unit frame, like Forever's: the health bars and, right of them, the level frame.
+function PlateUnitFrame(mob)
+	if not mob.unitFrame then
+		local uf = CreateFrame("Frame")
+		uf.HealthBarsContainer = CreateFrame("Frame", nil, uf)
+		uf.PlayerLevelDiffFrame = CreateFrame("Frame", nil, uf)
+		mob.unitFrame = uf
+	end
+	return mob.unitFrame
+end
 C_NamePlate = { GetNamePlateForUnit = function(u) -- mob.plateError: reading its position fails, like on Forever
 	local mob = MOBS[u]
 	if not (mob and mob.x) then return nil end
@@ -1520,7 +1552,7 @@ C_NamePlate = { GetNamePlateForUnit = function(u) -- mob.plateError: reading its
 	return { GetCenter = center, GetEffectiveScale = function() return 1 end, IsForbidden = function() return false end,
 		IsVisible = function() return true end, GetLeft = function() return (center()) - 50 end,
 		GetRect = function() local x, y = center(); return x - 50, y - 10, 100, 20 end, GetPoint = function() return "CENTER" end,
-		UnitFrame = { GetCenter = center } }
+		UnitFrame = PlateUnitFrame(mob) }
 end }
 -- The spellbook: one line; harmful spells with their range (0: melee), one passive.
 SPELL_RANGES = { [1752] = 0, [2764] = 30 } -- Sinister Strike, Throw

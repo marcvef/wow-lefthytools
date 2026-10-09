@@ -38,10 +38,11 @@ Facts verified against client builds 1.60.1.70009 and 1.60.1.70170.
   `GamepadActionBarEditFrame` and the `Gamepad*Flyout` frames being shown. Poll these instead of
   registering `GamepadMode.Register*` callbacks, so addon code never runs inside Blizzard's
   execution path. `InputUtil.IsGamepadUIEnabled()` tells whether the controller UI is active.
-- The personal resource display (`PersonalResourceDisplayFrame`) leaves class resources out:
-  `Camelot/Blizzard_PersonalResourceDisplay.lua` overrides `GetClassFrameInfo()` to return nil.
-  Combo points are target-bound like Classic (`GetComboPoints("player", "target")`) and shown on
-  the target frame (`ComboFrame`).
+- The personal resource display (`PersonalResourceDisplayFrame`) shows combo points since
+  1.60.1.70291: `Camelot/Blizzard_PersonalResourceDisplay.lua`'s `GetClassFrameInfo()` gives rogues
+  `RogueComboPointBarTemplate` and druids `DruidComboPointBarTemplate` (before, it returned nil).
+  Combo points are target-bound like Classic (`GetComboPoints("player", "target")`, Camelot's
+  `TargetBoundComboPointBarMixin`) and also shown on the target frame (`ComboFrame`).
 
 ## Known client issue: hang when closing the settings panel in gamepad mode
 

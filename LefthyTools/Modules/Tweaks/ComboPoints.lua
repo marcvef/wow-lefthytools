@@ -1,97 +1,45 @@
 local _, ns = ...
 
--- Misc Tweaks 4: combo points on the personal resource display.
+-- Misc Tweaks 4: combo points.
 --
--- Forever's personal resource display (Blizzard_PersonalResourceDisplay) leaves class
--- resources out: its Camelot override of GetClassFrameInfo() returns nil ("Class resource
--- templates are not loaded in Camelot"), so combo points only show on the target frame
--- (ComboFrame). This adds a centred row of combo points under the display's lowest bar.
+-- Blizzard's personal resource display shows combo points now: Forever's Camelot override of
+-- GetClassFrameInfo builds retail's RogueComboPointBarTemplate (rogues) and
+-- DruidComboPointBarTemplate (druids in Cat Form), bound to the target like Classic
+-- (TargetBoundComboPointBarMixin: GetComboPoints("player", "target")). LefthyTools adds:
 --
--- The row is our own child of PersonalResourceDisplayFrame: it moves, scales, hides (combat-only
--- setting, Edit Mode) and fades (Mirage) with it. It is anchored under the display's bottom edge,
--- which Blizzard sizes to the visible bars (UpdateFrameHeight), and shrinks to fit the display's
--- width (the Edit Mode bar width). Nothing of Blizzard's is changed; the only hook is the
--- display's OnSizeChanged, which just schedules a re-layout.
+--   * Colour by count (comboColors): Blizzard's lit gems and their effects, green with one point,
+--     through yellow, to red at full. A post-hook on the bar's UpdatePower (Blizzard has drawn the
+--     points by then) tints them; the empty sockets and the shadow keep their look. The art is red,
+--     so the tinted parts are desaturated first; a desaturated red gem is dark grey, so tinting
+--     alone looked muted: an additive copy of each gem in the same colour (our own texture on the
+--     point, its alpha following Blizzard's gem through the animations) keeps it bright.
+--   * A dot on your target's nameplate (comboNameplate), right of the mob's level: one round dot
+--     in the colour of the count (red with colouring off) and the number small at its corner.
+--     Only while you have points on that target. It's our own frame, put on the nameplate (it
+--     shows, fades and scales with it) and found again whenever the target or the nameplates change.
 --
--- Look: retail's rogue combo points (RogueComboPointTemplate's uf-roguecp-* atlases, rebuilt here
--- because Camelot doesn't load that template), with Blizzard's own gain and spend animations,
--- when the client has the atlases; otherwise the classic gems from the target frame
--- (Interface\ComboFrame\ComboPoint). At full points the row pulses: ready for a finisher.
---
--- Combo points sit on the target like in Classic: GetComboPoints("player", "target"), as
--- Blizzard's ComboFrame reads them. Rogues always; druids in Cat Form (energy).
+-- Nothing of Blizzard's is replaced; the only hooks are hooksecurefunc post-hooks. Updates run on
+-- the next frame, never inside an event.
 
-local MAX_PIPS = 10
-
--- Layers per style. Static layers are always visible; the others start at alpha 0 and are
--- driven by the animations below (Inactive = empty socket, Active = lit socket, Icon = the gem,
--- Glow/Burst/FrameGlow/Slash = effects).
-local STYLES = {
-	retail = {
-		size = 20, gap = 2,
-		probe = "uf-roguecp-icon-red",
-		layers = {
-			{ key = "Shadow", atlas = "uf-roguecp-bg-shadow", layer = "BACKGROUND", sub = 0, y = -4, static = true },
-			{ key = "Inactive", atlas = "uf-roguecp-bg-dis", layer = "BACKGROUND", sub = 1 },
-			{ key = "Active", atlas = "uf-roguecp-bg", layer = "BACKGROUND", sub = 2 },
-			{ key = "Glow", atlas = "uf-roguecp-bg", layer = "BACKGROUND", sub = 3 },
-			{ key = "Icon", atlas = "uf-roguecp-icon-red", layer = "ARTWORK", sub = 1 },
-			{ key = "IconBoost", atlas = "uf-roguecp-icon-red", layer = "ARTWORK", sub = 2, blend = "ADD" },
-			{ key = "Burst", atlas = "uf-roguecp-fx-red", layer = "ARTWORK", sub = 3 },
-			{ key = "FrameGlow", atlas = "uf-roguecp-frame-glow", layer = "OVERLAY", sub = 0 },
-			{ key = "Slash", atlas = "uf-roguecp-slash-red", layer = "OVERLAY", sub = 1, width = 43, height = 43,
-				flipBook = { rows = 3, columns = 6, frames = 17, duration = 0.57 } },
-		},
-	},
-	classic = {
-		size = 16, gap = 3,
-		layers = {
-			{ key = "Socket", file = "Interface\\ComboFrame\\ComboPoint", coords = { 0, 0.375, 0, 1 },
-				layer = "BACKGROUND", sub = 0, width = 15, height = 20, x = 0, y = -2, static = true },
-			{ key = "Icon", file = "Interface\\ComboFrame\\ComboPoint", coords = { 0.375, 0.5625, 0, 1 },
-				layer = "ARTWORK", sub = 1, width = 10, height = 20, x = 0, y = -2 },
-			{ key = "IconBoost", file = "Interface\\ComboFrame\\ComboPoint", coords = { 0.375, 0.5625, 0, 1 },
-				layer = "ARTWORK", sub = 2, width = 10, height = 20, x = 0, y = -2, blend = "ADD" },
-			{ key = "Glow", file = "Interface\\ComboFrame\\ComboPoint", coords = { 0.5625, 1, 0, 1 },
-				layer = "OVERLAY", sub = 0, width = 18, height = 20, x = 1, y = 3, blend = "ADD" },
-			{ key = "FrameGlow", file = "Interface\\ComboFrame\\ComboPoint", coords = { 0.5625, 1, 0, 1 },
-				layer = "OVERLAY", sub = 1, width = 18, height = 20, x = 1, y = 3, blend = "ADD" },
-		},
-	},
-}
-
--- { key, fromAlpha, toAlpha, startDelay, duration }; keys a style doesn't have are skipped.
--- Timings from RogueComboPointTemplate (unchargedEmptyToUnchargedFull / unchargedFullToUnchargedEmpty).
-local GAIN = {
-	{ "Slash", 0, 1, 0, 0 },
-	{ "Icon", 0, 0.5, 0, 0.1 }, { "Icon", 0.5, 1, 0.27, 0.27 },
-	{ "IconBoost", 0, 0.5, 0, 0.1 }, { "IconBoost", 0.5, 1, 0.27, 0.27 },
-	{ "Active", 0, 0, 0, 0.2 }, { "Active", 0, 1, 0.2, 0.17 },
-	{ "Inactive", 1, 1, 0, 0.37 }, { "Inactive", 1, 0, 0.37, 0.1 },
-	{ "Glow", 0, 1, 0, 0.17 }, { "Glow", 1, 0, 0.17, 0.4 },
-}
-local SPEND = {
-	{ "FrameGlow", 1, 0, 0, 0.5 },
-	{ "Icon", 1, 0, 0, 0.17 },
-	{ "IconBoost", 1, 0, 0, 0.17 },
-	{ "Burst", 1, 0, 0, 0.4 },
-	{ "Active", 1, 1, 0, 0.2 }, { "Active", 1, 0, 0.2, 0.17 },
-	{ "Inactive", 0, 0, 0, 0.37 }, { "Inactive", 0, 1, 0.37, 0.1 },
-}
-local READY_PULSE = { from = 0.15, to = 0.7, duration = 0.6 } -- FrameGlow while at full points
-
--- Colour by count: green with one point, through yellow, to red at full.
--- The art is red, so the coloured layers are desaturated first and then tinted; the empty
--- socket and the shadow keep their own look. A desaturated red gem is dark grey, so tinting
--- alone looked muted: IconBoost, an additive copy of the gem in the same colour, brightens it
--- (the plain gem underneath keeps its shape and outline), and the effects blend additively.
-local TINTED = { "Active", "Glow", "Icon", "IconBoost", "Burst", "FrameGlow", "Slash" }
-local ADDITIVE_WHEN_TINTED = { Glow = true, Burst = true, FrameGlow = true, Slash = true }
--- "A bit brighter still": the plain gem and the lit socket get a tint lifted towards white;
--- the additive copy and the effects keep the full colour, so the hue stays strong.
-local LIGHTEN = { Icon = 0.25, Active = 0.25 }
+local TINTED = { "BGActive", "BGGlow", "IconUncharged", "FXUncharged", "FrameGlow", "SlashFBUncharged" }
+local ADDITIVE_WHEN_TINTED = { BGGlow = true, FXUncharged = true, FrameGlow = true, SlashFBUncharged = true }
+-- The plain gem and the lit socket get a tint lifted towards white; the additive copy and the
+-- effects keep the full colour, so the hue stays strong.
+local LIGHTEN = { IconUncharged = 0.25, BGActive = 0.25 }
+local GEM_ATLAS = "uf-roguecp-icon-red"
+local FOLLOW_TIME = 1 -- seconds the copies follow Blizzard's gems after a change (its animations are shorter)
 local GREEN, YELLOW, RED = { 0.15, 1, 0.15 }, { 1, 0.9, 0 }, { 1, 0.1, 0.05 }
+local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local DOT_SIZE = 10
+local issecret = issecretvalue or function() return false end
+
 local colorByCount = false -- switched by Tweaks.lua (ns.ApplyComboColors), on by default
+local onNameplate = false  -- ns.ApplyComboNameplate, on by default
+local hooked = {}          -- Blizzard frames already post-hooked
+local followUntil = 0
+local driver = CreateFrame("Frame")
+local events = CreateFrame("Frame")
+local dot -- the nameplate dot, built on first use
 
 local function CountColor(points, count)
 	local t = count > 1 and (points - 1) / (count - 1) or 1
@@ -103,39 +51,10 @@ local function CountColor(points, count)
 	return from[1] + (to[1] - from[1]) * f, from[2] + (to[2] - from[2]) * f, from[3] + (to[3] - from[3]) * f
 end
 
-local row
-local pips = {}
-local style
-local shownPoints = 0
-local active, layoutDirty = false, true
-local driver = CreateFrame("Frame")
-local events = CreateFrame("Frame")
-
-local function Display()
-	return PersonalResourceDisplayFrame
-end
-
-local function PickStyle()
-	local probe = STYLES.retail.probe
-	if C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(probe) then
-		return STYLES.retail
-	end
-	return STYLES.classic
-end
-
-local function UsesComboPoints()
-	local _, classFile = UnitClass("player")
-	if classFile == "ROGUE" then
-		return true
-	end
-	local energy = Enum and Enum.PowerType and Enum.PowerType.Energy or 3
-	return classFile == "DRUID" and UnitPowerType("player") == energy
-end
-
--- nil when the game keeps the value secret (it shouldn't for combo points).
+-- nil when the game keeps them secret.
 local function CurrentPoints()
 	local points = GetComboPoints("player", "target")
-	if issecretvalue and issecretvalue(points) then
+	if issecret(points) then
 		return nil
 	end
 	return points or 0
@@ -144,285 +63,237 @@ end
 local function MaxPoints()
 	local comboPoints = Enum and Enum.PowerType and Enum.PowerType.ComboPoints or 4
 	local max = UnitPowerMax("player", comboPoints)
-	if (issecretvalue and issecretvalue(max)) or not max or max < 1 then
+	if issecret(max) or not max or max < 1 then
 		max = 5
 	end
-	return math.min(max, MAX_PIPS)
-end
-
-local function MarkDirty()
-	if active then
-		driver:Show() -- runs the update on the next frame, never inside the event
-	end
-end
-
-local function MarkLayoutDirty()
-	layoutDirty = true
-	MarkDirty()
+	return max
 end
 
 ---------------------------------------------------------------------------
--- One combo point
+-- Colouring Blizzard's combo points
 ---------------------------------------------------------------------------
 
-local function BuildAnimation(pip, steps)
-	local group = pip:CreateAnimationGroup()
-	group:SetToFinalAlpha(true)
-	for _, step in ipairs(steps) do
-		local texture = pip[step[1]]
-		if texture then
-			local alpha = group:CreateAnimation("Alpha")
-			alpha:SetTarget(texture)
-			alpha:SetFromAlpha(step[2])
-			alpha:SetToAlpha(step[3])
-			alpha:SetStartDelay(step[4])
-			alpha:SetDuration(step[5])
-			alpha:SetOrder(1)
-		end
-	end
-	return group
+local function Bar()
+	local display = PersonalResourceDisplayFrame
+	return display and display.classFrame
 end
 
-local function CreatePip()
-	local pip = CreateFrame("Frame", nil, row)
-	pip:SetSize(style.size, style.size)
-	pip.effects = {}
-	for _, spec in ipairs(style.layers) do
-		local texture = pip:CreateTexture(nil, spec.layer, nil, spec.sub)
-		if spec.atlas then
-			texture:SetAtlas(spec.atlas, not spec.width)
-		else
-			texture:SetTexture(spec.file)
-			texture:SetTexCoord(spec.coords[1], spec.coords[2], spec.coords[3], spec.coords[4])
-		end
-		if spec.width then
-			texture:SetSize(spec.width, spec.height)
-		end
-		texture.baseBlend = spec.blend or "BLEND"
-		texture:SetBlendMode(texture.baseBlend)
-		texture:SetPoint("CENTER", pip, "CENTER", spec.x or 0, spec.y or 0)
-		if not spec.static then
-			texture:SetAlpha(0)
-			pip.effects[#pip.effects + 1] = texture
-		end
-		pip[spec.key] = texture
-	end
-	pip.Gain = BuildAnimation(pip, GAIN)
-	pip.Spend = BuildAnimation(pip, SPEND)
-	local slash = style.layers[#style.layers].flipBook and pip.Slash
-	if slash then
-		local book = style.layers[#style.layers].flipBook
-		local ok = pcall(function()
-			local flip = pip.Gain:CreateAnimation("FlipBook")
-			flip:SetTarget(slash)
-			flip:SetFlipBookRows(book.rows)
-			flip:SetFlipBookColumns(book.columns)
-			flip:SetFlipBookFrames(book.frames)
-			flip:SetFlipBookFrameWidth(0)
-			flip:SetFlipBookFrameHeight(0)
-			flip:SetDuration(book.duration)
-			flip:SetOrder(1)
-		end)
-		if not ok then
-			pip.Slash:Hide() -- without the flipbook the slash would show its whole sprite sheet
-		end
-	end
-	-- Full points: the glow breathes until a finisher spends them.
-	pip.Ready = pip:CreateAnimationGroup()
-	pip.Ready:SetLooping("BOUNCE")
-	local breathe = pip.Ready:CreateAnimation("Alpha")
-	breathe:SetTarget(pip.FrameGlow)
-	breathe:SetFromAlpha(READY_PULSE.from)
-	breathe:SetToAlpha(READY_PULSE.to)
-	breathe:SetDuration(READY_PULSE.duration)
-	return pip
-end
-
--- r == nil: the art's own colours.
-local function TintPip(pip, r, g, b)
+-- r == nil: Blizzard's own colours.
+local function TintPoint(point, r, g, b)
 	local tinted = r ~= nil
 	for _, key in ipairs(TINTED) do
-		local texture = pip[key]
+		local texture = point[key]
 		if texture then
 			texture:SetDesaturated(tinted)
 			local lift = tinted and LIGHTEN[key] or 0
-			texture:SetVertexColor((r or 1) + (1 - (r or 1)) * lift, (g or 1) + (1 - (g or 1)) * lift,
-				(b or 1) + (1 - (b or 1)) * lift)
+			texture:SetVertexColor((r or 1) + (1 - (r or 1)) * lift, (g or 1) + (1 - (g or 1)) * lift, (b or 1) + (1 - (b or 1)) * lift)
 			if ADDITIVE_WHEN_TINTED[key] then
-				texture:SetBlendMode(tinted and "ADD" or texture.baseBlend)
+				texture:SetBlendMode(tinted and "ADD" or "BLEND")
 			end
 		end
 	end
-	pip.IconBoost:SetShown(tinted) -- retail's own red needs no boost
-end
-
--- Shows a point empty or full, animated like retail when it changes, instantly when not
--- (first draw, row coming back, or a point that didn't exist before).
-local function SetPip(pip, full, animate, ready)
-	if pip.full ~= full then
-		animate = animate and pip.full ~= nil
-		pip.Gain:Stop()
-		pip.Spend:Stop()
-		pip.Ready:Stop()
-		for _, texture in ipairs(pip.effects) do
-			texture:SetAlpha(0)
-		end
-		if animate then
-			if full then
-				pip.Gain:Play()
-			else
-				pip.Spend:Play()
-			end
-		else
-			-- Final state of the animation without playing it.
-			if pip.Inactive then pip.Inactive:SetAlpha(full and 0 or 1) end
-			if pip.Active then pip.Active:SetAlpha(full and 1 or 0) end
-			pip.Icon:SetAlpha(full and 1 or 0)
-			pip.IconBoost:SetAlpha(full and 1 or 0)
-		end
-		pip.full = full
+	local gem = point.IconUncharged
+	if tinted and gem and not point.LefthyToolsBoost then
+		local boost = point:CreateTexture(nil, "ARTWORK", nil, 7)
+		boost:SetAtlas(GEM_ATLAS, true)
+		boost:SetAllPoints(gem)
+		boost:SetBlendMode("ADD")
+		boost:SetDesaturated(true)
+		point.LefthyToolsBoost = boost
 	end
-	if ready and full then
-		if not pip.Ready:IsPlaying() then
-			pip.Ready:Play()
-		end
-	elseif pip.Ready:IsPlaying() then
-		pip.Ready:Stop()
-		pip.FrameGlow:SetAlpha(0)
+	if point.LefthyToolsBoost then
+		point.LefthyToolsBoost:SetVertexColor(r or 1, g or 1, b or 1)
+		point.LefthyToolsBoost:SetShown(tinted) -- retail's own red needs no boost
 	end
 end
 
----------------------------------------------------------------------------
--- The row
----------------------------------------------------------------------------
-
-local function CreateRow()
-	style = PickStyle()
-	local display = Display()
-	row = CreateFrame("Frame", nil, display)
-	display:HookScript("OnSizeChanged", MarkLayoutDirty) -- Edit Mode bar width and visible bars
-end
-
-local function Layout()
-	layoutDirty = false
-	local display = Display()
-	local padding = display.GetBarPadding and display:GetBarPadding() or 4
-	local count = MaxPoints()
-	local width = count * style.size + (count - 1) * style.gap
-	-- Shrink to fit narrow bars (Edit Mode bar width); never grow past Blizzard's size.
-	local available = display:GetWidth()
-	local scale = (available and available > 0 and width > available) and available / width or 1
-	row:SetScale(scale)
-	row:ClearAllPoints()
-	row:SetPoint("TOP", display, "BOTTOM", 0, -(padding + 2) / scale)
-	row:SetSize(width, style.size)
-	for i = 1, MAX_PIPS do
-		local pip = pips[i]
-		if i <= count then
-			pip = pip or CreatePip()
-			pips[i] = pip
-			pip:ClearAllPoints()
-			pip:SetPoint("LEFT", row, "LEFT", (i - 1) * (style.size + style.gap), 0)
-			pip:Show()
-		elseif pip then
-			pip:Hide()
+-- The copies follow Blizzard's gems (their alpha, through the gain and spend animations).
+local function Follow()
+	local bar = Bar()
+	for _, point in ipairs(bar and bar.classResourceButtonTable or {}) do
+		local boost, gem = point.LefthyToolsBoost, point.IconUncharged
+		if boost and gem and boost:IsShown() then
+			local ok, alpha = pcall(gem.GetAlpha, gem)
+			boost:SetAlpha(ok and not issecret(alpha) and alpha or 0)
 		end
 	end
-	row.count = count
-	shownPoints = -1 -- re-evaluate every point
 end
 
-local function Update()
-	driver:Hide()
-	local display = Display()
-	if not active or not display then
-		if row then
-			row:Hide()
-		end
+local function Recolor()
+	local bar = Bar()
+	local points = CurrentPoints()
+	if not (bar and bar.classResourceButtonTable and points) then
 		return
 	end
-	local points = UsesComboPoints() and CurrentPoints()
-	if not points then
-		if row then
-			row:Hide()
-		end
-		return
-	end
-	if not row then
-		CreateRow()
-	end
-	local firstDraw = layoutDirty and shownPoints == 0
-	if layoutDirty then
-		Layout()
-	end
-	local wasHidden = not row:IsShown()
-	row:Show()
-	if points == shownPoints then
-		return
-	end
-	local count = row.count
-	local animate = not (firstDraw or wasHidden)
-	-- Recolour first, so a gained point animates in its new colour. At 0 points the gems keep
-	-- their colour while they burst out.
-	if points > 0 or shownPoints < 0 then
+	-- At 0 points the gems keep their colour while they burst out.
+	if points > 0 or not colorByCount then
 		local r, g, b
-		if colorByCount and points > 0 then
-			r, g, b = CountColor(points, count)
+		if colorByCount then
+			r, g, b = CountColor(points, #bar.classResourceButtonTable)
 		end
-		for i = 1, count do
-			TintPip(pips[i], r, g, b)
+		for _, point in ipairs(bar.classResourceButtonTable) do
+			TintPoint(point, r, g, b)
 		end
 	end
-	for i = 1, count do
-		SetPip(pips[i], i <= points, animate, points >= count)
-	end
-	shownPoints = points
+	followUntil = GetTime() + FOLLOW_TIME
+	driver:Show()
 end
 
-driver:Hide()
-driver:SetScript("OnUpdate", Update)
+-- Blizzard's bar, once it exists (the display builds it in SetupClassBar): recoloured after each
+-- of its own updates.
+local function Attach()
+	local display = PersonalResourceDisplayFrame
+	if display and display.SetupClassBar and not hooked[display] then
+		hooked[display] = true
+		hooksecurefunc(display, "SetupClassBar", Attach)
+	end
+	local bar = Bar()
+	if bar and bar.UpdatePower and not hooked[bar] then
+		hooked[bar] = true
+		hooksecurefunc(bar, "UpdatePower", function()
+			if colorByCount or bar.lefthyTinted then
+				bar.lefthyTinted = colorByCount
+				Recolor()
+			end
+		end)
+	end
+	if bar then
+		bar.lefthyTinted = colorByCount
+		Recolor()
+	end
+end
 
-events:SetScript("OnEvent", function(_, event, unit, powerToken)
-	if event == "UNIT_POWER_FREQUENT" then
-		if powerToken == "COMBO_POINTS" then -- energy ticks come through here too; ignore them
-			MarkDirty()
+---------------------------------------------------------------------------
+-- The dot on your target's nameplate
+---------------------------------------------------------------------------
+
+local function BuildDot()
+	dot = CreateFrame("Frame")
+	dot:SetSize(DOT_SIZE, DOT_SIZE)
+	dot.Body = dot:CreateTexture(nil, "ARTWORK")
+	dot.Body:SetAllPoints()
+	local mask = dot:CreateMaskTexture()
+	mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+	mask:SetAllPoints()
+	dot.Body:AddMaskTexture(mask)
+	dot.Number = dot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	dot.Number:SetPoint("BOTTOMLEFT", dot, "TOPRIGHT", -3, -5) -- like a footnote
+	dot.Number:SetTextScale(0.8)
+	dot.Number:SetShadowOffset(1, -1)
+	dot:Hide()
+end
+
+-- The nameplate of your target (its unit frame), if it has one addons may touch.
+local function TargetPlate()
+	if not (C_NamePlate and C_NamePlate.GetNamePlateForUnit) then
+		return nil
+	end
+	local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, "target")
+	if not ok or not plate or issecret(plate) or (plate.IsForbidden and plate:IsForbidden()) then
+		return nil
+	end
+	return plate.UnitFrame
+end
+
+local function UpdateDot()
+	local points = onNameplate and CurrentPoints()
+	local plate = points and points > 0 and TargetPlate()
+	if not plate then
+		if dot then
+			dot:Hide()
 		end
-	elseif event == "UNIT_MAXPOWER" or event == "PLAYER_ENTERING_WORLD" or event == "EDIT_MODE_LAYOUTS_UPDATED" then
-		MarkLayoutDirty()
-	elseif event == "ADDON_LOADED" then
-		if unit == "Blizzard_PersonalResourceDisplay" then
-			MarkLayoutDirty()
+		return
+	end
+	if not dot then
+		BuildDot()
+	end
+	local level = plate.PlayerLevelDiffFrame
+	local ok = pcall(function()
+		if dot:GetParent() ~= plate then
+			dot:SetParent(plate)
 		end
-	else -- target changed, shapeshift (UNIT_DISPLAYPOWER)
-		MarkDirty()
+		dot:ClearAllPoints()
+		if level and level:IsShown() then
+			dot:SetPoint("LEFT", level, "RIGHT", 3, 0)
+		else
+			dot:SetPoint("LEFT", plate.HealthBarsContainer or plate, "RIGHT", 4, 0)
+		end
+		dot:SetFrameLevel(plate:GetFrameLevel() + 60) -- (over the level frame: 50)
+	end)
+	if not ok then
+		dot:Hide()
+		return
+	end
+	local r, g, b = RED[1], RED[2], RED[3]
+	if colorByCount then
+		r, g, b = CountColor(points, MaxPoints())
+	end
+	dot.Body:SetColorTexture(r, g, b, 1)
+	dot.Number:SetText(points)
+	dot:Show()
+end
+
+---------------------------------------------------------------------------
+-- Events
+---------------------------------------------------------------------------
+
+local pending = false
+driver:Hide()
+driver:SetScript("OnUpdate", function(self)
+	if pending then
+		pending = false
+		Attach()
+		UpdateDot()
+	end
+	Follow()
+	if GetTime() >= followUntil then
+		self:Hide()
 	end
 end)
 
--- Called by Tweaks.lua when the tweak is switched (on the next frame, never in a callback).
-function ns.ApplyComboPoints(on)
-	active = on
-	if on then
-		for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "PLAYER_ENTERING_WORLD", "EDIT_MODE_LAYOUTS_UPDATED", "ADDON_LOADED" }) do
-			pcall(events.RegisterEvent, events, event)
-		end
-		for _, event in ipairs({ "UNIT_POWER_FREQUENT", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER" }) do
-			pcall(events.RegisterUnitEvent, events, event, "player")
-		end
-		layoutDirty = true
-		Update()
-	else
-		events:UnregisterAllEvents()
-		Update() -- hides the row
+local function Soon()
+	pending = true
+	driver:Show()
+end
+
+events:SetScript("OnEvent", function(_, event, unit, powerToken)
+	if event == "UNIT_POWER_FREQUENT" and powerToken ~= "COMBO_POINTS" then
+		return -- energy ticks come through here too
+	elseif event == "ADDON_LOADED" and unit ~= "Blizzard_PersonalResourceDisplay" then
+		return
+	end
+	Soon()
+end)
+
+local function Listen()
+	events:UnregisterAllEvents()
+	if not (colorByCount or onNameplate) then
+		return
+	end
+	for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "PLAYER_ENTERING_WORLD", "ADDON_LOADED", "NAME_PLATE_UNIT_ADDED",
+		"NAME_PLATE_UNIT_REMOVED", "COMBO_TARGET_CHANGED" }) do
+		pcall(events.RegisterEvent, events, event)
+	end
+	for _, event in ipairs({ "UNIT_POWER_FREQUENT", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER" }) do
+		pcall(events.RegisterUnitEvent, events, event, "player")
 	end
 end
 
--- The "colour by number of points" switch (a Misc Tweaks entry of its own).
+-- Called by Tweaks.lua when a switch changes (on the next frame, never in a callback).
 function ns.ApplyComboColors(on)
 	colorByCount = on
-	MarkLayoutDirty() -- recolours on the next frame
+	Listen()
+	Attach() -- (off: Blizzard's colours back)
+	UpdateDot()
+end
+
+function ns.ApplyComboNameplate(on)
+	onNameplate = on
+	Listen()
+	UpdateDot()
 end
 
 -- For tests.
-function ns.GetComboPointRow()
-	return row, pips, style == STYLES.retail and "retail" or (style and "classic")
+function ns.GetComboDot()
+	return dot
 end
