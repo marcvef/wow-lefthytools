@@ -200,5 +200,8 @@ ns.CHANGELOG = {
 	{ id = 64, module = "chronicle",
 		en = { "While you were away, and a weekly recap", "A minute after you log in, a chat line per friend with what they did since you last played. And once a week, the first time you play, last week's leaderboard in chat." },
 		de = { "Was du verpasst hast, und Wochenbilanz", "Eine Minute nach dem Einloggen eine Chatzeile pro Freund mit dem, was er seit deinem letzten Spielen gemacht hat. Und einmal pro Woche, beim ersten Spielen, die Bestenliste der letzten Woche im Chat." } },
+	{ id = 65, module = "chronicle",
+		en = { "AFK and jumps: for all your characters", "Some numbers are about the player, not the character: the Martin tracker (time AFK) and jumps now count all your characters together, in a new All your characters section of the statistics. The Compare page and the leaderboards go per person too: an alt's quests, kills and time count for its player." },
+		de = { "AFK und Sprünge: alle Charaktere", "Manche Zahlen gehören zum Spieler, nicht zum Charakter: der Martin-Tracker (Zeit AFK) und die Sprünge zählen jetzt alle deine Charaktere zusammen, in einem neuen Abschnitt Alle deine Charaktere in der Statistik. Die Vergleich-Seite und die Bestenlisten gehen auch nach Person: Quests, Kills und Zeit eines Twinks zählen für seinen Spieler." } },
 	-- New entries go here, at the end.
 }
