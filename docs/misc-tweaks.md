@@ -33,7 +33,7 @@ backpack's menu (`Gamepad_SetupMenuOptions`), and `ContainerFrameMixin:UpdateSea
 ## gamepadBagSort: the bags' clean-up button
 
 Since 1.60.1.70291 the bags' clean-up button (`BagItemAutoSortButton`) no longer shows, with mouse
-and keyboard or in gamepad mode (the user's report; before, `ContainerFrameMixin:UpdateSearchBox`
+and keyboard or in gamepad mode (seen in game; before, `ContainerFrameMixin:UpdateSearchBox`
 hid it in gamepad mode only, where the gamepad bag bar, `GamepadBagBar`, offered clean-up in each
 bag's menu; 70291 also stopped showing that bar on the bags). So nobody had a way to clean up. A
 `hooksecurefunc` on each bag frame's `UpdateSearchBox` and a `HookScript("OnShow")` (in case that
