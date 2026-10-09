@@ -33,7 +33,7 @@ local KEEP_TESTS = 3
 local EXAMPLES = 3       -- example answers per line of a report
 local OUTER_YARDS = 40   -- the window's outer ring
 local RINGS = { 40, 30, 20, 10 }
-local WIDTH, HEIGHT, RADAR = 250, 320, 220
+local WIDTH, HEIGHT, RADAR = 250, 350, 220
 local MAX_DOTS = 20
 local NAMES = 4          -- the nearest mobs show their name
 local GLIDE = 6          -- how fast dots glide to their new spot
@@ -292,13 +292,52 @@ local testDriver = CreateFrame("Frame")
 -- test notes them): listened to only while the test runs or the window shows you.
 local castWatch = CreateFrame("Frame")
 local watching = { test = false, me = false }
+local CAST_EVENTS = { "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP",
+	"UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_STOP" }
 local function Rewatch()
+	castWatch:UnregisterAllEvents()
 	if watching.test or watching.me then
-		castWatch:RegisterEvent("UNIT_SPELLCAST_SUCCEEDED")
+		for _, event in ipairs(CAST_EVENTS) do
+			castWatch:RegisterUnitEvent(event, "player")
+		end
 		castWatch:RegisterEvent("UI_ERROR_MESSAGE")
-	else
-		castWatch:UnregisterAllEvents()
 	end
+end
+
+-- What you're doing (the window's row under the radar): the spell you're casting or channelling
+-- now, and the last RECENT spells you cast, newest first, each fading over RECENT_TIME.
+local RECENT, RECENT_TIME = 5, 12
+local doing = { recent = {} } -- cast = { name, icon, start, finish (GetTime seconds), channel } or nil
+local castNow = {}
+
+-- The spell being cast or channelled now (none, or hidden by the game: nil).
+local function ReadCast()
+	doing.cast, doing.dirty = nil, false
+	for _, path in ipairs({ "UnitCastingInfo", "UnitChannelInfo" }) do
+		local f = Api(path)
+		local ok, name, _, icon, startMs, endMs
+		if f then
+			ok, name, _, icon, startMs, endMs = pcall(f, "player")
+		end
+		if ok and name and startMs and endMs and not (issecret(name) or issecret(icon) or issecret(startMs) or issecret(endMs)) then
+			castNow.name, castNow.icon, castNow.start, castNow.finish = name, icon, startMs / 1000, endMs / 1000
+			castNow.channel = path == "UnitChannelInfo"
+			doing.cast = castNow
+			return
+		end
+	end
+end
+
+-- A spell you cast: in front of the recent ones.
+local function Recent(spellID, at)
+	local info = Value("C_Spell.GetSpellInfo", spellID)
+	if type(info) ~= "table" or not info.name or issecret(info.name) or issecret(info.iconID) then
+		return
+	end
+	local list = doing.recent
+	local entry = #list >= RECENT and table.remove(list) or {}
+	entry.name, entry.icon, entry.at = info.name, info.iconID, at or GetTime()
+	table.insert(list, 1, entry)
 end
 local resultsWindow
 
@@ -945,9 +984,15 @@ end
 -- test notes what came (to see that these events answer, and the errors' exact words).
 castWatch:SetScript("OnEvent", function(_, event, a, b, c)
 	local side
-	if event == "UNIT_SPELLCAST_SUCCEEDED" then -- unit, castGUID, spellID
+	if event ~= "UNIT_SPELLCAST_SUCCEEDED" and event ~= "UI_ERROR_MESSAGE" then
+		doing.dirty = a == "player" or doing.dirty -- (a cast started or stopped: the row looks again)
+		return
+	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then -- unit, castGUID, spellID
 		if a ~= "player" then
 			return
+		end
+		if watching.me and not issecret(c) and c then
+			Recent(c)
 		end
 		local harmful = not issecret(c) and c and Value("C_Spell.IsSpellHarmful", c)
 		if harmful and Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target") then
@@ -1167,6 +1212,24 @@ local function FeedPreview()
 	local rare = PreviewMob(5, "rare", L["Greyfang"], 17, "rare")
 	rare.yards, rare.angle = 37, 2.4 + 0.1 * math.sin(t * 0.5)
 	mobs[#mobs + 1] = rare
+	-- What she's doing: a Fireball every 4 s (2.5 s to cast), and the spells before it.
+	local now, cycle = GetTime(), t % 4
+	if cycle < 2.5 then
+		local info = Value("C_Spell.GetSpellInfo", 133)
+		castNow.name, castNow.icon = info and info.name or L["Fireball"], info and info.iconID
+		castNow.start, castNow.finish, castNow.channel = now - cycle, now - cycle + 2.5, false
+		doing.cast = castNow
+	else
+		doing.cast = nil
+	end
+	if not doing.recent[1] then
+		for i, id in ipairs({ 2136, 116, 122, 133 }) do -- Fire Blast, Frostbolt, Frost Nova, Fireball (oldest last)
+			Recent(id, now - 8 + i)
+		end
+	end
+	for i, entry in ipairs(doing.recent) do
+		entry.at = now - (i - 1) * 2 -- (kept from fading away in the preview)
+	end
 end
 
 -- "me": the mobs with a nameplate around you (on your screen), as the game tells them, and your
@@ -1212,6 +1275,51 @@ local function FeedMe()
 	for i = #mobs, n + 1, -1 do
 		mobs[i] = nil
 	end
+	ReadCast()
+end
+
+-- The row under the radar: the spell being cast (icon, name, a bar that fills while casting and
+-- empties while channelling), and the last spells on the right, fading.
+local CAST_BAR = 100
+local function ShowDoing(now)
+	local act, cast = win.Act, doing.cast
+	if cast and now > cast.finish + 0.3 then
+		cast, doing.cast = nil, nil -- (over; a new one shows on its start event or the next look)
+	end
+	if cast then
+		local p = math.max(0, math.min(1, (now - cast.start) / math.max(0.1, cast.finish - cast.start)))
+		if cast.channel then
+			p = 1 - p
+		end
+		if act.icon ~= cast.icon then
+			act.icon = cast.icon
+			act.Icon:SetTexture(cast.icon)
+		end
+		act.Icon:Show()
+		act.Name:SetText(cast.name)
+		act.Bar:SetWidth(math.max(1, CAST_BAR * p))
+		act.Bar:Show()
+		act.BarBack:Show()
+	else
+		act.Icon:Hide()
+		act.Name:SetText("")
+		act.Bar:Hide()
+		act.BarBack:Hide()
+	end
+	for i, icon in ipairs(act.Recent) do
+		local entry = doing.recent[i]
+		local age = entry and now - entry.at
+		if age and age < RECENT_TIME then
+			if icon.icon ~= entry.icon then
+				icon.icon = entry.icon
+				icon:SetTexture(entry.icon)
+			end
+			icon:SetAlpha(1 - 0.8 * age / RECENT_TIME)
+			icon:Show()
+		else
+			icon:Hide()
+		end
+	end
 end
 
 local function OnUpdate(_, elapsed)
@@ -1225,7 +1333,10 @@ local function OnUpdate(_, elapsed)
 		end
 		Apply()
 		win.Status:SetText(Status())
+	elseif doing.dirty and mode == "me" then
+		ReadCast() -- (a cast just started or stopped)
 	end
+	ShowDoing(GetTime())
 	local k = math.min(1, elapsed * GLIDE)
 	local pulse = 0.5 + 0.5 * math.sin(clock * 5)
 	for _, dot in ipairs(dots) do
@@ -1345,6 +1456,39 @@ local function Build()
 	me:SetSize(24, 24)
 	me:SetPoint("CENTER")
 
+	-- What you're doing (ShowDoing): the cast on the left, the last spells on the right.
+	local act = CreateFrame("Frame", nil, win)
+	win.Act = act
+	act:SetSize(WIDTH - 24, 22)
+	act:SetPoint("TOP", radar, "BOTTOM", 0, -8)
+	act.Icon = act:CreateTexture(nil, "ARTWORK")
+	act.Icon:SetSize(20, 20)
+	act.Icon:SetPoint("LEFT")
+	act.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	act.Name = act:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	act.Name:SetPoint("TOPLEFT", act.Icon, "TOPRIGHT", 5, 0)
+	act.Name:SetWidth(CAST_BAR)
+	act.Name:SetJustifyH("LEFT")
+	act.Name:SetWordWrap(false)
+	act.Name:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
+	act.BarBack = act:CreateTexture(nil, "BORDER")
+	act.BarBack:SetColorTexture(1, 1, 1, 0.12)
+	act.BarBack:SetSize(CAST_BAR, 3)
+	act.BarBack:SetPoint("BOTTOMLEFT", act.Icon, "BOTTOMRIGHT", 5, 1)
+	act.Bar = act:CreateTexture(nil, "ARTWORK")
+	act.Bar:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.9)
+	act.Bar:SetSize(1, 3)
+	act.Bar:SetPoint("LEFT", act.BarBack, "LEFT")
+	act.Recent = {}
+	for i = 1, RECENT do
+		local icon = act:CreateTexture(nil, "ARTWORK")
+		icon:SetSize(16, 16)
+		icon:SetPoint("RIGHT", act, "RIGHT", -(i - 1) * 18, 0)
+		icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		icon:Hide()
+		act.Recent[i] = icon
+	end
+
 	win.Status = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	win.Status:SetPoint("BOTTOM", 0, 12)
 	win.Status:SetWidth(WIDTH - 20)
@@ -1363,6 +1507,8 @@ local function OpenWindow(newMode)
 	ReleaseAll()
 	wipe(mobs)
 	mode, clock, nextFeed = newMode, 0, 0
+	wipe(doing.recent)
+	doing.cast, doing.dirty = nil, false
 	local name, classFile
 	if mode == "preview" then
 		name, classFile = PREVIEW_FRIEND, PREVIEW_CLASS

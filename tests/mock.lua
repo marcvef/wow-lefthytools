@@ -1496,7 +1496,11 @@ function UnitIsUnit(a, b)
 	if mob and a:find("target$") then return b == "player" and mob.attacking == true end
 	return a == b
 end
-function UnitCastingInfo(u) if MOBS[u] and MOBS[u].casting then return MOBS[u].casting end end
+-- PLAYER_CAST = { name, icon, start, finish (ms) }: what I'm casting now.
+function UnitCastingInfo(u)
+	if u == "player" and PLAYER_CAST then return PLAYER_CAST.name, PLAYER_CAST.name, PLAYER_CAST.icon, PLAYER_CAST.start, PLAYER_CAST.finish end
+	if MOBS[u] and MOBS[u].casting then return MOBS[u].casting end
+end
 function UnitChannelInfo() return nil end
 function UnitHealth() return SECRET end -- (Forever: always secret)
 function UnitHealthPercent() return SECRET end

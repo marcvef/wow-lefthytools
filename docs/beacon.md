@@ -536,12 +536,18 @@ checks answer for hostile units in combat, and where nameplates are on the scree
   misleads it until the cloud starts over). In an instance, without your place, it learns by
   turning only.
 
-The window (250 x 320, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
+The window (250 x 350, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
 you in the middle, a dot per mob (red: attacking you, orange: in combat, grey: not; gold ring:
 elite, silver: rare; a purple glow while casting; a skull that fades when it dies), names for the
 4 nearest, a tooltip per dot, and a bottom line ("2 on you · 5 near · X casts Y"). Dots follow
-their mob (by GUID) and glide to new spots. Cost: nothing unless a test runs or the window is
-open; its OnUpdate runs only while it's shown.
+their mob (by GUID) and glide to new spots. Under the radar, what you're doing: the spell you're
+casting or channelling (`UnitCastingInfo` / `UnitChannelInfo` on "player": icon, name, a bar that
+fills while casting and empties while channelling; read every look and at once on
+`UNIT_SPELLCAST_START` / `STOP` / `CHANNEL_START` / `CHANNEL_STOP`), and on the right the last 5
+spells you cast (`UNIT_SPELLCAST_SUCCEEDED`, icons from `C_Spell.GetSpellInfo`, newest first, fading
+over 12 s). The preview shows the made-up friend casting Fireball every 4 s. Cost: nothing unless a
+test runs or the window is open; its OnUpdate runs only while it's shown, the cast events
+(`RegisterUnitEvent` for "player") only while the window shows you or a test runs.
 
 ## Open questions (check in game)
 

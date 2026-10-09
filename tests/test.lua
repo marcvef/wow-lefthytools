@@ -3108,6 +3108,10 @@ do
 	local leader, gnoll = dot("Bandit leader"), dot("Gnoll")
 	check(leader.Ring:IsShown() and gnoll.ty < 0 and gnoll.Body.alpha < 1 and not gnoll.Ring:IsShown(),
 		"an elite has a gold ring; a mob without a direction sits behind, faint")
+	local act = win.Act
+	check(act.Name:GetText() == "Spell 133" and act.Icon:IsShown() and act.Bar.width > 1 and act.Bar.width < 50
+		and act.Recent[1]:IsShown() and act.Recent[1].path == 100133 and act.Recent[4]:IsShown() and not act.Recent[5]:IsShown(),
+		"what she's doing: the spell she's casting, with its bar, and the ones before it, newest first")
 	local before = leader.tx * leader.tx + leader.ty * leader.ty
 	Advance(3)
 	check(leader.tx * leader.tx + leader.ty * leader.ty < before and math.abs(leader.x - leader.tx) < 3,
@@ -3133,6 +3137,23 @@ do
 	gnoll = dot("Gnoll")
 	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3,
 		"/lefthy stream me: my own surroundings, live")
+	check(act.Name:GetText() == "" and not act.Icon:IsShown() and not act.Recent[1]:IsShown(), "not casting yet: the row is empty (the preview's spells are gone)")
+	-- What I'm doing: the spell I'm casting (right away, on its start), then in the row of the last ones.
+	PLAYER_CAST = { name = "Wrath", icon = 136006, start = GetTime() * 1000, finish = (GetTime() + 1.5) * 1000 }
+	Fire("UNIT_SPELLCAST_START", "player", "Cast-3", 5176)
+	Advance(0.05)
+	check(act.Name:GetText() == "Wrath" and act.Icon.path == 136006 and act.Bar.width < 10, "casting: the spell, at once, its bar just started")
+	Advance(0.75)
+	check(act.Bar.width > 45 and act.Bar.width < 60, "... and filling, got " .. act.Bar.width)
+	PLAYER_CAST = nil
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-3", 2764)
+	Fire("UNIT_SPELLCAST_STOP", "player", "Cast-3", 2764)
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "party1", "Cast-4", 116) -- (someone else's: not mine)
+	Advance(0.05)
+	check(act.Name:GetText() == "" and act.Recent[1]:IsShown() and act.Recent[1].path == 100000 + 2764 and not act.Recent[2]:IsShown(),
+		"done: the row clears, the spell joins the last ones (only mine)")
+	Advance(12.5)
+	check(not act.Recent[1]:IsShown(), "after a while it fades away")
 	local function radius(d) return math.sqrt(d.tx ^ 2 + d.ty ^ 2) end
 	check(thug.ty > 0 and pillager.ty > 0 and gnoll.ty > 0, "mobs with a nameplate are on my screen: ahead")
 	check(radius(thug) < 15 and radius(pillager) > 30 and radius(pillager) < 80 and radius(gnoll) > 100,
