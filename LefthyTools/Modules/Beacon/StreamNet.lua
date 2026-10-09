@@ -103,12 +103,15 @@ local function UpdateIndicator()
 		return
 	end
 	if not indicator then
+		-- Narrow: the dot with the number under it, so it fits between the calendar button and the
+		-- screen's edge (side by side ran off the screen); kept on screen whatever the layout.
 		indicator = CreateFrame("Frame", "LefthyToolsStreamWatched", UIParent)
-		indicator:SetSize(18, 12)
+		indicator:SetSize(10, 20)
 		indicator:SetFrameStrata("MEDIUM")
+		indicator:SetClampedToScreen(true)
 		local anchor = _G.GameTimeFrame
 		if anchor then
-			indicator:SetPoint("LEFT", anchor, "RIGHT", 1, 0)
+			indicator:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 0, -1)
 		elseif _G.Minimap then
 			indicator:SetPoint("BOTTOMLEFT", Minimap, "TOPRIGHT", 0, 0)
 		else
@@ -116,7 +119,7 @@ local function UpdateIndicator()
 		end
 		local dot = indicator:CreateTexture(nil, "OVERLAY")
 		dot:SetSize(6, 6)
-		dot:SetPoint("LEFT", 1, 0)
+		dot:SetPoint("TOP", 0, -1)
 		dot:SetColorTexture(1, 0.15, 0.1, 1)
 		local mask = indicator:CreateMaskTexture()
 		mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
@@ -124,7 +127,7 @@ local function UpdateIndicator()
 		dot:AddMaskTexture(mask)
 		indicator.Dot = dot
 		indicator.Count = indicator:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-		indicator.Count:SetPoint("LEFT", dot, "RIGHT", 2, 0)
+		indicator.Count:SetPoint("TOP", dot, "BOTTOM", 0, -1)
 		indicator:EnableMouse(true)
 		indicator:SetScript("OnEnter", IndicatorOnEnter)
 		indicator:SetScript("OnLeave", function() GameTooltip:Hide() end)

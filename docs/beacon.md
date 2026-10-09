@@ -549,7 +549,7 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
 
 Spells go as IDs; the watcher's client names them in its own language. Guard: 80 `O` messages per
 friend per 10 s. Watching: the sensor runs only while someone watches you (or your own window is
-open). Being watched: a tiny red dot and the count right of the minimap's calendar button
+open). Being watched: a tiny red dot with the count under it (narrow: side by side ran off the screen; clamped to it), right of the minimap's calendar button
 (`GameTimeFrame`; `streamWatchedDot`), hover for who. A friend who stops sharing (`h;0`) or goes
 offline: their window closes with a chat line. Beacon switched off: every stream closes.
 
