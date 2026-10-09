@@ -253,19 +253,19 @@ journal*).
 - **Statistics**, for this session and the character: time played, days played, sessions,
   fastest and average level, quests (and how many were new in WoW: Forever), experience,
   zones discovered and your favourite zone, dungeon runs, killing blows, rare elites, bosses,
-  deaths and your deadliest foe, distance on foot, riding, swimming and on flight paths, jumps,
-  gold earned, spent and the most you ever had, loot by quality, mounts, pets, toys and
-  achievements. And the **Martin tracker**: how long you've been AFK, its share of your play
-  time, how often and the longest stretch, with a verdict from "Always there" to "Practically
-  Martin".
-- **Graphs:** the last 14 days (time played, XP, quests, kills or time AFK per day, with its
-  share of your play time), this session's XP
+  deaths and your deadliest foe, distance on foot, riding, swimming and on flight paths, gold
+  earned, spent and the most you ever had, loot by quality, mounts, pets, toys and achievements.
+  For **all your characters** together: time played, quests, kills, deaths, distance and jumps,
+  and the **Martin tracker**: how long you've been AFK, its share of your play time, how often and
+  the longest stretch, with a verdict from "Always there" to "Practically Martin".
+- **Graphs:** the last 14 days (time played, XP, quests or kills per day), this session's XP
   curve with XP per hour, how long each level took (green fast, red slow), your favourite zones
   and deadliest foes, how you travel, and your loot by quality. Hover a bar for its value.
   Pick one of your **friends** in the dropdown at the top: their last 14 days, their week in
-  numbers, you and them side by side (AFK time too, and all time), and their latest news, also for
+  numbers, you and them side by side (this week and all time), and their latest news, also for
   the time you weren't online.
-- **Compare:** you and every friend in every graph, on one page: level, time played, XP, quests,
+- **Compare:** you and every friend in every graph, on one page, per person (all their characters
+  added up: an alt's quests count for its player): level, time played, XP, quests,
   killing blows, deaths, gold, distance, bosses and rares, time AFK and jumps, over the last 7, 14
   or 30 days, a line per person in their class colour (hover a day for everyone's value; click a
   name in the legend to hide or show them). Plus this week's **leaderboard** (top three in nine

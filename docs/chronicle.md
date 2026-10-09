@@ -124,26 +124,28 @@ the open one's button greyed out:
   inline icon (the item's or achievement's own where known) and the localized text. At most 250
   entries drawn, the rest summarized in one line.
 - **Statistics:** sections This session (current character only), Character, Quests, Exploring,
-  Combat, Travel, Gold and loot, Collections, Martin tracker (AFK time: `stats.afk`, `afkTimes`,
-  `longestAfk`, counted on the tick from `UnitIsAFK("player")`; its share of `played`, this
-  session's, and a verdict: under 5% "Always there", 15% "Takes a break now and then", 30%
-  "Coffee enthusiast", above "Practically Martin"). Labels and values are two font strings with the
+  Combat, Travel, Gold and loot, Collections (the picked character), then All your characters
+  (what means little per character: their count, time played, quests, killing blows, deaths,
+  distance, jumps, added up over every character in `store.chars`) and the Martin tracker (all your
+  characters too: AFK time `stats.afk`, `afkTimes`, `longestAfk`, counted on the tick from
+  `UnitIsAFK("player")`; its share of the time played, this session's, and a verdict: under 5%
+  "Always there", 15% "Takes a break now and then", 30% "Coffee enthusiast", above "Practically
+  Martin"). Labels and values are two font strings with the
   same number of lines (values right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h`,
   distance in km, gold with `GetMoneyString`.
 - **Graphs** (`Graphs.lua`): cards on the scroll content. Last 14 days (bars per day from
-  `daily`, buttons switch between time, XP, quests, killing blows and time AFK, the Martin
-  tracker, whose note adds its share of the time played; today in gold; hover shows the date and
-  value), This session (the session curve: a line with a gradient fill, plus XP per
+  `daily`, buttons switch between time, XP, quests and killing blows (time AFK and jumps go per
+  account: Compare); today in gold; hover shows the date and value), This session (the session curve: a line with a gradient fill, plus XP per
   hour; current character only), Time per level (a bar per level from `levelTimes`, up to 20,
   green = fast to red = slow), Favourite zones and Deadliest foes (horizontal bars, top 5), On
   the road and Loot by quality (one split bar each, with a legend). Drawn with plain textures
   (`SetGradient` for the bars), line objects (`CreateLine`) and font strings from pools
   (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first draw.
-- **Friends' graphs:** the dropdown lists every friend who sent their days
-  (`store.friendStats[name]`; other pages fall back to your own character). Their page: Last 14 days (the same bars from their days), Last 7 days (seven tiles:
-  time, XP, levels, quests, killing blows, deaths, time AFK), You and <name> (two bars per number:
-  time, XP, quests, kills, AFK; you in gold, them in blue) and Latest news (their last 6 feed
-  entries with date).
+- **Friends' graphs:** the dropdown lists every friend's character (`C.People()`; other pages fall
+  back to your own character). Their page: Last 14 days (the same bars from their days), Last 7
+  days (six tiles: time, XP, levels, quests, killing blows, deaths), You and <name> (two bars per
+  number: time, XP, quests, kills; you in gold, them in blue), You and <name>, all time (from their
+  profile) and Latest news (their last 6 feed entries with date).
 - **Friends:** "Online now" first: every Beacon friend in up to three lines (`B.FriendLines` in
   Beacon's `Alerts.lua`, shared with the AFK screen: name, AFK, level and progress, group; zone
   and distance; what they're fighting and their quest), then "Not online": friends' characters
@@ -153,10 +155,11 @@ the open one's button greyed out:
   about what will appear while it's empty. Showing it marks the news seen (`C.MarkFeedSeen`): the
   tab's blue count and the book's blue dot (`C.UnseenCount`: news that came after
   `store.feedSeenAt`) go. Redrawn when the feed changes and every 5 s.
-- **Compare** (`G.DrawCompare`): you (the character you play) and every friend's character in every
-  graph. A toolbar: 7 / 14 / 30 days, and a chip per person (their colour: the class colour, a
+- **Compare** (`G.DrawCompare`): people, not characters (`C.Accounts()`, see below): you and every
+  friend in every graph. A toolbar: 7 / 14 / 30 days, and a chip per person (their colour: the class colour, a
   second of the same class lighter, a third darker; you marked "(you)"; hover: level, BattleTag
-  name, online or last played; click: hidden from every graph and table, `compareState.hidden`).
+  name, all their characters, online or last played; click: hidden from every graph and table,
+  `compareState.hidden`).
   Then the Level chart (full width; where each day ended, carried over days not played), the
   Leaderboard of the last 7 days (`C.Leaderboard`: nine categories, top three each, gold, silver,
   bronze; the Martin award), a grid of line charts (time played, XP, quests, killing blows per day;
@@ -239,7 +242,14 @@ minute.
 from `C.ProfileNumbers`), then every friend's character from the book (`book:<acct>:<Name-Realm>`;
 last played from the profile or the latest day played; online if a Beacon peer has that name),
 then friends on older builds from the days they sent (`store.friendStats`, `friend:<Name>`), by
-name. `C.FriendNews()`: every synced highlight plus the live feed (`store.friends`: Beacon's
+name. `C.Accounts()`: the same per Battle.net account (me: all of `store.chars`; friends: their
+account's characters; older builds: one character each), each day's activity added up over the
+account's characters (time, XP, quests, kills, deaths, levels, AFK, distance, bosses, rares, runs,
+jumps), the level of the character played most that day, gold summed over each character's last
+known; lifetime numbers summed where they add up, else the best (zones, dungeons, most gold,
+longest session; fastest level the lowest); named after the character played most in 30 days (mine:
+the one I play), its class colour, foe and zone. Compare, the leaderboards and the recap use it.
+`C.FriendNews()`: every synced highlight plus the live feed (`store.friends`: Beacon's
 level-ups, deaths, online and offline, E2 highlights), oldest first; a live entry that a synced
 one repeats (same name, kind and first field within 15 minutes) is left out. Rebuilt only when
 something changed.

@@ -4581,7 +4581,8 @@ do
 	check(lines(labels) == lines(values), "statistics: labels and values line up")
 	for _, expected in ipairs({ "This session", "Killing blows", "Deadliest foe", "Rare elites killed", "Bosses defeated", "Dungeon runs",
 			"Favourite zone", "On foot", "Flight paths", "Jumps", "Most gold at once", "Epic items", "Mounts", "Time played (/played)",
-			"Martin tracker", "Time AFK", "Share of time played", "Times AFK", "Longest AFK", "AFK this session", "Verdict" }) do
+			"Martin tracker (all your characters)", "Time AFK", "Share of time played", "Times AFK", "Longest AFK", "AFK this session", "Verdict",
+		"All your characters", "Characters" }) do
 		check(labels:find(expected, 1, true), "statistics: " .. expected)
 	end
 	check(values:find("Hogger (1)", 1, true) and values:find("100h 0m", 1, true) == nil and values:find("4d 4h", 1, true),
@@ -4637,15 +4638,7 @@ do
 		"switching the 14-day chart to experience")
 	local afkButton
 	for _, child in ipairs(win.Content._children) do if child:GetText() == "Time AFK" then afkButton = child end end
-	afkButton:Click()
-	local afkNote
-	for i = 1, canvas.used.text do
-		local text = canvas.pools.text[i]:GetText() or ""
-		if text:find("^Time AFK: ") then afkNote = text end
-	end
-	check(hoverWith(date("%Y-%m-%d", time() - 86400)).lines[2] == "Time AFK: 15m" and afkNote and afkNote:find("% of time played)", 1, true),
-		"the Martin tracker on the graphs: AFK per day, and its share of the time played, got " .. tostring(afkNote))
-	xpButton:Click()
+	check(not afkButton, "time AFK isn't a character's graph any more (it's per account: Compare)")
 	check(canvas.used.line >= 2 and drawnText("This session"), "this session: an XP curve")
 	local level22 = hoverWith("Level 22")
 	check(level22 and level22.lines[2] == "1m", "time per level: a bar per level")
@@ -4722,7 +4715,7 @@ do
 		"a friend's graphs: their days, their week, you and them, their latest news")
 	local annaDay = hoverWith(date("%Y-%m-%d", time() - 86400))
 	check(annaDay and annaDay.lines[2]:find("5000", 1, true), "their 14 days, from what they sent, got " .. tostring(annaDay and annaDay.lines[2]))
-	check(drawnText("Time AFK") and drawnText("45m"), "... their AFK time too: a tile for the week and a row next to mine")
+	check(not drawnText("Time AFK"), "no AFK tiles on a character's page: AFK goes per account (Compare)")
 	win.Tabs.timeline:Click()
 	check(picker:GetText():find("Lefthy", 1, true), "friends only have graphs: other pages show your own characters")
 	win.Tabs.graphs:Click()
@@ -4949,6 +4942,17 @@ do
 	for _, person in ipairs(CH.People()) do if person.name == "Carl" then carlPerson = person end end
 	check(carlPerson and not carlPerson.online and carlPerson.account == "Carl" and carlPerson.profile
 		and CH.People()[1].me, "Carl is among the people (offline), me first")
+	-- One person per account: Carl's alt adds up into his numbers; name, class and level from the one he plays most.
+	anna("J2;d;" .. carl .. ";Carlbank-Realmy;4500;" .. yesterday .. ";30,100,1,2,1,0,10,5,20,300,0,0,0,23")
+	Advance(0.3)
+	local carlAccount
+	for _, a in ipairs(CH.Accounts()) do if a.acct == carl then carlAccount = a end end
+	local ad = carlAccount and carlAccount.days[date("%Y-%m-%d", time() - 86400)]
+	check(carlAccount and #carlAccount.chars == 2 and carlAccount.name == "Carl" and ad.played == 9000 and ad.jumps == 100
+		and ad.afk == 900 and ad.level == 18 and ad.gold == 115 and carlAccount.profile.quests == 140,
+		"per account: time, AFK and jumps add up over his characters; level from his main, gold summed")
+	local mine = CH.Accounts()[1]
+	check(mine.me and #mine.chars >= 2 and mine.name == "Lefthy", "me: all my characters, named after the one I play")
 	local function newsOf(name, k)
 		for _, f in ipairs(CH.FriendNews()) do if f.name == name and f.k == k then return f end end
 	end

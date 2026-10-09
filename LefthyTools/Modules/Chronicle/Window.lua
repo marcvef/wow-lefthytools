@@ -343,7 +343,6 @@ local function Statistics(c)
 	Row(L["Riding"], C.Distance(s.ridden))
 	Row(L["Swimming"], C.Distance(s.swum))
 	Row(L["Flight paths"], ("%d, %s"):format(s.flights, C.Distance(s.flown)))
-	Row(L["Jumps"], C.Number(s.jumps))
 
 	Section(L["Gold and loot"])
 	if current then
@@ -362,13 +361,34 @@ local function Statistics(c)
 	Row(L["Toys"], s.toys)
 	Row(L["Achievements"], s.achievements)
 
-	-- Time spent AFK, with a verdict by its share of the time played.
-	Section(L["Martin tracker"])
-	local share = s.played > 0 and s.afk / s.played or 0
-	Row(L["Time AFK"], C.Duration(s.afk))
+	-- The person behind the characters (per character these mean little): all my characters
+	-- together. The Martin tracker: time spent AFK, with a verdict by its share of the time played.
+	local all = { played = 0, afk = 0, afkTimes = 0, longestAfk = 0, jumps = 0, quests = 0, kills = 0, deaths = 0,
+		distance = 0, count = 0 }
+	for _, other in pairs(C.Store().chars) do
+		C.Fill(other)
+		local o = other.stats
+		all.count = all.count + 1
+		all.played, all.afk, all.afkTimes = all.played + o.played, all.afk + o.afk, all.afkTimes + o.afkTimes
+		all.longestAfk, all.jumps = math.max(all.longestAfk, o.longestAfk), all.jumps + o.jumps
+		all.quests, all.kills, all.deaths = all.quests + o.quests, all.kills + o.kills, all.deaths + o.deaths
+		all.distance = all.distance + o.walked + o.ridden + o.swum + o.flown
+	end
+	Section(L["All your characters"])
+	Row(L["Characters"], all.count)
+	Row(L["Time played (since Chronicle)"], C.Duration(all.played))
+	Row(L["Quests completed"], C.Number(all.quests))
+	Row(L["Killing blows"], C.Number(all.kills))
+	Row(L["Deaths"], C.Number(all.deaths))
+	Row(L["Distance"], C.Distance(all.distance))
+	Row(L["Jumps"], C.Number(all.jumps))
+
+	Section(L["Martin tracker (all your characters)"])
+	local share = all.played > 0 and all.afk / all.played or 0
+	Row(L["Time AFK"], C.Duration(all.afk))
 	Row(L["Share of time played"], ("%d%%"):format(math.floor(share * 100 + 0.5)))
-	Row(L["Times AFK"], s.afkTimes)
-	Row(L["Longest AFK"], C.Duration(s.longestAfk))
+	Row(L["Times AFK"], all.afkTimes)
+	Row(L["Longest AFK"], C.Duration(all.longestAfk))
 	if current then
 		local session = C.Session()
 		if session then
@@ -561,7 +581,7 @@ function Refresh(keepScroll)
 		local width = frame.Content:GetWidth()
 		local height
 		if tab == "compare" then
-			height = C.Graphs.DrawCompare(frame.Canvas, width, C.People(), compareState, RedrawCompare)
+			height = C.Graphs.DrawCompare(frame.Canvas, width, C.Accounts(), compareState, RedrawCompare)
 		elseif friend then
 			height = C.Graphs.DrawFriend(frame.Canvas, width, friend, friend.name or "?", C.Char(), graphState)
 		else

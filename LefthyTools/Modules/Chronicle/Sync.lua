@@ -691,6 +691,136 @@ function C.People()
 	return people
 end
 
+-- The same, per Battle.net account: me (all my characters), then each friend's account (all their
+-- characters), then friends on older builds (one character each, no account known). Activity adds
+-- up over an account's characters (time, XP, quests, kills, deaths, distance, AFK, jumps: per
+-- character those mean little for a person); level is that of the character played most that day,
+-- gold the sum of every character's last known gold. Named after the character played most in the
+-- last 30 days (its class colour), the others listed in chars. For the Compare page, leaderboards,
+-- the recap and the Martin tracker.
+local ADDITIVE = { "played", "xp", "quests", "kills", "deaths", "levels", "afk", "dist", "bosses", "rares", "runs", "jumps" }
+local SUMMED = { played = true, sessions = true, quests = true, kills = true, deaths = true, runs = true, bosses = true,
+	rares = true, dist = true, jumps = true, afk = true, loot4 = true, levels = true, xp = true }
+local LOWEST = { fastest = true }
+
+local function Combine(account)
+	local chars = account.chars
+	local oldest = Oldest()
+	-- The main character: the most played in the last 30 days (then the highest level).
+	local main, mainPlayed
+	for _, c in ipairs(chars) do
+		local played = 0
+		for day, b in pairs(c.days) do
+			if day >= oldest then
+				played = played + (b.played or 0)
+			end
+		end
+		c.recent = played
+		if not main or played > mainPlayed or (played == mainPlayed and (c.level or 0) > (main.level or 0)) then
+			main, mainPlayed = c, played
+		end
+	end
+	table.sort(chars, function(a, b) return a.recent > b.recent or (a.recent == b.recent and (a.level or 0) > (b.level or 0)) end)
+	account.name, account.classFile, account.level = main and main.name, main and main.classFile, main and main.level
+	account.foe, account.zone = main and main.foe, main and main.zone
+	-- Days: added up; level from the day's most played character; gold summed over each one's last.
+	local days, dayList = {}, {}
+	for _, c in ipairs(chars) do
+		for day in pairs(c.days) do
+			if day >= oldest and not days[day] then
+				days[day] = {}
+				dayList[#dayList + 1] = day
+			end
+		end
+	end
+	table.sort(dayList)
+	local lastGold = {}
+	for _, day in ipairs(dayList) do
+		local b, most = days[day], -1
+		for i, c in ipairs(chars) do
+			local cb = c.days[day]
+			if cb then
+				for _, key in ipairs(ADDITIVE) do
+					b[key] = (b[key] or 0) + (cb[key] or 0)
+				end
+				if cb.level and (cb.played or 0) > most then
+					b.level, most = cb.level, cb.played or 0
+				end
+				if cb.gold then
+					lastGold[i] = cb.gold
+				end
+			end
+		end
+		local gold, any = 0, false
+		for i = 1, #chars do
+			if lastGold[i] then
+				gold, any = gold + lastGold[i], true
+			end
+		end
+		b.gold = any and gold or nil
+	end
+	account.days = days
+	-- Lifetime: summed where it adds up, the best otherwise (zones, dungeons, most gold, longest session, ...).
+	local profile
+	for _, c in ipairs(chars) do
+		if c.profile then
+			profile = profile or {}
+			for key, value in pairs(c.profile) do
+				local old = profile[key]
+				if SUMMED[key] then
+					profile[key] = (old or 0) + value
+				elseif LOWEST[key] then
+					profile[key] = (value > 0 and (not old or old == 0 or value < old)) and value or old
+				else
+					profile[key] = math.max(old or 0, value)
+				end
+			end
+		end
+		account.online = account.online or c.online
+		account.last = math.max(account.last or 0, c.last or 0)
+	end
+	account.profile = profile
+	return account
+end
+
+function C.Accounts()
+	local accounts = {}
+	if C.Char() then
+		local mine = { key = "me", me = true, online = true, chars = {}, account = (BNGetInfo and select(2, BNGetInfo()) or ""):match("^[^#]+") }
+		for _, c in pairs(store.chars) do
+			C.Fill(c)
+			mine.chars[#mine.chars + 1] = { name = c.name, classFile = c.classFile, level = c.level, days = c.daily,
+				profile = ProfileNumbers(c), foe = Top(c.killers), zone = Top(c.zoneTime),
+				last = c == C.Char() and time() or (c.session and c.session.last) or 0, online = c == C.Char() }
+		end
+		accounts[1] = Combine(mine)
+		-- (my account is named after the character I'm playing, whatever I played most)
+		local current = C.Char()
+		mine.name, mine.classFile, mine.level = current.name, current.classFile, current.level
+	end
+	local byAccount, friends = {}, {}
+	for _, person in ipairs(C.People()) do
+		if not person.me then
+			local key = person.acct and ("acct:" .. person.acct) or person.key
+			local account = byAccount[key]
+			if not account then
+				account = { key = key, chars = {}, account = person.account, acct = person.acct }
+				byAccount[key] = account
+				friends[#friends + 1] = account
+			end
+			account.chars[#account.chars + 1] = person
+		end
+	end
+	for _, account in ipairs(friends) do
+		Combine(account)
+	end
+	table.sort(friends, function(a, b) return (a.name or "") < (b.name or "") end)
+	for _, account in ipairs(friends) do
+		accounts[#accounts + 1] = account
+	end
+	return accounts
+end
+
 -- "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago" (localized).
 function C.Ago(t)
 	local seconds = math.max(0, time() - (t or 0))
@@ -732,10 +862,10 @@ end
 C.BOARD = { "played", "xp", "quests", "kills", "levels", "deaths", "dist", "jumps", "afk" }
 
 -- Rankings over `count` days ending `ending` days ago: { [metric] = { { person, value }, ... } },
--- highest first, only people with some time played then.
+-- highest first, only people with some time played then. People: accounts (C.Accounts) by default.
 function C.Leaderboard(count, ending, people)
 	local board = {}
-	people = people or C.People()
+	people = people or C.Accounts()
 	for _, metric in ipairs(C.BOARD) do
 		local list = {}
 		for _, person in ipairs(people) do

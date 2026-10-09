@@ -8,7 +8,7 @@ local C = ns.Chronicle
 -- a pool and is reused on the next draw, so redrawing creates nothing new once the page has been
 -- drawn; the window draws the page only when it's opened and at most every few seconds after.
 --
---   Last 14 days      bars per day: time played, XP, quests, kills or time AFK (buttons switch)
+--   Last 14 days      bars per day: time played, XP, quests or kills (buttons switch)
 --   This session      XP over the session, a line with a soft fill under it
 --   Time per level    a bar per level, green (fast) to red (slow)
 --   Favourite zones | Deadliest foes        horizontal bars
@@ -22,7 +22,7 @@ local BAR_TODAY = { 1, 0.78, 0.2 }
 local LINE_COLOR = { 0.35, 0.85, 0.45 }
 local DAYS = 14
 local LEVELS = 20
-local METRICS = { "played", "xp", "quests", "kills", "afk" }
+local METRICS = { "played", "xp", "quests", "kills" } -- (time AFK and jumps go per account: the Compare page)
 
 local G = {}
 C.Graphs = G
@@ -299,9 +299,6 @@ local function Days(canvas, x, y, w, c, metric)
 			tooltip = { date(L["%Y-%m-%d"], t), METRIC_LABEL[metric]() .. ": " .. MetricText(metric, value) } }
 	end
 	local note = METRIC_LABEL[metric]() .. ": " .. MetricText(metric, total)
-	if metric == "afk" and played > 0 then -- the Martin tracker's number: AFK as a share of time played
-		note = note .. "  " .. L["(%d%% of time played)"]:format(math.floor(total / played * 100 + 0.5))
-	end
 	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Last 14 days"], note)
 	Bars(canvas, ix, iy + 22, iw, ih - 22, items, BAR_BLUE)
 	return h, ix, iy
@@ -474,7 +471,7 @@ end
 
 local MY_COLOR = { 1, 0.78, 0.2 }
 local THEIR_COLOR = BAR_BLUE
-local WEEK = { "played", "xp", "levels", "quests", "kills", "deaths", "afk" }
+local WEEK = { "played", "xp", "levels", "quests", "kills", "deaths" }
 
 local function Sum(days, count)
 	local sum = { played = 0, xp = 0, levels = 0, quests = 0, kills = 0, deaths = 0, afk = 0 }
@@ -513,7 +510,7 @@ end
 
 -- You and them over the last 7 days, two bars per number.
 local function Versus(canvas, x, y, w, mine, theirs, name)
-	local rows = { "played", "xp", "quests", "kills", "afk" }
+	local rows = { "played", "xp", "quests", "kills" }
 	local rowH = 32
 	local h = HEADER + 4 + #rows * rowH + PAD
 	local function Hex(c)
@@ -893,6 +890,13 @@ local function Toolbar(canvas, x, y, w, people, state, redraw)
 		tip[#tip + 1] = p.level and L["Level %d"]:format(p.level) or nil
 		if p.account then
 			tip[#tip + 1] = p.account
+		end
+		if p.chars and #p.chars > 1 then -- (an account: its numbers add up all its characters)
+			local names = {}
+			for _, c in ipairs(p.chars) do
+				names[#names + 1] = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r " .. (c.level or "")
+			end
+			tip[#tip + 1] = L["All characters: %s"]:format(table.concat(names, ", "))
 		end
 		if p.online then
 			tip[#tip + 1] = L["Online now"]
