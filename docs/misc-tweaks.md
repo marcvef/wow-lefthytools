@@ -30,16 +30,20 @@ A gamepad sort button was tried and dropped: controller mode already has "Clean 
 backpack's menu (`Gamepad_SetupMenuOptions`), and `ContainerFrameMixin:UpdateSearchBox()` hides
 `BagItemAutoSortButton` in gamepad mode, where `GamepadBagBar` covers its spot.
 
-## gamepadBagSort: the bags' clean-up button in gamepad mode
+## gamepadBagSort: the bags' clean-up button
 
-Blizzard's `ContainerFrameMixin:UpdateSearchBox` hides the search box and the clean-up button
-(`BagItemAutoSortButton`) in gamepad mode. Up to 1.60.1.70245 the gamepad bag bar (`GamepadBagBar`,
-shown on the combined bags from that same function) offered clean-up in each bag's menu; 70291
-rebuilt that bar and no longer shows it there, so gamepad players had no way to clean up. A
-`hooksecurefunc` on each bag frame's `UpdateSearchBox` (`ContainerFrames()`: the combined bags
-and every `ContainerFrameN`) shows Blizzard's own button again in gamepad mode, on the backpack or
-the combined bags, where Blizzard puts it without gamepad mode (TOPRIGHT -9, -34). Off: hidden
-again (as Blizzard has it). Blizzard's click handler is untouched (`C_Container.SortBags`).
+Since 1.60.1.70291 the bags' clean-up button (`BagItemAutoSortButton`) no longer shows, with mouse
+and keyboard or in gamepad mode (the user's report; before, `ContainerFrameMixin:UpdateSearchBox`
+hid it in gamepad mode only, where the gamepad bag bar, `GamepadBagBar`, offered clean-up in each
+bag's menu; 70291 also stopped showing that bar on the bags). So nobody had a way to clean up. A
+`hooksecurefunc` on each bag frame's `UpdateSearchBox` and a `HookScript("OnShow")` (in case that
+function isn't called any more; `ContainerFrames()`: the combined bags and every
+`ContainerFrameN`) show the button on the backpack or the combined bags, where Blizzard used to put
+it (TOPRIGHT -9, -34), above the frame. Blizzard's click handler is untouched
+(`C_Container.SortBags`). A client without `BagItemAutoSortButton` gets ours
+(`LefthyToolsBagSortButton`: the `bags-button-autosort-up` atlas, the sorting sound,
+`C_Container.SortBags`). Off: `UpdateSearchBox` again (as Blizzard has it), ours hidden. The key
+still says gamepad (it began there).
 
 ## questAnnounce: quest progress in party chat
 

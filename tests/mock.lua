@@ -833,23 +833,26 @@ ContainerFrame1:Hide()
 function ContainerFrame1:IsCombinedBagContainer() return false end
 function ContainerFrame1:GetBagID() return 0 end
 ContainerFrameContainer.ContainerFrames = { ContainerFrame1 }
--- The clean-up button: Blizzard puts it on the backpack (or the combined bags) and hides it in
--- gamepad mode (ContainerFrameMixin:UpdateSearchBox).
+-- The clean-up button: since Forever 1.60.1.70291 Blizzard's UpdateSearchBox hides it, with and
+-- without gamepad mode (MOCK_SORT_SHOWN: like before, shown without gamepad mode).
 CreateFrame("Button", "BagItemAutoSortButton", UIParent)
 BagItemAutoSortButton:Hide()
 for _, f in ipairs({ ContainerFrameCombinedBags, ContainerFrame1 }) do
 	function f:IsBackpack() return self == ContainerFrame1 end
 	function f:UpdateSearchBox()
-		if GAMEPAD_STATE.ui then
-			BagItemAutoSortButton:ClearAllPoints()
-			BagItemAutoSortButton:Hide()
+		local button = _G.BagItemAutoSortButton
+		if not button then return end
+		if GAMEPAD_STATE.ui or not MOCK_SORT_SHOWN then
+			button:ClearAllPoints()
+			button:Hide()
 		else
-			BagItemAutoSortButton:SetParent(self)
-			BagItemAutoSortButton:SetPoint("TOPRIGHT", self, "TOPRIGHT", -9, -34)
-			BagItemAutoSortButton:Show()
+			button:SetParent(self)
+			button:SetPoint("TOPRIGHT", self, "TOPRIGHT", -9, -34)
+			button:Show()
 		end
 	end
 end
+SORTED_BAGS = 0
 ANCHOR_CALLS = 0
 function UpdateContainerFrameAnchors()
 	ANCHOR_CALLS = ANCHOR_CALLS + 1
@@ -1292,6 +1295,7 @@ C_Container = {
 	end,
 	UseContainerItem = function(bag, slot) SOLD[#SOLD + 1] = BAGS[bag][slot]; BAGS[bag][slot] = nil end,
 	PickupContainerItem = function(bag, slot) PICKED_UP[#PICKED_UP + 1] = BAGS[bag][slot] end,
+	SortBags = function() SORTED_BAGS = SORTED_BAGS + 1 end,
 }
 C_Item.GetItemCount = function(itemID)
 	local n = 0

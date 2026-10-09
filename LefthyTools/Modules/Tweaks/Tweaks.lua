@@ -277,42 +277,83 @@ function M:ResetBagPositions()
 	end
 end
 
--- The bags' clean-up button in gamepad mode. Blizzard hides the backpack's clean-up button
--- (BagItemAutoSortButton) in gamepad mode (ContainerFrameMixin:UpdateSearchBox); its gamepad bag
--- bar offered clean-up in each bag's menu, but since Forever 1.60.1.70291 that bar doesn't show on
--- the bags any more, so there was no way to clean up. A post-hook on each bag frame's
--- UpdateSearchBox puts Blizzard's own button back where it sits without gamepad mode.
+-- The bags' clean-up button. Since Forever 1.60.1.70291 Blizzard's (BagItemAutoSortButton) no
+-- longer shows on the bags, with or without gamepad mode, and gamepad mode's bag bar with its
+-- clean-up menu is gone too: there was no way left to clean up. A post-hook on each bag frame's
+-- UpdateSearchBox (and its OnShow, in case that isn't called any more) puts the button back top
+-- right of the backpack or the combined bags. A client without Blizzard's button gets one of ours
+-- that does the same (C_Container.SortBags). (The setting's key still says gamepad: it began there.)
 local sortHooked = {}
+local ownSortButton
 
-local function GamepadUI()
-	return InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled()
+local function OwnSortButtonOnEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	GameTooltip:SetText(BAG_CLEANUP_BAGS or L["Clean up bags"], 1, 1, 1)
+	GameTooltip:Show()
+end
+
+-- Blizzard's button, or ours where this client has none.
+local function SortButton()
+	if BagItemAutoSortButton then
+		return BagItemAutoSortButton
+	end
+	if not ownSortButton then
+		local button = CreateFrame("Button", "LefthyToolsBagSortButton", UIParent)
+		button:SetSize(28, 26)
+		if button.SetNormalAtlas then
+			button:SetNormalAtlas("bags-button-autosort-up")
+			button:SetPushedAtlas("bags-button-autosort-down")
+		else
+			button:SetNormalTexture("Interface\\Icons\\INV_Pet_Broom")
+		end
+		button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+		button:SetScript("OnClick", function()
+			if SOUNDKIT and SOUNDKIT.UI_BAG_SORTING_01 then
+				PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
+			end
+			if C_Container and C_Container.SortBags then
+				C_Container.SortBags()
+			end
+		end)
+		button:SetScript("OnEnter", OwnSortButtonOnEnter)
+		button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		button:Hide()
+		ownSortButton = button
+	end
+	return ownSortButton
 end
 
 local function ShowSortButton(frame)
-	local button = BagItemAutoSortButton
-	if not (button and M.enabled and M.db.gamepadBagSort and GamepadUI()) then
+	if not (M.enabled and M.db.gamepadBagSort and frame:IsShown()) then
 		return
 	end
 	if (frame.IsBackpack and frame:IsBackpack()) or (frame.IsCombinedBagContainer and frame:IsCombinedBagContainer()) then
+		local button = SortButton()
 		button:SetParent(frame)
 		button:ClearAllPoints()
 		button:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -9, -34)
+		button:SetFrameLevel(frame:GetFrameLevel() + 10)
 		button:Show()
 	end
 end
 
 local function ApplyGamepadBagSort(on)
 	for _, frame in ipairs(ContainerFrames()) do
-		if on and frame.UpdateSearchBox and not sortHooked[frame] then
+		if on and not sortHooked[frame] then
 			sortHooked[frame] = true
-			hooksecurefunc(frame, "UpdateSearchBox", ShowSortButton)
+			if frame.UpdateSearchBox then
+				hooksecurefunc(frame, "UpdateSearchBox", ShowSortButton)
+			end
+			frame:HookScript("OnShow", ShowSortButton)
 		end
-		if on and frame:IsShown() then
+		if on then
 			ShowSortButton(frame)
+		elseif frame:IsShown() and frame.UpdateSearchBox then
+			frame:UpdateSearchBox() -- off: as Blizzard has it
 		end
 	end
-	if not on and BagItemAutoSortButton and GamepadUI() then
-		BagItemAutoSortButton:Hide() -- (as Blizzard has it in gamepad mode)
+	if not on and ownSortButton then
+		ownSortButton:Hide()
 	end
 end
 
@@ -481,7 +522,7 @@ end
 local TWEAKS = {
 	{ key = "statusText", command = "statustext", label = "Always show health & power values", apply = ApplyStatusText },
 	{ key = "movableBags", command = "bags", label = "Movable bags", apply = ApplyMovableBags },
-	{ key = "gamepadBagSort", command = "bagsort", label = "Clean-up button on the bags in gamepad mode", apply = ApplyGamepadBagSort },
+	{ key = "gamepadBagSort", command = "bagsort", label = "Clean-up button on the bags", apply = ApplyGamepadBagSort },
 	{ key = "questAnnounce", command = "quests", label = "Announce quest progress in party chat", apply = ApplyQuestAnnounce },
 	{ key = "comboNameplate", command = "combo", label = "Combo points on your target's nameplate",
 		apply = function(on) ns.ApplyComboNameplate(on) end }, -- ComboPoints.lua
@@ -558,8 +599,8 @@ function M:BuildOptions(o)
 	o:Header(L["Bags"])
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])
-	o:Checkbox("gamepadBagSort", L["Clean-up button on the bags in gamepad mode"],
-		L["In gamepad mode Blizzard hides the bags' clean-up button, and since Forever's latest patch there's no other way to clean up there. This puts Blizzard's button back, top right of the backpack."])
+	o:Checkbox("gamepadBagSort", L["Clean-up button on the bags"],
+		L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, top right of the backpack."])
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])

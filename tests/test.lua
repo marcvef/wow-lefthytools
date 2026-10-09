@@ -691,25 +691,43 @@ lefthy("tweaks resetbags")
 check(ContainerFrameCombinedBags:GetPoint(1) == "BOTTOMRIGHT" and next(TDB.bagPositions) == nil, "/lefthy tweaks resetbags")
 CloseBags()
 
-section("Misc Tweaks: the bags' clean-up button in gamepad mode")
+section("Misc Tweaks: the bags' clean-up button")
 do
 	check(TDB.gamepadBagSort == true and T("gamepadBagSort"), "on by default, with a checkbox")
 	ContainerFrameCombinedBags:Show()
 	ContainerFrameCombinedBags:UpdateSearchBox()
-	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags,
-		"without gamepad mode: Blizzard's own button, untouched")
-	GAMEPAD_STATE.ui = true
-	ContainerFrameCombinedBags:UpdateSearchBox()
 	local p1, rel, p2, x, y = BagItemAutoSortButton:GetPoint(1)
 	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags and p1 == "TOPRIGHT"
-		and rel == ContainerFrameCombinedBags and x == -9 and y == -34, "gamepad mode (Blizzard hides it): back, top right of the bags")
+		and rel == ContainerFrameCombinedBags and x == -9 and y == -34,
+		"mouse and keyboard (Blizzard hides it since the patch): back, top right of the bags")
+	GAMEPAD_STATE.ui = true
+	ContainerFrameCombinedBags:UpdateSearchBox()
+	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags, "gamepad mode: there too")
+	GAMEPAD_STATE.ui = false
+	ContainerFrameCombinedBags:Hide()
+	BagItemAutoSortButton:Hide()
+	ContainerFrameCombinedBags:Show() -- (opening the bags: also when UpdateSearchBox isn't called)
+	check(BagItemAutoSortButton:IsShown(), "opening the bags: there")
 	lefthy("tweaks bagsort off"); Advance(0.05)
 	check(TDB.gamepadBagSort == false and not BagItemAutoSortButton:IsShown(), "/lefthy tweaks bagsort off: hidden again, as Blizzard has it")
 	ContainerFrameCombinedBags:UpdateSearchBox()
 	check(not BagItemAutoSortButton:IsShown(), "... and stays so")
 	lefthy("tweaks bagsort on"); Advance(0.05)
 	check(BagItemAutoSortButton:IsShown(), "on again: back at once")
-	GAMEPAD_STATE.ui = false
+	-- A client without Blizzard's button: ours, which cleans up the same way.
+	local blizzard = BagItemAutoSortButton
+	blizzard:Hide()
+	BagItemAutoSortButton = nil
+	ContainerFrameCombinedBags:UpdateSearchBox()
+	local own = LefthyToolsBagSortButton
+	check(own and own:IsShown() and own:GetParent() == ContainerFrameCombinedBags, "no Blizzard button: ours, in the same place")
+	local sorted = SORTED_BAGS
+	own:Click()
+	check(SORTED_BAGS == sorted + 1, "... it cleans up the bags")
+	lefthy("tweaks bagsort off"); Advance(0.05)
+	check(not own:IsShown(), "off: ours goes too")
+	lefthy("tweaks bagsort on"); Advance(0.05)
+	BagItemAutoSortButton = blizzard
 	ContainerFrameCombinedBags:Hide()
 end
 
