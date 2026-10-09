@@ -64,6 +64,8 @@ local L = ns.L
 --                       and with every answer.
 --   O2;<word>;<...>     the fight stream (StreamNet.lua): h I can be watched (with every answer),
 --                       w I watch you, f what's around me (to watchers only), n a mob's name
+--   J2;<word>;<...>     Chronicle's journals (Chronicle/Sync.lua): h I sync, s what I hold, q send me
+--                       an account's records, p/d/n a profile, day or highlight, e that's all
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil), so new kinds can be
 -- added without breaking older friends.
@@ -101,6 +103,8 @@ local ITEM_GAP = 2           -- shared items accepted from one friend at most th
 local CALL_LIMIT, CALL_WINDOW = 10, 10 -- Need / Pass answers and verdicts accepted from one friend
 local DAILY_LIMIT = 30       -- Chronicle days accepted from one friend per minute (7 + their AFK times arrive at once)
 local REPORT_PARTS = 60      -- error report parts accepted from one friend per minute (a report has up to 16)
+local JOURNAL_LIMIT, JOURNAL_WINDOW = 700, 60 -- Chronicle journal messages accepted from one friend (a
+                             -- full sync of an account is a few hundred, low priority)
 local STREAM_LIMIT, STREAM_WINDOW = 80, 10 -- fight stream messages accepted from one friend (2 frames a
                              -- second, mob names, keepalives)
 local HIGHLIGHTS = { boss = true, rare = true, dungeon = true, loot = true, mount = true, achievement = true,
@@ -650,6 +654,9 @@ local function Forget(gameAccountID)
 	if B.StreamForget then
 		B.StreamForget(gameAccountID, peer) -- (watching them, or they me)
 	end
+	if B.JournalForget then
+		B.JournalForget(gameAccountID) -- (Chronicle: what was asked of them goes to someone else)
+	end
 end
 
 -- Walks the friend list: greets online WoW friends we don't know yet. Runs once a minute and
@@ -818,10 +825,10 @@ local function Parse(text)
 		if id and #id <= 4 and n >= 1 and n <= of and of <= 16 and #text <= 200 then
 			return "Z", tonumber(id), n, of, text
 		end
-	elseif kind == "O" then
+	elseif kind == "O" or kind == "J" then
 		local word, more = rest:match("^;(%l);(.*)$")
 		if word and #more <= 250 then
-			return "O", word, more
+			return kind, word, more
 		end
 	end
 	return nil
@@ -1014,6 +1021,14 @@ local function OnMessage(text, senderID)
 		if guard.streamCount <= STREAM_LIMIT and B.ReceiveStream then
 			B.ReceiveStream(senderID, a, b)
 		end
+	elseif kind == "J" then
+		if not guard.journalWindow or now - guard.journalWindow >= JOURNAL_WINDOW then
+			guard.journalWindow, guard.journalCount = now, 0
+		end
+		guard.journalCount = guard.journalCount + 1
+		if guard.journalCount <= JOURNAL_LIMIT and B.ReceiveJournal then
+			B.ReceiveJournal(senderID, a, b)
+		end
 	elseif kind == "F" then
 		peer.files = a -- (comes just before their version)
 	elseif kind == "V" then
@@ -1050,6 +1065,10 @@ local function OnMessage(text, senderID)
 		end
 		if B.StreamHello then
 			B.QueueLow(senderID, B.StreamHello()) -- whether they can watch my fights (after the rest)
+		end
+		local journal = B.JournalHello and B.JournalHello()
+		if journal then
+			B.QueueLow(senderID, journal) -- Chronicle: I sync journals
 		end
 		if lastQuest and lastQuest ~= NO_QUEST then
 			B.Queue(senderID, lastQuest)

@@ -4792,6 +4792,216 @@ do
 	check(mmb:IsShown(), "on again: back")
 end
 
+section("Chronicle: friends' journals, also when they're offline")
+do
+	local H = CH.Hash
+	local mine, annaAcct, bobAcct, carl, zed = H("Me#1111"), H("Annie#1234"), H("Bobby#2345"), H("Carl#3456"), H("Zed#9999")
+	check(mine:match("^%x%x%x%x%x%x%x%x$") and mine ~= annaAcct and H("annie#1234") == annaAcct and CH.MyAccount() == mine,
+		"accounts go by a hash of the BattleTag (8 hex, the same in any case)")
+	local function bob(text) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", text, "WHISPER", 12) end
+	local function fields(m)
+		local f = {}
+		for x in (m .. ";"):gmatch("([^;]*);") do f[#f + 1] = x end
+		return f
+	end
+	Advance(6)
+	mark = #GAMEDATA + 1
+	anna("H2")
+	bob("H2")
+	Advance(2)
+	check(sentTo(11, mark, "J2;h;" .. mine)[1], "my answers say I sync journals, with my account's hash")
+	anna("J2;h;" .. annaAcct)
+	bob("J2;h;" .. bobAcct)
+	Advance(1.2)
+	local summary = sentTo(11, mark, "J2;s;")[1] or ""
+	check(summary:find(mine .. ",%d+") and not summary:find(annaAcct, 1, true),
+		"a friend who syncs hears what I hold: my journal (not theirs), got " .. summary)
+	local myU = tonumber(summary:match(mine .. ",(%d+)"))
+
+	-- Anna asks for my journal: my characters' profiles, days and highlights, then the end.
+	Fire("NEW_MOUNT_ADDED", 6)
+	Advance(1.1)
+	local mount = me.events[#me.events]
+	check(mount.k == "mount" and mount.n and mount.u and mount.u > myU - 1, "a new highlight gets its number and stamp")
+	mark = #GAMEDATA + 1
+	anna("J2;q;" .. mine .. ";0")
+	Advance(8)
+	local profiles, days, news = sentTo(11, mark, "J2;p;"), sentTo(11, mark, "J2;d;"), sentTo(11, mark, "J2;n;")
+	local ends = sentTo(11, mark, "J2;e;" .. mine .. ";")
+	check(#profiles >= 2 and #days >= 1 and #news >= 1 and #ends == 1, ("she gets it all: %d profiles, %d days, %d highlights, the end")
+		:format(#profiles, #days, #news))
+	local p = fields(profiles[1])
+	check(#p == 11 and p[1] == "J2" and p[2] == "p" and p[3] == mine and (p[4] == "Lefthy-Realmy" or p[4] == "Alty-Realmy")
+		and select(2, p[9]:gsub(",", "")) == 20, "a profile: account, character, stamp, class, level, last played, 21 numbers, foe, zone")
+	local alts = false
+	for _, m in ipairs(profiles) do alts = alts or m:find(";Alty%-Realmy;") ~= nil end
+	check(alts, "all my characters (setting on)")
+	local d = fields(days[#days])
+	check(#d == 7 and d[6]:match("^%d%d%d%d%d%d%d%d$") and select(2, d[7]:gsub(",", "")) == 13, "a day: 14 numbers")
+	local mountNews
+	for _, m in ipairs(news) do if m:find(";mount;Brown Horse;") then mountNews = m end end
+	check(mountNews and #mountNews <= 250, "the new mount among the highlights")
+	for _, m in ipairs(sentTo(11, mark, "J2;")) do
+		check(#m <= 250, "every message fits: " .. m:sub(1, 40))
+	end
+
+	-- Anna holds Carl's journal (Carl is my friend, offline) and a stranger's: I ask for Carl's only.
+	mark = #GAMEDATA + 1
+	anna("J2;s;" .. carl .. ",5000/" .. zed .. ",6000")
+	Advance(0.3)
+	check(sentTo(11, mark, "J2;q;" .. carl .. ";0")[1] and not sentTo(11, mark, "J2;q;" .. zed)[1],
+		"a journal of a friend of mine is asked for; a stranger's isn't")
+	bob("J2;s;" .. carl .. ",5000")
+	Advance(0.3)
+	check(not sentTo(12, mark, "J2;q;")[1], "asked of Anna already: not of Bob too")
+	local yesterday = date("%Y%m%d", time() - 86400)
+	local t = time() - 3 * 3600
+	anna("J2;p;" .. carl .. ";Carl-Realmy;4000;ROGUE;18;" .. (t + 600) .. ";6000,12,140,900,7,15,2,4,3,1,250000,800,1,10,95,1800,14400,60,0,17,90000;Hogger;Westfall")
+	anna("J2;d;" .. carl .. ";Carl-Realmy;4100;" .. yesterday .. ";120,9000,12,40,2,1,5,18,95,4000,1,0,1,77")
+	anna("J2;n;" .. carl .. ";Carl-Realmy;4200;1;" .. t .. ";level;18;Westfall")
+	anna("J2;n;" .. carl .. ";Carl-Realmy;4300;2;" .. (t + 60) .. ";death;Hogger;Elwynn Forest")
+	anna("J2;n;" .. carl .. ";Carl-Realmy;4400;3;" .. (t + 120) .. ";hack;x;y")
+	anna("J2;d;" .. zed .. ";Zed-Realmy;4100;" .. yesterday .. ";1,1,1,1,1,1,1,1,1,1,1,1,1,1")
+	Advance(0.3)
+	local book = CDB.book
+	local c = book[carl] and book[carl].chars["Carl-Realmy"]
+	check(c and c.classFile == "ROGUE" and c.level == 18 and c.profile.played == 360000 and c.profile.quests == 140
+		and c.foe == "Hogger" and c.zone == "Westfall", "Carl's profile, kept (minutes back to seconds)")
+	local cd = c and c.days[date("%Y-%m-%d", time() - 86400)]
+	check(cd and cd.played == 7200 and cd.xp == 9000 and cd.level == 18 and cd.gold == 95 and cd.jumps == 77,
+		"his day: played, XP, level, gold, jumps ...")
+	check(c.news[1] and c.news[1].k == "level" and c.news[2].k == "death" and not c.news[3] and not book[zed],
+		"his highlights (unknown kinds dropped); nothing of the stranger's")
+	check(book[carl].u == 0 and CH.SyncPending()[carl], "not complete before the end")
+	anna("J2;e;" .. carl .. ";5000")
+	Advance(0.3)
+	check(book[carl].u == 5000 and not CH.SyncPending()[carl], "the end: complete up to her stamp")
+	mark = #GAMEDATA + 1
+	bob("J2;s;" .. carl .. ",5000")
+	Advance(0.3)
+	check(not sentTo(12, mark, "J2;q;")[1], "Bob holds the same: nothing to ask")
+	bob("J2;s;" .. carl .. ",6000")
+	Advance(0.3)
+	check(sentTo(12, mark, "J2;q;" .. carl .. ";5000")[1], "Bob holds more: only what's newer is asked for")
+	bob("J2;e;" .. carl .. ";6000")
+	Advance(0.3)
+
+	-- Passing it on: Bob asks me for Carl's journal.
+	mark = #GAMEDATA + 1
+	bob("J2;q;" .. carl .. ";0")
+	Advance(3)
+	check(#sentTo(12, mark, "J2;n;" .. carl) == 2 and sentTo(12, mark, "J2;p;" .. carl)[1] and sentTo(12, mark, "J2;e;" .. carl .. ";6000")[1],
+		"what I hold of a friend goes on to another friend who asks")
+	mark = #GAMEDATA + 1
+	bob("J2;q;" .. carl .. ";4250")
+	Advance(3)
+	check(#sentTo(12, mark, "J2;n;") == 1 and not sentTo(12, mark, "J2;p;")[1], "only what's newer than they have")
+	REGISTERED_SETTINGS.LefthyTools_chronicle_relay:SetValue(false)
+	mark = #GAMEDATA + 1
+	bob("J2;q;" .. carl .. ";0")
+	Advance(3)
+	check(not sentTo(12, mark, "J2;n;")[1] and sentTo(12, mark, "J2;e;" .. carl .. ";0")[1], "'pass on' off: nothing of friends' journals")
+	REGISTERED_SETTINGS.LefthyTools_chronicle_relay:SetValue(true)
+
+	-- People, news and the feed.
+	local carlPerson
+	for _, person in ipairs(CH.People()) do if person.name == "Carl" then carlPerson = person end end
+	check(carlPerson and not carlPerson.online and carlPerson.account == "Carl" and carlPerson.profile
+		and CH.People()[1].me, "Carl is among the people (offline), me first")
+	local function newsOf(name, k)
+		for _, f in ipairs(CH.FriendNews()) do if f.name == name and f.k == k then return f end end
+	end
+	check(newsOf("Carl", "level") and newsOf("Carl", "level").level == 18 and newsOf("Carl", "death").foe == "Hogger",
+		"his highlights are in the friends' news")
+	-- A live highlight and the same one synced later: once.
+	Advance(60)
+	anna("E2;boss;Murloc King;Westfall")
+	Advance(0.3)
+	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;7000;9;" .. time() .. ";boss;Murloc King;Westfall")
+	Advance(0.3)
+	local kings = 0
+	for _, f in ipairs(CH.FriendNews()) do if f.k == "boss" and f.a == "Murloc King" then kings = kings + 1 end end
+	check(kings == 1, "a live highlight that a synced one repeats shows once, got " .. kings)
+	check(CH.UnseenCount() >= 3, "new from friends, not seen yet: " .. CH.UnseenCount())
+	CH.UpdateMinimapButton()
+	check(CH.MinimapButton().New:IsShown(), "the book on the minimap gets a blue dot")
+
+	-- The journal: Friends shows who isn't online too; Compare has everyone in every graph.
+	CH.Open("friends")
+	local win = LefthyToolsChronicleFrame
+	local page = win.Text:GetText()
+	check(page:find("|cffffd200Not online|r", 1, true) and page:find("Carl|r  |cff", 1, true) and page:find("Level 18", 1, true)
+		and page:find("last played ", 1, true), "Friends: who isn't online, their level, when they last played, got\n" .. page)
+	check(page:find("Died to Hogger", 1, true) and CH.UnseenCount() == 0 and not CH.MinimapButton().New:IsShown(),
+		"their news is there; seen now: the dot goes")
+	CH.Open("compare")
+	local canvas = win.Canvas
+	local function drawn(text)
+		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return canvas.pools.text[i] end end
+	end
+	local function hover(title)
+		for i = 1, canvas.used.hover do
+			local f = canvas.pools.hover[i]
+			if f.lines and f.lines[1] == title then return f end
+		end
+	end
+	check(not win.Tabs.compare:IsEnabled() and not win.Picker:IsShown() and drawn("Level") and drawn("Leaderboard, last 7 days")
+		and drawn("Quests per day") and drawn("Deaths, adding up") and drawn("Hall of fame, all time") and drawn("Records"),
+		"Compare: the level chart, the leaderboard, a graph per number, the hall of fame, records")
+	check(drawn("Lefthy (you)") and drawn("Carl") and drawn("Anna"), "a chip per person in the legend")
+	local carlDay = hover(date("%Y-%m-%d", time() - 86400))
+	check(carlDay and table.concat(carlDay.lines, "|"):find("Carl", 1, true), "hovering a day: everyone's value that day")
+	check(drawn("Fastest level: ") and drawn("nemesis: Hogger"), "records: the fastest level, nemeses")
+	local lines = canvas.used.line
+	local chip = hover("Carl")
+	chip._scripts.OnMouseUp(chip, "LeftButton")
+	check(canvas.used.line < lines, "a click on a chip hides that person from every graph")
+	chip = hover("Carl")
+	chip._scripts.OnMouseUp(chip, "LeftButton")
+	local range = nil
+	for i = 1, canvas.used.text do
+		if canvas.pools.text[i]:GetText() == "|cffaaaaaa30 days|r" then range = canvas.pools.text[i] end
+	end
+	check(range, "range chips")
+	mark = #GAMEDATA + 1
+	local share = hover("Share")
+	share._scripts.OnMouseUp(share, "LeftButton")
+	Advance(0.5)
+	local shared = sentTo(11, mark, "M2;Chronicle")[1]
+	check(shared, "Share: a ranking goes to Lefthy chat, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	win:Hide()
+
+	-- Logging in later: what friends did meanwhile, in chat.
+	lefthy("disable chronicle")
+	CDB.lastSeenAt = time() - 6 * 3600
+	lefthy("enable chronicle")
+	pmark = #PRINTED + 1
+	Advance(80)
+	local said = printedSince(pmark)
+	check(said:find("while you were away", 1, true) and said:find("Carl|r: reached level 18", 1, true) and said:find("died once", 1, true),
+		"a minute after logging in: what friends did while I was away, got\n" .. said)
+
+	-- Once a week: last week's leaderboard.
+	local lastWeek = CH.Monday(1)
+	me.daily[lastWeek] = me.daily[lastWeek] or { played = 0, xp = 0, quests = 0, kills = 0, deaths = 0, levels = 0, afk = 0 }
+	me.daily[lastWeek].played, me.daily[lastWeek].quests = 3600, 12
+	anna("J2;d;" .. carl .. ";Carl-Realmy;8000;" .. lastWeek:gsub("-", "") .. ";90,500,30,5,4,0,0,17,50,100,0,0,0,3")
+	Advance(0.3)
+	CDB.recapWeek = nil
+	lefthy("disable chronicle")
+	lefthy("enable chronicle")
+	pmark = #PRINTED + 1
+	Advance(125)
+	said = printedSince(pmark)
+	check(said:find("last week's leaderboard", 1, true) and said:find("most quests: |c%x+Carl|r %(30%)") and said:find("most deaths", 1, true),
+		"the weekly recap: who led last week, got\n" .. said)
+	pmark = #PRINTED + 1
+	lefthy("disable chronicle")
+	lefthy("enable chronicle")
+	Advance(125)
+	check(not printedSince(pmark):find("leaderboard", 1, true), "once a week")
+end
+
 section("Chronicle: a broken tick doesn't run every frame")
 do
 	local C = ns.Chronicle

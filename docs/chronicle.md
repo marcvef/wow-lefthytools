@@ -1,8 +1,11 @@
 # Chronicle design
 
 A journal per character, kept automatically, plus statistics and a feed of what friends with
-LefthyTools did. Files: `Modules/Chronicle/Chronicle.lua` (recording, sharing, session,
-settings, `/chronicle`) and `Window.lua` (the window). They share `ns.Chronicle` (`C`).
+LefthyTools did, also while they (or you) weren't online. Files: `Modules/Chronicle/Chronicle.lua`
+(recording, sharing, session, settings, `/chronicle`), `Sync.lua` (friends' journals: publishing,
+passing on, the people and news for the window, catch-up, weekly recap, leaderboards),
+`Graphs.lua` (the Graphs and Compare pages), `Window.lua` (the window) and `MinimapButton.lua`.
+They share `ns.Chronicle` (`C`).
 
 ## Data
 
@@ -18,9 +21,14 @@ browsed from any character):
   `/played` last said; Chronicle never asks itself, that would print in chat).
 - `friends`: the feed, `{ t, name, classFile, k, ... }`, oldest first, at most 300.
 
-For the graphs: `daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels, afk }` (kept 60 days;
-`Add` and the tick fill today's bucket), and `session.series`, a point `{ played, xp, money }` per
-minute of play (at most 240: when full, every other point goes and the step doubles).
+For the graphs: `daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels, afk, bosses, rares,
+runs, jumps, dist, level, gold }` (kept 60 days; `Add` fills today's bucket for the counters in
+`DAILY` (stat -> day key: `dungeonRuns` -> `runs`), `TrackTravel` adds `dist` (yards), the tick sets
+`level` and `gold` (whole gold held) to where the day ends), and `session.series`, a point
+`{ played, xp, money }` per minute of play (at most 240: when full, every other point goes and the
+step doubles). `sync` (Sync.lua): the character's highlight counter and its days' and profile's
+stamps. `store.book`: friends' journals (below); `store.lastSeenAt`, `feedSeenAt`, `recapWeek`,
+`myU`, `sharedAlts`.
 
 `C.Fill` completes a record (records from older versions lack newer stats); every record is
 filled before it's shown.
@@ -89,9 +97,10 @@ forgotten (went offline, silent for 65 s, or switched Beacon off).
 
 ## Window
 
-`LefthyToolsChronicleFrame` (Core/Window.lua's template), opened with `/chronicle`,
+`LefthyToolsChronicleFrame` (Core/Window.lua's template, 780 x 620), opened with `/chronicle`,
 `/lefthy chronicle`, the settings button, the key binding `LEFTHYTOOLS_CHRONICLE_TOGGLE` or the
-minimap button.
+minimap button (`C.Open(page)` opens it on a page). Five pages: Timeline, Statistics, Graphs,
+Compare, Friends (tabs right to left from the top right corner, 88 px each).
 
 **Minimap button** (`MinimapButton.lua`, setting `minimapButton`, on by default; `/chronicle
 minimap` switches it), made by `LT.Window.MinimapButton` (Core/Window.lua, shared with Beacon's
@@ -99,14 +108,16 @@ stream button): a child of `Minimap` (so it hides and fades with it) in the usua
 look (`MiniMap-TrackingBorder`, `UI-Minimap-Background`, a book icon), `Minimap:GetWidth() / 2 + 5`
 from the centre at the saved `minimapAngle` (degrees, 210 = lower left; square minimaps: on the
 square's edge). Click toggles the journal, right-click opens the settings, the tooltip shows this
-session. Dragging sets an `OnUpdate` that turns the cursor position into the angle and removes it
-on drop. Created on first use; Chronicle's enable/disable and the setting update it on the next
-frame.
+session and how much is new from friends. A small blue dot while there's news from friends the
+journal hasn't shown yet (`C.UpdateNewDot`, on feed changes). Dragging sets an `OnUpdate` that turns
+the cursor position into the angle and removes it on drop. Created on first use; Chronicle's
+enable/disable and the setting update it on the next frame.
 A dropdown at the top left (`LT.Window.AddPicker`, our own: a Blizzard menu opened from addon code
 taints gamepad mode, see forever-platform.md): "Characters" (this one first, then the others by
-name, "Name  Level 20", other realms named), then "Friends" who sent their days ("(friend)"), the
+name, "Name  Level 20", other realms named), then "Friends": every friend's character from
+`C.People()` (synced journals, with their BattleTag's name; older builds' days: "(friend)"), the
 picked one ticked. Picking a friend opens the Graphs page, the only one friends have. The list is
-built when it opens; a refresh only sets the button's text. A click elsewhere closes it. Hidden on the Friends page. Then the pages,
+built when it opens; a refresh only sets the button's text. A click elsewhere closes it. Hidden on the Friends and Compare pages. Then the pages,
 the open one's button greyed out:
 
 - **Timeline:** newest first, a heading per day (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an
@@ -135,9 +146,30 @@ the open one's button greyed out:
   entries with date).
 - **Friends:** "Online now" first: every Beacon friend in up to three lines (`B.FriendLines` in
   Beacon's `Alerts.lua`, shared with the AFK screen: name, AFK, level and progress, group; zone
-  and distance; what they're fighting and their quest), then "What they did": the feed, as
-  "Name: text", with a hint about what will appear while it's empty. Redrawn when the feed
-  changes and every 5 s (the online part changes all the time).
+  and distance; what they're fighting and their quest), then "Not online": friends' characters
+  from their journals, most recently played first (level, their BattleTag's name, when they last
+  played, this week's time, their latest highlight under it; at most 20), then "What they did":
+  `C.FriendNews()` (synced highlights and live news, see below), as "Name: text", with a hint
+  about what will appear while it's empty. Showing it marks the news seen (`C.MarkFeedSeen`): the
+  tab's blue count and the book's blue dot (`C.UnseenCount`: news that came after
+  `store.feedSeenAt`) go. Redrawn when the feed changes and every 5 s.
+- **Compare** (`G.DrawCompare`): you (the character you play) and every friend's character in every
+  graph. A toolbar: 7 / 14 / 30 days, and a chip per person (their colour: the class colour, a
+  second of the same class lighter, a third darker; you marked "(you)"; hover: level, BattleTag
+  name, online or last played; click: hidden from every graph and table, `compareState.hidden`).
+  Then the Level chart (full width; where each day ended, carried over days not played), the
+  Leaderboard of the last 7 days (`C.Leaderboard`: nine categories, top three each, gold, silver,
+  bronze; the Martin award), a grid of line charts (time played, XP, quests, killing blows per day;
+  deaths, bosses and rares, jumps adding up over the range; gold where the day ended; distance and
+  time AFK per day): a line per person (yours thicker), points while the range is 14 days or less,
+  the leader in the card's corner, a hover per day with everyone's value, sorted. The Hall of fame
+  (lifetime numbers from profiles: level, time, quests, kills, deaths, zones, dungeons, bosses,
+  rares, distance, jumps; click a column header to sort; the best of each in gold) and Records
+  (fastest level, longest session, most gold, most deaths, most time AFK, everyone's nemesis).
+  "Share" on each chart and on the leaderboard posts the ranking in Lefthy chat (`C.ShareLine`:
+  Beacon's `B.SendChat`; printed locally when Lefthy chat is off). Toolbar chips, column headers
+  and Share are the canvas's hover areas with a click (`Canvas:Hover(..., onClick)`); a click
+  redraws the page. Redrawn like Graphs (on changes at most every 10 s, else every 30 s).
 
 Redrawn on the tick only while open, and only the open page when its own data changed:
 `C.eventsDirty` for the timeline (a kill only changes a counter, so it doesn't rebuild 250
@@ -158,6 +190,66 @@ go through Beacon's low-priority queue (`B.QueueLow`): sent only when no message
 waits, so they never delay live data. Beacon accepts up to 30 day messages per friend per minute
 and checks the ranges (minutes at most 1440); Chronicle keeps 30 days per friend in
 `store.friendStats`. Covered by the "Share highlights with friends" setting.
+
+## Friends' journals, also when they're offline (Sync.lua)
+
+Battle.net messages only reach friends who are online at the same time. So every client keeps
+what it learned about friends (`store.book`) and passes it on: whoever is online brings the news of
+whoever isn't. Journals go per Battle.net account, named by a hash of its BattleTag (`C.Hash`: two
+rolling 32-bit hashes of the lowercased BattleTag folded into 8 hex digits; the BattleTag itself
+is never sent). A client only asks for, and only keeps, accounts whose hash matches one of its own
+Battle.net friends (`C_BattleNet.GetFriendAccountInfo(i).battleTag`, online or not, cached 30 s):
+nobody gets the journal of someone who isn't their friend. My own account: `BNGetInfo()`'s
+BattleTag.
+
+**What I publish** (setting `share`; `shareAlts`: all my characters, else the one I play):
+- days: 30 days, `played, xp, quests, kills, deaths, levels, afk, level, gold, dist, bosses, rares,
+  runs, jumps` (played and AFK in minutes on the way, seconds when kept);
+- highlights: timeline entries of the kinds friends may see (`C.Shareable`: level, death, zone,
+  dungeon, boss, rare, epic loot, mount, achievement, quests and gold milestones, profession; no
+  pets, toys, blue loot or single quests), numbered per character (`e.n`), 30 days, at most 150;
+- a profile: lifetime numbers (time, sessions, quests, kills, deaths, zones, dungeons, runs,
+  bosses, rares, distance, jumps, mounts, achievements, most gold, fastest level, longest session,
+  AFK, epics, levels, XP), the deadliest foe and favourite zone, class, level, when last played.
+
+Every record has a stamp `u` from its author (`NextU`: `time()`, always above the last one,
+`store.myU`). Stamps: a highlight when recorded (`C.Stamp` from `Record`); a day when its numbers
+(as text) changed, checked every 60 s for today and yesterday (`StampChar`); the profile every
+5 min. After an update, highlights from before get numbers with their own time (`Upgrade`), and
+every character's days and profile get stamps. Switching `shareAlts` restamps everything, so
+friends ask again.
+
+**Messages** (Beacon kind `J`, older builds ignore it; low priority except requests):
+`J2;h;<acct>` I sync (with every answer to a hello, and to everyone when Chronicle is switched on),
+`J2;s;<acct>,<u>/...` what I hold (per account: complete up to u; ten per message; to a friend
+who syncs when it grew since they last heard it, at most every 60 s, everything the first time;
+their own account left out), `J2;q;<acct>;<since>` send me that account's records newer than since,
+`J2;p;<acct>;<Name-Realm>;<u>;<class>;<level>;<last>;<21 numbers>;<foe>;<zone>` (foe and zone left
+out if it wouldn't fit 250 bytes), `J2;d;<acct>;<Name-Realm>;<u>;<YYYYMMDD>;<14 numbers>`,
+`J2;n;<acct>;<Name-Realm>;<u>;<n>;<t>;<kind>;<a>;<b>` (the two text fields like Beacon's E2, 60
+bytes each), `J2;e;<acct>;<u>` that's all: complete up to u. A summary with a friend's account I
+hold less of starts a request (one friend at a time per account; 90 s without a record: it can go
+to another). An answer is at most 400 records, oldest first; its end says how far it got, so the
+rest comes on the next round. Records are checked (fields, sizes, kinds, 30 days, not tomorrow)
+and kept only for my friends' accounts, newer stamps replacing older. `relay` off: I don't pass on
+what I hold of others (a request gets an empty end). Beacon accepts 700 J messages per friend per
+minute.
+
+**People and news for the window** (`C.People()`): me (the character I play: its days, numbers
+from `C.ProfileNumbers`), then every friend's character from the book (`book:<acct>:<Name-Realm>`;
+last played from the profile or the latest day played; online if a Beacon peer has that name),
+then friends on older builds from the days they sent (`store.friendStats`, `friend:<Name>`), by
+name. `C.FriendNews()`: every synced highlight plus the live feed (`store.friends`: Beacon's
+level-ups, deaths, online and offline, E2 highlights), oldest first; a live entry that a synced
+one repeats (same name, kind and first field within 15 minutes) is left out. Rebuilt only when
+something changed.
+
+**While you were away** (`catchUp`): when Chronicle starts more than 5 minutes after its last tick
+(`store.lastSeenAt`), 75 s later (up to 4 minutes while journals still come in) a chat line per
+friend with what they did since: the most notable three (level-ups first), zones and deaths
+counted ("died 3 times"), "+N more". **Weekly recap** (`weeklyRecap`): 2 minutes after starting,
+once per week (`store.recapWeek`, the week's Monday): last week's leader of each category, if at
+least two people played. Both in English like all chat output.
 
 ## Cost, and what goes over the network
 

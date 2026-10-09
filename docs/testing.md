@@ -162,3 +162,11 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     yours. With a friend: their level-up
     and a highlight (e.g. a boss) appear under Friends and in chat. `/chronicle session`.
     Traffic in `/lefthy beacon status` stays at a few messages per minute while standing still.
+    Friends' journals (needs two friends on this build, A and B): A plays while B is online, then
+    logs off; you log in while only B is on: within a few minutes A's level, days and highlights
+    show up (Friends: "Not online" lists A with "last played", Compare has A's lines), although
+    you and A were never online together. A minute after logging in a chat
+    line says what friends did while you were away. Compare: chips hide and show people, 7 / 14 /
+    30 days, hovering a day lists everyone's value, a click on a Hall of fame column sorts it,
+    Share posts a ranking in Lefthy chat. The book on the minimap gets a blue dot for news; the
+    Friends tab shows how many. First login of a week: last week's leaderboard in chat.

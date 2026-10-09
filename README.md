@@ -8,7 +8,7 @@ module you can switch on or off.
 | [Mirage](#mirage) | Fades the interface away when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD. **Off by default**: switch it on on the overview page |
 | [Misc Tweaks](#misc-tweaks) | Small fixes, each switchable: always-visible health/power values, combo points on the personal resource display, movable bags, quest progress in party chat, markers for quests new in WoW: Forever, your quests on continent and world maps |
 | [Beacon](#beacon) | Battle.net friends who also use LefthyTools see each other on the world map and minimap, with status and level-up messages, without needing a group |
-| [Chronicle](#chronicle) | A journal for each character that writes itself: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, lots of statistics, and what your friends did |
+| [Chronicle](#chronicle) | A journal for each character that writes itself: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, lots of statistics, and what your friends did, also while you weren't online, with all of you compared in graphs and leaderboards |
 
 ## Settings
 
@@ -262,11 +262,25 @@ journal*).
   curve with XP per hour, how long each level took (green fast, red slow), your favourite zones
   and deadliest foes, how you travel, and your loot by quality. Hover a bar for its value.
   Pick one of your **friends** in the dropdown at the top: their last 14 days, their week in
-  numbers, you and them side by side (AFK time too), and their latest news, also for the time you
-  weren't online.
-- **Friends:** what your Battle.net friends with LefthyTools did: their level-ups, deaths and
-  highlights (bosses, rares, first dungeon visits, epic loot, mounts, achievements and
-  milestones). Your own highlights go to them the same way (needs Beacon).
+  numbers, you and them side by side (AFK time too, and all time), and their latest news, also for
+  the time you weren't online.
+- **Compare:** you and every friend in every graph, on one page: level, time played, XP, quests,
+  killing blows, deaths, gold, distance, bosses and rares, time AFK and jumps, over the last 7, 14
+  or 30 days, a line per person in their class colour (hover a day for everyone's value; click a
+  name in the legend to hide or show them). Plus this week's **leaderboard** (top three in nine
+  categories, with the Martin award), a **hall of fame** of lifetime numbers (click a column to
+  sort) and **records** (fastest level, longest session, most gold, everyone's nemesis). **Share**
+  posts a ranking in Lefthy chat.
+- **Friends:** who's online, **who isn't** (their level, when they last played, their week, their
+  latest highlight) and what everybody did: level-ups, deaths, bosses, rares, first dungeon
+  visits, epic loot, mounts, achievements and milestones. A blue number on the tab (and a blue dot
+  on the book) says what's new.
+- **Also when they're offline:** friends' clients pass each other's journals on, so whoever is
+  online brings you the news and graphs of those who aren't, and yours reach them the same way.
+  Only to people who have that player as a Battle.net friend too (journals go by a hash of the
+  BattleTag; the BattleTag itself never leaves your client). Needs Beacon.
+- **While you were away:** a minute after you log in, a chat line per friend with what they did
+  since you last played. Once a week, **last week's leaderboard** in chat.
 - **All your characters:** pick one in the dropdown at the top.
 - `/chronicle session` prints this session in one line; the AFK screen shows it too.
 
@@ -275,8 +289,12 @@ once a second, so it costs nothing you'd notice.
 
 | Setting | Default |
 |---|---|
-| Share highlights with friends | on |
+| Share highlights with friends (and your days, for their graphs) | on |
+| Share all my characters | on |
+| Pass on friends' journals | on |
 | Show friends' highlights in chat | on |
+| While you were away | on |
+| Weekly recap | on |
 
 ---
 

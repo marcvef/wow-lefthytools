@@ -954,6 +954,8 @@ BN_FRIENDS = {
 	{ WoWAccount(16, "Finn", "HUNTER"), battleTag = "Finn#6789" }, -- runs an older LefthyTools
 }
 function BNGetNumFriends() return #BN_FRIENDS, #BN_FRIENDS end
+MY_BATTLETAG = "Me#1111"
+function BNGetInfo() return 1, MY_BATTLETAG end
 GAMEDATA = {} -- every C_BattleNet.SendGameData call that went through
 MOCK_SEND_RESULT = nil -- set to 3 to make the server answer "throttled"
 C_BattleNet = {
@@ -970,6 +972,11 @@ C_BattleNet = {
 				if account.playerGuid == guid then return { battleTag = friend.battleTag, gameAccountInfo = account } end
 			end
 		end
+	end,
+	-- Every friend, online or not (Chronicle matches journals to friends by BattleTag).
+	GetFriendAccountInfo = function(i)
+		local friend = BN_FRIENDS[i]
+		return friend and { battleTag = friend.battleTag, gameAccountInfo = friend[1] }
 	end,
 	SendGameData = function(id, prefix, data)
 		if MOCK_SEND_RESULT then return MOCK_SEND_RESULT end

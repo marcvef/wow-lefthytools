@@ -39,7 +39,7 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   a day's AFK time (Chronicle), `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
   friends' graphs (see chronicle.md), `Y2;<1|0>` I collect error reports (or stopped),
   `Z2;<id>;<n>;<of>;<text>` part of an error report (see "Error reports"), `O2;<h|w|f|n>;...`
-  the fight stream (see "Fight stream"), `Q2` switched off. A build that doesn't
+  the fight stream (see "Fight stream"), `J2;<h|s|q|p|d|n|e>;...` Chronicle's journals, passed on between friends (see chronicle.md), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login

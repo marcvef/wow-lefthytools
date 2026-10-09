@@ -117,8 +117,12 @@ function Canvas:Text(text, x, y, font, justify, width)
 	return fs
 end
 
--- An invisible area that shows a tooltip: lines = { title, line, ... }.
+-- An invisible area that shows a tooltip: lines = { title, line, ... } (nil: none); onClick(button)
+-- makes it clickable.
 local function HoverEnter(self)
+	if not self.lines then
+		return
+	end
 	GameTooltip:SetOwner(self, "ANCHOR_TOP")
 	GameTooltip:SetText(self.lines[1], 1, 0.82, 0)
 	for i = 2, #self.lines do
@@ -127,18 +131,23 @@ local function HoverEnter(self)
 	GameTooltip:Show()
 end
 
-function Canvas:Hover(x, y, w, h, lines)
+function Canvas:Hover(x, y, w, h, lines, onClick)
 	local f = Take(self, "hover", function()
 		local frame = CreateFrame("Frame", nil, self.parent)
 		frame:EnableMouse(true)
 		frame:SetScript("OnEnter", HoverEnter)
 		frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		frame:SetScript("OnMouseUp", function(it, button)
+			if it.onClick then
+				it.onClick(button)
+			end
+		end)
 		return frame
 	end)
 	f:ClearAllPoints()
 	f:SetPoint("TOPLEFT", self.parent, "TOPLEFT", x, -y)
 	f:SetSize(math.max(w, 1), math.max(h, 1))
-	f.lines = lines
+	f.lines, f.onClick = lines, onClick
 	return f
 end
 
@@ -544,8 +553,42 @@ local function News(canvas, x, y, w, lines)
 	return h
 end
 
--- Draws a friend's page: friend = Chronicle's store.friendStats[name], me = my record (for the
--- comparison); state as for G.Draw, plus state.newsLines(name) from the window.
+-- You and them, lifetime: from their journal's profile (synced friends only).
+local LIFETIME = { "played", "quests", "kills", "deaths", "zones", "dungeons", "bosses", "rares", "dist", "jumps",
+	"achievements" }
+
+local function Lifetime(canvas, x, y, w, mine, theirs, name, person)
+	local rowH = 17
+	local h = HEADER + 4 + #LIFETIME * rowH + 22 + PAD
+	local ix, iy, iw = Card(canvas, x, y, w, h, L["You and %s, all time"]:format(name),
+		person.last and person.last > 0 and L["Last played %s"]:format(C.Ago(person.last)) or nil)
+	local labelW, colW = iw * 0.4, iw * 0.3
+	canvas:Text(L["You"], ix + labelW, iy, "GameFontNormalSmall", "RIGHT", colW - 10)
+	canvas:Text(name, ix + labelW + colW, iy, "GameFontNormalSmall", "RIGHT", colW - 10)
+	for i, key in ipairs(LIFETIME) do
+		local ry = iy + 16 + (i - 1) * rowH
+		local a, b = mine[key] or 0, theirs[key] or 0
+		canvas:Rect(ix, ry - 2, iw, rowH, 1, 1, 1, i % 2 == 0 and 0.03 or 0, "BORDER")
+		canvas:Text(G.LifetimeLabel(key), ix + 4, ry, "GameFontHighlightSmall", "LEFT", labelW)
+		canvas:Text((a > b and "|cffffd200" or "|cffffffff") .. G.LifetimeText(key, a) .. "|r", ix + labelW, ry,
+			"GameFontHighlightSmall", "RIGHT", colW - 10)
+		canvas:Text((b > a and "|cffffd200" or "|cffffffff") .. G.LifetimeText(key, b) .. "|r", ix + labelW + colW, ry,
+			"GameFontHighlightSmall", "RIGHT", colW - 10)
+	end
+	local facts = {}
+	if person.foe and person.foe ~= "" then
+		facts[#facts + 1] = L["Deadliest foe: %s"]:format(person.foe)
+	end
+	if person.zone and person.zone ~= "" then
+		facts[#facts + 1] = L["Favourite zone: %s"]:format(person.zone)
+	end
+	canvas:Text("|cff999999" .. table.concat(facts, "   ") .. "|r", ix + 4, iy + 18 + #LIFETIME * rowH, "GameFontHighlightSmall",
+		"LEFT", iw - 8)
+	return h
+end
+
+-- Draws a friend's page: friend = a person from C.People() (days; a synced one also a profile),
+-- me = my record (for the comparison); state as for G.Draw, plus state.newsLines(name) from the window.
 function G.DrawFriend(canvas, width, friend, name, me, state)
 	canvas:Reset()
 	local y = 0
@@ -554,7 +597,520 @@ function G.DrawFriend(canvas, width, friend, name, me, state)
 	y = y + h + CARD_GAP
 	y = y + Week(canvas, 0, y, width, friend.days) + CARD_GAP
 	y = y + Versus(canvas, 0, y, width, Sum(me.daily, 7), Sum(friend.days, 7), name) + CARD_GAP
+	if friend.profile then
+		y = y + Lifetime(canvas, 0, y, width, C.ProfileNumbers(me), friend.profile, name, friend) + CARD_GAP
+	end
 	y = y + News(canvas, 0, y, width, state.newsLines and state.newsLines(name) or {})
+	return y + 4
+end
+
+---------------------------------------------------------------------------
+-- Compare: you and every friend in every graph, on one page
+---------------------------------------------------------------------------
+
+local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:12:12:2:0|t"
+
+-- What a chart shows: key (a day's field, or value(b) for a sum of fields), mode "day" (that
+-- day's number), "sum" (adding up over the range) or "last" (where the day ended: level, gold).
+local CHARTS = {
+	{ key = "played", mode = "day" },
+	{ key = "xp", mode = "day" },
+	{ key = "quests", mode = "day" },
+	{ key = "kills", mode = "day" },
+	{ key = "deaths", mode = "sum" },
+	{ key = "gold", mode = "last" },
+	{ key = "dist", mode = "day" },
+	{ key = "bossesRares", mode = "sum", value = function(b) return (b.bosses or 0) + (b.rares or 0) end },
+	{ key = "afk", mode = "day" },
+	{ key = "jumps", mode = "sum" },
+}
+local LEVEL_CHART = { key = "level", mode = "last" }
+
+local CHART_LABEL = {
+	level = function() return L["Level"] end,
+	played = function() return L["Time played per day"] end,
+	xp = function() return L["Experience per day"] end,
+	quests = function() return L["Quests per day"] end,
+	kills = function() return L["Killing blows per day"] end,
+	deaths = function() return L["Deaths, adding up"] end,
+	gold = function() return L["Gold"] end,
+	dist = function() return L["Distance per day"] end,
+	bossesRares = function() return L["Bosses and rares, adding up"] end,
+	afk = function() return L["Time AFK per day"] end,
+	jumps = function() return L["Jumps, adding up"] end,
+}
+
+function G.ValueText(key, value)
+	if key == "played" or key == "afk" then
+		return C.Duration(value)
+	elseif key == "dist" then
+		return C.Distance(value)
+	elseif key == "gold" then
+		return C.Number(value) .. GOLD_ICON
+	end
+	return C.Number(value)
+end
+
+local LIFETIME_LABEL = {
+	level = function() return L["Level"] end,
+	played = function() return L["Time played"] end,
+	quests = function() return L["Quests"] end,
+	kills = function() return L["Killing blows"] end,
+	deaths = function() return L["Deaths"] end,
+	zones = function() return L["Zones discovered"] end,
+	dungeons = function() return L["Dungeons seen"] end,
+	bosses = function() return L["Bosses defeated"] end,
+	rares = function() return L["Rare elites killed"] end,
+	dist = function() return L["Distance"] end,
+	jumps = function() return L["Jumps"] end,
+	achievements = function() return L["Achievements"] end,
+	gold = function() return L["Most gold at once"] end,
+}
+function G.LifetimeLabel(key)
+	return LIFETIME_LABEL[key] and LIFETIME_LABEL[key]() or key
+end
+function G.LifetimeText(key, value)
+	return G.ValueText(key, value)
+end
+
+-- Each person's colour: their class's; a second (third) of the same class lighter (darker).
+local VARIANTS = { function(c) return c end, function(c) return c + (1 - c) * 0.55 end, function(c) return c * 0.55 end,
+	function(c) return c + (1 - c) * 0.25 end }
+local function Colours(people)
+	local seen = {}
+	for _, p in ipairs(people) do
+		local r, g, b = 1, 1, 1
+		if ns.Beacon and ns.Beacon.ClassColor then
+			r, g, b = ns.Beacon.ClassColor(p.classFile)
+		end
+		local n = (seen[p.classFile or "?"] or 0) + 1
+		seen[p.classFile or "?"] = n
+		local f = VARIANTS[(n - 1) % #VARIANTS + 1]
+		p.colour = { f(r), f(g), f(b) }
+		p.hex = ("%02x%02x%02x"):format(math.floor(p.colour[1] * 255), math.floor(p.colour[2] * 255), math.floor(p.colour[3] * 255))
+	end
+end
+
+local function Named(p)
+	return "|cff" .. p.hex .. (p.name or "?") .. "|r"
+end
+
+-- A person's values over the range (days: YYYY-MM-DD, oldest first): nil where unknown.
+local function Series(p, chart, days)
+	local values, last = {}, nil
+	local function Value(b)
+		if chart.value then
+			return chart.value(b)
+		end
+		return b[chart.key]
+	end
+	if chart.mode == "last" then
+		local first = days[1]
+		local before -- the latest value before the range starts
+		for day, b in pairs(p.days) do
+			if day < first and Value(b) ~= nil and (not before or day > before) then
+				before = day
+			end
+		end
+		last = before and Value(p.days[before]) or nil
+	end
+	local sum, any = 0, false
+	for i, day in ipairs(days) do
+		local b = p.days[day]
+		local v = b and Value(b)
+		if chart.mode == "last" then
+			if v ~= nil and (chart.key ~= "level" or v > 0) then
+				last = v
+			end
+			values[i] = last
+			any = any or last ~= nil
+		elseif chart.mode == "sum" then
+			sum = sum + (v or 0)
+			values[i] = sum
+			any = any or (v or 0) > 0
+		else
+			values[i] = v or 0
+			any = any or (v or 0) > 0
+		end
+	end
+	return any and values or nil
+end
+
+-- Share a ranking in Lefthy chat: "Chronicle, last 14 days, quests: Anna 142, Bob 98".
+local function ShareRanking(title, ranking, key, days)
+	local parts = {}
+	for i = 1, math.min(5, #ranking) do
+		parts[#parts + 1] = ranking[i].person.name .. " " .. (key == "gold" and (C.Number(ranking[i].value) .. "g")
+			or C.ChatValue(key == "bossesRares" and "kills" or key, ranking[i].value))
+	end
+	if #parts > 0 then
+		C.ShareLine(("Chronicle, %s (%d days): %s"):format(title, days, table.concat(parts, ", ")))
+	end
+end
+
+local CHART_CHAT = { level = "level", played = "time played", xp = "XP", quests = "quests", kills = "killing blows",
+	deaths = "deaths", gold = "gold", dist = "distance", bossesRares = "bosses and rares", afk = "time AFK", jumps = "jumps" }
+
+-- A line chart card: a line per person, the day's values in a tooltip, the leader in the corner.
+local function LineChart(canvas, x, y, w, h, chart, people, days, state)
+	local series, ranking = {}, {}
+	local lo, hi = math.huge, -math.huge
+	for _, p in ipairs(people) do
+		if not state.hidden[p.key] then
+			local values = Series(p, chart, days)
+			if values then
+				series[#series + 1] = { p = p, values = values }
+				local final
+				for _, v in pairs(values) do
+					lo, hi = math.min(lo, v), math.max(hi, v)
+				end
+				for i = #days, 1, -1 do
+					final = final or values[i]
+				end
+				-- The ranking: the range's total (per day), or where it ended (sum, last).
+				local total = 0
+				if chart.mode == "day" then
+					for i = 1, #days do
+						total = total + (values[i] or 0)
+					end
+				else
+					total = final or 0
+				end
+				ranking[#ranking + 1] = { person = p, value = total }
+			end
+		end
+	end
+	table.sort(ranking, function(a, b) return a.value > b.value end)
+	local note = ranking[1] and ranking[1].value > 0 and (Named(ranking[1].person) .. " " .. G.ValueText(chart.key, ranking[1].value)) or nil
+	local ix, iy, iw, ih = Card(canvas, x, y, w, h, CHART_LABEL[chart.key](), note)
+	-- Share, at the bottom right (under the day labels).
+	canvas:Text("|cff80c0ff" .. L["Share"] .. "|r", ix + iw - 60, iy + ih - 11, "GameFontHighlightSmall", "RIGHT", 60)
+	canvas:Hover(ix + iw - 60, iy + ih - 14, 60, 16, { L["Share"], L["Post this ranking in Lefthy chat."] },
+		function() ShareRanking(CHART_CHAT[chart.key], ranking, chart.key, #days) end)
+	ih = ih - 14
+	if #series == 0 then
+		Empty(canvas, ix, iy, iw, ih, L["Nothing recorded yet."])
+		return
+	end
+	if chart.mode ~= "last" or chart.key == "gold" then
+		lo = 0
+	else
+		lo = math.max(0, math.floor(lo) - 1)
+	end
+	hi = math.max(hi, lo + 1)
+	local plotH = ih - 14
+	for i = 1, 3 do
+		canvas:Rect(ix, iy + plotH * (1 - i / 3), iw, 1, 1, 1, 1, GRID[i], "BORDER")
+	end
+	canvas:Text(G.ValueText(chart.key, hi), ix, iy - 2, "GameFontHighlightSmall", "LEFT", iw / 2)
+	if lo > 0 then
+		canvas:Text(G.ValueText(chart.key, lo), ix, iy + plotH - 12, "GameFontHighlightSmall", "LEFT", iw / 2)
+	end
+	local n = #days
+	local function X(i)
+		return ix + (n > 1 and (i - 1) / (n - 1) or 0.5) * iw
+	end
+	local function Y(v)
+		return iy + plotH - plotH * (v - lo) / (hi - lo)
+	end
+	for _, s in ipairs(series) do
+		local thick = s.p.me and 3 or 2
+		local prev
+		for i = 1, n do
+			local v = s.values[i]
+			if v ~= nil then
+				if prev then
+					canvas:Line(X(prev), Y(s.values[prev]), X(i), Y(v), s.p.colour, thick)
+				end
+				prev = i
+			end
+		end
+		if n <= 14 then
+			for i = 1, n do
+				local v = s.values[i]
+				if v ~= nil then
+					canvas:Rect(X(i) - 2, Y(v) - 2, 4, 4, s.p.colour[1], s.p.colour[2], s.p.colour[3], 1, "OVERLAY")
+				end
+			end
+		end
+	end
+	-- Day labels under the plot, and a hover per day with everyone's value.
+	local step = n <= 7 and 1 or n <= 14 and 2 or 5
+	local slot = iw / math.max(n - 1, 1)
+	for i, day in ipairs(days) do
+		local t = time({ year = tonumber(day:sub(1, 4)), month = tonumber(day:sub(6, 7)), day = tonumber(day:sub(9, 10)), hour = 12 })
+		if (n - i) % step == 0 then
+			canvas:Text(date("%d", t), X(i) - 12, iy + plotH + 2, "GameFontHighlightSmall", "CENTER", 24)
+		end
+		local lines = { date(L["%Y-%m-%d"], t) }
+		local rows = {}
+		for _, s in ipairs(series) do
+			if s.values[i] ~= nil then
+				rows[#rows + 1] = { p = s.p, v = s.values[i] }
+			end
+		end
+		table.sort(rows, function(a, b) return a.v > b.v end)
+		for _, row in ipairs(rows) do
+			lines[#lines + 1] = Named(row.p) .. "  " .. G.ValueText(chart.key, row.v)
+		end
+		canvas:Hover(X(i) - slot / 2, iy, slot, plotH, lines)
+	end
+end
+
+-- The legend: a chip per person (click: hide or show them everywhere), the range, sharing the week.
+local RANGES = { 7, 14, 30 }
+
+local function Toolbar(canvas, x, y, w, people, state, redraw)
+	local h = 26
+	local cx = x
+	for _, days in ipairs(RANGES) do
+		local text = L["%d days"]:format(days)
+		local chipW = 58
+		local on = state.range == days
+		canvas:Rect(cx, y, chipW - 4, 20, 1, 0.82, 0, on and 0.35 or 0.08, "BORDER")
+		canvas:Text((on and "|cffffffff" or "|cffaaaaaa") .. text .. "|r", cx, y + 4, "GameFontHighlightSmall", "CENTER", chipW - 4)
+		canvas:Hover(cx, y, chipW - 4, 20, nil, function()
+			state.range = days
+			redraw()
+		end)
+		cx = cx + chipW
+	end
+	cx = cx + 10
+	local rowY = y
+	for _, p in ipairs(people) do
+		local label = (p.name or "?") .. (p.me and (" " .. L["(you)"]) or "")
+		local chipW = 26 + math.min(110, #label * 6.5)
+		if cx + chipW > x + w then
+			cx, rowY = x, rowY + 24
+			h = h + 24
+		end
+		local hidden = state.hidden[p.key]
+		canvas:Rect(cx, rowY, chipW - 4, 20, 1, 1, 1, hidden and 0.02 or 0.07, "BORDER")
+		canvas:Rect(cx + 6, rowY + 6, 8, 8, p.colour[1], p.colour[2], p.colour[3], hidden and 0.25 or 1)
+		canvas:Text((hidden and "|cff666666" or ("|cff" .. p.hex)) .. label .. "|r", cx + 18, rowY + 4, "GameFontHighlightSmall",
+			"LEFT", chipW - 22)
+		local tip = { p.name or "?" }
+		tip[#tip + 1] = p.level and L["Level %d"]:format(p.level) or nil
+		if p.account then
+			tip[#tip + 1] = p.account
+		end
+		if p.online then
+			tip[#tip + 1] = L["Online now"]
+		elseif p.last and p.last > 0 then
+			tip[#tip + 1] = L["Last played %s"]:format(C.Ago(p.last))
+		end
+		tip[#tip + 1] = hidden and L["Click: show in the graphs"] or L["Click: hide from the graphs"]
+		canvas:Hover(cx, rowY, chipW - 4, 20, tip, function()
+			state.hidden[p.key] = not state.hidden[p.key] or nil
+			redraw()
+		end)
+		cx = cx + chipW
+	end
+	return h + 6
+end
+
+-- This week (the last 7 days): who leads in what, the top three of each.
+local BOARD_LABEL = {
+	played = function() return L["Time played"] end, xp = function() return L["Experience"] end,
+	quests = function() return L["Quests"] end, kills = function() return L["Killing blows"] end,
+	levels = function() return L["Levels gained"] end, deaths = function() return L["Most deaths"] end,
+	dist = function() return L["Distance"] end, jumps = function() return L["Jumps"] end,
+	afk = function() return L["Martin award"] end,
+}
+
+local function Leaders(canvas, x, y, w, people, state)
+	local board = C.Leaderboard(7, 0, people)
+	local columns, cellH = 3, 64
+	local rows = math.ceil(#C.BOARD / columns)
+	local h = HEADER + 4 + rows * cellH + PAD
+	local ix, iy, iw = Card(canvas, x, y, w, h, L["Leaderboard, last 7 days"])
+	canvas:Text("|cff80c0ff" .. L["Share"] .. "|r", x + w - PAD - 60, y + 9, "GameFontHighlightSmall", "RIGHT", 60)
+	canvas:Hover(x + w - PAD - 60, y + 4, 60, 18, { L["Share"], L["Post the week's leaders in Lefthy chat."] }, function()
+		local parts = {}
+		for _, metric in ipairs({ "quests", "xp", "kills", "deaths", "afk" }) do
+			local first = board[metric][1]
+			if first then
+				local title = metric == "afk" and "Martin award" or ("most " .. CHART_CHAT[metric])
+				parts[#parts + 1] = ("%s %s (%s)"):format(title, first.person.name, C.ChatValue(metric, first.value))
+			end
+		end
+		if #parts > 0 then
+			C.ShareLine("Chronicle week: " .. table.concat(parts, ", "))
+		end
+	end)
+	local cellW = iw / columns
+	local medals = { "|cffffd700", "|cffc0c0c0", "|cffcd7f32" }
+	for i, metric in ipairs(C.BOARD) do
+		local cx = ix + ((i - 1) % columns) * cellW
+		local cy = iy + math.floor((i - 1) / columns) * cellH
+		canvas:Rect(cx + 2, cy, cellW - 4, cellH - 6, 1, 1, 1, 0.03, "BORDER")
+		canvas:Text(BOARD_LABEL[metric](), cx + 8, cy + 4, "GameFontNormalSmall", "LEFT", cellW - 16)
+		local list = {}
+		for _, entry in ipairs(board[metric] or {}) do
+			if not state.hidden[entry.person.key] then
+				list[#list + 1] = entry
+			end
+		end
+		if #list == 0 then
+			canvas:Text("|cff666666-|r", cx + 8, cy + 20, "GameFontHighlightSmall", "LEFT", cellW - 16)
+		end
+		for rank = 1, math.min(3, #list) do
+			local entry = list[rank]
+			canvas:Text(("%s%d.|r %s"):format(medals[rank], rank, Named(entry.person)), cx + 8, cy + 6 + rank * 13,
+				"GameFontHighlightSmall", "LEFT", cellW * 0.6)
+			canvas:Text(G.ValueText(metric, entry.value), cx + cellW * 0.5, cy + 6 + rank * 13, "GameFontHighlightSmall", "RIGHT",
+				cellW * 0.5 - 10)
+		end
+	end
+	return h
+end
+
+-- Everyone's lifetime numbers in a table; a column's header sorts by it; the best in gold.
+local HALL = { "level", "played", "quests", "kills", "deaths", "zones", "dungeons", "bosses", "rares", "dist", "jumps" }
+local HALL_SHORT = {
+	level = function() return L["Level"] end, played = function() return L["Time"] end, quests = function() return L["Quests"] end,
+	kills = function() return L["Kills"] end, deaths = function() return L["Deaths"] end, zones = function() return L["Zones"] end,
+	dungeons = function() return L["Dungeons"] end, bosses = function() return L["Bosses"] end, rares = function() return L["Rares"] end,
+	dist = function() return L["Distance"] end, jumps = function() return L["Jumps"] end,
+}
+
+local function Hall(canvas, x, y, w, people, state, redraw)
+	local list = {}
+	for _, p in ipairs(people) do
+		if p.profile and not state.hidden[p.key] then
+			list[#list + 1] = p
+		end
+	end
+	local rowH = 18
+	local h = HEADER + 4 + 20 + math.max(#list, 1) * rowH + PAD
+	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Hall of fame, all time"])
+	if #list == 0 then
+		Empty(canvas, ix, iy, iw, ih, L["Friends' lifetime numbers come with their synced journals."])
+		return h
+	end
+	local sortBy = state.sortBy or "level"
+	local function Value(p, key)
+		if key == "level" then
+			return p.level or 0
+		end
+		return p.profile[key] or 0
+	end
+	table.sort(list, function(a, b)
+		local va, vb = Value(a, sortBy), Value(b, sortBy)
+		return va > vb or (va == vb and (a.name or "") < (b.name or ""))
+	end)
+	local best = {}
+	for _, key in ipairs(HALL) do
+		for _, p in ipairs(list) do
+			best[key] = math.max(best[key] or 0, Value(p, key))
+		end
+	end
+	local nameW = iw * 0.16
+	local colW = (iw - nameW) / #HALL
+	for i, key in ipairs(HALL) do
+		local hx = ix + nameW + (i - 1) * colW
+		canvas:Text((key == sortBy and "|cffffffff" or "|cffffd200") .. HALL_SHORT[key]() .. "|r", hx, iy, "GameFontNormalSmall",
+			"RIGHT", colW - 4)
+		canvas:Hover(hx, iy - 2, colW, 16, { G.LifetimeLabel(key), L["Click: sort by this"] }, function()
+			state.sortBy = key
+			redraw()
+		end)
+	end
+	for r, p in ipairs(list) do
+		local ry = iy + 20 + (r - 1) * rowH
+		canvas:Rect(ix, ry - 3, iw, rowH, 1, 1, 1, r % 2 == 0 and 0.03 or 0, "BORDER")
+		canvas:Text(Named(p), ix + 2, ry, "GameFontHighlightSmall", "LEFT", nameW - 4)
+		for i, key in ipairs(HALL) do
+			local v = Value(p, key)
+			local text = key == "level" and tostring(v) or key == "played" and C.Duration(v) or key == "dist" and C.Distance(v)
+				or C.Number(v)
+			canvas:Text(((v > 0 and v == best[key]) and "|cffffd200" or "|cffffffff") .. text .. "|r", ix + nameW + (i - 1) * colW, ry,
+				"GameFontHighlightSmall", "RIGHT", colW - 4)
+		end
+	end
+	return h
+end
+
+-- Records among everyone: fastest level, longest session, most gold, most deaths, deadliest foes.
+local function Records(canvas, x, y, w, people, state)
+	local lines = {}
+	local function Best(key, lowest)
+		local winner, value
+		for _, p in ipairs(people) do
+			local v = p.profile and p.profile[key]
+			if v and v > 0 and not state.hidden[p.key] and (not value or (lowest and v < value) or (not lowest and v > value)) then
+				winner, value = p, v
+			end
+		end
+		return winner, value
+	end
+	local p, v = Best("fastest", true)
+	if p then
+		lines[#lines + 1] = L["Fastest level: %s (%s)"]:format(Named(p), C.Duration(v))
+	end
+	p, v = Best("longest")
+	if p then
+		lines[#lines + 1] = L["Longest session: %s (%s)"]:format(Named(p), C.Duration(v))
+	end
+	p, v = Best("gold")
+	if p then
+		lines[#lines + 1] = L["Most gold at once: %s (%s)"]:format(Named(p), C.Number(v) .. GOLD_ICON)
+	end
+	p, v = Best("deaths")
+	if p then
+		lines[#lines + 1] = L["Died the most: %s (%s)"]:format(Named(p), C.Number(v))
+	end
+	p, v = Best("afk")
+	if p then
+		lines[#lines + 1] = L["Martin of all time: %s (%s AFK)"]:format(Named(p), C.Duration(v))
+	end
+	for _, person in ipairs(people) do
+		if person.foe and person.foe ~= "" and not state.hidden[person.key] then
+			lines[#lines + 1] = L["%s's nemesis: %s"]:format(Named(person), person.foe)
+		end
+	end
+	local lineH = 15
+	local h = HEADER + 4 + math.max(#lines, 1) * lineH + PAD
+	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Records"])
+	if #lines == 0 then
+		Empty(canvas, ix, iy, iw, ih, L["Nothing recorded yet."])
+	end
+	for i, line in ipairs(lines) do
+		canvas:Text(line, ix, iy + (i - 1) * lineH, "GameFontHighlightSmall", "LEFT", iw)
+	end
+	return h
+end
+
+-- The page: state = { range (days), hidden = { [person key] = true }, sortBy }; redraw() draws it
+-- again (a click on a chip, a range or a column). Returns the page height.
+function G.DrawCompare(canvas, width, people, state, redraw)
+	canvas:Reset()
+	Colours(people)
+	local days = {}
+	for i = state.range - 1, 0, -1 do
+		days[#days + 1] = date("%Y-%m-%d", C.DayAgo(i))
+	end
+	local y = 0
+	y = y + Toolbar(canvas, 0, y, width, people, state, redraw)
+	if #people < 2 then
+		local h = 46
+		local ix, iy, iw, ih = Card(canvas, 0, y, width, h, L["Just you so far"])
+		Empty(canvas, ix, iy, iw, ih, L["Friends show up here once they run this LefthyTools: their journals come in whenever any friend who has them is online."])
+		y = y + h + CARD_GAP
+	end
+	LineChart(canvas, 0, y, width, 190, LEVEL_CHART, people, days, state)
+	y = y + 190 + CARD_GAP
+	y = y + Leaders(canvas, 0, y, width, people, state) + CARD_GAP
+	local half = (width - CARD_GAP) / 2
+	for i, chart in ipairs(CHARTS) do
+		local column = (i - 1) % 2
+		LineChart(canvas, column * (half + CARD_GAP), y, half, 160, chart, people, days, state)
+		if column == 1 or i == #CHARTS then
+			y = y + 160 + CARD_GAP
+		end
+	end
+	y = y + Hall(canvas, 0, y, width, people, state, redraw) + CARD_GAP
+	y = y + Records(canvas, 0, y, width, people, state)
 	return y + 4
 end
 

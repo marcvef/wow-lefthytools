@@ -4,16 +4,18 @@ local L = ns.L
 local C = ns.Chronicle
 local M = C.module
 
--- The Chronicle window: a character switcher and three pages. Timeline (this character's
--- journal, newest first, by day), Statistics (session and lifetime, labels left and values right
--- in two text blocks of the same line count) and Friends (what friends with LefthyTools did).
+-- The Chronicle window: a character switcher and five pages. Timeline (this character's journal,
+-- newest first, by day), Statistics (session and lifetime, labels left and values right in two text
+-- blocks of the same line count), Graphs (one character or friend), Compare (you and every friend
+-- in every graph, Graphs.lua's G.DrawCompare) and Friends (who's online, who isn't and since when,
+-- and what they all did: synced journals and live news, Sync.lua's C.FriendNews).
 -- Built on first open; redrawn only while open and only when something changed (the Statistics
 -- page also every few seconds, for the time and distance counters).
 
 local TIMELINE_SHOW = 250  -- entries drawn; older ones are summarized in one line
 local STATS_REFRESH = 5
 local GRAPHS_MIN_GAP, GRAPHS_REFRESH = 10, 30 -- graphs: redraw on changes at most every 10 s, else every 30 s
-local TAB_WIDTH = 92
+local TAB_WIDTH = 88
 
 local ICONS = {
 	level = "Interface\\Icons\\Achievement_Level_10",
@@ -40,6 +42,7 @@ local tab = "timeline"
 local selectedKey
 local lastStatsRefresh, lastGraphsRefresh, graphsPending = 0, 0, false
 local graphState = { metric = "played", buttons = {} }
+local compareState = { range = 14, hidden = {} }
 
 local function Icon(e)
 	return ("|T%s:14:14:0:0:64:64:5:59:5:59|t"):format(tostring(e.icon or ICONS[e.k] or ICONS.quests))
@@ -165,7 +168,57 @@ local function Timeline(c)
 	return Journal(c.events, function(e) return LineFor(e), e.t end)
 end
 
--- Who's online right now (each friend in a few lines, from Beacon), then what they did.
+-- Friends not online now, from their journals: level, when they last played, this week's time,
+-- and their latest highlight. Most recently played first.
+local function Away(lines)
+	local away = {}
+	for _, person in ipairs(C.People()) do
+		if not person.me and not person.online then
+			away[#away + 1] = person
+		end
+	end
+	if #away == 0 then
+		return
+	end
+	table.sort(away, function(a, b) return (a.last or 0) > (b.last or 0) end)
+	local latest = {}
+	for _, f in ipairs(C.FriendNews()) do
+		if f.k ~= "online" and f.k ~= "offline" then
+			latest[f.name] = f -- (oldest first: the last one stays)
+		end
+	end
+	lines[#lines + 1] = ""
+	lines[#lines + 1] = "|cffffd200" .. L["Not online"] .. "|r"
+	for i, person in ipairs(away) do
+		if i > 20 then
+			lines[#lines + 1] = "|cff999999" .. L["... and %d more"]:format(#away - 20) .. "|r"
+			break
+		end
+		local parts = { LT.Window.ClassColorCode(person.classFile) .. (person.name or "?") .. "|r" }
+		if person.level then
+			parts[#parts + 1] = L["Level %d"]:format(person.level)
+		end
+		if person.account then
+			parts[#parts + 1] = "|cff80c0ff" .. person.account .. "|r"
+		end
+		if person.last and person.last > 0 then
+			parts[#parts + 1] = L["last played %s"]:format(C.Ago(person.last))
+		end
+		local week = C.Sum(person, "played", 7)
+		if week > 0 then
+			parts[#parts + 1] = L["%s this week"]:format(C.Duration(week))
+		end
+		lines[#lines + 1] = table.concat(parts, "  |cff888888·|r  ")
+		local f = latest[person.name]
+		local e = f and FriendEvent(f)
+		local text = e and TEXT[e.k] and TEXT[e.k](e)
+		if text then
+			lines[#lines + 1] = "    |cff999999" .. date(L["%Y-%m-%d"], f.t) .. "|r  " .. Icon(e) .. " " .. text
+		end
+	end
+end
+
+-- Who's online right now (each friend in a few lines, from Beacon), who isn't, then what they did.
 local function Friends()
 	local lines = { "|cffffd200" .. L["Online now"] .. "|r" }
 	local beacon = LT:GetModule("beacon")
@@ -180,9 +233,10 @@ local function Friends()
 		end
 		ns.Beacon.FriendLines(lines, friend.peer, friend.id)
 	end
+	Away(lines)
 	lines[#lines + 1] = ""
 	lines[#lines + 1] = "|cffffd200" .. L["What they did"] .. "|r"
-	lines[#lines + 1] = Journal(C.Store().friends, function(f)
+	lines[#lines + 1] = Journal(C.FriendNews(), function(f)
 		local e = FriendEvent(f)
 		return e and LineFor(e, LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r"), f.t
 	end, L["Your friends' level-ups, deaths, quests, new zones, dungeons, bosses, rares, epic loot, mounts and milestones show up here, and when they come online. They need an up-to-date LefthyTools for most of it."])
@@ -335,9 +389,11 @@ end
 ---------------------------------------------------------------------------
 
 -- The dropdown at the top left: my characters (this one first, then the others by name), then
--- friends who sent me their days ("friend:Name"; friends only have graphs, so picking one opens
--- the Graphs page).
-local FRIEND = "friend:"
+-- friends' characters (Sync.lua's C.People: synced journals "book:<acct>:<Name-Realm>", older
+-- builds' days "friend:<Name>"; friends only have graphs, so picking one opens the Graphs page).
+local function IsFriend(key)
+	return key and (key:find("^book:") or key:find("^friend:")) and true or false
+end
 
 local function Keys()
 	local keys, current = {}, C.CurrentKey()
@@ -351,22 +407,23 @@ local function Keys()
 	return keys
 end
 
-local function FriendNames()
-	local names = {}
-	for name in pairs(C.Store().friendStats or {}) do
-		names[#names + 1] = name
+local function FriendPeople()
+	local list = {}
+	for _, person in ipairs(C.People()) do
+		if not person.me then
+			list[#list + 1] = person
+		end
 	end
-	table.sort(names)
-	return names
+	return list
 end
 
--- "Name  Level 20" in class colour; friends marked, other realms named.
+-- "Name  Level 20" in class colour; friends marked (with their BattleTag's name), other realms named.
 local function Label(key)
-	local friendName = key:match("^" .. FRIEND .. "(.+)$")
-	if friendName then
-		local f = C.Store().friendStats[friendName] or {}
-		return LT.Window.ClassColorCode(f.classFile) .. friendName .. "|r  |cffcccccc"
-			.. (f.level and L["Level %d"]:format(f.level) or "") .. "|r  |cff80c0ff" .. L["(friend)"] .. "|r"
+	if IsFriend(key) then
+		local person = C.Person(key) or {}
+		return LT.Window.ClassColorCode(person.classFile) .. (person.name or "?") .. "|r  |cffcccccc"
+			.. (person.level and L["Level %d"]:format(person.level) or "") .. "|r  |cff80c0ff"
+			.. (person.account and ("(" .. person.account .. ")") or L["(friend)"]) .. "|r"
 	end
 	local c = C.Store().chars[key] or {}
 	return LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r  |cffcccccc" .. L["Level %d"]:format(c.level or 0)
@@ -375,7 +432,7 @@ end
 
 -- A friend's latest feed entries, with their date, for their graphs page.
 graphState.newsLines = function(name)
-	local lines, feed = {}, C.Store().friends
+	local lines, feed = {}, C.FriendNews()
 	for i = #feed, 1, -1 do
 		local f = feed[i]
 		if f.name == name then
@@ -396,7 +453,7 @@ local Refresh
 
 local function Select(key)
 	selectedKey = key
-	if key:find("^" .. FRIEND) then
+	if IsFriend(key) then
 		tab = "graphs"
 	end
 	Refresh()
@@ -408,20 +465,19 @@ local function PickerEntries()
 	for _, key in ipairs(Keys()) do
 		items[#items + 1] = { text = Label(key), value = key, selected = key == selectedKey }
 	end
-	local names = FriendNames()
-	if names[1] then
+	local friends = FriendPeople()
+	if friends[1] then
 		items[#items + 1] = { divider = true }
 		items[#items + 1] = { title = L["Friends"] }
-		for _, name in ipairs(names) do
-			local key = FRIEND .. name
-			items[#items + 1] = { text = Label(key), value = key, selected = key == selectedKey }
+		for _, person in ipairs(friends) do
+			items[#items + 1] = { text = Label(person.key), value = person.key, selected = person.key == selectedKey }
 		end
 	end
 	return items
 end
 
 local function Build()
-	frame = LT.Window.Create("LefthyToolsChronicleFrame", "Chronicle", 680, 580)
+	frame = LT.Window.Create("LefthyToolsChronicleFrame", "Chronicle", 780, 620)
 	C.window = frame
 	LT.Window.AddText(frame)
 	frame.Canvas = C.Graphs.NewCanvas(frame.Content)
@@ -446,8 +502,8 @@ local function Build()
 	frame.Picker:SetPoint("TOPLEFT", 14, -30)
 
 	frame.Tabs = {}
-	for i, info in ipairs({ { "friends", L["Friends"] }, { "graphs", L["Graphs"] }, { "stats", L["Statistics"] },
-			{ "timeline", L["Timeline"] } }) do
+	for i, info in ipairs({ { "friends", L["Friends"] }, { "compare", L["Compare"] }, { "graphs", L["Graphs"] },
+			{ "stats", L["Statistics"] }, { "timeline", L["Timeline"] } }) do
 		local key = info[1]
 		local button = LT.Window.AddButton(frame, info[2], function()
 			tab = key
@@ -455,17 +511,26 @@ local function Build()
 		end, { "TOPRIGHT", frame, "TOPRIGHT", -10 - (i - 1) * (TAB_WIDTH + 4), -30 })
 		button:SetSize(TAB_WIDTH, 22)
 		frame.Tabs[key] = button
+		-- New from friends: a blue count on the Friends tab.
+		if key == "friends" then
+			button.New = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+			button.New:SetPoint("TOPRIGHT", -2, 6)
+			button.New:SetTextColor(0.4, 0.75, 1)
+		end
 	end
 	frame:SetScript("OnHide", function() selectedKey = nil end)
+end
+
+local function RedrawCompare()
+	Refresh(true)
 end
 
 -- keepScroll: a refresh of the same page.
 function Refresh(keepScroll)
 	local keys = Keys()
-	local friendName = selectedKey and selectedKey:match("^" .. FRIEND .. "(.+)$")
-	local friend = friendName and tab == "graphs" and C.Store().friendStats[friendName]
-	if friendName and not friend then
-		selectedKey, friendName = nil, nil -- friends only have graphs
+	local friend = IsFriend(selectedKey) and tab == "graphs" and C.Person(selectedKey)
+	if IsFriend(selectedKey) and not friend then
+		selectedKey = nil -- friends only have graphs
 	end
 	selectedKey = selectedKey or keys[1]
 	local c = not friend and (C.Store().chars[selectedKey] or C.Char())
@@ -476,19 +541,33 @@ function Refresh(keepScroll)
 	for key, button in pairs(frame.Tabs) do
 		button:SetEnabled(key ~= tab) -- the open page's button is greyed out
 	end
-	frame.Picker:SetShown(tab ~= "friends")
-	if tab ~= "graphs" then
+	frame.Picker:SetShown(tab ~= "friends" and tab ~= "compare")
+	if tab ~= "graphs" and tab ~= "compare" then
 		frame.Canvas:Reset()
+	end
+	if tab ~= "graphs" then
 		for _, button in pairs(graphState.buttons) do
 			button:Hide()
 		end
 	end
-	if tab == "graphs" then
+	if tab == "friends" then
+		C.MarkFeedSeen() -- (before the count below)
+	end
+	local unseen = C.UnseenCount()
+	frame.Tabs.friends.New:SetText(unseen > 0 and tostring(unseen) or "")
+	if tab == "graphs" or tab == "compare" then
 		frame.Text:SetText("")
 		frame.Values:SetText("")
 		local width = frame.Content:GetWidth()
-		frame.Content:SetHeight(friend and C.Graphs.DrawFriend(frame.Canvas, width, friend, friendName, C.Char(), graphState)
-			or C.Graphs.Draw(frame.Canvas, width, c, graphState))
+		local height
+		if tab == "compare" then
+			height = C.Graphs.DrawCompare(frame.Canvas, width, C.People(), compareState, RedrawCompare)
+		elseif friend then
+			height = C.Graphs.DrawFriend(frame.Canvas, width, friend, friend.name or "?", C.Char(), graphState)
+		else
+			height = C.Graphs.Draw(frame.Canvas, width, c, graphState)
+		end
+		frame.Content:SetHeight(height)
 		if not keepScroll then
 			frame.Scroll:SetVerticalScroll(0)
 		end
@@ -521,10 +600,27 @@ function C.Toggle()
 	frame:Show()
 end
 
+-- Opens the journal on a page ("compare", "friends", ...).
+function C.Open(page)
+	if not M.enabled then
+		return
+	end
+	if not frame then
+		Build()
+	end
+	tab = page or tab
+	selectedKey = selectedKey or C.CurrentKey()
+	Refresh()
+	frame:Show()
+end
+
 -- Chronicle's 1-second tick: counters, timeline entries or the friends' feed changed since the
 -- last one. Only the open page is redrawn, and only if its data changed (a kill updates a
 -- counter, not the timeline).
 function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
+	if feedChanged and C.UpdateNewDot then
+		C.UpdateNewDot() -- (the minimap button's blue dot)
+	end
 	if not (frame and frame:IsShown()) then
 		return
 	end
@@ -533,8 +629,8 @@ function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
 		redraw = eventsChanged
 	elseif tab == "friends" then
 		redraw = feedChanged or now - lastStatsRefresh >= STATS_REFRESH -- "online now" changes all the time
-	elseif tab == "graphs" then
-		graphsPending = graphsPending or statsChanged or eventsChanged -- kept until the next draw
+	elseif tab == "graphs" or tab == "compare" then
+		graphsPending = graphsPending or statsChanged or eventsChanged or feedChanged -- kept until the next draw
 		local since = now - lastGraphsRefresh
 		redraw = (graphsPending and since >= GRAPHS_MIN_GAP) or since >= GRAPHS_REFRESH
 	else

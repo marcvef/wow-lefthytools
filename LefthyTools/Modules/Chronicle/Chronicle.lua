@@ -49,6 +49,10 @@ local M = LT:NewModule("chronicle", {
 	description = L["A journal for each character, kept automatically: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, statistics, and what your friends did."],
 	defaults = {
 		share = true,
+		shareAlts = true,     -- Sync.lua: friends see all my characters, not only the one I play
+		relay = true,         -- Sync.lua: pass on friends' journals to other friends
+		catchUp = true,       -- Sync.lua: "while you were away" after logging in
+		weeklyRecap = true,   -- Sync.lua: last week's leaderboard in chat, once a week
 		friendsChat = true,
 		minimapButton = true,
 		minimapAngle = 210, -- degrees, 0 = right, counter-clockwise: the lower left
@@ -96,13 +100,17 @@ local function Fill(c)
 	c.first = c.first or time()
 end
 
--- An entry in this character's timeline; shareKind sends it to friends as a highlight too.
+-- An entry in this character's timeline. Entries friends may see (Sync.lua's C.Shareable) get a
+-- number and a stamp, so friends' clients can tell what they still lack.
 local function Record(kind, fields)
 	fields.t, fields.k = time(), kind
 	local events = char.events
 	events[#events + 1] = fields
 	if #events > EVENTS_MAX then
 		table.remove(events, 1)
+	end
+	if C.Stamp then
+		C.Stamp(char, fields)
 	end
 	C.dirty, C.eventsDirty = true, true
 	return fields
@@ -119,8 +127,11 @@ function C.DayAgo(back)
 	return time({ year = t.year, month = t.month, day = t.day - back, hour = 12 })
 end
 
--- Per day (for the graphs): daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels, afk }.
-local DAILY = { played = true, xp = true, quests = true, kills = true, deaths = true, levels = true, afk = true }
+-- Per day (for the graphs, and for friends: Sync.lua): daily["YYYY-MM-DD"] = { played, xp, quests,
+-- kills, deaths, levels, afk, bosses, rares, runs, jumps, dist (yards), level and gold (whole gold
+-- held, both at the day's last tick) }. Counter -> its key in the day.
+local DAILY = { played = "played", xp = "xp", quests = "quests", kills = "kills", deaths = "deaths", levels = "levels",
+	afk = "afk", bosses = "bosses", rares = "rares", dungeonRuns = "runs", jumps = "jumps" }
 
 local function Today()
 	local day = date("%Y-%m-%d")
@@ -132,13 +143,15 @@ local function Today()
 	end
 	return bucket
 end
+C.Today = function() return char and Today() end
 
 local function Add(stat, amount)
 	amount = amount or 1
 	char.stats[stat] = char.stats[stat] + amount
-	if DAILY[stat] then
+	local key = DAILY[stat]
+	if key then
 		local bucket = Today()
-		bucket[stat] = (bucket[stat] or 0) + amount -- older buckets lack newer fields
+		bucket[key] = (bucket[key] or 0) + amount -- older buckets lack newer fields
 	end
 	C.dirty = true
 end
@@ -517,7 +530,7 @@ end
 local jumpHooked = false
 local function OnJump()
 	if M.enabled and char and not (IsSwimming and IsSwimming()) and not (IsFlying and IsFlying()) then
-		char.stats.jumps = char.stats.jumps + 1
+		Add("jumps")
 	end
 end
 
@@ -596,6 +609,8 @@ local function TrackTravel()
 		if d > 0.5 and d < TELEPORT then
 			local kind = taxi and "flown" or (IsSwimming() and "swum") or (IsMounted() and "ridden") or "walked"
 			char.stats[kind] = char.stats[kind] + d
+			local today = Today()
+			today.dist = (today.dist or 0) + d
 		end
 	end
 	lastPos.continent, lastPos.north, lastPos.west = continent, north, west
@@ -647,6 +662,12 @@ local function Tick(now, elapsed)
 	stats.played = stats.played + elapsed
 	local today = Today()
 	today.played = today.played + elapsed
+	-- Where the day ends: level and gold (for friends' graphs too).
+	local level = UnitLevel("player")
+	if type(level) == "number" and not issecret(level) then
+		today.level = level
+	end
+	today.gold = math.floor(GetMoney() / COPPER_PER_GOLD)
 	SampleSession()
 	if zoneDirty then
 		CheckZone() -- first: a loading screen's time goes to the zone you arrived in
@@ -677,6 +698,10 @@ local function Tick(now, elapsed)
 	TrackTravel()
 	TrackTarget(now)
 	ShareDays(now)
+	if C.SyncTick then
+		C.SyncTick(now) -- Sync.lua: my journal for friends, theirs from whoever is online
+	end
+	store.lastSeenAt = time()
 	while shareQueue[1] do
 		local item = table.remove(shareQueue, 1)
 		local beacon = LT:GetModule("beacon")
@@ -958,12 +983,18 @@ function M:OnEnable()
 	lastTick, sinceTick = GetTime(), 0
 	driver:Show()
 	C_Timer.After(0, UpdateMinimapButton) -- MinimapButton.lua
+	if C.SyncEnable then
+		C.SyncEnable() -- Sync.lua
+	end
 end
 
 function M:OnDisable()
 	events:UnregisterAllEvents()
 	driver:Hide()
 	wipe(shareQueue)
+	if C.SyncDisable then
+		C.SyncDisable()
+	end
 	if C.window then
 		C.window:Hide()
 	end
@@ -972,6 +1003,9 @@ end
 
 function M:OnSettingChanged()
 	C_Timer.After(0, UpdateMinimapButton) -- the minimap button's checkbox
+	if C.SyncSettingChanged then
+		C.SyncSettingChanged() -- Sync.lua: sharing all characters or not
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -1059,9 +1093,17 @@ end
 function M:BuildOptions(o)
 	o:Header(L["Sharing"])
 	o:Checkbox("share", L["Share highlights with friends"],
-		L["Bosses, rares, first dungeon visits, epic loot, new mounts, achievements and milestones go to Battle.net friends with LefthyTools (needs Beacon)."])
+		L["Bosses, rares, first dungeon visits, epic loot, new mounts, achievements and milestones go to Battle.net friends with LefthyTools (needs Beacon), and your days for their graphs."])
+	o:Checkbox("shareAlts", L["Share all my characters"],
+		L["Friends see the journals of all your characters, not only the one you're playing."])
+	o:Checkbox("relay", L["Pass on friends' journals"],
+		L["Battle.net messages only reach friends who are online, so friends' clients pass each other's journals on: whoever is online brings the news of those who aren't. Only to people who have that player as a Battle.net friend too."])
 	o:Checkbox("friendsChat", L["Show friends' highlights in chat"],
 		L["A chat line when a friend shares a highlight. They're always in Chronicle's Friends tab."])
+	o:Checkbox("catchUp", L["While you were away"],
+		L["A minute after you log in, a chat line with what friends did since you last played."])
+	o:Checkbox("weeklyRecap", L["Weekly recap"],
+		L["Once a week, the first time you play: last week's leaderboard among you and your friends, in chat."])
 	o:Header(L["Journal"])
 	o:Button(L["Open the journal"], L["Open"], function() M:Toggle() end,
 		L["Your timeline, your statistics and your friends' news. Also /chronicle or a key binding."])
