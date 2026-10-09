@@ -506,6 +506,17 @@ picture also has your cast (`UnitCastingInfo` / `UnitChannelInfo`, read every lo
 the cast events), your last 5 spells, power (`UnitPowerType`: mana, rage, energy, focus) and form
 (`GetShapeshiftForm`).
 
+**Players.** Your group (`party1-4` / `raid1-40`): `UnitPosition` answers for group members, so
+they're placed exactly, no learning (`Group`: same continent, within 120 yd, the nearest 8; beyond
+the 40 yd ring on its rim, the tooltip says the exact yards); name, level, class, dead, in combat,
+casting. Other players with a nameplate: enemy ones come with the hostile nameplates (`UnitIsPlayer`
+marks them), friendly ones (friendly nameplates on, not in your group, at most 6) are learned like
+mobs (their range checks: whatever answers for a friendly unit). In the window a player's dot is
+in their class colour with a ring: blue your (their) group, white friendly, red enemy; group
+members always named. The bottom line counts enemies only. Over the network: flags `p` (player),
+`f` (friendly), `g` (group: exact) and `O2;u;<id>;<level>;<classFile>;<name>` instead of the
+mob's `n`: builds before it ignore `u` and show such a player as an unnamed mob.
+
 **The window** (StreamView.lua; 250 x 368 at scale 1): the map under a radar, north up, to scale
 (2.55 px per yard for rings, dots and map): the minimap's own terrain tiles where
 `Data/MinimapTiles.lua` has them (`world/minimaps/<continent>/mapX_Y.blp`, 256 px for 533.33 yd,

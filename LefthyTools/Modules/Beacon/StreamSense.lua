@@ -239,6 +239,7 @@ local function LearnSeen(mob, now)
 	cloud.info = info
 	info.name, info.level, info.class, info.combat, info.attacking = mob.name, mob.level, mob.class, mob.combat, mob.attacking
 	info.dead, info.est = mob.dead, mob.est
+	info.player, info.classFile, info.friendly = mob.player, mob.classFile, mob.friendly
 end
 
 -- Mobs that left your screen (not dead): remembered a while, outside your view, fading. Appended
@@ -255,6 +256,7 @@ local function Remember(mobs, n, now)
 				local ghost = cloud.ghost or {}
 				cloud.ghost = ghost
 				ghost.key, ghost.name, ghost.level, ghost.class = key, info.name, info.level, info.class
+				ghost.player, ghost.classFile, ghost.friendly, ghost.group = info.player, info.classFile, info.friendly, false
 				ghost.combat, ghost.attacking, ghost.target, ghost.casting, ghost.castID, ghost.dead =
 					info.combat, info.attacking, false, nil, nil, false
 				local angle
@@ -387,16 +389,84 @@ end
 -- A look
 ---------------------------------------------------------------------------
 
-local function Fill(n, unit, unitTarget, targetKey, onScreen, now)
+-- A player's class file (nil: not a player, or hidden).
+local function ClassOf(unit)
+	local ok, _, classFile = pcall(UnitClass, unit)
+	return ok and type(classFile) == "string" and not issecret(classFile) and classFile or nil
+end
+
+-- My group's members: their place is known exactly (UnitPosition answers for group members), so
+-- they need no learning: the nearest MAX_GROUP within GROUP_FAR yards (further than the outer ring:
+-- on its rim). Appended to the picture's mobs from n + 1; returns the new count. inGroup: their
+-- GUIDs, so their nameplates aren't counted again.
+local MAX_GROUP, GROUP_FAR, MAX_FRIENDLY = 8, 120, 6
+local groupLooks, inGroup, nearby, nearbyPool = {}, {}, {}, {}
+
+local function Group(n)
+	wipe(inGroup)
+	wipe(nearby)
+	local continent = picture.continent
+	if not continent then
+		return n -- (no place of mine: in an instance, positions are hidden anyway)
+	end
+	local raid = IsInRaid and IsInRaid()
+	for i = 1, raid and 40 or 4 do
+		local unit = (raid and "raid" or "party") .. i
+		if Value("UnitExists", unit) and not Value("UnitIsUnit", unit, "player") then
+			local key = Value("UnitGUID", unit) or unit
+			inGroup[key] = true
+			local ok, north, west, _, instance = pcall(UnitPosition, unit)
+			if ok and north and west and not (issecret(north) or issecret(west) or issecret(instance)) and instance == continent then
+				local dNorth, dEast = north - here.north, here.west - west
+				local yards = math.sqrt(dNorth * dNorth + dEast * dEast)
+				if yards <= GROUP_FAR then
+					local found = nearbyPool[#nearby + 1] or {}
+					nearbyPool[#nearby + 1] = found
+					found.unit, found.key, found.yards, found.bearing = unit, key, yards, atan2(dEast, dNorth)
+					nearby[#nearby + 1] = found
+				end
+			end
+		end
+	end
+	table.sort(nearby, function(a, b) return a.yards < b.yards end)
+	for i = 1, math.min(#nearby, MAX_GROUP) do
+		local found = nearby[i]
+		local unit = found.unit
+		local mob = groupLooks[i] or {}
+		groupLooks[i] = mob
+		mob.key, mob.name, mob.level = found.key, Value("UnitName", unit) or "?", Value("UnitLevel", unit)
+		mob.class, mob.player, mob.classFile, mob.friendly, mob.group = nil, true, ClassOf(unit), true, true
+		mob.dead = Value("UnitIsDeadOrGhost", unit) == true
+		mob.combat = Value("UnitAffectingCombat", unit) == true
+		mob.attacking, mob.target, mob.soft, mob.onScreen = false, false, false, nil
+		local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
+		mob.casting = ok and not issecret(castName) and castName or nil
+		mob.castID = mob.casting and not issecret(castID) and castID or nil
+		mob.yards, mob.exact = math.min(found.yards, S.OUTER_YARDS), math.floor(found.yards + 0.5)
+		mob.beyond = found.yards > S.OUTER_YARDS and mob.exact or nil
+		mob.sure, mob.bearing = 1, found.bearing
+		mob.remembered, mob.fade, mob.age = nil, nil, nil
+		n = n + 1
+		picture.mobs[n] = mob
+	end
+	return n
+end
+
+-- friendly: a player with a friendly nameplate (not in my group: those come exactly, above).
+local function Fill(n, unit, unitTarget, targetKey, onScreen, now, friendly)
 	local mob = looks[n] or {}
 	looks[n] = mob
 	mob.key = Value("UnitGUID", unit) or unit
 	mob.name = Value("UnitName", unit) or "?"
 	mob.level = Value("UnitLevel", unit)
 	mob.class = Value("UnitClassification", unit)
+	mob.player = Value("UnitIsPlayer", unit) == true
+	mob.classFile = mob.player and ClassOf(unit) or nil
+	mob.friendly, mob.group = friendly or false, false
 	mob.dead = Value("UnitIsDead", unit) == true
 	mob.combat = Value("UnitAffectingCombat", unit) == true
-	mob.attacking = Value("UnitIsUnit", unitTarget, "player") == true
+	mob.attacking = not friendly and Value("UnitIsUnit", unitTarget, "player") == true
+	mob.exact = nil
 	local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
 	if not ok or issecret(castName) or not castName then
 		local okChannel, channelName, _, _, _, _, _, _, channelID = pcall(UnitChannelInfo, unit)
@@ -428,11 +498,19 @@ local function Look()
 	local n, targetShown = 0, false
 	local targetKey = Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target")
 		and (Value("UnitGUID", "target") or "target") or nil
+	n = Group(n)
+	local players = 0
 	for i = 1, S.MAX_UNITS do
 		local unit = S.UNITS[i]
-		if n < S.MAX_MOBS and Value("UnitExists", unit) and Value("UnitCanAttack", "player", unit) then
-			n = n + 1
-			targetShown = Fill(n, unit, S.TARGETS[i], targetKey, true, now) or targetShown
+		if n < S.MAX_MOBS and Value("UnitExists", unit) then
+			if Value("UnitCanAttack", "player", unit) then
+				n = n + 1
+				targetShown = Fill(n, unit, S.TARGETS[i], targetKey, true, now) or targetShown
+			elseif players < MAX_FRIENDLY and Value("UnitIsPlayer", unit) and not inGroup[Value("UnitGUID", unit) or ""] then
+				-- Another player with a friendly nameplate: learned like a mob.
+				n, players = n + 1, players + 1
+				Fill(n, unit, S.TARGETS[i], nil, true, now, true)
+			end
 		end
 	end
 	if targetKey and not targetShown and n < S.MAX_MOBS then

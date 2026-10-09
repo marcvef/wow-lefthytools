@@ -1539,12 +1539,22 @@ local baseUnit = { UnitExists = UnitExists, UnitName = UnitName, UnitLevel = Uni
 function UnitExists(u)
 	if u == "softenemy" then return SoftEnemy() ~= nil end
 	if MOBS[u] then return u == "target" or MOBS[u].pinned or select(2, Placed(MOBS[u])) end -- (pinned: kept on screen in combat)
+	if PARTY[u] and PARTY[u].name then return true end
 	return baseUnit.UnitExists(u)
 end
-function UnitName(u) if MOBS[u] then return MOBS[u].name end return baseUnit.UnitName(u) end
-function UnitLevel(u) if MOBS[u] then return MOBS[u].level end return baseUnit.UnitLevel(u) end
+function UnitName(u) if MOBS[u] then return MOBS[u].name end if PARTY[u] and PARTY[u].name then return PARTY[u].name end return baseUnit.UnitName(u) end
+function UnitLevel(u) if MOBS[u] then return MOBS[u].level end if PARTY[u] and PARTY[u].level then return PARTY[u].level end return baseUnit.UnitLevel(u) end
+-- Players: a mob entry with player = true (and classFile), or a party member with a name (PARTY[unit]).
+local baseClass, baseIsPlayer, baseDeadOrGhost = UnitClass, UnitIsPlayer, UnitIsDeadOrGhost
+function UnitClass(u)
+	local p = MOBS[u] or (PARTY[u] and PARTY[u].name and PARTY[u])
+	if p and p.classFile then return p.classFile, p.classFile end
+	return baseClass(u)
+end
+function UnitIsPlayer(u) if MOBS[u] then return MOBS[u].player == true end if PARTY[u] and PARTY[u].name then return true end return baseIsPlayer(u) end
+function UnitIsDeadOrGhost(u) if PARTY[u] and PARTY[u].name then return PARTY[u].dead == true end return baseDeadOrGhost(u) end
 function UnitIsDead(u) if MOBS[u] then return MOBS[u].dead == true end return baseUnit.UnitIsDead(u) end
-function UnitCanAttack(a, u) if MOBS[u] then return true end return baseUnit.UnitCanAttack(a, u) end
+function UnitCanAttack(a, u) if MOBS[u] then return not MOBS[u].friendly end return baseUnit.UnitCanAttack(a, u) end
 function UnitAffectingCombat(u) if MOBS[u] then return MOBS[u].combat == true end return baseUnit.UnitAffectingCombat(u) end
 function UnitClassification(u) if MOBS[u] then return MOBS[u].class or "normal" end return baseUnit.UnitClassification(u) end
 function UnitGUID(u) if MOBS[u] then return MOBS[u].guid or ("Creature-0-" .. u) end return baseUnit.UnitGUID(u) end

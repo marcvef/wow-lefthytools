@@ -3144,7 +3144,11 @@ do
 	Advance(0.6)
 	local win = LefthyToolsStreamFrame
 	check(win and win:IsShown() and win.Title:GetText():find("Anna", 1, true) and win.Live.Text:GetText() == "DEMO"
-		and used() == 5 and not win.Hint:IsShown(), "/lefthy stream preview: the window, a friend and five mobs (no word about guessing)")
+		and used() == 7 and not win.Hint:IsShown(), "/lefthy stream preview: the window, a friend, five mobs and two players (no word about guessing)")
+	local tank, passer = dot("Bob"), dot("Cedric")
+	check(tank and tank.Ring.color[3] == 1 and tank.Ring.color[1] < 0.5 and tank.Name:GetText() == "Bob" and tank.Body.color[1] > 0.7
+		and passer and passer.Ring.color[1] > 0.8 and passer.Ring.color[3] > 0.8,
+		"players: class colours; her group member with a blue ring and his name, someone passing by with a white one")
 	check(math.abs(win._scale - 0.8) < 0.001 and win._strata == "HIGH", "compact: four fifths of its old size")
 	local leader, gnoll = dot("Bandit leader"), dot("Gnoll")
 	check(leader.Ring:IsShown() and gnoll.ty < 0 and gnoll.Body.alpha < 1 and not gnoll.Ring:IsShown(),
@@ -3276,6 +3280,27 @@ do
 	pillager._scripts.OnEnter(pillager)
 	check(tooltipHas("about 24 yd"), "a distance between two checks: in the middle")
 	pillager._scripts.OnLeave(pillager)
+	-- My group: placed exactly (the game gives their position); other players with a nameplate: learned like mobs.
+	do
+		local n0, w0 = UnitPosition("player")
+		GROUP = "party"
+		PARTY.party1 = { name = "Bobby", classFile = "WARRIOR", level = 18, guid = "Player-1-77", north = n0 + 12, west = w0, continent = 0 }
+		MOBS.nameplate5 = { name = "Cedric", level = 22, player = true, friendly = true, classFile = "PRIEST", yards = 20, x = 0.4, y = 0.5 }
+		Advance(0.6)
+		local bobby, cedric = dot("Bobby"), dot("Cedric")
+		check(bobby and bobby.mob.group and bobby.mob.exact == 12 and bobby.mob.sure == 1 and math.abs(bobby.tx) < 0.5
+			and math.abs(bobby.ty - 12 * px) < 0.5 and bobby.Name:GetText() == "Bobby" and bobby.Ring.color[3] == 1,
+			"a party member 12 yd north: exactly there, named, a blue ring")
+		check(cedric and cedric.mob.player and cedric.mob.friendly and not cedric.mob.group and cedric.ty > 0,
+			"another player with a friendly nameplate: on my screen, learned like a mob")
+		check(win.Status:GetText():find("3 near", 1, true), "players aren't counted as enemies near")
+		bobby._scripts.OnEnter(bobby)
+		check(tooltipHas("In your group") and tooltipHas("12 yd away"), "hover: in my group, the exact distance")
+		bobby._scripts.OnLeave(bobby)
+		PARTY.party1, GROUP, MOBS.nameplate5 = nil, "none", nil
+		Advance(8.6) -- (Cedric is remembered a while, then gone)
+		check(not dot("Bobby") and not dot("Cedric"), "gone with them")
+	end
 	-- My target without a nameplate though near: I turned away from it, so it's behind me. Further
 	-- than nameplates reach: no telling, so at first where I look.
 	MOBS.target, STATE.target = { name = "Kodo", level = 26, yards = 15, guid = "Creature-0-kodo" }, true

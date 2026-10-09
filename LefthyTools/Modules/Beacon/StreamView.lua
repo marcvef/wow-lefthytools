@@ -94,6 +94,36 @@ local function DotOnEnter(dot)
 	end
 	local who = Whose(view)
 	GameTooltip:SetOwner(dot, "ANCHOR_RIGHT")
+	if mob.player then
+		local r, g, b = B.ClassColor(mob.classFile)
+		GameTooltip:SetText(mob.level and ("%s (%s)"):format(mob.name, mob.level) or mob.name, r, g, b)
+		if mob.group then
+			GameTooltip:AddLine(who and L["In %s's group"]:format(who) or L["In your group"], 0.3, 0.65, 1)
+		else
+			GameTooltip:AddLine(mob.friendly and L["Friendly player"] or L["Enemy player"], mob.friendly and 0.9 or 1,
+				mob.friendly and 0.9 or 0.3, mob.friendly and 0.9 or 0.25)
+		end
+		if mob.dead then
+			GameTooltip:AddLine(L["dead"], 0.7, 0.7, 0.7)
+		elseif mob.combat then
+			GameTooltip:AddLine(L["in combat"], 1, 0.6, 0.2)
+		end
+		if mob.casting and not mob.dead then
+			GameTooltip:AddLine(L["casting %s"]:format(mob.casting), 0.8, 0.6, 1)
+		end
+		if mob.exact then
+			GameTooltip:AddLine(L["%d yd away"]:format(mob.exact), 0.8, 0.8, 0.8)
+		else
+			GameTooltip:AddLine(mob.beyond and L["more than %d yd away"]:format(mob.beyond)
+				or mob.yards and L["about %d yd"]:format(math.floor(mob.yards + 0.5)) or L["distance unknown"], 0.8, 0.8, 0.8)
+		end
+		if (mob.sure or 1) < 0.6 then
+			GameTooltip:AddLine(view.kind == "me" and L["direction still unsure: move and turn"] or L["direction still unsure"],
+				0.6, 0.6, 0.6, true)
+		end
+		GameTooltip:Show()
+		return
+	end
 	GameTooltip:SetText(mob.level and ("%s (%s)"):format(mob.name, mob.level) or mob.name, 1, 1, 1)
 	local class = ClassLabel(mob.class)
 	if class then
@@ -320,10 +350,14 @@ end
 -- Drawing a picture
 ---------------------------------------------------------------------------
 
+local GROUP_RING, ENEMY_RING, FRIEND_RING = { 0.3, 0.65, 1 }, { 1, 0.2, 0.2 }, { 0.9, 0.9, 0.9 }
+
 local function Style(view, dot, mob, named, clock)
 	dot.mob = mob
 	local r, g, b = 0.65, 0.65, 0.65 -- nearby, not fighting
-	if mob.attacking then
+	if mob.player then
+		r, g, b = B.ClassColor(mob.classFile) -- a player: their class colour, the ring says who
+	elseif mob.attacking then
 		r, g, b = 1, 0.25, 0.2
 	elseif mob.combat then
 		r, g, b = 1, 0.6, 0.15
@@ -335,7 +369,11 @@ local function Style(view, dot, mob, named, clock)
 	dot.Skull:SetShown(mob.dead)
 	dot.Target:SetShown(mob.target and not mob.dead or false)
 	local class = mob.class
-	if class == "elite" or class == "worldboss" or class == "rareelite" then
+	if mob.player then
+		local ring = mob.group and GROUP_RING or mob.friendly and FRIEND_RING or ENEMY_RING
+		dot.Ring:SetColorTexture(ring[1], ring[2], ring[3], 1)
+		dot.Ring:Show()
+	elseif class == "elite" or class == "worldboss" or class == "rareelite" then
 		dot.Ring:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 1)
 		dot.Ring:Show()
 	elseif class == "rare" then
@@ -346,12 +384,17 @@ local function Style(view, dot, mob, named, clock)
 	end
 	dot.casting = mob.casting and not mob.dead
 	dot.Glow:SetShown(dot.casting and true or false)
-	named = named or (mob.target and not mob.dead)
-	dot.Name:SetText(named and (mob.level and ("%s %s"):format(mob.name, mob.level) or mob.name) or "")
-	if mob.target then
-		dot.Name:SetTextColor(1, 0.9, 0.4) -- (their target: named in yellow)
+	named = named or (mob.target and not mob.dead) or mob.group -- (group members always: they're few)
+	if mob.player then
+		dot.Name:SetText(named and mob.name or "")
+		dot.Name:SetTextColor(r, g, b)
 	else
-		dot.Name:SetTextColor(1, 1, 1)
+		dot.Name:SetText(named and (mob.level and ("%s %s"):format(mob.name, mob.level) or mob.name) or "")
+		if mob.target then
+			dot.Name:SetTextColor(1, 0.9, 0.4) -- (their target: named in yellow)
+		else
+			dot.Name:SetTextColor(1, 1, 1)
+		end
 	end
 	if mob.dead and not dot.deadAt then
 		dot.deadAt = clock
@@ -379,7 +422,8 @@ local function Apply(view)
 	for _, dot in ipairs(view.dots) do
 		dot.seen = false
 	end
-	for n, mob in ipairs(mobs) do
+	local named = 0 -- (the nearest NAMES mobs get their name; players count apart)
+	for _, mob in ipairs(mobs) do
 		local dot = view.dotFor[mob.key]
 		if not dot then
 			dot = FreeDot(view)
@@ -390,7 +434,11 @@ local function Apply(view)
 			view.dotFor[mob.key] = dot
 		end
 		dot.seen = true
-		Style(view, dot, mob, n <= NAMES and not mob.dead, view.clock)
+		local name = false
+		if not mob.player and not mob.dead and named < NAMES then
+			named, name = named + 1, true
+		end
+		Style(view, dot, mob, name, view.clock)
 	end
 	for _, dot in ipairs(view.dots) do
 		if dot.key and not dot.seen then
@@ -403,7 +451,7 @@ end
 local function Status(view)
 	local on, near, cast = 0, 0, nil
 	for _, mob in ipairs(view.picture.mobs) do
-		if not mob.dead then
+		if not mob.dead and not mob.friendly then -- (enemies only: mobs and enemy players)
 			near = near + 1
 			on = on + (mob.attacking and 1 or 0)
 			if mob.casting and not cast then
@@ -512,6 +560,7 @@ local function PreviewMob(n, key, name, level, class)
 	previewMobs[n] = mob
 	mob.key, mob.name, mob.level, mob.class = key, name, level, class
 	mob.dead, mob.combat, mob.attacking, mob.casting, mob.target, mob.sure = false, false, false, nil, false, 1
+	mob.player, mob.classFile, mob.friendly, mob.group, mob.exact = false, nil, false, false, nil
 	return mob
 end
 
@@ -544,6 +593,16 @@ local function FeedPreview(view)
 	local rare = PreviewMob(5, "rare", L["Greyfang"], 17, "rare")
 	rare.yards, rare.bearing = 37, 2.4 + 0.1 * math.sin(t * 0.5)
 	mobs[#mobs + 1] = rare
+	-- Her group: a warrior in front of her, at the leader (placed exactly); and someone passing by.
+	local tank = PreviewMob(6, "tank", "Bob", 16)
+	tank.player, tank.classFile, tank.friendly, tank.group, tank.combat = true, "WARRIOR", true, true, t > 2
+	tank.yards, tank.bearing = math.max(4, leader.yards - 2), leader.bearing + 0.25
+	tank.exact = math.floor(tank.yards + 0.5)
+	mobs[#mobs + 1] = tank
+	local passer = PreviewMob(7, "passer", "Cedric", 22)
+	passer.player, passer.classFile, passer.friendly, passer.sure = true, "PRIEST", true, 0.5
+	passer.yards, passer.bearing = 28, -2.2 + 0.05 * t
+	mobs[#mobs + 1] = passer
 	-- What she's doing: a Fireball every 4 s (2.5 s to cast), and the spells before it.
 	local now, cycle = GetTime(), t % 4
 	if cycle < 2.5 then

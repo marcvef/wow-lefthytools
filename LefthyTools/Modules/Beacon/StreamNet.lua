@@ -22,10 +22,13 @@ local S = B.Stream
 --                         id,degrees,yards,sure 0-9,flags[,cast spellID]/... (degrees clockwise
 --                         from north; flags: a attacking me, c in combat, t my target, d dead,
 --                         e elite, x rare elite, r rare, m off my screen, b beyond: yards is the
---                         longest range it's beyond, s casting). As many mobs as fit, the ones
---                         that matter first.
+--                         longest range it's beyond, s casting, p a player, f friendly, g in my
+--                         group: placed exactly). As many as fit, the ones that matter first.
 --   O2;n;<id>;<level>;<name>
 --                       a mob's name, once per watcher before the first frame with that id
+--   O2;u;<id>;<level>;<classFile>;<name>
+--                       the same for a player (their class colours the dot; older builds ignore
+--                       it and show the player as an unnamed mob)
 --
 -- Spells go as IDs: the watcher's client names them, in its own language. Nothing runs while
 -- nobody watches and you watch nobody; the sensor (StreamSense.lua) runs while someone watches you.
@@ -184,7 +187,8 @@ local FLAG_CLASS = { elite = "e", worldboss = "e", rareelite = "x", rare = "r" }
 
 -- Which mobs go first when not all fit: my target, the ones attacking me, in combat, the nearest.
 local function Weight(mob)
-	return (mob.target and 1000 or 0) + (mob.attacking and 300 or 0) + (mob.combat and 100 or 0) - (mob.yards or 50)
+	return (mob.target and 1000 or 0) + (mob.attacking and 300 or 0) + (mob.group and 150 or 0) + (mob.combat and 100 or 0)
+		- (mob.yards or 50)
 		- (mob.remembered and 50 or 0) - (mob.dead and 200 or 0)
 end
 
@@ -235,7 +239,8 @@ local function Encode(picture, now)
 		if id then
 			local flags = (mob.attacking and "a" or "") .. (mob.combat and "c" or "") .. (mob.target and "t" or "")
 				.. (mob.dead and "d" or "") .. (FLAG_CLASS[mob.class] or "") .. (mob.remembered and "m" or "")
-				.. (mob.beyond and "b" or "") .. (mob.casting and "s" or "")
+				.. (mob.beyond and "b" or "") .. (mob.casting and "s" or "") .. (mob.player and "p" or "")
+				.. (mob.friendly and "f" or "") .. (mob.group and "g" or "")
 			local yards = mob.beyond or mob.yards
 			local entry = ("%d,%d,%s,%d,%s"):format(id, Deg(mob.bearing),
 				yards and Int(math.min(yards, 99)) or "", math.floor(math.max(0, math.min(1, mob.sure or 1)) * 9 + 0.5), flags)
@@ -274,8 +279,12 @@ S.OnSensed(function(picture)
 				if watcher.names[mobId] ~= mob.key then
 					watcher.names[mobId] = mob.key
 					named = true
-					B.Queue(id, Message("n", ("%d;%s;%s"):format(mobId, mob.level and not issecret(mob.level) and tostring(mob.level) or "",
-						B.Clean(mob.name, NAME_BYTES))))
+					local level = mob.level and not issecret(mob.level) and tostring(mob.level) or ""
+					if mob.player then
+						B.Queue(id, Message("u", ("%d;%s;%s;%s"):format(mobId, level, mob.classFile or "", B.Clean(mob.name, NAME_BYTES))))
+					else
+						B.Queue(id, Message("n", ("%d;%s;%s"):format(mobId, level, B.Clean(mob.name, NAME_BYTES))))
+					end
 				end
 			end
 			B.QueueLatest(id, Message("f", frame), "O" .. VERSION .. ";f;", named)
@@ -327,9 +336,14 @@ function B.ReceiveStream(senderID, word, rest)
 			stopSaid[senderID] = now -- (they think I watch: after my /reload, say)
 			B.Queue(senderID, Message("w", "0"))
 		end
-	elseif word == "n" then
+	elseif word == "n" or word == "u" then
 		local stream = streams[senderID]
-		local id, level, name = rest:match("^(%d+);(%-?%d*);([^;]+)$")
+		local id, level, classFile, name
+		if word == "u" then
+			id, level, classFile, name = rest:match("^(%d+);(%-?%d*);(%u*);([^;]+)$")
+		else
+			id, level, name = rest:match("^(%d+);(%-?%d*);([^;]+)$")
+		end
 		if not (watching[senderID] and id) then
 			return
 		end
@@ -345,7 +359,7 @@ function B.ReceiveStream(senderID, word, rest)
 			end
 			stream.count = stream.count + 1
 		end
-		stream.names[id] = { name = B.Clean(name, NAME_BYTES), level = tonumber(level) }
+		stream.names[id] = { name = B.Clean(name, NAME_BYTES), level = tonumber(level), classFile = classFile ~= "" and classFile or nil }
 	end
 end
 
@@ -489,6 +503,10 @@ local function Decode(stream, picture)
 			mob.target = flags:find("t", 1, true) ~= nil
 			mob.dead = flags:find("d", 1, true) ~= nil
 			mob.remembered = flags:find("m", 1, true) ~= nil
+			mob.player = flags:find("p", 1, true) ~= nil
+			mob.friendly = flags:find("f", 1, true) ~= nil
+			mob.group = flags:find("g", 1, true) ~= nil
+			mob.classFile = name and name.classFile
 			mob.fade = mob.remembered and 0.6 or nil
 			mob.age = nil
 			mob.casting = flags:find("s", 1, true) and (SpellName(tonumber(cast)) or L["a spell"]) or nil
@@ -500,6 +518,7 @@ local function Decode(stream, picture)
 			else
 				mob.beyond, mob.yards = nil, yards and math.min(yards, S.OUTER_YARDS)
 			end
+			mob.exact = mob.group and yards or nil
 			mobs[n] = mob
 		end
 	end

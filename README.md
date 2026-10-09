@@ -162,8 +162,9 @@ minimap, and you on theirs, without being in a group.
   `/lefthy beacon ping` pings where you stand. A ping goes away after a minute; **Alt+click
   your own marker** (or `/lefthy beacon ping clear`) takes it back sooner, for everyone.
 - **Fight stream:** watch a friend's fight live, in a small window: them in the middle on the
-  map of the place, the mobs around them (how far, which way, who attacks them, who casts), what
-  they're casting, their mana or rage. **Click a friend's dot on the world map** (again to close),
+  map of the place, the mobs around them (how far, which way, who attacks them, who casts), their
+  group (exactly where they are, blue ring) and other players with a nameplate (white ring friendly,
+  red enemy), what they're casting, their mana or rage. **Click a friend's dot on the world map** (again to close),
   or `/lefthy stream watch <name>`, or click the **spyglass on the minimap**: it lists the friends
   who share their fights, pick one. On a cinematic flight one friend's fight opens by itself (the
   one fighting), and the top bar has a Watch button next to each friend. Drag the window's corner
