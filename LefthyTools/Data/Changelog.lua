@@ -212,5 +212,8 @@ ns.CHANGELOG = {
 	{ id = 68, module = "tweaks",
 		en = { "Flights: shared items can be hovered", "An item a friend shows you during a cinematic flight now has its tooltip when you hover it in the subtitles, and a click opens it (the film waits until you close it)." },
 		de = { "Flüge: geteilte Items mit Tooltip", "Ein Item, das dir ein Freund während eines Flugs im Kinomodus zeigt, hat jetzt seinen Tooltip, wenn du in den Untertiteln mit der Maus darauf zeigst, und ein Klick öffnet es (der Film wartet, bis du es schließt)." } },
+	{ id = 69, module = "tweaks",
+		en = { "Combo gem: display's look, your place", "The combo point gem on your target's nameplate is now copied from the personal resource display's own, border and all, and smaller. Three new sliders set its size and where it sits; while you move them it shows on your target." },
+		de = { "Combopunkt: Anzeige-Look, dein Platz", "Der Combopunkt an der Namensplakette deines Ziels ist jetzt eine Kopie des Punkts der persönlichen Ressourcenanzeige, mit Rand, und kleiner. Drei neue Regler bestimmen Größe und Position; während du sie bewegst, zeigt er sich an deinem Ziel." } },
 	-- New entries go here, at the end.
 }
