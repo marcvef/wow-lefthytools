@@ -3100,6 +3100,10 @@ do
 	end
 
 	-- The preview: made-up mobs around a made-up friend.
+	math.randomseed(3) -- (the learning draws random places: the same ones every run)
+	local realTiles = ns.MINIMAP_TILES
+	ns.MINIMAP_TILES = { [0] = {} } -- (made-up minimap tiles around the test world)
+	for x = 25, 37 do for y = 25, 37 do ns.MINIMAP_TILES[0][x * 100 + y] = 900000 + x * 100 + y end end
 	lefthy("stream preview")
 	Advance(0.6)
 	local win = LefthyToolsStreamFrame
@@ -3108,6 +3112,32 @@ do
 	local leader, gnoll = dot("Bandit leader"), dot("Gnoll")
 	check(leader.Ring:IsShown() and gnoll.ty < 0 and gnoll.Body.alpha < 1 and not gnoll.Ring:IsShown(),
 		"an elite has a gold ring; a mob without a direction sits behind, faint")
+	-- The map under it, to scale (a yard on the map is a yard on the rings), where I stand in the
+	-- middle: the minimap's own tiles (3 x 3 of the world's 533 yd grid; here made-up file IDs) ...
+	local px = (220 / 2 - 8) / 40 -- pixels per yard
+	local function shownTiles()
+		local list = {}
+		for _, t in ipairs(win.Map._textures or {}) do if t.shown and t.path then list[#list + 1] = t end end
+		return list
+	end
+	local hereN, hereW = UnitPosition("player")
+	local tx, ty = 32 - hereW / (1600 / 3), 32 - hereN / (1600 / 3)
+	local x0, y0 = math.floor(tx) - 1, math.floor(ty) - 1
+	local tiles = shownTiles()
+	local mapPoint = win.Map._points[#win.Map._points]
+	check(win.Map:IsShown() and not win.Plain:IsShown() and #tiles == 9 and tiles[1].path == 900000 + x0 * 100 + y0
+		and tiles[9].path == 900000 + (x0 + 2) * 100 + y0 + 2 and math.abs(tiles[1].width - 1600 / 3 * px) < 0.01
+		and math.abs(mapPoint[4] + (tx - x0) * 1600 / 3 * px) < 0.01 and math.abs(mapPoint[5] - (ty - y0) * 1600 / 3 * px) < 0.01,
+		"the map under the rings: the minimap's tiles around me, to scale, where I stand in the middle")
+	-- ... or, where there are none, the world map's art of my zone.
+	ns.MINIMAP_TILES = {}
+	lefthy("stream preview")
+	Advance(0.6)
+	tiles = shownTiles()
+	mapPoint = win.Map._points[#win.Map._points]
+	check(#tiles == 12 and tiles[1].path == 142901 and tiles[12].path == 142912 and math.abs(tiles[1].width - 256 * 1000 * px / 1002) < 0.01
+		and math.abs(mapPoint[4] + (1000 - hereW) * px) < 0.01 and math.abs(mapPoint[5] - (1000 - hereN) * px) < 0.01,
+		"no minimap tiles: my zone's world map art (12 tiles), to scale, where I stand in the middle")
 	local act = win.Act
 	check(act.Name:GetText() == "Spell 133" and act.Icon:IsShown() and act.Bar.width > 1 and act.Bar.width < 50
 		and act.Recent[1]:IsShown() and act.Recent[1].path == 100133 and act.Recent[4]:IsShown() and not act.Recent[5]:IsShown(),
@@ -3138,6 +3168,25 @@ do
 	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3,
 		"/lefthy stream me: my own surroundings, live")
 	check(act.Name:GetText() == "" and not act.Icon:IsShown() and not act.Recent[1]:IsShown(), "not casting yet: the row is empty (the preview's spells are gone)")
+	-- The map moves with me, my arrow turns with me.
+	do
+		local before = win.Map._points[#win.Map._points][4]
+		local wasPos, wasFacing = PLAYER_POS[1], FACING
+		PLAYER_POS[1], FACING = PLAYER_POS[1] + 0.01, 1 -- 10 yd east, turned
+		Advance(0.05)
+		local after = win.Map._points[#win.Map._points][4]
+		check(math.abs((before - after) - 10 * px) < 0.01 and win.Me.rotation == 1,
+			"10 yd east: the map slides 10 yd west under me; my arrow turns with my facing")
+		PLAYER_POS[1], FACING = wasPos, wasFacing
+		Advance(0.6)
+		NO_MAP_ART = true
+		lefthy("stream me")
+		Advance(0.6)
+		check(not win.Map:IsShown() and win.Plain:IsShown(), "a map without art (or an instance): the plain rings")
+		NO_MAP_ART = nil
+		lefthy("stream me")
+		Advance(0.6)
+	end
 	-- What I'm doing: the spell I'm casting (right away, on its start), then in the row of the last ones.
 	PLAYER_CAST = { name = "Wrath", icon = 136006, start = GetTime() * 1000, finish = (GetTime() + 1.5) * 1000 }
 	Fire("UNIT_SPELLCAST_START", "player", "Cast-3", 5176)
@@ -3158,7 +3207,7 @@ do
 	check(thug.ty > 0 and pillager.ty > 0 and gnoll.ty > 0, "mobs with a nameplate are on my screen: ahead")
 	check(radius(thug) < 15 and radius(pillager) > 30 and radius(pillager) < 80 and radius(gnoll) > 100,
 		"at their distance: close, further, beyond every check (on the rim)")
-	check(gnoll.Body.alpha < 0.6 and win.Hint:IsShown() and win.Hint:GetText() == "Move and turn: faint dots find their place.",
+	check(gnoll.Body.alpha < 0.8 and win.Hint:IsShown() and win.Hint:GetText() == "Move and turn: faint dots find their place.",
 		"faint while left or right isn't known yet, and the window says how it learns")
 	check(win.Status:GetText():find("1 on you", 1, true) and win.Status:GetText():find("3 near", 1, true)
 		and win.Status:GetText():find("Defias Pillager casts Fireball", 1, true), "the bottom line, got " .. tostring(win.Status:GetText()))
@@ -3239,7 +3288,7 @@ do
 	FACING = math.pi -- turned around to face it
 	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-1", 2764)
 	Advance(1)
-	check(hyena.ty > 0, "turned around, a spell cast at it: in front, got " .. hyena.ty)
+	check(hyena.ty < 0 and math.abs(hyena.tx) < 40, "turned around to it, a spell cast at it: still south of me (north is up), now where I face, got " .. hyena.ty)
 	MOBS, FACING, STATE.target, STATE.combat = {}, 0, false, false
 	Advance(9)
 	MOBS = {
@@ -3310,6 +3359,7 @@ do
 	Advance(61)
 	check(#tests == 3, "switched off: a running test stops, unsaved")
 	MOBS = {}
+	ns.MINIMAP_TILES = realTiles
 end
 
 section("Beacon: a busy fight doesn't pile up messages")

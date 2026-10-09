@@ -58,7 +58,7 @@ end
 -- Which files the game loads for LefthyTools (the TOC's files and saved variables), as a short
 -- hash; npm test checks it against the TOC. The game reads the TOC only at startup, so an update
 -- that changes it needs a restart, any other a /reload. Friends send theirs with their version.
-LT.FILES = "d1ea2c7d"
+LT.FILES = "647253cc"
 
 -- The newest LefthyTools build seen from a friend (Beacon), if newer than ours, and its FILES
 -- (nil if that friend's build doesn't send them). Addons can't go online, so friends are the

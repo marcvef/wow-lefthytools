@@ -23,6 +23,7 @@ Data\Changelog.lua
 Data\ForeverQuests.lua
 Data\FlightPaths.lua
 Data\ClassSpells.lua
+Data\MinimapTiles.lua
 
 # Modules
 Modules\Mirage\Groups.lua

@@ -536,6 +536,20 @@ checks answer for hostile units in combat, and where nameplates are on the scree
   misleads it until the cloud starts over). In an instance, without your place, it learns by
   turning only.
 
+The map under the radar, north up (frames can't turn, so the map can't either; your arrow turns
+with `GetPlayerFacing` via `SetRotation`, and the mobs' learned places are turned to north up),
+to scale: one scale (2.55 px per yard: 102 px for 40 yd) for the rings, the dots and the map. Where
+`Data/MinimapTiles.lua` has tiles for your continent (`UnitPosition`'s instance ID: 0 Eastern
+Kingdoms, 1 Kalimdor; `node tools/update-minimap-tiles.js` from wago.tools' file list of a Forever
+build), the minimap's own terrain tiles: `world/minimaps/<continent>/mapX_Y.blp`, 256 px for
+533.33 yd, X = floor(32 - west / 533.33), Y = floor(32 - north / 533.33); the 3 x 3 around you,
+laid again when you step onto another tile. Otherwise the world map's art of your zone
+(`C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid like `Blizzard_MapCanvasDetailLayer`,
+placed by the map's corners from `C_Map.GetWorldPosFromMapPos`). Either cut round (a mask), a
+little darker, the rings as thin lines on top; it moves every frame with `UnitPosition`. Without a
+place (an instance) or art: the plain rings (faint discs). Whether the client lets addons show the
+minimap tiles is to be seen in game.
+
 The window (250 x 350, movable, Escape and its X close it): distance bands at 10, 20, 30, 40 yd,
 you in the middle, a dot per mob (red: attacking you, orange: in combat, grey: not; gold ring:
 elite, silver: rare; a purple glow while casting; a skull that fades when it dies), names for the

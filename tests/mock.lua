@@ -248,6 +248,7 @@ local function NewTexture()
 	function t:SetTexCoord(...) self.coords = { ... } end
 	function t:SetDesaturated(d) self.desaturated = d end
 	function t:SetScale(s) self.scale = s end
+	function t:SetRotation(r) self.rotation = r end
 	return t
 end
 function FrameMethods:CreateTexture(_, layer)
@@ -1556,3 +1557,15 @@ function CheckInteractDistance(u, i)
 	return mob ~= nil and MobYards(mob) ~= nil and MobYards(mob) <= ({ 28, 11, 10 })[i]
 end
 CVARS.cameraFov, CVARS.nameplateShowEnemies, CVARS.nameplateMaxDistance = "90", "1", "41"
+-- Map art (the fight stream's map): one layer of 4 x 3 tiles of 256 px, like a classic zone;
+-- NO_MAP_ART: a map without (the stream falls back to its plain rings).
+C_Map.GetMapArtLayers = function(mapID)
+	if MAPS[mapID] and not NO_MAP_ART then
+		return { { layerWidth = 1002, layerHeight = 668, tileWidth = 256, tileHeight = 256, minScale = 1, maxScale = 1, additionalZoomSteps = 0 } }
+	end
+end
+C_Map.GetMapArtLayerTextures = function(mapID)
+	local list = {}
+	for i = 1, 12 do list[i] = mapID * 100 + i end
+	return list
+end

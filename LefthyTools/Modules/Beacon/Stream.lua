@@ -807,13 +807,150 @@ function B.StreamDots()
 	return dots
 end
 
--- Where a mob goes on the radar (up = where you face): its direction (radians, right of ahead) and
--- distance (beyond every check: on the rim).
+-- One scale for the rings, the dots and the map under them.
+local PX_PER_YARD = (RADAR / 2 - 8) / OUTER_YARDS
+local facingNow = 0 -- your facing at this look ("me"; the preview's friend faces north)
+
+-- Where a mob goes on the radar, north up like the map: its direction (radians, right of where you
+-- face) turned by your facing, and its distance (beyond every check: on the rim).
 local function Spot(mob)
 	local yards = mob.beyond and OUTER_YARDS or mob.yards and math.min(mob.yards, OUTER_YARDS) or OUTER_YARDS * 0.85
-	local r = yards / OUTER_YARDS * (RADAR / 2 - 8)
-	local angle = mob.angle or 0
+	local r = yards * PX_PER_YARD
+	local angle = (mob.angle or 0) - facingNow -- (facing turns counterclockwise; angles go clockwise)
 	return math.sin(angle) * r, math.cos(angle) * r
+end
+
+---------------------------------------------------------------------------
+-- The map under the radar: your zone's map, to scale (a yard on it is a yard on the rings), north
+-- up, moving with you; your arrow turns with your facing. The world map's own art
+-- (C_Map.GetMapArtLayerTextures), its tiles laid out like Blizzard's (Blizzard_MapCanvasDetailLayer:
+-- columns of tileWidth, rows of tileHeight, row by row), placed by the map's corners in the world
+-- (C_Map.GetWorldPosFromMapPos), cut round. Without your place on a map (an instance), no map: the
+-- dark rings as before.
+---------------------------------------------------------------------------
+
+local map = { tiles = {} } -- id, ok, north0, west0 (the map's top left in the world), x, y (where it's drawn)
+
+local function MapCorner(mapID, x, y)
+	local ok, _, pos = pcall(C_Map.GetWorldPosFromMapPos, mapID, CreateVector2D(x, y))
+	if ok and pos and not issecret(pos) then
+		return pos:GetXY()
+	end
+end
+
+local function SetupMap(mapID)
+	map.id, map.ok, map.x = mapID, false, nil
+	local layers = mapID and Value("C_Map.GetMapArtLayers", mapID)
+	local layer = type(layers) == "table" and layers[1]
+	local textures = layer and Value("C_Map.GetMapArtLayerTextures", mapID, 1)
+	local north0, west0 = MapCorner(mapID, 0, 0)
+	local north1, west1 = MapCorner(mapID, 1, 1)
+	if type(textures) == "table" and north0 and north1 and west0 > west1 and north0 > north1 then
+		map.ok, map.north0, map.west0 = true, north0, west0
+		local sx = (west0 - west1) * PX_PER_YARD / layer.layerWidth
+		local sy = (north0 - north1) * PX_PER_YARD / layer.layerHeight
+		local cols = math.ceil(layer.layerWidth / layer.tileWidth)
+		local rows = math.ceil(layer.layerHeight / layer.tileHeight)
+		local n = 0
+		for row = 1, rows do
+			for col = 1, cols do
+				n = n + 1
+				local tile = map.tiles[n]
+				if not tile then
+					tile = win.Map:CreateTexture(nil, "BACKGROUND")
+					tile:AddMaskTexture(win.Map.Round)
+					map.tiles[n] = tile
+				end
+				tile:SetTexture(textures[(row - 1) * cols + col])
+				tile:SetSize(layer.tileWidth * sx, layer.tileHeight * sy)
+				tile:ClearAllPoints()
+				tile:SetPoint("TOPLEFT", win.Map, "TOPLEFT", (col - 1) * layer.tileWidth * sx, -(row - 1) * layer.tileHeight * sy)
+			end
+		end
+		map.count = n
+	end
+	for _, tile in ipairs(map.tiles) do
+		tile:Hide() -- (MoveMap shows them when they're the ones in use)
+	end
+	if map.source == "art" then
+		map.source = nil
+	end
+end
+
+-- Better than the world map's art, where there is one: the minimap's own terrain tiles
+-- (Data/MinimapTiles.lua, by file ID): the 3 x 3 tiles of the world's grid around you (a tile is
+-- 533.33 yd; the rings reach 40), laid again only when you step onto another tile.
+local TILE_YARDS = 1600 / 3
+local function LayMinimap(tiles, continent, x0, y0)
+	map.continent, map.x0, map.y0, map.x = continent, x0, y0, nil
+	local size = TILE_YARDS * PX_PER_YARD
+	map.mini = map.mini or {}
+	for i = 0, 2 do
+		for j = 0, 2 do
+			local n = i * 3 + j + 1
+			local tile = map.mini[n]
+			if not tile then
+				tile = win.Map:CreateTexture(nil, "BACKGROUND", nil, 1)
+				tile:AddMaskTexture(win.Map.Round)
+				tile:SetSize(size, size)
+				map.mini[n] = tile
+			end
+			local file = tiles[(x0 + i) * 100 + (y0 + j)]
+			if file then
+				tile:SetTexture(file)
+				tile:ClearAllPoints()
+				tile:SetPoint("TOPLEFT", win.Map, "TOPLEFT", i * size, -j * size)
+			end
+			tile.has = file ~= nil
+		end
+	end
+end
+
+-- Which tiles show: the minimap's ("mini"), the world map's art ("art") or none.
+local function UseTiles(source)
+	if source ~= map.source then
+		map.source, map.x = source, nil
+	end
+	for _, tile in ipairs(map.mini or {}) do
+		tile:SetShown(source == "mini" and tile.has)
+	end
+	for i, tile in ipairs(map.tiles) do
+		tile:SetShown(source == "art" and i <= (map.count or 0))
+	end
+end
+
+-- Every frame: the map under you (where you are now), your arrow (where you face now).
+local function MoveMap()
+	local ok, north, west, _, continent = pcall(UnitPosition, "player")
+	ok = ok and north and not (issecret(north) or issecret(west) or issecret(continent))
+	local tiles = ok and ns.MINIMAP_TILES and ns.MINIMAP_TILES[continent]
+	local x, y
+	if tiles then
+		local tx, ty = 32 - west / TILE_YARDS, 32 - north / TILE_YARDS
+		local x0, y0 = math.floor(tx) - 1, math.floor(ty) - 1
+		if not map.mini or x0 ~= map.x0 or y0 ~= map.y0 or continent ~= map.continent or map.source ~= "mini" then
+			LayMinimap(tiles, continent, x0, y0)
+			UseTiles("mini")
+		end
+		x, y = -(tx - x0) * TILE_YARDS * PX_PER_YARD, (ty - y0) * TILE_YARDS * PX_PER_YARD
+	elseif ok and map.ok then
+		if map.source ~= "art" then
+			UseTiles("art")
+		end
+		x, y = -(map.west0 - west) * PX_PER_YARD, (map.north0 - north) * PX_PER_YARD
+	end
+	win.Map:SetShown(x ~= nil)
+	win.Plain:SetShown(x == nil)
+	if x and (not map.x or math.abs(x - map.x) + math.abs(y - map.y) > 0.2) then
+		map.x, map.y = x, y
+		win.Map:ClearAllPoints()
+		win.Map:SetPoint("TOPLEFT", win.Radar, "CENTER", x, y)
+	end
+	local facing = mode == "me" and Value("GetPlayerFacing") or 0
+	if facing ~= win.Me.facing then
+		win.Me.facing = facing
+		win.Me:SetRotation(facing)
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -1189,6 +1326,7 @@ end
 
 local function FeedPreview()
 	local t = clock % PREVIEW_LOOP
+	facingNow = 0 -- (she faces north)
 	wipe(mobs)
 	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite")
 	leader.combat, leader.attacking, leader.target = t > 2, t > 2, true
@@ -1258,6 +1396,11 @@ end
 local function FeedMe()
 	local n, targetShown, now = 0, false, GetTime()
 	Here()
+	facingNow = here.facing or 0
+	local mapID = Value("C_Map.GetBestMapForUnit", "player")
+	if mapID ~= map.id then
+		SetupMap(mapID) -- (another zone)
+	end
 	local targetKey = Value("UnitExists", "target") and Value("UnitCanAttack", "player", "target")
 		and (Value("UnitGUID", "target") or "target") or nil
 	for i = 1, MAX_UNITS do
@@ -1336,6 +1479,7 @@ local function OnUpdate(_, elapsed)
 	elseif doing.dirty and mode == "me" then
 		ReadCast() -- (a cast just started or stopped)
 	end
+	MoveMap()
 	ShowDoing(GetTime())
 	local k = math.min(1, elapsed * GLIDE)
 	local pulse = 0.5 + 0.5 * math.sin(clock * 5)
@@ -1426,32 +1570,53 @@ local function Build()
 	win.Live.Dot = Circle(dotFrame, "OVERLAY", 0, 8)
 	win.Live.Dot:SetColorTexture(1, 0.2, 0.15, 1)
 
-	-- The radar: distance bands (faint discs, darker inside), a cross, labels, you in the middle.
+	-- The map (SetupMap, MoveMap): its own frame under the radar, its tiles cut round.
+	local ring = (OUTER_YARDS * PX_PER_YARD + 8) * 2 -- (the round cut: the outer ring and a little more)
+	win.Map = CreateFrame("Frame", nil, win)
+	win.Map:SetSize(1, 1)
+	win.Map.Round = win.Map:CreateMaskTexture()
+	win.Map.Round:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+	win.Map.Round:SetSize(ring, ring)
+	win.Map:Hide()
+
+	-- The radar, over the map: north up; rings every 10 yd (thin lines over the map; without one,
+	-- faint discs, darker inside), labels, you in the middle (your arrow turns with your facing).
 	local radar = CreateFrame("Frame", nil, win)
 	win.Radar = radar
 	radar:SetSize(RADAR, RADAR)
 	radar:SetPoint("TOP", 0, -46)
+	radar:SetFrameLevel(win.Map:GetFrameLevel() + 1)
+	win.Map.Round:SetPoint("CENTER", radar, "CENTER")
+	local dim = Circle(radar, "BACKGROUND", -8, ring) -- (the map a little darker: the dots stand out)
+	dim:SetColorTexture(0, 0, 0, 0.35)
+	win.Plain = CreateFrame("Frame", nil, radar) -- (no map: the discs)
+	win.Plain:SetAllPoints()
 	for i, yards in ipairs(RINGS) do
-		local size = RADAR * yards / OUTER_YARDS
-		local band = Circle(radar, "BACKGROUND", i - 8, size)
+		local radius = yards * PX_PER_YARD
+		local band = Circle(win.Plain, "BACKGROUND", i - 8, radius * 2)
 		band:SetColorTexture(0.35, 0.45, 0.55, 0.07 + i * 0.015)
-		local label = radar:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-		label:SetPoint("CENTER", radar, "CENTER", 0, size / 2 - 7)
-		label:SetTextScale(0.8)
+		local segments = 48
+		for s = 1, segments do
+			local a, b = 2 * math.pi * (s - 1) / segments, 2 * math.pi * s / segments
+			local line = radar:CreateLine(nil, "ARTWORK")
+			line:SetThickness(1)
+			line:SetColorTexture(1, 1, 1, i == 1 and 0.35 or 0.22)
+			line:SetStartPoint("CENTER", radar, math.sin(a) * radius, math.cos(a) * radius)
+			line:SetEndPoint("CENTER", radar, math.sin(b) * radius, math.cos(b) * radius)
+		end
+		local label = radar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		label:SetPoint("CENTER", radar, "CENTER", 0, radius - 6)
+		label:SetTextScale(0.75)
+		label:SetAlpha(0.8)
 		label:SetText(i == 1 and L["%d yd"]:format(yards) or tostring(yards))
 	end
-	for _, vertical in ipairs({ true, false }) do
-		local line = radar:CreateTexture(nil, "BORDER")
-		line:SetColorTexture(1, 1, 1, 0.06)
-		line:SetSize(vertical and 1 or RADAR, vertical and RADAR or 1)
-		line:SetPoint("CENTER")
-	end
-	local ahead = radar:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	ahead:SetPoint("BOTTOM", radar, "TOP", 0, 1)
-	ahead:SetText(L["you face"])
+	local north = radar:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	north:SetPoint("BOTTOM", radar, "TOP", 0, 1)
+	north:SetText("N")
 	local meDot = Circle(radar, "OVERLAY", 1, 7) -- (also there if this client lacks the arrow)
 	meDot:SetColorTexture(1, 1, 1, 0.9)
 	local me = radar:CreateTexture(nil, "OVERLAY", nil, 2)
+	win.Me = me
 	me:SetTexture(ARROW)
 	me:SetSize(24, 24)
 	me:SetPoint("CENTER")
@@ -1507,6 +1672,7 @@ local function OpenWindow(newMode)
 	ReleaseAll()
 	wipe(mobs)
 	mode, clock, nextFeed = newMode, 0, 0
+	SetupMap(Value("C_Map.GetBestMapForUnit", "player"))
 	wipe(doing.recent)
 	doing.cast, doing.dirty = nil, false
 	local name, classFile
