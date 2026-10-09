@@ -26,6 +26,8 @@ local defaults = {
 	chatOnMessage = true,
 	hideMinimapWhenFaded = true,
 	minimapHideAt = 0,   -- minimap opacity at which it's hidden during the fade-out (0 = at the end)
+	minimapButton = true, -- Options.lua: a button on the minimap that pauses fading
+	minimapAngle = 185,  -- degrees, 0 = right, counter-clockwise: left, above Chronicle's book
 	groups = {},
 }
 for _, g in ipairs(data.GROUPS) do
@@ -308,6 +310,7 @@ end
 local lastActivity = GetTime()
 local castingCast, channeling = false, false
 local peek = false
+local paused = false -- the minimap button (or /mirage pause): everything stays visible until resumed
 local reason              -- last global reason, for /mirage status
 local reportedErrors = {}
 
@@ -493,7 +496,7 @@ local function Evaluate()
 		if OverrideHidden(g.key) then
 			FadeTo(g, 0, fade)
 		else
-			if not M.enabled or peek or not db.groups[g.key] then
+			if not M.enabled or peek or paused or not db.groups[g.key] then
 				show = true
 			else
 				if db.mouseover then
@@ -612,6 +615,9 @@ function M:OnSettingChanged()
 		end
 	end
 	self:Refresh()
+	if self.UpdateButton then
+		C_Timer.After(0, function() M:UpdateButton() end) -- (its checkbox)
+	end
 end
 
 function M:SetPeek(down)
@@ -630,7 +636,28 @@ function M:GetStatus()
 		reason = reason,
 		idleFor = GetTime() - lastActivity,
 		peek = peek,
+		paused = paused,
 	}
+end
+
+-- Paused: nothing fades until resumed (the minimap button, /mirage pause). Not kept over a
+-- restart: a forgotten pause would look like Mirage being broken.
+function M:SetPaused(on)
+	if not self.enabled then
+		return
+	end
+	paused = on and true or false
+	if not paused then
+		self:Poke() -- (resuming starts the idle time over)
+	end
+	self:Refresh()
+	if self.UpdateButton then
+		self:UpdateButton()
+	end
+end
+
+function M:IsPaused()
+	return paused
 end
 
 function M:GetGroup(key)
@@ -740,11 +767,13 @@ function M:OnEnable()
 	rebuildAt = 0 -- adopt frames on the next frame
 	RequestEvaluate()
 	driver:SetScript("OnUpdate", OnUpdate)
+	C_Timer.After(0, function() if M.UpdateButton then M:UpdateButton() end end) -- (Options.lua)
 end
 
 function M:OnDisable()
 	events:UnregisterAllEvents()
-	peek = false
+	peek, paused = false, false
+	C_Timer.After(0, function() if M.UpdateButton then M:UpdateButton() end end)
 	castingCast, channeling = false, false
 	rebuildAt = nil
 	-- Fade everything back in; FinishStopping() then hands the frames back and goes idle.

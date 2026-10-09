@@ -56,6 +56,12 @@ L["General"] = "Allgemein"
 L["Fades the interface when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD."] =
 	"Blendet das Interface aus, wenn du nicht im Kampf bist und es gerade nicht benutzt, wie das Dynamic HUD in Dune: Awakening."
 L["Mirage: toggle interface fading"] = "Mirage: Interface-Ausblenden an/aus"
+L["Paused: the interface stays visible."] = "Pausiert: das Interface bleibt sichtbar."
+L["Click: fade again when idle"] = "Klick: wieder ausblenden, wenn du nichts tust"
+L["Fades the interface when you're idle."] = "Blendet das Interface aus, wenn du nichts tust."
+L["Click: pause (the interface stays)"] = "Klick: pausieren (das Interface bleibt)"
+L["A button on the edge of the minimap: click pauses fading (the interface stays) and resumes it, right-click opens these settings. Drag it to move it. /mirage pause does the same."] =
+	"Ein Button am Rand der Minimap: ein Klick pausiert das Ausblenden (das Interface bleibt) und setzt es fort, ein Rechtsklick öffnet diese Einstellungen. Zum Verschieben ziehen. /mirage pause macht dasselbe."
 L["Mirage: show interface (hold)"] = "Mirage: Interface zeigen (gedrückt halten)"
 
 L["Timing"] = "Timing"

@@ -459,6 +459,47 @@ check(near(a("MainActionBar"), 1), "peek shows")
 Mirage:SetPeek(false); Advance(0.4)
 check(near(a("MainActionBar"), 1), "stays briefly after peek")
 
+section("Mirage: the minimap button pauses fading")
+do
+	local function has(text) for _, l in ipairs(TOOLTIP.lines) do if l == text then return true end end return false end
+	local mb = Mirage:MinimapButton()
+	check(MDB.minimapButton == true and mb and mb:IsShown() and mb:GetParent() == Minimap and not mb.Pause:IsShown(),
+		"a minimap button while Mirage is on")
+	Advance(8)
+	check(near(a("MainActionBar"), 0), "faded")
+	mb._scripts.OnClick(mb, "LeftButton")
+	Advance(0.4)
+	check(Mirage:IsPaused() and near(a("MainActionBar"), 1) and mb.Pause:IsShown() and mb.Icon.desaturated, "click: paused, everything back, the icon greyed with II")
+	Advance(30)
+	check(near(a("MainActionBar"), 1), "and it stays while paused")
+	mb._scripts.OnEnter(mb)
+	check(TOOLTIP.title == "Mirage" and has("Paused: the interface stays visible.") and has("Click: fade again when idle"),
+		"hover: paused, and what a click does")
+	mb._scripts.OnLeave(mb)
+	local printed = #PRINTED
+	mirage("status")
+	check(table.concat(PRINTED, "\n", printed + 1):find("paused", 1, true), "/mirage status says so")
+	mb._scripts.OnClick(mb, "LeftButton")
+	Advance(8)
+	check(not Mirage:IsPaused() and near(a("MainActionBar"), 0) and not mb.Pause:IsShown(), "click again: fading when idle again")
+	mirage("pause")
+	Advance(0.4)
+	check(Mirage:IsPaused() and near(a("MainActionBar"), 1), "/mirage pause too")
+	mirage("resume")
+	check(not Mirage:IsPaused(), "/mirage resume")
+	mirage("off")
+	Advance(0.1)
+	check(not mb:IsShown(), "Mirage off: no button")
+	mirage("on")
+	Advance(0.1)
+	check(mb:IsShown(), "on again: back")
+	REGISTERED_SETTINGS.LefthyTools_mirage_minimapButton:SetValue(false)
+	Advance(0.1)
+	check(not mb:IsShown(), "setting off: gone")
+	REGISTERED_SETTINGS.LefthyTools_mirage_minimapButton:SetValue(true)
+	Advance(0.1)
+end
+
 section("secret alpha is left alone")
 Advance(8)
 PlayerFrame:SetAlpha(SECRET)
@@ -1357,7 +1398,7 @@ for i = 1, 10 do
 	PLAYER_POS = { 0.5 + i / 1000, 0.5 }
 	Advance(1)
 end
-local n = #GameDataTo(11, mark)
+local n = #sentTo(11, mark, "S2;") -- (states only: a journal summary may fall in here too)
 check(n >= 2 and n <= 3, "interval 5 s while moving: every 5 s, got " .. n)
 lefthy("beacon interval 3")
 check(BDB.interval == 3 and B("interval").uiUpdates > 0, "/lefthy beacon interval 3, through the setting (an open settings page follows)")

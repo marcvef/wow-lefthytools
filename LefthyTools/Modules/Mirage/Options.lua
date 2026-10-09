@@ -8,7 +8,70 @@ local Seconds, Percent = LT.Options.Seconds, LT.Options.Percent
 BINDING_NAME_LEFTHYTOOLS_MIRAGE_TOGGLE = L["Mirage: toggle interface fading"]
 BINDING_NAME_LEFTHYTOOLS_MIRAGE_PEEK = L["Mirage: show interface (hold)"]
 
+---------------------------------------------------------------------------
+-- The minimap button: pause and resume fading (Core/Window.lua's LT.Window.MinimapButton, like
+-- Chronicle's book). Paused, the icon is greyed with a pause sign. Shown while Mirage is on.
+---------------------------------------------------------------------------
+
+local ICON = "Interface\\Icons\\Spell_Magic_LesserInvisibilty"
+local button
+
+local function ButtonOnEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	GameTooltip:SetText("Mirage", 1, 0.82, 0)
+	if M:IsPaused() then
+		GameTooltip:AddLine(L["Paused: the interface stays visible."], 1, 0.6, 0.2)
+		GameTooltip:AddLine(L["Click: fade again when idle"], 0.8, 0.8, 0.8)
+	else
+		GameTooltip:AddLine(L["Fades the interface when you're idle."], 1, 1, 1)
+		GameTooltip:AddLine(L["Click: pause (the interface stays)"], 0.8, 0.8, 0.8)
+	end
+	GameTooltip:AddLine(L["Right-click: settings"], 0.8, 0.8, 0.8)
+	GameTooltip:AddLine(L["Drag: move it along the minimap"], 0.8, 0.8, 0.8)
+	GameTooltip:Show()
+end
+
+local function ButtonOnClick(self, mouseButton)
+	if mouseButton == "RightButton" then
+		LT:OpenSettings(M)
+	else
+		M:SetPaused(not M:IsPaused())
+		if self:IsMouseOver() then
+			ButtonOnEnter(self)
+		end
+	end
+end
+
+-- Mirage on or off, the setting, pausing (always cheap).
+function M:UpdateButton()
+	local show = self.enabled and self.db.minimapButton and Minimap ~= nil
+	if show and not button then
+		button = LT.Window.MinimapButton("LefthyToolsMirageMinimapButton", { icon = ICON, db = self.db,
+			angleKey = "minimapAngle", angle = 185, onClick = ButtonOnClick, onEnter = ButtonOnEnter })
+		button.Pause = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline")
+		button.Pause:SetPoint("CENTER", button.Icon, "CENTER", 0, 0)
+		button.Pause:SetText("II")
+	end
+	if button then
+		button:SetShown(show)
+		if show then
+			button:Place()
+			local paused = self:IsPaused()
+			button.Icon:SetDesaturated(paused)
+			button.Icon:SetAlpha(paused and 0.6 or 1)
+			button.Pause:SetShown(paused)
+		end
+	end
+end
+
+function M:MinimapButton()
+	return button
+end
+
 function M:BuildOptions(o)
+	o:Checkbox("minimapButton", L["Minimap button"],
+		L["A button on the edge of the minimap: click pauses fading (the interface stays) and resumes it, right-click opens these settings. Drag it to move it. /mirage pause does the same."])
+
 	o:Header(L["Timing"])
 	o:Slider("delay", L["Idle delay"],
 		L["How long you must be inactive before the interface starts fading."],
@@ -64,6 +127,7 @@ end
 local HELP = {
 	"/mirage - open settings",
 	"/mirage on | off | toggle - enable or disable the module",
+	"/mirage pause - pause fading (the interface stays) or resume it, like the minimap button",
 	"/mirage delay <0-30 seconds> - idle time before fading starts",
 	"/mirage fade <0-10 seconds> - how long the fade-out takes",
 	"/mirage fadein <0-2 seconds> - how long the fade-in takes",
@@ -105,6 +169,8 @@ local function Status()
 		state = "disabled"
 	elseif s.peek then
 		state = "peeking (key held)"
+	elseif s.paused then
+		state = "paused (the interface stays visible)"
 	elseif s.reason then
 		state = "visible: " .. s.reason
 	elseif s.idleFor < db.delay then
@@ -131,6 +197,13 @@ function M:OnSlashCommand(msg)
 		LT:SetModuleEnabled(self.key, cmd == "on")
 	elseif cmd == "toggle" then
 		LT:ToggleModule(self.key)
+	elseif cmd == "pause" or cmd == "resume" then
+		if not self.enabled then
+			self:Print("Mirage is off: /mirage on switches it on.")
+			return
+		end
+		self:SetPaused(cmd == "pause" and not self:IsPaused())
+		self:Print(self:IsPaused() and "paused: the interface stays visible." or "fading again when idle.")
 	-- (the sliders' ranges: a value beyond them would be clamped and written back by an open settings page)
 	elseif cmd == "delay" then
 		SetNumber("delay", arg, 0, 30, "Idle delay", Seconds)
