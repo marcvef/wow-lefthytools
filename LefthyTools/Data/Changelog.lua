@@ -182,5 +182,8 @@ ns.CHANGELOG = {
 	{ id = 58, module = "tweaks",
 		en = { "Friends on your flight, tidier", "The top bar shows each friend in three lines that stay put: who and where, their quest, and their fight, which fades in and out." },
 		de = { "Freunde im Flug, aufgeräumt", "Der obere Balken zeigt jeden Freund in drei festen Zeilen: wer und wo, die Quest und der Kampf, der ein- und ausblendet." } },
+	{ id = 59, module = "tweaks",
+		en = { "Combo points: coloured, on your target", "Forever's personal resource display shows combo points now, so LefthyTools' own row is gone: the colouring by count goes onto Blizzard's. New: a small dot right of your target's level on its nameplate, in that colour, with the number of points." },
+		de = { "Combopunkte: gefärbt, an deinem Ziel", "Die persönliche Ressourcenanzeige in Forever zeigt jetzt Combopunkte, deshalb ist die eigene Reihe von LefthyTools weg: das Färben nach Anzahl gilt jetzt für Blizzards. Neu: ein kleiner Punkt rechts neben dem Level an der Namensplakette deines Ziels, in dieser Farbe, mit der Anzahl der Punkte." } },
 	-- New entries go here, at the end.
 }
