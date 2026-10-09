@@ -206,5 +206,11 @@ ns.CHANGELOG = {
 	{ id = 66, module = "mirage",
 		en = { "Mirage: pause from the minimap", "A button on the minimap's edge while Mirage is on: click it to pause fading (the interface stays, the icon greys out), click again to fade when idle again. Right-click opens Mirage's settings. /mirage pause does the same." },
 		de = { "Mirage: Pause an der Minimap", "Ein Button am Rand der Minimap, solange Mirage an ist: ein Klick pausiert das Ausblenden (das Interface bleibt, das Symbol wird grau), ein zweiter blendet wieder aus, wenn du nichts tust. Rechtsklick öffnet die Einstellungen von Mirage. /mirage pause macht dasselbe." } },
+	{ id = 67, module = "tweaks",
+		en = { "Flights: six friends, top and bottom", "On a cinematic flight three friends fit in the top bar and three more in the bottom one; the time left moves to its right end while they're there." },
+		de = { "Flüge: sechs Freunde, oben und unten", "Auf einem Flug im Kinomodus passen drei Freunde in die obere Leiste und drei weitere in die untere; die Restzeit rückt dann an ihr rechtes Ende." } },
+	{ id = 68, module = "tweaks",
+		en = { "Flights: shared items can be hovered", "An item a friend shows you during a cinematic flight now has its tooltip when you hover it in the subtitles, and a click opens it (the film waits until you close it)." },
+		de = { "Flüge: geteilte Items mit Tooltip", "Ein Item, das dir ein Freund während eines Flugs im Kinomodus zeigt, hat jetzt seinen Tooltip, wenn du in den Untertiteln mit der Maus darauf zeigst, und ein Klick öffnet es (der Film wartet, bis du es schließt)." } },
 	-- New entries go here, at the end.
 }
