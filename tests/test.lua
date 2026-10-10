@@ -5262,9 +5262,21 @@ do
 	-- (deaths come first), besides the picker's and the switch's.
 	check(icons(skull) >= 4 and icons(bossIcon) == 1, "symbols: the day's most notable on each line, got "
 		.. icons(skull) .. " skulls, " .. icons(bossIcon) .. " dragons")
-	local today = table.concat(hover(date("%Y-%m-%d")).lines, "\n")
-	check(today:find("Defeated Murloc King", 1, true) and today:find("Died to Hogger", 1, true) and today:find("and %d+ more"),
-		"the day's tooltip: everyone's highlights (two of a kind), got\n" .. today)
+	-- A symbol's tooltip: only that person's moments that day; the day's: everyone's value and small icons.
+	local annaSymbol, daySpot
+	for i = 1, canvas.used.hover do
+		local f = canvas.pools.hover[i]
+		local text = table.concat(f.lines or {}, "\n")
+		if f.raised and text:find("Murloc King", 1, true) then annaSymbol = text end
+		if not f.raised and f.lines and f.lines[1] == date("%Y-%m-%d") and not daySpot then daySpot = text end
+	end
+	local _, annaDeaths = (annaSymbol or ""):gsub("Died", "")
+	check(annaSymbol and annaSymbol:find("Anna", 1, true) and annaSymbol:find("Defeated Murloc King", 1, true)
+		and not annaSymbol:find("Carl", 1, true) and not annaSymbol:find("Died to Hogger", 1, true) and annaDeaths <= 2,
+		"hovering Anna's symbol: only her moments that day (two of a kind), got\n" .. tostring(annaSymbol))
+	check(daySpot and daySpot:find("Carl", 1, true) and daySpot:find("Anna", 1, true) and not daySpot:find("Defeated", 1, true)
+		and not daySpot:find("Died to", 1, true) and daySpot:find("Hover a symbol for what happened.", 1, true),
+		"the day's tooltip: a line each, small icons instead of the moments, got\n" .. tostring(daySpot))
 	click(hoverWith("Quests", "Click: show this"))
 	check(hoverWith("Quests", "Shown now") and drawn("Quests, adding up") and drawn("|cffffffffAdding up|r"),
 		"picking quests: the big chart shows them, adding up")

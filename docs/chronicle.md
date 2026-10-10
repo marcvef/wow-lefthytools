@@ -176,9 +176,12 @@ the open one's button greyed out:
   that day: at the bottom). The kinds, most notable first (`G.MARK_KINDS`): death, boss, level
   (every tenth only), first dungeon visit, rare, epic loot, achievement, mount, gold milestone;
   from my characters' journals and `C.FriendNews()` (matched to accounts by character name;
-  `compareState.marks`, built in `Window.lua` on each draw). The day's tooltip lists everyone's
-  value and highlights (two of a kind, six at most, "and N more"). The symbols switch's tooltip
-  is the legend; off: `compareState.noMarks`. A click on a day of a small chart shows that chart
+  `compareState.marks`, built in `Window.lua` on each draw). Two kinds of tooltip (one listing
+  everything was far too big): a symbol's own (a raised hover area, `Canvas:Hover(..., raised)`,
+  above the day's): that person's moments of the day only (two of a kind, five at most, "and N
+  more"; symbols within 8 px of each other share one); the day's: a line per person with the value
+  and up to three small icons, one per kind, and "Hover a symbol for what happened." The symbols
+  switch's tooltip is the legend; off: `compareState.noMarks`. A click on a day of a small chart shows that chart
   big, scrolled to the top. The
   Leaderboard of the last 7 days (`C.Leaderboard`: nine categories, top three each, gold, silver,
   bronze; the Martin award), a grid of line charts (time played, XP, quests, killing blows per day;

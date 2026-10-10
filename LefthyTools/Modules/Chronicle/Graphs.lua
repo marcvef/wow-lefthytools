@@ -178,7 +178,8 @@ local function HoverEnter(self)
 	GameTooltip:Show()
 end
 
-function Canvas:Hover(x, y, w, h, lines, onClick)
+-- raised: above the other hover areas (a symbol on a chart, inside its day's area).
+function Canvas:Hover(x, y, w, h, lines, onClick, raised)
 	local f = Take(self, "hover", function()
 		local frame = CreateFrame("Frame", nil, self.parent)
 		frame:EnableMouse(true)
@@ -194,7 +195,8 @@ function Canvas:Hover(x, y, w, h, lines, onClick)
 	f:ClearAllPoints()
 	f:SetPoint("TOPLEFT", self.parent, "TOPLEFT", x, -y)
 	f:SetSize(math.max(w, 1), math.max(h, 1))
-	f.lines, f.onClick = lines, onClick
+	f:SetFrameLevel(self.parent:GetFrameLevel() + (raised and 4 or 1)) -- (a reused one may have been raised)
+	f.lines, f.onClick, f.raised = lines, onClick, raised
 	return f
 end
 
@@ -958,47 +960,81 @@ local function LineChart(canvas, x, y, w, h, chart, people, days, state, opts)
 			marked[#marked + 1] = { p = p, values = {} }
 		end
 	end
+	-- A symbol's own tooltip: only that person's moments of the day (two of a kind at most, so five
+	-- deaths don't hide the boss; five in all). Symbols on the same spot share one.
+	local function DayTitle(day)
+		return date(L["%Y-%m-%d"], time({ year = tonumber(day:sub(1, 4)), month = tonumber(day:sub(6, 7)),
+			day = tonumber(day:sub(9, 10)), hour = 12 }))
+	end
+	local function Moments(lines, p, list)
+		lines[#lines + 1] = Named(p)
+		local shown, ofKind = 0, {}
+		for _, m in ipairs(list) do
+			ofKind[m.rank] = (ofKind[m.rank] or 0) + 1
+			if ofKind[m.rank] <= 2 and shown < 5 then
+				lines[#lines + 1] = G.IconText(m.icon) .. " " .. m.text
+				shown = shown + 1
+			end
+		end
+		if #list > shown then
+			lines[#lines + 1] = "|cff888888" .. L["... and %d more"]:format(#list - shown) .. "|r"
+		end
+	end
+	local spots = {}
 	for _, s in ipairs(marked) do
 		local byDay = marks[s.p.key]
 		for i, day in ipairs(byDay and days or {}) do
 			local list = byDay[day]
 			if list then
 				table.sort(list, function(a, b) return a.rank < b.rank or (a.rank == b.rank and a.t > b.t) end)
-				canvas:Icon(list[1].icon, X(i) - 7, Y(s.values[i] or lo) - 7, 14)
+				local mx, my = X(i), Y(s.values[i] or lo)
+				canvas:Icon(list[1].icon, mx - 7, my - 7, 14)
+				local spot
+				for _, other in ipairs(spots) do
+					if math.abs(other.x - mx) < 8 and math.abs(other.y - my) < 8 then
+						spot = other
+						break
+					end
+				end
+				if not spot then
+					spot = { x = mx, y = my, lines = { DayTitle(day) } }
+					spots[#spots + 1] = spot
+					canvas:Hover(mx - 8, my - 8, 16, 16, spot.lines, nil, true)
+				end
+				Moments(spot.lines, s.p, list) -- (the hover shows its lines table as it is when hovered)
 			end
 		end
 	end
-	-- Day labels under the plot, and a hover per day with everyone's value (and highlights).
+	-- Day labels under the plot, and a hover per day: everyone's value, small icons for what
+	-- happened (a symbol's own hover tells what).
 	local step = n <= 7 and 1 or n <= 14 and 2 or 5
 	local slot = iw / math.max(n - 1, 1)
 	for i, day in ipairs(days) do
-		local t = time({ year = tonumber(day:sub(1, 4)), month = tonumber(day:sub(6, 7)), day = tonumber(day:sub(9, 10)), hour = 12 })
 		if (n - i) % step == 0 then
-			canvas:Text(date("%d", t), X(i) - 12, iy + plotH + 2, "GameFontHighlightSmall", "CENTER", 24)
+			canvas:Text(day:sub(9, 10), X(i) - 12, iy + plotH + 2, "GameFontHighlightSmall", "CENTER", 24)
 		end
-		local lines = { date(L["%Y-%m-%d"], t) }
-		local rows = {}
+		local lines = { DayTitle(day) }
+		local rows, anyMoments = {}, false
 		for _, s in ipairs(marked) do
 			local v, list = s.values[i], marks[s.p.key] and marks[s.p.key][day]
 			if v ~= nil or list then
-				rows[#rows + 1] = { p = s.p, v = v }
+				rows[#rows + 1] = { p = s.p, v = v, list = list }
 			end
 		end
 		table.sort(rows, function(a, b) return (a.v or -math.huge) > (b.v or -math.huge) end)
 		for _, row in ipairs(rows) do
-			lines[#lines + 1] = Named(row.p) .. (row.v and ("  " .. G.ValueText(chart.key, row.v)) or "")
-			-- Their highlights: two of a kind at most (five deaths don't hide the boss), six in all.
-			local list, shown, ofKind = marks[row.p.key] and marks[row.p.key][day] or {}, 0, {}
-			for _, m in ipairs(list) do
-				ofKind[m.rank] = (ofKind[m.rank] or 0) + 1
-				if ofKind[m.rank] <= 2 and shown < 6 then
-					lines[#lines + 1] = G.IconText(m.icon) .. " |cffaaaaaa" .. m.text .. "|r"
-					shown = shown + 1
+			local icons, kinds, count = "", {}, 0
+			for _, m in ipairs(row.list or {}) do
+				if not kinds[m.rank] and count < 3 then -- (each kind once, three at most)
+					kinds[m.rank], count = true, count + 1
+					icons = icons .. (count == 1 and "  " or " ") .. G.IconText(m.icon, 12)
 				end
 			end
-			if #list > shown then
-				lines[#lines + 1] = "|cff888888" .. L["... and %d more"]:format(#list - shown) .. "|r"
-			end
+			anyMoments = anyMoments or row.list ~= nil
+			lines[#lines + 1] = Named(row.p) .. (row.v and ("  " .. G.ValueText(chart.key, row.v)) or "") .. icons
+		end
+		if anyMoments then
+			lines[#lines + 1] = "|cff888888" .. L["Hover a symbol for what happened."] .. "|r"
 		end
 		if opts.pick then
 			lines[#lines + 1] = "|cff80c0ff" .. L["Click: show it big at the top"] .. "|r"
@@ -1027,7 +1063,7 @@ local function BigPicker(canvas, ix, iy, iw, chart, state, redraw)
 	end
 	-- From the right: the symbols switch, then per day | adding up.
 	local marksOn = not state.noMarks
-	local legend = { L["Symbols on the lines"], L["Everyone's most notable moment of the day. Hover a day for all of them."] }
+	local legend = { L["Symbols on the lines"], L["Everyone's most notable moment of the day. Hover a symbol for all of that day's."] }
 	for _, kind in ipairs(G.MARK_KINDS) do
 		legend[#legend + 1] = G.IconText(ICONS[kind]) .. " " .. MARK_LABEL[kind]()
 	end
