@@ -1021,7 +1021,7 @@ function C.FriendNews()
 	return list
 end
 
--- News from friends the journal hasn't shown yet (the Friends page marks them seen).
+-- News from friends the journal hasn't shown yet (the News page marks them seen).
 function C.UnseenCount()
 	if not store then
 		return 0

@@ -452,8 +452,8 @@ L["Weekly recap"] = "Wochenrückblick"
 L["Once a week, the first time you play: last week's leaderboard among you and your friends, in chat."] =
 	"Einmal pro Woche, beim ersten Spielen: die Bestenliste der letzten Woche unter dir und deinen Freunden, im Chat."
 L["Show friends' highlights in chat"] = "Highlights von Freunden im Chat zeigen"
-L["A chat line when a friend shares a highlight. They're always in Chronicle's Friends tab."] =
-	"Eine Chatzeile, wenn ein Freund ein Highlight teilt. Im Freunde-Tab von Chronicle stehen sie immer."
+L["A chat line when a friend shares a highlight. They're always in Chronicle's News tab."] =
+	"Eine Chatzeile, wenn ein Freund ein Highlight teilt. Im Tab Neues von Chronicle stehen sie immer."
 L["Journal"] = "Tagebuch"
 L["Open the journal"] = "Tagebuch öffnen"
 L["Minimap button"] = "Minimap-Button"
@@ -649,16 +649,18 @@ L["Just you so far"] = "Bisher nur du"
 L["Friends show up here once they run this LefthyTools: their journals come in whenever any friend who has them is online."] =
 	"Freunde erscheinen hier, sobald sie dieses LefthyTools nutzen: ihre Tagebücher kommen, sobald irgendein Freund online ist, der sie hat."
 L["Not online"] = "Nicht online"
-L["Offline"] = "Offline"
+L["News"] = "Neues"
+L["Where"] = "Wo"
+L["Doing"] = "Macht gerade"
 L["Name"] = "Name"
 L["BattleTag"] = "BattleTag"
 L["Last played"] = "Zuletzt gespielt"
 L["This week"] = "Diese Woche"
 L["%d characters"] = "%d Charaktere"
+L["1 character"] = "1 Charakter"
 L["Everyone with a journal is online, or no friend's journal has come yet."] =
 	"Alle mit Tagebuch sind online, oder es ist noch kein Tagebuch eines Freundes angekommen."
 L["Click: their graphs"] = "Klick: ihre Graphen"
-L["Not online: %d (Offline tab)"] = "Nicht online: %d (Tab Offline)"
 L["... and %d more"] = "... und %d weitere"
 L["%s this week"] = "%s diese Woche"
 

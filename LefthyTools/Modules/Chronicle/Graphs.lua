@@ -1370,81 +1370,54 @@ function G.DrawCompare(canvas, width, people, state, redraw)
 end
 
 ---------------------------------------------------------------------------
--- Offline: every friend's character that isn't online, a row each
+-- Tables (the Friends page: who's online, who isn't)
 ---------------------------------------------------------------------------
 
--- The columns, as parts of the width.
-local AWAY_COLUMNS = {
-	{ key = "name", w = 0.18, title = function() return L["Name"] end },
-	{ key = "level", w = 0.07, title = function() return L["Level"] end, right = true },
-	{ key = "account", w = 0.15, title = function() return L["BattleTag"] end },
-	{ key = "last", w = 0.15, title = function() return L["Last played"] end },
-	{ key = "week", w = 0.12, title = function() return L["This week"] end },
-	{ key = "latest", w = 0.33, title = function() return L["Latest news"] end },
-}
+local TABLE_ROW = 22
 
--- rows = { { person (C.People), week (seconds played in 7 days), latest = { icon, text, t } or nil } },
--- most recently played first; open(key): a click on a row (their graphs). Returns the page height.
-function G.DrawAway(canvas, width, rows, open)
-	canvas:Reset()
-	local rowH = 22
-	local h = HEADER + 4 + 20 + math.max(#rows, 1) * rowH + PAD
-	local ix, iy, iw, ih = Card(canvas, 0, 0, width, h, L["Not online"],
-		#rows > 0 and ("|cff999999" .. L["%d characters"]:format(#rows) .. "|r") or nil)
+-- One table in a card. t = { title, note, columns = { { title, w (part of the width), right } },
+-- rows = { { cells = { text | { icon, text } }, tip = { lines } (hover), click = fn } }, empty (text
+-- while there are no rows) }. Returns its height.
+local function Table(canvas, y, w, t)
+	local rows = t.rows
+	local h = HEADER + 4 + (#rows > 0 and (20 + #rows * TABLE_ROW) or 24) + PAD
+	local ix, iy, iw, ih = Card(canvas, 0, y, w, h, t.title, t.note)
 	if #rows == 0 then
-		Empty(canvas, ix, iy, iw, ih, L["Everyone with a journal is online, or no friend's journal has come yet."])
-		return h + 4
+		Empty(canvas, ix, iy, iw, ih, t.empty or "")
+		return h
 	end
-	local x = {}
-	local cx = ix
-	for i, column in ipairs(AWAY_COLUMNS) do
+	local x, cx = {}, ix
+	for i, column in ipairs(t.columns) do
 		x[i] = cx
-		canvas:Text("|cffffd200" .. column.title() .. "|r", cx, iy, "GameFontNormalSmall", column.right and "RIGHT" or "LEFT",
-			iw * column.w - 8)
+		canvas:Text("|cffffd200" .. column.title .. "|r", cx, iy, "GameFontNormalSmall", column.right and "RIGHT" or "LEFT", iw * column.w - 8)
 		cx = cx + iw * column.w
 	end
 	for r, row in ipairs(rows) do
-		local p = row.person
-		local ry = iy + 20 + (r - 1) * rowH
-		canvas:Rect(ix - 4, ry - 4, iw + 8, rowH, 1, 1, 1, r % 2 == 0 and 0.035 or 0, "BORDER")
-		local function Cell(i, text)
-			local column = AWAY_COLUMNS[i]
-			canvas:Text(text, x[i], ry, "GameFontHighlightSmall", column.right and "RIGHT" or "LEFT", iw * column.w - 8)
+		local ry = iy + 20 + (r - 1) * TABLE_ROW
+		canvas:Rect(ix - 4, ry - 4, iw + 8, TABLE_ROW, 1, 1, 1, r % 2 == 0 and 0.035 or 0, "BORDER")
+		for i, cell in ipairs(row.cells) do
+			local column = t.columns[i]
+			local cw = iw * column.w - 8
+			if type(cell) == "table" then -- an icon, then text
+				canvas:Icon(cell.icon, x[i], ry - 1, 14)
+				canvas:Text(cell.text, x[i] + 18, ry, "GameFontHighlightSmall", "LEFT", cw - 18)
+			else
+				canvas:Text(cell, x[i], ry, "GameFontHighlightSmall", column.right and "RIGHT" or "LEFT", cw)
+			end
 		end
-		Cell(1, LT.Window.ClassColorCode(p.classFile) .. (p.name or "?") .. "|r")
-		Cell(2, p.level and tostring(p.level) or "|cff666666-|r")
-		Cell(3, p.account and ("|cff80c0ff" .. p.account .. "|r") or "|cff666666-|r")
-		Cell(4, (p.last and p.last > 0) and C.Ago(p.last) or "|cff666666-|r")
-		Cell(5, row.week > 0 and C.Duration(row.week) or "|cff666666-|r")
-		local latest = row.latest
-		if latest then
-			canvas:Icon(latest.icon, x[6], ry - 1, 14)
-			canvas:Text("|cffcccccc" .. latest.text .. "|r  |cff888888" .. C.Ago(latest.t) .. "|r", x[6] + 18, ry,
-				"GameFontHighlightSmall", "LEFT", iw * AWAY_COLUMNS[6].w - 24)
-		else
-			Cell(6, "|cff666666-|r")
-		end
-		-- Hover: all of it (a long highlight is cut in its cell); click: their graphs.
-		local tip = { LT.Window.ClassColorCode(p.classFile) .. (p.name or "?") .. "|r" }
-		if p.level then
-			tip[#tip + 1] = L["Level %d"]:format(p.level) .. (p.realm and (" - " .. p.realm) or "")
-		end
-		if p.account then
-			tip[#tip + 1] = "|cff80c0ff" .. p.account .. "|r"
-		end
-		if p.last and p.last > 0 then
-			tip[#tip + 1] = L["Last played %s"]:format(C.Ago(p.last))
-		end
-		if row.week > 0 then
-			tip[#tip + 1] = L["%s this week"]:format(C.Duration(row.week))
-		end
-		if latest then
-			tip[#tip + 1] = G.IconText(latest.icon) .. " " .. latest.text .. "  |cff888888" .. date(L["%Y-%m-%d"], latest.t) .. "|r"
-		end
-		tip[#tip + 1] = "|cff80c0ff" .. L["Click: their graphs"] .. "|r"
-		canvas:Hover(ix - 4, ry - 4, iw + 8, rowH, tip, function() open(p.key) end)
+		canvas:Hover(ix - 4, ry - 4, iw + 8, TABLE_ROW, row.tip, row.click) -- (all of it: a long cell is cut)
 	end
-	return h + 4
+	return h
+end
+
+-- Tables one under the other (the window builds them). Returns the page height.
+function G.DrawTables(canvas, width, tables)
+	canvas:Reset()
+	local y = 0
+	for i, t in ipairs(tables) do
+		y = y + Table(canvas, y, width, t) + (i < #tables and CARD_GAP or 0)
+	end
+	return y + 4
 end
 
 G.METRICS = METRICS

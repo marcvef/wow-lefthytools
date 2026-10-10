@@ -1099,7 +1099,7 @@ function M:BuildOptions(o)
 	o:Checkbox("relay", L["Pass on friends' journals"],
 		L["Battle.net messages only reach friends who are online, so friends' clients pass each other's journals on: whoever is online brings the news of those who aren't. Only to people who have that player as a Battle.net friend too."])
 	o:Checkbox("friendsChat", L["Show friends' highlights in chat"],
-		L["A chat line when a friend shares a highlight. They're always in Chronicle's Friends tab."])
+		L["A chat line when a friend shares a highlight. They're always in Chronicle's News tab."])
 	o:Checkbox("catchUp", L["While you were away"],
 		L["A minute after you log in, a chat line with what friends did since you last played."])
 	o:Checkbox("weeklyRecap", L["Weekly recap"],

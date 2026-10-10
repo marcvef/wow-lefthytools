@@ -4821,14 +4821,18 @@ do
 	for _, v in ipairs(verdicts) do if values:find(v, 1, true) then verdict = v end end
 	check(verdict and labels:find("Martin tracker", 1, true), "the Martin tracker, with a verdict: " .. tostring(verdict))
 	check(not win.Tabs.stats:IsEnabled() and win.Tabs.timeline:IsEnabled(), "the open page's button is greyed out")
-	win.Tabs.friends:Click()
+	win.Tabs.news:Click()
 	local friendsPage = win.Text:GetText()
 	check(friendsPage:find("Anna|r: ", 1, true) and friendsPage:find("Defeated Hogger (Elwynn Forest)", 1, true),
-		"friends: their highlights")
-	check(friendsPage:find("|cffffd200Online now|r\n|cff40c7ebAnna|r  |cffccccccLevel 20", 1, true)
-		and friendsPage:find("Came online", 1, true) and friendsPage:find("Completed The Defias Brotherhood", 1, true)
-		and friendsPage:find("Discovered Westfall", 1, true),
-		"friends: who's online now and what they're doing, then what happened, got\n" .. friendsPage)
+		"news: friends' highlights")
+	check(friendsPage:find("Came online", 1, true) and friendsPage:find("Completed The Defias Brotherhood", 1, true)
+		and friendsPage:find("Discovered Westfall", 1, true), "news: what happened, got\n" .. friendsPage)
+	win.Tabs.friends:Click()
+	friendsPage = "" -- (the Friends page's tables: everything drawn on the canvas)
+	for i = 1, win.Canvas.used.text do friendsPage = friendsPage .. "\n" .. (win.Canvas.pools.text[i]:GetText() or "") end
+	check(win.Text:GetText() == "" and friendsPage:find("Online now", 1, true) and friendsPage:find("\n|cff40c7ebAnna|r\n", 1, true)
+		and friendsPage:find("Where|r", 1, true) and friendsPage:find("Doing|r", 1, true) and friendsPage:find("1 character|r", 1, true),
+		"friends: a table of who's online now, where they are and what they're doing, got\n" .. friendsPage)
 	me.daily[date("%Y-%m-%d", time() - 86400)] = { played = 3600, xp = 5000, quests = 3, kills = 20, deaths = 0, afk = 900 }
 	me.daily[date("%Y-%m-%d", time() - 20 * 86400)] = { played = 99, xp = 1, quests = 1, kills = 1, deaths = 0 }
 	local draws, draw = 0, CH.Graphs.Draw
@@ -5056,7 +5060,7 @@ do
 end
 
 section("Chronicle: friends' journals, also when they're offline")
-do
+;(function() -- (a function of its own: the main chunk's 200 locals)
 	local H = CH.Hash
 	local mine, annaAcct, bobAcct, carl, zed = H("Me#1111"), H("Annie#1234"), H("Bobby#2345"), H("Carl#3456"), H("Zed#9999")
 	check(mine:match("^%x%x%x%x%x%x%x%x$") and mine ~= annaAcct and H("annie#1234") == annaAcct and CH.MyAccount() == mine,
@@ -5200,9 +5204,9 @@ do
 	CH.UpdateMinimapButton()
 	check(CH.MinimapButton().New:IsShown(), "the book on the minimap gets a blue dot")
 
-	-- The journal: Friends shows who's online and what they all did; who isn't has a page of its own
-	-- (Offline); Compare has everyone in every graph.
-	CH.Open("friends")
+	-- The journal: News is what they all did; Friends everyone at a glance (who's online, who isn't,
+	-- a table each); Compare has everyone in every graph.
+	CH.Open("news")
 	local win = LefthyToolsChronicleFrame
 	local canvas = win.Canvas
 	local function drawn(text)
@@ -5215,19 +5219,22 @@ do
 		end
 	end
 	local page = win.Text:GetText()
-	check(not page:find("Not online|r", 1, true) and page:find("Not online: %d+ %(Offline tab%)") and page:find("What they did", 1, true),
-		"Friends: who's online, then the history at once; who isn't: one line pointing at the Offline tab, got\n" .. page)
-	check(page:find("Died to Hogger", 1, true) and CH.UnseenCount() == 0 and not CH.MinimapButton().New:IsShown(),
-		"their news is there; seen now: the dot goes")
-	CH.Open("offline")
-	check(not win.Tabs.offline:IsEnabled() and not win.Picker:IsShown() and win.Text:GetText() == "" and drawn("Not online")
-		and drawn("Last played") and drawn("BattleTag") and drawn("Carl|r") and drawn("Died to Hogger"),
-		"Offline: a table, a row per character not online (name, level, BattleTag, last played, this week, latest news)")
-	local carlRow
+	check(page:find("^|cffffd200What they did|r") and not page:find("Online now", 1, true) and not win.Picker:IsShown(),
+		"News: what they did, right at the top, got\n" .. page)
+	check(page:find("Died to Hogger", 1, true) and CH.UnseenCount() == 0 and not CH.MinimapButton().New:IsShown()
+		and win.Tabs.news.New:GetText() == "", "their news is there; seen now: the dot and the tab's count go")
+	CH.Open("friends")
+	check(not win.Tabs.friends:IsEnabled() and not win.Picker:IsShown() and win.Text:GetText() == "" and drawn("Online now")
+		and drawn("Where") and drawn("Doing") and drawn("Anna|r") and drawn("Not online") and drawn("Last played")
+		and drawn("BattleTag") and drawn("Carl|r") and drawn("Died to Hogger"),
+		"Friends: a table of who's online (where, doing) and one of who isn't (last played, this week, latest news)")
+	local carlRow, annaRow
 	for i = 1, canvas.used.hover do
 		local f = canvas.pools.hover[i]
 		if f.lines and f.lines[1]:find("Carl|r", 1, true) then carlRow = f end
+		if f.lines and f.lines[1]:find("Anna|r", 1, true) then annaRow = f end
 	end
+	check(annaRow and #annaRow.lines >= 3 and annaRow.onClick, "an online friend's row: their full status on hover, a click opens their graphs")
 	check(carlRow and table.concat(carlRow.lines, "\n"):find("Level 18", 1, true) and carlRow.lines[#carlRow.lines]:find("Click: their graphs", 1, true),
 		"hovering a row: all of it (a long highlight is cut in its cell)")
 	carlRow._scripts.OnMouseUp(carlRow, "LeftButton")
@@ -5344,7 +5351,7 @@ do
 	lefthy("enable chronicle")
 	Advance(125)
 	check(not printedSince(pmark):find("leaderboard", 1, true), "once a week")
-end
+end)()
 
 section("Chronicle: a broken tick doesn't run every frame")
 do

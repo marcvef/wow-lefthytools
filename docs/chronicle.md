@@ -100,7 +100,7 @@ forgotten (went offline, silent for 65 s, or switched Beacon off).
 `LefthyToolsChronicleFrame` (Core/Window.lua's template, 780 x 620), opened with `/chronicle`,
 `/lefthy chronicle`, the settings button, the key binding `LEFTHYTOOLS_CHRONICLE_TOGGLE` or the
 minimap button (`C.Open(page)` opens it on a page). Six pages: Timeline, Statistics, Graphs,
-Compare, Friends, Offline (tabs right to left from the top right corner, 80 px each, so six fit
+Compare, News, Friends (tabs right to left from the top right corner, 80 px each, so six fit
 right of the dropdown).
 
 **Minimap button** (`MinimapButton.lua`, setting `minimapButton`, on by default; `/chronicle
@@ -118,7 +118,7 @@ taints gamepad mode, see forever-platform.md): "Characters" (this one first, the
 name, "Name  Level 20", other realms named), then "Friends": every friend's character from
 `C.People()` (synced journals, with their BattleTag's name; older builds' days: "(friend)"), the
 picked one ticked. Picking a friend opens the Graphs page, the only one friends have. The list is
-built when it opens; a refresh only sets the button's text. A click elsewhere closes it. Hidden on the Friends, Compare and Offline pages. Then the pages,
+built when it opens; a refresh only sets the button's text. A click elsewhere closes it. Hidden on the News, Friends and Compare pages. Then the pages,
 the open one's button greyed out:
 
 - **Timeline:** newest first, a heading per day (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an
@@ -147,22 +147,25 @@ the open one's button greyed out:
   days (six tiles: time, XP, levels, quests, killing blows, deaths), You and <name> (two bars per
   number: time, XP, quests, kills; you in gold, them in blue), You and <name>, all time (from their
   profile) and Latest news (their last 6 feed entries with date).
-- **Friends:** "Online now" first: every Beacon friend in up to three lines (`B.FriendLines` in
-  Beacon's `Alerts.lua`, shared with the AFK screen: name, AFK, level and progress, group; zone
-  and distance; what they're fighting and their quest), one grey line "Not online: N (Offline
-  tab)" when there are any, then "What they did" right away (the user had to scroll past the
-  offline friends to reach it):
-  `C.FriendNews()` (synced highlights and live news, see below), as "Name: text", with a hint
-  about what will appear while it's empty. Showing it marks the news seen (`C.MarkFeedSeen`): the
-  tab's blue count and the book's blue dot (`C.UnseenCount`: news that came after
-  `store.feedSeenAt`) go. Redrawn when the feed changes (at most every 3 s) and every 5 s.
-- **Offline** (`G.DrawAway`, on the canvas): friends' characters not online (`C.People()`), most
-  recently played first, as a table in one card ("Not online", the count in its corner): Name (class
-  colour), Level, BattleTag (blue), Last played ("3 h ago"), This week (time played in 7 days),
-  Latest news (icon, text, how long ago; cut to its cell). Rows alternate faintly; hovering one
-  shows all of it (level and realm, BattleTag, last played, this week, the latest highlight with
-  its date); a click opens their graphs (`Select`). Redrawn like Graphs (on changes at most every
-  10 s, else every 30 s).
+- **News:** "What they did": `C.FriendNews()` (synced highlights and live news, see below), as
+  "Name: text", newest first by day, with a hint about what will appear while it's empty. Showing
+  it marks the news seen (`C.MarkFeedSeen`): the tab's blue count and the book's blue dot
+  (`C.UnseenCount`: news that came after `store.feedSeenAt`) go. Redrawn when the feed changes (at
+  most every 3 s). (Once one page with who's online, who isn't and the news; the user had to scroll
+  too far to reach the news, so they're separate now.)
+- **Friends:** everyone at a glance, two tables (`G.DrawTables` in Graphs.lua: a card each, a
+  header row, a row per entry with faint alternate stripes; a cell is text, cut to its width, or an
+  icon and text; a row's hover shows all of it, a click opens their graphs through `Select` when
+  they have a journal). **Online now**: Beacon's friends (`B.FriendList`, `B.FriendStatus` in
+  Alerts.lua): Name (class colour, <AFK>), Level (and progress), BattleTag (from their journal's
+  account), Where (zone - subzone, distance), Doing (dead or fighting, else the quest they track,
+  else "In your group"); the hover is `B.FriendLines` (the AFK screen's lines) plus the BattleTag
+  and their latest highlight. Beacon off or nobody online: a line says so. **Not online**:
+  friends' characters from their journals (`C.People()`), most recently played first: Name,
+  Level, BattleTag, Last played ("3 h ago"), This week (time played in 7 days), Latest news (icon,
+  text, how long ago); the hover adds the realm and the highlight's date. Each card's corner
+  counts the characters. Redrawn every 5 s (who's online and where changes all the time) and on
+  feed changes (at most every 3 s).
 - **Compare** (`G.DrawCompare`): people, not characters (`C.Accounts()`, see below): you and every
   friend in every graph. A toolbar: 7 / 14 / 30 days, and a chip per person (their colour: the class colour, a
   second of the same class lighter, a third darker; you marked "(you)"; hover: level, BattleTag

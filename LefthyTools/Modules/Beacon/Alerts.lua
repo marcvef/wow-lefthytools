@@ -118,6 +118,20 @@ function B.FriendLines(lines, peer, gameAccountID)
 	end
 end
 
+-- A friend's status in parts, for a table (Chronicle's Friends page): name (class colour, <AFK>),
+-- level (and progress), where (zone - subzone, distance, grey), doing (dead or fighting, else the
+-- quest they track, else "In your group"; nil: none of it).
+function B.FriendStatus(peer, gameAccountID)
+	local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
+	local level = info and info.characterLevel or peer.level
+	return {
+		name = ColouredName(peer) .. ((info and info.isGameAFK) and " |cff999999<AFK>|r" or ""),
+		level = level and (peer.xpPercent and ("%d |cff999999(%d%%)|r"):format(level, peer.xpPercent) or tostring(level)),
+		where = Where(peer, gameAccountID),
+		doing = FightText(peer) or QuestText(peer) or (peer.groupUnit and ("|cff4da6ff" .. L["In your group"] .. "|r")),
+	}
+end
+
 -- A friend in three parts that keep their place (the cinematic flight's top bar): who and where;
 -- the quest they track (nil: none); fighting or dead (nil: neither).
 function B.FriendRows(peer, gameAccountID)
