@@ -40,13 +40,15 @@ bag's menu; 70291 also stopped showing that bar on the bags). So nobody had a wa
 function isn't called any more; `ContainerFrames()`: the combined bags and every
 `ContainerFrameN`) show the button on the backpack or the combined bags, at the left end of the search row: where
 the search box starts (Blizzard's TOPLEFT point, "x - 4, y + 3"), the search box moved right by 32 px
-and made as much narrower (its width as Blizzard set it is told apart from ours, so repeated updates
-don't shrink it again). Blizzard's old spot (TOPRIGHT -9, -34) collides with something of
+and made as much narrower (its width and place as Blizzard set them are told apart from ours,
+`lefthyWidth` and `lefthyX`, so repeated updates don't shrink it again, and opening the bags
+without Blizzard placing it again, after Alt+Z for one, doesn't move it twice). Blizzard's old spot (TOPRIGHT -9, -34) collides with something of
 Forever's frame art. If the search box isn't anchored that way: left of it; without one: TOPLEFT
 38, -34. Above the frame. Blizzard's click handler is untouched
 (`C_Container.SortBags`). A client without `BagItemAutoSortButton` gets ours
 (`LefthyToolsBagSortButton`: the `bags-button-autosort-up` atlas, the sorting sound,
-`C_Container.SortBags`). Off: the search box's width back, `UpdateSearchBox` again (as Blizzard has it), ours hidden. The key
+`C_Container.SortBags`). Off: the search box's width and place back (also with the bags closed),
+`UpdateSearchBox` again (as Blizzard has it), ours hidden and taken off the bag. The key
 still says gamepad (it began there).
 
 ## questAnnounce: quest progress in party chat
@@ -341,7 +343,9 @@ left alone (a first version pulled it back and circled; that was removed).
 
 - **Destination:** a post-hook on `TakeTaxiNode(slot)` (the flight map and the old taxi window
   both call it) keeps `TaxiNodeName(slot)` ("Sentinel Hill, Westfall"). The zone you take off in
-  gets no card of its own. After a `/reload` mid-flight the current zone's card stands in.
+  gets no card of its own. After a `/reload` mid-flight the current zone's card stands in. Landing
+  (`PLAYER_CONTROL_GAINED`) drops a pick the film never used, so a flight not taken from the taxi
+  map (a quest's) doesn't get the last one's name and time.
 - **Time left:** the game doesn't tell. The same hook reads the taxi map (`GetTaxiMapID`,
   `C_TaxiMap.GetAllTaxiNodes`): the node you're at (state `Current`) names the route ("From >
   To"), and each slot's `nodeID`. Best first:
@@ -388,8 +392,10 @@ left alone (a first version pulled it back and circled; that was removed).
   `GameTooltip` sits on the hidden interface); links without a tooltip (map pins) show none. A click
   pauses the film (the interface is back) and opens the link like a chat link (`SetItemRef`; an item
   with a modifier through Beacon's `B.ModifiedItemClick`: no dressing room from addon code in
-  gamepad mode); the film waits while `ItemRefTooltip` shows (the dressing room counts as a window)
-  and resumes 2 s after.
+  gamepad mode). In gamepad mode not `SetItemRef` at all (it opens `ItemRefTooltip` with
+  `ShowUIPanel`, which from addon code taints the focus manager): an item's tooltip is shown
+  directly, other links do nothing. The film waits while `ItemRefTooltip` shows (the dressing room
+  counts as a window) and resumes 2 s after.
 - **Friends' fight streams** (Beacon setting `streamFlights`, see beacon.md "Fight stream"): at
   takeoff (`Start`) `B.StreamFlightStart()` opens one friend's stream (the busiest, else a random
   one who can be watched); in the top bar, right of each such friend's name, a small button

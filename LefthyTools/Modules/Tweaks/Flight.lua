@@ -284,8 +284,20 @@ local function LinkClick(_, link, text, button)
 		Pause()
 	end
 	local B = ns.Beacon
-	if type(link) == "string" and link:find("^item:") and IsModifiedClick() and B and B.ModifiedItemClick then
+	local isItem = type(link) == "string" and link:find("^item:") ~= nil
+	if isItem and IsModifiedClick() and B and B.ModifiedItemClick then
 		B.ModifiedItemClick(text or link)
+	elseif InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() then
+		-- Gamepad mode: not SetItemRef (it opens the tooltip with ShowUIPanel, which from addon code
+		-- taints the gamepad's focus manager): the item's tooltip shown directly; other links nothing.
+		if isItem and ItemRefTooltip then
+			if not ItemRefTooltip:IsShown() then
+				ItemRefTooltip:SetOwner(UIParent, "ANCHOR_PRESERVE")
+			end
+			if pcall(ItemRefTooltip.SetHyperlink, ItemRefTooltip, link) then
+				ItemRefTooltip:Show()
+			end
+		end
 	else
 		SetItemRef(link, text, button)
 	end
@@ -834,6 +846,9 @@ events:SetScript("OnEvent", function(_, event, ...)
 		if flying or trip then
 			driver:Show() -- landed: the driver notices on its next check
 		end
+		-- A route picked for a flight whose film never started (dismissed, in combat) isn't the next
+		-- one's: a flight not taken from the taxi map (a quest's) would get its name and time.
+		picked, takeoffAt = nil, nil
 	elseif event == "PLAYER_ENTERING_WORLD" then
 		Look() -- a /reload, or a loading screen mid-flight
 	elseif event == "ZONE_CHANGED_NEW_AREA" then

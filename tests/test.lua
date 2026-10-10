@@ -753,6 +753,15 @@ do
 	BagItemAutoSortButton:Hide()
 	ContainerFrameCombinedBags:Show() -- (opening the bags: also when UpdateSearchBox isn't called)
 	check(BagItemAutoSortButton:IsShown(), "opening the bags: there")
+	check(select(4, BagItemSearchBox:GetPoint(1)) == 74 and BagItemSearchBox:GetWidth() == 98,
+		"opened again without Blizzard placing the search box (Alt+Z, ...): not moved over twice, got "
+		.. tostring(select(4, BagItemSearchBox:GetPoint(1))))
+	ContainerFrameCombinedBags:Hide()
+	lefthy("tweaks bagsort off"); Advance(0.05)
+	check(select(4, BagItemSearchBox:GetPoint(1)) == 42 and BagItemSearchBox:GetWidth() == 130,
+		"switched off with the bags closed: the search box back too")
+	lefthy("tweaks bagsort on"); Advance(0.05)
+	ContainerFrameCombinedBags:Show()
 	lefthy("tweaks bagsort off"); Advance(0.05)
 	check(TDB.gamepadBagSort == false and not BagItemAutoSortButton:IsShown() and BagItemSearchBox:GetWidth() == 130
 		and select(4, BagItemSearchBox:GetPoint(1)) == 42, "/lefthy tweaks bagsort off: hidden again, the search box as Blizzard has it")
@@ -4095,6 +4104,17 @@ do
 		ItemRefTooltip:Hide()
 		Advance(2.6)
 		check(film:IsShown(), "closed: the film comes back")
+		-- Gamepad mode: not through SetItemRef (its ShowUIPanel from addon code taints the focus manager).
+		local clicked = #LINKS_CLICKED
+		GAMEPAD_STATE.ui = true
+		lines._scripts.OnHyperlinkClick(lines, link, "[Item]", "LeftButton")
+		GAMEPAD_STATE.ui = false
+		Advance(0.3)
+		check(#LINKS_CLICKED == clicked and ItemRefTooltip:IsShown() and ItemRefTooltip._hyperlink == link and not film:IsShown(),
+			"gamepad mode: the item's tooltip shown directly, the film waits")
+		ItemRefTooltip:Hide()
+		Advance(2.6)
+		check(film:IsShown(), "closed: back again")
 	end
 	Advance(2.1)
 	anna("I2;6948::::::::20:::::;6161")
@@ -4107,7 +4127,7 @@ do
 	anna("R2;6161;Bob:0")
 	Advance(0.3)
 	check(film.Subtitles:GetText():find("Bob wins!", 1, true), "and the outcome comes as a subtitle, got " .. tostring(film.Subtitles:GetText()))
-	Advance(56.6) -- 4222 yd in 70 s: much faster than the rest (5.9 s went to the item link above)
+	Advance(53.4) -- 4222 yd in 70 s: much faster than the rest (8.8 s went to the item link above)
 	TRAVEL.taxi = false
 	Fire("PLAYER_CONTROL_GAINED")
 	Advance(0.5)

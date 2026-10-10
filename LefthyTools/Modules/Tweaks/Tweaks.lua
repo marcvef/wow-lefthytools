@@ -355,8 +355,12 @@ local function ShowSortButton(frame)
 		end
 		if point == "TOPLEFT" and relative == frame and relativePoint == "TOPLEFT" then
 			local width = SearchWidth(search)
+			if search.lefthyX and math.abs(x - search.lefthyX) < 0.5 then
+				x = x - SORT_ROOM -- (still where we put it, Blizzard didn't place it again: not moved twice)
+			end
 			search:ClearAllPoints()
 			search:SetPoint("TOPLEFT", frame, "TOPLEFT", x + SORT_ROOM, y)
+			search.lefthyX = x + SORT_ROOM
 			search.lefthyWidth = math.max(40, width - SORT_ROOM)
 			search:SetWidth(search.lefthyWidth)
 			button:SetPoint("TOPLEFT", frame, "TOPLEFT", x - 4, y + 3)
@@ -370,7 +374,28 @@ local function ShowSortButton(frame)
 	end
 end
 
+-- Off: the search box as Blizzard had it, its width and its place (also with the bags closed:
+-- Blizzard may not place it again when they open).
+local function RestoreSearchBox()
+	local search = BagItemSearchBox
+	if not (search and search.lefthyWidth) then
+		return
+	end
+	search:SetWidth(SearchWidth(search))
+	if search.lefthyX and search:GetNumPoints() == 1 then
+		local point, relative, relativePoint, x, y = search:GetPoint(1)
+		if point == "TOPLEFT" and math.abs(x - search.lefthyX) < 0.5 then
+			search:ClearAllPoints()
+			search:SetPoint(point, relative, relativePoint, x - SORT_ROOM, y)
+		end
+	end
+	search.lefthyWidth, search.lefthyX = nil, nil
+end
+
 local function ApplyGamepadBagSort(on)
+	if not on then
+		RestoreSearchBox()
+	end
 	for _, frame in ipairs(ContainerFrames()) do
 		if on and not sortHooked[frame] then
 			sortHooked[frame] = true
@@ -382,15 +407,13 @@ local function ApplyGamepadBagSort(on)
 		if on then
 			ShowSortButton(frame)
 		elseif frame:IsShown() and frame.UpdateSearchBox then
-			if BagItemSearchBox and BagItemSearchBox.lefthyWidth then
-				BagItemSearchBox:SetWidth(SearchWidth(BagItemSearchBox)) -- (its width back)
-				BagItemSearchBox.lefthyWidth = nil
-			end
 			frame:UpdateSearchBox() -- off: as Blizzard has it
 		end
 	end
 	if not on and ownSortButton then
 		ownSortButton:Hide()
+		ownSortButton:ClearAllPoints()
+		ownSortButton:SetParent(UIParent) -- (not left on a bag)
 	end
 end
 
