@@ -215,5 +215,8 @@ ns.CHANGELOG = {
 	{ id = 69, module = "tweaks",
 		en = { "Combo gem: display's look, your place", "The combo point gem on your target's nameplate is now copied from the personal resource display's own, border and all, and smaller. Three new sliders set its size and where it sits; while you move them it shows on your target." },
 		de = { "Combopunkt: Anzeige-Look, dein Platz", "Der Combopunkt an der Namensplakette deines Ziels ist jetzt eine Kopie des Punkts der persönlichen Ressourcenanzeige, mit Rand, und kleiner. Drei neue Regler bestimmen Größe und Position; während du sie bewegst, zeigt er sich an deinem Ziel." } },
+	{ id = 70, module = "tweaks",
+		en = { "Combo gem: place it without a mob", "Try it (Misc Tweaks, or /lefthy tweaks combopos) opens a small window with a nameplate: drag the combo point gem where you want it, the mouse wheel over it changes its size, the arrows nudge it. No mob needed, and the settings can be closed." },
+		de = { "Combopunkt: platzieren ohne Mob", "Ausprobieren (Misc Tweaks, oder /lefthy tweaks combopos) öffnet ein kleines Fenster mit einer Namensplakette: zieh den Combopunkt dorthin, wo du ihn haben willst, das Mausrad darüber ändert seine Größe, die Pfeile verschieben ihn. Kein Mob nötig, und die Einstellungen können zu sein." } },
 	-- New entries go here, at the end.
 }
