@@ -1495,6 +1495,43 @@ Advance(1.2)
 local extras = 0
 for id in pairs(peers()) do if id > 100 then extras = extras + 1 end end
 check(extras == 0, "friends that left the friend list are forgotten")
+-- 60 friends in WoW without LefthyTools: greeted, but behind everything live.
+for i = 1, 60 do
+	BN_FRIENDS[#BN_FRIENDS + 1] = { { gameAccountID = 200 + i, isOnline = true, clientProgram = "WoW", wowProjectID = 1,
+		isInCurrentRegion = true, characterName = "Other" .. i, classFilename = "MAGE", characterLevel = 10,
+		areaName = "Westfall", playerGuid = "Player-1-" .. (200 + i) }, battleTag = "Other#" .. i }
+end
+local hellosFrom = #GAMEDATA + 1
+Fire("BN_FRIEND_ACCOUNT_ONLINE")
+for _ = 1, 150 do
+	if sentTo(201, hellosFrom, "H2")[1] then break end
+	Advance(0.1)
+end
+mark = #GAMEDATA + 1
+SlashCmdList.LEFTHYTOOLS_CHAT("hello there")
+Advance(0.3)
+check(sentTo(201, hellosFrom, "H2")[1] and sentTo(11, mark, "M2;")[1], "a chat line isn't held up by 60 hellos")
+Advance(8)
+local greeted = 0
+for i = 1, 60 do if sentTo(200 + i, hellosFrom, "H2")[1] then greeted = greeted + 1 end end
+check(greeted == 60, "and they're all greeted soon after, got " .. greeted)
+for i = 1, 60 do BN_FRIENDS[#BN_FRIENDS] = nil end
+-- A friend just found has no name until the next check: their first chat line waits for it.
+BN_FRIENDS[#BN_FRIENDS + 1] = { { gameAccountID = 300, isOnline = true, clientProgram = "WoW", wowProjectID = 1,
+	isInCurrentRegion = true, characterName = "Newbie", classFilename = "MAGE", characterLevel = 10,
+	areaName = "Westfall", playerGuid = "Player-1-300" }, battleTag = "Newbie#1" }
+Fire("BN_FRIEND_INFO_CHANGED")
+Advance(0.15) -- (a check right now: the next one a second later)
+pmark = #PRINTED + 1
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "M2;hello there", "WHISPER", 300)
+Advance(0.15)
+check(peers()[300] and not peers()[300].name, "a new friend, name not known yet")
+Advance(1.2)
+check(printedSince(pmark):find("Newbie|r|cffffb84d]: hello there", 1, true), "their first line shows once the name is known, got "
+	.. printedSince(pmark))
+BN_FRIENDS[#BN_FRIENDS] = nil
+Fire("BN_FRIEND_INFO_CHANGED")
+Advance(1.2)
 
 section("Beacon: a friend with a newer LefthyTools")
 local function infoRow(name)
@@ -1685,6 +1722,16 @@ check(not printedSince(pmark):find("died", 1, true) and #heard == heardBefore + 
 B("deathAlert"):SetValue(true)
 anna("S2;;0;260.0;750.0;Goldshire;")
 Advance(1.2)
+-- Sharing switched on while dead: her first real state says dead, but that's no news.
+Advance(10)
+pmark = #PRINTED + 1
+anna("S2;;;;;;")
+Advance(1.2)
+anna("S2;D;0;260.0;750.0;Goldshire;")
+Advance(0.15)
+check(not printedSince(pmark):find("died", 1, true), "sharing switched on while dead: no alert (she may have died before)")
+anna("S2;;0;260.0;750.0;Goldshire;")
+Advance(1.2)
 
 section("Beacon: map pings")
 check(BDB.pings == true and B("pings") ~= nil, "a setting, on by default")
@@ -1792,6 +1839,14 @@ Advance(0.15)
 lefthy("beacon ping clear")
 Advance(0.15)
 check(not BB.pings.me and not pingPin("me"), "/lefthy beacon ping clear")
+Advance(2.1)
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "P2;0;550.0;500.0;1429", "WHISPER", 11)
+Advance(0.15)
+check(BB.pings[11] and pingPin(11), "Anna pings again")
+B("pings"):SetValue(false)
+Advance(0.15)
+check(not BB.pings[11] and not pingPin(11) and not BB.GetMinimapPings()[11], "'Map pings' switched off: her marker goes at once")
+B("pings"):SetValue(true)
 pmark = #PRINTED + 1
 lefthy("beacon ping clear")
 check(printedSince(pmark):find("no ping out", 1, true), "nothing to take back: said so")
@@ -1929,8 +1984,9 @@ for _ = 1, 8 do
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 11)
 	Advance(0.3)
 end
-check(#sentTo(11, mark, "S2;") <= 1 and #sentTo(11, mark, "V2;") <= 1,
-	"repeated hellos get at most one answer per 5 s, got " .. #GameDataTo(11, mark) .. " messages")
+-- (counted by what only answers carry: a heartbeat state may fall in here too)
+check(#sentTo(11, mark, "F2;") <= 1 and #sentTo(11, mark, "V2;") <= 1,
+	"repeated hellos get at most one answer per 5 s, got " .. #GameDataTo(11, mark) .. " messages: " .. table.concat(GameDataTo(11, mark), " | "))
 Advance(10)
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;22;", "WHISPER", 11)
 Advance(0.15)
@@ -3176,6 +3232,7 @@ do
 	minute()
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 	for i = 1, 6 do lefthy("report " .. ("a long story, number " .. i .. ". "):rep(150)) end
+	check(#LefthyToolsDB.reportsOut == 6, "queued, but kept (a /reload now) until their last part has gone")
 	Advance(5) -- (the queue lets 10 a second go)
 	check(#sentTo(11, mark, "Z2;") == 32 and #LefthyToolsDB.reportsOut == 4, "six long reports (16 parts each): two go now, got "
 		.. #sentTo(11, mark, "Z2;") .. " parts")
@@ -4041,7 +4098,7 @@ do
 	end
 	Advance(2.1)
 	anna("I2;6948::::::::20:::::;6161")
-	Advance(0.3)
+	Advance(0.6) -- (Beacon's tick, then the film's check, a few times a second)
 	check(not film:IsShown() and UIParent:GetAlpha() == 1 and BB.calls["11:6161"].frame.Need:IsShown(),
 		"a friend's offer: the film pauses for its Need and Pass buttons")
 	BB.calls["11:6161"].frame.Pass:Click()

@@ -27,11 +27,12 @@ local FLUSH_GAP = 2
 local PARTS_PER_MINUTE, SENT_WINDOW = 45, 65
 local CLICKS = 8          -- the last links clicked, for hand-written reports
 
+local IN_FLIGHT_TIMEOUT = 120 -- a report whose last part hasn't gone out by then is sent again
 local assembling = {}     -- "<sender>:<id>" -> { sender, id, of, parts = {}, at }
 local errorsIn = {}       -- errors caught this session, waiting to become reports
 local clicks = {}         -- { at, link, result }
 local lastFlush = -math.huge
-local sentParts = {}      -- { at, count } per report sent lately
+local inFlight = {}       -- report (in reportsOut) -> when its parts were queued; it stays saved until they've gone
 local announced           -- what friends were last told about collecting
 
 local function Saved(key)
@@ -112,42 +113,64 @@ end
 -- Sending
 ---------------------------------------------------------------------------
 
+-- The first `limit` bytes of text, without splitting a UTF-8 character.
+local function Cut(text, limit)
+	local cut = math.min(#text, limit)
+	while cut < #text and cut > 1 and text:byte(cut + 1) >= 128 and text:byte(cut + 1) < 192 do
+		cut = cut - 1
+	end
+	return text:sub(1, cut)
+end
+
 -- The text in parts small enough for one message each (UTF-8 kept whole).
 local function Parts(text)
 	text = text:gsub("\r", ""):gsub("\n", "^"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("[|;%c]", "")
 	local parts = {}
 	while #text > 0 and #parts < MAX_PARTS do
-		local cut = math.min(#text, PART_BYTES)
-		while cut < #text and cut > 1 and text:byte(cut + 1) >= 128 and text:byte(cut + 1) < 192 do
-			cut = cut - 1 -- don't split a character
-		end
-		parts[#parts + 1] = text:sub(1, cut)
-		text = text:sub(cut + 1)
+		parts[#parts + 1] = Cut(text, PART_BYTES)
+		text = text:sub(#parts[#parts] + 1)
 	end
 	if #text > 0 then
-		parts[#parts] = parts[#parts]:sub(1, PART_BYTES - 3) .. "..."
+		parts[#parts] = Cut(parts[#parts], PART_BYTES - 3) .. "..."
 	end
 	return parts
 end
 
-local function Send(parts, to)
-	local db = LT.db
-	db.reportSeq = ((tonumber(db.reportSeq) or 0) % 9999) + 1
-	for _, gameAccountID in ipairs(to) do
-		for n, part in ipairs(parts) do
-			B.QueueLow(gameAccountID, ("Z%s;%d;%d;%d;%s"):format(B.VERSION, db.reportSeq, n, #parts, part))
+-- A report's last part went out: it's no longer kept.
+local function Delivered(report)
+	inFlight[report] = nil
+	local waiting = Saved("reportsOut")
+	for i = #waiting, 1, -1 do
+		if waiting[i] == report then
+			table.remove(waiting, i)
 		end
 	end
 end
 
--- Parts sent in the last SENT_WINDOW seconds (the old ones forgotten).
+-- Low priority; the report stays saved (a /reload, the collector gone) until its last part to one
+-- of them has actually been sent.
+local function Send(report, parts, to)
+	local db = LT.db
+	db.reportSeq = ((tonumber(db.reportSeq) or 0) % 9999) + 1
+	for _, gameAccountID in ipairs(to) do
+		for n, part in ipairs(parts) do
+			B.QueueLow(gameAccountID, ("Z%s;%d;%d;%d;%s"):format(B.VERSION, db.reportSeq, n, #parts, part),
+				n == #parts and function() Delivered(report) end or nil)
+		end
+	end
+end
+
+-- Parts sent in the last SENT_WINDOW seconds (the old ones forgotten). Saved: GetTime() goes on
+-- over a /reload, so a reload doesn't start the budget again (after a restart it's smaller: gone).
 local function RecentParts(now)
+	local sentParts = Saved("reportParts")
 	local total = 0
 	for i = #sentParts, 1, -1 do
-		if now - sentParts[i].at >= SENT_WINDOW then
+		local at = tonumber(sentParts[i].at)
+		if not at or now - at >= SENT_WINDOW or at > now then
 			table.remove(sentParts, i)
 		else
-			total = total + sentParts[i].count
+			total = total + (tonumber(sentParts[i].count) or 0)
 		end
 	end
 	return total
@@ -162,16 +185,27 @@ local function Flush()
 		return
 	end
 	local now = GetTime()
-	local room, sent = PARTS_PER_MINUTE - RecentParts(now), 0
-	while waiting[1] do
-		local parts = Parts(waiting[1].text)
-		if #parts > room then
-			break
+	local room, sent, more, empty = PARTS_PER_MINUTE - RecentParts(now), 0, 0, {}
+	for _, report in ipairs(waiting) do
+		local queued = inFlight[report]
+		local parts = not (queued and now - queued < IN_FLIGHT_TIMEOUT) -- (else still on its way)
+			and Parts(type(report) == "table" and type(report.text) == "string" and report.text or "")
+		if parts and #parts == 0 then
+			empty[#empty + 1] = report -- (nothing to send)
+		elseif parts then
+			if #parts > room then
+				room, more = 0, more + 1 -- (oldest first: the rest waits too)
+			else
+				inFlight[report] = now
+				Send(report, parts, to)
+				room, sent = room - #parts, sent + 1
+				local sentParts = Saved("reportParts")
+				sentParts[#sentParts + 1] = { at = now, count = #parts }
+			end
 		end
-		Send(parts, to)
-		room, sent = room - #parts, sent + 1
-		sentParts[#sentParts + 1] = { at = now, count = #parts }
-		table.remove(waiting, 1)
+	end
+	for _, report in ipairs(empty) do
+		Delivered(report)
 	end
 	if sent == 0 then
 		return
@@ -181,7 +215,7 @@ local function Flush()
 		names[#names + 1] = NameOf(gameAccountID)
 	end
 	M:Print(("%d report(s) sent to %s (they collect LefthyTools error reports)%s."):format(sent, table.concat(names, ", "),
-		#waiting > 0 and (", %d more in a moment"):format(#waiting) or ""))
+		more > 0 and (", %d more in a moment"):format(more) or ""))
 end
 
 local function Keep(text)

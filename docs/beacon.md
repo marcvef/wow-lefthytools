@@ -59,6 +59,13 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
 `wowProjectID == WOW_PROJECT_ID`) via `BNGetNumFriends` / `C_BattleNet.GetFriendGameAccountInfo`,
 once a minute and at most every 10 s after `BN_FRIEND_ACCOUNT_ONLINE`; the same friend at most
 every 120 s. Forever reports `WOW_PROJECT_ID == 1` like retail, which is why the handshake exists.
+The hellos go into their own queue (`helloOutbox`), sent after one-off messages and states and
+before bulk data: a friend list full of WoW players without LefthyTools never holds up a chat line
+or a Need answer (they all go within seconds, ten a second).
+A friend first heard from has no name until the next `Validate` (a second later, or a little more
+while Battle.net fills it in): what they sent that needs a name (chat lines, items and answers,
+level-ups, deaths, pings, Chronicle days and highlights) waits in its queue for it, up to 10 s
+(`Each` in the tick), instead of being dropped.
 `Validate` re-reads only the known peers (`GetGameAccountInfoByID`) every 15 s and, coalesced to
 once a second, after `BN_FRIEND_INFO_CHANGED`/`BN_FRIEND_ACCOUNT_OFFLINE`; offline peers are
 dropped at once. `BN_FRIEND_INFO_CHANGED` fires whenever *any* friend changes zone in any game, so
@@ -67,7 +74,9 @@ it must never trigger a full friend-list walk.
 ## Traffic (never lag the client)
 
 Bulk data (Chronicle's days for friends' graphs) goes into a low-priority queue (`B.QueueLow`)
-that `Drain` only empties when no one-off message and no state is waiting.
+that `Drain` only empties when no one-off message, state or hello is waiting. `B.QueueLow(id,
+message, onSent)`: onSent is called once it actually went (error reports are kept until then).
+The driver's tick resets its timer before running, so an error in it can't make it run every frame.
 
 Values that only matter in their newest form (tracked quest `T2`, enemy count `C2`, level
 progress `X2`) replace a message of the same kind still waiting in the queue for that friend
@@ -166,7 +175,8 @@ make no tables; only dots moving apart or together work it out again.
 ## Death alerts and listeners
 
 `ApplyState` notices a friend going from alive to dead or ghost (only after a first state from
-them, so someone already dead when first heard of isn't announced) and returns whom they were
+them, so someone already dead when first heard of isn't announced; nor after a blank state, what
+sharing off sends: switched on while dead, they may have died before) and returns whom they were
 fighting: the target of their *previous* state if it was a combat state. A long fight sends no
 new state, so the time since then doesn't matter; dying out of combat (a fall) has no killer. At
 most one alert per friend per 10 s (kept in the inbox guard, so `Q2` can't reset it). On the next
@@ -188,7 +198,8 @@ In combat the sender counts the enemies that have them on their threat list: nam
 most, only in combat and with `share` on; `C2;<count>` goes out when the number changes (a fight
 starts at 0, so a fight without nameplates sends nothing). If the game keeps threat secret
 (`SecretWhenUnitThreatStateRestricted`, e.g. in some instances) there's no count. Limits: only
-mobs with a nameplate (enemy nameplates on, in nameplate range) are counted. Receivers keep
+mobs with a nameplate (enemy nameplates on, in nameplate range) are counted. Switched on
+mid-session, `OnEnable` adds the nameplates already up (`C_NamePlate.GetNamePlates`). Receivers keep
 `peer.mobs` until a state without the combat flag clears it; the dot shows the number at its
 bottom right, the tooltip "Fighting Hogger and 2 more" / "In combat with 3 enemies".
 
@@ -407,7 +418,8 @@ mouse first; the markers take only mouse motion, so the click reaches the map) o
 `/lefthy beacon ping clear` takes it back: removed here and `G2` to everyone, whose clients drop
 my ping (and one still waiting for their tick). My marker's tooltip says so. `B.UpdatePings` on the driver tick expires and fades them and redraws the open
 map when the list changed. Setting `pings` switches sending, showing and the Alt+click off (the
-hook stays, it checks the setting).
+hook stays, it checks the setting); switching it off also removes the markers up at the time. A
+friend who's forgotten (`Q2`, offline, silent) takes their marker along.
 
 ## Level-ups
 
@@ -440,7 +452,11 @@ how many errors are kept. Reports wait in `LefthyToolsDB.reportsOut` (at most 10
 sessions) until a collector is online; every 2 s the tick sends waiting ones to every collector
 online, oldest first and each one whole, as `Z2` parts (up to 16 of 180 bytes; colour codes, `|`
 and `;` removed, newlines as `^`) at low priority, at most 45 parts in any 65 s (collectors take
-60 a minute from each friend), and prints "N report(s) sent to Anna" (", M more in a moment").
+60 a minute from each friend; the count is saved, `LefthyToolsDB.reportParts` with `GetTime()`,
+which goes on over a /reload), and prints "N report(s) sent to Anna" (", M more in a moment"). A
+report stays in `reportsOut` until its last part to a collector has actually gone (`QueueLow`'s
+onSent): a /reload or the collector going offline first doesn't lose it; one not gone after 120 s
+is sent again. An overlong report is cut without splitting a UTF-8 character.
 
 Profession links get a closer look, since the game handles them itself: Blizzard's UI only passes
 a `trade:<GUID>:<spell>:<skill line>` link to `ItemRefTooltip:SetHyperlink`, the client asks the

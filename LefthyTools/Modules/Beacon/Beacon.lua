@@ -184,7 +184,8 @@ local helloAt = {}      -- gameAccountID -> when we last greeted them
 local otherVersion = {} -- gameAccountID -> protocol version of a friend on another LefthyTools version
 local owed = {}         -- gameAccountID -> true: send them my current state
 local outbox = {}       -- { gameAccountID, message }: one-off messages, sent before states
-local lowOutbox = {}    -- the same, sent only when nothing else waits (bulk data)
+local lowOutbox = {}    -- the same, sent only when nothing else waits (bulk data); [3]: onSent()
+local helloOutbox = {}  -- gameAccountIDs to greet (Sweep): after states and messages, before bulk data
 local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt }: spam guards
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
@@ -565,24 +566,40 @@ local function Drain(now, elapsed)
 			owed[gameAccountID] = nil
 		end
 	end
-	-- Bulk data (Chronicle's days for friends' graphs) only goes when nothing else waits, so it
-	-- never delays positions, states or anything someone clicked.
-	while tokens >= 1 and lowOutbox[1] and not outbox[1] and not next(owed) do
-		local item = lowOutbox[1]
-		if peers[item[1]] then
-			if not SendNow(item[1], item[2]) then
+	-- Hellos to friends not known yet (Sweep): after everything live, so a friend list full of
+	-- WoW players without LefthyTools never delays a state or a chat line.
+	while tokens >= 1 and helloOutbox[1] and not outbox[1] do
+		local id = table.remove(helloOutbox, 1)
+		if not peers[id] then
+			if not SendNow(id, "H" .. VERSION) then
+				table.insert(helloOutbox, 1, id)
 				pausedUntil, stats.throttled = now + THROTTLE_PAUSE, stats.throttled + 1
 				return
 			end
 			tokens = tokens - 1
 		end
-		table.remove(lowOutbox, 1)
+	end
+	-- Bulk data (Chronicle's days for friends' graphs) only goes when nothing else waits, so it
+	-- never delays positions, states or anything someone clicked.
+	while tokens >= 1 and lowOutbox[1] and not outbox[1] and not next(owed) and not helloOutbox[1] do
+		local item = table.remove(lowOutbox, 1)
+		if peers[item[1]] then
+			if not SendNow(item[1], item[2]) then
+				table.insert(lowOutbox, 1, item)
+				pausedUntil, stats.throttled = now + THROTTLE_PAUSE, stats.throttled + 1
+				return
+			end
+			tokens = tokens - 1
+			if item[3] then
+				item[3]() -- (it went: an error report is no longer kept)
+			end
+		end
 	end
 end
 
--- Low priority (see Drain): sent when nothing else is waiting.
-function B.QueueLow(gameAccountID, message)
-	lowOutbox[#lowOutbox + 1] = { gameAccountID, message }
+-- Low priority (see Drain): sent when nothing else is waiting. onSent(): called once it went.
+function B.QueueLow(gameAccountID, message, onSent)
+	lowOutbox[#lowOutbox + 1] = { gameAccountID, message, onSent }
 end
 
 -- Drops low-priority messages still waiting that start with prefix (they'd arrive after a newer one
@@ -677,6 +694,9 @@ local function Forget(gameAccountID)
 	if B.JournalForget then
 		B.JournalForget(gameAccountID) -- (Chronicle: what was asked of them goes to someone else)
 	end
+	if B.RemovePing then
+		B.RemovePing(gameAccountID) -- (their marker goes with them)
+	end
 end
 
 -- Walks the friend list: greets online WoW friends we don't know yet. Runs once a minute and
@@ -692,7 +712,7 @@ local function Sweep(now)
 					CopyInfo(peers[id], info)
 				elseif not otherVersion[id] and (not helloAt[id] or now - helloAt[id] >= HELLO_RETRY) then
 					helloAt[id] = now
-					B.Queue(id, "H" .. VERSION)
+					helloOutbox[#helloOutbox + 1] = id
 				end
 			end
 		end
@@ -856,7 +876,10 @@ end
 
 -- Returns true and who they were fighting (or nil) when this state says they just died.
 local function ApplyState(peer, now, flags, continent, north, west, subzone, target)
-	local wasAlive = peer.stateSeen and not (peer.dead or peer.ghost)
+	-- (after a blank state, what a friend with sharing off sends, being dead is no news: they may
+	-- have died before switching it on)
+	local wasAlive = peer.stateSeen and not peer.blank and not (peer.dead or peer.ghost)
+	peer.blank = flags == "" and not continent and subzone == "" and target == ""
 	-- Their killer: whom they were fighting in their last state before this one. A long fight
 	-- sends no new state, so the time since then doesn't matter.
 	local foe = peer.combat and peer.target ~= "" and peer.target or nil
@@ -1151,6 +1174,71 @@ local driver = CreateFrame("Frame")
 local events = CreateFrame("Frame")
 local sinceTick = 0
 local pendingLevel
+local NAMELESS_WAIT = 10
+
+-- Hands a queue's items to handle(peer, item), in order. A friend just found has no name until
+-- the next Validate (a second, or a little more while Battle.net fills it in): their items wait
+-- for it, up to NAMELESS_WAIT; a friend who's gone, their items go.
+local function Each(queue, idAt, now, handle)
+	local waiting
+	while queue[1] do
+		local item = table.remove(queue, 1)
+		local peer = peers[item[idAt]]
+		item.at = item.at or now
+		if peer and peer.name then
+			handle(peer, item)
+		elseif peer and now - item.at < NAMELESS_WAIT then
+			waiting = waiting or {}
+			waiting[#waiting + 1] = item
+		end
+	end
+	for i, item in ipairs(waiting or {}) do
+		queue[i] = item
+	end
+end
+
+local function HandleDing(peer, ding)
+	if B.ShowDing then
+		B.ShowDing(peer, ding[2], ding[3])
+	end
+end
+
+local function HandleDeath(peer, death)
+	if B.ShowDeath then
+		B.ShowDeath(peer, death[1], death[2])
+	end
+end
+
+local function HandlePing(peer, ping)
+	if B.ReceivePing then
+		B.ReceivePing(peer, ping[1], ping[2], ping[3], ping[4], ping[5])
+	end
+end
+
+local function HandleDaily(peer, item)
+	B.Notify("daily", peer, item[2])
+end
+
+local function HandleItem(peer, item)
+	if not B.ReceiveItem then
+		return
+	end
+	if item[1] == "item" then
+		B.ReceiveItem(peer, item[2], item[3], item[4])
+	elseif item[1] == "chat" then
+		B.ReceiveChat(peer, item[3]) -- Chat.lua
+	elseif item[1] == "announce" then
+		B.ReceiveAnnouncement(peer, item[3])
+	elseif item[1] == "answer" then
+		B.ReceiveAnswer(peer, item[2], item[3], item[4])
+	else
+		B.ReceiveResult(peer, item[2], item[3], item[4])
+	end
+end
+
+local function HandleHighlight(peer, item)
+	B.Notify("highlight", peer, { kind = item[2], a = item[3], b = item[4] })
+end
 
 local function Tick(now, elapsed)
 	if validateRequested and now - lastValidate >= 1 or now - lastValidate >= VALIDATE_INTERVAL then
@@ -1177,65 +1265,19 @@ local function Tick(now, elapsed)
 	SendXPIfChanged(now)
 	Drain(now, elapsed)
 
-	while dings[1] do
-		local ding = table.remove(dings, 1)
-		local peer = peers[ding[1]]
-		if peer and peer.name and B.ShowDing then
-			B.ShowDing(peer, ding[2], ding[3])
-		end
-	end
-	while deaths[1] do
-		local death = table.remove(deaths, 1)
-		local peer = peers[death[1]]
-		if peer and peer.name and B.ShowDeath then
-			B.ShowDeath(peer, death[1], death[2])
-		end
-	end
-	while pingsIn[1] do
-		local ping = table.remove(pingsIn, 1)
-		local peer = peers[ping[1]]
-		if peer and peer.name and B.ReceivePing then
-			B.ReceivePing(peer, ping[1], ping[2], ping[3], ping[4], ping[5])
-		end
-	end
+	Each(dings, 1, now, HandleDing)
+	Each(deaths, 1, now, HandleDeath)
+	Each(pingsIn, 1, now, HandlePing)
 	while comings[1] do
 		local item = table.remove(comings, 1)
 		B.Notify(item[1], item[2], item[3] or {})
 	end
-	while dailyIn[1] do
-		local item = table.remove(dailyIn, 1)
-		local peer = peers[item[1]]
-		if peer and peer.name then
-			B.Notify("daily", peer, item[2])
-		end
-	end
-	while itemsIn[1] do -- Items.lua: shared items, Need / Pass answers, roll results
-		local item = table.remove(itemsIn, 1)
-		local peer = peers[item[2]]
-		if peer and peer.name and B.ReceiveItem then
-			if item[1] == "item" then
-				B.ReceiveItem(peer, item[2], item[3], item[4])
-			elseif item[1] == "chat" then
-				B.ReceiveChat(peer, item[3]) -- Chat.lua
-			elseif item[1] == "announce" then
-				B.ReceiveAnnouncement(peer, item[3])
-			elseif item[1] == "answer" then
-				B.ReceiveAnswer(peer, item[2], item[3], item[4])
-			else
-				B.ReceiveResult(peer, item[2], item[3], item[4])
-			end
-		end
-	end
+	Each(dailyIn, 1, now, HandleDaily)
+	Each(itemsIn, 2, now, HandleItem) -- Items.lua: shared items, Need / Pass answers, roll results
 	if B.UpdateCalls then
 		B.UpdateCalls(now)
 	end
-	while highlightsIn[1] do
-		local item = table.remove(highlightsIn, 1)
-		local peer = peers[item[1]]
-		if peer and peer.name then
-			B.Notify("highlight", peer, { kind = item[2], a = item[3], b = item[4] })
-		end
-	end
+	Each(highlightsIn, 1, now, HandleHighlight)
 	if B.UpdatePings then
 		B.UpdatePings(now)
 	end
@@ -1271,8 +1313,9 @@ local function OnUpdate(_, elapsed)
 	local now = GetTime()
 	sinceTick = sinceTick + elapsed
 	if sinceTick >= TICK then
-		Tick(now, sinceTick)
-		sinceTick = 0
+		local since = sinceTick
+		sinceTick = 0 -- (first: an error in Tick must not make it run every frame)
+		Tick(now, since)
 	end
 	if B.UpdateMinimap then
 		B.UpdateMinimap(now) -- every frame, but returns at once unless a dot has to move
@@ -1347,6 +1390,15 @@ function M:OnEnable()
 	ResetTimers()
 	wipe(outbox) -- goodbyes still pending from switching off just before: no longer true
 	wipe(lowOutbox)
+	wipe(helloOutbox)
+	-- Nameplates already up (switched on mid-session): counted like ones that come later.
+	wipe(plates)
+	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
+		local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+		if type(unit) == "string" then
+			plates[unit] = true
+		end
+	end
 	farewellUntil = nil
 	lastVersionSent = GetTime() -- the answers at the start carry it; the repeat comes later
 	tokens, pausedUntil, sinceTick = SEND_BURST, 0, 0
@@ -1372,8 +1424,8 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn, dailyIn,
-			comings, B.pings, plates }) do
+	for _, t in ipairs({ peers, helloAt, helloOutbox, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn,
+			dailyIn, comings, B.pings, plates }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil
@@ -1402,6 +1454,11 @@ function M:OnSettingChanged()
 	questDirty, lastQuestCheck = true, -math.huge
 	xpDirty, lastXPCheck = true, -math.huge
 	Changed()
+	if not M.db.pings and B.RemovePing then
+		for key in pairs(B.pings) do
+			B.RemovePing(key) -- "Map pings" off: the markers up now go too
+		end
+	end
 	if B.OnSettingChanged then
 		B.OnSettingChanged() -- Ding.lua: a newly picked level-up sound is played
 	end
