@@ -13,11 +13,13 @@ local _, ns = ...
 --     so the tinted parts are desaturated first; a desaturated red gem is dark grey, so tinting
 --     alone looked muted: an additive copy of each gem in the same colour (our own texture on the
 --     point, its alpha following Blizzard's gem through the animations) keeps it bright.
---   * A gem on your target's nameplate (comboNameplate), right of the mob's level and a little
---     below it (clear of the buffs and debuffs): one gem in the display's own look, tinted like
---     it (Blizzard's red with colouring off), and the number small at its corner. Only while you
---     have points on that target. It's our own frame, put on the nameplate (it shows, fades and
---     scales with it) and found again whenever the target or the nameplates change.
+--   * Dots on your target's nameplate (comboNameplate): small round dots set into the bottom edge
+--     of its health bar, one per point the bar can hold. Lit ones take the colour of the count
+--     (Blizzard's red with colouring off), the rest are dark, empty sockets; each sits on a dark
+--     ring, so it reads on a red bar too. They take no room of their own: nothing above the bar
+--     (buffs, debuffs) or beside it (the level) is touched. Only while you have points on that
+--     target. Our own frame, put on the nameplate (it shows, fades and scales with it) and found
+--     again whenever the target, the points or the target's nameplate change.
 --
 -- Nothing of Blizzard's is replaced; the only hooks are hooksecurefunc post-hooks. Updates run on
 -- the next frame, never inside an event.
@@ -31,8 +33,9 @@ local GEM_ATLAS = "uf-roguecp-icon-red"
 local FOLLOW_TIME = 1 -- seconds the copies follow Blizzard's gems after a change (its animations are shorter)
 local GREEN, YELLOW, RED = { 0.15, 1, 0.15 }, { 1, 0.9, 0 }, { 1, 0.1, 0.05 }
 local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
-local DOT_SIZE = 12  -- the nameplate gem's default size (the display's are 20); a slider changes it
-local DOT_DOWN = -6  -- default: below the level's middle, clear of the buffs and debuffs above the bar
+local DOT_SIZE = 6   -- default: each dot's size in pixels, its dark ring included (comboDotSize)
+local SIZE_MIN, SIZE_MAX = 4, 12
+local DOT_INSET = 1  -- the dots' bottom, this far above the bar's bottom edge
 local issecret = issecretvalue or function() return false end
 
 local colorByCount = false -- switched by Tweaks.lua (ns.ApplyComboColors), on by default
@@ -41,7 +44,7 @@ local hooked = {}          -- Blizzard frames already post-hooked
 local followUntil = 0
 local driver = CreateFrame("Frame")
 local events = CreateFrame("Frame")
-local dot -- the nameplate dot, built on first use
+local row -- the dots on the target's nameplate, built on first use
 
 local function CountColor(points, count)
 	local t = count > 1 and (points - 1) / (count - 1) or 1
@@ -68,7 +71,7 @@ local function MaxPoints()
 	if issecret(max) or not max or max < 1 then
 		max = 5
 	end
-	return max
+	return math.min(max, 10)
 end
 
 ---------------------------------------------------------------------------
@@ -121,7 +124,8 @@ local function Follow()
 	end
 end
 
-local function Recolor()
+-- animating: Blizzard just updated its points (their animations run): the copies follow a while.
+local function Recolor(animating)
 	local bar = Bar()
 	local points = CurrentPoints()
 	if not (bar and bar.classResourceButtonTable and points) then
@@ -137,8 +141,11 @@ local function Recolor()
 			TintPoint(point, r, g, b)
 		end
 	end
-	followUntil = GetTime() + FOLLOW_TIME
-	driver:Show()
+	Follow()
+	if animating then
+		followUntil = GetTime() + FOLLOW_TIME
+		driver:Show()
+	end
 end
 
 -- Blizzard's bar, once it exists (the display builds it in SetupClassBar): recoloured after each
@@ -155,187 +162,79 @@ local function Attach()
 		hooksecurefunc(bar, "UpdatePower", function()
 			if colorByCount or bar.lefthyTinted then
 				bar.lefthyTinted = colorByCount
-				Recolor()
+				Recolor(true)
 			end
 		end)
 	end
 	if bar then
 		bar.lefthyTinted = colorByCount
-		Recolor()
+		Recolor(false)
 	end
 end
 
 ---------------------------------------------------------------------------
--- The dot on your target's nameplate
+-- The dots on your target's nameplate
 ---------------------------------------------------------------------------
 
--- One gem in the display's own look. Copied from a point of Blizzard's bar when the display has one
--- (every base layer it draws: its atlases, layers, sizes and offsets, the socket with its border
--- included; not the effects, glows and slashes, nor the blue charged gem); otherwise retail's
--- RogueComboPointTemplate layers below. Sizes and offsets are kept as parts of the point's size, so
--- the gem scales to the chosen size. Without those atlases at all: a plain round dot.
-local PARTS = {
-	{ key = "BGShadow", atlas = "uf-roguecp-bg-shadow", layer = "BACKGROUND", sub = 0, w = 1, h = 1, x = 0, y = -0.15 },
-	{ key = "BGInactive", atlas = "uf-roguecp-bg-dis", layer = "BACKGROUND", sub = 1, w = 1, h = 1, x = 0, y = 0 },
-	{ key = "BGActive", atlas = "uf-roguecp-bg", layer = "BACKGROUND", sub = 2, w = 1, h = 1, x = 0, y = 0 },
-	{ key = "IconUncharged", atlas = GEM_ATLAS, layer = "ARTWORK", sub = 1, w = 1, h = 1, x = 0, y = 0 },
-}
-local SKIP = { "FX", "Slash", "Glow", "Boost", "LefthyTools", "Charged" }
-
-local function KeyOf(point, region)
-	for key, value in pairs(point) do
-		if value == region and type(key) == "string" then
-			return key
-		end
-	end
+-- A round texture: a colour through a round mask (like Beacon's map dots).
+local function Round(frame, sublevel)
+	local texture = frame:CreateTexture(nil, "ARTWORK", nil, sublevel)
+	local mask = frame:CreateMaskTexture()
+	mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+	mask:SetAllPoints(texture)
+	texture:AddMaskTexture(mask)
+	return texture
 end
 
-local function Skipped(key)
-	for _, word in ipairs(SKIP) do
-		if key:find(word, 1, true) and not (word == "Charged" and key:find("Uncharged", 1, true)) then
-			return true
-		end
-	end
-	return false
+local function NewRow(parent)
+	local frame = CreateFrame("Frame", nil, parent)
+	frame.dots = {}
+	frame:Hide()
+	return frame
 end
 
--- The base layers of a point on Blizzard's bar, as parts of its size; nil without one.
-local function PartsFromDisplay()
-	local bar = Bar()
-	local point = bar and bar.classResourceButtonTable and bar.classResourceButtonTable[1]
-	if not (point and point.GetRegions) then
-		return nil
-	end
-	local ok, pw, ph = pcall(point.GetSize, point)
-	if not ok or issecret(pw) or issecret(ph) or not pw or pw <= 0 or not ph or ph <= 0 then
-		return nil
-	end
-	local parts = {}
-	for _, region in ipairs({ point:GetRegions() }) do
-		local key = region.GetObjectType and region:GetObjectType() == "Texture" and KeyOf(point, region)
-		local atlas = key and not Skipped(key) and region.GetAtlas and region:GetAtlas()
-		if atlas and not issecret(atlas) then
-			local layer, sub = region:GetDrawLayer()
-			local okSize, w, h = pcall(region.GetSize, region)
-			local anchor, _, _, x, y = region:GetPoint(1)
-			if okSize and not issecret(w) and w and w > 0 and h and h > 0 then
-				local centred = anchor == "CENTER" and not issecret(x)
-				parts[#parts + 1] = { key = key, atlas = atlas, layer = layer or "ARTWORK", sub = sub or 0, w = w / pw, h = h / ph,
-					x = centred and (x or 0) / pw or 0, y = centred and (y or 0) / ph or 0 }
-			end
-		end
-	end
-	return #parts > 0 and parts or nil
-end
-
--- A gem's textures for a list of parts (reused by key; ones not in the list hidden).
-local function LayGem(gem, parts, fromDisplay)
-	gem.parts = gem.parts or {}
-	for _, texture in pairs(gem.parts) do
-		texture:Hide()
-	end
-	for _, part in ipairs(parts) do
-		local texture = gem.parts[part.key]
-		if not texture then
-			texture = gem:CreateTexture(nil, part.layer, nil, part.sub)
-			gem.parts[part.key] = texture
-		end
-		texture:SetDrawLayer(part.layer, part.sub)
-		texture:SetAtlas(part.atlas)
-		texture.part = part
-		texture:Show()
-	end
-	gem.Gem, gem.Socket = gem.parts.IconUncharged, gem.parts.BGActive
-	if gem.Gem and not gem.Boost then
-		gem.Boost = gem:CreateTexture(nil, "ARTWORK", nil, 7)
-		gem.Boost:SetAtlas(GEM_ATLAS)
-		gem.Boost:SetBlendMode("ADD")
-		gem.Boost:SetDesaturated(true)
-	end
-	gem.fromDisplay = fromDisplay
-end
-
--- The display's look, if the display has come since the gem was built.
-local function RelayGem(gem)
-	if not gem.fromDisplay and not gem.round then
-		local fromDisplay = PartsFromDisplay()
-		if fromDisplay then
-			LayGem(gem, fromDisplay, true)
-		end
-	end
-end
-
--- Size and place every part (size: the gem's in pixels).
-local function SizeGem(gem, size)
-	gem:SetSize(size, size)
-	for _, texture in pairs(gem.parts or {}) do
-		local part = texture.part
-		texture:ClearAllPoints()
-		texture:SetSize(size * part.w, size * part.h)
-		texture:SetPoint("CENTER", gem, "CENTER", size * part.x, size * part.y)
-	end
-	if gem.Boost and gem.Gem then
-		gem.Boost:ClearAllPoints()
-		gem.Boost:SetAllPoints(gem.Gem)
-	end
-	if gem.round then
-		gem.Gem:SetAllPoints()
-	end
-end
-
--- A gem with its number (the nameplate's, and the trial mode's below).
-local function NewGem(parent)
-	local gem = CreateFrame("Frame", nil, parent)
-	gem:SetSize(DOT_SIZE, DOT_SIZE)
-	local fromDisplay = PartsFromDisplay()
-	if fromDisplay then
-		LayGem(gem, fromDisplay, true)
-	elseif C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(GEM_ATLAS) then
-		LayGem(gem, PARTS, false)
-	else
-		gem.Gem = gem:CreateTexture(nil, "ARTWORK")
-		gem.Gem:SetAllPoints()
-		local mask = gem:CreateMaskTexture()
-		mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-		mask:SetAllPoints()
-		gem.Gem:AddMaskTexture(mask)
-		gem.round = true
-	end
-	gem.Number = gem:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-	gem.Number:SetPoint("LEFT", gem, "TOPRIGHT", -2, -2) -- like a footnote
-	return gem
-end
-
-local function BuildDot()
-	dot = NewGem()
-	dot:Hide()
-end
-
--- A gem in a colour (r == nil: Blizzard's red), tinted like the display's (Recolor).
-local function StyleGem(gem, r, g, b)
-	if gem.round then
-		gem.Gem:SetColorTexture(r or RED[1], g or RED[2], b or RED[3], 1)
-		return
-	end
-	local tinted = r ~= nil
-	for _, texture in ipairs({ gem.Gem, gem.Socket }) do
-		texture:SetDesaturated(tinted)
-		local lift = tinted and 0.25 or 0
-		texture:SetVertexColor((r or 1) + (1 - (r or 1)) * lift, (g or 1) + (1 - (g or 1)) * lift, (b or 1) + (1 - (b or 1)) * lift)
-	end
-	if gem.Boost then
-		gem.Boost:SetVertexColor(r or 1, g or 1, b or 1)
-		gem.Boost:SetShown(tinted)
-	end
-end
-
--- The colour for some points (Blizzard's red with colouring off).
-local function StyleFor(gem, points)
+-- The colour of lit dots for some points (Blizzard's red with colouring off).
+local function DotColor(points)
 	if colorByCount then
-		StyleGem(gem, CountColor(points, MaxPoints()))
-	else
-		StyleGem(gem, nil)
+		return CountColor(points, MaxPoints())
 	end
+	return RED[1], RED[2], RED[3]
+end
+
+-- count dots of size pixels in a row, the first `points` lit.
+local function LayRow(frame, count, points, size)
+	local gap = math.max(2, math.floor(size * 0.5 + 0.5))
+	local inner = math.max(2, size - 2)
+	local r, g, b = DotColor(math.max(points, 1))
+	frame:SetSize(count * size + (count - 1) * gap, size)
+	for i = 1, math.max(count, #frame.dots) do
+		local dot = frame.dots[i]
+		if i <= count then
+			if not dot then
+				dot = { Ring = Round(frame, 1), Fill = Round(frame, 2) }
+				frame.dots[i] = dot
+			end
+			dot.Ring:ClearAllPoints()
+			dot.Ring:SetPoint("LEFT", frame, "LEFT", (i - 1) * (size + gap), 0)
+			dot.Ring:SetSize(size, size)
+			dot.Ring:SetColorTexture(0, 0, 0, 0.85)
+			dot.Fill:ClearAllPoints()
+			dot.Fill:SetPoint("CENTER", dot.Ring, "CENTER")
+			dot.Fill:SetSize(inner, inner)
+			if i <= points then
+				dot.Fill:SetColorTexture(r, g, b, 1)
+			else
+				dot.Fill:SetColorTexture(0.22, 0.22, 0.22, 0.75) -- an empty socket
+			end
+			dot.lit = i <= points
+			dot.Ring:Show()
+			dot.Fill:Show()
+		elseif dot then
+			dot.Ring:Hide()
+			dot.Fill:Hide()
+		end
+	end
+	frame.points, frame.count, frame.size = points, count, size
 end
 
 -- The nameplate of your target (its unit frame), if it has one addons may touch.
@@ -350,143 +249,97 @@ local function TargetPlate()
 	return plate.UnitFrame
 end
 
--- Where and how big (Misc Tweaks' sliders): x, y from the spot right of the level, size in pixels.
-local function Placement()
+-- The dots' size (Misc Tweaks' slider).
+local function DotSize()
 	local tweaks = ns.LT:GetModule("tweaks")
-	local db = tweaks and tweaks.db or {}
-	return tonumber(db.comboNameplateX) or 2, tonumber(db.comboNameplateY) or DOT_DOWN, tonumber(db.comboNameplateSize) or DOT_SIZE
+	local size = tweaks and tweaks.db and tonumber(tweaks.db.comboDotSize)
+	return math.max(SIZE_MIN, math.min(SIZE_MAX, math.floor((size or DOT_SIZE) + 0.5)))
 end
 
-local previewUntil = 0 -- the sliders moved: shown a while on the target, also without points
+local previewUntil = 0 -- the slider moved or the preview is open: shown on the target, also without points
 
-local function UpdateDot()
+local function UpdateDots()
 	local points = onNameplate and CurrentPoints()
 	if points == 0 and onNameplate and GetTime() < previewUntil then
 		points = MaxPoints()
 	end
 	local plate = points and points > 0 and TargetPlate()
 	if not plate then
-		if dot then
-			dot:Hide()
+		if row then
+			row:Hide()
 		end
 		return
 	end
-	if not dot then
-		BuildDot()
-	else
-		RelayGem(dot) -- (the display's bar came after the gem was built)
-	end
-	local x, y, size = Placement()
-	SizeGem(dot, size)
-	local level = plate.PlayerLevelDiffFrame
+	row = row or NewRow()
+	local bar = plate.healthBar or plate.HealthBarsContainer or plate
 	local ok = pcall(function()
-		if dot:GetParent() ~= plate then
-			dot:SetParent(plate)
+		if row:GetParent() ~= plate then
+			row:SetParent(plate)
 		end
-		dot:ClearAllPoints()
-		if level and level:IsShown() then
-			dot:SetPoint("LEFT", level, "RIGHT", x, y)
-		else
-			dot:SetPoint("LEFT", plate.HealthBarsContainer or plate, "RIGHT", x + 1, y)
-		end
-		dot:SetFrameLevel(plate:GetFrameLevel() + 60) -- (over the level frame: 50)
+		row:ClearAllPoints()
+		row:SetPoint("BOTTOM", bar, "BOTTOM", 0, DOT_INSET) -- inside the bar, along its lower edge
+		row:SetFrameLevel(bar:GetFrameLevel() + 10)
 	end)
 	if not ok then
-		dot:Hide()
+		row:Hide()
 		return
 	end
-	StyleFor(dot, points)
-	dot.Number:SetText(points)
-	dot:Show()
+	LayRow(row, MaxPoints(), math.min(points, MaxPoints()), DotSize())
+	row:Show()
 end
 
 ---------------------------------------------------------------------------
--- Trial mode: placing the gem without a mob and without the settings open (Misc Tweaks' button,
--- /lefthy tweaks combopos). A small window with a stand-in nameplate (at your target's nameplate's
--- scale and level box size when you have one): drag the gem, the mouse wheel over it sizes it,
--- arrow and +/- buttons nudge it a pixel (controllers too). Saved on release, through the
--- settings (an open settings page shows it); your target's nameplate shows the gem meanwhile.
+-- Preview: the dots on a stand-in nameplate, without a mob and without the settings open (Misc
+-- Tweaks' button, /lefthy tweaks combopos). They count up from one point to full and again; - and
+-- + change their size (saved through the settings: an open settings page shows it). Your target's
+-- nameplate shows them meanwhile, also without points.
 ---------------------------------------------------------------------------
 
 local trial
-local X_RANGE, Y_RANGE, SIZE_MIN, SIZE_MAX = 60, 40, 6, 30
-
-local function Clamp(v, lo, hi)
-	return math.max(lo, math.min(hi, math.floor(v + 0.5)))
-end
+local COUNT_STEP = 0.8 -- seconds per point in the preview
 
 local function Save(key, value)
 	local tweaks = ns.LT:GetModule("tweaks")
 	if tweaks and tweaks.db and tweaks.db[key] ~= value then
-		ns.LT:SetModuleSetting(tweaks, key, value) -- (the settings page and your target's gem follow)
+		ns.LT:SetModuleSetting(tweaks, key, value) -- (the settings page and your target's dots follow)
 	end
 end
 
--- The stand-in at your target's nameplate's scale, its level box as big as the real one.
-local function MatchPlate()
-	local plate = TargetPlate()
-	local okScale, scale = false, nil
-	if plate then
-		okScale, scale = pcall(plate.GetEffectiveScale, plate)
-	end
-	local mine = trial:GetEffectiveScale()
-	if okScale and type(scale) == "number" and not issecret(scale) and scale > 0 and mine > 0 then
-		trial.Plate:SetScale(scale / mine)
-	else
-		trial.Plate:SetScale(1)
-	end
-	local level = plate and plate.PlayerLevelDiffFrame
-	if level then
-		local ok, w, h = pcall(level.GetSize, level)
-		if ok and type(w) == "number" and not issecret(w) and w > 0 and h > 0 then
-			trial.Level:SetSize(w, h)
-		end
-	end
+local function TrialLayout()
+	local count = MaxPoints()
+	local points = trial.points or count
+	LayRow(trial.Dots, count, points, DotSize())
+	trial.Values:SetText(ns.L["Size %d px"]:format(DotSize()))
 end
 
--- The gem where x, y and size say (nil: the saved ones).
-local function TrialLayout(x, y, size)
-	local savedX, savedY, savedSize = Placement()
-	x, y, size = x or savedX, y or savedY, size or savedSize
-	RelayGem(trial.Gem)
-	SizeGem(trial.Gem, size)
-	trial.Gem:ClearAllPoints()
-	trial.Gem:SetPoint("LEFT", trial.Level, "RIGHT", x, y)
-	StyleFor(trial.Gem, MaxPoints())
-	trial.Gem.Number:SetText(MaxPoints())
-	trial.Values:SetText(ns.L["Right %d, up %d, size %d"]:format(x, y, size))
-end
-
-local function Nudge(dx, dy, dsize)
-	local x, y, size = Placement()
-	Save("comboNameplateX", Clamp(x + dx, -X_RANGE, X_RANGE))
-	Save("comboNameplateY", Clamp(y + dy, -Y_RANGE, Y_RANGE))
-	Save("comboNameplateSize", Clamp(size + dsize, SIZE_MIN, SIZE_MAX))
-	MatchPlate()
+local function Resize(delta)
+	Save("comboDotSize", math.max(SIZE_MIN, math.min(SIZE_MAX, DotSize() + delta)))
 	TrialLayout()
+	UpdateDots()
 end
 
-local function DragUpdate(gem)
-	local cx, cy = GetCursorPosition()
-	local scale = trial.Plate:GetEffectiveScale()
-	gem.dragX = Clamp(gem.fromX + (cx - gem.startX) / scale, -X_RANGE, X_RANGE)
-	gem.dragY = Clamp(gem.fromY + (cy - gem.startY) / scale, -Y_RANGE, Y_RANGE)
-	TrialLayout(gem.dragX, gem.dragY)
+local function CountUp(self, elapsed)
+	self.since = (self.since or 0) + elapsed
+	if self.since >= COUNT_STEP then
+		self.since = 0
+		self.points = self.points % MaxPoints() + 1
+		TrialLayout()
+	end
 end
 
-local function ArrowButton(texture, size, dx, dy, dsize, x)
+local function SmallButton(texture, x, onClick)
 	local button = CreateFrame("Button", nil, trial)
-	button:SetSize(size, size)
+	button:SetSize(20, 20)
 	button:SetNormalTexture(texture)
 	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-	button:SetPoint("BOTTOMLEFT", trial, "BOTTOMLEFT", x, 12)
-	button:SetScript("OnClick", function() Nudge(dx, dy, dsize) end)
+	button:SetPoint("BOTTOMLEFT", trial, "BOTTOMLEFT", x, 13)
+	button:SetScript("OnClick", onClick)
 	return button
 end
 
 local function BuildTrial()
 	trial = CreateFrame("Frame", "LefthyToolsComboTrial", UIParent)
-	trial:SetSize(330, 210)
+	trial:SetSize(300, 170)
 	trial:SetPoint("CENTER", 0, 140)
 	trial:SetFrameStrata("FULLSCREEN_DIALOG") -- (above the settings, if they're open)
 	trial:SetClampedToScreen(true)
@@ -505,87 +358,57 @@ local function BuildTrial()
 	edge:SetColorTexture(1, 0.82, 0, 0.5)
 	trial.Title = trial:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	trial.Title:SetPoint("TOP", 0, -10)
-	trial.Title:SetText(ns.L["Place the combo point gem"])
+	trial.Title:SetText(ns.L["Combo points on your target's nameplate"])
 	trial.Hint = trial:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	trial.Hint:SetPoint("TOP", trial.Title, "BOTTOM", 0, -6)
-	trial.Hint:SetWidth(300)
-	trial.Hint:SetText(ns.L["Drag the gem; the mouse wheel over it changes its size. Your target's nameplate shows it too."])
-	-- The stand-in nameplate: a name, a health bar and the level box right of it.
+	trial.Hint:SetWidth(280)
+	trial.Hint:SetText(ns.L["They count up like your points will. - and + change their size; your target's nameplate shows them too."])
+	-- The stand-in nameplate: a name, a health bar with the dots in it, the level right of it.
 	trial.Plate = CreateFrame("Frame", nil, trial)
-	trial.Plate:SetSize(1, 1)
-	trial.Plate:SetPoint("CENTER", -20, 4)
+	trial.Plate:SetSize(120, 10)
+	trial.Plate:SetPoint("CENTER", -10, 0)
 	local bar = trial.Plate:CreateTexture(nil, "ARTWORK")
-	bar:SetSize(120, 10)
-	bar:SetPoint("CENTER")
+	bar:SetAllPoints()
 	bar:SetColorTexture(0.75, 0.12, 0.1, 1)
 	local barBack = trial.Plate:CreateTexture(nil, "BACKGROUND")
-	barBack:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
-	barBack:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
+	barBack:SetPoint("TOPLEFT", -1, 1)
+	barBack:SetPoint("BOTTOMRIGHT", 1, -1)
 	barBack:SetColorTexture(0, 0, 0, 1)
 	local name = trial.Plate:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	name:SetPoint("BOTTOM", bar, "TOP", 0, 3)
+	name:SetPoint("BOTTOM", trial.Plate, "TOP", 0, 3)
 	name:SetText(ns.L["Training Dummy"])
-	trial.Level = CreateFrame("Frame", nil, trial.Plate)
-	trial.Level:SetSize(18, 14)
-	trial.Level:SetPoint("LEFT", bar, "RIGHT", 2, 0)
-	local levelText = trial.Level:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	levelText:SetPoint("CENTER")
-	levelText:SetText("60")
-	trial.Gem = NewGem(trial.Plate)
-	trial.Gem:SetFrameLevel(trial.Plate:GetFrameLevel() + 5)
-	trial.Gem:EnableMouse(true)
-	trial.Gem:EnableMouseWheel(true)
-	trial.Gem:SetScript("OnMouseDown", function(gem, button)
-		if button == "LeftButton" then
-			gem.startX, gem.startY = GetCursorPosition()
-			gem.fromX, gem.fromY = Placement()
-			gem.dragX, gem.dragY = gem.fromX, gem.fromY
-			gem:SetScript("OnUpdate", DragUpdate)
-		end
-	end)
-	trial.Gem:SetScript("OnMouseUp", function(gem)
-		if gem:GetScript("OnUpdate") then
-			gem:SetScript("OnUpdate", nil)
-			Save("comboNameplateX", gem.dragX)
-			Save("comboNameplateY", gem.dragY)
-			TrialLayout()
-		end
-	end)
-	trial.Gem:SetScript("OnMouseWheel", function(_, delta) Nudge(0, 0, delta > 0 and 1 or -1) end)
+	local level = trial.Plate:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	level:SetPoint("LEFT", trial.Plate, "RIGHT", 4, 0)
+	level:SetText("60")
+	trial.Dots = NewRow(trial.Plate)
+	trial.Dots:SetPoint("BOTTOM", trial.Plate, "BOTTOM", 0, DOT_INSET)
+	trial.Dots:SetFrameLevel(trial.Plate:GetFrameLevel() + 5)
+	trial.Dots:Show()
 	trial.Values = trial:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	trial.Values:SetPoint("BOTTOM", 0, 44)
-	-- Nudges: left, right, up, down, smaller, bigger; then Reset and Done.
-	trial.Left = ArrowButton("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up", 26, -1, 0, 0, 10)
-	trial.Right = ArrowButton("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up", 26, 1, 0, 0, 36)
-	trial.Up = ArrowButton("Interface\\Buttons\\Arrow-Up-Up", 22, 0, 1, 0, 66)
-	trial.Down = ArrowButton("Interface\\Buttons\\Arrow-Down-Up", 22, 0, -1, 0, 90)
-	trial.Smaller = ArrowButton("Interface\\Buttons\\UI-MinusButton-Up", 18, 0, 0, -1, 122)
-	trial.Bigger = ArrowButton("Interface\\Buttons\\UI-PlusButton-Up", 18, 0, 0, 1, 144)
+	trial.Values:SetPoint("BOTTOMLEFT", 62, 18)
+	trial.Smaller = SmallButton("Interface\\Buttons\\UI-MinusButton-Up", 12, function() Resize(-1) end)
+	trial.Bigger = SmallButton("Interface\\Buttons\\UI-PlusButton-Up", 36, function() Resize(1) end)
 	trial.Reset = CreateFrame("Button", nil, trial, "UIPanelButtonTemplate")
 	trial.Reset:SetSize(70, 22)
 	trial.Reset:SetPoint("BOTTOMRIGHT", -88, 10)
 	trial.Reset:SetText(ns.L["Reset"])
-	trial.Reset:SetScript("OnClick", function()
-		Save("comboNameplateX", 2)
-		Save("comboNameplateY", DOT_DOWN)
-		Save("comboNameplateSize", DOT_SIZE)
-		TrialLayout()
-	end)
+	trial.Reset:SetScript("OnClick", function() Resize(DOT_SIZE - DotSize()) end)
 	trial.Done = CreateFrame("Button", nil, trial, "UIPanelButtonTemplate")
 	trial.Done:SetSize(70, 22)
 	trial.Done:SetPoint("BOTTOMRIGHT", -12, 10)
 	trial.Done:SetText(ns.L["Done"])
 	trial.Done:SetScript("OnClick", function() trial:Hide() end)
-	trial:SetScript("OnShow", function()
-		previewUntil = math.huge -- (your target's nameplate shows the gem while placing it)
-		MatchPlate()
+	trial:SetScript("OnShow", function(self)
+		previewUntil = math.huge -- (your target's nameplate shows the dots while it's open)
+		self.points, self.since = 1, 0
+		self:SetScript("OnUpdate", CountUp)
 		TrialLayout()
-		UpdateDot()
+		UpdateDots()
 	end)
-	trial:SetScript("OnHide", function()
-		trial.Gem:SetScript("OnUpdate", nil)
+	trial:SetScript("OnHide", function(self)
+		self:SetScript("OnUpdate", nil)
 		previewUntil = 0
-		UpdateDot()
+		UpdateDots()
 	end)
 	trial:Hide()
 	if UISpecialFrames then
@@ -593,7 +416,7 @@ local function BuildTrial()
 	end
 end
 
--- Opens (or closes) the trial mode.
+-- Opens (or closes) the preview.
 function ns.ComboTrial(on)
 	if on == nil then
 		on = not (trial and trial:IsShown())
@@ -616,32 +439,55 @@ end
 -- Events
 ---------------------------------------------------------------------------
 
-local pending = false
+local pendingAttach, pendingDots = false, false
 driver:Hide()
 driver:SetScript("OnUpdate", function(self)
-	if pending then
-		pending = false
+	if pendingAttach then
+		pendingAttach = false
 		Attach()
-		UpdateDot()
 	end
-	Follow()
-	if GetTime() >= followUntil then
+	if pendingDots then
+		pendingDots = false
+		UpdateDots()
+	end
+	if GetTime() < followUntil then
+		Follow()
+	elseif not (pendingAttach or pendingDots) then
 		self:Hide()
 	end
 end)
 
-local function Soon()
-	pending = true
+local function Soon(attach)
+	pendingAttach = pendingAttach or attach
+	pendingDots = true
 	driver:Show()
 end
 
+-- Only what can change the colouring or the dots: a nameplate coming or going matters only while
+-- points wait for the target's (crowds bring nameplates all the time).
 events:SetScript("OnEvent", function(_, event, unit, powerToken)
-	if event == "UNIT_POWER_FREQUENT" and powerToken ~= "COMBO_POINTS" then
-		return -- energy ticks come through here too
-	elseif event == "ADDON_LOADED" and unit ~= "Blizzard_PersonalResourceDisplay" then
-		return
+	if event == "UNIT_POWER_FREQUENT" then
+		if powerToken == "COMBO_POINTS" then
+			Soon(false) -- (Blizzard's bar updates itself: its hook recolours)
+		end
+	elseif event == "NAME_PLATE_UNIT_ADDED" then
+		local points = onNameplate and not (row and row:IsShown()) and CurrentPoints()
+		if (points and points > 0) or (onNameplate and GetTime() < previewUntil) then
+			Soon(false)
+		end
+	elseif event == "NAME_PLATE_UNIT_REMOVED" then
+		if row and row:IsShown() then
+			Soon(false)
+		end
+	elseif event == "ADDON_LOADED" then
+		if unit == "Blizzard_PersonalResourceDisplay" then
+			Soon(true)
+		end
+	elseif event == "PLAYER_ENTERING_WORLD" or event == "UNIT_DISPLAYPOWER" then
+		Soon(true) -- (the display may build its bar: a druid's Cat Form)
+	else
+		Soon(false) -- target, max points, combo target
 	end
-	Soon()
 end)
 
 local function Listen()
@@ -649,9 +495,12 @@ local function Listen()
 	if not (colorByCount or onNameplate) then
 		return
 	end
-	for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "PLAYER_ENTERING_WORLD", "ADDON_LOADED", "NAME_PLATE_UNIT_ADDED",
-		"NAME_PLATE_UNIT_REMOVED", "COMBO_TARGET_CHANGED" }) do
+	for _, event in ipairs({ "PLAYER_TARGET_CHANGED", "PLAYER_ENTERING_WORLD", "ADDON_LOADED", "COMBO_TARGET_CHANGED" }) do
 		pcall(events.RegisterEvent, events, event)
+	end
+	if onNameplate then
+		pcall(events.RegisterEvent, events, "NAME_PLATE_UNIT_ADDED")
+		pcall(events.RegisterEvent, events, "NAME_PLATE_UNIT_REMOVED")
 	end
 	for _, event in ipairs({ "UNIT_POWER_FREQUENT", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER" }) do
 		pcall(events.RegisterUnitEvent, events, event, "player")
@@ -663,24 +512,24 @@ function ns.ApplyComboColors(on)
 	colorByCount = on
 	Listen()
 	Attach() -- (off: Blizzard's colours back)
-	UpdateDot()
+	UpdateDots()
 end
 
 function ns.ApplyComboNameplate(on)
 	onNameplate = on
 	Listen()
-	UpdateDot()
+	UpdateDots()
 end
 
--- The position or size sliders moved: the gem shows on your target for a few seconds (full points
--- if you have none), so you see where it goes.
+-- The size slider moved: the dots show on your target for a few seconds (full points if you have
+-- none), so you see them.
 function ns.PreviewComboNameplate()
-	previewUntil = math.max(previewUntil, GetTime() + 5) -- (the trial mode's lasts while it's open)
-	UpdateDot()
-	C_Timer.After(5.1, UpdateDot)
+	previewUntil = math.max(previewUntil, GetTime() + 5) -- (the preview window's lasts while it's open)
+	UpdateDots()
+	C_Timer.After(5.1, UpdateDots)
 end
 
 -- For tests.
-function ns.GetComboDot()
-	return dot
+function ns.GetComboDots()
+	return row
 end

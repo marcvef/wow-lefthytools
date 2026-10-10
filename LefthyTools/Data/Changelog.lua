@@ -236,5 +236,8 @@ ns.CHANGELOG = {
 	{ id = 76, module = "mirage",
 		en = { "Mirage: minimap lists stay in view", "A minimap button's list, like the stream spyglass's, keeps the minimap in view while it's open, so it no longer fades away under your mouse. And pressing Toggle Minimap during a cinematic flight no longer switches the minimap off for good." },
 		de = { "Mirage: Minimap-Listen bleiben sichtbar", "Die Liste eines Minimap-Buttons, etwa die vom Fernrohr für Streams, hält die Minimap sichtbar, solange sie offen ist, sie blendet also nicht mehr unter deiner Maus aus. Und Minimap umschalten während eines Flugs im Kinomodus schaltet die Minimap nicht mehr dauerhaft aus." } },
+	{ id = 77, module = "tweaks",
+		en = { "Combo points: dots in the health bar", "The combo point gem beside your target's level is gone. Instead, small dots sit in the bottom edge of its health bar, one for each point you can have: lit ones in the colour of your points, the rest dark, each on a dark ring so it reads on a red bar. They take no room, so nothing else on the nameplate moves. A slider sets their size, and Try it shows them counting up on a stand-in nameplate." },
+		de = { "Combopunkte: Punkte in der Leiste", "Der Combopunkt neben dem Level deines Ziels ist weg. Stattdessen sitzen kleine Punkte am unteren Rand seiner Lebensleiste, einer für jeden Punkt, den du haben kannst: die aktiven in der Farbe deiner Punkte, die übrigen dunkel, jeder auf einem dunklen Ring, damit er auch auf roter Leiste gut lesbar ist. Sie brauchen keinen Platz, an der Namensplakette verschiebt sich also nichts. Ein Regler bestimmt ihre Größe, und Ausprobieren zeigt sie hochzählend an einer Beispiel-Namensplakette." } },
 	-- New entries go here, at the end.
 }

@@ -1357,8 +1357,8 @@ PersonalResourceDisplayFrame.PowerBar = CreateFrame("StatusBar", nil, PersonalRe
 PersonalResourceDisplayFrame.PowerBar:SetSize(200, 10)
 function PersonalResourceDisplayFrame:GetBarPadding() return 4 end
 COMBO_POINT_PARTS = { "BGShadow", "BGActive", "BGInactive", "BGGlow", "IconUncharged", "FXUncharged", "FrameGlow", "SlashFBUncharged", "Border" }
--- How a point looks (retail's RogueComboPointTemplate as far as known; Border: a part the
--- nameplate gem must copy although LefthyTools doesn't know it by name).
+-- How a point looks (retail's RogueComboPointTemplate as far as known; Border: a part LefthyTools
+-- doesn't know by name).
 COMBO_POINT_LOOK = {
 	BGShadow = { atlas = "uf-roguecp-bg-shadow", layer = "BACKGROUND", sub = 0, y = -4 },
 	BGInactive = { atlas = "uf-roguecp-bg-dis", layer = "BACKGROUND", sub = 1 },

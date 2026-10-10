@@ -919,125 +919,122 @@ do
 	lefthy("tweaks combocolors on"); Advance(0.05)
 	check(points[1].IconUncharged.desaturated and near(points[1].LefthyToolsBoost, 0.15, 1, 0.15), "on again: 1 point, green")
 
-	-- The gem on my target's nameplate, right of its level and a little lower (clear of the buffs): the display's
-	-- look, coloured by count, the number at its corner.
+	-- Dots in my target's health bar, along its bottom edge: one per point the bar can hold, the lit ones
+	-- coloured by count, the rest dark sockets; each on a dark ring.
 	MOBS.target = { name = "Hogger", level = 11, x = 0.5, y = 0.5 }
 	COMBO.points = 3
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-	local dot = ns.GetComboDot()
-	check(not (dot and dot:IsShown()), "nothing done inside the event")
+	local row = ns.GetComboDots()
+	check(not (row and row:IsShown()), "nothing done inside the event")
 	Advance(0.05)
-	dot = ns.GetComboDot()
+	row = ns.GetComboDots()
 	local plate = MOBS.target.unitFrame
-	local point = dot and dot._points[#dot._points]
-	check(dot and dot:IsShown() and dot:GetParent() == plate and point[1] == "LEFT" and point[2] == plate.PlayerLevelDiffFrame
-		and point[3] == "RIGHT" and point[5] == -6 and tostring(dot.Number:GetText()) == "3" and near(dot.Boost, 1, 0.9, 0)
-		and dot.Gem.desaturated and dot.Boost.shown,
-		"3 points: a yellow gem on my target's nameplate, right of its level, a little lower, with a 3")
-	local parts = dot.parts
-	check(dot.fromDisplay and parts.Border and parts.Border.atlas == "uf-roguecp-frame" and parts.Border.shown
-		and parts.BGInactive.atlas == "uf-roguecp-bg-dis" and parts.BGShadow.atlas == "uf-roguecp-bg-shadow"
-		and dot.Gem.atlas == "uf-roguecp-icon-red" and dot.Socket.atlas == "uf-roguecp-bg"
-		and not parts.FXUncharged and not parts.BGGlow and not parts.SlashFBUncharged and not parts.FrameGlow,
-		"copied from a point of the personal display: every base layer, the border too (not its effects)")
-	check(dot.Boost.blend == "ADD" and near(dot.Gem, 1, 0.925, 0.25) and not parts.BGInactive.desaturated and parts.Border.vertex == nil,
-		"tinted like the display: the gem and lit socket, a bright copy; the empty socket and border keep their look")
-	check(dot:GetWidth() == 12 and math.abs(dot.Gem.width - 12 * 16 / 20) < 0.01 and point[4] == 2,
-		"smaller: 12 px, each part in proportion; 2 px right of the level")
-	-- Its place and size: three sliders, and a preview on the target while they move.
-	T("comboNameplateX"):SetValue(10)
-	T("comboNameplateY"):SetValue(4)
-	T("comboNameplateSize"):SetValue(20)
+	local function lit()
+		local n = 0
+		for i = 1, row.count do if row.dots[i].lit then n = n + 1 end end
+		return n
+	end
+	local function colour(texture, r, g, b, a)
+		local c = texture and texture.color
+		return c and math.abs(c[1] - r) < 0.01 and math.abs(c[2] - g) < 0.01 and math.abs(c[3] - b) < 0.01
+			and (a == nil or math.abs((c[4] or 1) - a) < 0.01)
+	end
+	local point = row and row._points[#row._points]
+	check(row and row:IsShown() and row:GetParent() == plate and point[1] == "BOTTOM" and point[2] == plate.HealthBarsContainer
+		and point[3] == "BOTTOM" and point[5] == 1 and row.count == 5 and lit() == 3,
+		"3 points: five dots inside my target's health bar, along its bottom edge, three lit")
+	check(colour(row.dots[1].Fill, 1, 0.9, 0) and colour(row.dots[3].Fill, 1, 0.9, 0) and colour(row.dots[4].Fill, 0.22, 0.22, 0.22, 0.75)
+		and colour(row.dots[1].Ring, 0, 0, 0, 0.85), "lit ones yellow (3 of 5), the others dark sockets, each on a dark ring")
+	local _, _, _, ringX = row.dots[2].Ring:GetPoint(1)
+	check(row:GetWidth() == 5 * 6 + 4 * 3 and row:GetHeight() == 6 and row.dots[1].Ring.width == 6 and row.dots[1].Fill.width == 4
+		and ringX == 9, "6 px each, 3 px apart, the ring a pixel wider than the dot all round")
+	-- Their size: a slider, and a preview on the target while it moves.
+	T("comboDotSize"):SetValue(9)
 	Advance(0.05)
-	point = dot._points[#dot._points]
-	check(TDB.comboNameplateSize == 20 and point[4] == 10 and point[5] == 4 and dot:GetWidth() == 20 and math.abs(dot.Gem.width - 16) < 0.01,
-		"the sliders: 10 right, 4 up, 20 px")
+	check(TDB.comboDotSize == 9 and row.size == 9 and row:GetWidth() == 5 * 9 + 4 * 5, "the slider: 9 px dots")
 	COMBO.points = 0
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
-	T("comboNameplateX"):SetValue(11)
+	T("comboDotSize"):SetValue(8)
 	Advance(0.05)
-	check(dot:IsShown() and tostring(dot.Number:GetText()) == "5", "moving a slider without points: the gem shows a moment (full points), to see where")
+	check(row:IsShown() and lit() == 5, "moving the slider without points: the dots show a moment (full points), to see them")
 	Advance(5.2)
-	check(not dot:IsShown(), "then it goes")
-	-- Trial mode: placing it without a mob and without the settings.
+	check(not row:IsShown(), "then they go")
+	-- Nameplates coming and going in a crowd: nothing to do while no points wait for the target's.
+	local plateLookups, getPlate = 0, C_NamePlate.GetNamePlateForUnit
+	C_NamePlate.GetNamePlateForUnit = function(...) plateLookups = plateLookups + 1; return getPlate(...) end
+	for i = 1, 20 do
+		Fire("NAME_PLATE_UNIT_ADDED", "nameplate" .. i)
+		Fire("NAME_PLATE_UNIT_REMOVED", "nameplate" .. i)
+	end
+	Advance(0.05)
+	C_NamePlate.GetNamePlateForUnit = getPlate
+	check(plateLookups == 0, "nameplates coming and going without points: nothing looked up, got " .. plateLookups)
+	-- The preview: the dots on a stand-in nameplate, without a mob and without the settings.
 	local savedTarget = MOBS.target
 	MOBS.target = nil
-	T("comboNameplateX"):SetValue(2)
-	T("comboNameplateY"):SetValue(-6)
-	T("comboNameplateSize"):SetValue(12)
+	T("comboDotSize"):SetValue(6)
 	lefthy("tweaks combopos")
 	local trial = ns.GetComboTrial()
-	check(trial and trial:IsShown() and trial.Gem:IsShown() and trial.Values:GetText() == "Right 2, up -6, size 12"
-		and trial.Gem.fromDisplay and tostring(trial.Gem.Number:GetText()) == "5" and trial._strata == "FULLSCREEN_DIALOG",
-		"/lefthy tweaks combopos: a nameplate with the gem, no mob needed, got " .. tostring(trial and trial.Values:GetText()))
-	CURSOR.x, CURSOR.y = 100, 100
-	trial.Gem._scripts.OnMouseDown(trial.Gem, "LeftButton")
-	CURSOR.x, CURSOR.y = 110, 104
-	trial.Gem._scripts.OnUpdate(trial.Gem, 0.02)
-	check(TDB.comboNameplateX == 2 and trial.Values:GetText() == "Right 12, up -2, size 12", "dragging: it follows (saved on release)")
-	trial.Gem._scripts.OnMouseUp(trial.Gem, "LeftButton")
-	check(TDB.comboNameplateX == 12 and TDB.comboNameplateY == -2 and not trial.Gem._scripts.OnUpdate, "released: 10 right and 4 up, saved")
-	trial.Gem._scripts.OnMouseWheel(trial.Gem, 1)
-	check(TDB.comboNameplateSize == 13, "the mouse wheel over it: bigger")
-	trial.Left:Click()
-	trial.Down:Click()
+	local dots = trial and trial.Dots
+	check(trial and trial:IsShown() and dots.count == 5 and dots.points == 1 and trial.Values:GetText() == "Size 6 px"
+		and trial._strata == "FULLSCREEN_DIALOG",
+		"/lefthy tweaks combopos: a nameplate with the dots, one lit, no mob needed, got " .. tostring(trial and trial.Values:GetText()))
+	Advance(0.85)
+	check(dots.points == 2, "they count up")
+	Advance(0.8 * 4)
+	check(dots.points == 1, "... to full, then from one again")
+	trial.Bigger:Click()
+	check(TDB.comboDotSize == 7 and dots.size == 7 and trial.Values:GetText() == "Size 7 px", "+: bigger, saved")
 	trial.Smaller:Click()
-	check(TDB.comboNameplateX == 11 and TDB.comboNameplateY == -3 and TDB.comboNameplateSize == 12, "the arrows nudge it a pixel")
+	trial.Smaller:Click()
+	check(TDB.comboDotSize == 5, "-: smaller")
 	MOBS.target = savedTarget
 	Fire("PLAYER_TARGET_CHANGED")
 	Advance(6)
-	point = dot._points[#dot._points]
-	check(dot:IsShown() and point[4] == 11 and point[5] == -3, "a target meanwhile: its nameplate shows the gem there too, without points, for as long as it's open")
+	check(row:IsShown() and row.size == 5 and lit() == 5, "a target meanwhile: its nameplate shows the dots too, without points, while it's open")
 	trial.Reset:Click()
-	check(TDB.comboNameplateX == 2 and TDB.comboNameplateY == -6 and TDB.comboNameplateSize == 12, "Reset: back to the start")
+	check(TDB.comboDotSize == 6, "Reset: back to 6 px")
 	trial.Done:Click()
 	Advance(0.1)
-	check(not trial:IsShown() and not dot:IsShown(), "Done: closed; without points no gem")
-	T("comboNameplateX"):SetValue(2)
-	T("comboNameplateY"):SetValue(-6)
-	T("comboNameplateSize"):SetValue(12)
+	check(not trial:IsShown() and not row:IsShown(), "Done: closed; without points no dots")
 	COMBO.points = 3
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
 	Advance(5.3)
 	Fire("UNIT_POWER_FREQUENT", "player", "ENERGY")
-	plate.PlayerLevelDiffFrame:Hide()
 	COMBO.points = 5
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
 	Advance(0.05)
-	point = dot._points[#dot._points]
-	check(point[2] == plate.HealthBarsContainer and point[5] == -6 and tostring(dot.Number:GetText()) == "5" and near(dot.Boost, 1, 0.1, 0.05),
-		"no level shown: right of the health bar; 5 points: red")
-	plate.PlayerLevelDiffFrame:Show()
+	check(lit() == 5 and colour(row.dots[5].Fill, 1, 0.1, 0.05), "5 points: all lit, red")
 	lefthy("tweaks combocolors off"); Advance(0.05)
 	COMBO.points = 2
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
 	Advance(0.05)
-	check(dot:IsShown() and not dot.Gem.desaturated and near(dot.Gem, 1, 1, 1) and not dot.Boost.shown and tostring(dot.Number:GetText()) == "2",
-		"colouring off: Blizzard's red gem")
+	check(row:IsShown() and lit() == 2 and colour(row.dots[1].Fill, 1, 0.1, 0.05), "colouring off: Blizzard's red")
 	lefthy("tweaks combocolors on"); Advance(0.05)
+	check(colour(row.dots[1].Fill, 0.575, 0.95, 0.075), "on again: 2 of 5, yellow-green")
 	MOBS.target.x = nil -- (its nameplate gone: off screen)
 	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate1")
 	Advance(0.05)
-	check(not dot:IsShown(), "my target without a nameplate: no dot")
+	check(not row:IsShown(), "my target without a nameplate: no dots")
 	MOBS.target.x = 0.5
 	Fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
 	Advance(0.05)
-	check(dot:IsShown(), "its nameplate back: the dot too")
+	check(row:IsShown(), "its nameplate back: the dots too")
 	COMBO.points = 0
 	Fire("PLAYER_TARGET_CHANGED")
 	Advance(0.05)
-	check(not dot:IsShown(), "no points: no dot")
+	check(not row:IsShown(), "no points: no dots")
 	COMBO.points = SECRET
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
 	Advance(0.05)
-	check(not dot:IsShown(), "secret points: no dot, no error")
+	check(not row:IsShown(), "secret points: no dots, no error")
 	COMBO.points = 2
 	lefthy("tweaks combo off"); Advance(0.05)
 	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
 	Advance(0.05)
-	check(TDB.comboNameplate == false and not dot:IsShown(), "/lefthy tweaks combo off: no dot")
+	check(TDB.comboNameplate == false and not row:IsShown(), "/lefthy tweaks combo off: no dots")
 	lefthy("tweaks combo on"); Advance(0.05)
-	check(dot:IsShown(), "/lefthy tweaks combo on")
+	check(row:IsShown(), "/lefthy tweaks combo on")
 	MOBS, COMBO.points, STATE.target = {}, 0, false
 	Fire("PLAYER_TARGET_CHANGED")
 	Advance(0.05)
@@ -1123,7 +1120,7 @@ section("Misc Tweaks: module switch and /lefthy tweaks")
 REGISTERED_SETTINGS.LefthyTools_module_tweaks:SetValue(false); Advance(0.05)
 check(not Tweaks.enabled and CVARS.statusText == "0" and CVARS.statusTextDisplay == "PERCENT",
 	"disabling the module undoes its tweaks")
-check(not (ns.GetComboDot() and ns.GetComboDot():IsShown()), "including the combo points' dot")
+check(not (ns.GetComboDots() and ns.GetComboDots():IsShown()), "including the combo points' dots")
 lefthy("enable tweaks"); Advance(0.05)
 check(Tweaks.enabled and CVARS.statusText == "1", "enabling re-applies them")
 lefthy("tweaks statustext off"); Advance(0.05)

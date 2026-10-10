@@ -283,33 +283,28 @@ L["Blizzard shows only the area of your selected quest. All quests: the areas of
 L["Selected quest"] = "Ausgewählte Quest"
 L["All quests"] = "Alle Quests"
 L["Combo points on your target's nameplate"] = "Combopunkte an der Namensplakette deines Ziels"
-L["A small combo point gem, like the personal resource display's, right of your target's level and a little below it, in the colour of your points, with their number. Only while you have points on it. Rogues, and druids in Cat Form."] =
-	"Ein kleiner Combopunkt wie in der persönlichen Ressourcenanzeige, rechts neben dem Level deines Ziels und etwas darunter, in der Farbe deiner Punkte, mit ihrer Anzahl. Nur solange du Punkte darauf hast. Für Schurken und Druiden in Katzengestalt."
+L["Small dots set into the bottom edge of your target's health bar, one for each combo point you can have: lit ones in the colour of your points, the rest dark. Only while you have points on it. They take no room of their own, so nothing else on the nameplate moves. Rogues, and druids in Cat Form."] =
+	"Kleine Punkte am unteren Rand der Lebensleiste deines Ziels, einer für jeden Combopunkt, den du haben kannst: die aktiven in der Farbe deiner Punkte, die übrigen dunkel. Nur solange du Punkte darauf hast. Sie brauchen keinen eigenen Platz, an der Namensplakette verschiebt sich also nichts. Für Schurken und Druiden in Katzengestalt."
 L["Colour combo points by count"] = "Combopunkte nach Anzahl färben"
 L["Clean-up button on the bags"] = "Aufräumen-Knopf an den Taschen"
 L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, at the left of the bags' search box."] =
 	"Seit dem letzten Forever-Patch fehlt der Aufräumen-Knopf der Taschen, mit Maus und Tastatur wie im Gamepad-Modus. Das holt ihn zurück, links neben das Suchfeld der Taschen."
 L["Clean up bags"] = "Taschen aufräumen"
-L["Combo gem: left and right"] = "Combopunkt: links und rechts"
-L["Pixels right of your target's level (negative: to the left). While you move a slider, the gem shows on your target's nameplate for a few seconds."] =
-	"Pixel rechts neben dem Level deines Ziels (negativ: nach links). Während du einen Regler bewegst, zeigt sich der Combopunkt ein paar Sekunden an der Namensplakette deines Ziels."
-L["Combo gem: up and down"] = "Combopunkt: hoch und runter"
-L["Pixels above the middle of your target's level (negative: below)."] = "Pixel über der Mitte des Levels deines Ziels (negativ: darunter)."
-L["Combo gem: size"] = "Combopunkt: Größe"
-L["Combo gem: place it"] = "Combopunkt: platzieren"
+L["Combo dots: size"] = "Combopunkte: Größe"
+L["Each dot's size in pixels. While you move the slider, they show on your target's nameplate for a few seconds."] =
+	"Die Größe jedes Punkts in Pixeln. Während du den Regler bewegst, zeigen sie sich ein paar Sekunden an der Namensplakette deines Ziels."
+L["Combo dots: preview"] = "Combopunkte: Vorschau"
 L["Try it"] = "Ausprobieren"
-L["A small window with a nameplate: drag the gem where you want it, the mouse wheel over it changes its size, the arrows nudge it. No mob needed, and the settings can be closed. /lefthy tweaks combopos does the same."] =
-	"Ein kleines Fenster mit einer Namensplakette: zieh den Combopunkt dorthin, wo du ihn haben willst, das Mausrad darüber ändert seine Größe, die Pfeile verschieben ihn pixelweise. Kein Mob nötig, und die Einstellungen können zu sein. /lefthy tweaks combopos macht dasselbe."
-L["Right %d, up %d, size %d"] = "Rechts %d, hoch %d, Größe %d"
-L["Place the combo point gem"] = "Combopunkt platzieren"
-L["Drag the gem; the mouse wheel over it changes its size. Your target's nameplate shows it too."] =
-	"Zieh den Combopunkt; das Mausrad darüber ändert seine Größe. Die Namensplakette deines Ziels zeigt ihn auch."
+L["A small window with a nameplate whose dots count up like your points will; - and + change their size. No mob needed, and the settings can be closed. /lefthy tweaks combopos does the same."] =
+	"Ein kleines Fenster mit einer Namensplakette, deren Punkte hochzählen wie deine Combopunkte; - und + ändern ihre Größe. Kein Mob nötig, und die Einstellungen können zu sein. /lefthy tweaks combopos macht dasselbe."
+L["Size %d px"] = "Größe %d px"
+L["They count up like your points will. - and + change their size; your target's nameplate shows them too."] =
+	"Sie zählen hoch wie deine Combopunkte. - und + ändern ihre Größe; die Namensplakette deines Ziels zeigt sie auch."
 L["Training Dummy"] = "Trainingsattrappe"
 L["Reset"] = "Zurücksetzen"
 L["Done"] = "Fertig"
-L["The gem's size in pixels (the personal resource display's are 20)."] = "Die Größe in Pixeln (in der persönlichen Ressourcenanzeige sind es 20)."
-L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
-	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und der Punkt an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."
+L["Blizzard's combo points on the personal resource display (and the dots on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
+	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und die Punkte an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."
 
 -- Beacon
 L["Shares your position with Battle.net friends who also use LefthyTools and shows theirs on the world map and minimap, in their class colour."] =

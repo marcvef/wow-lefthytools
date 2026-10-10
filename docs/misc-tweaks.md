@@ -85,32 +85,30 @@ display (the old `comboPoints` tweak) is gone; its saved value is simply no long
   each update (its gain and spend animations are shorter); glows, burst and slash switch to ADD
   while tinted; the plain gem and the lit socket get their tint lifted 25% towards white. At 0
   points the colour stays for the burst. Off: Blizzard's colours and blending back.
-- **Nameplate gem** (`comboNameplate`, on): one gem in the personal display's look, copied from a
-  point of Blizzard's bar when the display has one (`PartsFromDisplay`: every texture of the point
-  with an atlas, by its key on the point, except effects: keys with FX, Slash, Glow, Charged but not
-  Uncharged; its atlas, draw layer and sublevel, size and CENTER offset kept as parts of the point's
-  size), so the socket with its border looks exactly like the display's; built again from the display
-  once its bar exists if the gem came first. Without a bar: retail's layers (`uf-roguecp-bg-shadow`,
-  `-bg-dis`, `-bg`, `-icon-red`); without those atlases: a round dot. Tinted exactly like the
-  display's (gem and lit socket desaturated with the count's colour lifted 25% towards white, an
-  additive copy of the gem in the full colour; the rest untouched; colouring off: Blizzard's red, no
-  copy). The number (`NumberFontNormalSmall`) at its top right corner. Size and place: sliders
-  `comboNameplateSize` (6-30 px, default 12; the display's are 20), `comboNameplateX` (-60..60,
-  default 2) and `comboNameplateY` (-40..40, default -6: below the level's middle, clear of the
-  buffs and debuffs above the bar), from LEFT at the RIGHT of `PlayerLevelDiffFrame` (Camelot's level
-  box right of the health bars) when that shows, else of `HealthBarsContainer`. Moving a slider
-  shows the gem on the target for 5 s (full points if there are none: `ns.PreviewComboNameplate`).
-  **Trial mode** (`ns.ComboTrial`: the settings' *Try it* button, `/lefthy tweaks combopos`): a small
-  window (FULLSCREEN_DIALOG, movable, Escape closes it) with a stand-in nameplate: a name, a health
-  bar and a level box, at the target's nameplate's scale and level box size when there is one. The
-  gem sits on it as configured (full points, coloured): drag it (follows the cursor, saved on
-  release, through `LT:SetModuleSetting` so an open settings page shows it), the mouse wheel over it
-  changes the size, arrow and +/- buttons nudge a pixel (also for controllers), Reset, Done. While
-  it's open the target's real nameplate shows the gem too, also without points.
-  Our own frame, parented to the plate's `UnitFrame` (it shows, fades and scales with it), frame
-  level above the level frame (50). Only while there are points; found again on target, nameplate
-  added/removed, combo and power changes (next frame). A forbidden or missing nameplate, or secret
-  points: no gem.
+- **Nameplate dots** (`comboNameplate`, on): small round dots set into the bottom edge of the
+  target's health bar (`healthBar`, else `HealthBarsContainer`; the row's BOTTOM 1 px above the
+  bar's), one per point the bar can hold (`UnitPowerMax` for combo points, 5 if unknown or secret),
+  centred. Lit ones in the count's colour (colouring off: Blizzard's red), the rest dark sockets
+  (grey 0.22 at 75%); each sits on a black ring (85%) a pixel wider all round, so it reads on a red
+  bar too. Round through a mask (`TempPortraitAlphaMask`, like Beacon's map dots). Size: slider
+  `comboDotSize` (4-12 px, default 6, the ring included), gap half the size (at least 2 px). They
+  take no room of their own: nothing above the bar (buffs, debuffs) or beside it (the level) moves.
+  This replaced a gem in the personal display's look beside the level, which looked stuck on; its
+  settings (`comboNameplateX/Y/Size`) are no longer read. Moving the slider shows the dots on the
+  target for 5 s (full points if there are none: `ns.PreviewComboNameplate`).
+  **Preview** (`ns.ComboTrial`: the settings' *Try it* button, `/lefthy tweaks combopos`): a small
+  window (FULLSCREEN_DIALOG, movable, Escape closes it) with a stand-in nameplate (a name, a health
+  bar, the level) whose dots count up from one to full every 0.8 s, again and again (an OnUpdate only
+  while it's open); - and + change the size (saved through `LT:SetModuleSetting`, so an open settings
+  page shows it), Reset, Done. While it's open the target's real nameplate shows the dots too, also
+  without points.
+  Our own frame, parented to the plate's `UnitFrame` (it shows, fades and scales with it), 10 frame
+  levels above the bar. Only while there are points. Found again on the next frame after target,
+  combo points, max points or combo target changes; a nameplate added only matters while points
+  wait for the target's (no dots up), one removed only while dots are up, so crowds bringing
+  nameplates all the time cost nothing. A forbidden or missing nameplate, or secret points: no dots.
+  The colouring's copies follow Blizzard's gems only after its own updates (its `UpdatePower`), not
+  after every event.
 
 ## foreverQuests: mark quests that are new in WoW: Forever (ForeverQuests.lua)
 
