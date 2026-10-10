@@ -195,6 +195,8 @@ local function Away(lines)
 			latest[f.name] = f -- (oldest first: the last one stays)
 		end
 	end
+	-- Like "Online now" above: the name and level, then plain grey lines (no indenting: the font's
+	-- spaces don't line up), a blank line between friends.
 	lines[#lines + 1] = ""
 	lines[#lines + 1] = "|cffffd200" .. L["Not online"] .. "|r"
 	for i, person in ipairs(away) do
@@ -202,26 +204,33 @@ local function Away(lines)
 			lines[#lines + 1] = "|cff999999" .. L["... and %d more"]:format(#away - 20) .. "|r"
 			break
 		end
-		local parts = { LT.Window.ClassColorCode(person.classFile) .. (person.name or "?") .. "|r" }
+		if i > 1 then
+			lines[#lines + 1] = " "
+		end
+		local head = LT.Window.ClassColorCode(person.classFile) .. (person.name or "?") .. "|r"
 		if person.level then
-			parts[#parts + 1] = L["Level %d"]:format(person.level)
+			head = head .. "  |cffcccccc" .. L["Level %d"]:format(person.level) .. "|r"
 		end
 		if person.account then
-			parts[#parts + 1] = "|cff80c0ff" .. person.account .. "|r"
+			head = head .. "  |cff80c0ff(" .. person.account .. ")|r"
 		end
+		lines[#lines + 1] = head
+		local when = {}
 		if person.last and person.last > 0 then
-			parts[#parts + 1] = L["last played %s"]:format(C.Ago(person.last))
+			when[#when + 1] = L["Last played %s"]:format(C.Ago(person.last))
 		end
 		local week = C.Sum(person, "played", 7)
 		if week > 0 then
-			parts[#parts + 1] = L["%s this week"]:format(C.Duration(week))
+			when[#when + 1] = L["%s this week"]:format(C.Duration(week))
 		end
-		lines[#lines + 1] = table.concat(parts, "  |cff888888·|r  ")
+		if #when > 0 then
+			lines[#lines + 1] = "|cffaaaaaa" .. table.concat(when, "   ·   ") .. "|r"
+		end
 		local f = latest[person.name]
 		local e = f and FriendEvent(f)
 		local text = e and TEXT[e.k] and TEXT[e.k](e)
 		if text then
-			lines[#lines + 1] = "    |cff999999" .. date(L["%Y-%m-%d"], f.t) .. "|r  " .. Icon(e) .. " " .. text
+			lines[#lines + 1] = Icon(e) .. " |cffaaaaaa" .. text .. "   ·   " .. C.Ago(f.t) .. "|r"
 		end
 	end
 end

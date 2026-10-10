@@ -149,8 +149,10 @@ the open one's button greyed out:
 - **Friends:** "Online now" first: every Beacon friend in up to three lines (`B.FriendLines` in
   Beacon's `Alerts.lua`, shared with the AFK screen: name, AFK, level and progress, group; zone
   and distance; what they're fighting and their quest), then "Not online": friends' characters
-  from their journals, most recently played first (level, their BattleTag's name, when they last
-  played, this week's time, their latest highlight under it; at most 20), then "What they did":
+  from their journals, most recently played first, at most 20, each like the online ones: name,
+  level and BattleTag's name; "Last played ..." and this week's time in grey; their latest
+  highlight (icon, text, how long ago); a blank line between friends. No line is indented (the
+  font's spaces don't line up). Then "What they did":
   `C.FriendNews()` (synced highlights and live news, see below), as "Name: text", with a hint
   about what will appear while it's empty. Showing it marks the news seen (`C.MarkFeedSeen`): the
   tab's blue count and the book's blue dot (`C.UnseenCount`: news that came after

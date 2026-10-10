@@ -221,5 +221,8 @@ ns.CHANGELOG = {
 	{ id = 71, module = "chronicle",
 		en = { "Friends' journals: more reliable", "A journal that arrived only in part is asked for again instead of counting as complete, everything is offered again every few minutes in case an offer got lost, and answering a friend's request no longer stutters the game. Players who are no longer your Battle.net friends drop out of the book, and so do characters with nothing in 60 days." },
 		de = { "Freunde-Tagebücher: zuverlässiger", "Ein Tagebuch, das nur zum Teil angekommen ist, wird nochmal angefragt, statt als vollständig zu gelten, alles wird alle paar Minuten neu angeboten, falls ein Angebot verloren ging, und eine Anfrage eines Freundes zu beantworten lässt das Spiel nicht mehr ruckeln. Wer nicht mehr dein Battle.net-Freund ist, fällt aus dem Buch, genauso Charaktere ohne etwas in 60 Tagen." } },
+	{ id = 72, module = "chronicle",
+		en = { "Friends page: easier to read", "Friends who aren't online are listed like the online ones: name, level and BattleTag on one line, when they last played and this week's time under it, then their latest highlight with how long ago, and a gap between friends. No more odd indenting." },
+		de = { "Freunde-Seite: besser lesbar", "Freunde, die nicht online sind, stehen jetzt wie die Online-Freunde da: Name, Level und BattleTag in einer Zeile, darunter wann sie zuletzt gespielt haben und die Zeit diese Woche, dann ihr letztes Highlight und wie lange das her ist, mit Abstand zwischen den Freunden. Keine komischen Einrückungen mehr." } },
 	-- New entries go here, at the end.
 }

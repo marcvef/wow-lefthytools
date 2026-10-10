@@ -5116,7 +5116,8 @@ do
 	local win = LefthyToolsChronicleFrame
 	local page = win.Text:GetText()
 	check(page:find("|cffffd200Not online|r", 1, true) and page:find("Carl|r  |cff", 1, true) and page:find("Level 18", 1, true)
-		and page:find("last played ", 1, true), "Friends: who isn't online, their level, when they last played, got\n" .. page)
+		and page:find("\n|cffaaaaaaLast played ", 1, true) and not page:find("\n  ", 1, true) or false,
+		"Friends: who isn't online, their level, when they last played (on its own line, nothing indented), got\n" .. page)
 	check(page:find("Died to Hogger", 1, true) and CH.UnseenCount() == 0 and not CH.MinimapButton().New:IsShown(),
 		"their news is there; seen now: the dot goes")
 	CH.Open("compare")
