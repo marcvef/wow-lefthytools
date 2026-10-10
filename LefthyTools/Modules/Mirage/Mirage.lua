@@ -171,12 +171,13 @@ end
 ---------------------------------------------------------------------------
 
 local minimapHiddenByUs = false
+local hiddenForOverride = false -- hidden for another part (a cinematic flight's film), not a fade
 -- The player pressed Toggle Minimap while we had it hidden. Blizzard's ToggleMinimap then shows
 -- it (it looked hidden), but the player saw a faded minimap and meant "off".
 local toggledWhileHidden = false
 
 local function OnToggleMinimap()
-	if M.enabled and minimapHiddenByUs then
+	if (M.enabled or hiddenForOverride) and minimapHiddenByUs then
 		toggledWhileHidden = true -- handled by the driver's next evaluation, not inside Blizzard's call
 	end
 end
@@ -190,23 +191,28 @@ local function SyncMinimap(g)
 		return
 	end
 	if toggledWhileHidden then
-		-- Off by the player's choice now: hidden, but not by us, so we never show it again.
-		toggledWhileHidden, minimapHiddenByUs = false, false
+		toggledWhileHidden = false
+		if not hiddenForOverride then
+			minimapHiddenByUs = false -- off by the player's choice now: hidden, but not by us, never shown again
+		end
+		-- (during a flight's film the player saw no interface at all: that press isn't "off for
+		-- good"; hidden again for the film, its quest areas ignore alpha, and back after it)
 		if mm:IsShown() then
 			mm:Hide()
 		end
 		return
 	end
-	local wantHidden = (M.enabled and db.hideMinimapWhenFaded and db.groups.minimap
+	local override = OverrideHidden("minimap") and g.to == 0 and g.alpha <= 0 -- (its quest areas ignore alpha)
+	local wantHidden = override or (M.enabled and db.hideMinimapWhenFaded and db.groups.minimap
 		and db.groupAlpha.minimap == 0 and g.to == 0 and g.alpha <= db.minimapHideAt)
-		or (OverrideHidden("minimap") and g.to == 0 and g.alpha <= 0) -- (its quest areas ignore alpha)
 	if wantHidden then
 		if not minimapHiddenByUs and mm:IsShown() then
 			mm:Hide()
 			minimapHiddenByUs = true
 		end
+		hiddenForOverride = minimapHiddenByUs and override
 	elseif minimapHiddenByUs then
-		minimapHiddenByUs = false
+		minimapHiddenByUs, hiddenForOverride = false, false
 		mm:Show()
 	end
 end
@@ -438,6 +444,21 @@ local function GroupHovered(g)
 	return AnyHovered(g.live) or AnyHovered(g.hoverLive)
 end
 
+-- One of our lists is open on the group (a minimap button's: it reaches past the minimap's edge,
+-- and fading the minimap would fade the list with it): kept in view like an open window.
+local function GroupPopup(g)
+	local PopupOpenIn = LT.Window.PopupOpenIn
+	if not (PopupOpenIn and LT.Window.AnyPopupOpen()) then
+		return false
+	end
+	for i = 1, #g.live do
+		if PopupOpenIn(g.live[i]) then
+			return true
+		end
+	end
+	return false
+end
+
 ---------------------------------------------------------------------------
 -- Fading
 --
@@ -505,7 +526,7 @@ local function Evaluate()
 						g.holdUntil = max(g.holdUntil, now + MOUSE_LINGER)
 					end
 				end
-				show = active or now < g.holdUntil or (g.key == "chat" and chatTyping)
+				show = active or now < g.holdUntil or (g.key == "chat" and chatTyping) or GroupPopup(g)
 			end
 			FadeTo(g, show and 1 or db.groupAlpha[g.key], fade)
 		end

@@ -58,7 +58,14 @@ Mirage fades the default HUD when the player is out of combat and idle (like Dun
   the player's own toggle wins. A post-hook on `ToggleMinimap` catches the case where the player
   presses the key while Mirage has the minimap hidden: Blizzard then shows it (it looks hidden),
   but the player saw a faded minimap and meant "off", so the driver hides it again as the
-  player's choice and clears `minimapHiddenByUs`.
+  player's choice and clears `minimapHiddenByUs`. Not while it's hidden for another part's
+  override (`hiddenForOverride`: a cinematic flight's film, also with Mirage off): the player saw
+  no interface at all, so the press isn't "off for good"; it's hidden again for the film (its quest
+  areas would show) and comes back after it.
+- **Our lists:** a `LT.Window.PopupList` open on a group's frame (a minimap button's: it reaches
+  past the minimap's edge, and as the minimap's child it would fade with it) keeps that group in
+  view like an open window (`GroupPopup`, `LT.Window.PopupOpenIn`; nothing to check while no list is
+  open), also with mouseover off.
 - **Health workaround:** health can't be read, but `UNIT_HEALTH` only fires while it changes, so a
   pulse on each event ("regen hold" = 3 s, ticks come about every 2 s) keeps the player frame
   visible until full. Mana uses `UNIT_POWER_UPDATE` with `powerType == "MANA"`.

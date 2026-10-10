@@ -319,6 +319,18 @@ Advance(0.02)
 check(Minimap:IsShown(), "excluding the minimap group shows it")
 mirage("group minimap on")
 Advance(3)
+-- A cinematic flight's film hides the minimap (another part's override): Toggle Minimap then isn't "off for good".
+STATE.target = true; Fire("PLAYER_TARGET_CHANGED"); Advance(0.4)
+Mirage:HideGroups("test", { minimap = true }, 0)
+Advance(0.3)
+check(not Minimap:IsShown(), "hidden for a flight's film")
+ToggleMinimap()
+Advance(0.15)
+check(not Minimap:IsShown(), "Toggle Minimap during the film: hidden again (its quest areas ignore alpha)")
+Mirage:HideGroups("test", nil, 0)
+Advance(0.3)
+check(Minimap:IsShown(), "after the film: back (that press wasn't the player switching it off)")
+STATE.target = false; Fire("PLAYER_TARGET_CHANGED"); Advance(8)
 check(S("minimapHideAt"), "quest area threshold slider registered")
 mirage("overlay 30")
 check(near(MDB.minimapHideAt, 0.3), "/mirage overlay 30")
@@ -1423,9 +1435,10 @@ for i = 1, 5 do
 	Fire("PLAYER_TARGET_CHANGED")
 	Advance(0.1)
 end
-check(#GameDataTo(11, mark) <= 1, "tab-targeting: at most one update a second, got " .. #GameDataTo(11, mark))
+-- (states only: a version repeat or level progress may go out in here too)
+check(#sentTo(11, mark, "S2;") <= 1, "tab-targeting: at most one update a second, got " .. table.concat(GameDataTo(11, mark), " | "))
 Advance(1.2)
-check(last(GameDataTo(11, mark)):find(";Mob5$") ~= nil, "the latest target wins")
+check((last(sentTo(11, mark, "S2;")) or ""):find(";Mob5$") ~= nil, "the latest target wins")
 STATE.targetName = SECRET
 Fire("PLAYER_TARGET_CHANGED")
 Advance(1.2)
@@ -1505,6 +1518,8 @@ local extras = 0
 for id in pairs(peers()) do if id > 100 then extras = extras + 1 end end
 check(extras == 0, "friends that left the friend list are forgotten")
 -- 60 friends in WoW without LefthyTools: greeted, but behind everything live.
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 11) -- (Anna's here)
+Advance(1.2)
 for i = 1, 60 do
 	BN_FRIENDS[#BN_FRIENDS + 1] = { { gameAccountID = 200 + i, isOnline = true, clientProgram = "WoW", wowProjectID = 1,
 		isInCurrentRegion = true, characterName = "Other" .. i, classFilename = "MAGE", characterLevel = 10,

@@ -118,6 +118,26 @@ end
 -- it's open). The caller anchors it (list:SetPoint) and opens it with list:Toggle() or list:Open().
 local PICKER_ROW = 20
 local PICKER_ROWS = 18 -- a longer list goes on in another column, so every row stays on screen
+local openLists = {}   -- lists shown now (Window.PopupOpenIn)
+
+function Window.AnyPopupOpen()
+	return next(openLists) ~= nil
+end
+
+-- A list is open on frame or one of its children (Mirage: a minimap button's list keeps the minimap
+-- in view: the list reaches past the minimap's edge).
+function Window.PopupOpenIn(frame)
+	for list in pairs(openLists) do
+		local parent = list:GetParent()
+		while parent do
+			if parent == frame then
+				return true
+			end
+			parent = parent:GetParent()
+		end
+	end
+	return false
+end
 
 function Window.PopupList(owner, width, entries, onPick)
 	local list = CreateFrame("Frame", nil, owner)
@@ -200,8 +220,14 @@ function Window.PopupList(owner, width, entries, onPick)
 		end
 	end
 
-	list:SetScript("OnShow", function(self) self:RegisterEvent("GLOBAL_MOUSE_DOWN") end)
-	list:SetScript("OnHide", function(self) self:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
+	list:SetScript("OnShow", function(self)
+		self:RegisterEvent("GLOBAL_MOUSE_DOWN")
+		openLists[self] = true
+	end)
+	list:SetScript("OnHide", function(self)
+		self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
+		openLists[self] = nil
+	end)
 	-- Its owner hiding (its window closing with Escape) closes it too, or it would come back open.
 	owner:HookScript("OnHide", function() list:Hide() end)
 	list:SetScript("OnEvent", function(self)

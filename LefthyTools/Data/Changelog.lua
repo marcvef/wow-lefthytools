@@ -233,5 +233,8 @@ ns.CHANGELOG = {
 	{ id = 75, module = "tweaks",
 		en = { "Bags and flights: small fixes", "The bags' search box no longer moves over twice when the bags open without the game placing it again (after Alt+Z, say). In gamepad mode, clicking an item in a flight's subtitles shows its tooltip without risking blocked buttons later. A flight not taken from the flight map (a quest's) no longer gets the previous flight's destination and time." },
 		de = { "Taschen und Flüge: kleine Korrekturen", "Das Suchfeld der Taschen rutscht nicht mehr doppelt zur Seite, wenn die Taschen aufgehen, ohne dass das Spiel es neu setzt (etwa nach Alt+Z). Im Gamepad-Modus zeigt ein Klick auf ein Item in den Untertiteln eines Flugs seinen Tooltip, ohne dass später Buttons blockiert werden können. Ein Flug, der nicht über die Flugkarte gebucht wurde (der einer Quest), bekommt nicht mehr Ziel und Zeit des letzten Flugs." } },
+	{ id = 76, module = "mirage",
+		en = { "Mirage: minimap lists stay in view", "A minimap button's list, like the stream spyglass's, keeps the minimap in view while it's open, so it no longer fades away under your mouse. And pressing Toggle Minimap during a cinematic flight no longer switches the minimap off for good." },
+		de = { "Mirage: Minimap-Listen bleiben sichtbar", "Die Liste eines Minimap-Buttons, etwa die vom Fernrohr für Streams, hält die Minimap sichtbar, solange sie offen ist, sie blendet also nicht mehr unter deiner Maus aus. Und Minimap umschalten während eines Flugs im Kinomodus schaltet die Minimap nicht mehr dauerhaft aus." } },
 	-- New entries go here, at the end.
 }
