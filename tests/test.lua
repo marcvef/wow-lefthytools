@@ -5138,6 +5138,49 @@ do
 	local carlDay = hover(date("%Y-%m-%d", time() - 86400))
 	check(carlDay and table.concat(carlDay.lines, "|"):find("Carl", 1, true), "hovering a day: everyone's value that day")
 	check(drawn("Fastest level: ") and drawn("nemesis: Hogger"), "records: the fastest level, nemeses")
+	-- The big chart: any number (icons pick), per day or adding up, symbols on the lines.
+	local function hoverWith(first, second)
+		for i = 1, canvas.used.hover do
+			local f = canvas.pools.hover[i]
+			if f.lines and f.lines[1] == first and (not second or f.lines[2] == second) then return f end
+		end
+	end
+	local function icons(path)
+		local n = 0
+		for i = 1, canvas.used.icon do if canvas.pools.icon[i].path == path then n = n + 1 end end
+		return n
+	end
+	local function click(f) f._scripts.OnMouseUp(f, "LeftButton") end
+	local bossIcon = "Interface\\Icons\\INV_Misc_Head_Dragon_01"
+	local skull = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
+	check(hoverWith("Level", "Shown now") and hoverWith("Jumps", "Click: show this") and drawn("Symbols"),
+		"the big chart: level at first, an icon for each thing it can show")
+	-- Today Anna died (more than once) and killed a boss, Carl died to Hogger: a skull on each line
+	-- (deaths come first), besides the picker's and the switch's.
+	check(icons(skull) >= 4 and icons(bossIcon) == 1, "symbols: the day's most notable on each line, got "
+		.. icons(skull) .. " skulls, " .. icons(bossIcon) .. " dragons")
+	local today = table.concat(hover(date("%Y-%m-%d")).lines, "\n")
+	check(today:find("Defeated Murloc King", 1, true) and today:find("Died to Hogger", 1, true) and today:find("and %d+ more"),
+		"the day's tooltip: everyone's highlights (two of a kind), got\n" .. today)
+	click(hoverWith("Quests", "Click: show this"))
+	check(hoverWith("Quests", "Shown now") and drawn("Quests, adding up") and drawn("|cffffffffAdding up|r"),
+		"picking quests: the big chart shows them, adding up")
+	click(hoverWith("Per day"))
+	check(hoverWith("Quests", "Shown now") and drawn("|cffffffffPer day|r"), "or per day")
+	click(hoverWith("Symbols on the lines"))
+	check(canvas.used.icon == 12, "symbols off: only the picker's icons and the switch's, got " .. canvas.used.icon)
+	click(hoverWith("Symbols on the lines"))
+	check(canvas.used.icon > 12, "and on again")
+	win.Scroll:SetVerticalScroll(300)
+	local small
+	for i = 1, canvas.used.hover do
+		local f = canvas.pools.hover[i]
+		if f.lines and f.lines[#f.lines]:find("show it big at the top", 1, true) then small = f; break end
+	end
+	click(small)
+	check(hoverWith("Time played", "Shown now") and drawn("|cffffffffPer day|r") and win.Scroll:GetVerticalScroll() == 0,
+		"a click on a small chart (time played per day): shown big at the top")
+	click(hoverWith("Level", "Click: show this"))
 	local lines = canvas.used.line
 	local chip = hover("Carl")
 	chip._scripts.OnMouseUp(chip, "LeftButton")

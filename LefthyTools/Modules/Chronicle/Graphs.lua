@@ -27,6 +27,36 @@ local METRICS = { "played", "xp", "quests", "kills" } -- (time AFK and jumps go 
 local G = {}
 C.Graphs = G
 
+-- Each kind of journal entry's icon (the window's timelines, the Compare page's symbols).
+local ICONS = {
+	level = "Interface\\Icons\\Achievement_Level_10",
+	death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
+	zone = "Interface\\Icons\\INV_Misc_Map_01",
+	dungeon = "Interface\\Icons\\INV_Misc_Key_14",
+	boss = "Interface\\Icons\\INV_Misc_Head_Dragon_01",
+	rare = "Interface\\Icons\\Ability_Hunter_SniperShot",
+	loot = "Interface\\Icons\\INV_Misc_Bag_10",
+	mount = "Interface\\Icons\\Ability_Mount_RidingHorse",
+	pet = "Interface\\Icons\\INV_Box_PetCarrier_01",
+	toy = "Interface\\Icons\\INV_Misc_Toy_10",
+	achievement = "Interface\\Icons\\Achievement_General",
+	quests = "Interface\\Icons\\INV_Misc_Note_01",
+	gold = "Interface\\Icons\\INV_Misc_Coin_01",
+	profession = "Interface\\Icons\\INV_Misc_Gear_01",
+	quest = "Interface\\Icons\\INV_Misc_Note_02",
+	online = "Interface\\FriendsFrame\\StatusIcon-Online",
+	offline = "Interface\\FriendsFrame\\StatusIcon-Offline",
+}
+G.EVENT_ICONS = ICONS
+
+-- The highlights the Compare page marks on the lines, the most notable first (a day shows its first).
+G.MARK_KINDS = { "death", "boss", "level", "dungeon", "rare", "loot", "achievement", "mount", "gold" }
+
+-- An icon in text, its border trimmed.
+function G.IconText(icon, size)
+	return ("|T%s:%d:%d:0:0:64:64:5:59:5:59|t"):format(tostring(icon), size or 14, size or 14)
+end
+
 ---------------------------------------------------------------------------
 -- Canvas: pooled drawing objects on one parent frame
 ---------------------------------------------------------------------------
@@ -35,8 +65,8 @@ local Canvas = {}
 Canvas.__index = Canvas
 
 function G.NewCanvas(parent)
-	return setmetatable({ parent = parent, pools = { tex = {}, line = {}, text = {}, hover = {} },
-		used = { tex = 0, line = 0, text = 0, hover = 0 } }, Canvas)
+	return setmetatable({ parent = parent, pools = { tex = {}, line = {}, text = {}, hover = {}, icon = {} },
+		used = { tex = 0, line = 0, text = 0, hover = 0, icon = 0 } }, Canvas)
 end
 
 local function Take(canvas, kind, create)
@@ -89,6 +119,23 @@ function Canvas:Bar(x, y, w, h, color, alpha)
 	local t = self:Rect(x, y, w, h, 1, 1, 1, 1)
 	local r, g, b = color[1], color[2], color[3]
 	return self:Gradient(t, CreateColor(r * 0.45, g * 0.45, b * 0.45, alpha or 0.9), CreateColor(r, g, b, alpha or 1))
+end
+
+-- An icon (a path or file id), its border trimmed, above lines and bars; dim: greyed out.
+function Canvas:Icon(icon, x, y, size, dim)
+	local t = Take(self, "icon", function()
+		local tex = self.parent:CreateTexture()
+		tex:SetDrawLayer("OVERLAY", 7)
+		tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		return tex
+	end)
+	t:ClearAllPoints()
+	t:SetPoint("TOPLEFT", self.parent, "TOPLEFT", x, -y)
+	t:SetSize(size, size)
+	t:SetTexture(icon)
+	t:SetDesaturated(dim and true or false)
+	t:SetAlpha(dim and 0.45 or 1)
+	return t
 end
 
 function Canvas:Line(x1, y1, x2, y2, color, thickness)
@@ -622,6 +669,68 @@ local CHARTS = {
 	{ key = "jumps", mode = "sum" },
 }
 local LEVEL_CHART = { key = "level", mode = "last" }
+local BY_KEY = { level = LEVEL_CHART }
+for _, chart in ipairs(CHARTS) do
+	BY_KEY[chart.key] = chart
+end
+
+-- The big chart at the top shows any of these (icons above it pick); per day or adding up.
+local BIG = { "level", "played", "xp", "quests", "kills", "deaths", "gold", "dist", "bossesRares", "afk", "jumps" }
+local CHART_ICON = {
+	level = ICONS.level,
+	played = "Interface\\Icons\\INV_Misc_PocketWatch_01",
+	xp = "Interface\\Icons\\Spell_Holy_HolyBolt",
+	quests = ICONS.quests,
+	kills = "Interface\\Icons\\Ability_DualWield",
+	deaths = ICONS.death,
+	gold = ICONS.gold,
+	dist = "Interface\\Icons\\Ability_Rogue_Sprint",
+	bossesRares = ICONS.boss,
+	afk = "Interface\\Icons\\Spell_Nature_Sleep",
+	jumps = "Interface\\Icons\\Spell_Magic_FeatherFall",
+}
+local CHART_NAME = {
+	level = function() return L["Level"] end,
+	played = function() return L["Time played"] end,
+	xp = function() return L["Experience"] end,
+	quests = function() return L["Quests"] end,
+	kills = function() return L["Killing blows"] end,
+	deaths = function() return L["Deaths"] end,
+	gold = function() return L["Gold"] end,
+	dist = function() return L["Distance"] end,
+	bossesRares = function() return L["Bosses and rares"] end,
+	afk = function() return L["Time AFK"] end,
+	jumps = function() return L["Jumps"] end,
+}
+-- The symbols' legend.
+local MARK_LABEL = {
+	death = function() return L["Deaths"] end,
+	boss = function() return L["Bosses defeated"] end,
+	level = function() return L["Level 10, 20, 30, ..."] end,
+	dungeon = function() return L["Dungeons seen"] end,
+	rare = function() return L["Rare elites killed"] end,
+	loot = function() return L["Epic items"] end,
+	achievement = function() return L["Achievements"] end,
+	mount = function() return L["Mounts"] end,
+	gold = function() return L["Gold milestones"] end,
+}
+
+-- What the big chart shows (state.big, state.perDay); level and gold are where the day ended.
+local function BigChart(state)
+	local key = BY_KEY[state.big or ""] and state.big or "level"
+	local base = BY_KEY[key]
+	return { key = key, value = base.value, mode = base.mode == "last" and "last" or (state.perDay and "day" or "sum") }
+end
+
+local function BigTitle(chart)
+	local name = CHART_NAME[chart.key]()
+	if chart.mode == "day" then
+		return L["%s per day"]:format(name)
+	elseif chart.mode == "sum" then
+		return L["%s, adding up"]:format(name)
+	end
+	return name
+end
 
 local CHART_LABEL = {
 	level = function() return L["Level"] end,
@@ -749,7 +858,11 @@ local CHART_CHAT = { level = "level", played = "time played", xp = "XP", quests 
 	deaths = "deaths", gold = "gold", dist = "distance", bossesRares = "bosses and rares", afk = "time AFK", jumps = "jumps" }
 
 -- A line chart card: a line per person, the day's values in a tooltip, the leader in the corner.
-local function LineChart(canvas, x, y, w, h, chart, people, days, state)
+-- opts (all optional): title; header(ix, iy, iw) draws a row above the plot and returns its height;
+-- marks ([person key][day] = { { icon, text, rank, t } }: a symbol on their line that day, all of
+-- them in the day's tooltip); pick() (a click on the plot: show this chart big at the top).
+local function LineChart(canvas, x, y, w, h, chart, people, days, state, opts)
+	opts = opts or {}
 	local series, ranking = {}, {}
 	local lo, hi = math.huge, -math.huge
 	for _, p in ipairs(people) do
@@ -779,7 +892,11 @@ local function LineChart(canvas, x, y, w, h, chart, people, days, state)
 	end
 	table.sort(ranking, function(a, b) return a.value > b.value end)
 	local note = ranking[1] and ranking[1].value > 0 and (Named(ranking[1].person) .. " " .. G.ValueText(chart.key, ranking[1].value)) or nil
-	local ix, iy, iw, ih = Card(canvas, x, y, w, h, CHART_LABEL[chart.key](), note)
+	local ix, iy, iw, ih = Card(canvas, x, y, w, h, opts.title or CHART_LABEL[chart.key](), note)
+	if opts.header then
+		local used = opts.header(ix, iy, iw)
+		iy, ih = iy + used, ih - used
+	end
 	-- Share, at the bottom right (under the day labels).
 	canvas:Text("|cff80c0ff" .. L["Share"] .. "|r", ix + iw - 60, iy + ih - 11, "GameFontHighlightSmall", "RIGHT", 60)
 	canvas:Hover(ix + iw - 60, iy + ih - 14, 60, 16, { L["Share"], L["Post this ranking in Lefthy chat."] },
@@ -831,7 +948,27 @@ local function LineChart(canvas, x, y, w, h, chart, people, days, state)
 			end
 		end
 	end
-	-- Day labels under the plot, and a hover per day with everyone's value.
+	-- Symbols: each person's most notable highlight of the day, on their line (no line: at the bottom).
+	local marks, marked, lined = opts.marks or {}, {}, {}
+	for _, s in ipairs(series) do
+		marked[#marked + 1], lined[s.p] = s, true
+	end
+	for _, p in ipairs(people) do
+		if marks[p.key] and not state.hidden[p.key] and not lined[p] then
+			marked[#marked + 1] = { p = p, values = {} }
+		end
+	end
+	for _, s in ipairs(marked) do
+		local byDay = marks[s.p.key]
+		for i, day in ipairs(byDay and days or {}) do
+			local list = byDay[day]
+			if list then
+				table.sort(list, function(a, b) return a.rank < b.rank or (a.rank == b.rank and a.t > b.t) end)
+				canvas:Icon(list[1].icon, X(i) - 7, Y(s.values[i] or lo) - 7, 14)
+			end
+		end
+	end
+	-- Day labels under the plot, and a hover per day with everyone's value (and highlights).
 	local step = n <= 7 and 1 or n <= 14 and 2 or 5
 	local slot = iw / math.max(n - 1, 1)
 	for i, day in ipairs(days) do
@@ -841,17 +978,84 @@ local function LineChart(canvas, x, y, w, h, chart, people, days, state)
 		end
 		local lines = { date(L["%Y-%m-%d"], t) }
 		local rows = {}
-		for _, s in ipairs(series) do
-			if s.values[i] ~= nil then
-				rows[#rows + 1] = { p = s.p, v = s.values[i] }
+		for _, s in ipairs(marked) do
+			local v, list = s.values[i], marks[s.p.key] and marks[s.p.key][day]
+			if v ~= nil or list then
+				rows[#rows + 1] = { p = s.p, v = v }
 			end
 		end
-		table.sort(rows, function(a, b) return a.v > b.v end)
+		table.sort(rows, function(a, b) return (a.v or -math.huge) > (b.v or -math.huge) end)
 		for _, row in ipairs(rows) do
-			lines[#lines + 1] = Named(row.p) .. "  " .. G.ValueText(chart.key, row.v)
+			lines[#lines + 1] = Named(row.p) .. (row.v and ("  " .. G.ValueText(chart.key, row.v)) or "")
+			-- Their highlights: two of a kind at most (five deaths don't hide the boss), six in all.
+			local list, shown, ofKind = marks[row.p.key] and marks[row.p.key][day] or {}, 0, {}
+			for _, m in ipairs(list) do
+				ofKind[m.rank] = (ofKind[m.rank] or 0) + 1
+				if ofKind[m.rank] <= 2 and shown < 6 then
+					lines[#lines + 1] = G.IconText(m.icon) .. " |cffaaaaaa" .. m.text .. "|r"
+					shown = shown + 1
+				end
+			end
+			if #list > shown then
+				lines[#lines + 1] = "|cff888888" .. L["... and %d more"]:format(#list - shown) .. "|r"
+			end
 		end
-		canvas:Hover(X(i) - slot / 2, iy, slot, plotH, lines)
+		if opts.pick then
+			lines[#lines + 1] = "|cff80c0ff" .. L["Click: show it big at the top"] .. "|r"
+		end
+		canvas:Hover(X(i) - slot / 2, iy, slot, plotH, lines, opts.pick)
 	end
+end
+
+-- The big chart's row above the plot: an icon per thing it can show, per day or adding up, and the
+-- symbols switch (its tooltip: what they mean). Returns the row's height.
+local function BigPicker(canvas, ix, iy, iw, chart, state, redraw)
+	local size, gap = 20, 6
+	local cx = ix
+	for _, key in ipairs(BIG) do
+		local on = key == chart.key
+		if on then
+			canvas:Rect(cx - 2, iy - 2, size + 4, size + 4, 1, 0.82, 0, 0.85, "BORDER")
+		end
+		canvas:Icon(CHART_ICON[key], cx, iy, size, not on)
+		canvas:Hover(cx - 2, iy - 2, size + 4, size + 4, { CHART_NAME[key](), on and L["Shown now"] or L["Click: show this"] },
+			function()
+				state.big = key
+				redraw()
+			end)
+		cx = cx + size + gap
+	end
+	-- From the right: the symbols switch, then per day | adding up.
+	local marksOn = not state.noMarks
+	local legend = { L["Symbols on the lines"], L["Everyone's most notable moment of the day. Hover a day for all of them."] }
+	for _, kind in ipairs(G.MARK_KINDS) do
+		legend[#legend + 1] = G.IconText(ICONS[kind]) .. " " .. MARK_LABEL[kind]()
+	end
+	legend[#legend + 1] = "|cff80c0ff" .. (marksOn and L["Click: hide the symbols"] or L["Click: show the symbols"]) .. "|r"
+	local rx = ix + iw - 84
+	canvas:Rect(rx, iy, 84, 20, 1, 1, 1, marksOn and 0.12 or 0.03, "BORDER")
+	canvas:Icon(ICONS.death, rx + 4, iy + 3, 14, not marksOn)
+	canvas:Text((marksOn and "|cffffffff" or "|cff888888") .. L["Symbols"] .. "|r", rx + 22, iy + 4, "GameFontHighlightSmall", "LEFT", 58)
+	canvas:Hover(rx, iy, 84, 20, legend, function()
+		state.noMarks = marksOn or nil
+		redraw()
+	end)
+	if chart.mode ~= "last" then
+		for _, perDay in ipairs({ true, false }) do
+			local chipW = 92
+			rx = rx - chipW - 4
+			local on = (chart.mode == "day") == perDay
+			canvas:Rect(rx, iy, chipW, 20, 1, 0.82, 0, on and 0.35 or 0.08, "BORDER")
+			canvas:Text((on and "|cffffffff" or "|cffaaaaaa") .. (perDay and L["Per day"] or L["Adding up"]) .. "|r", rx, iy + 4,
+				"GameFontHighlightSmall", "CENTER", chipW)
+			canvas:Hover(rx, iy, chipW, 20, { perDay and L["Per day"] or L["Adding up"],
+				perDay and L["Each day on its own."] or L["Each day adds to the days before it."] }, function()
+				state.perDay = perDay or nil
+				redraw()
+			end)
+		end
+	end
+	return size + 10
 end
 
 -- The legend: a chip per person (click: hide or show them everywhere), the range, sharing the week.
@@ -1085,8 +1289,11 @@ local function Records(canvas, x, y, w, people, state)
 	return h
 end
 
--- The page: state = { range (days), hidden = { [person key] = true }, sortBy }; redraw() draws it
--- again (a click on a chip, a range or a column). Returns the page height.
+-- The page: state = { range (days), hidden = { [person key] = true }, sortBy, big (what the big chart
+-- shows), perDay, noMarks, marks(people, days) (the symbols, from the window) }; redraw(top) draws it
+-- again (a click on a chip, a range or a column; top: scrolled to the top). Returns the page height.
+local BIG_H = 260
+
 function G.DrawCompare(canvas, width, people, state, redraw)
 	canvas:Reset()
 	Colours(people)
@@ -1102,13 +1309,21 @@ function G.DrawCompare(canvas, width, people, state, redraw)
 		Empty(canvas, ix, iy, iw, ih, L["Friends show up here once they run this LefthyTools: their journals come in whenever any friend who has them is online."])
 		y = y + h + CARD_GAP
 	end
-	LineChart(canvas, 0, y, width, 190, LEVEL_CHART, people, days, state)
-	y = y + 190 + CARD_GAP
+	local big = BigChart(state)
+	LineChart(canvas, 0, y, width, BIG_H, big, people, days, state, {
+		title = BigTitle(big),
+		header = function(ix, iy, iw) return BigPicker(canvas, ix, iy, iw, big, state, redraw) end,
+		marks = not state.noMarks and state.marks and state.marks(people, days) or nil,
+	})
+	y = y + BIG_H + CARD_GAP
 	y = y + Leaders(canvas, 0, y, width, people, state) + CARD_GAP
 	local half = (width - CARD_GAP) / 2
 	for i, chart in ipairs(CHARTS) do
 		local column = (i - 1) % 2
-		LineChart(canvas, column * (half + CARD_GAP), y, half, 160, chart, people, days, state)
+		LineChart(canvas, column * (half + CARD_GAP), y, half, 160, chart, people, days, state, { pick = function()
+			state.big, state.perDay = chart.key, chart.mode == "day" or nil
+			redraw(true)
+		end })
 		if column == 1 or i == #CHARTS then
 			y = y + 160 + CARD_GAP
 		end

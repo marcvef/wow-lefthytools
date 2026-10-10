@@ -18,25 +18,7 @@ local GRAPHS_MIN_GAP, GRAPHS_REFRESH = 10, 30 -- graphs: redraw on changes at mo
 local FEED_MIN_GAP = 3 -- friends' news: the Friends page and the minimap dot follow at most this often
 local TAB_WIDTH = 88
 
-local ICONS = {
-	level = "Interface\\Icons\\Achievement_Level_10",
-	death = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull",
-	zone = "Interface\\Icons\\INV_Misc_Map_01",
-	dungeon = "Interface\\Icons\\INV_Misc_Key_14",
-	boss = "Interface\\Icons\\INV_Misc_Head_Dragon_01",
-	rare = "Interface\\Icons\\Ability_Hunter_SniperShot",
-	loot = "Interface\\Icons\\INV_Misc_Bag_10",
-	mount = "Interface\\Icons\\Ability_Mount_RidingHorse",
-	pet = "Interface\\Icons\\INV_Box_PetCarrier_01",
-	toy = "Interface\\Icons\\INV_Misc_Toy_10",
-	achievement = "Interface\\Icons\\Achievement_General",
-	quests = "Interface\\Icons\\INV_Misc_Note_01",
-	gold = "Interface\\Icons\\INV_Misc_Coin_01",
-	profession = "Interface\\Icons\\INV_Misc_Gear_01",
-	quest = "Interface\\Icons\\INV_Misc_Note_02",
-	online = "Interface\\FriendsFrame\\StatusIcon-Online",
-	offline = "Interface\\FriendsFrame\\StatusIcon-Offline",
-}
+local ICONS = C.Graphs.EVENT_ICONS
 
 local frame
 local tab = "timeline"
@@ -47,7 +29,7 @@ local graphState = { metric = "played", buttons = {} }
 local compareState = { range = 14, hidden = {} }
 
 local function Icon(e)
-	return ("|T%s:14:14:0:0:64:64:5:59:5:59|t"):format(tostring(e.icon or ICONS[e.k] or ICONS.quests))
+	return C.Graphs.IconText(e.icon or ICONS[e.k] or ICONS.quests)
 end
 
 local function Where(zone, sub)
@@ -134,6 +116,60 @@ local function FriendEvent(f)
 		e.k, e.t = k, f.t
 	end
 	return e
+end
+
+-- The Compare page's symbols: { [person key] = { [day] = { { icon, text, rank, t }, ... } } } over the
+-- days shown, from my characters' journals and friends' feed (matched to their accounts by
+-- character name). Only the notable kinds (Graphs.lua's MARK_KINDS); levels only every tenth.
+local MARK_RANK = {}
+for rank, kind in ipairs(C.Graphs.MARK_KINDS) do
+	MARK_RANK[kind] = rank
+end
+
+compareState.marks = function(people, days)
+	local marks, byName = {}, {}
+	local first = days[1]
+	for _, p in ipairs(people) do
+		for _, c in ipairs(not p.me and p.chars or {}) do
+			if c.name then
+				byName[c.name] = p.key
+			end
+		end
+	end
+	local function Put(key, e)
+		local rank = MARK_RANK[e.k]
+		if not rank or (e.k == "level" and (e.level or 0) % 10 ~= 0) or (e.k == "loot" and (e.quality or 4) < 4) then
+			return
+		end
+		local text = TEXT[e.k](e)
+		local day = text and date("%Y-%m-%d", e.t)
+		if day and day >= first then
+			marks[key] = marks[key] or {}
+			local list = marks[key][day] or {}
+			marks[key][day] = list
+			list[#list + 1] = { icon = e.icon or ICONS[e.k], text = text, rank = rank, t = e.t }
+		end
+	end
+	if people[1] and people[1].me then
+		for _, c in pairs(C.Store().chars) do
+			local events = c.events or {}
+			for i = #events, 1, -1 do -- (newest first: stops at the first day shown)
+				local e = events[i]
+				if type(e.t) ~= "number" or date("%Y-%m-%d", e.t) < first then
+					break
+				end
+				Put(people[1].key, e)
+			end
+		end
+	end
+	for _, f in ipairs(C.FriendNews and C.FriendNews() or {}) do
+		local key = f.name and byName[f.name]
+		local e = key and type(f.t) == "number" and FriendEvent(f)
+		if e then
+			Put(key, e)
+		end
+	end
+	return marks
 end
 
 local function LineFor(e, who)
@@ -559,8 +595,9 @@ local function Build()
 	frame:SetScript("OnHide", function() selectedKey = nil end)
 end
 
-local function RedrawCompare()
-	Refresh(true)
+-- top: scrolled to the top (a small chart picked for the big one).
+local function RedrawCompare(top)
+	Refresh(not top)
 end
 
 -- keepScroll: a refresh of the same page.

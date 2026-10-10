@@ -162,7 +162,18 @@ the open one's button greyed out:
   second of the same class lighter, a third darker; you marked "(you)"; hover: level, BattleTag
   name, all their characters, online or last played; click: hidden from every graph and table,
   `compareState.hidden`).
-  Then the Level chart (full width; where each day ended, carried over days not played), the
+  Then the big chart (full width): an icon per thing it can show above it (level, time played,
+  XP, quests, killing blows, deaths, gold, distance, bosses and rares, time AFK, jumps;
+  `compareState.big`, level at first), "Adding up" or "Per day" for the counted ones
+  (`compareState.perDay`; level and gold are where the day ended, carried over days not played)
+  and "Symbols": each person's most notable highlight of the day as an icon on their line (no line
+  that day: at the bottom). The kinds, most notable first (`G.MARK_KINDS`): death, boss, level
+  (every tenth only), first dungeon visit, rare, epic loot, achievement, mount, gold milestone;
+  from my characters' journals and `C.FriendNews()` (matched to accounts by character name;
+  `compareState.marks`, built in `Window.lua` on each draw). The day's tooltip lists everyone's
+  value and highlights (two of a kind, six at most, "and N more"). The symbols switch's tooltip
+  is the legend; off: `compareState.noMarks`. A click on a day of a small chart shows that chart
+  big, scrolled to the top. The
   Leaderboard of the last 7 days (`C.Leaderboard`: nine categories, top three each, gold, silver,
   bronze; the Martin award), a grid of line charts (time played, XP, quests, killing blows per day;
   deaths, bosses and rares, jumps adding up over the range; gold where the day ended; distance and
