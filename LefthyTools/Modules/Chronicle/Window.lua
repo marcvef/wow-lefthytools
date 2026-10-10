@@ -4,11 +4,12 @@ local L = ns.L
 local C = ns.Chronicle
 local M = C.module
 
--- The Chronicle window: a character switcher and five pages. Timeline (this character's journal,
+-- The Chronicle window: a character switcher and six pages. Timeline (this character's journal,
 -- newest first, by day), Statistics (session and lifetime, labels left and values right in two text
 -- blocks of the same line count), Graphs (one character or friend), Compare (you and every friend
--- in every graph, Graphs.lua's G.DrawCompare) and Friends (who's online, who isn't and since when,
--- and what they all did: synced journals and live news, Sync.lua's C.FriendNews).
+-- in every graph, Graphs.lua's G.DrawCompare), Friends (who's online and what they all did: synced
+-- journals and live news, Sync.lua's C.FriendNews) and Offline (friends' characters not online, a
+-- row each: G.DrawAway; a click opens their graphs).
 -- Built on first open; redrawn only while open and only when something changed (the Statistics
 -- page also every few seconds, for the time and distance counters).
 
@@ -16,7 +17,7 @@ local TIMELINE_SHOW = 250  -- entries drawn; older ones are summarized in one li
 local STATS_REFRESH = 5
 local GRAPHS_MIN_GAP, GRAPHS_REFRESH = 10, 30 -- graphs: redraw on changes at most every 10 s, else every 30 s
 local FEED_MIN_GAP = 3 -- friends' news: the Friends page and the minimap dot follow at most this often
-local TAB_WIDTH = 88
+local TAB_WIDTH = 80 -- (six tabs and the picker fit in a row)
 
 local ICONS = C.Graphs.EVENT_ICONS
 
@@ -212,66 +213,45 @@ local function Timeline(c)
 	return Journal(c.events, function(e) return LineFor(e), e.t end)
 end
 
--- Friends not online now, from their journals: level, when they last played, this week's time,
--- and their latest highlight. Most recently played first.
-local function Away(lines)
-	local away = {}
+-- Friends' characters not online now (the Offline page): level, when they last played, this week's
+-- time and their latest highlight, most recently played first.
+local function AwayRows()
+	local rows = {}
 	for _, person in ipairs(C.People()) do
 		if not person.me and not person.online then
-			away[#away + 1] = person
+			rows[#rows + 1] = { person = person, week = C.Sum(person, "played", 7) }
 		end
 	end
-	if #away == 0 then
-		return
-	end
-	table.sort(away, function(a, b) return (a.last or 0) > (b.last or 0) end)
+	table.sort(rows, function(a, b) return (a.person.last or 0) > (b.person.last or 0) end)
 	local latest = {}
 	for _, f in ipairs(C.FriendNews()) do
 		if f.k ~= "online" and f.k ~= "offline" then
 			latest[f.name] = f -- (oldest first: the last one stays)
 		end
 	end
-	-- Like "Online now" above: the name and level, then plain grey lines (no indenting: the font's
-	-- spaces don't line up), a blank line between friends.
-	lines[#lines + 1] = ""
-	lines[#lines + 1] = "|cffffd200" .. L["Not online"] .. "|r"
-	for i, person in ipairs(away) do
-		if i > 20 then
-			lines[#lines + 1] = "|cff999999" .. L["... and %d more"]:format(#away - 20) .. "|r"
-			break
-		end
-		if i > 1 then
-			lines[#lines + 1] = " "
-		end
-		local head = LT.Window.ClassColorCode(person.classFile) .. (person.name or "?") .. "|r"
-		if person.level then
-			head = head .. "  |cffcccccc" .. L["Level %d"]:format(person.level) .. "|r"
-		end
-		if person.account then
-			head = head .. "  |cff80c0ff(" .. person.account .. ")|r"
-		end
-		lines[#lines + 1] = head
-		local when = {}
-		if person.last and person.last > 0 then
-			when[#when + 1] = L["Last played %s"]:format(C.Ago(person.last))
-		end
-		local week = C.Sum(person, "played", 7)
-		if week > 0 then
-			when[#when + 1] = L["%s this week"]:format(C.Duration(week))
-		end
-		if #when > 0 then
-			lines[#lines + 1] = "|cffaaaaaa" .. table.concat(when, "   ·   ") .. "|r"
-		end
-		local f = latest[person.name]
+	for _, row in ipairs(rows) do
+		local f = latest[row.person.name]
 		local e = f and FriendEvent(f)
 		local text = e and TEXT[e.k] and TEXT[e.k](e)
 		if text then
-			lines[#lines + 1] = Icon(e) .. " |cffaaaaaa" .. text .. "   ·   " .. C.Ago(f.t) .. "|r"
+			row.latest = { icon = e.icon or ICONS[e.k] or ICONS.quests, text = text, t = f.t }
 		end
 	end
+	return rows
 end
 
--- Who's online right now (each friend in a few lines, from Beacon), who isn't, then what they did.
+local function AwayCount()
+	local count = 0
+	for _, person in ipairs(C.People()) do
+		if not person.me and not person.online then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+-- Who's online right now (each friend in a few lines, from Beacon), then what they all did. Who
+-- isn't online has a page of its own (Offline): a line says so.
 local function Friends()
 	local lines = { "|cffffd200" .. L["Online now"] .. "|r" }
 	local beacon = LT:GetModule("beacon")
@@ -286,7 +266,11 @@ local function Friends()
 		end
 		ns.Beacon.FriendLines(lines, friend.peer, friend.id)
 	end
-	Away(lines)
+	local away = AwayCount()
+	if away > 0 then
+		lines[#lines + 1] = " "
+		lines[#lines + 1] = "|cff999999" .. L["Not online: %d (Offline tab)"]:format(away) .. "|r"
+	end
 	lines[#lines + 1] = ""
 	lines[#lines + 1] = "|cffffd200" .. L["What they did"] .. "|r"
 	lines[#lines + 1] = Journal(C.FriendNews(), function(f)
@@ -576,8 +560,8 @@ local function Build()
 	frame.Picker:SetPoint("TOPLEFT", 14, -30)
 
 	frame.Tabs = {}
-	for i, info in ipairs({ { "friends", L["Friends"] }, { "compare", L["Compare"] }, { "graphs", L["Graphs"] },
-			{ "stats", L["Statistics"] }, { "timeline", L["Timeline"] } }) do
+	for i, info in ipairs({ { "offline", L["Offline"] }, { "friends", L["Friends"] }, { "compare", L["Compare"] },
+			{ "graphs", L["Graphs"] }, { "stats", L["Statistics"] }, { "timeline", L["Timeline"] } }) do
 		local key = info[1]
 		local button = LT.Window.AddButton(frame, info[2], function()
 			tab = key
@@ -616,8 +600,9 @@ function Refresh(keepScroll)
 	for key, button in pairs(frame.Tabs) do
 		button:SetEnabled(key ~= tab) -- the open page's button is greyed out
 	end
-	frame.Picker:SetShown(tab ~= "friends" and tab ~= "compare")
-	if tab ~= "graphs" and tab ~= "compare" then
+	local onCanvas = tab == "graphs" or tab == "compare" or tab == "offline"
+	frame.Picker:SetShown(tab ~= "friends" and tab ~= "compare" and tab ~= "offline")
+	if not onCanvas then
 		frame.Canvas:Reset()
 	end
 	if tab ~= "graphs" then
@@ -630,12 +615,14 @@ function Refresh(keepScroll)
 	end
 	local unseen = C.UnseenCount and C.UnseenCount() or 0
 	frame.Tabs.friends.New:SetText(unseen > 0 and tostring(unseen) or "")
-	if tab == "graphs" or tab == "compare" then
+	if onCanvas then
 		frame.Text:SetText("")
 		frame.Values:SetText("")
 		local width = frame.Content:GetWidth()
 		local height
-		if tab == "compare" then
+		if tab == "offline" then
+			height = C.Graphs.DrawAway(frame.Canvas, width, AwayRows(), Select) -- (a click: their graphs)
+		elseif tab == "compare" then
 			height = C.Graphs.DrawCompare(frame.Canvas, width, C.Accounts(), compareState, RedrawCompare)
 		elseif friend then
 			height = C.Graphs.DrawFriend(frame.Canvas, width, friend, friend.name or "?", C.Char(), graphState)
@@ -710,7 +697,7 @@ function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
 	elseif tab == "friends" then
 		local since = now - lastStatsRefresh
 		redraw = (feedPending and since >= FEED_MIN_GAP) or since >= STATS_REFRESH -- "online now" changes all the time
-	elseif tab == "graphs" or tab == "compare" then
+	elseif tab == "graphs" or tab == "compare" or tab == "offline" then
 		graphsPending = graphsPending or statsChanged or eventsChanged or feedChanged -- kept until the next draw
 		local since = now - lastGraphsRefresh
 		redraw = (graphsPending and since >= GRAPHS_MIN_GAP) or since >= GRAPHS_REFRESH

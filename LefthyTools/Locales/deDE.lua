@@ -648,6 +648,16 @@ L["Just you so far"] = "Bisher nur du"
 L["Friends show up here once they run this LefthyTools: their journals come in whenever any friend who has them is online."] =
 	"Freunde erscheinen hier, sobald sie dieses LefthyTools nutzen: ihre Tagebücher kommen, sobald irgendein Freund online ist, der sie hat."
 L["Not online"] = "Nicht online"
+L["Offline"] = "Offline"
+L["Name"] = "Name"
+L["BattleTag"] = "BattleTag"
+L["Last played"] = "Zuletzt gespielt"
+L["This week"] = "Diese Woche"
+L["%d characters"] = "%d Charaktere"
+L["Everyone with a journal is online, or no friend's journal has come yet."] =
+	"Alle mit Tagebuch sind online, oder es ist noch kein Tagebuch eines Freundes angekommen."
+L["Click: their graphs"] = "Klick: ihre Graphen"
+L["Not online: %d (Offline tab)"] = "Nicht online: %d (Tab Offline)"
 L["... and %d more"] = "... und %d weitere"
 L["%s this week"] = "%s diese Woche"
 

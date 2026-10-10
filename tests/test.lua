@@ -5200,16 +5200,10 @@ do
 	CH.UpdateMinimapButton()
 	check(CH.MinimapButton().New:IsShown(), "the book on the minimap gets a blue dot")
 
-	-- The journal: Friends shows who isn't online too; Compare has everyone in every graph.
+	-- The journal: Friends shows who's online and what they all did; who isn't has a page of its own
+	-- (Offline); Compare has everyone in every graph.
 	CH.Open("friends")
 	local win = LefthyToolsChronicleFrame
-	local page = win.Text:GetText()
-	check(page:find("|cffffd200Not online|r", 1, true) and page:find("Carl|r  |cff", 1, true) and page:find("Level 18", 1, true)
-		and page:find("\n|cffaaaaaaLast played ", 1, true) and not page:find("\n  ", 1, true) or false,
-		"Friends: who isn't online, their level, when they last played (on its own line, nothing indented), got\n" .. page)
-	check(page:find("Died to Hogger", 1, true) and CH.UnseenCount() == 0 and not CH.MinimapButton().New:IsShown(),
-		"their news is there; seen now: the dot goes")
-	CH.Open("compare")
 	local canvas = win.Canvas
 	local function drawn(text)
 		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return canvas.pools.text[i] end end
@@ -5220,6 +5214,26 @@ do
 			if f.lines and f.lines[1] == title then return f end
 		end
 	end
+	local page = win.Text:GetText()
+	check(not page:find("Not online|r", 1, true) and page:find("Not online: %d+ %(Offline tab%)") and page:find("What they did", 1, true),
+		"Friends: who's online, then the history at once; who isn't: one line pointing at the Offline tab, got\n" .. page)
+	check(page:find("Died to Hogger", 1, true) and CH.UnseenCount() == 0 and not CH.MinimapButton().New:IsShown(),
+		"their news is there; seen now: the dot goes")
+	CH.Open("offline")
+	check(not win.Tabs.offline:IsEnabled() and not win.Picker:IsShown() and win.Text:GetText() == "" and drawn("Not online")
+		and drawn("Last played") and drawn("BattleTag") and drawn("Carl|r") and drawn("Died to Hogger"),
+		"Offline: a table, a row per character not online (name, level, BattleTag, last played, this week, latest news)")
+	local carlRow
+	for i = 1, canvas.used.hover do
+		local f = canvas.pools.hover[i]
+		if f.lines and f.lines[1]:find("Carl|r", 1, true) then carlRow = f end
+	end
+	check(carlRow and table.concat(carlRow.lines, "\n"):find("Level 18", 1, true) and carlRow.lines[#carlRow.lines]:find("Click: their graphs", 1, true),
+		"hovering a row: all of it (a long highlight is cut in its cell)")
+	carlRow._scripts.OnMouseUp(carlRow, "LeftButton")
+	check(not win.Tabs.graphs:IsEnabled() and win.Picker.Label:GetText():find("Carl", 1, true),
+		"a click on a row: their graphs, got " .. tostring(win.Picker.Label:GetText()))
+	CH.Open("compare")
 	check(not win.Tabs.compare:IsEnabled() and not win.Picker:IsShown() and drawn("Level") and drawn("Leaderboard, last 7 days")
 		and drawn("Quests per day") and drawn("Deaths, adding up") and drawn("Hall of fame, all time") and drawn("Records"),
 		"Compare: the level chart, the leaderboard, a graph per number, the hall of fame, records")
