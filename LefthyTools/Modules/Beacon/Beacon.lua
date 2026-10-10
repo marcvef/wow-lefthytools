@@ -585,6 +585,16 @@ function B.QueueLow(gameAccountID, message)
 	lowOutbox[#lowOutbox + 1] = { gameAccountID, message }
 end
 
+-- Drops low-priority messages still waiting that start with prefix (they'd arrive after a newer one
+-- sent through the normal queue, and contradict it).
+function B.DropLow(prefix)
+	for i = #lowOutbox, 1, -1 do
+		if lowOutbox[i][2]:sub(1, #prefix) == prefix then
+			table.remove(lowOutbox, i)
+		end
+	end
+end
+
 function B.QueueLowToPeers(message)
 	for gameAccountID in pairs(peers) do
 		B.QueueLow(gameAccountID, message)

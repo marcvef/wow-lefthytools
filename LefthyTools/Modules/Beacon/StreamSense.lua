@@ -194,14 +194,14 @@ end
 -- This look's place and facing (no place, in an instance: learning goes by turning only).
 local function Here()
 	local ok, north, west, _, continent = pcall(UnitPosition, "player")
-	if not ok or issecret(north) or issecret(west) or not north then
+	if not ok or issecret(north) or issecret(west) or issecret(continent) or not north then
 		north, west, continent = 0, 0, nil
 	end
 	local facing = Value("GetPlayerFacing")
 	here.north, here.west, here.facing = north, west, facing
 	here.combat, here.now = Value("UnitAffectingCombat", "player") == true, GetTime()
 	here.cos, here.sin = math.cos(facing or 0), math.sin(facing or 0)
-	return continent and not issecret(continent) and continent or nil
+	return continent -- (nil in an instance; secret ones were dropped above)
 end
 
 -- A mob seen now: its cloud learns, and it gets its direction and how sure that is.
@@ -285,9 +285,15 @@ local function ReadCast()
 		if f then
 			ok, name, _, icon, startMs, endMs, a, b, c, d = pcall(f, "player")
 		end
-		if ok and name and startMs and endMs and not (issecret(name) or issecret(icon) or issecret(startMs) or issecret(endMs)) then
+		-- (Secret first: a hidden value mustn't be tested as true or false.)
+		if ok and not (issecret(name) or issecret(icon) or issecret(startMs) or issecret(endMs)) and name and startMs and endMs then
 			local channel = path == "UnitChannelInfo"
-			local spellID = channel and c or d -- (UnitCastingInfo: 9th, UnitChannelInfo: 8th)
+			local spellID -- (UnitCastingInfo: 9th, UnitChannelInfo: 8th)
+			if channel then
+				spellID = c
+			else
+				spellID = d
+			end
 			castNow.name, castNow.icon, castNow.start, castNow.finish = name, icon, startMs / 1000, endMs / 1000
 			castNow.channel, castNow.spellID = channel, not issecret(spellID) and spellID or nil
 			picture.cast = castNow
@@ -311,7 +317,7 @@ end
 local function ReadPower()
 	local ok, kind, token = pcall(UnitPowerType, "player")
 	local cur, max = Value("UnitPower", "player"), Value("UnitPowerMax", "player")
-	if ok and token and not issecret(token) and POWER_LETTERS[token] and cur and max and max > 0 then
+	if ok and not issecret(token) and token and POWER_LETTERS[token] and cur and max and max > 0 then
 		powerNow.token, powerNow.frac = token, math.max(0, math.min(1, cur / max))
 		picture.power = powerNow
 	else
@@ -322,9 +328,10 @@ S.POWER_LETTERS = POWER_LETTERS
 
 local function ReadForm()
 	local index = Value("GetShapeshiftForm")
-	local spellID = index and index > 0 and select(4, pcall(GetShapeshiftFormInfo, index))
+	-- (pcall's first return is ok: icon, active, castable, spellID come after it, so the spell is 5th)
+	local spellID = index and index > 0 and select(5, pcall(GetShapeshiftFormInfo, index))
 	picture.form = nil
-	if spellID and not issecret(spellID) then
+	if not issecret(spellID) and type(spellID) == "number" then
 		local info = Value("C_Spell.GetSpellInfo", spellID)
 		if type(info) == "table" and info.name and not issecret(info.name) then
 			formNow.spellID, formNow.icon, formNow.name = spellID, info.iconID, info.name
@@ -416,7 +423,7 @@ local function Group(n)
 			local key = Value("UnitGUID", unit) or unit
 			inGroup[key] = true
 			local ok, north, west, _, instance = pcall(UnitPosition, unit)
-			if ok and north and west and not (issecret(north) or issecret(west) or issecret(instance)) and instance == continent then
+			if ok and not (issecret(north) or issecret(west) or issecret(instance)) and north and west and instance == continent then
 				local dNorth, dEast = north - here.north, here.west - west
 				local yards = math.sqrt(dNorth * dNorth + dEast * dEast)
 				if yards <= GROUP_FAR then

@@ -42,7 +42,6 @@ local QUIET_GAP = 1           -- nothing going on: a frame this often (place and
 local MAX_FRAME = 245         -- bytes of a frame (the message: 250)
 local RECENT_TIME = 12
 local NAME_BYTES = 40
-local MAX_NAMES = 200         -- a friend's mob names kept at most
 local STOP_GAP = 10           -- frames from someone I don't watch: tell them, at most this often
 local MAX_ID = 999
 local TICK = 1
@@ -57,6 +56,7 @@ local idFor, keyFor, idUsed, lastId = {}, {}, {}, 0
 local ticker = CreateFrame("Frame")
 ticker:Hide()
 local indicator
+local watchersDirty = false -- someone started or stopped watching: the sensor and the dot follow on the next frame
 
 local function Message(word, rest)
 	return ("O%s;%s;%s"):format(VERSION, word, rest)
@@ -75,7 +75,7 @@ local function Count(t)
 end
 
 local function Wake()
-	if next(watchers) or next(watching) or next(gone) then
+	if next(watchers) or next(watching) or next(gone) or watchersDirty then
 		ticker:Show()
 	end
 end
@@ -243,7 +243,7 @@ local function Encode(picture, now)
 				.. (mob.friendly and "f" or "") .. (mob.group and "g" or "")
 			local yards = mob.beyond or mob.yards
 			local entry = ("%d,%d,%s,%d,%s"):format(id, Deg(mob.bearing),
-				yards and Int(math.min(yards, 99)) or "", math.floor(math.max(0, math.min(1, mob.sure or 1)) * 9 + 0.5), flags)
+				yards and Int(math.min(yards, 999)) or "", math.floor(math.max(0, math.min(1, mob.sure or 1)) * 9 + 0.5), flags)
 			if mob.casting and mob.castID then
 				entry = entry .. "," .. mob.castID
 			end
@@ -265,7 +265,7 @@ S.OnSensed(function(picture)
 	end
 	local now = GetTime()
 	local busy = picture.combat or picture.cast or #picture.mobs > 0
-	local gap = busy and math.max(FRAME_GAP, Count(watchers) / FRAMES_PER_SECOND) or QUIET_GAP
+	local gap = math.max(busy and FRAME_GAP or QUIET_GAP, Count(watchers) / FRAMES_PER_SECOND) -- (all watchers together: at most 4 a second)
 	local frame, ids
 	for id, watcher in pairs(watchers) do
 		if now - watcher.sentAt >= gap - 0.05 then
@@ -303,6 +303,9 @@ function B.ReceiveStream(senderID, word, rest)
 	end
 	local now = GetTime()
 	if word == "h" then
+		if rest ~= "1" and rest ~= "0" then
+			return -- (something a later build says: not ours to guess)
+		end
 		local can = rest == "1"
 		if peer.streamable and not can and watching[senderID] then
 			gone[senderID] = { why = "stopped", name = peer.name }
@@ -316,13 +319,15 @@ function B.ReceiveStream(senderID, word, rest)
 			local watcher = watchers[senderID]
 			if not watcher then
 				watchers[senderID] = { at = now, sentAt = -math.huge, names = {} }
-				WatchersChanged()
+				watchersDirty = true -- (the sensor starts on the tick, not inside the event)
+				Wake()
 			else
 				watcher.at = now
 			end
 		elseif rest == "0" and watchers[senderID] then
 			watchers[senderID] = nil
-			WatchersChanged()
+			watchersDirty = true
+			Wake()
 		end
 	elseif word == "f" then
 		if watching[senderID] then
@@ -344,20 +349,13 @@ function B.ReceiveStream(senderID, word, rest)
 		else
 			id, level, name = rest:match("^(%d+);(%-?%d*);([^;]+)$")
 		end
-		if not (watching[senderID] and id) then
-			return
+		id = tonumber(id)
+		if not (watching[senderID] and id and id >= 1 and id <= MAX_ID) then
+			return -- (ids go 1-999: the names stay bounded, and none is ever sent twice)
 		end
 		if not stream then
 			stream = { names = {}, count = 0 }
 			streams[senderID] = stream
-		end
-		id = tonumber(id)
-		if not stream.names[id] then
-			if stream.count >= MAX_NAMES then
-				wipe(stream.names) -- (a long session: start over; frames bring them again)
-				stream.count = 0
-			end
-			stream.count = stream.count + 1
 		end
 		stream.names[id] = { name = B.Clean(name, NAME_BYTES), level = tonumber(level), classFile = classFile ~= "" and classFile or nil }
 	end
@@ -372,7 +370,8 @@ end
 function B.StreamForget(id, peer)
 	if watchers[id] then
 		watchers[id] = nil
-		WatchersChanged()
+		watchersDirty = true
+		Wake()
 	end
 	if watching[id] then
 		gone[id] = { why = "away", name = peer and peer.name }
@@ -420,6 +419,11 @@ local function SpellName(id)
 	return type(info) == "table" and type(info.name) == "string" and info.name or nil
 end
 
+-- A whole number in a field (plain digits only: tonumber would also take "nan", "inf" or hex).
+local function Whole(text)
+	return text and text:match("^%-?%d+$") and tonumber(text) or nil
+end
+
 local function Fields(payload)
 	local fields = {}
 	for field in (payload .. ";"):gmatch("([^;]*);") do
@@ -435,12 +439,12 @@ local function Decode(stream, picture)
 		return false
 	end
 	local at = stream.at
-	picture.continent, picture.mapID = tonumber(f[1]), tonumber(f[2])
-	picture.north, picture.west = tonumber(f[3]), tonumber(f[4])
+	picture.continent, picture.mapID = Whole(f[1]), Whole(f[2])
+	picture.north, picture.west = Whole(f[3]), Whole(f[4])
 	if not (picture.continent and picture.north and picture.west) then
 		picture.continent, picture.north, picture.west = nil, nil, nil
 	end
-	picture.facing = math.rad(tonumber(f[5]) or 0)
+	picture.facing = math.rad((Whole(f[5]) or 0) % 360)
 	picture.combat = f[6]:find("c", 1, true) ~= nil
 	picture.ghost = f[6]:find("g", 1, true) ~= nil
 	picture.dead = picture.ghost or f[6]:find("d", 1, true) ~= nil
@@ -451,7 +455,7 @@ local function Decode(stream, picture)
 	else
 		picture.power = nil
 	end
-	local formID = tonumber(f[8])
+	local formID = Whole(f[8])
 	local formInfo = formID and S.Value("C_Spell.GetSpellInfo", formID)
 	if type(formInfo) == "table" and formInfo.iconID then
 		picture.form = picture.form or {}
@@ -628,8 +632,15 @@ end
 
 local sinceTick = 0
 ticker:SetScript("OnUpdate", function(self, elapsed)
+	if watchersDirty then -- (from a message: never inside the event itself)
+		watchersDirty = false
+		WatchersChanged()
+	end
 	sinceTick = sinceTick + elapsed
 	if sinceTick < TICK then
+		if not (next(watchers) or next(watching) or next(gone)) then
+			self:Hide()
+		end
 		return
 	end
 	sinceTick = 0
@@ -681,6 +692,7 @@ end
 function B.StreamSettingChanged()
 	local share = M.db.streamShare and true or false
 	if share ~= shared and M.enabled then
+		B.DropLow(Message("h", "")) -- (an answer's older one still waiting would arrive after this)
 		B.QueueToPeers(B.StreamHello())
 	end
 	shared = share

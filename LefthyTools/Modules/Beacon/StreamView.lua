@@ -766,6 +766,12 @@ local function Build(view, name, parent)
 	end)
 	win:SetScript("OnUpdate", OnUpdate) -- (only runs while it's shown)
 	win:SetScript("OnHide", function(self)
+		-- A resize or move in progress ends (the mouse-up may never come; the frame is reused).
+		if self.Grip and self.Grip:GetScript("OnUpdate") then
+			self.Grip:SetScript("OnUpdate", nil)
+			S.Saved("streamWindows")[self.view.kind == "friend" and "friend" or "me"] = self.view.scale
+		end
+		self:StopMovingOrSizing()
 		-- Escape, or hidden some other way: closed. (Not when only the interface is hidden, Alt+Z:
 		-- then it's still shown itself, and comes back with it.)
 		if self.view.open and not self:IsShown() then
@@ -957,9 +963,11 @@ end
 -- Shows a view (fresh: its dots, map and picture start over).
 local function Start(view)
 	ReleaseAll(view)
-	wipe(view.picture.mobs)
-	wipe(view.picture.recent)
-	view.picture.cast = nil
+	if view.picture ~= S.Sensed() then -- (the sensor's own picture: friends watching may be getting it)
+		wipe(view.picture.mobs)
+		wipe(view.picture.recent)
+		view.picture.cast = nil
+	end
 	view.map.id, view.map.x, view.map.source = false, nil, nil
 	view.clock, view.nextFeed, view.open, view.looked = 0, 0, true, nil
 	view.win.Status:SetText("")

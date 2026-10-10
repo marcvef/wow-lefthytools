@@ -328,7 +328,7 @@ local function Look()
 		if spot == "nil" then -- (beyond nameplate range, or turned away): how far, from the range checks
 			local yards, beyond = S.YardsFrom(S.Bounds("target", test.checks))
 			Note("your target without a nameplate: distance", phase, yards and "value" or "nil",
-				beyond and ("more than %d yd"):format(beyond) or yards and ("about %d yd"):format(yards) or nil)
+				beyond and ("more than %d yd"):format(math.floor(beyond + 0.5)) or yards and ("about %d yd"):format(math.floor(yards + 0.5)) or nil)
 		end
 	end
 	local units = 0
