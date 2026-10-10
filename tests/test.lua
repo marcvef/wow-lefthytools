@@ -938,6 +938,40 @@ do
 	check(dot:IsShown() and tostring(dot.Number:GetText()) == "5", "moving a slider without points: the gem shows a moment (full points), to see where")
 	Advance(5.2)
 	check(not dot:IsShown(), "then it goes")
+	-- Trial mode: placing it without a mob and without the settings.
+	local savedTarget = MOBS.target
+	MOBS.target = nil
+	T("comboNameplateX"):SetValue(2)
+	T("comboNameplateY"):SetValue(-6)
+	T("comboNameplateSize"):SetValue(12)
+	lefthy("tweaks combopos")
+	local trial = ns.GetComboTrial()
+	check(trial and trial:IsShown() and trial.Gem:IsShown() and trial.Values:GetText() == "Right 2, up -6, size 12"
+		and trial.Gem.fromDisplay and tostring(trial.Gem.Number:GetText()) == "5" and trial._strata == "FULLSCREEN_DIALOG",
+		"/lefthy tweaks combopos: a nameplate with the gem, no mob needed, got " .. tostring(trial and trial.Values:GetText()))
+	CURSOR.x, CURSOR.y = 100, 100
+	trial.Gem._scripts.OnMouseDown(trial.Gem, "LeftButton")
+	CURSOR.x, CURSOR.y = 110, 104
+	trial.Gem._scripts.OnUpdate(trial.Gem, 0.02)
+	check(TDB.comboNameplateX == 2 and trial.Values:GetText() == "Right 12, up -2, size 12", "dragging: it follows (saved on release)")
+	trial.Gem._scripts.OnMouseUp(trial.Gem, "LeftButton")
+	check(TDB.comboNameplateX == 12 and TDB.comboNameplateY == -2 and not trial.Gem._scripts.OnUpdate, "released: 10 right and 4 up, saved")
+	trial.Gem._scripts.OnMouseWheel(trial.Gem, 1)
+	check(TDB.comboNameplateSize == 13, "the mouse wheel over it: bigger")
+	trial.Left:Click()
+	trial.Down:Click()
+	trial.Smaller:Click()
+	check(TDB.comboNameplateX == 11 and TDB.comboNameplateY == -3 and TDB.comboNameplateSize == 12, "the arrows nudge it a pixel")
+	MOBS.target = savedTarget
+	Fire("PLAYER_TARGET_CHANGED")
+	Advance(6)
+	point = dot._points[#dot._points]
+	check(dot:IsShown() and point[4] == 11 and point[5] == -3, "a target meanwhile: its nameplate shows the gem there too, without points, for as long as it's open")
+	trial.Reset:Click()
+	check(TDB.comboNameplateX == 2 and TDB.comboNameplateY == -6 and TDB.comboNameplateSize == 12, "Reset: back to the start")
+	trial.Done:Click()
+	Advance(0.1)
+	check(not trial:IsShown() and not dot:IsShown(), "Done: closed; without points no gem")
 	T("comboNameplateX"):SetValue(2)
 	T("comboNameplateY"):SetValue(-6)
 	T("comboNameplateSize"):SetValue(12)

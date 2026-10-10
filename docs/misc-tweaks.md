@@ -98,6 +98,13 @@ display (the old `comboPoints` tweak) is gone; its saved value is simply no long
   buffs and debuffs above the bar), from LEFT at the RIGHT of `PlayerLevelDiffFrame` (Camelot's level
   box right of the health bars) when that shows, else of `HealthBarsContainer`. Moving a slider
   shows the gem on the target for 5 s (full points if there are none: `ns.PreviewComboNameplate`).
+  **Trial mode** (`ns.ComboTrial`: the settings' *Try it* button, `/lefthy tweaks combopos`): a small
+  window (FULLSCREEN_DIALOG, movable, Escape closes it) with a stand-in nameplate: a name, a health
+  bar and a level box, at the target's nameplate's scale and level box size when there is one. The
+  gem sits on it as configured (full points, coloured): drag it (follows the cursor, saved on
+  release, through `LT:SetModuleSetting` so an open settings page shows it), the mouse wheel over it
+  changes the size, arrow and +/- buttons nudge a pixel (also for controllers), Reset, Done. While
+  it's open the target's real nameplate shows the gem too, also without points.
   Our own frame, parented to the plate's `UnitFrame` (it shows, fades and scales with it), frame
   level above the level frame (50). Only while there are points; found again on target, nameplate
   added/removed, combo and power changes (next frame). A forbidden or missing nameplate, or secret

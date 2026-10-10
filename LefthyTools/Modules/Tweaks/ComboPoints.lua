@@ -228,88 +228,113 @@ local function PartsFromDisplay()
 	return #parts > 0 and parts or nil
 end
 
--- The gem's textures for a list of parts (reused by key; ones not in the list hidden).
-local function LayDot(parts, fromDisplay)
-	dot.parts = dot.parts or {}
-	for _, texture in pairs(dot.parts) do
+-- A gem's textures for a list of parts (reused by key; ones not in the list hidden).
+local function LayGem(gem, parts, fromDisplay)
+	gem.parts = gem.parts or {}
+	for _, texture in pairs(gem.parts) do
 		texture:Hide()
 	end
 	for _, part in ipairs(parts) do
-		local texture = dot.parts[part.key]
+		local texture = gem.parts[part.key]
 		if not texture then
-			texture = dot:CreateTexture(nil, part.layer, nil, part.sub)
-			dot.parts[part.key] = texture
+			texture = gem:CreateTexture(nil, part.layer, nil, part.sub)
+			gem.parts[part.key] = texture
 		end
 		texture:SetDrawLayer(part.layer, part.sub)
 		texture:SetAtlas(part.atlas)
 		texture.part = part
 		texture:Show()
 	end
-	dot.Gem, dot.Socket = dot.parts.IconUncharged, dot.parts.BGActive
-	if dot.Gem and not dot.Boost then
-		dot.Boost = dot:CreateTexture(nil, "ARTWORK", nil, 7)
-		dot.Boost:SetAtlas(GEM_ATLAS)
-		dot.Boost:SetBlendMode("ADD")
-		dot.Boost:SetDesaturated(true)
+	gem.Gem, gem.Socket = gem.parts.IconUncharged, gem.parts.BGActive
+	if gem.Gem and not gem.Boost then
+		gem.Boost = gem:CreateTexture(nil, "ARTWORK", nil, 7)
+		gem.Boost:SetAtlas(GEM_ATLAS)
+		gem.Boost:SetBlendMode("ADD")
+		gem.Boost:SetDesaturated(true)
 	end
-	dot.fromDisplay = fromDisplay
+	gem.fromDisplay = fromDisplay
+end
+
+-- The display's look, if the display has come since the gem was built.
+local function RelayGem(gem)
+	if not gem.fromDisplay and not gem.round then
+		local fromDisplay = PartsFromDisplay()
+		if fromDisplay then
+			LayGem(gem, fromDisplay, true)
+		end
+	end
 end
 
 -- Size and place every part (size: the gem's in pixels).
-local function SizeDot(size)
-	dot:SetSize(size, size)
-	for _, texture in pairs(dot.parts or {}) do
+local function SizeGem(gem, size)
+	gem:SetSize(size, size)
+	for _, texture in pairs(gem.parts or {}) do
 		local part = texture.part
 		texture:ClearAllPoints()
 		texture:SetSize(size * part.w, size * part.h)
-		texture:SetPoint("CENTER", dot, "CENTER", size * part.x, size * part.y)
+		texture:SetPoint("CENTER", gem, "CENTER", size * part.x, size * part.y)
 	end
-	if dot.Boost and dot.Gem then
-		dot.Boost:ClearAllPoints()
-		dot.Boost:SetAllPoints(dot.Gem)
+	if gem.Boost and gem.Gem then
+		gem.Boost:ClearAllPoints()
+		gem.Boost:SetAllPoints(gem.Gem)
 	end
-	if dot.round then
-		dot.Gem:SetAllPoints()
+	if gem.round then
+		gem.Gem:SetAllPoints()
 	end
+end
+
+-- A gem with its number (the nameplate's, and the trial mode's below).
+local function NewGem(parent)
+	local gem = CreateFrame("Frame", nil, parent)
+	gem:SetSize(DOT_SIZE, DOT_SIZE)
+	local fromDisplay = PartsFromDisplay()
+	if fromDisplay then
+		LayGem(gem, fromDisplay, true)
+	elseif C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(GEM_ATLAS) then
+		LayGem(gem, PARTS, false)
+	else
+		gem.Gem = gem:CreateTexture(nil, "ARTWORK")
+		gem.Gem:SetAllPoints()
+		local mask = gem:CreateMaskTexture()
+		mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+		mask:SetAllPoints()
+		gem.Gem:AddMaskTexture(mask)
+		gem.round = true
+	end
+	gem.Number = gem:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
+	gem.Number:SetPoint("LEFT", gem, "TOPRIGHT", -2, -2) -- like a footnote
+	return gem
 end
 
 local function BuildDot()
-	dot = CreateFrame("Frame")
-	dot:SetSize(DOT_SIZE, DOT_SIZE)
-	local fromDisplay = PartsFromDisplay()
-	if fromDisplay then
-		LayDot(fromDisplay, true)
-	elseif C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(GEM_ATLAS) then
-		LayDot(PARTS, false)
-	else
-		dot.Gem = dot:CreateTexture(nil, "ARTWORK")
-		dot.Gem:SetAllPoints()
-		local mask = dot:CreateMaskTexture()
-		mask:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-		mask:SetAllPoints()
-		dot.Gem:AddMaskTexture(mask)
-		dot.round = true
-	end
-	dot.Number = dot:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
-	dot.Number:SetPoint("LEFT", dot, "TOPRIGHT", -2, -2) -- like a footnote
+	dot = NewGem()
 	dot:Hide()
 end
 
--- The gem in a colour (r == nil: Blizzard's red), tinted like the display's (Recolor).
-local function StyleDot(r, g, b)
-	if dot.round then
-		dot.Gem:SetColorTexture(r or RED[1], g or RED[2], b or RED[3], 1)
+-- A gem in a colour (r == nil: Blizzard's red), tinted like the display's (Recolor).
+local function StyleGem(gem, r, g, b)
+	if gem.round then
+		gem.Gem:SetColorTexture(r or RED[1], g or RED[2], b or RED[3], 1)
 		return
 	end
 	local tinted = r ~= nil
-	for _, texture in ipairs({ dot.Gem, dot.Socket }) do
+	for _, texture in ipairs({ gem.Gem, gem.Socket }) do
 		texture:SetDesaturated(tinted)
 		local lift = tinted and 0.25 or 0
 		texture:SetVertexColor((r or 1) + (1 - (r or 1)) * lift, (g or 1) + (1 - (g or 1)) * lift, (b or 1) + (1 - (b or 1)) * lift)
 	end
-	if dot.Boost then
-		dot.Boost:SetVertexColor(r or 1, g or 1, b or 1)
-		dot.Boost:SetShown(tinted)
+	if gem.Boost then
+		gem.Boost:SetVertexColor(r or 1, g or 1, b or 1)
+		gem.Boost:SetShown(tinted)
+	end
+end
+
+-- The colour for some points (Blizzard's red with colouring off).
+local function StyleFor(gem, points)
+	if colorByCount then
+		StyleGem(gem, CountColor(points, MaxPoints()))
+	else
+		StyleGem(gem, nil)
 	end
 end
 
@@ -348,14 +373,11 @@ local function UpdateDot()
 	end
 	if not dot then
 		BuildDot()
-	elseif not dot.fromDisplay and not dot.round then
-		local fromDisplay = PartsFromDisplay() -- (the display's bar came after the gem was built)
-		if fromDisplay then
-			LayDot(fromDisplay, true)
-		end
+	else
+		RelayGem(dot) -- (the display's bar came after the gem was built)
 	end
 	local x, y, size = Placement()
-	SizeDot(size)
+	SizeGem(dot, size)
 	local level = plate.PlayerLevelDiffFrame
 	local ok = pcall(function()
 		if dot:GetParent() ~= plate then
@@ -373,13 +395,221 @@ local function UpdateDot()
 		dot:Hide()
 		return
 	end
-	if colorByCount then
-		StyleDot(CountColor(points, MaxPoints()))
-	else
-		StyleDot(nil)
-	end
+	StyleFor(dot, points)
 	dot.Number:SetText(points)
 	dot:Show()
+end
+
+---------------------------------------------------------------------------
+-- Trial mode: placing the gem without a mob and without the settings open (Misc Tweaks' button,
+-- /lefthy tweaks combopos). A small window with a stand-in nameplate (at your target's nameplate's
+-- scale and level box size when you have one): drag the gem, the mouse wheel over it sizes it,
+-- arrow and +/- buttons nudge it a pixel (controllers too). Saved on release, through the
+-- settings (an open settings page shows it); your target's nameplate shows the gem meanwhile.
+---------------------------------------------------------------------------
+
+local trial
+local X_RANGE, Y_RANGE, SIZE_MIN, SIZE_MAX = 60, 40, 6, 30
+
+local function Clamp(v, lo, hi)
+	return math.max(lo, math.min(hi, math.floor(v + 0.5)))
+end
+
+local function Save(key, value)
+	local tweaks = ns.LT:GetModule("tweaks")
+	if tweaks and tweaks.db and tweaks.db[key] ~= value then
+		ns.LT:SetModuleSetting(tweaks, key, value) -- (the settings page and your target's gem follow)
+	end
+end
+
+-- The stand-in at your target's nameplate's scale, its level box as big as the real one.
+local function MatchPlate()
+	local plate = TargetPlate()
+	local okScale, scale = false, nil
+	if plate then
+		okScale, scale = pcall(plate.GetEffectiveScale, plate)
+	end
+	local mine = trial:GetEffectiveScale()
+	if okScale and type(scale) == "number" and not issecret(scale) and scale > 0 and mine > 0 then
+		trial.Plate:SetScale(scale / mine)
+	else
+		trial.Plate:SetScale(1)
+	end
+	local level = plate and plate.PlayerLevelDiffFrame
+	if level then
+		local ok, w, h = pcall(level.GetSize, level)
+		if ok and type(w) == "number" and not issecret(w) and w > 0 and h > 0 then
+			trial.Level:SetSize(w, h)
+		end
+	end
+end
+
+-- The gem where x, y and size say (nil: the saved ones).
+local function TrialLayout(x, y, size)
+	local savedX, savedY, savedSize = Placement()
+	x, y, size = x or savedX, y or savedY, size or savedSize
+	RelayGem(trial.Gem)
+	SizeGem(trial.Gem, size)
+	trial.Gem:ClearAllPoints()
+	trial.Gem:SetPoint("LEFT", trial.Level, "RIGHT", x, y)
+	StyleFor(trial.Gem, MaxPoints())
+	trial.Gem.Number:SetText(MaxPoints())
+	trial.Values:SetText(ns.L["Right %d, up %d, size %d"]:format(x, y, size))
+end
+
+local function Nudge(dx, dy, dsize)
+	local x, y, size = Placement()
+	Save("comboNameplateX", Clamp(x + dx, -X_RANGE, X_RANGE))
+	Save("comboNameplateY", Clamp(y + dy, -Y_RANGE, Y_RANGE))
+	Save("comboNameplateSize", Clamp(size + dsize, SIZE_MIN, SIZE_MAX))
+	MatchPlate()
+	TrialLayout()
+end
+
+local function DragUpdate(gem)
+	local cx, cy = GetCursorPosition()
+	local scale = trial.Plate:GetEffectiveScale()
+	gem.dragX = Clamp(gem.fromX + (cx - gem.startX) / scale, -X_RANGE, X_RANGE)
+	gem.dragY = Clamp(gem.fromY + (cy - gem.startY) / scale, -Y_RANGE, Y_RANGE)
+	TrialLayout(gem.dragX, gem.dragY)
+end
+
+local function ArrowButton(texture, size, dx, dy, dsize, x)
+	local button = CreateFrame("Button", nil, trial)
+	button:SetSize(size, size)
+	button:SetNormalTexture(texture)
+	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	button:SetPoint("BOTTOMLEFT", trial, "BOTTOMLEFT", x, 12)
+	button:SetScript("OnClick", function() Nudge(dx, dy, dsize) end)
+	return button
+end
+
+local function BuildTrial()
+	trial = CreateFrame("Frame", "LefthyToolsComboTrial", UIParent)
+	trial:SetSize(330, 210)
+	trial:SetPoint("CENTER", 0, 140)
+	trial:SetFrameStrata("FULLSCREEN_DIALOG") -- (above the settings, if they're open)
+	trial:SetClampedToScreen(true)
+	trial:EnableMouse(true)
+	trial:SetMovable(true)
+	trial:RegisterForDrag("LeftButton")
+	trial:SetScript("OnDragStart", trial.StartMoving)
+	trial:SetScript("OnDragStop", trial.StopMovingOrSizing)
+	local bg = trial:CreateTexture(nil, "BACKGROUND")
+	bg:SetAllPoints()
+	bg:SetColorTexture(0.04, 0.05, 0.07, 0.94)
+	local edge = trial:CreateTexture(nil, "BORDER")
+	edge:SetPoint("TOPLEFT")
+	edge:SetPoint("TOPRIGHT")
+	edge:SetHeight(1)
+	edge:SetColorTexture(1, 0.82, 0, 0.5)
+	trial.Title = trial:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	trial.Title:SetPoint("TOP", 0, -10)
+	trial.Title:SetText(ns.L["Place the combo point gem"])
+	trial.Hint = trial:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	trial.Hint:SetPoint("TOP", trial.Title, "BOTTOM", 0, -6)
+	trial.Hint:SetWidth(300)
+	trial.Hint:SetText(ns.L["Drag the gem; the mouse wheel over it changes its size. Your target's nameplate shows it too."])
+	-- The stand-in nameplate: a name, a health bar and the level box right of it.
+	trial.Plate = CreateFrame("Frame", nil, trial)
+	trial.Plate:SetSize(1, 1)
+	trial.Plate:SetPoint("CENTER", -20, 4)
+	local bar = trial.Plate:CreateTexture(nil, "ARTWORK")
+	bar:SetSize(120, 10)
+	bar:SetPoint("CENTER")
+	bar:SetColorTexture(0.75, 0.12, 0.1, 1)
+	local barBack = trial.Plate:CreateTexture(nil, "BACKGROUND")
+	barBack:SetPoint("TOPLEFT", bar, "TOPLEFT", -1, 1)
+	barBack:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 1, -1)
+	barBack:SetColorTexture(0, 0, 0, 1)
+	local name = trial.Plate:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	name:SetPoint("BOTTOM", bar, "TOP", 0, 3)
+	name:SetText(ns.L["Training Dummy"])
+	trial.Level = CreateFrame("Frame", nil, trial.Plate)
+	trial.Level:SetSize(18, 14)
+	trial.Level:SetPoint("LEFT", bar, "RIGHT", 2, 0)
+	local levelText = trial.Level:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	levelText:SetPoint("CENTER")
+	levelText:SetText("60")
+	trial.Gem = NewGem(trial.Plate)
+	trial.Gem:SetFrameLevel(trial.Plate:GetFrameLevel() + 5)
+	trial.Gem:EnableMouse(true)
+	trial.Gem:EnableMouseWheel(true)
+	trial.Gem:SetScript("OnMouseDown", function(gem, button)
+		if button == "LeftButton" then
+			gem.startX, gem.startY = GetCursorPosition()
+			gem.fromX, gem.fromY = Placement()
+			gem.dragX, gem.dragY = gem.fromX, gem.fromY
+			gem:SetScript("OnUpdate", DragUpdate)
+		end
+	end)
+	trial.Gem:SetScript("OnMouseUp", function(gem)
+		if gem:GetScript("OnUpdate") then
+			gem:SetScript("OnUpdate", nil)
+			Save("comboNameplateX", gem.dragX)
+			Save("comboNameplateY", gem.dragY)
+			TrialLayout()
+		end
+	end)
+	trial.Gem:SetScript("OnMouseWheel", function(_, delta) Nudge(0, 0, delta > 0 and 1 or -1) end)
+	trial.Values = trial:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	trial.Values:SetPoint("BOTTOM", 0, 44)
+	-- Nudges: left, right, up, down, smaller, bigger; then Reset and Done.
+	trial.Left = ArrowButton("Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up", 26, -1, 0, 0, 10)
+	trial.Right = ArrowButton("Interface\\Buttons\\UI-SpellbookIcon-NextPage-Up", 26, 1, 0, 0, 36)
+	trial.Up = ArrowButton("Interface\\Buttons\\Arrow-Up-Up", 22, 0, 1, 0, 66)
+	trial.Down = ArrowButton("Interface\\Buttons\\Arrow-Down-Up", 22, 0, -1, 0, 90)
+	trial.Smaller = ArrowButton("Interface\\Buttons\\UI-MinusButton-Up", 18, 0, 0, -1, 122)
+	trial.Bigger = ArrowButton("Interface\\Buttons\\UI-PlusButton-Up", 18, 0, 0, 1, 144)
+	trial.Reset = CreateFrame("Button", nil, trial, "UIPanelButtonTemplate")
+	trial.Reset:SetSize(70, 22)
+	trial.Reset:SetPoint("BOTTOMRIGHT", -88, 10)
+	trial.Reset:SetText(ns.L["Reset"])
+	trial.Reset:SetScript("OnClick", function()
+		Save("comboNameplateX", 2)
+		Save("comboNameplateY", DOT_DOWN)
+		Save("comboNameplateSize", DOT_SIZE)
+		TrialLayout()
+	end)
+	trial.Done = CreateFrame("Button", nil, trial, "UIPanelButtonTemplate")
+	trial.Done:SetSize(70, 22)
+	trial.Done:SetPoint("BOTTOMRIGHT", -12, 10)
+	trial.Done:SetText(ns.L["Done"])
+	trial.Done:SetScript("OnClick", function() trial:Hide() end)
+	trial:SetScript("OnShow", function()
+		previewUntil = math.huge -- (your target's nameplate shows the gem while placing it)
+		MatchPlate()
+		TrialLayout()
+		UpdateDot()
+	end)
+	trial:SetScript("OnHide", function()
+		trial.Gem:SetScript("OnUpdate", nil)
+		previewUntil = 0
+		UpdateDot()
+	end)
+	trial:Hide()
+	if UISpecialFrames then
+		table.insert(UISpecialFrames, "LefthyToolsComboTrial") -- Escape closes it
+	end
+end
+
+-- Opens (or closes) the trial mode.
+function ns.ComboTrial(on)
+	if on == nil then
+		on = not (trial and trial:IsShown())
+	end
+	if on and not trial then
+		BuildTrial()
+	end
+	if trial and on then
+		trial:Show()
+	elseif trial then
+		trial:Hide()
+	end
+end
+
+function ns.GetComboTrial()
+	return trial
 end
 
 ---------------------------------------------------------------------------
@@ -445,7 +675,7 @@ end
 -- The position or size sliders moved: the gem shows on your target for a few seconds (full points
 -- if you have none), so you see where it goes.
 function ns.PreviewComboNameplate()
-	previewUntil = GetTime() + 5
+	previewUntil = math.max(previewUntil, GetTime() + 5) -- (the trial mode's lasts while it's open)
 	UpdateDot()
 	C_Timer.After(5.1, UpdateDot)
 end

@@ -296,6 +296,17 @@ L["Pixels right of your target's level (negative: to the left). While you move a
 L["Combo gem: up and down"] = "Combopunkt: hoch und runter"
 L["Pixels above the middle of your target's level (negative: below)."] = "Pixel über der Mitte des Levels deines Ziels (negativ: darunter)."
 L["Combo gem: size"] = "Combopunkt: Größe"
+L["Combo gem: place it"] = "Combopunkt: platzieren"
+L["Try it"] = "Ausprobieren"
+L["A small window with a nameplate: drag the gem where you want it, the mouse wheel over it changes its size, the arrows nudge it. No mob needed, and the settings can be closed. /lefthy tweaks combopos does the same."] =
+	"Ein kleines Fenster mit einer Namensplakette: zieh den Combopunkt dorthin, wo du ihn haben willst, das Mausrad darüber ändert seine Größe, die Pfeile verschieben ihn pixelweise. Kein Mob nötig, und die Einstellungen können zu sein. /lefthy tweaks combopos macht dasselbe."
+L["Right %d, up %d, size %d"] = "Rechts %d, hoch %d, Größe %d"
+L["Place the combo point gem"] = "Combopunkt platzieren"
+L["Drag the gem; the mouse wheel over it changes its size. Your target's nameplate shows it too."] =
+	"Zieh den Combopunkt; das Mausrad darüber ändert seine Größe. Die Namensplakette deines Ziels zeigt ihn auch."
+L["Training Dummy"] = "Trainingsattrappe"
+L["Reset"] = "Zurücksetzen"
+L["Done"] = "Fertig"
 L["The gem's size in pixels (the personal resource display's are 20)."] = "Die Größe in Pixeln (in der persönlichen Ressourcenanzeige sind es 20)."
 L["Blizzard's combo points on the personal resource display (and the dot on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
 	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und der Punkt an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."

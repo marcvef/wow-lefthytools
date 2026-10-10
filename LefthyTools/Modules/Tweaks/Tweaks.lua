@@ -648,6 +648,8 @@ function M:BuildOptions(o)
 		L["Pixels above the middle of your target's level (negative: below)."], -40, 40, 1, Pixels)
 	o:Slider("comboNameplateSize", L["Combo gem: size"], L["The gem's size in pixels (the personal resource display's are 20)."],
 		6, 30, 1, Pixels)
+	o:Button(L["Combo gem: place it"], L["Try it"], function() ns.ComboTrial(true) end,
+		L["A small window with a nameplate: drag the gem where you want it, the mouse wheel over it changes its size, the arrows nudge it. No mob needed, and the settings can be closed. /lefthy tweaks combopos does the same."])
 	o:Header(L["Bags"])
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])
@@ -701,6 +703,8 @@ function M:OnSlashCommand(msg)
 	elseif cmd == "resetbags" then
 		self:ResetBagPositions()
 		self:Print("bag positions reset.")
+	elseif cmd == "combopos" then
+		ns.ComboTrial(true) -- ComboPoints.lua: place the nameplate gem without a mob
 	elseif cmd == "levelup" and arg == "test" then
 		ns.LevelUp.Preview()
 	elseif cmd == "status" then
@@ -730,5 +734,6 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy tweaks statustext | bags | bagsort | quests | newquests | combo | combocolors | questmap | afk | levelup | flights [on|off] - switch a tweak")
 		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
+		self:Print("/lefthy tweaks combopos - place the combo point gem on nameplates (no mob needed)")
 	end
 end
