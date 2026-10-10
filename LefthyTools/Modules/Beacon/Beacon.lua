@@ -595,6 +595,16 @@ function B.DropLow(prefix)
 	end
 end
 
+-- Drops low-priority messages still waiting for one friend that match(message) says (an answer
+-- asked for again: it goes once).
+function B.DropLowFor(gameAccountID, match)
+	for i = #lowOutbox, 1, -1 do
+		if lowOutbox[i][1] == gameAccountID and match(lowOutbox[i][2]) then
+			table.remove(lowOutbox, i)
+		end
+	end
+end
+
 function B.QueueLowToPeers(message)
 	for gameAccountID in pairs(peers) do
 		B.QueueLow(gameAccountID, message)
@@ -1381,6 +1391,9 @@ function M:OnDisable()
 	end
 	if B.StreamStop then
 		B.StreamStop() -- streams close, nobody watches me
+	end
+	if B.JournalStop then
+		B.JournalStop() -- Chronicle: nothing asked, offered or owed any more
 	end
 end
 

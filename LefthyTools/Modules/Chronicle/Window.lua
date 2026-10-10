@@ -15,6 +15,7 @@ local M = C.module
 local TIMELINE_SHOW = 250  -- entries drawn; older ones are summarized in one line
 local STATS_REFRESH = 5
 local GRAPHS_MIN_GAP, GRAPHS_REFRESH = 10, 30 -- graphs: redraw on changes at most every 10 s, else every 30 s
+local FEED_MIN_GAP = 3 -- friends' news: the Friends page and the minimap dot follow at most this often
 local TAB_WIDTH = 88
 
 local ICONS = {
@@ -41,6 +42,7 @@ local frame
 local tab = "timeline"
 local selectedKey
 local lastStatsRefresh, lastGraphsRefresh, graphsPending = 0, 0, false
+local feedPending, dotPending, lastDot = false, false, -math.huge
 local graphState = { metric = "played", buttons = {} }
 local compareState = { range = 14, hidden = {} }
 
@@ -103,27 +105,33 @@ local TEXT = {
 
 -- A friend's feed entry as an event of the same shape (highlights arrive as two text fields).
 local function FriendEvent(f)
-	local a, b = f.a, f.b
-	local shapes = {
-		level = { level = f.level },
-		death = { foe = f.foe, zone = f.where },
-		boss = { name = a, instance = b },
-		rare = { name = a, zone = b },
-		dungeon = { name = a },
-		loot = { name = a, quality = tonumber(b) },
-		mount = { name = a },
-		achievement = { name = a },
-		quests = { count = tonumber(a) },
-		gold = { gold = tonumber(a) },
-		profession = { name = a, level = tonumber(b) },
-		quest = { name = a },
-		zone = { zone = a },
-		online = {},
-		offline = {},
-	}
-	local e = shapes[f.k]
+	local a, b, k = f.a, f.b, f.k
+	local e -- (only the one shape it needs: this runs for every line drawn)
+	if k == "level" then
+		e = { level = f.level }
+	elseif k == "death" then
+		e = { foe = f.foe, zone = f.where }
+	elseif k == "boss" then
+		e = { name = a, instance = b }
+	elseif k == "rare" then
+		e = { name = a, zone = b }
+	elseif k == "loot" then
+		e = { name = a, quality = tonumber(b) }
+	elseif k == "quests" then
+		e = { count = tonumber(a) }
+	elseif k == "gold" then
+		e = { gold = tonumber(a) }
+	elseif k == "profession" then
+		e = { name = a, level = tonumber(b) }
+	elseif k == "zone" then
+		e = { zone = a }
+	elseif k == "dungeon" or k == "mount" or k == "achievement" or k == "quest" then
+		e = { name = a }
+	elseif k == "online" or k == "offline" then
+		e = {}
+	end
 	if e then
-		e.k, e.t = f.k, f.t
+		e.k, e.t = k, f.t
 	end
 	return e
 end
@@ -438,9 +446,10 @@ local function FriendPeople()
 end
 
 -- "Name  Level 20" in class colour; friends marked (with their BattleTag's name), other realms named.
-local function Label(key)
+-- person: the friend's entry when the caller has it (else it's looked up).
+local function Label(key, person)
 	if IsFriend(key) then
-		local person = C.Person(key) or {}
+		person = person or C.Person(key) or {}
 		return LT.Window.ClassColorCode(person.classFile) .. (person.name or "?") .. "|r  |cffcccccc"
 			.. (person.level and L["Level %d"]:format(person.level) or "") .. "|r  |cff80c0ff"
 			.. (person.account and ("(" .. person.account .. ")") or L["(friend)"]) .. "|r"
@@ -490,7 +499,7 @@ local function PickerEntries()
 		items[#items + 1] = { divider = true }
 		items[#items + 1] = { title = L["Friends"] }
 		for _, person in ipairs(friends) do
-			items[#items + 1] = { text = Label(person.key), value = person.key, selected = person.key == selectedKey }
+			items[#items + 1] = { text = Label(person.key, person), value = person.key, selected = person.key == selectedKey }
 		end
 	end
 	return items
@@ -570,10 +579,10 @@ function Refresh(keepScroll)
 			button:Hide()
 		end
 	end
-	if tab == "friends" then
+	if tab == "friends" and C.MarkFeedSeen then
 		C.MarkFeedSeen() -- (before the count below)
 	end
-	local unseen = C.UnseenCount()
+	local unseen = C.UnseenCount and C.UnseenCount() or 0
 	frame.Tabs.friends.New:SetText(unseen > 0 and tostring(unseen) or "")
 	if tab == "graphs" or tab == "compare" then
 		frame.Text:SetText("")
@@ -600,7 +609,7 @@ function Refresh(keepScroll)
 	else
 		frame:SetBodyText(tab == "friends" and Friends() or Timeline(c), keepScroll)
 		frame.Values:SetText("")
-		lastStatsRefresh = GetTime() -- the friends page refreshes every few seconds too
+		lastStatsRefresh, feedPending = GetTime(), false -- the friends page refreshes every few seconds too
 	end
 end
 
@@ -638,17 +647,23 @@ end
 -- last one. Only the open page is redrawn, and only if its data changed (a kill updates a
 -- counter, not the timeline).
 function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
-	if feedChanged and C.UpdateNewDot then
+	-- While journals stream in the feed changes every second: the dot and the Friends page follow
+	-- at most every few seconds.
+	dotPending = dotPending or feedChanged
+	if dotPending and now - lastDot >= FEED_MIN_GAP and C.UpdateNewDot then
+		dotPending, lastDot = false, now
 		C.UpdateNewDot() -- (the minimap button's blue dot)
 	end
 	if not (frame and frame:IsShown()) then
 		return
 	end
+	feedPending = feedPending or feedChanged
 	local redraw
 	if tab == "timeline" then
 		redraw = eventsChanged
 	elseif tab == "friends" then
-		redraw = feedChanged or now - lastStatsRefresh >= STATS_REFRESH -- "online now" changes all the time
+		local since = now - lastStatsRefresh
+		redraw = (feedPending and since >= FEED_MIN_GAP) or since >= STATS_REFRESH -- "online now" changes all the time
 	elseif tab == "graphs" or tab == "compare" then
 		graphsPending = graphsPending or statsChanged or eventsChanged or feedChanged -- kept until the next draw
 		local since = now - lastGraphsRefresh

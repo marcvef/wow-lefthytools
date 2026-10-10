@@ -45,6 +45,9 @@ local VERSION = "2"
 local DAYS_KEPT = 30
 local NEWS_KEPT = 150
 local SUMMARY_GAP = 60
+local FULL_OFFER = 300  -- everything offered again this often (an offer missed, a journal only partly got)
+local SERVES_PER_TICK = 2 -- answers built per tick (each up to SERVE_MAX messages)
+local BOOK_DAYS = 60     -- a friend's character with nothing newer than this goes
 local CHECK_GAP = 60
 local PROFILE_GAP = 300
 local PENDING_TIMEOUT = 90
@@ -65,11 +68,12 @@ local issecret = issecretvalue or function() return false end
 local store
 local myAcct
 local friendsCache, friendsAt = {}, -math.huge
-local pending = {}     -- acct -> { from, at }
+local pending = {}     -- acct -> { from, at, got (records come so far), expect (how many the answer has) }
+local serves = {}      -- answers to build on the tick: { id, acct, since }
 local summaries = {}   -- gameAccountID -> { at, sent = { [acct] = u } }
 local lastCheck, lastProfile = -math.huge, -math.huge
 local catchUp          -- { since, at, deadline }
-local recapAt
+local recapAt, recapDeadline, pruneAt = nil, 0, nil -- (the recap waits for journals until recapDeadline)
 local feedVersion = 0  -- bumped when friends' news change (the merged feed is rebuilt then)
 
 ---------------------------------------------------------------------------
@@ -268,10 +272,27 @@ local function Upgrade(c)
 	for _, e in ipairs(c.events) do
 		if not e.n and e.t and e.t >= oldest and C.Shareable(e) then
 			s.seq = s.seq + 1
-			e.n, e.u = s.seq, e.t
-			store.myU = math.max(store.myU or 0, e.t)
+			-- (its own time, but always above the last stamp: two in one second must differ, or an
+			-- answer cut between them would lose the second)
+			local u = math.max(e.t, (store.myU or 0) + 1)
+			e.n, e.u = s.seq, u
+			store.myU = u
 		end
 	end
+end
+
+-- Every record of a character stamped anew, so friends who are further ask for them again (all
+-- characters shared from now on; another character played while only the current one is shared).
+local function Restamp(c)
+	local s = SyncState(c)
+	wipe(s.daySig)
+	s.profileSig = nil
+	for _, e in ipairs(c.events) do
+		if e.n then
+			e.u = NextU()
+		end
+	end
+	StampChar(c, false, true)
 end
 
 ---------------------------------------------------------------------------
@@ -292,13 +313,19 @@ local function MyChars()
 	return list
 end
 
--- How far I hold an account (0: not at all).
+-- Is an account one of my friends' (while the friend list isn't known yet: assumed so)?
+local function IsFriend(acct)
+	local friends = Friends()
+	return next(friends) == nil or friends[acct] ~= nil
+end
+
+-- How far I hold an account (0: not at all; friends' journals only while they're still my friends).
 local function Held(acct)
 	if acct == C.MyAccount() then
 		return M.db.share and (store.myU or 0) or 0
 	end
 	local a = store.book[acct]
-	return a and M.db.relay and a.u or 0
+	return a and M.db.relay and IsFriend(acct) and a.u or 0
 end
 
 local function J(word, ...)
@@ -417,16 +444,21 @@ function ns.Beacon.JournalHello()
 	end
 end
 
--- What I hold, to one friend: only what grew since they last heard it (everything the first time),
--- at most every SUMMARY_GAP.
+-- What I hold, to one friend: only what grew since they last heard it (everything the first time,
+-- and again every FULL_OFFER: an offer missed, or a journal they got only part of, is asked for
+-- then), at most every SUMMARY_GAP.
 local function SendSummary(id, peer, now)
 	local s = summaries[id]
 	if not s then
-		s = { at = -math.huge, sent = {} }
+		s = { at = -math.huge, full = now, sent = {} }
 		summaries[id] = s
 	end
 	if now - s.at < SUMMARY_GAP then
 		return
+	end
+	if now - s.full >= FULL_OFFER then
+		s.full = now
+		wipe(s.sent)
 	end
 	local items = {}
 	local function Offer(acct)
@@ -457,22 +489,33 @@ local function Request(id, acct, now)
 	if p and now - p.at < PENDING_TIMEOUT then
 		return
 	end
-	pending[acct] = { from = id, at = now }
+	pending[acct] = { from = id, at = now, got = 0 }
 	ns.Beacon.Queue(id, J("q", acct, store.book[acct] and store.book[acct].u or 0))
 end
 
+-- An answer: the account's records newer than since, at most SERVE_MAX (never cutting between two
+-- of the same stamp), how many (c: a receiver that got fewer doesn't take the end's stamp; older
+-- builds ignore it) and the end. An answer to the same friend for the same account still waiting
+-- goes first: asked again, they get it once.
 local function Serve(id, acct, since)
+	local B = ns.Beacon
+	B.DropLowFor(id, function(message)
+		return message:sub(1, 3) == "J" .. VERSION .. ";" and message:find(";" .. acct .. ";", 1, true) ~= nil
+	end)
 	if Held(acct) == 0 then
-		ns.Beacon.Queue(id, J("e", acct, since)) -- (nothing for them: they ask someone else)
+		B.Queue(id, J("e", acct, since)) -- (nothing for them: they ask someone else)
 		return
 	end
 	local list = Records(acct, since)
-	local B = ns.Beacon
 	local count = math.min(#list, SERVE_MAX)
+	while list[count + 1] and list[count + 1][1] == list[count][1] do
+		count = count + 1
+	end
 	for i = 1, count do
 		B.QueueLow(id, list[i][2])
 	end
-	local upTo = #list > SERVE_MAX and list[SERVE_MAX][1] or Held(acct)
+	local upTo = #list > count and list[count][1] or Held(acct)
+	B.QueueLow(id, J("c", acct, count))
 	B.QueueLow(id, J("e", acct, upTo))
 end
 
@@ -485,17 +528,11 @@ local function Book(acct, key)
 	local c = a.chars[key]
 	if not c then
 		c = { days = {}, news = {} }
-		c.name, c.realm = key:match("^([^%-]+)%-?(.*)$")
+		c.name, c.realm = key:match("^([^%-]+)%-(.+)$")
 		a.chars[key] = c
 	end
 	a.seen = time()
 	return c
-end
-
-local function Progress(acct, now)
-	if pending[acct] then
-		pending[acct].at = now
-	end
 end
 
 local function Prune(c)
@@ -524,34 +561,50 @@ end
 local function Numbers(text, count)
 	local list = {}
 	for n in text:gmatch("[^,]+") do
-		list[#list + 1] = tonumber(n)
+		list[#list + 1] = n:match("^%d+$") and tonumber(n) or nil
+		if not list[#list] then
+			return nil
+		end
 	end
 	return #list == count and list or nil
 end
 
--- One record from a friend (validated; only for my own Battle.net friends' accounts).
-local function Store(word, more, now)
+-- A stamp that can be real: an author's clock, give or take a week.
+local function Plausible(u)
+	return u and u > 0 and u <= time() + 7 * 86400
+end
+
+-- One record from a friend (validated; only for my own Battle.net friends' accounts). Counted
+-- for the request it answers.
+local function Store(id, word, more, now)
 	local f = {}
 	for field in (more .. ";"):gmatch("([^;]*);") do
 		f[#f + 1] = field
 	end
-	local acct, key, u = f[1], f[2], tonumber(f[3])
-	if not (acct and acct:match("^%x%x%x%x%x%x%x%x$") and key and key ~= "" and #key <= NAME_BYTES and u)
+	local acct, key, u = f[1], f[2], f[3] and f[3]:match("^%d+$") and tonumber(f[3])
+	if not (acct and acct:match("^%x%x%x%x%x%x%x%x$")) then
+		return
+	end
+	local p = pending[acct]
+	if p and p.from == id then
+		p.at, p.got = now, (p.got or 0) + 1
+	end
+	if not (key and #key <= NAME_BYTES and key:match("^[^%-]+%-.+$") and Plausible(u))
 		or acct == C.MyAccount() or not Friends()[acct] then
 		return
 	end
-	Progress(acct, now)
+	local changed, newNews = false, false
 	if word == "p" and #f == 9 then
 		local numbers = Numbers(f[7], #PROFILE_FIELDS)
 		local c = numbers and Book(acct, key)
 		if c and u > (c.u or 0) then
-			c.u, c.classFile, c.level, c.last = u, f[4]:match("^%u+$"), tonumber(f[5]), tonumber(f[6])
+			c.u, c.classFile, c.level, c.last = u, f[4]:match("^%u+$"), tonumber(f[5]:match("^%d+$") or ""), tonumber(f[6]:match("^%d+$") or "")
 			c.profile = {}
 			for i, field in ipairs(PROFILE_FIELDS) do
 				c.profile[field] = MINUTES[field] and numbers[i] * 60 or numbers[i]
 			end
 			c.foe, c.zone = ns.Beacon.Clean(f[8], 40), ns.Beacon.Clean(f[9], 40)
-			Changed()
+			changed = true
 		end
 	elseif word == "d" and #f == 5 then
 		local y, mo, d = f[4]:match("^(%d%d%d%d)(%d%d)(%d%d)$")
@@ -567,11 +620,11 @@ local function Store(word, more, now)
 				end
 				c.days[day] = b
 				c.level = math.max(c.level or 0, b.level or 0)
-				Changed()
+				changed = true
 			end
 		end
 	elseif word == "n" and #f == 8 then
-		local n, t, k = tonumber(f[4]), tonumber(f[5]), f[6]
+		local n, t, k = f[4]:match("^%d+$") and tonumber(f[4]), f[5]:match("^%d+$") and tonumber(f[5]), f[6]
 		if n and t and SHAREABLE[k] and t >= C.DayAgo(DAYS_KEPT) and t <= time() + 86400 then
 			local c = Book(acct, key)
 			local old = c.news[n]
@@ -579,14 +632,20 @@ local function Store(word, more, now)
 				c.news[n] = { u = u, t = t, k = k, a = ns.Beacon.Clean(f[7], TEXT_BYTES), b = ns.Beacon.Clean(f[8], TEXT_BYTES),
 					g = old and old.g or time() }
 				Prune(c)
-				Changed()
+				changed, newNews = true, true
 			end
 		end
 	end
-	C.feedDirty, C.dirty = true, true
+	if newNews then
+		Changed() -- (the merged feed is rebuilt)
+	end
+	if changed then
+		C.feedDirty = true -- (the open page: Friends, Compare, a friend's graphs)
+	end
 end
 
--- Beacon.lua hands every J message here (after its own spam guard).
+-- Beacon.lua hands every J message here (after its own spam guard). Answering a request is heavy
+-- (hundreds of messages built): that waits for the tick (serves).
 function ns.Beacon.ReceiveJournal(id, word, more)
 	if not (M.enabled and store) then
 		return
@@ -598,30 +657,48 @@ function ns.Beacon.ReceiveJournal(id, word, more)
 	local now = GetTime()
 	if word == "h" then
 		peer.journal = more:match("^%x%x%x%x%x%x%x%x$") or "" -- (they sync; their account, if known)
+		summaries[id] = nil -- (they (re)started: everything is offered again)
 	elseif word == "s" then
 		peer.journal = peer.journal or ""
 		for acct, u in more:gmatch("(%x%x%x%x%x%x%x%x),(%d+)") do
 			u = tonumber(u)
-			if acct ~= C.MyAccount() and Friends()[acct] and u > ((store.book[acct] or {}).u or 0) then
+			if acct ~= C.MyAccount() and Friends()[acct] and Plausible(u) and u > ((store.book[acct] or {}).u or 0) then
 				Request(id, acct, now)
 			end
 		end
 	elseif word == "q" then
 		local acct, since = more:match("^(%x%x%x%x%x%x%x%x);(%d+)$")
 		if acct then
-			Serve(id, acct, tonumber(since))
+			for i = #serves, 1, -1 do -- (asked again before it was answered: once)
+				if serves[i].id == id and serves[i].acct == acct then
+					table.remove(serves, i)
+				end
+			end
+			if #serves < 50 then
+				serves[#serves + 1] = { id = id, acct = acct, since = tonumber(since) }
+			end
+		end
+	elseif word == "c" then
+		local acct, count = more:match("^(%x%x%x%x%x%x%x%x);(%d+)$")
+		local p = acct and pending[acct]
+		if p and p.from == id then
+			p.expect = tonumber(count)
 		end
 	elseif word == "e" then
 		local acct, u = more:match("^(%x%x%x%x%x%x%x%x);(%d+)$")
 		local p = acct and pending[acct]
 		if p and p.from == id then
 			pending[acct] = nil
-			local a = store.book[acct] or { u = 0, chars = {} } -- (nothing newer came: still, they're complete)
-			store.book[acct] = a
-			a.u = math.max(a.u or 0, tonumber(u))
+			u = tonumber(u)
+			-- Fewer records came than were sent (lost on the way): not complete; asked again later.
+			if Plausible(u) and not (p.expect and (p.got or 0) < p.expect) then
+				local a = store.book[acct] or { u = 0, chars = {} } -- (nothing newer came: still, they're complete)
+				store.book[acct] = a
+				a.u = math.max(a.u or 0, u)
+			end
 		end
 	else
-		Store(word, more, now)
+		Store(id, word, more, now)
 	end
 end
 
@@ -633,6 +710,18 @@ function ns.Beacon.JournalForget(id)
 			pending[acct] = nil
 		end
 	end
+	for i = #serves, 1, -1 do
+		if serves[i].id == id then
+			table.remove(serves, i)
+		end
+	end
+end
+
+-- Beacon switched off: nothing asked, offered or owed any more.
+function ns.Beacon.JournalStop()
+	wipe(summaries)
+	wipe(pending)
+	wipe(serves)
 end
 
 ---------------------------------------------------------------------------
@@ -662,19 +751,26 @@ function C.People()
 	end
 	local friends = {}
 	for acct, a in pairs(store.book) do
-		if acct ~= C.MyAccount() then
+		if acct ~= C.MyAccount() and IsFriend(acct) then
 			for key, c in pairs(a.chars) do
-				local last = c.last or 0
-				for day, b in pairs(c.days) do
-					if (b.played or 0) > 0 then
-						local y, mo, d = day:match("^(%d+)-(%d+)-(%d+)$")
-						last = math.max(last, time({ year = tonumber(y), month = tonumber(mo), day = tonumber(d), hour = 12 }))
+				if c.name then
+					-- When they last played: their profile says (stamped while they play); without one,
+					-- the last day they played (its morning: "noon" would read as later than it was).
+					local last = c.last or 0
+					if last == 0 then
+						for day, b in pairs(c.days) do
+							if (b.played or 0) > 0 then
+								local y, mo, d = day:match("^(%d+)-(%d+)-(%d+)$")
+								last = math.max(last, time({ year = tonumber(y), month = tonumber(mo), day = tonumber(d), hour = 0 }))
+							end
+						end
 					end
+					friends[#friends + 1] = { key = "book:" .. acct .. ":" .. key, name = c.name, realm = c.realm,
+						classFile = c.classFile, level = c.level, online = Online(c.name), last = math.min(last, time()),
+						days = c.days, profile = c.profile, foe = c.foe, zone = c.zone, acct = acct, account = C.AccountLabel(acct),
+						news = c.news }
+					names[c.name] = true
 				end
-				friends[#friends + 1] = { key = "book:" .. acct .. ":" .. key, name = c.name, realm = c.realm, classFile = c.classFile,
-					level = c.level, online = Online(c.name), last = last, days = c.days, profile = c.profile, foe = c.foe,
-					zone = c.zone, acct = acct, account = C.AccountLabel(acct), news = c.news }
-				names[c.name] = true
 			end
 		end
 	end
@@ -892,9 +988,9 @@ function C.FriendNews()
 	end
 	local list, synced = {}, {}
 	for acct, a in pairs(store.book) do
-		if acct ~= C.MyAccount() then
+		if acct ~= C.MyAccount() and IsFriend(acct) then
 			for _, c in pairs(a.chars) do
-				for _, e in pairs(c.news) do
+				for _, e in pairs(c.name and c.news or {}) do
 					local entry = { t = e.t, g = e.g, name = c.name, classFile = c.classFile, k = e.k, a = e.a, b = e.b, synced = true }
 					if e.k == "level" then
 						entry.level = tonumber(e.a)
@@ -1073,20 +1169,25 @@ local function Monday(back)
 end
 C.Monday = Monday
 
-local function Recap()
+-- Last week's leaderboard, once a week: once journals have come in (or a few minutes passed), and
+-- only marked done when it was shown (alone or with nobody's data yet: tried again next login).
+local function Recap(now)
+	if next(pending) and now < recapDeadline then
+		return -- (journals still coming in)
+	end
 	recapAt = nil
 	local week = Monday(0)
 	if store.recapWeek == week then
 		return
 	end
-	store.recapWeek = week
 	-- Last week: Monday to Sunday, ending (days since this Monday + 1) days ago.
 	local t = date("*t")
 	local ending = (t.wday + 5) % 7 + 1
 	local lines, board = C.RecapLines(7, ending)
 	if #(board.played or {}) < 2 then
-		return -- (alone, or nobody played: nothing to compare)
+		return -- (alone, or nobody's days yet: nothing to compare)
 	end
+	store.recapWeek = week
 	M:Print("last week's leaderboard (Chronicle):")
 	for _, line in ipairs(lines) do
 		print("   |cffffd200•|r " .. line)
@@ -1113,6 +1214,29 @@ local function CatchUp(now)
 	end
 end
 
+-- Friends' journals that aren't worth keeping: accounts no longer among my friends (once the friend
+-- list is known), characters with nothing in the last BOOK_DAYS days.
+local function PruneBook()
+	local friends = Friends()
+	local oldest = C.DayAgo(BOOK_DAYS)
+	for acct, a in pairs(store.book) do
+		if next(friends) and not friends[acct] then
+			store.book[acct] = nil
+		else
+			for key, c in pairs(a.chars) do
+				Prune(c)
+				if not next(c.days) and not next(c.news) and (c.last or 0) < oldest then
+					a.chars[key] = nil
+				end
+			end
+			if not next(a.chars) then
+				store.book[acct] = nil
+			end
+		end
+	end
+	Changed()
+end
+
 ---------------------------------------------------------------------------
 -- The tick (Chronicle.lua's, once a second) and switching on and off
 ---------------------------------------------------------------------------
@@ -1137,11 +1261,24 @@ function C.SyncTick(now)
 	end
 	local B = Beacon()
 	if B then
+		for _ = 1, SERVES_PER_TICK do -- (answers to friends' requests, built here, not in the event)
+			local serve = table.remove(serves, 1)
+			if not serve then
+				break
+			end
+			if B.peers[serve.id] then
+				Serve(serve.id, serve.acct, serve.since)
+			end
+		end
 		for id, peer in pairs(B.peers) do
 			if peer.journal then
 				SendSummary(id, peer, now)
 			end
 		end
+	end
+	if pruneAt and now >= pruneAt then
+		pruneAt = nil
+		PruneBook()
 	end
 	if catchUp and now >= catchUp.at then
 		if M.db.catchUp then
@@ -1152,7 +1289,7 @@ function C.SyncTick(now)
 	end
 	if recapAt and now >= recapAt then
 		if M.db.weeklyRecap then
-			Recap()
+			Recap(now)
 		else
 			recapAt = nil
 		end
@@ -1169,24 +1306,41 @@ function C.SyncEnable()
 	for _, c in pairs(store.chars) do
 		StampChar(c, false, true)
 	end
-	for _, a in pairs(store.book) do
+	for acct, a in pairs(store.book) do
 		a.chars = type(a.chars) == "table" and a.chars or {}
-		for _, c in pairs(a.chars) do
-			c.days, c.news = c.days or {}, c.news or {}
-			Prune(c)
+		for key, c in pairs(a.chars) do
+			if type(key) ~= "string" or not key:match("^[^%-]+%-.+$") then
+				a.chars[key] = nil -- (from before records were checked this closely)
+			else
+				c.days, c.news = c.days or {}, c.news or {}
+				c.name, c.realm = key:match("^([^%-]+)%-(.+)$")
+				Prune(c)
+			end
+		end
+		if type(a.u) ~= "number" or a.u > time() + 7 * 86400 then
+			a.u = 0 -- (an impossible stamp would block the account for good: everything is asked again)
 		end
 	end
+	if store.sharedAlts == nil then
+		store.sharedAlts = M.db.shareAlts
+	end
+	-- Only the character I play is shared, and it's another one than last time: its records are
+	-- stamped anew, or friends (further than its old stamps) would never ask for them.
+	local current = C.CurrentKey()
+	if not M.db.shareAlts and store.sharedChar and store.sharedChar ~= current and C.Char() then
+		Restamp(C.Char())
+	end
+	store.sharedChar = current
 	local now = GetTime()
 	lastCheck, lastProfile = now, now
 	wipe(pending)
 	wipe(summaries)
+	wipe(serves)
 	if store.lastSeenAt and time() - store.lastSeenAt > 300 then
 		catchUp = { since = store.lastSeenAt, at = now + CATCHUP_AFTER, deadline = now + CATCHUP_WAIT }
 	end
-	recapAt = now + RECAP_AFTER
-	if store.sharedAlts == nil then
-		store.sharedAlts = M.db.shareAlts
-	end
+	recapAt, recapDeadline = now + RECAP_AFTER, now + RECAP_AFTER + CATCHUP_WAIT
+	pruneAt = now + 60 -- (the friend list is known by then)
 	-- Switched on mid-session: friends already here hear it now (at login nobody is known yet;
 	-- they learn it from my answers).
 	local B = Beacon()
@@ -1201,7 +1355,8 @@ end
 function C.SyncDisable()
 	wipe(pending)
 	wipe(summaries)
-	catchUp, recapAt = nil, nil
+	wipe(serves)
+	catchUp, recapAt, pruneAt = nil, nil, nil
 end
 
 -- A setting changed: friends hear again what grew (all my characters, when that was switched on).
@@ -1212,17 +1367,7 @@ function C.SyncSettingChanged()
 	if M.db.shareAlts ~= store.sharedAlts then
 		store.sharedAlts = M.db.shareAlts
 		for _, c in pairs(store.chars) do
-			local s = SyncState(c)
-			wipe(s.daySig)
-			s.profileSig = nil
-			for _, e in ipairs(c.events) do
-				if e.n then
-					e.u = NextU()
-				end
-			end
-		end
-		for _, c in pairs(store.chars) do
-			StampChar(c, false, true)
+			Restamp(c)
 		end
 	end
 	wipe(summaries) -- (everything offered again)

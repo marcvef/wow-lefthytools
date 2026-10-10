@@ -154,7 +154,7 @@ the open one's button greyed out:
   `C.FriendNews()` (synced highlights and live news, see below), as "Name: text", with a hint
   about what will appear while it's empty. Showing it marks the news seen (`C.MarkFeedSeen`): the
   tab's blue count and the book's blue dot (`C.UnseenCount`: news that came after
-  `store.feedSeenAt`) go. Redrawn when the feed changes and every 5 s.
+  `store.feedSeenAt`) go. Redrawn when the feed changes (at most every 3 s) and every 5 s.
 - **Compare** (`G.DrawCompare`): people, not characters (`C.Accounts()`, see below): you and every
   friend in every graph. A toolbar: 7 / 14 / 30 days, and a chip per person (their colour: the class colour, a
   second of the same class lighter, a third darker; you marked "(you)"; hover: level, BattleTag
@@ -176,7 +176,8 @@ the open one's button greyed out:
 
 Redrawn on the tick only while open, and only the open page when its own data changed:
 `C.eventsDirty` for the timeline (a kill only changes a counter, so it doesn't rebuild 250
-lines), `C.feedDirty` for Friends, `C.dirty` (counters) for Statistics, which also refreshes
+lines), `C.feedDirty` for Friends (at most every 3 s, like the book's blue dot: while journals
+stream in the feed changes every second), `C.dirty` (counters) for Statistics, which also refreshes
 every 5 s for the time and distance. Graphs: a change is remembered and drawn at most every 10 s,
 otherwise every 30 s (the session curve). A redraw keeps the scroll position.
 
@@ -230,13 +231,29 @@ their own account left out), `J2;q;<acct>;<since>` send me that account's record
 `J2;p;<acct>;<Name-Realm>;<u>;<class>;<level>;<last>;<21 numbers>;<foe>;<zone>` (foe and zone left
 out if it wouldn't fit 250 bytes), `J2;d;<acct>;<Name-Realm>;<u>;<YYYYMMDD>;<14 numbers>`,
 `J2;n;<acct>;<Name-Realm>;<u>;<n>;<t>;<kind>;<a>;<b>` (the two text fields like Beacon's E2, 60
-bytes each), `J2;e;<acct>;<u>` that's all: complete up to u. A summary with a friend's account I
+bytes each), `J2;c;<acct>;<count>` the answer had count records (just before its end; older
+builds don't send it and ignore it), `J2;e;<acct>;<u>` that's all: complete up to u. A summary with a friend's account I
 hold less of starts a request (one friend at a time per account; 90 s without a record: it can go
-to another). An answer is at most 400 records, oldest first; its end says how far it got, so the
-rest comes on the next round. Records are checked (fields, sizes, kinds, 30 days, not tomorrow)
-and kept only for my friends' accounts, newer stamps replacing older. `relay` off: I don't pass on
-what I hold of others (a request gets an empty end). Beacon accepts 700 J messages per friend per
-minute.
+to another). An answer is at most 400 records, oldest first (records with the same stamp as the
+last one go along, so the cut never splits a stamp); its end says how far it got, so the
+rest comes on the next round. The end completes the account only when as many records came as
+the count said (else it's asked again on the next offer) and its stamp is plausible (at most a
+week ahead). Records are checked (fields, sizes, kinds, 30 days, not tomorrow)
+and kept only for my friends' accounts, newer stamps replacing older. Requests are queued
+(`serves`, at most 50, a repeat replaces the waiting one) and answered on the tick, two per
+second, never inside the event. Everything is offered again every 5 minutes (`FULL_OFFER`: an
+offer missed or an answer cut short). `relay` off: I don't pass on what I hold of others (a
+request gets an empty end). Beacon accepts 700 J messages per friend per minute.
+
+**Keeping the book small:** a minute after starting (the friend list is known by then), accounts
+that are no longer my Battle.net friends go, and characters with nothing in the last 60 days
+(`BOOK_DAYS`). An account's stamp that can't be real (more than a week ahead) is reset to 0 on
+start: everything is asked again. With "all my characters" off, playing another character than
+last time restamps its records, so friends who hold the other one ask for it.
+
+**Known limit:** one stamp per account. Playing the same Battle.net account on two PCs (two
+SavedVariables) makes two authors: a friend who already holds the newer stamps of one PC won't
+ask for the older ones of the other until they change again.
 
 **People and news for the window** (`C.People()`): me (the character I play: its days, numbers
 from `C.ProfileNumbers`), then every friend's character from the book (`book:<acct>:<Name-Realm>`;

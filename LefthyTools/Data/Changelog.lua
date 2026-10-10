@@ -218,5 +218,8 @@ ns.CHANGELOG = {
 	{ id = 70, module = "tweaks",
 		en = { "Combo gem: place it without a mob", "Try it (Misc Tweaks, or /lefthy tweaks combopos) opens a small window with a nameplate: drag the combo point gem where you want it, the mouse wheel over it changes its size, the arrows nudge it. No mob needed, and the settings can be closed." },
 		de = { "Combopunkt: platzieren ohne Mob", "Ausprobieren (Misc Tweaks, oder /lefthy tweaks combopos) öffnet ein kleines Fenster mit einer Namensplakette: zieh den Combopunkt dorthin, wo du ihn haben willst, das Mausrad darüber ändert seine Größe, die Pfeile verschieben ihn. Kein Mob nötig, und die Einstellungen können zu sein." } },
+	{ id = 71, module = "chronicle",
+		en = { "Friends' journals: more reliable", "A journal that arrived only in part is asked for again instead of counting as complete, everything is offered again every few minutes in case an offer got lost, and answering a friend's request no longer stutters the game. Players who are no longer your Battle.net friends drop out of the book, and so do characters with nothing in 60 days." },
+		de = { "Freunde-Tagebücher: zuverlässiger", "Ein Tagebuch, das nur zum Teil angekommen ist, wird nochmal angefragt, statt als vollständig zu gelten, alles wird alle paar Minuten neu angeboten, falls ein Angebot verloren ging, und eine Anfrage eines Freundes zu beantworten lässt das Spiel nicht mehr ruckeln. Wer nicht mehr dein Battle.net-Freund ist, fällt aus dem Buch, genauso Charaktere ohne etwas in 60 Tagen." } },
 	-- New entries go here, at the end.
 }
