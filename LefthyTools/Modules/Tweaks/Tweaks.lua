@@ -19,6 +19,7 @@ local M = LT:NewModule("tweaks", {
 		comboNameplate = true, -- (comboPoints, our own row under the personal resource display, is gone: Blizzard has its own now)
 		comboDotSize = 6,      -- the dots in the target's health bar: each one's size in pixels
 		comboColors = true,
+		retailFrames = false,  -- RetailFrames.lua: retail's unit frames instead of Forever's classic ones (off: Forever's own look)
 		foreverQuests = true,
 		questMap = true,       -- QuestMap.lua
 		questMapContinent = "both", -- "off" | "icons" | "areas" | "both"
@@ -586,6 +587,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyComboNameplate(on) end }, -- ComboPoints.lua
 	{ key = "comboColors", command = "combocolors", label = "Colour combo points by count",
 		apply = function(on) ns.ApplyComboColors(on) end },
+	{ key = "retailFrames", command = "retailframes", label = "Retail unit frames",
+		apply = function(on) ns.ApplyRetailFrames(on) end }, -- RetailFrames.lua
 	{ key = "foreverQuests", command = "newquests", label = "Mark quests that are new in WoW: Forever",
 		apply = function(on) ns.ApplyForeverQuests(on) end }, -- ForeverQuests.lua
 	{ key = "questMap", command = "questmap", label = "Quests on continent and world maps",
@@ -657,6 +660,8 @@ function M:BuildOptions(o)
 	o:Header(L["Unit frames"])
 	o:Checkbox("statusText", L["Always show health & power values"],
 		L["Show current / max on the health and power bars all the time instead of only on mouseover. Applies to every unit frame (player, target, focus, pet, party), like Blizzard's Options > Interface > Status Text set to Numeric."])
+	o:Checkbox("retailFrames", L["Retail unit frames"],
+		L["Since its latest patch Forever draws the player, target, focus, party and pet frames in a classic style. This brings back retail's: its art, bars and layout (the game still has them). Bars that move in combat follow when it ends. Switching it off takes a /reload."])
 	o:Checkbox("comboColors", L["Colour combo points by count"],
 		L["Blizzard's combo points on the personal resource display (and the dots on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."])
 	o:Checkbox("comboNameplate", L["Combo points on your target's nameplate"],
@@ -748,7 +753,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | bagsort | quests | newquests | combo | combocolors | questmap | afk | levelup | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | bagsort | quests | newquests | combo | combocolors | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
 		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 		self:Print("/lefthy tweaks combopos - preview the combo point dots on nameplates (no mob needed)")

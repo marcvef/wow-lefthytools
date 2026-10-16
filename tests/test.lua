@@ -1040,6 +1040,130 @@ do
 	Advance(0.05)
 end
 
+section("Misc Tweaks: retail unit frames")
+;(function() -- (a function of its own: the main chunk's 200 locals)
+	check(TDB.retailFrames == false and T("retailFrames"), "off by default (friends keep Forever's look), with a checkbox")
+	local ART, BARS = ns.RETAIL_FRAME_ART, ns.RETAIL_FRAME_BARS
+	local function Tex(parent, atlas, mask)
+		local t = mask and parent:CreateMaskTexture() or parent:CreateTexture()
+		t:SetAtlas(atlas, true) -- (XML: useAtlasSize)
+		return t
+	end
+	local function Bar(parent, atlas)
+		local b = CreateFrame("StatusBar", nil, parent)
+		b:SetStatusBarTexture(atlas)
+		return b
+	end
+	local function last(region)
+		local p = region._points or region.points or {}
+		return p[#p] or {}
+	end
+	local function retail(texture, atlas)
+		local art = ART[atlas:lower()]
+		return art and texture.path == art[1] and texture.coords and texture.coords[1] == art[2] and texture.coords[4] == art[5]
+			and texture.width == art[6] and texture.height == art[7]
+	end
+	-- The player and target frames as Forever builds them: its classic art set and its own layout.
+	PlayerFrame.unit = "player"
+	local box = CreateFrame("Frame", nil, PlayerFrame)
+	PlayerFrame.PlayerFrameContainer = box
+	local playerArt = Tex(box, "UI-HUD-UnitFrame-Player-PortraitOn")
+	box.FrameFlash = Tex(box, "UI-HUD-UnitFrame-Player-PortraitOn-InCombat")
+	PlayerFrame.PlayerFrameContent = CreateFrame("Frame", nil, PlayerFrame)
+	local main = CreateFrame("Frame", nil, PlayerFrame.PlayerFrameContent)
+	PlayerFrame.PlayerFrameContent.PlayerFrameContentMain = main
+	main.StatusTexture = Tex(main, "UI-HUD-UnitFrame-Player-PortraitOn-Status")
+	main.LevelBackgroundCircle = Tex(main, "UI-HUD-UnitFrame-SmallCircle")
+	local health = CreateFrame("Frame", nil, main)
+	main.HealthBarsContainer = health
+	health.HealthBar = Bar(health, "UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health")
+	health.HealthBarMask = Tex(health, "UI-HUD-UnitFrame-Player-PortraitOn-Bar-Health-Mask", true)
+	main.ManaBar = Bar(main, "UI-HUD-UnitFrame-Player-PortraitOn-Bar-Mana")
+	main.ManaBar.ManaBarMask = Tex(main.ManaBar, "UI-HUD-UnitFrame-Player-PortraitOn-Bar-Mana-Mask", true)
+	PlayerLevelText, PlayerName = main:CreateFontString(), main:CreateFontString()
+	function PlayerFrame_UpdateHealthBarVisuals()
+		health:SetHeight(15)
+		health:SetPoint("TOPLEFT", 87, -46)
+		health.HealthBar:ClearAllPoints()
+		health.HealthBar:SetPoint("TOPLEFT", health, "TOPLEFT", 0, 3)
+	end
+	function PlayerFrame_UpdateLevel() PlayerLevelText:SetVertexColor(1, 1, 1, 1) end
+	PlayerFrame_UpdateHealthBarVisuals()
+	TargetFrame.unit = "target"
+	TargetFrame.TargetFrameContainer = CreateFrame("Frame", nil, TargetFrame)
+	local targetArt = Tex(TargetFrame.TargetFrameContainer, "UI-HUD-UnitFrame-Target-PortraitOn")
+	TargetFrame.TargetFrameContainer.Flash = Tex(TargetFrame.TargetFrameContainer, "UI-HUD-UnitFrame-Target-PortraitOn-InCombat")
+	TargetFrame.TargetFrameContent = CreateFrame("Frame", nil, TargetFrame)
+	local tMain = CreateFrame("Frame", nil, TargetFrame.TargetFrameContent)
+	TargetFrame.TargetFrameContent.TargetFrameContentMain = tMain
+	local contextual = CreateFrame("Frame", nil, TargetFrame.TargetFrameContent)
+	TargetFrame.TargetFrameContent.TargetFrameContentContextual = contextual
+	contextual.HighLevelTexture = Tex(contextual, "UI-HUD-UnitFrame-Target-HighLevelTarget_Icon")
+	tMain.ReputationColor = Tex(tMain, "UI-HUD-UnitFrame-Target-PortraitOn-Type")
+	tMain.Name, tMain.LevelText = tMain:CreateFontString(), tMain:CreateFontString()
+	tMain.LevelBackgroundCircle = Tex(tMain, "UI-HUD-UnitFrame-SmallCircle")
+	local tHealth = CreateFrame("Frame", nil, tMain)
+	tMain.HealthBarsContainer = tHealth
+	tHealth.HealthBar = Bar(tHealth, "UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health")
+	tHealth.HealthBar.HealthBarTexture = tHealth.HealthBar:GetStatusBarTexture()
+	tHealth.HealthBarMask = Tex(tHealth, "UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health-Mask", true)
+	tMain.ManaBar = Bar(tMain, "UI-HUD-UnitFrame-Target-PortraitOn-Bar-Mana")
+	tMain.ManaBar.RightText = tMain:CreateFontString()
+	function TargetFrame:UpdateHealthBarVisuals() -- (Forever's, on every new target)
+		tHealth:SetHeight(15)
+		tHealth:SetPoint("BOTTOMRIGHT", self.TargetFrameContainer, "LEFT", 147, -9)
+		tHealth.HealthBar.HealthBarTexture:SetAtlas("UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health", true)
+	end
+
+	lefthy("tweaks retailframes on"); Advance(0.05)
+	check(TDB.retailFrames == true and retail(playerArt, "UI-HUD-UnitFrame-Player-PortraitOn")
+		and retail(targetArt, "UI-HUD-UnitFrame-Target-PortraitOn") and retail(box.FrameFlash, "UI-HUD-UnitFrame-Player-PortraitOn-InCombat"),
+		"on: the frames' art is retail's again (its file, texture coordinates and size)")
+	check(health.HealthBar:GetStatusBarTexture().atlas == BARS["ui-hud-unitframe-player-portraiton-bar-health"]
+		and main.ManaBar:GetStatusBarTexture().atlas == BARS["ui-hud-unitframe-player-portraiton-bar-mana"]
+		and not health.HealthBar:GetStatusBarTexture().coords,
+		"status bar fills: an atlas with retail's bar art (the bar crops it itself)")
+	local mask = health.HealthBarMask
+	check(mask.path == ART["ui-hud-unitframe-player-portraiton-bar-health-mask"][1] and mask.wrap == "CLAMPTOBLACKADDITIVE",
+		"masks: retail's mask file")
+	check(not main.LevelBackgroundCircle.shown and main.LevelBackgroundCircle.atlas == "UI-HUD-UnitFrame-SmallCircle"
+		and last(PlayerLevelText)[1] == "TOPRIGHT" and last(PlayerLevelText)[4] == -24.5 and PlayerLevelText.justifyH == "RIGHT"
+		and last(PlayerName)[4] == 88 and PlayerName.width == 96,
+		"player: Forever's level circle hidden (no retail art for it), level and name where retail has them")
+	check(last(health)[2] == 85 and last(health)[3] == -41 and health:GetHeight() == 19 and last(health.HealthBar)[4] == 0
+		and last(health.HealthBar)[5] == 0, "player: the health bar where retail's art has its slot")
+	PlayerFrame_UpdateLevel()
+	check(PlayerLevelText.vertex[2] == 0.82, "the level in retail's gold (Forever's is white)")
+	check(last(tMain.Name)[2] == tMain.ReputationColor and last(tMain.Name)[4] == -106 and last(tMain.LevelText)[4] == -133
+		and not tMain.LevelBackgroundCircle.shown and last(tHealth)[4] == 149 and tHealth:GetHeight() == 20,
+		"target: name, level and health bar where retail has them")
+	-- Forever's code places things again (a new target, a vehicle): retail's again after it.
+	PlayerFrame_UpdateHealthBarVisuals()
+	TargetFrame:UpdateHealthBarVisuals("normal")
+	check(last(health)[2] == 85 and health:GetHeight() == 19 and last(tHealth)[4] == 149 and tHealth:GetHeight() == 20
+		and tHealth.HealthBar:GetStatusBarTexture().atlas == BARS["ui-hud-unitframe-target-portraiton-bar-health"],
+		"Forever's layout runs again: retail's right after it")
+	main.StatusTexture:SetAtlas("UI-HUD-UnitFrame-Player-PortraitOn-Status", true)
+	main.ManaBar:SetStatusBarTexture("UI-HUD-UnitFrame-Player-PortraitOn-Bar-Rage")
+	check(retail(main.StatusTexture, "UI-HUD-UnitFrame-Player-PortraitOn-Status")
+		and main.ManaBar:GetStatusBarTexture().atlas == BARS["ui-hud-unitframe-player-portraiton-bar-rage"],
+		"art set later (a status flash, another power type): retail's too")
+	-- In combat bars can't be moved (protected): they follow when it ends.
+	STATE.combat = true
+	TargetFrame:UpdateHealthBarVisuals("normal")
+	check(last(tHealth)[4] == 147 and ns.RetailFramesPending() and tHealth.HealthBarMask.path,
+		"a new target in combat: Forever's bar position for now (the art still retail's)")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	check(last(tHealth)[4] == 149 and not ns.RetailFramesPending(), "combat over: retail's position")
+	local printedAt = #PRINTED + 1
+	lefthy("tweaks retailframes off"); Advance(0.05)
+	check(TDB.retailFrames == false and table.concat(PRINTED, "\n", printedAt):find("/reload", 1, true), "off: a /reload brings Forever's frames back")
+	PlayerFrame_UpdateHealthBarVisuals()
+	check(last(health)[2] == 87, "and nothing is changed any more")
+	PlayerFrame_UpdateHealthBarVisuals, PlayerFrame_UpdateLevel, PlayerLevelText, PlayerName = nil, nil, nil, nil
+end)()
+
 section("Misc Tweaks: quests that are new in WoW: Forever")
 check(TDB.foreverQuests == true and REGISTERED_SETTINGS.LefthyTools_tweaks_foreverQuests, "on by default, with a checkbox")
 check(ns.IsForeverQuest(86574) and ns.IsForeverQuest(99411) and not ns.IsForeverQuest(86575)
@@ -3366,7 +3490,9 @@ do
 	local px = (220 / 2 - 8) / 40 -- pixels per yard
 	local function shownTiles(w)
 		local list = {}
-		for _, t in ipairs((w or win).Map._textures or {}) do if t.shown and t.path then list[#list + 1] = t end end
+		for _, t in ipairs((w or win).Map._textures or {}) do
+			if t.shown and t.path and t:GetObjectType() ~= "MaskTexture" then list[#list + 1] = t end
+		end
 		return list
 	end
 	local hereN, hereW = UnitPosition("player")

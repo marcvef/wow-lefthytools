@@ -282,6 +282,9 @@ L["Blizzard shows only the area of your selected quest. All quests: the areas of
 	"Blizzard zeigt nur das Gebiet deiner ausgewählten Quest. Alle Quests: die Gebiete aller Quests in der Zone, wie bei Questie."
 L["Selected quest"] = "Ausgewählte Quest"
 L["All quests"] = "Alle Quests"
+L["Retail unit frames"] = "Einheitenfenster wie in Retail"
+L["Since its latest patch Forever draws the player, target, focus, party and pet frames in a classic style. This brings back retail's: its art, bars and layout (the game still has them). Bars that move in combat follow when it ends. Switching it off takes a /reload."] =
+	"Seit dem letzten Patch zeichnet Forever die Fenster für Spieler, Ziel, Fokus, Gruppe und Pet im Classic-Stil. Das holt die aus Retail zurück: Grafik, Leisten und Anordnung (das Spiel hat sie noch). Leisten, die sich im Kampf verschieben, rücken danach zurecht. Zum Ausschalten ist ein /reload nötig."
 L["Combo points on your target's nameplate"] = "Combopunkte an der Namensplakette deines Ziels"
 L["Small dots set into the bottom edge of your target's health bar, one for each combo point you can have: lit ones in the colour of your points, the rest dark. Only while you have points on it. They take no room of their own, so nothing else on the nameplate moves. Rogues, and druids in Cat Form."] =
 	"Kleine Punkte am unteren Rand der Lebensleiste deines Ziels, einer für jeden Combopunkt, den du haben kannst: die aktiven in der Farbe deiner Punkte, die übrigen dunkel. Nur solange du Punkte darauf hast. Sie brauchen keinen eigenen Platz, an der Namensplakette verschiebt sich also nichts. Für Schurken und Druiden in Katzengestalt."

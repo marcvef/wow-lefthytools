@@ -96,6 +96,12 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     classic gems mean the `uf-roguecp` atlases are missing). Gems fill green → red with the slash
     animation; at full they breathe; a finisher bursts them out. Narrow the bars and hide the power
     bar in Edit Mode: the row follows. Switching target empties the row.
+    Retail unit frames (`/lefthy tweaks retailframes on`): player, target, focus, target of target,
+    pet and party frames in retail's art (gold trim, no level circle, the level gold at the top
+    right), bars inside the frame's slots, masks shaped to them. Target a mob, an elite, a "minus"
+    critter: the frame and its health bar fit each time. In combat switch targets: the bar may sit
+    a pixel off until combat ends, then fits. A vehicle, a druid's forms (mana/energy/rage bars),
+    `/reload` with it on. Off: a chat line asks for a /reload; after it Forever's frames.
 14. Beacon (needs a Battle.net friend on Forever with the same LefthyTools): within ~30 s
     `/lefthy beacon status` lists them. Their dot moves on the zone and continent map and glides on
     the minimap, in their class colour; hover shows name, BattleTag, level, zone, distance. They

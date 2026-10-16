@@ -239,5 +239,8 @@ ns.CHANGELOG = {
 	{ id = 77, module = "tweaks",
 		en = { "Combo points: dots in the health bar", "The combo point gem beside your target's level is gone. Instead, small dots sit in the bottom edge of its health bar, one for each point you can have: lit ones in the colour of your points, the rest dark, each on a dark ring so it reads on a red bar. They take no room, so nothing else on the nameplate moves. A slider sets their size, and Try it shows them counting up on a stand-in nameplate." },
 		de = { "Combopunkte: Punkte in der Leiste", "Der Combopunkt neben dem Level deines Ziels ist weg. Stattdessen sitzen kleine Punkte am unteren Rand seiner Lebensleiste, einer für jeden Punkt, den du haben kannst: die aktiven in der Farbe deiner Punkte, die übrigen dunkel, jeder auf einem dunklen Ring, damit er auch auf roter Leiste gut lesbar ist. Sie brauchen keinen Platz, an der Namensplakette verschiebt sich also nichts. Ein Regler bestimmt ihre Größe, und Ausprobieren zeigt sie hochzählend an einer Beispiel-Namensplakette." } },
+	{ id = 78, module = "tweaks",
+		en = { "Retail unit frames, if you want them", "Forever's latest patch drew the player, target, focus, party and pet frames in a classic style. A new Misc Tweaks option, off by default, brings back retail's: their art, bars and layout (the game still has them). Switching it off takes a /reload." },
+		de = { "Einheitenfenster wie in Retail", "Seit Forevers letztem Patch sind die Fenster für Spieler, Ziel, Fokus, Gruppe und Pet im Classic-Stil. Eine neue Option in Misc Tweaks, standardmäßig aus, holt die aus Retail zurück: Grafik, Leisten und Anordnung (das Spiel hat sie noch). Zum Ausschalten ist ein /reload nötig." } },
 	-- New entries go here, at the end.
 }

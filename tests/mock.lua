@@ -247,7 +247,7 @@ local function NewTexture()
 	function t:GetDrawLayer() return self.layer, self.sublevel or 0 end
 	function t:GetObjectType() return "Texture" end
 	function t:SetColorTexture(r, g, b, a) self.color = { r, g, b, a } end
-	function t:SetTexture(path) self.path = path end
+	function t:SetTexture(path, hWrap) self.path, self.wrap, self.atlas = path, hWrap, nil end
 	function t:AddMaskTexture() end
 	function t:SetShown(s) self.shown = s and true or false end
 	function t:Show() self.shown = true end
@@ -256,7 +256,11 @@ local function NewTexture()
 	function t:SetAlpha(a) self.alpha = a end
 	function t:GetAlpha() return self.alpha end
 	function t:CreateAnimationGroup() return NewAnimationGroup(self) end
-	function t:SetAtlas(atlas) self.atlas, self.color = atlas, nil end
+	function t:SetAtlas(atlas, useAtlasSize)
+		self.atlas, self.color, self.path, self.coords = atlas, nil, nil, nil
+		local info = useAtlasSize and C_Texture and C_Texture.GetAtlasInfo(atlas)
+		if info then self.width, self.height = info.width, info.height end
+	end
 	function t:SetVertexColor(r, g, b, a) self.vertex, self.gradient = { r, g, b, a }, nil end -- replaces a gradient
 	function t:SetBlendMode(mode) self.blend = mode end
 	function t:ClearAllPoints() self.points = {} end
@@ -271,7 +275,8 @@ local function NewTexture()
 end
 function FrameMethods:CreateTexture(_, layer)
 	local t = NewTexture()
-	t.layer = layer
+	t.layer, t._owner = layer, self
+	function t:GetParent() return self._owner end
 	self._textures = self._textures or {}
 	self._textures[#self._textures + 1] = t
 	function t:SetDrawLayer(layer) self.layer = layer end
@@ -293,7 +298,13 @@ function FrameMethods:CreateLine()
 	return l
 end
 function CreateColor(r, g, b, a) return { r = r, g = g, b = b, a = a } end
-function FrameMethods:CreateMaskTexture() return NewTexture() end
+function FrameMethods:CreateMaskTexture()
+	local m = NewTexture()
+	function m:GetObjectType() return "MaskTexture" end
+	self._textures = self._textures or {}
+	self._textures[#self._textures + 1] = m
+	return m
+end
 function FrameMethods:CreateFontString()
 	local fs = {}
 	function fs:SetAllPoints() end
@@ -304,6 +315,7 @@ function FrameMethods:CreateFontString()
 	function fs:GetStringWidth() return #(self.text or "") * 6 end
 	function fs:GetStringHeight() local n = 1 for _ in (self.text or ""):gmatch("\n") do n = n + 1 end return n * 14 end
 	function fs:SetTextColor(r, g, b) self.color = { r, g, b } end
+	function fs:SetVertexColor(r, g, b, a) self.vertex = { r, g, b, a } end
 	function fs:SetJustifyH(j) self.justifyH = j end
 	function fs:SetJustifyV(j) self.justifyV = j end
 	function fs:SetSpacing() end
@@ -377,6 +389,14 @@ function CreateFrame(kind, name, parent, template)
 		parent._children[#parent._children + 1] = f
 	end
 	allFrames[#allFrames + 1] = f
+	if kind == "StatusBar" then -- (only status bars have a fill texture)
+		function f:SetStatusBarTexture(asset)
+			self._fill = self._fill or self:CreateTexture()
+			if type(asset) == "string" then self._fill:SetAtlas(asset) else self._fill:SetTexture(asset) end
+			return true
+		end
+		function f:GetStatusBarTexture() return self._fill end
+	end
 	if template then ApplyTemplate(f, template) end
 	return f
 end

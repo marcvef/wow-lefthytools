@@ -24,6 +24,7 @@ Data\ForeverQuests.lua
 Data\FlightPaths.lua
 Data\ClassSpells.lua
 Data\MinimapTiles.lua
+Data\RetailUnitFrames.lua
 
 # Modules
 Modules\Mirage\Groups.lua
@@ -32,6 +33,7 @@ Modules\Mirage\Options.lua
 
 Modules\Tweaks\Tweaks.lua
 Modules\Tweaks\ComboPoints.lua
+Modules\Tweaks\RetailFrames.lua
 Modules\Tweaks\ForeverQuests.lua
 Modules\Tweaks\AFK.lua
 Modules\Tweaks\Flight.lua
