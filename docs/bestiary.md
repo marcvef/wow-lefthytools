@@ -155,8 +155,9 @@ intrusive"): one line and one row of 6, never more. **Not in combat** (setting `
 on; the user: not "infight"): `InCombatLockdown()`, checked when the mouseover changes and in its
 OnUpdate (it goes when a fight starts); `PLAYER_REGEN_ENABLED` looks at the mouseover again, so it
 comes back if the mouse is still over an enemy. A mob killed before shows only your drops (no
-database cells on top); one you haven't killed shows the database's 6 likeliest, faded, under "Not
-killed yet: classic database".
+database cells on top); one you haven't killed, with the setting `cardUnseen` (off, like the
+window's `windowUnseen`: the user wanted neither by default), shows the database's 6 likeliest,
+faded, under "Not killed yet: classic database"; without it, no card.
 
 ## Item tooltips
 
@@ -201,7 +202,8 @@ line says which), Ctrl-click opens or closes the ledger, right-click opens the s
 says how many kinds and kills are known and all of that. Settings: open the window, open the
 ledger, minimap button (on), drops beside the mouse (off), hidden in combat (on), drop chances in
 item tooltips (on), grey
-items (on), compare with a drop database (on), not seen yet in the window (off). `/bestiary`
+items (on), compare with a drop database (on), not seen yet in the window (off), mobs not killed
+yet beside the mouse (off). `/bestiary`
 (`open`, `ledger [search]`, `log`,
 `data`, `minimap`, `settings`).
 

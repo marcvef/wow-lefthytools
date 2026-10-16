@@ -6671,6 +6671,10 @@ section("Bestiary: what mobs drop")
 	MOBS.mouseover = { name = "Young Wolf", level = 2, guid = "Creature-0-1-0-1-118-00000052", pinned = true }
 	Fire("UPDATE_MOUSEOVER_UNIT")
 	card = select(2, Bt.Frames())
+	check(LefthyToolsDB.settings.bestiary.cardUnseen == false and not card:IsShown(),
+		"a mob not killed yet: no card by default (only the ones you've killed)")
+	setting("cardUnseen"):SetValue(true)
+	Fire("UPDATE_MOUSEOVER_UNIT")
 	check(card:IsShown() and card.Kills:GetText():find("Not killed yet: classic database", 1, true) and card.cells[1].Icon.desaturated
 		and select(2, card:GetSize()) < 70, "the card over a mob not killed yet: the database's drops, faded, one row")
 	MOBS.mouseover = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000053", pinned = true }
@@ -6681,6 +6685,7 @@ section("Bestiary: what mobs drop")
 	MOBS.mouseover = nil
 	Advance(0.1)
 	setting("hoverCard"):SetValue(false)
+	setting("cardUnseen"):SetValue(false)
 	-- The ledger: a row says how many of its drops you've found; the picked mob's not seen yet in a
 	-- section of its own, the database's coin.
 	Bt.ToggleLedger(116)

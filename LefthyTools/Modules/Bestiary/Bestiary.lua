@@ -45,6 +45,7 @@ local M = LT:NewModule("bestiary", {
 		itemTooltip = true,  -- an item's tooltip: the mobs it comes from likeliest, with the chance
 		dropData = true,     -- compare with the classic drop database (LefthyTools_DropData)
 		windowUnseen = false, -- the window: what the database says it drops that you haven't had yet
+		cardUnseen = false,  -- the card beside the mouse over a mob you haven't killed: what it can drop
 		window = {},         -- shown, point, x, y
 	},
 })
@@ -788,6 +789,8 @@ function M:BuildOptions(o)
 		L["Beside your own numbers, what a classic world database (CMaNGOS) says each mob can drop: its chance on each of your drops, and what you haven't had yet, faded. WoW: Forever may differ. It's an add-on of its own, LefthyTools Drop Data, installed with LefthyTools; /bestiary data says whether it's there."])
 	o:Checkbox("windowUnseen", L["Not seen yet in the window"],
 		L["Under your target's drops in the window, what the drop database says it drops that you haven't had yet, faded (a mob you haven't killed: what it can drop). The ledger always shows it."])
+	o:Checkbox("cardUnseen", L["Mobs not killed yet beside the mouse"],
+		L["Over an enemy you haven't killed yet, the drops next to the mouse show what the drop database says it can drop, faded. Off: only enemies you've killed get them."])
 end
 
 function M:OnSlashCommand(msg)

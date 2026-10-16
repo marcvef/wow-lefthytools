@@ -20,7 +20,8 @@ local M = Bt.module
 -- without it), what it says the mob drops that you haven't had yet is a section of its own under
 -- your drops, smaller and faded (grey icons, how many of its drops you've found), each with the
 -- item's tooltip, the database's chance and how many you'd have expected by now; for a mob you
--- haven't killed, what it can drop. The card shows that too for a mob you haven't killed.
+-- haven't killed, what it can drop. The card shows that for a mob you haven't killed with the
+-- setting cardUnseen (off, like the window's: the user wanted both without it).
 
 local WIDTH = 236
 local PAD = 10
@@ -738,8 +739,8 @@ end
 -- Over an enemy: its card (setting hoverCard), small on purpose (the user: not "too large and
 -- intrusive"): a line and one row of CARD_CELLS icons, never more, and none in combat (setting
 -- cardHideInCombat, on; it goes when a fight starts, comes back after). Killed before: your kills and
--- your likeliest drops (not the database's on top); not yet: the classic database's likeliest,
--- faded.
+-- your likeliest drops (not the database's on top); not yet, with the setting cardUnseen (off): the
+-- classic database's likeliest, faded.
 function Bt.MouseoverChanged()
 	if not (M.enabled and M.db.hoverCard) or CardHidden() or not UnitExists("mouseover")
 		or not (Value(UnitCanAttack, "player", "mouseover") or Value(UnitIsDead, "mouseover")) then
@@ -753,7 +754,7 @@ function Bt.MouseoverChanged()
 	local drops, line
 	if mob and mob.kills > 0 then
 		drops, line = Bt.Drops(mob, M.db.showPoor, creature), KillsLine(mob)
-	else
+	elseif M.db.cardUnseen then
 		local unseen = Bt.Compare(creature, mob, M.db.showPoor)
 		if unseen and #unseen > 0 then
 			drops, line = unseen, "|cff999999" .. L["Not killed yet: classic database"] .. "|r"

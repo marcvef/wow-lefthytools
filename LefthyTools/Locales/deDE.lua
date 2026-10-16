@@ -859,6 +859,9 @@ L["%d of its %d drops found"] = "%d seiner %d Drops gefunden"
 L["Not seen yet (%d), classic database"] = "Noch nicht gesehen (%d), Classic-Datenbank"
 L["Not seen yet in the window"] = "Noch nicht Gesehenes im Fenster"
 L["Hidden in combat"] = "Im Kampf ausgeblendet"
+L["Mobs not killed yet beside the mouse"] = "Noch nicht getötete Mobs neben der Maus"
+L["Over an enemy you haven't killed yet, the drops next to the mouse show what the drop database says it can drop, faded. Off: only enemies you've killed get them."] =
+	"Über einem Gegner, den du noch nicht getötet hast, zeigen die Drops neben der Maus verblasst, was er laut Drop-Datenbank droppen kann. Aus: nur Gegner, die du getötet hast, bekommen sie."
 L["The drops next to the mouse don't show while you're in combat, and go when a fight starts."] =
 	"Die Drops neben der Maus erscheinen nicht, während du im Kampf bist, und verschwinden, wenn ein Kampf beginnt."
 L["Under your target's drops in the window, what the drop database says it drops that you haven't had yet, faded (a mob you haven't killed: what it can drop). The ledger always shows it."] =

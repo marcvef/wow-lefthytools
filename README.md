@@ -339,8 +339,8 @@ comes as an add-on of its own, `LefthyTools_DropData`, and loads only when first
 your drops shows the database's chance next to yours, or that it doesn't list it. The ledger shows
 how much of each mob's loot you've found, and a *Not seen yet* section for the mob you pick: what
 you haven't had yet, faded; hovering one shows how many you'd have expected in your kills by now.
-The window can show that too, under your drops (a setting, off). A mob you haven't killed shows
-what it can drop on the (still small) card beside the mouse. Quest items
+The window can show that too, under your drops, and the (still small) card beside the mouse can
+show what a mob you haven't killed can drop (two settings, both off). Quest items
 (they drop only while you're on the quest) are marked with a `!`. WoW: Forever is classic content
 but may differ, so your own numbers are never mixed with the database's. `/bestiary data` says
 whether the database is there.
@@ -358,6 +358,7 @@ made of your last loot windows (to see why something wasn't counted).
 | Grey items | on |
 | Compare with a drop database | on |
 | Not seen yet in the window (the database's drops you haven't had, under yours) | off |
+| Mobs not killed yet beside the mouse (what the database says they can drop) | off |
 
 ---
 
