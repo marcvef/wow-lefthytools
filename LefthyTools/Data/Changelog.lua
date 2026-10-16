@@ -242,5 +242,8 @@ ns.CHANGELOG = {
 	{ id = 78, module = "tweaks",
 		en = { "Retail unit frames, if you want them", "Forever's latest patch drew the player, target, focus, party and pet frames in a classic style. A new Misc Tweaks option, off by default, brings back retail's: their art, bars and layout (the game still has them). Switching it off takes a /reload." },
 		de = { "Einheitenfenster wie in Retail", "Seit Forevers letztem Patch sind die Fenster für Spieler, Ziel, Fokus, Gruppe und Pet im Classic-Stil. Eine neue Option in Misc Tweaks, standardmäßig aus, holt die aus Retail zurück: Grafik, Leisten und Anordnung (das Spiel hat sie noch). Zum Ausschalten ist ein /reload nötig." } },
+	{ id = 79, module = "beacon",
+		en = { "Lefthy chat is now LTC, with /ltc", "Lefthy chat is called LTC (LefthyTools chat) now: lines show as [LTC] [Anna], the chat box says LTC:, and /ltc works like /l. Friends who haven't updated still see [Lefthy]; nothing else changes." },
+		de = { "Lefthy-Chat heißt jetzt LTC, mit /ltc", "Der Lefthy-Chat heißt jetzt LTC (LefthyTools-Chat): Zeilen erscheinen als [LTC] [Anna], im Chatfeld steht LTC:, und /ltc funktioniert wie /l. Freunde ohne Update sehen weiter [Lefthy]; sonst ändert sich nichts." } },
 	-- New entries go here, at the end.
 }

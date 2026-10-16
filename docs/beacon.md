@@ -35,7 +35,7 @@ look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   highlight (see [chronicle.md](chronicle.md); at most 6 per friend per minute, known kinds only),
   `C2;<count>` enemies on them in combat, `X2;<percent>` progress on their level,
   `I2;<item string>[;<call id>]` an item shown or offered, `N2`/`R2` Need / Pass and the verdict,
-  `M2;<text>` a Lefthy chat line, `A2;<text>` an announcement (see below), `K2;<YYYYMMDD>;<minutes>`
+  `M2;<text>` an LTC line, `A2;<text>` an announcement (see below), `K2;<YYYYMMDD>;<minutes>`
   a day's AFK time (Chronicle), `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
   friends' graphs (see chronicle.md), `Y2;<1|0>` I collect error reports (or stopped),
   `Z2;<id>;<n>;<of>;<text>` part of an error report (see "Error reports"), `O2;<h|w|f|n>;...`
@@ -266,21 +266,21 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   Need and Pass buttons show.
 - Setting `shareItems` switches sending and showing.
 
-### Lefthy chat and announcements (Chat.lua)
+### LTC (LefthyTools chat) and announcements (Chat.lua)
 
-- **Lefthy chat** (`/l <text>`, also `/lchat`; setting `lefthyChat`): `M2;<text>` to every peer;
-  everyone prints `[Lefthy] [Name]: text` (orange, the name in its class colour) to the chat
+- **LTC** (LefthyTools chat, once "LTC"; `/ltc <text>`, also `/l`, `/lchat`; setting `lefthyChat`): `M2;<text>` to every peer;
+  everyone prints `[LTC] [Name]: text` (builds before the rename `[Lefthy]`) (orange, the name in its class colour) to the chat
   window, the sender too, like guild chat. At most 5 lines per 5 s are taken from one friend;
   sending at most every 0.5 s. A friend's line plays a very soft tick (`SOUNDKIT.IG_CHAT_SCROLL_UP`
   on the SFX channel, at most every 1.5 s, never for my own; setting `lefthyChatSound`).
 - **Sticky, like `/g`:** the box can't get a chat type of ours (`ChatTypeInfo` and
   `hash_ChatTypeInfoList` are Blizzard's; writing to them would taint everyone's chat). Instead
   `/l` (in a chat box: the slash handler gets the edit box) or typing `/l ` (a post-hook on the
-  box's `HandleChatType`, `send` 0) puts it in Lefthy mode for the chat type it showed: a post-hook
-  on `UpdateHeader` paints the header "Lefthy: " in our colour (and the text insets, as Blizzard's
+  box's `HandleChatType`, `send` 0) puts it in LTC mode for the chat type it showed: a post-hook
+  on `UpdateHeader` paints the header "LTC: " in our colour (and the text insets, as Blizzard's
   does), and a plain line is taken in Blizzard's `ChatFrame.OnEditBoxPreSendText` event
   (`EventRegistry`, which calls callbacks through `securecallfunction`, so `SendText` stays
-  untainted): sent to Lefthy chat, added to the box's history, and the box emptied so the game
+  untainted): sent to LTC, added to the box's history, and the box emptied so the game
   sends nothing. Another sticky chat type typed in the box (`/s`, `/g`, `/p`, `/1`:
   `ChatTypeInfo[type].sticky == 1`) ends it and repaints the header; whispers don't, as in the
   game. Temporary whisper windows keep their own type. Hooks on `ChatFrame1-10EditBox` at login.

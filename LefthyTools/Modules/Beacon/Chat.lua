@@ -3,8 +3,9 @@ local LT = ns.LT
 local M = LT:GetModule("beacon")
 local B = ns.Beacon
 
--- Lefthy chat: a chat for your Battle.net friends with LefthyTools, like guild or party chat.
--- /l <text> sends a line (M2;<text>), and every friend's chat window shows "[Lefthy] [Anna]: text".
+-- LTC (LefthyTools chat, once "Lefthy chat"): a chat for your Battle.net friends with LefthyTools,
+-- like guild or party chat. /ltc or /l <text> sends a line (M2;<text>), and every friend's chat
+-- window shows "[LTC] [Anna]: text" (older builds: "[Lefthy]"; only the name changed).
 -- Announcements (/la or /lefthy announce <text>, A2;<text>) go to the middle of their screens instead, in
 -- the notice stack of shared items (Items.lua: B.ShowAnnouncement), with the whisper sound. Both
 -- also come as subtitles on a cinematic flight. Settings lefthyChat and announcements switch
@@ -158,9 +159,9 @@ local function InOrder(text, show)
 	end, LOAD_WAIT)
 end
 
--- "[Lefthy] [Anna]: text", the name in its class colour.
+-- "[LTC] [Anna]: text", the name in its class colour.
 local function ChatLine(name, classFile, text)
-	return ("%s[Lefthy] [|r%s%s|r%s]: %s|r"):format(CHAT_COLOUR, LT.Window.ClassColorCode(classFile), name or "?",
+	return ("%s[LTC] [|r%s%s|r%s]: %s|r"):format(CHAT_COLOUR, LT.Window.ClassColorCode(classFile), name or "?",
 		CHAT_COLOUR, text)
 end
 
@@ -209,11 +210,11 @@ local function Send(kind, text)
 		return
 	end
 	if not M.db[kind == "chat" and "lefthyChat" or "announcements"] then
-		M:Print((kind == "chat" and "Lefthy chat is" or "announcements are") .. " off (Beacon settings).")
+		M:Print((kind == "chat" and "LTC is" or "announcements are") .. " off (Beacon settings).")
 		return
 	end
 	if text == "" then
-		M:Print(kind == "chat" and "/l <text> sends a line to every friend with LefthyTools."
+		M:Print(kind == "chat" and "/ltc <text> (or /l) sends a line to every friend with LefthyTools."
 			or "/la <text> (or /lefthy announce <text>) puts a line in the middle of your friends' screens.")
 		return
 	end
@@ -293,21 +294,21 @@ function B.ReceiveAnnouncement(peer, text)
 end
 
 ---------------------------------------------------------------------------
--- Sticky /l, like /g or /p
+-- Sticky /ltc (/l), like /g or /p
 --
 -- The chat box can't have a chat type of ours: ChatTypeInfo and its lists are Blizzard's, and
--- writing to them would taint every line anyone sends. Instead, after /l the box is in Lefthy
--- mode: its header says "Lefthy:" in our colour (a post-hook on UpdateHeader), and a plain line
--- typed there goes to Lefthy chat. It's taken in Blizzard's own "ChatFrame.OnEditBoxPreSendText"
+-- writing to them would taint every line anyone sends. Instead, after /ltc the box is in LTC
+-- mode: its header says "LTC:" in our colour (a post-hook on UpdateHeader), and a plain line
+-- typed there goes to LTC. It's taken in Blizzard's own "ChatFrame.OnEditBoxPreSendText"
 -- event, which runs callbacks through securecallfunction, so Blizzard's sending stays untainted:
--- the line goes to Lefthy chat and the box is emptied, so the game sends nothing. Typing another
--- sticky chat type (/s, /g, /p, /1, ...; a post-hook on HandleChatType) leaves Lefthy mode, as
+-- the line goes to LTC and the box is emptied, so the game sends nothing. Typing another
+-- sticky chat type (/s, /g, /p, /1, ...; a post-hook on HandleChatType) leaves LTC mode, as
 -- switching from /g to /p does; whispers don't (they aren't sticky in the game either).
 ---------------------------------------------------------------------------
 
-local HEADER = "Lefthy: "
+local HEADER = "LTC: "
 local HEADER_R, HEADER_G, HEADER_B = 1, 0.72, 0.3 -- CHAT_COLOUR
-local LEFTHY_COMMANDS = { ["/L"] = true, ["/LCHAT"] = true }
+local LEFTHY_COMMANDS = { ["/L"] = true, ["/LTC"] = true, ["/LCHAT"] = true }
 local sticky = false -- Lefthy mode
 local stickyType     -- the box's chat type it stands in for (what the box showed when /l came)
 
@@ -388,13 +389,14 @@ table.insert(LT.onLogin, function()
 	end
 end)
 
--- /l like /g or /p, and the box stays on it; /lchat in case another addon has /l. /la: announce.
+-- /ltc or /l like /g or /p, and the box stays on it; /lchat in case another addon has /l. /la: announce.
 SLASH_LEFTHYTOOLS_CHAT1 = "/l"
 SLASH_LEFTHYTOOLS_CHAT2 = "/lchat"
+SLASH_LEFTHYTOOLS_CHAT3 = "/ltc"
 SlashCmdList.LEFTHYTOOLS_CHAT = function(msg, editBox)
 	EnterLefthyMode(editBox) -- (typed in a chat box; nil from a macro)
 	if strtrim(msg or "") == "" and M.enabled and M.db.lefthyChat then
-		M:Print("Lefthy chat: what you type now goes to your friends with LefthyTools. /s, /g, /p, ... switch back.")
+		M:Print("LTC: what you type now goes to your friends with LefthyTools. /s, /g, /p, ... switch back.")
 	else
 		B.SendChat(msg) -- (or why it can't)
 	end

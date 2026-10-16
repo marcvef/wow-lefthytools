@@ -3038,7 +3038,7 @@ do
 	B("shareItems"):SetValue(true)
 end
 
-section("Beacon: Lefthy chat and announcements")
+section("Beacon: LTC (LefthyTools chat) and announcements")
 do
 	check(BDB.lefthyChat == true and BDB.announcements == true and B("lefthyChat") and B("announcements"),
 		"both on by default, each with a checkbox")
@@ -3048,7 +3048,7 @@ do
 	SlashCmdList.LEFTHYTOOLS_CHAT("anyone up for Deadmines?")
 	Advance(0.15)
 	check(sentTo(11, mark, "M2;")[1] == "M2;anyone up for Deadmines?", "/l sends the line to my friends")
-	check(printedSince(pmark):find("[Lefthy] [|r", 1, true) and printedSince(pmark):find("Lefthy|r|cffffb84d]: anyone up for Deadmines?", 1, true),
+	check(printedSince(pmark):find("[LTC] [|r", 1, true) and printedSince(pmark):find("Lefthy|r|cffffb84d]: anyone up for Deadmines?", 1, true),
 		"... and shows it in my chat window, like guild chat, got " .. printedSince(pmark))
 	pmark = #PRINTED + 1
 	anna("M2;sure, 5 min")
@@ -3111,7 +3111,7 @@ do
 	Advance(0.15)
 	check(not printedSince(pmark):find("hello?", 1, true) and not next(BB.calls) and #sentTo(11, mark, "A2;") == 0
 		and #sentTo(11, mark, "M2;") == 0 and printedSince(pmark):find("announcements are off", 1, true)
-		and printedSince(pmark):find("Lefthy chat is off", 1, true), "switched off: nothing shown or sent, and I'm told why")
+		and printedSince(pmark):find("LTC is off", 1, true), "switched off: nothing shown or sent, and I'm told why")
 	B("announcements"):SetValue(true)
 	B("lefthyChat"):SetValue(true)
 	mark = #GAMEDATA + 1
@@ -3204,7 +3204,7 @@ do
 	Advance(0.7)
 	check(printedSince(pmark):find("]: [?] never loads", 1, true), "... 3 seconds at most, then the line comes without it")
 	MOCK_ITEM_UNCACHED, PENDING_ITEM_LOADS = nil, {}
-	-- Sticky /l: the chat box stays on Lefthy chat, like /g, until another chat type.
+	-- Sticky /l (/ltc): the chat box stays on LTC, like /g, until another chat type.
 	local box, header = ChatFrame1EditBox, ChatFrame1EditBoxHeader
 	Advance(6) -- (my last chat lines out of the way: 5 per 6 s)
 	mark = #GAMEDATA + 1
@@ -3212,31 +3212,37 @@ do
 	Advance(0.6)
 	check(sentTo(11, mark, "M2;")[1] == "M2;first line", "/l in the chat box: sent")
 	box:UpdateHeader() -- the box opens again
-	check(header:GetText() == "Lefthy: " and header.color[2] == 0.72 and box._inset > 15,
-		"the box stays on Lefthy chat, and its header says so, got " .. tostring(header:GetText()))
+	check(header:GetText() == "LTC: " and header.color[2] == 0.72 and box._inset > 15,
+		"the box stays on LTC, and its header says so, got " .. tostring(header:GetText()))
 	local said = #SENT_CHAT
 	TypeChat("second line, no /l")
 	Advance(0.6)
 	check(sentTo(11, mark, "M2;")[2] == "M2;second line, no /l" and #SENT_CHAT == said and box._history == "second line, no /l",
-		"a plain line goes to Lefthy chat, not to /say (and into the box's history)")
+		"a plain line goes to LTC, not to /say (and into the box's history)")
 	TypeChat("/w Bob psst")
 	check(SENT_CHAT[#SENT_CHAT].type == "WHISPER", "a whisper goes out as a whisper")
 	TypeChat("third")
 	Advance(0.6)
-	check(sentTo(11, mark, "M2;")[3] == "M2;third", "... and Lefthy chat stays (whispers aren't sticky)")
+	check(sentTo(11, mark, "M2;")[3] == "M2;third", "... and LTC stays (whispers aren't sticky)")
 	TypeChat("/g hi guild")
 	check(SENT_CHAT[#SENT_CHAT].type == "GUILD" and SENT_CHAT[#SENT_CHAT].text == "hi guild", "/g: to the guild")
 	box:UpdateHeader()
 	TypeChat("guild again")
 	check(header:GetText() == "GUILD: " and SENT_CHAT[#SENT_CHAT].type == "GUILD" and #sentTo(11, mark, "M2;") == 3,
-		"another sticky chat type ends Lefthy mode, as /p after /g does")
+		"another sticky chat type ends LTC mode, as /p after /g does")
 	TypeChatSpace("/l ")
-	check(box:GetText() == "" and header:GetText() == "Lefthy: ", "typing /l and a space switches the box at once, like /g")
+	check(box:GetText() == "" and header:GetText() == "LTC: ", "typing /l and a space switches the box at once, like /g")
 	TypeChat("from guild mode")
 	Advance(0.6)
-	check(sentTo(11, mark, "M2;")[4] == "M2;from guild mode", "... and the line goes to Lefthy chat")
+	check(sentTo(11, mark, "M2;")[4] == "M2;from guild mode", "... and the line goes to LTC")
 	TypeChat("/s back to say")
 	check(SENT_CHAT[#SENT_CHAT].type == "SAY" and SENT_CHAT[#SENT_CHAT].text == "back to say", "/s: back to say")
+	TypeChatSpace("/ltc ")
+	check(header:GetText() == "LTC: ", "/ltc is /l too: typing it and a space switches the box")
+	TypeChat("/ltc via ltc")
+	Advance(0.6)
+	check(sentTo(11, mark, "M2;")[5] == "M2;via ltc", "... and /ltc <text> sends")
+	TypeChat("/s back to say")
 	-- A soft tick when a friend writes: once for a burst, not for my own lines, a setting.
 	local ticks = #SOUNDS
 	anna("M2;one")
@@ -3267,9 +3273,9 @@ do
 	Advance(1.1)
 	local info = LefthyToolsAFKFrame.Info:GetText()
 	check(LefthyToolsAFKFrame:IsShown() and info:find("While you were away", 1, true) and info:find("Anna|r shares", 1, true)
-		and info:find("Anna|r offers", 1, true) and info:find("[Lefthy]|r ", 1, true) and info:find("|r: brb, getting coffee", 1, true)
+		and info:find("Anna|r offers", 1, true) and info:find("[LTC]|r ", 1, true) and info:find("|r: brb, getting coffee", 1, true)
 		and info:find("|r: |cffffd200Raid in 10!", 1, true),
-		"AFK: items shown and offered, Lefthy chat and announcements are listed, got\n" .. info)
+		"AFK: items shown and offered, LTC lines and announcements are listed, got\n" .. info)
 	afk(false)
 	Advance(0.3)
 	BB.calls["11:7171"].frame.Pass:Click() -- back: the offer's buttons are there
@@ -5461,7 +5467,7 @@ section("Chronicle: friends' journals, also when they're offline")
 	share._scripts.OnMouseUp(share, "LeftButton")
 	Advance(0.5)
 	local shared = sentTo(11, mark, "M2;Chronicle")[1]
-	check(shared, "Share: a ranking goes to Lefthy chat, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	check(shared, "Share: a ranking goes to LTC, got " .. tostring(sentTo(11, mark, "M2;")[1]))
 	win:Hide()
 
 	-- Logging in later: what friends did meanwhile, in chat.

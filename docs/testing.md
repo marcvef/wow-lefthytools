@@ -34,7 +34,7 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    character, timer, time, XP, Beacon friends. Get whispered: it's counted. Press W: everything
    is back at once and the camera stops. `/afk` again, get attacked: back instantly, no "action
    blocked". `/afk`, then `/reload`: the camera doesn't keep circling. While AFK, a Beacon friend
-   shows or offers an item, writes in Lefthy chat or announces something: each is listed under
+   shows or offers an item, writes in LTC or announces something: each is listed under
    "While you were away"; after an offer, a click brings back its Need / Pass buttons.
    Cinematic flights (Misc Tweaks): take a flight path: the interface fades out, black bars come
    in (the top one lists your Beacon friends, a line each: level, zone, fighting or their quest;
@@ -114,14 +114,14 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     files, "then restart the game"; the settings overview's Updates row says "(needs a game
     restart)" then. Below it, "What's coming:" and one line per change in their build
     ("Misc Tweaks: ..."), in your client's language.
-    Lefthy chat: `/l hello` shows "[Lefthy] [you]: hello" in your chat and theirs; their `/l`
-    lines show in yours. Open the chat box again: it says "Lefthy:" in orange, and a plain line
-    goes to Lefthy chat; `/g` (or `/s`, `/p`) switches back, a whisper doesn't. Typing `/l ` with a
+    LTC: `/ltc hello` (or `/l`) shows "[LTC] [you]: hello" in your chat and theirs; their `/l`
+    lines show in yours. Open the chat box again: it says "LTC:" in orange, and a plain line
+    goes to LTC; `/g` (or `/s`, `/p`) switches back, a whisper doesn't. Typing `/l ` with a
     space switches at once. Shift-click an item into a `/l` line: friends get a working link. The
     same with your profession (the link on its window), a spell from the spellbook, a quest and a
     map pin (Ctrl+click the map, then Shift-click the pin): each is clickable in your line and
     theirs (the profession opens its recipe list, the pin sets the waypoint, with its icon). A
-    friend's line ticks softly (once for a quick burst); untick "Soft sound for Lefthy chat": silent. `/la meet at the flight master` (or `/lefthy announce "..."`): on their screen in the
+    friend's line ticks softly (once for a quick burst); untick "Soft sound for LTC": silent. `/la meet at the flight master` (or `/lefthy announce "..."`): on their screen in the
     middle (where shared items show), with the whisper sound, for 10 s; yours too.
     Error reports: switch on "Collect my friends' error reports" (Beacon settings). Your friend
     types `/lefthy report test`: their chat says "1 report(s) sent to <you>", yours "<friend> sent
@@ -174,7 +174,7 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     although you and A were never online together. A minute after logging in a chat
     line says what friends did while you were away. Compare: chips hide and show people, 7 / 14 /
     30 days, hovering a day lists everyone's value, hovering a symbol only that person's moments,
-    a click on a Hall of fame column sorts it, Share posts a ranking in Lefthy chat. The book on
+    a click on a Hall of fame column sorts it, Share posts a ranking in LTC. The book on
     the minimap gets a blue dot for news; the News tab shows how many. Friends: a row per friend
     online (where, doing) and not online; a click on a row opens their graphs. First login of a
     week: last week's leaderboard in chat.

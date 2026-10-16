@@ -1150,14 +1150,14 @@ function C.RecapLines(count, ending)
 	return lines, board
 end
 
--- Shares a line in Lefthy chat (Beacon's /l), or prints it if that isn't on.
+-- Shares a line in LTC (Beacon's /ltc), or prints it if that isn't on.
 function C.ShareLine(text)
 	local B = Beacon()
 	local beacon = LT:GetModule("beacon")
 	if B and B.SendChat and beacon.db.lefthyChat then
 		B.SendChat(text)
 	else
-		M:Print(text .. " (Lefthy chat is off: only you see this.)")
+		M:Print(text .. " (LTC is off: only you see this.)")
 	end
 end
 

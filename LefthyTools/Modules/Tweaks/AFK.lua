@@ -165,8 +165,8 @@ local function NewsLine(item)
 		return item.data.foe and L["%s died, fighting %s"]:format(who, item.data.foe) or L["%s died"]:format(who)
 	elseif item.kind == "item" and item.data.link then -- Beacon: shown or offered (a click brings back its buttons)
 		return (item.data.offer and L["%s offers %s"] or L["%s shares %s"]):format(who, item.data.link)
-	elseif item.kind == "chat" and item.data.text then -- Lefthy chat
-		return "|cffffb84d[Lefthy]|r " .. who .. ": " .. Short(item.data.text)
+	elseif item.kind == "chat" and item.data.text then -- LTC
+		return "|cffffb84d[LTC]|r " .. who .. ": " .. Short(item.data.text)
 	elseif item.kind == "announce" and item.data.text then
 		return who .. ": |cffffd200" .. Short(item.data.text) .. "|r"
 	end

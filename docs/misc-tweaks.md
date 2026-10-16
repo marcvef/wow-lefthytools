@@ -341,7 +341,7 @@ While the player is AFK (`UnitIsAFK("player")`; `/afk` or the auto-AFK), the
 interface disappears and a panel shows the character (`PlayerModel` with `SetUnit("player")`),
 time away, clock, zone, level progress and rested XP, whispers since then, friends' news while
 away (a `ns.Beacon.listeners` entry: level-ups, deaths, and, because their notices are hidden with
-the interface, items shown or offered, Lefthy chat lines and announcements, the text cut at 90
+the interface, items shown or offered, LTC lines and announcements, the text cut at 90
 bytes; the newest 6), and lines other modules add through
 `ns.AFKScreen.sections` (Chronicle's session). The camera circles with `MoveViewLeftStart(0.03)`
 (setting `afkSpin`). Beacon friends (up to 5, by name) get up to three lines each, all from what
@@ -432,7 +432,7 @@ left alone (a first version pulled it back and circled; that was removed).
 - **Beacon's item news:** the notices sit on the interface, so `Flight.Subtitle(text)` lets
   Items.lua add a friend's share ("[icon] Anna shares [item]") and an offer's outcome ("[item]:
   Bob wins!", "Nobody needs it.") to the subtitles, like whispers.
-- **Links in subtitles** (shared items, links in Lefthy chat): the subtitles sit in a frame of their
+- **Links in subtitles** (shared items, links in LTC): the subtitles sit in a frame of their
   own (`SubtitleFrame`, `SetHyperlinksEnabled`) that takes the mouse only while a line has a link,
   so camera drags go through everywhere else. Hovering a link shows our own tooltip
   (`LefthyToolsFlightTooltip`, a `GameTooltipTemplate` on the film at TOOLTIP strata: the game's

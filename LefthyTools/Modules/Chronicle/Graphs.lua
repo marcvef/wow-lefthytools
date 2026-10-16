@@ -844,7 +844,7 @@ local function Series(p, chart, days)
 	return any and values or nil
 end
 
--- Share a ranking in Lefthy chat: "Chronicle, last 14 days, quests: Anna 142, Bob 98".
+-- Share a ranking in LTC (LefthyTools chat): "Chronicle, last 14 days, quests: Anna 142, Bob 98".
 local function ShareRanking(title, ranking, key, days)
 	local parts = {}
 	for i = 1, math.min(5, #ranking) do
@@ -901,7 +901,7 @@ local function LineChart(canvas, x, y, w, h, chart, people, days, state, opts)
 	end
 	-- Share, at the bottom right (under the day labels).
 	canvas:Text("|cff80c0ff" .. L["Share"] .. "|r", ix + iw - 60, iy + ih - 11, "GameFontHighlightSmall", "RIGHT", 60)
-	canvas:Hover(ix + iw - 60, iy + ih - 14, 60, 16, { L["Share"], L["Post this ranking in Lefthy chat."] },
+	canvas:Hover(ix + iw - 60, iy + ih - 14, 60, 16, { L["Share"], L["Post this ranking in LTC."] },
 		function() ShareRanking(CHART_CHAT[chart.key], ranking, chart.key, #days) end)
 	ih = ih - 14
 	if #series == 0 then
@@ -1169,7 +1169,7 @@ local function Leaders(canvas, x, y, w, people, state)
 	local h = HEADER + 4 + rows * cellH + PAD
 	local ix, iy, iw = Card(canvas, x, y, w, h, L["Leaderboard, last 7 days"])
 	canvas:Text("|cff80c0ff" .. L["Share"] .. "|r", x + w - PAD - 60, y + 9, "GameFontHighlightSmall", "RIGHT", 60)
-	canvas:Hover(x + w - PAD - 60, y + 4, 60, 18, { L["Share"], L["Post the week's leaders in Lefthy chat."] }, function()
+	canvas:Hover(x + w - PAD - 60, y + 4, 60, 18, { L["Share"], L["Post the week's leaders in LTC."] }, function()
 		local parts = {}
 		for _, metric in ipairs({ "quests", "xp", "kills", "deaths", "afk" }) do
 			local first = board[metric][1]

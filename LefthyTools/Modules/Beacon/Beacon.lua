@@ -1498,10 +1498,10 @@ function M:BuildOptions(o)
 		L["Ctrl+right-click any item (bags, bank, character, loot, chat links) to show it to your friends: they see it at the top of the screen, with the whisper sound. Ctrl+Shift+right-click offers an item you can trade: they can say Need or Pass, and if several need it, it is rolled out. The item stays reserved for the winner until you hand it over."])
 	o:Button(L["Hand-over reminders"], L["Clear"], function() B.HandoverCommand("clear") end,
 		L["Items you offered and someone won stay reserved until you trade or mail them to the winner: a tooltip line, a bag border, a question at vendors. This forgets all of them, in case one is stuck. /lefthy beacon handover lists them."])
-	o:Checkbox("lefthyChat", L["Lefthy chat"],
-		L["A chat for your Battle.net friends with LefthyTools, like guild or party chat: /l <text> sends a line, and theirs show in your chat window."])
-	o:Checkbox("lefthyChatSound", L["Soft sound for Lefthy chat"],
-		L["A quiet tick when a friend writes in Lefthy chat."])
+	o:Checkbox("lefthyChat", L["LTC (LefthyTools chat)"],
+		L["A chat for your Battle.net friends with LefthyTools, like guild or party chat: /ltc <text> (or /l) sends a line, and theirs show in your chat window as [LTC]."])
+	o:Checkbox("lefthyChatSound", L["Soft sound for LTC"],
+		L["A quiet tick when a friend writes in LTC."])
 	o:Checkbox("announcements", L["Announcements"],
 		L["/la <text> (or /lefthy announce <text>) puts a line in the middle of your friends' screens, like a shared item, with the whisper sound. Theirs show on yours."])
 	o:Checkbox("pings", L["Map pings"],
@@ -1617,7 +1617,7 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy beacon show <item> - show an item to friends, like Ctrl+right-click (Shift-click it into the chat box)")
 		self:Print("/lefthy beacon offer <item> - offer it for Need or Pass, like Ctrl+Shift+right-click")
 		self:Print("/lefthy beacon handover [clear] - items you offered that winners still have to get")
-		self:Print("/l <text> - Lefthy chat: a line for every friend with LefthyTools, like guild chat")
+		self:Print("/ltc <text> (or /l) - LTC, LefthyTools chat: a line for every friend with LefthyTools, like guild chat")
 		self:Print("/la <text> (or /lefthy announce <text>) - a line in the middle of your friends' screens")
 	end
 end

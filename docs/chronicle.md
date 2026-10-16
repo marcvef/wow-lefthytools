@@ -194,8 +194,8 @@ the open one's button greyed out:
   (lifetime numbers from profiles: level, time, quests, kills, deaths, zones, dungeons, bosses,
   rares, distance, jumps; click a column header to sort; the best of each in gold) and Records
   (fastest level, longest session, most gold, most deaths, most time AFK, everyone's nemesis).
-  "Share" on each chart and on the leaderboard posts the ranking in Lefthy chat (`C.ShareLine`:
-  Beacon's `B.SendChat`; printed locally when Lefthy chat is off). Toolbar chips, column headers
+  "Share" on each chart and on the leaderboard posts the ranking in LTC (`C.ShareLine`:
+  Beacon's `B.SendChat`; printed locally when LTC is off). Toolbar chips, column headers
   and Share are the canvas's hover areas with a click (`Canvas:Hover(..., onClick)`); a click
   redraws the page. Redrawn like Graphs (on changes at most every 10 s, else every 30 s).
 
