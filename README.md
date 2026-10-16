@@ -9,6 +9,7 @@ module you can switch on or off.
 | [Misc Tweaks](#misc-tweaks) | Small fixes, each switchable: always-visible health/power values, combo points on the personal resource display, movable bags, quest progress in party chat, markers for quests new in WoW: Forever, your quests on continent and world maps |
 | [Beacon](#beacon) | Battle.net friends who also use LefthyTools see each other on the world map and minimap, with status and level-up messages, without needing a group |
 | [Chronicle](#chronicle) | A journal for each character that writes itself: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, lots of statistics, and what your friends did, also while you weren't online, with all of you compared in graphs and leaderboards |
+| [Bestiary](#bestiary) | What the mobs you kill drop: a window that follows your target with each drop, how many you got and its drop chance, from your own kills |
 
 ## Settings
 
@@ -301,6 +302,28 @@ once a second, so it costs nothing you'd notice.
 | Show friends' highlights in chat | on |
 | While you were away | on |
 | Weekly recap | on |
+
+---
+
+## Bestiary
+
+What the mobs you kill drop. Click the loot bag on the minimap's edge (or type `/bestiary`) for a
+small window that follows your target: its portrait, name and level, how many of it you killed
+and the coin each brought, and every item it dropped: the icon, how many you got in its corner and
+the drop chance under it. Hover a drop for the item's tooltip with the numbers, Shift-click to
+link it. The window stays open (Escape doesn't close it) and keeps the last mob when you clear
+your target.
+
+So the chances hold, only your own kills count (not in a group, where the loot is shared), and
+only once their corpse is looted or the game says it's empty. Skinning, pickpocketing, fishing,
+herbs, ore and chests don't count as a mob's drops. All your characters add to the same
+database; it stays on your computer.
+
+| Setting | Default |
+|---|---|
+| Minimap button | on |
+| Drops next to the mouse (an enemy you've killed before: its likeliest drops beside the mouse) | off |
+| Grey items | on |
 
 ---
 

@@ -601,6 +601,21 @@ function ItemLink(id, count) -- what CHAT_MSG_LOOT carries
 	local q = ITEMS[id].quality
 	return ("|cnIQ%d:|Hitem:%d::::::::20:::::|h[%s]|h|r"):format(q, id, ITEMS[id].name)
 end
+-- The loot window: LOOT = { { type = 1 (item) | 2 (coin), id, quantity, source = its corpse's GUID }, ... }
+-- (LOOT_FISHING: from fishing); CanLootUnit says LOOT_EMPTY[guid] corpses have nothing.
+LOOT, LOOT_FISHING, LOOT_EMPTY = {}, false, {}
+function GetNumLootItems() return #LOOT end
+function GetLootSlotType(i) return LOOT[i] and LOOT[i].type or 0 end
+function GetLootSlotInfo(i)
+	local s = LOOT[i]
+	if not s then return nil end
+	if s.type == 2 then return 133784, "34 Copper", 0, nil, 0 end
+	return 1000 + s.id, ITEMS[s.id].name, s.quantity or 1, nil, ITEMS[s.id].quality
+end
+function GetLootSlotLink(i) local s = LOOT[i]; if s and s.type == 1 then return ItemLink(s.id) end end
+function GetLootSourceInfo(i) local s = LOOT[i]; if s then return s.source, s.quantity or 1 end end
+function IsFishingLoot() return LOOT_FISHING end
+function CanLootUnit(guid) return not LOOT_EMPTY[guid], true end
 LOOT_ITEM_SELF = "You receive loot: %s."
 LOOT_ITEM_SELF_MULTIPLE = "You receive loot: %sx%d."
 LOOT_ITEM_PUSHED_SELF = "You receive item: %s."
@@ -1307,6 +1322,7 @@ GameTooltip = {
 	SetOwner = function(_, owner) TOOLTIP = { lines = {}, owner = owner } end,
 	SetText = function(_, text, r, g, b) TOOLTIP.title, TOOLTIP.color = text, { r, g, b } end,
 	AddLine = function(_, text) TOOLTIP.lines[#TOOLTIP.lines + 1] = text end,
+	AddDoubleLine = function(_, left, right) TOOLTIP.lines[#TOOLTIP.lines + 1] = left .. "  " .. right end,
 	Show = function() TOOLTIP.shown = true end,
 	Hide = function() TOOLTIP.shown = false end,
 	IsOwned = function(_, frame) return TOOLTIP.shown and TOOLTIP.owner == frame end,

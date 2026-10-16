@@ -1,8 +1,8 @@
 # Architecture
 
 LefthyTools is one addon made of switchable modules: **Mirage** (fades the HUD when idle),
-**Misc Tweaks** (small fixes), **Beacon** (Battle.net friends on the map) and **Chronicle** (a
-journal per character). User-facing docs are
+**Misc Tweaks** (small fixes), **Beacon** (Battle.net friends on the map), **Chronicle** (a
+journal per character) and **Bestiary** (what mobs drop). User-facing docs are
 in the [README](../README.md); this file covers how the code is organised.
 
 ## Layout
@@ -57,6 +57,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Chronicle/Graphs.lua     the Graphs and Compare pages: pooled canvas (bars, lines, text), cards
   Modules/Chronicle/Window.lua     the journal window (timeline, statistics, graphs, friends)
   Modules/Chronicle/MinimapButton.lua  the book button on the minimap's edge
+  Modules/Bestiary/Bestiary.lua    Bestiary: kills and loot per kind of mob (LefthyToolsBestiaryDB), /bestiary
+  Modules/Bestiary/Window.lua      its window (your target's drops), the card beside the mouse, the minimap button
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
@@ -147,9 +149,9 @@ variables ready) and `LT.onLogin`.
 
 `ns.CHANGELOG` lists every change players notice: `{ id, version, module, en = { title,
 sentence }, de = { title, sentence } }`, ids 1, 2, 3, ... in order; module is `mirage`, `tweaks`,
-`beacon`, `chronicle` or `general` (the tests check all of that, and titles stay short). The
+`beacon`, `chronicle`, `bestiary` or `general` (the tests check all of that, and titles stay short). The
 window groups them: per version (newest first) a large gold heading with a divider, then a
-section per module in a fixed order (Mirage, Misc Tweaks, Beacon, Chronicle, General; module
+section per module in a fixed order (Mirage, Misc Tweaks, Beacon, Chronicle, Bestiary, General; module
 names untranslated), then each entry as a bullet with its title and, below it in grey, the
 sentence; wrapped lines stay under the text. Drawn with pooled font strings (`Render`);
 `WhatsNew.Text` gives the same as plain text. Ids instead of versions, because

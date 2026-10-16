@@ -10,7 +10,7 @@ local L = ns.L
 local SHOW_DELAY = 3   -- seconds after login, so it doesn't open into the loading screen
 local COMBAT_RETRY = 5
 -- Sections inside a version, in this order (the overview's module order, then the addon as a whole).
-local SECTIONS = { "mirage", "tweaks", "beacon", "chronicle", "general" }
+local SECTIONS = { "mirage", "tweaks", "beacon", "chronicle", "bestiary", "general" }
 local BULLET_X, TEXT_X = 8, 22  -- an entry's bullet, and its text (wrapped lines stay under the text)
 local GAP = { version = 22, section = 14, entry = 8 } -- space above each kind of line
 

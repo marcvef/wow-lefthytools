@@ -6284,9 +6284,137 @@ do
 	STATS = { { 40, 45 }, { 60, 70 }, { 50, 58 }, { 25, 25 }, { 30, 32 } }
 end
 
+section("Bestiary: what mobs drop")
+;(function()
+	local Bt = ns.Bestiary
+	local function setting(id) return REGISTERED_SETTINGS["LefthyTools_bestiary_" .. id] end
+	local function mob() return LefthyToolsBestiaryDB.mobs[116] end
+	local function tipFind(text)
+		for _, l in ipairs(TOOLTIP.lines) do if l:find(text, 1, true) then return true end end
+		return false
+	end
+	local win, card, button = Bt.Frames()
+	check(LT:GetModule("bestiary").enabled and button and button:IsShown() and not win and setting("hoverCard"):GetValue() == false,
+		"on by default: a minimap button; no window yet; the card next to the mouse off")
+	button._scripts.OnEnter(button)
+	check(TOOLTIP.title == "Bestiary" and tipFind("0 kinds of mobs, 0 kills"), "the button's tooltip: how much it knows")
+	button._scripts.OnClick(button, "LeftButton")
+	win = Bt.Frames()
+	check(win and win:IsShown() and win.Name:GetText() == "Bestiary" and win.Note:GetText() == "Target a mob to see what it drops."
+		and button.Open:IsShown(), "a click opens the window: target a mob (a gold dot on the button)")
+	local escapes = false
+	for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsBestiaryFrame" then escapes = true end end
+	check(not escapes, "Escape doesn't close it")
+
+	-- A Defias Bandit (creature 116): targeted, killed, looted.
+	local guid = "Creature-0-1-0-1-116-0000000A"
+	MOBS.target, STATE.target = { name = "Defias Bandit", level = 9, guid = guid, combat = true, yards = 5 }, true
+	Fire("PLAYER_TARGET_CHANGED")
+	check(win.Name:GetText() == "Defias Bandit" and win.Kind:GetText() == "Level 9" and win.Portrait._creature == 116
+		and win.Note:GetText() == "No kills of it yet: kill one on your own and loot it.", "it follows my target: its portrait, name, level; no kills yet")
+	Fire("PARTY_KILL", "Player-1-0", guid)
+	MOBS.target.dead = true
+	LOOT = { { type = 1, id = 2589, quantity = 2, source = guid }, { type = 2, source = guid } }
+	local money = MONEY
+	Fire("LOOT_READY", false)
+	MONEY = MONEY + 1234
+	Fire("LOOT_CLOSED")
+	LOOT = {}
+	local cell = win.cells[1]
+	check(mob().kills == 1 and mob().money == 1234 and mob().items[2589][1] == 1 and mob().items[2589][2] == 2
+		and cell:IsShown() and cell.Count:GetText() == "2" and cell.Chance:GetText() == "100%" and cell.Icon.path == 3589
+		and win.Kills:GetText():find("1 kill", 1, true) and win.Kills:GetText():find("12s 34c each", 1, true),
+		"killed and looted: 1 kill, 2 Linen Cloth (100%), its coin (12s 34c each)")
+	-- Another, its corpse empty: counted once the game says so (twice, a few seconds apart).
+	local guid2 = "Creature-0-1-0-1-116-0000000B"
+	LOOT_EMPTY[guid2] = true
+	Fire("PARTY_KILL", "Player-1-0", guid2)
+	Advance(2.1)
+	check(mob().kills == 1, "an empty corpse: not yet (its loot can take a moment)")
+	Advance(4.1)
+	check(mob().kills == 2 and cell.Chance:GetText() == "50%", "still empty: counted, a kill without drops (Linen Cloth 50%)")
+	-- One left lying with loot on it: not counted (it would look like nothing dropped).
+	Fire("PARTY_KILL", "Player-1-0", "Creature-0-1-0-1-116-0000000C")
+	Advance(7)
+	check(mob().kills == 2, "a corpse with loot left lying: not counted")
+	-- Looted once only; skinning it after, a pickpocket, fishing: not its drops.
+	local guid4 = "Creature-0-1-0-1-116-0000000D"
+	ITEMS[4865] = ITEMS[4865] or { name = "Ruined Pelt", quality = 0 }
+	LOOT = { { type = 1, id = 2075, source = guid4 }, { type = 1, id = 4865, source = guid4 } }
+	Fire("LOOT_READY", true) -- (no killing blow of mine seen: its loot says it was mine)
+	Fire("LOOT_CLOSED")
+	LOOT = { { type = 1, id = 2589, source = guid4 } }
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-8", 921) -- (Pick Pocket)
+	LOOT = { { type = 1, id = 1179, source = "Creature-0-1-0-1-116-0000000E" } }
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	Advance(2)
+	LOOT_FISHING = true
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	LOOT, LOOT_FISHING = {}, false
+	check(mob().kills == 3 and mob().items[2589][1] == 1 and not mob().items[1179],
+		"a corpse looted again (skinning), a pickpocket, fishing: none of them counted")
+	local cells = win.cells
+	check(cells[1].drop.id == 2075 and cells[2].drop.id == 2589 and cells[3].drop.id == 4865 and cells[1].Chance:GetText() == "33%",
+		"the likeliest first, the better first when even (the green mace, the white cloth, the grey pelt)")
+	cells[1]._scripts.OnEnter(cells[1])
+	check(TOOLTIP.link == "item:2075" and tipFind("Dropped in 1 of 3 kills: 33%") and tipFind("Shift-click: link it in chat"),
+		"hover a drop: the item's tooltip, how often it dropped")
+	cells[1]._scripts.OnLeave(cells[1])
+	setting("showPoor"):SetValue(false)
+	check(not (cells[3] and cells[3]:IsShown()) and cells[2]:IsShown(), "grey items off: the Ruined Pelt goes")
+	setting("showPoor"):SetValue(true)
+	-- In a group: nothing counted (the loot is shared), and the window says so.
+	GROUP = "party"
+	Fire("PARTY_KILL", "Player-1-0", "Creature-0-1-0-1-116-0000000F")
+	LOOT = { { type = 1, id = 2589, source = "Creature-0-1-0-1-116-0000000F" } }
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	LOOT = {}
+	Fire("PLAYER_TARGET_CHANGED")
+	check(mob().kills == 3 and win.Note:GetText():find("In a group: kills aren't counted", 1, true), "in a group: not counted, and said")
+	GROUP = "none"
+	-- No target, or a vendor: the last mob stays.
+	MOBS.target, STATE.target = nil, false
+	Fire("PLAYER_TARGET_CHANGED")
+	check(win.Name:GetText() == "Defias Bandit", "target cleared: the last mob stays")
+	-- Many drops: as many as fit, the rest in a "+N".
+	for id = 50001, 50030 do mob().items[id] = { 1, 1, 1 } end
+	Bt.Draw()
+	check(cells[24]:IsShown() and cells[24].More:GetText() == "+10" and not cells[25], "33 drops: 23 fit, +10, the rest on hover")
+	cells[24]._scripts.OnEnter(cells[24])
+	check(TOOLTIP.title == "More drops" and #TOOLTIP.lines == 10, "hover: the rest, with their chances")
+	cells[24]._scripts.OnLeave(cells[24])
+	for id = 50001, 50030 do mob().items[id] = nil end
+	Bt.Draw()
+	-- The card next to the mouse (setting): an enemy killed before, its drops small.
+	MOBS.mouseover = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000010", pinned = true }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	check(not (select(2, Bt.Frames()) and select(2, Bt.Frames()):IsShown()), "the card is off by default")
+	setting("hoverCard"):SetValue(true)
+	CURSOR.x, CURSOR.y = 400, 300
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	card = select(2, Bt.Frames())
+	check(card and card:IsShown() and card.Kills:GetText():find("3 kills", 1, true) and card.cells[1]:IsShown()
+		and card.cells[1].Chance:GetText() == "33%", "over it: my kills and its drops, beside the mouse")
+	MOBS.mouseover = nil
+	Advance(0.1)
+	check(not card:IsShown(), "the mouse moves off: the card goes")
+	setting("hoverCard"):SetValue(false)
+	-- Closed and open again: kept for next time.
+	win.Close:Click()
+	check(not win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == false and not button.Open:IsShown(), "the X closes it, kept")
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("")
+	check(win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == true, "/bestiary opens it")
+	win.Close:Click()
+end)()
+
 section("what's new")
 local news = ns.CHANGELOG
-local MODULES = { mirage = true, tweaks = true, beacon = true, chronicle = true, general = true }
+local MODULES = { mirage = true, tweaks = true, beacon = true, chronicle = true, bestiary = true, general = true }
 local goodData = #news > 0
 for i, e in ipairs(news) do
 	goodData = goodData and e.id == i and (e.version == nil or LT.ParseVersion(e.version) ~= nil) and MODULES[e.module]
