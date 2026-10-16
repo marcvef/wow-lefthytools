@@ -1587,7 +1587,7 @@ check(last(GameDataTo(11, mark)) == "S2;;0;500.0;500.0;Goldshire;", "leaving com
 STATE.dead = true
 Fire("PLAYER_DEAD")
 Advance(1.2)
-check(last(GameDataTo(11, mark)) == "S2;D;0;500.0;500.0;Goldshire;", "dead")
+check(last(sentTo(11, mark, "S2;")) == "S2;D;0;500.0;500.0;Goldshire;", "dead")
 STATE.ghost = true
 Fire("PLAYER_ALIVE")
 Advance(1.2)
@@ -1610,7 +1610,8 @@ check((last(GameDataTo(11, mark)) or ""):find("^S2;;0;500.0;500.0;") ~= nil, "ba
 mark = #GAMEDATA + 1
 B("share"):SetValue(false)
 Advance(1.2)
-check(last(GameDataTo(11, mark)) == "S2;;;;;;", "sharing off: no position and no status")
+check(last(sentTo(11, mark, "S2;")) == "S2;;;;;;" and last(sentTo(11, mark, "O2;v;")) == "O2;v;",
+	"sharing off: no position, no status, no health")
 B("share"):SetValue(true)
 Advance(1.2)
 B("interval"):SetValue(5)
@@ -2324,6 +2325,59 @@ do
 	check(tooltipHas("Level 20"), "not shared: just the level")
 	pin:OnMouseLeave()
 	WorldMapFrame:Hide()
+end
+
+section("Beacon: friends' health")
+do
+	-- Hers (estimated on her side), for everyone, not only who watches her stream: beside her level
+	-- on her dot's tooltip and in her lines (AFK screen, flights); no line of its own.
+	OpenWorldMap(1429)
+	Advance(0.6)
+	local pin = pinOf(11)
+	pin:OnMouseEnter()
+	local lines = #TOOLTIP.lines
+	anna("O2;v;80")
+	Advance(0.6)
+	check(tooltipHas("Level 20  |cff66dd66~80% health|r") and #TOOLTIP.lines == lines,
+		"her health beside her level, green, no new line, got " .. table.concat(TOOLTIP.lines, " | "))
+	anna("O2;v;20")
+	Advance(0.6)
+	check(tooltipHas("Level 20  |cffff5050~20% health|r"), "low: red")
+	anna("O2;v;abc")
+	Advance(0.6)
+	check(tooltipHas("Level 20  |cffff5050~20% health|r"), "malformed: ignored")
+	local peer, friendLines = BB.peers[11], {}
+	BB.FriendLines(friendLines, peer, 11)
+	check(friendLines[1]:find("~20% health", 1, true) and BB.FriendRows(peer, 11):find("~20% health", 1, true),
+		"her lines (AFK screen, flights): beside her level too")
+	anna("O2;v;")
+	Advance(0.6)
+	check(tooltipHas("Level 20") and #TOOLTIP.lines == lines, "not known (or not shared): just the level")
+	pin:OnMouseLeave()
+	WorldMapFrame:Hide()
+	-- Mine, to every friend: when it changes (in steps of 5), at most every 2 s, and with answers.
+	STATE.combat, STATE.dead = false, false
+	BB.Stream.LifeStart()
+	Advance(4.5) -- (no ticks: full)
+	local hmark = #GAMEDATA + 1
+	STATE.combat = true
+	Fire("PLAYER_REGEN_DISABLED")
+	Fire("UNIT_COMBAT", "player", "WOUND", "", 300, 1)
+	Advance(0.6)
+	check(last(sentTo(11, hmark, "O2;v;")) == "O2;v;70" and last(sentTo(12, hmark, "O2;v;")) == "O2;v;70",
+		"hit for 300 of 1000: every friend hears ~70%")
+	Fire("UNIT_COMBAT", "player", "WOUND", "", 100, 1)
+	Advance(0.6)
+	check(#sentTo(11, hmark, "O2;v;") == 1, "again at once: not yet (at most every 2 s)")
+	Advance(2)
+	check(last(sentTo(11, hmark, "O2;v;")) == "O2;v;60", "then the new one")
+	hmark = #GAMEDATA + 1
+	anna("H2")
+	Advance(2)
+	check(sentTo(11, hmark, "O2;v;60")[1], "with every answer")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	Advance(5)
 end
 
 section("AFK screen: what friends are doing")
@@ -4046,7 +4100,7 @@ do
 	Fire("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
 	Advance(1.1)
 	local frames, names = sentTo(11, mark, "O2;f;"), sentTo(11, mark, "O2;n;")
-	check(#frames >= 2 and #names == 2 and #sentTo(12, mark, "O2;") == 0,
+	check(#frames >= 2 and #names == 2 and #sentTo(12, mark, "O2;f;") == 0 and #sentTo(12, mark, "O2;n;") == 0,
 		"frames go to her twice a second, each mob's name once, nothing to Bob, got " .. #frames .. " frames, " .. #names .. " names")
 	check((names[1] .. names[2]):find(";15;Defias Thug", 1, true), "a name with its level")
 	local fields = {}

@@ -82,7 +82,18 @@ local function Doing(peer)
 	return fight or quest
 end
 
--- Name (and <AFK>), level and progress, "In your group".
+-- Their health ("~80% health", estimated on their side: O2;v), green, yellow below half, red below a
+-- quarter; nil when not known (or an older build) and when dead.
+function B.HealthText(peer)
+	local health = peer.health
+	if not health or peer.dead or peer.ghost then
+		return nil
+	end
+	local color = health >= 0.5 and "66dd66" or health >= 0.25 and "ffd040" or "ff5050"
+	return ("|cff%s%s|r"):format(color, L["~%d%% health"]:format(math.floor(health * 100 + 0.5)))
+end
+
+-- Name (and <AFK>), level and progress, health, "In your group".
 local function Head(peer, info)
 	local level = info and info.characterLevel or peer.level
 	local head = ColouredName(peer)
@@ -92,6 +103,10 @@ local function Head(peer, info)
 	if level then
 		head = head .. "  |cffcccccc" .. (peer.xpPercent and L["Level %d (%d%%)"]:format(level, peer.xpPercent)
 			or L["Level %d"]:format(level)) .. "|r"
+	end
+	local health = B.HealthText(peer)
+	if health then
+		head = head .. "  " .. health
 	end
 	if peer.groupUnit then
 		head = head .. "  |cff4da6ff" .. L["In your group"] .. "|r"
@@ -106,7 +121,7 @@ local function Where(peer, gameAccountID)
 	return "|cffaaaaaa" .. where .. (distance and (", " .. distance) or "") .. "|r"
 end
 
--- Appends up to three lines to `lines`: name (and <AFK>), level and progress, "In your group";
+-- Appends up to three lines to `lines`: name (and <AFK>), level and progress, health, "In your group";
 -- zone - subzone and distance; what they're doing (only when there's something).
 function B.FriendLines(lines, peer, gameAccountID)
 	local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)

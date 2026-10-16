@@ -39,6 +39,11 @@ local S = B.Stream
 --   O2;u;<id>;<level>;<classFile>;<name>
 --                       the same for a player (their class colours the dot; older builds ignore
 --                       it and show the player as an unnamed mob)
+--   O2;v;<percent>      my health (estimated, StreamSense.lua; in steps of 5, empty: not known or
+--                       not sharing) for every friend, not only watchers: their map tooltip, AFK
+--                       screen and flights show it. When it changes, at most every HEALTH_GAP
+--                       seconds (a waiting one is replaced), and with every answer. Older builds
+--                       ignore the word.
 --
 -- Spells go as IDs: the watcher's client names them, in its own language. Nothing runs while
 -- nobody watches and you watch nobody; the sensor (StreamSense.lua) runs while someone watches you.
@@ -55,6 +60,7 @@ local NAME_BYTES = 40
 local STOP_GAP = 10           -- frames from someone I don't watch: tell them, at most this often
 local MAX_ID = 999
 local TICK = 1
+local HEALTH_GAP = 2          -- my health goes to friends at most this often
 local issecret = S.issecret
 
 local watchers = {}   -- gameAccountID -> { at (last heard), sentAt (last frame), names = { [id] = key } }
@@ -314,6 +320,38 @@ local function Encode(picture, now)
 	return head .. table.concat(mobs, "/"), ids
 end
 
+-- My health for every friend: what O2;v says ("" when not known or not shared).
+local function HealthWord()
+	if not (M.enabled and M.db.share) then
+		return ""
+	end
+	local health = S.Health()
+	return health and tostring(math.floor(health * 20 + 0.5) * 5) or ""
+end
+
+local healthSent, healthSentAt, healthLookAt = "", -math.huge, -math.huge
+
+-- On Beacon's tick: friends hear when it changes (in steps of 5), at most every HEALTH_GAP.
+function B.StreamHealthTick(now)
+	if now - healthSentAt < HEALTH_GAP or now - healthLookAt < 0.5 or not next(B.peers) then
+		return
+	end
+	healthLookAt = now
+	local word = HealthWord()
+	if word ~= healthSent then
+		healthSent, healthSentAt = word, now
+		for id in pairs(B.peers) do
+			B.QueueLatest(id, Message("v", word), "O" .. VERSION .. ";v;")
+		end
+	end
+end
+
+-- With every answer (nil: not known).
+function B.StreamHealthHello()
+	local word = HealthWord()
+	return word ~= "" and Message("v", word) or nil
+end
+
 -- After every look of the sensor: a frame for each watcher whose turn it is.
 S.OnSensed(function(picture)
 	if not next(watchers) or not Share() then
@@ -396,6 +434,16 @@ function B.ReceiveStream(senderID, word, rest)
 		elseif not stopSaid[senderID] or now - stopSaid[senderID] >= STOP_GAP then
 			stopSaid[senderID] = now -- (they think I watch: after my /reload, say)
 			B.Queue(senderID, Message("w", "0"))
+		end
+	elseif word == "v" then
+		local percent = rest:match("^(%d%d?%d?)$")
+		if rest ~= "" and not percent then
+			return
+		end
+		local health = percent and math.min(100, tonumber(percent)) / 100 or nil
+		if peer.health ~= health then
+			peer.health = health
+			B.PeerChanged(peer) -- (their tooltip follows)
 		end
 	elseif word == "n" or word == "u" then
 		local stream = streams[senderID]
@@ -792,6 +840,7 @@ local shared
 function B.StreamStart()
 	shared = M.db.streamShare and true or false
 	S.LifeStart() -- (StreamSense.lua: my health, estimated)
+	healthSent, healthSentAt, healthLookAt = "", -math.huge, -math.huge
 	C_Timer.After(0, function() S.UpdateButton() end) -- (StreamButton.lua: the minimap button)
 end
 

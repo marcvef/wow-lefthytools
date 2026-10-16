@@ -745,6 +745,7 @@ L["+%d XP"] = "+%d EP"
 L["1 kill"] = "1 Kill"
 L["an item"] = "ein Item"
 L["Health (estimated)"] = "Leben (geschätzt)"
+L["~%d%% health"] = "~%d%% Leben"
 L["%s's LefthyTools is older and doesn't send health: they need to update."] =
 	"LefthyTools von %s ist älter und sendet kein Leben: ein Update ist nötig."
 L["Not known here: the game hides the maximum health in this place, and none is known from before."] =

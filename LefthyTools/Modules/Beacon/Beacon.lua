@@ -63,7 +63,8 @@ local L = ns.L
 --                       off. Sent when the whole percent changes (at most every XP_GAP seconds)
 --                       and with every answer.
 --   O2;<word>;<...>     the fight stream (StreamNet.lua): h I can be watched (with every answer),
---                       w I watch you, f what's around me (to watchers only), n a mob's name
+--                       w I watch you, f what's around me (to watchers only), n a mob's name,
+--                       v my health (estimated; to everyone, when it changes, and with answers)
 --   J2;<word>;<...>     Chronicle's journals (Chronicle/Sync.lua): h I sync, s what I hold, q send me
 --                       an account's records, p/d/n a profile, day or highlight, e that's all
 --
@@ -216,6 +217,12 @@ B.dirty, B.minimapDirty = false, true
 
 local function Changed()
 	B.dirty, B.minimapDirty = true, true
+end
+
+-- A friend's data changed outside this file (their health, StreamNet.lua): tooltips follow.
+function B.PeerChanged(peer)
+	peer.rev = peer.rev + 1
+	Changed()
 end
 
 local function ResetTimers()
@@ -1109,6 +1116,10 @@ local function OnMessage(text, senderID)
 		if B.StreamHello then
 			B.QueueLow(senderID, B.StreamHello()) -- whether they can watch my fights (after the rest)
 		end
+		local health = B.StreamHealthHello and B.StreamHealthHello()
+		if health then
+			B.QueueLow(senderID, health) -- my health (estimated)
+		end
 		local journal = B.JournalHello and B.JournalHello()
 		if journal then
 			B.QueueLow(senderID, journal) -- Chronicle: I sync journals
@@ -1263,6 +1274,9 @@ local function Tick(now, elapsed)
 	SendQuestIfChanged(now)
 	SendCountIfChanged(now)
 	SendXPIfChanged(now)
+	if B.StreamHealthTick then
+		B.StreamHealthTick(now) -- my health (estimated), to everyone
+	end
 	Drain(now, elapsed)
 
 	Each(dings, 1, now, HandleDing)

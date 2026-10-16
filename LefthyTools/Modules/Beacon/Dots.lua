@@ -204,11 +204,14 @@ local function AddPeer(peer, first)
 	if peer.groupUnit then
 		GameTooltip:AddLine(L["In your group"], GROUP_R, GROUP_G, GROUP_B)
 	end
+	-- Level, with their progress on it, and their health (estimated) beside it.
 	local level = game and game.characterLevel or peer.level
-	if level and peer.xpPercent then
-		GameTooltip:AddLine(L["Level %d (%d%%)"]:format(level, peer.xpPercent), 1, 1, 1) -- with their progress on it
-	elseif level then
-		GameTooltip:AddLine(L["Level %d"]:format(level), 1, 1, 1)
+	local health = B.HealthText(peer)
+	if level then
+		local text = peer.xpPercent and L["Level %d (%d%%)"]:format(level, peer.xpPercent) or L["Level %d"]:format(level)
+		GameTooltip:AddLine(health and (text .. "  " .. health) or text, 1, 1, 1)
+	elseif health then
+		GameTooltip:AddLine(health, 1, 1, 1)
 	end
 	local area = game and game.areaName or peer.area
 	local subzone = peer.subzone ~= "" and peer.subzone ~= area and peer.subzone or nil

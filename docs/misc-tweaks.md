@@ -375,7 +375,7 @@ their tracked quest with its progress or "Ready to turn in", in or out of combat
 On a flight path (`UnitOnTaxi("player")`) the interface fades out over 1.5 s (`ns.HideInterface`
 with a fade: an OnUpdate only while fading), black letterbox bars (7% of the screen each) fade in
 (the bars show what Beacon friends are doing, setting `flightFriends`: `B.FriendRows` per friend in
-three lines, who and where, their quest, fighting or dead; three side by side in the top bar, a
+three lines, who (with their health, when known) and where, their quest, fighting or dead; three side by side in the top bar, a
 fourth to sixth in the bottom one, whose time left then moves to its right end (220 px kept for
 it); more than six: pages of six every 8 s; refreshed every 2 s while the film is shown),
 and a title card in the upper middle names where you're going: header "Next stop", the place in

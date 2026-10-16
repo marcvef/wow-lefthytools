@@ -254,5 +254,8 @@ ns.CHANGELOG = {
 	{ id = 82, module = "beacon",
 		en = { "Fight stream: casting mobs glow again", "Forever hides what a mob casts, which also hid that it was casting: the purple glow on its dot never came. The game still says when a cast begins and ends, so the glow is back, and the tooltip and bottom line say it's casting a spell (which one stays hidden)." },
 		de = { "Kampf-Stream: Zaubernde Mobs leuchten", "Forever verbirgt, was ein Mob zaubert, und damit auch, dass er zaubert: das violette Leuchten an seinem Punkt kam nie. Das Spiel sagt aber noch, wann ein Zauber beginnt und endet, also ist das Leuchten zurück, und Tooltip und unterste Zeile sagen, dass er einen Zauber wirkt (welchen, bleibt verborgen)." } },
+	{ id = 83, module = "beacon",
+		en = { "Friends' health in tooltips and lists", "A friend's health (the same estimate as in their fight stream) now shows beside their level: on their map dot's tooltip, on the AFK screen and in a flight's bars, green, yellow below half, red below a quarter. It goes to every friend, not only to whoever watches their stream. Friends need this update to send theirs." },
+		de = { "Leben der Freunde in Tooltips und Listen", "Das Leben eines Freundes (dieselbe Schätzung wie in seinem Kampf-Stream) steht jetzt neben seinem Level: im Tooltip seines Kartenpunkts, auf dem AFK-Bildschirm und in den Balken eines Flugs, grün, unter der Hälfte gelb, unter einem Viertel rot. Es geht an alle Freunde, nicht nur an die, die seinen Stream schauen. Freunde brauchen dieses Update, um ihres zu senden." } },
 	-- New entries go here, at the end.
 }

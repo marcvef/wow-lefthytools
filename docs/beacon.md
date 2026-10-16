@@ -376,6 +376,19 @@ max level (`IsPlayerAtEffectiveMaxLevel`) or with `share` off. `PLAYER_XP_UPDATE
 message differs (a kill rarely moves the whole percent). Hellos are answered with it. Tooltip:
 "Level 20 (64%)", or just the level without it.
 
+## Health
+
+`O2;v;<percent>` (StreamNet.lua; a fight stream word, so builds before it ignore it, and the
+last free kind letter, B, stays free): my health as the fight stream estimates it
+(StreamSense.lua), in steps of 5, empty when not known or with `share` off. To every friend, not
+only watchers: on Beacon's tick (`B.StreamHealthTick`, looked at every 0.5 s) when it changed, at
+most every 2 s, a waiting one replaced (`B.QueueLatest`); hellos are answered with it. Kept as
+`peer.health` (0-1; `B.PeerChanged` so open tooltips follow). `B.HealthText(peer)`: "~80% health",
+green from half, yellow from a quarter, red below; nothing while not known or dead. Shown on an
+existing line, never one of its own: beside the level in the dot's tooltip, and in
+`B.FriendLines` / `B.FriendRows`' first line (the AFK screen, Chronicle's Friends hover, the
+cinematic flight's bars).
+
 ## Tracked quest
 
 The quest a friend is on, for the tooltip: the super-tracked one (`C_SuperTrack.
@@ -629,6 +642,7 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   whole frame (they want exactly 11).
 - `O2;n;<id>;<level>;<name>` a mob's name (40 bytes), once per watcher before the first frame with
   that id (ids 1-999 per GUID, reused after 60 s).
+- `O2;v;<percent>` my health, to every friend (see "Health" above).
 
 Spells go as IDs; the watcher's client names them in its own language. Guard: 80 `O` messages per
 friend per 10 s. Watching: the sensor runs only while someone watches you (or your own window is
