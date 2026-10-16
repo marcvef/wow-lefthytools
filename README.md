@@ -350,6 +350,7 @@ made of your last loot windows (to see why something wasn't counted).
 |---|---|
 | Minimap button | on |
 | Drops next to the mouse (an enemy you've killed before: its likeliest drops beside the mouse) | off |
+| Hidden in combat (the drops next to the mouse) | on |
 | Drop chances in item tooltips | on |
 | Grey items | on |
 | Compare with a drop database | on |

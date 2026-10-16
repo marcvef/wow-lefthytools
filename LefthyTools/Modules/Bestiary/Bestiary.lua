@@ -41,6 +41,7 @@ local M = LT:NewModule("bestiary", {
 		minimapAngle = 150,  -- degrees, 0 = right, counter-clockwise: the upper left
 		showPoor = true,     -- grey items in the lists
 		hoverCard = false,   -- the drops next to the mouse over an enemy
+		cardHideInCombat = true, -- but not while you're in combat
 		itemTooltip = true,  -- an item's tooltip: the mobs it comes from likeliest, with the chance
 		dropData = true,     -- compare with the classic drop database (LefthyTools_DropData)
 		windowUnseen = false, -- the window: what the database says it drops that you haven't had yet
@@ -723,6 +724,10 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
 		end
 	elseif event == "NAME_PLATE_UNIT_ADDED" then
 		Bt.Look(a)
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		if Bt.MouseoverChanged then
+			Bt.MouseoverChanged() -- (the fight is over, the mouse still over an enemy: its card)
+		end
 	end
 end)
 
@@ -738,7 +743,7 @@ end
 
 function M:OnEnable()
 	for _, event in ipairs({ "PARTY_KILL", "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "PLAYER_TARGET_CHANGED",
-			"UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED" }) do
+			"UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED", "PLAYER_REGEN_ENABLED" }) do
 		events:RegisterEvent(event)
 	end
 	events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
@@ -774,6 +779,8 @@ function M:BuildOptions(o)
 	o:Header(L["Drops"])
 	o:Checkbox("hoverCard", L["Drops next to the mouse"],
 		L["Hovering an enemy you've killed before shows its likeliest drops beside the mouse. Shift-click on the minimap button switches it on or off."])
+	o:Checkbox("cardHideInCombat", L["Hidden in combat"],
+		L["The drops next to the mouse don't show while you're in combat, and go when a fight starts."])
 	o:Checkbox("itemTooltip", L["Drop chances in item tooltips"],
 		L["An item's tooltip (in your bags, in chat, anywhere) lists the three mobs it comes from likeliest, with the chance; a pelt marks skinning."])
 	o:Checkbox("showPoor", L["Grey items"], L["Show grey (junk) items among the drops."])

@@ -6441,6 +6441,23 @@ section("Bestiary: what mobs drop")
 	card = select(2, Bt.Frames())
 	check(card and card:IsShown() and card.Kills:GetText():find("3 kills", 1, true) and card.cells[1]:IsShown()
 		and card.cells[1].Chance:GetText() == "33%", "over it: my kills and its drops, beside the mouse")
+	-- Not in combat (a setting, on): it goes when a fight starts and comes back after.
+	check(LefthyToolsDB.settings.bestiary.cardHideInCombat == true, "hidden in combat: on by default")
+	STATE.combat = true
+	Advance(0.1)
+	check(not card:IsShown(), "a fight starts: the card goes")
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	check(not card:IsShown(), "in combat: not shown")
+	setting("cardHideInCombat"):SetValue(false)
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	Advance(0.1)
+	check(card:IsShown(), "the setting off: also in combat")
+	setting("cardHideInCombat"):SetValue(true)
+	Advance(0.1)
+	check(not card:IsShown(), "on again: gone")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	check(card:IsShown(), "the fight is over, the mouse still over it: back")
 	MOBS.mouseover = nil
 	Advance(0.1)
 	check(not card:IsShown(), "the mouse moves off: the card goes")

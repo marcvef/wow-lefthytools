@@ -696,8 +696,19 @@ end
 -- The card next to the mouse
 ---------------------------------------------------------------------------
 
+-- In combat with the setting cardHideInCombat (on): no card (the user: not while fighting).
+local function CardHidden()
+	if not M.db.cardHideInCombat then
+		return false
+	end
+	if InCombatLockdown then
+		return InCombatLockdown() == true
+	end
+	return Value(UnitAffectingCombat, "player") == true
+end
+
 local function CardFollow(self)
-	if not (UnitExists("mouseover") and Value(UnitGUID, "mouseover") == cardGUID) then
+	if CardHidden() or not (UnitExists("mouseover") and Value(UnitGUID, "mouseover") == cardGUID) then
 		self:Hide()
 		cardGUID = nil
 		return
@@ -725,11 +736,12 @@ local function BuildCard()
 end
 
 -- Over an enemy: its card (setting hoverCard), small on purpose (the user: not "too large and
--- intrusive"): a line and one row of CARD_CELLS icons, never more. Killed before: your kills and
+-- intrusive"): a line and one row of CARD_CELLS icons, never more, and none in combat (setting
+-- cardHideInCombat, on; it goes when a fight starts, comes back after). Killed before: your kills and
 -- your likeliest drops (not the database's on top); not yet: the classic database's likeliest,
 -- faded.
 function Bt.MouseoverChanged()
-	if not (M.enabled and M.db.hoverCard) or not UnitExists("mouseover")
+	if not (M.enabled and M.db.hoverCard) or CardHidden() or not UnitExists("mouseover")
 		or not (Value(UnitCanAttack, "player", "mouseover") or Value(UnitIsDead, "mouseover")) then
 		if card then
 			card:Hide()

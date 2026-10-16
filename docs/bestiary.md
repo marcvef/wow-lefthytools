@@ -151,7 +151,10 @@ Setting `hoverCard` (off by default). Over an enemy (attackable or dead) you've 
 12s each" and its 6 likeliest drops (22 px, chance under each), at the cursor's lower right,
 `TOOLTIP` strata, no mouse. An OnUpdate while it's shown follows the cursor and hides it once the
 mouseover is gone or another unit. **Small on purpose** (the user: it mustn't be "too large and
-intrusive"): one line and one row of 6, never more. A mob killed before shows only your drops (no
+intrusive"): one line and one row of 6, never more. **Not in combat** (setting `cardHideInCombat`,
+on; the user: not "infight"): `InCombatLockdown()`, checked when the mouseover changes and in its
+OnUpdate (it goes when a fight starts); `PLAYER_REGEN_ENABLED` looks at the mouseover again, so it
+comes back if the mouse is still over an enemy. A mob killed before shows only your drops (no
 database cells on top); one you haven't killed shows the database's 6 likeliest, faded, under "Not
 killed yet: classic database".
 
@@ -196,7 +199,8 @@ the settings or `/bestiary ledger [search]`.
 window is open; click toggles the window, Shift-click switches the card beside the mouse (a chat
 line says which), Ctrl-click opens or closes the ledger, right-click opens the settings; its tooltip
 says how many kinds and kills are known and all of that. Settings: open the window, open the
-ledger, minimap button (on), drops beside the mouse (off), drop chances in item tooltips (on), grey
+ledger, minimap button (on), drops beside the mouse (off), hidden in combat (on), drop chances in
+item tooltips (on), grey
 items (on), compare with a drop database (on), not seen yet in the window (off). `/bestiary`
 (`open`, `ledger [search]`, `log`,
 `data`, `minimap`, `settings`).
@@ -204,7 +208,7 @@ items (on), compare with a drop database (on), not seen yet in the window (off).
 ## Cost
 
 Event handlers only: `PARTY_KILL`, `LOOT_READY`, `LOOT_CLOSED`, the player's
-`UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added. The window redraws when its
+`UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added, leaving combat. The window redraws when its
 mob's record changes or the target does; the card's OnUpdate runs only while it's shown.
 
 ## To check in game
