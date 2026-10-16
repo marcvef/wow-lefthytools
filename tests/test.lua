@@ -1115,7 +1115,15 @@ section("Misc Tweaks: retail unit frames")
 		tHealth.HealthBar.HealthBarTexture:SetAtlas("UI-HUD-UnitFrame-Target-PortraitOn-Bar-Health", true)
 	end
 
+	-- Like the game: a bar's fill keeps its size secret (its width is the health), and so do textures
+	-- anchored to one.
+	health.HealthBar:GetStatusBarTexture().width = SECRET
+	contextual.HighLevelTexture.width = SECRET
+	local errorsBefore = LT.Errors.Count()
 	lefthy("tweaks retailframes on"); Advance(0.05)
+	local highLevel = ART["ui-hud-unitframe-target-highleveltarget_icon"]
+	check(LT.Errors.Count() == errorsBefore and Tweaks:IsTweakActive("retailFrames") and contextual.HighLevelTexture.path == highLevel[1]
+		and contextual.HighLevelTexture.width == SECRET, "secret sizes: no error, the art still retail's (not resized: it isn't the atlas's size)")
 	check(TDB.retailFrames == true and retail(playerArt, "UI-HUD-UnitFrame-Player-PortraitOn")
 		and retail(targetArt, "UI-HUD-UnitFrame-Target-PortraitOn") and retail(box.FrameFlash, "UI-HUD-UnitFrame-Player-PortraitOn-InCombat"),
 		"on: the frames' art is retail's again (its file, texture coordinates and size)")

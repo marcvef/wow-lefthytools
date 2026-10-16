@@ -103,11 +103,18 @@ local function OnSetStatusBarTexture(bar, asset)
 	end
 end
 
--- Did Blizzard size it by its atlas (XML useAtlasSize)? Then it has the atlas's size now.
+-- Did Blizzard size it by its atlas (XML useAtlasSize)? Then it has the atlas's size now. A size the
+-- game keeps secret (a bar's fill: its width is the health) is a bar's, not the atlas's.
 local function SizedByAtlas(texture, atlas)
+	if barTexture[texture] then
+		return false
+	end
 	local info = C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas)
 	local w, h = texture:GetSize()
-	return info ~= nil and type(w) == "number" and math.abs(w - info.width) < 0.5 and math.abs(h - info.height) < 0.5
+	if not info or issecret(w) or issecret(h) or type(w) ~= "number" or type(h) ~= "number" then
+		return false
+	end
+	return math.abs(w - info.width) < 0.5 and math.abs(h - info.height) < 0.5
 end
 
 local function Texture(texture)
@@ -350,7 +357,8 @@ local function Target(frame)
 		end
 	end
 	local unit = frame.unit
-	local classification = unit and UnitExists(unit) and UnitClassification(unit) or nil
+	local exists = unit and UnitExists(unit)
+	local classification = exists and not issecret(exists) and UnitClassification(unit) or nil
 	TargetHealth(frame, not issecret(classification) and classification or nil)
 end
 
