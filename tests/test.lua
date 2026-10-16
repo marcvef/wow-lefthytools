@@ -4053,7 +4053,7 @@ do
 	LefthyToolsStreamTestsFrame:Hide()
 	-- The model test: five models doing the same, notes kept (whatever this client lacks is noted, not an error).
 	lefthy("stream modeltest")
-	Advance(2.6)
+	Advance(4.1)
 	check(LefthyToolsModelTest and LefthyToolsModelTest:IsShown() and LefthyToolsDB.modelTest and type(LefthyToolsDB.modelTest.errors) == "table"
 		and LefthyToolsModelTest.Anim:GetText():find("Ready1H", 1, true), "/lefthy stream modeltest: a window cycling animations, notes kept")
 	lefthy("stream modeltest")

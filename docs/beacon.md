@@ -507,9 +507,13 @@ watch <name>`, a click on their world map dot (`streamMapClick`), or a cinematic
 
 - `Stream.lua`: asking the game (`B.Stream` = `S`: `S.Api`, `S.Value`, range checks, `S.Bounds`,
   `S.YardsFrom`), the test (`/lefthy stream test` / `results`), the model test (`/lefthy stream
-  modeltest`: for a battle row, five setups side by side cycling the same animations: your unit, a
-  mob by creature ID, your race's plain model with your gear tried on and no unit, a ModelScene actor
-  moved by position, a model frame slid as a lunge; notes in `LefthyToolsDB.modelTest`), the commands.
+  modeltest`: for a battle row, five setups side by side cycling the same animations; notes in
+  `LefthyToolsDB.modelTest`. Round 1 in game: animations play on your unit's model and on a
+  ModelScene actor, which moves; a slid frame works as a lunge; the mob stayed black (not loaded on
+  the first try) and so did the race model (race 96, Windshaper Skyborne, wasn't in the table). Round
+  2: you zoomed out (a bear didn't fit), the mob and the race model + gear loaded like the foes
+  (camera reset once loaded, again until there), the same as a ModelScene actor, the plain race model
+  alone), the commands.
 - `StreamSense.lua`: the sensor, your own picture (`S.Sensed()`), looked at every 0.5 s while
   someone needs it (`S.SenseNeed("me" | "stream", on)`: your window, friends watching you).
 - `StreamView.lua`: the windows (`S.OpenView("me" | "preview")`, `S.OpenFriend(id, origin)`,
