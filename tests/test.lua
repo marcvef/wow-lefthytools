@@ -3610,6 +3610,13 @@ do
 	check(leader.tx * leader.tx + leader.ty * leader.ty < before and math.abs(leader.x - leader.tx) < 3,
 		"mobs move, and their dots glide after them")
 	check(floatWith("-24"), "the bandits hit her: the numbers float up")
+	do
+		local slots = win.Foes.slots
+		check(slots[1]:IsShown() and slots[1].Model._creature == 448 and slots[1].Ring:IsShown() and slots[2].Model._creature == 116
+			and slots[3]:IsShown() and slots[3].Unknown:IsShown() and not (slots[4] and slots[4]:IsShown())
+			and slots[1].Bar._value > 0.8 and slots[1].Bar._value < 1,
+			"under her spells, the three she fights: her target first (gold), still models, health (the mage's not known)")
+	end
 	check(leader.Target:IsShown() and leader.Name:GetText() == "Bandit leader 16", "her target: a white ring, named with its level")
 	check(win.Status:GetText():find("on Anna", 1, true) and win.Status:GetText():find("near", 1, true), "the bottom line: how many on her, how many near")
 	Advance(12)
@@ -3945,6 +3952,42 @@ do
 		MOBS.nameplate4 = nil
 		Advance(9)
 	end
+	-- The foes under my spells: a still model each (its creature, from its GUID) with its health:
+	-- the real one in my own window (the hidden values straight into the bar); for friends an
+	-- estimate, its kind's maximum learned from a kill seen from full health.
+	do
+		local wolf = { name = "Young Wolf", level = 3, guid = "Creature-0-1-0-1-299-0000000A", yards = 6, x = 0.5, y = 0.5 }
+		MOBS.nameplate5 = wolf
+		Advance(0.6)
+		check(not win.Foes.slots[1] or not win.Foes.slots[1]:IsShown(), "a mob not fought: not in the row")
+		wolf.combat, wolf.attacking, MOBS.target, STATE.target = true, true, wolf, true
+		Advance(0.6)
+		local slot = win.Foes.slots[1]
+		check(slot and slot:IsShown() and slot.Model._creature == 299 and slot.Model._zoom == 1 and slot.Ring:IsShown()
+			and slot.real and slot.Bar._max == SECRET and slot.Bar._value == SECRET and not slot.Unknown:IsShown(),
+			"fought: its model (creature 299), gold as my target, its real health (hidden, straight into the bar)")
+		Fire("UNIT_COMBAT", "nameplate5", "WOUND", "", 60, 1)
+		Fire("UNIT_COMBAT", "target", "WOUND", "", 60, 1) -- (the same hit, for my target)
+		Advance(0.3)
+		Fire("UNIT_COMBAT", "nameplate5", "WOUND", "", 40, 1)
+		wolf.dead = true
+		Advance(0.6)
+		local learned = LefthyToolsDB.streamMobHealth["299:3"]
+		check(learned and learned[1] == 100 and learned[2] == 1, "it died, seen from full: its kind's maximum learned (100, the hit counted once)")
+		wolf = { name = "Young Wolf", level = 3, guid = "Creature-0-1-0-1-299-0000000B", yards = 6, x = 0.5, y = 0.5 }
+		MOBS.nameplate5, MOBS.target = wolf, wolf
+		Advance(0.6)
+		wolf.combat, wolf.attacking = true, true
+		Fire("UNIT_COMBAT", "nameplate5", "WOUND", "", 25, 1)
+		Advance(0.6)
+		check(dot("Young Wolf").mob.health == 0.75, "another of its kind: 25 of 100 lost, ~75% (for friends' windows)")
+		slot._scripts.OnEnter(slot)
+		check(TOOLTIP.title == "Young Wolf (3)" and not tooltipFind("health"), "hover: who (its health is the real bar)")
+		slot._scripts.OnLeave(slot)
+		MOBS.nameplate5, MOBS.target, STATE.target = nil, nil, false
+		Advance(9)
+		check(not slot:IsShown(), "gone: the row empties")
+	end
 	win.Close:Click()
 	check(not win:IsShown() and not S.SenseRunning(), "closed: the sensor stops")
 
@@ -4082,13 +4125,35 @@ do
 	bob("O2;f;0;1429;260;750;0;;;;;;")
 	Advance(0.3)
 	check(#sentTo(12, mark, "O2;w;0") == 1, "frames from someone I don't watch (after my /reload, say): told once to stop")
+	-- The ones she fights: their models (creature IDs come with the names) and health (estimated
+	-- on her side; one she hasn't learned yet: "?").
+	anna("O2;n;3;12;Kobold Miner")
+	anna("O2;c;3;40")
+	anna("O2;n;4;11;Kobold Vermin")
+	anna("O2;c;4;6")
+	anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,3=45/4,90,8,9,ac/3,30,6,9,act")
+	Advance(0.6)
+	do
+		local first, second = fwin.Foes.slots[1], fwin.Foes.slots[2]
+		check(first:IsShown() and first.Model._creature == 40 and first.Ring:IsShown() and first.Bar._value == 0.45
+			and second:IsShown() and second.Model._creature == 6 and second.Unknown:IsShown() and not first.Unknown:IsShown(),
+			"her foes: her target first (a Kobold Miner at ~45%), then a Kobold Vermin (its health not known)")
+		first._scripts.OnEnter(first)
+		check(TOOLTIP.title == "Kobold Miner (12)" and tooltipFind("~45% health") and tooltipFind("Estimated"), "hover: who, ~45%, estimated")
+		first._scripts.OnLeave(first)
+		second._scripts.OnEnter(second)
+		check(tooltipFind("Health not known yet"), "hover the other: not known yet, and how it will be")
+		second._scripts.OnLeave(second)
+	end
 
 	-- Anna watches me: the sensor runs, a small red dot with 1 right of the calendar button, frames
 	-- go to her (only her), each mob's name once.
 	MOBS = {
 		nameplate1 = { name = "Defias Thug", level = 15, combat = true, attacking = true, yards = 4, x = 0.5, y = 0.45 },
-		nameplate2 = { name = "Defias Pillager", level = 16, class = "elite", combat = true, casting = "Fireball", castID = 133, yards = 25, x = 0.25, y = 0.6 },
+		nameplate2 = { name = "Defias Pillager", level = 16, class = "elite", combat = true, casting = "Fireball", castID = 133, yards = 25,
+			x = 0.25, y = 0.6, guid = "Creature-0-1-0-1-589-0000000C" },
 	}
+	LefthyToolsDB.streamMobHealth["589:16"] = { 800, 2 } -- (its kind learned before)
 	mark = #GAMEDATA + 1
 	anna("O2;w;1")
 	Advance(0.1)
@@ -4108,17 +4173,20 @@ do
 	check(#fields == 11 and fields[1] == "0" and #frames[#frames] <= 250 and fields[11]:find(",133$"),
 		"a frame: where I am, how I face, and the mobs (the caster with its spell), got " .. frames[#frames])
 	local vitals = fields[11]:match("^(v[^/]*)/")
-	check(vitals and vitals:find("^v%d+,%d+w40$") and not vitals:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$"),
-		"my health and the hit I took first among the mobs, which older builds skip (not a mob to them), got " .. fields[11])
+	check(vitals and vitals:find("^v%d+,%d+=100,%d+w40$") and not vitals:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$"),
+		"my health, my foe's (the pillager: its kind known, not hit), the hit I took, first among the mobs, which older builds skip, got "
+		.. fields[11])
+	check(#sentTo(11, mark, "O2;c;") == 1 and sentTo(11, mark, "O2;c;")[1]:find(";589$"), "the pillager's creature (for its model), once")
 	-- What I send is what she sees: my frames, fed back as hers.
 	for _, m in ipairs(names) do anna(m) end
+	for _, m in ipairs(sentTo(11, mark, "O2;c;")) do anna(m) end
 	anna(frames[#frames])
 	Advance(0.6)
 	local back = dot("Defias Pillager", 11)
 	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown()
 		and fwin.HealthText:GetText() == ("~%d%%"):format(math.floor(tonumber(vitals:match("^v(%d+)")) / 5 + 0.5) * 5)
-		and floatWith("-40", fwin),
-		"what I send is what she sees: my mobs, named, the spell named in her client's language, my health, my hit")
+		and floatWith("-40", fwin) and back.mob.creature == 589 and back.mob.health == 1,
+		"what I send is what she sees: my mobs, named, the spell named in her client's language, my health, my hit, my foe")
 	anna("O2;w;1")
 	MOBS = {}
 	Advance(9) -- (the remembered ones fade first)

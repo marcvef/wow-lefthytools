@@ -162,6 +162,10 @@ function FrameMethods:SetAllPoints(rel) self._points = { { "TOPLEFT", rel }, { "
 -- PlayerModel
 function FrameMethods:SetUnit(unit) self._unit = unit end
 function FrameMethods:SetFacing(f) self._facing = f end
+function FrameMethods:SetCreature(id) self._creature = id end
+function FrameMethods:ClearModel() self._creature = nil end
+function FrameMethods:SetPortraitZoom(z) self._zoom = z end
+function FrameMethods:SetPaused(p) self._paused = p end
 function FrameMethods:SetToplevel() end
 -- Buttons and edit boxes
 function FrameMethods:SetText(text)
@@ -396,6 +400,11 @@ function CreateFrame(kind, name, parent, template)
 			return true
 		end
 		function f:GetStatusBarTexture() return self._fill end
+		-- (like the game: hidden values are taken, AllowedWhenTainted)
+		function f:SetMinMaxValues(lo, hi) self._min, self._max = lo, hi end
+		function f:SetValue(v) self._value = v end
+		function f:GetValue() return self._value end
+		function f:SetStatusBarColor(r, g, b) self._barColor = { r, g, b } end
 	end
 	if template then ApplyTemplate(f, template) end
 	return f

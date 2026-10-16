@@ -31,7 +31,8 @@ local S = B.Stream
 --                         (H big), a avoided (m miss, d dodge, p parry, b block, r resist, i
 --                         immune, e evade, f deflect, x reflect, a absorb), x XP [.mob id it came
 --                         from], k my killing blow [mob id], l loot item ID .quality. Each comes in
---                         every frame for a few seconds; the windows show each number once.
+--                         every frame for a few seconds; the windows show each number once. Then
+--                         the health of up to FOES mobs I fight, ",<mob id>=<percent>" (estimated).
 --                         Older builds skip it (a mob starts with its number), and a frame keeps
 --                         its 11 fields: they'd drop one with more.
 --   O2;n;<id>;<level>;<name>
@@ -39,6 +40,9 @@ local S = B.Stream
 --   O2;u;<id>;<level>;<classFile>;<name>
 --                       the same for a player (their class colours the dot; older builds ignore
 --                       it and show the player as an unnamed mob)
+--   O2;c;<id>;<creatureID>
+--                       a mob's creature ID (from its GUID), with its name: the watcher's window
+--                       shows its model (SetCreature)
 --   O2;v;<percent>      my health (estimated, StreamSense.lua; in steps of 5, empty: not known or
 --                       not sharing) for every friend, not only watchers: their map tooltip, AFK
 --                       screen and flights show it. When it changes, at most every HEALTH_GAP
@@ -213,7 +217,8 @@ local function ByWeight(a, b)
 	return a.weight > b.weight
 end
 
-local MAX_VITALS = 90 -- bytes for my health and what just happened (the rest: mobs)
+local MAX_VITALS = 120 -- bytes for my health, what just happened and my foes' health (the rest: mobs)
+local FOES = 5         -- the mobs I fight whose health goes along
 local LETTERS = { hurt = "w", heal = "h", avoid = "a", xp = "x", kill = "k", loot = "l" }
 
 -- A moment in a frame (nil: it can't go).
@@ -234,14 +239,24 @@ local function MomentText(m)
 	return text and m.seq .. text
 end
 
--- My health and what just happened, first among the mobs. Health not known: why ("?m" my maximum
--- is hidden here, "?w" no checkpoint yet), so a friend's window can say.
+-- My health, my foes' health and what just happened, first among the mobs. Health not known: why
+-- ("?m" my maximum is hidden here, "?w" no checkpoint yet), so a friend's window can say. Foes:
+-- the ones that have an id already (a new one's health goes from the next frame).
+local foeList = {}
 local function Vitals(picture)
 	local parts = { "v" .. (picture.health and Int(picture.health * 100) or "") }
 	if not picture.health then
 		parts[2] = picture.healthWhy == "max" and "?m" or "?w"
 	end
 	local size = #parts[1] + (parts[2] and #parts[2] + 1 or 0)
+	for _, mob in ipairs(S.Foes(picture.mobs, foeList, FOES)) do
+		local id = mob.health and idFor[mob.key]
+		if id then
+			local text = ("%d=%d"):format(id, math.floor(mob.health * 100 + 0.5))
+			size = size + #text + 1
+			parts[#parts + 1] = text
+		end
+	end
 	for _, m in ipairs(picture.moments or {}) do
 		local text = MomentText(m)
 		if text then
@@ -378,6 +393,9 @@ S.OnSensed(function(picture)
 						B.Queue(id, Message("u", ("%d;%s;%s;%s"):format(mobId, level, mob.classFile or "", B.Clean(mob.name, NAME_BYTES))))
 					else
 						B.Queue(id, Message("n", ("%d;%s;%s"):format(mobId, level, B.Clean(mob.name, NAME_BYTES))))
+						if mob.creature then
+							B.Queue(id, Message("c", ("%d;%d"):format(mobId, mob.creature))) -- (its model)
+						end
 					end
 				end
 			end
@@ -462,6 +480,13 @@ function B.ReceiveStream(senderID, word, rest)
 			streams[senderID] = stream
 		end
 		stream.names[id] = { name = B.Clean(name, NAME_BYTES), level = tonumber(level), classFile = classFile ~= "" and classFile or nil }
+	elseif word == "c" then
+		local stream = streams[senderID]
+		local id, creature = rest:match("^(%d+);(%d%d?%d?%d?%d?%d?%d?)$")
+		local named = stream and id and stream.names[tonumber(id)]
+		if named then
+			named.creature = tonumber(creature) -- (right after its name: a name anew starts without one)
+		end
 	end
 end
 
@@ -556,6 +581,9 @@ local function DecodeVitals(entry, picture)
 			picture.health, picture.vitals = health ~= "" and math.min(100, tonumber(health)) / 100 or nil, true
 		elseif part:match("^%?%a$") then -- (why their health isn't known)
 			picture.healthWhy = part == "?m" and "max" or "wait"
+		elseif part:match("^%d+=%d+$") then -- (a foe's health)
+			local id, percent = part:match("^(%d+)=(%d+)$")
+			picture.foeHealth[tonumber(id)] = math.min(100, tonumber(percent)) / 100
 		elseif #moments < MAX_MOMENTS then
 			local seq, letter, value, extra = part:match("^(%d%d?)(%a)(%w*)%.?(%d*)$")
 			local kind = letter and KINDS[letter:lower()]
@@ -636,6 +664,8 @@ local function Decode(stream, picture)
 	picture.health, picture.healthWhy, picture.vitals = nil, nil, nil
 	picture.moments = picture.moments or {}
 	wipe(picture.moments)
+	picture.foeHealth = picture.foeHealth or {}
+	wipe(picture.foeHealth)
 	local n = 0
 	for entry in f[11]:gmatch("[^/]+") do
 		local id, deg, yards, sure, flags, cast = entry:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$")
@@ -665,6 +695,8 @@ local function Decode(stream, picture)
 			mob.friendly = flags:find("f", 1, true) ~= nil
 			mob.group = flags:find("g", 1, true) ~= nil
 			mob.classFile = name and name.classFile
+			mob.creature = name and name.creature
+			mob.health = picture.foeHealth[id] -- (the "v" entry comes first)
 			mob.fade = mob.remembered and 0.6 or nil
 			mob.age = nil
 			mob.casting = flags:find("s", 1, true) and (SpellName(tonumber(cast)) or L["a spell"]) or nil

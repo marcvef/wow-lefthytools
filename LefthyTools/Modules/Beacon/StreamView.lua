@@ -28,7 +28,7 @@ local S = B.Stream
 -- they don't pause), stacked from the top left. Cost: an OnUpdate per open window (dots and map
 -- glide), nothing when none is open.
 
-local WIDTH, HEIGHT, RADAR = 250, 374, 220
+local WIDTH, HEIGHT, RADAR = 250, 420, 220
 local OUTER_YARDS = S.OUTER_YARDS
 local RINGS = { 40, 30, 20, 10 }
 local MAX_DOTS = S.MAX_MOBS
@@ -55,6 +55,9 @@ local FLOAT_TIME = 1.6     -- seconds one floats
 local LOOT_TIME = 3.5
 local SEEN_FOR = 6         -- seconds a moment's number counts as shown (they come round: 1-99)
 local HURT_COLOR, HEAL_COLOR, AVOID_COLOR, XP_COLOR = { 1, 0.3, 0.25 }, { 0.35, 1, 0.4 }, { 0.9, 0.9, 0.9 }, { 0.75, 0.6, 1 }
+local FOES = 5             -- the mobs fought, in the row under the spells
+local FOE_SIZE = 38        -- a foe's model (its portrait), px
+local BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 local PREVIEW_FRIEND, PREVIEW_CLASS = "Anna", "MAGE"
 local Value, issecret = S.Value, S.issecret
 
@@ -722,6 +725,116 @@ local function Happenings(view)
 	end
 end
 
+---------------------------------------------------------------------------
+-- The foes: the mobs fought, a still model and a health bar each
+---------------------------------------------------------------------------
+
+-- Your own window: the real health of a mob with a unit (hidden values go straight into the bar:
+-- StatusBar takes them, AllowedWhenTainted). A friend's (or no unit): the estimate, 0-1.
+local function RealHealth(bar, unit)
+	bar:SetMinMaxValues(0, UnitHealthMax(unit))
+	bar:SetValue(UnitHealth(unit))
+end
+
+local function FoeOnEnter(slot)
+	local mob = slot.mob
+	if not mob then
+		return
+	end
+	GameTooltip:SetOwner(slot, "ANCHOR_BOTTOM")
+	GameTooltip:SetText(mob.level and ("%s (%s)"):format(mob.name, mob.level) or mob.name, 1, 1, 1)
+	local class = mob.class == "elite" and L["Elite"] or mob.class == "rare" and L["Rare"] or mob.class == "rareelite" and L["Rare elite"]
+	if class then
+		GameTooltip:AddLine(class, GOLD[1], GOLD[2], GOLD[3])
+	end
+	if not slot.real then
+		if mob.health then
+			GameTooltip:AddLine(L["~%d%% health"]:format(math.floor(mob.health * 100 + 0.5)), 1, 0.4, 0.3)
+			GameTooltip:AddLine(L["Estimated: the hits it took, against what one of its kind had in all."], 0.7, 0.7, 0.7, true)
+		else
+			GameTooltip:AddLine(L["Health not known yet: it's learned when one of its kind is seen from full health to dead."],
+				0.7, 0.7, 0.7, true)
+		end
+	end
+	GameTooltip:Show()
+end
+
+local function NewFoe(row)
+	local slot = CreateFrame("Frame", nil, row)
+	slot:SetSize(FOE_SIZE + 2, FOE_SIZE + 8)
+	slot.Ring = slot:CreateTexture(nil, "BACKGROUND", nil, -1) -- (gold: their target)
+	slot.Ring:SetPoint("TOPLEFT")
+	slot.Ring:SetSize(FOE_SIZE + 2, FOE_SIZE + 2)
+	slot.Ring:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.8)
+	slot.Back = slot:CreateTexture(nil, "BACKGROUND")
+	slot.Back:SetPoint("TOPLEFT", 1, -1)
+	slot.Back:SetSize(FOE_SIZE, FOE_SIZE)
+	slot.Back:SetColorTexture(0, 0, 0, 0.55)
+	slot.Model = CreateFrame("PlayerModel", nil, slot)
+	slot.Model:SetPoint("TOPLEFT", 1, -1)
+	slot.Model:SetSize(FOE_SIZE, FOE_SIZE)
+	slot.Model:SetPortraitZoom(1)
+	slot.Model:SetScript("OnModelLoaded", function(self) self:SetPaused(true) end) -- (still)
+	slot.BarBack = slot:CreateTexture(nil, "BORDER")
+	slot.BarBack:SetPoint("TOPLEFT", slot.Back, "BOTTOMLEFT", 0, -2)
+	slot.BarBack:SetSize(FOE_SIZE, 4)
+	slot.BarBack:SetColorTexture(1, 1, 1, 0.15)
+	slot.Bar = CreateFrame("StatusBar", nil, slot)
+	slot.Bar:SetAllPoints(slot.BarBack)
+	slot.Bar:SetStatusBarTexture(BAR_TEXTURE)
+	slot.Bar:SetStatusBarColor(0.85, 0.2, 0.15)
+	slot.Unknown = slot:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	slot.Unknown:SetPoint("CENTER", slot.BarBack, "CENTER", 0, 0)
+	slot.Unknown:SetTextScale(0.7)
+	slot.Unknown:SetText("?")
+	slot:SetMouseMotionEnabled(true)
+	slot:SetMouseClickEnabled(false)
+	slot:SetScript("OnEnter", FoeOnEnter)
+	slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	slot:Hide()
+	return slot
+end
+
+-- The row: the mobs fought (S.Foes: the target first, then the ones attacking, the nearest), left
+-- to right. A model only loads when its creature changes.
+local foeList = {}
+local function ShowFoes(view)
+	local row, picture = view.win.Foes, view.picture
+	local foes = S.Foes(picture.mobs, foeList, FOES)
+	local shown = 0
+	for _, mob in ipairs(foes) do
+		if mob.creature and shown < FOES then
+			shown = shown + 1
+			local slot = row.slots[shown] or NewFoe(row)
+			row.slots[shown] = slot
+			slot:ClearAllPoints()
+			slot:SetPoint("TOPLEFT", row, "TOPLEFT", (shown - 1) * (FOE_SIZE + 8), 0)
+			slot.mob = mob
+			if slot.creature ~= mob.creature then
+				slot.creature = mob.creature
+				slot.Model:ClearModel()
+				slot.Model:SetCreature(mob.creature)
+			end
+			slot.Ring:SetShown(mob.target and true or false)
+			local unit = view.kind == "me" and mob.unit
+			slot.real = unit and Value("UnitGUID", unit) == mob.key and pcall(RealHealth, slot.Bar, unit) or false
+			if not slot.real and mob.health then
+				slot.Bar:SetMinMaxValues(0, 1)
+				slot.Bar:SetValue(mob.health)
+			elseif not slot.real then
+				slot.Bar:SetMinMaxValues(0, 1)
+				slot.Bar:SetValue(0)
+			end
+			slot.Unknown:SetShown(not slot.real and not mob.health)
+			slot:Show()
+		end
+	end
+	for i = shown + 1, #row.slots do
+		row.slots[i].mob = nil
+		row.slots[i]:Hide()
+	end
+end
+
 local function ClearFloats(view)
 	for _, f in ipairs(view.win.Floats.list) do
 		f.on = false
@@ -776,10 +889,10 @@ local function PreviewMoments(view, t)
 	end
 end
 
-local function PreviewMob(n, key, name, level, class)
+local function PreviewMob(n, key, name, level, class, creature)
 	local mob = previewMobs[n] or {}
 	previewMobs[n] = mob
-	mob.key, mob.name, mob.level, mob.class = key, name, level, class
+	mob.key, mob.name, mob.level, mob.class, mob.creature, mob.health = key, name, level, class, creature, nil
 	mob.dead, mob.combat, mob.attacking, mob.casting, mob.target, mob.sure = false, false, false, nil, false, 1
 	mob.player, mob.classFile, mob.friendly, mob.group, mob.exact = false, nil, false, false, nil
 	return mob
@@ -794,26 +907,30 @@ local function FeedPreview(view)
 	picture.power.frac = 0.4 + 0.3 * math.cos(t / 4)
 	picture.health = 0.65 + 0.3 * math.cos(t / 3)
 	PreviewMoments(view, t)
-	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite")
+	-- (Their models: Hogger, a Defias Bandit, a Defias Rogue Wizard, a Riverpaw Gnoll, Thuros
+	-- Lightfingers. Health: the leader's goes down, the bandit's faster, the mage's isn't known.)
+	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite", 448)
 	leader.combat, leader.attacking, leader.target = t > 2, t > 2, true
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
 	leader.casting = (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
+	leader.health = math.max(0.1, 1 - math.max(0, t - 2) / 24)
 	mobs[#mobs + 1] = leader
 	if t < 18 then
-		local bandit = PreviewMob(2, "bandit", L["Bandit"], 15, "normal")
+		local bandit = PreviewMob(2, "bandit", L["Bandit"], 15, "normal", 116)
 		bandit.dead = t >= 14
 		bandit.combat, bandit.attacking = not bandit.dead, not bandit.dead
 		bandit.yards, bandit.bearing = 5 + math.sin(t * 1.3), 0.35 + 0.15 * math.sin(t * 0.8)
+		bandit.health = bandit.dead and 0 or math.max(0.05, 1 - math.max(0, t - 2) / 12)
 		mobs[#mobs + 1] = bandit
 	end
-	local mage = PreviewMob(3, "mage", L["Bandit mage"], 15, "normal")
+	local mage = PreviewMob(3, "mage", L["Bandit mage"], 15, "normal", 474)
 	mage.combat, mage.yards, mage.bearing = true, 24, 1.1 + 0.03 * t
 	mage.casting = (t % 6 < 2) and L["Frostbolt"] or nil
 	mobs[#mobs + 1] = mage
-	local gnoll = PreviewMob(4, "gnoll", L["Gnoll"], 14, "normal")
+	local gnoll = PreviewMob(4, "gnoll", L["Gnoll"], 14, "normal", 117)
 	gnoll.yards, gnoll.bearing, gnoll.sure = 32 + 3 * math.sin(t * 0.4), 2.9, 0.25 -- behind, not sure yet: faint
 	mobs[#mobs + 1] = gnoll
-	local rare = PreviewMob(5, "rare", L["Greyfang"], 17, "rare")
+	local rare = PreviewMob(5, "rare", L["Greyfang"], 17, "rare", 61)
 	rare.yards, rare.bearing = 37, 2.4 + 0.1 * math.sin(t * 0.5)
 	mobs[#mobs + 1] = rare
 	-- Her group: a warrior in front of her, at the leader (placed exactly); and someone passing by.
@@ -916,6 +1033,7 @@ local function OnUpdate(win, elapsed)
 		Apply(view)
 		ShowSelf(view)
 		Happenings(view) -- (after Apply: XP floats from its mob's dot)
+		ShowFoes(view)
 		if view.kind == "friend" and view.stale then
 			win.Status:SetText(L["Waiting for %s's stream..."]:format(view.picture.name or "?"))
 			win.Live.Text:SetTextColor(0.6, 0.6, 0.6)
@@ -1198,6 +1316,12 @@ local function Build(view, name, parent)
 		act.Recent[i] = icon
 	end
 
+	-- The foes (ShowFoes): a still model and a health bar each, under the spells.
+	win.Foes = CreateFrame("Frame", nil, win)
+	win.Foes:SetSize(WIDTH - 24, FOE_SIZE + 8)
+	win.Foes:SetPoint("TOP", act, "BOTTOM", 0, -6)
+	win.Foes.slots = {}
+
 	win.Status = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	win.Status:SetPoint("BOTTOM", 0, 12)
 	win.Status:SetWidth(WIDTH - 36)
@@ -1237,6 +1361,10 @@ end
 local function Start(view)
 	ReleaseAll(view)
 	ClearFloats(view)
+	for _, slot in ipairs(view.win.Foes.slots) do
+		slot.mob = nil
+		slot:Hide()
+	end
 	if view.picture ~= S.Sensed() then -- (the sensor's own picture: friends watching may be getting it)
 		wipe(view.picture.mobs)
 		wipe(view.picture.recent)

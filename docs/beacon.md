@@ -573,6 +573,18 @@ the attacker) and loot of green and better (`LT.OwnLoot`, Core.lua: the same rea
 `CHAT_MSG_LOOT` that Chronicle counts). Each moment gets a number (1-99, going round) and stays
 2.5 s in the picture.
 
+**Mobs' health, estimated** (StreamSense.lua, `mob.health`, while the sensor runs). A mob's
+`UnitHealthMax` is secret too (seen in game), but `UNIT_COMBAT` on your target and on nameplates
+gives every hit and heal on it with its amount, anyone's (seen in game; a hit comes for both its
+nameplate and `target`: counted once, by GUID, time and amount). What it lost is added up per GUID
+and set back to nothing whenever it's seen out of combat (full; also after evading). Its maximum is
+learned: a mob seen out of combat before its fight and then dead (seen dead at a look, or a
+`PARTY_KILL`) lost all of it, so that's its kind's maximum (creature ID and level):
+`LefthyToolsDB.streamMobHealth["<creature>:<level>"] = { average, kills }`, the average of the last
+5, kept for good, each player's own (not synced: friends get the percent). Until a kind's first
+such kill: unknown. Not seen: hits while it has neither a nameplate nor is your target; a killing
+blow counts in full (a little high). Mobs not looked at for 5 minutes are forgotten.
+
 **Players.** Your group (`party1-4` / `raid1-40`): `UnitPosition` answers for group members, so
 they're placed exactly, no learning (`Group`: same continent, within 120 yd, the nearest 8; beyond
 the 40 yd ring on its rim, the tooltip says the exact yards); name, level, class, dead, in combat,
@@ -584,7 +596,7 @@ members always named. The bottom line counts enemies only. Over the network: fla
 `f` (friendly), `g` (group: exact) and `O2;u;<id>;<level>;<classFile>;<name>` instead of the
 mob's `n`: builds before it ignore `u` and show such a player as an unnamed mob.
 
-**The window** (StreamView.lua; 250 x 374 at scale 1): the map under a radar, north up, to scale
+**The window** (StreamView.lua; 250 x 420 at scale 1): the map under a radar, north up, to scale
 (2.55 px per yard for rings, dots and map): the minimap's own terrain tiles where
 `Data/MinimapTiles.lua` has them (`world/minimaps/<continent>/mapX_Y.blp`, 256 px for 533.33 yd,
 X = floor(32 - west / 533.33), Y = floor(32 - north / 533.33), the 3 x 3 around; `node
@@ -606,7 +618,15 @@ the dot of the mob it came from (else from them), loot rising through them with 
 in its quality's colour (3.5 s; an item the client doesn't know yet is asked for and says "an
 item"). At most 10 at once; another of the same kind within 0.45 s starts lower. Under the radar: the spell being cast with its bar, the
 last spells fading over 12 s. Bottom: "2 on Anna · 5 near · X casts Y"; a friend's stream with no
-frame for 6 s says "Waiting for Anna's stream...". Dots follow their mob and glide; a friend's map
+frame for 6 s says "Waiting for Anna's stream...". Under the spells, **the foes**: up to five mobs
+fought (`S.Foes`: not dead, not players, the target, attacking or in combat; the target first,
+then the ones attacking, then the nearest), each a still model (`PlayerModel:SetCreature` with the
+creature ID from the GUID, `SetPortraitZoom(1)`, paused once loaded; checked in game: a creature
+the client never saw loads too) with a gold edge for the target and a health bar under it. In your
+own window the bar is the real health: `UnitHealthMax` / `UnitHealth` of the mob's unit go
+straight into `StatusBar:SetMinMaxValues` / `SetValue`, which take hidden values (AllowedWhenTainted;
+the unit checked against the GUID first). In a friend's: their estimate; not known: "?" (the hover
+says how it's learned). Dots follow their mob and glide; a friend's map
 glides between their frames. Drag to move; the grip at the bottom right resizes (0.35 to 1.3;
 kept per kind in `LefthyToolsDB.streamWindows`: `me`, `friend`). Yours (`LefthyToolsStreamFrame`,
 "me" or the preview, scale 0.8, right of the middle) lives in the interface and pauses a cinematic
@@ -636,12 +656,15 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   newest first, up to 90 bytes: `,<number><letter><value>[.<extra>]` (`w` hurt, `W` big, `h`
   healed, `H` big, `a` + m miss, d dodge, p parry, b block, r resist, i immune, e evade, f deflect,
   x reflect, a absorb; `x` XP `.mob id`; `k` killing blow `[mob id]`; `l` item ID `.quality`), e.g.
-  `v82,14w52,13H300,12am`. Each comes in every frame while it's recent, so a frame replaced in the
+  `v82,14w52,13H300,12am`; before the moments, the health of up to 5 foes, `,<mob id>=<percent>`
+  (estimated; only ones with an id already). Each moment comes in every frame while it's recent, so a frame replaced in the
   queue loses none; the windows show each number once. It rides there because builds before it
   skip a mob entry that doesn't start with a number, while a 12th field would make them drop the
   whole frame (they want exactly 11).
 - `O2;n;<id>;<level>;<name>` a mob's name (40 bytes), once per watcher before the first frame with
   that id (ids 1-999 per GUID, reused after 60 s).
+- `O2;c;<id>;<creatureID>` a mob's creature ID (from its GUID), right after its name: the watcher's
+  window shows its model. Builds before it ignore the word.
 - `O2;v;<percent>` my health, to every friend (see "Health" above).
 
 Spells go as IDs; the watcher's client names them in its own language. Guard: 80 `O` messages per

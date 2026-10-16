@@ -18,7 +18,8 @@ local S = B.Stream
 --   moments = { what just happened to you: "What happens to you" below } (newest first),
 --   mobs = { { key, name, level, class, dead, combat, attacking, casting (a name), castID, target,
 --            yards, beyond, sure (0-1), bearing (radians clockwise from north), remembered, fade,
---            age }, ... } }
+--            age, unit (at the look), creature (its ID), health (0-1, estimated; nil: unknown) },
+--            ... } }
 --
 -- Learning where the mobs are: the game gives addons no direction to a mob (nameplates can't be
 -- measured), but every look says something, and that adds up. Each mob is a cloud of SPOTS
@@ -247,6 +248,7 @@ local function LearnSeen(mob, now)
 	info.name, info.level, info.class, info.combat, info.attacking = mob.name, mob.level, mob.class, mob.combat, mob.attacking
 	info.dead, info.est = mob.dead, mob.est
 	info.player, info.classFile, info.friendly = mob.player, mob.classFile, mob.friendly
+	info.creature, info.health = mob.creature, mob.health
 end
 
 -- Mobs that left your screen (not dead): remembered a while, outside your view, fading. Appended
@@ -266,6 +268,7 @@ local function Remember(mobs, n, now)
 				ghost.player, ghost.classFile, ghost.friendly, ghost.group = info.player, info.classFile, info.friendly, false
 				ghost.combat, ghost.attacking, ghost.target, ghost.casting, ghost.castID, ghost.dead =
 					info.combat, info.attacking, false, nil, nil, false
+				ghost.unit, ghost.creature, ghost.health = nil, info.creature, info.health
 				local angle
 				angle, ghost.est, ghost.sure = Estimate(cloud)
 				ghost.bearing = angle - (here.facing or 0)
@@ -624,6 +627,7 @@ momentWatch:SetScript("OnEvent", function(_, event, a, b)
 			return
 		end
 		lastKill.key, lastKill.at = b, now
+		S.MobDied(b) -- (its kind's maximum learns, if its whole fight was seen)
 		for _, moment in ipairs(picture.moments) do
 			if moment.kind == "xp" and not moment.key and now - moment.at <= XP_FROM_KILL then
 				moment.key = b -- (the XP came first)
@@ -724,6 +728,144 @@ local function SenseMobCasts(on)
 	end
 end
 
+---------------------------------------------------------------------------
+-- Mobs' health, estimated (your own window shows the real one: StreamView.lua)
+---------------------------------------------------------------------------
+
+-- A mob's health is hidden, its maximum too (UnitHealthMax of a mob: secret, seen in game), but
+-- UNIT_COMBAT tells every hit and heal on your target and on nameplates with its amount (anyone's
+-- hits). So what a mob lost is added up per GUID while the sensor runs (a hit reported for its
+-- nameplate and for your target counts once), and set back to nothing whenever it's seen out of
+-- combat (full; also after it evades). Its maximum is learned: a mob seen out of combat before its
+-- fight and seen dying lost all of it, so that's the maximum for its kind (creature ID and level).
+-- Kept for good in LefthyToolsDB.streamMobHealth["<creature>:<level>"] = { average, kills } (the
+-- average of the last MOB_SAMPLES), each player's own (friends get the percent, not the numbers).
+-- Until a kind's first such kill its health isn't known. Hits while a mob has neither a nameplate
+-- nor is your target aren't seen; a killing blow counts in full.
+local MOB_SAMPLES = 5
+local MOB_KEEP = 300        -- mobs not seen for this long are forgotten
+local mobLost = {}          -- GUID -> health lost since it was last full
+local mobFresh = {}         -- GUID -> true: seen out of combat, so its fight is seen from the start
+local mobKind = {}          -- GUID -> "<creature>:<level>"
+local mobSeen = {}          -- GUID -> when last looked at
+local hitAt, hitAmount = {}, {} -- GUID -> the last hit (the same one comes for nameplate and target)
+local mobCombat = CreateFrame("Frame")
+
+-- A mob's creature ID, from its GUID ("Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>"); nil for
+-- players (and when hidden).
+local function CreatureOf(key)
+	if type(key) ~= "string" then
+		return nil
+	end
+	return tonumber(key:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-") or key:match("^Vehicle%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
+end
+S.CreatureOf = CreatureOf
+
+mobCombat:SetScript("OnEvent", function(_, _, unit, kind, _, amount)
+	if type(unit) ~= "string" or issecret(unit) or (unit ~= "target" and unit:sub(1, 9) ~= "nameplate")
+		or issecret(kind) or issecret(amount) or type(amount) ~= "number" or amount <= 0 or (kind ~= "WOUND" and kind ~= "HEAL") then
+		return
+	end
+	local key = Value("UnitGUID", unit)
+	if not key then
+		return
+	end
+	local now, signed = GetTime(), kind == "WOUND" and amount or -amount
+	if hitAt[key] == now and hitAmount[key] == signed then
+		return -- (the same hit, reported for its other unit)
+	end
+	hitAt[key], hitAmount[key] = now, signed
+	mobLost[key] = math.max(0, (mobLost[key] or 0) + signed)
+end)
+
+-- Its kind's maximum, learned (nil: not yet).
+local function MobMax(kind)
+	local learned = kind and S.Saved("streamMobHealth")[kind]
+	return type(learned) == "table" and tonumber(learned[1]) or nil
+end
+
+-- A mob died: if its whole fight was seen, its kind's maximum learns what it lost.
+local function MobDied(key)
+	local kind, lost = mobKind[key], mobLost[key]
+	if not (mobFresh[key] and kind and lost and lost > 0) then
+		return
+	end
+	mobFresh[key] = nil -- (once)
+	local saved = S.Saved("streamMobHealth")
+	local learned = type(saved[kind]) == "table" and saved[kind] or nil
+	local average, kills = learned and tonumber(learned[1]), learned and tonumber(learned[2]) or 0
+	if average then
+		local n = math.min(kills, MOB_SAMPLES - 1)
+		saved[kind] = { math.floor((average * n + lost) / (n + 1) + 0.5), kills + 1 }
+	else
+		saved[kind] = { lost, 1 }
+	end
+end
+S.MobDied = MobDied
+
+-- At a look: a mob's health, 0-1 (nil: its kind not learned yet). Out of combat it's full.
+local function MobHealth(mob, now)
+	local key = mob.key
+	mobSeen[key] = now
+	mobKind[key] = mob.creature and mob.level and (mob.creature .. ":" .. mob.level) or nil
+	if not mob.combat and not mob.dead then
+		mobLost[key], mobFresh[key] = 0, true
+	end
+	if mob.dead then
+		MobDied(key)
+		return 0
+	end
+	local max = MobMax(mobKind[key])
+	return max and math.max(0, math.min(1, 1 - (mobLost[key] or 0) / max)) or nil
+end
+
+-- Mobs not seen for a while are forgotten.
+local function ForgetMobs(now)
+	for key, at in pairs(mobSeen) do
+		if now - at > MOB_KEEP then
+			mobSeen[key], mobLost[key], mobFresh[key], mobKind[key], hitAt[key], hitAmount[key] = nil, nil, nil, nil, nil, nil
+		end
+	end
+end
+
+-- The mobs fought (in your picture or a friend's): not dead, not players, the target, attacking or
+-- in combat; the target first, then the ones attacking, then the nearest. Into list, at most max.
+local function FoeFirst(a, b)
+	local at, bt = a.target and true or false, b.target and true or false
+	if at ~= bt then
+		return at
+	end
+	local aa, ba = a.attacking and true or false, b.attacking and true or false
+	if aa ~= ba then
+		return aa
+	end
+	return (a.yards or 999) < (b.yards or 999)
+end
+
+function S.Foes(mobs, list, max)
+	wipe(list)
+	for _, mob in ipairs(mobs) do
+		if not mob.dead and not mob.player and not mob.friendly and (mob.target or mob.attacking or mob.combat) then
+			list[#list + 1] = mob
+		end
+	end
+	table.sort(list, FoeFirst)
+	for i = #list, max + 1, -1 do
+		list[i] = nil
+	end
+	return list
+end
+
+local function SenseMobHealth(on)
+	mobCombat:UnregisterAllEvents()
+	for _, t in ipairs({ mobLost, mobFresh, mobKind, mobSeen, hitAt, hitAmount }) do
+		wipe(t)
+	end
+	if on then
+		mobCombat:RegisterEvent("UNIT_COMBAT") -- (every unit's: the target's and nameplates' are kept)
+	end
+end
+
 -- Your casts are listened to while the sensor runs or a test does.
 function S.SenseCasts(who, on)
 	castUsers[who] = on or nil
@@ -790,6 +932,7 @@ local function Group(n)
 		mob.dead = Value("UnitIsDeadOrGhost", unit) == true
 		mob.combat = Value("UnitAffectingCombat", unit) == true
 		mob.attacking, mob.target, mob.soft, mob.onScreen = false, false, false, nil
+		mob.unit, mob.creature, mob.health = unit, nil, nil
 		local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
 		mob.casting = ok and not issecret(castName) and castName or nil
 		mob.castID = mob.casting and not issecret(castID) and castID or nil
@@ -818,6 +961,9 @@ local function Fill(n, unit, unitTarget, targetKey, onScreen, now, friendly)
 	mob.combat = Value("UnitAffectingCombat", unit) == true
 	mob.attacking = not friendly and Value("UnitIsUnit", unitTarget, "player") == true
 	mob.exact = nil
+	mob.unit = unit -- (your window: its real health, its model)
+	mob.creature = not mob.player and CreatureOf(mob.key) or nil
+	mob.health = not mob.player and MobHealth(mob, now) or nil
 	local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
 	if not ok or issecret(castName) or not castName then
 		local okChannel, channelName, _, _, _, _, _, _, channelID = pcall(UnitChannelInfo, unit)
@@ -838,6 +984,7 @@ local function Fill(n, unit, unitTarget, targetKey, onScreen, now, friendly)
 	return mob.target
 end
 
+local forgotAt = 0
 local function Look()
 	local now = GetTime()
 	picture.continent = Here()
@@ -882,6 +1029,10 @@ local function Look()
 	picture.health = S.Health()
 	picture.healthWhy = not picture.health and S.HealthWhy() or nil
 	Flush(now)
+	if now - forgotAt >= 30 then
+		forgotAt = now
+		ForgetMobs(now)
+	end
 	picture.looked = now -- (your window redraws when this changes)
 	for _, listener in ipairs(listeners) do
 		local ok, err = pcall(listener, picture)
@@ -924,12 +1075,14 @@ function S.SenseNeed(who, on)
 		nextLook = 0
 		SenseMoments(true)
 		SenseMobCasts(true)
+		SenseMobHealth(true)
 		ticker:Show()
 	elseif not running and wasRunning then
 		ticker:Hide()
 		wipe(clouds)
 		SenseMoments(false)
 		SenseMobCasts(false)
+		SenseMobHealth(false)
 	end
 	S.SenseCasts("sensor", running)
 	if running then
