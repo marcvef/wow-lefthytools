@@ -813,6 +813,7 @@ L["Search mobs and items"] = "Mobs und Items suchen"
 L["Sort:"] = "Sortierung:"
 L["Pick a mob on the left."] = "Wähle links einen Mob."
 L["World drops"] = "Weltdrops"
+L["World drops (%d)"] = "Weltdrops (%d)"
 L["world"] = "Welt"
 L["Random gear that drops from mobs of its level anywhere: not this mob's own."] =
 	"Zufällige Ausrüstung, die überall von Mobs ihres Levels droppt: nicht die eigene dieses Mobs."

@@ -22,7 +22,9 @@ local PAD = 12
 local LIST_W, ROW_H = 282, 36
 local TOP = 104             -- where the list and the picked mob start
 local MODEL_W, MODEL_H = 112, 132
-local CELL, CELL_GAP, PER_ROW, ROWS = 28, 6, 9, 5
+local CELL, CELL_GAP, CELL_ROW = 28, 6, 46  -- a drop's icon, the gap, a row with its chance under it
+local DROPS_W = WIDTH - (PAD + LIST_W + 14) - PAD - 24 -- (the picked mob's pane, less its scroll bar)
+local PER_ROW = math.floor((DROPS_W + CELL_GAP) / (CELL + CELL_GAP))
 local ROW_ICONS = 6
 local GOLD = { 1, 0.82, 0.3 }
 local SORTS = { "kills", "name", "level", "coin", "last" }
@@ -284,6 +286,26 @@ local function Ago(t)
 	return L["%d days ago"]:format(math.floor(seconds / 86400))
 end
 
+-- A section of the picked mob's drops at y in its scrolling area (heading, a rule, every drop: no
+-- "+N", it scrolls); returns where the next one starts. show false: hidden.
+local function Section(section, title, list, kills, y, show)
+	section.Heading:SetShown(show)
+	section.Rule:SetShown(show)
+	section.Grid:SetShown(show)
+	if not show then
+		return y
+	end
+	y = y > 0 and y + 10 or y
+	section.Heading:ClearAllPoints()
+	section.Heading:SetPoint("TOPLEFT", ledger.Pane.Drops, "TOPLEFT", 0, -y)
+	section.Heading:SetText(title)
+	y = y + 20
+	section.Grid:ClearAllPoints()
+	section.Grid:SetPoint("TOPLEFT", ledger.Pane.Drops, "TOPLEFT", 0, -y)
+	local rows = Bt.Lay(section.Grid, section.cells, list, kills, CELL, CELL_GAP, PER_ROW, #list, true)
+	return y + rows * CELL_ROW
+end
+
 local function DrawPicked()
 	local pane, mob = ledger.Pane, Bt.Mob(selected)
 	pane:SetShown(mob ~= nil)
@@ -295,6 +317,7 @@ local function DrawPicked()
 		pane.creature, pane.facing = selected, 0.4
 		pane.Model:ClearModel()
 		pane.Model:SetCreature(selected)
+		pane.Scroll:SetVerticalScroll(0)
 	end
 	pane.Name:SetText(mob.name or ("#" .. selected))
 	pane.Kind:SetText(Bt.Kind({ level = mob.level, class = mob.class }))
@@ -313,9 +336,17 @@ local function DrawPicked()
 		lines[#lines + 1] = ("|T%s:12:12|t "):format(Bt.SKIN_ICON) .. L["Skinned %d times"]:format(mob.skinned)
 	end
 	pane.Stats:SetText(table.concat(lines, "\n"))
-	local drops = Bt.Drops(mob, M.db.showPoor)
-	pane.Heading:SetText(L["Drops (%d)"]:format(#drops))
-	Bt.Lay(pane.Grid, pane.cells, drops, mob.kills, CELL, CELL_GAP, PER_ROW, PER_ROW * ROWS, true)
+	local own, world = {}, {}
+	for _, drop in ipairs(Bt.Drops(mob, M.db.showPoor)) do
+		if drop.group then
+			world = drop.group
+		else
+			own[#own + 1] = drop
+		end
+	end
+	local y = Section(pane.sections.own, L["Drops (%d)"]:format(#own), own, mob.kills, 0, true)
+	y = Section(pane.sections.world, L["World drops (%d)"]:format(#world), world, mob.kills, y, #world > 0)
+	pane.Drops:SetHeight(math.max(y, 10))
 	-- What the search found stands out; the rest steps back.
 	local found = {}
 	for _, entry in ipairs(entries) do
@@ -325,8 +356,10 @@ local function DrawPicked()
 			end
 		end
 	end
-	for _, cell in ipairs(pane.cells) do
-		cell:SetAlpha((not next(found) or (cell.drop and found[cell.drop.id])) and 1 or 0.35)
+	for _, section in pairs(pane.sections) do
+		for _, cell in ipairs(section.cells) do
+			cell:SetAlpha((not next(found) or (cell.drop and found[cell.drop.id])) and 1 or 0.35)
+		end
 	end
 end
 
@@ -511,17 +544,27 @@ local function Build()
 	pane.Stats:SetPoint("RIGHT", 0, 0)
 	pane.Stats:SetJustifyH("LEFT")
 	pane.Stats:SetSpacing(3)
-	pane.Heading = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	pane.Heading:SetPoint("TOPLEFT", modelBack, "BOTTOMLEFT", 0, -12)
-	local rule = pane:CreateTexture(nil, "ARTWORK")
-	rule:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
-	rule:SetHeight(1)
-	rule:SetPoint("LEFT", pane.Heading, "RIGHT", 8, 0)
-	rule:SetPoint("RIGHT", pane, "RIGHT", 0, 0)
-	pane.Grid = CreateFrame("Frame", nil, pane)
-	pane.Grid:SetPoint("TOPLEFT", pane.Heading, "BOTTOMLEFT", 0, -8)
-	pane.Grid:SetSize(PER_ROW * (CELL + CELL_GAP), ROWS * (CELL + 18))
-	pane.cells = {}
+	-- Its drops under the model, scrolling: its own, then its world drops (random gear from
+	-- anywhere) in a section of their own, each drop with its item tooltip.
+	pane.Scroll = CreateFrame("ScrollFrame", nil, pane, "UIPanelScrollFrameTemplate")
+	pane.Scroll:SetPoint("TOPLEFT", modelBack, "BOTTOMLEFT", 0, -10)
+	pane.Scroll:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -24, 0)
+	pane.Drops = CreateFrame("Frame", nil, pane.Scroll)
+	pane.Drops:SetSize(DROPS_W, 10)
+	pane.Scroll:SetScrollChild(pane.Drops)
+	pane.sections = {}
+	for _, key in ipairs({ "own", "world" }) do
+		local section = { cells = {} }
+		section.Heading = pane.Drops:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		section.Rule = pane.Drops:CreateTexture(nil, "ARTWORK")
+		section.Rule:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
+		section.Rule:SetHeight(1)
+		section.Rule:SetPoint("LEFT", section.Heading, "RIGHT", 8, 0)
+		section.Rule:SetPoint("RIGHT", pane.Drops, "RIGHT", 0, 0)
+		section.Grid = CreateFrame("Frame", nil, pane.Drops)
+		section.Grid:SetSize(DROPS_W, 10)
+		pane.sections[key] = section
+	end
 	ledger.Empty = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisable")
 	ledger.Empty:SetPoint("CENTER", pane, "CENTER", 0, 0)
 	ledger.Empty:SetText(L["Pick a mob on the left."])

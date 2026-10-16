@@ -6522,9 +6522,10 @@ section("Bestiary: what mobs drop")
 	ledger.Search:SetText("cold milk")
 	_, entries, picked = Bt.Ledger()
 	local milk
-	for _, c in ipairs(ledger.Pane.cells) do if c:IsShown() and c.drop and c.drop.id == 1179 then milk = c end end
+	for _, c in ipairs(ledger.Pane.sections.own.cells) do if c:IsShown() and c.drop and c.drop.id == 1179 then milk = c end end
 	check(#entries == 1 and picked == 117 and ledger.rows[1].Found:GetText():find("Ice Cold Milk", 1, true)
-		and ledger.rows[1].Found:GetText():find("33%", 1, true) and milk and milk:GetAlpha() == 1 and ledger.Pane.cells[1]:GetAlpha() < 1,
+		and ledger.rows[1].Found:GetText():find("33%", 1, true) and milk and milk:GetAlpha() == 1
+		and ledger.Pane.sections.own.cells[1]:GetAlpha() < 1,
 		"an item: the mob it came from, picked; the item and its chance in the row; the match stands out among its drops")
 	ledger.Search:SetText("zzz")
 	check(not ledger.rows[1]:IsShown() and ledger.NoMatch:GetText() == "Nothing found.", "nothing: said so")
@@ -6564,6 +6565,22 @@ section("Bestiary: what mobs drop")
 	ITEMS[15212] = { name = "Bandit's Own Blade", quality = 2, classID = 2, equipLoc = "INVTYPE_WEAPON", bind = 1 }
 	check(not Bt.IsWorldDrop(15212, 2) and Bt.IsWorldDrop(15211, 2) and not Bt.IsWorldDrop(2589, 1),
 		"bound on pickup, or not gear: not a world drop")
+	-- In the ledger, world drops are a section of their own: each a drop with its item tooltip.
+	Bt.ToggleLedger(116)
+	local pane = ledger.Pane
+	local own, world = pane.sections.own, pane.sections.world
+	local sword = world.cells[1]
+	local inOwn = false
+	for _, c in ipairs(own.cells) do if c:IsShown() and (c.world or (c.drop and c.drop.id == 15211)) then inOwn = true end end
+	check(world.Heading:IsShown() and world.Heading:GetText() == "World drops (1)" and sword and sword:IsShown() and sword.drop.id == 15211
+		and not inOwn and own.Heading:GetText():find("^Drops %(") and pane.Drops:GetHeight() > 100,
+		"the ledger: the sword in a World drops section of its own, not among its drops; the drops scroll")
+	sword._scripts.OnEnter(sword)
+	check(TOOLTIP.link == "item:15211" and tipFind("Dropped in 1 of 5 kills: 20%"), "hover it: the sword's own tooltip, with its numbers")
+	sword._scripts.OnLeave(sword)
+	Bt.ToggleLedger(117)
+	check(not world.Heading:IsShown() and not world.Grid:IsShown(), "a mob without world drops: no such section")
+	ledger:Hide()
 	-- Closed and open again: kept for next time.
 	win.Close:Click()
 	check(not win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == false and not button.Open:IsShown(), "the X closes it, kept")
