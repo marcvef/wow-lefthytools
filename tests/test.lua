@@ -6390,6 +6390,41 @@ section("Bestiary: what mobs drop")
 	cells[24]._scripts.OnLeave(cells[24])
 	for id = 50001, 50030 do mob().items[id] = nil end
 	Bt.Draw()
+	-- A Riverpaw Gnoll (117). A quick loot right after an instant spell (the killing blow) counts:
+	-- only skinning, a pickpocket or gathering just before the loot window make it not a kill's.
+	local gnolls = function() return LefthyToolsBestiaryDB.mobs[117] end
+	local g1, g2, g3 = "Creature-0-1-0-1-117-00000020", "Creature-0-1-0-1-117-00000021", "Creature-0-1-0-1-117-00000022"
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-9", 2764) -- (Throw)
+	Fire("PARTY_KILL", "Player-1-0", g1)
+	LOOT = { { type = 1, id = 2589, source = g1 } }
+	Fire("LOOT_READY", true)
+	Fire("LOOT_CLOSED")
+	check(gnolls().kills == 1 and gnolls().items[2589], "a spell just before looting (the killing blow): its loot counts")
+	-- The game said a corpse was empty, but it's looted after all: its items join that kill.
+	LOOT_EMPTY[g2] = true
+	Fire("PARTY_KILL", "Player-1-0", g2)
+	Advance(6.2)
+	check(gnolls().kills == 2, "the game says it's empty: a kill without drops")
+	LOOT = { { type = 1, id = 2075, source = g2 } }
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	check(gnolls().kills == 2 and gnolls().items[2075] and gnolls().items[2075][1] == 1,
+		"looted after all: its items join that kill (not a second one)")
+	-- The slots not there yet when the loot is ready: looked at again when the window opens.
+	LOOT = {}
+	Fire("LOOT_READY", false)
+	LOOT = { { type = 1, id = 1179, source = g3 } }
+	Fire("LOOT_OPENED", false, false)
+	Fire("LOOT_CLOSED")
+	LOOT = {}
+	check(gnolls().kills == 3 and gnolls().items[1179], "slots filled only when the window opens: still read")
+	local pmark = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("log")
+	local logText = printedSince(pmark)
+	check(logText:find("Riverpaw", 1, true) == nil and logText:find("looted (said empty before), 1 item(s)", 1, true)
+		and logText:find("skinning or pickpocket", 1, true) and logText:find("Defias Bandit: looted, 2 item(s)", 1, true)
+		and logText:find("empty (loot check false/true)", 1, true),
+		"/bestiary log: what was made of each loot window and kill, got\n" .. logText)
 	-- The card next to the mouse (setting): an enemy killed before, its drops small.
 	MOBS.mouseover = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000010", pinned = true }
 	Fire("UPDATE_MOUSEOVER_UNIT")

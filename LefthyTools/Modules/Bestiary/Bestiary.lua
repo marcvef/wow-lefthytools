@@ -10,13 +10,16 @@ local L = ns.L
 --
 -- Counting so the chances hold:
 --   * a kill counts once its corpse is looted, or once the game says it's empty (CanLootUnit, a
---     moment after it died): a corpse left lying would count as a kill that dropped nothing;
+--     moment after it died): a corpse left lying would count as a kill that dropped nothing. The
+--     game can be wrong (in game: "empty" for a corpse with two items): looted after all, its items
+--     join that kill;
 --   * your (or your pet's) killing blow (PARTY_KILL), or any corpse you loot: it was yours;
 --   * on your own only: in a group the loot goes round, so you'd see only part of it;
---   * a corpse's loot once (the first time it opens); not when a spell of yours went off just before
---     (skinning, a pickpocket, opening), nor what isn't a creature's (herbs, ore, chests, fishing,
---     a bag's contents: their source isn't a creature);
+--   * a corpse's loot once (the first time it opens); not right after skinning, a pickpocket or
+--     gathering (NOT_A_KILL), nor what isn't a creature's (herbs, ore, chests, fishing, a bag's
+--     contents: their source isn't a creature);
 --   * coin: what your money grew by while the loot window was open.
+-- /bestiary log shows the last loot windows and kills and what was made of them.
 --
 -- LefthyToolsBestiaryDB = { mobs = { [creatureID] = { name, level, class, kills, money (copper),
 --   last (time()), items = { [itemID] = { drops (corpses it came from), count, quality } } } } }
@@ -38,17 +41,23 @@ ns.Bestiary = Bt
 
 local EMPTY_CHECKS = { 2, 6 }  -- seconds after a kill: is its corpse empty? (both times: then it counts)
 local PENDING_FOR = 300         -- a corpse not looted in this long: not counted
-local CAST_GAP = 1              -- a spell of yours this shortly before the loot window: not a mob's loot
+local CAST_GAP = 1.5            -- skinning (a pickpocket, gathering) this shortly before the loot window: not a kill's loot
 local SEEN_KEEP = 200           -- mobs remembered (name, level) from target, mouseover and nameplates
-local NOT_A_CAST = { [75] = true, [5019] = true } -- Auto Shot, Shoot (a wand): they repeat while fighting
+local LOG_KEEP = 12             -- loot windows remembered with what was made of them (/bestiary log)
+-- Spells whose loot isn't a kill's (each rank's ID, and by name for ranks not listed): Skinning,
+-- Pick Pocket, Mining, Herb Gathering. Any other spell just before looting (a killing blow, then a
+-- quick loot) doesn't matter.
+local NOT_A_KILL = { 8613, 8617, 8618, 10768, 921, 2575, 2576, 3564, 10248, 2366, 2368, 3570, 11993 }
 local issecret = issecretvalue or function() return false end
 
 local data                       -- LefthyToolsBestiaryDB
 local pending = {}               -- GUID -> { at, creature }: killed, its loot not seen yet
 local done = {}                  -- GUID -> time: counted (or its loot seen); kept a while
 local seen, seenOrder = {}, {}   -- GUID -> { name, level, class }
-local castAt = -math.huge
+local castAt = -math.huge        -- when one of the NOT_A_KILL spells went off
+local notKillIDs, notKillNames   -- NOT_A_KILL as a set, and their names (read once)
 local lootMoney, lootSource      -- while the loot window is open: money before, the corpse
+local lootSeen = false           -- this loot window was looked at (LOOT_READY or LOOT_OPENED)
 local listeners = {}
 local events = CreateFrame("Frame")
 
@@ -172,9 +181,40 @@ local function Solo()
 	return not (IsInGroup and IsInGroup())
 end
 
--- A kill counted (once per corpse).
-local function Count(guid, creature)
-	done[guid] = time()
+-- What was made of a loot window or a kill, the last LOG_KEEP (/bestiary log; kept for a look
+-- after a /reload): { time, mob (creature ID), what, items (how many), check (CanLootUnit's
+-- answers) }.
+local function Log(creature, what, items, check)
+	if not data then
+		return
+	end
+	data.log = type(data.log) == "table" and data.log or {}
+	table.insert(data.log, 1, { time(), creature, what, items, check })
+	for i = #data.log, LOG_KEEP + 1, -1 do
+		data.log[i] = nil
+	end
+end
+
+-- /bestiary log: the newest first, in chat (English, like the other chat lines).
+function Bt.PrintLog()
+	local log = data and type(data.log) == "table" and data.log or {}
+	if #log == 0 then
+		M:Print("nothing yet: no loot window or kill since the log began.")
+		return
+	end
+	M:Print("the last loot windows and kills, newest first:")
+	for _, entry in ipairs(log) do
+		local mob = entry[2] and data.mobs[entry[2]]
+		local who = mob and mob.name or entry[2] and ("creature " .. entry[2]) or "?"
+		print(("  %s  %s: %s%s%s"):format(date("%H:%M:%S", entry[1]), who, entry[3],
+			(entry[4] or 0) > 0 and (", " .. entry[4] .. " item(s)") or "", entry[5] and (" (loot check " .. entry[5] .. ")") or ""))
+	end
+end
+
+-- A kill counted (once per corpse). how: "looted" or "empty" (the game said there's nothing on it:
+-- if it's looted after all, its items still join this kill).
+local function Count(guid, creature, how)
+	done[guid] = { at = time(), how = how }
 	pending[guid] = nil
 	local mob = MobFor(creature)
 	mob.kills, mob.last = mob.kills + 1, time()
@@ -192,14 +232,16 @@ local function CheckEmpty(guid, round)
 	if not kill then
 		return
 	end
-	local ok, hasLoot = pcall(CanLootUnit, guid)
+	local ok, hasLoot, canLoot = pcall(CanLootUnit, guid)
+	kill.check = ("%s/%s"):format(tostring(ok and not issecret(hasLoot) and hasLoot), tostring(ok and not issecret(canLoot) and canLoot))
 	if not ok or issecret(hasLoot) or hasLoot then
 		return -- (has loot, or can't tell: counted when it's looted)
 	end
 	if round < #EMPTY_CHECKS then
 		C_Timer.After(EMPTY_CHECKS[round + 1] - EMPTY_CHECKS[round], function() CheckEmpty(guid, round + 1) end)
 	else
-		Count(guid, kill.creature)
+		Count(guid, kill.creature, "empty")
+		Log(kill.creature, "empty", 0, kill.check)
 		Changed(kill.creature)
 	end
 end
@@ -224,7 +266,8 @@ local function OnKill(attacker, target)
 	end
 end
 
--- The corpse a loot window is for: its GUID (GetLootSourceInfo; without it, the one kill waiting).
+-- The corpse a loot window is for: its GUID (GetLootSourceInfo; when that says nothing, your dead
+-- target, else the one kill waiting from the last minute).
 local function LootSource()
 	local source
 	for slot = 1, GetNumLootItems() do
@@ -236,7 +279,10 @@ local function LootSource()
 			source = guid
 		end
 	end
-	if not source and not GetLootSourceInfo then
+	if not source and Value(UnitIsDead, "target") then
+		source = Bt.CreatureOf(Value(UnitGUID, "target")) and Value(UnitGUID, "target")
+	end
+	if not source then
 		local now, only = GetTime(), nil
 		for guid, kill in pairs(pending) do
 			if now - kill.at < 60 then
@@ -251,19 +297,59 @@ local function LootSource()
 	return source
 end
 
--- The loot window opened (LOOT_READY, before anything is taken): a corpse's loot, the first time.
+-- Is this spell one whose loot isn't a kill's (skinning, a pickpocket, gathering)?
+local function NotAKill(spellID)
+	if not notKillIDs then
+		notKillIDs, notKillNames = {}, {}
+		for _, id in ipairs(NOT_A_KILL) do
+			notKillIDs[id] = true
+			local name = C_Spell and C_Spell.GetSpellName and Value(C_Spell.GetSpellName, id)
+			if name then
+				notKillNames[name] = true
+			end
+		end
+	end
+	if notKillIDs[spellID] then
+		return true
+	end
+	local name = C_Spell and C_Spell.GetSpellName and Value(C_Spell.GetSpellName, spellID)
+	return name ~= nil and notKillNames[name] == true
+end
+
+-- The loot window opened (LOOT_READY, before anything is taken; LOOT_OPENED if its slots weren't
+-- there yet): a corpse's loot, the first time.
 local function OnLoot()
-	lootMoney, lootSource = nil, nil
-	if not data or not Solo() or (IsFishingLoot and IsFishingLoot()) or GetTime() - castAt < CAST_GAP then
+	if lootSeen or not data then
 		return
 	end
+	lootMoney, lootSource = nil, nil
+	if GetNumLootItems() == 0 then
+		return -- (not filled yet: LOOT_OPENED looks again)
+	end
+	lootSeen = true
 	local guid = LootSource()
 	local creature = Bt.CreatureOf(guid)
-	if not creature or done[guid] then
+	if not Solo() then
+		return Log(creature, "group", 0)
+	elseif IsFishingLoot and IsFishingLoot() then
 		return
+	elseif GetTime() - castAt < CAST_GAP then
+		return Log(creature, "skinning or pickpocket", 0)
+	elseif not creature then
+		return Log(nil, guid and "not a mob" or "no corpse", 0)
 	end
-	local mob = Count(guid, creature)
-	local coin = false
+	local was, check = done[guid], pending[guid] and pending[guid].check
+	if was and was.how ~= "empty" then
+		return Log(creature, "looted before", 0)
+	end
+	local mob
+	if was then -- (the game said it was empty: its items join that kill)
+		mob = MobFor(creature)
+		done[guid].how = "looted"
+	else
+		mob = Count(guid, creature, "looted")
+	end
+	local coin, items = false, 0
 	for slot = 1, GetNumLootItems() do
 		local kind = Value(GetLootSlotType, slot)
 		if kind == 2 then -- (Enum.LootSlotType.Money)
@@ -276,12 +362,14 @@ local function OnLoot()
 				local item = mob.items[id] or { 0, 0, quality }
 				mob.items[id] = item
 				item[1], item[2], item[3] = item[1] + 1, item[2] + math.max(1, tonumber(quantity) or 1), tonumber(quality) or item[3]
+				items = items + 1
 			end
 		end
 	end
 	if coin then
 		lootMoney, lootSource = GetMoney(), creature
 	end
+	Log(creature, was and "looted (said empty before)" or "looted", items, check)
 	Changed(creature)
 end
 
@@ -295,7 +383,7 @@ local function OnLootClosed()
 			Changed(lootSource)
 		end
 	end
-	lootMoney, lootSource = nil, nil
+	lootMoney, lootSource, lootSeen = nil, nil, false
 end
 
 -- Old waiting kills and counted corpses go.
@@ -306,8 +394,8 @@ local function Prune()
 			pending[guid] = nil
 		end
 	end
-	for guid, at in pairs(done) do
-		if wall - at > PENDING_FOR then
+	for guid, counted in pairs(done) do
+		if wall - counted.at > PENDING_FOR then
 			done[guid] = nil
 		end
 	end
@@ -317,12 +405,12 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
 	if event == "PARTY_KILL" then
 		OnKill(a, b)
 		Prune()
-	elseif event == "LOOT_READY" then
+	elseif event == "LOOT_READY" or event == "LOOT_OPENED" then
 		OnLoot()
 	elseif event == "LOOT_CLOSED" then
 		OnLootClosed()
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then -- unit, castGUID, spellID
-		if issecret(c) or not NOT_A_CAST[c] then
+		if not issecret(c) and NotAKill(c) then
 			castAt = GetTime()
 		end
 	elseif event == "PLAYER_TARGET_CHANGED" then
@@ -351,8 +439,8 @@ LT.onLoad[#LT.onLoad + 1] = function()
 end
 
 function M:OnEnable()
-	for _, event in ipairs({ "PARTY_KILL", "LOOT_READY", "LOOT_CLOSED", "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT",
-			"NAME_PLATE_UNIT_ADDED" }) do
+	for _, event in ipairs({ "PARTY_KILL", "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "PLAYER_TARGET_CHANGED",
+			"UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED" }) do
 		events:RegisterEvent(event)
 	end
 	events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
@@ -397,8 +485,11 @@ function M:OnSlashCommand(msg)
 	elseif cmd == "minimap" then
 		LT:SetModuleSetting(self, "minimapButton", not self.db.minimapButton)
 		self:Print("minimap button " .. (self.db.minimapButton and "on." or "off."))
+	elseif cmd == "log" then
+		Bt.PrintLog()
 	else
 		self:Print("/bestiary - open or close the window (your target's drops)")
+		self:Print("/bestiary log - the last loot windows and kills, and what was made of them")
 		self:Print("/bestiary minimap - show or hide the minimap button")
 		self:Print("/bestiary settings - the Bestiary's settings")
 	end

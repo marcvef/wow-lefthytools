@@ -29,18 +29,25 @@ GUIDs remembered) and are written to a kind's record as last seen.
   blow (`PARTY_KILL` with you or your pet as the attacker) the corpse waits; `CanLootUnit(guid)`
   is asked 2 s and 6 s after (loot can take a moment to show): no loot both times, a kill without
   drops. One that has loot counts when it's looted; left lying for 5 minutes, it's forgotten. A
-  corpse left lying would otherwise look like a kill that dropped nothing.
+  corpse left lying would otherwise look like a kill that dropped nothing. In game `CanLootUnit`
+  said "no loot" for a corpse that had two items (perhaps it was too far away): a corpse counted
+  as empty that's looted after all adds its items to that kill (not a second one).
 - **Any corpse you loot was yours**: it counts even without your killing blow (a guard's).
 - **On your own only** (`IsInGroup()`): in a group the loot goes round, so you'd see only part of
   it. The window says so while you're in one.
 - **A corpse's loot once**: the first time its window opens (`LOOT_READY`, before anything is
-  taken: auto loot happens in the client, Blizzard's loot frame takes nothing itself). Not when a
-  spell of yours went off in the second before (`UNIT_SPELLCAST_SUCCEEDED`; skinning, a pickpocket,
-  opening a chest; Auto Shot and a wand's Shoot don't count, they repeat while fighting), nor
-  fishing (`IsFishingLoot`), nor what isn't a creature's (herbs, ore, chests and a bag's contents
-  have object or item GUIDs).
-- **The corpse**: `GetLootSourceInfo(slot)` (one source; several at once aren't told apart).
-  Without that function: the one kill waiting from the last minute.
+  taken: auto loot happens in the client, Blizzard's loot frame takes nothing itself; if its slots
+  aren't there yet, `LOOT_OPENED` looks again). Not when Skinning, Pick Pocket, Mining or Herb
+  Gathering went off in the 1.5 s before (`UNIT_SPELLCAST_SUCCEEDED`, by spell ID or the name of
+  one: other ranks); any other spell doesn't matter (the first version skipped the loot after any
+  spell, so a quick loot after an instant killing blow was lost). Nor fishing (`IsFishingLoot`),
+  nor what isn't a creature's (herbs, ore, chests and a bag's contents have object or item GUIDs).
+- **The corpse**: `GetLootSourceInfo(slot)` (one source; several at once aren't told apart). When
+  that says nothing: your dead target, else the one kill waiting from the last minute.
+- **The log** (`/bestiary log`, `LefthyToolsBestiaryDB.log`, the last 12): each loot window and
+  each empty kill with what was made of it (looted, said empty, looted after being said empty,
+  looted before, skinning or pickpocket, group, no corpse, not a mob), how many items and what
+  `CanLootUnit` answered ("hasLoot/canLoot"), to see why something wasn't counted.
 - **Items**: `GetLootSlotType` 1, `GetLootSlotLink` (the item ID), `GetLootSlotInfo` (quantity,
   quality). **Coin** (type 2): the slot doesn't say how much, so it's what `GetMoney()` grew by
   between `LOOT_READY` and `LOOT_CLOSED`.
