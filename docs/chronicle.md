@@ -212,7 +212,10 @@ Battle.net messages only arrive while both are online, so each friend's own Chro
 numbers: `D2;<YYYYMMDD>;<minutes played>;<xp>;<quests>;<kills>;<deaths>;<levels>` (about 45
 bytes), and after it `K2;<YYYYMMDD>;<minutes AFK>` when that day had any AFK time (its own
 message: builds before it reject a `D2` with another field and ignore kinds they don't know).
-`StoreFriendDay` merges them: a `K2` sets only the day's `afk`, a `D2` keeps it. When Beacon
+`StoreFriendDay` merges them: a `K2` sets only the day's `afk`, a `D2` keeps it. It also keeps the
+sender's account as `acct` (`C.PeerAccount`: the hash of the BattleTag Battle.net gives for the
+peer's GUID), so the window counts those days for that person (older builds keep the field and
+ignore it). When Beacon
 reports a friend as `known` (their name became known), they get my last 7 days; every 5 minutes
 today's and yesterday's go to everyone if they changed (each message compared on its own). Both
 go through Beacon's low-priority queue (`B.QueueLow`): sent only when no message, state or answer
@@ -283,9 +286,10 @@ ask for the older ones of the other until they change again.
 **People and news for the window** (`C.People()`): me (the character I play: its days, numbers
 from `C.ProfileNumbers`), then every friend's character from the book (`book:<acct>:<Name-Realm>`;
 last played from the profile or the latest day played; online if a Beacon peer has that name),
-then friends on older builds from the days they sent (`store.friendStats`, `friend:<Name>`), by
-name. `C.Accounts()`: the same per Battle.net account (me: all of `store.chars`; friends: their
-account's characters; older builds: one character each), each day's activity added up over the
+then friends on older builds from the days they sent (`store.friendStats`, `friend:<Name>`, with
+their `acct` when it's known), by name. `C.Accounts()`: the same per Battle.net account (me: all of
+`store.chars`; friends: their account's characters, also a character only known from the days it
+sent; older builds whose BattleTag isn't known: one character each), each day's activity added up over the
 account's characters (time, XP, quests, kills, deaths, levels, AFK, distance, bosses, rares, runs,
 jumps), the level of the character played most that day, gold summed over each character's last
 known; lifetime numbers summed where they add up, else the best (zones, dungeons, most gold,

@@ -813,7 +813,9 @@ local function SendDaysTo(gameAccountID)
 end
 
 -- A day of a friend's numbers (D2), or just its AFK time (K2: day.afk only):
--- store.friendStats[name] = { classFile, level, updated, days }. Either keeps what the other set.
+-- store.friendStats[name] = { classFile, level, updated, days, acct }. Either keeps what the other set.
+-- acct: their BattleTag's hash (Sync.lua), so the window counts these days for that person instead
+-- of listing the character on its own (older builds keep the field and ignore it).
 local function StoreFriendDay(peer, day)
 	if day.day > date("%Y-%m-%d", C.DayAgo(-1)) then
 		return -- a day after tomorrow (a wrong clock): it would never be pruned
@@ -822,6 +824,7 @@ local function StoreFriendDay(peer, day)
 	local f = friends[peer.name] or { days = {} }
 	friends[peer.name] = f
 	f.classFile, f.level, f.updated = peer.classFile, peer.level, time()
+	f.acct = C.PeerAccount and C.PeerAccount(peer) or f.acct
 	local old = f.days[day.day] or {}
 	if day.played == nil then
 		old.afk = day.afk

@@ -129,6 +129,17 @@ function C.AccountLabel(acct)
 	return Friends()[acct]
 end
 
+-- A Beacon friend's account (their BattleTag's hash), or nil while Battle.net doesn't say.
+function C.PeerAccount(peer)
+	local guid = peer and peer.guid
+	local info = type(guid) == "string" and not issecret(guid) and C_BattleNet and C_BattleNet.GetAccountInfoByGUID
+		and C_BattleNet.GetAccountInfoByGUID(guid)
+	local tag = info and info.battleTag
+	if type(tag) == "string" and tag ~= "" and not issecret(tag) then
+		return Hash(tag)
+	end
+end
+
 ---------------------------------------------------------------------------
 -- Publishing my journal: stamps
 ---------------------------------------------------------------------------
@@ -739,8 +750,9 @@ local function Online(name)
 end
 
 -- Everyone with a journal: me (the character I play) first, then friends' characters (synced
--- journals; friends on older builds from the days they sent), by name. Each: { key, name, classFile,
--- level, me, online, last, days, profile, foe, zone, acct, account (their BattleTag's name) }.
+-- journals; friends on older builds from the days they sent: their account too when Beacon told
+-- it), by name. Each: { key, name, classFile, level, me, online, last, days, profile, foe, zone,
+-- acct, account (their BattleTag's name) }.
 function C.People()
 	local people, names = {}, {}
 	local me = C.Char()
@@ -776,8 +788,11 @@ function C.People()
 	end
 	for name, f in pairs(store.friendStats or {}) do
 		if not names[name] then
+			-- (their BattleTag, when Beacon knew it: C.Accounts counts these days for that person)
+			local acct = type(f.acct) == "string" and f.acct:match("^%x%x%x%x%x%x%x%x$") and IsFriend(f.acct) and f.acct or nil
 			friends[#friends + 1] = { key = "friend:" .. name, name = name, classFile = f.classFile, level = f.level,
-				online = Online(name), last = f.updated or 0, days = f.days or {}, legacy = true }
+				online = Online(name), last = f.updated or 0, days = f.days or {}, legacy = true, acct = acct,
+				account = acct and C.AccountLabel(acct) }
 		end
 	end
 	table.sort(friends, function(a, b) return (a.name or "") < (b.name or "") end)
@@ -788,7 +803,8 @@ function C.People()
 end
 
 -- The same, per Battle.net account: me (all my characters), then each friend's account (all their
--- characters), then friends on older builds (one character each, no account known). Activity adds
+-- characters, also those only known from the days they sent, when Beacon told their BattleTag), then
+-- friends on older builds whose BattleTag isn't known (one character each). Activity adds
 -- up over an account's characters (time, XP, quests, kills, deaths, distance, AFK, jumps: per
 -- character those mean little for a person); level is that of the character played most that day,
 -- gold the sum of every character's last known gold. Named after the character played most in the
@@ -900,10 +916,11 @@ function C.Accounts()
 			local key = person.acct and ("acct:" .. person.acct) or person.key
 			local account = byAccount[key]
 			if not account then
-				account = { key = key, chars = {}, account = person.account, acct = person.acct }
+				account = { key = key, chars = {}, acct = person.acct }
 				byAccount[key] = account
 				friends[#friends + 1] = account
 			end
+			account.account = account.account or person.account
 			account.chars[#account.chars + 1] = person
 		end
 	end

@@ -5266,6 +5266,7 @@ do
 		and annaStats.days["2030-05-15"].quests == 2 and not annaStats.days["2030-05-13"] and annaStats.classFile == "MAGE",
 		"and I keep theirs (malformed days are dropped)")
 	check(annaStats.days["2030-05-14"].afk == 2700 and not annaStats.days["2030-05-12"], "their AFK time joins the day")
+	check(annaStats.acct == CH.Hash("Annie#1234"), "with their BattleTag's hash (from Battle.net): the days are that person's")
 	annaStats.days["2030-05-14"].played = nil -- (to see it written again)
 	anna("D2;20300514;90;5000;3;20;1;1") -- the day again, later
 	Advance(0.15)
@@ -5447,7 +5448,7 @@ do
 	local function drawnContaining(text)
 		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return true end end
 	end
-	check(picker:GetText():find("Anna|r  |cffccccccLevel 20|r  |cff80c0ff(friend)", 1, true) and drawnText("Last 7 days")
+	check(picker:GetText():find("Anna|r  |cffccccccLevel 20|r  |cff80c0ff(Annie)", 1, true) and drawnText("Last 7 days")
 		and drawnText("You and Anna, last 7 days") and drawnText("2h 0m") and drawnContaining("Completed The Defias Brotherhood"),
 		"a friend's graphs: their days, their week, you and them, their latest news")
 	local annaDay = hoverWith(date("%Y-%m-%d", time() - 86400))
@@ -5688,6 +5689,18 @@ section("Chronicle: friends' journals, also when they're offline")
 	check(carlAccount and #carlAccount.chars == 2 and carlAccount.name == "Carl" and ad.played == 9000 and ad.jumps == 100
 		and ad.afk == 900 and ad.level == 18 and ad.gold == 115 and carlAccount.profile.quests == 140,
 		"per account: time, AFK and jumps add up over his characters; level from his main, gold summed")
+	-- Days of a character his journal doesn't have yet (they go to everyone online): still Carl, not
+	-- a second person.
+	CDB.friendStats.Carlnew = { classFile = "ROGUE", level = 5, updated = time(), acct = carl,
+		days = { [date("%Y-%m-%d", time() - 86400)] = { played = 600, xp = 10, quests = 0, kills = 1, deaths = 0, levels = 0 } } }
+	local carls, carlChars, loose = 0, 0, false
+	for _, a in ipairs(CH.Accounts()) do
+		if a.acct == carl then carls, carlChars = carls + 1, #a.chars end
+		loose = loose or a.key == "friend:Carlnew"
+	end
+	check(carls == 1 and carlChars == 3 and not loose, "days from an older build's message join his account (one person), got "
+		.. carls .. " accounts, " .. carlChars .. " characters")
+	CDB.friendStats.Carlnew = nil
 	local mine = CH.Accounts()[1]
 	check(mine.me and #mine.chars >= 2 and mine.name == "Lefthy", "me: all my characters, named after the one I play")
 	local function newsOf(name, k)
