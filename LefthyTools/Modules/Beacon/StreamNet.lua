@@ -44,6 +44,11 @@ local S = B.Stream
 --   O2;c;<id>;<creatureID>
 --                       a mob's creature ID (from its GUID), with its name: the watcher's window
 --                       shows its model (SetCreature)
+--   O2;a;<race ID>;<sex 1|2>;<item ID>,...
+--                       my look, to a watcher before my first frame and again when my gear changes
+--                       (looked at every LOOK_GAP seconds): race, sex and what I wear (StreamBattle's
+--                       LOOK_SLOTS, 0 for nothing). Their battle row shows me as my race wearing it
+--                       when their client doesn't have my character. Older builds ignore the word.
 --   O2;v;<percent>      my health (estimated, StreamSense.lua; in steps of 5, empty: not known or
 --                       not sharing) for every friend, not only watchers: their map tooltip, AFK
 --                       screen and flights show it. When it changes, at most every HEALTH_GAP
@@ -368,12 +373,25 @@ function B.StreamHealthHello()
 	return word ~= "" and Message("v", word) or nil
 end
 
+-- My look (O2;a): race, sex, item IDs; read again every LOOK_GAP seconds while someone watches.
+local LOOK_GAP = 10
+local lookText, lookAt = nil, -math.huge
+local function LookText(now)
+	if not lookText or now - lookAt >= LOOK_GAP then
+		lookAt = now
+		local look = S.OwnLook()
+		lookText = look.race and ("%d;%d;%s"):format(look.race, look.sex, table.concat(look.items, ",")) or ""
+	end
+	return lookText
+end
+
 -- After every look of the sensor: a frame for each watcher whose turn it is.
 S.OnSensed(function(picture)
 	if not next(watchers) or not Share() then
 		return
 	end
 	local now = GetTime()
+	local look = LookText(now)
 	local busy = picture.combat or picture.cast or #picture.mobs > 0
 	local gap = math.max(busy and FRAME_GAP or QUIET_GAP, Count(watchers) / FRAMES_PER_SECOND) -- (all watchers together: at most 4 a second)
 	local frame, ids
@@ -384,6 +402,10 @@ S.OnSensed(function(picture)
 			end
 			watcher.sentAt = now
 			local named = false
+			if look ~= "" and watcher.look ~= look then
+				watcher.look, named = look, true -- (first, or my gear changed)
+				B.Queue(id, Message("a", look))
+			end
 			for _, pair in ipairs(ids) do
 				local mobId, mob = pair[1], pair[2]
 				if watcher.names[mobId] ~= mob.key then
@@ -488,6 +510,24 @@ function B.ReceiveStream(senderID, word, rest)
 		if named then
 			named.creature = tonumber(creature) -- (right after its name: a name anew starts without one)
 		end
+	elseif word == "a" then
+		local race, sex, list = rest:match("^(%d%d?%d?);([12]);([%d,]*)$")
+		if not (watching[senderID] and race) then
+			return
+		end
+		local items = {}
+		for item in list:gmatch("%d+") do
+			if #items >= 20 or #item > 7 then
+				return
+			end
+			items[#items + 1] = tonumber(item)
+		end
+		local stream = streams[senderID]
+		if not stream then
+			stream = { names = {}, count = 0 }
+			streams[senderID] = stream
+		end
+		stream.look = { race = tonumber(race), sex = tonumber(sex), items = items }
 	end
 end
 
@@ -726,10 +766,12 @@ function S.ReadFriend(id, picture)
 	local peer = B.peers[id]
 	if peer then
 		picture.name, picture.classFile, picture.level, picture.version = peer.name, peer.classFile, peer.level, peer.version
+		picture.guid = peer.guid -- (the battle row: their own model when this client has their character)
 		local where = peer.subzone ~= "" and peer.subzone or peer.area
 		picture.where = where
 	end
 	local stream = streams[id]
+	picture.look = stream and stream.look
 	if not (stream and stream.payload) then
 		return false, nil
 	end

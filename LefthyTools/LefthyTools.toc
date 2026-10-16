@@ -53,6 +53,7 @@ Modules\Beacon\Chat.lua
 Modules\Beacon\Reports.lua
 Modules\Beacon\Stream.lua
 Modules\Beacon\StreamSense.lua
+Modules\Beacon\StreamBattle.lua
 Modules\Beacon\StreamView.lua
 Modules\Beacon\StreamNet.lua
 Modules\Beacon\StreamButton.lua

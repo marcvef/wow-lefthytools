@@ -798,6 +798,11 @@ local function MobMax(kind)
 	return ratio and ratio * expected or nil
 end
 
+-- What a kind of mob has at a level (the battle row's damage: a loss times this); nil: not known.
+function S.MobMaxOf(creature, level, class)
+	return MobMax({ creature, level, class or "normal" })
+end
+
 -- A mob died: if its whole fight was seen, its kind's ratio learns from what it lost.
 local function MobDied(key)
 	local kind, lost = mobKind[key], mobLost[key]

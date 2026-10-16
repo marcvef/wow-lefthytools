@@ -177,7 +177,12 @@ minimap, and you on theirs, without being in a group.
   to resize it. While friends watch you, a tiny red dot with their number sits right of the
   calendar button at the minimap. `/lefthy stream me` shows what they see; the game tells addons
   only how far a mob is, so the directions are learned as you move and turn (faint dots are still
-  unsure).
+  unsure). Under the map, **the battle row**: their model and the mobs they fight, and the fight
+  played on them, Pokémon style: they cast or step up and strike, the mob flinches and roughly
+  what it lost floats up; mobs lunge at them, their hits and heals float up from their model, the
+  dead fall. It's an approximation from what the game tells addons. A friend near you in your
+  group looks like themselves; one elsewhere is their race wearing their gear, glowing in their
+  class colour (the game can't give add-ons a stranger's face).
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see
   "Anna reached level 21!" in their own language.

@@ -3533,6 +3533,17 @@ do
 		for _, f in ipairs((w or LefthyToolsStreamFrame).Floats.list) do if f.on and f:IsShown() then n = n + 1 end end
 		return n
 	end
+	-- A number floating twice (each moment shows once, though it comes again).
+	local function twice(w)
+		local seen = {}
+		for _, f in ipairs((w or LefthyToolsStreamFrame).Floats.list) do
+			if f.on and f:IsShown() then
+				if seen[f:GetText()] then return true end
+				seen[f:GetText()] = true
+			end
+		end
+		return false
+	end
 
 	-- The preview: made-up mobs around a made-up friend.
 	math.randomseed(3) -- (the learning draws random places: the same ones every run)
@@ -3609,7 +3620,31 @@ do
 	Advance(3)
 	check(leader.tx * leader.tx + leader.ty * leader.ty < before and math.abs(leader.x - leader.tx) < 3,
 		"mobs move, and their dots glide after them")
-	check(floatWith("-24"), "the bandits hit her: the numbers float up")
+	Advance(0.8) -- (her Fireball lands first; then the bandit's hit, a turn later)
+	do
+		local dump = {}
+		for _, f in ipairs(win.Floats.list) do dump[#dump + 1] = tostring(f.on) .. ":" .. tostring(f:GetText()) .. "@" .. tostring(f.age) end
+		local b = S.View("me").battle or {}
+		local q = {}
+		for _, a in ipairs(b.queue or {}) do q[#q + 1] = a.kind end
+		check(floatWith("-24") and floatWith("-24").anchor == win.Foes.Hero, "the bandits hit her: the numbers float up from her model; floats "
+			.. table.concat(dump, " | ") .. " action " .. tostring(b.action and b.action.kind) .. " queue " .. table.concat(q, ","))
+	end
+	-- The battle row: her model on the left (the preview's made-up friend: your race's plain model
+	-- in your gear, lit in her class's colour), the mobs she fights on the right, the fight on them.
+	do
+		local row = win.Foes
+		local spirit, leaderSlot = row.Hero.Spirit, row.slots[1]
+		check(spirit:IsShown() and not row.Hero.Real:IsShown() and spirit._display == 56658 and spirit._light
+			and spirit._light.ambientColor and spirit._camScale == 1.4,
+			"her model: a race's plain model (yours: a human woman), lit in her class's colour, the camera a little further back")
+		check(spirit._anims and spirit._anims[51] and spirit._anims[53] and spirit._anims[9],
+			"she cast (a casting pose, then the cast at her target) and was hit (a flinch)")
+		check(leaderSlot.Model._anims and leaderSlot.Model._anims[9] and leaderSlot.Model._anims[16] and leaderSlot.Model._paused == false
+			and leaderSlot.Model._facing == -0.45, "her target flinched at her Fireball and struck back; the mobs move and face her")
+		local loss = floatWith("-13%")
+		check(loss and loss.anchor == leaderSlot, "what her Fireball took floats up from it: a percent (an elite's health isn't known)")
+	end
 	do
 		local slots = win.Foes.slots
 		check(slots[1]:IsShown() and slots[1].Model._creature == 448 and slots[1].Ring:IsShown() and slots[2].Model._creature == 116
@@ -3626,7 +3661,7 @@ do
 	end
 	check(leader.Target:IsShown() and leader.Name:GetText() == "Bandit leader 16", "her target: a white ring, named with its level")
 	check(win.Status:GetText():find("on Anna", 1, true) and win.Status:GetText():find("near", 1, true), "the bottom line: how many on her, how many near")
-	Advance(10.8) -- (12 s after the mobs moved: 1.2 of them went to the size check)
+	Advance(10) -- (12 s after the mobs moved: 1.2 of them went to the size check, 0.8 to her hit)
 	local bandit = dot("Bandit")
 	check(bandit and bandit.Skull:IsShown() and not bandit.Body:IsShown(), "a mob that dies: a skull ...")
 	check(floatWith("+87 XP") and win.Kills:GetText() == "1 kill", "her kill: its XP floats up, 1 kill")
@@ -3647,6 +3682,8 @@ do
 	gnoll = dot("Gnoll")
 	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3
 		and S.SenseRunning(), "/lefthy stream me: my own surroundings, live")
+	check(win.Foes.Hero.Real:IsShown() and win.Foes.Hero.Real._unit == "player" and not win.Foes.Hero.Spirit:IsShown(),
+		"in the battle row: me, my own model")
 	check(act.Name:GetText() == "" and not act.Icon:IsShown() and not act.Recent[1]:IsShown(), "not casting yet: the row is empty (the preview's spells are gone)")
 	-- The map moves with me, my arrow turns with me.
 	do
@@ -3906,13 +3943,14 @@ do
 		Fire("UNIT_COMBAT", "player", "WOUND", "", 30, 1)
 		Fire("UNIT_COMBAT", "player", "HEAL", "", 300, 2)
 		Fire("UNIT_COMBAT", "player", "DODGE", "", 0, 1)
-		Advance(0.6)
+		Advance(1.2) -- (played one after another: the hit, then the dodge)
 		local hurt, heal, dodge = floatWith("-82"), floatWith("+300"), floatWith("Dodge")
-		check(hurt and heal and dodge and floating() == 3 and hurt.x < 0 and heal.x > 0 and hurt.color[1] == 1 and heal.color[2] == 1,
-			"hit twice, healed, dodged: -82 on the left in red, +300 on the right in green, Dodge")
+		local hero = win.Foes.Hero
+		check(hurt and heal and dodge and floating() == 3 and hurt.anchor == hero and heal.anchor == hero and dodge.anchor == hero
+			and hurt.color[1] == 1 and heal.color[2] == 1, "hit twice, healed, dodged: -82 in red, +300 in green, Dodge, all from my model")
 		check(heal.textScale > 1 and hurt.textScale == 1, "the heal is big (a sixth of my health): bigger")
-		Advance(1)
-		check(floating() == 3, "shown once, though still in the picture")
+		Advance(0.5)
+		check(floating() > 0 and not twice(), "shown once, though still in the picture")
 		Advance(1.5)
 		check(floating() == 0, "gone after a moment")
 		local pillager = dot("Defias Pillager")
@@ -3922,8 +3960,8 @@ do
 		Fire("PLAYER_XP_UPDATE", "player")
 		Advance(0.6)
 		local xp = floatWith("+120 XP")
-		check(xp and math.abs(xp.x - pillager.x) < 8 and win.Kills:GetText() == "1 kill",
-			"my killing blow: +120 XP floats up from its dot, 1 kill at the top")
+		check(xp and (xp.anchor == win.Foes.Hero or xp.anchor.mob and xp.anchor.mob.name == "Defias Pillager") and win.Kills:GetText() == "1 kill",
+			"my killing blow: +120 XP floats up (from its model if it's in the row, else from mine), 1 kill at the top")
 		local chronicled = LefthyToolsChronicleDB.chars["Lefthy-Realmy"].stats -- (Chronicle counts loot too: not this test's)
 		local loot2 = chronicled.loot2
 		Fire("CHAT_MSG_LOOT", LOOT_ITEM_SELF:format(ItemLink(2589))) -- (Linen Cloth: not green)
@@ -3970,9 +4008,9 @@ do
 		wolf.combat, wolf.attacking, MOBS.target, STATE.target = true, true, wolf, true
 		Advance(0.6)
 		local slot = win.Foes.slots[1]
-		check(slot and slot:IsShown() and slot.Model._creature == 299 and slot.Model._zoom == 0 and slot.Model._facing == 0.45
+		check(slot and slot:IsShown() and slot.Model._creature == 299 and slot.Model._zoom == 0 and slot.Model._facing == -0.45
 			and slot.Ring:IsShown() and slot.real and slot.Bar._max == SECRET and slot.Bar._value == SECRET and not slot.Unknown:IsShown(),
-			"fought: its whole model (creature 299, turned a little), gold as my target, its real health (hidden, straight into the bar)")
+			"fought: its whole model (creature 299, turned towards me), gold as my target, its real health (hidden, straight into the bar)")
 		check(dot("Young Wolf").mob.health == 1, "not hit, not learned yet: a normal mob, taken as usual for its level (for friends)")
 		local busy = { name = "Busy Wolf", level = 3, class = "elite", guid = "Creature-0-1-0-1-300-0000000D", combat = true, yards = 12,
 			x = 0.45, y = 0.5 }
@@ -4051,13 +4089,7 @@ do
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
 	LefthyToolsStreamTestsFrame:Hide()
-	-- The model test: five models doing the same, notes kept (whatever this client lacks is noted, not an error).
-	lefthy("stream modeltest")
-	Advance(4.1)
-	check(LefthyToolsModelTest and LefthyToolsModelTest:IsShown() and LefthyToolsDB.modelTest and type(LefthyToolsDB.modelTest.errors) == "table"
-		and LefthyToolsModelTest.Anim:GetText():find("Ready1H", 1, true), "/lefthy stream modeltest: a window cycling animations, notes kept")
-	lefthy("stream modeltest")
-	check(not LefthyToolsModelTest:IsShown(), "again: closed")
+
 	pmark = #PRINTED + 1
 	lefthy("stream test")
 	Advance(2)
@@ -4136,13 +4168,14 @@ do
 	local herFrame = "O2;f;0;1429;260;750;90;c;M40;;133,10,25;116,3/122,6;v63,5w52,6H300,7am,8x120.1,9k1,10l2075.2/1,45,20,9,actes,133/2,180,30,4,cb"
 	anna(herFrame)
 	Advance(0.6)
-	local herXP, pillagerDot = floatWith("+120 XP", fwin), dot("Defias Pillager", 11)
-	check(floatWith("-52", fwin) and floatWith("+300", fwin).textScale > 1 and floatWith("Miss", fwin) and herXP
-		and math.abs(herXP.x - pillagerDot.x) < 0.01 and floatWith("Priest's Mace", fwin) and fwin.Kills:GetText() == "1 kill"
-		and used(11) == 2, "her hits, heals, a miss, XP from her mob's dot, loot, her kill: all float up")
 	anna(herFrame) -- (the next frame still carries them)
-	Advance(0.6)
-	check(floating(fwin) == 5 and fwin.Kills:GetText() == "1 kill", "each once, though they come again")
+	Advance(0.6) -- (played one after another: the hit, then the miss)
+	local herXP = floatWith("+120 XP", fwin)
+	check(floatWith("-52", fwin) and floatWith("+300", fwin).textScale > 1 and floatWith("Miss", fwin) and herXP
+		and (herXP.anchor == fwin.Foes.Hero or herXP.anchor.mob and herXP.anchor.mob.name == "Defias Pillager") and floatWith("Priest's Mace", fwin)
+		and fwin.Kills:GetText() == "1 kill" and used(11) == 2, "her hits, heals, a miss, XP from the mob it came from, loot, her kill: all float up")
+	check(not twice(fwin) and fwin.Kills:GetText() == "1 kill", "each once, though they came again")
+
 	fpill._scripts.OnEnter(fpill)
 	check(TOOLTIP.title == "Defias Pillager (16)" and tooltipHas("attacking Anna") and tooltipHas("Anna's target")
 		and tooltipHas("about 20 yd") and not tooltipHas("direction still unsure"), "hover: about her mob")
@@ -4156,6 +4189,14 @@ do
 	bob("O2;f;0;1429;260;750;0;;;;;;")
 	Advance(0.3)
 	check(#sentTo(12, mark, "O2;w;0") == 1, "frames from someone I don't watch (after my /reload, say): told once to stop")
+	-- Her model: no look from her yet, and her character not here: someone plain in her class's light;
+	-- in my group and near (her character loaded here): her own model.
+	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == 57899, "no look yet: someone plain, in her class's light")
+	PARTY.party1 = { name = "Anna", guid = "Player-1-11", visible = true }
+	Advance(0.6)
+	check(fwin.Foes.Hero.Real:IsShown() and fwin.Foes.Hero.Real._unit == "party1" and not fwin.Foes.Hero.Spirit:IsShown(),
+		"in my group and near: her own model")
+	PARTY.party1 = nil
 	-- The ones she fights: their models (creature IDs come with the names) and health (estimated
 	-- on her side; one she hasn't learned yet: "?").
 	anna("O2;n;3;12;Kobold Miner")
@@ -4215,13 +4256,22 @@ do
 		"my health, my foes' (the thug: as usual for its level, the pillager: its kind learned; neither hit), the hit I took, first "
 		.. "among the mobs, which older builds skip, got " .. fields[11])
 	check(#sentTo(11, mark, "O2;c;") == 1 and sentTo(11, mark, "O2;c;")[1]:find(";589$"), "the pillager's creature (for its model), once")
+	check(#sentTo(11, mark, "O2;a;") == 1 and sentTo(11, mark, "O2;a;")[1]:find("^O2;a;1;2;"), "my look (race, sex, gear), once: her battle row shows me")
 	check(LefthyToolsDB.streamMobHealth["589:16"] == nil and math.abs(LefthyToolsDB.streamMobHealth[589][1] - 800 / 427) < 0.001
 		and LefthyToolsDB.streamMobHealth[589][2] == 2, "learned the old way (a maximum per level): now its ratio, kills kept")
 	-- What I send is what she sees: my frames, fed back as hers.
 	for _, m in ipairs(names) do anna(m) end
 	for _, m in ipairs(sentTo(11, mark, "O2;c;")) do anna(m) end
+	for _, m in ipairs(sentTo(11, mark, "O2;a;")) do anna(m) end
 	anna(frames[#frames])
 	Advance(0.6)
+	do -- (her client doesn't have my character: my race wearing my gear, in my class's light)
+		local spirit = fwin.Foes.Hero.Spirit
+		local worn = 0
+		for _, item in pairs(EQUIPPED) do if item then worn = worn + 1 end end
+		check(spirit:IsShown() and spirit._display == 56658 and #(spirit._tried or {}) == worn and spirit._light,
+			"what she sees of me: a human woman in my gear (" .. worn .. " pieces), in my class's light")
+	end
 	local back = dot("Defias Pillager", 11)
 	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown()
 		and fwin.HealthText:GetText() == ("~%d%%"):format(math.floor(tonumber(vitals:match("^v(%d+)")) / 5 + 0.5) * 5)

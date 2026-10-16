@@ -13,9 +13,10 @@ local S = B.Stream
 -- ring and its name: their target; a purple glow while casting; a skull that fades when it dies;
 -- faint while its direction is still a guess), and under it what they're doing (the spell being
 -- cast with its bar, the last spells), their health (estimated: "~80%"), power and form at the
--- top, and a bottom line ("2 on you · 5 near · X casts Y"). What happens to them floats up over
--- the radar: hits (red, left of them), heals (green, right), a dodge or miss, XP from the mob that
--- died, loot (green and better); their kills since the window opened at the top right.
+-- top, and a bottom line ("2 on you · 5 near · X casts Y"). Under the spells the battle row
+-- (StreamBattle.lua): their model and the mobs they fight, the fight played on them; what happens
+-- to them floats up from their model there (hits, heals, a dodge, loot; XP from the mob that died);
+-- their kills since the window opened at the top right.
 --
 -- The map: the minimap's own terrain tiles (Data/MinimapTiles.lua: 256 px for 533.33 yd of the
 -- world's grid, the 3 x 3 around), else the world map's art of the zone (C_Map.GetMapArtLayers /
@@ -52,14 +53,8 @@ local HEALTH_COLOR = { 0.25, 0.8, 0.3 }
 local BAR = 120            -- the health and power bars' width
 local FLOATS = 10          -- floating numbers at once, per window
 local FLOAT_TIME = 1.6     -- seconds one floats
-local LOOT_TIME = 3.5
 local SEEN_FOR = 6         -- seconds a moment's number counts as shown (they come round: 1-99)
-local HURT_COLOR, HEAL_COLOR, AVOID_COLOR, XP_COLOR = { 1, 0.3, 0.25 }, { 0.35, 1, 0.4 }, { 0.9, 0.9, 0.9 }, { 0.75, 0.6, 1 }
-local FOES = 5             -- the mobs fought, in the row under the spells
-local FOE_W, FOE_H = 40, 50 -- a foe's model (the whole mob), px
-local FOE_GAP = ((WIDTH - 24) - FOES * (FOE_W + 2)) / (FOES - 1)
-local FOE_FACING = 0.45    -- turned a little (radians): not straight at you
-local BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
+
 local PREVIEW_FRIEND, PREVIEW_CLASS = "Anna", "MAGE"
 local Value, issecret = S.Value, S.issecret
 
@@ -599,18 +594,17 @@ end
 -- What happens to them: numbers floating up over the radar
 ---------------------------------------------------------------------------
 
-local function Number(n)
-	return BreakUpLargeNumbers and BreakUpLargeNumbers(n) or tostring(n)
-end
 
 -- The game's own word for a miss, dodge, ... (in its language).
 local function Word(token)
 	local word = _G[token]
 	return type(word) == "string" and word or token:sub(1, 1) .. token:sub(2):lower()
 end
+S.Word = Word
 
--- One floating text: from x, y (off the radar's middle) by dx, dy over its life, fading in and out.
-local function Float(view, text, x, y, dx, dy, color, scale, life)
+-- One floating text: from x, y (off its anchor's middle: a model in the battle row, else the radar's)
+-- by dx, dy over its life, fading in and out.
+local function Float(view, text, x, y, dx, dy, color, scale, life, anchor)
 	local list = view.win.Floats.list
 	local float
 	for _, f in ipairs(list) do
@@ -631,15 +625,16 @@ local function Float(view, text, x, y, dx, dy, color, scale, life)
 		end
 	end
 	float.on, float.age, float.life = true, 0, life or FLOAT_TIME
-	float.x, float.y, float.dx, float.dy = x, y, dx, dy
+	float.x, float.y, float.dx, float.dy, float.anchor = x, y, dx, dy, anchor or view.win.Radar
 	float:SetText(text)
 	float:SetTextColor(color[1], color[2], color[3])
 	float:SetTextScale(scale or 1)
 	float:SetAlpha(0)
 	float:ClearAllPoints()
-	float:SetPoint("CENTER", view.win.Radar, "CENTER", x, y)
+	float:SetPoint("CENTER", float.anchor, "CENTER", x, y)
 	float:Show()
 end
+S.Float = Float
 
 local function MoveFloats(view, elapsed)
 	for _, f in ipairs(view.win.Floats.list) do
@@ -651,7 +646,7 @@ local function MoveFloats(view, elapsed)
 				f:Hide()
 			else
 				f:ClearAllPoints()
-				f:SetPoint("CENTER", view.win.Radar, "CENTER", f.x + f.dx * p, f.y + f.dy * p)
+				f:SetPoint("CENTER", f.anchor or view.win.Radar, "CENTER", f.x + f.dx * p, f.y + f.dy * p)
 				f:SetAlpha(p < 0.1 and p * 10 or p > 0.65 and (1 - p) / 0.35 or 1)
 			end
 		end
@@ -682,35 +677,16 @@ local function LootText(m)
 	end
 	return (icon and ("|T%s:16:16|t "):format(icon) or "") .. (name or L["an item"]), color
 end
+S.LootText = LootText
 
--- A moment floats up: hits up and to the left of them, heals to the right, a dodge above; XP from
--- the mob that died (else from them); loot rising through them, a little longer. A kill counts.
+-- A moment: played in the battle row (StreamBattle.lua: a hit lands on their model, a heal or loot
+-- floats up from it, XP from the mob that died); a kill counts.
 local function Spawn(view, m)
-	local kind = m.kind
-	local lift = 0 -- (another of its kind just now: below it, so they don't cover each other)
-	if view.lastFloat[kind] and view.clock - view.lastFloat[kind] < 0.45 then
-		lift = -12
-	end
-	view.lastFloat[kind] = view.clock
-	if kind == "hurt" then
-		Float(view, "-" .. Number(m.amount), -14, 8 + lift, -8, 34, HURT_COLOR, m.big and 1.35 or 1)
-	elseif kind == "heal" then
-		Float(view, "+" .. Number(m.amount), 14, 8 + lift, 8, 34, HEAL_COLOR, m.big and 1.35 or 1)
-	elseif kind == "avoid" then
-		Float(view, Word(m.avoid), 0, 18 + lift, 0, 26, AVOID_COLOR, 0.85)
-	elseif kind == "xp" then
-		local dot = m.key and view.dotFor[m.key]
-		local x, y = 0, 16
-		if dot and dot.x then
-			x, y = dot.x, dot.y + 10
-		end
-		Float(view, L["+%d XP"]:format(m.amount), x, y + lift, 0, 26, XP_COLOR, 0.9)
-	elseif kind == "kill" then
+	if m.kind == "kill" then
 		view.kills = view.kills + 1
 		ShowKills(view)
-	elseif kind == "loot" then
-		local text, color = LootText(m)
-		Float(view, text, 0, -16 + lift, 0, 44, color, 0.9, LOOT_TIME)
+	else
+		S.BattleMoment(view, m)
 	end
 end
 
@@ -724,174 +700,6 @@ local function Happenings(view)
 			view.seen[m.seq] = view.clock
 			Spawn(view, m)
 		end
-	end
-end
-
----------------------------------------------------------------------------
--- The foes: the mobs fought, a still model and a health bar each
----------------------------------------------------------------------------
-
--- Your own window: the real health of a mob with a unit (hidden values go straight into the bar:
--- StatusBar takes them, AllowedWhenTainted). A friend's (or no unit): the estimate, 0-1.
-local function RealHealth(bar, unit)
-	bar:SetMinMaxValues(0, UnitHealthMax(unit))
-	bar:SetValue(UnitHealth(unit))
-end
-
-local function FoeOnEnter(slot)
-	local mob = slot.mob
-	if not mob then
-		return
-	end
-	GameTooltip:SetOwner(slot, "ANCHOR_BOTTOM")
-	GameTooltip:SetText(mob.level and ("%s (%s)"):format(mob.name, mob.level) or mob.name, 1, 1, 1)
-	local class = mob.class == "elite" and L["Elite"] or mob.class == "rare" and L["Rare"] or mob.class == "rareelite" and L["Rare elite"]
-	if class then
-		GameTooltip:AddLine(class, GOLD[1], GOLD[2], GOLD[3])
-	end
-	if not slot.real then
-		if mob.health then
-			GameTooltip:AddLine(L["~%d%% health"]:format(math.floor(mob.health * 100 + 0.5)), 1, 0.4, 0.3)
-			GameTooltip:AddLine(L["Estimated from the hits it took, against what its kind has: learned from kills, else what mobs of its level usually have."],
-				0.7, 0.7, 0.7, true)
-		else
-			GameTooltip:AddLine(L["Health not known yet: it's learned when one of its kind is seen from full health to dead."],
-				0.7, 0.7, 0.7, true)
-		end
-	end
-	GameTooltip:Show()
-end
-
--- Loaded: the camera fits the model to the frame as big as it is now, turned a little, still.
-local function FoeLoaded(model)
-	model:GetParent().loaded = true
-	model:RefreshCamera()
-	model:SetFacing(FOE_FACING)
-	model:SetPaused(true)
-end
-
--- A creature this client hasn't met yet loads nothing at first (in game: the first try gave no
--- model, the next one did, once the game had asked for it), and nothing tries again by itself: so
--- a slot asks again every FOE_RETRY seconds, FOE_TRIES times, and shows the mob's initials meanwhile.
-local FOE_RETRY, FOE_TRIES = 1, 5
-
-local function LoadFoe(slot, creature, again)
-	slot.loaded, slot.loadAt = false, GetTime()
-	slot.tries = again and (slot.tries or 0) + 1 or 0
-	slot.Model:ClearModel()
-	slot.Model:SetCreature(creature)
-	slot.Model:SetFacing(FOE_FACING)
-end
-
--- "DB" for Defias Bandit (the first letter of the first two words; a letter of several bytes whole).
-local function Initials(name)
-	local letters = {}
-	for word in (name or "?"):gmatch("%S+") do
-		letters[#letters + 1] = word:match("^[\1-\127\194-\244][\128-\191]*") or ""
-		if #letters == 2 then
-			break
-		end
-	end
-	return table.concat(letters):upper()
-end
-
-local function NewFoe(row)
-	local slot = CreateFrame("Frame", nil, row)
-	slot:SetSize(FOE_W + 2, FOE_H + 8)
-	slot.Ring = slot:CreateTexture(nil, "BACKGROUND", nil, -1) -- (gold: their target)
-	slot.Ring:SetPoint("TOPLEFT")
-	slot.Ring:SetSize(FOE_W + 2, FOE_H + 2)
-	slot.Ring:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.8)
-	slot.Back = slot:CreateTexture(nil, "BACKGROUND")
-	slot.Back:SetPoint("TOPLEFT", 1, -1)
-	slot.Back:SetSize(FOE_W, FOE_H)
-	slot.Back:SetColorTexture(0, 0, 0, 0.55)
-	slot.Model = CreateFrame("PlayerModel", nil, slot)
-	slot.Model:SetPoint("TOPLEFT", 1, -1)
-	slot.Model:SetSize(FOE_W, FOE_H)
-	slot.Model:SetPortraitZoom(0) -- (the whole mob, not its portrait)
-	slot.Model:SetScript("OnModelLoaded", FoeLoaded)
-	-- Until its model is there: a faint question mark and the mob's initials.
-	slot.Stand = slot:CreateTexture(nil, "ARTWORK")
-	slot.Stand:SetPoint("CENTER", slot.Back, "CENTER", 0, 0)
-	slot.Stand:SetSize(FOE_W - 8, FOE_W - 8)
-	slot.Stand:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-	slot.Stand:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-	slot.Stand:SetDesaturated(true)
-	slot.Stand:SetAlpha(0.3)
-	slot.Initials = slot:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	slot.Initials:SetPoint("CENTER", slot.Back, "CENTER", 0, 0)
-	slot.Initials:SetTextColor(1, 1, 1)
-	slot.BarBack = slot:CreateTexture(nil, "BORDER")
-	slot.BarBack:SetPoint("TOPLEFT", slot.Back, "BOTTOMLEFT", 0, -2)
-	slot.BarBack:SetSize(FOE_W, 4)
-	slot.BarBack:SetColorTexture(1, 1, 1, 0.15)
-	slot.Bar = CreateFrame("StatusBar", nil, slot)
-	slot.Bar:SetAllPoints(slot.BarBack)
-	slot.Bar:SetStatusBarTexture(BAR_TEXTURE)
-	slot.Bar:SetStatusBarColor(0.85, 0.2, 0.15)
-	slot.Unknown = slot:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	slot.Unknown:SetPoint("CENTER", slot.BarBack, "CENTER", 0, 0)
-	slot.Unknown:SetTextScale(0.7)
-	slot.Unknown:SetText("?")
-	slot:SetMouseMotionEnabled(true)
-	slot:SetMouseClickEnabled(false)
-	slot:SetScript("OnEnter", FoeOnEnter)
-	slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
-	slot:Hide()
-	return slot
-end
-
--- The row: the mobs fought (S.Foes: fighting them or their target; the target first, then the
--- ones attacking, the nearest), left to right. A model loads when its creature changes, and again
--- when the window's size does (a model's camera is set for the size it loaded at: smaller, it
--- showed nothing).
-local foeList = {}
-local function ShowFoes(view)
-	local row, picture = view.win.Foes, view.picture
-	local foes = S.Foes(picture.mobs, foeList, FOES)
-	local shown = 0
-	for _, mob in ipairs(foes) do
-		if mob.creature and shown < FOES then
-			shown = shown + 1
-			local slot = row.slots[shown] or NewFoe(row)
-			row.slots[shown] = slot
-			slot:ClearAllPoints()
-			slot:SetPoint("TOPLEFT", row, "TOPLEFT", (shown - 1) * (FOE_W + 2 + FOE_GAP), 0)
-			slot.mob = mob
-			local scale = slot:GetEffectiveScale()
-			if slot.creature ~= mob.creature or not slot.scale or math.abs(slot.scale - scale) > 0.001 then
-				slot.creature, slot.scale = mob.creature, scale
-				LoadFoe(slot, mob.creature)
-			end
-			if not slot.loaded then
-				local file = slot.Model.GetModelFileID and slot.Model:GetModelFileID()
-				if type(file) == "number" and file > 0 then
-					slot.loaded = true -- (OnModelLoaded may not have come)
-				elseif slot.tries < FOE_TRIES and GetTime() - slot.loadAt >= FOE_RETRY then
-					LoadFoe(slot, mob.creature, true)
-				end
-			end
-			slot.Stand:SetShown(not slot.loaded)
-			slot.Initials:SetShown(not slot.loaded)
-			slot.Initials:SetText(Initials(mob.name))
-			slot.Ring:SetShown(mob.target and true or false)
-			local unit = view.kind == "me" and mob.unit
-			slot.real = unit and Value("UnitGUID", unit) == mob.key and pcall(RealHealth, slot.Bar, unit) or false
-			if not slot.real and mob.health then
-				slot.Bar:SetMinMaxValues(0, 1)
-				slot.Bar:SetValue(mob.health)
-			elseif not slot.real then
-				slot.Bar:SetMinMaxValues(0, 1)
-				slot.Bar:SetValue(0)
-			end
-			slot.Unknown:SetShown(not slot.real and not mob.health)
-			slot:Show()
-		end
-	end
-	for i = shown + 1, #row.slots do
-		row.slots[i].mob = nil
-		row.slots[i]:Hide()
 	end
 end
 
@@ -973,14 +781,14 @@ local function FeedPreview(view)
 	leader.combat, leader.attacking, leader.target, leader.engaged = t > 2, t > 2, true, t > 2
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
 	leader.casting = (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
-	leader.health = math.max(0.1, 1 - math.max(0, t - 2) / 24)
+	leader.health = math.max(0.1, 1 - 0.13 * (t >= 2.5 and math.floor((t - 2.5) / 4) + 1 or 0)) -- (her Fireballs land)
 	mobs[#mobs + 1] = leader
 	if t < 18 then
 		local bandit = PreviewMob(2, "bandit", L["Bandit"], 15, "normal", 116)
 		bandit.dead = t >= 14
 		bandit.combat, bandit.attacking, bandit.engaged = not bandit.dead, not bandit.dead, not bandit.dead
 		bandit.yards, bandit.bearing = 5 + math.sin(t * 1.3), 0.35 + 0.15 * math.sin(t * 0.8)
-		bandit.health = bandit.dead and 0 or math.max(0.05, 1 - math.max(0, t - 2) / 12)
+		bandit.health = bandit.dead and 0 or math.max(0.05, 1 - 0.12 * math.floor(math.max(0, t - 2) / 1.5)) -- (Bob's hits)
 		mobs[#mobs + 1] = bandit
 	end
 	local mage = PreviewMob(3, "mage", L["Bandit mage"], 15, "normal", 474)
@@ -1009,7 +817,7 @@ local function FeedPreview(view)
 		local info = Value("C_Spell.GetSpellInfo", 133)
 		local cast = picture.castPreview or {}
 		picture.castPreview = cast
-		cast.name, cast.icon = info and info.name or L["Fireball"], info and info.iconID
+		cast.name, cast.icon, cast.spellID = info and info.name or L["Fireball"], info and info.iconID, 133
 		cast.start, cast.finish, cast.channel = now - cycle, now - cycle + 2.5, false
 		picture.cast = cast
 	else
@@ -1020,8 +828,20 @@ local function FeedPreview(view)
 			S.AddRecent(picture.recent, id, now - 8 + i)
 		end
 	end
-	for i, entry in ipairs(picture.recent) do
-		entry.at = now - (i - 1) * 2 -- (kept from fading away in the preview)
+	-- A Fireball that went off joins her last spells; a Fire Blast now and then (an instant).
+	local landed = t >= 2.5 and math.floor((t - 2.5) / 4) or -1
+	if landed ~= view.previewLanded then
+		if view.previewLanded and landed >= 0 then
+			S.AddRecent(picture.recent, 133, now)
+		end
+		view.previewLanded = landed
+	end
+	local blast = t >= 7 and math.floor((t - 7) / 8) or -1
+	if blast ~= view.previewBlast then
+		if view.previewBlast and blast >= 0 then
+			S.AddRecent(picture.recent, 2136, now)
+		end
+		view.previewBlast = blast
 	end
 end
 
@@ -1092,8 +912,8 @@ local function OnUpdate(win, elapsed)
 	if changed then
 		Apply(view)
 		ShowSelf(view)
-		Happenings(view) -- (after Apply: XP floats from its mob's dot)
-		ShowFoes(view)
+		S.BattleShow(view) -- (StreamBattle.lua: the row, and what happened since)
+		Happenings(view) -- (after the row: XP floats from its mob)
 		if view.kind == "friend" and view.stale then
 			win.Status:SetText(L["Waiting for %s's stream..."]:format(view.picture.name or "?"))
 			win.Live.Text:SetTextColor(0.6, 0.6, 0.6)
@@ -1119,6 +939,7 @@ local function OnUpdate(win, elapsed)
 		win.Me:SetRotation(facing)
 	end
 	ShowDoing(view, now)
+	S.BattleUpdate(view, elapsed)
 	MoveFloats(view, elapsed)
 	local k = math.min(1, elapsed * GLIDE)
 	local pulse = 0.5 + 0.5 * math.sin(view.clock * 5)
@@ -1376,11 +1197,9 @@ local function Build(view, name, parent)
 		act.Recent[i] = icon
 	end
 
-	-- The foes (ShowFoes): a still model and a health bar each, under the spells.
-	win.Foes = CreateFrame("Frame", nil, win)
-	win.Foes:SetSize(WIDTH - 24, FOE_H + 8)
-	win.Foes:SetPoint("TOP", act, "BOTTOM", 0, -6)
-	win.Foes.slots = {}
+	-- The battle row under the spells (StreamBattle.lua): their model, the mobs they fight.
+	S.BattleBuild(win, act)
+	win.Floats:SetFrameLevel(win.Foes:GetFrameLevel() + 30) -- (the numbers float over the models too)
 
 	win.Status = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	win.Status:SetPoint("BOTTOM", 0, 12)
@@ -1421,17 +1240,14 @@ end
 local function Start(view)
 	ReleaseAll(view)
 	ClearFloats(view)
-	for _, slot in ipairs(view.win.Foes.slots) do
-		slot.mob, slot.creature = nil, nil -- (loaded anew when shown)
-		slot:Hide()
-	end
+	S.BattleReset(view) -- (the models load anew when shown)
 	if view.picture ~= S.Sensed() then -- (the sensor's own picture: friends watching may be getting it)
 		wipe(view.picture.mobs)
 		wipe(view.picture.recent)
 		wipe(view.picture.moments)
 		view.picture.cast, view.picture.health = nil, nil
 	end
-	view.previewAt = nil
+	view.previewAt, view.previewLanded, view.previewBlast = nil, nil, nil
 	view.map.id, view.map.x, view.map.source = false, nil, nil
 	view.clock, view.nextFeed, view.open, view.looked = 0, 0, true, nil
 	view.win.Status:SetText("")

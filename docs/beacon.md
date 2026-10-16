@@ -506,16 +506,11 @@ watch <name>`, a click on their world map dot (`streamMapClick`), or a cinematic
 (`streamFlights`). Files:
 
 - `Stream.lua`: asking the game (`B.Stream` = `S`: `S.Api`, `S.Value`, range checks, `S.Bounds`,
-  `S.YardsFrom`), the test (`/lefthy stream test` / `results`), the model test (`/lefthy stream
-  modeltest`: for a battle row, five setups side by side cycling the same animations; notes in
-  `LefthyToolsDB.modelTest`. Round 1 in game: animations play on your unit's model and on a
-  ModelScene actor, which moves; a slid frame works as a lunge; the mob stayed black (not loaded on
-  the first try) and so did the race model (race 96, Windshaper Skyborne, wasn't in the table). Round
-  2: you zoomed out (a bear didn't fit), the mob and the race model + gear loaded like the foes
-  (camera reset once loaded, again until there), the same as a ModelScene actor, the plain race model
-  alone), the commands.
+  `S.YardsFrom`), the test (`/lefthy stream test` / `results`), the commands.
 - `StreamSense.lua`: the sensor, your own picture (`S.Sensed()`), looked at every 0.5 s while
   someone needs it (`S.SenseNeed("me" | "stream", on)`: your window, friends watching you).
+- `StreamBattle.lua`: the battle row under the spells (their model and the mobs they fight, the
+  fight played on them; below).
 - `StreamView.lua`: the windows (`S.OpenView("me" | "preview")`, `S.OpenFriend(id, origin)`,
   `S.CloseView`, `S.ToggleFriend`, `S.CloseFlightViews`).
 - `StreamNet.lua`: between friends (protocol below), the "being watched" dot, flights.
@@ -623,21 +618,21 @@ estimated: "~80%" beside it in steps of 5, the tooltip says how; none from build
 power (health not known: an empty bar and a grey "~?", the hover says why: not known yet, the
 maximum hidden there, or a friend's build too old to send it: older than 0.5.0-114 by
 `peer.version`), the form's icon, "LIVE" (a breathing red dot) or "DEMO", under it their kills since the
-window opened ("3 kills"). What happens to them floats up over the radar, above the dots, each
-moment once (its number, remembered 6 s): hits in red up and to the left of them, heals in green
-to the right (bigger when big), a miss or dodge in the game's own word above, XP in violet from
-the dot of the mob it came from (else from them), loot rising through them with its icon and name
-in its quality's colour (3.5 s; an item the client doesn't know yet is asked for and says "an
-item"). At most 10 at once; another of the same kind within 0.45 s starts lower. Under the radar: the spell being cast with its bar, the
+window opened ("3 kills"). What happens to them floats up from their model in the battle row
+(below), each moment once (its number, remembered 6 s): hits in red, heals in green (bigger when
+big), a miss or dodge in the game's own word, XP in violet from the mob it came from (else from
+them), loot rising through them with its icon and name in its quality's colour (3.5 s; an item the
+client doesn't know yet is asked for and says "an item"). At most 10 at once. Under the radar: the spell being cast with its bar, the
 last spells fading over 12 s. Bottom: "2 on Anna · 5 near · X casts Y"; a friend's stream with no
-frame for 6 s says "Waiting for Anna's stream...". Under the spells, **the foes**: up to five mobs
+frame for 6 s says "Waiting for Anna's stream...". Under the spells, **the battle row**
+(StreamBattle.lua; below). In it **the foes**: up to four mobs (more: "+2" at the right)
 fighting them or their target (`S.Foes`: not dead, not players; `mob.engaged`: they're on its
 threat list, `UnitThreatSituation("player", unit)` not nil, or it attacks them; flag `h`, and from
 builds before it "attacking"; a mob merely in combat may fight someone else and isn't shown; the
-target first, then the ones attacking, then the nearest), each the whole mob, still
-(`PlayerModel:SetCreature` with the creature ID from the GUID, portrait zoom 0, turned 0.45 rad,
-`RefreshCamera` and paused once loaded; 40 x 50 px; checked in game: a creature the client never
-saw loads too). A model's camera is set for the size it loaded at (smaller, the window showed an
+target first, then the ones attacking, then the nearest), each the whole mob
+(`PlayerModel:SetCreature` with the creature ID from the GUID, portrait zoom 0, turned -0.45 rad
+towards their model, `RefreshCamera` once loaded, moving: ready while it fights, lying once dead;
+38 x 50 px; checked in game: a creature the client never saw loads too). A model's camera is set for the size it loaded at (smaller, the window showed an
 empty box): it loads again when the slot's effective scale changes (the grip, the UI scale) and
 when the window opens. A creature this client hasn't met loads nothing at first (in game: the first
 `SetCreature` of an unseen creature gave no model, the next one did, once the game had asked for
@@ -647,7 +642,50 @@ mob's initials ("DB") meanwhile. A gold edge for the target, a health bar under 
 own window the bar is the real health: `UnitHealthMax` / `UnitHealth` of the mob's unit go
 straight into `StatusBar:SetMinMaxValues` / `SetValue`, which take hidden values (AllowedWhenTainted;
 the unit checked against the GUID first). In a friend's: their estimate; not known: "?" (the hover
-says how it's learned). Dots follow their mob and glide; a friend's map
+says how it's learned).
+
+**The battle row** (StreamBattle.lua; the user: a Pokémon-style fight, "your model does something
+and affects the enemy models", in the foes' row, the radar staying above; "doesn't need to be shown
+exact. just an approximation with the data available", and no more data for it but their look).
+Left their model (50 x 58 px), the foes right of it, the space between the stage. Played from what
+the picture already holds, one action after another like turns (about half a second each; at most
+4 waiting, an older one goes but its number still floats; one waiting over 2.5 s goes too):
+- **A cast**: a casting pose (animation 51) while the bar fills; one that went off (it ended within
+  0.4 s of its end, not channelled): harmful (`C_Spell.IsSpellHarmful`) at their target, the cast
+  (53) and its icon flying over; else a cast in place (54). An **instant** one (new in their last
+  spells, not the cast that just went off): harmful, a special attack (57) on the target, its icon
+  popping on it.
+- **Their target loses health** (the estimate, a drop of 0.4% or more): theirs. It joins their
+  spell or ability on the way (its number lands with it), else it's a swing: they step forward 16 px
+  and strike (17). The mob flinches (9) with a red flash, and what it lost floats up from it in gold:
+  the loss times what its kind has (`S.MobMaxOf`, StreamSense's maximum: the usual for its level
+  times its kind's learned ratio), a percent when that isn't known (an elite not learned yet). The
+  combat log is closed, so who hit isn't known: their target's loss is taken as theirs; **another
+  mob's** only flinches, its number smaller and grey.
+- **They're hit** (moment `w`/`W`): the mob attacking them (their target first) lunges 10 px and
+  strikes (16), they flinch (9; a big hit 10, harder flash), the red number floats up from them. A
+  dodge, parry or block (`a`): that move (30, 21, 24) and the word. A heal floats up green from them,
+  loot rises through them, XP from the mob it came from.
+- **Deaths**: a mob that dies falls (1), keeps its place 1.4 s lying (6), then fades over 1.2 s;
+  they die: they fall and lie until they're up. Standing: ready (26) in a fight, else stand (0),
+  casting (51) while they or a mob cast. Animation IDs from AnimationData (1.60.1.70425, checked by
+  their fallbacks: Attack2H falls back to Attack1H, then AttackUnarmed; CombatCritical to
+  CombatWound; SpellCastDirected to SpellCastOmni ...), all seen playing in game.
+
+**Their model**: yours is you (`DressUpModel:SetUnit("player")`); a friend whose character your
+client has (in your group, nearby: `UnitTokenFromGUID(peer.guid)` and `UnitIsVisible`) is them; a
+friend elsewhere is **their race's plain model wearing their gear** (`SetDisplayInfo` with the
+race's display, `ChrRaceXChrModel` -> `ChrModel.DisplayID` for every playable race of 1.60.1.70425,
+Skyborne included; `TryOn` of each item ID of their look, `O2;a`) under a light in their class
+colour (`SetLight`: ambient and diffuse in it). Found with a model test in game: a plain race model
+loads but comes out white (the game makes a character's skin from their appearance, which addons
+can't set) while gear tried on shows; so it's shown as meant, a spirit of them. No look yet (an
+older build): a plain human in their class's light. The preview's made-up friend is your race in
+your gear. The camera a little further back (`SetCamDistanceScale(1.4)`: a bear didn't fit),
+turned 0.75 rad towards the foes. Reloaded like the foes (when who it is or the window's size
+changes, retried while nothing's there).
+
+Dots follow their mob and glide; a friend's map
 glides between their frames. Drag to move; the grip at the bottom right resizes (0.35 to 1.3;
 kept per kind in `LefthyToolsDB.streamWindows`: `me`, `friend`). Yours (`LefthyToolsStreamFrame`,
 "me" or the preview, scale 0.8, right of the middle) lives in the interface and pauses a cinematic
@@ -687,6 +725,11 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   that id (ids 1-999 per GUID, reused after 60 s).
 - `O2;c;<id>;<creatureID>` a mob's creature ID (from its GUID), right after its name: the watcher's
   window shows its model. Builds before it ignore the word.
+- `O2;a;<race ID>;<sex 1|2>;<item ID>,...` my look, to a watcher before my first frame and again
+  when my gear changes (read every 10 s while someone watches): race, sex and the items in
+  `S.LOOK_SLOTS` (head, shoulders, shirt, chest, waist, legs, feet, wrists, hands, back, main hand,
+  off hand, ranged, tabard; 0 for nothing). Their battle row shows me as my race wearing them when
+  their client doesn't have my character. Builds before it ignore the word.
 - `O2;v;<percent>` my health, to every friend (see "Health" above).
 
 Spells go as IDs; the watcher's client names them in its own language. Guard: 80 `O` messages per

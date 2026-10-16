@@ -160,7 +160,14 @@ function FrameMethods:SetPropagateMouseMotion(p)
 end
 function FrameMethods:SetAllPoints(rel) self._points = { { "TOPLEFT", rel }, { "BOTTOMRIGHT", rel } } end
 -- PlayerModel
-function FrameMethods:SetUnit(unit) self._unit = unit end
+function FrameMethods:SetUnit(unit) self._unit, self._loads = unit, (self._loads or 0) + 1 end
+-- DressUpModel and animations (the stream's battle row): what was set, every animation played.
+function FrameMethods:SetDisplayInfo(id) self._display, self._loads = id, (self._loads or 0) + 1 end
+function FrameMethods:TryOn(link) self._tried = self._tried or {}; self._tried[#self._tried + 1] = link end
+function FrameMethods:SetAutoDress(on) self._autoDress = on end
+function FrameMethods:SetLight(on, light) self._light = on and light or nil end
+function FrameMethods:SetCamDistanceScale(s) self._camScale = s end
+function FrameMethods:SetAnimation(a) self._anim = a; self._anims = self._anims or {}; self._anims[a] = true end
 function FrameMethods:SetFacing(f) self._facing = f end
 -- MODEL_UNKNOWN[creature] = n: a creature this client hasn't met; its first n loads give no model.
 MODEL_UNKNOWN = {}
@@ -169,8 +176,12 @@ function FrameMethods:SetCreature(id)
 	self._failed = (MODEL_UNKNOWN[id] or 0) > 0
 	if self._failed then MODEL_UNKNOWN[id] = MODEL_UNKNOWN[id] - 1 end
 end
-function FrameMethods:GetModelFileID() if self._creature and not self._failed then return 100000 + self._creature end end
-function FrameMethods:ClearModel() self._creature = nil end
+function FrameMethods:GetModelFileID()
+	if self._creature and not self._failed then return 100000 + self._creature end
+	if self._unit then return 300000 end
+	if self._display then return 400000 + self._display end
+end
+function FrameMethods:ClearModel() self._creature, self._unit, self._display, self._tried, self._light = nil, nil, nil, nil, nil end
 function FrameMethods:SetPortraitZoom(z) self._zoom = z end
 function FrameMethods:SetPaused(p) self._paused = p end
 function FrameMethods:RefreshCamera() self._cameraRefreshed = (self._cameraRefreshed or 0) + 1 end
@@ -500,6 +511,7 @@ ZONE = "Elwynn Forest"
 function GetZoneText() return ZONE end
 function GetRealZoneText() return INSTANCE and INSTANCE.name or ZONE end -- (inside an instance: its name, like the game)
 function UnitRace(unit) if unit == "player" then return "Human", "Human", 1 end end
+function UnitSex(unit) if unit == "player" then return 3 end end -- (female)
 function UnitFactionGroup(unit) if unit == "player" then return "Alliance", "Alliance" end end
 -- Stats: [index] = { base, effective } (Strength, Agility, Stamina, Intellect, Spirit); SECRET for a secret value.
 -- Like the client: the value with gear and buffs twice, then the plus and minus parts (base = value - plus - minus).
@@ -671,6 +683,7 @@ ITEMS[19019].bind, ITEMS[1155].bind = 1, 2 -- Thunderfury binds on pickup, the r
 MOCK_FOCUS, EQUIPPED, BOUND, BAG_TOOLTIP = nil, {}, {}, {}
 function GetMouseFoci() return { MOCK_FOCUS } end
 function GetInventoryItemLink(unit, slot) return unit == "player" and EQUIPPED[slot] and ItemLink(EQUIPPED[slot]) or nil end
+function GetInventoryItemID(unit, slot) return unit == "player" and EQUIPPED[slot] or nil end
 -- Item locations (bag and slot, or an equipment slot), bound state and instance GUIDs per slot.
 ITEM_GUIDS = {} -- [bag .. ":" .. slot] = guid; default "Item-<bag>-<slot>"
 local locationMethods = {
@@ -1101,6 +1114,13 @@ function UnitGUID(unit)
 	if unit == "target" then return STATE.target and (STATE.targetGUID or "Creature-0-1") or nil end
 	return PARTY[unit] and PARTY[unit].guid
 end
+function CreateVector3D(x, y, z) return { x = x, y = y, z = z } end
+-- A group member's unit from their GUID; UnitIsVisible: PARTY[unit].visible (their character loaded here).
+function UnitTokenFromGUID(guid)
+	for unit, p in pairs(PARTY) do if p.guid == guid then return unit end end
+	if guid == "Player-1-0" then return "player" end
+end
+function UnitIsVisible(unit) return unit == "player" or (PARTY[unit] and PARTY[unit].visible == true) or false end
 function CreateVector2D(x, y)
 	return { x = x, y = y, GetXY = function(self) return self.x, self.y end,
 		SetXY = function(self, nx, ny) self.x, self.y = nx, ny end }
@@ -1740,7 +1760,8 @@ C_Spell.GetSpellInfo = function(id)
 	info.minRange, info.maxRange = 0, SPELL_RANGES[id] or 0
 	return info
 end
-C_Spell.IsSpellHarmful = function(id) return SPELL_RANGES[id] ~= nil end
+HARMFUL = { [133] = true, [2136] = true, [116] = true } -- (Fireball, Fire Blast, Frostbolt: not in the spellbook)
+C_Spell.IsSpellHarmful = function(id) return SPELL_RANGES[id] ~= nil or HARMFUL[id] == true end
 C_Spell.IsSpellInRange = function(id, u)
 	local mob = MOBS[u]
 	if not (mob and MobYards(mob) and SPELL_RANGES[id]) then return nil end
