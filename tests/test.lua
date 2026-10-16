@@ -6599,6 +6599,9 @@ section("Bestiary: what mobs drop")
 	setting("dropData"):SetValue(false)
 	setting("dropData"):SetValue(true) -- (a setting changed: loading it is tried again)
 	check(#loads == 1 and loads[1] == "LefthyTools_DropData", "switched on: the database add-on is loaded, once")
+	check(LefthyToolsDB.settings.bestiary.windowUnseen == false and not win.KnownLabel:IsShown()
+		and not (win.knownCells[1] and win.knownCells[1]:IsShown()), "the window: not seen yet is off by default (only your drops)")
+	setting("windowUnseen"):SetValue(true)
 	-- Your drops: the database's chance beside yours, or that it doesn't list it.
 	local function cellOf(list, id) for _, c in ipairs(list) do if c:IsShown() and c.drop and c.drop.id == id then return c end end end
 	local linen = cellOf(win.cells, 2589)
@@ -6683,6 +6686,7 @@ section("Bestiary: what mobs drop")
 	setting("dropData"):SetValue(true)
 	check(#loads == 1, "loaded once only")
 	MOBS.target, KNOWN_SPELLS[8613] = nil, nil
+	setting("windowUnseen"):SetValue(false)
 	-- Closed and open again: kept for next time.
 	win.Close:Click()
 	check(not win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == false and not button.Open:IsShown(), "the X closes it, kept")

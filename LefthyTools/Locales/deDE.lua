@@ -857,3 +857,6 @@ L["%d/%d found"] = "%d/%d gefunden"
 L["Classic database: %s to %s each"] = "Classic-Datenbank: %s bis %s pro Kill"
 L["%d of its %d drops found"] = "%d seiner %d Drops gefunden"
 L["Not seen yet (%d), classic database"] = "Noch nicht gesehen (%d), Classic-Datenbank"
+L["Not seen yet in the window"] = "Noch nicht Gesehenes im Fenster"
+L["Under your target's drops in the window, what the drop database says it drops that you haven't had yet, faded (a mob you haven't killed: what it can drop). The ledger always shows it."] =
+	"Unter den Drops deines Ziels im Fenster, verblasst, was er laut Drop-Datenbank droppt und du noch nicht hattest (bei einem Mob, den du noch nicht getötet hast: was er droppen kann). Das Verzeichnis zeigt es immer."

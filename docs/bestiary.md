@@ -135,7 +135,8 @@ flights.
   Hover: the item's tooltip (`SetHyperlink`) plus "Dropped in 9 of 34 kills: 26%" and, for stacks,
   "12 in all, 1.3 each time". Shift-click links it (`HandleModifiedItemClick`). More than fit: the
   last place says "+N", its tooltip lists the rest with their chances.
-- **Not seen yet** (the drop database): under your drops a heading "Not seen yet" with a thin rule
+- **Not seen yet** (the drop database; setting `windowUnseen`, off: the user wanted the window
+  without it, the ledger always has it): under your drops a heading "Not seen yet" with a thin rule
   and "6 of 11 found" on the right, then the database's drops you haven't had, 22 px, 7 per row, at
   most 2 rows ("+N" for the rest, its tooltip greyed). A mob you haven't killed: "What it can
   drop", "classic database". All found: a tick and "All 11 drops of the classic database found."
@@ -196,7 +197,8 @@ window is open; click toggles the window, Shift-click switches the card beside t
 line says which), Ctrl-click opens or closes the ledger, right-click opens the settings; its tooltip
 says how many kinds and kills are known and all of that. Settings: open the window, open the
 ledger, minimap button (on), drops beside the mouse (off), drop chances in item tooltips (on), grey
-items (on), compare with a drop database (on). `/bestiary` (`open`, `ledger [search]`, `log`,
+items (on), compare with a drop database (on), not seen yet in the window (off). `/bestiary`
+(`open`, `ledger [search]`, `log`,
 `data`, `minimap`, `settings`).
 
 ## Cost

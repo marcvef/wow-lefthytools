@@ -333,11 +333,11 @@ with the chance and how many kills that's from; a pelt marks skinning.
 **Compared with a drop database.** Beside your own numbers, the Bestiary shows what a classic
 world database ([CMaNGOS Classic DB](https://github.com/cmangos/classic-db)) says a mob drops. It
 comes as an add-on of its own, `LefthyTools_DropData`, and loads only when first needed. Each of
-your drops shows the database's chance next to yours, or that it doesn't list it. What you haven't
-had yet sits under your drops, smaller and faded, with how many of its drops you've found. Hovering
-one shows how many you'd have expected in your kills by now. A mob you haven't killed shows what it
-can drop, in the window and on the (still small) card beside the mouse. The ledger shows how much
-of each mob's loot you've found, and a *Not seen yet* section for the mob you pick. Quest items
+your drops shows the database's chance next to yours, or that it doesn't list it. The ledger shows
+how much of each mob's loot you've found, and a *Not seen yet* section for the mob you pick: what
+you haven't had yet, faded; hovering one shows how many you'd have expected in your kills by now.
+The window can show that too, under your drops (a setting, off). A mob you haven't killed shows
+what it can drop on the (still small) card beside the mouse. Quest items
 (they drop only while you're on the quest) are marked with a `!`. WoW: Forever is classic content
 but may differ, so your own numbers are never mixed with the database's. `/bestiary data` says
 whether the database is there.
@@ -353,6 +353,7 @@ made of your last loot windows (to see why something wasn't counted).
 | Drop chances in item tooltips | on |
 | Grey items | on |
 | Compare with a drop database | on |
+| Not seen yet in the window (the database's drops you haven't had, under yours) | off |
 
 ---
 

@@ -16,10 +16,11 @@ local M = Bt.module
 -- its likeliest drops, small, following the mouse while it's over it.
 --
 -- The classic drop database (Bestiary.lua, setting dropData) beside your numbers: each drop's
--- tooltip has its chance there; what it says the mob drops that you haven't had yet is a section
--- of its own under your drops, smaller and faded (grey icons, how many of its drops you've found),
--- each with the item's tooltip, the database's chance and how many you'd have expected by now. For
--- a mob you haven't killed it's what it can drop, in the window and on the card.
+-- tooltip has its chance there. With the setting windowUnseen (off: the user wanted the window
+-- without it), what it says the mob drops that you haven't had yet is a section of its own under
+-- your drops, smaller and faded (grey icons, how many of its drops you've found), each with the
+-- item's tooltip, the database's chance and how many you'd have expected by now; for a mob you
+-- haven't killed, what it can drop. The card shows that too for a mob you haven't killed.
 
 local WIDTH = 236
 local PAD = 10
@@ -584,8 +585,11 @@ local function Draw()
 	local rows = Lay(win.Grid, win.cells, drops, mob and mob.kills or 0, ICON, GAP, PER_ROW, PER_ROW * ROWS, true)
 	local height = HEADER + rows * (CELL_H + 4)
 	-- What the classic database says it drops that you haven't had yet (for a mob you haven't
-	-- killed: what it can drop).
-	local unseen, found, total = Bt.Compare(shown, mob, M.db.showPoor)
+	-- killed: what it can drop), when that's switched on for the window.
+	local unseen, found, total
+	if M.db.windowUnseen then
+		unseen, found, total = Bt.Compare(shown, mob, M.db.showPoor)
+	end
 	local tried = mob and (mob.kills > 0 or (mob.skinned or 0) > 0)
 	local known = unseen ~= nil and #unseen > 0
 	if known then
