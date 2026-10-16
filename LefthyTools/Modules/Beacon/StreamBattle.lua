@@ -328,8 +328,10 @@ local function HeroLoaded(model)
 	Call(model, "SetCamDistanceScale", hero.inForm and FORM_ZOOM or HERO_ZOOM)
 	Call(model, "SetFacing", HERO_FACING)
 	if model == hero.Spirit and hero.look and not hero.inForm then
-		-- Undressed first: the model dresses itself in your own gear (in game the cloak came back though
-		-- it wasn't tried on), then their look, the cloak taken off again.
+		-- Undressed first: the model may dress itself in your own gear (in game the cloak came back
+		-- though it wasn't tried on), then their look, the cloak taken off again, and again a moment
+		-- later (in case the game dresses it after loading).
+		Call(model, "SetAutoDress", false)
 		Call(model, "Undress")
 		for i, item in ipairs(hero.look.items or {}) do
 			if item > 0 and S.LOOK_SLOTS[i] ~= NO_CLOAK then
@@ -338,6 +340,14 @@ local function HeroLoaded(model)
 		end
 		Call(model, "UndressSlot", NO_CLOAK)
 		Tint(model, hero.color)
+		local who = hero.who
+		for _, later in ipairs({ 0.5, 1.5 }) do
+			C_Timer.After(later, function()
+				if hero.who == who and hero.model == model then
+					Call(model, "UndressSlot", NO_CLOAK)
+				end
+			end)
+		end
 	end
 	Call(model, "SetSheathed", hero.sheathed ~= false)
 	model.current = nil
