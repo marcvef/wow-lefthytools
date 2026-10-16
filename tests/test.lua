@@ -3630,18 +3630,16 @@ do
 		check(floatWith("-24") and floatWith("-24").anchor == win.Foes.Hero, "the bandits hit her: the numbers float up from her model; floats "
 			.. table.concat(dump, " | ") .. " action " .. tostring(b.action and b.action.kind) .. " queue " .. table.concat(q, ","))
 	end
-	-- The battle row: her model on the left (the preview's made-up friend: your race's plain model
-	-- in your gear, lit in her class's colour), the mobs she fights on the right, the fight on them.
+	-- The battle row: on the left the preview's made-up friend, out of reach (her character isn't on
+	-- this client): her class's emblem in a ring of its colour; the mobs she fights on the right, the
+	-- fight played on them.
 	do
 		local row = win.Foes
-		local spirit, leaderSlot = row.Hero.Spirit, row.slots[1]
-		check(spirit:IsShown() and not row.Hero.Real:IsShown() and spirit._display == ns.CLASS_FIGURES.MAGE[1][2] and not spirit._light
-			and spirit._camScale == 1.05 and row.Hero.Away:IsShown() and row.Hero.Away:GetText() == "out of reach",
-			"her model: a figure of her class of your race and sex (a human woman who trains mages), the camera just a little back, "
+		local hero, leaderSlot = row.Hero, row.slots[1]
+		check(hero.Emblem:IsShown() and (hero.Emblem.atlas or hero.Emblem.path) and hero.Ring:IsShown() and hero.Ring.vertex[3] > 0.9
+			and hero.Ring.vertex[1] < 0.3 and not hero.Real:IsShown() and not hero.Shifted:IsShown() and hero.Away:IsShown()
+			and hero.Away:GetText() == "out of reach", "her model, out of reach: her class's emblem in a ring of its colour (a mage's, light blue), "
 			.. "'out of reach' under it")
-		check(spirit._anims and spirit._anims[51] and spirit._anims[53] and spirit._anims[9],
-			"she cast (a casting pose, then the cast at her target) and was hit (a flinch)")
-		check(spirit._sheathed == true, "a mage: her weapon stays sheathed")
 		check(leaderSlot.Model._anims and leaderSlot.Model._anims[9] and leaderSlot.Model._anims[16] and leaderSlot.Model._paused == false
 			and leaderSlot.Model._facing == -0.45, "her target flinched at her Fireball and struck back; the mobs move and face her")
 		local loss = floatWith("-13%")
@@ -3669,11 +3667,7 @@ do
 	check(floatWith("+87 XP") and win.Kills:GetText() == "1 kill", "her kill: its XP floats up, 1 kill")
 	Advance(2.5)
 	check(bandit:GetAlpha() < 0.5, "... that fades")
-	SHAPESHIFT_SPELL = 768 -- (in Cat Form: the preview's made-up friend takes my form)
-	lefthy("stream preview")
-	Advance(0.6)
-	check(win.Foes.Hero.Spirit._display == 892 and win.Foes.Hero.Spirit._camScale == 1.4, "the preview, me in Cat Form: a cat, a little further back")
-	SHAPESHIFT_SPELL = nil
+
 	win.Close:Click()
 	check(not win:IsShown() and used() == 0, "the X closes it, its dots let go")
 
@@ -3690,7 +3684,7 @@ do
 	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3
 		and S.SenseRunning(), "/lefthy stream me: my own surroundings, live")
 	check(win.Foes.Hero.Real:IsShown() and win.Foes.Hero.Real._unit == "player" and win.Foes.Hero.Real._nativeForm == false
-		and not win.Foes.Hero.Spirit:IsShown(), "in the battle row: me, my own model (in the form I'm in, not my native one)")
+		and not win.Foes.Hero.Emblem:IsShown(), "in the battle row: me, my own model (in the form I'm in, not my native one)")
 	SHAPESHIFT_SPELL = 768
 	Fire("UPDATE_SHAPESHIFT_FORM")
 	Advance(1.1)
@@ -4107,10 +4101,7 @@ do
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
 	LefthyToolsStreamTestsFrame:Hide()
-	lefthy("stream looktest") -- (a probe: whatever this client lacks is noted, not an error)
-	Advance(3.1)
-	check(LefthyToolsLookTest and LefthyToolsLookTest:IsShown() and LefthyToolsDB.lookTest, "/lefthy stream looktest: four boxes, notes kept")
-	LefthyToolsLookTest:Hide()
+
 
 	pmark = #PRINTED + 1
 	lefthy("stream test")
@@ -4211,30 +4202,26 @@ do
 	bob("O2;f;0;1429;260;750;0;;;;;;")
 	Advance(0.3)
 	check(#sentTo(12, mark, "O2;w;0") == 1, "frames from someone I don't watch (after my /reload, say): told once to stop")
-	-- Her model: no look from her yet, and her character not here: someone plain in her class's light;
-	-- in my group and near (her character loaded here): her own model.
-	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == ns.CLASS_FIGURES.MAGE[1][1],
-		"no look yet (race and sex not known): a figure of her class, a man")
+	-- Her model: her character isn't on my client: her class's emblem; in my group and near (her
+	-- character loaded here): her own model, also in Cat Form; away again: the emblem (in a form too).
+	check(fwin.Foes.Hero.Emblem:IsShown() and fwin.Foes.Hero.Away:IsShown() and not fwin.Foes.Hero.Real:IsShown(),
+		"out of reach: her class's emblem")
 	PARTY.party1 = { name = "Anna", guid = "Player-1-11", visible = true }
 	Advance(0.6)
-	check(fwin.Foes.Hero.Real:IsShown() and fwin.Foes.Hero.Real._unit == "party1" and not fwin.Foes.Hero.Spirit:IsShown(),
+	check(fwin.Foes.Hero.Real:IsShown() and fwin.Foes.Hero.Real._unit == "party1" and not fwin.Foes.Hero.Emblem:IsShown(),
 		"in my group and near: her own model")
-	PARTY.party1 = nil
 	anna((herFrame:gsub(";M40;;", ";M40;768;"))) -- (in Cat Form)
-	Advance(0.6)
-	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == 892 and not fwin.Foes.Hero.Spirit._light
-		and not fwin.Foes.Hero.Spirit._tried, "far away in Cat Form: a cat (the form's own model: no gear, no light)")
-	PARTY.party1 = { name = "Anna", guid = "Player-1-11", visible = true }
 	Advance(1.1) -- (loaded, then its camera set on the next picture)
 	check(fwin.Foes.Hero.Shifted:IsShown() and fwin.Foes.Hero.Shifted._unit == "party1" and not fwin.Foes.Hero.Real:IsShown()
 		and fwin.Foes.Hero.Shifted._camScale == 1.4 and not fwin.Foes.Hero.Away:IsShown(),
 		"near and in Cat Form: her own model as she is (a PlayerModel shows the form), a little further back")
 	PARTY.party1 = nil
-	anna("O2;a;1;2;1001,0,0,1002") -- (her look, with a gear list as dev builds sent it: ignored)
+	Advance(0.6)
+	check(fwin.Foes.Hero.Emblem:IsShown() and not fwin.Foes.Hero.Shifted:IsShown(), "away again, in Cat Form too: the emblem")
+	anna("O2;a;1;2;1001,0,0,1002") -- (a look, as dev builds sent it: ignored)
 	anna(herFrame) -- (out of the form)
 	Advance(0.6)
-	check(fwin.Foes.Hero.Spirit._display == ns.CLASS_FIGURES.MAGE[1][2] and not fwin.Foes.Hero.Spirit._tried and fwin.Foes.Hero.Away:IsShown(),
-		"her look (a human woman): a woman of her race who trains mages, 'out of reach'")
+	check(fwin.Foes.Hero.Emblem:IsShown() and fwin.Foes.Hero.Away:IsShown(), "a look from a dev build: ignored, the emblem")
 	-- The ones she fights: their models (creature IDs come with the names) and health (estimated
 	-- on her side; one she hasn't learned yet: "?").
 	anna("O2;n;3;12;Kobold Miner")
@@ -4279,7 +4266,7 @@ do
 		-- Skinning (a cast): she kneels; nothing is cast at anyone when it's done.
 		anna("O2;f;0;1429;260;750;90;;M40;;8613,5,30;;v80")
 		Advance(0.6)
-		check(fwin.Foes.Hero.Spirit._anim == 50, "skinning: she kneels (the loot animation), not a cast")
+		check(b.cast and b.cast.gather, "skinning: a kneel (the loot animation), not a cast")
 		anna("O2;f;0;1429;260;750;90;;M40;;;;v80")
 		Advance(0.6)
 		check(not (b.action and b.action.kind == "release") and #b.queue == 0, "done: no cast at anyone")
@@ -4317,17 +4304,16 @@ do
 		"my health, my foes' (the thug: as usual for its level, the pillager: its kind learned; neither hit), the hit I took, first "
 		.. "among the mobs, which older builds skip, got " .. fields[11])
 	check(#sentTo(11, mark, "O2;c;") == 1 and sentTo(11, mark, "O2;c;")[1]:find(";589$"), "the pillager's creature (for its model), once")
-	check(#sentTo(11, mark, "O2;a;") == 1 and sentTo(11, mark, "O2;a;")[1]:find("^O2;a;1;2;"), "my look (race, sex, gear), once: her battle row shows me")
+
 	check(LefthyToolsDB.streamMobHealth["589:16"] == nil and math.abs(LefthyToolsDB.streamMobHealth[589][1] - 800 / 427) < 0.001
 		and LefthyToolsDB.streamMobHealth[589][2] == 2, "learned the old way (a maximum per level): now its ratio, kills kept")
 	-- What I send is what she sees: my frames, fed back as hers.
 	for _, m in ipairs(names) do anna(m) end
 	for _, m in ipairs(sentTo(11, mark, "O2;c;")) do anna(m) end
-	for _, m in ipairs(sentTo(11, mark, "O2;a;")) do anna(m) end
+
 	anna(frames[#frames])
 	Advance(0.6)
-	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == ns.CLASS_FIGURES.MAGE[1][2],
-		"what she sees of me (her client doesn't have my character): a figure of the class, of my race and sex")
+	check(fwin.Foes.Hero.Emblem:IsShown(), "what she sees of me (her client doesn't have my character): the class's emblem")
 	local back = dot("Defias Pillager", 11)
 	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown()
 		and fwin.HealthText:GetText() == ("~%d%%"):format(math.floor(tonumber(vitals:match("^v(%d+)")) / 5 + 0.5) * 5)

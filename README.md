@@ -181,8 +181,8 @@ minimap, and you on theirs, without being in a group.
   played on them, Pokémon style: they cast or step up and strike, the mob flinches and roughly
   what it lost floats up; mobs lunge at them, their hits and heals float up from their model, the
   dead fall. It's an approximation from what the game tells addons. A friend near you in your
-  group looks like themselves; one elsewhere is a figure of their class, of their race and sex
-  where there is one (the game shows no player as they look from afar), "out of reach" under it.
+  group looks like themselves; one elsewhere is their class's emblem, "out of reach" under it (the
+  game shows no player as they look from afar).
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see
   "Anna reached level 21!" in their own language.

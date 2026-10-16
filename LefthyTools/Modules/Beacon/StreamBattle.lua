@@ -24,17 +24,15 @@ local S = B.Stream
 -- waiting, an older one goes (its number still floats), so it stays close to live.
 --
 -- Their model: you are you (SetUnit, in the form you're in: cat, bear, ...); a friend whose
--- character your client has (in your group, nearby) is them; a friend elsewhere in a form is that
--- form's own model (a cat, a bear, a ghost wolf: textured, the tauren ones for tauren); out of one,
--- a figure of their class (Data/ClassFigures.lua: an NPC who trains it, of their race and sex when
--- there is one; O2;a, their look, says race and sex): the game shows nobody as they look from afar
--- (a plain race model came out white, in its own default outfit, gear tried on didn't show; seen in
--- game), and "out of reach" under it says so. The preview's made-up friend is that too, of your race
--- and sex. Weapons: sheathed while they cast and out of a fight, drawn
--- when they swing (the user: "when I cast, the weapon should be sheathed"); casters (mages,
--- priests, warlocks) keep them sheathed, their instant spells cast too.
---
--- Cost: an OnUpdate per open window already runs (StreamView.lua); this adds a few comparisons per
+-- character your client has (in your group, nearby) is them. A friend elsewhere is their class's
+-- emblem in a ring of its colour, "out of reach" under it (the user chose it, after a race's plain
+-- model, a ghost of it and an NPC of their class: the game shows no player as they look from afar,
+-- and "if you cant render their actual model" the emblem). It still steps up, flashes when hit,
+-- pulses while they cast and greys when they die; the numbers float up from it. The preview's
+-- made-up friend is that too. Weapons: sheathed while they cast and out of a fight, drawn when they
+-- swing (the user: "when I cast, the weapon should be sheathed"); casters (mages, priests, warlocks)
+-- keep them sheathed, their instant spells cast too.
+---- Cost: an OnUpdate per open window already runs (StreamView.lua); this adds a few comparisons per
 -- frame, an animation set when it changes, a frame moved while it lunges.
 
 local ROW_W = 226              -- the row's width (the window's less its edges)
@@ -92,44 +90,32 @@ end
 local AVOID_ANIM = { DODGE = ANIM.dodge, PARRY = ANIM.parry, BLOCK = ANIM.block }
 local CASTERS = { MAGE = true, PRIEST = true, WARLOCK = true } -- (weapons stay sheathed)
 
--- A form's own model (SpellShapeshiftForm.CreatureDisplayID, 1.60.1.70425; the tauren ones from
--- classic): by the form's spell ID, { the default, a tauren's }.
-local FORM_DISPLAY = {
-	[768] = { 892, 8571 },     -- Cat Form
-	[5487] = { 2281, 2289 },   -- Bear Form
-	[9634] = { 2281, 2289 },   -- Dire Bear Form
-	[783] = { 918, 918 },      -- Travel Form
-	[1066] = { 2428, 2428 },   -- Aquatic Form
-	[24858] = { 15374, 15375 }, -- Moonkin Form
-	[2645] = { 4613, 4613 },   -- Ghost Wolf
-}
-local TAUREN = { [6] = true, [28] = true }
+-- Druid forms and Ghost Wolf by spell ID: a character in one shows on a PlayerModel (in game a
+-- DressUpModel kept the native form).
+local FORMS = { [768] = true, [5487] = true, [9634] = true, [783] = true, [1066] = true, [24858] = true, [2645] = true }
 
--- A figure of a class (Data/ClassFigures.lua): of their race and sex, else the other sex, else
--- another race (the first that has one; races in this order), else any.
-local FIGURE_RACES = { 1, 2, 3, 4, 5, 6, 7, 8, 10, 11 }
-local function Figure(classFile, race, sex)
-	local all = ns.CLASS_FIGURES
-	local figures = all and (all[classFile or ""] or all.WARRIOR)
-	if not figures then
-		return nil
+-- A class's emblem on a texture: the atlas the game uses (GetClassAtlas), else the round icons.
+local function Emblem(texture, classFile)
+	local atlas = classFile and GetClassAtlas and Value("GetClassAtlas", classFile:lower())
+	if atlas and C_Texture and C_Texture.GetAtlasInfo and Value("C_Texture.GetAtlasInfo", atlas) then
+		texture:SetAtlas(atlas)
+		return
 	end
-	local i = sex == 2 and 2 or 1
-	local own = race and figures[race]
-	if own and own[i] > 0 then
-		return own[i]
-	elseif own and own[3 - i] > 0 then
-		return own[3 - i]
+	local coords = classFile and CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[classFile]
+	texture:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
+	if coords then
+		texture:SetTexCoord(coords[1], coords[2], coords[3], coords[4])
+	else
+		texture:SetTexCoord(0, 0.25, 0, 0.25) -- (a warrior's: not known)
 	end
-	for pass = 1, 2 do
-		for _, r in ipairs(FIGURE_RACES) do
-			local f = figures[r]
-			local id = f and f[pass == 1 and i or 3 - i]
-			if id and id > 0 then
-				return id
-			end
-		end
+end
+
+local function ClassColor(classFile)
+	local color = classFile and C_ClassColor and C_ClassColor.GetClassColor and C_ClassColor.GetClassColor(classFile)
+	if color then
+		return color:GetRGB()
 	end
+	return 0.7, 0.7, 0.7
 end
 local function Call(obj, method, ...)
 	local f = obj and obj[method]
@@ -159,20 +145,6 @@ local function Act(model, anim, length, now)
 	if model then
 		model.act, model.actUntil = anim, now + length
 	end
-end
-
--- Your look (race, sex): what O2;a sends; the preview's made-up friend.
-function S.OwnLook()
-	local _, _, _, race = pcall(UnitRace, "player")
-	local sex = select(2, pcall(UnitSex, "player")) == 3 and 2 or 1
-	return { race = tonumber(race), sex = sex }
-end
-
--- The form you're in (its spell ID; the preview's made-up friend takes it).
-function S.OwnForm()
-	local index = Value("GetShapeshiftForm")
-	local spellID = index and index > 0 and GetShapeshiftFormInfo and select(5, pcall(GetShapeshiftFormInfo, index))
-	return type(spellID) == "number" and not issecret(spellID) and spellID or nil
 end
 
 ---------------------------------------------------------------------------
@@ -348,7 +320,17 @@ local function NewHero(row)
 	hero.Back:SetColorTexture(0, 0, 0, 0.55)
 	hero.Real = NewHeroModel(hero)   -- (a character this client has: SetUnit; weapons can be sheathed)
 	hero.Shifted = NewHeroModel(hero, "PlayerModel") -- (the same in a form: a DressUpModel shows the native one, in game)
-	hero.Spirit = NewHeroModel(hero, "PlayerModel") -- (out of reach: a figure of their class, or their form)
+	-- Out of reach: their class's emblem in a ring of its colour.
+	local size = HERO_W - 12
+	hero.Ring = hero:CreateTexture(nil, "ARTWORK", nil, 1)
+	hero.Ring:SetSize(size + 4, size + 4)
+	hero.Ring:SetPoint("CENTER", hero.Back, "CENTER", 0, 4)
+	hero.Ring:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+	hero.Emblem = hero:CreateTexture(nil, "ARTWORK", nil, 2)
+	hero.Emblem:SetSize(size, size)
+	hero.Emblem:SetPoint("CENTER", hero.Ring, "CENTER")
+	hero.Ring:Hide()
+	hero.Emblem:Hide()
 	hero.Flash = NewFlash(hero, HERO_W, HERO_H)
 	-- Not their own look (their character isn't on this client): said under them, small.
 	hero.Away = hero:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -362,7 +344,7 @@ local function NewHero(row)
 		if self.Away:IsShown() then
 			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 			GameTooltip:SetText(L["Out of reach"], 1, 1, 1)
-			GameTooltip:AddLine(L["Their character isn't near you, and the game shows nobody as they look from afar: this is a figure of their class (in a form, the form)."],
+			GameTooltip:AddLine(L["Their character isn't near you, and the game can't show anyone as they look from afar: their class instead."],
 				0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end
@@ -372,50 +354,45 @@ local function NewHero(row)
 	return hero
 end
 
--- Who they are now: a unit this client has (you; a friend in your group nearby), else their look.
+-- Who they are now: a unit this client has (you; a friend in your group nearby), else nobody (the
+-- emblem); and the form they're in.
 local function HeroSource(view)
 	local picture = view.picture
 	local form = picture.form and picture.form.spellID
 	if view.kind == "me" then
-		return "player", nil, form
+		return "player", form
 	elseif view.kind == "friend" then
 		local unit = picture.guid and Value("UnitTokenFromGUID", picture.guid)
 		if type(unit) == "string" and Value("UnitIsVisible", unit) then
-			return unit, nil, form
+			return unit, form
 		end
-		return nil, picture.look, form
 	end
-	view.ownLook = view.ownLook or S.OwnLook() -- (the preview: your race, gear and form)
-	return nil, view.ownLook, S.OwnForm()
+	return nil, form -- (the preview's made-up friend too)
 end
 
-local function LoadHero(hero, unit, look, form, classFile, again)
+local function LoadHero(hero, unit, form, classFile, again)
 	hero.loaded, hero.loadAt = false, GetTime()
 	hero.tries = again and (hero.tries or 0) + 1 or 0
-	hero.look = look
-	local formDisplay = form and FORM_DISPLAY[form]
-	hero.inForm = formDisplay and true or false
+	hero.inForm = form and FORMS[form] or false
 	hero.Away:SetShown(not unit)
-	if unit then
-		hero.model = hero.inForm and hero.Shifted or hero.Real
-		hero.Spirit:Hide()
-		hero[hero.inForm and "Real" or "Shifted"]:Hide()
-		Call(hero.model, "ClearModel")
-		if hero.inForm then
-			Call(hero.model, "SetUnit", unit) -- (a PlayerModel shows the form they're in)
-		else
-			Call(hero.model, "SetUnit", unit, false, false)
-		end
-	else
-		local display = formDisplay and formDisplay[look and TAUREN[look.race] and 2 or 1]
-			or Figure(classFile, look and look.race, look and look.sex) -- (no look yet: a man of their class)
-		hero.model = hero.Spirit
+	hero.Ring:SetShown(not unit)
+	hero.Emblem:SetShown(not unit)
+	if not unit then
+		hero.model = nil
 		hero.Real:Hide()
 		hero.Shifted:Hide()
-		Call(hero.Spirit, "ClearModel")
-		if display then
-			Call(hero.Spirit, "SetDisplayInfo", display)
-		end
+		Emblem(hero.Emblem, classFile)
+		hero.Ring:SetVertexColor(ClassColor(classFile))
+		hero.loaded = true
+		return
+	end
+	hero.model = hero.inForm and hero.Shifted or hero.Real
+	hero[hero.inForm and "Real" or "Shifted"]:Hide()
+	Call(hero.model, "ClearModel")
+	if hero.inForm then
+		Call(hero.model, "SetUnit", unit) -- (a PlayerModel shows the form they're in)
+	else
+		Call(hero.model, "SetUnit", unit, false, false)
 	end
 	hero.model:Show()
 	hero.model.current = nil
@@ -423,23 +400,21 @@ end
 
 local function ShowHero(view, now)
 	local hero, picture = view.win.Foes.Hero, view.picture
-	local unit, look, form = HeroSource(view)
+	local unit, form = HeroSource(view)
 	local classFile = picture.classFile
-	local who = (unit and ("u:" .. unit) or ("l:" .. (look and look.race or "?") .. ":" .. (look and look.sex or "?")
-		.. ":" .. (classFile or "?"))) .. ":f" .. (form or 0) -- (a new form: loaded anew)
+	local who = unit and ("u:" .. unit .. ":f" .. (form or 0)) or ("e:" .. (classFile or "?")) -- (a new form: loaded anew)
 	local scale = hero:GetEffectiveScale()
 	if who ~= hero.who or not hero.scale or math.abs(hero.scale - scale) > 0.001 then
 		hero.who, hero.scale = who, scale
-		LoadHero(hero, unit, look, form, classFile)
+		LoadHero(hero, unit, form, classFile)
 	elseif not hero.loaded then
 		if Loaded(hero.model) then
 			HeroLoaded(hero.model) -- (OnModelLoaded may not have come)
 		elseif hero.tries < TRIES and now - hero.loadAt >= RETRY then
-			LoadHero(hero, unit, look, form, classFile, true)
+			LoadHero(hero, unit, form, classFile, true)
 		end
 	end
 end
-
 ---------------------------------------------------------------------------
 -- The row: their model, then the mobs they fight
 ---------------------------------------------------------------------------
@@ -911,7 +886,8 @@ function S.BattleShow(view)
 	local gathering = casting and b.cast and b.cast.gather
 	local base = picture.dead and ANIM.dead or gathering and ANIM.loot or casting and ANIM.aim
 		or picture.combat and ANIM.ready or ANIM.stand
-	hero.Real.base, hero.Shifted.base, hero.Spirit.base = base, base, base
+	hero.Real.base, hero.Shifted.base = base, base
+	hero.casting, hero.dead = casting, picture.dead -- (the emblem pulses, greys)
 	if casting or not picture.combat then
 		Sheathe(hero, true)
 	elseif not b.fighting then
@@ -971,6 +947,9 @@ function S.BattleUpdate(view, elapsed)
 	local hero = row.Hero
 	if hero.model then
 		Play(hero.model, now)
+	elseif hero.Emblem:IsShown() then -- (out of reach: greyed when dead, pulsing while casting)
+		hero.Emblem:SetDesaturated(hero.dead and true or false)
+		hero.Emblem:SetAlpha(hero.casting and 0.75 + 0.25 * math.sin(now * 6) or 1)
 	end
 	if hero.dx ~= hero.shownDx then
 		hero.shownDx = hero.dx
@@ -1021,8 +1000,10 @@ function S.BattleReset(view)
 	local hero = row.Hero
 	hero.who, hero.dx, hero.loaded = nil, 0, false
 	hero.Away:Hide()
-	view.ownLook = nil -- (the preview: your gear as it is now)
-	for _, model in ipairs({ hero.Real, hero.Shifted, hero.Spirit }) do
+
+	hero.Ring:Hide()
+	hero.Emblem:Hide()
+	for _, model in ipairs({ hero.Real, hero.Shifted }) do
 		model.act, model.current, model.base = nil, nil, nil
 		model:Hide()
 	end

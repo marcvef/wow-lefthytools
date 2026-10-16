@@ -879,5 +879,5 @@ L["For ten seconds the enemy nameplates you can see show examples: you, a tank, 
 L[">YOU<"] = ">DU<"
 L["out of reach"] = "außer Reichweite"
 L["Out of reach"] = "Außer Reichweite"
-L["Their character isn't near you, and the game shows nobody as they look from afar: this is a figure of their class (in a form, the form)."] =
-	"Sein Charakter ist nicht in deiner Nähe, und das Spiel zeigt aus der Ferne niemanden so, wie er aussieht: das ist eine Figur seiner Klasse (in einer Gestalt die Gestalt)."
+L["Their character isn't near you, and the game can't show anyone as they look from afar: their class instead."] =
+	"Sein Charakter ist nicht in deiner Nähe, und das Spiel kann aus der Ferne niemanden so zeigen, wie er aussieht: stattdessen seine Klasse."

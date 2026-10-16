@@ -646,7 +646,7 @@ says how it's learned).
 
 **The battle row** (StreamBattle.lua; the user: a Pokémon-style fight, "your model does something
 and affects the enemy models", in the foes' row, the radar staying above; "doesn't need to be shown
-exact. just an approximation with the data available", and no more data for it but their look).
+exact. just an approximation with the data available", and no more data for it).
 Left their model (50 x 58 px), the foes right of it, the space between the stage. Played from what
 the picture already holds, one action after another like turns (about half a second each; at most
 4 waiting, an older one goes but its number still floats; one waiting over 2.5 s goes too):
@@ -681,29 +681,26 @@ the picture already holds, one action after another like turns (about half a sec
 **Their model**: yours is you (`DressUpModel:SetUnit("player", false, false)`; in a form a
 `PlayerModel:SetUnit` instead: in game the DressUpModel kept the native form even so, and a
 PlayerModel showed the bear; the user: "when a druid is in cat form it should show cat form"); a
-friend whose character your client has (in your group, nearby:
-`UnitTokenFromGUID(peer.guid)` and `UnitIsVisible`) is them; a model loads anew when their form
-changes. A friend elsewhere **in a form** is that form's own model, textured (`FORM_DISPLAY` by the
-form's spell ID: SpellShapeshiftForm.CreatureDisplayID of 1.60.1.70425, the tauren cat, bear and
-moonkin from classic): no gear, no light. **Weapons** (`SetSheathed`; the user: "when I cast, the
-weapon should be sheathed"): sheathed while they cast and out of a fight, drawn for a swing; a
-caster (mage, priest, warlock) keeps them sheathed and casts their instant spells (53, no lunge).
-Out of a form, a friend elsewhere is **a figure of their class** (`Data/ClassFigures.lua`,
-`tools/update-class-figures.js`: per class, race and sex the model of an NPC who trains that class;
-which NPCs train which class from the classic world database, the facts only; each model's race and
-sex from the client's CreatureDisplayInfo/CreatureDisplayInfoExtra, wago.tools; their race and sex
-from their look, `O2;a`; none of theirs: the other sex, else another race), textured and dressed,
-shown with `SetDisplayInfo` on a PlayerModel. Found in game: a race's plain model
-(ChrRaceXChrModel -> ChrModel.DisplayID) comes out white (the game makes a character's skin from
-their appearance, which addons can't set) in a default outfit of its own (a staff, a robe, a cloak
-with red squares inside), and gear tried on (`DressUpModel:TryOn`) didn't show at all: what looked
-like gear in the model test was that outfit. So no player's look can be shown from afar; the class
-figure is clean and says the class at a glance (the user chose it). No look yet (an older build): a
-man of their class. The preview's made-up friend is a figure of her class of your race and sex (and
-your form). "out of reach" in small letters under it, its tooltip saying why (the user's idea).The camera just a little back (`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in
-game), further in a form (1.4: a bear didn't fit), turned 0.75 rad towards the foes. Reloaded like the foes (when who it is or the window's size
-changes, retried while nothing's there).
+friend whose character your client has (in your group, nearby: `UnitTokenFromGUID(peer.guid)` and
+`UnitIsVisible`) is them; a model loads anew when their form changes. The camera just a little back
+(`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in game), further in a form (1.4: a
+bear didn't fit), turned 0.75 rad towards the foes; reloaded like the foes (when who it is or the
+window's size changes, retried while nothing's there). **Weapons** (`SetSheathed`; the user: "when
+I cast, the weapon should be sheathed"): sheathed while they cast and out of a fight, drawn for a
+swing; a caster (mage, priest, warlock) keeps them sheathed and casts their instant spells (53, no
+lunge).
 
+A friend **out of reach** (their character isn't on your client) is **their class's emblem**
+(`GetClassAtlas`, else `UI-Classes-Circles` with `CLASS_ICON_TCOORDS`) in a ring of their class
+colour, "out of reach" in small letters under it, its tooltip saying why; also the preview's
+made-up friend. It steps up, flashes when hit, pulses while they cast and greys when they die; the
+numbers float up from it. Tried first, in game, and given up (the user: "use the class emblem if
+you cant render their actual model"): a race's plain model (ChrRaceXChrModel -> ChrModel.DisplayID)
+comes out white in a default outfit of its own (a staff, a robe, a cloak with red squares inside)
+and gear tried on (`TryOn`) doesn't show; a class trainer NPC of their race and sex ("doesn't look
+like me"); a form's own model; a ModelScene actor of your own character with a `customRaceID` and
+their gear (not looked at: "all not satisfying"). The game shows no player as they look unless
+their character is loaded on your client.
 Dots follow their mob and glide; a friend's map
 glides between their frames. Drag to move; the grip at the bottom right resizes (0.35 to 1.3;
 kept per kind in `LefthyToolsDB.streamWindows`: `me`, `friend`). Yours (`LefthyToolsStreamFrame`,
@@ -744,10 +741,6 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   that id (ids 1-999 per GUID, reused after 60 s).
 - `O2;c;<id>;<creatureID>` a mob's creature ID (from its GUID), right after its name: the watcher's
   window shows its model. Builds before it ignore the word.
-- `O2;a;<race ID>;<sex 1|2>;` my look, to a watcher before my first frame (and again if it changes,
-  read every 10 s while someone watches): race and sex. Their battle row shows a figure of my class of
-  that race and sex when their client doesn't have my character. A list of item IDs after the last
-  `;` (0.5.0-142 to -146 sent my gear) is ignored. Builds before it ignore the word.
 - `O2;v;<percent>` my health, to every friend (see "Health" above).
 
 Spells go as IDs; the watcher's client names them in its own language. Guard: 80 `O` messages per
