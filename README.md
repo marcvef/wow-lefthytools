@@ -315,14 +315,29 @@ link it. The window stays open (Escape doesn't close it) and keeps the last mob 
 your target.
 
 So the chances hold, only your own kills count (not in a group, where the loot is shared), and
-only once their corpse is looted or the game says it's empty. Skinning, pickpocketing, fishing,
-herbs, ore and chests don't count as a mob's drops. All your characters add to the same
-database; it stays on your computer.
+only once their corpse is looted or the game says it's empty. Pickpocketing, fishing, herbs, ore
+and chests don't count as a mob's drops; **skinning** is kept apart, per skinning, and marked with
+Skinning's pelt icon. All your characters add to the same database; it stays on your computer.
+
+**The ledger** (the book in the window, Ctrl-click on the minimap button, or `/bestiary ledger`)
+lists every mob you've killed: kills, level, its best drops at a glance, sortable. Pick one for
+its turning model, kills, coin each and in all, first and last kill, and all its drops. The search
+finds mobs and items with just some of their letters in order ("dfbnd" for Defias Bandit, "milk"
+for every mob that dropped Ice Cold Milk). At the top: everything in all, the coin per kill over
+all your kills, and your rarest find.
+
+**Item tooltips** (anywhere: bags, chat links) list the three mobs an item comes from likeliest,
+with the chance and how many kills that's from; a pelt marks skinning.
+
+Minimap button: click for the window, **Shift-click** to switch the drops next to the mouse on
+or off, Ctrl-click for the ledger, right-click for the settings. `/bestiary log` shows what was
+made of your last loot windows (to see why something wasn't counted).
 
 | Setting | Default |
 |---|---|
 | Minimap button | on |
 | Drops next to the mouse (an enemy you've killed before: its likeliest drops beside the mouse) | off |
+| Drop chances in item tooltips | on |
 | Grey items | on |
 
 ---

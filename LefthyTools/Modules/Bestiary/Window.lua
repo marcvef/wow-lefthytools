@@ -31,6 +31,7 @@ local issecret = issecretvalue or function() return false end
 local win, card, button
 local shown, shownInfo -- the creature the window shows, and what was seen of it (name, level, class)
 local cardGUID
+local ownTooltip = false -- showing our own drop's tooltip (it has the numbers already: no item tooltip lines)
 
 local function Value(f, ...)
 	if not f then
@@ -108,14 +109,19 @@ local function Kind(info)
 	return table.concat(parts, " ")
 end
 
--- "34 kills · 12s 40c each" (coin only when some came).
+-- "34 kills · 12s 40c each · (pelt) 12" (the coin on average over all its kills, "no coin" for
+-- beasts; skinnings when there were some).
 local function KillsLine(mob)
 	local text = mob.kills == 1 and L["1 kill"] or L["%d kills"]:format(mob.kills)
-	if mob.kills > 0 and mob.money > 0 then
-		text = text .. "  |cff888888·|r  " .. L["%s each"]:format(Coins(mob.money / mob.kills))
+	if mob.kills > 0 then
+		text = text .. "  |cff888888·|r  " .. (mob.money > 0 and L["%s each"]:format(Coins(mob.money / mob.kills)) or L["no coin"])
+	end
+	if (mob.skinned or 0) > 0 then
+		text = text .. ("  |cff888888·|r  |T%s:12:12|t %d"):format(Bt.SKIN_ICON, mob.skinned)
 	end
 	return text
 end
+Bt.KillsLine, Bt.Coins = KillsLine, Coins
 
 ---------------------------------------------------------------------------
 -- A drop: its icon, edged in its quality's colour, how many in the corner, the chance under it
@@ -127,15 +133,24 @@ local function CellOnEnter(cell)
 		GameTooltip:SetText(L["More drops"], 1, 1, 1)
 		for _, drop in ipairs(cell.more) do
 			local r, g, b = QualityColor(drop.quality)
-			GameTooltip:AddDoubleLine(("|T%s:14:14|t %s"):format(ItemIcon(drop.id), ItemName(drop.id)), Percent(drop.chance), r, g, b, 1, 1, 1)
+			GameTooltip:AddDoubleLine(("|T%s:14:14|t %s%s"):format(ItemIcon(drop.id), drop.name or ItemName(drop.id),
+				drop.skin and (" |T%s:12:12|t"):format(Bt.SKIN_ICON) or ""), Percent(drop.chance), r, g, b, 1, 1, 1)
 		end
 		GameTooltip:Show()
 		return
 	end
 	local drop = cell.drop
+	ownTooltip = true
 	GameTooltip:SetHyperlink(("item:%d"):format(drop.id))
+	ownTooltip = false
 	GameTooltip:AddLine(" ")
-	GameTooltip:AddLine(L["Dropped in %d of %d kills: %s"]:format(drop.drops, cell.kills, Percent(drop.chance)), GOLD[1], GOLD[2], GOLD[3])
+	if drop.skin then
+		GameTooltip:AddLine(("|T%s:14:14|t "):format(Bt.SKIN_ICON) .. L["Only from skinning: %d of %d skinnings, %s"]:format(drop.drops,
+			drop.out or 0, Percent(drop.chance)), GOLD[1], GOLD[2], GOLD[3])
+	else
+		GameTooltip:AddLine(L["Dropped in %d of %d kills: %s"]:format(drop.drops, drop.out or cell.kills, Percent(drop.chance)),
+			GOLD[1], GOLD[2], GOLD[3])
+	end
 	if drop.count > drop.drops then
 		GameTooltip:AddLine(L["%d in all, %.1f each time"]:format(drop.count, drop.each), 0.8, 0.8, 0.8)
 	end
@@ -167,6 +182,13 @@ local function NewCell(parent, size, link)
 	cell.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
 	cell.Count = cell:CreateFontString(nil, "OVERLAY", "NumberFontNormalSmall")
 	cell.Count:SetPoint("BOTTOMRIGHT", cell.Edge, "BOTTOMRIGHT", -1, 2)
+	-- Only from skinning: Skinning's own icon, small, in the top left corner.
+	cell.Skin = cell:CreateTexture(nil, "OVERLAY", nil, 2)
+	cell.Skin:SetSize(math.floor(size * 0.42), math.floor(size * 0.42))
+	cell.Skin:SetPoint("TOPLEFT", cell.Edge, "TOPLEFT", -2, 2)
+	cell.Skin:SetTexture(Bt.SKIN_ICON)
+	cell.Skin:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	cell.Skin:Hide()
 	cell.More = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	cell.More:SetPoint("CENTER", cell.Edge, "CENTER", 0, 0)
 	cell.Chance = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -193,6 +215,7 @@ local function FillCell(cell, drop, kills)
 	cell.Icon:SetTexture(ItemIcon(drop.id))
 	cell.Icon:Show()
 	cell.Count:SetText(tostring(drop.count))
+	cell.Skin:SetShown(drop.skin and true or false)
 	cell.More:SetText("")
 	cell.Chance:SetText(Percent(drop.chance))
 	cell.Chance:SetTextColor(r, g, b)
@@ -204,6 +227,7 @@ local function FillMore(cell, more, kills)
 	cell.drop, cell.more, cell.kills = nil, more, kills
 	cell.Edge:SetColorTexture(0.3, 0.3, 0.3, 0.9)
 	cell.Icon:Hide()
+	cell.Skin:Hide()
 	cell.Count:SetText("")
 	cell.More:SetText("+" .. #more)
 	cell.Chance:SetText("")
@@ -239,6 +263,8 @@ local function Lay(grid, cells, drops, kills, size, gap, perRow, maxCells, link)
 	return math.ceil(math.min(#drops, maxCells) / perRow)
 end
 
+Bt.Lay, Bt.QualityColor, Bt.ItemIcon, Bt.ItemName, Bt.Kind = Lay, QualityColor, ItemIcon, ItemName, Kind
+
 -- Dark, thin gold edges (like the fight stream's windows).
 local function Dress(frame)
 	local bg = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
@@ -258,6 +284,41 @@ local function Dress(frame)
 			edge:SetPoint("BOTTOM" .. side)
 		end
 	end
+end
+
+Bt.Dress = Dress
+
+---------------------------------------------------------------------------
+-- Item tooltips: the mobs an item comes from likeliest (setting itemTooltip)
+---------------------------------------------------------------------------
+
+local TOOLTIP_SOURCES = 3
+
+local function OnItemTooltip(tooltip, info)
+	if ownTooltip or not (M.enabled and M.db.itemTooltip) or (tooltip ~= GameTooltip and tooltip ~= _G.ItemRefTooltip) then
+		return
+	end
+	local id = info and info.id
+	local list = type(id) == "number" and not issecret(id) and Bt.Sources(id)
+	if not list then
+		return
+	end
+	tooltip:AddLine(" ")
+	tooltip:AddDoubleLine("Bestiary", L["drop chance (kills)"], GOLD[1], GOLD[2], GOLD[3], 0.6, 0.6, 0.6)
+	for i = 1, math.min(TOOLTIP_SOURCES, #list) do
+		local source = list[i]
+		local mob = source.mob
+		local name = (mob.name or ("#" .. source.creature)) .. (mob.level and mob.level > 0 and (" (" .. mob.level .. ")") or "")
+		tooltip:AddDoubleLine((source.skin and ("|T%s:14:14|t "):format(Bt.SKIN_ICON) or "") .. name,
+			("%s |cff888888(%d)|r"):format(Percent(source.chance), source.out), 1, 1, 1, 1, 1, 1)
+	end
+	if #list > TOOLTIP_SOURCES then
+		tooltip:AddLine(L["and %d more (the Bestiary's ledger)"]:format(#list - TOOLTIP_SOURCES), 0.6, 0.6, 0.6)
+	end
+end
+
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, OnItemTooltip)
 end
 
 ---------------------------------------------------------------------------
@@ -307,6 +368,20 @@ local function Build()
 	win.Close = CreateFrame("Button", nil, win, "UIPanelCloseButtonNoScripts")
 	win.Close:SetPoint("TOPRIGHT", -2, -2)
 	win.Close:SetScript("OnClick", function() Bt.Toggle(false) end)
+	-- The ledger (every mob, search): a small book left of the X.
+	win.Ledger = CreateFrame("Button", nil, win)
+	win.Ledger:SetSize(16, 16)
+	win.Ledger:SetPoint("RIGHT", win.Close, "LEFT", -2, 0)
+	win.Ledger:SetNormalTexture("Interface\\Icons\\INV_Misc_Book_11")
+	win.Ledger:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	win.Ledger:SetScript("OnClick", function() Bt.LedgerButton() end)
+	win.Ledger:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:SetText(L["The ledger"], 1, 1, 1)
+		GameTooltip:AddLine(L["Every mob you've killed, its statistics and drops; search mobs and items."], 0.8, 0.8, 0.8, true)
+		GameTooltip:Show()
+	end)
+	win.Ledger:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 	-- The mob: a still portrait in a dark square, its name, level and kind, kills and coin.
 	win.PortraitBack = win:CreateTexture(nil, "BORDER")
@@ -325,7 +400,7 @@ local function Build()
 	win.Unknown:SetAlpha(0.5)
 	win.Name = win:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	win.Name:SetPoint("TOPLEFT", win.PortraitBack, "TOPRIGHT", 8, -1)
-	win.Name:SetPoint("RIGHT", win.Close, "LEFT", 0, 0)
+	win.Name:SetPoint("RIGHT", win.Ledger, "LEFT", -2, 0)
 	win.Name:SetJustifyH("LEFT")
 	win.Name:SetWordWrap(false)
 	win.Kind = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -413,6 +488,17 @@ end
 function Bt.TargetChanged()
 	if win and win:IsShown() and FollowTarget() then
 		Draw()
+	end
+end
+
+-- The ledger's buttons (the window's book, Ctrl-click on the minimap's): open on the mob shown, or
+-- close it when it's open.
+function Bt.LedgerButton()
+	local ledger = Bt.Ledger and Bt.Ledger()
+	if ledger and ledger:IsShown() then
+		ledger:Hide()
+	else
+		Bt.ToggleLedger(shown)
 	end
 end
 
@@ -516,6 +602,9 @@ local function ButtonOnEnter(self)
 	end
 	GameTooltip:AddLine(L["%d kinds of mobs, %d kills"]:format(count, kills), 1, 1, 1)
 	GameTooltip:AddLine(L["Click: open or close the window"], 0.8, 0.8, 0.8)
+	GameTooltip:AddLine((M.db.hoverCard and L["Shift-click: drops next to the mouse off"] or L["Shift-click: drops next to the mouse on"]),
+		0.8, 0.8, 0.8)
+	GameTooltip:AddLine(L["Ctrl-click: the ledger"], 0.8, 0.8, 0.8)
 	GameTooltip:AddLine(L["Right-click: settings"], 0.8, 0.8, 0.8)
 	GameTooltip:AddLine(L["Drag: move it along the minimap"], 0.8, 0.8, 0.8)
 	GameTooltip:Show()
@@ -524,6 +613,11 @@ end
 local function ButtonOnClick(_, mouseButton)
 	if mouseButton == "RightButton" then
 		LT:OpenSettings(M)
+	elseif IsShiftKeyDown() then
+		LT:SetModuleSetting(M, "hoverCard", not M.db.hoverCard)
+		M:Print(M.db.hoverCard and "drops next to the mouse: on." or "drops next to the mouse: off.")
+	elseif IsControlKeyDown() then
+		Bt.LedgerButton()
 	else
 		Bt.Toggle()
 	end

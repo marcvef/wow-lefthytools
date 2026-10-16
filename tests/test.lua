@@ -6422,7 +6422,7 @@ section("Bestiary: what mobs drop")
 	SlashCmdList.LEFTHYTOOLS_BESTIARY("log")
 	local logText = printedSince(pmark)
 	check(logText:find("Riverpaw", 1, true) == nil and logText:find("looted (said empty before), 1 item(s)", 1, true)
-		and logText:find("skinning or pickpocket", 1, true) and logText:find("Defias Bandit: looted, 2 item(s)", 1, true)
+		and logText:find("pickpocket or gathering", 1, true) and logText:find("Defias Bandit: looted, 2 item(s)", 1, true)
 		and logText:find("empty (loot check false/true)", 1, true),
 		"/bestiary log: what was made of each loot window and kill, got\n" .. logText)
 	-- The card next to the mouse (setting): an enemy killed before, its drops small.
@@ -6439,6 +6439,101 @@ section("Bestiary: what mobs drop")
 	Advance(0.1)
 	check(not card:IsShown(), "the mouse moves off: the card goes")
 	setting("hoverCard"):SetValue(false)
+	-- Skinning: what came, per skinning, apart from the drops, marked with Skinning's icon.
+	local beast = "Creature-0-1-0-1-116-00000030"
+	ITEMS[2318] = ITEMS[2318] or { name = "Light Leather", quality = 1 }
+	Fire("PARTY_KILL", "Player-1-0", beast)
+	LOOT = { { type = 1, id = 2589, source = beast } } -- (its loot first)
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	Advance(2)
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-10", 8613) -- (Skinning)
+	LOOT = { { type = 1, id = 2318, quantity = 2, source = beast } }
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	check(mob().kills == 4 and mob().skinned == 1 and mob().skins[2318][1] == 1 and mob().skins[2318][2] == 2
+		and mob().skins[2318][4] == "Light Leather" and not mob().items[2318], "skinned: kept apart, per skinning, with its name")
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-11", 8613)
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	LOOT = {}
+	check(mob().skinned == 1, "the same corpse again: skinned once")
+	local skinCell
+	for _, c in ipairs(win.cells) do if c:IsShown() and c.drop and c.drop.skin then skinCell = c end end
+	check(skinCell and skinCell.drop.id == 2318 and skinCell.Skin:IsShown() and skinCell.Chance:GetText() == "100%"
+		and not win.cells[1].Skin:IsShown() and win.Kills:GetText():find("INV_Misc_Pelt_Wolf_01:12:12|t 1", 1, true),
+		"the window: after the drops, with Skinning's icon, 100% per skinning; how often skinned")
+	skinCell._scripts.OnEnter(skinCell)
+	check(tipFind("Only from skinning: 1 of 1 skinnings, 100%"), "hover: only from skinning")
+	skinCell._scripts.OnLeave(skinCell)
+	Advance(2)
+	-- Item tooltips (on by default): the three mobs an item comes from likeliest; a pelt for skinning.
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:2589")
+	check(tipFind("Bestiary  drop chance (kills)") and tipFind("Defias Bandit (9)  50% |cff888888(4)|r") and tipFind("#117  33%"),
+		"an item's tooltip: the mobs it comes from, the likeliest first, the chance and the kills behind it")
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:2318")
+	check(tipFind("INV_Misc_Pelt_Wolf_01:14:14|t Defias Bandit (9)  100%"), "from skinning: the pelt")
+	setting("itemTooltip"):SetValue(false)
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:2589")
+	check(not tipFind("Bestiary"), "the setting off: nothing added")
+	setting("itemTooltip"):SetValue(true)
+	cells[1]._scripts.OnEnter(cells[1])
+	check(not tipFind("drop chance (kills)"), "the window's own drop: its numbers, not the list again")
+	cells[1]._scripts.OnLeave(cells[1])
+	-- The minimap button: Shift-click switches the card next to the mouse, Ctrl-click the ledger.
+	STATE.shift = true
+	button._scripts.OnClick(button, "LeftButton")
+	STATE.shift = false
+	check(LefthyToolsDB.settings.bestiary.hoverCard == true and win:IsShown(), "Shift-click: the card next to the mouse on (the window stays)")
+	STATE.shift = true
+	button._scripts.OnClick(button, "LeftButton")
+	STATE.shift = false
+	check(LefthyToolsDB.settings.bestiary.hoverCard == false, "again: off")
+	STATE.ctrl = true
+	button._scripts.OnClick(button, "LeftButton")
+	STATE.ctrl = false
+	local ledger, entries, picked = Bt.Ledger()
+	-- The ledger: every mob, the most kills first; the window's mob picked.
+	check(ledger and ledger:IsShown() and picked == 116 and #entries == 2 and ledger.rows[1].Name:GetText():find("Defias Bandit", 1, true)
+		and ledger.rows[1].Kills:GetText() == "4" and ledger.Pane.Name:GetText() == "Defias Bandit" and ledger.Pane.Model._creature == 116,
+		"Ctrl-click: the ledger, every mob (the most kills first), the window's mob picked: its model and name")
+	check(ledger.Summary:GetText() == "2 mobs  ·  7 kills  ·  5 items  ·  12s 34c coin, 1s 76c per kill" and ledger.rows[1].icons[1]:IsShown(),
+		"at the top: all it knows, the coin per kill over all kills; a row's best drops as tiny icons")
+	local escapes = false
+	for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsBestiaryLedger" then escapes = true end end
+	check(escapes, "Escape closes the ledger (unlike the window)")
+	local facing = ledger.Pane.facing
+	Advance(1)
+	check(ledger.Pane.facing > facing and ledger.Pane.Model._facing == ledger.Pane.facing, "its model turns slowly")
+	-- The fuzzy search: letters in order, over mob names and their drops' names.
+	ledger.Search:SetText("dfbnd")
+	_, entries = Bt.Ledger()
+	check(#entries == 1 and entries[1].creature == 116 and ledger.rows[1].Name:GetText():find("|cffffd100D|r", 1, true)
+		and ledger.Clear:IsShown() and not ledger.Placeholder:IsShown(), "\"dfbnd\": the Defias Bandit, its found letters in gold")
+	ledger.Search:SetText("cold milk")
+	_, entries, picked = Bt.Ledger()
+	local milk
+	for _, c in ipairs(ledger.Pane.cells) do if c:IsShown() and c.drop and c.drop.id == 1179 then milk = c end end
+	check(#entries == 1 and picked == 117 and ledger.rows[1].Found:GetText():find("Ice Cold Milk", 1, true)
+		and ledger.rows[1].Found:GetText():find("33%", 1, true) and milk and milk:GetAlpha() == 1 and ledger.Pane.cells[1]:GetAlpha() < 1,
+		"an item: the mob it came from, picked; the item and its chance in the row; the match stands out among its drops")
+	ledger.Search:SetText("zzz")
+	check(not ledger.rows[1]:IsShown() and ledger.NoMatch:GetText() == "Nothing found.", "nothing: said so")
+	ledger.Clear._scripts.OnClick(ledger.Clear)
+	_, entries = Bt.Ledger()
+	check(#entries == 2 and ledger.Placeholder:IsShown(), "cleared: every mob again")
+	ledger.Sort._scripts.OnClick(ledger.Sort)
+	for _, row in ipairs(ledger.Sort.List.rows) do if row.value == "name" then row._scripts.OnClick(row) end end
+	_, entries = Bt.Ledger()
+	check(entries[1].creature == 116 and ledger.Sort.Label:GetText() == "Name", "sorted by name")
+	ledger:Hide()
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("ledger milk")
+	_, entries = Bt.Ledger()
+	check(ledger:IsShown() and #entries == 1 and ledger.Search:GetText() == "milk", "/bestiary ledger milk: opened on that search")
+	ledger:Hide()
 	-- Closed and open again: kept for next time.
 	win.Close:Click()
 	check(not win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == false and not button.Open:IsShown(), "the X closes it, kept")

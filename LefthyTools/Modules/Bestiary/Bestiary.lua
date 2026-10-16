@@ -19,10 +19,13 @@ local L = ns.L
 --     gathering (NOT_A_KILL), nor what isn't a creature's (herbs, ore, chests, fishing, a bag's
 --     contents: their source isn't a creature);
 --   * coin: what your money grew by while the loot window was open.
--- /bestiary log shows the last loot windows and kills and what was made of them.
+-- Skinning is kept apart: what you skin from a kind of mob, each corpse once, per skinning (also in
+-- a group: what you skin is yours). /bestiary log shows the last loot windows and kills and what was
+-- made of them.
 --
 -- LefthyToolsBestiaryDB = { mobs = { [creatureID] = { name, level, class, kills, money (copper),
---   last (time()), items = { [itemID] = { drops (corpses it came from), count, quality } } } } }
+--   first, last (time()), items = { [itemID] = { drops (corpses it came from), count, quality,
+--   name } }, skinned (how many), skins = { [itemID] = { times, count, quality, name } } } } }
 
 local M = LT:NewModule("bestiary", {
 	title = "Bestiary",
@@ -32,6 +35,7 @@ local M = LT:NewModule("bestiary", {
 		minimapAngle = 150,  -- degrees, 0 = right, counter-clockwise: the upper left
 		showPoor = true,     -- grey items in the lists
 		hoverCard = false,   -- the drops next to the mouse over an enemy
+		itemTooltip = true,  -- an item's tooltip: the mobs it comes from likeliest, with the chance
 		window = {},         -- shown, point, x, y
 	},
 })
@@ -48,6 +52,8 @@ local LOG_KEEP = 12             -- loot windows remembered with what was made of
 -- Pick Pocket, Mining, Herb Gathering. Any other spell just before looting (a killing blow, then a
 -- quick loot) doesn't matter.
 local NOT_A_KILL = { 8613, 8617, 8618, 10768, 921, 2575, 2576, 3564, 10248, 2366, 2368, 3570, 11993 }
+local SKINNING = { [8613] = true, [8617] = true, [8618] = true, [10768] = true }
+Bt.SKIN_ICON = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" -- (Skinning's own icon)
 local issecret = issecretvalue or function() return false end
 
 local data                       -- LefthyToolsBestiaryDB
@@ -55,7 +61,10 @@ local pending = {}               -- GUID -> { at, creature }: killed, its loot n
 local done = {}                  -- GUID -> time: counted (or its loot seen); kept a while
 local seen, seenOrder = {}, {}   -- GUID -> { name, level, class }
 local castAt = -math.huge        -- when one of the NOT_A_KILL spells went off
-local notKillIDs, notKillNames   -- NOT_A_KILL as a set, and their names (read once)
+local castSkin = false           -- and it was Skinning
+local notKillIDs, notKillNames   -- NOT_A_KILL as a set, and their names (read once); Skinning's name
+local skinName
+local skinnedCorpse = {}         -- GUID -> time: skinned (once each)
 local lootMoney, lootSource      -- while the loot window is open: money before, the corpse
 local lootSeen = false           -- this loot window was looked at (LOOT_READY or LOOT_OPENED)
 local listeners = {}
@@ -93,7 +102,10 @@ function Bt.OnChanged(fn)
 	listeners[#listeners + 1] = fn
 end
 
+local sources -- item ID -> where it comes from (Bt.Sources), built when asked after a change
+
 local function Changed(creature)
+	sources = nil
 	for _, fn in ipairs(listeners) do
 		local ok, err = pcall(fn, creature)
 		if not ok then
@@ -102,31 +114,86 @@ local function Changed(creature)
 	end
 end
 
--- A drop's chance, 0-1, and how many came per drop.
-function Bt.Chance(mob, item)
-	return mob.kills > 0 and math.min(1, item[1] / mob.kills) or 0, item[1] > 0 and item[2] / item[1] or 0
+local NONE = {}
+
+-- A kind's drops (skin: what skinning it gave), never nil. (Not `skin and mob.skins or mob.items`:
+-- without skinnings that falls back to the drops.)
+function Bt.Part(mob, skin)
+	if skin then
+		return mob.skins or NONE
+	end
+	return mob.items
 end
 
--- A kind's drops, the likeliest first (ties: better quality first): { { id, drops, count, quality,
--- chance, each }, ... }. Grey ones only with showPoor.
+-- A drop's chance, 0-1, and how many came per drop (out of kills, or skinnings for skin = true).
+function Bt.Chance(mob, item, skin)
+	local out = skin and (mob.skinned or 0) or mob.kills
+	return out > 0 and math.min(1, item[1] / out) or 0, item[1] > 0 and item[2] / item[1] or 0
+end
+
+local function Likelier(a, b)
+	if a.chance ~= b.chance then
+		return a.chance > b.chance
+	elseif a.quality ~= b.quality then
+		return a.quality > b.quality
+	end
+	return a.id < b.id
+end
+
+-- A kind's drops, the likeliest first (ties: better quality first), then what skinning it gives
+-- (skin = true, the chance per skinning): { { id, drops, count, quality, chance, each, skin, name,
+-- out (kills or skinnings) }, ... }. Grey ones only with showPoor.
 function Bt.Drops(mob, showPoor)
 	local list = {}
-	for id, item in pairs(mob and mob.items or {}) do
-		local quality = item[3] or 1
-		if showPoor or quality ~= 0 then
-			local chance, each = Bt.Chance(mob, item)
-			list[#list + 1] = { id = id, drops = item[1], count = item[2], quality = quality, chance = chance, each = each }
+	for _, skin in ipairs({ false, true }) do
+		local part = {}
+		for id, item in pairs(mob and Bt.Part(mob, skin) or {}) do
+			local quality = item[3] or 1
+			if showPoor or quality ~= 0 then
+				local chance, each = Bt.Chance(mob, item, skin)
+				part[#part + 1] = { id = id, drops = item[1], count = item[2], quality = quality, chance = chance, each = each,
+					skin = skin, name = item[4], out = skin and mob.skinned or mob.kills }
+			end
+		end
+		table.sort(part, Likelier)
+		for _, entry in ipairs(part) do
+			list[#list + 1] = entry
 		end
 	end
-	table.sort(list, function(a, b)
-		if a.chance ~= b.chance then
-			return a.chance > b.chance
-		elseif a.quality ~= b.quality then
-			return a.quality > b.quality
-		end
-		return a.id < b.id
-	end)
 	return list
+end
+
+-- Where an item comes from: { { creature, mob, chance, out (kills or skinnings), skin }, ... }, the
+-- likeliest first (then the more kills behind it); nil: nowhere yet. Built over the whole
+-- database when first asked after a change (item tooltips, the ledger's search).
+local function Likeliest(a, b)
+	if a.chance ~= b.chance then
+		return a.chance > b.chance
+	end
+	return a.out > b.out
+end
+
+function Bt.Sources(itemID)
+	if not sources then
+		sources = {}
+		for creature, mob in pairs(data and data.mobs or {}) do
+			for _, skin in ipairs({ false, true }) do
+				for id, item in pairs(Bt.Part(mob, skin)) do
+					local chance = Bt.Chance(mob, item, skin)
+					if chance > 0 then
+						local list = sources[id] or {}
+						sources[id] = list
+						list[#list + 1] = { creature = creature, mob = mob, chance = chance, skin = skin,
+							out = skin and mob.skinned or mob.kills }
+					end
+				end
+			end
+		end
+		for _, list in pairs(sources) do
+			table.sort(list, Likeliest)
+		end
+	end
+	return sources[itemID]
 end
 
 ---------------------------------------------------------------------------
@@ -218,6 +285,7 @@ local function Count(guid, creature, how)
 	pending[guid] = nil
 	local mob = MobFor(creature)
 	mob.kills, mob.last = mob.kills + 1, time()
+	mob.first = mob.first or mob.last
 	local info = seen[guid]
 	if info then
 		mob.name, mob.level, mob.class = info.name or mob.name, info.level or mob.level, info.class or mob.class
@@ -297,23 +365,53 @@ local function LootSource()
 	return source
 end
 
--- Is this spell one whose loot isn't a kill's (skinning, a pickpocket, gathering)?
+-- Is this spell one whose loot isn't a kill's (skinning, a pickpocket, gathering)? And is it Skinning?
 local function NotAKill(spellID)
+	local GetName = C_Spell and C_Spell.GetSpellName
 	if not notKillIDs then
 		notKillIDs, notKillNames = {}, {}
 		for _, id in ipairs(NOT_A_KILL) do
 			notKillIDs[id] = true
-			local name = C_Spell and C_Spell.GetSpellName and Value(C_Spell.GetSpellName, id)
+			local name = Value(GetName, id)
 			if name then
 				notKillNames[name] = true
 			end
 		end
+		skinName = Value(GetName, 8613)
 	end
-	if notKillIDs[spellID] then
-		return true
+	local name = not notKillIDs[spellID] and Value(GetName, spellID)
+	if notKillIDs[spellID] or (name and notKillNames[name]) then
+		return true, SKINNING[spellID] or (name ~= nil and name == skinName)
 	end
-	local name = C_Spell and C_Spell.GetSpellName and Value(C_Spell.GetSpellName, spellID)
-	return name ~= nil and notKillNames[name] == true
+	return false
+end
+
+-- Skinned: what came, per skinning of its kind (each corpse once; also in a group).
+local function OnSkinned(guid, creature)
+	if skinnedCorpse[guid] then
+		return Log(creature, "skinned before", 0)
+	end
+	skinnedCorpse[guid] = time()
+	local mob = MobFor(creature)
+	mob.skinned = (mob.skinned or 0) + 1
+	mob.skins = mob.skins or {}
+	local items = 0
+	for slot = 1, GetNumLootItems() do
+		if Value(GetLootSlotType, slot) == 1 then
+			local _, name, quantity, _, quality = GetLootSlotInfo(slot)
+			local link = Value(GetLootSlotLink, slot)
+			local id = type(link) == "string" and tonumber(link:match("|Hitem:(%d+)"))
+			if id and not issecret(quantity) and not issecret(quality) then
+				local skin = mob.skins[id] or { 0, 0, quality }
+				mob.skins[id] = skin
+				skin[1], skin[2], skin[3] = skin[1] + 1, skin[2] + math.max(1, tonumber(quantity) or 1), tonumber(quality) or skin[3]
+				skin[4] = not issecret(name) and type(name) == "string" and name or skin[4]
+				items = items + 1
+			end
+		end
+	end
+	Log(creature, "skinned", items)
+	Changed(creature)
 end
 
 -- The loot window opened (LOOT_READY, before anything is taken; LOOT_OPENED if its slots weren't
@@ -329,12 +427,15 @@ local function OnLoot()
 	lootSeen = true
 	local guid = LootSource()
 	local creature = Bt.CreatureOf(guid)
-	if not Solo() then
-		return Log(creature, "group", 0)
+	local gathered = GetTime() - castAt < CAST_GAP
+	if gathered and castSkin and creature then
+		return OnSkinned(guid, creature)
 	elseif IsFishingLoot and IsFishingLoot() then
 		return
-	elseif GetTime() - castAt < CAST_GAP then
-		return Log(creature, "skinning or pickpocket", 0)
+	elseif gathered then
+		return Log(creature, "pickpocket or gathering", 0)
+	elseif not Solo() then
+		return Log(creature, "group", 0)
 	elseif not creature then
 		return Log(nil, guid and "not a mob" or "no corpse", 0)
 	end
@@ -355,13 +456,14 @@ local function OnLoot()
 		if kind == 2 then -- (Enum.LootSlotType.Money)
 			coin = true
 		elseif kind == 1 then -- (Item)
-			local _, _, quantity, _, quality = GetLootSlotInfo(slot)
+			local _, name, quantity, _, quality = GetLootSlotInfo(slot)
 			local link = Value(GetLootSlotLink, slot)
 			local id = type(link) == "string" and tonumber(link:match("|Hitem:(%d+)"))
 			if id and not issecret(quantity) and not issecret(quality) then
 				local item = mob.items[id] or { 0, 0, quality }
 				mob.items[id] = item
 				item[1], item[2], item[3] = item[1] + 1, item[2] + math.max(1, tonumber(quantity) or 1), tonumber(quality) or item[3]
+				item[4] = not issecret(name) and type(name) == "string" and name or item[4] -- (for the search)
 				items = items + 1
 			end
 		end
@@ -399,6 +501,11 @@ local function Prune()
 			done[guid] = nil
 		end
 	end
+	for guid, at in pairs(skinnedCorpse) do
+		if wall - at > PENDING_FOR then
+			skinnedCorpse[guid] = nil
+		end
+	end
 end
 
 events:SetScript("OnEvent", function(_, event, a, b, c)
@@ -410,8 +517,12 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
 	elseif event == "LOOT_CLOSED" then
 		OnLootClosed()
 	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then -- unit, castGUID, spellID
-		if not issecret(c) and NotAKill(c) then
-			castAt = GetTime()
+		local notKill, skin = false, false
+		if not issecret(c) then
+			notKill, skin = NotAKill(c)
+		end
+		if notKill then
+			castAt, castSkin = GetTime(), skin
 		end
 	elseif event == "PLAYER_TARGET_CHANGED" then
 		Bt.Look("target")
@@ -470,9 +581,13 @@ function M:BuildOptions(o)
 		L["Your target's drops: each item, how many you got and its drop chance. It stays open (Escape doesn't close it) and follows your target. Also /bestiary."])
 	o:Checkbox("minimapButton", L["Minimap button"],
 		L["A button on the edge of the minimap: click opens or closes the Bestiary, right-click these settings. Drag it to move it."])
+	o:Button(L["Open the ledger"], L["Open"], function() Bt.ToggleLedger() end,
+		L["Every mob you've killed, with its statistics and drops; search mobs and items. Also Ctrl-click on the minimap button, or /bestiary ledger."])
 	o:Header(L["Drops"])
 	o:Checkbox("hoverCard", L["Drops next to the mouse"],
-		L["Hovering an enemy you've killed before shows its likeliest drops beside the mouse."])
+		L["Hovering an enemy you've killed before shows its likeliest drops beside the mouse. Shift-click on the minimap button switches it on or off."])
+	o:Checkbox("itemTooltip", L["Drop chances in item tooltips"],
+		L["An item's tooltip (in your bags, in chat, anywhere) lists the three mobs it comes from likeliest, with the chance; a pelt marks skinning."])
 	o:Checkbox("showPoor", L["Grey items"], L["Show grey (junk) items among the drops."])
 end
 
@@ -487,8 +602,11 @@ function M:OnSlashCommand(msg)
 		self:Print("minimap button " .. (self.db.minimapButton and "on." or "off."))
 	elseif cmd == "log" then
 		Bt.PrintLog()
+	elseif cmd == "ledger" or cmd:match("^ledger ") or cmd:match("^search ") then
+		Bt.ToggleLedger(nil, strtrim(msg or ""):match("^%S+%s+(.+)$"))
 	else
 		self:Print("/bestiary - open or close the window (your target's drops)")
+		self:Print("/bestiary ledger [search] - every mob you've killed, its drops; search mobs and items")
 		self:Print("/bestiary log - the last loot windows and kills, and what was made of them")
 		self:Print("/bestiary minimap - show or hide the minimap button")
 		self:Print("/bestiary settings - the Bestiary's settings")

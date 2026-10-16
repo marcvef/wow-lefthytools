@@ -58,7 +58,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Chronicle/Window.lua     the journal window (timeline, statistics, graphs, friends)
   Modules/Chronicle/MinimapButton.lua  the book button on the minimap's edge
   Modules/Bestiary/Bestiary.lua    Bestiary: kills and loot per kind of mob (LefthyToolsBestiaryDB), /bestiary
-  Modules/Bestiary/Window.lua      its window (your target's drops), the card beside the mouse, the minimap button
+  Modules/Bestiary/Window.lua      its window (your target's drops), the card beside the mouse, item tooltips, the minimap button
+  Modules/Bestiary/Ledger.lua      the ledger: every mob, its statistics and drops, fuzzy search over mobs and items
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools

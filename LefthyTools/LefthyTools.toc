@@ -65,3 +65,4 @@ Modules\Chronicle\MinimapButton.lua
 
 Modules\Bestiary\Bestiary.lua
 Modules\Bestiary\Window.lua
+Modules\Bestiary\Ledger.lua

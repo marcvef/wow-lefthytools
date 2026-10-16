@@ -1,10 +1,11 @@
 # Bestiary design
 
-What the mobs you kill drop: a database of your own per kind of mob, a window for your target, and
-(a setting) a card beside the mouse over an enemy. Files: `Modules/Bestiary/Bestiary.lua` (the
-module, recording, `ns.Bestiary` = `Bt`) and `Modules/Bestiary/Window.lua` (the window, the card,
-the minimap button). Nothing goes over the network (the user: "just your own, I want to limit
-traffic").
+What the mobs you kill drop: a database of your own per kind of mob, a window for your target,
+(settings) a card beside the mouse over an enemy and drop chances in item tooltips, and a ledger
+of every mob with a fuzzy search. Files: `Modules/Bestiary/Bestiary.lua` (the module, recording,
+`ns.Bestiary` = `Bt`), `Modules/Bestiary/Window.lua` (the window, the card, item tooltips, the
+minimap button) and `Modules/Bestiary/Ledger.lua` (the ledger). Nothing goes over the network (the
+user: "just your own, I want to limit traffic").
 
 ## The database
 
@@ -12,13 +13,25 @@ traffic").
 
 ```
 mobs = { [creature ID] = { name, level, class (UnitClassification), kills, money (copper, all
-         kills), last (time()), items = { [item ID] = { drops, count, quality } } } }
+         kills), first, last (time()), items = { [item ID] = { drops, count, quality, name } },
+         skinned, skins = { [item ID] = { times, count, quality, name } } } }
+log = { { time, creature, what, items, check }, ... } (the last 12)
 ```
 
 The creature ID comes from the GUID (`Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>`, also
 `Vehicle-`; `Bt.CreatureOf`). `drops` is how many corpses it came from, `count` how many in all.
-Drop chance = drops / kills; per drop = count / drops (`Bt.Chance`). `Bt.Drops(mob, showPoor)`:
-the likeliest first, the better quality first when even, grey ones only with `showPoor`.
+Drop chance = drops / kills; per drop = count / drops (`Bt.Chance`; skinning: out of skinnings).
+`Bt.Drops(mob, showPoor)`: the drops, the likeliest first, the better quality first when even, then
+the same for skinning (`skin = true`); grey ones only with `showPoor`. Use `Bt.Part(mob, skin)` for
+a kind's drops or skinnings: `skin and mob.skins or mob.items` falls back to the drops when there
+are no skinnings (that listed every drop twice once). Item names are kept as looted (the search
+needs them; a client may not know an item yet). `Bt.Sources(itemID)`: where an item comes from,
+the likeliest first, built over the whole database when first asked after a change.
+
+**Skinning** is kept apart (`skins`, `skinned`): after Skinning (any rank: by ID or its name) a
+corpse's loot window is what skinning gave, each corpse once (`skinnedCorpse`), also in a group
+(what you skin is yours). It's marked with Skinning's own icon (`Bt.SKIN_ICON`,
+`INV_Misc_Pelt_Wolf_01`) everywhere.
 
 Name, level and kind come from units seen (`Bt.Look`: target, mouseover, nameplates; the last 200
 GUIDs remembered) and are written to a kind's record as last seen.
@@ -63,7 +76,9 @@ flights.
 
 - **Header**: a still portrait (`PlayerModel:SetCreature`, portrait zoom 1, `RefreshCamera` and
   paused once loaded; a question mark before any mob), the name (gold), level and kind ("Level 16
-  Elite"), then "34 kills · 12s 40c each" (`GetCoinTextureString`).
+  Elite"), then "34 kills · 12s 40c each" (`GetCoinTextureString`; the coin on average over all
+  its kills, "no coin" for beasts) and, when skinned, the pelt and how often. A small book left of
+  the X opens the ledger on this mob.
 - **Drops**: 6 per row, at most 4 rows; each a 30 px icon edged in its quality's colour, how many you
   got in its corner, the drop chance under it ("35%", "3.4%", "<0.1%") in the quality's colour.
   Hover: the item's tooltip (`SetHyperlink`) plus "Dropped in 9 of 34 kills: 26%" and, for stacks,
@@ -81,12 +96,46 @@ Setting `hoverCard` (off by default). Over an enemy (attackable or dead) you've 
 `TOOLTIP` strata, no mouse. An OnUpdate while it's shown follows the cursor and hides it once the
 mouseover is gone or another unit.
 
+## Item tooltips
+
+Setting `itemTooltip` (on). A post-call on item tooltips (`TooltipDataProcessor`, only
+`GameTooltip` and `ItemRefTooltip`: bags, chat links, anywhere) adds, under a blank line,
+"Bestiary · drop chance (kills)" and the 3 likeliest sources (`Bt.Sources`): "Defias Bandit (9)
+50% (4)", skinning with the pelt in front; more: "and N more (the Bestiary's ledger)". Not on the
+window's own drop tooltips (they show the numbers already: `ownTooltip` while they're set).
+
+## The ledger (Ledger.lua)
+
+`LefthyToolsBestiaryLedger`, 640 x 470, same look; Escape closes it (it's for looking things up),
+registered with `LT.Window.Register`. Opened by the window's book, Ctrl-click on the minimap button,
+the settings or `/bestiary ledger [search]`.
+
+- **At the top**: "2 mobs · 7 kills · 5 items · 12s coin, 1s 76c per kill" (the coin per kill over
+  all kills), and the **rarest find**: the looted item with the lowest chance among mobs with at
+  least 5 kills, its icon, chance and mob.
+- **The list** (left, scrolling): a row per mob with kills or skinnings: name (found letters in
+  gold), level, Elite/Rare, kills on the right, its best drops as tiny icons (best quality first).
+  Sorted by most kills, name, level, coin per kill or last killed (a picker of our own).
+- **The picked mob** (right): its whole model turning slowly (an OnUpdate while open), name, kind,
+  kills, coin each and in all (or "no coin"), first and last kill ("2 h ago"), skinnings, then all
+  its drops (9 per row, 5 rows, "+N"; skinning marked).
+- **The search** (fuzzy, `Bt.Fuzzy`): the query's letters in order, not necessarily together, case
+  and spaces ignored ("dfbnd" finds Defias Bandit); letters together, at a word's start and early
+  score more, a shorter text a little more. Over mob names and the names of all their drops and
+  skinnings (an item found counts 0.95 of its score). Results best first; typing picks the best
+  match. A row found by an item shows that item, its chance (and "+N" more found); the picked
+  mob's found drops stand out, the others fade to 35%. Names the client doesn't know yet are asked
+  for (`RequestLoadItemDataByID`); `GET_ITEM_INFO_RECEIVED` (listened to only while open) redraws
+  once, half a second later.
+
 ## Minimap button and settings
 
 `LT.Window.MinimapButton` (a loot bag, angle `minimapAngle`, 150: upper left), a gold dot while the
-window is open; click toggles the window, right-click opens the settings, its tooltip says how many
-kinds and kills are known. Settings: open the window, minimap button (on), drops beside the mouse
-(off), grey items (on). `/bestiary` (`open`, `minimap`, `settings`).
+window is open; click toggles the window, Shift-click switches the card beside the mouse (a chat
+line says which), Ctrl-click opens or closes the ledger, right-click opens the settings; its tooltip
+says how many kinds and kills are known and all of that. Settings: open the window, open the
+ledger, minimap button (on), drops beside the mouse (off), drop chances in item tooltips (on), grey
+items (on). `/bestiary` (`open`, `ledger [search]`, `log`, `minimap`, `settings`).
 
 ## Cost
 
