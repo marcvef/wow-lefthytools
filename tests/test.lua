@@ -4107,6 +4107,10 @@ do
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
 	LefthyToolsStreamTestsFrame:Hide()
+	lefthy("stream looktest") -- (a probe: whatever this client lacks is noted, not an error)
+	Advance(3.1)
+	check(LefthyToolsLookTest and LefthyToolsLookTest:IsShown() and LefthyToolsDB.lookTest, "/lefthy stream looktest: four boxes, notes kept")
+	LefthyToolsLookTest:Hide()
 
 	pmark = #PRINTED + 1
 	lefthy("stream test")
