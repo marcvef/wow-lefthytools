@@ -26,6 +26,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Mirage/Options.lua settings page, /mirage, keybinding labels
   Modules/Tweaks/Tweaks.lua  Misc Tweaks: status text, movable bags, quest announcements
   Modules/Tweaks/ComboPoints.lua  combo points on the personal resource display
+  Modules/Tweaks/Aggro.lua   who has aggro, on enemy nameplates (role colours, role check)
   Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever
   Modules/Tweaks/AFK.lua     AFK screen (a tweak): interface hidden, camera circling, a panel with news
   Modules/Tweaks/Flight.lua  cinematic flights (a tweak): letterbox, title cards, subtitles, time left

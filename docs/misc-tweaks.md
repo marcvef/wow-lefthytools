@@ -111,6 +111,46 @@ display (the old `comboPoints` tweak) is gone; its saved value is simply no long
   The colouring's copies follow Blizzard's gems only after its own updates (its `UpdatePower`), not
   after every event.
 
+## aggroNameplate: who has aggro, on enemy nameplates (Aggro.lua)
+
+The user, a tank or healer: "on top of the HP bar similar to combo points on the very left it should
+tell you who has aggro of that mob. If its you it should say >You< otherwise it should show the
+first 3 characters of the other player in the color of their role ... people will mostly look for
+the color first".
+
+- **The tag**: our own frame on the plate's `UnitFrame` (it shows, fades and scales with it; kept
+  in a weak table by unit frame, nothing written into Blizzard's frames), at the health bar's left
+  end (`LEFT`, 1 px in; the bar found like the combo dots'), 10 levels above it: the text in 8 px
+  outlined on black at 72%, so the colour reads on the red bar. `>You<` (deDE `>Du<`) or the
+  first three letters of the name, whole UTF-8 letters ("Ölrik" -> "Ölr"). Colours: tank (0.35,
+  0.62, 1), healer (0.3, 0.95, 0.4), damage (1, 0.32, 0.26), no role (0.92 white), pet (0.85, 0.72,
+  0.45), outside the group (0.6 grey). Takes no room: nothing on the nameplate moves.
+- **When**: in a group (`IsInGroup`), on an enemy (`UnitCanAttack`, not a player, not dead) that's
+  in combat (`UnitAffectingCombat`). Solo nothing (the user's case is the group).
+- **Who** (`Holder`): the mob's target (`UnitGUID(<plate>target)`) when it's in the group and its
+  `UnitThreatSituation(member, mob)` isn't 0 or 1 (tanking, or not readable); else whoever is
+  tanking it (status 3, else 2) over the group, pets included (a spell at the healer while you
+  tank it: you); else the target anyway; else someone outside the group by name (an escort). The
+  API docs mark threat and unit identity "secret when restricted": a secret value counts as not
+  readable, and with nothing readable there's no tag (not a wrong one).
+- **Roles** (`Role`): `UnitGroupRolesAssigned` (the dungeon finder or a role check), else
+  `GetPartyAssignment("MAINTANK")`, else a guess: Bear Form, Dire Bear Form, Righteous Fury
+  (`C_UnitAuras.GetAuraDataBySpellName` or `AuraUtil.FindAuraByName`, names from the spell IDs) and
+  your own Defensive Stance (`GetShapeshiftFormInfo` spell 71). Forever's UI has Blizzard's role
+  check window (`RolePoll.lua`) but no way to start one, and `InitiateRolePoll` isn't restricted:
+  **Start a role check** (`/lefthy tweaks rolecheck`, leader or assistant) starts it, and everyone
+  picks in Blizzard's window, LefthyTools or not.
+- **Cost**: the roster (GUID -> unit, name, role; player, pet, party1-4 or raid1-40 and their pets)
+  is read again only on roster, role, pet and form changes and when combat starts or ends (forms
+  are up by then), not on threat changes. `UNIT_THREAT_LIST_UPDATE`, `UNIT_TARGET` and
+  `UNIT_FLAGS` mark that nameplate, `UNIT_THREAT_SITUATION_UPDATE` all of them; one OnUpdate looks
+  at the marked ones on the next frame. While you're in combat in a group it also looks at every
+  enemy nameplate every 0.5 s (1 s in a raid), in case an event was missed; otherwise it stops.
+- **Try it** (`/lefthy tweaks aggrotest`): for 10 s each enemy nameplate in sight shows an example
+  (you as tank, a healer, a damage dealer, someone without a role).
+- To check in game: whether threat and a mob's target are readable in dungeons (or secret), and
+  whether Forever's groups have roles.
+
 ## retailFrames: retail unit frames (RetailFrames.lua)
 
 Off by default (friends may like Forever's look). Build 1.60.1.70425 drew the player, target,

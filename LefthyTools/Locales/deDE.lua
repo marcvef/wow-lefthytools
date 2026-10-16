@@ -863,3 +863,14 @@ L["The drops next to the mouse don't show while you're in combat, and go when a 
 	"Die Drops neben der Maus erscheinen nicht, während du im Kampf bist, und verschwinden, wenn ein Kampf beginnt."
 L["Under your target's drops in the window, what the drop database says it drops that you haven't had yet, faded (a mob you haven't killed: what it can drop). The ledger always shows it."] =
 	"Unter den Drops deines Ziels im Fenster, verblasst, was er laut Drop-Datenbank droppt und du noch nicht hattest (bei einem Mob, den du noch nicht getötet hast: was er droppen kann). Das Verzeichnis zeigt es immer."
+L["Who has aggro, on enemy nameplates"] = "Wer Aggro hat, auf feindlichen Namensplaketten"
+L["In a group, the left end of each enemy's health bar says whom it's on: >You< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."] =
+	"In einer Gruppe zeigt das linke Ende des Lebensbalkens jedes Gegners, auf wem er ist: >Du<, wenn du es bist, sonst die ersten drei Buchstaben des Namens in der Farbe der Rolle (Tank blau, Heiler grün, DD rot, weiß, wenn unbekannt). Die Rollen kommen aus dem Dungeonbrowser oder einem Rollencheck; in einer selbst erstellten Gruppe kann der Anführer unten einen starten."
+L["Start a role check"] = "Rollencheck starten"
+L["Start"] = "Starten"
+L["Everyone in your group picks tank, healer or damage in Blizzard's role check window, LefthyTools or not, and the aggro colours follow. Only the group's leader or an assistant can start one. /lefthy tweaks rolecheck does the same."] =
+	"Jeder in deiner Gruppe wählt Tank, Heiler oder Schaden in Blizzards Rollencheck-Fenster, mit LefthyTools oder ohne, und die Aggro-Farben folgen. Nur der Anführer der Gruppe oder ein Assistent kann einen starten. /lefthy tweaks rolecheck macht dasselbe."
+L["Aggro on nameplates: preview"] = "Aggro auf Namensplaketten: Vorschau"
+L["For ten seconds the enemy nameplates you can see show examples: you, a tank, a healer, a damage dealer and someone without a role. /lefthy tweaks aggrotest does the same."] =
+	"Zehn Sekunden lang zeigen die feindlichen Namensplaketten, die du siehst, Beispiele: dich, einen Tank, einen Heiler, einen DD und jemanden ohne Rolle. /lefthy tweaks aggrotest macht dasselbe."
+L[">You<"] = ">Du<"

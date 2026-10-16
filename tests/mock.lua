@@ -512,7 +512,10 @@ end
 -- Spells: KNOWN_SPELLS[id] = true for spells the player knows; names and icons are made up.
 KNOWN_SPELLS = {}
 function IsPlayerSpell(id) return KNOWN_SPELLS[id] == true end
-SPELL_NAMES = {} -- [id] = a name of its own (default "Spell <id>")
+SPELL_NAMES = { [5487] = "Bear Form" } -- [id] = a name of its own (default "Spell <id>")
+-- Auras: AURAS[unit][name] = true (AuraUtil.FindAuraByName).
+AURAS = {}
+AuraUtil = { FindAuraByName = function(name, unit) return AURAS[unit] and AURAS[unit][name] and name or nil end }
 C_Spell = { GetSpellInfo = function(id) return { name = SPELL_NAMES[id] or ("Spell " .. id), iconID = 100000 + id, spellID = id } end }
 function SetPortraitTexture(texture, unit) texture.portrait = unit end
 -- A link clicked in chat (ItemRef.lua): nothing opens here.
@@ -586,7 +589,12 @@ function IsMounted() return TRAVEL.mounted end
 function IsFlying() return TRAVEL.flying end
 function UnitOnTaxi() return TRAVEL.taxi end
 THREAT = {} -- nameplate unit -> UnitThreatSituation("player", unit): nil (not on its list), 0-3, or SECRET
-function UnitThreatSituation(unit, mob) if unit == "player" then return THREAT[mob] end end
+THREATS = {} -- "<group unit>><nameplate unit>" -> UnitThreatSituation(unit, mob) for the rest of the group
+function UnitThreatSituation(unit, mob) if unit == "player" then return THREAT[mob] end return THREATS[unit .. ">" .. mob] end
+-- Roles: ROLES[unit] (UnitGroupRolesAssigned; "NONE" when not set); InitiateRolePoll counts its calls.
+ROLES, ROLE_POLLS, ROLE_POLL_OK = {}, 0, true
+function UnitGroupRolesAssigned(unit) return ROLES[unit] or "NONE" end
+function InitiateRolePoll() ROLE_POLLS = ROLE_POLLS + 1; return ROLE_POLL_OK end
 TARGET_CLASS = "normal"
 function UnitClassification(unit) return unit == "target" and TARGET_CLASS or "normal" end
 function UnitIsPlayer(unit) return unit == "player" end
@@ -1633,13 +1641,23 @@ end
 local baseUnit = { UnitExists = UnitExists, UnitName = UnitName, UnitLevel = UnitLevel, UnitIsDead = UnitIsDead,
 	UnitCanAttack = UnitCanAttack, UnitAffectingCombat = UnitAffectingCombat, UnitClassification = UnitClassification,
 	UnitGUID = UnitGUID }
+-- A mob's target ("nameplate1target"): mob.targetGUID (else me while it's attacking me), mob.targetName.
+local function MobOfTarget(u) return u:find(".target$") and MOBS[(u:gsub("target$", ""))] or nil end
 function UnitExists(u)
 	if u == "softenemy" then return SoftEnemy() ~= nil end
 	if MOBS[u] then return u == "target" or MOBS[u].pinned or select(2, Placed(MOBS[u])) end -- (pinned: kept on screen in combat)
 	if PARTY[u] and PARTY[u].name then return true end
+	local mob = MobOfTarget(u)
+	if mob and mob.targetGUID then return true end
 	return baseUnit.UnitExists(u)
 end
-function UnitName(u) if MOBS[u] then return MOBS[u].name end if PARTY[u] and PARTY[u].name then return PARTY[u].name end return baseUnit.UnitName(u) end
+function UnitName(u)
+	if MOBS[u] then return MOBS[u].name end
+	if PARTY[u] and PARTY[u].name then return PARTY[u].name end
+	local mob = MobOfTarget(u)
+	if mob and mob.targetName then return mob.targetName end
+	return baseUnit.UnitName(u)
+end
 function UnitLevel(u) if MOBS[u] then return MOBS[u].level end if PARTY[u] and PARTY[u].level then return PARTY[u].level end return baseUnit.UnitLevel(u) end
 -- Players: a mob entry with player = true (and classFile), or a party member with a name (PARTY[unit]).
 local baseClass, baseIsPlayer, baseDeadOrGhost = UnitClass, UnitIsPlayer, UnitIsDeadOrGhost
@@ -1654,7 +1672,12 @@ function UnitIsDead(u) if MOBS[u] then return MOBS[u].dead == true end return ba
 function UnitCanAttack(a, u) if MOBS[u] then return not MOBS[u].friendly end return baseUnit.UnitCanAttack(a, u) end
 function UnitAffectingCombat(u) if MOBS[u] then return MOBS[u].combat == true end return baseUnit.UnitAffectingCombat(u) end
 function UnitClassification(u) if MOBS[u] then return MOBS[u].class or "normal" end return baseUnit.UnitClassification(u) end
-function UnitGUID(u) if MOBS[u] then return MOBS[u].guid or ("Creature-0-" .. u) end return baseUnit.UnitGUID(u) end
+function UnitGUID(u)
+	if MOBS[u] then return MOBS[u].guid or ("Creature-0-" .. u) end
+	local mob = MobOfTarget(u)
+	if mob and (mob.targetGUID or mob.attacking) then return mob.targetGUID or "Player-1-0" end
+	return baseUnit.UnitGUID(u)
+end
 function UnitIsUnit(a, b)
 	if b == "softenemy" then return SoftEnemy() == a end
 	local mob = MOBS[(a:gsub("target$", ""))]

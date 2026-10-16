@@ -4,7 +4,7 @@ local L = ns.L
 
 -- Misc Tweaks: small annoyances fixed, each switchable on its own. All tweaks default to on
 -- (chosen while the Forever beta still dropped SavedVariables on restart).
--- The combo point tweaks live in ComboPoints.lua.
+-- The combo point tweaks live in ComboPoints.lua, who has aggro on nameplates in Aggro.lua.
 
 local M = LT:NewModule("tweaks", {
 	title = "Misc Tweaks", -- module names are never translated
@@ -19,6 +19,7 @@ local M = LT:NewModule("tweaks", {
 		comboNameplate = true, -- (comboPoints, our own row under the personal resource display, is gone: Blizzard has its own now)
 		comboDotSize = 6,      -- the dots in the target's health bar: each one's size in pixels
 		comboColors = true,
+		aggroNameplate = true, -- Aggro.lua: in a group, who an enemy is on, on its nameplate
 		retailFrames = false,  -- RetailFrames.lua: retail's unit frames instead of Forever's classic ones (off: Forever's own look)
 		foreverQuests = true,
 		questMap = true,       -- QuestMap.lua
@@ -587,6 +588,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyComboNameplate(on) end }, -- ComboPoints.lua
 	{ key = "comboColors", command = "combocolors", label = "Colour combo points by count",
 		apply = function(on) ns.ApplyComboColors(on) end },
+	{ key = "aggroNameplate", command = "aggro", label = "Who has aggro, on enemy nameplates",
+		apply = function(on) ns.ApplyAggro(on) end }, -- Aggro.lua
 	{ key = "retailFrames", command = "retailframes", label = "Retail unit frames",
 		apply = function(on) ns.ApplyRetailFrames(on) end }, -- RetailFrames.lua
 	{ key = "foreverQuests", command = "newquests", label = "Mark quests that are new in WoW: Forever",
@@ -652,6 +655,20 @@ function M:IsTweakActive(key)
 	return active[key] == true
 end
 
+-- Who has aggro: examples on the enemy nameplates in sight (Aggro.lua).
+function M:AggroPreview()
+	if not active.aggroNameplate then
+		self:Print("who has aggro on nameplates is off: /lefthy tweaks aggro switches it on.")
+		return
+	end
+	local count = ns.AggroPreview()
+	if count == 0 then
+		self:Print("no enemy nameplates in sight: look at some mobs (with enemy nameplates on) and try again.")
+	else
+		self:Print(("examples of who has aggro on %d enemy nameplate(s), for ten seconds."):format(count))
+	end
+end
+
 ---------------------------------------------------------------------------
 -- Settings page and /lefthy tweaks
 ---------------------------------------------------------------------------
@@ -672,6 +689,12 @@ function M:BuildOptions(o)
 		4, 12, 1, Pixels)
 	o:Button(L["Combo dots: preview"], L["Try it"], function() ns.ComboTrial(true) end,
 		L["A small window with a nameplate whose dots count up like your points will; - and + change their size. No mob needed, and the settings can be closed. /lefthy tweaks combopos does the same."])
+	o:Checkbox("aggroNameplate", L["Who has aggro, on enemy nameplates"],
+		L["In a group, the left end of each enemy's health bar says whom it's on: >You< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."])
+	o:Button(L["Start a role check"], L["Start"], function() M:Print(ns.AggroRoleCheck()) end,
+		L["Everyone in your group picks tank, healer or damage in Blizzard's role check window, LefthyTools or not, and the aggro colours follow. Only the group's leader or an assistant can start one. /lefthy tweaks rolecheck does the same."])
+	o:Button(L["Aggro on nameplates: preview"], L["Try it"], function() M:AggroPreview() end,
+		L["For ten seconds the enemy nameplates you can see show examples: you, a tank, a healer, a damage dealer and someone without a role. /lefthy tweaks aggrotest does the same."])
 	o:Header(L["Bags"])
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])
@@ -727,6 +750,10 @@ function M:OnSlashCommand(msg)
 		self:Print("bag positions reset.")
 	elseif cmd == "combopos" then
 		ns.ComboTrial(true) -- ComboPoints.lua: the nameplate dots' preview, without a mob
+	elseif cmd == "rolecheck" then
+		self:Print(ns.AggroRoleCheck()) -- Aggro.lua
+	elseif cmd == "aggrotest" then
+		self:AggroPreview()
 	elseif cmd == "levelup" and arg == "test" then
 		ns.LevelUp.Preview()
 	elseif cmd == "status" then
@@ -753,9 +780,11 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | bagsort | quests | newquests | combo | combocolors | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | bagsort | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
 		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 		self:Print("/lefthy tweaks combopos - preview the combo point dots on nameplates (no mob needed)")
+		self:Print("/lefthy tweaks aggrotest - examples of who has aggro on the enemy nameplates you see")
+		self:Print("/lefthy tweaks rolecheck - start a role check (group leader or assistant)")
 	end
 end
