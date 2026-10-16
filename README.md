@@ -246,23 +246,28 @@ minimap** (drag it along the edge; right-click for the settings; `/chronicle min
 `/chronicle`, the button on its settings page, or a key binding (*Chronicle: open or close the
 journal*).
 
-- **Timeline**, newest first, by day: level-ups (and how long each level took), deaths (where,
-  and what killed you), zones discovered, first visits to dungeons, bosses defeated, rare
-  elites killed, blue and better loot, new mounts, pets and toys, achievements, professions
-  learned and their milestones, and milestones for quests (10, 25, 50, 100, ...) and gold
-  (1, 10, 50, 100, ...).
-- **Statistics**, for this session and the character: time played, days played, sessions,
-  fastest and average level, quests (and how many were new in WoW: Forever), experience,
-  zones discovered and your favourite zone, dungeon runs, killing blows, rare elites, bosses,
-  deaths and your deadliest foe, distance on foot, riding, swimming and on flight paths, gold
-  earned, spent and the most you ever had, loot by quality, mounts, pets, toys and achievements.
-  For **all your characters** together: time played, quests, kills, deaths, distance and jumps,
-  and the **Martin tracker**: how long you've been AFK, its share of your play time, how often and
-  the longest stretch, with a verdict from "Always there" to "Practically Martin".
-- **Graphs:** the last 14 days (time played, XP, quests or kills per day), this session's XP
-  curve with XP per hour, how long each level took (green fast, red slow), your favourite zones
-  and deadliest foes, how you travel, and your loot by quality. Hover a bar for its value.
-  Pick one of your **friends** in the dropdown at the top: their last 14 days, their week in
+The journal is about **you, not one character**: every number is all your characters added up
+(your BattleTag's), and your friends' are theirs. Only what belongs to a character on its own
+stays per character: its level, how long its levels took, and the session you're playing now.
+
+- **Timeline**, newest first, by day, all your characters in one (each line says whose):
+  level-ups (and how long each level took), deaths (where, and what killed you), zones
+  discovered, first visits to dungeons, bosses defeated, rare elites killed, blue and better
+  loot, new mounts, pets and toys, achievements, professions learned and their milestones, and
+  milestones for quests (10, 25, 50, 100, ...) and gold (1, 10, 50, 100, ...).
+- **Statistics:** this session, your characters and their levels, then all of them together:
+  time played, days played, sessions, fastest and average level, quests (and how many were new in
+  WoW: Forever), experience, zones discovered and your favourite zone, dungeon runs, killing blows,
+  rare elites, bosses, deaths and your deadliest foe, distance on foot, riding, swimming and on
+  flight paths, jumps, gold now, earned, spent and the most you ever had, loot by quality, mounts,
+  pets, toys and achievements, and the **Martin tracker**: how long you've been AFK, its share of
+  your play time, how often and the longest stretch, with a verdict from "Always there" to
+  "Practically Martin".
+- **Graphs:** the last 14 days (time played, XP, quests, kills or time AFK per day), this
+  session's XP curve with XP per hour, how long each level of the character you play took (green
+  fast, red slow), your favourite zones and deadliest foes, how you travel, and your loot by
+  quality. Hover a bar for its value. Pick one of your **friends** in the dropdown at the top (one
+  entry per friend, by BattleTag, with their characters): their last 14 days, their week in
   numbers, you and them side by side (this week and all time), and their latest news, also for
   the time you weren't online.
 - **Compare:** you and every friend in every graph, on one page, per person (all their characters
@@ -283,7 +288,6 @@ journal*).
   BattleTag; the BattleTag itself never leaves your client). Needs Beacon.
 - **While you were away:** a minute after you log in, a chat line per friend with what they did
   since you last played. Once a week, **last week's leaderboard** in chat.
-- **All your characters:** pick one in the dropdown at the top.
 - `/chronicle session` prints this session in one line; the AFK screen shows it too.
 
 Everything counts from when Chronicle first saw a character. It's recorded in the background

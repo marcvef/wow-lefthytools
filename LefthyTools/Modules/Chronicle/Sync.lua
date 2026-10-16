@@ -808,8 +808,8 @@ end
 -- up over an account's characters (time, XP, quests, kills, deaths, distance, AFK, jumps: per
 -- character those mean little for a person); level is that of the character played most that day,
 -- gold the sum of every character's last known gold. Named after the character played most in the
--- last 30 days (its class colour), the others listed in chars. For the Compare page, leaderboards,
--- the recap and the Martin tracker.
+-- last 30 days (its class colour), the others listed in chars. For the window's dropdown (one entry
+-- per person), a friend's graphs, the Compare page, leaderboards and the recap.
 local ADDITIVE = { "played", "xp", "quests", "kills", "deaths", "levels", "afk", "dist", "bosses", "rares", "runs", "jumps" }
 local SUMMED = { played = true, sessions = true, quests = true, kills = true, deaths = true, runs = true, bosses = true,
 	rares = true, dist = true, jumps = true, afk = true, loot4 = true, levels = true, xp = true }
@@ -947,14 +947,6 @@ function C.Ago(t)
 		return L["yesterday"]
 	end
 	return L["%d days ago"]:format(math.floor(seconds / 86400))
-end
-
-function C.Person(key)
-	for _, person in ipairs(C.People()) do
-		if person.key == key then
-			return person
-		end
-	end
 end
 
 -- A metric's value on one day of a person (nil: no record that day).

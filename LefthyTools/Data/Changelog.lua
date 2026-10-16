@@ -263,5 +263,8 @@ ns.CHANGELOG = {
 	{ id = 85, module = "chronicle",
 		en = { "Compare: no friend counted twice", "Days a friend sends from a character their synced journal doesn't have yet, or from an older LefthyTools, now count for their BattleTag, so they no longer show up as a second person marked (friend)." },
 		de = { "Vergleich: kein Freund mehr doppelt", "Tage, die ein Freund von einem Charakter schickt, den sein abgeglichenes Tagebuch noch nicht hat, oder von einem älteren LefthyTools, zählen jetzt für seinen BattleTag: er erscheint nicht mehr als zweite Person mit (Freund)." } },
+	{ id = 86, module = "chronicle",
+		en = { "Chronicle: you, not one character", "Statistics, Graphs and the Timeline now add up all your characters, and each number shows once: time AFK only in the Martin tracker, no character and all-characters versions side by side. Only levels, time per level and the session you're playing stay per character. The dropdown at the top lists each person once: you, then every friend by BattleTag with their characters. A friend's graphs add up their characters too, and time AFK is back in the graphs." },
+		de = { "Chronicle: du, nicht ein Charakter", "Statistiken, Grafiken und die Zeitleiste zählen jetzt alle deine Charaktere zusammen, und jede Zahl steht nur einmal da: Zeit AFK nur im Martin-Tracker, keine Charakter- und Alle-Charaktere-Werte mehr nebeneinander. Nur Level, Zeit pro Level und die laufende Session bleiben pro Charakter. Das Dropdown oben zeigt jede Person einmal: dich, dann jeden Freund nach BattleTag mit seinen Charakteren. Die Grafiken eines Freundes zählen seine Charaktere auch zusammen, und Zeit AFK ist zurück in den Grafiken." } },
 	-- New entries go here, at the end.
 }

@@ -8,7 +8,9 @@ local C = ns.Chronicle
 -- a pool and is reused on the next draw, so redrawing creates nothing new once the page has been
 -- drawn; the window draws the page only when it's opened and at most every few seconds after.
 --
---   Last 14 days      bars per day: time played, XP, quests or kills (buttons switch)
+-- The person, not a character: all my characters added up (Chronicle.lua's C.Totals), except what
+-- only a character has (the session going on, time per level: the character I play).
+--   Last 14 days      bars per day: time played, XP, quests, kills or time AFK (buttons switch)
 --   This session      XP over the session, a line with a soft fill under it
 --   Time per level    a bar per level, green (fast) to red (slow)
 --   Favourite zones | Deadliest foes        horizontal bars
@@ -22,7 +24,7 @@ local BAR_TODAY = { 1, 0.78, 0.2 }
 local LINE_COLOR = { 0.35, 0.85, 0.45 }
 local DAYS = 14
 local LEVELS = 20
-local METRICS = { "played", "xp", "quests", "kills" } -- (time AFK and jumps go per account: the Compare page)
+local METRICS = { "played", "xp", "quests", "kills", "afk" }
 
 local G = {}
 C.Graphs = G
@@ -394,7 +396,7 @@ local function Levels(canvas, x, y, w, c)
 	end
 	local note = fastest and L["Fastest: %d (%s), slowest: %d (%s)"]:format(fastest, C.Duration(c.levelTimes[fastest]),
 		slowest, C.Duration(c.levelTimes[slowest])) or nil
-	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Time per level"], note)
+	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Time per level: %s"]:format(c.name or "?"), note) -- (a character's own)
 	if #levels == 0 then
 		Empty(canvas, ix, iy, iw, ih, L["Level up once with Chronicle on to see this."])
 		return h
@@ -492,18 +494,20 @@ local function PlaceButtons(canvas, ix, iy, state)
 	end
 end
 
--- Draws the whole page for record c; state.metric is the 14-day chart's metric, state.buttons
--- the four metric buttons (created by the window). Returns the page height.
+-- Draws the whole page for c, all my characters (C.Totals; c.current: the one I play, whose session
+-- and time per level it shows); state.metric is the 14-day chart's metric, state.buttons the metric
+-- buttons (created by the window). Returns the page height.
 function G.Draw(canvas, width, c, state)
 	canvas:Reset()
+	local current = c.current or c
 	local y = 0
 	local h, ix, iy = Days(canvas, 0, y, width, c, state.metric)
 	PlaceButtons(canvas, ix, iy, state)
 	y = y + h + CARD_GAP
-	if c == C.Char() then -- a session only exists for the character you're playing
-		y = y + Session(canvas, 0, y, width, c) + CARD_GAP
+	if current == C.Char() then -- a session only exists for the character you're playing
+		y = y + Session(canvas, 0, y, width, current) + CARD_GAP
 	end
-	y = y + Levels(canvas, 0, y, width, c) + CARD_GAP
+	y = y + Levels(canvas, 0, y, width, current) + CARD_GAP
 	local half = (width - CARD_GAP) / 2
 	Zones(canvas, 0, y, half, 120, c)
 	Foes(canvas, half + CARD_GAP, y, half, 120, c)
@@ -520,7 +524,7 @@ end
 
 local MY_COLOR = { 1, 0.78, 0.2 }
 local THEIR_COLOR = BAR_BLUE
-local WEEK = { "played", "xp", "levels", "quests", "kills", "deaths" }
+local WEEK = { "played", "xp", "levels", "quests", "kills", "deaths", "afk" }
 
 local function Sum(days, count)
 	local sum = { played = 0, xp = 0, levels = 0, quests = 0, kills = 0, deaths = 0, afk = 0 }
@@ -559,7 +563,7 @@ end
 
 -- You and them over the last 7 days, two bars per number.
 local function Versus(canvas, x, y, w, mine, theirs, name)
-	local rows = { "played", "xp", "quests", "kills" }
+	local rows = { "played", "xp", "quests", "kills", "afk" }
 	local rowH = 32
 	local h = HEADER + 4 + #rows * rowH + PAD
 	local function Hex(c)
@@ -633,8 +637,9 @@ local function Lifetime(canvas, x, y, w, mine, theirs, name, person)
 	return h
 end
 
--- Draws a friend's page: friend = a person from C.People() (days; a synced one also a profile),
--- me = my record (for the comparison); state as for G.Draw, plus state.newsLines(name) from the window.
+-- Draws a friend's page: friend = a person from C.Accounts() (all their characters added up: days;
+-- with a synced journal also a profile), me = mine from there (for the comparison: all my characters
+-- too); state as for G.Draw, plus state.newsLines(friend) from the window.
 function G.DrawFriend(canvas, width, friend, name, me, state)
 	canvas:Reset()
 	local y = 0
@@ -642,11 +647,11 @@ function G.DrawFriend(canvas, width, friend, name, me, state)
 	PlaceButtons(canvas, ix, iy, state)
 	y = y + h + CARD_GAP
 	y = y + Week(canvas, 0, y, width, friend.days) + CARD_GAP
-	y = y + Versus(canvas, 0, y, width, Sum(me.daily, 7), Sum(friend.days, 7), name) + CARD_GAP
+	y = y + Versus(canvas, 0, y, width, Sum(me.days, 7), Sum(friend.days, 7), name) + CARD_GAP
 	if friend.profile then
-		y = y + Lifetime(canvas, 0, y, width, C.ProfileNumbers(me), friend.profile, name, friend) + CARD_GAP
+		y = y + Lifetime(canvas, 0, y, width, me.profile or {}, friend.profile, name, friend) + CARD_GAP
 	end
-	y = y + News(canvas, 0, y, width, state.newsLines and state.newsLines(name) or {})
+	y = y + News(canvas, 0, y, width, state.newsLines and state.newsLines(friend) or {})
 	return y + 4
 end
 

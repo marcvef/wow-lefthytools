@@ -1000,6 +1000,64 @@ function C.Char()
 	return char
 end
 
+-- All my characters as one record, the person behind them (the window's Timeline, Statistics and
+-- Graphs). Counters added up (records like the longest session: the best of them), time per zone
+-- and deadly foes added up, zones, dungeons and days played joined, each day's counters added up.
+-- What only makes sense per character stays with them: current is the one I play (its session and
+-- time per level), chars every character (the one I play first, then by time played).
+local BEST = { maxMoney = true, longestSession = true, longestAfk = true }
+
+function C.Totals()
+	local t = { me = true, current = char, chars = {}, stats = {}, zoneTime = {}, killers = {},
+		seen = { zones = {}, dungeons = {} }, days = {}, daily = {}, first = char.first }
+	local stats = t.stats
+	for _, key in ipairs(STAT_KEYS) do
+		stats[key] = 0
+	end
+	for _, c in pairs(store.chars) do
+		Fill(c)
+		t.chars[#t.chars + 1] = c
+		for _, key in ipairs(STAT_KEYS) do
+			local v = c.stats[key]
+			stats[key] = BEST[key] and math.max(stats[key], v) or stats[key] + v
+		end
+		for name, seconds in pairs(c.zoneTime) do
+			t.zoneTime[name] = (t.zoneTime[name] or 0) + seconds
+		end
+		for name, times in pairs(c.killers) do
+			t.killers[name] = (t.killers[name] or 0) + times
+		end
+		for _, kind in ipairs({ "zones", "dungeons" }) do
+			for name in pairs(c.seen[kind]) do
+				t.seen[kind][name] = true
+			end
+		end
+		for day in pairs(c.days) do
+			t.days[day] = true
+		end
+		for day, b in pairs(c.daily) do
+			local sum = t.daily[day] or {}
+			t.daily[day] = sum
+			for key, v in pairs(b) do
+				if type(v) == "number" and key ~= "level" and key ~= "gold" then -- (where the day ended: per character)
+					sum[key] = (sum[key] or 0) + v
+				end
+			end
+		end
+		if c.fastestLevel and c.fastestLevel < (t.fastestLevel or math.huge) then
+			t.fastestLevel = c.fastestLevel
+		end
+		t.first = math.min(t.first or c.first, c.first)
+	end
+	table.sort(t.chars, function(a, b)
+		if (a == char) ~= (b == char) then
+			return a == char
+		end
+		return a.stats.played > b.stats.played or (a.stats.played == b.stats.played and (a.name or "") < (b.name or ""))
+	end)
+	return t
+end
+
 -- "1h 12m", "3d 4h", "45s"
 function C.Duration(seconds)
 	seconds = math.floor((seconds or 0) + 0.5)

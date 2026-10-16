@@ -5315,10 +5315,12 @@ do
 	check(lines(labels) == lines(values), "statistics: labels and values line up")
 	for _, expected in ipairs({ "This session", "Killing blows", "Deadliest foe", "Rare elites killed", "Bosses defeated", "Dungeon runs",
 			"Favourite zone", "On foot", "Flight paths", "Jumps", "Most gold at once", "Epic items", "Mounts", "Time played (/played)",
-			"Martin tracker (all your characters)", "Time AFK", "Share of time played", "Times AFK", "Longest AFK", "AFK this session", "Verdict",
-		"All your characters", "Characters" }) do
+			"Martin tracker", "Time AFK", "Share of time played", "Times AFK", "Longest AFK", "Verdict", "Characters", "Lefthy|r" }) do
 		check(labels:find(expected, 1, true), "statistics: " .. expected)
 	end
+	check(not labels:find("All your characters", 1, true) and not labels:find("AFK this session", 1, true)
+		and select(2, labels:gsub("Time AFK", "")) == 1 and select(2, labels:gsub("Killing blows", "")) == 2,
+		"each number once, for the person (the session's own aside): no character and all-characters versions side by side")
 	check(values:find("Hogger (1)", 1, true) and values:find("100h 0m", 1, true) == nil and values:find("4d 4h", 1, true),
 		"values: deadliest foe, /played as days and hours")
 	local verdicts = { "Always there", "Takes a break now and then", "Coffee enthusiast", "Practically Martin" }
@@ -5376,7 +5378,9 @@ do
 		"switching the 14-day chart to experience")
 	local afkButton
 	for _, child in ipairs(win.Content._children) do if child:GetText() == "Time AFK" then afkButton = child end end
-	check(not afkButton, "time AFK isn't a character's graph any more (it's per account: Compare)")
+	afkButton:Click()
+	check(hoverWith(date("%Y-%m-%d", time() - 86400)).lines[2] == "Time AFK: 15m", "the 14-day chart shows time AFK too (it's the person's)")
+	xpButton:Click()
 	check(canvas.used.line >= 2 and drawnText("This session"), "this session: an XP curve")
 	local level22 = hoverWith("Level 22")
 	check(level22 and level22.lines[2] == "1m", "time per level: a bar per level")
@@ -5389,8 +5393,10 @@ do
 	Advance(10)
 	check(draws == 1, "but within 10 s (at most once)")
 	CH.Graphs.Draw = draw
+	-- A second character: the window is about the person, so its numbers join mine (its level stays its own).
 	CDB.chars["Alty-Realmy"] = { name = "Alty", realm = "Realmy", classFile = "MAGE", level = 12,
-		events = { { t = time(), k = "level", level = 12 } } }
+		events = { { t = time(), k = "level", level = 12 } }, stats = { quests = 7, afk = 600, played = 1200 },
+		daily = { [date("%Y-%m-%d", time() - 86400)] = { played = 1800, xp = 100, quests = 1, kills = 2, deaths = 0, afk = 300 } } }
 	-- The picker: our own dropdown (a Blizzard menu opened from addon code taints gamepad mode).
 	local picker = win.Picker
 	picker.GetText = function(self) return self.Label:GetText() end
@@ -5410,15 +5416,16 @@ do
 	local menu = {}
 	for i = 1, picker.List.count do
 		local row = picker.List.rows[i]
-		menu[#menu + 1] = row.kind == "divider" and "-" or row.Text:GetText():match("|c%x%x%x%x%x%x%x%x(%a+)|r")
+		menu[#menu + 1] = row.kind == "divider" and "-" or (row.Text:GetText():gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 	end
-	check(picker.List:IsShown() and table.concat(menu, ",") == "Characters,Lefthy,Alty,-,Friends,Anna",
-		"a click opens the list: my characters (this one first), then friends who sent their days, got " .. table.concat(menu, ","))
-	check(picker.List.rows[2].Check.shown and not picker.List.rows[3].Check.shown and not picker.List.rows[1]._mouseEnabled,
+	menu = table.concat(menu, " / ")
+	check(picker.List:IsShown() and menu == ("You  Lefthy %d, Alty 12 / - / Friends / Annie  Anna 20"):format(me.level),
+		"a click opens the list: people, not characters (you with all your characters, this one first; each friend once, by BattleTag), got " .. menu)
+	check(picker.List.rows[1].Check.shown and not picker.List.rows[4].Check.shown and not picker.List.rows[3]._mouseEnabled,
 		"the picked one is ticked; headings can't be clicked")
 	picker.List:GetScript("OnEvent")(picker.List, "GLOBAL_MOUSE_DOWN")
 	check(not picker.List:IsShown(), "a click elsewhere closes it")
-	check(picker:GetText():find("Lefthy|r  |cffccccccLevel ", 1, true), "it shows who's picked")
+	check(picker:GetText():find("^|cffffd200You|r  ") and picker:GetText():find("Lefthy|r", 1, true), "it shows who's picked: you, with your characters")
 	for i = 1, 24 do CDB.friendStats["Friend" .. i] = { classFile = "MAGE", level = 10, days = { [date("%Y-%m-%d")] = { played = 60 } } } end
 	picker:Click()
 	local _, _, _, lastX = picker.List.rows[picker.List.count]:GetPoint(1)
@@ -5439,25 +5446,25 @@ do
 		end
 		return n
 	end
+	picker:Pick("You")
 	check(drawnText("This session") and strayGradients() == 0, "my graphs, with the session curve")
-	picker:Pick("Alty")
-	check(not drawnText("This session") and drawnText("|cff888888Level up once with Chronicle on to see this.|r")
-		and picker:GetText():find("Alty", 1, true), "another character's graphs: no session, and a hint where there's no data yet")
-	check(strayGradients() == 0, "no bar or curve gradient left on the textures they reused, got " .. strayGradients())
+	check(hoverWith(date("%Y-%m-%d", time() - 86400)).lines[2] == "Experience: 5100" and drawnText("Time per level: Lefthy"),
+		"my graphs add up all my characters (Alty's day joins Lefthy's); time per level is the one I play's own")
 	picker:Pick("Anna")
 	local function drawnContaining(text)
 		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return true end end
 	end
-	check(picker:GetText():find("Anna|r  |cffccccccLevel 20|r  |cff80c0ff(Annie)", 1, true) and drawnText("Last 7 days")
+	check(picker:GetText():find("^|cff80c0ffAnnie|r  ") and picker:GetText():find("Anna|r |cffcccccc20|r", 1, true) and drawnText("Last 7 days")
 		and drawnText("You and Anna, last 7 days") and drawnText("2h 0m") and drawnContaining("Completed The Defias Brotherhood"),
 		"a friend's graphs: their days, their week, you and them, their latest news")
+	check(strayGradients() == 0, "no bar or curve gradient left on the textures they reused, got " .. strayGradients())
 	local annaDay = hoverWith(date("%Y-%m-%d", time() - 86400))
 	check(annaDay and annaDay.lines[2]:find("5000", 1, true), "their 14 days, from what they sent, got " .. tostring(annaDay and annaDay.lines[2]))
-	check(not drawnText("Time AFK"), "no AFK tiles on a character's page: AFK goes per account (Compare)")
+	check(drawnText("Time AFK") and drawnText("45m"), "their time AFK (the person's): a tile, and a row next to yours")
 	win.Tabs.timeline:Click()
-	check(picker:GetText():find("Lefthy", 1, true), "friends only have graphs: other pages show your own characters")
+	check(picker:GetText():find("You", 1, true), "friends only have graphs: other pages show you")
 	win.Tabs.graphs:Click()
-	check(picker:GetText():find("Lefthy", 1, true), "back on the Graphs page: still your own character")
+	check(picker:GetText():find("You", 1, true), "back on the Graphs page: still you")
 	win.Tabs.timeline:Click()
 	picker:Pick("Anna")
 	check(not win.Tabs.graphs:IsEnabled() and picker:GetText():find("Anna", 1, true) and drawnText("Last 7 days"),
@@ -5466,13 +5473,25 @@ do
 	check(not picker:IsShown(), "the Friends page has no dropdown")
 	win.Tabs.timeline:Click()
 	check(picker:IsShown(), "the others do")
-	picker:Pick("Alty")
-	check(picker:GetText():find("Alty", 1, true) and win.Text:GetText():find("Level 12", 1, true), "your other characters' journals")
+	check(win.Text:GetText():find("Alty|r: Level 12", 1, true) and win.Text:GetText():find("Lefthy|r: Level 23 - Elwynn Forest", 1, true),
+		"the timeline: all my characters' journals in one, each line saying whose")
 	win.Tabs.stats:Click()
-	check(win.Values:GetText() ~= "" and not win.Text:GetText():find("This session", 1, true), "and their statistics (no session)")
+	do
+		local function stat(label) -- the value on that label's line
+			local values, i = {}, 0
+			for line in (win.Values:GetText() .. "\n"):gmatch("(.-)\n") do values[#values + 1] = line end
+			for line in (win.Text:GetText() .. "\n"):gmatch("(.-)\n") do
+				i = i + 1
+				if line:find(label, 1, true) then return ((values[i] or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+			end
+		end
+		check(stat("Quests completed") == CH.Number(me.stats.quests + 7) and stat("Time AFK") == CH.Duration(me.stats.afk + 600)
+			and stat("Alty|r") == "Level 12" and stat("Lefthy|r") == "Level " .. me.level,
+			"statistics: all my characters added up; per character only who they are and their level, got "
+			.. tostring(stat("Quests completed")) .. ", " .. tostring(stat("Time AFK")) .. ", " .. tostring(stat("Alty|r")))
+	end
 	win.Tabs.timeline:Click()
-	picker:Pick("Lefthy")
-	check(picker:GetText():find("Lefthy", 1, true) and win.Text:GetText():find("Level 20", 1, true), "back to this character")
+	check(picker:GetText():find("You", 1, true) and win.Text:GetText():find("Level 20", 1, true), "back to the timeline")
 	local redraws, setBody = 0, win.SetBodyText
 	win.SetBodyText = function(...) redraws = redraws + 1; return setBody(...) end
 	Advance(1.1)
@@ -5757,6 +5776,21 @@ section("Chronicle: friends' journals, also when they're offline")
 	carlRow._scripts.OnMouseUp(carlRow, "LeftButton")
 	check(not win.Tabs.graphs:IsEnabled() and win.Picker.Label:GetText():find("Carl", 1, true),
 		"a click on a row: their graphs, got " .. tostring(win.Picker.Label:GetText()))
+	-- Carl plays two characters: one person, in the dropdown and on his page.
+	check(win.Picker.Label:GetText():find("Carlbank", 1, true) and drawn("You and Carl, last 7 days") and drawn("2h 30m")
+		and drawn("Carl|r: Died to Hogger"), "his graphs: both characters added up (2 h + 30 min), his news saying whose")
+	do
+		win.Picker:Click()
+		local carls, annas = 0, 0
+		for i = 1, win.Picker.List.count do
+			local text = win.Picker.List.rows[i].Text:GetText() or ""
+			carls = carls + (text:find("Carl", 1, true) and 1 or 0)
+			annas = annas + (text:find("Anna", 1, true) and 1 or 0)
+		end
+		win.Picker.List:Hide()
+		check(carls == 1 and annas == 1, "the dropdown: each friend once (Anna's journal and her days from older messages too), got "
+			.. carls .. " Carl, " .. annas .. " Anna")
+	end
 	CH.Open("compare")
 	check(not win.Tabs.compare:IsEnabled() and not win.Picker:IsShown() and drawn("Level") and drawn("Leaderboard, last 7 days")
 		and drawn("Quests per day") and drawn("Deaths, adding up") and drawn("Hall of fame, all time") and drawn("Records"),

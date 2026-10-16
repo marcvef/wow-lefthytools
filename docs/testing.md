@@ -162,10 +162,12 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     mobs, loot a green, turn in a quest, jump, ride: the Statistics page counts them (time and
     distance update every few seconds). Enter a dungeon: "First visit"; kill a boss: one entry.
     Die to a mob: "Died to <mob>". `/reload`: the session continues (Sessions stays). Log in a
-    second character: the dropdown at the top left lists both (and friends who sent their days;
-    picking one opens their graphs). Graphs: "Time AFK" shows AFK time per day and its share of
-    the time played; a friend's page (both on this build) has an AFK tile and an AFK row next to
-    yours. With a friend: their level-up
+    second character: the dropdown at the top left has one entry, "You", with both characters and
+    their levels; Statistics adds both up (Characters lists each with its level, time AFK shows only
+    in the Martin tracker), the Timeline has both, each line saying whose. Friends are in the
+    dropdown once each, by BattleTag, also with several characters (picking one opens their graphs).
+    Graphs: "Time AFK" shows AFK time per day; a friend's page (both on this build) has an AFK tile
+    and an AFK row next to yours. With a friend: their level-up
     and a highlight (e.g. a boss) appear under Friends and in chat. `/chronicle session`.
     Traffic in `/lefthy beacon status` stays at a few messages per minute while standing still.
     Friends' journals (needs two friends on this build, A and B): A plays while B is online, then

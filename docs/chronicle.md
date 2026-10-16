@@ -1,7 +1,8 @@
 # Chronicle design
 
 A journal per character, kept automatically, plus statistics and a feed of what friends with
-LefthyTools did, also while they (or you) weren't online. Files: `Modules/Chronicle/Chronicle.lua`
+LefthyTools did, also while they (or you) weren't online. Recorded per character, shown per person
+(all of a BattleTag's characters together, see Window). Files: `Modules/Chronicle/Chronicle.lua`
 (recording, sharing, session, settings, `/chronicle`), `Sync.lua` (friends' journals: publishing,
 passing on, the people and news for the window, catch-up, weekly recap, leaderboards),
 `Graphs.lua` (the Graphs and Compare pages), `Window.lua` (the window) and `MinimapButton.lua`.
@@ -113,40 +114,59 @@ session and how much is new from friends. A small blue dot while there's news fr
 journal hasn't shown yet (`C.UpdateNewDot`, on feed changes). Dragging sets an `OnUpdate` that turns
 the cursor position into the angle and removes it on drop. Created on first use; Chronicle's
 enable/disable and the setting update it on the next frame.
+**People, not characters.** The window is about the person behind the characters (a Battle.net
+account, a BattleTag): every number is theirs, all their characters added up, and shown once (never
+a character's and the account's version of the same number side by side). Only what a character
+has on its own stays per character: its level and class colour, its time per level, and the
+session going on now (the character you play). Mine: `C.Totals()` (Chronicle.lua: every record in
+`store.chars` as one: counters added up, the longest session, longest AFK and most gold the best of
+them, time per zone and deadly foes added up, zones, dungeons and days played joined, each day's
+counters added up; `current` the character I play, `chars` all of them, it first, then by time
+played). Friends': `C.Accounts()` (below).
+
 A dropdown at the top left (`LT.Window.AddPicker`, our own: a Blizzard menu opened from addon code
-taints gamepad mode, see forever-platform.md): "Characters" (this one first, then the others by
-name, "Name  Level 20", other realms named), then "Friends": every friend's character from
-`C.People()` (synced journals, with their BattleTag's name; older builds' days: "(friend)"), the
-picked one ticked. Picking a friend opens the Graphs page, the only one friends have. The list is
-built when it opens; a refresh only sets the button's text. A click elsewhere closes it. Hidden on the News, Friends and Compare pages. Then the pages,
+taints gamepad mode, see forever-platform.md) picks the person, one entry each: "You" with your
+characters and their levels ("You  Cara 20, Alty 12", key `me`), then "Friends": everyone from
+`C.Accounts()` by their BattleTag's name with their characters, the one they play most first
+("Annie  Anna 20, Annalt 12", key `acct:<hash>`; an older build's days whose BattleTag isn't known:
+"Anna 20  (friend)", `friend:<Name>`), the picked one ticked. Picking a friend opens the Graphs
+page, the only one friends have. The list is built when it opens; a refresh only sets the button's
+text. A click elsewhere closes it. Hidden on the News, Friends and Compare pages. Then the pages,
 the open one's button greyed out:
 
-- **Timeline:** newest first, a heading per day (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an
-  inline icon (the item's or achievement's own where known) and the localized text. At most 250
-  entries drawn, the rest summarized in one line.
-- **Statistics:** sections This session (current character only), Character, Quests, Exploring,
-  Combat, Travel, Gold and loot, Collections (the picked character), then All your characters
-  (what means little per character: their count, time played, quests, killing blows, deaths,
-  distance, jumps, added up over every character in `store.chars`) and the Martin tracker (all your
-  characters too: AFK time `stats.afk`, `afkTimes`, `longestAfk`, counted on the tick from
-  `UnitIsAFK("player")`; its share of the time played, this session's, and a verdict: under 5%
-  "Always there", 15% "Takes a break now and then", 30% "Coffee enthusiast", above "Practically
-  Martin"). Labels and values are two font strings with the
-  same number of lines (values right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h`,
-  distance in km, gold with `GetMoneyString`.
-- **Graphs** (`Graphs.lua`): cards on the scroll content. Last 14 days (bars per day from
-  `daily`, buttons switch between time, XP, quests and killing blows (time AFK and jumps go per
-  account: Compare); today in gold; hover shows the date and value), This session (the session curve: a line with a gradient fill, plus XP per
-  hour; current character only), Time per level (a bar per level from `levelTimes`, up to 20,
-  green = fast to red = slow), Favourite zones and Deadliest foes (horizontal bars, top 5), On
-  the road and Loot by quality (one split bar each, with a legend). Drawn with plain textures
-  (`SetGradient` for the bars), line objects (`CreateLine`) and font strings from pools
-  (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first draw.
-- **Friends' graphs:** the dropdown lists every friend's character (`C.People()`; other pages fall
-  back to your own character). Their page: Last 14 days (the same bars from their days), Last 7
-  days (six tiles: time, XP, levels, quests, killing blows, deaths), You and <name> (two bars per
-  number: time, XP, quests, kills; you in gold, them in blue), You and <name>, all time (from their
-  profile) and Latest news (their last 6 feed entries with date).
+- **Timeline:** all your characters' journals in one, newest first, a heading per day
+  (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an inline icon (the item's or achievement's own where
+  known), whose it is ("Alty: ", once there's more than one character with entries) and the
+  localized text. At most 250 entries drawn (only each character's newest 250 are merged), the rest
+  summarized in one line.
+- **Statistics** (yours, `C.Totals()`): sections This session (the session going on), Characters
+  (a row per character: name in its class colour, other realms named, and its level: what only a
+  character has), Time (time played since Chronicle; `/played` added up once every character has
+  said it; days played, sessions, longest session, fastest level, average per level), Quests,
+  Exploring, Combat, Travel (distance, by foot/riding/swimming/flight, jumps), Gold and loot (gold
+  now: the character you play's plus where the others' last day ended), Collections, and the Martin
+  tracker (AFK time `stats.afk`, `afkTimes`, `longestAfk`, counted on the tick from
+  `UnitIsAFK("player")`; its share of the time played and a verdict: under 5% "Always there", 15%
+  "Takes a break now and then", 30% "Coffee enthusiast", above "Practically Martin"; the only place
+  time AFK shows). Labels and values are two font strings with the same number of lines (values
+  right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h`, distance in km, gold with
+  `GetMoneyString`.
+- **Graphs** (`Graphs.lua`, yours: `C.Totals()`): cards on the scroll content. Last 14 days (bars
+  per day from the added-up `daily`, buttons switch between time, XP, quests, killing blows and time
+  AFK; today in gold; hover shows the date and value), This session (the session curve: a line with
+  a gradient fill, plus XP per hour), Time per level: <the character you play> (a bar per level from
+  its `levelTimes`, up to 20, green = fast to red = slow), Favourite zones and Deadliest foes
+  (horizontal bars, top 5), On the road and Loot by quality (one split bar each, with a legend).
+  Drawn with plain textures (`SetGradient` for the bars), line objects (`CreateLine`) and font
+  strings from pools (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first
+  draw.
+- **Friends' graphs:** a friend picked in the dropdown (other pages fall back to you): their
+  account from `C.Accounts()`, compared with mine from there (both all characters). Last 14 days
+  (the same bars from their days), Last 7 days (seven tiles: time, XP, levels, quests, killing
+  blows, deaths, time AFK), You and <name> (two bars per number: time, XP, quests, kills, time AFK;
+  you in gold, them in blue), You and <name>, all time (from their profiles) and Latest news (the
+  last 6 feed entries of any of their characters, with date; the character's name when they have
+  more than one).
 - **News:** "What they did": `C.FriendNews()` (synced highlights and live news, see below), as
   "Name: text", newest first by day, with a hint about what will appear while it's empty. Showing
   it marks the news seen (`C.MarkFeedSeen`): the tab's blue count and the book's blue dot
