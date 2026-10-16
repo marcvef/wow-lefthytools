@@ -160,7 +160,8 @@ function FrameMethods:SetPropagateMouseMotion(p)
 end
 function FrameMethods:SetAllPoints(rel) self._points = { { "TOPLEFT", rel }, { "BOTTOMRIGHT", rel } } end
 -- PlayerModel
-function FrameMethods:SetUnit(unit) self._unit, self._loads = unit, (self._loads or 0) + 1 end
+function FrameMethods:SetUnit(unit, blend, nativeForm) self._unit, self._nativeForm, self._loads = unit, nativeForm, (self._loads or 0) + 1 end
+function FrameMethods:SetSheathed(on) self._sheathed = on end
 -- DressUpModel and animations (the stream's battle row): what was set, every animation played.
 function FrameMethods:SetDisplayInfo(id) self._display, self._loads = id, (self._loads or 0) + 1 end
 function FrameMethods:TryOn(link) self._tried = self._tried or {}; self._tried[#self._tried + 1] = link end

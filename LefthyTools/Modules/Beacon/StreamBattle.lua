@@ -23,11 +23,15 @@ local S = B.Stream
 -- Played one after another like turns (an action about half a second); never more than QUEUE_MAX
 -- waiting, an older one goes (its number still floats), so it stays close to live.
 --
--- Their model: you are you (SetUnit); a friend whose character your client has (in your group,
--- nearby) is them; a friend elsewhere is their race's plain model wearing their gear (O2;a, their
--- look: race, sex, item IDs) under a light in their class colour: the game can't give a plain race
--- model a face or skin (it comes out white, seen in game), so it's shown as meant, a spirit of them.
--- The preview's made-up friend is that too, from your own race and gear.
+-- Their model: you are you (SetUnit, in the form you're in: cat, bear, ...); a friend whose
+-- character your client has (in your group, nearby) is them; a friend elsewhere in a form is that
+-- form's own model (a cat, a bear, a ghost wolf: textured, the tauren ones for tauren); out of one,
+-- their race's plain model wearing their gear (O2;a, their look: race, sex, item IDs) under a light
+-- in their class colour: the game can't give a plain race model a face or skin (it comes out white,
+-- seen in game), so it's shown as meant, a spirit of them. The preview's made-up friend is that
+-- too, from your own race and gear. Weapons: sheathed while they cast and out of a fight, drawn
+-- when they swing (the user: "when I cast, the weapon should be sheathed"); casters (mages,
+-- priests, warlocks) keep them sheathed, their instant spells cast too.
 --
 -- Cost: an OnUpdate per open window already runs (StreamView.lua); this adds a few comparisons per
 -- frame, an animation set when it changes, a frame moved while it lunges.
@@ -58,6 +62,20 @@ local Value, issecret = S.Value, S.issecret
 local ANIM = { stand = 0, death = 1, dead = 6, wound = 9, crit = 10, punch = 16, strike = 17, parry = 21, block = 24,
 	ready = 26, dodge = 30, aim = 51, cast = 53, release = 54, special = 57 }
 local AVOID_ANIM = { DODGE = ANIM.dodge, PARRY = ANIM.parry, BLOCK = ANIM.block }
+local CASTERS = { MAGE = true, PRIEST = true, WARLOCK = true } -- (weapons stay sheathed)
+
+-- A form's own model (SpellShapeshiftForm.CreatureDisplayID, 1.60.1.70425; the tauren ones from
+-- classic): by the form's spell ID, { the default, a tauren's }.
+local FORM_DISPLAY = {
+	[768] = { 892, 8571 },     -- Cat Form
+	[5487] = { 2281, 2289 },   -- Bear Form
+	[9634] = { 2281, 2289 },   -- Dire Bear Form
+	[783] = { 918, 918 },      -- Travel Form
+	[1066] = { 2428, 2428 },   -- Aquatic Form
+	[24858] = { 15374, 15375 }, -- Moonkin Form
+	[2645] = { 4613, 4613 },   -- Ghost Wolf
+}
+local TAUREN = { [6] = true, [28] = true }
 
 -- Each playable race's plain model: { male, female } (ChrRaceXChrModel -> ChrModel.DisplayID, 1.60.1.70425).
 local RACE_DISPLAY = {
@@ -275,7 +293,7 @@ local function HeroLoaded(model)
 	Call(model, "RefreshCamera")
 	Call(model, "SetCamDistanceScale", HERO_ZOOM)
 	Call(model, "SetFacing", HERO_FACING)
-	if model == hero.Spirit and hero.look then
+	if model == hero.Spirit and hero.look and not hero.inForm then
 		for _, item in ipairs(hero.look.items or {}) do
 			if item > 0 then
 				Call(model, "TryOn", "item:" .. item)
@@ -283,7 +301,16 @@ local function HeroLoaded(model)
 		end
 		Tint(model, hero.color)
 	end
+	Call(model, "SetSheathed", hero.sheathed ~= false)
 	model.current = nil
+end
+
+-- Their weapons: sheathed (casting, out of a fight) or drawn (swinging).
+local function Sheathe(hero, on)
+	if hero.sheathed ~= on then
+		hero.sheathed = on
+		Call(hero.model, "SetSheathed", on)
+	end
 end
 
 local function NewHeroModel(hero)
@@ -314,31 +341,37 @@ end
 -- Who they are now: a unit this client has (you; a friend in your group nearby), else their look.
 local function HeroSource(view)
 	local picture = view.picture
+	local form = picture.form and picture.form.spellID
 	if view.kind == "me" then
-		return "player"
+		return "player", nil, form
 	elseif view.kind == "friend" then
 		local unit = picture.guid and Value("UnitTokenFromGUID", picture.guid)
 		if type(unit) == "string" and Value("UnitIsVisible", unit) then
-			return unit
+			return unit, nil, form
 		end
-		return nil, picture.look
+		return nil, picture.look, form
 	end
 	view.ownLook = view.ownLook or S.OwnLook() -- (the preview: your race and gear)
-	return nil, view.ownLook
+	return nil, view.ownLook, form
 end
 
-local function LoadHero(hero, unit, look, again)
+local function LoadHero(hero, unit, look, form, again)
 	hero.loaded, hero.loadAt = false, GetTime()
 	hero.tries = again and (hero.tries or 0) + 1 or 0
 	hero.look = look
+	local formDisplay = not unit and form and FORM_DISPLAY[form]
+	hero.inForm = formDisplay and true or false
 	if unit then
 		hero.model = hero.Real
 		hero.Spirit:Hide()
 		Call(hero.Real, "ClearModel")
-		Call(hero.Real, "SetUnit", unit)
+		Call(hero.Real, "SetUnit", unit, false, false) -- (not their native form: the cat or bear they are now)
 	else
 		local display = look and RACE_DISPLAY[look.race]
 		display = display and display[look.sex == 2 and 2 or 1] or RACE_DISPLAY[1][1] -- (no look yet: someone plain)
+		if formDisplay then
+			display = formDisplay[look and TAUREN[look.race] and 2 or 1]
+		end
 		hero.model = hero.Spirit
 		hero.Real:Hide()
 		Call(hero.Spirit, "ClearModel")
@@ -351,19 +384,19 @@ end
 
 local function ShowHero(view, now)
 	local hero, picture = view.win.Foes.Hero, view.picture
-	local unit, look = HeroSource(view)
+	local unit, look, form = HeroSource(view)
 	hero.color = ClassColor(picture.classFile)
-	local who = unit and ("u:" .. unit) or ("l:" .. (look and look.race or "?") .. ":" .. (look and look.sex or "?") .. ":"
-		.. table.concat(look and look.items or {}, ","))
+	local who = (unit and ("u:" .. unit) or ("l:" .. (look and look.race or "?") .. ":" .. (look and look.sex or "?") .. ":"
+		.. table.concat(look and look.items or {}, ","))) .. ":f" .. (form or 0) -- (a new form: loaded anew)
 	local scale = hero:GetEffectiveScale()
 	if who ~= hero.who or not hero.scale or math.abs(hero.scale - scale) > 0.001 then
 		hero.who, hero.scale = who, scale
-		LoadHero(hero, unit, look)
+		LoadHero(hero, unit, look, form)
 	elseif not hero.loaded then
 		if Loaded(hero.model) then
 			HeroLoaded(hero.model) -- (OnModelLoaded may not have come)
 		elseif hero.tries < TRIES and now - hero.loadAt >= RETRY then
-			LoadHero(hero, unit, look, true)
+			LoadHero(hero, unit, look, form, true)
 		end
 	end
 end
@@ -596,13 +629,18 @@ end
 local function Begin(view, a, now)
 	local hero, b = view.win.Foes.Hero, Battle(view)
 	a.start, a.length, a.hitAt = now, LENGTH[a.kind] or 0.5, HIT_AT[a.kind] or 0.2
+	local caster = CASTERS[view.picture.classFile]
 	if a.kind == "strike" then
+		Sheathe(hero, false)
 		Act(hero.model, ANIM.strike, 0.5, now)
 	elseif a.kind == "ability" then
-		Act(hero.model, ANIM.special, 0.5, now)
+		Sheathe(hero, caster or false) -- (a caster's instant spell: cast; else a weapon's special attack)
+		Act(hero.model, caster and ANIM.cast or ANIM.special, 0.5, now)
 	elseif a.kind == "spell" then
+		Sheathe(hero, true)
 		Act(hero.model, ANIM.cast, 0.55, now)
 	elseif a.kind == "release" then
+		Sheathe(hero, true)
 		Act(hero.model, ANIM.release, 0.5, now)
 	elseif a.kind == "hit" or a.kind == "miss" then
 		a.attacker = AttackerSlot(view)
@@ -624,7 +662,7 @@ end
 
 local function Step(view, a, p, now)
 	local row = view.win.Foes
-	if a.kind == "strike" or a.kind == "ability" then
+	if a.kind == "strike" or (a.kind == "ability" and not CASTERS[view.picture.classFile]) then
 		row.Hero.dx = math.floor(LUNGE * Bump(p) + 0.5)
 	elseif (a.kind == "hit" or a.kind == "miss") and a.attacker and a.attacker.key == a.attackerKey then
 		a.attacker.dx = -math.floor(LUNGE * 0.6 * Bump(p) + 0.5)
@@ -767,6 +805,12 @@ function S.BattleShow(view)
 	end
 	local base = picture.dead and ANIM.dead or casting and ANIM.aim or picture.combat and ANIM.ready or ANIM.stand
 	hero.Real.base, hero.Spirit.base = base, base
+	if casting or not picture.combat then
+		Sheathe(hero, true)
+	elseif not b.fighting then
+		Sheathe(hero, CASTERS[picture.classFile] or false) -- (a fight starts: weapons drawn, not a caster's)
+	end
+	b.fighting = picture.combat and true or false
 end
 
 -- What happened to them (StreamView.lua's moments): true when it's shown here.

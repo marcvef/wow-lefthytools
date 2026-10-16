@@ -672,9 +672,16 @@ the picture already holds, one action after another like turns (about half a sec
   their fallbacks: Attack2H falls back to Attack1H, then AttackUnarmed; CombatCritical to
   CombatWound; SpellCastDirected to SpellCastOmni ...), all seen playing in game.
 
-**Their model**: yours is you (`DressUpModel:SetUnit("player")`); a friend whose character your
-client has (in your group, nearby: `UnitTokenFromGUID(peer.guid)` and `UnitIsVisible`) is them; a
-friend elsewhere is **their race's plain model wearing their gear** (`SetDisplayInfo` with the
+**Their model**: yours is you (`DressUpModel:SetUnit("player", false, false)`: not the native form,
+so a druid shows as the cat or bear they are; the user: "when a druid is in cat form it should show
+cat form"); a friend whose character your client has (in your group, nearby:
+`UnitTokenFromGUID(peer.guid)` and `UnitIsVisible`) is them; a model loads anew when their form
+changes. A friend elsewhere **in a form** is that form's own model, textured (`FORM_DISPLAY` by the
+form's spell ID: SpellShapeshiftForm.CreatureDisplayID of 1.60.1.70425, the tauren cat, bear and
+moonkin from classic): no gear, no light. **Weapons** (`SetSheathed`; the user: "when I cast, the
+weapon should be sheathed"): sheathed while they cast and out of a fight, drawn for a swing; a
+caster (mage, priest, warlock) keeps them sheathed and casts their instant spells (53, no lunge).
+Out of a form, a friend elsewhere is **their race's plain model wearing their gear** (`SetDisplayInfo` with the
 race's display, `ChrRaceXChrModel` -> `ChrModel.DisplayID` for every playable race of 1.60.1.70425,
 Skyborne included; `TryOn` of each item ID of their look, `O2;a`) under a light in their class
 colour (`SetLight`: ambient and diffuse in it). Found with a model test in game: a plain race model

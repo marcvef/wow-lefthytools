@@ -3640,6 +3640,7 @@ do
 			"her model: a race's plain model (yours: a human woman), lit in her class's colour, the camera a little further back")
 		check(spirit._anims and spirit._anims[51] and spirit._anims[53] and spirit._anims[9],
 			"she cast (a casting pose, then the cast at her target) and was hit (a flinch)")
+		check(spirit._sheathed == true, "a mage: her weapon stays sheathed")
 		check(leaderSlot.Model._anims and leaderSlot.Model._anims[9] and leaderSlot.Model._anims[16] and leaderSlot.Model._paused == false
 			and leaderSlot.Model._facing == -0.45, "her target flinched at her Fireball and struck back; the mobs move and face her")
 		local loss = floatWith("-13%")
@@ -3682,8 +3683,8 @@ do
 	gnoll = dot("Gnoll")
 	check(win:IsShown() and win.Title:GetText():find("Lefthy", 1, true) and win.Live.Text:GetText() == "LIVE" and used() == 3
 		and S.SenseRunning(), "/lefthy stream me: my own surroundings, live")
-	check(win.Foes.Hero.Real:IsShown() and win.Foes.Hero.Real._unit == "player" and not win.Foes.Hero.Spirit:IsShown(),
-		"in the battle row: me, my own model")
+	check(win.Foes.Hero.Real:IsShown() and win.Foes.Hero.Real._unit == "player" and win.Foes.Hero.Real._nativeForm == false
+		and not win.Foes.Hero.Spirit:IsShown(), "in the battle row: me, my own model (in the form I'm in, not my native one)")
 	check(act.Name:GetText() == "" and not act.Icon:IsShown() and not act.Recent[1]:IsShown(), "not casting yet: the row is empty (the preview's spells are gone)")
 	-- The map moves with me, my arrow turns with me.
 	do
@@ -4197,6 +4198,10 @@ do
 	check(fwin.Foes.Hero.Real:IsShown() and fwin.Foes.Hero.Real._unit == "party1" and not fwin.Foes.Hero.Spirit:IsShown(),
 		"in my group and near: her own model")
 	PARTY.party1 = nil
+	anna((herFrame:gsub(";M40;;", ";M40;768;"))) -- (in Cat Form)
+	Advance(0.6)
+	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == 892 and not fwin.Foes.Hero.Spirit._light
+		and not fwin.Foes.Hero.Spirit._tried, "far away in Cat Form: a cat (the form's own model: no gear, no light)")
 	-- The ones she fights: their models (creature IDs come with the names) and health (estimated
 	-- on her side; one she hasn't learned yet: "?").
 	anna("O2;n;3;12;Kobold Miner")
