@@ -545,6 +545,15 @@ checkpoint. It runs while Beacon is on (`S.LifeStart` / `S.LifeStop`), not only 
 watches, so it's known when someone starts. Mob casts, for comparison, are secret through and
 through (name, times, interruptible).
 
+**What happens to you** (StreamSense.lua, `picture.moments`, while the sensor runs): hits and
+heals from `UNIT_COMBAT` (added up per look; big: 15% of the maximum or more), what you avoided
+(`MISS`, `DODGE`, `PARRY`, `BLOCK`, `RESIST`, `IMMUNE`, `EVADE`, `DEFLECT`, `REFLECT`, `ABSORB`; a
+`WOUND` of 0 by its flag), XP (`PLAYER_XP_UPDATE`, the difference; with the mob it came from when
+a `PARTY_KILL` was within 1.5 s, either way round), your killing blows (`PARTY_KILL` with you as
+the attacker) and loot of green and better (`LT.OwnLoot`, Core.lua: the same reading of
+`CHAT_MSG_LOOT` that Chronicle counts). Each moment gets a number (1-99, going round) and stays
+2.5 s in the picture.
+
 **Players.** Your group (`party1-4` / `raid1-40`): `UnitPosition` answers for group members, so
 they're placed exactly, no learning (`Group`: same continent, within 120 yd, the nearest 8; beyond
 the 40 yd ring on its rim, the tooltip says the exact yards); name, level, class, dead, in combat,
@@ -568,7 +577,13 @@ not; gold ring: elite, silver: rare; white ring and a yellow name: their target;
 casting; a skull that fades: dead; faint: direction unsure), names for the 4 nearest and the
 target, a tooltip per dot. Top: name (class colour), where, thin bars for health (green,
 estimated: "~80%" beside it in steps of 5, the tooltip says how; none from builds before it) and
-power, the form's icon, "LIVE" (a breathing red dot) or "DEMO". Under the radar: the spell being cast with its bar, the
+power, the form's icon, "LIVE" (a breathing red dot) or "DEMO", under it their kills since the
+window opened ("3 kills"). What happens to them floats up over the radar, above the dots, each
+moment once (its number, remembered 6 s): hits in red up and to the left of them, heals in green
+to the right (bigger when big), a miss or dodge in the game's own word above, XP in violet from
+the dot of the mob it came from (else from them), loot rising through them with its icon and name
+in its quality's colour (3.5 s; an item the client doesn't know yet is asked for and says "an
+item"). At most 10 at once; another of the same kind within 0.45 s starts lower. Under the radar: the spell being cast with its bar, the
 last spells fading over 12 s. Bottom: "2 on Anna · 5 near · X casts Y"; a friend's stream with no
 frame for 6 s says "Waiting for Anna's stream...". Dots follow their mob and glide; a friend's map
 glides between their frames. Drag to move; the grip at the bottom right resizes (0.35 to 1.3;
@@ -594,10 +609,15 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   `id,degrees from north,yards,sure 0-9,flags[,cast spellID]/...` (flags: a attacking them, c in
   combat, t their target, d dead, e elite, x rare elite, r rare, m off their screen, b beyond (yards =
   the range it's beyond), s casting). Mobs that matter first (target, attacking, in combat,
-  nearest) until 245 bytes; the message stays under 255. First among the mobs, when known:
-  `v<health percent>` (estimated). It rides there because builds before it skip a mob entry that
-  doesn't start with a number, while a 12th field would make them drop the whole frame (they
-  want exactly 11).
+  nearest) until 245 bytes; the message stays under 255. First among the mobs, when there's
+  any: `v<health percent, empty if unknown>` (estimated), then the moments of the last 2.5 s,
+  newest first, up to 90 bytes: `,<number><letter><value>[.<extra>]` (`w` hurt, `W` big, `h`
+  healed, `H` big, `a` + m miss, d dodge, p parry, b block, r resist, i immune, e evade, f deflect,
+  x reflect, a absorb; `x` XP `.mob id`; `k` killing blow `[mob id]`; `l` item ID `.quality`), e.g.
+  `v82,14w52,13H300,12am`. Each comes in every frame while it's recent, so a frame replaced in the
+  queue loses none; the windows show each number once. It rides there because builds before it
+  skip a mob entry that doesn't start with a number, while a 12th field would make them drop the
+  whole frame (they want exactly 11).
 - `O2;n;<id>;<level>;<name>` a mob's name (40 bytes), once per watcher before the first frame with
   that id (ids 1-999 per GUID, reused after 60 s).
 

@@ -1,4 +1,5 @@
 local _, ns = ...
+local LT = ns.LT
 local B = ns.Beacon
 local S = B.Stream
 
@@ -12,6 +13,7 @@ local S = B.Stream
 --   power = { token, frac } or nil, form = { spellID, icon, name } or nil,
 --   cast = { name, icon, spellID, start, finish (GetTime seconds), channel } or nil,
 --   recent = { { name, icon, spellID, at }, ... } (newest first),
+--   moments = { what just happened to you: "What happens to you" below } (newest first),
 --   mobs = { { key, name, level, class, dead, combat, attacking, casting (a name), castID, target,
 --            yards, beyond, sure (0-1), bearing (radians clockwise from north), remembered, fade,
 --            age }, ... } }
@@ -35,8 +37,8 @@ local S = B.Stream
 -- closely its places point one way is how sure.
 --
 -- Cost: nothing while nobody needs it. Then a look at up to 40 nameplate units every half second
--- (range checks, 48 places each), and the cast events of "player". Apart from that, your health
--- is estimated while Beacon is on (a handful of your own events; below).
+-- (range checks, 48 places each), the cast events of "player", XP, kills and loot. Apart from
+-- that, your health is estimated while Beacon is on (a handful of your own events; below).
 
 local Value, issecret = S.Value, S.issecret
 local SPOTS = 48
@@ -54,7 +56,7 @@ local RECENT = 5            -- the last spells you cast
 local POWER_LETTERS = { MANA = "M", RAGE = "R", ENERGY = "E", FOCUS = "F" }
 local atan2 = math.atan2 or math.atan -- (Lua 5.1 / 5.3)
 
-local picture = { me = true, mobs = {}, recent = {} }
+local picture = { me = true, mobs = {}, recent = {}, moments = {} }
 local castNow, powerNow, formNow = {}, {}, {}
 local checks                -- the range checks, read when the sensor starts
 local plateReach = 40       -- nameplateMaxDistance
@@ -420,9 +422,12 @@ lifeWatch:SetScript("OnUpdate", function(self, elapsed)
 	end
 end)
 
-lifeWatch:SetScript("OnEvent", function(_, event, _, kind, _, amount)
+lifeWatch:SetScript("OnEvent", function(_, event, _, kind, flags, amount)
 	local now = GetTime()
 	if event == "UNIT_COMBAT" then -- unit, event, flagText, amount, schoolMask
+		if next(users) then
+			S.Happened(kind, flags, amount) -- (for whoever watches)
+		end
 		if issecret(kind) or issecret(amount) or type(amount) ~= "number" or amount <= 0
 			or (kind ~= "WOUND" and kind ~= "HEAL") then
 			return
@@ -504,6 +509,131 @@ function S.LifeStop()
 	lifeWatch:UnregisterAllEvents()
 	lifeWatch:Hide()
 	life.missing, life.from, life.ticks, life.taken = nil, nil, 0, nil
+end
+
+---------------------------------------------------------------------------
+-- What happens to you, for whoever watches
+---------------------------------------------------------------------------
+
+-- Moments (picture.moments, newest first): hits and heals (UNIT_COMBAT, added up per look; big:
+-- BIG of your maximum or more), what you avoided (a miss, dodge, parry, ...), XP (with the mob it
+-- came from, if it died just then), your killing blows (PARTY_KILL), loot (green and better).
+-- Each gets a number (1-99, going round) and stays MOMENT_KEEP seconds: a friend's frames carry
+-- the recent ones (a frame replaced in the queue loses none), and the windows show each number
+-- once. Only while the sensor runs.
+--   { seq, kind ("hurt", "heal", "avoid", "xp", "kill", "loot"), at, amount, big, avoid (MISS,
+--     DODGE, ...), key (the mob's: XP from a kill, a killing blow), item, quality }
+
+local MOMENT_KEEP = 2.5
+local BIG = 0.15
+local XP_FROM_KILL = 1.5   -- seconds: XP this close to a kill came from it
+-- What UNIT_COMBAT says when nothing got through (and its letter in a friend's frame).
+S.AVOIDED = { MISS = "m", DODGE = "d", PARRY = "p", BLOCK = "b", RESIST = "r", IMMUNE = "i", EVADE = "e",
+	DEFLECT = "f", REFLECT = "x", ABSORB = "a" }
+
+local pending = { hurt = 0, heal = 0 } -- since the last look (and avoid: the last word)
+local seq = 0
+local lastKill = { at = -math.huge }
+local xpWas = {}
+local momentWatch = CreateFrame("Frame")
+
+local function Moment(kind)
+	seq = seq % 99 + 1
+	local moment = { seq = seq, kind = kind, at = GetTime() }
+	table.insert(picture.moments, 1, moment)
+	return moment
+end
+
+-- A UNIT_COMBAT on you (from the health estimate's events).
+function S.Happened(kind, flags, amount)
+	if issecret(kind) or issecret(flags) or issecret(amount) then
+		return
+	end
+	if (kind == "WOUND" or kind == "HEAL") and type(amount) == "number" and amount > 0 then
+		local field = kind == "WOUND" and "hurt" or "heal"
+		pending[field] = pending[field] + amount
+	elseif kind == "WOUND" then -- (nothing got through: absorbed, blocked, resisted, else missed)
+		pending.avoid = S.AVOIDED[flags] and flags or "MISS"
+	elseif S.AVOIDED[kind] then
+		pending.avoid = kind
+	end
+end
+
+-- Every look: what came since becomes moments; old ones go.
+local function Flush(now)
+	for _, field in ipairs({ "hurt", "heal" }) do
+		local amount = pending[field]
+		if amount > 0 then
+			local moment = Moment(field)
+			moment.amount, moment.big = amount, life.max ~= nil and amount >= BIG * life.max
+			pending[field] = 0
+		end
+	end
+	if pending.avoid then
+		Moment("avoid").avoid = pending.avoid
+		pending.avoid = nil
+	end
+	local moments = picture.moments
+	while moments[1] and now - moments[#moments].at > MOMENT_KEEP do
+		moments[#moments] = nil
+	end
+end
+
+local function ReadXP()
+	local xp, max, level = Value("UnitXP", "player"), Value("UnitXPMax", "player"), Value("UnitLevel", "player")
+	if type(xp) ~= "number" or type(max) ~= "number" then
+		return nil
+	end
+	local gained = xpWas.xp and (level == xpWas.level and xp - xpWas.xp or (xpWas.max - xpWas.xp) + xp)
+	xpWas.xp, xpWas.max, xpWas.level = xp, max, level
+	return gained
+end
+
+momentWatch:SetScript("OnEvent", function(_, event, a, b)
+	local now = GetTime()
+	if event == "PLAYER_XP_UPDATE" then
+		local gained = ReadXP()
+		if gained and gained > 0 then
+			local moment = Moment("xp")
+			moment.amount = gained
+			if now - lastKill.at <= XP_FROM_KILL then
+				moment.key = lastKill.key
+			end
+		end
+	elseif event == "PARTY_KILL" then -- attackerGUID, targetGUID (yours or your group's)
+		if issecret(a) or issecret(b) or type(b) ~= "string" then
+			return
+		end
+		lastKill.key, lastKill.at = b, now
+		for _, moment in ipairs(picture.moments) do
+			if moment.kind == "xp" and not moment.key and now - moment.at <= XP_FROM_KILL then
+				moment.key = b -- (the XP came first)
+			end
+		end
+		if a == Value("UnitGUID", "player") then
+			Moment("kill").key = b
+		end
+	elseif event == "CHAT_MSG_LOOT" then
+		local _, itemID, _, quality = LT.OwnLoot(a)
+		if itemID and quality and quality >= 2 then
+			local moment = Moment("loot")
+			moment.item, moment.quality = itemID, quality
+		end
+	end
+end)
+
+-- Listened to while the sensor runs.
+local function SenseMoments(on)
+	momentWatch:UnregisterAllEvents()
+	wipe(picture.moments)
+	pending.hurt, pending.heal, pending.avoid = 0, 0, nil
+	if on then
+		for _, event in ipairs({ "PLAYER_XP_UPDATE", "PARTY_KILL", "CHAT_MSG_LOOT" }) do
+			momentWatch:RegisterEvent(event)
+		end
+		xpWas.xp = nil
+		ReadXP()
+	end
 end
 
 -- Your own casts at your target tell where it is: a harmful spell that went off needed it in front
@@ -698,6 +828,7 @@ local function Look()
 	ReadPower()
 	ReadForm()
 	picture.health = S.Health()
+	Flush(now)
 	picture.looked = now -- (your window redraws when this changes)
 	for _, listener in ipairs(listeners) do
 		local ok, err = pcall(listener, picture)
@@ -738,10 +869,12 @@ function S.SenseNeed(who, on)
 		wipe(picture.mobs)
 		picture.cast = nil
 		nextLook = 0
+		SenseMoments(true)
 		ticker:Show()
 	elseif not running and wasRunning then
 		ticker:Hide()
 		wipe(clouds)
+		SenseMoments(false)
 	end
 	S.SenseCasts("sensor", running)
 	if running then

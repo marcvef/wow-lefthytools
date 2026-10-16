@@ -102,6 +102,40 @@ function LT.CompareVersions(a, b)
 end
 
 ---------------------------------------------------------------------------
+-- Your own loot (Chronicle counts it, the fight stream shows it)
+---------------------------------------------------------------------------
+
+local lootPatterns
+
+-- A CHAT_MSG_LOOT line about your own loot: its link, item ID, count and quality (nil if it's
+-- someone else's; the quality nil if not known).
+function LT.OwnLoot(text)
+	if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then
+		return nil
+	end
+	if not lootPatterns then
+		lootPatterns = {}
+		for _, fmt in ipairs({ LOOT_ITEM_SELF_MULTIPLE or "You receive loot: %sx%d.", LOOT_ITEM_SELF or "You receive loot: %s.",
+				LOOT_ITEM_PUSHED_SELF_MULTIPLE or "You receive item: %sx%d.", LOOT_ITEM_PUSHED_SELF or "You receive item: %s." }) do
+			local pattern = fmt:gsub("[%(%)%.%+%-%*%?%[%]%^%$]", "%%%0")
+			pattern = pattern:gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)")
+			lootPatterns[#lootPatterns + 1] = "^" .. pattern .. "$"
+		end
+	end
+	for _, pattern in ipairs(lootPatterns) do
+		local link, count = text:match(pattern)
+		if link then
+			local itemID = tonumber(link:match("|Hitem:(%d+)"))
+			local quality = itemID and C_Item and C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(itemID)
+			if type(quality) ~= "number" then
+				quality = tonumber(link:match("|cnIQ(%d):")) -- retail links carry their quality
+			end
+			return link, itemID, tonumber(count) or 1, quality
+		end
+	end
+end
+
+---------------------------------------------------------------------------
 -- Modules
 ---------------------------------------------------------------------------
 

@@ -49,7 +49,7 @@ Handlers only count or append; nothing in them draws or sends.
 | `dungeon` (first visit; every entry counts as a run) | same, `IsInInstance` party/raid + `GetInstanceInfo` |
 | `boss` (first kill of each; every kill counted) | `ENCOUNTER_END` with success, or `BOSS_KILL`; the same name within 30 s counts once |
 | `rare` | your target is rare/rareelite/worldboss, not a player, dead and not someone else's tap (`UnitIsTapDenied`), checked on the tick; also `PARTY_KILL` on your target |
-| `loot` (blue and better; with the item's icon) | `CHAT_MSG_LOOT` matched against `LOOT_ITEM_SELF(_MULTIPLE)` and `LOOT_ITEM_PUSHED_SELF(_MULTIPLE)` turned into patterns, so only your own loot, in any client language; quality from `C_Item.GetItemQualityByID`, else the link's `|cnIQ<n>:` |
+| `loot` (blue and better; with the item's icon) | `CHAT_MSG_LOOT` matched against `LOOT_ITEM_SELF(_MULTIPLE)` and `LOOT_ITEM_PUSHED_SELF(_MULTIPLE)` turned into patterns, so only your own loot, in any client language; quality from `C_Item.GetItemQualityByID`, else the link's `|cnIQ<n>:` (`LT.OwnLoot` in Core.lua, shared with the fight stream) |
 | `mount`, `pet`, `toy` | `NEW_MOUNT_ADDED`, `NEW_PET_ADDED`, `NEW_TOY_ADDED` |
 | `achievement` | `ACHIEVEMENT_EARNED` (not `alreadyEarned`) |
 | `quests` milestones (10, 25, 50, 100, 250, ...) | `QUEST_TURNED_IN` |

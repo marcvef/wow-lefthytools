@@ -431,51 +431,21 @@ function handlers.PLAYER_MONEY()
 	lastMoney = money
 end
 
--- "You receive loot: %s." and friends, as patterns: only my own loot counts.
-local LOOT_PATTERNS
-local function LootPatterns()
-	if LOOT_PATTERNS then
-		return LOOT_PATTERNS
-	end
-	LOOT_PATTERNS = {}
-	for _, fmt in ipairs({ LOOT_ITEM_SELF_MULTIPLE or "You receive loot: %sx%d.", LOOT_ITEM_SELF or "You receive loot: %s.",
-			LOOT_ITEM_PUSHED_SELF_MULTIPLE or "You receive item: %sx%d.", LOOT_ITEM_PUSHED_SELF or "You receive item: %s." }) do
-		local pattern = fmt:gsub("[%(%)%.%+%-%*%?%[%]%^%$]", "%%%0")
-		pattern = pattern:gsub("%%s", "(.+)"):gsub("%%d", "(%%d+)")
-		LOOT_PATTERNS[#LOOT_PATTERNS + 1] = "^" .. pattern .. "$"
-	end
-	return LOOT_PATTERNS
-end
-
-local function ItemQuality(link, itemID)
-	local quality = C_Item and C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(itemID)
-	if type(quality) ~= "number" then
-		quality = tonumber(link:match("|cnIQ(%d):")) -- retail links carry their quality
-	end
-	return quality
-end
-
+-- Only my own loot counts ("You receive loot: %s." and friends: LT.OwnLoot).
 function handlers.CHAT_MSG_LOOT(text)
-	if type(text) ~= "string" or issecret(text) then
+	local link, itemID, count, quality = LT.OwnLoot(text)
+	if not link then
 		return
 	end
-	for _, pattern in ipairs(LootPatterns()) do
-		local link, count = text:match(pattern)
-		if link then
-			local itemID = tonumber(link:match("|Hitem:(%d+)"))
-			local quality = itemID and ItemQuality(link, itemID)
-			if quality and quality >= 2 then
-				Add("loot" .. math.min(quality, 4), tonumber(count) or 1)
-			end
-			if quality and quality >= 3 then
-				local name = link:match("|h%[(.-)%]|h") or link
-				local icon = C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID)
-				Record("loot", { link = link, name = name, quality = quality, icon = icon })
-				if quality >= 4 then
-					Share("loot", name, quality)
-				end
-			end
-			return
+	if quality and quality >= 2 then
+		Add("loot" .. math.min(quality, 4), count)
+	end
+	if quality and quality >= 3 then
+		local name = link:match("|h%[(.-)%]|h") or link
+		local icon = itemID and C_Item and C_Item.GetItemIconByID and C_Item.GetItemIconByID(itemID)
+		Record("loot", { link = link, name = name, quality = quality, icon = icon })
+		if quality >= 4 then
+			Share("loot", name, quality)
 		end
 	end
 end

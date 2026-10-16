@@ -24,9 +24,15 @@ local S = B.Stream
 --                         e elite, x rare elite, r rare, m off my screen, b beyond: yards is the
 --                         longest range it's beyond, s casting, p a player, f friendly, g in my
 --                         group: placed exactly). As many as fit, the ones that matter first.
---                         First among them, when known: v<my health, percent> (estimated:
---                         StreamSense.lua). Older builds skip it (a mob starts with its number),
---                         and a frame keeps its 11 fields: they'd drop one with more.
+--                         First among them, when there's any: v<my health, percent; empty if
+--                         unknown> (estimated: StreamSense.lua), then what just happened to me,
+--                         ",<number 1-99><letter><value>[.<extra>]" each: w hurt (W big), h healed
+--                         (H big), a avoided (m miss, d dodge, p parry, b block, r resist, i
+--                         immune, e evade, f deflect, x reflect, a absorb), x XP [.mob id it came
+--                         from], k my killing blow [mob id], l loot item ID .quality. Each comes in
+--                         every frame for a few seconds; the windows show each number once.
+--                         Older builds skip it (a mob starts with its number), and a frame keeps
+--                         its 11 fields: they'd drop one with more.
 --   O2;n;<id>;<level>;<name>
 --                       a mob's name, once per watcher before the first frame with that id
 --   O2;u;<id>;<level>;<classFile>;<name>
@@ -200,11 +206,45 @@ local function ByWeight(a, b)
 	return a.weight > b.weight
 end
 
--- My health, first among the mobs ("v" and the percent), when it's known.
-local function Vitals(picture)
-	if picture.health then
-		return "v" .. Int(picture.health * 100)
+local MAX_VITALS = 90 -- bytes for my health and what just happened (the rest: mobs)
+local LETTERS = { hurt = "w", heal = "h", avoid = "a", xp = "x", kill = "k", loot = "l" }
+
+-- A moment in a frame (nil: it can't go).
+local function MomentText(m)
+	local letter, kind, text = LETTERS[m.kind], m.kind, nil
+	if (kind == "hurt" or kind == "heal") and m.amount then
+		text = (m.big and letter:upper() or letter) .. Int(m.amount)
+	elseif kind == "avoid" and S.AVOIDED[m.avoid] then
+		text = letter .. S.AVOIDED[m.avoid]
+	elseif kind == "xp" and m.amount then
+		local id = m.key and idFor[m.key]
+		text = letter .. Int(m.amount) .. (id and "." .. id or "")
+	elseif kind == "kill" then
+		text = letter .. (m.key and idFor[m.key] or "")
+	elseif kind == "loot" and m.item and m.quality then
+		text = ("%s%d.%d"):format(letter, m.item, m.quality)
 	end
+	return text and m.seq .. text
+end
+
+-- My health and what just happened, first among the mobs (nil: neither).
+local function Vitals(picture)
+	local parts = { "v" .. (picture.health and Int(picture.health * 100) or "") }
+	local size = #parts[1]
+	for _, m in ipairs(picture.moments or {}) do
+		local text = MomentText(m)
+		if text then
+			if size + #text + 1 > MAX_VITALS then
+				break
+			end
+			size = size + #text + 1
+			parts[#parts + 1] = text
+		end
+	end
+	if #parts == 1 and not picture.health then
+		return nil
+	end
+	return table.concat(parts, ",")
 end
 
 -- The frame (without names) and the ids used in it, in order.
@@ -446,6 +486,49 @@ local function Fields(payload)
 	return fields
 end
 
+local KINDS = { w = "hurt", h = "heal", a = "avoid", x = "xp", k = "kill", l = "loot" }
+local AVOID_TOKENS = {} -- a letter -> MISS, DODGE, ...
+for token, letter in pairs(S.AVOIDED) do
+	AVOID_TOKENS[letter] = token
+end
+local MAX_MOMENTS = 12
+
+-- "v..." (their health and what just happened, Vitals) into a picture.
+local function DecodeVitals(entry, picture)
+	local moments, first = picture.moments, true
+	for part in entry:gmatch("[^,]+") do
+		if first then
+			first = false
+			local health = part:match("^v(%d?%d?%d?)$")
+			if not health then
+				return
+			end
+			picture.health = health ~= "" and math.min(100, tonumber(health)) / 100 or nil
+		elseif #moments < MAX_MOMENTS then
+			local seq, letter, value, extra = part:match("^(%d%d?)(%a)(%w*)%.?(%d*)$")
+			local kind = letter and KINDS[letter:lower()]
+			local number = value and value:match("^%d%d?%d?%d?%d?%d?%d?%d?%d?$") and tonumber(value)
+			local m
+			if kind == "hurt" or kind == "heal" then
+				m = number and { amount = number, big = letter ~= letter:lower() }
+			elseif kind == "avoid" then
+				m = AVOID_TOKENS[value] and { avoid = AVOID_TOKENS[value] }
+			elseif kind == "xp" then
+				m = number and { amount = number, key = tonumber(extra) }
+			elseif kind == "kill" then
+				m = { key = number or nil }
+			elseif kind == "loot" then
+				local quality = tonumber(extra)
+				m = number and quality and quality <= 8 and { item = number, quality = quality }
+			end
+			if m then
+				m.seq, m.kind = tonumber(seq), kind
+				moments[#moments + 1] = m
+			end
+		end
+	end
+end
+
 -- A frame into a view's picture; false if it isn't one.
 local function Decode(stream, picture)
 	local f = Fields(stream.payload)
@@ -499,12 +582,13 @@ local function Decode(stream, picture)
 	local mobs = picture.mobs
 	picture.pool = picture.pool or {}
 	picture.health = nil
+	picture.moments = picture.moments or {}
+	wipe(picture.moments)
 	local n = 0
 	for entry in f[11]:gmatch("[^/]+") do
 		local id, deg, yards, sure, flags, cast = entry:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$")
-		local health = not id and entry:match("^v(%d%d?%d?)$")
-		if health then
-			picture.health = math.min(100, tonumber(health)) / 100
+		if not id and entry:sub(1, 1) == "v" then
+			DecodeVitals(entry, picture)
 		elseif id then
 			n = n + 1
 			local mob = picture.pool[n] or {}

@@ -3468,6 +3468,17 @@ do
 		for _, l in ipairs(TOOLTIP.lines) do if l:find(text, 1, true) then return true end end
 		return false
 	end
+	-- The floating numbers in a window (mine by default): the one with this text, how many float.
+	local function floatWith(text, w)
+		for _, f in ipairs((w or LefthyToolsStreamFrame).Floats.list) do
+			if f.on and f:IsShown() and f:GetText():find(text, 1, true) then return f end
+		end
+	end
+	local function floating(w)
+		local n = 0
+		for _, f in ipairs((w or LefthyToolsStreamFrame).Floats.list) do if f.on and f:IsShown() then n = n + 1 end end
+		return n
+	end
 
 	-- The preview: made-up mobs around a made-up friend.
 	math.randomseed(3) -- (the learning draws random places: the same ones every run)
@@ -3544,11 +3555,13 @@ do
 	Advance(3)
 	check(leader.tx * leader.tx + leader.ty * leader.ty < before and math.abs(leader.x - leader.tx) < 3,
 		"mobs move, and their dots glide after them")
+	check(floatWith("-24"), "the bandits hit her: the numbers float up")
 	check(leader.Target:IsShown() and leader.Name:GetText() == "Bandit leader 16", "her target: a white ring, named with its level")
 	check(win.Status:GetText():find("on Anna", 1, true) and win.Status:GetText():find("near", 1, true), "the bottom line: how many on her, how many near")
 	Advance(12)
 	local bandit = dot("Bandit")
 	check(bandit and bandit.Skull:IsShown() and not bandit.Body:IsShown(), "a mob that dies: a skull ...")
+	check(floatWith("+87 XP") and win.Kills:GetText() == "1 kill", "her kill: its XP floats up, 1 kill")
 	Advance(2.5)
 	check(bandit:GetAlpha() < 0.5, "... that fades")
 	win.Close:Click()
@@ -3798,6 +3811,43 @@ do
 		Advance(5)
 		check(S.Health() == 1, "no ticks after that: full")
 	end
+	-- What happens to me floats up over the radar: hits and heals (added up per look), a dodge, XP
+	-- from the mob that died, loot; my kills count at the top right.
+	do
+		Fire("UNIT_COMBAT", "player", "WOUND", "", 52, 1)
+		Fire("UNIT_COMBAT", "player", "WOUND", "", 30, 1)
+		Fire("UNIT_COMBAT", "player", "HEAL", "", 300, 2)
+		Fire("UNIT_COMBAT", "player", "DODGE", "", 0, 1)
+		Advance(0.6)
+		local hurt, heal, dodge = floatWith("-82"), floatWith("+300"), floatWith("Dodge")
+		check(hurt and heal and dodge and floating() == 3 and hurt.x < 0 and heal.x > 0 and hurt.color[1] == 1 and heal.color[2] == 1,
+			"hit twice, healed, dodged: -82 on the left in red, +300 on the right in green, Dodge")
+		check(heal.textScale > 1 and hurt.textScale == 1, "the heal is big (a sixth of my health): bigger")
+		Advance(1)
+		check(floating() == 3, "shown once, though still in the picture")
+		Advance(1.5)
+		check(floating() == 0, "gone after a moment")
+		local pillager = dot("Defias Pillager")
+		local xpWas = XP.current
+		Fire("PARTY_KILL", "Player-1-0", "Creature-0-nameplate2")
+		XP.current = XP.current + 120
+		Fire("PLAYER_XP_UPDATE", "player")
+		Advance(0.6)
+		local xp = floatWith("+120 XP")
+		check(xp and math.abs(xp.x - pillager.x) < 8 and win.Kills:GetText() == "1 kill",
+			"my killing blow: +120 XP floats up from its dot, 1 kill at the top")
+		local chronicled = LefthyToolsChronicleDB.chars["Lefthy-Realmy"].stats -- (Chronicle counts loot too: not this test's)
+		local loot2 = chronicled.loot2
+		Fire("CHAT_MSG_LOOT", LOOT_ITEM_SELF:format(ItemLink(2589))) -- (Linen Cloth: not green)
+		Fire("CHAT_MSG_LOOT", LOOT_ITEM_SELF:format(ItemLink(2075)))
+		chronicled.loot2 = loot2
+		Advance(0.6)
+		local loot = floatWith("Priest's Mace")
+		check(loot and loot:GetText():find("|T3075:16:16|t", 1, true) and not floatWith("Linen Cloth"),
+			"loot, green and better: its icon and name float up")
+		XP.current = xpWas
+		Advance(4)
+	end
 	win.Close:Click()
 	check(not win:IsShown() and not S.SenseRunning(), "closed: the sensor stops")
 
@@ -3895,6 +3945,18 @@ do
 	Advance(0.6)
 	check(fwin.Health:IsShown() and fwin.HealthText:GetText() == "~65%" and math.abs(fwin.Health.width - 0.63 * 120) < 0.01
 		and used(11) == 2, "her health first among the mobs: ~65% (steps of 5), the mobs as before")
+	-- What happens to her, after her health: hits and heals (big in capitals), a miss, XP from mob 1,
+	-- her killing blow on it, loot.
+	local herFrame = "O2;f;0;1429;260;750;90;c;M40;;133,10,25;116,3/122,6;v63,5w52,6H300,7am,8x120.1,9k1,10l2075.2/1,45,20,9,actes,133/2,180,30,4,cb"
+	anna(herFrame)
+	Advance(0.6)
+	local herXP, pillagerDot = floatWith("+120 XP", fwin), dot("Defias Pillager", 11)
+	check(floatWith("-52", fwin) and floatWith("+300", fwin).textScale > 1 and floatWith("Miss", fwin) and herXP
+		and math.abs(herXP.x - pillagerDot.x) < 0.01 and floatWith("Priest's Mace", fwin) and fwin.Kills:GetText() == "1 kill"
+		and used(11) == 2, "her hits, heals, a miss, XP from her mob's dot, loot, her kill: all float up")
+	anna(herFrame) -- (the next frame still carries them)
+	Advance(0.6)
+	check(floating(fwin) == 5 and fwin.Kills:GetText() == "1 kill", "each once, though they come again")
 	fpill._scripts.OnEnter(fpill)
 	check(TOOLTIP.title == "Defias Pillager (16)" and tooltipHas("attacking Anna") and tooltipHas("Anna's target")
 		and tooltipHas("about 20 yd") and not tooltipHas("direction still unsure"), "hover: about her mob")
@@ -3923,6 +3985,7 @@ do
 	watched._scripts.OnEnter(watched)
 	check(TOOLTIP.title == "Watching your fights" and tooltipFind("Anna"), "hover: who")
 	watched._scripts.OnLeave(watched)
+	Fire("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
 	Advance(1.1)
 	local frames, names = sentTo(11, mark, "O2;f;"), sentTo(11, mark, "O2;n;")
 	check(#frames >= 2 and #names == 2 and #sentTo(12, mark, "O2;") == 0,
@@ -3932,17 +3995,18 @@ do
 	for f in (frames[#frames]:sub(6) .. ";"):gmatch("([^;]*);") do fields[#fields + 1] = f end
 	check(#fields == 11 and fields[1] == "0" and #frames[#frames] <= 250 and fields[11]:find(",133$"),
 		"a frame: where I am, how I face, and the mobs (the caster with its spell), got " .. frames[#frames])
-	local vitals = fields[11]:match("^(v%d+)/")
-	check(vitals and not vitals:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$"),
-		"my health first among the mobs, which older builds skip (not a mob to them), got " .. fields[11])
+	local vitals = fields[11]:match("^(v[^/]*)/")
+	check(vitals and vitals:find("^v%d+,%d+w40$") and not vitals:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$"),
+		"my health and the hit I took first among the mobs, which older builds skip (not a mob to them), got " .. fields[11])
 	-- What I send is what she sees: my frames, fed back as hers.
 	for _, m in ipairs(names) do anna(m) end
 	anna(frames[#frames])
 	Advance(0.6)
 	local back = dot("Defias Pillager", 11)
 	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown()
-		and fwin.HealthText:GetText() == ("~%d%%"):format(math.floor(tonumber(vitals:sub(2)) / 5 + 0.5) * 5),
-		"what I send is what she sees: my mobs, named, the spell named in her client's language, my health")
+		and fwin.HealthText:GetText() == ("~%d%%"):format(math.floor(tonumber(vitals:match("^v(%d+)")) / 5 + 0.5) * 5)
+		and floatWith("-40", fwin),
+		"what I send is what she sees: my mobs, named, the spell named in her client's language, my health, my hit")
 	anna("O2;w;1")
 	MOBS = {}
 	Advance(9) -- (the remembered ones fade first)

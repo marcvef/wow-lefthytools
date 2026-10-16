@@ -13,7 +13,9 @@ local S = B.Stream
 -- ring and its name: their target; a purple glow while casting; a skull that fades when it dies;
 -- faint while its direction is still a guess), and under it what they're doing (the spell being
 -- cast with its bar, the last spells), their health (estimated: "~80%"), power and form at the
--- top, and a bottom line ("2 on you · 5 near · X casts Y").
+-- top, and a bottom line ("2 on you · 5 near · X casts Y"). What happens to them floats up over
+-- the radar: hits (red, left of them), heals (green, right), a dodge or miss, XP from the mob that
+-- died, loot (green and better); their kills since the window opened at the top right.
 --
 -- The map: the minimap's own terrain tiles (Data/MinimapTiles.lua: 256 px for 533.33 yd of the
 -- world's grid, the 3 x 3 around), else the world map's art of the zone (C_Map.GetMapArtLayers /
@@ -48,6 +50,11 @@ local GOLD = { 1, 0.82, 0.3 }
 local POWER_COLORS = { MANA = { 0.2, 0.45, 1 }, RAGE = { 0.9, 0.15, 0.15 }, ENERGY = { 1, 0.9, 0.2 }, FOCUS = { 1, 0.5, 0.25 } }
 local HEALTH_COLOR = { 0.25, 0.8, 0.3 }
 local BAR = 120            -- the health and power bars' width
+local FLOATS = 10          -- floating numbers at once, per window
+local FLOAT_TIME = 1.6     -- seconds one floats
+local LOOT_TIME = 3.5
+local SEEN_FOR = 6         -- seconds a moment's number counts as shown (they come round: 1-99)
+local HURT_COLOR, HEAL_COLOR, AVOID_COLOR, XP_COLOR = { 1, 0.3, 0.25 }, { 0.35, 1, 0.4 }, { 0.9, 0.9, 0.9 }, { 0.75, 0.6, 1 }
 local PREVIEW_FRIEND, PREVIEW_CLASS = "Anna", "MAGE"
 local Value, issecret = S.Value, S.issecret
 
@@ -561,11 +568,190 @@ local function ShowDoing(view, now)
 end
 
 ---------------------------------------------------------------------------
+-- What happens to them: numbers floating up over the radar
+---------------------------------------------------------------------------
+
+local function Number(n)
+	return BreakUpLargeNumbers and BreakUpLargeNumbers(n) or tostring(n)
+end
+
+-- The game's own word for a miss, dodge, ... (in its language).
+local function Word(token)
+	local word = _G[token]
+	return type(word) == "string" and word or token:sub(1, 1) .. token:sub(2):lower()
+end
+
+-- One floating text: from x, y (off the radar's middle) by dx, dy over its life, fading in and out.
+local function Float(view, text, x, y, dx, dy, color, scale, life)
+	local list = view.win.Floats.list
+	local float
+	for _, f in ipairs(list) do
+		if not f.on then
+			float = f
+			break
+		end
+	end
+	if not float and #list < FLOATS then
+		float = view.win.Floats:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+		list[#list + 1] = float
+	elseif not float then
+		float = list[1] -- (all in use: the oldest goes)
+		for _, f in ipairs(list) do
+			if f.age > float.age then
+				float = f
+			end
+		end
+	end
+	float.on, float.age, float.life = true, 0, life or FLOAT_TIME
+	float.x, float.y, float.dx, float.dy = x, y, dx, dy
+	float:SetText(text)
+	float:SetTextColor(color[1], color[2], color[3])
+	float:SetTextScale(scale or 1)
+	float:SetAlpha(0)
+	float:ClearAllPoints()
+	float:SetPoint("CENTER", view.win.Radar, "CENTER", x, y)
+	float:Show()
+end
+
+local function MoveFloats(view, elapsed)
+	for _, f in ipairs(view.win.Floats.list) do
+		if f.on then
+			f.age = f.age + elapsed
+			local p = f.age / f.life
+			if p >= 1 then
+				f.on = false
+				f:Hide()
+			else
+				f:ClearAllPoints()
+				f:SetPoint("CENTER", view.win.Radar, "CENTER", f.x + f.dx * p, f.y + f.dy * p)
+				f:SetAlpha(p < 0.1 and p * 10 or p > 0.65 and (1 - p) / 0.35 or 1)
+			end
+		end
+	end
+end
+
+local function ShowKills(view)
+	local kills = view.kills
+	view.win.Kills:SetText(kills == 1 and L["1 kill"] or kills > 1 and L["%d kills"]:format(kills) or "")
+end
+
+-- Loot: its icon and name in its quality's colour (an item the client doesn't know yet: asked for).
+local function LootText(m)
+	local name = Value("C_Item.GetItemInfo", ("item:%d"):format(m.item))
+	if not name then
+		local load = S.Api("C_Item.RequestLoadItemDataByID")
+		if load then
+			pcall(load, m.item)
+		end
+	end
+	local icon = Value("C_Item.GetItemIconByID", m.item)
+	local color, colorOf = { 1, 1, 1 }, S.Api("C_Item.GetItemQualityColor")
+	if colorOf then
+		local ok, r, g, b = pcall(colorOf, m.quality)
+		if ok and type(r) == "number" then
+			color = { r, g, b }
+		end
+	end
+	return (icon and ("|T%s:16:16|t "):format(icon) or "") .. (name or L["an item"]), color
+end
+
+-- A moment floats up: hits up and to the left of them, heals to the right, a dodge above; XP from
+-- the mob that died (else from them); loot rising through them, a little longer. A kill counts.
+local function Spawn(view, m)
+	local kind = m.kind
+	local lift = 0 -- (another of its kind just now: below it, so they don't cover each other)
+	if view.lastFloat[kind] and view.clock - view.lastFloat[kind] < 0.45 then
+		lift = -12
+	end
+	view.lastFloat[kind] = view.clock
+	if kind == "hurt" then
+		Float(view, "-" .. Number(m.amount), -14, 8 + lift, -8, 34, HURT_COLOR, m.big and 1.35 or 1)
+	elseif kind == "heal" then
+		Float(view, "+" .. Number(m.amount), 14, 8 + lift, 8, 34, HEAL_COLOR, m.big and 1.35 or 1)
+	elseif kind == "avoid" then
+		Float(view, Word(m.avoid), 0, 18 + lift, 0, 26, AVOID_COLOR, 0.85)
+	elseif kind == "xp" then
+		local dot = m.key and view.dotFor[m.key]
+		local x, y = 0, 16
+		if dot and dot.x then
+			x, y = dot.x, dot.y + 10
+		end
+		Float(view, L["+%d XP"]:format(m.amount), x, y + lift, 0, 26, XP_COLOR, 0.9)
+	elseif kind == "kill" then
+		view.kills = view.kills + 1
+		ShowKills(view)
+	elseif kind == "loot" then
+		local text, color = LootText(m)
+		Float(view, text, 0, -16 + lift, 0, 44, color, 0.9, LOOT_TIME)
+	end
+end
+
+-- The picture's new moments (each number once), oldest first.
+local function Happenings(view)
+	local moments = view.picture.moments
+	for i = #(moments or {}), 1, -1 do
+		local m = moments[i]
+		local seen = view.seen[m.seq]
+		if not seen or view.clock - seen > SEEN_FOR then
+			view.seen[m.seq] = view.clock
+			Spawn(view, m)
+		end
+	end
+end
+
+local function ClearFloats(view)
+	for _, f in ipairs(view.win.Floats.list) do
+		f.on = false
+		f:Hide()
+	end
+	wipe(view.seen)
+	wipe(view.lastFloat)
+	view.kills = 0
+	ShowKills(view)
+end
+
+---------------------------------------------------------------------------
 -- The preview: a made-up friend in a made-up fight, on a loop
 ---------------------------------------------------------------------------
 
 local PREVIEW_LOOP = 24
 local previewMobs = {}
+-- What happens to her (seconds into the loop): hits while the bandits are on her, heals, a dodge,
+-- the bandit's death (her killing blow, its XP), loot.
+local PREVIEW_MOMENTS = {
+	{ 3, "hurt", 24 }, { 4.6, "hurt", 31 }, { 5.5, "avoid", "DODGE" }, { 6.3, "hurt", 27 }, { 7.5, "heal", 120 },
+	{ 9, "hurt", 26 }, { 10.4, "hurt", 158, true }, { 11.6, "heal", 310, true }, { 12.8, "hurt", 25 },
+	{ 14, "kill" }, { 14.1, "xp", 87 }, { 16.5, "loot", 774 }, { 19, "hurt", 30 }, { 21, "avoid", "PARRY" },
+}
+
+-- The moments passed since the last step (also over the loop's end), newest first, kept 2.5 s.
+local function PreviewMoments(view, t)
+	local was = view.previewAt or t
+	view.previewAt = t
+	local moments = view.picture.moments
+	for _, e in ipairs(PREVIEW_MOMENTS) do
+		local at, kind = e[1], e[2]
+		if (was < at and at <= t) or (t < was and (at > was or at <= t)) then
+			view.previewSeq = (view.previewSeq or 0) % 99 + 1
+			local m = { seq = view.previewSeq, kind = kind, at = view.clock }
+			if kind == "hurt" or kind == "heal" then
+				m.amount, m.big = e[3], e[4] or false
+			elseif kind == "avoid" then
+				m.avoid = e[3]
+			elseif kind == "xp" then
+				m.amount, m.key = e[3], "bandit"
+			elseif kind == "kill" then
+				m.key = "bandit"
+			else
+				m.item, m.quality = e[3], 2 -- (Malachite)
+			end
+			table.insert(moments, 1, m)
+		end
+	end
+	while moments[1] and view.clock - moments[#moments].at > 2.5 do
+		moments[#moments] = nil
+	end
+end
 
 local function PreviewMob(n, key, name, level, class)
 	local mob = previewMobs[n] or {}
@@ -584,6 +770,7 @@ local function FeedPreview(view)
 	picture.power = picture.power or { token = "MANA" }
 	picture.power.frac = 0.4 + 0.3 * math.cos(t / 4)
 	picture.health = 0.65 + 0.3 * math.cos(t / 3)
+	PreviewMoments(view, t)
 	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite")
 	leader.combat, leader.attacking, leader.target = t > 2, t > 2, true
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
@@ -705,6 +892,7 @@ local function OnUpdate(win, elapsed)
 	if changed then
 		Apply(view)
 		ShowSelf(view)
+		Happenings(view) -- (after Apply: XP floats from its mob's dot)
 		if view.kind == "friend" and view.stale then
 			win.Status:SetText(L["Waiting for %s's stream..."]:format(view.picture.name or "?"))
 			win.Live.Text:SetTextColor(0.6, 0.6, 0.6)
@@ -730,6 +918,7 @@ local function OnUpdate(win, elapsed)
 		win.Me:SetRotation(facing)
 	end
 	ShowDoing(view, now)
+	MoveFloats(view, elapsed)
 	local k = math.min(1, elapsed * GLIDE)
 	local pulse = 0.5 + 0.5 * math.sin(view.clock * 5)
 	for _, dot in ipairs(view.dots) do
@@ -878,6 +1067,9 @@ local function Build(view, name, parent)
 	dotFrame:SetPoint("RIGHT", win.Live.Text, "LEFT", -4, 0)
 	win.Live.Dot = Circle(dotFrame, "OVERLAY", 0, 8)
 	win.Live.Dot:SetColorTexture(1, 0.2, 0.15, 1)
+	-- Their kills since the window opened, under it.
+	win.Kills = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	win.Kills:SetPoint("TOPRIGHT", win.Live, "BOTTOMRIGHT", 0, -3)
 
 	-- The map (MoveMap): its own frame under the radar, its tiles cut round.
 	local ring = (OUTER_YARDS * PX_PER_YARD + 8) * 2 -- (the round cut: the outer ring and a little more)
@@ -933,6 +1125,11 @@ local function Build(view, name, parent)
 	win.MeSkull:SetSize(22, 22)
 	win.MeSkull:SetPoint("CENTER")
 	win.MeSkull:Hide()
+	-- The floating numbers: their own frame, above the dots.
+	win.Floats = CreateFrame("Frame", nil, radar)
+	win.Floats:SetAllPoints()
+	win.Floats:SetFrameLevel(radar:GetFrameLevel() + 30)
+	win.Floats.list = {}
 
 	-- What they're doing (ShowDoing): the cast on the left, the last spells on the right.
 	local act = CreateFrame("Frame", nil, win)
@@ -999,17 +1196,20 @@ end
 
 local function NewView(key, kind)
 	return { key = key, kind = kind, dots = {}, dotFor = {}, map = { tiles = {} }, clock = 0, nextFeed = 0,
-		picture = { mobs = {}, recent = {} } }
+		picture = { mobs = {}, recent = {}, moments = {} }, seen = {}, lastFloat = {}, kills = 0 }
 end
 
--- Shows a view (fresh: its dots, map and picture start over).
+-- Shows a view (fresh: its dots, map, floating numbers and picture start over).
 local function Start(view)
 	ReleaseAll(view)
+	ClearFloats(view)
 	if view.picture ~= S.Sensed() then -- (the sensor's own picture: friends watching may be getting it)
 		wipe(view.picture.mobs)
 		wipe(view.picture.recent)
+		wipe(view.picture.moments)
 		view.picture.cast, view.picture.health = nil, nil
 	end
+	view.previewAt = nil
 	view.map.id, view.map.x, view.map.source = false, nil, nil
 	view.clock, view.nextFeed, view.open, view.looked = 0, 0, true, nil
 	view.win.Status:SetText("")
@@ -1037,7 +1237,7 @@ function S.OpenView(kind)
 		S.SenseNeed("me", true)
 		view.win.Live.Text:SetText(L["LIVE"])
 	else
-		view.picture = { mobs = {}, recent = {} }
+		view.picture = { mobs = {}, recent = {}, moments = {} }
 		S.SenseNeed("me", false)
 		view.win.Live.Text:SetText(L["DEMO"])
 	end
@@ -1059,7 +1259,7 @@ function S.OpenFriend(id, origin)
 		Build(view, "LefthyToolsStreamFriend" .. friendCount, nil)
 	end
 	view.key, view.id, view.kind, view.origin = id, id, "friend", origin
-	view.picture = { mobs = {}, recent = {}, name = S.FriendName(id) }
+	view.picture = { mobs = {}, recent = {}, moments = {}, name = S.FriendName(id) }
 	-- Side by side from the top left: the first place no other friend's window has.
 	local taken = {}
 	for _, other in pairs(views) do
