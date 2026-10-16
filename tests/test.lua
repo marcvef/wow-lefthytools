@@ -4051,6 +4051,13 @@ do
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
 	LefthyToolsStreamTestsFrame:Hide()
+	-- The model test: five models doing the same, notes kept (whatever this client lacks is noted, not an error).
+	lefthy("stream modeltest")
+	Advance(2.6)
+	check(LefthyToolsModelTest and LefthyToolsModelTest:IsShown() and LefthyToolsDB.modelTest and type(LefthyToolsDB.modelTest.errors) == "table"
+		and LefthyToolsModelTest.Anim:GetText():find("Ready1H", 1, true), "/lefthy stream modeltest: a window cycling animations, notes kept")
+	lefthy("stream modeltest")
+	check(not LefthyToolsModelTest:IsShown(), "again: closed")
 	pmark = #PRINTED + 1
 	lefthy("stream test")
 	Advance(2)

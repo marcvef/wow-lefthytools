@@ -511,6 +511,182 @@ local function StartTest()
 end
 
 ---------------------------------------------------------------------------
+-- The model test (/lefthy stream modeltest): what the game's models can do, for a battle row in the
+-- stream (your model attacking or casting at the foes' models). Five setups side by side, all playing
+-- the same animation, the next one every 2.5 s: you (PlayerModel:SetUnit), a mob (SetCreature: your
+-- target's kind, else a Defias Bandit), your race's plain model wearing your gear without a unit
+-- (DressUpModel:SetDisplayInfo + TryOn: how a friend far away could look), you as an actor in a
+-- ModelScene moved by position, and you slid across your box (a lunge). What the game answered goes
+-- to LefthyToolsDB.modelTest.
+---------------------------------------------------------------------------
+
+-- Animation IDs (AnimationData, checked against 1.60.1.70425 by their fallbacks).
+local TEST_ANIMS = { { 0, "Stand" }, { 26, "Ready1H" }, { 17, "Attack1H" }, { 18, "Attack2H" },
+	{ 16, "AttackUnarmed" }, { 57, "Special1H" }, { 51, "ReadySpellDirected" }, { 53, "SpellCastDirected" },
+	{ 54, "SpellCastOmni" }, { 9, "CombatWound" }, { 10, "CombatCritical" }, { 30, "Dodge" }, { 21, "Parry1H" },
+	{ 24, "ShieldBlock" }, { 46, "AttackBow" }, { 1, "Death" } }
+-- Each race's plain model (ChrRaceXChrModel -> ChrModel.DisplayID, 1.60.1.70425): { male, female }.
+local RACE_DISPLAY = { [1] = { 57899, 56658 }, [2] = { 51894, 53762 }, [3] = { 49242, 53768 }, [4] = { 54918, 54439 },
+	[5] = { 54041, 56327 }, [6] = { 55077, 56316 }, [7] = { 51877, 53291 }, [8] = { 59071, 59223 },
+	[10] = { 62127, 62128 }, [11] = { 57027, 58232 } }
+local ANIM_STEP, BOX_W, BOX_H = 2.5, 96, 130
+local modelTest
+
+local function Try(notes, key, f, ...)
+	local ok, a = pcall(f, ...)
+	if not ok then
+		notes.errors[#notes.errors + 1] = key .. ": " .. tostring(a)
+	end
+	return ok, a
+end
+
+local function TestBox(index, kind, label)
+	local box = CreateFrame(kind, nil, modelTest)
+	box:SetSize(BOX_W, BOX_H)
+	box:SetPoint("TOPLEFT", 12 + (index - 1) * (BOX_W + 8), -40)
+	local back = modelTest:CreateTexture(nil, "BACKGROUND", nil, 1)
+	back:SetPoint("TOPLEFT", 12 + (index - 1) * (BOX_W + 8), -40)
+	back:SetSize(BOX_W, BOX_H)
+	back:SetColorTexture(0, 0, 0, 0.5)
+	local text = modelTest:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	text:SetPoint("TOP", back, "BOTTOM", 0, -4)
+	text:SetWidth(BOX_W)
+	text:SetText(index .. ". " .. label)
+	return box
+end
+
+local function ModelTestStep(self, elapsed)
+	self.since, self.clock = (self.since or 0) + elapsed, (self.clock or 0) + elapsed
+	if self.since >= ANIM_STEP or not self.step then
+		self.since = 0
+		self.step = (self.step or 0) % #TEST_ANIMS + 1
+		local anim = TEST_ANIMS[self.step]
+		self.Anim:SetText(("%d  %s  (%d of %d)"):format(anim[1], anim[2], self.step, #TEST_ANIMS))
+		for _, model in ipairs(self.models) do
+			pcall(model.SetAnimation, model, anim[1])
+		end
+		if self.actor then
+			pcall(self.actor.SetAnimation, self.actor, anim[1])
+		end
+	end
+	-- The lunge: box 5 slides 30 px right and back once a second; the actor goes left and right.
+	local t = (self.clock % 1)
+	local lunge = t < 0.5 and t * 2 or (1 - t) * 2
+	self.slide:SetPoint("TOPLEFT", 12 + 4 * (BOX_W + 8) + math.floor(lunge * 30), -40)
+	if self.actor then
+		pcall(self.actor.SetPosition, self.actor, 0, math.sin(self.clock * 2) * 0.8, 0)
+	end
+end
+
+local function RecordModelTest(notes)
+	local function File(model)
+		local ok, id = pcall(model.GetModelFileID, model)
+		return ok and not issecret(id) and id or nil
+	end
+	local m = modelTest.models
+	notes.unitFile, notes.creatureFile, notes.dressFile, notes.slideFile = File(m[1]), File(m[2]), File(m[3]), File(m[4])
+	if modelTest.actor then
+		local ok, id = pcall(modelTest.actor.GetModelFileID, modelTest.actor)
+		notes.actorFile = ok and not issecret(id) and id or nil
+	end
+	LT.db.modelTest = notes
+	M:Print("model test notes kept (LefthyToolsDB.modelTest). Tell what each box did; /reload so the notes are saved.")
+end
+
+local function ModelTest()
+	if modelTest then
+		modelTest:SetShown(not modelTest:IsShown())
+		return
+	end
+	local notes = { time = time(), build = select(3, pcall(GetBuildInfo)), errors = {} }
+	modelTest = CreateFrame("Frame", "LefthyToolsModelTest", UIParent)
+	modelTest:SetSize(12 + 5 * (BOX_W + 8) + 4, 200)
+	modelTest:SetPoint("CENTER", 0, 120)
+	modelTest:SetFrameStrata("DIALOG")
+	modelTest:EnableMouse(true)
+	modelTest:SetMovable(true)
+	modelTest:RegisterForDrag("LeftButton")
+	modelTest:SetScript("OnDragStart", modelTest.StartMoving)
+	modelTest:SetScript("OnDragStop", modelTest.StopMovingOrSizing)
+	local bg = modelTest:CreateTexture(nil, "BACKGROUND")
+	bg:SetAllPoints()
+	bg:SetColorTexture(0.04, 0.05, 0.07, 0.94)
+	modelTest.Anim = modelTest:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	modelTest.Anim:SetPoint("TOP", 0, -14)
+	local close = CreateFrame("Button", nil, modelTest, "UIPanelCloseButtonNoScripts")
+	close:SetPoint("TOPRIGHT", -2, -2)
+	close:SetScript("OnClick", function() modelTest:Hide() end)
+	table.insert(UISpecialFrames, "LefthyToolsModelTest")
+	modelTest.models = {}
+	-- 1. You, from your unit.
+	local you = TestBox(1, "PlayerModel", "you (unit)")
+	Try(notes, "unit", you.SetUnit, you, "player")
+	Try(notes, "unitRotation", you.SetRotation, you, 0.6)
+	-- 2. A mob: your target's kind, else a Defias Bandit.
+	local creature = 116
+	local guid = UnitGUID("target")
+	if type(guid) == "string" and not issecret(guid) then
+		creature = tonumber(guid:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-")) or creature
+	end
+	notes.creature = creature
+	local mob = TestBox(2, "PlayerModel", "a mob (" .. creature .. ")")
+	Try(notes, "creature", mob.SetCreature, mob, creature)
+	Try(notes, "creatureRotation", mob.SetRotation, mob, -0.6)
+	-- 3. Your race's plain model wearing your gear, without a unit.
+	local _, _, _, raceID = pcall(UnitRace, "player")
+	local sex = select(2, pcall(UnitSex, "player")) == 3 and 2 or 1
+	local display = RACE_DISPLAY[raceID] and RACE_DISPLAY[raceID][sex]
+	notes.raceID, notes.sex, notes.display = raceID, sex, display
+	local dress = TestBox(3, "DressUpModel", "race model + gear")
+	if display then
+		Try(notes, "autoDress", dress.SetAutoDress, dress, false)
+		Try(notes, "display", dress.SetDisplayInfo, dress, display)
+		local worn = 0
+		for slot = 1, 19 do
+			local okLink, link = pcall(GetInventoryItemLink, "player", slot)
+			if okLink and type(link) == "string" and not issecret(link) and slot ~= 4 and slot ~= 19 then -- (not shirt or tabard)
+				local ok = Try(notes, "tryOn" .. slot, dress.TryOn, dress, link)
+				worn = worn + (ok and 1 or 0)
+			end
+		end
+		notes.triedOn = worn
+		Try(notes, "dressRotation", dress.SetRotation, dress, 0.6)
+	end
+	-- 4. You as an actor in a ModelScene, moved by position (camera looking at the origin from x = 4).
+	local okScene, scene = pcall(CreateFrame, "ModelScene", nil, modelTest)
+	if okScene and scene then
+		scene:SetSize(BOX_W, BOX_H)
+		scene:SetPoint("TOPLEFT", 12 + 3 * (BOX_W + 8), -40)
+		local back = modelTest:CreateTexture(nil, "BACKGROUND", nil, 1)
+		back:SetAllPoints(scene)
+		back:SetColorTexture(0, 0, 0, 0.5)
+		local text = modelTest:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		text:SetPoint("TOP", back, "BOTTOM", 0, -4)
+		text:SetText("4. scene actor")
+		Try(notes, "sceneCamera", scene.SetCameraPosition, scene, 4, 0, 1)
+		Try(notes, "sceneOrientation", scene.SetCameraOrientationByAxisVectors, scene, -1, 0, 0, 0, -1, 0, 0, 0, 1)
+		Try(notes, "sceneFov", scene.SetCameraFieldOfView, scene, 0.8)
+		local okActor, actor = Try(notes, "createActor", scene.CreateActor, scene)
+		if okActor and actor then
+			modelTest.actor = actor
+			Try(notes, "actorUnit", actor.SetModelByUnit, actor, "player")
+			Try(notes, "actorYaw", actor.SetYaw, actor, math.pi / 2)
+		end
+	else
+		notes.errors[#notes.errors + 1] = "ModelScene: " .. tostring(scene)
+	end
+	-- 5. You again, the box itself sliding (a lunge).
+	local slide = TestBox(5, "PlayerModel", "slid (lunge)")
+	Try(notes, "slideUnit", slide.SetUnit, slide, "player")
+	Try(notes, "slideRotation", slide.SetRotation, slide, 0.6)
+	modelTest.slide = slide
+	modelTest.models = { you, mob, dress, slide }
+	modelTest:SetScript("OnUpdate", ModelTestStep)
+	C_Timer.After(2, function() RecordModelTest(notes) end)
+	M:Print("model test: five models doing the same, the next animation every 2.5 s (its name at the top). Escape or the X closes it.")
+end
+
+---------------------------------------------------------------------------
 -- Commands
 ---------------------------------------------------------------------------
 
@@ -527,6 +703,8 @@ function B.StreamCommand(arg)
 		end
 	elseif cmd == "results" then
 		ShowResults()
+	elseif cmd == "modeltest" then
+		ModelTest()
 	elseif (cmd == "preview" or cmd == "me") and S.OpenView then
 		S.OpenView(cmd)
 	elseif cmd == "watch" and S.WatchByName then
@@ -540,5 +718,6 @@ function B.StreamCommand(arg)
 		M:Print("/lefthy stream stop [<name>] - stop watching (everyone, or one friend)")
 		M:Print("/lefthy stream test - a minute of notes on what the game tells addons about the mobs around you")
 		M:Print("/lefthy stream results - the last tests, ready to copy")
+		M:Print("/lefthy stream modeltest - what the game's models can do (a test for a battle row)")
 	end
 end
