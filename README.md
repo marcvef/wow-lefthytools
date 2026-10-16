@@ -77,7 +77,8 @@ at commit `1a2b3c4`.
 .\install.ps1 -GameDir "D:\...\World of Warcraft\_classic_beta_"   # if it isn't found
 ```
 
-The installer also removes the old standalone `Mirage` addon, which is now part of
+The installer also installs `LefthyTools_DropData` next to it (the Bestiary's drop database, an
+add-on of its own) and removes the old standalone `Mirage` addon, which is now part of
 LefthyTools. How it works inside (for developers): see [docs/](docs/architecture.md).
 
 ## Known limitations (Forever beta)
@@ -329,6 +330,18 @@ all your kills, and your rarest find.
 **Item tooltips** (anywhere: bags, chat links) list the three mobs an item comes from likeliest,
 with the chance and how many kills that's from; a pelt marks skinning.
 
+**Compared with a drop database.** Beside your own numbers, the Bestiary shows what a classic
+world database ([CMaNGOS Classic DB](https://github.com/cmangos/classic-db)) says a mob drops. It
+comes as an add-on of its own, `LefthyTools_DropData`, and loads only when first needed. Each of
+your drops shows the database's chance next to yours, or that it doesn't list it. What you haven't
+had yet sits under your drops, smaller and faded, with how many of its drops you've found. Hovering
+one shows how many you'd have expected in your kills by now. A mob you haven't killed shows what it
+can drop, in the window and on the (still small) card beside the mouse. The ledger shows how much
+of each mob's loot you've found, and a *Not seen yet* section for the mob you pick. Quest items
+(they drop only while you're on the quest) are marked with a `!`. WoW: Forever is classic content
+but may differ, so your own numbers are never mixed with the database's. `/bestiary data` says
+whether the database is there.
+
 Minimap button: click for the window, **Shift-click** to switch the drops next to the mouse on
 or off, Ctrl-click for the ledger, right-click for the settings. `/bestiary log` shows what was
 made of your last loot windows (to see why something wasn't counted).
@@ -339,6 +352,7 @@ made of your last loot windows (to see why something wasn't counted).
 | Drops next to the mouse (an enemy you've killed before: its likeliest drops beside the mouse) | off |
 | Drop chances in item tooltips | on |
 | Grey items | on |
+| Compare with a drop database | on |
 
 ---
 
@@ -443,3 +457,14 @@ Other commands:
   which covers regeneration and taking damage.
 - Faded elements can still be clicked, just like mouseover bars in other addons.
   Hovering reveals them first.
+
+---
+
+## License
+
+LefthyTools is under the BSD 2-Clause License ([LICENSE](LICENSE)). The drop database add-on,
+[LefthyTools_DropData](LefthyTools_DropData/), is generated from CMaNGOS Classic DB and is under the GPL v3
+like its source ([its LICENSE.md](LefthyTools_DropData/LICENSE.md) and
+[COPYRIGHT.md](LefthyTools_DropData/COPYRIGHT.md)). It's rebuilt with
+`node tools/update-drop-data.js` ([its README](LefthyTools_DropData/README.md)). World of Warcraft
+content and names belong to Blizzard.

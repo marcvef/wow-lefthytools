@@ -26,6 +26,12 @@ local L = ns.L
 -- LefthyToolsBestiaryDB = { mobs = { [creatureID] = { name, level, class, kills, money (copper),
 --   first, last (time()), items = { [itemID] = { drops (corpses it came from), count, quality,
 --   name } }, skinned (how many), skins = { [itemID] = { times, count, quality, name } } } } }
+--
+-- Beside your own numbers (setting dropData): what a classic world database says each kind of mob
+-- can drop (LefthyTools_DropData, a separate add-on: GPL v3 like its source, CMaNGOS Classic DB),
+-- loaded when first needed. Forever is classic content (the same mob and item IDs) but may differ, so
+-- it's never mixed into your numbers: your drops show its chance beside yours, and what you haven't
+-- seen yet shows faded.
 
 local M = LT:NewModule("bestiary", {
 	title = "Bestiary",
@@ -36,6 +42,7 @@ local M = LT:NewModule("bestiary", {
 		showPoor = true,     -- grey items in the lists
 		hoverCard = false,   -- the drops next to the mouse over an enemy
 		itemTooltip = true,  -- an item's tooltip: the mobs it comes from likeliest, with the chance
+		dropData = true,     -- compare with the classic drop database (LefthyTools_DropData)
 		window = {},         -- shown, point, x, y
 	},
 })
@@ -167,17 +174,27 @@ end
 -- A kind's drops, the likeliest first (ties: better quality first), then what skinning it gives
 -- (skin = true, the chance per skinning), then its world drops gathered in one entry ({ group =
 -- the world drops, quality = the best of them }): { { id, drops, count, quality, chance, each,
--- skin, name, out (kills or skinnings) }, ... }. Grey ones only with showPoor.
-function Bt.Drops(mob, showPoor)
+-- skin, name, out (kills or skinnings), classic, quest }, ... }. Grey ones only with showPoor.
+-- With its creature ID, the classic database beside it: classic = its chance there (false: the
+-- database knows the mob but not this drop), quest = only while on a quest.
+function Bt.Drops(mob, showPoor, creature)
 	local list, world = {}, {}
+	local known = Bt.Known(creature)
 	for _, skin in ipairs({ false, true }) do
 		local part = {}
+		local classic = known and (skin and known.skins or known.items)
 		for id, item in pairs(mob and Bt.Part(mob, skin) or {}) do
 			local quality = item[3] or 1
 			if showPoor or quality ~= 0 then
 				local chance, each = Bt.Chance(mob, item, skin)
+				local said = classic and classic[id]
 				local entry = { id = id, drops = item[1], count = item[2], quality = quality, chance = chance, each = each,
-					skin = skin, name = item[4], out = skin and mob.skinned or mob.kills }
+					skin = skin, name = item[4], out = skin and mob.skinned or mob.kills, quest = said and said[3] or nil }
+				if said then
+					entry.classic = said[1]
+				elseif classic then
+					entry.classic = false -- (not `classic and false or nil`: that's always nil)
+				end
 				if not skin and Bt.IsWorldDrop(id, quality) then
 					world[#world + 1] = entry
 				else
@@ -232,6 +249,137 @@ function Bt.Sources(itemID)
 		end
 	end
 	return sources[itemID]
+end
+
+---------------------------------------------------------------------------
+-- The classic drop database (LefthyTools_DropData)
+---------------------------------------------------------------------------
+
+local DATA_ADDON = "LefthyTools_DropData"
+local known = {}           -- creature ID -> what the database says (false: not in it), read when first asked
+local dataTried = false    -- loading it was tried (again after a setting changes)
+local dataWhy              -- why it isn't there (LoadAddOn's reason: "MISSING", "DISABLED", ...)
+
+-- The database, loaded the first time it's needed (nil: switched off, not installed or disabled).
+local function DropData()
+	if not (M.db and M.db.dropData) then
+		return nil
+	end
+	if type(LefthyToolsDropData) ~= "table" and not dataTried then
+		dataTried = true
+		local load = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
+		if load then
+			local ok, loaded, why = pcall(load, DATA_ADDON)
+			dataWhy = not (ok and loaded) and tostring(ok and why or "error") or nil
+		else
+			dataWhy = "no LoadAddOn"
+		end
+	end
+	local db = LefthyToolsDropData
+	return type(db) == "table" and type(db.mobs) == "table" and db or nil
+end
+
+-- "<item>:<quality>:<chance in hundredths of a percent>[q],...[;s=<skinning, the same>][;g=<min>-<max>]"
+-- (tools/update-drop-data.js).
+local function ParseKnown(text)
+	local entry = { items = {}, skins = {} }
+	for part in text:gmatch("[^;]+") do
+		local kind, rest = part:match("^(%a)=(.*)$")
+		if kind == "g" then
+			local low, high = rest:match("^(%d+)%-(%d+)$")
+			entry.coin = low and { tonumber(low), tonumber(high) } or nil
+		elseif not kind or kind == "s" then
+			local into = kind and entry.skins or entry.items
+			for id, quality, chance, quest in (rest or part):gmatch("(%d+):(%d+):(%d+)(q?)") do
+				into[tonumber(id)] = { tonumber(chance) / 10000, tonumber(quality), quest == "q" }
+			end
+		end
+	end
+	return entry
+end
+
+-- What the classic database says a kind of mob drops: { items = { [item ID] = { chance (0-1),
+-- quality, quest (only while on its quest) } }, skins = (the same, per skinning), coin = { min, max }
+-- (copper, or nil) }; nil: it doesn't know the mob, or there's no database. Each mob read once.
+function Bt.Known(creature)
+	local db = creature and DropData()
+	if not db then
+		return nil
+	end
+	if known[creature] == nil then
+		local text = db.mobs[creature]
+		known[creature] = type(text) == "string" and ParseKnown(text) or false
+	end
+	return known[creature] or nil
+end
+
+-- You can skin (Skinning, any rank): only then does what skinning gives count among what you could
+-- have had (else every beast's leather would wait there forever).
+local function CanSkin()
+	for id in pairs(SKINNING) do
+		if C_SpellBook and C_SpellBook.IsSpellKnown then
+			local ok, known = pcall(C_SpellBook.IsSpellKnown, id)
+			if ok and known == true then
+				return true
+			end
+		end
+		if IsPlayerSpell and IsPlayerSpell(id) == true then
+			return true
+		end
+	end
+	return false
+end
+
+-- The database beside your own: what it says this kind drops that you haven't had yet (entries like
+-- Bt.Drops', unseen = true, chance = the database's, out = your kills or skinnings: the likeliest
+-- first, then skinning), how many of its drops you've had, and of how many. Grey ones only with
+-- showPoor; skinning only when you can skin or have skinned this kind. nil: the database doesn't
+-- know it. countOnly: the counts, no list.
+function Bt.Compare(creature, mob, showPoor, countOnly)
+	local data = Bt.Known(creature)
+	if not data then
+		return nil
+	end
+	local unseen, found, total = {}, 0, 0
+	local skins = next(data.skins) ~= nil and ((mob and (mob.skinned or 0) > 0) or CanSkin())
+	for _, skin in ipairs(skins and { false, true } or { false }) do
+		local part, mine = {}, mob and Bt.Part(mob, skin) or NONE
+		for id, said in pairs(skin and data.skins or data.items) do
+			if showPoor or said[2] ~= 0 then
+				total = total + 1
+				if mine[id] then
+					found = found + 1
+				elseif not countOnly then
+					part[#part + 1] = { id = id, chance = said[1], quality = said[2], quest = said[3] or nil, skin = skin, unseen = true,
+						drops = 0, count = 0, classic = said[1], out = mob and (skin and (mob.skinned or 0) or mob.kills) or 0 }
+				end
+			end
+		end
+		table.sort(part, Likelier)
+		for _, entry in ipairs(part) do
+			unseen[#unseen + 1] = entry
+		end
+	end
+	return unseen, found, total
+end
+
+-- /bestiary data: whether the database is there and what it holds (English, like the other chat lines).
+function Bt.PrintData()
+	if not M.db.dropData then
+		M:Print("the classic drop database is switched off (settings).")
+		return
+	end
+	local db = DropData()
+	if not db then
+		M:Print(("the classic drop database isn't there (%s): the add-on %s is missing or switched off in the add-on list.")
+			:format(dataWhy or "?", DATA_ADDON))
+		return
+	end
+	local count = 0
+	for _ in pairs(db.mobs) do
+		count = count + 1
+	end
+	M:Print(("the classic drop database: %d kinds of mobs, from %s."):format(count, tostring(db.source)))
 end
 
 ---------------------------------------------------------------------------
@@ -608,6 +756,7 @@ function M:OnDisable()
 end
 
 function M:OnSettingChanged()
+	dataTried = false -- (switched on again, or installed since: loading the database is tried again)
 	if Bt.Settings then
 		Bt.Settings()
 	end
@@ -627,6 +776,8 @@ function M:BuildOptions(o)
 	o:Checkbox("itemTooltip", L["Drop chances in item tooltips"],
 		L["An item's tooltip (in your bags, in chat, anywhere) lists the three mobs it comes from likeliest, with the chance; a pelt marks skinning."])
 	o:Checkbox("showPoor", L["Grey items"], L["Show grey (junk) items among the drops."])
+	o:Checkbox("dropData", L["Compare with a drop database"],
+		L["Beside your own numbers, what a classic world database (CMaNGOS) says each mob can drop: its chance on each of your drops, and what you haven't had yet, faded. WoW: Forever may differ. It's an add-on of its own, LefthyTools Drop Data, installed with LefthyTools; /bestiary data says whether it's there."])
 end
 
 function M:OnSlashCommand(msg)
@@ -640,12 +791,15 @@ function M:OnSlashCommand(msg)
 		self:Print("minimap button " .. (self.db.minimapButton and "on." or "off."))
 	elseif cmd == "log" then
 		Bt.PrintLog()
+	elseif cmd == "data" then
+		Bt.PrintData()
 	elseif cmd == "ledger" or cmd:match("^ledger ") or cmd:match("^search ") then
 		Bt.ToggleLedger(nil, strtrim(msg or ""):match("^%S+%s+(.+)$"))
 	else
 		self:Print("/bestiary - open or close the window (your target's drops)")
 		self:Print("/bestiary ledger [search] - every mob you've killed, its drops; search mobs and items")
 		self:Print("/bestiary log - the last loot windows and kills, and what was made of them")
+		self:Print("/bestiary data - whether the classic drop database is there")
 		self:Print("/bestiary minimap - show or hide the minimap button")
 		self:Print("/bestiary settings - the Bestiary's settings")
 	end

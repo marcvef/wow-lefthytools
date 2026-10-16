@@ -60,10 +60,13 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Bestiary/Bestiary.lua    Bestiary: kills and loot per kind of mob (LefthyToolsBestiaryDB), /bestiary
   Modules/Bestiary/Window.lua      its window (your target's drops), the card beside the mouse, item tooltips, the minimap button
   Modules/Bestiary/Ledger.lua      the ledger: every mob, its statistics and drops, fuzzy search over mobs and items
+LefthyTools_DropData/        the Bestiary's classic drop database, an add-on of its own (load on demand), GPL v3
+  Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
 tools/update-class-spells.js     regenerates Data/ClassSpells.lua from wago.tools (node)
+tools/update-drop-data.js    regenerates LefthyTools_DropData/Drops.lua from a classic world DB dump (node)
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
 Update-LefthyTools.cmd       players' one-file installer: batch header + install.ps1 (generated)
@@ -93,8 +96,11 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
 - It finds WoW: Forever (`World of Warcraft\_classic_beta_`) via a remembered path
   (`%LOCALAPPDATA%\LefthyTools\game-folder.txt`), Battle.net's `product.db`, then common folders
   on every drive, else asks; `-GameDir` overrides it. It replaces `Interface\AddOns\LefthyTools`
-  (settings live in `WTF`, untouched), removes the old standalone `Mirage` addon, and skips the
-  install if that exact version is already there (`-Force` reinstalls).
+  (settings live in `WTF`, untouched) and the add-ons that come with it (`$Companions`: folders
+  next to `LefthyTools/` in the repo, `LefthyTools_DropData`; checked the same way, not stamped
+  with a version; a new one means "restart the game"), removes the old standalone `Mirage` addon,
+  and skips the install if that exact version is already there and nothing is missing (`-Force`
+  reinstalls).
 - Everything runs inside a script block, so `irm | iex` in someone's PowerShell window leaves no
   variables or preference changes behind. TLS 1.2 is enabled for old Windows PowerShell setups;
   the progress bar is off (it slows downloads a lot in PowerShell 5). `.gitattributes` keeps the

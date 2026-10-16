@@ -21,8 +21,8 @@ exit /b
 #   folder. Run it again any time to update. Settings are kept (they live in the WTF folder).
 #
 # Development, from a clone of the repo:
-#   .\install.ps1             install this checkout's LefthyTools folder
-#   .\install.ps1 -Link       junction AddOns\LefthyTools to this checkout (edits only need /reload)
+#   .\install.ps1             install this checkout's LefthyTools folder (and LefthyTools_DropData)
+#   .\install.ps1 -Link       junction AddOns\LefthyTools (and the rest) to this checkout (edits only need /reload)
 #   .\install.ps1 -Download   install the latest version from GitHub instead
 #   -GameDir <dir>            the WoW: Forever folder (...\World of Warcraft\_classic_beta_)
 #   -Force                    reinstall even if that version is already installed
@@ -48,6 +48,9 @@ param(
 	$Name = 'LefthyTools'
 	$Flavor = '_classic_beta_' # WoW: Forever's folder inside the World of Warcraft install
 	$Legacy = @('Mirage')      # addons that are now part of LefthyTools; left installed they'd run twice
+	# Add-ons that come with it, each a folder of its own next to LefthyTools in the repo: the drop
+	# database (GPL v3 like its source, so apart from the BSD-licensed rest).
+	$Companions = @('LefthyTools_DropData')
 	$Remembered = Join-Path $env:LOCALAPPDATA 'LefthyTools\game-folder.txt'
 
 	function Test-ForeverFolder([string]$dir) {
@@ -131,7 +134,7 @@ param(
 
 	# After copying: every file of the download arrived intact (same SHA-256; the TOC is left out,
 	# its version line is stamped on install) and every file the TOC loads is there.
-	function Test-Install([string]$source, [string]$target) {
+	function Test-Install([string]$source, [string]$target, [string]$addon = $Name) {
 		$problems = New-Object System.Collections.Generic.List[string]
 		$root = (Get-Item -LiteralPath $source).FullName.TrimEnd('\')
 		$count = 0
@@ -141,13 +144,13 @@ param(
 			$copy = Join-Path $target $relative
 			if (-not (Test-Path -LiteralPath $copy -PathType Leaf)) {
 				$problems.Add("missing: $relative")
-			} elseif ($relative -ne "$Name.toc") {
+			} elseif ($relative -ne "$addon.toc") {
 				$want = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
 				$have = (Get-FileHash -LiteralPath $copy -Algorithm SHA256).Hash
 				if ($want -ne $have) { $problems.Add("damaged: $relative") }
 			}
 		}
-		foreach ($entry in Get-TocFiles (Join-Path $target "$Name.toc")) {
+		foreach ($entry in Get-TocFiles (Join-Path $target "$addon.toc")) {
 			if (-not (Test-Path -LiteralPath (Join-Path $target $entry) -PathType Leaf)) {
 				$problems.Add("in the TOC but not installed: $entry")
 			}
@@ -280,7 +283,11 @@ param(
 		$target = Join-Path $addons $Name
 		$targetToc = Join-Path $target "$Name.toc"
 		$installed = if ((Test-Path -LiteralPath $targetToc) -and -not (Get-Item -LiteralPath $target -Force).LinkType) { Get-TocVersion $targetToc } else { $null }
-		if (-not $Force -and -not $Link -and $installed -eq $build.Version -and $build.Version -notmatch 'dirty|dev') {
+		# The add-ons that come with it, in this build, and which of them aren't installed yet.
+		$sourceRoot = Split-Path $build.Addon -Parent
+		$companions = @($Companions | Where-Object { Test-Path -LiteralPath (Join-Path $sourceRoot "$_\$_.toc") })
+		$newCompanions = @($companions | Where-Object { -not (Test-Path -LiteralPath (Join-Path $addons "$_\$_.toc")) })
+		if (-not $Force -and -not $Link -and $installed -eq $build.Version -and $build.Version -notmatch 'dirty|dev' -and $newCompanions.Count -eq 0) {
 			Write-Host "LefthyTools $installed is already the latest version." -ForegroundColor Green
 			return
 		}
@@ -303,10 +310,34 @@ param(
 			}
 			$from = if ($installed) { "$installed -> " } else { '' }
 			Write-Host "LefthyTools $from$($build.Version) installed in $target" -ForegroundColor Green
-			Write-Host "Checked: all $($check.Count) files arrived intact (SHA-256), and every file the game loads is there."
+		}
+		$files = if ($Link) { 0 } else { $check.Count }
+		foreach ($companion in $companions) {
+			$from = Join-Path $sourceRoot $companion
+			$to = Join-Path $addons $companion
+			Remove-AddonFolder $to
+			if ($Link) {
+				New-Item -ItemType Junction -Path $to -Target $from | Out-Null
+				Write-Host "Linked $to -> $from"
+			} else {
+				Copy-Item -LiteralPath $from -Destination $to -Recurse
+				$check = Test-Install $from $to $companion
+				if ($check.Problems.Count -gt 0) {
+					foreach ($problem in $check.Problems) { Write-Host "  $companion\$problem" -ForegroundColor Red }
+					throw ("The installed files don't match the download ($($check.Problems.Count) problem(s)). Run it again;" +
+						' if it keeps happening, an antivirus may be blocking files in the AddOns folder.')
+				}
+				$files += $check.Count
+				Write-Host "$companion installed with it in $to"
+			}
+		}
+		if (-not $Link) {
+			Write-Host "Checked: all $files files arrived intact (SHA-256), and every file the game loads is there."
 		}
 		$added = if ($null -ne $oldFiles) { @(Get-TocFiles $targetToc | Where-Object { $oldFiles -notcontains $_ }) } else { @() }
-		if ($added.Count -gt 0) {
+		if ($installed -and $newCompanions.Count -gt 0) {
+			Write-Host "This update adds an add-on ($($newCompanions -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
+		} elseif ($added.Count -gt 0) {
 			Write-Host "This update adds files ($($added -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
 		} else {
 			Write-Host 'In game, type /reload. If something seems missing afterwards, restart the game once.'

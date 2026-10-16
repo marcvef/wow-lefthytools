@@ -6581,6 +6581,108 @@ section("Bestiary: what mobs drop")
 	Bt.ToggleLedger(117)
 	check(not world.Heading:IsShown() and not world.Grid:IsShown(), "a mob without world drops: no such section")
 	ledger:Hide()
+	-- The classic drop database: an add-on of its own (LefthyTools_DropData), loaded the first time
+	-- it's needed. Not there: said so.
+	local pmark2 = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("data")
+	check(printedSince(pmark2):find("isn't there", 1, true), "/bestiary data: no database yet, said so")
+	local loads = {}
+	C_AddOns.LoadAddOn = function(name)
+		loads[#loads + 1] = name
+		LefthyToolsDropData = { source = "test", mobs = {
+			[116] = "1019:1:6600q,2070:1:5000,2589:1:2972,774:2:128;s=2318:1:9000;g=8-15",
+			[117] = "2589:1:5000,1179:1:1000",
+			[118] = "4865:0:4000,2589:1:1500;s=2318:1:9000;g=20-40",
+		} }
+		return true
+	end
+	setting("dropData"):SetValue(false)
+	setting("dropData"):SetValue(true) -- (a setting changed: loading it is tried again)
+	check(#loads == 1 and loads[1] == "LefthyTools_DropData", "switched on: the database add-on is loaded, once")
+	-- Your drops: the database's chance beside yours, or that it doesn't list it.
+	local function cellOf(list, id) for _, c in ipairs(list) do if c:IsShown() and c.drop and c.drop.id == id then return c end end end
+	local linen = cellOf(win.cells, 2589)
+	linen._scripts.OnEnter(linen)
+	check(linen.drop.classic == 0.2972 and tipFind("Dropped in 2 of 5 kills: 40%") and tipFind("Classic database: 30%"),
+		"hover a drop: your chance, then the classic database's")
+	linen._scripts.OnLeave(linen)
+	local mace = cellOf(win.cells, 2075)
+	mace._scripts.OnEnter(mace)
+	check(mace.drop.classic == false and tipFind("Not in the classic database"), "a drop the database doesn't list: said so")
+	mace._scripts.OnLeave(mace)
+	-- What it says the mob drops that you haven't had yet: under your drops, smaller and faded.
+	local known = win.knownCells
+	check(win.KnownLabel:IsShown() and win.KnownLabel:GetText() == "Not seen yet" and win.KnownCount:GetText() == "2 of 5 found"
+		and known[1].drop.id == 1019 and known[2].drop.id == 2070 and known[3].drop.id == 774 and not (known[4] and known[4]:IsShown())
+		and known[1].Icon.desaturated and known[1].Icon:GetAlpha() < 1 and known[1].Count:GetText() == "" and known[1].Chance:GetText() == "66%"
+		and known[1].Quest:IsShown() and not known[2].Quest:IsShown() and not cells[1].Icon.desaturated,
+		"not seen yet: the database's other drops, the likeliest first, grey and faded, its chance; a quest item marked; 2 of its 5 found")
+	known[2]._scripts.OnEnter(known[2])
+	check(not known[2].Icon.desaturated and tipFind("Classic database: 50%") and tipFind("Not seen in your 5 kills (about 3 expected)"),
+		"hover one: in colour, the database's chance, how many you'd have expected by now")
+	known[2]._scripts.OnLeave(known[2])
+	check(known[2].Icon.desaturated, "and faded again")
+	known[1]._scripts.OnEnter(known[1])
+	check(tipFind("Classic database: 66%, only while on its quest") and tipFind("Not seen yet in your 5 kills"),
+		"a quest item: only while on its quest (nothing expected)")
+	known[1]._scripts.OnLeave(known[1])
+	-- All of them found: said so.
+	MOBS.target = { name = "Riverpaw Gnoll", level = 10, guid = "Creature-0-1-0-1-117-00000050" }
+	Fire("PLAYER_TARGET_CHANGED")
+	check(not win.KnownLabel:IsShown() and win.Note:GetText():find("All 2 drops of the classic database found.", 1, true),
+		"every drop of the database found: nothing faded, a tick")
+	-- A mob you haven't killed: what it can drop (skinning after, with its pelt).
+	MOBS.target = { name = "Young Wolf", level = 2, guid = "Creature-0-1-0-1-118-00000051" }
+	Fire("PLAYER_TARGET_CHANGED")
+	check(known[3] == nil or not known[3]:IsShown(), "you can't skin: what skinning gives isn't among it")
+	KNOWN_SPELLS[8613] = true -- (Skinning)
+	Bt.Draw()
+	check(win.KnownLabel:GetText() == "What it can drop" and win.KnownCount:GetText() == "classic database" and not cells[1]:IsShown()
+		and known[1].drop.id == 4865 and known[2].drop.id == 2589 and known[3].drop.id == 2318 and known[3].Skin:IsShown()
+		and win.Note:GetText():find("No kills of it yet", 1, true), "a mob not killed yet: what it can drop, then what skinning gives")
+	known[1]._scripts.OnEnter(known[1])
+	check(tipFind("You haven't killed one yet."), "hover: you haven't killed one yet")
+	known[1]._scripts.OnLeave(known[1])
+	setting("showPoor"):SetValue(false)
+	check(known[1].drop.id == 2589, "grey items off: also the database's")
+	setting("showPoor"):SetValue(true)
+	-- The card beside the mouse stays small: a line and one row, also for a mob not killed yet.
+	setting("hoverCard"):SetValue(true)
+	MOBS.mouseover = { name = "Young Wolf", level = 2, guid = "Creature-0-1-0-1-118-00000052", pinned = true }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	card = select(2, Bt.Frames())
+	check(card:IsShown() and card.Kills:GetText():find("Not killed yet: classic database", 1, true) and card.cells[1].Icon.desaturated
+		and select(2, card:GetSize()) < 70, "the card over a mob not killed yet: the database's drops, faded, one row")
+	MOBS.mouseover = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000053", pinned = true }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	local ghost = false
+	for _, c in ipairs(card.cells) do if c:IsShown() and c.drop and c.drop.unseen then ghost = true end end
+	check(card.Kills:GetText():find("5 kills", 1, true) and not ghost, "over one killed before: only your drops (nothing added)")
+	MOBS.mouseover = nil
+	Advance(0.1)
+	setting("hoverCard"):SetValue(false)
+	-- The ledger: a row says how many of its drops you've found; the picked mob's not seen yet in a
+	-- section of its own, the database's coin.
+	Bt.ToggleLedger(116)
+	local unseenSection = ledger.Pane.sections.unseen
+	check(ledger.rows[1].Known:GetText() == "2/5 found" and unseenSection.Heading:IsShown()
+		and unseenSection.Heading:GetText() == "Not seen yet (3), classic database" and unseenSection.cells[1].drop.id == 1019
+		and unseenSection.cells[1].Icon.desaturated and ledger.Pane.Stats:GetText():find("2 of its 5 drops found", 1, true)
+		and ledger.Pane.Stats:GetText():find("Classic database: ", 1, true),
+		"the ledger: 2/5 found in its row; not seen yet, faded, in a section of its own; the database's coin and how many found")
+	ledger:Hide()
+	local pmark3 = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("data")
+	check(printedSince(pmark3):find("3 kinds of mobs, from test", 1, true), "/bestiary data: what it holds")
+	-- Switched off: your numbers alone.
+	setting("dropData"):SetValue(false)
+	MOBS.target = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000054" }
+	Fire("PLAYER_TARGET_CHANGED")
+	check(not win.KnownLabel:IsShown() and not (known[1] and known[1]:IsShown()) and cellOf(win.cells, 2589).drop.classic == nil,
+		"the setting off: no database anywhere")
+	setting("dropData"):SetValue(true)
+	check(#loads == 1, "loaded once only")
+	MOBS.target, KNOWN_SPELLS[8613] = nil, nil
 	-- Closed and open again: kept for next time.
 	win.Close:Click()
 	check(not win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == false and not button.Open:IsShown(), "the X closes it, kept")

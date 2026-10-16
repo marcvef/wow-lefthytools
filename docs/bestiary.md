@@ -3,9 +3,10 @@
 What the mobs you kill drop: a database of your own per kind of mob, a window for your target,
 (settings) a card beside the mouse over an enemy and drop chances in item tooltips, and a ledger
 of every mob with a fuzzy search. Files: `Modules/Bestiary/Bestiary.lua` (the module, recording,
-`ns.Bestiary` = `Bt`), `Modules/Bestiary/Window.lua` (the window, the card, item tooltips, the
-minimap button) and `Modules/Bestiary/Ledger.lua` (the ledger). Nothing goes over the network (the
-user: "just your own, I want to limit traffic").
+the drop database, `ns.Bestiary` = `Bt`), `Modules/Bestiary/Window.lua` (the window, the card, item
+tooltips, the minimap button) and `Modules/Bestiary/Ledger.lua` (the ledger). Nothing goes over the
+network (the user: "just your own, I want to limit traffic"). Beside your own numbers: a classic
+drop database, an add-on of its own (`LefthyTools_DropData`, below).
 
 ## The database
 
@@ -47,6 +48,44 @@ corpse's loot window is what skinning gave, each corpse once (`skinnedCorpse`), 
 
 Name, level and kind come from units seen (`Bt.Look`: target, mouseover, nameplates; the last 200
 GUIDs remembered) and are written to a kind's record as last seen.
+
+## The classic drop database (LefthyTools_DropData)
+
+The user wanted to "compare my mob against what it can drop". Wowhead has no API and doesn't allow
+scraping; the classic emulator databases have the loot tables. `LefthyTools_DropData/` (a folder of
+its own in the repo, next to `LefthyTools/`) is generated from CMaNGOS Classic DB's full dump by
+`tools/update-drop-data.js` and is **GPL v3** like its source (its `LICENSE.md` and `COPYRIGHT.md`
+must go with it); the rest of the repo stays BSD-2. Its README says how the chances are worked out
+(groups, references, quest items) and how to make it again; the user: "we may want to rerun the
+emulator or something when we have more access to forever data". World loot is left out (the level
+world drop tables, bags, scrolls, recipes, zone drops: reached only through a reference and not
+bound on pickup, gear or a reference shared by 8+ tables), so a mob's list is its own loot: 11
+items for a Defias Bandit, 27 for Ragnaros, 69 at most; 5046 mobs, 0.75 MB.
+
+- **Loading**: `## LoadOnDemand: 1`. `DropData()` calls `C_AddOns.LoadAddOn` the first time
+  something asks (`Bt.Known`), once; when the setting `dropData` (on) changes it's tried again (and
+  off means nothing reads it). A one-off moment when the window first draws, not at login for
+  everyone who never opens it. `/bestiary data` says whether it's there (LoadAddOn's reason if
+  not: `MISSING`, `DISABLED`) and what it holds.
+- **Format**: `LefthyToolsDropData = { source, mobs = { [creature] = "<item>:<quality>:<chance in
+  1/100 %>[q],...;s=<skinning>;g=<min>-<max copper>" } }`: strings, so only mobs shown are read
+  (`Bt.Known(creature)`: `{ items = { [id] = { chance 0-1, quality, quest } }, skins, coin }`,
+  cached). The quality is in there so grey items can be left out (`showPoor`) and edged before the
+  client knows an item.
+- **Beside your drops** (`Bt.Drops(mob, showPoor, creature)`): each entry's `classic` is the
+  database's chance (`false`: it knows the mob but not this drop, `nil`: it doesn't know the mob),
+  `quest` when it's a quest item. Tooltips: "Classic database: 30%" under your numbers, "Not in the
+  classic database" (Forever's own, or a change), "only while on its quest"; the cell gets a "!".
+- **Not seen yet** (`Bt.Compare(creature, mob, showPoor[, countOnly])`): the database's drops
+  you've never had (the likeliest first, then skinning: entries with `unseen = true`), how many of
+  its drops you have had and of how many. Skinning only counts when you know Skinning (any rank) or
+  have skinned that kind: else every beast's leather would wait there forever. Shown as cells like the others but grey and faded (the
+  icon desaturated at 50%, a dim edge, no count, the chance in grey), in colour while hovered. Their
+  tooltip: the database's chance, then "Not seen in your 34 kills (about 10 expected)" in red-ish
+  when you'd have expected 1.5 or more (bad luck, or Forever differs), else "Not seen yet in your 5
+  kills", or "You haven't killed one yet."
+- **Never mixed in**: your chances, the ledger's totals, the rarest find, item tooltips and the
+  search are your kills only.
 
 ## Counting (so the chances hold)
 
@@ -96,6 +135,10 @@ flights.
   Hover: the item's tooltip (`SetHyperlink`) plus "Dropped in 9 of 34 kills: 26%" and, for stacks,
   "12 in all, 1.3 each time". Shift-click links it (`HandleModifiedItemClick`). More than fit: the
   last place says "+N", its tooltip lists the rest with their chances.
+- **Not seen yet** (the drop database): under your drops a heading "Not seen yet" with a thin rule
+  and "6 of 11 found" on the right, then the database's drops you haven't had, 22 px, 7 per row, at
+  most 2 rows ("+N" for the rest, its tooltip greyed). A mob you haven't killed: "What it can
+  drop", "classic database". All found: a tick and "All 11 drops of the classic database found."
 - **A line under it** when there's something to say: target a mob, no kills yet, nothing (or only
   grey items) dropped yet, in a group nothing is counted.
 - **It follows your target**: a mob you can attack or a dead one (not a vendor); clearing the
@@ -106,7 +149,10 @@ flights.
 Setting `hoverCard` (off by default). Over an enemy (attackable or dead) you've killed: "34 kills ·
 12s each" and its 6 likeliest drops (22 px, chance under each), at the cursor's lower right,
 `TOOLTIP` strata, no mouse. An OnUpdate while it's shown follows the cursor and hides it once the
-mouseover is gone or another unit.
+mouseover is gone or another unit. **Small on purpose** (the user: it mustn't be "too large and
+intrusive"): one line and one row of 6, never more. A mob killed before shows only your drops (no
+database cells on top); one you haven't killed shows the database's 6 likeliest, faded, under "Not
+killed yet: classic database".
 
 ## Item tooltips
 
@@ -129,9 +175,11 @@ the settings or `/bestiary ledger [search]`.
   gold), level, Elite/Rare, kills on the right, its best drops as tiny icons (best quality first).
   Sorted by most kills, name, level, coin per kill or last killed (a picker of our own).
 - **The picked mob** (right): its whole model turning slowly (an OnUpdate while open), name, kind,
-  kills, coin each and in all (or "no coin"), first and last kill ("2 h ago"), skinnings, then its
-  drops in a scrolling area (all of them, 8 per row, no "+N"): "Drops (N)" (skinning marked), and
-  "World drops (N)" when it has any.
+  kills, coin each and in all (or "no coin"), first and last kill ("2 h ago"), skinnings, the drop
+  database's coin ("Classic database: 8c to 15c each") and "6 of its 11 drops found", then its
+  drops in a scrolling area (all of them, 8 per row, no "+N"): "Drops (N)" (skinning marked), "Not
+  seen yet (N), classic database" (faded, as in the window) and "World drops (N)" when it has any.
+- **A row** also says "6/11 found" (the drop database; not while it shows what the search found).
 - **The search** (fuzzy, `Bt.Fuzzy`): the query's letters in order, not necessarily together, case
   and spaces ignored ("dfbnd" finds Defias Bandit); letters together, at a word's start and early
   score more, a shorter text a little more. Over mob names and the names of all their drops and
@@ -148,7 +196,8 @@ window is open; click toggles the window, Shift-click switches the card beside t
 line says which), Ctrl-click opens or closes the ledger, right-click opens the settings; its tooltip
 says how many kinds and kills are known and all of that. Settings: open the window, open the
 ledger, minimap button (on), drops beside the mouse (off), drop chances in item tooltips (on), grey
-items (on). `/bestiary` (`open`, `ledger [search]`, `log`, `minimap`, `settings`).
+items (on), compare with a drop database (on). `/bestiary` (`open`, `ledger [search]`, `log`,
+`data`, `minimap`, `settings`).
 
 ## Cost
 
@@ -161,3 +210,5 @@ mob's record changes or the target does; the card's OnUpdate runs only while it'
 - `GetLootSourceInfo` and `CanLootUnit` answer (and aren't secret), and `CanLootUnit` says "no
   loot" for an empty corpse of yours.
 - The portrait's look; the coin attribution with auto loot.
+- `LoadAddOn` of the load-on-demand drop database works on Forever, and its first load (0.75 MB of
+  strings) is only a moment.

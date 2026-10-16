@@ -14,6 +14,12 @@ local M = Bt.module
 --
 -- The card next to the mouse (setting hoverCard): over an enemy you've killed before, your kills and
 -- its likeliest drops, small, following the mouse while it's over it.
+--
+-- The classic drop database (Bestiary.lua, setting dropData) beside your numbers: each drop's
+-- tooltip has its chance there; what it says the mob drops that you haven't had yet is a section
+-- of its own under your drops, smaller and faded (grey icons, how many of its drops you've found),
+-- each with the item's tooltip, the database's chance and how many you'd have expected by now. For
+-- a mob you haven't killed it's what it can drop, in the window and on the card.
 
 local WIDTH = 236
 local PAD = 10
@@ -23,9 +29,16 @@ local HEADER = 62
 local PORTRAIT = 40
 local LINE = 14
 local CARD_ICON, CARD_GAP, CARD_CELLS = 22, 5, 6
+local KNOWN_ICON, KNOWN_GAP, KNOWN_ROWS = 22, 6, 2 -- not seen yet (the classic database): smaller, faded
+local KNOWN_PER_ROW = math.floor((WIDTH - 2 * PAD + KNOWN_GAP) / (KNOWN_ICON + KNOWN_GAP))
+local KNOWN_HEAD = 16   -- its heading's height
+local UNSEEN_ALPHA = 0.5
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
+local QUEST_ICON = "Interface\\GossipFrame\\AvailableQuestIcon"
+local ALL_FOUND = "Interface\\RaidFrame\\ReadyCheck-Ready"
 local BUTTON_ICON = "Interface\\Icons\\INV_Misc_Bag_10"
 local GOLD = { 1, 0.82, 0.3 }
+local NONE = {}
 local issecret = issecretvalue or function() return false end
 
 local win, card, button
@@ -127,16 +140,49 @@ Bt.KillsLine, Bt.Coins = KillsLine, Coins
 -- A drop: its icon, edged in its quality's colour, how many in the corner, the chance under it
 ---------------------------------------------------------------------------
 
--- A list of drops in a tooltip: icon, name (a pelt for skinning), chance.
+-- A list of drops in a tooltip: icon, name (a pelt for skinning), chance; not seen yet: greyed, the
+-- classic database's chance.
 local function ListDrops(list)
 	for _, drop in ipairs(list) do
 		if drop.group then
 			GameTooltip:AddLine(L["World drops"] .. (" (%d)"):format(#drop.group), 0.7, 0.7, 0.7)
 		else
 			local r, g, b = QualityColor(drop.quality)
+			local right = drop.unseen and 0.55 or 1
+			if drop.unseen then
+				r, g, b = 0.55, 0.55, 0.55
+			end
 			GameTooltip:AddDoubleLine(("|T%s:14:14|t %s%s"):format(ItemIcon(drop.id), drop.name or ItemName(drop.id),
-				drop.skin and (" |T%s:12:12|t"):format(Bt.SKIN_ICON) or ""), Percent(drop.chance), r, g, b, 1, 1, 1)
+				drop.skin and (" |T%s:12:12|t"):format(Bt.SKIN_ICON) or drop.quest and (" |T%s:12:12|t"):format(QUEST_ICON) or ""),
+				Percent(drop.chance), r, g, b, right, right, right)
 		end
+	end
+end
+
+-- The classic database's word on a drop: its chance there (a quest item's: only while on its
+-- quest), or that it doesn't list it; nothing when it doesn't know the mob.
+local function AddClassic(drop, r, g, b)
+	if drop.classic then
+		GameTooltip:AddLine((drop.quest and L["Classic database: %s, only while on its quest"] or L["Classic database: %s"])
+			:format(Percent(drop.classic)), r, g, b)
+	elseif drop.classic == false then
+		GameTooltip:AddLine(L["Not in the classic database"], 0.6, 0.6, 0.6)
+	end
+end
+
+-- Not seen yet: the database's chance, and how many you'd have expected in your kills (or
+-- skinnings) by now; red-ish when that's a few (Forever may differ, or bad luck).
+local function AddUnseen(drop)
+	AddClassic(drop, GOLD[1], GOLD[2], GOLD[3])
+	local out = drop.out or 0
+	local expected = drop.quest and 0 or drop.chance * out
+	if out == 0 then
+		GameTooltip:AddLine(drop.skin and L["You haven't skinned one yet."] or L["You haven't killed one yet."], 0.7, 0.7, 0.7)
+	elseif expected >= 1.5 then
+		GameTooltip:AddLine((drop.skin and L["Not seen in your %d skinnings (about %d expected)"] or L["Not seen in your %d kills (about %d expected)"])
+			:format(out, math.floor(expected + 0.5)), 0.95, 0.55, 0.45)
+	else
+		GameTooltip:AddLine((drop.skin and L["Not seen yet in your %d skinnings"] or L["Not seen yet in your %d kills"]):format(out), 0.7, 0.7, 0.7)
 	end
 end
 
@@ -159,20 +205,35 @@ local function CellOnEnter(cell)
 	GameTooltip:SetHyperlink(("item:%d"):format(drop.id))
 	ownTooltip = false
 	GameTooltip:AddLine(" ")
-	if drop.skin then
-		GameTooltip:AddLine(("|T%s:14:14|t "):format(Bt.SKIN_ICON) .. L["Only from skinning: %d of %d skinnings, %s"]:format(drop.drops,
-			drop.out or 0, Percent(drop.chance)), GOLD[1], GOLD[2], GOLD[3])
+	if drop.unseen then -- (the database's, not had yet: in colour while hovered)
+		cell.Icon:SetDesaturated(false)
+		cell.Icon:SetAlpha(1)
+		AddUnseen(drop)
 	else
-		GameTooltip:AddLine(L["Dropped in %d of %d kills: %s"]:format(drop.drops, drop.out or cell.kills, Percent(drop.chance)),
-			GOLD[1], GOLD[2], GOLD[3])
-	end
-	if drop.count > drop.drops then
-		GameTooltip:AddLine(L["%d in all, %.1f each time"]:format(drop.count, drop.each), 0.8, 0.8, 0.8)
+		if drop.skin then
+			GameTooltip:AddLine(("|T%s:14:14|t "):format(Bt.SKIN_ICON) .. L["Only from skinning: %d of %d skinnings, %s"]:format(drop.drops,
+				drop.out or 0, Percent(drop.chance)), GOLD[1], GOLD[2], GOLD[3])
+		else
+			GameTooltip:AddLine(L["Dropped in %d of %d kills: %s"]:format(drop.drops, drop.out or cell.kills, Percent(drop.chance)),
+				GOLD[1], GOLD[2], GOLD[3])
+		end
+		if drop.count > drop.drops then
+			GameTooltip:AddLine(L["%d in all, %.1f each time"]:format(drop.count, drop.each), 0.8, 0.8, 0.8)
+		end
+		AddClassic(drop, 0.8, 0.8, 0.8)
 	end
 	if cell.link then
 		GameTooltip:AddLine(L["Shift-click: link it in chat"], 0.6, 0.6, 0.6)
 	end
 	GameTooltip:Show()
+end
+
+local function CellOnLeave(cell)
+	GameTooltip:Hide()
+	if cell.drop and cell.drop.unseen then
+		cell.Icon:SetDesaturated(true)
+		cell.Icon:SetAlpha(UNSEEN_ALPHA)
+	end
 end
 
 local function CellOnClick(cell)
@@ -204,6 +265,12 @@ local function NewCell(parent, size, link)
 	cell.Skin:SetTexture(Bt.SKIN_ICON)
 	cell.Skin:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	cell.Skin:Hide()
+	-- A quest item (the classic database: it drops only while you're on its quest): a "!" there.
+	cell.Quest = cell:CreateTexture(nil, "OVERLAY", nil, 2)
+	cell.Quest:SetSize(math.floor(size * 0.5), math.floor(size * 0.5))
+	cell.Quest:SetPoint("TOPLEFT", cell.Edge, "TOPLEFT", -3, 3)
+	cell.Quest:SetTexture(QUEST_ICON)
+	cell.Quest:Hide()
 	cell.More = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	cell.More:SetPoint("CENTER", cell.Edge, "CENTER", 0, 0)
 	cell.Chance = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -215,7 +282,7 @@ local function NewCell(parent, size, link)
 	cell.link = link
 	if link then
 		cell:SetScript("OnEnter", CellOnEnter)
-		cell:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		cell:SetScript("OnLeave", CellOnLeave)
 		cell:SetScript("OnClick", CellOnClick)
 	else
 		cell:EnableMouse(false)
@@ -223,18 +290,35 @@ local function NewCell(parent, size, link)
 	return cell
 end
 
+-- A drop; not seen yet (the classic database's): grey and faded, no count, the database's chance.
 local function FillCell(cell, drop, kills)
 	cell.drop, cell.more, cell.world, cell.kills = drop, nil, nil, kills
 	local r, g, b = QualityColor(drop.quality)
-	cell.Edge:SetColorTexture(r, g, b, 0.9)
+	local unseen = drop.unseen and true or false
+	cell.Edge:SetColorTexture(r, g, b, unseen and 0.3 or 0.9)
 	cell.Icon:SetTexture(ItemIcon(drop.id))
+	cell.Icon:SetDesaturated(unseen)
+	cell.Icon:SetAlpha(unseen and UNSEEN_ALPHA or 1)
 	cell.Icon:Show()
-	cell.Count:SetText(tostring(drop.count))
+	cell.Count:SetText(unseen and "" or tostring(drop.count))
 	cell.Skin:SetShown(drop.skin and true or false)
+	cell.Quest:SetShown(drop.quest and not drop.skin and true or false)
 	cell.More:SetText("")
 	cell.Chance:SetText(Percent(drop.chance))
-	cell.Chance:SetTextColor(r, g, b)
+	if unseen then
+		cell.Chance:SetTextColor(0.55, 0.55, 0.55)
+	else
+		cell.Chance:SetTextColor(r, g, b)
+	end
 	cell:Show()
+end
+
+-- Back to a plain icon (the world drops' map, the "+N").
+local function Plain(cell)
+	cell.Icon:SetDesaturated(false)
+	cell.Icon:SetAlpha(1)
+	cell.Skin:Hide()
+	cell.Quest:Hide()
 end
 
 -- A mob's world drops in one place: a map, how many, "world" under it; the list in its tooltip.
@@ -246,7 +330,7 @@ local function FillWorld(cell, entry, kills)
 	cell.Edge:SetColorTexture(r, g, b, 0.9)
 	cell.Icon:SetTexture(WORLD_ICON)
 	cell.Icon:Show()
-	cell.Skin:Hide()
+	Plain(cell)
 	cell.Count:SetText(tostring(#entry.group))
 	cell.More:SetText("")
 	cell.Chance:SetText(L["world"])
@@ -259,7 +343,7 @@ local function FillMore(cell, more, kills)
 	cell.drop, cell.more, cell.world, cell.kills = nil, more, nil, kills
 	cell.Edge:SetColorTexture(0.3, 0.3, 0.3, 0.9)
 	cell.Icon:Hide()
-	cell.Skin:Hide()
+	Plain(cell)
 	cell.Count:SetText("")
 	cell.More:SetText("+" .. #more)
 	cell.Chance:SetText("")
@@ -458,6 +542,18 @@ local function Build()
 	win.Grid:SetPoint("TOPLEFT", PAD + 1, -HEADER - 4)
 	win.Grid:SetSize(WIDTH - 2 * PAD, 10)
 	win.cells = {}
+	-- Not seen yet (the classic database): a heading with a rule and how many of its drops you've
+	-- found, then its drops, smaller and faded.
+	win.KnownLabel = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	win.KnownCount = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	win.KnownRule = win:CreateTexture(nil, "ARTWORK")
+	win.KnownRule:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.18)
+	win.KnownRule:SetHeight(1)
+	win.KnownRule:SetPoint("LEFT", win.KnownLabel, "RIGHT", 6, 0)
+	win.KnownRule:SetPoint("RIGHT", win.KnownCount, "LEFT", -6, 0)
+	win.Known = CreateFrame("Frame", nil, win)
+	win.Known:SetSize(WIDTH - 2 * PAD, 10)
+	win.knownCells = {}
 	win.Note = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	win.Note:SetWidth(WIDTH - 2 * PAD)
 	win.Note:SetJustifyH("CENTER")
@@ -484,8 +580,33 @@ local function Draw()
 	win.Name:SetText(name or "Bestiary") -- (module names aren't translated)
 	win.Kind:SetText(shown and Kind({ level = info.level or mob and mob.level, class = info.class or mob and mob.class }) or "")
 	win.Kills:SetText(mob and KillsLine(mob) or "")
-	local drops = Bt.Drops(mob, M.db.showPoor)
+	local drops = Bt.Drops(mob, M.db.showPoor, shown)
 	local rows = Lay(win.Grid, win.cells, drops, mob and mob.kills or 0, ICON, GAP, PER_ROW, PER_ROW * ROWS, true)
+	local height = HEADER + rows * (CELL_H + 4)
+	-- What the classic database says it drops that you haven't had yet (for a mob you haven't
+	-- killed: what it can drop).
+	local unseen, found, total = Bt.Compare(shown, mob, M.db.showPoor)
+	local tried = mob and (mob.kills > 0 or (mob.skinned or 0) > 0)
+	local known = unseen ~= nil and #unseen > 0
+	if known then
+		local top = height + (rows > 0 and 2 or 0)
+		win.KnownLabel:ClearAllPoints()
+		win.KnownLabel:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -top)
+		win.KnownLabel:SetText(tried and L["Not seen yet"] or L["What it can drop"])
+		win.KnownCount:ClearAllPoints()
+		win.KnownCount:SetPoint("TOPRIGHT", win, "TOPRIGHT", -PAD, -top)
+		win.KnownCount:SetText(tried and L["%d of %d found"]:format(found, total) or L["classic database"])
+		win.Known:ClearAllPoints()
+		win.Known:SetPoint("TOPLEFT", win, "TOPLEFT", PAD + 1, -(top + KNOWN_HEAD))
+		local knownRows = Lay(win.Known, win.knownCells, unseen, mob and mob.kills or 0, KNOWN_ICON, KNOWN_GAP, KNOWN_PER_ROW,
+			KNOWN_PER_ROW * KNOWN_ROWS, true)
+		height = top + KNOWN_HEAD + knownRows * (KNOWN_ICON + LINE + 4)
+	elseif win.knownCells[1] then
+		Lay(win.Known, win.knownCells, NONE, 0, KNOWN_ICON, KNOWN_GAP, KNOWN_PER_ROW, KNOWN_PER_ROW * KNOWN_ROWS, true)
+	end
+	win.KnownLabel:SetShown(known)
+	win.KnownCount:SetShown(known)
+	win.KnownRule:SetShown(known)
 	local notes = {}
 	if not shown then
 		notes[#notes + 1] = L["Target a mob to see what it drops."]
@@ -494,15 +615,18 @@ local function Draw()
 	elseif #drops == 0 then
 		notes[#notes + 1] = next(mob.items) and L["Only grey items so far."] or L["Nothing dropped yet."]
 	end
+	if tried and unseen and #unseen == 0 and total > 0 then
+		notes[#notes + 1] = ("|T%s:12:12|t "):format(ALL_FOUND) .. L["All %d drops of the classic database found."]:format(total)
+	end
 	if IsInGroup and IsInGroup() then
 		notes[#notes + 1] = L["In a group: kills aren't counted (the loot is shared)."]
 	end
-	local height = HEADER + rows * (CELL_H + 4)
+	local any = rows > 0 or known
 	win.Note:ClearAllPoints()
-	win.Note:SetPoint("TOP", win, "TOP", 0, -height - (rows > 0 and 0 or 6))
+	win.Note:SetPoint("TOP", win, "TOP", 0, -height - (any and 0 or 6))
 	win.Note:SetText(table.concat(notes, "\n"))
 	win.Note:SetShown(#notes > 0)
-	height = height + (#notes > 0 and (#notes * LINE + (rows > 0 and 4 or 10)) or 0) + PAD
+	height = height + (#notes > 0 and (#notes * LINE + (any and 4 or 10)) or 0) + PAD
 	win:SetHeight(math.max(height, HEADER + 16))
 end
 Bt.Draw = Draw
@@ -596,7 +720,10 @@ local function BuildCard()
 	card:SetScript("OnUpdate", CardFollow)
 end
 
--- Over an enemy you've killed before: its card (setting hoverCard).
+-- Over an enemy: its card (setting hoverCard), small on purpose (the user: not "too large and
+-- intrusive"): a line and one row of CARD_CELLS icons, never more. Killed before: your kills and
+-- your likeliest drops (not the database's on top); not yet: the classic database's likeliest,
+-- faded.
 function Bt.MouseoverChanged()
 	if not (M.enabled and M.db.hoverCard) or not UnitExists("mouseover")
 		or not (Value(UnitCanAttack, "player", "mouseover") or Value(UnitIsDead, "mouseover")) then
@@ -607,7 +734,16 @@ function Bt.MouseoverChanged()
 	end
 	local guid, creature = Bt.Look("mouseover")
 	local mob = Bt.Mob(creature)
-	if not (mob and mob.kills > 0) then
+	local drops, line
+	if mob and mob.kills > 0 then
+		drops, line = Bt.Drops(mob, M.db.showPoor, creature), KillsLine(mob)
+	else
+		local unseen = Bt.Compare(creature, mob, M.db.showPoor)
+		if unseen and #unseen > 0 then
+			drops, line = unseen, "|cff999999" .. L["Not killed yet: classic database"] .. "|r"
+		end
+	end
+	if not drops then
 		if card then
 			card:Hide()
 		end
@@ -617,9 +753,8 @@ function Bt.MouseoverChanged()
 		BuildCard()
 	end
 	cardGUID = guid
-	card.Kills:SetText(KillsLine(mob))
-	local drops = Bt.Drops(mob, M.db.showPoor)
-	local rows = Lay(card.Grid, card.cells, drops, mob.kills, CARD_ICON, CARD_GAP, CARD_CELLS, CARD_CELLS, false)
+	card.Kills:SetText(line)
+	local rows = Lay(card.Grid, card.cells, drops, mob and mob.kills or 0, CARD_ICON, CARD_GAP, CARD_CELLS, CARD_CELLS, false)
 	local width = math.max(card.Kills:GetStringWidth(), math.min(#drops, CARD_CELLS) * (CARD_ICON + CARD_GAP) - CARD_GAP)
 	card:SetSize(width + 16, rows > 0 and (24 + CARD_ICON + LINE + 6) or 24)
 	CardFollow(card)
@@ -715,6 +850,9 @@ end
 function Bt.Settings()
 	UpdateButton()
 	Draw()
+	if Bt.DrawLedger then
+		Bt.DrawLedger()
+	end
 	if card and not M.db.hoverCard then
 		card:Hide()
 	end

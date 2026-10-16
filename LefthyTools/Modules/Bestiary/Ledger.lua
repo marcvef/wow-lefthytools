@@ -9,7 +9,9 @@ local M = Bt.module
 -- as tiny icons), sorted by kills, name, level, coin or when you last killed one. On the right the
 -- one picked: its whole model turning slowly, kills, coin, first and last kill, skinnings, and all
 -- its drops (as in the window: quality edge, how many, chance; skinning marked). At the top what
--- the Bestiary knows in all, and your rarest find.
+-- the Bestiary knows in all, and your rarest find. With the classic drop database (Bestiary.lua):
+-- a row says how many of its drops you've found, and the picked mob's drops have a section of
+-- what you haven't had yet, faded, between its own drops and its world drops.
 --
 -- The search is fuzzy: a query's letters in order, not necessarily together ("dfbnd" finds Defias
 -- Bandit), case and spaces ignored. Letters together, at a word's start and early count more. It
@@ -217,6 +219,11 @@ local function NewRow(parent)
 	row.Found:SetPoint("RIGHT", -46, 0)
 	row.Found:SetJustifyH("LEFT")
 	row.Found:SetWordWrap(false)
+	-- How many of the classic database's drops you've found: "6/11 found".
+	row.Known = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	row.Known:SetPoint("RIGHT", -46, 0)
+	row.Known:SetPoint("TOP", row.icons[1], "TOP", 0, 0)
+	row.Known:SetTextScale(0.9)
 	row:SetScript("OnClick", function(self) Select(self.creature) end)
 	return row
 end
@@ -236,6 +243,9 @@ local function FillRow(row, entry)
 	for _, icon in ipairs(row.icons) do
 		icon:Hide()
 	end
+	local _, found, total = Bt.Compare(entry.creature, mob, M.db.showPoor, true)
+	row.Known:SetText(total and total > 0 and L["%d/%d found"]:format(found, total) or "")
+	row.Known:SetShown(not entry.items and total ~= nil)
 	if entry.items then
 		local found = entry.items[1]
 		local r, g, b = Bt.QualityColor(found.quality)
@@ -335,16 +345,27 @@ local function DrawPicked()
 	if (mob.skinned or 0) > 0 then
 		lines[#lines + 1] = ("|T%s:12:12|t "):format(Bt.SKIN_ICON) .. L["Skinned %d times"]:format(mob.skinned)
 	end
+	-- The classic database beside it: its coin, and how many of its drops you've found.
+	local unseen, had, total = Bt.Compare(selected, mob, M.db.showPoor)
+	local known = Bt.Known(selected)
+	if known and known.coin then
+		lines[#lines + 1] = "|cff999999" .. L["Classic database: %s to %s each"]:format(Bt.Coins(known.coin[1]), Bt.Coins(known.coin[2])) .. "|r"
+	end
+	if total and total > 0 then
+		lines[#lines + 1] = "|cff999999" .. L["%d of its %d drops found"]:format(had, total) .. "|r"
+	end
 	pane.Stats:SetText(table.concat(lines, "\n"))
 	local own, world = {}, {}
-	for _, drop in ipairs(Bt.Drops(mob, M.db.showPoor)) do
+	for _, drop in ipairs(Bt.Drops(mob, M.db.showPoor, selected)) do
 		if drop.group then
 			world = drop.group
 		else
 			own[#own + 1] = drop
 		end
 	end
+	unseen = unseen or {}
 	local y = Section(pane.sections.own, L["Drops (%d)"]:format(#own), own, mob.kills, 0, true)
+	y = Section(pane.sections.unseen, L["Not seen yet (%d), classic database"]:format(#unseen), unseen, mob.kills, y, #unseen > 0)
 	y = Section(pane.sections.world, L["World drops (%d)"]:format(#world), world, mob.kills, y, #world > 0)
 	pane.Drops:SetHeight(math.max(y, 10))
 	-- What the search found stands out; the rest steps back.
@@ -544,8 +565,9 @@ local function Build()
 	pane.Stats:SetPoint("RIGHT", 0, 0)
 	pane.Stats:SetJustifyH("LEFT")
 	pane.Stats:SetSpacing(3)
-	-- Its drops under the model, scrolling: its own, then its world drops (random gear from
-	-- anywhere) in a section of their own, each drop with its item tooltip.
+	-- Its drops under the model, scrolling: its own, what the classic database says it drops that
+	-- you haven't had yet (faded), then its world drops (random gear from anywhere), each a section
+	-- of its own and each drop with its item tooltip.
 	pane.Scroll = CreateFrame("ScrollFrame", nil, pane, "UIPanelScrollFrameTemplate")
 	pane.Scroll:SetPoint("TOPLEFT", modelBack, "BOTTOMLEFT", 0, -10)
 	pane.Scroll:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -24, 0)
@@ -553,7 +575,7 @@ local function Build()
 	pane.Drops:SetSize(DROPS_W, 10)
 	pane.Scroll:SetScrollChild(pane.Drops)
 	pane.sections = {}
-	for _, key in ipairs({ "own", "world" }) do
+	for _, key in ipairs({ "own", "unseen", "world" }) do
 		local section = { cells = {} }
 		section.Heading = pane.Drops:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 		section.Rule = pane.Drops:CreateTexture(nil, "ARTWORK")
