@@ -12,8 +12,8 @@ local S = B.Stream
 -- mob (red: attacking them, orange: in combat, grey: not; gold ring: elite, silver: rare; a white
 -- ring and its name: their target; a purple glow while casting; a skull that fades when it dies;
 -- faint while its direction is still a guess), and under it what they're doing (the spell being
--- cast with its bar, the last spells), their power and form at the top, and a bottom line ("2 on
--- you · 5 near · X casts Y").
+-- cast with its bar, the last spells), their health (estimated: "~80%"), power and form at the
+-- top, and a bottom line ("2 on you · 5 near · X casts Y").
 --
 -- The map: the minimap's own terrain tiles (Data/MinimapTiles.lua: 256 px for 533.33 yd of the
 -- world's grid, the 3 x 3 around), else the world map's art of the zone (C_Map.GetMapArtLayers /
@@ -26,7 +26,7 @@ local S = B.Stream
 -- they don't pause), stacked from the top left. Cost: an OnUpdate per open window (dots and map
 -- glide), nothing when none is open.
 
-local WIDTH, HEIGHT, RADAR = 250, 368, 220
+local WIDTH, HEIGHT, RADAR = 250, 374, 220
 local OUTER_YARDS = S.OUTER_YARDS
 local RINGS = { 40, 30, 20, 10 }
 local MAX_DOTS = S.MAX_MOBS
@@ -46,6 +46,8 @@ local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
 local GRIP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 local GOLD = { 1, 0.82, 0.3 }
 local POWER_COLORS = { MANA = { 0.2, 0.45, 1 }, RAGE = { 0.9, 0.15, 0.15 }, ENERGY = { 1, 0.9, 0.2 }, FOCUS = { 1, 0.5, 0.25 } }
+local HEALTH_COLOR = { 0.25, 0.8, 0.3 }
+local BAR = 120            -- the health and power bars' width
 local PREVIEW_FRIEND, PREVIEW_CLASS = "Anna", "MAGE"
 local Value, issecret = S.Value, S.issecret
 
@@ -481,11 +483,21 @@ local function ShowSelf(view)
 	win.Me:SetShown(not picture.dead)
 	win.MeDot:SetShown(not picture.dead)
 	win.MeSkull:SetShown(picture.dead and true or false)
+	-- Health: estimated (StreamSense.lua), so "~" and in steps of 5%; none from older builds.
+	local health = not picture.dead and picture.health
+	if health then
+		win.Health:SetWidth(math.max(1, BAR * health))
+		win.HealthText:SetText(("~%d%%"):format(math.floor(health * 20 + 0.5) * 5))
+	end
+	win.Health:SetShown(health and true or false)
+	win.HealthBack:SetShown(health and true or false)
+	win.HealthText:SetShown(health and true or false)
+	win.HealthHover:SetShown(health and true or false)
 	local power = picture.power
 	if power and power.frac then
 		local color = POWER_COLORS[power.token] or GOLD
 		win.Power:SetColorTexture(color[1], color[2], color[3], 0.9)
-		win.Power:SetWidth(math.max(1, 120 * power.frac))
+		win.Power:SetWidth(math.max(1, BAR * power.frac))
 		win.Power:Show()
 		win.PowerBack:Show()
 	else
@@ -571,6 +583,7 @@ local function FeedPreview(view)
 	picture.name, picture.classFile, picture.where, picture.facing = PREVIEW_FRIEND, PREVIEW_CLASS, L["Westfall"], 0
 	picture.power = picture.power or { token = "MANA" }
 	picture.power.frac = 0.4 + 0.3 * math.cos(t / 4)
+	picture.health = 0.65 + 0.3 * math.cos(t / 3)
 	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite")
 	leader.combat, leader.attacking, leader.target = t > 2, t > 2, true
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
@@ -814,11 +827,40 @@ local function Build(view, name, parent)
 	win.Form:Hide()
 	win.Where = win:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	win.Where:SetPoint("TOPLEFT", win.Title, "BOTTOMLEFT", 0, -2)
-	-- Their power (mana, rage, energy), a thin bar under where they are.
+	-- Their health (estimated, "~80%" beside it; the tooltip says so) and power (mana, rage,
+	-- energy): thin bars under where they are.
+	win.HealthBack = win:CreateTexture(nil, "BORDER")
+	win.HealthBack:SetColorTexture(1, 1, 1, 0.12)
+	win.HealthBack:SetSize(BAR, 4)
+	win.HealthBack:SetPoint("TOPLEFT", win.Where, "BOTTOMLEFT", 0, -3)
+	win.Health = win:CreateTexture(nil, "ARTWORK")
+	win.Health:SetColorTexture(HEALTH_COLOR[1], HEALTH_COLOR[2], HEALTH_COLOR[3], 0.9)
+	win.Health:SetSize(1, 4)
+	win.Health:SetPoint("LEFT", win.HealthBack, "LEFT")
+	win.HealthText = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	win.HealthText:SetPoint("LEFT", win.HealthBack, "RIGHT", 5, 0)
+	win.HealthText:SetTextScale(0.85)
+	win.HealthText:SetTextColor(0.6, 0.95, 0.6)
+	win.HealthHover = CreateFrame("Frame", nil, win) -- (hover only: a drag still moves the window)
+	win.HealthHover:SetPoint("TOPLEFT", win.HealthBack, "TOPLEFT", 0, 4)
+	win.HealthHover:SetPoint("BOTTOMRIGHT", win.HealthBack, "BOTTOMRIGHT", 40, -4)
+	win.HealthHover:SetMouseMotionEnabled(true)
+	win.HealthHover:SetMouseClickEnabled(false)
+	win.HealthHover:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:SetText(L["Health (estimated)"], HEALTH_COLOR[1], HEALTH_COLOR[2], HEALTH_COLOR[3])
+		GameTooltip:AddLine(L["The game hides health from addons, so this one is added up from hits and heals. It can be a little off until the next time it's full."],
+			0.8, 0.8, 0.8, true)
+		GameTooltip:Show()
+	end)
+	win.HealthHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	for _, part in ipairs({ win.HealthBack, win.Health, win.HealthText, win.HealthHover }) do
+		part:Hide()
+	end
 	win.PowerBack = win:CreateTexture(nil, "BORDER")
 	win.PowerBack:SetColorTexture(1, 1, 1, 0.12)
-	win.PowerBack:SetSize(120, 3)
-	win.PowerBack:SetPoint("TOPLEFT", win.Where, "BOTTOMLEFT", 0, -3)
+	win.PowerBack:SetSize(BAR, 3)
+	win.PowerBack:SetPoint("TOPLEFT", win.HealthBack, "BOTTOMLEFT", 0, -2)
 	win.Power = win:CreateTexture(nil, "ARTWORK")
 	win.Power:SetSize(1, 3)
 	win.Power:SetPoint("LEFT", win.PowerBack, "LEFT")
@@ -851,7 +893,7 @@ local function Build(view, name, parent)
 	local radar = CreateFrame("Frame", nil, win)
 	win.Radar = radar
 	radar:SetSize(RADAR, RADAR)
-	radar:SetPoint("TOP", 0, -58)
+	radar:SetPoint("TOP", 0, -64)
 	radar:SetFrameLevel(win.Map:GetFrameLevel() + 1)
 	win.Map.Round:SetPoint("CENTER", radar, "CENTER")
 	local dim = Circle(radar, "BACKGROUND", -8, ring) -- (the map a little darker: the dots stand out)
@@ -966,7 +1008,7 @@ local function Start(view)
 	if view.picture ~= S.Sensed() then -- (the sensor's own picture: friends watching may be getting it)
 		wipe(view.picture.mobs)
 		wipe(view.picture.recent)
-		view.picture.cast = nil
+		view.picture.cast, view.picture.health = nil, nil
 	end
 	view.map.id, view.map.x, view.map.source = false, nil, nil
 	view.clock, view.nextFeed, view.open, view.looked = 0, 0, true, nil

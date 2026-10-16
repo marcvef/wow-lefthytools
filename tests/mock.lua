@@ -1634,6 +1634,8 @@ function UnitCastingInfo(u)
 end
 function UnitChannelInfo() return nil end
 function UnitHealth() return SECRET end -- (Forever: always secret)
+HEALTH_MAX = 1000 -- my maximum health (Forever: it answers, unless restricted: then SECRET)
+function UnitHealthMax(u) if u == "player" then return HEALTH_MAX end return SECRET end
 function UnitHealthPercent() return SECRET end
 function GetRaidTargetIndex() return SECRET end
 function UnitReaction(u) if MOBS[u] then return 2 end end

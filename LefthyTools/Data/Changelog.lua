@@ -245,5 +245,8 @@ ns.CHANGELOG = {
 	{ id = 79, module = "beacon",
 		en = { "Lefthy chat is now LTC, with /ltc", "Lefthy chat is called LTC (LefthyTools chat) now: lines show as [LTC] [Anna], the chat box says LTC:, and /ltc works like /l. Friends who haven't updated still see [Lefthy]; nothing else changes." },
 		de = { "Lefthy-Chat heißt jetzt LTC, mit /ltc", "Der Lefthy-Chat heißt jetzt LTC (LefthyTools-Chat): Zeilen erscheinen als [LTC] [Anna], im Chatfeld steht LTC:, und /ltc funktioniert wie /l. Freunde ohne Update sehen weiter [Lefthy]; sonst ändert sich nichts." } },
+	{ id = 80, module = "beacon",
+		en = { "Fight stream: health, estimated", "A friend's stream now shows their health: a green bar over their power bar, with a percent beside it. The game hides health from addons, so it's added up from the hits and heals they take and set right whenever they're back at full health, which is why it says ~80%: about. Friends need this update to send theirs." },
+		de = { "Kampf-Stream: Leben, geschätzt", "Der Stream eines Freundes zeigt jetzt sein Leben: eine grüne Leiste über der Ressourcenleiste, mit Prozent daneben. Das Spiel verbirgt das Leben vor Addons, deshalb wird es aus den Treffern und Heilungen zusammengezählt und jedes Mal korrigiert, wenn er wieder volles Leben hat; daher ~80%: ungefähr. Freunde brauchen dieses Update, um ihres zu senden." } },
 	-- New entries go here, at the end.
 }

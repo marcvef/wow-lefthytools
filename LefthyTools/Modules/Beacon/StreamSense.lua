@@ -8,6 +8,7 @@ local S = B.Stream
 -- S.Sensed() -> picture = {
 --   me = true, looked (GetTime of the last look), name, classFile, level, where, north, west,
 --   continent, mapID, facing (radians, counterclockwise from north), combat, dead, ghost,
+--   health (0-1, estimated: "Your health, estimated" below; nil while unknown),
 --   power = { token, frac } or nil, form = { spellID, icon, name } or nil,
 --   cast = { name, icon, spellID, start, finish (GetTime seconds), channel } or nil,
 --   recent = { { name, icon, spellID, at }, ... } (newest first),
@@ -34,7 +35,8 @@ local S = B.Stream
 -- closely its places point one way is how sure.
 --
 -- Cost: nothing while nobody needs it. Then a look at up to 40 nameplate units every half second
--- (range checks, 48 places each), and the cast events of "player".
+-- (range checks, 48 places each), and the cast events of "player". Apart from that, your health
+-- is estimated while Beacon is on (a handful of your own events; below).
 
 local Value, issecret = S.Value, S.issecret
 local SPOTS = 48
@@ -340,6 +342,170 @@ local function ReadForm()
 	end
 end
 
+---------------------------------------------------------------------------
+-- Your health, estimated
+---------------------------------------------------------------------------
+
+-- The game hides your health from addons (UnitHealth is always secret), but not what changes it:
+-- UNIT_COMBAT tells every hit and heal on you with its amount, and your maximum health answers
+-- (UnitHealthMax: hidden only where the game restricts it; then the last one known stays). So what
+-- you lack is added up from hits and heals, between nothing and your maximum, and checkpoints set
+-- it right again: out of combat your health comes back in ticks (UNIT_HEALTH without a hit or heal
+-- at the same moment), and when they stop for FULL_AFTER seconds you're full; dead is empty; a
+-- level-up fills you up. Unknown after a /reload until the first checkpoint. What a tick gives is
+-- learned (what you lacked when they began, over how many it took). Not seen: health lost or won in
+-- combat without a hit or heal (drains, some regeneration), until the next checkpoint. Runs while
+-- Beacon is on (a few events, a sum each), so it's known when someone starts watching.
+
+local FULL_AFTER = 4       -- seconds out of combat without a tick: full
+local LONGEST_REGEN = 180  -- out of combat this long: full, whatever the ticks say
+local TICK_GUESS = 0.03    -- what a tick gives (a share of your maximum), until learned
+local LIFE_CHECK = 0.25
+
+-- missing (nil: unknown), max, share (what a tick gives, learned), from (missing when the ticks
+-- began), ticks, taken (what the last tick took: given back if a hit or heal came at that moment),
+-- tickAt, hitAt (the last tick, hit or heal), calmAt (out of combat or alive since)
+local life = { ticks = 0, tickAt = -1, hitAt = -1, calmAt = 0 }
+local lifeWatch = CreateFrame("Frame")
+lifeWatch:Hide()
+
+local function Dead()
+	return Value("UnitIsDeadOrGhost", "player") == true
+end
+
+local function Fighting()
+	return Value("UnitAffectingCombat", "player") == true
+end
+
+local function ReadMax()
+	local max = Value("UnitHealthMax", "player")
+	if type(max) == "number" and max > 0 then
+		life.max = max
+		if life.missing then
+			life.missing = math.min(life.missing, max)
+		end
+	end
+end
+
+-- Full again: what the ticks gave is learned (from two or more).
+local function Full()
+	if life.from and life.from > 0 and life.ticks >= 2 and life.max then
+		local share = life.from / life.ticks / life.max
+		life.share = life.share and (life.share + share) / 2 or share
+	end
+	life.missing, life.from, life.ticks, life.taken = 0, nil, 0, nil
+end
+
+-- Out of combat and alive: wait for the ticks to stop.
+local function Calm()
+	if not Dead() and not Fighting() then
+		lifeWatch:Show()
+	end
+end
+
+lifeWatch:SetScript("OnUpdate", function(self, elapsed)
+	self.since = (self.since or 0) + elapsed
+	if self.since < LIFE_CHECK then
+		return
+	end
+	self.since = 0
+	if Dead() or Fighting() then
+		self:Hide() -- (on again when the fight ends, or alive again)
+		return
+	end
+	local now = GetTime()
+	if now - math.max(life.tickAt, life.hitAt, life.calmAt) >= FULL_AFTER or now - life.calmAt >= LONGEST_REGEN then
+		Full()
+		self:Hide()
+	end
+end)
+
+lifeWatch:SetScript("OnEvent", function(_, event, _, kind, _, amount)
+	local now = GetTime()
+	if event == "UNIT_COMBAT" then -- unit, event, flagText, amount, schoolMask
+		if issecret(kind) or issecret(amount) or type(amount) ~= "number" or amount <= 0
+			or (kind ~= "WOUND" and kind ~= "HEAL") then
+			return
+		end
+		life.hitAt = now
+		if life.taken and life.tickAt == now then -- (that change was this, not a tick)
+			life.missing, life.ticks, life.taken = life.missing and life.missing + life.taken, life.ticks - 1, nil
+		end
+		if life.missing and life.max then
+			if kind == "WOUND" then
+				life.missing = math.min(life.max, life.missing + amount)
+			else
+				life.missing = math.max(0, life.missing - amount) -- (more than you lack: overhealed)
+			end
+		end
+		Calm()
+	elseif event == "UNIT_HEALTH" then
+		if life.hitAt == now or Fighting() then
+			return -- (a hit or heal, counted; or a change in combat: why isn't known)
+		end
+		life.tickAt, life.taken = now, nil
+		if life.missing and life.missing > 0 and life.max then
+			life.from = life.from or life.missing
+			life.ticks = life.ticks + 1
+			life.taken = math.min(life.missing, (life.share or TICK_GUESS) * life.max)
+			life.missing = life.missing - life.taken
+		end
+		Calm()
+	elseif event == "UNIT_MAXHEALTH" or event == "PLAYER_ENTERING_WORLD" then
+		ReadMax()
+	elseif event == "PLAYER_REGEN_DISABLED" then
+		lifeWatch:Hide()
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		life.calmAt = now
+		Calm()
+	elseif event == "PLAYER_DEAD" then
+		life.missing, life.from, life.ticks, life.taken = life.max, nil, 0, nil
+		lifeWatch:Hide()
+	elseif event == "PLAYER_ALIVE" or event == "PLAYER_UNGHOST" then
+		if not Dead() then -- (PLAYER_ALIVE also comes on releasing: then a ghost)
+			-- About what being brought back gives; the ticks tell the rest.
+			life.missing, life.from, life.ticks, life.taken, life.calmAt = life.max and life.max / 2, nil, 0, nil, now
+			Calm()
+		end
+	elseif event == "PLAYER_LEVEL_UP" then
+		life.missing, life.from, life.ticks, life.taken = life.max and 0, nil, 0, nil
+	end
+end)
+
+local LIFE_UNIT_EVENTS = { "UNIT_COMBAT", "UNIT_HEALTH", "UNIT_MAXHEALTH" }
+local LIFE_EVENTS = { "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST",
+	"PLAYER_LEVEL_UP", "PLAYER_ENTERING_WORLD" }
+
+-- Your health now, 0 to 1 (estimated); nil while it isn't known.
+function S.Health()
+	if Dead() then
+		return 0
+	elseif not (life.missing and life.max) then
+		return nil
+	end
+	return math.max(0, math.min(1, 1 - life.missing / life.max))
+end
+
+-- Beacon on: the estimate starts (unknown until the first checkpoint). Off: it stops.
+function S.LifeStart()
+	lifeWatch:UnregisterAllEvents()
+	for _, event in ipairs(LIFE_UNIT_EVENTS) do
+		lifeWatch:RegisterUnitEvent(event, "player")
+	end
+	for _, event in ipairs(LIFE_EVENTS) do
+		lifeWatch:RegisterEvent(event)
+	end
+	life.missing, life.from, life.ticks, life.taken, life.calmAt = nil, nil, 0, nil, GetTime()
+	ReadMax()
+	Calm()
+end
+
+function S.LifeStop()
+	lifeWatch:UnregisterAllEvents()
+	lifeWatch:Hide()
+	life.missing, life.from, life.ticks, life.taken = nil, nil, 0, nil
+end
+
 -- Your own casts at your target tell where it is: a harmful spell that went off needed it in front
 -- of you; "Target needs to be in front of you" (or facing the wrong way) means it's behind. The
 -- test notes what came (to see that these events answer, and the errors' exact words).
@@ -531,6 +697,7 @@ local function Look()
 	ReadCast()
 	ReadPower()
 	ReadForm()
+	picture.health = S.Health()
 	picture.looked = now -- (your window redraws when this changes)
 	for _, listener in ipairs(listeners) do
 		local ok, err = pcall(listener, picture)

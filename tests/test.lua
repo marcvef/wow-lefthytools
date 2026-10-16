@@ -3488,6 +3488,7 @@ do
 	check(leader.Ring:IsShown() and gnoll.ty < 0 and gnoll.Body.alpha < 1 and not gnoll.Ring:IsShown(),
 		"an elite has a gold ring; a mob without a direction sits behind, faint")
 	check(win.Power:IsShown() and win.Power.color[3] == 1, "her mana, a thin blue bar under where she is")
+	check(win.Health:IsShown() and win.Health.color[2] > 0.7 and win.HealthText:GetText():find("^~%d+%%$"), "her health above it, green, about")
 	-- Resizing: the corner at the bottom right; the size is kept, the top left corner stays.
 	do
 		local p = win._points[1]
@@ -3723,6 +3724,80 @@ do
 	}
 	Advance(0.6)
 	check(used() == 2, "two mobs again")
+	-- My health: the game hides it, so it's added up from hits and heals (StreamSense.lua). Out of
+	-- combat it comes back in ticks; when they stop for 4 s, I'm full.
+	do
+		local function near(a, b) return a and math.abs(a - b) < 0.001 end
+		local function hit(kind, amount) Fire("UNIT_COMBAT", "player", kind, "", amount, 1) end
+		S.LifeStart() -- (as after a /reload)
+		Advance(1)
+		check(S.Health() == nil and not win.Health:IsShown() and not win.HealthText:IsShown(), "after a /reload: not known yet, no bar")
+		Fire("UNIT_HEALTH", "player")
+		Advance(2)
+		Fire("UNIT_HEALTH", "player")
+		Advance(3)
+		check(S.Health() == nil, "ticks coming back: not full yet, still not known")
+		Advance(1.5)
+		check(S.Health() == 1, "no tick for 4 s: full")
+		Advance(0.6)
+		check(win.Health:IsShown() and win.HealthText:GetText() == "~100%" and win.Health.width == 120,
+			"the window: a green bar over the power bar, ~100%")
+		win.HealthHover._scripts.OnEnter(win.HealthHover)
+		check(TOOLTIP.title == "Health (estimated)" and tooltipFind("added up from hits and heals"), "hover: it's estimated, and how")
+		win.HealthHover._scripts.OnLeave(win.HealthHover)
+		hit("WOUND", 250)
+		Advance(0.6)
+		check(near(S.Health(), 0.75) and win.HealthText:GetText() == "~75%" and near(win.Health.width, 90), "hit for 250 of 1000: ~75%")
+		hit("HEAL", 100)
+		check(near(S.Health(), 0.85), "healed 100: 85%")
+		hit("HEAL", 500)
+		hit("MISS", 0)
+		check(S.Health() == 1, "overhealed: full, not more (a miss changes nothing)")
+		STATE.combat = true
+		Fire("PLAYER_REGEN_DISABLED")
+		hit("WOUND", 700)
+		Advance(1)
+		Fire("UNIT_HEALTH", "player") -- (in combat, without a hit or heal: why isn't known)
+		Advance(5)
+		check(near(S.Health(), 0.3), "in combat: hits count, nothing else, got " .. tostring(S.Health()))
+		STATE.combat = false
+		Fire("PLAYER_REGEN_ENABLED")
+		for _ = 1, 3 do
+			Advance(2)
+			Fire("UNIT_HEALTH", "player")
+		end
+		check(near(S.Health(), 0.39), "out of combat: each tick gives a guess, got " .. tostring(S.Health()))
+		Advance(4.5)
+		check(S.Health() == 1, "the ticks stopped: full")
+		hit("WOUND", 500)
+		Fire("UNIT_HEALTH", "player") -- (the same moment: that hit, not a tick)
+		Advance(2)
+		Fire("UNIT_HEALTH", "player")
+		check(near(S.Health(), 0.5 + 0.7 / 3), "a tick now gives what they gave last time (70% in 3), got " .. tostring(S.Health()))
+		Advance(1)
+		Fire("UNIT_HEALTH", "player")
+		hit("HEAL", 100) -- (after its health change, at the same moment: a heal, not a tick)
+		check(near(S.Health(), 0.5 + 0.7 / 3 + 0.1), "a heal right after its health change: counted once, got " .. tostring(S.Health()))
+		HEALTH_MAX = SECRET -- (where the game restricts it)
+		Fire("UNIT_MAXHEALTH", "player")
+		check(near(S.Health(), 0.5 + 0.7 / 3 + 0.1), "my maximum hidden: the last one known stays")
+		HEALTH_MAX = 1200
+		Fire("UNIT_MAXHEALTH", "player")
+		check(near(S.Health(), 1 - (1 - 0.5 - 0.7 / 3 - 0.1) * 1000 / 1200), "more maximum (a buff): what I lack stays")
+		HEALTH_MAX = 1000
+		Fire("UNIT_MAXHEALTH", "player")
+		STATE.dead = true
+		Fire("PLAYER_DEAD")
+		Advance(0.6)
+		check(S.Health() == 0 and not win.Health:IsShown(), "dead: nothing (the skull says it)")
+		Fire("PLAYER_ALIVE") -- (released: a ghost, still dead)
+		check(S.Health() == 0, "a ghost: still nothing")
+		STATE.dead = false
+		Fire("PLAYER_UNGHOST")
+		check(near(S.Health(), 0.5), "alive again: about half")
+		Advance(5)
+		check(S.Health() == 1, "no ticks after that: full")
+	end
 	win.Close:Click()
 	check(not win:IsShown() and not S.SenseRunning(), "closed: the sensor stops")
 
@@ -3815,6 +3890,11 @@ do
 		"what she's doing: her cast, her last spells (newest first), her mana; her arrow turned")
 	check(fwin.Status:GetText():find("1 on Anna", 1, true) and fwin.Status:GetText():find("Defias Pillager casts Spell 133", 1, true),
 		"the bottom line, got " .. tostring(fwin.Status:GetText()))
+	check(not fwin.Health:IsShown() and not fwin.HealthText:IsShown(), "no health in her frame (an older build): no bar")
+	anna("O2;f;0;1429;260;750;90;c;M40;;133,10,25;116,3/122,6;v63/1,45,20,9,actes,133/2,180,30,4,cb")
+	Advance(0.6)
+	check(fwin.Health:IsShown() and fwin.HealthText:GetText() == "~65%" and math.abs(fwin.Health.width - 0.63 * 120) < 0.01
+		and used(11) == 2, "her health first among the mobs: ~65% (steps of 5), the mobs as before")
 	fpill._scripts.OnEnter(fpill)
 	check(TOOLTIP.title == "Defias Pillager (16)" and tooltipHas("attacking Anna") and tooltipHas("Anna's target")
 		and tooltipHas("about 20 yd") and not tooltipHas("direction still unsure"), "hover: about her mob")
@@ -3852,13 +3932,17 @@ do
 	for f in (frames[#frames]:sub(6) .. ";"):gmatch("([^;]*);") do fields[#fields + 1] = f end
 	check(#fields == 11 and fields[1] == "0" and #frames[#frames] <= 250 and fields[11]:find(",133$"),
 		"a frame: where I am, how I face, and the mobs (the caster with its spell), got " .. frames[#frames])
+	local vitals = fields[11]:match("^(v%d+)/")
+	check(vitals and not vitals:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$"),
+		"my health first among the mobs, which older builds skip (not a mob to them), got " .. fields[11])
 	-- What I send is what she sees: my frames, fed back as hers.
 	for _, m in ipairs(names) do anna(m) end
 	anna(frames[#frames])
 	Advance(0.6)
 	local back = dot("Defias Pillager", 11)
-	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown(),
-		"what I send is what she sees: my mobs, named, the spell named in her client's language")
+	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown()
+		and fwin.HealthText:GetText() == ("~%d%%"):format(math.floor(tonumber(vitals:sub(2)) / 5 + 0.5) * 5),
+		"what I send is what she sees: my mobs, named, the spell named in her client's language, my health")
 	anna("O2;w;1")
 	MOBS = {}
 	Advance(9) -- (the remembered ones fade first)

@@ -24,6 +24,9 @@ local S = B.Stream
 --                         e elite, x rare elite, r rare, m off my screen, b beyond: yards is the
 --                         longest range it's beyond, s casting, p a player, f friendly, g in my
 --                         group: placed exactly). As many as fit, the ones that matter first.
+--                         First among them, when known: v<my health, percent> (estimated:
+--                         StreamSense.lua). Older builds skip it (a mob starts with its number),
+--                         and a frame keeps its 11 fields: they'd drop one with more.
 --   O2;n;<id>;<level>;<name>
 --                       a mob's name, once per watcher before the first frame with that id
 --   O2;u;<id>;<level>;<classFile>;<name>
@@ -197,6 +200,13 @@ local function ByWeight(a, b)
 	return a.weight > b.weight
 end
 
+-- My health, first among the mobs ("v" and the percent), when it's known.
+local function Vitals(picture)
+	if picture.health then
+		return "v" .. Int(picture.health * 100)
+	end
+end
+
 -- The frame (without names) and the ids used in it, in order.
 local function Encode(picture, now)
 	local parts = {}
@@ -234,6 +244,10 @@ local function Encode(picture, now)
 	end
 	table.sort(order, ByWeight)
 	local mobs, ids, size = {}, {}, #head
+	local vitals = Vitals(picture)
+	if vitals then
+		mobs[1], size = vitals, size + #vitals + 1
+	end
 	for _, mob in ipairs(order) do
 		local id = IdFor(mob.key, now)
 		if id then
@@ -484,10 +498,14 @@ local function Decode(stream, picture)
 	table.sort(picture.recent, function(a, b) return a.at > b.at end) -- (newest first)
 	local mobs = picture.mobs
 	picture.pool = picture.pool or {}
+	picture.health = nil
 	local n = 0
 	for entry in f[11]:gmatch("[^/]+") do
 		local id, deg, yards, sure, flags, cast = entry:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$")
-		if id then
+		local health = not id and entry:match("^v(%d%d?%d?)$")
+		if health then
+			picture.health = math.min(100, tonumber(health)) / 100
+		elseif id then
 			n = n + 1
 			local mob = picture.pool[n] or {}
 			picture.pool[n] = mob
@@ -685,6 +703,7 @@ end)
 local shared
 function B.StreamStart()
 	shared = M.db.streamShare and true or false
+	S.LifeStart() -- (StreamSense.lua: my health, estimated)
 	C_Timer.After(0, function() S.UpdateButton() end) -- (StreamButton.lua: the minimap button)
 end
 
@@ -712,6 +731,7 @@ function B.StreamStop()
 	wipe(streams)
 	wipe(gone)
 	S.SenseNeed("stream", false)
+	S.LifeStop()
 	UpdateIndicator()
 	ticker:Hide()
 	shared = nil
