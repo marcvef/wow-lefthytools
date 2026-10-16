@@ -24,8 +24,9 @@ local S = B.Stream
 --                         e elite, x rare elite, r rare, m off my screen, b beyond: yards is the
 --                         longest range it's beyond, s casting, p a player, f friendly, g in my
 --                         group: placed exactly). As many as fit, the ones that matter first.
---                         First among them, when there's any: v<my health, percent; empty if
---                         unknown> (estimated: StreamSense.lua), then what just happened to me,
+--                         First among them: v<my health, percent; empty if unknown, then ",?m"
+--                         (my maximum is hidden here) or ",?w" (no checkpoint yet)> (estimated:
+--                         StreamSense.lua), then what just happened to me,
 --                         ",<number 1-99><letter><value>[.<extra>]" each: w hurt (W big), h healed
 --                         (H big), a avoided (m miss, d dodge, p parry, b block, r resist, i
 --                         immune, e evade, f deflect, x reflect, a absorb), x XP [.mob id it came
@@ -227,10 +228,14 @@ local function MomentText(m)
 	return text and m.seq .. text
 end
 
--- My health and what just happened, first among the mobs (nil: neither).
+-- My health and what just happened, first among the mobs. Health not known: why ("?m" my maximum
+-- is hidden here, "?w" no checkpoint yet), so a friend's window can say.
 local function Vitals(picture)
 	local parts = { "v" .. (picture.health and Int(picture.health * 100) or "") }
-	local size = #parts[1]
+	if not picture.health then
+		parts[2] = picture.healthWhy == "max" and "?m" or "?w"
+	end
+	local size = #parts[1] + (parts[2] and #parts[2] + 1 or 0)
 	for _, m in ipairs(picture.moments or {}) do
 		local text = MomentText(m)
 		if text then
@@ -240,9 +245,6 @@ local function Vitals(picture)
 			size = size + #text + 1
 			parts[#parts + 1] = text
 		end
-	end
-	if #parts == 1 and not picture.health then
-		return nil
 	end
 	return table.concat(parts, ",")
 end
@@ -503,7 +505,9 @@ local function DecodeVitals(entry, picture)
 			if not health then
 				return
 			end
-			picture.health = health ~= "" and math.min(100, tonumber(health)) / 100 or nil
+			picture.health, picture.vitals = health ~= "" and math.min(100, tonumber(health)) / 100 or nil, true
+		elseif part:match("^%?%a$") then -- (why their health isn't known)
+			picture.healthWhy = part == "?m" and "max" or "wait"
 		elseif #moments < MAX_MOMENTS then
 			local seq, letter, value, extra = part:match("^(%d%d?)(%a)(%w*)%.?(%d*)$")
 			local kind = letter and KINDS[letter:lower()]
@@ -581,7 +585,7 @@ local function Decode(stream, picture)
 	table.sort(picture.recent, function(a, b) return a.at > b.at end) -- (newest first)
 	local mobs = picture.mobs
 	picture.pool = picture.pool or {}
-	picture.health = nil
+	picture.health, picture.healthWhy, picture.vitals = nil, nil, nil
 	picture.moments = picture.moments or {}
 	wipe(picture.moments)
 	local n = 0
@@ -639,7 +643,7 @@ end
 function S.ReadFriend(id, picture)
 	local peer = B.peers[id]
 	if peer then
-		picture.name, picture.classFile, picture.level = peer.name, peer.classFile, peer.level
+		picture.name, picture.classFile, picture.level, picture.version = peer.name, peer.classFile, peer.level, peer.version
 		local where = peer.subzone ~= "" and peer.subzone or peer.area
 		picture.where = where
 	end

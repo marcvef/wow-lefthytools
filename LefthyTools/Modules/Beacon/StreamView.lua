@@ -78,6 +78,22 @@ local function Circle(parent, layer, sublevel, size)
 	return texture
 end
 
+-- Why a view's health isn't known (nil: it is): "old" (a friend's build from before health went
+-- along), "max" (the maximum is hidden there), "wait" (no checkpoint yet; or a friend's build that
+-- said nothing yet).
+local HEALTH_SINCE = "0.5.0-114-g060a4af"
+local function HealthWhy(view)
+	local picture = view.picture
+	if picture.health then
+		return nil
+	elseif picture.healthWhy then
+		return picture.healthWhy
+	elseif view.kind == "friend" and not picture.vitals and LT.CompareVersions(picture.version, HEALTH_SINCE) == -1 then
+		return "old"
+	end
+	return "wait"
+end
+
 local function ClassLabel(class)
 	if class == "elite" or class == "worldboss" then
 		return L["Elite"]
@@ -490,16 +506,23 @@ local function ShowSelf(view)
 	win.Me:SetShown(not picture.dead)
 	win.MeDot:SetShown(not picture.dead)
 	win.MeSkull:SetShown(picture.dead and true or false)
-	-- Health: estimated (StreamSense.lua), so "~" and in steps of 5%; none from older builds.
+	-- Health: estimated (StreamSense.lua), so "~" and in steps of 5%; not known: "~?" (the hover
+	-- says why).
 	local health = not picture.dead and picture.health
+	local unknown = not picture.dead and not health
 	if health then
 		win.Health:SetWidth(math.max(1, BAR * health))
 		win.HealthText:SetText(("~%d%%"):format(math.floor(health * 20 + 0.5) * 5))
+		win.HealthText:SetTextColor(0.6, 0.95, 0.6)
+	elseif unknown then
+		win.HealthText:SetText("~?")
+		win.HealthText:SetTextColor(0.6, 0.6, 0.6)
 	end
+	local row = (health or unknown) and true or false
 	win.Health:SetShown(health and true or false)
-	win.HealthBack:SetShown(health and true or false)
-	win.HealthText:SetShown(health and true or false)
-	win.HealthHover:SetShown(health and true or false)
+	win.HealthBack:SetShown(row)
+	win.HealthText:SetShown(row)
+	win.HealthHover:SetShown(row)
 	local power = picture.power
 	if power and power.frac then
 		local color = POWER_COLORS[power.token] or GOLD
@@ -1038,6 +1061,17 @@ local function Build(view, name, parent)
 	win.HealthHover:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 		GameTooltip:SetText(L["Health (estimated)"], HEALTH_COLOR[1], HEALTH_COLOR[2], HEALTH_COLOR[3])
+		local why = HealthWhy(win.view)
+		if why == "old" then
+			GameTooltip:AddLine(L["%s's LefthyTools is older and doesn't send health: they need to update."]:format(win.view.picture.name or "?"),
+				1, 0.6, 0.3, true)
+		elseif why == "max" then
+			GameTooltip:AddLine(L["Not known here: the game hides the maximum health in this place, and none is known from before."],
+				1, 0.6, 0.3, true)
+		elseif why == "wait" then
+			GameTooltip:AddLine(L["Not known yet: it is after a few seconds out of combat at full health (a /reload starts over)."],
+				1, 0.6, 0.3, true)
+		end
 		GameTooltip:AddLine(L["The game hides health from addons, so this one is added up from hits and heals. It can be a little off until the next time it's full."],
 			0.8, 0.8, 0.8, true)
 		GameTooltip:Show()

@@ -3744,7 +3744,11 @@ do
 		local function hit(kind, amount) Fire("UNIT_COMBAT", "player", kind, "", amount, 1) end
 		S.LifeStart() -- (as after a /reload)
 		Advance(1)
-		check(S.Health() == nil and not win.Health:IsShown() and not win.HealthText:IsShown(), "after a /reload: not known yet, no bar")
+		check(S.Health() == nil and not win.Health:IsShown() and win.HealthBack:IsShown() and win.HealthText:GetText() == "~?",
+			"after a /reload: not known yet, an empty bar, ~?")
+		win.HealthHover._scripts.OnEnter(win.HealthHover)
+		check(tooltipFind("Not known yet: it is after a few seconds out of combat at full health"), "hover: why, and when it will be")
+		win.HealthHover._scripts.OnLeave(win.HealthHover)
 		Fire("UNIT_HEALTH", "player")
 		Advance(2)
 		Fire("UNIT_HEALTH", "player")
@@ -3799,6 +3803,22 @@ do
 		check(near(S.Health(), 1 - (1 - 0.5 - 0.7 / 3 - 0.1) * 1000 / 1200), "more maximum (a buff): what I lack stays")
 		HEALTH_MAX = 1000
 		Fire("UNIT_MAXHEALTH", "player")
+		-- A /reload where the maximum is hidden: the one from before (this character, this level).
+		HEALTH_MAX = SECRET
+		S.LifeStart()
+		Advance(4.5)
+		check(S.Health() == 1, "a /reload where my maximum is hidden: the one known from before")
+		LefthyToolsDB.streamHealthMax["Player-1-0"][2] = 99 -- (as if from another level)
+		S.LifeStart()
+		Advance(0.6)
+		check(S.Health() == nil and win.HealthText:GetText() == "~?", "... not from another level: not known")
+		win.HealthHover._scripts.OnEnter(win.HealthHover)
+		check(tooltipFind("the game hides the maximum health in this place"), "hover: the maximum is hidden here")
+		win.HealthHover._scripts.OnLeave(win.HealthHover)
+		Advance(4)
+		HEALTH_MAX = 1000
+		Fire("UNIT_MAXHEALTH", "player")
+		check(S.Health() == 1 and LefthyToolsDB.streamHealthMax["Player-1-0"][2] ~= 99, "it answers again: known, and kept")
 		STATE.dead = true
 		Fire("PLAYER_DEAD")
 		Advance(0.6)
@@ -3963,7 +3983,22 @@ do
 		"what she's doing: her cast, her last spells (newest first), her mana; her arrow turned")
 	check(fwin.Status:GetText():find("1 on Anna", 1, true) and fwin.Status:GetText():find("Defias Pillager casts Spell 133", 1, true),
 		"the bottom line, got " .. tostring(fwin.Status:GetText()))
-	check(not fwin.Health:IsShown() and not fwin.HealthText:IsShown(), "no health in her frame (an older build): no bar")
+	do
+		local annaVersion = BB.peers[11].version
+		BB.peers[11].version = "0.5.0-113-g4661d7b"
+		Advance(0.1)
+		check(not fwin.Health:IsShown() and fwin.HealthText:GetText() == "~?", "no health in her frame: ~?")
+		fwin.HealthHover._scripts.OnEnter(fwin.HealthHover)
+		check(tooltipFind("Anna's LefthyTools is older and doesn't send health"), "hover: her build is older (it sends none)")
+		fwin.HealthHover._scripts.OnLeave(fwin.HealthHover)
+		BB.peers[11].version = annaVersion
+	end
+	anna("O2;f;0;1429;260;750;90;c;M40;;133,10,25;116,3/122,6;v,?m/1,45,20,9,actes,133/2,180,30,4,cb")
+	Advance(0.6)
+	fwin.HealthHover._scripts.OnEnter(fwin.HealthHover)
+	check(fwin.HealthText:GetText() == "~?" and tooltipFind("the game hides the maximum health in this place") and used(11) == 2,
+		"her health not known, and why (her maximum is hidden there)")
+	fwin.HealthHover._scripts.OnLeave(fwin.HealthHover)
 	anna("O2;f;0;1429;260;750;90;c;M40;;133,10,25;116,3/122,6;v63/1,45,20,9,actes,133/2,180,30,4,cb")
 	Advance(0.6)
 	check(fwin.Health:IsShown() and fwin.HealthText:GetText() == "~65%" and math.abs(fwin.Health.width - 0.63 * 120) < 0.01

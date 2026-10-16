@@ -10,7 +10,8 @@ local S = B.Stream
 -- S.Sensed() -> picture = {
 --   me = true, looked (GetTime of the last look), name, classFile, level, where, north, west,
 --   continent, mapID, facing (radians, counterclockwise from north), combat, dead, ghost,
---   health (0-1, estimated: "Your health, estimated" below; nil while unknown),
+--   health (0-1, estimated: "Your health, estimated" below; nil while unknown), healthWhy (then:
+--   "max" or "wait", S.HealthWhy),
 --   power = { token, frac } or nil, form = { spellID, icon, name } or nil,
 --   cast = { name, icon, spellID, start, finish (GetTime seconds), channel } or nil,
 --   recent = { { name, icon, spellID, at }, ... } (newest first),
@@ -381,13 +382,23 @@ local function Fighting()
 	return Value("UnitAffectingCombat", "player") == true
 end
 
+-- Your maximum health (hidden where the game restricts it, as perhaps in dungeons: then the last
+-- one known, also from before a /reload: kept per character and level in streamHealthMax).
 local function ReadMax()
-	local max = Value("UnitHealthMax", "player")
+	local max, level = Value("UnitHealthMax", "player"), Value("UnitLevel", "player")
+	local key = Value("UnitGUID", "player")
+	local saved = key and S.Saved("streamHealthMax")
 	if type(max) == "number" and max > 0 then
 		life.max = max
 		if life.missing then
 			life.missing = math.min(life.missing, max)
 		end
+		local kept = saved and saved[key]
+		if saved and not (type(kept) == "table" and kept[1] == max and kept[2] == level) then
+			saved[key] = { max, level }
+		end
+	elseif not life.max and saved and type(saved[key]) == "table" and saved[key][2] == level then
+		life.max = tonumber(saved[key][1])
 	end
 end
 
@@ -493,6 +504,12 @@ function S.Health()
 	return math.max(0, math.min(1, 1 - life.missing / life.max))
 end
 
+-- Why your health isn't known: "max" (your maximum is hidden here, none known from before) or
+-- "wait" (no checkpoint yet).
+function S.HealthWhy()
+	return life.max and "wait" or "max"
+end
+
 -- Beacon on: the estimate starts (unknown until the first checkpoint). Off: it stops.
 function S.LifeStart()
 	lifeWatch:UnregisterAllEvents()
@@ -502,7 +519,7 @@ function S.LifeStart()
 	for _, event in ipairs(LIFE_EVENTS) do
 		lifeWatch:RegisterEvent(event)
 	end
-	life.missing, life.from, life.ticks, life.taken, life.calmAt = nil, nil, 0, nil, GetTime()
+	life.missing, life.max, life.from, life.ticks, life.taken, life.calmAt = nil, nil, nil, 0, nil, GetTime()
 	ReadMax()
 	Calm()
 end
@@ -863,6 +880,7 @@ local function Look()
 	ReadPower()
 	ReadForm()
 	picture.health = S.Health()
+	picture.healthWhy = not picture.health and S.HealthWhy() or nil
 	Flush(now)
 	picture.looked = now -- (your window redraws when this changes)
 	for _, listener in ipairs(listeners) do

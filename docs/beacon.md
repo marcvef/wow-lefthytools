@@ -533,12 +533,14 @@ the cast events), your last 5 spells, power (`UnitPowerType`: mana, rage, energy
 secret, but what changes it isn't (the test in game, 1.60.1.70425): `UNIT_COMBAT` on the player
 gives every hit and heal with its amount (also in combat; `MISS`, `DODGE` with 0), and
 `UnitHealthMax` answers (it's secret only where `C_Secrets.ShouldUnitHealthMaxBeSecret` says so;
-then the last one known stays). So what you lack is added up from hits (`WOUND`) and heals
+then the last one known stays, also across a `/reload`: `LefthyToolsDB.streamHealthMax[GUID] =
+{ max, level }`, used at the same level). So what you lack is added up from hits (`WOUND`) and heals
 (`HEAL`), between nothing and the maximum (overhealing does nothing). Checkpoints set it right
 again: out of combat health comes back in ticks (`UNIT_HEALTH` without a hit or heal at the same
 moment; one that came first is given back), and when none came for 4 s you're full (180 s out of
 combat: full anyway); dead is empty; alive again about half; a level-up full. Unknown after a
-`/reload` until the first checkpoint. What a tick gives starts as a guess (3% of the maximum) and
+`/reload` until the first checkpoint (a `/reload` in combat: until after the fight; seen in game),
+and while no maximum is known (`S.HealthWhy`: "wait" or "max"). What a tick gives starts as a guess (3% of the maximum) and
 is learned from each full regeneration (what you lacked when the ticks began, over how many).
 Changes in combat without a hit or heal (drains, some regeneration) aren't seen until the next
 checkpoint. It runs while Beacon is on (`S.LifeStart` / `S.LifeStop`), not only while someone
@@ -581,7 +583,9 @@ not; gold ring: elite, silver: rare; white ring and a yellow name: their target;
 casting; a skull that fades: dead; faint: direction unsure), names for the 4 nearest and the
 target, a tooltip per dot. Top: name (class colour), where, thin bars for health (green,
 estimated: "~80%" beside it in steps of 5, the tooltip says how; none from builds before it) and
-power, the form's icon, "LIVE" (a breathing red dot) or "DEMO", under it their kills since the
+power (health not known: an empty bar and a grey "~?", the hover says why: not known yet, the
+maximum hidden there, or a friend's build too old to send it: older than 0.5.0-114 by
+`peer.version`), the form's icon, "LIVE" (a breathing red dot) or "DEMO", under it their kills since the
 window opened ("3 kills"). What happens to them floats up over the radar, above the dots, each
 moment once (its number, remembered 6 s): hits in red up and to the left of them, heals in green
 to the right (bigger when big), a miss or dodge in the game's own word above, XP in violet from
@@ -613,8 +617,9 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   `id,degrees from north,yards,sure 0-9,flags[,cast spellID]/...` (flags: a attacking them, c in
   combat, t their target, d dead, e elite, x rare elite, r rare, m off their screen, b beyond (yards =
   the range it's beyond), s casting). Mobs that matter first (target, attacking, in combat,
-  nearest) until 245 bytes; the message stays under 255. First among the mobs, when there's
-  any: `v<health percent, empty if unknown>` (estimated), then the moments of the last 2.5 s,
+  nearest) until 245 bytes; the message stays under 255. First among the mobs, always:
+  `v<health percent, empty if unknown>` (estimated; unknown: then `,?m` the maximum is hidden
+  there, `,?w` no checkpoint yet; 0.5.0-116 ignores those), then the moments of the last 2.5 s,
   newest first, up to 90 bytes: `,<number><letter><value>[.<extra>]` (`w` hurt, `W` big, `h`
   healed, `H` big, `a` + m miss, d dodge, p parry, b block, r resist, i immune, e evade, f deflect,
   x reflect, a absorb; `x` XP `.mob id`; `k` killing blow `[mob id]`; `l` item ID `.quality`), e.g.
