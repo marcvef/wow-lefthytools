@@ -180,12 +180,14 @@ the open one's button greyed out:
   Alerts.lua): Name (class colour, <AFK>), Level (and progress), BattleTag (from their journal's
   account), Where (zone - subzone, distance), Doing (dead or fighting, else the quest they track,
   else "In your group"); the hover is `B.FriendLines` (the AFK screen's lines) plus the BattleTag
-  and their latest highlight. Beacon off or nobody online: a line says so. **Not online**:
-  friends' characters from their journals (`C.People()`), most recently played first: Name,
-  Level, BattleTag, Last played ("3 h ago"), This week (time played in 7 days), Latest news (icon,
-  text, how long ago); the hover adds the realm and the highlight's date. Each card's corner
-  counts the characters. Redrawn every 5 s (who's online and where changes all the time) and on
-  feed changes (at most every 3 s).
+  and their latest highlight (any of their characters'). Beacon off or nobody online: a line says
+  so. **Not online**: a row per person (`C.Accounts()`) none of whose characters is online (an
+  online friend's other characters aren't listed here too), most recently played first: Name (the
+  character they play most), Level, BattleTag, Last played ("3 h ago"), This week (time played in 7
+  days, all their characters), Latest news (icon, text, how long ago; any of their characters');
+  the hover adds the realm, all their characters with their levels and the highlight's date. Each
+  card's corner counts the friends. Redrawn every 5 s (who's online and where changes all the
+  time) and on feed changes (at most every 3 s).
 - **Compare** (`G.DrawCompare`): people, not characters (`C.Accounts()`, see below): you and every
   friend in every graph. A toolbar: 7 / 14 / 30 days, and a chip per person (their colour: the class colour, a
   second of the same class lighter, a third darker; you marked "(you)"; hover: level, BattleTag

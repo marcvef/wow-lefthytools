@@ -278,8 +278,8 @@ stays per character: its level, how long its levels took, and the session you're
   categories, with the Martin award), a **hall of fame** of lifetime numbers (click a column to
   sort) and **records** (fastest level, longest session, most gold, everyone's nemesis). **Share**
   posts a ranking in LTC.
-- **Friends:** who's online, **who isn't** (their level, when they last played, their week, their
-  latest highlight) and what everybody did: level-ups, deaths, bosses, rares, first dungeon
+- **Friends:** who's online, **who isn't** (a row per friend, all their characters together: their
+  level, when they last played, their week, their latest highlight) and what everybody did: level-ups, deaths, bosses, rares, first dungeon
   visits, epic loot, mounts, achievements and milestones. A blue number on the tab (and a blue dot
   on the book) says what's new.
 - **Also when they're offline:** friends' clients pass each other's journals on, so whoever is

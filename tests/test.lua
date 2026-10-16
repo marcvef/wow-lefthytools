@@ -5338,7 +5338,7 @@ do
 	friendsPage = "" -- (the Friends page's tables: everything drawn on the canvas)
 	for i = 1, win.Canvas.used.text do friendsPage = friendsPage .. "\n" .. (win.Canvas.pools.text[i]:GetText() or "") end
 	check(win.Text:GetText() == "" and friendsPage:find("Online now", 1, true) and friendsPage:find("\n|cff40c7ebAnna|r\n", 1, true)
-		and friendsPage:find("Where|r", 1, true) and friendsPage:find("Doing|r", 1, true) and friendsPage:find("1 character|r", 1, true),
+		and friendsPage:find("Where|r", 1, true) and friendsPage:find("Doing|r", 1, true) and friendsPage:find("1 friend|r", 1, true),
 		"friends: a table of who's online now, where they are and what they're doing, got\n" .. friendsPage)
 	me.daily[date("%Y-%m-%d", time() - 86400)] = { played = 3600, xp = 5000, quests = 3, kills = 20, deaths = 0, afk = 900 }
 	me.daily[date("%Y-%m-%d", time() - 20 * 86400)] = { played = 99, xp = 1, quests = 1, kills = 1, deaths = 0 }
@@ -5759,11 +5759,17 @@ section("Chronicle: friends' journals, also when they're offline")
 		"News: what they did, right at the top, got\n" .. page)
 	check(page:find("Died to Hogger", 1, true) and CH.UnseenCount() == 0 and not CH.MinimapButton().New:IsShown()
 		and win.Tabs.news.New:GetText() == "", "their news is there; seen now: the dot and the tab's count go")
+	-- Anna's journal has a second character of hers; she's online (on Anna).
+	anna("J2;d;" .. annaAcct .. ";Annalt-Realmy;7100;" .. yesterday .. ";60,100,1,1,0,0,0,10,5,100,0,0,0,1")
+	Advance(0.3)
 	CH.Open("friends")
 	check(not win.Tabs.friends:IsEnabled() and not win.Picker:IsShown() and win.Text:GetText() == "" and drawn("Online now")
 		and drawn("Where") and drawn("Doing") and drawn("Anna|r") and drawn("Not online") and drawn("Last played")
 		and drawn("BattleTag") and drawn("Carl|r") and drawn("Died to Hogger"),
 		"Friends: a table of who's online (where, doing) and one of who isn't (last played, this week, latest news)")
+	check(CDB.book[annaAcct].chars["Annalt-Realmy"] and not drawn("Annalt") and not drawn("Carlbank"),
+		"a row per person: Anna is online, so her other character isn't under not online; Carl is there once")
+	CDB.book[annaAcct].chars["Annalt-Realmy"] = nil
 	local carlRow, annaRow
 	for i = 1, canvas.used.hover do
 		local f = canvas.pools.hover[i]
@@ -5771,8 +5777,9 @@ section("Chronicle: friends' journals, also when they're offline")
 		if f.lines and f.lines[1]:find("Anna|r", 1, true) then annaRow = f end
 	end
 	check(annaRow and #annaRow.lines >= 3 and annaRow.onClick, "an online friend's row: their full status on hover, a click opens their graphs")
-	check(carlRow and table.concat(carlRow.lines, "\n"):find("Level 18", 1, true) and carlRow.lines[#carlRow.lines]:find("Click: their graphs", 1, true),
-		"hovering a row: all of it (a long highlight is cut in its cell)")
+	check(carlRow and table.concat(carlRow.lines, "\n"):find("Level 18", 1, true) and carlRow.lines[#carlRow.lines]:find("Click: their graphs", 1, true)
+		and table.concat(carlRow.lines, "\n"):find("All characters: ", 1, true) and table.concat(carlRow.lines, "\n"):find("Carlbank", 1, true),
+		"hovering a row: all of it (a long highlight is cut in its cell), all their characters")
 	carlRow._scripts.OnMouseUp(carlRow, "LeftButton")
 	check(not win.Tabs.graphs:IsEnabled() and win.Picker.Label:GetText():find("Carl", 1, true),
 		"a click on a row: their graphs, got " .. tostring(win.Picker.Label:GetText()))
