@@ -3973,7 +3973,9 @@ do
 		check(slot and slot:IsShown() and slot.Model._creature == 299 and slot.Model._zoom == 0 and slot.Model._facing == 0.45
 			and slot.Ring:IsShown() and slot.real and slot.Bar._max == SECRET and slot.Bar._value == SECRET and not slot.Unknown:IsShown(),
 			"fought: its whole model (creature 299, turned a little), gold as my target, its real health (hidden, straight into the bar)")
-		local busy = { name = "Busy Wolf", level = 3, guid = "Creature-0-1-0-1-299-0000000D", combat = true, yards = 12, x = 0.45, y = 0.5 }
+		check(dot("Young Wolf").mob.health == 1, "not hit, not learned yet: a normal mob, taken as usual for its level (for friends)")
+		local busy = { name = "Busy Wolf", level = 3, class = "elite", guid = "Creature-0-1-0-1-300-0000000D", combat = true, yards = 12,
+			x = 0.45, y = 0.5 }
 		MOBS.nameplate6 = busy
 		Advance(0.6)
 		check(not (win.Foes.slots[2] and win.Foes.slots[2]:IsShown()), "a mob in combat with someone else: not in the row")
@@ -3981,6 +3983,7 @@ do
 		Advance(0.6)
 		check(win.Foes.slots[2] and win.Foes.slots[2]:IsShown() and win.Foes.slots[2].mob.name == "Busy Wolf"
 			and win.Foes.slots[1].mob.name == "Young Wolf", "I'm on its threat list: in the row, after my target")
+		check(win.Foes.slots[2].mob.health == nil, "an elite not learned yet: its health not known (for friends)")
 		MOBS.nameplate6, THREAT.nameplate6 = nil, nil
 		Fire("UNIT_COMBAT", "nameplate5", "WOUND", "", 60, 1)
 		Fire("UNIT_COMBAT", "target", "WOUND", "", 60, 1) -- (the same hit, for my target)
@@ -3988,17 +3991,22 @@ do
 		Fire("UNIT_COMBAT", "nameplate5", "WOUND", "", 40, 1)
 		wolf.dead = true
 		Advance(0.6)
-		local learned = LefthyToolsDB.streamMobHealth["299:3"]
-		check(learned and learned[1] == 100 and learned[2] == 1, "it died, seen from full: its kind's maximum learned (100, the hit counted once)")
+		local learned = LefthyToolsDB.streamMobHealth[299]
+		check(learned and math.abs(learned[1] - 100 / 71) < 0.001 and learned[2] == 1,
+			"it died, seen from full: 100 (the hit counted once), its kind's ratio to a usual level 3 mob (71) learned")
 		wolf = { name = "Young Wolf", level = 3, guid = "Creature-0-1-0-1-299-0000000B", yards = 6, x = 0.5, y = 0.5 }
 		MOBS.nameplate5, MOBS.target = wolf, wolf
 		Advance(0.6)
 		wolf.combat, wolf.attacking = true, true
 		Fire("UNIT_COMBAT", "nameplate5", "WOUND", "", 25, 1)
 		Advance(0.6)
-		check(dot("Young Wolf").mob.health == 0.75, "another of its kind: 25 of 100 lost, ~75% (for friends' windows)")
+		check(math.abs(dot("Young Wolf").mob.health - 0.75) < 0.001, "another of its kind: 25 of 100 lost, ~75% (for friends' windows)")
+		wolf.level = 5
+		Advance(0.6)
+		check(math.abs(dot("Young Wolf").mob.health - (1 - 25 / (100 / 71 * 102))) < 0.001,
+			"the same kind at another level: its ratio times a usual level 5 mob (102)")
 		slot._scripts.OnEnter(slot)
-		check(TOOLTIP.title == "Young Wolf (3)" and not tooltipFind("health"), "hover: who (its health is the real bar)")
+		check(TOOLTIP.title == "Young Wolf (5)" and not tooltipFind("health"), "hover: who (its health is the real bar)")
 		slot._scripts.OnLeave(slot)
 		MOBS.nameplate5, MOBS.target, STATE.target = nil, nil, false
 		Advance(9)
@@ -4190,10 +4198,12 @@ do
 	check(#fields == 11 and fields[1] == "0" and #frames[#frames] <= 250 and fields[11]:find(",133$"),
 		"a frame: where I am, how I face, and the mobs (the caster with its spell), got " .. frames[#frames])
 	local vitals = fields[11]:match("^(v[^/]*)/")
-	check(vitals and vitals:find("^v%d+,%d+=100,%d+w40$") and not vitals:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$"),
-		"my health, my foe's (the pillager: its kind known, not hit), the hit I took, first among the mobs, which older builds skip, got "
-		.. fields[11])
+	check(vitals and vitals:find("^v%d+,1=100,2=100,%d+w40$") and not vitals:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$"),
+		"my health, my foes' (the thug: as usual for its level, the pillager: its kind learned; neither hit), the hit I took, first "
+		.. "among the mobs, which older builds skip, got " .. fields[11])
 	check(#sentTo(11, mark, "O2;c;") == 1 and sentTo(11, mark, "O2;c;")[1]:find(";589$"), "the pillager's creature (for its model), once")
+	check(LefthyToolsDB.streamMobHealth["589:16"] == nil and math.abs(LefthyToolsDB.streamMobHealth[589][1] - 800 / 427) < 0.001
+		and LefthyToolsDB.streamMobHealth[589][2] == 2, "learned the old way (a maximum per level): now its ratio, kills kept")
 	-- What I send is what she sees: my frames, fed back as hers.
 	for _, m in ipairs(names) do anna(m) end
 	for _, m in ipairs(sentTo(11, mark, "O2;c;")) do anna(m) end

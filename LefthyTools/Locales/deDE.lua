@@ -746,8 +746,8 @@ L["1 kill"] = "1 Kill"
 L["an item"] = "ein Item"
 L["Health (estimated)"] = "Leben (geschätzt)"
 L["~%d%% health"] = "~%d%% Leben"
-L["Estimated: the hits it took, against what one of its kind had in all."] =
-	"Geschätzt: die Treffer, die er abbekommen hat, gemessen an dem, was einer seiner Art insgesamt hatte."
+L["Estimated from the hits it took, against what its kind has: learned from kills, else what mobs of its level usually have."] =
+	"Geschätzt aus den Treffern, die er abbekommen hat, gemessen an dem, was seine Art hat: gelernt aus Kills, sonst was Mobs seines Levels üblicherweise haben."
 L["Health not known yet: it's learned when one of its kind is seen from full health to dead."] =
 	"Leben noch nicht bekannt: Es wird gelernt, sobald einer seiner Art von vollem Leben bis zum Tod gesehen wird."
 L["%s's LefthyTools is older and doesn't send health: they need to update."] =

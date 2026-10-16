@@ -577,12 +577,17 @@ the attacker) and loot of green and better (`LT.OwnLoot`, Core.lua: the same rea
 `UnitHealthMax` is secret too (seen in game), but `UNIT_COMBAT` on your target and on nameplates
 gives every hit and heal on it with its amount, anyone's (seen in game; a hit comes for both its
 nameplate and `target`: counted once, by GUID, time and amount). What it lost is added up per GUID
-and set back to nothing whenever it's seen out of combat (full; also after evading). Its maximum is
+and set back to nothing whenever it's seen out of combat (full; also after evading). Its maximum:
+what a normal mob of its level usually has (`EXPECTED_HEALTH`, from ExpectedStat.db2's
+CreatureHealth for classic content, levels 1-63, via wago.tools; checked in game: a kind had 620
+at level 20 against 629 there, another 874 at 22 against 731) times its kind's ratio to that,
 learned: a mob seen out of combat before its fight and then dead (seen dead at a look, or a
-`PARTY_KILL`) lost all of it, so that's its kind's maximum (creature ID and level):
-`LefthyToolsDB.streamMobHealth["<creature>:<level>"] = { average, kills }`, the average of the last
-5, kept for good, each player's own (not synced: friends get the percent). Until a kind's first
-such kill: unknown. Not seen: hits while it has neither a nameplate nor is your target; a killing
+`PARTY_KILL`) lost all of it. One ratio per creature ID serves all its levels (per level, mobs a
+level apart stayed unknown): `LefthyToolsDB.streamMobHealth[<creature ID>] = { ratio, kills }`,
+the average of the last 5, kept for good, each player's own (not synced: friends get the percent).
+0.5.0-119/120 kept `["<creature>:<level>"] = { maximum, kills }`: turned into ratios when the sensor
+starts. Not learned yet: a normal (or trivial) mob is taken as usual (ratio 1); an elite, rare or
+boss isn't known. Not seen: hits while it has neither a nameplate nor is your target; a killing
 blow counts in full (a little high). Mobs not looked at for 5 minutes are forgotten.
 
 **Players.** Your group (`party1-4` / `raid1-40`): `UnitPosition` answers for group members, so

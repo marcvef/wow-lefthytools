@@ -737,17 +737,25 @@ end
 -- UNIT_COMBAT tells every hit and heal on your target and on nameplates with its amount (anyone's
 -- hits). So what a mob lost is added up per GUID while the sensor runs (a hit reported for its
 -- nameplate and for your target counts once), and set back to nothing whenever it's seen out of
--- combat (full; also after it evades). Its maximum is learned: a mob seen out of combat before its
--- fight and seen dying lost all of it, so that's the maximum for its kind (creature ID and level).
--- Kept for good in LefthyToolsDB.streamMobHealth["<creature>:<level>"] = { average, kills } (the
--- average of the last MOB_SAMPLES), each player's own (friends get the percent, not the numbers).
--- Until a kind's first such kill its health isn't known. Hits while a mob has neither a nameplate
--- nor is your target aren't seen; a killing blow counts in full.
+-- combat (full; also after it evades). Its maximum: what a normal mob of its level usually has
+-- (EXPECTED_HEALTH) times its kind's own ratio to that, learned: a mob seen out of combat before
+-- its fight and seen dying lost all of it. One ratio per creature ID serves every level of it.
+-- Kept for good in LefthyToolsDB.streamMobHealth[<creature ID>] = { ratio, kills } (the average of
+-- the last MOB_SAMPLES), each player's own (friends get the percent, not the numbers). Not learned
+-- yet: a normal mob is taken as usual (ratio 1); an elite or rare isn't known. Hits while a mob has
+-- neither a nameplate nor is your target aren't seen; a killing blow counts in full.
 local MOB_SAMPLES = 5
 local MOB_KEEP = 300        -- mobs not seen for this long are forgotten
+-- A normal mob's health by level (ExpectedStat.db2 CreatureHealth, classic content, levels 1-63).
+-- Checked in game: one kind had 620 at level 20 against 629 here, another 874 at 22 against 731.
+local EXPECTED_HEALTH = { 42, 55, 71, 86, 102, 120, 137, 156, 180, 208, 239, 272, 307, 345, 385, 427, 473, 521, 572,
+	629, 677, 731, 787, 846, 909, 975, 1040, 1109, 1177, 1242, 1308, 1374, 1443, 1512, 1586, 1660, 1737, 1814, 1897,
+	1981, 2061, 2146, 2231, 2317, 2402, 2495, 2587, 2681, 2779, 2909, 3040, 3174, 3317, 3458, 3602, 3755, 3909, 4105,
+	4234, 4365, 4496, 4629, 4763 }
+local USUAL = { normal = true, trivial = true, minus = true } -- (taken as usual until learned)
 local mobLost = {}          -- GUID -> health lost since it was last full
 local mobFresh = {}         -- GUID -> true: seen out of combat, so its fight is seen from the start
-local mobKind = {}          -- GUID -> "<creature>:<level>"
+local mobKind = {}          -- GUID -> { creature, level, class }
 local mobSeen = {}          -- GUID -> when last looked at
 local hitAt, hitAmount = {}, {} -- GUID -> the last hit (the same one comes for nameplate and target)
 local mobCombat = CreateFrame("Frame")
@@ -779,36 +787,69 @@ mobCombat:SetScript("OnEvent", function(_, _, unit, kind, _, amount)
 	mobLost[key] = math.max(0, (mobLost[key] or 0) + signed)
 end)
 
--- Its kind's maximum, learned (nil: not yet).
+-- A kind's maximum at a level (nil: not known): its learned ratio, else 1 for a normal mob.
 local function MobMax(kind)
-	local learned = kind and S.Saved("streamMobHealth")[kind]
-	return type(learned) == "table" and tonumber(learned[1]) or nil
+	local expected = kind and type(kind[2]) == "number" and EXPECTED_HEALTH[kind[2]]
+	if not expected then
+		return nil
+	end
+	local learned = kind[1] and S.Saved("streamMobHealth")[kind[1]]
+	local ratio = type(learned) == "table" and tonumber(learned[1]) or (USUAL[kind[3]] and 1) or nil
+	return ratio and ratio * expected or nil
 end
 
--- A mob died: if its whole fight was seen, its kind's maximum learns what it lost.
+-- A mob died: if its whole fight was seen, its kind's ratio learns from what it lost.
 local function MobDied(key)
 	local kind, lost = mobKind[key], mobLost[key]
-	if not (mobFresh[key] and kind and lost and lost > 0) then
+	local expected = kind and type(kind[2]) == "number" and EXPECTED_HEALTH[kind[2]]
+	if not (mobFresh[key] and kind and kind[1] and expected and lost and lost > 0) then
 		return
 	end
 	mobFresh[key] = nil -- (once)
-	local saved = S.Saved("streamMobHealth")
-	local learned = type(saved[kind]) == "table" and saved[kind] or nil
-	local average, kills = learned and tonumber(learned[1]), learned and tonumber(learned[2]) or 0
-	if average then
+	local saved, sample = S.Saved("streamMobHealth"), lost / expected
+	local learned = type(saved[kind[1]]) == "table" and saved[kind[1]] or nil
+	local ratio, kills = learned and tonumber(learned[1]), learned and tonumber(learned[2]) or 0
+	if ratio then
 		local n = math.min(kills, MOB_SAMPLES - 1)
-		saved[kind] = { math.floor((average * n + lost) / (n + 1) + 0.5), kills + 1 }
-	else
-		saved[kind] = { lost, 1 }
+		sample = (ratio * n + sample) / (n + 1)
 	end
+	saved[kind[1]] = { math.floor(sample * 1000 + 0.5) / 1000, kills + 1 }
 end
 S.MobDied = MobDied
 
--- At a look: a mob's health, 0-1 (nil: its kind not learned yet). Out of combat it's full.
+-- Learned before ratios (0.5.0-119/120): "<creature>:<level>" = { maximum, kills }, as ratios now.
+local function MigrateMobHealth()
+	local saved, old = S.Saved("streamMobHealth"), {}
+	for key in pairs(saved) do
+		if type(key) == "string" and key:match("^%d+:%-?%d+$") then
+			old[#old + 1] = key -- (not changed while going through it)
+		end
+	end
+	for _, key in ipairs(old) do
+		local entry = saved[key]
+		saved[key] = nil
+		local creature, level = key:match("^(%d+):(%-?%d+)$")
+		local expected = EXPECTED_HEALTH[tonumber(level)]
+		creature = tonumber(creature)
+		if expected and type(entry) == "table" and tonumber(entry[1]) then
+			local kills = tonumber(entry[2]) or 1
+			local was = type(saved[creature]) == "table" and saved[creature] or nil
+			local ratio, n = tonumber(entry[1]) / expected, was and tonumber(was[2]) or 0
+			if was and tonumber(was[1]) then
+				ratio = (tonumber(was[1]) * n + ratio * kills) / (n + kills)
+			end
+			saved[creature] = { math.floor(ratio * 1000 + 0.5) / 1000, n + kills }
+		end
+	end
+end
+
+-- At a look: a mob's health, 0-1 (nil: not known). Out of combat it's full.
 local function MobHealth(mob, now)
 	local key = mob.key
 	mobSeen[key] = now
-	mobKind[key] = mob.creature and mob.level and (mob.creature .. ":" .. mob.level) or nil
+	local kind = mobKind[key] or {}
+	mobKind[key] = kind
+	kind[1], kind[2], kind[3] = mob.creature, mob.level, mob.class
 	if not mob.combat and not mob.dead then
 		mobLost[key], mobFresh[key] = 0, true
 	end
@@ -816,7 +857,7 @@ local function MobHealth(mob, now)
 		MobDied(key)
 		return 0
 	end
-	local max = MobMax(mobKind[key])
+	local max = MobMax(kind)
 	return max and math.max(0, math.min(1, 1 - (mobLost[key] or 0) / max)) or nil
 end
 
@@ -865,6 +906,7 @@ local function SenseMobHealth(on)
 		wipe(t)
 	end
 	if on then
+		MigrateMobHealth()
 		mobCombat:RegisterEvent("UNIT_COMBAT") -- (every unit's: the target's and nameplates' are kept)
 	end
 end

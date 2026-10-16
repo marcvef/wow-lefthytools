@@ -752,7 +752,8 @@ local function FoeOnEnter(slot)
 	if not slot.real then
 		if mob.health then
 			GameTooltip:AddLine(L["~%d%% health"]:format(math.floor(mob.health * 100 + 0.5)), 1, 0.4, 0.3)
-			GameTooltip:AddLine(L["Estimated: the hits it took, against what one of its kind had in all."], 0.7, 0.7, 0.7, true)
+			GameTooltip:AddLine(L["Estimated from the hits it took, against what its kind has: learned from kills, else what mobs of its level usually have."],
+				0.7, 0.7, 0.7, true)
 		else
 			GameTooltip:AddLine(L["Health not known yet: it's learned when one of its kind is seen from full health to dead."],
 				0.7, 0.7, 0.7, true)
