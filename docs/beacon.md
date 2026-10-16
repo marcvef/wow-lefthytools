@@ -696,7 +696,9 @@ loads but comes out white (the game makes a character's skin from their appearan
 can't set) while gear tried on shows; so it's shown as meant, a spirit of them. No look yet (an
 older build): a plain human in their class's light. The preview's made-up friend is your race in
 your gear and form. No cloak on it (`NO_CLOAK`: on a plain race model its inside showed red squares,
-in game), and "out of reach" in small letters under it, its tooltip saying why (the user's idea).
+in game; skipping it wasn't enough, the cloak came back: the model dresses itself in your own gear,
+so it's `Undress`ed before their look goes on and `UndressSlot(15)` after), and "out of reach" in
+small letters under it, its tooltip saying why (the user's idea).
 The camera just a little back (`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in
 game), further in a form (1.4: a bear didn't fit), turned 0.75 rad towards the foes. Reloaded like the foes (when who it is or the window's size
 changes, retried while nothing's there).

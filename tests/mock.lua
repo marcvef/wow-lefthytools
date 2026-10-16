@@ -165,6 +165,8 @@ function FrameMethods:SetSheathed(on) self._sheathed = on end
 -- DressUpModel and animations (the stream's battle row): what was set, every animation played.
 function FrameMethods:SetDisplayInfo(id) self._display, self._loads = id, (self._loads or 0) + 1 end
 function FrameMethods:TryOn(link) self._tried = self._tried or {}; self._tried[#self._tried + 1] = link end
+function FrameMethods:Undress() self._tried, self._undressed = {}, (self._undressed or 0) + 1 end
+function FrameMethods:UndressSlot(slot) self._undressedSlots = self._undressedSlots or {}; self._undressedSlots[slot] = true end
 function FrameMethods:SetAutoDress(on) self._autoDress = on end
 function FrameMethods:SetLight(on, light) self._light = on and light or nil end
 function FrameMethods:SetCamDistanceScale(s) self._camScale = s end

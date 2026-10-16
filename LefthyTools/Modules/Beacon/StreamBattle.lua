@@ -328,11 +328,15 @@ local function HeroLoaded(model)
 	Call(model, "SetCamDistanceScale", hero.inForm and FORM_ZOOM or HERO_ZOOM)
 	Call(model, "SetFacing", HERO_FACING)
 	if model == hero.Spirit and hero.look and not hero.inForm then
+		-- Undressed first: the model dresses itself in your own gear (in game the cloak came back though
+		-- it wasn't tried on), then their look, the cloak taken off again.
+		Call(model, "Undress")
 		for i, item in ipairs(hero.look.items or {}) do
 			if item > 0 and S.LOOK_SLOTS[i] ~= NO_CLOAK then
 				Call(model, "TryOn", "item:" .. item)
 			end
 		end
+		Call(model, "UndressSlot", NO_CLOAK)
 		Tint(model, hero.color)
 	end
 	Call(model, "SetSheathed", hero.sheathed ~= false)

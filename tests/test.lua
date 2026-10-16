@@ -4228,7 +4228,8 @@ do
 	anna("O2;a;1;2;1001,0,0,1002,0,0,0,0,0,1003,0,0,0,0") -- (her look: a cloak in it)
 	anna(herFrame) -- (out of the form)
 	Advance(0.6)
-	check(table.concat(fwin.Foes.Hero.Spirit._tried or {}, " ") == "item:1001 item:1002" and fwin.Foes.Hero.Away:IsShown(),
+	check(table.concat(fwin.Foes.Hero.Spirit._tried or {}, " ") == "item:1001 item:1002" and fwin.Foes.Hero.Away:IsShown()
+		and fwin.Foes.Hero.Spirit._undressed and fwin.Foes.Hero.Spirit._undressedSlots[15],
 		"her look, but the cloak (on a plain race model it shows red squares), got " .. table.concat(fwin.Foes.Hero.Spirit._tried or {}, " "))
 	-- The ones she fights: their models (creature IDs come with the names) and health (estimated
 	-- on her side; one she hasn't learned yet: "?").
