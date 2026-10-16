@@ -877,3 +877,7 @@ L["Aggro on nameplates: preview"] = "Aggro auf Namensplaketten: Vorschau"
 L["For ten seconds the enemy nameplates you can see show examples: you, a tank, a healer, a damage dealer and someone without a role. /lefthy tweaks aggrotest does the same."] =
 	"Zehn Sekunden lang zeigen die feindlichen Namensplaketten, die du siehst, Beispiele: dich, einen Tank, einen Heiler, einen DD und jemanden ohne Rolle. /lefthy tweaks aggrotest macht dasselbe."
 L[">YOU<"] = ">DU<"
+L["out of reach"] = "außer Reichweite"
+L["Out of reach"] = "Außer Reichweite"
+L["Their character isn't near you, and the game shows nobody's face and skin from afar: this is their race in their gear (in a form, the form), in their class's colour."] =
+	"Sein Charakter ist nicht in deiner Nähe, und das Spiel zeigt aus der Ferne niemandes Gesicht und Haut: das ist seine Rasse in seiner Ausrüstung (in einer Gestalt die Gestalt), in seiner Klassenfarbe."

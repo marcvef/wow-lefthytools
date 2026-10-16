@@ -3636,8 +3636,9 @@ do
 		local row = win.Foes
 		local spirit, leaderSlot = row.Hero.Spirit, row.slots[1]
 		check(spirit:IsShown() and not row.Hero.Real:IsShown() and spirit._display == 56658 and spirit._light
-			and spirit._light.ambientColor and spirit._camScale == 1.4,
-			"her model: a race's plain model (yours: a human woman), lit in her class's colour, the camera a little further back")
+			and spirit._light.ambientColor and spirit._camScale == 1.05 and row.Hero.Away:IsShown()
+			and row.Hero.Away:GetText() == "out of reach", "her model: a race's plain model (yours: a human woman), lit in her class's colour, "
+			.. "the camera just a little back, 'out of reach' under it")
 		check(spirit._anims and spirit._anims[51] and spirit._anims[53] and spirit._anims[9],
 			"she cast (a casting pose, then the cast at her target) and was hit (a flinch)")
 		check(spirit._sheathed == true, "a mage: her weapon stays sheathed")
@@ -3668,6 +3669,11 @@ do
 	check(floatWith("+87 XP") and win.Kills:GetText() == "1 kill", "her kill: its XP floats up, 1 kill")
 	Advance(2.5)
 	check(bandit:GetAlpha() < 0.5, "... that fades")
+	SHAPESHIFT_SPELL = 768 -- (in Cat Form: the preview's made-up friend takes my form)
+	lefthy("stream preview")
+	Advance(0.6)
+	check(win.Foes.Hero.Spirit._display == 892 and win.Foes.Hero.Spirit._camScale == 1.4, "the preview, me in Cat Form: a cat, a little further back")
+	SHAPESHIFT_SPELL = nil
 	win.Close:Click()
 	check(not win:IsShown() and used() == 0, "the X closes it, its dots let go")
 
@@ -3685,6 +3691,14 @@ do
 		and S.SenseRunning(), "/lefthy stream me: my own surroundings, live")
 	check(win.Foes.Hero.Real:IsShown() and win.Foes.Hero.Real._unit == "player" and win.Foes.Hero.Real._nativeForm == false
 		and not win.Foes.Hero.Spirit:IsShown(), "in the battle row: me, my own model (in the form I'm in, not my native one)")
+	SHAPESHIFT_SPELL = 768
+	Fire("UPDATE_SHAPESHIFT_FORM")
+	Advance(1.1)
+	check(win.Foes.Hero.Shifted:IsShown() and win.Foes.Hero.Shifted._unit == "player" and not win.Foes.Hero.Real:IsShown()
+		and win.Foes.Hero.Shifted._camScale == 1.4, "in Cat Form: my model as I am now (a PlayerModel: it shows the form)")
+	SHAPESHIFT_SPELL = nil
+	Fire("UPDATE_SHAPESHIFT_FORM")
+	Advance(0.6)
 	check(act.Name:GetText() == "" and not act.Icon:IsShown() and not act.Recent[1]:IsShown(), "not casting yet: the row is empty (the preview's spells are gone)")
 	-- The map moves with me, my arrow turns with me.
 	do
@@ -4044,6 +4058,9 @@ do
 		Advance(0.6)
 		check(math.abs(dot("Young Wolf").mob.health - (1 - 25 / (100 / 71 * 102))) < 0.001,
 			"the same kind at another level: its ratio times a usual level 5 mob (102)")
+		for _, s in ipairs(win.Foes.slots) do -- (the first wolf still falls in its place: the new one's box)
+			if s:IsShown() and s.key == "Creature-0-1-0-1-299-0000000B" then slot = s end
+		end
 		slot._scripts.OnEnter(slot)
 		check(TOOLTIP.title == "Young Wolf (5)" and not tooltipFind("health"), "hover: who (its health is the real bar)")
 		slot._scripts.OnLeave(slot)
@@ -4202,6 +4219,17 @@ do
 	Advance(0.6)
 	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == 892 and not fwin.Foes.Hero.Spirit._light
 		and not fwin.Foes.Hero.Spirit._tried, "far away in Cat Form: a cat (the form's own model: no gear, no light)")
+	PARTY.party1 = { name = "Anna", guid = "Player-1-11", visible = true }
+	Advance(1.1) -- (loaded, then its camera set on the next picture)
+	check(fwin.Foes.Hero.Shifted:IsShown() and fwin.Foes.Hero.Shifted._unit == "party1" and not fwin.Foes.Hero.Real:IsShown()
+		and fwin.Foes.Hero.Shifted._camScale == 1.4 and not fwin.Foes.Hero.Away:IsShown(),
+		"near and in Cat Form: her own model as she is (a PlayerModel shows the form), a little further back")
+	PARTY.party1 = nil
+	anna("O2;a;1;2;1001,0,0,1002,0,0,0,0,0,1003,0,0,0,0") -- (her look: a cloak in it)
+	anna(herFrame) -- (out of the form)
+	Advance(0.6)
+	check(table.concat(fwin.Foes.Hero.Spirit._tried or {}, " ") == "item:1001 item:1002" and fwin.Foes.Hero.Away:IsShown(),
+		"her look, but the cloak (on a plain race model it shows red squares), got " .. table.concat(fwin.Foes.Hero.Spirit._tried or {}, " "))
 	-- The ones she fights: their models (creature IDs come with the names) and health (estimated
 	-- on her side; one she hasn't learned yet: "?").
 	anna("O2;n;3;12;Kobold Miner")
@@ -4227,6 +4255,29 @@ do
 		second._scripts.OnEnter(second)
 		check(tooltipFind("Health not known yet"), "hover the other: not known yet, and how it will be")
 		second._scripts.OnLeave(second)
+		-- Her target loses health: her swing (she steps up), it flinches, roughly what it lost floats
+		-- up from it (15% of a usual level 12 mob, 272: 41).
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,3=30/4,90,8,9,ac/3,30,6,9,act")
+		Advance(0.15)
+		local b = S.View(11).battle
+		check(b.action and b.action.kind == "strike" and b.action.key == first.key and fwin.Foes.Hero.dx > 0,
+			"her target lost health: her swing, she steps up")
+		Advance(0.3)
+		check(floatWith("-41", fwin) and floatWith("-41", fwin).anchor == first and first.Model._anims[9], "it flinches, -41 floats up from it")
+		-- Her killing blow: it falls at once, and keeps its place while it fades, though gone from her frames.
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,31k3/4,90,8,9,ac")
+		Advance(0.6)
+		check(first:IsShown() and first.key == b.foe[first.key].ghost.key and first.mob.dead and first.Model._anims[1]
+			and first.Bar._value == 0, "her killing blow: it falls at once (its box stays, though it's gone from her frames)")
+		Advance(3)
+		check(not (first:IsShown() and first.mob and first.mob.name == "Kobold Miner"), "fallen and faded: its box goes")
+		-- Skinning (a cast): she kneels; nothing is cast at anyone when it's done.
+		anna("O2;f;0;1429;260;750;90;;M40;;8613,5,30;;v80")
+		Advance(0.6)
+		check(fwin.Foes.Hero.Spirit._anim == 50, "skinning: she kneels (the loot animation), not a cast")
+		anna("O2;f;0;1429;260;750;90;;M40;;;;v80")
+		Advance(0.6)
+		check(not (b.action and b.action.kind == "release") and #b.queue == 0, "done: no cast at anyone")
 	end
 
 	-- Anna watches me: the sensor runs, a small red dot with 1 right of the calendar button, frames

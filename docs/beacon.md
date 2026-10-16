@@ -666,15 +666,22 @@ the picture already holds, one action after another like turns (about half a sec
   strikes (16), they flinch (9; a big hit 10, harder flash), the red number floats up from them. A
   dodge, parry or block (`a`): that move (30, 21, 24) and the word. A heal floats up green from them,
   loot rises through them, XP from the mob it came from.
-- **Deaths**: a mob that dies falls (1), keeps its place 1.4 s lying (6), then fades over 1.2 s;
-  they die: they fall and lie until they're up. Standing: ready (26) in a fight, else stand (0),
-  casting (51) while they or a mob cast. Animation IDs from AnimationData (1.60.1.70425, checked by
+- **Deaths** take precedence (the user: a nameplate's death "should take preference"): a mob seen
+  dead, or their killing blow on it (`k`, read before the row is laid out: its mob may be gone from
+  the picture already), falls at once (1); turns still waiting at it go (their numbers float now)
+  and it doesn't flinch any more. It keeps its place 1.4 s lying (6), then fades over 1.2 s, from a
+  copy of it (`st.last`, kept while it's alive) when it's gone from the picture. They die: they fall
+  and lie until they're up. Standing: ready (26) in a fight, else stand (0), casting (51) while they
+  or a mob cast; **kneeling** (50, the loot animation) while they skin, mine, gather herbs or pick a
+  pocket (`GATHER` by spell ID, other ranks by name; the user: "the skinning animation is wrong"),
+  with no cast at anyone when it's done. Animation IDs from AnimationData (1.60.1.70425, checked by
   their fallbacks: Attack2H falls back to Attack1H, then AttackUnarmed; CombatCritical to
   CombatWound; SpellCastDirected to SpellCastOmni ...), all seen playing in game.
 
-**Their model**: yours is you (`DressUpModel:SetUnit("player", false, false)`: not the native form,
-so a druid shows as the cat or bear they are; the user: "when a druid is in cat form it should show
-cat form"); a friend whose character your client has (in your group, nearby:
+**Their model**: yours is you (`DressUpModel:SetUnit("player", false, false)`; in a form a
+`PlayerModel:SetUnit` instead: in game the DressUpModel kept the native form even so, and a
+PlayerModel showed the bear; the user: "when a druid is in cat form it should show cat form"); a
+friend whose character your client has (in your group, nearby:
 `UnitTokenFromGUID(peer.guid)` and `UnitIsVisible`) is them; a model loads anew when their form
 changes. A friend elsewhere **in a form** is that form's own model, textured (`FORM_DISPLAY` by the
 form's spell ID: SpellShapeshiftForm.CreatureDisplayID of 1.60.1.70425, the tauren cat, bear and
@@ -688,8 +695,10 @@ colour (`SetLight`: ambient and diffuse in it). Found with a model test in game:
 loads but comes out white (the game makes a character's skin from their appearance, which addons
 can't set) while gear tried on shows; so it's shown as meant, a spirit of them. No look yet (an
 older build): a plain human in their class's light. The preview's made-up friend is your race in
-your gear. The camera a little further back (`SetCamDistanceScale(1.4)`: a bear didn't fit),
-turned 0.75 rad towards the foes. Reloaded like the foes (when who it is or the window's size
+your gear and form. No cloak on it (`NO_CLOAK`: on a plain race model its inside showed red squares,
+in game), and "out of reach" in small letters under it, its tooltip saying why (the user's idea).
+The camera just a little back (`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in
+game), further in a form (1.4: a bear didn't fit), turned 0.75 rad towards the foes. Reloaded like the foes (when who it is or the window's size
 changes, retried while nothing's there).
 
 Dots follow their mob and glide; a friend's map

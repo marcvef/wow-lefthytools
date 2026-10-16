@@ -685,6 +685,7 @@ local function Spawn(view, m)
 	if m.kind == "kill" then
 		view.kills = view.kills + 1
 		ShowKills(view)
+		S.BattleKill(view, m.key) -- (its box falls now)
 	else
 		S.BattleMoment(view, m)
 	end

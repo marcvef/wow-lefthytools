@@ -43,7 +43,9 @@ local FOE_W, FOE_H = 38, 50    -- a foe's model (the whole mob), px
 local FOE_GAP = 2
 local FOE_X = ROW_W - FOES * (FOE_W + 2) - (FOES - 1) * FOE_GAP -- where the foes start (between: the stage)
 local HERO_FACING, FOE_FACING = 0.75, -0.45 -- turned towards each other (radians)
-local HERO_ZOOM = 1.4          -- the camera a little further back (in game a bear didn't fit)
+local HERO_ZOOM = 1.05         -- the camera just a little back (1.4 was too far for a character, in game)
+local FORM_ZOOM = 1.4          -- further for a form (in game a bear didn't fit)
+local NO_CLOAK = 15            -- a cloak tried on a plain race model shows red squares inside (in game): left off
 local RETRY, TRIES = 1, 5      -- a model not there yet: asked for again (a creature the client hasn't met)
 local LUNGE = 16               -- px a strike steps forward (a mob's: 60% of it)
 local DIE_TIME = 1.4           -- falling; then lying, fading (a dying mob keeps its place this long and FADE_TIME)
@@ -60,7 +62,32 @@ local Value, issecret = S.Value, S.issecret
 
 -- Animation IDs (AnimationData 1.60.1.70425, checked by their fallbacks; seen playing in game).
 local ANIM = { stand = 0, death = 1, dead = 6, wound = 9, crit = 10, punch = 16, strike = 17, parry = 21, block = 24,
-	ready = 26, dodge = 30, aim = 51, cast = 53, release = 54, special = 57 }
+	ready = 26, dodge = 30, loot = 50, aim = 51, cast = 53, release = 54, special = 57 }
+-- Casts that kneel (the loot animation) instead of casting, and go off without a cast at anyone:
+-- Skinning, Mining, Herb Gathering, Pick Pocket (each rank; other ranks by name). The user: "the
+-- skinning animation is wrong in the box".
+local GATHER = { 8613, 8617, 8618, 10768, 2575, 2576, 3564, 10248, 2366, 2368, 3570, 11993, 921 }
+local gatherIDs, gatherNames
+local function Gathering(spellID)
+	if not spellID then
+		return false
+	end
+	if not gatherIDs then
+		gatherIDs, gatherNames = {}, {}
+		for _, id in ipairs(GATHER) do
+			gatherIDs[id] = true
+			local name = Value("C_Spell.GetSpellName", id)
+			if name then
+				gatherNames[name] = true
+			end
+		end
+	end
+	if gatherIDs[spellID] then
+		return true
+	end
+	local name = Value("C_Spell.GetSpellName", spellID)
+	return name ~= nil and gatherNames[name] == true
+end
 local AVOID_ANIM = { DODGE = ANIM.dodge, PARRY = ANIM.parry, BLOCK = ANIM.block }
 local CASTERS = { MAGE = true, PRIEST = true, WARLOCK = true } -- (weapons stay sheathed)
 
@@ -150,6 +177,13 @@ function S.OwnLook()
 		items[i] = ok and type(id) == "number" and not issecret(id) and id or 0
 	end
 	return { race = tonumber(race), sex = sex, items = items }
+end
+
+-- The form you're in (its spell ID; the preview's made-up friend takes it).
+function S.OwnForm()
+	local index = Value("GetShapeshiftForm")
+	local spellID = index and index > 0 and GetShapeshiftFormInfo and select(5, pcall(GetShapeshiftFormInfo, index))
+	return type(spellID) == "number" and not issecret(spellID) and spellID or nil
 end
 
 ---------------------------------------------------------------------------
@@ -291,11 +325,11 @@ local function HeroLoaded(model)
 	end
 	hero.loaded = true
 	Call(model, "RefreshCamera")
-	Call(model, "SetCamDistanceScale", HERO_ZOOM)
+	Call(model, "SetCamDistanceScale", hero.inForm and FORM_ZOOM or HERO_ZOOM)
 	Call(model, "SetFacing", HERO_FACING)
 	if model == hero.Spirit and hero.look and not hero.inForm then
-		for _, item in ipairs(hero.look.items or {}) do
-			if item > 0 then
+		for i, item in ipairs(hero.look.items or {}) do
+			if item > 0 and S.LOOK_SLOTS[i] ~= NO_CLOAK then
 				Call(model, "TryOn", "item:" .. item)
 			end
 		end
@@ -313,8 +347,8 @@ local function Sheathe(hero, on)
 	end
 end
 
-local function NewHeroModel(hero)
-	local model = CreateFrame("DressUpModel", nil, hero)
+local function NewHeroModel(hero, kind)
+	local model = CreateFrame(kind or "DressUpModel", nil, hero)
 	model:SetPoint("TOPLEFT", 1, -1)
 	model:SetSize(HERO_W, HERO_H)
 	Call(model, "SetPortraitZoom", 0)
@@ -331,9 +365,28 @@ local function NewHero(row)
 	hero.Back:SetPoint("TOPLEFT", 1, -1)
 	hero.Back:SetSize(HERO_W, HERO_H)
 	hero.Back:SetColorTexture(0, 0, 0, 0.55)
-	hero.Real = NewHeroModel(hero)   -- (a character this client has: SetUnit)
+	hero.Real = NewHeroModel(hero)   -- (a character this client has: SetUnit; weapons can be sheathed)
+	hero.Shifted = NewHeroModel(hero, "PlayerModel") -- (the same in a form: a DressUpModel shows the native one, in game)
 	hero.Spirit = NewHeroModel(hero) -- (a race's plain model, their gear, their class's light)
 	hero.Flash = NewFlash(hero, HERO_W, HERO_H)
+	-- Not their own look (their character isn't on this client): said under them, small.
+	hero.Away = hero:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	hero.Away:SetPoint("BOTTOM", hero, "BOTTOM", 0, 3)
+	hero.Away:SetTextScale(0.75)
+	hero.Away:SetText(L["out of reach"])
+	hero.Away:Hide()
+	hero:SetMouseMotionEnabled(true)
+	hero:SetMouseClickEnabled(false)
+	hero:SetScript("OnEnter", function(self)
+		if self.Away:IsShown() then
+			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+			GameTooltip:SetText(L["Out of reach"], 1, 1, 1)
+			GameTooltip:AddLine(L["Their character isn't near you, and the game shows nobody's face and skin from afar: this is their race in their gear (in a form, the form), in their class's colour."],
+				0.8, 0.8, 0.8, true)
+			GameTooltip:Show()
+		end
+	end)
+	hero:SetScript("OnLeave", function() GameTooltip:Hide() end)
 	hero.dx = 0
 	return hero
 end
@@ -351,21 +404,27 @@ local function HeroSource(view)
 		end
 		return nil, picture.look, form
 	end
-	view.ownLook = view.ownLook or S.OwnLook() -- (the preview: your race and gear)
-	return nil, view.ownLook, form
+	view.ownLook = view.ownLook or S.OwnLook() -- (the preview: your race, gear and form)
+	return nil, view.ownLook, S.OwnForm()
 end
 
 local function LoadHero(hero, unit, look, form, again)
 	hero.loaded, hero.loadAt = false, GetTime()
 	hero.tries = again and (hero.tries or 0) + 1 or 0
 	hero.look = look
-	local formDisplay = not unit and form and FORM_DISPLAY[form]
+	local formDisplay = form and FORM_DISPLAY[form]
 	hero.inForm = formDisplay and true or false
+	hero.Away:SetShown(not unit)
 	if unit then
-		hero.model = hero.Real
+		hero.model = hero.inForm and hero.Shifted or hero.Real
 		hero.Spirit:Hide()
-		Call(hero.Real, "ClearModel")
-		Call(hero.Real, "SetUnit", unit, false, false) -- (not their native form: the cat or bear they are now)
+		hero[hero.inForm and "Real" or "Shifted"]:Hide()
+		Call(hero.model, "ClearModel")
+		if hero.inForm then
+			Call(hero.model, "SetUnit", unit) -- (a PlayerModel shows the form they're in)
+		else
+			Call(hero.model, "SetUnit", unit, false, false)
+		end
 	else
 		local display = look and RACE_DISPLAY[look.race]
 		display = display and display[look.sex == 2 and 2 or 1] or RACE_DISPLAY[1][1] -- (no look yet: someone plain)
@@ -374,6 +433,7 @@ local function LoadHero(hero, unit, look, form, again)
 		end
 		hero.model = hero.Spirit
 		hero.Real:Hide()
+		hero.Shifted:Hide()
 		Call(hero.Spirit, "ClearModel")
 		Call(hero.Spirit, "SetAutoDress", false)
 		Call(hero.Spirit, "SetDisplayInfo", display)
@@ -440,13 +500,27 @@ local function Dying(b, mob, now)
 end
 
 local foeList = {}
+local LAST_FIELDS = { "key", "name", "level", "class", "creature", "target", "health", "combat", "engaged" }
 local function ShowFoes(view, now)
 	local row, picture, b = view.win.Foes, view.picture, Battle(view)
 	local foes = S.Foes(picture.mobs, foeList, 99)
-	-- The dying go back where they were.
+	-- The dying go back where they were: dead in the picture, or killed and gone from it (its copy).
+	local listed = {}
+	for _, mob in ipairs(foes) do
+		listed[mob.key] = true
+	end
 	for _, mob in ipairs(picture.mobs) do
-		if Dying(b, mob, now) then
+		if Dying(b, mob, now) and not listed[mob.key] then
+			listed[mob.key] = true
 			table.insert(foes, math.min(#foes + 1, b.foe[mob.key].index), mob)
+		end
+	end
+	for key, st in pairs(b.foe) do
+		if st.deadAt and now - st.deadAt >= DIE_TIME + FADE_TIME + 5 then
+			b.foe[key] = nil -- (long gone)
+		elseif st.ghost and st.index and not listed[key] and now - st.deadAt < DIE_TIME + FADE_TIME then
+			listed[key] = true
+			table.insert(foes, math.min(#foes + 1, st.index), st.ghost)
 		end
 	end
 	local shown, total = 0, 0
@@ -470,6 +544,12 @@ local function ShowFoes(view, now)
 			local st = b.foe[mob.key] or {}
 			b.foe[mob.key] = st
 			st.index = shown
+			if not mob.dead and not st.deadAt then -- (a copy: it may die and be gone from the picture at once)
+				st.last = st.last or {}
+				for _, field in ipairs(LAST_FIELDS) do
+					st.last[field] = mob[field]
+				end
+			end
 			local scale = slot:GetEffectiveScale()
 			if slot.creature ~= mob.creature or not slot.scale or math.abs(slot.scale - scale) > 0.001 then
 				slot.creature, slot.scale = mob.creature, scale
@@ -596,7 +676,8 @@ function S.BattleImpact(view, a, now)
 	local hero = view.win.Foes.Hero
 	if a.kind == "strike" or a.kind == "ability" or a.kind == "spell" then
 		local slot = SlotOf(view, a.key)
-		if slot and not a.skipped then
+		local st = view.battle and view.battle.foe[a.key]
+		if slot and not a.skipped and not (st and st.deadAt) then -- (a mob that fell doesn't flinch)
 			Act(slot.Model, ANIM.wound, 0.4, now)
 			slot.Flash:SetAlpha(0.55)
 			if a.kind ~= "strike" and a.icon then
@@ -706,11 +787,14 @@ local function Casting(view, b, now)
 	if cast and now <= (cast.finish or 0) + 0.3 then
 		b.cast = b.cast or {}
 		b.cast.spellID, b.cast.icon, b.cast.finish, b.cast.channel = cast.spellID, cast.icon, cast.finish, cast.channel
+		b.cast.gather = Gathering(cast.spellID)
 		return true
 	end
 	local was = b.cast
 	b.cast = nil
-	if was and not was.channel and now >= (was.finish or 0) - 0.4 then -- (went off: not stopped early)
+	if was and was.gather then
+		b.released, b.releasedAt = was.spellID, now -- (skinned, mined, picked: no cast at anyone)
+	elseif was and not was.channel and now >= (was.finish or 0) - 0.4 then -- (went off: not stopped early)
 		b.released, b.releasedAt = was.spellID, now
 		local target = TargetSlot(view)
 		if Harmful(was.spellID) and target then
@@ -747,6 +831,44 @@ local function Instants(view, b, now)
 	end
 end
 
+-- A mob died (dead in the picture, or their killing blow): its box falls now, before anything
+-- waiting (the user: the nameplate's death "should take preference"). Turns at it go (their numbers
+-- float now); a copy keeps its place while it falls and fades, even if it's gone from the picture.
+local function Fall(view, b, key, now)
+	local st = key and b.foe[key]
+	if not st or st.deadAt then
+		return
+	end
+	st.deadAt = now
+	if st.last then
+		st.ghost = {}
+		for k, v in pairs(st.last) do
+			st.ghost[k] = v
+		end
+		st.ghost.dead, st.ghost.health, st.ghost.target = true, 0, false
+	end
+	local slot = SlotOf(view, key)
+	if slot then
+		Act(slot.Model, ANIM.death, DIE_TIME, now)
+		slot.Model.base = ANIM.dead
+		slot.Bar:SetMinMaxValues(0, 1)
+		slot.Bar:SetValue(0)
+	end
+	for i = #b.queue, 1, -1 do
+		local q = b.queue[i]
+		if q.key == key then
+			table.remove(b.queue, i)
+			q.skipped = true
+			S.BattleImpact(view, q, now)
+		end
+	end
+end
+
+-- Their killing blow (a moment): it falls, also when its nameplate is already gone.
+function S.BattleKill(view, key)
+	Fall(view, Battle(view), key, GetTime())
+end
+
 -- Mobs losing health: their target's loss was theirs (their spell, else a swing); another's only
 -- flinches. A mob that died falls.
 local function Losses(view, b, now)
@@ -756,10 +878,9 @@ local function Losses(view, b, now)
 		local st = mob and b.foe[mob.key]
 		if st then
 			if mob.dead then
-				if not st.deadAt then
-					st.deadAt = now
-					Act(slot.Model, ANIM.death, DIE_TIME, now)
-				end
+				Fall(view, b, mob.key, now)
+			elseif st.deadAt then
+				-- (fallen already: their killing blow came first)
 			elseif mob.health then
 				if st.health and mob.health < st.health - DROP_MIN then
 					local frac = st.health - mob.health
@@ -790,6 +911,11 @@ end
 -- After each new picture (StreamView.lua): the row, then what happened.
 function S.BattleShow(view)
 	local now, b = GetTime(), Battle(view)
+	for _, m in ipairs(view.picture.moments or {}) do -- (their killing blows first: its mob may be gone already)
+		if m.kind == "kill" and m.key then
+			Fall(view, b, m.key, now)
+		end
+	end
 	ShowFoes(view, now)
 	ShowHero(view, now)
 	local hero, picture = view.win.Foes.Hero, view.picture
@@ -803,8 +929,10 @@ function S.BattleShow(view)
 	elseif not picture.dead then
 		b.deadAt = nil
 	end
-	local base = picture.dead and ANIM.dead or casting and ANIM.aim or picture.combat and ANIM.ready or ANIM.stand
-	hero.Real.base, hero.Spirit.base = base, base
+	local gathering = casting and b.cast and b.cast.gather
+	local base = picture.dead and ANIM.dead or gathering and ANIM.loot or casting and ANIM.aim
+		or picture.combat and ANIM.ready or ANIM.stand
+	hero.Real.base, hero.Shifted.base, hero.Spirit.base = base, base, base
 	if casting or not picture.combat then
 		Sheathe(hero, true)
 	elseif not b.fighting then
@@ -913,7 +1041,9 @@ function S.BattleReset(view)
 	end
 	local hero = row.Hero
 	hero.who, hero.dx, hero.loaded = nil, 0, false
-	for _, model in ipairs({ hero.Real, hero.Spirit }) do
+	hero.Away:Hide()
+	view.ownLook = nil -- (the preview: your gear as it is now)
+	for _, model in ipairs({ hero.Real, hero.Shifted, hero.Spirit }) do
 		model.act, model.current, model.base = nil, nil, nil
 		model:Hide()
 	end

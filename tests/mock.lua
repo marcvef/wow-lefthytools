@@ -513,6 +513,10 @@ function GetZoneText() return ZONE end
 function GetRealZoneText() return INSTANCE and INSTANCE.name or ZONE end -- (inside an instance: its name, like the game)
 function UnitRace(unit) if unit == "player" then return "Human", "Human", 1 end end
 function UnitSex(unit) if unit == "player" then return 3 end end -- (female)
+-- My form: SHAPESHIFT_SPELL (its spell ID; nil: none), as form 1.
+SHAPESHIFT_SPELL = nil
+function GetShapeshiftForm() return SHAPESHIFT_SPELL and 1 or 0 end
+function GetShapeshiftFormInfo(i) if i == 1 and SHAPESHIFT_SPELL then return 132115, true, true, SHAPESHIFT_SPELL end end
 function UnitFactionGroup(unit) if unit == "player" then return "Alliance", "Alliance" end end
 -- Stats: [index] = { base, effective } (Strength, Agility, Stamina, Intellect, Spirit); SECRET for a secret value.
 -- Like the client: the value with gear and buffs twice, then the plus and minus parts (base = value - plus - minus).
