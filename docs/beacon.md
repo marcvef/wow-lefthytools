@@ -691,8 +691,9 @@ swing; a caster (mage, priest, warlock) keeps them sheathed and casts their inst
 lunge).
 
 A friend **out of reach** (their character isn't on your client) is **their class's emblem**
-(`GetClassAtlas`, else `UI-Classes-Circles` with `CLASS_ICON_TCOORDS`) in a ring of their class
-colour, "out of reach" in small letters under it, its tooltip saying why; also the preview's
+(`GetClassAtlas`, else `UI-Classes-Circles` with `CLASS_ICON_TCOORDS`; a ring of their class
+colour behind it read as a blue disc in game and went), "out of reach" in small letters under it,
+its tooltip saying why; also the preview's
 made-up friend. It steps up, flashes when hit, pulses while they cast and greys when they die; the
 numbers float up from it. Tried first, in game, and given up (the user: "use the class emblem if
 you cant render their actual model"): a race's plain model (ChrRaceXChrModel -> ChrModel.DisplayID)

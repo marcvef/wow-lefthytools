@@ -25,7 +25,7 @@ local S = B.Stream
 --
 -- Their model: you are you (SetUnit, in the form you're in: cat, bear, ...); a friend whose
 -- character your client has (in your group, nearby) is them. A friend elsewhere is their class's
--- emblem in a ring of its colour, "out of reach" under it (the user chose it, after a race's plain
+-- emblem, "out of reach" under it (the user chose it, after a race's plain
 -- model, a ghost of it and an NPC of their class: the game shows no player as they look from afar,
 -- and "if you cant render their actual model" the emblem). It still steps up, flashes when hit,
 -- pulses while they cast and greys when they die; the numbers float up from it. The preview's
@@ -110,13 +110,6 @@ local function Emblem(texture, classFile)
 	end
 end
 
-local function ClassColor(classFile)
-	local color = classFile and C_ClassColor and C_ClassColor.GetClassColor and C_ClassColor.GetClassColor(classFile)
-	if color then
-		return color:GetRGB()
-	end
-	return 0.7, 0.7, 0.7
-end
 local function Call(obj, method, ...)
 	local f = obj and obj[method]
 	if f then
@@ -320,16 +313,11 @@ local function NewHero(row)
 	hero.Back:SetColorTexture(0, 0, 0, 0.55)
 	hero.Real = NewHeroModel(hero)   -- (a character this client has: SetUnit; weapons can be sheathed)
 	hero.Shifted = NewHeroModel(hero, "PlayerModel") -- (the same in a form: a DressUpModel shows the native one, in game)
-	-- Out of reach: their class's emblem in a ring of its colour.
-	local size = HERO_W - 12
-	hero.Ring = hero:CreateTexture(nil, "ARTWORK", nil, 1)
-	hero.Ring:SetSize(size + 4, size + 4)
-	hero.Ring:SetPoint("CENTER", hero.Back, "CENTER", 0, 4)
-	hero.Ring:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+	-- Out of reach: their class's emblem (a ring of their class colour behind it read as a blue disc,
+	-- in game: the icon has a rim of its own).
 	hero.Emblem = hero:CreateTexture(nil, "ARTWORK", nil, 2)
-	hero.Emblem:SetSize(size, size)
-	hero.Emblem:SetPoint("CENTER", hero.Ring, "CENTER")
-	hero.Ring:Hide()
+	hero.Emblem:SetSize(HERO_W - 12, HERO_W - 12)
+	hero.Emblem:SetPoint("CENTER", hero.Back, "CENTER", 0, 4)
 	hero.Emblem:Hide()
 	hero.Flash = NewFlash(hero, HERO_W, HERO_H)
 	-- Not their own look (their character isn't on this client): said under them, small.
@@ -375,14 +363,12 @@ local function LoadHero(hero, unit, form, classFile, again)
 	hero.tries = again and (hero.tries or 0) + 1 or 0
 	hero.inForm = form and FORMS[form] or false
 	hero.Away:SetShown(not unit)
-	hero.Ring:SetShown(not unit)
 	hero.Emblem:SetShown(not unit)
 	if not unit then
 		hero.model = nil
 		hero.Real:Hide()
 		hero.Shifted:Hide()
 		Emblem(hero.Emblem, classFile)
-		hero.Ring:SetVertexColor(ClassColor(classFile))
 		hero.loaded = true
 		return
 	end
@@ -1001,7 +987,6 @@ function S.BattleReset(view)
 	hero.who, hero.dx, hero.loaded = nil, 0, false
 	hero.Away:Hide()
 
-	hero.Ring:Hide()
 	hero.Emblem:Hide()
 	for _, model in ipairs({ hero.Real, hero.Shifted }) do
 		model.act, model.current, model.base = nil, nil, nil

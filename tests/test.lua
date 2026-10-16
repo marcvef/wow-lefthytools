@@ -3631,15 +3631,13 @@ do
 			.. table.concat(dump, " | ") .. " action " .. tostring(b.action and b.action.kind) .. " queue " .. table.concat(q, ","))
 	end
 	-- The battle row: on the left the preview's made-up friend, out of reach (her character isn't on
-	-- this client): her class's emblem in a ring of its colour; the mobs she fights on the right, the
+	-- this client): her class's emblem; the mobs she fights on the right, the
 	-- fight played on them.
 	do
 		local row = win.Foes
 		local hero, leaderSlot = row.Hero, row.slots[1]
-		check(hero.Emblem:IsShown() and (hero.Emblem.atlas or hero.Emblem.path) and hero.Ring:IsShown() and hero.Ring.vertex[3] > 0.9
-			and hero.Ring.vertex[1] < 0.3 and not hero.Real:IsShown() and not hero.Shifted:IsShown() and hero.Away:IsShown()
-			and hero.Away:GetText() == "out of reach", "her model, out of reach: her class's emblem in a ring of its colour (a mage's, light blue), "
-			.. "'out of reach' under it")
+		check(hero.Emblem:IsShown() and (hero.Emblem.atlas or hero.Emblem.path) and not hero.Real:IsShown() and not hero.Shifted:IsShown()
+			and hero.Away:IsShown() and hero.Away:GetText() == "out of reach", "her model, out of reach: her class's emblem, 'out of reach' under it")
 		check(leaderSlot.Model._anims and leaderSlot.Model._anims[9] and leaderSlot.Model._anims[16] and leaderSlot.Model._paused == false
 			and leaderSlot.Model._facing == -0.45, "her target flinched at her Fireball and struck back; the mobs move and face her")
 		local loss = floatWith("-13%")
