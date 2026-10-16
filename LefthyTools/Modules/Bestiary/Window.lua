@@ -125,11 +125,14 @@ local function Kind(info)
 end
 
 -- "34 kills · 12s 40c each · (pelt) 12" (the coin on average over all its kills, "no coin" for
--- beasts; skinnings when there were some).
-local function KillsLine(mob)
+-- beasts; skinnings when there were some). short: nothing about coin when there was none (the card
+-- beside the mouse: the user didn't need "no coin" there).
+local function KillsLine(mob, short)
 	local text = mob.kills == 1 and L["1 kill"] or L["%d kills"]:format(mob.kills)
-	if mob.kills > 0 then
-		text = text .. "  |cff888888·|r  " .. (mob.money > 0 and L["%s each"]:format(Coins(mob.money / mob.kills)) or L["no coin"])
+	if mob.kills > 0 and mob.money > 0 then
+		text = text .. "  |cff888888·|r  " .. L["%s each"]:format(Coins(mob.money / mob.kills))
+	elseif mob.kills > 0 and not short then
+		text = text .. "  |cff888888·|r  " .. L["no coin"]
 	end
 	if (mob.skinned or 0) > 0 then
 		text = text .. ("  |cff888888·|r  |T%s:12:12|t %d"):format(Bt.SKIN_ICON, mob.skinned)
@@ -753,7 +756,7 @@ function Bt.MouseoverChanged()
 	local mob = Bt.Mob(creature)
 	local drops, line
 	if mob and mob.kills > 0 then
-		drops, line = Bt.Drops(mob, M.db.showPoor, creature), KillsLine(mob)
+		drops, line = Bt.Drops(mob, M.db.showPoor, creature), KillsLine(mob, true)
 	elseif M.db.cardUnseen then
 		local unseen = Bt.Compare(creature, mob, M.db.showPoor)
 		if unseen and #unseen > 0 then

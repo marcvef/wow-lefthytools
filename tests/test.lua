@@ -6458,6 +6458,10 @@ section("Bestiary: what mobs drop")
 	STATE.combat = false
 	Fire("PLAYER_REGEN_ENABLED")
 	check(card:IsShown(), "the fight is over, the mouse still over it: back")
+	-- A mob that never dropped coin: the card says nothing about coin (the window says "no coin").
+	MOBS.mouseover = { guid = "Creature-0-1-0-1-117-00000011", pinned = true } -- (no name: later tests want it unnamed)
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	check(card:IsShown() and card.Kills:GetText() == "3 kills", "no coin: not said on the card, got " .. tostring(card.Kills:GetText()))
 	MOBS.mouseover = nil
 	Advance(0.1)
 	check(not card:IsShown(), "the mouse moves off: the card goes")

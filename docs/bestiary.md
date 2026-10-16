@@ -148,7 +148,7 @@ flights.
 ## The card beside the mouse
 
 Setting `hoverCard` (off by default). Over an enemy (attackable or dead) you've killed: "34 kills ·
-12s each" and its 6 likeliest drops (22 px, chance under each), at the cursor's lower right,
+12s each" (no coin: nothing said, unlike the window's "no coin") and its 6 likeliest drops (22 px, chance under each), at the cursor's lower right,
 `TOOLTIP` strata, no mouse. An OnUpdate while it's shown follows the cursor and hides it once the
 mouseover is gone or another unit. **Small on purpose** (the user: it mustn't be "too large and
 intrusive"): one line and one row of 6, never more. **Not in combat** (setting `cardHideInCombat`,
