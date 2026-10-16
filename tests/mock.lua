@@ -162,7 +162,14 @@ function FrameMethods:SetAllPoints(rel) self._points = { { "TOPLEFT", rel }, { "
 -- PlayerModel
 function FrameMethods:SetUnit(unit) self._unit = unit end
 function FrameMethods:SetFacing(f) self._facing = f end
-function FrameMethods:SetCreature(id) self._creature, self._loads = id, (self._loads or 0) + 1 end
+-- MODEL_UNKNOWN[creature] = n: a creature this client hasn't met; its first n loads give no model.
+MODEL_UNKNOWN = {}
+function FrameMethods:SetCreature(id)
+	self._creature, self._loads = id, (self._loads or 0) + 1
+	self._failed = (MODEL_UNKNOWN[id] or 0) > 0
+	if self._failed then MODEL_UNKNOWN[id] = MODEL_UNKNOWN[id] - 1 end
+end
+function FrameMethods:GetModelFileID() if self._creature and not self._failed then return 100000 + self._creature end end
 function FrameMethods:ClearModel() self._creature = nil end
 function FrameMethods:SetPortraitZoom(z) self._zoom = z end
 function FrameMethods:SetPaused(p) self._paused = p end

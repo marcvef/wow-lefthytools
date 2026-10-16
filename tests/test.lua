@@ -4155,10 +4155,16 @@ do
 	anna("O2;c;3;40")
 	anna("O2;n;4;11;Kobold Vermin")
 	anna("O2;c;4;6")
+	MODEL_UNKNOWN[40] = 2 -- (a creature my client hasn't met: no model the first two times)
 	anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,3=45/4,90,8,9,ac/3,30,6,9,act")
 	Advance(0.6)
 	do
 		local first, second = fwin.Foes.slots[1], fwin.Foes.slots[2]
+		check(first.Initials:IsShown() and first.Initials:GetText() == "KM" and first.Stand:IsShown() and not second.Initials:IsShown(),
+			"a creature my client hasn't met: no model yet, its initials meanwhile (the other one's model is there)")
+		Advance(3)
+		check(not first.Initials:IsShown() and not first.Stand:IsShown() and first.Model._loads == 3,
+			"asked again every second: the model came")
 		check(first:IsShown() and first.Model._creature == 40 and first.Ring:IsShown() and first.Bar._value == 0.45
 			and second:IsShown() and second.Model._creature == 6 and second.Unknown:IsShown() and not first.Unknown:IsShown(),
 			"her foes: her target first (a Kobold Miner at ~45%), then a Kobold Vermin (its health not known)")

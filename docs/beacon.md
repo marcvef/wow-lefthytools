@@ -632,7 +632,11 @@ target first, then the ones attacking, then the nearest), each the whole mob, st
 `RefreshCamera` and paused once loaded; 40 x 50 px; checked in game: a creature the client never
 saw loads too). A model's camera is set for the size it loaded at (smaller, the window showed an
 empty box): it loads again when the slot's effective scale changes (the grip, the UI scale) and
-when the window opens. A gold edge for the target, a health bar under it. In your
+when the window opens. A creature this client hasn't met loads nothing at first (in game: the first
+`SetCreature` of an unseen creature gave no model, the next one did, once the game had asked for
+it), and nothing tries again by itself: a slot without a model (`GetModelFileID`, or no
+`OnModelLoaded` yet) asks again every second, 5 times, and shows a faint question mark with the
+mob's initials ("DB") meanwhile. A gold edge for the target, a health bar under it. In your
 own window the bar is the real health: `UnitHealthMax` / `UnitHealth` of the mob's unit go
 straight into `StatusBar:SetMinMaxValues` / `SetValue`, which take hidden values (AllowedWhenTainted;
 the unit checked against the GUID first). In a friend's: their estimate; not known: "?" (the hover

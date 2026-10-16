@@ -764,9 +764,35 @@ end
 
 -- Loaded: the camera fits the model to the frame as big as it is now, turned a little, still.
 local function FoeLoaded(model)
+	model:GetParent().loaded = true
 	model:RefreshCamera()
 	model:SetFacing(FOE_FACING)
 	model:SetPaused(true)
+end
+
+-- A creature this client hasn't met yet loads nothing at first (in game: the first try gave no
+-- model, the next one did, once the game had asked for it), and nothing tries again by itself: so
+-- a slot asks again every FOE_RETRY seconds, FOE_TRIES times, and shows the mob's initials meanwhile.
+local FOE_RETRY, FOE_TRIES = 1, 5
+
+local function LoadFoe(slot, creature, again)
+	slot.loaded, slot.loadAt = false, GetTime()
+	slot.tries = again and (slot.tries or 0) + 1 or 0
+	slot.Model:ClearModel()
+	slot.Model:SetCreature(creature)
+	slot.Model:SetFacing(FOE_FACING)
+end
+
+-- "DB" for Defias Bandit (the first letter of the first two words; a letter of several bytes whole).
+local function Initials(name)
+	local letters = {}
+	for word in (name or "?"):gmatch("%S+") do
+		letters[#letters + 1] = word:match("^[\1-\127\194-\244][\128-\191]*") or ""
+		if #letters == 2 then
+			break
+		end
+	end
+	return table.concat(letters):upper()
 end
 
 local function NewFoe(row)
@@ -785,6 +811,17 @@ local function NewFoe(row)
 	slot.Model:SetSize(FOE_W, FOE_H)
 	slot.Model:SetPortraitZoom(0) -- (the whole mob, not its portrait)
 	slot.Model:SetScript("OnModelLoaded", FoeLoaded)
+	-- Until its model is there: a faint question mark and the mob's initials.
+	slot.Stand = slot:CreateTexture(nil, "ARTWORK")
+	slot.Stand:SetPoint("CENTER", slot.Back, "CENTER", 0, 0)
+	slot.Stand:SetSize(FOE_W - 8, FOE_W - 8)
+	slot.Stand:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+	slot.Stand:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	slot.Stand:SetDesaturated(true)
+	slot.Stand:SetAlpha(0.3)
+	slot.Initials = slot:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	slot.Initials:SetPoint("CENTER", slot.Back, "CENTER", 0, 0)
+	slot.Initials:SetTextColor(1, 1, 1)
 	slot.BarBack = slot:CreateTexture(nil, "BORDER")
 	slot.BarBack:SetPoint("TOPLEFT", slot.Back, "BOTTOMLEFT", 0, -2)
 	slot.BarBack:SetSize(FOE_W, 4)
@@ -825,10 +862,19 @@ local function ShowFoes(view)
 			local scale = slot:GetEffectiveScale()
 			if slot.creature ~= mob.creature or not slot.scale or math.abs(slot.scale - scale) > 0.001 then
 				slot.creature, slot.scale = mob.creature, scale
-				slot.Model:ClearModel()
-				slot.Model:SetCreature(mob.creature)
-				slot.Model:SetFacing(FOE_FACING)
+				LoadFoe(slot, mob.creature)
 			end
+			if not slot.loaded then
+				local file = slot.Model.GetModelFileID and slot.Model:GetModelFileID()
+				if type(file) == "number" and file > 0 then
+					slot.loaded = true -- (OnModelLoaded may not have come)
+				elseif slot.tries < FOE_TRIES and GetTime() - slot.loadAt >= FOE_RETRY then
+					LoadFoe(slot, mob.creature, true)
+				end
+			end
+			slot.Stand:SetShown(not slot.loaded)
+			slot.Initials:SetShown(not slot.loaded)
+			slot.Initials:SetText(Initials(mob.name))
 			slot.Ring:SetShown(mob.target and true or false)
 			local unit = view.kind == "me" and mob.unit
 			slot.real = unit and Value("UnitGUID", unit) == mob.key and pcall(RealHealth, slot.Bar, unit) or false
