@@ -18,7 +18,8 @@ local S = B.Stream
 --   moments = { what just happened to you: "What happens to you" below } (newest first),
 --   mobs = { { key, name, level, class, dead, combat, attacking, casting (a name), castID, target,
 --            yards, beyond, sure (0-1), bearing (radians clockwise from north), remembered, fade,
---            age, unit (at the look), creature (its ID), health (0-1, estimated; nil: unknown) },
+--            age, unit (at the look), creature (its ID), health (0-1, estimated; nil: unknown),
+--            engaged (fighting you: you're on its threat list, or it attacks you) },
 --            ... } }
 --
 -- Learning where the mobs are: the game gives addons no direction to a mob (nameplates can't be
@@ -248,7 +249,7 @@ local function LearnSeen(mob, now)
 	info.name, info.level, info.class, info.combat, info.attacking = mob.name, mob.level, mob.class, mob.combat, mob.attacking
 	info.dead, info.est = mob.dead, mob.est
 	info.player, info.classFile, info.friendly = mob.player, mob.classFile, mob.friendly
-	info.creature, info.health = mob.creature, mob.health
+	info.creature, info.health, info.engaged = mob.creature, mob.health, mob.engaged
 end
 
 -- Mobs that left your screen (not dead): remembered a while, outside your view, fading. Appended
@@ -268,7 +269,7 @@ local function Remember(mobs, n, now)
 				ghost.player, ghost.classFile, ghost.friendly, ghost.group = info.player, info.classFile, info.friendly, false
 				ghost.combat, ghost.attacking, ghost.target, ghost.casting, ghost.castID, ghost.dead =
 					info.combat, info.attacking, false, nil, nil, false
-				ghost.unit, ghost.creature, ghost.health = nil, info.creature, info.health
+				ghost.unit, ghost.creature, ghost.health, ghost.engaged = nil, info.creature, info.health, info.engaged
 				local angle
 				angle, ghost.est, ghost.sure = Estimate(cloud)
 				ghost.bearing = angle - (here.facing or 0)
@@ -828,8 +829,10 @@ local function ForgetMobs(now)
 	end
 end
 
--- The mobs fought (in your picture or a friend's): not dead, not players, the target, attacking or
--- in combat; the target first, then the ones attacking, then the nearest. Into list, at most max.
+-- The mobs fought (in your picture or a friend's): not dead, not players, fighting them (on whose
+-- threat list they are, or attacking them) or their target; the target first, then the ones
+-- attacking, then the nearest. Not every mob in combat: those may fight someone else. Into list,
+-- at most max.
 local function FoeFirst(a, b)
 	local at, bt = a.target and true or false, b.target and true or false
 	if at ~= bt then
@@ -845,7 +848,7 @@ end
 function S.Foes(mobs, list, max)
 	wipe(list)
 	for _, mob in ipairs(mobs) do
-		if not mob.dead and not mob.player and not mob.friendly and (mob.target or mob.attacking or mob.combat) then
+		if not mob.dead and not mob.player and not mob.friendly and (mob.target or mob.engaged) then
 			list[#list + 1] = mob
 		end
 	end
@@ -932,7 +935,7 @@ local function Group(n)
 		mob.dead = Value("UnitIsDeadOrGhost", unit) == true
 		mob.combat = Value("UnitAffectingCombat", unit) == true
 		mob.attacking, mob.target, mob.soft, mob.onScreen = false, false, false, nil
-		mob.unit, mob.creature, mob.health = unit, nil, nil
+		mob.unit, mob.creature, mob.health, mob.engaged = unit, nil, nil, false
 		local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
 		mob.casting = ok and not issecret(castName) and castName or nil
 		mob.castID = mob.casting and not issecret(castID) and castID or nil
@@ -964,6 +967,8 @@ local function Fill(n, unit, unitTarget, targetKey, onScreen, now, friendly)
 	mob.unit = unit -- (your window: its real health, its model)
 	mob.creature = not mob.player and CreatureOf(mob.key) or nil
 	mob.health = not mob.player and MobHealth(mob, now) or nil
+	-- Fighting you: you're on its threat list (hidden where the game restricts it), or it attacks you.
+	mob.engaged = not friendly and (type(Value("UnitThreatSituation", "player", unit)) == "number" or mob.attacking) or false
 	local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
 	if not ok or issecret(castName) or not castName then
 		local okChannel, channelName, _, _, _, _, _, _, channelID = pcall(UnitChannelInfo, unit)

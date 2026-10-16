@@ -596,7 +596,7 @@ members always named. The bottom line counts enemies only. Over the network: fla
 `f` (friendly), `g` (group: exact) and `O2;u;<id>;<level>;<classFile>;<name>` instead of the
 mob's `n`: builds before it ignore `u` and show such a player as an unnamed mob.
 
-**The window** (StreamView.lua; 250 x 420 at scale 1): the map under a radar, north up, to scale
+**The window** (StreamView.lua; 250 x 432 at scale 1): the map under a radar, north up, to scale
 (2.55 px per yard for rings, dots and map): the minimap's own terrain tiles where
 `Data/MinimapTiles.lua` has them (`world/minimaps/<continent>/mapX_Y.blp`, 256 px for 533.33 yd,
 X = floor(32 - west / 533.33), Y = floor(32 - north / 533.33), the 3 x 3 around; `node
@@ -619,10 +619,15 @@ in its quality's colour (3.5 s; an item the client doesn't know yet is asked for
 item"). At most 10 at once; another of the same kind within 0.45 s starts lower. Under the radar: the spell being cast with its bar, the
 last spells fading over 12 s. Bottom: "2 on Anna · 5 near · X casts Y"; a friend's stream with no
 frame for 6 s says "Waiting for Anna's stream...". Under the spells, **the foes**: up to five mobs
-fought (`S.Foes`: not dead, not players, the target, attacking or in combat; the target first,
-then the ones attacking, then the nearest), each a still model (`PlayerModel:SetCreature` with the
-creature ID from the GUID, `SetPortraitZoom(1)`, paused once loaded; checked in game: a creature
-the client never saw loads too) with a gold edge for the target and a health bar under it. In your
+fighting them or their target (`S.Foes`: not dead, not players; `mob.engaged`: they're on its
+threat list, `UnitThreatSituation("player", unit)` not nil, or it attacks them; flag `h`, and from
+builds before it "attacking"; a mob merely in combat may fight someone else and isn't shown; the
+target first, then the ones attacking, then the nearest), each the whole mob, still
+(`PlayerModel:SetCreature` with the creature ID from the GUID, portrait zoom 0, turned 0.45 rad,
+`RefreshCamera` and paused once loaded; 40 x 50 px; checked in game: a creature the client never
+saw loads too). A model's camera is set for the size it loaded at (smaller, the window showed an
+empty box): it loads again when the slot's effective scale changes (the grip, the UI scale) and
+when the window opens. A gold edge for the target, a health bar under it. In your
 own window the bar is the real health: `UnitHealthMax` / `UnitHealth` of the mob's unit go
 straight into `StatusBar:SetMinMaxValues` / `SetValue`, which take hidden values (AllowedWhenTainted;
 the unit checked against the GUID first). In a friend's: their estimate; not known: "?" (the hover
@@ -649,7 +654,8 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   cast spellID,elapsed,total (tenths)[,c];recent spellID,seconds ago/...;mobs`, mobs
   `id,degrees from north,yards,sure 0-9,flags[,cast spellID]/...` (flags: a attacking them, c in
   combat, t their target, d dead, e elite, x rare elite, r rare, m off their screen, b beyond (yards =
-  the range it's beyond), s casting). Mobs that matter first (target, attacking, in combat,
+  the range it's beyond), s casting, h fighting them: they're on its threat list or it attacks
+  them; builds before it ignore the letter). Mobs that matter first (target, attacking, in combat,
   nearest) until 245 bytes; the message stays under 255. First among the mobs, always:
   `v<health percent, empty if unknown>` (estimated; unknown: then `,?m` the maximum is hidden
   there, `,?w` no checkpoint yet; 0.5.0-116 ignores those), then the moments of the last 2.5 s,

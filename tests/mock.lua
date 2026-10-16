@@ -90,7 +90,7 @@ function FrameMethods:GetObjectType() return "Frame" end
 -- positioning / dragging (bags)
 function FrameMethods:SetScale(s) self._scale = s end
 function FrameMethods:GetScale() return self._scale or 1 end
-function FrameMethods:GetEffectiveScale() return self._scale or 1 end
+function FrameMethods:GetEffectiveScale() return (self._scale or 1) * (self._parent and self._parent.GetEffectiveScale and self._parent:GetEffectiveScale() or 1) end
 function FrameMethods:ClearAllPoints() self._points = {} end
 function FrameMethods:SetPoint(...) self._points = self._points or {}; self._points[#self._points + 1] = { ... } end
 function FrameMethods:GetPoint(i) local p = (self._points or {})[i or 1]; if p then return unpack(p) end end
@@ -162,10 +162,11 @@ function FrameMethods:SetAllPoints(rel) self._points = { { "TOPLEFT", rel }, { "
 -- PlayerModel
 function FrameMethods:SetUnit(unit) self._unit = unit end
 function FrameMethods:SetFacing(f) self._facing = f end
-function FrameMethods:SetCreature(id) self._creature = id end
+function FrameMethods:SetCreature(id) self._creature, self._loads = id, (self._loads or 0) + 1 end
 function FrameMethods:ClearModel() self._creature = nil end
 function FrameMethods:SetPortraitZoom(z) self._zoom = z end
 function FrameMethods:SetPaused(p) self._paused = p end
+function FrameMethods:RefreshCamera() self._cameraRefreshed = (self._cameraRefreshed or 0) + 1 end
 function FrameMethods:SetToplevel() end
 -- Buttons and edit boxes
 function FrameMethods:SetText(text)

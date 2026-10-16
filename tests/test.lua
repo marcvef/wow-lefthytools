@@ -3616,10 +3616,17 @@ do
 			and slots[3]:IsShown() and slots[3].Unknown:IsShown() and not (slots[4] and slots[4]:IsShown())
 			and slots[1].Bar._value > 0.8 and slots[1].Bar._value < 1,
 			"under her spells, the three she fights: her target first (gold), still models, health (the mage's not known)")
+		local loads = slots[1].Model._loads
+		win:SetScale(0.5)
+		Advance(0.6)
+		check(slots[1].Model._loads == loads + 1 and math.abs(slots[1].scale - slots[1]:GetEffectiveScale()) < 0.001,
+			"the window smaller: the models load again (their camera fits the new size)")
+		win:SetScale(0.8)
+		Advance(0.6)
 	end
 	check(leader.Target:IsShown() and leader.Name:GetText() == "Bandit leader 16", "her target: a white ring, named with its level")
 	check(win.Status:GetText():find("on Anna", 1, true) and win.Status:GetText():find("near", 1, true), "the bottom line: how many on her, how many near")
-	Advance(12)
+	Advance(10.8) -- (12 s after the mobs moved: 1.2 of them went to the size check)
 	local bandit = dot("Bandit")
 	check(bandit and bandit.Skull:IsShown() and not bandit.Body:IsShown(), "a mob that dies: a skull ...")
 	check(floatWith("+87 XP") and win.Kills:GetText() == "1 kill", "her kill: its XP floats up, 1 kill")
@@ -3963,9 +3970,18 @@ do
 		wolf.combat, wolf.attacking, MOBS.target, STATE.target = true, true, wolf, true
 		Advance(0.6)
 		local slot = win.Foes.slots[1]
-		check(slot and slot:IsShown() and slot.Model._creature == 299 and slot.Model._zoom == 1 and slot.Ring:IsShown()
-			and slot.real and slot.Bar._max == SECRET and slot.Bar._value == SECRET and not slot.Unknown:IsShown(),
-			"fought: its model (creature 299), gold as my target, its real health (hidden, straight into the bar)")
+		check(slot and slot:IsShown() and slot.Model._creature == 299 and slot.Model._zoom == 0 and slot.Model._facing == 0.45
+			and slot.Ring:IsShown() and slot.real and slot.Bar._max == SECRET and slot.Bar._value == SECRET and not slot.Unknown:IsShown(),
+			"fought: its whole model (creature 299, turned a little), gold as my target, its real health (hidden, straight into the bar)")
+		local busy = { name = "Busy Wolf", level = 3, guid = "Creature-0-1-0-1-299-0000000D", combat = true, yards = 12, x = 0.45, y = 0.5 }
+		MOBS.nameplate6 = busy
+		Advance(0.6)
+		check(not (win.Foes.slots[2] and win.Foes.slots[2]:IsShown()), "a mob in combat with someone else: not in the row")
+		THREAT.nameplate6 = 1
+		Advance(0.6)
+		check(win.Foes.slots[2] and win.Foes.slots[2]:IsShown() and win.Foes.slots[2].mob.name == "Busy Wolf"
+			and win.Foes.slots[1].mob.name == "Young Wolf", "I'm on its threat list: in the row, after my target")
+		MOBS.nameplate6, THREAT.nameplate6 = nil, nil
 		Fire("UNIT_COMBAT", "nameplate5", "WOUND", "", 60, 1)
 		Fire("UNIT_COMBAT", "target", "WOUND", "", 60, 1) -- (the same hit, for my target)
 		Advance(0.3)
@@ -4154,6 +4170,7 @@ do
 			x = 0.25, y = 0.6, guid = "Creature-0-1-0-1-589-0000000C" },
 	}
 	LefthyToolsDB.streamMobHealth["589:16"] = { 800, 2 } -- (its kind learned before)
+	THREAT.nameplate2 = 1 -- (the pillager fights me: I'm on its threat list)
 	mark = #GAMEDATA + 1
 	anna("O2;w;1")
 	Advance(0.1)
@@ -4185,8 +4202,9 @@ do
 	local back = dot("Defias Pillager", 11)
 	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown()
 		and fwin.HealthText:GetText() == ("~%d%%"):format(math.floor(tonumber(vitals:match("^v(%d+)")) / 5 + 0.5) * 5)
-		and floatWith("-40", fwin) and back.mob.creature == 589 and back.mob.health == 1,
+		and floatWith("-40", fwin) and back.mob.creature == 589 and back.mob.health == 1 and back.mob.engaged,
 		"what I send is what she sees: my mobs, named, the spell named in her client's language, my health, my hit, my foe")
+	THREAT.nameplate2 = nil
 	anna("O2;w;1")
 	MOBS = {}
 	Advance(9) -- (the remembered ones fade first)

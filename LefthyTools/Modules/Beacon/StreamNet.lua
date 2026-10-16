@@ -23,7 +23,8 @@ local S = B.Stream
 --                         from north; flags: a attacking me, c in combat, t my target, d dead,
 --                         e elite, x rare elite, r rare, m off my screen, b beyond: yards is the
 --                         longest range it's beyond, s casting, p a player, f friendly, g in my
---                         group: placed exactly). As many as fit, the ones that matter first.
+--                         group: placed exactly, h fighting me: I'm on its threat list or it
+--                         attacks me). As many as fit, the ones that matter first.
 --                         First among them: v<my health, percent; empty if unknown, then ",?m"
 --                         (my maximum is hidden here) or ",?w" (no checkpoint yet)> (estimated:
 --                         StreamSense.lua), then what just happened to me,
@@ -317,7 +318,7 @@ local function Encode(picture, now)
 			local flags = (mob.attacking and "a" or "") .. (mob.combat and "c" or "") .. (mob.target and "t" or "")
 				.. (mob.dead and "d" or "") .. (FLAG_CLASS[mob.class] or "") .. (mob.remembered and "m" or "")
 				.. (mob.beyond and "b" or "") .. (mob.casting and "s" or "") .. (mob.player and "p" or "")
-				.. (mob.friendly and "f" or "") .. (mob.group and "g" or "")
+				.. (mob.friendly and "f" or "") .. (mob.group and "g" or "") .. (mob.engaged and "h" or "")
 			local yards = mob.beyond or mob.yards
 			local entry = ("%d,%d,%s,%d,%s"):format(id, Deg(mob.bearing),
 				yards and Int(math.min(yards, 999)) or "", math.floor(math.max(0, math.min(1, mob.sure or 1)) * 9 + 0.5), flags)
@@ -694,6 +695,7 @@ local function Decode(stream, picture)
 			mob.player = flags:find("p", 1, true) ~= nil
 			mob.friendly = flags:find("f", 1, true) ~= nil
 			mob.group = flags:find("g", 1, true) ~= nil
+			mob.engaged = flags:find("h", 1, true) ~= nil or mob.attacking -- (builds before "h": attacking them)
 			mob.classFile = name and name.classFile
 			mob.creature = name and name.creature
 			mob.health = picture.foeHealth[id] -- (the "v" entry comes first)

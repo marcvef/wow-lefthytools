@@ -28,7 +28,7 @@ local S = B.Stream
 -- they don't pause), stacked from the top left. Cost: an OnUpdate per open window (dots and map
 -- glide), nothing when none is open.
 
-local WIDTH, HEIGHT, RADAR = 250, 420, 220
+local WIDTH, HEIGHT, RADAR = 250, 432, 220
 local OUTER_YARDS = S.OUTER_YARDS
 local RINGS = { 40, 30, 20, 10 }
 local MAX_DOTS = S.MAX_MOBS
@@ -56,7 +56,9 @@ local LOOT_TIME = 3.5
 local SEEN_FOR = 6         -- seconds a moment's number counts as shown (they come round: 1-99)
 local HURT_COLOR, HEAL_COLOR, AVOID_COLOR, XP_COLOR = { 1, 0.3, 0.25 }, { 0.35, 1, 0.4 }, { 0.9, 0.9, 0.9 }, { 0.75, 0.6, 1 }
 local FOES = 5             -- the mobs fought, in the row under the spells
-local FOE_SIZE = 38        -- a foe's model (its portrait), px
+local FOE_W, FOE_H = 40, 50 -- a foe's model (the whole mob), px
+local FOE_GAP = ((WIDTH - 24) - FOES * (FOE_W + 2)) / (FOES - 1)
+local FOE_FACING = 0.45    -- turned a little (radians): not straight at you
 local BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 local PREVIEW_FRIEND, PREVIEW_CLASS = "Anna", "MAGE"
 local Value, issecret = S.Value, S.issecret
@@ -759,25 +761,32 @@ local function FoeOnEnter(slot)
 	GameTooltip:Show()
 end
 
+-- Loaded: the camera fits the model to the frame as big as it is now, turned a little, still.
+local function FoeLoaded(model)
+	model:RefreshCamera()
+	model:SetFacing(FOE_FACING)
+	model:SetPaused(true)
+end
+
 local function NewFoe(row)
 	local slot = CreateFrame("Frame", nil, row)
-	slot:SetSize(FOE_SIZE + 2, FOE_SIZE + 8)
+	slot:SetSize(FOE_W + 2, FOE_H + 8)
 	slot.Ring = slot:CreateTexture(nil, "BACKGROUND", nil, -1) -- (gold: their target)
 	slot.Ring:SetPoint("TOPLEFT")
-	slot.Ring:SetSize(FOE_SIZE + 2, FOE_SIZE + 2)
+	slot.Ring:SetSize(FOE_W + 2, FOE_H + 2)
 	slot.Ring:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.8)
 	slot.Back = slot:CreateTexture(nil, "BACKGROUND")
 	slot.Back:SetPoint("TOPLEFT", 1, -1)
-	slot.Back:SetSize(FOE_SIZE, FOE_SIZE)
+	slot.Back:SetSize(FOE_W, FOE_H)
 	slot.Back:SetColorTexture(0, 0, 0, 0.55)
 	slot.Model = CreateFrame("PlayerModel", nil, slot)
 	slot.Model:SetPoint("TOPLEFT", 1, -1)
-	slot.Model:SetSize(FOE_SIZE, FOE_SIZE)
-	slot.Model:SetPortraitZoom(1)
-	slot.Model:SetScript("OnModelLoaded", function(self) self:SetPaused(true) end) -- (still)
+	slot.Model:SetSize(FOE_W, FOE_H)
+	slot.Model:SetPortraitZoom(0) -- (the whole mob, not its portrait)
+	slot.Model:SetScript("OnModelLoaded", FoeLoaded)
 	slot.BarBack = slot:CreateTexture(nil, "BORDER")
 	slot.BarBack:SetPoint("TOPLEFT", slot.Back, "BOTTOMLEFT", 0, -2)
-	slot.BarBack:SetSize(FOE_SIZE, 4)
+	slot.BarBack:SetSize(FOE_W, 4)
 	slot.BarBack:SetColorTexture(1, 1, 1, 0.15)
 	slot.Bar = CreateFrame("StatusBar", nil, slot)
 	slot.Bar:SetAllPoints(slot.BarBack)
@@ -795,8 +804,10 @@ local function NewFoe(row)
 	return slot
 end
 
--- The row: the mobs fought (S.Foes: the target first, then the ones attacking, the nearest), left
--- to right. A model only loads when its creature changes.
+-- The row: the mobs fought (S.Foes: fighting them or their target; the target first, then the
+-- ones attacking, the nearest), left to right. A model loads when its creature changes, and again
+-- when the window's size does (a model's camera is set for the size it loaded at: smaller, it
+-- showed nothing).
 local foeList = {}
 local function ShowFoes(view)
 	local row, picture = view.win.Foes, view.picture
@@ -808,12 +819,14 @@ local function ShowFoes(view)
 			local slot = row.slots[shown] or NewFoe(row)
 			row.slots[shown] = slot
 			slot:ClearAllPoints()
-			slot:SetPoint("TOPLEFT", row, "TOPLEFT", (shown - 1) * (FOE_SIZE + 8), 0)
+			slot:SetPoint("TOPLEFT", row, "TOPLEFT", (shown - 1) * (FOE_W + 2 + FOE_GAP), 0)
 			slot.mob = mob
-			if slot.creature ~= mob.creature then
-				slot.creature = mob.creature
+			local scale = slot:GetEffectiveScale()
+			if slot.creature ~= mob.creature or not slot.scale or math.abs(slot.scale - scale) > 0.001 then
+				slot.creature, slot.scale = mob.creature, scale
 				slot.Model:ClearModel()
 				slot.Model:SetCreature(mob.creature)
+				slot.Model:SetFacing(FOE_FACING)
 			end
 			slot.Ring:SetShown(mob.target and true or false)
 			local unit = view.kind == "me" and mob.unit
@@ -892,7 +905,7 @@ end
 local function PreviewMob(n, key, name, level, class, creature)
 	local mob = previewMobs[n] or {}
 	previewMobs[n] = mob
-	mob.key, mob.name, mob.level, mob.class, mob.creature, mob.health = key, name, level, class, creature, nil
+	mob.key, mob.name, mob.level, mob.class, mob.creature, mob.health, mob.engaged = key, name, level, class, creature, nil, false
 	mob.dead, mob.combat, mob.attacking, mob.casting, mob.target, mob.sure = false, false, false, nil, false, 1
 	mob.player, mob.classFile, mob.friendly, mob.group, mob.exact = false, nil, false, false, nil
 	return mob
@@ -910,7 +923,7 @@ local function FeedPreview(view)
 	-- (Their models: Hogger, a Defias Bandit, a Defias Rogue Wizard, a Riverpaw Gnoll, Thuros
 	-- Lightfingers. Health: the leader's goes down, the bandit's faster, the mage's isn't known.)
 	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite", 448)
-	leader.combat, leader.attacking, leader.target = t > 2, t > 2, true
+	leader.combat, leader.attacking, leader.target, leader.engaged = t > 2, t > 2, true, t > 2
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
 	leader.casting = (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
 	leader.health = math.max(0.1, 1 - math.max(0, t - 2) / 24)
@@ -918,13 +931,13 @@ local function FeedPreview(view)
 	if t < 18 then
 		local bandit = PreviewMob(2, "bandit", L["Bandit"], 15, "normal", 116)
 		bandit.dead = t >= 14
-		bandit.combat, bandit.attacking = not bandit.dead, not bandit.dead
+		bandit.combat, bandit.attacking, bandit.engaged = not bandit.dead, not bandit.dead, not bandit.dead
 		bandit.yards, bandit.bearing = 5 + math.sin(t * 1.3), 0.35 + 0.15 * math.sin(t * 0.8)
 		bandit.health = bandit.dead and 0 or math.max(0.05, 1 - math.max(0, t - 2) / 12)
 		mobs[#mobs + 1] = bandit
 	end
 	local mage = PreviewMob(3, "mage", L["Bandit mage"], 15, "normal", 474)
-	mage.combat, mage.yards, mage.bearing = true, 24, 1.1 + 0.03 * t
+	mage.combat, mage.engaged, mage.yards, mage.bearing = true, true, 24, 1.1 + 0.03 * t -- (casting at her)
 	mage.casting = (t % 6 < 2) and L["Frostbolt"] or nil
 	mobs[#mobs + 1] = mage
 	local gnoll = PreviewMob(4, "gnoll", L["Gnoll"], 14, "normal", 117)
@@ -1318,7 +1331,7 @@ local function Build(view, name, parent)
 
 	-- The foes (ShowFoes): a still model and a health bar each, under the spells.
 	win.Foes = CreateFrame("Frame", nil, win)
-	win.Foes:SetSize(WIDTH - 24, FOE_SIZE + 8)
+	win.Foes:SetSize(WIDTH - 24, FOE_H + 8)
 	win.Foes:SetPoint("TOP", act, "BOTTOM", 0, -6)
 	win.Foes.slots = {}
 
@@ -1362,7 +1375,7 @@ local function Start(view)
 	ReleaseAll(view)
 	ClearFloats(view)
 	for _, slot in ipairs(view.win.Foes.slots) do
-		slot.mob = nil
+		slot.mob, slot.creature = nil, nil -- (loaded anew when shown)
 		slot:Hide()
 	end
 	if view.picture ~= S.Sensed() then -- (the sensor's own picture: friends watching may be getting it)
