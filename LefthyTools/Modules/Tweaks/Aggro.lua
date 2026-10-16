@@ -3,10 +3,10 @@ local L = ns.L
 
 -- Misc Tweaks 5: who has aggro, on enemy nameplates (aggroNameplate).
 --
--- In a group, the left end of each enemy's health bar says whom it's on: ">You<" when it's you,
+-- In a group, the left end of each enemy's health bar says whom it's on: ">YOU<" when it's you,
 -- else the first three letters of their name, in the colour of their role (tank blue, healer
 -- green, damage red; white when it isn't known; a pet tan; someone outside the group grey). Small,
--- on a dark backing so the colour reads on the red bar (the user: "people will mostly look for the
+-- outlined with a shadow so the colour reads on the red bar (no backing: the user) (the user: "people will mostly look for the
 -- color first"). Like the combo dots in the middle of the bar it takes no room: nothing on the
 -- nameplate moves.
 --
@@ -194,7 +194,7 @@ end
 -- Its text and colour.
 local function Look(holder)
 	if holder.you then
-		return L[">You<"], COLORS[holder.role] or COLORS.NONE
+		return L[">YOU<"], COLORS[holder.role] or COLORS.NONE
 	elseif holder.outsider then
 		return Short(holder.name), COLORS.OUTSIDER
 	elseif holder.pet then
@@ -223,11 +223,10 @@ local function TagFor(frame)
 	local tag = tags[frame]
 	if not tag then
 		tag = CreateFrame("Frame", nil, frame)
-		tag.Back = tag:CreateTexture(nil, "BACKGROUND")
-		tag.Back:SetAllPoints()
-		tag.Back:SetColorTexture(0, 0, 0, 0.72)
 		tag.Text = tag:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 		tag.Text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", SIZE, "OUTLINE")
+		tag.Text:SetShadowColor(0, 0, 0, 1) -- (no backing: a thin outline and a shadow keep it readable)
+		tag.Text:SetShadowOffset(1, -1)
 		tag.Text:SetPoint("CENTER", tag, "CENTER", 0, 0)
 		tag:Hide()
 		tags[frame] = tag
@@ -270,7 +269,7 @@ end
 
 -- The examples (/lefthy tweaks aggrotest): each enemy nameplate another one.
 local SAMPLES = {
-	{ nil, "TANK" }, -- (>You<)
+	{ nil, "TANK" }, -- (>YOU<)
 	{ "Annabelle", "HEALER" },
 	{ "Borgar", "DAMAGER" },
 	{ "Cilla", "NONE" },
@@ -281,7 +280,7 @@ local function Sample(unit)
 		return Hide(unit)
 	end
 	local sample = SAMPLES[((tonumber(unit:match("(%d+)$")) or 1) - 1) % #SAMPLES + 1]
-	Show(unit, sample[1] and Short(sample[1]) or L[">You<"], COLORS[sample[2]])
+	Show(unit, sample[1] and Short(sample[1]) or L[">YOU<"], COLORS[sample[2]])
 end
 
 local function Update(unit)

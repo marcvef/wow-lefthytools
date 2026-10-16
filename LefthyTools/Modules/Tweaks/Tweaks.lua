@@ -690,7 +690,7 @@ function M:BuildOptions(o)
 	o:Button(L["Combo dots: preview"], L["Try it"], function() ns.ComboTrial(true) end,
 		L["A small window with a nameplate whose dots count up like your points will; - and + change their size. No mob needed, and the settings can be closed. /lefthy tweaks combopos does the same."])
 	o:Checkbox("aggroNameplate", L["Who has aggro, on enemy nameplates"],
-		L["In a group, the left end of each enemy's health bar says whom it's on: >You< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."])
+		L["In a group, the left end of each enemy's health bar says whom it's on: >YOU< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."])
 	o:Button(L["Start a role check"], L["Start"], function() M:Print(ns.AggroRoleCheck()) end,
 		L["Everyone in your group picks tank, healer or damage in Blizzard's role check window, LefthyTools or not, and the aggro colours follow. Only the group's leader or an assistant can start one. /lefthy tweaks rolecheck does the same."])
 	o:Button(L["Aggro on nameplates: preview"], L["Try it"], function() M:AggroPreview() end,

@@ -6741,8 +6741,8 @@ section("Misc Tweaks: who has aggro, on enemy nameplates")
 	Fire("NAME_PLATE_UNIT_ADDED", "nameplate2")
 	Advance(0.1)
 	local tag = ns.GetAggroTag("nameplate1")
-	check(tagText("nameplate1") == ">You<" and same("nameplate1", 0.35, 0.62, 1) and tag:GetParent() == MOBS.nameplate1.unitFrame
-		and select(1, tag:GetPoint(1)) == "LEFT", "on me: >You< in my role's colour (tank blue), at the left end of its health bar")
+	check(tagText("nameplate1") == ">YOU<" and same("nameplate1", 0.35, 0.62, 1) and tag:GetParent() == MOBS.nameplate1.unitFrame
+		and select(1, tag:GetPoint(1)) == "LEFT", "on me: >YOU< in my role's colour (tank blue), at the left end of its health bar")
 	check(tagText("nameplate2") == "Ölr" and same("nameplate2", 1, 0.32, 0.26),
 		"on a damage dealer: the first three letters of the name (whole letters), red")
 	-- Its target is the healer, but I'm the one tanking it (a spell at her): me.
@@ -6750,7 +6750,7 @@ section("Misc Tweaks: who has aggro, on enemy nameplates")
 	THREATS["party1>nameplate2"], THREATS["party2>nameplate2"], THREAT.nameplate2 = 1, 0, 3
 	Fire("UNIT_TARGET", "nameplate2")
 	Advance(0.1)
-	check(tagText("nameplate2") == ">You<", "its target isn't tanking it (a spell at the healer): whoever is, me")
+	check(tagText("nameplate2") == ">YOU<", "its target isn't tanking it (a spell at the healer): whoever is, me")
 	THREATS["party1>nameplate2"], THREAT.nameplate2 = 3, 1
 	Fire("UNIT_THREAT_LIST_UPDATE", "nameplate2")
 	Advance(0.1)
@@ -6789,7 +6789,7 @@ section("Misc Tweaks: who has aggro, on enemy nameplates")
 	GROUP, STATE.combat = "party", true
 	Fire("PLAYER_REGEN_DISABLED")
 	Advance(0.1)
-	check(tagText("nameplate1") == ">You<", "in a group again: back")
+	check(tagText("nameplate1") == ">YOU<", "in a group again: back")
 	MOBS.nameplate1.attacking, THREAT.nameplate1, THREATS["party2>nameplate1"] = false, 0, 3
 	MOBS.nameplate1.targetGUID = "Player-1-32"
 	Advance(0.6)
@@ -6800,7 +6800,7 @@ section("Misc Tweaks: who has aggro, on enemy nameplates")
 	local pmark = #PRINTED + 1
 	lefthy("tweaks aggrotest")
 	Advance(0.1)
-	check(printedSince(pmark):find("2 enemy nameplate", 1, true) and tagText("nameplate1") == ">You<" and tagText("nameplate2") == "Ann",
+	check(printedSince(pmark):find("2 enemy nameplate", 1, true) and tagText("nameplate1") == ">YOU<" and tagText("nameplate2") == "Ann",
 		"/lefthy tweaks aggrotest: examples on the enemy nameplates in sight")
 	Advance(10.2)
 	check(tagText("nameplate2") == nil, "ten seconds later: the real thing again")
