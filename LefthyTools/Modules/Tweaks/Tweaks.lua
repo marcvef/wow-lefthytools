@@ -665,7 +665,7 @@ function M:BuildOptions(o)
 	o:Checkbox("comboColors", L["Colour combo points by count"],
 		L["Blizzard's combo points on the personal resource display (and the dots on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."])
 	o:Checkbox("comboNameplate", L["Combo points on your target's nameplate"],
-		L["Small dots set into the bottom edge of your target's health bar, one for each combo point you can have: lit ones in the colour of your points, the rest dark. Only while you have points on it. They take no room of their own, so nothing else on the nameplate moves. Rogues, and druids in Cat Form."])
+		L["Small dots in the middle of your target's health bar, one for each combo point you can have: lit ones in the colour of your points, the rest dark. Only while you have points on it. They take no room of their own, so nothing else on the nameplate moves. Rogues, and druids in Cat Form."])
 	local function Pixels(v) return ("%d px"):format(math.floor((tonumber(v) or 0) + 0.5)) end
 	o:Slider("comboDotSize", L["Combo dots: size"],
 		L["Each dot's size in pixels. While you move the slider, they show on your target's nameplate for a few seconds."],

@@ -919,7 +919,7 @@ do
 	lefthy("tweaks combocolors on"); Advance(0.05)
 	check(points[1].IconUncharged.desaturated and near(points[1].LefthyToolsBoost, 0.15, 1, 0.15), "on again: 1 point, green")
 
-	-- Dots in my target's health bar, along its bottom edge: one per point the bar can hold, the lit ones
+	-- Dots in the middle of my target's health bar: one per point the bar can hold, the lit ones
 	-- coloured by count, the rest dark sockets; each on a dark ring.
 	MOBS.target = { name = "Hogger", level = 11, x = 0.5, y = 0.5 }
 	COMBO.points = 3
@@ -940,9 +940,17 @@ do
 			and (a == nil or math.abs((c[4] or 1) - a) < 0.01)
 	end
 	local point = row and row._points[#row._points]
-	check(row and row:IsShown() and row:GetParent() == plate and point[1] == "BOTTOM" and point[2] == plate.HealthBarsContainer
-		and point[3] == "BOTTOM" and point[5] == 1 and row.count == 5 and lit() == 3,
-		"3 points: five dots inside my target's health bar, along its bottom edge, three lit")
+	check(row and row:IsShown() and row:GetParent() == plate and point[1] == "CENTER" and point[2] == plate.HealthBarsContainer
+		and point[3] == "CENTER" and point[4] == 0 and point[5] == 0 and row.count == 5 and lit() == 3,
+		"3 points: five dots in the middle of my target's health bar, three lit")
+	plate.HealthBarsContainer.healthBar = CreateFrame("StatusBar", nil, plate.HealthBarsContainer)
+	T("comboDotSize"):SetValue(10)
+	Advance(0.05)
+	point = row._points[#row._points]
+	check(point[1] == "CENTER" and point[2] == plate.HealthBarsContainer.healthBar and point[5] == 0 and row:GetHeight() == 10,
+		"bigger dots: still centred, on the health bar itself (its container can be taller)")
+	T("comboDotSize"):SetValue(6)
+	Advance(0.05)
 	check(colour(row.dots[1].Fill, 1, 0.9, 0) and colour(row.dots[3].Fill, 1, 0.9, 0) and colour(row.dots[4].Fill, 0.22, 0.22, 0.22, 0.75)
 		and colour(row.dots[1].Ring, 0, 0, 0, 0.85), "lit ones yellow (3 of 5), the others dark sockets, each on a dark ring")
 	local _, _, _, ringX = row.dots[2].Ring:GetPoint(1)

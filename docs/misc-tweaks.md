@@ -85,10 +85,11 @@ display (the old `comboPoints` tweak) is gone; its saved value is simply no long
   each update (its gain and spend animations are shorter); glows, burst and slash switch to ADD
   while tinted; the plain gem and the lit socket get their tint lifted 25% towards white. At 0
   points the colour stays for the burst. Off: Blizzard's colours and blending back.
-- **Nameplate dots** (`comboNameplate`, on): small round dots set into the bottom edge of the
-  target's health bar (`healthBar`, else `HealthBarsContainer`; the row's BOTTOM 1 px above the
-  bar's), one per point the bar can hold (`UnitPowerMax` for combo points, 5 if unknown or secret),
-  centred. Lit ones in the count's colour (colouring off: Blizzard's red), the rest dark sockets
+- **Nameplate dots** (`comboNameplate`, on): small round dots in the middle of the target's health
+  bar (the bar itself: `healthBar`, else `HealthBarsContainer.healthBar`, else the container, whose
+  height can differ; the row's CENTER on the bar's, so any dot size stays centred; it sat on the
+  bottom edge at first, the user wanted it centred), one per point the bar can hold (`UnitPowerMax`
+  for combo points, 5 if unknown or secret), centred horizontally too. Lit ones in the count's colour (colouring off: Blizzard's red), the rest dark sockets
   (grey 0.22 at 75%); each sits on a black ring (85%) a pixel wider all round, so it reads on a red
   bar too. Round through a mask (`TempPortraitAlphaMask`, like Beacon's map dots). Size: slider
   `comboDotSize` (4-12 px, default 6, the ring included), gap half the size (at least 2 px). They

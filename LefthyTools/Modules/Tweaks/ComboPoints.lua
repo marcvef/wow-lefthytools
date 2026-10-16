@@ -13,8 +13,8 @@ local _, ns = ...
 --     so the tinted parts are desaturated first; a desaturated red gem is dark grey, so tinting
 --     alone looked muted: an additive copy of each gem in the same colour (our own texture on the
 --     point, its alpha following Blizzard's gem through the animations) keeps it bright.
---   * Dots on your target's nameplate (comboNameplate): small round dots set into the bottom edge
---     of its health bar, one per point the bar can hold. Lit ones take the colour of the count
+--   * Dots on your target's nameplate (comboNameplate): small round dots in the middle of its
+--     health bar (centred, whatever their size), one per point the bar can hold. Lit ones take the colour of the count
 --     (Blizzard's red with colouring off), the rest are dark, empty sockets; each sits on a dark
 --     ring, so it reads on a red bar too. They take no room of their own: nothing above the bar
 --     (buffs, debuffs) or beside it (the level) is touched. Only while you have points on that
@@ -35,7 +35,6 @@ local GREEN, YELLOW, RED = { 0.15, 1, 0.15 }, { 1, 0.9, 0 }, { 1, 0.1, 0.05 }
 local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local DOT_SIZE = 6   -- default: each dot's size in pixels, its dark ring included (comboDotSize)
 local SIZE_MIN, SIZE_MAX = 4, 12
-local DOT_INSET = 1  -- the dots' bottom, this far above the bar's bottom edge
 local issecret = issecretvalue or function() return false end
 
 local colorByCount = false -- switched by Tweaks.lua (ns.ApplyComboColors), on by default
@@ -271,13 +270,15 @@ local function UpdateDots()
 		return
 	end
 	row = row or NewRow()
-	local bar = plate.healthBar or plate.HealthBarsContainer or plate
+	-- The health bar itself (its container can be taller than the bar).
+	local container = plate.HealthBarsContainer
+	local bar = plate.healthBar or (type(container) == "table" and container.healthBar) or container or plate
 	local ok = pcall(function()
 		if row:GetParent() ~= plate then
 			row:SetParent(plate)
 		end
 		row:ClearAllPoints()
-		row:SetPoint("BOTTOM", bar, "BOTTOM", 0, DOT_INSET) -- inside the bar, along its lower edge
+		row:SetPoint("CENTER", bar, "CENTER", 0, 0) -- in the middle of the bar, whatever their size
 		row:SetFrameLevel(bar:GetFrameLevel() + 10)
 	end)
 	if not ok then
@@ -381,7 +382,7 @@ local function BuildTrial()
 	level:SetPoint("LEFT", trial.Plate, "RIGHT", 4, 0)
 	level:SetText("60")
 	trial.Dots = NewRow(trial.Plate)
-	trial.Dots:SetPoint("BOTTOM", trial.Plate, "BOTTOM", 0, DOT_INSET)
+	trial.Dots:SetPoint("CENTER", trial.Plate, "CENTER", 0, 0)
 	trial.Dots:SetFrameLevel(trial.Plate:GetFrameLevel() + 5)
 	trial.Dots:Show()
 	trial.Values = trial:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
