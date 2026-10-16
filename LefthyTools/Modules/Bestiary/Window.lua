@@ -127,15 +127,30 @@ Bt.KillsLine, Bt.Coins = KillsLine, Coins
 -- A drop: its icon, edged in its quality's colour, how many in the corner, the chance under it
 ---------------------------------------------------------------------------
 
-local function CellOnEnter(cell)
-	GameTooltip:SetOwner(cell, "ANCHOR_RIGHT")
-	if cell.more then -- (the drops that didn't fit)
-		GameTooltip:SetText(L["More drops"], 1, 1, 1)
-		for _, drop in ipairs(cell.more) do
+-- A list of drops in a tooltip: icon, name (a pelt for skinning), chance.
+local function ListDrops(list)
+	for _, drop in ipairs(list) do
+		if drop.group then
+			GameTooltip:AddLine(L["World drops"] .. (" (%d)"):format(#drop.group), 0.7, 0.7, 0.7)
+		else
 			local r, g, b = QualityColor(drop.quality)
 			GameTooltip:AddDoubleLine(("|T%s:14:14|t %s%s"):format(ItemIcon(drop.id), drop.name or ItemName(drop.id),
 				drop.skin and (" |T%s:12:12|t"):format(Bt.SKIN_ICON) or ""), Percent(drop.chance), r, g, b, 1, 1, 1)
 		end
+	end
+end
+
+local function CellOnEnter(cell)
+	GameTooltip:SetOwner(cell, "ANCHOR_RIGHT")
+	if cell.more then -- (the drops that didn't fit)
+		GameTooltip:SetText(L["More drops"], 1, 1, 1)
+		ListDrops(cell.more)
+		GameTooltip:Show()
+		return
+	elseif cell.world then -- (random gear: not this mob's own)
+		GameTooltip:SetText(L["World drops"], 1, 1, 1)
+		GameTooltip:AddLine(L["Random gear that drops from mobs of its level anywhere: not this mob's own."], 0.7, 0.7, 0.7, true)
+		ListDrops(cell.world)
 		GameTooltip:Show()
 		return
 	end
@@ -209,7 +224,7 @@ local function NewCell(parent, size, link)
 end
 
 local function FillCell(cell, drop, kills)
-	cell.drop, cell.more, cell.kills = drop, nil, kills
+	cell.drop, cell.more, cell.world, cell.kills = drop, nil, nil, kills
 	local r, g, b = QualityColor(drop.quality)
 	cell.Edge:SetColorTexture(r, g, b, 0.9)
 	cell.Icon:SetTexture(ItemIcon(drop.id))
@@ -222,9 +237,26 @@ local function FillCell(cell, drop, kills)
 	cell:Show()
 end
 
+-- A mob's world drops in one place: a map, how many, "world" under it; the list in its tooltip.
+local WORLD_ICON = "Interface\\Icons\\INV_Misc_Map_01"
+
+local function FillWorld(cell, entry, kills)
+	cell.drop, cell.more, cell.world, cell.kills = nil, nil, entry.group, kills
+	local r, g, b = QualityColor(entry.quality)
+	cell.Edge:SetColorTexture(r, g, b, 0.9)
+	cell.Icon:SetTexture(WORLD_ICON)
+	cell.Icon:Show()
+	cell.Skin:Hide()
+	cell.Count:SetText(tostring(#entry.group))
+	cell.More:SetText("")
+	cell.Chance:SetText(L["world"])
+	cell.Chance:SetTextColor(0.7, 0.7, 0.7)
+	cell:Show()
+end
+
 -- The last place, when more drops than fit: "+N", the rest in its tooltip.
 local function FillMore(cell, more, kills)
-	cell.drop, cell.more, cell.kills = nil, more, kills
+	cell.drop, cell.more, cell.world, cell.kills = nil, more, nil, kills
 	cell.Edge:SetColorTexture(0.3, 0.3, 0.3, 0.9)
 	cell.Icon:Hide()
 	cell.Skin:Hide()
@@ -246,7 +278,9 @@ local function Lay(grid, cells, drops, kills, size, gap, perRow, maxCells, link)
 			end
 			cell:ClearAllPoints()
 			cell:SetPoint("TOPLEFT", grid, "TOPLEFT", ((i - 1) % perRow) * (size + gap), -math.floor((i - 1) / perRow) * (size + LINE + 4))
-			if i <= fit then
+			if i <= fit and drops[i].group then
+				FillWorld(cell, drops[i], kills)
+			elseif i <= fit then
 				FillCell(cell, drops[i], kills)
 			else
 				local more = {}
@@ -314,6 +348,9 @@ local function OnItemTooltip(tooltip, info)
 	end
 	if #list > TOOLTIP_SOURCES then
 		tooltip:AddLine(L["and %d more (the Bestiary's ledger)"]:format(#list - TOOLTIP_SOURCES), 0.6, 0.6, 0.6)
+	end
+	if Bt.IsWorldDrop(id, list[1].quality) then
+		tooltip:AddLine(L["A world drop: random gear from mobs of its level, anywhere."], 0.6, 0.6, 0.6)
 	end
 end
 

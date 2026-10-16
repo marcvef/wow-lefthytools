@@ -28,6 +28,16 @@ are no skinnings (that listed every drop twice once). Item names are kept as loo
 needs them; a client may not know an item yet). `Bt.Sources(itemID)`: where an item comes from,
 the likeliest first, built over the whole database when first asked after a change.
 
+**World drops** (`Bt.IsWorldDrop`): random green and better gear drops from any mob of about its
+level, so with one mob it says nothing about that mob (the user: a random BoE "forever stuck to that
+mob's loot window"). An item is one when it's gear (`C_Item.GetItemInfoInstant`: class 2 weapon or
+4 armour, worn somewhere) of green or better that doesn't bind on pickup (`GetItemInfo`'s bind type
+1 = a mob's own; not known yet: taken as a world drop), or when it came from 3 or more kinds of mobs
+(`Bt.Sources`). They're still counted per mob, but `Bt.Drops` gathers them in one entry at the end
+(`group`): in the window and the ledger a single place with a map icon, how many and "world"; its
+tooltip explains and lists them with their chances. The ledger's tiny "best drops" leave them out;
+item tooltips add "A world drop: random gear from mobs of its level, anywhere."
+
 **Skinning** is kept apart (`skins`, `skinned`): after Skinning (any rank: by ID or its name) a
 corpse's loot window is what skinning gave, each corpse once (`skinnedCorpse`), also in a group
 (what you skin is yours). It's marked with Skinning's own icon (`Bt.SKIN_ICON`,

@@ -246,7 +246,12 @@ local function FillRow(row, entry)
 		row.Found:Show()
 	else
 		row.Found:Hide()
-		local best = Bt.Drops(mob, M.db.showPoor)
+		local best = {}
+		for _, drop in ipairs(Bt.Drops(mob, M.db.showPoor)) do
+			if not drop.group then -- (its own drops: not the world drops)
+				best[#best + 1] = drop
+			end
+		end
 		table.sort(best, function(a, b)
 			if a.quality ~= b.quality then
 				return a.quality > b.quality

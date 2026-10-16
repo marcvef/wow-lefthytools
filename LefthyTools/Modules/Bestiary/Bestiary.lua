@@ -140,25 +140,63 @@ local function Likelier(a, b)
 	return a.id < b.id
 end
 
+-- World drops: random green and better gear drops from any mob of about its level, so with one mob
+-- it says nothing about that mob (the user: a random BoE "forever stuck to that mob"). An item is
+-- one when it's gear (a weapon or armour that can be worn: GetItemInfoInstant) of green or better
+-- that doesn't bind on pickup (unknown yet: taken as one), or when it came from WORLD_KINDS or more
+-- kinds of mobs. They gather in one place at the end of a mob's drops.
+local WORLD_KINDS = 3
+
+function Bt.IsWorldDrop(id, quality)
+	local list = Bt.Sources(id)
+	if list and #list >= WORLD_KINDS then
+		return true
+	end
+	if (quality or 0) < 2 or not (C_Item and C_Item.GetItemInfoInstant) then
+		return false
+	end
+	local ok, _, _, _, equipLoc, _, classID = pcall(C_Item.GetItemInfoInstant, id)
+	if not ok or (classID ~= 2 and classID ~= 4) or type(equipLoc) ~= "string" or equipLoc == ""
+		or equipLoc == "INVTYPE_NON_EQUIP_IGNORE" then
+		return false
+	end
+	local bind = C_Item.GetItemInfo and select(14, C_Item.GetItemInfo(("item:%d"):format(id)))
+	return bind ~= 1 -- (1: binds on pickup, a mob's own)
+end
+
 -- A kind's drops, the likeliest first (ties: better quality first), then what skinning it gives
--- (skin = true, the chance per skinning): { { id, drops, count, quality, chance, each, skin, name,
--- out (kills or skinnings) }, ... }. Grey ones only with showPoor.
+-- (skin = true, the chance per skinning), then its world drops gathered in one entry ({ group =
+-- the world drops, quality = the best of them }): { { id, drops, count, quality, chance, each,
+-- skin, name, out (kills or skinnings) }, ... }. Grey ones only with showPoor.
 function Bt.Drops(mob, showPoor)
-	local list = {}
+	local list, world = {}, {}
 	for _, skin in ipairs({ false, true }) do
 		local part = {}
 		for id, item in pairs(mob and Bt.Part(mob, skin) or {}) do
 			local quality = item[3] or 1
 			if showPoor or quality ~= 0 then
 				local chance, each = Bt.Chance(mob, item, skin)
-				part[#part + 1] = { id = id, drops = item[1], count = item[2], quality = quality, chance = chance, each = each,
+				local entry = { id = id, drops = item[1], count = item[2], quality = quality, chance = chance, each = each,
 					skin = skin, name = item[4], out = skin and mob.skinned or mob.kills }
+				if not skin and Bt.IsWorldDrop(id, quality) then
+					world[#world + 1] = entry
+				else
+					part[#part + 1] = entry
+				end
 			end
 		end
 		table.sort(part, Likelier)
 		for _, entry in ipairs(part) do
 			list[#list + 1] = entry
 		end
+	end
+	if #world > 0 then
+		table.sort(world, Likelier)
+		local best = 0
+		for _, entry in ipairs(world) do
+			best = math.max(best, entry.quality)
+		end
+		list[#list + 1] = { id = 0, group = world, quality = best, chance = 0, drops = 0, count = #world }
 	end
 	return list
 end
@@ -184,7 +222,7 @@ function Bt.Sources(itemID)
 						local list = sources[id] or {}
 						sources[id] = list
 						list[#list + 1] = { creature = creature, mob = mob, chance = chance, skin = skin,
-							out = skin and mob.skinned or mob.kills }
+							out = skin and mob.skinned or mob.kills, quality = item[3] }
 					end
 				end
 			end

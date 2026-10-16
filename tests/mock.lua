@@ -600,6 +600,11 @@ ITEMS = { [19019] = { name = "Thunderfury", quality = 5 }, [2589] = { name = "Li
 	[6948] = { name = "Hearthstone", quality = 1 }, [1179] = { name = "Ice Cold Milk", quality = 1 },
 	[2075] = { name = "Priest's Mace", quality = 2 }, [1155] = { name = "Rod of the Sleepwalker", quality = 3 } }
 C_Item = {
+	-- (ITEMS[id].classID: 2 weapon, 4 armour; equipLoc: where it's worn)
+	GetItemInfoInstant = function(id)
+		local item = ITEMS[id]
+		if item then return id, "", "", item.equipLoc or "", 1000 + id, item.classID or 0, 0 end
+	end,
 	GetItemQualityByID = function(id) return ITEMS[id] and ITEMS[id].quality end,
 	GetItemIconByID = function(id) return ITEMS[id] and 1000 + id end,
 	GetItemQualityColor = function(q) local hex = ({ [2] = "ff1eff00", [3] = "ff0070dd", [4] = "ffa335ee", [5] = "ffff8000" })[q] or "ffffffff"; return 1, 1, 1, hex end,

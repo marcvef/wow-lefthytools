@@ -6540,6 +6540,30 @@ section("Bestiary: what mobs drop")
 	_, entries = Bt.Ledger()
 	check(ledger:IsShown() and #entries == 1 and ledger.Search:GetText() == "milk", "/bestiary ledger milk: opened on that search")
 	ledger:Hide()
+	-- World drops: random green gear that doesn't bind on pickup drops from mobs anywhere; with a mob
+	-- they gather in one place (the map), and their tooltip says so.
+	ITEMS[15211] = { name = "Militant Shortsword", quality = 2, classID = 2, equipLoc = "INVTYPE_WEAPON", bind = 2 }
+	local lucky = "Creature-0-1-0-1-116-00000040"
+	Fire("PARTY_KILL", "Player-1-0", lucky)
+	LOOT = { { type = 1, id = 15211, source = lucky } }
+	Fire("LOOT_READY", false)
+	Fire("LOOT_CLOSED")
+	LOOT = {}
+	local worldCell
+	for _, c in ipairs(win.cells) do if c:IsShown() and c.world then worldCell = c end end
+	check(worldCell and worldCell.Icon.path == "Interface\\Icons\\INV_Misc_Map_01" and worldCell.Count:GetText() == "1"
+		and worldCell.Chance:GetText() == "world" and not (win.cells[1].drop and win.cells[1].drop.id == 15211),
+		"a random green sword: not among its own drops, in the world drops (a map, 1)")
+	worldCell._scripts.OnEnter(worldCell)
+	check(TOOLTIP.title == "World drops" and tipFind("Militant Shortsword"), "hover: the world drops, with their chances")
+	worldCell._scripts.OnLeave(worldCell)
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:15211")
+	check(tipFind("A world drop: random gear from mobs of its level, anywhere."), "its item tooltip says it's a world drop")
+	-- One that binds on pickup is a mob's own.
+	ITEMS[15212] = { name = "Bandit's Own Blade", quality = 2, classID = 2, equipLoc = "INVTYPE_WEAPON", bind = 1 }
+	check(not Bt.IsWorldDrop(15212, 2) and Bt.IsWorldDrop(15211, 2) and not Bt.IsWorldDrop(2589, 1),
+		"bound on pickup, or not gear: not a world drop")
 	-- Closed and open again: kept for next time.
 	win.Close:Click()
 	check(not win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == false and not button.Open:IsShown(), "the X closes it, kept")
