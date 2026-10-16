@@ -37,6 +37,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Data/ForeverQuests.lua     generated list of those quests (tools/update-forever-quests.ps1)
   Data/FlightPaths.lua       generated length of every flight path (tools/update-flight-paths.ps1)
   Data/ClassSpells.lua       generated trainer spells per class and level (tools/update-class-spells.js)
+  Data/ClassFigures.lua      generated: a figure per class, race and sex (display IDs) for the stream's battle row (tools/update-class-figures.js)
   Data/MinimapTiles.lua      generated minimap tile file IDs (tools/update-minimap-tiles.js)
   Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
@@ -68,6 +69,7 @@ tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.to
 tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
 tools/update-class-spells.js     regenerates Data/ClassSpells.lua from wago.tools (node)
 tools/update-drop-data.js    regenerates LefthyTools_DropData/Drops.lua from a classic world DB dump (node)
+tools/update-class-figures.js regenerates Data/ClassFigures.lua (class trainers from that dump, races from wago.tools)
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
 Update-LefthyTools.cmd       players' one-file installer: batch header + install.ps1 (generated)

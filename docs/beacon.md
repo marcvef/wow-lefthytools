@@ -688,18 +688,19 @@ form's spell ID: SpellShapeshiftForm.CreatureDisplayID of 1.60.1.70425, the taur
 moonkin from classic): no gear, no light. **Weapons** (`SetSheathed`; the user: "when I cast, the
 weapon should be sheathed"): sheathed while they cast and out of a fight, drawn for a swing; a
 caster (mage, priest, warlock) keeps them sheathed and casts their instant spells (53, no lunge).
-Out of a form, a friend elsewhere is **their race's plain model wearing their gear** (`SetDisplayInfo` with the
-race's display, `ChrRaceXChrModel` -> `ChrModel.DisplayID` for every playable race of 1.60.1.70425,
-Skyborne included; `TryOn` of each item ID of their look, `O2;a`) under a light in their class
-colour (`SetLight`: ambient and diffuse in it). Found with a model test in game: a plain race model
-loads but comes out white (the game makes a character's skin from their appearance, which addons
-can't set) while gear tried on shows; so it's shown as meant, a spirit of them. No look yet (an
-older build): a plain human in their class's light. The preview's made-up friend is your race in
-your gear and form. No cloak on it (`NO_CLOAK`: on a plain race model its inside showed red squares,
-in game; skipping it wasn't enough, the cloak came back: the model dresses itself in your own gear,
-so it's `Undress`ed before their look goes on and `UndressSlot(15)` after), and "out of reach" in
-small letters under it, its tooltip saying why (the user's idea).
-The camera just a little back (`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in
+Out of a form, a friend elsewhere is **a figure of their class** (`Data/ClassFigures.lua`,
+`tools/update-class-figures.js`: per class, race and sex the model of an NPC who trains that class;
+which NPCs train which class from the classic world database, the facts only; each model's race and
+sex from the client's CreatureDisplayInfo/CreatureDisplayInfoExtra, wago.tools; their race and sex
+from their look, `O2;a`; none of theirs: the other sex, else another race), textured and dressed,
+shown with `SetDisplayInfo` on a PlayerModel. Found in game: a race's plain model
+(ChrRaceXChrModel -> ChrModel.DisplayID) comes out white (the game makes a character's skin from
+their appearance, which addons can't set) in a default outfit of its own (a staff, a robe, a cloak
+with red squares inside), and gear tried on (`DressUpModel:TryOn`) didn't show at all: what looked
+like gear in the model test was that outfit. So no player's look can be shown from afar; the class
+figure is clean and says the class at a glance (the user chose it). No look yet (an older build): a
+man of their class. The preview's made-up friend is a figure of her class of your race and sex (and
+your form). "out of reach" in small letters under it, its tooltip saying why (the user's idea).The camera just a little back (`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in
 game), further in a form (1.4: a bear didn't fit), turned 0.75 rad towards the foes. Reloaded like the foes (when who it is or the window's size
 changes, retried while nothing's there).
 
@@ -743,11 +744,10 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   that id (ids 1-999 per GUID, reused after 60 s).
 - `O2;c;<id>;<creatureID>` a mob's creature ID (from its GUID), right after its name: the watcher's
   window shows its model. Builds before it ignore the word.
-- `O2;a;<race ID>;<sex 1|2>;<item ID>,...` my look, to a watcher before my first frame and again
-  when my gear changes (read every 10 s while someone watches): race, sex and the items in
-  `S.LOOK_SLOTS` (head, shoulders, shirt, chest, waist, legs, feet, wrists, hands, back, main hand,
-  off hand, ranged, tabard; 0 for nothing). Their battle row shows me as my race wearing them when
-  their client doesn't have my character. Builds before it ignore the word.
+- `O2;a;<race ID>;<sex 1|2>;` my look, to a watcher before my first frame (and again if it changes,
+  read every 10 s while someone watches): race and sex. Their battle row shows a figure of my class of
+  that race and sex when their client doesn't have my character. A list of item IDs after the last
+  `;` (0.5.0-142 to -146 sent my gear) is ignored. Builds before it ignore the word.
 - `O2;v;<percent>` my health, to every friend (see "Health" above).
 
 Spells go as IDs; the watcher's client names them in its own language. Guard: 80 `O` messages per

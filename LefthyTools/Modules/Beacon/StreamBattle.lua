@@ -26,10 +26,11 @@ local S = B.Stream
 -- Their model: you are you (SetUnit, in the form you're in: cat, bear, ...); a friend whose
 -- character your client has (in your group, nearby) is them; a friend elsewhere in a form is that
 -- form's own model (a cat, a bear, a ghost wolf: textured, the tauren ones for tauren); out of one,
--- their race's plain model wearing their gear (O2;a, their look: race, sex, item IDs) under a light
--- in their class colour: the game can't give a plain race model a face or skin (it comes out white,
--- seen in game), so it's shown as meant, a spirit of them. The preview's made-up friend is that
--- too, from your own race and gear. Weapons: sheathed while they cast and out of a fight, drawn
+-- a figure of their class (Data/ClassFigures.lua: an NPC who trains it, of their race and sex when
+-- there is one; O2;a, their look, says race and sex): the game shows nobody as they look from afar
+-- (a plain race model came out white, in its own default outfit, gear tried on didn't show; seen in
+-- game), and "out of reach" under it says so. The preview's made-up friend is that too, of your race
+-- and sex. Weapons: sheathed while they cast and out of a fight, drawn
 -- when they swing (the user: "when I cast, the weapon should be sheathed"); casters (mages,
 -- priests, warlocks) keep them sheathed, their instant spells cast too.
 --
@@ -45,7 +46,7 @@ local FOE_X = ROW_W - FOES * (FOE_W + 2) - (FOES - 1) * FOE_GAP -- where the foe
 local HERO_FACING, FOE_FACING = 0.75, -0.45 -- turned towards each other (radians)
 local HERO_ZOOM = 1.05         -- the camera just a little back (1.4 was too far for a character, in game)
 local FORM_ZOOM = 1.4          -- further for a form (in game a bear didn't fit)
-local NO_CLOAK = 15            -- a cloak tried on a plain race model shows red squares inside (in game): left off
+
 local RETRY, TRIES = 1, 5      -- a model not there yet: asked for again (a creature the client hasn't met)
 local LUNGE = 16               -- px a strike steps forward (a mob's: 60% of it)
 local DIE_TIME = 1.4           -- falling; then lying, fading (a dying mob keeps its place this long and FADE_TIME)
@@ -104,20 +105,32 @@ local FORM_DISPLAY = {
 }
 local TAUREN = { [6] = true, [28] = true }
 
--- Each playable race's plain model: { male, female } (ChrRaceXChrModel -> ChrModel.DisplayID, 1.60.1.70425).
-local RACE_DISPLAY = {
-	[1] = { 57899, 56658 }, [2] = { 51894, 53762 }, [3] = { 49242, 53768 }, [4] = { 54918, 54439 }, [5] = { 54041, 56327 },
-	[6] = { 55077, 56316 }, [7] = { 51877, 53291 }, [8] = { 59071, 59223 }, [9] = { 6894, 6895 }, [10] = { 62127, 62128 },
-	[11] = { 57027, 58232 }, [22] = { 29422, 29423 }, [24] = { 38551, 38552 }, [25] = { 38551, 38552 }, [26] = { 38551, 38552 },
-	[27] = { 75078, 75079 }, [28] = { 75080, 75081 }, [29] = { 75082, 75083 }, [30] = { 75084, 75085 }, [31] = { 79100, 79101 },
-	[32] = { 80387, 80388 }, [34] = { 83910, 83911 }, [35] = { 83913, 83914 }, [36] = { 84558, 84560 }, [37] = { 90786, 90787 },
-	[52] = { 104597, 104597 }, [70] = { 104597, 104597 }, [84] = { 115279, 115281 }, [85] = { 115279, 115281 },
-	[86] = { 116539, 116687 }, [91] = { 116539, 116687 }, [95] = { 139407, 139408 }, [96] = { 139407, 139408 },
-}
--- The slots a look sends, in order (StreamNet.lua): head, shoulders, shirt, chest, waist, legs, feet,
--- wrists, hands, back, main hand, off hand, ranged, tabard.
-S.LOOK_SLOTS = { 1, 3, 4, 5, 6, 7, 8, 9, 10, 15, 16, 17, 18, 19 }
-
+-- A figure of a class (Data/ClassFigures.lua): of their race and sex, else the other sex, else
+-- another race (the first that has one; races in this order), else any.
+local FIGURE_RACES = { 1, 2, 3, 4, 5, 6, 7, 8, 10, 11 }
+local function Figure(classFile, race, sex)
+	local all = ns.CLASS_FIGURES
+	local figures = all and (all[classFile or ""] or all.WARRIOR)
+	if not figures then
+		return nil
+	end
+	local i = sex == 2 and 2 or 1
+	local own = race and figures[race]
+	if own and own[i] > 0 then
+		return own[i]
+	elseif own and own[3 - i] > 0 then
+		return own[3 - i]
+	end
+	for pass = 1, 2 do
+		for _, r in ipairs(FIGURE_RACES) do
+			local f = figures[r]
+			local id = f and f[pass == 1 and i or 3 - i]
+			if id and id > 0 then
+				return id
+			end
+		end
+	end
+end
 local function Call(obj, method, ...)
 	local f = obj and obj[method]
 	if f then
@@ -148,35 +161,11 @@ local function Act(model, anim, length, now)
 	end
 end
 
-local function ClassColor(classFile)
-	local color = classFile and C_ClassColor and C_ClassColor.GetClassColor and C_ClassColor.GetClassColor(classFile)
-	if color then
-		local r, g, b = color:GetRGB()
-		return { r, g, b }
-	end
-	return { 0.6, 0.75, 1 }
-end
-
--- A light in their class colour (the spirit: a plain race model is white).
-local function Tint(model, color)
-	if not (CreateVector3D and CreateColor) then
-		return
-	end
-	local c = CreateColor(color[1], color[2], color[3])
-	Call(model, "SetLight", true, { omnidirectional = false, point = CreateVector3D(-1, 1, -1),
-		ambientIntensity = 0.9, ambientColor = c, diffuseIntensity = 0.8, diffuseColor = c })
-end
-
--- The look of a character this client has (yours: the preview's made-up friend).
+-- Your look (race, sex): what O2;a sends; the preview's made-up friend.
 function S.OwnLook()
 	local _, _, _, race = pcall(UnitRace, "player")
 	local sex = select(2, pcall(UnitSex, "player")) == 3 and 2 or 1
-	local items = {}
-	for i, slot in ipairs(S.LOOK_SLOTS) do
-		local ok, id = pcall(GetInventoryItemID, "player", slot)
-		items[i] = ok and type(id) == "number" and not issecret(id) and id or 0
-	end
-	return { race = tonumber(race), sex = sex, items = items }
+	return { race = tonumber(race), sex = sex }
 end
 
 -- The form you're in (its spell ID; the preview's made-up friend takes it).
@@ -327,28 +316,6 @@ local function HeroLoaded(model)
 	Call(model, "RefreshCamera")
 	Call(model, "SetCamDistanceScale", hero.inForm and FORM_ZOOM or HERO_ZOOM)
 	Call(model, "SetFacing", HERO_FACING)
-	if model == hero.Spirit and hero.look and not hero.inForm then
-		-- Undressed first: the model may dress itself in your own gear (in game the cloak came back
-		-- though it wasn't tried on), then their look, the cloak taken off again, and again a moment
-		-- later (in case the game dresses it after loading).
-		Call(model, "SetAutoDress", false)
-		Call(model, "Undress")
-		for i, item in ipairs(hero.look.items or {}) do
-			if item > 0 and S.LOOK_SLOTS[i] ~= NO_CLOAK then
-				Call(model, "TryOn", "item:" .. item)
-			end
-		end
-		Call(model, "UndressSlot", NO_CLOAK)
-		Tint(model, hero.color)
-		local who = hero.who
-		for _, later in ipairs({ 0.5, 1.5 }) do
-			C_Timer.After(later, function()
-				if hero.who == who and hero.model == model then
-					Call(model, "UndressSlot", NO_CLOAK)
-				end
-			end)
-		end
-	end
 	Call(model, "SetSheathed", hero.sheathed ~= false)
 	model.current = nil
 end
@@ -381,7 +348,7 @@ local function NewHero(row)
 	hero.Back:SetColorTexture(0, 0, 0, 0.55)
 	hero.Real = NewHeroModel(hero)   -- (a character this client has: SetUnit; weapons can be sheathed)
 	hero.Shifted = NewHeroModel(hero, "PlayerModel") -- (the same in a form: a DressUpModel shows the native one, in game)
-	hero.Spirit = NewHeroModel(hero) -- (a race's plain model, their gear, their class's light)
+	hero.Spirit = NewHeroModel(hero, "PlayerModel") -- (out of reach: a figure of their class, or their form)
 	hero.Flash = NewFlash(hero, HERO_W, HERO_H)
 	-- Not their own look (their character isn't on this client): said under them, small.
 	hero.Away = hero:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -395,7 +362,7 @@ local function NewHero(row)
 		if self.Away:IsShown() then
 			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 			GameTooltip:SetText(L["Out of reach"], 1, 1, 1)
-			GameTooltip:AddLine(L["Their character isn't near you, and the game shows nobody's face and skin from afar: this is their race in their gear (in a form, the form), in their class's colour."],
+			GameTooltip:AddLine(L["Their character isn't near you, and the game shows nobody as they look from afar: this is a figure of their class (in a form, the form)."],
 				0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end
@@ -422,7 +389,7 @@ local function HeroSource(view)
 	return nil, view.ownLook, S.OwnForm()
 end
 
-local function LoadHero(hero, unit, look, form, again)
+local function LoadHero(hero, unit, look, form, classFile, again)
 	hero.loaded, hero.loadAt = false, GetTime()
 	hero.tries = again and (hero.tries or 0) + 1 or 0
 	hero.look = look
@@ -440,17 +407,15 @@ local function LoadHero(hero, unit, look, form, again)
 			Call(hero.model, "SetUnit", unit, false, false)
 		end
 	else
-		local display = look and RACE_DISPLAY[look.race]
-		display = display and display[look.sex == 2 and 2 or 1] or RACE_DISPLAY[1][1] -- (no look yet: someone plain)
-		if formDisplay then
-			display = formDisplay[look and TAUREN[look.race] and 2 or 1]
-		end
+		local display = formDisplay and formDisplay[look and TAUREN[look.race] and 2 or 1]
+			or Figure(classFile, look and look.race, look and look.sex) -- (no look yet: a man of their class)
 		hero.model = hero.Spirit
 		hero.Real:Hide()
 		hero.Shifted:Hide()
 		Call(hero.Spirit, "ClearModel")
-		Call(hero.Spirit, "SetAutoDress", false)
-		Call(hero.Spirit, "SetDisplayInfo", display)
+		if display then
+			Call(hero.Spirit, "SetDisplayInfo", display)
+		end
 	end
 	hero.model:Show()
 	hero.model.current = nil
@@ -459,18 +424,18 @@ end
 local function ShowHero(view, now)
 	local hero, picture = view.win.Foes.Hero, view.picture
 	local unit, look, form = HeroSource(view)
-	hero.color = ClassColor(picture.classFile)
-	local who = (unit and ("u:" .. unit) or ("l:" .. (look and look.race or "?") .. ":" .. (look and look.sex or "?") .. ":"
-		.. table.concat(look and look.items or {}, ","))) .. ":f" .. (form or 0) -- (a new form: loaded anew)
+	local classFile = picture.classFile
+	local who = (unit and ("u:" .. unit) or ("l:" .. (look and look.race or "?") .. ":" .. (look and look.sex or "?")
+		.. ":" .. (classFile or "?"))) .. ":f" .. (form or 0) -- (a new form: loaded anew)
 	local scale = hero:GetEffectiveScale()
 	if who ~= hero.who or not hero.scale or math.abs(hero.scale - scale) > 0.001 then
 		hero.who, hero.scale = who, scale
-		LoadHero(hero, unit, look, form)
+		LoadHero(hero, unit, look, form, classFile)
 	elseif not hero.loaded then
 		if Loaded(hero.model) then
 			HeroLoaded(hero.model) -- (OnModelLoaded may not have come)
 		elseif hero.tries < TRIES and now - hero.loadAt >= RETRY then
-			LoadHero(hero, unit, look, form, true)
+			LoadHero(hero, unit, look, form, classFile, true)
 		end
 	end
 end

@@ -3635,10 +3635,10 @@ do
 	do
 		local row = win.Foes
 		local spirit, leaderSlot = row.Hero.Spirit, row.slots[1]
-		check(spirit:IsShown() and not row.Hero.Real:IsShown() and spirit._display == 56658 and spirit._light
-			and spirit._light.ambientColor and spirit._camScale == 1.05 and row.Hero.Away:IsShown()
-			and row.Hero.Away:GetText() == "out of reach", "her model: a race's plain model (yours: a human woman), lit in her class's colour, "
-			.. "the camera just a little back, 'out of reach' under it")
+		check(spirit:IsShown() and not row.Hero.Real:IsShown() and spirit._display == ns.CLASS_FIGURES.MAGE[1][2] and not spirit._light
+			and spirit._camScale == 1.05 and row.Hero.Away:IsShown() and row.Hero.Away:GetText() == "out of reach",
+			"her model: a figure of her class of your race and sex (a human woman who trains mages), the camera just a little back, "
+			.. "'out of reach' under it")
 		check(spirit._anims and spirit._anims[51] and spirit._anims[53] and spirit._anims[9],
 			"she cast (a casting pose, then the cast at her target) and was hit (a flinch)")
 		check(spirit._sheathed == true, "a mage: her weapon stays sheathed")
@@ -4209,7 +4209,8 @@ do
 	check(#sentTo(12, mark, "O2;w;0") == 1, "frames from someone I don't watch (after my /reload, say): told once to stop")
 	-- Her model: no look from her yet, and her character not here: someone plain in her class's light;
 	-- in my group and near (her character loaded here): her own model.
-	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == 57899, "no look yet: someone plain, in her class's light")
+	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == ns.CLASS_FIGURES.MAGE[1][1],
+		"no look yet (race and sex not known): a figure of her class, a man")
 	PARTY.party1 = { name = "Anna", guid = "Player-1-11", visible = true }
 	Advance(0.6)
 	check(fwin.Foes.Hero.Real:IsShown() and fwin.Foes.Hero.Real._unit == "party1" and not fwin.Foes.Hero.Spirit:IsShown(),
@@ -4225,12 +4226,11 @@ do
 		and fwin.Foes.Hero.Shifted._camScale == 1.4 and not fwin.Foes.Hero.Away:IsShown(),
 		"near and in Cat Form: her own model as she is (a PlayerModel shows the form), a little further back")
 	PARTY.party1 = nil
-	anna("O2;a;1;2;1001,0,0,1002,0,0,0,0,0,1003,0,0,0,0") -- (her look: a cloak in it)
+	anna("O2;a;1;2;1001,0,0,1002") -- (her look, with a gear list as dev builds sent it: ignored)
 	anna(herFrame) -- (out of the form)
 	Advance(0.6)
-	check(table.concat(fwin.Foes.Hero.Spirit._tried or {}, " ") == "item:1001 item:1002" and fwin.Foes.Hero.Away:IsShown()
-		and fwin.Foes.Hero.Spirit._undressed and fwin.Foes.Hero.Spirit._undressedSlots[15],
-		"her look, but the cloak (on a plain race model it shows red squares), got " .. table.concat(fwin.Foes.Hero.Spirit._tried or {}, " "))
+	check(fwin.Foes.Hero.Spirit._display == ns.CLASS_FIGURES.MAGE[1][2] and not fwin.Foes.Hero.Spirit._tried and fwin.Foes.Hero.Away:IsShown(),
+		"her look (a human woman): a woman of her race who trains mages, 'out of reach'")
 	-- The ones she fights: their models (creature IDs come with the names) and health (estimated
 	-- on her side; one she hasn't learned yet: "?").
 	anna("O2;n;3;12;Kobold Miner")
@@ -4322,13 +4322,8 @@ do
 	for _, m in ipairs(sentTo(11, mark, "O2;a;")) do anna(m) end
 	anna(frames[#frames])
 	Advance(0.6)
-	do -- (her client doesn't have my character: my race wearing my gear, in my class's light)
-		local spirit = fwin.Foes.Hero.Spirit
-		local worn = 0
-		for _, item in pairs(EQUIPPED) do if item then worn = worn + 1 end end
-		check(spirit:IsShown() and spirit._display == 56658 and #(spirit._tried or {}) == worn and spirit._light,
-			"what she sees of me: a human woman in my gear (" .. worn .. " pieces), in my class's light")
-	end
+	check(fwin.Foes.Hero.Spirit:IsShown() and fwin.Foes.Hero.Spirit._display == ns.CLASS_FIGURES.MAGE[1][2],
+		"what she sees of me (her client doesn't have my character): a figure of the class, of my race and sex")
 	local back = dot("Defias Pillager", 11)
 	check(dot("Defias Thug", 11) and back and back.mob.casting == "Spell 133" and back.mob.level == 16 and back.Ring:IsShown()
 		and fwin.HealthText:GetText() == ("~%d%%"):format(math.floor(tonumber(vitals:match("^v(%d+)")) / 5 + 0.5) * 5)

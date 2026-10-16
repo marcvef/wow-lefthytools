@@ -44,11 +44,12 @@ local S = B.Stream
 --   O2;c;<id>;<creatureID>
 --                       a mob's creature ID (from its GUID), with its name: the watcher's window
 --                       shows its model (SetCreature)
---   O2;a;<race ID>;<sex 1|2>;<item ID>,...
---                       my look, to a watcher before my first frame and again when my gear changes
---                       (looked at every LOOK_GAP seconds): race, sex and what I wear (StreamBattle's
---                       LOOK_SLOTS, 0 for nothing). Their battle row shows me as my race wearing it
---                       when their client doesn't have my character. Older builds ignore the word.
+--   O2;a;<race ID>;<sex 1|2>;
+--                       my look, to a watcher before my first frame (and again if it changes, looked at
+--                       every LOOK_GAP seconds): race and sex. Their battle row shows a figure of my class
+--                       of that race and sex when their client doesn't have my character. A list of item
+--                       IDs after the last ";" (0.5.0-142 to -146 sent my gear) is ignored. Older builds
+--                       ignore the word.
 --   O2;v;<percent>      my health (estimated, StreamSense.lua; in steps of 5, empty: not known or
 --                       not sharing) for every friend, not only watchers: their map tooltip, AFK
 --                       screen and flights show it. When it changes, at most every HEALTH_GAP
@@ -380,7 +381,7 @@ local function LookText(now)
 	if not lookText or now - lookAt >= LOOK_GAP then
 		lookAt = now
 		local look = S.OwnLook()
-		lookText = look.race and ("%d;%d;%s"):format(look.race, look.sex, table.concat(look.items, ",")) or ""
+		lookText = look.race and ("%d;%d;"):format(look.race, look.sex) or ""
 	end
 	return lookText
 end
@@ -515,19 +516,15 @@ function B.ReceiveStream(senderID, word, rest)
 		if not (watching[senderID] and race) then
 			return
 		end
-		local items = {}
-		for item in list:gmatch("%d+") do
-			if #items >= 20 or #item > 7 then
-				return
-			end
-			items[#items + 1] = tonumber(item)
+		if #list > 200 then
+			return
 		end
 		local stream = streams[senderID]
 		if not stream then
 			stream = { names = {}, count = 0 }
 			streams[senderID] = stream
 		end
-		stream.look = { race = tonumber(race), sex = tonumber(sex), items = items }
+		stream.look = { race = tonumber(race), sex = tonumber(sex) } -- (a gear list after it: older dev builds)
 	end
 end
 

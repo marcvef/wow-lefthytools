@@ -23,6 +23,7 @@ Data\Changelog.lua
 Data\ForeverQuests.lua
 Data\FlightPaths.lua
 Data\ClassSpells.lua
+Data\ClassFigures.lua
 Data\MinimapTiles.lua
 Data\RetailUnitFrames.lua
 
