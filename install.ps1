@@ -1,7 +1,8 @@
 # LefthyTools installer and updater for WoW: Forever (Windows).
 #
 # Players: double-click Update-LefthyTools.cmd, a standalone copy of this script (built by
-#   `npm run build-installer`), or paste this into PowerShell:
+#   `npm run build-installer`; it updates itself: a newer one on GitHub runs instead and replaces it),
+#   or paste this into PowerShell:
 #     irm https://raw.githubusercontent.com/marcvef/wow-lefthytools/main/install.ps1 | iex
 #   It downloads the latest LefthyTools from GitHub and installs it into WoW: Forever's AddOns
 #   folder. Run it again any time to update. Settings are kept (they live in the WTF folder).
@@ -229,6 +230,49 @@ param(
 		}
 	}
 
+	# --- A newer installer? ---
+	# Started from Update-LefthyTools.cmd (not from a clone of the repo, and not already the newer one):
+	# when GitHub has a different .cmd, that one runs instead, so nobody needs to be sent a new file
+	# again. This file is replaced with it too (passed on, it's the newest), but only when its batch
+	# header is byte for byte the same: cmd.exe is still reading this file and goes on at the same
+	# place once PowerShell is done. No GitHub: this one carries on.
+	$installer = $env:LEFTHYTOOLS_INSTALLER
+	$fromCmd = $installer -and (Test-Path -LiteralPath $installer -PathType Leaf) -and -not $env:LEFTHYTOOLS_SELF_UPDATED -and -not $Link -and
+		-not ($ScriptRoot -and (Test-Path -LiteralPath (Join-Path $ScriptRoot "$Name\$Name.toc")))
+	if ($fromCmd) {
+		$latest = $null
+		try {
+			$sha = $null
+			try { $sha = (Invoke-RestMethod "https://api.github.com/repos/$Repo/commits/main" -TimeoutSec 20).sha } catch { }
+			$ref = if ($sha) { $sha } else { 'main' }
+			$latest = (Invoke-WebRequest "https://raw.githubusercontent.com/$Repo/$ref/Update-LefthyTools.cmd" -UseBasicParsing -TimeoutSec 30).Content
+			if ($latest -is [byte[]]) { $latest = [Text.Encoding]::UTF8.GetString($latest) }
+		} catch { $latest = $null }
+		$mine = [IO.File]::ReadAllText($installer)
+		if ($latest -is [string] -and $latest.StartsWith('<# : LefthyTools installer') -and $latest -ne $mine) {
+			Write-Host 'There is a newer installer: using it.'
+			$header = $mine.IndexOf("#>`r`n")
+			if ($header -gt 0 -and $latest.Length -gt $header + 4 -and $latest.Substring(0, $header + 4) -eq $mine.Substring(0, $header + 4)) {
+				try {
+					[IO.File]::WriteAllText($installer, $latest, (New-Object Text.UTF8Encoding $false))
+					Write-Host "$(Split-Path $installer -Leaf) is now the newer one too (pass this file on)."
+				} catch {
+					Write-Host "Couldn't update $installer itself; it still works (it uses the newest installer each time)."
+				}
+			}
+			$env:LEFTHYTOOLS_SELF_UPDATED = '1'
+			try {
+				$call = @{}
+				if ($GameDir) { $call.GameDir = $GameDir }
+				if ($Download) { $call.Download = $true }
+				if ($Force) { $call.Force = $true }
+				& ([ScriptBlock]::Create($latest)) @call
+			} finally {
+				Remove-Item Env:\LEFTHYTOOLS_SELF_UPDATED -ErrorAction SilentlyContinue
+			}
+			return
+		}
+	}
 	# --- Where is WoW: Forever? ---
 	$game = $null
 	if ($GameDir) {

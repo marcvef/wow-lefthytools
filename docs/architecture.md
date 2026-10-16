@@ -87,6 +87,16 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
   editing `install.ps1`, run `npm run build-installer`; `npm test` fails while the `.cmd` is out
   of date, and the build fails on non-ASCII text in `install.ps1` (cmd.exe reads the file in the
   console code page). Copies of an older `.cmd` keep working, they only run the code they carry.
+  **It updates itself** (since 0.5.0-136; the user: "I dont want to repeatetly send them new
+  installers"): started from a `.cmd` (`LEFTHYTOOLS_INSTALLER` set, not a clone, not `-Link`), it
+  first fetches the newest `.cmd` (`raw.githubusercontent.com/.../<sha>/Update-LefthyTools.cmd`,
+  the sha from the commits API so no CDN cache is in the way). Different: it runs that one in the
+  same process (`[ScriptBlock]::Create`, the same arguments; `LEFTHYTOOLS_SELF_UPDATED` stops it
+  from doing it again) and writes it over the file, but only when the batch header up to `#>` is
+  the same bytes: cmd.exe re-reads the batch file by offset after PowerShell returns, so a header
+  of another length would make it run garbage. Keep `HEADER` in `tools/build-installer.js` as it
+  is. No GitHub: the local code carries on. Copies from before 0.5.0-136 don't have this and need
+  one new file.
   With no checkout next to the script it downloads the repo:
   `api.github.com/repos/.../commits/main` for the commit, `codeload.github.com/.../zip/<sha>` for
   the files (if the API is unavailable, `zip/refs/heads/main`; git archive stores the commit id

@@ -56,7 +56,9 @@ reads and the default level-up message.
    `/lefthy version` should then show the version the installer printed.
 
 To **update**, double-click it again: it installs the latest version, or tells you that you
-already have it. Your settings are kept. `/lefthy version` shows what you're running, and Beacon
+already have it. Your settings are kept. The file updates itself too: when there's a newer
+installer, it uses that one and replaces itself with it, so the copy you have (and pass on) never
+goes out of date. (Copies from before mid-October 2026 can't do that yet: get the file once more.) `/lefthy version` shows what you're running, and Beacon
 tells you when a friend has a newer one.
 
 Without the file, the same in PowerShell:

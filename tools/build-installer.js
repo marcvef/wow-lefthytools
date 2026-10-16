@@ -2,6 +2,10 @@
 // cmd.exe sees "<# :" as a label and runs only the batch header, which hands the whole file to
 // PowerShell; PowerShell sees "<# ... #>" as a comment and runs the rest, which is install.ps1.
 // install.ps1 stays the source; `npm test` fails if the .cmd is out of date.
+// The .cmd updates itself (install.ps1, "A newer installer?"): a newer one on GitHub runs instead and
+// is written over the old file, but only when the batch header below is the same bytes, since cmd.exe
+// is still reading the file. So leave HEADER as it is: changed, copies out there still run the newest
+// installer, they just aren't replaced with it.
 //   npm run build-installer
 const fs = require("fs");
 const path = require("path");
