@@ -3848,6 +3848,29 @@ do
 		XP.current = xpWas
 		Advance(4)
 	end
+	-- A mob's cast is hidden by the game (all of it, on Forever), but not that it began or ended.
+	do
+		MOBS.nameplate4 = { name = "Kobold Geomancer", level = 12, combat = true, casting = SECRET, yards = 20, x = 0.6, y = 0.5 }
+		Advance(0.6)
+		local geo = dot("Kobold Geomancer")
+		check(geo and not geo.casting and not geo.Glow:IsShown(), "its cast hidden: nothing to tell yet")
+		Fire("UNIT_SPELLCAST_START", "nameplate4", "Cast-7", SECRET)
+		Advance(0.6)
+		check(geo.casting and geo.Glow:IsShown() and geo.mob.casting == "a spell", "it began casting: the purple glow, \"a spell\"")
+		geo._scripts.OnEnter(geo)
+		check(tooltipHas("casting a spell"), "hover: casting a spell")
+		geo._scripts.OnLeave(geo)
+		Fire("UNIT_SPELLCAST_STOP", "nameplate4", "Cast-7", SECRET)
+		Advance(0.6)
+		check(not geo.casting and not geo.Glow:IsShown(), "it stopped: no glow")
+		Fire("UNIT_SPELLCAST_CHANNEL_START", "nameplate4", "Cast-8", SECRET)
+		Advance(0.6)
+		check(geo.casting, "a channel too")
+		Advance(10)
+		check(not geo.casting, "never seen to end: over after 10 s")
+		MOBS.nameplate4 = nil
+		Advance(9)
+	end
 	win.Close:Click()
 	check(not win:IsShown() and not S.SenseRunning(), "closed: the sensor stops")
 

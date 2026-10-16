@@ -251,5 +251,8 @@ ns.CHANGELOG = {
 	{ id = 81, module = "beacon",
 		en = { "Fight stream: hits, heals, XP and loot", "What happens to a friend floats up in their stream: the hits they take in red, heals in green (bigger when big), a dodge or miss, XP rising from the mob that died, and green or better loot with its icon and name. Their kills since you opened the window count at the top right. Your own stream and the demo show it too." },
 		de = { "Kampf-Stream: Treffer, Heilung, EP, Loot", "Was einem Freund passiert, steigt in seinem Stream auf: Treffer, die er abbekommt, in Rot, Heilungen in Grün (größer, wenn sie groß sind), ein Ausweichen oder Verfehlen, EP, die vom gestorbenen Mob aufsteigen, und grüner oder besserer Loot mit Symbol und Namen. Seine Kills, seit du das Fenster geöffnet hast, stehen oben rechts. Dein eigener Stream und die Demo zeigen es auch." } },
+	{ id = 82, module = "beacon",
+		en = { "Fight stream: casting mobs glow again", "Forever hides what a mob casts, which also hid that it was casting: the purple glow on its dot never came. The game still says when a cast begins and ends, so the glow is back, and the tooltip and bottom line say it's casting a spell (which one stays hidden)." },
+		de = { "Kampf-Stream: Zaubernde Mobs leuchten", "Forever verbirgt, was ein Mob zaubert, und damit auch, dass er zaubert: das violette Leuchten an seinem Punkt kam nie. Das Spiel sagt aber noch, wann ein Zauber beginnt und endet, also ist das Leuchten zurück, und Tooltip und unterste Zeile sagen, dass er einen Zauber wirkt (welchen, bleibt verborgen)." } },
 	-- New entries go here, at the end.
 }

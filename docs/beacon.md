@@ -543,7 +543,11 @@ is learned from each full regeneration (what you lacked when the ticks began, ov
 Changes in combat without a hit or heal (drains, some regeneration) aren't seen until the next
 checkpoint. It runs while Beacon is on (`S.LifeStart` / `S.LifeStop`), not only while someone
 watches, so it's known when someone starts. Mob casts, for comparison, are secret through and
-through (name, times, interruptible).
+through (`UnitCastingInfo`: name, times, interruptible; tested on the target), so a mob's cast
+comes from its events instead: `UNIT_SPELLCAST_START` / `CHANNEL_START` of a nameplate or your
+target begin it, `STOP`, `CHANNEL_STOP`, `INTERRUPTED`, `FAILED` end it (10 s at most), kept per
+mob key while the sensor runs; such a mob is casting "a spell" (no spell ID goes out, so a
+friend's client says "a spell" too).
 
 **What happens to you** (StreamSense.lua, `picture.moments`, while the sensor runs): hits and
 heals from `UNIT_COMBAT` (added up per look; big: 15% of the maximum or more), what you avoided

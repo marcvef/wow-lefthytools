@@ -1,5 +1,6 @@
 local _, ns = ...
 local LT = ns.LT
+local L = ns.L
 local B = ns.Beacon
 local S = B.Stream
 
@@ -37,8 +38,9 @@ local S = B.Stream
 -- closely its places point one way is how sure.
 --
 -- Cost: nothing while nobody needs it. Then a look at up to 40 nameplate units every half second
--- (range checks, 48 places each), the cast events of "player", XP, kills and loot. Apart from
--- that, your health is estimated while Beacon is on (a handful of your own events; below).
+-- (range checks, 48 places each), the cast events of "player" and (a word each) of mobs, XP,
+-- kills and loot. Apart from that, your health is estimated while Beacon is on (a handful of your
+-- own events; below).
 
 local Value, issecret = S.Value, S.issecret
 local SPOTS = 48
@@ -676,6 +678,35 @@ end)
 local CAST_EVENTS = { "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP",
 	"UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_STOP" }
 
+-- Mobs casting: the game hides what a mob casts (UnitCastingInfo: name, times, whether it can be
+-- interrupted, all secret on Forever), but not that it began or ended: the cast events of
+-- nameplates and your target, without their spells. Kept per mob while the sensor runs; a cast
+-- not seen to end is over after CAST_LONGEST.
+local CAST_LONGEST = 10
+local MOB_CAST_EVENTS = { "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_STOP",
+	"UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_INTERRUPTED", "UNIT_SPELLCAST_FAILED" }
+local CAST_BEGINS = { UNIT_SPELLCAST_START = true, UNIT_SPELLCAST_CHANNEL_START = true }
+local castingSince = {} -- mob key -> when its cast began
+local mobCasts = CreateFrame("Frame")
+
+mobCasts:SetScript("OnEvent", function(_, event, unit)
+	if type(unit) ~= "string" or issecret(unit) or (unit ~= "target" and unit:sub(1, 9) ~= "nameplate") then
+		return
+	end
+	local key = Value("UnitGUID", unit) or unit -- (as a look keys it)
+	castingSince[key] = CAST_BEGINS[event] and GetTime() or nil
+end)
+
+local function SenseMobCasts(on)
+	mobCasts:UnregisterAllEvents()
+	wipe(castingSince)
+	if on then
+		for _, event in ipairs(MOB_CAST_EVENTS) do
+			mobCasts:RegisterEvent(event)
+		end
+	end
+end
+
 -- Your casts are listened to while the sensor runs or a test does.
 function S.SenseCasts(who, on)
 	castUsers[who] = on or nil
@@ -776,6 +807,10 @@ local function Fill(n, unit, unitTarget, targetKey, onScreen, now, friendly)
 		castName, castID = okChannel and not issecret(channelName) and channelName or nil, channelID
 	end
 	mob.casting, mob.castID = castName, castName and not issecret(castID) and castID or nil
+	local began = not castName and castingSince[mob.key]
+	if began and now - began <= CAST_LONGEST then
+		mob.casting = L["a spell"] -- (what it is, the game hides)
+	end
 	mob.near, mob.far = S.Bounds(unit, checks)
 	mob.yards, mob.beyond = S.YardsFrom(mob.near, mob.far)
 	mob.onScreen, mob.soft = onScreen, Value("UnitIsUnit", unit, "softenemy") == true
@@ -870,11 +905,13 @@ function S.SenseNeed(who, on)
 		picture.cast = nil
 		nextLook = 0
 		SenseMoments(true)
+		SenseMobCasts(true)
 		ticker:Show()
 	elseif not running and wasRunning then
 		ticker:Hide()
 		wipe(clouds)
 		SenseMoments(false)
+		SenseMobCasts(false)
 	end
 	S.SenseCasts("sensor", running)
 	if running then
