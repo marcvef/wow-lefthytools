@@ -38,19 +38,11 @@ local L = ns.L
 -- (the level you were at the kill): a kill at another level starts it again. A kill's worth (its
 -- coin and what its drops sell for at a vendor, Bt.Worth) is worked out when shown, not kept.
 --
--- Beside your own numbers (setting dropData): what a classic world database says each kind of mob
--- can drop (LefthyTools_DropData, a separate add-on: GPL v3 like its source, CMaNGOS Classic DB),
--- loaded when first needed. Forever is classic content (the same mob and item IDs) but may differ, so
--- it's never mixed into your numbers: your drops show its chance beside yours, and what you haven't
--- seen yet shows faded. It also has each kind's health, for Beacon's fight stream (Bt.Health).
---
--- Quest drops: the quest log's item objectives matched by name to what a kind of mob can drop (yours
--- and the database's), so the window and the card can say "Gnoll Paw: 3/8, 40% each, about 12 more
--- kills" while you're on the quest.
---
--- The wish list: items you pin (Alt-click on a drop, /bestiary wish). Mobs that drop one show it with
--- a star; your kills of them are counted from then on, and when it drops a quiet chat line says after
--- how many kills (and how many you'd have expected), and it comes off the list.
+-- The Bestiary's other files, in the order they load: Classic.lua (what a classic drop database says
+-- beside your numbers, and mobs' health for the fight stream), Quests.lua (quest drops), Wishes.lua
+-- (the wish list), Window.lua (the window, the card beside the mouse, item tooltips, the minimap
+-- button) and Ledger.lua (every mob, the search). Each registers the events it handles (Bt.On) and
+-- what it does when the Bestiary is switched on or off or a setting changes (Bt.When).
 
 local M = LT:NewModule("bestiary", {
 	title = "Bestiary",
@@ -136,6 +128,7 @@ local TAP_UNITS = { "target", "mouseover" } -- whose tap a killing blow can be c
 -- quick loot) doesn't matter.
 local NOT_A_KILL = { 8613, 8617, 8618, 10768, 921, 2575, 2576, 3564, 10248, 2366, 2368, 3570, 11993 }
 local SKINNING = { [8613] = true, [8617] = true, [8618] = true, [10768] = true }
+Bt.SKINNING = SKINNING -- (Classic.lua: can you skin?)
 Bt.SKIN_ICON = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" -- (Skinning's own icon)
 Bt.STAR = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1" -- (on your wish list: the raid marker's star)
 
@@ -174,6 +167,11 @@ end
 -- A kind of mob's record (nil: never killed or seen).
 function Bt.Mob(creature)
 	return data and creature and data.mobs[creature]
+end
+
+-- LefthyToolsBestiaryDB (nil before the saved variables are loaded).
+function Bt.Data()
+	return data
 end
 
 local function MobFor(creature)
@@ -276,6 +274,23 @@ Bt.When("disable", function()
 	itemEvents:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
 end)
 
+-- An item's name: as you looted it (item: its entry in a record), else the client's (asked for when
+-- it doesn't know it yet: it redraws when it comes). For quest objectives and the wish list.
+local itemNames = {}    -- item ID -> its name (the client's)
+
+function Bt.ItemNameOf(id, item)
+	local name = item and item[4] or itemNames[id]
+	if name then
+		return name
+	end
+	name = C_Item and Value(C_Item.GetItemInfo, ("item:%d"):format(id))
+	if type(name) == "string" then
+		itemNames[id] = name
+		return name
+	end
+	Bt.AskItem(id)
+end
+
 -- Vendor prices (C_Item.GetItemInfo's sellPrice), read once each; one the client doesn't know yet
 -- counts as nothing until it comes (asked for: Bt.AskItem).
 local prices = {}       -- item ID -> what it sells for, in copper
@@ -338,6 +353,7 @@ function Bt.Spots(mob)
 	return list[1] and list or nil
 end
 
+-- The order drops are listed in: the likeliest first, the better quality first when even.
 local function Likelier(a, b)
 	if a.chance ~= b.chance then
 		return a.chance > b.chance
@@ -346,6 +362,7 @@ local function Likelier(a, b)
 	end
 	return a.id < b.id
 end
+Bt.Likelier = Likelier
 
 -- World drops: random green and better gear drops from any mob of about its level, so with one mob
 -- it says nothing about that mob (the user: a random BoE "forever stuck to that mob"). An item is
@@ -452,220 +469,6 @@ function Bt.Sources(itemID)
 end
 
 ---------------------------------------------------------------------------
--- The classic drop database (LefthyTools_DropData)
----------------------------------------------------------------------------
-
-local DATA_ADDON = "LefthyTools_DropData"
-local known = {}           -- creature ID -> what the database says (false: not in it), read when first asked
-local knownOf              -- the database those were read from (another one: read again)
-local dataTried = false    -- loading it was tried (again after a setting changes)
-local dataWhy              -- why it isn't there (LoadAddOn's reason: "MISSING", "DISABLED", ...)
-
--- The database, loaded the first time it's needed (nil: switched off, not installed or disabled).
-local function DropData()
-	if not (M.db and M.db.dropData) then
-		return nil
-	end
-	if type(LefthyToolsDropData) ~= "table" and not dataTried then
-		dataTried = true
-		local load = C_AddOns and C_AddOns.LoadAddOn or LoadAddOn
-		if load then
-			local ok, loaded, why = pcall(load, DATA_ADDON)
-			dataWhy = not (ok and loaded) and tostring(ok and why or "error") or nil
-		else
-			dataWhy = "no LoadAddOn"
-		end
-	end
-	local db = LefthyToolsDropData
-	return type(db) == "table" and type(db.mobs) == "table" and db or nil
-end
-
--- "<item>:<quality>:<chance in hundredths of a percent>[q],...[;s=<skinning, the same>][;g=<min>-<max>]
--- [;h=<min level>[-<max level>]:<health at the min level>[-<at the max level>]]"
--- (tools/update-drop-data.js). A part of a kind it doesn't know is skipped (builds before the health
--- skip "h" that way).
-local function ParseKnown(text)
-	local entry = { items = {}, skins = {} }
-	for part in text:gmatch("[^;]+") do
-		local kind, rest = part:match("^(%a)=(.*)$")
-		if kind == "g" then
-			local low, high = rest:match("^(%d+)%-(%d+)$")
-			entry.coin = low and { tonumber(low), tonumber(high) } or nil
-		elseif kind == "h" then
-			local low, high, lowHealth, highHealth = rest:match("^(%d+)%-?(%d*):(%d+)%-?(%d*)$")
-			if low then
-				low, lowHealth = tonumber(low), tonumber(lowHealth)
-				entry.health = { low, tonumber(high) or low, lowHealth, tonumber(highHealth) or lowHealth }
-			end
-		elseif not kind or kind == "s" then
-			local into = kind and entry.skins or entry.items
-			for id, quality, chance, quest in (rest or part):gmatch("(%d+):(%d+):(%d+)(q?)") do
-				into[tonumber(id)] = { tonumber(chance) / 10000, tonumber(quality), quest == "q" }
-			end
-		end
-	end
-	return entry
-end
-
--- What the classic database says a kind of mob drops: { items = { [item ID] = { chance (0-1),
--- quality, quest (only while on its quest) } }, skins = (the same, per skinning), coin = { min, max }
--- (copper, or nil), health = { min level, max level, health at the min level, at the max } (or nil) };
--- nil: it doesn't know the mob, or there's no database. Each mob read once.
-function Bt.Known(creature)
-	local db = creature and DropData()
-	if not db then
-		return nil
-	end
-	if db ~= knownOf then
-		known, knownOf = {}, db
-	end
-	if known[creature] == nil then
-		local text = db.mobs[creature]
-		known[creature] = type(text) == "string" and ParseKnown(text) or false
-	end
-	return known[creature] or nil
-end
-
--- What the classic database says a kind of mob has at full health at a level (the fight stream's
--- estimate of mobs' health, StreamSense.lua): between its lowest and highest level in a straight
--- line (most kinds span a level or two); and the level that is for. A level outside its range: the
--- nearest end's (that level second, so the caller can scale it); not known (nil, or -1 for a boss's
--- "??"): its highest. nil: the database doesn't know it, or the Bestiary or the database is switched
--- off (then nothing is loaded).
-function Bt.Health(creature, level)
-	if not M.enabled then
-		return nil
-	end
-	local entry = Bt.Known(creature)
-	local health = entry and entry.health
-	if not health then
-		return nil
-	end
-	local low, high = health[1], health[2]
-	if type(level) ~= "number" or issecret(level) or level < 1 or level >= high then
-		return health[4], high
-	elseif level <= low then
-		return health[3], low
-	end
-	return math.floor(health[3] + (health[4] - health[3]) * (level - low) / (high - low)), level
-end
-
--- The mobs the classic database says drop an item (not skinning): { { creature, chance }, ... }, the
--- likeliest first; found when first asked (the wish list). A plain find for "<item>:" over every
--- mob's text is quick; only the mobs it finds are looked at closer, and not kept read (a common item
--- comes from hundreds).
-local knownSources, sourcesOf = {}, nil -- item ID -> that list; the database it was found in
-
-function Bt.KnownSources(id)
-	local db = DropData()
-	if not (db and type(id) == "number") then
-		return NONE
-	end
-	if db ~= sourcesOf then -- (another database: found anew)
-		knownSources, sourcesOf = {}, db
-	end
-	local list = knownSources[id]
-	if not list then
-		list = {}
-		local key, entry = id .. ":", "," .. id .. ":%d+:(%d+)"
-		for creature, text in pairs(db.mobs) do
-			if type(text) == "string" and text:find(key, 1, true) then
-				local chance = ("," .. text:match("^[^;]*")):match(entry) -- (its drops: before ";s=" and ";g=")
-				if chance then
-					list[#list + 1] = { creature = creature, chance = tonumber(chance) / 10000 }
-				end
-			end
-		end
-		table.sort(list, function(a, b)
-			if a.chance ~= b.chance then
-				return a.chance > b.chance
-			end
-			return a.creature < b.creature
-		end)
-		knownSources[id] = list
-	end
-	return list
-end
-
-Bt.When("settings", function()
-	dataTried = false -- (switched on again, or installed since: loading the database is tried again)
-	wipe(knownSources)
-end)
-
--- You can skin (Skinning, any rank): only then does what skinning gives count among what you could
--- have had (else every beast's leather would wait there forever).
-local function CanSkin()
-	for id in pairs(SKINNING) do
-		if C_SpellBook and C_SpellBook.IsSpellKnown then
-			local ok, known = pcall(C_SpellBook.IsSpellKnown, id)
-			if ok and known == true then
-				return true
-			end
-		end
-		if IsPlayerSpell and IsPlayerSpell(id) == true then
-			return true
-		end
-	end
-	return false
-end
-
--- The database beside your own: what it says this kind drops that you haven't had yet (entries like
--- Bt.Drops', unseen = true, chance = the database's, out = your kills or skinnings: the likeliest
--- first, then skinning), how many of its drops you've had, and of how many. Grey ones only with
--- showPoor; skinning only when you can skin or have skinned this kind. nil: the database doesn't
--- know it. countOnly: the counts, no list.
-function Bt.Compare(creature, mob, showPoor, countOnly)
-	local data = Bt.Known(creature)
-	if not data then
-		return nil
-	end
-	local unseen, found, total = {}, 0, 0
-	local skins = next(data.skins) ~= nil and ((mob and (mob.skinned or 0) > 0) or CanSkin())
-	for _, skin in ipairs(skins and { false, true } or { false }) do
-		local part, mine = {}, mob and Bt.Part(mob, skin) or NONE
-		for id, said in pairs(skin and data.skins or data.items) do
-			if showPoor or said[2] ~= 0 then
-				total = total + 1
-				if mine[id] then
-					found = found + 1
-				elseif not countOnly then
-					part[#part + 1] = { id = id, chance = said[1], quality = said[2], quest = said[3] or nil, skin = skin, unseen = true,
-						drops = 0, count = 0, classic = said[1], out = mob and (skin and (mob.skinned or 0) or mob.kills) or 0 }
-				end
-			end
-		end
-		table.sort(part, Likelier)
-		for _, entry in ipairs(part) do
-			unseen[#unseen + 1] = entry
-		end
-	end
-	return unseen, found, total
-end
-
--- /bestiary data: whether the database is there and what it holds (English, like the other chat lines).
-function Bt.PrintData()
-	if not M.db.dropData then
-		M:Print("the classic drop database is switched off (settings).")
-		return
-	end
-	local db = DropData()
-	if not db then
-		M:Print(("the classic drop database isn't there (%s): the add-on %s is missing or switched off in the add-on list.")
-			:format(dataWhy or "?", DATA_ADDON))
-		return
-	end
-	local count, health = 0, 0
-	for _, text in pairs(db.mobs) do
-		count = count + 1
-		if type(text) == "string" and text:find(";h=", 1, true) then
-			health = health + 1
-		end
-	end
-	M:Print(("the classic drop database: %d kinds of mobs, %d of them with their health, from %s.")
-		:format(count, health, tostring(db.source)))
-end
-
----------------------------------------------------------------------------
 -- Mobs seen: name, level, kind (for records and the window)
 ---------------------------------------------------------------------------
 
@@ -709,324 +512,6 @@ end
 Bt.On("PLAYER_TARGET_CHANGED", function() Bt.Look("target") end)
 Bt.On("UPDATE_MOUSEOVER_UNIT", function() Bt.Look("mouseover") end)
 Bt.On("NAME_PLATE_UNIT_ADDED", function(unit) Bt.Look(unit) end)
-
----------------------------------------------------------------------------
--- Quest drops: what your quests want collected that a kind of mob drops
----------------------------------------------------------------------------
-
--- The quest log's item objectives, read when first asked after it changed (QUEST_LOG_UPDATE comes
--- often: it only marks them old, and a look half a second later redraws what's up, once). The
--- objectives don't say which item they want, only its name, so a mob's drops (yours and the classic
--- database's) are matched by name.
-local QUEST_GAP = 0.5
-local wants = {}          -- item name (lower case) -> { name, have, need, done }
-local wantsKey = ""       -- the same as text: did anything change?
-local wantsOld = true     -- the quest log changed since they were read
-local wantsSoon = false   -- a look after the changes is on its way (they come in bursts)
-local questIDs = {}       -- quests seen in the log (one under a collapsed header isn't listed)
-local itemNames = {}      -- item ID -> its name (the client's)
-
-local function Plain(v)
-	if not issecret(v) then
-		return v
-	end
-end
-
--- "Gnoll Paw: 3/8" (classic) or "3/8 Gnoll Paw" (the modern client): its name, have, need.
-local function ParseObjective(text)
-	local have, need, name = text:match("^%s*(%d+)%s*/%s*(%d+)%s+(.-)%s*$")
-	if not have then
-		name, have, need = text:match("^%s*(.-)%s*:%s*(%d+)%s*/%s*(%d+)")
-	end
-	name = name and name:gsub("%s*%(.-%)$", "") -- (a "(Complete)" behind it)
-	if name and name ~= "" then
-		return name, tonumber(have), tonumber(need)
-	end
-end
-
--- Reads the quest log's objectives; returns whether what they want changed.
-local function ReadWants()
-	wantsOld = false
-	wipe(wants)
-	local log = C_QuestLog
-	if log and log.GetNumQuestLogEntries and log.GetInfo and log.GetQuestObjectives then
-		for index = 1, tonumber(Value(log.GetNumQuestLogEntries)) or 0 do
-			local info = Value(log.GetInfo, index)
-			local id = type(info) == "table" and not Plain(info.isHeader) and not Plain(info.isHidden) and Plain(info.questID)
-			if type(id) == "number" and id > 0 then
-				questIDs[id] = true
-			end
-		end
-		for id in pairs(questIDs) do
-			if log.GetLogIndexForQuestID and not Value(log.GetLogIndexForQuestID, id) then
-				questIDs[id] = nil -- (turned in or abandoned)
-			else
-				local objectives = Value(log.GetQuestObjectives, id)
-				for _, o in ipairs(type(objectives) == "table" and objectives or NONE) do
-					local text, name, have, need = Plain(o.text), nil, nil, nil
-					if type(text) == "string" then
-						name, have, need = ParseObjective(text)
-					end
-					if name then
-						have = type(Plain(o.numFulfilled)) == "number" and o.numFulfilled or have
-						need = type(Plain(o.numRequired)) == "number" and o.numRequired > 0 and o.numRequired or need
-						local key = name:lower()
-						local was = wants[key]
-						if not was or need > was.need then -- (two quests wanting the same: the bigger)
-							wants[key] = { name = name, have = have, need = need, done = Plain(o.finished) == true or have >= need }
-						end
-					end
-				end
-			end
-		end
-	end
-	local parts = {}
-	for key, want in pairs(wants) do
-		parts[#parts + 1] = ("%s:%d/%d"):format(key, want.have, want.need)
-	end
-	table.sort(parts)
-	local text = table.concat(parts, ";")
-	local changed = text ~= wantsKey
-	wantsKey = text
-	return changed
-end
-
-local function QuestWants()
-	if wantsOld then
-		ReadWants()
-	end
-	return wants
-end
-
--- The quest log changed (or your bags): half a second later, if the window or the card is up and
--- what your quests want changed, they redraw.
-local function QuestLogChanged()
-	wantsOld = true
-	if wantsSoon then
-		return
-	end
-	wantsSoon = true
-	C_Timer.After(QUEST_GAP, function()
-		wantsSoon = false
-		if wantsOld and Bt.QuestsShown and Bt.QuestsShown() and ReadWants() and Bt.QuestsChanged then
-			Bt.QuestsChanged()
-		end
-	end)
-end
-
-Bt.On("QUEST_LOG_UPDATE", QuestLogChanged)
-Bt.On("BAG_UPDATE_DELAYED", QuestLogChanged)
-Bt.When("enable", function()
-	wantsOld = true -- (the quest log may have changed while switched off)
-end)
-
--- An item's name: as you looted it, else the client's (asked for when it doesn't know it yet: it
--- redraws when it comes).
-local function NameOf(id, item)
-	local name = item and item[4] or itemNames[id]
-	if name then
-		return name
-	end
-	name = C_Item and Value(C_Item.GetItemInfo, ("item:%d"):format(id))
-	if type(name) == "string" then
-		itemNames[id] = name
-		return name
-	end
-	Bt.AskItem(id)
-end
-
--- How likely a kind of mob drops an item, per kill: the classic database's chance (for a quest item,
--- while on its quest), else your own; nil: neither says it drops it. And how many come each time
--- (yours; 1 before you've had one).
-function Bt.ChanceOf(creature, mob, id)
-	local said = Bt.Known(creature)
-	said = said and said.items[id]
-	local item = mob and mob.items[id]
-	local each = item and item[1] > 0 and item[2] / item[1] or 1
-	if said then
-		return said[1], each
-	elseif item and mob.kills > 0 then
-		return (Bt.Chance(mob, item)), each
-	end
-end
-
--- What your quests want collected that this kind of mob can drop: { { id, name, have, need, done,
--- chance (Bt.ChanceOf; nil: not known), more (about how many more kills) }, ... }, the ones still
--- wanted first.
-function Bt.QuestDrops(creature, mob)
-	local want = creature and QuestWants()
-	if not (want and next(want)) then
-		return NONE
-	end
-	local list, tried = {}, {}
-	local said = Bt.Known(creature)
-	for _, part in ipairs({ said and said.items or NONE, mob and mob.items or NONE }) do
-		for id in pairs(part) do
-			if not tried[id] then
-				tried[id] = true
-				local name = NameOf(id, mob and mob.items[id])
-				local wanted = name and want[name:lower()]
-				if wanted then
-					local chance, each = Bt.ChanceOf(creature, mob, id)
-					local left = wanted.need - wanted.have
-					list[#list + 1] = { id = id, name = wanted.name, have = wanted.have, need = wanted.need, done = wanted.done,
-						chance = chance, more = chance and chance > 0 and not wanted.done and left > 0
-							and math.max(1, math.floor(left / (chance * each) + 0.5)) or nil }
-				end
-			end
-		end
-	end
-	table.sort(list, function(a, b)
-		if a.done ~= b.done then
-			return not a.done
-		end
-		return a.id < b.id
-	end)
-	return list
-end
-
----------------------------------------------------------------------------
--- The wish list: items you're after, and how long they keep you waiting
----------------------------------------------------------------------------
-
--- LefthyToolsBestiaryDB.wishes (only once there's one): { [item ID] = { pinned (time()), kills (of
--- mobs that drop it, since), expected (their chances added up: how many it should have dropped in
--- them), name, quality } }. A kill counts for a wish when the classic database or your own record
--- says that kind drops it; when it drops (your loot of a counted kill), a quiet chat line says after
--- how many kills and how many you'd have expected (kills / expected: 1 / its chance for one kind of
--- mob), no sound, no popup, and it comes off the list.
-
-function Bt.Wishes()
-	return data and data.wishes or NONE
-end
-
-function Bt.Wish(id)
-	return data and data.wishes and data.wishes[id]
-end
-
--- An item's link for chat (as plain as it gets when the client doesn't know it yet).
-local function LinkOf(id, name)
-	if C_Item and C_Item.GetItemInfo then
-		local ok, _, link = pcall(C_Item.GetItemInfo, ("item:%d"):format(id))
-		if ok and type(link) == "string" and not issecret(link) then
-			return link
-		end
-	end
-	return "[" .. (name or NameOf(id) or ("item " .. id)) .. "]"
-end
-
--- Pins an item, or unpins it when it's pinned (drop: a Bt.Drops entry, for its name and quality);
--- returns whether it's on the list now.
-function Bt.ToggleWish(id, drop)
-	if not (data and type(id) == "number") then
-		return false
-	end
-	local wish = data.wishes and data.wishes[id]
-	if wish then
-		data.wishes[id] = nil
-		if not next(data.wishes) then
-			data.wishes = nil
-		end
-		M:Print(("%s is off your wish list."):format(LinkOf(id, wish[4])))
-	else
-		local name = drop and drop.name or NameOf(id)
-		local quality = drop and drop.quality or C_Item and Value(C_Item.GetItemQualityByID, id)
-		data.wishes = data.wishes or {}
-		data.wishes[id] = { time(), 0, 0, name, type(quality) == "number" and quality or nil }
-		M:Print(("%s is on your wish list: mobs that drop it show it with a star, and a line here says when it drops.")
-			:format(LinkOf(id, name)))
-	end
-	if Bt.Redraw then
-		Bt.Redraw() -- (its star everywhere)
-	end
-	return not wish
-end
-
--- Where a wished item comes from: your own drops (your chance and kills: out) and the classic
--- database's (its chance), each kind of mob once, the likeliest first: { { creature, name, chance,
--- out }, ... }; and how many more the database lists that the Bestiary can't name (it has no names:
--- only mobs you've killed or seen are known).
-function Bt.WishSources(id)
-	local list, had, unnamed = {}, {}, 0
-	for _, source in ipairs(Bt.Sources(id) or NONE) do
-		if not source.skin then
-			had[source.creature] = true
-			list[#list + 1] = { creature = source.creature, name = source.mob.name or ("#" .. source.creature), chance = source.chance,
-				out = source.out }
-		end
-	end
-	for _, source in ipairs(Bt.KnownSources(id)) do
-		if not had[source.creature] then
-			local name = Bt.NameOf(source.creature)
-			if name then
-				list[#list + 1] = { creature = source.creature, name = name, chance = source.chance }
-			else
-				unnamed = unnamed + 1
-			end
-		end
-	end
-	table.sort(list, function(a, b)
-		if a.chance ~= b.chance then
-			return a.chance > b.chance
-		end
-		return a.creature < b.creature
-	end)
-	return list, unnamed
-end
-
--- A kill counted (counted: before, when the game said its corpse was empty): it counts for each wish
--- its kind drops; got (item ID -> link): what it dropped. A wish that dropped comes off the list.
-local function WishKill(creature, mob, got, counted)
-	local wishes = data and data.wishes
-	if not wishes then
-		return false
-	end
-	local fulfilled = false
-	for id, wish in pairs(wishes) do
-		if not counted then
-			local chance = Bt.ChanceOf(creature, mob, id)
-			if chance then
-				wish[2], wish[3] = (wish[2] or 0) + 1, (wish[3] or 0) + chance
-			end
-		end
-		if got and got[id] then
-			local kills = math.max(1, wish[2] or 0)
-			local expected = (wish[3] or 0) > 0 and math.max(1, math.floor(kills / wish[3] + 0.5)) or nil
-			M:Print(("%s after %s%s; off your wish list."):format(got[id], kills == 1 and "1 kill" or (kills .. " kills"),
-				expected and (" (about %d expected)"):format(expected) or ""))
-			wishes[id], fulfilled = nil, true
-		end
-	end
-	if not next(wishes) then
-		data.wishes = nil
-	end
-	return fulfilled
-end
-
--- /bestiary wishes: the list in chat (English, like the other chat lines).
-function Bt.PrintWishes()
-	local wishes, ids = Bt.Wishes(), {}
-	for id in pairs(wishes) do
-		ids[#ids + 1] = id
-	end
-	if #ids == 0 then
-		M:Print("your wish list is empty: Alt-click a drop in the window or the ledger, or /bestiary wish <item link or ID>.")
-		return
-	end
-	table.sort(ids, function(a, b)
-		if wishes[a][1] ~= wishes[b][1] then
-			return wishes[a][1] < wishes[b][1]
-		end
-		return a < b
-	end)
-	M:Print(("your wish list (%d):"):format(#ids))
-	for _, id in ipairs(ids) do
-		local wish = wishes[id]
-		local best = Bt.WishSources(id)[1]
-		print(("  %s: %d kills since you pinned it%s"):format(LinkOf(id, wish[4]), wish[2] or 0,
-			best and (", likeliest from %s (%s)"):format(best.name, Bt.Percent and Bt.Percent(best.chance, true) or "?") or ""))
-	end
-end
 
 ---------------------------------------------------------------------------
 -- Kills and loot
@@ -1214,7 +699,7 @@ local function CheckEmpty(guid, round)
 	if round < #EMPTY_CHECKS then
 		C_Timer.After(EMPTY_CHECKS[round + 1] - EMPTY_CHECKS[round], function() CheckEmpty(guid, round + 1) end)
 	else
-		WishKill(kill.creature, Count(guid, kill.creature, "empty"))
+		Bt.WishKill(kill.creature, Count(guid, kill.creature, "empty"))
 		Log(kill.creature, "empty", 0, kill.check, guid)
 		Changed(kill.creature)
 	end
@@ -1399,7 +884,7 @@ local function OnLoot()
 	if coin then
 		lootMoney, lootSource = GetMoney(), creature
 	end
-	local fulfilled = WishKill(creature, mob, got, was ~= nil)
+	local fulfilled = Bt.WishKill(creature, mob, got, was ~= nil)
 	Log(creature, was and "looted (said empty before)" or "looted", items, check, guid)
 	Changed(creature)
 	if fulfilled and Bt.Redraw then

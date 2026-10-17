@@ -84,5 +84,8 @@ Modules\Chronicle\Window.lua
 Modules\Chronicle\MinimapButton.lua
 
 Modules\Bestiary\Bestiary.lua
+Modules\Bestiary\Classic.lua
+Modules\Bestiary\Quests.lua
+Modules\Bestiary\Wishes.lua
 Modules\Bestiary\Window.lua
 Modules\Bestiary\Ledger.lua

@@ -106,23 +106,15 @@ local function Marked(name, positions)
 	return table.concat(marked)
 end
 
--- An item's name: as it was looted, else the client's, kept in its record for the search (asked for
--- when it doesn't know it yet, once: it redraws when it comes).
+-- An item's name: as it was looted, else the client's (Bt.ItemNameOf: asked for when it doesn't know
+-- it yet), kept in its record for the search.
 local function NameOf(id, item)
 	if not item then
 		return nil
-	elseif item[4] then
-		return item[4]
 	end
-	local ok, name = false, nil
-	if C_Item and C_Item.GetItemInfo then
-		ok, name = pcall(C_Item.GetItemInfo, ("item:%d"):format(id))
-	end
-	if ok and type(name) == "string" and not issecret(name) then
-		item[4] = name
-		return name
-	end
-	Bt.AskItem(id)
+	local name = Bt.ItemNameOf(id, item)
+	item[4] = name
+	return name
 end
 
 local function XPPerHour(mob)
