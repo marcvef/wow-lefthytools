@@ -9,6 +9,7 @@ local B = ns.Beacon
 --   Stream.lua       asking the game (shared helpers: B.Stream), the test, the commands
 --   StreamSense.lua  what's around you: mobs, their distance and learned direction, what you do
 --   StreamBattle.lua the battle row under the spells: their model, the mobs they fight, the fight
+--   StreamMoments.lua what happens to them in a window: floating numbers, loot, the fight's line
 --   StreamView.lua   the windows (yours, the preview, and one per friend you watch)
 --   StreamMap.lua    the map under a window's radar
 --   StreamPreview.lua the preview's made-up fight
@@ -32,6 +33,7 @@ S.LOOK_GAP = 0.5     -- the sensor and the windows look around this often
 S.OUTER_YARDS = 40   -- the windows' outer ring
 S.MAX_UNITS = 40     -- nameplate1 .. nameplate40
 S.MAX_MOBS = 20
+S.GOLD = { 1, 0.82, 0.3 } -- the windows' gold (their edges, names, an elite's ring, the target's box)
 local TEST_TIME = 60 -- seconds a test takes notes
 local KEEP_TESTS = 3
 local EXAMPLES = 3   -- example answers per line of a report

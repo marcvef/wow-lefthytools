@@ -541,6 +541,9 @@ watch <name>`, a click on their world map dot (`streamMapClick`), or a cinematic
   someone needs it (`S.SenseNeed("me" | "stream", on)`: your window, friends watching you).
 - `StreamBattle.lua`: the battle row under the spells (their model and the mobs they fight, the
   fight played on them; below).
+- `StreamMoments.lua`: what happens to them, in a window (`S.Happenings`: each moment once, as
+  numbers floating up, `S.Float`; loot and rare finds; kills) and the line after a fight
+  (`S.FightLook`).
 - `StreamView.lua`: the windows (`S.OpenView("me" | "preview")`, `S.OpenFriend(id, origin)`,
   `S.CloseView`, `S.ToggleFriend`, `S.CloseFlightViews`).
 - `StreamMap.lua`: the map under a window's radar (`S.MoveMap`, every frame).
