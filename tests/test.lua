@@ -7231,6 +7231,20 @@ do
 	Advance(1.1)
 end
 
+section("Chronicle: spring cleaning")
+;(function() -- (a function of its own: the main chunk's 200 locals; clock-neutral: no Advance)
+	local carl = CH.Hash("Carl#3456")
+	local carlBook = CDB.book[carl].chars["Carl-Realmy"]
+	-- While you were away: a profession learned has no skill level, only its milestones have.
+	anna("J2;n;" .. carl .. ";Carl-Realmy;9700;50;" .. time() .. ";profession;Herbalism;")
+	anna("J2;n;" .. carl .. ";Carl-Realmy;9701;51;" .. time() .. ";profession;Mining;150")
+	local line
+	for _, l in ipairs(CH.CatchUpLines(time() - 1)) do if l:find("Herbalism", 1, true) then line = l end end
+	check(line and line:find("learned Herbalism", 1, true) and line:find("reached Mining 150", 1, true)
+		and not line:find("reached Herbalism", 1, true), "the catch-up: a profession learned, and one's milestone, got " .. tostring(line))
+	carlBook.news[50], carlBook.news[51] = nil, nil
+end)()
+
 section("Beacon: leaving")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 12)
 Advance(0.15)

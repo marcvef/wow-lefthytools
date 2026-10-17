@@ -1447,7 +1447,10 @@ local NEWS_CHAT = {
 	achievement = function(f) return ("earned %s"):format(f.a) end,
 	quests = function(f) return ("completed %s quests"):format(f.a) end,
 	gold = function(f) return ("has %s gold"):format(f.a) end,
-	profession = function(f) return ("reached %s %s"):format(f.a, f.b) end,
+	-- (a profession learned has no skill level: only milestones do)
+	profession = function(f)
+		return (f.b or "") ~= "" and ("reached %s %s"):format(f.a, f.b) or ("learned %s"):format(f.a)
+	end,
 }
 local CHAT_ORDER = { level = 1, boss = 2, rare = 3, dungeon = 4, achievement = 5, mount = 6, loot = 7, profession = 8,
 	quests = 9, gold = 10, death = 11, zone = 12 }
