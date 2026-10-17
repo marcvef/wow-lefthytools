@@ -6487,7 +6487,7 @@ section("Chronicle: friends' journals, also when they're offline")
 			.. carls .. " Carl, " .. annas .. " Anna")
 	end
 	CH.Open("compare")
-	check(not win.Tabs.compare:IsEnabled() and not win.Picker:IsShown() and drawn("Level") and drawn("Leaderboard, last 7 days")
+	check(not win.Tabs.compare:IsEnabled() and not win.Picker:IsShown() and drawn("Level") and drawn("Leaderboard, last 14 days")
 		and drawn("Quests per day") and drawn("Deaths, adding up") and drawn("Hall of fame, all time") and drawn("Records"),
 		"Compare: the level chart, the leaderboard, a graph per number, the hall of fame, records")
 	check(drawn("Lefthy (you)") and drawn("Carl") and drawn("Anna"), "a chip per person in the legend")
@@ -6566,6 +6566,27 @@ section("Chronicle: friends' journals, also when they're offline")
 	Advance(0.5)
 	local shared = sentTo(11, mark, "M2;Chronicle")[1]
 	check(shared, "Share: a ranking goes to LTC, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+	do -- The leaderboard follows the range picked above, like the charts.
+		local counts, board = {}, CH.Leaderboard
+		CH.Leaderboard = function(count, ...) counts[#counts + 1] = count; return board(count, ...) end
+		local thirty = canvas.pools.hover[3] -- (the toolbar comes first: 7, 14, 30 days)
+		thirty._scripts.OnMouseUp(thirty, "LeftButton")
+		CH.Leaderboard = board
+		check(counts[#counts] == 30 and drawn("Leaderboard, last 30 days") and not drawn("Leaderboard, last 14 days"),
+			"the leaderboard follows the range: 30 days picked, 30 days ranked, got " .. tostring(counts[#counts]))
+		local leaders
+		for i = 1, canvas.used.hover do
+			local f = canvas.pools.hover[i]
+			if f.lines and f.lines[2] == "Post the leaders in LTC." then leaders = f end
+		end
+		mark = #GAMEDATA + 1
+		leaders._scripts.OnMouseUp(leaders, "LeftButton")
+		Advance(0.5)
+		check(sentTo(11, mark, "M2;Chronicle, last 30 days: ")[1], "and shared with its range, got " .. tostring(sentTo(11, mark, "M2;")[1]))
+		local fourteen = canvas.pools.hover[2]
+		fourteen._scripts.OnMouseUp(fourteen, "LeftButton")
+		check(drawn("Leaderboard, last 14 days"), "back to 14 days")
+	end
 	win:Hide()
 
 	-- Logging in later: what friends did meanwhile, in chat.

@@ -1153,7 +1153,8 @@ local function Toolbar(canvas, x, y, w, people, state, redraw)
 	return h + 6
 end
 
--- This week (the last 7 days): who leads in what, the top three of each.
+-- The range picked above (7, 14 or 30 days, like every chart on the page): who leads in what, the
+-- top three of each.
 local BOARD_LABEL = {
 	played = function() return L["Time played"] end, xp = function() return L["Experience"] end,
 	quests = function() return L["Quests"] end, kills = function() return L["Killing blows"] end,
@@ -1163,23 +1164,33 @@ local BOARD_LABEL = {
 }
 
 local function Leaders(canvas, x, y, w, people, state)
-	local board = C.Leaderboard(7, 0, people)
+	local days = state.range
+	local board = C.Leaderboard(days, 0, people)
+	local shown = {} -- (without the ones hidden by their chip, here and when shared)
+	for _, metric in ipairs(C.BOARD) do
+		shown[metric] = {}
+		for _, entry in ipairs(board[metric] or {}) do
+			if not state.hidden[entry.person.key] then
+				table.insert(shown[metric], entry)
+			end
+		end
+	end
 	local columns, cellH = 3, 64
 	local rows = math.ceil(#C.BOARD / columns)
 	local h = HEADER + 4 + rows * cellH + PAD
-	local ix, iy, iw = Card(canvas, x, y, w, h, L["Leaderboard, last 7 days"])
+	local ix, iy, iw = Card(canvas, x, y, w, h, L["Leaderboard, last %d days"]:format(days))
 	canvas:Text("|cff80c0ff" .. L["Share"] .. "|r", x + w - PAD - 60, y + 9, "GameFontHighlightSmall", "RIGHT", 60)
-	canvas:Hover(x + w - PAD - 60, y + 4, 60, 18, { L["Share"], L["Post the week's leaders in LTC."] }, function()
+	canvas:Hover(x + w - PAD - 60, y + 4, 60, 18, { L["Share"], L["Post the leaders in LTC."] }, function()
 		local parts = {}
 		for _, metric in ipairs({ "quests", "xp", "kills", "deaths", "afk" }) do
-			local first = board[metric][1]
+			local first = shown[metric][1]
 			if first then
 				local title = metric == "afk" and "Martin award" or ("most " .. CHART_CHAT[metric])
 				parts[#parts + 1] = ("%s %s (%s)"):format(title, first.person.name, C.ChatValue(metric, first.value))
 			end
 		end
 		if #parts > 0 then
-			C.ShareLine("Chronicle week: " .. table.concat(parts, ", "))
+			C.ShareLine(("Chronicle, last %d days: %s"):format(days, table.concat(parts, ", ")))
 		end
 	end)
 	local cellW = iw / columns
@@ -1189,12 +1200,7 @@ local function Leaders(canvas, x, y, w, people, state)
 		local cy = iy + math.floor((i - 1) / columns) * cellH
 		canvas:Rect(cx + 2, cy, cellW - 4, cellH - 6, 1, 1, 1, 0.03, "BORDER")
 		canvas:Text(BOARD_LABEL[metric](), cx + 8, cy + 4, "GameFontNormalSmall", "LEFT", cellW - 16)
-		local list = {}
-		for _, entry in ipairs(board[metric] or {}) do
-			if not state.hidden[entry.person.key] then
-				list[#list + 1] = entry
-			end
-		end
+		local list = shown[metric]
 		if #list == 0 then
 			canvas:Text("|cff666666-|r", cx + 8, cy + 20, "GameFontHighlightSmall", "LEFT", cellW - 16)
 		end

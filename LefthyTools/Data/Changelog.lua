@@ -347,5 +347,8 @@ ns.CHANGELOG = {
 	{ id = 113, module = "chronicle",
 		en = { "A death counts once", "The game sometimes reports one death several times. Chronicle now counts it once, and deaths saved twice before show once." },
 		de = { "Ein Tod zählt einmal", "Das Spiel meldet einen Tod manchmal mehrfach. Chronicle zählt ihn jetzt einmal, und doppelt gespeicherte Tode erscheinen nur einmal." } },
+	{ id = 114, module = "chronicle",
+		en = { "Leaderboard follows 7/14/30 days", "The leaderboard on Chronicle's Compare page ranks the range you pick, like the charts." },
+		de = { "Bestenliste folgt 7/14/30 Tagen", "Die Bestenliste auf Chronicles Vergleich-Seite wertet den gewählten Zeitraum aus, wie die Grafiken." } },
 	-- New entries go here, at the end.
 }

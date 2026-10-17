@@ -222,8 +222,9 @@ the open one's button greyed out:
   and up to three small icons, one per kind, and "Hover a symbol for what happened." The symbols
   switch's tooltip is the legend; off: `compareState.noMarks`. A click on a day of a small chart shows that chart
   big, scrolled to the top. The
-  Leaderboard of the last 7 days (`C.Leaderboard`: nine categories, top three each, gold, silver,
-  bronze; the Martin award), a grid of line charts (time played, XP, quests, killing blows per day;
+  Leaderboard over the range picked, like the charts (7, 14 or 30 days, `compareState.range`; the
+  title says which; `C.Leaderboard`: nine categories, top three each, gold, silver, bronze; the
+  Martin award; characters hidden by their chip left out, also when shared), a grid of line charts (time played, XP, quests, killing blows per day;
   deaths, bosses and rares, jumps adding up over the range; gold where the day ended; distance and
   time AFK per day): a line per character (yours thicker), points while the range is 14 days or less,
   the leader in the card's corner, a hover per day with everyone's value, sorted. The Hall of fame

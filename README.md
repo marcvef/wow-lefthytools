@@ -299,7 +299,7 @@ beside it.
 - **Compare:** every character, yours and your friends', in every graph, on one page: level, time
   played, XP, quests, killing blows, deaths, gold, distance, bosses and rares, time AFK and jumps,
   over the last 7, 14 or 30 days, a line per character in its class colour (hover a day for
-  everyone's value; click a name in the legend to hide or show it). Plus this week's **leaderboard** (top three in nine
+  everyone's value; click a name in the legend to hide or show it). Plus a **leaderboard** over the same days (top three in nine
   categories, with the Martin award), a **hall of fame** of lifetime numbers (click a column to
   sort) and **records** (fastest level, longest session, most gold, everyone's nemesis). **Share**
   posts a ranking in LTC.
