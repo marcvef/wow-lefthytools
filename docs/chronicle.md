@@ -3,11 +3,12 @@
 A journal per character, kept automatically, plus statistics and a feed of what friends with
 LefthyTools did, also while they (or you) weren't online. Recorded per character; a character
 belongs to an account (a Battle.net account: a BattleTag), shown beside it, never mixed with it (see
-Characters and accounts). Files: `Modules/Chronicle/Chronicle.lua`
-(recording, sharing, session, settings, `/chronicle`), `Sync.lua` (friends' journals: publishing,
-passing on, the people and news for the window, catch-up, weekly recap, leaderboards),
-`Graphs.lua` (the Graphs and Compare pages), `Window.lua` (the window) and `MinimapButton.lua`.
-They share `ns.Chronicle` (`C`).
+Characters and accounts). Files, in load order: `Modules/Chronicle/Chronicle.lua` (recording,
+sharing, session, settings, `/chronicle`, formatting helpers), `Characters.lua` (who is who:
+accounts, names, matching; the characters, accounts and news every page uses), `Sync.lua` (friends'
+journals: publishing, passing on), `Recap.lua` (chat: catch-up, weekly recap, sharing; the
+leaderboards), `Graphs.lua` (the Graphs and Compare pages), `Window.lua` (the window) and
+`MinimapButton.lua`. They share `ns.Chronicle` (`C`).
 
 ## Data
 
@@ -363,7 +364,7 @@ up twice (news twice, its days counted twice, a row each, an account's row next 
 
 So every character has one identity: mine its `store.chars` key (`me:<key>`), a friend's its
 journal's (`book:<acct>:<Name-Realm>`), and one only known from live days its name
-(`friend:<full name>`). Sync.lua matches a full name from Battle.net (with the friend's account,
+(`friend:<full name>`). Characters.lua matches a full name from Battle.net (with the friend's account,
 class and GUID where known) to a journal's character (`FindBook`): by GUID; else by the full name
 (the journal's own from its author's `a` record, or learned); else by the first name while the
 journal doesn't know the full one, within their account, if exactly one character fits and its

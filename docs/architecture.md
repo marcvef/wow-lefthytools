@@ -66,7 +66,9 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/StreamButton.lua the spyglass minimap button: friends to watch
   Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
   Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, sharing, /chronicle
-  Modules/Chronicle/Sync.lua       friends' journals passed on between friends (kind J), catch-up, recap
+  Modules/Chronicle/Characters.lua  who is who: accounts, names, matching; characters, accounts, news
+  Modules/Chronicle/Sync.lua       friends' journals passed on between friends (kind J)
+  Modules/Chronicle/Recap.lua      in chat: catch-up, weekly recap, sharing; the leaderboards
   Modules/Chronicle/Graphs.lua     the Graphs and Compare pages: pooled canvas (bars, lines, text), cards
   Modules/Chronicle/Window.lua     the journal window (timeline, statistics, graphs, friends)
   Modules/Chronicle/MinimapButton.lua  the book button on the minimap's edge

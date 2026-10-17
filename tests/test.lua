@@ -7031,7 +7031,7 @@ section("Chronicle: Battle.net tells a friend's surname, whatever they run")
 			isGameAFK = false, isGameBusy = false, realmName = "Realmy", factionName = "Alliance" }
 		for k, v in pairs(extra or {}) do game[k] = v end
 		carlFriend[2] = game
-		CH.SyncMeet()
+		CH.Meet()
 	end
 	online("Corin Vale", "PALADIN")
 	local item
@@ -7045,7 +7045,7 @@ section("Chronicle: Battle.net tells a friend's surname, whatever they run")
 	online("Cora", "PRIEST", { playerGuid = "Player-1-934" })
 	check(cora.full == "Cora" and cora.guid == "Player-1-934", "a name Battle.net shows without a surname: that's all of it (not marked)")
 	carlFriend[2] = setmetatable({}, { __index = function() error("a secret value") end })
-	local ok = pcall(CH.SyncMeet)
+	local ok = pcall(CH.Meet)
 	online(SECRET, "PRIEST")
 	check(ok and cora.full == "Cora", "what can't be read (a secret) is skipped, nothing breaks")
 	carlFriend[2] = nil

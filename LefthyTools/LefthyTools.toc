@@ -69,7 +69,9 @@ Modules\Beacon\StreamButton.lua
 Modules\Beacon\Beacon.xml
 
 Modules\Chronicle\Chronicle.lua
+Modules\Chronicle\Characters.lua
 Modules\Chronicle\Sync.lua
+Modules\Chronicle\Recap.lua
 Modules\Chronicle\Graphs.lua
 Modules\Chronicle\Window.lua
 Modules\Chronicle\MinimapButton.lua
