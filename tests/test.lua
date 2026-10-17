@@ -1357,6 +1357,11 @@ check(textInput and textInput.template == "LefthyToolsSettingsTextTemplate" and 
 check(SETTINGS_BUTTONS["Test your message"] and SETTINGS_BUTTONS["Test your message"].text == "Preview", "preview button")
 check(ADDON_PREFIXES.LTBeacon, "addon message prefix registered")
 check(next(WorldMapFrame.providers) ~= nil, "data provider attached to the world map")
+do -- Free text cut to a size: no letter split, and none dropped that fits whole ("\195\164" is a two-byte letter).
+	local cut = BB.Clean("ab\195\164c", 4)
+	check(cut == "ab\195\164" and BB.Clean("abc\195\164", 4) == "abc" and BB.Clean("ab\226\130\172", 4) == "ab"
+		and BB.Clean("|cffff0000a;b|r", 10) == "ab", "free text cut at a byte limit keeps whole letters only, got " .. cut)
+end
 
 section("Beacon: finding friends with the addon")
 local greeted = {}

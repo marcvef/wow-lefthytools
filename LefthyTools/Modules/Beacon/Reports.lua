@@ -113,14 +113,7 @@ end
 -- Sending
 ---------------------------------------------------------------------------
 
--- The first `limit` bytes of text, without splitting a UTF-8 character.
-local function Cut(text, limit)
-	local cut = math.min(#text, limit)
-	while cut < #text and cut > 1 and text:byte(cut + 1) >= 128 and text:byte(cut + 1) < 192 do
-		cut = cut - 1
-	end
-	return text:sub(1, cut)
-end
+local Cut = B.CutUTF8 -- (the first `limit` bytes, without splitting a UTF-8 character)
 
 -- The text in parts small enough for one message each (UTF-8 kept whole).
 local function Parts(text)
