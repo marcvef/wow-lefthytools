@@ -7861,6 +7861,40 @@ section("Bestiary: what mobs drop")
 		check(dots[1].shown and dots[2].shown and not (dots[3] and dots[3].shown) and width == 296 and math.abs(height - 668 * 296 / 1002) < 0.01
 			and math.abs(x1 - 0.2505 * width) < 0.01 and math.abs(y1 + 0.7505 * height) < 0.01 and dots[1]:GetAlpha() < dots[2]:GetAlpha(),
 			"a dot for each kill there, where it was; the older fainter")
+		-- On the art, what you've explored (the art leaves the rest blank): each area's tiles from its
+		-- offset, scaled like the art, the last column a smaller file, cut at the map's edge; not what
+		-- only a mouseover shows.
+		do
+			local overlays, s = where.overlays, 296 / 1002
+			local function near(a, b) return math.abs(a - b) < 1e-6 end
+			local o1, o2, o3 = overlays[1], overlays[2], overlays[3]
+			local _, _, _, x2, y2 = o2:GetPoint(1)
+			local _, _, _, x3, y3 = o3:GetPoint(1)
+			check(#overlays == 3 and o1.path == 7001 and o2.path == 7002 and o3.path == 7004 and o1.shown and o2.shown and o3.shown
+				and o1.coords[2] == 1 and near(o1.coords[4], 200 / 256) and near(o1.width, 256 * s) and near(o1.height, 200 * s)
+				and near(x2, 356 * s) and near(y2, -50 * s) and near(o2.width, 44 * s) and near(o2.coords[2], 44 / 64)
+				and near(x3, 950 * s) and near(y3, -600 * s) and near(o3.width, 52 * s) and near(o3.height, 68 * s)
+				and near(o3.coords[2], 52 / 128) and near(o3.coords[4], 68 / 128),
+				"what you've explored on the art: its tiles where they go, the last one a smaller file, cut at the edge; not the mouseover one")
+			o1.path = nil
+			Bt.DrawLedger()
+			check(o1.path == nil, "drawn again on the same map: not laid again")
+			local elwynn = EXPLORED[1429]
+			EXPLORED[1429] = { elwynn[3] }
+			Fire("MAP_EXPLORATION_UPDATED")
+			Bt.DrawLedger()
+			check(o1.path == 7004 and o1.shown and not o2.shown and not o3.shown and #overlays == 3 and tiles[1].shown,
+				"explored more (here: less): laid again, the pool's other tiles hidden")
+			local api = C_MapExplorationInfo
+			C_MapExplorationInfo = nil
+			Fire("MAP_EXPLORATION_UPDATED")
+			Bt.DrawLedger()
+			check(not o1.shown and tiles[12].shown, "no exploration API: the art alone")
+			C_MapExplorationInfo, EXPLORED[1429] = api, elwynn
+			Fire("MAP_EXPLORATION_UPDATED")
+			Bt.DrawLedger()
+			check(#overlays == 3 and o1.path == 7001 and o3.shown, "back: laid again from the pool")
+		end
 		check(where.Note:IsShown() and where.Note:GetText() == "Also in Westfall (1)", "the other maps named under it")
 		-- A corpse looted without your killing blow seen: you at it then. The last 50 are kept.
 		for _ = 1, 47 do table.insert(kobolds().spots, 1, 1429100100) end

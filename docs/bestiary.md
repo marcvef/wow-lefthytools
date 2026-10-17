@@ -339,7 +339,20 @@ the settings or `/bestiary ledger [search]`.
   row's tiles cut to the map's edge with `SetTexCoord`, so nothing hangs over; no art: a dark
   rectangle), a small red dot in a dark ring per kill (older ones fainter). Under it, one line:
   "Your last 50 kills." once that many are kept, and "Also in Westfall (3), Duskwood (1)" (three
-  at most, "+N") when kills were on other maps. Tiles are laid again only when the map changes.
+  at most, "+N") when kills were on other maps.
+- **What you've explored** is on the map as your world map shows it (the user: "should be fully
+  explored or ideally the same visibility the player has"). The art leaves unexplored areas blank;
+  explored ones are overlays, `C_MapExplorationInfo.GetExploredMapTextures(mapID)`: each a
+  `textureWidth` x `textureHeight` area at `offsetX`, `offsetY` (the layer's pixels), its
+  `fileDataIDs` tiles of the layer's tile size in rows, the last column and row in a smaller file
+  (what's left over, in the next power of two from 16: `SetTexCoord` takes only that part), as
+  Blizzard's `MapExplorationPin` lays them. Scaled like the art and cut at its edge; drawn over it
+  (`isDrawOnTopLayer` over the other overlays); one `isShownByMouseOver` isn't explored, left out.
+  The API missing or saying nothing: the art alone. The overlays' textures are pooled (a zone can
+  have dozens).
+- **Laid only when needed**: the art and its overlays again only when the map changes, or after
+  `MAP_EXPLORATION_UPDATED` (registered once the ledger is built; it only clears the map shown, so
+  the next draw lays it again). Every other redraw only moves the dots.
 - **A row** also says "6/11 found" (the drop database; not while it shows what the search found).
   Sorted by coin, worth, XP per kill or XP per hour, it says that instead ("~45s", "85 XP", "21k
   XP/h").
@@ -374,7 +387,8 @@ Event handlers only: `PARTY_KILL`, `LOOT_READY`, `LOOT_CLOSED`, the player's
 `UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added, entering and leaving
 combat (a time stamp), `PLAYER_XP_UPDATE` (three numbers read, the last 8 kills looked at),
 `QUEST_LOG_UPDATE`/`BAG_UPDATE_DELAYED` (a flag, then one look half a second later),
-`GET_ITEM_INFO_RECEIVED` only while a vendor price or a quest item's name is awaited. A kill reads
+`GET_ITEM_INFO_RECEIVED` only while a vendor price or a quest item's name is awaited,
+`MAP_EXPLORATION_UPDATED` once the ledger is built (a flag: its map is laid again). A kill reads
 your map position once (two `C_Map` calls). The window redraws when its mob's
 record changes or the target does; the card's OnUpdate runs only while it's shown. Worth is
 worked out when drawn, over a mob's drops with the prices cached (the ledger sorted by worth: over
@@ -389,7 +403,10 @@ every mob, table lookups only).
   new level at a level-up's update; `IsPlayerAtEffectiveMaxLevel` answers on Forever.
 - `C_Item.GetItemInfo`'s `sellPrice` is Forever's vendor price.
 - The ledger's map: the zone art lines up with the dots (a kill next to a landmark shows there),
-  and `GetMapArtLayerTextures` gives the tiles in rows like the fight stream's map.
+  and `GetMapArtLayerTextures` gives the tiles in rows like the fight stream's map. The explored
+  overlays sit where the world map has them (`GetExploredMapTextures` answers on Forever, its
+  offsets are the layer's pixels, the smaller last files cut right), and a zone you've explored
+  fully looks like the world map's.
 - `LoadAddOn` of the load-on-demand drop database works on Forever, and its first load (0.93 MB of
   strings) is only a moment, also when the fight stream asks for it in a fight.
 - How close the classic database's health is to Forever's (the fight stream's learned ratio from

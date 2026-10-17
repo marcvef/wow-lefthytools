@@ -1806,3 +1806,18 @@ C_Map.GetMapArtLayerTextures = function(mapID)
 	for i = 1, 12 do list[i] = mapID * 100 + i end
 	return list
 end
+-- What you've explored of a map (the art leaves the rest blank): overlays in the layer's pixels,
+-- tiles of up to 256 px in rows, the last column and row a smaller file. Elwynn Forest: an area of
+-- 2 x 1 tiles (300 x 200: the second 44 px of a 64 px file), one shown only on mouseover (not
+-- explored) and one over the map's bottom right corner. EXPLORED[mapID] = nil: the game says nothing.
+EXPLORED = {
+	[1429] = {
+		{ textureWidth = 300, textureHeight = 200, offsetX = 100, offsetY = 50, isShownByMouseOver = false, isDrawOnTopLayer = false,
+			fileDataIDs = { 7001, 7002 }, hitRect = { top = 50, bottom = 250, left = 100, right = 400 } },
+		{ textureWidth = 256, textureHeight = 256, offsetX = 500, offsetY = 300, isShownByMouseOver = true, isDrawOnTopLayer = false,
+			fileDataIDs = { 7003 }, hitRect = { top = 300, bottom = 556, left = 500, right = 756 } },
+		{ textureWidth = 100, textureHeight = 100, offsetX = 950, offsetY = 600, isShownByMouseOver = false, isDrawOnTopLayer = true,
+			fileDataIDs = { 7004 }, hitRect = { top = 600, bottom = 700, left = 950, right = 1050 } },
+	},
+}
+C_MapExplorationInfo = { GetExploredMapTextures = function(mapID) return EXPLORED[mapID] end }

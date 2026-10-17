@@ -11,7 +11,8 @@ local M = Bt.module
 -- pays. On the right the one picked: its whole model turning slowly, kills, coin, first and last
 -- kill, skinnings, under the model what a kill pays (its worth, XP and time per kill, XP per hour of
 -- fighting), all its drops (as in the window: quality edge, how many, chance; skinning marked) and,
--- under them, where you killed it: the world map's art of the zone with the most kills, a dot each.
+-- under them, where you killed it: the world map's art of the zone with the most kills (what you've
+-- explored of it, as your world map shows it), a dot each.
 -- At the top what the Bestiary knows in all, and your rarest find. With the classic drop database
 -- (Bestiary.lua): a row says how many of its drops you've found, and the picked mob's drops have a
 -- section of what you haven't had yet, faded, between its own drops and its world drops.
@@ -382,9 +383,74 @@ local function MapName(mapID)
 	return not issecret(name) and type(name) == "string" and name or ("#" .. mapID)
 end
 
+-- A number the game gave (nil: none, or a secret).
+local function Number(v)
+	if not issecret(v) and type(v) == "number" then
+		return v
+	end
+end
+
+-- An explored area's tile along one side: a whole tile, but the last is what's left over, in a file
+-- of the next power of two from 16 (as Blizzard's MapExplorationPin reads them): its pixels, the file's.
+local function OverlayPart(size, tile, last)
+	if not last then
+		return tile, tile
+	end
+	local pixels = size % tile
+	pixels = pixels > 0 and pixels or tile
+	local file = 16
+	while file < pixels do
+		file = file * 2
+	end
+	return pixels, file
+end
+
+-- An area you've explored, on the art: its tiles in rows from its offset (the layer's pixels, scaled
+-- like the base tiles), cut at the map's edge; one shown only on mouseover isn't explored. Returns
+-- how many of the pool are in use.
+local function LayOverlay(where, info, layer, scale, n)
+	local width, height = Number(info.textureWidth), Number(info.textureHeight)
+	local files, mouseOver = info.fileDataIDs, info.isShownByMouseOver
+	if not (width and height and width > 0 and height > 0) or issecret(files) or type(files) ~= "table"
+		or issecret(mouseOver) or mouseOver == true then
+		return n
+	end
+	local onTop = not issecret(info.isDrawOnTopLayer) and info.isDrawOnTopLayer == true
+	local x0, y0 = Number(info.offsetX) or 0, Number(info.offsetY) or 0
+	local wide, tall = math.ceil(width / layer.tileWidth), math.ceil(height / layer.tileHeight)
+	for row = 1, tall do
+		local y = y0 + (row - 1) * layer.tileHeight
+		local h, fileH = OverlayPart(height, layer.tileHeight, row == tall)
+		h = math.min(h, layer.layerHeight - y)
+		for col = 1, wide do
+			local x = x0 + (col - 1) * layer.tileWidth
+			local w, fileW = OverlayPart(width, layer.tileWidth, col == wide)
+			w = math.min(w, layer.layerWidth - x)
+			local file = files[(row - 1) * wide + col]
+			if file and w > 0 and h > 0 then
+				n = n + 1
+				local tile = where.overlays[n] or where.Map:CreateTexture(nil, "ARTWORK", nil, 1)
+				where.overlays[n] = tile
+				tile:SetDrawLayer("ARTWORK", onTop and 2 or 1) -- (over the base art; some over the others, as Blizzard draws them)
+				tile:SetTexture(file)
+				tile:SetTexCoord(0, w / fileW, 0, h / fileH)
+				tile:SetSize(w * scale, h * scale)
+				tile:ClearAllPoints()
+				tile:SetPoint("TOPLEFT", where.Map, "TOPLEFT", x * scale, -y * scale)
+				tile:Show()
+			end
+		end
+	end
+	return n
+end
+
 -- The world map's art of a zone, DROPS_W wide: its first layer's tiles, laid like
 -- Blizzard_MapCanvasDetailLayer (and the fight stream's map), the last column and row cut to the
--- map's edge. No art: its dark back alone. Returns its height; laid again only for another map.
+-- map's edge. That art leaves what you haven't explored blank; what you have is overlays on it
+-- (C_MapExplorationInfo.GetExploredMapTextures, laid like Blizzard's MapExplorationPin), so the map
+-- shows what your world map shows (the user: "ideally the same visibility the player has"). The
+-- game saying nothing: the art alone. No art: its dark back alone. Returns its height; laid again
+-- only for another map, or once you've explored more (MAP_EXPLORATION_UPDATED: where.mapID = nil).
 local function LayMap(where, mapID)
 	if where.mapID == mapID then
 		return where.height
@@ -393,7 +459,7 @@ local function LayMap(where, mapID)
 	local layers = C_Map and Value(C_Map.GetMapArtLayers, mapID)
 	local layer = type(layers) == "table" and layers[1]
 	local textures = type(layer) == "table" and Value(C_Map.GetMapArtLayerTextures, mapID, 1)
-	local height, n = math.floor(DROPS_W * 2 / 3), 0
+	local height, n, o = math.floor(DROPS_W * 2 / 3), 0, 0
 	if type(textures) == "table" and (layer.layerWidth or 0) > 0 and (layer.layerHeight or 0) > 0
 		and (layer.tileWidth or 0) > 0 and (layer.tileHeight or 0) > 0 then
 		local scale = DROPS_W / layer.layerWidth
@@ -417,9 +483,18 @@ local function LayMap(where, mapID)
 				end
 			end
 		end
+		local explored = C_MapExplorationInfo and Value(C_MapExplorationInfo.GetExploredMapTextures, mapID)
+		for _, info in ipairs(type(explored) == "table" and explored or {}) do
+			if not issecret(info) and type(info) == "table" then
+				o = LayOverlay(where, info, layer, scale, o)
+			end
+		end
 	end
 	for i = n + 1, #where.tiles do
 		where.tiles[i]:Hide()
+	end
+	for i = o + 1, #where.overlays do
+		where.overlays[i]:Hide()
 	end
 	where.height = height
 	where.Map:SetSize(DROPS_W, height)
@@ -893,8 +968,8 @@ local function Build()
 		pane.sections[key] = section
 	end
 	-- Under the drops, where you killed it: a heading like theirs, the map (a dark back under its
-	-- art, the dots on top) and a line under it.
-	local where = { tiles = {}, dots = {} }
+	-- art and what you've explored of it, the dots on top) and a line under it.
+	local where = { tiles = {}, overlays = {}, dots = {} }
 	where.Heading = pane.Drops:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	where.Rule = pane.Drops:CreateTexture(nil, "ARTWORK")
 	where.Rule:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
@@ -929,8 +1004,11 @@ local function Build()
 				self.redrawSoon, namesWanted = false, false
 				Bt.DrawLedger()
 			end)
+		elseif event == "MAP_EXPLORATION_UPDATED" then
+			where.mapID = nil -- (you've explored more: the map is laid again when next drawn)
 		end
 	end)
+	ledger:RegisterEvent("MAP_EXPLORATION_UPDATED") -- (rare, and only a flag: also while closed)
 	ledger:SetScript("OnShow", function(self) self:RegisterEvent("GET_ITEM_INFO_RECEIVED") end)
 	ledger:SetScript("OnHide", function(self)
 		self:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
