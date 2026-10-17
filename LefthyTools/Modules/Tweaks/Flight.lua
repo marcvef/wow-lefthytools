@@ -594,69 +594,74 @@ local function ShouldStart()
 	return M.enabled and M.db.cinematicFlights and not dismissed and OnTaxi() and not InCombat() and not ChatActive()
 end
 
-driver:SetScript("OnUpdate", function(self, elapsed)
-	sincePoll = sincePoll + elapsed
-	if sincePoll < POLL and not leaveNow then
+-- The driver, 4x a second while it's shown, in one of three states:
+
+-- The film was ended for this flight (combat, a popup): only the flight's time is still taken.
+local function WhileDismissed(self)
+	if not OnTaxi() then
+		FlightTime.Record(trip)
+		trip = nil
+		self:Hide()
+	end
+end
+
+-- A window, typing, a waiting offer or an opened link pause the film; RESUME_DELAY after they're
+-- done it comes back. (The fewest windows this flight count as none: the taxi map closes at takeoff.)
+local function PauseOrResume(now)
+	local windows = Windows()
+	baseline = math.min(baseline, windows)
+	local busy = ChatActive() or windows > baseline or OfferWaiting() or LinkOpen()
+	if shown and busy then
+		Pause()
+	elseif not shown then
+		if busy then
+			resumeAt = nil
+		elseif not resumeAt then
+			resumeAt = now + RESUME_DELAY
+		elseif now >= resumeAt then
+			Show()
+		end
+	end
+end
+
+-- On the flight with the film (shown or paused): landing, leaving, pausing, and what's on screen.
+local function WhileFlying(self)
+	if not OnTaxi() then
+		FlightTime.Record(trip)
+		trip = nil
+		EndFilm(true)
+		self:Hide()
 		return
 	end
-	sincePoll = 0
-	if dismissed and trip then
-		-- The film was ended: only the flight's time is still taken.
-		if not OnTaxi() then
-			FlightTime.Record(trip)
-			trip = nil
+	if leaveNow or not (M.enabled and M.db.cinematicFlights) or InCombat() then
+		EndFilm(false)
+		dismissed = true
+		if not trip then
 			self:Hide()
 		end
 		return
 	end
-	if flying then
-		if not OnTaxi() then
-			FlightTime.Record(trip)
-			trip = nil
-			EndFilm(true)
-			self:Hide()
-			return
-		end
-		if leaveNow or not (M.enabled and M.db.cinematicFlights) or InCombat() then
-			EndFilm(false)
-			dismissed = true
-			if not trip then
-				self:Hide()
-			end
-			return
-		end
-		local now = GetTime()
-		local windows = Windows()
-		baseline = math.min(baseline, windows)
-		local busy = ChatActive() or windows > baseline or OfferWaiting() or LinkOpen()
-		if shown and busy then
-			Pause()
-		elseif not shown then
-			if busy then
-				resumeAt = nil
-			elseif not resumeAt then
-				resumeAt = now + RESUME_DELAY
-			elseif now >= resumeAt then
-				Show()
-			end
-		end
-		if not shown then
-			return
-		end
-		if zoneChanged then
-			zoneChanged = false
-			ZoneCard()
-		end
-		if chatChanged or subtitles[1] then
-			chatChanged = false
-			UpdateSubtitles()
-		end
-		UpdateTimer()
-		if now - friendsAt >= FRIENDS_EVERY then
-			UpdateFriends(now)
-		end
+	local now = GetTime()
+	PauseOrResume(now)
+	if not shown then
 		return
 	end
+	if zoneChanged then
+		zoneChanged = false
+		ZoneCard()
+	end
+	if chatChanged or subtitles[1] then
+		chatChanged = false
+		UpdateSubtitles()
+	end
+	UpdateTimer()
+	if now - friendsAt >= FRIENDS_EVERY then
+		UpdateFriends(now)
+	end
+end
+
+-- After losing control (or a reload): looking for the taxi; once in the air, the film starts.
+local function WhileLooking(self)
 	if ShouldStart() then
 		Start()
 	elseif M.enabled and M.db.cinematicFlights and not dismissed and not InCombat() and OnTaxi() then
@@ -664,6 +669,21 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 	elseif not lookUntil or GetTime() > lookUntil then
 		lookUntil = nil
 		self:Hide() -- on the ground: nothing to do until the next flight
+	end
+end
+
+driver:SetScript("OnUpdate", function(self, elapsed)
+	sincePoll = sincePoll + elapsed
+	if sincePoll < POLL and not leaveNow then
+		return
+	end
+	sincePoll = 0
+	if dismissed and trip then
+		WhileDismissed(self)
+	elseif flying then
+		WhileFlying(self)
+	else
+		WhileLooking(self)
 	end
 end)
 
