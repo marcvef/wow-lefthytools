@@ -311,5 +311,8 @@ ns.CHANGELOG = {
 	{ id = 101, module = "bestiary",
 		en = { "Quest drops while questing", "While a quest wants an item a mob drops, the Bestiary window shows how far you are, its chance and about how many more kills. The drops beside the mouse get one small line for it." },
 		de = { "Quest-Drops beim Questen", "Will eine Quest ein Item, das ein Mob droppt, zeigt das Bestiary-Fenster deinen Stand, die Chance und wie viele Kills es etwa noch braucht. Die Drops neben der Maus bekommen eine kleine Zeile dazu." } },
+	{ id = 102, module = "bestiary",
+		en = { "Wish list and dry streak", "Alt-click a drop in the Bestiary to pin it: a star marks it wherever it shows, and the ledger lists your wishes. When it finally drops, one quiet line says after how many kills." },
+		de = { "Wunschliste und Durststrecke", "Alt-Klick auf einen Drop im Bestiary merkt ihn vor: ein Stern markiert ihn überall, und das Verzeichnis zeigt deine Wünsche. Droppt er endlich, sagt eine ruhige Zeile, nach wie vielen Kills." } },
 	-- New entries go here, at the end.
 }

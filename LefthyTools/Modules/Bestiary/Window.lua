@@ -26,6 +26,11 @@ local M = Bt.module
 -- Quest drops (Bestiary.lua): while a quest wants an item this mob drops, the window has a line for
 -- it under the header ("Gnoll Paw: 3/8, 40% each, about 12 more kills", the quest's "!" in front)
 -- and the card one more small line, also over a mob you haven't killed yet.
+--
+-- The wish list (Bestiary.lua): Alt-click on a drop here or in the ledger pins it (or unpins it).
+-- Wished drops have a small star wherever they show; the card puts a wished item a mob drops first
+-- (from the classic database, faded, when you haven't had one), also over a mob you haven't killed;
+-- item tooltips say it's on your wish list.
 
 local WIDTH = 236
 local PAD = 10
@@ -177,9 +182,9 @@ local function ListDrops(list)
 			if drop.unseen then
 				r, g, b = 0.55, 0.55, 0.55
 			end
-			GameTooltip:AddDoubleLine(("|T%s:14:14|t %s%s"):format(ItemIcon(drop.id), drop.name or ItemName(drop.id),
-				drop.skin and (" |T%s:12:12|t"):format(Bt.SKIN_ICON) or drop.quest and (" |T%s:12:12|t"):format(QUEST_ICON) or ""),
-				Percent(drop.chance), r, g, b, right, right, right)
+			GameTooltip:AddDoubleLine(("|T%s:14:14|t %s%s%s"):format(ItemIcon(drop.id), drop.name or ItemName(drop.id),
+				drop.skin and (" |T%s:12:12|t"):format(Bt.SKIN_ICON) or drop.quest and (" |T%s:12:12|t"):format(QUEST_ICON) or "",
+				Bt.Wish(drop.id) and (" |T%s:12:12|t"):format(Bt.STAR) or ""), Percent(drop.chance), r, g, b, right, right, right)
 		end
 	end
 end
@@ -210,6 +215,13 @@ local function AddUnseen(drop)
 		GameTooltip:AddLine((drop.skin and L["Not seen yet in your %d skinnings"] or L["Not seen yet in your %d kills"]):format(out), 0.7, 0.7, 0.7)
 	end
 end
+
+-- "On your Bestiary wish list (37 kills since you pinned it)", with its star.
+local function AddWish(tooltip, wish)
+	tooltip:AddLine(("|T%s:12:12|t "):format(Bt.STAR) .. L["On your Bestiary wish list (%d kills since you pinned it)"]:format(wish[2] or 0),
+		GOLD[1], GOLD[2], GOLD[3])
+end
+Bt.AddWish = AddWish
 
 local function CellOnEnter(cell)
 	GameTooltip:SetOwner(cell, "ANCHOR_RIGHT")
@@ -247,8 +259,13 @@ local function CellOnEnter(cell)
 		end
 		AddClassic(drop, 0.8, 0.8, 0.8)
 	end
+	local wish = Bt.Wish(drop.id)
+	if wish then
+		AddWish(GameTooltip, wish)
+	end
 	if cell.link then
 		GameTooltip:AddLine(L["Shift-click: link it in chat"], 0.6, 0.6, 0.6)
+		GameTooltip:AddLine(wish and L["Alt-click: off your wish list"] or L["Alt-click: on your wish list"], 0.6, 0.6, 0.6)
 	end
 	GameTooltip:Show()
 end
@@ -262,7 +279,12 @@ local function CellOnLeave(cell)
 end
 
 local function CellOnClick(cell)
-	if cell.drop and cell.link then
+	if cell.drop and cell.link and IsAltKeyDown() then -- (the wish list: on, or off again)
+		Bt.ToggleWish(cell.drop.id, cell.drop)
+		if GameTooltip:IsOwned(cell) then
+			CellOnEnter(cell)
+		end
+	elseif cell.drop and cell.link then
 		local link = select(2, C_Item.GetItemInfo(("item:%d"):format(cell.drop.id)))
 		if link then
 			HandleModifiedItemClick(link)
@@ -296,6 +318,12 @@ local function NewCell(parent, size, link)
 	cell.Quest:SetPoint("TOPLEFT", cell.Edge, "TOPLEFT", -3, 3)
 	cell.Quest:SetTexture(QUEST_ICON)
 	cell.Quest:Hide()
+	-- On your wish list: a small star in the top right corner.
+	cell.Star = cell:CreateTexture(nil, "OVERLAY", nil, 3)
+	cell.Star:SetSize(math.floor(size * 0.45), math.floor(size * 0.45))
+	cell.Star:SetPoint("TOPRIGHT", cell.Edge, "TOPRIGHT", 3, 3)
+	cell.Star:SetTexture(Bt.STAR)
+	cell.Star:Hide()
 	cell.More = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	cell.More:SetPoint("CENTER", cell.Edge, "CENTER", 0, 0)
 	cell.Chance = cell:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -328,6 +356,7 @@ local function FillCell(cell, drop, kills)
 	cell.Count:SetText(unseen and "" or tostring(drop.count))
 	cell.Skin:SetShown(drop.skin and true or false)
 	cell.Quest:SetShown(drop.quest and not drop.skin and true or false)
+	cell.Star:SetShown(Bt.Wish(drop.id) ~= nil)
 	cell.More:SetText("")
 	cell.Chance:SetText(Percent(drop.chance))
 	if unseen then
@@ -344,6 +373,7 @@ local function Plain(cell)
 	cell.Icon:SetAlpha(1)
 	cell.Skin:Hide()
 	cell.Quest:Hide()
+	cell.Star:Hide()
 end
 
 -- A mob's world drops in one place: a map, how many, "world" under it; the list in its tooltip.
@@ -356,6 +386,11 @@ local function FillWorld(cell, entry, kills)
 	cell.Icon:SetTexture(WORLD_ICON)
 	cell.Icon:Show()
 	Plain(cell)
+	for _, drop in ipairs(entry.group) do
+		if Bt.Wish(drop.id) then
+			cell.Star:Show() -- (a wished one among them)
+		end
+	end
 	cell.Count:SetText(tostring(#entry.group))
 	cell.More:SetText("")
 	cell.Chance:SetText(L["world"])
@@ -438,11 +473,19 @@ Bt.Dress = Dress
 local TOOLTIP_SOURCES = 3
 
 local function OnItemTooltip(tooltip, info)
-	if ownTooltip or not (M.enabled and M.db.itemTooltip) or (tooltip ~= GameTooltip and tooltip ~= _G.ItemRefTooltip) then
+	if ownTooltip or not M.enabled or (tooltip ~= GameTooltip and tooltip ~= _G.ItemRefTooltip) then
 		return
 	end
 	local id = info and info.id
-	local list = type(id) == "number" and not issecret(id) and Bt.Sources(id)
+	if type(id) ~= "number" or issecret(id) then
+		return
+	end
+	-- On your wish list: said (also with the setting off: you pinned it).
+	local list, wish = M.db.itemTooltip and Bt.Sources(id), Bt.Wish(id)
+	if wish and not list then
+		tooltip:AddLine(" ")
+		AddWish(tooltip, wish)
+	end
 	if not list then
 		return
 	end
@@ -460,6 +503,9 @@ local function OnItemTooltip(tooltip, info)
 	end
 	if Bt.IsWorldDrop(id, list[1].quality) then
 		tooltip:AddLine(L["A world drop: random gear from mobs of its level, anywhere."], 0.6, 0.6, 0.6)
+	end
+	if wish then
+		AddWish(tooltip, wish)
 	end
 end
 
@@ -778,12 +824,50 @@ local function BuildCard()
 	card:SetScript("OnUpdate", CardFollow)
 end
 
+-- Wished items a mob drops go first on its card, with their star: yours (a world drop's too), else the
+-- classic database's, faded (you haven't had one). drops may be nil (nothing to show otherwise).
+local function WishedFirst(creature, mob, drops)
+	local wishes = Bt.Wishes()
+	if not next(wishes) then
+		return drops
+	end
+	local first, rest, had = {}, {}, {}
+	for _, drop in ipairs(drops or NONE) do
+		if not drop.group and wishes[drop.id] and not had[drop.id] then
+			first[#first + 1], had[drop.id] = drop, true
+		else
+			rest[#rest + 1] = drop
+		end
+		for _, inside in ipairs(drop.group or NONE) do
+			if wishes[inside.id] and not had[inside.id] then
+				first[#first + 1], had[inside.id] = inside, true
+			end
+		end
+	end
+	local said = Bt.Known(creature)
+	for id in pairs(wishes) do
+		local item = not had[id] and said and said.items[id]
+		if item then
+			first[#first + 1] = { id = id, chance = item[1], quality = item[2], quest = item[3] or nil, unseen = true, drops = 0, count = 0,
+				classic = item[1], out = mob and mob.kills or 0 }
+		end
+	end
+	if #first == 0 then
+		return drops
+	end
+	for _, drop in ipairs(rest) do
+		first[#first + 1] = drop
+	end
+	return first
+end
+
 -- Over an enemy: its card (setting hoverCard), small on purpose (the user: not "too large and
 -- intrusive"): a line and one row of CARD_CELLS icons, never more, and none in combat (setting
 -- cardHideInCombat, on; it goes when a fight starts, comes back after). Killed before: your kills and
 -- your likeliest drops (not the database's on top); not yet, with the setting cardUnseen (off): the
 -- classic database's likeliest, faded. The only line more: a quest that still wants one of its drops
--- (then also over a mob you haven't killed: useful while questing).
+-- (then also over a mob you haven't killed: useful while questing). Wished items it drops come first
+-- (also over a mob you haven't killed).
 function Bt.MouseoverChanged()
 	if not (M.enabled and M.db.hoverCard) or CardHidden() or not UnitExists("mouseover")
 		or not (Value(UnitCanAttack, "player", "mouseover") or Value(UnitIsDead, "mouseover")) then
@@ -804,6 +888,7 @@ function Bt.MouseoverChanged()
 			drops, line = unseen, notKilled
 		end
 	end
+	drops = WishedFirst(creature, mob, drops)
 	-- A quest that still wants one of its drops: a line (and how many more want others).
 	local want, others = nil, 0
 	for _, wanted in ipairs(Bt.QuestDrops(creature, mob)) do
@@ -856,6 +941,14 @@ function Bt.QuestsChanged()
 	end
 	if card and card:IsShown() then
 		Bt.MouseoverChanged()
+	end
+end
+
+-- The wish list changed: its stars everywhere (the window, the card, the ledger and its strip).
+function Bt.WishesChanged()
+	Bt.QuestsChanged()
+	if Bt.DrawLedger then
+		Bt.DrawLedger()
 	end
 end
 

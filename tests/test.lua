@@ -7216,6 +7216,141 @@ section("Bestiary: quest drops while questing")
 	Bt.Toggle(false)
 end)()
 
+section("Bestiary: wish list and dry streak")
+;(function()
+	local Bt = ns.Bestiary
+	local function setting(id) return REGISTERED_SETTINGS["LefthyTools_bestiary_" .. id] end
+	local function tipFind(text)
+		for _, l in ipairs(TOOLTIP.lines) do if l:find(text, 1, true) then return true end end
+		return false
+	end
+	local function cellOf(list, id) for _, c in ipairs(list) do if c:IsShown() and c.drop and c.drop.id == id then return c end end end
+	ITEMS[774] = ITEMS[774] or { name = "Malachite", quality = 2 }
+	LefthyToolsDropData.mobs[119] = "774:2:500" -- (a mob the Bestiary has never met: no name)
+	check(LefthyToolsBestiaryDB.wishes == nil, "no wish list yet: nothing saved for it")
+	-- Alt-click on a drop in the window: on the wish list, a star on it.
+	MOBS.target, STATE.target = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000070" }, true
+	Bt.Toggle(true)
+	local win = Bt.Frames()
+	local linen = cellOf(win.cells, 2589)
+	linen._scripts.OnEnter(linen)
+	check(not linen.Star:IsShown() and tipFind("Alt-click: on your wish list"), "a drop: no star; its tooltip says how to pin it")
+	local pmark = #PRINTED + 1
+	STATE.alt = true
+	linen._scripts.OnClick(linen)
+	STATE.alt = false
+	local wish = Bt.Wish(2589)
+	linen = cellOf(win.cells, 2589)
+	check(wish and wish[1] == time() and wish[2] == 0 and wish[4] == "Linen Cloth" and wish[5] == 1 and linen.Star:IsShown()
+		and printedSince(pmark):find("is on your wish list", 1, true) and tipFind("On your Bestiary wish list (0 kills since you pinned it)")
+		and tipFind("Alt-click: off your wish list"), "Alt-click: on the wish list (when, its name and quality kept), a star, a chat line")
+	linen._scripts.OnLeave(linen)
+	Advance(1)
+	-- Item tooltips say so, also with the drop chances there switched off.
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:2589")
+	check(tipFind("Bestiary  drop chance (kills)") and tipFind("On your Bestiary wish list (0 kills"), "an item's tooltip: on your wish list")
+	setting("itemTooltip"):SetValue(false)
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:2589")
+	check(not tipFind("drop chance") and tipFind("On your Bestiary wish list"), "the drop chances off: still on your wish list")
+	setting("itemTooltip"):SetValue(true)
+	-- /bestiary wish <item link or ID>: on, and off again; /bestiary wishes: the list.
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("wish 774")
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("wish " .. ItemLink(1179))
+	check(Bt.Wish(774) and Bt.Wish(774)[4] == "Malachite" and Bt.Wish(1179), "/bestiary wish with an ID or a link: pinned")
+	pmark = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("wish 1179")
+	check(not Bt.Wish(1179) and printedSince(pmark):find("is off your wish list", 1, true), "again: off it")
+	pmark = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("wish 99999")
+	check(printedSince(pmark):find("there's no item 99999", 1, true) and not Bt.Wish(99999), "an item that doesn't exist: said so")
+	pmark = #PRINTED + 1
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("wishes")
+	local listed = printedSince(pmark)
+	check(listed:find("your wish list (2)", 1, true) and listed:find("[Linen Cloth]|h|r: 0 kills since you pinned it, likeliest from", 1, true)
+		and listed:find("[Malachite]|h|r: 0 kills since you pinned it, likeliest from Defias Bandit (1.3%)", 1, true),
+		"/bestiary wishes: each, the kills since and where it comes from likeliest, got\n" .. listed)
+	-- The card: wished items it drops first, with their star (from the database, faded, when not had yet).
+	setting("hoverCard"):SetValue(true)
+	MOBS.mouseover = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000071", pinned = true }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	local card = select(2, Bt.Frames())
+	local cells = card.cells
+	check(card:IsShown() and cells[1].drop.id == 2589 and cells[1].Star:IsShown() and cells[2].drop.id == 774 and cells[2].drop.unseen
+		and cells[2].Icon.desaturated and cells[2].Star:IsShown() and not cells[3].Star:IsShown(),
+		"the card: wished items first with their star (the Malachite from the database, faded: not had yet)")
+	MOBS.mouseover = { name = "Young Wolf", level = 2, guid = "Creature-0-1-0-1-118-00000072", pinned = true }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	check(card:IsShown() and card.Kills:GetText():find("Not killed yet", 1, true) and cells[1].drop.id == 2589 and cells[1].Star:IsShown()
+		and not cells[2]:IsShown(), "a mob not killed yet that drops a wished item: its card, with just that")
+	MOBS.mouseover = nil
+	Advance(0.1)
+	setting("hoverCard"):SetValue(false)
+	-- The ledger: a strip of the wishes at the top; hover: where each drops; click: search for it.
+	Bt.ToggleLedger(116)
+	local ledger = Bt.Ledger()
+	local strip = ledger.wishes
+	check(strip[1]:IsShown() and strip[1].id == 2589 and strip[2]:IsShown() and strip[2].id == 774 and not (strip[3] and strip[3]:IsShown())
+		and ledger.WishLabel:GetText():find("Wish list", 1, true), "the ledger: the wish list as a strip of icons, the first pinned first")
+	strip[2]._scripts.OnEnter(strip[2])
+	check(TOOLTIP.title:find("Malachite", 1, true) and tipFind("Defias Bandit  1.3% |cff888888classic database|r")
+		and tipFind("and 1 more in the classic database") and tipFind("On your Bestiary wish list (0 kills"),
+		"hover: the database's mobs you've met, named; the one you haven't, counted")
+	strip[2]._scripts.OnLeave(strip[2])
+	strip[1]._scripts.OnEnter(strip[1])
+	check(tipFind("Defias Bandit  ") and tipFind("Young Wolf  15% |cff888888classic database|r") and not tipFind("more in the classic"),
+		"your own drops with your kills, the database's for a mob you've only seen")
+	strip[1]._scripts.OnLeave(strip[1])
+	strip[2]._scripts.OnClick(strip[2])
+	check(ledger.Search:GetText() == "Malachite", "a click searches for it")
+	ledger.Search:SetText("")
+	STATE.alt = true
+	strip[2]._scripts.OnClick(strip[2])
+	STATE.alt = false
+	check(not Bt.Wish(774) and not strip[2]:IsShown(), "Alt-click: off the list")
+	local mace = cellOf(ledger.Pane.sections.own.cells, 2075)
+	STATE.alt = true
+	mace._scripts.OnClick(mace)
+	STATE.alt = false
+	check(Bt.Wish(2075) and cellOf(ledger.Pane.sections.own.cells, 2075).Star:IsShown() and strip[2]:IsShown() and strip[2].id == 2075,
+		"Alt-click on a drop in the ledger: pinned, a star, in the strip")
+	ledger:Hide()
+	-- The dry streak: kills of mobs that drop it count, their chances add up; when it drops, one quiet
+	-- line (after how many, how many expected) and it's off the list.
+	Advance(1)
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("wish 774")
+	local function kill(guid, loot)
+		Fire("PARTY_KILL", "Player-1-0", guid)
+		for _, slot in ipairs(loot) do slot.source = guid end
+		LOOT = loot
+		Fire("LOOT_READY", false)
+		Fire("LOOT_CLOSED")
+		LOOT = {}
+	end
+	kill("Creature-0-1-0-1-116-00000073", { { type = 1, id = 4865 } })
+	LOOT_EMPTY["Creature-0-1-0-1-116-00000074"] = true
+	Fire("PARTY_KILL", "Player-1-0", "Creature-0-1-0-1-116-00000074")
+	Advance(6.2)
+	kill("Creature-0-1-0-1-117-00000075", { { type = 1, id = 1179 } }) -- (a gnoll: no Malachite)
+	check(Bt.Wish(774)[2] == 2 and near(Bt.Wish(774)[3], 0.0256, 1e-9) and Bt.Wish(2589)[2] == 3,
+		"kills of mobs that drop it count (an empty corpse too, not the gnoll for the Malachite), their chances add up")
+	pmark = #PRINTED + 1
+	kill("Creature-0-1-0-1-116-00000076", { { type = 1, id = 774 }, { type = 1, id = 4865 } })
+	local said = printedSince(pmark)
+	check(said == "|cffe0b060Bestiary|r: " .. ItemLink(774) .. " after 3 kills (about 78 expected); off your wish list."
+		and not Bt.Wish(774) and cellOf(win.cells, 774) and not cellOf(win.cells, 774).Star:IsShown(),
+		"it drops: one line, after 3 kills (78 expected: 1.28% each), and it's off the list, got\n" .. said)
+	pmark = #PRINTED + 1
+	kill("Creature-0-1-0-1-116-00000077", { { type = 1, id = 2589 } })
+	check(printedSince(pmark):find("[Linen Cloth]|h|r after 5 kills (about 3 expected); off your wish list.", 1, true),
+		"another: the chances of different mobs added up (5 kills, about 3 expected)")
+	SlashCmdList.LEFTHYTOOLS_BESTIARY("wish 2075")
+	check(LefthyToolsBestiaryDB.wishes == nil, "the last one off: nothing kept for it")
+	LefthyToolsDropData.mobs[119], MOBS.target, STATE.target = nil, nil, false
+	Bt.Toggle(false)
+end)()
+
 section("Misc Tweaks: who has aggro, on enemy nameplates")
 ;(function()
 	local function tagText(unit) local t = ns.GetAggroTag(unit); return t and t:IsShown() and t.Text:GetText() or nil end

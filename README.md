@@ -360,6 +360,13 @@ takes mobs' health from it too. `/bestiary data` says whether the database is th
 database), the window says so under the mob: "Gnoll Paw: 3/8, 40% each, about 12 more kills". The
 card beside the mouse gets one more small line for it, also over a mob you haven't killed yet.
 
+**Wish list.** Alt-click a drop in the window or the ledger (or `/bestiary wish <item link or ID>`)
+to pin an item you're after. It gets a small star wherever it shows, the card puts it first on any
+mob that drops it, and the ledger shows your wishes as a strip at the top: hover one for where it
+drops and how many kills since you pinned it, click to search for it. When it finally drops, one
+quiet chat line says after how many kills (and how many you'd have expected), and it comes off the
+list. `/bestiary wishes` lists them.
+
 Minimap button: click for the window, **Shift-click** to switch the drops next to the mouse on
 or off, Ctrl-click for the ledger, right-click for the settings. `/bestiary log` shows what was
 made of your last loot windows (to see why something wasn't counted).

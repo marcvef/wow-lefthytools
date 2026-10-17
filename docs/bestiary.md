@@ -17,6 +17,8 @@ mobs = { [creature ID] = { name, level, class (UnitClassification), kills, money
          kills), first, last (time()), items = { [item ID] = { drops, count, quality, name } },
          skinned, skins = { [item ID] = { times, count, quality, name } } } }
 log = { { time, creature, what, items, check }, ... } (the last 12)
+wishes = { [item ID] = { pinned (time()), kills since, expected drops in them, name, quality } }
+         (the wish list; only while there's one)
 ```
 
 The creature ID comes from the GUID (`Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>`, also
@@ -206,6 +208,46 @@ While a quest wants an item a mob can drop, the window and the card say so (the 
   a quest wants its drop, without `cardUnseen`: "Not killed yet: classic database" and the quest's
   line, no icons.
 
+## The wish list
+
+Items you're after (the user: "Pin an item ... Mobs that drop it get a small mark on the card. When
+it finally drops, a quiet line says 'after 87 kills (expected about 40)'"). Your own only, like the
+rest.
+
+- **Pinning**: Alt-click on a drop in the window or the ledger (also one not seen yet), or
+  `/bestiary wish <item link or ID>` (an ID `GetItemInfoInstant` doesn't know: said so); the same
+  again takes it off. A chat line says which. `/bestiary wishes` lists them in chat: kills since
+  and where each comes from likeliest. Tooltips can't be clicked, so there's no pinning from bags.
+- **Saved** as `wishes` (above): when, the kills since, the chances of those kills added up, and
+  name and quality as known then (the ledger's strip before the client knows the item). The table
+  is only there while it has a wish (old saved data without it works as before).
+- **Counting** (`WishKill`, per counted kill: looted, or said empty): a kill counts for a wish when
+  its kind drops the item, by the classic database or your own record (`Bt.ChanceOf`, the same
+  chance as quest drops), and adds that chance. Skinning doesn't count. A kill said empty and looted
+  after all isn't counted again, its items are still looked at.
+- **When it drops** (an item of a counted kill's loot): one chat line, no sound, no popup:
+  "Bestiary: [item] after 87 kills (about 40 expected); off your wish list." Expected = kills /
+  the chances added up (1 / its chance when it's all one kind of mob), at least 1; none known: left
+  out. It comes off the list.
+- **The star** (`Bt.STAR`, the raid marker's star): on wished drops in the window, the ledger and
+  the card (top right corner; on the world drops' place when one of them is wished), after the name
+  in drop lists.
+- **The card** puts wished items the mob drops first: yours (also from among its world drops), else
+  the classic database's, faded (not had yet). That also brings up the card over a mob you haven't
+  killed, with only those.
+- **Item tooltips**: "On your Bestiary wish list (37 kills since you pinned it)" with the star,
+  also with `itemTooltip` off.
+- **The ledger's strip** (top right, at most 8 icons, the first pinned leftmost, "+N" beside "Wish
+  list" for more; empty: "Wish list: Alt-click a drop to pin it"). Hover (`Bt.WishSources`): the
+  item, kills since, and where it drops: your own drops (your chance and kills) and the classic
+  database's (its chance). The database has creature IDs but no names, so only mobs the Bestiary
+  knows are named (a record, or seen this session: target, mouseover, nameplates); the rest are
+  counted ("and 3 more in the classic database"). At most 8 named. Click: searches for it (its
+  name); Alt-click: off the list; Shift-click: links it.
+- **The database's sources** (`Bt.KnownSources`): a plain `find` for "<item>:" over every mob's
+  text, then the drops part (before ";s=") of the ones found matched exactly; nothing more is read
+  or kept but the list, per item, until a setting changes. A few milliseconds once per item.
+
 ## Item tooltips
 
 Setting `itemTooltip` (on). A post-call on item tooltips (`TooltipDataProcessor`, only
@@ -222,7 +264,7 @@ the settings or `/bestiary ledger [search]`.
 
 - **At the top**: "2 mobs · 7 kills · 5 items · 12s coin, 1s 76c per kill" (the coin per kill over
   all kills), and the **rarest find**: the looted item with the lowest chance among mobs with at
-  least 5 kills, its icon, chance and mob.
+  least 5 kills, its icon, chance and mob. On the right the wish list's strip (above).
 - **The list** (left, scrolling): a row per mob with kills or skinnings: name (found letters in
   gold), level, Elite/Rare, kills on the right, its best drops as tiny icons (best quality first).
   Sorted by most kills, name, level, coin per kill or last killed (a picker of our own).
@@ -251,7 +293,7 @@ ledger, minimap button (on), drops beside the mouse (off), hidden in combat (on)
 item tooltips (on), grey
 items (on), compare with a drop database (on), not seen yet in the window (off), mobs not killed
 yet beside the mouse (off). `/bestiary`
-(`open`, `ledger [search]`, `log`,
+(`open`, `ledger [search]`, `wish <item link or ID>`, `wishes`, `log`,
 `data`, `minimap`, `settings`).
 
 ## Cost
@@ -272,3 +314,4 @@ mob's record changes or the target does; the card's OnUpdate runs only while it'
   two kills on tells).
 - How Forever writes item objectives ("Gnoll Paw: 3/8" or "3/8 Gnoll Paw") and whether it gives
   `numFulfilled`/`numRequired`; that they update while looting.
+- The wish list's star (`UI-RaidTargetingIcon_1`) on cells and in text; Alt-click on a drop.

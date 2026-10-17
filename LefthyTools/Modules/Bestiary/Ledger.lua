@@ -18,6 +18,11 @@ local M = Bt.module
 -- looks at mob names and at the names of everything they dropped: a mob found by one of its items
 -- shows that item and its chance in its row, and the picked mob's matching drops stand out.
 -- Escape closes it (it's for looking things up, unlike the window, which stays).
+--
+-- The wish list (Bestiary.lua) is a strip of icons at the top right: hovering one says where it
+-- drops (your kills, else the classic database's mobs you've seen; how many more it lists) and how
+-- many kills since you pinned it; a click searches for it, Alt-click takes it off the list. Alt-click
+-- on any drop here pins it, as in the window.
 
 local WIDTH, HEIGHT = 640, 470
 local PAD = 12
@@ -28,6 +33,9 @@ local CELL, CELL_GAP, CELL_ROW = 28, 6, 46  -- a drop's icon, the gap, a row wit
 local DROPS_W = WIDTH - (PAD + LIST_W + 14) - PAD - 24 -- (the picked mob's pane, less its scroll bar)
 local PER_ROW = math.floor((DROPS_W + CELL_GAP) / (CELL + CELL_GAP))
 local ROW_ICONS = 6
+local WISH_ICON, WISH_GAP, WISH_TOP = 20, 4, 40 -- the wish list's strip, at the top right
+local WISHES = 8          -- icons in it, at most (the rest: "+N")
+local WISH_SOURCES = 8    -- mobs named in an icon's tooltip, at most
 local GOLD = { 1, 0.82, 0.3 }
 local SORTS = { "kills", "name", "level", "coin", "last" }
 local issecret = issecretvalue or function() return false end
@@ -385,6 +393,111 @@ local function DrawPicked()
 end
 
 ---------------------------------------------------------------------------
+-- The wish list's strip
+---------------------------------------------------------------------------
+
+-- Hover: the item, how many kills since you pinned it, where it drops (your chance and kills, else
+-- the classic database's chance; mobs it lists that you haven't met have no name: counted).
+local function WishOnEnter(self)
+	local wish = Bt.Wish(self.id)
+	if not wish then
+		return
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+	local r, g, b = Bt.QualityColor(wish[5])
+	GameTooltip:SetText(("|T%s:16:16|t %s"):format(Bt.ItemIcon(self.id), wish[4] or Bt.ItemName(self.id)), r, g, b)
+	Bt.AddWish(GameTooltip, wish)
+	local sources, unnamed = Bt.WishSources(self.id)
+	for i = 1, math.min(#sources, WISH_SOURCES) do
+		local source = sources[i]
+		GameTooltip:AddDoubleLine(source.name, source.out and ("%s |cff888888(%d)|r"):format(Bt.Percent(source.chance), source.out)
+			or ("%s |cff888888%s|r"):format(Bt.Percent(source.chance), L["classic database"]), 1, 1, 1, 1, 1, 1)
+	end
+	local more = unnamed + math.max(0, #sources - WISH_SOURCES)
+	if #sources == 0 and unnamed == 0 then
+		GameTooltip:AddLine(L["No mob known to drop it yet."], 0.6, 0.6, 0.6)
+	elseif more > 0 then
+		GameTooltip:AddLine((more == unnamed and L["and %d more in the classic database"] or L["and %d more"]):format(more), 0.6, 0.6, 0.6)
+	end
+	GameTooltip:AddLine(L["Click: search for it"], 0.6, 0.6, 0.6)
+	GameTooltip:AddLine(L["Shift-click: link it in chat"], 0.6, 0.6, 0.6)
+	GameTooltip:AddLine(L["Alt-click: off your wish list"], 0.6, 0.6, 0.6)
+	GameTooltip:Show()
+end
+
+-- Click: search for it; Alt-click: off the list; Shift-click: link it.
+local function WishOnClick(self)
+	if IsAltKeyDown() then
+		GameTooltip:Hide()
+		Bt.ToggleWish(self.id)
+	elseif IsShiftKeyDown() or IsControlKeyDown() then
+		local link = C_Item and select(2, C_Item.GetItemInfo(("item:%d"):format(self.id)))
+		if link then
+			HandleModifiedItemClick(link)
+		end
+	else
+		local wish = Bt.Wish(self.id)
+		ledger.Search:SetText(wish and wish[4] or Bt.ItemName(self.id)) -- (searches: OnTextChanged)
+		ledger.Search:ClearFocus()
+	end
+end
+
+local function NewWish()
+	local button = CreateFrame("Button", nil, ledger)
+	button:SetSize(WISH_ICON, WISH_ICON)
+	button.Edge = button:CreateTexture(nil, "BACKGROUND")
+	button.Edge:SetAllPoints()
+	button.Icon = button:CreateTexture(nil, "ARTWORK")
+	button.Icon:SetPoint("TOPLEFT", 1, -1)
+	button.Icon:SetPoint("BOTTOMRIGHT", -1, 1)
+	button.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	button:SetScript("OnEnter", WishOnEnter)
+	button:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	button:SetScript("OnClick", WishOnClick)
+	return button
+end
+
+-- The strip: the wishes, the first pinned leftmost, right-aligned; empty: how to pin one.
+local function DrawWishes()
+	local wishes, ids = Bt.Wishes(), {}
+	for id in pairs(wishes) do
+		ids[#ids + 1] = id
+	end
+	table.sort(ids, function(a, b)
+		if wishes[a][1] ~= wishes[b][1] then
+			return wishes[a][1] < wishes[b][1]
+		end
+		return a < b
+	end)
+	local shown = math.min(#ids, WISHES)
+	for i = 1, math.max(#ledger.wishes, shown) do
+		local button = ledger.wishes[i]
+		if i <= shown then
+			button = button or NewWish()
+			ledger.wishes[i] = button
+			button.id = ids[i]
+			button:ClearAllPoints()
+			button:SetPoint("TOPRIGHT", ledger, "TOPRIGHT", -PAD - (shown - i) * (WISH_ICON + WISH_GAP), -WISH_TOP)
+			button.Icon:SetTexture(Bt.ItemIcon(ids[i]))
+			local r, g, b = Bt.QualityColor(wishes[ids[i]][5])
+			button.Edge:SetColorTexture(r, g, b, 0.9)
+			button:Show()
+		elseif button then
+			button:Hide()
+		end
+	end
+	ledger.WishLabel:ClearAllPoints()
+	if shown > 0 then
+		ledger.WishLabel:SetPoint("RIGHT", ledger.wishes[1], "LEFT", -6, 0)
+		ledger.WishLabel:SetText(("|T%s:12:12|t "):format(Bt.STAR) .. L["Wish list"] .. (#ids > shown and ("  +" .. (#ids - shown)) or ""))
+	else
+		ledger.WishLabel:SetPoint("TOPRIGHT", ledger, "TOPRIGHT", -PAD, -WISH_TOP - 4)
+		ledger.WishLabel:SetText(L["Wish list: Alt-click a drop to pin it"])
+	end
+end
+
+---------------------------------------------------------------------------
 -- Drawing it all
 ---------------------------------------------------------------------------
 
@@ -401,6 +514,7 @@ function Bt.DrawLedger()
 	else
 		ledger.Rarest:SetText("")
 	end
+	DrawWishes()
 	Collect()
 	if not selected or not Bt.Mob(selected) or (query ~= "" and entries[1] and not ledger.keepPick) then
 		selected = entries[1] and entries[1].creature or selected
@@ -467,6 +581,9 @@ local function Build()
 	ledger.Summary:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
 	ledger.Rarest = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 	ledger.Rarest:SetPoint("TOPLEFT", ledger.Summary, "BOTTOMLEFT", 0, -4)
+	-- The wish list: a strip of icons at the top right (DrawWishes).
+	ledger.WishLabel = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	ledger.wishes = {}
 
 	-- The search: a box with a magnifier, a grey hint while empty, an x to clear it.
 	local box = CreateFrame("EditBox", "LefthyToolsBestiarySearch", ledger)
