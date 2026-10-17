@@ -47,7 +47,7 @@ local JOURNAL_LIMIT, JOURNAL_WINDOW = 700, 60 -- Chronicle journal messages acce
 local STREAM_LIMIT, STREAM_WINDOW = 80, 10 -- fight stream messages accepted from one friend (2 frames a
                              -- second, mob names, keepalives)
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
-local CHAT_LIMIT, CHAT_WINDOW = 5, 5 -- Lefthy chat lines accepted from one friend (a burst of 5 per 5 s)
+local CHAT_LIMIT, CHAT_WINDOW = 5, 5 -- LTC lines accepted from one friend (a burst of 5 per 5 s)
 local ANNOUNCE_GAP = 3       -- announcements from one friend at most this often
 local NEWS_GAP = 60          -- tell one friend what's new in mine at most this often (Updates.lua)
 local FAREWELL_TIMEOUT = 10  -- switched off: stop trying to say goodbye after this long
@@ -69,7 +69,7 @@ local M = LT:NewModule("beacon", {
 		deathAlert = true,
 		pings = true,
 		shareItems = true,
-		lefthyChat = true,    -- Chat.lua: /l lines in the chat window
+		lefthyChat = true,    -- Chat.lua: LTC (/ltc, /l) lines in the chat window
 		lefthyChatSound = true, -- a soft tick when a friend writes there
 		announcements = true, -- /lefthy announce: lines in the middle of the screen
 		dingAnnounce = true,
@@ -88,8 +88,8 @@ local M = LT:NewModule("beacon", {
 	},
 })
 
--- Shared with Dots.lua, Ding.lua and Alerts.lua.
-local B = { module = M, VERSION = VERSION, handlers = {}, listeners = {}, pings = {} }
+-- Shared by Beacon's files, and used by Chronicle and Misc Tweaks (docs/beacon.md lists what).
+local B ={ module = M, VERSION = VERSION, handlers = {}, listeners = {}, pings = {} }
 ns.Beacon = B
 
 -- Things that happened to a friend ("level", "death", ...), for other modules (Chronicle):
@@ -105,11 +105,15 @@ end
 
 -- peers[gameAccountID] = {
 --   seen                             time of their last message
---   name, classFile, guid, level, area   from Battle.net (CopyInfo)
+--   name, classFile, guid, level, area   from Battle.net (CopyInfo); name nil until the first check
 --   hasPos, continent, north, west   their last world position, posTime when it arrived
 --   fromNorth, fromWest, glide       where the minimap dot glides from, over how many seconds
---   dead, ghost, combat, subzone, target
---   rev                              bumped on every change, so dots restyle only when needed
+--   dead, ghost, combat, subzone, target   their last state (S2); stateSeen, blank (sharing off)
+--   quest, mobs, xpPercent           tracked quest (T2), enemies on them (C2), level progress (X2)
+--   version, files, collects         their build (V2, F2), they collect error reports (Y2)
+--   groupUnit                        their unit token while in my group
+--   health, streamable, journal      set by StreamNet.lua (O2) and Chronicle's Sync.lua (J2)
+--   rev                              bumped on every change, so dots and tooltips redraw only then
 -- }
 local peers = {}
 B.peers = peers
@@ -126,9 +130,10 @@ local dings = {}        -- { gameAccountID, level, text } received, shown on the
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
 local pingsIn = {}      -- { gameAccountID, continent, north, west, mapID } received, shown on the next tick
 local highlightsIn = {} -- { gameAccountID, kind, a, b } received, passed on on the next tick
-local itemsIn = {}      -- { "item" | "answer" | "result", gameAccountID, ... } for Items.lua, next tick
+local itemsIn = {}      -- { "item" | "answer" | "result" | "chat" | "announce", gameAccountID, ... }: for
+                        -- Items.lua and Chat.lua, on the next tick
 local dailyIn = {}      -- { gameAccountID, { day, played, xp, ... } }: friends' days, for Chronicle
-local comings = {}      -- { "online" | "offline", peer }: told to listeners on the next tick
+local comings = {}      -- { "known" | "online" | "offline", peer[, data] }: told to listeners on the next tick
 local enabledAt = 0
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
 
