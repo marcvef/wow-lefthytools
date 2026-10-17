@@ -88,5 +88,8 @@ Modules\Bestiary\Classic.lua
 Modules\Bestiary\Quests.lua
 Modules\Bestiary\Wishes.lua
 Modules\Bestiary\Recording.lua
+Modules\Bestiary\Format.lua
+Modules\Bestiary\Cells.lua
 Modules\Bestiary\Window.lua
+Modules\Bestiary\Card.lua
 Modules\Bestiary\Ledger.lua
