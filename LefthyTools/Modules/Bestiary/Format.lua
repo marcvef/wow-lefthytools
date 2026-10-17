@@ -133,7 +133,7 @@ local function Rounded(copper)
 	return copper >= 100 and math.floor(copper / 100 + 0.5) * 100 or math.floor(copper + 0.5)
 end
 
--- What a kill of a kind pays, the parts known (Bestiary.lua: its worth, its pace): short for the
+-- What a kill of a kind pays, the parts known (Bt.Worth, Bt.Pace): short for the
 -- window's line ("Per kill: worth ~45s · 85 XP · 14 s", "(level 12)" when the pace isn't for your
 -- level), and in full, a line each, for its tooltip and the ledger (the worth's coin and vendor
 -- parts, the XP per hour of fighting). nil and {} when nothing's known.

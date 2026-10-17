@@ -12,10 +12,10 @@ local M = Bt.module
 -- kill, skinnings, under the model what a kill pays (its worth, XP and time per kill, XP per hour of
 -- fighting); beside that where you killed it, seen without scrolling (LedgerMap.lua): the world
 -- map's art of the zone with the most kills (what you've explored of it, as your world map shows
--- it), a dot each, a picker for its other zones; under all that its drops (as in the window: quality edge, how many,
--- chance; skinning marked), scrolling.
+-- it), a dot each, a picker for its other zones; under all that its drops (as in the window: quality
+-- edge, how many, chance; skinning marked), scrolling.
 -- At the top what the Bestiary knows in all, and your rarest find. With the classic drop database
--- (Bestiary.lua): a row says how many of its drops you've found, and the picked mob's drops have a
+-- (Classic.lua): a row says how many of its drops you've found, and the picked mob's drops have a
 -- section of what you haven't had yet, faded, between its own drops and its world drops.
 --
 -- The search is fuzzy: a query's letters in order, not necessarily together ("dfbnd" finds Defias

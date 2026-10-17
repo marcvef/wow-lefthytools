@@ -4,9 +4,9 @@ local L = ns.L
 
 -- Bestiary: what the mobs you kill drop. A database of your own (LefthyToolsBestiaryDB: all your
 -- characters add to it, nothing goes to friends) per kind of mob (creature ID, from its GUID): how
--- many you killed, which items dropped how often and how many, and the coin. Window.lua shows your
--- target's (a window that stays open, a minimap button) and, if you like, a hovered enemy's next to
--- the mouse.
+-- many you killed, which items dropped how often and how many, and the coin. A window shows your
+-- target's (it stays open; a minimap button) and, if you like, a hovered enemy's on a card next to
+-- the mouse; a ledger lists every mob.
 --
 -- LefthyToolsBestiaryDB = { mobs = { [creatureID] = { name, level, class, kills, money (copper),
 --   first, last (time()), items = { [itemID] = { drops (corpses it came from), count, quality,
@@ -18,12 +18,14 @@ local L = ns.L
 --   log = { { time, creature, what, items, check, the corpse's GUID }, ... } (/bestiary log) }
 --
 -- This file: the module, what its files share, reading the records (chances, drops, worth, where),
--- the mobs seen. The others, in the order they load: Classic.lua (what a classic drop database says
--- beside your numbers, and mobs' health for the fight stream), Quests.lua (quest drops), Wishes.lua
--- (the wish list), Recording.lua (your kills and their loot: how they're counted), Window.lua (the
--- window, the card beside the mouse, item tooltips, the minimap button) and Ledger.lua (every mob,
--- the search). Each registers the events it handles (Bt.On) and what it does when the Bestiary is
--- switched on or off or a setting changes (Bt.When).
+-- items the client doesn't know yet, the mobs seen. The others, in the order they load: Classic.lua
+-- (what a classic drop database says beside your numbers, and mobs' health for the fight stream),
+-- Quests.lua (quest drops), Wishes.lua (the wish list), Recording.lua (your kills and their loot:
+-- how they're counted), Format.lua (how numbers and lines are written), Cells.lua (drops as cells,
+-- item tooltips), Window.lua (the window, the minimap button), Card.lua (the card beside the mouse),
+-- LedgerMap.lua (the ledger's map of where you killed them) and Ledger.lua (every mob, the search).
+-- Each registers the events it handles (Bt.On) and what it does when the Bestiary is switched on or
+-- off or a setting changes (Bt.When).
 
 local M = LT:NewModule("bestiary", {
 	title = "Bestiary",

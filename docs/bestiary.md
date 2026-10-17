@@ -2,11 +2,34 @@
 
 What the mobs you kill drop: a database of your own per kind of mob, a window for your target,
 (settings) a card beside the mouse over an enemy and drop chances in item tooltips, and a ledger
-of every mob with a fuzzy search. Files: `Modules/Bestiary/Bestiary.lua` (the module, recording,
-the drop database, `ns.Bestiary` = `Bt`), `Modules/Bestiary/Window.lua` (the window, the card, item
-tooltips, the minimap button) and `Modules/Bestiary/Ledger.lua` (the ledger). Nothing goes over the
-network (the user: "just your own, I want to limit traffic"). Beside your own numbers: a classic
-drop database, an add-on of its own (`LefthyTools_DropData`, below).
+of every mob with a fuzzy search. Nothing goes over the network (the user: "just your own, I want
+to limit traffic"). Beside your own numbers: a classic drop database, an add-on of its own
+(`LefthyTools_DropData`, below).
+
+## Files
+
+In `Modules/Bestiary/`, in the order they load (the TOC):
+
+| File | What |
+|---|---|
+| `Bestiary.lua` | the module (`ns.Bestiary` = `Bt`), settings, `/bestiary`; what the files share (`Bt.Value`, `Bt.NONE`, `Bt.GOLD`); reading the records (`Bt.Chance`, `Bt.Drops`, `Bt.Sources`, `Bt.IsWorldDrop`, `Bt.Worth`, `Bt.Spots`, `Bt.Pace`); items the client doesn't know yet (`Bt.AskItem`, `Bt.ItemNameOf`); the mobs seen (`Bt.Look`) |
+| `Classic.lua` | the classic drop database: `Bt.Known`, `Bt.Health`, `Bt.Compare`, `Bt.KnownSources`, `/bestiary data` |
+| `Quests.lua` | quest drops: `Bt.QuestDrops`, `Bt.ChanceOf` |
+| `Wishes.lua` | the wish list: `Bt.ToggleWish`, `Bt.WishKill`, `Bt.WishSources`, `/bestiary wishes` |
+| `Recording.lua` | counting kills and loot, skinning, the pace, where they died, the log (`/bestiary log`) |
+| `Format.lua` | how things are written: `Bt.Percent`, `Bt.Coins`, `Bt.KillsLine`, `Bt.PaceText`, `Bt.QuestLine`, ... |
+| `Cells.lua` | drops as cells (`Bt.Lay`), their tooltips and clicks, `Bt.ListDrops`, `Bt.Dress`; lines in item tooltips |
+| `Window.lua` | the window, the minimap button, `Bt.Redraw` |
+| `Card.lua` | the card beside the mouse |
+| `LedgerMap.lua` | the ledger's map of where you killed them (`Bt.NewKillMap`, `Bt.DrawKillMap`) |
+| `Ledger.lua` | the ledger: list, search, the picked mob, the wish list's strip |
+
+Each file registers the events it handles (`Bt.On(event, handler[, unit])`; registered while the
+Bestiary is switched on, handlers run in load order) and what it does when it's switched on or off
+or a setting changes (`Bt.When("enable" | "disable" | "settings", fn)`), so a new part needs no
+change elsewhere. Beacon's fight stream uses `Bt.Known`, `Bt.Health`, `Bt.Mob`, `Bt.Chance`,
+`Bt.Drops`, `Bt.Compare`, `Bt.KillsLine`, `Bt.ListDrops` and `Bt.Percent`: keep their names and
+behaviour.
 
 ## The database
 
