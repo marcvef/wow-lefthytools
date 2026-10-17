@@ -988,15 +988,33 @@ end
 
 -- What was made of a loot window or a kill, the last LOG_KEEP (/bestiary log; kept for a look
 -- after a /reload): { time, mob (creature ID), what, items (how many), check (CanLootUnit's
--- answers) }.
-local function Log(creature, what, items, check)
+-- answers), the corpse's GUID (when it was counted: Counted) }.
+local function Log(creature, what, items, check, guid)
 	if not data then
 		return
 	end
 	data.log = type(data.log) == "table" and data.log or {}
-	table.insert(data.log, 1, { time(), creature, what, items, check })
+	table.insert(data.log, 1, { time(), creature, what, items, check, guid })
 	for i = #data.log, LOG_KEEP + 1, -1 do
 		data.log[i] = nil
+	end
+end
+
+-- A corpse counted already (done: { at, how }), also before a /reload: that forgets the session's
+-- corpses, but the log is saved, and a corpse looted, a /reload and looted again would count twice
+-- (said empty, then looted after the /reload: a second kill instead of its items joining the first).
+local COUNTED = { empty = "empty", looted = "looted", ["looted (said empty before)"] = "looted", ["looted before"] = "looted" }
+
+local function Counted(guid)
+	if done[guid] or not (data and type(data.log) == "table") then
+		return done[guid]
+	end
+	local now = time()
+	for _, entry in ipairs(data.log) do -- (the newest first)
+		if entry[6] == guid and COUNTED[entry[3]] and now - (tonumber(entry[1]) or 0) <= PENDING_FOR then
+			done[guid] = { at = entry[1], how = COUNTED[entry[3]] }
+			return done[guid]
+		end
 	end
 end
 
@@ -1147,7 +1165,7 @@ local function CheckEmpty(guid, round)
 		C_Timer.After(EMPTY_CHECKS[round + 1] - EMPTY_CHECKS[round], function() CheckEmpty(guid, round + 1) end)
 	else
 		WishKill(kill.creature, Count(guid, kill.creature, "empty"))
-		Log(kill.creature, "empty", 0, kill.check)
+		Log(kill.creature, "empty", 0, kill.check, guid)
 		Changed(kill.creature)
 	end
 end
@@ -1299,14 +1317,14 @@ local function OnLoot()
 	elseif not creature then
 		return Log(nil, guid and "not a mob" or "no corpse", 0)
 	end
-	local was, check = done[guid], pending[guid] and pending[guid].check
+	local was, check = Counted(guid), pending[guid] and pending[guid].check
 	if was and was.how ~= "empty" then
-		return Log(creature, "looted before", 0)
+		return Log(creature, "looted before", 0, nil, guid)
 	end
 	local mob
 	if was then -- (the game said it was empty: its items join that kill)
 		mob = MobFor(creature)
-		done[guid].how = "looted"
+		was.how = "looted"
 	else
 		mob = Count(guid, creature, "looted")
 	end
@@ -1332,7 +1350,7 @@ local function OnLoot()
 		lootMoney, lootSource = GetMoney(), creature
 	end
 	local fulfilled = WishKill(creature, mob, got, was ~= nil)
-	Log(creature, was and "looted (said empty before)" or "looted", items, check)
+	Log(creature, was and "looted (said empty before)" or "looted", items, check, guid)
 	Changed(creature)
 	if fulfilled and Bt.WishesChanged then
 		Bt.WishesChanged() -- (its star goes everywhere)
@@ -1549,7 +1567,14 @@ SlashCmdList.LEFTHYTOOLS_BESTIARY = function(msg)
 	end
 end
 
--- For tests.
+-- For tests: the kills waiting to be counted, and what a /reload forgets.
 function Bt.Pending()
 	return pending
+end
+
+function Bt.Forget()
+	wipe(pending)
+	wipe(done)
+	wipe(skinnedCorpse)
+	wipe(recent)
 end

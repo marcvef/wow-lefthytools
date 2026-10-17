@@ -8713,6 +8713,26 @@ section("Bestiary: counting, more cases")
 			"someone else's tap: not waiting to be counted (it would count as a kill without drops), the log says so")
 		MOBS.target, STATE.target, STATE.tapDenied = nil, false, false
 	end
+	-- A /reload forgets this session's corpses; the log (saved) still knows the last ones: a corpse
+	-- looted again after it counts once, and one said empty and looted after it adds its items to
+	-- that kill. (From the wish list's kills a moment ago.)
+	do
+		local bandits = LefthyToolsBestiaryDB.mobs[116]
+		local kills, cloth = bandits.kills, bandits.items[2589][1]
+		Bt.Forget() -- (what a /reload forgets)
+		local function loot(guid, id)
+			LOOT = { { type = 1, id = id, source = guid } }
+			Fire("LOOT_READY", false)
+			Fire("LOOT_CLOSED")
+			LOOT = {}
+		end
+		loot("Creature-0-1-0-1-116-00000077", 2589) -- (looted before the /reload)
+		check(bandits.kills == kills and bandits.items[2589][1] == cloth and logged():find("Defias Bandit: looted before", 1, true),
+			"looted before a /reload, again after it: counted once")
+		loot("Creature-0-1-0-1-116-00000074", 2589) -- (said empty before the /reload)
+		check(bandits.kills == kills and bandits.items[2589][1] == cloth + 1 and logged():find("Defias Bandit: looted (said empty before)", 1, true),
+			"said empty before a /reload, looted after it: its items join that kill")
+	end
 end)()
 
 section("Misc Tweaks: who has aggro, on enemy nameplates")

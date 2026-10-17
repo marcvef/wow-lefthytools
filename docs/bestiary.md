@@ -18,7 +18,7 @@ mobs = { [creature ID] = { name, level, class (UnitClassification), kills, money
          skinned, skins = { [item ID] = { times, count, quality, name } },
          pace = { your level, kills with XP, XP, kills timed, seconds },
          spots = { map ID * 1e6 + x * 1e3 + y, ... } (the last 50 kills) } }
-log = { { time, creature, what, items, check }, ... } (the last 12)
+log = { { time, creature, what, items, check, the corpse's GUID (when counted) }, ... } (the last 12)
 wishes = { [item ID] = { pinned (time()), kills since, expected drops in them, name, quality } }
          (the wish list; only while there's one)
 ```
@@ -133,6 +133,10 @@ kind's health, for Beacon's fight stream (below): 9791 of them; 9921 creatures i
   one: other ranks); any other spell doesn't matter (the first version skipped the loot after any
   spell, so a quick loot after an instant killing blow was lost). Nor fishing (`IsFishingLoot`),
   nor what isn't a creature's (herbs, ore, chests and a bag's contents have object or item GUIDs).
+- **Across a /reload**: the corpses counted this session are forgotten with it, so a loot window
+  looks in the log too (`Counted`: saved, its entries keep the corpse's GUID, the last 5 minutes):
+  a corpse looted, a `/reload` and looted again counts once, and one said empty and looted after a
+  `/reload` adds its items to that kill.
 - **The corpse**: `GetLootSourceInfo(slot)` (one source; several at once aren't told apart). When
   that says nothing: your dead target, else the one kill waiting from the last minute.
 - **The log** (`/bestiary log`, `LefthyToolsBestiaryDB.log`, the last 12): each loot window and
