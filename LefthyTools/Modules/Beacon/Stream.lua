@@ -7,6 +7,7 @@ local B = ns.Beacon
 -- Fight stream: a small view of a fight from above, you (or a friend) in the middle, the mobs
 -- around, on the map of the place. The parts:
 --   Stream.lua       asking the game (shared helpers: B.Stream), the test, the commands
+--   StreamHealth.lua health, estimated: yours, and the mobs'
 --   StreamSense.lua  what's around you: mobs, their distance and learned direction, what you do
 --   StreamBattle.lua the battle row under the spells: their model, the mobs they fight, the fight
 --   StreamMoments.lua what happens to them in a window: floating numbers, loot, the fight's line
@@ -176,6 +177,15 @@ function S.YardsFrom(near, far)
 		return math.min(far + 5, S.OUTER_YARDS), far
 	end
 	return nil
+end
+
+-- A mob's creature ID, from its GUID ("Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>"); nil for
+-- players (and when hidden).
+function S.CreatureOf(key)
+	if type(key) ~= "string" then
+		return nil
+	end
+	return tonumber(key:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-") or key:match("^Vehicle%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
 end
 
 -- A mob's (or a player's) level as the game shows it: "??" where the game says -1 (a boss, or too

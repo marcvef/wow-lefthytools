@@ -61,6 +61,7 @@ Modules\Beacon\Handover.lua
 Modules\Beacon\Chat.lua
 Modules\Beacon\Reports.lua
 Modules\Beacon\Stream.lua
+Modules\Beacon\StreamHealth.lua
 Modules\Beacon\StreamSense.lua
 Modules\Beacon\StreamBattle.lua
 Modules\Beacon\StreamMoments.lua

@@ -406,7 +406,7 @@ message differs (a kill rarely moves the whole percent). Hellos are answered wit
 
 `O2;v;<percent>` (StreamNet.lua; a fight stream word, so builds before it ignore it, and the
 last free kind letter, B, stays free): my health as the fight stream estimates it
-(StreamSense.lua), in steps of 5, empty when not known or with `share` off. To every friend, not
+(StreamHealth.lua), in steps of 5, empty when not known or with `share` off. To every friend, not
 only watchers: on Beacon's tick (`B.StreamHealthTick`, looked at every 0.5 s) when it changed, at
 most every 2 s, a waiting one replaced (`B.QueueLatest`); hellos are answered with it. Kept as
 `peer.health` (0-1; `B.PeerChanged` so open tooltips follow). `B.HealthText(peer)`: "~80% health",
@@ -535,8 +535,10 @@ watch <name>`, a click on their world map dot (`streamMapClick`), or a cinematic
 (`streamFlights`). Files:
 
 - `Stream.lua`: asking the game (`B.Stream` = `S`: `S.Api`, `S.Value`, range checks, `S.Bounds`,
-  `S.YardsFrom`), what a mob is called (`S.LevelText`, `S.MobTitle`, `S.ClassLabel`), the test
-  (`/lefthy stream test` / `results`), the commands.
+  `S.YardsFrom`, `S.CreatureOf`), what a mob is called (`S.LevelText`, `S.MobTitle`,
+  `S.ClassLabel`), the test (`/lefthy stream test` / `results`), the commands.
+- `StreamHealth.lua`: health, estimated: yours (`S.Health()`, while Beacon is on) and the mobs'
+  (`S.MobHealth`, `S.MobMaxOf`, while the sensor runs); below.
 - `StreamSense.lua`: the sensor, your own picture (`S.Sensed()`), looked at every 0.5 s while
   someone needs it (`S.SenseNeed("me" | "stream", on)`: your window, friends watching you).
 - `StreamBattle.lua`: the battle row under the spells (their model and the mobs they fight, the
@@ -580,7 +582,7 @@ picture also has your cast (`UnitCastingInfo` / `UnitChannelInfo`, read every lo
 the cast events), your last 5 spells, power (`UnitPowerType`: mana, rage, energy, focus) and form
 (`GetShapeshiftForm`).
 
-**Health, estimated** (StreamSense.lua, `S.Health()`, `picture.health`). `UnitHealth` is always
+**Health, estimated** (StreamHealth.lua, `S.Health()`, `picture.health`). `UnitHealth` is always
 secret, but what changes it isn't (the test in game, 1.60.1.70425): `UNIT_COMBAT` on the player
 gives every hit and heal with its amount (also in combat; `MISS`, `DODGE` with 0), and
 `UnitHealthMax` answers (it's secret only where `C_Secrets.ShouldUnitHealthMaxBeSecret` says so;
@@ -611,7 +613,7 @@ the attacker) and loot of green and better (`LT.OwnLoot`, Core.lua: the same rea
 `CHAT_MSG_LOOT` that Chronicle counts). Each moment gets a number (1-99, going round) and stays
 2.5 s in the picture.
 
-**Mobs' health, estimated** (StreamSense.lua, `mob.health`, while the sensor runs). A mob's
+**Mobs' health, estimated** (StreamHealth.lua, `mob.health`, while the sensor runs). A mob's
 `UnitHealthMax` is secret too (seen in game), but `UNIT_COMBAT` on your target and on nameplates
 gives every hit and heal on it with its amount, anyone's (seen in game; a hit comes for both its
 nameplate and `target`: counted once, by GUID, time and amount). What it lost is added up per GUID
