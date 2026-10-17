@@ -543,6 +543,7 @@ watch <name>`, a click on their world map dot (`streamMapClick`), or a cinematic
   fight played on them; below).
 - `StreamView.lua`: the windows (`S.OpenView("me" | "preview")`, `S.OpenFriend(id, origin)`,
   `S.CloseView`, `S.ToggleFriend`, `S.CloseFlightViews`).
+- `StreamMap.lua`: the map under a window's radar (`S.MoveMap`, every frame).
 - `StreamPreview.lua`: the preview's made-up fight (`S.FeedPreview(view)`, its next picture).
 - `StreamNet.lua`: between friends (protocol below), the "being watched" dot, flights.
 - `StreamButton.lua`: the spyglass minimap button (below).
@@ -645,8 +646,8 @@ members always named. The bottom line counts enemies only. Over the network: fla
 `f` (friendly), `g` (group: exact) and `O2;u;<id>;<level>;<classFile>;<name>` instead of the
 mob's `n`: builds before it ignore `u` and show such a player as an unnamed mob.
 
-**The window** (StreamView.lua; 250 x 432 at scale 1): the map under a radar, north up, to scale
-(2.55 px per yard for rings, dots and map): the minimap's own terrain tiles where
+**The window** (StreamView.lua; 250 x 432 at scale 1): the map under a radar (StreamMap.lua), north
+up, to scale (2.55 px per yard for rings, dots and map): the minimap's own terrain tiles where
 `Data/MinimapTiles.lua` has them (`world/minimaps/<continent>/mapX_Y.blp`, 256 px for 533.33 yd,
 X = floor(32 - west / 533.33), Y = floor(32 - north / 533.33), the 3 x 3 around; `node
 tools/update-minimap-tiles.js` from wago.tools' file list), else the world map's art of the zone

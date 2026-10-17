@@ -64,6 +64,7 @@ Modules\Beacon\Stream.lua
 Modules\Beacon\StreamSense.lua
 Modules\Beacon\StreamBattle.lua
 Modules\Beacon\StreamView.lua
+Modules\Beacon\StreamMap.lua
 Modules\Beacon\StreamPreview.lua
 Modules\Beacon\StreamNet.lua
 Modules\Beacon\StreamButton.lua
