@@ -904,11 +904,23 @@ local function MobHealth(mob, now)
 	return max and math.max(0, math.min(1, 1 - (mobLost[key] or 0) / max)) or nil
 end
 
--- Mobs not seen for a while are forgotten.
+-- Mobs not looked at for a while are forgotten; so are hits on units never looked at (UNIT_COMBAT
+-- counts every nameplate's: a player's, mobs past the ones looked at) and casts not seen to end (the
+-- nameplate went first). Now and then, while the sensor runs.
 local function ForgetMobs(now)
 	for key, at in pairs(mobSeen) do
 		if now - at > MOB_KEEP then
 			mobSeen[key], mobLost[key], mobFresh[key], mobKind[key], hitAt[key], hitAmount[key] = nil, nil, nil, nil, nil, nil
+		end
+	end
+	for key, at in pairs(hitAt) do
+		if now - at > MOB_KEEP and not mobSeen[key] then
+			mobLost[key], mobFresh[key], mobKind[key], hitAt[key], hitAmount[key] = nil, nil, nil, nil, nil
+		end
+	end
+	for key, began in pairs(castingSince) do
+		if now - began > CAST_LONGEST then
+			castingSince[key] = nil
 		end
 	end
 end
@@ -1211,5 +1223,11 @@ end
 
 function S.SenseRunning()
 	return next(users) ~= nil
+end
+
+-- For tests: the sensor's books on mobs, and the pass that forgets what's stale in them (now: as if
+-- it were then).
+function S.MobBooks()
+	return { lost = mobLost, hitAt = hitAt, casting = castingSince }, ForgetMobs
 end
 

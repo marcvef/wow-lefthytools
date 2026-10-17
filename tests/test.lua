@@ -5007,6 +5007,26 @@ do
 		view.kind, view.picture = kind, picture0
 		S.BattleReset(view)
 	end)()
+
+	-- The sensor's books on mobs keep only what's recent: hits on units it never looks at (a player's
+	-- nameplate) and casts not seen to end (the nameplate went first) are forgotten after a while too.
+	;(function()
+		MOBS = {
+			nameplate1 = { name = "Cedric", level = 22, player = true, friendly = true, classFile = "PRIEST", guid = "Player-1-90", yards = 20 },
+			nameplate2 = { name = "Kobold Vermin", level = 5, guid = "Creature-0-1-0-1-6-00000091", yards = 10 },
+		}
+		lefthy("stream me") -- (no time passes: the sensor listens from the start)
+		Fire("UNIT_COMBAT", "nameplate1", "WOUND", "", 30, 1)
+		Fire("UNIT_SPELLCAST_START", "nameplate2", "Cast-9", SECRET)
+		local books, forget = S.MobBooks()
+		local had = books.lost["Player-1-90"] == 30 and books.casting["Creature-0-1-0-1-6-00000091"] ~= nil
+		forget(GetTime() + 301)
+		check(had and books.lost["Player-1-90"] == nil and books.hitAt["Player-1-90"] == nil
+			and books.casting["Creature-0-1-0-1-6-00000091"] == nil,
+			"the sensor forgets, after a while, hits on units it never looks at and casts not seen to end")
+		win.Close:Click()
+		MOBS = {}
+	end)()
 	ns.MINIMAP_TILES = realTiles
 end
 

@@ -628,7 +628,8 @@ its highest level's), else a ratio from 1 kill, else a normal (or trivial) mob i
 get a percent from the start, and the battle row's numbers too. Learning stays against
 `EXPECTED_HEALTH`, the database doesn't change it. Not seen: hits while it has neither a nameplate
 nor is your target; a killing blow counts in full (a little high). Mobs not looked at for 5 minutes
-are forgotten.
+are forgotten, and so are hits on units never looked at (every nameplate's are counted as they come:
+a player's, mobs past the ones looked at) and mob casts not seen to end.
 
 **Players.** Your group (`party1-4` / `raid1-40`): `UnitPosition` answers for group members, so
 they're placed exactly, no learning (`Group`: same continent, within 120 yd, the nearest 8; beyond
