@@ -161,11 +161,16 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     settings; drag it around the edge, it stays there after `/reload`); `/chronicle` too; the zone you're in is "discovered". Kill a few
     mobs, loot a green, turn in a quest, jump, ride: the Statistics page counts them (time and
     distance update every few seconds). Enter a dungeon: "First visit"; kill a boss: one entry.
-    Die to a mob: "Died to <mob>". `/reload`: the session continues (Sessions stays). Log in a
-    second character: the dropdown at the top left has one entry, "You", with both characters and
-    their levels; Statistics adds both up (Characters lists each with its level, time AFK shows only
-    in the Martin tracker), the Timeline has both, each line saying whose. Friends are in the
-    dropdown once each, by BattleTag, also with several characters (picking one opens their graphs).
+    Die to a mob: "Died to <mob>", once (also on the Statistics page's death count). `/reload`: the
+    session continues (Sessions stays). Characters go by their full name (first name and surname)
+    everywhere. Log in a second character: the dropdown at the top left has one entry, "You", with
+    both characters and their levels; Statistics adds both up (Characters lists each with its level,
+    time AFK shows only in the Martin tracker), the Timeline has both, each line saying whose.
+    Friends are in the dropdown once each, by BattleTag, with their characters (picking one opens
+    their graphs, "You and <BattleTag>"). No character anywhere twice, or under its first name alone
+    next to its full name: the News page has one line per event, Compare and its leaderboard a
+    chip, a line and a row per character (BattleTag on a chip's hover), the Friends page a row per
+    character with the BattleTag in its column.
     Graphs: "Time AFK" shows AFK time per day; a friend's page (both on this build) has an AFK tile
     and an AFK row next to yours. With a friend: their level-up
     and a highlight (e.g. a boss) appear under Friends and in chat. `/chronicle session`.
@@ -174,9 +179,10 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     logs off; you log in while only B is on: within a few minutes A's level, days and highlights
     show up (Friends: the "Not online" table has A with "last played", Compare has A's lines),
     although you and A were never online together. A minute after logging in a chat
-    line says what friends did while you were away. Compare: chips hide and show people, 7 / 14 /
-    30 days, hovering a day lists everyone's value, hovering a symbol only that person's moments,
-    a click on a Hall of fame column sorts it, Share posts a ranking in LTC. The book on
+    line says what friends did while you were away. Compare: chips hide and show characters, 7 / 14 /
+    30 days (the leaderboard's title and numbers follow), hovering a day lists everyone's value,
+    hovering a symbol only that character's moments, a click on a Hall of fame column sorts it,
+    Share posts a ranking in LTC (the leaderboard's with its range). The book on
     the minimap gets a blue dot for news; the News tab shows how many. Friends: a row per friend
-    online (where, doing) and not online; a click on a row opens their graphs. First login of a
-    week: last week's leaderboard in chat.
+    online (where, doing) and per character not online (none of a friend who's online); a click on
+    a row opens their graphs. First login of a week: last week's leaderboard in chat.
