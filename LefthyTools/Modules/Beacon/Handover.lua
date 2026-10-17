@@ -40,28 +40,15 @@ local mailWarned -- the recipient + attachments last warned about
 
 local Readable = LT.Readable
 
--- "Anna" from "Anna", "Anna-Realm" or "Anna Surname" (Forever's display names add surnames).
-local function BaseName(name)
-	return Readable(name) and type(name) == "string" and name:match("^[^%s%-]+") or nil
-end
+-- "Anna" from "Anna", "Anna-Realm" or "Anna Surname" (Forever's display names add surnames), and
+-- whether two names are the same character, however typed ("anna", "Anna-Realm"): Core's LT.Names.
+local BaseName, SameName = LT.Names.First, LT.Names.Same
 
 -- Who a mail goes to: the character's name, without the surname Battle.net shows with it (a
 -- winner's name comes from there): "Anna Brook-ArgentDawn" -> "Anna-ArgentDawn". Reservations
 -- saved before kept the surname, so it's also taken off when the name is used.
 local function MailName(name)
 	return (name:gsub("^([^%s%-]+)[^%-]*", "%1"))
-end
-
--- The same character, however it was typed ("anna", "Anna-Realm").
-local function SameName(a, b)
-	a, b = BaseName(a), BaseName(b)
-	if not (a and b) then
-		return false
-	end
-	if strcmputf8i then
-		return strcmputf8i(a, b) == 0
-	end
-	return a:lower() == b:lower()
 end
 
 local function EntryFor(itemID)

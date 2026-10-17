@@ -723,10 +723,8 @@ function M:OnEnable()
 	-- second return; the game (and Battle.net) shows them together. Its record keeps the first name's
 	-- key, the one friends' builds know it by, unless that's another character of mine with the same
 	-- first name (its GUID or full name says so): then this one goes by its full name.
-	local name, surname = UnitName("player")
+	local full, name, surname = LT.Names.Mine() -- (surname nil: none, or the game keeps it secret)
 	local realm = GetRealmName()
-	surname = type(surname) == "string" and not issecret(surname) and surname ~= "" and surname or nil
-	local full = surname and (name .. " " .. surname) or name
 	local guid = UnitGUID("player")
 	guid = type(guid) == "string" and not issecret(guid) and guid or nil
 	local key, fullKey = name .. "-" .. (realm or ""), full .. "-" .. (realm or "")

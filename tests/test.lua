@@ -85,6 +85,26 @@ do -- shared text helpers
 		"LT.Ago: just now, minutes, hours, yesterday, days")
 	check(ns.Chronicle.Ago == LT.Ago, "Chronicle's Ago is Core's")
 end
+do -- character names: a first name and a surname on Forever
+	local N, surnameBefore = LT.Names, MY_SURNAME
+	check(N.First("Anna Brook") == "Anna" and N.First("Anna-Realm") == "Anna" and N.First("Anna") == "Anna"
+		and N.First(nil) == nil and N.First(SECRET) == nil, "LT.Names.First: the first name, nil for a secret")
+	check(N.HasSurname("Anna Brook") and not N.HasSurname("Anna") and not N.HasSurname(nil) and not N.HasSurname(SECRET),
+		"LT.Names.HasSurname")
+	check(N.Same("anna", "Anna-Realm") and N.Same("Anna Brook", "ANNA") and not N.Same("Anna", "Bob") and not N.Same(nil, "Anna"),
+		"LT.Names.Same: the same character however typed")
+	MY_SURNAME = "Brook"
+	local full, first, surname = N.Mine()
+	check(full == "Lefthy Brook" and first == "Lefthy" and surname == "Brook" and N.IsMine("Lefthy") and N.IsMine("Lefthy Brook")
+		and not N.IsMine("Lefthy Stone") and not N.IsMine(nil) and ns.Beacon.MyName() == "Lefthy Brook",
+		"LT.Names.Mine and IsMine: my name as the game shows it, with or without the surname")
+	MY_SURNAME = SECRET
+	full, first, surname = N.Mine()
+	check(full == "Lefthy" and first == "Lefthy" and surname == nil, "a surname the game keeps secret: the first name alone")
+	MY_SURNAME = nil
+	check(N.Mine() == "Lefthy" and select("#", ns.Beacon.MyName()) == 1, "no surname: the first name (Beacon's MyName: only the name)")
+	MY_SURNAME = surnameBefore
+end
 
 section("error catcher")
 local function errorRow() -- the overview's "Errors" info row

@@ -96,6 +96,54 @@ function LT.Ago(t)
 end
 
 ---------------------------------------------------------------------------
+-- Character names (LT.Names). In WoW: Forever every character has a first name and a surname:
+-- UnitName gives them apart (the surname as its second return), the game and Battle.net show them
+-- together ("Anna Brook"). Typed names may carry a realm instead ("Anna-Realm").
+---------------------------------------------------------------------------
+
+local Names = {}
+LT.Names = Names
+
+-- "Anna" of "Anna", "Anna Brook" or "Anna-Realm"; nil if it isn't a name addons may read.
+function Names.First(name)
+	return type(name) == "string" and not LT.IsSecret(name) and name:match("^[^%s%-]+") or nil
+end
+
+-- More than the first name: "Anna Brook" (or "Anna-Realm"), not "Anna".
+function Names.HasSurname(name)
+	return type(name) == "string" and not LT.IsSecret(name) and Names.First(name) ~= name
+end
+
+-- The same character, however it was typed ("anna", "Anna-Realm", "Anna Brook"): the first names,
+-- whatever their case.
+function Names.Same(a, b)
+	a, b = Names.First(a), Names.First(b)
+	if not (a and b) then
+		return false
+	end
+	if strcmputf8i then
+		return strcmputf8i(a, b) == 0
+	end
+	return a:lower() == b:lower()
+end
+
+-- My character's name as the game and Battle.net (a friend's peer.name) show it: "Anna Brook", the
+-- first name alone where there's no surname; then the first name and the surname (nil: none, or the
+-- game keeps it secret).
+function Names.Mine()
+	local first, surname = UnitName("player")
+	if type(surname) == "string" and not LT.IsSecret(surname) and surname ~= "" then
+		return first .. " " .. surname, first, surname
+	end
+	return first, first, nil
+end
+
+-- Whether a name a friend's client sent (a verdict, ...) is my character's: with the surname, or without.
+function Names.IsMine(name)
+	return name ~= nil and (name == UnitName("player") or name == (Names.Mine()))
+end
+
+---------------------------------------------------------------------------
 -- Version. The repo's TOC holds the base version (e.g. 0.3.0, git tag v0.3.0); install.ps1
 -- writes the exact build into the installed copy, like `git describe`:
 --   0.3.0               the tagged commit itself

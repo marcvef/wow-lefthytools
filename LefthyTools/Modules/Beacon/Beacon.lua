@@ -181,19 +181,13 @@ function B.Clean(text, maxBytes)
 end
 
 -- My character's name as friends see it: Battle.net (a friend's peer.name) shows the name the game
--- shows, with the surname WoW: Forever gives every character (UnitName's second return).
+-- shows, with the surname WoW: Forever gives every character (Core's LT.Names; only the name here).
 function B.MyName()
-	local first, surname = UnitName("player")
-	if type(surname) == "string" and surname ~= "" and not LT.IsSecret(surname) then
-		return first .. " " .. surname
-	end
-	return first
+	return (LT.Names.Mine())
 end
 
 -- Whether a name a friend's client sent (a verdict, ...) is mine: with the surname, or without.
-function B.IsMe(name)
-	return name ~= nil and (name == UnitName("player") or name == B.MyName())
-end
+B.IsMe = LT.Names.IsMine
 
 function B.ClassColor(classFile)
 	local color = classFile and C_ClassColor and C_ClassColor.GetClassColor(classFile)

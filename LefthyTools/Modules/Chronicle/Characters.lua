@@ -127,17 +127,9 @@ end
 -- of it (the user: "In forever you have to have two"), and a hover or a line under the list says
 -- when the rest comes.
 
--- "Anna" of "Anna Brook" or "Anna-Realm".
-local function FirstName(name)
-	return type(name) == "string" and name:match("^[^%s%-]+") or nil
-end
-C.FirstName = FirstName
-
--- "Anna Brook", not "Anna".
-local function HasSurname(name)
-	return type(name) == "string" and FirstName(name) ~= name
-end
-C.HasSurname = HasSurname
+-- "Anna" of "Anna Brook" or "Anna-Realm"; whether a name is "Anna Brook", not "Anna" (Core's LT.Names).
+local FirstName, HasSurname = ns.LT.Names.First, ns.LT.Names.HasSurname
+C.FirstName, C.HasSurname = FirstName, HasSurname
 
 -- The name a character is shown by: the full name the game shows, once known.
 function C.NameOf(c)
