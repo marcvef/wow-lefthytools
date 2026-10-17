@@ -7305,7 +7305,7 @@ section("Bestiary: what mobs drop")
 	-- level-up between wraps) and how long it took (since the fight began, or since the last kill in
 	-- it). Kept for your level. A Kobold Vermin (119) of its own, so the numbers above stay.
 	local kobold = {}
-	for i = 1, 10 do kobold[i] = ("Creature-0-1-0-1-119-%08X"):format(0x60 + i) end
+	for i = 1, 13 do kobold[i] = ("Creature-0-1-0-1-119-%08X"):format(0x60 + i) end
 	local function kobolds() return LefthyToolsBestiaryDB.mobs[119] end
 	local function koboldKill(guid, xp, xpFirst)
 		if xp and xpFirst then XP.current = XP.current + xp; Fire("PLAYER_XP_UPDATE", "player") end
@@ -7439,6 +7439,52 @@ section("Bestiary: what mobs drop")
 			and ledger.Sort.Label:GetText() == "Worth per kill", "sorted by worth per kill: where farming pays, each row says it")
 		ledgerSort("name")
 		ledger:Hide()
+	end
+	-- Where you killed them: you on the map at each killing blow (not in instances), the last 50. The
+	-- ledger shows the zone with the most on the world map's art, a dot each, the other maps under it.
+	do
+		local mapWas, posWas = PLAYER_MAP, PLAYER_POS
+		kobolds().spots = nil -- (like a record from before)
+		Bt.ToggleLedger(119)
+		local where = ledger.Pane.where
+		check(not where.Heading:IsShown() and not where.Map:IsShown() and not where.Note:IsShown(), "a record from before: no map, nothing else missing")
+		local function killAt(map, x, y, guid)
+			PLAYER_MAP, PLAYER_POS = map, { x, y }
+			Fire("PARTY_KILL", "Player-1-0", guid)
+			PLAYER_POS = { 0.99, 0.99 } -- (walked over to loot it: where it died counts)
+			koboldLoot(guid)
+		end
+		Advance(2)
+		killAt(1429, 0.25, 0.75, kobold[8])
+		check(kobolds().spots and #kobolds().spots == 1 and kobolds().spots[1] == 1429250750,
+			"a kill: where you were at its killing blow, in one number (map, x and y in thousandths)")
+		killAt(1429, 0.5, 0.5, kobold[9])
+		killAt(1436, 0.4, 0.6, kobold[10])
+		INSTANCE, STATE.inInstance = { name = "The Deadmines", type = "party" }, true
+		killAt(1429, 0.3, 0.3, kobold[11])
+		INSTANCE, STATE.inInstance = nil, nil
+		check(kobolds().kills == 11 and #kobolds().spots == 3, "in an instance: counted, but no spot")
+		local tiles = where.tiles
+		check(where.Heading:IsShown() and where.Heading:GetText() == "Where you killed them: Elwynn Forest" and where.Map:IsShown()
+			and #tiles == 12 and tiles[1].path == 142901 and tiles[12].path == 142912 and tiles[12].shown
+			and math.abs(tiles[4].coords[2] - 234 / 256) < 1e-6 and tiles[4].coords[4] == 1 and math.abs(tiles[12].coords[4] - 156 / 256) < 1e-6,
+			"the ledger: the zone with the most kills on its world map art (4 x 3 tiles, the last column and row cut to the map)")
+		local width, height = where.Map:GetSize()
+		local dots = where.dots
+		local _, _, _, x1, y1 = dots[1]:GetPoint(1)
+		check(dots[1].shown and dots[2].shown and not (dots[3] and dots[3].shown) and width == 296 and math.abs(height - 668 * 296 / 1002) < 0.01
+			and math.abs(x1 - 0.2505 * width) < 0.01 and math.abs(y1 + 0.7505 * height) < 0.01 and dots[1]:GetAlpha() < dots[2]:GetAlpha(),
+			"a dot for each kill there, where it was; the older fainter")
+		check(where.Note:IsShown() and where.Note:GetText() == "Also in Westfall (1)", "the other maps named under it")
+		-- A corpse looted without your killing blow seen: you at it then. The last 50 are kept.
+		for _ = 1, 47 do table.insert(kobolds().spots, 1, 1429100100) end
+		PLAYER_POS = { 0.6, 0.4 }
+		koboldLoot(kobold[12])
+		check(kobolds().kills == 12 and #kobolds().spots == 50 and kobolds().spots[50] == 1429600400 and kobolds().spots[1] == 1429100100
+			and where.Note:GetText():find("Your last 50 kills.", 1, true) and where.Note:GetText():find("Also in Westfall (1)", 1, true),
+			"a corpse looted without a killing blow seen: where you are; the last 50 kept, the oldest goes")
+		ledger:Hide()
+		PLAYER_MAP, PLAYER_POS = mapWas, posWas
 	end
 	-- Closed and open again: kept for next time.
 	win.Close:Click()

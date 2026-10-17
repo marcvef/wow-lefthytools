@@ -10,7 +10,8 @@ local M = Bt.module
 -- per kill or per hour of fighting (a row then says it) or when you last killed one: where farming
 -- pays. On the right the one picked: its whole model turning slowly, kills, coin, first and last
 -- kill, skinnings, under the model what a kill pays (its worth, XP and time per kill, XP per hour of
--- fighting), and all its drops (as in the window: quality edge, how many, chance; skinning marked).
+-- fighting), all its drops (as in the window: quality edge, how many, chance; skinning marked) and,
+-- under them, where you killed it: the world map's art of the zone with the most kills, a dot each.
 -- At the top what the Bestiary knows in all, and your rarest find. With the classic drop database
 -- (Bestiary.lua): a row says how many of its drops you've found, and the picked mob's drops have a
 -- section of what you haven't had yet, faded, between its own drops and its world drops.
@@ -39,9 +40,22 @@ local WISH_ICON, WISH_GAP, WISH_TOP = 20, 4, 40 -- the wish list's strip, at the
 local WISHES = 8          -- icons in it, at most (the rest: "+N")
 local WISH_SOURCES = 8    -- mobs named in an icon's tooltip, at most
 local PACE_LINE = 13        -- a line of what a kill pays, under the model
+local MAP_DOT = 6           -- a kill on the map of where you killed them
+local MAP_OTHERS = 3        -- other maps named under it, at most
+local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local GOLD = { 1, 0.82, 0.3 }
 local SORTS = { "kills", "name", "level", "coin", "worth", "xp", "xph", "last" }
 local issecret = issecretvalue or function() return false end
+
+local function Value(f, ...)
+	if not f then
+		return nil
+	end
+	local ok, v = pcall(f, ...)
+	if ok and not issecret(v) then
+		return v
+	end
+end
 
 local ledger
 local entries = {}       -- the list as shown: { creature, mob, score, positions, items (found by the search) }
@@ -359,6 +373,127 @@ local function Section(section, title, list, kills, y, show)
 	return y + rows * CELL_ROW
 end
 
+local function MapName(mapID)
+	local info = C_Map and Value(C_Map.GetMapInfo, mapID)
+	local name = type(info) == "table" and info.name
+	return not issecret(name) and type(name) == "string" and name or ("#" .. mapID)
+end
+
+-- The world map's art of a zone, DROPS_W wide: its first layer's tiles, laid like
+-- Blizzard_MapCanvasDetailLayer (and the fight stream's map), the last column and row cut to the
+-- map's edge. No art: its dark back alone. Returns its height; laid again only for another map.
+local function LayMap(where, mapID)
+	if where.mapID == mapID then
+		return where.height
+	end
+	where.mapID = mapID
+	local layers = C_Map and Value(C_Map.GetMapArtLayers, mapID)
+	local layer = type(layers) == "table" and layers[1]
+	local textures = type(layer) == "table" and Value(C_Map.GetMapArtLayerTextures, mapID, 1)
+	local height, n = math.floor(DROPS_W * 2 / 3), 0
+	if type(textures) == "table" and (layer.layerWidth or 0) > 0 and (layer.layerHeight or 0) > 0
+		and (layer.tileWidth or 0) > 0 and (layer.tileHeight or 0) > 0 then
+		local scale = DROPS_W / layer.layerWidth
+		local cols = math.ceil(layer.layerWidth / layer.tileWidth)
+		height = layer.layerHeight * scale
+		for row = 1, math.ceil(layer.layerHeight / layer.tileHeight) do
+			for col = 1, cols do
+				local file = textures[(row - 1) * cols + col]
+				if file then
+					n = n + 1
+					local tile = where.tiles[n] or where.Map:CreateTexture(nil, "ARTWORK")
+					where.tiles[n] = tile
+					local w = math.min(layer.tileWidth, layer.layerWidth - (col - 1) * layer.tileWidth)
+					local h = math.min(layer.tileHeight, layer.layerHeight - (row - 1) * layer.tileHeight)
+					tile:SetTexture(file)
+					tile:SetTexCoord(0, w / layer.tileWidth, 0, h / layer.tileHeight)
+					tile:SetSize(w * scale, h * scale)
+					tile:ClearAllPoints()
+					tile:SetPoint("TOPLEFT", where.Map, "TOPLEFT", (col - 1) * layer.tileWidth * scale, -(row - 1) * layer.tileHeight * scale)
+					tile:Show()
+				end
+			end
+		end
+	end
+	for i = n + 1, #where.tiles do
+		where.tiles[i]:Hide()
+	end
+	where.height = height
+	where.Map:SetSize(DROPS_W, height)
+	return height
+end
+
+-- Where you killed it (Bt.Spots: the last SPOTS_KEEP kills, outside instances): the map with the
+-- most of them, a dot each (the older, the fainter), under it the other maps and that only the last
+-- kills are kept. At y in the drops' area; returns where the next thing starts.
+local function Where(where, mob, y)
+	local maps = Bt.Spots(mob)
+	local show = maps ~= nil
+	where.Heading:SetShown(show)
+	where.Rule:SetShown(show)
+	where.Map:SetShown(show)
+	where.Note:SetShown(false)
+	if not show then
+		return y
+	end
+	y = y > 0 and y + 10 or y
+	local main = maps[1]
+	where.Heading:ClearAllPoints()
+	where.Heading:SetPoint("TOPLEFT", ledger.Pane.Drops, "TOPLEFT", 0, -y)
+	where.Heading:SetText(L["Where you killed them: %s"]:format(MapName(main.map)))
+	y = y + 20
+	where.Map:ClearAllPoints()
+	where.Map:SetPoint("TOPLEFT", ledger.Pane.Drops, "TOPLEFT", 0, -y)
+	local height = LayMap(where, main.map)
+	local count = #main.xy / 2
+	for i = 1, math.max(count, #where.dots) do
+		local dot = where.dots[i]
+		if i <= count then
+			if not dot then -- (a red dot in a dark ring: seen on any map's colours)
+				dot = where.Map:CreateTexture(nil, "OVERLAY", nil, 2)
+				dot:SetTexture(CIRCLE)
+				dot:SetSize(MAP_DOT, MAP_DOT)
+				dot:SetVertexColor(1, 0.25, 0.15)
+				dot.Ring = where.Map:CreateTexture(nil, "OVERLAY", nil, 1)
+				dot.Ring:SetTexture(CIRCLE)
+				dot.Ring:SetSize(MAP_DOT + 3, MAP_DOT + 3)
+				dot.Ring:SetVertexColor(0, 0, 0, 0.8)
+				dot.Ring:SetPoint("CENTER", dot, "CENTER")
+				where.dots[i] = dot
+			end
+			dot:ClearAllPoints()
+			dot:SetPoint("CENTER", where.Map, "TOPLEFT", main.xy[2 * i - 1] * DROPS_W, -main.xy[2 * i] * height)
+			dot:SetAlpha(0.45 + 0.55 * i / count) -- (the newest the brightest)
+			dot.Ring:SetAlpha(0.45 + 0.55 * i / count)
+			dot:Show()
+			dot.Ring:Show()
+		elseif dot then
+			dot:Hide()
+			dot.Ring:Hide()
+		end
+	end
+	y = y + height
+	local notes = {}
+	if #mob.spots >= Bt.SPOTS_KEEP then
+		notes[#notes + 1] = L["Your last %d kills."]:format(Bt.SPOTS_KEEP)
+	end
+	if maps[2] then
+		local others = {}
+		for i = 2, math.min(#maps, MAP_OTHERS + 1) do
+			others[#others + 1] = ("%s (%d)"):format(MapName(maps[i].map), #maps[i].xy / 2)
+		end
+		notes[#notes + 1] = L["Also in %s"]:format(table.concat(others, ", ")) .. (#maps > MAP_OTHERS + 1 and (" +" .. (#maps - MAP_OTHERS - 1)) or "")
+	end
+	if #notes > 0 then
+		where.Note:ClearAllPoints()
+		where.Note:SetPoint("TOPLEFT", ledger.Pane.Drops, "TOPLEFT", 0, -(y + 4))
+		where.Note:SetText(table.concat(notes, "  "))
+		where.Note:Show()
+		y = y + 4 + PACE_LINE
+	end
+	return y
+end
+
 local function DrawPicked()
 	local pane, mob = ledger.Pane, Bt.Mob(selected)
 	pane:SetShown(mob ~= nil)
@@ -415,6 +550,7 @@ local function DrawPicked()
 	local y = Section(pane.sections.own, L["Drops (%d)"]:format(#own), own, mob.kills, 0, true)
 	y = Section(pane.sections.unseen, L["Not seen yet (%d), classic database"]:format(#unseen), unseen, mob.kills, y, #unseen > 0)
 	y = Section(pane.sections.world, L["World drops (%d)"]:format(#world), world, mob.kills, y, #world > 0)
+	y = Where(pane.where, mob, y)
 	pane.Drops:SetHeight(math.max(y, 10))
 	-- What the search found stands out; the rest steps back.
 	local found = {}
@@ -733,7 +869,7 @@ local function Build()
 	pane.Pace:SetSpacing(3)
 	-- Its drops under the model, scrolling: its own, what the classic database says it drops that
 	-- you haven't had yet (faded), then its world drops (random gear from anywhere), each a section
-	-- of its own and each drop with its item tooltip.
+	-- of its own and each drop with its item tooltip; at the end the map of where you killed it.
 	pane.Scroll = CreateFrame("ScrollFrame", nil, pane, "UIPanelScrollFrameTemplate")
 	pane.Scroll:SetPoint("TOPLEFT", modelBack, "BOTTOMLEFT", 0, -10)
 	pane.Scroll:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -24, 0)
@@ -753,6 +889,25 @@ local function Build()
 		section.Grid:SetSize(DROPS_W, 10)
 		pane.sections[key] = section
 	end
+	-- Under the drops, where you killed it: a heading like theirs, the map (a dark back under its
+	-- art, the dots on top) and a line under it.
+	local where = { tiles = {}, dots = {} }
+	where.Heading = pane.Drops:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	where.Rule = pane.Drops:CreateTexture(nil, "ARTWORK")
+	where.Rule:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
+	where.Rule:SetHeight(1)
+	where.Rule:SetPoint("LEFT", where.Heading, "RIGHT", 8, 0)
+	where.Rule:SetPoint("RIGHT", pane.Drops, "RIGHT", 0, 0)
+	where.Map = CreateFrame("Frame", nil, pane.Drops)
+	where.Map:SetSize(DROPS_W, 10)
+	local mapBack = where.Map:CreateTexture(nil, "BACKGROUND")
+	mapBack:SetAllPoints()
+	mapBack:SetColorTexture(0, 0, 0, 0.45)
+	where.Note = pane.Drops:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	where.Note:SetWidth(DROPS_W)
+	where.Note:SetJustifyH("LEFT")
+	where.Note:SetWordWrap(false)
+	pane.where = where
 	ledger.Empty = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisable")
 	ledger.Empty:SetPoint("CENTER", pane, "CENTER", 0, 0)
 	ledger.Empty:SetText(L["Pick a mob on the left."])

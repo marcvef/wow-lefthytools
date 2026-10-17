@@ -329,5 +329,8 @@ ns.CHANGELOG = {
 	{ id = 107, module = "bestiary",
 		en = { "Bestiary: worth per kill", "A kill's worth is its coin plus what its drops sell for at a vendor. The Bestiary window shows it (worth ~45s), the ledger the details, and it can sort by it to show where farming pays." },
 		de = { "Bestiary: Wert pro Kill", "Der Wert eines Kills ist sein Geld plus das, was seine Drops beim Händler bringen. Das Bestiary-Fenster zeigt ihn (Wert ~45s), das Verzeichnis die Details, und es kann danach sortieren, um zu zeigen, wo sich Farmen lohnt." } },
+	{ id = 108, module = "bestiary",
+		en = { "Bestiary: where you killed them", "The Bestiary's ledger now shows a map of the zone where you killed a mob most often, with a dot for each of your last 50 kills, and names the other zones." },
+		de = { "Bestiary: wo du sie getötet hast", "Das Verzeichnis des Bestiary zeigt jetzt eine Karte der Zone, in der du einen Mob am häufigsten getötet hast, mit einem Punkt für jeden deiner letzten 50 Kills, und nennt die anderen Zonen." } },
 	-- New entries go here, at the end.
 }

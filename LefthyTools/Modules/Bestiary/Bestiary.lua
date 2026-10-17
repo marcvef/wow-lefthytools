@@ -26,7 +26,9 @@ local L = ns.L
 -- LefthyToolsBestiaryDB = { mobs = { [creatureID] = { name, level, class, kills, money (copper),
 --   first, last (time()), items = { [itemID] = { drops (corpses it came from), count, quality,
 --   name } }, skinned (how many), skins = { [itemID] = { times, count, quality, name } },
---   pace = { your level, kills with their XP known, XP, kills timed, seconds } } },
+--   pace = { your level, kills with their XP known, XP, kills timed, seconds },
+--   spots = { where you were at each kill outside instances, the last SPOTS_KEEP: map ID * 1e6 +
+--   x * 1e3 + y, x and y in thousandths of the map } } },
 --   wishes = { [itemID] = { pinned (time()), kills since, expected drops in them, name, quality } } }
 --
 -- The pace: what a counted kill of yours gave in XP (PLAYER_XP_UPDATE in the moment around its
@@ -77,6 +79,8 @@ local LOG_KEEP = 12             -- loot windows remembered with what was made of
 local XP_FROM_KILL = 1.5        -- seconds: XP this close to a kill of yours came from it
 local FIGHT_AFTER = 2           -- seconds a kill may come after the fight ended and still be timed
 local RECENT_KEEP = 8           -- your last kills, for the XP that comes a moment after them
+local SPOTS_KEEP = 50           -- where you killed each kind: the last this many kills
+Bt.SPOTS_KEEP = SPOTS_KEEP
 -- Spells whose loot isn't a kill's (each rank's ID, and by name for ranks not listed): Skinning,
 -- Pick Pocket, Mining, Herb Gathering. Any other spell just before looting (a killing blow, then a
 -- quick loot) doesn't matter.
@@ -248,6 +252,36 @@ function Bt.Worth(mob)
 	end
 	local money = mob.money or 0
 	return (money + vendor) / mob.kills, money / mob.kills, vendor / mob.kills
+end
+
+-- Where you killed a kind (its last SPOTS_KEEP kills), per map, the most kills first: { { map = map
+-- ID, xy = { x, y, x, y, ... } (0-1, the oldest first) }, ... }; nil: nowhere known.
+function Bt.Spots(mob)
+	local spots = mob and type(mob.spots) == "table" and mob.spots
+	if not spots or #spots == 0 then
+		return nil
+	end
+	local byMap, list = {}, {}
+	for _, spot in ipairs(spots) do
+		if type(spot) == "number" then
+			local map = math.floor(spot / 1e6)
+			local rest = spot - map * 1e6
+			local entry = byMap[map]
+			if not entry then
+				entry = { map = map, xy = {} }
+				byMap[map], list[#list + 1] = entry, entry
+			end
+			entry.xy[#entry.xy + 1] = (math.floor(rest / 1e3) + 0.5) / 1e3
+			entry.xy[#entry.xy + 1] = (rest % 1e3 + 0.5) / 1e3
+		end
+	end
+	table.sort(list, function(a, b)
+		if #a.xy ~= #b.xy then
+			return #a.xy > #b.xy
+		end
+		return a.map < b.map
+	end)
+	return list[1] and list or nil
 end
 
 local function Likelier(a, b)
@@ -1039,6 +1073,37 @@ local function OnXP()
 	looseXP = { amount = gained, at = now }
 end
 
+-- Where you are, packed in one number (map ID * 1e6 + x * 1e3 + y, x and y in thousandths of the
+-- map: a yard or two); nil in an instance or when the game doesn't say.
+local function Spot()
+	if Value(IsInInstance) or not C_Map then
+		return nil
+	end
+	local map = Value(C_Map.GetBestMapForUnit, "player")
+	local pos = type(map) == "number" and Value(C_Map.GetPlayerMapPosition, map, "player")
+	if type(pos) ~= "table" or type(pos.GetXY) ~= "function" then
+		return nil
+	end
+	local ok, x, y = pcall(pos.GetXY, pos)
+	if not ok or issecret(x) or issecret(y) or type(x) ~= "number" or type(y) ~= "number"
+		or x < 0 or x > 1 or y < 0 or y > 1 or (x == 0 and y == 0) then
+		return nil
+	end
+	return map * 1e6 + math.min(999, math.floor(x * 1e3)) * 1e3 + math.min(999, math.floor(y * 1e3))
+end
+
+-- A kill's spot joins its kind's, the last SPOTS_KEEP.
+local function AddSpot(mob, spot)
+	if not spot then
+		return
+	end
+	mob.spots = type(mob.spots) == "table" and mob.spots or {}
+	mob.spots[#mob.spots + 1] = spot
+	while #mob.spots > SPOTS_KEEP do
+		table.remove(mob.spots, 1)
+	end
+end
+
 -- A kill counted (once per corpse). how: "looted" or "empty" (the game said there's nothing on it:
 -- if it's looted after all, its items still join this kill).
 local function Count(guid, creature, how)
@@ -1053,6 +1118,12 @@ local function Count(guid, creature, how)
 		mob.name, mob.level, mob.class = info.name or mob.name, info.level or mob.level, info.class or mob.class
 	end
 	AddPace(mob, kill)
+	-- Where: you at its killing blow; a corpse looted without one seen, you at it now.
+	if kill then
+		AddSpot(mob, kill.spot)
+	else
+		AddSpot(mob, Spot())
+	end
 	return mob
 end
 
@@ -1092,7 +1163,7 @@ local function OnKill(attacker, target)
 		Bt.Look("target")
 	end
 	local now = GetTime()
-	local kill = { at = now, creature = creature, level = Value(UnitLevel, "player") }
+	local kill = { at = now, creature = creature, level = Value(UnitLevel, "player"), spot = Spot() }
 	-- How long it took: since the fight began, or since your last kill in it; not when the fight's
 	-- start wasn't seen (switched on in it, a /reload).
 	if fightFrom and (not fightEnd or now - fightEnd <= FIGHT_AFTER) then

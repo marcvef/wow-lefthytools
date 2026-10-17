@@ -16,14 +16,15 @@ drop database, an add-on of its own (`LefthyTools_DropData`, below).
 mobs = { [creature ID] = { name, level, class (UnitClassification), kills, money (copper, all
          kills), first, last (time()), items = { [item ID] = { drops, count, quality, name } },
          skinned, skins = { [item ID] = { times, count, quality, name } },
-         pace = { your level, kills with XP, XP, kills timed, seconds } } }
+         pace = { your level, kills with XP, XP, kills timed, seconds },
+         spots = { map ID * 1e6 + x * 1e3 + y, ... } (the last 50 kills) } }
 log = { { time, creature, what, items, check }, ... } (the last 12)
 wishes = { [item ID] = { pinned (time()), kills since, expected drops in them, name, quality } }
          (the wish list; only while there's one)
 ```
 
-Fields added later (`pace`) are simply missing from older records, and everything reads them as
-"not known".
+Fields added later (`pace`, `spots`) are simply missing from older records, and everything reads
+them as "not known".
 
 The creature ID comes from the GUID (`Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>`, also
 `Vehicle-`; `Bt.CreatureOf`). `drops` is how many corpses it came from, `count` how many in all.
@@ -175,6 +176,16 @@ while one is awaited, and the window and the ledger redraw half a second after t
 bunch at once). Shown rounded the way players say it ("~45s": to the silver from 1s up, else the
 copper).
 
+## Where you killed them
+
+The user: "could just be a map with a dot on where it was killed". With each counted kill, where
+you were at its killing blow (`C_Map.GetBestMapForUnit("player")`, `C_Map.GetPlayerMapPosition`;
+a corpse looted without your killing blow seen: where you are at the loot), the last 50 per kind
+in `spots`. Nothing in instances (`IsInInstance()`, and the position is nil there anyway), nor
+off the map (outside 0-1, or 0,0). Packed in one number to stay small: map ID * 1e6 + x * 1e3 +
+y, x and y in thousandths of the map (a yard or two in a zone). `Bt.Spots(mob)` unpacks them per
+map, the most kills first.
+
 ## The window
 
 `LefthyToolsBestiaryFrame`, 236 px wide, its height fits the drops; dark with thin gold edges
@@ -321,6 +332,14 @@ the settings or `/bestiary ledger [search]`.
   fighting (the time between fights not counted)"; the drops start under it. Then its drops in a
   scrolling area (all of them, 8 per row, no "+N"): "Drops (N)" (skinning marked), "Not seen yet
   (N), classic database" (faded, as in the window) and "World drops (N)" when it has any.
+- **Where you killed it**, at the end of that area when it has spots: "Where you killed them:
+  Elwynn Forest", the map with the most of its kills as the world map shows it (its first art
+  layer, `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid like
+  `Blizzard_MapCanvasDetailLayer` and the fight stream's map, the pane wide; the last column and
+  row's tiles cut to the map's edge with `SetTexCoord`, so nothing hangs over; no art: a dark
+  rectangle), a small red dot in a dark ring per kill (older ones fainter). Under it, one line:
+  "Your last 50 kills." once that many are kept, and "Also in Westfall (3), Duskwood (1)" (three
+  at most, "+N") when kills were on other maps. Tiles are laid again only when the map changes.
 - **A row** also says "6/11 found" (the drop database; not while it shows what the search found).
   Sorted by coin, worth, XP per kill or XP per hour, it says that instead ("~45s", "85 XP", "21k
   XP/h").
@@ -352,7 +371,8 @@ Event handlers only: `PARTY_KILL`, `LOOT_READY`, `LOOT_CLOSED`, the player's
 `UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added, entering and leaving
 combat (a time stamp), `PLAYER_XP_UPDATE` (three numbers read, the last 8 kills looked at),
 `QUEST_LOG_UPDATE`/`BAG_UPDATE_DELAYED` (a flag, then one look half a second later),
-`GET_ITEM_INFO_RECEIVED` only while a vendor price is awaited. The window redraws when its mob's
+`GET_ITEM_INFO_RECEIVED` only while a vendor price or a quest item's name is awaited. A kill reads
+your map position once (two `C_Map` calls). The window redraws when its mob's
 record changes or the target does; the card's OnUpdate runs only while it's shown. Worth is
 worked out when drawn, over a mob's drops with the prices cached (the ledger sorted by worth: over
 every mob, table lookups only).
@@ -365,6 +385,8 @@ every mob, table lookups only).
 - `PLAYER_XP_UPDATE` comes within 1.5 s of `PARTY_KILL` (either order), and `UnitLevel` has the
   new level at a level-up's update; `IsPlayerAtEffectiveMaxLevel` answers on Forever.
 - `C_Item.GetItemInfo`'s `sellPrice` is Forever's vendor price.
+- The ledger's map: the zone art lines up with the dots (a kill next to a landmark shows there),
+  and `GetMapArtLayerTextures` gives the tiles in rows like the fight stream's map.
 - `LoadAddOn` of the load-on-demand drop database works on Forever, and its first load (0.93 MB of
   strings) is only a moment, also when the fight stream asks for it in a fight.
 - How close the classic database's health is to Forever's (the fight stream's learned ratio from

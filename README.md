@@ -354,6 +354,10 @@ and sorts by worth, XP per kill or XP per hour, to see where farming pays and to
 spots. XP per kill depends on your level, so it's kept for your current level and starts again at
 the next.
 
+**Where you killed them.** The ledger also shows, under a mob's drops, a map of the zone where you
+killed most of them with a dot for each kill (the last 50, not in dungeons), and names the other
+zones if there were any.
+
 **Item tooltips** (anywhere: bags, chat links) list the three mobs an item comes from likeliest,
 with the chance and how many kills that's from; a pelt marks skinning.
 
