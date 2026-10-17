@@ -1742,7 +1742,11 @@ function UnitCastingInfo(u)
 	end
 	if MOBS[u] and MOBS[u].casting then return MOBS[u].casting, nil, nil, nil, nil, false, nil, false, MOBS[u].castID end
 end
-function UnitChannelInfo() return nil end
+-- A channel: MOBS[u].channel or PARTY[u].channel (a name) with channelID: the spell's ID (8th, like the game).
+function UnitChannelInfo(u)
+	local who = MOBS[u] or PARTY[u]
+	if who and who.channel then return who.channel, nil, nil, nil, nil, false, false, who.channelID end
+end
 function UnitHealth() return SECRET end -- (Forever: always secret)
 HEALTH_MAX = 1000 -- my maximum health (Forever: it answers, unless restricted: then SECRET)
 function UnitHealthMax(u) if u == "player" then return HEALTH_MAX end return SECRET end

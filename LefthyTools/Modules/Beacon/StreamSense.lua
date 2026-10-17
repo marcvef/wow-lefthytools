@@ -635,6 +635,19 @@ local function ClassOf(unit)
 	return ok and type(classFile) == "string" and not issecret(classFile) and classFile or nil
 end
 
+-- What a unit is casting, or else channelling: its name and spell ID (nil: nothing, or hidden).
+-- (A mob's are hidden on Forever: then its cast events tell that it casts, Fill.)
+local function UnitCast(unit)
+	local ok, name, _, _, _, _, _, _, _, spellID = pcall(UnitCastingInfo, unit) -- (the spell: 9th)
+	if not ok or issecret(name) or not name then
+		ok, name, _, _, _, _, _, _, spellID = pcall(UnitChannelInfo, unit) -- (8th)
+		if not ok or issecret(name) or not name then
+			return nil
+		end
+	end
+	return name, not issecret(spellID) and spellID or nil
+end
+
 -- My group's members: their place is known exactly (UnitPosition answers for group members), so
 -- they need no learning: the nearest MAX_GROUP within GROUP_FAR yards (further than the outer ring:
 -- on its rim). Appended to the picture's mobs from n + 1; returns the new count. inGroup: their
@@ -680,9 +693,7 @@ local function Group(n)
 		mob.combat = Value("UnitAffectingCombat", unit) == true
 		mob.attacking, mob.target, mob.soft, mob.onScreen = false, false, false, nil
 		mob.unit, mob.creature, mob.health, mob.engaged = unit, nil, nil, false
-		local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
-		mob.casting = ok and not issecret(castName) and castName or nil
-		mob.castID = mob.casting and not issecret(castID) and castID or nil
+		mob.casting, mob.castID = UnitCast(unit)
 		mob.yards, mob.exact = math.min(found.yards, S.OUTER_YARDS), math.floor(found.yards + 0.5)
 		mob.beyond = found.yards > S.OUTER_YARDS and mob.exact or nil
 		mob.sure, mob.bearing = 1, found.bearing
@@ -714,12 +725,8 @@ local function Fill(n, unit, unitTarget, targetKey, onScreen, now, friendly)
 	-- Fighting you: you're on its threat list (hidden where the game restricts it), or it attacks you.
 	mob.engaged = not friendly and (type(Value("UnitThreatSituation", "player", unit)) == "number" or mob.attacking) or false
 	mob.aggro, mob.aggroName, mob.aggroSelf = nil, nil, nil -- (read after the look, for the mobs fought: Holders)
-	local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
-	if not ok or issecret(castName) or not castName then
-		local okChannel, channelName, _, _, _, _, _, _, channelID = pcall(UnitChannelInfo, unit)
-		castName, castID = okChannel and not issecret(channelName) and channelName or nil, channelID
-	end
-	mob.casting, mob.castID = castName, castName and not issecret(castID) and castID or nil
+	local castName, castID = UnitCast(unit)
+	mob.casting, mob.castID = castName, castID
 	local began = not castName and castingSince[mob.key]
 	if began and now - began <= CAST_LONGEST then
 		mob.casting = L["a spell"] -- (what it is, the game hides)

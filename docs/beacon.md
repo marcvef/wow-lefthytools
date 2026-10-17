@@ -643,7 +643,7 @@ a player's, mobs past the ones looked at) and mob casts not seen to end.
 **Players.** Your group (`party1-4` / `raid1-40`): `UnitPosition` answers for group members, so
 they're placed exactly, no learning (`Group`: same continent, within 120 yd, the nearest 8; beyond
 the 40 yd ring on its rim, the tooltip says the exact yards); name, level, class, dead, in combat,
-casting. Other players with a nameplate: enemy ones come with the hostile nameplates (`UnitIsPlayer`
+casting or channelling (like a mob, `UnitCast`). Other players with a nameplate: enemy ones come with the hostile nameplates (`UnitIsPlayer`
 marks them), friendly ones (friendly nameplates on, not in your group, at most 6) are learned like
 mobs (their range checks: whatever answers for a friendly unit). In the window a player's dot is
 in their class colour with a ring: blue your (their) group, white friendly, red enemy; group

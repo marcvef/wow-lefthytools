@@ -3899,13 +3899,16 @@ do
 	do
 		local n0, w0 = UnitPosition("player")
 		GROUP = "party"
-		PARTY.party1 = { name = "Bobby", classFile = "WARRIOR", level = 18, guid = "Player-1-77", north = n0 + 12, west = w0, continent = 0 }
+		PARTY.party1 = { name = "Bobby", classFile = "WARRIOR", level = 18, guid = "Player-1-77", north = n0 + 12, west = w0, continent = 0,
+			channel = "Mind Flay", channelID = 15407 }
 		MOBS.nameplate5 = { name = "Cedric", level = 22, player = true, friendly = true, classFile = "PRIEST", yards = 20, x = 0.4, y = 0.5 }
 		Advance(0.6)
 		local bobby, cedric = dot("Bobby"), dot("Cedric")
 		check(bobby and bobby.mob.group and bobby.mob.exact == 12 and bobby.mob.sure == 1 and math.abs(bobby.tx) < 0.5
 			and math.abs(bobby.ty - 12 * px) < 0.5 and bobby.Name:GetText() == "Bobby" and bobby.Ring.color[3] == 1,
 			"a party member 12 yd north: exactly there, named, a blue ring")
+		check(bobby.mob.casting == "Mind Flay" and bobby.mob.castID == 15407 and bobby.Glow:IsShown(),
+			"his channel (Mind Flay): casting, like a mob's")
 		check(cedric and cedric.mob.player and cedric.mob.friendly and not cedric.mob.group and cedric.ty > 0,
 			"another player with a friendly nameplate: on my screen, learned like a mob")
 		check(win.Status:GetText():find("3 near", 1, true), "players aren't counted as enemies near")
