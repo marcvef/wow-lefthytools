@@ -87,5 +87,6 @@ Modules\Bestiary\Bestiary.lua
 Modules\Bestiary\Classic.lua
 Modules\Bestiary\Quests.lua
 Modules\Bestiary\Wishes.lua
+Modules\Bestiary\Recording.lua
 Modules\Bestiary\Window.lua
 Modules\Bestiary\Ledger.lua
