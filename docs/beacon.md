@@ -723,6 +723,25 @@ the picture already holds, one action after another like turns (about half a sec
   last }` (1306 spells, 8 KB, from 1.60.1.70450). Turned into `[spell ID] = school` the first time a
   spell is looked at (`S.SpellSchool`, when an action starts; nothing per frame). The preview casts
   Fireballs and a Frostbolt and a Fire Blast now and then.
+- **Polymorph** (picked by the user: "polymorphed mobs as sheep in the battle row"): their own
+  Polymorph that went off at their target (the cast, or new in their last spells when the cast
+  wasn't seen; a mob's debuffs aren't read, nothing more goes over the network; only a foe that is
+  their target: other spells go to the first foe when it isn't in the row) turns it into the animal
+  when it lands (`PlayerModel:SetDisplayInfo`, the slot's `display`). The animal: the creature the
+  spell transforms into (SpellEffect: aura 56, `EffectMiscValue_0`), its first model; the
+  creatures' models are server data, not in the client's tables (taken from AzerothCore's
+  `creature_template_model`; each display checked in this client's CreatureDisplayInfo and
+  CreatureModelData): 16372 -> 856 the white sheep, 16371 -> 16358 a pink pig, 16377 -> 16361 a
+  turtle, 16779 -> 1060 a cow (the server picks one of a creature's models; the others are a black
+  sheep, other pigs and turtles). By spell ID: 118, 12824, 12825, 12826 (ranks 1-4: 20, 30, 40,
+  50 s; SpellMisc's DurationIndex), 28272 Pig, 28271 Turtle, 28270 Cow (50 s); other IDs by name
+  (the first of that name: rank 1). It lasts until it takes damage (a loss on it; one after the
+  spell went off but before it landed cancels it), dies (it falls as itself), the spell's time runs
+  out (from when it went off) or it leaves the row. A sheep stands and never strikes, and keeps its
+  place while it's in combat (a sheep may not count as fighting them: off their target, perhaps off
+  its threat list). The preview: once a loop she targets the mage at 11.5 s, polymorphs it
+  (12-13.5 s, instead of a Fireball) and goes back to the leader at 14.5 s; the mage joins the fight
+  1 s into the loop, so it's itself again when the loop starts over.
 - **Their target loses health** (the estimate, a drop of 0.4% or more): theirs. It joins their
   spell or ability on the way (its number lands with it), else it's a swing: they step forward 16 px
   and strike (17). The mob flinches (9) with a red flash, and what it lost floats up from it in gold:

@@ -335,5 +335,8 @@ ns.CHANGELOG = {
 	{ id = 109, module = "beacon",
 		en = { "Fight stream: spells in their colours", "In the battle row a spell glows in its school's colour as it flies, and its hit flashes in it: fire orange, frost blue, shadow purple and so on. Restart the game once after this update." },
 		de = { "Kampf-Stream: Zauber in ihren Farben", "In der Kampfreihe leuchtet ein Zauber im Flug in der Farbe seiner Schule, und sein Treffer blitzt darin auf: Feuer orange, Frost blau, Schatten lila und so weiter. Nach diesem Update einmal das Spiel neu starten." } },
+	{ id = 110, module = "beacon",
+		en = { "Fight stream: polymorphed mobs as sheep", "A mob they polymorph turns into a sheep in the battle row (or a pig, turtle or cow) until it takes damage, dies or the spell runs out." },
+		de = { "Kampf-Stream: verwandelte Mobs als Schaf", "Verwandelt der Magier im Stream einen Mob, steht der in der Kampfreihe als Schaf da (oder Schwein, Schildkröte, Kuh), bis er Schaden nimmt, stirbt oder die Verwandlung ausläuft." } },
 	-- New entries go here, at the end.
 }

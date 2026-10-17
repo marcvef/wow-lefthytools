@@ -937,8 +937,11 @@ local PREVIEW_MOMENTS = {
 -- Her spells: a cast every 4 s, { start, spell ID, cast time, its name if the game has none },
 -- each joining her last spells when it goes off; a Fire Blast (an instant) now and then.
 local PREVIEW_CASTS = { { 0, 133, 2.5, L["Fireball"] }, { 4, 133, 2.5, L["Fireball"] }, { 8, 116, 2.5, L["Frostbolt"] },
-	{ 12, 133, 2.5, L["Fireball"] }, { 16, 133, 2.5, L["Fireball"] } } -- (the last before the fight is over)
+	{ 12, 118, 1.5, L["Polymorph"] }, { 16, 133, 2.5, L["Fireball"] } } -- (the last before the fight is over)
 local PREVIEW_BLASTS = { 7, 15 }
+-- Once a loop she sheeps the mage: her target from a moment before her Polymorph until after it went
+-- off (then the leader again). It's a sheep until the fight is over: it leaves the row then.
+local PREVIEW_POLYMORPH, PREVIEW_ON_MAGE, PREVIEW_SHEEP = 118, { 11.5, 14.5 }, 13.5
 
 -- Whether a moment of the loop passed since the last step (also over the loop's end).
 local function Passed(at, was, t)
@@ -998,14 +1001,15 @@ local function FeedPreview(view)
 	-- (Their models: Hogger, a Defias Bandit, a Defias Rogue Wizard, a Riverpaw Gnoll, Thuros
 	-- Lightfingers. Health: the leader's goes down, the bandit's faster, the mage's isn't known.
 	-- Who has aggro: her Fireball pulls the leader, Bob, the tank, takes it from her at 8 s; the
-	-- bandit stays on her; the mage is on Cedric, passing by, outside her group.)
+	-- bandit stays on her; the mage is on Cedric, passing by, outside her group, until she sheeps it.)
+	local onMage = t >= PREVIEW_ON_MAGE[1] and t < PREVIEW_ON_MAGE[2] -- (her target for her Polymorph)
 	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite", 448)
-	leader.combat, leader.attacking, leader.target, leader.engaged = fighting, fighting and t < 8, true, fighting
+	leader.combat, leader.attacking, leader.target, leader.engaged = fighting, fighting and t < 8, not onMage, fighting
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
 	leader.casting = fighting and (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
-	local landed = 0 -- (her spells land)
+	local landed = 0 -- (her spells land; the Polymorph hurts nobody)
 	for _, c in ipairs(PREVIEW_CASTS) do
-		if t >= c[1] + c[3] then
+		if c[2] ~= PREVIEW_POLYMORPH and t >= c[1] + c[3] then
 			landed = landed + 1
 		end
 	end
@@ -1026,9 +1030,10 @@ local function FeedPreview(view)
 		mobs[#mobs + 1] = bandit
 	end
 	local mage = PreviewMob(3, "mage", L["Bandit mage"], 15, "normal", 474)
-	mage.combat, mage.engaged, mage.yards, mage.bearing = fighting, fighting, 24, 1.1 + 0.03 * t -- (she's on its threat list)
-	mage.casting = fighting and (t % 6 < 2) and L["Frostbolt"] or nil
-	if fighting then
+	mage.combat, mage.engaged, mage.target = fighting, fighting, onMage -- (she's on its threat list)
+	mage.yards, mage.bearing = 24, 1.1 + 0.03 * t -- (casting at her, until it's a sheep)
+	mage.casting = fighting and (t % 6 < 2 and t < PREVIEW_SHEEP) and L["Frostbolt"] or nil
+	if fighting and t < PREVIEW_SHEEP then
 		mage.aggro, mage.aggroName = "OUTSIDER", "Cedric"
 	end
 	mobs[#mobs + 1] = mage

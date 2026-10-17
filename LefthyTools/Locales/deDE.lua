@@ -779,6 +779,7 @@ L["Died after %s"] = "Gestorben nach %s"
 L["%s XP"] = "%s EP"
 L["lowest ~%d%%"] = "min. ~%d%% HP"
 L["Not killed yet"] = "Noch nicht getötet"
+L["Polymorph"] = "Verwandlung"
 -- Bestiary
 L["What the mobs you kill drop: a window for your target with each drop, how many you got and the drop chance, from your own kills. Kept for all your characters, only on your computer."] =
 	"Was die Mobs droppen, die du tötest: ein Fenster für dein Ziel mit jedem Drop, wie viele du bekommen hast und der Dropchance, aus deinen eigenen Kills. Für alle deine Charaktere, nur auf deinem Computer."

@@ -14,6 +14,8 @@ local S = B.Stream
 --   * an instant spell: a harmful one is a special attack on their target (its icon pops on it);
 --     either way the icon glows in its school's colour and the hit flashes in it (fire orange,
 --     frost blue, shadow purple, ...; Data/SpellSchools.lua), a physical one as before;
+--   * their Polymorph: the mob it went off at becomes a sheep (a pig, a turtle, a cow) until it
+--     takes damage, dies, the spell's time runs out or it leaves the row;
 --   * their target loses health (the estimate): it was them (their spell or ability, else a swing:
 --     they step forward and strike); it flinches, and roughly what it lost floats up from it (the
 --     loss times what its kind has, S.MobMaxOf: learned, the classic database or usual for its
@@ -145,6 +147,47 @@ local function School(spellID)
 	return schoolOf[spellID]
 end
 S.SpellSchool = School
+
+-- Polymorph: the mob it hits becomes the animal in the row (picked by the user: "polymorphed mobs
+-- as sheep in the battle row").
+-- Known from their own spells only (a Polymorph of theirs that went off at their target; a mob's
+-- debuffs aren't read, nothing more goes over the network), until it takes damage (a loss on it),
+-- dies, the spell's time runs out or it leaves the row. { spell ID, creature display, seconds }:
+-- each rank (SpellMisc's DurationIndex: 20 to 50 s), Pig, Turtle and Cow (wago.tools, 1.60.1.70450).
+-- The animal: the first model of the creature the spell turns a mob into (its SpellEffect's
+-- transform; the creature's models aren't in the client's tables, the server's are: 856 the white
+-- sheep, 16358 a pink pig, 16361 a turtle, 1060 a cow; all in this client's CreatureDisplayInfo).
+-- Other IDs by name: the first of that name (Polymorph: rank 1).
+local SHEEP, PIG, TURTLE, COW = 856, 16358, 16361, 1060
+local POLYMORPH = { { 118, SHEEP, 20 }, { 12824, SHEEP, 30 }, { 12825, SHEEP, 40 }, { 12826, SHEEP, 50 },
+	{ 28272, PIG, 50 }, { 28271, TURTLE, 50 }, { 28270, COW, 50 } }
+local polyIDs, polyNames
+local function Polymorph(spellID)
+	if type(spellID) ~= "number" or issecret(spellID) then
+		return nil
+	end
+	if not polyIDs then
+		polyIDs, polyNames = {}, {}
+		for _, poly in ipairs(POLYMORPH) do
+			polyIDs[poly[1]] = poly
+			local name = Value("C_Spell.GetSpellName", poly[1])
+			if name and not polyNames[name] then
+				polyNames[name] = poly
+			end
+		end
+	end
+	if polyIDs[spellID] then
+		return polyIDs[spellID]
+	end
+	local name = Value("C_Spell.GetSpellName", spellID)
+	return name and polyNames[name]
+end
+
+-- Their Polymorph at a slot: only one that's their target (other spells go to the first foe when
+-- their target isn't in the row, a guess no sheep should rest on).
+local function PolymorphAt(slot, spellID)
+	return slot and slot.mob and slot.mob.target and Polymorph(spellID) or nil
+end
 local AVOID_ANIM = { DODGE = ANIM.dodge, PARRY = ANIM.parry, BLOCK = ANIM.block }
 local CASTERS = { MAGE = true, PRIEST = true, WARLOCK = true } -- (weapons stay sheathed)
 
@@ -293,13 +336,28 @@ end
 -- A creature this client hasn't met yet loads nothing at first (in game: the first try gave no
 -- model, the next one did, once the game had asked for it), and nothing tries again by itself: so
 -- a slot asks again every RETRY seconds, TRIES times, and shows the mob's initials meanwhile.
+-- Polymorphed (slot.display): the animal instead.
 local function LoadFoe(slot, creature, again)
 	slot.loaded, slot.loadAt = false, GetTime()
 	slot.tries = again and (slot.tries or 0) + 1 or 0
 	slot.Model:ClearModel()
-	slot.Model:SetCreature(creature)
+	if slot.display then
+		Call(slot.Model, "SetDisplayInfo", slot.display)
+	else
+		slot.Model:SetCreature(creature)
+	end
 	slot.Model:SetFacing(FOE_FACING)
 	slot.Model.current = nil
+end
+
+-- A slot's model: the mob's creature, or the animal while it's polymorphed (st.sheep); loaded anew
+-- when that changes, or the slot's size (its camera fits the size it loaded at).
+local function Look(slot, mob, st)
+	local display, scale = st.sheep, slot:GetEffectiveScale()
+	if slot.creature ~= mob.creature or slot.display ~= display or not slot.scale or math.abs(slot.scale - scale) > 0.001 then
+		slot.creature, slot.display, slot.scale = mob.creature, display, scale
+		LoadFoe(slot, mob.creature)
+	end
 end
 
 -- "DB" for Defias Bandit (the first letter of the first two words; a letter of several bytes whole).
@@ -634,18 +692,26 @@ local function ShowAggro(view, slot, mob)
 	end
 end
 
+-- A polymorphed mob keeps its place while it's in combat: a sheep may not count as fighting them
+-- (off their target, perhaps off its threat list).
+local function Sheep(b, mob, now)
+	local st = b.foe[mob.key]
+	return st and st.sheep and st.index and not mob.dead and mob.combat and now < st.sheepUntil
+end
+
 local foeList = {}
 local LAST_FIELDS = { "key", "name", "level", "class", "creature", "target", "health", "combat", "engaged" }
 local function ShowFoes(view, now)
 	local row, picture, b = view.win.Foes, view.picture, Battle(view)
 	local foes = S.Foes(picture.mobs, foeList, 99)
-	-- The dying go back where they were: dead in the picture, or killed and gone from it (its copy).
+	-- The dying go back where they were: dead in the picture, or killed and gone from it (its copy);
+	-- so do sheep.
 	local listed = {}
 	for _, mob in ipairs(foes) do
 		listed[mob.key] = true
 	end
 	for _, mob in ipairs(picture.mobs) do
-		if Dying(b, mob, now) and not listed[mob.key] then
+		if (Dying(b, mob, now) or Sheep(b, mob, now)) and not listed[mob.key] then
 			listed[mob.key] = true
 			table.insert(foes, math.min(#foes + 1, b.foe[mob.key].index), mob)
 		end
@@ -678,18 +744,17 @@ local function ShowFoes(view, now)
 			slot.mob = mob
 			local st = b.foe[mob.key] or {}
 			b.foe[mob.key] = st
-			st.index = shown
+			st.index, st.shownAt = shown, now
 			if not mob.dead and not st.deadAt then -- (a copy: it may die and be gone from the picture at once)
 				st.last = st.last or {}
 				for _, field in ipairs(LAST_FIELDS) do
 					st.last[field] = mob[field]
 				end
 			end
-			local scale = slot:GetEffectiveScale()
-			if slot.creature ~= mob.creature or not slot.scale or math.abs(slot.scale - scale) > 0.001 then
-				slot.creature, slot.scale = mob.creature, scale
-				LoadFoe(slot, mob.creature)
+			if st.sheep and now >= st.sheepUntil then
+				st.sheep = nil -- (its time ran out)
 			end
+			Look(slot, mob, st)
 			if not slot.loaded then
 				if Loaded(slot.Model) then
 					slot.loaded = true -- (OnModelLoaded may not have come)
@@ -710,14 +775,20 @@ local function ShowFoes(view, now)
 			end
 			slot.Unknown:SetShown(not slot.real and not mob.health and not mob.dead)
 			ShowAggro(view, slot, mob)
-			-- How it stands: ready while it fights, lying once dead, casting while it casts.
-			slot.Model.base = mob.dead and ANIM.dead or mob.casting and ANIM.aim or (mob.combat or mob.engaged) and ANIM.ready or ANIM.stand
+			-- How it stands: ready while it fights, lying once dead, casting while it casts; a sheep stands.
+			slot.Model.base = mob.dead and ANIM.dead or st.sheep and ANIM.stand or mob.casting and ANIM.aim
+				or (mob.combat or mob.engaged) and ANIM.ready or ANIM.stand
 			slot:Show()
 		end
 	end
 	for i = shown + 1, #row.slots do
 		row.slots[i].mob, row.slots[i].key = nil, nil
 		row.slots[i]:Hide()
+	end
+	for _, st in pairs(b.foe) do
+		if st.sheep and st.shownAt ~= now then
+			st.sheep = nil -- (out of the row)
+		end
 	end
 	row.More:SetText("+" .. (total - shown))
 	row.More:SetShown(total > shown)
@@ -745,12 +816,12 @@ local function TargetSlot(view)
 	return first
 end
 
--- The mob that hits them: one attacking them (their target first).
+-- The mob that hits them: one attacking them (their target first; never a sheep).
 local function AttackerSlot(view)
 	local best
 	for _, slot in ipairs(view.win.Foes.slots) do
 		local mob = slot:IsShown() and slot.mob
-		if mob and not mob.dead and mob.attacking then
+		if mob and not mob.dead and mob.attacking and not slot.display then
 			if mob.target then
 				return slot
 			end
@@ -808,25 +879,31 @@ local function Enqueue(view, action, now)
 	end
 end
 
--- The waiting (or running) spell or ability at a mob that has no number yet: a loss joins it.
+-- The waiting (or running) spell or ability at a mob that has no number yet: a loss joins it (not
+-- a Polymorph's: it hurts nobody).
 local function Pending(b, key)
 	local a = b.action
-	if a and (a.kind == "spell" or a.kind == "ability") and a.key == key and not a.loss and not a.impacted then
+	if a and (a.kind == "spell" or a.kind == "ability") and a.key == key and not a.loss and not a.impacted and not a.poly then
 		return a
 	end
 	for _, q in ipairs(b.queue) do
-		if (q.kind == "spell" or q.kind == "ability" or q.kind == "strike") and q.key == key and not q.loss then
+		if (q.kind == "spell" or q.kind == "ability" or q.kind == "strike") and q.key == key and not q.loss and not q.poly then
 			return q
 		end
 	end
 end
 
--- When it lands: the one struck flinches, the number floats up from it.
+-- When it lands: the one struck flinches, the number floats up from it; a Polymorph's turns into
+-- the animal (also when its turn was skipped), unless it lost health after the spell went off.
 function S.BattleImpact(view, a, now)
 	local hero = view.win.Foes.Hero
 	if a.kind == "strike" or a.kind == "ability" or a.kind == "spell" then
 		local slot = SlotOf(view, a.key)
 		local st = view.battle and view.battle.foe[a.key]
+		if a.poly and slot and st and not st.deadAt and not (st.lostAt and st.lostAt > a.at) then
+			st.sheep, st.sheepUntil = a.poly[2], a.at + a.poly[3]
+			Look(slot, slot.mob, st)
+		end
 		if slot and not a.skipped and not (st and st.deadAt) then -- (a mob that fell doesn't flinch)
 			Act(slot.Model, ANIM.wound, 0.4, now)
 			Flash(slot, 0.55, a.kind ~= "strike" and a.school and SCHOOL_COLORS[a.school] or nil)
@@ -930,6 +1007,7 @@ local function Harmful(spellID)
 end
 
 -- Their cast: a pose while it lasts; when it went off, cast at their target (harmful) or in place.
+-- A Polymorph (always at their target) turns it into the animal when it lands.
 local function Casting(view, b, now)
 	local picture, hero = view.picture, view.win.Foes.Hero
 	local cast = picture.cast
@@ -946,9 +1024,10 @@ local function Casting(view, b, now)
 	elseif was and not was.channel and now >= (was.finish or 0) - 0.4 then -- (went off: not stopped early)
 		b.released, b.releasedAt = was.spellID, now
 		local target = TargetSlot(view)
-		if Harmful(was.spellID) and target then
+		local poly = PolymorphAt(target, was.spellID)
+		if (poly or Harmful(was.spellID)) and target then
 			b.mineAt = now
-			Enqueue(view, { kind = "spell", key = target.key, icon = was.icon, school = School(was.spellID) }, now)
+			Enqueue(view, { kind = "spell", key = target.key, icon = was.icon, school = School(was.spellID), poly = poly }, now)
 		else
 			Enqueue(view, { kind = "release" }, now)
 		end
@@ -972,9 +1051,10 @@ local function Instants(view, b, now)
 		return
 	end
 	local target = TargetSlot(view)
-	if Harmful(r.spellID) and target then
+	local poly = PolymorphAt(target, r.spellID) -- (a Polymorph whose cast wasn't seen)
+	if (poly or Harmful(r.spellID)) and target then
 		b.mineAt = now
-		Enqueue(view, { kind = "ability", key = target.key, icon = r.icon, school = School(r.spellID) }, now)
+		Enqueue(view, { kind = "ability", key = target.key, icon = r.icon, school = School(r.spellID), poly = poly }, now)
 	else
 		Enqueue(view, { kind = "release" }, now)
 	end
@@ -988,7 +1068,7 @@ local function Fall(view, b, key, now)
 	if not st or st.deadAt then
 		return
 	end
-	st.deadAt = now
+	st.deadAt, st.sheep = now, nil -- (a sheep dies as itself)
 	if st.last then
 		st.ghost = {}
 		for k, v in pairs(st.last) do
@@ -998,6 +1078,9 @@ local function Fall(view, b, key, now)
 	end
 	local slot = SlotOf(view, key)
 	if slot then
+		if st.last or slot.mob then
+			Look(slot, st.last or slot.mob, st) -- (its copy: a friend's picture reuses its mob tables)
+		end
 		Act(slot.Model, ANIM.death, DIE_TIME, now)
 		slot.Model.base = ANIM.dead
 		slot.Bar:SetMinMaxValues(0, 1)
@@ -1019,7 +1102,7 @@ function S.BattleKill(view, key)
 end
 
 -- Mobs losing health: their target's loss was theirs (their spell, else a swing); another's only
--- flinches. A mob that died falls.
+-- flinches. A sheep is itself again. A mob that died falls.
 local function Losses(view, b, now)
 	local picture = view.picture
 	for _, slot in ipairs(view.win.Foes.slots) do
@@ -1032,6 +1115,11 @@ local function Losses(view, b, now)
 				-- (fallen already: their killing blow came first)
 			elseif mob.health then
 				if st.health and mob.health < st.health - DROP_MIN then
+					st.lostAt = now
+					if st.sheep then -- (damage breaks it)
+						st.sheep = nil
+						Look(slot, mob, st)
+					end
 					local frac = st.health - mob.health
 					local max = S.MobMaxOf and S.MobMaxOf(mob.creature, mob.level, mob.class)
 					local loss = { frac = frac, amount = max and frac * max or nil }
@@ -1200,7 +1288,7 @@ function S.BattleReset(view)
 	view.battle = nil
 	local row = view.win.Foes
 	for _, slot in ipairs(row.slots) do
-		slot.mob, slot.creature, slot.key, slot.dx = nil, nil, nil, 0
+		slot.mob, slot.creature, slot.display, slot.key, slot.dx = nil, nil, nil, nil, 0
 		slot.Model.act, slot.Model.current = nil, nil
 		slot:SetAlpha(1)
 		slot:Hide()

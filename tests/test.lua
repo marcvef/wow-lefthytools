@@ -3697,10 +3697,31 @@ do
 	local bandit = dot("Bandit")
 	check(bandit and bandit.Skull:IsShown() and not bandit.Body:IsShown(), "a mob that dies: a skull ...")
 	check(floatWith("+87 XP") and win.Kills:GetText() == "1 kill", "her kill: its XP floats up, 1 kill")
+	do -- Her Polymorph at the mage (it went off 13.5 s into the loop): a sheep in the row.
+		local sheep
+		for _, s in ipairs(win.Foes.slots) do
+			if s:IsShown() and s.key == "mage" then sheep = s end
+		end
+		check(sheep and sheep.Model._display == 856 and sheep.Model._creature == nil and sheep.Model._anim == 0 and not sheep.Ring:IsShown()
+			and win.Foes.slots[1].key == "leader" and win.Foes.slots[1].Ring:IsShown() and not dot("Bandit mage").casting,
+			"her Polymorph turned the mage into a sheep (standing, no more Frostbolts); her target the leader again")
+	end
 	Advance(2.5)
 	check(bandit:GetAlpha() < 0.5, "... that fades")
 	check(floatWith("an item, |cffffd14c1.3%|r") and floatWith("an item, |cffffd14c1.3%|r").anchor == win.Foes.Hero,
 		"her loot from it: a rare find (the classic database's chance for a Defias Bandit), in gold")
+	do -- The fight ends (the mage leaves the row), the loop starts over: in the next fight it's itself again.
+		local wasSheep, mage = false
+		for _, s in ipairs(win.Foes.slots) do
+			if s:IsShown() and s.key == "mage" then wasSheep = s.Model._display == 856 end
+		end
+		Advance(10)
+		for _, s in ipairs(win.Foes.slots) do
+			if s:IsShown() and s.key == "mage" then mage = s end
+		end
+		check(wasSheep and mage and mage.Model._creature == 474 and mage.Model._display == nil,
+			"still a sheep near the loop's end; once it starts over, the mage again")
+	end
 
 	win.Close:Click()
 	check(not win:IsShown() and used() == 0, "the X closes it, its dots let go")
@@ -4392,22 +4413,74 @@ do
 				"Sinister Strike (physical): its icon pops on it without a glow, the flash red")
 			Advance(0.6)
 		end
+		-- Her Polymorph (known from her own spells: a mob's debuffs aren't read): the mob it went off at
+		-- is a sheep until it takes damage, dies, the spell's time runs out or it leaves the row.
+		do
+			local row, slot = fwin.Foes, fwin.Foes.slots[1]
+			local function frame(recent, rest) -- (her frame: no cast, these last spells, then vitals and mobs)
+				return "O2;f;0;1429;260;750;90;c;M40;;;" .. recent .. ";" .. rest
+			end
+			anna("O2;f;0;1429;260;750;90;c;M40;;118,10,15;;v80,4=80/4,90,8,9,act")
+			Advance(0.6)
+			anna(frame("118,0", "v80,4=80/4,90,8,9,act"))
+			Advance(0.2)
+			check(b.action and b.action.kind == "spell" and b.action.poly and row.ShotGlow:IsShown() and row.ShotGlow.vertex[2] == 0.4,
+				"her Polymorph flies over, glowing arcane pink-violet")
+			Advance(0.4)
+			local st = b.foe[slot.key]
+			check(slot.mob.name == "Kobold Vermin" and slot.Model._display == 856 and slot.Model._creature == nil and st.sheep == 856
+				and math.abs(st.sheepUntil - GetTime() - 19.4) < 0.2, "it lands: the Kobold Vermin is a sheep (rank 1: for 20 s)")
+			anna(frame("118,1", "v80,4=80/4,90,8,9,c"))
+			Advance(0.6)
+			check(slot:IsShown() and slot.key == st.last.key and slot.Model._display == 856 and slot.Model._anim == 0,
+				"off her target and merely in combat: the sheep keeps its place, standing")
+			anna(frame("118,2", "v80,4=70/4,90,8,9,act"))
+			Advance(0.6)
+			check(slot.Model._creature == 6 and slot.Model._display == nil and not st.sheep, "it takes damage: itself again")
+			anna(frame("12826,0/118,3", "v80,4=70/4,90,8,9,act"))
+			Advance(0.6)
+			check(slot.Model._display == 856 and math.abs(st.sheepUntil - GetTime() - 49.4) < 0.2,
+				"rank 4, its cast not seen (only in her last spells): a sheep for 50 s")
+			st.sheepUntil = GetTime() -- (as if its time were over)
+			Advance(0.6)
+			check(slot.Model._creature == 6 and not st.sheep, "its time runs out: itself again")
+			anna(frame("28272,0/12826,1", "v80,4=70/4,90,8,9,act"))
+			Advance(0.6)
+			check(slot.Model._display == 16358 and st.sheep, "Polymorph: Pig: a pig")
+			anna(frame("28272,1", "v80"))
+			Advance(0.6)
+			check(not slot:IsShown() and not st.sheep, "gone from her frames, out of the row: no pig any more")
+			anna(frame("118,0", "v80,4=70/4,90,8,9,ac"))
+			Advance(0.6)
+			check(slot:IsShown() and slot.Model._creature == 6 and not st.sheep,
+				"back, but her Polymorph went off at someone not in the row: no sheep guessed")
+			anna(frame("12825,0/118,1", "v80,4=70/4,90,8,9,act"))
+			Advance(0.6)
+			check(slot.Model._display == 856, "her target again, rank 3: a sheep")
+			anna(frame("12825,1", "v80,41k4"))
+			Advance(0.6)
+			check(slot:IsShown() and slot.Model._creature == 6 and slot.Model._display == nil and slot.Model._anims[1] and not st.sheep,
+				"her killing blow: it falls as itself")
+		end
 	end
 	-- An elite she fights, in the classic database (my client knows no other health for it): the hover
 	-- says where its kind's health comes from, and what it lost floats up as a number, not a percent.
 	do
 		local dropData = LefthyToolsDropData
 		LefthyToolsDropData = { source = "test", mobs = { [9201] = ";h=17-18:1180-1260" } }
-		anna("O2;n;6;18;Riverpaw Brute")
-		anna("O2;c;6;9201")
-		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,6=50/6,90,8,9,acte")
+		anna("O2;n;26;18;Riverpaw Brute")
+		anna("O2;c;26;9201")
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,26=50/26,90,8,9,acte")
 		Advance(0.6)
-		local brute = fwin.Foes.slots[1]
+		local brute -- (its own box: one that died before may still be falling in the first)
+		for _, s in ipairs(fwin.Foes.slots) do
+			if s:IsShown() and s.key == 26 then brute = s end
+		end
 		brute._scripts.OnEnter(brute)
 		check(brute.mob.name == "Riverpaw Brute" and brute.mob.class == "elite" and tooltipFind("~50% health")
 			and tooltipFind("against its kind's health: the classic database."), "hover an elite she fights: ~50%, its kind's health from the classic database")
 		brute._scripts.OnLeave(brute)
-		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,6=40/6,90,8,9,acte")
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,26=40/26,90,8,9,acte")
 		Advance(0.15)
 		Advance(0.3)
 		check(floatWith("-126", fwin) and floatWith("-126", fwin).anchor == brute, "it loses 10%: -126 floats up from it (of 1260, its health at level 18 there)")
