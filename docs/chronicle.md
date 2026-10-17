@@ -91,7 +91,10 @@ continues it. A snapshot of the counters and the gold at the start gives the ses
 One driver, 1 tick per second while the module is on: time played and per zone, one
 `UnitPosition`, the target check, the zone/profession re-checks only when flagged, sharing, and
 `C.OnTick` for the window (returns at once unless it's open). Switched off: events unregistered,
-driver hidden.
+driver hidden. The driver resets its timer before the tick, so an error in it can't make it run
+every frame; the other files' hooks (`C.ShareDays`, `C.SyncTick`, `C.ShareHighlights`,
+`C.OnTick`) go through `LT.Guard` (architecture.md): one that fails is reported once and rests,
+and the rest of the tick goes on. A redraw that failed keeps its page marked for the next one.
 
 ## Friends and sharing (Live.lua)
 

@@ -131,6 +131,19 @@ check(not report:find("|c", 1, true), "plain text, no colour codes")
 check(#UISpecialFrames > 0 and UISpecialFrames[#UISpecialFrames] == "LefthyToolsErrorsFrame", "Escape closes it")
 for i = 1, 30 do geterrorhandler()("Interface/AddOns/LefthyTools/Core/Core.lua:" .. i .. ": test " .. i) end
 check(#kept == 25 and kept[25].msg:find("test 30", 1, true) and not kept[1].msg:find(ours, 1, true), "at most 25 kept, the oldest go")
+do -- LT.Guard (ticks call other files' hooks with it; more at the end of this file). No time passes here.
+	local calls = 0
+	local function brokenHook() calls = calls + 1; error("a hook that fails") end
+	local first, again = LT.Guard("test.broken", brokenHook), LT.Guard("test.broken", brokenHook)
+	local newest = kept[#kept]
+	check(first == nil and again == nil and calls == 1, "LT.Guard: a hook that fails rests (called again right away, it isn't)")
+	check(newest.msg:find("a hook that fails", 1, true) and newest.count == 1
+		and newest.stack:find("test.lua:" .. debug.getinfo(brokenHook, "S").linedefined .. ":", 1, true),
+		"... and reaches the error catcher once, with the stack where it failed, got\n" .. newest.stack)
+	local ok, one, two = LT.Guard("test.works", function(x) return x + 1, "two" end, 1)
+	check(ok == true and one == 2 and two == "two" and LT.Guard("test.missing", nil) == nil,
+		"a hook that works: true and its answers; one that isn't there (a file not loaded): nothing")
+end
 lefthy("errors clear")
 check(#LefthyToolsDB.errors == 0 and errorRow():find("None", 1, true) and not renderRow("Errors").Button:IsShown(),
 	"/lefthy errors clear (and the Show button goes)")
@@ -7473,13 +7486,15 @@ section("Chronicle: a broken tick doesn't run every frame")
 do
 	local C = ns.Chronicle
 	local c = C.Store().chars["Lefthy-Realmy"]
-	local ticks, played = C.ticks, c.stats.played
-	local onTick = C.OnTick
-	C.OnTick = function() error("a broken redraw") end
+	-- Chronicle's own part of the tick fails (a broken record; other files' hooks are guarded, see the
+	-- end of this file): it still runs once a second, not every frame.
+	local ticks, stats = C.ticks, c.stats
+	local played = stats.played
+	c.stats = nil
 	for _ = 1, 180 do pcall(Advance, 1 / 60) end
-	C.OnTick = onTick
-	check(C.ticks - ticks <= 4 and c.stats.played - played <= 4,
-		"an error in the tick: still once a second, no time made up, got " .. (C.ticks - ticks) .. " ticks")
+	c.stats = stats
+	check(C.ticks - ticks <= 4 and c.stats.played == played,
+		"an error in the tick: still once a second, got " .. (C.ticks - ticks) .. " ticks")
 	-- Levelled while Chronicle was off: the new level's time doesn't count from the old level's start.
 	c.level, c.levelStart, c.levelFrom = PLAYER_LEVEL - 1, c.stats.played - 100, { kills = 0, quests = 0 }
 	C.Store().friendStats.Gone = { classFile = "MAGE", level = 10, days = { ["2020-01-01"] = { played = 60 } } }
@@ -9182,6 +9197,62 @@ do
 		lefthy("enable mirage")
 		Advance(0.5)
 	end
+end
+
+-- Ticks call other files' hooks through LT.Guard: one that fails doesn't stop the rest of the tick,
+-- is reported once, and rests (1 s, 2 s, 4 s, ...) instead of failing on every tick or frame.
+local function catchErrors() -- what reaches the error handler from now on; call the result to stop
+	local reported, errorHandler = {}, geterrorhandler
+	geterrorhandler = function() return function(err) reported[#reported + 1] = tostring(err) end end
+	return reported, function() geterrorhandler = errorHandler end
+end
+
+section("Beacon: a hook that fails doesn't stop the tick")
+do
+	local health, calls, pings, reports, minimap = BB.StreamHealthTick, BB.UpdateCalls, BB.UpdatePings, BB.TickReports, BB.UpdateMinimap
+	local ticks, healthCalls, reportTicks, minimapCalls = 0, 0, 0, 0
+	BB.StreamHealthTick = function() healthCalls = healthCalls + 1; error("a broken health tick") end -- (before sending)
+	BB.UpdateCalls = function(now) ticks = ticks + 1; return calls(now) end
+	BB.UpdatePings = function() error("broken pings") end
+	BB.TickReports = function(now) reportTicks = reportTicks + 1; return reports(now) end -- (after the pings)
+	BB.UpdateMinimap = function() minimapCalls = minimapCalls + 1; error("a broken minimap") end -- (every frame)
+	local reported, stop = catchErrors()
+	mark = #GAMEDATA + 1
+	anna("H2")
+	Advance(3)
+	stop()
+	BB.StreamHealthTick, BB.UpdateCalls, BB.UpdatePings, BB.TickReports, BB.UpdateMinimap = health, calls, pings, reports, minimap
+	check(sentTo(11, mark, "V2;")[1], "a hook before sending fails on every tick: Anna's hello is answered all the same")
+	check(ticks >= 20 and reportTicks == ticks, "one in the middle fails: the rest of the tick runs, got " .. reportTicks .. " of " .. ticks)
+	check(healthCalls <= 3 and minimapCalls <= 3,
+		"the failing ones rest: " .. healthCalls .. " of " .. ticks .. " ticks, " .. minimapCalls .. " of 180 frames")
+	check(#reported == 3, "each error reported once, got " .. #reported)
+end
+
+section("Chronicle: a hook that fails doesn't stop the tick")
+do
+	local C = ns.Chronicle
+	local sync, share, onTick = C.SyncTick, C.ShareHighlights, C.OnTick
+	local syncCalls, shares, redraws, feedSeen = 0, 0, 0, {}
+	C.SyncTick = function() syncCalls = syncCalls + 1; error("a broken sync") end
+	C.ShareHighlights = function(now) shares = shares + 1; return share(now) end -- (after Sync.lua's)
+	C.OnTick = function(_, _, _, feedChanged) -- the window: fails the first time only
+		redraws = redraws + 1
+		feedSeen[redraws] = feedChanged
+		if redraws == 1 then error("a broken redraw") end
+	end
+	local reported, stop = catchErrors()
+	local ticks = C.ticks
+	C.feedDirty = true
+	Advance(5.5)
+	stop()
+	C.SyncTick, C.ShareHighlights, C.OnTick = sync, share, onTick
+	local n = C.ticks - ticks
+	check(n >= 5 and shares == n, "Sync.lua's hook fails on every tick: the rest of the tick runs, got " .. shares .. " of " .. n)
+	check(syncCalls <= 3, "... and the failing hook rests, got " .. syncCalls .. " calls in " .. n .. " ticks")
+	check(redraws >= 2 and feedSeen[1] and feedSeen[2], "a redraw that failed: its page stays marked for the next one")
+	check(#reported == 2 and reported[1]:find("a broken sync", 1, true) and reported[2]:find("a broken redraw", 1, true),
+		"each error reported once")
 end
 
 check(#ERRORS == 0, "no errors reported through the error handler")

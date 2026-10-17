@@ -311,3 +311,12 @@ Handlers and settings callbacks only record state; frame work (alpha, Show/Hide,
 sending messages) happens on the next frame, in an OnUpdate driver or `C_Timer.After(0)`.
 Blizzard's `PlayerMovementFrameFader.lua` follows the same rule. Drivers that only need to run
 after a change are shown for one frame and hide themselves, so they cost nothing while idle.
+
+A driver resets its timer before its tick, so an error in the tick can't make it run every
+frame. A tick that calls other files' hooks (Beacon's, Chronicle's) calls each through
+`LT.Guard(name, fn, ...)` (`Core/Core.lua`): in `xpcall`, so one that fails doesn't stop the rest
+of the tick (Beacon's sending, say). Its error goes to the error handler, and so to the error
+catcher with the stack where it happened, once per message and session; then that hook rests:
+skipped for 1 s, twice as long each time it fails again (at most a minute), until a call works.
+`LT.Guard` returns true and the hook's answers if it ran and worked, nothing if it failed, rested
+or isn't there (a file not loaded: `fn` nil). It makes no garbage, so it's fine for every frame.

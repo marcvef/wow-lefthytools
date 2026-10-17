@@ -852,10 +852,10 @@ local function Tick(now, elapsed)
 		UpdateGroupUnits()
 		Changed()
 	end
-	B.SharingTick(now) -- Sharing.lua: my level-up, state, quest, enemies, level progress
-	if B.StreamHealthTick then
-		B.StreamHealthTick(now) -- my health (estimated), to everyone
-	end
+	-- The other files' hooks go through LT.Guard: one that fails doesn't stop the tick (sending
+	-- below), and rests a while instead of failing ten times a second.
+	LT.Guard("B.SharingTick", B.SharingTick, now) -- Sharing.lua: my level-up, state, quest, enemies, level progress
+	LT.Guard("B.StreamHealthTick", B.StreamHealthTick, now) -- my health (estimated), to everyone
 	Drain(now, elapsed)
 
 	Each(dings, 1, now, HandleDing)
@@ -867,26 +867,18 @@ local function Tick(now, elapsed)
 	end
 	Each(dailyIn, 1, now, HandleDaily)
 	Each(itemsIn, 2, now, HandleItem) -- Items.lua: shared items, Need / Pass answers, roll results
-	if B.UpdateCalls then
-		B.UpdateCalls(now)
-	end
+	LT.Guard("B.UpdateCalls", B.UpdateCalls, now)
 	Each(highlightsIn, 1, now, HandleHighlight)
-	if B.UpdatePings then
-		B.UpdatePings(now)
-	end
-	if B.TickReports then
-		B.TickReports(now)
-	end
-	B.TickUpdates(now) -- Updates.lua: a friend's newer build, what's new in mine
+	LT.Guard("B.UpdatePings", B.UpdatePings, now)
+	LT.Guard("B.TickReports", B.TickReports, now)
+	LT.Guard("B.TickUpdates", B.TickUpdates, now) -- Updates.lua: a friend's newer build, what's new in mine
 	if now - lastExpire >= 1 then
 		Expire(now)
 	end
 	if B.dirty and now - lastRefresh >= REFRESH_THROTTLE then
 		lastRefresh = now
 		B.dirty = false
-		if B.RefreshMaps then
-			B.RefreshMaps()
-		end
+		LT.Guard("B.RefreshMaps", B.RefreshMaps)
 	end
 end
 
@@ -898,12 +890,8 @@ local function OnUpdate(_, elapsed)
 		sinceTick = 0 -- (first: an error in Tick must not make it run every frame)
 		Tick(now, since)
 	end
-	if B.UpdateMinimap then
-		B.UpdateMinimap(now) -- every frame, but returns at once unless a dot has to move
-	end
-	if B.UpdateWorldMapGroupPins then
-		B.UpdateWorldMapGroupPins() -- only does something with the map open and group friends on it
-	end
+	LT.Guard("B.UpdateMinimap", B.UpdateMinimap, now) -- every frame, but returns at once unless a dot has to move
+	LT.Guard("B.UpdateWorldMapGroupPins", B.UpdateWorldMapGroupPins) -- only does something with the map open and group friends on it
 end
 
 local handlers = B.handlers

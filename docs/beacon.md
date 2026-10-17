@@ -25,9 +25,9 @@ Files, in load order:
 
 They share state through `ns.Beacon` (`B`): `B.peers` (`gameAccountID -> peer`), the queues
 (`B.Queue`, `B.QueueToPeers`, `B.QueueLatest`, `B.QueueLow`, ...), `B.MyWorldPosition`, and hooks
-the later files set, which Beacon.lua calls when they're there (`if B.X then B.X() end`): on the
-driver tick (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`, `B.StreamHealthTick`,
-`B.RefreshMaps`, `B.UpdateMinimap`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
+the later files set, which Beacon.lua calls when they're there (`if B.X then B.X() end`, on the
+tick `LT.Guard`): on the driver tick (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`,
+`B.StreamHealthTick`, `B.RefreshMaps`, `B.UpdateMinimap`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
 `B.ReceivePing`, `B.ReceiveItem`, `B.ReceiveChat`, `B.ReceiveReportPart`, `B.ReceiveStream`,
 `B.ReceiveJournal`), with an answer (`B.CollectorMessage`, `B.StreamHello`, `B.JournalHello`), and on
 switching (`B.Attach` / `B.Detach`, `B.StreamStart` / `B.StreamStop`, `B.OnSettingChanged`).
@@ -103,6 +103,10 @@ Bulk data (Chronicle's days for friends' graphs) goes into a low-priority queue 
 that `Drain` only empties when no one-off message, state or hello is waiting. `B.QueueLow(id,
 message, onSent)`: onSent is called once it actually went (error reports are kept until then).
 The driver's tick resets its timer before running, so an error in it can't make it run every frame.
+The other files' hooks it calls (`B.SharingTick`, `B.StreamHealthTick`, `B.UpdateCalls`,
+`B.UpdatePings`, `B.TickReports`, `B.TickUpdates`, `B.RefreshMaps`, and every frame
+`B.UpdateMinimap` and `B.UpdateWorldMapGroupPins`) go through `LT.Guard` (architecture.md): one
+that fails is reported once and rests, and the rest of the tick, sending included, goes on.
 
 Values that only matter in their newest form (tracked quest `T2`, enemy count `C2`, level
 progress `X2`) replace a message of the same kind still waiting in the queue for that friend

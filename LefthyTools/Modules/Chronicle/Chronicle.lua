@@ -662,17 +662,17 @@ local function Tick(now, elapsed)
 	end
 	TrackTravel()
 	TrackTarget(now)
-	C.ShareDays(now) -- Live.lua: my days for friends' graphs (older builds')
-	if C.SyncTick then
-		C.SyncTick(now) -- Sync.lua: my journal for friends, theirs from whoever is online
-	end
+	-- The other files' hooks go through LT.Guard: one that fails doesn't stop the tick, and rests a
+	-- while instead of failing every second.
+	LT.Guard("C.ShareDays", C.ShareDays, now) -- Live.lua: my days for friends' graphs (older builds')
+	LT.Guard("C.SyncTick", C.SyncTick, now) -- Sync.lua: my journal for friends, theirs from whoever is online
 	store.lastSeenAt = time()
-	C.ShareHighlights(now) -- Live.lua: this tick's highlights to friends
-	if C.OnTick then
-		-- Window.lua: redraws only while open, and only the page whose data changed.
-		C.OnTick(now, C.dirty, C.eventsDirty, C.feedDirty)
+	LT.Guard("C.ShareHighlights", C.ShareHighlights, now) -- Live.lua: this tick's highlights to friends
+	-- Window.lua: redraws only while open, and only the page whose data changed (marked until a
+	-- redraw works).
+	if LT.Guard("C.OnTick", C.OnTick, now, C.dirty, C.eventsDirty, C.feedDirty) or not C.OnTick then
+		C.dirty, C.eventsDirty, C.feedDirty = false, false, false
 	end
-	C.dirty, C.eventsDirty, C.feedDirty = false, false, false
 end
 
 local driver = CreateFrame("Frame")

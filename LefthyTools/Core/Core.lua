@@ -208,6 +208,62 @@ end
 LT.SafeCall = SafeCall
 
 ---------------------------------------------------------------------------
+-- Guarded hooks. A tick (Beacon's, Chronicle's) calls other files' hooks several times a second,
+-- some every frame. One that fails must not stop the rest of the tick (sending, say), nor fail
+-- again ten times a second: LT.Guard reports its error once and lets it rest a while.
+---------------------------------------------------------------------------
+
+local GUARD_REST, GUARD_REST_MAX = 1, 60 -- seconds a failed hook rests: doubled each time it fails again
+local guards = {} -- name -> { rest = seconds, resting = until (GetTime), told = { [message] = true } }
+local guarded     -- the guard whose hook is running (for Report)
+
+-- xpcall's error handler: it runs where the error happened, so the error catcher keeps that stack.
+-- Each message once per hook and session.
+local function Report(err)
+	local key = (type(err) == "string" and not LT.IsSecret(err)) and err or "?"
+	if not guarded.told[key] then
+		guarded.told[key] = true
+		geterrorhandler()(err)
+	end
+	return err
+end
+
+local function Finish(guard, outer, ok, ...)
+	guarded = outer
+	if ok then
+		guard.rest = nil
+		return true, ...
+	end
+	guard.rest = guard.rest and math.min(guard.rest * 2, GUARD_REST_MAX) or GUARD_REST
+	guard.resting = GetTime() + guard.rest
+end
+
+-- Calls the hook fn(...), name being what it's known by (e.g. "B.UpdatePings"). Returns true and
+-- what fn returned if it ran and worked; nothing if it failed, rests, or fn is nil (a file not
+-- loaded). An error goes to the error handler, and so to the error catcher (Errors.lua), once per
+-- message; then the hook rests: 1 s, twice as long each time it fails again (at most a minute),
+-- until a call works. No garbage per call: fine for every frame.
+function LT.Guard(name, fn, ...)
+	if not fn then
+		return
+	end
+	local guard = guards[name]
+	if not guard then
+		guard = { told = {} }
+		guards[name] = guard
+	end
+	if guard.resting then
+		if GetTime() < guard.resting then
+			return
+		end
+		guard.resting = nil
+	end
+	local outer = guarded
+	guarded = guard
+	return Finish(guard, outer, xpcall(fn, Report, ...))
+end
+
+---------------------------------------------------------------------------
 -- Saved settings: LefthyToolsDB = { modules = { key = bool }, settings = { key = {...} } }
 ---------------------------------------------------------------------------
 
