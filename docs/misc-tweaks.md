@@ -8,7 +8,7 @@ compares what's wanted (module enabled and the tweak's setting on) with what's a
 the next frame via `C_Timer.After(0)`. All tweaks default to on, except `retailFrames`. The other
 files, in load order: `Bags.lua` (`movableBags`, `gamepadBagSort`), `QuestAnnounce.lua`,
 `ComboPoints.lua`, `Aggro.lua`, `RetailFrames.lua`, `ForeverQuests.lua`, `AFK.lua`, `Flight.lua`,
-`LevelUp.lua`, `QuestMap.lua` (+ `QuestMap.xml`).
+`LevelUp.lua` and `LevelUpWindow.lua`, `QuestMap.lua` (+ `QuestMap.xml`).
 
 ## statusText: always show health and power values
 
@@ -315,7 +315,12 @@ choices are `Builder:Choice` sliders (no dropdowns, see forever-platform.md).
 - **Unverified in game:** whether `QuestPOIFrame` draws a zone's blob correctly in a frame that
   small, and how thick the border looks there (`SetBorderScalar`).
 
-## levelUp: the level-up window (LevelUp.lua)
+## levelUp: the level-up window (LevelUp.lua, LevelUpWindow.lua)
+
+`LevelUp.lua` knows what a level brings (`Collect`: trainer spells, talent row, class quest,
+dungeons, friends) and when the window comes (the events, the stat snapshot, `Preview`,
+`Browse`); `LevelUpWindow.lua` draws it (`LevelUp.Show`, `Close`, `SetPinned`) and steps aside for
+fights (`LevelUp.StepAside` / `ComeBack`).
 
 A moment after `PLAYER_LEVEL_UP` (1.5 s, then it waits while `EventToastManagerFrame`, Blizzard's
 level-up banner, is shown, at most 8 s; never in combat: `PLAYER_REGEN_ENABLED` brings it 1 s

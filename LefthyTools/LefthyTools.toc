@@ -42,6 +42,7 @@ Modules\Tweaks\ForeverQuests.lua
 Modules\Tweaks\AFK.lua
 Modules\Tweaks\Flight.lua
 Modules\Tweaks\LevelUp.lua
+Modules\Tweaks\LevelUpWindow.lua
 Modules\Tweaks\QuestMap.lua
 Modules\Tweaks\QuestMap.xml
 

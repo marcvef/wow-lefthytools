@@ -37,7 +37,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever
   Modules/Tweaks/AFK.lua     AFK screen (a tweak): interface hidden, camera circling, a panel with news
   Modules/Tweaks/Flight.lua  cinematic flights (a tweak): letterbox, title cards, subtitles, time left
-  Modules/Tweaks/LevelUp.lua  level-up window (a tweak): stat gains, trainer spells, class quests
+  Modules/Tweaks/LevelUp.lua  level-up window (a tweak): what a level brings (stat gains, trainer spells, talents, class quests), when it shows
+  Modules/Tweaks/LevelUpWindow.lua  the level-up window itself: drawing, count-ups, pin, arrows
   Modules/Tweaks/QuestMap.lua  quests on continent and world maps: icons and areas (world map provider)
   Modules/Tweaks/QuestMap.xml  its world map pin templates (quest icon, quest area)
   Data/Changelog.lua         what's new: one entry per player-visible change, English and German
