@@ -588,9 +588,18 @@ learned: a mob seen out of combat before its fight and then dead (seen dead at a
 level apart stayed unknown): `LefthyToolsDB.streamMobHealth[<creature ID>] = { ratio, kills }`,
 the average of the last 5, kept for good, each player's own (not synced: friends get the percent).
 0.5.0-119/120 kept `["<creature>:<level>"] = { maximum, kills }`: turned into ratios when the sensor
-starts. Not learned yet: a normal (or trivial) mob is taken as usual (ratio 1); an elite, rare or
-boss isn't known. Not seen: hits while it has neither a nameplate nor is your target; a killing
-blow counts in full (a little high). Mobs not looked at for 5 minutes are forgotten.
+starts. Beside it **the classic database's health** (the Bestiary's `LefthyTools_DropData`,
+`ns.Bestiary.Health`, see bestiary.md; nothing while the Bestiary or its `dropData` setting is off,
+or without the add-on; loaded the first time a maximum is asked for). Which one (`MobMax`, also
+`S.MobMaxOf` -> maximum, `"learned"` / `"database"` / `"usual"`): a ratio learned from 2 kills or
+more (it's measured on Forever, the database is classic), else the database (a level outside the
+creature's range there: its nearest end scaled like a usual mob, `EXPECTED_HEALTH`; a boss's "??":
+its highest level's), else a ratio from 1 kill, else a normal (or trivial) mob is taken as usual
+(ratio 1); an elite, rare or boss known by none isn't known. So elites and rares in the database
+get a percent from the start, and the battle row's numbers too. Learning stays against
+`EXPECTED_HEALTH`, the database doesn't change it. Not seen: hits while it has neither a nameplate
+nor is your target; a killing blow counts in full (a little high). Mobs not looked at for 5 minutes
+are forgotten.
 
 **Players.** Your group (`party1-4` / `raid1-40`): `UnitPosition` answers for group members, so
 they're placed exactly, no learning (`Group`: same continent, within 120 yd, the nearest 8; beyond
@@ -642,7 +651,10 @@ mob's initials ("DB") meanwhile. A gold edge for the target, a health bar under 
 own window the bar is the real health: `UnitHealthMax` / `UnitHealth` of the mob's unit go
 straight into `StatusBar:SetMinMaxValues` / `SetValue`, which take hidden values (AllowedWhenTainted;
 the unit checked against the GUID first). In a friend's: their estimate; not known: "?" (the hover
-says how it's learned).
+says how it's learned). The hover of an estimate says where its kind's health comes from, as this
+client knows it (`S.MobMaxOf`: "learned from kills", "the classic database", "usual for its level";
+a friend's percent may rest on their own kills); known only to the friend: "Estimated by their
+client".
 
 **The battle row** (StreamBattle.lua; the user: a Pokémon-style fight, "your model does something
 and affects the enemy models", in the foes' row, the radar staying above; "doesn't need to be shown
@@ -658,8 +670,8 @@ the picture already holds, one action after another like turns (about half a sec
 - **Their target loses health** (the estimate, a drop of 0.4% or more): theirs. It joins their
   spell or ability on the way (its number lands with it), else it's a swing: they step forward 16 px
   and strike (17). The mob flinches (9) with a red flash, and what it lost floats up from it in gold:
-  the loss times what its kind has (`S.MobMaxOf`, StreamSense's maximum: the usual for its level
-  times its kind's learned ratio), a percent when that isn't known (an elite not learned yet). The
+  the loss times what its kind has (`S.MobMaxOf`, StreamSense's maximum: learned, the classic
+  database or usual for its level), a percent when that isn't known (an elite in neither). The
   combat log is closed, so who hit isn't known: their target's loss is taken as theirs; **another
   mob's** only flinches, its number smaller and grey.
 - **They're hit** (moment `w`/`W`): the mob attacking them (their target first) lunges 10 px and

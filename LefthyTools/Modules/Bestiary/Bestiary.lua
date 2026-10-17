@@ -31,7 +31,7 @@ local L = ns.L
 -- can drop (LefthyTools_DropData, a separate add-on: GPL v3 like its source, CMaNGOS Classic DB),
 -- loaded when first needed. Forever is classic content (the same mob and item IDs) but may differ, so
 -- it's never mixed into your numbers: your drops show its chance beside yours, and what you haven't
--- seen yet shows faded.
+-- seen yet shows faded. It also has each kind's health, for Beacon's fight stream (Bt.Health).
 
 local M = LT:NewModule("bestiary", {
 	title = "Bestiary",
@@ -260,6 +260,7 @@ end
 
 local DATA_ADDON = "LefthyTools_DropData"
 local known = {}           -- creature ID -> what the database says (false: not in it), read when first asked
+local knownOf              -- the database those were read from (another one: read again)
 local dataTried = false    -- loading it was tried (again after a setting changes)
 local dataWhy              -- why it isn't there (LoadAddOn's reason: "MISSING", "DISABLED", ...)
 
@@ -282,8 +283,10 @@ local function DropData()
 	return type(db) == "table" and type(db.mobs) == "table" and db or nil
 end
 
--- "<item>:<quality>:<chance in hundredths of a percent>[q],...[;s=<skinning, the same>][;g=<min>-<max>]"
--- (tools/update-drop-data.js).
+-- "<item>:<quality>:<chance in hundredths of a percent>[q],...[;s=<skinning, the same>][;g=<min>-<max>]
+-- [;h=<min level>[-<max level>]:<health at the min level>[-<at the max level>]]"
+-- (tools/update-drop-data.js). A part of a kind it doesn't know is skipped (builds before the health
+-- skip "h" that way).
 local function ParseKnown(text)
 	local entry = { items = {}, skins = {} }
 	for part in text:gmatch("[^;]+") do
@@ -291,6 +294,12 @@ local function ParseKnown(text)
 		if kind == "g" then
 			local low, high = rest:match("^(%d+)%-(%d+)$")
 			entry.coin = low and { tonumber(low), tonumber(high) } or nil
+		elseif kind == "h" then
+			local low, high, lowHealth, highHealth = rest:match("^(%d+)%-?(%d*):(%d+)%-?(%d*)$")
+			if low then
+				low, lowHealth = tonumber(low), tonumber(lowHealth)
+				entry.health = { low, tonumber(high) or low, lowHealth, tonumber(highHealth) or lowHealth }
+			end
 		elseif not kind or kind == "s" then
 			local into = kind and entry.skins or entry.items
 			for id, quality, chance, quest in (rest or part):gmatch("(%d+):(%d+):(%d+)(q?)") do
@@ -303,17 +312,45 @@ end
 
 -- What the classic database says a kind of mob drops: { items = { [item ID] = { chance (0-1),
 -- quality, quest (only while on its quest) } }, skins = (the same, per skinning), coin = { min, max }
--- (copper, or nil) }; nil: it doesn't know the mob, or there's no database. Each mob read once.
+-- (copper, or nil), health = { min level, max level, health at the min level, at the max } (or nil) };
+-- nil: it doesn't know the mob, or there's no database. Each mob read once.
 function Bt.Known(creature)
 	local db = creature and DropData()
 	if not db then
 		return nil
+	end
+	if db ~= knownOf then
+		known, knownOf = {}, db
 	end
 	if known[creature] == nil then
 		local text = db.mobs[creature]
 		known[creature] = type(text) == "string" and ParseKnown(text) or false
 	end
 	return known[creature] or nil
+end
+
+-- What the classic database says a kind of mob has at full health at a level (the fight stream's
+-- estimate of mobs' health, StreamSense.lua): between its lowest and highest level in a straight
+-- line (most kinds span a level or two); and the level that is for. A level outside its range: the
+-- nearest end's (that level second, so the caller can scale it); not known (nil, or -1 for a boss's
+-- "??"): its highest. nil: the database doesn't know it, or the Bestiary or the database is switched
+-- off (then nothing is loaded).
+function Bt.Health(creature, level)
+	if not M.enabled then
+		return nil
+	end
+	local entry = Bt.Known(creature)
+	local health = entry and entry.health
+	if not health then
+		return nil
+	end
+	local low, high = health[1], health[2]
+	if type(level) ~= "number" or issecret(level) or level < 1 or level >= high then
+		return health[4], high
+	elseif level <= low then
+		return health[3], low
+	end
+	return math.floor(health[3] + (health[4] - health[3]) * (level - low) / (high - low)), level
 end
 
 -- You can skin (Skinning, any rank): only then does what skinning gives count among what you could
@@ -378,11 +415,15 @@ function Bt.PrintData()
 			:format(dataWhy or "?", DATA_ADDON))
 		return
 	end
-	local count = 0
-	for _ in pairs(db.mobs) do
+	local count, health = 0, 0
+	for _, text in pairs(db.mobs) do
 		count = count + 1
+		if type(text) == "string" and text:find(";h=", 1, true) then
+			health = health + 1
+		end
 	end
-	M:Print(("the classic drop database: %d kinds of mobs, from %s."):format(count, tostring(db.source)))
+	M:Print(("the classic drop database: %d kinds of mobs, %d of them with their health, from %s.")
+		:format(count, health, tostring(db.source)))
 end
 
 ---------------------------------------------------------------------------
@@ -786,7 +827,7 @@ function M:BuildOptions(o)
 		L["An item's tooltip (in your bags, in chat, anywhere) lists the three mobs it comes from likeliest, with the chance; a pelt marks skinning."])
 	o:Checkbox("showPoor", L["Grey items"], L["Show grey (junk) items among the drops."])
 	o:Checkbox("dropData", L["Compare with a drop database"],
-		L["Beside your own numbers, what a classic world database (CMaNGOS) says each mob can drop: its chance on each of your drops, and what you haven't had yet, faded. WoW: Forever may differ. It's an add-on of its own, LefthyTools Drop Data, installed with LefthyTools; /bestiary data says whether it's there."])
+		L["Beside your own numbers, what a classic world database (CMaNGOS) says each mob can drop: its chance on each of your drops, and what you haven't had yet, faded. Beacon's fight stream takes mobs' health from it too. WoW: Forever may differ. It's an add-on of its own, LefthyTools Drop Data, installed with LefthyTools; /bestiary data says whether it's there."])
 	o:Checkbox("windowUnseen", L["Not seen yet in the window"],
 		L["Under your target's drops in the window, what the drop database says it drops that you haven't had yet, faded (a mob you haven't killed: what it can drop). The ledger always shows it."])
 	o:Checkbox("cardUnseen", L["Mobs not killed yet beside the mouse"],

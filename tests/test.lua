@@ -4071,6 +4071,14 @@ do
 		check(win.Foes.slots[2] and win.Foes.slots[2]:IsShown() and win.Foes.slots[2].mob.name == "Busy Wolf"
 			and win.Foes.slots[1].mob.name == "Young Wolf", "I'm on its threat list: in the row, after my target")
 		check(win.Foes.slots[2].mob.health == nil, "an elite not learned yet: its health not known (for friends)")
+		-- With the classic database (the Bestiary's LefthyTools_DropData) it is: its health there.
+		local dropData = LefthyToolsDropData
+		LefthyToolsDropData = { source = "test", mobs = { [300] = "2589:1:5000;h=2-4:60-100" } }
+		Fire("UNIT_COMBAT", "nameplate6", "WOUND", "", 20, 1)
+		Advance(0.6)
+		check(win.Foes.slots[2].mob.health and math.abs(win.Foes.slots[2].mob.health - 0.75) < 0.001,
+			"an elite in the classic database: its health there (80 at level 3, between 60 at 2 and 100 at 4), 20 lost: ~75% (for friends)")
+		LefthyToolsDropData = dropData
 		MOBS.nameplate6, THREAT.nameplate6 = nil, nil
 		Fire("UNIT_COMBAT", "nameplate5", "WOUND", "", 60, 1)
 		Fire("UNIT_COMBAT", "target", "WOUND", "", 60, 1) -- (the same hit, for my target)
@@ -4101,6 +4109,39 @@ do
 		MOBS.nameplate5, MOBS.target, STATE.target = nil, nil, false
 		Advance(9)
 		check(not slot:IsShown(), "gone: the row empties")
+	end
+	-- A kind's health: a ratio learned from 2 kills or more first (measured on Forever), then the
+	-- classic database, then a ratio from 1 kill, then usual for its level (a normal mob); else not known.
+	do
+		local dropData, learned, bestiary = LefthyToolsDropData, LefthyToolsDB.streamMobHealth, ns.Bestiary
+		LefthyToolsDropData = { source = "test", mobs = { [9101] = ";h=10-20:300-800", [9102] = ";h=10-20:300-800",
+			[9103] = "2589:1:5000;g=8-15" } }
+		learned[9101], learned[9102], learned[9104] = { 1.5, 2 }, { 1.5, 1 }, { 1.5, 1 }
+		local max, from = S.MobMaxOf(9101, 15, "elite")
+		check(math.abs(max - 1.5 * 385) < 0.001 and from == "learned", "learned from 2 kills: its ratio, before the database")
+		max, from = S.MobMaxOf(9102, 15, "elite")
+		check(max == 550 and from == "database", "learned from 1 kill: the database first (550 at level 15, between 300 at 10 and 800 at 20)")
+		max, from = S.MobMaxOf(9103, 15)
+		check(max == 385 and from == "usual", "in the database without its health, a normal mob: usual for its level")
+		max, from = S.MobMaxOf(9104, 15, "elite")
+		check(math.abs(max - 1.5 * 385) < 0.001 and from == "learned", "not in the database, 1 kill: its ratio")
+		check(S.MobMaxOf(9105, 15, "rare") == nil, "a rare nobody knows: not known")
+		max = S.MobMaxOf(9102, 22, "elite")
+		check(math.abs(max - 800 / 629 * 731) < 0.001, "a level the database doesn't have: its nearest (20) scaled like a usual mob")
+		check(S.MobMaxOf(9102, -1, "worldboss") == 800, "a boss's \"??\": its highest level's")
+		-- No database: the Bestiary switched off, its database off, or not there at all.
+		bestiary.module.enabled = false
+		check(select(2, S.MobMaxOf(9102, 15, "elite")) == "learned", "the Bestiary switched off: as before")
+		bestiary.module.enabled = true
+		LefthyToolsDB.settings.bestiary.dropData = false
+		check(select(2, S.MobMaxOf(9102, 15, "elite")) == "learned", "its database switched off: as before")
+		LefthyToolsDB.settings.bestiary.dropData = true
+		ns.Bestiary = nil
+		check(select(2, S.MobMaxOf(9102, 15, "elite")) == "learned" and select(2, S.MobMaxOf(9103, 15)) == "usual",
+			"no Bestiary at all: as before")
+		ns.Bestiary = bestiary
+		learned[9101], learned[9102], learned[9104] = nil, nil, nil
+		LefthyToolsDropData = dropData
 	end
 	win.Close:Click()
 	check(not win:IsShown() and not S.SenseRunning(), "closed: the sensor stops")
@@ -4287,7 +4328,8 @@ do
 			and second:IsShown() and second.Model._creature == 6 and second.Unknown:IsShown() and not first.Unknown:IsShown(),
 			"her foes: her target first (a Kobold Miner at ~45%), then a Kobold Vermin (its health not known)")
 		first._scripts.OnEnter(first)
-		check(TOOLTIP.title == "Kobold Miner (12)" and tooltipFind("~45% health") and tooltipFind("Estimated"), "hover: who, ~45%, estimated")
+		check(TOOLTIP.title == "Kobold Miner (12)" and tooltipFind("~45% health") and tooltipFind("against its kind's health: usual for its level."),
+			"hover: who, ~45%, estimated against what its level usually has")
 		first._scripts.OnLeave(first)
 		second._scripts.OnEnter(second)
 		check(tooltipFind("Health not known yet"), "hover the other: not known yet, and how it will be")
@@ -4315,6 +4357,28 @@ do
 		anna("O2;f;0;1429;260;750;90;;M40;;;;v80")
 		Advance(0.6)
 		check(not (b.action and b.action.kind == "release") and #b.queue == 0, "done: no cast at anyone")
+	end
+	-- An elite she fights, in the classic database (my client knows no other health for it): the hover
+	-- says where its kind's health comes from, and what it lost floats up as a number, not a percent.
+	do
+		local dropData = LefthyToolsDropData
+		LefthyToolsDropData = { source = "test", mobs = { [9201] = ";h=17-18:1180-1260" } }
+		anna("O2;n;6;18;Riverpaw Brute")
+		anna("O2;c;6;9201")
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,6=50/6,90,8,9,acte")
+		Advance(0.6)
+		local brute = fwin.Foes.slots[1]
+		brute._scripts.OnEnter(brute)
+		check(brute.mob.name == "Riverpaw Brute" and brute.mob.class == "elite" and tooltipFind("~50% health")
+			and tooltipFind("against its kind's health: the classic database."), "hover an elite she fights: ~50%, its kind's health from the classic database")
+		brute._scripts.OnLeave(brute)
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,6=40/6,90,8,9,acte")
+		Advance(0.15)
+		Advance(0.3)
+		check(floatWith("-126", fwin) and floatWith("-126", fwin).anchor == brute, "it loses 10%: -126 floats up from it (of 1260, its health at level 18 there)")
+		LefthyToolsDropData = dropData
+		anna("O2;f;0;1429;260;750;90;;M40;;;;v80")
+		Advance(0.6)
 	end
 
 	-- Anna watches me: the sensor runs, a small red dot with 1 right of the calendar button, frames
@@ -6755,15 +6819,34 @@ section("Bestiary: what mobs drop")
 	C_AddOns.LoadAddOn = function(name)
 		loads[#loads + 1] = name
 		LefthyToolsDropData = { source = "test", mobs = {
-			[116] = "1019:1:6600q,2070:1:5000,2589:1:2972,774:2:128;s=2318:1:9000;g=8-15",
-			[117] = "2589:1:5000,1179:1:1000",
+			[116] = "1019:1:6600q,2070:1:5000,2589:1:2972,774:2:128;s=2318:1:9000;g=8-15;h=8-9:156-176",
+			[117] = "2589:1:5000,1179:1:1000", -- (as before the health: none)
 			[118] = "4865:0:4000,2589:1:1500;s=2318:1:9000;g=20-40",
+			[119] = ";h=10-20:300-800", -- (no loot, its health only)
 		} }
 		return true
 	end
 	setting("dropData"):SetValue(false)
 	setting("dropData"):SetValue(true) -- (a setting changed: loading it is tried again)
 	check(#loads == 1 and loads[1] == "LefthyTools_DropData", "switched on: the database add-on is loaded, once")
+	-- Each kind's health in it too (for the fight stream), read beside the drops; strings without it as before.
+	do
+		local bandit, gnoll, brute = Bt.Known(116), Bt.Known(117), Bt.Known(119)
+		check(bandit.health and bandit.health[1] == 8 and bandit.health[2] == 9 and bandit.health[3] == 156 and bandit.health[4] == 176
+			and bandit.coin[1] == 8 and bandit.coin[2] == 15 and bandit.items[1019] and bandit.skins[2318],
+			"a mob's string with its health: the health read, its drops, skinning and coin as before")
+		check(gnoll.health == nil and gnoll.items[2589][1] == 0.5 and gnoll.items[1179] and Bt.Health(117, 10) == nil,
+			"a string from before the health: its drops, no health")
+		check(brute.health and next(brute.items) == nil and brute.coin == nil, "health only: known, no drops")
+		local function at(level) return table.concat({ Bt.Health(119, level) }, ",") end
+		check(Bt.Health(116, 8) == 156 and Bt.Health(116, 9) == 176 and at(15) == "550,15" and at(12) == "400,12",
+			"its health at a level: in a straight line between its lowest and highest")
+		check(at(25) == "800,20" and at(5) == "300,10" and at(nil) == "800,20" and at(-1) == "800,20",
+			"outside its levels: the nearest end's, with that level; a level not known: its highest")
+		Bt.module.enabled = false
+		check(Bt.Health(116, 9) == nil, "the Bestiary switched off: none")
+		Bt.module.enabled = true
+	end
 	check(LefthyToolsDB.settings.bestiary.windowUnseen == false and not win.KnownLabel:IsShown()
 		and not (win.knownCells[1] and win.knownCells[1]:IsShown()), "the window: not seen yet is off by default (only your drops)")
 	setting("windowUnseen"):SetValue(true)
@@ -6846,13 +6929,13 @@ section("Bestiary: what mobs drop")
 	ledger:Hide()
 	local pmark3 = #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_BESTIARY("data")
-	check(printedSince(pmark3):find("3 kinds of mobs, from test", 1, true), "/bestiary data: what it holds")
+	check(printedSince(pmark3):find("4 kinds of mobs, 2 of them with their health, from test", 1, true), "/bestiary data: what it holds")
 	-- Switched off: your numbers alone.
 	setting("dropData"):SetValue(false)
 	MOBS.target = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000054" }
 	Fire("PLAYER_TARGET_CHANGED")
-	check(not win.KnownLabel:IsShown() and not (known[1] and known[1]:IsShown()) and cellOf(win.cells, 2589).drop.classic == nil,
-		"the setting off: no database anywhere")
+	check(not win.KnownLabel:IsShown() and not (known[1] and known[1]:IsShown()) and cellOf(win.cells, 2589).drop.classic == nil
+		and Bt.Health(116, 9) == nil, "the setting off: no database anywhere (nor health)")
 	setting("dropData"):SetValue(true)
 	check(#loads == 1, "loaded once only")
 	MOBS.target, KNOWN_SPELLS[8613] = nil, nil

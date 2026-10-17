@@ -302,5 +302,8 @@ ns.CHANGELOG = {
 	{ id = 98, module = "mirage",
 		en = { "Mirage: pause for good", "Shift-click on Mirage's minimap button pauses fading for good: the interface stays visible, also after a restart, until you click the button again. Its pause sign turns orange, and chat reminds you after a login." },
 		de = { "Mirage: dauerhaft pausieren", "Ein Shift-Klick auf Mirages Minimap-Button pausiert das Ausblenden dauerhaft: das Interface bleibt sichtbar, auch nach einem Neustart, bis du wieder auf den Button klickst. Das Pausenzeichen wird orange, und nach dem Einloggen erinnert dich der Chat daran." } },
+	{ id = 99, module = "beacon",
+		en = { "Mob health from the classic database", "The fight stream knows a mob's health from the Bestiary's classic database, elites too, until two of your kills have measured it. Hovering a mob in the battle row says where its health comes from." },
+		de = { "Mob-Leben aus der Classic-Datenbank", "Der Kampf-Stream kennt das Leben eines Mobs aus der Classic-Datenbank des Bestiary, auch bei Elites, bis zwei deiner Kills es gemessen haben. Der Tooltip eines Mobs in der Kampfreihe sagt, woher das Leben kommt." } },
 	-- New entries go here, at the end.
 }

@@ -14,8 +14,9 @@ local S = B.Stream
 --   * an instant spell: a harmful one is a special attack on their target (its icon pops on it);
 --   * their target loses health (the estimate): it was them (their spell or ability, else a swing:
 --     they step forward and strike); it flinches, and roughly what it lost floats up from it (the
---     loss times what its kind has, S.MobMaxOf; a percent when that isn't known). Another mob losing
---     health only flinches (someone else's hit), its number smaller and grey;
+--     loss times what its kind has, S.MobMaxOf: learned, the classic database or usual for its
+--     level; a percent when that isn't known). Another mob losing health only flinches (someone
+--     else's hit), its number smaller and grey;
 --   * they're hit: the mob attacking them (their target first) lunges and strikes, they flinch (a
 --     big hit harder), the number floats up from them; a dodge, parry or block: that move and the
 --     word; a heal floats up green from them, loot rises through them, XP from the mob that died;
@@ -164,6 +165,9 @@ local function RealHealth(bar, unit)
 	bar:SetValue(UnitHealth(unit))
 end
 
+-- Where a kind's health comes from (S.MobMaxOf), for the hover.
+local HEALTH_FROM = { learned = L["learned from kills"], database = L["the classic database"], usual = L["usual for its level"] }
+
 local function FoeOnEnter(slot)
 	local mob = slot.mob
 	if not mob then
@@ -178,8 +182,10 @@ local function FoeOnEnter(slot)
 	if not slot.real then
 		if mob.health then
 			GameTooltip:AddLine(L["~%d%% health"]:format(math.floor(mob.health * 100 + 0.5)), 1, 0.4, 0.3)
-			GameTooltip:AddLine(L["Estimated from the hits it took, against what its kind has: learned from kills, else what mobs of its level usually have."],
-				0.7, 0.7, 0.7, true)
+			-- (as this client knows its kind: a friend's own estimate may know it otherwise)
+			local _, from = S.MobMaxOf(mob.creature, mob.level, mob.class)
+			GameTooltip:AddLine(HEALTH_FROM[from] and L["Estimated from the hits it took, against its kind's health: %s."]:format(HEALTH_FROM[from])
+				or L["Estimated by their client from the hits it took."], 0.7, 0.7, 0.7, true)
 		else
 			GameTooltip:AddLine(L["Health not known yet: it's learned when one of its kind is seen from full health to dead."],
 				0.7, 0.7, 0.7, true)

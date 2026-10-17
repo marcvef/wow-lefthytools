@@ -741,10 +741,14 @@ end
 -- (EXPECTED_HEALTH) times its kind's own ratio to that, learned: a mob seen out of combat before
 -- its fight and seen dying lost all of it. One ratio per creature ID serves every level of it.
 -- Kept for good in LefthyToolsDB.streamMobHealth[<creature ID>] = { ratio, kills } (the average of
--- the last MOB_SAMPLES), each player's own (friends get the percent, not the numbers). Not learned
--- yet: a normal mob is taken as usual (ratio 1); an elite or rare isn't known. Hits while a mob has
--- neither a nameplate nor is your target aren't seen; a killing blow counts in full.
+-- the last MOB_SAMPLES), each player's own (friends get the percent, not the numbers). Beside it the
+-- classic database's health (the Bestiary's LefthyTools_DropData, Bt.Health; not while the Bestiary
+-- or its database is switched off): a ratio learned from LEARNED_FIRST kills or more comes first (it's
+-- measured on Forever, the database is classic), then the database, then a ratio from one kill. Known
+-- by none: a normal mob is taken as usual (ratio 1); an elite or rare isn't known. Hits while a mob
+-- has neither a nameplate nor is your target aren't seen; a killing blow counts in full.
 local MOB_SAMPLES = 5
+local LEARNED_FIRST = 2     -- kills behind a learned ratio: then it counts before the classic database
 local MOB_KEEP = 300        -- mobs not seen for this long are forgotten
 -- A normal mob's health by level (ExpectedStat.db2 CreatureHealth, classic content, levels 1-63).
 -- Checked in game: one kind had 620 at level 20 against 629 here, another 874 at 22 against 731.
@@ -787,18 +791,48 @@ mobCombat:SetScript("OnEvent", function(_, _, unit, kind, _, amount)
 	mobLost[key] = math.max(0, (mobLost[key] or 0) + signed)
 end)
 
--- A kind's maximum at a level (nil: not known): its learned ratio, else 1 for a normal mob.
-local function MobMax(kind)
-	local expected = kind and type(kind[2]) == "number" and EXPECTED_HEALTH[kind[2]]
-	if not expected then
+-- What the classic database says a kind has at a level (nil: not known, or the Bestiary or its
+-- database switched off; ns.Bestiary may not be there at all). A level outside the database's range:
+-- the nearest end's, scaled like a usual mob's; a level not known (a boss's "??"): its highest.
+local function ClassicMax(creature, level, expected)
+	local Bt = ns.Bestiary
+	if not (creature and Bt and Bt.Health) then
 		return nil
 	end
-	local learned = kind[1] and S.Saved("streamMobHealth")[kind[1]]
-	local ratio = type(learned) == "table" and tonumber(learned[1]) or (USUAL[kind[3]] and 1) or nil
-	return ratio and ratio * expected or nil
+	local health, at = Bt.Health(creature, level)
+	if health and expected and at ~= level then
+		local there = EXPECTED_HEALTH[at]
+		health = there and health / there * expected or nil
+	end
+	return health
 end
 
--- What a kind of mob has at a level (the battle row's damage: a loss times this); nil: not known.
+-- A kind's maximum at a level (nil: not known), and where it comes from ("learned", "database",
+-- "usual"): its ratio learned from LEARNED_FIRST kills or more, else the classic database, else a
+-- ratio from fewer kills, else 1 for a normal mob.
+local function MobMax(kind)
+	if not kind then
+		return nil
+	end
+	local expected = type(kind[2]) == "number" and EXPECTED_HEALTH[kind[2]]
+	local learned = expected and kind[1] and S.Saved("streamMobHealth")[kind[1]]
+	local ratio = type(learned) == "table" and tonumber(learned[1]) or nil
+	if ratio and (tonumber(learned[2]) or 0) >= LEARNED_FIRST then
+		return ratio * expected, "learned"
+	end
+	local classic = ClassicMax(kind[1], kind[2], expected)
+	if classic then
+		return classic, "database"
+	elseif ratio then
+		return ratio * expected, "learned"
+	elseif expected and USUAL[kind[3]] then
+		return expected, "usual"
+	end
+	return nil
+end
+
+-- What a kind of mob has at a level (the battle row's damage: a loss times this; nil: not known),
+-- and where that comes from ("learned", "database", "usual").
 function S.MobMaxOf(creature, level, class)
 	return MobMax({ creature, level, class or "normal" })
 end

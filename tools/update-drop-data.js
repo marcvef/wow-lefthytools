@@ -1,12 +1,13 @@
 // Regenerates LefthyTools_DropData/Drops.lua: what each kind of mob can drop and how likely, for the
-// Bestiary's comparison with your own kills (Modules/Bestiary). A separate add-on (GPL v3, like its
-// source), loaded only when the Bestiary needs it.
+// Bestiary's comparison with your own kills (Modules/Bestiary), and its health, for the fight
+// stream's estimate of mobs' health (Modules/Beacon/StreamSense.lua). A separate add-on (GPL v3, like
+// its source), loaded only when one of them needs it.
 //
-// Source: a classic world database's loot tables, by default CMaNGOS Classic DB's full dump
-// (https://github.com/cmangos/classic-db, Full_DB, GPL v3; World of Warcraft content belongs to
-// Blizzard). WoW: Forever is built on classic content: its mobs and items have classic IDs, but its
-// own additions aren't in there, and its rates may be tuned. Run this again when there's a newer dump
-// (or one closer to Forever):
+// Source: a classic world database's loot tables and creatures, by default CMaNGOS Classic DB's
+// full dump (https://github.com/cmangos/classic-db, Full_DB, GPL v3; World of Warcraft content
+// belongs to Blizzard). WoW: Forever is built on classic content: its mobs and items have classic
+// IDs, but its own additions aren't in there, and its rates may be tuned. Run this again when
+// there's a newer dump (or one closer to Forever):
 //   node tools/update-drop-data.js                          download CMaNGOS Classic DB's full dump
 //   node tools/update-drop-data.js <dump.sql[.gz]> [--source "name"]   a dump you have
 //   node tools/update-drop-data.js --stats                  numbers only, nothing written
@@ -26,11 +27,22 @@
 //     (Ragnaros's tier legs) stay. The Bestiary keeps world drops apart anyway, and they'd add some
 //     200 items at 0.2% to every mob;
 //   * chances under MIN_CHANCE are left out.
+// Health, from creature_template (MinLevel, MaxLevel, MinLevelHealth, MaxLevelHealth): what it has at
+// its lowest and its highest level, the HealthMultiplier already in (93% of them are exactly
+// creature_template_classlevelstats' BaseHealthExp0 times HealthMultiplier, what the emulator gives
+// a creature at a level; the rest set by hand); the add-on takes a level between in a straight line
+// (close to the emulator's per-level stats: most creatures span a level or two). Also for creatures
+// without loot, but not for what no one fights: 1 health or less, totems (CreatureType 11), triggers
+// (invisible, ExtraFlags 0x80; "Trigger", "DND" or "Only GM can see it" in the name; not selectable,
+// UnitFlags 0x2000000, and friendly to all, faction 35), and the unused ones ("[UNUSED]", "[PH]" in
+// the name). Not selectable alone isn't enough: Nefarian starts so.
 // Output: LefthyToolsDropData = { source, mobs = { [creature ID] = "<item>:<quality>:<chance>[q],...
-// [;s=<skinning in the same form>][;g=<min copper>-<max copper>]" } }, chances in hundredths of a
-// percent (4785 = 47.85%), the likeliest first; the quality (0 grey ... 5 legendary) so grey items can
-// be left out and edged before the client knows an item. Strings: the Bestiary reads only the mobs
-// it shows.
+// [;s=<skinning in the same form>][;g=<min copper>-<max copper>][;h=<min level>[-<max level>]:<health
+// at the min level>[-<at the max level>]]" } }, chances in hundredths of a percent (4785 = 47.85%), the
+// likeliest first; the quality (0 grey ... 5 legendary) so grey items can be left out and edged before
+// the client knows an item; the second level or health only when it differs. Strings: the Bestiary
+// reads only the mobs it shows (and the fight stream the mobs it sees); builds before the health skip
+// the "h" part.
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
@@ -156,6 +168,16 @@ function encode(map, items) {
     .join(",");
 }
 
+// A creature's health, "<min level>[-<max level>]:<health at the min level>[-<at the max level>]", or ""
+// for what no one fights (see the top).
+function health(c) {
+  if (c.MaxLevelHealth <= 1 || c.CreatureType === 11 || (c.ExtraFlags & 0x80)
+    || ((c.UnitFlags & 0x2000000) && c.Faction === 35) || /trigger|\bDND\b|only GM can see|\[UNUSED\]|\[PH\]/i.test(c.Name)) return "";
+  const low = Math.min(c.MinLevel, c.MaxLevel), high = Math.max(c.MinLevel, c.MaxLevel);
+  const lowHealth = Math.max(1, Math.min(c.MinLevelHealth, c.MaxLevelHealth)), highHealth = Math.max(c.MinLevelHealth, c.MaxLevelHealth);
+  return (high > low ? `${low}-${high}` : `${low}`) + ":" + (highHealth > lowHealth ? `${lowHealth}-${highHealth}` : `${lowHealth}`);
+}
+
 async function readDump(arg) {
   if (arg) {
     const data = fs.readFileSync(arg);
@@ -184,18 +206,22 @@ async function main() {
   console.log(`${creatures.length} creatures, ${loot.size} loot tables, ${skin.size} skinning tables, ${refs.size} references, ${items.size} items`);
 
   const mobs = [];
-  let entries = 0, longest = 0;
+  let entries = 0, longest = 0, looted = 0, healthy = 0;
   for (const c of creatures) {
     const drops = c.LootId ? encode(chances(loot.get(c.LootId), refs, users, 0), items) : "";
     const skins = c.SkinningLootId ? encode(chances(skin.get(c.SkinningLootId), refs, users, 0), items) : "";
     const coin = c.MaxLootGold > 0 ? `${c.MinLootGold}-${c.MaxLootGold}` : "";
-    if (!drops && !skins && !coin) continue;
+    const life = health(c);
+    if (!drops && !skins && !coin && !life) continue;
     let text = drops;
     if (skins) text += `;s=${skins}`;
     if (coin) text += `;g=${coin}`;
+    if (life) text += `;h=${life}`;
     const count = (drops ? drops.split(",").length : 0) + (skins ? skins.split(",").length : 0);
     entries += count;
     longest = Math.max(longest, count);
+    if (drops || skins || coin) looted++;
+    if (life) healthy++;
     mobs.push([c.Entry, text]);
   }
   mobs.sort((a, b) => a[0] - b[0]);
@@ -203,8 +229,8 @@ async function main() {
   const lua = [
     `-- Generated by tools/update-drop-data.js from ${source}. Don't edit: run the tool again.`,
     "-- What each kind of mob can drop (creature ID): \"<item>:<quality>:<chance in hundredths of a percent>[q for",
-    "-- a quest item],...[;s=<skinning, the same>][;g=<min copper>-<max copper>]\", the likeliest first; world loot",
-    "-- left out.",
+    "-- a quest item],...[;s=<skinning, the same>][;g=<min copper>-<max copper>][;h=<min level>[-<max level>]:<its",
+    "-- health at the min level>[-<at the max level>]]\", the likeliest first; world loot left out.",
     "-- GPL v3 (LICENSE.md); World of Warcraft content and names belong to Blizzard (COPYRIGHT.md).",
     "LefthyToolsDropData = {",
     `\tsource = ${JSON.stringify(source)},`,
@@ -214,7 +240,7 @@ async function main() {
     "}",
     "",
   ].join("\n");
-  console.log(`${mobs.length} mobs, ${entries} drops (at most ${longest} for one), ${(lua.length / 1024 / 1024).toFixed(2)} MB`);
+  console.log(`${mobs.length} mobs: ${looted} with loot, ${entries} drops (at most ${longest} for one); ${healthy} with health; ${(lua.length / 1024 / 1024).toFixed(2)} MB`);
   if (stats) return;
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, lua, "utf8");
@@ -222,4 +248,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((e) => { console.error(e.message); process.exit(1); });
-module.exports = { rows, byEntry, referenceUsers, chances, worldLoot, encode };
+module.exports = { rows, byEntry, referenceUsers, chances, worldLoot, encode, health };

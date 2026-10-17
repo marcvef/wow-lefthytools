@@ -79,9 +79,10 @@ at commit `1a2b3c4`.
 .\install.ps1 -GameDir "D:\...\World of Warcraft\_classic_beta_"   # if it isn't found
 ```
 
-The installer also installs `LefthyTools_DropData` next to it (the Bestiary's drop database, an
-add-on of its own) and removes the old standalone `Mirage` addon, which is now part of
-LefthyTools. How it works inside (for developers): see [docs/](docs/architecture.md).
+The installer also installs `LefthyTools_DropData` next to it (the Bestiary's drop database, also
+mobs' health for the fight stream, an add-on of its own) and removes the old standalone `Mirage`
+addon, which is now part of LefthyTools. How it works inside (for developers): see
+[docs/](docs/architecture.md).
 
 ## Known limitations (Forever beta)
 
@@ -179,11 +180,12 @@ minimap, and you on theirs, without being in a group.
   only how far a mob is, so the directions are learned as you move and turn (faint dots are still
   unsure). Under the map, **the battle row**: their model and the mobs they fight, and the fight
   played on them, Pokémon style: they cast or step up and strike, the mob flinches and roughly
-  what it lost floats up; mobs lunge at them, their hits and heals float up from their model, the
-  dead fall. It's an approximation from what the game tells addons. A friend near you in your
-  group looks like themselves; one elsewhere is their class's emblem, "out of reach" under it (the
-  game shows no player as they look from afar), with their party frame portrait on top as a
-  bobblehead if they're in your group.
+  what it lost floats up (a kind's health comes from the Bestiary's classic database, elites
+  too, until two of your kills have measured it on Forever); mobs lunge at them, their hits and
+  heals float up from their model, the dead fall. It's an approximation from what the game tells
+  addons. A friend near you in your group looks like themselves; one elsewhere is their class's
+  emblem, "out of reach" under it (the game shows no player as they look from afar), with their
+  party frame portrait on top as a bobblehead if they're in your group.
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see
   "Anna reached level 21!" in their own language.
@@ -348,8 +350,8 @@ you haven't had yet, faded; hovering one shows how many you'd have expected in y
 The window can show that too, under your drops, and the (still small) card beside the mouse can
 show what a mob you haven't killed can drop (two settings, both off). Quest items
 (they drop only while you're on the quest) are marked with a `!`. WoW: Forever is classic content
-but may differ, so your own numbers are never mixed with the database's. `/bestiary data` says
-whether the database is there.
+but may differ, so your own numbers are never mixed with the database's. Beacon's fight stream
+takes mobs' health from it too. `/bestiary data` says whether the database is there.
 
 Minimap button: click for the window, **Shift-click** to switch the drops next to the mouse on
 or off, Ctrl-click for the ledger, right-click for the settings. `/bestiary log` shows what was

@@ -60,18 +60,35 @@ must go with it); the rest of the repo stays BSD-2. Its README says how the chan
 emulator or something when we have more access to forever data". World loot is left out (the level
 world drop tables, bags, scrolls, recipes, zone drops: reached only through a reference and not
 bound on pickup, gear or a reference shared by 8+ tables), so a mob's list is its own loot: 11
-items for a Defias Bandit, 27 for Ragnaros, 69 at most; 5046 mobs, 0.75 MB.
+items for a Defias Bandit, 27 for Ragnaros, 69 at most; 5046 mobs with loot. It also has each
+kind's health, for Beacon's fight stream (below): 9791 of them; 9921 creatures in all, 0.93 MB.
 
 - **Loading**: `## LoadOnDemand: 1`. `DropData()` calls `C_AddOns.LoadAddOn` the first time
-  something asks (`Bt.Known`), once; when the setting `dropData` (on) changes it's tried again (and
-  off means nothing reads it). A one-off moment when the window first draws, not at login for
-  everyone who never opens it. `/bestiary data` says whether it's there (LoadAddOn's reason if
-  not: `MISSING`, `DISABLED`) and what it holds.
+  something asks (`Bt.Known`: the window, the ledger, the card, or the fight stream's sensor and
+  battle row through `Bt.Health`), once; when the setting `dropData` (on) changes it's tried again
+  (and off means nothing reads it). A one-off moment when it's first needed, not at login for
+  everyone who never needs it. `/bestiary data` says whether it's there (LoadAddOn's reason if
+  not: `MISSING`, `DISABLED`) and what it holds (kinds of mobs, how many with their health).
 - **Format**: `LefthyToolsDropData = { source, mobs = { [creature] = "<item>:<quality>:<chance in
-  1/100 %>[q],...;s=<skinning>;g=<min>-<max copper>" } }`: strings, so only mobs shown are read
-  (`Bt.Known(creature)`: `{ items = { [id] = { chance 0-1, quality, quest } }, skins, coin }`,
-  cached). The quality is in there so grey items can be left out (`showPoor`) and edged before the
-  client knows an item.
+  1/100 %>[q],...;s=<skinning>;g=<min>-<max copper>;h=<min level>-<max level>:<health at the min
+  level>-<at the max>" } }` (each part only when there is one; the second level or health only when
+  it differs: `h=63:1099230`): strings, so only mobs shown are read (`Bt.Known(creature)`: `{ items
+  = { [id] = { chance 0-1, quality, quest } }, skins, coin, health = { min level, max level, min
+  health, max health } }`, cached; read again when the database is another table). The quality is in
+  there so grey items can be left out (`showPoor`) and edged before the client knows an item. A part
+  of a kind the parser doesn't know is skipped: builds before the health read the same drops from
+  the new strings (checked over the whole file). A creature with its health only (no loot in
+  classic) is known with no drops: your drops of it say "Not in the classic database".
+- **Health** (`Bt.Health(creature, level)`): `MinLevelHealth` / `MaxLevelHealth` of
+  creature_template, the health at its lowest and highest level with its `HealthMultiplier` already
+  in (93% of them are exactly `creature_template_classlevelstats`' BaseHealthExp0 times the
+  multiplier, which is what the emulator gives a creature at a level; the rest set by hand); a
+  level between in a straight line, rounded down (close to the emulator's per-level stats: most
+  kinds span a level or two). Outside its levels: the nearest end's, with that level as the second
+  value (the fight stream scales it); level not known (nil, -1 for "??"): its highest. nil while
+  the Bestiary or `dropData` is off (nothing is loaded then). Left out by the tool: 1 health or
+  less, totems, triggers and other invisible helpers, the unused ones. How the fight stream weighs
+  it against what it learns: [beacon.md](beacon.md), "Mobs' health, estimated".
 - **Beside your drops** (`Bt.Drops(mob, showPoor, creature)`): each entry's `classic` is the
   database's chance (`false`: it knows the mob but not this drop, `nil`: it doesn't know the mob),
   `quest` when it's a quest item. Tooltips: "Classic database: 30%" under your numbers, "Not in the
@@ -218,5 +235,7 @@ mob's record changes or the target does; the card's OnUpdate runs only while it'
 - `GetLootSourceInfo` and `CanLootUnit` answer (and aren't secret), and `CanLootUnit` says "no
   loot" for an empty corpse of yours.
 - The portrait's look; the coin attribution with auto loot.
-- `LoadAddOn` of the load-on-demand drop database works on Forever, and its first load (0.75 MB of
-  strings) is only a moment.
+- `LoadAddOn` of the load-on-demand drop database works on Forever, and its first load (0.93 MB of
+  strings) is only a moment, also when the fight stream asks for it in a fight.
+- How close the classic database's health is to Forever's (the fight stream's learned ratio from
+  two kills on tells).

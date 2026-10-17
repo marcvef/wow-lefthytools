@@ -747,8 +747,12 @@ L["1 kill"] = "1 Kill"
 L["an item"] = "ein Item"
 L["Health (estimated)"] = "Leben (geschätzt)"
 L["~%d%% health"] = "~%d%% Leben"
-L["Estimated from the hits it took, against what its kind has: learned from kills, else what mobs of its level usually have."] =
-	"Geschätzt aus den Treffern, die er abbekommen hat, gemessen an dem, was seine Art hat: gelernt aus Kills, sonst was Mobs seines Levels üblicherweise haben."
+L["Estimated from the hits it took, against its kind's health: %s."] =
+	"Geschätzt aus den Treffern, die er abbekommen hat, gemessen am Leben seiner Art: %s."
+L["learned from kills"] = "aus Kills gelernt"
+L["the classic database"] = "die Classic-Datenbank"
+L["usual for its level"] = "üblich für sein Level"
+L["Estimated by their client from the hits it took."] = "Vom Client deines Freundes geschätzt, aus den Treffern, die der Mob abbekommen hat."
 L["Health not known yet: it's learned when one of its kind is seen from full health to dead."] =
 	"Leben noch nicht bekannt: Es wird gelernt, sobald einer seiner Art von vollem Leben bis zum Tod gesehen wird."
 L["%s's LefthyTools is older and doesn't send health: they need to update."] =
@@ -840,8 +844,8 @@ L["In a group: kills aren't counted (the loot is shared)."] = "In einer Gruppe: 
 L["%d kinds of mobs, %d kills"] = "%d Arten von Mobs, %d Kills"
 L["Click: open or close the window"] = "Klick: Fenster öffnen oder schließen"
 L["Compare with a drop database"] = "Mit einer Drop-Datenbank vergleichen"
-L["Beside your own numbers, what a classic world database (CMaNGOS) says each mob can drop: its chance on each of your drops, and what you haven't had yet, faded. WoW: Forever may differ. It's an add-on of its own, LefthyTools Drop Data, installed with LefthyTools; /bestiary data says whether it's there."] =
-	"Neben deinen eigenen Zahlen, was laut einer Classic-Weltdatenbank (CMaNGOS) jeder Mob droppen kann: ihre Chance bei jedem deiner Drops, und verblasst, was du noch nicht hattest. WoW: Forever kann abweichen. Es ist ein eigenes Addon, LefthyTools Drop Data, das mit LefthyTools installiert wird; /bestiary data sagt, ob es da ist."
+L["Beside your own numbers, what a classic world database (CMaNGOS) says each mob can drop: its chance on each of your drops, and what you haven't had yet, faded. Beacon's fight stream takes mobs' health from it too. WoW: Forever may differ. It's an add-on of its own, LefthyTools Drop Data, installed with LefthyTools; /bestiary data says whether it's there."] =
+	"Neben deinen eigenen Zahlen, was laut einer Classic-Weltdatenbank (CMaNGOS) jeder Mob droppen kann: ihre Chance bei jedem deiner Drops, und verblasst, was du noch nicht hattest. Der Kampf-Stream von Beacon nimmt auch das Leben der Mobs daraus. WoW: Forever kann abweichen. Es ist ein eigenes Addon, LefthyTools Drop Data, das mit LefthyTools installiert wird; /bestiary data sagt, ob es da ist."
 L["Classic database: %s"] = "Classic-Datenbank: %s"
 L["Classic database: %s, only while on its quest"] = "Classic-Datenbank: %s, nur während der Quest"
 L["Not in the classic database"] = "Nicht in der Classic-Datenbank"

@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: LefthyTools Drop Data
-## Notes: What each mob can drop, from a classic world database (CMaNGOS Classic DB, GPL v3), for the Bestiary's comparison with your own kills. Loaded only when the Bestiary needs it.
-## Notes-deDE: Was jeder Mob droppen kann, aus einer Classic-Weltdatenbank (CMaNGOS Classic DB, GPL v3), für den Vergleich des Bestiary mit deinen eigenen Kills. Wird erst geladen, wenn das Bestiary es braucht.
+## Notes: What each mob can drop and its health, from a classic world database (CMaNGOS Classic DB, GPL v3), for the Bestiary's comparison with your own kills and the fight stream's mob health. Loaded only when one of them needs it.
+## Notes-deDE: Was jeder Mob droppen kann und wie viel Leben er hat, aus einer Classic-Weltdatenbank (CMaNGOS Classic DB, GPL v3), für den Vergleich des Bestiary mit deinen eigenen Kills und das Leben der Mobs im Kampf-Stream. Wird erst geladen, wenn eins davon es braucht.
 ## Author: lefthy
 ## Version: z2815
 ## LoadOnDemand: 1

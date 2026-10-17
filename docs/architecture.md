@@ -61,7 +61,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Bestiary/Bestiary.lua    Bestiary: kills and loot per kind of mob (LefthyToolsBestiaryDB), /bestiary
   Modules/Bestiary/Window.lua      its window (your target's drops), the card beside the mouse, item tooltips, the minimap button
   Modules/Bestiary/Ledger.lua      the ledger: every mob, its statistics and drops, fuzzy search over mobs and items
-LefthyTools_DropData/        the Bestiary's classic drop database, an add-on of its own (load on demand), GPL v3
+LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
