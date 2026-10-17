@@ -314,5 +314,8 @@ ns.CHANGELOG = {
 	{ id = 102, module = "bestiary",
 		en = { "Wish list and dry streak", "Alt-click a drop in the Bestiary to pin it: a star marks it wherever it shows, and the ledger lists your wishes. When it finally drops, one quiet line says after how many kills." },
 		de = { "Wunschliste und Durststrecke", "Alt-Klick auf einen Drop im Bestiary merkt ihn vor: ein Stern markiert ihn überall, und das Verzeichnis zeigt deine Wünsche. Droppt er endlich, sagt eine ruhige Zeile, nach wie vielen Kills." } },
+	{ id = 103, module = "beacon",
+		en = { "Fight stream: fight summaries", "When a fight ends, the stream window sums it up for a few seconds: how long it took, the kills, the XP and the lowest health, or that they died." },
+		de = { "Kampf-Stream: Kampf-Zusammenfassung", "Nach einem Kampf fasst das Stream-Fenster ihn ein paar Sekunden zusammen: Dauer, Kills, EP und die niedrigsten HP, oder dass er gestorben ist." } },
 	-- New entries go here, at the end.
 }

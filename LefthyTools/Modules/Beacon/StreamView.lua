@@ -16,7 +16,8 @@ local S = B.Stream
 -- top, and a bottom line ("2 on you · 5 near · X casts Y"). Under the spells the battle row
 -- (StreamBattle.lua): their model and the mobs they fight, the fight played on them; what happens
 -- to them floats up from their model there (hits, heals, a dodge, loot; XP from the mob that died);
--- their kills since the window opened at the top right.
+-- their kills since the window opened at the top right; after a fight, a line on how it went in
+-- the bottom line's place for a few seconds.
 --
 -- The map: the minimap's own terrain tiles (Data/MinimapTiles.lua: 256 px for 533.33 yd of the
 -- world's grid, the 3 x 3 around), else the world map's art of the zone (C_Map.GetMapArtLayers /
@@ -591,6 +592,116 @@ local function ShowDoing(view, now)
 end
 
 ---------------------------------------------------------------------------
+-- After a fight: one line, fading
+---------------------------------------------------------------------------
+
+-- The user: "if it remains only in the stream". A fight seen from its start (out of combat, then
+-- in) is followed per window: how long it lasted, their kills (killing blows), the XP, their lowest
+-- health (estimated). When it's over, a line takes the bottom line's place for SUMMARY_TIME, fading
+-- in and out: "38 s · 3 kills · 420 XP · lowest ~10%", only what's known (no XP: none said). Their
+-- death ends it too: "Died after 38 s · ...". A fight joined halfway isn't summed up (its numbers
+-- would be short). Nothing in chat. Cost: a look per new picture, a fade while the line shows.
+local SUMMARY_TIME = 6     -- seconds the line stays, fading in and out
+local SUMMARY_WAIT = 1     -- seconds after the fight before it shows (the last kill's XP can come a moment later)
+local SHORT_FIGHT = 4      -- shorter, with no kill, XP or death: no line (combat that only flickered)
+
+-- "38 s", "1:12 min".
+local function Duration(seconds)
+	seconds = math.floor(seconds + 0.5)
+	if seconds < 60 then
+		return L["%d s"]:format(seconds)
+	end
+	return L["%d:%02d min"]:format(math.floor(seconds / 60), seconds % 60)
+end
+
+-- A moment while a fight is followed (also in the moment after it ends): kills and XP add up.
+local function Tally(view, m)
+	local fight = view.fight
+	if not fight then
+		return
+	elseif m.kind == "kill" then
+		fight.kills = fight.kills + 1
+	elseif m.kind == "xp" and m.amount then
+		fight.xp = fight.xp + m.amount
+	end
+end
+
+-- What's known of it, in a line.
+local function FightLine(fight)
+	local length = Duration(fight.endAt - fight.startAt)
+	local parts = { fight.died and L["Died after %s"]:format(length) or length }
+	if fight.kills > 0 then
+		parts[#parts + 1] = fight.kills == 1 and L["1 kill"] or L["%d kills"]:format(fight.kills)
+	end
+	if fight.xp > 0 then
+		parts[#parts + 1] = L["%s XP"]:format(BreakUpLargeNumbers and BreakUpLargeNumbers(fight.xp) or tostring(fight.xp))
+	end
+	if fight.lowest and not fight.died then
+		parts[#parts + 1] = L["lowest ~%d%%"]:format(math.floor(fight.lowest * 20 + 0.5) * 5) -- (in steps of 5, like the bar's)
+	end
+	return table.concat(parts, "  ·  ")
+end
+
+local function ShowSummary(view, fight)
+	local win = view.win
+	if not fight.died and fight.kills == 0 and fight.xp == 0 and fight.endAt - fight.startAt < SHORT_FIGHT then
+		return
+	end
+	win.Summary:SetText(FightLine(fight))
+	if fight.died then
+		win.Summary:SetTextColor(1, 0.45, 0.4)
+	else
+		win.Summary:SetTextColor(GOLD[1], GOLD[2], GOLD[3])
+	end
+	win.Summary:SetAlpha(0)
+	win.Summary:Show()
+	view.summaryAt = view.clock
+end
+
+-- After each new picture: a fight begins (in combat after a picture out of it), goes on, ends (out
+-- of combat, or dead); its line shows SUMMARY_WAIT later. In combat again before that: the same
+-- fight, pulled on.
+local function FightLook(view)
+	local picture, fight = view.picture, view.fight
+	if (view.kind == "friend" and view.stale) or (view.kind == "me" and (picture.looked or 0) < view.since) then
+		return -- (nothing new from them yet: a picture from before the window opened says nothing)
+	end
+	local combat = picture.combat and not picture.dead and true or false
+	if fight then
+		if picture.dead and not fight.died then
+			fight.died, fight.endAt = true, fight.endAt or view.clock
+		elseif fight.endAt and combat and not fight.died then
+			fight.endAt = nil
+		elseif not fight.endAt and not combat then
+			fight.endAt = view.clock
+		end
+		if not fight.endAt and picture.health then
+			fight.lowest = math.min(fight.lowest or 1, picture.health)
+		elseif fight.endAt and view.clock - fight.endAt >= SUMMARY_WAIT then
+			view.fight = nil
+			ShowSummary(view, fight)
+		end
+	elseif combat and view.wasCombat == false then
+		view.fight = { startAt = view.clock, kills = 0, xp = 0, lowest = picture.health }
+	end
+	view.wasCombat = combat
+end
+
+-- Every frame while the line shows: it fades in, stays, fades out; the bottom line (and the hint
+-- above it) gives way meanwhile.
+local function FadeSummary(view)
+	local win, age = view.win, view.clock - view.summaryAt
+	local alpha = math.max(0, math.min(1, age / 0.3, (SUMMARY_TIME - age) / 1.5))
+	if age >= SUMMARY_TIME then
+		view.summaryAt = nil
+		win.Summary:Hide()
+	end
+	win.Summary:SetAlpha(alpha)
+	win.Status:SetAlpha(1 - alpha)
+	win.Hint:SetAlpha(1 - alpha)
+end
+
+---------------------------------------------------------------------------
 -- What happens to them: numbers floating up over the radar
 ---------------------------------------------------------------------------
 
@@ -680,8 +791,9 @@ end
 S.LootText = LootText
 
 -- A moment: played in the battle row (StreamBattle.lua: a hit lands on their model, a heal or loot
--- floats up from it, XP from the mob that died); a kill counts.
+-- floats up from it, XP from the mob that died); a kill counts (and adds to a fight's line).
 local function Spawn(view, m)
+	Tally(view, m)
 	if m.kind == "kill" then
 		view.kills = view.kills + 1
 		ShowKills(view)
@@ -720,6 +832,7 @@ end
 ---------------------------------------------------------------------------
 
 local PREVIEW_LOOP = 24
+local PREVIEW_CALM = 21.5 -- her fight is over (the rest run off), so its line shows; a new one each loop
 local previewMobs = {}
 -- What happens to her (seconds into the loop): hits while the bandits are on her, heals, a dodge,
 -- the bandit's death (her killing blow, its XP), loot.
@@ -770,9 +883,12 @@ end
 
 local function FeedPreview(view)
 	local picture, t = view.picture, view.clock % PREVIEW_LOOP
+	local fighting = t > 2 and t < PREVIEW_CALM
+	local f = math.min(t, PREVIEW_CALM) -- (the fight's own time: once it's over, nothing more lands)
 	local mobs = picture.mobs
 	wipe(mobs)
 	picture.name, picture.classFile, picture.where, picture.facing = PREVIEW_FRIEND, PREVIEW_CLASS, L["Westfall"], 0
+	picture.combat = fighting
 	picture.power = picture.power or { token = "MANA" }
 	picture.power.frac = 0.4 + 0.3 * math.cos(t / 4)
 	picture.health = 0.65 + 0.3 * math.cos(t / 3)
@@ -782,10 +898,10 @@ local function FeedPreview(view)
 	-- Who has aggro: her Fireball pulls the leader, Bob, the tank, takes it from her at 8 s; the
 	-- bandit stays on her; the mage is on Cedric, passing by, outside her group.)
 	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite", 448)
-	leader.combat, leader.attacking, leader.target, leader.engaged = t > 2, t > 2 and t < 8, true, t > 2
+	leader.combat, leader.attacking, leader.target, leader.engaged = fighting, fighting and t < 8, true, fighting
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
-	leader.casting = (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
-	leader.health = math.max(0.1, 1 - 0.13 * (t >= 2.5 and math.floor((t - 2.5) / 4) + 1 or 0)) -- (her Fireballs land)
+	leader.casting = fighting and (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
+	leader.health = math.max(0.1, 1 - 0.13 * (f >= 2.5 and math.floor((f - 2.5) / 4) + 1 or 0)) -- (her Fireballs land)
 	if leader.attacking then
 		leader.aggro, leader.aggroSelf = "DAMAGER", true
 	elseif leader.combat then
@@ -802,9 +918,11 @@ local function FeedPreview(view)
 		mobs[#mobs + 1] = bandit
 	end
 	local mage = PreviewMob(3, "mage", L["Bandit mage"], 15, "normal", 474)
-	mage.combat, mage.engaged, mage.yards, mage.bearing = true, true, 24, 1.1 + 0.03 * t -- (she's on its threat list)
-	mage.casting = (t % 6 < 2) and L["Frostbolt"] or nil
-	mage.aggro, mage.aggroName = "OUTSIDER", "Cedric"
+	mage.combat, mage.engaged, mage.yards, mage.bearing = fighting, fighting, 24, 1.1 + 0.03 * t -- (she's on its threat list)
+	mage.casting = fighting and (t % 6 < 2) and L["Frostbolt"] or nil
+	if fighting then
+		mage.aggro, mage.aggroName = "OUTSIDER", "Cedric"
+	end
 	mobs[#mobs + 1] = mage
 	local gnoll = PreviewMob(4, "gnoll", L["Gnoll"], 14, "normal", 117)
 	gnoll.yards, gnoll.bearing, gnoll.sure = 32 + 3 * math.sin(t * 0.4), 2.9, 0.25 -- behind, not sure yet: faint
@@ -814,7 +932,7 @@ local function FeedPreview(view)
 	mobs[#mobs + 1] = rare
 	-- Her group: a warrior in front of her, at the leader (placed exactly); and someone passing by.
 	local tank = PreviewMob(6, "tank", "Bob", 16)
-	tank.player, tank.classFile, tank.friendly, tank.group, tank.combat = true, "WARRIOR", true, true, t > 2
+	tank.player, tank.classFile, tank.friendly, tank.group, tank.combat = true, "WARRIOR", true, true, fighting
 	tank.yards, tank.bearing = math.max(4, leader.yards - 2), leader.bearing + 0.25
 	tank.exact = math.floor(tank.yards + 0.5)
 	mobs[#mobs + 1] = tank
@@ -822,9 +940,10 @@ local function FeedPreview(view)
 	passer.player, passer.classFile, passer.friendly, passer.sure = true, "PRIEST", true, 0.5
 	passer.yards, passer.bearing = 28, -2.2 + 0.05 * t
 	mobs[#mobs + 1] = passer
-	-- What she's doing: a Fireball every 4 s (2.5 s to cast), and the spells before it.
+	-- What she's doing: a Fireball every 4 s (2.5 s to cast) until the fight is over, and the spells
+	-- before it.
 	local now, cycle = GetTime(), t % 4
-	if cycle < 2.5 then
+	if cycle < 2.5 and t < PREVIEW_CALM then
 		local info = Value("C_Spell.GetSpellInfo", 133)
 		local cast = picture.castPreview or {}
 		picture.castPreview = cast
@@ -840,14 +959,14 @@ local function FeedPreview(view)
 		end
 	end
 	-- A Fireball that went off joins her last spells; a Fire Blast now and then (an instant).
-	local landed = t >= 2.5 and math.floor((t - 2.5) / 4) or -1
+	local landed = f >= 2.5 and math.floor((f - 2.5) / 4) or -1
 	if landed ~= view.previewLanded then
 		if view.previewLanded and landed >= 0 then
 			S.AddRecent(picture.recent, 133, now)
 		end
 		view.previewLanded = landed
 	end
-	local blast = t >= 7 and math.floor((t - 7) / 8) or -1
+	local blast = f >= 7 and math.floor((f - 7) / 8) or -1
 	if blast ~= view.previewBlast then
 		if view.previewBlast and blast >= 0 then
 			S.AddRecent(picture.recent, 2136, now)
@@ -924,6 +1043,7 @@ local function OnUpdate(win, elapsed)
 		Apply(view)
 		ShowSelf(view)
 		S.BattleShow(view) -- (StreamBattle.lua: the row, and what happened since)
+		FightLook(view) -- (before the moments: the first hit is the fight's, the last kill's XP too)
 		Happenings(view) -- (after the row: XP floats from its mob)
 		if view.kind == "friend" and view.stale then
 			win.Status:SetText(L["Waiting for %s's stream..."]:format(view.picture.name or "?"))
@@ -952,6 +1072,9 @@ local function OnUpdate(win, elapsed)
 	ShowDoing(view, now)
 	S.BattleUpdate(view, elapsed)
 	MoveFloats(view, elapsed)
+	if view.summaryAt then
+		FadeSummary(view)
+	end
 	local k = math.min(1, elapsed * GLIDE)
 	local pulse = 0.5 + 0.5 * math.sin(view.clock * 5)
 	for _, dot in ipairs(view.dots) do
@@ -1221,6 +1344,12 @@ local function Build(view, name, parent)
 	win.Hint:SetWidth(WIDTH - 20)
 	win.Hint:SetText(L["Move and turn: faint dots find their place."])
 	win.Hint:Hide()
+	-- After a fight, its line in the bottom line's place for a few seconds (FightLook). Clear of the
+	-- radar's middle and the battle row's models.
+	win.Summary = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	win.Summary:SetPoint("BOTTOM", 0, 12)
+	win.Summary:SetWidth(WIDTH - 20)
+	win.Summary:Hide()
 
 	-- The grip: drag to resize.
 	local grip = CreateFrame("Button", nil, win)
@@ -1261,6 +1390,10 @@ local function Start(view)
 	view.previewAt, view.previewLanded, view.previewBlast = nil, nil, nil
 	view.map.id, view.map.x, view.map.source = false, nil, nil
 	view.clock, view.nextFeed, view.open, view.looked = 0, 0, true, nil
+	view.fight, view.wasCombat, view.summaryAt, view.since = nil, nil, nil, GetTime() -- (a fight going on now isn't seen from its start)
+	view.win.Summary:Hide()
+	view.win.Status:SetAlpha(1)
+	view.win.Hint:SetAlpha(1)
 	view.win.Status:SetText("")
 	view.win:Show()
 end

@@ -633,7 +633,17 @@ big), a miss or dodge in the game's own word, XP in violet from the mob it came 
 them), loot rising through them with its icon and name in its quality's colour (3.5 s; an item the
 client doesn't know yet is asked for and says "an item"). At most 10 at once. Under the radar: the spell being cast with its bar, the
 last spells fading over 12 s. Bottom: "2 on Anna · 5 near · X casts Y"; a friend's stream with no
-frame for 6 s says "Waiting for Anna's stream...". Under the spells, **the battle row**
+frame for 6 s says "Waiting for Anna's stream...". **After a fight** (`FightLook`; the user: "if it
+remains only in the stream", nothing in chat) a line takes the bottom line's place: a fight seen
+from its start (a picture out of combat, then one in combat; one going on when the window opened,
+before a friend's first frame or before your sensor's first look, isn't summed up: its numbers would
+be short) is followed per window: how long, its kill moments, its XP moments, the lowest
+`picture.health`. Out of combat or dead it ends; 1 s later (the last kill's XP can come a moment
+after the combat flag goes; in combat again meanwhile: the same fight, pulled on) the line shows
+for 6 s, fading in and out while the bottom line and the hint fade the other way: "38 s · 3 kills ·
+420 XP · lowest ~10%" in gold (the health in steps of 5, like the bar), only what's known; a death:
+"Died after 38 s · ..." in red. Shorter than 4 s with no kill, XP or death: no line. The preview's
+fight ends at 21.5 s of its 24 s loop. Under the spells, **the battle row**
 (StreamBattle.lua; below). In it **the foes**: up to four mobs (more: "+2" at the right)
 fighting them or their target (`S.Foes`: not dead, not players; `mob.engaged`: they're on its
 threat list, `UnitThreatSituation("player", unit)` not nil, or it attacks them; flag `h`, and from

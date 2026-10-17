@@ -4560,6 +4560,86 @@ do
 	BN_FRIENDS[1][1].isOnline = true
 	anna("S2;;0;260.0;750.0;Goldshire;")
 	Advance(1.2)
+
+	-- After a fight, a line on how it went (how long, kills, XP, the lowest health) in the bottom
+	-- line's place for a few seconds, fading; only for fights seen from their start.
+	;(function()
+		local function line(w) return w.Summary:IsShown() and w.Summary:GetAlpha() > 0 and w.Summary:GetText() or nil end
+		-- Anna's fight, from its start: out of combat, in, her killing blow and its XP, out again.
+		local fwin = S.OpenFriend(11, "command").win -- (a window kept from before: whichever is free)
+		anna("O2;f;0;1429;260;750;90;;M40;;;;v90")
+		Advance(0.6)
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v60")
+		Advance(3)
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v35,41k,42x200")
+		Advance(0.6)
+		anna("O2;f;0;1429;260;750;90;;M40;;;;v40")
+		Advance(0.6)
+		check(not fwin.Summary:IsShown() and fwin.Status:GetAlpha() == 1, "her fight is over: its line waits a moment (the last XP can come late)")
+		Advance(1)
+		local text = line(fwin)
+		check(text and text:find("^%d s  ·  1 kill  ·  200 XP  ·  lowest ~35%%$") and fwin.Status:GetAlpha() < 1,
+			"... then a line in the bottom line's place: how long, her kill, the XP, her lowest health, got " .. tostring(text))
+		Advance(6)
+		check(not fwin.Summary:IsShown() and fwin.Status:GetAlpha() == 1, "a few seconds later it's gone, the bottom line back")
+		-- A fight going on when the window opens: no line (its numbers would be short).
+		S.CloseView(11)
+		fwin = S.OpenFriend(11, "command").win
+		Advance(0.6) -- (nothing from her yet)
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80")
+		Advance(0.6)
+		anna("O2;f;0;1429;260;750;90;;M40;;;;v80,43k")
+		Advance(2)
+		check(not fwin.Summary:IsShown(), "a fight joined halfway: no line")
+		S.CloseView(11)
+		-- The preview's fight ends now and then: its line shows there too.
+		lefthy("stream preview")
+		Advance(23.5)
+		text = line(win)
+		check(text and text:find("^%d+ s  ·  1 kill  ·  87 XP  ·  lowest ~35%%$") and win.Summary.color[2] == 0.82,
+			"the preview: her fight ends, its line in gold, got " .. tostring(text))
+		win.Close:Click()
+		-- My own: a hit, my killing blow and its XP; then a fight I die in; then combat that only flickers.
+		MOBS = {}
+		S.LifeStart()
+		lefthy("stream me")
+		Advance(4.6) -- (out of combat: my health known, full)
+		local xpWas = XP.current
+		STATE.combat = true
+		Fire("PLAYER_REGEN_DISABLED")
+		Advance(0.6)
+		Fire("UNIT_COMBAT", "player", "WOUND", "", 400, 1)
+		Advance(2)
+		Fire("PARTY_KILL", "Player-1-0", "Creature-0-thug") -- (not a creature's GUID: the Bestiary doesn't count it)
+		XP.current = XP.current + 120
+		Fire("PLAYER_XP_UPDATE", "player")
+		Advance(0.6)
+		STATE.combat = false
+		Fire("PLAYER_REGEN_ENABLED")
+		Advance(1.6)
+		text = line(win)
+		check(text and text:find("^%d s  ·  1 kill  ·  120 XP  ·  lowest ~60%%$") and win.Hint:GetAlpha() < 1,
+			"my own fight: its line (the hint above the bottom line gives way too), got " .. tostring(text))
+		Advance(6)
+		STATE.combat = true
+		Advance(0.6)
+		STATE.dead = true
+		Fire("PLAYER_DEAD")
+		Advance(2)
+		text = line(win)
+		check(text and text:find("^Died after %d s$") and win.Summary.color[2] < 0.5, "I die: the fight ends, its line says so, in red, got " .. tostring(text))
+		STATE.dead, STATE.combat = false, false
+		Fire("PLAYER_UNGHOST")
+		Fire("PLAYER_REGEN_ENABLED")
+		Advance(6)
+		STATE.combat = true
+		Advance(0.6)
+		STATE.combat = false
+		Advance(2)
+		check(not win.Summary:IsShown(), "combat that only flickered, nothing in it: no line")
+		win.Close:Click()
+		XP.current = xpWas
+	end)()
 	ns.MINIMAP_TILES = realTiles
 end
 
