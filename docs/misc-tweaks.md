@@ -7,7 +7,7 @@ and the list of independent tweaks (`TWEAKS`), each with a setting, a slash comm
 compares what's wanted (module enabled and the tweak's setting on) with what's active, and runs on
 the next frame via `C_Timer.After(0)`. All tweaks default to on, except `retailFrames`. The other
 files, in load order: `Bags.lua` (`movableBags`, `gamepadBagSort`), `QuestAnnounce.lua`,
-`ComboPoints.lua`, `Aggro.lua`, `RetailFrames.lua`, `ForeverQuests.lua`, `AFK.lua`, `Flight.lua`,
+`ComboPoints.lua`, `Aggro.lua`, `RetailFrames.lua`, `ForeverQuests.lua`, `AFK.lua`, `FlightTime.lua` and `Flight.lua`,
 `LevelUp.lua` and `LevelUpWindow.lua`, `QuestMap.lua` (+ `QuestMap.xml`).
 
 ## statusText: always show health and power values
@@ -434,7 +434,7 @@ their tracked quest with its progress or "Ready to turn in", in or out of combat
 - **Reload mid-circle:** `db.afkSpinning` is set while the camera circles; `AFK.Enable` (the tweak being
   applied at login) stops the camera if it's still set.
 
-## cinematicFlights: flights like a film (Flight.lua)
+## cinematicFlights: flights like a film (Flight.lua, FlightTime.lua)
 
 On a flight path (`UnitOnTaxi("player")`) the interface fades out over 1.5 s (`ns.HideInterface`
 with a fade: an OnUpdate only while fading), black letterbox bars (7% of the screen each) fade in
@@ -458,9 +458,10 @@ left alone (a first version pulled it back and circled; that was removed).
   (`PLAYER_CONTROL_GAINED`) drops a pick the film never used, so a flight not taken from the taxi
   map (a quest's) doesn't get the last one's name and time; so does a takeoff more than 10 s
   after the pick (a pick that never took off: not enough money, say).
-- **Time left:** the game doesn't tell. The same hook reads the taxi map (`GetTaxiMapID`,
-  `C_TaxiMap.GetAllTaxiNodes`): the node you're at (state `Current`) names the route ("From >
-  To"), and each slot's `nodeID`. Best first:
+- **Time left** (`FlightTime.lua`: `Pick` on the taxi map, `Trip` at takeoff, `Record` on
+  landing, `Left` / `Text` for the bottom bar): the game doesn't tell. The same hook reads the
+  taxi map (`GetTaxiMapID`, `C_TaxiMap.GetAllTaxiNodes`): the node you're at (state `Current`)
+  names the route ("From > To"), and each slot's `nodeID`. Best first:
   1. A route flown before: each flight that lands is timed (10 s to 30 min, also when the film
      was ended early) and kept per route in `LefthyToolsDB.flightTimes`; the next flight on it
      counts down exactly ("Landing in 1:42").

@@ -21,13 +21,8 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 -- popup that needs you ends it for the rest of that flight. Friends' item shares and the outcome
 -- of offers come in as subtitles too (Flight.Subtitle, from Beacon's Items.lua).
 --
--- Flight time: the game doesn't tell. Best first:
---   * a route flown before: its time (LefthyToolsDB.flightTimes, "From > To"), counted down exactly;
---   * its length along the real flight path: the flight's legs (GetNumRoutes / TaxiGetNodeSlot)
---     looked up in Data/FlightPaths.lua (from the client's TaxiPath / TaxiPathNode tables), at
---     ~29.9 yd/s, learned from your flights (LefthyToolsDB.flightPathPace), plus waits on the way;
---   * only if a leg isn't known: the straight distance between the two flight points (C_TaxiMap
---     node positions, C_Map.GetMapWorldSize) at a learned pace (flightPace), shown as "about".
+-- The time left to landing: FlightTime.lua (the game doesn't tell; routes flown before, the flight
+-- path data, the straight line).
 --
 -- The interface is hidden with ns.HideInterface (Tweaks.lua: UIParent's alpha, shared with the AFK
 -- screen), or, with the setting flightHide on "chosen", only the chosen elements (flightGroups:
@@ -53,9 +48,6 @@ local PER_BAR = 3           -- friends in the top bar; more go into the bottom o
 local TIMER_ROOM = 220      -- the bottom bar's right end, kept for the time left while friends are there
 local FRIEND_ROWS = { "Who", "Quest", "Fight" } -- a friend's three lines, top to bottom
 local FIGHT_FADE = 0.6      -- their fighting line fades in and out
-local PATH_PACE = 1 / 29.9  -- seconds per yard along a flight path (classic routes fly ~29.9 yd/s)
-local DEFAULT_PACE = 1.15 / 30 -- seconds per yard of straight distance (the fallback) before any flight is timed
-local MIN_FLIGHT, MAX_FLIGHT = 10, 1800 -- timed flights outside this are left out
 local TITLE_FONT = "Fonts\\MORPHEUS.TTF"
 local CHAT_COLOURS = {
 	CHAT_MSG_WHISPER = "|cffff80ff", CHAT_MSG_BN_WHISPER = "|cff00faf6",
@@ -68,6 +60,7 @@ local LEAVE_EVENTS = {      -- things that need the interface right away
 
 local Flight = {}
 ns.CinematicFlight = Flight
+local FlightTime = ns.FlightTime -- FlightTime.lua: the route, the time left, the flights kept
 
 local screen, card -- built on first use
 local driver = CreateFrame("Frame")
@@ -78,14 +71,13 @@ local events = CreateFrame("Frame")
 -- ended for the rest of this flight (combat, a popup), only the flight's time is still taken.
 local flying, shown, dismissed, leaveNow, zoneChanged, chatChanged = false, false, false, false, false, false
 local lookUntil      -- after losing control: look for the taxi until then
-local picked         -- from TakeTaxiNode: { name = "Sentinel Hill, Westfall", route, distance, at }
-local trip           -- this flight: { route, distance, started, known, estimate }
+local picked         -- from TakeTaxiNode (FlightTime.Pick): { name = "Sentinel Hill, Westfall", route, ..., at }
+local trip           -- this flight (FlightTime.Trip): { route, started, known, estimate, ... }
 local lastZone, baseline -- baseline: the fewest windows open this flight (the taxi map closes at takeoff)
 local resumeAt
 local takeoffAt      -- when control was lost for this flight; nil if the film didn't see the takeoff
 local sincePoll, shownSecond = 0, nil
 local subtitles = {} -- { text, at }
-local saved -- LefthyToolsDB: flightTimes, flightPathPace, flightPace
 
 local function Readable(value)
 	return value ~= nil and not (issecretvalue and issecretvalue(value))
@@ -130,102 +122,6 @@ local function Windows()
 		end
 	end
 	return count
-end
-
-local function Clock(seconds)
-	seconds = math.max(0, math.floor(seconds + 0.5))
-	local h, m, s = math.floor(seconds / 3600), math.floor(seconds / 60) % 60, seconds % 60
-	if h > 0 then
-		return ("%d:%02d:%02d"):format(h, m, s)
-	end
-	return ("%d:%02d"):format(m, s)
-end
-
----------------------------------------------------------------------------
--- The route picked on the taxi map: its name, its length along the real flight path, and the
--- straight distance to it
----------------------------------------------------------------------------
-
--- The flight's length along its real path: its legs (GetNumRoutes / TaxiGetNodeSlot, as the old
--- taxi window draws them), each looked up in Data/FlightPaths.lua (generated from the client's
--- own flight path tables). nil if any leg isn't known.
-local function PathLength(slot, nodeBySlot)
-	local paths = ns.FLIGHT_PATHS
-	local legs = paths and GetNumRoutes and TaxiGetNodeSlot and GetNumRoutes(slot)
-	if not (type(legs) == "number" and legs > 0) then
-		return nil
-	end
-	local yards, waits = 0, 0
-	for leg = 1, legs do
-		local from = nodeBySlot[TaxiGetNodeSlot(slot, leg, true)]
-		local to = nodeBySlot[TaxiGetNodeSlot(slot, leg, false)]
-		local path = from and to and paths[from .. ">" .. to]
-		if not path then
-			return nil
-		end
-		yards, waits = yards + path[1], waits + path[2]
-	end
-	return yards, waits
-end
-
-local function PickRoute(slot)
-	local name = TaxiNodeName and TaxiNodeName(slot)
-	if not (Readable(name) and type(name) == "string") then
-		return nil
-	end
-	local route = { name = name, at = GetTime() }
-	local ok = pcall(function()
-		local mapID = GetTaxiMapID and GetTaxiMapID()
-		local nodes = mapID and C_TaxiMap and C_TaxiMap.GetAllTaxiNodes(mapID)
-		local here, there
-		local nodeBySlot = {}
-		local current = Enum.FlightPathState and Enum.FlightPathState.Current or 0
-		for _, node in ipairs(nodes or {}) do
-			nodeBySlot[node.slotIndex] = node.nodeID
-			if node.state == current then
-				here = node
-			elseif node.slotIndex == slot then
-				there = node
-			end
-		end
-		if here and Readable(here.name) then
-			route.route = here.name .. " > " .. name
-		end
-		route.pathYards, route.pathWait = PathLength(slot, nodeBySlot)
-		local width, height = C_Map.GetMapWorldSize(mapID)
-		if here and there and (width or 0) > 0 and (height or 0) > 0 then
-			local dx = (there.position.x - here.position.x) * width
-			local dy = (there.position.y - here.position.y) * height
-			route.distance = math.sqrt(dx * dx + dy * dy)
-		end
-	end)
-	if not (ok and route.route) then
-		-- Without the taxi map's nodes: from where you stand.
-		route.route = (GetRealZoneText() or "?") .. "/" .. (GetSubZoneText() or "") .. " > " .. name
-	end
-	return route
-end
-
--- The flight is over: its time for this route, and the paces for estimating new ones. The path
--- pace only learns from flights near it (within 25%): a route flown at another speed (some of
--- Forever's own) has its own time kept and shouldn't skew the rest.
-local function RecordTrip()
-	local seconds = trip and trip.route and trip.fromTakeoff and trip.started and GetTime() - trip.started
-	if not (saved and seconds and seconds >= MIN_FLIGHT and seconds <= MAX_FLIGHT) then
-		return
-	end
-	saved.flightTimes[trip.route] = math.floor(seconds + 0.5)
-	if trip.pathYards and trip.pathYards > 0 then
-		local pace = math.max(seconds - (trip.pathWait or 0), 1) / trip.pathYards
-		local current = saved.flightPathPace or PATH_PACE
-		if pace > current * 0.8 and pace < current * 1.25 then
-			saved.flightPathPace = current * 0.7 + pace * 0.3
-		end
-	end
-	if trip.distance and trip.distance > 0 then
-		local pace = seconds / trip.distance
-		saved.flightPace = saved.flightPace and (saved.flightPace * 0.7 + pace * 0.3) or pace
-	end
 end
 
 ---------------------------------------------------------------------------
@@ -608,28 +504,20 @@ local function UpdateSubtitles()
 	end
 end
 
--- "Landing in 1:42" (timed before, or from the flight path's length), "Landing in about 2:10"
--- (only the straight distance known), nothing if unknown (a /reload mid-flight). Set only when
--- the second changes.
+-- The time left (FlightTime.lua: "Landing in 1:42", "Landing in about 2:10"), nothing if unknown
+-- (a /reload mid-flight). Set only when the second changes.
 local function UpdateTimer()
-	local total = trip and (trip.known or trip.estimate)
-	if not (total and trip.started) then
+	local left = FlightTime.Left(trip)
+	if not left then
 		screen.Timer:SetText("")
 		return
 	end
-	local left = total - (GetTime() - trip.started)
 	local second = math.floor(left + 0.5)
 	if second == shownSecond then
 		return
 	end
 	shownSecond = second
-	if second <= 0 then
-		screen.Timer:SetText(L["Landing any moment"])
-	elseif trip.known or trip.pathYards then
-		screen.Timer:SetText(L["Landing in %s"]:format(Clock(left)))
-	else
-		screen.Timer:SetText(L["Landing in about %s"]:format(Clock(left)))
-	end
+	screen.Timer:SetText(FlightTime.Text(trip, left))
 end
 
 ---------------------------------------------------------------------------
@@ -689,16 +577,8 @@ local function Start()
 	trip = nil
 	if picked then
 		-- Timed from the takeoff (also when the film starts late); not kept if it didn't see it.
-		trip = { route = picked.route, distance = picked.distance, pathYards = picked.pathYards,
-			pathWait = picked.pathWait, started = takeoffAt or GetTime(), fromTakeoff = takeoffAt ~= nil }
+		trip = FlightTime.Trip(picked, takeoffAt)
 		takeoffAt = nil -- (used up: a later start can't take an old takeoff)
-		-- Best first: this route's own time; its length along the flight path; the straight line.
-		trip.known = saved and saved.flightTimes[picked.route]
-		if picked.pathYards then
-			trip.estimate = picked.pathYards * (saved and saved.flightPathPace or PATH_PACE) + (picked.pathWait or 0)
-		elseif picked.distance then
-			trip.estimate = picked.distance * (saved and saved.flightPace or DEFAULT_PACE)
-		end
 	end
 	Show()
 	if picked then
@@ -750,7 +630,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 	if dismissed and trip then
 		-- The film was ended: only the flight's time is still taken.
 		if not OnTaxi() then
-			RecordTrip()
+			FlightTime.Record(trip)
 			trip = nil
 			self:Hide()
 		end
@@ -758,7 +638,7 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 	end
 	if flying then
 		if not OnTaxi() then
-			RecordTrip()
+			FlightTime.Record(trip)
 			trip = nil
 			EndFilm(true)
 			self:Hide()
@@ -874,19 +754,9 @@ end)
 
 if type(TakeTaxiNode) == "function" then
 	hooksecurefunc("TakeTaxiNode", function(slot)
-		picked = PickRoute(slot)
+		picked = FlightTime.Pick(slot)
 	end)
 end
-
-table.insert(LT.onLoad, function(db)
-	db.flightTimes = type(db.flightTimes) == "table" and db.flightTimes or {}
-	for _, key in ipairs({ "flightPace", "flightPathPace" }) do
-		if type(db[key]) ~= "number" then
-			db[key] = nil
-		end
-	end
-	saved = db
-end)
 
 ---------------------------------------------------------------------------
 -- Switched by Tweaks.lua (on the next frame after the setting or the module changes)

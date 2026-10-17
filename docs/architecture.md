@@ -36,7 +36,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
                              Forever's player, target, focus, party and pet frames
   Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever
   Modules/Tweaks/AFK.lua     AFK screen (a tweak): interface hidden, camera circling, a panel with news
-  Modules/Tweaks/Flight.lua  cinematic flights (a tweak): letterbox, title cards, subtitles, time left
+  Modules/Tweaks/FlightTime.lua  cinematic flights' time left: the route picked, flight path lengths, flights kept
+  Modules/Tweaks/Flight.lua  cinematic flights (a tweak): letterbox, title cards, subtitles, friends in the bars
   Modules/Tweaks/LevelUp.lua  level-up window (a tweak): what a level brings (stat gains, trainer spells, talents, class quests), when it shows
   Modules/Tweaks/LevelUpWindow.lua  the level-up window itself: drawing, count-ups, pin, arrows
   Modules/Tweaks/QuestMap.lua  quests on continent and world maps: icons and areas (world map provider)
