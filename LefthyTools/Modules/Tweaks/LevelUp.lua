@@ -31,7 +31,7 @@ local M = LT:GetModule("tweaks")
 local SHOW_DELAY = 1.5     -- seconds after the level-up (Blizzard's banner and fanfare first)
 local TOAST_WAIT = 8       -- at most this long for Blizzard's level-up banner to go away
 local FIRST_TALENT_LEVEL, TALENT_ROW_POINTS = 10, 5
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 
 local LevelUp = {}
 ns.LevelUp = LevelUp

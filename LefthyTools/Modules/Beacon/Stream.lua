@@ -39,7 +39,7 @@ S.CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask" -- (a round mask: 
 local TEST_TIME = 60 -- seconds a test takes notes
 local KEEP_TESTS = 3
 local EXAMPLES = 3   -- example answers per line of a report
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 S.issecret = issecret
 
 -- Items with a known use range: C_Item.IsItemInRange works without owning them, if the game knows
@@ -75,15 +75,7 @@ S.Api = Api
 
 -- A call's first answer if addons may read it; nil if the call is missing, fails or is hidden.
 local function Value(path, ...)
-	local f = Api(path)
-	if not f then
-		return nil
-	end
-	local ok, v = pcall(f, ...)
-	if not ok or issecret(v) then
-		return nil
-	end
-	return v
+	return LT.Value(Api(path), ...)
 end
 S.Value = Value
 

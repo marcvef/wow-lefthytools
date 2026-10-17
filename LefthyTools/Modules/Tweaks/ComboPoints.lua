@@ -35,7 +35,7 @@ local GREEN, YELLOW, RED = { 0.15, 1, 0.15 }, { 1, 0.9, 0 }, { 1, 0.1, 0.05 }
 local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local DOT_SIZE = 6   -- default: each dot's size in pixels, its dark ring included (comboDotSize)
 local SIZE_MIN, SIZE_MAX = 4, 12
-local issecret = issecretvalue or function() return false end
+local issecret = ns.LT.IsSecret
 local Util = ns.TweakUtil -- Tweaks.lua: the nameplate and its health bar
 
 local colorByCount = false -- switched by Tweaks.lua (ns.ApplyComboColors), on by default

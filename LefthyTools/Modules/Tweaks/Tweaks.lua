@@ -74,7 +74,7 @@ local fadeFrom, fadeTo, fadeTime, fadeElapsed = 1, 1, 1, 0
 
 local function CurrentAlpha()
 	local alpha = UIParent:GetAlpha()
-	return (type(alpha) == "number" and not (issecretvalue and issecretvalue(alpha))) and alpha or 1
+	return (type(alpha) == "number" and not LT.IsSecret(alpha)) and alpha or 1
 end
 
 fader:SetScript("OnUpdate", function(self, elapsed)
@@ -163,7 +163,7 @@ function Util.PlateFrame(unit)
 		return nil
 	end
 	local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unit)
-	if not ok or not plate or (issecretvalue and issecretvalue(plate)) or (plate.IsForbidden and plate:IsForbidden()) then
+	if not ok or not plate or LT.IsSecret(plate) or (plate.IsForbidden and plate:IsForbidden()) then
 		return nil
 	end
 	return plate.UnitFrame

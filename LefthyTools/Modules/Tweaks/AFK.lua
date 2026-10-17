@@ -29,7 +29,7 @@ local LEAVE_EVENTS = {   -- things that need the interface right away
 	"PLAYER_REGEN_DISABLED", "READY_CHECK", "PARTY_INVITE_REQUEST", "LFG_PROPOSAL_SHOW", "TRADE_SHOW",
 	"DUEL_REQUESTED", "CONFIRM_SUMMON", "RESURRECT_REQUEST", "PLAYER_DEAD", "CINEMATIC_START", "PLAY_MOVIE",
 }
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 
 local AFK = {}
 ns.AFKScreen = AFK

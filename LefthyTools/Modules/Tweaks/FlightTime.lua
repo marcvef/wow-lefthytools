@@ -24,10 +24,7 @@ ns.FlightTime = FlightTime
 
 local saved -- LefthyToolsDB: flightTimes, flightPathPace, flightPace
 
-local function Readable(value)
-	return value ~= nil and not (issecretvalue and issecretvalue(value))
-end
-
+local Readable = LT.Readable
 local Clock = ns.TweakUtil.Clock -- Tweaks.lua
 
 ---------------------------------------------------------------------------

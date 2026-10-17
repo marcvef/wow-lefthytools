@@ -38,9 +38,7 @@ local merchantOpen = false
 local counts = {} -- at a vendor: itemID -> how many are in my bags (to notice one going)
 local mailWarned -- the recipient + attachments last warned about
 
-local function Readable(value)
-	return value ~= nil and not (issecretvalue and issecretvalue(value))
-end
+local Readable = LT.Readable
 
 -- "Anna" from "Anna", "Anna-Realm" or "Anna Surname" (Forever's display names add surnames).
 local function BaseName(name)

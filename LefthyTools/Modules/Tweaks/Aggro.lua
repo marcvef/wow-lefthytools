@@ -45,7 +45,7 @@ local COLORS = {
 }
 local TANK_AURAS = { 5487, 9634, 25780 } -- Bear Form, Dire Bear Form, Righteous Fury
 local DEFENSIVE_STANCE = 71
-local issecret = issecretvalue or function() return false end
+local issecret, Value = ns.LT.IsSecret, ns.LT.Value
 local Util = ns.TweakUtil -- Tweaks.lua: the nameplate and its health bar
 
 local on = false                 -- switched by Tweaks.lua (ns.ApplyAggro)
@@ -60,16 +60,6 @@ local previewUntil = 0
 local auraNames                  -- TANK_AURAS' names, read once
 local driver = CreateFrame("Frame")
 local events = CreateFrame("Frame")
-
-local function Value(f, ...)
-	if not f then
-		return nil
-	end
-	local ok, v = pcall(f, ...)
-	if ok and not issecret(v) then
-		return v
-	end
-end
 
 -- The first three letters of a name (whole letters: "Ä" is two bytes).
 local function Short(name)

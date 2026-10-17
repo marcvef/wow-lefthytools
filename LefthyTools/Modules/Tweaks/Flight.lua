@@ -82,9 +82,7 @@ local takeoffAt      -- when control was lost for this flight; nil if the film d
 local sincePoll, shownSecond = 0, nil
 local subtitles = {} -- { text, at }
 
-local function Readable(value)
-	return value ~= nil and not (issecretvalue and issecretvalue(value))
-end
+local Readable = LT.Readable
 
 local function OnTaxi()
 	local onTaxi = UnitOnTaxi("player")

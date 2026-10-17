@@ -17,7 +17,7 @@ local C = ns.Chronicle
 
 local DAYS = 30 -- an account's days added up: what friends' journals keep (Sync.lua's DAYS_KEPT)
 local FRIENDS_CACHE = 30
-local issecret = issecretvalue or function() return false end
+local issecret = ns.LT.IsSecret
 
 local myAcct
 local friendsCache, friendsAt = {}, -math.huge

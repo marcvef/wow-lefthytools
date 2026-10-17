@@ -472,7 +472,7 @@ function B.ShareItem(link, offer, location)
 	local itemGUID
 	if location and location.IsBagAndSlot and location:IsBagAndSlot() and C_Item.GetItemGUID then
 		local ok, guid = pcall(C_Item.GetItemGUID, location)
-		itemGUID = ok and type(guid) == "string" and not (issecretvalue and issecretvalue(guid)) and guid or nil
+		itemGUID = ok and type(guid) == "string" and not LT.IsSecret(guid) and guid or nil
 	end
 	local call = { id = id, mine = true, link = link, itemString = itemString, itemGUID = itemGUID,
 		recipients = recipients, answers = {}, state = "open", ends = now + CALL_TIME }
@@ -513,7 +513,7 @@ local function HasTradeTimer(bag, slot)
 	local data = C_TooltipInfo.GetBagItem(bag, slot)
 	for _, line in ipairs(data and data.lines or {}) do
 		local text = line.leftText
-		if type(text) == "string" and not (issecretvalue and issecretvalue(text)) and text:find(tradeTimerPattern) then
+		if type(text) == "string" and not LT.IsSecret(text) and text:find(tradeTimerPattern) then
 			return true
 		end
 	end

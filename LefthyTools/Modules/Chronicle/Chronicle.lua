@@ -33,7 +33,7 @@ local COPPER_PER_GOLD = 10000
 local DAILY_DAYS = 60        -- days of per-day counters kept (the graphs show 14)
 local SAMPLE_STEP, SAMPLE_MAX = 60, 240 -- the session curve: a point a minute, at most 240
 local SESSION_GAP = 300 -- switched on after this long without a tick: a new session
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 
 local STAT_KEYS = {
 	"played", "sessions", "levels", "quests", "foreverQuests", "questXP", "xp", "kills", "rares", "bosses",

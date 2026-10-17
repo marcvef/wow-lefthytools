@@ -383,7 +383,7 @@ end
 local WATCH_TIME = 3
 local WATCH_EVENTS = { "UI_ERROR_MESSAGE", "UI_INFO_MESSAGE", "CHAT_MSG_SYSTEM", "TRADE_SKILL_SHOW",
 	"TRADE_SKILL_DATA_SOURCE_CHANGED", "TRADE_SKILL_LIST_UPDATE", "TRADE_SKILL_CLOSE" }
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 local watcher = CreateFrame("Frame")
 local watching -- the click being watched: { events = { ... } }
 local linkFailureSent = false

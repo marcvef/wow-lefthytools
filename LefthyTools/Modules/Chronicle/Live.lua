@@ -16,7 +16,7 @@ local SHARE_AGAIN = 600      -- back sooner (a /reload, a shaky connection): onl
 local SHARE_GAP = 300        -- today's numbers go to friends at most this often (if they changed)
 local FRIEND_DAYS = 30       -- days of friends' numbers kept
 local FEED_MAX = 300
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 
 local shareQueue = {} -- { kind, a, b }: highlights recorded since the last tick
 local listening = false

@@ -37,7 +37,7 @@ local lastVersionSent = 0 -- my version to every friend every VERSION_EVERY seco
 -- seen to agree with the map route (HereBeDragons relies on the two matching), checked again
 -- after every loading screen (another continent or instance).
 local unitPositionAgrees = false
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 
 local function MapRoutePosition()
 	local mapID = C_Map.GetBestMapForUnit("player")
@@ -102,7 +102,7 @@ local function EnemyCount()
 	for unit in pairs(plates) do
 		if UnitCanAttack("player", unit) then
 			local threat = UnitThreatSituation("player", unit)
-			if issecretvalue and issecretvalue(threat) then
+			if issecret(threat) then
 				return nil
 			end
 			if threat then
@@ -138,7 +138,7 @@ local function CurrentXP()
 		return NO_XP
 	end
 	local xp, xpMax = UnitXP("player"), UnitXPMax("player")
-	if issecretvalue and (issecretvalue(xp) or issecretvalue(xpMax)) or not xpMax or xpMax <= 0 then
+	if issecret(xp) or issecret(xpMax) or not xpMax or xpMax <= 0 then
 		return NO_XP
 	end
 	return ("X%s;%d"):format(VERSION, math.min(99, math.floor(xp / xpMax * 100)))

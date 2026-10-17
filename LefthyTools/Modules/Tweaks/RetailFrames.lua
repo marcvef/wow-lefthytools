@@ -25,7 +25,7 @@ local _, ns = ...
 local LT = ns.LT
 local ART = ns.RETAIL_FRAME_ART or {}
 local BARS = ns.RETAIL_FRAME_BARS or {}
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 
 local on = false
 local applied = false        -- switched on this session (switching off then needs a /reload)

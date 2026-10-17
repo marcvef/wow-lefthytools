@@ -178,7 +178,7 @@ end
 -- Free text for a message: no colour codes or other escape sequences, separators or control
 -- characters, and cut at maxBytes without splitting a UTF-8 character.
 function B.Clean(text, maxBytes)
-	if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then
+	if type(text) ~= "string" or LT.IsSecret(text) then
 		return ""
 	end
 	text = strtrim((text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("[|;%c]", "")))
@@ -192,7 +192,7 @@ end
 -- shows, with the surname WoW: Forever gives every character (UnitName's second return).
 function B.MyName()
 	local first, surname = UnitName("player")
-	if type(surname) == "string" and surname ~= "" and not (issecretvalue and issecretvalue(surname)) then
+	if type(surname) == "string" and surname ~= "" and not LT.IsSecret(surname) then
 		return first .. " " .. surname
 	end
 	return first
@@ -236,7 +236,7 @@ local function FindGroupUnit(guid)
 	for i = 1, raid and 40 or 4 do
 		local unit = (raid and "raid" or "party") .. i
 		local unitGuid = UnitGUID(unit)
-		if unitGuid == guid and not (issecretvalue and issecretvalue(unitGuid)) then
+		if unitGuid == guid and not LT.IsSecret(unitGuid) then
 			return unit
 		end
 	end
