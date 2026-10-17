@@ -48,20 +48,9 @@ local Bt = { module = M }
 ns.Bestiary = Bt
 
 -- Shared by the Bestiary's files: whether a value is a secret (Forever hides many API returns), a
--- game call's value (nil when it fails or is a secret), an empty table to read from, the gold of
--- edges and headings.
-local issecret = issecretvalue or function() return false end
-
-local function Value(f, ...)
-	if not f then
-		return nil
-	end
-	local ok, v = pcall(f, ...)
-	if ok and not issecret(v) then
-		return v
-	end
-end
-
+-- game call's value (nil when it fails or is a secret; both Core's), an empty table to read from,
+-- the gold of edges and headings.
+local issecret, Value = LT.IsSecret, LT.Value
 local NONE = {}
 Bt.issecret, Bt.Value, Bt.NONE, Bt.GOLD = issecret, Value, NONE, { 1, 0.82, 0.3 }
 

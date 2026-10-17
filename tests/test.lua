@@ -8795,6 +8795,14 @@ section("Bestiary: quest drops while questing")
 			"the other came after the window had redrawn: its line too (both asked for before, when the bandit's drops were first drawn: not again)")
 		C_Item.RequestLoadItemDataByID, QUESTS[3] = request, nil
 	end
+	do -- (its own Value used to answer nothing at all for a secret, and tonumber() wants a value)
+		local count = C_QuestLog.GetNumQuestLogEntries
+		C_QuestLog.GetNumQuestLogEntries = function() return SECRET end
+		Fire("QUEST_LOG_UPDATE")
+		local ok = pcall(Bt.QuestDrops, 116, Bt.Mob(116))
+		C_QuestLog.GetNumQuestLogEntries = count
+		check(ok, "a quest log the game keeps secret doesn't break the quest drops")
+	end
 	QUESTS, MOBS.target, STATE.target = savedQuests, nil, false
 	Fire("QUEST_LOG_UPDATE")
 	Advance(0.6)
