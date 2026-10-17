@@ -4694,6 +4694,47 @@ do
 		LefthyToolsDropData, LefthyToolsBestiaryDB.mobs[9003] = nil, nil
 		chronicled.loot2 = loot2
 	end)()
+
+	-- The battle row: hovering a foe shows my own Bestiary card for its kind under the rest, short:
+	-- my kills and coin, its three likeliest drops; a kind I haven't killed: "Not killed yet" and the
+	-- classic database's three likeliest, greyed.
+	;(function()
+		LefthyToolsDropData = { source = "test", mobs = { [9005] = "2589:1:5000,2075:2:40,1179:1:900,6948:1:10" } }
+		LefthyToolsBestiaryDB.mobs[9006] = { kills = 20, money = 2400, items = { [2589] = { 8, 10, 1, "Linen Cloth" },
+			[2075] = { 1, 1, 2, "Priest's Mace" }, [1179] = { 3, 3, 1, "Ice Cold Milk" }, [6948] = { 2, 2, 1, "Hearthstone" } } }
+		local fwin = S.OpenFriend(11, "command").win
+		anna("O2;n;8;12;Kobold Tunneler")
+		anna("O2;c;8;9005")
+		anna("O2;n;9;13;Kobold Digger")
+		anna("O2;c;9;9006")
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80/8,90,8,9,act/9,30,6,9,ac")
+		Advance(0.6)
+		local first, second = fwin.Foes.slots[1], fwin.Foes.slots[2]
+		first._scripts.OnEnter(first)
+		check(TOOLTIP.title == "Kobold Tunneler (12)" and tooltipFind("Health not known yet") and tooltipFind("Bestiary  Not killed yet: classic database")
+			and tooltipFind("Linen Cloth  50%") and tooltipFind("Ice Cold Milk  9.0%") and tooltipFind("Priest's Mace  0.4%")
+			and not tooltipFind("Hearthstone"), "hover a foe I haven't killed: under its health, the classic database's three likeliest drops")
+		first._scripts.OnLeave(first)
+		second._scripts.OnEnter(second)
+		check(tooltipFind("Bestiary  20 kills") and tooltipFind("each") and tooltipFind("Linen Cloth  40%") and tooltipFind("Ice Cold Milk  15%")
+			and tooltipFind("Hearthstone  10%") and not tooltipFind("Priest's Mace"), "one I've killed: my kills and coin, my three likeliest drops")
+		second._scripts.OnLeave(second)
+		LT:SetModuleEnabled("bestiary", false)
+		second._scripts.OnEnter(second)
+		check(TOOLTIP.title == "Kobold Digger (13)" and not tooltipFind("Bestiary"), "the Bestiary switched off: nothing of it")
+		second._scripts.OnLeave(second)
+		LT:SetModuleEnabled("bestiary", true)
+		S.CloseView(11)
+		LefthyToolsDropData, LefthyToolsBestiaryDB.mobs[9006] = nil, nil
+		-- The preview's foes too: my card for each kind (here: none killed, no database).
+		lefthy("stream preview")
+		Advance(5)
+		local leader = win.Foes.slots[1]
+		leader._scripts.OnEnter(leader)
+		check(TOOLTIP.title == "Bandit leader (16)" and tooltipFind("Bestiary  Not killed yet"), "the preview: hover a foe, my card for its kind")
+		leader._scripts.OnLeave(leader)
+		win.Close:Click()
+	end)()
 	ns.MINIMAP_TILES = realTiles
 end
 

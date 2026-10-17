@@ -675,7 +675,14 @@ the unit checked against the GUID first). In a friend's: their estimate; not kno
 says how it's learned). The hover of an estimate says where its kind's health comes from, as this
 client knows it (`S.MobMaxOf`: "learned from kills", "the classic database", "usual for its level";
 a friend's percent may rest on their own kills); known only to the friend: "Estimated by their
-client".
+client". Under the rest of a foe's hover, **your own Bestiary card** for its kind
+(`FoeBestiary`; the user picked "Hovering a foe in the row shows your own card for it: kills and
+drops"), short: "Bestiary" and your kills and the coin each (`Bt.KillsLine`, short form), then its 3
+likeliest drops (`Bt.Drops`, the world drops' group left out) with their chances in their quality's
+colour (`Bt.ListDrops`); a kind you haven't killed: "Not killed yet: classic database" and the
+database's 3 likeliest (`Bt.Compare`), greyed, or only "Not killed yet". Grey items as the
+Bestiary's `showPoor` says; an item the client doesn't know yet is asked for (named on the next
+hover). Read on hover only; the Bestiary switched off: nothing of it.
 
 **Who has aggro** on each foe, in a group (the user picked it: "each foe gets the tiny role-coloured
 tag from the nameplate aggro tweak"): Misc Tweaks' nameplate tag (misc-tweaks.md, `aggroNameplate`),

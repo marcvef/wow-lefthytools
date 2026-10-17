@@ -186,13 +186,14 @@ minimap, and you on theirs, without being in a group.
   its aggro, like on the nameplates: **>YOU<** in your own stream, else the first three letters of
   the name in the colour of their role (a friend on an older LefthyTools doesn't send it: there a
   mob attacking them shows their name in white). It's an approximation from what the game tells
-  addons. Loot floats up from them; a rare find (below 2% where it most likely came from, by the
-  Bestiary's drop database or your own kills) says its drop chance in gold, e.g. "Cutthroat's
-  Pants, 0.4%". After a fight, one line sums it up for a few seconds at the bottom: how long it
-  took, the kills, the XP and the lowest health (or that they died). A friend near you in your
-  group looks like themselves; one elsewhere is their class's emblem, "out of reach" under it (the
-  game shows no player as they look from afar), with their party frame portrait on top as a
-  bobblehead if they're in your group.
+  addons. Hover a mob in the row for your own Bestiary card: your kills and its three likeliest
+  drops (not killed yet: what the drop database says, greyed). Loot floats up from them; a rare
+  find (below 2% where it most likely came from, by the Bestiary's drop database or your own
+  kills) says its drop chance in gold, e.g. "Cutthroat's Pants, 0.4%". After a fight, one line
+  sums it up for a few seconds at the bottom: how long it took, the kills, the XP and the lowest
+  health (or that they died). A friend near you in your group looks like themselves; one elsewhere
+  is their class's emblem, "out of reach" under it (the game shows no player as they look from
+  afar), with their party frame portrait on top as a bobblehead if they're in your group.
 - **Level-ups:** when you level up, your friends get your own message in big letters
   with a sound, e.g. `{name} hit {level}, drinks on me!`. Leave it empty and they see
   "Anna reached level 21!" in their own language.

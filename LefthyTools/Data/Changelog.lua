@@ -320,5 +320,8 @@ ns.CHANGELOG = {
 	{ id = 104, module = "beacon",
 		en = { "Fight stream: rare finds", "Loot that's rare where it most likely came from (below 2%) floats up with its drop chance in gold, from the Bestiary's database or your own kills." },
 		de = { "Kampf-Stream: seltene Funde", "Seltener Loot (unter 2 % beim wahrscheinlichsten Mob) steigt mit seiner Dropchance in Gold auf, aus der Datenbank des Bestiary oder deinen eigenen Kills." } },
+	{ id = 105, module = "beacon",
+		en = { "Fight stream: Bestiary on hover", "Hovering a mob in the battle row shows your Bestiary card for it: your kills and its three likeliest drops." },
+		de = { "Kampf-Stream: Bestiary per Mouseover", "Mouseover über einen Mob in der Kampfreihe zeigt deine Bestiary-Karte: deine Kills und seine drei wahrscheinlichsten Drops." } },
 	-- New entries go here, at the end.
 }

@@ -188,6 +188,7 @@ local function ListDrops(list)
 		end
 	end
 end
+Bt.ListDrops = ListDrops -- (also the fight stream's battle row: a foe's tooltip)
 
 -- The classic database's word on a drop: its chance there (a quest item's: only while on its
 -- quest), or that it doesn't list it; nothing when it doesn't know the mob.

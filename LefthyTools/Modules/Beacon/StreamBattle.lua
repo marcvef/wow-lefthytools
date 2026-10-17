@@ -177,6 +177,47 @@ end
 -- Where a kind's health comes from (S.MobMaxOf), for the hover.
 local HEALTH_FROM = { learned = L["learned from kills"], database = L["the classic database"], usual = L["usual for its level"] }
 
+-- Your own Bestiary card for a foe's kind, under the rest of its tooltip (the user picked it:
+-- "Hovering a foe in the row shows your own card for it: kills and drops"), short: your kills and
+-- the coin each brought, its CARD_DROPS likeliest drops with their chances in their quality's colour;
+-- a kind you haven't killed: "Not killed yet" and the classic database's likeliest, greyed. Read
+-- on hover only; nothing without the Bestiary (switched off) or a creature ID.
+local CARD_DROPS = 3
+
+local function FoeBestiary(creature)
+	local Bt = ns.Bestiary
+	if not (creature and Bt and Bt.module and Bt.module.enabled and Bt.ListDrops) then
+		return
+	end
+	local showPoor, mob = Bt.module.db.showPoor, Bt.Mob(creature)
+	local killed = mob and mob.kills > 0
+	local list, line
+	if killed then
+		list, line = Bt.Drops(mob, showPoor), Bt.KillsLine(mob, true)
+	else
+		list = Bt.Compare(creature, mob, showPoor)
+		line = list and #list > 0 and L["Not killed yet: classic database"] or L["Not killed yet"]
+	end
+	local drops = {}
+	for _, drop in ipairs(list or {}) do
+		if #drops == CARD_DROPS then
+			break
+		elseif not drop.group then -- (the world drops in one place: not this kind's own)
+			drops[#drops + 1] = drop
+			if not drop.name and not Value("C_Item.GetItemInfo", ("item:%d"):format(drop.id)) then
+				local load = S.Api("C_Item.RequestLoadItemDataByID")
+				if load then
+					pcall(load, drop.id) -- (named on the next hover)
+				end
+			end
+		end
+	end
+	local shade = killed and 1 or 0.6
+	GameTooltip:AddLine(" ")
+	GameTooltip:AddDoubleLine("Bestiary", line, GOLD[1], GOLD[2], GOLD[3], shade, shade, shade)
+	Bt.ListDrops(drops)
+end
+
 local function FoeOnEnter(slot)
 	local mob = slot.mob
 	if not mob then
@@ -200,6 +241,8 @@ local function FoeOnEnter(slot)
 				0.7, 0.7, 0.7, true)
 		end
 	end
+
+	FoeBestiary(mob.creature) -- (your own card for its kind)
 	GameTooltip:Show()
 end
 
