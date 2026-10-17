@@ -396,7 +396,36 @@ end
 
 ---------------------------------------------------------------------------
 -- /lefthy
+--
+-- Its words are registered: Core's own below, a module's in the file that does it
+-- (LT:AddCommand), so Core doesn't have to know them. "/lefthy <module> ..." goes to the module's
+-- OnSlashCommand.
 ---------------------------------------------------------------------------
+
+local commands = {}  -- word -> run(rest)
+local helpLines = {} -- { word, line }, in the order /lefthy lists them
+
+-- "/lefthy <word> ..." runs run(rest), rest being what follows the word, as typed. help is its line
+-- in /lefthy's list (nil: not listed, e.g. another word for the same thing), right after the line of
+-- the word named by after (default: at the end). Registered when the file loads, so the word works
+-- while its module is off too (the command says so where that matters). Not a module's key: the
+-- word would hide that module's own commands.
+function LT:AddCommand(word, run, help, after)
+	commands[word] = run
+	if help then
+		local at = #helpLines + 1
+		for i, line in ipairs(helpLines) do
+			if line[1] == after then
+				at = i + 1
+			end
+		end
+		table.insert(helpLines, at, { word, help })
+	end
+end
+
+local function OpenSettings()
+	LT:OpenSettings()
+end
 
 local function ListModules()
 	for _, m in ipairs(LT.modules) do
@@ -404,6 +433,24 @@ local function ListModules()
 			m.title, m.key, m.description))
 	end
 end
+
+local function News()
+	LT.WhatsNew.Show(false)
+end
+
+LT:AddCommand("", OpenSettings, "/lefthy - open settings")
+LT:AddCommand("config", OpenSettings)
+LT:AddCommand("options", OpenSettings)
+LT:AddCommand("modules", ListModules, "/lefthy modules - list modules")
+LT:AddCommand("list", ListModules)
+LT:AddCommand("version", function()
+	LT.Print("version " .. LT.version .. (LT.newerVersion and (", a friend has the newer " .. LT.newerVersion) or "")
+		.. ". " .. LT.UpdateHint(LT.newerVersion and LT.newerFiles))
+end, "/lefthy version - the installed LefthyTools version")
+LT:AddCommand("errors", function(rest) LT.Errors.Command(rest) end, "/lefthy errors [clear] - LefthyTools' own errors, ready to copy")
+LT:AddCommand("news", News, "/lefthy news - what's new in LefthyTools")
+LT:AddCommand("whatsnew", News)
+LT:AddCommand("changelog", News)
 
 SLASH_LEFTHYTOOLS1 = "/lefthy"
 SLASH_LEFTHYTOOLS2 = "/lt"
@@ -415,25 +462,8 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 	cmd = cmd:lower()
 	local target = LT:GetModule(rest:lower())
 
-	if cmd == "" or cmd == "config" or cmd == "options" then
-		LT:OpenSettings()
-	elseif cmd == "modules" or cmd == "list" then
-		ListModules()
-	elseif cmd == "version" then
-		LT.Print("version " .. LT.version .. (LT.newerVersion and (", a friend has the newer " .. LT.newerVersion) or "")
-			.. ". " .. LT.UpdateHint(LT.newerVersion and LT.newerFiles))
-	elseif cmd == "errors" then
-		LT.Errors.Command(rest)
-	elseif cmd == "news" or cmd == "whatsnew" or cmd == "changelog" then
-		LT.WhatsNew.Show(false)
-	elseif cmd == "announce" and ns.Beacon and ns.Beacon.Announce then
-		ns.Beacon.Announce(rest) -- Beacon's Chat.lua: the middle of every friend's screen
-	elseif cmd == "report" and ns.Beacon and ns.Beacon.ReportCommand then
-		ns.Beacon.ReportCommand(rest) -- Beacon's Reports.lua: to friends who collect error reports
-	elseif cmd == "reports" and ns.Beacon and ns.Beacon.ShowReports then
-		ns.Beacon.ShowReports()
-	elseif cmd == "stream" and ns.Beacon and ns.Beacon.StreamCommand then
-		ns.Beacon.StreamCommand(rest) -- Beacon's fight stream: watch a friend, your own, the preview
+	if commands[cmd] then
+		commands[cmd](rest)
 	elseif (cmd == "enable" or cmd == "disable" or cmd == "toggle") and target then
 		if cmd == "toggle" then
 			LT:ToggleModule(target.key)
@@ -448,15 +478,9 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 			LT:OpenSettings(m)
 		end
 	else
-		LT.Print("/lefthy - open settings")
-		LT.Print("/lefthy modules - list modules")
-		LT.Print("/lefthy version - the installed LefthyTools version")
-		LT.Print("/lefthy errors [clear] - LefthyTools' own errors, ready to copy")
-		LT.Print("/lefthy report <what happened> - send a report to friends who collect them (Beacon)")
-		LT.Print("/lefthy reports - the reports your friends sent you")
-		LT.Print("/lefthy news - what's new in LefthyTools")
-		LT.Print("/lefthy announce <text> (or /la) - a line in the middle of your Beacon friends' screens (/ltc or /l <text>: LTC, LefthyTools chat)")
-		LT.Print("/lefthy stream watch <name> | stop | me | preview - a Beacon friend's fight, live (more: /lefthy stream)")
+		for _, line in ipairs(helpLines) do
+			LT.Print(line[2])
+		end
 		LT.Print("/lefthy enable | disable | toggle <module>")
 		LT.Print("/lefthy <module> ... - module commands, e.g. /lefthy mirage status")
 	end

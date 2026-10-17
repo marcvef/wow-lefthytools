@@ -245,7 +245,12 @@ entry, in English and German, with every change players notice.**
   keybinding or slash command flips it. `LT:ApplyModuleState` is idempotent and only runs after
   `PLAYER_LOGIN`.
 - `/lefthy` and `/lt`: open settings, `modules`, `enable|disable|toggle <key>`, `<key> ...`
-  forwarded to the module. Modules may add an alias (Mirage keeps `/mirage`).
+  forwarded to the module (`OnSlashCommand`). A module's file can add a word of its own with
+  `LT:AddCommand(word, run, help, after)` (`Core/Options.lua`): `/lefthy <word> ...` runs
+  `run(rest)`, and `help` is its line in `/lefthy`'s list, right after the line of the word `after`
+  (Beacon's `announce`, `report`, `reports` and `stream`; Core's own words are registered the same
+  way). Words are registered when the file loads, so they answer while their module is off too.
+  Modules may add an alias (Mirage keeps `/mirage`).
 - **Shared helpers** (`Core/Core.lua`), for code in any module: `LT.Print(msg, source)`;
   secret values (forever-platform.md) with `LT.IsSecret(v)`, `LT.Readable(v)` (there and not a
   secret) and `LT.Value(f, ...)` (a call's first answer if the call works and the answer isn't a

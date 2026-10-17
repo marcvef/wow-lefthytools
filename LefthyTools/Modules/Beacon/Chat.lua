@@ -402,3 +402,5 @@ SlashCmdList.LEFTHYTOOLS_CHAT = function(msg, editBox)
 end
 SLASH_LEFTHYTOOLS_ANNOUNCE1 = "/la"
 SlashCmdList.LEFTHYTOOLS_ANNOUNCE = B.Announce
+LT:AddCommand("announce", B.Announce, "/lefthy announce <text> (or /la) - a line in the middle of your Beacon friends' screens"
+	.. " (/ltc or /l <text>: LTC, LefthyTools chat)", "news")

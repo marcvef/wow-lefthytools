@@ -605,3 +605,6 @@ function B.StreamCommand(arg)
 		M:Print("/lefthy stream results - the last tests, ready to copy")
 	end
 end
+
+LT:AddCommand("stream", B.StreamCommand, "/lefthy stream watch <name> | stop | me | preview - a Beacon friend's fight, live"
+	.. " (more: /lefthy stream)", "announce")

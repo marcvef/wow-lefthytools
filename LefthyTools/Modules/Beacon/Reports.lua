@@ -322,6 +322,9 @@ function B.ShowReports()
 	window:Show()
 end
 
+LT:AddCommand("report", B.ReportCommand, "/lefthy report <what happened> - send a report to friends who collect them (Beacon)", "errors")
+LT:AddCommand("reports", B.ShowReports, "/lefthy reports - the reports your friends sent you", "report")
+
 ---------------------------------------------------------------------------
 -- The tick (Beacon.lua): collect, tell friends I collect, send what waits
 ---------------------------------------------------------------------------

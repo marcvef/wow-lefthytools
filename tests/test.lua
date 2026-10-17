@@ -483,6 +483,30 @@ lefthy("")
 check(OPENED_CATEGORY == nil and (PRINTED[#PRINTED] or ""):find("in gamepad mode, open the settings from the game menu", 1, true),
 	"gamepad mode: /lefthy points to the game menu instead of opening the panel")
 GAMEPAD_STATE.ui = false
+do -- /lefthy's list: Core's words and the ones modules add (LT:AddCommand), each where it always was.
+	local hmark = #PRINTED + 1
+	lefthy("help")
+	local lines = {}
+	for i = hmark, #PRINTED do lines[#lines + 1] = (PRINTED[i]:gsub("^|cff%x+LefthyTools|r: ", "")) end
+	local want = {
+		"/lefthy - open settings",
+		"/lefthy modules - list modules",
+		"/lefthy version - the installed LefthyTools version",
+		"/lefthy errors [clear] - LefthyTools' own errors, ready to copy",
+		"/lefthy report <what happened> - send a report to friends who collect them (Beacon)",
+		"/lefthy reports - the reports your friends sent you",
+		"/lefthy news - what's new in LefthyTools",
+		"/lefthy announce <text> (or /la) - a line in the middle of your Beacon friends' screens (/ltc or /l <text>: LTC, LefthyTools chat)",
+		"/lefthy stream watch <name> | stop | me | preview - a Beacon friend's fight, live (more: /lefthy stream)",
+		"/lefthy enable | disable | toggle <module>",
+		"/lefthy <module> ... - module commands, e.g. /lefthy mirage status",
+	}
+	check(table.concat(lines, "\n") == table.concat(want, "\n"), "/lefthy help: every word, Beacon's too, got\n" .. table.concat(lines, "\n"))
+	local got
+	LT:AddCommand("testword", function(rest) got = rest end) -- (no help line: not listed)
+	lefthy("TestWord Some Text")
+	check(got == "Some Text", "a word a module adds gets what follows it, as typed")
+end
 lefthy("modules")
 lefthy("mirage status")
 lefthy("mirage")
@@ -7618,6 +7642,17 @@ local seenNewer = LT.newerVersion
 LT.newerVersion = nil
 check(updateStatus():find("Unknown (Beacon is off)", 1, true), "update status with Beacon off: unknown")
 LT.newerVersion = seenNewer
+do -- Beacon's /lefthy words while it's off: they answer as they always did (no time passes here).
+	pmark = #PRINTED + 1
+	lefthy("announce hello")
+	lefthy("stream watch anna")
+	check(printedSince(pmark):find("Beacon is off: /lefthy enable beacon.", 1, true)
+		and printedSince(pmark):find("no friend called anna online with LefthyTools.", 1, true),
+		"Beacon off: /lefthy announce and /lefthy stream say why nothing happens, got " .. printedSince(pmark))
+	lefthy("reports")
+	check(LefthyToolsReportsFrame:IsShown(), "... and /lefthy reports still shows the collected ones")
+	LefthyToolsReportsFrame:Hide()
+end
 lefthy("enable beacon")
 Advance(0.15)
 check(next(WorldMapFrame.providers) ~= nil, "on again: back on the map")

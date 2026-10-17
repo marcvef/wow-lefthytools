@@ -32,6 +32,8 @@ driver tick (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`, `B.StreamHealthT
 `B.ReceiveJournal`), with an answer (`B.CollectorMessage`, `B.StreamHello`, `B.JournalHello`), and on
 switching (`B.Attach` / `B.Detach`, `B.StreamStart` / `B.StreamStop`, `B.OnSettingChanged`).
 Other modules (Chronicle, Misc Tweaks) use the same `B` fields, and `B.listeners` (`B.Notify`).
+`Chat.lua`, `Reports.lua` and `Stream.lua` add their own `/lefthy` words (`announce`, `report`,
+`reports`, `stream`) with `LT:AddCommand` (architecture.md); they answer while Beacon is off too.
 
 ## Transport and protocol
 
