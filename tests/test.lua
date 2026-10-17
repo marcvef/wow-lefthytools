@@ -8509,6 +8509,17 @@ section("Misc Tweaks: who has aggro, on enemy nameplates")
 	check(tagText("nameplate1") == "Ölr", "no event, but in combat: seen within half a second")
 	STATE.combat = false
 	Fire("PLAYER_REGEN_ENABLED")
+	-- Like the game: the combat lockdown begins only after PLAYER_REGEN_DISABLED, so inside it
+	-- InCombatLockdown still says no.
+	Fire("PLAYER_REGEN_DISABLED")
+	STATE.combat = true
+	Advance(0.1)
+	MOBS.nameplate1.targetGUID, THREATS["party1>nameplate1"] = "Player-1-31", 3
+	Advance(0.6)
+	check(tagText("nameplate1") == "Ann", "a fight starting: the half-second looks begin (combat taken from the event)")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	THREATS["party1>nameplate1"] = nil
 	-- The examples: each enemy nameplate another one, for ten seconds.
 	local pmark = #PRINTED + 1
 	lefthy("tweaks aggrotest")

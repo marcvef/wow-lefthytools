@@ -147,6 +147,8 @@ the color first".
   `UNIT_FLAGS` mark that nameplate, `UNIT_THREAT_SITUATION_UPDATE` all of them; one OnUpdate looks
   at the marked ones on the next frame. While you're in combat in a group it also looks at every
   enemy nameplate every 0.5 s (1 s in a raid), in case an event was missed; otherwise it stops.
+  Combat comes from `PLAYER_REGEN_DISABLED` / `_ENABLED` themselves: the combat lockdown begins
+  only after the first, so `InCombatLockdown()` is still false inside it.
 - **Try it** (`/lefthy tweaks aggrotest`): for 10 s each enemy nameplate in sight shows an example
   (you as tank, a healer, a damage dealer, someone without a role).
 - **The fight stream** shows the same tag on its battle row's foes (beacon.md, "Who has aggro"), so

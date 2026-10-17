@@ -330,9 +330,14 @@ local function Mark(unit)
 	end
 end
 
--- In combat in a group: every enemy is looked at again now and then.
-local function CheckSweep()
-	sweeping = on and IsInGroup and IsInGroup() and InCombatLockdown and InCombatLockdown() or false
+-- In combat in a group: every enemy is looked at again now and then. inCombat: what the event
+-- says (the combat lockdown begins only after PLAYER_REGEN_DISABLED, so InCombatLockdown is still
+-- false inside it); nil: asked.
+local function CheckSweep(inCombat)
+	if inCombat == nil then
+		inCombat = (InCombatLockdown and InCombatLockdown()) or Value(UnitAffectingCombat, "player") == true
+	end
+	sweeping = on and IsInGroup and IsInGroup() and inCombat or false
 	sinceSweep = 0
 	if sweeping then
 		driver:Show()
@@ -373,7 +378,11 @@ events:SetScript("OnEvent", function(_, event, unit)
 	else
 		-- The group, its roles, pets, forms, combat starting or ending (forms are up by then).
 		rosterDirty = true
-		if event == "PLAYER_REGEN_DISABLED" or event == "PLAYER_REGEN_ENABLED" or event == "GROUP_ROSTER_UPDATE" then
+		if event == "PLAYER_REGEN_DISABLED" then
+			CheckSweep(true)
+		elseif event == "PLAYER_REGEN_ENABLED" then
+			CheckSweep(false)
+		elseif event == "GROUP_ROSTER_UPDATE" then
 			CheckSweep()
 		end
 		MarkAll()
