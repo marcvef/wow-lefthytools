@@ -49,7 +49,11 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Data/SpellSchools.lua      generated magic school of the class spells (tools/update-spell-schools.js)
   Data/MinimapTiles.lua      generated minimap tile file IDs (tools/update-minimap-tiles.js)
   Data/RetailUnitFrames.lua  generated retail unit frame atlases (tools/update-retail-frames.js)
-  Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
+  Modules/Beacon/Beacon.lua  Beacon: transport (rate limiter, queues), finding friends, receiving, the tick
+  Modules/Beacon/Protocol.lua  every message kind, B.Parse, highlights
+  Modules/Beacon/Sharing.lua  what I tell friends about myself (state, quest, progress, level-ups)
+  Modules/Beacon/Updates.lua  a friend's newer build, the what's-new exchange
+  Modules/Beacon/Options.lua  Beacon's settings page, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
   Modules/Beacon/Alerts.lua  death alerts
@@ -59,9 +63,13 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Chat.lua    LTC, LefthyTools chat (/ltc, /l) and announcements (/lefthy announce)
   Modules/Beacon/Reports.lua error reports to friends who collect them (/lefthy report, /lefthy reports)
   Modules/Beacon/Stream.lua  fight stream: asking the game, the test, /lefthy stream
+  Modules/Beacon/StreamHealth.lua  fight stream: health, estimated (yours and the mobs')
   Modules/Beacon/StreamSense.lua  fight stream: what's around you (learning mob directions)
   Modules/Beacon/StreamBattle.lua fight stream: the battle row (the one shown and the mobs they fight)
+  Modules/Beacon/StreamMoments.lua fight stream: what happens to them in a window (numbers, loot, the fight's line)
   Modules/Beacon/StreamView.lua   fight stream windows (yours, the preview, friends')
+  Modules/Beacon/StreamMap.lua    fight stream: the map under a window's radar
+  Modules/Beacon/StreamPreview.lua fight stream: the preview's made-up fight
   Modules/Beacon/StreamNet.lua    fight stream between friends (kind O), the being-watched dot
   Modules/Beacon/StreamButton.lua the spyglass minimap button: friends to watch
   Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
@@ -75,8 +83,16 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Chronicle/Compare.lua    the Compare page: everyone in every graph, leaderboard, hall of fame
   Modules/Chronicle/Window.lua     the journal window (timeline, statistics, graphs, friends)
   Modules/Chronicle/MinimapButton.lua  the book button on the minimap's edge
-  Modules/Bestiary/Bestiary.lua    Bestiary: kills and loot per kind of mob (LefthyToolsBestiaryDB), /bestiary
-  Modules/Bestiary/Window.lua      its window (your target's drops), the card beside the mouse, item tooltips, the minimap button
+  Modules/Bestiary/Bestiary.lua    Bestiary: the module, shared helpers, reading records (LefthyToolsBestiaryDB), /bestiary
+  Modules/Bestiary/Classic.lua     the classic drop database (LefthyTools_DropData), mob health
+  Modules/Bestiary/Quests.lua      quest drops while questing
+  Modules/Bestiary/Wishes.lua      the wish list and dry streak
+  Modules/Bestiary/Recording.lua   counting kills and loot, XP and time per kill, the log
+  Modules/Bestiary/Format.lua      how numbers and lines are written
+  Modules/Bestiary/Cells.lua       drop cells, item tooltips
+  Modules/Bestiary/Window.lua      its window (your target's drops), the minimap button
+  Modules/Bestiary/Card.lua        the card beside the mouse
+  Modules/Bestiary/LedgerMap.lua   the ledger's kill map
   Modules/Bestiary/Ledger.lua      the ledger: every mob, its statistics and drops, fuzzy search over mobs and items
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
