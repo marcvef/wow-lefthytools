@@ -662,6 +662,8 @@ L["Last played"] = "Zuletzt gespielt"
 L["This week"] = "Diese Woche"
 L["%d friends"] = "%d Freunde"
 L["1 friend"] = "1 Freund"
+L["%d characters"] = "%d Charaktere"
+L["1 character"] = "1 Charakter"
 L["Everyone with a journal is online, or no friend's journal has come yet."] =
 	"Alle mit Tagebuch sind online, oder es ist noch kein Tagebuch eines Freundes angekommen."
 L["Click: their graphs"] = "Klick: ihre Graphen"

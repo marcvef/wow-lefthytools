@@ -6136,8 +6136,8 @@ do
 		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return true end end
 	end
 	check(picker:GetText():find("^|cff80c0ffAnnie|r  ") and picker:GetText():find("Anna|r |cffcccccc20|r", 1, true) and drawnText("Last 7 days")
-		and drawnText("You and Anna, last 7 days") and drawnText("2h 0m") and drawnContaining("Completed The Defias Brotherhood"),
-		"a friend's graphs: their days, their week, you and them, their latest news")
+		and drawnText("You and Annie, last 7 days") and drawnText("2h 0m") and drawnContaining("Completed The Defias Brotherhood"),
+		"a friend's graphs: their days, their week, you and them (by their BattleTag: it's all their characters), their latest news")
 	check(strayGradients() == 0, "no bar or curve gradient left on the textures they reused, got " .. strayGradients())
 	local annaDay = hoverWith(date("%Y-%m-%d", time() - 86400))
 	check(annaDay and annaDay.lines[2]:find("5000", 1, true), "their 14 days, from what they sent, got " .. tostring(annaDay and annaDay.lines[2]))
@@ -6375,12 +6375,12 @@ section("Chronicle: friends' journals, also when they're offline")
 	check(not sentTo(12, mark, "J2;n;")[1] and sentTo(12, mark, "J2;e;" .. carl .. ";0")[1], "'pass on' off: nothing of friends' journals")
 	REGISTERED_SETTINGS.LefthyTools_chronicle_relay:SetValue(true)
 
-	-- People, news and the feed.
-	local carlPerson
-	for _, person in ipairs(CH.People()) do if person.name == "Carl" then carlPerson = person end end
-	check(carlPerson and not carlPerson.online and carlPerson.account == "Carl" and carlPerson.profile
-		and CH.People()[1].me, "Carl is among the people (offline), me first")
-	-- One person per account: Carl's alt adds up into his numbers; name, class and level from the one he plays most.
+	-- Characters, accounts, news and the feed.
+	local carlChar
+	for _, c in ipairs(CH.Characters()) do if c.name == "Carl" then carlChar = c end end
+	check(carlChar and not carlChar.online and carlChar.account == "Carl" and carlChar.profile
+		and CH.Characters()[1].me and CH.Characters()[1].current, "Carl is among the characters (offline), the one I play first")
+	-- An account adds up its characters: Carl's alt's numbers join his on his page.
 	anna("J2;d;" .. carl .. ";Carlbank-Realmy;4500;" .. yesterday .. ";30,100,1,2,1,0,10,5,20,300,0,0,0,23")
 	Advance(0.3)
 	local carlAccount
@@ -6388,9 +6388,9 @@ section("Chronicle: friends' journals, also when they're offline")
 	local ad = carlAccount and carlAccount.days[date("%Y-%m-%d", time() - 86400)]
 	check(carlAccount and #carlAccount.chars == 2 and carlAccount.name == "Carl" and ad.played == 9000 and ad.jumps == 100
 		and ad.afk == 900 and ad.level == 18 and ad.gold == 115 and carlAccount.profile.quests == 140,
-		"per account: time, AFK and jumps add up over his characters; level from his main, gold summed")
-	-- Days of a character his journal doesn't have yet (they go to everyone online): still Carl, not
-	-- a second person.
+		"per account: time, AFK and jumps add up over his characters; level from his main, gold summed; named after his BattleTag")
+	-- Days of a character his journal doesn't have yet (they go to everyone online): a character of
+	-- his account, not a person of its own.
 	CDB.friendStats.Carlnew = { classFile = "ROGUE", level = 5, updated = time(), acct = carl,
 		days = { [date("%Y-%m-%d", time() - 86400)] = { played = 600, xp = 10, quests = 0, kills = 1, deaths = 0, levels = 0 } } }
 	local carls, carlChars, loose = 0, 0, false
@@ -6398,11 +6398,11 @@ section("Chronicle: friends' journals, also when they're offline")
 		if a.acct == carl then carls, carlChars = carls + 1, #a.chars end
 		loose = loose or a.key == "friend:Carlnew"
 	end
-	check(carls == 1 and carlChars == 3 and not loose, "days from an older build's message join his account (one person), got "
+	check(carls == 1 and carlChars == 3 and not loose, "days from an older build's message join his account, got "
 		.. carls .. " accounts, " .. carlChars .. " characters")
 	CDB.friendStats.Carlnew = nil
 	local mine = CH.Accounts()[1]
-	check(mine.me and #mine.chars >= 2 and mine.name == "Lefthy", "me: all my characters, named after the one I play")
+	check(mine.me and #mine.chars >= 2 and mine.name == "You" and mine.chars[1].current, "me: all my characters, the one I play first")
 	local function newsOf(name, k)
 		for _, f in ipairs(CH.FriendNews()) do if f.name == name and f.k == k then return f end end
 	end
@@ -6448,8 +6448,15 @@ section("Chronicle: friends' journals, also when they're offline")
 		and drawn("Where") and drawn("Doing") and drawn("Anna|r") and drawn("Not online") and drawn("Last played")
 		and drawn("BattleTag") and drawn("Carl|r") and drawn("Died to Hogger"),
 		"Friends: a table of who's online (where, doing) and one of who isn't (last played, this week, latest news)")
-	check(CDB.book[annaAcct].chars["Annalt-Realmy"] and not drawn("Annalt") and not drawn("Carlbank"),
-		"a row per person: Anna is online, so her other character isn't under not online; Carl is there once")
+	local function drawnTimes(text)
+		local n = 0
+		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then n = n + 1 end end
+		return n
+	end
+	local tags = drawnTimes("|cff80c0ffCarl|r") -- (his BattleTag's name is Carl too)
+	check(CDB.book[annaAcct].chars["Annalt-Realmy"] and not drawn("Annalt") and drawnTimes("Carl|r") - tags == 1
+		and drawnTimes("Carlbank|r") == 1 and tags == 2,
+		"a row per character, its BattleTag beside it: Anna is online, so her other character isn't under not online; Carl's two are, his BattleTag on each")
 	CDB.book[annaAcct].chars["Annalt-Realmy"] = nil
 	local carlRow, annaRow
 	for i = 1, canvas.used.hover do
@@ -6590,6 +6597,184 @@ section("Chronicle: friends' journals, also when they're offline")
 	lefthy("enable chronicle")
 	Advance(125)
 	check(not printedSince(pmark):find("leaderboard", 1, true), "once a week")
+end)()
+
+section("Chronicle: one row per character, accounts beside them")
+;(function() -- (a function of its own: the main chunk's 200 locals)
+	local H = CH.Hash
+	local mine, annaAcct, carl = H("Me#1111"), H("Annie#1234"), H("Carl#3456")
+	local function bn(id) for _, f in ipairs(BN_FRIENDS) do if f[1].gameAccountID == id then return f[1] end end end
+	local function bob(text) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", text, "WHISPER", 12) end
+	local win = LefthyToolsChronicleFrame
+	local canvas = win.Canvas
+	local function drawnTimes(text) -- how many of the page's texts have it
+		local n = 0
+		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then n = n + 1 end end
+		return n
+	end
+	local function named(name, list) -- how many have that name
+		local n = 0
+		for _, item in ipairs(list) do if item.name == name then n = n + 1 end end
+		return n
+	end
+	local yesterday = date("%Y-%m-%d", time() - 86400)
+
+	-- WoW: Forever names have a surname. Battle.net (and so Beacon, and what an older build sends live)
+	-- says "Anna Brook"; her own client's journal knows her by UnitName's first return ("Anna-Realmy").
+	bn(11).characterName = "Anna Brook"
+	anna("H2")
+	Fire("BN_FRIEND_INFO_CHANGED")
+	Advance(1.2)
+	check(peers()[11] and peers()[11].name == "Anna Brook", "Beacon knows her by the full name")
+	local today = date("%Y%m%d")
+	anna("L2;25;")
+	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;9000;20;" .. time() .. ";level;25;Elwynn Forest")
+	anna("D2;" .. today .. ";50;100;1;1;0;1")
+	anna("J2;d;" .. annaAcct .. ";Anna-Realmy;9001;" .. today .. ";50,100,1,1,0,1,0,25,5,100,0,0,0,1")
+	Advance(0.3)
+	local levels = {}
+	for _, f in ipairs(CH.FriendNews()) do
+		if f.k == "level" and (f.level == 25 or f.a == "25") and f.name:find("^Anna") then levels[#levels + 1] = f.name end
+	end
+	check(#levels == 1 and levels[1] == "Anna Brook", "her level-up is in the news once (live and synced), by her full name, got "
+		.. table.concat(levels, ", "))
+	local annaBook = CDB.book[annaAcct].chars["Anna-Realmy"]
+	check(annaBook.full == "Anna Brook" and annaBook.guid == "Player-1-11" and CDB.friendStats["Anna Brook"].acct == annaAcct,
+		"her journal learns her full name and GUID from Battle.net; her live days know her account")
+	local chars = CH.Characters()
+	check(named("Anna Brook", chars) == 1 and named("Anna", chars) == 0, "one Anna among the characters, by her full name")
+	local annaChar
+	for _, c in ipairs(chars) do if c.name == "Anna Brook" then annaChar = c end end
+	check(annaChar.online and annaChar.account == "Annie" and annaChar.days[date("%Y-%m-%d")].played == 3000,
+		"online, her BattleTag beside her; today counted once (her journal's day, not also the one sent live)")
+	local board = CH.Leaderboard(7, 0)
+	check(named("Anna Brook", (function() local l = {} for _, e in ipairs(board.played) do l[#l + 1] = e.person end return l end)()) == 1,
+		"the leaderboard: a row per character, Anna once")
+
+	-- An older build's saved data, from before characters were matched: days and news kept by the
+	-- full name, without the account (as builds before this one saved them), joined once when Chronicle starts.
+	local carlBook, carlbank = CDB.book[carl].chars["Carl-Realmy"], CDB.book[carl].chars["Carlbank-Realmy"]
+	carlBook.full, carlbank.full = nil, nil
+	local death = carlBook.news[2]
+	CDB.friendStats["Carl Vale"] = { classFile = "ROGUE", level = 18, updated = time() - 7200,
+		days = { [yesterday] = { played = 7200, xp = 9000, quests = 12, kills = 40, deaths = 2, levels = 1 } } }
+	CDB.friendStats["Carlbank Moor"] = { classFile = "ROGUE", level = 5, updated = time() - 7200, -- (not Carlbank: his days differ)
+		days = { [yesterday] = { played = 30000, xp = 1, quests = 0, kills = 0, deaths = 0, levels = 0 } } }
+	CDB.friendStats["Cedric Vale"] = { classFile = "PRIEST", level = 7, updated = time() - 7200, -- (no journal of his)
+		days = { [yesterday] = { played = 600, xp = 1, quests = 0, kills = 0, deaths = 0, levels = 0 } } }
+	-- Two friends with a "Bob": a "Bob Stone" without an account could be either, so he's neither.
+	local function bobChar() return { name = "Bob", realm = "Realmy", classFile = "WARRIOR", u = 1, news = {},
+		days = { [yesterday] = { played = 600, xp = 1, quests = 0, kills = 0, deaths = 0, levels = 0 } } } end
+	CDB.book[annaAcct].chars["Bob-Realmy"], CDB.book[carl].chars["Bob-Realmy"] = bobChar(), bobChar()
+	CDB.friendStats["Bob Stone"] = { classFile = "WARRIOR", level = 9, updated = time() - 7200,
+		days = { [yesterday] = { played = 600, xp = 1, quests = 0, kills = 0, deaths = 0, levels = 0 } } }
+	table.insert(CDB.friends, 1, { t = death.t, name = "Carl Vale", classFile = "ROGUE", k = "death", foe = "Hogger", where = "Elwynn Forest" })
+	local liveDeath = CDB.friends[1]
+	CDB.identity = nil
+	lefthy("disable chronicle")
+	lefthy("enable chronicle")
+	Advance(0.3)
+	check(CDB.identity == 1 and CDB.friendStats["Carl Vale"].acct == carl and carlBook.full == "Carl Vale" and liveDeath.acct == carl,
+		"once: an older build's days find their character's journal (it learns the full name), the live news too")
+	check(not CDB.friendStats["Carlbank Moor"].acct and not carlbank.full and not CDB.friendStats["Cedric Vale"].acct
+		and not CDB.friendStats["Bob Stone"].acct and not CDB.book[annaAcct].chars["Bob-Realmy"].full and not CDB.book[carl].chars["Bob-Realmy"].full,
+		"never two characters taken for one: days that disagree, no journal of his, two that could be him")
+	chars = CH.Characters()
+	local carlVale
+	for _, c in ipairs(chars) do if c.name == "Carl Vale" then carlVale = c end end
+	check(named("Carl Vale", chars) == 1 and named("Carl", chars) == 0 and named("Carlbank", chars) == 1 and named("Carlbank Moor", chars) == 1
+		and named("Cedric Vale", chars) == 1 and named("Bob Stone", chars) == 1 and named("Bob", chars) == 2,
+		"a row per character: Carl once (by his full name), his alt apart, the others on their own")
+	check(carlVale and carlVale.account == "Carl" and carlVale.days[yesterday].played == 7200, "his days counted once, his BattleTag beside him")
+	local deaths = 0
+	for _, f in ipairs(CH.FriendNews()) do
+		if f.k == "death" and f.foe == "Hogger" and f.key == carlVale.key then deaths = deaths + 1 end
+	end
+	check(deaths == 1, "his death is in the news once (saved live, and in his journal), got " .. deaths)
+	local carlAccount
+	for _, a in ipairs(CH.Accounts()) do if a.acct == carl then carlAccount = a end end
+	check(carlAccount.name == "Carl" and #carlAccount.chars == 3 and carlAccount.days[yesterday].played == 7200 + 1800 + 600,
+		"his account: his characters added up once each (Carl, Carlbank, a Bob), got " .. tostring(carlAccount.days[yesterday].played))
+	CDB.friendStats["Carlbank Vale"] = { classFile = "ROGUE", level = 5, updated = time(),
+		days = { [yesterday] = { played = 1800, xp = 1, quests = 0, kills = 0, deaths = 0, levels = 0 } } }
+	lefthy("disable chronicle")
+	lefthy("enable chronicle")
+	check(not CDB.friendStats["Carlbank Vale"].acct, "the joining runs once")
+	CDB.friendStats["Carlbank Vale"], CDB.friendStats["Carlbank Moor"], CDB.friendStats["Cedric Vale"], CDB.friendStats["Bob Stone"] = nil, nil, nil, nil
+	CDB.book[annaAcct].chars["Bob-Realmy"], CDB.book[carl].chars["Bob-Realmy"] = nil, nil
+
+	-- My character: its full name and GUID kept; its key stays the first name's, what friends'
+	-- builds have always known it by.
+	lefthy("disable chronicle")
+	MY_SURNAME = "Mirewood"
+	lefthy("enable chronicle")
+	Advance(0.3)
+	check(CH.CurrentKey() == "Lefthy-Realmy" and me.full == "Lefthy Mirewood" and me.guid == "Player-1-0",
+		"my character: the full name and GUID kept, the key the first name's (the one friends' builds know)")
+	anna("H2")
+	Advance(1.2)
+	anna("J2;h;" .. annaAcct)
+	local mark = #GAMEDATA + 1
+	anna("J2;q;" .. mine .. ";0")
+	Advance(8)
+	check(sentTo(11, mark, "J2;p;" .. mine .. ";Lefthy-Realmy;")[1] and not sentTo(11, mark, "J2;p;" .. mine .. ";Lefthy Mirewood")[1],
+		"friends get my journal as before, by the first name's key")
+
+	-- Another character of mine with the same first name (another GUID): a record of its own.
+	lefthy("disable chronicle")
+	MY_GUID, MY_SURNAME = "Player-1-500", "Brightwater"
+	lefthy("enable chronicle")
+	Advance(0.3)
+	local other = CDB.chars["Lefthy Brightwater-Realmy"]
+	check(CH.CurrentKey() == "Lefthy Brightwater-Realmy" and other and other.name == "Lefthy Brightwater" and me.full == "Lefthy Mirewood",
+		"my alt with the same first name isn't taken for me: its own record, by its full name")
+	lefthy("disable chronicle")
+	MY_GUID, MY_SURNAME = nil, "Mirewood"
+	lefthy("enable chronicle")
+	Advance(0.3)
+	check(CH.CurrentKey() == "Lefthy-Realmy", "and back on mine")
+	CDB.chars["Lefthy Brightwater-Realmy"] = nil
+
+	-- Every page: one row per character, by the name the game shows.
+	CH.Open("news")
+	local page = win.Text:GetText()
+	local _, annaLevels = page:gsub("Anna Brook|r: Level 25", "")
+	check(annaLevels == 1 and not page:find("Anna|r: Level 25", 1, true) and page:find("Carl Vale|r: Died to Hogger", 1, true),
+		"News: one line per event, by the character's full name")
+	CH.Open("friends")
+	check(drawnTimes("Anna Brook|r") == 1 and drawnTimes("Anna|r") == 0 and drawnTimes("|cff80c0ffAnnie|r") >= 1
+		and drawnTimes("Carl Vale|r") == 1 and drawnTimes("Carlbank|r") == 1 and drawnTimes("Carl|r") == drawnTimes("|cff80c0ffCarl|r"),
+		"Friends: Anna online once with her BattleTag; not online a row per character, never a character's other name")
+	CH.Open("compare")
+	check(drawnTimes("Anna Brook") >= 1 and drawnTimes("Anna|r") == 0 and drawnTimes("Lefthy Mirewood (you)") == 1
+		and drawnTimes("Alty (you)") == 1 and drawnTimes("Carl|r") == 0,
+		"Compare: a chip, a line and a row per character, by character names only")
+	local annaChip
+	for i = 1, canvas.used.hover do
+		local f = canvas.pools.hover[i]
+		if f.lines and f.lines[1] == "Anna Brook" then annaChip = f end
+	end
+	check(annaChip and table.concat(annaChip.lines, "\n"):find("Annie", 1, true), "a chip's hover says whose: the BattleTag")
+	win.Tabs.timeline:Click()
+	check(win.Text:GetText():find("Lefthy Mirewood|r: ", 1, true), "the timeline says whose by the full name")
+	win.Picker:Click()
+	local annies, annaNames = 0, 0
+	for i = 1, win.Picker.List.count do
+		local text = win.Picker.List.rows[i].Text:GetText() or ""
+		annies = annies + (text:find("Annie", 1, true) and 1 or 0)
+		annaNames = annaNames + select(2, text:gsub("Anna Brook", ""))
+	end
+	win.Picker.List:Hide()
+	check(annies == 1 and annaNames == 1, "the dropdown: accounts, each with its characters, Anna's once")
+	win:Hide()
+
+	-- (back to how the later tests know her and me)
+	bn(11).characterName = "Anna"
+	Fire("BN_FRIEND_INFO_CHANGED")
+	lefthy("disable chronicle")
+	MY_SURNAME = nil
+	lefthy("enable chronicle")
+	Advance(1.2)
 end)()
 
 section("Chronicle: a broken tick doesn't run every frame")

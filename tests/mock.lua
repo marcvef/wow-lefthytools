@@ -499,8 +499,9 @@ function UnitIsDead() return STATE.targetDead end
 function UnitCanAttack() return STATE.hostile end
 function UnitIsDeadOrGhost() return STATE.dead end
 function UnitIsGhost() return STATE.ghost == true end
+MY_SURNAME = nil -- Forever: UnitName's second return is the surname ("Lefthy", MY_SURNAME)
 function UnitName(unit)
-	if unit == "player" then return "Lefthy" end
+	if unit == "player" then return "Lefthy", MY_SURNAME end
 	if unit == "NPC" then return TRADE_PARTNER, TRADE_SURNAME end -- Forever: the second return is a surname
 	if unit == "target" and STATE.target then return STATE.targetName or "Hogger" end
 end
@@ -1120,8 +1121,9 @@ GROUP_GUIDS = {}
 C_PartyInfo = { IsGUIDInGroup = function(guid) return GROUP_GUIDS[guid] == true end }
 -- Group units: unit token -> { guid, continent, north, west } (their live position)
 PARTY = {}
+MY_GUID = nil -- another character of mine (its GUID); nil: "Player-1-0"
 function UnitGUID(unit)
-	if unit == "player" then return "Player-1-0" end
+	if unit == "player" then return MY_GUID or "Player-1-0" end
 	if unit == "target" then return STATE.target and (STATE.targetGUID or "Creature-0-1") or nil end
 	return PARTY[unit] and PARTY[unit].guid
 end

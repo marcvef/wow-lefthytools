@@ -338,5 +338,8 @@ ns.CHANGELOG = {
 	{ id = 110, module = "beacon",
 		en = { "Fight stream: polymorphed mobs as sheep", "A mob they polymorph turns into a sheep in the battle row (or a pig, turtle or cow) until it takes damage, dies or the spell runs out." },
 		de = { "Kampf-Stream: verwandelte Mobs als Schaf", "Verwandelt der Magier im Stream einen Mob, steht der in der Kampfreihe als Schaf da (oder Schwein, Schildkröte, Kuh), bis er Schaden nimmt, stirbt oder die Verwandlung ausläuft." } },
+	{ id = 111, module = "chronicle",
+		en = { "One row per character", "Characters no longer show up twice (first name and full name). Each is shown once by the name the game shows, its BattleTag beside it; Compare and the leaderboards go by character." },
+		de = { "Eine Zeile pro Charakter", "Charaktere tauchen nicht mehr doppelt auf (Vorname und voller Name). Jeder steht einmal da, mit dem Namen, den das Spiel zeigt, und seinem BattleTag daneben; Vergleich und Bestenlisten gehen nach Charakter." } },
 	-- New entries go here, at the end.
 }

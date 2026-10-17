@@ -140,6 +140,12 @@ function C.PeerAccount(peer)
 	end
 end
 
+-- My BattleTag's name ("Me" of "Me#1111"), or nil.
+local function MyTag()
+	local _, tag = BNGetInfo and BNGetInfo()
+	return type(tag) == "string" and not issecret(tag) and tag:match("^[^#]+") or nil
+end
+
 ---------------------------------------------------------------------------
 -- Publishing my journal: stamps
 ---------------------------------------------------------------------------
@@ -440,6 +446,113 @@ function C.NewsFields(e)
 end
 
 ---------------------------------------------------------------------------
+-- Who is who: a character is one, whatever named it
+---------------------------------------------------------------------------
+
+-- A character in WoW: Forever has a first name and a surname: UnitName gives them apart (the
+-- surname as its second return), the game shows them together ("Anna Brook"), and so does
+-- Battle.net (characterName: Beacon's peer.name). Journals go by the first name and realm
+-- ("Anna-Realm", the key every build sends), Beacon's live news and older builds' days
+-- (store.friends, store.friendStats) by the full name. So they're matched here, and every page
+-- shows each character once, by its full name: by GUID; else by the full name (learned from
+-- Battle.net); else by the first name while its journal doesn't know the full one, within their
+-- account, if exactly one character fits (and has the same class).
+-- A match that isn't unique isn't made: two characters are never taken for one.
+
+-- "Anna" of "Anna Brook" or "Anna-Realm".
+local function FirstName(name)
+	return type(name) == "string" and name:match("^[^%s%-]+") or nil
+end
+
+-- The name a character is shown by: the full name the game shows, once known.
+function C.NameOf(c)
+	return c.full or c.name
+end
+
+-- A friend's account hash as saved (nil: not one, or no longer my friend's).
+local function ValidAcct(acct)
+	return type(acct) == "string" and acct:match("^%x%x%x%x%x%x%x%x$") and IsFriend(acct) and acct or nil
+end
+
+local function ValidGuid(guid)
+	return type(guid) == "string" and not issecret(guid) and guid:match("^Player%-%d+%-%x+$") and guid or nil
+end
+
+-- The character in my friends' journals that a full name from Battle.net belongs to: acct (their
+-- account; nil: any of my friends', and then only by GUID or full name, unless loose), name, and
+-- classFile and guid when known. kept: any journal kept counts (also before the friend list is known,
+-- at login). Returns acct, key, the record and how it matched (1 GUID, 2 the full name, 3 the first
+-- name), or nil when no single character fits.
+local function FindBook(acct, name, classFile, guid, kept, loose)
+	if type(name) ~= "string" or name == "" or issecret(name) then
+		return nil
+	end
+	local first, mine = FirstName(name), C.MyAccount()
+	local best, count, foundAcct, foundKey, found = 4, 0, nil, nil, nil
+	for a, account in pairs(store.book) do
+		if (not acct or a == acct) and a ~= mine and (kept or IsFriend(a)) then
+			for key, c in pairs(account.chars) do
+				local tier
+				if guid and c.guid then
+					tier = c.guid == guid and 1 or nil -- (another GUID: another character, whatever its name)
+				elseif classFile and c.classFile and classFile ~= c.classFile then
+					tier = nil
+				elseif C.NameOf(c) == name then
+					tier = 2
+				elseif not c.full and c.name == first and (acct or loose) then
+					tier = 3
+				end
+				if tier and tier < best then
+					best, count, foundAcct, foundKey, found = tier, 1, a, key, c
+				elseif tier and tier == best then
+					count = count + 1
+				end
+			end
+		end
+	end
+	if count == 1 then
+		return foundAcct, foundKey, found, best
+	end
+end
+
+-- What Battle.net says of a friend's character joins its journal: its GUID, and its full name when
+-- that adds a surname (one it knows stays, unless the GUID says it's this character, renamed).
+local function Learn(c, name, guid, tier)
+	local changed = false
+	if guid and not c.guid then
+		c.guid, changed = guid, true
+	end
+	if name ~= c.name and c.full ~= name and FirstName(name) == FirstName(c.name) and (not c.full or tier == 1) then
+		c.full, changed = name, true
+	end
+	if changed then
+		Changed() -- (names in the news)
+	end
+end
+
+-- A friend's character for a full name from Battle.net (Beacon's live news, an older build's days):
+-- its key among C.Characters() and its journal's record, or "friend:<name>" while no journal has it.
+local function LiveChar(name, classFile, acct, guid)
+	if type(name) ~= "string" or issecret(name) then
+		return "friend:?"
+	end
+	acct, guid = ValidAcct(acct), ValidGuid(guid)
+	local a, key, c, tier = FindBook(acct, name, classFile, guid)
+	if c then
+		Learn(c, name, guid, tier)
+		return "book:" .. a .. ":" .. key, c
+	end
+	return "friend:" .. name
+end
+
+-- A Beacon friend's character (its key among C.Characters()) and their account (nil while
+-- Battle.net doesn't say).
+function C.PeerChar(peer)
+	local acct = C.PeerAccount(peer)
+	return LiveChar(peer.name, peer.classFile, acct, peer.guid), acct
+end
+
+---------------------------------------------------------------------------
 -- Talking to friends
 ---------------------------------------------------------------------------
 
@@ -736,80 +849,119 @@ function ns.Beacon.JournalStop()
 end
 
 ---------------------------------------------------------------------------
--- People, news and leaderboards (for the window, the recap and sharing)
+-- Characters, accounts, news and leaderboards (for the window, the recap and sharing)
 ---------------------------------------------------------------------------
 
-local function Online(name)
-	local B = ns.Beacon
-	for _, peer in pairs(B and B.peers or {}) do
-		if peer.name == name then
-			return true
+-- When a friend's character last played: its profile says (stamped while they play); without one,
+-- the last day it played (its morning: "noon" would read as later than it was).
+local function LastPlayed(last, days)
+	last = last or 0
+	if last == 0 then
+		for day, b in pairs(days) do
+			if (b.played or 0) > 0 then
+				local y, mo, d = day:match("^(%d+)-(%d+)-(%d+)$")
+				last = math.max(last, time({ year = tonumber(y), month = tonumber(mo), day = tonumber(d), hour = 0 }))
+			end
 		end
 	end
-	return false
+	return math.min(last, time())
 end
 
--- Everyone with a journal: me (the character I play) first, then friends' characters (synced
--- journals; friends on older builds from the days they sent: their account too when Beacon told
--- it), by name. Each: { key, name, classFile, level, me, online, last, days, profile, foe, zone,
--- acct, account (their BattleTag's name) }.
-function C.People()
-	local people, names = {}, {}
-	local me = C.Char()
-	if me then
-		local profile = ProfileNumbers(me)
-		people[1] = { key = "me", name = me.name, classFile = me.classFile, level = me.level, me = true, online = true,
-			last = time(), days = me.daily, profile = profile, foe = Top(me.killers), zone = Top(me.zoneTime) }
+-- Every character, once: mine (store.chars), my friends' from their journals (the book; with the days
+-- their older builds sent live, store.friendStats, where the journal has none), and characters only
+-- known from such days. Each: { key, name (the full name the game shows), realm, classFile, level,
+-- me, current (the one I play), online, accountOnline (one of its account's characters is), last,
+-- days, profile, foe, zone, acct, account (its BattleTag's name), news, legacy }. Mine first (the one
+-- I play first), then my friends', by name. Graphs, leaderboards and lists go by these: a character
+-- is never also shown as part of another row.
+function C.Characters()
+	local list, current = {}, C.Char()
+	local myAcct, myTag = C.MyAccount(), MyTag()
+	for key, c in pairs(store.chars) do
+		C.Fill(c)
+		list[#list + 1] = { key = "me:" .. key, name = C.NameOf(c), realm = c.realm, classFile = c.classFile, level = c.level,
+			me = true, current = c == current, online = c == current, accountOnline = true,
+			last = c == current and time() or (c.session and c.session.last) or 0, days = c.daily, profile = ProfileNumbers(c),
+			foe = Top(c.killers), zone = Top(c.zoneTime), acct = myAcct, account = myTag }
 	end
-	local friends = {}
-	for acct, a in pairs(store.book) do
-		if acct ~= C.MyAccount() and IsFriend(acct) then
-			for key, c in pairs(a.chars) do
-				if c.name then
-					-- When they last played: their profile says (stamped while they play); without one,
-					-- the last day they played (its morning: "noon" would read as later than it was).
-					local last = c.last or 0
-					if last == 0 then
-						for day, b in pairs(c.days) do
-							if (b.played or 0) > 0 then
-								local y, mo, d = day:match("^(%d+)-(%d+)-(%d+)$")
-								last = math.max(last, time({ year = tonumber(y), month = tonumber(mo), day = tonumber(d), hour = 0 }))
+	-- Who's online: Beacon's friends, by their character's key (and their account).
+	local online, onlineAccounts = {}, {}
+	for _, peer in pairs(ns.Beacon and ns.Beacon.peers or {}) do
+		if peer.name then
+			local key, acct = C.PeerChar(peer)
+			online[key] = true
+			if acct then
+				onlineAccounts[acct] = true
+			end
+		end
+	end
+	-- Older builds' days: their character's journal (its own days come first), else a character of their own.
+	local liveDays, loose = {}, {}
+	for name, f in pairs(store.friendStats) do
+		local key = LiveChar(name, f.classFile, f.acct, f.guid)
+		if key:find("^book:") then
+			liveDays[key] = liveDays[key] or {}
+			table.insert(liveDays[key], f)
+		else
+			loose[#loose + 1] = { key = key, name = name, f = f }
+		end
+	end
+	for acct, account in pairs(store.book) do
+		if acct ~= myAcct and IsFriend(acct) then
+			for bookKey, c in pairs(account.chars) do
+				local key = "book:" .. acct .. ":" .. bookKey
+				local extra = liveDays[key]
+				if c.name and (c.profile or next(c.days) or next(c.news) or extra) then
+					local days, last, level = c.days, c.last, c.level
+					if extra then
+						days = {}
+						for _, f in ipairs(extra) do
+							for day, b in pairs(type(f.days) == "table" and f.days or {}) do
+								days[day] = b
 							end
+							last, level = math.max(last or 0, f.updated or 0), math.max(level or 0, f.level or 0)
+						end
+						for day, b in pairs(c.days) do
+							days[day] = b
 						end
 					end
-					friends[#friends + 1] = { key = "book:" .. acct .. ":" .. key, name = c.name, realm = c.realm,
-						classFile = c.classFile, level = c.level, online = Online(c.name), last = math.min(last, time()),
-						days = c.days, profile = c.profile, foe = c.foe, zone = c.zone, acct = acct, account = C.AccountLabel(acct),
+					list[#list + 1] = { key = key, name = C.NameOf(c), realm = c.realm, classFile = c.classFile, level = level,
+						online = online[key] or false, accountOnline = onlineAccounts[acct] or false, last = LastPlayed(last, days),
+						days = days, profile = c.profile, foe = c.foe, zone = c.zone, acct = acct, account = C.AccountLabel(acct),
 						news = c.news }
-					names[c.name] = true
 				end
 			end
 		end
 	end
-	for name, f in pairs(store.friendStats or {}) do
-		if not names[name] then
-			-- (their BattleTag, when Beacon knew it: C.Accounts counts these days for that person)
-			local acct = type(f.acct) == "string" and f.acct:match("^%x%x%x%x%x%x%x%x$") and IsFriend(f.acct) and f.acct or nil
-			friends[#friends + 1] = { key = "friend:" .. name, name = name, classFile = f.classFile, level = f.level,
-				online = Online(name), last = f.updated or 0, days = f.days or {}, legacy = true, acct = acct,
-				account = acct and C.AccountLabel(acct) }
+	for _, item in ipairs(loose) do
+		local f, acct = item.f, ValidAcct(item.f.acct)
+		list[#list + 1] = { key = item.key, name = item.name, classFile = f.classFile, level = f.level,
+			online = online[item.key] or false, accountOnline = (acct and onlineAccounts[acct]) or online[item.key] or false,
+			last = f.updated or 0, days = type(f.days) == "table" and f.days or {}, legacy = true, acct = acct,
+			account = acct and C.AccountLabel(acct) }
+	end
+	table.sort(list, function(a, b)
+		if (a.me or false) ~= (b.me or false) then
+			return a.me == true
+		elseif (a.current or false) ~= (b.current or false) then
+			return a.current == true
+		elseif a.name ~= b.name then
+			return (a.name or "") < (b.name or "")
 		end
-	end
-	table.sort(friends, function(a, b) return (a.name or "") < (b.name or "") end)
-	for _, f in ipairs(friends) do
-		people[#people + 1] = f
-	end
-	return people
+		return a.key < b.key
+	end)
+	return list
 end
 
--- The same, per Battle.net account: me (all my characters), then each friend's account (all their
--- characters, also those only known from the days they sent, when Beacon told their BattleTag), then
--- friends on older builds whose BattleTag isn't known (one character each). Activity adds
--- up over an account's characters (time, XP, quests, kills, deaths, distance, AFK, jumps: per
--- character those mean little for a person); level is that of the character played most that day,
--- gold the sum of every character's last known gold. Named after the character played most in the
--- last 30 days (its class colour), the others listed in chars. For the window's dropdown (one entry
--- per person), a friend's graphs, the Compare page, leaderboards and the recap.
+-- The same characters per Battle.net account: me (all my characters), then each friend's account
+-- (all its characters, also those only known from the days they sent, when Battle.net told their
+-- BattleTag), then characters whose account isn't known (one each). For the window's dropdown (one
+-- entry per account) and a friend's graphs. An account goes by its own name: "You", a friend's
+-- BattleTag's name (only a lone character whose account isn't known goes by its name), never by
+-- one of its characters'. Activity adds up over its characters (time, XP, quests, kills, deaths,
+-- distance, AFK, jumps); level is that of the character played most that day, gold the sum of every
+-- character's last known gold. chars: the one played most in the last 30 days first (mine: the one
+-- I play), whose class colour, foe and zone the account takes.
 local ADDITIVE = { "played", "xp", "quests", "kills", "deaths", "levels", "afk", "dist", "bosses", "rares", "runs", "jumps" }
 local SUMMED = { played = true, sessions = true, quests = true, kills = true, deaths = true, runs = true, bosses = true,
 	rares = true, dist = true, jumps = true, afk = true, loot4 = true, levels = true, xp = true }
@@ -818,10 +970,10 @@ local LOWEST = { fastest = true }
 local function Combine(account)
 	local chars = account.chars
 	local oldest = Oldest()
-	-- The main character: the most played in the last 30 days (then the highest level).
+	-- The main character: the one I play, else the most played in the last 30 days (then the highest level).
 	local main, mainPlayed
 	for _, c in ipairs(chars) do
-		local played = 0
+		local played = c.current and math.huge or 0
 		for day, b in pairs(c.days) do
 			if day >= oldest then
 				played = played + (b.played or 0)
@@ -832,8 +984,16 @@ local function Combine(account)
 			main, mainPlayed = c, played
 		end
 	end
-	table.sort(chars, function(a, b) return a.recent > b.recent or (a.recent == b.recent and (a.level or 0) > (b.level or 0)) end)
-	account.name, account.classFile, account.level = main and main.name, main and main.classFile, main and main.level
+	table.sort(chars, function(a, b)
+		if a.recent ~= b.recent then
+			return a.recent > b.recent
+		elseif (a.level or 0) ~= (b.level or 0) then
+			return (a.level or 0) > (b.level or 0)
+		end
+		return a.key < b.key
+	end)
+	account.name = account.me and L["You"] or account.account or (main and main.name)
+	account.classFile, account.level = main and main.classFile, main and main.level
 	account.foe, account.zone = main and main.foe, main and main.zone
 	-- Days: added up; level from the day's most played character; gold summed over each one's last.
 	local days, dayList = {}, {}
@@ -896,38 +1056,28 @@ local function Combine(account)
 end
 
 function C.Accounts()
-	local accounts = {}
-	if C.Char() then
-		local mine = { key = "me", me = true, online = true, chars = {}, account = (BNGetInfo and select(2, BNGetInfo()) or ""):match("^[^#]+") }
-		for _, c in pairs(store.chars) do
-			C.Fill(c)
-			mine.chars[#mine.chars + 1] = { name = c.name, classFile = c.classFile, level = c.level, days = c.daily,
-				profile = ProfileNumbers(c), foe = Top(c.killers), zone = Top(c.zoneTime),
-				last = c == C.Char() and time() or (c.session and c.session.last) or 0, online = c == C.Char() }
-		end
-		accounts[1] = Combine(mine)
-		-- (my account is named after the character I'm playing, whatever I played most)
-		local current = C.Char()
-		mine.name, mine.classFile, mine.level = current.name, current.classFile, current.level
-	end
-	local byAccount, friends = {}, {}
-	for _, person in ipairs(C.People()) do
-		if not person.me then
-			local key = person.acct and ("acct:" .. person.acct) or person.key
-			local account = byAccount[key]
-			if not account then
-				account = { key = key, chars = {}, acct = person.acct }
-				byAccount[key] = account
+	local accounts, mine, byAccount, friends = {}, nil, {}, {}
+	for _, c in ipairs(C.Characters()) do
+		local key = c.me and "me" or (c.acct and ("acct:" .. c.acct)) or c.key
+		local account = byAccount[key]
+		if not account then
+			account = { key = key, me = c.me, chars = {}, acct = c.acct, account = c.account }
+			byAccount[key] = account
+			if c.me then
+				mine = account
+			else
 				friends[#friends + 1] = account
 			end
-			account.account = account.account or person.account
-			account.chars[#account.chars + 1] = person
 		end
+		account.chars[#account.chars + 1] = c
+	end
+	if mine then
+		accounts[1] = Combine(mine)
 	end
 	for _, account in ipairs(friends) do
 		Combine(account)
 	end
-	table.sort(friends, function(a, b) return (a.name or "") < (b.name or "") end)
+	table.sort(friends, function(a, b) return (a.name or "") < (b.name or "") or (a.name == b.name and a.key < b.key) end)
 	for _, account in ipairs(friends) do
 		accounts[#accounts + 1] = account
 	end
@@ -967,10 +1117,10 @@ end
 C.BOARD = { "played", "xp", "quests", "kills", "levels", "deaths", "dist", "jumps", "afk" }
 
 -- Rankings over `count` days ending `ending` days ago: { [metric] = { { person, value }, ... } },
--- highest first, only people with some time played then. People: accounts (C.Accounts) by default.
+-- highest first, only those with some time played then. By character (C.Characters) by default.
 function C.Leaderboard(count, ending, people)
 	local board = {}
-	people = people or C.Accounts()
+	people = people or C.Characters()
 	for _, metric in ipairs(C.BOARD) do
 		local list = {}
 		for _, person in ipairs(people) do
@@ -981,48 +1131,68 @@ function C.Leaderboard(count, ending, people)
 				end
 			end
 		end
-		table.sort(list, function(a, b) return a.value > b.value or (a.value == b.value and a.person.name < b.person.name) end)
+		table.sort(list, function(a, b)
+			return a.value > b.value or (a.value == b.value and ((a.person.name or "") < (b.person.name or "")
+				or (a.person.name == b.person.name and a.person.key < b.person.key)))
+		end)
 		board[metric] = list
 	end
 	return board
 end
 
 -- The merged feed, oldest first: friends' synced highlights and what came live (Beacon's events,
--- E2 highlights, online and offline), each once (a live one that a synced one repeats goes).
+-- E2 highlights, online and offline), each once (a live one that a synced one of the same character
+-- repeats goes). Each entry: its character's key (among C.Characters()) and name (the full one).
 local merged, mergedFor
 function C.FriendNews()
 	local version = feedVersion .. ":" .. #store.friends .. ":" .. tostring(store.friends[#store.friends])
 	if mergedFor == version then
 		return merged
 	end
-	local list, synced = {}, {}
+	local list, synced, live, found = {}, {}, {}, {}
+	for i, f in ipairs(store.friends) do -- (first: what they teach the journals shows in the synced ones' names)
+		if type(f.name) == "string" and type(f.t) == "number" then
+			local id = f.name .. "|" .. tostring(f.acct) .. "|" .. tostring(f.classFile) -- (each character once, not per entry)
+			found[id] = found[id] or { LiveChar(f.name, f.classFile, f.acct) }
+			live[i] = found[id]
+		end
+	end
 	for acct, a in pairs(store.book) do
 		if acct ~= C.MyAccount() and IsFriend(acct) then
-			for _, c in pairs(a.chars) do
+			for bookKey, c in pairs(a.chars) do
+				local key, name = "book:" .. acct .. ":" .. bookKey, C.NameOf(c)
 				for _, e in pairs(c.name and c.news or {}) do
-					local entry = { t = e.t, g = e.g, name = c.name, classFile = c.classFile, k = e.k, a = e.a, b = e.b, synced = true }
+					local entry = { t = e.t, g = e.g, key = key, name = name, classFile = c.classFile, k = e.k, a = e.a, b = e.b,
+						synced = true }
 					if e.k == "level" then
 						entry.level = tonumber(e.a)
 					elseif e.k == "death" then
 						entry.foe, entry.where = e.a ~= "" and e.a or nil, e.b
 					end
 					list[#list + 1] = entry
-					local id = c.name .. "|" .. e.k .. "|" .. (e.a or "")
+					local id = key .. "|" .. e.k .. "|" .. (e.a or "")
 					synced[id] = synced[id] or {}
 					table.insert(synced[id], e.t)
 				end
 			end
 		end
 	end
-	for _, f in ipairs(store.friends) do
-		local a = f.k == "level" and tostring(f.level or "") or f.k == "death" and (f.foe or "") or f.a or ""
-		local times = synced[(f.name or "") .. "|" .. (f.k or "") .. "|" .. a]
-		local repeated = false
-		for _, t in ipairs(times or {}) do
-			repeated = repeated or math.abs(t - f.t) < 900
-		end
-		if not repeated then
-			list[#list + 1] = f
+	for i, f in ipairs(store.friends) do
+		if live[i] then
+			local key, c = live[i][1], live[i][2]
+			local a = f.k == "level" and tostring(f.level or "") or f.k == "death" and (f.foe or "") or f.a or ""
+			local times = synced[key .. "|" .. (f.k or "") .. "|" .. a]
+			local repeated = false
+			for _, t in ipairs(times or {}) do
+				repeated = repeated or math.abs(t - f.t) < 900
+			end
+			if not repeated then
+				local entry = { key = key, name = c and C.NameOf(c) or f.name, classFile = c and c.classFile or f.classFile }
+				for field, value in pairs(f) do
+					entry[field] = entry[field] or value
+				end
+				list[#list + 1] = entry
+			end
 		end
 	end
 	table.sort(list, function(x, y) return x.t < y.t end)
@@ -1078,16 +1248,17 @@ local function Coloured(name, classFile)
 	return LT.Window.ClassColorCode(classFile) .. (name or "?") .. "|r"
 end
 
--- One line per friend, the most notable first: "Anna: reached level 24, defeated Hogger, died 2x (+5 more)".
+-- One line per friend's character, the most notable first: "Anna Brook: reached level 24, defeated
+-- Hogger, died 2x (+5 more)".
 function C.CatchUpLines(since)
-	local byName, order = {}, {}
+	local byChar, order = {}, {}
 	for _, f in ipairs(C.FriendNews()) do
 		if f.t > since and NEWS_CHAT[f.k] then
-			local entry = byName[f.name]
+			local entry = byChar[f.key]
 			if not entry then
-				entry = { classFile = f.classFile, items = {}, deaths = 0, zones = 0 }
-				byName[f.name] = entry
-				order[#order + 1] = f.name
+				entry = { name = f.name, classFile = f.classFile, items = {}, deaths = 0, zones = 0 }
+				byChar[f.key] = entry
+				order[#order + 1] = f.key
 			end
 			if f.k == "death" then
 				entry.deaths = entry.deaths + 1
@@ -1099,8 +1270,8 @@ function C.CatchUpLines(since)
 		end
 	end
 	local lines = {}
-	for _, name in ipairs(order) do
-		local entry = byName[name]
+	for _, key in ipairs(order) do
+		local entry = byChar[key]
 		table.sort(entry.items, function(a, b) return (CHAT_ORDER[a.k] or 99) < (CHAT_ORDER[b.k] or 99) end)
 		local parts = {}
 		for i, f in ipairs(entry.items) do
@@ -1116,7 +1287,7 @@ function C.CatchUpLines(since)
 			parts[#parts + 1] = entry.deaths == 1 and "died once" or ("died %d times"):format(entry.deaths)
 		end
 		local more = #entry.items - 3
-		lines[#lines + 1] = Coloured(name, entry.classFile) .. ": " .. table.concat(parts, ", ") .. (more > 0 and (" (+%d more)"):format(more) or "")
+		lines[#lines + 1] = Coloured(entry.name, entry.classFile) .. ": " .. table.concat(parts, ", ") .. (more > 0 and (" (+%d more)"):format(more) or "")
 	end
 	return lines
 end
@@ -1193,7 +1364,14 @@ local function Recap(now)
 	local t = date("*t")
 	local ending = (t.wday + 5) % 7 + 1
 	local lines, board = C.RecapLines(7, ending)
-	if #(board.played or {}) < 2 then
+	local people, count = {}, 0 -- (two of my own characters aren't a comparison)
+	for _, entry in ipairs(board.played or {}) do
+		local who = entry.person.me and "me" or entry.person.acct or entry.person.key
+		if not people[who] then
+			people[who], count = true, count + 1
+		end
+	end
+	if count < 2 then
 		return -- (alone, or nobody's days yet: nothing to compare)
 	end
 	store.recapWeek = week
@@ -1244,6 +1422,53 @@ local function PruneBook()
 		end
 	end
 	Changed()
+end
+
+-- Do an older build's days (sent live) look like the journal's character's? Both come from its
+-- author's own numbers: the live one is the day as far as it had gone when sent (they may have
+-- played on after), so never more than the journal's day, and on some day both have about the same.
+local function SameDays(live, journal)
+	local shared, agree = false, false
+	for day, x in pairs(type(live) == "table" and live or {}) do
+		local y = journal[day]
+		if type(x) == "table" and y then
+			local more = (x.played or 0) - (y.played or 0)
+			if more > 900 then
+				return false
+			end
+			shared, agree = true, agree or more >= -900
+		end
+	end
+	return agree or not shared
+end
+
+-- Once (store.identity), for what was saved before characters were matched: older builds' days and
+-- the live feed were kept by the full name Battle.net gives ("Anna Brook"), journals by the first
+-- name ("Anna-Realm"), so a character showed up twice and its days counted twice. Each finds its
+-- journal's character now: its account is noted, and the journal learns the full name. Days saved
+-- before their account was noted with them are matched over all the journals kept, only where
+-- exactly one character fits (first name, class, and the days both have agree). Nothing is deleted
+-- or moved: the pages match the same way from then on.
+local function JoinCharacters()
+	local function Acct(acct) -- (the friend list may not be known yet at login: any account kept)
+		return type(acct) == "string" and acct:match("^%x%x%x%x%x%x%x%x$") and store.book[acct] and acct or nil
+	end
+	for name, f in pairs(store.friendStats) do
+		local acct, guid = Acct(f.acct), ValidGuid(f.guid)
+		local a, _, c, tier = FindBook(acct, name, f.classFile, guid, true, true)
+		if c and (acct or tier < 3 or SameDays(f.days, c.days)) then
+			Learn(c, name, guid, tier)
+			f.acct = a
+		end
+	end
+	-- (the feed's entries without their account: by the full names the days above taught the journals)
+	for _, f in ipairs(store.friends) do
+		local a, _, c, tier = FindBook(Acct(f.acct), f.name, f.classFile, nil, true)
+		if c then
+			Learn(c, f.name, nil, tier)
+			f.acct = a
+		end
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -1329,6 +1554,10 @@ function C.SyncEnable()
 		if type(a.u) ~= "number" or a.u > time() + 7 * 86400 then
 			a.u = 0 -- (an impossible stamp would block the account for good: everything is asked again)
 		end
+	end
+	if (store.identity or 0) < 1 then
+		JoinCharacters()
+		store.identity = 1
 	end
 	if store.sharedAlts == nil then
 		store.sharedAlts = M.db.shareAlts

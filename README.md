@@ -269,9 +269,12 @@ minimap** (drag it along the edge; right-click for the settings; `/chronicle min
 `/chronicle`, the button on its settings page, or a key binding (*Chronicle: open or close the
 journal*).
 
-The journal is about **you, not one character**: every number is all your characters added up
-(your BattleTag's), and your friends' are theirs. Only what belongs to a character on its own
-stays per character: its level, how long its levels took, and the session you're playing now.
+**Characters and accounts are kept apart.** Every character shows up once, by the name the game
+shows (with its surname), and an account goes by your BattleTag ("You") or a friend's. Your
+Timeline, Statistics and Graphs, and a friend's graphs, are the account's: all its characters added
+up (only a character's level, how long its levels took and the session you're playing now stay per
+character). Compare, the leaderboards and the friends lists go by character, with the BattleTag
+beside it.
 
 - **Timeline**, newest first, by day, all your characters in one (each line says whose):
   level-ups (and how long each level took), deaths (where, and what killed you), zones
@@ -293,18 +296,18 @@ stays per character: its level, how long its levels took, and the session you're
   entry per friend, by BattleTag, with their characters): their last 14 days, their week in
   numbers, you and them side by side (this week and all time), and their latest news, also for
   the time you weren't online.
-- **Compare:** you and every friend in every graph, on one page, per person (all their characters
-  added up: an alt's quests count for its player): level, time played, XP, quests,
-  killing blows, deaths, gold, distance, bosses and rares, time AFK and jumps, over the last 7, 14
-  or 30 days, a line per person in their class colour (hover a day for everyone's value; click a
-  name in the legend to hide or show them). Plus this week's **leaderboard** (top three in nine
+- **Compare:** every character, yours and your friends', in every graph, on one page: level, time
+  played, XP, quests, killing blows, deaths, gold, distance, bosses and rares, time AFK and jumps,
+  over the last 7, 14 or 30 days, a line per character in its class colour (hover a day for
+  everyone's value; click a name in the legend to hide or show it). Plus this week's **leaderboard** (top three in nine
   categories, with the Martin award), a **hall of fame** of lifetime numbers (click a column to
   sort) and **records** (fastest level, longest session, most gold, everyone's nemesis). **Share**
   posts a ranking in LTC.
-- **Friends:** who's online, **who isn't** (a row per friend, all their characters together: their
-  level, when they last played, their week, their latest highlight) and what everybody did: level-ups, deaths, bosses, rares, first dungeon
-  visits, epic loot, mounts, achievements and milestones. A blue number on the tab (and a blue dot
-  on the book) says what's new.
+- **Friends:** who's online, **who isn't** (a row per character, its BattleTag beside it: its
+  level, when it was last played, its week, its latest highlight; a friend who's online isn't
+  listed again with their other characters), and on **News** what everybody did, one line per
+  event: level-ups, deaths, bosses, rares, first dungeon visits, epic loot, mounts, achievements
+  and milestones. A blue number on the tab (and a blue dot on the book) says what's new.
 - **Also when they're offline:** friends' clients pass each other's journals on, so whoever is
   online brings you the news and graphs of those who aren't, and yours reach them the same way.
   Only to people who have that player as a Battle.net friend too (journals go by a hash of the

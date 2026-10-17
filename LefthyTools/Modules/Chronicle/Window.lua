@@ -4,13 +4,15 @@ local L = ns.L
 local C = ns.Chronicle
 local M = C.module
 
--- The Chronicle window: a person picker (you or a friend: people by BattleTag, not characters) and
--- six pages. Timeline (all your characters' journals in one, newest first, by day), Statistics
--- (yours, all your characters added up, plus this session and each character's level; labels left
--- and values right in two text blocks of the same line count), Graphs (you or a friend, per person),
--- Compare (you and every friend in every graph, Graphs.lua's G.DrawCompare), News (what friends did:
--- synced journals and live news, Sync.lua's C.FriendNews) and Friends (who's online, who isn't: two
--- tables, G.DrawTables; a click on a row opens their graphs).
+-- The Chronicle window: an account picker (you or a friend by BattleTag, each with their
+-- characters) and six pages. Timeline (all your characters' journals in one, newest first, by
+-- day), Statistics (yours, all your characters added up, plus this session and each character's
+-- level; labels left and values right in two text blocks of the same line count), Graphs (you or a
+-- friend, all their characters), Compare (every character, yours and your friends', in every graph,
+-- Graphs.lua's G.DrawCompare), News (what friends' characters did: synced journals and live news,
+-- Sync.lua's C.FriendNews) and Friends (who's online, who isn't: a row per character, its BattleTag
+-- beside it; two tables, G.DrawTables; a click on a row opens their account's graphs). A character
+-- is shown by the name the game shows (with its surname), and only ever once.
 -- Built on first open; redrawn only while open and only when something changed (the Statistics
 -- page also every few seconds, for the time and distance counters).
 
@@ -120,23 +122,19 @@ local function FriendEvent(f)
 	return e
 end
 
--- The Compare page's symbols: { [person key] = { [day] = { { icon, text, rank, t }, ... } } } over the
--- days shown, from my characters' journals and friends' feed (matched to their accounts by
--- character name). Only the notable kinds (Graphs.lua's MARK_KINDS); levels only every tenth.
+-- The Compare page's symbols: { [character key] = { [day] = { { icon, text, rank, t }, ... } } } over
+-- the days shown, from my characters' journals and friends' news (C.FriendNews: each entry knows its
+-- character). Only the notable kinds (Graphs.lua's MARK_KINDS); levels only every tenth.
 local MARK_RANK = {}
 for rank, kind in ipairs(C.Graphs.MARK_KINDS) do
 	MARK_RANK[kind] = rank
 end
 
 compareState.marks = function(people, days)
-	local marks, byName = {}, {}
+	local marks, shown = {}, {}
 	local first = days[1]
 	for _, p in ipairs(people) do
-		for _, c in ipairs(not p.me and p.chars or {}) do
-			if c.name then
-				byName[c.name] = p.key
-			end
-		end
+		shown[p.key] = true
 	end
 	local function Put(key, e)
 		local rank = MARK_RANK[e.k]
@@ -152,20 +150,18 @@ compareState.marks = function(people, days)
 			list[#list + 1] = { icon = e.icon or ICONS[e.k], text = text, rank = rank, t = e.t }
 		end
 	end
-	if people[1] and people[1].me then
-		for _, c in pairs(C.Store().chars) do
-			local events = c.events or {}
-			for i = #events, 1, -1 do -- (newest first: stops at the first day shown)
-				local e = events[i]
-				if type(e.t) ~= "number" or date("%Y-%m-%d", e.t) < first then
-					break
-				end
-				Put(people[1].key, e)
+	for storeKey, c in pairs(C.Store().chars) do
+		local events = shown["me:" .. storeKey] and c.events or {}
+		for i = #events, 1, -1 do -- (newest first: stops at the first day shown)
+			local e = events[i]
+			if type(e.t) ~= "number" or date("%Y-%m-%d", e.t) < first then
+				break
 			end
+			Put("me:" .. storeKey, e)
 		end
 	end
 	for _, f in ipairs(C.FriendNews and C.FriendNews() or {}) do
-		local key = f.name and byName[f.name]
+		local key = shown[f.key] and f.key
 		local e = key and type(f.t) == "number" and FriendEvent(f)
 		if e then
 			Put(key, e)
@@ -223,7 +219,7 @@ local function Timeline(chars)
 		local events = c.events
 		local first = math.max(1, #events - TIMELINE_SHOW + 1)
 		older = older + first - 1
-		local who = keeping > 1 and (LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r") or nil
+		local who = keeping > 1 and (LT.Window.ClassColorCode(c.classFile) .. (C.NameOf(c) or "?") .. "|r") or nil
 		for i = first, #events do
 			local n = #list + 1
 			list[n] = { e = events[i], who = who, n = n }
@@ -236,12 +232,13 @@ local function Timeline(chars)
 	return Journal(list, function(item) return LineFor(item.e, item.who), item.e.t end, nil, older)
 end
 
--- The Friends page: two tables (Graphs.lua's G.DrawTables), a row per person. Online now: Beacon's
--- friends, where they are and what they're doing. Not online: friends none of whose characters is
--- online (C.Accounts: per BattleTag, so an online friend's other characters aren't here too), most
--- recently played first, with when they last played, this week's time and their latest highlight
--- (any of their characters'). Hovering a row shows all of it, a click opens their graphs (when they
--- have a journal). What they all did is the News page.
+-- The Friends page: two tables (Graphs.lua's G.DrawTables), a row per character, named as the game
+-- names it, with its account's BattleTag in a column of its own. Online now: Beacon's friends, where
+-- they are and what they're doing. Not online: my friends' characters (C.Characters) whose account
+-- has none online (someone playing one character isn't listed again with the others), most recently
+-- played first, with when it last played, its week's time and its latest highlight. Hovering a row
+-- shows all of it (and the account's characters), a click opens that account's graphs (when there
+-- are any). What they all did is the News page.
 local DASH = "|cff666666-|r"
 
 -- A friend's latest highlight: an { icon, text } cell and a tooltip line (nil: none).
@@ -256,27 +253,25 @@ local function LatestCell(f)
 end
 
 local function FriendTables(open)
-	local people, byName = C.Accounts(), {} -- (people[1] is me)
-	for i = 2, #people do
-		for _, c in ipairs(people[i].chars) do
-			if c.name and not byName[c.name] then
-				byName[c.name] = people[i]
-			end
-		end
+	local accounts = {}
+	for _, account in ipairs(C.Accounts()) do
+		accounts[account.key] = account
 	end
-	-- The latest highlight of each person (any of their characters), and by name for friends who
-	-- have no journal.
-	local latest, latestByName = {}, {}
+	-- Each character's latest highlight.
+	local latest = {}
 	for _, f in ipairs(C.FriendNews()) do
-		if f.k ~= "online" and f.k ~= "offline" and f.name then
-			latestByName[f.name] = f -- (oldest first: the last one stays)
-			if byName[f.name] then
-				latest[byName[f.name].key] = f
-			end
+		if f.k ~= "online" and f.k ~= "offline" then
+			latest[f.key] = f -- (oldest first: the last one stays)
 		end
 	end
-	local function Tag(person)
-		return person and person.account and ("|cff80c0ff" .. person.account .. "|r") or nil
+	local function Tag(acct)
+		local label = acct and C.AccountLabel(acct)
+		return label and ("|cff80c0ff" .. label .. "|r") or nil
+	end
+	-- A click: the graphs of the account the character belongs to (a lone character's own).
+	local function Open(key, acct)
+		local account = accounts[acct and ("acct:" .. acct) or key]
+		return account and function() open(account.key) end or nil
 	end
 
 	-- Online now.
@@ -285,75 +280,79 @@ local function FriendTables(open)
 	local online = {}
 	for _, friend in ipairs(B and B.FriendList() or {}) do
 		local status = B.FriendStatus(friend.peer, friend.id)
-		local person = byName[friend.peer.name]
+		local key, acct = C.PeerChar(friend.peer)
 		local tip = {}
 		B.FriendLines(tip, friend.peer, friend.id)
-		if Tag(person) then
-			table.insert(tip, 2, Tag(person))
+		if Tag(acct) then
+			table.insert(tip, 2, Tag(acct))
 		end
-		local _, latestLine = LatestCell(person and latest[person.key] or latestByName[friend.peer.name])
+		local _, latestLine = LatestCell(latest[key])
 		tip[#tip + 1] = latestLine
-		if person then
+		local click = Open(key, acct)
+		if click then
 			tip[#tip + 1] = "|cff80c0ff" .. L["Click: their graphs"] .. "|r"
 		end
-		online[#online + 1] = { cells = { status.name, status.level or DASH, Tag(person) or DASH, status.where, status.doing or DASH },
-			tip = tip, click = person and function() open(person.key) end or nil }
+		online[#online + 1] = { cells = { status.name, status.level or DASH, Tag(acct) or DASH, status.where, status.doing or DASH },
+			tip = tip, click = click }
 	end
 
-	-- Not online: named after the character they play most (its level), all of them on hover.
+	-- Not online.
 	local away = {}
-	for i = 2, #people do
-		if not people[i].online then
-			away[#away + 1] = people[i]
+	for _, c in ipairs(C.Characters()) do
+		if not c.me and not c.online and not c.accountOnline then
+			away[#away + 1] = c
 		end
 	end
-	table.sort(away, function(a, b) return (a.last or 0) > (b.last or 0) end)
+	table.sort(away, function(a, b) return (a.last or 0) > (b.last or 0) or ((a.last or 0) == (b.last or 0) and a.key < b.key) end)
 	local awayRows = {}
-	for _, p in ipairs(away) do
-		local week = C.Sum(p, "played", 7)
-		local played = p.last and p.last > 0
-		local cell, latestLine = LatestCell(latest[p.key])
-		local name = LT.Window.ClassColorCode(p.classFile) .. (p.name or "?") .. "|r"
-		local main = p.chars[1] or {}
+	for _, c in ipairs(away) do
+		local week = C.Sum(c, "played", 7)
+		local played = c.last and c.last > 0
+		local cell, latestLine = LatestCell(latest[c.key])
+		local name = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r"
 		local tip = { name }
-		if p.level then
-			tip[#tip + 1] = L["Level %d"]:format(p.level) .. (main.realm and (" - " .. main.realm) or "")
+		if c.level then
+			tip[#tip + 1] = L["Level %d"]:format(c.level) .. (c.realm and (" - " .. c.realm) or "")
 		end
-		tip[#tip + 1] = Tag(p)
-		if #p.chars > 1 then
+		tip[#tip + 1] = Tag(c.acct)
+		local account = c.acct and accounts["acct:" .. c.acct]
+		if account and #account.chars > 1 then
 			local names = {}
-			for _, c in ipairs(p.chars) do
-				names[#names + 1] = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r " .. (c.level or "")
+			for _, other in ipairs(account.chars) do
+				names[#names + 1] = LT.Window.ClassColorCode(other.classFile) .. (other.name or "?") .. "|r " .. (other.level or "")
 			end
 			tip[#tip + 1] = L["All characters: %s"]:format(table.concat(names, ", "))
 		end
 		if played then
-			tip[#tip + 1] = L["Last played %s"]:format(C.Ago(p.last))
+			tip[#tip + 1] = L["Last played %s"]:format(C.Ago(c.last))
 		end
 		if week > 0 then
 			tip[#tip + 1] = L["%s this week"]:format(C.Duration(week))
 		end
 		tip[#tip + 1] = latestLine
-		tip[#tip + 1] = "|cff80c0ff" .. L["Click: their graphs"] .. "|r"
-		awayRows[#awayRows + 1] = { cells = { name, p.level and tostring(p.level) or DASH, Tag(p) or DASH,
-			played and C.Ago(p.last) or DASH, week > 0 and C.Duration(week) or DASH, cell }, tip = tip,
-			click = function() open(p.key) end }
+		local click = Open(c.key, c.acct)
+		if click then
+			tip[#tip + 1] = "|cff80c0ff" .. L["Click: their graphs"] .. "|r"
+		end
+		awayRows[#awayRows + 1] = { cells = { name, c.level and tostring(c.level) or DASH, Tag(c.acct) or DASH,
+			played and C.Ago(c.last) or DASH, week > 0 and C.Duration(week) or DASH, cell }, tip = tip, click = click }
 	end
 
-	local function Count(n)
-		return n > 0 and ("|cff999999" .. (n == 1 and L["1 friend"] or L["%d friends"]:format(n)) .. "|r") or nil
+	local function Count(n, one, many)
+		return n > 0 and ("|cff999999" .. (n == 1 and one or many:format(n)) .. "|r") or nil
 	end
 	return {
-		{ title = L["Online now"], note = Count(#online), rows = online,
+		{ title = L["Online now"], note = Count(#online, L["1 friend"], L["%d friends"]), rows = online,
 			columns = { { title = L["Name"], w = 0.2 }, { title = L["Level"], w = 0.1, right = true }, { title = L["BattleTag"], w = 0.14 },
 				{ title = L["Where"], w = 0.27 }, { title = L["Doing"], w = 0.29 } },
 			empty = B and L["No friends with LefthyTools online"] or L["Unknown (Beacon is off)"] },
-		{ title = L["Not online"], note = Count(#awayRows), rows = awayRows,
+		{ title = L["Not online"], note = Count(#awayRows, L["1 character"], L["%d characters"]), rows = awayRows,
 			columns = { { title = L["Name"], w = 0.18 }, { title = L["Level"], w = 0.07, right = true }, { title = L["BattleTag"], w = 0.15 },
 				{ title = L["Last played"], w = 0.15 }, { title = L["This week"], w = 0.12 }, { title = L["Latest news"], w = 0.33 } },
 			empty = L["Everyone with a journal is online, or no friend's journal has come yet."] },
 	}
 end
+
 
 -- The News page: what friends did (synced journals and live news), newest first, by day.
 local function News()
@@ -433,7 +432,7 @@ local function Statistics(t)
 	local played, levelTotal, levels, gold = 0, 0, 0, 0
 	for _, c in ipairs(t.chars) do
 		local realm = (c.realm and c.realm ~= GetRealmName()) and (" |cff999999- " .. c.realm .. "|r") or ""
-		Row(LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r" .. realm, L["Level %d"]:format(c.level or 0))
+		Row(LT.Window.ClassColorCode(c.classFile) .. (C.NameOf(c) or "?") .. "|r" .. realm, L["Level %d"]:format(c.level or 0))
 		played = played and c.playedTotal and played + c.playedTotal or nil -- (only if every one has said)
 		for _, seconds in pairs(c.levelTimes) do
 			levelTotal, levels = levelTotal + seconds, levels + 1
@@ -522,9 +521,9 @@ end
 -- The window
 ---------------------------------------------------------------------------
 
--- The dropdown at the top left: people, not characters, so nobody is in it twice. "me" (you: all
--- your characters, C.Totals), then every friend (C.Accounts: "acct:<hash>" per BattleTag, all their
--- characters; "friend:<Name>" for an older build's days whose BattleTag isn't known). Friends only
+-- The dropdown at the top left: accounts, each with its characters, so nobody is in it twice. "me"
+-- (you: all your characters, C.Totals), then every friend (C.Accounts: "acct:<hash>" per BattleTag,
+-- all their characters; a lone character whose BattleTag isn't known by its own key). Friends only
 -- have graphs, so picking one opens the Graphs page.
 local function IsFriend(key)
 	return key ~= nil and key ~= "me"
@@ -538,13 +537,13 @@ local function Find(people, key)
 	end
 end
 
--- "You  Cara 20, Alty 12" or "Annie  Anna 20, Annalt 12": who (a friend by their BattleTag's
--- name, "(friend)" after the name while it isn't known), then their characters with their levels
--- (what only a character has), the one I play or they play most first.
+-- "You  Cara Moss 20, Alty 12" or "Annie  Anna Brook 20, Annalt 12": whose (a friend by their
+-- BattleTag's name, "(friend)" after the name while it isn't known), then their characters by name
+-- with their levels, the one I play or they play most first.
 local function Label(person)
 	local names = {}
 	for _, c in ipairs(person.chars or {}) do
-		names[#names + 1] = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r" .. (c.level and (" |cffcccccc" .. c.level .. "|r") or "")
+		names[#names + 1] = LT.Window.ClassColorCode(c.classFile) .. (C.NameOf(c) or "?") .. "|r" .. (c.level and (" |cffcccccc" .. c.level .. "|r") or "")
 	end
 	local who = person.me and ("|cffffd200" .. L["You"] .. "|r") or person.account and ("|cff80c0ff" .. person.account .. "|r")
 	if who then
@@ -555,16 +554,14 @@ end
 
 -- A friend's latest feed entries (any of their characters'), with their date, for their graphs page.
 graphState.newsLines = function(person)
-	local lines, feed, names = {}, C.FriendNews(), {}
+	local lines, feed, keys = {}, C.FriendNews(), {}
 	for _, c in ipairs(person.chars or {}) do
-		if c.name then
-			names[c.name] = true
-		end
+		keys[c.key] = true
 	end
 	local several = #(person.chars or {}) > 1 -- (then each line says whose)
 	for i = #feed, 1, -1 do
 		local f = feed[i]
-		if f.name and names[f.name] then
+		if keys[f.key] then
 			local e = FriendEvent(f)
 			local line = e and LineFor(e, several and (LT.Window.ClassColorCode(f.classFile) .. f.name .. "|r") or nil)
 			if line then
@@ -696,7 +693,7 @@ function Refresh(keepScroll)
 			height = C.Graphs.DrawTables(frame.Canvas, width, FriendTables(Select)) -- (a click on a row: their graphs)
 			lastStatsRefresh, feedPending = GetTime(), false -- (online friends change all the time: every few seconds)
 		elseif tab == "compare" then
-			height = C.Graphs.DrawCompare(frame.Canvas, width, C.Accounts(), compareState, RedrawCompare)
+			height = C.Graphs.DrawCompare(frame.Canvas, width, C.Characters(), compareState, RedrawCompare) -- (by character)
 		elseif friend then
 			height = C.Graphs.DrawFriend(frame.Canvas, width, friend, friend.name or "?", people[1], graphState)
 		else

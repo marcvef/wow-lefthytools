@@ -10,9 +10,10 @@ local L = ns.L
 -- Battle.net friends with LefthyTools did. Highlights go to those friends through Beacon.
 --
 -- Data: LefthyToolsChronicleDB (account-wide, so every character's chronicle can be browsed)
---   chars[<name-realm>] = { name, realm, classFile, race, level, first, events, stats, zoneTime,
---     killers, levelTimes, seen = { zones, dungeons, bosses, rares }, professions, session, ... }
---   friends = { { t, name, classFile, k, ... }, ... } the friends' feed, newest last
+--   chars[<first name-realm>] = { name (the key's), full (the name the game shows: with the surname),
+--     guid, realm, classFile, race, level, first, events, stats, zoneTime, killers, levelTimes,
+--     seen = { zones, dungeons, bosses, rares }, professions, session, ... }
+--   friends = { { t, name, classFile, acct, k, ... }, ... } the friends' feed, newest last
 --
 -- Cost: event handlers only count or note things. A 1-second tick does the rest: time played,
 -- time per zone, distance (one UnitPosition call), the rare-kill check on your target, sharing,
@@ -813,9 +814,11 @@ local function SendDaysTo(gameAccountID)
 end
 
 -- A day of a friend's numbers (D2), or just its AFK time (K2: day.afk only):
--- store.friendStats[name] = { classFile, level, updated, days, acct }. Either keeps what the other set.
--- acct: their BattleTag's hash (Sync.lua), so the window counts these days for that person instead
--- of listing the character on its own (older builds keep the field and ignore it).
+-- store.friendStats[name] = { classFile, level, updated, days, acct, guid }, by the full name
+-- Battle.net gives. Either keeps what the other set. acct (their BattleTag's hash) and guid find the
+-- character in their journal (Sync.lua), whose name is its first name: these days are that
+-- character's (where the journal has none), never a second one (older builds keep the fields and
+-- ignore them).
 local function StoreFriendDay(peer, day)
 	if day.day > date("%Y-%m-%d", C.DayAgo(-1)) then
 		return -- a day after tomorrow (a wrong clock): it would never be pruned
@@ -825,6 +828,7 @@ local function StoreFriendDay(peer, day)
 	friends[peer.name] = f
 	f.classFile, f.level, f.updated = peer.classFile, peer.level, time()
 	f.acct = C.PeerAccount and C.PeerAccount(peer) or f.acct
+	f.guid = type(peer.guid) == "string" and not issecret(peer.guid) and peer.guid or f.guid
 	local old = f.days[day.day] or {}
 	if day.played == nil then
 		old.afk = day.afk
@@ -856,7 +860,8 @@ local function OnFriendEvent(kind, peer, data)
 		StoreFriendDay(peer, data)
 		return
 	end
-	local entry = { t = time(), name = peer.name, classFile = peer.classFile }
+	-- (their account too: Sync.lua finds the character in their journal by it and the full name)
+	local entry = { t = time(), name = peer.name, classFile = peer.classFile, acct = C.PeerAccount and C.PeerAccount(peer) }
 	if kind == "level" then
 		entry.k, entry.level = "level", data.level
 	elseif kind == "death" then
@@ -911,13 +916,29 @@ function M:OnEnable()
 			store.friendStats[friendName] = nil
 		end
 	end
-	local name, realm = UnitName("player"), GetRealmName()
-	charKey = name .. "-" .. (realm or "")
+	-- The character's names: UnitName gives the first name and, in WoW: Forever, the surname as its
+	-- second return; the game (and Battle.net) shows them together. Its record keeps the first name's
+	-- key, the one friends' builds know it by, unless that's another character of mine with the same
+	-- first name (its GUID or full name says so): then this one goes by its full name.
+	local name, surname = UnitName("player")
+	local realm = GetRealmName()
+	surname = type(surname) == "string" and not issecret(surname) and surname ~= "" and surname or nil
+	local full = surname and (name .. " " .. surname) or name
+	local guid = UnitGUID("player")
+	guid = type(guid) == "string" and not issecret(guid) and guid or nil
+	local key, fullKey = name .. "-" .. (realm or ""), full .. "-" .. (realm or "")
+	local other = store.chars[key]
+	if store.chars[fullKey] or (other and ((guid and other.guid and other.guid ~= guid)
+		or (surname and other.full and other.full ~= other.name and other.full ~= full))) then
+		key, name = fullKey, full
+	end
+	charKey = key
 	char = store.chars[charKey] or NewChar()
 	store.chars[charKey] = char
 	Fill(char)
 	local _, classFile = UnitClass("player")
-	char.name, char.realm, char.classFile, char.race = name, realm, classFile, UnitRace("player")
+	char.name, char.full, char.guid = name, full, guid or char.guid
+	char.realm, char.classFile, char.race = realm, classFile, UnitRace("player")
 	local level = UnitLevel("player")
 	if char.level and char.level ~= level then
 		-- Levelled where Chronicle didn't see it (off, another PC): this level's start is unknown.

@@ -396,7 +396,7 @@ local function Levels(canvas, x, y, w, c)
 	end
 	local note = fastest and L["Fastest: %d (%s), slowest: %d (%s)"]:format(fastest, C.Duration(c.levelTimes[fastest]),
 		slowest, C.Duration(c.levelTimes[slowest])) or nil
-	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Time per level: %s"]:format(c.name or "?"), note) -- (a character's own)
+	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Time per level: %s"]:format(C.NameOf(c) or "?"), note) -- (a character's own)
 	if #levels == 0 then
 		Empty(canvas, ix, iy, iw, ih, L["Level up once with Chronicle on to see this."])
 		return h
@@ -637,9 +637,10 @@ local function Lifetime(canvas, x, y, w, mine, theirs, name, person)
 	return h
 end
 
--- Draws a friend's page: friend = a person from C.Accounts() (all their characters added up: days;
--- with a synced journal also a profile), me = mine from there (for the comparison: all my characters
--- too); state as for G.Draw, plus state.newsLines(friend) from the window.
+-- Draws a friend's page: friend = an account from C.Accounts() (all their characters added up: days;
+-- with a synced journal also a profile), name = the account's (their BattleTag's), me = mine from
+-- there (for the comparison: all my characters too); state as for G.Draw, plus
+-- state.newsLines(friend) from the window.
 function G.DrawFriend(canvas, width, friend, name, me, state)
 	canvas:Reset()
 	local y = 0
@@ -656,7 +657,8 @@ function G.DrawFriend(canvas, width, friend, name, me, state)
 end
 
 ---------------------------------------------------------------------------
--- Compare: you and every friend in every graph, on one page
+-- Compare: every character, yours and your friends', in every graph, on one page (people below are
+-- characters, from C.Characters: a line, a chip, a row each, by the name the game shows)
 ---------------------------------------------------------------------------
 
 local GOLD_ICON = "|TInterface\\MoneyFrame\\UI-GoldIcon:12:12:2:0|t"
@@ -1099,7 +1101,7 @@ local function BigPicker(canvas, ix, iy, iw, chart, state, redraw)
 	return size + 10
 end
 
--- The legend: a chip per person (click: hide or show them everywhere), the range, sharing the week.
+-- The legend: a chip per character (click: hide or show it everywhere), the range.
 local RANGES = { 7, 14, 30 }
 
 local function Toolbar(canvas, x, y, w, people, state, redraw)
@@ -1134,14 +1136,7 @@ local function Toolbar(canvas, x, y, w, people, state, redraw)
 		local tip = { p.name or "?" }
 		tip[#tip + 1] = p.level and L["Level %d"]:format(p.level) or nil
 		if p.account then
-			tip[#tip + 1] = p.account
-		end
-		if p.chars and #p.chars > 1 then -- (an account: its numbers add up all its characters)
-			local names = {}
-			for _, c in ipairs(p.chars) do
-				names[#names + 1] = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r " .. (c.level or "")
-			end
-			tip[#tip + 1] = L["All characters: %s"]:format(table.concat(names, ", "))
+			tip[#tip + 1] = "|cff80c0ff" .. p.account .. "|r" -- (whose character it is: their BattleTag)
 		end
 		if p.online then
 			tip[#tip + 1] = L["Online now"]
@@ -1330,7 +1325,7 @@ local function Records(canvas, x, y, w, people, state)
 	return h
 end
 
--- The page: state = { range (days), hidden = { [person key] = true }, sortBy, big (what the big chart
+-- The page: state = { range (days), hidden = { [character key] = true }, sortBy, big (what the big chart
 -- shows), perDay, noMarks, marks(people, days) (the symbols, from the window) }; redraw(top) draws it
 -- again (a click on a chip, a range or a column; top: scrolled to the top). Returns the page height.
 local BIG_H = 260

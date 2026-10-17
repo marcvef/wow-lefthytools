@@ -1,8 +1,9 @@
 # Chronicle design
 
 A journal per character, kept automatically, plus statistics and a feed of what friends with
-LefthyTools did, also while they (or you) weren't online. Recorded per character, shown per person
-(all of a BattleTag's characters together, see Window). Files: `Modules/Chronicle/Chronicle.lua`
+LefthyTools did, also while they (or you) weren't online. Recorded per character; a character
+belongs to an account (a Battle.net account: a BattleTag), shown beside it, never mixed with it (see
+Characters and accounts). Files: `Modules/Chronicle/Chronicle.lua`
 (recording, sharing, session, settings, `/chronicle`), `Sync.lua` (friends' journals: publishing,
 passing on, the people and news for the window, catch-up, weekly recap, leaderboards),
 `Graphs.lua` (the Graphs and Compare pages), `Window.lua` (the window) and `MinimapButton.lua`.
@@ -13,14 +14,16 @@ They share `ns.Chronicle` (`C`).
 `LefthyToolsChronicleDB` (account-wide saved variable, so every character's journal can be
 browsed from any character):
 
-- `chars["Name-Realm"]`: `name, realm, classFile, race, level, first` (when Chronicle first saw
-  it), `events` (the timeline, oldest first, at most 1000), `stats` (counters, below),
+- `chars["Name-Realm"]`: `name` (the key's: the first name), `full` (the name the game shows: first
+  name and surname, from `UnitName`'s two returns), `guid`, `realm, classFile, race, level, first`
+  (when Chronicle first saw it), `events` (the timeline, oldest first, at most 1000), `stats` (counters, below),
   `zoneTime[zone]`, `killers[name]`, `levelTimes[level]`, `fastestLevel`, `levelStart`,
   `levelCounts[level] = { kills, quests }` (during that level; `levelFrom` holds the counters at
   the level's start), `professions[name]`, `seen = { zones, dungeons, bosses, rares }` (rares by GUID: one spawn
   counts once), `days[YYYY-MM-DD]`, `session = { start, stats, money }`, `playedTotal` (what
   `/played` last said; Chronicle never asks itself, that would print in chat).
-- `friends`: the feed, `{ t, name, classFile, k, ... }`, oldest first, at most 300.
+- `friends`: the feed, `{ t, name, classFile, acct, k, ... }`, oldest first, at most 300 (`name`:
+  the full name Battle.net gives, `acct`: their account, see Characters and accounts).
 
 For the graphs: `daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels, afk, bosses, rares,
 runs, jumps, dist, level, gold }` (kept 60 days; `Add` fills today's bucket for the counters in
@@ -29,7 +32,12 @@ runs, jumps, dist, level, gold }` (kept 60 days; `Add` fills today's bucket for 
 `{ played, xp, money }` per minute of play (at most 240: when full, every other point goes and the
 step doubles). `sync` (Sync.lua): the character's highlight counter and its days' and profile's
 stamps. `store.book`: friends' journals (below); `store.lastSeenAt`, `feedSeenAt`, `recapWeek`,
-`myU`, `sharedAlts`.
+`myU`, `sharedAlts`, `identity` (1: the saved data's characters have been matched once, below).
+
+**The record's key** is the first name and realm (`UnitName`'s first return, as friends' builds
+have always known it), unless another character of mine has that first name on the realm (its
+`guid`, or a different `full` name, says so): then this one's key is its full name ("Cara
+Brightwater-Realm"), and so is its `name`. A new character takes the first name's key.
 
 `C.Fill` completes a record (records from older versions lack newer stats); every record is
 filled before it's shown.
@@ -90,7 +98,8 @@ quests (count), gold (amount), profession (name, level), and for the feed only (
 quest (every quest turned in: its title) and zone (first visit). Pets, toys and blue loot stay
 private. Beacon accepts at most 10 highlights per friend per minute and only known kinds, and
 passes them on as `B.Notify("highlight", peer, { kind, a, b })`. Chronicle's listener puts them,
-and Beacon's `level`, `death`, `online` and `offline` events, into the feed, and prints a chat
+and Beacon's `level`, `death`, `online` and `offline` events, into the feed (with the friend's
+account, `C.PeerAccount`, so the window finds the character in their journal), and prints a chat
 line for highlights except quest and zone (English, `friendsChat`). Friends' level-ups and deaths
 already have their own lines. `online`: a friend's name became known more than a minute after
 Beacon started (friends already online at login aren't news); `offline`: a known friend was
@@ -114,33 +123,36 @@ session and how much is new from friends. A small blue dot while there's news fr
 journal hasn't shown yet (`C.UpdateNewDot`, on feed changes). Dragging sets an `OnUpdate` that turns
 the cursor position into the angle and removes it on drop. Created on first use; Chronicle's
 enable/disable and the setting update it on the next frame.
-**People, not characters.** The window is about the person behind the characters (a Battle.net
-account, a BattleTag): every number is theirs, all their characters added up, and shown once (never
-a character's and the account's version of the same number side by side). Only what a character
-has on its own stays per character: its level and class colour, its time per level, and the
-session going on now (the character you play). Mine: `C.Totals()` (Chronicle.lua: every record in
-`store.chars` as one: counters added up, the longest session, longest AFK and most gold the best of
-them, time per zone and deadly foes added up, zones, dungeons and days played joined, each day's
-counters added up; `current` the character I play, `chars` all of them, it first, then by time
-played). Friends': `C.Accounts()` (below).
+**Characters and accounts.** A character is shown once, by the name the game shows ("Anna Brook":
+first name and surname, see Characters and accounts below), and an account (a Battle.net account,
+a BattleTag) by its own name ("You", a friend's BattleTag's name), never by one of its characters'.
+Graphs, leaderboards, the hall of fame, records and the lists of friends go by character (the
+BattleTag beside it where it matters: a column on the Friends page, a chip's hover); the dropdown,
+your Statistics, Timeline and Graphs and a friend's graphs go by account (all its characters added
+up, the characters named in it). Only what a character has on its own stays per character there:
+its level and class colour, its time per level, and the session going on now (the character you
+play). Mine: `C.Totals()` (Chronicle.lua: every record in `store.chars` as one: counters added up,
+the longest session, longest AFK and most gold the best of them, time per zone and deadly foes added
+up, zones, dungeons and days played joined, each day's counters added up; `current` the character
+I play, `chars` all of them, it first, then by time played). Friends': `C.Accounts()` (below).
 
 A dropdown at the top left (`LT.Window.AddPicker`, our own: a Blizzard menu opened from addon code
-taints gamepad mode, see forever-platform.md) picks the person, one entry each: "You" with your
-characters and their levels ("You  Cara 20, Alty 12", key `me`), then "Friends": everyone from
+taints gamepad mode, see forever-platform.md) picks the account, one entry each: "You" with your
+characters and their levels ("You  Cara Moss 20, Alty 12", key `me`), then "Friends": everyone from
 `C.Accounts()` by their BattleTag's name with their characters, the one they play most first
-("Annie  Anna 20, Annalt 12", key `acct:<hash>`; an older build's days whose BattleTag isn't known:
-"Anna 20  (friend)", `friend:<Name>`), the picked one ticked. Picking a friend opens the Graphs
+("Annie  Anna Brook 20, Annalt 12", key `acct:<hash>`; a character whose BattleTag isn't known:
+"Anna Brook 20  (friend)", its character key), the picked one ticked. Picking a friend opens the Graphs
 page, the only one friends have. The list is built when it opens; a refresh only sets the button's
 text. A click elsewhere closes it. Hidden on the News, Friends and Compare pages. Then the pages,
 the open one's button greyed out:
 
 - **Timeline:** all your characters' journals in one, newest first, a heading per day
   (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an inline icon (the item's or achievement's own where
-  known), whose it is ("Alty: ", once there's more than one character with entries) and the
+  known), whose it is ("Alty Moss: ", once there's more than one character with entries) and the
   localized text. At most 250 entries drawn (only each character's newest 250 are merged), the rest
   summarized in one line.
 - **Statistics** (yours, `C.Totals()`): sections This session (the session going on), Characters
-  (a row per character: name in its class colour, other realms named, and its level: what only a
+  (a row per character: its full name in its class colour, other realms named, and its level: what only a
   character has), Time (time played since Chronicle; `/played` added up once every character has
   said it; days played, sessions, longest session, fastest level, average per level), Quests,
   Exploring, Combat, Travel (distance, by foot/riding/swimming/flight, jumps), Gold and loot (gold
@@ -161,57 +173,59 @@ the open one's button greyed out:
   strings from pools (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first
   draw.
 - **Friends' graphs:** a friend picked in the dropdown (other pages fall back to you): their
-  account from `C.Accounts()`, compared with mine from there (both all characters). Last 14 days
-  (the same bars from their days), Last 7 days (seven tiles: time, XP, levels, quests, killing
-  blows, deaths, time AFK), You and <name> (two bars per number: time, XP, quests, kills, time AFK;
-  you in gold, them in blue), You and <name>, all time (from their profiles) and Latest news (the
-  last 6 feed entries of any of their characters, with date; the character's name when they have
-  more than one).
+  account from `C.Accounts()`, compared with mine from there (both all characters), named by the
+  account (their BattleTag's name). Last 14 days (the same bars from their days), Last 7 days
+  (seven tiles: time, XP, levels, quests, killing blows, deaths, time AFK), You and <account> (two
+  bars per number: time, XP, quests, kills, time AFK; you in gold, them in blue), You and
+  <account>, all time (from their profiles) and Latest news (the last 6 feed entries of any of
+  their characters, with date; the character's name when they have more than one).
 - **News:** "What they did": `C.FriendNews()` (synced highlights and live news, see below), as
-  "Name: text", newest first by day, with a hint about what will appear while it's empty. Showing
+  "Name: text" (the character's full name), one line per event, newest first by day, with a hint
+  about what will appear while it's empty. Showing
   it marks the news seen (`C.MarkFeedSeen`): the tab's blue count and the book's blue dot
   (`C.UnseenCount`: news that came after `store.feedSeenAt`) go. Redrawn when the feed changes (at
   most every 3 s). (Once one page with who's online, who isn't and the news; the user had to scroll
   too far to reach the news, so they're separate now.)
 - **Friends:** everyone at a glance, two tables (`G.DrawTables` in Graphs.lua: a card each, a
   header row, a row per entry with faint alternate stripes; a cell is text, cut to its width, or an
-  icon and text; a row's hover shows all of it, a click opens their graphs through `Select` when
-  they have a journal). **Online now**: Beacon's friends (`B.FriendList`, `B.FriendStatus` in
-  Alerts.lua): Name (class colour, <AFK>), Level (and progress), BattleTag (from their journal's
-  account), Where (zone - subzone, distance), Doing (dead or fighting, else the quest they track,
-  else "In your group"); the hover is `B.FriendLines` (the AFK screen's lines) plus the BattleTag
-  and their latest highlight (any of their characters'). Beacon off or nobody online: a line says
-  so. **Not online**: a row per person (`C.Accounts()`) none of whose characters is online (an
-  online friend's other characters aren't listed here too), most recently played first: Name (the
-  character they play most), Level, BattleTag, Last played ("3 h ago"), This week (time played in 7
-  days, all their characters), Latest news (icon, text, how long ago; any of their characters');
-  the hover adds the realm, all their characters with their levels and the highlight's date. Each
-  card's corner counts the friends. Redrawn every 5 s (who's online and where changes all the
-  time) and on feed changes (at most every 3 s).
-- **Compare** (`G.DrawCompare`): people, not characters (`C.Accounts()`, see below): you and every
-  friend in every graph. A toolbar: 7 / 14 / 30 days, and a chip per person (their colour: the class colour, a
-  second of the same class lighter, a third darker; you marked "(you)"; hover: level, BattleTag
-  name, all their characters, online or last played; click: hidden from every graph and table,
-  `compareState.hidden`).
+  icon and text; a row's hover shows all of it, a click opens their account's graphs through
+  `Select` when it has any). A row per character, by its full name, its account's BattleTag in a
+  column of its own. **Online now**: Beacon's friends (`B.FriendList`, `B.FriendStatus` in
+  Alerts.lua): Name (class colour, <AFK>), Level (and progress), BattleTag (`C.PeerChar`: their
+  account from Battle.net), Where (zone - subzone, distance), Doing (dead or fighting, else the
+  quest they track, else "In your group"); the hover is `B.FriendLines` (the AFK screen's lines)
+  plus the BattleTag and that character's latest highlight. Beacon off or nobody online: a line
+  says so. **Not online**: a row per friend's character (`C.Characters()`) whose account has none
+  online (someone playing one character isn't listed again with the others), most recently played
+  first: Name, Level, BattleTag, Last played ("3 h ago"), This week (its time played in 7 days),
+  Latest news (icon, text, how long ago); the hover adds the realm, the account's characters with
+  their levels and the highlight's date. The corners count friends online and characters not
+  online. Redrawn every 5 s (who's online and where changes all the time) and on feed changes (at
+  most every 3 s).
+- **Compare** (`G.DrawCompare`): characters (`C.Characters()`, see below), yours and every
+  friend's, in every graph, by character names only. A toolbar: 7 / 14 / 30 days, and a chip per
+  character (its colour: the class colour, a second of the same class lighter, a third darker;
+  yours marked "(you)"; hover: level, BattleTag name, online or last played; click: hidden from
+  every graph and table, `compareState.hidden`).
   Then the big chart (full width): an icon per thing it can show above it (level, time played,
   XP, quests, killing blows, deaths, gold, distance, bosses and rares, time AFK, jumps;
   `compareState.big`, level at first), "Adding up" or "Per day" for the counted ones
   (`compareState.perDay`; level and gold are where the day ended, carried over days not played)
-  and "Symbols": each person's most notable highlight of the day as an icon on their line (no line
+  and "Symbols": each character's most notable highlight of the day as an icon on its line (no line
   that day: at the bottom). The kinds, most notable first (`G.MARK_KINDS`): death, boss, level
   (every tenth only), first dungeon visit, rare, epic loot, achievement, mount, gold milestone;
-  from my characters' journals and `C.FriendNews()` (matched to accounts by character name;
+  from my characters' journals and `C.FriendNews()` (each entry knows its character's key;
   `compareState.marks`, built in `Window.lua` on each draw). Two kinds of tooltip (one listing
   everything was far too big): a symbol's own (a raised hover area, `Canvas:Hover(..., raised)`,
-  above the day's): that person's moments of the day only (two of a kind, five at most, "and N
-  more"; symbols within 8 px of each other share one); the day's: a line per person with the value
+  above the day's): that character's moments of the day only (two of a kind, five at most, "and N
+  more"; symbols within 8 px of each other share one); the day's: a line per character with the value
   and up to three small icons, one per kind, and "Hover a symbol for what happened." The symbols
   switch's tooltip is the legend; off: `compareState.noMarks`. A click on a day of a small chart shows that chart
   big, scrolled to the top. The
   Leaderboard of the last 7 days (`C.Leaderboard`: nine categories, top three each, gold, silver,
   bronze; the Martin award), a grid of line charts (time played, XP, quests, killing blows per day;
   deaths, bosses and rares, jumps adding up over the range; gold where the day ended; distance and
-  time AFK per day): a line per person (yours thicker), points while the range is 14 days or less,
+  time AFK per day): a line per character (yours thicker), points while the range is 14 days or less,
   the leader in the card's corner, a hover per day with everyone's value, sorted. The Hall of fame
   (lifetime numbers from profiles: level, time, quests, kills, deaths, zones, dungeons, bosses,
   rares, distance, jumps; click a column header to sort; the best of each in gold) and Records
@@ -234,10 +248,11 @@ Battle.net messages only arrive while both are online, so each friend's own Chro
 numbers: `D2;<YYYYMMDD>;<minutes played>;<xp>;<quests>;<kills>;<deaths>;<levels>` (about 45
 bytes), and after it `K2;<YYYYMMDD>;<minutes AFK>` when that day had any AFK time (its own
 message: builds before it reject a `D2` with another field and ignore kinds they don't know).
-`StoreFriendDay` merges them: a `K2` sets only the day's `afk`, a `D2` keeps it. It also keeps the
-sender's account as `acct` (`C.PeerAccount`: the hash of the BattleTag Battle.net gives for the
-peer's GUID), so the window counts those days for that person (older builds keep the field and
-ignore it). When Beacon
+`StoreFriendDay` merges them, by the full name Battle.net gives (`store.friendStats[name]`): a `K2`
+sets only the day's `afk`, a `D2` keeps it. It also keeps the sender's account as `acct`
+(`C.PeerAccount`: the hash of the BattleTag Battle.net gives for the peer's GUID) and their `guid`,
+so the window finds the character in their journal and counts those days for it, where the journal
+has none (older builds keep the fields and ignore them). When Beacon
 reports a friend as `known` (their name became known), they get my last 7 days; every 5 minutes
 today's and yesterday's go to everyone if they changed (each message compared on its own). Both
 go through Beacon's low-priority queue (`B.QueueLow`): sent only when no message, state or answer
@@ -265,6 +280,9 @@ BattleTag.
 - a profile: lifetime numbers (time, sessions, quests, kills, deaths, zones, dungeons, runs,
   bosses, rares, distance, jumps, mounts, achievements, most gold, fastest level, longest session,
   AFK, epics, levels, XP), the deadliest foe and favourite zone, class, level, when last played.
+
+A character goes by its record's key (`<Name-Realm>`: the first name's, see Data) in every record,
+as every build has known it.
 
 Every record has a stamp `u` from its author (`NextU`: `time()`, always above the last one,
 `store.myU`). Stamps: a highlight when recorded (`C.Stamp` from `Record`); a day when its numbers
@@ -305,29 +323,60 @@ last time restamps its records, so friends who hold the other one ask for it.
 SavedVariables) makes two authors: a friend who already holds the newer stamps of one PC won't
 ask for the older ones of the other until they change again.
 
-**People and news for the window** (`C.People()`): me (the character I play: its days, numbers
-from `C.ProfileNumbers`), then every friend's character from the book (`book:<acct>:<Name-Realm>`;
-last played from the profile or the latest day played; online if a Beacon peer has that name),
-then friends on older builds from the days they sent (`store.friendStats`, `friend:<Name>`, with
-their `acct` when it's known), by name. `C.Accounts()`: the same per Battle.net account (me: all of
-`store.chars`; friends: their account's characters, also a character only known from the days it
-sent; older builds whose BattleTag isn't known: one character each), each day's activity added up over the
-account's characters (time, XP, quests, kills, deaths, levels, AFK, distance, bosses, rares, runs,
-jumps), the level of the character played most that day, gold summed over each character's last
-known; lifetime numbers summed where they add up, else the best (zones, dungeons, most gold,
-longest session; fastest level the lowest); named after the character played most in 30 days (mine:
-the one I play), its class colour, foe and zone. Compare, the leaderboards and the recap use it.
-`C.FriendNews()`: every synced highlight plus the live feed (`store.friends`: Beacon's
-level-ups, deaths, online and offline, E2 highlights), oldest first; a live entry that a synced
-one repeats (same name, kind and first field within 15 minutes) is left out. Rebuilt only when
-something changed.
-
 **While you were away** (`catchUp`): when Chronicle starts more than 5 minutes after its last tick
 (`store.lastSeenAt`), 75 s later (up to 4 minutes while journals still come in) a chat line per
-friend with what they did since: the most notable three (level-ups first), zones and deaths
+friend's character with what it did since: the most notable three (level-ups first), zones and deaths
 counted ("died 3 times"), "+N more". **Weekly recap** (`weeklyRecap`): 2 minutes after starting,
-once per week (`store.recapWeek`, the week's Monday): last week's leader of each category, if at
-least two people played. Both in English like all chat output.
+once per week (`store.recapWeek`, the week's Monday): last week's leading character of each
+category, if characters of at least two accounts played. Both in English like all chat output.
+
+## Characters and accounts
+
+A character in WoW: Forever has a first name and a surname. `UnitName` gives them apart (the
+surname as its second return: Blizzard's `NameUtil.FormatUnitNameForDisplay` joins them with a
+space), the game shows them together ("Anna Brook"), and so does Battle.net (`characterName`, so
+Beacon's `peer.name`). Journals have always gone by the first name and realm ("Anna-Realm", the key
+every build sends), while Beacon's live news (`store.friends`) and older builds' days
+(`store.friendStats`) go by the full name: the same character arrived under two names, and showed
+up twice (news twice, its days counted twice, a row each, an account's row next to its own).
+
+So every character has one identity: mine its `store.chars` key (`me:<key>`), a friend's its
+journal's (`book:<acct>:<Name-Realm>`), and one only known from live days its name
+(`friend:<full name>`). Sync.lua matches a full name from Battle.net (with the friend's account,
+class and GUID where known) to a journal's character (`FindBook`): by GUID; else by the full name
+(learned); else by the first name while the journal doesn't know the full one, within their
+account, if exactly one character fits and its class is the same. A match that isn't unique isn't
+made: two characters are never taken for one (an alt of the same account with another first name,
+"Anna" and "Annabel", stays apart). A match teaches the journal what it didn't know (`Learn`: the
+GUID, and the full name when it adds a surname; one it knows only changes on a GUID match, a
+rename). Without the account, only GUID and full name count.
+
+`C.Characters()` lists every character once, by the name the game shows (`C.NameOf`: `full`, else
+`name`): mine (days, numbers from `C.ProfileNumbers`, the one I play first), then my friends', by
+name: from their journals (last played from the profile or the latest day played, joined by their
+live days where the journal has no day), then characters only known from live days (with their
+account when known). Each has `online` (a Beacon friend plays it: `C.PeerChar(peer)`) and
+`accountOnline` (one of its account's characters is), `acct` and `account` (its BattleTag's
+name). Compare, the leaderboards, the recap and the Friends page use it. `C.Accounts()`: the same per
+Battle.net account (me: all of `store.chars`; friends: their account's characters; a character
+whose account isn't known: on its own), each day's activity added up over the account's characters
+(time, XP, quests, kills, deaths, levels, AFK, distance, bosses, rares, runs, jumps), the level of
+the character played most that day, gold summed over each character's last known; lifetime numbers
+summed where they add up, else the best (zones, dungeons, most gold, longest session; fastest level
+the lowest); named after the account ("You", the BattleTag's name; a lone character whose account
+isn't known by its own name), the class colour, foe and zone of the character played most in 30
+days (mine: the one I play). The dropdown and a friend's graphs use it. `C.FriendNews()`: every
+synced highlight plus the live feed (Beacon's level-ups, deaths, online and offline, E2
+highlights), oldest first, each with its character's key and full name; a live entry that a synced
+one of the same character repeats (same kind and first field within 15 minutes) is left out.
+Rebuilt only when something changed (a name learned counts).
+
+**Saved data from before** (`JoinCharacters`, once: `store.identity`): older builds' days saved
+without their account are matched over all the journals kept (also before the friend list is known
+at login) by the same rules, and only where the days both have agree too (the live day, sent while
+it went on, is never more than the journal's day, and on some day about the same); then the feed's
+entries, by the full names that taught the journals. The account is noted with them (`acct`) and the
+journal learns the full name. Nothing is deleted or moved.
 
 ## Cost, and what goes over the network
 
