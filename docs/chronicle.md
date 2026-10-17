@@ -7,8 +7,9 @@ Characters and accounts). Files, in load order: `Modules/Chronicle/Chronicle.lua
 sharing, session, settings, `/chronicle`, formatting helpers), `Characters.lua` (who is who:
 accounts, names, matching; the characters, accounts and news every page uses), `Sync.lua` (friends'
 journals: publishing, passing on), `Recap.lua` (chat: catch-up, weekly recap, sharing; the
-leaderboards), `Graphs.lua` (the Graphs and Compare pages), `Window.lua` (the window) and
-`MinimapButton.lua`. They share `ns.Chronicle` (`C`).
+leaderboards), `Canvas.lua` (the pages' drawing kit: a pooled canvas, cards, bars, tables),
+`Graphs.lua` (the Graphs page, a friend's too), `Compare.lua` (the Compare page), `Window.lua` (the
+window) and `MinimapButton.lua`. They share `ns.Chronicle` (`C`).
 
 ## Data
 
@@ -172,7 +173,7 @@ the open one's button greyed out:
   its `levelTimes`, up to 20, green = fast to red = slow), Favourite zones and Deadliest foes
   (horizontal bars, top 5), On the road and Loot by quality (one split bar each, with a legend).
   Drawn with plain textures (`SetGradient` for the bars), line objects (`CreateLine`) and font
-  strings from pools (`G.NewCanvas`): a redraw reuses everything, nothing is created after the first
+  strings from pools (`G.NewCanvas`, Canvas.lua): a redraw reuses everything, nothing is created after the first
   draw.
 - **Friends' graphs:** a friend picked in the dropdown (other pages fall back to you): their
   account from `C.Accounts()`, compared with mine from there (both all characters), named by the
@@ -188,7 +189,7 @@ the open one's button greyed out:
   (`C.UnseenCount`: news that came after `store.feedSeenAt`) go. Redrawn when the feed changes (at
   most every 3 s). (Once one page with who's online, who isn't and the news; the user had to scroll
   too far to reach the news, so they're separate now.)
-- **Friends:** everyone at a glance, two tables (`G.DrawTables` in Graphs.lua: a card each, a
+- **Friends:** everyone at a glance, two tables (`G.DrawTables` in Canvas.lua: a card each, a
   header row, a row per entry with faint alternate stripes; a cell is text, cut to its width, or an
   icon and text; a row's hover shows all of it, a click opens their account's graphs through
   `Select` when it has any). A row per character, by its full name, its account's BattleTag in a
@@ -204,7 +205,7 @@ the open one's button greyed out:
   their levels and the highlight's date. The corners count friends online and characters not
   online. Redrawn every 5 s (who's online and where changes all the time) and on feed changes (at
   most every 3 s).
-- **Compare** (`G.DrawCompare`): characters (`C.Characters()`, see below), yours and every
+- **Compare** (`G.DrawCompare`, Compare.lua): characters (`C.Characters()`, see below), yours and every
   friend's, in every graph, by character names only. A toolbar: 7 / 14 / 30 days, and a chip per
   character (its colour: the class colour, a second of the same class lighter, a third darker;
   yours marked "(you)"; hover: level, BattleTag name, online or last played; click: hidden from

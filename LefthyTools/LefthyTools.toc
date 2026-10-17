@@ -72,7 +72,9 @@ Modules\Chronicle\Chronicle.lua
 Modules\Chronicle\Characters.lua
 Modules\Chronicle\Sync.lua
 Modules\Chronicle\Recap.lua
+Modules\Chronicle\Canvas.lua
 Modules\Chronicle\Graphs.lua
+Modules\Chronicle\Compare.lua
 Modules\Chronicle\Window.lua
 Modules\Chronicle\MinimapButton.lua
 
