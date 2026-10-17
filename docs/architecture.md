@@ -145,7 +145,8 @@ sends it (`F2`) before every `V2`; `LT:NoteFriendVersion(version, files)` keeps 
 build's files in `LT.newerFiles`, and `LT.UpdateHint(files)` words the advice: restart when they
 differ from ours, `/reload` when they match, "or restart if the updater says so" when the friend's
 build doesn't send them. The friend notice, `/lefthy version` and the Updates row use it.
-`install.ps1` independently says "restart" when an update adds files.
+`install.ps1` independently says "restart" when an update adds files, saved variables or a
+companion add-on (comparing the installed TOC with the new one).
 
 ## Error catcher (Core/Errors.lua)
 

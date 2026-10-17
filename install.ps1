@@ -119,6 +119,21 @@ param(
 		return @([IO.File]::ReadAllLines($toc) | Where-Object { $_.Trim() -and $_ -notmatch '^\s*#' } | ForEach-Object { $_.Trim() })
 	}
 
+	# The saved variables a TOC names (## SavedVariables and ## SavedVariablesPerCharacter). The game
+	# reads them only at startup too: a new one isn't loaded or saved until a restart.
+	function Get-TocSaved([string]$toc) {
+		if (-not (Test-Path -LiteralPath $toc)) { return @() }
+		$names = New-Object System.Collections.Generic.List[string]
+		foreach ($line in [IO.File]::ReadAllLines($toc)) {
+			if ($line -match '^##\s*SavedVariables(PerCharacter)?\s*:(.*)$') {
+				foreach ($name in $Matches[2].Split(',')) {
+					if ($name.Trim()) { $names.Add($name.Trim()) }
+				}
+			}
+		}
+		return @($names)
+	}
+
 	# After copying: every file of the download arrived intact (same SHA-256; the TOC is left out,
 	# its version line is stamped on install) and every file the TOC loads is there.
 	function Test-Install([string]$source, [string]$target, [string]$addon = $Name) {
@@ -323,8 +338,10 @@ param(
 		}
 
 		# The game only loads files that are new to the TOC after a restart (a /reload into such an
-		# update can even freeze the client), so say so when there are any.
+		# update can even freeze the client), and the same goes for new saved variables, so say so
+		# when there are any.
 		$oldFiles = if ($installed) { Get-TocFiles $targetToc } else { $null }
+		$oldSaved = if ($installed) { Get-TocSaved $targetToc } else { $null }
 		Remove-AddonFolder $target
 		if ($Link) {
 			New-Item -ItemType Junction -Path $target -Target $build.Addon | Out-Null
@@ -365,10 +382,13 @@ param(
 			Write-Host "Checked: all $files files arrived intact (SHA-256), and every file the game loads is there."
 		}
 		$added = if ($null -ne $oldFiles) { @(Get-TocFiles $targetToc | Where-Object { $oldFiles -notcontains $_ }) } else { @() }
+		$addedSaved = if ($null -ne $oldSaved) { @(Get-TocSaved $targetToc | Where-Object { $oldSaved -notcontains $_ }) } else { @() }
 		if ($installed -and $newCompanions.Count -gt 0) {
 			Write-Host "This update adds an add-on ($($newCompanions -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
 		} elseif ($added.Count -gt 0) {
 			Write-Host "This update adds files ($($added -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
+		} elseif ($addedSaved.Count -gt 0) {
+			Write-Host "This update adds saved data ($($addedSaved -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
 		} else {
 			Write-Host 'In game, type /reload. If something seems missing afterwards, restart the game once.'
 		}
