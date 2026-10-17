@@ -1,12 +1,22 @@
 local _, ns = ...
 local LT = ns.LT
 
--- Small windows (error report, what's new, Chronicle): Blizzard's ButtonFrameTemplate without the
--- portrait, movable, closed with Escape. The template leaves a band under the title for controls
--- (tabs, buttons) and a button bar at the bottom; content goes into its Inset.
+-- LT.Window: the interface pieces every module builds with.
+--   * Windows (error report, what's new, Chronicle): Create, AddScroll, AddText, AddCopyBox,
+--     AddButton, and Register for windows built another way.
+--   * Lists of our own instead of Blizzard's menus (gamepad mode, see PopupList): PopupList,
+--     AddPicker (a dropdown), AnyPopupOpen and PopupOpenIn (Mirage keeps their group in view).
+--   * Round buttons on the minimap's edge: MinimapButton.
+--   * ClassColorCode.
 
 local Window = {}
 LT.Window = Window
+
+---------------------------------------------------------------------------
+-- Windows: Blizzard's ButtonFrameTemplate without the portrait, movable, closed with Escape. The
+-- template leaves a band under the title for controls (tabs, buttons) and a button bar at the
+-- bottom; content goes into its Inset.
+---------------------------------------------------------------------------
 
 -- A window of ours counts as "using the interface", like Blizzard's (ns.MirageData.WINDOWS): a
 -- cinematic flight pauses for it, Mirage keeps the interface up and the AFK screen stays away.
@@ -107,6 +117,10 @@ function Window.AddButton(frame, label, onClick, anchor)
 	button:SetScript("OnClick", onClick)
 	return button
 end
+
+---------------------------------------------------------------------------
+-- Popup lists and pickers
+---------------------------------------------------------------------------
 
 -- A list of our own that pops up from a frame (a dropdown's button, a minimap button). Not
 -- Blizzard's menu (Blizzard_Menu): one opened from addon code runs tainted, and in gamepad mode its
@@ -277,6 +291,10 @@ function Window.AddPicker(parent, width, entries, onPick)
 	return picker
 end
 
+---------------------------------------------------------------------------
+-- Minimap buttons
+---------------------------------------------------------------------------
+
 -- A round button on the minimap's edge in the usual addon look (tracking border, dark background,
 -- an icon), a child of the Minimap (it hides and fades with it). Dragging moves it along the edge;
 -- the angle (degrees, 0 = right, counter-clockwise) is kept in db[angleKey]. options = { icon,
@@ -352,6 +370,10 @@ function Window.MinimapButton(name, options)
 	button:SetScript("OnHide", StopDrag) -- hidden mid-drag (Mirage, the minimap key): no OnDragStop may come
 	return button
 end
+
+---------------------------------------------------------------------------
+-- Colours
+---------------------------------------------------------------------------
 
 -- "|cffRRGGBB" for a class.
 function Window.ClassColorCode(classFile)
