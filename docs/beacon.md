@@ -11,6 +11,8 @@ Files, in load order:
   members), sending (one rate limiter, the queues), finding friends, receiving, what I share about
   myself, the driver tick, switching on and off, `/lefthy beacon status` (`B.PrintStatus`).
 - `Protocol.lua`: every message kind, what it says, and `B.Parse`, which reads them.
+- `Updates.lua`: a friend on a newer build (the notice, "What's coming"), and answering what's new
+  in mine (`U2` / `W2`).
 - `Options.lua`: the settings page and `/lefthy beacon` (each command is done by its own file).
 - `Dots.lua` (dot look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   toast, sounds), `Alerts.lua` (death alerts; a friend in a few lines for lists: `B.FriendLines`,
