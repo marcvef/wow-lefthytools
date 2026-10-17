@@ -235,8 +235,11 @@ end
 -- A mob's row
 ---------------------------------------------------------------------------
 
+-- A click picks that row and keeps it while the list redraws (names coming in, a kill), also among
+-- a search's results (in game a click went back to the first); typing again picks the best match.
 local function Select(creature)
 	selected = creature
+	ledger.keepPick = true
 	Bt.DrawLedger()
 end
 

@@ -347,10 +347,13 @@ the settings or `/bestiary ledger [search]`.
   and spaces ignored ("dfbnd" finds Defias Bandit); letters together, at a word's start and early
   score more, a shorter text a little more. Over mob names and the names of all their drops and
   skinnings (an item found counts 0.95 of its score). Results best first; typing picks the best
-  match. A row found by an item shows that item, its chance (and "+N" more found); the picked
-  mob's found drops stand out, the others fade to 35%. Names the client doesn't know yet are asked
-  for (`RequestLoadItemDataByID`); `GET_ITEM_INFO_RECEIVED` (listened to only while open) redraws
-  once, half a second later.
+  match. A click picks a row (`ledger.keepPick`), also among a search's results, and it stays
+  picked while the list redraws (names coming in, a kill); typing again picks the best match. (The
+  first version picked the best match on every redraw while a search was typed, so a click on
+  another result jumped back.) A row found by an item shows that item, its chance (and "+N" more
+  found); the picked mob's found drops stand out, the others fade to 35%. Names the client doesn't
+  know yet are asked for (`RequestLoadItemDataByID`); `GET_ITEM_INFO_RECEIVED` (listened to only
+  while open) redraws once, half a second later.
 
 ## Minimap button and settings
 

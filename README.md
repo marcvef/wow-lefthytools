@@ -348,8 +348,9 @@ Skinning's pelt icon. All your characters add to the same database; it stays on 
 lists every mob you've killed: kills, level, its best drops at a glance, sortable. Pick one for
 its turning model, kills, coin each and in all, first and last kill, and all its drops. The search
 finds mobs and items with just some of their letters in order ("dfbnd" for Defias Bandit, "milk"
-for every mob that dropped Ice Cold Milk). At the top: everything in all, the coin per kill over
-all your kills, and your rarest find.
+for every mob that dropped Ice Cold Milk) and picks the best match; click any other result to look
+at it instead. At the top: everything in all, the coin per kill over all your kills, and your
+rarest find.
 
 **XP, time and worth per kill.** Each of your kills also notes the XP it gave and how long it took
 (from the start of the fight, or from your last kill in it), and a kill's worth is its coin plus

@@ -7486,6 +7486,23 @@ section("Bestiary: what mobs drop")
 		and ledger.rows[1].Found:GetText():find("33%", 1, true) and milk and milk:GetAlpha() == 1
 		and ledger.Pane.sections.own.cells[1]:GetAlpha() < 1,
 		"an item: the mob it came from, picked; the item and its chance in the row; the match stands out among its drops")
+	-- Another result can be picked (in game a click went back to the first): it stays while the list
+	-- redraws; typing again picks the best match.
+	do
+		ledger.Search:SetText("l") -- (both: their Linen Cloth)
+		local _, found, first = Bt.Ledger()
+		local other = found[2] and found[2].creature
+		ledger.rows[2]:Click()
+		local _, _, now = Bt.Ledger()
+		check(#found == 2 and first == found[1].creature and other and other ~= first and now == other and ledger.Pane.creature == other
+			and ledger.rows[2].Picked:IsShown() and not ledger.rows[1].Picked:IsShown(), "a search: another result clicked, picked")
+		Bt.DrawLedger() -- (what names coming in and a kill do)
+		_, _, now = Bt.Ledger()
+		check(now == other and ledger.Pane.creature == other, "the list redraws: the click's pick stays")
+		ledger.Search:SetText("li")
+		_, found, now = Bt.Ledger()
+		check(now == found[1].creature and now ~= other, "typing again: the best match picked")
+	end
 	ledger.Search:SetText("zzz")
 	check(not ledger.rows[1]:IsShown() and ledger.NoMatch:GetText() == "Nothing found.", "nothing: said so")
 	ledger.Clear._scripts.OnClick(ledger.Clear)
