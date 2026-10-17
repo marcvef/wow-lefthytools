@@ -51,7 +51,12 @@ local FOE_GAP = 2
 local FOE_X = ROW_W - FOES * (FOE_W + 2) - (FOES - 1) * FOE_GAP -- where the foes start (between: the stage)
 local HERO_FACING, FOE_FACING = 0.75, -0.45 -- turned towards each other (radians)
 local HERO_ZOOM = 1.05         -- the camera just a little back (1.4 was too far for a character, in game)
-local FORM_ZOOM = 1.4          -- further for a form (in game a bear didn't fit)
+-- Further or closer in a form, from what fit in game: a bear at 1.4 (closer it didn't fit); a cat
+-- at 1.4 was too small; a Skyborne's travel form (a bird) too large at 1.4, like the bear before.
+-- Another race's travel form (a cheetah): as a cat.
+local FORM_ZOOM, CAT_ZOOM, BIRD_ZOOM = 1.4, 1, 2
+local CAT, TRAVEL = 768, 783
+local SKYBORNE = { [95] = true, [96] = true } -- (race IDs: High Order, Windshaper)
 
 local RETRY, TRIES = 1, 5      -- a model not there yet: asked for again (a creature the client hasn't met)
 local LUNGE = 16               -- px a strike steps forward (a mob's: 60% of it)
@@ -287,7 +292,7 @@ local function HeroLoaded(model)
 	end
 	hero.loaded = true
 	Call(model, "RefreshCamera")
-	Call(model, "SetCamDistanceScale", hero.inForm and FORM_ZOOM or HERO_ZOOM)
+	Call(model, "SetCamDistanceScale", hero.zoom)
 	Call(model, "SetFacing", HERO_FACING)
 	Call(model, "SetSheathed", hero.sheathed ~= false)
 	model.current = nil
@@ -409,6 +414,15 @@ local function LoadHero(hero, unit, form, classFile, face, again)
 	end
 	hero.model = hero.inForm and hero.Shifted or hero.Real
 	hero[hero.inForm and "Real" or "Shifted"]:Hide()
+	hero.zoom = HERO_ZOOM
+	if form == CAT then
+		hero.zoom = CAT_ZOOM
+	elseif form == TRAVEL then
+		local ok, _, _, race = pcall(UnitRace, unit)
+		hero.zoom = ok and SKYBORNE[race] and BIRD_ZOOM or CAT_ZOOM
+	elseif hero.inForm then
+		hero.zoom = FORM_ZOOM
+	end
 	Call(hero.model, "ClearModel")
 	if hero.inForm then
 		Call(hero.model, "SetUnit", unit) -- (a PlayerModel shows the form they're in)

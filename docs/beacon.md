@@ -683,8 +683,10 @@ the picture already holds, one action after another like turns (about half a sec
 PlayerModel showed the bear; the user: "when a druid is in cat form it should show cat form"); a
 friend whose character your client has (in your group, nearby: `UnitTokenFromGUID(peer.guid)` and
 `UnitIsVisible`) is them; a model loads anew when their form changes. The camera just a little back
-(`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in game), further in a form (1.4: a
-bear didn't fit), turned 0.75 rad towards the foes; reloaded like the foes (when who it is or the
+(`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in game); per form, from what fit
+in game: a bear 1.4 (closer it didn't fit), a cat 1 (at 1.4 too small), Travel Form 2 for a
+Skyborne (race 95/96: a bird, too large at 1.4) and 1 for other races (a cheetah, as a cat; not
+seen in game), other forms 1.4; turned 0.75 rad towards the foes; reloaded like the foes (when who it is or the
 window's size changes, retried while nothing's there). **Weapons** (`SetSheathed`; the user: "when
 I cast, the weapon should be sheathed"): sheathed while they cast and out of a fight, drawn for a
 swing; a caster (mage, priest, warlock) keeps them sheathed and casts their instant spells (53, no

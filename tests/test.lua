@@ -3689,7 +3689,7 @@ do
 	Fire("UPDATE_SHAPESHIFT_FORM")
 	Advance(1.1)
 	check(win.Foes.Hero.Shifted:IsShown() and win.Foes.Hero.Shifted._unit == "player" and not win.Foes.Hero.Real:IsShown()
-		and win.Foes.Hero.Shifted._camScale == 1.4, "in Cat Form: my model as I am now (a PlayerModel: it shows the form)")
+		and win.Foes.Hero.Shifted._camScale == 1, "in Cat Form: my model as I am now (a PlayerModel: it shows the form), the camera closer")
 	SHAPESHIFT_SPELL = nil
 	Fire("UPDATE_SHAPESHIFT_FORM")
 	Advance(0.6)
@@ -3791,6 +3791,24 @@ do
 	thug._scripts.OnLeave(thug)
 	Advance(8)
 	check(not dot("Defias Thug") and not dot("Kodo") and used() == 2, "after a while the ones not seen again are gone")
+	-- The camera per form (what fit in game): a bear further back; Travel Form a Skyborne's bird
+	-- further still, another race's cheetah as a cat.
+	do
+		local race, scales = UnitRace, {}
+		for _, case in ipairs({ { 783, 95 }, { 5487 }, { 783 } }) do
+			UnitRace = case[2] and function() return "Skyborne", "Skyborne", case[2] end or race
+			SHAPESHIFT_SPELL = case[1]
+			Fire("UPDATE_SHAPESHIFT_FORM")
+			Advance(1.1)
+			scales[#scales + 1] = win.Foes.Hero.Shifted._camScale
+		end
+		UnitRace, SHAPESHIFT_SPELL = race, nil
+		Fire("UPDATE_SHAPESHIFT_FORM")
+		Advance(0.6)
+		check(scales[1] == 2 and scales[2] == 1.4 and scales[3] == 1 and win.Foes.Hero.Real:IsShown(),
+			"the camera per form: a Skyborne's Travel Form (a bird) 2, a bear 1.4, a human's Travel Form (a cheetah) 1; "
+			.. table.concat(scales, ", "))
+	end
 
 	-- Learning: two gnolls 20 yd ahead, one 30 degrees to the left, one to the right. Looking left and
 	-- right tells which is which (nameplates come and go, the soft target is the one straight ahead).
@@ -4218,8 +4236,8 @@ do
 	anna((herFrame:gsub(";M40;;", ";M40;768;"))) -- (in Cat Form)
 	Advance(1.1) -- (loaded, then its camera set on the next picture)
 	check(fwin.Foes.Hero.Shifted:IsShown() and fwin.Foes.Hero.Shifted._unit == "party1" and not fwin.Foes.Hero.Real:IsShown()
-		and fwin.Foes.Hero.Shifted._camScale == 1.4 and not fwin.Foes.Hero.Away:IsShown(),
-		"near and in Cat Form: her own model as she is (a PlayerModel shows the form), a little further back")
+		and fwin.Foes.Hero.Shifted._camScale == 1 and not fwin.Foes.Hero.Away:IsShown(),
+		"near and in Cat Form: her own model as she is (a PlayerModel shows the form), the camera as for a cat")
 	PARTY.party1 = nil
 	Advance(0.6)
 	check(fwin.Foes.Hero.Emblem:IsShown() and not fwin.Foes.Hero.Shifted:IsShown(), "away again, in Cat Form too: the emblem")
