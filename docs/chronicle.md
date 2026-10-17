@@ -279,7 +279,8 @@ BattleTag.
   pets, toys, blue loot or single quests), numbered per character (`e.n`), 30 days, at most 150;
 - a profile: lifetime numbers (time, sessions, quests, kills, deaths, zones, dungeons, runs,
   bosses, rares, distance, jumps, mounts, achievements, most gold, fastest level, longest session,
-  AFK, epics, levels, XP), the deadliest foe and favourite zone, class, level, when last played.
+  AFK, epics, levels, XP), the deadliest foe and favourite zone, class, level, when last played;
+- with the profile's stamp, the character's full name and GUID (an "a" record, below).
 
 A character goes by its record's key (`<Name-Realm>`: the first name's, see Data) in every record,
 as every build has known it.
@@ -287,7 +288,8 @@ as every build has known it.
 Every record has a stamp `u` from its author (`NextU`: `time()`, always above the last one,
 `store.myU`). Stamps: a highlight when recorded (`C.Stamp` from `Record`); a day when its numbers
 (as text) changed, checked every 60 s for today and yesterday (`StampChar`); the profile every
-5 min. After an update, highlights from before get numbers with their own time (`Upgrade`), and
+5 min (its text includes the full name and GUID: a new one is stamped too). After an update,
+highlights from before get numbers with their own time (`Upgrade`), and
 every character's days and profile get stamps. Switching `shareAlts` restamps everything, so
 friends ask again.
 
@@ -299,7 +301,12 @@ their own account left out), `J2;q;<acct>;<since>` send me that account's record
 `J2;p;<acct>;<Name-Realm>;<u>;<class>;<level>;<last>;<21 numbers>;<foe>;<zone>` (foe and zone left
 out if it wouldn't fit 250 bytes), `J2;d;<acct>;<Name-Realm>;<u>;<YYYYMMDD>;<14 numbers>`,
 `J2;n;<acct>;<Name-Realm>;<u>;<n>;<t>;<kind>;<a>;<b>` (the two text fields like Beacon's E2, 60
-bytes each), `J2;c;<acct>;<count>` the answer had count records (just before its end; older
+bytes each), `J2;a;<acct>;<Name-Realm>;<u>;<full name>;<guid>` (with the profile's stamp; older
+builds ignore words they don't know, and don't keep or pass it on; kept as the book character's
+`full`, `guid`, `aliasU` when its first name is the key's, newer stamps replacing older; a holder
+passes it on with the rest; one that only reached me through an older build comes with the next
+profile stamp, or Battle.net tells the name when that character is online), `J2;c;<acct>;<count>`
+the answer had count records (just before its end; older
 builds don't send it and ignore it), `J2;e;<acct>;<u>` that's all: complete up to u. A summary with a friend's account I
 hold less of starts a request (one friend at a time per account; 90 s without a record: it can go
 to another). An answer is at most 400 records, oldest first (records with the same stamp as the
@@ -344,12 +351,13 @@ So every character has one identity: mine its `store.chars` key (`me:<key>`), a 
 journal's (`book:<acct>:<Name-Realm>`), and one only known from live days its name
 (`friend:<full name>`). Sync.lua matches a full name from Battle.net (with the friend's account,
 class and GUID where known) to a journal's character (`FindBook`): by GUID; else by the full name
-(learned); else by the first name while the journal doesn't know the full one, within their
-account, if exactly one character fits and its class is the same. A match that isn't unique isn't
-made: two characters are never taken for one (an alt of the same account with another first name,
-"Anna" and "Annabel", stays apart). A match teaches the journal what it didn't know (`Learn`: the
-GUID, and the full name when it adds a surname; one it knows only changes on a GUID match, a
-rename). Without the account, only GUID and full name count.
+(the journal's own from its author's `a` record, or learned); else by the first name while the
+journal doesn't know the full one, within their account, if exactly one character fits and its
+class is the same. A match that isn't unique isn't made: two characters are never taken for one (an
+alt of the same account with another first name, "Anna" and "Annabel", stays apart). A match
+teaches the journal what it didn't know (`Learn`: the GUID, and the full name when it adds a
+surname; one it knows, its author's or learned, only changes on a GUID match, a rename). Without
+the account, only GUID and full name count.
 
 `C.Characters()` lists every character once, by the name the game shows (`C.NameOf`: `full`, else
 `name`): mine (days, numbers from `C.ProfileNumbers`, the one I play first), then my friends', by

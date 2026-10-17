@@ -28,6 +28,8 @@ local M = C.module
 --   J2;p;<acct>;<char>;<u>;<class>;<level>;<last>;<numbers>;<foe>;<zone>      a profile
 --   J2;d;<acct>;<char>;<u>;<YYYYMMDD>;<numbers>                              a day
 --   J2;n;<acct>;<char>;<u>;<n>;<t>;<kind>;<a>;<b>                             a highlight
+--   J2;a;<acct>;<char>;<u>;<full name>;<guid>    the character's full name and GUID, with the
+--                          profile's stamp (<char> stays its record's key: the first name's)
 --   J2;e;<acct>;<u>        that's all: you're complete up to u
 -- A request goes to one friend at a time per account (PENDING_TIMEOUT without progress: another
 -- may answer). An answer holds at most SERVE_MAX records, oldest first; its end says how far that
@@ -274,7 +276,8 @@ local function StampChar(c, recentOnly, withProfile)
 	end
 	if withProfile then
 		local numbers, foe, zone = ProfileText(c)
-		local text = numbers .. ";" .. foe .. ";" .. zone .. ";" .. (c.level or 0)
+		-- (its full name and GUID go with the profile's stamp: friends ask again when they're new)
+		local text = numbers .. ";" .. foe .. ";" .. zone .. ";" .. (c.level or 0) .. ";" .. (c.full or "") .. ";" .. (c.guid or "")
 		if text ~= s.profileSig then
 			s.profileSig, s.profileU = text, NextU()
 		end
@@ -358,6 +361,12 @@ local function ProfileMessage(acct, key, u, classFile, level, last, numbers, foe
 	return message
 end
 
+-- A character's full name and GUID (the "a" word: newer builds; older ones ignore words they don't
+-- know). Its key stays the first name's, the one every build knows it by.
+local function AliasMessage(acct, key, u, full, guid)
+	return J("a", acct, key, u, ns.Beacon.Clean(full or "", NAME_BYTES), guid or "")
+end
+
 -- An account's records newer than since: { { u, message }, ... }, oldest first.
 local function Records(acct, since)
 	local list = {}
@@ -374,6 +383,9 @@ local function Records(acct, since)
 				local numbers, foe, zone = ProfileText(c)
 				local last = c == C.Char() and time() or (c.session and c.session.last) or 0
 				Add(s.profileU, ProfileMessage(acct, key, s.profileU, c.classFile, c.level, last, numbers, foe, zone))
+				if c.full or c.guid then
+					Add(s.profileU, AliasMessage(acct, key, s.profileU, c.full or c.name, c.guid))
+				end
 			end
 			for day, u in pairs(s.dayU) do
 				local b = c.daily[day]
@@ -397,6 +409,9 @@ local function Records(acct, since)
 	else
 		local a = store.book[acct]
 		for key, c in pairs(a and a.chars or {}) do
+			if c.aliasU and c.full then
+				Add(c.aliasU, AliasMessage(acct, key, c.aliasU, c.full, c.guid))
+			end
 			if c.profile then
 				local p, numbers = c.profile, {}
 				for i, field in ipairs(PROFILE_FIELDS) do
@@ -454,9 +469,9 @@ end
 -- Battle.net (characterName: Beacon's peer.name). Journals go by the first name and realm
 -- ("Anna-Realm", the key every build sends), Beacon's live news and older builds' days
 -- (store.friends, store.friendStats) by the full name. So they're matched here, and every page
--- shows each character once, by its full name: by GUID; else by the full name (learned from
--- Battle.net); else by the first name while its journal doesn't know the full one, within their
--- account, if exactly one character fits (and has the same class).
+-- shows each character once, by its full name: by GUID; else by the full name (from its author:
+-- the "a" record, or learned from Battle.net); else by the first name while its journal doesn't
+-- know the full one, within their account, if exactly one character fits (and has the same class).
 -- A match that isn't unique isn't made: two characters are never taken for one.
 
 -- "Anna" of "Anna Brook" or "Anna-Realm".
@@ -516,7 +531,8 @@ local function FindBook(acct, name, classFile, guid, kept, loose)
 end
 
 -- What Battle.net says of a friend's character joins its journal: its GUID, and its full name when
--- that adds a surname (one it knows stays, unless the GUID says it's this character, renamed).
+-- that adds a surname (one it knows, its author's or learned, stays, unless the GUID says it's this
+-- character, renamed).
 local function Learn(c, name, guid, tier)
 	local changed = false
 	if guid and not c.guid then
@@ -757,6 +773,17 @@ local function Store(id, word, more, now)
 					g = old and old.g or time() }
 				Prune(c)
 				changed, newNews = true, true
+			end
+		end
+	elseif word == "a" and #f == 5 then
+		-- A character's full name and GUID, from its author (the name its journal is shown by, and
+		-- how Battle.net's news finds it). It must name the character of its key.
+		local full, guid = ns.Beacon.Clean(f[4], NAME_BYTES), ValidGuid(f[5])
+		if full ~= "" and FirstName(full) == FirstName(key) then
+			local c = Book(acct, key)
+			if u > (c.aliasU or 0) then
+				c.full, c.guid, c.aliasU = full, guid or c.guid, u
+				changed, newNews = true, true -- (the news shows the name)
 			end
 		end
 	end

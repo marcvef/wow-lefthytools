@@ -341,5 +341,8 @@ ns.CHANGELOG = {
 	{ id = 111, module = "chronicle",
 		en = { "One row per character", "Characters no longer show up twice (first name and full name). Each is shown once by the name the game shows, its BattleTag beside it; Compare and the leaderboards go by character." },
 		de = { "Eine Zeile pro Charakter", "Charaktere tauchen nicht mehr doppelt auf (Vorname und voller Name). Jeder steht einmal da, mit dem Namen, den das Spiel zeigt, und seinem BattleTag daneben; Vergleich und Bestenlisten gehen nach Charakter." } },
+	{ id = 112, module = "chronicle",
+		en = { "Full names from friends' journals", "Your friends' characters show their full names, also those that weren't online with you. Their LefthyTools needs this update." },
+		de = { "Volle Namen aus Tagebüchern", "Die Charaktere deiner Freunde zeigen ihren vollen Namen, auch die, die nicht mit dir online waren. Ihr LefthyTools braucht dieses Update." } },
 	-- New entries go here, at the end.
 }

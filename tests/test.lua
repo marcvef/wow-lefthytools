@@ -6703,22 +6703,35 @@ section("Chronicle: one row per character, accounts beside them")
 	CDB.friendStats["Carlbank Vale"], CDB.friendStats["Carlbank Moor"], CDB.friendStats["Cedric Vale"], CDB.friendStats["Bob Stone"] = nil, nil, nil, nil
 	CDB.book[annaAcct].chars["Bob-Realmy"], CDB.book[carl].chars["Bob-Realmy"] = nil, nil
 
-	-- My character: its full name and GUID kept; its key stays the first name's, what friends'
-	-- builds have always known it by.
+	-- Full names on the wire: "a" records (older builds ignore words they don't know), with the
+	-- profile's stamp; the key stays the first name's, so older builds see what they always saw.
+	anna("H2")
+	bob("H2")
+	Advance(1.2)
+	anna("J2;a;" .. carl .. ";Carlbank-Realmy;9100;Carlbank Vale;Player-1-77")
+	anna("J2;a;" .. carl .. ";Carl-Realmy;9200;Bob Stone;") -- (not his name)
+	anna("J2;a;" .. carl .. ";Carlbank-Realmy;9050;Carlbank Old;") -- (older)
+	Advance(0.3)
+	check(carlbank.full == "Carlbank Vale" and carlbank.guid == "Player-1-77" and carlBook.full == "Carl Vale",
+		"a journal's full name and GUID from its author; one that names someone else, or is older, is ignored")
+	local mark = #GAMEDATA + 1
+	bob("J2;q;" .. carl .. ";0")
+	Advance(3)
+	check(sentTo(12, mark, "J2;a;" .. carl .. ";Carlbank-Realmy;9100;Carlbank Vale;Player-1-77")[1], "passed on with his journal")
 	lefthy("disable chronicle")
 	MY_SURNAME = "Mirewood"
 	lefthy("enable chronicle")
 	Advance(0.3)
 	check(CH.CurrentKey() == "Lefthy-Realmy" and me.full == "Lefthy Mirewood" and me.guid == "Player-1-0",
 		"my character: the full name and GUID kept, the key the first name's (the one friends' builds know)")
-	anna("H2")
-	Advance(1.2)
 	anna("J2;h;" .. annaAcct)
-	local mark = #GAMEDATA + 1
+	mark = #GAMEDATA + 1
 	anna("J2;q;" .. mine .. ";0")
 	Advance(8)
-	check(sentTo(11, mark, "J2;p;" .. mine .. ";Lefthy-Realmy;")[1] and not sentTo(11, mark, "J2;p;" .. mine .. ";Lefthy Mirewood")[1],
-		"friends get my journal as before, by the first name's key")
+	local alias = sentTo(11, mark, "J2;a;" .. mine .. ";Lefthy-Realmy;")[1] or ""
+	check(alias:find(";Lefthy Mirewood;Player%-1%-0$") and sentTo(11, mark, "J2;p;" .. mine .. ";Lefthy-Realmy;")[1]
+		and not sentTo(11, mark, "J2;p;" .. mine .. ";Lefthy Mirewood")[1],
+		"friends get my full name and GUID in a record of their own; the profile is as older builds know it, got " .. alias)
 
 	-- Another character of mine with the same first name (another GUID): a record of its own.
 	lefthy("disable chronicle")
@@ -6743,7 +6756,7 @@ section("Chronicle: one row per character, accounts beside them")
 		"News: one line per event, by the character's full name")
 	CH.Open("friends")
 	check(drawnTimes("Anna Brook|r") == 1 and drawnTimes("Anna|r") == 0 and drawnTimes("|cff80c0ffAnnie|r") >= 1
-		and drawnTimes("Carl Vale|r") == 1 and drawnTimes("Carlbank|r") == 1 and drawnTimes("Carl|r") == drawnTimes("|cff80c0ffCarl|r"),
+		and drawnTimes("Carl Vale|r") == 1 and drawnTimes("Carlbank Vale|r") == 1 and drawnTimes("Carl|r") == drawnTimes("|cff80c0ffCarl|r"),
 		"Friends: Anna online once with her BattleTag; not online a row per character, never a character's other name")
 	CH.Open("compare")
 	check(drawnTimes("Anna Brook") >= 1 and drawnTimes("Anna|r") == 0 and drawnTimes("Lefthy Mirewood (you)") == 1
