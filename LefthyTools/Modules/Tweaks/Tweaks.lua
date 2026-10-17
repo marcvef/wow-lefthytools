@@ -44,6 +44,9 @@ local M = LT:NewModule("tweaks", {
 	},
 })
 
+local active = {} -- tweak key -> currently applied
+local lastDotSize  -- the combo dots' size before the latest setting change (OnSettingChanged)
+
 -- The AFK screen used to be part of Mirage: a choice made there carries over once.
 function M:OnInitialize()
 	local mirage = LT.db.settings.mirage
@@ -51,9 +54,8 @@ function M:OnInitialize()
 		self.db.afkScreen, self.db.afkSpin = mirage.afkScreen == true, mirage.afkSpin ~= false
 		mirage.afkScreen, mirage.afkSpin, mirage.afkSpinning = nil, nil, nil
 	end
+	lastDotSize = self.db.comboDotSize -- (so the slider's first move after login shows the dots too)
 end
-
-local active = {} -- tweak key -> currently applied
 
 ---------------------------------------------------------------------------
 -- Hiding the whole interface (the AFK screen, cinematic flights)
@@ -639,7 +641,6 @@ function M:OnDisable()
 	RequestReconcile()
 end
 
-local lastDotSize
 function M:OnSettingChanged()
 	RequestReconcile()
 	ns.RefreshQuestMap() -- what each zoom level shows
