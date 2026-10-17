@@ -120,7 +120,7 @@ function B.BuildDingOptions(o)
 	o:Header(L["Level-ups"])
 	o:Checkbox("dingAnnounce", L["Tell my friends when I level up"],
 		L["Battle.net friends who also use LefthyTools see your level-up message."])
-	B.dingTextSetting = o:TextInput("dingText", L["Level-up message"],
+	o:TextInput("dingText", L["Level-up message"],
 		L["What your friends see when you level up. {name} and {level} are filled in. Leave it empty for the default."],
 		{ maxLetters = TEXT_LETTERS })
 	o:Button(L["Test your message"], L["Preview"], Preview,
@@ -133,7 +133,7 @@ function B.BuildDingOptions(o)
 	for _, sound in ipairs(SOUNDS) do
 		values[#values + 1] = { sound.kit, sound.label }
 	end
-	B.dingSoundSetting = o:Choice("dingSoundKit", L["Level-up sound"],
+	o:Choice("dingSoundKit", L["Level-up sound"],
 		L["The sound for a friend's level-up. Picking one plays it."], values)
 	B.lastSoundKit = M.db.dingSoundKit
 end
@@ -151,10 +151,9 @@ function B.SoundCommand(arg)
 	local index = tonumber(arg)
 	local pick = index and SOUNDS[index]
 	if pick then
-		if M.db.dingSoundKit ~= pick.kit and B.dingSoundSetting then
-			B.dingSoundSetting:SetValue(index) -- the slider's position; keeps the panel in sync, B.OnSettingChanged plays it
+		if M.db.dingSoundKit ~= pick.kit then
+			LT:SetModuleSetting(M, "dingSoundKit", pick.kit) -- like picking it in the settings: B.OnSettingChanged plays it
 		else
-			M.db.dingSoundKit, B.lastSoundKit = pick.kit, pick.kit
 			PlayDingSound()
 		end
 		M:Print("level-up sound: " .. pick.name .. ".")
@@ -167,12 +166,7 @@ function B.SoundCommand(arg)
 end
 
 local function SetText(text)
-	text = strtrim(text)
-	if B.dingTextSetting then
-		B.dingTextSetting:SetValue(text) -- keeps the settings panel in sync
-	else
-		M.db.dingText = text
-	end
+	LT:SetModuleSetting(M, "dingText", strtrim(text)) -- (an open settings page follows)
 end
 
 -- /lefthy beacon ding [<text> | reset | test]

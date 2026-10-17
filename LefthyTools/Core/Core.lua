@@ -242,11 +242,19 @@ end
 
 -- Changes a setting the way its checkbox or slider would: through the setting object, so an
 -- open settings page shows the new value and OnSettingChanged runs. id is the setting's id
--- (its key, or the opts.id given to the builder); tbl/key say where it lives if there is no
--- settings panel (default m.db[id]).
+-- (its key, or the opts.id given to the builder); value is what the db keeps, for a choice too
+-- (Builder:Choice: its slider is moved to that value; one that isn't a choice changes nothing).
+-- tbl/key say where it lives if there is no settings panel (default m.db[id]).
 function LT:SetModuleSetting(m, id, value, tbl, key)
 	local setting = m.settings and m.settings[id]
 	if setting then
+		local position = m.choices and m.choices[id]
+		if position then
+			value = position(value) -- the slider's position
+			if not value then
+				return
+			end
+		end
 		setting:SetValue(value)
 	else
 		(tbl or m.db)[key or id] = value

@@ -110,7 +110,8 @@ end
 -- One of a few values, as a slider whose label names the value; the module's db keeps the value
 -- itself (a proxy setting maps it to the slider's position). Not a dropdown: a Blizzard menu
 -- opened from addon settings taints gamepad mode's focus manager, and a protected click through
--- it later (a role check's Accept) is blocked; see LT.Window.AddPicker.
+-- it later (a role check's Accept) is blocked; see LT.Window.AddPicker. LT:SetModuleSetting takes
+-- the value too: module.choices[id] finds its position.
 -- values: { { value, label }, ... } in display order.
 function Builder:Choice(key, name, tooltip, values, opts)
 	local tbl, default, id, variable = Describe(self, key, opts or {})
@@ -132,6 +133,8 @@ function Builder:Choice(key, name, tooltip, values, opts)
 	end
 	local setting = Settings.RegisterProxySetting(self.category, variable, "number", name, IndexOf(default) or 1, Get, Set)
 	Keep(self, setting, id)
+	self.module.choices = self.module.choices or {}
+	self.module.choices[id] = IndexOf
 	Settings.CreateSlider(self.category, setting, SliderOptions(1, #values, 1, function(index)
 		local v = values[math.floor(index + 0.5)]
 		return v and v[2] or ""

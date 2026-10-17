@@ -268,7 +268,9 @@ per module, and only the parent goes to `RegisterAddOnCategory`. Setting variabl
 Every setting the builder registers is kept in `module.settings[id]`. Code that changes a setting
 (slash commands) uses `LT:SetModuleSetting(m, id, value)`, which goes through the setting object
 like a click would: an open settings page shows the new value and `OnSettingChanged` runs. Writing
-`m.db` directly would leave the panel showing the old value.
+`m.db` directly would leave the panel showing the old value. The value is always what the db
+keeps, for a `Choice` too: its slider works with positions, and the builder keeps the lookup from
+value to position in `module.choices[id]` (a value that isn't one of the choices changes nothing).
 
 The builder handed to `BuildOptions` has `Header`, `Checkbox`, `Slider`, `CheckboxSlider` (both in
 one row, Blizzard's `CreateSettingsCheckboxSliderInitializer`), `Choice` (one of

@@ -2411,6 +2411,15 @@ check(BDB.dingSoundKit == 50111 and SOUNDS[#SOUNDS] == 50111 and #SOUNDS == soun
 lefthy("beacon sound 1")
 Advance(0.05)
 check(#SOUNDS == soundMark + 2, "picking the current one again still plays it")
+do -- A choice is set by the value the db keeps (LT:SetModuleSetting finds its slider's position). No time passes.
+	local updates = soundSlider.uiUpdates
+	LT:SetModuleSetting(Beacon, "dingSoundKit", 31578)
+	check(BDB.dingSoundKit == 31578 and soundSlider:GetValue() == 4 and soundSlider.uiUpdates == updates + 1,
+		"LT:SetModuleSetting takes a choice's value; its slider moves to it")
+	LT:SetModuleSetting(Beacon, "dingSoundKit", 12345)
+	check(BDB.dingSoundKit == 31578 and soundSlider.uiUpdates == updates + 1, "a value that isn't one of the choices changes nothing")
+	LT:SetModuleSetting(Beacon, "dingSoundKit", 50111) -- (back to the default; both play on the next frame)
+end
 
 section("Beacon: how many enemies")
 do
