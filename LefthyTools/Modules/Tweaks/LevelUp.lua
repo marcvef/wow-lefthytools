@@ -1196,7 +1196,7 @@ end)
 -- if it was to this level, example numbers otherwise.
 function LevelUp.Preview()
 	if InCombat() then
-		M:Print(L["Not in combat."])
+		M:Print("not in combat: try again after the fight.") -- (chat output stays English)
 		return
 	end
 	local level = UnitLevel("player") or 1

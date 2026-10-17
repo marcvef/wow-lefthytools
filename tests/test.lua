@@ -7399,6 +7399,13 @@ do
 	for _, b in ipairs(icons()) do if b.spell.known and b.Icon.desaturated then known = known + 1 end end
 	check(#icons() == #rogue20 and known == 2, "the preview lists every spell of the level, known ones greyed out")
 	W:Hide()
+	do -- In combat it says so in chat (English, like every chat line) instead.
+		STATE.combat = true
+		local mark = #PRINTED + 1
+		SlashCmdList.LEFTHYTOOLS_LEVELUP("")
+		check(not shown() and printedSince(mark):find("not in combat", 1, true), "/levelup in combat: a chat line, no window")
+		STATE.combat = false
+	end
 
 	-- Talents: level 10 opens the first row of every tree; later, the next row of the tree with the most points.
 	local function talentParts()

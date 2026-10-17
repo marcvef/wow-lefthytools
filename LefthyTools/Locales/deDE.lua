@@ -125,7 +125,6 @@ L["Shows the window for your current level, with the gains of your last level-up
 	"Zeigt das Fenster für dein aktuelles Level, mit den Werten deines letzten Level-Ups (Beispielzahlen, wenn es noch keins gab). /levelup macht dasselbe."
 L["Preview, with example gains (your next level-up shows the real ones)"] = "Vorschau mit Beispielwerten (dein nächstes Level-Up zeigt die echten)"
 L["Your last level-up, once more"] = "Dein letztes Level-Up, noch einmal"
-L["Not in combat."] = "Nicht im Kampf."
 L["LEVEL"] = "LEVEL"
 L["Level %d took %s"] = "Level %d hat %s gedauert"
 L["%d kills"] = "%d Kills"
