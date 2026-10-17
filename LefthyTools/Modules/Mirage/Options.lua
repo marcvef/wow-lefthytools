@@ -155,8 +155,17 @@ local HELP = {
 	"/mirage reset - restore defaults",
 }
 
+-- A number typed after a command (or already one); a decimal comma counts too (German clients
+-- show "1,5 s").
+local function Number(value)
+	if type(value) == "string" then
+		value = value:gsub(",", ".")
+	end
+	return tonumber(value)
+end
+
 local function SetNumber(key, value, minValue, maxValue, label, formatter)
-	local n = tonumber(value)
+	local n = Number(value)
 	if not n then
 		M:Print(label .. " is " .. formatter(M.db[key]) .. ".")
 		return
@@ -166,7 +175,7 @@ local function SetNumber(key, value, minValue, maxValue, label, formatter)
 end
 
 local function SetPercent(key, value, label)
-	local n = tonumber(value)
+	local n = Number(value)
 	SetNumber(key, n and n / 100, 0, 1, label, Percent)
 end
 
@@ -246,7 +255,7 @@ function M:OnSlashCommand(msg)
 			ListGroups()
 			return
 		end
-		local percent = tonumber(arg2)
+		local percent = Number(arg2)
 		if percent then
 			LT:SetModuleSetting(self, "alpha_" .. arg, math.max(0, math.min(100, percent)) / 100, self.db.groupAlpha, arg)
 			self:Print(arg .. " fades to " .. Percent(self.db.groupAlpha[arg]) .. ".")

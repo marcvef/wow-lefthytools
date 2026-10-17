@@ -428,6 +428,8 @@ do -- An element new in a later build starts at the player's faded opacity (not 
 	MDB.groupAlpha.chat, MDB.fadedAlpha = chatAlpha, fadedAlpha
 	Mirage:OnInitialize()
 end
+mirage("delay 1,5")
+check(MDB.delay == 1.5, "/mirage delay 1,5: a decimal comma too (German clients show \"1,5 s\")")
 mirage("delay 2")
 check(MDB.delay == 2 and S("delay").uiUpdates > 0, "/mirage delay 2, through the setting (an open settings page follows)")
 mirage("alpha 20")
