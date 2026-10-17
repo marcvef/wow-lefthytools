@@ -8732,6 +8732,18 @@ section("Bestiary: counting, more cases")
 		loot("Creature-0-1-0-1-116-00000074", 2589) -- (said empty before the /reload)
 		check(bandits.kills == kills and bandits.items[2589][1] == cloth + 1 and logged():find("Defias Bandit: looted (said empty before)", 1, true),
 			"said empty before a /reload, looted after it: its items join that kill")
+		-- Switched off with the ledger open: it closes too. Switched off with a loot window open (its
+		-- LOOT_CLOSED doesn't come then): on again, the next loot window still counts.
+		Bt.ToggleLedger(116)
+		local ledger = Bt.Ledger()
+		LOOT = { { type = 1, id = 2589, source = "Creature-0-1-0-1-116-00000081" } }
+		Fire("LOOT_READY", false)
+		LT:SetModuleEnabled("bestiary", false)
+		Fire("LOOT_CLOSED")
+		check(bandits.kills == kills + 1 and not ledger:IsShown(), "switched off: the ledger closes too")
+		LT:SetModuleEnabled("bestiary", true)
+		loot("Creature-0-1-0-1-116-00000082", 2589)
+		check(bandits.kills == kills + 2, "switched off in a loot window and on again: the next loot window counts")
 	end
 end)()
 

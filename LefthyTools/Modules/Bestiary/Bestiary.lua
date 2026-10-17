@@ -1481,7 +1481,9 @@ function M:OnDisable()
 			waiting[id] = nil -- (not listened to now: asked for again when needed)
 		end
 	end
-	lootMoney, lootSource, looseXP, fightFrom = nil, nil, nil, nil
+	-- (switched off with the loot window open: its LOOT_CLOSED won't come, and the next window would
+	-- look already seen)
+	lootMoney, lootSource, lootSeen, looseXP, fightFrom = nil, nil, false, nil, nil
 	if Bt.Stop then
 		Bt.Stop()
 	end

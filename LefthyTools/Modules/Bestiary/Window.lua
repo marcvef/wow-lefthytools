@@ -1121,13 +1121,17 @@ function Bt.Start()
 	end)
 end
 
--- Switched off: everything hides (whether the window was open stays kept).
+-- Switched off: everything hides, the ledger too (whether the window was open stays kept).
 function Bt.Stop()
 	if win then
 		win:Hide()
 	end
 	if card then
 		card:Hide()
+	end
+	local ledger = Bt.Ledger and Bt.Ledger()
+	if ledger then
+		ledger:Hide()
 	end
 	UpdateButton()
 end
