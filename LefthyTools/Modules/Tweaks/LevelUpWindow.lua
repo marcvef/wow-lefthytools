@@ -492,12 +492,14 @@ local function PlaceIcon(b, icon, x, y)
 	b:Show()
 end
 
-local function Fill(data)
+-- The window's sections, top to bottom: each places itself from y down (offsets from the window's
+-- top, negative) and returns where the next one starts.
+
+-- Portrait, level, name, and how long the level before took (Chronicle).
+local function FillHeader(data)
 	local className, classFile = UnitClass("player")
 	local race = UnitRace("player")
 	local y = -22 - 84 - 10 -- below the portrait
-
-	win.data = data
 	win.Tag:SetText(TagText(data))
 	SetPortraitTexture(win.Face.Portrait, "player")
 	win.LevelLabel:SetText(L["LEVEL"])
@@ -526,8 +528,11 @@ local function Fill(data)
 	else
 		win.Took:Hide()
 	end
+	return y
+end
 
-	-- Stats, two to a row (only for a level-up of yours: browsing other levels has none).
+-- Stats, two to a row (only for a level-up of yours: browsing other levels has none).
+local function FillStats(data, y)
 	local rows = StatRows(data.gains)
 	win.rows = rows
 	if #rows > 0 then
@@ -555,9 +560,11 @@ local function Fill(data)
 			cell.Value:Hide()
 		end
 	end
-	y = y - math.ceil(#rows / 2) * 22 - 10
+	return y - math.ceil(#rows / 2) * 22 - 10
+end
 
-	-- Spells from the trainer.
+-- Spells from the trainer. Also returns when the icons after them (talents) pop in.
+local function FillSpells(data, y)
 	local popAt = 1.0
 	for _, b in ipairs(win.Icons) do
 		b:Hide()
@@ -611,8 +618,11 @@ local function Fill(data)
 		win.SpellsTitle:Hide()
 		win.SpellNote:Hide()
 	end
+	return y, popAt
+end
 
-	-- A new talent row: per tree, its name and the row's talents.
+-- A new talent row: per tree, its name and the row's talents (popping in from popAt on).
+local function FillTalents(data, y, popAt)
 	for _, b in ipairs(win.TalentIcons) do
 		b:Hide()
 		b.talent = nil
@@ -657,8 +667,11 @@ local function Fill(data)
 	else
 		win.TalentsTitle:Hide()
 	end
+	return y
+end
 
-	-- Also unlocked: talent points, a class quest, dungeons.
+-- Also unlocked: talent points, a class quest, dungeons. Also returns how many lines.
+local function FillUnlocks(data, y)
 	local lines = UnlockLines(data)
 	if #lines > 0 then
 		y = y - 6
@@ -673,15 +686,20 @@ local function Fill(data)
 		win.UnlockTitle:Hide()
 		win.Unlocks:Hide()
 	end
-	if data.browse and #spells == 0 and not talentRow and #lines == 0 then
-		win.SpellNote:SetText(L["Nothing new at this level."])
-		win.SpellNote:ClearAllPoints()
-		win.SpellNote:SetPoint("TOP", win, "TOP", 0, y - 6)
-		win.SpellNote:Show()
-		y = y - 28
-	end
+	return y, #lines
+end
 
-	-- Friends at the bottom.
+-- Browsing a level that brings nothing: said so (in the spells' note).
+local function FillNothingNew(y)
+	win.SpellNote:SetText(L["Nothing new at this level."])
+	win.SpellNote:ClearAllPoints()
+	win.SpellNote:SetPoint("TOP", win, "TOP", 0, y - 6)
+	win.SpellNote:Show()
+	return y - 28
+end
+
+-- Friends at the bottom.
+local function FillFriends(data, y)
 	if #data.friends > 0 then
 		local names = {}
 		for _, peer in ipairs(data.friends) do
@@ -695,7 +713,22 @@ local function Fill(data)
 	else
 		win.Friends:Hide()
 	end
-	win:SetHeight(-y + 22)
+	return y
+end
+
+local function Fill(data)
+	win.data = data
+	local y = FillHeader(data)
+	y = FillStats(data, y)
+	local popAt, unlocks
+	y, popAt = FillSpells(data, y)
+	y = FillTalents(data, y, popAt)
+	y, unlocks = FillUnlocks(data, y)
+	if data.browse and #data.spells == 0 and not data.talentRow and unlocks == 0 then
+		y = FillNothingNew(y)
+	end
+	y = FillFriends(data, y)
+	win:SetHeight(-y + 22) -- (as tall as what it shows)
 end
 
 ---------------------------------------------------------------------------
