@@ -307,7 +307,7 @@ end
 ---------------------------------------------------------------------------
 
 local function WinnerText(name)
-	if name == MyName() then
+	if B.IsMe(name) then -- (the sharer's client names me as Battle.net does: with my surname)
 		return L["You win!"]
 	end
 	return L["%s wins!"]:format(name)

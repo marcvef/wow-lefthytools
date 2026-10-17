@@ -2757,12 +2757,19 @@ do
 
 	-- Only one needs it: no roll. Nobody: nobody.
 	anna("I2;6948::::::::20:::::;5151")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "I2;1179::::::::20:::::;6262", "WHISPER", 12) -- (Bob offers one too)
 	Advance(0.15)
 	BB.calls["11:5151"].frame.Pass:Click()
+	BB.calls["12:6262"].frame.Need:Click()
 	anna("R2;5151;Bob:0")
+	MY_SURNAME = "Mirewood" -- Battle.net names characters with their surname: so does Bob's verdict
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "R2;6262;Lefthy Mirewood:0", "WHISPER", 12)
 	Advance(0.15)
-	local single = BB.calls["11:5151"]
+	MY_SURNAME = nil
+	local single, bobs = BB.calls["11:5151"], BB.calls["12:6262"]
 	check(single.state == "done" and single.frame.Winner:GetText():find("Bob wins!", 1, true), "a single Need: they get it, no roll")
+	check(bobs.state == "done" and bobs.frame.Winner:GetText():find("You win!", 1, true),
+		"a verdict naming me with my surname: I win, got " .. tostring(bobs.frame.Winner:GetText()))
 	Advance(9)
 	ctrlRight(ItemLink(1155), true)
 	Advance(0.15)
