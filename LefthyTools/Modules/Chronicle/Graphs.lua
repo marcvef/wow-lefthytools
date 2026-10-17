@@ -806,8 +806,9 @@ local function Colours(people)
 	end
 end
 
+-- (marked while only the first name is known, Sync.lua's C.Mark)
 local function Named(p)
-	return "|cff" .. p.hex .. (p.name or "?") .. "|r"
+	return "|cff" .. p.hex .. (p.name or "?") .. "|r" .. C.Mark(p.partial)
 end
 
 -- A person's values over the range (days: YYYY-MM-DD, oldest first): nil where unknown.
@@ -855,8 +856,8 @@ end
 local function ShareRanking(title, ranking, key, days)
 	local parts = {}
 	for i = 1, math.min(5, #ranking) do
-		parts[#parts + 1] = ranking[i].person.name .. " " .. (key == "gold" and (C.Number(ranking[i].value) .. "g")
-			or C.ChatValue(key == "bossesRares" and "kills" or key, ranking[i].value))
+		parts[#parts + 1] = ranking[i].person.name .. C.Mark(ranking[i].person.partial, true) .. " "
+			.. (key == "gold" and (C.Number(ranking[i].value) .. "g") or C.ChatValue(key == "bossesRares" and "kills" or key, ranking[i].value))
 	end
 	if #parts > 0 then
 		C.ShareLine(("Chronicle, %s (%d days): %s"):format(title, days, table.concat(parts, ", ")))
@@ -1122,8 +1123,8 @@ local function Toolbar(canvas, x, y, w, people, state, redraw)
 	cx = cx + 10
 	local rowY = y
 	for _, p in ipairs(people) do
-		local label = (p.name or "?") .. (p.me and (" " .. L["(you)"]) or "")
-		local chipW = 26 + math.min(110, #label * 6.5)
+		local you = p.me and (" " .. L["(you)"]) or ""
+		local chipW = 26 + math.min(110, (#(p.name or "?") + #you + (p.partial and 2 or 0)) * 6.5)
 		if cx + chipW > x + w then
 			cx, rowY = x, rowY + 24
 			h = h + 24
@@ -1131,9 +1132,13 @@ local function Toolbar(canvas, x, y, w, people, state, redraw)
 		local hidden = state.hidden[p.key]
 		canvas:Rect(cx, rowY, chipW - 4, 20, 1, 1, 1, hidden and 0.02 or 0.07, "BORDER")
 		canvas:Rect(cx + 6, rowY + 6, 8, 8, p.colour[1], p.colour[2], p.colour[3], hidden and 0.25 or 1)
-		canvas:Text((hidden and "|cff666666" or ("|cff" .. p.hex)) .. label .. "|r", cx + 18, rowY + 4, "GameFontHighlightSmall",
-			"LEFT", chipW - 22)
-		local tip = { p.name or "?" }
+		local colour = hidden and "|cff666666" or ("|cff" .. p.hex)
+		canvas:Text(colour .. (p.name or "?") .. (p.partial and ("|r" .. C.Mark(true) .. colour) or "") .. you .. "|r", cx + 18, rowY + 4,
+			"GameFontHighlightSmall", "LEFT", chipW - 22)
+		local tip = { (p.name or "?") .. C.Mark(p.partial) }
+		if p.partial then
+			tip[#tip + 1] = C.PartialHint(p.me, p.account)
+		end
 		tip[#tip + 1] = p.level and L["Level %d"]:format(p.level) or nil
 		if p.account then
 			tip[#tip + 1] = "|cff80c0ff" .. p.account .. "|r" -- (whose character it is: their BattleTag)
@@ -1186,7 +1191,8 @@ local function Leaders(canvas, x, y, w, people, state)
 			local first = shown[metric][1]
 			if first then
 				local title = metric == "afk" and "Martin award" or ("most " .. CHART_CHAT[metric])
-				parts[#parts + 1] = ("%s %s (%s)"):format(title, first.person.name, C.ChatValue(metric, first.value))
+				parts[#parts + 1] = ("%s %s%s (%s)"):format(title, first.person.name, C.Mark(first.person.partial, true),
+					C.ChatValue(metric, first.value))
 			end
 		end
 		if #parts > 0 then

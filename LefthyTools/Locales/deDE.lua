@@ -667,6 +667,12 @@ L["1 character"] = "1 Charakter"
 L["Everyone with a journal is online, or no friend's journal has come yet."] =
 	"Alle mit Tagebuch sind online, oder es ist noch kein Tagebuch eines Freundes angekommen."
 L["Click: their graphs"] = "Klick: ihre Graphen"
+L["Surname not known yet: it shows once you log in on the character."] =
+	"Nachname noch unbekannt: Er erscheint, sobald du dich mit dem Charakter einloggst."
+L["Surname not known yet: it shows once %s plays the character while you're online, or with an up-to-date LefthyTools."] =
+	"Nachname noch unbekannt: Er erscheint, sobald %s den Charakter spielt, während du online bist, oder mit einem aktuellen LefthyTools."
+L["Surname not known yet: it shows once the character is played while you're online, or with an up-to-date LefthyTools."] =
+	"Nachname noch unbekannt: Er erscheint, sobald der Charakter gespielt wird, während du online bist, oder mit einem aktuellen LefthyTools."
 L["... and %d more"] = "... und %d weitere"
 L["%s this week"] = "%s diese Woche"
 

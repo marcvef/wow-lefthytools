@@ -473,15 +473,53 @@ end
 -- the "a" record, or learned from Battle.net); else by the first name while its journal doesn't
 -- know the full one, within their account, if exactly one character fits (and has the same class).
 -- A match that isn't unique isn't made: two characters are never taken for one.
+--
+-- A character whose full name isn't known yet (its journal came from an older build, which only
+-- ever sent the first name, and Battle.net hasn't shown it online since; or an alt of mine not
+-- played since this build) is shown by its first name with a muted mark, never as if that were all
+-- of it (the user: "In forever you have to have two"), and a hover or a line under the list says
+-- when the rest comes.
 
 -- "Anna" of "Anna Brook" or "Anna-Realm".
 local function FirstName(name)
 	return type(name) == "string" and name:match("^[^%s%-]+") or nil
 end
 
+-- "Anna Brook", not "Anna".
+local function HasSurname(name)
+	return type(name) == "string" and FirstName(name) ~= name
+end
+C.HasSurname = HasSurname
+
 -- The name a character is shown by: the full name the game shows, once known.
 function C.NameOf(c)
 	return c.full or c.name
+end
+
+-- A record (mine, or a friend's journal's) without the name the game shows: only its first name.
+function C.Partial(c)
+	return not c.full
+end
+
+-- The mark after a partial name ("" for a whole one); plain: for LTC, where colours don't go.
+local MARK = " |cff888888?|r"
+function C.Mark(partial, plain)
+	return partial and (plain and " (?)" or MARK) or ""
+end
+
+-- When a partial name gets its surname, for a hover or the line under a list: mine when I log in on
+-- it; a friend's when Battle.net shows it online while I am, or their journal sends it (an up-to-date
+-- LefthyTools). account: their BattleTag's name, if known. note: as a line under a list (the mark first).
+function C.PartialHint(me, account, note)
+	local text
+	if me then
+		text = L["Surname not known yet: it shows once you log in on the character."]
+	elseif account then
+		text = L["Surname not known yet: it shows once %s plays the character while you're online, or with an up-to-date LefthyTools."]:format(account)
+	else
+		text = L["Surname not known yet: it shows once the character is played while you're online, or with an up-to-date LefthyTools."]
+	end
+	return (note and (MARK:sub(2) .. "  ") or "") .. "|cff888888" .. text .. "|r"
 end
 
 -- A friend's account hash as saved (nil: not one, or no longer my friend's).
@@ -514,7 +552,7 @@ local function FindBook(acct, name, classFile, guid, kept, loose)
 					tier = nil
 				elseif C.NameOf(c) == name then
 					tier = 2
-				elseif not c.full and c.name == first and (acct or loose) then
+				elseif not HasSurname(c.full) and c.name == first and (acct or loose) then
 					tier = 3
 				end
 				if tier and tier < best then
@@ -530,15 +568,17 @@ local function FindBook(acct, name, classFile, guid, kept, loose)
 	end
 end
 
--- What Battle.net says of a friend's character joins its journal: its GUID, and its full name when
--- that adds a surname (one it knows, its author's or learned, stays, unless the GUID says it's this
--- character, renamed).
+-- What Battle.net says of a friend's character joins its journal: its GUID, and the name the game
+-- shows (also without a surname: then that's all of it). One it knows, its author's or learned, stays,
+-- unless this one adds the surname, or the GUID says it's this character, renamed (to a name with a
+-- surname: one without never replaces one with).
 local function Learn(c, name, guid, tier)
 	local changed = false
 	if guid and not c.guid then
 		c.guid, changed = guid, true
 	end
-	if name ~= c.name and c.full ~= name and FirstName(name) == FirstName(c.name) and (not c.full or tier == 1) then
+	if c.full ~= name and FirstName(name) == FirstName(c.name)
+		and (not c.full or (HasSurname(name) and (tier == 1 or not HasSurname(c.full)))) then
 		c.full, changed = name, true
 	end
 	if changed then
@@ -896,18 +936,19 @@ end
 
 -- Every character, once: mine (store.chars), my friends' from their journals (the book; with the days
 -- their older builds sent live, store.friendStats, where the journal has none), and characters only
--- known from such days. Each: { key, name (the full name the game shows), realm, classFile, level,
--- me, current (the one I play), online, accountOnline (one of its account's characters is), last,
--- days, profile, foe, zone, acct, account (its BattleTag's name), news, legacy }. Mine first (the one
--- I play first), then my friends', by name. Graphs, leaderboards and lists go by these: a character
--- is never also shown as part of another row.
+-- known from such days. Each: { key, name (the full name the game shows), partial (only the first
+-- name is known: shown marked), realm, classFile, level, me, current (the one I play), online,
+-- accountOnline (one of its account's characters is), last, days, profile, foe, zone, acct, account
+-- (its BattleTag's name), news, legacy }. Mine first (the one I play first), then my friends', by
+-- name. Graphs, leaderboards and lists go by these: a character is never also shown as part of
+-- another row.
 function C.Characters()
 	local list, current = {}, C.Char()
 	local myAcct, myTag = C.MyAccount(), MyTag()
 	for key, c in pairs(store.chars) do
 		C.Fill(c)
-		list[#list + 1] = { key = "me:" .. key, name = C.NameOf(c), realm = c.realm, classFile = c.classFile, level = c.level,
-			me = true, current = c == current, online = c == current, accountOnline = true,
+		list[#list + 1] = { key = "me:" .. key, name = C.NameOf(c), partial = C.Partial(c), realm = c.realm, classFile = c.classFile,
+			level = c.level, me = true, current = c == current, online = c == current, accountOnline = true,
 			last = c == current and time() or (c.session and c.session.last) or 0, days = c.daily, profile = ProfileNumbers(c),
 			foe = Top(c.killers), zone = Top(c.zoneTime), acct = myAcct, account = myTag }
 	end
@@ -952,8 +993,8 @@ function C.Characters()
 							days[day] = b
 						end
 					end
-					list[#list + 1] = { key = key, name = C.NameOf(c), realm = c.realm, classFile = c.classFile, level = level,
-						online = online[key] or false, accountOnline = onlineAccounts[acct] or false, last = LastPlayed(last, days),
+					list[#list + 1] = { key = key, name = C.NameOf(c), partial = C.Partial(c), realm = c.realm, classFile = c.classFile,
+						level = level, online = online[key] or false, accountOnline = onlineAccounts[acct] or false, last = LastPlayed(last, days),
 						days = days, profile = c.profile, foe = c.foe, zone = c.zone, acct = acct, account = C.AccountLabel(acct),
 						news = c.news }
 				end
@@ -962,7 +1003,7 @@ function C.Characters()
 	end
 	for _, item in ipairs(loose) do
 		local f, acct = item.f, ValidAcct(item.f.acct)
-		list[#list + 1] = { key = item.key, name = item.name, classFile = f.classFile, level = f.level,
+		list[#list + 1] = { key = item.key, name = item.name, partial = false, classFile = f.classFile, level = f.level,
 			online = online[item.key] or false, accountOnline = (acct and onlineAccounts[acct]) or online[item.key] or false,
 			last = f.updated or 0, days = type(f.days) == "table" and f.days or {}, legacy = true, acct = acct,
 			account = acct and C.AccountLabel(acct) }
@@ -1190,7 +1231,8 @@ end
 
 -- The merged feed, oldest first: friends' synced highlights and what came live (Beacon's events,
 -- E2 highlights, online and offline), each once (a live one that a synced one of the same character
--- repeats goes). Each entry: its character's key (among C.Characters()) and name (the full one).
+-- repeats goes). Each entry: its character's key (among C.Characters()), name (the full one) and
+-- partial (only its first name is known).
 local merged, mergedFor
 function C.FriendNews()
 	local version = feedVersion .. ":" .. #store.friends .. ":" .. tostring(store.friends[#store.friends])
@@ -1208,12 +1250,12 @@ function C.FriendNews()
 	for acct, a in pairs(store.book) do
 		if acct ~= C.MyAccount() and IsFriend(acct) then
 			for bookKey, c in pairs(a.chars) do
-				local key, name = "book:" .. acct .. ":" .. bookKey, C.NameOf(c)
+				local key, name, partial = "book:" .. acct .. ":" .. bookKey, C.NameOf(c), C.Partial(c)
 				local repeated = RepeatedDeaths(c.news)
 				for n, e in pairs(c.name and c.news or {}) do
 					if not repeated[n] then
-						local entry = { t = e.t, g = e.g, key = key, name = name, classFile = c.classFile, k = e.k, a = e.a, b = e.b,
-							synced = true }
+						local entry = { t = e.t, g = e.g, key = key, name = name, partial = partial, classFile = c.classFile, k = e.k,
+							a = e.a, b = e.b, synced = true }
 						if e.k == "level" then
 							entry.level = tonumber(e.a)
 						elseif e.k == "death" then
@@ -1238,7 +1280,8 @@ function C.FriendNews()
 				repeated = repeated or math.abs(t - f.t) < 900
 			end
 			if not repeated then
-				local entry = { key = key, name = c and C.NameOf(c) or f.name, classFile = c and c.classFile or f.classFile }
+				local entry = { key = key, name = c and C.NameOf(c) or f.name, partial = c ~= nil and C.Partial(c),
+					classFile = c and c.classFile or f.classFile }
 				for field, value in pairs(f) do
 					entry[field] = entry[field] or value
 				end
@@ -1307,7 +1350,7 @@ function C.CatchUpLines(since)
 		if f.t > since and NEWS_CHAT[f.k] then
 			local entry = byChar[f.key]
 			if not entry then
-				entry = { name = f.name, classFile = f.classFile, items = {}, deaths = 0, zones = 0 }
+				entry = { name = f.name, partial = f.partial, classFile = f.classFile, items = {}, deaths = 0, zones = 0 }
 				byChar[f.key] = entry
 				order[#order + 1] = f.key
 			end
@@ -1338,7 +1381,8 @@ function C.CatchUpLines(since)
 			parts[#parts + 1] = entry.deaths == 1 and "died once" or ("died %d times"):format(entry.deaths)
 		end
 		local more = #entry.items - 3
-		lines[#lines + 1] = Coloured(entry.name, entry.classFile) .. ": " .. table.concat(parts, ", ") .. (more > 0 and (" (+%d more)"):format(more) or "")
+		lines[#lines + 1] = Coloured(entry.name, entry.classFile) .. C.Mark(entry.partial) .. ": " .. table.concat(parts, ", ")
+			.. (more > 0 and (" (+%d more)"):format(more) or "")
 	end
 	return lines
 end
@@ -1374,8 +1418,8 @@ function C.RecapLines(count, ending)
 			local first = list[1]
 			local title = metric == "deaths" and "most deaths" or metric == "afk" and "Martin award (most time AFK)"
 				or ("most " .. LABEL_CHAT[metric])
-			lines[#lines + 1] = ("%s: %s (%s)"):format(title, Coloured(first.person.name, first.person.classFile),
-				C.ChatValue(metric, first.value))
+			lines[#lines + 1] = ("%s: %s%s (%s)"):format(title, Coloured(first.person.name, first.person.classFile),
+				C.Mark(first.person.partial), C.ChatValue(metric, first.value))
 		end
 	end
 	return lines, board

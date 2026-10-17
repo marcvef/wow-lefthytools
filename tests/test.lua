@@ -6075,7 +6075,7 @@ do
 	check(draws == 1, "but within 10 s (at most once)")
 	CH.Graphs.Draw = draw
 	-- A second character: the window is about the person, so its numbers join mine (its level stays its own).
-	CDB.chars["Alty-Realmy"] = { name = "Alty", realm = "Realmy", classFile = "MAGE", level = 12,
+	CDB.chars["Alty-Realmy"] = { name = "Alty", full = "Alty", realm = "Realmy", classFile = "MAGE", level = 12, -- (played with this build)
 		events = { { t = time(), k = "level", level = 12 } }, stats = { quests = 7, afk = 600, played = 1200 },
 		daily = { [date("%Y-%m-%d", time() - 86400)] = { played = 1800, xp = 100, quests = 1, kills = 2, deaths = 0, afk = 300 } } }
 	-- The picker: our own dropdown (a Blizzard menu opened from addon code taints gamepad mode).
@@ -6472,8 +6472,10 @@ section("Chronicle: friends' journals, also when they're offline")
 	check(not win.Tabs.graphs:IsEnabled() and win.Picker.Label:GetText():find("Carl", 1, true),
 		"a click on a row: their graphs, got " .. tostring(win.Picker.Label:GetText()))
 	-- Carl plays two characters: one person, in the dropdown and on his page.
+	-- (his journal came from Anna, an older build's: only his first name is known, marked)
+	local unsure = " |cff888888?|r"
 	check(win.Picker.Label:GetText():find("Carlbank", 1, true) and drawn("You and Carl, last 7 days") and drawn("2h 30m")
-		and drawn("Carl|r: Died to Hogger"), "his graphs: both characters added up (2 h + 30 min), his news saying whose")
+		and drawn("Carl|r" .. unsure .. ": Died to Hogger"), "his graphs: both characters added up (2 h + 30 min), his news saying whose")
 	do
 		win.Picker:Click()
 		local carls, annas = 0, 0
@@ -6550,10 +6552,12 @@ section("Chronicle: friends' journals, also when they're offline")
 		"a click on a small chart (time played per day): shown big at the top")
 	click(hoverWith("Level", "Click: show this"))
 	local lines = canvas.used.line
-	local chip = hover("Carl")
+	local chip = hover("Carl" .. unsure)
+	check(chip and chip.lines[2] == "|cff888888Surname not known yet: it shows once Carl plays the character while you're online, or with an up-to-date LefthyTools.|r",
+		"his chip: his first name marked, its hover says when the surname comes")
 	chip._scripts.OnMouseUp(chip, "LeftButton")
 	check(canvas.used.line < lines, "a click on a chip hides that person from every graph")
-	chip = hover("Carl")
+	chip = hover("Carl" .. unsure)
 	chip._scripts.OnMouseUp(chip, "LeftButton")
 	local range = nil
 	for i = 1, canvas.used.text do
@@ -6596,7 +6600,7 @@ section("Chronicle: friends' journals, also when they're offline")
 	pmark = #PRINTED + 1
 	Advance(80)
 	local said = printedSince(pmark)
-	check(said:find("while you were away", 1, true) and said:find("Carl|r: reached level 18", 1, true) and said:find("died once", 1, true),
+	check(said:find("while you were away", 1, true) and said:find("Carl|r" .. unsure .. ": reached level 18", 1, true) and said:find("died once", 1, true),
 		"a minute after logging in: what friends did while I was away, got\n" .. said)
 
 	-- Once a week: last week's leaderboard.
@@ -6611,7 +6615,7 @@ section("Chronicle: friends' journals, also when they're offline")
 	pmark = #PRINTED + 1
 	Advance(125)
 	said = printedSince(pmark)
-	check(said:find("last week's leaderboard", 1, true) and said:find("most quests: |c%x+Carl|r %(30%)") and said:find("most deaths", 1, true),
+	check(said:find("last week's leaderboard", 1, true) and said:find("most quests: |c%x+Carl|r |cff888888%?|r %(30%)") and said:find("most deaths", 1, true),
 		"the weekly recap: who led last week, got\n" .. said)
 	pmark = #PRINTED + 1
 	lefthy("disable chronicle")
@@ -6802,13 +6806,88 @@ section("Chronicle: one row per character, accounts beside them")
 	check(annies == 1 and annaNames == 1, "the dropdown: accounts, each with its characters, Anna's once")
 	win:Hide()
 
+	-- UnitName not saying the surname this time (every character in Forever has one): the one known stays.
+	lefthy("disable chronicle")
+	MY_SURNAME = nil
+	lefthy("enable chronicle")
+	check(me.full == "Lefthy Mirewood", "my surname stays when UnitName doesn't say one this time")
+
 	-- (back to how the later tests know her and me)
 	bn(11).characterName = "Anna"
 	Fire("BN_FRIEND_INFO_CHANGED")
 	lefthy("disable chronicle")
-	MY_SURNAME = nil
+	me.full = nil
 	lefthy("enable chronicle")
 	Advance(1.2)
+end)()
+
+section("Chronicle: a surname not known yet says so")
+;(function() -- (a function of its own: the main chunk's 200 locals)
+	local carl = CH.Hash("Carl#3456")
+	local unsure = " |cff888888?|r"
+	local hint = "Surname not known yet: it shows once Carl plays the character while you're online, or with an up-to-date LefthyTools."
+	local win = LefthyToolsChronicleFrame
+	local canvas = win.Canvas
+	local function drawn(text)
+		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return true end end
+	end
+	local function hoverOf(first)
+		for i = 1, canvas.used.hover do
+			local f = canvas.pools.hover[i]
+			if f.lines and (f.lines[1] or ""):find(first, 1, true) then return f end
+		end
+	end
+	-- A character of Carl's whose journal came from an older build (it only ever sends the first name)
+	-- and that was never online while I was: nothing told its surname.
+	local today = date("%Y%m%d")
+	anna("H2")
+	Advance(1.2)
+	anna("J2;p;" .. carl .. ";Corin-Realmy;9400;PALADIN;9;" .. time() .. ";600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000;;")
+	anna("J2;d;" .. carl .. ";Corin-Realmy;9401;" .. today .. ";30,300,5,20,1,1,0,9,1,1000,0,0,0,10")
+	anna("J2;n;" .. carl .. ";Corin-Realmy;9402;1;" .. time() .. ";level;9;Westfall")
+	Advance(0.3)
+	local corin
+	for _, c in ipairs(CH.Characters()) do
+		if c.key == "book:" .. carl .. ":Corin-Realmy" then corin = c end
+	end
+	check(corin and corin.name == "Corin" and corin.partial, "only its first name is known: partial")
+	check(not CH.Characters()[1].partial and CDB.book[CH.Hash("Annie#1234")].chars["Anna-Realmy"].full == "Anna Brook",
+		"the one I play isn't (UnitName); a surname known isn't taken back by a name without (Battle.net's \"Anna\" again)")
+	-- Every page: the first name with a muted mark; a hover, or a line under the list, says when the rest comes.
+	CH.Open("friends")
+	local row = hoverOf("Corin|r")
+	check(drawn("Corin|r" .. unsure) and row and row.lines[1]:find("Corin|r" .. unsure, 1, true) and row.lines[2] == "|cff888888" .. hint .. "|r",
+		"Friends, not online: Corin marked, the hover says when the surname comes")
+	CH.Open("news")
+	local page = win.Text:GetText()
+	local note = "\n\n|cff888888?|r  |cff888888Surname not known yet: it shows once the character is played while you're online, or with an up-to-date LefthyTools.|r"
+	check(page:find("Corin|r" .. unsure .. ": Level 9", 1, true) and page:sub(-#note) == note,
+		"News: marked, and a line under the list says what the mark means")
+	CH.Open("compare")
+	local chip = hoverOf("Corin" .. unsure)
+	check(drawn("Corin|r" .. unsure) and chip and chip.lines[2] == "|cff888888" .. hint .. "|r", "Compare: the chip and the charts marked, the chip's hover says when")
+	CH.Open("graphs")
+	win.Picker:Click()
+	local entry
+	for i = 1, win.Picker.List.count do
+		local text = win.Picker.List.rows[i].Text:GetText() or ""
+		if text:find("Corin", 1, true) then entry = text end
+	end
+	win.Picker.List:Hide()
+	check(entry and entry:find("Corin|r" .. unsure .. " |cffcccccc9|r", 1, true), "the dropdown: marked, got " .. tostring(entry))
+	-- An alt of mine not played since this build: its full name comes when I log in on it.
+	CDB.chars["Oldalt-Realmy"] = { name = "Oldalt", realm = "Realmy", classFile = "WARRIOR", level = 5,
+		events = { { t = time(), k = "level", level = 5 } } }
+	local mine = "|cff888888?|r  |cff888888Surname not known yet: it shows once you log in on the character.|r"
+	win.Tabs.timeline:Click()
+	page = win.Text:GetText()
+	check(page:find("Oldalt|r" .. unsure .. ": Level 5", 1, true) and page:sub(-#mine) == mine and not page:find("Lefthy|r" .. unsure, 1, true),
+		"my timeline: the alt marked, the one I play not, and what the mark means")
+	win.Tabs.stats:Click()
+	check(win.Text:GetText():find("Oldalt|r" .. unsure, 1, true) and win.Text:GetText():sub(-#mine) == mine, "my statistics: the same")
+	CDB.chars["Oldalt-Realmy"] = nil
+	CDB.book[carl].chars["Corin-Realmy"] = nil
+	win:Hide()
 end)()
 
 section("Chronicle: a death counts once")

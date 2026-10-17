@@ -170,7 +170,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     their graphs, "You and <BattleTag>"). No character anywhere twice, or under its first name alone
     next to its full name: the News page has one line per event, Compare and its leaderboard a
     chip, a line and a row per character (BattleTag on a chip's hover), the Friends page a row per
-    character with the BattleTag in its column.
+    character with the BattleTag in its column. A friend's character whose journal came from an
+    older build shows its first name with a grey "?" on every page (its hover, or a line under the
+    News list, says when the surname comes); never a first name alone without it.
     Graphs: "Time AFK" shows AFK time per day; a friend's page (both on this build) has an AFK tile
     and an AFK row next to yours. With a friend: their level-up
     and a highlight (e.g. a boss) appear under Friends and in chat. `/chronicle session`.

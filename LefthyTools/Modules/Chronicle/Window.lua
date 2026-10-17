@@ -219,6 +219,16 @@ local function Journal(list, toLine, empty, older)
 	return table.concat(lines, "\n")
 end
 
+-- A character's name in its class colour, marked while only its first name is known.
+local function Named(name, classFile, partial)
+	return LT.Window.ClassColorCode(classFile) .. (name or "?") .. "|r" .. C.Mark(partial)
+end
+
+-- A text page's lines plus, when a name on it is marked, what the mark means (me: my characters).
+local function WithNote(text, partial, me)
+	return partial and (text .. "\n\n" .. C.PartialHint(me, nil, true)) or text
+end
+
 -- My timeline: every character's journal in one (chars from C.Totals). With more than one character
 -- each line says whose it is. Only the newest TIMELINE_SHOW of each can be drawn: only those are merged.
 local function Timeline(chars)
@@ -230,13 +240,14 @@ local function Timeline(chars)
 		local events = c.events
 		local first = math.max(1, #events - TIMELINE_SHOW + 1)
 		older = older + first - 1
-		local who = keeping > 1 and (LT.Window.ClassColorCode(c.classFile) .. (C.NameOf(c) or "?") .. "|r") or nil
+		local who = keeping > 1 and Named(C.NameOf(c), c.classFile, C.Partial(c)) or nil
+		local marked = who ~= nil and C.Partial(c)
 		local lastDeath
 		for i = first, #events do
 			local e = events[i]
 			if not RepeatedDeath(e, lastDeath) then
 				local n = #list + 1
-				list[n] = { e = e, who = who, n = n }
+				list[n] = { e = e, who = who, n = n, marked = marked }
 				lastDeath = e.k == "death" and e.t or lastDeath
 			end
 		end
@@ -245,7 +256,12 @@ local function Timeline(chars)
 		local ta, tb = a.e.t or 0, b.e.t or 0
 		return ta < tb or (ta == tb and a.n < b.n)
 	end)
-	return Journal(list, function(item) return LineFor(item.e, item.who), item.e.t end, nil, older)
+	local partial = false -- (a marked name among the lines drawn)
+	local text = Journal(list, function(item)
+		partial = partial or item.marked
+		return LineFor(item.e, item.who), item.e.t
+	end, nil, older)
+	return WithNote(text, partial, true)
 end
 
 -- The Friends page: two tables (Graphs.lua's G.DrawTables), a row per character, named as the game
@@ -325,8 +341,11 @@ local function FriendTables(open)
 		local week = C.Sum(c, "played", 7)
 		local played = c.last and c.last > 0
 		local cell, latestLine = LatestCell(latest[c.key])
-		local name = LT.Window.ClassColorCode(c.classFile) .. (c.name or "?") .. "|r"
+		local name = Named(c.name, c.classFile, c.partial)
 		local tip = { name }
+		if c.partial then
+			tip[#tip + 1] = C.PartialHint(false, c.account)
+		end
 		if c.level then
 			tip[#tip + 1] = L["Level %d"]:format(c.level) .. (c.realm and (" - " .. c.realm) or "")
 		end
@@ -335,7 +354,7 @@ local function FriendTables(open)
 		if account and #account.chars > 1 then
 			local names = {}
 			for _, other in ipairs(account.chars) do
-				names[#names + 1] = LT.Window.ClassColorCode(other.classFile) .. (other.name or "?") .. "|r " .. (other.level or "")
+				names[#names + 1] = Named(other.name, other.classFile, other.partial) .. " " .. (other.level or "")
 			end
 			tip[#tip + 1] = L["All characters: %s"]:format(table.concat(names, ", "))
 		end
@@ -372,10 +391,13 @@ end
 
 -- The News page: what friends did (synced journals and live news), newest first, by day.
 local function News()
-	return "|cffffd200" .. L["What they did"] .. "|r\n" .. Journal(C.FriendNews(), function(f)
+	local partial = false -- (a marked name among the lines drawn)
+	local text = Journal(C.FriendNews(), function(f)
 		local e = FriendEvent(f)
-		return e and LineFor(e, LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r"), f.t
+		partial = partial or (e ~= nil and f.partial)
+		return e and LineFor(e, Named(f.name, f.classFile, f.partial)), f.t
 	end, L["Your friends' level-ups, deaths, quests, new zones, dungeons, bosses, rares, epic loot, mounts and milestones show up here, and when they come online. They need an up-to-date LefthyTools for most of it."])
+	return "|cffffd200" .. L["What they did"] .. "|r\n" .. WithNote(text, partial)
 end
 
 ---------------------------------------------------------------------------
@@ -445,10 +467,11 @@ local function Statistics(t)
 	end
 
 	Section(L["Characters"])
-	local played, levelTotal, levels, gold = 0, 0, 0, 0
+	local played, levelTotal, levels, gold, partial = 0, 0, 0, 0, false
 	for _, c in ipairs(t.chars) do
 		local realm = (c.realm and c.realm ~= GetRealmName()) and (" |cff999999- " .. c.realm .. "|r") or ""
-		Row(LT.Window.ClassColorCode(c.classFile) .. (C.NameOf(c) or "?") .. "|r" .. realm, L["Level %d"]:format(c.level or 0))
+		Row(Named(C.NameOf(c), c.classFile, C.Partial(c)) .. realm, L["Level %d"]:format(c.level or 0))
+		partial = partial or C.Partial(c)
 		played = played and c.playedTotal and played + c.playedTotal or nil -- (only if every one has said)
 		for _, seconds in pairs(c.levelTimes) do
 			levelTotal, levels = levelTotal + seconds, levels + 1
@@ -530,6 +553,9 @@ local function Statistics(t)
 
 	labels[#labels + 1], values[#values + 1] = "", ""
 	labels[#labels + 1], values[#values + 1] = "|cff999999" .. L["Counted since %s."]:format(date(L["%Y-%m-%d"], t.first)) .. "|r", ""
+	if partial then
+		labels[#labels + 1], values[#values + 1] = C.PartialHint(true, nil, true), ""
+	end
 	return table.concat(labels, "\n"), table.concat(values, "\n")
 end
 
@@ -559,7 +585,12 @@ end
 local function Label(person)
 	local names = {}
 	for _, c in ipairs(person.chars or {}) do
-		names[#names + 1] = LT.Window.ClassColorCode(c.classFile) .. (C.NameOf(c) or "?") .. "|r" .. (c.level and (" |cffcccccc" .. c.level .. "|r") or "")
+		-- (mine: my records, C.Totals; a friend's: C.Characters' entries, which say partial)
+		local partial = c.partial
+		if partial == nil then
+			partial = C.Partial(c)
+		end
+		names[#names + 1] = Named(C.NameOf(c), c.classFile, partial) .. (c.level and (" |cffcccccc" .. c.level .. "|r") or "")
 	end
 	local who = person.me and ("|cffffd200" .. L["You"] .. "|r") or person.account and ("|cff80c0ff" .. person.account .. "|r")
 	if who then
@@ -579,7 +610,7 @@ graphState.newsLines = function(person)
 		local f = feed[i]
 		if keys[f.key] then
 			local e = FriendEvent(f)
-			local line = e and LineFor(e, several and (LT.Window.ClassColorCode(f.classFile) .. f.name .. "|r") or nil)
+			local line = e and LineFor(e, several and Named(f.name, f.classFile, f.partial) or nil)
 			if line then
 				lines[#lines + 1] = "|cff999999" .. date(L["%Y-%m-%d"], f.t) .. "|r  " .. line
 				if #lines == 6 then

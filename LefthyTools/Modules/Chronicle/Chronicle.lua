@@ -957,7 +957,10 @@ function M:OnEnable()
 	store.chars[charKey] = char
 	Fill(char)
 	local _, classFile = UnitClass("player")
-	char.name, char.full, char.guid = name, full, guid or char.guid
+	-- (a surname known from before stays if UnitName doesn't say one this time: every character in
+	-- WoW: Forever has one; this record's is how friends learn it)
+	char.name, char.guid = name, guid or char.guid
+	char.full = (surname or not (C.HasSurname and C.HasSurname(char.full))) and full or char.full
 	char.realm, char.classFile, char.race = realm, classFile, UnitRace("player")
 	local level = UnitLevel("player")
 	if char.level and char.level ~= level then

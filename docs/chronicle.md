@@ -37,7 +37,8 @@ stamps. `store.book`: friends' journals (below); `store.lastSeenAt`, `feedSeenAt
 **The record's key** is the first name and realm (`UnitName`'s first return, as friends' builds
 have always known it), unless another character of mine has that first name on the realm (its
 `guid`, or a different `full` name, says so): then this one's key is its full name ("Cara
-Brightwater-Realm"), and so is its `name`. A new character takes the first name's key.
+Brightwater-Realm"), and so is its `name`. A new character takes the first name's key. `full` is
+set at every login; a surname known from before stays when `UnitName` doesn't give one that time.
 
 `C.Fill` completes a record (records from older versions lack newer stats); every record is
 filled before it's shown.
@@ -356,9 +357,21 @@ class and GUID where known) to a journal's character (`FindBook`): by GUID; else
 journal doesn't know the full one, within their account, if exactly one character fits and its
 class is the same. A match that isn't unique isn't made: two characters are never taken for one (an
 alt of the same account with another first name, "Anna" and "Annabel", stays apart). A match
-teaches the journal what it didn't know (`Learn`: the GUID, and the full name when it adds a
-surname; one it knows, its author's or learned, only changes on a GUID match, a rename). Without
+teaches the journal what it didn't know (`Learn`: the GUID, and the name the game shows, also one
+without a surname, which is then all of it; one it knows, its author's or learned, only changes to
+one that adds the surname, or on a GUID match, a rename, and never to one without a surname). Without
 the account, only GUID and full name count.
+
+**A name not known in full.** A journal from an older build only ever says the first name (the
+key's), so a character of it that Battle.net hasn't shown online since, and an alt of mine not played
+since this build, have no `full` (`C.Partial`). Every place that shows a character shows it by its
+first name with a muted mark (`C.Mark`: a grey "?" after it; " (?)" in LTC, which can't colour),
+never as if that were all of it (in Forever every character has a surname): the Friends page, Compare
+(chips, charts, leaderboard, hall of fame, records), News, the dropdown, a friend's latest news, my
+Timeline and Statistics, the catch-up and the weekly recap. A hover says when the surname comes
+(`C.PartialHint`: a friend's when they play it while I'm online, or with an up-to-date LefthyTools,
+naming their BattleTag; mine when I log in on it); text pages say it in a line under the list when a
+marked name is on them. `C.Characters()` and `C.FriendNews()` entries carry `partial`.
 
 `C.Characters()` lists every character once, by the name the game shows (`C.NameOf`: `full`, else
 `name`): mine (days, numbers from `C.ProfileNumbers`, the one I play first), then my friends', by
