@@ -745,7 +745,7 @@ local function Decode(stream, picture)
 			local name = stream.names[id]
 			mob.key = id
 			mob.name = name and name.name or "?"
-			mob.level = name and name.level and name.level > 0 and name.level or nil
+			mob.level = name and name.level -- (-1: "??", as the game says it)
 			mob.class = nil
 			for flag, class in pairs(CLASS_FLAGS) do
 				if flags:find(flag, 1, true) then

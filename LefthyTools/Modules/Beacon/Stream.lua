@@ -172,6 +172,32 @@ function S.YardsFrom(near, far)
 	return nil
 end
 
+-- A mob's (or a player's) level as the game shows it: "??" where the game says -1 (a boss, or too
+-- far above you to tell); nil when not known.
+function S.LevelText(level)
+	if type(level) ~= "number" then
+		return nil
+	end
+	return level < 1 and "??" or tostring(level)
+end
+
+-- A tooltip's title for a mob: "Defias Thug (15)", "Hogger (??)", or its name alone.
+function S.MobTitle(mob)
+	local level = S.LevelText(mob.level)
+	return level and ("%s (%s)"):format(mob.name, level) or mob.name
+end
+
+-- What kind of mob it is, said under its name (nil: a normal one). A world boss is elite.
+function S.ClassLabel(class)
+	if class == "elite" or class == "worldboss" then
+		return L["Elite"]
+	elseif class == "rare" then
+		return L["Rare"]
+	elseif class == "rareelite" then
+		return L["Rare elite"]
+	end
+end
+
 -- An error message without the file and line in front.
 local function ErrorText(err)
 	return (tostring(err):gsub("^[^:]*:%d+: ", ""))

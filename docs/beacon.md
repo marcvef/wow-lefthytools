@@ -652,7 +652,8 @@ else plain rings; cut round, a little darker. In the middle an arrow turning wit
 skull when dead, the name greyed). A dot per mob (red: attacking them, orange: in combat, grey:
 not; gold ring: elite, silver: rare; white ring and a yellow name: their target; purple glow:
 casting; a skull that fades: dead; faint: direction unsure), names for the 4 nearest and the
-target, a tooltip per dot. Top: name (class colour), where, thin bars for health (green,
+target with their level ("??" where the game says -1: a boss, or far above; `S.LevelText`), a
+tooltip per dot. Top: name (class colour), where, thin bars for health (green,
 estimated: "~80%" beside it in steps of 5, the tooltip says how; none from builds before it) and
 power (health not known: an empty bar and a grey "~?", the hover says why: not known yet, the
 maximum hidden there, or a friend's build too old to send it: older than 0.5.0-114 by

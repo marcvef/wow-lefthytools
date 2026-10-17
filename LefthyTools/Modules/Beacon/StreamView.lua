@@ -95,16 +95,6 @@ local function HealthWhy(view)
 	return "wait"
 end
 
-local function ClassLabel(class)
-	if class == "elite" or class == "worldboss" then
-		return L["Elite"]
-	elseif class == "rare" then
-		return L["Rare"]
-	elseif class == "rareelite" then
-		return L["Rare elite"]
-	end
-end
-
 -- Whose window: nil for yours, else the friend's (or the preview's) name.
 local function Whose(view)
 	if view.kind == "me" then
@@ -122,7 +112,7 @@ local function DotOnEnter(dot)
 	GameTooltip:SetOwner(dot, "ANCHOR_RIGHT")
 	if mob.player then
 		local r, g, b = B.ClassColor(mob.classFile)
-		GameTooltip:SetText(mob.level and ("%s (%s)"):format(mob.name, mob.level) or mob.name, r, g, b)
+		GameTooltip:SetText(S.MobTitle(mob), r, g, b)
 		if mob.group then
 			GameTooltip:AddLine(who and L["In %s's group"]:format(who) or L["In your group"], 0.3, 0.65, 1)
 		else
@@ -150,8 +140,8 @@ local function DotOnEnter(dot)
 		GameTooltip:Show()
 		return
 	end
-	GameTooltip:SetText(mob.level and ("%s (%s)"):format(mob.name, mob.level) or mob.name, 1, 1, 1)
-	local class = ClassLabel(mob.class)
+	GameTooltip:SetText(S.MobTitle(mob), 1, 1, 1)
+	local class = S.ClassLabel(mob.class)
 	if class then
 		GameTooltip:AddLine(class, GOLD[1], GOLD[2], GOLD[3])
 	end
@@ -415,7 +405,8 @@ local function Style(view, dot, mob, named, clock)
 		dot.Name:SetText(named and mob.name or "")
 		dot.Name:SetTextColor(r, g, b)
 	else
-		dot.Name:SetText(named and (mob.level and ("%s %s"):format(mob.name, mob.level) or mob.name) or "")
+		local level = S.LevelText(mob.level)
+		dot.Name:SetText(named and (level and ("%s %s"):format(mob.name, level) or mob.name) or "")
 		if mob.target then
 			dot.Name:SetTextColor(1, 0.9, 0.4) -- (their target: named in yellow)
 		else

@@ -5004,6 +5004,28 @@ do
 			target.health = 1
 		end
 
+		-- A mob too high to tell (the game says level -1: a boss, or far above you): "??", as the game
+		-- shows it, in the row and on the radar; a world boss is called elite in both.
+		do
+			S.BattleReset(view)
+			target.level, target.class = -1, "worldboss"
+			show()
+			local slot = view.win.Foes.slots[1]
+			slot._scripts.OnEnter(slot)
+			local inRow = TOOLTIP.title == "Kobold Vermin (??)" and tooltipFind("Elite")
+			slot._scripts.OnLeave(slot)
+			view.kind, view.looked = "me", nil
+			view.picture = { mobs = { { key = "skull", name = "Hogger", level = -1, class = "worldboss", yards = 10, bearing = 0, sure = 1 } },
+				recent = {}, moments = {}, looked = -1 }
+			view.win._scripts.OnUpdate(view.win, 0) -- (a new picture: drawn)
+			local dot = view.dotFor.skull
+			dot._scripts.OnEnter(dot)
+			check(inRow and dot.Name:GetText() == "Hogger ??" and TOOLTIP.title == "Hogger (??)" and tooltipFind("Elite"),
+				"level -1: \"??\" in the row's tooltip, on the radar and in its tooltip; a world boss is elite")
+			dot._scripts.OnLeave(dot)
+			view.kind, target.level, target.class = "friend", 5, nil
+		end
+
 		view.kind, view.picture = kind, picture0
 		S.BattleReset(view)
 	end)()

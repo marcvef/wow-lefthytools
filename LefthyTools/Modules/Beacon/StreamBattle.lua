@@ -305,8 +305,8 @@ local function FoeOnEnter(slot)
 		return
 	end
 	GameTooltip:SetOwner(slot, "ANCHOR_BOTTOM")
-	GameTooltip:SetText(mob.level and ("%s (%s)"):format(mob.name, mob.level) or mob.name, 1, 1, 1)
-	local class = mob.class == "elite" and L["Elite"] or mob.class == "rare" and L["Rare"] or mob.class == "rareelite" and L["Rare elite"]
+	GameTooltip:SetText(S.MobTitle(mob), 1, 1, 1)
+	local class = S.ClassLabel(mob.class)
 	if class then
 		GameTooltip:AddLine(class, GOLD[1], GOLD[2], GOLD[3])
 	end
