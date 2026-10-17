@@ -5,13 +5,14 @@ local S = B.Stream
 
 -- The fight stream's map under a window's radar (StreamView.lua builds the window: win.Map, cut
 -- round, and win.Plain, the rings' discs for when there's no map): the minimap's own terrain tiles
--- (Data/MinimapTiles.lua: 256 px for 533.33 yd of the world's grid, the 3 x 3 around the place),
--- else the world map's art of the zone with what you've explored of it (LT.MapArt, Core/MapArt.lua,
--- like the Bestiary ledger's map; yours, also on a friend's stream: what your world map shows),
--- else none (the plain discs). To the windows' one scale (S.PX_PER_YARD: a yard on the map is a
--- yard on the rings), north up, the place in the middle. S.MoveMap every frame: textures change only
--- when the place reaches another tile or zone (or you've explored more), the anchor only when the
--- map moved.
+-- (Data/MinimapTiles.lua: 256 px for 533.33 yd of the world's grid, the 3 x 3 around the place)
+-- where it has one under the place (at sea it has none), else the world map's art of the zone with
+-- what you've explored of it (LT.MapArt, Core/MapArt.lua, like the Bestiary ledger's map; yours,
+-- also on a friend's stream: what your world map shows) while the radar sees some of it, else none
+-- (the plain discs, never an empty map). To the windows' one scale (S.PX_PER_YARD: a yard on the
+-- map is a yard on the rings), north up, the place in the middle. S.MoveMap every frame: textures
+-- change only when the place reaches another tile or zone (or you've explored more), the anchor
+-- only when the map moved.
 
 local Value, issecret = S.Value, S.issecret
 local PX_PER_YARD, GLIDE = S.PX_PER_YARD, S.GLIDE
@@ -37,17 +38,18 @@ local function SetupMap(view, mapID)
 	local north1, west1 = MapCorner(mapID, 1, 1)
 	if north0 and north1 and west0 > west1 and north0 > north1 then
 		map.ok = LT.MapArt.Lay(map.art, mapID, (west0 - west1) * PX_PER_YARD, (north0 - north1) * PX_PER_YARD) ~= nil
-		map.north0, map.west0 = north0, west0
+		map.north0, map.west0, map.north1, map.west1 = north0, west0, north1, west1
 	end
 	if map.source == "art" then
 		map.source = nil
 	end
 end
 
--- The minimap's own terrain tiles, the 3 x 3 of the world's grid around (x0, y0 the top left one).
-local function LayMinimap(view, tiles, continent, x0, y0)
+-- The minimap's own terrain tiles (a continent's), the 3 x 3 of the world's grid around (x0, y0 the
+-- top left one); shown only while they're the ones in use.
+local function LayMinimap(view, tiles, x0, y0)
 	local map, win = view.map, view.win
-	map.continent, map.x0, map.y0, map.x = continent, x0, y0, nil
+	map.from, map.x0, map.y0, map.x = tiles, x0, y0, nil
 	local size = TILE_YARDS * PX_PER_YARD
 	map.mini = map.mini or {}
 	for i = 0, 2 do
@@ -67,8 +69,16 @@ local function LayMinimap(view, tiles, continent, x0, y0)
 				tile:SetPoint("TOPLEFT", win.Map, "TOPLEFT", i * size, -j * size)
 			end
 			tile.has = file ~= nil
+			tile:SetShown(map.source == "mini" and tile.has)
 		end
 	end
+end
+
+-- The world map's art in the radar's view: the place on it, or less than the outer ring off it.
+local function ArtInView(map, north, west)
+	local margin = S.OUTER_YARDS
+	return west <= map.west0 + margin and west >= map.west1 - margin and north <= map.north0 + margin
+		and north >= map.north1 - margin
 end
 
 -- Which tiles show: the minimap's ("mini"), the world map's art ("art") or none.
@@ -97,12 +107,18 @@ function S.MoveMap(view, north, west, continent, mapID, elapsed)
 	if tiles then
 		local tx, ty = 32 - west / TILE_YARDS, 32 - north / TILE_YARDS
 		local x0, y0 = math.floor(tx) - 1, math.floor(ty) - 1
-		if not map.mini or x0 ~= map.x0 or y0 ~= map.y0 or continent ~= map.continent or map.source ~= "mini" then
-			LayMinimap(view, tiles, continent, x0, y0)
-			UseTiles(view, "mini")
+		if tiles ~= map.from or x0 ~= map.x0 or y0 ~= map.y0 then
+			LayMinimap(view, tiles, x0, y0)
 		end
-		x, y = -(tx - x0) * TILE_YARDS * PX_PER_YARD, (ty - y0) * TILE_YARDS * PX_PER_YARD
-	elseif north and map.ok then
+		-- (at sea the minimap has no tile under the place: not an empty map, the art or the plain rings)
+		if map.mini[5].has then
+			if map.source ~= "mini" then
+				UseTiles(view, "mini")
+			end
+			x, y = -(tx - x0) * TILE_YARDS * PX_PER_YARD, (ty - y0) * TILE_YARDS * PX_PER_YARD
+		end
+	end
+	if not x and north and map.ok and ArtInView(map, north, west) then
 		if map.source ~= "art" then
 			UseTiles(view, "art")
 		end

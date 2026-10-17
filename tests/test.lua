@@ -3835,6 +3835,23 @@ do
 		Fire("MAP_EXPLORATION_UPDATED")
 		S.MoveMap(view, hereN, hereW, 0, 1429)
 		check(o[1].path == 7001 and o[3].shown, "and back")
+		-- At sea the minimap has no tile under you (here only land to the east): not an empty map (as
+		-- the first round found it), the zone's art; no art either, or far off it: the plain rings.
+		local here = math.floor(tx) * 100 + math.floor(ty)
+		ns.MINIMAP_TILES = { [0] = { [here + 100] = 900001 } }
+		S.MoveMap(view, hereN, hereW, 0, 1429)
+		check(win.Map:IsShown() and not win.Plain:IsShown() and #shownTiles() == 15 and art.tiles[1].shown,
+			"at sea, no minimap tile under me: my zone's art, not an empty map")
+		S.MoveMap(view, hereN, hereW, 0, nil)
+		check(not win.Map:IsShown() and win.Plain:IsShown(), "at sea without art: the plain rings")
+		S.MoveMap(view, hereN - 1100, hereW, 0, 1429)
+		check(not win.Map:IsShown() and win.Plain:IsShown(), "far off the zone's art (nothing of it in the rings): the plain rings")
+		ns.MINIMAP_TILES = { [0] = { [here] = 900002 } }
+		S.MoveMap(view, hereN, hereW, 0, 1429)
+		check(win.Map:IsShown() and #shownTiles() == 1 and shownTiles()[1].path == 900002 and not art.tiles[1].shown,
+			"back by the shore: the minimap's tile under me (the sea around it stays empty, as on the minimap)")
+		ns.MINIMAP_TILES = {}
+		S.MoveMap(view, hereN, hereW, 0, 1429)
 	end
 	local act = win.Act
 	check(act.Name:GetText() == "Spell 133" and act.Icon:IsShown() and act.Bar.width > 1 and act.Bar.width < 50
