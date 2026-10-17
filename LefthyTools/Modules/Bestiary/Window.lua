@@ -55,24 +55,12 @@ local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
 local QUEST_ICON = "Interface\\GossipFrame\\AvailableQuestIcon"
 local ALL_FOUND = "Interface\\RaidFrame\\ReadyCheck-Ready"
 local BUTTON_ICON = "Interface\\Icons\\INV_Misc_Bag_10"
-local GOLD = { 1, 0.82, 0.3 }
-local NONE = {}
-local issecret = issecretvalue or function() return false end
+local GOLD, NONE, Value, issecret = Bt.GOLD, Bt.NONE, Bt.Value, Bt.issecret
 
 local win, card, button
 local shown, shownInfo -- the creature the window shows, and what was seen of it (name, level, class)
 local cardGUID
 local ownTooltip = false -- showing our own drop's tooltip (it has the numbers already: no item tooltip lines)
-
-local function Value(f, ...)
-	if not f then
-		return nil
-	end
-	local ok, v = pcall(f, ...)
-	if ok and not issecret(v) then
-		return v
-	end
-end
 
 ---------------------------------------------------------------------------
 -- Pieces

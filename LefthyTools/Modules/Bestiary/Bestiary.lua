@@ -72,6 +72,24 @@ local M = LT:NewModule("bestiary", {
 local Bt = { module = M }
 ns.Bestiary = Bt
 
+-- Shared by the Bestiary's files: whether a value is a secret (Forever hides many API returns), a
+-- game call's value (nil when it fails or is a secret), an empty table to read from, the gold of
+-- edges and headings.
+local issecret = issecretvalue or function() return false end
+
+local function Value(f, ...)
+	if not f then
+		return nil
+	end
+	local ok, v = pcall(f, ...)
+	if ok and not issecret(v) then
+		return v
+	end
+end
+
+local NONE = {}
+Bt.issecret, Bt.Value, Bt.NONE, Bt.GOLD = issecret, Value, NONE, { 1, 0.82, 0.3 }
+
 local EMPTY_CHECKS = { 2, 6 }  -- seconds after a kill: is its corpse empty? (both times: then it counts)
 local PENDING_FOR = 300         -- a corpse not looted in this long: not counted
 local CAST_GAP = 1.5            -- skinning (a pickpocket, gathering) this shortly before the loot window: not a kill's loot
@@ -90,7 +108,6 @@ local NOT_A_KILL = { 8613, 8617, 8618, 10768, 921, 2575, 2576, 3564, 10248, 2366
 local SKINNING = { [8613] = true, [8617] = true, [8618] = true, [10768] = true }
 Bt.SKIN_ICON = "Interface\\Icons\\INV_Misc_Pelt_Wolf_01" -- (Skinning's own icon)
 Bt.STAR = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1" -- (on your wish list: the raid marker's star)
-local issecret = issecretvalue or function() return false end
 
 local data                       -- LefthyToolsBestiaryDB
 local pending = {}               -- GUID -> { at, creature }: killed, its loot not seen yet
@@ -155,8 +172,6 @@ local function Changed(creature)
 		end
 	end
 end
-
-local NONE = {}
 
 -- A kind's drops (skin: what skinning it gave), never nil. (Not `skin and mob.skins or mob.items`:
 -- without skinnings that falls back to the drops.)
@@ -619,16 +634,6 @@ end
 ---------------------------------------------------------------------------
 -- Mobs seen: name, level, kind (for records and the window)
 ---------------------------------------------------------------------------
-
-local function Value(f, ...)
-	if not f then
-		return nil
-	end
-	local ok, v = pcall(f, ...)
-	if ok and not issecret(v) then
-		return v
-	end
-end
 
 -- Remembers a unit that's a creature; returns its GUID and creature ID.
 function Bt.Look(unit)

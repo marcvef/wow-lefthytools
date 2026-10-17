@@ -54,19 +54,8 @@ local WISHES = 8          -- icons in it, at most (the rest: "+N")
 local WISH_SOURCES = 8    -- mobs named in an icon's tooltip, at most
 local MAP_DOT = 6           -- a kill on the map of where you killed them
 local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
-local GOLD = { 1, 0.82, 0.3 }
 local SORTS = { "kills", "name", "level", "coin", "worth", "xp", "xph", "last" }
-local issecret = issecretvalue or function() return false end
-
-local function Value(f, ...)
-	if not f then
-		return nil
-	end
-	local ok, v = pcall(f, ...)
-	if ok and not issecret(v) then
-		return v
-	end
-end
+local GOLD, Value, issecret = Bt.GOLD, Bt.Value, Bt.issecret
 
 local ledger
 local entries = {}       -- the list as shown: { creature, mob, score, positions, items (found by the search) }
