@@ -8086,6 +8086,26 @@ section("Bestiary: what mobs drop")
 	ITEMS[15212] = { name = "Bandit's Own Blade", quality = 2, classID = 2, equipLoc = "INVTYPE_WEAPON", bind = 1 }
 	check(not Bt.IsWorldDrop(15212, 2) and Bt.IsWorldDrop(15211, 2) and not Bt.IsWorldDrop(2589, 1),
 		"bound on pickup, or not gear: not a world drop")
+	-- Skinning doesn't count towards the kinds an item comes from: leather skinned from three kinds of
+	-- beast, and looted from one mob, stays that mob's drop; looted from three kinds, it's a world drop.
+	do
+		local mobs = LefthyToolsBestiaryDB.mobs
+		ITEMS[2318] = ITEMS[2318] or { name = "Light Leather", quality = 1 }
+		for i, creature in ipairs({ 8101, 8102, 8103 }) do
+			mobs[creature] = { name = "Beast " .. i, kills = 4, money = 0, items = {}, skinned = 2, skins = { [2318] = { 2, 3, 1 } } }
+		end
+		mobs[8104] = { name = "Leatherworker", kills = 5, money = 0, items = { [2318] = { 1, 1, 1 } } }
+		Bt.Changed(8104)
+		check(not Bt.IsWorldDrop(2318, 1), "leather skinned from three kinds, looted from one: not a world drop")
+		mobs[8105] = { name = "Trapper", kills = 5, money = 0, items = { [2318] = { 1, 1, 1 } } }
+		mobs[8106] = { name = "Tanner", kills = 5, money = 0, items = { [2318] = { 1, 1, 1 } } }
+		Bt.Changed(8106)
+		check(Bt.IsWorldDrop(2318, 1), "looted from three kinds of mobs: a world drop")
+		for creature = 8101, 8106 do
+			mobs[creature] = nil
+		end
+		Bt.Changed(8101)
+	end
 	-- In the ledger, world drops are a section of their own: each a drop with its item tooltip.
 	Bt.ToggleLedger(116)
 	local pane = ledger.Pane

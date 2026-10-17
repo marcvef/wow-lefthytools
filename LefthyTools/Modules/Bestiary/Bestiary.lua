@@ -312,13 +312,20 @@ Bt.Likelier = Likelier
 -- World drops: random green and better gear drops from any mob of about its level, so with one mob
 -- it says nothing about that mob (the user: a random BoE "forever stuck to that mob"). An item is
 -- one when it's gear (a weapon or armour that can be worn: GetItemInfoInstant) of green or better
--- that doesn't bind on pickup (unknown yet: taken as one), or when it came from WORLD_KINDS or more
--- kinds of mobs. They gather in one place at the end of a mob's drops.
+-- that doesn't bind on pickup (unknown yet: taken as one), or when it dropped as loot from WORLD_KINDS
+-- or more kinds of mobs. Skinning doesn't count: every beast gives leather (the user, on an item
+-- skinned from three kinds counting as a world drop: "no that doesnt make sense does it"). They
+-- gather in one place at the end of a mob's drops.
 local WORLD_KINDS = 3
 
 function Bt.IsWorldDrop(id, quality)
-	local list = Bt.Sources(id)
-	if list and #list >= WORLD_KINDS then
+	local looted = 0
+	for _, source in ipairs(Bt.Sources(id) or Bt.NONE) do
+		if not source.skin then
+			looted = looted + 1
+		end
+	end
+	if looted >= WORLD_KINDS then
 		return true
 	end
 	if (quality or 0) < 2 or not (C_Item and C_Item.GetItemInfoInstant) then

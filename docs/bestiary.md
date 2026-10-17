@@ -63,8 +63,9 @@ the likeliest first, built over the whole database when first asked after a chan
 level, so with one mob it says nothing about that mob (the user: a random BoE "forever stuck to that
 mob's loot window"). An item is one when it's gear (`C_Item.GetItemInfoInstant`: class 2 weapon or
 4 armour, worn somewhere) of green or better that doesn't bind on pickup (`GetItemInfo`'s bind type
-1 = a mob's own; not known yet: taken as a world drop), or when it came from 3 or more kinds of mobs
-(`Bt.Sources`). They're still counted per mob, but `Bt.Drops` gathers them in one entry at the end
+1 = a mob's own; not known yet: taken as a world drop), or when it dropped as loot from 3 or more
+kinds of mobs (`Bt.Sources`; skinning doesn't count: every beast gives leather, and the user found an
+item skinned from three kinds counting as a world drop made no sense). They're still counted per mob, but `Bt.Drops` gathers them in one entry at the end
 (`group`): in the window a single place with a map icon, how many and "world"; its tooltip explains
 and lists them with their chances. In the ledger they're a section of their own under the mob's
 drops, each a normal drop with its item tooltip (the user: a list in a tooltip can't show an item's
