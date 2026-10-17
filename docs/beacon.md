@@ -4,12 +4,28 @@ Battle.net friends who also run LefthyTools see each other on the world map and 
 status (dead/ghost, in combat, who they're fighting), and get each other's level-ups. Only
 Battle.net friends; each player writes their own level-up message.
 
-Files: `Beacon.lua` (module, protocol, rate limiter, settings, `/lefthy beacon`), `Dots.lua` (dot
-look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages, toast, sounds),
-`Alerts.lua` (death alerts), `Pings.lua` (map pings), `Stream*.lua` (the fight stream), `Beacon.xml`
-(world map pin templates). They share state through `ns.Beacon` (`B`): `B.peers`,
-`B.Clean`, `B.QueueToPeers`, `B.MyWorldPosition`, and hooks the other files set (`B.RefreshMaps`,
-`B.UpdateMinimap`, `B.Attach`/`B.Detach`, `B.ShowDing`, `B.AnnounceLevel`, `B.OnSettingChanged`).
+Files, in load order:
+
+- `Beacon.lua`: the module and its settings' defaults, `B` (below) and the helpers every file uses
+  (`B.Clean`, `B.CutUTF8`, `B.MyName` / `B.IsMe`, `B.ClassColor` / `B.ColouredName`, group
+  members), sending (one rate limiter, the queues), finding friends, receiving, what I share about
+  myself, the driver tick, switching on and off, the settings page and `/lefthy beacon`.
+- `Protocol.lua`: every message kind, what it says, and `B.Parse`, which reads them.
+- `Dots.lua` (dot look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
+  toast, sounds), `Alerts.lua` (death alerts; a friend in a few lines for lists: `B.FriendLines`,
+  `B.FriendRows`, `B.FriendStatus`), `Pings.lua` (map pings), `Items.lua` (showing and offering
+  items), `Handover.lua` (reserved items), `Chat.lua` (LTC, announcements), `Reports.lua` (error
+  reports), `Stream*.lua` (the fight stream), `Beacon.xml` (world map pin templates).
+
+They share state through `ns.Beacon` (`B`): `B.peers` (`gameAccountID -> peer`), the queues
+(`B.Queue`, `B.QueueToPeers`, `B.QueueLatest`, `B.QueueLow`, ...), `B.MyWorldPosition`, and hooks
+the later files set, which Beacon.lua calls when they're there (`if B.X then B.X() end`): on the
+driver tick (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`, `B.StreamHealthTick`,
+`B.RefreshMaps`, `B.UpdateMinimap`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
+`B.ReceivePing`, `B.ReceiveItem`, `B.ReceiveChat`, `B.ReceiveReportPart`, `B.ReceiveStream`,
+`B.ReceiveJournal`), with an answer (`B.CollectorMessage`, `B.StreamHello`, `B.JournalHello`), and on
+switching (`B.Attach` / `B.Detach`, `B.StreamStart` / `B.StreamStop`, `B.OnSettingChanged`).
+Other modules (Chronicle, Misc Tweaks) use the same `B` fields, and `B.listeners` (`B.Notify`).
 
 ## Transport and protocol
 
