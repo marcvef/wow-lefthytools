@@ -1,4 +1,5 @@
 local ADDON, ns = ...
+local L = ns.L
 
 -- LefthyTools: a collection of small UI modules for WoW: Forever.
 -- Each module registers itself with LT:NewModule() and implements any of:
@@ -76,6 +77,22 @@ function LT.Decimal(text, english)
 		return (text:gsub("%.", ","))
 	end
 	return text
+end
+
+-- How long ago a time() was: "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago"
+-- (in the client's language; a time still to come is just now).
+function LT.Ago(t)
+	local seconds = math.max(0, time() - (t or 0))
+	if seconds < 120 then
+		return L["just now"]
+	elseif seconds < 3600 then
+		return L["%d min ago"]:format(math.floor(seconds / 60))
+	elseif seconds < 86400 then
+		return L["%d h ago"]:format(math.floor(seconds / 3600))
+	elseif seconds < 2 * 86400 then
+		return L["yesterday"]
+	end
+	return L["%d days ago"]:format(math.floor(seconds / 86400))
 end
 
 ---------------------------------------------------------------------------

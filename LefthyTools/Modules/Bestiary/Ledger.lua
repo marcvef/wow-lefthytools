@@ -327,19 +327,7 @@ end
 -- The picked mob
 ---------------------------------------------------------------------------
 
-local function Ago(t)
-	local seconds = math.max(0, time() - (t or 0))
-	if seconds < 120 then
-		return L["just now"]
-	elseif seconds < 3600 then
-		return L["%d min ago"]:format(math.floor(seconds / 60))
-	elseif seconds < 86400 then
-		return L["%d h ago"]:format(math.floor(seconds / 3600))
-	elseif seconds < 2 * 86400 then
-		return L["yesterday"]
-	end
-	return L["%d days ago"]:format(math.floor(seconds / 86400))
-end
+local Ago = LT.Ago -- ("3 h ago")
 
 -- A section of the picked mob's drops at y in its scrolling area (heading, a rule, every drop: no
 -- "+N", it scrolls); returns where the next one starts. show false: hidden.

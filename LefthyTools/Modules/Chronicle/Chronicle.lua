@@ -925,20 +925,8 @@ function C.Duration(seconds)
 	return ("%dd %dh"):format(math.floor(seconds / 86400), math.floor(seconds / 3600) % 24)
 end
 
--- "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago" (localized).
-function C.Ago(t)
-	local seconds = math.max(0, time() - (t or 0))
-	if seconds < 120 then
-		return L["just now"]
-	elseif seconds < 3600 then
-		return L["%d min ago"]:format(math.floor(seconds / 60))
-	elseif seconds < 86400 then
-		return L["%d h ago"]:format(math.floor(seconds / 3600))
-	elseif seconds < 2 * 86400 then
-		return L["yesterday"]
-	end
-	return L["%d days ago"]:format(math.floor(seconds / 86400))
-end
+-- "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago" (localized; Core's).
+C.Ago = LT.Ago
 
 function C.Number(n)
 	n = math.floor((n or 0) + 0.5)

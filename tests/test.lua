@@ -79,6 +79,11 @@ do -- shared text helpers
 	check(LefthyTools.CutUTF8 == ns.Beacon.CutUTF8, "Beacon's CutUTF8 is Core's")
 	check(LT.Decimal("4.5") == "4.5" and LT.Decimal("12.3 km", true) == "12.3 km" and LT.Decimal("<0.1%") == "<0.1%",
 		"LT.Decimal: an English client keeps the point (test_de.lua: the German comma)")
+	local now = time()
+	check(LT.Ago(now) == "just now" and LT.Ago(now + 60) == "just now" and LT.Ago(now - 300) == "5 min ago"
+		and LT.Ago(now - 3 * 3600) == "3 h ago" and LT.Ago(now - 86400 - 60) == "yesterday" and LT.Ago(now - 4 * 86400) == "4 days ago",
+		"LT.Ago: just now, minutes, hours, yesterday, days")
+	check(ns.Chronicle.Ago == LT.Ago, "Chronicle's Ago is Core's")
 end
 
 section("error catcher")
