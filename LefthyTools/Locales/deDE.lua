@@ -52,6 +52,13 @@ L["All changes"] = "Alle Änderungen"
 L["You have LefthyTools %s."] = "Du hast LefthyTools %s."
 L["General"] = "Allgemein"
 
+-- How long ago something was (Core: Chronicle, the Bestiary's ledger)
+L["just now"] = "gerade eben"
+L["%d min ago"] = "vor %d Min."
+L["%d h ago"] = "vor %d Std."
+L["yesterday"] = "gestern"
+L["%d days ago"] = "vor %d Tagen"
+
 -- Mirage
 L["Fades the interface when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD."] =
 	"Blendet das Interface aus, wenn du nicht im Kampf bist und es gerade nicht benutzt, wie das Dynamic HUD in Dune: Awakening."
@@ -115,6 +122,106 @@ L["Quest areas on the minimap ignore transparency, so the minimap is hidden once
 L["Hide quest areas at"] = "Questgebiete verstecken bei"
 L["Minimap opacity at which the minimap and its quest areas are hidden during the fade-out. 0% waits until the fade has finished."] =
 	"Deckkraft der Minimap, bei der Minimap und Questgebiete beim Ausblenden versteckt werden. Bei 0 % erst, wenn das Ausblenden fertig ist."
+
+-- Mirage element groups
+L["Action bars"] = "Aktionsleisten"
+L["Controller action bars & button legend"] = "Controller-Aktionsleisten & Tastenhinweise"
+L["Controller aiming reticle"] = "Controller-Fadenkreuz"
+L["Player, pet, target & focus frames"] = "Spieler-, Pet-, Ziel- & Fokusfenster"
+L["Party & raid frames"] = "Gruppen- & Raidfenster"
+L["Cooldown Manager & swing timer"] = "Cooldown Manager & Swing-Timer"
+L["Buffs & debuffs"] = "Buffs & Debuffs"
+L["Minimap"] = "Minimap"
+L["Quest & objective tracker"] = "Quest-Tracker"
+L["Micro menu & bag bar"] = "Menü- & Taschenleiste"
+L["Experience & reputation bars"] = "EP- & Rufleiste"
+L["Damage meter"] = "Damage Meter"
+L["Chat"] = "Chat"
+L["Durability & vehicle indicators"] = "Haltbarkeits- & Fahrzeuganzeige"
+
+-- Misc Tweaks
+L["Small quality-of-life fixes, each one switchable on its own."] =
+	"Kleine Komfort-Verbesserungen, jede einzeln an- und abschaltbar."
+L["Unit frames"] = "Unitframes"
+L["Always show health & power values"] = "HP- & Ressourcenwerte immer anzeigen"
+L["Show current / max on the health and power bars all the time instead of only on mouseover. Applies to every unit frame (player, target, focus, pet, party), like Blizzard's Options > Interface > Status Text set to Numeric."] =
+	"Zeigt aktuell / maximal dauerhaft auf den HP- und Ressourcenleisten statt nur bei Mouseover. Gilt für alle Unitframes (Spieler, Ziel, Fokus, Pet, Gruppe), genau wie Blizzards Interface-Option „Statustext“ mit Zahlenwerten."
+L["Bags"] = "Taschen"
+L["Movable bags"] = "Verschiebbare Taschen"
+L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."] =
+	"Zieh eine Tasche an der Titelleiste oder an einer freien Stelle, um sie zu verschieben. Sie öffnet sich wieder dort, wo du sie gelassen hast. /lefthy tweaks resetbags setzt alle Taschen zurück."
+L["Quests"] = "Quests"
+L["Announce quest progress in party chat"] = "Questfortschritt im Gruppenchat posten"
+L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."] =
+	"Wenn du in einer Gruppe ein Questziel oder eine ganze Quest abschließt, postet dein Charakter das im Gruppenchat, so wie Questie. Nicht solo und nicht im Raid."
+
+L["Mark quests that are new in WoW: Forever"] = "Quests markieren, die neu in WoW: Forever sind"
+L["WoW: Forever adds over a thousand quests to the Classic world, plus about as many from Classic's later seasons that original Classic never had. They get a NEW right after their name: in the quest log (hover for details), in the quest details and in the quest window when you accept or turn one in."] =
+	"WoW: Forever bringt über tausend neue Quests in die Classic-Welt, dazu etwa genauso viele aus den späteren Seasons von Classic, die es im ursprünglichen Classic nie gab. Sie bekommen ein NEU direkt hinter ihrem Namen: im Questlog (Mouseover für Details), in den Questdetails und im Questfenster beim Annehmen und Abgeben."
+L["New in WoW: Forever"] = "Neu in WoW: Forever"
+L["Not in the original Classic (from its later seasons)"] = "Nicht im ursprünglichen Classic (aus den späteren Seasons)"
+L["Quests on continent and world maps"] = "Quests auf Kontinent- und Weltkarte"
+L["Blizzard's world map shows your quests only on zone maps. This shows them on continent maps and the world map too: an icon where to go (hover it for the objectives) and the area where the mobs and items are. Choose below what each zoom level shows. The map's own filter for quest objectives hides them as well."] =
+	"Blizzards Weltkarte zeigt deine Quests nur auf Zonenkarten. Das hier zeigt sie auch auf Kontinentkarten und der Weltkarte: ein Icon, wo du hinmusst (Mouseover zeigt die Questziele), und das Gebiet, in dem die Mobs und Items sind. Unten wählst du, was jede Zoomstufe zeigt. Der Filter für Questziele im Kartenmenü blendet sie ebenfalls aus."
+L["Nothing"] = "Nichts"
+L["Icons"] = "Icons"
+L["Areas"] = "Gebiete"
+L["Icons and areas"] = "Icons und Gebiete"
+L["On continent maps"] = "Auf Kontinentkarten"
+L["What continent maps like Kalimdor show of your quests. With icons only, hovering one shows its area."] =
+	"Was Kontinentkarten wie Kalimdor von deinen Quests zeigen. Nur mit Icons zeigt ein Mouseover das Gebiet der Quest."
+L["On the world map"] = "Auf der Weltkarte"
+L["What the map of the whole world shows of your quests."] = "Was die Karte der ganzen Welt von deinen Quests zeigt."
+L["Click an icon to select its quest"] = "Klick auf ein Icon wählt die Quest aus"
+L["As on zone maps: clicking a quest's icon selects that quest (waypoint arrow, its area on the map, and it's tracked if it wasn't); clicking it again unselects it, Shift-click stops tracking it. Off: a click zooms into the zone. With a controller, the button always zooms in."] =
+	"Wie auf Zonenkarten: Ein Klick auf das Icon einer Quest wählt sie aus (Wegpunktpfeil, ihr Gebiet auf der Karte, und sie wird verfolgt, falls nicht schon); nochmal klicken hebt die Auswahl auf, Umschalt+Klick beendet das Verfolgen. Aus: Ein Klick zoomt in die Zone. Mit Controller zoomt die Taste immer hinein."
+L["Quest areas on zone maps"] = "Questgebiete auf Zonenkarten"
+L["Blizzard shows only the area of your selected quest. All quests: the areas of every quest in the zone, like Questie."] =
+	"Blizzard zeigt nur das Gebiet deiner ausgewählten Quest. Alle Quests: die Gebiete aller Quests in der Zone, wie bei Questie."
+L["Selected quest"] = "Ausgewählte Quest"
+L["All quests"] = "Alle Quests"
+L["Retail unit frames"] = "Einheitenfenster wie in Retail"
+L["Since its latest patch Forever draws the player, target, focus, party and pet frames in a classic style. This brings back retail's: its art, bars and layout (the game still has them). Bars that move in combat follow when it ends. Switching it off takes a /reload."] =
+	"Seit dem letzten Patch zeichnet Forever die Fenster für Spieler, Ziel, Fokus, Gruppe und Pet im Classic-Stil. Das holt die aus Retail zurück: Grafik, Leisten und Anordnung (das Spiel hat sie noch). Leisten, die sich im Kampf verschieben, rücken danach zurecht. Zum Ausschalten ist ein /reload nötig."
+L["Combo points on your target's nameplate"] = "Combopunkte an der Namensplakette deines Ziels"
+L["Small dots in the middle of your target's health bar, one for each combo point you can have: lit ones in the colour of your points, the rest dark. Only while you have points on it. They take no room of their own, so nothing else on the nameplate moves. Rogues, and druids in Cat Form."] =
+	"Kleine Punkte in der Mitte der Lebensleiste deines Ziels, einer für jeden Combopunkt, den du haben kannst: die aktiven in der Farbe deiner Punkte, die übrigen dunkel. Nur solange du Punkte darauf hast. Sie brauchen keinen eigenen Platz, an der Namensplakette verschiebt sich also nichts. Für Schurken und Druiden in Katzengestalt."
+L["Colour combo points by count"] = "Combopunkte nach Anzahl färben"
+L["Clean-up button on the bags"] = "Aufräumen-Knopf an den Taschen"
+L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, at the left of the bags' search box."] =
+	"Seit dem letzten Forever-Patch fehlt der Aufräumen-Knopf der Taschen, mit Maus und Tastatur wie im Gamepad-Modus. Das holt ihn zurück, links neben das Suchfeld der Taschen."
+L["Clean up bags"] = "Taschen aufräumen"
+L["Combo dots: size"] = "Combopunkte: Größe"
+L["Each dot's size in pixels. While you move the slider, they show on your target's nameplate for a few seconds."] =
+	"Die Größe jedes Punkts in Pixeln. Während du den Regler bewegst, zeigen sie sich ein paar Sekunden an der Namensplakette deines Ziels."
+L["Combo dots: preview"] = "Combopunkte: Vorschau"
+L["Try it"] = "Ausprobieren"
+L["A small window with a nameplate whose dots count up like your points will; - and + change their size. No mob needed, and the settings can be closed. /lefthy tweaks combopos does the same."] =
+	"Ein kleines Fenster mit einer Namensplakette, deren Punkte hochzählen wie deine Combopunkte; - und + ändern ihre Größe. Kein Mob nötig, und die Einstellungen können zu sein. /lefthy tweaks combopos macht dasselbe."
+L["Size %d px"] = "Größe %d px"
+L["They count up like your points will. - and + change their size; your target's nameplate shows them too."] =
+	"Sie zählen hoch wie deine Combopunkte. - und + ändern ihre Größe; die Namensplakette deines Ziels zeigt sie auch."
+L["Training Dummy"] = "Trainingsattrappe"
+L["Reset"] = "Zurücksetzen"
+L["Done"] = "Fertig"
+L["Blizzard's combo points on the personal resource display (and the dots on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
+	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und die Punkte an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."
+
+-- Misc Tweaks: party chat announcements (party members read these, so they follow the client language too)
+L["%s: quest complete!"] = "%s: Quest erledigt!"
+
+-- Misc Tweaks: who has aggro, on enemy nameplates
+L["Who has aggro, on enemy nameplates"] = "Wer Aggro hat, auf feindlichen Namensplaketten"
+L["In a group, the left end of each enemy's health bar says whom it's on: >YOU< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."] =
+	"In einer Gruppe zeigt das linke Ende des Lebensbalkens jedes Gegners, auf wem er ist: >DU<, wenn du es bist, sonst die ersten drei Buchstaben des Namens in der Farbe der Rolle (Tank blau, Heiler grün, DD rot, weiß, wenn unbekannt). Die Rollen kommen aus dem Dungeonbrowser oder einem Rollencheck; in einer selbst erstellten Gruppe kann der Anführer unten einen starten."
+L["Start a role check"] = "Rollencheck starten"
+L["Start"] = "Starten"
+L["Everyone in your group picks tank, healer or damage in Blizzard's role check window, LefthyTools or not, and the aggro colours follow. Only the group's leader or an assistant can start one. /lefthy tweaks rolecheck does the same."] =
+	"Jeder in deiner Gruppe wählt Tank, Heiler oder Schaden in Blizzards Rollencheck-Fenster, mit LefthyTools oder ohne, und die Aggro-Farben folgen. Nur der Anführer der Gruppe oder ein Assistent kann einen starten. /lefthy tweaks rolecheck macht dasselbe."
+L["Aggro on nameplates: preview"] = "Aggro auf Namensplaketten: Vorschau"
+L["For ten seconds the enemy nameplates you can see show examples: you, a tank, a healer, a damage dealer and someone without a role. /lefthy tweaks aggrotest does the same."] =
+	"Zehn Sekunden lang zeigen die feindlichen Namensplaketten, die du siehst, Beispiele: dich, einen Tank, einen Heiler, einen DD und jemanden ohne Rolle. /lefthy tweaks aggrotest macht dasselbe."
+L[">YOU<"] = ">DU<"
 
 -- Misc Tweaks: level-up window
 L["Level-up window"] = "Level-Up-Fenster"
@@ -227,90 +334,8 @@ L["%s died"] = "%s ist gestorben"
 L["Friends online"] = "Freunde online"
 L["No friends with LefthyTools online"] = "Keine Freunde mit LefthyTools online"
 L["and %d more"] = "und %d weitere"
-
--- Mirage element groups
-L["Action bars"] = "Aktionsleisten"
-L["Controller action bars & button legend"] = "Controller-Aktionsleisten & Tastenhinweise"
-L["Controller aiming reticle"] = "Controller-Fadenkreuz"
-L["Player, pet, target & focus frames"] = "Spieler-, Pet-, Ziel- & Fokusfenster"
-L["Party & raid frames"] = "Gruppen- & Raidfenster"
-L["Cooldown Manager & swing timer"] = "Cooldown Manager & Swing-Timer"
-L["Buffs & debuffs"] = "Buffs & Debuffs"
-L["Minimap"] = "Minimap"
-L["Quest & objective tracker"] = "Quest-Tracker"
-L["Micro menu & bag bar"] = "Menü- & Taschenleiste"
-L["Experience & reputation bars"] = "EP- & Rufleiste"
-L["Damage meter"] = "Damage Meter"
-L["Chat"] = "Chat"
-L["Durability & vehicle indicators"] = "Haltbarkeits- & Fahrzeuganzeige"
-
--- Misc Tweaks
-L["Small quality-of-life fixes, each one switchable on its own."] =
-	"Kleine Komfort-Verbesserungen, jede einzeln an- und abschaltbar."
-L["Unit frames"] = "Unitframes"
-L["Always show health & power values"] = "HP- & Ressourcenwerte immer anzeigen"
-L["Show current / max on the health and power bars all the time instead of only on mouseover. Applies to every unit frame (player, target, focus, pet, party), like Blizzard's Options > Interface > Status Text set to Numeric."] =
-	"Zeigt aktuell / maximal dauerhaft auf den HP- und Ressourcenleisten statt nur bei Mouseover. Gilt für alle Unitframes (Spieler, Ziel, Fokus, Pet, Gruppe), genau wie Blizzards Interface-Option „Statustext“ mit Zahlenwerten."
-L["Bags"] = "Taschen"
-L["Movable bags"] = "Verschiebbare Taschen"
-L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."] =
-	"Zieh eine Tasche an der Titelleiste oder an einer freien Stelle, um sie zu verschieben. Sie öffnet sich wieder dort, wo du sie gelassen hast. /lefthy tweaks resetbags setzt alle Taschen zurück."
-L["Quests"] = "Quests"
-L["Announce quest progress in party chat"] = "Questfortschritt im Gruppenchat posten"
-L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."] =
-	"Wenn du in einer Gruppe ein Questziel oder eine ganze Quest abschließt, postet dein Charakter das im Gruppenchat, so wie Questie. Nicht solo und nicht im Raid."
-
-L["Mark quests that are new in WoW: Forever"] = "Quests markieren, die neu in WoW: Forever sind"
-L["WoW: Forever adds over a thousand quests to the Classic world, plus about as many from Classic's later seasons that original Classic never had. They get a NEW right after their name: in the quest log (hover for details), in the quest details and in the quest window when you accept or turn one in."] =
-	"WoW: Forever bringt über tausend neue Quests in die Classic-Welt, dazu etwa genauso viele aus den späteren Seasons von Classic, die es im ursprünglichen Classic nie gab. Sie bekommen ein NEU direkt hinter ihrem Namen: im Questlog (Mouseover für Details), in den Questdetails und im Questfenster beim Annehmen und Abgeben."
-L["New in WoW: Forever"] = "Neu in WoW: Forever"
-L["Not in the original Classic (from its later seasons)"] = "Nicht im ursprünglichen Classic (aus den späteren Seasons)"
-L["Quests on continent and world maps"] = "Quests auf Kontinent- und Weltkarte"
-L["Blizzard's world map shows your quests only on zone maps. This shows them on continent maps and the world map too: an icon where to go (hover it for the objectives) and the area where the mobs and items are. Choose below what each zoom level shows. The map's own filter for quest objectives hides them as well."] =
-	"Blizzards Weltkarte zeigt deine Quests nur auf Zonenkarten. Das hier zeigt sie auch auf Kontinentkarten und der Weltkarte: ein Icon, wo du hinmusst (Mouseover zeigt die Questziele), und das Gebiet, in dem die Mobs und Items sind. Unten wählst du, was jede Zoomstufe zeigt. Der Filter für Questziele im Kartenmenü blendet sie ebenfalls aus."
-L["Nothing"] = "Nichts"
-L["Icons"] = "Icons"
-L["Areas"] = "Gebiete"
-L["Icons and areas"] = "Icons und Gebiete"
-L["On continent maps"] = "Auf Kontinentkarten"
-L["What continent maps like Kalimdor show of your quests. With icons only, hovering one shows its area."] =
-	"Was Kontinentkarten wie Kalimdor von deinen Quests zeigen. Nur mit Icons zeigt ein Mouseover das Gebiet der Quest."
-L["On the world map"] = "Auf der Weltkarte"
-L["What the map of the whole world shows of your quests."] = "Was die Karte der ganzen Welt von deinen Quests zeigt."
-L["Click an icon to select its quest"] = "Klick auf ein Icon wählt die Quest aus"
-L["As on zone maps: clicking a quest's icon selects that quest (waypoint arrow, its area on the map, and it's tracked if it wasn't); clicking it again unselects it, Shift-click stops tracking it. Off: a click zooms into the zone. With a controller, the button always zooms in."] =
-	"Wie auf Zonenkarten: Ein Klick auf das Icon einer Quest wählt sie aus (Wegpunktpfeil, ihr Gebiet auf der Karte, und sie wird verfolgt, falls nicht schon); nochmal klicken hebt die Auswahl auf, Umschalt+Klick beendet das Verfolgen. Aus: Ein Klick zoomt in die Zone. Mit Controller zoomt die Taste immer hinein."
-L["Quest areas on zone maps"] = "Questgebiete auf Zonenkarten"
-L["Blizzard shows only the area of your selected quest. All quests: the areas of every quest in the zone, like Questie."] =
-	"Blizzard zeigt nur das Gebiet deiner ausgewählten Quest. Alle Quests: die Gebiete aller Quests in der Zone, wie bei Questie."
-L["Selected quest"] = "Ausgewählte Quest"
-L["All quests"] = "Alle Quests"
-L["Retail unit frames"] = "Einheitenfenster wie in Retail"
-L["Since its latest patch Forever draws the player, target, focus, party and pet frames in a classic style. This brings back retail's: its art, bars and layout (the game still has them). Bars that move in combat follow when it ends. Switching it off takes a /reload."] =
-	"Seit dem letzten Patch zeichnet Forever die Fenster für Spieler, Ziel, Fokus, Gruppe und Pet im Classic-Stil. Das holt die aus Retail zurück: Grafik, Leisten und Anordnung (das Spiel hat sie noch). Leisten, die sich im Kampf verschieben, rücken danach zurecht. Zum Ausschalten ist ein /reload nötig."
-L["Combo points on your target's nameplate"] = "Combopunkte an der Namensplakette deines Ziels"
-L["Small dots in the middle of your target's health bar, one for each combo point you can have: lit ones in the colour of your points, the rest dark. Only while you have points on it. They take no room of their own, so nothing else on the nameplate moves. Rogues, and druids in Cat Form."] =
-	"Kleine Punkte in der Mitte der Lebensleiste deines Ziels, einer für jeden Combopunkt, den du haben kannst: die aktiven in der Farbe deiner Punkte, die übrigen dunkel. Nur solange du Punkte darauf hast. Sie brauchen keinen eigenen Platz, an der Namensplakette verschiebt sich also nichts. Für Schurken und Druiden in Katzengestalt."
-L["Colour combo points by count"] = "Combopunkte nach Anzahl färben"
-L["Clean-up button on the bags"] = "Aufräumen-Knopf an den Taschen"
-L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, at the left of the bags' search box."] =
-	"Seit dem letzten Forever-Patch fehlt der Aufräumen-Knopf der Taschen, mit Maus und Tastatur wie im Gamepad-Modus. Das holt ihn zurück, links neben das Suchfeld der Taschen."
-L["Clean up bags"] = "Taschen aufräumen"
-L["Combo dots: size"] = "Combopunkte: Größe"
-L["Each dot's size in pixels. While you move the slider, they show on your target's nameplate for a few seconds."] =
-	"Die Größe jedes Punkts in Pixeln. Während du den Regler bewegst, zeigen sie sich ein paar Sekunden an der Namensplakette deines Ziels."
-L["Combo dots: preview"] = "Combopunkte: Vorschau"
-L["Try it"] = "Ausprobieren"
-L["A small window with a nameplate whose dots count up like your points will; - and + change their size. No mob needed, and the settings can be closed. /lefthy tweaks combopos does the same."] =
-	"Ein kleines Fenster mit einer Namensplakette, deren Punkte hochzählen wie deine Combopunkte; - und + ändern ihre Größe. Kein Mob nötig, und die Einstellungen können zu sein. /lefthy tweaks combopos macht dasselbe."
-L["Size %d px"] = "Größe %d px"
-L["They count up like your points will. - and + change their size; your target's nameplate shows them too."] =
-	"Sie zählen hoch wie deine Combopunkte. - und + ändern ihre Größe; die Namensplakette deines Ziels zeigt sie auch."
-L["Training Dummy"] = "Trainingsattrappe"
-L["Reset"] = "Zurücksetzen"
-L["Done"] = "Fertig"
-L["Blizzard's combo points on the personal resource display (and the dots on your target's nameplate): green with one point, through yellow and orange, to red at full points. Off: retail's red."] =
-	"Blizzards Combopunkte an der persönlichen Ressourcenanzeige (und die Punkte an der Namensplakette deines Ziels): Grün bei einem Punkt, über Gelb und Orange bis Rot bei vollen Punkten. Aus: das Rot aus Retail."
+L["Watch"] = "Zuschauen"
+L["Live"] = "Live"
 
 -- Beacon
 L["Shares your position with Battle.net friends who also use LefthyTools and shows theirs on the world map and minimap, in their class colour."] =
@@ -415,6 +440,9 @@ L["Epic loot"] = "Epischer Loot"
 L["Scenario complete"] = "Szenario abgeschlossen"
 L["Gentle chime"] = "Leises Glockenspiel"
 
+-- Beacon: a friend's level-up with no message of their own, shown in your language
+L["{name} reached level {level}!"] = "{name} hat Level {level} erreicht!"
+
 -- Beacon tooltip on a friend's dot
 L["Level %d"] = "Level %d"
 L["Level %d (%d%%)"] = "Level %d (%d %%)"
@@ -439,6 +467,116 @@ L["south"] = "südlich"
 L["south-west"] = "südwestlich"
 L["west"] = "westlich"
 L["north-west"] = "nordwestlich"
+
+-- Beacon: fight stream
+L["Fight stream"] = "Kampf-Stream"
+L["Friends can watch my fights"] = "Freunde dürfen meine Kämpfe sehen"
+L["Friends with LefthyTools can open a small live view of your fight: you in the middle, the mobs around you on the map, what you're casting. Only while someone watches is anything sent."] =
+	"Freunde mit LefthyTools können eine kleine Live-Ansicht deines Kampfes öffnen: du in der Mitte, die Mobs um dich herum auf der Karte, was du gerade wirkst. Nur solange jemand zuschaut, wird etwas gesendet."
+L["Show when friends watch me"] = "Zeigen, wenn Freunde zuschauen"
+L["A tiny red dot with the number of watchers right of the calendar button at the minimap. Hover it to see who."] =
+	"Ein winziger roter Punkt mit der Zahl der Zuschauer rechts vom Kalender-Button an der Minimap. Mit der Maus drüber siehst du, wer."
+L["Friends' fights on flights"] = "Kämpfe von Freunden auf Flügen"
+L["A cinematic flight (Misc Tweaks) opens the stream of one friend who is fighting (or anyone, if nobody is). The top bar has a button for each friend to open or close theirs; they close when you land."] =
+	"Ein Flug im Kinomodus (Misc Tweaks) öffnet den Stream eines Freundes, der gerade kämpft (oder irgendeines, wenn keiner kämpft). Die obere Leiste hat für jeden Freund einen Button zum Öffnen und Schließen; bei der Landung gehen sie zu."
+L["Click a friend on the world map to watch"] = "Freund auf der Weltkarte anklicken zum Zuschauen"
+L["Clicking a friend's dot on the world map opens their stream; clicking it again closes it. /lefthy stream watch <name> does the same."] =
+	"Ein Klick auf den Punkt eines Freundes auf der Weltkarte öffnet seinen Stream, ein zweiter Klick schließt ihn. /lefthy stream watch <name> macht dasselbe."
+L["Your own stream"] = "Dein eigener Stream"
+L["What friends see when they watch you, live. /lefthy stream me does the same."] =
+	"Was Freunde sehen, wenn sie dir zuschauen, live. /lefthy stream me macht dasselbe."
+L["Stream window"] = "Stream-Fenster"
+L["The window with a made-up fight. Drag it to move it, the corner at the bottom right to resize it. /lefthy stream preview does the same."] =
+	"Das Fenster mit einem ausgedachten Kampf. Zieh es, um es zu verschieben, und die Ecke unten rechts, um die Größe zu ändern. /lefthy stream preview macht dasselbe."
+L["Click: watch their fight"] = "Klick: beim Kampf zuschauen"
+L["Click: close their fight stream"] = "Klick: Kampf-Stream schließen"
+L["Watching your fights"] = "Schauen dir zu"
+L["Beacon settings: Friends can watch my fights."] = "Beacon-Einstellungen: Freunde dürfen meine Kämpfe sehen."
+L["Waiting for %s's stream..."] = "Warte auf den Stream von %s ..."
+L["%s: off screen for %d s"] = "%s: seit %d s nicht im Bild"
+L["direction still unsure"] = "Richtung noch unsicher"
+L["a spell"] = "einen Zauber"
+L["In %s's group"] = "In der Gruppe von %s"
+L["Friendly player"] = "Freundlicher Spieler"
+L["Enemy player"] = "Feindlicher Spieler"
+L["%d yd away"] = "%d m entfernt"
+L["Minimap button for fight streams"] = "Minimap-Button für Kampf-Streams"
+L["A spyglass on the edge of the minimap: click it for the friends who share their fights, and pick one to watch (or close their stream). A red dot on it while you watch someone. Drag it to move it."] =
+	"Ein Fernrohr am Rand der Minimap: ein Klick zeigt die Freunde, die ihre Kämpfe teilen, und du wählst einen zum Zuschauen (oder schließt seinen Stream). Ein roter Punkt darauf, solange du jemandem zuschaust. Zum Verschieben ziehen."
+L["Stream"] = "Stream"
+L["No friend shares their fights right now."] = "Gerade teilt kein Freund seine Kämpfe."
+L["Close all streams"] = "Alle Streams schließen"
+L["You watch: %s"] = "Du schaust zu: %s"
+L["Watching you: %s"] = "Schauen dir zu: %s"
+L["Click: watch a friend's fight"] = "Klick: einem Freund beim Kampf zuschauen"
+L["Fight stream tests"] = "Kampf-Stream-Tests"
+L["No test yet: /lefthy stream test."] = "Noch kein Test: /lefthy stream test."
+L["LIVE"] = "LIVE"
+L["DEMO"] = "DEMO"
+L["%d yd"] = "%d m"
+L["%d on you"] = "%d auf dir"
+L["%d on %s"] = "%d auf %s"
+L["%d near"] = "%d in der Nähe"
+L["%s casts %s"] = "%s wirkt %s"
+L["No mobs with a nameplate near you."] = "Keine Mobs mit Namensplakette in deiner Nähe."
+L["Elite"] = "Elite"
+L["Rare"] = "Rar"
+L["Rare elite"] = "Rar-Elite"
+L["dead"] = "tot"
+L["attacking you"] = "greift dich an"
+L["attacking %s"] = "greift %s an"
+L["in combat"] = "im Kampf"
+L["casting %s"] = "wirkt %s"
+L["about %d yd"] = "etwa %d m"
+L["distance unknown"] = "Entfernung unbekannt"
+L["more than %d yd away"] = "mehr als %d m entfernt"
+L["%s's target"] = "Ziel von %s"
+L["your target"] = "dein Ziel"
+L["Move and turn: faint dots find their place."] = "Beweg und dreh dich: blasse Punkte finden ihren Platz."
+L["+%d XP"] = "+%d EP"
+L["1 kill"] = "1 Kill"
+L["an item"] = "ein Item"
+L["Health (estimated)"] = "Leben (geschätzt)"
+L["~%d%% health"] = "~%d%% Leben"
+L["Estimated from the hits it took, against its kind's health: %s."] =
+	"Geschätzt aus den Treffern, die er abbekommen hat, gemessen am Leben seiner Art: %s."
+L["learned from kills"] = "aus Kills gelernt"
+L["the classic database"] = "die Classic-Datenbank"
+L["usual for its level"] = "üblich für sein Level"
+L["Estimated by their client from the hits it took."] = "Vom Client deines Freundes geschätzt, aus den Treffern, die der Mob abbekommen hat."
+L["Health not known yet: it's learned when one of its kind is seen from full health to dead."] =
+	"Leben noch nicht bekannt: Es wird gelernt, sobald einer seiner Art von vollem Leben bis zum Tod gesehen wird."
+L["%s's LefthyTools is older and doesn't send health: they need to update."] =
+	"LefthyTools von %s ist älter und sendet kein Leben: ein Update ist nötig."
+L["Not known here: the game hides the maximum health in this place, and none is known from before."] =
+	"Hier nicht bekannt: Das Spiel verbirgt an diesem Ort das maximale Leben, und von vorher ist keins bekannt."
+L["Not known yet: it is after a few seconds out of combat at full health (a /reload starts over)."] =
+	"Noch nicht bekannt: Das ist es nach ein paar Sekunden außerhalb des Kampfes mit vollem Leben (ein /reload fängt neu an)."
+L["The game hides health from addons, so this one is added up from hits and heals. It can be a little off until the next time it's full."] =
+	"Das Spiel verbirgt das Leben vor Addons, deshalb wird es aus Treffern und Heilungen zusammengezählt. Bis es das nächste Mal voll ist, kann es etwas danebenliegen."
+L["off your screen for %d s"] = "seit %d s nicht im Bild"
+L["direction still unsure: move and turn"] = "Richtung noch unsicher: beweg und dreh dich"
+L["Westfall"] = "Westfall"
+L["Bandit leader"] = "Banditenanführer"
+L["Bandit"] = "Bandit"
+L["Bandit mage"] = "Banditenmagier"
+L["Gnoll"] = "Gnoll"
+L["Greyfang"] = "Graufang"
+L["Fireball"] = "Feuerball"
+L["Frostbolt"] = "Frostblitz"
+L["%d s"] = "%d s"
+L["%d:%02d min"] = "%d:%02d Min."
+L["Died after %s"] = "Gestorben nach %s"
+L["%s XP"] = "%s EP"
+L["lowest ~%d%%"] = "min. ~%d%% HP"
+L["Not killed yet"] = "Noch nicht getötet"
+L["Polymorph"] = "Verwandlung"
+L["out of reach"] = "außer Reichweite"
+L["Out of reach"] = "Außer Reichweite"
+L["Their character isn't near you, and the game can't show anyone as they look from afar: their class instead."] =
+	"Sein Charakter ist nicht in deiner Nähe, und das Spiel kann aus der Ferne niemanden so zeigen, wie er aussieht: stattdessen seine Klasse."
+L["Their character isn't near you, and the game can't show anyone as they look from afar: their portrait from the party frame, on their class's emblem."] =
+	"Sein Charakter ist nicht in deiner Nähe, und das Spiel kann aus der Ferne niemanden so zeigen, wie er aussieht: sein Porträt aus dem Gruppenfenster, auf dem Wappen seiner Klasse."
 
 -- Chronicle
 L["A journal for each character, kept automatically: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, statistics, and what your friends did."] =
@@ -468,11 +606,13 @@ L["A button on the edge of the minimap: click opens the journal, right-click the
 L["Click: open or close the journal"] = "Klick: Tagebuch öffnen oder schließen"
 L["Right-click: settings"] = "Rechtsklick: Einstellungen"
 L["Drag: move it along the minimap"] = "Ziehen: am Rand der Minimap verschieben"
+L["%d new from friends"] = "%d Neues von Freunden"
 L["Open"] = "Öffnen"
 L["Your timeline, your statistics and your friends' news. Also /chronicle or a key binding."] =
 	"Deine Zeitleiste, deine Statistiken und die Neuigkeiten deiner Freunde. Auch mit /chronicle oder einer Tastenbelegung."
 L["Chronicle: open or close the journal"] = "Chronicle: Tagebuch öffnen/schließen"
 L["This session: %s played, %s XP, %d quests, %d kills"] = "Diese Session: %s gespielt, %s EP, %d Quests, %d Kills"
+
 -- Chronicle window
 L["Timeline"] = "Zeitleiste"
 L["Statistics"] = "Statistiken"
@@ -564,6 +704,7 @@ L["Your friends' level-ups, deaths, quests, new zones, dungeons, bosses, rares, 
 L["Completed %s"] = "%s abgeschlossen"
 L["Came online"] = "Ist online gekommen"
 L["Went offline"] = "Ist offline gegangen"
+
 -- Chronicle graphs
 L["Graphs"] = "Grafiken"
 L["Last 14 days"] = "Letzte 14 Tage"
@@ -584,11 +725,6 @@ L["You and %s, last 7 days"] = "Du und %s, letzte 7 Tage"
 L["Latest news"] = "Neueste Ereignisse"
 
 -- Chronicle: friends' journals, the Compare page
-L["just now"] = "gerade eben"
-L["%d min ago"] = "vor %d Min."
-L["%d h ago"] = "vor %d Std."
-L["yesterday"] = "gestern"
-L["%d days ago"] = "vor %d Tagen"
 L["You and %s, all time"] = "Du und %s, insgesamt"
 L["Last played %s"] = "Zuletzt gespielt: %s"
 L["Deadliest foe: %s"] = "Gefährlichster Gegner: %s"
@@ -675,118 +811,6 @@ L["Surname not known yet: it shows once the character is played while you're onl
 L["... and %d more"] = "... und %d weitere"
 L["%s this week"] = "%s diese Woche"
 
--- A friend's level-up with no message of their own: shown in your language
-L["{name} reached level {level}!"] = "{name} hat Level {level} erreicht!"
-
--- Party chat announcements (party members read these, so they follow the client language too)
-L["%s: quest complete!"] = "%s: Quest erledigt!"
-
--- Beacon: fight stream
-L["Fight stream"] = "Kampf-Stream"
-L["Friends can watch my fights"] = "Freunde dürfen meine Kämpfe sehen"
-L["Friends with LefthyTools can open a small live view of your fight: you in the middle, the mobs around you on the map, what you're casting. Only while someone watches is anything sent."] =
-	"Freunde mit LefthyTools können eine kleine Live-Ansicht deines Kampfes öffnen: du in der Mitte, die Mobs um dich herum auf der Karte, was du gerade wirkst. Nur solange jemand zuschaut, wird etwas gesendet."
-L["Show when friends watch me"] = "Zeigen, wenn Freunde zuschauen"
-L["A tiny red dot with the number of watchers right of the calendar button at the minimap. Hover it to see who."] =
-	"Ein winziger roter Punkt mit der Zahl der Zuschauer rechts vom Kalender-Button an der Minimap. Mit der Maus drüber siehst du, wer."
-L["Friends' fights on flights"] = "Kämpfe von Freunden auf Flügen"
-L["A cinematic flight (Misc Tweaks) opens the stream of one friend who is fighting (or anyone, if nobody is). The top bar has a button for each friend to open or close theirs; they close when you land."] =
-	"Ein Flug im Kinomodus (Misc Tweaks) öffnet den Stream eines Freundes, der gerade kämpft (oder irgendeines, wenn keiner kämpft). Die obere Leiste hat für jeden Freund einen Button zum Öffnen und Schließen; bei der Landung gehen sie zu."
-L["Click a friend on the world map to watch"] = "Freund auf der Weltkarte anklicken zum Zuschauen"
-L["Clicking a friend's dot on the world map opens their stream; clicking it again closes it. /lefthy stream watch <name> does the same."] =
-	"Ein Klick auf den Punkt eines Freundes auf der Weltkarte öffnet seinen Stream, ein zweiter Klick schließt ihn. /lefthy stream watch <name> macht dasselbe."
-L["Your own stream"] = "Dein eigener Stream"
-L["What friends see when they watch you, live. /lefthy stream me does the same."] =
-	"Was Freunde sehen, wenn sie dir zuschauen, live. /lefthy stream me macht dasselbe."
-L["Stream window"] = "Stream-Fenster"
-L["The window with a made-up fight. Drag it to move it, the corner at the bottom right to resize it. /lefthy stream preview does the same."] =
-	"Das Fenster mit einem ausgedachten Kampf. Zieh es, um es zu verschieben, und die Ecke unten rechts, um die Größe zu ändern. /lefthy stream preview macht dasselbe."
-L["Click: watch their fight"] = "Klick: beim Kampf zuschauen"
-L["Click: close their fight stream"] = "Klick: Kampf-Stream schließen"
-L["Watch"] = "Zuschauen"
-L["Live"] = "Live"
-L["Watching your fights"] = "Schauen dir zu"
-L["Beacon settings: Friends can watch my fights."] = "Beacon-Einstellungen: Freunde dürfen meine Kämpfe sehen."
-L["Waiting for %s's stream..."] = "Warte auf den Stream von %s ..."
-L["%s: off screen for %d s"] = "%s: seit %d s nicht im Bild"
-L["direction still unsure"] = "Richtung noch unsicher"
-L["a spell"] = "einen Zauber"
-L["In %s's group"] = "In der Gruppe von %s"
-L["Friendly player"] = "Freundlicher Spieler"
-L["Enemy player"] = "Feindlicher Spieler"
-L["%d yd away"] = "%d m entfernt"
-L["Minimap button for fight streams"] = "Minimap-Button für Kampf-Streams"
-L["A spyglass on the edge of the minimap: click it for the friends who share their fights, and pick one to watch (or close their stream). A red dot on it while you watch someone. Drag it to move it."] =
-	"Ein Fernrohr am Rand der Minimap: ein Klick zeigt die Freunde, die ihre Kämpfe teilen, und du wählst einen zum Zuschauen (oder schließt seinen Stream). Ein roter Punkt darauf, solange du jemandem zuschaust. Zum Verschieben ziehen."
-L["Stream"] = "Stream"
-L["No friend shares their fights right now."] = "Gerade teilt kein Freund seine Kämpfe."
-L["Close all streams"] = "Alle Streams schließen"
-L["You watch: %s"] = "Du schaust zu: %s"
-L["Watching you: %s"] = "Schauen dir zu: %s"
-L["Click: watch a friend's fight"] = "Klick: einem Freund beim Kampf zuschauen"
-L["%d new from friends"] = "%d Neues von Freunden"
-L["Fight stream tests"] = "Kampf-Stream-Tests"
-L["No test yet: /lefthy stream test."] = "Noch kein Test: /lefthy stream test."
-L["LIVE"] = "LIVE"
-L["DEMO"] = "DEMO"
-L["%d yd"] = "%d m"
-L["%d on you"] = "%d auf dir"
-L["%d on %s"] = "%d auf %s"
-L["%d near"] = "%d in der Nähe"
-L["%s casts %s"] = "%s wirkt %s"
-L["No mobs with a nameplate near you."] = "Keine Mobs mit Namensplakette in deiner Nähe."
-L["Elite"] = "Elite"
-L["Rare"] = "Rar"
-L["Rare elite"] = "Rar-Elite"
-L["dead"] = "tot"
-L["attacking you"] = "greift dich an"
-L["attacking %s"] = "greift %s an"
-L["in combat"] = "im Kampf"
-L["casting %s"] = "wirkt %s"
-L["about %d yd"] = "etwa %d m"
-L["distance unknown"] = "Entfernung unbekannt"
-L["more than %d yd away"] = "mehr als %d m entfernt"
-L["%s's target"] = "Ziel von %s"
-L["your target"] = "dein Ziel"
-L["Move and turn: faint dots find their place."] = "Beweg und dreh dich: blasse Punkte finden ihren Platz."
-L["+%d XP"] = "+%d EP"
-L["1 kill"] = "1 Kill"
-L["an item"] = "ein Item"
-L["Health (estimated)"] = "Leben (geschätzt)"
-L["~%d%% health"] = "~%d%% Leben"
-L["Estimated from the hits it took, against its kind's health: %s."] =
-	"Geschätzt aus den Treffern, die er abbekommen hat, gemessen am Leben seiner Art: %s."
-L["learned from kills"] = "aus Kills gelernt"
-L["the classic database"] = "die Classic-Datenbank"
-L["usual for its level"] = "üblich für sein Level"
-L["Estimated by their client from the hits it took."] = "Vom Client deines Freundes geschätzt, aus den Treffern, die der Mob abbekommen hat."
-L["Health not known yet: it's learned when one of its kind is seen from full health to dead."] =
-	"Leben noch nicht bekannt: Es wird gelernt, sobald einer seiner Art von vollem Leben bis zum Tod gesehen wird."
-L["%s's LefthyTools is older and doesn't send health: they need to update."] =
-	"LefthyTools von %s ist älter und sendet kein Leben: ein Update ist nötig."
-L["Not known here: the game hides the maximum health in this place, and none is known from before."] =
-	"Hier nicht bekannt: Das Spiel verbirgt an diesem Ort das maximale Leben, und von vorher ist keins bekannt."
-L["Not known yet: it is after a few seconds out of combat at full health (a /reload starts over)."] =
-	"Noch nicht bekannt: Das ist es nach ein paar Sekunden außerhalb des Kampfes mit vollem Leben (ein /reload fängt neu an)."
-L["The game hides health from addons, so this one is added up from hits and heals. It can be a little off until the next time it's full."] =
-	"Das Spiel verbirgt das Leben vor Addons, deshalb wird es aus Treffern und Heilungen zusammengezählt. Bis es das nächste Mal voll ist, kann es etwas danebenliegen."
-L["off your screen for %d s"] = "seit %d s nicht im Bild"
-L["direction still unsure: move and turn"] = "Richtung noch unsicher: beweg und dreh dich"
-L["Westfall"] = "Westfall"
-L["Bandit leader"] = "Banditenanführer"
-L["Bandit"] = "Bandit"
-L["Bandit mage"] = "Banditenmagier"
-L["Gnoll"] = "Gnoll"
-L["Greyfang"] = "Graufang"
-L["Fireball"] = "Feuerball"
-L["Frostbolt"] = "Frostblitz"
-L["%d s"] = "%d s"
-L["%d:%02d min"] = "%d:%02d Min."
-L["Died after %s"] = "Gestorben nach %s"
-L["%s XP"] = "%s EP"
-L["lowest ~%d%%"] = "min. ~%d%% HP"
-L["Not killed yet"] = "Noch nicht getötet"
-L["Polymorph"] = "Verwandlung"
 -- Bestiary
 L["What the mobs you kill drop: a window for your target with each drop, how many you got and the drop chance, from your own kills. Kept for all your characters, only on your computer."] =
 	"Was die Mobs droppen, die du tötest: ein Fenster für dein Ziel mit jedem Drop, wie viele du bekommen hast und der Dropchance, aus deinen eigenen Kills. Für alle deine Charaktere, nur auf deinem Computer."
@@ -919,20 +943,3 @@ L["Where you killed them"] = "Wo du sie getötet hast"
 L["Your last %d kills."] = "Deine letzten %d Kills."
 L["item %d"] = "Item %d"
 L["No kills on a map yet"] = "Noch keine Kills auf der Karte"
-L["Who has aggro, on enemy nameplates"] = "Wer Aggro hat, auf feindlichen Namensplaketten"
-L["In a group, the left end of each enemy's health bar says whom it's on: >YOU< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."] =
-	"In einer Gruppe zeigt das linke Ende des Lebensbalkens jedes Gegners, auf wem er ist: >DU<, wenn du es bist, sonst die ersten drei Buchstaben des Namens in der Farbe der Rolle (Tank blau, Heiler grün, DD rot, weiß, wenn unbekannt). Die Rollen kommen aus dem Dungeonbrowser oder einem Rollencheck; in einer selbst erstellten Gruppe kann der Anführer unten einen starten."
-L["Start a role check"] = "Rollencheck starten"
-L["Start"] = "Starten"
-L["Everyone in your group picks tank, healer or damage in Blizzard's role check window, LefthyTools or not, and the aggro colours follow. Only the group's leader or an assistant can start one. /lefthy tweaks rolecheck does the same."] =
-	"Jeder in deiner Gruppe wählt Tank, Heiler oder Schaden in Blizzards Rollencheck-Fenster, mit LefthyTools oder ohne, und die Aggro-Farben folgen. Nur der Anführer der Gruppe oder ein Assistent kann einen starten. /lefthy tweaks rolecheck macht dasselbe."
-L["Aggro on nameplates: preview"] = "Aggro auf Namensplaketten: Vorschau"
-L["For ten seconds the enemy nameplates you can see show examples: you, a tank, a healer, a damage dealer and someone without a role. /lefthy tweaks aggrotest does the same."] =
-	"Zehn Sekunden lang zeigen die feindlichen Namensplaketten, die du siehst, Beispiele: dich, einen Tank, einen Heiler, einen DD und jemanden ohne Rolle. /lefthy tweaks aggrotest macht dasselbe."
-L[">YOU<"] = ">DU<"
-L["out of reach"] = "außer Reichweite"
-L["Out of reach"] = "Außer Reichweite"
-L["Their character isn't near you, and the game can't show anyone as they look from afar: their class instead."] =
-	"Sein Charakter ist nicht in deiner Nähe, und das Spiel kann aus der Ferne niemanden so zeigen, wie er aussieht: stattdessen seine Klasse."
-L["Their character isn't near you, and the game can't show anyone as they look from afar: their portrait from the party frame, on their class's emblem."] =
-	"Sein Charakter ist nicht in deiner Nähe, und das Spiel kann aus der Ferne niemanden so zeigen, wie er aussieht: sein Porträt aus dem Gruppenfenster, auf dem Wappen seiner Klasse."
