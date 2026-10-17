@@ -7274,6 +7274,15 @@ section("Chronicle: spring cleaning")
 	end
 	check(CDB.myU <= week and latest <= week and latest > 0,
 		"my stamps from a clock weeks ahead: all anew from now, got " .. tostring(CDB.myU - time()) .. " s ahead")
+	-- A character keyed by its full name (another of the account's has its first name) whose "a" record
+	-- was lost on the way (an older build passed the journal on): the key says its surname.
+	fromAnna("d", carl .. ";Carl Moor-Realmy;9720;" .. today .. ";30,300,5,20,1,1,0,9,1,1000,0,0,0,10")
+	fromAnna("l", carl .. ";Carl Moor-Realmy;Carl Other;")
+	local moor
+	for _, c in ipairs(CH.Characters()) do if c.key == "book:" .. carl .. ":Carl Moor-Realmy" then moor = c end end
+	check(moor and moor.name == "Carl Moor" and not moor.partial, "a character keyed by its full name isn't marked: the key says the surname")
+	check(not chars["Carl Moor-Realmy"].full, "... and no other name learned replaces it")
+	chars["Carl Moor-Realmy"] = nil
 end)()
 
 section("Beacon: leaving")

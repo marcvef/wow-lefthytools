@@ -387,7 +387,8 @@ their journal sends it on as its own.
 
 **A name not known in full.** A journal from an older build only ever says the first name (the
 key's), so a character of it that Battle.net hasn't shown online since, and an alt of mine not played
-since this build, have no `full` (`C.Partial`). Every place that shows a character shows it by its
+since this build, have no `full` (`C.Partial`; one keyed by its full name, see Data, has its surname
+in the key: not partial, and no learned name replaces it). Every place that shows a character shows it by its
 first name with a muted mark (`C.Mark`: a grey "?" after it; " (?)" in LTC, which can't colour),
 never as if that were all of it (in Forever every character has a surname): the Friends page, Compare
 (chips, charts, leaderboard, hall of fame, records), News, the dropdown, a friend's latest news, my

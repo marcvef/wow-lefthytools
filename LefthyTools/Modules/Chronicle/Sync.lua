@@ -500,9 +500,11 @@ function C.NameOf(c)
 	return c.full or c.name
 end
 
--- A record (mine, or a friend's journal's) without the name the game shows: only its first name.
+-- A record (mine, or a friend's journal's) without the name the game shows: only its first name. (A
+-- character keyed by its full name, Chronicle.lua: another of that account's has its first name,
+-- carries its surname in the key, also when its "a" record was lost on the way through an older build.)
 function C.Partial(c)
-	return not c.full
+	return not c.full and not HasSurname(c.name)
 end
 
 -- The mark after a partial name ("" for a whole one); plain: for LTC, where colours don't go.
@@ -868,8 +870,8 @@ local function StoreName(acct, f)
 	elseif Friends()[acct] and store.book[acct] then
 		c = store.book[acct].chars[key]
 	end
-	if not c or HasSurname(c.full) then
-		return
+	if not c or HasSurname(C.NameOf(c)) then
+		return -- (a surname known, or in its key)
 	end
 	c.full, c.guid = full, c.guid or guid
 	if acct == C.MyAccount() then
