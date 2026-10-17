@@ -2,15 +2,16 @@ local _, ns = ...
 local LT = ns.LT
 
 -- LT.MapArt: a zone's map as your world map draws it, laid into a frame of ours (the Bestiary
--- ledger's kill map). The world map's art of the zone: its first layer (C_Map.GetMapArtLayers /
--- GetMapArtLayerTextures), tiles in rows like Blizzard_MapCanvasDetailLayer, the last column and
--- row cut to the map's edge with SetTexCoord, so nothing hangs over. That art leaves what you
--- haven't explored blank; what you have is overlays on it (C_MapExplorationInfo.
--- GetExploredMapTextures, laid like Blizzard's MapExplorationPin), so the map shows what your
--- world map shows. Both checked against the forever branch of Blizzard's UI source.
+-- ledger's kill map; the fight stream's map where it has no minimap tiles). The world map's art of
+-- the zone: its first layer (C_Map.GetMapArtLayers / GetMapArtLayerTextures), tiles in rows like
+-- Blizzard_MapCanvasDetailLayer, the last column and row cut to the map's edge with SetTexCoord,
+-- so nothing hangs over. That art leaves what you haven't explored blank; what you have is
+-- overlays on it (C_MapExplorationInfo.GetExploredMapTextures, laid like Blizzard's
+-- MapExplorationPin), so the map shows what your world map shows. Both checked against the
+-- forever branch of Blizzard's UI source.
 --   * New(frame, drawLayer, subLevel, mask): a map on that frame, its textures pooled.
 --   * Lay(map, mapID, width, height, fit): the zone's art at that size, its top left at the frame's.
---   * SetShown(map, shown), Stale(map).
+--   * SetShown(map, shown), Stale(map), Forget(map).
 -- Laid only when the zone, the size or what you've explored changes; never per frame.
 
 local MapArt = {}
@@ -197,4 +198,12 @@ end
 -- true when you've explored more since the art shown was laid (Lay lays it again).
 function MapArt.Stale(map)
 	return map.width ~= nil and map.explored ~= explored
+end
+
+-- Forgets what's laid, all of it hidden: the next Lay asks the game again, even for the same map.
+function MapArt.Forget(map)
+	map.mapID, map.explored, map.width, map.height = nil, nil, nil, nil
+	HideFrom(map.tiles, 0)
+	HideFrom(map.overlays, 0)
+	map.tileCount, map.overlayCount = 0, 0
 end

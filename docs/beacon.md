@@ -656,8 +656,12 @@ up, to scale (2.55 px per yard for rings, dots and map): the minimap's own terra
 `Data/MinimapTiles.lua` has them (`world/minimaps/<continent>/mapX_Y.blp`, 256 px for 533.33 yd,
 X = floor(32 - west / 533.33), Y = floor(32 - north / 533.33), the 3 x 3 around; `node
 tools/update-minimap-tiles.js` from wago.tools' file list), else the world map's art of the zone
-(`C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, laid like `Blizzard_MapCanvasDetailLayer`),
-else plain rings; cut round, a little darker. In the middle an arrow turning with their facing (a
+with what you've explored of it, as your world map shows it (`LT.MapArt`, Core/MapArt.lua, like the
+Bestiary ledger's map: `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures` laid like
+`Blizzard_MapCanvasDetailLayer`, the explored overlays like `MapExplorationPin`; the zone's yards
+from its corners, `C_Map.GetWorldPosFromMapPos`; yours also on a friend's stream: the game tells
+only your own; laid when the zone changes, the window opens or you've explored more, never per
+frame), else plain rings; cut round, a little darker. In the middle an arrow turning with their facing (a
 skull when dead, the name greyed). A dot per mob (red: attacking them, orange: in combat, grey:
 not; gold ring: elite, silver: rare; white ring and a yellow name: their target; purple glow:
 casting; a skull that fades: dead; faint: direction unsure), names for the 4 nearest and the

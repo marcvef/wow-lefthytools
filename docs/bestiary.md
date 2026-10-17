@@ -380,7 +380,8 @@ map wide).
   when its kills were in more than one zone, a picker of them (`LT.Window.AddPicker`, like the
   sort's: the most kills first, each "Elwynn Forest (12)"; the user: "if there are multiple regions
   there needs to be a drop down"). Under it the zone's map in a 330 x 220 box as the world map shows
-  it, laid by `LT.MapArt` (Core/MapArt.lua): its first art layer, `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid
+  it, laid by `LT.MapArt` (Core/MapArt.lua, shared with the fight stream's map where that has no
+  minimap tiles): its first art layer, `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid
   like `Blizzard_MapCanvasDetailLayer`, as large as fits the box (`fit`), centred; the last column
   and row's tiles cut to the map's edge with `SetTexCoord`, so nothing hangs over; no art: the box's
   dark back. On it a small red dot in a dark ring per kill there (older ones fainter).
@@ -400,8 +401,8 @@ map wide).
   (a zone can have dozens).
 - **Laid only when needed**: the art and its overlays again only when the map shown changes
   (another mob, another zone picked), or after `MAP_EXPLORATION_UPDATED` (one frame of
-  `LT.MapArt`'s, registered once the ledger is built; it only counts, so the next draw lays it
-  again). Every other redraw only moves the dots.
+  `LT.MapArt`'s, registered once the ledger is built or a fight stream window lays a map; it only
+  counts, so the next draw lays it again). Every other redraw only moves the dots.
 - **A row** also says "6/11 found" (the drop database; not while it shows what the search found).
   Sorted by coin, worth, XP per kill or XP per hour, it says that instead ("~45s", "85 XP", "21k
   XP/h").

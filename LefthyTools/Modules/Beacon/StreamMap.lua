@@ -1,15 +1,17 @@
 local _, ns = ...
+local LT = ns.LT
 local B = ns.Beacon
 local S = B.Stream
 
 -- The fight stream's map under a window's radar (StreamView.lua builds the window: win.Map, cut
 -- round, and win.Plain, the rings' discs for when there's no map): the minimap's own terrain tiles
 -- (Data/MinimapTiles.lua: 256 px for 533.33 yd of the world's grid, the 3 x 3 around the place),
--- else the world map's art of the zone (C_Map.GetMapArtLayers / GetMapArtLayerTextures, laid like
--- Blizzard_MapCanvasDetailLayer), else none (the plain discs). To the windows' one scale
--- (S.PX_PER_YARD: a yard on the map is a yard on the rings), north up, the place in the middle.
--- S.MoveMap every frame: textures change only when the place reaches another tile or zone, the
--- anchor only when the map moved.
+-- else the world map's art of the zone with what you've explored of it (LT.MapArt, Core/MapArt.lua,
+-- like the Bestiary ledger's map; yours, also on a friend's stream: what your world map shows),
+-- else none (the plain discs). To the windows' one scale (S.PX_PER_YARD: a yard on the map is a
+-- yard on the rings), north up, the place in the middle. S.MoveMap every frame: textures change only
+-- when the place reaches another tile or zone (or you've explored more), the anchor only when the
+-- map moved.
 
 local Value, issecret = S.Value, S.issecret
 local PX_PER_YARD, GLIDE = S.PX_PER_YARD, S.GLIDE
@@ -22,41 +24,20 @@ local function MapCorner(mapID, x, y)
 	end
 end
 
--- The world map's art of a zone (laid out, hidden: MoveMap shows it when it's the one in use).
+-- The world map's art of a zone with what you've explored of it, to scale (the zone's corners in
+-- the world: its yards), cut round; laid anew (a zone, a window opened, explored more), hidden:
+-- MoveMap shows it when it's the one in use.
 local function SetupMap(view, mapID)
 	local map, win = view.map, view.win
 	map.id, map.ok, map.x = mapID, false, nil
-	local layers = mapID and Value("C_Map.GetMapArtLayers", mapID)
-	local layer = type(layers) == "table" and layers[1]
-	local textures = layer and Value("C_Map.GetMapArtLayerTextures", mapID, 1)
+	map.art = map.art or LT.MapArt.New(win.Map, "BACKGROUND", 0, win.Map.Round)
+	LT.MapArt.Forget(map.art)
+	LT.MapArt.SetShown(map.art, false)
 	local north0, west0 = MapCorner(mapID, 0, 0)
 	local north1, west1 = MapCorner(mapID, 1, 1)
-	if type(textures) == "table" and north0 and north1 and west0 > west1 and north0 > north1 then
-		map.ok, map.north0, map.west0 = true, north0, west0
-		local sx = (west0 - west1) * PX_PER_YARD / layer.layerWidth
-		local sy = (north0 - north1) * PX_PER_YARD / layer.layerHeight
-		local cols = math.ceil(layer.layerWidth / layer.tileWidth)
-		local rows = math.ceil(layer.layerHeight / layer.tileHeight)
-		local n = 0
-		for row = 1, rows do
-			for col = 1, cols do
-				n = n + 1
-				local tile = map.tiles[n]
-				if not tile then
-					tile = win.Map:CreateTexture(nil, "BACKGROUND")
-					tile:AddMaskTexture(win.Map.Round)
-					map.tiles[n] = tile
-				end
-				tile:SetTexture(textures[(row - 1) * cols + col])
-				tile:SetSize(layer.tileWidth * sx, layer.tileHeight * sy)
-				tile:ClearAllPoints()
-				tile:SetPoint("TOPLEFT", win.Map, "TOPLEFT", (col - 1) * layer.tileWidth * sx, -(row - 1) * layer.tileHeight * sy)
-			end
-		end
-		map.count = n
-	end
-	for _, tile in ipairs(map.tiles) do
-		tile:Hide()
+	if north0 and north1 and west0 > west1 and north0 > north1 then
+		map.ok = LT.MapArt.Lay(map.art, mapID, (west0 - west1) * PX_PER_YARD, (north0 - north1) * PX_PER_YARD) ~= nil
+		map.north0, map.west0 = north0, west0
 	end
 	if map.source == "art" then
 		map.source = nil
@@ -99,8 +80,8 @@ local function UseTiles(view, source)
 	for _, tile in ipairs(map.mini or {}) do
 		tile:SetShown(source == "mini" and tile.has)
 	end
-	for i, tile in ipairs(map.tiles) do
-		tile:SetShown(source == "art" and i <= (map.count or 0))
+	if map.art then
+		LT.MapArt.SetShown(map.art, source == "art")
 	end
 end
 
@@ -108,7 +89,7 @@ end
 -- there smoothly (a friend's place comes twice a second) instead of at once.
 function S.MoveMap(view, north, west, continent, mapID, elapsed)
 	local map, win = view.map, view.win
-	if mapID ~= map.id then
+	if mapID ~= map.id or (map.art and LT.MapArt.Stale(map.art)) then
 		SetupMap(view, mapID)
 	end
 	local tiles = north and continent and ns.MINIMAP_TILES and ns.MINIMAP_TILES[continent]

@@ -140,7 +140,8 @@ for i = #ERRORS, errorsBefore + 1, -1 do table.remove(ERRORS, i) end -- the test
 
 section("a zone's map (LT.MapArt)")
 do -- The world map's art of a zone and what you've explored of it, laid into a frame of ours (the
-	-- Bestiary ledger's kill map). The frame here notes each texture's draw sublevel and mask.
+	-- Bestiary ledger's kill map, the fight stream's map without minimap tiles). The frame here notes
+	-- each texture's draw sublevel and mask.
 	local MapArt, errorsWere, made = LT.MapArt, #ERRORS, 0
 	local host = CreateFrame("Frame")
 	local mask = host:CreateMaskTexture()
@@ -187,7 +188,8 @@ do -- The world map's art of a zone and what you've explored of it, laid into a 
 	MapArt.Lay(map, 1429, 2004, 668)
 	check(not MapArt.Stale(map) and o1.shown and o2.shown and not o3.shown, "laid again when next asked for")
 	EXPLORED[1429] = elwynn
-	-- Hidden: also what's laid meanwhile; shown again: only what's in use.
+	-- Hidden (the fight stream's art while it shows minimap tiles): also what's laid meanwhile; shown
+	-- again: only what's in use.
 	MapArt.SetShown(map, false)
 	local any = false
 	for _, t in ipairs(tiles) do any = any or t.shown end
@@ -196,6 +198,12 @@ do -- The world map's art of a zone and what you've explored of it, laid into a 
 	check(not any and not tiles[1].shown and tiles[1].path == 143601, "hidden: all of it, also what's laid while hidden")
 	MapArt.SetShown(map, true)
 	check(tiles[1].shown and tiles[12].shown and not o1.shown and not o2.shown, "shown again: only what's in use")
+	-- Forgotten (the fight stream's window opened again): all hidden, the same map laid anew.
+	MapArt.Forget(map)
+	tiles[1].path = nil
+	check(not tiles[1].shown and not tiles[12].shown and not MapArt.Stale(map), "forgotten: nothing shown")
+	check(MapArt.Lay(map, 1436, 2004, 668) == 2004 and tiles[1].path == 143601 and tiles[1].shown and made == 15,
+		"the same map again: laid anew, from the pool")
 	-- The game saying nothing.
 	local layers, exploration = C_Map.GetMapArtLayers, C_MapExplorationInfo
 	C_MapExplorationInfo = nil
@@ -3795,15 +3803,39 @@ do
 		and tiles[9].path == 900000 + (x0 + 2) * 100 + y0 + 2 and math.abs(tiles[1].width - 1600 / 3 * px) < 0.01
 		and math.abs(mapPoint[4] + (tx - x0) * 1600 / 3 * px) < 0.01 and math.abs(mapPoint[5] - (ty - y0) * 1600 / 3 * px) < 0.01,
 		"the map under the rings: the minimap's tiles around me, to scale, where I stand in the middle")
-	-- ... or, where there are none, the world map's art of my zone.
+	-- ... or, where there are none, the world map's art of my zone (LT.MapArt, like the ledger's map),
+	-- with what I've explored of it.
 	ns.MINIMAP_TILES = {}
 	lefthy("stream preview")
 	Advance(0.6)
 	tiles = shownTiles()
 	mapPoint = win.Map._points[#win.Map._points]
-	check(#tiles == 12 and tiles[1].path == 142901 and tiles[12].path == 142912 and math.abs(tiles[1].width - 256 * 1000 * px / 1002) < 0.01
-		and math.abs(mapPoint[4] + (1000 - hereW) * px) < 0.01 and math.abs(mapPoint[5] - (1000 - hereN) * px) < 0.01,
-		"no minimap tiles: my zone's world map art (12 tiles), to scale, where I stand in the middle")
+	do
+		local art = S.View("me").map.art
+		check(#tiles == 15 and art.tiles[1].shown and art.tiles[1].path == 142901 and art.tiles[12].path == 142912
+			and math.abs(art.tiles[1].width - 256 * 1000 * px / 1002) < 0.01
+			and math.abs(mapPoint[4] + (1000 - hereW) * px) < 0.01 and math.abs(mapPoint[5] - (1000 - hereN) * px) < 0.01,
+			"no minimap tiles: my zone's world map art (12 tiles), to scale, where I stand in the middle")
+		local sx, sy = 1000 * px / 1002, 1000 * px / 668 -- (the zone's yards: the art's pixels a little wider than tall here)
+		local o = art.overlays
+		local _, _, _, x2, y2 = o[2]:GetPoint(1)
+		check(o[1].shown and o[1].path == 7001 and o[2].shown and o[3].shown and o[3].path == 7004 and math.abs(x2 - 356 * sx) < 0.01
+			and math.abs(y2 + 50 * sy) < 0.01 and math.abs(o[1].height - 200 * sy) < 0.01,
+			"... and what I've explored of it on the art, scaled like it (the minimap's tiles have it already)")
+		-- Explored more while it shows: laid again on the next frame, not in the event. (MoveMap called
+		-- as a frame would: no time passes.)
+		local view, elwynn = S.View("me"), EXPLORED[1429]
+		EXPLORED[1429] = { elwynn[3] }
+		Fire("MAP_EXPLORATION_UPDATED")
+		check(o[2].shown and o[1].path == 7001, "explored more: nothing laid in the event")
+		S.MoveMap(view, hereN, hereW, 0, 1429)
+		check(o[1].path == 7004 and o[1].shown and not o[2].shown and not o[3].shown and art.tiles[12].shown and win.Map:IsShown(),
+			"the next frame: laid again, still shown")
+		EXPLORED[1429] = elwynn
+		Fire("MAP_EXPLORATION_UPDATED")
+		S.MoveMap(view, hereN, hereW, 0, 1429)
+		check(o[1].path == 7001 and o[3].shown, "and back")
+	end
 	local act = win.Act
 	check(act.Name:GetText() == "Spell 133" and act.Icon:IsShown() and act.Bar.width > 1 and act.Bar.width < 50
 		and act.Recent[1]:IsShown() and act.Recent[1].path == 100133 and act.Recent[4]:IsShown() and not act.Recent[5]:IsShown(),
