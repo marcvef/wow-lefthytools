@@ -65,7 +65,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/StreamNet.lua    fight stream between friends (kind O), the being-watched dot
   Modules/Beacon/StreamButton.lua the spyglass minimap button: friends to watch
   Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
-  Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, sharing, /chronicle
+  Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, /chronicle
+  Modules/Chronicle/Live.lua       friends live through Beacon: highlights (E2), days (D2/K2), the feed
   Modules/Chronicle/Characters.lua  who is who: accounts, names, matching; characters, accounts, news
   Modules/Chronicle/Sync.lua       friends' journals passed on between friends (kind J)
   Modules/Chronicle/Recap.lua      in chat: catch-up, weekly recap, sharing; the leaderboards

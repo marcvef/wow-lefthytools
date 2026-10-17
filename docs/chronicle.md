@@ -4,7 +4,8 @@ A journal per character, kept automatically, plus statistics and a feed of what 
 LefthyTools did, also while they (or you) weren't online. Recorded per character; a character
 belongs to an account (a Battle.net account: a BattleTag), shown beside it, never mixed with it (see
 Characters and accounts). Files, in load order: `Modules/Chronicle/Chronicle.lua` (recording,
-sharing, session, settings, `/chronicle`, formatting helpers), `Characters.lua` (who is who:
+session, settings, `/chronicle`, formatting helpers), `Live.lua` (friends live through Beacon: E2
+highlights, D2/K2 days, the feed), `Characters.lua` (who is who:
 accounts, names, matching; the characters, accounts and news every page uses), `Sync.lua` (friends'
 journals: publishing, passing on), `Recap.lua` (chat: catch-up, weekly recap, sharing; the
 leaderboards), `Canvas.lua` (the pages' drawing kit: a pooled canvas, cards, bars, tables),
@@ -92,7 +93,7 @@ One driver, 1 tick per second while the module is on: time played and per zone, 
 `C.OnTick` for the window (returns at once unless it's open). Switched off: events unregistered,
 driver hidden.
 
-## Friends and sharing
+## Friends and sharing (Live.lua)
 
 Highlights go to friends through Beacon (`ns.Beacon.ShareHighlight`, on the tick, only with
 Beacon on and `share` on) as `E2;<kind>;<a>;<b>`: boss (name, instance), rare (name, zone),
@@ -246,7 +247,7 @@ stream in the feed changes every second), `C.dirty` (counters) for Statistics, w
 every 5 s for the time and distance. Graphs: a change is remembered and drawn at most every 10 s,
 otherwise every 30 s (the session curve). A redraw keeps the scroll position.
 
-## Days for friends' graphs
+## Days for friends' graphs (Live.lua)
 
 Battle.net messages only arrive while both are online, so each friend's own Chronicle sends its
 numbers: `D2;<YYYYMMDD>;<minutes played>;<xp>;<quests>;<kills>;<deaths>;<levels>` (about 45

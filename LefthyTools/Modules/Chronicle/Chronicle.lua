@@ -6,8 +6,9 @@ local L = ns.L
 -- took), deaths (where, and what killed you), zones discovered, first dungeon visits, bosses and
 -- rare elites killed, notable loot, new mounts, pets, toys and achievements, and milestones
 -- (quests, gold, professions). Plus statistics (time, distance on foot/riding/swimming/flying,
--- kills, gold, loot, ...) for the character and for the current session, and a feed of what
--- Battle.net friends with LefthyTools did. Highlights go to those friends through Beacon.
+-- kills, gold, loot, ...) for all my characters and for the current session, and a feed of what
+-- Battle.net friends with LefthyTools did. Highlights go to those friends through Beacon (Live.lua,
+-- and the synced journals: Sync.lua).
 --
 -- Data: LefthyToolsChronicleDB (account-wide, so every character's chronicle can be browsed)
 --   chars[<first name-realm>] = { name (the key's), full (the name the game shows: with the surname),
@@ -21,7 +22,6 @@ local L = ns.L
 
 local TICK = 1
 local EVENTS_MAX = 1000      -- per character; the oldest go first
-local FEED_MAX = 300
 local FOE_MEMORY = 15        -- seconds: whom you last fought counts as your killer this long
 local TELEPORT = 150         -- yards within one tick: a portal, hearthstone or teleport, not travel
 local BOSS_DEDUPE = 30       -- ENCOUNTER_END and BOSS_KILL report the same kill
@@ -31,10 +31,6 @@ local GOLD_MILESTONES = { 1, 10, 50, 100, 250, 500, 1000, 2500, 5000, 10000 }
 local PROFESSION_MILESTONES = { 75, 150, 225, 300 }
 local COPPER_PER_GOLD = 10000
 local DAILY_DAYS = 60        -- days of per-day counters kept (the graphs show 14)
-local SHARE_DAYS = 7         -- days a friend gets from me when they show up
-local SHARE_AGAIN = 600      -- back sooner (a /reload, a shaky connection): only today, they keep the rest
-local SHARE_GAP = 300        -- today's numbers go to friends at most this often (if they changed)
-local FRIEND_DAYS = 30       -- days of friends' numbers kept
 local SAMPLE_STEP, SAMPLE_MAX = 60, 240 -- the session curve: a point a minute, at most 240
 local SESSION_GAP = 300 -- switched on after this long without a tick: a new session
 local issecret = issecretvalue or function() return false end
@@ -75,7 +71,6 @@ local onTaxi = false
 local zone
 local zoneDirty, professionsDirty = true, true
 local lastBossName, lastBossAt
-local shareQueue = {}
 C.ticks = 0 -- for tests: the driver ticks once a second
 
 ---------------------------------------------------------------------------
@@ -118,8 +113,9 @@ local function Record(kind, fields)
 	return fields
 end
 
+-- A highlight for friends (Live.lua sends it on the tick, through Beacon).
 local function Share(kind, a, b)
-	shareQueue[#shareQueue + 1] = { kind, a, b }
+	C.Share(kind, a, b)
 end
 
 -- Noon of the day `back` days before today (negative: ahead), by the calendar: stepping back
@@ -623,27 +619,6 @@ local function TrackTarget(now)
 	end
 end
 
-local ShareDays -- below, with the friends' part
-
--- Friends take at most 10 highlights a minute from one friend (Beacon). Feed-only ones (every quest
--- turned in, every new zone) take at most FEED_SHARES of them, so a quest hub can't crowd out a boss
--- or epic loot in the same minute.
-local FEED_SHARE_KINDS, FEED_SHARES, FEED_WINDOW = { quest = true, zone = true }, 5, 60
-local feedShares = {} -- times of the last feed-only shares
-local function FeedBudget(kind, now)
-	if not FEED_SHARE_KINDS[kind] then
-		return true
-	end
-	while feedShares[1] and now - feedShares[1] >= FEED_WINDOW do
-		table.remove(feedShares, 1)
-	end
-	if #feedShares >= FEED_SHARES then
-		return false
-	end
-	feedShares[#feedShares + 1] = now
-	return true
-end
-
 local function Tick(now, elapsed)
 	C.ticks = C.ticks + 1
 	local stats = char.stats
@@ -688,18 +663,12 @@ local function Tick(now, elapsed)
 	end
 	TrackTravel()
 	TrackTarget(now)
-	ShareDays(now)
+	C.ShareDays(now) -- Live.lua: my days for friends' graphs (older builds')
 	if C.SyncTick then
 		C.SyncTick(now) -- Sync.lua: my journal for friends, theirs from whoever is online
 	end
 	store.lastSeenAt = time()
-	while shareQueue[1] do
-		local item = table.remove(shareQueue, 1)
-		local beacon = LT:GetModule("beacon")
-		if M.db.share and beacon and beacon.enabled and ns.Beacon and ns.Beacon.ShareHighlight and FeedBudget(item[1], now) then
-			ns.Beacon.ShareHighlight(item[1], item[2], item[3])
-		end
-	end
+	C.ShareHighlights(now) -- Live.lua: this tick's highlights to friends
 	if C.OnTick then
 		-- Window.lua: redraws only while open, and only the page whose data changed.
 		C.OnTick(now, C.dirty, C.eventsDirty, C.feedDirty)
@@ -727,179 +696,6 @@ events:SetScript("OnEvent", function(_, event, ...)
 end)
 
 ---------------------------------------------------------------------------
--- Friends: their level-ups, deaths and highlights, from Beacon (on Beacon's tick)
----------------------------------------------------------------------------
-
--- English chat lines for friends' highlights (chat output stays English).
-local CHAT = {
-	boss = function(a, b) return ("defeated %s%s."):format(a, b ~= "" and (" (" .. b .. ")") or "") end,
-	rare = function(a, b) return ("killed the rare %s%s."):format(a, b ~= "" and (" in " .. b) or "") end,
-	dungeon = function(a) return ("entered %s for the first time."):format(a) end,
-	loot = function(a, b) return ("looted %s."):format(C.QualityText(a, tonumber(b))) end,
-	mount = function(a) return ("got a new mount: %s."):format(a) end,
-	achievement = function(a) return ("earned %s."):format(a) end,
-	quests = function(a) return ("has completed %s quests."):format(a) end,
-	gold = function(a) return ("has %s gold."):format(a) end,
-	profession = function(a, b) return ("reached %s %s."):format(a, b) end,
-}
-
--- An item name in its quality colour.
-function C.QualityText(name, quality)
-	local hex
-	if quality and C_Item and C_Item.GetItemQualityColor then
-		hex = select(4, C_Item.GetItemQualityColor(quality))
-	end
-	return hex and ("|c" .. hex .. name .. "|r") or name
-end
-
-local function AddToFeed(entry)
-	local feed = store.friends
-	feed[#feed + 1] = entry
-	if #feed > FEED_MAX then
-		table.remove(feed, 1)
-	end
-	C.feedDirty = true
-end
-
----------------------------------------------------------------------------
--- My days for friends' graphs (through Beacon), and theirs
----------------------------------------------------------------------------
-
-local sentDaily = {} -- day -> the message last sent to everyone
-local lastDailyShare = -math.huge
-
-local function SharingOn()
-	local beacon = LT:GetModule("beacon")
-	return M.db.share and beacon and beacon.enabled and ns.Beacon ~= nil
-end
-
--- D2;<YYYYMMDD>;<minutes>;<xp>;<quests>;<kills>;<deaths>;<levels> for one of my days, or nil.
-local function DailyMessage(day)
-	local b = char.daily[day]
-	if not b then
-		return nil
-	end
-	return ("D%s;%s;%d;%d;%d;%d;%d;%d"):format(ns.Beacon.VERSION, (day:gsub("-", "")),
-		math.min(1440, math.floor((b.played or 0) / 60)), math.floor(b.xp or 0), b.quests or 0, b.kills or 0,
-		b.deaths or 0, b.levels or 0)
-end
-
--- K2;<YYYYMMDD>;<minutes AFK> for one of my days, or nil (none). Its own message, sent after the
--- day's D2: builds before it reject a D2 with another field, and ignore a kind they don't know.
-local function AfkMessage(day)
-	local b = char.daily[day]
-	local minutes = b and math.min(1440, math.floor((b.afk or 0) / 60)) or 0
-	if minutes > 0 then
-		return ("K%s;%s;%d"):format(ns.Beacon.VERSION, (day:gsub("-", "")), minutes)
-	end
-end
-
--- On the tick, at most every SHARE_GAP: today's and yesterday's numbers to everyone, if changed.
-function ShareDays(now)
-	if now - lastDailyShare < SHARE_GAP or not SharingOn() then
-		return
-	end
-	lastDailyShare = now
-	for _, t in ipairs({ C.DayAgo(1), C.DayAgo(0) }) do
-		local day = date("%Y-%m-%d", t)
-		for _, message in ipairs({ DailyMessage(day) or false, AfkMessage(day) or false }) do
-			local key = message and (day .. message:sub(1, 1))
-			if message and message ~= sentDaily[key] then
-				sentDaily[key] = message
-				ns.Beacon.QueueLowToPeers(message) -- never ahead of live data
-			end
-		end
-	end
-end
-
--- A friend just showed up: my last SHARE_DAYS days, for their graphs.
-local daysSentAt = {} -- gameAccountID -> GetTime() of the last full week
-local function SendDaysTo(gameAccountID)
-	if not SharingOn() then
-		return
-	end
-	local now = GetTime()
-	local again = daysSentAt[gameAccountID] and now - daysSentAt[gameAccountID] < SHARE_AGAIN
-	if not again then
-		daysSentAt[gameAccountID] = now
-	end
-	for i = again and 0 or SHARE_DAYS - 1, 0, -1 do
-		local day = date("%Y-%m-%d", C.DayAgo(i))
-		for _, message in ipairs({ DailyMessage(day) or false, AfkMessage(day) or false }) do
-			if message then
-				ns.Beacon.QueueLow(gameAccountID, message)
-			end
-		end
-	end
-end
-
--- A day of a friend's numbers (D2), or just its AFK time (K2: day.afk only):
--- store.friendStats[name] = { classFile, level, updated, days, acct, guid }, by the full name
--- Battle.net gives. Either keeps what the other set. acct (their BattleTag's hash) and guid find the
--- character in their journal (Sync.lua), whose name is its first name: these days are that
--- character's (where the journal has none), never a second one (older builds keep the fields and
--- ignore them).
-local function StoreFriendDay(peer, day)
-	if day.day > date("%Y-%m-%d", C.DayAgo(-1)) then
-		return -- a day after tomorrow (a wrong clock): it would never be pruned
-	end
-	local friends = store.friendStats
-	local f = friends[peer.name] or { days = {} }
-	friends[peer.name] = f
-	f.classFile, f.level, f.updated = peer.classFile, peer.level, time()
-	f.acct = C.PeerAccount and C.PeerAccount(peer) or f.acct
-	f.guid = type(peer.guid) == "string" and not issecret(peer.guid) and peer.guid or f.guid
-	local old = f.days[day.day] or {}
-	if day.played == nil then
-		old.afk = day.afk
-		f.days[day.day] = old
-	else
-		f.days[day.day] = { played = day.played, xp = day.xp, quests = day.quests, kills = day.kills,
-			deaths = day.deaths, levels = day.levels, afk = old.afk }
-	end
-	local oldest = date("%Y-%m-%d", C.DayAgo(FRIEND_DAYS))
-	for d in pairs(f.days) do
-		if d < oldest then
-			f.days[d] = nil
-		end
-	end
-	C.dirty = true -- the graphs
-end
-
--- Highlights that only go into the feed: they'd be too chatty as chat lines.
-local FEED_ONLY = { quest = true, zone = true }
-
-local function OnFriendEvent(kind, peer, data)
-	if not (M.enabled and store and peer.name) then
-		return
-	end
-	if kind == "known" then
-		SendDaysTo(data.id)
-		return
-	elseif kind == "daily" then
-		StoreFriendDay(peer, data)
-		return
-	end
-	-- (their account too: Sync.lua finds the character in their journal by it and the full name)
-	local entry = { t = time(), name = peer.name, classFile = peer.classFile, acct = C.PeerAccount and C.PeerAccount(peer) }
-	if kind == "level" then
-		entry.k, entry.level = "level", data.level
-	elseif kind == "death" then
-		entry.k, entry.where, entry.foe = "death", data.where, data.foe
-	elseif kind == "online" or kind == "offline" then
-		entry.k = kind
-	elseif kind == "highlight" and (CHAT[data.kind] or FEED_ONLY[data.kind]) then
-		entry.k, entry.a, entry.b = data.kind, data.a, data.b
-		if M.db.friendsChat and CHAT[data.kind] then
-			M:Print(("%s%s|r %s"):format(LT.Window.ClassColorCode(peer.classFile), peer.name, CHAT[data.kind](data.a, data.b)))
-		end
-	else
-		return
-	end
-	AddToFeed(entry)
-end
-
----------------------------------------------------------------------------
 -- Lifecycle
 ---------------------------------------------------------------------------
 
@@ -908,8 +704,6 @@ local EVENTS = {
 	"QUEST_TURNED_IN", "PLAYER_XP_UPDATE", "PARTY_KILL", "ENCOUNTER_END", "BOSS_KILL", "PLAYER_MONEY",
 	"CHAT_MSG_LOOT", "NEW_MOUNT_ADDED", "NEW_PET_ADDED", "NEW_TOY_ADDED", "ACHIEVEMENT_EARNED", "TIME_PLAYED_MSG",
 }
-
-local listening = false
 
 -- MinimapButton.lua's, looked up when it runs: after an update that added that file, a /reload
 -- doesn't load it (only a restart does), and C_Timer.After must never get nil.
@@ -925,17 +719,7 @@ function M:OnEnable()
 	store.chars = type(store.chars) == "table" and store.chars or {}
 	store.friends = type(store.friends) == "table" and store.friends or {}
 	store.friendStats = type(store.friendStats) == "table" and store.friendStats or {}
-	-- Friends whose days have all run out (30 days) leave the dropdown.
-	local oldest = date("%Y-%m-%d", C.DayAgo(FRIEND_DAYS))
-	for friendName, f in pairs(store.friendStats) do
-		local any = false
-		for day in pairs(type(f.days) == "table" and f.days or {}) do
-			any = any or day >= oldest
-		end
-		if not any then
-			store.friendStats[friendName] = nil
-		end
-	end
+	C.LiveEnable() -- Live.lua: friends' days kept, Beacon's news listened to
 	-- The character's names: UnitName gives the first name and, in WoW: Forever, the surname as its
 	-- second return; the game (and Battle.net) shows them together. Its record keeps the first name's
 	-- key, the one friends' builds know it by, unless that's another character of mine with the same
@@ -990,10 +774,6 @@ function M:OnEnable()
 	for _, event in ipairs(EVENTS) do
 		pcall(events.RegisterEvent, events, event)
 	end
-	if not listening and ns.Beacon then
-		listening = true
-		table.insert(ns.Beacon.listeners, OnFriendEvent)
-	end
 	if not jumpHooked and type(JumpOrAscendStart) == "function" then
 		jumpHooked = true
 		hooksecurefunc("JumpOrAscendStart", OnJump)
@@ -1009,7 +789,7 @@ end
 function M:OnDisable()
 	events:UnregisterAllEvents()
 	driver:Hide()
-	wipe(shareQueue)
+	C.LiveDisable() -- (highlights not sent yet go)
 	if C.SyncDisable then
 		C.SyncDisable()
 	end
@@ -1122,6 +902,15 @@ function C.Top(t)
 		end
 	end
 	return best, most
+end
+
+-- An item name in its quality colour.
+function C.QualityText(name, quality)
+	local hex
+	if quality and C_Item and C_Item.GetItemQualityColor then
+		hex = select(4, C_Item.GetItemQualityColor(quality))
+	end
+	return hex and ("|c" .. hex .. name .. "|r") or name
 end
 
 -- "1h 12m", "3d 4h", "45s"
