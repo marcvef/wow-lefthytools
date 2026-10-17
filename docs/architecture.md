@@ -9,14 +9,17 @@ in the [README](../README.md); this file covers how the code is organised.
 
 ```
 LefthyTools/                 the addon (copied or junctioned into Interface\AddOns)
-  LefthyTools.toc            Interface 16001, SavedVariables LefthyToolsDB; every file in load order
-  Bindings.xml               LEFTHYTOOLS_MIRAGE_TOGGLE, LEFTHYTOOLS_MIRAGE_PEEK (hold)
+  LefthyTools.toc            Interface 16001, SavedVariables LefthyToolsDB, LefthyToolsChronicleDB,
+                             LefthyToolsBestiaryDB; every file in load order
+  Bindings.xml               LEFTHYTOOLS_MIRAGE_TOGGLE, LEFTHYTOOLS_MIRAGE_PEEK (hold),
+                             LEFTHYTOOLS_CHRONICLE_TOGGLE
   Core/Locale.lua            ns.L localization table (English keys, falls back to English)
   Locales/deDE.lua           German settings texts (loaded only on a deDE client)
-  Core/Core.lua              module registry, saved settings, enable/disable lifecycle
+  Core/Core.lua              module registry, saved settings, enable/disable lifecycle, versions,
+                             shared helpers (secret values, your own loot)
   Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons,
                              our own popup list and dropdown (PopupList, AddPicker), minimap
-                             buttons (MinimapButton)
+                             buttons (MinimapButton), class colours
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
   Core/WhatsNew.lua          what's-new window after an update, /lefthy news (entries: Data/Changelog.lua)
   Core/Options.lua           settings panel (overview + one page per module), option builder, /lefthy
@@ -26,7 +29,10 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Mirage/Options.lua settings page, /mirage, keybinding labels
   Modules/Tweaks/Tweaks.lua  Misc Tweaks: status text, movable bags, quest announcements
   Modules/Tweaks/ComboPoints.lua  combo points on the personal resource display
-  Modules/Tweaks/Aggro.lua   who has aggro, on enemy nameplates (role colours, role check); also the fight stream's
+  Modules/Tweaks/Aggro.lua   who has aggro, on enemy nameplates (role colours, role check); its
+                             holder logic also tags the mobs on the fight stream's battle row
+  Modules/Tweaks/RetailFrames.lua  retail unit frames (a tweak): retail's art and layout on
+                             Forever's player, target, focus, party and pet frames
   Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever
   Modules/Tweaks/AFK.lua     AFK screen (a tweak): interface hidden, camera circling, a panel with news
   Modules/Tweaks/Flight.lua  cinematic flights (a tweak): letterbox, title cards, subtitles, time left
@@ -39,6 +45,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Data/ClassSpells.lua       generated trainer spells per class and level (tools/update-class-spells.js)
   Data/SpellSchools.lua      generated magic school of the class spells (tools/update-spell-schools.js)
   Data/MinimapTiles.lua      generated minimap tile file IDs (tools/update-minimap-tiles.js)
+  Data/RetailUnitFrames.lua  generated retail unit frame atlases (tools/update-retail-frames.js)
   Modules/Beacon/Beacon.lua  Beacon: protocol, rate limiter, friend tracking, settings, /lefthy beacon
   Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
@@ -50,6 +57,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Reports.lua error reports to friends who collect them (/lefthy report, /lefthy reports)
   Modules/Beacon/Stream.lua  fight stream: asking the game, the test, /lefthy stream
   Modules/Beacon/StreamSense.lua  fight stream: what's around you (learning mob directions)
+  Modules/Beacon/StreamBattle.lua fight stream: the battle row (the one shown and the mobs they fight)
   Modules/Beacon/StreamView.lua   fight stream windows (yours, the preview, friends')
   Modules/Beacon/StreamNet.lua    fight stream between friends (kind O), the being-watched dot
   Modules/Beacon/StreamButton.lua the spyglass minimap button: friends to watch
@@ -69,6 +77,8 @@ tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.to
 tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
 tools/update-class-spells.js     regenerates Data/ClassSpells.lua from wago.tools (node)
 tools/update-spell-schools.js    regenerates Data/SpellSchools.lua from wago.tools (node)
+tools/update-minimap-tiles.js    regenerates Data/MinimapTiles.lua from wago.tools (node)
+tools/update-retail-frames.js    regenerates Data/RetailUnitFrames.lua from wago.tools (node)
 tools/update-drop-data.js    regenerates LefthyTools_DropData/Drops.lua from a classic world DB dump (node)
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
@@ -196,7 +206,10 @@ entry, in English and German, with every change players notice.**
   file, add the files to the TOC after the Core files. It gets a switch on the overview page, a
   settings sub-page (with `BuildOptions`), saved settings and `/lefthy` routing. Keybindings go
   in `Bindings.xml` as `LEFTHYTOOLS_<MODULE>_<ACTION>` with `BINDING_NAME_...` globals.
-- **Saved variables:** `LefthyToolsDB = { modules = { <key> = bool }, settings = { <key> = {...} } }`.
+- **Saved variables:** `LefthyToolsDB = { modules = { <key> = bool }, settings = { <key> = {...} } }`,
+  plus Core's `errors` and `changelogSeen` and a few top-level keys of modules' own (data, not
+  settings); Chronicle and Bestiary keep their data in `LefthyToolsChronicleDB` and
+  `LefthyToolsBestiaryDB`. Core parts that aren't modules get the table through `LT.onLoad`.
   Defaults are merged on load; `defaultEnabled` only applies when no on/off choice is saved
   (Mirage defaults to off, the others to on). `LT:ResetModuleSettings(m)` resets in place,
   keeping the same tables, because the settings panel holds references to them.
