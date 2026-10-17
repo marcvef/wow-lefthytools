@@ -24,6 +24,7 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    close the panel with gamepad mode off (see the known issue in forever-platform.md).
 2. Mirage (switch it on first): `/mirage status` lists a sensible frame count per group; 0 means a
    wrong frame name or a Blizzard module that isn't loaded (`meter` and `cooldowns` can be 0).
+   On a German client `/mirage delay 1,5` says "Idle delay set to 1,5 s."
 3. Wait 5 s idle: the HUD fades over 1.5 s. Hover the action bars: only they come back.
 4. Pull a mob: everything is back instantly; after combat plus 5 s it fades again.
 5. Edit Mode: everything visible. Change a frame's Opacity slider, close Edit Mode: the frame
@@ -50,7 +51,9 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
    later the film resumes; the winner ("[item]: Anna wins!") comes as a subtitle.
    Settings, Flights, "What a flight hides" on Chosen elements, untick Chat: on the next flight
    the ticked elements fade out (minimap included, quest areas too), chat stays, other addons stay;
-   landing brings everything back at its own opacity. Try with Mirage on and off.
+   landing brings everything back at its own opacity. Try with Mirage on and off. With Mirage off
+   since login, press Toggle Minimap during that film: the minimap (and its quest areas) stays
+   away and is back after landing.
    Per element: set the minimap's slider to 50%: it stays half visible while the rest fades.
 9. Watch for Lua errors (`/console scriptErrors 1`), especially "action blocked" taint in combat.
    `/lefthy errors` lists LefthyTools' own errors from all sessions (also with the error display

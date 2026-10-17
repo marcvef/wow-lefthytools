@@ -52,7 +52,8 @@ reads and the default level-up message.
    whether to run it, choose *Run* (or *More info* → *Run anyway*). If it can't find the game, it
    asks for your `World of Warcraft` folder once. If it finds Forever in more than one place, it
    uses the one you played most recently and lists the others.
-3. In game, type `/reload`. If the installer says the update adds files, restart the game instead.
+3. In game, type `/reload`. If the installer says to restart the game (the update adds files or
+   saved data), do that instead.
    `/lefthy version` should then show the version the installer printed.
 
 To **update**, double-click it again: it installs the latest version, or tells you that you
