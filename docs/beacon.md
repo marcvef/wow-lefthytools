@@ -693,9 +693,14 @@ lunge).
 A friend **out of reach** (their character isn't on your client) is **their class's emblem**
 (`GetClassAtlas`, else `UI-Classes-Circles` with `CLASS_ICON_TCOORDS`; a ring of their class
 colour behind it read as a blue disc in game and went), "out of reach" in small letters under it,
-its tooltip saying why; also the preview's
-made-up friend. It steps up, flashes when hit, pulses while they cast and greys when they die; the
-numbers float up from it. Tried first, in game, and given up (the user: "use the class emblem if
+its tooltip saying why. In your group (a unit token, not visible) **their face** sits on it: the
+portrait their party frame has from afar (`SetPortraitTexture`, round through
+`TempPortraitAlphaMask`, asked for again every 5 s: their look may come late), 26 px on a 24 px
+emblem, a bobblehead (the user: "use the head of this 2d as in the party frame and then the class
+emblem as the body"). The preview's made-up friend is that too, with your face. It steps up,
+flashes when hit, pulses while they cast and greys when they die (the head nods forward as they
+step up, jolts back when hit, lolls over when they die: `SetRotation`); the numbers float up from
+it. Tried first, in game, and given up (the user: "use the class emblem if
 you cant render their actual model"): a race's plain model (ChrRaceXChrModel -> ChrModel.DisplayID)
 comes out white in a default outfit of its own (a staff, a robe, a cloak with red squares inside)
 and gear tried on (`TryOn`) doesn't show; a class trainer NPC of their race and sex ("doesn't look

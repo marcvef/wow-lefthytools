@@ -881,3 +881,5 @@ L["out of reach"] = "außer Reichweite"
 L["Out of reach"] = "Außer Reichweite"
 L["Their character isn't near you, and the game can't show anyone as they look from afar: their class instead."] =
 	"Sein Charakter ist nicht in deiner Nähe, und das Spiel kann aus der Ferne niemanden so zeigen, wie er aussieht: stattdessen seine Klasse."
+L["Their character isn't near you, and the game can't show anyone as they look from afar: their portrait from the party frame, on their class's emblem."] =
+	"Sein Charakter ist nicht in deiner Nähe, und das Spiel kann aus der Ferne niemanden so zeigen, wie er aussieht: sein Porträt aus dem Gruppenfenster, auf dem Wappen seiner Klasse."

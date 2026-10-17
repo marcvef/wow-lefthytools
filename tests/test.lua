@@ -3638,6 +3638,8 @@ do
 		local hero, leaderSlot = row.Hero, row.slots[1]
 		check(hero.Emblem:IsShown() and (hero.Emblem.atlas or hero.Emblem.path) and not hero.Real:IsShown() and not hero.Shifted:IsShown()
 			and hero.Away:IsShown() and hero.Away:GetText() == "out of reach", "her model, out of reach: her class's emblem, 'out of reach' under it")
+		check(hero.Face:IsShown() and hero.Face.portrait == "player" and hero.Emblem.width == 24,
+			"with a face on it (the preview's: mine), the emblem smaller under it: a bobblehead")
 		check(leaderSlot.Model._anims and leaderSlot.Model._anims[9] and leaderSlot.Model._anims[16] and leaderSlot.Model._paused == false
 			and leaderSlot.Model._facing == -0.45, "her target flinched at her Fireball and struck back; the mobs move and face her")
 		local loss = floatWith("-13%")
@@ -4202,12 +4204,17 @@ do
 	check(#sentTo(12, mark, "O2;w;0") == 1, "frames from someone I don't watch (after my /reload, say): told once to stop")
 	-- Her model: her character isn't on my client: her class's emblem; in my group and near (her
 	-- character loaded here): her own model, also in Cat Form; away again: the emblem (in a form too).
-	check(fwin.Foes.Hero.Emblem:IsShown() and fwin.Foes.Hero.Away:IsShown() and not fwin.Foes.Hero.Real:IsShown(),
-		"out of reach: her class's emblem")
+	check(fwin.Foes.Hero.Emblem:IsShown() and fwin.Foes.Hero.Away:IsShown() and not fwin.Foes.Hero.Real:IsShown()
+		and not fwin.Foes.Hero.Face:IsShown() and fwin.Foes.Hero.Emblem.width == 38, "out of reach: her class's emblem")
+	PARTY.party1 = { name = "Anna", guid = "Player-1-11", visible = false }
+	Advance(0.6)
+	check(fwin.Foes.Hero.Emblem:IsShown() and fwin.Foes.Hero.Face:IsShown() and fwin.Foes.Hero.Face.portrait == "party1"
+		and fwin.Foes.Hero.Away:IsShown() and not fwin.Foes.Hero.Real:IsShown(),
+		"in my group but far away: her portrait (the party frame's) on her class's emblem")
 	PARTY.party1 = { name = "Anna", guid = "Player-1-11", visible = true }
 	Advance(0.6)
-	check(fwin.Foes.Hero.Real:IsShown() and fwin.Foes.Hero.Real._unit == "party1" and not fwin.Foes.Hero.Emblem:IsShown(),
-		"in my group and near: her own model")
+	check(fwin.Foes.Hero.Real:IsShown() and fwin.Foes.Hero.Real._unit == "party1" and not fwin.Foes.Hero.Emblem:IsShown()
+		and not fwin.Foes.Hero.Face:IsShown(), "in my group and near: her own model")
 	anna((herFrame:gsub(";M40;;", ";M40;768;"))) -- (in Cat Form)
 	Advance(1.1) -- (loaded, then its camera set on the next picture)
 	check(fwin.Foes.Hero.Shifted:IsShown() and fwin.Foes.Hero.Shifted._unit == "party1" and not fwin.Foes.Hero.Real:IsShown()

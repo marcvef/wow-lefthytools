@@ -25,18 +25,26 @@ local S = B.Stream
 --
 -- Their model: you are you (SetUnit, in the form you're in: cat, bear, ...); a friend whose
 -- character your client has (in your group, nearby) is them. A friend elsewhere is their class's
--- emblem, "out of reach" under it (the user chose it, after a race's plain
--- model, a ghost of it and an NPC of their class: the game shows no player as they look from afar,
--- and "if you cant render their actual model" the emblem). It still steps up, flashes when hit,
--- pulses while they cast and greys when they die; the numbers float up from it. The preview's
--- made-up friend is that too. Weapons: sheathed while they cast and out of a fight, drawn when they
--- swing (the user: "when I cast, the weapon should be sheathed"); casters (mages, priests, warlocks)
--- keep them sheathed, their instant spells cast too.
----- Cost: an OnUpdate per open window already runs (StreamView.lua); this adds a few comparisons per
+-- emblem, "out of reach" under it (the user chose it, after a race's plain model, a ghost of it
+-- and an NPC of their class: the game shows no player as they look from afar, and "if you cant
+-- render their actual model" the emblem). In your group, their face sits on it: the portrait
+-- their party frame has from afar (SetPortraitTexture), a bobblehead on a smaller emblem (the
+-- user: "use the head of this 2d ... and then the class emblem as the body"). It still steps up,
+-- flashes when hit, pulses while they cast and greys when they die (the head nods as they step
+-- up, jolts back when hit and lolls over when they die); the numbers float up from it. The
+-- preview's made-up friend is that too, with your face. Weapons: sheathed while they cast and out
+-- of a fight, drawn when they swing (the user: "when I cast, the weapon should be sheathed");
+-- casters (mages, priests, warlocks) keep them sheathed, their instant spells cast too.
+--
+-- Cost: an OnUpdate per open window already runs (StreamView.lua); this adds a few comparisons per
 -- frame, an animation set when it changes, a frame moved while it lunges.
 
 local ROW_W = 226              -- the row's width (the window's less its edges)
 local HERO_W, HERO_H = 50, 58  -- their model, px
+local FACE, BODY = 26, 24      -- out of reach in your group: their portrait on their class's emblem, px
+local FACE_EVERY = 5           -- s; their portrait asked for again (their look may come late, or change)
+local DEAD_TILT = 1.1          -- radians the head lolls over when they die
+local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local FOES = 4                 -- the mobs fought, right of them
 local FOE_W, FOE_H = 38, 50    -- a foe's model (the whole mob), px
 local FOE_GAP = 2
@@ -314,11 +322,17 @@ local function NewHero(row)
 	hero.Real = NewHeroModel(hero)   -- (a character this client has: SetUnit; weapons can be sheathed)
 	hero.Shifted = NewHeroModel(hero, "PlayerModel") -- (the same in a form: a DressUpModel shows the native one, in game)
 	-- Out of reach: their class's emblem (a ring of their class colour behind it read as a blue disc,
-	-- in game: the icon has a rim of its own).
+	-- in game: the icon has a rim of its own); in your group, their face on top (LoadHero places them).
 	hero.Emblem = hero:CreateTexture(nil, "ARTWORK", nil, 2)
-	hero.Emblem:SetSize(HERO_W - 12, HERO_W - 12)
-	hero.Emblem:SetPoint("CENTER", hero.Back, "CENTER", 0, 4)
 	hero.Emblem:Hide()
+	hero.Face = hero:CreateTexture(nil, "ARTWORK", nil, 3)
+	hero.Face:SetSize(FACE, FACE)
+	hero.Face:SetPoint("TOP", hero.Back, "TOP", 0, -3)
+	local round = hero:CreateMaskTexture()
+	round:SetTexture(CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+	round:SetAllPoints(hero.Face)
+	hero.Face:AddMaskTexture(round)
+	hero.Face:Hide()
 	hero.Flash = NewFlash(hero, HERO_W, HERO_H)
 	-- Not their own look (their character isn't on this client): said under them, small.
 	hero.Away = hero:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -332,7 +346,9 @@ local function NewHero(row)
 		if self.Away:IsShown() then
 			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 			GameTooltip:SetText(L["Out of reach"], 1, 1, 1)
-			GameTooltip:AddLine(L["Their character isn't near you, and the game can't show anyone as they look from afar: their class instead."],
+			GameTooltip:AddLine(self.face
+				and L["Their character isn't near you, and the game can't show anyone as they look from afar: their portrait from the party frame, on their class's emblem."]
+				or L["Their character isn't near you, and the game can't show anyone as they look from afar: their class instead."],
 				0.8, 0.8, 0.8, true)
 			GameTooltip:Show()
 		end
@@ -343,7 +359,8 @@ local function NewHero(row)
 end
 
 -- Who they are now: a unit this client has (you; a friend in your group nearby), else nobody (the
--- emblem); and the form they're in.
+-- emblem); the form they're in; and whose face goes on the emblem (a friend in your group far away;
+-- the preview's made-up friend has yours).
 local function HeroSource(view)
 	local picture = view.picture
 	local form = picture.form and picture.form.spellID
@@ -351,24 +368,42 @@ local function HeroSource(view)
 		return "player", form
 	elseif view.kind == "friend" then
 		local unit = picture.guid and Value("UnitTokenFromGUID", picture.guid)
-		if type(unit) == "string" and Value("UnitIsVisible", unit) then
-			return unit, form
+		if type(unit) == "string" then
+			if Value("UnitIsVisible", unit) then
+				return unit, form
+			end
+			return nil, form, unit
 		end
+	elseif view.kind == "preview" then
+		return nil, form, "player"
 	end
-	return nil, form -- (the preview's made-up friend too)
+	return nil, form
 end
 
-local function LoadHero(hero, unit, form, classFile, again)
+local function LoadHero(hero, unit, form, classFile, face, again)
 	hero.loaded, hero.loadAt = false, GetTime()
 	hero.tries = again and (hero.tries or 0) + 1 or 0
 	hero.inForm = form and FORMS[form] or false
+	hero.face = not unit and face or nil
 	hero.Away:SetShown(not unit)
 	hero.Emblem:SetShown(not unit)
+	hero.Face:SetShown(hero.face ~= nil)
 	if not unit then
 		hero.model = nil
 		hero.Real:Hide()
 		hero.Shifted:Hide()
 		Emblem(hero.Emblem, classFile)
+		hero.Emblem:ClearAllPoints()
+		if hero.face then -- (the body, under their head)
+			hero.Emblem:SetSize(BODY, BODY)
+			hero.Emblem:SetPoint("TOP", hero.Face, "BOTTOM", 0, 6)
+			SetPortraitTexture(hero.Face, hero.face)
+			hero.faceAt, hero.tilt = GetTime(), 0
+			Call(hero.Face, "SetRotation", 0)
+		else
+			hero.Emblem:SetSize(HERO_W - 12, HERO_W - 12)
+			hero.Emblem:SetPoint("CENTER", hero.Back, "CENTER", 0, 4)
+		end
 		hero.loaded = true
 		return
 	end
@@ -386,19 +421,22 @@ end
 
 local function ShowHero(view, now)
 	local hero, picture = view.win.Foes.Hero, view.picture
-	local unit, form = HeroSource(view)
+	local unit, form, face = HeroSource(view)
 	local classFile = picture.classFile
-	local who = unit and ("u:" .. unit .. ":f" .. (form or 0)) or ("e:" .. (classFile or "?")) -- (a new form: loaded anew)
+	local who = unit and ("u:" .. unit .. ":f" .. (form or 0)) or ("e:" .. (classFile or "?") .. ":" .. (face or "")) -- (a new form: loaded anew)
 	local scale = hero:GetEffectiveScale()
 	if who ~= hero.who or not hero.scale or math.abs(hero.scale - scale) > 0.001 then
 		hero.who, hero.scale = who, scale
-		LoadHero(hero, unit, form, classFile)
+		LoadHero(hero, unit, form, classFile, face)
 	elseif not hero.loaded then
 		if Loaded(hero.model) then
 			HeroLoaded(hero.model) -- (OnModelLoaded may not have come)
 		elseif hero.tries < TRIES and now - hero.loadAt >= RETRY then
-			LoadHero(hero, unit, form, classFile, true)
+			LoadHero(hero, unit, form, classFile, face, true)
 		end
+	elseif hero.face and now - hero.faceAt >= FACE_EVERY then
+		hero.faceAt = now
+		SetPortraitTexture(hero.Face, hero.face)
 	end
 end
 ---------------------------------------------------------------------------
@@ -934,8 +972,18 @@ function S.BattleUpdate(view, elapsed)
 	if hero.model then
 		Play(hero.model, now)
 	elseif hero.Emblem:IsShown() then -- (out of reach: greyed when dead, pulsing while casting)
-		hero.Emblem:SetDesaturated(hero.dead and true or false)
-		hero.Emblem:SetAlpha(hero.casting and 0.75 + 0.25 * math.sin(now * 6) or 1)
+		local grey, alpha = hero.dead and true or false, hero.casting and 0.75 + 0.25 * math.sin(now * 6) or 1
+		hero.Emblem:SetDesaturated(grey)
+		hero.Emblem:SetAlpha(alpha)
+		if hero.face then -- (the bobblehead: nods as they step up, jolts back when hit, lolls over dead)
+			hero.Face:SetDesaturated(grey)
+			hero.Face:SetAlpha(alpha)
+			local tilt = hero.dead and DEAD_TILT or -0.5 * hero.dx / LUNGE + 0.4 * (hero.Flash:GetAlpha() or 0)
+			if math.abs(tilt - hero.tilt) > 0.01 then
+				hero.tilt = tilt
+				Call(hero.Face, "SetRotation", tilt)
+			end
+		end
 	end
 	if hero.dx ~= hero.shownDx then
 		hero.shownDx = hero.dx
@@ -984,10 +1032,10 @@ function S.BattleReset(view)
 		slot:Hide()
 	end
 	local hero = row.Hero
-	hero.who, hero.dx, hero.loaded = nil, 0, false
+	hero.who, hero.dx, hero.loaded, hero.face = nil, 0, false, nil
 	hero.Away:Hide()
-
 	hero.Emblem:Hide()
+	hero.Face:Hide()
 	for _, model in ipairs({ hero.Real, hero.Shifted }) do
 		model.act, model.current, model.base = nil, nil, nil
 		model:Hide()
