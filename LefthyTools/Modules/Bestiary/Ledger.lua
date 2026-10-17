@@ -594,42 +594,9 @@ end
 local SORT_LABELS = { kills = L["Most kills"], name = L["Name"], level = L["Level"], coin = L["Coin per kill"], worth = L["Worth per kill"],
 	xp = L["XP per kill"], xph = L["XP per hour"], last = L["Last killed"] }
 
-local function Build()
-	ledger = CreateFrame("Frame", "LefthyToolsBestiaryLedger", UIParent)
-	ledger:SetSize(WIDTH, HEIGHT)
-	ledger:SetPoint("CENTER")
-	ledger:SetFrameStrata("HIGH")
-	ledger:SetToplevel(true)
-	ledger:SetClampedToScreen(true)
-	ledger:EnableMouse(true)
-	ledger:SetMovable(true)
-	ledger:RegisterForDrag("LeftButton")
-	ledger:SetScript("OnDragStart", ledger.StartMoving)
-	ledger:SetScript("OnDragStop", ledger.StopMovingOrSizing)
-	ledger:Hide()
-	Bt.Dress(ledger)
-	table.insert(UISpecialFrames, "LefthyToolsBestiaryLedger") -- (Escape closes it)
-	LT.Window.Register("LefthyToolsBestiaryLedger")
-	ledger.rows = {}
-
-	ledger.Close = CreateFrame("Button", nil, ledger, "UIPanelCloseButtonNoScripts")
-	ledger.Close:SetPoint("TOPRIGHT", -2, -2)
-	ledger.Close:SetScript("OnClick", function() ledger:Hide() end)
-	local title = ledger:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	title:SetPoint("TOPLEFT", PAD + 2, -12)
-	title:SetText("Bestiary")
-	local subtitle = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-	subtitle:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 8, 1)
-	subtitle:SetText(L["the ledger"])
-	ledger.Summary = ledger:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	ledger.Summary:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
-	ledger.Rarest = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	ledger.Rarest:SetPoint("TOPLEFT", ledger.Summary, "BOTTOMLEFT", 0, -4)
-	-- The wish list: a strip of icons at the top right (DrawWishes).
-	ledger.WishLabel = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	ledger.wishes = {}
-
-	-- The search: a box with a magnifier, a grey hint while empty, an x to clear it.
+-- The search: a box with a magnifier, a grey hint while empty, an x to clear it; beside it the
+-- order, a picker of our own (Core/Window.lua).
+local function BuildSearch()
 	local box = CreateFrame("EditBox", "LefthyToolsBestiarySearch", ledger)
 	ledger.Search = box
 	box:SetSize(LIST_W - 26, 22)
@@ -681,8 +648,10 @@ local function Build()
 	end)
 	ledger.Sort:SetPoint("LEFT", sortLabel, "RIGHT", 6, 0)
 	ledger.Sort:SetLabel(SORT_LABELS[sortBy])
+end
 
-	-- The list, scrolling.
+-- The list of mobs, scrolling, and the line between it and the picked mob.
+local function BuildList()
 	ledger.List = CreateFrame("ScrollFrame", nil, ledger, "UIPanelScrollFrameTemplate")
 	ledger.List:SetPoint("TOPLEFT", PAD, -TOP)
 	ledger.List:SetPoint("BOTTOMLEFT", PAD, PAD)
@@ -699,9 +668,11 @@ local function Build()
 	split:SetWidth(1)
 	split:SetPoint("TOPLEFT", PAD + LIST_W, -TOP + 4)
 	split:SetPoint("BOTTOMLEFT", PAD + LIST_W, PAD)
+end
 
-	-- The picked mob: its model turning slowly, its numbers, beside them the map of where you killed
-	-- it, all its drops under them.
+-- The picked mob: its model turning slowly, its numbers, beside them the map of where you killed
+-- it, all its drops under them. Returns the pane.
+local function BuildPane()
 	local x = PAD + LIST_W + 14
 	local pane = CreateFrame("Frame", nil, ledger)
 	ledger.Pane = pane
@@ -764,6 +735,47 @@ local function Build()
 	ledger.Empty = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisable")
 	ledger.Empty:SetPoint("CENTER", pane, "CENTER", 0, 0)
 	ledger.Empty:SetText(L["Pick a mob on the left."])
+	return pane
+end
+
+local function Build()
+	ledger = CreateFrame("Frame", "LefthyToolsBestiaryLedger", UIParent)
+	ledger:SetSize(WIDTH, HEIGHT)
+	ledger:SetPoint("CENTER")
+	ledger:SetFrameStrata("HIGH")
+	ledger:SetToplevel(true)
+	ledger:SetClampedToScreen(true)
+	ledger:EnableMouse(true)
+	ledger:SetMovable(true)
+	ledger:RegisterForDrag("LeftButton")
+	ledger:SetScript("OnDragStart", ledger.StartMoving)
+	ledger:SetScript("OnDragStop", ledger.StopMovingOrSizing)
+	ledger:Hide()
+	Bt.Dress(ledger)
+	table.insert(UISpecialFrames, "LefthyToolsBestiaryLedger") -- (Escape closes it)
+	LT.Window.Register("LefthyToolsBestiaryLedger")
+	ledger.rows = {}
+
+	ledger.Close = CreateFrame("Button", nil, ledger, "UIPanelCloseButtonNoScripts")
+	ledger.Close:SetPoint("TOPRIGHT", -2, -2)
+	ledger.Close:SetScript("OnClick", function() ledger:Hide() end)
+	local title = ledger:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	title:SetPoint("TOPLEFT", PAD + 2, -12)
+	title:SetText("Bestiary")
+	local subtitle = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	subtitle:SetPoint("BOTTOMLEFT", title, "BOTTOMRIGHT", 8, 1)
+	subtitle:SetText(L["the ledger"])
+	ledger.Summary = ledger:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	ledger.Summary:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
+	ledger.Rarest = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	ledger.Rarest:SetPoint("TOPLEFT", ledger.Summary, "BOTTOMLEFT", 0, -4)
+	-- The wish list: a strip of icons at the top right (DrawWishes).
+	ledger.WishLabel = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	ledger.wishes = {}
+
+	BuildSearch()
+	BuildList()
+	local pane = BuildPane()
 
 	-- The model turns slowly while the ledger is open (an OnUpdate only then).
 	ledger:SetScript("OnUpdate", function(_, elapsed)
