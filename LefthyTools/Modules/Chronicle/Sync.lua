@@ -1302,17 +1302,35 @@ function C.Ago(t)
 	return L["%d days ago"]:format(math.floor(seconds / 86400))
 end
 
--- A metric's value on one day of a person (nil: no record that day).
-function C.DayValue(person, day, metric)
-	local b = person.days[day]
-	return b and b[metric]
+-- The `count` days ending `ending` days ago, as YYYY-MM-DD, kept until the date changes: a leaderboard
+-- sums them for every character and number, and asking the calendar for each (C.DayAgo) made the
+-- Compare page's every draw slow.
+local dayLists, dayListsOn = {}, nil
+local function DaysBack(count, ending)
+	ending = ending or 0
+	local today = date("%Y-%m-%d")
+	if dayListsOn ~= today then
+		wipe(dayLists)
+		dayListsOn = today
+	end
+	local id = count .. ":" .. ending
+	local list = dayLists[id]
+	if not list then
+		list = {}
+		for i = ending, ending + count - 1 do
+			list[#list + 1] = date("%Y-%m-%d", C.DayAgo(i))
+		end
+		dayLists[id] = list
+	end
+	return list
 end
 
 -- Sums over the last `count` days (ending today, or `ending` days ago).
 function C.Sum(person, metric, count, ending)
 	local sum = 0
-	for i = ending or 0, (ending or 0) + count - 1 do
-		sum = sum + (C.DayValue(person, date("%Y-%m-%d", C.DayAgo(i)), metric) or 0)
+	for _, day in ipairs(DaysBack(count, ending)) do
+		local b = person.days[day]
+		sum = sum + (b and b[metric] or 0)
 	end
 	return sum
 end
