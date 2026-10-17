@@ -54,6 +54,21 @@ function LT.Value(f, ...)
 end
 
 ---------------------------------------------------------------------------
+-- Text
+---------------------------------------------------------------------------
+
+-- The first maxBytes bytes of text, cut before a UTF-8 character that wouldn't fit whole (a
+-- letter that ends right at the limit stays). At least one byte, so a loop cutting a long text
+-- into parts always gets on.
+function LT.CutUTF8(text, maxBytes)
+	local cut = math.min(#text, maxBytes)
+	while cut < #text and cut > 1 and text:byte(cut + 1) >= 128 and text:byte(cut + 1) < 192 do
+		cut = cut - 1 -- (the byte after the cut continues a character: it goes too)
+	end
+	return text:sub(1, cut)
+end
+
+---------------------------------------------------------------------------
 -- Version. The repo's TOC holds the base version (e.g. 0.3.0, git tag v0.3.0); install.ps1
 -- writes the exact build into the installed copy, like `git describe`:
 --   0.3.0               the tagged commit itself

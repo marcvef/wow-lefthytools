@@ -72,6 +72,12 @@ do -- shared helpers for Forever's secret values
 	check(select("#", LT.Value(function() return SECRET end)) == 1 and select("#", LT.Value(function() error("x") end)) == 1
 		and tonumber(LT.Value(function() return SECRET end)) == nil, "LT.Value: always one value, also when it's nil")
 end
+do -- shared text helpers
+	local cut = LT.CutUTF8
+	check(cut("Anna", 10) == "Anna" and cut("Anna", 2) == "An" and cut("Jäger", 2) == "J" and cut("Jäger", 3) == "Jä"
+		and cut("äb", 1) == "\195" and cut("", 5) == "", "LT.CutUTF8: whole letters only (a letter ending at the limit stays), at least one byte")
+	check(LefthyTools.CutUTF8 == ns.Beacon.CutUTF8, "Beacon's CutUTF8 is Core's")
+end
 
 section("error catcher")
 local function errorRow() -- the overview's "Errors" info row

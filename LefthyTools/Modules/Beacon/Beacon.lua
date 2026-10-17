@@ -164,16 +164,8 @@ ResetTimers()
 -- Helpers
 ---------------------------------------------------------------------------
 
--- The first maxBytes bytes of text, cut before a UTF-8 character that wouldn't fit whole (a
--- letter that ends right at the limit stays). At least one byte, so a loop cutting a long text
--- into parts always gets on.
-function B.CutUTF8(text, maxBytes)
-	local cut = math.min(#text, maxBytes)
-	while cut < #text and cut > 1 and text:byte(cut + 1) >= 128 and text:byte(cut + 1) < 192 do
-		cut = cut - 1 -- (the byte after the cut continues a character: it goes too)
-	end
-	return text:sub(1, cut)
-end
+-- The first maxBytes bytes of text without splitting a UTF-8 character (Core's).
+B.CutUTF8 = LT.CutUTF8
 
 -- Free text for a message: no colour codes or other escape sequences, separators or control
 -- characters, and cut at maxBytes without splitting a UTF-8 character.
@@ -183,7 +175,7 @@ function B.Clean(text, maxBytes)
 	end
 	text = strtrim((text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("[|;%c]", "")))
 	if #text > maxBytes then
-		text = B.CutUTF8(text, maxBytes)
+		text = LT.CutUTF8(text, maxBytes)
 	end
 	return text
 end
