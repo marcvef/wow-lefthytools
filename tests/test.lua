@@ -105,6 +105,25 @@ do -- character names: a first name and a surname on Forever
 	check(N.Mine() == "Lefthy" and select("#", ns.Beacon.MyName()) == 1, "no surname: the first name (Beacon's MyName: only the name)")
 	MY_SURNAME = surnameBefore
 end
+do -- in a fight; windows open (what Mirage and Misc Tweaks ask)
+	local combat, lockdown, affecting = STATE.combat, InCombatLockdown, UnitAffectingCombat
+	STATE.combat = nil
+	check(LT.InCombat() == false, "LT.InCombat: not in a fight")
+	STATE.combat = true
+	check(LT.InCombat() == true, "LT.InCombat: in a fight")
+	InCombatLockdown = function() return false end
+	check(LT.InCombat() == true, "LT.InCombat: also the moment before the combat lockdown begins")
+	UnitAffectingCombat = function() return SECRET end
+	check(LT.InCombat() == false, "LT.InCombat: an answer the game keeps secret isn't a fight")
+	STATE.combat, InCombatLockdown, UnitAffectingCombat = combat, lockdown, affecting
+	check(ns.TweakUtil.InCombat == LT.InCombat and ns.TweakUtil.OpenWindows == LT.Window.OpenCount, "Misc Tweaks ask Core")
+	local panel, bags = STATE.panel, STATE.bags
+	STATE.panel, STATE.bags = nil, nil
+	local none = LT.Window.OpenCount()
+	STATE.panel, STATE.bags = "left", true
+	check(none == 0 and LT.Window.OpenCount() == 2, "LT.Window.OpenCount: a panel and the bags")
+	STATE.panel, STATE.bags = panel, bags
+end
 
 section("error catcher")
 local function errorRow() -- the overview's "Errors" info row

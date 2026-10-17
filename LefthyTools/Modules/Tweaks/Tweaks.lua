@@ -113,39 +113,16 @@ end
 local Util = {}
 ns.TweakUtil = Util
 
--- In a fight (also the moment before the combat lockdown begins).
-function Util.InCombat()
-	return InCombatLockdown() or UnitAffectingCombat("player")
-end
+-- In a fight (also the moment before the combat lockdown begins): Core's.
+Util.InCombat = LT.InCombat
 
 -- Typing: a chat box open, or anything else that has the keyboard.
 function Util.ChatActive()
 	return ACTIVE_CHAT_EDIT_BOX ~= nil or (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus() ~= nil)
 end
 
--- How many windows are open: Blizzard's panels, the bags and the windows in Mirage's lists
--- (LefthyTools' own too, LT.Window.Register). The lists are Mirage's data: they work with Mirage off.
-function Util.OpenWindows()
-	local data = ns.MirageData
-	local count = 0
-	if GetUIPanel then
-		for _, area in ipairs(data.PANEL_AREAS) do
-			if GetUIPanel(area) then
-				count = count + 1
-			end
-		end
-	end
-	if IsAnyBagOpen and IsAnyBagOpen() then
-		count = count + 1
-	end
-	for _, name in ipairs(data.WINDOWS) do
-		local f = _G[name]
-		if type(f) == "table" and f.IsShown and f:IsShown() then
-			count = count + 1
-		end
-	end
-	return count
-end
+-- How many windows are open (Blizzard's, the bags, LefthyTools' own): Core's.
+Util.OpenWindows = LT.Window.OpenCount
 
 -- Seconds as "1:05" or "1:02:03", rounded (refreshed right on the second: 64.9999 is 65).
 function Util.Clock(seconds)

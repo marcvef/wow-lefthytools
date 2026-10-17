@@ -3,7 +3,7 @@ local LT = ns.LT
 
 -- LT.Window: the interface pieces every module builds with.
 --   * Windows (error report, what's new, Chronicle): Create, AddScroll, AddText, AddCopyBox,
---     AddButton, and Register for windows built another way.
+--     AddButton, and Register for windows built another way; OpenCount (how many are open).
 --   * Lists of our own instead of Blizzard's menus (gamepad mode, see PopupList): PopupList,
 --     AddPicker (a dropdown), AnyPopupOpen and PopupOpenIn (Mirage keeps their group in view).
 --   * Round buttons on the minimap's edge: MinimapButton.
@@ -25,6 +25,31 @@ function Window.Register(name)
 	if data and data.WINDOWS then
 		table.insert(data.WINDOWS, name)
 	end
+end
+
+-- How many windows are open: Blizzard's panels, the bags and the windows in Mirage's lists
+-- (ns.MirageData: LefthyTools' own too, Window.Register; it's Mirage's data, so this works with
+-- Mirage off). Mirage keeps the interface up for them, the AFK screen stays away, a flight pauses.
+function Window.OpenCount()
+	local data = ns.MirageData
+	local count = 0
+	if GetUIPanel then
+		for _, area in ipairs(data.PANEL_AREAS) do
+			if GetUIPanel(area) then
+				count = count + 1
+			end
+		end
+	end
+	if IsAnyBagOpen and IsAnyBagOpen() then
+		count = count + 1
+	end
+	for _, name in ipairs(data.WINDOWS) do
+		local f = _G[name]
+		if type(f) == "table" and f.IsShown and f:IsShown() then
+			count = count + 1
+		end
+	end
+	return count
 end
 
 function Window.Create(name, title, width, height)

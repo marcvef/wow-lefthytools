@@ -312,7 +312,7 @@ end
 -- false inside it); nil: asked.
 local function CheckSweep(inCombat)
 	if inCombat == nil then
-		inCombat = (InCombatLockdown and InCombatLockdown()) or Value(UnitAffectingCombat, "player") == true
+		inCombat = Util.InCombat()
 	end
 	sweeping = on and IsInGroup and IsInGroup() and inCombat or false
 	sinceSweep = 0

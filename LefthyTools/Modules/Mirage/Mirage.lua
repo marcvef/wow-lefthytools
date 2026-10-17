@@ -355,24 +355,9 @@ local function ReportError(err)
 	end
 end
 
+-- Blizzard's panels, the bags, the windows in our lists (LT.Window.OpenCount).
 local function AnyWindowOpen()
-	if GetUIPanel then
-		for _, area in ipairs(data.PANEL_AREAS) do
-			if GetUIPanel(area) then
-				return true
-			end
-		end
-	end
-	if IsAnyBagOpen and IsAnyBagOpen() then
-		return true
-	end
-	for _, name in ipairs(data.WINDOWS) do
-		local f = _G[name]
-		if type(f) == "table" and f.IsShown and f:IsShown() then
-			return true
-		end
-	end
-	return false
+	return LT.Window.OpenCount() > 0
 end
 
 local function HasTarget()
@@ -415,7 +400,7 @@ end
 
 -- Returns why the whole interface must be visible right now, or nil.
 local function GlobalReason()
-	if InCombatLockdown() or UnitAffectingCombat("player") then
+	if LT.InCombat() then
 		return "combat"
 	end
 	if EditModeManagerFrame and EditModeManagerFrame:IsShown() then

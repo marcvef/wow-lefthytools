@@ -54,6 +54,12 @@ function LT.Value(f, ...)
 	return nil
 end
 
+-- In a fight: the combat lockdown, or the moment before it (it begins only after
+-- PLAYER_REGEN_DISABLED, so InCombatLockdown is still false inside that event). Always true or false.
+function LT.InCombat()
+	return (InCombatLockdown and InCombatLockdown()) or LT.Value(UnitAffectingCombat, "player") == true
+end
+
 ---------------------------------------------------------------------------
 -- Text
 ---------------------------------------------------------------------------
