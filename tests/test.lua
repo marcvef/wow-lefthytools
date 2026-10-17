@@ -3689,6 +3689,8 @@ do
 	check(floatWith("+87 XP") and win.Kills:GetText() == "1 kill", "her kill: its XP floats up, 1 kill")
 	Advance(2.5)
 	check(bandit:GetAlpha() < 0.5, "... that fades")
+	check(floatWith("an item, |cffffd14c1.3%|r") and floatWith("an item, |cffffd14c1.3%|r").anchor == win.Foes.Hero,
+		"her loot from it: a rare find (the classic database's chance for a Defias Bandit), in gold")
 
 	win.Close:Click()
 	check(not win:IsShown() and used() == 0, "the X closes it, its dots let go")
@@ -4639,6 +4641,58 @@ do
 		check(not win.Summary:IsShown(), "combat that only flickered, nothing in it: no line")
 		win.Close:Click()
 		XP.current = xpWas
+	end)()
+
+	-- Rare finds: a loot's drop chance where it most likely came from (the mobs killed lately), by the
+	-- Bestiary's classic database, else my own record of that kind (10 kills or more); below 2% it's
+	-- said after its name, in gold, and floats a little bigger and longer. (Creatures the Bestiary's
+	-- own tests don't use: it keeps what it read of the database.)
+	;(function()
+		local chronicled = LefthyToolsChronicleDB.chars["Lefthy-Realmy"].stats -- (Chronicle counts loot too: not this test's)
+		local loot2 = chronicled.loot2
+		LefthyToolsDropData = { source = "test", mobs = { [9001] = "2075:2:40,2589:1:5000", [9002] = "2075:2:2500" } }
+		LefthyToolsBestiaryDB.mobs[9003] = { kills = 100, money = 0, items = { [2075] = { 1, 1, 2, "Priest's Mace" } } }
+		local function looted(creatures)
+			win.Close:Click()
+			lefthy("stream me")
+			Advance(0.6)
+			for i, creature in ipairs(creatures) do
+				Fire("PARTY_KILL", "Player-1-0", ("Creature-0-1-0-1-%d-000000A%d"):format(creature, i))
+			end
+			Advance(0.6)
+			Fire("CHAT_MSG_LOOT", LOOT_ITEM_SELF:format(ItemLink(2075)))
+			Advance(0.6)
+			return floatWith("Priest's Mace")
+		end
+		MOBS = {}
+		lefthy("stream me")
+		local mace = looted({ 9001 })
+		check(mace and mace:GetText():find("Priest's Mace, |cffffd14c0.4%|r", 1, true) and mace.textScale > 1 and mace.life == 5,
+			"loot from a kind that seldom drops it (the classic database: 0.4%): its chance after its name, in gold, a little longer")
+		mace = looted({ 9001, 9002 })
+		check(mace and not mace:GetText():find("%", 1, true) and mace.life == 3.5,
+			"two killed: from the one that drops it often (25%) likeliest, so not a rare find")
+		mace = looted({ 9003 })
+		check(mace and mace:GetText():find("Priest's Mace, |cffffd14c1.0%|r", 1, true),
+			"a kind the database doesn't know: my own record (1 in 100 kills)")
+		LT:SetModuleEnabled("bestiary", false)
+		mace = looted({ 9001 })
+		check(mace and not mace:GetText():find("%", 1, true), "the Bestiary switched off: plain loot")
+		LT:SetModuleEnabled("bestiary", true)
+		win.Close:Click()
+		-- A friend's: the mob's creature from the names her stream sent, also once it's gone from her frames.
+		local fwin = S.OpenFriend(11, "command").win
+		anna("O2;n;7;12;Defias Cutpurse")
+		anna("O2;c;7;9001")
+		anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,51k7")
+		Advance(0.6)
+		anna("O2;f;0;1429;260;750;90;;M40;;;;v80,51k7,52l2075.2")
+		Advance(0.6)
+		mace = floatWith("Priest's Mace", fwin)
+		check(mace and mace:GetText():find("Priest's Mace, |cffffd14c0.4%|r", 1, true), "her loot, from the mob she killed: a rare find too")
+		S.CloseView(11)
+		LefthyToolsDropData, LefthyToolsBestiaryDB.mobs[9003] = nil, nil
+		chronicled.loot2 = loot2
 	end)()
 	ns.MINIMAP_TILES = realTiles
 end

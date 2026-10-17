@@ -19,7 +19,8 @@ local S = B.Stream
 --     else's hit), its number smaller and grey;
 --   * they're hit: the mob attacking them (their target first) lunges and strikes, they flinch (a
 --     big hit harder), the number floats up from them; a dodge, parry or block: that move and the
---     word; a heal floats up green from them, loot rises through them, XP from the mob that died;
+--     word; a heal floats up green from them, loot rises through them (a rare find with its drop
+--     chance, in gold: StreamView.lua), XP from the mob that died;
 --   * a mob dies: it falls and fades; they die: so do they, and they stay down until they're up.
 -- Played one after another like turns (an action about half a second); never more than QUEUE_MAX
 -- waiting, an older one goes (its number still floats), so it stays close to live.
@@ -73,6 +74,7 @@ local FADE_TIME = 1.2
 local QUEUE_MAX = 4
 local QUEUE_STALE = 2.5        -- an action waiting longer goes (its number floats anyway)
 local MINE_FOR = 1.3           -- their spell this recent: their target's loss came from it
+local RARE_LIFE = 5            -- seconds a rare find floats (other loot: 3.5)
 local DROP_MIN = 0.004         -- a smaller loss (of its health) isn't one
 local GOLD = { 1, 0.82, 0.3 }
 local BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
@@ -981,8 +983,9 @@ function S.BattleShow(view)
 	b.fighting = picture.combat and true or false
 end
 
--- What happened to them (StreamView.lua's moments): true when it's shown here.
-function S.BattleMoment(view, m)
+-- What happened to them (StreamView.lua's moments): true when it's shown here. rare: a rare find's
+-- drop chance (loot: StreamView.lua's RareChance), said after its name; it stands out a little.
+function S.BattleMoment(view, m, rare)
 	local now, hero = GetTime(), view.win.Foes.Hero
 	if m.kind == "hurt" then
 		Enqueue(view, { kind = "hit", amount = m.amount, big = m.big }, now)
@@ -993,8 +996,8 @@ function S.BattleMoment(view, m)
 	elseif m.kind == "xp" then
 		Float(view, L["+%d XP"]:format(m.amount), SlotOf(view, m.key) or hero, 28, XP_COLOR, 0.9)
 	elseif m.kind == "loot" then
-		local text, color = S.LootText(m)
-		Float(view, text, hero, 44, color, 0.9, 3.5)
+		local text, color = S.LootText(m, rare)
+		Float(view, text, hero, 44, color, rare and 1.05 or 0.9, rare and RARE_LIFE or 3.5)
 	else
 		return false
 	end

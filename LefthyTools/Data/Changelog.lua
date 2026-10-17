@@ -317,5 +317,8 @@ ns.CHANGELOG = {
 	{ id = 103, module = "beacon",
 		en = { "Fight stream: fight summaries", "When a fight ends, the stream window sums it up for a few seconds: how long it took, the kills, the XP and the lowest health, or that they died." },
 		de = { "Kampf-Stream: Kampf-Zusammenfassung", "Nach einem Kampf fasst das Stream-Fenster ihn ein paar Sekunden zusammen: Dauer, Kills, EP und die niedrigsten HP, oder dass er gestorben ist." } },
+	{ id = 104, module = "beacon",
+		en = { "Fight stream: rare finds", "Loot that's rare where it most likely came from (below 2%) floats up with its drop chance in gold, from the Bestiary's database or your own kills." },
+		de = { "Kampf-Stream: seltene Funde", "Seltener Loot (unter 2 % beim wahrscheinlichsten Mob) steigt mit seiner Dropchance in Gold auf, aus der Datenbank des Bestiary oder deinen eigenen Kills." } },
 	-- New entries go here, at the end.
 }

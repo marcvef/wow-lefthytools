@@ -631,7 +631,18 @@ window opened ("3 kills"). What happens to them floats up from their model in th
 (below), each moment once (its number, remembered 6 s): hits in red, heals in green (bigger when
 big), a miss or dodge in the game's own word, XP in violet from the mob it came from (else from
 them), loot rising through them with its icon and name in its quality's colour (3.5 s; an item the
-client doesn't know yet is asked for and says "an item"). At most 10 at once. Under the radar: the spell being cast with its bar, the
+client doesn't know yet is asked for and says "an item"). At most 10 at once. **Rare finds**
+(`RareChance`; the user picked "the database chance pops up with it"): a loot moment carries only
+the item and its quality, so the watcher's client works the chance out, nothing more goes over the
+network. Where it may have come from: the mobs killed lately (kill and XP moments with a mob, the
+last 45 s, at most 8; a creature ID from the picture's mob, else your own GUID, else a friend's
+`O2;c` names, `S.FriendCreature`, kept after the mob left their frames) and the dead mobs in the
+picture now. Of those the one likeliest to drop it counts: the Bestiary's classic database
+(`Bt.Known(creature).items[item]`), else your own record of that kind with 10 kills or more
+(`Bt.Mob`, `Bt.Chance`). Below 2%: ", 0.4%" after its name in gold (`Bt.Percent`), the float a little
+bigger and 5 s. Looked up when the moment comes; the classic database loads the first time it's
+asked (as for the Bestiary's window). The Bestiary switched off: plain loot. The preview's Malachite
+carries a made-up 1.28% (the classic database's for a Defias Bandit). Under the radar: the spell being cast with its bar, the
 last spells fading over 12 s. Bottom: "2 on Anna · 5 near · X casts Y"; a friend's stream with no
 frame for 6 s says "Waiting for Anna's stream...". **After a fight** (`FightLook`; the user: "if it
 remains only in the stream", nothing in chat) a line takes the bottom line's place: a fight seen

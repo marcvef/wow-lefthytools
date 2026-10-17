@@ -769,8 +769,9 @@ local function ShowKills(view)
 	view.win.Kills:SetText(kills == 1 and L["1 kill"] or kills > 1 and L["%d kills"]:format(kills) or "")
 end
 
--- Loot: its icon and name in its quality's colour (an item the client doesn't know yet: asked for).
-local function LootText(m)
+-- Loot: its icon and name in its quality's colour (an item the client doesn't know yet: asked for);
+-- a rare find (chance: RareChance) has its drop chance after it, in gold.
+local function LootText(m, chance)
 	local name = Value("C_Item.GetItemInfo", ("item:%d"):format(m.item))
 	if not name then
 		local load = S.Api("C_Item.RequestLoadItemDataByID")
@@ -786,20 +787,110 @@ local function LootText(m)
 			color = { r, g, b }
 		end
 	end
-	return (icon and ("|T%s:16:16|t "):format(icon) or "") .. (name or L["an item"]), color
+	local text = (icon and ("|T%s:16:16|t "):format(icon) or "") .. (name or L["an item"])
+	if chance then
+		local Bt = ns.Bestiary
+		text = text .. ", |cffffd14c" .. (Bt and Bt.Percent and Bt.Percent(chance) or ("%.1f%%"):format(chance * 100)) .. "|r"
+	end
+	return text, color
 end
 S.LootText = LootText
+
+-- Rare finds (the user picked it: "When a friend loots something rare, the database chance pops up
+-- with it"). A loot moment carries only the item and its quality, so the chance is worked out here,
+-- from what this client has (nothing more over the network): the mobs killed lately (their kill and
+-- XP moments, the last LATELY seconds; a friend's by the creature their stream named) and the dead
+-- ones in the picture now are where it may have come from; the one likeliest to drop it is taken,
+-- by the Bestiary's classic database (Bt.Known), else your own record of that kind once it has
+-- RARE_KILLS kills (Bt.Mob). Below RARE it's a rare find: its float says the chance, in gold, a
+-- little bigger and longer. Looked up when loot comes, never per frame; the classic database loads
+-- the first time it's asked, as for the Bestiary's window. Without the Bestiary (switched off):
+-- plain loot, as before.
+local RARE = 0.02
+local RARE_KILLS = 10
+local LATELY = 45          -- seconds a kill counts as where loot may come from
+local LATELY_MAX = 8
+
+-- A mob's creature ID by its key: from the picture; gone from it already, from your own mob's GUID
+-- or from the names a friend's stream sent.
+local function CreatureFor(view, key)
+	for _, mob in ipairs(view.picture.mobs) do
+		if mob.key == key then
+			return mob.creature
+		end
+	end
+	if view.kind == "friend" then
+		return S.FriendCreature(view.id, key)
+	end
+	return S.CreatureOf(key)
+end
+
+-- A kill or its XP: that kind was killed just now (each mob once).
+local function Lately(view, key)
+	local list = view.lately
+	for _, kill in ipairs(list) do
+		if kill.key == key then
+			kill.at = view.clock
+			return
+		end
+	end
+	local creature = CreatureFor(view, key)
+	if creature then
+		table.insert(list, 1, { key = key, creature = creature, at = view.clock })
+		list[LATELY_MAX + 1] = nil
+	end
+end
+
+-- What a kind of mob drops an item with (0-1; nil: not known).
+local function DropChance(Bt, creature, item)
+	local known = Bt.Known(creature)
+	local said = known and known.items[item]
+	if said then
+		return said[1]
+	end
+	local mob = Bt.Mob(creature)
+	local own = mob and mob.kills >= RARE_KILLS and mob.items[item]
+	return own and (Bt.Chance(mob, own)) or nil
+end
+
+-- A loot's chance where it most likely came from, if that's rare (nil: not rare, or not known).
+local function RareChance(view, m)
+	if m.chance then
+		return m.chance < RARE and m.chance or nil -- (the preview's, made up)
+	end
+	local Bt = ns.Bestiary
+	if not (Bt and Bt.module and Bt.module.enabled and m.item) then
+		return nil
+	end
+	local best
+	for _, kill in ipairs(view.lately) do
+		local chance = view.clock - kill.at <= LATELY and DropChance(Bt, kill.creature, m.item)
+		if chance and chance > 0 and chance > (best or 0) then
+			best = chance
+		end
+	end
+	for _, mob in ipairs(view.picture.mobs) do
+		local chance = mob.dead and mob.creature and DropChance(Bt, mob.creature, m.item)
+		if chance and chance > 0 and chance > (best or 0) then
+			best = chance
+		end
+	end
+	return best and best < RARE and best or nil
+end
 
 -- A moment: played in the battle row (StreamBattle.lua: a hit lands on their model, a heal or loot
 -- floats up from it, XP from the mob that died); a kill counts (and adds to a fight's line).
 local function Spawn(view, m)
 	Tally(view, m)
+	if (m.kind == "kill" or m.kind == "xp") and m.key then
+		Lately(view, m.key) -- (loot may come from it)
+	end
 	if m.kind == "kill" then
 		view.kills = view.kills + 1
 		ShowKills(view)
 		S.BattleKill(view, m.key) -- (its box falls now)
 	else
-		S.BattleMoment(view, m)
+		S.BattleMoment(view, m, m.kind == "loot" and RareChance(view, m) or nil)
 	end
 end
 
@@ -823,6 +914,7 @@ local function ClearFloats(view)
 	end
 	wipe(view.seen)
 	wipe(view.lastFloat)
+	wipe(view.lately)
 	view.kills = 0
 	ShowKills(view)
 end
@@ -861,7 +953,7 @@ local function PreviewMoments(view, t)
 			elseif kind == "kill" then
 				m.key = "bandit"
 			else
-				m.item, m.quality = e[3], 2 -- (Malachite)
+				m.item, m.quality, m.chance = e[3], 2, 0.0128 -- (Malachite: a rare find, the classic database's chance from a Defias Bandit)
 			end
 			table.insert(moments, 1, m)
 		end
@@ -1373,7 +1465,7 @@ end
 
 local function NewView(key, kind)
 	return { key = key, kind = kind, dots = {}, dotFor = {}, map = { tiles = {} }, clock = 0, nextFeed = 0,
-		picture = { mobs = {}, recent = {}, moments = {} }, seen = {}, lastFloat = {}, kills = 0 }
+		picture = { mobs = {}, recent = {}, moments = {} }, seen = {}, lastFloat = {}, kills = 0, lately = {} }
 end
 
 -- Shows a view (fresh: its dots, map, floating numbers and picture start over).

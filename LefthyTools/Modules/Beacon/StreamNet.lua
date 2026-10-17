@@ -557,6 +557,14 @@ function S.FriendName(id)
 	return peer and peer.name or "?"
 end
 
+-- A friend's mob's creature ID by its id in their frames (O2;c), also once it's gone from them (a
+-- rare find: the mob it came from); nil when not known.
+function S.FriendCreature(id, mobId)
+	local stream = streams[id]
+	local named = stream and stream.names[mobId]
+	return named and named.creature
+end
+
 function S.CanWatch(id)
 	local peer = B.peers[id]
 	return M.enabled and peer ~= nil and peer.name ~= nil and peer.streamable == true
