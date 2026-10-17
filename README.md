@@ -137,7 +137,7 @@ minimap, and you on theirs, without being in a group.
   the dots glide smoothly; friends out of range wait faded at the edge, so you see which
   way they are.
 - **Hover a dot** for name (with AFK/DND), BattleTag, level and progress on it ("Level 20
-  (64%)"), zone and subzone, who
+  (64%)"), their health as their LefthyTools estimates it ("~80% health"), zone and subzone, who
   they're fighting, the quest they're tracking with their progress (and whether you have it
   too), and how far away they are and in which direction ("240 yd north-east").
 - **Death alerts:** a chat line when a friend dies, with where and what they were fighting
@@ -220,7 +220,8 @@ minimap, and you on theirs, without being in a group.
 - **Not shown:**
   - anyone in a dungeon or raid (the game hides positions there),
   - friends on another continent than the map you're looking at,
-  - health: the game keeps health hidden from addons in Forever.
+  - exact health: the game keeps health hidden from addons in Forever, so the health you see is
+    an estimate (from the hits and heals their game tells them).
 
 | Setting | Default | Command |
 |---|---|---|

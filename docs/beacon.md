@@ -273,7 +273,7 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
 - **LTC** (LefthyTools chat, once "LTC"; `/ltc <text>`, also `/l`, `/lchat`; setting `lefthyChat`): `M2;<text>` to every peer;
   everyone prints `[LTC] [Name]: text` (builds before the rename `[Lefthy]`) (orange, the name in its class colour) to the chat
   window, the sender too, like guild chat. At most 5 lines per 5 s are taken from one friend;
-  sending at most every 0.5 s. A friend's line plays a very soft tick (`SOUNDKIT.IG_CHAT_SCROLL_UP`
+  sending at most 5 lines in any 6 s (the second to spare is for the way there). A friend's line plays a very soft tick (`SOUNDKIT.IG_CHAT_SCROLL_UP`
   on the SFX channel, at most every 1.5 s, never for my own; setting `lefthyChatSound`).
 - **Sticky, like `/g`:** the box can't get a chat type of ours (`ChatTypeInfo` and
   `hash_ChatTypeInfoList` are Blizzard's; writing to them would taint everyone's chat). Instead
@@ -289,7 +289,7 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
 - **Announcements** (`/la <text>` or `/lefthy announce <text>`, quotes optional; setting `announcements`):
   `A2;<text>`; `B.ShowAnnouncement` puts "Name: text" into the notice stack of shared items
   (`call.message`, already "done", `hold` 10 s instead of 7; the line wraps at 700 px), with the
-  whisper sound for friends' and a chat line. At most one per 3 s each way.
+  whisper sound for friends' and a chat line. One per 3 s is taken from a friend; one per 4 s goes.
 - Text goes through `B.Clean` (200 bytes): no colour codes, `|`, `;` or control characters. So
   links are packed first (`PackLinks`): an item link becomes `{item:<numbers>}` (`B.ItemString`:
   numeric fields only, as for shared items; trailing empty fields dropped); map pins
@@ -417,7 +417,7 @@ is caught with `WorldMapFrame.ScrollContainer:HookScript("OnMouseDown")`: a post
 Blizzard's click handling (canvas click handlers, navigation, zoom) runs first and untainted;
 mouse *down* because mouse up may zoom into the zone and move what's under the cursor. Not a
 canvas click handler: those run inside Blizzard's click code, which would carry on tainted.
-Own pings at most every 1.5 s; received ones at most one per friend per 2 s, malformed ones
+Own pings at most every 2.5 s (else "not so fast"); received ones at most one per friend per 2 s, malformed ones
 dropped by `Parse`.
 
 Every ping (`B.pings[gameAccountID or "me"]`, a newer one from the same sender replaces it) shows
