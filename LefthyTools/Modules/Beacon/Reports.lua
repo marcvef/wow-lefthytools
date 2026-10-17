@@ -433,7 +433,7 @@ watcher:SetScript("OnEvent", function(_, event, a, b)
 	end
 	local probe = (event == "TRADE_SKILL_DATA_SOURCE_CHANGED" or event == "TRADE_SKILL_LIST_UPDATE" or event == "TRADE_SKILL_SHOW")
 		and (" (" .. TradeProbe() .. ")") or ""
-	watching.events[#watching.events + 1] = event .. (text and (": " .. text:sub(1, 80)) or "") .. probe
+	watching.events[#watching.events + 1] = event .. (text and (": " .. Cut(text, 80)) or "") .. probe
 end)
 
 local function Opened(kind)
@@ -484,7 +484,7 @@ local function OnLinkClicked(link)
 	if type(link) ~= "string" then
 		return
 	end
-	local click = { at = date("%H:%M:%S"), link = link:gsub("|", ""):sub(1, 80) }
+	local click = { at = date("%H:%M:%S"), link = Cut((link:gsub("|", "")), 80) }
 	table.insert(clicks, click)
 	while #clicks > CLICKS do
 		table.remove(clicks, 1)

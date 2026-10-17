@@ -3590,6 +3590,7 @@ do
 	-- Anna's profession link, clicked: nothing opens, the game says why; that's a report by itself.
 	SetItemRef("trade:Player-1-11:2259:171", "[Alchemy]", "LeftButton")
 	Fire("UI_ERROR_MESSAGE", 51, "That player is on another realm.")
+	Fire("UI_ERROR_MESSAGE", 52, ("x"):rep(79) .. "äz") -- (cut at 80 bytes: in the middle of the ä)
 	local realTradeSkill = C_TradeSkillUI
 	C_TradeSkillUI = { IsTradeSkillLinked = function() return true end, GetAllRecipeIDs = function() return { 1, 2, 3 } end,
 		GetBaseProfessionInfo = function() return { professionName = "Alchemy" } end, IsTradeSkillReady = function() return true end }
@@ -3624,6 +3625,7 @@ do
 		and linkReport:find("UI_ERROR_MESSAGE: That player is on another realm.", 1, true)
 		and linkReport:find("TRADE_SKILL_LIST_UPDATE (linked true, recipes 3, profession Alchemy, ready true, window not loaded)", 1, true),
 		"the profession link report: the linker's server, whether I know them, their realm and faction, mine, what the game said, got " .. linkReport)
+	check(linkReport:find("UI_ERROR_MESSAGE: " .. ("x"):rep(79) .. " / ", 1, true), "what the game said is cut on a whole letter")
 	check(handReport:find("What happened: the profession link does nothing", 1, true) and handReport:find(", Realmy, Alliance, ", 1, true)
 		and handReport:find("trade:Player-1-11:2259:171 -> nothing opened", 1, true) and handReport:find("linker: their server id 1", 1, true)
 		and handReport:find("^", 1, true) and not handReport:find("\n", 1, true),

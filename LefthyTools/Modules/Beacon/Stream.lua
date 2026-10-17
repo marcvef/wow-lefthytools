@@ -333,7 +333,7 @@ local function Note(label, phase, kind, example)
 	end
 	line[phase][kind] = (line[phase][kind] or 0) + 1
 	if example ~= nil and #line.examples < EXAMPLES then
-		example = tostring(example):sub(1, 100)
+		example = LT.CutUTF8(tostring(example), 100)
 		for _, seen in ipairs(line.examples) do
 			if seen == example then
 				return
