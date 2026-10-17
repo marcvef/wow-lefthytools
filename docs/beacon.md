@@ -8,9 +8,12 @@ Files, in load order:
 
 - `Beacon.lua`: the module and its settings' defaults, `B` (below) and the helpers every file uses
   (`B.Clean`, `B.CutUTF8`, `B.MyName` / `B.IsMe`, `B.ClassColor` / `B.ColouredName`, group
-  members), sending (one rate limiter, the queues), finding friends, receiving, what I share about
-  myself, the driver tick, switching on and off, `/lefthy beacon status` (`B.PrintStatus`).
+  members), sending (one rate limiter, the queues), finding friends, receiving (`OnMessage`, the
+  limits per friend), the driver tick, switching on and off, `/lefthy beacon status` (`B.PrintStatus`).
 - `Protocol.lua`: every message kind, what it says, and `B.Parse`, which reads them.
+- `Sharing.lua`: what I tell friends about myself: my position (`B.MyWorldPosition`) and state,
+  tracked quest, level progress, enemies on me, level-ups, Chronicle highlights, my build every 10
+  minutes; its event handlers only mark what changed, `B.SharingTick` sends it.
 - `Updates.lua`: a friend on a newer build (the notice, "What's coming"), and answering what's new
   in mine (`U2` / `W2`).
 - `Options.lua`: the settings page and `/lefthy beacon` (each command is done by its own file).

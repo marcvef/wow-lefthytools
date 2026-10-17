@@ -8,11 +8,16 @@ local L = ns.L
 -- Addons can't reach the internet, so this runs entirely on the game's Battle.net addon
 -- messages (C_BattleNet.SendGameData / BN_CHAT_MSG_ADDON): no group, guild or realm needed.
 -- Each client can only read its *own* position (C_Map.GetPlayerMapPosition works for the
--- player and party only), so every client sends its own. The messages are listed in Protocol.lua.
+-- player and party only), so every client sends its own.
 --
--- Keeping it light: the state is only sent when it changed (checked every <interval> seconds,
--- status changes at most once a second) plus a heartbeat every HEARTBEAT seconds. Every send
--- goes through one rate limiter, and a throttle answer from the server pauses sending.
+-- This file: the module, what the other files share (B), sending (one rate limiter, the queues),
+-- finding friends, receiving, and the driver tick. The messages are listed in Protocol.lua, what
+-- I send about myself is Sharing.lua's, a friend's newer build Updates.lua's, the settings page
+-- Options.lua's; dots, level-ups, pings, items, chat, reports and the fight stream have files of
+-- their own, which hook in through B (docs/beacon.md lists the hooks).
+--
+-- Keeping it light: my state is only sent when it changed, plus a heartbeat (Sharing.lua). Every
+-- send goes through one rate limiter, and a throttle answer from the server pauses sending.
 -- Event handlers only record what happened; the 10 Hz driver tick does the work, and drawing
 -- (Dots.lua) is batched: the world map at most twice a second while open, the minimap only
 -- when something on it moved.
@@ -22,21 +27,16 @@ local VERSION = "2"
 local SWEEP_INTERVAL = 60    -- look for friends who started the addon
 local SWEEP_COALESCE = 10    -- a friend came online: look again, but not more often than this
 local HELLO_RETRY = 120      -- greet the same friend at most this often
-local HEARTBEAT = 20         -- resend an unchanged state this often, so friends know I'm still here
 local PEER_TIMEOUT = 65      -- forget a friend after this much silence (three missed heartbeats)
 local VALIDATE_INTERVAL = 15 -- re-check that known friends are still online in WoW
-local STATUS_GAP = 1         -- status changes (combat, death, target) go out at most this often
 local SEND_RATE, SEND_BURST = 10, 10 -- messages per second, across all friends
 local THROTTLE_PAUSE = 2     -- the server said slow down: pause sending this long
 local INBOX_LIMIT = 20       -- messages per second accepted from one friend
 local DING_GAP = 10          -- level-up messages accepted from one friend at most this often
 local DEATH_GAP = 10         -- death alerts for one friend at most this often
 local PING_GAP = 2           -- map pings accepted from one friend at most this often
-local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed) at most this often
 local HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW = 10, 60 -- Chronicle highlights accepted from one friend
 local ONLINE_QUIET = 60      -- friends found in the first minute were online already: not news
-local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
-local XP_GAP = 2             -- my level progress is checked (and sent if changed) at most this often
 local ITEM_GAP = 2           -- shared items accepted from one friend at most this often (they send
                              -- at most every 3 s; the margin is for their queue and the network)
 local CALL_LIMIT, CALL_WINDOW = 10, 10 -- Need / Pass answers and verdicts accepted from one friend
@@ -47,7 +47,6 @@ local JOURNAL_LIMIT, JOURNAL_WINDOW = 700, 60 -- Chronicle journal messages acce
 local STREAM_LIMIT, STREAM_WINDOW = 80, 10 -- fight stream messages accepted from one friend (2 frames a
                              -- second, mob names, keepalives)
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
-local VERSION_EVERY = 600    -- my version goes to every friend this often too (besides answers)
 local CHAT_LIMIT, CHAT_WINDOW = 5, 5 -- Lefthy chat lines accepted from one friend (a burst of 5 per 5 s)
 local ANNOUNCE_GAP = 3       -- announcements from one friend at most this often
 local NEWS_GAP = 60          -- tell one friend what's new in mine at most this often (Updates.lua)
@@ -133,13 +132,9 @@ local comings = {}      -- { "online" | "offline", peer }: told to listeners on 
 local enabledAt = 0
 local stats = { sent = 0, received = 0, throttled = 0, since = 0 }
 
-local sweepRequested, validateRequested, statusDirty = false, false, false
+local sweepRequested, validateRequested = false, false
 local groupChanged = true -- re-check which friends are in my group on the next tick
-local questDirty = true   -- my tracked quest may have changed
-local xpDirty = true      -- my experience may have changed
-local lastSweep, lastValidate, lastCheck, lastSent, lastExpire, lastRefresh, lastQuestCheck, lastXPCheck
-local lastState, lastQuest, lastXP
-local lastVersionSent = 0 -- my version to every friend every VERSION_EVERY seconds too
+local lastSweep, lastValidate, lastExpire, lastRefresh
 local tokens, pausedUntil = SEND_BURST, 0
 -- Friends' data changed: the world map redraws on the next tick (at most twice a second, and
 -- only while open), the minimap on the next frame so gliding dots start right away.
@@ -156,9 +151,7 @@ function B.PeerChanged(peer)
 end
 
 local function ResetTimers()
-	lastSweep, lastValidate, lastCheck, lastSent = -math.huge, -math.huge, -math.huge, -math.huge
-	lastExpire, lastRefresh, lastQuestCheck, lastXPCheck = 0, -math.huge, -math.huge, -math.huge
-	lastState, lastQuest, questDirty, lastXP, xpDirty = nil, nil, true, nil, true
+	lastSweep, lastValidate, lastExpire, lastRefresh = -math.huge, -math.huge, 0, -math.huge
 end
 ResetTimers()
 
@@ -273,174 +266,6 @@ function B.DrawnPosition(peer, now)
 end
 
 ---------------------------------------------------------------------------
--- My own position
----------------------------------------------------------------------------
-
--- The map route (verified in game) is what we send. The minimap needs my position every frame
--- while moving; UnitPosition gives it without creating tables, so it's used once it has been
--- seen to agree with the map route (HereBeDragons relies on the two matching), checked again
--- after every loading screen (another continent or instance).
-local unitPositionAgrees = false
-local issecret = issecretvalue or function() return false end
-
-local function MapRoutePosition()
-	local mapID = C_Map.GetBestMapForUnit("player")
-	local mapPos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
-	if not mapPos then
-		return nil -- dungeons, raids and other places without a map position
-	end
-	local continent, worldPos = C_Map.GetWorldPosFromMapPos(mapID, mapPos)
-	if not continent or not worldPos then
-		return nil
-	end
-	local north, west = worldPos:GetXY()
-	if UnitPosition and not unitPositionAgrees then
-		local uNorth, uWest, _, uContinent = UnitPosition("player")
-		unitPositionAgrees = uNorth ~= nil and not (issecret(uNorth) or issecret(uWest) or issecret(uContinent))
-			and uContinent == continent and math.abs(uNorth - north) < 2 and math.abs(uWest - west) < 2
-	end
-	return continent, north, west
-end
-
--- continent, north, west in world yards, or nil where the game hides positions.
-function B.MyWorldPosition()
-	if unitPositionAgrees then
-		local north, west, _, continent = UnitPosition("player")
-		if north and not (issecret(north) or issecret(west) or issecret(continent)) then
-			return continent, north, west
-		end
-	end
-	return MapRoutePosition()
-end
-
-local function CurrentState()
-	if not M.db.share then
-		return "S" .. VERSION .. ";;;;;;"
-	end
-	local flags, target = "", ""
-	if UnitIsDeadOrGhost("player") then
-		flags = UnitIsGhost("player") and "G" or "D"
-	end
-	if UnitAffectingCombat("player") then
-		flags = flags .. "C"
-		if UnitExists("target") and UnitCanAttack("player", "target") then
-			target = B.Clean(UnitName("target"), 48)
-		end
-	end
-	local position = ";;"
-	local continent, north, west = MapRoutePosition()
-	if continent then
-		position = ("%d;%.1f;%.1f"):format(continent, north, west)
-	end
-	return ("S%s;%s;%s;%s;%s"):format(VERSION, flags, position, B.Clean(GetSubZoneText(), 48), target)
-end
-
--- Enemies fighting me: nameplate units (tracked from NAME_PLATE_UNIT_ADDED/REMOVED) that can be
--- attacked and have me on their threat list. Needs enemy nameplates on; mobs without a nameplate
--- (out of range, nameplates off) aren't counted. nil when the game keeps threat secret.
-local plates = {}
-local lastCount, lastCountCheck = 0, -math.huge
-
-local function EnemyCount()
-	local count = 0
-	for unit in pairs(plates) do
-		if UnitCanAttack("player", unit) then
-			local threat = UnitThreatSituation("player", unit)
-			if issecretvalue and issecretvalue(threat) then
-				return nil
-			end
-			if threat then
-				count = count + 1
-			end
-		end
-	end
-	return count
-end
-
--- On the tick, only in combat (and only with sharing on): tell friends when the number changes.
-local function SendCountIfChanged(now)
-	if not (M.db.share and UnitAffectingCombat("player")) then
-		lastCount = 0 -- friends drop the count when the fight ends; the next one starts at 0
-		return
-	end
-	if now - lastCountCheck < COUNT_GAP then
-		return
-	end
-	lastCountCheck = now
-	local count = EnemyCount()
-	if count and count ~= lastCount then
-		lastCount = count
-		B.QueueToPeers(("C%s;%d"):format(VERSION, math.min(count, 99)), true)
-	end
-end
-
-local NO_XP = "X" .. VERSION .. ";"
-
--- Progress on my current level in whole percent; none at max level or with sharing off.
-local function CurrentXP()
-	if not M.db.share or (IsPlayerAtEffectiveMaxLevel and IsPlayerAtEffectiveMaxLevel()) then
-		return NO_XP
-	end
-	local xp, xpMax = UnitXP("player"), UnitXPMax("player")
-	if issecretvalue and (issecretvalue(xp) or issecretvalue(xpMax)) or not xpMax or xpMax <= 0 then
-		return NO_XP
-	end
-	return ("X%s;%d"):format(VERSION, math.min(99, math.floor(xp / xpMax * 100)))
-end
-
-local function SendXPIfChanged(now)
-	if not xpDirty or now - lastXPCheck < XP_GAP then
-		return
-	end
-	xpDirty, lastXPCheck = false, now
-	local message = CurrentXP()
-	if message ~= lastXP then
-		lastXP = message
-		B.QueueToPeers(message, true)
-	end
-end
-
-local NO_QUEST = "T" .. VERSION .. ";0;;;"
-
--- The quest I'm tracking: the super-tracked one (the arrow), else the first on the tracker.
-local function CurrentQuest()
-	if not M.db.shareQuest then
-		return NO_QUEST
-	end
-	local questID = C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID and C_SuperTrack.GetSuperTrackedQuestID()
-	if not questID or questID == 0 then
-		questID = C_QuestLog.GetQuestIDForQuestWatchIndex and C_QuestLog.GetQuestIDForQuestWatchIndex(1)
-	end
-	local title = type(questID) == "number" and questID > 0 and C_QuestLog.GetTitleForQuestID(questID)
-	if not title then
-		return NO_QUEST
-	end
-	local done, objective = C_QuestLog.IsComplete(questID), ""
-	if not done then
-		for _, o in ipairs(C_QuestLog.GetQuestObjectives(questID) or {}) do
-			if not o.finished and type(o.text) == "string" and o.text ~= "" then
-				objective = o.text
-				break
-			end
-		end
-	end
-	return ("T%s;%d;%s;%s;%s"):format(VERSION, questID, done and "1" or "0", B.Clean(title, 64), B.Clean(objective, 64))
-end
-
--- On the tick: tell friends when my tracked quest or its progress changed.
-local function SendQuestIfChanged(now)
-	if not questDirty or now - lastQuestCheck < QUEST_GAP then
-		return
-	end
-	questDirty, lastQuestCheck = false, now
-	local quest = CurrentQuest()
-	if quest ~= lastQuest then
-		lastQuest = quest
-		B.QueueToPeers(quest, true)
-	end
-end
-
----------------------------------------------------------------------------
 -- Sending: everything goes through the rate limiter in Drain()
 ---------------------------------------------------------------------------
 
@@ -519,7 +344,7 @@ local function Drain(now, elapsed)
 		tokens = tokens - 1
 	end
 	if tokens >= 1 and next(owed) then
-		local state = CurrentState()
+		local state = B.CurrentState() -- (Sharing.lua)
 		for gameAccountID in pairs(owed) do
 			if tokens < 1 then
 				return
@@ -609,26 +434,10 @@ function B.QueueLowToPeers(message)
 	end
 end
 
--- Every <interval> seconds (sooner after a status change): send my state if it changed, or
--- as a heartbeat. Standing still out of combat sends one small message every HEARTBEAT seconds.
-local function SendStateIfChanged(now)
-	if not next(peers) or now - lastSent < STATUS_GAP or not (statusDirty or now - lastCheck >= M.db.interval) then
-		return
-	end
-	statusDirty, lastCheck = false, now
-	local state = CurrentState()
-	if state ~= lastState or now - lastSent >= HEARTBEAT then
-		lastState, lastSent = state, now
-		for gameAccountID in pairs(peers) do
-			owed[gameAccountID] = true
-		end
-	end
-	-- Versions go with answers; this makes sure no friend's view of mine stays unknown or old
-	-- whatever got lost (low priority: after everything else).
-	if now - lastVersionSent >= VERSION_EVERY then
-		lastVersionSent = now
-		B.QueueLowToPeers("F" .. VERSION .. ";" .. LT.FILES)
-		B.QueueLowToPeers("V" .. VERSION .. ";" .. B.Clean(LT.version, 40))
+-- My state goes to every friend on the next Drain (built when it goes: B.CurrentState, Sharing.lua).
+function B.OweStateToAll()
+	for gameAccountID in pairs(peers) do
+		owed[gameAccountID] = true
 	end
 end
 
@@ -949,12 +758,7 @@ local function OnMessage(text, senderID)
 		if journal then
 			B.QueueLow(senderID, journal) -- Chronicle: I sync journals
 		end
-		if lastQuest and lastQuest ~= NO_QUEST then
-			B.Queue(senderID, lastQuest)
-		end
-		if lastXP and lastXP ~= NO_XP then
-			B.Queue(senderID, lastXP)
-		end
+		B.SharingAnswer(senderID) -- my tracked quest and level progress
 	end
 end
 
@@ -965,7 +769,6 @@ end
 local driver = CreateFrame("Frame")
 local events = CreateFrame("Frame")
 local sinceTick = 0
-local pendingLevel
 local NAMELESS_WAIT = 10
 
 -- Hands a queue's items to handle(peer, item), in order. A friend just found has no name until
@@ -1044,17 +847,7 @@ local function Tick(now, elapsed)
 		UpdateGroupUnits()
 		Changed()
 	end
-	if pendingLevel then
-		local level = pendingLevel
-		pendingLevel = nil
-		if B.AnnounceLevel then
-			B.AnnounceLevel(level)
-		end
-	end
-	SendStateIfChanged(now)
-	SendQuestIfChanged(now)
-	SendCountIfChanged(now)
-	SendXPIfChanged(now)
+	B.SharingTick(now) -- Sharing.lua: my level-up, state, quest, enemies, level progress
 	if B.StreamHealthTick then
 		B.StreamHealthTick(now) -- my health (estimated), to everyone
 	end
@@ -1121,24 +914,12 @@ handlers.BN_FRIEND_ACCOUNT_ONLINE = function() sweepRequested = true end
 handlers.BN_FRIEND_INFO_CHANGED = function() validateRequested = true end
 handlers.BN_FRIEND_ACCOUNT_OFFLINE = handlers.BN_FRIEND_INFO_CHANGED
 handlers.PLAYER_ENTERING_WORLD = function()
-	sweepRequested, statusDirty, lastSweep, lastState = true, true, -math.huge, nil
-	unitPositionAgrees = false
+	sweepRequested, lastSweep = true, -math.huge
+	B.SharingEnteredWorld()
 end
 handlers.GROUP_ROSTER_UPDATE = function() groupChanged = true end
-handlers.NAME_PLATE_UNIT_ADDED = function(unit) plates[unit] = true end
-handlers.NAME_PLATE_UNIT_REMOVED = function(unit) plates[unit] = nil end
-local function MarkQuestDirty() questDirty = true end
-handlers.QUEST_LOG_UPDATE = MarkQuestDirty
-handlers.QUEST_WATCH_LIST_CHANGED = MarkQuestDirty
-handlers.SUPER_TRACKING_CHANGED = MarkQuestDirty
-handlers.PLAYER_LEVEL_UP = function(level) pendingLevel, xpDirty = level, true end
-handlers.PLAYER_XP_UPDATE = function() xpDirty = true end
-
-local function MarkStatusDirty() statusDirty = true end
-for _, event in ipairs({ "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_DEAD", "PLAYER_ALIVE",
-		"PLAYER_UNGHOST", "PLAYER_TARGET_CHANGED", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA" }) do
-	handlers[event] = MarkStatusDirty
-end
+-- (Sharing.lua adds its own: nameplates, quests, experience, combat, death, target, zone; Dots.lua
+-- ADDON_LOADED. All are registered while Beacon is on.)
 
 events:SetScript("OnEvent", function(_, event, ...)
 	local handler = handlers[event]
@@ -1171,20 +952,12 @@ function M:OnEnable()
 		pcall(events.RegisterEvent, events, event)
 	end
 	ResetTimers()
+	B.SharingStart()
 	wipe(outbox) -- goodbyes still pending from switching off just before: no longer true
 	wipe(lowOutbox)
 	wipe(helloOutbox)
 	wipe(helloWaiting)
-	-- Nameplates already up (switched on mid-session): counted like ones that come later.
-	wipe(plates)
-	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
-		local unit = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
-		if type(unit) == "string" then
-			plates[unit] = true
-		end
-	end
 	farewellUntil = nil
-	lastVersionSent = GetTime() -- the answers at the start carry it; the repeat comes later
 	tokens, pausedUntil, sinceTick = SEND_BURST, 0, 0
 	stats.sent, stats.received, stats.throttled, stats.since = 0, 0, 0, GetTime()
 	enabledAt = GetTime()
@@ -1209,10 +982,11 @@ function M:OnDisable()
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
 	for _, t in ipairs({ peers, helloAt, helloOutbox, helloWaiting, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn,
-			dailyIn, comings, B.pings, plates }) do
+			dailyIn, comings, B.pings }) do
 		wipe(t)
 	end
-	sweepRequested, validateRequested, statusDirty, pendingLevel = false, false, false, nil
+	sweepRequested, validateRequested = false, false
+	B.SharingStop()
 	B.dirty = false
 	farewellUntil = GetTime() + FAREWELL_TIMEOUT
 	driver:SetScript("OnUpdate", outbox[1] and FarewellUpdate or nil)
@@ -1234,9 +1008,7 @@ function M:OnDisable()
 end
 
 function M:OnSettingChanged()
-	statusDirty, lastCheck = true, -math.huge -- e.g. sharing switched: tell friends right away
-	questDirty, lastQuestCheck = true, -math.huge
-	xpDirty, lastXPCheck = true, -math.huge
+	B.SharingSettingChanged() -- e.g. sharing switched: friends are told right away
 	Changed()
 	if not M.db.pings and B.RemovePing then
 		for key in pairs(B.pings) do
@@ -1253,13 +1025,6 @@ end
 
 function M:GetPeers()
 	return peers
-end
-
--- A Chronicle highlight for every friend with Beacon (Chronicle.lua calls this on its tick).
-function B.ShareHighlight(kind, a, b)
-	if M.enabled and B.HIGHLIGHTS[kind] then
-		B.QueueToPeers(("E%s;%s;%s;%s"):format(VERSION, kind, B.Clean(tostring(a or ""), 64), B.Clean(tostring(b or ""), 64)))
-	end
 end
 
 -- /lefthy beacon status: every friend with LefthyTools (realm, faction, last position, status,
