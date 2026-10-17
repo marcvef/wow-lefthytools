@@ -346,6 +346,12 @@ finds mobs and items with just some of their letters in order ("dfbnd" for Defia
 for every mob that dropped Ice Cold Milk). At the top: everything in all, the coin per kill over
 all your kills, and your rarest find.
 
+**XP and time per kill.** Each of your kills also notes the XP it gave and how long it took (from
+the start of the fight, or from your last kill in it). The window shows it in a small line under
+the portrait ("Per kill: 85 XP · 14 s"; hover it for more); the ledger adds the XP per hour of
+fighting and sorts by XP per kill or per hour, to compare leveling spots. XP per kill depends on
+your level, so it's kept for your current level and starts again at the next.
+
 **Item tooltips** (anywhere: bags, chat links) list the three mobs an item comes from likeliest,
 with the chance and how many kills that's from; a pelt marks skinning.
 

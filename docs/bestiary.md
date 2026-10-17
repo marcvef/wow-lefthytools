@@ -15,11 +15,15 @@ drop database, an add-on of its own (`LefthyTools_DropData`, below).
 ```
 mobs = { [creature ID] = { name, level, class (UnitClassification), kills, money (copper, all
          kills), first, last (time()), items = { [item ID] = { drops, count, quality, name } },
-         skinned, skins = { [item ID] = { times, count, quality, name } } } }
+         skinned, skins = { [item ID] = { times, count, quality, name } },
+         pace = { your level, kills with XP, XP, kills timed, seconds } } }
 log = { { time, creature, what, items, check }, ... } (the last 12)
 wishes = { [item ID] = { pinned (time()), kills since, expected drops in them, name, quality } }
          (the wish list; only while there's one)
 ```
+
+Fields added later (`pace`) are simply missing from older records, and everything reads them as
+"not known".
 
 The creature ID comes from the GUID (`Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>`, also
 `Vehicle-`; `Bt.CreatureOf`). `drops` is how many corpses it came from, `count` how many in all.
@@ -135,6 +139,29 @@ kind's health, for Beacon's fight stream (below): 9791 of them; 9921 creatures i
   quality). **Coin** (type 2): the slot doesn't say how much, so it's what `GetMoney()` grew by
   between `LOOT_READY` and `LOOT_CLOSED`.
 
+## The pace: XP and time per kill
+
+To compare leveling spots (the user: "85 XP, 14 s per kill, about 21k XP per hour"). Recorded with
+each kill of yours that counts (a `PARTY_KILL` of yours, then looted or said empty; a corpse looted
+without your killing blow seen has none), into `pace`:
+
+- **XP**: what `UnitXP` grew by (`PLAYER_XP_UPDATE`) within 1.5 s of its `PARTY_KILL`, either way
+  round (the XP can come first: it waits that long for its kill). Several kills at once take the
+  XP in order. A level-up in between wraps (the rest of the old level plus what's in the new one,
+  as Chronicle counts it). A kill without any XP gave 0 (a grey mob), unless kills give no XP at
+  all (the XP bar's own rule: `IsPlayerAtEffectiveMaxLevel()` or `IsXPUserDisabled()`): then it
+  says nothing about XP. XP that comes after the kill was already counted (a quick loot) is added
+  then. Rested bonus is part of what you got.
+- **Time**: from when the fight began (`PLAYER_REGEN_DISABLED`), or from your previous kill in the
+  same fight, to the kill: several mobs in one fight share its length, so their times add up to
+  it. Not timed when the fight's start wasn't seen (a `/reload` in it) or the kill came more than
+  2 s after the fight ended. Kept to a tenth of a second.
+- **Per level**: XP per kill depends on your level, so `pace` is for one level, the one you were at
+  when it died; a kill at another level starts it again (time too: you fight faster as you level).
+  Shown for another level, it says so: "(level 12)", "At level 12: ...".
+- `Bt.Pace(mob)`: XP per kill, seconds per kill, XP per hour of fighting (XP per kill over seconds
+  per kill: the time between fights isn't counted, and the text says so) and the level.
+
 ## The window
 
 `LefthyToolsBestiaryFrame`, 236 px wide, its height fits the drops; dark with thin gold edges
@@ -148,7 +175,10 @@ flights.
   paused once loaded; a question mark before any mob), the name (gold), level and kind ("Level 16
   Elite"), then "34 kills · 12s 40c each" (`GetCoinTextureString`; the coin on average over all
   its kills, "no coin" for beasts) and, when skinned, the pelt and how often. A small book left of
-  the X opens the ledger on this mob.
+  the X opens the ledger on this mob. When its pace is known, one more small grey line under the
+  portrait, the window wide (`PaceText`): "Per kill: 85 XP · 14 s", only the parts known, "(level
+  12)" when that's not your level; the header grows by it. Hovering it shows the same in full
+  with the XP per hour of fighting.
 - **Drops**: 6 per row, at most 4 rows; each a 30 px icon edged in its quality's colour, how many you
   got in its corner, the drop chance under it ("35%", "3.4%", "<0.1%") in the quality's colour.
   Hover: the item's tooltip (`SetHyperlink`) plus "Dropped in 9 of 34 kills: 26%" and, for stacks,
@@ -267,13 +297,18 @@ the settings or `/bestiary ledger [search]`.
   least 5 kills, its icon, chance and mob. On the right the wish list's strip (above).
 - **The list** (left, scrolling): a row per mob with kills or skinnings: name (found letters in
   gold), level, Elite/Rare, kills on the right, its best drops as tiny icons (best quality first).
-  Sorted by most kills, name, level, coin per kill or last killed (a picker of our own).
+  Sorted by most kills, name, level, coin per kill, XP per kill, XP per hour (of fighting) or last
+  killed (a picker of our own).
 - **The picked mob** (right): its whole model turning slowly (an OnUpdate while open), name, kind,
   kills, coin each and in all (or "no coin"), first and last kill ("2 h ago"), skinnings, the drop
-  database's coin ("Classic database: 8c to 15c each") and "6 of its 11 drops found", then its
-  drops in a scrolling area (all of them, 8 per row, no "+N"): "Drops (N)" (skinning marked), "Not
-  seen yet (N), classic database" (faded, as in the window) and "World drops (N)" when it has any.
+  database's coin ("Classic database: 8c to 15c each") and "6 of its 11 drops found". Under the
+  model, the pane wide, what a kill pays when known: "85 XP and 14 s per kill" ("At level 12:
+  ..."), "About 21k XP per hour of fighting (the time between fights not counted)"; the drops start
+  under it. Then its drops in a scrolling area (all of them, 8 per row, no "+N"): "Drops (N)"
+  (skinning marked), "Not seen yet (N), classic database" (faded, as in the window) and "World
+  drops (N)" when it has any.
 - **A row** also says "6/11 found" (the drop database; not while it shows what the search found).
+  Sorted by coin, XP per kill or XP per hour, it says that instead ("85 XP", "21k XP/h").
 - **The search** (fuzzy, `Bt.Fuzzy`): the query's letters in order, not necessarily together, case
   and spaces ignored ("dfbnd" finds Defias Bandit); letters together, at a word's start and early
   score more, a shorter text a little more. Over mob names and the names of all their drops and
@@ -299,15 +334,19 @@ yet beside the mouse (off). `/bestiary`
 ## Cost
 
 Event handlers only: `PARTY_KILL`, `LOOT_READY`, `LOOT_CLOSED`, the player's
-`UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added, leaving combat, and
-`QUEST_LOG_UPDATE`/`BAG_UPDATE_DELAYED` (a flag, then one look half a second later). The window redraws when its
-mob's record changes or the target does; the card's OnUpdate runs only while it's shown.
+`UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added, entering and leaving
+combat (a time stamp), `PLAYER_XP_UPDATE` (three numbers read, the last 8 kills looked at), and
+`QUEST_LOG_UPDATE`/`BAG_UPDATE_DELAYED` (a flag, then one look half a second later). The window
+redraws when its mob's record changes or the target does; the card's OnUpdate runs only while
+it's shown.
 
 ## To check in game
 
 - `GetLootSourceInfo` and `CanLootUnit` answer (and aren't secret), and `CanLootUnit` says "no
   loot" for an empty corpse of yours.
 - The portrait's look; the coin attribution with auto loot.
+- `PLAYER_XP_UPDATE` comes within 1.5 s of `PARTY_KILL` (either order), and `UnitLevel` has the
+  new level at a level-up's update; `IsPlayerAtEffectiveMaxLevel` answers on Forever.
 - `LoadAddOn` of the load-on-demand drop database works on Forever, and its first load (0.93 MB of
   strings) is only a moment, also when the fight stream asks for it in a fight.
 - How close the classic database's health is to Forever's (the fight stream's learned ratio from

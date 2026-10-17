@@ -6,9 +6,11 @@ local M = Bt.module
 
 -- The Bestiary's ledger: every kind of mob you've killed, with its statistics and drops, and one
 -- search over mobs and items. On the left the mobs (name, level, kind, your kills, their best drops
--- as tiny icons), sorted by kills, name, level, coin or when you last killed one. On the right the
--- one picked: its whole model turning slowly, kills, coin, first and last kill, skinnings, and all
--- its drops (as in the window: quality edge, how many, chance; skinning marked). At the top what
+-- as tiny icons), sorted by kills, name, level, coin, XP per kill or per hour of fighting (a row then
+-- says it) or when you last killed one. On the right the one picked: its whole model turning slowly,
+-- kills, coin, first and last kill, skinnings, under the model what a kill pays (XP and time per
+-- kill, XP per hour of fighting), and all its drops (as in the window: quality edge, how many,
+-- chance; skinning marked). At the top what
 -- the Bestiary knows in all, and your rarest find. With the classic drop database (Bestiary.lua):
 -- a row says how many of its drops you've found, and the picked mob's drops have a section of
 -- what you haven't had yet, faded, between its own drops and its world drops.
@@ -36,8 +38,9 @@ local ROW_ICONS = 6
 local WISH_ICON, WISH_GAP, WISH_TOP = 20, 4, 40 -- the wish list's strip, at the top right
 local WISHES = 8          -- icons in it, at most (the rest: "+N")
 local WISH_SOURCES = 8    -- mobs named in an icon's tooltip, at most
+local PACE_LINE = 13        -- a line of what a kill pays, under the model
 local GOLD = { 1, 0.82, 0.3 }
-local SORTS = { "kills", "name", "level", "coin", "last" }
+local SORTS = { "kills", "name", "level", "coin", "xp", "xph", "last" }
 local issecret = issecretvalue or function() return false end
 
 local ledger
@@ -111,12 +114,33 @@ local function NameOf(id, item)
 	end
 end
 
+local function XPPerHour(mob)
+	local _, _, perHour = Bt.Pace(mob)
+	return perHour
+end
+
 local SORT_KEYS = {
 	kills = function(mob) return -mob.kills end,
 	name = function(mob) return (mob.name or "~"):lower() end,
 	level = function(mob) return -(mob.level or 0) end,
 	coin = function(mob) return mob.kills > 0 and -(mob.money / mob.kills) or 0 end,
+	xp = function(mob) return -((Bt.Pace(mob)) or 0) end,
+	xph = function(mob) return -(XPPerHour(mob) or 0) end,
 	last = function(mob) return -(mob.last or 0) end,
+}
+
+-- What a row says on the right, sorted by something it doesn't show otherwise: coin, XP per kill or
+-- per hour of fighting (nil: the found count, as always).
+local SORT_SHOWS = {
+	coin = function(mob) return mob.kills > 0 and mob.money > 0 and Bt.Coins(mob.money / mob.kills) or "" end,
+	xp = function(mob)
+		local xp = Bt.Pace(mob)
+		return xp and L["%d XP"]:format(math.floor(xp + 0.5)) or ""
+	end,
+	xph = function(mob)
+		local perHour = XPPerHour(mob)
+		return perHour and L["%s XP/h"]:format(Bt.Thousands(perHour)) or ""
+	end,
 }
 
 -- The list: everything (sorted) or what the search finds (the best match first).
@@ -251,9 +275,15 @@ local function FillRow(row, entry)
 	for _, icon in ipairs(row.icons) do
 		icon:Hide()
 	end
-	local _, found, total = Bt.Compare(entry.creature, mob, M.db.showPoor, true)
-	row.Known:SetText(total and total > 0 and L["%d/%d found"]:format(found, total) or "")
-	row.Known:SetShown(not entry.items and total ~= nil)
+	local shows = SORT_SHOWS[sortBy]
+	if shows then -- (sorted by it: what it's sorted by)
+		row.Known:SetText(shows(mob))
+		row.Known:SetShown(not entry.items)
+	else
+		local _, found, total = Bt.Compare(entry.creature, mob, M.db.showPoor, true)
+		row.Known:SetText(total and total > 0 and L["%d/%d found"]:format(found, total) or "")
+		row.Known:SetShown(not entry.items and total ~= nil)
+	end
 	if entry.items then
 		local found = entry.items[1]
 		local r, g, b = Bt.QualityColor(found.quality)
@@ -363,6 +393,11 @@ local function DrawPicked()
 		lines[#lines + 1] = "|cff999999" .. L["%d of its %d drops found"]:format(had, total) .. "|r"
 	end
 	pane.Stats:SetText(table.concat(lines, "\n"))
+	-- What a kill pays, a line each, under the model; the drops start under them.
+	local _, pace = Bt.PaceText(mob)
+	pane.Pace:SetText(table.concat(pace, "\n"))
+	pane.Pace:SetShown(#pace > 0)
+	pane.Scroll:SetPoint("TOPLEFT", pane.ModelBack, "BOTTOMLEFT", 0, -(10 + (#pace > 0 and #pace * PACE_LINE + 6 or 0)))
 	local own, world = {}, {}
 	for _, drop in ipairs(Bt.Drops(mob, M.db.showPoor, selected)) do
 		if drop.group then
@@ -548,7 +583,8 @@ end
 -- The frame
 ---------------------------------------------------------------------------
 
-local SORT_LABELS = { kills = L["Most kills"], name = L["Name"], level = L["Level"], coin = L["Coin per kill"], last = L["Last killed"] }
+local SORT_LABELS = { kills = L["Most kills"], name = L["Name"], level = L["Level"], coin = L["Coin per kill"], xp = L["XP per kill"],
+	xph = L["XP per hour"], last = L["Last killed"] }
 
 local function Build()
 	ledger = CreateFrame("Frame", "LefthyToolsBestiaryLedger", UIParent)
@@ -682,6 +718,14 @@ local function Build()
 	pane.Stats:SetPoint("RIGHT", 0, 0)
 	pane.Stats:SetJustifyH("LEFT")
 	pane.Stats:SetSpacing(3)
+	-- What a kill of it pays (worth, XP and time per kill, XP per hour of fighting), under the model,
+	-- the pane wide: the drops start under it.
+	pane.ModelBack = modelBack
+	pane.Pace = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	pane.Pace:SetPoint("TOPLEFT", modelBack, "BOTTOMLEFT", 0, -8)
+	pane.Pace:SetPoint("RIGHT", 0, 0)
+	pane.Pace:SetJustifyH("LEFT")
+	pane.Pace:SetSpacing(3)
 	-- Its drops under the model, scrolling: its own, what the classic database says it drops that
 	-- you haven't had yet (faded), then its world drops (random gear from anywhere), each a section
 	-- of its own and each drop with its item tooltip.

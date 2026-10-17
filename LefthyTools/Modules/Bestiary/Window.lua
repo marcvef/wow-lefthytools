@@ -5,7 +5,8 @@ local Bt = ns.Bestiary
 local M = Bt.module
 
 -- The Bestiary's window: your target's drops. At the top the mob: a small still portrait, its
--- name, level and kind, your kills and the coin each brought. Under it its drops, the likeliest
+-- name, level and kind, your kills and the coin each brought, and (when known) a small grey line on
+-- what a kill pays: XP and how long it takes (hover: in full). Under it its drops, the likeliest
 -- first: an icon edged in its quality's colour, how many you got in its corner, the drop chance
 -- under it; the item's tooltip with the numbers on hover, Shift-click links it. It follows your
 -- target (a mob you can attack, or a dead one) and keeps the last when you clear it. It stays
@@ -37,8 +38,10 @@ local PAD = 10
 local ICON, GAP, PER_ROW, ROWS = 30, 8, 6, 4
 local CELL_H = ICON + 16
 local HEADER = 62
+local PACE_H = 13       -- the header's line on what a kill pays, when there's something to say
 local PORTRAIT = 40
 local LINE = 14
+local DOT = "  |cff888888·|r  "
 local CARD_ICON, CARD_GAP, CARD_CELLS = 22, 5, 6
 local KNOWN_ICON, KNOWN_GAP, KNOWN_ROWS = 22, 6, 2 -- not seen yet (the classic database): smaller, faded
 local KNOWN_PER_ROW = math.floor((WIDTH - 2 * PAD + KNOWN_GAP) / (KNOWN_ICON + KNOWN_GAP))
@@ -165,6 +168,48 @@ local function QuestLine(want)
 	end
 	return ("|T%s:12:12|t "):format(QUEST_ICON) .. counts
 end
+
+-- "14 s", "4.5 s" (a tenth under 10 s; "4,5 s" in German).
+local function Seconds(s)
+	return LT.Options.Seconds(s >= 10 and math.floor(s + 0.5) or math.floor(s * 10 + 0.5) / 10)
+end
+
+-- XP per hour, short: "850", "4.3k", "21k".
+local function Thousands(n)
+	if n >= 9950 then
+		return ("%dk"):format(math.floor(n / 1000 + 0.5))
+	elseif n >= 1000 then
+		local text = ("%.1fk"):format(n / 1000)
+		return ns.DECIMAL_COMMA and (text:gsub("%.", ",")) or text
+	end
+	return tostring(math.floor(n + 0.5))
+end
+
+-- What a kill of a kind pays, the parts known (Bestiary.lua's pace): short for the window's line
+-- ("Per kill: 85 XP · 14 s", "(level 12)" when that's not yours), and in full, a line each, for
+-- its tooltip and the ledger (with the XP per hour of fighting). nil and {} when nothing's known.
+local function PaceText(mob)
+	local parts, lines = {}, {}
+	local xp, seconds, perHour, level = Bt.Pace(mob)
+	if xp then
+		parts[#parts + 1] = L["%d XP"]:format(math.floor(xp + 0.5))
+	end
+	if seconds then
+		parts[#parts + 1] = Seconds(seconds)
+	end
+	if #parts == 0 then
+		return nil, lines
+	end
+	local other = level ~= Value(UnitLevel, "player") and level or nil
+	local each = xp and seconds and L["%d XP and %s per kill"]:format(math.floor(xp + 0.5), Seconds(seconds))
+		or xp and L["%d XP per kill"]:format(math.floor(xp + 0.5)) or L["%s per kill"]:format(Seconds(seconds))
+	lines[#lines + 1] = other and L["At level %d: %s"]:format(other, each) or each
+	if perHour and perHour > 0 then
+		lines[#lines + 1] = L["About %s XP per hour of fighting (the time between fights not counted)"]:format(Thousands(perHour))
+	end
+	return L["Per kill: %s"]:format(table.concat(parts, DOT)) .. (other and (" " .. L["(level %d)"]:format(other)) or ""), lines
+end
+Bt.PaceText, Bt.Thousands = PaceText, Thousands
 
 ---------------------------------------------------------------------------
 -- A drop: its icon, edged in its quality's colour, how many in the corner, the chance under it
@@ -603,21 +648,40 @@ local function Build()
 	win.Kills:SetPoint("RIGHT", -PAD, 0)
 	win.Kills:SetJustifyH("LEFT")
 	win.Kills:SetWordWrap(false)
-	local line = win:CreateTexture(nil, "ARTWORK")
-	line:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
-	line:SetHeight(1)
-	line:SetPoint("TOPLEFT", PAD, -HEADER + 4)
-	line:SetPoint("TOPRIGHT", -PAD, -HEADER + 4)
-	-- Quests wanting its drops: a line each, under the header.
+	-- What a kill pays (worth, XP, how long it takes), small and grey under the portrait, the window
+	-- wide; hover: the same in full, with the XP per hour of fighting.
+	win.Pace = CreateFrame("Button", nil, win)
+	win.Pace:SetPoint("TOPLEFT", PAD, -(HEADER - 6))
+	win.Pace:SetSize(WIDTH - 2 * PAD, PACE_H)
+	win.Pace.Text = win.Pace:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	win.Pace.Text:SetPoint("LEFT")
+	win.Pace.Text:SetPoint("RIGHT")
+	win.Pace.Text:SetJustifyH("LEFT")
+	win.Pace.Text:SetWordWrap(false)
+	win.Pace:SetScript("OnEnter", function(self)
+		local _, lines = PaceText(Bt.Mob(shown))
+		if #lines > 0 then
+			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+			GameTooltip:SetText(lines[1], 1, 1, 1)
+			for i = 2, #lines do
+				GameTooltip:AddLine(lines[i], 0.8, 0.8, 0.8, true)
+			end
+			GameTooltip:Show()
+		end
+	end)
+	win.Pace:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	win.Rule = win:CreateTexture(nil, "ARTWORK")
+	win.Rule:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.25)
+	win.Rule:SetHeight(1)
+	-- Quests wanting its drops: a line each, under the header (placed when drawn: under the line of
+	-- what a kill pays, when there is one).
 	win.Quest = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	win.Quest:SetPoint("TOPLEFT", PAD, -HEADER)
 	win.Quest:SetWidth(WIDTH - 2 * PAD)
 	win.Quest:SetJustifyH("LEFT")
 	win.Quest:SetSpacing(2)
 
 	-- The drops, and a line under them when there's something to say.
 	win.Grid = CreateFrame("Frame", nil, win)
-	win.Grid:SetPoint("TOPLEFT", PAD + 1, -HEADER - 4)
 	win.Grid:SetSize(WIDTH - 2 * PAD, 10)
 	win.cells = {}
 	-- Not seen yet (the classic database): a heading with a rule and how many of its drops you've
@@ -658,19 +722,29 @@ local function Draw()
 	win.Name:SetText(name or "Bestiary") -- (module names aren't translated)
 	win.Kind:SetText(shown and Kind({ level = info.level or mob and mob.level, class = info.class or mob and mob.class }) or "")
 	win.Kills:SetText(mob and KillsLine(mob) or "")
+	-- What a kill pays, when something's known: the header grows by a line.
+	local pace = PaceText(mob)
+	win.Pace.Text:SetText(pace or "")
+	win.Pace:SetShown(pace ~= nil)
+	local head = HEADER + (pace and PACE_H or 0)
+	win.Rule:ClearAllPoints()
+	win.Rule:SetPoint("TOPLEFT", PAD, -head + 4)
+	win.Rule:SetPoint("TOPRIGHT", -PAD, -head + 4)
 	-- Quests wanting its drops (the ones still wanted first), then its drops under them.
 	local wanted, lines = Bt.QuestDrops(shown, mob), {}
 	for i = 1, math.min(#wanted, QUEST_LINES) do
 		lines[i] = QuestLine(wanted[i])
 	end
+	win.Quest:ClearAllPoints()
+	win.Quest:SetPoint("TOPLEFT", PAD, -head)
 	win.Quest:SetText(table.concat(lines, "\n"))
 	win.Quest:SetShown(#lines > 0)
 	local quests = #lines > 0 and math.ceil(win.Quest:GetStringHeight()) + 6 or 0
 	win.Grid:ClearAllPoints()
-	win.Grid:SetPoint("TOPLEFT", PAD + 1, -HEADER - 4 - quests)
+	win.Grid:SetPoint("TOPLEFT", PAD + 1, -head - 4 - quests)
 	local drops = Bt.Drops(mob, M.db.showPoor, shown)
 	local rows = Lay(win.Grid, win.cells, drops, mob and mob.kills or 0, ICON, GAP, PER_ROW, PER_ROW * ROWS, true)
-	local height = HEADER + quests + rows * (CELL_H + 4)
+	local height = head + quests + rows * (CELL_H + 4)
 	-- What the classic database says it drops that you haven't had yet (for a mob you haven't
 	-- killed: what it can drop), when that's switched on for the window.
 	local unseen, found, total
@@ -718,7 +792,7 @@ local function Draw()
 	win.Note:SetText(table.concat(notes, "\n"))
 	win.Note:SetShown(#notes > 0)
 	height = height + (#notes > 0 and (#notes * LINE + (any and 4 or 10)) or 0) + PAD
-	win:SetHeight(math.max(height, HEADER + 16))
+	win:SetHeight(math.max(height, head + 16))
 end
 Bt.Draw = Draw
 

@@ -891,6 +891,17 @@ L["Wish list: Alt-click a drop to pin it"] = "Wunschliste: Alt-Klick auf einen D
 L["No mob known to drop it yet."] = "Noch kein Mob bekannt, der es droppt."
 L["and %d more in the classic database"] = "und %d weitere in der Classic-Datenbank"
 L["Click: search for it"] = "Klick: danach suchen"
+L["%d XP"] = "%d EP"
+L["%d XP and %s per kill"] = "%d EP und %s pro Kill"
+L["%d XP per kill"] = "%d EP pro Kill"
+L["%s per kill"] = "%s pro Kill"
+L["At level %d: %s"] = "Auf Level %d: %s"
+L["About %s XP per hour of fighting (the time between fights not counted)"] =
+	"Etwa %s EP pro Stunde Kampf (die Zeit zwischen den Kämpfen nicht mitgezählt)"
+L["Per kill: %s"] = "Pro Kill: %s"
+L["%s XP/h"] = "%s EP/h"
+L["XP per kill"] = "EP pro Kill"
+L["XP per hour"] = "EP pro Stunde"
 L["Who has aggro, on enemy nameplates"] = "Wer Aggro hat, auf feindlichen Namensplaketten"
 L["In a group, the left end of each enemy's health bar says whom it's on: >YOU< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."] =
 	"In einer Gruppe zeigt das linke Ende des Lebensbalkens jedes Gegners, auf wem er ist: >DU<, wenn du es bist, sonst die ersten drei Buchstaben des Namens in der Farbe der Rolle (Tank blau, Heiler grün, DD rot, weiß, wenn unbekannt). Die Rollen kommen aus dem Dungeonbrowser oder einem Rollencheck; in einer selbst erstellten Gruppe kann der Anführer unten einen starten."

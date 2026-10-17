@@ -25,8 +25,14 @@ local L = ns.L
 --
 -- LefthyToolsBestiaryDB = { mobs = { [creatureID] = { name, level, class, kills, money (copper),
 --   first, last (time()), items = { [itemID] = { drops (corpses it came from), count, quality,
---   name } }, skinned (how many), skins = { [itemID] = { times, count, quality, name } } } },
+--   name } }, skinned (how many), skins = { [itemID] = { times, count, quality, name } },
+--   pace = { your level, kills with their XP known, XP, kills timed, seconds } } },
 --   wishes = { [itemID] = { pinned (time()), kills since, expected drops in them, name, quality } } }
+--
+-- The pace: what a counted kill of yours gave in XP (PLAYER_XP_UPDATE in the moment around its
+-- PARTY_KILL) and how long it took (since the fight began, or since your last kill in it: several
+-- mobs in one fight share its length). XP per kill depends on your level, so it's kept for one level
+-- (the level you were at the kill): a kill at another level starts it again.
 --
 -- Beside your own numbers (setting dropData): what a classic world database says each kind of mob
 -- can drop (LefthyTools_DropData, a separate add-on: GPL v3 like its source, CMaNGOS Classic DB),
@@ -67,6 +73,9 @@ local PENDING_FOR = 300         -- a corpse not looted in this long: not counted
 local CAST_GAP = 1.5            -- skinning (a pickpocket, gathering) this shortly before the loot window: not a kill's loot
 local SEEN_KEEP = 200           -- mobs remembered (name, level) from target, mouseover and nameplates
 local LOG_KEEP = 12             -- loot windows remembered with what was made of them (/bestiary log)
+local XP_FROM_KILL = 1.5        -- seconds: XP this close to a kill of yours came from it
+local FIGHT_AFTER = 2           -- seconds a kill may come after the fight ended and still be timed
+local RECENT_KEEP = 8           -- your last kills, for the XP that comes a moment after them
 -- Spells whose loot isn't a kill's (each rank's ID, and by name for ranks not listed): Skinning,
 -- Pick Pocket, Mining, Herb Gathering. Any other spell just before looting (a killing blow, then a
 -- quick loot) doesn't matter.
@@ -88,6 +97,11 @@ local skinName
 local skinnedCorpse = {}         -- GUID -> time: skinned (once each)
 local lootMoney, lootSource      -- while the loot window is open: money before, the corpse
 local lootSeen = false           -- this loot window was looked at (LOOT_READY or LOOT_OPENED)
+local recent = {}                -- your last kills (their pending entries), the oldest first
+local xpWas = {}                 -- your XP as last read (xp, max, level): what each update added
+local looseXP                    -- XP that came just before its kill: { amount, at }
+local fightFrom, fightEnd        -- when the fight began (PLAYER_REGEN_DISABLED) and ended (nil: still on)
+local lastKillAt = -math.huge    -- your last kill in this fight: the next one's time starts there
 local listeners = {}
 local events = CreateFrame("Frame")
 
@@ -150,6 +164,18 @@ end
 function Bt.Chance(mob, item, skin)
 	local out = skin and (mob.skinned or 0) or mob.kills
 	return out > 0 and math.min(1, item[1] / out) or 0, item[1] > 0 and item[2] / item[1] or 0
+end
+
+-- A kind's pace (nil: nothing known): XP per kill, seconds per kill, XP per hour of fighting (the
+-- time between fights not counted), each nil when not known, and the level they're for.
+function Bt.Pace(mob)
+	local pace = mob and type(mob.pace) == "table" and mob.pace
+	if not pace then
+		return nil
+	end
+	local xp = (pace[2] or 0) > 0 and pace[3] / pace[2] or nil
+	local seconds = (pace[4] or 0) > 0 and pace[5] / pace[4] or nil
+	return xp, seconds, xp and seconds and seconds > 0 and xp / seconds * 3600 or nil, pace[1]
 end
 
 local function Likelier(a, b)
@@ -881,9 +907,69 @@ function Bt.PrintLog()
 	end
 end
 
+-- What your XP grew by since it was last read (a level-up in between: the rest of the old level
+-- and what's in the new one); nil when it can't be told.
+local function ReadXP()
+	local xp, max, level = Value(UnitXP, "player"), Value(UnitXPMax, "player"), Value(UnitLevel, "player")
+	if type(xp) ~= "number" or type(max) ~= "number" then
+		return nil
+	end
+	local gained = xpWas.xp and (level == xpWas.level and xp - xpWas.xp or (xpWas.max - xpWas.xp) + xp)
+	xpWas.xp, xpWas.max, xpWas.level = xp, max, level
+	return gained
+end
+
+-- Kills give you XP (the XP bar's own rule: not at the level cap, not switched off): a kill without
+-- any then gave 0 (a grey mob), else it says nothing about XP.
+local function XPGrows()
+	return not (Value(IsPlayerAtEffectiveMaxLevel) or Value(IsXPUserDisabled))
+end
+
+-- A counted kill's XP and how long it took, for the level you were at when it died (another level
+-- starts the pace again: XP per kill depends on it). XP still to come joins it then (kill.pace).
+local function AddPace(mob, kill)
+	if not (kill and kill.level) then
+		return -- (a corpse looted without your killing blow seen: nothing known)
+	end
+	local pace = mob.pace
+	if type(pace) ~= "table" or pace[1] ~= kill.level then
+		pace = { kill.level, 0, 0, 0, 0 }
+		mob.pace = pace
+	end
+	if kill.xp or XPGrows() then
+		pace[2], pace[3] = pace[2] + 1, pace[3] + (kill.xp or 0)
+		kill.pace = not kill.xp and pace or nil
+	end
+	if kill.seconds then
+		pace[4], pace[5] = pace[4] + 1, pace[5] + math.floor(kill.seconds * 10 + 0.5) / 10
+	end
+end
+
+-- Your XP grew: a kill's from the moment before (the oldest still without, when several died at
+-- once), else it waits a moment for its kill (the XP can come first).
+local function OnXP()
+	local gained = ReadXP()
+	if not gained or gained <= 0 then
+		return
+	end
+	local now = GetTime()
+	for _, kill in ipairs(recent) do
+		if not kill.xp and now - kill.at <= XP_FROM_KILL then
+			kill.xp = gained
+			if kill.pace then -- (counted already, as 0: it's added now)
+				kill.pace[3], kill.pace = kill.pace[3] + gained, nil
+				Changed(kill.creature)
+			end
+			return
+		end
+	end
+	looseXP = { amount = gained, at = now }
+end
+
 -- A kill counted (once per corpse). how: "looted" or "empty" (the game said there's nothing on it:
 -- if it's looted after all, its items still join this kill).
 local function Count(guid, creature, how)
+	local kill = pending[guid]
 	done[guid] = { at = time(), how = how }
 	pending[guid] = nil
 	local mob = MobFor(creature)
@@ -893,6 +979,7 @@ local function Count(guid, creature, how)
 	if info then
 		mob.name, mob.level, mob.class = info.name or mob.name, info.level or mob.level, info.class or mob.class
 	end
+	AddPace(mob, kill)
 	return mob
 end
 
@@ -931,7 +1018,22 @@ local function OnKill(attacker, target)
 	if Value(UnitGUID, "target") == target then
 		Bt.Look("target")
 	end
-	pending[target] = { at = GetTime(), creature = creature }
+	local now = GetTime()
+	local kill = { at = now, creature = creature, level = Value(UnitLevel, "player") }
+	-- How long it took: since the fight began, or since your last kill in it; not when the fight's
+	-- start wasn't seen (switched on in it, a /reload).
+	if fightFrom and (not fightEnd or now - fightEnd <= FIGHT_AFTER) then
+		kill.seconds = now - math.max(fightFrom, lastKillAt)
+	end
+	lastKillAt = now
+	if looseXP and now - looseXP.at <= XP_FROM_KILL then -- (its XP came first)
+		kill.xp, looseXP = looseXP.amount, nil
+	end
+	pending[target] = kill
+	recent[#recent + 1] = kill
+	if #recent > RECENT_KEEP then
+		table.remove(recent, 1)
+	end
 	if CanLootUnit then
 		C_Timer.After(EMPTY_CHECKS[1], function() CheckEmpty(target, 1) end)
 	end
@@ -1143,7 +1245,12 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
 		end
 	elseif event == "NAME_PLATE_UNIT_ADDED" then
 		Bt.Look(a)
+	elseif event == "PLAYER_XP_UPDATE" then
+		OnXP()
+	elseif event == "PLAYER_REGEN_DISABLED" then -- (a fight began: the next kill's time starts here)
+		fightFrom, fightEnd, lastKillAt = GetTime(), nil, -math.huge
 	elseif event == "PLAYER_REGEN_ENABLED" then
+		fightEnd = GetTime()
 		if Bt.MouseoverChanged then
 			Bt.MouseoverChanged() -- (the fight is over, the mouse still over an enemy: its card)
 		end
@@ -1174,11 +1281,14 @@ end
 
 function M:OnEnable()
 	for _, event in ipairs({ "PARTY_KILL", "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "PLAYER_TARGET_CHANGED",
-			"UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED", "PLAYER_REGEN_ENABLED", "QUEST_LOG_UPDATE", "BAG_UPDATE_DELAYED" }) do
+			"UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_XP_UPDATE",
+			"QUEST_LOG_UPDATE", "BAG_UPDATE_DELAYED" }) do
 		events:RegisterEvent(event)
 	end
 	events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
 	wantsOld = true -- (the quest log may have changed while switched off)
+	xpWas.xp = nil
+	ReadXP() -- (where counting XP starts)
 	if Bt.Start then
 		Bt.Start() -- (Window.lua: the button, the window as it was)
 	end
@@ -1187,7 +1297,8 @@ end
 function M:OnDisable()
 	events:UnregisterAllEvents()
 	wipe(pending)
-	lootMoney, lootSource = nil, nil
+	wipe(recent)
+	lootMoney, lootSource, looseXP, fightFrom = nil, nil, nil, nil
 	if Bt.Stop then
 		Bt.Stop()
 	end

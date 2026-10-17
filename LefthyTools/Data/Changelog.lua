@@ -323,5 +323,8 @@ ns.CHANGELOG = {
 	{ id = 105, module = "beacon",
 		en = { "Fight stream: Bestiary on hover", "Hovering a mob in the battle row shows your Bestiary card for it: your kills and its three likeliest drops." },
 		de = { "Kampf-Stream: Bestiary per Mouseover", "Mouseover über einen Mob in der Kampfreihe zeigt deine Bestiary-Karte: deine Kills und seine drei wahrscheinlichsten Drops." } },
+	{ id = 106, module = "bestiary",
+		en = { "Bestiary: XP and time per kill", "Each of your kills now notes the XP it gave and how long it took. The window shows it in a small line under the portrait; the ledger adds the XP per hour of fighting and sorts by XP per kill or per hour, to compare leveling spots." },
+		de = { "Bestiary: EP und Zeit pro Kill", "Jeder deiner Kills merkt sich jetzt die EP, die er gab, und wie lange er dauerte. Das Fenster zeigt es in einer kleinen Zeile unter dem Porträt; das Verzeichnis zeigt zusätzlich die EP pro Stunde Kampf und sortiert nach EP pro Kill oder pro Stunde, um Leveling-Spots zu vergleichen." } },
 	-- New entries go here, at the end.
 }

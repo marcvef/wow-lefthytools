@@ -7301,6 +7301,108 @@ section("Bestiary: what mobs drop")
 	check(#loads == 1, "loaded once only")
 	MOBS.target, KNOWN_SPELLS[8613] = nil, nil
 	setting("windowUnseen"):SetValue(false)
+	-- The pace: what each kill gave in XP (around its killing blow, also when the XP comes first; a
+	-- level-up between wraps) and how long it took (since the fight began, or since the last kill in
+	-- it). Kept for your level. A Kobold Vermin (119) of its own, so the numbers above stay.
+	local kobold = {}
+	for i = 1, 6 do kobold[i] = ("Creature-0-1-0-1-119-%08X"):format(0x60 + i) end
+	local function kobolds() return LefthyToolsBestiaryDB.mobs[119] end
+	local function koboldKill(guid, xp, xpFirst)
+		if xp and xpFirst then XP.current = XP.current + xp; Fire("PLAYER_XP_UPDATE", "player") end
+		Fire("PARTY_KILL", "Player-1-0", guid)
+		if xp and not xpFirst then XP.current = XP.current + xp; Fire("PLAYER_XP_UPDATE", "player") end
+	end
+	ITEMS[2770] = ITEMS[2770] or { name = "Copper Ore", quality = 1 } -- (its own: Linen Cloth from a third kind would make it a world drop)
+	local function koboldLoot(guid)
+		LOOT = { { type = 1, id = 2770, source = guid }, { type = 2, source = guid } }
+		Fire("LOOT_READY", false)
+		MONEY = MONEY + 1500
+		Fire("LOOT_CLOSED")
+		LOOT = {}
+	end
+	do
+		MOBS.target, STATE.target = { name = "Kobold Vermin", level = 17, guid = kobold[1] }, true
+		Fire("PLAYER_TARGET_CHANGED")
+		Advance(2) -- (the kills above long done)
+		Fire("PLAYER_XP_UPDATE", "player") -- (where the XP stands now: other tests set it)
+		Advance(2)
+		STATE.combat = true
+		Fire("PLAYER_REGEN_DISABLED")
+		Advance(12)
+		koboldKill(kobold[1], 80)
+		Advance(8)
+		koboldKill(kobold[2], 90, true) -- (its XP first: still its own)
+		STATE.combat = false
+		Fire("PLAYER_REGEN_ENABLED")
+		koboldLoot(kobold[1])
+		koboldLoot(kobold[2])
+		local pace = kobolds().pace
+		check(pace and pace[1] == 19 and pace[2] == 2 and pace[3] == 170 and pace[4] == 2 and pace[5] == 20,
+			"two kills in one fight: the XP each gave (80, 90) and the fight's 20 s shared (12 s, then 8 s since the first)")
+		local line = win.Pace.Text:GetText() or ""
+		check(win.Pace:IsShown() and line:find("Per kill: 85 XP", 1, true) and line:find("10 s", 1, true) and not line:find("level", 1, true),
+			"the window: a line on it under the portrait, got " .. line)
+		win.Pace._scripts.OnEnter(win.Pace)
+		check(TOOLTIP.title == "85 XP and 10 s per kill" and tipFind("About 31k XP per hour of fighting (the time between fights not counted)"),
+			"hover it: in full, with the XP per hour of fighting")
+		win.Pace._scripts.OnLeave(win.Pace)
+		-- A kill that levels you up: the rest of the old level and what's in the new one, for the level
+		-- it died at.
+		Advance(2)
+		XP.current = XP.max - 10
+		Fire("PLAYER_XP_UPDATE", "player")
+		Advance(2)
+		STATE.combat = true
+		Fire("PLAYER_REGEN_DISABLED")
+		Advance(10)
+		Fire("PARTY_KILL", "Player-1-0", kobold[3])
+		PLAYER_LEVEL, XP.current, XP.max = 20, 75, 7000
+		Fire("PLAYER_XP_UPDATE", "player")
+		STATE.combat = false
+		Fire("PLAYER_REGEN_ENABLED")
+		koboldLoot(kobold[3])
+		check(pace[1] == 19 and pace[2] == 3 and pace[3] == 255 and pace[5] == 30, "a kill that levels you up: its 85 XP across the level-up, at 19")
+		check(win.Pace.Text:GetText():find("(level 19)", 1, true), "now 20: the window says which level that's for")
+		-- At the new level it starts again; a kill without XP gave 0 (grey); no fight seen: not timed.
+		Advance(2)
+		STATE.combat = true
+		Fire("PLAYER_REGEN_DISABLED")
+		Advance(6)
+		koboldKill(kobold[4], 100)
+		STATE.combat = false
+		Fire("PLAYER_REGEN_ENABLED")
+		koboldLoot(kobold[4])
+		Advance(3)
+		koboldKill(kobold[5])
+		koboldLoot(kobold[5])
+		pace = kobolds().pace
+		check(pace[1] == 20 and pace[2] == 2 and pace[3] == 100 and pace[4] == 1 and pace[5] == 6 and not win.Pace.Text:GetText():find("level", 1, true),
+			"a new level: started again; a kill without XP counts 0; one after the fight ended: not timed")
+		IsPlayerAtEffectiveMaxLevel = function() return true end
+		koboldKill(kobold[6])
+		koboldLoot(kobold[6])
+		IsPlayerAtEffectiveMaxLevel = nil
+		check(kobolds().kills == 6 and pace[2] == 2, "at the level cap: a kill without XP says nothing about XP")
+		-- The ledger: the same in full under the model; sorted by XP per kill or per hour, a row says it.
+		Bt.ToggleLedger(119)
+		local paceText = ledger.Pane.Pace:GetText() or ""
+		check(ledger.Pane.Pace:IsShown() and paceText:find("50 XP and 6 s per kill", 1, true) and paceText:find("About 30k XP per hour", 1, true),
+			"the ledger: what a kill pays, under the model, got " .. paceText)
+		local function sortBy(key)
+			ledger.Sort._scripts.OnClick(ledger.Sort)
+			for _, row in ipairs(ledger.Sort.List.rows) do if row.value == key then row._scripts.OnClick(row) end end
+			_, entries = Bt.Ledger()
+		end
+		sortBy("xp")
+		check(entries[1].creature == 119 and ledger.rows[1].Known:GetText() == "50 XP" and ledger.Sort.Label:GetText() == "XP per kill",
+			"sorted by XP per kill: the most first, each row says it")
+		sortBy("xph")
+		check(entries[1].creature == 119 and ledger.rows[1].Known:GetText() == "30k XP/h", "sorted by XP per hour of fighting")
+		sortBy("name")
+		ledger:Hide()
+		PLAYER_LEVEL, XP.current, XP.max = 19, 1500, 6000
+		MOBS.target = nil
+	end
 	-- Closed and open again: kept for next time.
 	win.Close:Click()
 	check(not win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == false and not button.Open:IsShown(), "the X closes it, kept")
@@ -7401,7 +7503,7 @@ section("Bestiary: wish list and dry streak")
 	end
 	local function cellOf(list, id) for _, c in ipairs(list) do if c:IsShown() and c.drop and c.drop.id == id then return c end end end
 	ITEMS[774] = ITEMS[774] or { name = "Malachite", quality = 2 }
-	LefthyToolsDropData.mobs[119] = "774:2:500" -- (a mob the Bestiary has never met: no name)
+	LefthyToolsDropData.mobs[8119] = "774:2:500" -- (a mob the Bestiary has never met: no name)
 	check(LefthyToolsBestiaryDB.wishes == nil, "no wish list yet: nothing saved for it")
 	-- Alt-click on a drop in the window: on the wish list, a star on it.
 	MOBS.target, STATE.target = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000070" }, true
@@ -7522,7 +7624,7 @@ section("Bestiary: wish list and dry streak")
 		"another: the chances of different mobs added up (5 kills, about 3 expected)")
 	SlashCmdList.LEFTHYTOOLS_BESTIARY("wish 2075")
 	check(LefthyToolsBestiaryDB.wishes == nil, "the last one off: nothing kept for it")
-	LefthyToolsDropData.mobs[119], MOBS.target, STATE.target = nil, nil, false
+	LefthyToolsDropData.mobs[8119], MOBS.target, STATE.target = nil, nil, false
 	Bt.Toggle(false)
 end)()
 
