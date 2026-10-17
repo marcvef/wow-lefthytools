@@ -26,6 +26,32 @@ function LT.Print(msg, source)
 end
 
 ---------------------------------------------------------------------------
+-- Secret values. Forever hides many API answers from addons (health always, names and casts while
+-- restricted): a secret can be stored and passed on, but comparing it, doing arithmetic with it or
+-- using it as a table key is an error. These are for code that only wants what it may read.
+---------------------------------------------------------------------------
+
+-- true if v is a secret (never on a client without them).
+LT.IsSecret = issecretvalue or function() return false end
+
+-- true if v is there and not a secret.
+function LT.Readable(v)
+	return v ~= nil and not LT.IsSecret(v)
+end
+
+-- What f(...) answers first, if the call works and the answer isn't a secret; nil if f is missing,
+-- fails or answers a secret. For APIs that may be gone, broken or hidden on Forever.
+function LT.Value(f, ...)
+	if not f then
+		return nil
+	end
+	local ok, v = pcall(f, ...)
+	if ok and not LT.IsSecret(v) then
+		return v
+	end
+end
+
+---------------------------------------------------------------------------
 -- Version. The repo's TOC holds the base version (e.g. 0.3.0, git tag v0.3.0); install.ps1
 -- writes the exact build into the installed copy, like `git describe`:
 --   0.3.0               the tagged commit itself
@@ -110,7 +136,7 @@ local lootPatterns
 -- A CHAT_MSG_LOOT line about your own loot: its link, item ID, count and quality (nil if it's
 -- someone else's; the quality nil if not known).
 function LT.OwnLoot(text)
-	if type(text) ~= "string" or (issecretvalue and issecretvalue(text)) then
+	if type(text) ~= "string" or LT.IsSecret(text) then
 		return nil
 	end
 	if not lootPatterns then

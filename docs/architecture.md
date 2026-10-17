@@ -206,6 +206,12 @@ entry, in English and German, with every change players notice.**
   `PLAYER_LOGIN`.
 - `/lefthy` and `/lt`: open settings, `modules`, `enable|disable|toggle <key>`, `<key> ...`
   forwarded to the module. Modules may add an alias (Mirage keeps `/mirage`).
+- **Shared helpers** (`Core/Core.lua`), for code in any module: `LT.Print(msg, source)`;
+  secret values (forever-platform.md) with `LT.IsSecret(v)`, `LT.Readable(v)` (there and not a
+  secret) and `LT.Value(f, ...)` (a call's first answer if the call works and the answer isn't a
+  secret, else nil: for APIs that may be missing, broken or hidden); `LT.SafeCall(m, method, ...)`;
+  `LT.OwnLoot(text)` (your own loot from a `CHAT_MSG_LOOT` line); versions (`LT.ParseVersion`,
+  `LT.CompareVersions`). UI building blocks are in `Core/Window.lua` (`LT.Window`).
 
 ## Settings panel
 

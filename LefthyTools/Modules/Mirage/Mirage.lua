@@ -8,7 +8,7 @@ local data = ns.MirageData
 
 local GetTime = GetTime
 local min, max, abs = math.min, math.max, math.abs
-local issecretvalue = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 
 local defaults = {
 	delay = 5,           -- seconds without activity before fading starts
@@ -119,7 +119,7 @@ local function SyncBase(frame)
 		return
 	end
 	local ok, cur = pcall(frame.GetAlpha, frame)
-	if ok and not issecretvalue(cur) and abs(cur - last) > 0.02 then
+	if ok and not issecret(cur) and abs(cur - last) > 0.02 then
 		base[frame] = cur
 	end
 end
@@ -128,7 +128,7 @@ local function OnSetAlpha(frame, alpha)
 	if applying then
 		return
 	end
-	if issecretvalue(alpha) then
+	if issecret(alpha) then
 		secret[frame] = true
 		return
 	end
@@ -144,7 +144,7 @@ local function Adopt(frame, g)
 	if not hooked[frame] then
 		hooked[frame] = true
 		local a = frame:GetAlpha()
-		if issecretvalue(a) then
+		if issecret(a) then
 			secret[frame] = true
 		else
 			base[frame] = a
@@ -890,7 +890,7 @@ end
 
 function handlers.UNIT_POWER_UPDATE(_, _, powerType)
 	if db.showRegen and not InCombatLockdown()
-		and not issecretvalue(powerType) and powerType == "MANA" then
+		and not issecret(powerType) and powerType == "MANA" then
 		M:Pulse("unitframes", REGEN_HOLD)
 	end
 end

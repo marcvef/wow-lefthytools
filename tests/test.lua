@@ -61,6 +61,15 @@ check(Mirage.category and Mirage.category.parent == LT.category and Mirage.categ
 	"Mirage has its own sub-page under LefthyTools")
 check(#ADDON_CATEGORIES == 1 and ADDON_CATEGORIES[1] == LT.category,
 	"only the parent category is registered as an addon category")
+do -- shared helpers for Forever's secret values
+	check(LT.IsSecret(SECRET) and not LT.IsSecret(1) and not LT.IsSecret(nil), "LT.IsSecret")
+	check(LT.Readable(0) and LT.Readable(false) and LT.Readable("") and not LT.Readable(nil) and not LT.Readable(SECRET),
+		"LT.Readable: there and not a secret")
+	local errorsBefore = #ERRORS
+	check(LT.Value(function(n) return n + 1, "second" end, 1) == 2 and LT.Value(nil, 1) == nil
+		and LT.Value(function() error("broken API") end) == nil and LT.Value(function() return SECRET end) == nil
+		and #ERRORS == errorsBefore, "LT.Value: a call's first answer; nil if the API is missing, fails (quietly) or answers a secret")
+end
 
 section("error catcher")
 local function errorRow() -- the overview's "Errors" info row

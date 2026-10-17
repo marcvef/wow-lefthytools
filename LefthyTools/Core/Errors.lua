@@ -15,7 +15,7 @@ local L = ns.L
 local MAX_ERRORS = 25
 local STACK_LINES = 12
 local MESSAGE_TYPES = { [0] = "error", [1] = "warning" } -- ScriptErrorsFrame's message types
-local issecret = issecretvalue or function() return false end
+local issecret = LT.IsSecret
 
 local Errors = {}
 LT.Errors = Errors
