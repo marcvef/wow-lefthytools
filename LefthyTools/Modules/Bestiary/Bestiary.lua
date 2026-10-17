@@ -32,7 +32,8 @@ local L = ns.L
 -- The pace: what a counted kill of yours gave in XP (PLAYER_XP_UPDATE in the moment around its
 -- PARTY_KILL) and how long it took (since the fight began, or since your last kill in it: several
 -- mobs in one fight share its length). XP per kill depends on your level, so it's kept for one level
--- (the level you were at the kill): a kill at another level starts it again.
+-- (the level you were at the kill): a kill at another level starts it again. A kill's worth (its
+-- coin and what its drops sell for at a vendor, Bt.Worth) is worked out when shown, not kept.
 --
 -- Beside your own numbers (setting dropData): what a classic world database says each kind of mob
 -- can drop (LefthyTools_DropData, a separate add-on: GPL v3 like its source, CMaNGOS Classic DB),
@@ -176,6 +177,77 @@ function Bt.Pace(mob)
 	local xp = (pace[2] or 0) > 0 and pace[3] / pace[2] or nil
 	local seconds = (pace[4] or 0) > 0 and pace[5] / pace[4] or nil
 	return xp, seconds, xp and seconds and seconds > 0 and xp / seconds * 3600 or nil, pace[1]
+end
+
+-- Vendor prices (C_Item.GetItemInfo's sellPrice), read once each. An item the client doesn't know
+-- yet is asked for, once a session; when it comes, the window and the ledger redraw (once for a
+-- bunch, a moment later).
+local prices = {}       -- item ID -> what it sells for, in copper
+local waiting = {}      -- item ID -> true: asked for, not here yet (false: came)
+local redrawSoon = false
+local namesWaiting = false -- quest items' names asked for too (NameOf, below): GET_ITEM_INFO_RECEIVED stays on
+
+local function PricesWaiting()
+	for _, wait in pairs(waiting) do
+		if wait then
+			return true
+		end
+	end
+	return false
+end
+
+local function Price(id)
+	if prices[id] then
+		return prices[id]
+	end
+	local ok, name, _, _, _, _, _, _, _, _, _, sell = pcall(C_Item and C_Item.GetItemInfo, ("item:%d"):format(id))
+	if ok and not issecret(name) and type(name) == "string" then
+		prices[id] = not issecret(sell) and type(sell) == "number" and sell or 0
+		return prices[id]
+	end
+	if waiting[id] == nil and C_Item and C_Item.RequestLoadItemDataByID then
+		waiting[id] = true
+		pcall(C_Item.RequestLoadItemDataByID, id)
+		events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+	end
+end
+
+local function PriceCame(id)
+	if issecret(id) or not waiting[id] then
+		return
+	end
+	waiting[id] = false
+	if not PricesWaiting() and not namesWaiting then -- (all came: not listened to any more)
+		events:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
+	end
+	if not redrawSoon then
+		redrawSoon = true
+		C_Timer.After(0.5, function()
+			redrawSoon = false
+			if Bt.Draw then
+				Bt.Draw()
+			end
+			if Bt.DrawLedger then
+				Bt.DrawLedger()
+			end
+		end)
+	end
+end
+
+-- What a kill of a kind brings on average, in copper: its coin and what its drops sell for at a
+-- vendor (how many per kill times the sell price; grey ones and world drops too, it's all money;
+-- not skinning, not everyone skins). Returns the worth, the coin's part and the drops' part per
+-- kill; nil without kills. A price the client doesn't know yet counts as nothing until it comes.
+function Bt.Worth(mob)
+	if not mob or (mob.kills or 0) <= 0 then
+		return nil
+	end
+	local vendor = 0
+	for id, item in pairs(mob.items or NONE) do
+		vendor = vendor + (item[2] or 0) * (Price(id) or 0)
+	end
+	local money = mob.money or 0
+	return (money + vendor) / mob.kills, money / mob.kills, vendor / mob.kills
 end
 
 local function Likelier(a, b)
@@ -671,6 +743,7 @@ local function NameOf(id, item)
 	end
 	if not namesAsked[id] and C_Item and C_Item.RequestLoadItemDataByID then
 		namesAsked[id] = true
+		namesWaiting = true
 		pcall(C_Item.RequestLoadItemDataByID, id)
 		events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 	end
@@ -1247,6 +1320,20 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
 		Bt.Look(a)
 	elseif event == "PLAYER_XP_UPDATE" then
 		OnXP()
+	elseif event == "GET_ITEM_INFO_RECEIVED" then -- itemID (only while a price or a quest item's name is asked for)
+		PriceCame(a)
+		if namesWaiting and not namesSoon then
+			namesSoon = true -- (names come in bunches: once, a moment later)
+			C_Timer.After(QUEST_GAP, function()
+				namesSoon, namesWaiting = false, false
+				if not PricesWaiting() then
+					events:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
+				end
+				if Bt.QuestsChanged then
+					Bt.QuestsChanged()
+				end
+			end)
+		end
 	elseif event == "PLAYER_REGEN_DISABLED" then -- (a fight began: the next kill's time starts here)
 		fightFrom, fightEnd, lastKillAt = GetTime(), nil, -math.huge
 	elseif event == "PLAYER_REGEN_ENABLED" then
@@ -1256,15 +1343,6 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
 		end
 	elseif event == "QUEST_LOG_UPDATE" or event == "BAG_UPDATE_DELAYED" then
 		QuestLogChanged()
-	elseif event == "GET_ITEM_INFO_RECEIVED" and not namesSoon then
-		namesSoon = true -- (names come in bunches: once, a moment later)
-		C_Timer.After(QUEST_GAP, function()
-			namesSoon = false
-			events:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
-			if Bt.QuestsChanged then
-				Bt.QuestsChanged()
-			end
-		end)
 	end
 end)
 
@@ -1298,6 +1376,11 @@ function M:OnDisable()
 	events:UnregisterAllEvents()
 	wipe(pending)
 	wipe(recent)
+	for id, wait in pairs(waiting) do
+		if wait then
+			waiting[id] = nil -- (not listened to now: asked for again when needed)
+		end
+	end
 	lootMoney, lootSource, looseXP, fightFrom = nil, nil, nil, nil
 	if Bt.Stop then
 		Bt.Stop()

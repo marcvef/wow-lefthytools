@@ -6,14 +6,14 @@ local M = Bt.module
 
 -- The Bestiary's ledger: every kind of mob you've killed, with its statistics and drops, and one
 -- search over mobs and items. On the left the mobs (name, level, kind, your kills, their best drops
--- as tiny icons), sorted by kills, name, level, coin, XP per kill or per hour of fighting (a row then
--- says it) or when you last killed one. On the right the one picked: its whole model turning slowly,
--- kills, coin, first and last kill, skinnings, under the model what a kill pays (XP and time per
--- kill, XP per hour of fighting), and all its drops (as in the window: quality edge, how many,
--- chance; skinning marked). At the top what
--- the Bestiary knows in all, and your rarest find. With the classic drop database (Bestiary.lua):
--- a row says how many of its drops you've found, and the picked mob's drops have a section of
--- what you haven't had yet, faded, between its own drops and its world drops.
+-- as tiny icons), sorted by kills, name, level, coin, worth (coin and the drops' vendor value), XP
+-- per kill or per hour of fighting (a row then says it) or when you last killed one: where farming
+-- pays. On the right the one picked: its whole model turning slowly, kills, coin, first and last
+-- kill, skinnings, under the model what a kill pays (its worth, XP and time per kill, XP per hour of
+-- fighting), and all its drops (as in the window: quality edge, how many, chance; skinning marked).
+-- At the top what the Bestiary knows in all, and your rarest find. With the classic drop database
+-- (Bestiary.lua): a row says how many of its drops you've found, and the picked mob's drops have a
+-- section of what you haven't had yet, faded, between its own drops and its world drops.
 --
 -- The search is fuzzy: a query's letters in order, not necessarily together ("dfbnd" finds Defias
 -- Bandit), case and spaces ignored. Letters together, at a word's start and early count more. It
@@ -40,7 +40,7 @@ local WISHES = 8          -- icons in it, at most (the rest: "+N")
 local WISH_SOURCES = 8    -- mobs named in an icon's tooltip, at most
 local PACE_LINE = 13        -- a line of what a kill pays, under the model
 local GOLD = { 1, 0.82, 0.3 }
-local SORTS = { "kills", "name", "level", "coin", "xp", "xph", "last" }
+local SORTS = { "kills", "name", "level", "coin", "worth", "xp", "xph", "last" }
 local issecret = issecretvalue or function() return false end
 
 local ledger
@@ -124,15 +124,20 @@ local SORT_KEYS = {
 	name = function(mob) return (mob.name or "~"):lower() end,
 	level = function(mob) return -(mob.level or 0) end,
 	coin = function(mob) return mob.kills > 0 and -(mob.money / mob.kills) or 0 end,
+	worth = function(mob) return -((Bt.Worth(mob)) or 0) end,
 	xp = function(mob) return -((Bt.Pace(mob)) or 0) end,
 	xph = function(mob) return -(XPPerHour(mob) or 0) end,
 	last = function(mob) return -(mob.last or 0) end,
 }
 
--- What a row says on the right, sorted by something it doesn't show otherwise: coin, XP per kill or
--- per hour of fighting (nil: the found count, as always).
+-- What a row says on the right, sorted by something it doesn't show otherwise: coin, worth, XP per
+-- kill or per hour of fighting (nil: the found count, as always).
 local SORT_SHOWS = {
 	coin = function(mob) return mob.kills > 0 and mob.money > 0 and Bt.Coins(mob.money / mob.kills) or "" end,
+	worth = function(mob)
+		local worth = Bt.Worth(mob)
+		return worth and worth > 0 and "~" .. Bt.Coins(Bt.Rounded(worth)) or ""
+	end,
 	xp = function(mob)
 		local xp = Bt.Pace(mob)
 		return xp and L["%d XP"]:format(math.floor(xp + 0.5)) or ""
@@ -583,8 +588,8 @@ end
 -- The frame
 ---------------------------------------------------------------------------
 
-local SORT_LABELS = { kills = L["Most kills"], name = L["Name"], level = L["Level"], coin = L["Coin per kill"], xp = L["XP per kill"],
-	xph = L["XP per hour"], last = L["Last killed"] }
+local SORT_LABELS = { kills = L["Most kills"], name = L["Name"], level = L["Level"], coin = L["Coin per kill"], worth = L["Worth per kill"],
+	xp = L["XP per kill"], xph = L["XP per hour"], last = L["Last killed"] }
 
 local function Build()
 	ledger = CreateFrame("Frame", "LefthyToolsBestiaryLedger", UIParent)
@@ -718,8 +723,8 @@ local function Build()
 	pane.Stats:SetPoint("RIGHT", 0, 0)
 	pane.Stats:SetJustifyH("LEFT")
 	pane.Stats:SetSpacing(3)
-	-- What a kill of it pays (worth, XP and time per kill, XP per hour of fighting), under the model,
-	-- the pane wide: the drops start under it.
+	-- What a kill of it pays (its worth, XP and time per kill, XP per hour of fighting), under the
+	-- model, the pane wide: the drops start under it.
 	pane.ModelBack = modelBack
 	pane.Pace = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	pane.Pace:SetPoint("TOPLEFT", modelBack, "BOTTOMLEFT", 0, -8)

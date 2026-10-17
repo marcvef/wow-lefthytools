@@ -6,7 +6,8 @@ local M = Bt.module
 
 -- The Bestiary's window: your target's drops. At the top the mob: a small still portrait, its
 -- name, level and kind, your kills and the coin each brought, and (when known) a small grey line on
--- what a kill pays: XP and how long it takes (hover: in full). Under it its drops, the likeliest
+-- what a kill pays: its worth (coin and the drops' vendor value), XP and how long it takes (hover:
+-- in full). Under it its drops, the likeliest
 -- first: an icon edged in its quality's colour, how many you got in its corner, the drop chance
 -- under it; the item's tooltip with the numbers on hover, Shift-click links it. It follows your
 -- target (a mob you can attack, or a dead one) and keeps the last when you clear it. It stays
@@ -185,11 +186,27 @@ local function Thousands(n)
 	return tostring(math.floor(n + 0.5))
 end
 
--- What a kill of a kind pays, the parts known (Bestiary.lua's pace): short for the window's line
--- ("Per kill: 85 XP · 14 s", "(level 12)" when that's not yours), and in full, a line each, for
--- its tooltip and the ledger (with the XP per hour of fighting). nil and {} when nothing's known.
+-- Worth the way a player says it: to the silver from 1s up, else to the copper.
+local function Rounded(copper)
+	return copper >= 100 and math.floor(copper / 100 + 0.5) * 100 or math.floor(copper + 0.5)
+end
+
+-- What a kill of a kind pays, the parts known (Bestiary.lua: its worth, its pace): short for the
+-- window's line ("Per kill: worth ~45s · 85 XP · 14 s", "(level 12)" when the pace isn't for your
+-- level), and in full, a line each, for its tooltip and the ledger (the worth's coin and vendor
+-- parts, the XP per hour of fighting). nil and {} when nothing's known.
 local function PaceText(mob)
 	local parts, lines = {}, {}
+	local worth, coin, vendor = Bt.Worth(mob)
+	if worth and worth > 0 then
+		local about = Coins(Rounded(worth))
+		parts[#parts + 1] = L["worth ~%s"]:format(about)
+		local line = L["Worth about %s per kill"]:format(about)
+		if coin > 0 and vendor > 0 then -- (both: what it's made of)
+			line = line .. (" (%s, %s)"):format(L["%s coin"]:format(Coins(coin)), L["%s from drops at a vendor"]:format(Coins(vendor)))
+		end
+		lines[#lines + 1] = line
+	end
 	local xp, seconds, perHour, level = Bt.Pace(mob)
 	if xp then
 		parts[#parts + 1] = L["%d XP"]:format(math.floor(xp + 0.5))
@@ -200,16 +217,18 @@ local function PaceText(mob)
 	if #parts == 0 then
 		return nil, lines
 	end
-	local other = level ~= Value(UnitLevel, "player") and level or nil
-	local each = xp and seconds and L["%d XP and %s per kill"]:format(math.floor(xp + 0.5), Seconds(seconds))
-		or xp and L["%d XP per kill"]:format(math.floor(xp + 0.5)) or L["%s per kill"]:format(Seconds(seconds))
-	lines[#lines + 1] = other and L["At level %d: %s"]:format(other, each) or each
+	local other = level and level ~= Value(UnitLevel, "player") and (xp or seconds) and level or nil
+	if xp or seconds then
+		local each = xp and seconds and L["%d XP and %s per kill"]:format(math.floor(xp + 0.5), Seconds(seconds))
+			or xp and L["%d XP per kill"]:format(math.floor(xp + 0.5)) or L["%s per kill"]:format(Seconds(seconds))
+		lines[#lines + 1] = other and L["At level %d: %s"]:format(other, each) or each
+	end
 	if perHour and perHour > 0 then
 		lines[#lines + 1] = L["About %s XP per hour of fighting (the time between fights not counted)"]:format(Thousands(perHour))
 	end
 	return L["Per kill: %s"]:format(table.concat(parts, DOT)) .. (other and (" " .. L["(level %d)"]:format(other)) or ""), lines
 end
-Bt.PaceText, Bt.Thousands = PaceText, Thousands
+Bt.PaceText, Bt.Thousands, Bt.Rounded = PaceText, Thousands, Rounded
 
 ---------------------------------------------------------------------------
 -- A drop: its icon, edged in its quality's colour, how many in the corner, the chance under it

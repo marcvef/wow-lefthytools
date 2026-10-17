@@ -681,8 +681,9 @@ C_Item.GetItemInfo = function(itemLink)
 	assert(itemLink ~= nil, "Usage: local itemInfo = C_Item.GetItemInfo(itemInfo)") -- not nilable, like the game's
 	local id = tonumber(tostring(itemLink):match("item:(%d+)"))
 	if ITEMS[id] and MOCK_ITEM_UNCACHED ~= id then
-		-- name, link, ..., the 14th: bindType (ITEMS[id].bind: 1 = on pickup, 2 = on equip)
-		return ITEMS[id].name, ItemLink(id), ITEMS[id].quality, 1, 1, "", "", 1, "", 0, 0, 0, 0, ITEMS[id].bind or 0
+		-- name, link, ..., the 11th: sellPrice (ITEMS[id].price, copper), the 14th: bindType
+		-- (ITEMS[id].bind: 1 = on pickup, 2 = on equip)
+		return ITEMS[id].name, ItemLink(id), ITEMS[id].quality, 1, 1, "", "", 1, "", 0, ITEMS[id].price or 0, 0, 0, ITEMS[id].bind or 0
 	end
 end
 ITEMS[19019].bind, ITEMS[1155].bind = 1, 2 -- Thunderfury binds on pickup, the rod on equip

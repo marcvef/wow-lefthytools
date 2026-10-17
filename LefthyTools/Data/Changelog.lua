@@ -326,5 +326,8 @@ ns.CHANGELOG = {
 	{ id = 106, module = "bestiary",
 		en = { "Bestiary: XP and time per kill", "Each of your kills now notes the XP it gave and how long it took. The window shows it in a small line under the portrait; the ledger adds the XP per hour of fighting and sorts by XP per kill or per hour, to compare leveling spots." },
 		de = { "Bestiary: EP und Zeit pro Kill", "Jeder deiner Kills merkt sich jetzt die EP, die er gab, und wie lange er dauerte. Das Fenster zeigt es in einer kleinen Zeile unter dem Porträt; das Verzeichnis zeigt zusätzlich die EP pro Stunde Kampf und sortiert nach EP pro Kill oder pro Stunde, um Leveling-Spots zu vergleichen." } },
+	{ id = 107, module = "bestiary",
+		en = { "Bestiary: worth per kill", "A kill's worth is its coin plus what its drops sell for at a vendor. The Bestiary window shows it (worth ~45s), the ledger the details, and it can sort by it to show where farming pays." },
+		de = { "Bestiary: Wert pro Kill", "Der Wert eines Kills ist sein Geld plus das, was seine Drops beim Händler bringen. Das Bestiary-Fenster zeigt ihn (Wert ~45s), das Verzeichnis die Details, und es kann danach sortieren, um zu zeigen, wo sich Farmen lohnt." } },
 	-- New entries go here, at the end.
 }

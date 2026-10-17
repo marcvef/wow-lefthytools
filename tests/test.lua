@@ -7305,7 +7305,7 @@ section("Bestiary: what mobs drop")
 	-- level-up between wraps) and how long it took (since the fight began, or since the last kill in
 	-- it). Kept for your level. A Kobold Vermin (119) of its own, so the numbers above stay.
 	local kobold = {}
-	for i = 1, 6 do kobold[i] = ("Creature-0-1-0-1-119-%08X"):format(0x60 + i) end
+	for i = 1, 10 do kobold[i] = ("Creature-0-1-0-1-119-%08X"):format(0x60 + i) end
 	local function kobolds() return LefthyToolsBestiaryDB.mobs[119] end
 	local function koboldKill(guid, xp, xpFirst)
 		if xp and xpFirst then XP.current = XP.current + xp; Fire("PLAYER_XP_UPDATE", "player") end
@@ -7319,6 +7319,11 @@ section("Bestiary: what mobs drop")
 		MONEY = MONEY + 1500
 		Fire("LOOT_CLOSED")
 		LOOT = {}
+	end
+	local function ledgerSort(key)
+		ledger.Sort._scripts.OnClick(ledger.Sort)
+		for _, row in ipairs(ledger.Sort.List.rows) do if row.value == key then row._scripts.OnClick(row) end end
+		_, entries = Bt.Ledger()
 	end
 	do
 		MOBS.target, STATE.target = { name = "Kobold Vermin", level = 17, guid = kobold[1] }, true
@@ -7340,10 +7345,10 @@ section("Bestiary: what mobs drop")
 		check(pace and pace[1] == 19 and pace[2] == 2 and pace[3] == 170 and pace[4] == 2 and pace[5] == 20,
 			"two kills in one fight: the XP each gave (80, 90) and the fight's 20 s shared (12 s, then 8 s since the first)")
 		local line = win.Pace.Text:GetText() or ""
-		check(win.Pace:IsShown() and line:find("Per kill: 85 XP", 1, true) and line:find("10 s", 1, true) and not line:find("level", 1, true),
-			"the window: a line on it under the portrait, got " .. line)
+		check(win.Pace:IsShown() and line:find("Per kill: ", 1, true) and line:find("85 XP", 1, true) and line:find("10 s", 1, true)
+			and not line:find("level", 1, true), "the window: a line on it under the portrait, got " .. line)
 		win.Pace._scripts.OnEnter(win.Pace)
-		check(TOOLTIP.title == "85 XP and 10 s per kill" and tipFind("About 31k XP per hour of fighting (the time between fights not counted)"),
+		check(tipFind("85 XP and 10 s per kill") and tipFind("About 31k XP per hour of fighting (the time between fights not counted)"),
 			"hover it: in full, with the XP per hour of fighting")
 		win.Pace._scripts.OnLeave(win.Pace)
 		-- A kill that levels you up: the rest of the old level and what's in the new one, for the level
@@ -7388,20 +7393,52 @@ section("Bestiary: what mobs drop")
 		local paceText = ledger.Pane.Pace:GetText() or ""
 		check(ledger.Pane.Pace:IsShown() and paceText:find("50 XP and 6 s per kill", 1, true) and paceText:find("About 30k XP per hour", 1, true),
 			"the ledger: what a kill pays, under the model, got " .. paceText)
-		local function sortBy(key)
-			ledger.Sort._scripts.OnClick(ledger.Sort)
-			for _, row in ipairs(ledger.Sort.List.rows) do if row.value == key then row._scripts.OnClick(row) end end
-			_, entries = Bt.Ledger()
-		end
-		sortBy("xp")
+		ledgerSort("xp")
 		check(entries[1].creature == 119 and ledger.rows[1].Known:GetText() == "50 XP" and ledger.Sort.Label:GetText() == "XP per kill",
 			"sorted by XP per kill: the most first, each row says it")
-		sortBy("xph")
+		ledgerSort("xph")
 		check(entries[1].creature == 119 and ledger.rows[1].Known:GetText() == "30k XP/h", "sorted by XP per hour of fighting")
-		sortBy("name")
+		ledgerSort("name")
 		ledger:Hide()
 		PLAYER_LEVEL, XP.current, XP.max = 19, 1500, 6000
 		MOBS.target = nil
+	end
+	-- Worth per kill: the coin and what the drops sell for at a vendor (how many per kill times the
+	-- price, grey ones too). A price the client doesn't know yet is asked for, once; when it comes,
+	-- the window redraws.
+	do
+		ITEMS[772] = { name = "Large Candle", quality = 0, price = 700 }
+		MOCK_ITEM_UNCACHED = 772
+		local asked, request = {}, C_Item.RequestLoadItemDataByID
+		C_Item.RequestLoadItemDataByID = function(id) asked[#asked + 1] = id end
+		Advance(2)
+		Fire("PARTY_KILL", "Player-1-0", kobold[7])
+		LOOT = { { type = 1, id = 772, quantity = 2, source = kobold[7] }, { type = 2, source = kobold[7] } }
+		Fire("LOOT_READY", false)
+		MONEY = MONEY + 1500
+		Fire("LOOT_CLOSED")
+		LOOT = {}
+		Bt.Draw()
+		local worth, coin, vendor = Bt.Worth(kobolds())
+		check(kobolds().kills == 7 and worth == 1500 and coin == 1500 and vendor == 0 and #asked == 1 and asked[1] == 772
+			and win.Pace.Text:GetText():find("worth ~15s", 1, true), "a price the client doesn't know yet: asked for, once; nothing meanwhile")
+		MOCK_ITEM_UNCACHED = nil
+		Fire("GET_ITEM_INFO_RECEIVED", 772, true)
+		check(win.Pace.Text:GetText():find("worth ~15s", 1, true), "not at once (prices come in bunches)")
+		Advance(0.6)
+		worth, coin, vendor = Bt.Worth(kobolds())
+		check(worth == 1700 and vendor == 200 and #asked == 1 and win.Pace.Text:GetText():find("Per kill: worth ~17s", 1, true),
+			"it came: the window redraws with it (2 candles at 7s over 7 kills: 2s a kill, 17s in all)")
+		C_Item.RequestLoadItemDataByID = request
+		Bt.ToggleLedger(119)
+		local paceText = ledger.Pane.Pace:GetText() or ""
+		check(paceText:find("Worth about 17s 0c per kill (15s 0c coin, 2s 0c from drops at a vendor)", 1, true),
+			"the ledger: its worth and what it's made of, got " .. paceText)
+		ledgerSort("worth")
+		check(entries[1].creature == 119 and entries[2].creature == 116 and ledger.rows[1].Known:GetText() == "~17s 0c"
+			and ledger.Sort.Label:GetText() == "Worth per kill", "sorted by worth per kill: where farming pays, each row says it")
+		ledgerSort("name")
+		ledger:Hide()
 	end
 	-- Closed and open again: kept for next time.
 	win.Close:Click()
