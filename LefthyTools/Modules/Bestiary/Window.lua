@@ -118,7 +118,7 @@ end
 
 local function ItemName(id)
 	local name = C_Item and Value(C_Item.GetItemInfo, ("item:%d"):format(id))
-	return name or ("item " .. id)
+	return name or L["item %d"]:format(id) -- (one the client doesn't know yet)
 end
 
 local function ItemIcon(id)

@@ -917,6 +917,7 @@ L["%s from drops at a vendor"] = "%s für Drops beim Händler"
 L["Worth per kill"] = "Wert pro Kill"
 L["Where you killed them"] = "Wo du sie getötet hast"
 L["Your last %d kills."] = "Deine letzten %d Kills."
+L["item %d"] = "Item %d"
 L["No kills on a map yet"] = "Noch keine Kills auf der Karte"
 L["Who has aggro, on enemy nameplates"] = "Wer Aggro hat, auf feindlichen Namensplaketten"
 L["In a group, the left end of each enemy's health bar says whom it's on: >YOU< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."] =
