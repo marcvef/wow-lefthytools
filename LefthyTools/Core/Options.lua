@@ -28,26 +28,43 @@ end
 local Builder = {}
 Builder.__index = Builder
 
+-- Where a setting keeps its value and what it's called. opts (optional): tbl = the table holding the
+-- value (default the module's db), default = its default (default module.defaults[key]), id = a
+-- unique id (default key). Returns tbl, default, id and the variable "LefthyTools_<module>_<id>".
+local function Describe(builder, key, opts)
+	local default = opts.default
+	if default == nil then
+		default = builder.module.defaults[key]
+	end
+	local id = opts.id or key
+	return opts.tbl or builder.module.db, default, id, "LefthyTools_" .. builder.module.key .. "_" .. id
+end
+
+-- Every change runs the module's OnSettingChanged. Kept in module.settings, so slash commands and
+-- resets go through the setting too (LT:SetModuleSetting) and an open settings page follows.
+local function Keep(builder, setting, id)
+	setting:SetValueChangedCallback(builder.onChange)
+	builder.module.settings = builder.module.settings or {}
+	builder.module.settings[id] = setting
+	return setting
+end
+
+-- A slider's range and step, and the label at its right end (formatter(value) -> text).
+local function SliderOptions(minValue, maxValue, step, formatter)
+	local options = Settings.CreateSliderOptions(minValue, maxValue, step)
+	options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, formatter)
+	return options
+end
+
 function Builder:Header(text)
 	self.layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(text))
 end
 
--- opts (optional): tbl = table holding the value (default module.db),
--- default = default value (default module.defaults[key]), id = unique variable id (default key)
+-- A setting whose value lives in a table (see Describe for opts).
 function Builder:Register(key, name, varType, opts)
-	opts = opts or {}
-	local tbl = opts.tbl or self.module.db
-	local default = opts.default
-	if default == nil then
-		default = self.module.defaults[key]
-	end
-	local variable = "LefthyTools_" .. self.module.key .. "_" .. (opts.id or key)
+	local tbl, default, id, variable = Describe(self, key, opts or {})
 	local setting = Settings.RegisterAddOnSetting(self.category, variable, key, tbl, varType or type(default), name, default)
-	setting:SetValueChangedCallback(self.onChange)
-	-- Kept so slash commands and resets go through the setting too (LT:SetModuleSetting).
-	self.module.settings = self.module.settings or {}
-	self.module.settings[opts.id or key] = setting
-	return setting
+	return Keep(self, setting, id)
 end
 
 function Builder:Checkbox(key, name, tooltip, opts)
@@ -58,9 +75,7 @@ end
 
 function Builder:Slider(key, name, tooltip, minValue, maxValue, step, formatter, opts)
 	local setting = self:Register(key, name, "number", opts)
-	local options = Settings.CreateSliderOptions(minValue, maxValue, step)
-	options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, formatter)
-	Settings.CreateSlider(self.category, setting, options, tooltip)
+	Settings.CreateSlider(self.category, setting, SliderOptions(minValue, maxValue, step, formatter), tooltip)
 	return setting
 end
 
@@ -70,8 +85,7 @@ function Builder:CheckboxSlider(cbKey, cbName, cbTooltip, sliderKey, sliderName,
 		formatter, cbOpts, sliderOpts)
 	local cbSetting = self:Register(cbKey, cbName, "boolean", cbOpts)
 	local sliderSetting = self:Register(sliderKey, sliderName, "number", sliderOpts)
-	local options = Settings.CreateSliderOptions(minValue, maxValue, step)
-	options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, formatter)
+	local options = SliderOptions(minValue, maxValue, step, formatter)
 	if CreateSettingsCheckboxSliderInitializer then
 		self.layout:AddInitializer(CreateSettingsCheckboxSliderInitializer(cbSetting, cbName, cbTooltip,
 			sliderSetting, options, sliderName, sliderTooltip))
@@ -99,12 +113,7 @@ end
 -- it later (a role check's Accept) is blocked; see LT.Window.AddPicker.
 -- values: { { value, label }, ... } in display order.
 function Builder:Choice(key, name, tooltip, values, opts)
-	opts = opts or {}
-	local tbl = opts.tbl or self.module.db
-	local default = opts.default
-	if default == nil then
-		default = self.module.defaults[key]
-	end
+	local tbl, default, id, variable = Describe(self, key, opts or {})
 	local function IndexOf(value)
 		for i, v in ipairs(values) do
 			if v[1] == value then
@@ -121,17 +130,12 @@ function Builder:Choice(key, name, tooltip, values, opts)
 			tbl[key] = v[1]
 		end
 	end
-	local variable = "LefthyTools_" .. self.module.key .. "_" .. (opts.id or key)
 	local setting = Settings.RegisterProxySetting(self.category, variable, "number", name, IndexOf(default) or 1, Get, Set)
-	setting:SetValueChangedCallback(self.onChange)
-	self.module.settings = self.module.settings or {}
-	self.module.settings[opts.id or key] = setting
-	local options = Settings.CreateSliderOptions(1, #values, 1)
-	options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(index)
+	Keep(self, setting, id)
+	Settings.CreateSlider(self.category, setting, SliderOptions(1, #values, 1, function(index)
 		local v = values[math.floor(index + 0.5)]
 		return v and v[2] or ""
-	end)
-	Settings.CreateSlider(self.category, setting, options, tooltip)
+	end), tooltip)
 	return setting
 end
 
