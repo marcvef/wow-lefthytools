@@ -1115,40 +1115,39 @@ Bt.OnChanged(function(creature)
 end)
 
 -- Switched on (and after login): the button, and the window if it was open.
-function Bt.Start()
+Bt.When("enable", function()
 	C_Timer.After(0, function()
 		UpdateButton()
 		if M.enabled and M.db.window.shown then
 			Bt.Toggle(true)
 		end
 	end)
-end
+end)
 
--- Switched off: everything hides, the ledger too (whether the window was open stays kept).
-function Bt.Stop()
+-- Switched off: the window and the card hide (whether the window was open stays kept).
+Bt.When("disable", function()
 	if win then
 		win:Hide()
 	end
 	if card then
 		card:Hide()
 	end
-	local ledger = Bt.Ledger and Bt.Ledger()
-	if ledger then
-		ledger:Hide()
-	end
 	UpdateButton()
-end
+end)
 
-function Bt.Settings()
+Bt.When("settings", function()
 	UpdateButton()
 	Draw()
-	if Bt.DrawLedger then
-		Bt.DrawLedger()
-	end
 	if card and not M.db.hoverCard then
 		card:Hide()
 	end
-end
+end)
+
+Bt.On("PLAYER_TARGET_CHANGED", function() Bt.TargetChanged() end)
+Bt.On("UPDATE_MOUSEOVER_UNIT", function() Bt.MouseoverChanged() end)
+Bt.On("PLAYER_REGEN_ENABLED", function()
+	Bt.MouseoverChanged() -- (the fight is over, the mouse still over an enemy: its card)
+end)
 
 -- For tests.
 function Bt.Frames()

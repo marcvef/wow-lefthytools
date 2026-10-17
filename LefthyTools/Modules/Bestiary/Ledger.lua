@@ -1058,6 +1058,16 @@ Bt.OnChanged(function()
 	Bt.DrawLedger()
 end)
 
+-- Switched off: it closes too. A setting changed: drawn again (grey items, the drop database).
+Bt.When("disable", function()
+	if ledger then
+		ledger:Hide()
+	end
+end)
+Bt.When("settings", function()
+	Bt.DrawLedger()
+end)
+
 -- For tests.
 function Bt.Ledger()
 	return ledger, entries, selected

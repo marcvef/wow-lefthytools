@@ -90,6 +90,36 @@ end
 local NONE = {}
 Bt.issecret, Bt.Value, Bt.NONE, Bt.GOLD = issecret, Value, NONE, { 1, 0.82, 0.3 }
 
+-- The events each file of the Bestiary handles (Bt.On: handlers run in the order the files load),
+-- registered while it's switched on; and what each file does when it's switched on or off or a
+-- setting changes (Bt.When "enable", "disable", "settings"; after its events are registered, after
+-- they're unregistered).
+local events = CreateFrame("Frame")
+local handlers, units = {}, {} -- event -> { handler, ... }; event -> the unit it's registered for
+local hooks = { enable = {}, disable = {}, settings = {} }
+
+function Bt.On(event, handler, unit)
+	handlers[event] = handlers[event] or {}
+	table.insert(handlers[event], handler)
+	units[event] = unit or units[event]
+end
+
+function Bt.When(what, fn)
+	table.insert(hooks[what], fn)
+end
+
+local function Run(what)
+	for _, fn in ipairs(hooks[what]) do
+		fn()
+	end
+end
+
+events:SetScript("OnEvent", function(_, event, ...)
+	for _, handler in ipairs(handlers[event] or NONE) do
+		handler(...)
+	end
+end)
+
 local EMPTY_CHECKS = { 2, 6 }  -- seconds after a kill: is its corpse empty? (both times: then it counts)
 local PENDING_FOR = 300         -- a corpse not looted in this long: not counted
 local CAST_GAP = 1.5            -- skinning (a pickpocket, gathering) this shortly before the loot window: not a kill's loot
@@ -127,7 +157,6 @@ local looseXP                    -- XP that came just before its kill: { amount,
 local fightFrom, fightEnd        -- when the fight began (PLAYER_REGEN_DISABLED) and ended (nil: still on)
 local lastKillAt = -math.huge    -- your last kill in this fight: the next one's time starts there
 local listeners = {}
-local events = CreateFrame("Frame")
 
 ---------------------------------------------------------------------------
 -- The database
@@ -239,13 +268,13 @@ itemEvents:SetScript("OnEvent", function(_, _, id)
 end)
 
 -- Switched off: nothing awaited (what didn't come is asked for again when needed).
-local function ForgetAsked()
+Bt.When("disable", function()
 	for id in pairs(awaited) do
 		asked[id] = nil
 	end
 	wipe(awaited)
 	itemEvents:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
-end
+end)
 
 -- Vendor prices (C_Item.GetItemInfo's sellPrice), read once each; one the client doesn't know yet
 -- counts as nothing until it comes (asked for: Bt.AskItem).
@@ -558,6 +587,11 @@ function Bt.KnownSources(id)
 	return list
 end
 
+Bt.When("settings", function()
+	dataTried = false -- (switched on again, or installed since: loading the database is tried again)
+	wipe(knownSources)
+end)
+
 -- You can skin (Skinning, any rank): only then does what skinning gives count among what you could
 -- have had (else every beast's leather would wait there forever).
 local function CanSkin()
@@ -672,6 +706,10 @@ function Bt.NameOf(creature)
 	return mob and mob.name or seenNames[creature]
 end
 
+Bt.On("PLAYER_TARGET_CHANGED", function() Bt.Look("target") end)
+Bt.On("UPDATE_MOUSEOVER_UNIT", function() Bt.Look("mouseover") end)
+Bt.On("NAME_PLATE_UNIT_ADDED", function(unit) Bt.Look(unit) end)
+
 ---------------------------------------------------------------------------
 -- Quest drops: what your quests want collected that a kind of mob drops
 ---------------------------------------------------------------------------
@@ -775,6 +813,12 @@ local function QuestLogChanged()
 		end
 	end)
 end
+
+Bt.On("QUEST_LOG_UPDATE", QuestLogChanged)
+Bt.On("BAG_UPDATE_DELAYED", QuestLogChanged)
+Bt.When("enable", function()
+	wantsOld = true -- (the quest log may have changed while switched off)
+end)
 
 -- An item's name: as you looted it, else the client's (asked for when it doesn't know it yet: it
 -- redraws when it comes).
@@ -1396,46 +1440,41 @@ local function Prune()
 	end
 end
 
-events:SetScript("OnEvent", function(_, event, a, b, c)
-	if event == "PARTY_KILL" then
-		OnKill(a, b)
-		Prune()
-	elseif event == "LOOT_READY" or event == "LOOT_OPENED" then
-		OnLoot()
-	elseif event == "LOOT_CLOSED" then
-		OnLootClosed()
-	elseif event == "UNIT_SPELLCAST_SUCCEEDED" then -- unit, castGUID, spellID
-		local notKill, skin = false, false
-		if not issecret(c) then
-			notKill, skin = NotAKill(c)
-		end
-		if notKill then
-			castAt, castSkin = GetTime(), skin
-		end
-	elseif event == "PLAYER_TARGET_CHANGED" then
-		Bt.Look("target")
-		if Bt.TargetChanged then
-			Bt.TargetChanged()
-		end
-	elseif event == "UPDATE_MOUSEOVER_UNIT" then
-		Bt.Look("mouseover")
-		if Bt.MouseoverChanged then
-			Bt.MouseoverChanged()
-		end
-	elseif event == "NAME_PLATE_UNIT_ADDED" then
-		Bt.Look(a)
-	elseif event == "PLAYER_XP_UPDATE" then
-		OnXP()
-	elseif event == "PLAYER_REGEN_DISABLED" then -- (a fight began: the next kill's time starts here)
-		fightFrom, fightEnd, lastKillAt = GetTime(), nil, -math.huge
-	elseif event == "PLAYER_REGEN_ENABLED" then
-		fightEnd = GetTime()
-		if Bt.MouseoverChanged then
-			Bt.MouseoverChanged() -- (the fight is over, the mouse still over an enemy: its card)
-		end
-	elseif event == "QUEST_LOG_UPDATE" or event == "BAG_UPDATE_DELAYED" then
-		QuestLogChanged()
+Bt.On("PARTY_KILL", function(attacker, target)
+	OnKill(attacker, target)
+	Prune()
+end)
+Bt.On("LOOT_READY", OnLoot)
+Bt.On("LOOT_OPENED", OnLoot)
+Bt.On("LOOT_CLOSED", OnLootClosed)
+Bt.On("UNIT_SPELLCAST_SUCCEEDED", function(_, _, spellID)
+	local notKill, skin = false, false
+	if not issecret(spellID) then
+		notKill, skin = NotAKill(spellID)
 	end
+	if notKill then
+		castAt, castSkin = GetTime(), skin
+	end
+end, "player")
+Bt.On("PLAYER_XP_UPDATE", OnXP)
+Bt.On("PLAYER_REGEN_DISABLED", function() -- (a fight began: the next kill's time starts here)
+	fightFrom, fightEnd, lastKillAt = GetTime(), nil, -math.huge
+end)
+Bt.On("PLAYER_REGEN_ENABLED", function()
+	fightEnd = GetTime()
+end)
+
+Bt.When("enable", function()
+	xpWas.xp = nil
+	ReadXP() -- (where counting XP starts)
+end)
+
+Bt.When("disable", function()
+	wipe(pending)
+	wipe(recent)
+	-- (switched off with the loot window open: its LOOT_CLOSED won't come, and the next window would
+	-- look already seen)
+	lootMoney, lootSource, lootSeen, looseXP, fightFrom = nil, nil, false, nil, nil
 end)
 
 ---------------------------------------------------------------------------
@@ -1450,39 +1489,23 @@ LT.onLoad[#LT.onLoad + 1] = function()
 end
 
 function M:OnEnable()
-	for _, event in ipairs({ "PARTY_KILL", "LOOT_READY", "LOOT_OPENED", "LOOT_CLOSED", "PLAYER_TARGET_CHANGED",
-			"UPDATE_MOUSEOVER_UNIT", "NAME_PLATE_UNIT_ADDED", "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_XP_UPDATE",
-			"QUEST_LOG_UPDATE", "BAG_UPDATE_DELAYED" }) do
-		events:RegisterEvent(event)
+	for event in pairs(handlers) do
+		if units[event] then
+			events:RegisterUnitEvent(event, units[event])
+		else
+			events:RegisterEvent(event)
+		end
 	end
-	events:RegisterUnitEvent("UNIT_SPELLCAST_SUCCEEDED", "player")
-	wantsOld = true -- (the quest log may have changed while switched off)
-	xpWas.xp = nil
-	ReadXP() -- (where counting XP starts)
-	if Bt.Start then
-		Bt.Start() -- (Window.lua: the button, the window as it was)
-	end
+	Run("enable")
 end
 
 function M:OnDisable()
 	events:UnregisterAllEvents()
-	wipe(pending)
-	wipe(recent)
-	ForgetAsked()
-	-- (switched off with the loot window open: its LOOT_CLOSED won't come, and the next window would
-	-- look already seen)
-	lootMoney, lootSource, lootSeen, looseXP, fightFrom = nil, nil, false, nil, nil
-	if Bt.Stop then
-		Bt.Stop()
-	end
+	Run("disable")
 end
 
 function M:OnSettingChanged()
-	dataTried = false -- (switched on again, or installed since: loading the database is tried again)
-	wipe(knownSources)
-	if Bt.Settings then
-		Bt.Settings()
-	end
+	Run("settings")
 end
 
 function M:BuildOptions(o)
