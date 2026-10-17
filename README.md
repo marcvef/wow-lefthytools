@@ -344,8 +344,8 @@ the drop chance under it. Hover a drop for the item's tooltip with the numbers, 
 link it. The window stays open (Escape doesn't close it) and keeps the last mob when you clear
 your target.
 
-So the chances hold, only your own kills count (not in a group, where the loot is shared), and
-only once their corpse is looted or the game says it's empty. Pickpocketing, fishing, herbs, ore
+So the chances hold, only your own kills count (not in a group, where the loot is shared, nor a
+mob someone else tagged first), and only once their corpse is looted or the game says it's empty. Pickpocketing, fishing, herbs, ore
 and chests don't count as a mob's drops; **skinning** is kept apart, per skinning, and marked with
 Skinning's pelt icon. All your characters add to the same database; it stays on your computer.
 
