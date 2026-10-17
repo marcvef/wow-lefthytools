@@ -373,15 +373,15 @@ local function FriendTables(open)
 			played and C.Ago(c.last) or DASH, week > 0 and C.Duration(week) or DASH, cell }, tip = tip, click = click }
 	end
 
-	local function Count(n, one, many)
+	local function Counted(n, one, many) -- (a card's corner: "3 friends")
 		return n > 0 and ("|cff999999" .. (n == 1 and one or many:format(n)) .. "|r") or nil
 	end
 	return {
-		{ title = L["Online now"], note = Count(#online, L["1 friend"], L["%d friends"]), rows = online,
+		{ title = L["Online now"], note = Counted(#online, L["1 friend"], L["%d friends"]), rows = online,
 			columns = { { title = L["Name"], w = 0.2 }, { title = L["Level"], w = 0.1, right = true }, { title = L["BattleTag"], w = 0.14 },
 				{ title = L["Where"], w = 0.27 }, { title = L["Doing"], w = 0.29 } },
 			empty = B and L["No friends with LefthyTools online"] or L["Unknown (Beacon is off)"] },
-		{ title = L["Not online"], note = Count(#awayRows, L["1 character"], L["%d characters"]), rows = awayRows,
+		{ title = L["Not online"], note = Counted(#awayRows, L["1 character"], L["%d characters"]), rows = awayRows,
 			columns = { { title = L["Name"], w = 0.18 }, { title = L["Level"], w = 0.07, right = true }, { title = L["BattleTag"], w = 0.15 },
 				{ title = L["Last played"], w = 0.15 }, { title = L["This week"], w = 0.12 }, { title = L["Latest news"], w = 0.33 } },
 			empty = L["Everyone with a journal is online, or no friend's journal has come yet."] },
@@ -404,24 +404,7 @@ end
 -- Statistics
 ---------------------------------------------------------------------------
 
-local function Count(t)
-	local n = 0
-	for _ in pairs(t or {}) do
-		n = n + 1
-	end
-	return n
-end
-
--- The key with the highest value (ties: alphabetically first, so it doesn't change randomly).
-local function Top(t)
-	local best, most
-	for key, value in pairs(t or {}) do
-		if not most or value > most or (value == most and key < best) then
-			best, most = key, value
-		end
-	end
-	return best, most
-end
+local Count, Top = C.Count, C.Top
 
 -- A character's gold: now (the one I play), else where its last day played ended (whole gold).
 local function GoldOf(c)

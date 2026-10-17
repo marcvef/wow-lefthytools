@@ -412,7 +412,8 @@ local function Levels(canvas, x, y, w, c)
 	return h
 end
 
-local function Top(t, count)
+-- The count highest of t: { { key, value }, ... }, highest first.
+local function Ranked(t, count)
 	local list = {}
 	for key, value in pairs(t) do
 		list[#list + 1] = { key = key, value = value }
@@ -427,7 +428,7 @@ end
 local function Zones(canvas, x, y, w, h, c)
 	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Favourite zones"])
 	local items = {}
-	for _, entry in ipairs(Top(c.zoneTime, 5)) do
+	for _, entry in ipairs(Ranked(c.zoneTime, 5)) do
 		items[#items + 1] = { label = entry.key, value = entry.value, text = C.Duration(entry.value) }
 	end
 	if #items == 0 then
@@ -440,7 +441,7 @@ end
 local function Foes(canvas, x, y, w, h, c)
 	local ix, iy, iw, ih = Card(canvas, x, y, w, h, L["Deadliest foes"])
 	local items = {}
-	for _, entry in ipairs(Top(c.killers, 5)) do
+	for _, entry in ipairs(Ranked(c.killers, 5)) do
 		items[#items + 1] = { label = entry.key, value = entry.value, text = tostring(entry.value) }
 	end
 	if #items == 0 then

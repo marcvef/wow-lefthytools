@@ -210,23 +210,7 @@ local function DayText(b)
 	return table.concat(parts, ",")
 end
 
-local function Count(t)
-	local n = 0
-	for _ in pairs(t or {}) do
-		n = n + 1
-	end
-	return n
-end
-
-local function Top(t)
-	local best, most
-	for key, value in pairs(t or {}) do
-		if not most or value > most or (value == most and key < best) then
-			best, most = key, value
-		end
-	end
-	return best
-end
+local Count, Top = C.Count, C.Top
 
 -- My character's lifetime numbers, in PROFILE_FIELDS' order.
 local function ProfileNumbers(c)
@@ -1285,21 +1269,6 @@ function C.Accounts()
 		accounts[#accounts + 1] = account
 	end
 	return accounts
-end
-
--- "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago" (localized).
-function C.Ago(t)
-	local seconds = math.max(0, time() - (t or 0))
-	if seconds < 120 then
-		return L["just now"]
-	elseif seconds < 3600 then
-		return L["%d min ago"]:format(math.floor(seconds / 60))
-	elseif seconds < 86400 then
-		return L["%d h ago"]:format(math.floor(seconds / 3600))
-	elseif seconds < 2 * 86400 then
-		return L["yesterday"]
-	end
-	return L["%d days ago"]:format(math.floor(seconds / 86400))
 end
 
 -- The `count` days ending `ending` days ago, as YYYY-MM-DD, kept until the date changes: a leaderboard
