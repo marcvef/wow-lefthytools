@@ -188,7 +188,7 @@ local outbox = {}       -- { gameAccountID, message }: one-off messages, sent be
 local lowOutbox = {}    -- the same, sent only when nothing else waits (bulk data); [3]: onSent()
 local helloOutbox = {}  -- gameAccountIDs to greet (Sweep): after states and messages, before bulk data
 local helloWaiting = {} -- gameAccountID -> true while their hello is in helloOutbox
-local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt }: spam guards
+local inbox = {}        -- gameAccountID -> what they may still send (Spaced / Counted, in OnMessage)
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
 local pingsIn = {}      -- { gameAccountID, continent, north, west, mapID } received, shown on the next tick
@@ -962,22 +962,46 @@ local function ApplyState(peer, now, flags, continent, north, west, subzone, tar
 	end
 end
 
+-- What one friend may send, kept in their inbox guard (per sender, also when the peer is
+-- forgotten, so "Q2" can't reset it). Spaced: one per gap seconds.
+local function Spaced(guard, key, gap, now)
+	local last = guard[key]
+	if last and now - last < gap then
+		return false
+	end
+	guard[key] = now
+	return true
+end
+
+-- Counted: at most limit in a window of that many seconds, starting with the first one after the
+-- last window ran out (a burst of them in the same moment all count).
+local function Counted(guard, key, limit, window, now)
+	local counter = guard[key]
+	if not counter then
+		counter = {}
+		guard[key] = counter
+	end
+	if not counter.at or now - counter.at >= window then
+		counter.at, counter.n = now, 0
+	end
+	if counter.n >= limit then
+		return false
+	end
+	counter.n = counter.n + 1
+	return true
+end
+
 local function OnMessage(text, senderID)
 	if type(senderID) ~= "number" then
 		return
 	end
 	local now = GetTime()
-	-- Per sender, kept even when the peer is forgotten (so "Q2" can't reset the guards).
 	local guard = inbox[senderID]
 	if not guard then
-		guard = { count = 0, window = now }
+		guard = {}
 		inbox[senderID] = guard
 	end
-	if now - guard.window >= 1 then
-		guard.count, guard.window = 0, now
-	end
-	guard.count = guard.count + 1
-	if guard.count > INBOX_LIMIT then
+	if not Counted(guard, "flood", INBOX_LIMIT, 1, now) then
 		return -- a friend's client gone haywire can't flood us
 	end
 
@@ -1015,13 +1039,11 @@ local function OnMessage(text, senderID)
 		answer = true              -- they (re)started the addon: answer with my state
 	elseif kind == "S" then
 		local died, foe = ApplyState(peer, now, a, b, c, d, e, f)
-		if died and (not guard.deathAt or now - guard.deathAt >= DEATH_GAP) then
-			guard.deathAt = now
+		if died and Spaced(guard, "deathAt", DEATH_GAP, now) then
 			deaths[#deaths + 1] = { senderID, foe }
 		end
 	elseif kind == "L" then
-		if not guard.dingAt or now - guard.dingAt >= DING_GAP then
-			guard.dingAt = now
+		if Spaced(guard, "dingAt", DING_GAP, now) then
 			dings[#dings + 1] = { senderID, a, b }
 		end
 	elseif kind == "T" then
@@ -1038,51 +1060,32 @@ local function OnMessage(text, senderID)
 		peer.rev = peer.rev + 1
 		Changed()
 	elseif kind == "I" then
-		if not guard.itemAt or now - guard.itemAt >= ITEM_GAP then
-			guard.itemAt = now
+		if Spaced(guard, "itemAt", ITEM_GAP, now) then
 			itemsIn[#itemsIn + 1] = { "item", senderID, a, b }
 		end
 	elseif kind == "M" then
-		if not guard.chatWindow or now - guard.chatWindow >= CHAT_WINDOW then
-			guard.chatWindow, guard.chatLines = now, 0
-		end
-		if guard.chatLines < CHAT_LIMIT then
-			guard.chatLines = guard.chatLines + 1
+		if Counted(guard, "chat", CHAT_LIMIT, CHAT_WINDOW, now) then
 			itemsIn[#itemsIn + 1] = { "chat", senderID, a }
 		end
 	elseif kind == "A" then
-		if not guard.announceAt or now - guard.announceAt >= ANNOUNCE_GAP then
-			guard.announceAt = now
+		if Spaced(guard, "announceAt", ANNOUNCE_GAP, now) then
 			itemsIn[#itemsIn + 1] = { "announce", senderID, a }
 		end
 	elseif kind == "N" or kind == "R" then
 		-- One per call each way; a count per window, so two in the same moment both count.
-		if not guard.callWindow or now - guard.callWindow >= CALL_WINDOW then
-			guard.callWindow, guard.calls = now, 0
-		end
-		if guard.calls < CALL_LIMIT then
-			guard.calls = guard.calls + 1
+		if Counted(guard, "calls", CALL_LIMIT, CALL_WINDOW, now) then
 			itemsIn[#itemsIn + 1] = { kind == "N" and "answer" or "result", senderID, a, b }
 		end
 	elseif kind == "D" or kind == "K" then -- (K: a day's AFK time, merged into that day)
-		if not guard.dailyWindow or now - guard.dailyWindow >= 60 then
-			guard.dailyWindow, guard.daily = now, 0
-		end
-		if guard.daily < DAILY_LIMIT then
-			guard.daily = guard.daily + 1
+		if Counted(guard, "daily", DAILY_LIMIT, 60, now) then
 			dailyIn[#dailyIn + 1] = { senderID, a }
 		end
 	elseif kind == "E" then
-		if not guard.highlightWindow or now - guard.highlightWindow >= HIGHLIGHT_WINDOW then
-			guard.highlightWindow, guard.highlights = now, 0
-		end
-		if guard.highlights < HIGHLIGHT_LIMIT then
-			guard.highlights = guard.highlights + 1
+		if Counted(guard, "highlights", HIGHLIGHT_LIMIT, HIGHLIGHT_WINDOW, now) then
 			highlightsIn[#highlightsIn + 1] = { senderID, a, B.Clean(b, 64), B.Clean(c, 64) }
 		end
 	elseif kind == "P" then
-		if M.db.pings and (not guard.pingAt or now - guard.pingAt >= PING_GAP) then
-			guard.pingAt = now
+		if M.db.pings and Spaced(guard, "pingAt", PING_GAP, now) then
 			pingsIn[#pingsIn + 1] = { senderID, a, b, c, d }
 		end
 	elseif kind == "G" then
@@ -1097,29 +1100,15 @@ local function OnMessage(text, senderID)
 	elseif kind == "Y" then
 		peer.collects = a -- Reports.lua sends my error reports to them
 	elseif kind == "Z" then
-		if M.db.collectReports and B.ReceiveReportPart then
-			if not guard.reportWindow or now - guard.reportWindow >= 60 then
-				guard.reportWindow, guard.reportParts = now, 0
-			end
-			if guard.reportParts < REPORT_PARTS then
-				guard.reportParts = guard.reportParts + 1
-				B.ReceiveReportPart(senderID, a, b, c, d)
-			end
+		if M.db.collectReports and B.ReceiveReportPart and Counted(guard, "reportParts", REPORT_PARTS, 60, now) then
+			B.ReceiveReportPart(senderID, a, b, c, d)
 		end
 	elseif kind == "O" then
-		if not guard.streamWindow or now - guard.streamWindow >= STREAM_WINDOW then
-			guard.streamWindow, guard.streamCount = now, 0
-		end
-		guard.streamCount = guard.streamCount + 1
-		if guard.streamCount <= STREAM_LIMIT and B.ReceiveStream then
+		if Counted(guard, "stream", STREAM_LIMIT, STREAM_WINDOW, now) and B.ReceiveStream then
 			B.ReceiveStream(senderID, a, b)
 		end
 	elseif kind == "J" then
-		if not guard.journalWindow or now - guard.journalWindow >= JOURNAL_WINDOW then
-			guard.journalWindow, guard.journalCount = now, 0
-		end
-		guard.journalCount = guard.journalCount + 1
-		if guard.journalCount <= JOURNAL_LIMIT and B.ReceiveJournal then
+		if Counted(guard, "journal", JOURNAL_LIMIT, JOURNAL_WINDOW, now) and B.ReceiveJournal then
 			B.ReceiveJournal(senderID, a, b)
 		end
 	elseif kind == "F" then
@@ -1133,8 +1122,7 @@ local function OnMessage(text, senderID)
 			B.Queue(senderID, ("U%s;%d;%s"):format(VERSION, LT.WhatsNew.LatestID(), ns.LOCALE == "deDE" and "de" or "en"))
 		end
 	elseif kind == "U" then
-		if not guard.newsAt or now - guard.newsAt >= NEWS_GAP then
-			guard.newsAt = now
+		if Spaced(guard, "newsAt", NEWS_GAP, now) then
 			newsAsked[#newsAsked + 1] = { senderID, a, b }
 		end
 	elseif kind == "W" then
@@ -1147,8 +1135,7 @@ local function OnMessage(text, senderID)
 		end
 	end
 	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget.
-	if answer and (not guard.answeredAt or now - guard.answeredAt >= ANSWER_GAP) then
-		guard.answeredAt = now
+	if answer and Spaced(guard, "answeredAt", ANSWER_GAP, now) then
 		owed[senderID] = true
 		B.Queue(senderID, "F" .. VERSION .. ";" .. LT.FILES) -- my LefthyTools build and its files
 		B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40))
