@@ -117,7 +117,7 @@ local function Short(text)
 		text = text:gsub("|H.-|h(.-)|h", "%1"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[^:|]*:", ""):gsub("|r", "")
 	end
 	if #text > 90 then
-		text = text:sub(1, 87):gsub("[\192-\255][\128-\191]*$", "") .. "..."
+		text = LT.CutUTF8(text, 87) .. "..."
 	end
 	return text
 end

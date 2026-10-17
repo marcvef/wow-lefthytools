@@ -3562,12 +3562,14 @@ do
 	anna("I2;6948::::::::20:::::;7171")
 	anna("M2;brb, getting coffee")
 	anna("A2;Raid in 10!")
+	anna("M2;" .. ("x"):rep(85) .. "äyyyyyyyyyy") -- (a long line, cut at 87 bytes: right after the ä)
 	Advance(1.1)
 	local info = LefthyToolsAFKFrame.Info:GetText()
 	check(LefthyToolsAFKFrame:IsShown() and info:find("While you were away", 1, true) and info:find("Anna|r shares", 1, true)
 		and info:find("Anna|r offers", 1, true) and info:find("[LTC]|r ", 1, true) and info:find("|r: brb, getting coffee", 1, true)
 		and info:find("|r: |cffffd200Raid in 10!", 1, true),
 		"AFK: items shown and offered, LTC lines and announcements are listed, got\n" .. info)
+	check(info:find("|r: " .. ("x"):rep(85) .. "ä...", 1, true), "a long line is cut on a whole letter, and one that fits whole stays")
 	afk(false)
 	Advance(0.3)
 	BB.calls["11:7171"].frame.Pass:Click() -- back: the offer's buttons are there
