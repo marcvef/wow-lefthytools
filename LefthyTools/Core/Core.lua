@@ -295,23 +295,29 @@ end
 -- Startup
 ---------------------------------------------------------------------------
 
+-- Each function in list with these arguments; one that fails doesn't stop the others.
+local function RunAll(list, ...)
+	for _, fn in ipairs(list) do
+		local ok, err = pcall(fn, ...)
+		if not ok then
+			geterrorhandler()(err)
+		end
+	end
+end
+
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
-events:SetScript("OnEvent", function(_, event, arg)
+events:SetScript("OnEvent", function(self, event, arg)
 	if event == "ADDON_LOADED" and arg == ADDON then
+		self:UnregisterEvent("ADDON_LOADED") -- (every add-on loaded later would fire it here too)
 		LT.freshInstall = type(LefthyToolsDB) ~= "table" -- no saved settings yet: a new install
 		LefthyToolsDB = type(LefthyToolsDB) == "table" and LefthyToolsDB or {}
 		local db = LefthyToolsDB
 		db.modules = type(db.modules) == "table" and db.modules or {}
 		db.settings = type(db.settings) == "table" and db.settings or {}
 		LT.db = db
-		for _, fn in ipairs(LT.onLoad) do
-			local ok, err = pcall(fn, db)
-			if not ok then
-				geterrorhandler()(err)
-			end
-		end
+		RunAll(LT.onLoad, db)
 
 		for _, m in ipairs(LT.modules) do
 			if type(db.modules[m.key]) ~= "boolean" then
@@ -325,13 +331,9 @@ events:SetScript("OnEvent", function(_, event, arg)
 
 		ns.SetupOptions()
 	elseif event == "PLAYER_LOGIN" then
+		self:UnregisterEvent("PLAYER_LOGIN")
 		loggedIn = true
-		for _, fn in ipairs(LT.onLogin) do
-			local ok, err = pcall(fn)
-			if not ok then
-				geterrorhandler()(err)
-			end
-		end
+		RunAll(LT.onLogin)
 		for _, m in ipairs(LT.modules) do
 			if LT.db.modules[m.key] then
 				m.enabled = true
