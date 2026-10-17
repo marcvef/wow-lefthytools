@@ -1167,6 +1167,27 @@ function C.Leaderboard(count, ending, people)
 	return board
 end
 
+-- A death the game reported twice (PLAYER_DEAD again within seconds), from builds that recorded
+-- each: the highlights (n -> entry) of a character's that came this soon after the death before.
+local function RepeatedDeaths(news)
+	local deaths, repeated = {}, {}
+	for n, e in pairs(news) do
+		if e.k == "death" and type(e.t) == "number" then
+			deaths[#deaths + 1] = { n = n, t = e.t }
+		end
+	end
+	table.sort(deaths, function(a, b) return a.t < b.t or (a.t == b.t and a.n < b.n) end)
+	local last
+	for _, d in ipairs(deaths) do
+		if last and d.t - last < C.DEATH_REPEAT then
+			repeated[d.n] = true
+		else
+			last = d.t
+		end
+	end
+	return repeated
+end
+
 -- The merged feed, oldest first: friends' synced highlights and what came live (Beacon's events,
 -- E2 highlights, online and offline), each once (a live one that a synced one of the same character
 -- repeats goes). Each entry: its character's key (among C.Characters()) and name (the full one).
@@ -1188,15 +1209,18 @@ function C.FriendNews()
 		if acct ~= C.MyAccount() and IsFriend(acct) then
 			for bookKey, c in pairs(a.chars) do
 				local key, name = "book:" .. acct .. ":" .. bookKey, C.NameOf(c)
-				for _, e in pairs(c.name and c.news or {}) do
-					local entry = { t = e.t, g = e.g, key = key, name = name, classFile = c.classFile, k = e.k, a = e.a, b = e.b,
-						synced = true }
-					if e.k == "level" then
-						entry.level = tonumber(e.a)
-					elseif e.k == "death" then
-						entry.foe, entry.where = e.a ~= "" and e.a or nil, e.b
+				local repeated = RepeatedDeaths(c.news)
+				for n, e in pairs(c.name and c.news or {}) do
+					if not repeated[n] then
+						local entry = { t = e.t, g = e.g, key = key, name = name, classFile = c.classFile, k = e.k, a = e.a, b = e.b,
+							synced = true }
+						if e.k == "level" then
+							entry.level = tonumber(e.a)
+						elseif e.k == "death" then
+							entry.foe, entry.where = e.a ~= "" and e.a or nil, e.b
+						end
+						list[#list + 1] = entry
 					end
-					list[#list + 1] = entry
 					local id = key .. "|" .. e.k .. "|" .. (e.a or "")
 					synced[id] = synced[id] or {}
 					table.insert(synced[id], e.t)

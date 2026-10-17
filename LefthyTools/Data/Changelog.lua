@@ -344,5 +344,8 @@ ns.CHANGELOG = {
 	{ id = 112, module = "chronicle",
 		en = { "Full names from friends' journals", "Your friends' characters show their full names, also those that weren't online with you. Their LefthyTools needs this update." },
 		de = { "Volle Namen aus Tagebüchern", "Die Charaktere deiner Freunde zeigen ihren vollen Namen, auch die, die nicht mit dir online waren. Ihr LefthyTools braucht dieses Update." } },
+	{ id = 113, module = "chronicle",
+		en = { "A death counts once", "The game sometimes reports one death several times. Chronicle now counts it once, and deaths saved twice before show once." },
+		de = { "Ein Tod zählt einmal", "Das Spiel meldet einen Tod manchmal mehrfach. Chronicle zählt ihn jetzt einmal, und doppelt gespeicherte Tode erscheinen nur einmal." } },
 	-- New entries go here, at the end.
 }

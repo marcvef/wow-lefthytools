@@ -122,6 +122,12 @@ local function FriendEvent(f)
 	return e
 end
 
+-- A death the game reported twice (PLAYER_DEAD again within seconds), saved twice by builds that
+-- counted each: one this soon after the death shown before (lastDeath) isn't shown again.
+local function RepeatedDeath(e, lastDeath)
+	return e.k == "death" and lastDeath ~= nil and type(e.t) == "number" and math.abs(e.t - lastDeath) < C.DEATH_REPEAT
+end
+
 -- The Compare page's symbols: { [character key] = { [day] = { { icon, text, rank, t }, ... } } } over
 -- the days shown, from my characters' journals and friends' news (C.FriendNews: each entry knows its
 -- character). Only the notable kinds (Graphs.lua's MARK_KINDS); levels only every tenth.
@@ -152,12 +158,17 @@ compareState.marks = function(people, days)
 	end
 	for storeKey, c in pairs(C.Store().chars) do
 		local events = shown["me:" .. storeKey] and c.events or {}
-		for i = #events, 1, -1 do -- (newest first: stops at the first day shown)
+		local from = #events + 1
+		while from > 1 and type(events[from - 1].t) == "number" and date("%Y-%m-%d", events[from - 1].t) >= first do
+			from = from - 1 -- (from the newest back to the first day shown)
+		end
+		local lastDeath
+		for i = from, #events do
 			local e = events[i]
-			if type(e.t) ~= "number" or date("%Y-%m-%d", e.t) < first then
-				break
+			if not RepeatedDeath(e, lastDeath) then
+				Put("me:" .. storeKey, e)
+				lastDeath = e.k == "death" and e.t or lastDeath
 			end
-			Put("me:" .. storeKey, e)
 		end
 	end
 	for _, f in ipairs(C.FriendNews and C.FriendNews() or {}) do
@@ -220,9 +231,14 @@ local function Timeline(chars)
 		local first = math.max(1, #events - TIMELINE_SHOW + 1)
 		older = older + first - 1
 		local who = keeping > 1 and (LT.Window.ClassColorCode(c.classFile) .. (C.NameOf(c) or "?") .. "|r") or nil
+		local lastDeath
 		for i = first, #events do
-			local n = #list + 1
-			list[n] = { e = events[i], who = who, n = n }
+			local e = events[i]
+			if not RepeatedDeath(e, lastDeath) then
+				local n = #list + 1
+				list[n] = { e = e, who = who, n = n }
+				lastDeath = e.k == "death" and e.t or lastDeath
+			end
 		end
 	end
 	table.sort(list, function(a, b) -- by time; the same second: as each journal has them

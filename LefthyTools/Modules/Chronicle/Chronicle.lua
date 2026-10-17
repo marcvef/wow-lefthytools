@@ -25,6 +25,7 @@ local FEED_MAX = 300
 local FOE_MEMORY = 15        -- seconds: whom you last fought counts as your killer this long
 local TELEPORT = 150         -- yards within one tick: a portal, hearthstone or teleport, not travel
 local BOSS_DEDUPE = 30       -- ENCOUNTER_END and BOSS_KILL report the same kill
+local DEATH_REPEAT = 10      -- PLAYER_DEAD again this soon (or while still dead) is the same death
 local QUEST_MILESTONES = { 10, 25, 50, 100, 250, 500, 750, 1000, 1500, 2000, 2500, 3000, 4000, 5000 }
 local GOLD_MILESTONES = { 1, 10, 50, 100, 250, 500, 1000, 2500, 5000, 10000 }
 local PROFESSION_MILESTONES = { 75, 150, 225, 300 }
@@ -293,8 +294,24 @@ function handlers.PLAYER_LEVEL_UP(level)
 	Record("level", { level = level, zone = ZoneAndSubzone(), took = took })
 end
 
+-- The game can fire PLAYER_DEAD more than once for one death (seen up to five seconds apart, in
+-- journals here and friends'): a death counts once. The next one counts once the tick has seen you
+-- alive again, DEATH_REPEAT after it at the earliest.
+local deadSince -- GetTime() of the death counted; nil once alive again
+C.DEATH_REPEAT = DEATH_REPEAT -- (the pages show deaths saved twice before this once: Window.lua, Sync.lua)
+
+local function Dead()
+	local dead = UnitIsDeadOrGhost("player")
+	return not issecret(dead) and dead == true
+end
+
 function handlers.PLAYER_DEAD()
-	local foe = lastFoeAt and GetTime() - lastFoeAt <= FOE_MEMORY and lastFoe or nil
+	if deadSince then
+		return
+	end
+	local now = GetTime()
+	deadSince = now
+	local foe = lastFoeAt and now - lastFoeAt <= FOE_MEMORY and lastFoe or nil
 	Add("deaths")
 	if foe then
 		char.killers[foe] = (char.killers[foe] or 0) + 1
@@ -666,6 +683,9 @@ local function Tick(now, elapsed)
 	if professionsDirty then
 		CheckProfessions()
 	end
+	if deadSince and now - deadSince >= DEATH_REPEAT and not Dead() then
+		deadSince = nil -- (alive again: the next death counts)
+	end
 	TrackTravel()
 	TrackTarget(now)
 	ShareDays(now)
@@ -952,6 +972,7 @@ function M:OnEnable()
 	zoneDirty, professionsDirty, lastPos.continent = true, true, nil
 	local taxi = UnitOnTaxi("player")
 	onTaxi = not issecret(taxi) and taxi == true -- (a /reload mid-flight isn't another flight)
+	deadSince = Dead() and GetTime() or nil -- (nor a /reload while dead another death)
 	sessionJustStarted = false
 	-- A new character, or Chronicle switched on mid-game after being off: the session it knows
 	-- ended long ago (a /reload or switching it off and on keeps it; those take seconds).

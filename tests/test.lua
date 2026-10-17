@@ -6790,6 +6790,50 @@ section("Chronicle: one row per character, accounts beside them")
 	Advance(1.2)
 end)()
 
+section("Chronicle: a death counts once")
+do
+	-- The game can say PLAYER_DEAD more than once for one death.
+	local deaths, since = me.stats.deaths, time()
+	local function entries()
+		local n = 0
+		for _, e in ipairs(me.events) do if e.k == "death" and e.t >= since then n = n + 1 end end
+		return n
+	end
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Fire("PLAYER_DEAD")
+	Advance(3.1)
+	Fire("PLAYER_DEAD")
+	check(me.stats.deaths == deaths + 1 and entries() == 1, "PLAYER_DEAD again for the same death: counted once")
+	STATE.dead = false
+	Fire("PLAYER_ALIVE")
+	Advance(11)
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	check(me.stats.deaths == deaths + 2 and entries() == 2, "alive again, the next death counts")
+	STATE.dead = false
+	Fire("PLAYER_ALIVE")
+	-- Saved twice by builds before (mine, friends'): shown once.
+	Advance(30)
+	local t = time()
+	me.events[#me.events + 1] = { t = t, k = "death", foe = "Twicefoe", zone = "Duskwood" }
+	me.events[#me.events + 1] = { t = t + 2, k = "death", foe = "Twicefoe", zone = "Duskwood" }
+	local annaAcct = CH.Hash("Annie#1234")
+	anna("H2")
+	Advance(1.2)
+	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;9600;40;" .. t .. ";death;Twinfoe;Westfall")
+	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;9601;41;" .. (t + 3) .. ";death;Twinfoe;Westfall")
+	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;9602;42;" .. (t + 40) .. ";death;Twinfoe;Westfall") -- (another death)
+	Advance(0.3)
+	local twins = 0
+	for _, f in ipairs(CH.FriendNews()) do if f.foe == "Twinfoe" then twins = twins + 1 end end
+	check(twins == 2, "a friend's death saved twice: in the news once (a later one too), got " .. twins)
+	CH.Open("timeline")
+	local _, mine = LefthyToolsChronicleFrame.Text:GetText():gsub("Died to Twicefoe", "")
+	check(mine == 1, "mine: once in the timeline, got " .. mine)
+	LefthyToolsChronicleFrame:Hide()
+end
+
 section("Chronicle: a broken tick doesn't run every frame")
 do
 	local C = ns.Chronicle

@@ -53,7 +53,7 @@ Handlers only count or append; nothing in them draws or sends.
 | Entry (`k`) | Source |
 |---|---|
 | `level` (+ how long the level took, in time played) | `PLAYER_LEVEL_UP` |
-| `death` (zone, subzone, foe, level) | `PLAYER_DEAD`; foe = your last attackable target while in combat, if within 15 s (the tick notes it) |
+| `death` (zone, subzone, foe, level) | `PLAYER_DEAD`; foe = your last attackable target while in combat, if within 15 s (the tick notes it). Once per death: the game can fire it again within seconds, so it counts again only after the tick has seen you alive (`UnitIsDeadOrGhost`), 10 s at the earliest (`DEATH_REPEAT`; a /reload while dead isn't another). Deaths saved twice before (mine, friends' journals) are shown once: the Timeline, News and Compare's symbols leave out a character's death within 10 s of the one before |
 | `zone` (first visit) | tick after `ZONE_CHANGED_NEW_AREA` / `PLAYER_ENTERING_WORLD`, `GetRealZoneText` |
 | `dungeon` (first visit; every entry counts as a run) | same, `IsInInstance` party/raid + `GetInstanceInfo` |
 | `boss` (first kill of each; every kill counted) | `ENCOUNTER_END` with success, or `BOSS_KILL`; the same name within 30 s counts once |
