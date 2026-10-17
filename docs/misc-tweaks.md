@@ -206,7 +206,10 @@ Switched on (`ns.ApplyRetailFrames`):
   bars, masks). Bars and their containers inherit `SecureFrameParentPropagationTemplate`
   (protected): moved only out of combat, else marked and done on `PLAYER_REGEN_ENABLED` (Forever's
   target code places the health bar again on every new target, also in combat: until combat ends it
-  sits a pixel or two off). Textures, masks and font strings any time.
+  sits a pixel or two off). Textures, masks and font strings any time. The events only note the
+  work (`GROUP_ROSTER_UPDATE`: new party member frames get their hooks and art; the end of combat:
+  the marked layout); a driver does it on the next frame, once for a burst (a raid forming sends
+  many roster events a second).
 - **Off:** the hooks do nothing any more; a chat line says a /reload brings Forever's frames back
   (nothing is undone piece by piece).
 

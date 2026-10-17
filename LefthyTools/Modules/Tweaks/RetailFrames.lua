@@ -527,18 +527,36 @@ local function SetHooks()
 	end
 end
 
+-- The events only note what to do; it's done on the next frame, once for a burst (a raid forming
+-- sends GROUP_ROSTER_UPDATE many times a second).
+local partyChanged = false
+local driver = CreateFrame("Frame")
+driver:Hide()
+driver:SetScript("OnUpdate", function(self)
+	self:Hide()
+	if not on then
+		return
+	end
+	if partyChanged then
+		partyChanged = false
+		Walk(PartyFrame, 0) -- new party member frames get their hooks and art
+		Party()
+	end
+	if layoutPending and not InCombatLockdown() then
+		Layout() -- (combat is over: the protected frames' turn)
+	end
+end)
+
 events:SetScript("OnEvent", function(_, event)
 	if not on then
 		return
 	end
-	if event == "PLAYER_REGEN_ENABLED" then
-		if layoutPending then
-			Layout()
-		end
-	else -- GROUP_ROSTER_UPDATE: new party member frames get their hooks and art
-		Walk(PartyFrame, 0)
-		Party()
+	if event == "GROUP_ROSTER_UPDATE" then
+		partyChanged = true
+	elseif not layoutPending then
+		return -- PLAYER_REGEN_ENABLED with nothing left over from the fight
 	end
+	driver:Show()
 end)
 
 -- Called by Tweaks.lua when the switch changes (on the next frame, never in a callback).

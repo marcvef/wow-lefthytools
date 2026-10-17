@@ -1219,7 +1219,25 @@ section("Misc Tweaks: retail unit frames")
 		"a new target in combat: Forever's bar position for now (the art still retail's)")
 	STATE.combat = false
 	Fire("PLAYER_REGEN_ENABLED")
-	check(last(tHealth)[4] == 149 and not ns.RetailFramesPending(), "combat over: retail's position")
+	check(last(tHealth)[4] == 147, "nothing moved inside the event")
+	Advance(0.05)
+	check(last(tHealth)[4] == 149 and not ns.RetailFramesPending(), "combat over: retail's position, on the next frame")
+	do -- Roster changes come in bursts (a group forming): the party frames are looked at once, on the next frame.
+		local member = CreateFrame("Frame")
+		PartyFrame = CreateFrame("Frame")
+		member:SetParent(PartyFrame)
+		PartyFrame._children = { member }
+		PartyFrame.PartyMemberFramePool = { EnumerateActive = function() return pairs({ [member] = true }) end }
+		local art = Tex(member, "UI-HUD-UnitFrame-CharacterFrameOnParty-PortraitOn")
+		local walks, regions = 0, member.GetRegions
+		member.GetRegions = function(self) walks = walks + 1; return regions(self) end
+		for _ = 1, 5 do Fire("GROUP_ROSTER_UPDATE") end
+		check(walks == 0 and not art.path, "a new party member: nothing done inside the events")
+		Advance(0.05)
+		check(walks == 1 and retail(art, "UI-HUD-UnitFrame-CharacterFrameOnParty-PortraitOn"),
+			"on the next frame its frame gets retail's art, looked at once for the five events, got " .. walks)
+		PartyFrame = nil
+	end
 	local printedAt = #PRINTED + 1
 	lefthy("tweaks retailframes off"); Advance(0.05)
 	check(TDB.retailFrames == false and table.concat(PRINTED, "\n", printedAt):find("/reload", 1, true), "off: a /reload brings Forever's frames back")
