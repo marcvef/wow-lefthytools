@@ -8269,7 +8269,7 @@ section("Bestiary: what mobs drop")
 			"hover it: in full, with the XP per hour of fighting")
 		win.Pace._scripts.OnLeave(win.Pace)
 		-- A kill that levels you up: the rest of the old level and what's in the new one, for the level
-		-- it died at.
+		-- it died at. The client may tell the new XP an update before the new level: still one kill's.
 		Advance(2)
 		XP.current = XP.max - 10
 		Fire("PLAYER_XP_UPDATE", "player")
@@ -8278,8 +8278,9 @@ section("Bestiary: what mobs drop")
 		Fire("PLAYER_REGEN_DISABLED")
 		Advance(10)
 		Fire("PARTY_KILL", "Player-1-0", kobold[3])
-		PLAYER_LEVEL, XP.current, XP.max = 20, 75, 7000
+		XP.current, XP.max = 75, 7000
 		Fire("PLAYER_XP_UPDATE", "player")
+		PLAYER_LEVEL = 20 -- (told after the XP)
 		STATE.combat = false
 		Fire("PLAYER_REGEN_ENABLED")
 		koboldLoot(kobold[3])
@@ -8299,7 +8300,7 @@ section("Bestiary: what mobs drop")
 		koboldLoot(kobold[5])
 		pace = kobolds().pace
 		check(pace[1] == 20 and pace[2] == 2 and pace[3] == 100 and pace[4] == 1 and pace[5] == 6 and not win.Pace.Text:GetText():find("level", 1, true),
-			"a new level: started again; a kill without XP counts 0; one after the fight ended: not timed")
+			"a new level: started again (the level told late isn't a second level-up); a kill without XP counts 0; one after the fight ended: not timed")
 		IsPlayerAtEffectiveMaxLevel = function() return true end
 		koboldKill(kobold[6])
 		koboldLoot(kobold[6])

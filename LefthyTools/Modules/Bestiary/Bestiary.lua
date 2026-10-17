@@ -103,7 +103,7 @@ local skinnedCorpse = {}         -- GUID -> time: skinned (once each)
 local lootMoney, lootSource      -- while the loot window is open: money before, the corpse
 local lootSeen = false           -- this loot window was looked at (LOOT_READY or LOOT_OPENED)
 local recent = {}                -- your last kills (their pending entries), the oldest first
-local xpWas = {}                 -- your XP as last read (xp, max, level): what each update added
+local xpWas = {}                 -- your XP as last read (xp, max): what each update added
 local looseXP                    -- XP that came just before its kill: { amount, at }
 local fightFrom, fightEnd        -- when the fight began (PLAYER_REGEN_DISABLED) and ended (nil: still on)
 local lastKillAt = -math.huge    -- your last kill in this fight: the next one's time starts there
@@ -1015,14 +1015,16 @@ function Bt.PrintLog()
 end
 
 -- What your XP grew by since it was last read (a level-up in between: the rest of the old level
--- and what's in the new one); nil when it can't be told.
+-- and what's in the new one); nil when it can't be told. A level-up shows as the XP going down, not
+-- as UnitLevel changing: the client may tell the new XP an update before the new level, and taking
+-- the level then would count a whole level as one kill's XP.
 local function ReadXP()
-	local xp, max, level = Value(UnitXP, "player"), Value(UnitXPMax, "player"), Value(UnitLevel, "player")
+	local xp, max = Value(UnitXP, "player"), Value(UnitXPMax, "player")
 	if type(xp) ~= "number" or type(max) ~= "number" then
 		return nil
 	end
-	local gained = xpWas.xp and (level == xpWas.level and xp - xpWas.xp or (xpWas.max - xpWas.xp) + xp)
-	xpWas.xp, xpWas.max, xpWas.level = xp, max, level
+	local gained = xpWas.xp and (xp >= xpWas.xp and xp - xpWas.xp or (xpWas.max - xpWas.xp) + xp)
+	xpWas.xp, xpWas.max = xp, max
 	return gained
 end
 
