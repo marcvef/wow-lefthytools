@@ -4969,6 +4969,24 @@ do
 				"chain casting: the Fireball before the one she's casting went off at her target, its icon flying over (not an instant)")
 		end
 
+		-- Her target loses health picture after picture while her swing still waits its turn: what it
+		-- lost adds up on that swing (one swing, not one per picture).
+		do
+			S.BattleReset(view)
+			target.health = 1
+			show()
+			target.health = 0.9
+			local b = show()
+			S.BattleUpdate(view, 0) -- (her first swing begins)
+			target.health = 0.8
+			show()
+			target.health = 0.7
+			show()
+			check(b.action and b.action.kind == "strike" and #b.queue == 1 and b.queue[1].kind == "strike"
+				and math.abs(b.queue[1].loss.frac - 0.2) < 1e-6, "losses while her next swing waits: they add up on it")
+			target.health = 1
+		end
+
 		view.kind, view.picture = kind, picture0
 		S.BattleReset(view)
 	end)()

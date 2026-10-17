@@ -773,8 +773,8 @@ the picture already holds, one action after another like turns (about half a sec
   (12-13.5 s, instead of a Fireball) and goes back to the leader at 14.5 s; the mage joins the fight
   1 s into the loop, so it's itself again when the loop starts over.
 - **Their target loses health** (the estimate, a drop of 0.4% or more): theirs. It joins their
-  spell or ability on the way (its number lands with it), else it's a swing: they step forward 16 px
-  and strike (17). The mob flinches (9) with a red flash, and what it lost floats up from it in gold:
+  spell or ability on the way (its number lands with it), else a swing at it still waiting its turn
+  (what it lost adds up), else it's a swing: they step forward 16 px and strike (17). The mob flinches (9) with a red flash, and what it lost floats up from it in gold:
   the loss times what its kind has (`S.MobMaxOf`, StreamSense's maximum: learned, the classic
   database or usual for its level), a percent when that isn't known (an elite in neither). The
   combat log is closed, so who hit isn't known: their target's loss is taken as theirs; **another

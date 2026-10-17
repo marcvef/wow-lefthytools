@@ -879,15 +879,21 @@ local function Enqueue(view, action, now)
 	end
 end
 
--- The waiting (or running) spell or ability at a mob that has no number yet: a loss joins it (not
--- a Polymorph's: it hurts nobody).
+-- What a loss at a mob joins: the waiting (or running) spell or ability at it that has no number yet
+-- (not a Polymorph's: it hurts nobody), else a swing at it still waiting its turn (what it lost adds
+-- up: one swing, not one per picture, while the turns before it play); nil: a swing of its own.
 local function Pending(b, key)
 	local a = b.action
 	if a and (a.kind == "spell" or a.kind == "ability") and a.key == key and not a.loss and not a.impacted and not a.poly then
 		return a
 	end
 	for _, q in ipairs(b.queue) do
-		if (q.kind == "spell" or q.kind == "ability" or q.kind == "strike") and q.key == key and not q.loss and not q.poly then
+		if (q.kind == "spell" or q.kind == "ability") and q.key == key and not q.loss and not q.poly then
+			return q
+		end
+	end
+	for _, q in ipairs(b.queue) do
+		if q.kind == "strike" and q.key == key then
 			return q
 		end
 	end
