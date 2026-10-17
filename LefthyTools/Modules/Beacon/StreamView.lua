@@ -1,7 +1,6 @@
 local _, ns = ...
 local LT = ns.LT
 local L = ns.L
-local M = LT:GetModule("beacon")
 local B = ns.Beacon
 local S = B.Stream
 
