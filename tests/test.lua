@@ -8552,6 +8552,31 @@ section("Bestiary: quest drops while questing")
 	MOBS.mouseover = nil
 	Advance(0.1)
 	setting("hoverCard"):SetValue(false)
+	-- Names the client doesn't know yet, coming at different times: each line drawn when its name
+	-- comes, each asked for once.
+	do
+		ITEMS[2070] = ITEMS[2070] or { name = "Darnassian Bleu", quality = 1 }
+		ITEMS[774] = ITEMS[774] or { name = "Malachite", quality = 2 }
+		local asked, request = {}, C_Item.RequestLoadItemDataByID
+		C_Item.RequestLoadItemDataByID = function(id) asked[#asked + 1] = id end
+		MOCK_ITEM_UNCACHED = { [2070] = true, [774] = true }
+		QUESTS[3] = { id = 304, title = "Cheese and gems", objectives = {
+			{ text = "Darnassian Bleu: 0/3", finished = false }, { text = "Malachite: 0/1", finished = false } } }
+		Fire("QUEST_LOG_UPDATE")
+		MOBS.target = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000064" }
+		Fire("PLAYER_TARGET_CHANGED")
+		MOCK_ITEM_UNCACHED = { [774] = true }
+		Fire("GET_ITEM_INFO_RECEIVED", 2070, true)
+		Advance(0.6)
+		local lines = win.Quest:GetText()
+		check(lines:find("Darnassian Bleu: 0/3", 1, true) and not lines:find("Malachite", 1, true), "one name came: its line")
+		MOCK_ITEM_UNCACHED = nil
+		Fire("GET_ITEM_INFO_RECEIVED", 774, true)
+		Advance(0.6)
+		check(win.Quest:GetText():find("Malachite: 0/1", 1, true) and #asked == 0,
+			"the other came after the window had redrawn: its line too (both asked for before, when the bandit's drops were first drawn: not again)")
+		C_Item.RequestLoadItemDataByID, QUESTS[3] = request, nil
+	end
 	QUESTS, MOBS.target, STATE.target = savedQuests, nil, false
 	Fire("QUEST_LOG_UPDATE")
 	Advance(0.6)

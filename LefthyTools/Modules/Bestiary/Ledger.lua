@@ -73,7 +73,6 @@ local entries = {}       -- the list as shown: { creature, mob, score, positions
 local selected           -- the picked creature
 local query = ""         -- the search, lower case, without spaces
 local sortBy = "kills"
-local namesWanted = false -- an item's name was asked for (the list redraws when it comes)
 
 ---------------------------------------------------------------------------
 -- The search
@@ -118,7 +117,8 @@ local function Marked(name, positions)
 	return table.concat(marked)
 end
 
--- An item's name: as it was looted, else the client's (asked for when it doesn't know it yet).
+-- An item's name: as it was looted, else the client's, kept in its record for the search (asked for
+-- when it doesn't know it yet, once: it redraws when it comes).
 local function NameOf(id, item)
 	if not item then
 		return nil
@@ -133,10 +133,7 @@ local function NameOf(id, item)
 		item[4] = name
 		return name
 	end
-	if C_Item and C_Item.RequestLoadItemDataByID then
-		pcall(C_Item.RequestLoadItemDataByID, id)
-		namesWanted = true
-	end
+	Bt.AskItem(id)
 end
 
 local function XPPerHour(mob)
@@ -1036,21 +1033,11 @@ local function Build()
 			pane.Model:SetFacing(pane.facing)
 		end
 	end)
-	ledger:SetScript("OnEvent", function(self, event)
-		if event == "GET_ITEM_INFO_RECEIVED" and namesWanted and not self.redrawSoon then
-			self.redrawSoon = true -- (names come in bunches: once, a moment later)
-			C_Timer.After(0.5, function()
-				self.redrawSoon, namesWanted = false, false
-				Bt.DrawLedger()
-			end)
-		elseif event == "MAP_EXPLORATION_UPDATED" then
-			where.mapID = nil -- (you've explored more: the map is laid again when next drawn)
-		end
+	ledger:SetScript("OnEvent", function()
+		where.mapID = nil -- (MAP_EXPLORATION_UPDATED: you've explored more, the map is laid again when next drawn)
 	end)
 	ledger:RegisterEvent("MAP_EXPLORATION_UPDATED") -- (rare, and only a flag: also while closed)
-	ledger:SetScript("OnShow", function(self) self:RegisterEvent("GET_ITEM_INFO_RECEIVED") end)
 	ledger:SetScript("OnHide", function(self)
-		self:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
 		self.Search:ClearFocus()
 	end)
 end

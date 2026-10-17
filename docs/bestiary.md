@@ -178,10 +178,16 @@ the coin's and the drops' parts. Grey items and world drops count (it's all mone
 doesn't (not everyone skins). Worked out when shown, nothing stored. The price is
 `C_Item.GetItemInfo`'s `sellPrice` (11th), kept per item for the session (prices don't change).
 An item the client doesn't know yet counts as nothing for now and is asked for
-(`RequestLoadItemDataByID`, once a session per item); `GET_ITEM_INFO_RECEIVED` is listened to only
-while one is awaited, and the window and the ledger redraw half a second after the first comes (a
-bunch at once). Shown rounded the way players say it ("~45s": to the silver from 1s up, else the
-copper).
+(`Bt.AskItem`, below). Shown rounded the way players say it ("~45s": to the silver from 1s up, else
+the copper).
+
+**Items the client doesn't know yet** (a price, a quest item's name, a name for the ledger's search):
+`Bt.AskItem` asks for each once a session (`RequestLoadItemDataByID`); `GET_ITEM_INFO_RECEIVED` is
+listened to only while one is awaited (its own frame), and half a second after the first comes
+everything shown redraws once (`Bt.Redraw`: the window, the card, the ledger; a bunch at once). One
+that comes later redraws again: the first version stopped listening after the first bunch, so a
+name that came later never showed. Switched off, what's still awaited is forgotten (asked again
+when needed).
 
 ## Where you killed them
 
@@ -253,9 +259,8 @@ While a quest wants an item a mob can drop, the window and the card say so (the 
   or have >= need. Two quests wanting the same item: the bigger need.
 - **Matched by name**: an objective doesn't say which item it is, so a mob's possible drops (its
   record's and the classic database's) are matched by the item's name, case ignored: the name as
-  looted, else `C_Item.GetItemInfo` (kept; one the client doesn't know is asked for once,
-  `RequestLoadItemDataByID`, and `GET_ITEM_INFO_RECEIVED`, listened to only then, redraws half a
-  second later).
+  looted, else `C_Item.GetItemInfo` (kept; one the client doesn't know is asked for, `Bt.AskItem`:
+  it redraws when it comes).
 - **The numbers** (`Bt.QuestDrops(creature, mob)`, `Bt.ChanceOf`): the chance per kill is the
   classic database's (for a quest item its chance while on the quest), else yours (drops / kills);
   about how many more kills = what's left / (chance x how many come per drop: yours, 1 before you've
@@ -383,8 +388,7 @@ map wide).
   first version picked the best match on every redraw while a search was typed, so a click on
   another result jumped back.) A row found by an item shows that item, its chance (and "+N" more
   found); the picked mob's found drops stand out, the others fade to 35%. Names the client doesn't
-  know yet are asked for (`RequestLoadItemDataByID`); `GET_ITEM_INFO_RECEIVED` (listened to only
-  while open) redraws once, half a second later.
+  know yet are asked for (`Bt.AskItem`, once each) and kept in the record when they come.
 
 ## Minimap button and settings
 
@@ -405,7 +409,7 @@ Event handlers only: `PARTY_KILL`, `LOOT_READY`, `LOOT_CLOSED`, the player's
 `UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added, entering and leaving
 combat (a time stamp), `PLAYER_XP_UPDATE` (three numbers read, the last 8 kills looked at),
 `QUEST_LOG_UPDATE`/`BAG_UPDATE_DELAYED` (a flag, then one look half a second later),
-`GET_ITEM_INFO_RECEIVED` only while a vendor price or a quest item's name is awaited,
+`GET_ITEM_INFO_RECEIVED` only while an item asked for is awaited (a price, a name),
 `MAP_EXPLORATION_UPDATED` once the ledger is built (a flag: its map is laid again). A kill reads
 your map position once (two `C_Map` calls). The window redraws when its mob's
 record changes or the target does; the card's OnUpdate runs only while it's shown. Worth is

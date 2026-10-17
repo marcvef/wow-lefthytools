@@ -1024,7 +1024,7 @@ function Bt.MouseoverChanged()
 	card:Show()
 end
 
--- The quest log changed what your quests want, or item names came: the window and the card again.
+-- The quest log changed what your quests want: the window and the card again.
 function Bt.QuestsShown()
 	return (win and win:IsShown()) or (card and card:IsShown()) or false
 end
@@ -1038,8 +1038,9 @@ function Bt.QuestsChanged()
 	end
 end
 
--- The wish list changed: its stars everywhere (the window, the card, the ledger and its strip).
-function Bt.WishesChanged()
+-- Everything shown again: the wish list changed (its stars everywhere, the ledger's strip), or items
+-- the client didn't know came (names, prices): the window, the card, the ledger.
+function Bt.Redraw()
 	Bt.QuestsChanged()
 	if Bt.DrawLedger then
 		Bt.DrawLedger()

@@ -185,22 +185,56 @@ function Bt.Pace(mob)
 	return xp, seconds, xp and seconds and seconds > 0 and xp / seconds * 3600 or nil, pace[1]
 end
 
--- Vendor prices (C_Item.GetItemInfo's sellPrice), read once each. An item the client doesn't know
--- yet is asked for, once a session; when it comes, the window and the ledger redraw (once for a
--- bunch, a moment later).
-local prices = {}       -- item ID -> what it sells for, in copper
-local waiting = {}      -- item ID -> true: asked for, not here yet (false: came)
-local redrawSoon = false
-local namesWaiting = false -- quest items' names asked for too (NameOf, below): GET_ITEM_INFO_RECEIVED stays on
+-- Items the client doesn't know yet (for a price, a quest item's name, the ledger's search): each is
+-- asked for once a session (RequestLoadItemDataByID), and GET_ITEM_INFO_RECEIVED is listened to only
+-- while one is awaited. They come in bunches: half a second after the first, everything shown
+-- redraws once (Bt.Redraw: the window, the card, the ledger); one coming later redraws again.
+local ITEM_GAP = 0.5
+local asked = {}        -- item ID -> true: asked for this session
+local awaited = {}      -- item ID -> true: asked for, not here yet
+local itemsSoon = false -- a redraw is on its way
+local itemEvents = CreateFrame("Frame")
 
-local function PricesWaiting()
-	for _, wait in pairs(waiting) do
-		if wait then
-			return true
-		end
+function Bt.AskItem(id)
+	if asked[id] or type(id) ~= "number" or not (C_Item and C_Item.RequestLoadItemDataByID) then
+		return
 	end
-	return false
+	asked[id], awaited[id] = true, true
+	pcall(C_Item.RequestLoadItemDataByID, id)
+	itemEvents:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 end
+
+itemEvents:SetScript("OnEvent", function(_, _, id)
+	if issecret(id) or not awaited[id] then
+		return
+	end
+	awaited[id] = nil
+	if not next(awaited) then -- (all came: not listened to any more)
+		itemEvents:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
+	end
+	if not itemsSoon then
+		itemsSoon = true
+		C_Timer.After(ITEM_GAP, function()
+			itemsSoon = false
+			if Bt.Redraw then
+				Bt.Redraw()
+			end
+		end)
+	end
+end)
+
+-- Switched off: nothing awaited (what didn't come is asked for again when needed).
+local function ForgetAsked()
+	for id in pairs(awaited) do
+		asked[id] = nil
+	end
+	wipe(awaited)
+	itemEvents:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
+end
+
+-- Vendor prices (C_Item.GetItemInfo's sellPrice), read once each; one the client doesn't know yet
+-- counts as nothing until it comes (asked for: Bt.AskItem).
+local prices = {}       -- item ID -> what it sells for, in copper
 
 local function Price(id)
 	if prices[id] then
@@ -211,33 +245,7 @@ local function Price(id)
 		prices[id] = not issecret(sell) and type(sell) == "number" and sell or 0
 		return prices[id]
 	end
-	if waiting[id] == nil and C_Item and C_Item.RequestLoadItemDataByID then
-		waiting[id] = true
-		pcall(C_Item.RequestLoadItemDataByID, id)
-		events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-	end
-end
-
-local function PriceCame(id)
-	if issecret(id) or not waiting[id] then
-		return
-	end
-	waiting[id] = false
-	if not PricesWaiting() and not namesWaiting then -- (all came: not listened to any more)
-		events:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
-	end
-	if not redrawSoon then
-		redrawSoon = true
-		C_Timer.After(0.5, function()
-			redrawSoon = false
-			if Bt.Draw then
-				Bt.Draw()
-			end
-			if Bt.DrawLedger then
-				Bt.DrawLedger()
-			end
-		end)
-	end
+	Bt.AskItem(id)
 end
 
 -- What a kill of a kind brings on average, in copper: its coin and what its drops sell for at a
@@ -674,8 +682,6 @@ local wantsOld = true     -- the quest log changed since they were read
 local wantsSoon = false   -- a look after the changes is on its way (they come in bursts)
 local questIDs = {}       -- quests seen in the log (one under a collapsed header isn't listed)
 local itemNames = {}      -- item ID -> its name (the client's)
-local namesAsked = {}     -- item ID -> true: asked for once (the client didn't know it)
-local namesSoon = false   -- names came in: a redraw is on its way
 
 local function Plain(v)
 	if not issecret(v) then
@@ -765,8 +771,8 @@ local function QuestLogChanged()
 	end)
 end
 
--- An item's name: as you looted it, else the client's (asked for once when it doesn't know it yet:
--- GET_ITEM_INFO_RECEIVED redraws).
+-- An item's name: as you looted it, else the client's (asked for when it doesn't know it yet: it
+-- redraws when it comes).
 local function NameOf(id, item)
 	local name = item and item[4] or itemNames[id]
 	if name then
@@ -777,12 +783,7 @@ local function NameOf(id, item)
 		itemNames[id] = name
 		return name
 	end
-	if not namesAsked[id] and C_Item and C_Item.RequestLoadItemDataByID then
-		namesAsked[id] = true
-		namesWaiting = true
-		pcall(C_Item.RequestLoadItemDataByID, id)
-		events:RegisterEvent("GET_ITEM_INFO_RECEIVED")
-	end
+	Bt.AskItem(id)
 end
 
 -- How likely a kind of mob drops an item, per kill: the classic database's chance (for a quest item,
@@ -886,8 +887,8 @@ function Bt.ToggleWish(id, drop)
 		M:Print(("%s is on your wish list: mobs that drop it show it with a star, and a line here says when it drops.")
 			:format(LinkOf(id, name)))
 	end
-	if Bt.WishesChanged then
-		Bt.WishesChanged()
+	if Bt.Redraw then
+		Bt.Redraw() -- (its star everywhere)
 	end
 	return not wish
 end
@@ -1352,8 +1353,8 @@ local function OnLoot()
 	local fulfilled = WishKill(creature, mob, got, was ~= nil)
 	Log(creature, was and "looted (said empty before)" or "looted", items, check, guid)
 	Changed(creature)
-	if fulfilled and Bt.WishesChanged then
-		Bt.WishesChanged() -- (its star goes everywhere)
+	if fulfilled and Bt.Redraw then
+		Bt.Redraw() -- (its star goes everywhere)
 	end
 end
 
@@ -1420,20 +1421,6 @@ events:SetScript("OnEvent", function(_, event, a, b, c)
 		Bt.Look(a)
 	elseif event == "PLAYER_XP_UPDATE" then
 		OnXP()
-	elseif event == "GET_ITEM_INFO_RECEIVED" then -- itemID (only while a price or a quest item's name is asked for)
-		PriceCame(a)
-		if namesWaiting and not namesSoon then
-			namesSoon = true -- (names come in bunches: once, a moment later)
-			C_Timer.After(QUEST_GAP, function()
-				namesSoon, namesWaiting = false, false
-				if not PricesWaiting() then
-					events:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
-				end
-				if Bt.QuestsChanged then
-					Bt.QuestsChanged()
-				end
-			end)
-		end
 	elseif event == "PLAYER_REGEN_DISABLED" then -- (a fight began: the next kill's time starts here)
 		fightFrom, fightEnd, lastKillAt = GetTime(), nil, -math.huge
 	elseif event == "PLAYER_REGEN_ENABLED" then
@@ -1476,11 +1463,7 @@ function M:OnDisable()
 	events:UnregisterAllEvents()
 	wipe(pending)
 	wipe(recent)
-	for id, wait in pairs(waiting) do
-		if wait then
-			waiting[id] = nil -- (not listened to now: asked for again when needed)
-		end
-	end
+	ForgetAsked()
 	-- (switched off with the loot window open: its LOOT_CLOSED won't come, and the next window would
 	-- look already seen)
 	lootMoney, lootSource, lootSeen, looseXP, fightFrom = nil, nil, false, nil, nil

@@ -669,19 +669,23 @@ function GetMouseButtonClicked() return MOCK_BUTTON end
 function IsControlKeyDown() return STATE.ctrl == true end
 function IsShiftKeyDown() return STATE.shift == true end
 PENDING_ITEM_LOADS = {} -- items the client still has to ask the server for (MOCK_ITEM_UNCACHED)
+-- MOCK_ITEM_UNCACHED: an item ID the client doesn't know yet, or a set of them ({ [id] = true }).
+local function Uncached(id)
+	return MOCK_ITEM_UNCACHED == id or (type(MOCK_ITEM_UNCACHED) == "table" and MOCK_ITEM_UNCACHED[id] == true)
+end
 Item = { CreateFromItemLink = function(_, itemLink)
 	local id = tonumber(itemLink:match("item:(%d+)"))
 	return {
 		IsItemEmpty = function() return not ITEMS[id] end,
 		ContinueOnItemLoad = function(_, callback)
-			if MOCK_ITEM_UNCACHED == id then table.insert(PENDING_ITEM_LOADS, callback) else callback() end
+			if Uncached(id) then table.insert(PENDING_ITEM_LOADS, callback) else callback() end
 		end,
 	}
 end }
 C_Item.GetItemInfo = function(itemLink)
 	assert(itemLink ~= nil, "Usage: local itemInfo = C_Item.GetItemInfo(itemInfo)") -- not nilable, like the game's
 	local id = tonumber(tostring(itemLink):match("item:(%d+)"))
-	if ITEMS[id] and MOCK_ITEM_UNCACHED ~= id then
+	if ITEMS[id] and not Uncached(id) then
 		-- name, link, ..., the 11th: sellPrice (ITEMS[id].price, copper), the 14th: bindType
 		-- (ITEMS[id].bind: 1 = on pickup, 2 = on equip)
 		return ITEMS[id].name, ItemLink(id), ITEMS[id].quality, 1, 1, "", "", 1, "", 0, ITEMS[id].price or 0, 0, 0, ITEMS[id].bind or 0
