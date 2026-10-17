@@ -334,7 +334,9 @@ request gets an empty end). Beacon accepts 700 J messages per friend per minute.
 **Keeping the book small:** a minute after starting (the friend list is known by then), accounts
 that are no longer my Battle.net friends go, and characters with nothing in the last 60 days
 (`BOOK_DAYS`). An account's stamp that can't be real (more than a week ahead) is reset to 0 on
-start: everything is asked again. With "all my characters" off, playing another character than
+start: everything is asked again. My own last stamp that far ahead (`store.myU`: the clock was wrong
+once; friends drop records stamped beyond a week, and new stamps would go on from it) restamps
+everything of mine from now on start. With "all my characters" off, playing another character than
 last time restamps its records, so friends who hold the other one ask for it.
 
 **Known limit:** one stamp per account. Playing the same Battle.net account on two PCs (two

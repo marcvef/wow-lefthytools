@@ -7261,6 +7261,19 @@ section("Chronicle: spring cleaning")
 	check(chars["Carlfine-Realmy"] and chars["Carlfine-Realmy"].profile and chars["Carlfine-Realmy"].days[date("%Y-%m-%d")],
 		"what a real client sends is kept (a whole day played, a whole day AFK)")
 	chars["Carlfine-Realmy"], chars["Carlold-Realmy"] = nil, nil
+	-- My clock was weeks ahead once: friends drop every record of mine stamped after it, and every new
+	-- stamp went on from it. Switched on again, everything of mine is stamped anew from now.
+	CDB.myU = time() + 30 * 86400
+	lefthy("disable chronicle")
+	lefthy("enable chronicle")
+	local latest, week = 0, time() + 7 * 86400
+	for _, c in pairs(CDB.chars) do
+		latest = math.max(latest, c.sync.profileU or 0)
+		for _, u in pairs(c.sync.dayU) do latest = math.max(latest, u) end
+		for _, e in ipairs(c.events) do latest = math.max(latest, e.u or 0) end
+	end
+	check(CDB.myU <= week and latest <= week and latest > 0,
+		"my stamps from a clock weeks ahead: all anew from now, got " .. tostring(CDB.myU - time()) .. " s ahead")
 end)()
 
 section("Beacon: leaving")

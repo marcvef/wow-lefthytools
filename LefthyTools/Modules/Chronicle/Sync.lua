@@ -1768,9 +1768,19 @@ end
 function C.SyncEnable()
 	store = C.Store()
 	store.book = type(store.book) == "table" and store.book or {}
+	-- My last stamp from a clock that was more than a week ahead once: friends drop every record of
+	-- mine stamped after it (Plausible), and every new stamp would go on from it, for good. Everything
+	-- of mine is stamped anew from now.
+	local fromTheFuture = type(store.myU) == "number" and store.myU > time() + 7 * 86400
+	if fromTheFuture then
+		store.myU = nil
+	end
 	for _, c in pairs(store.chars) do
 		C.Fill(c)
 		Upgrade(c)
+		if fromTheFuture then
+			Restamp(c)
+		end
 	end
 	for _, c in pairs(store.chars) do
 		StampChar(c, false, true)
