@@ -568,7 +568,7 @@ local function LoadHero(hero, unit, form, classFile, face, again)
 	hero.Emblem:SetShown(not unit)
 	hero.Face:SetShown(hero.face ~= nil)
 	if not unit then
-		hero.model = nil
+		hero.model, hero.shownGrey = nil, nil -- (its look set anew on the next frame)
 		hero.Real:Hide()
 		hero.Shifted:Hide()
 		Emblem(hero.Emblem, classFile)
@@ -1216,6 +1216,14 @@ function S.BattleMoment(view, m, rare)
 	return true
 end
 
+-- A flash falls back (by fade of its alpha), while there's any.
+local function FadeFlash(flash, fade)
+	local alpha = flash:GetAlpha() or 0
+	if alpha > 0 then
+		flash:SetAlpha(math.max(0, alpha - fade))
+	end
+end
+
 -- Every frame: the action running (or the next), the models' moves, lunges, flashes, the spell.
 function S.BattleUpdate(view, elapsed)
 	local row = view.win.Foes
@@ -1249,11 +1257,14 @@ function S.BattleUpdate(view, elapsed)
 		Play(hero.model, now)
 	elseif hero.Emblem:IsShown() then -- (out of reach: greyed when dead, pulsing while casting)
 		local grey, alpha = hero.dead and true or false, hero.casting and 0.75 + 0.25 * math.sin(now * 6) or 1
-		hero.Emblem:SetDesaturated(grey)
-		hero.Emblem:SetAlpha(alpha)
-		if hero.face then -- (the bobblehead: nods as they step up, jolts back when hit, lolls over dead)
+		if grey ~= hero.shownGrey or alpha ~= hero.shownAlpha then -- (set when it changes: while casting, every frame)
+			hero.shownGrey, hero.shownAlpha = grey, alpha
+			hero.Emblem:SetDesaturated(grey)
+			hero.Emblem:SetAlpha(alpha)
 			hero.Face:SetDesaturated(grey)
 			hero.Face:SetAlpha(alpha)
+		end
+		if hero.face then -- (the bobblehead: nods as they step up, jolts back when hit, lolls over dead)
 			local tilt = hero.dead and DEAD_TILT or -0.5 * hero.dx / LUNGE + 0.4 * (hero.Flash:GetAlpha() or 0)
 			if math.abs(tilt - hero.tilt) > 0.01 then
 				hero.tilt = tilt
@@ -1267,7 +1278,7 @@ function S.BattleUpdate(view, elapsed)
 		hero:SetPoint("TOPLEFT", row, "TOPLEFT", hero.dx, 0)
 	end
 	local fade = math.min(1, elapsed * 4)
-	hero.Flash:SetAlpha(math.max(0, (hero.Flash:GetAlpha() or 0) - fade))
+	FadeFlash(hero.Flash, fade)
 	for _, slot in ipairs(row.slots) do
 		if slot:IsShown() then
 			Play(slot.Model, now)
@@ -1276,7 +1287,7 @@ function S.BattleUpdate(view, elapsed)
 				slot:ClearAllPoints()
 				slot:SetPoint("TOPLEFT", row, "TOPLEFT", (slot.x or 0) + slot.dx, 0)
 			end
-			slot.Flash:SetAlpha(math.max(0, (slot.Flash:GetAlpha() or 0) - fade))
+			FadeFlash(slot.Flash, fade)
 			local st = slot.key and b.foe[slot.key]
 			if st and st.deadAt and now - st.deadAt > DIE_TIME then
 				slot:SetAlpha(math.max(0, 1 - (now - st.deadAt - DIE_TIME) / FADE_TIME))
@@ -1310,7 +1321,7 @@ function S.BattleReset(view)
 		slot:Hide()
 	end
 	local hero = row.Hero
-	hero.who, hero.dx, hero.loaded, hero.face = nil, 0, false, nil
+	hero.who, hero.dx, hero.loaded, hero.face, hero.shownGrey = nil, 0, false, nil, nil
 	hero.Away:Hide()
 	hero.Emblem:Hide()
 	hero.Face:Hide()

@@ -5029,6 +5029,25 @@ do
 			view.kind, target.level, target.class = "friend", 5, nil
 		end
 
+		-- Every frame of an open window costs little: what didn't change isn't set again (the cast's
+		-- name while it fills its bar, a flash at rest).
+		do
+			local now = GetTime()
+			view.kind, view.looked = "me", nil
+			view.picture = { mobs = {}, recent = {}, moments = {}, looked = -2,
+				cast = { name = "Frostbolt", icon = 100116, spellID = 116, start = now - 1, finish = now + 1.5 } }
+			local name, flash = view.win.Act.Name, view.win.Foes.Hero.Flash
+			flash:SetAlpha(0)
+			local texts, flashes, setText, setAlpha = 0, 0, name.SetText, flash.SetAlpha
+			name.SetText = function(self, ...) texts = texts + 1 return setText(self, ...) end
+			flash.SetAlpha = function(self, ...) flashes = flashes + 1 return setAlpha(self, ...) end
+			for _ = 1, 3 do view.win._scripts.OnUpdate(view.win, 0.016) end
+			name.SetText, flash.SetAlpha = setText, setAlpha
+			check(texts == 1 and flashes == 0 and name:GetText() == "Frostbolt",
+				"three frames of a cast: its name set once, a flash at rest left alone; got " .. texts .. ", " .. flashes)
+			view.kind = "friend"
+		end
+
 		-- Hovering a foe whose kind I've killed: my drops with what the classic database says of them,
 		-- as on the Bestiary's own card (a drop only while on a quest has its quest mark).
 		do

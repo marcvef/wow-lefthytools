@@ -402,7 +402,8 @@ local function ShowSelf(view)
 end
 
 -- The row under the radar: the spell being cast (icon, name, a bar that fills while casting and
--- empties while channelling), and the last spells on the right, fading.
+-- empties while channelling), and the last spells on the right, fading. Every frame: only the bar
+-- and the fading change then, the rest is set when it changes.
 local function ShowDoing(view, now)
 	local act, picture = view.win.Act, view.picture
 	local cast = picture.cast
@@ -418,12 +419,19 @@ local function ShowDoing(view, now)
 			act.icon = cast.icon
 			act.Icon:SetTexture(cast.icon)
 		end
-		act.Icon:Show()
-		act.Name:SetText(cast.name)
+		if act.name ~= cast.name then
+			act.name = cast.name
+			act.Name:SetText(cast.name)
+		end
 		act.Bar:SetWidth(math.max(1, CAST_BAR * p))
-		act.Bar:Show()
-		act.BarBack:Show()
-	else
+		if not act.casting then
+			act.casting = true
+			act.Icon:Show()
+			act.Bar:Show()
+			act.BarBack:Show()
+		end
+	elseif act.casting ~= false then
+		act.casting, act.name = false, nil
 		act.Icon:Hide()
 		act.Name:SetText("")
 		act.Bar:Hide()
@@ -536,7 +544,10 @@ local function OnUpdate(win, elapsed)
 		if not ok or issecret(north) or issecret(west) or issecret(continent) then
 			north, continent = nil, nil
 		end
-		S.MoveMap(view, north, west, continent, Value("C_Map.GetBestMapForUnit", "player"))
+		if due then -- (the zone: every LOOK_GAP is enough, the place every frame)
+			view.myMapID = Value("C_Map.GetBestMapForUnit", "player")
+		end
+		S.MoveMap(view, north, west, continent, view.myMapID)
 		facing = view.kind == "me" and Value("GetPlayerFacing") or 0 -- (yours: every frame, smooth)
 	end
 	if facing ~= win.Me.facing then
