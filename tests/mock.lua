@@ -900,6 +900,22 @@ CreateFrame("Frame", "ChatFrame1Tab", GeneralDockManager) -- docked tab: child o
 CreateFrame("Frame", "ChatFrame2", UIParent)
 CreateFrame("Frame", "ChatFrame2Tab", UIParent) -- undocked tab
 CHAT_FRAMES = { "ChatFrame1", "ChatFrame2" }
+-- A whisper in a window of its own (FloatingChatFrame: temporary windows are ChatFrame11 and up):
+-- FCF_OpenTemporaryWindow lists it in CHAT_FRAMES, FCF_Close takes it away. Made here, hidden, not
+-- when opened (a frame made by a test would count as a leaked global).
+CreateFrame("Frame", "ChatFrame11", UIParent)
+ChatFrame11:Hide()
+function FCF_OpenTemporaryWindow()
+	CHAT_FRAMES[#CHAT_FRAMES + 1] = "ChatFrame11"
+	ChatFrame11:Show()
+	return ChatFrame11
+end
+function FCF_Close(frame)
+	frame:Hide()
+	for i = #CHAT_FRAMES, 1, -1 do
+		if CHAT_FRAMES[i] == frame:GetName() then table.remove(CHAT_FRAMES, i) end
+	end
+end
 NOT_A_FRAME = "string global"
 CreateFrame("Frame", "EditModeManagerFrame", UIParent)
 EditModeManagerFrame:Hide()

@@ -48,8 +48,8 @@ Mirage fades the default HUD when the player is out of combat and idle (like Dun
   resumes (paused: the icon greyed with "II"), Shift-click pauses for good (an orange "II"),
   right-click opens Mirage's settings. As a child of
   the minimap it fades with the minimap group: hover the minimap to reach it.
-- **Enable/disable:** `OnEnable` registers events, re-adopts frames (`Rebuild`) and starts the
-  driver. `OnDisable` unregisters events and fades everything to 1; `FinishStopping` releases
+- **Enable/disable:** `OnEnable` installs the hooks (once), registers events, re-adopts frames
+  (`Rebuild`) and starts the driver. `OnDisable` unregisters events and fades everything to 1; `FinishStopping` releases
   every frame to its base alpha, re-shows the minimap and removes the OnUpdate script. `SetAlpha`
   hooks can't be removed, but with no owner they only keep tracking the base alpha.
 - **Minimap quest areas ("blobs")** are engine-drawn inside `Minimap` and ignore frame alpha.
@@ -94,7 +94,11 @@ Mirage fades the default HUD when the player is out of combat and idle (like Dun
   Mirage off: the engine adopts the frames (`Rebuild`) and runs the driver just for this, with
   `stopping` set, so once no owner hides anything and every group is back at 1, `FinishStopping`
   hands the frames back and the driver stops. A hidden minimap group also hides the `Minimap`
-  frame at 0 (its quest areas ignore alpha), shown again as it starts fading in.
+  frame at 0 (its quest areas ignore alpha), shown again as it starts fading in. The post-hooks
+  on Blizzard functions (`InstallHooks`: the chat window `FCF_*` functions, `ToggleMinimap`) go in
+  when the engine first runs, from `OnEnable` or from `HideGroups`, so with Mirage never switched
+  on the Toggle Minimap key still can't bring a minimap hidden for the film back, and a chat
+  window opening during the film is adopted (`RequestRebuild` works while `stopping`).
 
 ## Ideas
 

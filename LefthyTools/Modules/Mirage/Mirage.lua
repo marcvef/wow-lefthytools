@@ -69,6 +69,10 @@ end
 -- owner -> { [group key] = true }. Hidden there beats everything else.
 local overrides = {}
 local pendingFade -- seconds for the fades the latest HideGroups call starts (nil: Mirage's own)
+-- The engine runs with Mirage off: fading everything back after Mirage was switched off, or for
+-- another part's HideGroups. Once nothing is hidden and every group is back at 1, FinishStopping
+-- hands the frames back and the driver stops.
+local stopping = false
 
 local function OverrideHidden(key)
 	for _, set in pairs(overrides) do
@@ -302,11 +306,33 @@ function M:Rebuild()
 	end
 end
 
--- Debounced; the rebuild itself runs from the OnUpdate driver (see below).
+-- Debounced; the rebuild itself runs from the OnUpdate driver (see below). Also while the engine
+-- runs with Mirage off (a flight's film): a chat window opening then is hidden with the others.
 local rebuildAt
 function M:RequestRebuild()
-	if self.enabled and not rebuildAt then
+	if (self.enabled or stopping) and not rebuildAt then
 		rebuildAt = GetTime() + 0.2
+	end
+end
+
+-- Post-hooks on Blizzard functions, once (they can't be removed; with nothing to do they return at
+-- once): chat windows docking, opening and closing need a rebuild, and the Toggle Minimap key is
+-- watched while a minimap is hidden. Installed when the engine first runs, by Mirage or by another
+-- part's HideGroups with Mirage off: a flight's film hides the minimap too, and the key would bring
+-- it back over the film, quest areas and all.
+local hooksInstalled = false
+local function InstallHooks()
+	if hooksInstalled then
+		return
+	end
+	hooksInstalled = true
+	for _, name in ipairs({ "FCF_DockFrame", "FCF_UnDockFrame", "FCF_OpenTemporaryWindow", "FCF_Close" }) do
+		if type(_G[name]) == "function" then
+			hooksecurefunc(name, function() M:RequestRebuild() end)
+		end
+	end
+	if type(ToggleMinimap) == "function" then
+		hooksecurefunc("ToggleMinimap", OnToggleMinimap)
 	end
 end
 
@@ -539,7 +565,6 @@ end
 local driver = CreateFrame("Frame")
 local sinceTick, sinceEnforce = 0, 0
 local evaluatePending = false
-local stopping = false -- disabled: finishing the fade-in before handing frames back
 
 -- Evaluate on the next frame (from the driver), not in the caller's context.
 local function RequestEvaluate()
@@ -709,6 +734,9 @@ function M:HideGroups(ownerKey, hidden, fade)
 	if not db then
 		return
 	end
+	if set then
+		InstallHooks()
+	end
 	if set and not driver:GetScript("OnUpdate") then
 		self:Rebuild() -- Mirage is off: adopt the frames now
 		driver:SetScript("OnUpdate", OnUpdate)
@@ -731,7 +759,6 @@ end
 
 local events = CreateFrame("Frame")
 local handlers = {}
-local chatHooksInstalled = false
 
 local EVENTS = {
 	"ADDON_LOADED", "PLAYER_ENTERING_WORLD", "EDIT_MODE_LAYOUTS_UPDATED", "UPDATE_CHAT_WINDOWS",
@@ -769,17 +796,7 @@ end
 
 function M:OnEnable()
 	stopping = false
-	if not chatHooksInstalled then
-		chatHooksInstalled = true
-		for _, name in ipairs({ "FCF_DockFrame", "FCF_UnDockFrame", "FCF_OpenTemporaryWindow", "FCF_Close" }) do
-			if type(_G[name]) == "function" then
-				hooksecurefunc(name, function() M:RequestRebuild() end)
-			end
-		end
-		if type(ToggleMinimap) == "function" then
-			hooksecurefunc("ToggleMinimap", OnToggleMinimap)
-		end
-	end
+	InstallHooks()
 
 	for _, event in ipairs(EVENTS) do
 		pcall(events.RegisterEvent, events, event)

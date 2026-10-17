@@ -44,6 +44,13 @@ check(PRINTED[versionMark] and PRINTED[versionMark]:find("0.4.0-3-gabc1234", 1, 
 section("framework")
 check(Mirage and not Mirage.enabled and LefthyToolsDB.modules.mirage == false, "Mirage is off by default (opt-in)")
 check(LT:GetModule("tweaks").enabled and LT:GetModule("beacon").enabled, "the other modules are on by default")
+do -- Mirage never on yet: a flight's film runs its engine (HideGroups), and the Toggle Minimap key mustn't
+	-- bring a minimap hidden for the film back over it (its quest areas ignore opacity). (No time passes here.)
+	local key = ToggleMinimap
+	Mirage:HideGroups("test", { minimap = true }, 0)
+	check(ToggleMinimap ~= key, "Mirage off: a film hiding the minimap watches the Toggle Minimap key too")
+	Mirage:HideGroups("test", nil, 0)
+end
 lefthy("enable mirage")
 Advance(0.3) -- let the debounced rebuild run
 check(Mirage.enabled, "mirage switched on")
@@ -8527,6 +8534,30 @@ check(LefthyToolsNewsFrame:IsShown(), "the settings overview's What's new button
 LefthyToolsNewsFrame:Hide()
 Advance(10)
 check(not LefthyToolsNewsFrame:IsShown(), "nothing new: it doesn't open again")
+
+-- (Sections down here can let time pass without shifting any other section's timing.)
+section("Mirage: another part's hiding with Mirage off")
+do
+	local wasOn = Mirage.enabled
+	if wasOn then
+		lefthy("disable mirage")
+		Advance(3)
+	end
+	Mirage:HideGroups("test", { chat = true }, 0)
+	Advance(0.3)
+	check(a("ChatFrame1") == 0 and a("MainActionBar") == 1, "Mirage off: the chat goes for the film, the rest stays")
+	local whisper = FCF_OpenTemporaryWindow() -- a whisper in a window of its own
+	Advance(0.5)
+	check(whisper:GetAlpha() == 0, "a chat window opening during the film goes with the chat, got " .. whisper:GetAlpha())
+	Mirage:HideGroups("test", nil, 0)
+	Advance(0.5)
+	check(whisper:GetAlpha() == 1 and a("ChatFrame1") == 1, "after the film: back")
+	FCF_Close(whisper)
+	if wasOn then
+		lefthy("enable mirage")
+		Advance(0.5)
+	end
+end
 
 check(#ERRORS == 0, "no errors reported through the error handler")
 
