@@ -356,6 +356,10 @@ show what a mob you haven't killed can drop (two settings, both off). Quest item
 but may differ, so your own numbers are never mixed with the database's. Beacon's fight stream
 takes mobs' health from it too. `/bestiary data` says whether the database is there.
 
+**Quest drops.** While one of your quests wants an item a mob can drop (in your loot or the drop
+database), the window says so under the mob: "Gnoll Paw: 3/8, 40% each, about 12 more kills". The
+card beside the mouse gets one more small line for it, also over a mob you haven't killed yet.
+
 Minimap button: click for the window, **Shift-click** to switch the drops next to the mouse on
 or off, Ctrl-click for the ledger, right-click for the settings. `/bestiary log` shows what was
 made of your last loot windows (to see why something wasn't counted).

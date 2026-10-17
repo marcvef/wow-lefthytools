@@ -7134,6 +7134,88 @@ section("Bestiary: what mobs drop")
 	win.Close:Click()
 end)()
 
+section("Bestiary: quest drops while questing")
+;(function()
+	local Bt = ns.Bestiary
+	local function setting(id) return REGISTERED_SETTINGS["LefthyTools_bestiary_" .. id] end
+	local savedQuests = QUESTS
+	ITEMS[1019] = ITEMS[1019] or { name = "Red Linen Bandana", quality = 1 }
+	-- Quests wanting items: written the classic way ("Name: 2/6") or the modern one ("0/2 Name", the
+	-- numbers given too). The Defias Bandit (116) drops the bandana (the classic database: a quest
+	-- item, 66%) and the mace (only yours: 1 in 5 kills).
+	QUESTS = {
+		{ id = 301, title = "The Defias Brotherhood", objectives = { { text = "Red Linen Bandana: 2/6", finished = false } } },
+		{ id = 302, title = "Milk Run", objectives = {
+			{ text = "0/2 Ice Cold Milk", finished = false, type = "item", numFulfilled = 0, numRequired = 2 },
+			{ text = "Priest's Mace: 0/1", finished = false } } },
+	}
+	Fire("QUEST_LOG_UPDATE")
+	MOCK_ITEM_UNCACHED = 1019 -- (the client doesn't know the bandana yet)
+	MOBS.target, STATE.target = { name = "Defias Bandit", level = 9, guid = "Creature-0-1-0-1-116-00000060" }, true
+	Bt.Toggle(true)
+	local win = Bt.Frames()
+	check(win:IsShown() and win.Quest:IsShown() and not win.Quest:GetText():find("Bandana", 1, true)
+		and win.Quest:GetText():find("Priest's Mace: 0/1, 20% each, about 5 more kills", 1, true),
+		"the window: a quest wants its mace (your chance, 1 in 5 kills); the bandana's name isn't known yet")
+	MOCK_ITEM_UNCACHED = nil
+	Fire("GET_ITEM_INFO_RECEIVED", 1019, true)
+	Advance(0.6)
+	local text = win.Quest:GetText()
+	check(text:find("^|T[^|]*AvailableQuestIcon:12:12|t Red Linen Bandana: 2/6, 66%% each, about 6 more kills\n")
+		and text:find("Priest's Mace", 1, true) and select(3, win.Grid:GetPoint(1)) < -70,
+		"its name came: a line for it too (the database's quest chance, 4 more: about 6 kills), the quest's ! in front, the drops under them")
+	-- The gnoll: the milk (the database's 10%) and the mace (yours: 1 in 3).
+	MOBS.target = { name = "Riverpaw Gnoll", level = 10, guid = "Creature-0-1-0-1-117-00000061" }
+	Fire("PLAYER_TARGET_CHANGED")
+	text = win.Quest:GetText()
+	check(text:find("Ice Cold Milk: 0/2, 10% each, about 20 more kills", 1, true) and text:find("Priest's Mace: 0/1, 33% each, about 3 more kills", 1, true)
+		and not text:find("Bandana", 1, true), "another mob: what the quests want of its drops, with its chances")
+	-- The log changes often: once, half a second later.
+	QUESTS[2].objectives[1] = { text = "1/2 Ice Cold Milk", finished = false, type = "item", numFulfilled = 1, numRequired = 2 }
+	for _ = 1, 3 do Fire("QUEST_LOG_UPDATE") end
+	check(win.Quest:GetText():find("0/2", 1, true), "the quest log changed: not at once (it changes often)")
+	Advance(0.6)
+	check(win.Quest:GetText():find("Ice Cold Milk: 1/2, 10% each, about 10 more kills", 1, true), "half a second later: 1/2, about 10 more")
+	QUESTS[2].objectives[1] = { text = "2/2 Ice Cold Milk", finished = true, type = "item", numFulfilled = 2, numRequired = 2 }
+	Fire("BAG_UPDATE_DELAYED")
+	Advance(0.6)
+	text = win.Quest:GetText()
+	check(text:find("^|T[^|]*AvailableQuestIcon[^\n]*Priest's Mace") and text:find("ReadyCheck-Ready:12:12|t |cff888888Ice Cold Milk: 2/2|r", 1, true),
+		"done: a tick, grey, after the ones still wanted")
+	-- The card beside the mouse: one line more, for a quest still wanting one of its drops.
+	setting("hoverCard"):SetValue(true)
+	MOBS.mouseover = { name = "Riverpaw Gnoll", level = 10, guid = "Creature-0-1-0-1-117-00000062", pinned = true }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	local card = select(2, Bt.Frames())
+	check(card:IsShown() and card.Kills:GetText():find("3 kills", 1, true) and card.cells[1]:IsShown() and card.Quest:IsShown()
+		and card.Quest:GetText():find("Priest's Mace: 0/1, 33% each, about 3 more kills", 1, true)
+		and not card.Quest:GetText():find("Milk", 1, true) and select(2, card:GetSize()) == 80,
+		"the card: its kills, its drops, and a line for the quest still wanting one (not the one done)")
+	-- A mob you haven't killed: the card too, when a quest wants its drop (not otherwise).
+	MOBS.mouseover = { name = "Young Wolf", level = 2, guid = "Creature-0-1-0-1-118-00000063", pinned = true }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	check(not card:IsShown(), "a mob not killed yet, no quest wanting its drops: no card")
+	QUESTS[3] = { id = 303, title = "Pelts", objectives = { { text = "Ruined Pelt: 1/5", finished = false } } }
+	Fire("QUEST_LOG_UPDATE")
+	Advance(0.6)
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	check(card:IsShown() and card.Kills:GetText():find("Not killed yet", 1, true) and not card.cells[1]:IsShown()
+		and card.Quest:GetText():find("Ruined Pelt: 1/5, 40% each, about 10 more kills", 1, true) and select(2, card:GetSize()) < 50,
+		"a quest wants its drop: the card for a mob not killed yet, a line and the quest's (no icons)")
+	QUESTS[3] = nil
+	Fire("QUEST_LOG_UPDATE")
+	Advance(0.6)
+	check(not card:IsShown(), "the quest gone: the card goes")
+	MOBS.mouseover = nil
+	Advance(0.1)
+	setting("hoverCard"):SetValue(false)
+	QUESTS, MOBS.target, STATE.target = savedQuests, nil, false
+	Fire("QUEST_LOG_UPDATE")
+	Advance(0.6)
+	check(not win.Quest:IsShown(), "no quest wanting its drops: no line")
+	Bt.Toggle(false)
+end)()
+
 section("Misc Tweaks: who has aggro, on enemy nameplates")
 ;(function()
 	local function tagText(unit) local t = ns.GetAggroTag(unit); return t and t:IsShown() and t.Text:GetText() or nil end

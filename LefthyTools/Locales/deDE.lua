@@ -874,6 +874,9 @@ L["The drops next to the mouse don't show while you're in combat, and go when a 
 	"Die Drops neben der Maus erscheinen nicht, während du im Kampf bist, und verschwinden, wenn ein Kampf beginnt."
 L["Under your target's drops in the window, what the drop database says it drops that you haven't had yet, faded (a mob you haven't killed: what it can drop). The ledger always shows it."] =
 	"Unter den Drops deines Ziels im Fenster, verblasst, was er laut Drop-Datenbank droppt und du noch nicht hattest (bei einem Mob, den du noch nicht getötet hast: was er droppen kann). Das Verzeichnis zeigt es immer."
+L["%s: %d/%d"] = "%s: %d/%d"
+L["%s: %d/%d, %s each, about 1 more kill"] = "%s: %d/%d, %s pro Kill, noch etwa 1 Kill"
+L["%s: %d/%d, %s each, about %d more kills"] = "%s: %d/%d, %s pro Kill, noch etwa %d Kills"
 L["Who has aggro, on enemy nameplates"] = "Wer Aggro hat, auf feindlichen Namensplaketten"
 L["In a group, the left end of each enemy's health bar says whom it's on: >YOU< when it's you, else the first three letters of their name in the colour of their role (tank blue, healer green, damage red, white when not known). Roles come from the dungeon finder or a role check; in a group you made yourself, the leader can start one below."] =
 	"In einer Gruppe zeigt das linke Ende des Lebensbalkens jedes Gegners, auf wem er ist: >DU<, wenn du es bist, sonst die ersten drei Buchstaben des Namens in der Farbe der Rolle (Tank blau, Heiler grün, DD rot, weiß, wenn unbekannt). Die Rollen kommen aus dem Dungeonbrowser oder einem Rollencheck; in einer selbst erstellten Gruppe kann der Anführer unten einen starten."

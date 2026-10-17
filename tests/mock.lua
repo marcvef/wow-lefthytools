@@ -984,7 +984,8 @@ function OpenBags() -- what Blizzard does when the bag opens
 end
 function CloseBags() ContainerFrameCombinedBags:Hide() end
 
--- Quest log: QUESTS = { { id, title, objectives = { { text, finished } } , complete, header } }
+-- Quest log: QUESTS = { { id, title, objectives = { { text, finished [, type, numFulfilled, numRequired] } } ,
+-- complete, header } } (type and the numbers: as the modern client gives them, when a test sets them)
 QUESTS = {}
 local function FindQuest(id) for _, q in ipairs(QUESTS) do if q.id == id then return q end end end
 C_QuestLog = {
@@ -1006,7 +1007,9 @@ C_QuestLog = {
 		local q = FindQuest(id)
 		if not q then return nil end
 		local list = {}
-		for i, o in ipairs(q.objectives) do list[i] = { text = o.text, finished = o.finished } end
+		for i, o in ipairs(q.objectives) do
+			list[i] = { text = o.text, finished = o.finished, type = o.type, numFulfilled = o.numFulfilled, numRequired = o.numRequired }
+		end
 		return list
 	end,
 	IsComplete = function(id)

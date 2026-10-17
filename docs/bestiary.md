@@ -168,13 +168,43 @@ Setting `hoverCard` (off by default). Over an enemy (attackable or dead) you've 
 12s each" (no coin: nothing said, unlike the window's "no coin") and its 6 likeliest drops (22 px, chance under each), at the cursor's lower right,
 `TOOLTIP` strata, no mouse. An OnUpdate while it's shown follows the cursor and hides it once the
 mouseover is gone or another unit. **Small on purpose** (the user: it mustn't be "too large and
-intrusive"): one line and one row of 6, never more. **Not in combat** (setting `cardHideInCombat`,
+intrusive"): one line and one row of 6, never more (a quest's line, below, the only one more). **Not in combat** (setting `cardHideInCombat`,
 on; the user: not "infight"): `InCombatLockdown()`, checked when the mouseover changes and in its
 OnUpdate (it goes when a fight starts); `PLAYER_REGEN_ENABLED` looks at the mouseover again, so it
 comes back if the mouse is still over an enemy. A mob killed before shows only your drops (no
 database cells on top); one you haven't killed, with the setting `cardUnseen` (off, like the
 window's `windowUnseen`: the user wanted neither by default), shows the database's 6 likeliest,
 faded, under "Not killed yet: classic database"; without it, no card.
+
+## Quest drops
+
+While a quest wants an item a mob can drop, the window and the card say so (the user: "Gnoll Paw:
+3/8, 40% each, about 12 more kills").
+
+- **What your quests want**: `C_QuestLog.GetQuestObjectives` of each quest in the log (`GetInfo`;
+  one under a collapsed header isn't listed, so quests seen once are remembered until
+  `GetLogIndexForQuestID` no longer finds them, like the quest announcements). Name and counts from
+  the text, "Gnoll Paw: 3/8" (classic) or "3/8 Gnoll Paw" (the modern client), a "(Complete)" behind
+  it dropped; `numFulfilled` and `numRequired` instead when the client gives them. Done: `finished`
+  or have >= need. Two quests wanting the same item: the bigger need.
+- **Matched by name**: an objective doesn't say which item it is, so a mob's possible drops (its
+  record's and the classic database's) are matched by the item's name, case ignored: the name as
+  looted, else `C_Item.GetItemInfo` (kept; one the client doesn't know is asked for once,
+  `RequestLoadItemDataByID`, and `GET_ITEM_INFO_RECEIVED`, listened to only then, redraws half a
+  second later).
+- **The numbers** (`Bt.QuestDrops(creature, mob)`, `Bt.ChanceOf`): the chance per kill is the
+  classic database's (for a quest item its chance while on the quest), else yours (drops / kills);
+  about how many more kills = what's left / (chance x how many come per drop: yours, 1 before you've
+  had one), at least 1. No chance known: only the counts.
+- **When**: `QUEST_LOG_UPDATE` and `BAG_UPDATE_DELAYED` (they come often) only mark the objectives
+  old; whatever looks next reads them again. Half a second after the first of a burst, if the window
+  or the card is up and what the quests want changed (compared as text), they redraw, once.
+- **The window**: a line each under the header (at most 3), the quest's "!" in front, the ones still
+  wanted first; done: a tick, grey. The drops move down under them.
+- **The card**: one more small line, the first still wanted ("+1" when another wants more of its
+  drops), cut at 250 px; done ones aren't shown. It also comes up over a mob you haven't killed when
+  a quest wants its drop, without `cardUnseen`: "Not killed yet: classic database" and the quest's
+  line, no icons.
 
 ## Item tooltips
 
@@ -227,7 +257,8 @@ yet beside the mouse (off). `/bestiary`
 ## Cost
 
 Event handlers only: `PARTY_KILL`, `LOOT_READY`, `LOOT_CLOSED`, the player's
-`UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added, leaving combat. The window redraws when its
+`UNIT_SPELLCAST_SUCCEEDED`, target/mouseover changes, nameplates added, leaving combat, and
+`QUEST_LOG_UPDATE`/`BAG_UPDATE_DELAYED` (a flag, then one look half a second later). The window redraws when its
 mob's record changes or the target does; the card's OnUpdate runs only while it's shown.
 
 ## To check in game
@@ -239,3 +270,5 @@ mob's record changes or the target does; the card's OnUpdate runs only while it'
   strings) is only a moment, also when the fight stream asks for it in a fight.
 - How close the classic database's health is to Forever's (the fight stream's learned ratio from
   two kills on tells).
+- How Forever writes item objectives ("Gnoll Paw: 3/8" or "3/8 Gnoll Paw") and whether it gives
+  `numFulfilled`/`numRequired`; that they update while looting.

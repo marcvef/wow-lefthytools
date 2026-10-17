@@ -308,5 +308,8 @@ ns.CHANGELOG = {
 	{ id = 100, module = "beacon",
 		en = { "Fight stream: who has aggro", "In a group, each mob in the battle row shows who has its aggro, like the nameplate tags: >YOU< or the first three letters of their name in their role's colour. Friends on an older LefthyTools don't send it (nothing breaks)." },
 		de = { "Kampf-Stream: wer Aggro hat", "In einer Gruppe zeigt jeder Mob in der Kampfreihe, wer Aggro hat, wie auf den Namensplaketten: >DU< oder die ersten drei Buchstaben des Namens in der Farbe seiner Rolle. Freunde mit einem älteren LefthyTools schicken das nicht (es geht nichts kaputt)." } },
+	{ id = 101, module = "bestiary",
+		en = { "Quest drops while questing", "While a quest wants an item a mob drops, the Bestiary window shows how far you are, its chance and about how many more kills. The drops beside the mouse get one small line for it." },
+		de = { "Quest-Drops beim Questen", "Will eine Quest ein Item, das ein Mob droppt, zeigt das Bestiary-Fenster deinen Stand, die Chance und wie viele Kills es etwa noch braucht. Die Drops neben der Maus bekommen eine kleine Zeile dazu." } },
 	-- New entries go here, at the end.
 }

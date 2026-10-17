@@ -22,6 +22,10 @@ local M = Bt.module
 -- item's tooltip, the database's chance and how many you'd have expected by now; for a mob you
 -- haven't killed, what it can drop. The card shows that for a mob you haven't killed with the
 -- setting cardUnseen (off, like the window's: the user wanted both without it).
+--
+-- Quest drops (Bestiary.lua): while a quest wants an item this mob drops, the window has a line for
+-- it under the header ("Gnoll Paw: 3/8, 40% each, about 12 more kills", the quest's "!" in front)
+-- and the card one more small line, also over a mob you haven't killed yet.
 
 local WIDTH = 236
 local PAD = 10
@@ -34,6 +38,8 @@ local CARD_ICON, CARD_GAP, CARD_CELLS = 22, 5, 6
 local KNOWN_ICON, KNOWN_GAP, KNOWN_ROWS = 22, 6, 2 -- not seen yet (the classic database): smaller, faded
 local KNOWN_PER_ROW = math.floor((WIDTH - 2 * PAD + KNOWN_GAP) / (KNOWN_ICON + KNOWN_GAP))
 local KNOWN_HEAD = 16   -- its heading's height
+local QUEST_LINES = 3   -- quests wanting its drops: a line each in the window, at most
+local CARD_QUEST_W = 250 -- the card's quest line, at most (longer: cut)
 local UNSEEN_ALPHA = 0.5
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
 local QUEST_ICON = "Interface\\GossipFrame\\AvailableQuestIcon"
@@ -140,6 +146,20 @@ local function KillsLine(mob, short)
 	return text
 end
 Bt.KillsLine, Bt.Coins = KillsLine, Coins
+
+-- A quest wanting this mob's drop (Bt.QuestDrops): "Gnoll Paw: 3/8, 40% each, about 12 more kills"
+-- after the quest's "!" (the chance: the classic database's, else yours); done: a tick, grey.
+local function QuestLine(want)
+	local counts = L["%s: %d/%d"]:format(want.name, want.have, want.need)
+	if want.done then
+		return ("|T%s:12:12|t |cff888888%s|r"):format(ALL_FOUND, counts)
+	elseif want.more == 1 then
+		counts = L["%s: %d/%d, %s each, about 1 more kill"]:format(want.name, want.have, want.need, Percent(want.chance))
+	elseif want.more then
+		counts = L["%s: %d/%d, %s each, about %d more kills"]:format(want.name, want.have, want.need, Percent(want.chance), want.more)
+	end
+	return ("|T%s:12:12|t "):format(QUEST_ICON) .. counts
+end
 
 ---------------------------------------------------------------------------
 -- A drop: its icon, edged in its quality's colour, how many in the corner, the chance under it
@@ -541,6 +561,12 @@ local function Build()
 	line:SetHeight(1)
 	line:SetPoint("TOPLEFT", PAD, -HEADER + 4)
 	line:SetPoint("TOPRIGHT", -PAD, -HEADER + 4)
+	-- Quests wanting its drops: a line each, under the header.
+	win.Quest = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	win.Quest:SetPoint("TOPLEFT", PAD, -HEADER)
+	win.Quest:SetWidth(WIDTH - 2 * PAD)
+	win.Quest:SetJustifyH("LEFT")
+	win.Quest:SetSpacing(2)
 
 	-- The drops, and a line under them when there's something to say.
 	win.Grid = CreateFrame("Frame", nil, win)
@@ -585,9 +611,19 @@ local function Draw()
 	win.Name:SetText(name or "Bestiary") -- (module names aren't translated)
 	win.Kind:SetText(shown and Kind({ level = info.level or mob and mob.level, class = info.class or mob and mob.class }) or "")
 	win.Kills:SetText(mob and KillsLine(mob) or "")
+	-- Quests wanting its drops (the ones still wanted first), then its drops under them.
+	local wanted, lines = Bt.QuestDrops(shown, mob), {}
+	for i = 1, math.min(#wanted, QUEST_LINES) do
+		lines[i] = QuestLine(wanted[i])
+	end
+	win.Quest:SetText(table.concat(lines, "\n"))
+	win.Quest:SetShown(#lines > 0)
+	local quests = #lines > 0 and math.ceil(win.Quest:GetStringHeight()) + 6 or 0
+	win.Grid:ClearAllPoints()
+	win.Grid:SetPoint("TOPLEFT", PAD + 1, -HEADER - 4 - quests)
 	local drops = Bt.Drops(mob, M.db.showPoor, shown)
 	local rows = Lay(win.Grid, win.cells, drops, mob and mob.kills or 0, ICON, GAP, PER_ROW, PER_ROW * ROWS, true)
-	local height = HEADER + rows * (CELL_H + 4)
+	local height = HEADER + quests + rows * (CELL_H + 4)
 	-- What the classic database says it drops that you haven't had yet (for a mob you haven't
 	-- killed: what it can drop), when that's switched on for the window.
 	local unseen, found, total
@@ -629,7 +665,7 @@ local function Draw()
 	if IsInGroup and IsInGroup() then
 		notes[#notes + 1] = L["In a group: kills aren't counted (the loot is shared)."]
 	end
-	local any = rows > 0 or known
+	local any = rows > 0 or known or quests > 0
 	win.Note:ClearAllPoints()
 	win.Note:SetPoint("TOP", win, "TOP", 0, -height - (any and 0 or 6))
 	win.Note:SetText(table.concat(notes, "\n"))
@@ -736,6 +772,9 @@ local function BuildCard()
 	card.Grid:SetPoint("TOPLEFT", 8, -24)
 	card.Grid:SetSize(CARD_CELLS * (CARD_ICON + CARD_GAP), CARD_ICON + LINE)
 	card.cells = {}
+	card.Quest = card:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	card.Quest:SetJustifyH("LEFT")
+	card.Quest:SetWordWrap(false)
 	card:SetScript("OnUpdate", CardFollow)
 end
 
@@ -743,7 +782,8 @@ end
 -- intrusive"): a line and one row of CARD_CELLS icons, never more, and none in combat (setting
 -- cardHideInCombat, on; it goes when a fight starts, comes back after). Killed before: your kills and
 -- your likeliest drops (not the database's on top); not yet, with the setting cardUnseen (off): the
--- classic database's likeliest, faded.
+-- classic database's likeliest, faded. The only line more: a quest that still wants one of its drops
+-- (then also over a mob you haven't killed: useful while questing).
 function Bt.MouseoverChanged()
 	if not (M.enabled and M.db.hoverCard) or CardHidden() or not UnitExists("mouseover")
 		or not (Value(UnitCanAttack, "player", "mouseover") or Value(UnitIsDead, "mouseover")) then
@@ -755,15 +795,27 @@ function Bt.MouseoverChanged()
 	local guid, creature = Bt.Look("mouseover")
 	local mob = Bt.Mob(creature)
 	local drops, line
+	local notKilled = "|cff999999" .. L["Not killed yet: classic database"] .. "|r"
 	if mob and mob.kills > 0 then
 		drops, line = Bt.Drops(mob, M.db.showPoor, creature), KillsLine(mob, true)
 	elseif M.db.cardUnseen then
 		local unseen = Bt.Compare(creature, mob, M.db.showPoor)
 		if unseen and #unseen > 0 then
-			drops, line = unseen, "|cff999999" .. L["Not killed yet: classic database"] .. "|r"
+			drops, line = unseen, notKilled
 		end
 	end
-	if not drops then
+	-- A quest that still wants one of its drops: a line (and how many more want others).
+	local want, others = nil, 0
+	for _, wanted in ipairs(Bt.QuestDrops(creature, mob)) do
+		if not wanted.done then
+			if want then
+				others = others + 1
+			else
+				want = wanted
+			end
+		end
+	end
+	if not (drops or want) then
 		if card then
 			card:Hide()
 		end
@@ -773,12 +825,38 @@ function Bt.MouseoverChanged()
 		BuildCard()
 	end
 	cardGUID = guid
-	card.Kills:SetText(line)
+	drops = drops or NONE
+	card.Kills:SetText(line or notKilled)
 	local rows = Lay(card.Grid, card.cells, drops, mob and mob.kills or 0, CARD_ICON, CARD_GAP, CARD_CELLS, CARD_CELLS, false)
 	local width = math.max(card.Kills:GetStringWidth(), math.min(#drops, CARD_CELLS) * (CARD_ICON + CARD_GAP) - CARD_GAP)
-	card:SetSize(width + 16, rows > 0 and (24 + CARD_ICON + LINE + 6) or 24)
+	local height = rows > 0 and (24 + CARD_ICON + LINE + 6) or 24
+	if want then
+		card.Quest:SetWidth(0) -- (as wide as its text, to measure it)
+		card.Quest:SetText(QuestLine(want) .. (others > 0 and ("  |cff888888+%d|r"):format(others) or ""))
+		card.Quest:ClearAllPoints()
+		card.Quest:SetPoint("TOPLEFT", 8, -(height - 2))
+		local questWidth = math.min(card.Quest:GetStringWidth(), CARD_QUEST_W)
+		card.Quest:SetWidth(questWidth)
+		width, height = math.max(width, questWidth), height + LINE
+	end
+	card.Quest:SetShown(want ~= nil)
+	card:SetSize(width + 16, height)
 	CardFollow(card)
 	card:Show()
+end
+
+-- The quest log changed what your quests want, or item names came: the window and the card again.
+function Bt.QuestsShown()
+	return (win and win:IsShown()) or (card and card:IsShown()) or false
+end
+
+function Bt.QuestsChanged()
+	if win and win:IsShown() then
+		Draw()
+	end
+	if card and card:IsShown() then
+		Bt.MouseoverChanged()
+	end
 end
 
 ---------------------------------------------------------------------------
