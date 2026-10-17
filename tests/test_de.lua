@@ -129,6 +129,8 @@ SlashCmdList.LEFTHYTOOLS_MIRAGE("status")
 check(#ns.L_MISSING == 0 and next(ns.L_MISSING) == nil, "chat commands don't look up settings texts")
 check(ns.Chronicle.Distance(1500) == "1,4 km" and ns.Chronicle.Distance(1500, true) == "1.4 km",
 	"distances with a decimal comma (chat lines, which stay English, with a point)")
+check(ns.Bestiary.Percent(0.034) == "3,4%" and ns.Bestiary.Percent(0.35) == "35%" and ns.Bestiary.Percent(0.034, true) == "3.4%",
+	"the Bestiary's drop chances with a decimal comma (chat lines with a point)")
 check(#ERRORS == 0, "no errors reported through the error handler")
 
 io.write(string.format("\n%d passed, %d failed (German)\n", passes, failures))

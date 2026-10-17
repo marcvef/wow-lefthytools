@@ -218,7 +218,8 @@ flights.
   Hovering it shows the same in full: the worth's coin and vendor parts, the XP per hour of
   fighting.
 - **Drops**: 6 per row, at most 4 rows; each a 30 px icon edged in its quality's colour, how many you
-  got in its corner, the drop chance under it ("35%", "3.4%", "<0.1%") in the quality's colour.
+  got in its corner, the drop chance under it ("35%", "3.4%", "<0.1%"; `Bt.Percent`, a decimal comma
+  in German, a point in chat lines) in the quality's colour.
   Hover: the item's tooltip (`SetHyperlink`) plus "Dropped in 9 of 34 kills: 26%" and, for stacks,
   "12 in all, 1.3 each time". Shift-click links it (`HandleModifiedItemClick`). More than fit: the
   last place says "+N", its tooltip lists the rest with their chances (at most 20, then "and N more

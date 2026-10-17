@@ -975,7 +975,7 @@ function Bt.PrintWishes()
 		local wish = wishes[id]
 		local best = Bt.WishSources(id)[1]
 		print(("  %s: %d kills since you pinned it%s"):format(LinkOf(id, wish[4]), wish[2] or 0,
-			best and (", likeliest from %s (%s)"):format(best.name, Bt.Percent and Bt.Percent(best.chance) or "?") or ""))
+			best and (", likeliest from %s (%s)"):format(best.name, Bt.Percent and Bt.Percent(best.chance, true) or "?") or ""))
 	end
 end
 

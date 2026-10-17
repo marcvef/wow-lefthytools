@@ -89,15 +89,21 @@ local function QualityColor(quality)
 	return 1, 1, 1
 end
 
--- "35%", "3.4%", "<0.1%".
-local function Percent(chance)
+-- A number's decimal point as the client's language writes it ("4,5" in German), unless plain (chat
+-- lines, which stay English).
+local function Decimal(text, plain)
+	return ns.DECIMAL_COMMA and not plain and (text:gsub("%.", ",")) or text
+end
+
+-- "35%", "3.4%" ("3,4%" in German; plain: with a point, for chat lines), "<0.1%".
+local function Percent(chance, plain)
 	local p = chance * 100
 	if p >= 9.95 then
 		return ("%d%%"):format(math.floor(p + 0.5))
 	elseif p >= 0.05 then
-		return ("%.1f%%"):format(p)
+		return Decimal(("%.1f%%"):format(p), plain)
 	end
-	return "<0.1%"
+	return Decimal("<0.1%", plain)
 end
 Bt.Percent = Percent
 
@@ -181,8 +187,7 @@ local function Thousands(n)
 	if n >= 9950 then
 		return ("%dk"):format(math.floor(n / 1000 + 0.5))
 	elseif n >= 1000 then
-		local text = ("%.1fk"):format(n / 1000)
-		return ns.DECIMAL_COMMA and (text:gsub("%.", ",")) or text
+		return Decimal(("%.1fk"):format(n / 1000))
 	end
 	return tostring(math.floor(n + 0.5))
 end
@@ -327,7 +332,7 @@ local function CellOnEnter(cell)
 				GOLD[1], GOLD[2], GOLD[3])
 		end
 		if drop.count > drop.drops then
-			GameTooltip:AddLine(L["%d in all, %.1f each time"]:format(drop.count, drop.each), 0.8, 0.8, 0.8)
+			GameTooltip:AddLine(L["%d in all, %s each time"]:format(drop.count, Decimal(("%.1f"):format(drop.each))), 0.8, 0.8, 0.8)
 		end
 		AddClassic(drop, 0.8, 0.8, 0.8)
 	end
