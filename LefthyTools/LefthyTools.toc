@@ -92,4 +92,5 @@ Modules\Bestiary\Format.lua
 Modules\Bestiary\Cells.lua
 Modules\Bestiary\Window.lua
 Modules\Bestiary\Card.lua
+Modules\Bestiary\LedgerMap.lua
 Modules\Bestiary\Ledger.lua
