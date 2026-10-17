@@ -4,7 +4,8 @@
 
 `npm install` once, then `npm test`. `tests/run.js`:
 
-1. reads the file list from the TOC and checks each Lua file's syntax as Lua 5.1 (luaparse);
+1. reads the file list from the TOC, checks that every file it names exists (XML too) and each
+   Lua file's syntax as Lua 5.1 (luaparse);
 2. checks translations: every `L["..."]` used in code has a German entry and every German entry is
    used (comment lines are ignored);
 3. checks that `LT.FILES` in `Core/Core.lua` matches the TOC's files and saved variables (it

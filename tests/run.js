@@ -7,10 +7,17 @@ const luaparse = require("luaparse");
 
 const addonDir = process.argv[2] || path.resolve(__dirname, "..", "LefthyTools");
 const toc = fs.readFileSync(path.join(addonDir, path.basename(addonDir) + ".toc"), "utf8");
-const files = toc.split(/\r?\n/)
+const tocFiles = toc.split(/\r?\n/)
   .map((line) => line.trim())
-  .filter((line) => line && !line.startsWith("#") && line.endsWith(".lua"))
+  .filter((line) => line && !line.startsWith("#"))
   .map((line) => line.replace(/\\/g, "/"));
+
+// 0) Every file the TOC names is there, XML too (the game would only say so in a load error).
+const missingFiles = tocFiles.filter((f) => !fs.existsSync(path.join(addonDir, f)));
+for (const f of missingFiles) console.log(`MISSING FILE named in the TOC: ${f}`);
+if (missingFiles.length) process.exit(1);
+
+const files = tocFiles.filter((f) => f.endsWith(".lua"));
 const sources = Object.fromEntries(files.map((f) => [f, fs.readFileSync(path.join(addonDir, f), "utf8")]));
 
 // 1) Syntax check as Lua 5.1 (what WoW runs).
