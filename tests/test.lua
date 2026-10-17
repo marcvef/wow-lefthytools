@@ -593,6 +593,14 @@ check(S("alpha_chat").uiUpdates == sameUpdates, "other settings leave the elemen
 mirage("alpha 50") -- as before this section
 Advance(1)
 check(Minimap:IsShown(), "minimap back at 50%")
+do -- "Faded opacity" changes every element's setting: the minimap button is updated once for all of them
+	local after, scheduled = C_Timer.After, 0
+	C_Timer.After = function(...) scheduled = scheduled + 1; return after(...) end
+	mirage("alpha 40")
+	mirage("alpha 50")
+	C_Timer.After = after
+	check(scheduled == 1, "one deferred button update for two changes of every element, got " .. scheduled)
+end
 
 section("AFK screen")
 local AFK = ns.AFKScreen

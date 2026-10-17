@@ -649,6 +649,22 @@ function M:Refresh()
 	end
 end
 
+-- The minimap button (Options.lua) follows Mirage on or off and its own setting: updated on the
+-- next frame, once however many changes come in together (a reset changes every setting).
+local buttonUpdatePending = false
+local function UpdateButtonSoon()
+	if buttonUpdatePending then
+		return
+	end
+	buttonUpdatePending = true
+	C_Timer.After(0, function()
+		buttonUpdatePending = false
+		if M.UpdateButton then
+			M:UpdateButton()
+		end
+	end)
+end
+
 -- "Faded opacity" sets every element's own faded opacity; each can then be changed on its own.
 -- Through the settings, so an open settings page shows the new values.
 local lastFadedAlpha
@@ -662,9 +678,7 @@ function M:OnSettingChanged()
 		end
 	end
 	self:Refresh()
-	if self.UpdateButton then
-		C_Timer.After(0, function() M:UpdateButton() end) -- (its checkbox)
-	end
+	UpdateButtonSoon() -- (its checkbox)
 end
 
 function M:SetPeek(down)
@@ -817,13 +831,13 @@ function M:OnEnable()
 	rebuildAt = 0 -- adopt frames on the next frame
 	RequestEvaluate()
 	driver:SetScript("OnUpdate", OnUpdate)
-	C_Timer.After(0, function() if M.UpdateButton then M:UpdateButton() end end) -- (Options.lua)
+	UpdateButtonSoon()
 end
 
 function M:OnDisable()
 	events:UnregisterAllEvents()
 	peek, paused = false, false
-	C_Timer.After(0, function() if M.UpdateButton then M:UpdateButton() end end)
+	UpdateButtonSoon()
 	castingCast, channeling = false, false
 	rebuildAt = nil
 	-- Fade everything back in; FinishStopping() then hands the frames back and goes idle.
