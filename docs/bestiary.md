@@ -121,6 +121,9 @@ kind's health, for Beacon's fight stream (below): 9791 of them; 9921 creatures i
   said "no loot" for a corpse that had two items (perhaps it was too far away): a corpse counted
   as empty that's looted after all adds its items to that kill (not a second one).
 - **Any corpse you loot was yours**: it counts even without your killing blow (a guard's).
+- **Not a mob someone else tagged first** (`UnitIsTapDenied` on your target or mouseover at its
+  killing blow): with your killing blow its corpse still has nothing for you, and it would count as
+  a kill without drops.
 - **On your own only** (`IsInGroup()`): in a group the loot goes round, so you'd see only part of
   it. The window says so while you're in one.
 - **A corpse's loot once**: the first time its window opens (`LOOT_READY`, before anything is
@@ -134,7 +137,7 @@ kind's health, for Beacon's fight stream (below): 9791 of them; 9921 creatures i
   that says nothing: your dead target, else the one kill waiting from the last minute.
 - **The log** (`/bestiary log`, `LefthyToolsBestiaryDB.log`, the last 12): each loot window and
   each empty kill with what was made of it (looted, said empty, looted after being said empty,
-  looted before, skinning or pickpocket, group, no corpse, not a mob), how many items and what
+  looted before, skinning or pickpocket, group, no corpse, not a mob, tapped by someone else), how many items and what
   `CanLootUnit` answered ("hasLoot/canLoot"), to see why something wasn't counted.
 - **Items**: `GetLootSlotType` 1, `GetLootSlotLink` (the item ID), `GetLootSlotInfo` (quantity,
   quality). **Coin** (type 2): the slot doesn't say how much, so it's what `GetMoney()` grew by

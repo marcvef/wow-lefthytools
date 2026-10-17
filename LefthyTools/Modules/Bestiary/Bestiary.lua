@@ -13,7 +13,8 @@ local L = ns.L
 --     moment after it died): a corpse left lying would count as a kill that dropped nothing. The
 --     game can be wrong (in game: "empty" for a corpse with two items): looted after all, its items
 --     join that kill;
---   * your (or your pet's) killing blow (PARTY_KILL), or any corpse you loot: it was yours;
+--   * your (or your pet's) killing blow (PARTY_KILL), or any corpse you loot: it was yours; not a
+--     mob someone else tagged first (its corpse isn't yours);
 --   * on your own only: in a group the loot goes round, so you'd see only part of it;
 --   * a corpse's loot once (the first time it opens); not right after skinning, a pickpocket or
 --     gathering (NOT_A_KILL), nor what isn't a creature's (herbs, ore, chests, fishing, a bag's
@@ -81,6 +82,7 @@ local FIGHT_AFTER = 2           -- seconds a kill may come after the fight ended
 local RECENT_KEEP = 8           -- your last kills, for the XP that comes a moment after them
 local SPOTS_KEEP = 50           -- where you killed each kind: the last this many kills
 Bt.SPOTS_KEEP = SPOTS_KEEP
+local TAP_UNITS = { "target", "mouseover" } -- whose tap a killing blow can be checked on
 -- Spells whose loot isn't a kill's (each rank's ID, and by name for ranks not listed): Skinning,
 -- Pick Pocket, Mining, Herb Gathering. Any other spell just before looting (a killing blow, then a
 -- quick loot) doesn't matter.
@@ -1160,6 +1162,13 @@ local function OnKill(attacker, target)
 	local creature = Bt.CreatureOf(target)
 	if not creature then
 		return
+	end
+	-- Someone else's mob (they hit it first, you finished it): its corpse isn't yours, and the game
+	-- would say it's empty, a kill without drops. Told by your target or the mouseover.
+	for _, unit in ipairs(TAP_UNITS) do
+		if Value(UnitGUID, unit) == target and Value(UnitIsTapDenied, unit) == true then
+			return Log(creature, "tapped by someone else", 0)
+		end
 	end
 	if Value(UnitGUID, "target") == target then
 		Bt.Look("target")

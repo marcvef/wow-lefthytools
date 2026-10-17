@@ -8694,6 +8694,27 @@ section("Bestiary: wish list and dry streak")
 	Bt.Toggle(false)
 end)()
 
+section("Bestiary: counting, more cases")
+;(function()
+	local Bt = ns.Bestiary
+	local function logged()
+		local mark = #PRINTED + 1
+		SlashCmdList.LEFTHYTOOLS_BESTIARY("log")
+		return printedSince(mark)
+	end
+	-- Someone else's mob (they hit it first, my killing blow): its corpse isn't mine, so it's no kill
+	-- without drops; the log says why.
+	do
+		local stolen = "Creature-0-1-0-1-116-00000080"
+		MOBS.target, STATE.target, STATE.tapDenied = { name = "Defias Bandit", level = 9, guid = stolen, dead = true }, true, true
+		LOOT_EMPTY[stolen] = true
+		Fire("PARTY_KILL", "Player-1-0", stolen)
+		check(Bt.Pending()[stolen] == nil and logged():find("Defias Bandit: tapped by someone else", 1, true),
+			"someone else's tap: not waiting to be counted (it would count as a kill without drops), the log says so")
+		MOBS.target, STATE.target, STATE.tapDenied = nil, false, false
+	end
+end)()
+
 section("Misc Tweaks: who has aggro, on enemy nameplates")
 ;(function()
 	local function tagText(unit) local t = ns.GetAggroTag(unit); return t and t:IsShown() and t.Text:GetText() or nil end
