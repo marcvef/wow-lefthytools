@@ -380,10 +380,10 @@ map wide).
   when its kills were in more than one zone, a picker of them (`LT.Window.AddPicker`, like the
   sort's: the most kills first, each "Elwynn Forest (12)"; the user: "if there are multiple regions
   there needs to be a drop down"). Under it the zone's map in a 330 x 220 box as the world map shows
-  it (its first art layer, `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid like
-  `Blizzard_MapCanvasDetailLayer` and the fight stream's map, as large as fits the box, centred;
-  the last column and row's tiles cut to the map's edge with `SetTexCoord`, so nothing hangs over;
-  no art: the box's dark back), a small red dot in a dark ring per kill there (older ones fainter).
+  it, laid by `LT.MapArt` (Core/MapArt.lua): its first art layer, `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid
+  like `Blizzard_MapCanvasDetailLayer`, as large as fits the box (`fit`), centred; the last column
+  and row's tiles cut to the map's edge with `SetTexCoord`, so nothing hangs over; no art: the box's
+  dark back. On it a small red dot in a dark ring per kill there (older ones fainter).
   At first the zone with the most kills; the one picked stays while the ledger redraws, another
   mob starts again with its most. Under the map "Your last 50 kills." once that many are kept. No
   kill with a place (older records, only instances): the box says "No kills on a map yet", quietly,
@@ -396,12 +396,12 @@ map wide).
   (what's left over, in the next power of two from 16: `SetTexCoord` takes only that part), as
   Blizzard's `MapExplorationPin` lays them. Scaled like the art and cut at its edge; drawn over it
   (`isDrawOnTopLayer` over the other overlays); one `isShownByMouseOver` isn't explored, left out.
-  The API missing or saying nothing: the art alone. The overlays' textures are pooled (a zone can
-  have dozens).
+  The API missing or saying nothing: the art alone. The art's and the overlays' textures are pooled
+  (a zone can have dozens).
 - **Laid only when needed**: the art and its overlays again only when the map shown changes
-  (another mob, another zone picked), or after `MAP_EXPLORATION_UPDATED` (registered once the
-  ledger is built; it only clears the map shown, so the next draw lays it again). Every other
-  redraw only moves the dots.
+  (another mob, another zone picked), or after `MAP_EXPLORATION_UPDATED` (one frame of
+  `LT.MapArt`'s, registered once the ledger is built; it only counts, so the next draw lays it
+  again). Every other redraw only moves the dots.
 - **A row** also says "6/11 found" (the drop database; not while it shows what the search found).
   Sorted by coin, worth, XP per kill or XP per hour, it says that instead ("~45s", "85 XP", "21k
   XP/h").
@@ -436,7 +436,7 @@ Event handlers only: `PARTY_KILL`, `LOOT_READY`, `LOOT_CLOSED`, the player's
 combat (a time stamp), `PLAYER_XP_UPDATE` (three numbers read, the last 8 kills looked at),
 `QUEST_LOG_UPDATE`/`BAG_UPDATE_DELAYED` (a flag, then one look half a second later),
 `GET_ITEM_INFO_RECEIVED` only while an item asked for is awaited (a price, a name),
-`MAP_EXPLORATION_UPDATED` once the ledger is built (a flag: its map is laid again). A kill reads
+`MAP_EXPLORATION_UPDATED` once the ledger is built (`LT.MapArt`'s, a count: its map is laid again). A kill reads
 your map position once (two `C_Map` calls). The window redraws when its mob's
 record changes or the target does; the card's OnUpdate runs only while it's shown. Worth is
 worked out when drawn, over a mob's drops with the prices cached (the ledger sorted by worth: over

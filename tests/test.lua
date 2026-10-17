@@ -138,6 +138,80 @@ check(errWindow.Box:GetText():find("No errors.", 1, true), "the open window foll
 errWindow:Hide()
 for i = #ERRORS, errorsBefore + 1, -1 do table.remove(ERRORS, i) end -- the test's own errors
 
+section("a zone's map (LT.MapArt)")
+do -- The world map's art of a zone and what you've explored of it, laid into a frame of ours (the
+	-- Bestiary ledger's kill map). The frame here notes each texture's draw sublevel and mask.
+	local MapArt, errorsWere, made = LT.MapArt, #ERRORS, 0
+	local host = CreateFrame("Frame")
+	local mask = host:CreateMaskTexture()
+	local frame = { CreateTexture = function(_, name, layer, inherits, sub)
+		made = made + 1
+		local t = host:CreateTexture(name, layer, inherits, sub)
+		t.sub = sub
+		function t:SetDrawLayer(l, s) self.layer, self.sub = l, s end
+		function t:AddMaskTexture(m) self.mask = m end
+		return t
+	end }
+	local function at(t) return select(4, t:GetPoint(1)) end
+	local map = MapArt.New(frame, "BACKGROUND", 0, mask)
+	local width, height = MapArt.Lay(map, 1429, 2004, 668) -- (twice the art's width, its height: x 2 and x 1)
+	local tiles, overlays = map.tiles, map.overlays
+	local x12, y12 = at(tiles[12])
+	check(width == 2004 and height == 668 and #tiles == 12 and tiles[1].path == 142901 and tiles[12].path == 142912 and tiles[1].shown
+		and tiles[1].width == 512 and tiles[1].height == 256 and tiles[1].layer == "BACKGROUND" and tiles[1].sub == 0 and tiles[1].mask == mask
+		and tiles[4].width == 468 and near(tiles[4].coords[2], 234 / 256, 1e-9) and tiles[4].coords[4] == 1
+		and tiles[12].height == 156 and near(tiles[12].coords[4], 156 / 256, 1e-9) and x12 == 1536 and y12 == -512,
+		"the art: 4 x 3 tiles in rows at the size asked for, the last column and row cut to the map's edge, each cut by the mask")
+	local o1, o2, o3 = overlays[1], overlays[2], overlays[3]
+	local x2, y2 = at(o2)
+	local x3, y3 = at(o3)
+	check(#overlays == 3 and made == 15 and o1.path == 7001 and o2.path == 7002 and o3.path == 7004 and o1.shown and o3.shown
+		and o1.width == 512 and o1.height == 200 and near(o1.coords[4], 200 / 256, 1e-9) and o1.sub == 1 and o1.mask == mask
+		and x2 == 712 and y2 == -50 and o2.width == 88 and near(o2.coords[2], 44 / 64, 1e-9)
+		and x3 == 1900 and y3 == -600 and o3.width == 104 and o3.height == 68 and near(o3.coords[2], 52 / 128, 1e-9)
+		and near(o3.coords[4], 68 / 128, 1e-9) and o3.sub == 2,
+		"what you've explored, over it: each area's tiles from its offset in the art's pixels, scaled like the art, the last a "
+		.. "smaller file, cut at the edge, the top layer's over the others; not what only a mouseover shows")
+	o1.path = nil
+	check(MapArt.Lay(map, 1429, 2004, 668) == 2004 and o1.path == nil and not MapArt.Stale(map), "the same map at the same size: nothing laid again")
+	width, height = MapArt.Lay(map, 1436, 400, 220, true)
+	check(made == 15 and tiles[1].path == 143601 and near(width, 330) and near(height, 220) and near(tiles[1].width, 256 * 220 / 668, 1e-9)
+		and not o1.shown and not o2.shown and not o3.shown,
+		"another zone, fit into a box: as large as fits, the art's own shape; the pool's textures again; nothing explored there")
+	MapArt.Lay(map, 1429, 2004, 668)
+	check(made == 15 and o1.path == 7001 and o1.shown and o3.shown, "back: laid again from the pool")
+	local elwynn = EXPLORED[1429]
+	EXPLORED[1429] = { elwynn[1] }
+	Fire("MAP_EXPLORATION_UPDATED")
+	check(MapArt.Stale(map) and o3.shown, "explored more: the map is stale (the event only counts)")
+	MapArt.Lay(map, 1429, 2004, 668)
+	check(not MapArt.Stale(map) and o1.shown and o2.shown and not o3.shown, "laid again when next asked for")
+	EXPLORED[1429] = elwynn
+	-- Hidden: also what's laid meanwhile; shown again: only what's in use.
+	MapArt.SetShown(map, false)
+	local any = false
+	for _, t in ipairs(tiles) do any = any or t.shown end
+	for _, t in ipairs(overlays) do any = any or t.shown end
+	MapArt.Lay(map, 1436, 2004, 668)
+	check(not any and not tiles[1].shown and tiles[1].path == 143601, "hidden: all of it, also what's laid while hidden")
+	MapArt.SetShown(map, true)
+	check(tiles[1].shown and tiles[12].shown and not o1.shown and not o2.shown, "shown again: only what's in use")
+	-- The game saying nothing.
+	local layers, exploration = C_Map.GetMapArtLayers, C_MapExplorationInfo
+	C_MapExplorationInfo = nil
+	check(MapArt.Lay(map, 1429, 2004, 668) == 2004 and tiles[12].shown and not o1.shown, "no exploration API: the art alone")
+	C_MapExplorationInfo = exploration
+	C_Map.GetMapArtLayers = function() return SECRET end
+	check(MapArt.Lay(map, 1436, 2004, 668) == nil and not tiles[1].shown, "the art a secret: none, nothing shown")
+	C_Map.GetMapArtLayers = function() return { { layerWidth = 1002, layerHeight = 668, tileWidth = 0, tileHeight = SECRET } } end
+	check(MapArt.Lay(map, 1429, 2004, 668) == nil and not tiles[1].shown, "nonsense or secret sizes: none")
+	C_Map.GetMapArtLayers = nil
+	check(MapArt.Lay(map, 1436, 2004, 668) == nil and MapArt.Lay(map, nil, 2004, 668) == nil, "no art API, or no map: none")
+	Fire("MAP_EXPLORATION_UPDATED")
+	check(not MapArt.Stale(map) and #ERRORS == errorsWere, "no art: never stale; no errors")
+	C_Map.GetMapArtLayers = layers
+end
+
 section("discovery")
 local ab = Mirage:GetGroup("actionbars")
 check(#ab.live == 2, "actionbars should have MainActionBar + MultiBarBottomLeft (alias/child deduped), got " .. #ab.live)
@@ -8429,7 +8503,7 @@ section("Bestiary: what mobs drop")
 		killAt(1429, 0.3, 0.3, kobold[11])
 		INSTANCE, STATE.inInstance = nil, nil
 		check(kobolds().kills == 11 and #kobolds().spots == 3, "in an instance: counted, but no spot")
-		local tiles = where.tiles
+		local tiles = where.art.tiles
 		check(where.Heading:GetText() == "Where you killed them" and where.Pick:IsShown() and where.Pick.Label:GetText() == "Elwynn Forest (2)"
 			and not where.Zone:IsShown() and where.Map:IsShown()
 			and #tiles == 12 and tiles[1].path == 142901 and tiles[12].path == 142912 and tiles[12].shown
@@ -8445,7 +8519,7 @@ section("Bestiary: what mobs drop")
 		-- offset, scaled like the art, the last column a smaller file, cut at the map's edge; not what
 		-- only a mouseover shows.
 		do
-			local overlays, s = where.overlays, 330 / 1002
+			local overlays, s = where.art.overlays, 330 / 1002
 			local function near(a, b) return math.abs(a - b) < 1e-6 end
 			local o1, o2, o3 = overlays[1], overlays[2], overlays[3]
 			local _, _, _, x2, y2 = o2:GetPoint(1)
@@ -8484,13 +8558,13 @@ section("Bestiary: what mobs drop")
 				and list.rows[1].Check:IsShown() and list.rows[2].Text:GetText() == "Westfall (1)" and list.rows[2].value == 1436,
 				"several zones: a picker of them, the most kills first, each with its kills")
 			list.rows[2]:Click()
-			check(not list:IsShown() and where.Pick.Label:GetText() == "Westfall (1)" and where.tiles[1].path == 143601 and not where.overlays[1].shown
+			check(not list:IsShown() and where.Pick.Label:GetText() == "Westfall (1)" and where.art.tiles[1].path == 143601 and not where.art.overlays[1].shown
 				and where.dots[1].shown and not where.dots[2].shown, "Westfall picked: its map (nothing explored there), its one dot")
 			Bt.DrawLedger()
-			check(where.Pick.Label:GetText() == "Westfall (1)" and where.tiles[1].path == 143601, "the list redraws: the zone stays")
+			check(where.Pick.Label:GetText() == "Westfall (1)" and where.art.tiles[1].path == 143601, "the list redraws: the zone stays")
 			Bt.ToggleLedger(116)
 			Bt.ToggleLedger(119)
-			check(where.Pick.Label:GetText() == "Elwynn Forest (2)" and where.tiles[1].path == 142901 and where.overlays[1].shown,
+			check(where.Pick.Label:GetText() == "Elwynn Forest (2)" and where.art.tiles[1].path == 142901 and where.art.overlays[1].shown,
 				"another mob and back: the zone with the most kills again")
 		end
 		-- A corpse looted without your killing blow seen: you at it then. The last 50 are kept.

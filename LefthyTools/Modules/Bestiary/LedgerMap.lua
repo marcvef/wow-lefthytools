@@ -22,121 +22,14 @@ local function MapName(mapID)
 	return not issecret(name) and type(name) == "string" and name or ("#" .. mapID)
 end
 
--- A number the game gave (nil: none, or a secret).
-local function Number(v)
-	if not issecret(v) and type(v) == "number" then
-		return v
-	end
-end
-
--- An explored area's tile along one side: a whole tile, but the last is what's left over, in a file
--- of the next power of two from 16 (as Blizzard's MapExplorationPin reads them): its pixels, the file's.
-local function OverlayPart(size, tile, last)
-	if not last then
-		return tile, tile
-	end
-	local pixels = size % tile
-	pixels = pixels > 0 and pixels or tile
-	local file = 16
-	while file < pixels do
-		file = file * 2
-	end
-	return pixels, file
-end
-
--- An area you've explored, on the art: its tiles in rows from its offset (the layer's pixels, scaled
--- like the base tiles), cut at the map's edge; one shown only on mouseover isn't explored. Returns
--- how many of the pool are in use.
-local function LayOverlay(where, info, layer, scale, n)
-	local width, height = Number(info.textureWidth), Number(info.textureHeight)
-	local files, mouseOver = info.fileDataIDs, info.isShownByMouseOver
-	if not (width and height and width > 0 and height > 0) or issecret(files) or type(files) ~= "table"
-		or issecret(mouseOver) or mouseOver == true then
-		return n
-	end
-	local onTop = not issecret(info.isDrawOnTopLayer) and info.isDrawOnTopLayer == true
-	local x0, y0 = Number(info.offsetX) or 0, Number(info.offsetY) or 0
-	local wide, tall = math.ceil(width / layer.tileWidth), math.ceil(height / layer.tileHeight)
-	for row = 1, tall do
-		local y = y0 + (row - 1) * layer.tileHeight
-		local h, fileH = OverlayPart(height, layer.tileHeight, row == tall)
-		h = math.min(h, layer.layerHeight - y)
-		for col = 1, wide do
-			local x = x0 + (col - 1) * layer.tileWidth
-			local w, fileW = OverlayPart(width, layer.tileWidth, col == wide)
-			w = math.min(w, layer.layerWidth - x)
-			local file = files[(row - 1) * wide + col]
-			if file and w > 0 and h > 0 then
-				n = n + 1
-				local tile = where.overlays[n] or where.Map:CreateTexture(nil, "ARTWORK", nil, 1)
-				where.overlays[n] = tile
-				tile:SetDrawLayer("ARTWORK", onTop and 2 or 1) -- (over the base art; some over the others, as Blizzard draws them)
-				tile:SetTexture(file)
-				tile:SetTexCoord(0, w / fileW, 0, h / fileH)
-				tile:SetSize(w * scale, h * scale)
-				tile:ClearAllPoints()
-				tile:SetPoint("TOPLEFT", where.Map, "TOPLEFT", x * scale, -y * scale)
-				tile:Show()
-			end
-		end
-	end
-	return n
-end
-
--- The world map's art of a zone, as large as fits the map's box (MAP_W x MAP_H): its first layer's
--- tiles, laid like Blizzard_MapCanvasDetailLayer (and the fight stream's map), the last column and
--- row cut to the map's edge. That art leaves what you haven't explored blank; what you have is
--- overlays on it (C_MapExplorationInfo.GetExploredMapTextures, laid like Blizzard's
--- MapExplorationPin), so the map shows what your world map shows (the user: "ideally the same
--- visibility the player has"). The game saying nothing: the art alone. No art: the box's dark back
--- alone. Returns its width and height; laid again only for another map, or once you've explored
--- more (MAP_EXPLORATION_UPDATED: where.mapID = nil).
+-- The world map's art of a zone with what you've explored of it (LT.MapArt, Core/MapArt.lua: laid
+-- like Blizzard_MapCanvasDetailLayer and MapExplorationPin, as the fight stream's map), as large as
+-- fits the map's box (MAP_W x MAP_H), so the map shows what your world map shows (the user: "ideally
+-- the same visibility the player has"). No art: the box's dark back alone. Returns its width and
+-- height; laid again only for another map, or once you've explored more.
 local function LayMap(where, mapID)
-	if where.mapID == mapID then
-		return where.width, where.height
-	end
-	where.mapID = mapID
-	local layers = C_Map and Value(C_Map.GetMapArtLayers, mapID)
-	local layer = type(layers) == "table" and layers[1]
-	local textures = type(layer) == "table" and Value(C_Map.GetMapArtLayerTextures, mapID, 1)
-	local width, height, n, o = MAP_W, MAP_H, 0, 0
-	if type(textures) == "table" and (layer.layerWidth or 0) > 0 and (layer.layerHeight or 0) > 0
-		and (layer.tileWidth or 0) > 0 and (layer.tileHeight or 0) > 0 then
-		local scale = math.min(MAP_W / layer.layerWidth, MAP_H / layer.layerHeight)
-		local cols = math.ceil(layer.layerWidth / layer.tileWidth)
-		width, height = layer.layerWidth * scale, layer.layerHeight * scale
-		for row = 1, math.ceil(layer.layerHeight / layer.tileHeight) do
-			for col = 1, cols do
-				local file = textures[(row - 1) * cols + col]
-				if file then
-					n = n + 1
-					local tile = where.tiles[n] or where.Map:CreateTexture(nil, "ARTWORK")
-					where.tiles[n] = tile
-					local w = math.min(layer.tileWidth, layer.layerWidth - (col - 1) * layer.tileWidth)
-					local h = math.min(layer.tileHeight, layer.layerHeight - (row - 1) * layer.tileHeight)
-					tile:SetTexture(file)
-					tile:SetTexCoord(0, w / layer.tileWidth, 0, h / layer.tileHeight)
-					tile:SetSize(w * scale, h * scale)
-					tile:ClearAllPoints()
-					tile:SetPoint("TOPLEFT", where.Map, "TOPLEFT", (col - 1) * layer.tileWidth * scale, -(row - 1) * layer.tileHeight * scale)
-					tile:Show()
-				end
-			end
-		end
-		local explored = C_MapExplorationInfo and Value(C_MapExplorationInfo.GetExploredMapTextures, mapID)
-		for _, info in ipairs(type(explored) == "table" and explored or {}) do
-			if not issecret(info) and type(info) == "table" then
-				o = LayOverlay(where, info, layer, scale, o)
-			end
-		end
-	end
-	for i = n + 1, #where.tiles do
-		where.tiles[i]:Hide()
-	end
-	for i = o + 1, #where.overlays do
-		where.overlays[i]:Hide()
-	end
-	where.width, where.height = width, height
+	local width, height = LT.MapArt.Lay(where.art, mapID, MAP_W, MAP_H, true)
+	width, height = width or MAP_W, height or MAP_H
 	where.Map:SetSize(width, height)
 	return width, height
 end
@@ -217,7 +110,7 @@ end
 -- dark back under the art and what you've explored of it, the dots on top; none known: a quiet line),
 -- a line under it. Returns it (Bt.DrawKillMap draws on it).
 function Bt.NewKillMap(pane, x)
-	local where = { tiles = {}, overlays = {}, dots = {} }
+	local where = { dots = {} }
 	where.Box = CreateFrame("Frame", nil, pane)
 	where.Box:SetPoint("TOPLEFT", x, -(MAP_HEAD + 4))
 	where.Box:SetSize(MAP_W, MAP_H)
@@ -227,6 +120,7 @@ function Bt.NewKillMap(pane, x)
 	where.Map = CreateFrame("Frame", nil, where.Box)
 	where.Map:SetPoint("CENTER")
 	where.Map:SetSize(MAP_W, MAP_H)
+	where.art = LT.MapArt.New(where.Map) -- (the art and what you've explored, under the dots)
 	where.Heading = pane:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	where.Heading:SetPoint("LEFT", where.Box, "TOPLEFT", 0, MAP_HEAD / 2 + 4)
 	where.Heading:SetText(L["Where you killed them"])
@@ -256,12 +150,6 @@ function Bt.NewKillMap(pane, x)
 	where.Note:SetJustifyH("LEFT")
 	where.Note:SetWordWrap(false)
 	where.Note:SetText(L["Your last %d kills."]:format(Bt.SPOTS_KEEP))
-	-- (you've explored more: the map is laid again when next drawn; registered once built, also while
-	-- the ledger is closed: rare, and only a flag)
-	where.Box:RegisterEvent("MAP_EXPLORATION_UPDATED")
-	where.Box:SetScript("OnEvent", function()
-		where.mapID = nil
-	end)
 	return where
 end
 

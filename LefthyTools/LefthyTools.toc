@@ -13,6 +13,7 @@ Core\Locale.lua
 Locales\deDE.lua
 Core\Core.lua
 Core\Window.lua
+Core\MapArt.lua
 Core\Errors.lua
 Core\WhatsNew.lua
 Core\Options.lua

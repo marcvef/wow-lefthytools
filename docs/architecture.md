@@ -20,6 +20,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons,
                              our own popup list and dropdown (PopupList, AddPicker), minimap
                              buttons (MinimapButton), class colours
+  Core/MapArt.lua            a zone's map from the world map's art with what you've explored (LT.MapArt:
+                             the Bestiary ledger's kill map)
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
   Core/WhatsNew.lua          what's-new window after an update, /lefthy news (entries: Data/Changelog.lua)
   Core/Options.lua           settings panel (overview + one page per module), option builder, /lefthy
