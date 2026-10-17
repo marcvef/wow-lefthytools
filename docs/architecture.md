@@ -27,10 +27,11 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Mirage/Groups.lua  frame names per group, window list, chat events (edit to add frames)
   Modules/Mirage/Mirage.lua  engine: frame adoption + alpha hooks, visibility, fading, events
   Modules/Mirage/Options.lua settings page, /mirage, keybinding labels
-  Modules/Tweaks/Tweaks.lua  Misc Tweaks: status text, movable bags, quest announcements
-  Modules/Tweaks/ComboPoints.lua  combo points on the personal resource display
-  Modules/Tweaks/Aggro.lua   who has aggro, on enemy nameplates (role colours, role check); its
-                             holder logic also tags the mobs on the fight stream's battle row
+  Modules/Tweaks/Tweaks.lua  Misc Tweaks: settings, the tweak list and switching, /lefthy tweaks, status text, hiding the interface
+  Modules/Tweaks/Bags.lua    movable bags, the bags' clean-up button
+  Modules/Tweaks/QuestAnnounce.lua  quest progress in party chat
+  Modules/Tweaks/ComboPoints.lua  combo points: coloured by count, dots on the target's nameplate
+  Modules/Tweaks/Aggro.lua   who has aggro, on enemy nameplates (role colours, role check); also the fight stream's tags
   Modules/Tweaks/RetailFrames.lua  retail unit frames (a tweak): retail's art and layout on
                              Forever's player, target, focus, party and pet frames
   Modules/Tweaks/ForeverQuests.lua  NEW badges for quests that are new in WoW: Forever

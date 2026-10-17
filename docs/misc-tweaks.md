@@ -1,9 +1,14 @@
 # Misc Tweaks design
 
-`Modules/Tweaks/Tweaks.lua` holds a list of independent tweaks (`TWEAKS`), each with an
-`apply(on)` function, a setting and a slash command word. `Reconcile()` compares what's wanted
-(module enabled and the tweak's setting on) with what's active, and runs on the next frame via
-`C_Timer.After(0)`. All tweaks default to on, except `retailFrames`.
+`Modules/Tweaks/Tweaks.lua` is the module: its settings (defaults, the settings page), `/lefthy tweaks`,
+the small `statusText` tweak, `ns.HideInterface` (shared by the AFK screen and cinematic flights)
+and the list of independent tweaks (`TWEAKS`), each with a setting, a slash command word and an
+`apply(on)` function, which calls the tweak's file (`ns.ApplyMovableBags`, ...). `Reconcile()`
+compares what's wanted (module enabled and the tweak's setting on) with what's active, and runs on
+the next frame via `C_Timer.After(0)`. All tweaks default to on, except `retailFrames`. The other
+files, in load order: `Bags.lua` (`movableBags`, `gamepadBagSort`), `QuestAnnounce.lua`,
+`ComboPoints.lua`, `Aggro.lua`, `RetailFrames.lua`, `ForeverQuests.lua`, `AFK.lua`, `Flight.lua`,
+`LevelUp.lua`, `QuestMap.lua` (+ `QuestMap.xml`).
 
 ## statusText: always show health and power values
 
@@ -15,7 +20,7 @@ stored in `savedStatusText` and restored when switched off. **Don't use `bar:Set
 write fields on Blizzard bars:** health is secret in Forever, and a tainted field read makes
 Blizzard's secret comparisons in `UpdateTextStringWithValues` error.
 
-## movableBags
+## movableBags (Bags.lua)
 
 Blizzard re-anchors every shown bag in the global `UpdateContainerFrameAnchors()` (open/close,
 bank, panel layout); a `hooksecurefunc` post-hook re-applies saved positions. Drag handles: the
@@ -30,7 +35,7 @@ A gamepad sort button was tried and dropped: controller mode already has "Clean 
 backpack's menu (`Gamepad_SetupMenuOptions`), and `ContainerFrameMixin:UpdateSearchBox()` hides
 `BagItemAutoSortButton` in gamepad mode, where `GamepadBagBar` covers its spot.
 
-## gamepadBagSort: the bags' clean-up button
+## gamepadBagSort: the bags' clean-up button (Bags.lua)
 
 Since 1.60.1.70291 the bags' clean-up button (`BagItemAutoSortButton`) no longer shows, with mouse
 and keyboard or in gamepad mode (seen in game; before, `ContainerFrameMixin:UpdateSearchBox`
@@ -51,7 +56,7 @@ Forever's frame art. If the search box isn't anchored that way: left of it; with
 `UpdateSearchBox` again (as Blizzard has it), ours hidden and taken off the bag. The key
 still says gamepad (it began there).
 
-## questAnnounce: quest progress in party chat
+## questAnnounce: quest progress in party chat (QuestAnnounce.lua)
 
 Modelled on Questie's `Modules/QuestieAnnounce.lua`: an objective is announced only when it goes
 from unfinished to finished, prefixed with the `{rt1}` star icon. `questState[questID]` holds

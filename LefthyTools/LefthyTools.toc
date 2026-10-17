@@ -33,6 +33,8 @@ Modules\Mirage\Mirage.lua
 Modules\Mirage\Options.lua
 
 Modules\Tweaks\Tweaks.lua
+Modules\Tweaks\Bags.lua
+Modules\Tweaks\QuestAnnounce.lua
 Modules\Tweaks\ComboPoints.lua
 Modules\Tweaks\Aggro.lua
 Modules\Tweaks\RetailFrames.lua
