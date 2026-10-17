@@ -732,7 +732,7 @@ function M:BuildOptions(o)
 	o:Checkbox("cinematicFlights", L["Cinematic flights"],
 		L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. The bottom bar shows the time left to landing, and whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."])
 	o:Checkbox("flightFriends", L["Friends in the top bar"],
-		L["The top black bar shows what your Beacon friends are doing: a line each with their level, where they are, and whom they're fighting or which quest they're on. With more than two friends it goes through them in turn."])
+		L["The black bars show what your Beacon friends are doing, three lines each: their level and where they are, their quest, and whom they're fighting. Three fit in the top bar and three more in the bottom one; with more than six, they take turns."])
 	o:Choice("flightHide", L["What a flight hides"],
 		L["Everything: the whole interface, other addons included. Chosen elements: only the ones ticked below, the rest stays (other addons too). Works with Mirage on or off."],
 		{ { "all", L["Everything"] }, { "chosen", L["Chosen elements"] } })
