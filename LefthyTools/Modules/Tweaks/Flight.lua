@@ -42,6 +42,7 @@ local data = ns.MirageData -- the window lists, to notice a window being opened
 local FADE = 1.5            -- seconds for the interface and the bars
 local POLL = 0.25
 local START_WAIT = 3        -- seconds after losing control to look for the taxi
+local PICK_KEPT = 10        -- seconds a pick on the flight map waits for its takeoff (a flight that didn't start)
 local RESUME_DELAY = 2      -- seconds after a window closes or typing ends
 local CARD_IN, CARD_HOLD, CARD_OUT = 1.2, 3.5, 1.5
 local SUBTITLE_TIME, MAX_SUBTITLES = 8, 2
@@ -77,7 +78,7 @@ local events = CreateFrame("Frame")
 -- ended for the rest of this flight (combat, a popup), only the flight's time is still taken.
 local flying, shown, dismissed, leaveNow, zoneChanged, chatChanged = false, false, false, false, false, false
 local lookUntil      -- after losing control: look for the taxi until then
-local picked         -- from TakeTaxiNode: { name = "Sentinel Hill, Westfall", route, distance }
+local picked         -- from TakeTaxiNode: { name = "Sentinel Hill, Westfall", route, distance, at }
 local trip           -- this flight: { route, distance, started, known, estimate }
 local lastZone, baseline -- baseline: the fewest windows open this flight (the taxi map closes at takeoff)
 local resumeAt
@@ -172,7 +173,7 @@ local function PickRoute(slot)
 	if not (Readable(name) and type(name) == "string") then
 		return nil
 	end
-	local route = { name = name }
+	local route = { name = name, at = GetTime() }
 	local ok = pcall(function()
 		local mapID = GetTaxiMapID and GetTaxiMapID()
 		local nodes = mapID and C_TaxiMap and C_TaxiMap.GetAllTaxiNodes(mapID)
@@ -841,6 +842,11 @@ events:SetScript("OnEvent", function(_, event, ...)
 	if event == "PLAYER_CONTROL_LOST" then
 		dismissed, trip = false, nil -- a new flight
 		takeoffAt = GetTime() -- (the film may start later: typing in chat at takeoff)
+		-- A pick that never took off (not enough money, say) isn't this flight's: a flight not taken
+		-- from the flight map (a quest's) would get its name, and its time would be kept for that route.
+		if picked and takeoffAt - picked.at > PICK_KEPT then
+			picked = nil
+		end
 		Look()
 	elseif event == "PLAYER_CONTROL_GAINED" then
 		if flying or trip then

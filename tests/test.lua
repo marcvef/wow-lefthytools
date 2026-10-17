@@ -5503,6 +5503,22 @@ do
 	check(LefthyToolsDB.flightTimes[route] == nil, "a flight the film joined late isn't kept as the route's time")
 	Advance(2)
 	if film:IsShown() then film.FadeOut:Finish() end
+	-- A pick that never took off (not enough money): a later flight not taken from the flight map
+	-- (a quest's) isn't that route.
+	TakeTaxiNode(3)
+	Advance(11)
+	TRAVEL.taxi = true
+	Fire("PLAYER_CONTROL_LOST")
+	Advance(0.5)
+	check(film:IsShown() and film.Card.Header:GetText() ~= "Next stop" and film.Timer:GetText() == "",
+		"a quest's flight long after an old pick: not named after it, no time, got " .. tostring(film.Card.Header:GetText()))
+	Advance(11)
+	TRAVEL.taxi = false
+	Fire("PLAYER_CONTROL_GAINED")
+	Advance(0.5)
+	check(LefthyToolsDB.flightTimes[route] == nil, "... and its time isn't kept for the old pick's route")
+	Advance(2)
+	if film:IsShown() then film.FadeOut:Finish() end
 end
 
 section("Misc Tweaks: what a flight hides")

@@ -443,7 +443,8 @@ left alone (a first version pulled it back and circled; that was removed).
   both call it) keeps `TaxiNodeName(slot)` ("Sentinel Hill, Westfall"). The zone you take off in
   gets no card of its own. After a `/reload` mid-flight the current zone's card stands in. Landing
   (`PLAYER_CONTROL_GAINED`) drops a pick the film never used, so a flight not taken from the taxi
-  map (a quest's) doesn't get the last one's name and time.
+  map (a quest's) doesn't get the last one's name and time; so does a takeoff more than 10 s
+  after the pick (a pick that never took off: not enough money, say).
 - **Time left:** the game doesn't tell. The same hook reads the taxi map (`GetTaxiMapID`,
   `C_TaxiMap.GetAllTaxiNodes`): the node you're at (state `Current`) names the route ("From >
   To"), and each slot's `nodeID`. Best first:
