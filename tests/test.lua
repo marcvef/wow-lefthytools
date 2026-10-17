@@ -6890,6 +6890,51 @@ section("Chronicle: a surname not known yet says so")
 	win:Hide()
 end)()
 
+section("Chronicle: Battle.net tells a friend's surname, whatever they run")
+;(function() -- (a function of its own: the main chunk's 200 locals)
+	local carl = CH.Hash("Carl#3456")
+	local function profile(key, u, class)
+		anna("J2;p;" .. carl .. ";" .. key .. ";" .. u .. ";" .. class .. ";9;" .. time() .. ";600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000;;")
+	end
+	anna("H2")
+	Advance(1.2)
+	profile("Corin-Realmy", 9500, "PALADIN")
+	profile("Cora-Realmy", 9501, "PRIEST")
+	Advance(0.3)
+	local book = CDB.book[carl].chars
+	local corin, cora = book["Corin-Realmy"], book["Cora-Realmy"]
+	check(corin and cora and not corin.full and not cora.full, "two of Carl's characters from an older build's journal: first names only")
+	-- Carl comes online on his second game account, without LefthyTools: Battle.net still says who.
+	-- (The walk runs on the tick every 30 s; called here, so the clock stays.)
+	local carlFriend
+	for _, f in ipairs(BN_FRIENDS) do if f.battleTag == "Carl#3456" then carlFriend = f end end
+	local function online(name, class, extra)
+		local game = { gameAccountID = 33, isOnline = true, clientProgram = "WoW", wowProjectID = 1, isInCurrentRegion = true,
+			characterName = name, classFilename = class, characterLevel = 9, areaName = "Westfall", playerGuid = "Player-1-933",
+			isGameAFK = false, isGameBusy = false, realmName = "Realmy", factionName = "Alliance" }
+		for k, v in pairs(extra or {}) do game[k] = v end
+		carlFriend[2] = game
+		CH.SyncMeet()
+	end
+	online("Corin Vale", "PALADIN")
+	local item
+	for _, c in ipairs(CH.Characters()) do if c.key == "book:" .. carl .. ":Corin-Realmy" then item = c end end
+	check(corin.full == "Corin Vale" and corin.guid == "Player-1-933" and item and item.name == "Corin Vale" and not item.partial,
+		"online on it (another game account of his, no LefthyTools): its surname and GUID, the mark gone")
+	online("Cora Vale", "PRIEST", { wowProjectID = 2, playerGuid = "Player-1-934" })
+	check(not cora.full, "another WoW (another project): nothing")
+	online("Cora Vale", "MAGE", { playerGuid = "Player-1-934" })
+	check(not cora.full and not cora.guid, "another class: another character with that first name, nothing")
+	online("Cora", "PRIEST", { playerGuid = "Player-1-934" })
+	check(cora.full == "Cora" and cora.guid == "Player-1-934", "a name Battle.net shows without a surname: that's all of it (not marked)")
+	carlFriend[2] = setmetatable({}, { __index = function() error("a secret value") end })
+	local ok = pcall(CH.SyncMeet)
+	online(SECRET, "PRIEST")
+	check(ok and cora.full == "Cora", "what can't be read (a secret) is skipped, nothing breaks")
+	carlFriend[2] = nil
+	book["Corin-Realmy"], book["Cora-Realmy"] = nil, nil
+end)()
+
 section("Chronicle: a death counts once")
 do
 	-- The game can say PLAYER_DEAD more than once for one death.

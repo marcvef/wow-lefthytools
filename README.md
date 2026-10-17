@@ -275,7 +275,8 @@ Timeline, Statistics and Graphs, and a friend's graphs, are the account's: all i
 up (only a character's level, how long its levels took and the session you're playing now stay per
 character). Compare, the leaderboards and the friends lists go by character, with the BattleTag
 beside it. A friend's character whose surname hasn't reached you yet (their journal came from an
-older LefthyTools) shows its first name with a grey **?**; hover it to see when the surname comes.
+older LefthyTools) shows its first name with a grey **?** until it does: as soon as they play it
+while you're online (whatever LefthyTools they have), or with an up-to-date LefthyTools.
 
 - **Timeline**, newest first, by day, all your characters in one (each line says whose):
   level-ups (and how long each level took), deaths (where, and what killed you), zones

@@ -57,6 +57,7 @@ local SERVE_MAX = 400
 local FRIENDS_CACHE = 30
 local CATCHUP_AFTER, CATCHUP_WAIT = 75, 240 -- s after logging in; waiting for syncs at most this long
 local RECAP_AFTER = 120
+local MEET_GAP, MEET_FIRST = 30, 10 -- friends' characters online on Battle.net, matched to their journals (s)
 local NAME_BYTES, TEXT_BYTES = 48, 60
 local SHAREABLE = { level = true, death = true, zone = true, dungeon = true, boss = true, rare = true, loot = true, mount = true,
 	achievement = true, quests = true, gold = true, profession = true }
@@ -76,6 +77,7 @@ local summaries = {}   -- gameAccountID -> { at, sent = { [acct] = u } }
 local lastCheck, lastProfile = -math.huge, -math.huge
 local catchUp          -- { since, at, deadline }
 local recapAt, recapDeadline, pruneAt = nil, 0, nil -- (the recap waits for journals until recapDeadline)
+local meetAt           -- the next walk over Battle.net's friends online (Meet)
 local feedVersion = 0  -- bumped when friends' news change (the merged feed is rebuilt then)
 
 ---------------------------------------------------------------------------
@@ -571,7 +573,7 @@ end
 -- What Battle.net says of a friend's character joins its journal: its GUID, and the name the game
 -- shows (also without a surname: then that's all of it). One it knows, its author's or learned, stays,
 -- unless this one adds the surname, or the GUID says it's this character, renamed (to a name with a
--- surname: one without never replaces one with).
+-- surname: one without never replaces one with). Returns true if it learned something.
 local function Learn(c, name, guid, tier)
 	local changed = false
 	if guid and not c.guid then
@@ -583,6 +585,55 @@ local function Learn(c, name, guid, tier)
 	end
 	if changed then
 		Changed() -- (names in the news)
+	end
+	return changed
+end
+
+-- One character a friend is online on (Battle.net's game account info), within their account: its
+-- journal's character learns its name and GUID. Called through pcall: a value Battle.net keeps
+-- secret can't be compared, and then this one is skipped.
+local function MeetGame(acct, game)
+	if not (game and game.isOnline and game.clientProgram == (BNET_CLIENT_WOW or "WoW") and game.isInCurrentRegion ~= false
+		and game.wowProjectID == WOW_PROJECT_ID) then
+		return false
+	end
+	local name, classFile, guid = game.characterName, game.classFilename, ValidGuid(game.playerGuid)
+	if type(name) ~= "string" or name == "" or issecret(name) then
+		return false
+	end
+	classFile = type(classFile) == "string" and not issecret(classFile) and classFile or nil
+	local _, _, c, tier = FindBook(acct, name, classFile, guid)
+	return c ~= nil and Learn(c, name, guid, tier)
+end
+
+-- Battle.net shows the name the game shows (with the surname) of every character a friend is online
+-- on, on each of their game accounts, whatever they run (an older LefthyTools, none, Beacon off):
+-- the journals I hold of their account learn it. (Beacon's friends teach it too, C.PeerChar, but
+-- only those with LefthyTools, and only when a page asks.) Every MEET_GAP on the tick: a walk over
+-- the friend list, a few calls per friend online.
+local function Meet()
+	local getAccount, numGames, getGame = C_BattleNet and C_BattleNet.GetFriendAccountInfo,
+		C_BattleNet and C_BattleNet.GetFriendNumGameAccounts, C_BattleNet and C_BattleNet.GetFriendGameAccountInfo
+	if not (getAccount and numGames and getGame and BNGetNumFriends) then
+		return
+	end
+	local learned = false
+	for i = 1, BNGetNumFriends() or 0 do
+		local ok, info = pcall(getAccount, i)
+		local tag = ok and info and info.battleTag
+		local acct = type(tag) == "string" and tag ~= "" and not issecret(tag) and Hash(tag)
+		if acct and store.book[acct] then
+			local okCount, count = pcall(numGames, i)
+			count = okCount and type(count) == "number" and not issecret(count) and count or 0
+			for j = 1, count do
+				local okGame, game = pcall(getGame, i, j)
+				local okMeet, met = pcall(MeetGame, acct, okGame and game)
+				learned = learned or (okMeet and met)
+			end
+		end
+	end
+	if learned then
+		C.feedDirty = true -- (the open page: its names)
 	end
 end
 
@@ -1609,6 +1660,10 @@ function C.SyncTick(now)
 		pruneAt = nil
 		PruneBook()
 	end
+	if meetAt and now >= meetAt then
+		meetAt = now + MEET_GAP
+		Meet()
+	end
 	if catchUp and now >= catchUp.at then
 		if M.db.catchUp then
 			CatchUp(now)
@@ -1674,6 +1729,7 @@ function C.SyncEnable()
 	end
 	recapAt, recapDeadline = now + RECAP_AFTER, now + RECAP_AFTER + CATCHUP_WAIT
 	pruneAt = now + 60 -- (the friend list is known by then)
+	meetAt = now + MEET_FIRST
 	-- Switched on mid-session: friends already here hear it now (at login nobody is known yet;
 	-- they learn it from my answers).
 	local B = Beacon()
@@ -1689,7 +1745,7 @@ function C.SyncDisable()
 	wipe(pending)
 	wipe(summaries)
 	wipe(serves)
-	catchUp, recapAt, pruneAt = nil, nil, nil
+	catchUp, recapAt, pruneAt, meetAt = nil, nil, nil, nil
 end
 
 -- A setting changed: friends hear again what grew (all my characters, when that was switched on).
@@ -1710,3 +1766,4 @@ end
 function C.SyncPending()
 	return pending
 end
+C.SyncMeet = Meet

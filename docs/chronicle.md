@@ -362,6 +362,15 @@ without a surname, which is then all of it; one it knows, its author's or learne
 one that adds the surname, or on a GUID match, a rename, and never to one without a surname). Without
 the account, only GUID and full name count.
 
+**Battle.net tells it** (`Meet`, on the tick every 30 s, the first 10 s after starting): a walk over
+the friend list (`C_BattleNet.GetFriendAccountInfo`, `GetFriendNumGameAccounts`,
+`GetFriendGameAccountInfo`: every game account of each friend, so also one they play on besides
+the one Battle.net shows first) takes every character a friend is online on in WoW: Forever (online,
+the WoW client, the current region, `WOW_PROJECT_ID`), whatever they run (an older LefthyTools, none,
+Beacon off), and matches it within their account (their BattleTag's hash) to the journals I hold
+(`FindBook`, `Learn`). Beacon's friends teach it too (`C.PeerChar`, when a page asks), but only
+those with LefthyTools. Each game account is read under `pcall`: one Battle.net keeps secret is skipped.
+
 **A name not known in full.** A journal from an older build only ever says the first name (the
 key's), so a character of it that Battle.net hasn't shown online since, and an alt of mine not played
 since this build, have no `full` (`C.Partial`). Every place that shows a character shows it by its
@@ -403,6 +412,7 @@ journal learns the full name. Nothing is deleted or moved.
 ## Cost, and what goes over the network
 
 The 1-second tick is local only: a few cheap API reads (position, target), adding up counters,
-and a session point per minute. Nothing is sent from it except highlights, which are rare (a few
+and a session point per minute; every 30 s a walk over the Battle.net friend list (`Meet`, a few
+calls per friend online). Nothing is sent from it except highlights, which are rare (a few
 per hour at most) and go through Beacon's rate limiter like everything else. The AFK screen shows a session line
 (`ns.AFKScreen.sections`).
