@@ -107,6 +107,75 @@ function ns.HideInterface(owner, hide, fade)
 end
 
 ---------------------------------------------------------------------------
+-- Shared by the tweaks (ns.TweakUtil): what several of them ask
+---------------------------------------------------------------------------
+
+local Util = {}
+ns.TweakUtil = Util
+
+-- In a fight (also the moment before the combat lockdown begins).
+function Util.InCombat()
+	return InCombatLockdown() or UnitAffectingCombat("player")
+end
+
+-- Typing: a chat box open, or anything else that has the keyboard.
+function Util.ChatActive()
+	return ACTIVE_CHAT_EDIT_BOX ~= nil or (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus() ~= nil)
+end
+
+-- How many windows are open: Blizzard's panels, the bags and the windows in Mirage's lists
+-- (LefthyTools' own too, LT.Window.Register). The lists are Mirage's data: they work with Mirage off.
+function Util.OpenWindows()
+	local data = ns.MirageData
+	local count = 0
+	if GetUIPanel then
+		for _, area in ipairs(data.PANEL_AREAS) do
+			if GetUIPanel(area) then
+				count = count + 1
+			end
+		end
+	end
+	if IsAnyBagOpen and IsAnyBagOpen() then
+		count = count + 1
+	end
+	for _, name in ipairs(data.WINDOWS) do
+		local f = _G[name]
+		if type(f) == "table" and f.IsShown and f:IsShown() then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+-- Seconds as "1:05" or "1:02:03", rounded (refreshed right on the second: 64.9999 is 65).
+function Util.Clock(seconds)
+	seconds = math.max(0, math.floor(seconds + 0.5))
+	local h, m, s = math.floor(seconds / 3600), math.floor(seconds / 60) % 60, seconds % 60
+	if h > 0 then
+		return ("%d:%02d:%02d"):format(h, m, s)
+	end
+	return ("%d:%02d"):format(m, s)
+end
+
+-- A unit's nameplate ("target", "nameplate3"): its unit frame, if it has one addons may touch.
+function Util.PlateFrame(unit)
+	if not (C_NamePlate and C_NamePlate.GetNamePlateForUnit) then
+		return nil
+	end
+	local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unit)
+	if not ok or not plate or (issecretvalue and issecretvalue(plate)) or (plate.IsForbidden and plate:IsForbidden()) then
+		return nil
+	end
+	return plate.UnitFrame
+end
+
+-- The health bar of a nameplate's unit frame (its container can be taller than the bar).
+function Util.PlateHealthBar(frame)
+	local container = frame.HealthBarsContainer
+	return frame.healthBar or (type(container) == "table" and container.healthBar) or container or frame
+end
+
+---------------------------------------------------------------------------
 -- Always show health / power values on unit frames (statusText)
 --
 -- The bars show their text permanently when the CVar "statusText" is "1"

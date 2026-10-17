@@ -26,6 +26,7 @@ local DOT = "|A:levelup-dot-gold:12:12|a "
 local GOLD = { 1, 0.82, 0.3 }
 local Num, SpellName, MaxLevel = LevelUp.Num, LevelUp.SpellName, LevelUp.MaxLevel
 local FIRST_TALENT_LEVEL = LevelUp.FIRST_TALENT_LEVEL
+local Clock = ns.TweakUtil.Clock -- Tweaks.lua
 
 local STAT_NAMES = { L["Strength"], L["Agility"], L["Stamina"], L["Intellect"], L["Spirit"] }
 local POWER_NAMES = { MANA = L["Mana"], RAGE = L["Rage"], ENERGY = L["Energy"] }
@@ -409,15 +410,6 @@ LevelUp.SetPinned = SetPinned
 ---------------------------------------------------------------------------
 -- Filling it in
 ---------------------------------------------------------------------------
-
-local function Clock(seconds)
-	seconds = math.floor(seconds + 0.5)
-	local h, m, s = math.floor(seconds / 3600), math.floor(seconds / 60) % 60, seconds % 60
-	if h > 0 then
-		return ("%d:%02d:%02d"):format(h, m, s)
-	end
-	return ("%d:%02d"):format(m, s)
-end
 
 -- One stat cell's text at p (0..1) of its count-up.
 local function CellText(row, p)

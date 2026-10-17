@@ -2,7 +2,8 @@ local _, ns = ...
 local LT = ns.LT
 local L = ns.L
 local M = LT:GetModule("tweaks")
-local data = ns.MirageData -- the window lists Mirage uses to tell whether the UI is in use
+local Util = ns.TweakUtil -- Tweaks.lua
+local InCombat, ChatActive, Clock = Util.InCombat, Util.ChatActive, Util.Clock
 
 -- AFK screen (a Misc Tweak; works without Mirage): while you're away (/afk or the game's
 -- auto-AFK) the interface disappears, the camera slowly circles your character, and a panel shows your character, how long you've been away,
@@ -52,36 +53,9 @@ local function IsAFK()
 	return not issecret(afk) and afk == true
 end
 
-local function ChatActive()
-	if ACTIVE_CHAT_EDIT_BOX then
-		return true
-	end
-	local focus = GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()
-	return focus ~= nil
-end
-
+-- A window open (Mirage's window lists, also with Mirage off): the screen isn't wanted then.
 local function WindowOpen()
-	if GetUIPanel then
-		for _, area in ipairs(data.PANEL_AREAS) do
-			if GetUIPanel(area) then
-				return true
-			end
-		end
-	end
-	if IsAnyBagOpen and IsAnyBagOpen() then
-		return true
-	end
-	for _, name in ipairs(data.WINDOWS) do
-		local f = _G[name]
-		if type(f) == "table" and f.IsShown and f:IsShown() then
-			return true
-		end
-	end
-	return false
-end
-
-local function InCombat()
-	return InCombatLockdown() or UnitAffectingCombat("player")
+	return Util.OpenWindows() > 0
 end
 
 ---------------------------------------------------------------------------
@@ -130,15 +104,6 @@ local function Build()
 	screen.Hint = Text(screen, "GameFontDisableSmall", "CENTER")
 	screen.Hint:SetPoint("BOTTOM", 0, 4)
 	screen.Hint:SetText(L["Move, or click anywhere, to come back."])
-end
-
-local function Clock(seconds)
-	seconds = math.floor(seconds + 0.5) -- refreshed right on the second: 64.9999 is 65
-	local h, m, s = math.floor(seconds / 3600), math.floor(seconds / 60) % 60, seconds % 60
-	if h > 0 then
-		return ("%d:%02d:%02d"):format(h, m, s)
-	end
-	return ("%d:%02d"):format(m, s)
 end
 
 local function ColouredName(name, classFile)

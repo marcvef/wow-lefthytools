@@ -28,14 +28,7 @@ local function Readable(value)
 	return value ~= nil and not (issecretvalue and issecretvalue(value))
 end
 
-local function Clock(seconds)
-	seconds = math.max(0, math.floor(seconds + 0.5))
-	local h, m, s = math.floor(seconds / 3600), math.floor(seconds / 60) % 60, seconds % 60
-	if h > 0 then
-		return ("%d:%02d:%02d"):format(h, m, s)
-	end
-	return ("%d:%02d"):format(m, s)
-end
+local Clock = ns.TweakUtil.Clock -- Tweaks.lua
 
 ---------------------------------------------------------------------------
 -- The route picked on the taxi map: its name, its length along the real flight path, and the

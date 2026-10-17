@@ -56,9 +56,7 @@ local function Num(v)
 	return type(v) == "number" and not issecret(v) and v or nil
 end
 
-local function InCombat()
-	return InCombatLockdown() or UnitAffectingCombat("player")
-end
+local InCombat = ns.TweakUtil.InCombat -- Tweaks.lua
 
 local function CharKey()
 	return (UnitName("player") or "?") .. "-" .. (GetRealmName() or "?")

@@ -2,7 +2,10 @@ local _, ns = ...
 local LT = ns.LT
 local L = ns.L
 local M = LT:GetModule("tweaks")
-local data = ns.MirageData -- the window lists, to notice a window being opened
+local Util = ns.TweakUtil -- Tweaks.lua
+local InCombat, ChatActive = Util.InCombat, Util.ChatActive
+-- How many windows are open (the taxi map closing as you take off is fine; one opening isn't).
+local Windows = Util.OpenWindows
 
 -- Cinematic flights (a Misc Tweak; works without Mirage): on a flight path the interface fades
 -- out, thin black bars fade in like a film, and a title card names your destination and every
@@ -88,40 +91,10 @@ local function OnTaxi()
 	return Readable(onTaxi) and onTaxi == true
 end
 
-local function InCombat()
-	return InCombatLockdown() or UnitAffectingCombat("player")
-end
-
-local function ChatActive()
-	return ACTIVE_CHAT_EDIT_BOX ~= nil or (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus() ~= nil)
-end
-
 -- A friend's item offer waiting for my Need or Pass: its buttons are on the interface.
 local function OfferWaiting()
 	local beacon = ns.Beacon
 	return beacon and beacon.AwaitingAnswer and beacon.AwaitingAnswer() or false
-end
-
--- How many windows are open (the taxi map closing as you take off is fine; one opening isn't).
-local function Windows()
-	local count = 0
-	if GetUIPanel then
-		for _, area in ipairs(data.PANEL_AREAS) do
-			if GetUIPanel(area) then
-				count = count + 1
-			end
-		end
-	end
-	if IsAnyBagOpen and IsAnyBagOpen() then
-		count = count + 1
-	end
-	for _, name in ipairs(data.WINDOWS) do
-		local f = _G[name]
-		if type(f) == "table" and f.IsShown and f:IsShown() then
-			count = count + 1
-		end
-	end
-	return count
 end
 
 ---------------------------------------------------------------------------

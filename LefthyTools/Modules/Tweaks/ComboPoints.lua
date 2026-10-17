@@ -36,6 +36,7 @@ local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local DOT_SIZE = 6   -- default: each dot's size in pixels, its dark ring included (comboDotSize)
 local SIZE_MIN, SIZE_MAX = 4, 12
 local issecret = issecretvalue or function() return false end
+local Util = ns.TweakUtil -- Tweaks.lua: the nameplate and its health bar
 
 local colorByCount = false -- switched by Tweaks.lua (ns.ApplyComboColors), on by default
 local onNameplate = false  -- ns.ApplyComboNameplate, on by default
@@ -236,18 +237,6 @@ local function LayRow(frame, count, points, size)
 	frame.points, frame.count, frame.size = points, count, size
 end
 
--- The nameplate of your target (its unit frame), if it has one addons may touch.
-local function TargetPlate()
-	if not (C_NamePlate and C_NamePlate.GetNamePlateForUnit) then
-		return nil
-	end
-	local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, "target")
-	if not ok or not plate or issecret(plate) or (plate.IsForbidden and plate:IsForbidden()) then
-		return nil
-	end
-	return plate.UnitFrame
-end
-
 -- The dots' size (Misc Tweaks' slider).
 local function DotSize()
 	local tweaks = ns.LT:GetModule("tweaks")
@@ -262,7 +251,7 @@ local function UpdateDots()
 	if points == 0 and onNameplate and GetTime() < previewUntil then
 		points = MaxPoints()
 	end
-	local plate = points and points > 0 and TargetPlate()
+	local plate = points and points > 0 and Util.PlateFrame("target") -- (your target's, if it has one addons may touch)
 	if not plate then
 		if row then
 			row:Hide()
@@ -270,9 +259,7 @@ local function UpdateDots()
 		return
 	end
 	row = row or NewRow()
-	-- The health bar itself (its container can be taller than the bar).
-	local container = plate.HealthBarsContainer
-	local bar = plate.healthBar or (type(container) == "table" and container.healthBar) or container or plate
+	local bar = Util.PlateHealthBar(plate)
 	local ok = pcall(function()
 		if row:GetParent() ~= plate then
 			row:SetParent(plate)

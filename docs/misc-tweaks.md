@@ -1,7 +1,9 @@
 # Misc Tweaks design
 
 `Modules/Tweaks/Tweaks.lua` is the module: its settings (defaults, the settings page), `/lefthy tweaks`,
-the small `statusText` tweak, `ns.HideInterface` (shared by the AFK screen and cinematic flights)
+the small `statusText` tweak, `ns.HideInterface` (shared by the AFK screen and cinematic flights),
+`ns.TweakUtil` (what several tweaks ask: in combat, typing, how many windows are open, "1:05",
+a unit's nameplate and its health bar)
 and the list of independent tweaks (`TWEAKS`), each with a setting, a slash command word and an
 `apply(on)` function, which calls the tweak's file (`ns.ApplyMovableBags`, ...). `Reconcile()`
 compares what's wanted (module enabled and the tweak's setting on) with what's active, and runs on

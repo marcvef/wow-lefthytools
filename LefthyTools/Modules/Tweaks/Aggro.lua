@@ -46,6 +46,7 @@ local COLORS = {
 local TANK_AURAS = { 5487, 9634, 25780 } -- Bear Form, Dire Bear Form, Righteous Fury
 local DEFENSIVE_STANCE = 71
 local issecret = issecretvalue or function() return false end
+local Util = ns.TweakUtil -- Tweaks.lua: the nameplate and its health bar
 
 local on = false                 -- switched by Tweaks.lua (ns.ApplyAggro)
 local plates = {}                -- nameplate unit -> true: its nameplate is up
@@ -215,18 +216,6 @@ end
 -- The tag on a nameplate
 ---------------------------------------------------------------------------
 
--- A nameplate's unit frame, if it has one addons may touch.
-local function PlateFrame(unit)
-	if not (C_NamePlate and C_NamePlate.GetNamePlateForUnit) then
-		return nil
-	end
-	local ok, plate = pcall(C_NamePlate.GetNamePlateForUnit, unit)
-	if not ok or not plate or issecret(plate) or (plate.IsForbidden and plate:IsForbidden()) then
-		return nil
-	end
-	return plate.UnitFrame
-end
-
 local function TagFor(frame)
 	local tag = tags[frame]
 	if not tag then
@@ -251,14 +240,12 @@ local function Hide(unit)
 end
 
 local function Show(unit, text, color)
-	local frame = PlateFrame(unit)
+	local frame = Util.PlateFrame(unit) -- (if it has one addons may touch)
 	if not frame then
 		return Hide(unit)
 	end
 	local tag = TagFor(frame)
-	-- On the health bar itself, at its left end (its container can be taller than the bar).
-	local container = frame.HealthBarsContainer
-	local bar = frame.healthBar or (type(container) == "table" and container.healthBar) or container or frame
+	local bar = Util.PlateHealthBar(frame) -- (at its left end)
 	local ok = pcall(function()
 		tag:ClearAllPoints()
 		tag:SetPoint("LEFT", bar, "LEFT", 1, 0)
