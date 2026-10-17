@@ -9,11 +9,7 @@ LT.Options = Options
 
 function Options.Seconds(value)
 	-- 0.25 -> "0.25 s", 1.50 -> "1.5 s", 3.00 -> "3 s" ("1,5 s" in German)
-	local text = string.format("%.2f", value):gsub("%.?0+$", "")
-	if ns.DECIMAL_COMMA then
-		text = text:gsub("%.", ",")
-	end
-	return text .. " s"
+	return LT.Decimal((string.format("%.2f", value):gsub("%.?0+$", ""))) .. " s"
 end
 
 function Options.Percent(value)

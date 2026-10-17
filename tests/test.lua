@@ -77,6 +77,8 @@ do -- shared text helpers
 	check(cut("Anna", 10) == "Anna" and cut("Anna", 2) == "An" and cut("Jäger", 2) == "J" and cut("Jäger", 3) == "Jä"
 		and cut("äb", 1) == "\195" and cut("", 5) == "", "LT.CutUTF8: whole letters only (a letter ending at the limit stays), at least one byte")
 	check(LefthyTools.CutUTF8 == ns.Beacon.CutUTF8, "Beacon's CutUTF8 is Core's")
+	check(LT.Decimal("4.5") == "4.5" and LT.Decimal("12.3 km", true) == "12.3 km" and LT.Decimal("<0.1%") == "<0.1%",
+		"LT.Decimal: an English client keeps the point (test_de.lua: the German comma)")
 end
 
 section("error catcher")

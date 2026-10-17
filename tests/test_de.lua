@@ -64,6 +64,8 @@ for _, formal in ipairs({ "Minikarte", "Oberfläche", "Schlachtzug", "Stärkungs
 	check(not all:find(formal, 1, true), "no formal term '" .. formal .. "' in the German settings")
 end
 check(LT.Options.Seconds(1.5) == "1,5 s" and LT.Options.Seconds(3) == "3 s", "German decimal comma on sliders")
+check(LT.Decimal("4.5") == "4,5" and LT.Decimal("12.3 km") == "12,3 km" and LT.Decimal("4.5", true) == "4.5",
+	"LT.Decimal: the German decimal comma (english: the point, for chat lines)")
 
 GROUP = "party"
 QUESTS = { { id = 201, title = "Aufräumen im Koboldlager", objectives = { { text = "0/10 Koboldungeziefer getötet", finished = false } } } }

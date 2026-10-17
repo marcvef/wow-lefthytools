@@ -957,11 +957,7 @@ end
 
 -- "12.3 km" ("12,3 km" in German; chat lines, which stay English, ask for the point).
 function C.Distance(yards, english)
-	local text = ("%.1f km"):format((yards or 0) * 0.9144 / 1000)
-	if ns.DECIMAL_COMMA and not english then
-		text = text:gsub("%.", ",")
-	end
-	return text
+	return LT.Decimal(("%.1f km"):format((yards or 0) * 0.9144 / 1000), english)
 end
 
 -- This session in one line, for the AFK screen (localized) or chat (English).

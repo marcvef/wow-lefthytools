@@ -68,6 +68,16 @@ function LT.CutUTF8(text, maxBytes)
 	return text:sub(1, cut)
 end
 
+-- A number written with a decimal point ("4.5", "12.3 km", "3.4%") with the decimal mark of the
+-- client's language: "4,5" in German (ns.DECIMAL_COMMA, Locales/deDE.lua). english: keeps the point
+-- (chat lines, which stay English).
+function LT.Decimal(text, english)
+	if ns.DECIMAL_COMMA and not english then
+		return (text:gsub("%.", ","))
+	end
+	return text
+end
+
 ---------------------------------------------------------------------------
 -- Version. The repo's TOC holds the base version (e.g. 0.3.0, git tag v0.3.0); install.ps1
 -- writes the exact build into the installed copy, like `git describe`:

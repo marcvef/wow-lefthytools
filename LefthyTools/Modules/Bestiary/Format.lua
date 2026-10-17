@@ -25,10 +25,8 @@ local function QualityColor(quality)
 end
 
 -- A number's decimal point as the client's language writes it ("4,5" in German), unless plain (chat
--- lines, which stay English).
-local function Decimal(text, plain)
-	return ns.DECIMAL_COMMA and not plain and (text:gsub("%.", ",")) or text
-end
+-- lines, which stay English): Core's.
+local Decimal = LT.Decimal
 
 -- "35%", "3.4%" ("3,4%" in German; plain: with a point, for chat lines), "<0.1%".
 local function Percent(chance, plain)
