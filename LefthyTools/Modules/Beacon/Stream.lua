@@ -10,6 +10,7 @@ local B = ns.Beacon
 --   StreamSense.lua  what's around you: mobs, their distance and learned direction, what you do
 --   StreamBattle.lua the battle row under the spells: their model, the mobs they fight, the fight
 --   StreamView.lua   the windows (yours, the preview, and one per friend you watch)
+--   StreamPreview.lua the preview's made-up fight
 --   StreamNet.lua    between friends: who may watch, who watches, the pictures sent
 --   StreamButton.lua the spyglass on the minimap: friends to watch
 --

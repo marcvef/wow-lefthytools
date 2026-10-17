@@ -526,7 +526,7 @@ friend per minute); complete ones, or after 120 s with "[part n of m missing]", 
 so. `/lefthy reports` (or the settings button) shows them newest first in a copy box, with Clear.
 Not collecting: parts are ignored.
 
-## Fight stream (Stream.lua, StreamSense.lua, StreamView.lua, StreamNet.lua)
+## Fight stream (Stream*.lua)
 
 A small live view of a friend's fight from above: them in the middle on the map of the place, the
 mobs around them (how far, which way, who attacks, who casts), what they're casting. Watch any
@@ -535,14 +535,17 @@ watch <name>`, a click on their world map dot (`streamMapClick`), or a cinematic
 (`streamFlights`). Files:
 
 - `Stream.lua`: asking the game (`B.Stream` = `S`: `S.Api`, `S.Value`, range checks, `S.Bounds`,
-  `S.YardsFrom`), the test (`/lefthy stream test` / `results`), the commands.
+  `S.YardsFrom`), what a mob is called (`S.LevelText`, `S.MobTitle`, `S.ClassLabel`), the test
+  (`/lefthy stream test` / `results`), the commands.
 - `StreamSense.lua`: the sensor, your own picture (`S.Sensed()`), looked at every 0.5 s while
   someone needs it (`S.SenseNeed("me" | "stream", on)`: your window, friends watching you).
 - `StreamBattle.lua`: the battle row under the spells (their model and the mobs they fight, the
   fight played on them; below).
 - `StreamView.lua`: the windows (`S.OpenView("me" | "preview")`, `S.OpenFriend(id, origin)`,
   `S.CloseView`, `S.ToggleFriend`, `S.CloseFlightViews`).
+- `StreamPreview.lua`: the preview's made-up fight (`S.FeedPreview(view)`, its next picture).
 - `StreamNet.lua`: between friends (protocol below), the "being watched" dot, flights.
+- `StreamButton.lua`: the spyglass minimap button (below).
 
 Known from the API docs (1.60.1): `UnitHealth`, `UnitHealthPercent` and `GetRaidTargetIndex` are
 always secret, `UnitPosition` answers for group members only, the combat log is closed to addons.
