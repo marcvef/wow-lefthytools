@@ -65,7 +65,7 @@ local M = LT:NewModule("bestiary", {
 		dropData = true,     -- compare with the classic drop database (LefthyTools_DropData)
 		windowUnseen = false, -- the window: what the database says it drops that you haven't had yet
 		cardUnseen = false,  -- the card beside the mouse over a mob you haven't killed: what it can drop
-		window = {},         -- shown, point, x, y
+		window = {},         -- shown, left, top (Window.lua: whether it's open, where)
 	},
 })
 

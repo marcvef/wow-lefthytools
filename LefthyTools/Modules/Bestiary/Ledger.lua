@@ -951,8 +951,7 @@ local function Build()
 	pane.Stats:SetSpacing(3)
 	-- What a kill of it pays (its worth, XP and time per kill, XP per hour of fighting), under the
 	-- model, as wide as the details.
-	pane.ModelBack = modelBack
-	pane.Pace = pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	pane.Pace =pane:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	pane.Pace:SetPoint("TOPLEFT", modelBack, "BOTTOMLEFT", 0, -8)
 	pane.Pace:SetPoint("RIGHT", details, "RIGHT", 0, 0)
 	pane.Pace:SetJustifyH("LEFT")
