@@ -313,9 +313,12 @@ window's own drop tooltips (they show the numbers already: `ownTooltip` while th
 
 ## The ledger (Ledger.lua)
 
-`LefthyToolsBestiaryLedger`, 640 x 470, same look; Escape closes it (it's for looking things up),
+`LefthyToolsBestiaryLedger`, 986 x 580, same look; Escape closes it (it's for looking things up),
 registered with `LT.Window.Register`. Opened by the window's book, Ctrl-click on the minimap button,
-the settings or `/bestiary ledger [search]`.
+the settings or `/bestiary ledger [search]`. Its size fits a 1366 x 768 screen at the default UI
+scale (UIParent 768 high) with room around it, and it's clamped to the screen. Columns: the list
+(282), the picked mob's details (320), its map (330), its drops under both (the details and the
+map wide).
 
 - **At the top**: "2 mobs · 7 kills · 5 items · 12s coin, 1s 76c per kill" (the coin per kill over
   all kills), and the **rarest find**: the looted item with the lowest chance among mobs with at
@@ -327,19 +330,26 @@ the settings or `/bestiary ledger [search]`.
 - **The picked mob** (right): its whole model turning slowly (an OnUpdate while open), name, kind,
   kills, coin each and in all (or "no coin"), first and last kill ("2 h ago"), skinnings, the drop
   database's coin ("Classic database: 8c to 15c each") and "6 of its 11 drops found". Under the
-  model, the pane wide, what a kill pays when known: "Worth about 45s per kill (12s coin, 33s from
-  drops at a vendor)", "85 XP and 14 s per kill" ("At level 12: ..."), "About 21k XP per hour of
-  fighting (the time between fights not counted)"; the drops start under it. Then its drops in a
-  scrolling area (all of them, 8 per row, no "+N"): "Drops (N)" (skinning marked), "Not seen yet
-  (N), classic database" (faded, as in the window) and "World drops (N)" when it has any.
-- **Where you killed it**, at the end of that area when it has spots: "Where you killed them:
-  Elwynn Forest", the map with the most of its kills as the world map shows it (its first art
-  layer, `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid like
-  `Blizzard_MapCanvasDetailLayer` and the fight stream's map, the pane wide; the last column and
-  row's tiles cut to the map's edge with `SetTexCoord`, so nothing hangs over; no art: a dark
-  rectangle), a small red dot in a dark ring per kill (older ones fainter). Under it, one line:
-  "Your last 50 kills." once that many are kept, and "Also in Westfall (3), Duskwood (1)" (three
-  at most, "+N") when kills were on other maps.
+  model, as wide as the details, what a kill pays when known: "Worth about 45s per kill (12s coin,
+  33s from drops at a vendor)", "85 XP and 14 s per kill" ("At level 12: ..."), "About 21k XP per
+  hour of fighting (the time between fights not counted)". Beside all that the map of where you
+  killed it (below). Under both, its drops in a scrolling area (all of them, 19 per row, no "+N"):
+  "Drops (N)" (skinning marked), "Not seen yet (N), classic database" (faded, as in the window) and
+  "World drops (N)" when it has any.
+- **Where you killed it**, beside the details, seen without scrolling (the user: "the map should be
+  also on the right of the mob details so that you dont have to scroll down"; it was under the
+  drops at first). A heading "Where you killed them" with a rule, at its right the zone's name, or,
+  when its kills were in more than one zone, a picker of them (`LT.Window.AddPicker`, like the
+  sort's: the most kills first, each "Elwynn Forest (12)"; the user: "if there are multiple regions
+  there needs to be a drop down"). Under it the zone's map in a 330 x 220 box as the world map shows
+  it (its first art layer, `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid like
+  `Blizzard_MapCanvasDetailLayer` and the fight stream's map, as large as fits the box, centred;
+  the last column and row's tiles cut to the map's edge with `SetTexCoord`, so nothing hangs over;
+  no art: the box's dark back), a small red dot in a dark ring per kill there (older ones fainter).
+  At first the zone with the most kills; the one picked stays while the ledger redraws, another
+  mob starts again with its most. Under the map "Your last 50 kills." once that many are kept. No
+  kill with a place (older records, only instances): the box says "No kills on a map yet", quietly,
+  and the layout stays as it is.
 - **What you've explored** is on the map as your world map shows it (the user: "should be fully
   explored or ideally the same visibility the player has"). The art leaves unexplored areas blank;
   explored ones are overlays, `C_MapExplorationInfo.GetExploredMapTextures(mapID)`: each a
@@ -350,9 +360,10 @@ the settings or `/bestiary ledger [search]`.
   (`isDrawOnTopLayer` over the other overlays); one `isShownByMouseOver` isn't explored, left out.
   The API missing or saying nothing: the art alone. The overlays' textures are pooled (a zone can
   have dozens).
-- **Laid only when needed**: the art and its overlays again only when the map changes, or after
-  `MAP_EXPLORATION_UPDATED` (registered once the ledger is built; it only clears the map shown, so
-  the next draw lays it again). Every other redraw only moves the dots.
+- **Laid only when needed**: the art and its overlays again only when the map shown changes
+  (another mob, another zone picked), or after `MAP_EXPLORATION_UPDATED` (registered once the
+  ledger is built; it only clears the map shown, so the next draw lays it again). Every other
+  redraw only moves the dots.
 - **A row** also says "6/11 found" (the drop database; not while it shows what the search found).
   Sorted by coin, worth, XP per kill or XP per hour, it says that instead ("~45s", "85 XP", "21k
   XP/h").
@@ -407,6 +418,8 @@ every mob, table lookups only).
   overlays sit where the world map has them (`GetExploredMapTextures` answers on Forever, its
   offsets are the layer's pixels, the smaller last files cut right), and a zone you've explored
   fully looks like the world map's.
+- The ledger at 986 x 580 on a 1366 x 768 screen; the map beside the details, the zone picker's
+  list over it, a long zone name ("Stranglethorn Vale (50)") whole in the picker's 180 px.
 - `LoadAddOn` of the load-on-demand drop database works on Forever, and its first load (0.93 MB of
   strings) is only a moment, also when the fight stream asks for it in a fight.
 - How close the classic database's health is to Forever's (the fight stream's learned ratio from

@@ -7827,13 +7827,24 @@ section("Bestiary: what mobs drop")
 		ledger:Hide()
 	end
 	-- Where you killed them: you on the map at each killing blow (not in instances), the last 50. The
-	-- ledger shows the zone with the most on the world map's art, a dot each, the other maps under it.
+	-- ledger shows it beside the mob's details: the zone with the most on the world map's art, a dot
+	-- each, a picker of its zones.
 	do
 		local mapWas, posWas = PLAYER_MAP, PLAYER_POS
 		kobolds().spots = nil -- (like a record from before)
 		Bt.ToggleLedger(119)
 		local where = ledger.Pane.where
-		check(not where.Heading:IsShown() and not where.Map:IsShown() and not where.Note:IsShown(), "a record from before: no map, nothing else missing")
+		check(where.Heading:IsShown() and where.Empty:IsShown() and where.Empty:GetText() == "No kills on a map yet" and not where.Map:IsShown()
+			and not where.Zone:IsShown() and not where.Pick:IsShown() and not where.Note:IsShown(),
+			"a record from before: the map's box says so quietly, nothing else missing")
+		-- The map beside the details, seen without scrolling (in game it was under the drops); the
+		-- window still fits a 1366 x 768 screen at the default UI scale (768 high), clamped to it.
+		local width, height = ledger:GetSize()
+		local boxX, boxY = select(-2, where.Box:GetPoint(1))
+		local dropsY = select(-1, ledger.Pane.Scroll:GetPoint(1))
+		check(where.Box:GetParent() == ledger.Pane and boxX >= 300 and boxY > -40 and dropsY <= boxY - 220
+			and width <= 1366 - 200 and height <= 768 - 120 and ledger._clamped,
+			"the map: beside the details at the top of the pane, the drops under both; the window fits a small screen, clamped")
 		local function killAt(map, x, y, guid)
 			PLAYER_MAP, PLAYER_POS = map, { x, y }
 			Fire("PARTY_KILL", "Player-1-0", guid)
@@ -7845,27 +7856,30 @@ section("Bestiary: what mobs drop")
 		check(kobolds().spots and #kobolds().spots == 1 and kobolds().spots[1] == 1429250750,
 			"a kill: where you were at its killing blow, in one number (map, x and y in thousandths)")
 		killAt(1429, 0.5, 0.5, kobold[9])
+		check(where.Zone:IsShown() and where.Zone:GetText() == "Elwynn Forest" and not where.Pick:IsShown() and where.Map:IsShown()
+			and not where.Empty:IsShown(), "kills in one zone: its name over the map, no picker")
 		killAt(1436, 0.4, 0.6, kobold[10])
 		INSTANCE, STATE.inInstance = { name = "The Deadmines", type = "party" }, true
 		killAt(1429, 0.3, 0.3, kobold[11])
 		INSTANCE, STATE.inInstance = nil, nil
 		check(kobolds().kills == 11 and #kobolds().spots == 3, "in an instance: counted, but no spot")
 		local tiles = where.tiles
-		check(where.Heading:IsShown() and where.Heading:GetText() == "Where you killed them: Elwynn Forest" and where.Map:IsShown()
+		check(where.Heading:GetText() == "Where you killed them" and where.Pick:IsShown() and where.Pick.Label:GetText() == "Elwynn Forest (2)"
+			and not where.Zone:IsShown() and where.Map:IsShown()
 			and #tiles == 12 and tiles[1].path == 142901 and tiles[12].path == 142912 and tiles[12].shown
 			and math.abs(tiles[4].coords[2] - 234 / 256) < 1e-6 and tiles[4].coords[4] == 1 and math.abs(tiles[12].coords[4] - 156 / 256) < 1e-6,
 			"the ledger: the zone with the most kills on its world map art (4 x 3 tiles, the last column and row cut to the map)")
-		local width, height = where.Map:GetSize()
+		width, height = where.Map:GetSize()
 		local dots = where.dots
 		local _, _, _, x1, y1 = dots[1]:GetPoint(1)
-		check(dots[1].shown and dots[2].shown and not (dots[3] and dots[3].shown) and width == 296 and math.abs(height - 668 * 296 / 1002) < 0.01
+		check(dots[1].shown and dots[2].shown and not (dots[3] and dots[3].shown) and math.abs(width - 330) < 0.01 and math.abs(height - 220) < 0.01
 			and math.abs(x1 - 0.2505 * width) < 0.01 and math.abs(y1 + 0.7505 * height) < 0.01 and dots[1]:GetAlpha() < dots[2]:GetAlpha(),
 			"a dot for each kill there, where it was; the older fainter")
 		-- On the art, what you've explored (the art leaves the rest blank): each area's tiles from its
 		-- offset, scaled like the art, the last column a smaller file, cut at the map's edge; not what
 		-- only a mouseover shows.
 		do
-			local overlays, s = where.overlays, 296 / 1002
+			local overlays, s = where.overlays, 330 / 1002
 			local function near(a, b) return math.abs(a - b) < 1e-6 end
 			local o1, o2, o3 = overlays[1], overlays[2], overlays[3]
 			local _, _, _, x2, y2 = o2:GetPoint(1)
@@ -7895,14 +7909,31 @@ section("Bestiary: what mobs drop")
 			Bt.DrawLedger()
 			check(#overlays == 3 and o1.path == 7001 and o3.shown, "back: laid again from the pool")
 		end
-		check(where.Note:IsShown() and where.Note:GetText() == "Also in Westfall (1)", "the other maps named under it")
+		-- More than one zone: the picker lists them, the most kills first, each with its kills; one
+		-- picked shows its map and dots; another mob and back: the most kills again.
+		do
+			where.Pick:Click()
+			local list = where.Pick.List
+			check(not where.Note:IsShown() and list:IsShown() and list.count == 2 and list.rows[1].Text:GetText() == "Elwynn Forest (2)"
+				and list.rows[1].Check:IsShown() and list.rows[2].Text:GetText() == "Westfall (1)" and list.rows[2].value == 1436,
+				"several zones: a picker of them, the most kills first, each with its kills")
+			list.rows[2]:Click()
+			check(not list:IsShown() and where.Pick.Label:GetText() == "Westfall (1)" and where.tiles[1].path == 143601 and not where.overlays[1].shown
+				and where.dots[1].shown and not where.dots[2].shown, "Westfall picked: its map (nothing explored there), its one dot")
+			Bt.DrawLedger()
+			check(where.Pick.Label:GetText() == "Westfall (1)" and where.tiles[1].path == 143601, "the list redraws: the zone stays")
+			Bt.ToggleLedger(116)
+			Bt.ToggleLedger(119)
+			check(where.Pick.Label:GetText() == "Elwynn Forest (2)" and where.tiles[1].path == 142901 and where.overlays[1].shown,
+				"another mob and back: the zone with the most kills again")
+		end
 		-- A corpse looted without your killing blow seen: you at it then. The last 50 are kept.
 		for _ = 1, 47 do table.insert(kobolds().spots, 1, 1429100100) end
 		PLAYER_POS = { 0.6, 0.4 }
 		koboldLoot(kobold[12])
 		check(kobolds().kills == 12 and #kobolds().spots == 50 and kobolds().spots[50] == 1429600400 and kobolds().spots[1] == 1429100100
-			and where.Note:GetText():find("Your last 50 kills.", 1, true) and where.Note:GetText():find("Also in Westfall (1)", 1, true),
-			"a corpse looted without a killing blow seen: where you are; the last 50 kept, the oldest goes")
+			and where.Note:IsShown() and where.Note:GetText() == "Your last 50 kills." and where.Pick.Label:GetText() == "Elwynn Forest (49)",
+			"a corpse looted without a killing blow seen: where you are; the last 50 kept (said under the map), the oldest goes")
 		ledger:Hide()
 		PLAYER_MAP, PLAYER_POS = mapWas, posWas
 	end
