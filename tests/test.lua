@@ -7499,6 +7499,18 @@ do
 	W.Close:Click()
 	Advance(0.5)
 	check(not shown() and not W.pinned, "closed: gone, and the next one starts unpinned")
+	do -- Pinned, its X clicked just as a fight starts (still fading out): it stays closed.
+		lefthy("tweaks levelup test")
+		W.Pin:Click()
+		W.Close:Click()
+		STATE.combat = true
+		Fire("PLAYER_REGEN_DISABLED")
+		Advance(0.5)
+		STATE.combat = false
+		Fire("PLAYER_REGEN_ENABLED")
+		Advance(1.2)
+		check(not shown() and not W.pinned, "closed with its X as a fight starts: it doesn't come back after the fight")
+	end
 	lefthy("tweaks levelup test")
 	W:GetScript("OnDragStart")(W)
 	W:GetScript("OnDragStop")(W)

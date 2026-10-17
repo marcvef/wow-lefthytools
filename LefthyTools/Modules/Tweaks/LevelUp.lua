@@ -1181,7 +1181,7 @@ events:SetScript("OnEvent", function(_, event, ...)
 			C_Timer.After(1, BackAfterFight)
 		end
 	elseif event == "PLAYER_REGEN_DISABLED" then
-		if win and win:IsShown() and win.pinned then
+		if win and win:IsShown() and win.pinned and not win.closing then -- (closing: its X was clicked, it stays closed)
 			win.awayForFight, win.stepAside = true, true
 			win:Hide()
 		else
