@@ -3567,10 +3567,24 @@ do
 		and printedSince(pmark):find("Anna sent a LefthyTools error report: /lefthy reports shows it.", 1, true),
 		"a friend's report, put together (parts in any order, no escape codes), and a chat line")
 	anna("Z2;8;1;3;first part")
-	for _ = 1, 5 do
-		Advance(25)
+	-- Meanwhile one of mine to her can't go for minutes (the server holds everything back): it waits
+	-- in the queue, and isn't queued again on top of itself.
+	anna("Y2;1")
+	MOCK_SEND_RESULT = 3
+	local heldMark = #PRINTED + 1
+	lefthy("report stuck behind the server")
+	for i = 1, 5 do
+		if i < 5 then
+			Advance(25)
+		else -- (the same 25 s: let go after 2 minutes and a bit, when a report not gone yet would be sent again)
+			Advance(22)
+			MOCK_SEND_RESULT = nil
+			Advance(3)
+		end
 		bobAlive()
 	end
+	local _, sendings = printedSince(heldMark):gsub("report%(s%) sent to Anna", "")
+	check(sendings == 1, "a report held up for minutes is queued once, not again on top, got " .. sendings)
 	check(reports[#reports].text == "first part[part 2 of 3 missing][part 3 of 3 missing]", "parts that never came: kept with a note")
 	lefthy("reports")
 	check(LefthyToolsReportsFrame:IsShown() and BB.ReportsText():find("from Anna", 1, true)
@@ -3584,6 +3598,8 @@ do
 	anna("Z2;9;1;1;ignored")
 	Advance(0.3)
 	check(#reports == count, "not collecting: friends' reports are ignored")
+	check(#LefthyToolsDB.reportsOut == 0, "the held-up report went once the server let it")
+	anna("Y2;0")
 	wipe(reports)
 end
 

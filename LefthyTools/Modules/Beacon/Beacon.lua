@@ -658,6 +658,17 @@ function B.DropLowFor(gameAccountID, match)
 	end
 end
 
+-- Whether a low-priority message starting with prefix is still waiting (Reports.lua: a report
+-- still on its way isn't queued again).
+function B.LowWaiting(prefix)
+	for _, item in ipairs(lowOutbox) do
+		if item[2]:sub(1, #prefix) == prefix then
+			return true
+		end
+	end
+	return false
+end
+
 function B.QueueLowToPeers(message)
 	for gameAccountID in pairs(peers) do
 		B.QueueLow(gameAccountID, message)

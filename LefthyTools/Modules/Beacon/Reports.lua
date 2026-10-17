@@ -32,7 +32,8 @@ local assembling = {}     -- "<sender>:<id>" -> { sender, id, of, parts = {}, at
 local errorsIn = {}       -- errors caught this session, waiting to become reports
 local clicks = {}         -- { at, link, result }
 local lastFlush = -math.huge
-local inFlight = {}       -- report (in reportsOut) -> when its parts were queued; it stays saved until they've gone
+local inFlight = {}       -- report (in reportsOut) -> { at = when its parts were queued, seq = their id }; it
+                          -- stays saved until they've gone
 local announced           -- what friends were last told about collecting
 
 local function Saved(key)
@@ -141,7 +142,7 @@ local function Delivered(report)
 end
 
 -- Low priority; the report stays saved (a /reload, the collector gone) until its last part to one
--- of them has actually been sent.
+-- of them has actually been sent. Returns the id its parts go under.
 local function Send(report, parts, to)
 	local db = LT.db
 	db.reportSeq = ((tonumber(db.reportSeq) or 0) % 9999) + 1
@@ -151,6 +152,22 @@ local function Send(report, parts, to)
 				n == #parts and function() Delivered(report) end or nil)
 		end
 	end
+	return db.reportSeq
+end
+
+-- Still on its way: queued less than IN_FLIGHT_TIMEOUT ago, or its parts still wait in Beacon's
+-- low-priority queue (a long journal sync ahead of them, the server holding everything back).
+-- Queued again only once they're gone without the last one sent (the collector went offline).
+local function OnItsWay(flight, now)
+	if not flight then
+		return false
+	elseif now - flight.at < IN_FLIGHT_TIMEOUT then
+		return true
+	elseif B.LowWaiting(("Z%s;%d;"):format(B.VERSION, flight.seq)) then
+		flight.at = now -- (looked at again in a while)
+		return true
+	end
+	return false
 end
 
 -- Parts sent in the last SENT_WINDOW seconds (the old ones forgotten). Saved: GetTime() goes on
@@ -180,8 +197,7 @@ local function Flush()
 	local now = GetTime()
 	local room, sent, more, empty = PARTS_PER_MINUTE - RecentParts(now), 0, 0, {}
 	for _, report in ipairs(waiting) do
-		local queued = inFlight[report]
-		local parts = not (queued and now - queued < IN_FLIGHT_TIMEOUT) -- (else still on its way)
+		local parts = not OnItsWay(inFlight[report], now)
 			and Parts(type(report) == "table" and type(report.text) == "string" and report.text or "")
 		if parts and #parts == 0 then
 			empty[#empty + 1] = report -- (nothing to send)
@@ -189,8 +205,7 @@ local function Flush()
 			if #parts > room then
 				room, more = 0, more + 1 -- (oldest first: the rest waits too)
 			else
-				inFlight[report] = now
-				Send(report, parts, to)
+				inFlight[report] = { at = now, seq = Send(report, parts, to) }
 				room, sent = room - #parts, sent + 1
 				local sentParts = Saved("reportParts")
 				sentParts[#sentParts + 1] = { at = now, count = #parts }

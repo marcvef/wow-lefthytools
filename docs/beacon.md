@@ -475,7 +475,8 @@ and `;` removed, newlines as `^`) at low priority, at most 45 parts in any 65 s 
 which goes on over a /reload), and prints "N report(s) sent to Anna" (", M more in a moment"). A
 report stays in `reportsOut` until its last part to a collector has actually gone (`QueueLow`'s
 onSent): a /reload or the collector going offline first doesn't lose it; one not gone after 120 s
-is sent again. An overlong report is cut without splitting a UTF-8 character.
+is sent again, unless its parts still wait in the queue (`B.LowWaiting`: a long journal sync ahead
+of them, the server holding everything back), so a collector never gets it twice. An overlong report is cut without splitting a UTF-8 character.
 
 Profession links get a closer look, since the game handles them itself: Blizzard's UI only passes
 a `trade:<GUID>:<spell>:<skill line>` link to `ItemRefTooltip:SetHyperlink`, the client asks the
