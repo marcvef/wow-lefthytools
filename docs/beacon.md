@@ -656,6 +656,23 @@ client knows it (`S.MobMaxOf`: "learned from kills", "the classic database", "us
 a friend's percent may rest on their own kills); known only to the friend: "Estimated by their
 client".
 
+**Who has aggro** on each foe, in a group (the user picked it: "each foe gets the tiny role-coloured
+tag from the nameplate aggro tweak"): Misc Tweaks' nameplate tag (misc-tweaks.md, `aggroNameplate`),
+the same look through `ns.AggroTag`: `>YOU<` (deDE `>DU<`) in your own window, else the first three
+letters of the holder's name in their role's colour (tank blue, healer green, damage red, no role
+white, a pet tan, outside the group grey), 8 px outlined with a shadow, no backing, on the top edge of
+the foe's box at the left (`LEFT` on its `TOPLEFT`: half over the gap above, the mob's head mostly
+free), on a frame two levels above its model. Yours: read at the sensor's look (`Holders`,
+StreamSense.lua: `ns.AggroHolder(mob.unit)`, Aggro.lua's holder and roles, for the first 5 foes in
+combat), also with that tweak or Misc Tweaks off (while the sensor runs, `ns.AggroWatch` keeps the
+group's roster fresh); a mob off your screen keeps what was last known. A friend's: from their frame
+(the `@` part, below); the one shown holding it is named (theirs, "Ann"), not `>YOU<`. Not in a group
+or nobody known (target and threat hidden): no tag. A friend's build from before it, in a group (a
+`g` member in their frame): a mob attacking them (`a`) says their name, white (no role known); without
+a group member near, nothing. A dead mob has none. Set only when text or colour changes
+(`ShowAggro`). The preview: her Fireball pulls the leader ("Ann", red) until Bob, the tank, takes it at
+8 s (blue); the bandit is on her; the mage on Cedric, passing by (grey).
+
 **The battle row** (StreamBattle.lua; the user: a Pokémon-style fight, "your model does something
 and affects the enemy models", in the foes' row, the radar staying above; "doesn't need to be shown
 exact. just an approximation with the data available", and no more data for it).
@@ -756,7 +773,19 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   (estimated; only ones with an id already). Each moment comes in every frame while it's recent, so a frame replaced in the
   queue loses none; the windows show each number once. It rides there because builds before it
   skip a mob entry that doesn't start with a number, while a 12th field would make them drop the
-  whole frame (they want exactly 11).
+  whole frame (they want exactly 11). In a group, after the foes' health and before the moments,
+  **who has their aggro**: `,<mob id>@<role><name>`, role `t` tank, `h` healer, `d` damage, `n`
+  none, `p` a pet, `o` outside the group; name the first three letters of theirs (whole UTF-8
+  letters, `,` `/` `;` `=` `@` `|` and control characters stripped), none when it's the sender:
+  `v82,3=45,3@tBob,4@d,14w52`. 5 to 9 bytes each (ASCII names), only for foes with an id, the
+  same 5 as the health; within `MAX_VITALS - MOMENT_ROOM` (80 of the 120 bytes: the newest moments
+  keep 40, since each moment rides in every frame for 2.5 s anyway while a tag left out of a frame
+  would flicker); the vitals stay within 120, the frame within 245. Builds before it skip the part
+  (`DecodeVitals`: not `?x`, not `<id>=<n>`, and a moment needs a letter right after its number,
+  `^(%d%d?)(%a)`: `@` isn't one, whatever bytes the name has), and its entry, mobs and 11 fields are
+  unchanged (`tests/test.lua` reads such vitals with the old decoder: the same health, foes' health
+  and moments). A receiver shows a role letter it doesn't know white; the name is cleaned
+  (`B.Clean`) and cut to three letters again.
 - `O2;n;<id>;<level>;<name>` a mob's name (40 bytes), once per watcher before the first frame with
   that id (ids 1-999 per GUID, reused after 60 s).
 - `O2;c;<id>;<creatureID>` a mob's creature ID (from its GUID), right after its name: the watcher's

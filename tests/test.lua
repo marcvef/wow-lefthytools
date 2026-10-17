@@ -4563,6 +4563,192 @@ do
 	ns.MINIMAP_TILES = realTiles
 end
 
+section("Beacon: fight stream: who has aggro, on the battle row")
+;(function()
+	local S = BB.Stream
+	local function slotOf(w, name)
+		for _, s in ipairs(w.Foes.slots) do
+			if s:IsShown() and s.mob and s.mob.name == name then return s end
+		end
+	end
+	local function tagOf(w, name)
+		local s = slotOf(w, name)
+		return s and s.Aggro:IsShown() and s.Aggro.Text:GetText() or nil
+	end
+	local function coloured(w, name, r, g, b)
+		local s = slotOf(w, name)
+		local c = s and s.Aggro.Text.color
+		return c ~= nil and math.abs(c[1] - r) < 0.01 and math.abs(c[2] - g) < 0.01 and math.abs(c[3] - b) < 0.01
+	end
+	-- My group: me (damage), Bob (the tank), Ölrik (the healer); a mob on each of us, all three on my
+	-- threat list (so in my row).
+	GROUP = "party"
+	PARTY.party1 = { name = "Bob", guid = "Player-1-41" }
+	PARTY.party2 = { name = "Ölrik", guid = "Player-1-42" }
+	ROLES = { player = "DAMAGER", party1 = "TANK", party2 = "HEALER" }
+	MOBS = {
+		nameplate1 = { name = "Defias Thug", level = 15, guid = "Creature-0-1-0-1-94-00000021", combat = true, attacking = true,
+			yards = 5, x = 0.5, y = 0.45 },
+		nameplate2 = { name = "Defias Pillager", level = 16, guid = "Creature-0-1-0-1-589-00000022", combat = true,
+			targetGUID = "Player-1-41", yards = 8, x = 0.45, y = 0.5 },
+		nameplate3 = { name = "Defias Looter", level = 15, guid = "Creature-0-1-0-1-590-00000023", combat = true,
+			targetGUID = "Player-1-42", yards = 12, x = 0.55, y = 0.5 },
+	}
+	THREAT = { nameplate1 = 3, nameplate2 = 1, nameplate3 = 1 }
+	THREATS = { ["party1>nameplate2"] = 3, ["party2>nameplate3"] = 3 }
+	Fire("GROUP_ROSTER_UPDATE")
+	lefthy("stream me")
+	Advance(0.6)
+	local win = LefthyToolsStreamFrame
+	local thug = slotOf(win, "Defias Thug")
+	check(tagOf(win, "Defias Thug") == ">YOU<" and coloured(win, "Defias Thug", 1, 0.32, 0.26)
+		and tagOf(win, "Defias Pillager") == "Bob" and coloured(win, "Defias Pillager", 0.35, 0.62, 1)
+		and tagOf(win, "Defias Looter") == "Ölr" and coloured(win, "Defias Looter", 0.3, 0.95, 0.4),
+		"my window, in a group: who has each foe's aggro, as on the nameplates: >YOU< (my role, damage: red), Bob (tank: blue), Ölr (healer: green)")
+	check(thug.Aggro:GetParent() == thug and select(1, thug.Aggro:GetPoint(1)) == "LEFT" and select(3, thug.Aggro:GetPoint(1)) == "TOPLEFT"
+		and thug.Aggro:GetFrameLevel() > thug.Model:GetFrameLevel() and thug.Aggro.Text.fontSize == 8,
+		"small, on its box's top edge at the left, above its model")
+	-- Drawn only when it changes: nothing for a second, then Bob taunts the thug off me.
+	do
+		local text, sets = thug.Aggro.Text, 0
+		local setText = text.SetText
+		text.SetText = function(self, ...) sets = sets + 1 return setText(self, ...) end
+		Advance(1.1)
+		local still = sets
+		MOBS.nameplate1.attacking, MOBS.nameplate1.targetGUID = false, "Player-1-41"
+		THREAT.nameplate1, THREATS["party1>nameplate1"] = 1, 3
+		Advance(0.6)
+		text.SetText = setText
+		check(still == 0 and sets == 1 and tagOf(win, "Defias Thug") == "Bob", "drawn only when it changes: Bob taunted it off me")
+	end
+	-- The nameplate tweak off (as with Misc Tweaks off): the same, the group still read again when it changes.
+	lefthy("tweaks aggro off")
+	Advance(0.1)
+	ROLES.party1 = "DAMAGER"
+	Fire("PLAYER_ROLES_ASSIGNED")
+	Advance(0.6)
+	check(not ns.GetAggroTag("nameplate2") and tagOf(win, "Defias Pillager") == "Bob" and coloured(win, "Defias Pillager", 1, 0.32, 0.26),
+		"the nameplate tweak off: still there, and roles followed (Bob picked damage: red)")
+	ROLES.party1 = "TANK"
+	lefthy("tweaks aggro on")
+	Fire("PLAYER_ROLES_ASSIGNED")
+	Advance(0.6)
+	-- Its target and the group's threat hidden: nothing said (not a wrong one). Solo: nothing at all.
+	MOBS.nameplate3.targetGUID, THREATS["party2>nameplate3"] = SECRET, SECRET
+	Advance(0.6)
+	check(slotOf(win, "Defias Looter") and tagOf(win, "Defias Looter") == nil, "its target and the group's threat hidden: no tag")
+	MOBS.nameplate3.targetGUID, THREATS["party2>nameplate3"] = "Player-1-42", 3
+	GROUP = "none"
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.6)
+	check(slotOf(win, "Defias Thug") and not tagOf(win, "Defias Thug") and not tagOf(win, "Defias Pillager"), "solo: no tags")
+	GROUP = "party"
+	Fire("GROUP_ROSTER_UPDATE")
+	MOBS.nameplate1.attacking, MOBS.nameplate1.targetGUID, THREAT.nameplate1, THREATS["party1>nameplate1"] = true, nil, 3, nil
+
+	-- Anna watches me: who has aggro goes with my frames, after my foes' health, "<id>@<role><name>"
+	-- (no name: me).
+	local from = #GAMEDATA + 1
+	anna("O2;w;1")
+	Fire("UNIT_COMBAT", "player", "WOUND", "", 40, 1)
+	Advance(1.1)
+	local ids = {}
+	for _, m in ipairs(sentTo(11, from, "O2;n;")) do
+		local id, name = m:match("^O2;n;(%d+);%d*;(.+)$")
+		ids[name or "?"] = id
+	end
+	local frames = sentTo(11, from, "O2;f;")
+	local frame = frames[#frames] or ""
+	local fields = {}
+	for f in (frame:sub(6) .. ";"):gmatch("([^;]*);") do fields[#fields + 1] = f end
+	local vitals = (fields[11] or ""):match("^(v[^/]*)") or ""
+	local function has(name, part) return ids[name] ~= nil and ("," .. vitals .. ","):find("," .. ids[name] .. part .. ",", 1, true) ~= nil end
+	check(#fields == 11 and #frame <= 250 and has("Defias Thug", "@d") and has("Defias Pillager", "@tBob") and has("Defias Looter", "@hÖlr")
+		and has("Defias Thug", "=100") and vitals:find(",%d+w40$"),
+		"my frames say who has my foes' aggro: me (no name), Bob, Ölr (whole letters); my health, theirs and my hit as before; got " .. frame)
+	-- What a build from before reads from it (its DecodeVitals, as it was): the same health, foes'
+	-- health and moments; the new parts match none of its patterns (a moment needs a letter after
+	-- its number, "@" isn't one), so they're skipped.
+	do
+		local function oldRead(entry)
+			local got, first = { foes = {}, moments = {} }, true
+			for part in entry:gmatch("[^,]+") do
+				if first then
+					first = false
+					got.health = part:match("^v(%d?%d?%d?)$")
+					if not got.health then return nil end
+				elseif part:match("^%?%a$") then
+					got.why = part
+				elseif part:match("^%d+=%d+$") then
+					got.foes[#got.foes + 1] = part
+				elseif part:match("^(%d%d?)(%a)(%w*)%.?(%d*)$") then
+					got.moments[#got.moments + 1] = part
+				end
+			end
+			return got
+		end
+		local a, b = oldRead(vitals), oldRead((vitals:gsub(",%d+@[^,]*", "")))
+		local skipped = true
+		for _, part in ipairs({ "1@t", "12@dÄbc", "999@o???", "5@h中文字", "7@nÖlr", "42@p", "3@tB=1" }) do
+			if part:match("^%?%a$") or part:match("^%d+=%d+$") or part:match("^(%d%d?)(%a)(%w*)%.?(%d*)$") then skipped = false end
+		end
+		check(a and b and a.health == b.health and a.why == b.why and table.concat(a.foes, ",") == table.concat(b.foes, ",")
+			and table.concat(a.moments, ",") == table.concat(b.moments, ",") and #a.moments == 1 and #a.foes == 3 and skipped,
+			"a build from before reads the same from it (health, foes' health, moments): the new parts match none of its patterns")
+	end
+	-- What I send is what she sees: my frames fed back as hers. On her window she's the one shown:
+	-- the thug on her says her name (in her role's colour, damage: red).
+	anna("O2;h;1")
+	S.OpenFriend(11, "command")
+	local fwin = S.View(11).win
+	for _, m in ipairs(sentTo(11, from, "O2;n;")) do anna(m) end
+	for _, m in ipairs(sentTo(11, from, "O2;c;")) do anna(m) end
+	anna(frame)
+	Advance(0.6)
+	check(tagOf(fwin, "Defias Thug") == "Ann" and coloured(fwin, "Defias Thug", 1, 0.32, 0.26) and tagOf(fwin, "Defias Pillager") == "Bob"
+		and coloured(fwin, "Defias Pillager", 0.35, 0.62, 1) and tagOf(fwin, "Defias Looter") == "Ölr"
+		and coloured(fwin, "Defias Looter", 0.3, 0.95, 0.4), "her window: who has her foes' aggro, from her frames: Ann (herself), Bob, Ölr")
+	-- A build from before it (no such part), in a group (someone of it near her, "g"): a mob
+	-- attacking her is on her, white (no role known); nobody of her group near: nothing.
+	anna("O2;n;31;15;Defias Thug")
+	anna("O2;c;31;94")
+	anna("O2;n;32;16;Defias Pillager")
+	anna("O2;c;32;589")
+	anna("O2;u;33;18;WARRIOR;Bob")
+	anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,31=60/31,0,5,9,ach/32,40,8,9,ch/33,10,6,9,pfg")
+	Advance(0.6)
+	check(tagOf(fwin, "Defias Thug") == "Ann" and coloured(fwin, "Defias Thug", 0.92, 0.92, 0.92) and slotOf(fwin, "Defias Pillager")
+		and tagOf(fwin, "Defias Pillager") == nil, "a frame from a build before it, in a group: the mob attacking her says her name, white")
+	anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,31=60/31,0,5,9,ach/32,40,8,9,ch")
+	Advance(0.6)
+	check(slotOf(fwin, "Defias Thug") and tagOf(fwin, "Defias Thug") == nil, "... nobody of her group near (solo, maybe): nothing")
+	anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,32@tBob/31,0,5,9,ach/32,40,8,9,ch/33,10,6,9,pfg")
+	Advance(0.6)
+	check(tagOf(fwin, "Defias Thug") == nil and tagOf(fwin, "Defias Pillager") == "Bob", "her build sends it: only what it says")
+	anna("O2;f;0;1429;260;750;90;c;M40;;;;v80,31@xÉvilname,32@t/31,0,5,9,ach/32,40,8,9,ch")
+	Advance(0.6)
+	check(tagOf(fwin, "Defias Thug") == "Évi" and coloured(fwin, "Defias Thug", 0.92, 0.92, 0.92) and tagOf(fwin, "Defias Pillager") == "Ann"
+		and coloured(fwin, "Defias Pillager", 0.35, 0.62, 1), "a role letter this build doesn't know: white; three whole letters at most; no name: her")
+	S.CloseView(11)
+
+	-- The preview: her Fireball pulls the leader (her name, red) until Bob takes it at 8 s (blue); the
+	-- bandit is on her, the mage on Cedric, passing by, outside her group (grey).
+	lefthy("stream preview")
+	Advance(3)
+	check(tagOf(win, "Bandit leader") == "Ann" and coloured(win, "Bandit leader", 1, 0.32, 0.26) and tagOf(win, "Bandit") == "Ann"
+		and tagOf(win, "Bandit mage") == "Ced" and coloured(win, "Bandit mage", 0.6, 0.6, 0.6),
+		"the preview: the leader and the bandit on her, the mage on someone outside her group")
+	Advance(6)
+	check(tagOf(win, "Bandit leader") == "Bob" and coloured(win, "Bandit leader", 0.35, 0.62, 1), "... and Bob, the tank, takes the leader at 8 s")
+	win.Close:Click()
+	anna("O2;w;0")
+	for i = 1, 3 do Fire("NAME_PLATE_UNIT_REMOVED", "nameplate" .. i) end -- (the nameplate tweak, on again, took them up)
+	GROUP, PARTY.party1, PARTY.party2, ROLES, MOBS, THREAT, THREATS = "none", nil, nil, {}, {}, {}, {}
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.6)
+	check(not S.SenseRunning() and not S.IsWatching(11), "closed, nobody watching: the sensor stops")
+end)()
+
 section("Beacon: a busy fight doesn't pile up messages")
 do
 	anna("S2;;0;260.0;750.0;Goldshire;")

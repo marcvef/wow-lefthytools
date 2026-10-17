@@ -26,6 +26,11 @@ local L = ns.L
 -- flag); one OnUpdate looks at the marked ones on the next frame. While you're in combat in a
 -- group it also looks at every enemy nameplate twice a second (once a second in a raid), in case
 -- an event was missed; otherwise it stops.
+--
+-- The fight stream's battle row shows the same tag on the mobs fought (Beacon, StreamSense.lua and
+-- StreamBattle.lua): ns.AggroHolder reads whom a mob is on, ns.AggroTag its text and colour. Its
+-- sensor reads them also with this tweak off (or Misc Tweaks off); while it runs, ns.AggroWatch
+-- keeps the group's roster fresh.
 
 local SIZE = 8                   -- the letters (px, outlined)
 local SWEEP, SWEEP_RAID = 0.5, 1 -- seconds between looks at every enemy while in combat
@@ -191,16 +196,19 @@ local function Holder(mob)
 	end
 end
 
--- Its text and colour.
-local function Look(holder)
-	if holder.you then
-		return L[">YOU<"], COLORS[holder.role] or COLORS.NONE
-	elseif holder.outsider then
-		return Short(holder.name), COLORS.OUTSIDER
+-- What colours its tag: a member's role ("TANK", "HEALER", "DAMAGER", "NONE"), "PET" or "OUTSIDER".
+local function RoleOf(holder)
+	if holder.outsider then
+		return "OUTSIDER"
 	elseif holder.pet then
-		return Short(holder.name or "?"), COLORS.PET
+		return "PET"
 	end
-	return Short(holder.name or "?"), COLORS[holder.role] or COLORS.NONE
+	return holder.role or "NONE"
+end
+
+-- A tag's text and colour: ">YOU<" in your role's colour, else the first three letters of the name.
+local function Tag(role, name, you)
+	return you and L[">YOU<"] or Short(name or "?"), COLORS[role] or COLORS.NONE
 end
 
 ---------------------------------------------------------------------------
@@ -280,7 +288,7 @@ local function Sample(unit)
 		return Hide(unit)
 	end
 	local sample = SAMPLES[((tonumber(unit:match("(%d+)$")) or 1) - 1) % #SAMPLES + 1]
-	Show(unit, sample[1] and Short(sample[1]) or L[">YOU<"], COLORS[sample[2]])
+	Show(unit, Tag(sample[2], sample[1], not sample[1]))
 end
 
 local function Update(unit)
@@ -301,7 +309,7 @@ local function Update(unit)
 	if not holder then
 		return Hide(unit)
 	end
-	Show(unit, Look(holder))
+	Show(unit, Tag(RoleOf(holder), holder.name, holder.you))
 end
 
 ---------------------------------------------------------------------------
@@ -372,8 +380,10 @@ events:SetScript("OnEvent", function(_, event, unit)
 	end
 end)
 
-local EVENTS = { "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_THREAT_LIST_UPDATE", "UNIT_TARGET", "UNIT_FLAGS",
-	"UNIT_THREAT_SITUATION_UPDATE", "GROUP_ROSTER_UPDATE", "UNIT_PET", "PLAYER_ROLES_ASSIGNED", "PLAYER_REGEN_DISABLED",
+local PLATE_EVENTS = { "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_THREAT_LIST_UPDATE", "UNIT_TARGET",
+	"UNIT_FLAGS", "UNIT_THREAT_SITUATION_UPDATE" }
+-- The group, its roles, pets, forms, combat starting or ending: the roster is read again.
+local ROSTER_EVENTS = { "GROUP_ROSTER_UPDATE", "UNIT_PET", "PLAYER_ROLES_ASSIGNED", "PLAYER_REGEN_DISABLED",
 	"PLAYER_REGEN_ENABLED", "UPDATE_SHAPESHIFT_FORM", "PLAYER_ENTERING_WORLD" }
 
 -- Called by Tweaks.lua when the switch changes (on the next frame, never in a callback).
@@ -381,8 +391,10 @@ function ns.ApplyAggro(want)
 	on = want
 	events:UnregisterAllEvents()
 	if on then
-		for _, event in ipairs(EVENTS) do
-			pcall(events.RegisterEvent, events, event)
+		for _, list in ipairs({ PLATE_EVENTS, ROSTER_EVENTS }) do
+			for _, event in ipairs(list) do
+				pcall(events.RegisterEvent, events, event)
+			end
 		end
 		for i = 1, 40 do -- (the nameplates already up)
 			if Value(UnitExists, "nameplate" .. i) then
@@ -428,6 +440,49 @@ function ns.AggroRoleCheck()
 		return "role check started: everyone picks tank, healer or damage in Blizzard's window."
 	end
 	return "only the group's leader or an assistant can start a role check."
+end
+
+---------------------------------------------------------------------------
+-- For the fight stream's battle row (Beacon: StreamSense.lua, StreamNet.lua, StreamBattle.lua)
+---------------------------------------------------------------------------
+
+-- Whom a mob is on (a unit: a nameplate, "target"), read at the sensor's look, also with this tweak
+-- off: nil when you're not in a group or nobody is known; else the holder's role ("TANK", "HEALER",
+-- "DAMAGER", "NONE", "PET" or "OUTSIDER"), name (nil: hidden) and whether it's you.
+function ns.AggroHolder(mob)
+	if not (IsInGroup and IsInGroup()) then
+		return nil
+	end
+	if rosterDirty then
+		BuildRoster()
+	end
+	local holder = Holder(mob)
+	if holder then
+		return RoleOf(holder), holder.name, holder.you == true
+	end
+end
+
+-- A tag's text and colour ({ r, g, b }, shared: don't change it), as on the nameplates.
+ns.AggroTag = Tag
+
+-- The first three letters of a name, whole UTF-8 letters (what a tag shows, and what goes to friends).
+ns.AggroShort = Short
+
+-- While the fight stream's sensor runs, the group's roster is read again when it changes, also with
+-- this tweak off (a flag each, read at the next look).
+local rosterWatch = CreateFrame("Frame")
+rosterWatch:SetScript("OnEvent", function()
+	rosterDirty = true
+end)
+
+function ns.AggroWatch(want)
+	rosterWatch:UnregisterAllEvents()
+	if want then
+		for _, event in ipairs(ROSTER_EVENTS) do
+			pcall(rosterWatch.RegisterEvent, rosterWatch, event)
+		end
+	end
+	rosterDirty = true -- (the tweak off, nobody kept it fresh meanwhile)
 end
 
 -- For tests: the tag showing on a nameplate (nil: none).

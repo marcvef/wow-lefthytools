@@ -8,7 +8,7 @@ local S = B.Stream
 -- them or their target; the target first, gold), each with a health bar. The fight is played on
 -- them, Pokémon style (the user: "your model does something and affects the enemy models"), as an
 -- approximation from what the picture already holds; nothing more goes over the network but their
--- look:
+-- look (and who has aggro, below):
 --   * they cast: a casting pose while the bar fills; a harmful spell that went off is cast at their
 --     target and its icon flies over; a helpful one, a cast in place;
 --   * an instant spell: a harmful one is a special attack on their target (its icon pops on it);
@@ -23,6 +23,12 @@ local S = B.Stream
 --   * a mob dies: it falls and fades; they die: so do they, and they stay down until they're up.
 -- Played one after another like turns (an action about half a second); never more than QUEUE_MAX
 -- waiting, an older one goes (its number still floats), so it stays close to live.
+--
+-- Who has aggro on each foe, in a group: the tag of Misc Tweaks' nameplates (Aggro.lua, the same
+-- look: ">YOU<" in your own window, else the first three letters of the name in the colour of the
+-- role), small on the top edge of its box at the left. Yours read at the sensor's look, a friend's
+-- sent with their frame (StreamNet.lua); a friend's build from before it, in a group: a mob
+-- attacking them says their name, uncoloured. Drawn only when it changes.
 --
 -- Their model: you are you (SetUnit, in the form you're in: cat, bear, ...); a friend whose
 -- character your client has (in your group, nearby) is them. A friend elsewhere is their class's
@@ -50,6 +56,7 @@ local FOES = 4                 -- the mobs fought, right of them
 local FOE_W, FOE_H = 38, 50    -- a foe's model (the whole mob), px
 local FOE_GAP = 2
 local FOE_X = ROW_W - FOES * (FOE_W + 2) - (FOES - 1) * FOE_GAP -- where the foes start (between: the stage)
+local AGGRO_SIZE = 8           -- who has aggro: the letters (px, outlined), as on the nameplates
 local HERO_FACING, FOE_FACING = 0.75, -0.45 -- turned towards each other (radians)
 local HERO_ZOOM = 1.05         -- the camera just a little back (1.4 was too far for a character, in game)
 -- Further or closer in a form, from what fit in game: a bear at 1.4 (closer it didn't fit); a cat
@@ -278,6 +285,18 @@ local function NewFoe(row)
 	slot.Unknown:SetPoint("CENTER", slot.BarBack, "CENTER", 0, 0)
 	slot.Unknown:SetTextScale(0.7)
 	slot.Unknown:SetText("?")
+	-- Who has aggro on it: on the box's top edge at the left (half over the gap above, the mob's head
+	-- mostly free), above its model; outlined with a shadow, no backing, like the nameplates' tag.
+	slot.Aggro = CreateFrame("Frame", nil, slot)
+	slot.Aggro:SetSize(FOE_W, AGGRO_SIZE + 3)
+	slot.Aggro:SetPoint("LEFT", slot.Back, "TOPLEFT", 1, 0)
+	slot.Aggro:SetFrameLevel(slot.Model:GetFrameLevel() + 2)
+	slot.Aggro.Text = slot.Aggro:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	slot.Aggro.Text:SetFont(STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF", AGGRO_SIZE, "OUTLINE")
+	slot.Aggro.Text:SetShadowColor(0, 0, 0, 1)
+	slot.Aggro.Text:SetShadowOffset(1, -1)
+	slot.Aggro.Text:SetPoint("LEFT", slot.Aggro, "LEFT", 0, 0)
+	slot.Aggro:Hide()
 	slot:SetMouseMotionEnabled(true)
 	slot:SetMouseClickEnabled(false)
 	slot:SetScript("OnEnter", FoeOnEnter)
@@ -497,6 +516,27 @@ local function Dying(b, mob, now)
 	return mob.dead and st and st.index and (not st.deadAt or now - st.deadAt < DIE_TIME + FADE_TIME)
 end
 
+-- Who has aggro on a foe (the nameplates' tag, Aggro.lua): ">YOU<" in your own window; else the
+-- holder's name, theirs when it's the one shown (a friend's, the preview's). Set only when it changes.
+local function ShowAggro(view, slot, mob)
+	local text, color
+	if mob.aggro and not mob.dead and ns.AggroTag then
+		local name = mob.aggroSelf and view.picture.name or mob.aggroName
+		text, color = ns.AggroTag(mob.aggro, name, view.kind == "me" and mob.aggroSelf)
+	end
+	if text == slot.aggroText and color == slot.aggroColor then
+		return
+	end
+	slot.aggroText, slot.aggroColor = text, color
+	if text then
+		slot.Aggro.Text:SetText(text)
+		slot.Aggro.Text:SetTextColor(color[1], color[2], color[3])
+		slot.Aggro:Show()
+	else
+		slot.Aggro:Hide()
+	end
+end
+
 local foeList = {}
 local LAST_FIELDS = { "key", "name", "level", "class", "creature", "target", "health", "combat", "engaged" }
 local function ShowFoes(view, now)
@@ -572,6 +612,7 @@ local function ShowFoes(view, now)
 				slot.Bar:SetValue(mob.dead and 0 or mob.health or 0)
 			end
 			slot.Unknown:SetShown(not slot.real and not mob.health and not mob.dead)
+			ShowAggro(view, slot, mob)
 			-- How it stands: ready while it fights, lying once dead, casting while it casts.
 			slot.Model.base = mob.dead and ANIM.dead or mob.casting and ANIM.aim or (mob.combat or mob.engaged) and ANIM.ready or ANIM.stand
 			slot:Show()

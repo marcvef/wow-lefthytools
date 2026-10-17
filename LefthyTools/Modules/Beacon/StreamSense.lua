@@ -19,7 +19,9 @@ local S = B.Stream
 --   mobs = { { key, name, level, class, dead, combat, attacking, casting (a name), castID, target,
 --            yards, beyond, sure (0-1), bearing (radians clockwise from north), remembered, fade,
 --            age, unit (at the look), creature (its ID), health (0-1, estimated; nil: unknown),
---            engaged (fighting you: you're on its threat list, or it attacks you) },
+--            engaged (fighting you: you're on its threat list, or it attacks you), aggro (in a
+--            group, who has its aggro: their role, "TANK", "HEALER", "DAMAGER", "NONE", "PET" or
+--            "OUTSIDER"; nil: not known), aggroName, aggroSelf (it's you) },
 --            ... } }
 --
 -- Learning where the mobs are: the game gives addons no direction to a mob (nameplates can't be
@@ -41,9 +43,9 @@ local S = B.Stream
 -- closely its places point one way is how sure.
 --
 -- Cost: nothing while nobody needs it. Then a look at up to 40 nameplate units every half second
--- (range checks, 48 places each), the cast events of "player" and (a word each) of mobs, XP,
--- kills and loot. Apart from that, your health is estimated while Beacon is on (a handful of your
--- own events; below).
+-- (range checks, 48 places each; in a group, who has aggro on the five you fight first), the cast
+-- events of "player" and (a word each) of mobs, XP, kills and loot. Apart from that, your health
+-- is estimated while Beacon is on (a handful of your own events; below).
 
 local Value, issecret = S.Value, S.issecret
 local SPOTS = 48
@@ -250,6 +252,7 @@ local function LearnSeen(mob, now)
 	info.dead, info.est = mob.dead, mob.est
 	info.player, info.classFile, info.friendly = mob.player, mob.classFile, mob.friendly
 	info.creature, info.health, info.engaged = mob.creature, mob.health, mob.engaged
+	info.aggro, info.aggroName, info.aggroSelf = mob.aggro, mob.aggroName, mob.aggroSelf -- (set after the look: Holders)
 end
 
 -- Mobs that left your screen (not dead): remembered a while, outside your view, fading. Appended
@@ -270,6 +273,7 @@ local function Remember(mobs, n, now)
 				ghost.combat, ghost.attacking, ghost.target, ghost.casting, ghost.castID, ghost.dead =
 					info.combat, info.attacking, false, nil, nil, false
 				ghost.unit, ghost.creature, ghost.health, ghost.engaged = nil, info.creature, info.health, info.engaged
+				ghost.aggro, ghost.aggroName, ghost.aggroSelf = info.aggro, info.aggroName, info.aggroSelf -- (as last seen)
 				local angle
 				angle, ghost.est, ghost.sure = Estimate(cloud)
 				ghost.bearing = angle - (here.facing or 0)
@@ -939,6 +943,27 @@ function S.Foes(mobs, list, max)
 	return list
 end
 
+-- Who has aggro on the mobs you fight, in a group: Misc Tweaks' reading for the nameplates
+-- (Aggro.lua: the mob's target and the group's threat, the holder's role), also with that tweak off.
+-- At the look, for the first AGGRO_FOES of them only (the battle row shows four, friends get five):
+-- a few calls each. A mob that left your screen keeps what was last known.
+local AGGRO_FOES = 5
+local aggroList = {}
+local function Holders(mobs)
+	if not (ns.AggroHolder and IsInGroup and IsInGroup()) then
+		return
+	end
+	for _, mob in ipairs(S.Foes(mobs, aggroList, AGGRO_FOES)) do
+		if mob.unit and mob.combat then
+			mob.aggro, mob.aggroName, mob.aggroSelf = ns.AggroHolder(mob.unit)
+			local info = clouds[mob.key] and clouds[mob.key].info
+			if info then
+				info.aggro, info.aggroName, info.aggroSelf = mob.aggro, mob.aggroName, mob.aggroSelf
+			end
+		end
+	end
+end
+
 local function SenseMobHealth(on)
 	mobCombat:UnregisterAllEvents()
 	for _, t in ipairs({ mobLost, mobFresh, mobKind, mobSeen, hitAt, hitAmount }) do
@@ -1050,6 +1075,7 @@ local function Fill(n, unit, unitTarget, targetKey, onScreen, now, friendly)
 	mob.health = not mob.player and MobHealth(mob, now) or nil
 	-- Fighting you: you're on its threat list (hidden where the game restricts it), or it attacks you.
 	mob.engaged = not friendly and (type(Value("UnitThreatSituation", "player", unit)) == "number" or mob.attacking) or false
+	mob.aggro, mob.aggroName, mob.aggroSelf = nil, nil, nil -- (read after the look, for the mobs fought: Holders)
 	local ok, castName, _, _, _, _, _, _, _, castID = pcall(UnitCastingInfo, unit)
 	if not ok or issecret(castName) or not castName then
 		local okChannel, channelName, _, _, _, _, _, _, channelID = pcall(UnitChannelInfo, unit)
@@ -1109,6 +1135,7 @@ local function Look()
 	for i = #picture.mobs, n + 1, -1 do
 		picture.mobs[i] = nil
 	end
+	Holders(picture.mobs)
 	ReadCast()
 	ReadPower()
 	ReadForm()
@@ -1162,6 +1189,9 @@ function S.SenseNeed(who, on)
 		SenseMoments(true)
 		SenseMobCasts(true)
 		SenseMobHealth(true)
+		if ns.AggroWatch then
+			ns.AggroWatch(true) -- (Aggro.lua: the group's roster kept fresh, for who has aggro)
+		end
 		ticker:Show()
 	elseif not running and wasRunning then
 		ticker:Hide()
@@ -1169,6 +1199,9 @@ function S.SenseNeed(who, on)
 		SenseMoments(false)
 		SenseMobCasts(false)
 		SenseMobHealth(false)
+		if ns.AggroWatch then
+			ns.AggroWatch(false)
+		end
 	end
 	S.SenseCasts("sensor", running)
 	if running then

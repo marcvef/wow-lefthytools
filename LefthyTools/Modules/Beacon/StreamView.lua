@@ -764,6 +764,7 @@ local function PreviewMob(n, key, name, level, class, creature)
 	mob.key, mob.name, mob.level, mob.class, mob.creature, mob.health, mob.engaged = key, name, level, class, creature, nil, false
 	mob.dead, mob.combat, mob.attacking, mob.casting, mob.target, mob.sure = false, false, false, nil, false, 1
 	mob.player, mob.classFile, mob.friendly, mob.group, mob.exact = false, nil, false, false, nil
+	mob.aggro, mob.aggroName, mob.aggroSelf = nil, nil, false
 	return mob
 end
 
@@ -777,12 +778,19 @@ local function FeedPreview(view)
 	picture.health = 0.65 + 0.3 * math.cos(t / 3)
 	PreviewMoments(view, t)
 	-- (Their models: Hogger, a Defias Bandit, a Defias Rogue Wizard, a Riverpaw Gnoll, Thuros
-	-- Lightfingers. Health: the leader's goes down, the bandit's faster, the mage's isn't known.)
+	-- Lightfingers. Health: the leader's goes down, the bandit's faster, the mage's isn't known.
+	-- Who has aggro: her Fireball pulls the leader, Bob, the tank, takes it from her at 8 s; the
+	-- bandit stays on her; the mage is on Cedric, passing by, outside her group.)
 	local leader = PreviewMob(1, "leader", L["Bandit leader"], 16, "elite", 448)
-	leader.combat, leader.attacking, leader.target, leader.engaged = t > 2, t > 2, true, t > 2
+	leader.combat, leader.attacking, leader.target, leader.engaged = t > 2, t > 2 and t < 8, true, t > 2
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
 	leader.casting = (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
 	leader.health = math.max(0.1, 1 - 0.13 * (t >= 2.5 and math.floor((t - 2.5) / 4) + 1 or 0)) -- (her Fireballs land)
+	if leader.attacking then
+		leader.aggro, leader.aggroSelf = "DAMAGER", true
+	elseif leader.combat then
+		leader.aggro, leader.aggroName = "TANK", "Bob"
+	end
 	mobs[#mobs + 1] = leader
 	if t < 18 then
 		local bandit = PreviewMob(2, "bandit", L["Bandit"], 15, "normal", 116)
@@ -790,11 +798,13 @@ local function FeedPreview(view)
 		bandit.combat, bandit.attacking, bandit.engaged = not bandit.dead, not bandit.dead, not bandit.dead
 		bandit.yards, bandit.bearing = 5 + math.sin(t * 1.3), 0.35 + 0.15 * math.sin(t * 0.8)
 		bandit.health = bandit.dead and 0 or math.max(0.05, 1 - 0.12 * math.floor(math.max(0, t - 2) / 1.5)) -- (Bob's hits)
+		bandit.aggro, bandit.aggroSelf = not bandit.dead and "DAMAGER" or nil, not bandit.dead
 		mobs[#mobs + 1] = bandit
 	end
 	local mage = PreviewMob(3, "mage", L["Bandit mage"], 15, "normal", 474)
-	mage.combat, mage.engaged, mage.yards, mage.bearing = true, true, 24, 1.1 + 0.03 * t -- (casting at her)
+	mage.combat, mage.engaged, mage.yards, mage.bearing = true, true, 24, 1.1 + 0.03 * t -- (she's on its threat list)
 	mage.casting = (t % 6 < 2) and L["Frostbolt"] or nil
+	mage.aggro, mage.aggroName = "OUTSIDER", "Cedric"
 	mobs[#mobs + 1] = mage
 	local gnoll = PreviewMob(4, "gnoll", L["Gnoll"], 14, "normal", 117)
 	gnoll.yards, gnoll.bearing, gnoll.sure = 32 + 3 * math.sin(t * 0.4), 2.9, 0.25 -- behind, not sure yet: faint

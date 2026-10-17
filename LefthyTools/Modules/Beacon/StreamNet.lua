@@ -34,8 +34,13 @@ local S = B.Stream
 --                         from], k my killing blow [mob id], l loot item ID .quality. Each comes in
 --                         every frame for a few seconds; the windows show each number once. Then
 --                         the health of up to FOES mobs I fight, ",<mob id>=<percent>" (estimated).
---                         Older builds skip it (a mob starts with its number), and a frame keeps
---                         its 11 fields: they'd drop one with more.
+--                         In a group, who has their aggro (after their health, before the
+--                         moments): ",<mob id>@<role><name>", role t tank, h healer, d damage, n
+--                         none, p a pet, o someone outside my group; name the first three letters
+--                         of theirs (whole UTF-8 letters, without , / ; = @ |), none when it's me:
+--                         "12@tBob", "14@d". Builds before it skip that part (it's no moment: "@"
+--                         isn't a letter). Older builds skip the whole entry (a mob starts with its
+--                         number), and a frame keeps its 11 fields: they'd drop one with more.
 --   O2;n;<id>;<level>;<name>
 --                       a mob's name, once per watcher before the first frame with that id
 --   O2;u;<id>;<level>;<classFile>;<name>
@@ -219,8 +224,10 @@ local function ByWeight(a, b)
 end
 
 local MAX_VITALS = 120 -- bytes for my health, what just happened and my foes' health (the rest: mobs)
-local FOES = 5         -- the mobs I fight whose health goes along
+local FOES = 5         -- the mobs I fight whose health (and who has their aggro) goes along
+local MOMENT_ROOM = 40 -- of MAX_VITALS, kept for the newest moments: who has aggro goes before the older ones
 local LETTERS = { hurt = "w", heal = "h", avoid = "a", xp = "x", kill = "k", loot = "l" }
+local ROLE_LETTERS = { TANK = "t", HEALER = "h", DAMAGER = "d", NONE = "n", PET = "p", OUTSIDER = "o" }
 
 -- A moment in a frame (nil: it can't go).
 local function MomentText(m)
@@ -240,9 +247,28 @@ local function MomentText(m)
 	return text and m.seq .. text
 end
 
--- My health, my foes' health and what just happened, first among the mobs. Health not known: why
--- ("?m" my maximum is hidden here, "?w" no checkpoint yet), so a friend's window can say. Foes:
--- the ones that have an id already (a new one's health goes from the next frame).
+-- Who has a foe's aggro (nil: not known, or it can't go): "<id>@<role letter><name>", no name when
+-- it's me. The first three letters of theirs, without what would split the frame (, / ;), read as
+-- another part (= @) or as an escape sequence (|).
+local function AggroText(id, mob)
+	local letter = ROLE_LETTERS[mob.aggro]
+	if not (letter and ns.AggroShort) then
+		return nil
+	end
+	local name = ""
+	if not mob.aggroSelf then
+		name = ns.AggroShort((tostring(mob.aggroName or "?"):gsub("[,/;=@|%c]", "")))
+		name = name ~= "" and name or "?"
+	end
+	return ("%d@%s%s"):format(id, letter, name)
+end
+
+-- My health, my foes' health, who has their aggro and what just happened, first among the mobs.
+-- Health not known: why ("?m" my maximum is hidden here, "?w" no checkpoint yet), so a friend's
+-- window can say. Foes: the ones that have an id already (a new one's health goes from the next
+-- frame). Who has their aggro goes before the moments, but leaves MOMENT_ROOM for the newest ones:
+-- a moment comes in every frame for a while (the older ones went before), while a tag left out of
+-- a frame would flicker in the battle row.
 local foeList = {}
 local function Vitals(picture)
 	local parts = { "v" .. (picture.health and Int(picture.health * 100) or "") }
@@ -250,10 +276,22 @@ local function Vitals(picture)
 		parts[2] = picture.healthWhy == "max" and "?m" or "?w"
 	end
 	local size = #parts[1] + (parts[2] and #parts[2] + 1 or 0)
-	for _, mob in ipairs(S.Foes(picture.mobs, foeList, FOES)) do
+	local foes = S.Foes(picture.mobs, foeList, FOES)
+	for _, mob in ipairs(foes) do
 		local id = mob.health and idFor[mob.key]
 		if id then
 			local text = ("%d=%d"):format(id, math.floor(mob.health * 100 + 0.5))
+			size = size + #text + 1
+			parts[#parts + 1] = text
+		end
+	end
+	for _, mob in ipairs(foes) do
+		local id = mob.aggro and idFor[mob.key]
+		local text = id and AggroText(id, mob)
+		if text then
+			if size + #text + 1 > MAX_VITALS - MOMENT_ROOM then
+				break
+			end
 			size = size + #text + 1
 			parts[#parts + 1] = text
 		end
@@ -569,8 +607,13 @@ for token, letter in pairs(S.AVOIDED) do
 	AVOID_TOKENS[letter] = token
 end
 local MAX_MOMENTS = 12
+local ROLES = {} -- a letter -> TANK, HEALER, ...
+for role, letter in pairs(ROLE_LETTERS) do
+	ROLES[letter] = role
+end
 
--- "v..." (their health and what just happened, Vitals) into a picture.
+-- "v..." (their health, their foes' health, who has their aggro and what just happened, Vitals) into
+-- a picture.
 local function DecodeVitals(entry, picture)
 	local moments, first = picture.moments, true
 	for part in entry:gmatch("[^,]+") do
@@ -586,6 +629,15 @@ local function DecodeVitals(entry, picture)
 		elseif part:match("^%d+=%d+$") then -- (a foe's health)
 			local id, percent = part:match("^(%d+)=(%d+)$")
 			picture.foeHealth[tonumber(id)] = math.min(100, tonumber(percent)) / 100
+		elseif part:match("^%d+@") then -- (who has a foe's aggro: a role unknown here is none)
+			local id, letter, name = part:match("^(%d+)@(%a)(.*)$")
+			if id then
+				id = tonumber(id)
+				local short = name ~= "" and ns.AggroShort and ns.AggroShort(B.Clean(name, 16)) or ""
+				picture.aggroRole[id] = ROLES[letter] or "NONE"
+				picture.aggroName[id] = name == "" and "" or short ~= "" and short or "?" -- ("": them)
+				picture.aggroSent = true
+			end
 		elseif #moments < MAX_MOMENTS then
 			local seq, letter, value, extra = part:match("^(%d%d?)(%a)(%w*)%.?(%d*)$")
 			local kind = letter and KINDS[letter:lower()]
@@ -668,7 +720,11 @@ local function Decode(stream, picture)
 	wipe(picture.moments)
 	picture.foeHealth = picture.foeHealth or {}
 	wipe(picture.foeHealth)
-	local n = 0
+	picture.aggroRole, picture.aggroName = picture.aggroRole or {}, picture.aggroName or {}
+	wipe(picture.aggroRole)
+	wipe(picture.aggroName)
+	picture.aggroSent = false
+	local n, grouped = 0, false
 	for entry in f[11]:gmatch("[^/]+") do
 		local id, deg, yards, sure, flags, cast = entry:match("^(%d+),(%d+),(%d*),(%d),(%l*),?(%d*)$")
 		if not id and entry:sub(1, 1) == "v" then
@@ -700,6 +756,10 @@ local function Decode(stream, picture)
 			mob.classFile = name and name.classFile
 			mob.creature = name and name.creature
 			mob.health = picture.foeHealth[id] -- (the "v" entry comes first)
+			mob.aggro = picture.aggroRole[id]
+			mob.aggroSelf = mob.aggro ~= nil and picture.aggroName[id] == ""
+			mob.aggroName = not mob.aggroSelf and picture.aggroName[id] or nil
+			grouped = grouped or mob.group
 			mob.fade = mob.remembered and 0.6 or nil
 			mob.age = nil
 			mob.casting = flags:find("s", 1, true) and (SpellName(tonumber(cast)) or L["a spell"]) or nil
@@ -717,6 +777,16 @@ local function Decode(stream, picture)
 	end
 	for i = #mobs, n + 1, -1 do
 		mobs[i] = nil
+	end
+	-- A build from before who has aggro went along, in a group (someone of it near them): a mob
+	-- attacking them is on them (its target), in no role's colour (theirs isn't known).
+	if grouped and not picture.aggroSent then
+		for i = 1, n do
+			local mob = mobs[i]
+			if mob.attacking and not (mob.dead or mob.player or mob.friendly) then
+				mob.aggro, mob.aggroSelf = "NONE", true
+			end
+		end
 	end
 	return true
 end

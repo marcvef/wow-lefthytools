@@ -149,6 +149,14 @@ the color first".
   enemy nameplate every 0.5 s (1 s in a raid), in case an event was missed; otherwise it stops.
 - **Try it** (`/lefthy tweaks aggrotest`): for 10 s each enemy nameplate in sight shows an example
   (you as tank, a healer, a damage dealer, someone without a role).
+- **The fight stream** shows the same tag on its battle row's foes (beacon.md, "Who has aggro"), so
+  the reading and the look are shared: `ns.AggroHolder(unit)` (in a group: the holder's role, a
+  member's or `PET` / `OUTSIDER`, their name and whether it's you; nil when solo or nobody's known),
+  `ns.AggroTag(role, name, you)` (text and colour; the nameplates' tag goes through it too, with
+  `RoleOf(holder)`) and `ns.AggroShort` (the three letters). The stream's sensor reads them also
+  with this tweak or Misc Tweaks off: while it runs, `ns.AggroWatch(true)` registers the roster
+  events (`ROSTER_EVENTS`, the same as the tweak's) on a frame of its own, which only mark the
+  roster to be read again at the next look.
 - To check in game: whether threat and a mob's target are readable in dungeons (or secret), and
   whether Forever's groups have roles.
 

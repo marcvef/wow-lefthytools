@@ -305,5 +305,8 @@ ns.CHANGELOG = {
 	{ id = 99, module = "beacon",
 		en = { "Mob health from the classic database", "The fight stream knows a mob's health from the Bestiary's classic database, elites too, until two of your kills have measured it. Hovering a mob in the battle row says where its health comes from." },
 		de = { "Mob-Leben aus der Classic-Datenbank", "Der Kampf-Stream kennt das Leben eines Mobs aus der Classic-Datenbank des Bestiary, auch bei Elites, bis zwei deiner Kills es gemessen haben. Der Tooltip eines Mobs in der Kampfreihe sagt, woher das Leben kommt." } },
+	{ id = 100, module = "beacon",
+		en = { "Fight stream: who has aggro", "In a group, each mob in the battle row shows who has its aggro, like the nameplate tags: >YOU< or the first three letters of their name in their role's colour. Friends on an older LefthyTools don't send it (nothing breaks)." },
+		de = { "Kampf-Stream: wer Aggro hat", "In einer Gruppe zeigt jeder Mob in der Kampfreihe, wer Aggro hat, wie auf den Namensplaketten: >DU< oder die ersten drei Buchstaben des Namens in der Farbe seiner Rolle. Freunde mit einem älteren LefthyTools schicken das nicht (es geht nichts kaputt)." } },
 	-- New entries go here, at the end.
 }
