@@ -40,7 +40,8 @@ function LT.Readable(v)
 end
 
 -- What f(...) answers first, if the call works and the answer isn't a secret; nil if f is missing,
--- fails or answers a secret. For APIs that may be gone, broken or hidden on Forever.
+-- fails or answers a secret. For APIs that may be gone, broken or hidden on Forever. Always one
+-- value, also nil (tonumber(LT.Value(...)) or a call's last argument can't come up empty).
 function LT.Value(f, ...)
 	if not f then
 		return nil
@@ -49,6 +50,7 @@ function LT.Value(f, ...)
 	if ok and not LT.IsSecret(v) then
 		return v
 	end
+	return nil
 end
 
 ---------------------------------------------------------------------------

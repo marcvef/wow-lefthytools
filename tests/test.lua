@@ -69,6 +69,8 @@ do -- shared helpers for Forever's secret values
 	check(LT.Value(function(n) return n + 1, "second" end, 1) == 2 and LT.Value(nil, 1) == nil
 		and LT.Value(function() error("broken API") end) == nil and LT.Value(function() return SECRET end) == nil
 		and #ERRORS == errorsBefore, "LT.Value: a call's first answer; nil if the API is missing, fails (quietly) or answers a secret")
+	check(select("#", LT.Value(function() return SECRET end)) == 1 and select("#", LT.Value(function() error("x") end)) == 1
+		and tonumber(LT.Value(function() return SECRET end)) == nil, "LT.Value: always one value, also when it's nil")
 end
 
 section("error catcher")
