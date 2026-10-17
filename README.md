@@ -182,7 +182,8 @@ minimap, and you on theirs, without being in a group.
   played on them, Pokémon style: they cast or step up and strike, the mob flinches and roughly
   what it lost floats up (a kind's health comes from the Bestiary's classic database, elites
   too, until two of your kills have measured it on Forever); mobs lunge at them, their hits and
-  heals float up from their model, the dead fall. In a group, a tiny tag on each mob says who has
+  heals float up from their model, the dead fall; spells glow in their school's colour as they fly
+  and hit (fire orange, frost blue, shadow purple, ...). In a group, a tiny tag on each mob says who has
   its aggro, like on the nameplates: **>YOU<** in your own stream, else the first three letters of
   the name in the colour of their role (a friend on an older LefthyTools doesn't send it: there a
   mob attacking them shows their name in white). It's an approximation from what the game tells

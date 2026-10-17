@@ -1,0 +1,162 @@
+// Regenerates LefthyTools/Data/SpellSchools.lua: the magic school of every class spell, all ranks.
+// The fight stream's battle row (Modules/Beacon/StreamBattle.lua) colours a spell by it: the icon
+// flying over glows in its school's colour, and so does the hit it lands. The client gives addons
+// no spell's school, so it comes from the client's own tables.
+//
+// Source: wago.tools exports of the client's SpellMisc (SchoolMask), SkillLineAbility (spells of
+// each class skill line), SkillLine and SpellName tables. Kept: every spell of a class's own skill
+// lines (as in update-class-spells.js: no pets, mounts or runes) that has a school other than
+// physical; with several schools, the first in the game's order (holy, fire, nature, frost,
+// shadow, arcane: Frostfire Bolt is fire). Left out: Season of Discovery runes (IDs
+// 395000-469999; Forever's own versions have new IDs). Consecutive IDs of one school are written
+// as a range.
+// Run it when Forever gets new builds:
+//   node tools/update-spell-schools.js                      the latest Forever build
+//   node tools/update-spell-schools.js 1.60.1.70450
+//   node tools/update-spell-schools.js --cache <dir>        keep the downloads in <dir>
+const fs = require("fs");
+const path = require("path");
+
+const SKIPPED_LINES = /^(Pet - |Mounts$|Companions$|Engraving$|Runes$|Meditation$|Explorer Imp$|Beast Training$)/;
+const SOD_IDS = [395000, 470000];
+// SchoolMask bits, in the game's order (1 is physical).
+const SCHOOLS = [[2, "holy"], [4, "fire"], [8, "nature"], [16, "frost"], [32, "shadow"], [64, "arcane"]];
+// Spells everyone knows, to check the export: Fireball, Frostbolt, Fire Blast, Shadow Bolt, Smite,
+// Lightning Bolt, Arcane Missiles, Polymorph.
+const EXPECTED = { 133: "fire", 116: "frost", 2136: "fire", 686: "shadow", 585: "holy", 403: "nature", 5143: "arcane", 118: "arcane" };
+const RANGE_MIN = 3; // consecutive IDs written as { first, last } from this many
+
+function parseCsv(text) {
+  const rows = [];
+  let field = "", row = [], quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false;
+      } else field += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n") { row.push(field.replace(/\r$/, "")); rows.push(row); row = []; field = ""; }
+    else field += c;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  const head = rows.shift();
+  return rows.filter((r) => r.length === head.length).map((r) => Object.fromEntries(head.map((h, i) => [h, r[i]])));
+}
+
+async function latestBuild() {
+  const builds = await (await fetch("https://wago.tools/api/builds")).json();
+  // WoW: Forever is version 1.60.x (listed under a beta product on wago.tools).
+  const all = Object.values(builds).flat().map((b) => b.version).filter((v) => /^1\.60\./.test(v));
+  const key = (v) => v.split(".").map((n) => n.padStart(8, "0")).join(".");
+  return all.sort((a, b) => (key(a) < key(b) ? 1 : -1))[0];
+}
+
+async function table(name, build, cache) {
+  const file = cache && path.join(cache, `${name}-${build}.csv`);
+  let text;
+  if (file && fs.existsSync(file)) {
+    text = fs.readFileSync(file, "utf8");
+  } else {
+    const response = await fetch(`https://wago.tools/db2/${name}/csv?build=${build}`);
+    if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
+    text = await response.text();
+    if (file) fs.writeFileSync(file, text);
+  }
+  const rows = parseCsv(text);
+  if (rows.length < 10) throw new Error(`${name} for ${build} looks incomplete (${rows.length} rows)`);
+  return rows;
+}
+
+// A school mask's school: the first of its schools in the game's order; nil for physical.
+function schoolOf(mask) {
+  for (const [bit, name] of SCHOOLS) if (mask & bit) return name;
+  return null;
+}
+
+// Sorted IDs as Lua: runs of consecutive IDs as { first, last }, the rest one by one.
+function compact(ids) {
+  const out = [];
+  for (let i = 0; i < ids.length; ) {
+    let j = i;
+    while (j + 1 < ids.length && ids[j + 1] === ids[j] + 1) j++;
+    if (j - i + 1 >= RANGE_MIN) out.push(`{ ${ids[i]}, ${ids[j]} }`);
+    else for (let k = i; k <= j; k++) out.push(String(ids[k]));
+    i = j + 1;
+  }
+  return out;
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  let cache, build;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--cache") cache = args[++i];
+    else build = args[i];
+  }
+  if (cache) fs.mkdirSync(cache, { recursive: true });
+  build = build || (await latestBuild());
+  if (!build) throw new Error("could not determine the Forever build; pass it as an argument");
+  console.log(`WoW: Forever ${build}`);
+
+  const [skillLines, abilities, misc] = await Promise.all(
+    ["SkillLine", "SkillLineAbility", "SpellMisc"].map((t) => table(t, build, cache)));
+
+  const classLines = {};
+  for (const r of skillLines) if (r.CategoryID === "7" && !SKIPPED_LINES.test(r.DisplayName_lang)) classLines[r.ID] = true;
+  const maskOf = {};
+  for (const r of misc) if (r.DifficultyID === "0") maskOf[r.SpellID] = Number(r.SchoolMask);
+
+  const school = {}, bySchool = {};
+  for (const r of abilities) {
+    const id = Number(r.Spell);
+    if (!(r.SkillLine in classLines) || school[id] || (id >= SOD_IDS[0] && id < SOD_IDS[1])) continue;
+    const name = maskOf[id] !== undefined && schoolOf(maskOf[id]);
+    if (!name) continue;
+    school[id] = name;
+    (bySchool[name] = bySchool[name] || []).push(id);
+  }
+  for (const [id, want] of Object.entries(EXPECTED)) {
+    if (school[id] !== want) throw new Error(`spell ${id} should be ${want}, the export says ${school[id] || "nothing"}`);
+  }
+
+  const total = Object.keys(school).length;
+  const lines = [
+    "local _, ns = ...",
+    "",
+    "-- The magic school of the classes' spells (all ranks), for the fight stream's battle row: [school]",
+    "-- = { spell IDs; { first, last } for consecutive ones }. Physical ones aren't listed; a spell of",
+    "-- several schools is the first of them (holy, fire, nature, frost, shadow, arcane).",
+    `-- Generated by tools/update-spell-schools.js from wago.tools exports of WoW: Forever ${build}.`,
+    `-- ${total} spells.`,
+    "ns.SPELL_SCHOOLS = {",
+  ];
+  for (const [, name] of SCHOOLS) {
+    const ids = (bySchool[name] || []).sort((a, b) => a - b);
+    const items = compact(ids);
+    lines.push(`\t${name} = { -- ${ids.length}`);
+    let line = "";
+    for (const item of items) {
+      if (line && line.length + item.length + 2 > 96) {
+        lines.push(`\t\t${line.trimEnd()}`);
+        line = "";
+      }
+      line += `${item}, `;
+    }
+    if (line) lines.push(`\t\t${line.trimEnd()}`);
+    lines.push("\t},");
+  }
+  lines.push("}");
+
+  const target = path.resolve(__dirname, "..", "LefthyTools", "Data", "SpellSchools.lua");
+  const text = lines.join("\r\n") + "\r\n";
+  fs.writeFileSync(target, text);
+  const counts = SCHOOLS.map(([, name]) => `${name} ${(bySchool[name] || []).length}`).join(", ");
+  console.log(`${total} spells (${counts}), ${text.length} bytes, written to ${path.relative(process.cwd(), target)}`);
+}
+
+main().catch((e) => {
+  console.error(e.message || e);
+  process.exit(1);
+});

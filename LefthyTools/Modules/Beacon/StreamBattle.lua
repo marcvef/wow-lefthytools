@@ -12,6 +12,8 @@ local S = B.Stream
 --   * they cast: a casting pose while the bar fills; a harmful spell that went off is cast at their
 --     target and its icon flies over; a helpful one, a cast in place;
 --   * an instant spell: a harmful one is a special attack on their target (its icon pops on it);
+--     either way the icon glows in its school's colour and the hit flashes in it (fire orange,
+--     frost blue, shadow purple, ...; Data/SpellSchools.lua), a physical one as before;
 --   * their target loses health (the estimate): it was them (their spell or ability, else a swing:
 --     they step forward and strike); it flinches, and roughly what it lost floats up from it (the
 --     loss times what its kind has, S.MobMaxOf: learned, the classic database or usual for its
@@ -80,6 +82,14 @@ local GOLD = { 1, 0.82, 0.3 }
 local BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 local DEALT_COLOR, OTHER_COLOR = { 1, 0.85, 0.4 }, { 0.75, 0.75, 0.75 }
 local HURT_COLOR, HEAL_COLOR, AVOID_COLOR, XP_COLOR = { 1, 0.3, 0.25 }, { 0.35, 1, 0.4 }, { 0.9, 0.9, 0.9 }, { 0.75, 0.6, 1 }
+-- A spell's school (Data/SpellSchools.lua: the game tells addons none, so it comes from the
+-- client's own tables): the icon flying over glows in its colour, and the hit it lands flashes in
+-- it. A physical one, and a blow, stay as they were: no glow, a red flash.
+local SCHOOL_COLORS = { holy = GOLD, fire = { 1, 0.5, 0.1 }, nature = { 0.4, 1, 0.3 }, frost = { 0.45, 0.8, 1 },
+	shadow = { 0.6, 0.3, 1 }, arcane = { 1, 0.4, 0.9 } }
+local HIT_COLOR = { 1, 0.15, 0.1 }
+local GLOW = "Spells\\GenericGlow64" -- (soft and round, black around it: drawn added)
+local GLOW_SIZE, GLOW_ALPHA = 32, 0.85
 local Value, issecret = S.Value, S.issecret
 
 -- Animation IDs (AnimationData 1.60.1.70425, checked by their fallbacks; seen playing in game).
@@ -110,6 +120,31 @@ local function Gathering(spellID)
 	local name = Value("C_Spell.GetSpellName", spellID)
 	return name ~= nil and gatherNames[name] == true
 end
+
+-- A spell's school ("fire", "frost", ...; nil: physical, or not a class spell). The list is
+-- turned into [spell ID] = school the first time a spell is looked at (when an action starts).
+local schoolOf
+local function School(spellID)
+	if type(spellID) ~= "number" or issecret(spellID) then
+		return nil
+	end
+	if not schoolOf then
+		schoolOf = {}
+		for school, list in pairs(ns.SPELL_SCHOOLS or {}) do
+			for _, id in ipairs(list) do
+				if type(id) == "table" then -- (a range: { first, last })
+					for each = id[1], id[2] do
+						schoolOf[each] = school
+					end
+				else
+					schoolOf[id] = school
+				end
+			end
+		end
+	end
+	return schoolOf[spellID]
+end
+S.SpellSchool = School
 local AVOID_ANIM = { DODGE = ANIM.dodge, PARRY = ANIM.parry, BLOCK = ANIM.block }
 local CASTERS = { MAGE = true, PRIEST = true, WARLOCK = true } -- (weapons stay sheathed)
 
@@ -284,10 +319,21 @@ local function NewFlash(slot, w, h)
 	local flash = slot:CreateTexture(nil, "OVERLAY", nil, 6)
 	flash:SetPoint("TOPLEFT", 1, -1)
 	flash:SetSize(w, h)
-	flash:SetColorTexture(1, 0.15, 0.1, 1)
+	flash:SetColorTexture(HIT_COLOR[1], HIT_COLOR[2], HIT_COLOR[3], 1)
 	flash:SetBlendMode("ADD")
 	flash:SetAlpha(0)
+	slot.flashColor = HIT_COLOR
 	return flash
+end
+
+-- A foe's flash: red for a blow, a spell's in its school's colour.
+local function Flash(slot, alpha, color)
+	color = color or HIT_COLOR
+	if slot.flashColor ~= color then
+		slot.flashColor = color
+		slot.Flash:SetColorTexture(color[1], color[2], color[3], 1)
+	end
+	slot.Flash:SetAlpha(alpha)
 end
 
 local function NewFoe(row)
@@ -534,11 +580,17 @@ function S.BattleBuild(win, above)
 	row:SetPoint("TOP", above, "BOTTOM", 0, -6)
 	row.slots = {}
 	row.Hero = NewHero(row)
-	-- A spell flying over: its icon.
+	-- A spell flying over: its icon, a soft glow in its school's colour behind it.
 	row.Shot = row:CreateTexture(nil, "OVERLAY", nil, 7)
 	row.Shot:SetSize(14, 14)
 	row.Shot:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	row.Shot:Hide()
+	row.ShotGlow = row:CreateTexture(nil, "OVERLAY", nil, 6)
+	row.ShotGlow:SetSize(GLOW_SIZE, GLOW_SIZE)
+	row.ShotGlow:SetPoint("CENTER", row.Shot, "CENTER", 0, 0)
+	row.ShotGlow:SetTexture(GLOW)
+	row.ShotGlow:SetBlendMode("ADD")
+	row.ShotGlow:Hide()
 	-- More mobs than fit: "+2" over the last.
 	row.More = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	row.More:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, -2)
@@ -728,6 +780,20 @@ local function Float(view, text, anchor, dy, color, scale, life)
 	S.Float(view, text, 0, 6, (math.random() - 0.5) * 10, dy or 30, color, scale, life, anchor)
 end
 
+-- The spell's icon over the row (flying, or popping on the one it hit), glowing in its school's
+-- colour (a physical one doesn't).
+local function ShowShot(row, a)
+	row.Shot:SetTexture(a.icon)
+	row.Shot:SetAlpha(1)
+	row.Shot:Show()
+	local color = a.school and SCHOOL_COLORS[a.school]
+	if color then
+		row.ShotGlow:SetVertexColor(color[1], color[2], color[3])
+		row.ShotGlow:SetAlpha(GLOW_ALPHA)
+	end
+	row.ShotGlow:SetShown(color ~= nil)
+end
+
 local LENGTH = { strike = 0.55, ability = 0.55, spell = 0.6, hit = 0.5, miss = 0.5, release = 0.5 }
 local HIT_AT = { strike = 0.22, ability = 0.25, spell = 0.42, hit = 0.2, miss = 0.2, release = 0 }
 
@@ -763,14 +829,12 @@ function S.BattleImpact(view, a, now)
 		local st = view.battle and view.battle.foe[a.key]
 		if slot and not a.skipped and not (st and st.deadAt) then -- (a mob that fell doesn't flinch)
 			Act(slot.Model, ANIM.wound, 0.4, now)
-			slot.Flash:SetAlpha(0.55)
+			Flash(slot, 0.55, a.kind ~= "strike" and a.school and SCHOOL_COLORS[a.school] or nil)
 			if a.kind ~= "strike" and a.icon then
 				local row = view.win.Foes
-				row.Shot:SetTexture(a.icon)
+				ShowShot(row, a)
 				row.Shot:ClearAllPoints()
 				row.Shot:SetPoint("CENTER", slot, "CENTER", 0, 6)
-				row.Shot:SetAlpha(1)
-				row.Shot:Show()
 				row.shotFade = now
 			end
 		end
@@ -838,11 +902,12 @@ local function Step(view, a, p, now)
 		if slot and p >= from and p < to then
 			local t = (p - from) / (to - from)
 			local hx, sx = HERO_W / 2 + 4, slot.x + FOE_W / 2
-			row.Shot:SetTexture(a.icon)
+			if not a.flying then
+				a.flying = true
+				ShowShot(row, a)
+			end
 			row.Shot:ClearAllPoints()
 			row.Shot:SetPoint("CENTER", row, "TOPLEFT", hx + (sx - hx) * t, -HERO_H / 2 + 8 * math.sin(t * math.pi))
-			row.Shot:SetAlpha(1)
-			row.Shot:Show()
 		end
 	end
 end
@@ -883,7 +948,7 @@ local function Casting(view, b, now)
 		local target = TargetSlot(view)
 		if Harmful(was.spellID) and target then
 			b.mineAt = now
-			Enqueue(view, { kind = "spell", key = target.key, icon = was.icon }, now)
+			Enqueue(view, { kind = "spell", key = target.key, icon = was.icon, school = School(was.spellID) }, now)
 		else
 			Enqueue(view, { kind = "release" }, now)
 		end
@@ -909,7 +974,7 @@ local function Instants(view, b, now)
 	local target = TargetSlot(view)
 	if Harmful(r.spellID) and target then
 		b.mineAt = now
-		Enqueue(view, { kind = "ability", key = target.key, icon = r.icon }, now)
+		Enqueue(view, { kind = "ability", key = target.key, icon = r.icon, school = School(r.spellID) }, now)
 	else
 		Enqueue(view, { kind = "release" }, now)
 	end
@@ -982,7 +1047,7 @@ local function Losses(view, b, now)
 						end
 					else
 						Act(slot.Model, ANIM.wound, 0.35, now) -- (someone else's hit)
-						slot.Flash:SetAlpha(0.35)
+						Flash(slot, 0.35)
 						Float(view, LossText(loss), slot, 26, OTHER_COLOR, 0.8)
 					end
 				end
@@ -1119,9 +1184,11 @@ function S.BattleUpdate(view, elapsed)
 		local alpha = 1 - (now - row.shotFade) / 0.35
 		if alpha <= 0 then
 			row.Shot:Hide()
+			row.ShotGlow:Hide()
 			row.shotFade = nil
 		else
 			row.Shot:SetAlpha(alpha)
+			row.ShotGlow:SetAlpha(alpha * GLOW_ALPHA)
 		end
 	elseif a and a.kind == "spell" then
 		row.shotFade = nil
@@ -1148,5 +1215,6 @@ function S.BattleReset(view)
 		model:Hide()
 	end
 	row.Shot:Hide()
+	row.ShotGlow:Hide()
 	row.More:Hide()
 end

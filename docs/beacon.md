@@ -711,7 +711,18 @@ the picture already holds, one action after another like turns (about half a sec
   0.4 s of its end, not channelled): harmful (`C_Spell.IsSpellHarmful`) at their target, the cast
   (53) and its icon flying over; else a cast in place (54). An **instant** one (new in their last
   spells, not the cast that just went off): harmful, a special attack (57) on the target, its icon
-  popping on it.
+  popping on it. **Spell colours**: the icon glows in its spell's school's colour
+  (`Spells\GenericGlow64`, added, 32 px behind the 14 px icon) and the hit flashes in it instead of
+  red: fire orange, frost icy blue, nature green, shadow purple, arcane pink-violet, holy gold;
+  physical spells and swings as before. The game tells addons no spell's school, so it comes from
+  the client's tables: `ns.SPELL_SCHOOLS[school]` (Data/SpellSchools.lua, made by
+  `tools/update-spell-schools.js` from SpellMisc's `SchoolMask`, SkillLineAbility and SkillLine on
+  wago.tools): every spell of the class skill lines (no pets, mounts, runes; Season of Discovery IDs
+  left out), all ranks, physical ones not listed; several schools: the first in the game's order
+  (holy, fire, nature, frost, shadow, arcane: Frostfire Bolt is fire); consecutive IDs as `{ first,
+  last }` (1306 spells, 8 KB, from 1.60.1.70450). Turned into `[spell ID] = school` the first time a
+  spell is looked at (`S.SpellSchool`, when an action starts; nothing per frame). The preview casts
+  Fireballs and a Frostbolt and a Fire Blast now and then.
 - **Their target loses health** (the estimate, a drop of 0.4% or more): theirs. It joins their
   spell or ability on the way (its number lands with it), else it's a swing: they step forward 16 px
   and strike (17). The mob flinches (9) with a red flash, and what it lost floats up from it in gold:

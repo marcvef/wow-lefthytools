@@ -3666,6 +3666,16 @@ do
 			and leaderSlot.Model._facing == -0.45, "her target flinched at her Fireball and struck back; the mobs move and face her")
 		local loss = floatWith("-13%")
 		check(loss and loss.anchor == leaderSlot, "what her Fireball took floats up from it: a percent (an elite's health isn't known)")
+		local flash = leaderSlot.Flash.color
+		check(flash[1] == 1 and flash[2] == 0.5 and flash[3] == 0.1 and leaderSlot.Flash.blend == "ADD",
+			"her Fireball's hit flashed in fire's orange (not the red of a blow)")
+		-- Spell schools: generated from the client's tables (Data/SpellSchools.lua), every rank (some as
+		-- ranges); physical ones aren't listed.
+		check(S.SpellSchool(133) == "fire" and S.SpellSchool(10150) == "fire" and S.SpellSchool(116) == "frost" and S.SpellSchool(2136) == "fire"
+			and S.SpellSchool(686) == "shadow" and S.SpellSchool(585) == "holy" and S.SpellSchool(403) == "nature"
+			and S.SpellSchool(5143) == "arcane" and S.SpellSchool(1752) == nil and S.SpellSchool(SECRET) == nil and S.SpellSchool(nil) == nil,
+			"spell schools: Fireball (also a rank inside a range), Frostbolt, Fire Blast, Shadow Bolt, Smite, Lightning Bolt, Arcane "
+			.. "Missiles; Sinister Strike is physical; a hidden ID asks nothing")
 	end
 	do
 		local slots = win.Foes.slots
@@ -4359,6 +4369,29 @@ do
 		anna("O2;f;0;1429;260;750;90;;M40;;;;v80")
 		Advance(0.6)
 		check(not (b.action and b.action.kind == "release") and #b.queue == 0, "done: no cast at anyone")
+		-- Her Fireball goes off at her target: its icon flies over glowing in fire's orange, and the
+		-- hit flashes in it; a physical spell (Sinister Strike): no glow, the red flash of a blow.
+		do
+			local row = fwin.Foes
+			anna("O2;f;0;1429;260;750;90;c;M40;;133,20,25;;v80,4=90/4,90,8,9,act")
+			Advance(0.6)
+			anna("O2;f;0;1429;260;750;90;c;M40;;;133,0;v80,4=90/4,90,8,9,act")
+			Advance(0.2)
+			local glow = row.ShotGlow
+			check(b.action and b.action.kind == "spell" and b.action.school == "fire" and row.Shot:IsShown() and row.Shot.path == 100133
+				and glow:IsShown() and glow.vertex[1] == 1 and glow.vertex[2] == 0.5 and glow.blend == "ADD" and glow.points[1][2] == row.Shot,
+				"her Fireball flies over, glowing orange behind its icon")
+			Advance(0.4)
+			local slot = row.slots[1]
+			check(slot.mob.name == "Kobold Vermin" and slot.Flash.color[2] == 0.5 and slot.Model._anims[9], "it lands: the Kobold Vermin flinches, an orange flash")
+			Advance(0.4)
+			check(not row.Shot:IsShown() and not glow:IsShown(), "the icon and its glow fade away")
+			anna("O2;f;0;1429;260;750;90;c;M40;;;1752,0/133,2;v80,4=90/4,90,8,9,act")
+			Advance(0.4)
+			check(row.Shot:IsShown() and row.Shot.path == 101752 and not glow:IsShown() and slot.Flash.color[2] == 0.15,
+				"Sinister Strike (physical): its icon pops on it without a glow, the flash red")
+			Advance(0.6)
+		end
 	end
 	-- An elite she fights, in the classic database (my client knows no other health for it): the hover
 	-- says where its kind's health comes from, and what it lost floats up as a number, not a percent.

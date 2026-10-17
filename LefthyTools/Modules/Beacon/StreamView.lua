@@ -934,14 +934,23 @@ local PREVIEW_MOMENTS = {
 	{ 14, "kill" }, { 14.1, "xp", 87 }, { 16.5, "loot", 774 }, { 19, "hurt", 30 }, { 21, "avoid", "PARRY" },
 }
 
--- The moments passed since the last step (also over the loop's end), newest first, kept 2.5 s.
-local function PreviewMoments(view, t)
-	local was = view.previewAt or t
-	view.previewAt = t
+-- Her spells: a cast every 4 s, { start, spell ID, cast time, its name if the game has none },
+-- each joining her last spells when it goes off; a Fire Blast (an instant) now and then.
+local PREVIEW_CASTS = { { 0, 133, 2.5, L["Fireball"] }, { 4, 133, 2.5, L["Fireball"] }, { 8, 116, 2.5, L["Frostbolt"] },
+	{ 12, 133, 2.5, L["Fireball"] }, { 16, 133, 2.5, L["Fireball"] } } -- (the last before the fight is over)
+local PREVIEW_BLASTS = { 7, 15 }
+
+-- Whether a moment of the loop passed since the last step (also over the loop's end).
+local function Passed(at, was, t)
+	return (was < at and at <= t) or (t < was and (at > was or at <= t))
+end
+
+-- The moments passed since the last step, newest first, kept 2.5 s.
+local function PreviewMoments(view, was, t)
 	local moments = view.picture.moments
 	for _, e in ipairs(PREVIEW_MOMENTS) do
 		local at, kind = e[1], e[2]
-		if (was < at and at <= t) or (t < was and (at > was or at <= t)) then
+		if Passed(at, was, t) then
 			view.previewSeq = (view.previewSeq or 0) % 99 + 1
 			local m = { seq = view.previewSeq, kind = kind, at = view.clock }
 			if kind == "hurt" or kind == "heal" then
@@ -976,7 +985,6 @@ end
 local function FeedPreview(view)
 	local picture, t = view.picture, view.clock % PREVIEW_LOOP
 	local fighting = t > 2 and t < PREVIEW_CALM
-	local f = math.min(t, PREVIEW_CALM) -- (the fight's own time: once it's over, nothing more lands)
 	local mobs = picture.mobs
 	wipe(mobs)
 	picture.name, picture.classFile, picture.where, picture.facing = PREVIEW_FRIEND, PREVIEW_CLASS, L["Westfall"], 0
@@ -984,7 +992,9 @@ local function FeedPreview(view)
 	picture.power = picture.power or { token = "MANA" }
 	picture.power.frac = 0.4 + 0.3 * math.cos(t / 4)
 	picture.health = 0.65 + 0.3 * math.cos(t / 3)
-	PreviewMoments(view, t)
+	local was = view.previewAt or t
+	view.previewAt = t
+	PreviewMoments(view, was, t)
 	-- (Their models: Hogger, a Defias Bandit, a Defias Rogue Wizard, a Riverpaw Gnoll, Thuros
 	-- Lightfingers. Health: the leader's goes down, the bandit's faster, the mage's isn't known.
 	-- Who has aggro: her Fireball pulls the leader, Bob, the tank, takes it from her at 8 s; the
@@ -993,7 +1003,13 @@ local function FeedPreview(view)
 	leader.combat, leader.attacking, leader.target, leader.engaged = fighting, fighting and t < 8, true, fighting
 	leader.yards, leader.bearing = math.max(6, 30 - t * 2), -0.6 + 0.15 * math.sin(t)
 	leader.casting = fighting and (t % 8 >= 3 and t % 8 < 5) and L["Fireball"] or nil
-	leader.health = math.max(0.1, 1 - 0.13 * (f >= 2.5 and math.floor((f - 2.5) / 4) + 1 or 0)) -- (her Fireballs land)
+	local landed = 0 -- (her spells land)
+	for _, c in ipairs(PREVIEW_CASTS) do
+		if t >= c[1] + c[3] then
+			landed = landed + 1
+		end
+	end
+	leader.health = math.max(0.1, 1 - 0.13 * landed)
 	if leader.attacking then
 		leader.aggro, leader.aggroSelf = "DAMAGER", true
 	elseif leader.combat then
@@ -1032,38 +1048,34 @@ local function FeedPreview(view)
 	passer.player, passer.classFile, passer.friendly, passer.sure = true, "PRIEST", true, 0.5
 	passer.yards, passer.bearing = 28, -2.2 + 0.05 * t
 	mobs[#mobs + 1] = passer
-	-- What she's doing: a Fireball every 4 s (2.5 s to cast) until the fight is over, and the spells
-	-- before it.
-	local now, cycle = GetTime(), t % 4
-	if cycle < 2.5 and t < PREVIEW_CALM then
-		local info = Value("C_Spell.GetSpellInfo", 133)
-		local cast = picture.castPreview or {}
-		picture.castPreview = cast
-		cast.name, cast.icon, cast.spellID = info and info.name or L["Fireball"], info and info.iconID, 133
-		cast.start, cast.finish, cast.channel = now - cycle, now - cycle + 2.5, false
-		picture.cast = cast
-	else
-		picture.cast = nil
+	-- What she's doing: her cast now, and the spells before it.
+	local now = GetTime()
+	picture.cast = nil
+	for _, c in ipairs(PREVIEW_CASTS) do
+		if t >= c[1] and t < c[1] + c[3] then
+			local info = Value("C_Spell.GetSpellInfo", c[2])
+			local cast = picture.castPreview or {}
+			picture.castPreview = cast
+			cast.name, cast.icon, cast.spellID = info and info.name or c[4], info and info.iconID, c[2]
+			cast.start, cast.finish, cast.channel = now - (t - c[1]), now - (t - c[1]) + c[3], false
+			picture.cast = cast
+		end
 	end
 	if not picture.recent[1] then
 		for i, id in ipairs({ 2136, 116, 122, 133 }) do -- Fire Blast, Frostbolt, Frost Nova, Fireball (oldest last)
 			S.AddRecent(picture.recent, id, now - 8 + i)
 		end
 	end
-	-- A Fireball that went off joins her last spells; a Fire Blast now and then (an instant).
-	local landed = f >= 2.5 and math.floor((f - 2.5) / 4) or -1
-	if landed ~= view.previewLanded then
-		if view.previewLanded and landed >= 0 then
-			S.AddRecent(picture.recent, 133, now)
+	-- A cast that went off joins her last spells; so does a Fire Blast.
+	for _, c in ipairs(PREVIEW_CASTS) do
+		if Passed(c[1] + c[3], was, t) then
+			S.AddRecent(picture.recent, c[2], now)
 		end
-		view.previewLanded = landed
 	end
-	local blast = f >= 7 and math.floor((f - 7) / 8) or -1
-	if blast ~= view.previewBlast then
-		if view.previewBlast and blast >= 0 then
+	for _, at in ipairs(PREVIEW_BLASTS) do
+		if Passed(at, was, t) then
 			S.AddRecent(picture.recent, 2136, now)
 		end
-		view.previewBlast = blast
 	end
 end
 
@@ -1479,7 +1491,7 @@ local function Start(view)
 		wipe(view.picture.moments)
 		view.picture.cast, view.picture.health = nil, nil
 	end
-	view.previewAt, view.previewLanded, view.previewBlast = nil, nil, nil
+	view.previewAt = nil
 	view.map.id, view.map.x, view.map.source = false, nil, nil
 	view.clock, view.nextFeed, view.open, view.looked = 0, 0, true, nil
 	view.fight, view.wasCombat, view.summaryAt, view.since = nil, nil, nil, GetTime() -- (a fight going on now isn't seen from its start)

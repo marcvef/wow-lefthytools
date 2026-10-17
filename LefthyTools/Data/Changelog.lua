@@ -332,5 +332,8 @@ ns.CHANGELOG = {
 	{ id = 108, module = "bestiary",
 		en = { "Bestiary: where you killed them", "The Bestiary's ledger now shows a map of the zone where you killed a mob most often, with a dot for each of your last 50 kills, and names the other zones." },
 		de = { "Bestiary: wo du sie getötet hast", "Das Verzeichnis des Bestiary zeigt jetzt eine Karte der Zone, in der du einen Mob am häufigsten getötet hast, mit einem Punkt für jeden deiner letzten 50 Kills, und nennt die anderen Zonen." } },
+	{ id = 109, module = "beacon",
+		en = { "Fight stream: spells in their colours", "In the battle row a spell glows in its school's colour as it flies, and its hit flashes in it: fire orange, frost blue, shadow purple and so on. Restart the game once after this update." },
+		de = { "Kampf-Stream: Zauber in ihren Farben", "In der Kampfreihe leuchtet ein Zauber im Flug in der Farbe seiner Schule, und sein Treffer blitzt darin auf: Feuer orange, Frost blau, Schatten lila und so weiter. Nach diesem Update einmal das Spiel neu starten." } },
 	-- New entries go here, at the end.
 }
