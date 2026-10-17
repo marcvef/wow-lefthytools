@@ -817,7 +817,9 @@ local function Draw()
 	win.Note:SetPoint("TOP", win, "TOP", 0, -height - (any and 0 or 6))
 	win.Note:SetText(table.concat(notes, "\n"))
 	win.Note:SetShown(#notes > 0)
-	height = height + (#notes > 0 and (#notes * LINE + (any and 4 or 10)) or 0) + PAD
+	-- (a line each, or more when one wraps: most do in the window's width, in German more so)
+	local noteHeight = math.max(#notes * LINE, math.ceil(win.Note:GetStringHeight()))
+	height = height + (#notes > 0 and (noteHeight + (any and 4 or 10)) or 0) + PAD
 	win:SetHeight(math.max(height, head + 16))
 end
 Bt.Draw = Draw

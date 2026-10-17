@@ -7851,6 +7851,14 @@ section("Bestiary: what mobs drop")
 	LOOT = {}
 	Fire("PLAYER_TARGET_CHANGED")
 	check(mob().kills == 3 and win.Note:GetText():find("In a group: kills aren't counted", 1, true), "in a group: not counted, and said")
+	do -- (a note wraps in the window's width, as this one does in game: the window grows with it)
+		local tall, measure = win:GetHeight(), win.Note.GetStringHeight
+		win.Note.GetStringHeight = function() return 2 * 14 end
+		Bt.Draw()
+		check(win:GetHeight() == tall + 14, "a note on two lines: the window a line taller")
+		win.Note.GetStringHeight = measure
+		Bt.Draw()
+	end
 	GROUP = "none"
 	-- No target, or a vendor: the last mob stays.
 	MOBS.target, STATE.target = nil, false
