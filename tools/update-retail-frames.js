@@ -18,6 +18,7 @@
 //   node tools/update-retail-frames.js --cache <dir>        keep the downloads in <dir>
 const fs = require("fs");
 const path = require("path");
+const { table, options } = require("./wago");
 
 // A bar fill's retail stand-in, by the end of its name: the player frame's "portrait off" bars
 // (same art family; a status bar stretches its fill to its own size anyway).
@@ -30,49 +31,6 @@ const BARS = [
   [/-bar-rage$/i, "UI-HUD-UnitFrame-Player-PortraitOff-Bar-Rage"],
   [/-bar-runicpower$/i, "UI-HUD-UnitFrame-Player-PortraitOff-Bar-RunicPower"],
 ];
-
-function parseCsv(text) {
-  const rows = [];
-  let field = "", row = [], quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (quoted) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false;
-      } else field += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ",") { row.push(field); field = ""; }
-    else if (c === "\n") { row.push(field.replace(/\r$/, "")); rows.push(row); row = []; field = ""; }
-    else field += c;
-  }
-  if (field || row.length) { row.push(field); rows.push(row); }
-  const head = rows.shift();
-  return rows.filter((r) => r.length === head.length).map((r) => Object.fromEntries(head.map((h, i) => [h, r[i]])));
-}
-
-async function latestBuild() {
-  const builds = await (await fetch("https://wago.tools/api/builds")).json();
-  // WoW: Forever is version 1.60.x (listed under a beta product on wago.tools).
-  const all = Object.values(builds).flat().map((b) => b.version).filter((v) => /^1\.60\./.test(v));
-  const key = (v) => v.split(".").map((n) => n.padStart(8, "0")).join(".");
-  return all.sort((a, b) => (key(a) < key(b) ? 1 : -1))[0];
-}
-
-async function table(name, build, cache) {
-  const file = cache && path.join(cache, `${name}-${build}.csv`);
-  let text;
-  if (file && fs.existsSync(file)) {
-    text = fs.readFileSync(file, "utf8");
-  } else {
-    const response = await fetch(`https://wago.tools/db2/${name}/csv?build=${build}`);
-    if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
-    text = await response.text();
-    if (file) fs.writeFileSync(file, text);
-  }
-  const rows = parseCsv(text);
-  if (rows.length < 10) throw new Error(`${name} for ${build} looks incomplete (${rows.length} rows)`);
-  return rows;
-}
 
 // Every atlas name: { name, set: { [setID]: { [canvasID]: member } } }.
 function atlasSets(atlas, element, member) {
@@ -96,11 +54,7 @@ function atlasSets(atlas, element, member) {
 const num = (n) => String(Math.round(n * 1e6) / 1e6);
 
 async function main() {
-  const args = process.argv.slice(2);
-  const cacheAt = args.indexOf("--cache");
-  const cache = cacheAt >= 0 ? args.splice(cacheAt, 2)[1] : null;
-  if (cache) fs.mkdirSync(cache, { recursive: true });
-  const build = args[0] || await latestBuild();
+  const { build, cache } = await options();
   console.log(`WoW: Forever ${build}`);
   const [atlas, element, member] = await Promise.all(["UiTextureAtlas", "UiTextureAtlasElement", "UiTextureAtlasMember"]
     .map((name) => table(name, build, cache)));

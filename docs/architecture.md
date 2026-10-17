@@ -103,6 +103,7 @@ tools/update-class-spells.js     regenerates Data/ClassSpells.lua from wago.tool
 tools/update-spell-schools.js    regenerates Data/SpellSchools.lua from wago.tools (node)
 tools/update-minimap-tiles.js    regenerates Data/MinimapTiles.lua from wago.tools (node)
 tools/update-retail-frames.js    regenerates Data/RetailUnitFrames.lua from wago.tools (node)
+tools/wago.js                    shared by the four node tools above: latest Forever build, tables (CSV, --cache), arguments
 tools/update-drop-data.js    regenerates LefthyTools_DropData/Drops.lua from a classic world DB dump (node)
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)

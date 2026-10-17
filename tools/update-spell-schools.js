@@ -16,6 +16,7 @@
 //   node tools/update-spell-schools.js --cache <dir>        keep the downloads in <dir>
 const fs = require("fs");
 const path = require("path");
+const { table, options } = require("./wago");
 
 const SKIPPED_LINES = /^(Pet - |Mounts$|Companions$|Engraving$|Runes$|Meditation$|Explorer Imp$|Beast Training$)/;
 const SOD_IDS = [395000, 470000];
@@ -25,49 +26,6 @@ const SCHOOLS = [[2, "holy"], [4, "fire"], [8, "nature"], [16, "frost"], [32, "s
 // Lightning Bolt, Arcane Missiles, Polymorph.
 const EXPECTED = { 133: "fire", 116: "frost", 2136: "fire", 686: "shadow", 585: "holy", 403: "nature", 5143: "arcane", 118: "arcane" };
 const RANGE_MIN = 3; // consecutive IDs written as { first, last } from this many
-
-function parseCsv(text) {
-  const rows = [];
-  let field = "", row = [], quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (quoted) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; } else quoted = false;
-      } else field += c;
-    } else if (c === '"') quoted = true;
-    else if (c === ",") { row.push(field); field = ""; }
-    else if (c === "\n") { row.push(field.replace(/\r$/, "")); rows.push(row); row = []; field = ""; }
-    else field += c;
-  }
-  if (field || row.length) { row.push(field); rows.push(row); }
-  const head = rows.shift();
-  return rows.filter((r) => r.length === head.length).map((r) => Object.fromEntries(head.map((h, i) => [h, r[i]])));
-}
-
-async function latestBuild() {
-  const builds = await (await fetch("https://wago.tools/api/builds")).json();
-  // WoW: Forever is version 1.60.x (listed under a beta product on wago.tools).
-  const all = Object.values(builds).flat().map((b) => b.version).filter((v) => /^1\.60\./.test(v));
-  const key = (v) => v.split(".").map((n) => n.padStart(8, "0")).join(".");
-  return all.sort((a, b) => (key(a) < key(b) ? 1 : -1))[0];
-}
-
-async function table(name, build, cache) {
-  const file = cache && path.join(cache, `${name}-${build}.csv`);
-  let text;
-  if (file && fs.existsSync(file)) {
-    text = fs.readFileSync(file, "utf8");
-  } else {
-    const response = await fetch(`https://wago.tools/db2/${name}/csv?build=${build}`);
-    if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
-    text = await response.text();
-    if (file) fs.writeFileSync(file, text);
-  }
-  const rows = parseCsv(text);
-  if (rows.length < 10) throw new Error(`${name} for ${build} looks incomplete (${rows.length} rows)`);
-  return rows;
-}
 
 // A school mask's school: the first of its schools in the game's order; nil for physical.
 function schoolOf(mask) {
@@ -89,15 +47,7 @@ function compact(ids) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  let cache, build;
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--cache") cache = args[++i];
-    else build = args[i];
-  }
-  if (cache) fs.mkdirSync(cache, { recursive: true });
-  build = build || (await latestBuild());
-  if (!build) throw new Error("could not determine the Forever build; pass it as an argument");
+  const { build, cache } = await options();
   console.log(`WoW: Forever ${build}`);
 
   const [skillLines, abilities, misc] = await Promise.all(

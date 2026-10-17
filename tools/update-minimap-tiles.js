@@ -11,16 +11,9 @@
 //   node tools/update-minimap-tiles.js 1.60.1.70291
 const fs = require("fs");
 const path = require("path");
+const { latestBuild } = require("./wago");
 
 const CONTINENTS = { 0: "azeroth", 1: "kalimdor" }; // UnitPosition's instance ID -> folder
-
-async function latestBuild() {
-  const builds = await (await fetch("https://wago.tools/api/builds")).json();
-  // WoW: Forever is version 1.60.x (listed under a beta product on wago.tools).
-  const all = Object.values(builds).flat().map((b) => b.version).filter((v) => /^1\.60\./.test(v));
-  const key = (v) => v.split(".").map((n) => n.padStart(8, "0")).join(".");
-  return all.sort((a, b) => (key(a) < key(b) ? 1 : -1))[0];
-}
 
 async function tiles(folder, build) {
   const url = `https://wago.tools/api/files?search=world/minimaps/${folder}/map&version=${build}`;
