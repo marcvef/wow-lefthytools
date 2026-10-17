@@ -30,6 +30,8 @@ local M = C.module
 --   J2;n;<acct>;<char>;<u>;<n>;<t>;<kind>;<a>;<b>                             a highlight
 --   J2;a;<acct>;<char>;<u>;<full name>;<guid>    the character's full name and GUID, with the
 --                          profile's stamp (<char> stays its record's key: the first name's)
+--   J2;l;<acct>;<char>;<full name>;<guid>        a full name I learned, not from its author (no
+--                          stamp; with every answer, and to the account's owner on their hello)
 --   J2;e;<acct>;<u>        that's all: you're complete up to u
 -- A request goes to one friend at a time per account (PENDING_TIMEOUT without progress: another
 -- may answer). An answer holds at most SERVE_MAX records, oldest first; its end says how far that
@@ -724,10 +726,28 @@ local function Request(id, acct, now)
 	ns.Beacon.Queue(id, J("q", acct, store.book[acct] and store.book[acct].u or 0))
 end
 
+-- Full names of a friend's characters that I learned (Battle.net showed them online, or an older
+-- build's days by the full name joined their journal), not from their author: "l" messages,
+-- J2;l;<acct>;<Name-Realm>;<full name>;<guid>, without a stamp (no author made them; older builds
+-- ignore the word). They go with every answer about that account, whatever it asked since (whoever
+-- holds the journal from older builds only has its first names), and to the account's owner when
+-- they say hello: their journal takes the name of an alt it doesn't know (not played since their
+-- update) and sends it on as its own ("a").
+local function Learned(acct)
+	local list = {}
+	local a = acct ~= C.MyAccount() and store.book[acct]
+	for key, c in pairs(a and a.chars or {}) do
+		if not c.aliasU and HasSurname(c.full) then
+			list[#list + 1] = J("l", acct, key, ns.Beacon.Clean(c.full, NAME_BYTES), c.guid or "")
+		end
+	end
+	return list
+end
+
 -- An answer: the account's records newer than since, at most SERVE_MAX (never cutting between two
--- of the same stamp), how many (c: a receiver that got fewer doesn't take the end's stamp; older
--- builds ignore it) and the end. An answer to the same friend for the same account still waiting
--- goes first: asked again, they get it once.
+-- of the same stamp), the names learned of it, how many (c: a receiver that got fewer doesn't take
+-- the end's stamp; older builds ignore it) and the end. An answer to the same friend for the same
+-- account still waiting goes first: asked again, they get it once.
 local function Serve(id, acct, since)
 	local B = ns.Beacon
 	B.DropLowFor(id, function(message)
@@ -745,8 +765,13 @@ local function Serve(id, acct, since)
 	for i = 1, count do
 		B.QueueLow(id, list[i][2])
 	end
+	-- (counted too: every build that counts counts every message about the account it asked for)
+	local learned = Learned(acct)
+	for _, message in ipairs(learned) do
+		B.QueueLow(id, message)
+	end
 	local upTo = #list > count and list[count][1] or Held(acct)
-	B.QueueLow(id, J("c", acct, count))
+	B.QueueLow(id, J("c", acct, count + #learned))
 	B.QueueLow(id, J("e", acct, upTo))
 end
 
@@ -805,6 +830,37 @@ local function Plausible(u)
 	return u and u > 0 and u <= time() + 7 * 86400
 end
 
+-- A full name a friend learned ("l", see Learned): for a character of one of my friends' journals,
+-- or an alt of mine, that doesn't know its surname yet; never instead of one it knows, nor for the
+-- character I play (UnitName says). Mine then goes on as my own (its profile's stamp changes with
+-- it, so friends ask for its "a" record).
+local function StoreName(acct, f)
+	local key, full, guid = f[2], ns.Beacon.Clean(f[3] or "", NAME_BYTES), ValidGuid(f[4])
+	if #f ~= 4 or not (key and #key <= NAME_BYTES and key:match("^[^%-]+%-.+$")) or not HasSurname(full)
+		or FirstName(full) ~= FirstName(key) then
+		return
+	end
+	local c
+	if acct == C.MyAccount() then
+		for _, mine in pairs(store.chars) do
+			if CharKey(mine) == key and mine ~= C.Char() then
+				c = mine
+			end
+		end
+	elseif Friends()[acct] and store.book[acct] then
+		c = store.book[acct].chars[key]
+	end
+	if not c or HasSurname(c.full) then
+		return
+	end
+	c.full, c.guid = full, c.guid or guid
+	if acct == C.MyAccount() then
+		StampChar(c, true, true)
+	end
+	Changed() -- (names in the news)
+	C.feedDirty = true
+end
+
 -- One record from a friend (validated; only for my own Battle.net friends' accounts). Counted
 -- for the request it answers.
 local function Store(id, word, more, now)
@@ -819,6 +875,10 @@ local function Store(id, word, more, now)
 	local p = pending[acct]
 	if p and p.from == id then
 		p.at, p.got = now, (p.got or 0) + 1
+	end
+	if word == "l" then
+		StoreName(acct, f) -- (no stamp)
+		return
 	end
 	if not (key and #key <= NAME_BYTES and key:match("^[^%-]+%-.+$") and Plausible(u))
 		or acct == C.MyAccount() or not Friends()[acct] then
@@ -900,6 +960,9 @@ function ns.Beacon.ReceiveJournal(id, word, more)
 	if word == "h" then
 		peer.journal = more:match("^%x%x%x%x%x%x%x%x$") or "" -- (they sync; their account, if known)
 		summaries[id] = nil -- (they (re)started: everything is offered again)
+		for _, message in ipairs(peer.journal ~= "" and Learned(peer.journal) or {}) do
+			ns.Beacon.QueueLow(id, message) -- (their own characters' names I learned)
+		end
 	elseif word == "s" then
 		peer.journal = peer.journal or ""
 		for acct, u in more:gmatch("(%x%x%x%x%x%x%x%x),(%d+)") do

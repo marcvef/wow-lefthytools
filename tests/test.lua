@@ -6935,6 +6935,72 @@ section("Chronicle: Battle.net tells a friend's surname, whatever they run")
 	book["Corin-Realmy"], book["Cora-Realmy"] = nil, nil
 end)()
 
+section("Chronicle: friends pass on the surnames they learned")
+;(function() -- (a function of its own: the main chunk's 200 locals)
+	local H = CH.Hash
+	local mine, annaAcct, carl = H("Me#1111"), H("Annie#1234"), H("Carl#3456")
+	local function bob(text) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", text, "WHISPER", 12) end
+	local function profile(acct, key, u, class)
+		anna("J2;p;" .. acct .. ";" .. key .. ";" .. u .. ";" .. class .. ";9;" .. time() .. ";600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000;;")
+	end
+	anna("H2")
+	bob("H2")
+	Advance(1.2)
+	profile(carl, "Corin-Realmy", 9600, "PALADIN")
+	profile(carl, "Cora-Realmy", 9601, "PRIEST")
+	profile(annaAcct, "Annalt-Realmy", 9602, "MAGE")
+	Advance(0.3)
+	local corin, cora, annalt = CDB.book[carl].chars["Corin-Realmy"], CDB.book[carl].chars["Cora-Realmy"],
+		CDB.book[annaAcct].chars["Annalt-Realmy"]
+	-- Bob's client saw Corin and Annalt online (Battle.net): it says so, without a stamp of their author's.
+	bob("J2;l;" .. carl .. ";Corin-Realmy;Corin Vale;Player-1-933")
+	bob("J2;l;" .. carl .. ";Corin-Realmy;Corin Other;")
+	bob("J2;l;" .. carl .. ";Cora-Realmy;Bob Stone;")
+	bob("J2;l;" .. carl .. ";Cora-Realmy;Cora;")
+	bob("J2;l;" .. annaAcct .. ";Annalt-Realmy;Annalt Brook;")
+	bob("J2;l;" .. H("Zed#9999") .. ";Zed-Realmy;Zed Moor;")
+	Advance(0.3)
+	check(corin.full == "Corin Vale" and corin.guid == "Player-1-933" and not corin.aliasU and annalt.full == "Annalt Brook",
+		"a surname a friend learned fills in a journal that didn't know it")
+	check(not cora.full and not CDB.book[H("Zed#9999")], "one that names someone else, has no surname, or isn't my friend's: nothing")
+	-- Passed on with every answer about the account (whatever it asked since), counted with it; a name
+	-- from its author goes as its "a" record, not again.
+	mark = #GAMEDATA + 1
+	bob("J2;q;" .. carl .. ";9999999999")
+	Advance(3)
+	local count = tonumber((sentTo(12, mark, "J2;c;" .. carl .. ";")[1] or ""):match(";(%d+)$") or -1)
+	local about = 0
+	for _, m in ipairs(GameDataTo(12, mark)) do
+		if m:find("^J2;[pdnal];" .. carl .. ";") then about = about + 1 end
+	end
+	local carlbank = CDB.book[carl].chars["Carlbank-Realmy"]
+	check(sentTo(12, mark, "J2;l;" .. carl .. ";Corin-Realmy;Corin Vale;Player-1-933")[1] and count == about
+		and not (carlbank and carlbank.aliasU and sentTo(12, mark, "J2;l;" .. carl .. ";Carlbank-Realmy")[1]),
+		"an answer carries the names learned, counted (got " .. count .. " for " .. about .. ")")
+	-- To the account's owner when they say hello: Anna's journal learns her alt's name from me.
+	mark = #GAMEDATA + 1
+	anna("J2;h;" .. annaAcct)
+	Advance(3)
+	check(sentTo(11, mark, "J2;l;" .. annaAcct .. ";Annalt-Realmy;Annalt Brook;")[1], "Anna says hello: her alt's name goes to her")
+	-- And mine: an alt not played since this build learns its surname, and sends it on as its own.
+	CDB.chars["Oldalt-Realmy"] = { name = "Oldalt", realm = "Realmy", classFile = "WARRIOR", level = 5, events = {}, daily = {} }
+	CH.Fill(CDB.chars["Oldalt-Realmy"])
+	local before = CDB.myU
+	anna("J2;l;" .. mine .. ";Oldalt-Realmy;Oldalt Mirewood;Player-1-78")
+	anna("J2;l;" .. mine .. ";Lefthy-Realmy;Lefthy Otherone;")
+	Advance(0.3)
+	local oldalt = CDB.chars["Oldalt-Realmy"]
+	check(oldalt.full == "Oldalt Mirewood" and oldalt.guid == "Player-1-78" and me.full == "Lefthy",
+		"my alt takes the surname a friend saw; the one I play doesn't (UnitName says)")
+	mark = #GAMEDATA + 1
+	anna("J2;q;" .. mine .. ";" .. before)
+	Advance(3)
+	check(sentTo(11, mark, "J2;a;" .. mine .. ";Oldalt-Realmy;")[1] and sentTo(11, mark, "J2;a;" .. mine .. ";Oldalt-Realmy;")[1]:find(";Oldalt Mirewood;Player%-1%-78$"),
+		"and friends get it from me as my own (\"a\", with its profile's stamp)")
+	CDB.chars["Oldalt-Realmy"] = nil
+	CDB.book[carl].chars["Corin-Realmy"], CDB.book[carl].chars["Cora-Realmy"], CDB.book[annaAcct].chars["Annalt-Realmy"] = nil, nil, nil
+end)()
+
 section("Chronicle: a death counts once")
 do
 	-- The game can say PLAYER_DEAD more than once for one death.

@@ -339,8 +339,8 @@ ns.CHANGELOG = {
 		en = { "Fight stream: polymorphed mobs as sheep", "A mob they polymorph turns into a sheep in the battle row (or a pig, turtle or cow) until it takes damage, dies or the spell runs out." },
 		de = { "Kampf-Stream: verwandelte Mobs als Schaf", "Verwandelt der Magier im Stream einen Mob, steht der in der Kampfreihe als Schaf da (oder Schwein, Schildkröte, Kuh), bis er Schaden nimmt, stirbt oder die Verwandlung ausläuft." } },
 	{ id = 111, module = "chronicle",
-		en = { "One row per character", "Characters no longer show up twice (first name and full name). Each is shown once by the name the game shows, its BattleTag beside it; Compare and the leaderboards go by character." },
-		de = { "Eine Zeile pro Charakter", "Charaktere tauchen nicht mehr doppelt auf (Vorname und voller Name). Jeder steht einmal da, mit dem Namen, den das Spiel zeigt, und seinem BattleTag daneben; Vergleich und Bestenlisten gehen nach Charakter." } },
+		en = { "One row per character", "Characters no longer show up twice (first name and full name). Each is shown once by the name the game shows, its BattleTag beside it; Compare and the leaderboards go by character. A character known only by its first name (from an older LefthyTools) has a grey ? until its surname is known: hover it to see when." },
+		de = { "Eine Zeile pro Charakter", "Charaktere tauchen nicht mehr doppelt auf (Vorname und voller Name). Jeder steht einmal da, mit dem Namen, den das Spiel zeigt, und seinem BattleTag daneben; Vergleich und Bestenlisten gehen nach Charakter. Ein Charakter, von dem nur der Vorname bekannt ist (von einem älteren LefthyTools), hat ein graues ?, bis sein Nachname bekannt ist: fahr mit der Maus darüber, um zu sehen, wann." } },
 	{ id = 112, module = "chronicle",
 		en = { "Full names from friends' journals", "Your friends' characters show their full names, also those that weren't online with you. Their LefthyTools needs this update." },
 		de = { "Volle Namen aus Tagebüchern", "Die Charaktere deiner Freunde zeigen ihren vollen Namen, auch die, die nicht mit dir online waren. Ihr LefthyTools braucht dieses Update." } },
@@ -350,5 +350,8 @@ ns.CHANGELOG = {
 	{ id = 114, module = "chronicle",
 		en = { "Leaderboard follows 7/14/30 days", "The leaderboard on Chronicle's Compare page ranks the range you pick, like the charts." },
 		de = { "Bestenliste folgt 7/14/30 Tagen", "Die Bestenliste auf Chronicles Vergleich-Seite wertet den gewählten Zeitraum aus, wie die Grafiken." } },
+	{ id = 115, module = "chronicle",
+		en = { "Surnames from Battle.net", "Chronicle learns a character's full name as soon as your friend is online on it, even with an older LefthyTools or none, and passes it on to your other friends." },
+		de = { "Nachnamen von Battle.net", "Chronicle lernt den vollen Namen eines Charakters, sobald dein Freund damit online ist, auch mit älterem oder ohne LefthyTools, und gibt ihn an deine anderen Freunde weiter." } },
 	-- New entries go here, at the end.
 }

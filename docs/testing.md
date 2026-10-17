@@ -172,7 +172,10 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
     chip, a line and a row per character (BattleTag on a chip's hover), the Friends page a row per
     character with the BattleTag in its column. A friend's character whose journal came from an
     older build shows its first name with a grey "?" on every page (its hover, or a line under the
-    News list, says when the surname comes); never a first name alone without it.
+    News list, says when the surname comes); never a first name alone without it. When that friend
+    logs in on it while you're online (any LefthyTools, or none), the "?" goes within 30 s and the
+    full name shows; a third friend on this build who holds that journal gets the name from you too
+    (theirs loses the "?" after their next sync).
     Graphs: "Time AFK" shows AFK time per day; a friend's page (both on this build) has an AFK tile
     and an AFK row next to yours. With a friend: their level-up
     and a highlight (e.g. a boss) appear under Friends and in chat. `/chronicle session`.

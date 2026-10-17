@@ -307,8 +307,15 @@ bytes each), `J2;a;<acct>;<Name-Realm>;<u>;<full name>;<guid>` (with the profile
 builds ignore words they don't know, and don't keep or pass it on; kept as the book character's
 `full`, `guid`, `aliasU` when its first name is the key's, newer stamps replacing older; a holder
 passes it on with the rest; one that only reached me through an older build comes with the next
-profile stamp, or Battle.net tells the name when that character is online), `J2;c;<acct>;<count>`
-the answer had count records (just before its end; older
+profile stamp, or Battle.net tells the name when that character is online),
+`J2;l;<acct>;<Name-Realm>;<full name>;<guid>` a full name I learned, not from its author
+(Battle.net, an older build's days; no stamp: no author made it), with every answer about that
+account whatever it asked since (counted in its `c`), and to the account's owner when they say
+hello (`Learned`); taken only by a character that doesn't know its surname yet, never instead of
+one it knows (`StoreName`): a friend's journal's, or an alt of mine (not the one I play), which
+then sends it on as its own, with a new profile stamp (builds before it ignore the word; those that
+count an answer's records count it too, so the count matches), `J2;c;<acct>;<count>` the answer
+had count records (just before its end; older
 builds don't send it and ignore it), `J2;e;<acct>;<u>` that's all: complete up to u. A summary with a friend's account I
 hold less of starts a request (one friend at a time per account; 90 s without a record: it can go
 to another). An answer is at most 400 records, oldest first (records with the same stamp as the
@@ -370,6 +377,9 @@ the WoW client, the current region, `WOW_PROJECT_ID`), whatever they run (an old
 Beacon off), and matches it within their account (their BattleTag's hash) to the journals I hold
 (`FindBook`, `Learn`). Beacon's friends teach it too (`C.PeerChar`, when a page asks), but only
 those with LefthyTools. Each game account is read under `pcall`: one Battle.net keeps secret is skipped.
+What I learned this way goes on to friends who hold that journal, and to its owner (`J2;l`, below):
+an alt they haven't played since their update gets its surname from whoever saw it online, and
+their journal sends it on as its own.
 
 **A name not known in full.** A journal from an older build only ever says the first name (the
 key's), so a character of it that Battle.net hasn't shown online since, and an alt of mine not played
