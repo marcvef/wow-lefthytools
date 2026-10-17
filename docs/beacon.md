@@ -61,7 +61,9 @@ once a minute and at most every 10 s after `BN_FRIEND_ACCOUNT_ONLINE`; the same 
 every 120 s. Forever reports `WOW_PROJECT_ID == 1` like retail, which is why the handshake exists.
 The hellos go into their own queue (`helloOutbox`), sent after one-off messages and states and
 before bulk data: a friend list full of WoW players without LefthyTools never holds up a chat line
-or a Need answer (they all go within seconds, ten a second).
+or a Need answer (they all go within seconds, ten a second). A friend whose hello is still waiting
+(sending held up by a throttle or a busy queue) isn't queued again (`helloWaiting`); the sweep
+counts it as greeted, so a long hold-up doesn't end in a burst of hellos.
 A friend first heard from has no name until the next `Validate` (a second later, or a little more
 while Battle.net fills it in): what they sent that needs a name (chat lines, items and answers,
 level-ups, deaths, pings, Chronicle days and highlights) waits in its queue for it, up to 10 s

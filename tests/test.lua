@@ -1861,9 +1861,24 @@ Advance(0.15)
 check(peers()[11].version == "0.5.0" and #sentTo(11, hmark, "H2") == 1, "and it's known again (one hello)")
 -- My version also goes to every friend every 10 minutes, whatever happened to the answers.
 local versionMark = #GAMEDATA + 1
-for _ = 1, 21 do
-	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 11) -- Anna stays around
-	Advance(30)
+do -- Meanwhile the server holds my messages back for 3 minutes: a WoW friend without LefthyTools
+	-- waits for one hello, not one more each time the friend list is looked at.
+	BN_FRIENDS[#BN_FRIENDS + 1] = { { gameAccountID = 450, isOnline = true, clientProgram = "WoW", wowProjectID = 1,
+		isInCurrentRegion = true, characterName = "Gus", classFilename = "PRIEST", characterLevel = 10,
+		areaName = "Westfall", playerGuid = "Player-1-450" }, battleTag = "Gus#1" }
+	MOCK_SEND_RESULT = 3
+	local released, afterRelease
+	for i = 1, 21 do
+		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 11) -- Anna stays around
+		Advance(30)
+		if i == 6 then
+			MOCK_SEND_RESULT, released = nil, #GAMEDATA + 1
+		elseif i == 7 then
+			afterRelease = #sentTo(450, released, "H2")
+		end
+	end
+	BN_FRIENDS[#BN_FRIENDS] = nil
+	check(afterRelease == 1, "held back for minutes: one hello waits for a friend without LefthyTools, got " .. tostring(afterRelease))
 end
 local repeats = sentTo(11, versionMark, "V2;")
 check(#repeats == 1 and repeats[1] == "V2;0.4.0-3-gabc1234", "my version, repeated once in 10 minutes, got " .. #repeats)

@@ -187,6 +187,7 @@ local owed = {}         -- gameAccountID -> true: send them my current state
 local outbox = {}       -- { gameAccountID, message }: one-off messages, sent before states
 local lowOutbox = {}    -- the same, sent only when nothing else waits (bulk data); [3]: onSent()
 local helloOutbox = {}  -- gameAccountIDs to greet (Sweep): after states and messages, before bulk data
+local helloWaiting = {} -- gameAccountID -> true while their hello is in helloOutbox
 local inbox = {}        -- gameAccountID -> { count, window, dingAt, answeredAt }: spam guards
 local dings = {}        -- { gameAccountID, level, text } received, shown on the next tick
 local deaths = {}       -- { gameAccountID, foe }: friends who just died, told on the next tick
@@ -603,9 +604,11 @@ local function Drain(now, elapsed)
 	-- WoW players without LefthyTools never delays a state or a chat line.
 	while tokens >= 1 and helloOutbox[1] and not outbox[1] do
 		local id = table.remove(helloOutbox, 1)
+		helloWaiting[id] = nil
 		if not peers[id] then
 			if not SendNow(id, "H" .. VERSION) then
 				table.insert(helloOutbox, 1, id)
+				helloWaiting[id] = true
 				pausedUntil, stats.throttled = now + THROTTLE_PAUSE, stats.throttled + 1
 				return
 			end
@@ -743,8 +746,11 @@ local function Sweep(now)
 				local id = info.gameAccountID
 				if peers[id] then
 					CopyInfo(peers[id], info)
-				elseif not otherVersion[id] and (not helloAt[id] or now - helloAt[id] >= HELLO_RETRY) then
+				elseif helloWaiting[id] then
+					-- Still waiting to go (sending is held up): as good as a new one, and never two.
 					helloAt[id] = now
+				elseif not otherVersion[id] and (not helloAt[id] or now - helloAt[id] >= HELLO_RETRY) then
+					helloAt[id], helloWaiting[id] = now, true
 					helloOutbox[#helloOutbox + 1] = id
 				end
 			end
@@ -1431,6 +1437,7 @@ function M:OnEnable()
 	wipe(outbox) -- goodbyes still pending from switching off just before: no longer true
 	wipe(lowOutbox)
 	wipe(helloOutbox)
+	wipe(helloWaiting)
 	-- Nameplates already up (switched on mid-session): counted like ones that come later.
 	wipe(plates)
 	for _, plate in ipairs(C_NamePlate and C_NamePlate.GetNamePlates and C_NamePlate.GetNamePlates() or {}) do
@@ -1464,7 +1471,7 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, helloOutbox, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn,
+	for _, t in ipairs({ peers, helloAt, helloOutbox, helloWaiting, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn,
 			dailyIn, comings, B.pings, plates }) do
 		wipe(t)
 	end
