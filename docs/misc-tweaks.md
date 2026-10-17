@@ -1,16 +1,16 @@
 # Misc Tweaks design
 
-`Modules/Tweaks/Tweaks.lua` is the module: its settings (defaults, the settings page), `/lefthy tweaks`,
-the small `statusText` tweak, `ns.HideInterface` (shared by the AFK screen and cinematic flights),
-`ns.TweakUtil` (what several tweaks ask: in combat, typing, how many windows are open, "1:05",
-a unit's nameplate and its health bar)
-and the list of independent tweaks (`TWEAKS`), each with a setting, a slash command word and an
-`apply(on)` function, which calls the tweak's file (`ns.ApplyMovableBags`, ...). `Reconcile()`
-compares what's wanted (module enabled and the tweak's setting on) with what's active, and runs on
-the next frame via `C_Timer.After(0)`. All tweaks default to on, except `retailFrames`. The other
-files, in load order: `Bags.lua` (`movableBags`, `gamepadBagSort`), `QuestAnnounce.lua`,
-`ComboPoints.lua`, `Aggro.lua`, `RetailFrames.lua`, `ForeverQuests.lua`, `AFK.lua`, `FlightTime.lua` and `Flight.lua`,
-`LevelUp.lua` and `LevelUpWindow.lua`, `QuestMap.lua` (+ `QuestMap.xml`).
+`Modules/Tweaks/Tweaks.lua` is the module: its settings (defaults, the settings page),
+`/lefthy tweaks`, the small `statusText` tweak, `ns.HideInterface` (shared by the AFK screen and
+cinematic flights), `ns.TweakUtil` (what several tweaks ask: in combat, typing, how many windows
+are open, "1:05", a unit's nameplate and its health bar) and the list of independent tweaks
+(`TWEAKS`), each with a setting, a slash command word and an `apply(on)` function, which calls
+the tweak's file (`ns.ApplyMovableBags`, ...). `Reconcile()` compares what's wanted (module enabled
+and the tweak's setting on) with what's active, and runs on the next frame via `C_Timer.After(0)`.
+All tweaks default to on, except `retailFrames`. The other files, in load order: `Bags.lua`
+(`movableBags`, `gamepadBagSort`), `QuestAnnounce.lua`, `ComboPoints.lua`, `Aggro.lua`,
+`RetailFrames.lua`, `ForeverQuests.lua`, `AFK.lua`, `FlightTime.lua` and `Flight.lua`, `LevelUp.lua` and
+`LevelUpWindow.lua`, `QuestMap.lua` (+ `QuestMap.xml`).
 
 ## statusText: always show health and power values
 
