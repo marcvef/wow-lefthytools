@@ -47,6 +47,13 @@ local function BaseName(name)
 	return Readable(name) and type(name) == "string" and name:match("^[^%s%-]+") or nil
 end
 
+-- Who a mail goes to: the character's name, without the surname Battle.net shows with it (a
+-- winner's name comes from there): "Anna Brook-ArgentDawn" -> "Anna-ArgentDawn". Reservations
+-- saved before kept the surname, so it's also taken off when the name is used.
+local function MailName(name)
+	return (name:gsub("^([^%s%-]+)[^%-]*", "%1"))
+end
+
 -- The same character, however it was typed ("anna", "Anna-Realm").
 local function SameName(a, b)
 	a, b = BaseName(a), BaseName(b)
@@ -121,11 +128,11 @@ function B.AddHandover(itemString, link, winner, guid, gameAccountID, itemGUID)
 	if not (list and itemID and winner) then
 		return
 	end
-	local mailName = winner
+	local mailName = MailName(winner)
 	local info = gameAccountID and C_BattleNet.GetGameAccountInfoByID(gameAccountID)
 	local realm = info and Readable(info.realmName) and info.realmName
 	if realm and realm ~= "" and realm ~= GetRealmName() then
-		mailName = winner .. "-" .. realm:gsub("[%s%-]", "")
+		mailName = mailName .. "-" .. realm:gsub("[%s%-]", "")
 	end
 	-- Rolled again: only the newest winner keeps it reserved. The same copy (same GUID), or, when
 	-- copies aren't known, the same item; another copy of the same item is a reservation of its own.
@@ -473,7 +480,7 @@ local function CheckMail()
 	local typed = SendMailNameEditBox:GetText() or ""
 	if typed == "" then
 		if count == 1 then
-			SendMailNameEditBox:SetText(first.mailName or first.winner)
+			SendMailNameEditBox:SetText(MailName(first.mailName or first.winner))
 			M:Print(("mail to %s: they won %s."):format(first.winner, first.link or "it"))
 		end
 		return

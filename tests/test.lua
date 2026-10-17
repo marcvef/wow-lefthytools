@@ -3086,10 +3086,11 @@ do
 	-- Mail: attaching it fills in the winner.
 	wipe(owed)
 	BN_FRIENDS[1][1].realmName = "Argent Dawn"
-	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", 11)
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna Brook", "Player-1-11", 11) -- (Battle.net's name: with her surname)
 	BN_FRIENDS[1][1].realmName = "Realmy"
-	check(owed[1].mailName == "Anna-ArgentDawn", "a winner on another realm: mailed as Name-Realm")
-	owed[1].mailName = "Anna"
+	check(owed[1].mailName == "Anna-ArgentDawn", "a winner on another realm: mailed as Name-Realm, her character name without the surname, got "
+		.. tostring(owed[1].mailName))
+	owed[1].mailName = "Anna Brook" -- (on my realm, as builds before saved it)
 	SendMailFrame:Show()
 	SendMailNameEditBox:SetText("")
 	MAIL_ITEMS = { 6948 }
@@ -3097,8 +3098,8 @@ do
 	Fire("MAIL_SEND_INFO_UPDATE")
 	check(SendMailNameEditBox:GetText() == "", "nothing done inside the event handler")
 	Advance(0.1)
-	check(SendMailNameEditBox:GetText() == "Anna" and printedSince(pmark):find("mail to Anna: they won " .. ItemLink(6948), 1, true),
-		"attaching a reserved item fills in its winner")
+	check(SendMailNameEditBox:GetText() == "Anna" and printedSince(pmark):find("mail to Anna Brook: they won " .. ItemLink(6948), 1, true),
+		"attaching a reserved item fills in its winner's character name (a mail takes no surname), got " .. tostring(SendMailNameEditBox:GetText()))
 	SendMailNameEditBox:SetText("anna")
 	Fire("MAIL_SEND_INFO_UPDATE")
 	Advance(0.1)
@@ -3108,7 +3109,7 @@ do
 	Advance(0.1)
 	Fire("MAIL_SEND_INFO_UPDATE")
 	Advance(0.1)
-	local _, warnings = printedSince(pmark):gsub("is reserved for Anna, not Bob", "")
+	local _, warnings = printedSince(pmark):gsub("is reserved for Anna Brook, not Bob", "")
 	check(SendMailNameEditBox:GetText() == "Bob" and warnings == 1, "another name typed: kept, with one warning")
 	SendMailFrame:Hide()
 	MAIL_ITEMS = {}

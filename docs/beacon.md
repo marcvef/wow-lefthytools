@@ -315,7 +315,9 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
 
 When my offer has a winner, `B.AddHandover` saves `{ itemID, link, winner, mailName, guid, at }`
 in `LefthyToolsDB.handover`: the item is reserved for them. The winner's GUID comes from their
-answer's peer; `mailName` is "Name-Realm" when Battle.net says their realm isn't mine. An offer from
+answer's peer; `mailName` is their character's name without the surname Battle.net shows with it
+(a mail takes no surname; entries saved before are mended when used), "Name-Realm" when
+Battle.net says their realm isn't mine. An offer from
 the bags (or bank) records the copy's own GUID (`C_Item.GetItemGUID` of the clicked location) as
 `itemGUID`: the reservation follows that copy, so two copies won by two people are two entries, and
 the tooltip (its data's `guid`), the bag border and the vendor question only apply to that copy.
