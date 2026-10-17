@@ -274,7 +274,7 @@ local function FoeBestiary(creature)
 	local killed = mob and mob.kills > 0
 	local list, line
 	if killed then
-		list, line = Bt.Drops(mob, showPoor), Bt.KillsLine(mob, true)
+		list, line = Bt.Drops(mob, showPoor, creature), Bt.KillsLine(mob, true) -- (the classic database beside it: quest drops)
 	else
 		list = Bt.Compare(creature, mob, showPoor)
 		line = list and #list > 0 and L["Not killed yet: classic database"] or L["Not killed yet"]

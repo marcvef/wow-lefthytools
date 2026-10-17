@@ -5026,6 +5026,23 @@ do
 			view.kind, target.level, target.class = "friend", 5, nil
 		end
 
+		-- Hovering a foe whose kind I've killed: my drops with what the classic database says of them,
+		-- as on the Bestiary's own card (a drop only while on a quest has its quest mark).
+		do
+			local dropData = LefthyToolsDropData
+			LefthyToolsDropData = { source = "test", mobs = { [9007] = "2589:1:5000q" } }
+			LefthyToolsBestiaryDB.mobs[9007] = { kills = 20, money = 0, items = { [2589] = { 8, 10, 1, "Linen Cloth" } } }
+			S.BattleReset(view)
+			target.creature = 9007
+			show()
+			local slot = view.win.Foes.slots[1]
+			slot._scripts.OnEnter(slot)
+			check(tooltipFind("Linen Cloth") and tooltipFind("AvailableQuestIcon"), "a foe I've killed: my drops, a quest drop with its mark")
+			slot._scripts.OnLeave(slot)
+			target.creature = 6
+			LefthyToolsDropData, LefthyToolsBestiaryDB.mobs[9007] = dropData, nil
+		end
+
 		view.kind, view.picture = kind, picture0
 		S.BattleReset(view)
 	end)()
