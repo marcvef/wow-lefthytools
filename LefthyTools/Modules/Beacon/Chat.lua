@@ -243,7 +243,7 @@ local function Send(kind, text)
 	UnpackLinks(text, function(shown) -- what my friends see
 		if kind == "chat" then
 			local _, classFile = UnitClass("player")
-			print(ChatLine(UnitName("player"), classFile, shown)) -- my own line, as in guild chat
+			print(ChatLine(B.MyName(), classFile, shown)) -- my own line, as in guild chat (named as friends see me)
 		else
 			B.ShowAnnouncement(nil, shown)
 		end

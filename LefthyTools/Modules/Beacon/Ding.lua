@@ -93,9 +93,10 @@ local function Announce(name, classFile, level, template)
 	end
 end
 
+-- My message as friends see it (they get my name from Battle.net: with my surname).
 local function Preview()
 	local _, classFile = UnitClass("player")
-	Announce(UnitName("player"), classFile, (UnitLevel("player") or 0) + 1, B.Clean(M.db.dingText, TEXT_MAX))
+	Announce(B.MyName(), classFile, (UnitLevel("player") or 0) + 1, B.Clean(M.db.dingText, TEXT_MAX))
 end
 
 ---------------------------------------------------------------------------
@@ -189,5 +190,5 @@ function B.DingCommand(arg)
 	end
 	local _, classFile = UnitClass("player")
 	M:Print("level-up message" .. (M.db.dingText == "" and " (default)" or "") .. ": "
-		.. Render(B.Clean(M.db.dingText, TEXT_MAX), UnitName("player"), classFile, (UnitLevel("player") or 0) + 1))
+		.. Render(B.Clean(M.db.dingText, TEXT_MAX), B.MyName(), classFile, (UnitLevel("player") or 0) + 1))
 end

@@ -443,7 +443,9 @@ default "{name} reached level {level}!"; the text is edited in a settings text f
 `/lefthy beacon ding`). Receiving: a toast (own frame, `GameFontNormalHuge`, top centre, 5 s +
 1.5 s fade), a chat line, and the sound picked on the "Level-up sound" slider (`dingSoundKit`, `Builder:Choice`),
 falling back to 18019 (`UI_BNET_TOAST`) if `PlaySound` returns false. `{name}` becomes the
-class-coloured name. Sounds offered are ones Forever's own UI plays, so the client has them: boss
+class-coloured name, as Battle.net shows it: with the surname WoW: Forever gives every character.
+My own lines (the preview, my LTC echo and announcements, my ping marker) name me the same way
+(`B.MyName`: `UnitName`'s two returns), and `B.IsMe` takes either form (a roll's verdict). Sounds offered are ones Forever's own UI plays, so the client has them: boss
 defeated fanfare 50111 (default; `BossBannerToast.lua`), world quest complete 73277, legendary
 loot 63971, epic loot 31578, scenario complete 31754, garrison follower chime 46893. Not offered:
 the level-up fanfare 888, which sounds like the player levelled. Picking one plays it on the next

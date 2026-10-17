@@ -2238,8 +2238,11 @@ check(printedSince(pmark):find("Lefthy|r hit 20, drinks on me!", 1, true) ~= nil
 lefthy("beacon ding reset")
 check(BDB.dingText == "", "/lefthy beacon ding reset")
 pmark = #PRINTED + 1
+MY_SURNAME = "Mirewood" -- (Battle.net names me with my surname: so do my friends' clients)
 lefthy("beacon ding test")
-check(printedSince(pmark):find("Lefthy|r reached level 20!", 1, true) ~= nil, "/lefthy beacon ding test")
+MY_SURNAME = nil
+check(printedSince(pmark):find("Lefthy Mirewood|r reached level 20!", 1, true) ~= nil,
+	"/lefthy beacon ding test: as friends see it, my name with its surname, got " .. printedSince(pmark))
 -- A slider whose label names the sound (no dropdown: a Blizzard menu from addon settings taints gamepad mode).
 local soundSlider = B("dingSoundKit")
 local soundOptions = soundSlider and soundSlider.sliderOptions
@@ -3177,9 +3180,14 @@ do
 	check(spam == 4, "a flood: at most 5 lines per 5 seconds from one friend, got " .. spam)
 	mark = #GAMEDATA + 1
 	Advance(1)
+	pmark = #PRINTED + 1
+	MY_SURNAME = "Mirewood"
 	SlashCmdList.LEFTHYTOOLS_CHAT("|cffff0000red|r; sneaky")
+	MY_SURNAME = nil
 	Advance(0.15)
 	check(sentTo(11, mark, "M2;")[1] == "M2;red sneaky", "colour codes and separators are taken out")
+	check(printedSince(pmark):find("Lefthy Mirewood|r|cffffb84d]: red sneaky", 1, true),
+		"my own line names me the way friends see me, with my surname, got " .. printedSince(pmark))
 	-- Mine stay within what friends take (5 lines per 5 s, an announcement per 3 s), with room to spare.
 	Advance(6)
 	mark, pmark = #GAMEDATA + 1, #PRINTED + 1

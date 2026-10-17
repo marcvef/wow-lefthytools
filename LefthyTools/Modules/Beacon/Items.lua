@@ -69,10 +69,6 @@ local function Coloured(name, classFile)
 	return LT.Window.ClassColorCode(classFile) .. (name or "?") .. "|r"
 end
 
-local function MyName()
-	return UnitName("player")
-end
-
 ---------------------------------------------------------------------------
 -- The notice: one frame per call, stacked at the top of the screen
 ---------------------------------------------------------------------------
@@ -206,7 +202,7 @@ local function Headline(call)
 	if call.message then
 		local name, classFile = call.fromName, call.fromClass
 		if call.mine then
-			name, classFile = MyName(), select(2, UnitClass("player"))
+			name, classFile = B.MyName(), select(2, UnitClass("player")) -- (as friends see me)
 		end
 		return Coloured(name, classFile) .. ": " .. call.message
 	end

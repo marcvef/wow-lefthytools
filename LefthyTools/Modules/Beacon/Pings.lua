@@ -85,7 +85,7 @@ function B.SendPing(continent, north, west, mapID)
 	lastSent = now
 	B.QueueToPeers(("P%s;%d;%.1f;%.1f;%d"):format(B.VERSION, continent, north, west, mapID or 0))
 	local _, classFile = UnitClass("player")
-	AddPing("me", UnitName("player"), classFile, continent, north, west, mapID)
+	AddPing("me", B.MyName(), classFile, continent, north, west, mapID)
 	M:Print(("pinged %s for %d friend(s)."):format(ZoneName(mapID) or "a spot", count))
 	PingSound()
 end
