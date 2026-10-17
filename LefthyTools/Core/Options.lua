@@ -194,12 +194,6 @@ function LefthyToolsSettingsTextMixin:Release()
 end
 
 ---------------------------------------------------------------------------
--- Settings panel: "LefthyTools" overview (module switches) + one sub-page per module,
--- following Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua: only the parent
--- category is passed to RegisterAddOnCategory.
----------------------------------------------------------------------------
-
----------------------------------------------------------------------------
 -- Info rows on the overview page (version, updates): a label, and a value that is read every
 -- time the settings list shows the row (Init), so it's current whenever the page is opened.
 -- Optionally a button at the right end (data.button = { text, onClick, shown }). Template in
@@ -308,14 +302,15 @@ local function AddInfoRow(layout, name, tooltip, getValue, button)
 	layout:AddInitializer(initializer)
 end
 
-function ns.SetupOptions()
-	if not (Settings and Settings.RegisterVerticalLayoutCategory) then
-		return
-	end
+---------------------------------------------------------------------------
+-- Settings panel: "LefthyTools" overview (module switches, info) + one sub-page per module,
+-- following Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua: only the parent
+-- category is passed to RegisterAddOnCategory.
+---------------------------------------------------------------------------
 
-	local category, layout = Settings.RegisterVerticalLayoutCategory("LefthyTools")
-	LT.category = category
-
+-- The overview: a switch per module (LT.db.modules is the single source of truth; keybindings and
+-- slash commands go through the switch's setting, LT:SetModuleEnabled), then the Info rows.
+local function BuildOverview(category, layout)
 	layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(L["Modules"]))
 	for _, m in ipairs(LT.modules) do
 		local setting = Settings.RegisterAddOnSetting(category, "LefthyTools_module_" .. m.key, m.key,
@@ -339,23 +334,35 @@ function ns.SetupOptions()
 		L["LefthyTools' own Lua errors, kept across sessions until you clear them. Show lists them, ready to copy; the list can clear them too."],
 		Options.ErrorStatus,
 		{ text = L["Show"], onClick = function() LT.Errors.Show() end, shown = function() return LT.Errors.Count() > 0 end })
+end
 
+-- A module's own page, filled by its BuildOptions through a Builder.
+local function BuildModulePage(category, m)
+	local sub, subLayout = Settings.RegisterVerticalLayoutSubcategory(category, m.title)
+	m.category = sub
+	local builder = setmetatable({
+		module = m,
+		category = sub,
+		layout = subLayout,
+		onChange = function()
+			LT.SafeCall(m, "OnSettingChanged")
+		end,
+	}, Builder)
+	LT.SafeCall(m, "BuildOptions", builder)
+end
+
+function ns.SetupOptions()
+	if not (Settings and Settings.RegisterVerticalLayoutCategory) then
+		return
+	end
+	local category, layout = Settings.RegisterVerticalLayoutCategory("LefthyTools")
+	LT.category = category
+	BuildOverview(category, layout)
 	for _, m in ipairs(LT.modules) do
 		if type(m.BuildOptions) == "function" then
-			local sub, subLayout = Settings.RegisterVerticalLayoutSubcategory(category, m.title)
-			m.category = sub
-			local builder = setmetatable({
-				module = m,
-				category = sub,
-				layout = subLayout,
-				onChange = function()
-					LT.SafeCall(m, "OnSettingChanged")
-				end,
-			}, Builder)
-			LT.SafeCall(m, "BuildOptions", builder)
+			BuildModulePage(category, m)
 		end
 	end
-
 	Settings.RegisterAddOnCategory(category)
 end
 
