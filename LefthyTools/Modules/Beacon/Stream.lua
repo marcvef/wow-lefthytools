@@ -8,8 +8,10 @@ local B = ns.Beacon
 -- around, on the map of the place. The parts:
 --   Stream.lua       asking the game (shared helpers: B.Stream), the test, the commands
 --   StreamSense.lua  what's around you: mobs, their distance and learned direction, what you do
+--   StreamBattle.lua the battle row under the spells: their model, the mobs they fight, the fight
 --   StreamView.lua   the windows (yours, the preview, and one per friend you watch)
 --   StreamNet.lua    between friends: who may watch, who watches, the pictures sent
+--   StreamButton.lua the spyglass on the minimap: friends to watch
 --
 -- Known from the API docs (1.60.1): health is always hidden (secret), mob positions aren't there
 -- (UnitPosition answers for group members only), the combat log is closed, raid markers are

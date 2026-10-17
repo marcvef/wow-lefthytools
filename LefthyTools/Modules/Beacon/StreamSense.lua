@@ -16,9 +16,11 @@ local S = B.Stream
 --   cast = { name, icon, spellID, start, finish (GetTime seconds), channel } or nil,
 --   recent = { { name, icon, spellID, at }, ... } (newest first),
 --   moments = { what just happened to you: "What happens to you" below } (newest first),
---   mobs = { { key, name, level, class, dead, combat, attacking, casting (a name), castID, target,
---            yards, beyond, sure (0-1), bearing (radians clockwise from north), remembered, fade,
---            age, unit (at the look), creature (its ID), health (0-1, estimated; nil: unknown),
+--   mobs = { { key, name, level, class, dead, combat, attacking, casting (a name), castID (its spell
+--            ID), target, yards, beyond, sure (0-1), bearing (radians clockwise from north),
+--            remembered, fade, age, unit (at the look), creature (its ID), health (0-1, estimated;
+--            nil: unknown), player, classFile, friendly, group (a player in your group: placed
+--            exactly, exact = how many yards away),
 --            engaged (fighting you: you're on its threat list, or it attacks you), aggro (in a
 --            group, who has its aggro: their role, "TANK", "HEALER", "DAMAGER", "NONE", "PET" or
 --            "OUTSIDER"; nil: not known), aggroName, aggroSelf (it's you) },
@@ -316,7 +318,6 @@ local function ReadCast()
 		end
 	end
 end
-S.ReadCast = ReadCast
 
 -- A spell cast: in front of the recent ones (list: the picture's, or a preview's).
 function S.AddRecent(list, spellID, at)

@@ -904,7 +904,6 @@ local function ClearFloats(view)
 		f:Hide()
 	end
 	wipe(view.seen)
-	wipe(view.lastFloat)
 	wipe(view.lately)
 	view.kills = 0
 	ShowKills(view)
@@ -1473,7 +1472,7 @@ end
 
 local function NewView(key, kind)
 	return { key = key, kind = kind, dots = {}, dotFor = {}, map = { tiles = {} }, clock = 0, nextFeed = 0,
-		picture = { mobs = {}, recent = {}, moments = {} }, seen = {}, lastFloat = {}, kills = 0, lately = {} }
+		picture = { mobs = {}, recent = {}, moments = {} }, seen = {}, kills = 0, lately = {} }
 end
 
 -- Shows a view (fresh: its dots, map, floating numbers and picture start over).

@@ -1,5 +1,5 @@
 // Regenerates LefthyTools/Data/MinimapTiles.lua: the file ID of every minimap tile of the two
-// continents, for the fight stream's map (Modules/Beacon/Stream.lua draws the tiles around you).
+// continents, for the fight stream's map (Modules/Beacon/StreamView.lua draws the tiles around you).
 //
 // A minimap tile is world/minimaps/<continent>/map<X>_<Y>.blp, 256 px for 533.33 yd of the world's
 // grid: X = floor(32 - west / 533.33), Y = floor(32 - north / 533.33). The client draws the minimap

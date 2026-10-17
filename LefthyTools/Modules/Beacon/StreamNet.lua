@@ -164,7 +164,6 @@ local function UpdateIndicator()
 	indicator.Count:SetText(tostring(count))
 	indicator:Show()
 end
-S.UpdateIndicator = UpdateIndicator
 
 local function WatchersChanged()
 	S.SenseNeed("stream", next(watchers) ~= nil)

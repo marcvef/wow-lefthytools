@@ -7,8 +7,8 @@ local S = B.Stream
 -- above). On the left the one shown, their model; on the right the mobs they fight (S.Foes: fighting
 -- them or their target; the target first, gold), each with a health bar. The fight is played on
 -- them, Pokémon style (the user: "your model does something and affects the enemy models"), as an
--- approximation from what the picture already holds; nothing more goes over the network but their
--- look (and who has aggro, below):
+-- approximation from what the picture already holds; nothing more goes over the network for it but
+-- who has aggro (below):
 --   * they cast: a casting pose while the bar fills; a harmful spell that went off is cast at their
 --     target and its icon flies over; a helpful one, a cast in place;
 --   * an instant spell: a harmful one is a special attack on their target (its icon pops on it);
@@ -1027,7 +1027,6 @@ local function CastEnded(view, b, was, now)
 		local target = TargetSlot(view)
 		local poly = PolymorphAt(target, was.spellID)
 		if (poly or Harmful(was.spellID)) and target then
-			b.mineAt = now
 			Enqueue(view, { kind = "spell", key = target.key, icon = was.icon, school = School(was.spellID), poly = poly }, now)
 		else
 			Enqueue(view, { kind = "release" }, now)
@@ -1076,7 +1075,6 @@ local function Instants(view, b, now)
 	local target = TargetSlot(view)
 	local poly = PolymorphAt(target, r.spellID) -- (a Polymorph whose cast wasn't seen)
 	if (poly or Harmful(r.spellID)) and target then
-		b.mineAt = now
 		Enqueue(view, { kind = "ability", key = target.key, icon = r.icon, school = School(r.spellID), poly = poly }, now)
 	else
 		Enqueue(view, { kind = "release" }, now)
