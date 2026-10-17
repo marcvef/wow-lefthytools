@@ -11,7 +11,7 @@ local B = ns.Beacon
 local SKULL = "|TInterface\\TargetingFrame\\UI-TargetingFrame-Skull:14:14|t"
 
 local function ColouredName(peer)
-	return LT.Window.ClassColorCode(peer.classFile) .. (peer.name or "?") .. "|r"
+	return B.ColouredName(peer.name, peer.classFile)
 end
 
 -- "Duskwood - Raven Hill", from Battle.net (current) and their last state.

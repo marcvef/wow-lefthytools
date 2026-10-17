@@ -288,6 +288,11 @@ function B.ClassColor(classFile)
 	return 1, 1, 1
 end
 
+-- A name in its class colour, for chat lines and notices ("?" while it isn't known).
+function B.ColouredName(name, classFile)
+	return LT.Window.ClassColorCode(classFile) .. (name or "?") .. "|r"
+end
+
 -- C_PartyInfo.IsGUIDInGroup; the global IsGUIDInGroup only exists while the client's
 -- "loadDeprecationFallbacks" setting is on (Blizzard_DeprecatedPartyInfo).
 function B.IsInMyGroup(guid)

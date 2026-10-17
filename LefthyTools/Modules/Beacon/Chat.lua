@@ -161,8 +161,7 @@ end
 
 -- "[LTC] [Anna]: text", the name in its class colour.
 local function ChatLine(name, classFile, text)
-	return ("%s[LTC] [|r%s%s|r%s]: %s|r"):format(CHAT_COLOUR, LT.Window.ClassColorCode(classFile), name or "?",
-		CHAT_COLOUR, text)
+	return ("%s[LTC] [|r%s%s]: %s|r"):format(CHAT_COLOUR, B.ColouredName(name, classFile), CHAT_COLOUR, text)
 end
 
 -- A friend whose build turns fewer links back into links than mine sent (they get "[text]"

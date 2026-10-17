@@ -142,7 +142,7 @@ end
 function B.ReceivePing(peer, gameAccountID, continent, north, west, mapID)
 	AddPing(gameAccountID, peer.name, peer.classFile, continent, north, west, mapID)
 	local pin = PinLink(continent, north, west, mapID)
-	M:Print(("%s%s|r pinged a spot%s: see your map.%s"):format(LT.Window.ClassColorCode(peer.classFile), peer.name,
+	M:Print(("%s pinged a spot%s: see your map.%s"):format(B.ColouredName(peer.name, peer.classFile),
 		ZoneName(mapID) and (" in " .. ZoneName(mapID)) or "", pin and (" " .. pin) or ""))
 	PingSound()
 end

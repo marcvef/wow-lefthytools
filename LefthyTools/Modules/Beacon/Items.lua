@@ -65,9 +65,7 @@ local function ItemString(link)
 	end
 end
 
-local function Coloured(name, classFile)
-	return LT.Window.ClassColorCode(classFile) .. (name or "?") .. "|r"
-end
+local Coloured = B.ColouredName
 
 ---------------------------------------------------------------------------
 -- The notice: one frame per call, stacked at the top of the screen

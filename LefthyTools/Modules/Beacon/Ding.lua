@@ -29,9 +29,7 @@ local function Render(template, name, classFile, level)
 	if template == "" then
 		template = L["{name} reached level {level}!"]
 	end
-	local r, g, b = B.ClassColor(classFile)
-	local coloured = ("|cff%02x%02x%02x%s|r"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5),
-		math.floor(b * 255 + 0.5), name or "?")
+	local coloured = B.ColouredName(name, classFile)
 	local text = template:gsub("{name}", function() return coloured end)
 	text = text:gsub("{level}", function() return tostring(level) end)
 	return text
