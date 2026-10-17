@@ -9,8 +9,9 @@ Files, in load order:
 - `Beacon.lua`: the module and its settings' defaults, `B` (below) and the helpers every file uses
   (`B.Clean`, `B.CutUTF8`, `B.MyName` / `B.IsMe`, `B.ClassColor` / `B.ColouredName`, group
   members), sending (one rate limiter, the queues), finding friends, receiving, what I share about
-  myself, the driver tick, switching on and off, the settings page and `/lefthy beacon`.
+  myself, the driver tick, switching on and off, `/lefthy beacon status` (`B.PrintStatus`).
 - `Protocol.lua`: every message kind, what it says, and `B.Parse`, which reads them.
+- `Options.lua`: the settings page and `/lefthy beacon` (each command is done by its own file).
 - `Dots.lua` (dot look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   toast, sounds), `Alerts.lua` (death alerts; a friend in a few lines for lists: `B.FriendLines`,
   `B.FriendRows`, `B.FriendStatus`), `Pings.lua` (map pings), `Items.lua` (showing and offering

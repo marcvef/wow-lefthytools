@@ -45,6 +45,7 @@ Modules\Tweaks\QuestMap.xml
 
 Modules\Beacon\Beacon.lua
 Modules\Beacon\Protocol.lua
+Modules\Beacon\Options.lua
 Modules\Beacon\Dots.lua
 Modules\Beacon\Ding.lua
 Modules\Beacon\Alerts.lua
