@@ -345,7 +345,8 @@ ask for the older ones of the other until they change again.
 
 **While you were away** (`catchUp`): when Chronicle starts more than 5 minutes after its last tick
 (`store.lastSeenAt`), 75 s later (up to 4 minutes while journals still come in) a chat line per
-friend's character with what it did since: the most notable three (level-ups first), zones and deaths
+friend's character with what it did since, up to when Chronicle started (what came after came live,
+with its own chat line): the most notable three (level-ups first), zones and deaths
 counted ("died 3 times"), "+N more". **Weekly recap** (`weeklyRecap`): 2 minutes after starting,
 once per week (`store.recapWeek`, the week's Monday): last week's leading character of each
 category, if characters of at least two accounts played. Both in English like all chat output.

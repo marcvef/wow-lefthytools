@@ -6710,10 +6710,15 @@ section("Chronicle: friends' journals, also when they're offline")
 	CDB.lastSeenAt = time() - 6 * 3600
 	lefthy("enable chronicle")
 	pmark = #PRINTED + 1
-	Advance(80)
+	Advance(10)
+	bob("E2;boss;Lord Liveone;Westfall") -- (after logging in: seen live, with its chat line)
+	Advance(70)
 	local said = printedSince(pmark)
 	check(said:find("while you were away", 1, true) and said:find("Carl|r" .. unsure .. ": reached level 18", 1, true) and said:find("died once", 1, true),
 		"a minute after logging in: what friends did while I was away, got\n" .. said)
+	check(said:find("Bob|r defeated Lord Liveone", 1, true) and said:find("Bob|r: reached level 24, reached level 25", 1, true)
+		and not said:match("while you were away.*Lord Liveone"),
+		"what came live since logging in isn't told again, got\n" .. said)
 
 	-- Once a week: last week's leaderboard.
 	local lastWeek = CH.Monday(1)

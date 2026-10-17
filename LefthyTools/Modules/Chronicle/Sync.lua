@@ -77,7 +77,7 @@ local pending = {}     -- acct -> { from, at, got (records come so far), expect 
 local serves = {}      -- answers to build on the tick: { id, acct, since }
 local summaries = {}   -- gameAccountID -> { at, sent = { [acct] = u } }
 local lastCheck, lastProfile = -math.huge, -math.huge
-local catchUp          -- { since, at, deadline }
+local catchUp          -- { since, upTo (when it started), at, deadline }
 local recapAt, recapDeadline, pruneAt = nil, 0, nil -- (the recap waits for journals until recapDeadline)
 local meetAt           -- the next walk over Battle.net's friends online (Meet)
 local feedVersion = 0  -- bumped when friends' news change (the merged feed is rebuilt then)
@@ -1499,11 +1499,11 @@ local function Coloured(name, classFile)
 end
 
 -- One line per friend's character, the most notable first: "Anna Brook: reached level 24, defeated
--- Hogger, died 2x (+5 more)".
-function C.CatchUpLines(since)
+-- Hogger, died 2x (+5 more)". What happened after since (and up to upTo, if given).
+function C.CatchUpLines(since, upTo)
 	local byChar, order = {}, {}
 	for _, f in ipairs(C.FriendNews()) do
-		if f.t > since and NEWS_CHAT[f.k] then
+		if f.t > since and (not upTo or f.t <= upTo) and NEWS_CHAT[f.k] then
 			local entry = byChar[f.key]
 			if not entry then
 				entry = { name = f.name, partial = f.partial, classFile = f.classFile, items = {}, deaths = 0, zones = 0 }
@@ -1636,9 +1636,9 @@ local function CatchUp(now)
 	if next(pending) and now < catchUp.deadline then
 		return -- (journals still coming in)
 	end
-	local since = catchUp.since
+	local since, upTo = catchUp.since, catchUp.upTo
 	catchUp = nil
-	local lines = C.CatchUpLines(since)
+	local lines = C.CatchUpLines(since, upTo) -- (since logging in, friends' news came live, with chat lines)
 	if #lines == 0 then
 		return
 	end
@@ -1840,7 +1840,7 @@ function C.SyncEnable()
 	wipe(summaries)
 	wipe(serves)
 	if store.lastSeenAt and time() - store.lastSeenAt > 300 then
-		catchUp = { since = store.lastSeenAt, at = now + CATCHUP_AFTER, deadline = now + CATCHUP_WAIT }
+		catchUp = { since = store.lastSeenAt, upTo = time(), at = now + CATCHUP_AFTER, deadline = now + CATCHUP_WAIT }
 	end
 	recapAt, recapDeadline = now + RECAP_AFTER, now + RECAP_AFTER + CATCHUP_WAIT
 	pruneAt = now + 60 -- (the friend list is known by then)
