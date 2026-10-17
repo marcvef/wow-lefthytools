@@ -595,8 +595,8 @@ local function LoadHero(hero, unit, form, classFile, face, again)
 	if form == CAT then
 		hero.zoom = CAT_ZOOM
 	elseif form == TRAVEL then
-		local ok, _, _, race = pcall(UnitRace, unit)
-		hero.zoom = ok and SKYBORNE[race] and BIRD_ZOOM or CAT_ZOOM
+		local ok, _, _, race = pcall(UnitRace, unit) -- (hidden where their identity is: no table key then)
+		hero.zoom = ok and not issecret(race) and SKYBORNE[race] and BIRD_ZOOM or CAT_ZOOM
 	elseif hero.inForm then
 		hero.zoom = FORM_ZOOM
 	end
