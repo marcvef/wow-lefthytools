@@ -25,9 +25,9 @@ Files, in load order:
 
 They share state through `ns.Beacon` (`B`): `B.peers` (`gameAccountID -> peer`), the queues
 (`B.Queue`, `B.QueueToPeers`, `B.QueueLatest`, `B.QueueLow`, ...), `B.MyWorldPosition`, and hooks
-the later files set, which Beacon.lua calls when they're there (`if B.X then B.X() end`, on the
-tick `LT.Guard`): on the driver tick (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`,
-`B.StreamHealthTick`, `B.RefreshMaps`, `B.UpdateMinimap`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
+the later files set, which Beacon.lua calls when they're there (`if B.X then B.X() end`): on the
+driver tick through `LT.Guard` (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`, `B.StreamHealthTick`,
+`B.RefreshMaps`, `B.UpdateMinimap`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
 `B.ReceivePing`, `B.ReceiveItem`, `B.ReceiveChat`, `B.ReceiveReportPart`, `B.ReceiveStream`,
 `B.ReceiveJournal`), with an answer (`B.CollectorMessage`, `B.StreamHello`, `B.JournalHello`), and on
 switching (`B.Attach` / `B.Detach`, `B.StreamStart` / `B.StreamStop`, `B.OnSettingChanged`).
