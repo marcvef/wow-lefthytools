@@ -35,6 +35,7 @@ S.OUTER_YARDS = 40   -- the windows' outer ring
 S.MAX_UNITS = 40     -- nameplate1 .. nameplate40
 S.MAX_MOBS = 20
 S.GOLD = { 1, 0.82, 0.3 } -- the windows' gold (their edges, names, an elite's ring, the target's box)
+S.CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask" -- (a round mask: dots, faces, the watched dot)
 local TEST_TIME = 60 -- seconds a test takes notes
 local KEEP_TESTS = 3
 local EXAMPLES = 3   -- example answers per line of a report
@@ -86,6 +87,14 @@ local function Value(path, ...)
 end
 S.Value = Value
 
+-- An item the client doesn't know yet (its name, its icon): asked for, it's there the next time.
+function S.AskItem(itemID)
+	local load = Api("C_Item.RequestLoadItemDataByID")
+	if load then
+		pcall(load, itemID)
+	end
+end
+
 -- Harmful spells you know, two per range (one may not work on every mob, like Soothe Animal), melee
 -- counted as 5 yd, shortest first.
 local function RangeSpells()
@@ -123,11 +132,8 @@ function S.RangeChecks()
 		checks[#checks + 1] = { label = ("spell %s (%d yd)"):format(spell.name, spell.yards), yards = spell.yards,
 			path = "C_Spell.IsSpellInRange", arg = spell.id }
 	end
-	local load = Api("C_Item.RequestLoadItemDataByID")
 	for _, item in ipairs(RANGE_ITEMS) do
-		if load then
-			pcall(load, item[1])
-		end
+		S.AskItem(item[1])
 		checks[#checks + 1] = { label = ("item %d (%d yd)"):format(item[1], item[2]), yards = item[2],
 			path = "C_Item.IsItemInRange", arg = item[1] }
 	end
@@ -212,6 +218,20 @@ function S.ClassLabel(class)
 	elseif class == "rareelite" then
 		return L["Rare elite"]
 	end
+end
+
+-- A number as the game writes it ("1,240").
+function S.Number(n)
+	return BreakUpLargeNumbers and BreakUpLargeNumbers(n) or tostring(n)
+end
+
+-- Health as the windows (and friends) say it: estimated, so a percent in steps of 5.
+function S.Fives(fraction)
+	return math.floor(fraction * 20 + 0.5) * 5
+end
+
+function S.HideTooltip()
+	GameTooltip:Hide()
 end
 
 -- An error message without the file and line in front.

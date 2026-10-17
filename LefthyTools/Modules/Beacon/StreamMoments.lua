@@ -63,10 +63,10 @@ local function FightLine(fight)
 		parts[#parts + 1] = fight.kills == 1 and L["1 kill"] or L["%d kills"]:format(fight.kills)
 	end
 	if fight.xp > 0 then
-		parts[#parts + 1] = L["%s XP"]:format(BreakUpLargeNumbers and BreakUpLargeNumbers(fight.xp) or tostring(fight.xp))
+		parts[#parts + 1] = L["%s XP"]:format(S.Number(fight.xp))
 	end
 	if fight.lowest and not fight.died then
-		parts[#parts + 1] = L["lowest ~%d%%"]:format(math.floor(fight.lowest * 20 + 0.5) * 5) -- (in steps of 5, like the bar's)
+		parts[#parts + 1] = L["lowest ~%d%%"]:format(S.Fives(fight.lowest)) -- (in steps of 5, like the bar's)
 	end
 	return table.concat(parts, "  ·  ")
 end
@@ -203,10 +203,7 @@ end
 local function LootText(m, chance)
 	local name = Value("C_Item.GetItemInfo", ("item:%d"):format(m.item))
 	if not name then
-		local load = S.Api("C_Item.RequestLoadItemDataByID")
-		if load then
-			pcall(load, m.item)
-		end
+		S.AskItem(m.item)
 	end
 	local icon = Value("C_Item.GetItemIconByID", m.item)
 	local color, colorOf = { 1, 1, 1 }, S.Api("C_Item.GetItemQualityColor")

@@ -56,7 +56,7 @@ local HERO_W, HERO_H = 50, 58  -- their model, px
 local FACE, BODY = 26, 24      -- out of reach in your group: their portrait on their class's emblem, px
 local FACE_EVERY = 5           -- s; their portrait asked for again (their look may come late, or change)
 local DEAD_TILT = 1.1          -- radians the head lolls over when they die
-local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local CIRCLE = S.CIRCLE
 local FOES = 4                 -- the mobs fought, right of them
 local FOE_W, FOE_H = 38, 50    -- a foe's model (the whole mob), px
 local FOE_GAP = 2
@@ -83,7 +83,7 @@ local FOE_FORGET = 10
 local MINE_FOR = 1.3           -- their spell this recent: their target's loss came from it
 local RARE_LIFE = 5            -- seconds a rare find floats (other loot: 3.5)
 local DROP_MIN = 0.004         -- a smaller loss (of its health) isn't one
-local GOLD = { 1, 0.82, 0.3 }
+local GOLD = S.GOLD
 local BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 local DEALT_COLOR, OTHER_COLOR = { 1, 0.85, 0.4 }, { 0.75, 0.75, 0.75 }
 local HURT_COLOR, HEAL_COLOR, AVOID_COLOR, XP_COLOR = { 1, 0.3, 0.25 }, { 0.35, 1, 0.4 }, { 0.9, 0.9, 0.9 }, { 0.75, 0.6, 1 }
@@ -286,10 +286,7 @@ local function FoeBestiary(creature)
 		elseif not drop.group then -- (the world drops in one place: not this kind's own)
 			drops[#drops + 1] = drop
 			if not drop.name and not Value("C_Item.GetItemInfo", ("item:%d"):format(drop.id)) then
-				local load = S.Api("C_Item.RequestLoadItemDataByID")
-				if load then
-					pcall(load, drop.id) -- (named on the next hover)
-				end
+				S.AskItem(drop.id) -- (named on the next hover)
 			end
 		end
 	end
@@ -452,7 +449,7 @@ local function NewFoe(row)
 	slot:SetMouseMotionEnabled(true)
 	slot:SetMouseClickEnabled(false)
 	slot:SetScript("OnEnter", FoeOnEnter)
-	slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	slot:SetScript("OnLeave", S.HideTooltip)
 	slot.dx = 0
 	slot:Hide()
 	return slot
@@ -535,7 +532,7 @@ local function NewHero(row)
 			GameTooltip:Show()
 		end
 	end)
-	hero:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	hero:SetScript("OnLeave", S.HideTooltip)
 	hero.dx = 0
 	return hero
 end
@@ -840,9 +837,7 @@ end
 -- The actions, one after another
 ---------------------------------------------------------------------------
 
-local function Number(n)
-	return BreakUpLargeNumbers and BreakUpLargeNumbers(n) or tostring(n)
-end
+local Number = S.Number
 
 -- What a mob lost, as text: roughly how much (its kind's health), else the percent.
 local function LossText(loss)

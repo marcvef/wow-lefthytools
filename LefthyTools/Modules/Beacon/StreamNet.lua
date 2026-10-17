@@ -151,7 +151,7 @@ local function UpdateIndicator()
 		dot:SetPoint("TOP", 0, -1)
 		dot:SetColorTexture(1, 0.15, 0.1, 1)
 		local mask = indicator:CreateMaskTexture()
-		mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+		mask:SetTexture(S.CIRCLE, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
 		mask:SetAllPoints(dot)
 		dot:AddMaskTexture(mask)
 		indicator.Dot = dot
@@ -159,7 +159,7 @@ local function UpdateIndicator()
 		indicator.Count:SetPoint("TOP", dot, "BOTTOM", 0, -1)
 		indicator:EnableMouse(true)
 		indicator:SetScript("OnEnter", IndicatorOnEnter)
-		indicator:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		indicator:SetScript("OnLeave", S.HideTooltip)
 	end
 	indicator.Count:SetText(tostring(count))
 	indicator:Show()
@@ -379,7 +379,7 @@ local function HealthWord()
 		return ""
 	end
 	local health = S.Health()
-	return health and tostring(math.floor(health * 20 + 0.5) * 5) or ""
+	return health and tostring(S.Fives(health)) or ""
 end
 
 local healthSent, healthSentAt, healthLookAt = "", -math.huge, -math.huge

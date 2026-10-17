@@ -43,7 +43,7 @@ local SCALES = { me = 0.8, friend = 0.55 } -- default sizes; the grip changes th
 local MIN_SCALE, MAX_SCALE = 0.35, 1.3
 local PX_PER_YARD = (RADAR / 2 - 8) / OUTER_YARDS
 S.PX_PER_YARD, S.GLIDE = PX_PER_YARD, GLIDE -- (StreamMap.lua: the map to the same scale, gliding alike)
-local CIRCLE = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local CIRCLE = S.CIRCLE
 local ARROW = "Interface\\Minimap\\MinimapArrow"
 local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
 local GRIP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
@@ -188,7 +188,7 @@ local function NewDot(view)
 	dot.Name:SetTextScale(0.85)
 	dot:EnableMouse(true)
 	dot:SetScript("OnEnter", DotOnEnter)
-	dot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	dot:SetScript("OnLeave", S.HideTooltip)
 	dot:Hide()
 	return dot
 end
@@ -367,7 +367,7 @@ local function ShowSelf(view)
 	local unknown = not picture.dead and not health
 	if health then
 		win.Health:SetWidth(math.max(1, BAR * health))
-		win.HealthText:SetText(("~%d%%"):format(math.floor(health * 20 + 0.5) * 5))
+		win.HealthText:SetText(("~%d%%"):format(S.Fives(health)))
 		win.HealthText:SetTextColor(0.6, 0.95, 0.6)
 	elseif unknown then
 		win.HealthText:SetText("~?")
@@ -449,10 +449,14 @@ end
 -- A window
 ---------------------------------------------------------------------------
 
+-- Sizes are kept per kind of window (LefthyToolsDB.streamWindows): "friend", or "me" (also the preview).
+local function SizeKey(kind)
+	return kind == "friend" and "friend" or "me"
+end
+
 local function UserScale(kind)
-	local sizes = S.Saved("streamWindows")
-	local key = kind == "friend" and "friend" or "me"
-	local scale = tonumber(sizes[key]) or SCALES[key]
+	local key = SizeKey(kind)
+	local scale = tonumber(S.Saved("streamWindows")[key]) or SCALES[key]
 	return math.max(MIN_SCALE, math.min(MAX_SCALE, scale))
 end
 
@@ -597,7 +601,7 @@ local function Build(view, name, parent)
 		-- A resize or move in progress ends (the mouse-up may never come; the frame is reused).
 		if self.Grip and self.Grip:GetScript("OnUpdate") then
 			self.Grip:SetScript("OnUpdate", nil)
-			S.Saved("streamWindows")[self.view.kind == "friend" and "friend" or "me"] = self.view.scale
+			S.Saved("streamWindows")[SizeKey(self.view.kind)] = self.view.scale
 		end
 		self:StopMovingOrSizing()
 		-- Escape, or hidden some other way: closed. (Not when only the interface is hidden, Alt+Z:
@@ -679,7 +683,7 @@ local function Build(view, name, parent)
 			0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)
-	win.HealthHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	win.HealthHover:SetScript("OnLeave", S.HideTooltip)
 	for _, part in ipairs({ win.HealthBack, win.Health, win.HealthText, win.HealthHover }) do
 		part:Hide()
 	end
@@ -836,7 +840,7 @@ local function Build(view, name, parent)
 	grip:SetScript("OnMouseUp", function(self)
 		self:SetScript("OnUpdate", nil)
 		local v = win.view
-		S.Saved("streamWindows")[v.kind == "friend" and "friend" or "me"] = v.scale
+		S.Saved("streamWindows")[SizeKey(v.kind)] = v.scale
 	end)
 	return win
 end
