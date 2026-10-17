@@ -221,7 +221,8 @@ flights.
   got in its corner, the drop chance under it ("35%", "3.4%", "<0.1%") in the quality's colour.
   Hover: the item's tooltip (`SetHyperlink`) plus "Dropped in 9 of 34 kills: 26%" and, for stacks,
   "12 in all, 1.3 each time". Shift-click links it (`HandleModifiedItemClick`). More than fit: the
-  last place says "+N", its tooltip lists the rest with their chances.
+  last place says "+N", its tooltip lists the rest with their chances (at most 20, then "and N more
+  (the Bestiary's ledger)", like the world drops' tooltip: a mob farmed for long can have dozens).
 - **Not seen yet** (the drop database; setting `windowUnseen`, off: the user wanted the window
   without it, the ledger always has it): under your drops a heading "Not seen yet" with a thin rule
   and "6 of 11 found" on the right, then the database's drops you haven't had, 22 px, 7 per row, at

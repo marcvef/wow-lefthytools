@@ -7863,7 +7863,13 @@ section("Bestiary: what mobs drop")
 	cells[24]._scripts.OnEnter(cells[24])
 	check(TOOLTIP.title == "More drops" and #TOOLTIP.lines == 10, "hover: the rest, with their chances")
 	cells[24]._scripts.OnLeave(cells[24])
-	for id = 50001, 50030 do mob().items[id] = nil end
+	for id = 50031, 50060 do mob().items[id] = { 1, 1, 1 } end
+	Bt.Draw()
+	cells[24]._scripts.OnEnter(cells[24])
+	check(#TOOLTIP.lines == 21 and tipFind("and 20 more (the Bestiary's ledger)"),
+		"far more: the tooltip lists 20 and says how many more (it would be taller than the screen)")
+	cells[24]._scripts.OnLeave(cells[24])
+	for id = 50001, 50060 do mob().items[id] = nil end
 	Bt.Draw()
 	-- A Riverpaw Gnoll (117). A quick loot right after an instant spell (the killing blow) counts:
 	-- only skinning, a pickpocket or gathering just before the loot window make it not a kill's.

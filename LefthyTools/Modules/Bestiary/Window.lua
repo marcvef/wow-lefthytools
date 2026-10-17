@@ -48,6 +48,7 @@ local KNOWN_ICON, KNOWN_GAP, KNOWN_ROWS = 22, 6, 2 -- not seen yet (the classic 
 local KNOWN_PER_ROW = math.floor((WIDTH - 2 * PAD + KNOWN_GAP) / (KNOWN_ICON + KNOWN_GAP))
 local KNOWN_HEAD = 16   -- its heading's height
 local QUEST_LINES = 3   -- quests wanting its drops: a line each in the window, at most
+local TOOLTIP_LIST = 20 -- drops listed in a cell's tooltip (the rest: how many), at most
 local CARD_QUEST_W = 250 -- the card's quest line, at most (longer: cut)
 local UNSEEN_ALPHA = 0.5
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
@@ -235,9 +236,12 @@ Bt.PaceText, Bt.Thousands, Bt.Rounded = PaceText, Thousands, Rounded
 ---------------------------------------------------------------------------
 
 -- A list of drops in a tooltip: icon, name (a pelt for skinning), chance; not seen yet: greyed, the
--- classic database's chance.
-local function ListDrops(list)
-	for _, drop in ipairs(list) do
+-- classic database's chance. At most max (then how many more: a mob farmed for long can have dozens
+-- of world drops, and a tooltip taller than the screen shows none of them well).
+local function ListDrops(list, max)
+	local shown = math.min(#list, max or #list)
+	for i = 1, shown do
+		local drop = list[i]
 		if drop.group then
 			GameTooltip:AddLine(L["World drops"] .. (" (%d)"):format(#drop.group), 0.7, 0.7, 0.7)
 		else
@@ -250,6 +254,9 @@ local function ListDrops(list)
 				drop.skin and (" |T%s:12:12|t"):format(Bt.SKIN_ICON) or drop.quest and (" |T%s:12:12|t"):format(QUEST_ICON) or "",
 				Bt.Wish(drop.id) and (" |T%s:12:12|t"):format(Bt.STAR) or ""), Percent(drop.chance), r, g, b, right, right, right)
 		end
+	end
+	if shown < #list then
+		GameTooltip:AddLine(L["and %d more (the Bestiary's ledger)"]:format(#list - shown), 0.6, 0.6, 0.6)
 	end
 end
 Bt.ListDrops = ListDrops -- (also the fight stream's battle row: a foe's tooltip)
@@ -292,13 +299,13 @@ local function CellOnEnter(cell)
 	GameTooltip:SetOwner(cell, "ANCHOR_RIGHT")
 	if cell.more then -- (the drops that didn't fit)
 		GameTooltip:SetText(L["More drops"], 1, 1, 1)
-		ListDrops(cell.more)
+		ListDrops(cell.more, TOOLTIP_LIST)
 		GameTooltip:Show()
 		return
 	elseif cell.world then -- (random gear: not this mob's own)
 		GameTooltip:SetText(L["World drops"], 1, 1, 1)
 		GameTooltip:AddLine(L["Random gear that drops from mobs of its level anywhere: not this mob's own."], 0.7, 0.7, 0.7, true)
-		ListDrops(cell.world)
+		ListDrops(cell.world, TOOLTIP_LIST)
 		GameTooltip:Show()
 		return
 	end
