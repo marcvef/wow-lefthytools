@@ -161,7 +161,7 @@ end
 -- A day of a friend's numbers (D2), or just its AFK time (K2: day.afk only):
 -- store.friendStats[name] = { classFile, level, updated, days, acct, guid }, by the full name
 -- Battle.net gives. Either keeps what the other set. acct (their BattleTag's hash) and guid find the
--- character in their journal (Sync.lua), whose name is its first name: these days are that
+-- character in their journal (Characters.lua), whose name is its first name: these days are that
 -- character's (where the journal has none), never a second one (older builds keep the fields and
 -- ignore them).
 local function StoreFriendDay(peer, day)
@@ -205,7 +205,7 @@ local function OnFriendEvent(kind, peer, data)
 		StoreFriendDay(peer, data)
 		return
 	end
-	-- (their account too: Sync.lua finds the character in their journal by it and the full name)
+	-- (their account too: Characters.lua finds the character in their journal by it and the full name)
 	local entry = { t = time(), name = peer.name, classFile = peer.classFile, acct = C.PeerAccount and C.PeerAccount(peer) }
 	if kind == "level" then
 		entry.k, entry.level = "level", data.level

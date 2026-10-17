@@ -11,7 +11,7 @@ local L = ns.L
 -- and the synced journals: Sync.lua).
 --
 -- Data: LefthyToolsChronicleDB (account-wide, so every character's chronicle can be browsed)
---   chars[<first name-realm>] = { name (the key's), full (the name the game shows: with the surname),
+--   chars[<first name-realm>] (or the full name's, see OnEnable) = { name (the key's), full (the name the game shows: with the surname),
 --     guid, realm, classFile, race, level, first, events, stats, zoneTime, killers, levelTimes,
 --     seen = { zones, dungeons, bosses, rares }, professions, session, ... }
 --   friends = { { t, name, classFile, acct, k, ... }, ... } the friends' feed, newest last
@@ -49,8 +49,8 @@ local M = LT:NewModule("chronicle", {
 		share = true,
 		shareAlts = true,     -- Sync.lua: friends see all my characters, not only the one I play
 		relay = true,         -- Sync.lua: pass on friends' journals to other friends
-		catchUp = true,       -- Sync.lua: "while you were away" after logging in
-		weeklyRecap = true,   -- Sync.lua: last week's leaderboard in chat, once a week
+		catchUp = true,       -- Recap.lua: "while you were away" after logging in
+		weeklyRecap = true,   -- Recap.lua: last week's leaderboard in chat, once a week
 		friendsChat = true,
 		minimapButton = true,
 		minimapAngle = 210, -- degrees, 0 = right, counter-clockwise: the lower left
@@ -141,7 +141,6 @@ local function Today()
 	end
 	return bucket
 end
-C.Today = function() return char and Today() end
 
 local function Add(stat, amount)
 	amount = amount or 1
@@ -294,7 +293,7 @@ end
 -- journals here and friends'): a death counts once. The next one counts once the tick has seen you
 -- alive again, DEATH_REPEAT after it at the earliest.
 local deadSince -- GetTime() of the death counted; nil once alive again
-C.DEATH_REPEAT = DEATH_REPEAT -- (the pages show deaths saved twice before this once: Window.lua, Sync.lua)
+C.DEATH_REPEAT = DEATH_REPEAT -- (the pages show deaths saved twice before this once: Window.lua, Characters.lua)
 
 local function Dead()
 	local dead = UnitIsDeadOrGhost("player")

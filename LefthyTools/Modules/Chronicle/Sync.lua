@@ -36,7 +36,7 @@ local M = C.module
 -- A request goes to one friend at a time per account (PENDING_TIMEOUT without progress: another
 -- may answer). An answer holds at most SERVE_MAX records, oldest first; its end says how far that
 -- got, so the rest follows on the next round. Old D2/K2/E2 messages still go to everyone (older
--- builds, chat lines: Chronicle.lua); their data stays in store.friendStats / store.friends, and
+-- builds, chat lines: Live.lua); their data stays in store.friendStats / store.friends, and
 -- Characters.lua joins it to the journals' characters.
 --
 -- Characters.lua: who is who (accounts, names, matching) and the lists the pages use; Recap.lua:

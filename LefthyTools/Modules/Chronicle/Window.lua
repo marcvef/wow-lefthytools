@@ -9,8 +9,8 @@ local M = C.module
 -- day), Statistics (yours, all your characters added up, plus this session and each character's
 -- level; labels left and values right in two text blocks of the same line count), Graphs (you or a
 -- friend, all their characters), Compare (every character, yours and your friends', in every graph,
--- Graphs.lua's G.DrawCompare), News (what friends' characters did: synced journals and live news,
--- Sync.lua's C.FriendNews) and Friends (who's online, who isn't: a row per character, its BattleTag
+-- Compare.lua's G.DrawCompare), News (what friends' characters did: synced journals and live news,
+-- Characters.lua's C.FriendNews) and Friends (who's online, who isn't: a row per character, its BattleTag
 -- beside it; two tables, G.DrawTables; a click on a row opens their account's graphs). A character
 -- is shown by the name the game shows (with its surname), and only ever once.
 -- Built on first open; redrawn only while open and only when something changed (the Statistics
@@ -130,7 +130,7 @@ end
 
 -- The Compare page's symbols: { [character key] = { [day] = { { icon, text, rank, t }, ... } } } over
 -- the days shown, from my characters' journals and friends' news (C.FriendNews: each entry knows its
--- character). Only the notable kinds (Graphs.lua's MARK_KINDS); levels only every tenth.
+-- character). Only the notable kinds (Canvas.lua's MARK_KINDS); levels only every tenth.
 local MARK_RANK = {}
 for rank, kind in ipairs(C.Graphs.MARK_KINDS) do
 	MARK_RANK[kind] = rank
@@ -264,7 +264,7 @@ local function Timeline(chars)
 	return WithNote(text, partial, true)
 end
 
--- The Friends page: two tables (Graphs.lua's G.DrawTables), a row per character, named as the game
+-- The Friends page: two tables (Canvas.lua's G.DrawTables), a row per character, named as the game
 -- names it, with its account's BattleTag in a column of its own. Online now: Beacon's friends, where
 -- they are and what they're doing. Not online: my friends' characters (C.Characters) whose account
 -- has none online (someone playing one character isn't listed again with the others), most recently
@@ -808,13 +808,5 @@ function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
 	end
 	if redraw then
 		Refresh(true)
-	end
-end
-
--- For tests.
-function C.ShowPage(page)
-	tab = page
-	if frame and frame:IsShown() then
-		Refresh()
 	end
 end

@@ -122,7 +122,7 @@ local function Colours(people)
 	end
 end
 
--- (marked while only the first name is known, Sync.lua's C.Mark)
+-- (marked while only the first name is known, Characters.lua's C.Mark)
 local function Named(p)
 	return "|cff" .. p.hex .. (p.name or "?") .. "|r" .. C.Mark(p.partial)
 end
