@@ -60,8 +60,12 @@ L["Paused: the interface stays visible."] = "Pausiert: das Interface bleibt sich
 L["Click: fade again when idle"] = "Klick: wieder ausblenden, wenn du nichts tust"
 L["Fades the interface when you're idle."] = "Blendet das Interface aus, wenn du nichts tust."
 L["Click: pause (the interface stays)"] = "Klick: pausieren (das Interface bleibt)"
-L["A button on the edge of the minimap: click pauses fading (the interface stays) and resumes it, right-click opens these settings. Drag it to move it. /mirage pause does the same."] =
-	"Ein Button am Rand der Minimap: ein Klick pausiert das Ausblenden (das Interface bleibt) und setzt es fort, ein Rechtsklick öffnet diese Einstellungen. Zum Verschieben ziehen. /mirage pause macht dasselbe."
+L["Paused for good: the interface stays visible, also after a restart."] =
+	"Dauerhaft pausiert: das Interface bleibt sichtbar, auch nach einem Neustart."
+L["Shift-click: keep it paused, also after a restart"] = "Shift-Klick: pausiert lassen, auch nach einem Neustart"
+L["Shift-click: pause for good, also after a restart"] = "Shift-Klick: dauerhaft pausieren, auch nach einem Neustart"
+L["A button on the edge of the minimap: click pauses fading (the interface stays) and resumes it, Shift-click pauses it for good (also after a restart), right-click opens these settings. Drag it to move it. /mirage pause does the same."] =
+	"Ein Button am Rand der Minimap: ein Klick pausiert das Ausblenden (das Interface bleibt) und setzt es fort, ein Shift-Klick pausiert es dauerhaft (auch nach einem Neustart), ein Rechtsklick öffnet diese Einstellungen. Zum Verschieben ziehen. /mirage pause macht dasselbe."
 L["Mirage: show interface (hold)"] = "Mirage: Interface zeigen (gedrückt halten)"
 
 L["Timing"] = "Timing"

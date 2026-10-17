@@ -499,6 +499,28 @@ do
 	check(Mirage:IsPaused() and near(a("MainActionBar"), 1), "/mirage pause too")
 	mirage("resume")
 	check(not Mirage:IsPaused(), "/mirage resume")
+	-- Shift-click: paused for good, also after a restart (Mirage switched off and on stands in for one).
+	STATE.shift = true
+	mb._scripts.OnClick(mb, "LeftButton")
+	STATE.shift = false
+	Advance(0.4)
+	check(Mirage:IsPauseKept() and MDB.pauseKept == true and near(a("MainActionBar"), 1) and mb.Pause:IsShown()
+		and mb.Pause.color[3] < 0.5, "Shift-click: paused for good, the II in orange")
+	mb._scripts.OnEnter(mb)
+	check(has("Paused for good: the interface stays visible, also after a restart."), "hover: paused for good")
+	mb._scripts.OnLeave(mb)
+	mirage("off")
+	printed = #PRINTED
+	mirage("on")
+	Advance(8)
+	check(Mirage:IsPauseKept() and near(a("MainActionBar"), 1)
+		and table.concat(PRINTED, "\n", printed + 1):find("paused for good", 1, true), "after a restart still paused, and chat says so")
+	mb._scripts.OnClick(mb, "LeftButton")
+	check(not Mirage:IsPaused() and MDB.pauseKept == false and mb.Pause.color[3] == 1, "a click: fading again, not kept any more")
+	mirage("pause keep")
+	check(Mirage:IsPauseKept(), "/mirage pause keep too")
+	mirage("resume")
+	check(not Mirage:IsPaused() and MDB.pauseKept == false, "/mirage resume ends it")
 	mirage("off")
 	Advance(0.1)
 	check(not mb:IsShown(), "Mirage off: no button")

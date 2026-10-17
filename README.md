@@ -442,13 +442,14 @@ Some elements also reveal on their own for a few seconds:
 | Faded opacity: sets every element at once | 0% | `/mirage alpha <0-100>` |
 | Elements to fade: per element a switch and its own faded opacity, e.g. minimap only down to 50% | on, 0% | `/mirage group <name> on\|off\|<0-100>` |
 | Hide quest areas at: minimap opacity at which the minimap and its quest overlay are hidden (only when the minimap fades to 0%) | 0% | `/mirage overlay <0-100>` |
-| Minimap button: click **pauses** fading (the interface stays) and resumes it, right-click opens the settings, drag it along the edge | on | `/mirage pause`, `/mirage resume` |
+| Minimap button: click **pauses** fading (the interface stays) and resumes it, Shift-click pauses it **for good** (also after a restart), right-click opens the settings, drag it along the edge | on | `/mirage pause`, `/mirage pause keep`, `/mirage resume` |
 
 Other commands:
 
 ```
 /mirage on | off | toggle     switch the module (same as the overview checkbox)
 /mirage pause | resume        pause fading (the interface stays) or resume it, like the minimap button
+/mirage pause keep            pause for good, also after a restart (Shift-click on the button)
 /mirage groups                list element groups and how far each fades
 /mirage group <name> on|off   fade (or stop fading) one group, e.g. /mirage group chat off
 /mirage group <name> <0-100>  how visible one group stays when faded, e.g. /mirage group minimap 50

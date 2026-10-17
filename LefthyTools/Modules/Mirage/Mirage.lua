@@ -27,6 +27,7 @@ local defaults = {
 	hideMinimapWhenFaded = true,
 	minimapHideAt = 0,   -- minimap opacity at which it's hidden during the fade-out (0 = at the end)
 	minimapButton = true, -- Options.lua: a button on the minimap that pauses fading
+	pauseKept = false,   -- paused for good (Shift-click on the button, /mirage pause keep): also after a restart
 	minimapAngle = 185,  -- degrees, 0 = right, counter-clockwise: left, above Chronicle's book
 	groups = {},
 }
@@ -662,12 +663,15 @@ function M:GetStatus()
 end
 
 -- Paused: nothing fades until resumed (the minimap button, /mirage pause). Not kept over a
--- restart: a forgotten pause would look like Mirage being broken.
-function M:SetPaused(on)
+-- restart (a forgotten pause would look like Mirage being broken) unless asked for: keep
+-- (Shift-click on the button, /mirage pause keep; the user: "a shift click to permanently toggle
+-- it") saves it, and switching Mirage on (a login) says so in chat.
+function M:SetPaused(on, keep)
 	if not self.enabled then
 		return
 	end
 	paused = on and true or false
+	self.db.pauseKept = paused and keep and true or false
 	if not paused then
 		self:Poke() -- (resuming starts the idle time over)
 	end
@@ -679,6 +683,10 @@ end
 
 function M:IsPaused()
 	return paused
+end
+
+function M:IsPauseKept()
+	return paused and self.db.pauseKept == true
 end
 
 function M:GetGroup(key)
@@ -785,6 +793,10 @@ function M:OnEnable()
 	pcall(events.RegisterUnitEvent, events, "UNIT_HEALTH", "player", "pet")
 
 	self:Poke()
+	if self.db.pauseKept then -- (paused for good before: still, and said, so it doesn't look broken)
+		paused = true
+		self:Print("paused for good: Shift-click the minimap button (or /mirage resume) to fade again.")
+	end
 	rebuildAt = 0 -- adopt frames on the next frame
 	RequestEvaluate()
 	driver:SetScript("OnUpdate", OnUpdate)

@@ -38,10 +38,15 @@ Mirage fades the default HUD when the player is out of combat and idle (like Dun
 - **Pause** (`M:SetPaused`, the minimap button, `/mirage pause` / `resume`): while paused every
   group shows, like holding the peek key, and Mirage stays on (switching the module off would take
   the button with it). Resuming counts as activity, so the idle delay starts over. Not saved: a
-  restart or switching Mirage off ends it. `/mirage status` says "paused".
+  restart or switching Mirage off ends it. `/mirage status` says "paused". **For good**
+  (`M:SetPaused(true, true)`: Shift-click on the button, `/mirage pause keep`; the user: "a shift
+  click to permanently toggle it"): saved (`db.pauseKept`), so it's paused again after a restart
+  (`OnEnable`), and chat says so then (a forgotten pause mustn't look like Mirage being broken); the
+  button's "II" turns orange. Any resume (a click, `/mirage resume`) clears it.
 - **Minimap button** (Options.lua, setting `minimapButton`, on; `LT.Window.MinimapButton` like
   Chronicle's book, angle `minimapAngle`, 185 = left): shown while Mirage is on; click pauses or
-  resumes (paused: the icon greyed with "II"), right-click opens Mirage's settings. As a child of
+  resumes (paused: the icon greyed with "II"), Shift-click pauses for good (an orange "II"),
+  right-click opens Mirage's settings. As a child of
   the minimap it fades with the minimap group: hover the minimap to reach it.
 - **Enable/disable:** `OnEnable` registers events, re-adopts frames (`Rebuild`) and starts the
   driver. `OnDisable` unregisters events and fades everything to 1; `FinishStopping` releases
