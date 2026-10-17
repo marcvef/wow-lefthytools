@@ -186,7 +186,7 @@ L["Dreadsteed (epic mount)"] = "Schreckensross (episches Reittier)"
 L["Bear Form"] = "Bärengestalt"
 L["Aquatic Form"] = "Wassergestalt"
 
--- Mirage: AFK screen
+-- Misc Tweaks: AFK screen, cinematic flights
 L["AFK screen"] = "AFK-Bildschirm"
 L["While you're AFK the interface disappears and a panel shows your character, how long you've been away, whispers, friends' news and which friends are online. Moving, combat, a ready check or a click brings everything back."] =
 	"Solange du AFK bist, verschwindet das Interface und eine Leiste zeigt deinen Charakter, wie lange du weg bist, Flüsternachrichten, Neuigkeiten von Freunden und welche Freunde online sind. Bewegen, Kampf, ein Bereitschaftscheck oder ein Klick holt alles zurück."

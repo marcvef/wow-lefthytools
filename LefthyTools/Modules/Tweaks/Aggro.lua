@@ -1,7 +1,7 @@
 local _, ns = ...
 local L = ns.L
 
--- Misc Tweaks 5: who has aggro, on enemy nameplates (aggroNameplate).
+-- Misc Tweaks: who has aggro, on enemy nameplates (aggroNameplate).
 --
 -- In a group, the left end of each enemy's health bar says whom it's on: ">YOU<" when it's you,
 -- else the first three letters of their name, in the colour of their role (tank blue, healer

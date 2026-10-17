@@ -2,9 +2,11 @@ local _, ns = ...
 local LT = ns.LT
 local L = ns.L
 
--- Misc Tweaks: small annoyances fixed, each switchable on its own. All tweaks default to on
--- (chosen while the Forever beta still dropped SavedVariables on restart).
--- The combo point tweaks live in ComboPoints.lua, who has aggro on nameplates in Aggro.lua.
+-- Misc Tweaks: small annoyances fixed, each switchable on its own. Tweaks default to on (chosen
+-- while the Forever beta still dropped SavedVariables on restart), except retail unit frames
+-- (friends may like Forever's look). This file holds the module, the tweaks' list and switching,
+-- the settings page and /lefthy tweaks, plus a few small tweaks; the bigger ones have files of
+-- their own (the TWEAKS list below says which).
 
 local M = LT:NewModule("tweaks", {
 	title = "Misc Tweaks", -- module names are never translated
@@ -105,7 +107,7 @@ function ns.HideInterface(owner, hide, fade)
 end
 
 ---------------------------------------------------------------------------
--- 1. Always show health / power values on unit frames
+-- Always show health / power values on unit frames (statusText)
 --
 -- The bars show their text permanently when the CVar "statusText" is "1"
 -- ("statusTextDisplay" picks the format). That's exactly what Blizzard's own
@@ -133,7 +135,7 @@ local function ApplyStatusText(on)
 end
 
 ---------------------------------------------------------------------------
--- 2. Movable bags
+-- Movable bags (movableBags) and the bags' clean-up button (gamepadBagSort)
 --
 -- Blizzard re-anchors every bag to the bottom right in UpdateContainerFrameAnchors()
 -- whenever bags open, close or the layout changes; a post-hook puts moved bags
@@ -285,9 +287,10 @@ end
 -- The bags' clean-up button. Since Forever 1.60.1.70291 Blizzard's (BagItemAutoSortButton) no
 -- longer shows on the bags, with or without gamepad mode, and gamepad mode's bag bar with its
 -- clean-up menu is gone too: there was no way left to clean up. A post-hook on each bag frame's
--- UpdateSearchBox (and its OnShow, in case that isn't called any more) puts the button back top
--- right of the backpack or the combined bags. A client without Blizzard's button gets one of ours
--- that does the same (C_Container.SortBags). (The setting's key still says gamepad: it began there.)
+-- UpdateSearchBox (and its OnShow, in case that isn't called any more) puts the button back on the
+-- backpack or the combined bags, at the left end of the search row. A client without Blizzard's
+-- button gets one of ours that does the same (C_Container.SortBags). (The setting's key still says
+-- gamepad: it began there.)
 local sortHooked = {}
 local ownSortButton
 
@@ -420,7 +423,7 @@ local function ApplyGamepadBagSort(on)
 end
 
 ---------------------------------------------------------------------------
--- 3. Announce quest progress in party chat (like Questie's QuestieAnnounce)
+-- Announce quest progress in party chat (questAnnounce; like Questie's QuestieAnnounce)
 --
 -- An objective is announced when it changes from unfinished to finished; when that
 -- completes the whole quest, one "quest complete" line replaces it. Quests and

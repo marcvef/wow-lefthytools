@@ -1,6 +1,6 @@
 local _, ns = ...
 
--- Misc Tweaks 5: retail unit frames (retailFrames, off by default).
+-- Misc Tweaks: retail unit frames (retailFrames, off by default).
 --
 -- Since build 1.60.1.70425 Forever draws the player, target, focus, party and pet frames in a
 -- classic style: its own art set ("c60", Data/RetailUnitFrames.lua explains the atlas sets)

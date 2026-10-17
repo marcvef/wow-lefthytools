@@ -6,7 +6,7 @@ module you can switch on or off.
 | Module | What it does |
 |---|---|
 | [Mirage](#mirage) | Fades the interface away when you're out of combat and not using it, like Dune: Awakening's Dynamic HUD. **Off by default**: switch it on on the overview page |
-| [Misc Tweaks](#misc-tweaks) | Small fixes, each switchable: always-visible health/power values, combo points on the personal resource display, movable bags, quest progress in party chat, markers for quests new in WoW: Forever, your quests on continent and world maps |
+| [Misc Tweaks](#misc-tweaks) | Small fixes, each switchable: always-visible health/power values, combo points coloured by count and on your target's nameplate, who has aggro on enemy nameplates, movable bags, quest progress in party chat, markers for quests new in WoW: Forever, your quests on continent and world maps, a level-up window, an AFK screen, cinematic flights |
 | [Beacon](#beacon) | Battle.net friends who also use LefthyTools see each other on the world map and minimap, with status and level-up messages, without needing a group |
 | [Chronicle](#chronicle) | A journal for each character that writes itself: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, lots of statistics, and what your friends did, also while you weren't online, with all of you compared in graphs and leaderboards |
 | [Bestiary](#bestiary) | What the mobs you kill drop: a window that follows your target with each drop, how many you got and its drop chance, from your own kills |
@@ -96,7 +96,7 @@ addon, which is now part of LefthyTools. How it works inside (for developers): s
 ## Misc Tweaks
 
 Small annoyances fixed. Each tweak has its own checkbox under **Options → AddOns →
-LefthyTools → Misc Tweaks**, and all are on by default.
+LefthyTools → Misc Tweaks**, and all but Retail unit frames are on by default.
 
 | Tweak | What it does | Command |
 |---|---|---|

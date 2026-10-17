@@ -1,6 +1,6 @@
 local _, ns = ...
 
--- Misc Tweaks 4: combo points.
+-- Misc Tweaks: combo points (comboColors, comboNameplate).
 --
 -- Blizzard's personal resource display shows combo points now: Forever's Camelot override of
 -- GetClassFrameInfo builds retail's RogueComboPointBarTemplate (rogues) and

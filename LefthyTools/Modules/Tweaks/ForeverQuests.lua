@@ -1,7 +1,7 @@
 local _, ns = ...
 local L = ns.L
 
--- Misc Tweaks 6: mark quests that are new in WoW: Forever.
+-- Misc Tweaks: mark quests that are new in WoW: Forever (foreverQuests).
 --
 -- Forever adds over a thousand quests to the Classic world, and the client has no flag for them,
 -- so Data/ForeverQuests.lua lists them (generated from the client's quest tables by

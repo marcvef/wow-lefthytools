@@ -3,7 +3,7 @@
 `Modules/Tweaks/Tweaks.lua` holds a list of independent tweaks (`TWEAKS`), each with an
 `apply(on)` function, a setting and a slash command word. `Reconcile()` compares what's wanted
 (module enabled and the tweak's setting on) with what's active, and runs on the next frame via
-`C_Timer.After(0)`. All tweaks default to on.
+`C_Timer.After(0)`. All tweaks default to on, except `retailFrames`.
 
 ## statusText: always show health and power values
 
