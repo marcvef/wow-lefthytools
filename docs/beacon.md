@@ -737,8 +737,9 @@ Left their model (50 x 58 px), the foes right of it, the space between the stage
 the picture already holds, one action after another like turns (about half a second each; at most
 4 waiting, an older one goes but its number still floats; one waiting over 2.5 s goes too):
 - **A cast**: a casting pose (animation 51) while the bar fills; one that went off (it ended within
-  0.4 s of its end, not channelled): harmful (`C_Spell.IsSpellHarmful`) at their target, the cast
-  (53) and its icon flying over; else a cast in place (54). An **instant** one (new in their last
+  0.4 s of its end, not channelled; or the next cast began then, chain casting, before a picture saw
+  the gap: a cast pushed back by a hit keeps its start): harmful (`C_Spell.IsSpellHarmful`) at their
+  target, the cast (53) and its icon flying over; else a cast in place (54). An **instant** one (new in their last
   spells, not the cast that just went off): harmful, a special attack (57) on the target, its icon
   popping on it. **Spell colours**: the icon glows in its spell's school's colour
   (`Spells\GenericGlow64`, added, 32 px behind the 14 px icon) and the hit flashes in it instead of

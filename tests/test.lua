@@ -4937,6 +4937,41 @@ do
 		leader._scripts.OnLeave(leader)
 		win.Close:Click()
 	end)()
+
+	-- The battle row, with pictures handed to it directly (no time passes): a friend's (her mage's)
+	-- pictures, her target in each. show(fields): the row after a picture with these fields.
+	;(function()
+		local view = S.View("me")
+		local kind, picture0 = view.kind, view.picture
+		local target = { key = "row-target", name = "Kobold Vermin", level = 5, creature = 6, target = true, combat = true,
+			engaged = true, health = 1 }
+		local function show(fields)
+			local picture = { mobs = { target }, recent = {}, moments = {}, classFile = "MAGE", combat = true }
+			for k, v in pairs(fields or {}) do picture[k] = v end
+			view.picture = picture
+			S.BattleShow(view)
+			return view.battle
+		end
+		view.kind = "friend"
+		S.BattleReset(view)
+
+		-- Chain casting: her next Fireball began before a picture saw the gap between them; the one
+		-- before still went off at her target (not taken for an instant). Pushed back by a hit, a cast
+		-- keeps its start: still the same one.
+		do
+			local now, old = GetTime(), { spellID = 116, icon = 100116, at = GetTime() - 5 }
+			show({ cast = { spellID = 133, icon = 100133, start = now - 2.7, finish = now - 0.2 }, recent = { old } })
+			local b = show({ cast = { spellID = 133, icon = 100133, start = now - 2.7, finish = now - 0.1 }, recent = { old } })
+			check(#b.queue == 0 and not b.action, "a cast pushed back by a hit: still the same cast, nothing went off yet")
+			show({ cast = { spellID = 133, icon = 100133, start = now - 0.05, finish = now + 2.45 },
+				recent = { { spellID = 133, icon = 100133, at = now - 0.1 }, old } })
+			check(#b.queue == 1 and b.queue[1].kind == "spell" and b.queue[1].key == "row-target" and b.queue[1].school == "fire",
+				"chain casting: the Fireball before the one she's casting went off at her target, its icon flying over (not an instant)")
+		end
+
+		view.kind, view.picture = kind, picture0
+		S.BattleReset(view)
+	end)()
 	ns.MINIMAP_TILES = realTiles
 end
 

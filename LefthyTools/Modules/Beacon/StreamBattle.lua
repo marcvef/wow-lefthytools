@@ -1006,22 +1006,12 @@ local function Harmful(spellID)
 	return spellID and Value("C_Spell.IsSpellHarmful", spellID) == true
 end
 
--- Their cast: a pose while it lasts; when it went off, cast at their target (harmful) or in place.
--- A Polymorph (always at their target) turns it into the animal when it lands.
-local function Casting(view, b, now)
-	local picture, hero = view.picture, view.win.Foes.Hero
-	local cast = picture.cast
-	if cast and now <= (cast.finish or 0) + 0.3 then
-		b.cast = b.cast or {}
-		b.cast.spellID, b.cast.icon, b.cast.finish, b.cast.channel = cast.spellID, cast.icon, cast.finish, cast.channel
-		b.cast.gather = Gathering(cast.spellID)
-		return true
-	end
-	local was = b.cast
-	b.cast = nil
-	if was and was.gather then
+-- A cast of theirs ended: one that went off is cast at their target (harmful) or in place; a
+-- Polymorph (always at their target) turns it into the animal when it lands.
+local function CastEnded(view, b, was, now)
+	if was.gather then
 		b.released, b.releasedAt = was.spellID, now -- (skinned, mined, picked: no cast at anyone)
-	elseif was and not was.channel and now >= (was.finish or 0) - 0.4 then -- (went off: not stopped early)
+	elseif not was.channel and now >= (was.finish or 0) - 0.4 then -- (went off: not stopped early)
 		b.released, b.releasedAt = was.spellID, now
 		local target = TargetSlot(view)
 		local poly = PolymorphAt(target, was.spellID)
@@ -1031,6 +1021,28 @@ local function Casting(view, b, now)
 		else
 			Enqueue(view, { kind = "release" }, now)
 		end
+	end
+end
+
+-- Their cast: a pose while it lasts, and what it did when it ended. A cast that began at the end of
+-- the one before ended that one (chain casting: the next began before a picture saw the gap; a
+-- cast pushed back by a hit keeps its start, so it's still the same).
+local function Casting(view, b, now)
+	local cast = view.picture.cast
+	if cast and now <= (cast.finish or 0) + 0.3 then
+		local was = b.cast
+		if was and cast.start and cast.start >= (was.finish or 0) - 0.4 then
+			CastEnded(view, b, was, now)
+		end
+		b.cast = was or {}
+		b.cast.spellID, b.cast.icon, b.cast.finish, b.cast.channel = cast.spellID, cast.icon, cast.finish, cast.channel
+		b.cast.gather = Gathering(cast.spellID)
+		return true
+	end
+	local was = b.cast
+	b.cast = nil
+	if was then
+		CastEnded(view, b, was, now)
 	end
 	return false
 end
