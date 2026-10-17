@@ -7243,6 +7243,24 @@ section("Chronicle: spring cleaning")
 	check(line and line:find("learned Herbalism", 1, true) and line:find("reached Mining 150", 1, true)
 		and not line:find("reached Herbalism", 1, true), "the catch-up: a profession learned, and one's milestone, got " .. tostring(line))
 	carlBook.news[50], carlBook.news[51] = nil, nil
+	-- A friend's journal can't name a character with escape codes, or bring numbers nobody has (a
+	-- broken or hostile client): the pages would draw them, and pass them on.
+	local function fromAnna(word, more) ns.Beacon.ReceiveJournal(11, word, more) end -- (past Beacon's spam guard)
+	local numbers = "600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000"
+	local today = date("%Y%m%d")
+	fromAnna("p", carl .. ";|Tx:300|t-Realmy;9710;ROGUE;9;" .. time() .. ";" .. numbers .. ";;")
+	fromAnna("p", carl .. ";Carlhuge-Realmy;9711;ROGUE;9;" .. time() .. ";" .. numbers:gsub("^600", "99999999999999999999") .. ";;")
+	fromAnna("p", carl .. ";Carlold-Realmy;9712;ROGUE;99999;" .. time() .. ";" .. numbers .. ";;")
+	fromAnna("d", carl .. ";Carlday-Realmy;9713;" .. today .. ";1500,300,5,20,1,1,0,9,1,1000,0,0,0,10")
+	fromAnna("p", carl .. ";Carlfine-Realmy;9714;ROGUE;9;" .. time() .. ";" .. numbers .. ";;")
+	fromAnna("d", carl .. ";Carlfine-Realmy;9715;" .. today .. ";1440,300,5,20,1,1,1440,9,1,1000,0,0,0,10")
+	local chars = CDB.book[carl].chars
+	check(not chars["|Tx:300|t-Realmy"] and not chars["Carlhuge-Realmy"] and not chars["Carlday-Realmy"]
+		and not (chars["Carlold-Realmy"] and chars["Carlold-Realmy"].level),
+		"a friend's journal: no escape codes in a name, no numbers of 20 digits, no 25 hours in a day, no level 99999")
+	check(chars["Carlfine-Realmy"] and chars["Carlfine-Realmy"].profile and chars["Carlfine-Realmy"].days[date("%Y-%m-%d")],
+		"what a real client sends is kept (a whole day played, a whole day AFK)")
+	chars["Carlfine-Realmy"], chars["Carlold-Realmy"] = nil, nil
 end)()
 
 section("Beacon: leaving")

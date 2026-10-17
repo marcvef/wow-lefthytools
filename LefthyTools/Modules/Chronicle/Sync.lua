@@ -814,15 +814,34 @@ local function Prune(c)
 	end
 end
 
+-- A record's numbers ("12,3400,5,..."), exactly count of them, or nil. Each at most 10 digits: more is
+-- nobody's real number (a broken or hostile client), and too large to show or add up.
 local function Numbers(text, count)
 	local list = {}
 	for n in text:gmatch("[^,]+") do
-		list[#list + 1] = n:match("^%d+$") and tonumber(n) or nil
-		if not list[#list] then
+		if not n:match("^%d+$") or #n > 10 then
+			return nil
+		end
+		list[#list + 1] = tonumber(n)
+	end
+	return #list == count and list or nil
+end
+
+-- A day's numbers (DAY_FIELDS): a day has 1440 minutes to play, or be AFK, at most (like a D2's).
+local function DayNumbers(text)
+	local numbers = Numbers(text, #DAY_FIELDS)
+	for i, field in ipairs(numbers and DAY_FIELDS or {}) do
+		if MINUTES[field] and numbers[i] > 1440 then
 			return nil
 		end
 	end
-	return #list == count and list or nil
+	return numbers
+end
+
+-- A character's key in a record ("Anna-Realm": its first name, or its full name, and its realm), as
+-- every build sends it. No escape codes or control characters: the pages show it as a name.
+local function ValidKey(key)
+	return type(key) == "string" and #key <= NAME_BYTES and key:match("^[^%-]+%-.+$") ~= nil and not key:find("[|%c]")
 end
 
 -- A stamp that can be real: an author's clock, give or take a week.
@@ -836,8 +855,7 @@ end
 -- it, so friends ask for its "a" record).
 local function StoreName(acct, f)
 	local key, full, guid = f[2], ns.Beacon.Clean(f[3] or "", NAME_BYTES), ValidGuid(f[4])
-	if #f ~= 4 or not (key and #key <= NAME_BYTES and key:match("^[^%-]+%-.+$")) or not HasSurname(full)
-		or FirstName(full) ~= FirstName(key) then
+	if #f ~= 4 or not ValidKey(key) or not HasSurname(full) or FirstName(full) ~= FirstName(key) then
 		return
 	end
 	local c
@@ -880,8 +898,7 @@ local function Store(id, word, more, now)
 		StoreName(acct, f) -- (no stamp)
 		return
 	end
-	if not (key and #key <= NAME_BYTES and key:match("^[^%-]+%-.+$") and Plausible(u))
-		or acct == C.MyAccount() or not Friends()[acct] then
+	if not (ValidKey(key) and Plausible(u)) or acct == C.MyAccount() or not Friends()[acct] then
 		return
 	end
 	local changed, newNews = false, false
@@ -889,7 +906,9 @@ local function Store(id, word, more, now)
 		local numbers = Numbers(f[7], #PROFILE_FIELDS)
 		local c = numbers and Book(acct, key)
 		if c and u > (c.u or 0) then
-			c.u, c.classFile, c.level, c.last = u, f[4]:match("^%u+$"), tonumber(f[5]:match("^%d+$") or ""), tonumber(f[6]:match("^%d+$") or "")
+			-- (a level has three digits at most, last played is a time())
+			c.u, c.classFile, c.level, c.last = u, f[4]:match("^%u+$"), tonumber(f[5]:match("^%d%d?%d?$") or ""),
+				tonumber(f[6]:match("^%d+$") and #f[6] <= 10 and f[6] or "")
 			c.profile = {}
 			for i, field in ipairs(PROFILE_FIELDS) do
 				c.profile[field] = MINUTES[field] and numbers[i] * 60 or numbers[i]
@@ -899,7 +918,7 @@ local function Store(id, word, more, now)
 		end
 	elseif word == "d" and #f == 5 then
 		local y, mo, d = f[4]:match("^(%d%d%d%d)(%d%d)(%d%d)$")
-		local numbers = y and Numbers(f[5], #DAY_FIELDS)
+		local numbers = y and DayNumbers(f[5])
 		local day = y and (y .. "-" .. mo .. "-" .. d)
 		if numbers and day >= Oldest() and day <= date("%Y-%m-%d", C.DayAgo(-1)) then
 			local c = Book(acct, key)
@@ -1759,7 +1778,7 @@ function C.SyncEnable()
 	for acct, a in pairs(store.book) do
 		a.chars = type(a.chars) == "table" and a.chars or {}
 		for key, c in pairs(a.chars) do
-			if type(key) ~= "string" or not key:match("^[^%-]+%-.+$") then
+			if not ValidKey(key) then
 				a.chars[key] = nil -- (from before records were checked this closely)
 			else
 				c.days, c.news = c.days or {}, c.news or {}

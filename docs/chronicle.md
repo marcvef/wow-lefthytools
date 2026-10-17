@@ -322,8 +322,10 @@ to another). An answer is at most 400 records, oldest first (records with the sa
 last one go along, so the cut never splits a stamp); its end says how far it got, so the
 rest comes on the next round. The end completes the account only when as many records came as
 the count said (else it's asked again on the next offer) and its stamp is plausible (at most a
-week ahead). Records are checked (fields, sizes, kinds, 30 days, not tomorrow)
-and kept only for my friends' accounts, newer stamps replacing older. Requests are queued
+week ahead). Records are checked (fields, sizes, kinds, 30 days, not tomorrow; numbers of at most 10
+digits, a level of at most 3, a day's minutes played or AFK at most 1440; a character key without
+escape codes or control characters, `ValidKey`: pages show it as a name) and kept only for my
+friends' accounts, newer stamps replacing older. Requests are queued
 (`serves`, at most 50, a repeat replaces the waiting one) and answered on the tick, two per
 second, never inside the event. Everything is offered again every 5 minutes (`FULL_OFFER`: an
 offer missed or an answer cut short). `relay` off: I don't pass on what I hold of others (a
