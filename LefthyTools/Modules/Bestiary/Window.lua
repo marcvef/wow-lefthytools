@@ -191,13 +191,17 @@ local function Build()
 	Place()
 end
 
--- The window shows creature (nil: none yet); info: what was seen of it.
-local function Draw()
-	if not (win and win:IsShown()) then
-		return
-	end
-	local mob = Bt.Mob(shown)
-	local info = shownInfo or {}
+-- Drawn from the top down, each part where the one above it ends (the window shows creature
+-- `shown`, nil: none yet; shownInfo: what was seen of it).
+
+-- You've killed or skinned one: what it can drop is "not seen yet" rather than "what it can drop".
+local function Tried(mob)
+	return mob and (mob.kills > 0 or (mob.skinned or 0) > 0)
+end
+
+-- The header: portrait, name, level and kind, kills and coin; what a kill pays, when something's
+-- known (the header grows by a line). Returns its height.
+local function DrawHeader(mob, info)
 	if win.creature ~= shown then
 		win.creature = shown
 		win.Portrait:ClearModel()
@@ -211,7 +215,6 @@ local function Draw()
 	win.Name:SetText(name or "Bestiary") -- (module names aren't translated)
 	win.Kind:SetText(shown and Kind({ level = info.level or mob and mob.level, class = info.class or mob and mob.class }) or "")
 	win.Kills:SetText(mob and KillsLine(mob) or "")
-	-- What a kill pays, when something's known: the header grows by a line.
 	local pace = PaceText(mob)
 	win.Pace.Text:SetText(pace or "")
 	win.Pace:SetShown(pace ~= nil)
@@ -219,31 +222,35 @@ local function Draw()
 	win.Rule:ClearAllPoints()
 	win.Rule:SetPoint("TOPLEFT", PAD, -head + 4)
 	win.Rule:SetPoint("TOPRIGHT", -PAD, -head + 4)
-	-- Quests wanting its drops (the ones still wanted first), then its drops under them.
+	return head
+end
+
+-- Quests wanting its drops, a line each (the ones still wanted first), at y; returns their height
+-- (0: none).
+local function DrawQuests(mob, y)
 	local wanted, lines = Bt.QuestDrops(shown, mob), {}
 	for i = 1, math.min(#wanted, QUEST_LINES) do
 		lines[i] = QuestLine(wanted[i])
 	end
 	win.Quest:ClearAllPoints()
-	win.Quest:SetPoint("TOPLEFT", PAD, -head)
+	win.Quest:SetPoint("TOPLEFT", PAD, -y)
 	win.Quest:SetText(table.concat(lines, "\n"))
 	win.Quest:SetShown(#lines > 0)
-	local quests = #lines > 0 and math.ceil(win.Quest:GetStringHeight()) + 6 or 0
-	win.Grid:ClearAllPoints()
-	win.Grid:SetPoint("TOPLEFT", PAD + 1, -head - 4 - quests)
-	local drops = Bt.Drops(mob, M.db.showPoor, shown)
-	local rows = Lay(win.Grid, win.cells, drops, mob and mob.kills or 0, ICON, GAP, PER_ROW, PER_ROW * ROWS, true)
-	local height = head + quests + rows * (CELL_H + 4)
-	-- What the classic database says it drops that you haven't had yet (for a mob you haven't
-	-- killed: what it can drop), when that's switched on for the window.
+	return #lines > 0 and math.ceil(win.Quest:GetStringHeight()) + 6 or 0
+end
+
+-- What the classic database says it drops that you haven't had yet (for a mob you haven't killed:
+-- what it can drop), when that's switched on for the window, at top; else nothing, and height stays
+-- where everything ends. Returns where everything ends, whether it shows, and the database's list
+-- and total (nil: it doesn't know the mob, or the setting is off).
+local function DrawUnseen(mob, top, height)
 	local unseen, found, total
 	if M.db.windowUnseen then
 		unseen, found, total = Bt.Compare(shown, mob, M.db.showPoor)
 	end
-	local tried = mob and (mob.kills > 0 or (mob.skinned or 0) > 0)
+	local tried = Tried(mob)
 	local known = unseen ~= nil and #unseen > 0
 	if known then
-		local top = height + (rows > 0 and 2 or 0)
 		win.KnownLabel:ClearAllPoints()
 		win.KnownLabel:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -top)
 		win.KnownLabel:SetText(tried and L["Not seen yet"] or L["What it can drop"])
@@ -261,6 +268,13 @@ local function Draw()
 	win.KnownLabel:SetShown(known)
 	win.KnownCount:SetShown(known)
 	win.KnownRule:SetShown(known)
+	return height, known, unseen, total
+end
+
+-- A line under it all when there's something to say (target a mob, no kills yet, nothing or only
+-- grey items dropped, all of the database's drops found, in a group nothing counts), at height (a
+-- little lower when nothing's above it: any); returns the window's height.
+local function DrawNotes(mob, drops, unseen, total, height, any)
 	local notes = {}
 	if not shown then
 		notes[#notes + 1] = L["Target a mob to see what it drops."]
@@ -269,20 +283,37 @@ local function Draw()
 	elseif #drops == 0 then
 		notes[#notes + 1] = next(mob.items) and L["Only grey items so far."] or L["Nothing dropped yet."]
 	end
-	if tried and unseen and #unseen == 0 and total > 0 then
+	if Tried(mob) and unseen and #unseen == 0 and total > 0 then
 		notes[#notes + 1] = ("|T%s:12:12|t "):format(ALL_FOUND) .. L["All %d drops of the classic database found."]:format(total)
 	end
 	if IsInGroup and IsInGroup() then
 		notes[#notes + 1] = L["In a group: kills aren't counted (the loot is shared)."]
 	end
-	local any = rows > 0 or known or quests > 0
 	win.Note:ClearAllPoints()
 	win.Note:SetPoint("TOP", win, "TOP", 0, -height - (any and 0 or 6))
 	win.Note:SetText(table.concat(notes, "\n"))
 	win.Note:SetShown(#notes > 0)
 	-- (a line each, or more when one wraps: most do in the window's width, in German more so)
 	local noteHeight = math.max(#notes * LINE, math.ceil(win.Note:GetStringHeight()))
-	height = height + (#notes > 0 and (noteHeight + (any and 4 or 10)) or 0) + PAD
+	return height + (#notes > 0 and (noteHeight + (any and 4 or 10)) or 0) + PAD
+end
+
+local function Draw()
+	if not (win and win:IsShown()) then
+		return
+	end
+	local mob = Bt.Mob(shown)
+	local head = DrawHeader(mob, shownInfo or {})
+	local quests = DrawQuests(mob, head)
+	-- Its drops under them.
+	win.Grid:ClearAllPoints()
+	win.Grid:SetPoint("TOPLEFT", PAD + 1, -head - 4 - quests)
+	local drops = Bt.Drops(mob, M.db.showPoor, shown)
+	local rows = Lay(win.Grid, win.cells, drops, mob and mob.kills or 0, ICON, GAP, PER_ROW, PER_ROW * ROWS, true)
+	local height = head + quests + rows * (CELL_H + 4)
+	local known, unseen, total
+	height, known, unseen, total = DrawUnseen(mob, height + (rows > 0 and 2 or 0), height)
+	height = DrawNotes(mob, drops, unseen, total, height, rows > 0 or known or quests > 0)
 	win:SetHeight(math.max(height, head + 16))
 end
 Bt.Draw = Draw
