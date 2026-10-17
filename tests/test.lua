@@ -4987,6 +4987,23 @@ do
 			target.health = 1
 		end
 
+		-- A foe out of the row a while is forgotten: back (or in a friend's stream another mob with its
+		-- id, a minute later), what it lost meanwhile isn't her hit.
+		do
+			S.BattleReset(view)
+			target.health = 1
+			local b = show()
+			show({ mobs = {} })
+			local kept = b.foe["row-target"] ~= nil
+			b.foe["row-target"].shownAt = GetTime() - 10 -- (as if 10 s had passed)
+			show({ mobs = {} })
+			target.health = 0.5
+			show()
+			check(kept and not b.action and #b.queue == 0 and b.foe["row-target"].health == 0.5,
+				"a foe back in the row after 10 s away: forgotten meanwhile, no hit of hers made up")
+			target.health = 1
+		end
+
 		view.kind, view.picture = kind, picture0
 		S.BattleReset(view)
 	end)()

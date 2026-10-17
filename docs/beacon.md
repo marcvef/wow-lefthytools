@@ -778,7 +778,9 @@ the picture already holds, one action after another like turns (about half a sec
   the loss times what its kind has (`S.MobMaxOf`, StreamSense's maximum: learned, the classic
   database or usual for its level), a percent when that isn't known (an elite in neither). The
   combat log is closed, so who hit isn't known: their target's loss is taken as theirs; **another
-  mob's** only flinches, its number smaller and grey.
+  mob's** only flinches, its number smaller and grey. A foe out of the row for 10 s is forgotten:
+  back later, what it lost meanwhile isn't counted (a friend's mob id comes round again for another
+  mob after a minute).
 - **They're hit** (moment `w`/`W`): the mob attacking them (their target first) lunges 10 px and
   strikes (16), they flinch (9; a big hit 10, harder flash), the red number floats up from them. A
   dodge, parry or block (`a`): that move (30, 21, 24) and the word. A heal floats up green from them,

@@ -77,6 +77,9 @@ local DIE_TIME = 1.4           -- falling; then lying, fading (a dying mob keeps
 local FADE_TIME = 1.2
 local QUEUE_MAX = 4
 local QUEUE_STALE = 2.5        -- an action waiting longer goes (its number floats anyway)
+-- A foe out of the row this long (s) is forgotten: back later, what it lost meanwhile wasn't their
+-- doing (and a friend's mob id comes round again for another mob).
+local FOE_FORGET = 10
 local MINE_FOR = 1.3           -- their spell this recent: their target's loss came from it
 local RARE_LIFE = 5            -- seconds a rare find floats (other loot: 3.5)
 local DROP_MIN = 0.004         -- a smaller loss (of its health) isn't one
@@ -719,6 +722,8 @@ local function ShowFoes(view, now)
 	for key, st in pairs(b.foe) do
 		if st.deadAt and now - st.deadAt >= DIE_TIME + FADE_TIME + 5 then
 			b.foe[key] = nil -- (long gone)
+		elseif not st.deadAt and now - st.shownAt >= FOE_FORGET then
+			b.foe[key] = nil -- (out of the row a while, alive)
 		elseif st.ghost and st.index and not listed[key] and now - st.deadAt < DIE_TIME + FADE_TIME then
 			listed[key] = true
 			table.insert(foes, math.min(#foes + 1, st.index), st.ghost)
