@@ -47,11 +47,12 @@ reads and the default level-up message.
    (if the browser shows the text instead: right-click the link → *Save link as*) and keep it,
    e.g. on your desktop. It's the whole installer in one file, so you can pass it on to
    friends as it is.
-2. Double-click it. It finds your WoW: Forever folder, downloads the latest LefthyTools from
-   this page, installs it and checks every installed file against the download. If Windows asks
-   whether to run it, choose *Run* (or *More info* → *Run anyway*). If it can't find the game, it
-   asks for your `World of Warcraft` folder once. If it finds Forever in more than one place, it
-   uses the one you played most recently and lists the others.
+2. Double-click it. It finds your WoW: Forever folder (and keeps using it while the game is
+   there), downloads the latest LefthyTools from this page, installs it and checks every installed
+   file against the download. If Windows asks whether to run it, choose *Run* (or *More info* →
+   *Run anyway*). If it can't find the game (it doesn't search network drives), it asks for your
+   `World of Warcraft` folder once. If it finds Forever in more than one place, it uses the one
+   you played most recently and lists the others.
 3. In game, type `/reload`. If the installer says to restart the game (the update adds files or
    saved data), do that instead.
    `/lefthy version` should then show the version the installer printed.

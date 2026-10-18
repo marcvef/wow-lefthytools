@@ -68,32 +68,90 @@ param(
 		return $newest
 	}
 
-	# Every WoW: Forever folder found (the remembered one, Battle.net's list of installs, the usual
-	# places on every drive). With more than one (an old copy, a second drive), the one played
-	# most recently wins, and all are listed: an update into a folder the game doesn't use changes
+	# Whether a drive (or network share) answers: $true, $false (no disk in it, no such drive) or
+	# $null (no answer in time). A network drive that's disconnected or slow can keep every look at
+	# it waiting for half a minute or more, so each drive is asked once, on a thread of its own
+	# (Start-DriveCheck asks several at once), and gets $Wait seconds from then.
+	$Wait = 10
+	$asked = @{}
+	function Start-DriveCheck([string]$root) {
+		if ($asked.ContainsKey($root)) { return }
+		$exists = [IO.DirectoryInfo].GetProperty('Exists').GetGetMethod()
+		$task = New-Object 'Threading.Tasks.Task[bool]' ([Delegate]::CreateDelegate([Func[bool]], (New-Object IO.DirectoryInfo $root), $exists))
+		$task.Start()
+		$asked[$root] = @{ Task = $task; Until = [datetime]::UtcNow.AddSeconds($Wait) }
+	}
+	function Test-DriveAnswers([string]$root) {
+		Start-DriveCheck $root
+		$ask = $asked[$root]
+		$ms = [Math]::Max(0, ($ask.Until - [datetime]::UtcNow).TotalMilliseconds)
+		if (-not $ask.Task.Wait([int]$ms)) { return $null }
+		return $ask.Task.Result
+	}
+
+	# Adds the WoW: Forever folders among $candidates to $found, each once. A candidate on a drive
+	# that doesn't answer is left out (and noted in $skipped).
+	function Add-ForeverFolders($candidates, $found, $skipped) {
+		foreach ($candidate in $candidates) {
+			if (-not $candidate) { continue }
+			try { $root = [IO.Path]::GetPathRoot($candidate.Trim().Trim('"')) } catch { continue }
+			if ($root) {
+				$answer = Test-DriveAnswers $root
+				if ($null -eq $answer -and -not $skipped.Contains($root)) { $skipped[$root] = "no answer within $Wait s" }
+				if (-not $answer) { continue }
+			}
+			$dir = Resolve-ForeverFolder $candidate
+			if ($dir) {
+				$full = (Get-Item -LiteralPath $dir).FullName.TrimEnd('\')
+				if (-not ($found | Where-Object { $_ -eq $full })) { $found.Add($full) }
+			}
+		}
+	}
+
+	# Every WoW: Forever folder found. The remembered one (installed into last time) alone, while
+	# the game is still there (not just an Interface folder left behind). Otherwise also Battle.net's
+	# list of installs and the usual places on every fixed and USB drive; network drives aren't
+	# searched (a disconnected one can take minutes to say so), and a drive that doesn't answer in
+	# time is left out. With more than one (an old copy, a second drive), the one played most
+	# recently wins, and all are listed: an update into a folder the game doesn't use changes
 	# nothing in game.
 	function Find-ForeverFolder {
+		$found = New-Object System.Collections.Generic.List[string]
+		$skipped = [ordered]@{}
 		$candidates = New-Object System.Collections.Generic.List[string]
 		if (Test-Path -LiteralPath $Remembered) { $candidates.Add((Get-Content -LiteralPath $Remembered -TotalCount 1)) }
+		Add-ForeverFolders $candidates $found $skipped
+		if ($found.Count -eq 1) {
+			foreach ($marker in 'WowB.exe', 'Wow.exe', '.flavor.info') {
+				if (Test-Path -LiteralPath (Join-Path $found[0] $marker)) { return $found[0] }
+			}
+		}
+		$candidates.Clear()
 		# Battle.net's own list of installs (product.db holds the paths as plain text).
 		$db = Join-Path $env:ProgramData 'Battle.net\Agent\product.db'
 		if (Test-Path -LiteralPath $db) {
 			$text = [Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($db))
 			foreach ($m in [regex]::Matches($text, '[A-Za-z]:[\\/][^\x00-\x1f"<>|*?]*?World of Warcraft')) { $candidates.Add($m.Value) }
 		}
-		# The usual places on every local drive.
-		foreach ($drive in Get-PSDrive -PSProvider FileSystem) {
-			foreach ($parent in '', 'Games', 'Program Files (x86)', 'Program Files', 'Blizzard', 'Games\Blizzard', 'Battle.net') {
-				$candidates.Add((Join-Path (Join-Path $drive.Root $parent) 'World of Warcraft'))
+		# The usual places on every fixed and USB drive, all drives asked at once.
+		$drives = New-Object System.Collections.Generic.List[string]
+		foreach ($drive in [IO.DriveInfo]::GetDrives()) {
+			$type = "$($drive.DriveType)" # known without asking the drive
+			if ($type -eq 'Network') {
+				if (-not $skipped.Contains($drive.Name)) { $skipped[$drive.Name] = 'network drive' }
+			} elseif ('Fixed', 'Removable', 'Ram' -contains $type) {
+				$drives.Add($drive.Name)
+				Start-DriveCheck $drive.Name
 			}
 		}
-		$found = New-Object System.Collections.Generic.List[string]
-		foreach ($candidate in $candidates) {
-			$dir = Resolve-ForeverFolder $candidate
-			if ($dir) {
-				$full = (Get-Item -LiteralPath $dir).FullName.TrimEnd('\')
-				if (-not ($found | Where-Object { $_ -eq $full })) { $found.Add($full) }
+		foreach ($root in $drives) {
+			foreach ($parent in '', 'Games', 'Program Files (x86)', 'Program Files', 'Blizzard', 'Games\Blizzard', 'Battle.net') {
+				$candidates.Add([IO.Path]::Combine($root, $parent, 'World of Warcraft'))
 			}
+		}
+		Add-ForeverFolders $candidates $found $skipped
+		if ($skipped.Count -gt 0) {
+			Write-Host ('Not searched: ' + (@($skipped.Keys | ForEach-Object { "$_ ($($skipped[$_]))" }) -join ', ') + '.')
 		}
 		if ($found.Count -eq 0) { return $null }
 		if ($found.Count -eq 1) { return $found[0] }

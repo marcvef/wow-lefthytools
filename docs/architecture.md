@@ -143,9 +143,16 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
   and no login; unauthenticated API calls are limited to 60 per hour per IP, two per update.
 - **From a clone:** installs the checkout (`-Link`: junction for live editing, `-Download`: the
   GitHub version), version from `git describe --tags --long --dirty --match v[0-9]*`.
-- It finds WoW: Forever (`World of Warcraft\_classic_beta_`) via a remembered path
-  (`%LOCALAPPDATA%\LefthyTools\game-folder.txt`), Battle.net's `product.db`, then common folders
-  on every drive, else asks; `-GameDir` overrides it. It replaces `Interface\AddOns\LefthyTools`
+- It finds WoW: Forever (`World of Warcraft\_classic_beta_`): the remembered folder
+  (`%LOCALAPPDATA%\LefthyTools\game-folder.txt`) alone while the game is still in it (`WowB.exe`,
+  `Wow.exe` or `.flavor.info`, not just a leftover `Interface`); otherwise it searches that folder,
+  Battle.net's `product.db` and common folders on every fixed and USB drive (the one played most
+  recently wins), else asks; `-GameDir` overrides it. Network drives aren't searched (their
+  `DriveType` is known without touching them; a disconnected one held each look for ~20 s), and
+  every drive or share a candidate is on is first asked on a thread-pool task
+  (`DirectoryInfo.Exists`) that gets 10 s, all drives at once, so a dead one can't hold it up;
+  what was left out is listed ("Not searched: ..."). The registry's WoW path isn't used (on some
+  PCs it belongs to another launcher). It replaces `Interface\AddOns\LefthyTools`
   (settings live in `WTF`, untouched) and the add-ons that come with it (`$Companions`: folders
   next to `LefthyTools/` in the repo, `LefthyTools_DropData`; checked the same way, not stamped
   with a version; a new one means "restart the game"), removes the old standalone `Mirage` addon,

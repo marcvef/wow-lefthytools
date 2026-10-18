@@ -106,6 +106,18 @@ From the mock (globals):
   (nameplates), `PARTY`, `QUESTS`, `QUESTS_ON_MAP`, `MAP_RECTS`, `ITEMS`, `BAGS`, and `MOCK_*`
   knobs (`MOCK_SEND_RESULT`, `MOCK_ITEM_UNCACHED`, ...): each is described where mock.lua sets it.
 
+## The installer (by hand)
+
+`npm test` only checks that `Update-LefthyTools.cmd` is the current build. To try `install.ps1`
+without touching your own game or remembered folder, start it in a child `powershell.exe` with
+`LOCALAPPDATA` and `ProgramData` pointed at a temp folder (no remembered folder, no Battle.net
+list) and make a fake game: `...\World of Warcraft\_classic_beta_` with an empty `WowB.exe` and
+`WTF\Config.wtf`. With its path in `<temp>\LefthyTools\game-folder.txt`, `.\install.ps1`
+installs the checkout into it without searching. Without one it searches every fixed and USB
+drive and finds your real game too, so try the search only on a copy of the script that stops
+once `$game` is set (`subst T: <folder>` makes a fixed drive for a second fake game). A copy of
+the `.cmd` outside a clone runs the newest installer from GitHub instead.
+
 ## In game
 
 1. `/lefthy` opens Options → AddOns → LefthyTools; module pages sit under it. Change a setting and
