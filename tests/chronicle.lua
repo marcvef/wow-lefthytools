@@ -629,7 +629,7 @@ do
 end
 
 section("Chronicle: friends' journals, also when they're offline")
-;(function() -- (a function of its own: the main chunk's 200 locals)
+do
 	local H = CH.Hash
 	local mine, annaAcct, bobAcct, carl, zed = H("Me#1111"), H("Annie#1234"), H("Bobby#2345"), H("Carl#3456"), H("Zed#9999")
 	check(mine:match("^%x%x%x%x%x%x%x%x$") and mine ~= annaAcct and H("annie#1234") == annaAcct and CH.MyAccount() == mine,
@@ -991,10 +991,10 @@ section("Chronicle: friends' journals, also when they're offline")
 	lefthy("enable chronicle")
 	Advance(125)
 	check(not printedSince(pmark):find("leaderboard", 1, true), "once a week")
-end)()
+end
 
 section("Chronicle: one row per character, accounts beside them")
-;(function() -- (a function of its own: the main chunk's 200 locals)
+do
 	local H = CH.Hash
 	local mine, annaAcct, carl = H("Me#1111"), H("Annie#1234"), H("Carl#3456")
 	local function bn(id) for _, f in ipairs(BN_FRIENDS) do if f[1].gameAccountID == id then return f[1] end end end
@@ -1184,10 +1184,10 @@ section("Chronicle: one row per character, accounts beside them")
 	me.full = nil
 	lefthy("enable chronicle")
 	Advance(1.2)
-end)()
+end
 
 section("Chronicle: a surname not known yet says so")
-;(function() -- (a function of its own: the main chunk's 200 locals)
+do
 	local carl = CH.Hash("Carl#3456")
 	local unsure = " |cff888888?|r"
 	local hint = "Surname not known yet: it shows once Carl plays the character while you're online, or with an up-to-date LefthyTools."
@@ -1253,10 +1253,10 @@ section("Chronicle: a surname not known yet says so")
 	CDB.chars["Oldalt-Realmy"] = nil
 	CDB.book[carl].chars["Corin-Realmy"] = nil
 	win:Hide()
-end)()
+end
 
 section("Chronicle: Battle.net tells a friend's surname, whatever they run")
-;(function() -- (a function of its own: the main chunk's 200 locals)
+do
 	local carl = CH.Hash("Carl#3456")
 	local function profile(key, u, class)
 		anna("J2;p;" .. carl .. ";" .. key .. ";" .. u .. ";" .. class .. ";9;" .. time() .. ";600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000;;")
@@ -1298,10 +1298,10 @@ section("Chronicle: Battle.net tells a friend's surname, whatever they run")
 	check(ok and cora.full == "Cora", "what can't be read (a secret) is skipped, nothing breaks")
 	carlFriend[2] = nil
 	book["Corin-Realmy"], book["Cora-Realmy"] = nil, nil
-end)()
+end
 
 section("Chronicle: friends pass on the surnames they learned")
-;(function() -- (a function of its own: the main chunk's 200 locals)
+do
 	local H = CH.Hash
 	local mine, annaAcct, carl = H("Me#1111"), H("Annie#1234"), H("Carl#3456")
 	local function bob(text) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", text, "WHISPER", 12) end
@@ -1364,7 +1364,7 @@ section("Chronicle: friends pass on the surnames they learned")
 		"and friends get it from me as my own (\"a\", with its profile's stamp)")
 	CDB.chars["Oldalt-Realmy"] = nil
 	CDB.book[carl].chars["Corin-Realmy"], CDB.book[carl].chars["Cora-Realmy"], CDB.book[annaAcct].chars["Annalt-Realmy"] = nil, nil, nil
-end)()
+end
 
 section("Chronicle: a death counts once")
 do
@@ -1487,7 +1487,7 @@ do
 end
 
 section("Chronicle: spring cleaning")
-;(function() -- (a function of its own: the main chunk's 200 locals; clock-neutral: no Advance)
+do -- (clock-neutral: no Advance)
 	local carl = CH.Hash("Carl#3456")
 	local carlBook = CDB.book[carl].chars["Carl-Realmy"]
 	-- While you were away: a profession learned has no skill level, only its milestones have.
@@ -1538,7 +1538,7 @@ section("Chronicle: spring cleaning")
 	check(moor and moor.name == "Carl Moor" and not moor.partial, "a character keyed by its full name isn't marked: the key says the surname")
 	check(not chars["Carl Moor-Realmy"].full, "... and no other name learned replaces it")
 	chars["Carl Moor-Realmy"] = nil
-end)()
+end
 
 section("Chronicle: a hook that fails doesn't stop the tick")
 do

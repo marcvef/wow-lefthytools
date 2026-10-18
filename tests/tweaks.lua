@@ -500,7 +500,7 @@ do
 end
 
 section("Misc Tweaks: retail unit frames")
-;(function() -- (a function of its own: the main chunk's 200 locals)
+do
 	check(TDB.retailFrames == false and T("retailFrames"), "off by default (friends keep Forever's look), with a checkbox")
 	local ART, BARS = ns.RETAIL_FRAME_ART, ns.RETAIL_FRAME_BARS
 	local function Tex(parent, atlas, mask)
@@ -646,7 +646,7 @@ section("Misc Tweaks: retail unit frames")
 	PlayerFrame_UpdateHealthBarVisuals()
 	check(last(health)[2] == 87, "and nothing is changed any more")
 	PlayerFrame_UpdateHealthBarVisuals, PlayerFrame_UpdateLevel, PlayerLevelText, PlayerName = nil, nil, nil, nil
-end)()
+end
 
 section("Misc Tweaks: quests that are new in WoW: Forever")
 check(TDB.foreverQuests == true and REGISTERED_SETTINGS.LefthyTools_tweaks_foreverQuests, "on by default, with a checkbox")
@@ -927,7 +927,7 @@ do
 end
 
 section("Misc Tweaks: who has aggro, on enemy nameplates")
-;(function()
+do
 	local function tagText(unit) local t = ns.GetAggroTag(unit); return t and t:IsShown() and t.Text:GetText() or nil end
 	local function same(unit, r, g, b)
 		local t = ns.GetAggroTag(unit)
@@ -1040,4 +1040,4 @@ section("Misc Tweaks: who has aggro, on enemy nameplates")
 	THREAT.nameplate1, THREAT.nameplate2, THREATS = nil, nil, {}
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.1)
-end)()
+end

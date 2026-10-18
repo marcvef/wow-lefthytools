@@ -6,7 +6,7 @@ local printedSince = suite.printedSince
 local _
 
 section("Bestiary: what mobs drop")
-;(function()
+do
 	local Bt = ns.Bestiary
 	local function setting(id) return REGISTERED_SETTINGS["LefthyTools_bestiary_" .. id] end
 	local function mob() return LefthyToolsBestiaryDB.mobs[116] end
@@ -748,10 +748,10 @@ section("Bestiary: what mobs drop")
 	SlashCmdList.LEFTHYTOOLS_BESTIARY("")
 	check(win:IsShown() and LefthyToolsDB.settings.bestiary.window.shown == true, "/bestiary opens it")
 	win.Close:Click()
-end)()
+end
 
 section("Bestiary: quest drops while questing")
-;(function()
+do
 	local Bt = ns.Bestiary
 	local function setting(id) return REGISTERED_SETTINGS["LefthyTools_bestiary_" .. id] end
 	local savedQuests = QUESTS
@@ -863,10 +863,10 @@ section("Bestiary: quest drops while questing")
 	Advance(0.6)
 	check(not win.Quest:IsShown(), "no quest wanting its drops: no line")
 	Bt.Toggle(false)
-end)()
+end
 
 section("Bestiary: wish list and dry streak")
-;(function()
+do
 	local Bt = ns.Bestiary
 	local function setting(id) return REGISTERED_SETTINGS["LefthyTools_bestiary_" .. id] end
 	local function tipFind(text)
@@ -998,10 +998,10 @@ section("Bestiary: wish list and dry streak")
 	check(LefthyToolsBestiaryDB.wishes == nil, "the last one off: nothing kept for it")
 	LefthyToolsDropData.mobs[8119], MOBS.target, STATE.target = nil, nil, false
 	Bt.Toggle(false)
-end)()
+end
 
 section("Bestiary: counting, more cases")
-;(function()
+do
 	local Bt = ns.Bestiary
 	local function logged()
 		local mark = #PRINTED + 1
@@ -1051,4 +1051,4 @@ section("Bestiary: counting, more cases")
 		loot("Creature-0-1-0-1-116-00000082", 2589)
 		check(bandits.kills == kills + 2, "switched off in a loot window and on again: the next loot window counts")
 	end
-end)()
+end

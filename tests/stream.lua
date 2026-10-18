@@ -1533,7 +1533,7 @@ do
 end
 
 section("Beacon: fight stream: who has aggro, on the battle row")
-;(function()
+do
 	local S = BB.Stream
 	local function slotOf(w, name)
 		for _, s in ipairs(w.Foes.slots) do
@@ -1716,7 +1716,7 @@ section("Beacon: fight stream: who has aggro, on the battle row")
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.6)
 	check(not S.SenseRunning() and not S.IsWatching(11), "closed, nobody watching: the sensor stops")
-end)()
+end
 
 section("Beacon: a busy fight doesn't pile up messages")
 do
