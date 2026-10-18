@@ -286,7 +286,7 @@ do
 		"a friend who shows up gets my last days for their graphs, got " .. table.concat(days, " | "))
 	check(sentTo(11, dmark, "K2;")[1] == "K2;20300515;10", "... and each day's AFK time, in a message of its own (older builds ignore it)")
 	do -- back again soon (a /reload): she has the week, only today goes
-		local feedWas = #feed
+		local newestWas = feed[#feed]
 		anna("Q2")
 		Advance(0.15)
 		local again = #GAMEDATA + 1
@@ -297,7 +297,9 @@ do
 		for _, m in ipairs(sent) do onlyToday = onlyToday and m:find("^D2;20300515;") ~= nil end -- (today's regular share may come too)
 		check(onlyToday and #sentTo(11, again, "K2;") >= 1,
 			"a friend back within 10 minutes: only today, not the whole week again, got " .. table.concat(sent, " | "))
-		while #feed > feedWas do table.remove(feed) end -- (her offline and online lines: the later checks count on her news)
+		-- (her offline and online lines: the later checks count on her news; with the comings' share
+		-- full, each pushed out an older one, so the feed didn't grow)
+		while feed[#feed] ~= newestWas do table.remove(feed) end
 	end
 	anna("D2;20300514;90;5000;3;20;1;1")
 	anna("K2;20300514;45")
@@ -1564,4 +1566,88 @@ do
 	check(redraws >= 2 and feedSeen[1] and feedSeen[2], "a redraw that failed: its page stays marked for the next one")
 	check(#reported == 2 and reported[1]:find("a broken sync", 1, true) and reported[2]:find("a broken redraw", 1, true),
 		"each error reported once")
+end
+
+section("Chronicle: what friends' journals and the feed keep")
+do
+	local C = ns.Chronicle
+	local dora, carl = C.Hash("Dora#4567"), C.Hash("Carl#3456")
+	anna("H2")
+	Advance(1.2)
+	local function fromAnna(word, more) ns.Beacon.ReceiveJournal(11, word, more) end -- (past Beacon's spam guard)
+	local function day(back) return date("%Y%m%d", C.DayAgo(back)) end
+	local numbers = "30,300,5,20,1,1,0,9,1,1000,0,0,0,10"
+	-- A friend's account keeps its 30 most recently played characters (a broken or hostile client
+	-- can't fill the saved data with characters).
+	for i = 1, 30 do
+		fromAnna("d", dora .. ";Dora" .. i .. "-Realmy;" .. (9800 + i) .. ";" .. day(i - 1) .. ";" .. numbers)
+	end
+	local chars = CDB.book[dora].chars
+	check(C.Count(chars) == 30, "30 characters of an account are kept, got " .. C.Count(chars))
+	fromAnna("d", dora .. ";Doranew-Realmy;9831;" .. day(2) .. ";" .. numbers)
+	check(C.Count(chars) == 30 and chars["Doranew-Realmy"] and not chars["Dora30-Realmy"] and chars["Dora29-Realmy"],
+		"a 31st: the least recently played goes")
+	fromAnna("d", dora .. ";Doraold-Realmy;9832;" .. day(29) .. ";" .. numbers)
+	check(C.Count(chars) == 30 and not chars["Doraold-Realmy"] and chars["Dora29-Realmy"],
+		"one played longer ago than all of them isn't kept")
+	fromAnna("d", dora .. ";Dora1-Realmy;9833;" .. day(1) .. ";" .. numbers)
+	check(C.Count(chars) == 30 and chars["Dora1-Realmy"].days[date("%Y-%m-%d", C.DayAgo(1))], "a character it has: just its record")
+	-- Saved before there was a cap: cut down on start, the least recently played first, nothing else lost.
+	for i = 1, 5 do
+		chars["Doraextra" .. i .. "-Realmy"] = { name = "Doraextra" .. i, realm = "Realmy", last = time() - 40 * 86400, days = {}, news = {},
+			profile = { played = 60 } }
+	end
+	chars["Dorafresh-Realmy"] = { name = "Dorafresh", realm = "Realmy", last = time() - 60, days = {}, news = {}, profile = { played = 60 } }
+	local carls = C.Count(CDB.book[carl].chars)
+	local today = chars["Dora1-Realmy"].days[date("%Y-%m-%d")]
+
+	-- The feed: each kind of news keeps a share of its own (300 in all), so a busy quest day can't
+	-- push out a boss kill. A feed saved as one list of 300 before: cut down to the shares on start.
+	local savedFeed = {}
+	for i, f in ipairs(CDB.friends) do savedFeed[i] = f end
+	wipe(CDB.friends)
+	local t0 = time() - 1000
+	local function entry(k, a) CDB.friends[#CDB.friends + 1] = { t = t0 + #CDB.friends, name = "Anna Brook", classFile = "MAGE", k = k, a = a } end
+	entry("boss", "Old Boss")
+	for i = 1, 120 do entry("quest", "Quest " .. i) end
+	for i = 1, 70 do entry(i % 2 == 0 and "online" or "offline") end
+	for i = 1, 50 do entry("zone", "Zone " .. i) end
+	for i = 1, 40 do CDB.friends[#CDB.friends + 1] = { t = t0 + #CDB.friends, name = "Anna Brook", classFile = "MAGE", k = "level", level = i } end
+	for i = 1, 35 do CDB.friends[#CDB.friends + 1] = { t = t0 + #CDB.friends, name = "Anna Brook", classFile = "MAGE", k = "death", foe = "Foe " .. i } end
+	for i = 1, 10 do entry("rare", "Rare " .. i) end
+	local function kinds()
+		local n = {}
+		for _, f in ipairs(CDB.friends) do
+			local group = (f.k == "online" or f.k == "offline") and "comings" or (f.k == "rare" or f.k == "boss") and "highlight" or f.k
+			n[group] = (n[group] or 0) + 1
+		end
+		return n
+	end
+	local function has(k, a)
+		for _, f in ipairs(CDB.friends) do if f.k == k and f.a == a then return true end end
+		return false
+	end
+	lefthy("disable chronicle")
+	lefthy("enable chronicle")
+	check(C.Count(chars) == 30 and chars["Dorafresh-Realmy"] and not chars["Dora29-Realmy"] and not chars["Doraextra1-Realmy"]
+		and not chars["Doraextra5-Realmy"] and chars["Doranew-Realmy"] and chars["Dora1-Realmy"].days[date("%Y-%m-%d")] == today
+		and C.Count(CDB.book[carl].chars) == carls,
+		"saved before the cap: the least recently played go on start, the rest (and other accounts) stay as they were")
+	local n = kinds()
+	check(n.quest == 80 and n.comings == 50 and n.zone == 40 and n.level == 30 and n.death == 30 and n.highlight == 11 and #CDB.friends == 241,
+		"a feed saved before: each kind down to its share, got quests " .. tostring(n.quest) .. ", comings " .. tostring(n.comings)
+		.. ", zones " .. tostring(n.zone) .. ", levels " .. tostring(n.level) .. ", deaths " .. tostring(n.death) .. ", highlights "
+		.. tostring(n.highlight) .. ", all " .. #CDB.friends)
+	check(has("boss", "Old Boss") and not has("quest", "Quest 40") and has("quest", "Quest 41") and has("quest", "Quest 120"),
+		"the oldest of each kind went; the boss kill older than every quest stayed")
+	local peer = peers()[11]
+	ns.Beacon.Notify("highlight", peer, { kind = "quest", a = "Quest 121", b = "" })
+	ns.Beacon.Notify("highlight", peer, { kind = "boss", a = "New Boss", b = "" })
+	n = kinds()
+	check(n.quest == 80 and has("quest", "Quest 121") and not has("quest", "Quest 41") and n.highlight == 12 and has("boss", "Old Boss")
+		and #CDB.friends == 242, "a new quest pushes out the oldest quest, not a boss; a new boss joins the highlights")
+	wipe(CDB.friends)
+	for i, f in ipairs(savedFeed) do CDB.friends[i] = f end
+	CDB.book[dora] = nil
+	C.NewsChanged()
 end

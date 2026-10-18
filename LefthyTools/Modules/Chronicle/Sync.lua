@@ -52,6 +52,10 @@ local SUMMARY_GAP = 60
 local FULL_OFFER = 300  -- everything offered again this often (an offer missed, a journal only partly got)
 local SERVES_PER_TICK = 2 -- answers built per tick (each up to SERVE_MAX messages)
 local BOOK_DAYS = 60     -- a friend's character with nothing newer than this goes
+-- Characters kept per friend's account, the most recently played: a real account has a handful in
+-- BOOK_DAYS (the most in a real book: 6), so 30 keeps every one even an altoholic plays, while a
+-- broken or hostile client can't fill my saved data with characters.
+local CHARS_KEPT = 30
 local CHECK_GAP = 60
 local PROFILE_GAP = 300
 local PENDING_TIMEOUT = 90
@@ -517,6 +521,39 @@ local function Prune(c)
 	end
 end
 
+-- When a friend's character last played, as far as its journal says: its profile's last played,
+-- its latest day, its latest highlight (never ahead of now: a wrong clock).
+local function LastSeen(c)
+	local t, latest = tonumber(c.last) or 0, nil
+	for day in pairs(c.days) do
+		latest = (not latest or day > latest) and day or latest
+	end
+	local y, mo, d = (latest or ""):match("^(%d+)-(%d+)-(%d+)$")
+	if y then
+		t = math.max(t, time({ year = tonumber(y), month = tonumber(mo), day = tonumber(d), hour = 0 }))
+	end
+	for _, e in pairs(c.news) do
+		t = math.max(t, tonumber(e.t) or 0)
+	end
+	return math.min(t, time())
+end
+
+-- An account keeps its CHARS_KEPT most recently played characters; the others go (one played again
+-- comes back with its next records).
+local function Cap(a)
+	if Count(a.chars) <= CHARS_KEPT then
+		return
+	end
+	local list = {}
+	for key, c in pairs(a.chars) do
+		list[#list + 1] = { key = key, t = LastSeen(c) }
+	end
+	table.sort(list, function(x, y) return x.t > y.t or (x.t == y.t and x.key < y.key) end)
+	for i = CHARS_KEPT + 1, #list do
+		a.chars[list[i].key] = nil
+	end
+end
+
 -- A record's numbers ("12,3400,5,..."), exactly count of them, or nil. Each at most 10 digits: more is
 -- nobody's real number (a broken or hostile client), and too large to show or add up.
 local function Numbers(text, count)
@@ -604,6 +641,7 @@ local function Store(id, word, more, now)
 	if not (ValidKey(key) and Plausible(u)) or acct == C.MyAccount() or not Friends()[acct] then
 		return
 	end
+	local known = store.book[acct] and store.book[acct].chars[key] ~= nil
 	local changed, newNews = false, false
 	if word == "p" and #f == 9 then
 		local numbers = Numbers(f[7], #PROFILE_FIELDS)
@@ -659,6 +697,9 @@ local function Store(id, word, more, now)
 				changed, newNews = true, true -- (the news shows the name)
 			end
 		end
+	end
+	if not known and store.book[acct] and store.book[acct].chars[key] then
+		Cap(store.book[acct]) -- (a character new to the account: the most recently played stay)
 	end
 	if newNews then
 		Changed() -- (the merged feed is rebuilt)
@@ -855,6 +896,7 @@ function C.SyncEnable()
 				Prune(c)
 			end
 		end
+		Cap(a) -- (saved before there was a cap: the most recently played stay)
 		if type(a.u) ~= "number" or a.u > time() + 7 * 86400 then
 			a.u = 0 -- (an impossible stamp would block the account for good: everything is asked again)
 		end

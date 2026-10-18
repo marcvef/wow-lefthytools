@@ -15,7 +15,13 @@ local SHARE_DAYS = 7         -- days a friend gets from me when they show up
 local SHARE_AGAIN = 600      -- back sooner (a /reload, a shaky connection): only today, they keep the rest
 local SHARE_GAP = 300        -- today's numbers go to friends at most this often (if they changed)
 local FRIEND_DAYS = 30       -- days of friends' numbers kept
-local FEED_MAX = 300
+-- The feed keeps each kind of news to a share of its own (300 in all), the oldest of that kind going
+-- first: one list of 300 let a busy quest day push out a boss kill (a real feed held 126 quests of
+-- its 300). Every quest turned in, friends coming online and going offline, first visits to zones,
+-- level-ups, deaths, and the highlights (bosses, rares, dungeons, loot, mounts, achievements,
+-- milestones, professions).
+local FEED_KEEP = { quest = 80, comings = 50, zone = 40, level = 30, death = 30, highlight = 70 }
+local FEED_GROUP = { quest = "quest", online = "comings", offline = "comings", zone = "zone", level = "level", death = "death" }
 local issecret = LT.IsSecret
 
 local shareQueue = {} -- { kind, a, b }: highlights recorded since the last tick
@@ -77,12 +83,22 @@ local CHAT = {
 	profession = function(a, b) return ("reached %s %s."):format(a, b) end,
 }
 
+-- Keeps each kind's newest entries, as many as its share (FEED_KEEP); the rest goes.
+local function TrimFeed(feed)
+	local counts = {}
+	for i = #feed, 1, -1 do
+		local group = type(feed[i]) == "table" and FEED_GROUP[feed[i].k] or "highlight"
+		counts[group] = (counts[group] or 0) + 1
+		if counts[group] > FEED_KEEP[group] then
+			table.remove(feed, i)
+		end
+	end
+end
+
 local function AddToFeed(entry)
 	local feed = C.Store().friends
 	feed[#feed + 1] = entry
-	if #feed > FEED_MAX then
-		table.remove(feed, 1)
-	end
+	TrimFeed(feed) -- (the oldest of its kind, if that kind's share is full)
 	C.feedDirty = true
 end
 
@@ -241,6 +257,8 @@ function C.LiveEnable()
 			store.friendStats[friendName] = nil
 		end
 	end
+	-- A feed saved before the shares (one list of 300): each kind down to its share, oldest first.
+	TrimFeed(store.friends)
 	if not listening and ns.Beacon then
 		listening = true
 		table.insert(ns.Beacon.listeners, OnFriendEvent)

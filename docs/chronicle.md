@@ -25,8 +25,13 @@ browsed from any character):
   the level's start), `professions[name]`, `seen = { zones, dungeons, bosses, rares }` (rares by GUID: one spawn
   counts once), `days[YYYY-MM-DD]`, `session = { start, stats, money }`, `playedTotal` (what
   `/played` last said; Chronicle never asks itself, that would print in chat).
-- `friends`: the feed, `{ t, name, classFile, acct, k, ... }`, oldest first, at most 300 (`name`:
-  the full name Battle.net gives, `acct`: their account, see Characters and accounts).
+- `friends`: the feed, `{ t, name, classFile, acct, k, ... }`, oldest first (`name`: the full name
+  Battle.net gives, `acct`: their account, see Characters and accounts). Each kind keeps a share of
+  its own, 300 in all (`FEED_KEEP` in Live.lua): quests turned in 80, coming online and going
+  offline 50, zones 40, level-ups 30, deaths 30, the highlights (bosses, rares, dungeons, loot,
+  mounts, achievements, milestones, professions) 70; a new entry pushes out the oldest of its kind
+  only. One list of 300 let a busy quest day push out a boss kill (a real feed held 126 quests of
+  300). A feed saved before is cut down to the shares when Chronicle starts, oldest first.
 
 For the graphs: `daily["YYYY-MM-DD"] = { played, xp, quests, kills, deaths, levels, afk, bosses, rares,
 runs, jumps, dist, level, gold }` (kept 60 days; `Add` fills today's bucket for the counters in
@@ -339,7 +344,13 @@ request gets an empty end). Beacon accepts 700 J messages per friend per minute.
 
 **Keeping the book small:** a minute after starting (the friend list is known by then), accounts
 that are no longer my Battle.net friends go, and characters with nothing in the last 60 days
-(`BOOK_DAYS`). An account's stamp that can't be real (more than a week ahead) is reset to 0 on
+(`BOOK_DAYS`). An account keeps at most 30 characters (`CHARS_KEPT`), the most recently played
+(its profile's last played, else its latest day or highlight): a real account has a handful within
+60 days (the most in a real book: 6), so this only stops a broken or hostile client from filling
+the saved data with characters. Checked when a record brings a character new to the account (the
+new one goes if it's the least recent), and on start for what was saved before. One that went comes
+back with its next records (its older ones aren't asked for again: the account is complete up to
+its stamp). An account's stamp that can't be real (more than a week ahead) is reset to 0 on
 start: everything is asked again. My own last stamp that far ahead (`store.myU`: the clock was wrong
 once; friends drop records stamped beyond a week, and new stamps would go on from it) restamps
 everything of mine from now on start. With "all my characters" off, playing another character than

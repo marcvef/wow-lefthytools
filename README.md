@@ -313,11 +313,13 @@ version they have), or once they play it with an up-to-date LefthyTools.
   level, when it was last played, its week, its latest highlight; a friend who's online isn't
   listed again with their other characters), and on **News** what everybody did, one line per
   event: level-ups, deaths, bosses, rares, first dungeon visits, epic loot, mounts, achievements
-  and milestones. A blue number on the tab (and a blue dot on the book) says what's new.
+  and milestones. A blue number on the tab (and a blue dot on the book) says what's new. Each kind
+  of news keeps a share of its own, so a busy quest day doesn't push out a boss kill.
 - **Also when they're offline:** friends' clients pass each other's journals on, so whoever is
   online brings you the news and graphs of those who aren't, and yours reach them the same way.
   Only to people who have that player as a Battle.net friend too (journals go by a hash of the
-  BattleTag; the BattleTag itself never leaves your client). Needs Beacon.
+  BattleTag; the BattleTag itself never leaves your client). Up to 30 characters per friend are
+  kept, the ones they played most recently. Needs Beacon.
 - **While you were away:** a minute after you log in, a chat line per friend with what they did
   since you last played. Once a week, **last week's leaderboard** in chat.
 - `/chronicle session` prints this session in one line; the AFK screen shows it too.
