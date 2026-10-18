@@ -16,10 +16,10 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Core/Locale.lua            ns.L localization table (English keys, falls back to English)
   Locales/deDE.lua           German settings texts (loaded only on a deDE client)
   Core/Core.lua              module registry, saved settings, enable/disable lifecycle, versions,
-                             shared helpers (secret values, your own loot)
+                             shared helpers (secret values, combat, text, names, your own loot)
   Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons,
                              our own popup list and dropdown (PopupList, AddPicker), minimap
-                             buttons (MinimapButton), class colours
+                             buttons (MinimapButton), class colours, how many windows are open
   Core/MapArt.lua            a zone's map from the world map's art with what you've explored (LT.MapArt:
                              the Bestiary ledger's kill map, the fight stream's map without minimap tiles)
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
@@ -251,12 +251,23 @@ entry, in English and German, with every change players notice.**
   (Beacon's `announce`, `report`, `reports` and `stream`; Core's own words are registered the same
   way). Words are registered when the file loads, so they answer while their module is off too.
   Modules may add an alias (Mirage keeps `/mirage`).
-- **Shared helpers** (`Core/Core.lua`), for code in any module: `LT.Print(msg, source)`;
-  secret values (forever-platform.md) with `LT.IsSecret(v)`, `LT.Readable(v)` (there and not a
-  secret) and `LT.Value(f, ...)` (a call's first answer if the call works and the answer isn't a
-  secret, else nil: for APIs that may be missing, broken or hidden); `LT.SafeCall(m, method, ...)`;
-  `LT.OwnLoot(text)` (your own loot from a `CHAT_MSG_LOOT` line); versions (`LT.ParseVersion`,
-  `LT.CompareVersions`). UI building blocks are in `Core/Window.lua` (`LT.Window`).
+- **Shared helpers** (`Core/Core.lua`), for code in any module. One copy each: a module keeps at
+  most a short local name for one (`local issecret = LT.IsSecret`, `B.CutUTF8`, `C.Ago`), never a
+  copy of its own. `LT.Print(msg, source)`; secret values (forever-platform.md) with
+  `LT.IsSecret(v)`, `LT.Readable(v)` (there and not a secret) and `LT.Value(f, ...)` (a call's
+  first answer if the call works and the answer isn't a secret, else nil, always one value: for
+  APIs that may be missing, broken or hidden); `LT.InCombat()` (the combat lockdown or the moment
+  before it, inside `PLAYER_REGEN_DISABLED`; never a secret); text: `LT.CutUTF8(text, maxBytes)`
+  (a byte limit cut on a whole UTF-8 letter), `LT.Decimal(text, english)` (a number's decimal
+  point as the client writes it, "4,5" in German; `english` keeps the point for chat lines),
+  `LT.Ago(t)` ("just now", "5 min ago", ..., localized); names with Forever's surnames in
+  `LT.Names`: `First` ("Anna" of "Anna Brook" or "Anna-Realm"), `HasSurname`, `Same` (the same
+  character however typed), `Mine` (my name as the game shows it, then the first name and the
+  surname) and `IsMine`; `LT.SafeCall(m, method, ...)`; `LT.OwnLoot(text)` (your own loot from a
+  `CHAT_MSG_LOOT` line); versions (`LT.ParseVersion`, `LT.CompareVersions`). UI building blocks
+  are in `Core/Window.lua` (`LT.Window`), with `LT.Window.OpenCount()`: how many windows are open
+  (Blizzard's panels, the bags, Mirage's window lists with ours), for Mirage, the AFK screen and
+  flights.
 
 ## Settings panel
 
@@ -287,7 +298,7 @@ elsewhere (e.g. a slash command).
 
 - `Core/Locale.lua` creates `ns.L`, keyed by the English text; missing translations fall back to
   the key. `Locales/deDE.lua` returns early unless `GetLocale() == "deDE"` and sets
-  `ns.DECIMAL_COMMA` (used by `LT.Options.Seconds`: "1,5 s"). Both load first in the TOC.
+  `ns.DECIMAL_COMMA` (read by `LT.Decimal`: "1,5 s"). Both load first in the TOC.
 - **Scope:** everything in the settings panel (titles, descriptions, headers, labels, tooltips,
   Mirage group labels, keybinding names) and Beacon's tooltips. Chat commands and chat output
   stay English, except texts other players or the toast show: party quest announcements and
@@ -299,8 +310,10 @@ elsewhere (e.g. a slash command).
   are plain strings, not `L[...]`. `tests/test_de.lua` fails on formal terms (Minikarte,
   Oberfläche, Schlachtzug, …) and on translated module names.
 - **Adding a text:** write `L["English text"]` (one literal per key, `%s` for variable parts) and
-  add the German line to `Locales/deDE.lua`. `npm test` fails if a used key has no German entry or
-  a German entry is unused, and on any runtime fallback in the German run (`ns.L_MISSING`).
+  add the German line to `Locales/deDE.lua`, under its module's heading (the blocks go in module
+  order; a text several modules use sits with one of them). `npm test` fails if a used key has no
+  German entry or a German entry is unused, and on any runtime fallback in the German run
+  (`ns.L_MISSING`).
 - **Adding a language:** `Locales/<locale>.lua` like `deDE.lua`, listed in the TOC after
   `Core/Locale.lua`.
 
