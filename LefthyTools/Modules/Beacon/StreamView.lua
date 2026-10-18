@@ -856,7 +856,7 @@ local function Build(view, name, parent)
 end
 
 local function NewView(key, kind)
-	return { key = key, kind = kind, dots = {}, dotFor = {}, map = { tiles = {} }, clock = 0, nextFeed = 0,
+	return { key = key, kind = kind, dots = {}, dotFor = {}, map = {}, clock = 0, nextFeed = 0,
 		picture = { mobs = {}, recent = {}, moments = {} }, seen = {}, kills = 0, lately = {} }
 end
 

@@ -14,7 +14,7 @@ local S = B.Stream
 -- change only when the place reaches another tile or zone (or you've explored more), the anchor
 -- only when the map moved.
 
-local Value, issecret = S.Value, S.issecret
+local issecret = S.issecret
 local PX_PER_YARD, GLIDE = S.PX_PER_YARD, S.GLIDE
 local TILE_YARDS = 1600 / 3
 
