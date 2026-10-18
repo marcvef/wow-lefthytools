@@ -46,8 +46,11 @@ for _, heading in ipairs({ "Mirage", "Misc Tweaks", "Beacon", "Chronicle", "Gene
 end
 check(order[1] > 0 and order[1] < order[2] and order[2] < order[3] and order[3] < order[4] and order[4] < order[5],
 	"in a version: grouped by module, each heading once, in a fixed order, got\n" .. newsText)
-check(newsText:find("LefthyTools 0.4.0-3-gabc1234", 1, true) < newsText:find("LefthyTools 0.5.0", 1, true),
-	"the newest first: what came after the last tag, then the tagged versions")
+-- (Right after a release every entry has its version: then the newest version's heading comes first.)
+local newestHeading = news[#news].version and ("LefthyTools " .. news[#news].version) or "LefthyTools 0.4.0-3-gabc1234"
+local newestAt, olderAt = newsText:find(newestHeading, 1, true), newsText:find("LefthyTools 0.5.0", 1, true)
+check(newestAt and olderAt and (newestHeading == "LefthyTools 0.5.0" or newestAt < olderAt),
+	"the newest first: what came after the last tag (or the newest version), then the tagged versions")
 check(newsText:find("\nBeacon\n- Friends in your group: ", 1, true) and newsText:find("- Level progress: ", 1, true),
 	"each entry: a short title and a sentence")
 local drawn = {}
