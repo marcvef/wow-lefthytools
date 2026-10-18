@@ -186,6 +186,13 @@ the open one's button greyed out:
   strings from pools (`G.NewCanvas`, Canvas.lua): a redraw reuses everything, nothing is created after the first
   draw. A hover area's tooltip (`Canvas:Hover`, every page on the canvas) lets a long line wrap
   (`AddLine(..., true)`), so the tooltip keeps a readable width instead of growing with its longest line.
+  A redraw keeps an open tooltip: hiding the area under the mouse closed it (its owner gone), and the
+  game opens it again only when the mouse moves, so the Friends page's redraw every 5 s closed it
+  under a resting mouse. The page draws start with `Canvas:Reset(true)`, which leaves the area whose
+  tooltip is open (`GameTooltip:IsOwned`) shown, and the window calls `Canvas:Done()` after the draw:
+  the tooltip shows the area now under the mouse (`IsMouseOver`: the same row, unless the rows
+  moved), filled from its new lines, or closes; the old area goes if the draw didn't use it. A
+  hover area's `OnLeave` closes only its own tooltip. Nothing extra while no tooltip of ours is open.
 - **Friends' graphs:** a friend picked in the dropdown (other pages fall back to you): their
   account from `C.Accounts()`, compared with mine from there (both all characters), named by the
   account (their BattleTag's name). Last 14 days (the same bars from their days), Last 7 days
@@ -216,7 +223,7 @@ the open one's button greyed out:
   their levels (up to three on one line; more one per line, the most played first, at most 10 and
   "... and N more": one line of them made the tooltip very wide) and the highlight's date. The corners count friends online and characters not
   online. Redrawn every 5 s (who's online and where changes all the time) and on feed changes (at
-  most every 3 s).
+  most every 3 s); a row's tooltip stays open through it (see Graphs: a redraw keeps an open tooltip).
 - **Compare** (`G.DrawCompare`, Compare.lua): characters (`C.Characters()`, see below), yours and every
   friend's, in every graph, by character names only. A toolbar: 7 / 14 / 30 days, and a chip per
   character (its colour: the class colour, a second of the same class lighter, a third darker;

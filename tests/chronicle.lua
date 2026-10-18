@@ -1780,5 +1780,49 @@ do
 		"many: one per line, the most played first, at most 10 (and how many more), got " .. listed)
 	row._scripts.OnLeave(row)
 	for i = 1, 12 do book["Carlalt" .. i .. "-Realmy"] = nil end
+
+	-- The Friends page redraws every 5 s. The row under a resting mouse isn't hidden for it (that
+	-- closed its tooltip, and the game opens it again only when the mouse moves): its tooltip stays,
+	-- filled anew.
+	anna("S2;;0;260.0;750.0;Goldshire;") -- (she stays online: the rows don't move)
+	CH.Open("friends")
+	row = rowOf("Carl Vale|r")
+	row._mouse = true
+	row._scripts.OnEnter(row)
+	local hide, hidden = row.Hide, false
+	row.Hide = function(self) hidden = true; return hide(self) end
+	local draws, drawTables = 0, C.Graphs.DrawTables
+	C.Graphs.DrawTables = function(...) draws = draws + 1; return drawTables(...) end
+	book["Carl-Realmy"].level = 19 -- (to see the tooltip filled anew)
+	Advance(6.5)
+	check(draws >= 1 and not hidden and TOOLTIP.shown and TOOLTIP.owner == row and TOOLTIP.title:find("Carl Vale|r", 1, true)
+		and tooltipHas("Level 19 - Realmy"), "a redraw under the mouse: the row's tooltip stays open, with its new lines")
+	row._mouse = false
+	row._scripts.OnLeave(row)
+	draws = 0
+	Advance(6.5)
+	check(draws >= 1 and hidden and not TOOLTIP.shown, "the mouse gone: redrawn as usual, no tooltip")
+	row.Hide, C.Graphs.DrawTables = nil, drawTables
+	book["Carl-Realmy"].level = 18
 	win:Hide()
+	-- The rows moved (fewer areas this time): the area that had the tooltip goes, and the one under
+	-- the mouse now shows its own; nothing under the mouse: the tooltip closes.
+	local scratch = C.Graphs.NewCanvas(CreateFrame("Frame"))
+	scratch:Reset(true)
+	local first = scratch:Hover(0, 0, 10, 10, { "One", "first" })
+	local second = scratch:Hover(0, 10, 10, 10, { "Two", "second" })
+	scratch:Done()
+	second._mouse = true
+	second._scripts.OnEnter(second)
+	scratch:Reset(true)
+	check(scratch:Hover(0, 0, 10, 10, { "Three", "third" }) == first and second:IsShown(), "(the next draw reuses the first area)")
+	first._mouse = true
+	scratch:Done()
+	check(not second:IsShown() and TOOLTIP.shown and TOOLTIP.owner == first and TOOLTIP.title == "Three",
+		"the rows moved: the tooltip shows the area under the mouse now")
+	first._mouse = false
+	scratch:Reset(true)
+	scratch:Hover(0, 0, 10, 10, { "Four" })
+	scratch:Done()
+	check(not TOOLTIP.shown, "nothing under the mouse any more: the tooltip closes")
 end

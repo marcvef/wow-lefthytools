@@ -199,7 +199,7 @@ end
 -- and time per level it shows); state.metric is the 14-day chart's metric, state.buttons the metric
 -- buttons (created by the window). Returns the page height.
 function G.Draw(canvas, width, c, state)
-	canvas:Reset()
+	canvas:Reset(true) -- (a redraw: the window calls Done after it)
 	local current = c.current or c
 	local y = 0
 	local h, ix, iy = Days(canvas, 0, y, width, c, state.metric)
@@ -343,7 +343,7 @@ end
 -- there (for the comparison: all my characters too); state as for G.Draw, plus
 -- state.newsLines(friend) from the window.
 function G.DrawFriend(canvas, width, friend, name, me, state)
-	canvas:Reset()
+	canvas:Reset(true)
 	local y = 0
 	local h, ix, iy = Days(canvas, 0, y, width, { daily = friend.days }, state.metric)
 	PlaceButtons(canvas, ix, iy, state)

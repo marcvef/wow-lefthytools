@@ -659,7 +659,7 @@ end
 local BIG_H = 260
 
 function G.DrawCompare(canvas, width, people, state, redraw)
-	canvas:Reset()
+	canvas:Reset(true) -- (a redraw: the window calls Done after it)
 	Colours(people)
 	local days = {}
 	for i = state.range - 1, 0, -1 do

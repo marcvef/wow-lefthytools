@@ -746,6 +746,7 @@ function Refresh(keepScroll)
 		if not keepScroll then
 			frame.Scroll:SetVerticalScroll(0)
 		end
+		frame.Canvas:Done() -- (a tooltip open on the page shows what's under the mouse now)
 		lastGraphsRefresh, graphsPending = GetTime(), false
 	elseif tab == "stats" then
 		local labels, values = Statistics(mine)

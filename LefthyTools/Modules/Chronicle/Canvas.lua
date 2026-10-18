@@ -73,11 +73,22 @@ local function Take(canvas, kind, create)
 	return object
 end
 
--- Hides everything; the next draw takes objects from the start again.
-function Canvas:Reset()
+local tipFrame -- the hover area whose tooltip is open (HoverEnter), until the mouse leaves it
+
+-- Hides everything; the next draw takes objects from the start again. redraw: the page is drawn
+-- again right away (Done after it): the hover area whose tooltip is open stays shown, since hiding it
+-- closes the tooltip and the game opens it again only when the mouse moves (the Friends page redraws
+-- every 5 s under a mouse that rests on a row).
+function Canvas:Reset(redraw)
+	local keep = redraw and tipFrame and tipFrame.canvas == self and GameTooltip:IsOwned(tipFrame) and tipFrame or nil
+	self.kept, self.keptAt = keep, nil
 	for kind, pool in pairs(self.pools) do
-		for _, object in ipairs(pool) do
-			object:Hide()
+		for i, object in ipairs(pool) do
+			if object == keep then
+				self.keptAt = i
+			else
+				object:Hide()
+			end
 		end
 		self.used[kind] = 0
 	end
@@ -162,6 +173,7 @@ local function HoverEnter(self)
 	if not self.lines then
 		return
 	end
+	tipFrame = self
 	GameTooltip:SetOwner(self, "ANCHOR_TOP")
 	GameTooltip:SetText(self.lines[1], 1, 0.82, 0)
 	for i = 2, #self.lines do
@@ -170,13 +182,52 @@ local function HoverEnter(self)
 	GameTooltip:Show()
 end
 
+-- (its own tooltip only: after a redraw another area may have it, Done)
+local function HoverLeave(self)
+	if tipFrame == self then
+		tipFrame = nil
+	end
+	if GameTooltip:IsOwned(self) then
+		GameTooltip:Hide()
+	end
+end
+
+-- After a redraw (Reset(true)): the tooltip that was open shows the hover area now under the mouse
+-- (the same row, unless the rows moved), filled from its new lines; nothing there, it closes. The
+-- area that had it goes if this draw didn't use it. Costs nothing while no tooltip of ours is open.
+function Canvas:Done()
+	local kept = self.kept
+	if not kept then
+		return
+	end
+	self.kept = nil
+	local hovers, used = self.pools.hover, self.used.hover
+	local under = self.keptAt <= used and kept:IsMouseOver() and kept or nil
+	if not under then -- (the rows moved: whichever is under the mouse now, a raised one first)
+		for i = 1, used do
+			if hovers[i]:IsMouseOver() and (not under or hovers[i].raised) then
+				under = hovers[i]
+			end
+		end
+	end
+	if self.keptAt > used then
+		kept:Hide()
+	end
+	if under and under.lines then
+		HoverEnter(under)
+	else
+		HoverLeave(kept)
+	end
+end
+
 -- raised: above the other hover areas (a symbol on a chart, inside its day's area).
 function Canvas:Hover(x, y, w, h, lines, onClick, raised)
 	local f = Take(self, "hover", function()
 		local frame = CreateFrame("Frame", nil, self.parent)
+		frame.canvas = self
 		frame:EnableMouse(true)
 		frame:SetScript("OnEnter", HoverEnter)
-		frame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+		frame:SetScript("OnLeave", HoverLeave)
 		frame:SetScript("OnMouseUp", function(it, button)
 			if it.onClick then
 				it.onClick(button)
@@ -393,7 +444,7 @@ end
 
 -- Tables one under the other (the window builds them). Returns the page height.
 function G.DrawTables(canvas, width, tables)
-	canvas:Reset()
+	canvas:Reset(true) -- (a redraw: the window calls Done after it)
 	local y = 0
 	for i, t in ipairs(tables) do
 		y = y + Table(canvas, y, width, t) + (i < #tables and CARD_GAP or 0)
