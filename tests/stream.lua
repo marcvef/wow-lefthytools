@@ -1739,3 +1739,52 @@ do
 	THREAT = {}
 	Advance(1.2)
 end
+
+section("Beacon: fight stream: spells learned while it runs")
+do
+	-- The sensor reads your spellbook's range checks when it starts; one that changes while it runs
+	-- (a spell learned, a new rank, a talent) is read again: once for a burst of events, a moment
+	-- later, out of a fight.
+	local S = BB.Stream
+	local reads, RangeChecks = 0, S.RangeChecks
+	S.RangeChecks = function() reads = reads + 1; return RangeChecks() end
+	local function yards()
+		for _, mob in ipairs(S.Sensed().mobs) do if mob.name == "Kobold Miner" then return mob.yards end end
+	end
+	local function about(a, b) return a ~= nil and math.abs(a - b) < 0.01 end
+	MOBS = { nameplate1 = { name = "Kobold Miner", level = 9, combat = true, attacking = true, yards = 8, x = 0.5, y = 0.5 } }
+	Fire("SPELLS_CHANGED")
+	Advance(1.1)
+	check(not S.SenseRunning() and reads == 0, "nobody needs the sensor: a changed spellbook isn't read")
+	lefthy("stream me")
+	EnterCombat()
+	Advance(0.6)
+	check(reads == 1 and about(yards(), 17.5),
+		"the sensor starts: the range checks are read (in a fight Sinister Strike 5 yd and Throw 30: the miner at 8 yd is about 17)")
+	BOOK[#BOOK + 1] = { spellID = 2094, itemType = 1, isPassive = false }
+	SPELL_RANGES[2094], SPELL_NAMES[2094] = 10, "Blind"
+	for _ = 1, 3 do Fire("SPELLS_CHANGED") end
+	Fire("LEARNED_SPELL_IN_SKILL_LINE", 2094, 1, false)
+	Advance(1.6)
+	check(reads == 1 and about(yards(), 17.5), "the spellbook changes in a fight: not read until it's over")
+	LeaveCombat()
+	Advance(0.6)
+	check(reads == 2, "the fight is over: read again, once for the four events")
+	EnterCombat()
+	Advance(0.6)
+	check(about(yards(), 7.5), "... and Blind (10 yd) tells distances now: the miner is about 7 yd away, got " .. tostring(yards()))
+	LeaveCombat()
+	Fire("SPELLS_CHANGED")
+	Advance(0.4)
+	check(reads == 2, "out of a fight: not at once ...")
+	Advance(1.1)
+	check(reads == 3, "... but a moment later")
+	S.CloseView("me")
+	Advance(0.6)
+	Fire("SPELLS_CHANGED")
+	Advance(1.6)
+	check(not S.SenseRunning() and reads == 3, "the sensor stopped: its spellbook isn't read any more")
+	S.RangeChecks = RangeChecks
+	BOOK[#BOOK], SPELL_RANGES[2094], SPELL_NAMES[2094] = nil, nil, nil
+	MOBS = {}
+end

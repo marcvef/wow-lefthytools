@@ -46,9 +46,9 @@ local S = B.Stream
 --
 -- Cost: nothing while nobody needs it. Then a look at up to 40 nameplate units every half second
 -- (range checks, 48 places each; in a group, who has aggro on the five you fight first), the cast
--- events of "player" and (a word each) of mobs, XP, kills and loot; the mobs' health
--- (StreamHealth.lua). Apart from that, your health is estimated while Beacon is on (a handful of
--- your own events; StreamHealth.lua).
+-- events of "player" and (a word each) of mobs, XP, kills and loot, your spellbook changing (its
+-- range checks read again, once, out of a fight); the mobs' health (StreamHealth.lua). Apart from
+-- that, your health is estimated while Beacon is on (a handful of your own events; StreamHealth.lua).
 
 local Value, issecret = S.Value, S.issecret
 local SPOTS = 48
@@ -68,7 +68,7 @@ local atan2 = math.atan2 or math.atan -- (Lua 5.1 / 5.3)
 
 local picture = { me = true, mobs = {}, recent = {}, moments = {} }
 local castNow, powerNow, formNow = {}, {}, {}
-local checks                -- the range checks, read when the sensor starts
+local checks                -- the range checks, read when the sensor starts (and when your spellbook changes)
 local plateReach = 40       -- nameplateMaxDistance
 local soft                  -- the soft target's arc (nil: wide or off, tells nothing)
 local pinned = 1            -- nameplateTargetRadialPosition (2: every mob's nameplate kept in combat)
@@ -741,10 +741,35 @@ local function Fill(n, unit, unitTarget, targetKey, onScreen, now, friendly)
 	return mob.target
 end
 
+-- Your spellbook changed (a spell learned, a new rank, a talent): the range checks are read again,
+-- at the first look SPELLS_WAIT after the first event of a burst, and only out of a fight (spells
+-- aren't learned in one, and the event may come for other things then too). Listened to while the
+-- sensor runs.
+local SPELLS_WAIT = 1
+local SPELL_EVENTS = { "SPELLS_CHANGED", "LEARNED_SPELL_IN_SKILL_LINE" }
+local spellsAt -- when to read them again (nil: they're up to date)
+local spellWatch = CreateFrame("Frame")
+spellWatch:SetScript("OnEvent", function()
+	spellsAt = spellsAt or GetTime() + SPELLS_WAIT
+end)
+
+local function SenseSpells(on)
+	spellWatch:UnregisterAllEvents()
+	spellsAt = nil
+	if on then
+		for _, event in ipairs(SPELL_EVENTS) do
+			pcall(spellWatch.RegisterEvent, spellWatch, event) -- (one this client doesn't have: left out)
+		end
+	end
+end
+
 local forgotAt = 0
 local function Look()
 	local now = GetTime()
 	picture.continent = Here()
+	if spellsAt and now >= spellsAt and not here.combat then
+		spellsAt, checks = nil, S.RangeChecks()
+	end
 	picture.north, picture.west, picture.facing, picture.combat = here.north, here.west, here.facing or 0, here.combat
 	picture.mapID = Value("C_Map.GetBestMapForUnit", "player")
 	picture.name = UnitName("player")
@@ -832,6 +857,7 @@ function S.SenseNeed(who, on)
 		wipe(picture.mobs)
 		picture.cast = nil
 		nextLook = 0
+		SenseSpells(true)
 		SenseMoments(true)
 		SenseMobCasts(true)
 		S.SenseMobHealth(true)
@@ -842,6 +868,7 @@ function S.SenseNeed(who, on)
 	elseif not running and wasRunning then
 		ticker:Hide()
 		wipe(clouds)
+		SenseSpells(false)
 		SenseMoments(false)
 		SenseMobCasts(false)
 		S.SenseMobHealth(false)

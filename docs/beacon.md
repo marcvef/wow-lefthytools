@@ -570,7 +570,10 @@ screen fails ("Can't measure restricted regions"); a mob has a nameplate only wh
 screen; your own place and facing are exact; nameplate size doesn't tell distance; in combat the
 game keeps your target's nameplate up while it's behind you. So distances come from the range
 checks (beyond 30 yd: on the rim, "more than 30 yd away"; 40 yd is the outer ring) and directions
-are **learned**.
+are **learned**. The sensor reads its range checks when it starts, and again when your spellbook
+changes while it runs (`SPELLS_CHANGED`, `LEARNED_SPELL_IN_SKILL_LINE`: a spell learned, a new rank,
+a talent): once for a burst of them, at the first look 1 s after the first one, and only out of a
+fight (nothing is learned in one, and the event may come for other things then).
 
 **Learning a direction** (StreamSense.lua): each mob is a cloud of 48 possible places in the world
 (by GUID); every look keeps the places that fit: the distance band (2 yd slack); a nameplate = on
