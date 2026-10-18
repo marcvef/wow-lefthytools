@@ -2,7 +2,7 @@
 
 ## Automated (`npm test`)
 
-`npm install` once, then `npm test`. `tests/run.js`:
+`npm install` once, then `npm test` (about 80 s), or a part of it (below). `tests/run.js`:
 
 1. reads the file list from the TOC, checks that every file it names exists (XML too) and each
    Lua file's syntax as Lua 5.1 (luaparse);
@@ -12,12 +12,99 @@
    prints the value to set after adding or removing a file), and that `Update-LefthyTools.cmd`
    is the current build of `install.ps1` (`npm run build-installer` regenerates it);
 4. runs the addon in fengari (Lua 5.3) against `tests/mock.lua`, which fakes the WoW API: once as
-   an English client (`tests/helpers.lua`, then one file per module, in the order `tests/run.js`
-   lists them) and once as German (`tests/test_de.lua`, which also fails
+   an English client (the files below) and once as German (`tests/test_de.lua`, which also fails
    on formal terms, translated module names and runtime translation fallbacks).
 
 The mock runs OnUpdate only on visible frames, like the game, and animation groups with
 `SetToFinalAlpha(true)` jump to their end state on `Play()`. It does not replace testing in game.
+
+### The English suite
+
+One Lua state, in the order `ENGLISH` in `tests/run.js` lists the files. `tests/helpers.lua` loads
+the addon like the client does (TOC order, then `ADDON_LOADED`, `PLAYER_LOGIN`,
+`PLAYER_ENTERING_WORLD`) and returns the shared helpers; each test file is then a chunk of its own
+and gets that table as `...`. After the last file, helpers.lua's `Finish()` makes the last checks
+(nothing reached the error handler, no secret kept as a table key or in saved variables, no
+global leaked) and prints the count. The files share the mock's clock and world: each goes on
+from where the one before left time, Beacon's friends, saved variables and open windows.
+
+| File | What it tests | Needs before it |
+|---|---|---|
+| `core.lua` | version, module framework, error catcher, Core's helpers, map art | (runs first) |
+| `mirage.lua` | the idle fade, reveals, controller UI, minimap quest areas, settings, Mirage off | - |
+| `tweaks.lua` | Misc Tweaks: AFK screen, bags, quest progress, combo points, retail frames, new quests, quests on maps, aggro tags | - |
+| `beacon.lua` | Beacon: maps, sharing, updates, alerts, pings, level-ups, items, LTC, reports, switching off | - |
+| `stream.lua` | Beacon's fight stream | `beacon.lua` (the clock) |
+| `flights.lua` | Misc Tweaks: cinematic flights | - |
+| `chronicle.lua` | Chronicle | `beacon.lua` (what happened there) |
+| `levelup.lua` | Misc Tweaks: the level-up window | - |
+| `bestiary.lua` | Bestiary | - |
+| `whatsnew.lua` | Core: the what's new window | - |
+
+Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
+(`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:
+`stream.lua` needs `beacon.lua` only for the clock (which floating numbers are up at a check
+follows from where Beacon's 0.5 s looks fall), `chronicle.lua` counts what Chronicle kept from
+`beacon.lua` (my level-ups, Anna's and Bob's deaths and level-ups), and `mirage.lua` watches the
+fade that begins at login, so no file that lets time pass may run before it.
+
+### One module's tests
+
+`npm test -- stream` runs steps 1-3, then helpers.lua, `stream.lua` and what its Needs line names
+(`beacon.lua`), in the suite's order, and the last checks. Several names add up
+(`npm test -- chronicle levelup`); `german` is the German suite (`npm test -- german`). Without
+names everything runs. Alone a file takes seconds (`beacon.lua` and `chronicle.lua` the longest);
+the whole suite takes longer than its files added up, since each `Advance` step goes over every
+frame made so far.
+
+### Adding a test
+
+- Put it in the module's file, in its section or under a new `section("...")` (a heading in the
+  output). Locals as usual: each file is its own chunk, far from Lua's 200.
+- Take what you use from helpers.lua at the top of the file
+  (`local check, section, ns, LT, lefthy = suite.check, ...`).
+- Don't count on what another file left: set up what the test needs (greet the friends it talks
+  to, `anna("H2")`; Beacon forgets a friend 65 s after their last message) and put back the mock
+  knobs you change (`QUESTS`, `MOBS`, `STATE`, `UnitRace = ...`): later checks share them.
+- Time passes for every check after yours: count the kind of message that matters
+  (`sentTo(11, mark, "S2;")`), not everything sent in a window, as an added test moves the phase
+  of every periodic send after it.
+- A new file: add it to `ENGLISH` in run.js where it should run, with a description line and a
+  `-- Needs:` line (run.js fails without them, or when a file it needs runs after it). Then
+  `npm test -- <name>` must pass.
+
+### Helpers
+
+From helpers.lua (`suite.<name>`): `check(cond, msg)`, `near(a, b, eps)`, `a(frameName)` (its
+alpha), `section(title)`; `ns`, `LT`, `lefthy` (`/lefthy`); `printedSince(mark)` (chat lines since
+`PRINTED[mark]`); `sentTo(id, from, prefix)` (Beacon messages to a game account since
+`GAMEDATA[from]` that start with prefix); `anna(msg)` (a Beacon message from Anna, game account 11;
+Bob is 12: `Fire("BN_CHAT_MSG_ADDON", "LTBeacon", msg, "WHISPER", 12)`); `peers()`; `pinOf(id)` (a
+friend's world map dot); `tooltipHas(line)`; `afk(on)`; `catchErrors()` (what reaches the error
+handler meanwhile).
+
+From the mock (globals):
+- `Fire(event, ...)`; `Advance(seconds)` moves the clock in 1/60 s steps (timers, then each
+  visible frame's OnUpdate).
+- `EnterCombat()` / `LeaveCombat()`: a fight the game's way. `PLAYER_REGEN_DISABLED` comes with
+  `UnitAffectingCombat` already true but `InCombatLockdown()` still false (the lockdown begins
+  after that event; `Fire` keeps it so for anyone firing it); `PLAYER_REGEN_ENABLED` after the
+  lockdown ends. `STATE.combat` alone: in a fight without the events.
+- `SECRET`, a value the game keeps secret. Like the game's it errors on arithmetic, comparing
+  (`<`, `<=`, ...; `==` only against another table), `..`, `#`, indexing, calling and `pairs`;
+  `issecretvalue` and `tostring` work. Lua can't catch it as a table key, in `==` with a plain
+  value, `type()`, `tonumber()` or `if secret then`: the last checks look for secrets kept as keys.
+- Battle.net friends (`BN_FRIENDS`): Anna Brook (11, mage) and Bob Stone (12, warrior) online in
+  WoW, Finn Hale (16) on an older LefthyTools, Carl Vale (13) offline, Dora Reed (14) in the app,
+  Eve Marsh (15) in another region. As on Forever, Battle.net names carry the surname (Beacon's
+  `peer.name` is "Anna Brook"); a journal keys a character by first name and realm ("Anna-Realmy").
+- What happened: `PRINTED` (chat), `GAMEDATA` and `GameDataTo(id, from)` (Beacon messages),
+  `SENT_CHAT`, `SOUNDS`, `BLOCKED` (protected calls in combat), `ERRORS`, `TOOLTIP`.
+- Doing things: `TypeChat(text)` / `TypeChatSpace(text)` (the chat box), `OpenWorldMap(mapID)`,
+  `ClickWorldMap()`, `PinsOf(template)`.
+- The world: `STATE` (target, cursor, panel, bags, afk, ...), `PLAYER_POS`, `ZONE`, `MOBS`
+  (nameplates), `PARTY`, `QUESTS`, `QUESTS_ON_MAP`, `MAP_RECTS`, `ITEMS`, `BAGS`, and `MOCK_*`
+  knobs (`MOCK_SEND_RESULT`, `MOCK_ITEM_UNCACHED`, ...): each is described where mock.lua sets it.
 
 ## In game
 
