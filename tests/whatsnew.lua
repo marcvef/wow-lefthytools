@@ -1,4 +1,5 @@
 -- Core: the what's new window.
+-- Needs: no other file.
 local suite = ...
 local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
 

@@ -1,4 +1,7 @@
 -- Beacon's fight stream: the sensor, the window, watching friends, the battle row.
+-- Needs: beacon.lua, only for the clock: the battle row plays a look's moments one after another,
+-- looks come every 0.5 s on Beacon's tick, and which numbers float at a check depends on where that
+-- tick stands when this file begins.
 local suite = ...
 local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
 local printedSince, sentTo, anna = suite.printedSince, suite.sentTo, suite.anna

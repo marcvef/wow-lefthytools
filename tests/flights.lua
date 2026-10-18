@@ -1,4 +1,5 @@
 -- Misc Tweaks: cinematic flights.
+-- Needs: no other file (it greets Anna and Bob itself).
 local suite = ...
 local check, a, section, ns, LT, lefthy = suite.check, suite.a, suite.section, suite.ns, suite.LT, suite.lefthy
 local anna = suite.anna

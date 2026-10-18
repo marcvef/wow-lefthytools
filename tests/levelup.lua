@@ -1,4 +1,5 @@
 -- Misc Tweaks: the level-up window.
+-- Needs: no other file.
 local suite = ...
 local check, section, ns, lefthy = suite.check, suite.section, suite.ns, suite.lefthy
 local printedSince = suite.printedSince
@@ -26,6 +27,9 @@ do
 	if LefthyToolsLevelUpFrame then LefthyToolsLevelUpFrame:Hide() end
 
 	-- A rogue goes from 19 to 20: base stats +1 Str, +2 Agi, +1 Sta, +0 Int, +1 Spi (Spirit: only the snapshot knows).
+	-- Chronicle times a level from the level-up that began it: an earlier file's, else an hour ago.
+	local chronicled = LefthyToolsChronicleDB.chars["Lefthy-Realmy"]
+	chronicled.levelStart = chronicled.levelStart or chronicled.stats.played - 3600
 	PLAYER_LEVEL = 19
 	LU.TakeSnapshot()
 	PLAYER_LEVEL = 20

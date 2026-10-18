@@ -1,4 +1,6 @@
 -- Core: the version, the module framework, the error catcher, Core's shared helpers and map art.
+-- Needs: no other file. It runs first: its framework checks see the modules as login left them
+-- (Mirage off) and switch Mirage on; hardly any time passes in it (see mirage.lua).
 local suite = ...
 local check, near, section, ns, LT, lefthy = suite.check, suite.near, suite.section, suite.ns, suite.LT, suite.lefthy
 local Mirage = LT:GetModule("mirage")

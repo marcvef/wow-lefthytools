@@ -1,5 +1,6 @@
 -- Beacon: friends on the maps, sharing, updates, alerts, pings, quests, level-ups, items, LTC, error
 -- reports, switching it off, and its tick calling the other files' hooks. (The fight stream: stream.lua.)
+-- Needs: no other file: Anna, Bob and Finn (the mock's Battle.net friends) are online at login.
 local suite = ...
 local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
 local printedSince, sentTo, anna, peers = suite.printedSince, suite.sentTo, suite.anna, suite.peers

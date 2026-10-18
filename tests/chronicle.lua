@@ -1,5 +1,7 @@
 -- Chronicle: recording, friends, the window, friends' journals, surnames, and its tick calling the
 -- other files' hooks.
+-- Needs: beacon.lua: Chronicle kept what happened there (my level-ups to 21, Anna's and Bob's
+-- deaths and level-ups), and its pages, symbols and catch-up lines count on it.
 local suite = ...
 local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
 local printedSince, sentTo, anna, peers = suite.printedSince, suite.sentTo, suite.anna, suite.peers

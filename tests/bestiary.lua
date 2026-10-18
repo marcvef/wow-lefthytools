@@ -1,4 +1,5 @@
 -- Bestiary: what mobs drop, quest drops, the wish list, counting.
+-- Needs: no other file.
 local suite = ...
 local check, near, section, ns, LT = suite.check, suite.near, suite.section, suite.ns, suite.LT
 local printedSince = suite.printedSince

@@ -1,6 +1,7 @@
 -- Misc Tweaks: the AFK screen, status values, bags, quest progress, combo points, retail unit frames,
 -- new quests, quests on continent and world maps, who has aggro on enemy nameplates. (Cinematic
 -- flights and the level-up window: flights.lua and levelup.lua.)
+-- Needs: no other file.
 local suite = ...
 local check, near, section, ns, LT, lefthy = suite.check, suite.near, suite.section, suite.ns, suite.LT, suite.lefthy
 local printedSince, afk = suite.printedSince, suite.afk

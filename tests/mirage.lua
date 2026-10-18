@@ -1,11 +1,17 @@
 -- Mirage: the idle fade, what reveals each element, the controller UI, minimap quest areas, settings,
 -- and its engine hiding elements for another part (a flight's film) while Mirage is off.
+-- Needs: no other file (it switches Mirage on itself when core.lua hasn't). Its first checks watch
+-- the fade that begins at login, so no file that lets time pass may run before it.
 local suite = ...
 local check, near, a, section, LT, lefthy = suite.check, suite.near, suite.a, suite.section, suite.LT, suite.lefthy
 local Mirage = LT:GetModule("mirage")
 local MDB = LefthyToolsDB.settings.mirage
 local mirage = SlashCmdList.LEFTHYTOOLS_MIRAGE
 local function S(id) return REGISTERED_SETTINGS["LefthyTools_mirage_" .. id] end
+if not Mirage.enabled then -- (core.lua switches it on; run without it, this file does)
+	lefthy("enable mirage")
+	Advance(0.3) -- let the debounced rebuild run
+end
 
 section("discovery")
 local ab = Mirage:GetGroup("actionbars")
