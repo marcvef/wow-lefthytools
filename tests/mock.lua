@@ -460,9 +460,14 @@ function geterrorhandler()
 	end
 end
 
+-- The combat lockdown begins only after PLAYER_REGEN_DISABLED, like the game: inside that event
+-- InCombatLockdown() is still false (UnitAffectingCombat already true).
+local lockdownStarting = false
 function Fire(event, ...)
 	local targets = {}
 	for f in pairs(eventFrames[event] or {}) do targets[#targets + 1] = f end
+	local starting = lockdownStarting
+	lockdownStarting = lockdownStarting or event == "PLAYER_REGEN_DISABLED"
 	for _, f in ipairs(targets) do
 		local units = f._units[event]
 		local ok = true
@@ -472,6 +477,7 @@ function Fire(event, ...)
 		end
 		if ok and f._scripts.OnEvent then f._scripts.OnEvent(f, event, ...) end
 	end
+	lockdownStarting = starting
 end
 
 function Advance(seconds, step)
@@ -492,8 +498,12 @@ end
 
 -- game state knobs used by the tests
 STATE = { combat = false, target = false, targetDead = false, hostile = true, cursor = nil, dead = false, moving = false, panel = nil, bags = false }
-function InCombatLockdown() return STATE.combat end
+function InCombatLockdown() return STATE.combat and not lockdownStarting end
 function UnitAffectingCombat() return STATE.combat end
+-- A fight starting and ending, the game's way: in a fight when PLAYER_REGEN_DISABLED fires (the
+-- lockdown follows it), out of it when PLAYER_REGEN_ENABLED does.
+function EnterCombat() STATE.combat = true; Fire("PLAYER_REGEN_DISABLED") end
+function LeaveCombat() STATE.combat = false; Fire("PLAYER_REGEN_ENABLED") end
 function UnitExists(u) return u == "target" and STATE.target end
 function UnitIsDead() return STATE.targetDead end
 function UnitCanAttack() return STATE.hostile end

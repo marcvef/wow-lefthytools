@@ -184,8 +184,7 @@ section("Bestiary: what mobs drop")
 	setting("cardHideInCombat"):SetValue(true)
 	Advance(0.1)
 	check(not card:IsShown(), "on again: gone")
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	check(card:IsShown(), "the fight is over, the mouse still over it: back")
 	-- A mob that never dropped coin: the card says nothing about coin (the window says "no coin").
 	MOBS.mouseover = { guid = "Creature-0-1-0-1-117-00000011", pinned = true } -- (no name: later tests want it unnamed)
@@ -528,14 +527,12 @@ section("Bestiary: what mobs drop")
 		Advance(2) -- (the kills above long done)
 		Fire("PLAYER_XP_UPDATE", "player") -- (where the XP stands now: other tests set it)
 		Advance(2)
-		STATE.combat = true
-		Fire("PLAYER_REGEN_DISABLED")
+		EnterCombat()
 		Advance(12)
 		koboldKill(kobold[1], 80)
 		Advance(8)
 		koboldKill(kobold[2], 90, true) -- (its XP first: still its own)
-		STATE.combat = false
-		Fire("PLAYER_REGEN_ENABLED")
+		LeaveCombat()
 		koboldLoot(kobold[1])
 		koboldLoot(kobold[2])
 		local pace = kobolds().pace
@@ -554,26 +551,22 @@ section("Bestiary: what mobs drop")
 		XP.current = XP.max - 10
 		Fire("PLAYER_XP_UPDATE", "player")
 		Advance(2)
-		STATE.combat = true
-		Fire("PLAYER_REGEN_DISABLED")
+		EnterCombat()
 		Advance(10)
 		Fire("PARTY_KILL", "Player-1-0", kobold[3])
 		XP.current, XP.max = 75, 7000
 		Fire("PLAYER_XP_UPDATE", "player")
 		PLAYER_LEVEL = 20 -- (told after the XP)
-		STATE.combat = false
-		Fire("PLAYER_REGEN_ENABLED")
+		LeaveCombat()
 		koboldLoot(kobold[3])
 		check(pace[1] == 19 and pace[2] == 3 and pace[3] == 255 and pace[5] == 30, "a kill that levels you up: its 85 XP across the level-up, at 19")
 		check(win.Pace.Text:GetText():find("(level 19)", 1, true), "now 20: the window says which level that's for")
 		-- At the new level it starts again; a kill without XP gave 0 (grey); no fight seen: not timed.
 		Advance(2)
-		STATE.combat = true
-		Fire("PLAYER_REGEN_DISABLED")
+		EnterCombat()
 		Advance(6)
 		koboldKill(kobold[4], 100)
-		STATE.combat = false
-		Fire("PLAYER_REGEN_ENABLED")
+		LeaveCombat()
 		koboldLoot(kobold[4])
 		Advance(3)
 		koboldKill(kobold[5])

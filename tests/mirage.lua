@@ -51,9 +51,8 @@ PlayerFrame:SetAlpha(0.6) -- Edit Mode opacity slider moved to 60%
 check(near(a("PlayerFrame"), 0), "stays hidden, new base is remembered")
 
 section("combat reveals")
-STATE.combat = true
 local setsBefore, minimapBefore = MainActionBar._setCount, Minimap:IsShown()
-Fire("PLAYER_REGEN_DISABLED")
+EnterCombat()
 check(MainActionBar._setCount == setsBefore and Minimap:IsShown() == minimapBefore,
 	"no frame changes inside the event handler itself (deferred to the next frame)")
 Advance(0.3)
@@ -63,8 +62,7 @@ check(near(a("DurabilityFrame"), 1), "a frame an animation revealed isn't stuck 
 check(near(a("StatusTrackingBarManager"), 1), "XP bars back in combat")
 Advance(20)
 check(near(a("MainActionBar"), 1), "stays visible during long combat")
-STATE.combat = false
-Fire("PLAYER_REGEN_ENABLED")
+LeaveCombat()
 Advance(4.5)
 check(near(a("MainActionBar"), 1), "lingers after combat")
 Advance(2.5)
@@ -162,13 +160,11 @@ Advance(0.4)
 section("minimap quest areas")
 Advance(8)
 check(not Minimap:IsShown(), "minimap hidden once fully faded (takes the quest areas with it)")
-STATE.combat = true
-Fire("PLAYER_REGEN_DISABLED")
+EnterCombat()
 Advance(0.02)
 check(Minimap:IsShown(), "shown on the very next frame when combat starts")
 Advance(0.4)
-STATE.combat = false
-Fire("PLAYER_REGEN_ENABLED")
+LeaveCombat()
 Advance(5 + 0.1 + 0.6)
 check(Minimap:IsShown(), "still shown while the minimap is visibly fading")
 Advance(0.65)
@@ -250,7 +246,7 @@ check(near(a("MainActionBar"), 1) and near(a("PlayerFrame"), 0.6), "everything b
 local sets = MainActionBar._setCount
 Advance(5)
 check(MainActionBar._setCount == sets, "fully unhooked: no more alpha updates while disabled")
-Fire("CHAT_MSG_WHISPER", "hi", "Someone"); STATE.combat = true; Fire("PLAYER_REGEN_DISABLED"); STATE.combat = false
+Fire("CHAT_MSG_WHISPER", "hi", "Someone"); EnterCombat(); STATE.combat = false
 Advance(1)
 check(MainActionBar._setCount == sets, "events are ignored while disabled")
 Mirage:SetPeek(true); Advance(0.3); Mirage:SetPeek(false)
@@ -372,9 +368,9 @@ section("idle delay 0")
 mirage("delay 0")
 Advance(0.3 + 2)
 check(near(a("MainActionBar"), 0), "delay 0: fades as soon as nothing is going on")
-STATE.combat = true; Fire("PLAYER_REGEN_DISABLED"); Advance(0.5)
+EnterCombat(); Advance(0.5)
 check(near(a("MainActionBar"), 1), "delay 0: still visible in combat, got " .. a("MainActionBar"))
-STATE.target = true; STATE.combat = false; Fire("PLAYER_REGEN_ENABLED"); Fire("PLAYER_TARGET_CHANGED"); Advance(0.5)
+STATE.target = true; LeaveCombat(); Fire("PLAYER_TARGET_CHANGED"); Advance(0.5)
 check(near(a("MainActionBar"), 1), "delay 0: still visible with a target")
 STATE.target = false; Fire("PLAYER_TARGET_CHANGED")
 mirage("reset")

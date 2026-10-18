@@ -47,8 +47,7 @@ Advance(0.1)
 afk(true)
 Advance(0.05)
 check(afkScreen:IsShown(), "the next AFK shows it again")
-STATE.combat = true
-Fire("PLAYER_REGEN_DISABLED")
+EnterCombat()
 Advance(0.02)
 check(not afkScreen:IsShown() and UIParent:GetAlpha() == 1, "combat: back on the next frame (SetAlpha works in combat)")
 afk(false)
@@ -621,8 +620,7 @@ section("Misc Tweaks: retail unit frames")
 	TargetFrame:UpdateHealthBarVisuals("normal")
 	check(last(tHealth)[4] == 147 and ns.RetailFramesPending() and tHealth.HealthBarMask.path,
 		"a new target in combat: Forever's bar position for now (the art still retail's)")
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	check(last(tHealth)[4] == 147, "nothing moved inside the event")
 	Advance(0.05)
 	check(last(tHealth)[4] == 149 and not ns.RetailFramesPending(), "combat over: retail's position, on the next frame")
@@ -972,10 +970,10 @@ section("Misc Tweaks: who has aggro, on enemy nameplates")
 	Advance(0.1)
 	check(same("nameplate2", 0.92, 0.92, 0.92), "no roles: white")
 	AURAS.party1 = { ["Bear Form"] = true, [C_Spell.GetSpellInfo(5487).name] = true } -- (other tests rename spells)
-	Fire("PLAYER_REGEN_DISABLED") -- (roles are guessed again when a fight starts)
+	EnterCombat() -- (roles are guessed again when a fight starts)
 	Advance(0.1)
 	check(same("nameplate2", 0.35, 0.62, 1), "in Bear Form: a tank")
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	AURAS.party1 = nil
 	-- Threat secret and its target not known: nothing said.
 	THREATS["party1>nameplate2"], THREAT.nameplate2, MOBS.nameplate2.targetGUID = SECRET, SECRET, nil
@@ -997,26 +995,21 @@ section("Misc Tweaks: who has aggro, on enemy nameplates")
 	Advance(0.1)
 	check(tagText("nameplate1") == nil, "solo: no tags")
 	-- While I'm in combat in a group it looks again twice a second, also without events.
-	GROUP, STATE.combat = "party", true
-	Fire("PLAYER_REGEN_DISABLED")
+	GROUP = "party"
+	EnterCombat()
 	Advance(0.1)
 	check(tagText("nameplate1") == ">YOU<", "in a group again: back")
 	MOBS.nameplate1.attacking, THREAT.nameplate1, THREATS["party2>nameplate1"] = false, 0, 3
 	MOBS.nameplate1.targetGUID = "Player-1-32"
 	Advance(0.6)
 	check(tagText("nameplate1") == "Ölr", "no event, but in combat: seen within half a second")
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
-	-- Like the game: the combat lockdown begins only after PLAYER_REGEN_DISABLED, so inside it
-	-- InCombatLockdown still says no.
-	Fire("PLAYER_REGEN_DISABLED")
-	STATE.combat = true
+	LeaveCombat()
+	EnterCombat() -- (inside PLAYER_REGEN_DISABLED the combat lockdown hasn't begun yet, like in the game)
 	Advance(0.1)
 	MOBS.nameplate1.targetGUID, THREATS["party1>nameplate1"] = "Player-1-31", 3
 	Advance(0.6)
 	check(tagText("nameplate1") == "Ann", "a fight starting: the half-second looks begin (combat taken from the event)")
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	THREATS["party1>nameplate1"] = nil
 	-- The examples: each enemy nameplate another one, for ten seconds.
 	local pmark = #PRINTED + 1

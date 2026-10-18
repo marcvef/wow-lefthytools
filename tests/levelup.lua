@@ -84,12 +84,10 @@ do
 	Fire("PLAYER_LEVEL_UP", 21, 31, 0, 1, 0, 1, 1, 1, 1)
 	Advance(4)
 	check(not shown(), "a level-up in combat: no window yet")
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	Advance(1.2)
 	check(shown() and W.Number:GetText() == 21, "after the fight: there it is")
-	STATE.combat = true
-	Fire("PLAYER_REGEN_DISABLED")
+	EnterCombat()
 	Advance(0.1)
 	check(not shown(), "a fight starting closes it")
 	STATE.combat = false
@@ -191,20 +189,16 @@ do
 	check(W.pinned and not W.Timer.shown, "the pin keeps it (no timer line)")
 	Advance(30)
 	check(shown(), "pinned: still there after 30 s")
-	STATE.combat = true
-	Fire("PLAYER_REGEN_DISABLED")
+	EnterCombat()
 	check(not shown(), "a fight: it steps aside")
 	Advance(2)
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	Advance(1.2)
 	check(shown() and W.pinned and W:GetAlpha() == 1, "after the fight it's back, still pinned")
-	STATE.combat = true
-	Fire("PLAYER_REGEN_DISABLED")
+	EnterCombat()
 	Fire("PLAYER_LEVEL_UP", PLAYER_LEVEL, 10, 0, 1, 0, 1, 1, 1, 1)
 	Advance(2)
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	Advance(1.2)
 	check(shown() and not W.pinned and W.Timer.shown, "a level-up during that fight: its window starts unpinned")
 	W.Pin:Click() -- (pinned again for the arrows below)
@@ -232,11 +226,9 @@ do
 		lefthy("tweaks levelup test")
 		W.Pin:Click()
 		W.Close:Click()
-		STATE.combat = true
-		Fire("PLAYER_REGEN_DISABLED")
+		EnterCombat()
 		Advance(0.5)
-		STATE.combat = false
-		Fire("PLAYER_REGEN_ENABLED")
+		LeaveCombat()
 		Advance(1.2)
 		check(not shown() and not W.pinned, "closed with its X as a fight starts: it doesn't come back after the fight")
 	end

@@ -278,8 +278,8 @@ check(mm[11] ~= nil, "on again")
 
 section("Beacon: sharing my state")
 mark = #GAMEDATA + 1
-STATE.combat, STATE.target, STATE.targetName = true, true, "Hogger"
-Fire("PLAYER_REGEN_DISABLED")
+STATE.target, STATE.targetName = true, "Hogger"
+EnterCombat()
 Advance(1.2)
 check(last(GameDataTo(11, mark)) == "S2;C;0;500.0;500.0;Goldshire;Hogger",
 	"entering combat goes out within a second, with my target, got " .. tostring(last(GameDataTo(11, mark))))
@@ -297,8 +297,8 @@ STATE.targetName = SECRET
 Fire("PLAYER_TARGET_CHANGED")
 Advance(1.2)
 check(last(GameDataTo(11, mark)) == "S2;C;0;500.0;500.0;Goldshire;", "a name the game keeps secret isn't sent")
-STATE.combat, STATE.target, STATE.targetName = false, false, nil
-Fire("PLAYER_REGEN_ENABLED")
+STATE.target, STATE.targetName = false, nil
+LeaveCombat()
 Advance(1.2)
 check(last(GameDataTo(11, mark)) == "S2;;0;500.0;500.0;Goldshire;", "leaving combat")
 STATE.dead = true
@@ -967,8 +967,7 @@ do
 	for i = 1, 3 do Fire("NAME_PLATE_UNIT_ADDED", "nameplate" .. i) end
 	THREAT = { nameplate1 = 3, nameplate2 = 0 } -- two mobs have me on their list, the third doesn't
 	mark = #GAMEDATA + 1
-	STATE.combat = true
-	Fire("PLAYER_REGEN_DISABLED")
+	EnterCombat()
 	Advance(1.2)
 	check(sentTo(11, mark, "C2;")[1] == "C2;2", "in combat: how many enemies are on me, got " .. tostring(sentTo(11, mark, "C2;")[1]))
 	Advance(3)
@@ -983,19 +982,16 @@ do
 	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate2")
 	Advance(1.1)
 	check(sentTo(11, mark, "C2;")[3] == "C2;1", "nameplates gone (dead or out of range): fewer")
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	Advance(3)
 	check(#sentTo(11, mark, "C2;") == 3, "out of combat: nothing (the state says the fight is over)")
 	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate3")
 	THREAT = {}
 	mark = #GAMEDATA + 1
-	STATE.combat = true
-	Fire("PLAYER_REGEN_DISABLED")
+	EnterCombat()
 	Advance(2.2)
 	check(#sentTo(11, mark, "C2;") == 0, "a fight without nameplates: nothing sent")
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	Advance(1.2)
 
 	OpenWorldMap(1429)
@@ -1103,8 +1099,7 @@ do
 	BB.Stream.LifeStart()
 	Advance(4.5) -- (no ticks: full)
 	local hmark = #GAMEDATA + 1
-	STATE.combat = true
-	Fire("PLAYER_REGEN_DISABLED")
+	EnterCombat()
 	Fire("UNIT_COMBAT", "player", "WOUND", "", 300, 1)
 	Advance(0.6)
 	check(last(sentTo(11, hmark, "O2;v;")) == "O2;v;70" and last(sentTo(12, hmark, "O2;v;")) == "O2;v;70",
@@ -1118,8 +1113,7 @@ do
 	anna("H2")
 	Advance(2)
 	check(sentTo(11, hmark, "O2;v;60")[1], "with every answer")
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	Advance(5)
 end
 

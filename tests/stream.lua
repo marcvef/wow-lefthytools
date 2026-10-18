@@ -487,15 +487,13 @@ do
 		hit("HEAL", 500)
 		hit("MISS", 0)
 		check(S.Health() == 1, "overhealed: full, not more (a miss changes nothing)")
-		STATE.combat = true
-		Fire("PLAYER_REGEN_DISABLED")
+		EnterCombat()
 		hit("WOUND", 700)
 		Advance(1)
 		Fire("UNIT_HEALTH", "player") -- (in combat, without a hit or heal: why isn't known)
 		Advance(5)
 		check(near(S.Health(), 0.3), "in combat: hits count, nothing else, got " .. tostring(S.Health()))
-		STATE.combat = false
-		Fire("PLAYER_REGEN_ENABLED")
+		LeaveCombat()
 		for _ = 1, 3 do
 			Advance(2)
 			Fire("UNIT_HEALTH", "player")
@@ -1243,8 +1241,7 @@ do
 		lefthy("stream me")
 		Advance(4.6) -- (out of combat: my health known, full)
 		local xpWas = XP.current
-		STATE.combat = true
-		Fire("PLAYER_REGEN_DISABLED")
+		EnterCombat()
 		Advance(0.6)
 		Fire("UNIT_COMBAT", "player", "WOUND", "", 400, 1)
 		Advance(2)
@@ -1252,8 +1249,7 @@ do
 		XP.current = XP.current + 120
 		Fire("PLAYER_XP_UPDATE", "player")
 		Advance(0.6)
-		STATE.combat = false
-		Fire("PLAYER_REGEN_ENABLED")
+		LeaveCombat()
 		Advance(1.6)
 		text = line(win)
 		check(text and text:find("^%d s  ·  1 kill  ·  120 XP  ·  lowest ~60%%$") and win.Hint:GetAlpha() < 1,
@@ -1714,8 +1710,7 @@ do
 	Advance(0.2)
 	mark = #GAMEDATA + 1
 	MOCK_SEND_RESULT = 3 -- the server is throttling: everything waits in the queue
-	STATE.combat = true
-	Fire("PLAYER_REGEN_DISABLED")
+	EnterCombat()
 	for i = 1, 4 do
 		THREAT["nameplate" .. i] = 1
 		Fire("NAME_PLATE_UNIT_ADDED", "nameplate" .. i)
@@ -1725,8 +1720,7 @@ do
 	Advance(3)
 	local counts = sentTo(11, mark, "C2;")
 	check(#counts == 1 and counts[1] == "C2;4", "only the newest count goes out once the queue moves, got " .. table.concat(counts, ","))
-	STATE.combat = false
-	Fire("PLAYER_REGEN_ENABLED")
+	LeaveCombat()
 	for i = 1, 4 do Fire("NAME_PLATE_UNIT_REMOVED", "nameplate" .. i) end
 	THREAT = {}
 	Advance(1.2)
