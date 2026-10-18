@@ -1,11 +1,17 @@
 // Runs LefthyTools inside fengari (Lua 5.3 VM in JS) against mock.lua.
 // Files are loaded in the order the TOC lists them, like the game client does.
+// `npm test` runs everything. Names run a part of the behavioural tests (3): `npm test -- stream`
+// runs tests/stream.lua and the files it needs (its "-- Needs:" line, and theirs) in the suite's
+// order; several names add up, and "german" is the German suite. A folder is the add-on to test.
 const fs = require("fs");
 const path = require("path");
 const { lua, lauxlib, lualib, to_luastring } = require("fengari");
 const luaparse = require("luaparse");
 
-const addonDir = process.argv[2] || path.resolve(__dirname, "..", "LefthyTools");
+const args = process.argv.slice(2);
+const addonArg = args.find((a) => fs.existsSync(a) && fs.statSync(a).isDirectory());
+const names = args.filter((a) => a !== addonArg).map((a) => a.replace(/\.lua$/, ""));
+const addonDir = addonArg || path.resolve(__dirname, "..", "LefthyTools");
 const toc = fs.readFileSync(path.join(addonDir, path.basename(addonDir) + ".toc"), "utf8");
 const tocFiles = toc.split(/\r?\n/)
   .map((line) => line.trim())
@@ -66,7 +72,7 @@ if (filesConst !== filesId) {
 console.log(`files ok: LT.FILES = ${filesId}`);
 
 // 2b) The players' one-file installer must be install.ps1 with the batch header (tools/build-installer.js).
-if (!process.argv[2]) {
+if (!addonArg) {
   const installer = require("../tools/build-installer.js");
   const current = fs.existsSync(installer.target) ? fs.readFileSync(installer.target, "utf8") : "";
   if (current !== installer.build()) {
@@ -82,6 +88,40 @@ if (!process.argv[2]) {
 //    helpers.lua returns as `...`; its Finish() makes the last checks and prints the count.
 const ENGLISH = ["core.lua", "mirage.lua", "tweaks.lua", "beacon.lua", "stream.lua", "flights.lua", "chronicle.lua",
   "levelup.lua", "bestiary.lua", "whatsnew.lua"];
+
+// Every test file is in the list, and says at its top which files it needs before it (they run
+// earlier): "-- Needs: beacon.lua, ..." or "-- Needs: no other file."
+const NOT_LISTED = ["mock.lua", "helpers.lua", "test_de.lua"];
+const needs = {};
+for (const f of fs.readdirSync(__dirname).filter((f) => f.endsWith(".lua") && !NOT_LISTED.includes(f))) {
+  if (!ENGLISH.includes(f)) {
+    console.log(`tests/${f} isn't in run.js's ENGLISH list: add it where it should run`);
+    process.exit(1);
+  }
+}
+for (const f of ENGLISH) {
+  const line = (fs.readFileSync(path.join(__dirname, f), "utf8").match(/^-- Needs: .*$/m) || [])[0];
+  const list = line && line.match(/^-- Needs: (\w+\.lua(?:, \w+\.lua)*)/);
+  needs[f] = list ? list[1].split(", ") : [];
+  const late = needs[f].filter((n) => !ENGLISH.slice(0, ENGLISH.indexOf(f)).includes(n));
+  if (!line || late.length) {
+    console.log(line ? `tests/${f} needs ${late.join(", ")}, which don't run before it` : `tests/${f} has no "-- Needs:" line at its top`);
+    process.exit(1);
+  }
+}
+
+// What to run: everything, or the files named and what they need.
+const known = ENGLISH.map((f) => f.replace(/\.lua$/, "")).concat("german");
+const unknown = names.filter((n) => !known.includes(n));
+if (unknown.length) {
+  console.log(`No test file ${unknown.join(", ")}; there are: ${known.join(", ")}`);
+  process.exit(1);
+}
+const picked = new Set();
+const pick = (f) => { if (!picked.has(f)) { picked.add(f); needs[f].forEach(pick); } };
+names.filter((n) => n !== "german").forEach((n) => pick(n + ".lua"));
+const english = names.length ? ENGLISH.filter((f) => picked.has(f)) : ENGLISH;
+const german = !names.length || names.includes("german");
 
 function newState() {
   const L = lauxlib.luaL_newstate();
@@ -113,15 +153,20 @@ function fail(L) {
 }
 
 // English client
-let L = newState();
-run(L, "mock.lua");
-const suite = run(L, "helpers.lua");
-for (const file of ENGLISH) run(L, file, suite);
-lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, suite);
-lua.lua_getfield(L, -1, to_luastring("Finish"));
-if (lua.lua_pcall(L, 0, 0, 0) !== lua.LUA_OK) fail(L);
+if (english.length) {
+  if (names.length) console.log(`English suite: ${english.join(", ")}`);
+  const L = newState();
+  run(L, "mock.lua");
+  const suite = run(L, "helpers.lua");
+  for (const file of english) run(L, file, suite);
+  lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, suite);
+  lua.lua_getfield(L, -1, to_luastring("Finish"));
+  if (lua.lua_pcall(L, 0, 0, 0) !== lua.LUA_OK) fail(L);
+}
 
 // German client
-L = newState();
-run(L, "mock.lua");
-run(L, "test_de.lua");
+if (german) {
+  const L = newState();
+  run(L, "mock.lua");
+  run(L, "test_de.lua");
+}
