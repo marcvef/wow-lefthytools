@@ -12,12 +12,12 @@ In `Modules/Bestiary/`, in the order they load (the TOC):
 
 | File | What |
 |---|---|
-| `Bestiary.lua` | the module (`ns.Bestiary` = `Bt`), settings, `/bestiary`; what the files share (`Bt.Value`, `Bt.NONE`, `Bt.GOLD`); reading the records (`Bt.Chance`, `Bt.Drops`, `Bt.Sources`, `Bt.IsWorldDrop`, `Bt.Worth`, `Bt.Spots`, `Bt.Pace`); items the client doesn't know yet (`Bt.AskItem`, `Bt.ItemNameOf`); the mobs seen (`Bt.Look`) |
+| `Bestiary.lua` | the module (`ns.Bestiary` = `Bt`), settings, `/bestiary`; what the files share (`Bt.Value`, `Bt.NONE`, `Bt.GOLD`); reading the records (`Bt.Chance`, `Bt.Drops`, `Bt.Sources`, `Bt.IsWorldDrop`, `Bt.Worth`, `Bt.Spots`, `Bt.Pace`); items the client doesn't know yet (`Bt.AskItem`, `Bt.ItemNameOf`); the mobs seen (`Bt.Look`, `Bt.NoteSeen`) and a kind's levels (`Bt.Levels`) |
 | `Classic.lua` | the classic drop database: `Bt.Known`, `Bt.Health`, `Bt.Compare`, `Bt.KnownSources`, `/bestiary data` |
 | `Quests.lua` | quest drops: `Bt.QuestDrops`, `Bt.ChanceOf` |
 | `Wishes.lua` | the wish list: `Bt.ToggleWish`, `Bt.WishKill`, `Bt.WishSources`, `/bestiary wishes` |
 | `Recording.lua` | counting kills and loot, skinning, the pace, where they died, the log (`/bestiary log`) |
-| `Format.lua` | how things are written: `Bt.Percent`, `Bt.Coins`, `Bt.KillsLine`, `Bt.PaceText`, `Bt.QuestLine`, ... |
+| `Format.lua` | how things are written: `Bt.Percent`, `Bt.Coins`, `Bt.Kind`, `Bt.LevelRange`, `Bt.KillsLine`, `Bt.PaceText`, `Bt.QuestLine`, ... |
 | `Cells.lua` | drops as cells (`Bt.Lay`), their tooltips and clicks, `Bt.ListDrops`, `Bt.Dress`; lines in item tooltips |
 | `Window.lua` | the window, the minimap button, `Bt.Redraw` |
 | `Card.lua` | the card beside the mouse |
@@ -36,7 +36,8 @@ behaviour.
 `LefthyToolsBestiaryDB` (its own saved variable, account-wide: every character adds to it):
 
 ```
-mobs = { [creature ID] = { name, level, class (UnitClassification), kills, money (copper, all
+mobs = { [creature ID] = { name, level, class (UnitClassification; the three as last seen),
+         levels = { the lowest, the highest level seen }, kills, money (copper, all
          kills), first, last (time()), items = { [item ID] = { drops, count, quality, name } },
          skinned, skins = { [item ID] = { times, count, quality, name } },
          pace = { your level, kills with XP, XP, kills timed, seconds },
@@ -46,8 +47,8 @@ wishes = { [item ID] = { pinned (time()), kills since, expected drops in them, n
          (the wish list; only while there's one)
 ```
 
-Fields added later (`pace`, `spots`) are simply missing from older records, and everything reads
-them as "not known".
+Fields added later (`pace`, `spots`, `levels`) are simply missing from older records, and everything
+reads them as "not known" (a record without `levels` has its `level`, and starts from it).
 
 The creature ID comes from the GUID (`Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>`, also
 `Vehicle-`; `Bt.CreatureOf`). `drops` is how many corpses it came from, `count` how many in all.
@@ -78,7 +79,20 @@ corpse's loot window is what skinning gave, each corpse once (`skinnedCorpse`), 
 `INV_Misc_Pelt_Wolf_01`) everywhere.
 
 Name, level and kind come from units seen (`Bt.Look`: target, mouseover, nameplates; the last 200
-GUIDs remembered) and are written to a kind's record as last seen.
+GUIDs remembered) and are written to a kind's record as last seen (`Bt.NoteSeen`, also at each
+counted kill).
+
+**A kind's levels.** One creature ID covers a small level range (most kinds a level or two, a few up
+to six: a Shatterspear Troll at 52-58), so a record also keeps the lowest and highest level seen of
+its kind (`levels`; "??", UnitLevel's -1 for a boss or a mob far above you, isn't a level). A record
+from before it has only its `level` and starts from that. `Bt.Levels(creature, mob[, level])`: those
+and a level seen now (the window's target), widened by the classic database's when it knows the kind
+(`Bt.Known(creature).health`: its lowest and highest level; a mob you haven't killed gets its levels
+from there). Shown as "Level 9–10" (an en dash; the window's header and the ledger's picked mob:
+`Bt.Kind`) or "9–10" (the ledger's rows, item tooltips: `Bt.LevelRange`), "Level 10" when it's one.
+A boss (`worldboss`) stays "Level ??" as the game shows it, not the database's level, and has none
+in rows and tooltips. Two kinds of one name (two Felguards, at 29-30 and at 50) are told apart by it
+in the ledger's rows. The card beside the mouse shows no level (it stays small).
 
 ## The classic drop database (LefthyTools_DropData)
 
@@ -95,9 +109,9 @@ items for a Defias Bandit, 27 for Ragnaros, 69 at most; 5046 mobs with loot. It 
 kind's health, for Beacon's fight stream (below): 9791 of them; 9921 creatures in all, 0.93 MB.
 
 - **Loading**: `## LoadOnDemand: 1`. `DropData()` calls `C_AddOns.LoadAddOn` the first time
-  something asks (`Bt.Known`: the window, the ledger, the card, or the fight stream's sensor and
-  battle row through `Bt.Health`), once; when the setting `dropData` (on) changes it's tried again
-  (and off means nothing reads it). A one-off moment when it's first needed, not at login for
+  something asks (`Bt.Known`: the window, the ledger, the card, a mob's levels in an item tooltip,
+  or the fight stream's sensor and battle row through `Bt.Health`), once; when the setting
+  `dropData` (on) changes it's tried again (and off means nothing reads it). A one-off moment when it's first needed, not at login for
   everyone who never needs it. `/bestiary data` says whether it's there (LoadAddOn's reason if
   not: `MISSING`, `DISABLED`) and what it holds (kinds of mobs, how many with their health).
 - **Format**: `LefthyToolsDropData = { source, mobs = { [creature] = "<item>:<quality>:<chance in
@@ -233,9 +247,9 @@ whether it's open and where it is are kept (`db.window`: shown, left, top). Not 
 flights.
 
 - **Header**: a still portrait (`PlayerModel:SetCreature`, portrait zoom 1, `RefreshCamera` and
-  paused once loaded; a question mark before any mob), the name (gold), level and kind ("Level 16
-  Elite"), then "34 kills · 12s 40c each" (`GetCoinTextureString`; the coin on average over all
-  its kills, "no coin" for beasts) and, when skinned, the pelt and how often. A small book left of
+  paused once loaded; a question mark before any mob), the name (gold), levels and kind ("Level
+  15–16 Elite": its kind's, above), then "34 kills · 12s 40c each" (`GetCoinTextureString`; the
+  coin on average over all its kills, "no coin" for beasts) and, when skinned, the pelt and how often. A small book left of
   the X opens the ledger on this mob. When its worth or pace is known, one more small grey line
   under the portrait, the window wide (`PaceText`): "Per kill: worth ~45s · 85 XP · 14 s", only
   the parts known, "(level 12)" when the pace isn't for your level; the header grows by it.
@@ -345,9 +359,9 @@ rest.
 
 Setting `itemTooltip` (on). A post-call on item tooltips (`TooltipDataProcessor`, only
 `GameTooltip` and `ItemRefTooltip`: bags, chat links, anywhere) adds, under a blank line,
-"Bestiary · drop chance (kills)" and the 3 likeliest sources (`Bt.Sources`): "Defias Bandit (9)
-50% (4)", skinning with the pelt in front; more: "and N more (the Bestiary's ledger)". Not on the
-window's own drop tooltips (they show the numbers already: `ownTooltip` while they're set).
+"Bestiary · drop chance (kills)" and the 3 likeliest sources (`Bt.Sources`): "Defias Bandit (9–10)
+50% (4)" (its kind's levels), skinning with the pelt in front; more: "and N more (the Bestiary's
+ledger)". Not on the window's own drop tooltips (they show the numbers already: `ownTooltip` while they're set).
 
 ## The ledger (Ledger.lua)
 
@@ -362,9 +376,9 @@ map wide).
   all kills), and the **rarest find**: the looted item with the lowest chance among mobs with at
   least 5 kills, its icon, chance and mob. On the right the wish list's strip (above).
 - **The list** (left, scrolling): a row per mob with kills or skinnings: name (found letters in
-  gold), level, Elite/Rare, kills on the right, its best drops as tiny icons (best quality first).
-  Sorted by most kills, name, level, coin per kill, worth per kill, XP per kill, XP per hour (of
-  fighting) or last killed (a picker of our own).
+  gold), its kind's levels ("29–30"), Elite/Rare, kills on the right, its best drops as tiny icons
+  (best quality first). Sorted by most kills, name, level (the highest of its kind's), coin per
+  kill, worth per kill, XP per kill, XP per hour (of fighting) or last killed (a picker of our own).
 - **The picked mob** (right): its whole model turning slowly (an OnUpdate while open), name, kind,
   kills, coin each and in all (or "no coin"), first and last kill ("2 h ago"), skinnings, the drop
   database's coin ("Classic database: 8c to 15c each") and "6 of its 11 drops found". Under the
@@ -465,3 +479,4 @@ every mob, table lookups only).
 - How Forever writes item objectives ("Gnoll Paw: 3/8" or "3/8 Gnoll Paw") and whether it gives
   `numFulfilled`/`numRequired`; that they update while looting.
 - The wish list's star (`UI-RaidTargetingIcon_1`) on cells and in text; Alt-click on a drop.
+- The en dash in "Level 9–10" (window, ledger, item tooltips) shows as a dash, not a box or a gap.

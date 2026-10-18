@@ -5,15 +5,15 @@ local Bt = ns.Bestiary
 local M = Bt.module
 
 -- The Bestiary's ledger: every kind of mob you've killed, with its statistics and drops, and one
--- search over mobs and items. On the left the mobs (name, level, kind, your kills, their best drops
--- as tiny icons), sorted by kills, name, level, coin, worth (coin and the drops' vendor value), XP
--- per kill or per hour of fighting (a row then says it) or when you last killed one: where farming
--- pays. On the right the one picked: its whole model turning slowly, kills, coin, first and last
--- kill, skinnings, under the model what a kill pays (its worth, XP and time per kill, XP per hour of
--- fighting); beside that where you killed it, seen without scrolling (LedgerMap.lua): the world
--- map's art of the zone with the most kills (what you've explored of it, as your world map shows
--- it), a dot each, a picker for its other zones; under all that its drops (as in the window: quality
--- edge, how many, chance; skinning marked), scrolling.
+-- search over mobs and items. On the left the mobs (name, the levels of its kind, kind, your kills,
+-- their best drops as tiny icons), sorted by kills, name, level (the highest), coin, worth (coin and
+-- the drops' vendor value), XP per kill or per hour of fighting (a row then says it) or when you last
+-- killed one: where farming pays. On the right the one picked: its whole model turning slowly,
+-- kills, coin, first and last kill, skinnings, under the model what a kill pays (its worth, XP and
+-- time per kill, XP per hour of fighting); beside that where you killed it, seen without scrolling
+-- (LedgerMap.lua): the world map's art of the zone with the most kills (what you've explored of it,
+-- as your world map shows it), a dot each, a picker for its other zones; under all that its drops
+-- (as in the window: quality edge, how many, chance; skinning marked), scrolling.
 -- At the top what the Bestiary knows in all, and your rarest find. With the classic drop database
 -- (Classic.lua): a row says how many of its drops you've found, and the picked mob's drops have a
 -- section of what you haven't had yet, faded, between its own drops and its world drops.
@@ -118,10 +118,11 @@ local function XPPerHour(mob)
 	return perHour
 end
 
+-- The order's key for a kind (the smaller first). By level: the highest of its levels.
 local SORT_KEYS = {
 	kills = function(mob) return -mob.kills end,
 	name = function(mob) return (mob.name or "~"):lower() end,
-	level = function(mob) return -(mob.level or 0) end,
+	level = function(mob, creature) return -(select(2, Bt.Levels(creature, mob)) or 0) end,
 	coin = function(mob) return mob.kills > 0 and -(mob.money / mob.kills) or 0 end,
 	worth = function(mob) return -((Bt.Worth(mob)) or 0) end,
 	xp = function(mob) return -((Bt.Pace(mob)) or 0) end,
@@ -153,7 +154,7 @@ local function Collect()
 	local key = SORT_KEYS[sortBy] or SORT_KEYS.kills
 	for creature, mob in pairs(LefthyToolsBestiaryDB and LefthyToolsBestiaryDB.mobs or {}) do
 		if mob.kills > 0 or (mob.skinned or 0) > 0 then
-			local entry = { creature = creature, mob = mob, sort = key(mob) }
+			local entry = { creature = creature, mob = mob, sort = key(mob, creature) }
 			if query ~= "" then
 				local score, positions = Fuzzy(query, mob.name)
 				entry.positions = positions
@@ -275,7 +276,8 @@ local function FillRow(row, entry)
 	local tag = mob.class == "elite" and (" |cffffd100" .. L["Elite"] .. "|r") or mob.class == "rare" and (" |cffc0c0ff" .. L["Rare"] .. "|r")
 		or mob.class == "rareelite" and (" |cffc0c0ff" .. L["Rare elite"] .. "|r") or ""
 	local name = Marked(mob.name or ("#" .. entry.creature), entry.positions)
-	row.Name:SetText(name .. (mob.level and mob.level > 0 and (" |cff888888" .. mob.level .. "|r") or "") .. tag)
+	local levels = Bt.LevelRange(entry.creature, mob) -- ("9–10": two kinds of one name told apart)
+	row.Name:SetText(name .. (levels and (" |cff888888" .. levels .. "|r") or "") .. tag)
 	row.Kills:SetText(tostring(mob.kills))
 	row.KillsLabel:SetText(mob.kills == 1 and L["kill"] or L["kills"])
 	row.Picked:SetShown(entry.creature == selected)
@@ -364,7 +366,7 @@ local function DrawPicked()
 		pane.where.zone = nil -- (its map: the zone with the most kills again)
 	end
 	pane.Name:SetText(mob.name or ("#" .. selected))
-	pane.Kind:SetText(Bt.Kind({ level = mob.level, class = mob.class }))
+	pane.Kind:SetText(Bt.Kind(selected, mob))
 	local lines = { (mob.kills == 1 and L["1 kill"] or L["%d kills"]:format(mob.kills)) }
 	if mob.kills > 0 then
 		lines[#lines + 1] = mob.money > 0 and L["%s each, %s in all"]:format(Bt.Coins(mob.money / mob.kills), Bt.Coins(mob.money))

@@ -2,7 +2,7 @@ local _, ns = ...
 local LT = ns.LT
 local L = ns.L
 local Bt = ns.Bestiary
-local Value = Bt.Value
+local NONE, Value = Bt.NONE, Bt.Value
 
 -- How the Bestiary writes things, in the window, the card and the ledger (and the fight stream's
 -- tooltips): quality colours, chances, coin, a mob's kind, its kills, what a kill pays, quest lines.
@@ -58,15 +58,34 @@ local function ItemIcon(id)
 	return C_Item and Value(C_Item.GetItemIconByID, id) or QUESTION
 end
 
--- "Level 16 Elite" (what's known of it).
-local function Kind(info)
+local DASH = "–" -- (between two levels: an en dash, the interface's font has it like the What's new bullet)
+
+-- A kind's levels, short: "9–10", "10" when it's one (Bt.Levels: the ones seen, the classic
+-- database's); nil when none is known, and for a boss (the game never says its level). For the
+-- ledger's rows and item tooltips.
+local function LevelRange(creature, mob)
+	if mob and mob.class == "worldboss" then
+		return nil
+	end
+	local low, high = Bt.Levels(creature, mob)
+	if low then
+		return low == high and tostring(low) or (low .. DASH .. high)
+	end
+end
+
+-- "Level 15–16 Elite" (what's known of it): the levels of its kind (Bt.Levels: the ones seen, the
+-- classic database's), "Level ??" for a boss or when only that was seen. seen: what was seen of the
+-- one shown (your target: its own level and kind), else its record says.
+local function Kind(creature, mob, seen)
+	seen = seen or NONE
+	local level, class = seen.level or mob and mob.level, seen.class or mob and mob.class
+	local low, high = Bt.Levels(creature, mob, seen.level)
 	local parts = {}
-	if info.level and info.level > 0 then
-		parts[#parts + 1] = L["Level %d"]:format(info.level)
-	elseif info.level then
+	if low and class ~= "worldboss" then
+		parts[#parts + 1] = low == high and L["Level %d"]:format(low) or L["Level %d–%d"]:format(low, high)
+	elseif level or low then
 		parts[#parts + 1] = L["Level ??"]
 	end
-	local class = info.class
 	if class == "elite" then
 		parts[#parts + 1] = L["Elite"]
 	elseif class == "rare" then
@@ -110,6 +129,7 @@ local function QuestLine(want)
 	return ("|T%s:12:12|t "):format(QUEST_ICON) .. counts
 end
 Bt.QuestLine, Bt.QualityColor, Bt.Decimal, Bt.ItemIcon, Bt.ItemName, Bt.Kind = QuestLine, QualityColor, Decimal, ItemIcon, ItemName, Kind
+Bt.LevelRange = LevelRange
 
 -- "14 s", "4.5 s" (a tenth under 10 s; "4,5 s" in German).
 local function Seconds(s)

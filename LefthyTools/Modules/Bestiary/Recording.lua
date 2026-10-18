@@ -227,7 +227,7 @@ local function Count(guid, creature, how)
 	mob.first = mob.first or mob.last
 	local info = Bt.Seen(guid)
 	if info then
-		mob.name, mob.level, mob.class = info.name or mob.name, info.level or mob.level, info.class or mob.class
+		Bt.NoteSeen(mob, info)
 	end
 	AddPace(mob, kill)
 	-- Where: you at its killing blow; a corpse looted without one seen, you at it now.

@@ -349,7 +349,8 @@ local function OnItemTooltip(tooltip, info)
 	for i = 1, math.min(TOOLTIP_SOURCES, #list) do
 		local source = list[i]
 		local mob = source.mob
-		local name = (mob.name or ("#" .. source.creature)) .. (mob.level and mob.level > 0 and (" (" .. mob.level .. ")") or "")
+		local levels = Bt.LevelRange(source.creature, mob) -- ("9–10": two kinds of one name told apart)
+		local name = (mob.name or ("#" .. source.creature)) .. (levels and (" (" .. levels .. ")") or "")
 		tooltip:AddDoubleLine((source.skin and ("|T%s:14:14|t "):format(Bt.SKIN_ICON) or "") .. name,
 			("%s |cff888888(%d)|r"):format(Percent(source.chance), source.out), 1, 1, 1, 1, 1, 1)
 	end

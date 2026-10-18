@@ -1052,3 +1052,89 @@ do
 		check(bandits.kills == kills + 2, "switched off in a loot window and on again: the next loot window counts")
 	end
 end
+
+section("Bestiary: a kind's levels")
+do
+	local Bt = ns.Bestiary
+	local mobs, known = LefthyToolsBestiaryDB.mobs, LefthyToolsDropData.mobs
+	local function tipFind(text)
+		for _, l in ipairs(TOOLTIP.lines) do if l:find(text, 1, true) then return true end end
+		return false
+	end
+	local function look(unit, level, n, class)
+		MOBS[unit] = { name = "Made-up Troll", level = level, class = class, guid = ("Creature-0-1-0-1-8201-%08X"):format(0x90 + n) }
+		Fire(unit == "target" and "PLAYER_TARGET_CHANGED" or "UPDATE_MOUSEOVER_UNIT")
+	end
+	-- One creature ID covers a few levels (a troll at 52 to 58): the window, the ledger and item
+	-- tooltips say the levels seen of its kind, not the last one. A record from before starts from its level.
+	ITEMS[50201] = { name = "Made-up Tusk", quality = 1 }
+	mobs[8201] = { name = "Made-up Troll", level = 54, kills = 3, money = 0, items = { [50201] = { 3, 3, 1 } } }
+	local troll = mobs[8201]
+	check(Bt.LevelRange(8201, troll) == "54" and troll.levels == nil, "a record from before: its level, nothing added to it")
+	STATE.target = true
+	Bt.Toggle(true)
+	local win = Bt.Frames()
+	look("target", 52, 1)
+	check(troll.levels and troll.levels[1] == 52 and troll.levels[2] == 54 and troll.level == 52 and win.Kind:GetText() == "Level 52–54",
+		"one at 52 targeted: the lowest and highest kept (from its level before), the window says both, got " .. tostring(win.Kind:GetText()))
+	look("mouseover", 58, 2)
+	look("target", -1, 3) -- (far above you: "??")
+	check(troll.levels[1] == 52 and troll.levels[2] == 58 and win.Kind:GetText() == "Level 52–58",
+		"one at 58 seen, one at \"??\" targeted: still its kind's levels (\"??\" isn't one)")
+	MOBS.mouseover = nil
+	GameTooltip:SetOwner(UIParent)
+	GameTooltip:SetHyperlink("item:50201")
+	check(tipFind("Made-up Troll (52–58)  100%"), "an item's tooltip: the levels of the mobs it comes from")
+	-- The classic database widens it when it knows the kind (its lowest and highest level); a mob you
+	-- haven't killed gets its levels from it too.
+	known[8202] = "h=20-22:500-600"
+	MOBS.target = { name = "Made-up Gnoll", level = 21, guid = "Creature-0-1-0-1-8202-000000A0" }
+	Fire("PLAYER_TARGET_CHANGED")
+	check(win.Kind:GetText() == "Level 20–22", "a mob not killed yet: the database's levels, got " .. tostring(win.Kind:GetText()))
+	known[8206] = "h=30-33:900-1100"
+	mobs[8206] = { name = "Made-up Ogre", level = 31, levels = { 31, 32 }, kills = 0, money = 0, items = {} }
+	check(Bt.LevelRange(8206, mobs[8206]) == "30–33", "the database's levels widen what you've seen")
+	-- A boss: "??" as the game shows it (not the database's level).
+	known[8205] = "h=63:100000"
+	mobs[8205] = { name = "Made-up Lord", level = -1, class = "worldboss", kills = 1, money = 0, items = {} }
+	MOBS.target = { name = "Made-up Lord", level = -1, class = "worldboss", guid = "Creature-0-1-0-1-8205-000000A1" }
+	Fire("PLAYER_TARGET_CHANGED")
+	check(win.Kind:GetText() == "Level ?? Boss" and Bt.LevelRange(8205, mobs[8205]) == nil and mobs[8205].levels == nil,
+		"a boss: \"Level ??\", its level nowhere, got " .. tostring(win.Kind:GetText()))
+	-- Two kinds of one name (a Felguard at 29-30 and another at 50): the ledger's rows tell them apart.
+	mobs[8203] = { name = "Made-up Felguard", level = 30, levels = { 29, 30 }, kills = 2, money = 0, items = {} }
+	mobs[8204] = { name = "Made-up Felguard", level = 50, kills = 1, money = 0, items = {} }
+	Bt.Changed(8204)
+	Bt.ToggleLedger(nil, "made-up felguard")
+	local ledger, entries = Bt.Ledger()
+	local function rowOf(creature) for _, row in ipairs(ledger.rows) do if row:IsShown() and row.creature == creature then return row end end end
+	check(#entries == 2 and rowOf(8203).Name:GetText():find("|cff88888829–30|r", 1, true) and rowOf(8204).Name:GetText():find("|cff88888850|r", 1, true),
+		"two kinds of one name: their rows say their levels")
+	-- Sorted by level: by the highest of each kind's.
+	ledger.Search:SetText("")
+	Bt.DrawLedger()
+	ledger.Sort._scripts.OnClick(ledger.Sort)
+	for _, row in ipairs(ledger.Sort.List.rows) do if row.value == "level" then row._scripts.OnClick(row) end end
+	_, entries = Bt.Ledger()
+	local ordered = true
+	local function highest(entry) return select(2, Bt.Levels(entry.creature, entry.mob)) or 0 end
+	for i = 2, #entries do
+		if highest(entries[i]) > highest(entries[i - 1]) then
+			ordered = false
+		end
+	end
+	check(entries[1].creature == 8205 and entries[2].creature == 8201 and entries[3].creature == 8204 and entries[4].creature == 8203 and ordered,
+		"sorted by level: the highest of each kind's first (the boss by the database's)")
+	Bt.ToggleLedger(8201)
+	check(ledger.Pane.Kind:GetText() == "Level 52–58" and not rowOf(8205).Name:GetText():find("|cff888888", 1, true),
+		"the picked mob: its kind's levels; the boss's row: none")
+	ledger.Sort._scripts.OnClick(ledger.Sort)
+	for _, row in ipairs(ledger.Sort.List.rows) do if row.value == "kills" then row._scripts.OnClick(row) end end
+	ledger:Hide()
+	for creature = 8201, 8206 do
+		mobs[creature], known[creature] = nil, nil
+	end
+	Bt.Changed(8201)
+	MOBS.target, STATE.target, ITEMS[50201] = nil, false, nil
+	Bt.Toggle(false)
+end

@@ -339,9 +339,9 @@ once a second, so it costs nothing you'd notice.
 ## Bestiary
 
 What the mobs you kill drop. Click the loot bag on the minimap's edge (or type `/bestiary`) for a
-small window that follows your target: its portrait, name and level, how many of it you killed
-and the coin each brought, and every item it dropped: the icon, how many you got in its corner and
-the drop chance under it. Hover a drop for the item's tooltip with the numbers, Shift-click to
+small window that follows your target: its portrait, name and level (the levels you've seen of its
+kind, "Level 9–10"), how many of it you killed and the coin each brought, and every item it
+dropped: the icon, how many you got in its corner and the drop chance under it. Hover a drop for the item's tooltip with the numbers, Shift-click to
 link it. The window stays open (Escape doesn't close it) and keeps the last mob when you clear
 your target.
 
@@ -351,7 +351,7 @@ and chests don't count as a mob's drops; **skinning** is kept apart, per skinnin
 Skinning's pelt icon. All your characters add to the same database; it stays on your computer.
 
 **The ledger** (the book in the window, Ctrl-click on the minimap button, or `/bestiary ledger`)
-lists every mob you've killed: kills, level, its best drops at a glance, sortable. Pick one for
+lists every mob you've killed: kills, levels, its best drops at a glance, sortable. Pick one for
 its turning model, kills, coin each and in all, first and last kill, and all its drops. The search
 finds mobs and items with just some of their letters in order ("dfbnd" for Defias Bandit, "milk"
 for every mob that dropped Ice Cold Milk) and picks the best match; click any other result to look

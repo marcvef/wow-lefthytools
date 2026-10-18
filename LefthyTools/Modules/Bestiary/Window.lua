@@ -213,7 +213,7 @@ local function DrawHeader(mob, info)
 	win.Unknown:SetShown(shown == nil)
 	local name = info.name or mob and mob.name
 	win.Name:SetText(name or "Bestiary") -- (module names aren't translated)
-	win.Kind:SetText(shown and Kind({ level = info.level or mob and mob.level, class = info.class or mob and mob.class }) or "")
+	win.Kind:SetText(shown and Kind(shown, mob, info) or "") -- (the levels of its kind: your target's among them)
 	win.Kills:SetText(mob and KillsLine(mob) or "")
 	local pace = PaceText(mob)
 	win.Pace.Text:SetText(pace or "")

@@ -8,9 +8,10 @@ local L = ns.L
 -- target's (it stays open; a minimap button) and, if you like, a hovered enemy's on a card next to
 -- the mouse; a ledger lists every mob.
 --
--- LefthyToolsBestiaryDB = { mobs = { [creatureID] = { name, level, class, kills, money (copper),
---   first, last (time()), items = { [itemID] = { drops (corpses it came from), count, quality,
---   name } }, skinned (how many), skins = { [itemID] = { times, count, quality, name } },
+-- LefthyToolsBestiaryDB = { mobs = { [creatureID] = { name, level, class (as last seen), levels =
+--   { the lowest, the highest level seen }, kills, money (copper), first, last (time()), items =
+--   { [itemID] = { drops (corpses it came from), count, quality, name } }, skinned (how many),
+--   skins = { [itemID] = { times, count, quality, name } },
 --   pace = { your level, kills with their XP known, XP, kills timed, seconds },
 --   spots = { where you were at each kill outside instances, the last SPOTS_KEEP: map ID * 1e6 +
 --   x * 1e3 + y, x and y in thousandths of the map } } },
@@ -413,6 +414,53 @@ end
 -- Mobs seen: name, level, kind (for records and the window)
 ---------------------------------------------------------------------------
 
+-- A level that is one: "??" (-1: a boss, or a mob far above you) isn't.
+local function IsLevel(level)
+	return type(level) == "number" and level > 0
+end
+
+-- What was seen of a mob joins its kind's record: its name, level and kind as last seen, and the
+-- lowest and highest level seen of the kind (levels; one creature ID covers a small range: mostly a
+-- level or two, a few up to six). A record from before them starts from its level.
+function Bt.NoteSeen(mob, info)
+	if IsLevel(info.level) then
+		local levels = mob.levels
+		if type(levels) ~= "table" or not IsLevel(levels[1]) or not IsLevel(levels[2]) then
+			local was = IsLevel(mob.level) and mob.level or info.level
+			levels = { was, was }
+			mob.levels = levels
+		end
+		levels[1], levels[2] = math.min(levels[1], info.level), math.max(levels[2], info.level)
+	end
+	mob.name, mob.level, mob.class = info.name or mob.name, info.level or mob.level, info.class or mob.class
+end
+
+local function Widen(low, high, level)
+	if IsLevel(level) then
+		return math.min(low or level, level), math.max(high or level, level)
+	end
+	return low, high
+end
+
+-- A kind's levels: the lowest and highest seen of it (its record's; one from before them: its level),
+-- with a level seen now (your target's), widened by the classic database's when it knows the kind
+-- (Bt.Known: its lowest and highest level). nil when none is known (only "??" seen).
+function Bt.Levels(creature, mob, level)
+	local low, high = Widen(nil, nil, level)
+	if mob then
+		local levels = type(mob.levels) == "table" and mob.levels or NONE
+		low, high = Widen(low, high, levels[1] or mob.level)
+		low, high = Widen(low, high, levels[2])
+	end
+	local known = Bt.Known(creature)
+	local health = known and known.health -- ({ lowest level, highest, ... })
+	if health then
+		low, high = Widen(low, high, health[1])
+		low, high = Widen(low, high, health[2])
+	end
+	return low, high
+end
+
 -- Remembers a unit that's a creature; returns its GUID and creature ID.
 function Bt.Look(unit)
 	local guid = Value(UnitGUID, unit)
@@ -434,8 +482,8 @@ function Bt.Look(unit)
 	info.class = Value(UnitClassification, unit) or info.class
 	seenNames[creature] = info.name or seenNames[creature]
 	local mob = data and data.mobs[creature]
-	if mob then -- (its name and level as last seen)
-		mob.name, mob.level, mob.class = info.name or mob.name, info.level or mob.level, info.class or mob.class
+	if mob then -- (its name and level as last seen, the levels seen of its kind)
+		Bt.NoteSeen(mob, info)
 	end
 	return guid, creature
 end
