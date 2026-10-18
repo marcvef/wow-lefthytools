@@ -1,7 +1,9 @@
--- Misc Tweaks: the AFK screen, status values, bags, quest progress, combo points, retail unit frames, new quests.
+-- Misc Tweaks: the AFK screen, status values, bags, quest progress, combo points, retail unit frames,
+-- new quests, quests on continent and world maps, who has aggro on enemy nameplates. (Cinematic
+-- flights and the level-up window: flights.lua and levelup.lua.)
 local suite = ...
-local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
-local afk = suite.afk
+local check, near, section, ns, LT, lefthy = suite.check, suite.near, suite.section, suite.ns, suite.LT, suite.lefthy
+local printedSince, afk = suite.printedSince, suite.afk
 local Mirage = LT:GetModule("mirage")
 local MDB = LefthyToolsDB.settings.mirage
 local function S(id) return REGISTERED_SETTINGS["LefthyTools_mirage_" .. id] end
@@ -747,3 +749,301 @@ end
 check(helpMark - statusMark >= 8 and #missingWords == 0,
 	"/lefthy tweaks help names every tweak's word, missing: " .. table.concat(missingWords, ", "))
 check(Mirage.enabled, "Mirage is unaffected by the tweaks module")
+
+section("Misc Tweaks: quests on continent and world maps")
+do
+	local TDB = LefthyToolsDB.settings.tweaks
+	local function T(id) return REGISTERED_SETTINGS["LefthyTools_tweaks_" .. id] end
+	check(TDB.questMap == true and TDB.questMapContinent == "both" and TDB.questMapWorld == "both"
+		and TDB.questMapZone == "blizzard" and T("questMap") and T("questMapContinent") and T("questMapWorld") and T("questMapZone"),
+		"on by default: icons and areas on continent maps and the world map, zone maps as Blizzard has them")
+	local savedQuests = QUESTS
+	QUESTS = {
+		{ id = 101, title = "Kobold Camp Cleanup",
+			objectives = { { text = "Kobold Vermin slain: 4/10", finished = false }, { text = "Map found", finished = true } } },
+		{ id = 102, title = "The Defias Brotherhood", objectives = {}, complete = true },
+		{ id = 103, title = "A city errand", objectives = { { text = "Package delivered: 0/1", finished = false } } },
+	}
+	-- What the zone maps show: Elwynn Forest its quest and the city's (reported on the zone too),
+	-- the city its own, Westfall one.
+	QUESTS_ON_MAP = { [1429] = { { 101, 0.5, 0.5 }, { 103, 0.2, 0.2, 1453 } }, [1453] = { { 103, 0.5, 0.5 } },
+		[1436] = { { 102, 0.5, 0.25 } } }
+	SUPER_TRACKED = 0
+	local asked = 0
+	local getQuestsOnMap = C_QuestLog.GetQuestsOnMap
+	C_QuestLog.GetQuestsOnMap = function(mapID) asked = asked + 1; return getQuestsOnMap(mapID) end
+	local ICONS, AREAS = "LefthyToolsQuestMapPinTemplate", "LefthyToolsQuestAreaPinTemplate"
+	local function iconOf(id) for _, pin in ipairs(PinsOf(ICONS)) do if pin.quest.questID == id then return pin end end end
+	local function areaOf(zone) for _, pin in ipairs(PinsOf(AREAS)) do if pin.mapID == zone then return pin end end end
+
+	OpenWorldMap(1429)
+	check(#PinsOf(ICONS) == 0 and #PinsOf(AREAS) == 0, "a zone map: Blizzard's own icons and area, nothing added")
+	OpenWorldMap(1415)
+	local kobolds, defias, errand = iconOf(101), iconOf(102), iconOf(103)
+	check(#PinsOf(ICONS) == 3 and kobolds and defias and errand, "continent map: an icon per quest in its zones, the city's quest once")
+	check(near(kobolds.x, 0.375) and near(kobolds.y, 0.375) and near(defias.x, 0.25) and near(defias.y, 0.5625),
+		"... at the zone map's spot, carried over to the continent")
+	check(near(errand.x, 0.3) and near(errand.y, 0.3), "... a quest in the city at its spot in the city")
+	check(kobolds.Icon.atlas == "Quest-In-Progress-Icon-yellow" and defias.Icon.atlas == "UI-QuestIcon-TurnIn-Normal"
+		and kobolds.Back.atlas == "UI-QuestPoi-QuestNumber", "Blizzard's quest icons: in progress, ready to turn in")
+	local elwynn = areaOf(1429)
+	check(#PinsOf(AREAS) == 3 and elwynn and #elwynn.blobs == 1 and elwynn.blobs[1] == 101 and areaOf(1453).blobs[1] == 103
+		and areaOf(1436).blobs[1] == 102, "... and the quest areas, each drawn for its own zone")
+	check(elwynn:GetWidth() == 250 and elwynn:GetHeight() == 250 and near(elwynn.x, 0.375) and near(elwynn.y, 0.375),
+		"... laid over that zone on the continent")
+	kobolds:OnMouseEnter()
+	local tip = table.concat(TOOLTIP.lines, "|")
+	check(TOOLTIP.title == "Kobold Camp Cleanup" and tip:find("Elwynn Forest", 1, true) and tip:find("Kobold Vermin slain: 4/10", 1, true)
+		and not tip:find("Map found", 1, true), "hovering an icon: the quest, its zone and what's left, got " .. tip)
+	check(#PinsOf(AREAS) == 3, "... areas already shown: none added")
+	kobolds:OnMouseLeave()
+	check(not TOOLTIP.shown, "the tooltip goes on leave")
+	defias:OnMouseEnter()
+	check(table.concat(TOOLTIP.lines, "|"):find("Ready to turn in", 1, true), "a finished quest: ready to turn in")
+	defias:OnMouseLeave()
+
+	OpenWorldMap(947)
+	check(#PinsOf(ICONS) == 3 and near(iconOf(101).x, 0.65) and near(iconOf(101).y, 0.325) and near(iconOf(103).x, 0.62),
+		"world map: the same quests, placed through their continent")
+	check(areaOf(1429) and near(areaOf(1429).x, 0.65) and near(areaOf(1429):GetWidth(), 100), "... with their areas")
+
+	SUPER_TRACKED = 101
+	OpenWorldMap(1415)
+	check(not iconOf(101) and #PinsOf(ICONS) == 2 and areaOf(1429).blobs[1] == 101,
+		"the selected quest: Blizzard shows its icon on continent maps, so only its area is added")
+	OpenWorldMap(947)
+	check(iconOf(101) and iconOf(101).Back.atlas == "UI-QuestPoi-QuestNumber-SuperTracked"
+		and iconOf(101).frameLevelType == "PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST", "... the world map shows it, marked as selected")
+	SUPER_TRACKED = 0
+
+	-- Clicking an icon selects its quest, as on zone maps.
+	local savedWatched = WATCHED
+	WATCHED = {}
+	OpenWorldMap(1415)
+	check(TDB.questMapClick == true and T("questMapClick") and iconOf(102)._click == true
+		and iconOf(102)._passThrough and iconOf(102)._passThrough[1] == "RightButton",
+		"icons take left clicks (a setting, on); right-clicks go through to the map, which zooms out")
+	local soundMark = #SOUNDS
+	iconOf(102):OnClick("LeftButton")
+	check(SUPER_TRACKED == 102 and WATCHED[1] == 102 and #SOUNDS == soundMark + 1, "a click selects the quest and tracks it, with a click sound")
+	Advance(0.05)
+	check(not iconOf(102) and #PinsOf(ICONS) == 2, "... the map is redrawn right away: on continent maps Blizzard shows the selected quest's icon")
+	OpenWorldMap(947)
+	iconOf(102):OnClick("LeftButton")
+	check(SUPER_TRACKED == 0 and WATCHED[1] == 102, "clicking the selected quest unselects it (it stays tracked)")
+	STATE.shift = true
+	iconOf(102):OnClick("LeftButton")
+	STATE.shift = false
+	check(SUPER_TRACKED == 0 and #WATCHED == 0, "Shift-click on a tracked quest stops tracking it")
+	iconOf(101):OnClick("RightButton")
+	check(SUPER_TRACKED == 0, "a right-click doesn't select")
+	T("questMapContinent"):SetValue(2) -- icons only
+	SUPER_TRACKED = 101
+	OpenWorldMap(1415)
+	check(#PinsOf(AREAS) == 1 and areaOf(1429).blobs[1] == 101 and #areaOf(1429).blobs == 1,
+		"icons only: the selected quest's area still shows, as on zone maps")
+	SUPER_TRACKED = 0
+	T("questMapContinent"):SetValue(4)
+	T("questMapClick"):SetValue(false)
+	OpenWorldMap(1415)
+	iconOf(102):OnClick("LeftButton")
+	check(iconOf(102)._click == false and SUPER_TRACKED == 0, "setting off: icons take no clicks, a click zooms the map in")
+	T("questMapClick"):SetValue(true)
+	GAMEPAD_STATE.ui = true
+	OpenWorldMap(1415)
+	check(iconOf(102)._click == false and not iconOf(102).OnMouseClickAction,
+		"gamepad mode: no click action (the controller's button would run it inside Blizzard's map code)")
+	GAMEPAD_STATE.ui = false
+	WATCHED = savedWatched
+	Advance(0.6)
+
+	T("questMapContinent"):SetValue(2) -- the slider: icons only
+	check(TDB.questMapContinent == "icons", "continent maps: icons only")
+	OpenWorldMap(1415)
+	check(#PinsOf(ICONS) == 3 and #PinsOf(AREAS) == 0, "... no areas")
+	kobolds = iconOf(101)
+	kobolds:OnMouseEnter()
+	check(#PinsOf(AREAS) == 1 and areaOf(1429).blobs[1] == 101 and #areaOf(1429).blobs == 1, "... hovering an icon shows its area")
+	kobolds:OnMouseLeave()
+	check(#PinsOf(AREAS) == 0, "... until the mouse leaves")
+	T("questMapContinent"):SetValue(3) -- areas only
+	Advance(0.6) -- the open map follows the setting
+	check(#PinsOf(ICONS) == 0 and #PinsOf(AREAS) == 3, "areas only")
+	T("questMapContinent"):SetValue(1)
+	Advance(0.6)
+	check(#PinsOf(ICONS) == 0 and #PinsOf(AREAS) == 0, "nothing")
+	T("questMapContinent"):SetValue(4)
+	Advance(0.6)
+
+	T("questMapZone"):SetValue(2) -- every quest's area on zone maps
+	SUPER_TRACKED = 103
+	OpenWorldMap(1429)
+	check(#PinsOf(ICONS) == 0 and #PinsOf(AREAS) == 1 and areaOf(1429).blobs[1] == 101 and #areaOf(1429).blobs == 1
+		and areaOf(1429):GetWidth() == 1000, "zone maps, all quests: their areas over the whole map, not the selected one's (Blizzard draws it)")
+	T("questMapZone"):SetValue(1)
+	SUPER_TRACKED = 0
+
+	FOCUSED_QUEST = 102
+	QuestMapFrame_GetFocusedQuestID = function() return FOCUSED_QUEST end
+	OpenWorldMap(1415)
+	check(#PinsOf(ICONS) == 1 and iconOf(102) and #PinsOf(AREAS) == 1, "a quest's details open: only that quest, as on zone maps")
+	QuestMapFrame_GetFocusedQuestID = nil
+
+	-- Quest changes while the map is open: one redraw for a burst of events.
+	OpenWorldMap(1415)
+	QUESTS[#QUESTS + 1] = { id = 104, title = "Another one", objectives = {} }
+	table.insert(QUESTS_ON_MAP[1436], { 104, 0.7, 0.7 })
+	asked = 0
+	for _ = 1, 5 do Fire("QUEST_LOG_UPDATE") end
+	check(asked == 0, "quest events only queue a redraw")
+	Advance(0.6)
+	check(asked == 3 and iconOf(104), "... half a second later the map is redrawn once (3 zones asked), with the new quest")
+	CVARS.questPOI = "0"
+	Fire("CVAR_UPDATE", "questPOI")
+	Advance(0.6)
+	check(#PinsOf(ICONS) == 0 and #PinsOf(AREAS) == 0, "the map's quest objectives filter off: nothing")
+	CVARS.questPOI = "1"
+	local blockedMark = #BLOCKED
+	STATE.combat = true
+	OpenWorldMap(1414); OpenWorldMap(1415)
+	check(#PinsOf(ICONS) == 4 and #BLOCKED == blockedMark, "drawn in combat without blocked actions, got " .. table.concat(BLOCKED, ", "))
+	STATE.combat = false
+
+	WorldMapFrame:Hide()
+	asked = 0
+	Fire("QUEST_LOG_UPDATE"); Fire("QUEST_POI_UPDATE")
+	Advance(1)
+	check(asked == 0, "map closed: quest events cost nothing")
+	lefthy("tweaks questmap off")
+	Advance(0.1)
+	OpenWorldMap(1415)
+	check(TDB.questMap == false and #PinsOf(ICONS) == 0 and #PinsOf(AREAS) == 0 and asked == 0, "/lefthy tweaks questmap off")
+	lefthy("tweaks questmap on")
+	Advance(0.1)
+	OpenWorldMap(1415)
+	check(#PinsOf(ICONS) == 4, "on again")
+	WorldMapFrame:Hide()
+	C_QuestLog.GetQuestsOnMap = getQuestsOnMap
+	QUESTS, QUESTS_ON_MAP = savedQuests, {}
+end
+
+section("Misc Tweaks: who has aggro, on enemy nameplates")
+;(function()
+	local function tagText(unit) local t = ns.GetAggroTag(unit); return t and t:IsShown() and t.Text:GetText() or nil end
+	local function same(unit, r, g, b)
+		local t = ns.GetAggroTag(unit)
+		local c = t and t.Text.color
+		return c ~= nil and math.abs(c[1] - r) < 0.01 and math.abs(c[2] - g) < 0.01 and math.abs(c[3] - b) < 0.01
+	end
+	check(LefthyToolsDB.settings.tweaks.aggroNameplate == true, "on by default")
+	-- A party: me (the tank), Annabelle (healer), Ölrik (damage), two mobs fighting us.
+	GROUP = "party"
+	PARTY.party1 = { name = "Annabelle", guid = "Player-1-31" }
+	PARTY.party2 = { name = "Ölrik", guid = "Player-1-32" }
+	ROLES = { player = "TANK", party1 = "HEALER", party2 = "DAMAGER" }
+	MOBS.nameplate1 = { name = "Defias Thug", guid = "Creature-0-1-0-1-120-00000001", combat = true, attacking = true,
+		x = 0.5, y = 0.5, pinned = true }
+	MOBS.nameplate2 = { name = "Defias Thug", guid = "Creature-0-1-0-1-120-00000002", combat = true, targetGUID = "Player-1-32",
+		x = 0.6, y = 0.5, pinned = true }
+	THREAT.nameplate1, THREATS["party2>nameplate2"] = 3, 3
+	Fire("GROUP_ROSTER_UPDATE")
+	Fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
+	Fire("NAME_PLATE_UNIT_ADDED", "nameplate2")
+	Advance(0.1)
+	local tag = ns.GetAggroTag("nameplate1")
+	check(tagText("nameplate1") == ">YOU<" and same("nameplate1", 0.35, 0.62, 1) and tag:GetParent() == MOBS.nameplate1.unitFrame
+		and select(1, tag:GetPoint(1)) == "LEFT", "on me: >YOU< in my role's colour (tank blue), at the left end of its health bar")
+	check(tagText("nameplate2") == "Ölr" and same("nameplate2", 1, 0.32, 0.26),
+		"on a damage dealer: the first three letters of the name (whole letters), red")
+	-- Its target is the healer, but I'm the one tanking it (a spell at her): me.
+	MOBS.nameplate2.targetGUID = "Player-1-31"
+	THREATS["party1>nameplate2"], THREATS["party2>nameplate2"], THREAT.nameplate2 = 1, 0, 3
+	Fire("UNIT_TARGET", "nameplate2")
+	Advance(0.1)
+	check(tagText("nameplate2") == ">YOU<", "its target isn't tanking it (a spell at the healer): whoever is, me")
+	THREATS["party1>nameplate2"], THREAT.nameplate2 = 3, 1
+	Fire("UNIT_THREAT_LIST_UPDATE", "nameplate2")
+	Advance(0.1)
+	check(tagText("nameplate2") == "Ann" and same("nameplate2", 0.3, 0.95, 0.4), "the healer has it: Ann, green")
+	-- No roles (a group made by hand): white; a bear is a tank anyway.
+	ROLES = {}
+	Fire("PLAYER_ROLES_ASSIGNED")
+	Advance(0.1)
+	check(same("nameplate2", 0.92, 0.92, 0.92), "no roles: white")
+	AURAS.party1 = { ["Bear Form"] = true, [C_Spell.GetSpellInfo(5487).name] = true } -- (other tests rename spells)
+	Fire("PLAYER_REGEN_DISABLED") -- (roles are guessed again when a fight starts)
+	Advance(0.1)
+	check(same("nameplate2", 0.35, 0.62, 1), "in Bear Form: a tank")
+	Fire("PLAYER_REGEN_ENABLED")
+	AURAS.party1 = nil
+	-- Threat secret and its target not known: nothing said.
+	THREATS["party1>nameplate2"], THREAT.nameplate2, MOBS.nameplate2.targetGUID = SECRET, SECRET, nil
+	Fire("UNIT_THREAT_LIST_UPDATE", "nameplate2")
+	Advance(0.1)
+	check(tagText("nameplate2") == nil, "nothing readable: no tag")
+	-- Someone outside the group (an escort): grey.
+	MOBS.nameplate2.targetGUID, MOBS.nameplate2.targetName = "Creature-0-1-0-1-467-00000009", "The Defias Traitor"
+	Fire("UNIT_TARGET", "nameplate2")
+	Advance(0.1)
+	check(tagText("nameplate2") == "The" and same("nameplate2", 0.6, 0.6, 0.6), "on someone outside the group: grey")
+	-- Out of combat, or solo: nothing.
+	MOBS.nameplate2.combat = false
+	Fire("UNIT_FLAGS", "nameplate2")
+	Advance(0.1)
+	check(tagText("nameplate2") == nil, "a mob out of combat: no tag")
+	GROUP = "none"
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.1)
+	check(tagText("nameplate1") == nil, "solo: no tags")
+	-- While I'm in combat in a group it looks again twice a second, also without events.
+	GROUP, STATE.combat = "party", true
+	Fire("PLAYER_REGEN_DISABLED")
+	Advance(0.1)
+	check(tagText("nameplate1") == ">YOU<", "in a group again: back")
+	MOBS.nameplate1.attacking, THREAT.nameplate1, THREATS["party2>nameplate1"] = false, 0, 3
+	MOBS.nameplate1.targetGUID = "Player-1-32"
+	Advance(0.6)
+	check(tagText("nameplate1") == "Ölr", "no event, but in combat: seen within half a second")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	-- Like the game: the combat lockdown begins only after PLAYER_REGEN_DISABLED, so inside it
+	-- InCombatLockdown still says no.
+	Fire("PLAYER_REGEN_DISABLED")
+	STATE.combat = true
+	Advance(0.1)
+	MOBS.nameplate1.targetGUID, THREATS["party1>nameplate1"] = "Player-1-31", 3
+	Advance(0.6)
+	check(tagText("nameplate1") == "Ann", "a fight starting: the half-second looks begin (combat taken from the event)")
+	STATE.combat = false
+	Fire("PLAYER_REGEN_ENABLED")
+	THREATS["party1>nameplate1"] = nil
+	-- The examples: each enemy nameplate another one, for ten seconds.
+	local pmark = #PRINTED + 1
+	lefthy("tweaks aggrotest")
+	Advance(0.1)
+	check(printedSince(pmark):find("2 enemy nameplate", 1, true) and tagText("nameplate1") == ">YOU<" and tagText("nameplate2") == "Ann",
+		"/lefthy tweaks aggrotest: examples on the enemy nameplates in sight")
+	Advance(10.2)
+	check(tagText("nameplate2") == nil, "ten seconds later: the real thing again")
+	-- The role check: Blizzard's, for the whole group.
+	pmark = #PRINTED + 1
+	lefthy("tweaks rolecheck")
+	check(ROLE_POLLS == 1 and printedSince(pmark):find("role check started", 1, true), "/lefthy tweaks rolecheck: Blizzard's role check")
+	ROLE_POLL_OK = false
+	pmark = #PRINTED + 1
+	lefthy("tweaks rolecheck")
+	check(printedSince(pmark):find("only the group's leader or an assistant", 1, true), "not the leader: said so")
+	ROLE_POLL_OK = true
+	-- Switched off: every tag goes.
+	lefthy("tweaks aggro off")
+	Advance(0.1)
+	check(tagText("nameplate1") == nil, "switched off: no tags")
+	lefthy("tweaks aggro on")
+	Advance(0.1)
+	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate1")
+	Fire("NAME_PLATE_UNIT_REMOVED", "nameplate2")
+	GROUP, PARTY.party1, PARTY.party2, ROLES, MOBS.nameplate1, MOBS.nameplate2 = "none", nil, nil, {}, nil, nil
+	THREAT.nameplate1, THREAT.nameplate2, THREATS = nil, nil, {}
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.1)
+end)()

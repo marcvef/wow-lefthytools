@@ -1,8 +1,9 @@
--- Beacon: friends on the maps, sharing, updates, alerts, pings, quests, level-ups, items, LTC, error reports.
+-- Beacon: friends on the maps, sharing, updates, alerts, pings, quests, level-ups, items, LTC, error
+-- reports, switching it off, and its tick calling the other files' hooks. (The fight stream: stream.lua.)
 local suite = ...
 local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
 local printedSince, sentTo, anna, peers = suite.printedSince, suite.sentTo, suite.anna, suite.peers
-local pinOf, tooltipHas, afk = suite.pinOf, suite.tooltipHas, suite.afk
+local pinOf, tooltipHas, afk, catchErrors = suite.pinOf, suite.tooltipHas, suite.afk, suite.catchErrors
 
 section("Beacon: setup")
 local Beacon = LT:GetModule("beacon")
@@ -92,7 +93,7 @@ check(peers()[12].subzone == "Zone20", "flood guard: at most 20 messages a secon
 section("Beacon: friends on the world map")
 PLAYER_POS = { 0.5, 0.5 } -- me: north 500, west 500
 Advance(0.6)
-check(#PINS == 0, "map closed: nothing drawn")
+check(#PinsOf("LefthyToolsBeaconPinTemplate") == 0, "map closed: nothing drawn")
 OpenWorldMap(1429)
 local annaPin = pinOf(11)
 check(#PINS == 2 and annaPin and pinOf(12), "map open: Anna's and Bob's dots")
@@ -2275,4 +2276,102 @@ do
 	check(#LefthyToolsDB.reportsOut == 0, "the held-up report went once the server let it")
 	anna("Y2;0")
 	wipe(reports)
+end
+
+section("Beacon: leaving")
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 12)
+Advance(0.15)
+check(not peers()[12] and peers()[11], "a friend switching Beacon off (Q2) is forgotten")
+-- A reserved item at a vendor, then Beacon goes off (below).
+local owedList = LefthyToolsDB.handover
+BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12)
+BAGS[0] = { [3] = 1155 }
+OpenBags()
+Fire("MERCHANT_SHOW")
+Advance(0.1)
+local reservedButton = ContainerFrameCombinedBags.buttons[3]
+check(reservedButton.LefthyToolsReserved:IsShown() and reservedButton.LefthyToolsSellGuard:IsShown(), "a reserved item at a vendor, Beacon on")
+mark = #GAMEDATA + 1
+MOCK_SEND_RESULT = 3 -- the server is throttling right now
+local mapProviders = {} -- (Beacon's and others' on the world map)
+for p in pairs(WorldMapFrame.providers) do mapProviders[p] = true end
+lefthy("disable beacon")
+check(#GameDataTo(11, mark) == 0, "switching off sends nothing inside the settings callback")
+Advance(1)
+check(#GameDataTo(11, mark) == 0, "throttled: the goodbye waits")
+MOCK_SEND_RESULT = nil
+Advance(3)
+check(GameDataTo(11, mark)[1] == "Q2", "... and then tells friends (through the rate limiter, not lost)")
+local providersLeft, providersGone = 0, 0
+for p in pairs(mapProviders) do
+	if WorldMapFrame.providers[p] then providersLeft = providersLeft + 1 else providersGone = providersGone + 1 end
+end
+check(providersGone == 2 and providersLeft == 1 and next(BB.GetMinimapPins()) == nil,
+	"and removes the dots from both maps (its two map providers go, the quest map's stays)")
+check(not reservedButton.LefthyToolsReserved:IsShown() and not reservedButton.LefthyToolsSellGuard:IsShown(),
+	"and the reserved item's border and vendor question")
+pmark = #PRINTED + 1
+TRADE_PARTNER, PARTY.NPC = "Bob", { guid = "Player-1-12" }
+Fire("TRADE_SHOW")
+SendMailFrame:Show()
+SendMailNameEditBox:SetText("")
+MAIL_ITEMS = { 1155 }
+Fire("MAIL_SEND_INFO_UPDATE")
+BAGS[0][3] = nil
+Fire("BAG_UPDATE_DELAYED")
+Advance(0.1)
+check(printedSince(pmark) == "" and SendMailNameEditBox:GetText() == "", "while off: no trade nudge, no mail help, no vendor warning, got " .. printedSince(pmark))
+BAGS[0][3] = 1155
+SendMailFrame:Hide()
+MAIL_ITEMS, TRADE_PARTNER, PARTY.NPC = {}, nil, nil
+mark = #GAMEDATA + 1
+Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 11)
+Advance(5)
+check(#GameDataTo(11, mark) == 0, "while off: no answers, no positions")
+local seenNewer = LT.newerVersion
+LT.newerVersion = nil
+check(updateStatus():find("Unknown (Beacon is off)", 1, true), "update status with Beacon off: unknown")
+LT.newerVersion = seenNewer
+do -- Beacon's /lefthy words while it's off: they answer as they always did (no time passes here).
+	pmark = #PRINTED + 1
+	lefthy("announce hello")
+	lefthy("stream watch anna")
+	check(printedSince(pmark):find("Beacon is off: /lefthy enable beacon.", 1, true)
+		and printedSince(pmark):find("no friend called anna online with LefthyTools.", 1, true),
+		"Beacon off: /lefthy announce and /lefthy stream say why nothing happens, got " .. printedSince(pmark))
+	lefthy("reports")
+	check(LefthyToolsReportsFrame:IsShown(), "... and /lefthy reports still shows the collected ones")
+	LefthyToolsReportsFrame:Hide()
+end
+lefthy("enable beacon")
+Advance(0.15)
+check(next(WorldMapFrame.providers) ~= nil, "on again: back on the map")
+check(reservedButton.LefthyToolsReserved:IsShown() and reservedButton.LefthyToolsSellGuard:IsShown(),
+	"and the reserved item's border and vendor question")
+Fire("MERCHANT_CLOSED")
+wipe(owedList)
+BAGS = { [0] = {} }
+CloseBags()
+Advance(0.1)
+
+section("Beacon: a hook that fails doesn't stop the tick")
+do
+	local health, calls, pings, reports, minimap = BB.StreamHealthTick, BB.UpdateCalls, BB.UpdatePings, BB.TickReports, BB.UpdateMinimap
+	local ticks, healthCalls, reportTicks, minimapCalls = 0, 0, 0, 0
+	BB.StreamHealthTick = function() healthCalls = healthCalls + 1; error("a broken health tick") end -- (before sending)
+	BB.UpdateCalls = function(now) ticks = ticks + 1; return calls(now) end
+	BB.UpdatePings = function() error("broken pings") end
+	BB.TickReports = function(now) reportTicks = reportTicks + 1; return reports(now) end -- (after the pings)
+	BB.UpdateMinimap = function() minimapCalls = minimapCalls + 1; error("a broken minimap") end -- (every frame)
+	local reported, stop = catchErrors()
+	mark = #GAMEDATA + 1
+	anna("H2")
+	Advance(3)
+	stop()
+	BB.StreamHealthTick, BB.UpdateCalls, BB.UpdatePings, BB.TickReports, BB.UpdateMinimap = health, calls, pings, reports, minimap
+	check(sentTo(11, mark, "V2;")[1], "a hook before sending fails on every tick: Anna's hello is answered all the same")
+	check(ticks >= 20 and reportTicks == ticks, "one in the middle fails: the rest of the tick runs, got " .. reportTicks .. " of " .. ticks)
+	check(healthCalls <= 3 and minimapCalls <= 3,
+		"the failing ones rest: " .. healthCalls .. " of " .. ticks .. " ticks, " .. minimapCalls .. " of 180 frames")
+	check(#reported == 3, "each error reported once, got " .. #reported)
 end

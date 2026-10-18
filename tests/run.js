@@ -80,8 +80,8 @@ if (!process.argv[2]) {
 //    The English suite: helpers.lua loads the addon, then the test files run in this order in the
 //    same state (the mock's clock and world go on from one to the next), each getting what
 //    helpers.lua returns as `...`; its Finish() makes the last checks and prints the count.
-const ENGLISH = ["core.lua", "mirage.lua", "tweaks.lua", "beacon.lua", "stream.lua", "flights.lua", "questmap.lua",
-  "chronicle.lua", "leaving.lua", "levelup.lua", "bestiary.lua", "aggro.lua", "whatsnew.lua", "mirageoff.lua", "guard.lua"];
+const ENGLISH = ["core.lua", "mirage.lua", "tweaks.lua", "beacon.lua", "stream.lua", "flights.lua", "chronicle.lua",
+  "levelup.lua", "bestiary.lua", "whatsnew.lua"];
 
 function newState() {
   const L = lauxlib.luaL_newstate();
