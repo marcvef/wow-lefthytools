@@ -172,9 +172,8 @@ do
 		and card.cells[1].Chance:GetText() == "33%", "over it: my kills and its drops, beside the mouse")
 	-- Not in combat (a setting, on): it goes when a fight starts and comes back after.
 	check(LefthyToolsDB.settings.bestiary.cardHideInCombat == true, "hidden in combat: on by default")
-	STATE.combat = true
-	Advance(0.1)
-	check(not card:IsShown(), "a fight starts: the card goes")
+	EnterCombat()
+	check(not card:IsShown(), "a fight starts: the card goes at once (when it starts, before the combat lockdown begins)")
 	Fire("UPDATE_MOUSEOVER_UNIT")
 	check(not card:IsShown(), "in combat: not shown")
 	setting("cardHideInCombat"):SetValue(false)

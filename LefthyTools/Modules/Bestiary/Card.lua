@@ -1,4 +1,5 @@
 local _, ns = ...
+local LT = ns.LT
 local L = ns.L
 local Bt = ns.Bestiary
 local M = Bt.module
@@ -17,15 +18,11 @@ local LINE = 14
 
 local card, cardGUID
 
--- In combat with the setting cardHideInCombat (on): no card (the user: not while fighting).
+-- In combat with the setting cardHideInCombat (on): no card (the user: not while fighting). Core's
+-- LT.InCombat: the lockdown begins only after PLAYER_REGEN_DISABLED, so InCombatLockdown alone still
+-- says no inside it (the card stayed a frame into the fight).
 local function CardHidden()
-	if not M.db.cardHideInCombat then
-		return false
-	end
-	if InCombatLockdown then
-		return InCombatLockdown() == true
-	end
-	return Value(UnitAffectingCombat, "player") == true
+	return M.db.cardHideInCombat and LT.InCombat()
 end
 
 local function CardFollow(self)
@@ -188,6 +185,12 @@ Bt.When("settings", function()
 end)
 
 Bt.On("UPDATE_MOUSEOVER_UNIT", function() Bt.MouseoverChanged() end)
+Bt.On("PLAYER_REGEN_DISABLED", function()
+	if card and card:IsShown() and CardHidden() then -- (a fight starts: it goes at once, not on the next frame)
+		card:Hide()
+		cardGUID = nil
+	end
+end)
 Bt.On("PLAYER_REGEN_ENABLED", function()
 	Bt.MouseoverChanged() -- (the fight is over, the mouse still over an enemy: its card)
 end)

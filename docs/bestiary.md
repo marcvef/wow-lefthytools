@@ -279,8 +279,10 @@ Setting `hoverCard` (off by default). Over an enemy (attackable or dead) you've 
 `TOOLTIP` strata, no mouse. An OnUpdate while it's shown follows the cursor and hides it once the
 mouseover is gone or another unit. **Small on purpose** (the user: it mustn't be "too large and
 intrusive"): one line and one row of 6, never more (a quest's line, below, the only one more). **Not in combat** (setting `cardHideInCombat`,
-on; the user: not "infight"): `InCombatLockdown()`, checked when the mouseover changes and in its
-OnUpdate (it goes when a fight starts); `PLAYER_REGEN_ENABLED` looks at the mouseover again, so it
+on; the user: not "infight"): `LT.InCombat()` (the lockdown or the moment before it), checked when
+the mouseover changes, in its OnUpdate and at `PLAYER_REGEN_DISABLED`, so it goes the moment a fight
+starts (the lockdown begins only after that event: asking `InCombatLockdown()` alone left it a frame
+into the fight); `PLAYER_REGEN_ENABLED` looks at the mouseover again, so it
 comes back if the mouse is still over an enemy. A mob killed before shows only your drops (no
 database cells on top); one you haven't killed, with the setting `cardUnseen` (off, like the
 window's `windowUnseen`: the user wanted neither by default), shows the database's 6 likeliest,
