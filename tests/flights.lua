@@ -55,7 +55,7 @@ do
 	Fire("ZONE_CHANGED_NEW_AREA")
 	Advance(0.3)
 	check(card.Title:GetText() == "Elwynn Forest" and card.Header:GetText() == "Eastern Kingdoms"
-		and card.Sub:GetText():find("Levels 1-10", 1, true) and card.Sub:GetText():find("Anna|r, |cffc79c6eBob|r are here", 1, true)
+		and card.Sub:GetText():find("Levels 1-10", 1, true) and card.Sub:GetText():find("Anna Brook|r, |cffc79c6eBob Stone|r are here", 1, true)
 		and card.Anim.plays == 2,
 		"each new zone gets a card: continent, levels, friends there, got " .. tostring(card.Sub:GetText()))
 	Fire("ZONE_CHANGED_NEW_AREA") -- same zone again
@@ -233,7 +233,7 @@ do
 	Advance(2)
 	anna("I2;1179::::::::20:::::")
 	Advance(0.3)
-	check(film:IsShown() and film.Subtitles:GetText():find("Anna|r shares", 1, true),
+	check(film:IsShown() and film.Subtitles:GetText():find("Anna Brook|r shares", 1, true),
 		"a friend shows an item: a subtitle, got " .. tostring(film.Subtitles:GetText()))
 	do -- The item in it: hover for its tooltip (ours, above the film), click to open it.
 		local lines = film.SubtitleFrame

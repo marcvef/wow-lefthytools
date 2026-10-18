@@ -252,9 +252,9 @@ do
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "E2;hack;x;y", "WHISPER", 11)
 	check(#feed == before, "nothing recorded inside the event handler")
 	Advance(0.15)
-	check(#feed == before + 1 and feed[#feed].k == "boss" and feed[#feed].name == "Anna" and feed[#feed].a == "Hogger",
+	check(#feed == before + 1 and feed[#feed].k == "boss" and feed[#feed].name == "Anna Brook" and feed[#feed].a == "Hogger",
 		"a friend's highlight goes into the feed (unknown kinds are dropped)")
-	check(printedSince(pmark):find("Anna|r defeated Hogger (Elwynn Forest).", 1, true), "with a chat line")
+	check(printedSince(pmark):find("Anna Brook|r defeated Hogger (Elwynn Forest).", 1, true), "with a chat line")
 	for i = 1, 10 do anna("E2;rare;Rare" .. i .. ";Duskwood") end
 	Advance(0.15)
 	check(#feed == before + 10, "at most 10 highlights a minute from one friend, got " .. (#feed - before))
@@ -274,12 +274,12 @@ do
 	QUESTS = {}
 	anna("Q2") -- she switches Beacon off (or logs off)
 	Advance(0.15)
-	check(feed[#feed].k == "offline" and feed[#feed].name == "Anna", "a friend going offline is in the feed")
+	check(feed[#feed].k == "offline" and feed[#feed].name == "Anna Brook", "a friend going offline is in the feed")
 	local dmark = #GAMEDATA + 1
 	me.daily["2030-05-15"].afk = 600 -- 10 minutes AFK today
 	anna("H2")
 	Advance(1.2)
-	check(feed[#feed].k == "online" and feed[#feed].name == "Anna", "and coming back online")
+	check(feed[#feed].k == "online" and feed[#feed].name == "Anna Brook", "and coming back online")
 	Advance(2)
 	local days = sentTo(11, dmark, "D2;")
 	check(#days >= 1 and days[#days]:find("^D2;20300515;%d+;%d+;%d+;%d+;%d+;%d+$"),
@@ -306,7 +306,7 @@ do
 	anna("D2;20300513;2000;1;1;1;1;1") -- more minutes than a day has
 	anna("K2;20300512;9999")
 	Advance(0.15)
-	local annaStats = CDB.friendStats.Anna
+	local annaStats = CDB.friendStats["Anna Brook"]
 	check(annaStats and annaStats.days["2030-05-14"].played == 5400 and annaStats.days["2030-05-14"].xp == 5000
 		and annaStats.days["2030-05-15"].quests == 2 and not annaStats.days["2030-05-13"] and annaStats.classFile == "MAGE",
 		"and I keep theirs (malformed days are dropped)")
@@ -375,14 +375,14 @@ do
 	check(not win.Tabs.stats:IsEnabled() and win.Tabs.timeline:IsEnabled(), "the open page's button is greyed out")
 	win.Tabs.news:Click()
 	local friendsPage = win.Text:GetText()
-	check(friendsPage:find("Anna|r: ", 1, true) and friendsPage:find("Defeated Hogger (Elwynn Forest)", 1, true),
+	check(friendsPage:find("Anna Brook|r: ", 1, true) and friendsPage:find("Defeated Hogger (Elwynn Forest)", 1, true),
 		"news: friends' highlights")
 	check(friendsPage:find("Came online", 1, true) and friendsPage:find("Completed The Defias Brotherhood", 1, true)
 		and friendsPage:find("Discovered Westfall", 1, true), "news: what happened, got\n" .. friendsPage)
 	win.Tabs.friends:Click()
 	friendsPage = "" -- (the Friends page's tables: everything drawn on the canvas)
 	for i = 1, win.Canvas.used.text do friendsPage = friendsPage .. "\n" .. (win.Canvas.pools.text[i]:GetText() or "") end
-	check(win.Text:GetText() == "" and friendsPage:find("Online now", 1, true) and friendsPage:find("\n|cff40c7ebAnna|r\n", 1, true)
+	check(win.Text:GetText() == "" and friendsPage:find("Online now", 1, true) and friendsPage:find("\n|cff40c7ebAnna Brook|r\n", 1, true)
 		and friendsPage:find("Where|r", 1, true) and friendsPage:find("Doing|r", 1, true) and friendsPage:find("1 friend|r", 1, true),
 		"friends: a table of who's online now, where they are and what they're doing, got\n" .. friendsPage)
 	me.daily[date("%Y-%m-%d", time() - 86400)] = { played = 3600, xp = 5000, quests = 3, kills = 20, deaths = 0, afk = 900 }
@@ -464,7 +464,7 @@ do
 		menu[#menu + 1] = row.kind == "divider" and "-" or (row.Text:GetText():gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 	end
 	menu = table.concat(menu, " / ")
-	check(picker.List:IsShown() and menu == ("You  Lefthy %d, Alty 12 / - / Friends / Annie  Anna 20"):format(me.level),
+	check(picker.List:IsShown() and menu == ("You  Lefthy %d, Alty 12 / - / Friends / Annie  Anna Brook 20"):format(me.level),
 		"a click opens the list: people, not characters (you with all your characters, this one first; each friend once, by BattleTag), got " .. menu)
 	check(picker.List.rows[1].Check.shown and not picker.List.rows[4].Check.shown and not picker.List.rows[3]._mouseEnabled,
 		"the picked one is ticked; headings can't be clicked")
@@ -499,7 +499,7 @@ do
 	local function drawnContaining(text)
 		for i = 1, canvas.used.text do if (canvas.pools.text[i]:GetText() or ""):find(text, 1, true) then return true end end
 	end
-	check(picker:GetText():find("^|cff80c0ffAnnie|r  ") and picker:GetText():find("Anna|r |cffcccccc20|r", 1, true) and drawnText("Last 7 days")
+	check(picker:GetText():find("^|cff80c0ffAnnie|r  ") and picker:GetText():find("Anna Brook|r |cffcccccc20|r", 1, true) and drawnText("Last 7 days")
 		and drawnText("You and Annie, last 7 days") and drawnText("2h 0m") and drawnContaining("Completed The Defias Brotherhood"),
 		"a friend's graphs: their days, their week, you and them (by their BattleTag: it's all their characters), their latest news")
 	check(strayGradients() == 0, "no bar or curve gradient left on the textures they reused, got " .. strayGradients())
@@ -809,7 +809,7 @@ section("Chronicle: friends' journals, also when they're offline")
 	Advance(0.3)
 	CH.Open("friends")
 	check(not win.Tabs.friends:IsEnabled() and not win.Picker:IsShown() and win.Text:GetText() == "" and drawn("Online now")
-		and drawn("Where") and drawn("Doing") and drawn("Anna|r") and drawn("Not online") and drawn("Last played")
+		and drawn("Where") and drawn("Doing") and drawn("Anna Brook|r") and drawn("Not online") and drawn("Last played")
 		and drawn("BattleTag") and drawn("Carl|r") and drawn("Died to Hogger"),
 		"Friends: a table of who's online (where, doing) and one of who isn't (last played, this week, latest news)")
 	local function drawnTimes(text)
@@ -826,7 +826,7 @@ section("Chronicle: friends' journals, also when they're offline")
 	for i = 1, canvas.used.hover do
 		local f = canvas.pools.hover[i]
 		if f.lines and f.lines[1]:find("Carl|r", 1, true) then carlRow = f end
-		if f.lines and f.lines[1]:find("Anna|r", 1, true) then annaRow = f end
+		if f.lines and f.lines[1]:find("Anna Brook|r", 1, true) then annaRow = f end
 	end
 	check(annaRow and #annaRow.lines >= 3 and annaRow.onClick, "an online friend's row: their full status on hover, a click opens their graphs")
 	check(carlRow and table.concat(carlRow.lines, "\n"):find("Level 18", 1, true) and carlRow.lines[#carlRow.lines]:find("Click: their graphs", 1, true)
@@ -968,7 +968,7 @@ section("Chronicle: friends' journals, also when they're offline")
 	local said = printedSince(pmark)
 	check(said:find("while you were away", 1, true) and said:find("Carl|r" .. unsure .. ": reached level 18", 1, true) and said:find("died once", 1, true),
 		"a minute after logging in: what friends did while I was away, got\n" .. said)
-	check(said:find("Bob|r defeated Lord Liveone", 1, true) and said:find("Bob|r: reached level 24, reached level 25", 1, true)
+	check(said:find("Bob Stone|r defeated Lord Liveone", 1, true) and said:find("Bob Stone|r: reached level 24, reached level 25", 1, true)
 		and not said:match("while you were away.*Lord Liveone"),
 		"what came live since logging in isn't told again, got\n" .. said)
 
@@ -1015,9 +1015,7 @@ section("Chronicle: one row per character, accounts beside them")
 
 	-- WoW: Forever names have a surname. Battle.net (and so Beacon, and what an older build sends live)
 	-- says "Anna Brook"; her own client's journal knows her by UnitName's first return ("Anna-Realmy").
-	bn(11).characterName = "Anna Brook"
 	anna("H2")
-	Fire("BN_FRIEND_INFO_CHANGED")
 	Advance(1.2)
 	check(peers()[11] and peers()[11].name == "Anna Brook", "Beacon knows her by the full name")
 	local today = date("%Y%m%d")
@@ -1181,9 +1179,7 @@ section("Chronicle: one row per character, accounts beside them")
 	lefthy("enable chronicle")
 	check(me.full == "Lefthy Mirewood", "my surname stays when UnitName doesn't say one this time")
 
-	-- (back to how the later tests know her and me)
-	bn(11).characterName = "Anna"
-	Fire("BN_FRIEND_INFO_CHANGED")
+	-- (back to how the later tests know me)
 	lefthy("disable chronicle")
 	me.full = nil
 	lefthy("enable chronicle")
@@ -1468,7 +1464,7 @@ do
 	anna("D2;20990101;10;100;1;1;0;0")
 	anna("D2;" .. date("%Y%m%d") .. ";11;100;1;1;0;0")
 	Advance(1.5)
-	local annaStats = C.Store().friendStats.Anna
+	local annaStats = C.Store().friendStats["Anna Brook"]
 	check(annaStats and annaStats.days[date("%Y-%m-%d")] and not annaStats.days["2099-01-01"],
 		"a friend's day after tomorrow is ignored (today's is kept)")
 	-- A session past midnight: the new day counts as a day played.

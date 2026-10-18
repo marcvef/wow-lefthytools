@@ -1106,12 +1106,12 @@ local function WoWAccount(id, name, class, extra)
 	return a
 end
 BN_FRIENDS = {
-	{ WoWAccount(11, "Anna", "MAGE"), battleTag = "Annie#1234" },
-	{ WoWAccount(12, "Bob", "WARRIOR"), battleTag = "Bobby#2345" },
-	{ WoWAccount(13, "Carl", "ROGUE", { isOnline = false }), battleTag = "Carl#3456" },
-	{ WoWAccount(14, "Dora", "PRIEST", { clientProgram = "App" }), battleTag = "Dora#4567" },
-	{ WoWAccount(15, "Eve", "DRUID", { isInCurrentRegion = false }), battleTag = "Eve#5678" },
-	{ WoWAccount(16, "Finn", "HUNTER"), battleTag = "Finn#6789" }, -- runs an older LefthyTools
+	{ WoWAccount(11, "Anna Brook", "MAGE"), battleTag = "Annie#1234" },
+	{ WoWAccount(12, "Bob Stone", "WARRIOR"), battleTag = "Bobby#2345" },
+	{ WoWAccount(13, "Carl Vale", "ROGUE", { isOnline = false }), battleTag = "Carl#3456" },
+	{ WoWAccount(14, "Dora Reed", "PRIEST", { clientProgram = "App" }), battleTag = "Dora#4567" },
+	{ WoWAccount(15, "Eve Marsh", "DRUID", { isInCurrentRegion = false }), battleTag = "Eve#5678" },
+	{ WoWAccount(16, "Finn Hale", "HUNTER"), battleTag = "Finn#6789" }, -- runs an older LefthyTools
 }
 function BNGetNumFriends() return #BN_FRIENDS, #BN_FRIENDS end
 MY_BATTLETAG = "Me#1111"

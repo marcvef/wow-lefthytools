@@ -770,7 +770,7 @@ do
 	anna("O2;h;1")
 	pmark = #PRINTED + 1
 	lefthy("stream watch bob")
-	check(printedSince(pmark):find("Bob can't be watched", 1, true) and not S.IsWatching(12), "Bob's LefthyTools is older: he can't be watched, and I'm told why")
+	check(printedSince(pmark):find("Bob Stone can't be watched", 1, true) and not S.IsWatching(12), "Bob's LefthyTools is older: he can't be watched, and I'm told why")
 	lefthy("stream watch nobody")
 	check(printedSince(pmark):find("no friend called nobody", 1, true), "an unknown name: said so")
 	mark = #GAMEDATA + 1
@@ -781,7 +781,7 @@ do
 		"/lefthy stream watch anna: her window opens, and she's told I watch")
 	check(fwin._strata == "FULLSCREEN_DIALOG" and math.abs(fwin._scale - 0.55) < 0.001 and fwin._points[1][1] == "TOPLEFT"
 		and fwin._points[1][4] < 40, "small, at the top left, above everything (also a flight's film)")
-	check(fwin.Status:GetText() == "Waiting for Anna's stream...", "nothing from her yet: waiting")
+	check(fwin.Status:GetText() == "Waiting for Anna Brook's stream...", "nothing from her yet: waiting")
 	-- Her frames: mob names first (once), then what's around her twice a second.
 	anna("O2;n;1;16;Defias Pillager")
 	anna("O2;f;0;1429;260;750;90;c;M40;;133,10,25;116,3/122,6;1,45,20,9,actes,133/2,180,30,4,cb")
@@ -804,7 +804,7 @@ do
 		Advance(0.1)
 		check(not fwin.Health:IsShown() and fwin.HealthText:GetText() == "~?", "no health in her frame: ~?")
 		fwin.HealthHover._scripts.OnEnter(fwin.HealthHover)
-		check(tooltipFind("Anna's LefthyTools is older and doesn't send health"), "hover: her build is older (it sends none)")
+		check(tooltipFind("Anna Brook's LefthyTools is older and doesn't send health"), "hover: her build is older (it sends none)")
 		fwin.HealthHover._scripts.OnLeave(fwin.HealthHover)
 		BB.peers[11].version = annaVersion
 	end
@@ -832,13 +832,13 @@ do
 	check(not twice(fwin) and fwin.Kills:GetText() == "1 kill", "each once, though they came again")
 
 	fpill._scripts.OnEnter(fpill)
-	check(TOOLTIP.title == "Defias Pillager (16)" and tooltipHas("attacking Anna") and tooltipHas("Anna's target")
+	check(TOOLTIP.title == "Defias Pillager (16)" and tooltipHas("attacking Anna Brook") and tooltipHas("Anna Brook's target")
 		and tooltipHas("about 20 yd") and not tooltipHas("direction still unsure"), "hover: about her mob")
 	fpill._scripts.OnLeave(fpill)
 	mark = #GAMEDATA + 1
 	Advance(6)
 	check(#sentTo(11, mark, "O2;w;1") == 1, "every 5 s: still watching")
-	check(fwin.Status:GetText() == "Waiting for Anna's stream...", "no frames for a while: waiting again")
+	check(fwin.Status:GetText() == "Waiting for Anna Brook's stream...", "no frames for a while: waiting again")
 	mark = #GAMEDATA + 1
 	bob("O2;f;0;1429;260;750;0;;;;;;")
 	bob("O2;f;0;1429;260;750;0;;;;;;")
@@ -1101,7 +1101,7 @@ do
 	mark = #GAMEDATA + 1
 	anna("O2;h;0")
 	Advance(1.1)
-	check(not fwin:IsShown() and not S.IsWatching(11) and printedSince(pmark):find("Anna stopped sharing their fights.", 1, true)
+	check(not fwin:IsShown() and not S.IsWatching(11) and printedSince(pmark):find("Anna Brook stopped sharing their fights.", 1, true)
 		and sentTo(11, mark, "O2;w;0")[1], "she stops sharing: her window closes, I'm told")
 	anna("O2;h;1")
 
@@ -1150,10 +1150,6 @@ do
 	BB.StreamFlightEnd()
 	check(S.IsWatching(11), "one opened on the map stays")
 	do -- Battle.net shows Forever's names with the surname: her first name is enough, her full name too.
-		local bnName = BN_FRIENDS[1][1].characterName
-		BN_FRIENDS[1][1].characterName = "Anna Brook"
-		Fire("BN_FRIEND_INFO_CHANGED")
-		Advance(1.1) -- (the Battle.net lookup comes once a second)
 		check(BB.peers[11].name == "Anna Brook", "Battle.net: Anna Brook")
 		lefthy("stream stop Anna Brook")
 		check(not S.IsWatching(11), "/lefthy stream stop by her full name")
@@ -1166,9 +1162,6 @@ do
 		check(not S.IsWatching(11), "/lefthy stream stop anna: it closes")
 		lefthy("stream watch anna brook")
 		check(S.IsWatching(11), "... and opens by her full name")
-		BN_FRIENDS[1][1].characterName = bnName
-		Fire("BN_FRIEND_INFO_CHANGED")
-		Advance(1.1)
 	end
 	lefthy("stream stop")
 	check(not S.IsWatching(11), "/lefthy stream stop: every stream closes")
@@ -1212,7 +1205,7 @@ do
 	BN_FRIENDS[1][1].isOnline = false
 	Fire("BN_FRIEND_ACCOUNT_OFFLINE", 1, false)
 	Advance(2.2)
-	check(not S.IsWatching(11) and not fwin:IsShown() and printedSince(pmark):find("Anna went offline: their stream closed.", 1, true),
+	check(not S.IsWatching(11) and not fwin:IsShown() and printedSince(pmark):find("Anna Brook went offline: their stream closed.", 1, true),
 		"she went offline: her stream closes, I'm told")
 	BN_FRIENDS[1][1].isOnline = true
 	anna("S2;;0;260.0;750.0;Goldshire;")

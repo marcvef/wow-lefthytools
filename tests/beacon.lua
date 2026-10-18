@@ -52,7 +52,7 @@ check(sentTo(11, mark, "S2;")[1] == "S2;;0;500.0;500.0;Goldshire;",
 	"Anna answered: my state goes out right away, got " .. tostring(sentTo(11, mark, "S2;")[1]))
 check(sentTo(11, mark, "V2;")[1] == "V2;0.4.0-3-gabc1234", "... together with my LefthyTools version")
 Advance(1) -- the Battle.net lookup is coalesced to once a second
-check(peers()[11] and peers()[11].name == "Anna" and peers()[11].classFile == "MAGE", "her name and class come from Battle.net")
+check(peers()[11] and peers()[11].name == "Anna Brook" and peers()[11].classFile == "MAGE", "her name and class come from Battle.net")
 mark = #GAMEDATA + 1
 Advance(15)
 check(#GameDataTo(11, mark) == 0, "standing still: nothing is sent")
@@ -83,7 +83,7 @@ check(not peers()[16], "a friend on another LefthyTools version isn't treated as
 local pmark = #PRINTED + 1
 lefthy("beacon status")
 local status = printedSince(pmark)
-check(status:find("Finn runs another LefthyTools version", 1, true) ~= nil, "... and /lefthy beacon status says why")
+check(status:find("Finn Hale runs another LefthyTools version", 1, true) ~= nil, "... and /lefthy beacon status says why")
 check(status:find("traffic:", 1, true) ~= nil and status:find("2 friend(s)", 1, true) ~= nil, "status: friends and message traffic")
 Advance(1.1) -- a fresh one-second window
 for i = 1, 30 do -- a client gone haywire
@@ -109,7 +109,7 @@ STATE.combat = false
 annaPin = pinOf(11)
 check(annaPin.Ring.color[1] == 0 and not annaPin.Skull.shown and not annaPin.Pulse:IsPlaying(), "normal look: dark ring, no skull")
 annaPin:OnMouseEnter()
-check(TOOLTIP.title == "Anna" and TOOLTIP.shown, "tooltip: name")
+check(TOOLTIP.title == "Anna Brook" and TOOLTIP.shown, "tooltip: name")
 check(TOOLTIP.lines[1] == "Annie" and tooltipHas("Level 20") and tooltipHas("Elwynn Forest - Goldshire"),
 	"tooltip: BattleTag, level, zone and subzone; got " .. table.concat(TOOLTIP.lines, " | "))
 check(tooltipHas("355 yd south-west"), "tooltip: distance and direction from me")
@@ -142,7 +142,7 @@ Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER",
 BN_FRIENDS[1][1].isGameAFK = true
 Advance(0.6)
 annaPin:OnMouseEnter()
-check(TOOLTIP.title == "Anna <AFK>" and not annaPin.Skull.shown, "alive again; AFK shows in the tooltip")
+check(TOOLTIP.title == "Anna Brook <AFK>" and not annaPin.Skull.shown, "alive again; AFK shows in the tooltip")
 annaPin:OnMouseLeave()
 BN_FRIENDS[1][1].isGameAFK = false
 GROUP_GUIDS["Player-1-11"] = true
@@ -247,7 +247,7 @@ Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;C;0;550.0;500.0;;Hogger", "WHISPER", 1
 Advance(0.6)
 check(mm[11].Ring.color[1] == 1 and mm[11].Pulse:IsPlaying(), "same status look on the minimap")
 BB.GetMinimapPins()[11]._scripts.OnEnter(mm[11])
-check(TOOLTIP.title == "Anna" and tooltipHas("Fighting Hogger") and tooltipHas("50 yd north"), "same tooltip on the minimap")
+check(TOOLTIP.title == "Anna Brook" and tooltipHas("Fighting Hogger") and tooltipHas("50 yd north"), "same tooltip on the minimap")
 mm[11]._scripts.OnLeave(mm[11])
 GROUP_GUIDS["Player-1-11"] = true
 PARTY.party1 = { guid = "Player-1-11", continent = 0, north = 560, west = 490 } -- live: 60 yd N, 10 yd E
@@ -448,7 +448,7 @@ check(notice:find("What's coming:\n   |cffffd200•|r Misc Tweaks: Quests on the
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "W2;142;tweaks;Unasked news", "WHISPER", 11)
 Advance(0.15)
 check(not printedSince(vmark):find("Unasked news", 1, true), "news nobody asked for are ignored")
-check(notice:find("Anna has a newer LefthyTools (0.4.0-9-gbbbbbbb, you have 0.4.0-3-gabc1234)", 1, true)
+check(notice:find("Anna Brook has a newer LefthyTools (0.4.0-9-gbbbbbbb, you have 0.4.0-3-gabc1234)", 1, true)
 	and notice:find("run Update-LefthyTools.cmd again, then restart the game: this update adds files, a /reload isn't enough.", 1, true),
 	"a friend on a newer build that loads other files: told to update and restart the game, got " .. notice)
 check(LT.UpdateHint(LT.FILES):find("then /reload (no restart needed).", 1, true)
@@ -492,11 +492,11 @@ check(updateStatus():find("Newer version available: 0.5.0 (needs a game restart)
 local updatesTip = infoRow("Updates").data.tooltip
 check(type(updatesTip) == "function", "the Updates tooltip is built when it opens")
 local tip = updatesTip()
-check(tip:find("You: 0.4.0-3-gabc1234", 1, true) and tip:find("Anna|r: 0.5.0  |cffffa040newer", 1, true),
+check(tip:find("You: 0.4.0-3-gabc1234", 1, true) and tip:find("Anna Brook|r: 0.5.0  |cffffa040newer", 1, true),
 	"it lists my build and each friend's, marked newer / same / older, got\n" .. tip)
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.4.0-3-gabc1234", "WHISPER", 11)
 Advance(0.15)
-check(updatesTip():find("Anna|r: 0.4.0-3-gabc1234  |cff80ff80same", 1, true), "same build")
+check(updatesTip():find("Anna Brook|r: 0.4.0-3-gabc1234  |cff80ff80same", 1, true), "same build")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "V2;0.5.0", "WHISPER", 11) -- back to what the next checks expect
 Advance(0.15)
 vmark = #PRINTED + 1
@@ -569,15 +569,15 @@ anna("S2;D;0;260.0;750.0;Raven Hill;")
 check(#PRINTED < pmark, "nothing printed inside the event handler")
 Advance(0.15)
 local deathLine = printedSince(pmark)
-check(deathLine:find("Anna|r died in Elwynn Forest - Raven Hill, fighting Stitches.", 1, true),
+check(deathLine:find("Anna Brook|r died in Elwynn Forest - Raven Hill, fighting Stitches.", 1, true),
 	"a chat line: who died, where, and what they were fighting, got " .. deathLine)
-check(heard[#heard] and heard[#heard].kind == "death" and heard[#heard].name == "Anna" and heard[#heard].data.foe == "Stitches"
+check(heard[#heard] and heard[#heard].kind == "death" and heard[#heard].name == "Anna Brook" and heard[#heard].data.foe == "Stitches"
 	and heard[#heard].data.where == "Elwynn Forest - Raven Hill", "other modules hear about it")
 Advance(1.1)
 check(LefthyToolsAFKFrame:IsShown() and LefthyToolsAFKFrame.Info:GetText():find("While you were away|r\n", 1, true)
-	and LefthyToolsAFKFrame.Info:GetText():find("Anna|r died, fighting Stitches", 1, true),
+	and LefthyToolsAFKFrame.Info:GetText():find("Anna Brook|r died, fighting Stitches", 1, true),
 	"the AFK screen: 'While you were away' lists it, got " .. LefthyToolsAFKFrame.Info:GetText())
-check(LefthyToolsAFKFrame.Friends:GetText():find("Anna|r  |cffccccccLevel 20|r", 1, true)
+check(LefthyToolsAFKFrame.Friends:GetText():find("Anna Brook|r  |cffccccccLevel 20|r", 1, true)
 	and LefthyToolsAFKFrame.Friends:GetText():find("Elwynn Forest - Raven Hill", 1, true)
 	and LefthyToolsAFKFrame.Friends:GetText():find("|cffff5050Dead|r", 1, true),
 	"and the friends online, with their zone and status, got " .. LefthyToolsAFKFrame.Friends:GetText())
@@ -597,7 +597,7 @@ anna("S2;;0;260.0;750.0;Raven Hill;")
 Advance(1.2)
 anna("S2;D;0;260.0;750.0;Raven Hill;")
 Advance(0.15)
-check(printedSince(pmark):find("Anna|r died in Elwynn Forest - Raven Hill.", 1, true), "died out of combat (a fall): no killer")
+check(printedSince(pmark):find("Anna Brook|r died in Elwynn Forest - Raven Hill.", 1, true), "died out of combat (a fall): no killer")
 Advance(10)
 pmark = #PRINTED + 1
 anna("Q2")
@@ -671,7 +671,7 @@ pmark = #PRINTED + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "P2;0;550.0;500.0;1429", "WHISPER", 11)
 check(#PRINTED < pmark, "receiving: nothing printed inside the event handler")
 Advance(0.15)
-check(printedSince(pmark):find("Anna|r pinged a spot in Elwynn Forest: see your map.", 1, true) and SOUNDS[#SOUNDS] == 3175,
+check(printedSince(pmark):find("Anna Brook|r pinged a spot in Elwynn Forest: see your map.", 1, true) and SOUNDS[#SOUNDS] == 3175,
 	"a friend's ping: chat line and sound, got " .. printedSince(pmark))
 check(printedSince(pmark):find("map. |cffffff00|Hworldmap:1429:5000:4500|h[Map pin]|h|r", 1, true),
 	"with the game's map pin link for the spot (a click sets the waypoint), got " .. printedSince(pmark))
@@ -680,7 +680,7 @@ local annaPing = pingPin(11)
 check(annaPing and math.abs(annaPing.x - 0.5) < 1e-6 and math.abs(annaPing.y - 0.45) < 1e-6
 	and math.abs(annaPing.Ripple.color[3] - 0.92) < 1e-6, "her marker on my map, rippling in her class colour")
 annaPing:OnMouseEnter()
-check(TOOLTIP.title == "Anna" and tooltipHas("Map ping, 0 s ago") and tooltipHas("Elwynn Forest") and tooltipHas("50 yd north"),
+check(TOOLTIP.title == "Anna Brook" and tooltipHas("Map ping, 0 s ago") and tooltipHas("Elwynn Forest") and tooltipHas("50 yd north"),
 	"tooltip: whose ping, how old, where, how far, got " .. table.concat(TOOLTIP.lines, " | "))
 annaPing:OnMouseLeave()
 local mmPings = BB.GetMinimapPings()
@@ -852,7 +852,7 @@ Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;21;{name} is now {level}!", "WHISPER",
 check(#PRINTED < pmark, "nothing shown inside the event handler")
 Advance(0.15)
 local shown = printedSince(pmark)
-check(shown:find("Anna|r is now 21!", 1, true) ~= nil and shown:find("|cff40c7eb", 1, true) ~= nil,
+check(shown:find("Anna Brook|r is now 21!", 1, true) ~= nil and shown:find("|cff40c7eb", 1, true) ~= nil,
 	"Anna's own message, her name in class colour, got " .. shown)
 check(SOUNDS[#SOUNDS] == 50111 and #SOUNDS == soundMark + 1, "with the picked sound (default: boss defeated fanfare, not the level-up fanfare)")
 check(heard[#heard].kind == "level" and heard[#heard].data.level == 21, "other modules hear about level-ups too")
@@ -883,7 +883,7 @@ check(#sentTo(11, mark, "F2;") <= 1 and #sentTo(11, mark, "V2;") <= 1,
 Advance(10)
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;22;", "WHISPER", 11)
 Advance(0.15)
-check(printedSince(pmark):find("Anna|r reached level 22!", 1, true) ~= nil, "no text of her own: my default")
+check(printedSince(pmark):find("Anna Brook|r reached level 22!", 1, true) ~= nil, "no text of her own: my default")
 Advance(10)
 pmark = #PRINTED + 1
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;23;|cffff0000evil|r {name}", "WHISPER", 11)
@@ -1127,7 +1127,7 @@ do
 	afk(true)
 	Advance(1.1)
 	local text = LefthyToolsAFKFrame.Friends:GetText()
-	check(text:find("Anna|r  |cffccccccLevel 20 (64%)|r", 1, true) and text:find("Elwynn Forest - Raven Hill", 1, true)
+	check(text:find("Anna Brook|r  |cffccccccLevel 20 (64%)|r", 1, true) and text:find("Elwynn Forest - Raven Hill", 1, true)
 		and text:find("Fighting Stitches and 2 more", 1, true)
 		and text:find("Quest: Wanted: Hogger|r|cffcccccc - Huge Gnoll Claw: 0/1", 1, true),
 		"each friend: level and progress, where, whom and how many they fight, their quest, got\n" .. text)
@@ -1139,7 +1139,7 @@ do
 		"out of combat: still what they're doing")
 	BN_FRIENDS[1][1].isGameAFK = true
 	Advance(1.1)
-	check(LefthyToolsAFKFrame.Friends:GetText():find("Anna|r |cff999999<AFK>|r", 1, true), "friends who are AFK too")
+	check(LefthyToolsAFKFrame.Friends:GetText():find("Anna Brook|r |cff999999<AFK>|r", 1, true), "friends who are AFK too")
 	BN_FRIENDS[1][1].isGameAFK = false
 	afk(false)
 	Advance(0.3)
@@ -1162,13 +1162,13 @@ do
 		"two friends on one spot: their dots sit side by side around it (map: 1 yd = 1 px here), got "
 		.. tostring(a and a.x) .. " / " .. tostring(b and b.x))
 	a:OnMouseEnter()
-	check(TOOLTIP.title == "Anna" and tooltipHas("Bob") and tooltipHas("Level 20"), "hovering either shows both")
+	check(TOOLTIP.title == "Anna Brook" and tooltipHas("Bob Stone") and tooltipHas("Level 20"), "hovering either shows both")
 	bob("S2;C;0;520.0;500.0;Goldshire;Hogger")
 	Advance(0.6)
 	check(tooltipHas("Fighting Hogger"), "the open tooltip follows the other one too")
 	a:OnMouseLeave()
 	b:OnMouseEnter()
-	check(TOOLTIP.title == "Bob" and tooltipHas("Anna"), "the hovered one comes first")
+	check(TOOLTIP.title == "Bob Stone" and tooltipHas("Anna Brook"), "the hovered one comes first")
 	b:OnMouseLeave()
 	bob("S2;;0;380.0;500.0;Goldshire;") -- 140 yd apart now
 	Advance(0.6)
@@ -1183,7 +1183,7 @@ do
 	check(math.abs(bx - ax - 8) < 1e-6 and math.abs(ay - by) < 1e-6 and math.abs((ax + bx) / 2) < 1e-6,
 		"on the minimap too, got " .. tostring(ax) .. " / " .. tostring(bx))
 	mm[12]._scripts.OnEnter(mm[12])
-	check(TOOLTIP.title == "Bob" and tooltipHas("Anna"), "and hovering shows both")
+	check(TOOLTIP.title == "Bob Stone" and tooltipHas("Anna Brook"), "and hovering shows both")
 	mm[12]._scripts.OnLeave(mm[12])
 	local spreads, spread = 0, BB.Spread
 	BB.Spread = function(...) spreads = spreads + 1; return spread(...) end
@@ -1338,10 +1338,10 @@ do
 	anna("I2;19019::::::::20:::::")
 	check(#PRINTED < pmark, "receiving: nothing inside the event handler")
 	Advance(0.15)
-	check(printedSince(pmark):find("Anna|r shares " .. ItemLink(19019) .. ".", 1, true), "a chat line with the link")
+	check(printedSince(pmark):find("Anna Brook|r shares " .. ItemLink(19019) .. ".", 1, true), "a chat line with the link")
 	local shown
 	for _, call in pairs(BB.calls) do if call.frame and call.frame:IsShown() then shown = call.frame end end
-	check(shown and shown.Line:GetText():find("^|T%d+:0|t ") and shown.Line:GetText():find("Anna|r shares " .. ItemLink(19019), 1, true)
+	check(shown and shown.Line:GetText():find("^|T%d+:0|t ") and shown.Line:GetText():find("Anna Brook|r shares " .. ItemLink(19019), 1, true)
 		and not shown.Need:IsShown() and SOUNDS[#SOUNDS] == 3081 and #SOUNDS == sounds + 1,
 		"a notice with the icon and the item (no buttons when just shown) and the whisper sound")
 	local boxes = 0
@@ -1374,7 +1374,7 @@ do
 	MOCK_ITEM_UNCACHED = nil
 	for _, callback in ipairs(PENDING_ITEM_LOADS) do callback() end
 	PENDING_ITEM_LOADS = {}
-	check(printedSince(pmark):find("Anna|r shares " .. ItemLink(6948), 1, true), "... and shows it once it's loaded")
+	check(printedSince(pmark):find("Anna Brook|r shares " .. ItemLink(6948), 1, true), "... and shows it once it's loaded")
 	pmark = #PRINTED + 1
 	anna("I2;1179::::::::20:::::")
 	anna("I2;abc")
@@ -1395,16 +1395,16 @@ do
 		"my notice: waiting for their answers")
 	anna("N2;" .. callID .. ";1")
 	Advance(0.15)
-	check(mine.frame.Status:GetText():find("Anna: |cff40ff40Need", 1, true), "answers show up live")
+	check(mine.frame.Status:GetText():find("Anna Brook: |cff40ff40Need", 1, true), "answers show up live")
 	anna("N2;" .. callID .. ";0") -- she can't change her mind
 	local verdictMark = #GAMEDATA + 1
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "N2;" .. callID .. ";1", "WHISPER", 12) -- Bob needs it too
 	Advance(0.3)
 	local verdict = sentTo(11, verdictMark, "R2;")[1]
-	check(verdict and verdict:find("^R2;" .. callID .. ";%a+:%d+,%a+:%d+$") and sentTo(12, verdictMark, "R2;")[1] == verdict,
+	check(verdict and verdict:find("^R2;" .. callID .. ";[^:,]+:%d+,[^:,]+:%d+$") and sentTo(12, verdictMark, "R2;")[1] == verdict,
 		"everyone answered: rolled right away, the verdict goes to everyone, got " .. tostring(verdict))
-	local winner, top, second = verdict:match("^R2;%d+;(%a+):(%d+),%a+:(%d+)$")
-	check(winner == "Anna" or winner == "Bob", "the two who needed it")
+	local winner, top, second = verdict:match("^R2;%d+;([^:,]+):(%d+),[^:,]+:(%d+)$")
+	check(winner == "Anna Brook" or winner == "Bob Stone", "the two who needed it")
 	check(tonumber(top) > tonumber(second), "highest first, never a tie")
 	check(mine.state == "rolling" and mine.frame.Winner:GetText():find("Rolling", 1, true)
 		and soundsSince(sounds):find(",31579,31580,", 1, true), "a drumroll: the bonus roll spinner, numbers whirling")
@@ -1495,7 +1495,7 @@ do
 	local fourth, oldest = BB.calls["12:7004"], BB.calls["11:7001"]
 	check(spareFrame and fourth and fourth.frame == spareFrame and not showOnly.frame and oldest.frame and oldest.frame:IsShown(),
 		"a fourth notice takes the frame of one that's only shown, not of an open offer")
-	check(fourth.frame.Line:GetText():find("Bob|r offers " .. ItemLink(1155), 1, true) and fourth.frame.Need:IsShown(),
+	check(fourth.frame.Line:GetText():find("Bob Stone|r offers " .. ItemLink(1155), 1, true) and fourth.frame.Need:IsShown(),
 		"... filled in for the new one (a friend's offer says so)")
 	Advance(6.5)
 	check(not BB.calls[showKey] and fourth.frame and fourth.frame:IsShown() and fourth.frame.Line:GetText():find(ItemLink(1155), 1, true),
@@ -1552,14 +1552,14 @@ do
 	anna("N2;" .. giveaway.id .. ";1")
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "N2;" .. giveaway.id .. ";0", "WHISPER", 12)
 	Advance(0.3)
-	check(#owed == 1 and owed[1].itemID == 6948 and owed[1].winner == "Anna" and owed[1].guid == "Player-1-11"
+	check(#owed == 1 and owed[1].itemID == 6948 and owed[1].winner == "Anna Brook" and owed[1].guid == "Player-1-11"
 		and owed[1].itemGUID == "Item-0-3"
-		and printedSince(pmark):find("its tooltip reminds you until you trade or mail it to Anna.", 1, true),
+		and printedSince(pmark):find("its tooltip reminds you until you trade or mail it to Anna Brook.", 1, true),
 		"Anna won my item: noted (this very copy), and I'm told")
 	BAGS = { [0] = {} }
 	GameTooltip:SetOwner(UIParent)
 	GameTooltip:SetHyperlink("item:6948::::::::20:::::")
-	check(tooltipHas("Won by Anna: still to hand over"), "its tooltip says so")
+	check(tooltipHas("Won by Anna Brook: still to hand over"), "its tooltip says so")
 	GameTooltip:SetOwner(UIParent)
 	GameTooltip:SetHyperlink("item:1155::::::::20:::::")
 	check(not tooltipHas("Won by"), "other items' tooltips don't")
@@ -1593,7 +1593,7 @@ do
 	Fire("TRADE_CLOSED")
 	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
 	Advance(0.1)
-	check(#owed == 0 and printedSince(pmark):find(ItemLink(6948) .. " handed over to Anna.", 1, true), "traded to the winner: the reminder is gone")
+	check(#owed == 0 and printedSince(pmark):find(ItemLink(6948) .. " handed over to Anna Brook.", 1, true), "traded to the winner: the reminder is gone")
 	-- A partner with a surname and no GUID: still her.
 	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", nil)
 	TRADE_PARTNER, TRADE_SURNAME, PARTY.NPC, TRADE_ITEMS = "Anna", "Smith", nil, {}
@@ -1852,7 +1852,7 @@ do
 	pmark = #PRINTED + 1
 	anna("M2;sure, 5 min")
 	Advance(0.15)
-	check(printedSince(pmark):find("Anna|r|cffffb84d]: sure, 5 min", 1, true), "a friend's line in my chat window")
+	check(printedSince(pmark):find("Anna Brook|r|cffffb84d]: sure, 5 min", 1, true), "a friend's line in my chat window")
 	pmark = #PRINTED + 1
 	for i = 1, 8 do anna("M2;spam " .. i) end
 	Advance(0.15)
@@ -1898,7 +1898,7 @@ do
 	anna("A2;Boss down, loot time!")
 	Advance(0.15)
 	for _, call in pairs(BB.calls) do if call.message and not call.mine then theirs = call end end
-	check(theirs and theirs.frame:IsShown() and theirs.frame.Line:GetText():find("Anna|r: Boss down, loot time!", 1, true)
+	check(theirs and theirs.frame:IsShown() and theirs.frame.Line:GetText():find("Anna Brook|r: Boss down, loot time!", 1, true)
 		and #SOUNDS > soundMark and not theirs.frame.Need:IsShown() and printedSince(pmark):find("]: Boss down, loot time!", 1, true),
 		"a friend's announcement: in the middle of my screen with the whisper sound (and in chat), no buttons")
 	Advance(9)
@@ -1997,7 +1997,7 @@ do
 	for _, callback in ipairs(PENDING_ITEM_LOADS) do callback() end
 	PENDING_ITEM_LOADS = {}
 	local shownAll = printedSince(pmark)
-	local needAt, anyoneAt = shownAll:find("Anna|r|cffffb84d]: need " .. ItemLink(19019) .. "?", 1, true), shownAll:find("anyone?", 1, true)
+	local needAt, anyoneAt = shownAll:find("Anna Brook|r|cffffb84d]: need " .. ItemLink(19019) .. "?", 1, true), shownAll:find("anyone?", 1, true)
 	check(needAt and anyoneAt and needAt < anyoneAt,
 		"... and comes with a real link once it's loaded, then the next one: in the order she wrote them, got " .. shownAll)
 	pmark = #PRINTED + 1
@@ -2077,8 +2077,8 @@ do
 	anna("M2;" .. ("x"):rep(85) .. "äyyyyyyyyyy") -- (a long line, cut at 87 bytes: right after the ä)
 	Advance(1.1)
 	local info = LefthyToolsAFKFrame.Info:GetText()
-	check(LefthyToolsAFKFrame:IsShown() and info:find("While you were away", 1, true) and info:find("Anna|r shares", 1, true)
-		and info:find("Anna|r offers", 1, true) and info:find("[LTC]|r ", 1, true) and info:find("|r: brb, getting coffee", 1, true)
+	check(LefthyToolsAFKFrame:IsShown() and info:find("While you were away", 1, true) and info:find("Anna Brook|r shares", 1, true)
+		and info:find("Anna Brook|r offers", 1, true) and info:find("[LTC]|r ", 1, true) and info:find("|r: brb, getting coffee", 1, true)
 		and info:find("|r: |cffffd200Raid in 10!", 1, true),
 		"AFK: items shown and offered, LTC lines and announcements are listed, got\n" .. info)
 	check(info:find("|r: " .. ("x"):rep(85) .. "ä...", 1, true), "a long line is cut on a whole letter, and one that fits whole stays")
@@ -2132,7 +2132,7 @@ do
 	local linkReport, handReport = texts[1], texts[2] -- ("Profession link: ..." sorts before "Report: ...")
 	check(linkReport:find("^Profession link: LefthyTools ") and linkReport:find("Clicked trade:Player-1-11:2259:171 at ", 1, true)
 		and linkReport:find(" -> nothing opened^", 1, true)
-		and linkReport:find("their server id 1, mine 1 - this client doesn't know them - Beacon friend Anna on Realmy, Alliance", 1, true)
+		and linkReport:find("their server id 1, mine 1 - this client doesn't know them - Beacon friend Anna Brook on Realmy, Alliance", 1, true)
 		and linkReport:find("Me: Realmy, Alliance", 1, true)
 		and linkReport:find("UI_ERROR_MESSAGE: That player is on another realm.", 1, true)
 		and linkReport:find("TRADE_SKILL_LIST_UPDATE (linked true, recipes 3, profession Alchemy, ready true, window not loaded)", 1, true),
@@ -2153,7 +2153,7 @@ do
 	-- /lefthy beacon status: realm and faction of every friend and mine, to compare.
 	pmark = #PRINTED + 1
 	lefthy("beacon status")
-	check(printedSince(pmark):find("Anna (Realmy, Alliance) - ", 1, true) and printedSince(pmark):find("you (Realmy, Alliance), LefthyTools ", 1, true),
+	check(printedSince(pmark):find("Anna Brook (Realmy, Alliance) - ", 1, true) and printedSince(pmark):find("you (Realmy, Alliance), LefthyTools ", 1, true),
 		"status: each friend's realm and faction, and mine")
 	-- A link other than an item, to a friend on a build from before link tokens: I'm told, once.
 	local peerList = BB.module:GetPeers()
@@ -2164,7 +2164,7 @@ do
 	pmark = #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("my |cffffd000|Htrade:Player-1-0:2259:171|h[Alchemy]|h|r")
 	Advance(0.6)
-	check(peerList[12] and printedSince(pmark):find("Bob has an older LefthyTools", 1, true) and not printedSince(pmark):find("Anna has", 1, true),
+	check(peerList[12] and printedSince(pmark):find("Bob Stone has an older LefthyTools", 1, true) and not printedSince(pmark):find("Anna Brook has", 1, true),
 		"a friend on an older build: named (links reach them as text), got " .. printedSince(pmark))
 	pmark = #PRINTED + 1
 	SlashCmdList.LEFTHYTOOLS_CHAT("again |cffffd000|Htrade:Player-1-0:2259:171|h[Alchemy]|h|r")
@@ -2214,7 +2214,7 @@ do
 	pmark = #PRINTED + 1
 	minute()
 	check(#sentTo(11, mark, "Z2;") == 64 and #LefthyToolsDB.reportsOut == 2
-		and printedSince(pmark):find("2 report(s) sent to Anna (they collect LefthyTools error reports), 2 more in a moment.", 1, true),
+		and printedSince(pmark):find("2 report(s) sent to Anna Brook (they collect LefthyTools error reports), 2 more in a moment.", 1, true),
 		"two more a minute later, and I'm told more are coming")
 	minute()
 	local parts = sentTo(11, mark, "Z2;")
@@ -2233,8 +2233,8 @@ do
 	anna("Z2;7;1;2;Error, |cffff0000LefthyTools|r 0.5.0^line two")
 	Advance(0.3)
 	local reports = LefthyToolsDB.friendReports
-	check(reports[#reports].from == "Anna" and reports[#reports].text == "Error, cffff0000LefthyToolsr 0.5.0\nline two and more"
-		and printedSince(pmark):find("Anna sent a LefthyTools error report: /lefthy reports shows it.", 1, true),
+	check(reports[#reports].from == "Anna Brook" and reports[#reports].text == "Error, cffff0000LefthyToolsr 0.5.0\nline two and more"
+		and printedSince(pmark):find("Anna Brook sent a LefthyTools error report: /lefthy reports shows it.", 1, true),
 		"a friend's report, put together (parts in any order, no escape codes), and a chat line")
 	anna("Z2;8;1;3;first part")
 	-- Meanwhile one of mine to her can't go for minutes (the server holds everything back): it waits

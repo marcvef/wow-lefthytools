@@ -89,7 +89,7 @@ PINS[1]:OnMouseLeave()
 local before = #PRINTED
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;21;", "WHISPER", 11)
 Advance(0.2)
-check(PRINTED[#PRINTED] and PRINTED[#PRINTED]:find("Anna|r hat Level 21 erreicht!", 1, true) and #PRINTED > before,
+check(PRINTED[#PRINTED] and PRINTED[#PRINTED]:find("Anna Brook|r hat Level 21 erreicht!", 1, true) and #PRINTED > before,
 	"a friend's level-up without their own text uses the German default")
 check(S("LefthyTools_beacon_dingText").name == "Level-Up-Nachricht" and SETTINGS_BUTTONS["Nachricht testen"],
 	"level-up settings are German")
@@ -104,7 +104,7 @@ check(asked and asked:find(";de$"), "asking a friend on a newer build what's new
 check(#PRINTED == printMark, "the notice waits for their news")
 Advance(5)
 local notice = table.concat(PRINTED, "\n", printMark + 1)
-check(notice:find("Anna has a newer LefthyTools (9.0.0", 1, true) and notice:find("restart the game if the updater says so", 1, true)
+check(notice:find("Anna Brook has a newer LefthyTools (9.0.0", 1, true) and notice:find("restart the game if the updater says so", 1, true)
 	and not notice:find("What's coming", 1, true), "no news from them within 5 s: the notice without them, got " .. notice)
 
 check(LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()
