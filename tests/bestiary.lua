@@ -262,12 +262,17 @@ do
 	local facing = ledger.Pane.facing
 	Advance(1)
 	check(ledger.Pane.facing > facing and ledger.Pane.Model._facing == ledger.Pane.facing, "its model turns slowly")
-	-- The fuzzy search: letters in order, over mob names and their drops' names.
-	ledger.Search:SetText("dfbnd")
+	-- The fuzzy search: letters in order, over mob names and their drops' names. (The list follows on
+	-- the next frame: what's typed in one is searched once.)
+	local function typed(text)
+		ledger.Search:SetText(text)
+		Advance(0.02)
+	end
+	typed("dfbnd")
 	_, entries = Bt.Ledger()
 	check(#entries == 1 and entries[1].creature == 116 and ledger.rows[1].Name:GetText():find("|cffffd100D|r", 1, true)
 		and ledger.Clear:IsShown() and not ledger.Placeholder:IsShown(), "\"dfbnd\": the Defias Bandit, its found letters in gold")
-	ledger.Search:SetText("cold milk")
+	typed("cold milk")
 	_, entries, picked = Bt.Ledger()
 	local milk
 	for _, c in ipairs(ledger.Pane.sections.own.cells) do if c:IsShown() and c.drop and c.drop.id == 1179 then milk = c end end
@@ -278,7 +283,7 @@ do
 	-- Another result can be picked (in game a click went back to the first): it stays while the list
 	-- redraws; typing again picks the best match.
 	do
-		ledger.Search:SetText("l") -- (both: their Linen Cloth)
+		typed("l") -- (both: their Linen Cloth)
 		local _, found, first = Bt.Ledger()
 		local other = found[2] and found[2].creature
 		ledger.rows[2]:Click()
@@ -288,13 +293,14 @@ do
 		Bt.DrawLedger() -- (what names coming in and a kill do)
 		_, _, now = Bt.Ledger()
 		check(now == other and ledger.Pane.creature == other, "the list redraws: the click's pick stays")
-		ledger.Search:SetText("li")
+		typed("li")
 		_, found, now = Bt.Ledger()
 		check(now == found[1].creature and now ~= other, "typing again: the best match picked")
 	end
-	ledger.Search:SetText("zzz")
+	typed("zzz")
 	check(not ledger.rows[1]:IsShown() and ledger.NoMatch:GetText() == "Nothing found.", "nothing: said so")
 	ledger.Clear._scripts.OnClick(ledger.Clear)
+	Advance(0.02)
 	_, entries = Bt.Ledger()
 	check(#entries == 2 and ledger.Placeholder:IsShown(), "cleared: every mob again")
 	ledger.Sort._scripts.OnClick(ledger.Sort)
@@ -654,6 +660,7 @@ do
 			Fire("PARTY_KILL", "Player-1-0", guid)
 			PLAYER_POS = { 0.99, 0.99 } -- (walked over to loot it: where it died counts)
 			koboldLoot(guid)
+			Advance(0.02) -- (the ledger draws it on the next frame)
 		end
 		Advance(2)
 		killAt(1429, 0.25, 0.75, kobold[8])
@@ -735,6 +742,7 @@ do
 		for _ = 1, 47 do table.insert(kobolds().spots, 1, 1429100100) end
 		PLAYER_POS = { 0.6, 0.4 }
 		koboldLoot(kobold[12])
+		Advance(0.02) -- (the ledger draws a kill on the next frame)
 		check(kobolds().kills == 12 and #kobolds().spots == 50 and kobolds().spots[50] == 1429600400 and kobolds().spots[1] == 1429100100
 			and where.Note:IsShown() and where.Note:GetText() == "Your last 50 kills." and where.Pick.Label:GetText() == "Elwynn Forest (49)",
 			"a corpse looted without a killing blow seen: where you are; the last 50 kept (said under the map), the oldest goes")
@@ -1136,4 +1144,102 @@ do
 	Bt.Changed(8201)
 	MOBS.target, STATE.target, ITEMS[50201] = nil, false, nil
 	Bt.Toggle(false)
+end
+
+section("Bestiary: a long ledger")
+do
+	local Bt = ns.Bestiary
+	local mobs = LefthyToolsBestiaryDB.mobs
+	-- 500 made-up kinds of mobs: the list keeps a pool of rows, as many as can be in sight, and fills
+	-- only those (a keystroke, a scroll, a kill); keys typed in one frame are searched once.
+	local IN_SIGHT = math.ceil((580 - 104 - 12) / 36) + 1 -- (the list's height over a row's, one more cut in two)
+	ITEMS[50301] = { name = "Made-up Fang", quality = 1 }
+	for i = 1, 500 do
+		mobs[90000 + i] = { name = ("Made-up Beast %03d"):format(i), level = 10 + i % 20, kills = 1000 - i, money = 0,
+			items = { [50301] = { 1, 1, 1, "Made-up Fang" } } }
+	end
+	Bt.Changed(90001)
+	Bt.ToggleLedger()
+	local ledger, entries = Bt.Ledger()
+	local list = ledger.List
+	check(#entries >= 500 and entries[1].creature == 90001 and #ledger.rows == IN_SIGHT and ledger.rows[IN_SIGHT].creature == entries[IN_SIGHT].creature
+		and select(2, ledger.ListContent:GetSize()) == #entries * 36,
+		"500 kinds: a pool of " .. IN_SIGHT .. " rows, the first entries in them; the list as tall as all (its scroll bar as before)")
+	-- Counted: rows filled (each asks how many of the database's drops it has found) and drops' names
+	-- looked up (a search looks at every one once).
+	local fills, names = 0, 0
+	local compare, nameOf = Bt.Compare, Bt.ItemNameOf
+	Bt.Compare = function(...) if select(4, ...) then fills = fills + 1 end return compare(...) end
+	Bt.ItemNameOf = function(...) names = names + 1 return nameOf(...) end
+	local all = 0
+	for _, mob in pairs(mobs) do
+		if mob.kills > 0 or (mob.skinned or 0) > 0 then
+			for _ in pairs(mob.items) do all = all + 1 end
+			for _ in pairs(mob.skins or {}) do all = all + 1 end
+		end
+	end
+	ledger.Search:SetText("m")
+	ledger.Search:SetText("ma")
+	ledger.Search:SetText("mad")
+	check(fills == 0 and names == 0, "three keys typed in one frame: nothing searched or drawn yet")
+	Advance(1 / 60)
+	_, entries = Bt.Ledger()
+	local inOrder = true
+	for k = 1, IN_SIGHT do
+		if ledger.rows[k].creature ~= entries[k].creature then inOrder = false end
+	end
+	check(#entries >= 500 and names >= all and names <= all + IN_SIGHT and fills > 0 and fills <= IN_SIGHT and inOrder,
+		"the next frame: searched once, only the rows in sight filled (" .. fills .. " rows, " .. names .. " names for " .. all .. " drops)")
+	-- Scrolling (the wheel, the bar: the game calls the scroll frame's script) lays the rows again
+	-- where the list is, only when another one comes first.
+	ledger.Search:SetText("")
+	Advance(1 / 60)
+	_, entries = Bt.Ledger()
+	fills = 0
+	list:SetVerticalScroll(200 * 36 + 10)
+	list._scripts.OnVerticalScroll(list, 200 * 36 + 10)
+	local right = true
+	for k = 1, IN_SIGHT do
+		local row, entry = ledger.rows[k], entries[200 + k]
+		if not (row:IsShown() and row.creature == entry.creature and select(3, row:GetPoint(1)) == -(199 + k) * 36
+			and row.Name:GetText():find(entry.mob.name, 1, true) == 1) then
+			right = false
+		end
+	end
+	check(right and fills == IN_SIGHT, "scrolled 200 rows down: the rows show the 201st to the " .. (200 + IN_SIGHT) .. "th, each at its place")
+	fills = 0
+	list:SetVerticalScroll(200 * 36 + 30)
+	list._scripts.OnVerticalScroll(list, 200 * 36 + 30)
+	check(fills == 0 and ledger.rows[1].creature == entries[201].creature, "a little further, the same row first: nothing filled again")
+	-- A click among them picks it, as before.
+	fills = 0
+	ledger.rows[3]:Click()
+	local _, _, picked = Bt.Ledger()
+	check(picked == entries[203].creature and ledger.Pane.Name:GetText() == entries[203].mob.name and ledger.rows[3].Picked:IsShown()
+		and not ledger.rows[2].Picked:IsShown() and fills <= IN_SIGHT, "a click: picked, its row marked (the rows in sight drawn again, no more)")
+	-- A kill: drawn on the next frame (also its coin a moment later: once), where the list is scrolled.
+	fills = 0
+	mobs[90300].kills = 5000
+	Bt.Changed(90300)
+	Bt.Changed(90300)
+	check(fills == 0, "a kill: not drawn at once")
+	Advance(1 / 60)
+	_, entries = Bt.Ledger()
+	check(entries[1].creature == 90300 and fills > 0 and fills <= IN_SIGHT and list:GetVerticalScroll() == 200 * 36 + 30,
+		"the next frame: the list made again, only the rows in sight filled, still scrolled where it was")
+	-- A search while scrolled down: from the top, its best match first; an item found shows in the row.
+	ledger.Search:SetText("fang")
+	Advance(1 / 60)
+	_, entries, picked = Bt.Ledger()
+	check(list:GetVerticalScroll() == 0 and #entries >= 500 and ledger.rows[1].creature == entries[1].creature and picked == entries[1].creature
+		and ledger.rows[1].Found:IsShown() and ledger.rows[1].Found:GetText():find("Made-up Fang", 1, true),
+		"a search scrolled down: from the top, the best match picked, the item it found in the row")
+	Bt.Compare, Bt.ItemNameOf = compare, nameOf
+	ledger.Search:SetText("")
+	ledger:Hide()
+	for i = 1, 500 do
+		mobs[90000 + i] = nil
+	end
+	Bt.Changed(90001)
+	ITEMS[50301] = nil
 end

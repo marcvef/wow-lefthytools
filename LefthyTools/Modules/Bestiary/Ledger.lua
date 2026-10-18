@@ -43,6 +43,10 @@ local MAP_W, MAP_H, MAP_HEAD = Bt.KILL_MAP_W, Bt.KILL_MAP_H, Bt.KILL_MAP_HEAD --
 local UPPER = MAP_HEAD + 4 + MAP_H + 4 + 13 -- the details and the map (a line under it): the drops start under them
 local PANE_W = DETAILS_W + MAP_GAP + MAP_W
 local WIDTH, HEIGHT = PAD + LIST_W + 14 + PANE_W + PAD, 580
+-- The list's rows: a pool of as many as can be in sight at once (its height in rows, one more for a
+-- row cut at the top and the bottom while scrolled), laid at their entries' places as it scrolls, so
+-- hundreds of mobs cost one screen of them.
+local ROWS = math.ceil((HEIGHT - TOP - PAD) / ROW_H) + 1
 local CELL, CELL_GAP, CELL_ROW = 28, 6, 46  -- a drop's icon, the gap, a row with its chance under it
 local DROPS_W = PANE_W - 24 -- (the picked mob's pane, less its scroll bar)
 local PER_ROW = math.floor((DROPS_W + CELL_GAP) / (CELL + CELL_GAP))
@@ -58,6 +62,11 @@ local entries = {}       -- the list as shown: { creature, mob, score, positions
 local selected           -- the picked creature
 local query = ""         -- the search, lower case, without spaces
 local sortBy = "kills"
+-- What the next draw makes again (Draw): the Bestiary changed (the totals, the wish list's strip, the
+-- list), the search or the order changed (the list), a new search (from the top); soon: drawn on the
+-- next frame (typing, a kill and its loot), once for all that came in it.
+local dataOld, listOld, toTop, soon = true, true, false, false
+local Draw -- below
 
 ---------------------------------------------------------------------------
 -- The search
@@ -226,7 +235,7 @@ end
 local function Select(creature)
 	selected = creature
 	ledger.keepPick = true
-	Bt.DrawLedger()
+	Draw() -- (the same list: its rows in sight and the picked mob)
 end
 
 local function NewRow(parent)
@@ -534,47 +543,80 @@ end
 -- Drawing it all
 ---------------------------------------------------------------------------
 
-function Bt.DrawLedger()
+-- The rows in sight (the list scrolled to offset; nil: where it is): the pool's rows, each laid at
+-- its entry's place in the list and filled with it; the rest of the pool hidden.
+local function LayRows(offset)
+	local top = math.max(0, math.floor((offset or ledger.List:GetVerticalScroll() or 0) / ROW_H))
+	ledger.first = top + 1
+	for k = 1, ROWS do
+		local i, row = top + k, ledger.rows[k]
+		if entries[i] then
+			if not row then
+				row = NewRow(ledger.ListContent)
+				ledger.rows[k] = row
+			end
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
+			FillRow(row, entries[i])
+		elseif row then
+			row:Hide()
+		end
+	end
+end
+
+-- Draws what's out of date: the totals and the wish list's strip after the Bestiary changed, the
+-- list (its entries, once) after that or a new search or order; then always the rows in sight and the
+-- picked mob (a click, a redraw: cheap).
+function Draw()
+	soon = false
 	if not (ledger and ledger:IsShown()) then
 		return
 	end
-	local mobs, kills, items, coin, rarest = Totals()
-	ledger.Summary:SetText(L["%d mobs  ·  %d kills  ·  %d items  ·  %s coin, %s per kill"]:format(mobs, kills, items, Bt.Coins(coin),
-		Bt.Coins(kills > 0 and coin / kills or 0)))
-	if rarest then
-		ledger.Rarest:SetText(L["Rarest find: %s, %s from %s"]:format(("|T%s:14:14|t %s"):format(Bt.ItemIcon(rarest.id),
-			NameOf(rarest.id, rarest.item) or "?"), Bt.Percent(rarest.chance), rarest.mob.name or ("#" .. rarest.creature)))
-	else
-		ledger.Rarest:SetText("")
+	if dataOld then
+		dataOld, listOld = false, true
+		local mobs, kills, items, coin, rarest = Totals()
+		ledger.Summary:SetText(L["%d mobs  ·  %d kills  ·  %d items  ·  %s coin, %s per kill"]:format(mobs, kills, items, Bt.Coins(coin),
+			Bt.Coins(kills > 0 and coin / kills or 0)))
+		if rarest then
+			ledger.Rarest:SetText(L["Rarest find: %s, %s from %s"]:format(("|T%s:14:14|t %s"):format(Bt.ItemIcon(rarest.id),
+				NameOf(rarest.id, rarest.item) or "?"), Bt.Percent(rarest.chance), rarest.mob.name or ("#" .. rarest.creature)))
+		else
+			ledger.Rarest:SetText("")
+		end
+		DrawWishes()
 	end
-	DrawWishes()
-	Collect()
+	if listOld then
+		listOld = false
+		Collect()
+		ledger.ListContent:SetHeight(math.max(1, #entries * ROW_H))
+		ledger.NoMatch:SetShown(#entries == 0)
+		ledger.NoMatch:SetText(query ~= "" and L["Nothing found."] or L["No mobs yet: kill something on your own and loot it."])
+	end
+	if toTop then -- (a new search: from its best match)
+		toTop = false
+		ledger.first = 1 -- (laid just below, not again while it scrolls there)
+		ledger.List:SetVerticalScroll(0)
+	end
 	if not selected or not Bt.Mob(selected) or (query ~= "" and entries[1] and not ledger.keepPick) then
 		selected = entries[1] and entries[1].creature or selected
 	end
-	local rows = ledger.rows
-	for i, entry in ipairs(entries) do
-		rows[i] = rows[i] or NewRow(ledger.ListContent)
-		rows[i]:ClearAllPoints()
-		rows[i]:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
-		FillRow(rows[i], entry)
-	end
-	for i = #entries + 1, #rows do
-		rows[i]:Hide()
-	end
-	ledger.ListContent:SetHeight(math.max(1, #entries * ROW_H))
-	ledger.NoMatch:SetShown(#entries == 0)
-	ledger.NoMatch:SetText(query ~= "" and L["Nothing found."] or L["No mobs yet: kill something on your own and loot it."])
+	LayRows()
 	DrawPicked()
 end
 
+-- Everything again, now: opened, or items' names came in or the wish list changed (Bt.Redraw).
+function Bt.DrawLedger()
+	dataOld = true
+	Draw()
+end
+
+-- Typed: the list on the next frame (keys typed in one frame: one search, one redraw).
 local function Search(text)
 	query = (text or ""):lower():gsub("%s", "")
 	ledger.keepPick = false
 	ledger.Placeholder:SetShown(text == nil or text == "")
 	ledger.Clear:SetShown(text ~= nil and text ~= "")
-	ledger.List:SetVerticalScroll(0)
-	Bt.DrawLedger()
+	listOld, toTop, soon = true, true, true
 end
 
 ---------------------------------------------------------------------------
@@ -634,13 +676,15 @@ local function BuildSearch()
 	end, function(key)
 		sortBy = key
 		ledger.Sort:SetLabel(SORT_LABELS[key])
-		Bt.DrawLedger()
+		listOld = true
+		Draw()
 	end)
 	ledger.Sort:SetPoint("LEFT", sortLabel, "RIGHT", 6, 0)
 	ledger.Sort:SetLabel(SORT_LABELS[sortBy])
 end
 
--- The list of mobs, scrolling, and the line between it and the picked mob.
+-- The list of mobs, scrolling, and the line between it and the picked mob. The scroll child is as
+-- tall as all its rows (the scroll bar as before); the pool's rows are laid where it's scrolled to.
 local function BuildList()
 	ledger.List = CreateFrame("ScrollFrame", nil, ledger, "UIPanelScrollFrameTemplate")
 	ledger.List:SetPoint("TOPLEFT", PAD, -TOP)
@@ -649,6 +693,12 @@ local function BuildList()
 	ledger.ListContent = CreateFrame("Frame", nil, ledger.List)
 	ledger.ListContent:SetSize(LIST_W - 26, 1)
 	ledger.List:SetScrollChild(ledger.ListContent)
+	-- Scrolled (the wheel, the bar; after the template's own): the rows again when another is first.
+	ledger.List:HookScript("OnVerticalScroll", function(_, offset)
+		if ledger.first and math.floor((offset or 0) / ROW_H) + 1 ~= ledger.first then
+			LayRows(offset)
+		end
+	end)
 	ledger.NoMatch = ledger:CreateFontString(nil, "OVERLAY", "GameFontDisable")
 	ledger.NoMatch:SetPoint("TOPLEFT", PAD + 4, -TOP - 8)
 	ledger.NoMatch:SetWidth(LIST_W - 30)
@@ -767,8 +817,12 @@ local function Build()
 	BuildList()
 	local pane = BuildPane()
 
-	-- The model turns slowly while the ledger is open (an OnUpdate only then).
+	-- The model turns slowly while the ledger is open (an OnUpdate only then); what was typed or
+	-- changed in the last frame is drawn, once.
 	ledger:SetScript("OnUpdate", function(_, elapsed)
+		if soon then
+			Draw()
+		end
 		if pane:IsShown() and pane.facing then
 			pane.facing = pane.facing + elapsed * 0.35
 			pane.Model:SetFacing(pane.facing)
@@ -803,8 +857,10 @@ function Bt.ToggleLedger(creature, search)
 	Bt.DrawLedger()
 end
 
+-- A kind's record changed (a kill, its loot, its coin): drawn again on the next frame, once for all
+-- that changed in it (also not from inside the game's events).
 Bt.OnChanged(function()
-	Bt.DrawLedger()
+	dataOld, soon = true, true
 end)
 
 -- Switched off: it closes too. A setting changed: drawn again (grey items, the drop database).
@@ -814,7 +870,7 @@ Bt.When("disable", function()
 	end
 end)
 Bt.When("settings", function()
-	Bt.DrawLedger()
+	dataOld, soon = true, true
 end)
 
 -- For tests.

@@ -432,6 +432,19 @@ map wide).
   another result jumped back.) A row found by an item shows that item, its chance (and "+N" more
   found); the picked mob's found drops stand out, the others fade to 35%. Names the client doesn't
   know yet are asked for (`Bt.AskItem`, once each) and kept in the record when they come.
+- **Hundreds of mobs stay cheap.** The first version filled a row for every mob on every keystroke
+  and every change of the Bestiary. Now the list is a pool of `ROWS` row frames, as many as can be
+  in sight (14: the list's 464 px over a row's 36, one more cut in two), laid at their entries'
+  places in the scroll child, which is as tall as all the rows (Blizzard's scroll bar as before);
+  scrolling (the scroll frame's `OnVerticalScroll`, hooked after the template's) lays and fills them
+  again when another entry comes first. What's out of date is drawn once (`Draw`): the totals and
+  the wish list's strip after a change of the Bestiary; the list's entries (`Collect`: the search
+  over every name, the order) after that, a new search or another order; then always the rows in
+  sight and the picked mob (a click draws only those). Typing and the Bestiary's changes (a kill,
+  its loot, its coin; a setting) draw on the next frame, in the ledger's OnUpdate (which turns the
+  model anyway), once for all that came in it: keys typed in one frame are one search, and nothing
+  is drawn from inside the game's events. A new search starts from the top; items' names coming in
+  and the wish list (`Bt.Redraw`, `Bt.DrawLedger`) draw everything at once.
 
 ## Minimap button and settings
 
@@ -455,7 +468,8 @@ combat (a time stamp), `PLAYER_XP_UPDATE` (three numbers read, the last 8 kills 
 `GET_ITEM_INFO_RECEIVED` only while an item asked for is awaited (a price, a name),
 `MAP_EXPLORATION_UPDATED` once the ledger is built (`LT.MapArt`'s, a count: its map is laid again). A kill reads
 your map position once (two `C_Map` calls). The window redraws when its mob's
-record changes or the target does; the card's OnUpdate runs only while it's shown. Worth is
+record changes or the target does; the card's OnUpdate runs only while it's shown; the ledger, while
+open, at most once a frame and only the rows in sight (above). Worth is
 worked out when drawn, over a mob's drops with the prices cached (the ledger sorted by worth: over
 every mob, table lookups only).
 
@@ -482,3 +496,6 @@ every mob, table lookups only).
   `numFulfilled`/`numRequired`; that they update while looting.
 - The wish list's star (`UI-RaidTargetingIcon_1`) on cells and in text; Alt-click on a drop.
 - The en dash in "Level 9–10" (window, ledger, item tooltips) shows as a dash, not a box or a gap.
+- The ledger's list scrolled with the wheel, the bar's arrows and by dragging its thumb: the rows
+  follow without a blank or a doubled one (`OnVerticalScroll` fires for each); a click far down
+  picks that mob; a search while scrolled down starts from the top.
