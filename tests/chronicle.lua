@@ -1726,3 +1726,59 @@ do -- (clock-neutral: no Advance)
 		"chat lines (the recap, Share in LTC, /chronicle session) stay English: 4d 4h")
 	ns.L["%dd %dh"] = nil
 end
+
+section("Chronicle: tooltips")
+do
+	local C = ns.Chronicle
+	local carl = C.Hash("Carl#3456")
+	local win = LefthyToolsChronicleFrame
+	local canvas = win.Canvas
+	local function rowOf(name)
+		for i = 1, canvas.used.hover do
+			local f = canvas.pools.hover[i]
+			if f.lines and (f.lines[1] or ""):find(name, 1, true) then return f end
+		end
+	end
+	local function hover(f) -- shows its tooltip; whether every line was asked to wrap
+		local wrapped, addLine = true, GameTooltip.AddLine
+		GameTooltip.AddLine = function(self, text, r, g, b, wrap)
+			wrapped = wrapped and wrap == true
+			return addLine(self, text, r, g, b, wrap)
+		end
+		f._scripts.OnEnter(f)
+		GameTooltip.AddLine = addLine
+		return wrapped
+	end
+	local function lineAt(prefix)
+		for i, line in ipairs(TOOLTIP.lines) do if line:sub(1, #prefix) == prefix then return i, line end end
+	end
+	-- A long line wraps instead of making the tooltip as wide as it is; a friend's characters: a few on
+	-- one line, more one per line (at most 10, the most played first).
+	CH.Open("friends")
+	local row = rowOf("Carl Vale|r")
+	local wrapped = row and hover(row)
+	local _, all = lineAt("All characters: ")
+	check(wrapped and all and all:find("Carlbank Vale", 1, true) and TOOLTIP.title == row.lines[1],
+		"a few of a friend's characters on one line; every line may wrap, got " .. tostring(all))
+	row._scripts.OnLeave(row)
+	local book = CDB.book[carl].chars
+	for i = 1, 12 do
+		book["Carlalt" .. i .. "-Realmy"] = { name = "Carlalt" .. i, realm = "Realmy", classFile = "ROGUE", level = i, news = {},
+			days = { [date("%Y-%m-%d")] = { played = 60 * i } } }
+	end
+	CH.Open("friends")
+	row = rowOf("Carl Vale|r")
+	hover(row)
+	local at = lineAt("All characters:")
+	local listed = 0
+	for i = at and at + 1 or 1, at and #TOOLTIP.lines or 0 do
+		if TOOLTIP.lines[i]:find("^   |c%x+Carl") then listed = listed + 1 end
+	end
+	check(at and TOOLTIP.lines[at] == "All characters:" and listed == 10 and TOOLTIP.lines[at + 1]:find("Carl Vale|r 18", 1, true)
+		and TOOLTIP.lines[at + 3]:find("Carlalt12|r", 1, true) and TOOLTIP.lines[at + 10]:find("Carlalt5|r", 1, true)
+		and TOOLTIP.lines[at + 11] == "   |cff888888... and 4 more|r",
+		"many: one per line, the most played first, at most 10 (and how many more), got " .. listed)
+	row._scripts.OnLeave(row)
+	for i = 1, 12 do book["Carlalt" .. i .. "-Realmy"] = nil end
+	win:Hide()
+end

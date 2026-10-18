@@ -21,6 +21,7 @@ local STATS_REFRESH = 5
 local GRAPHS_MIN_GAP, GRAPHS_REFRESH = 10, 30 -- graphs: redraw on changes at most every 10 s, else every 30 s
 local FEED_MIN_GAP = 3 -- friends' news: the News and Friends pages and the minimap dot follow at most this often
 local TAB_WIDTH = 80 -- (six tabs and the picker fit in a row)
+local LIST_CHARS = 10 -- a friend's characters listed in a row's tooltip, one per line
 
 local ICONS = C.Graphs.EVENT_ICONS
 
@@ -356,7 +357,19 @@ local function FriendTables(open)
 			for _, other in ipairs(account.chars) do
 				names[#names + 1] = Named(other.name, other.classFile, other.partial) .. " " .. (other.level or "")
 			end
-			tip[#tip + 1] = L["All characters: %s"]:format(table.concat(names, ", "))
+			-- A few on one line; more one per line, the most played first (one long line made the
+			-- tooltip very wide, and wrapping it splits names), at most LIST_CHARS.
+			if #names <= 3 then
+				tip[#tip + 1] = L["All characters: %s"]:format(table.concat(names, ", "))
+			else
+				tip[#tip + 1] = L["All characters:"]
+				for i = 1, math.min(#names, LIST_CHARS) do
+					tip[#tip + 1] = "   " .. names[i]
+				end
+				if #names > LIST_CHARS then
+					tip[#tip + 1] = "   |cff888888" .. L["... and %d more"]:format(#names - LIST_CHARS) .. "|r"
+				end
+			end
 		end
 		if played then
 			tip[#tip + 1] = L["Last played %s"]:format(C.Ago(c.last))

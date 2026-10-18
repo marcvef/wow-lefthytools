@@ -184,7 +184,8 @@ the open one's button greyed out:
   (horizontal bars, top 5), On the road and Loot by quality (one split bar each, with a legend).
   Drawn with plain textures (`SetGradient` for the bars), line objects (`CreateLine`) and font
   strings from pools (`G.NewCanvas`, Canvas.lua): a redraw reuses everything, nothing is created after the first
-  draw.
+  draw. A hover area's tooltip (`Canvas:Hover`, every page on the canvas) lets a long line wrap
+  (`AddLine(..., true)`), so the tooltip keeps a readable width instead of growing with its longest line.
 - **Friends' graphs:** a friend picked in the dropdown (other pages fall back to you): their
   account from `C.Accounts()`, compared with mine from there (both all characters), named by the
   account (their BattleTag's name). Last 14 days (the same bars from their days), Last 7 days
@@ -212,7 +213,8 @@ the open one's button greyed out:
   online (someone playing one character isn't listed again with the others), most recently played
   first: Name, Level, BattleTag, Last played ("3 h ago"), This week (its time played in 7 days),
   Latest news (icon, text, how long ago); the hover adds the realm, the account's characters with
-  their levels and the highlight's date. The corners count friends online and characters not
+  their levels (up to three on one line; more one per line, the most played first, at most 10 and
+  "... and N more": one line of them made the tooltip very wide) and the highlight's date. The corners count friends online and characters not
   online. Redrawn every 5 s (who's online and where changes all the time) and on feed changes (at
   most every 3 s).
 - **Compare** (`G.DrawCompare`, Compare.lua): characters (`C.Characters()`, see below), yours and every

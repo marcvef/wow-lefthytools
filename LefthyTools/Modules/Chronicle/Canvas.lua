@@ -156,7 +156,8 @@ function Canvas:Text(text, x, y, font, justify, width)
 end
 
 -- An invisible area that shows a tooltip: lines = { title, line, ... } (nil: none); onClick(button)
--- makes it clickable.
+-- makes it clickable. A long line wraps (all of a friend's characters, a hint), so the tooltip keeps
+-- a readable width instead of growing as wide as its longest line.
 local function HoverEnter(self)
 	if not self.lines then
 		return
@@ -164,7 +165,7 @@ local function HoverEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_TOP")
 	GameTooltip:SetText(self.lines[1], 1, 0.82, 0)
 	for i = 2, #self.lines do
-		GameTooltip:AddLine(self.lines[i], 1, 1, 1)
+		GameTooltip:AddLine(self.lines[i], 1, 1, 1, true)
 	end
 	GameTooltip:Show()
 end
