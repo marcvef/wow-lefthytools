@@ -45,9 +45,21 @@ C_AddOns = { GetAddOnMetadata = function(addon, field)
 	if addon == "LefthyTools" and field == "Version" then return MOCK_VERSION end
 end }
 
--- secret values: a table marked SECRET
-SECRET = setmetatable({}, { __tostring = function() return "<secret>" end })
-function issecretvalue(v) return v == SECRET end
+-- Secret values: SECRET stands for anything the game keeps secret. Using one errors, like in the
+-- game: arithmetic, comparing (<, <=, ...; == only against another table: Lua asks no metamethod
+-- for == with a number, a string or nil), joining it (..), its length, indexing, calling, pairs.
+-- Not caught here (Lua has no hook for them): a secret as a table key, == with a plain value,
+-- type() (a table, not the number or string it hides), tonumber(), and testing it (if secret).
+-- tostring() and issecretvalue() work, as in the game.
+local function Refuse(what) return function() error("attempt to " .. what .. " a secret value", 2) end end
+local secretMeta = { __tostring = function() return "<secret>" end, __concat = Refuse("concatenate"),
+	__len = Refuse("get the length of"), __index = Refuse("index"), __newindex = Refuse("index"), __call = Refuse("call"),
+	__pairs = Refuse("iterate over"), __eq = Refuse("compare"), __lt = Refuse("compare"), __le = Refuse("compare") }
+for _, op in ipairs({ "add", "sub", "mul", "div", "mod", "pow", "unm", "idiv", "band", "bor", "bxor", "shl", "shr", "bnot" }) do
+	secretMeta["__" .. op] = Refuse("perform arithmetic on")
+end
+SECRET = setmetatable({}, secretMeta)
+function issecretvalue(v) return rawequal(v, SECRET) end
 
 -- timers
 local timers = {}
@@ -536,7 +548,7 @@ function UnitFactionGroup(unit) if unit == "player" then return "Alliance", "All
 STATS = { { 40, 45 }, { 60, 70 }, { 50, 58 }, { 25, 25 }, { 30, 32 } }
 function UnitStat(unit, i)
 	local s = unit == "player" and STATS[i]
-	if s == SECRET then return SECRET, SECRET, 0, 0 end
+	if issecretvalue(s) then return SECRET, SECRET, 0, 0 end
 	if s then return s[2], s[2], s[2] - s[1], 0 end
 end
 -- Spells: KNOWN_SPELLS[id] = true for spells the player knows; names and icons are made up.

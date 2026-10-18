@@ -60,9 +60,33 @@ local function catchErrors()
 	return reported, function() geterrorhandler = errorHandler end
 end
 
--- After the last file: nothing reached the error handler, no globals leaked, and the count.
+-- Where the addon kept a secret it mustn't: as a table key anywhere it can reach (in the game
+-- that errors; Lua has no hook to catch it when it happens, so this looks afterwards), or anywhere
+-- in its saved variables. A few paths, nil if none.
+local function secretsKept()
+	local found, seen = {}, {}
+	local function walk(t, path, saved)
+		if seen[t] or #found >= 5 then return end
+		seen[t] = true
+		for k, v in next, t do
+			local at = path .. (issecretvalue(k) and "[secret]" or "." .. tostring(k))
+			if issecretvalue(k) or (saved and issecretvalue(v)) then found[#found + 1] = at end
+			if type(k) == "table" and not issecretvalue(k) then walk(k, path .. "[key]", saved) end
+			if type(v) == "table" and not issecretvalue(v) then walk(v, at, saved) end
+		end
+	end
+	for _, name in ipairs({ "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB" }) do
+		if type(_G[name]) == "table" then walk(_G[name], name, true) end
+	end
+	walk(ns, "ns")
+	return found[1] and table.concat(found, ", ")
+end
+
+-- After the last file: nothing reached the error handler, no secret kept, no globals leaked, the count.
 function suite.Finish()
 	check(#ERRORS == 0, "no errors reported through the error handler")
+	local kept = secretsKept()
+	check(not kept, "no secret as a table key, none in saved variables, found: " .. tostring(kept))
 
 	-- A forgotten `local` leaks a global, which in game can clash with other addons. Ours start with
 	-- LefthyTools (incl. mixins); SLASH_/BINDING_ names and the tests' own MOCK_* knobs are all caps.
