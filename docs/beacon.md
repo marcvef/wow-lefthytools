@@ -917,7 +917,8 @@ friend in the top bar who can be watched has a small button right of their name 
 "Live" red) to open or close theirs. Streams opened on the flight close when the film ends.
 **World map** (`streamMapClick`, Dots.lua): a plain left click on a friend's dot opens or closes
 their stream (a hook on the map's `ScrollContainer` `OnMouseDown`; the pins themselves take no
-clicks), and the dot's tooltip says so. `/lefthy stream stop [<name>]` closes them.
+clicks), and the dot's tooltip says so. `/lefthy stream stop [<name>]` closes them. A typed name
+(`watch`, `stop`) is the friend's as Battle.net shows it ("anna brook") or their first name alone.
 **Minimap button** (`streamButton`, StreamButton.lua; `LT.Window.MinimapButton`, angle `streamButtonAngle`, 235): a spyglass on the minimap's edge, a red dot on it while you watch
 someone. Click: our own list (`LT.Window.PopupList`; Blizzard's menu taints gamepad mode) titled
 "Stream": the online friends who can be watched (level, where, dead or in combat; ticked while

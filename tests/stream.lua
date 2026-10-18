@@ -1149,6 +1149,27 @@ do
 	S.OpenFriend(11, "map")
 	BB.StreamFlightEnd()
 	check(S.IsWatching(11), "one opened on the map stays")
+	do -- Battle.net shows Forever's names with the surname: her first name is enough, her full name too.
+		local bnName = BN_FRIENDS[1][1].characterName
+		BN_FRIENDS[1][1].characterName = "Anna Brook"
+		Fire("BN_FRIEND_INFO_CHANGED")
+		Advance(1.1) -- (the Battle.net lookup comes once a second)
+		check(BB.peers[11].name == "Anna Brook", "Battle.net: Anna Brook")
+		lefthy("stream stop Anna Brook")
+		check(not S.IsWatching(11), "/lefthy stream stop by her full name")
+		lefthy("stream watch anna")
+		Advance(0.6)
+		check(S.IsWatching(11), "/lefthy stream watch anna: Anna Brook's stream opens")
+		lefthy("stream stop anna stone")
+		check(S.IsWatching(11), "... a surname that isn't hers: not her")
+		lefthy("stream stop anna")
+		check(not S.IsWatching(11), "/lefthy stream stop anna: it closes")
+		lefthy("stream watch anna brook")
+		check(S.IsWatching(11), "... and opens by her full name")
+		BN_FRIENDS[1][1].characterName = bnName
+		Fire("BN_FRIEND_INFO_CHANGED")
+		Advance(1.1)
+	end
 	lefthy("stream stop")
 	check(not S.IsWatching(11), "/lefthy stream stop: every stream closes")
 	anna("S2;;0;260.0;750.0;Goldshire;")

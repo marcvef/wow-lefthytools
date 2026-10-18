@@ -822,6 +822,16 @@ function S.ReadFriend(id, picture)
 	return fresh, GetTime() - stream.at
 end
 
+-- A typed name (lower case) means a friend: their name as Battle.net shows it ("anna brook"; on
+-- Forever with the surname), or their first name alone ("anna").
+local function Named(peer, typed)
+	local name = peer and peer.name
+	if type(name) ~= "string" or issecret(name) then
+		return false
+	end
+	return name:lower() == typed or (not LT.Names.HasSurname(typed) and LT.Names.Same(name, typed))
+end
+
 -- /lefthy stream watch <name>
 function S.WatchByName(name)
 	name = strtrim(name or ""):lower()
@@ -829,15 +839,19 @@ function S.WatchByName(name)
 		M:Print("/lefthy stream watch <name> - whose fight? (or click their dot on the world map)")
 		return
 	end
+	local found, whole
 	for id, peer in pairs(B.peers) do
-		if peer.name and peer.name:lower() == name then
-			if not S.CanWatch(id) then
-				M:Print(("%s can't be watched: their LefthyTools is older, or they don't share their fights."):format(peer.name))
-			else
-				S.OpenFriend(id, "command")
-			end
-			return
+		if not whole and Named(peer, name) then -- (the whole name wins: two friends can share a first one)
+			found, whole = id, peer.name:lower() == name
 		end
+	end
+	if found then
+		if not S.CanWatch(found) then
+			M:Print(("%s can't be watched: their LefthyTools is older, or they don't share their fights."):format(B.peers[found].name))
+		else
+			S.OpenFriend(found, "command")
+		end
+		return
 	end
 	M:Print(("no friend called %s online with LefthyTools."):format(name))
 end
@@ -846,8 +860,7 @@ end
 function S.StopWatching(name)
 	name = strtrim(name or ""):lower()
 	for id in pairs(watching) do
-		local peer = B.peers[id]
-		if name == "" or (peer and peer.name and peer.name:lower() == name) then
+		if name == "" or Named(B.peers[id], name) then
 			S.CloseView(id)
 		end
 	end
