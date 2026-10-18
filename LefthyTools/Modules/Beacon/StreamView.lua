@@ -26,7 +26,7 @@ local S = B.Stream
 -- kind in LefthyToolsDB.streamWindows). Yours sits in the interface (and pauses a cinematic flight,
 -- like any window); friends' windows float above everything (also above a flight's film, which
 -- they don't pause), stacked from the top left. Cost: an OnUpdate per open window (dots and map
--- glide), nothing when none is open.
+-- glide), nothing when none is open; while a friend's is open, the interface's scale is listened to.
 
 local WIDTH, HEIGHT, RADAR = 250, 432, 220
 local OUTER_YARDS = S.OUTER_YARDS
@@ -468,7 +468,8 @@ local function UserScale(kind)
 end
 
 -- The window's size: yours lives in the interface (UIParent's scale); a friend's floats on its own
--- (no parent: above a flight's film), so it takes UIParent's scale itself.
+-- (no parent: above a flight's film), so it takes UIParent's scale itself (again when that
+-- changes: below).
 local function ApplyScale(view, scale)
 	view.scale = scale
 	if view.kind == "friend" then
@@ -493,6 +494,50 @@ local function WhereNow(view)
 		return left * ratio, top * ratio
 	end
 	return view.left, view.top
+end
+
+-- UIParent's scale changed (the UI scale, the game's window or resolution): friends' windows took
+-- it themselves when they opened, so they take it anew, kept where they are (in UIParent's units,
+-- like yours). A moment after the first event, once for a burst (resizing the game's window sends
+-- one after another; UIParent's own scale may follow the event). Listened to only while a friend's
+-- window is open.
+local RESCALE_WAIT = 0.2
+local SCALE_EVENTS = { "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED" }
+local rescale = CreateFrame("Frame")
+rescale:Hide()
+rescale:SetScript("OnEvent", function(self)
+	if not self:IsShown() then
+		self.at = GetTime() + RESCALE_WAIT
+		self:Show()
+	end
+end)
+rescale:SetScript("OnUpdate", function(self)
+	if GetTime() < self.at then
+		return
+	end
+	self:Hide()
+	for _, view in pairs(views) do
+		if view.kind == "friend" and view.open then
+			ApplyScale(view, view.scale)
+			PlaceAt(view, view.left, view.top)
+		end
+	end
+end)
+
+-- Called when a friend's window opens or closes.
+local function FollowScale()
+	local open = false
+	for _, view in pairs(views) do
+		open = open or (view.kind == "friend" and view.open == true)
+	end
+	rescale:UnregisterAllEvents()
+	if open then
+		for _, event in ipairs(SCALE_EVENTS) do
+			pcall(rescale.RegisterEvent, rescale, event) -- (one this client doesn't have: left out)
+		end
+	else
+		rescale:Hide()
+	end
 end
 
 local function OnUpdate(win, elapsed)
@@ -943,6 +988,7 @@ function S.OpenFriend(id, origin)
 	view.win.Live.Text:SetText(L["LIVE"])
 	view.win.Hint:Hide()
 	Start(view)
+	FollowScale()
 	S.Watch(id, true)
 	S.UpdateButton() -- (StreamButton.lua: its red dot)
 	return view
@@ -961,6 +1007,7 @@ function S.CloseView(key)
 		S.Watch(view.id, false)
 		views[key] = nil
 		spare[#spare + 1] = view
+		FollowScale()
 		S.UpdateButton()
 	elseif view.kind == "me" then
 		S.SenseNeed("me", false)

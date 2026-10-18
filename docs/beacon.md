@@ -859,8 +859,10 @@ glides between their frames. Drag to move; the grip at the bottom right resizes 
 kept per kind in `LefthyToolsDB.streamWindows`: `me`, `friend`). Yours (`LefthyToolsStreamFrame`,
 "me" or the preview, scale 0.8, right of the middle) lives in the interface and pauses a cinematic
 flight like any LefthyTools window. Friends' windows (`LefthyToolsStreamFriend1..`, scale 0.55)
-have no parent (scaled with UIParent's scale themselves), `FULLSCREEN_DIALOG` strata, so they float
-above a flight's film without pausing it; they open side by side from the top left (the first free
+have no parent (scaled with UIParent's scale themselves, and again when it changes:
+`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED` for the game's window or resolution, listened to while one
+is open; 0.2 s after the first of a burst, kept where they are in UIParent's units, as yours is),
+`FULLSCREEN_DIALOG` strata, so they float above a flight's film without pausing it; they open side by side from the top left (the first free
 place), several at once. Escape or the X closes any. Frames are kept for reuse.
 
 **Between friends** (StreamNet.lua), kind `O` (older builds ignore it):

@@ -1788,3 +1788,40 @@ do
 	BOOK[#BOOK], SPELL_RANGES[2094], SPELL_NAMES[2094] = nil, nil, nil
 	MOBS = {}
 end
+
+section("Beacon: fight stream: a friend's window follows the UI scale")
+do
+	-- Friends' windows have no parent: they take UIParent's scale themselves when they open, and
+	-- again when it changes (the UI scale, the game's window), kept where they are; a moment later,
+	-- once for a burst of events.
+	local S = BB.Stream
+	anna("H2")
+	anna("O2;h;1")
+	local view = S.OpenFriend(11, "command")
+	local fwin, scale, left, top = view.win, view.scale, view.left, view.top
+	local function same(a, b) return math.abs(a - b) < 0.001 end
+	-- Its size and its top left corner in UIParent's units: as when it opened.
+	local function fits()
+		local p, ratio = fwin._points[1], fwin:GetEffectiveScale() / UIParent:GetEffectiveScale()
+		return #fwin._points == 1 and same(ratio, scale) and same(p[4] * ratio, left) and same(p[5] * ratio, top)
+	end
+	check(fwin:IsShown() and fits(), "her window: its size and place in the interface")
+	local sets, SetScale = 0, fwin.SetScale
+	fwin.SetScale = function(self, s) sets = sets + 1; return SetScale(self, s) end
+	UIParent:SetScale(0.8)
+	Fire("UI_SCALE_CHANGED")
+	for _ = 1, 3 do Fire("DISPLAY_SIZE_CHANGED") end
+	check(sets == 0, "the UI scale changes: not at once ...")
+	Advance(0.3)
+	check(fits() and sets == 1, "... a moment later her window takes it, where it was: once for the four events")
+	UIParent:SetScale(1.25)
+	Fire("DISPLAY_SIZE_CHANGED")
+	Advance(0.3)
+	check(fits() and sets == 2, "the game's window (or resolution) changes it: followed too")
+	S.CloseView(11)
+	UIParent:SetScale(1)
+	Fire("UI_SCALE_CHANGED")
+	Advance(0.3)
+	check(sets == 2, "her window closed: not followed any more")
+	fwin.SetScale = nil
+end
