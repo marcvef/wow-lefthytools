@@ -896,7 +896,7 @@ place), several at once. Escape or the X closes any. Frames are kept for reuse.
   would flicker); the vitals stay within 120, the frame within 245. Builds before it skip the part
   (`DecodeVitals`: not `?x`, not `<id>=<n>`, and a moment needs a letter right after its number,
   `^(%d%d?)(%a)`: `@` isn't one, whatever bytes the name has), and its entry, mobs and 11 fields are
-  unchanged (`tests/test.lua` reads such vitals with the old decoder: the same health, foes' health
+  unchanged (`tests/stream.lua` reads such vitals with the old decoder: the same health, foes' health
   and moments). A receiver shows a role letter it doesn't know white; the name is cleaned
   (`B.Clean`) and cut to three letters again.
 - `O2;n;<id>;<level>;<name>` a mob's name (40 bytes), once per watcher before the first frame with

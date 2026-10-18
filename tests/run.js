@@ -76,8 +76,14 @@ if (!process.argv[2]) {
   console.log("installer ok: Update-LefthyTools.cmd matches install.ps1");
 }
 
-// 3) Behavioural tests, each in a fresh Lua state. SOURCES = { { name, src }, ... } in TOC order.
-function runSuite(scripts) {
+// 3) Behavioural tests, each suite in a fresh Lua state. SOURCES = { { name, src }, ... } in TOC order.
+//    The English suite: helpers.lua loads the addon, then the test files run in this order in the
+//    same state (the mock's clock and world go on from one to the next), each getting what
+//    helpers.lua returns as `...`; its Finish() makes the last checks and prints the count.
+const ENGLISH = ["core.lua", "mirage.lua", "tweaks.lua", "beacon.lua", "stream.lua", "flights.lua", "questmap.lua",
+  "chronicle.lua", "leaving.lua", "levelup.lua", "bestiary.lua", "aggro.lua", "whatsnew.lua", "mirageoff.lua", "guard.lua"];
+
+function newState() {
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);
   lua.lua_newtable(L);
@@ -90,16 +96,32 @@ function runSuite(scripts) {
     lua.lua_rawseti(L, -2, i + 1);
   });
   lua.lua_setglobal(L, to_luastring("SOURCES"));
-
-  for (const script of scripts) {
-    const src = fs.readFileSync(path.join(__dirname, script), "utf8");
-    if (lauxlib.luaL_loadbuffer(L, to_luastring(src), null, to_luastring("@" + script)) !== lua.LUA_OK ||
-        lua.lua_pcall(L, 0, 0, 0) !== lua.LUA_OK) {
-      console.log("LUA ERROR: " + lua.lua_tojsstring(L, -1));
-      process.exit(1);
-    }
-  }
+  return L;
 }
 
-runSuite(["mock.lua", "test.lua"]);      // English client
-runSuite(["mock.lua", "test_de.lua"]);   // German client
+// Runs a script with the suite table (a registry reference) as its argument; returns its first result.
+function run(L, script, suite) {
+  const src = fs.readFileSync(path.join(__dirname, script), "utf8");
+  if (lauxlib.luaL_loadbuffer(L, to_luastring(src), null, to_luastring("@" + script)) !== lua.LUA_OK) fail(L);
+  if (suite !== undefined) lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, suite);
+  if (lua.lua_pcall(L, suite !== undefined ? 1 : 0, 1, 0) !== lua.LUA_OK) fail(L);
+  return lauxlib.luaL_ref(L, lua.LUA_REGISTRYINDEX);
+}
+function fail(L) {
+  console.log("LUA ERROR: " + lua.lua_tojsstring(L, -1));
+  process.exit(1);
+}
+
+// English client
+let L = newState();
+run(L, "mock.lua");
+const suite = run(L, "helpers.lua");
+for (const file of ENGLISH) run(L, file, suite);
+lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, suite);
+lua.lua_getfield(L, -1, to_luastring("Finish"));
+if (lua.lua_pcall(L, 0, 0, 0) !== lua.LUA_OK) fail(L);
+
+// German client
+L = newState();
+run(L, "mock.lua");
+run(L, "test_de.lua");

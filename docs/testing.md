@@ -12,7 +12,8 @@
    prints the value to set after adding or removing a file), and that `Update-LefthyTools.cmd`
    is the current build of `install.ps1` (`npm run build-installer` regenerates it);
 4. runs the addon in fengari (Lua 5.3) against `tests/mock.lua`, which fakes the WoW API: once as
-   an English client (`tests/test.lua`) and once as German (`tests/test_de.lua`, which also fails
+   an English client (`tests/helpers.lua`, then one file per module, in the order `tests/run.js`
+   lists them) and once as German (`tests/test_de.lua`, which also fails
    on formal terms, translated module names and runtime translation fallbacks).
 
 The mock runs OnUpdate only on visible frames, like the game, and animation groups with
