@@ -30,14 +30,15 @@ local M = C.module
 --   J2;a;<acct>;<char>;<u>;<full name>;<guid>    the character's full name and GUID, with the
 --                          profile's stamp (<char> stays its record's key: the first name's)
 --   J2;l;<acct>;<char>;<full name>;<guid>        a full name I learned, not from its author (no
---                          stamp; with every answer, and to the account's owner on their hello)
+--                          stamp; with every answer, and to the account's owner on their hello;
+--                          only to builds that read it)
 --   J2;c;<acct>;<count>    the answer had count records (just before its end)
 --   J2;e;<acct>;<u>        that's all: you're complete up to u
 -- A request goes to one friend at a time per account (PENDING_TIMEOUT without progress: another
 -- may answer). An answer holds at most SERVE_MAX records, oldest first; its end says how far that
--- got, so the rest follows on the next round. Old D2/K2/E2 messages still go to everyone (older
--- builds, chat lines: Live.lua); their data stays in store.friendStats / store.friends, and
--- Characters.lua joins it to the journals' characters.
+-- got, so the rest follows on the next round. Old D2/K2 days still go to builds before these
+-- journals, E2 highlights to everyone (chat lines; Live.lua); their data stays in
+-- store.friendStats / store.friends, and Characters.lua joins it to the journals' characters.
 --
 -- Characters.lua: who is who (accounts, names, matching) and the lists the pages use; Recap.lua:
 -- "while you were away", the weekly recap, the leaderboards and sharing in LTC.
@@ -451,6 +452,13 @@ local function Learned(acct)
 	return list
 end
 
+-- Builds from 0.5.0-176 on (ba4dbad) read "l"; older ones ignore it, so they aren't sent it. A friend
+-- whose build isn't known yet, or doesn't say its commit count, gets it, as before.
+local NAMES_SINCE = "0.5.0-176-gba4dbad"
+local function ReadsNames(peer)
+	return LT.CompareVersions(peer and peer.version, NAMES_SINCE) ~= -1
+end
+
 -- An answer: the account's records newer than since, at most SERVE_MAX (never cutting between two
 -- of the same stamp), the names learned of it, how many (c: a receiver that got fewer doesn't take
 -- the end's stamp; older builds ignore it) and the end. An answer to the same friend for the same
@@ -472,8 +480,9 @@ local function Serve(id, acct, since)
 	for i = 1, count do
 		B.QueueLow(id, list[i][2])
 	end
-	-- (counted too: every build that counts counts every message about the account it asked for)
-	local learned = Learned(acct)
+	-- (counted too: every build that counts counts every message about the account it asked for;
+	-- builds that don't read them get none, and a count without them)
+	local learned = ReadsNames(B.peers[id]) and Learned(acct) or {}
 	for _, message in ipairs(learned) do
 		B.QueueLow(id, message)
 	end
@@ -723,8 +732,8 @@ function ns.Beacon.ReceiveJournal(id, word, more)
 	if word == "h" then
 		peer.journal = more:match("^%x%x%x%x%x%x%x%x$") or "" -- (they sync; their account, if known)
 		summaries[id] = nil -- (they (re)started: everything is offered again)
-		for _, message in ipairs(peer.journal ~= "" and Learned(peer.journal) or {}) do
-			ns.Beacon.QueueLow(id, message) -- (their own characters' names I learned)
+		for _, message in ipairs(peer.journal ~= "" and ReadsNames(peer) and Learned(peer.journal) or {}) do
+			ns.Beacon.QueueLow(id, message) -- (their own characters' names I learned, if their build reads them)
 		end
 	elseif word == "s" then
 		peer.journal = peer.journal or ""

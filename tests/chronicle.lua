@@ -319,11 +319,20 @@ do
 	Advance(0.15)
 	check(annaStats.days["2030-05-14"].played == 5400 and annaStats.days["2030-05-14"].afk == 2700, "the day sent again keeps its AFK time")
 	dmark = #GAMEDATA + 1
-	for _ = 1, 11 do -- 5 minutes; she keeps sending her heartbeat meanwhile
+	-- Bob's build syncs journals (0.5.0-80 on): my days reach him with my journal, the old day
+	-- messages don't (Anna's build isn't known: she gets them, as before).
+	local function bob(text) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", text, "WHISPER", 12) end
+	bob("H2")
+	peers()[12].version = "0.5.0-80-g94d1d36"
+	for _ = 1, 11 do -- 5 minutes; they keep sending their heartbeats meanwhile
 		anna("S2;;0;260.0;750.0;Goldshire;")
+		bob("S2;;0;260.0;750.0;Goldshire;")
 		Advance(30)
 	end
 	check(sentTo(11, dmark, "D2;20300515;")[1], "today's numbers go out again every 5 minutes while they change")
+	check(sentTo(12, dmark, "V2;")[1] and #sentTo(12, dmark, "D2;") == 0 and #sentTo(12, dmark, "K2;") == 0,
+		"not to a friend whose build syncs journals: neither when he shows up nor every 5 minutes")
+	bob("Q2") -- (he's gone again: the later checks count on Anna alone)
 	Advance(15)
 	anna("L2;24;")
 	Advance(0.15)
@@ -1349,6 +1358,31 @@ do
 	anna("J2;h;" .. annaAcct)
 	Advance(3)
 	check(sentTo(11, mark, "J2;l;" .. annaAcct .. ";Annalt-Realmy;Annalt Brook;")[1], "Anna says hello: her alt's name goes to her")
+	-- Builds before "l" (0.5.0-176) ignore it: they aren't sent it (their answers count without it).
+	-- One whose version hasn't come yet gets it, as before (the checks above).
+	local annaVersion, bobVersion = peers()[11].version, peers()[12].version
+	peers()[12].version = "0.5.0-175-g0000000"
+	mark = #GAMEDATA + 1
+	bob("J2;q;" .. carl .. ";0")
+	Advance(3)
+	count = tonumber((sentTo(12, mark, "J2;c;" .. carl .. ";")[1] or ""):match(";(%d+)$") or -1)
+	about = 0
+	for _, m in ipairs(GameDataTo(12, mark)) do
+		if m:find("^J2;[pdnal];" .. carl .. ";") then about = about + 1 end
+	end
+	check(sentTo(12, mark, "J2;p;" .. carl)[1] and not sentTo(12, mark, "J2;l;")[1] and count == about,
+		"an older build's answer: no names learned, counted without them (got " .. count .. " for " .. about .. ")")
+	peers()[11].version = "0.5.0-175-g0000000"
+	mark = #GAMEDATA + 1
+	anna("J2;h;" .. annaAcct)
+	Advance(3)
+	check(not sentTo(11, mark, "J2;l;")[1], "... nor on its hello")
+	peers()[11].version = "0.5.0-176-gba4dbad"
+	mark = #GAMEDATA + 1
+	anna("J2;h;" .. annaAcct)
+	Advance(3)
+	check(sentTo(11, mark, "J2;l;" .. annaAcct .. ";Annalt-Realmy;Annalt Brook;")[1], "the build that reads them gets them")
+	peers()[11].version, peers()[12].version = annaVersion, bobVersion
 	-- And mine: an alt not played since this build learns its surname, and sends it on as its own.
 	CDB.chars["Oldalt-Realmy"] = { name = "Oldalt", realm = "Realmy", classFile = "WARRIOR", level = 5, events = {}, daily = {} }
 	CH.Fill(CDB.chars["Oldalt-Realmy"])
@@ -1650,4 +1684,27 @@ do
 	for i, f in ipairs(savedFeed) do CDB.friends[i] = f end
 	CDB.book[dora] = nil
 	C.NewsChanged()
+end
+
+section("Chronicle: old-style days only for builds that read nothing else")
+do
+	-- My days reach builds from 0.5.0-80 on with my journal; the old day messages go to builds before
+	-- it, and to a friend whose build isn't known yet (or doesn't say its commit count), as before.
+	anna("H2")
+	Advance(1.2)
+	local peer = peers()[11]
+	local versionWas = peer.version
+	local function daysFor(version)
+		peer.version = version
+		local from = #GAMEDATA + 1
+		ns.Beacon.Notify("known", peer, { id = 11 }) -- (as when her name becomes known)
+		Advance(2)
+		return #sentTo(11, from, "D2;") + #sentTo(11, from, "K2;")
+	end
+	check(daysFor("0.5.0-80-g94d1d36") == 0 and daysFor("0.5.0-176-gba4dbad-dirty") == 0 and daysFor("0.6.0") == 0,
+		"a friend whose build syncs journals gets no old day messages")
+	check(daysFor("0.5.0-79-gaaaaaaa") >= 1 and daysFor("0.4.0") >= 1, "builds before it get them")
+	check(daysFor(nil) >= 1 and daysFor("0.5.0-g1a2b3c4") >= 1,
+		"as before, so does one whose build isn't known yet, or doesn't say its commit count")
+	peer.version = versionWas
 end

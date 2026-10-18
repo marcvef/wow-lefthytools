@@ -267,7 +267,14 @@ sets only the day's `afk`, a `D2` keeps it. It also keeps the sender's account a
 so the window finds the character in their journal and counts those days for it, where the journal
 has none (older builds keep the fields and ignore them). When Beacon
 reports a friend as `known` (their name became known), they get my last 7 days; every 5 minutes
-today's and yesterday's go to everyone if they changed (each message compared on its own). Both
+today's and yesterday's go to them again if they changed (each message compared on its own). Only
+friends whose build needs them get these (`NeedsDays`): builds from 0.5.0-80 on (94d1d36,
+`JOURNALS_SINCE`) sync journals and get my days as "d" records with my journal (Sync.lua), so the
+old messages only go to builds before it, which read nothing else; a friend whose version hasn't
+come yet (Beacon's `peer.version`, V2), or whose build doesn't say its commit count
+(`0.5.0-g1a2b3c4`: `LT.CompareVersions` can't tell), gets them as before, and so does everyone
+while my own journal can't be offered (my BattleTag not known). (Before, every /reload of mine sent
+every friend 7 days again, journal or not.) Both
 go through Beacon's low-priority queue (`B.QueueLow`): sent only when no message, state or answer
 waits, so they never delay live data. Beacon accepts up to 30 day messages per friend per minute
 and checks the ranges (minutes at most 1440); Chronicle keeps 30 days per friend in
@@ -322,7 +329,9 @@ profile stamp, or Battle.net tells the name when that character is online),
 `J2;l;<acct>;<Name-Realm>;<full name>;<guid>` a full name I learned, not from its author
 (Battle.net, an older build's days; no stamp: no author made it), with every answer about that
 account whatever it asked since (counted in its `c`), and to the account's owner when they say
-hello (`Learned`); taken only by a character that doesn't know its surname yet, never instead of
+hello (`Learned`); both only to builds that read it (0.5.0-176 on, ba4dbad, `NAMES_SINCE`; one
+whose version isn't known yet or has no commit count gets it as before; older builds' answers
+count without it); taken only by a character that doesn't know its surname yet, never instead of
 one it knows (`StoreName`): a friend's journal's, or an alt of mine (not the one I play), which
 then sends it on as its own, with a new profile stamp (builds before it ignore the word; those that
 count an answer's records count it too, so the count matches), `J2;c;<acct>;<count>` the answer

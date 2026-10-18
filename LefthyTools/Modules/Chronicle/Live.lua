@@ -5,9 +5,10 @@ local M = C.module
 
 -- Chronicle and friends live, through Beacon: the messages builds before the synced journals
 -- (Sync.lua) rely on, still sent and read for them. Out: my highlights (E2, on the tick, at most a
--- few a minute) and my days for their graphs (D2, and K2 for the day's AFK time: builds before it
--- reject a D2 with another field). In: their highlights, level-ups, deaths, coming online and going
--- offline into the feed (store.friends, with a chat line for highlights), and their days
+-- few a minute; every build shows them in chat) and my days for their graphs (D2, and K2 for the
+-- day's AFK time: builds before it reject a D2 with another field), only to builds before the synced
+-- journals, which bring my days to the others. In: their highlights, level-ups, deaths, coming online
+-- and going offline into the feed (store.friends, with a chat line for highlights), and their days
 -- (store.friendStats, by the full name Battle.net gives; Characters.lua joins them to their
 -- journals' characters). Never change these messages' formats: older builds read them.
 
@@ -114,6 +115,16 @@ local function SharingOn()
 	return M.db.share and beacon and beacon.enabled and ns.Beacon ~= nil
 end
 
+-- Builds from 0.5.0-80 on (94d1d36) sync journals: my days reach them with my journal (Sync.lua's
+-- "d" records, every day's numbers and more), so the old day messages only go to builds before it,
+-- and, as before, to a friend whose build isn't known yet or doesn't say its commit count
+-- ("0.5.0-g1a2b3c4"). To everyone while my journal can't be offered (my BattleTag isn't known).
+local JOURNALS_SINCE = "0.5.0-80-g94d1d36"
+local function NeedsDays(peer)
+	local order = C.MyAccount and C.MyAccount() and LT.CompareVersions(peer and peer.version, JOURNALS_SINCE)
+	return not (order and order >= 0)
+end
+
 -- D2;<YYYYMMDD>;<minutes>;<xp>;<quests>;<kills>;<deaths>;<levels> for one of my days, or nil.
 local function DailyMessage(day)
 	local b = C.Char().daily[day]
@@ -135,7 +146,8 @@ local function AfkMessage(day)
 	end
 end
 
--- On the tick, at most every SHARE_GAP: today's and yesterday's numbers to everyone, if changed.
+-- On the tick, at most every SHARE_GAP: today's and yesterday's numbers to every friend who needs
+-- them (NeedsDays), if changed.
 function C.ShareDays(now)
 	if now - lastDailyShare < SHARE_GAP or not SharingOn() then
 		return
@@ -147,16 +159,20 @@ function C.ShareDays(now)
 			local key = message and (day .. message:sub(1, 1))
 			if message and message ~= sentDaily[key] then
 				sentDaily[key] = message
-				ns.Beacon.QueueLowToPeers(message) -- never ahead of live data
+				for id, peer in pairs(ns.Beacon.peers) do
+					if NeedsDays(peer) then
+						ns.Beacon.QueueLow(id, message) -- never ahead of live data
+					end
+				end
 			end
 		end
 	end
 end
 
--- A friend just showed up: my last SHARE_DAYS days, for their graphs.
+-- A friend just showed up: my last SHARE_DAYS days, for their graphs (if their build needs them).
 local daysSentAt = {} -- gameAccountID -> GetTime() of the last full week
-local function SendDaysTo(gameAccountID)
-	if not SharingOn() then
+local function SendDaysTo(peer, gameAccountID)
+	if not SharingOn() or not NeedsDays(peer) then
 		return
 	end
 	local now = GetTime()
@@ -215,7 +231,7 @@ local function OnFriendEvent(kind, peer, data)
 		return
 	end
 	if kind == "known" then
-		SendDaysTo(data.id)
+		SendDaysTo(peer, data.id)
 		return
 	elseif kind == "daily" then
 		StoreFriendDay(peer, data)
