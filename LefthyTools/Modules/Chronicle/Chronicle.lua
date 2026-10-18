@@ -910,8 +910,9 @@ function C.QualityText(name, quality)
 	return hex and ("|c" .. hex .. name .. "|r") or name
 end
 
--- "1h 12m", "3d 4h", "45s"
-function C.Duration(seconds)
+-- "1h 12m", "3d 4h" (German "3T 4h": Tage, the user's pick), "45s"; english: for chat lines, which
+-- stay English.
+function C.Duration(seconds, english)
 	seconds = math.floor((seconds or 0) + 0.5)
 	if seconds < 60 then
 		return seconds .. "s"
@@ -920,7 +921,7 @@ function C.Duration(seconds)
 	elseif seconds < 86400 then
 		return ("%dh %dm"):format(math.floor(seconds / 3600), math.floor(seconds / 60) % 60)
 	end
-	return ("%dd %dh"):format(math.floor(seconds / 86400), math.floor(seconds / 3600) % 24)
+	return (english and "%dd %dh" or L["%dd %dh"]):format(math.floor(seconds / 86400), math.floor(seconds / 3600) % 24)
 end
 
 -- "just now", "5 min ago", "3 h ago", "yesterday", "4 days ago" (localized; Core's).
@@ -954,7 +955,7 @@ function C.SessionLine(english)
 	end
 	if english then
 		return ("this session: %s played, %s XP, %d level(s), %d quest(s), %d killing blow(s), %d death(s), %s, %s gold.")
-			:format(C.Duration(s.played), C.Number(s.xp), s.levels, s.quests, s.kills, s.deaths, C.Distance(s.distance, true),
+			:format(C.Duration(s.played, true), C.Number(s.xp), s.levels, s.quests, s.kills, s.deaths, C.Distance(s.distance, true),
 				C.Money(s.money))
 	end
 	return L["This session: %s played, %s XP, %d quests, %d kills"]:format(C.Duration(s.played), C.Number(s.xp), s.quests, s.kills)

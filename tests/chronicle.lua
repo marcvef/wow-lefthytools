@@ -1708,3 +1708,21 @@ do
 		"as before, so does one whose build isn't known yet, or doesn't say its commit count")
 	peer.version = versionWas
 end
+
+section("Chronicle: days in German")
+do -- (clock-neutral: no Advance)
+	local C = ns.Chronicle
+	-- German writes a day as "T" (Tage): "4T 4h". Hours and minutes stay; chat lines stay English.
+	local de = {} -- (the German entries, read from Locales/deDE.lua as a German client would)
+	for _, file in ipairs(SOURCES) do
+		if file.name == "Locales/deDE.lua" then load(file.src)("LefthyTools", { LOCALE = "deDE", L = de }) end
+	end
+	local long = 4 * 86400 + 4 * 3600 + 120
+	check(C.Duration(long) == "4d 4h" and C.Duration(5400) == "1h 30m", "English: 4d 4h, 1h 30m")
+	ns.L["%dd %dh"] = de["%dd %dh"]
+	check(C.Duration(long) == "4T 4h" and C.Duration(5400) == "1h 30m" and C.Duration(150) == "2m",
+		"German: 4T 4h, hours and minutes as they are, got " .. C.Duration(long))
+	check(C.Duration(long, true) == "4d 4h" and C.ChatValue("played", long) == "4d 4h" and C.ChatValue("afk", long) == "4d 4h",
+		"chat lines (the recap, Share in LTC, /chronicle session) stay English: 4d 4h")
+	ns.L["%dd %dh"] = nil
+end

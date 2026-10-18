@@ -173,8 +173,9 @@ the open one's button greyed out:
   `UnitIsAFK("player")`; its share of the time played and a verdict: under 5% "Always there", 15%
   "Takes a break now and then", 30% "Coffee enthusiast", above "Practically Martin"; the only place
   time AFK shows). Labels and values are two font strings with the same number of lines (values
-  right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h`, distance in km, gold with
-  `GetMoneyString`.
+  right-aligned), so the columns line up. Times as `1h 12m`/`4d 4h` (`C.Duration`; a day is `T` in
+  German, `4T 4h`, through `L["%dd %dh"]`; chat lines, which stay English, ask for `d`), distance in
+  km, gold with `GetMoneyString`.
 - **Graphs** (`Graphs.lua`, yours: `C.Totals()`): cards on the scroll content. Last 14 days (bars
   per day from the added-up `daily`, buttons switch between time, XP, quests, killing blows and time
   AFK; today in gold; hover shows the date and value), This session (the session curve: a line with

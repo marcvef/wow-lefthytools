@@ -161,7 +161,7 @@ local LABEL_CHAT = { played = "time played", xp = "XP", quests = "quests", kills
 -- A value as chat text (English).
 function C.ChatValue(metric, value)
 	if metric == "played" or metric == "afk" then
-		return C.Duration(value)
+		return C.Duration(value, true)
 	elseif metric == "dist" then
 		return C.Distance(value, true)
 	end
