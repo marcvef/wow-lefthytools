@@ -426,6 +426,10 @@ end
 ---------------------------------------------------------------------------
 
 LT.FIRST_RELEASE_BUILD = 70532 -- the release's first build (1.60.1.70532)
+-- Forever's launch day, UTC ("YYYY-MM-DD"; nil until it's known). A friend on an older LefthyTools
+-- that didn't start fresh can still pass on the beta's journals: on the release Chronicle leaves out
+-- what's dated before it (LT.BeforeLaunch).
+LT.LAUNCH_DAY = nil
 
 -- The client's own answers: true on a beta, test or PTR client (Blizzard's code asks IsTestBuild).
 local CLIENT_CHECKS = { "IsBetaBuild", "IsTestBuild", "IsPublicTestClient" }
@@ -449,6 +453,37 @@ function LT.WhichWorld()
 		return "release"
 	end
 	return nil
+end
+
+-- The launch day's first second (UTC) as a time(), worked out once; nil if LT.LAUNCH_DAY isn't a date.
+local launch = {}
+local function LaunchTime()
+	if launch.day ~= LT.LAUNCH_DAY then
+		local y, m, d = tostring(LT.LAUNCH_DAY):match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
+		launch.day, launch.at = LT.LAUNCH_DAY, nil
+		if y then
+			-- That day's noon here: in UTC that day too, unless 12 hours or more off UTC (a day either
+			-- way, put right below). Back from it to UTC's midnight.
+			local noon = time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 })
+			local utc = date("!*t", noon)
+			local at = noon - (utc.hour * 3600 + utc.min * 60 + utc.sec)
+			local utcDay = ("%04d-%02d-%02d"):format(utc.year, utc.month, utc.day)
+			launch.at = at + (utcDay < LT.LAUNCH_DAY and 86400 or utcDay > LT.LAUNCH_DAY and -86400 or 0)
+		end
+	end
+	return launch.at
+end
+
+-- Whether something dated day ("YYYY-MM-DD", or a time()) is from before the launch day: only on the
+-- release, and only once LT.LAUNCH_DAY is set. (A friend's day is their own date, the launch day
+-- UTC's: a few hours either way.) Cheap: friends' journals ask it for every record.
+function LT.BeforeLaunch(day)
+	if LT.world ~= "release" or not LT.LAUNCH_DAY or not LaunchTime() then
+		return false
+	elseif type(day) == "number" then
+		return day < LaunchTime()
+	end
+	return type(day) == "string" and day < LT.LAUNCH_DAY
 end
 
 local SAVED = { "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB" } -- the TOC's SavedVariables

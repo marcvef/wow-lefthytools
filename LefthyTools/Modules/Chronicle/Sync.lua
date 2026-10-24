@@ -81,6 +81,10 @@ local meetAt           -- the next walk over Battle.net's friends online (Meet)
 -- (Characters.lua: accounts, names, matching)
 local Friends, IsFriend, FirstName, HasSurname, ValidGuid = C.FriendAccounts, C.IsFriend, C.FirstName, C.HasSurname, C.ValidGuid
 local Changed = C.NewsChanged -- (friends' news or names changed)
+-- Dated before Forever's launch, on the release (Core.lua): the beta's, passed on by a friend on an
+-- older LefthyTools that didn't start fresh. Left out where records come in and pruned from the book;
+-- older builds send as before, only what I take changes.
+local BeforeLaunch = LT.BeforeLaunch
 
 ---------------------------------------------------------------------------
 -- Publishing my journal: stamps
@@ -510,13 +514,16 @@ end
 local function Prune(c)
 	local oldestDay, oldestT = Oldest(), C.DayAgo(DAYS_KEPT)
 	for day in pairs(c.days) do
-		if day < oldestDay then
+		if day < oldestDay or BeforeLaunch(day) then
 			c.days[day] = nil
 		end
 	end
+	if c.profile and BeforeLaunch(c.last or 0) then
+		c.profile = nil -- (not played since the launch: the beta's numbers)
+	end
 	local list = {}
 	for n, e in pairs(c.news) do
-		if e.t < oldestT then
+		if e.t < oldestT or BeforeLaunch(e.t) then
 			c.news[n] = nil
 		else
 			list[#list + 1] = n
@@ -654,7 +661,8 @@ local function Store(id, word, more, now)
 	local changed, newNews = false, false
 	if word == "p" and #f == 9 then
 		local numbers = Numbers(f[7], #PROFILE_FIELDS)
-		local c = numbers and Book(acct, key)
+		-- (last played before the launch: a character of the beta's)
+		local c = numbers and not BeforeLaunch(tonumber(f[6]:match("^%d+$") or "") or 0) and Book(acct, key)
 		if c and u > (c.u or 0) then
 			-- (a level has three digits at most, last played is a time())
 			c.u, c.classFile, c.level, c.last = u, f[4]:match("^%u+$"), tonumber(f[5]:match("^%d%d?%d?$") or ""),
@@ -670,7 +678,7 @@ local function Store(id, word, more, now)
 		local y, mo, d = f[4]:match("^(%d%d%d%d)(%d%d)(%d%d)$")
 		local numbers = y and DayNumbers(f[5])
 		local day = y and (y .. "-" .. mo .. "-" .. d)
-		if numbers and day >= Oldest() and day <= date("%Y-%m-%d", C.DayAgo(-1)) then
+		if numbers and day >= Oldest() and day <= date("%Y-%m-%d", C.DayAgo(-1)) and not BeforeLaunch(day) then
 			local c = Book(acct, key)
 			local old = c.days[day]
 			if not old or u > (old.u or 0) then
@@ -685,7 +693,7 @@ local function Store(id, word, more, now)
 		end
 	elseif word == "n" and #f == 8 then
 		local n, t, k = f[4]:match("^%d+$") and tonumber(f[4]), f[5]:match("^%d+$") and tonumber(f[5]), f[6]
-		if n and t and SHAREABLE[k] and t >= C.DayAgo(DAYS_KEPT) and t <= time() + 86400 then
+		if n and t and SHAREABLE[k] and t >= C.DayAgo(DAYS_KEPT) and t <= time() + 86400 and not BeforeLaunch(t) then
 			local c = Book(acct, key)
 			local old = c.news[n]
 			if not old or u > (old.u or 0) then
@@ -812,7 +820,7 @@ local function PruneBook()
 		else
 			for key, c in pairs(a.chars) do
 				Prune(c)
-				if not next(c.days) and not next(c.news) and (c.last or 0) < oldest then
+				if not next(c.days) and not next(c.news) and ((c.last or 0) < oldest or BeforeLaunch(c.last or 0)) then
 					a.chars[key] = nil
 				end
 			end

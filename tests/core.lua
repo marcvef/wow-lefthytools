@@ -301,4 +301,22 @@ do -- Which client this is (LT.WhichWorld): the release starts fresh, also from 
 	check(secretBuild == nil and noBuild == nil and LT.WhichWorld() == "release", "the build secret or not there: unknown")
 	MOCK_CLIENT, MOCK_BUILD = client, "70205"
 	check(LT.WhichWorld() == "beta", "(the mock is the beta again)")
+
+	-- Friends' journals dated before the launch day (Chronicle): only on the release, once it's set.
+	local launch, was = LT.LAUNCH_DAY, LT.world
+	LT.world, LT.LAUNCH_DAY = "release", nil
+	check(not LT.BeforeLaunch("2020-01-01") and not LT.BeforeLaunch(0), "the launch day not known yet: nothing is from before it")
+	LT.LAUNCH_DAY = "2030-05-10"
+	local first = 1904601600 -- 2030-05-10 00:00:00 UTC
+	check(LT.BeforeLaunch("2030-05-09") and not LT.BeforeLaunch("2030-05-10") and not LT.BeforeLaunch("2030-05-11")
+		and LT.BeforeLaunch(first - 1) and not LT.BeforeLaunch(first) and not LT.BeforeLaunch(nil),
+		"set: a day before it, or a time before its first second (UTC), is from before the launch")
+	LT.LAUNCH_DAY = "May 10"
+	check(not LT.BeforeLaunch("2030-05-09") and not LT.BeforeLaunch(first - 1), "a launch day that isn't a date: nothing")
+	LT.LAUNCH_DAY = "2030-05-10"
+	LT.world = "beta"
+	check(not LT.BeforeLaunch("2030-05-09"), "never on the beta")
+	LT.world = nil
+	check(not LT.BeforeLaunch("2030-05-09"), "nor when it isn't known which client this is")
+	LT.world, LT.LAUNCH_DAY = was, launch
 end

@@ -199,6 +199,8 @@ end
 local function StoreFriendDay(peer, day)
 	if day.day > date("%Y-%m-%d", C.DayAgo(-1)) then
 		return -- a day after tomorrow (a wrong clock): it would never be pruned
+	elseif LT.BeforeLaunch(day.day) then
+		return -- (on the release, a day before the launch: the beta's, from a build that didn't start fresh)
 	end
 	local friends = C.Store().friendStats
 	local f = friends[peer.name] or { days = {} }
@@ -262,12 +264,17 @@ end
 
 function C.LiveEnable()
 	local store = C.Store()
-	-- Friends whose days have all run out (30 days) leave the dropdown.
+	-- Friends whose days have all run out (30 days) leave the dropdown. (On the release, days from
+	-- before the launch go first: the beta's.)
 	local oldest = date("%Y-%m-%d", C.DayAgo(FRIEND_DAYS))
 	for friendName, f in pairs(store.friendStats) do
 		local any = false
 		for day in pairs(type(f.days) == "table" and f.days or {}) do
-			any = any or day >= oldest
+			if LT.BeforeLaunch(day) then
+				f.days[day] = nil
+			else
+				any = any or day >= oldest
+			end
 		end
 		if not any then
 			store.friendStats[friendName] = nil

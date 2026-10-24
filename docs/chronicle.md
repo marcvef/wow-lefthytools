@@ -288,7 +288,8 @@ every friend 7 days again, journal or not.) Both
 go through Beacon's low-priority queue (`B.QueueLow`): sent only when no message, state or answer
 waits, so they never delay live data. Beacon accepts up to 30 day messages per friend per minute
 and checks the ranges (minutes at most 1440); Chronicle keeps 30 days per friend in
-`store.friendStats`. Covered by the "Share highlights with friends" setting.
+`store.friendStats` (on the release none from before its launch day, like the journals' below;
+ones kept from before go on start). Covered by the "Share highlights with friends" setting.
 
 ## Friends' journals, also when they're offline (Sync.lua)
 
@@ -355,7 +356,13 @@ the count said (else it's asked again on the next offer) and its stamp is plausi
 week ahead). Records are checked (fields, sizes, kinds, 30 days, not tomorrow; numbers of at most 10
 digits, a level of at most 3, a day's minutes played or AFK at most 1440; a character key without
 escape codes or control characters, `ValidKey`: pages show it as a name) and kept only for my
-friends' accounts, newer stamps replacing older. Requests are queued
+friends' accounts, newer stamps replacing older. On WoW: Forever's release, once its launch day is
+known (`LT.LAUNCH_DAY`, `LT.BeforeLaunch`: architecture.md, The beta and the release), what's dated
+before it is the beta's: a friend on an older build that kept the beta's saved data passes it on
+(theirs sends as before; only what I take changes). Left out: days before it, highlights before it
+and a profile last played before it (a character played only then isn't taken at all); kept from
+before (an earlier build): it goes when Chronicle starts (`Prune`), and a character left with
+nothing goes with the book's pruning. Requests are queued
 (`serves`, at most 50, a repeat replaces the waiting one) and answered on the tick, two per
 second, never inside the event. Everything is offered again every 5 minutes (`FULL_OFFER`: an
 offer missed or an answer cut short). `relay` off: I don't pass on what I hold of others (a

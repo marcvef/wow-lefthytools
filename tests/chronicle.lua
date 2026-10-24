@@ -1,5 +1,5 @@
--- Chronicle: recording, friends, the window, friends' journals, surnames, and its tick calling the
--- other files' hooks.
+-- Chronicle: recording, friends, the window, friends' journals, surnames, its tick calling the
+-- other files' hooks, and the beta's journals left out on the release.
 -- Needs: beacon.lua: Chronicle kept what happened there (my level-ups to 21, Anna's and Bob's
 -- deaths and level-ups), and its pages, symbols and catch-up lines count on it.
 local suite = ...
@@ -1825,4 +1825,65 @@ do
 	scratch:Hover(0, 0, 10, 10, { "Four" })
 	scratch:Done()
 	check(not TOOLTIP.shown, "nothing under the mouse any more: the tooltip closes")
+end
+
+section("Chronicle: the beta's journals on the release")
+do -- (clock-neutral: no Advance) A friend on an older LefthyTools who copied the beta's saved data
+	-- to the release (it didn't start fresh) still passes on the beta's journals, and sends the beta's
+	-- days the old way. On the release, once Forever's launch day is set (LT.LAUNCH_DAY), what's dated
+	-- before it is left out; they send as before.
+	local C = ns.Chronicle
+	local carl = C.Hash("Carl#3456")
+	local function fromAnna(word, more) ns.Beacon.ReceiveJournal(11, word, more) end -- (past Beacon's spam guard)
+	local function day(back) return date("%Y-%m-%d", C.DayAgo(back)) end
+	local profile, numbers = "600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000", "30,300,5,20,1,1,0,9,1,1000,0,0,0,10"
+	-- A character's journal from Anna: its profile (last played back days ago), that day and a level-up then.
+	local function journal(key, u, back)
+		fromAnna("p", carl .. ";" .. key .. ";" .. u .. ";ROGUE;9;" .. C.DayAgo(back) .. ";" .. profile .. ";;")
+		fromAnna("d", carl .. ";" .. key .. ";" .. (u + 1) .. ";" .. day(back):gsub("-", "") .. ";" .. numbers)
+		fromAnna("n", carl .. ";" .. key .. ";" .. (u + 2) .. ";1;" .. C.DayAgo(back) .. ";level;9;Westfall")
+		return CDB.book[carl].chars[key]
+	end
+	local function whole(c) return c and c.profile and next(c.days) and c.news[1] and true end
+	local function listed(name)
+		for _, item in ipairs(C.Characters()) do if item.name == name then return true end end
+		return false
+	end
+	local function oldDay(back) ns.Beacon.Notify("daily", peers()[11], { day = day(back), played = 600, xp = 100, quests = 1, kills = 2, deaths = 0, levels = 0 }) end
+	anna("H2")
+	check(peers()[11], "(Anna is here)")
+	local world, launch = LT.world, LT.LAUNCH_DAY
+	LT.world, LT.LAUNCH_DAY = "release", nil
+	local before = journal("Carlbeta-Realmy", 9900, 5)
+	check(whole(before), "the launch day not known yet: kept, as before")
+	LT.world, LT.LAUNCH_DAY = "beta", day(3)
+	check(whole(journal("Carlbetb-Realmy", 9910, 5)), "on the beta: kept, whatever its date")
+
+	LT.world = "release"
+	check(not journal("Carlbetc-Realmy", 9920, 5) and not listed("Carlbetc"),
+		"on the release, the launch day set: a character played only before it isn't taken")
+	local new = journal("Carlnew-Realmy", 9930, 1)
+	fromAnna("d", carl .. ";Carlnew-Realmy;9933;" .. day(4):gsub("-", "") .. ";" .. numbers) -- (an older day of it)
+	fromAnna("n", carl .. ";Carlnew-Realmy;9934;2;" .. C.DayAgo(4) .. ";boss;Hogger;Elwynn Forest")
+	fromAnna("n", carl .. ";Carlnew-Realmy;9935;3;" .. C.DayAgo(3) .. ";boss;Hogger;Elwynn Forest")
+	check(whole(new) and new.days[day(1)] and not new.days[day(4)] and not new.news[2] and new.news[3] and listed("Carlnew"),
+		"one played since: its days and highlights from the launch day on, nothing before")
+	local annaDays = CDB.friendStats["Anna Brook"].days
+	local annaYesterday = annaDays[day(1)]
+	oldDay(5)
+	oldDay(1)
+	check(not annaDays[day(5)] and annaDays[day(1)] and annaDays[day(1)].kills == 2, "an older build's days: the same")
+
+	-- Kept before the day was set (an earlier build): it goes when Chronicle starts.
+	annaDays[day(5)] = { played = 600 }
+	lefthy("disable chronicle")
+	lefthy("enable chronicle")
+	check(not before.profile and not next(before.days) and not next(before.news) and not listed("Carlbeta")
+		and not annaDays[day(5)] and annaDays[day(1)] and whole(new), "kept from before: what's dated before the launch goes on start")
+
+	LT.world, LT.LAUNCH_DAY = world, launch
+	local chars = CDB.book[carl].chars
+	chars["Carlbeta-Realmy"], chars["Carlbetb-Realmy"], chars["Carlnew-Realmy"] = nil, nil, nil
+	annaDays[day(1)] = annaYesterday
+	C.NewsChanged()
 end

@@ -282,6 +282,14 @@ touched. Not verified in game yet: what the beta answers (`/dump IsBetaBuild(), 
 IsPublicTestClient()`). If it answered false to all three, a beta build from 70532 on would count
 as the release.
 
+**Friends' data:** a friend on an older LefthyTools (without this) who copied the beta's saved data
+still passes the beta's journals on through Chronicle's sync. `LT.LAUNCH_DAY` is Forever's launch
+day, UTC (`"YYYY-MM-DD"`; nil until it's known, and then nothing changes): on the release
+`LT.BeforeLaunch(day or time)` says what's dated before it, and Chronicle leaves that out of
+friends' journals and old-style days (chronicle.md). Only what we take changes; nothing new goes
+over the network, older builds send as before. A time is compared with the launch day's first
+second (UTC), worked out once, so it's cheap for every record.
+
 ## Module framework (Core/)
 
 - A module is `LT:NewModule(key, { title, description, defaults, defaultEnabled })` plus any of
