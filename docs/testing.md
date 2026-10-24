@@ -12,8 +12,9 @@
    prints the value to set after adding or removing a file), and that `Update-LefthyTools.cmd`
    is the current build of `install.ps1` (`npm run build-installer` regenerates it);
 4. runs the addon in fengari (Lua 5.3) against `tests/mock.lua`, which fakes the WoW API: once as
-   an English client (the files below) and once as German (`tests/test_de.lua`, which also fails
-   on formal terms, translated module names and runtime translation fallbacks).
+   an English client (the files below), once as German (`tests/test_de.lua`, which also fails
+   on formal terms, translated module names and runtime translation fallbacks) and once for
+   WoW: Forever's release (`tests/release.lua`, below).
 
 The mock runs OnUpdate only on visible frames, like the game, and animation groups with
 `SetToFinalAlpha(true)` jump to their end state on `Play()`. It does not replace testing in game.
@@ -30,7 +31,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 
 | File | What it tests | Needs before it |
 |---|---|---|
-| `core.lua` | version, module framework, error catcher, Core's helpers, map art | (runs first) |
+| `core.lua` | version, module framework, error catcher, Core's helpers, map art, which client (beta or release) | (runs first) |
 | `mirage.lua` | the idle fade, reveals, controller UI, minimap quest areas, settings, Mirage off | - |
 | `tweaks.lua` | Misc Tweaks: AFK screen, bags, quest progress, combo points, retail frames, new quests, quests on maps, aggro tags | - |
 | `beacon.lua` | Beacon: maps, sharing, updates, alerts, pings, level-ups, items, LTC, reports, switching off | - |
@@ -48,12 +49,22 @@ follows from where Beacon's 0.5 s looks fall), `chronicle.lua` counts what Chron
 `beacon.lua` (my level-ups, Anna's and Bob's deaths and level-ups), and `mirage.lua` watches the
 fade that begins at login, so no file that lets time pass may run before it.
 
+### The release suite
+
+The mock is the beta, like the game today (`MOCK_CLIENT`), so the English and German suites load
+the addon on the beta. `tests/release.lua` runs in a Lua state of its own and starts the game
+itself, several times (`MockReload()`, then the addon loaded again with the saved variables as
+they are): a copy of the beta's saved data on the release (all three tables new, settings back to
+their defaults, one chat line, what's new as on a first install), `/reload`s after it (nothing
+goes), one table copied again alone, a new install, the beta and an unknown client (nothing goes),
+and the beta's data back on the release.
+
 ### One module's tests
 
 `npm test -- stream` runs steps 1-3, then helpers.lua, `stream.lua` and what its Needs line names
 (`beacon.lua`), in the suite's order, and the last checks. Several names add up
-(`npm test -- chronicle levelup`); `german` is the German suite (`npm test -- german`). Without
-names everything runs. Alone a file takes seconds (`beacon.lua` and `chronicle.lua` the longest);
+(`npm test -- chronicle levelup`); `german` is the German suite (`npm test -- german`), `release`
+the release's. Without names everything runs. Alone a file takes seconds (`beacon.lua` and `chronicle.lua` the longest);
 the whole suite takes longer than its files added up, since each `Advance` step goes over every
 frame made so far.
 
@@ -86,6 +97,11 @@ handler meanwhile).
 From the mock (globals):
 - `Fire(event, ...)`; `Advance(seconds)` moves the clock in 1/60 s steps (timers, then each
   visible frame's OnUpdate).
+- Which client: `MOCK_CLIENT` (`beta`, `test`, `ptr`: what `IsBetaBuild`, `IsTestBuild` and
+  `IsPublicTestClient` answer; the beta by default) and `MOCK_BUILD` (`GetBuildInfo`'s build).
+  `MockReload()`: a `/reload` for a suite that loads the addon itself (`release.lua`): the frames
+  loaded so far get no more events or updates, timers and the settings panel are cleared, the
+  saved variables stay.
 - `EnterCombat()` / `LeaveCombat()`: a fight the game's way. `PLAYER_REGEN_DISABLED` comes with
   `UnitAffectingCombat` already true but `InCombatLockdown()` still false (the lockdown begins
   after that event; `Fire` keeps it so for anyone firing it); `PLAYER_REGEN_ENABLED` after the
@@ -310,3 +326,12 @@ installer from GitHub instead.
     the minimap gets a blue dot for news; the News tab shows how many. Friends: a row per friend
     online (where, doing) and per character not online (none of a friend who's online); a click on
     a row opens their graphs. First login of a week: last week's leaderboard in chat.
+16. The beta or the release (architecture.md). On the beta: `/dump IsBetaBuild(), IsTestBuild(),
+    IsPublicTestClient()` (note the answers: at least one should be true) and
+    `/dump LefthyTools.world` says "beta"; settings, journal and Bestiary are all still there
+    after a `/reload` and a restart, and no chat line about the beta comes. On the release:
+    `/dump select(2, GetBuildInfo())` is 70532 or later, the three questions answer false and
+    `LefthyTools.world` is "release". A new install: no chat line. With the beta's `WTF` folder
+    copied over: one line "LefthyTools: data from the beta was reset; WoW: Forever starts fresh.",
+    Mirage off, every setting its default, an empty journal and Bestiary, no what's-new window;
+    then `/reload` and a restart: no line, and what you set since stays.

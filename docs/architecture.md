@@ -15,7 +15,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
                              LEFTHYTOOLS_CHRONICLE_TOGGLE
   Core/Locale.lua            ns.L localization table (English keys, falls back to English)
   Locales/deDE.lua           German settings texts (loaded only on a deDE client)
-  Core/Core.lua              module registry, saved settings, enable/disable lifecycle, versions,
+  Core/Core.lua              module registry, saved settings, enable/disable lifecycle, versions, the
+                             beta or the release (the beta's saved data goes on the release),
                              shared helpers (secret values, combat, text, names, your own loot)
   Core/Window.lua            small movable windows (ButtonFrameTemplate): text, copy box, buttons,
                              our own popup list and dropdown (PopupList, AddPicker), minimap
@@ -251,6 +252,36 @@ without a version (made after the last tag) come first, under the installed buil
 changes", `/lefthy news` and the overview's What's new button show the whole list. **Add an
 entry, in English and German, with every change players notice.**
 
+## The beta and the release (Core/Core.lua)
+
+WoW: Forever's release is an install of its own (`_forever_`, product `wowf`) beside the beta's
+(`_classic_beta_`), and saved variables live per install (`WTF`), so LefthyTools starts empty there.
+A player can still copy the beta's `WTF` folder over; the release starts fresh all the same (the
+user: "any data from the beta should not be used. even if people copy the WTF folder"). At
+`ADDON_LOADED`, first of all (before `LT.onLoad` and the modules read anything):
+
+1. **Which client** (`LT.WhichWorld()`, the one rule, kept in `LT.world`): `"beta"` when
+   `IsBetaBuild()`, `IsTestBuild()` or `IsPublicTestClient()` answers true (Blizzard's own code asks
+   `IsTestBuild()`); `"release"` when all three answer false and the build (`GetBuildInfo`) is
+   `LT.FIRST_RELEASE_BUILD` (70532, the release's first) or later; unknown (nil) otherwise: an
+   answer missing, broken or secret, or a client that says it's none of them on an older build (a
+   beta that doesn't say so).
+2. **On the release** each of the three saved tables whose `world` isn't `"release"` (the beta's,
+   or none: written before the stamps, so on the beta) is dropped, as if LefthyTools had never been
+   installed: every module's defaults, a new journal and Bestiary, no errors, and `LT.freshInstall`
+   (what's new counts everything as seen). Each table on its own: a copy of only one of them
+   replaces only that one. At `PLAYER_LOGIN` one chat line says so ("LefthyTools: data from the
+   beta was reset; WoW: Forever starts fresh.").
+3. **Then every table gets its `world`**, where it's written; one that isn't there yet is made now
+   (a table a module makes later would carry none, and count as the beta's at the next load). So
+   the release resets once: what it wrote says `"release"` and stays for good. On the beta nothing
+   goes and the tables say `"beta"`. Unknown: nothing changes, no table is stamped.
+
+Only our own saved variables: nothing else of the game's (its settings, other addons' data) is
+touched. Not verified in game yet: what the beta answers (`/dump IsBetaBuild(), IsTestBuild(),
+IsPublicTestClient()`). If it answered false to all three, a beta build from 70532 on would count
+as the release.
+
 ## Module framework (Core/)
 
 - A module is `LT:NewModule(key, { title, description, defaults, defaultEnabled })` plus any of
@@ -265,7 +296,9 @@ entry, in English and German, with every change players notice.**
 - **Saved variables:** `LefthyToolsDB = { modules = { <key> = bool }, settings = { <key> = {...} } }`,
   plus Core's `errors` and `changelogSeen` and a few top-level keys of modules' own (data, not
   settings); Chronicle and Bestiary keep their data in `LefthyToolsChronicleDB` and
-  `LefthyToolsBestiaryDB`. Core parts that aren't modules get the table through `LT.onLoad`.
+  `LefthyToolsBestiaryDB`. Each of the three says where it was written (`world`: `"beta"` or
+  `"release"`; the release drops the beta's, see The beta and the release). Core parts that aren't
+  modules get the table through `LT.onLoad`.
   Defaults are merged on load; `defaultEnabled` only applies when no on/off choice is saved
   (Mirage defaults to off, the others to on). `LT:ResetModuleSettings(m)` resets in place,
   keeping the same tables, because the settings panel holds references to them.

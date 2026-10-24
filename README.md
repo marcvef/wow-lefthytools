@@ -73,6 +73,11 @@ irm https://raw.githubusercontent.com/marcvef/wow-lefthytools/main/install.ps1 |
 **Versions** look like `0.4.0` (a release) or `0.4.0-3-g1a2b3c4`: three changes after 0.4.0,
 at commit `1a2b3c4`.
 
+**From the beta to the release.** WoW: Forever's release gets a folder of its own, and LefthyTools
+starts fresh there. Even if you copy the beta's `WTF` folder over, LefthyTools resets its own saved
+data once (its settings, the Chronicle journal and the Bestiary; nothing else of the game's) and
+says so in chat. Your data on the beta stays as it is.
+
 ### From a clone of this repo
 
 ```powershell

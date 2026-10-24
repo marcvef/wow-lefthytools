@@ -1,4 +1,5 @@
--- Core: the version, the module framework, the error catcher, Core's shared helpers and map art.
+-- Core: the version, the module framework, the error catcher, Core's shared helpers, map art, and
+-- which client this is (the beta or the release).
 -- Needs: no other file. It runs first: its framework checks see the modules as login left them
 -- (Mirage off) and switch Mirage on; hardly any time passes in it (see mirage.lua).
 local suite = ...
@@ -263,4 +264,41 @@ do -- The world map's art of a zone and what you've explored of it, laid into a 
 	Fire("MAP_EXPLORATION_UPDATED")
 	check(not MapArt.Stale(map) and #ERRORS == errorsWere, "no art: never stale; no errors")
 	C_Map.GetMapArtLayers = layers
+end
+
+section("the beta or the release")
+do -- Which client this is (LT.WhichWorld): the release starts fresh, also from a copy of the beta's
+	-- saved variables (release.lua loads the addon on each). No time passes here.
+	check(LT.world == "beta" and not LT.betaForgotten and LefthyToolsDB.world == "beta" and LefthyToolsChronicleDB.world == "beta"
+		and LefthyToolsBestiaryDB.world == "beta", "the mock is the beta: every saved table says so, nothing reset")
+	local client, ptr, buildInfo = MOCK_CLIENT, IsPublicTestClient, GetBuildInfo
+	local function world(beta, test, pt, build)
+		MOCK_CLIENT, MOCK_BUILD = { beta = beta, test = test, ptr = pt }, build or "70532"
+		return LT.WhichWorld()
+	end
+	check(world(true, true, false) == "beta" and world(true, false, false) == "beta" and world(false, true, false) == "beta"
+		and world(false, false, true) == "beta" and world(true, false, false, "70600") == "beta",
+		"the beta: the client says it's a beta, test or PTR build (whatever its build)")
+	check(world(false, false, false) == "release" and world(false, false, false, "70533") == "release" and world(false, false, false, "71000") == "release",
+		"the release: none of them, on the release's first build (70532) or later")
+	check(world(false, false, false, "70531") == nil and world(false, false, false, "70450") == nil,
+		"none of them on a build before the release's (a beta that doesn't say so): unknown")
+	check(world(SECRET, false, false) == nil and world(false, SECRET, false) == nil and world(false, false, nil) == nil
+		and world(false, "no", false) == nil, "an answer secret, missing or not a yes or no: unknown")
+	world(false, false, false)
+	IsPublicTestClient = nil
+	local missing = LT.WhichWorld()
+	IsPublicTestClient = function() error("broken") end
+	local errorsWere = #ERRORS
+	local broken = LT.WhichWorld()
+	IsPublicTestClient = ptr
+	check(missing == nil and broken == nil and #ERRORS == errorsWere, "a question the client doesn't have, or that fails: unknown (quietly)")
+	GetBuildInfo = function() return "1.60.1", SECRET end
+	local secretBuild = LT.WhichWorld()
+	GetBuildInfo = nil
+	local noBuild = LT.WhichWorld()
+	GetBuildInfo = buildInfo
+	check(secretBuild == nil and noBuild == nil and LT.WhichWorld() == "release", "the build secret or not there: unknown")
+	MOCK_CLIENT, MOCK_BUILD = client, "70205"
+	check(LT.WhichWorld() == "beta", "(the mock is the beta again)")
 end

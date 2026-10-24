@@ -451,7 +451,15 @@ function ButtonFrameTemplate_HidePortrait(f) f._noPortrait = true end
 MOCK_EPOCH = os.time({ year = 2030, month = 5, day = 15, hour = 12, min = 0, sec = 0 })
 function time(t) if t then return os.time(t) end return MOCK_EPOCH + math.floor(now) end
 function date(fmt, t) return os.date(fmt, t or time()) end
-function GetBuildInfo() return "1.60.1", "70205", "Jan 1 2030", 16001 end
+-- Which client this is (Core's LT.WhichWorld): the beta, like the game today. MOCK_CLIENT's beta,
+-- test and ptr are what IsBetaBuild, IsTestBuild and IsPublicTestClient answer, MOCK_BUILD
+-- GetBuildInfo's build (the release's first is 70532).
+MOCK_CLIENT = { beta = true, test = true, ptr = false }
+MOCK_BUILD = "70205"
+function IsBetaBuild() return MOCK_CLIENT.beta end
+function IsTestBuild() return MOCK_CLIENT.test end
+function IsPublicTestClient() return MOCK_CLIENT.ptr end
+function GetBuildInfo() return "1.60.1", MOCK_BUILD, "Jan 1 2030", 16001 end
 function debugstack() return debug.traceback("", 2) end
 
 -- Blizzard_ScriptErrorsFrame: every Lua error reaches DisplayMessageInternal (also with the error
@@ -1867,3 +1875,19 @@ EXPLORED = {
 	},
 }
 C_MapExplorationInfo = { GetExploredMapTextures = function(mapID) return EXPLORED[mapID] end }
+
+-- A /reload (or the game started again), for a suite that loads the addon itself (release.lua): the
+-- interface loaded so far goes (its frames get no more events or updates, its timers don't run, the
+-- settings panel is empty again; what it hooked stays hooked, the mock can't take that back) and the
+-- saved variables stay as they are (the game writes them out and reads them back in). Then the suite
+-- loads the addon again.
+local mockFrames = #allFrames -- (the mock's own)
+function MockReload()
+	wipe(eventFrames)
+	wipe(timers)
+	for i = #allFrames, mockFrames + 1, -1 do allFrames[i] = nil end
+	for _, list in ipairs({ REGISTERED_SETTINGS, CATEGORIES, LAYOUTS, ADDON_CATEGORIES, TEXT_INPUTS, DROPDOWNS, CHECKBOX_SLIDERS,
+			SETTINGS_BUTTONS, HEADERS }) do
+		wipe(list)
+	end
+end

@@ -417,6 +417,68 @@ function LT:SetModuleSetting(m, id, value, tbl, key)
 end
 
 ---------------------------------------------------------------------------
+-- The beta or the release. WoW: Forever's release is an install of its own (_forever_, beside the
+-- beta's _classic_beta_), with saved variables of its own, so LefthyTools starts empty there, unless
+-- a player copies the beta's WTF folder over. The release starts fresh all the same (the user: "any
+-- data from the beta should not be used. even if people copy the WTF folder"): each saved table says
+-- where it was written (its world), and on the release one the beta wrote is replaced by a new one,
+-- as on a first install. Only our own saved variables; nothing else of the game's is touched.
+---------------------------------------------------------------------------
+
+LT.FIRST_RELEASE_BUILD = 70532 -- the release's first build (1.60.1.70532)
+
+-- The client's own answers: true on a beta, test or PTR client (Blizzard's code asks IsTestBuild).
+local CLIENT_CHECKS = { "IsBetaBuild", "IsTestBuild", "IsPublicTestClient" }
+
+-- Which client this is, the one rule for it: "beta" when any of CLIENT_CHECKS answers true;
+-- "release" when all of them answer false and the build is the release's first or later; nil
+-- (unknown) otherwise: an answer missing, broken or secret, or a client that calls itself none of
+-- them on a build before the release's (a beta that doesn't say so). Unknown changes nothing.
+function LT.WhichWorld()
+	local none = true
+	for _, name in ipairs(CLIENT_CHECKS) do
+		local answer = LT.Value(_G[name])
+		if answer == true then
+			return "beta"
+		end
+		none = none and answer == false
+	end
+	local ok, _, build = pcall(GetBuildInfo)
+	build = ok and LT.Readable(build) and tonumber(build)
+	if none and build and build >= LT.FIRST_RELEASE_BUILD then
+		return "release"
+	end
+	return nil
+end
+
+local SAVED = { "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB" } -- the TOC's SavedVariables
+
+-- At load, before anything reads them. On the release, each table the beta wrote goes (one that says
+-- so, or says nothing: written before the stamps, so on the beta), as if LefthyTools had never been
+-- installed; true if one went. What the release wrote says so, and stays for good.
+local function ForgetTheBeta(world)
+	local forgot = false
+	for _, name in ipairs(SAVED) do
+		if world == "release" and type(_G[name]) == "table" and _G[name].world ~= "release" then
+			_G[name], forgot = nil, true
+		end
+	end
+	return forgot
+end
+
+-- Then every table says where it's written: made now if it isn't there yet (one a module makes later
+-- would say nothing, and count as the beta's next time). Unknown: nothing changes.
+local function Stamp(world)
+	if not world then
+		return
+	end
+	for _, name in ipairs(SAVED) do
+		_G[name] = type(_G[name]) == "table" and _G[name] or {}
+		_G[name].world = world
+	end
+end
+
+---------------------------------------------------------------------------
 -- Enable / disable
 ---------------------------------------------------------------------------
 
@@ -473,8 +535,12 @@ events:RegisterEvent("PLAYER_LOGIN")
 events:SetScript("OnEvent", function(self, event, arg)
 	if event == "ADDON_LOADED" and arg == ADDON then
 		self:UnregisterEvent("ADDON_LOADED") -- (every add-on loaded later would fire it here too)
-		LT.freshInstall = type(LefthyToolsDB) ~= "table" -- no saved settings yet: a new install
+		-- First of all, before anything reads the saved variables: the beta's go on the release.
+		LT.world = LT.WhichWorld()
+		LT.betaForgotten = ForgetTheBeta(LT.world)
+		LT.freshInstall = type(LefthyToolsDB) ~= "table" -- no saved settings yet: a new install (or the beta's went)
 		LefthyToolsDB = type(LefthyToolsDB) == "table" and LefthyToolsDB or {}
+		Stamp(LT.world)
 		local db = LefthyToolsDB
 		db.modules = type(db.modules) == "table" and db.modules or {}
 		db.settings = type(db.settings) == "table" and db.settings or {}
@@ -495,6 +561,9 @@ events:SetScript("OnEvent", function(self, event, arg)
 	elseif event == "PLAYER_LOGIN" then
 		self:UnregisterEvent("PLAYER_LOGIN")
 		loggedIn = true
+		if LT.betaForgotten then -- (now that the chat is there)
+			LT.Print("data from the beta was reset; WoW: Forever starts fresh.")
+		end
 		RunAll(LT.onLogin)
 		for _, m in ipairs(LT.modules) do
 			if LT.db.modules[m.key] then

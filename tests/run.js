@@ -2,7 +2,8 @@
 // Files are loaded in the order the TOC lists them, like the game client does.
 // `npm test` runs everything. Names run a part of the behavioural tests (3): `npm test -- stream`
 // runs tests/stream.lua and the files it needs (its "-- Needs:" line, and theirs) in the suite's
-// order; several names add up, and "german" is the German suite. A folder is the add-on to test.
+// order; several names add up, "german" is the German suite and "release" the release's (the beta's
+// saved data going). A folder is the add-on to test.
 const fs = require("fs");
 const path = require("path");
 const { lua, lauxlib, lualib, to_luastring } = require("fengari");
@@ -91,7 +92,7 @@ const ENGLISH = ["core.lua", "mirage.lua", "tweaks.lua", "beacon.lua", "stream.l
 
 // Every test file is in the list, and says at its top which files it needs before it (they run
 // earlier): "-- Needs: beacon.lua, ..." or "-- Needs: no other file."
-const NOT_LISTED = ["mock.lua", "helpers.lua", "test_de.lua"];
+const NOT_LISTED = ["mock.lua", "helpers.lua", "test_de.lua", "release.lua"];
 const needs = {};
 for (const f of fs.readdirSync(__dirname).filter((f) => f.endsWith(".lua") && !NOT_LISTED.includes(f))) {
   if (!ENGLISH.includes(f)) {
@@ -111,7 +112,8 @@ for (const f of ENGLISH) {
 }
 
 // What to run: everything, or the files named and what they need.
-const known = ENGLISH.map((f) => f.replace(/\.lua$/, "")).concat("german");
+const SUITES = ["german", "release"]; // suites of their own (a Lua state each), named like a file
+const known = ENGLISH.map((f) => f.replace(/\.lua$/, "")).concat(SUITES);
 const unknown = names.filter((n) => !known.includes(n));
 if (unknown.length) {
   console.log(`No test file ${unknown.join(", ")}; there are: ${known.join(", ")}`);
@@ -119,9 +121,10 @@ if (unknown.length) {
 }
 const picked = new Set();
 const pick = (f) => { if (!picked.has(f)) { picked.add(f); needs[f].forEach(pick); } };
-names.filter((n) => n !== "german").forEach((n) => pick(n + ".lua"));
+names.filter((n) => !SUITES.includes(n)).forEach((n) => pick(n + ".lua"));
 const english = names.length ? ENGLISH.filter((f) => picked.has(f)) : ENGLISH;
 const german = !names.length || names.includes("german");
+const release = !names.length || names.includes("release");
 
 function newState() {
   const L = lauxlib.luaL_newstate();
@@ -169,4 +172,11 @@ if (german) {
   const L = newState();
   run(L, "mock.lua");
   run(L, "test_de.lua");
+}
+
+// The release: the beta's saved data going (release.lua starts the game itself, several times)
+if (release) {
+  const L = newState();
+  run(L, "mock.lua");
+  run(L, "release.lua");
 }
