@@ -776,9 +776,9 @@ the picture already holds, one action after another like turns (about half a sec
   wago.tools): every spell of the class skill lines (no pets, mounts, runes; Season of Discovery IDs
   left out), all ranks, physical ones not listed; several schools: the first in the game's order
   (holy, fire, nature, frost, shadow, arcane: Frostfire Bolt is fire); consecutive IDs as `{ first,
-  last }` (1306 spells, 8 KB, from 1.60.1.70450). Turned into `[spell ID] = school` the first time a
-  spell is looked at (`S.SpellSchool`, when an action starts; nothing per frame). The preview casts
-  Fireballs and a Frostbolt and a Fire Blast now and then.
+  last }` (1306 spells, 8 KB, from 1.60.1.70532, the release build). Turned into `[spell ID] =
+  school` the first time a spell is looked at (`S.SpellSchool`, when an action starts; nothing per
+  frame). The preview casts Fireballs and a Frostbolt and a Fire Blast now and then.
 - **Polymorph** (picked by the user: "polymorphed mobs as sheep in the battle row"): their own
   Polymorph that went off at their target (the cast, or new in their last spells when the cast
   wasn't seen; a mob's debuffs aren't read, nothing more goes over the network; only a foe that is
