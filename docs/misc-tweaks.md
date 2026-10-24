@@ -237,8 +237,8 @@ Switched on (`ns.ApplyRetailFrames`):
 
   Both get the same marker; the tooltip line tells them apart ("New in WoW: Forever" or "Not in
   the original Classic"). `ns.IsForeverQuest` is the first list only (Chronicle counts those).
-  Forever builds are listed under a beta product on wago.tools (version 1.60.x); the script picks
-  the newest one. Regenerate the lists when Forever gets new builds. Stored as comma-separated IDs
+  Forever builds are listed under the release product `wowf` on wago.tools and, as version 1.60.x,
+  under the beta's `wow_classic_beta`; the script picks the newest one. Regenerate the lists when Forever gets new builds. Stored as comma-separated IDs
   and ranges, parsed on first use. Caveat: quests without a completion bit aren't in `QuestV2`, so
   a few new quests may be missing.
 - **Marker:** a coloured `NEW_CAPS` ("NEW", "NEU" on German clients) right after the quest's name,

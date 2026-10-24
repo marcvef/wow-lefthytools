@@ -27,11 +27,14 @@ function parseCsv(text) {
   return rows.filter((r) => r.length === head.length).map((r) => Object.fromEntries(head.map((h, i) => [h, r[i]])));
 }
 
-// The latest WoW: Forever build on wago.tools ("1.60.1.70450"), undefined if there's none.
+// The latest WoW: Forever build on wago.tools ("1.60.1.70532"), undefined if there's none.
 async function latestBuild() {
   const builds = await (await fetch("https://wago.tools/api/builds")).json();
-  // WoW: Forever is version 1.60.x (listed under a beta product on wago.tools).
-  const all = Object.values(builds).flat().map((b) => b.version).filter((v) => /^1\.60\./.test(v));
+  // WoW: Forever is the product wowf on wago.tools (the release client, any version), and version
+  // 1.60.x under other products too (the beta's wow_classic_beta): the newest of all of them.
+  const all = Object.entries(builds)
+    .flatMap(([product, list]) => list.filter((b) => product === "wowf" || /^1\.60\./.test(b.version)))
+    .map((b) => b.version);
   const key = (v) => v.split(".").map((n) => n.padStart(8, "0")).join(".");
   return all.sort((a, b) => (key(a) < key(b) ? 1 : -1))[0];
 }

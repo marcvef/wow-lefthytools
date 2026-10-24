@@ -26,8 +26,9 @@ if (-not $ForeverBuild -or -not $EraBuild) {
 	$builds = Invoke-RestMethod 'https://wago.tools/api/builds' -TimeoutSec 60
 	$all = $builds.PSObject.Properties | ForEach-Object { $_.Value } | ForEach-Object { $_ }
 	if (-not $ForeverBuild) {
-		# WoW: Forever is version 1.60.x (listed under a beta product on wago.tools).
-		$ForeverBuild = ($all | Where-Object { $_.version -like '1.60.*' } |
+		# WoW: Forever is the product wowf on wago.tools (the release client, any version), and
+		# version 1.60.x under other products too (the beta's wow_classic_beta): the newest of all.
+		$ForeverBuild = ($all | Where-Object { $_.product -eq 'wowf' -or $_.version -like '1.60.*' } |
 			Sort-Object { [version]$_.version } -Descending | Select-Object -First 1).version
 	}
 	if (-not $EraBuild) {
