@@ -392,5 +392,14 @@ ns.CHANGELOG = {
 	{ id = 128, version = "0.6.0", module = "general",
 		en = { "Installer: no wait for network drives", "The installer goes straight to your game folder from last time and no longer hangs on disconnected network drives or drives that are gone." },
 		de = { "Installer: kein Warten auf Netzlaufwerke", "Der Installer nimmt direkt deinen Spielordner vom letzten Mal und hängt nicht mehr an getrennten Netzlaufwerken oder Laufwerken, die es nicht mehr gibt." } },
+	{ id = 129, module = "general",
+		en = { "Installer knows the release", "The installer recognises WoW: Forever's release folder and, while the beta is still installed too, updates both at once." },
+		de = { "Installer kennt den Release", "Der Installer erkennt den Release-Ordner von WoW: Forever und aktualisiert, solange die Beta auch noch installiert ist, beide auf einmal." } },
+	{ id = 130, module = "general",
+		en = { "The release starts fresh", "On WoW: Forever's release, LefthyTools ignores saved data copied over from the beta (settings, journal, Bestiary) and starts fresh once, with a chat line." },
+		de = { "Das Release startet frisch", "Auf dem Release von WoW: Forever nutzt LefthyTools keine aus der Beta kopierten Daten (Einstellungen, Tagebuch, Bestiary), sondern startet einmal frisch, mit einer Chatzeile." } },
+	{ id = 131, module = "tweaks",
+		en = { "Spells and quests of the release", "The level-up window's trainer spells and the markers for quests new in Forever come from the release build: 12 spells and 7 quests more." },
+		de = { "Zauber und Quests vom Release", "Die Trainer-Zauber im Level-Up-Fenster und die Markierungen für Quests, die neu in Forever sind, stammen vom Release-Build: 12 Zauber und 7 Quests mehr." } },
 	-- New entries go here, at the end.
 }

@@ -11,8 +11,11 @@ Facts verified against client builds 1.60.1.70009 and 1.60.1.70170.
   `<Addon>.toc` loads fine. The game type "camelot" is part of the **Mainline family**: in
   Blizzard TOCs `[Family]` resolves to `Mainline` and `[Game]` to `Camelot`. Frame names are the
   retail ones (`MainActionBar`, `MicroMenuContainer`, `MinimapCluster`, ...), not `MainMenuBar`.
-- Install folder: `World of Warcraft\_classic_beta_` (`.flavor.info` = `wow_classic_beta`,
-  executable `WowB.exe`).
+- Install folders: the release in `World of Warcraft\_forever_` (`.flavor.info` = `wowf`,
+  executable `Wow.exe`, from build 1.60.1.70532), the beta in `World of Warcraft\_classic_beta_`
+  (`wow_classic_beta`, `WowB.exe`). The installer finds either by `.build.info` (docs/architecture.md),
+  and LefthyTools tells them apart in game with `IsBetaBuild()` / `IsTestBuild()` /
+  `IsPublicTestClient()` (`LT.WhichWorld`).
 - `WOW_PROJECT_ID == 1` (the retail value). Libraries that branch on Classic project IDs
   misdetect it.
 - **Secret values:** `UnitHealth`, `UnitHealthMax`, `UnitHealthPercent` and `UnitHealthMissing`
