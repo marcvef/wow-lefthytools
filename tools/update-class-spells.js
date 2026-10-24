@@ -25,6 +25,10 @@ const SOD_IDS = [395000, 470000];
 // spell name in the export.
 const EFFECTS = /( Effect| Passive| \(Passive\d*\))$/;
 const PROCS = new Set(["Clearcasting", "Pyroclasm", "Lightwell Renew"]);
+// Effects Forever renamed like their spell, by ID: Immolation Trap Effect (all ranks) is called
+// "Immolation Trap" since the beta's later builds (70205 still had the old name). Its lower IDs
+// would otherwise win over the trap itself at the same level.
+const EFFECT_IDS = new Set([13797, 14298, 14299, 14300, 14301]);
 
 // RaceMasks_0 is the low 32 bits of the race mask, signed.
 const unsigned = (n) => (Number(n) >>> 0);
@@ -81,7 +85,7 @@ async function main() {
       const level = levelOf[r.Spell] || 0;
       if (seen[id] || !name || level < 1 || talentSpell[id]) continue;
       if (id >= SOD_IDS[0] && id < SOD_IDS[1]) continue;
-      if (EFFECTS.test(name) || PROCS.has(name) || (multiRankNames[classID] || {})[name]) continue;
+      if (EFFECTS.test(name) || PROCS.has(name) || EFFECT_IDS.has(id) || (multiRankNames[classID] || {})[name]) continue;
       seen[id] = true;
       const raceMask = unsigned(r.RaceMasks_0);
       const listed = r.AcquireMethod === "0" && level >= 2;
