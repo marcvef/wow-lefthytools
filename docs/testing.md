@@ -111,12 +111,27 @@ From the mock (globals):
 `npm test` only checks that `Update-LefthyTools.cmd` is the current build. To try `install.ps1`
 without touching your own game or remembered folder, start it in a child `powershell.exe` with
 `LOCALAPPDATA` and `ProgramData` pointed at a temp folder (no remembered folder, no Battle.net
-list) and make a fake game: `...\World of Warcraft\_classic_beta_` with an empty `WowB.exe` and
-`WTF\Config.wtf`. With its path in `<temp>\LefthyTools\game-folder.txt`, `.\install.ps1`
-installs the checkout into it without searching. Without one it searches every fixed and USB
-drive and finds your real game too, so try the search only on a copy of the script that stops
-once `$game` is set (`subst T: <folder>` makes a fixed drive for a second fake game). A copy of
-the `.cmd` outside a clone runs the newest installer from GitHub instead.
+list) and make a fake game: a `...\World of Warcraft` folder with a `.build.info` (the header
+`Branch!STRING:0|Active!DEC:1|Build Key!HEX:16|CDN Key!HEX:16|Install Key!HEX:16|IM Size!DEC:4|CDN Path!STRING:0|CDN Hosts!STRING:0|CDN Servers!STRING:0|Tags!STRING:0|Armadillo!STRING:0|Last Activated!STRING:0|Version!STRING:0|KeyRing!HEX:16|Product!STRING:0`
+and a row per product, e.g. `eu|1|a|b|||tpr/wow|h|s|t|||1.60.1.70532||wowf`), in it `_forever_`
+(an empty `Wow.exe` and a `.flavor.info` of two lines, `Product Flavor!STRING:0` and `wowf`; no
+`Interface`, like the release before its first start) and/or `_classic_beta_` (`WowB.exe`,
+`wow_classic_beta`, `WTF\Config.wtf`). With that folder in `-GameDir`, or a flavor folder's
+path in `<temp>\LefthyTools\game-folder.txt`, `.\install.ps1` installs the checkout without
+searching. Without either it searches every fixed and USB drive and finds your real game too, so
+try the search only on a copy of the script whose `[IO.DriveInfo]::GetDrives()` is replaced with
+fake drives (objects with a `Name` of a temp folder and `DriveType` `Fixed`). Worth a run: beta
+only; release only (gets `Interface\AddOns`); both (installs into both, lists both, remembers the
+release); a remembered beta with the release next to it (both, no search: a decoy beta on a fake
+drive stays untouched); a remembered beta alone (only it); a remembered beta that's uninstalled
+(only `Interface` left, `.build.info` without its row: the release only); `_classic_era_`
+(`wow_classic_era`, 1.15.x) ignored, and `_classic_beta_` with a 2.x version too; no
+`.build.info` (the known names); two betas on two drives (the newer `WTF\Config.wtf` wins);
+`-GameDir` with the `World of Warcraft` folder and with one flavor folder (only that one);
+`-Link`; `-Download` twice ("already the latest version" for each folder). The `.cmd` puts its
+arguments inside a double-quoted `-Command`, so give it a path with spaces in single quotes
+(`-GameDir 'C:\...\World of Warcraft'`). A copy of the `.cmd` outside a clone runs the newest
+installer from GitHub instead.
 
 ## In game
 

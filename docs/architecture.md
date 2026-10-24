@@ -143,21 +143,43 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
   and no login; unauthenticated API calls are limited to 60 per hour per IP, two per update.
 - **From a clone:** installs the checkout (`-Link`: junction for live editing, `-Download`: the
   GitHub version), version from `git describe --tags --long --dirty --match v[0-9]*`.
-- It finds WoW: Forever (`World of Warcraft\_classic_beta_`): the remembered folder
-  (`%LOCALAPPDATA%\LefthyTools\game-folder.txt`) alone while the game is still in it (`WowB.exe`,
-  `Wow.exe` or `.flavor.info`, not just a leftover `Interface`); otherwise it searches that folder,
-  Battle.net's `product.db` and common folders on every fixed and USB drive (the one played most
-  recently wins), else asks; `-GameDir` overrides it. Network drives aren't searched (their
+- It finds WoW: Forever by what the game says, not by folder name. A `World of Warcraft` folder
+  holds a `_name_` folder per flavor and a `.build.info`: a `|`-separated table, a header of typed
+  column names (`Branch!STRING:0|...|Version!STRING:0|KeyRing!HEX:16|Product!STRING:0`, looked
+  up by name) and a row per installed product. A `_name_` folder whose `.flavor.info` product
+  (its second line: `wowf`, `wow_classic_beta`) has a `Version` starting with `1.6` there is
+  Forever (its client line is 1.60.x; Classic Era is 1.15.x, the other flavors 2.x and up), so a
+  renamed folder still counts and a reused beta name with another version doesn't. Without a
+  `.build.info` (or the product in it) the known names count: `_forever_` (the release, `wowf`,
+  `Wow.exe`) and `_classic_beta_` (the beta, `WowB.exe`). The game must be there (`Wow.exe`,
+  `WowB.exe` or `.flavor.info`, not just a leftover `Interface`); the release has no `Interface`
+  or `WTF` until its first start, so the installer makes `Interface\AddOns`.
+  **Release and beta** are kinds (a product, else folder name, with `beta`, `ptr`, `alpha` or
+  `test` is the beta kind, anything else the release). It installs into one folder of each kind:
+  until launch everyone plays the beta and the release can't start, after it the release, so
+  while both are installed one update keeps both current (the output lists both, then each
+  folder's install and check). Several copies of one kind: the one played most recently (newest
+  of `WTF\Config.wtf`, `Logs`, `WTF\Account`, `Cache`), the others listed.
+  Where it looks: the remembered folder (`%LOCALAPPDATA%\LefthyTools\game-folder.txt`) alone
+  while the game is still in it and its `World of Warcraft` folder's `.build.info` (one small
+  read; without one, the known names next to it) shows no other Forever product; with one (the
+  release next to a remembered beta, or the beta still next to the release), every Forever folder
+  in that `World of Warcraft` folder, without searching further. It remembers the release's
+  folder when there is one. Otherwise it searches the remembered folder's parent, Battle.net's
+  `product.db` and common folders on every fixed and USB drive, else asks; `-GameDir` overrides
+  it (a `World of Warcraft` folder: the same choice inside it; a flavor folder: only that one,
+  also an unrecognised folder with an `Interface` folder). Network drives aren't searched (their
   `DriveType` is known without touching them; a disconnected one held each look for ~20 s), and
   every drive or share a candidate is on is first asked on a thread-pool task
   (`DirectoryInfo.Exists`) that gets 10 s, all drives at once, so a dead one can't hold it up;
   what was left out is listed ("Not searched: ..."). The registry's WoW path isn't used (on some
-  PCs it belongs to another launcher). It replaces `Interface\AddOns\LefthyTools`
+  PCs it belongs to another launcher). In each folder it replaces `Interface\AddOns\LefthyTools`
   (settings live in `WTF`, untouched) and the add-ons that come with it (`$Companions`: folders
   next to `LefthyTools/` in the repo, `LefthyTools_DropData`; checked the same way, not stamped
   with a version; a new one means "restart the game"), removes the old standalone `Mirage` addon,
   and skips the install if that exact version is already there and nothing is missing (`-Force`
-  reinstalls).
+  reinstalls). "/reload" or "restart the game" is said once at the end, a restart if any folder
+  needs one.
 - Everything runs inside a script block, so `irm | iex` in someone's PowerShell window leaves no
   variables or preference changes behind. TLS 1.2 is enabled for old Windows PowerShell setups;
   the progress bar is off (it slows downloads a lot in PowerShell 5). `.gitattributes` keeps the

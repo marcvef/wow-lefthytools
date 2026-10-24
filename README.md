@@ -49,10 +49,11 @@ reads and the default level-up message.
    friends as it is.
 2. Double-click it. It finds your WoW: Forever folder (and keeps using it while the game is
    there), downloads the latest LefthyTools from this page, installs it and checks every installed
-   file against the download. If Windows asks whether to run it, choose *Run* (or *More info* →
-   *Run anyway*). If it can't find the game (it doesn't search network drives), it asks for your
-   `World of Warcraft` folder once. If it finds Forever in more than one place, it uses the one
-   you played most recently and lists the others.
+   file against the download. While both the release and the beta are installed, it installs
+   into both, so one update keeps both current. If Windows asks whether to run it, choose *Run*
+   (or *More info* → *Run anyway*). If it can't find the game (it doesn't search network drives),
+   it asks for your `World of Warcraft` folder once. If it finds the same one (release or beta)
+   in more than one place, it uses the one you played most recently and lists the others.
 3. In game, type `/reload`. If the installer says to restart the game (the update adds files or
    saved data), do that instead.
    `/lefthy version` should then show the version the installer printed.
@@ -78,7 +79,7 @@ at commit `1a2b3c4`.
 .\install.ps1            # install this checkout (version stamped from git)
 .\install.ps1 -Link      # dev mode: junction to this folder, so edits only need /reload
 .\install.ps1 -Download  # install the latest version from GitHub instead
-.\install.ps1 -GameDir "D:\...\World of Warcraft\_classic_beta_"   # if it isn't found
+.\install.ps1 -GameDir "D:\...\World of Warcraft"   # if it isn't found (...\_forever_: only that folder)
 ```
 
 The installer also installs `LefthyTools_DropData` next to it (the Bestiary's drop database, also

@@ -5,13 +5,15 @@
 #   or paste this into PowerShell:
 #     irm https://raw.githubusercontent.com/marcvef/wow-lefthytools/main/install.ps1 | iex
 #   It downloads the latest LefthyTools from GitHub and installs it into WoW: Forever's AddOns
-#   folder. Run it again any time to update. Settings are kept (they live in the WTF folder).
+#   folder (the release's, and the beta's too while both are installed). Run it again any time to
+#   update. Settings are kept (they live in the WTF folder).
 #
 # Development, from a clone of the repo:
 #   .\install.ps1             install this checkout's LefthyTools folder (and LefthyTools_DropData)
 #   .\install.ps1 -Link       junction AddOns\LefthyTools (and the rest) to this checkout (edits only need /reload)
 #   .\install.ps1 -Download   install the latest version from GitHub instead
-#   -GameDir <dir>            the WoW: Forever folder (...\World of Warcraft\_classic_beta_)
+#   -GameDir <dir>            the World of Warcraft folder (...\World of Warcraft), or one WoW: Forever
+#                             folder in it for that folder alone (...\World of Warcraft\_forever_)
 #   -Force                    reinstall even if that version is already installed
 #
 # Versions: the TOC holds the base version (e.g. 0.3.0, tagged v0.3.0). The installed copy gets the
@@ -33,14 +35,17 @@ param(
 
 	$Repo = 'marcvef/wow-lefthytools'
 	$Name = 'LefthyTools'
-	$Flavor = '_classic_beta_' # WoW: Forever's folder inside the World of Warcraft install
-	$Legacy = @('Mirage')      # addons that are now part of LefthyTools; left installed they'd run twice
+	# WoW: Forever's folders inside the World of Warcraft install: the release and the beta. Which
+	# folders hold Forever, the game itself says (Get-ForeverGame); these names are the fallback.
+	$KnownFlavors = @('_forever_', '_classic_beta_')
+	$Legacy = @('Mirage') # addons that are now part of LefthyTools; left installed they'd run twice
 	# Add-ons that come with it, each a folder of its own next to LefthyTools in the repo: the drop
 	# database (GPL v3 like its source, so apart from the BSD-licensed rest).
 	$Companions = @('LefthyTools_DropData')
 	$Remembered = Join-Path $env:LOCALAPPDATA 'LefthyTools\game-folder.txt'
 
-	function Test-ForeverFolder([string]$dir) {
+	# Any game folder (also just an Interface folder): what -GameDir may name when it isn't recognised.
+	function Test-GameFolder([string]$dir) {
 		if (-not $dir -or -not (Test-Path -LiteralPath $dir -PathType Container)) { return $false }
 		foreach ($marker in 'Interface', 'WowB.exe', 'Wow.exe', '.flavor.info') {
 			if (Test-Path -LiteralPath (Join-Path $dir $marker)) { return $true }
@@ -48,14 +53,101 @@ param(
 		return $false
 	}
 
-	# Accepts the World of Warcraft folder or the Forever folder itself.
-	function Resolve-ForeverFolder([string]$dir) {
-		if (-not $dir) { return $null }
-		$dir = $dir.Trim().Trim('"')
-		$inner = Join-Path $dir $Flavor
-		if (Test-ForeverFolder $inner) { return $inner }
-		if ((Split-Path $dir -Leaf) -eq $Flavor -and (Test-ForeverFolder $dir)) { return $dir }
+	# The game is installed there (not just an Interface folder left behind). Not Interface: the
+	# release has none until its first start.
+	function Test-GameInstalled([string]$dir) {
+		foreach ($marker in 'WowB.exe', 'Wow.exe', '.flavor.info') {
+			if (Test-Path -LiteralPath (Join-Path $dir $marker)) { return $true }
+		}
+		return $false
+	}
+
+	# Each installed product's client version (product -> version) from a World of Warcraft folder's
+	# .build.info, or $null without a readable one. It's a table: a header of typed column names
+	# (Branch!STRING:0|Active!DEC:1|...|Version!STRING:0|...|Product!STRING:0), then a row per
+	# product (us|1|...|1.60.1.70450|...|wowf), so columns are looked up by name.
+	function Get-ProductVersions([string]$root) {
+		$path = Join-Path $root '.build.info'
+		if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+		try { $lines = @([IO.File]::ReadAllLines($path) | Where-Object { $_.Trim() }) } catch { return $null }
+		if ($lines.Count -eq 0) { return $null }
+		$columns = @($lines[0].Split('|') | ForEach-Object { $_.Split('!')[0].Trim() })
+		$version = [array]::IndexOf($columns, 'Version')
+		$product = [array]::IndexOf($columns, 'Product')
+		if ($version -lt 0 -or $product -lt 0) { return $null }
+		$versions = @{}
+		foreach ($line in @($lines | Select-Object -Skip 1)) {
+			$cells = $line.Split('|')
+			if ($cells.Count -le [Math]::Max($version, $product)) { continue }
+			$name = $cells[$product].Trim()
+			if ($name -and -not $versions.ContainsKey($name)) { $versions[$name] = $cells[$version].Trim() }
+		}
+		return $versions
+	}
+
+	# The product a game folder holds, from its .flavor.info (a header line, then e.g. wowf), or $null.
+	function Get-FlavorProduct([string]$dir) {
+		$path = Join-Path $dir '.flavor.info'
+		if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+		try { $lines = [IO.File]::ReadAllLines($path) } catch { return $null }
+		foreach ($line in $lines) {
+			if ($line.Trim() -and $line -notmatch '!') { return $line.Trim() }
+		}
 		return $null
+	}
+
+	# A game folder: its path, product and kind. A beta, PTR or other test version says so in its
+	# product (wow_classic_beta), else in the folder's name; anything else is the release (wowf).
+	function New-Game([string]$dir, [string]$product) {
+		$full = (Get-Item -LiteralPath $dir).FullName.TrimEnd('\')
+		$label = if ($product) { $product } else { Split-Path $full -Leaf }
+		$kind = if ($label -match 'beta|ptr|alpha|test') { 'beta' } else { 'release' }
+		return [pscustomobject]@{ Path = $full; Product = $product; Kind = $kind }
+	}
+
+	# The game in $dir if it's WoW: Forever, else nothing. The World of Warcraft folder's .build.info
+	# ($versions, from Get-ProductVersions) says so: Forever's client line is 1.60 (1.6x; Classic
+	# Era is 1.15, the other flavors 2 and up), so a renamed folder still counts. When it doesn't
+	# list the folder's product (no .build.info, no .flavor.info), the known folder names do.
+	function Get-ForeverGame([string]$dir, $versions) {
+		if (-not (Test-GameInstalled $dir)) { return }
+		$product = Get-FlavorProduct $dir
+		if ($null -ne $versions -and $product -and $versions.ContainsKey($product)) {
+			if ($versions[$product] -notmatch '^1\.6') { return }
+		} elseif ($KnownFlavors -notcontains (Split-Path $dir -Leaf)) {
+			return
+		}
+		New-Game $dir $product
+	}
+
+	# The WoW: Forever folders in a World of Warcraft folder (among its _name_ folders).
+	function Get-ForeverGamesIn([string]$root) {
+		$versions = Get-ProductVersions $root
+		foreach ($sub in @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue)) {
+			if ($sub.Name -notmatch '^_.+_$') { continue }
+			$game = Get-ForeverGame $sub.FullName $versions
+			if ($game) { $game }
+		}
+	}
+
+	# A path as given (pasted, remembered): no quotes, no trailing backslash.
+	function Get-CleanPath([string]$dir) {
+		if (-not $dir) { return '' }
+		$dir = $dir.Trim().Trim('"')
+		if ($dir.Length -gt 3) { $dir = $dir.TrimEnd('\', '/') }
+		return $dir
+	}
+
+	# Accepts the World of Warcraft folder (the Forever folders in it) or a Forever folder itself.
+	function Resolve-ForeverGames([string]$dir) {
+		$dir = Get-CleanPath $dir
+		if (-not $dir -or -not (Test-Path -LiteralPath $dir -PathType Container)) { return }
+		$inside = @(Get-ForeverGamesIn $dir)
+		if ($inside.Count -gt 0) { return $inside }
+		$parent = Split-Path $dir -Parent
+		$versions = if ($parent) { Get-ProductVersions $parent } else { $null }
+		$game = Get-ForeverGame $dir $versions
+		if ($game) { $game }
 	}
 
 	# When it was last played: the newest of the files the game writes (settings, logs).
@@ -89,44 +181,93 @@ param(
 		return $ask.Task.Result
 	}
 
+	# Whether a path's drive answers (see Test-DriveAnswers); one that doesn't is noted in $skipped.
+	function Test-Reachable([string]$path, $skipped) {
+		try { $root = [IO.Path]::GetPathRoot($path) } catch { return $false }
+		if (-not $root) { return $true }
+		$answer = Test-DriveAnswers $root
+		if ($null -eq $answer -and -not $skipped.Contains($root)) { $skipped[$root] = "no answer within $Wait s" }
+		return [bool]$answer
+	}
+
 	# Adds the WoW: Forever folders among $candidates to $found, each once. A candidate on a drive
 	# that doesn't answer is left out (and noted in $skipped).
-	function Add-ForeverFolders($candidates, $found, $skipped) {
+	function Add-ForeverGames($candidates, $found, $skipped) {
+		$seen = @{}
 		foreach ($candidate in $candidates) {
-			if (-not $candidate) { continue }
-			try { $root = [IO.Path]::GetPathRoot($candidate.Trim().Trim('"')) } catch { continue }
-			if ($root) {
-				$answer = Test-DriveAnswers $root
-				if ($null -eq $answer -and -not $skipped.Contains($root)) { $skipped[$root] = "no answer within $Wait s" }
-				if (-not $answer) { continue }
-			}
-			$dir = Resolve-ForeverFolder $candidate
-			if ($dir) {
-				$full = (Get-Item -LiteralPath $dir).FullName.TrimEnd('\')
-				if (-not ($found | Where-Object { $_ -eq $full })) { $found.Add($full) }
+			$candidate = Get-CleanPath $candidate
+			if (-not $candidate -or $seen.ContainsKey($candidate)) { continue }
+			$seen[$candidate] = $true
+			if (-not (Test-Reachable $candidate $skipped)) { continue }
+			foreach ($game in @(Resolve-ForeverGames $candidate)) {
+				if (-not ($found | Where-Object { $_.Path -eq $game.Path })) { $found.Add($game) }
 			}
 		}
 	}
 
-	# Every WoW: Forever folder found. The remembered one (installed into last time) alone, while
-	# the game is still there (not just an Interface folder left behind). Otherwise also Battle.net's
-	# list of installs and the usual places on every fixed and USB drive; network drives aren't
-	# searched (a disconnected one can take minutes to say so), and a drive that doesn't answer in
-	# time is left out. With more than one (an old copy, a second drive), the one played most
-	# recently wins, and all are listed: an update into a folder the game doesn't use changes
-	# nothing in game.
-	function Find-ForeverFolder {
-		$found = New-Object System.Collections.Generic.List[string]
+	# Whether the World of Warcraft folder $root holds another WoW: Forever besides $game: by its
+	# .build.info ($versions; one small file), or without one by the known folder names.
+	function Test-OtherForever($game, [string]$root, $versions) {
+		if ($null -ne $versions) {
+			foreach ($product in @($versions.Keys)) {
+				if ($product -ne $game.Product -and $versions[$product] -match '^1\.6') { return $true }
+			}
+			return $false
+		}
+		foreach ($name in $KnownFlavors) {
+			if ($name -eq (Split-Path $game.Path -Leaf)) { continue }
+			$dir = Join-Path $root $name
+			if ((Test-Path -LiteralPath $dir -PathType Container) -and (Test-GameInstalled $dir)) { return $true }
+		}
+		return $false
+	}
+
+	# The folders to install into: one of each kind, the release and the beta (before launch the
+	# beta is played and the release can't start yet; after it, the release is played), so one
+	# update keeps both current while both are installed. With more than one copy of a kind (an old
+	# copy, a second drive), the one played most recently, and all are listed: an update into a
+	# folder the game doesn't use changes nothing in game.
+	function Select-Games($found) {
+		foreach ($kind in 'release', 'beta') {
+			$copies = @($found | Where-Object { $_.Kind -eq $kind })
+			if ($copies.Count -eq 0) { continue }
+			if ($copies.Count -eq 1) { $copies[0]; continue }
+			$best = $copies | Sort-Object { Get-LastPlayed $_.Path } -Descending | Select-Object -First 1
+			Write-Host "WoW: Forever ($kind) was found in more than one place:" -ForegroundColor Yellow
+			foreach ($copy in $copies) {
+				$played = Get-LastPlayed $copy.Path
+				$when = if ($played -eq [datetime]::MinValue) { 'not played yet' } else { 'last played {0:yyyy-MM-dd HH:mm}' -f $played }
+				$mark = if ($copy.Path -eq $best.Path) { '  <- played most recently, installing here' } else { '' }
+				Write-Host ("  {0}  ({1}){2}" -f $copy.Path, $when, $mark)
+			}
+			Write-Host 'Another one? Run it again with -GameDir "<that folder>".'
+			$best
+		}
+	}
+
+	# The WoW: Forever folders to install into. The remembered one (installed into last time) alone,
+	# while the game is still there (not just an Interface folder left behind) and its World of
+	# Warcraft folder holds no other Forever (.build.info); with another one there (the release next
+	# to the beta), every Forever folder in it. Otherwise also Battle.net's list of installs and the
+	# usual places on every fixed and USB drive; network drives aren't searched (a disconnected one
+	# can take minutes to say so), and a drive that doesn't answer in time is left out.
+	function Find-ForeverGames {
+		$found = New-Object System.Collections.Generic.List[object]
 		$skipped = [ordered]@{}
 		$candidates = New-Object System.Collections.Generic.List[string]
-		if (Test-Path -LiteralPath $Remembered) { $candidates.Add((Get-Content -LiteralPath $Remembered -TotalCount 1)) }
-		Add-ForeverFolders $candidates $found $skipped
-		if ($found.Count -eq 1) {
-			foreach ($marker in 'WowB.exe', 'Wow.exe', '.flavor.info') {
-				if (Test-Path -LiteralPath (Join-Path $found[0] $marker)) { return $found[0] }
+		$remembered = if (Test-Path -LiteralPath $Remembered) { Get-CleanPath (Get-Content -LiteralPath $Remembered -TotalCount 1) } else { '' }
+		if ($remembered -and (Test-Reachable $remembered $skipped) -and (Test-Path -LiteralPath $remembered -PathType Container)) {
+			$root = Split-Path $remembered -Parent
+			$versions = if ($root) { Get-ProductVersions $root } else { $null }
+			$game = Get-ForeverGame $remembered $versions
+			if ($game) {
+				if (-not $root -or -not (Test-OtherForever $game $root $versions)) { return $game }
+				return Select-Games @(Get-ForeverGamesIn $root)
 			}
+			# No longer Forever (or only an Interface folder is left): look next to it as well.
+			$candidates.Add($remembered)
+			if ($root) { $candidates.Add($root) }
 		}
-		$candidates.Clear()
 		# Battle.net's own list of installs (product.db holds the paths as plain text).
 		$db = Join-Path $env:ProgramData 'Battle.net\Agent\product.db'
 		if (Test-Path -LiteralPath $db) {
@@ -149,20 +290,11 @@ param(
 				$candidates.Add([IO.Path]::Combine($root, $parent, 'World of Warcraft'))
 			}
 		}
-		Add-ForeverFolders $candidates $found $skipped
+		Add-ForeverGames $candidates $found $skipped
 		if ($skipped.Count -gt 0) {
 			Write-Host ('Not searched: ' + (@($skipped.Keys | ForEach-Object { "$_ ($($skipped[$_]))" }) -join ', ') + '.')
 		}
-		if ($found.Count -eq 0) { return $null }
-		if ($found.Count -eq 1) { return $found[0] }
-		$best = $found | Sort-Object { Get-LastPlayed $_ } -Descending | Select-Object -First 1
-		Write-Host 'WoW: Forever was found in more than one place:' -ForegroundColor Yellow
-		foreach ($dir in $found) {
-			$mark = if ($dir -eq $best) { '  <- played most recently, installing here' } else { '' }
-			Write-Host ("  {0}  (last played {1:yyyy-MM-dd HH:mm}){2}" -f $dir, (Get-LastPlayed $dir), $mark)
-		}
-		Write-Host 'Another one? Run it again with -GameDir "<that folder>".'
-		return $best
+		Select-Games $found
 	}
 
 	function Get-TocVersion([string]$toc) {
@@ -347,23 +479,31 @@ param(
 		}
 	}
 	# --- Where is WoW: Forever? ---
-	$game = $null
+	$games = @()
 	if ($GameDir) {
-		$game = Resolve-ForeverFolder $GameDir
-		if (-not $game -and (Test-ForeverFolder $GameDir)) { $game = $GameDir }
-		if (-not $game) { throw "Not a WoW: Forever folder: $GameDir" }
+		$games = @(Resolve-ForeverGames $GameDir)
+		$dir = Get-CleanPath $GameDir
+		if ($games.Count -eq 0 -and (Test-GameFolder $dir)) { $games = @(New-Game $dir (Get-FlavorProduct $dir)) }
+		if ($games.Count -eq 0) { throw "Not a WoW: Forever folder: $GameDir" }
+		$games = @(Select-Games $games)
 	} else {
-		$game = Find-ForeverFolder
+		$games = @(Find-ForeverGames)
 	}
-	while (-not $game) {
+	while ($games.Count -eq 0) {
 		Write-Host "WoW: Forever wasn't found. Paste the path of your 'World of Warcraft' folder" -ForegroundColor Yellow
 		$answer = Read-Host '(empty to cancel)'
 		if (-not $answer) { throw 'Cancelled.' }
-		$game = Resolve-ForeverFolder $answer
-		if (-not $game) { Write-Host "No '$Flavor' folder in there." -ForegroundColor Yellow }
+		$games = @(Select-Games @(Resolve-ForeverGames $answer))
+		if ($games.Count -eq 0) { Write-Host 'No WoW: Forever folder in there.' -ForegroundColor Yellow }
 	}
+	if ($games.Count -gt 1) {
+		Write-Host "WoW: Forever's release and beta are both installed: installing into both, so one update keeps both current."
+		foreach ($game in $games) { Write-Host "  $($game.Path)  ($($game.Kind))" }
+	}
+	# The release from then on, while there is one.
+	$keep = @(@($games | Where-Object { $_.Kind -eq 'release' }) + $games)[0]
 	New-Item -ItemType Directory -Force (Split-Path $Remembered) | Out-Null
-	Set-Content -LiteralPath $Remembered -Value $game -Encoding UTF8
+	Set-Content -LiteralPath $Remembered -Value $keep.Path -Encoding UTF8
 
 	# --- What to install ---
 	$isCheckout = $ScriptRoot -and (Test-Path -LiteralPath (Join-Path $ScriptRoot "$Name\$Name.toc"))
@@ -372,86 +512,106 @@ param(
 	New-Item -ItemType Directory -Path $temp | Out-Null
 	try {
 		$build = if ($Download -or -not $isCheckout) { Get-Latest $temp } else { Get-Local $ScriptRoot }
-
-		$addons = Join-Path $game 'Interface\AddOns'
-		New-Item -ItemType Directory -Force $addons | Out-Null
-		foreach ($old in $Legacy) {
-			$oldPath = Join-Path $addons $old
-			if (Test-Path -LiteralPath $oldPath) {
-				Remove-AddonFolder $oldPath
-				Write-Host "Removed the old standalone addon: $old"
-			}
-		}
-
-		$target = Join-Path $addons $Name
-		$targetToc = Join-Path $target "$Name.toc"
-		$installed = if ((Test-Path -LiteralPath $targetToc) -and -not (Get-Item -LiteralPath $target -Force).LinkType) { Get-TocVersion $targetToc } else { $null }
-		# The add-ons that come with it, in this build, and which of them aren't installed yet.
+		# The add-ons that come with it, in this build.
 		$sourceRoot = Split-Path $build.Addon -Parent
 		$companions = @($Companions | Where-Object { Test-Path -LiteralPath (Join-Path $sourceRoot "$_\$_.toc") })
-		$newCompanions = @($companions | Where-Object { -not (Test-Path -LiteralPath (Join-Path $addons "$_\$_.toc")) })
-		if (-not $Force -and -not $Link -and $installed -eq $build.Version -and $build.Version -notmatch 'dirty|dev' -and $newCompanions.Count -eq 0) {
-			Write-Host "LefthyTools $installed is already the latest version." -ForegroundColor Green
-			return
-		}
+		$restart = New-Object System.Collections.Generic.List[string]
+		$updated = $false
 
-		# The game only loads files that are new to the TOC after a restart (a /reload into such an
-		# update can even freeze the client), and the same goes for new saved variables, so say so
-		# when there are any.
-		$oldFiles = if ($installed) { Get-TocFiles $targetToc } else { $null }
-		$oldSaved = if ($installed) { Get-TocSaved $targetToc } else { $null }
-		Remove-AddonFolder $target
-		if ($Link) {
-			New-Item -ItemType Junction -Path $target -Target $build.Addon | Out-Null
-			Write-Host "Linked $target -> $($build.Addon)"
-		} else {
-			Copy-Item -LiteralPath $build.Addon -Destination $target -Recurse
-			Set-TocVersion $targetToc $build.Version
-			$check = Test-Install $build.Addon $target
-			if ($check.Problems.Count -gt 0) {
-				foreach ($problem in $check.Problems) { Write-Host "  $problem" -ForegroundColor Red }
-				throw ("The installed files don't match the download ($($check.Problems.Count) problem(s)). Run it again;" +
-					' if it keeps happening, an antivirus may be blocking files in the AddOns folder.')
+		foreach ($game in $games) {
+			if ($games.Count -gt 1) {
+				Write-Host ''
+				Write-Host "WoW: Forever $($game.Kind), $($game.Path):"
 			}
-			$from = if ($installed) { "$installed -> " } else { '' }
-			Write-Host "LefthyTools $from$($build.Version) installed in $target" -ForegroundColor Green
-		}
-		$files = if ($Link) { 0 } else { $check.Count }
-		foreach ($companion in $companions) {
-			$from = Join-Path $sourceRoot $companion
-			$to = Join-Path $addons $companion
-			Remove-AddonFolder $to
+			# A folder the game hasn't started in yet (the release before launch) has no Interface
+			# folder: it's made here.
+			$addons = Join-Path $game.Path 'Interface\AddOns'
+			New-Item -ItemType Directory -Force $addons | Out-Null
+			foreach ($old in $Legacy) {
+				$oldPath = Join-Path $addons $old
+				if (Test-Path -LiteralPath $oldPath) {
+					Remove-AddonFolder $oldPath
+					Write-Host "Removed the old standalone addon: $old"
+				}
+			}
+
+			$target = Join-Path $addons $Name
+			$targetToc = Join-Path $target "$Name.toc"
+			$installed = if ((Test-Path -LiteralPath $targetToc) -and -not (Get-Item -LiteralPath $target -Force).LinkType) { Get-TocVersion $targetToc } else { $null }
+			# Which of the add-ons that come with it aren't installed here yet.
+			$newCompanions = @($companions | Where-Object { -not (Test-Path -LiteralPath (Join-Path $addons "$_\$_.toc")) })
+			if (-not $Force -and -not $Link -and $installed -eq $build.Version -and $build.Version -notmatch 'dirty|dev' -and $newCompanions.Count -eq 0) {
+				Write-Host "LefthyTools $installed is already the latest version." -ForegroundColor Green
+				continue
+			}
+
+			# The game only loads files that are new to the TOC after a restart (a /reload into such an
+			# update can even freeze the client), and the same goes for new saved variables, so say so
+			# when there are any.
+			$oldFiles = if ($installed) { Get-TocFiles $targetToc } else { $null }
+			$oldSaved = if ($installed) { Get-TocSaved $targetToc } else { $null }
+			Remove-AddonFolder $target
 			if ($Link) {
-				New-Item -ItemType Junction -Path $to -Target $from | Out-Null
-				Write-Host "Linked $to -> $from"
+				New-Item -ItemType Junction -Path $target -Target $build.Addon | Out-Null
+				Write-Host "Linked $target -> $($build.Addon)"
 			} else {
-				Copy-Item -LiteralPath $from -Destination $to -Recurse
-				$check = Test-Install $from $to $companion
+				Copy-Item -LiteralPath $build.Addon -Destination $target -Recurse
+				Set-TocVersion $targetToc $build.Version
+				$check = Test-Install $build.Addon $target
 				if ($check.Problems.Count -gt 0) {
-					foreach ($problem in $check.Problems) { Write-Host "  $companion\$problem" -ForegroundColor Red }
+					foreach ($problem in $check.Problems) { Write-Host "  $problem" -ForegroundColor Red }
 					throw ("The installed files don't match the download ($($check.Problems.Count) problem(s)). Run it again;" +
 						' if it keeps happening, an antivirus may be blocking files in the AddOns folder.')
 				}
-				$files += $check.Count
-				Write-Host "$companion installed with it in $to"
+				$from = if ($installed) { "$installed -> " } else { '' }
+				Write-Host "LefthyTools $from$($build.Version) installed in $target" -ForegroundColor Green
 			}
+			$files = if ($Link) { 0 } else { $check.Count }
+			foreach ($companion in $companions) {
+				$from = Join-Path $sourceRoot $companion
+				$to = Join-Path $addons $companion
+				Remove-AddonFolder $to
+				if ($Link) {
+					New-Item -ItemType Junction -Path $to -Target $from | Out-Null
+					Write-Host "Linked $to -> $from"
+				} else {
+					Copy-Item -LiteralPath $from -Destination $to -Recurse
+					$check = Test-Install $from $to $companion
+					if ($check.Problems.Count -gt 0) {
+						foreach ($problem in $check.Problems) { Write-Host "  $companion\$problem" -ForegroundColor Red }
+						throw ("The installed files don't match the download ($($check.Problems.Count) problem(s)). Run it again;" +
+							' if it keeps happening, an antivirus may be blocking files in the AddOns folder.')
+					}
+					$files += $check.Count
+					Write-Host "$companion installed with it in $to"
+				}
+			}
+			if (-not $Link) {
+				Write-Host "Checked: all $files files arrived intact (SHA-256), and every file the game loads is there."
+			}
+			$updated = $true
+			$added = if ($null -ne $oldFiles) { @(Get-TocFiles $targetToc | Where-Object { $oldFiles -notcontains $_ }) } else { @() }
+			$addedSaved = if ($null -ne $oldSaved) { @(Get-TocSaved $targetToc | Where-Object { $oldSaved -notcontains $_ }) } else { @() }
+			$why = if ($installed -and $newCompanions.Count -gt 0) {
+				"This update adds an add-on ($($newCompanions -join ', ')): restart the game, a /reload is not enough."
+			} elseif ($added.Count -gt 0) {
+				"This update adds files ($($added -join ', ')): restart the game, a /reload is not enough."
+			} elseif ($addedSaved.Count -gt 0) {
+				"This update adds saved data ($($addedSaved -join ', ')): restart the game, a /reload is not enough."
+			} else { $null }
+			if ($why -and -not $restart.Contains($why)) { $restart.Add($why) }
 		}
-		if (-not $Link) {
-			Write-Host "Checked: all $files files arrived intact (SHA-256), and every file the game loads is there."
-		}
-		$added = if ($null -ne $oldFiles) { @(Get-TocFiles $targetToc | Where-Object { $oldFiles -notcontains $_ }) } else { @() }
-		$addedSaved = if ($null -ne $oldSaved) { @(Get-TocSaved $targetToc | Where-Object { $oldSaved -notcontains $_ }) } else { @() }
-		if ($installed -and $newCompanions.Count -gt 0) {
-			Write-Host "This update adds an add-on ($($newCompanions -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
-		} elseif ($added.Count -gt 0) {
-			Write-Host "This update adds files ($($added -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
-		} elseif ($addedSaved.Count -gt 0) {
-			Write-Host "This update adds saved data ($($addedSaved -join ', ')): restart the game, a /reload is not enough." -ForegroundColor Yellow
-		} else {
-			Write-Host 'In game, type /reload. If something seems missing afterwards, restart the game once.'
-		}
-		if (-not $Link) {
-			Write-Host "Check in game: /lefthy version should say $($build.Version)."
+
+		if ($updated) {
+			if ($games.Count -gt 1) { Write-Host '' }
+			if ($restart.Count -gt 0) {
+				foreach ($why in $restart) { Write-Host $why -ForegroundColor Yellow }
+			} else {
+				Write-Host 'In game, type /reload. If something seems missing afterwards, restart the game once.'
+			}
+			if (-not $Link) {
+				Write-Host "Check in game: /lefthy version should say $($build.Version)."
+			}
 		}
 	} finally {
 		Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
