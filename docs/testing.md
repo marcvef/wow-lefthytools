@@ -54,7 +54,7 @@ fade that begins at login, so no file that lets time pass may run before it.
 The mock is the beta, like the game today (`MOCK_CLIENT`), so the English and German suites load
 the addon on the beta. `tests/release.lua` runs in a Lua state of its own and starts the game
 itself, several times (`MockReload()`, then the addon loaded again with the saved variables as
-they are): a copy of the beta's saved data on the release (all three tables new, settings back to
+they are): a copy of the beta's saved data on the release (all four tables new, settings back to
 their defaults, one chat line, what's new as on a first install), `/reload`s after it (nothing
 goes), one table copied again alone, a new install, the beta and an unknown client (nothing goes),
 and the beta's data back on the release.

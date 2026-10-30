@@ -315,7 +315,7 @@ section("the beta or the release")
 do -- Which client this is (LT.WhichWorld): the release starts fresh, also from a copy of the beta's
 	-- saved variables (release.lua loads the addon on each). No time passes here.
 	check(LT.world == "beta" and not LT.betaForgotten and LefthyToolsDB.world == "beta" and LefthyToolsChronicleDB.world == "beta"
-		and LefthyToolsBestiaryDB.world == "beta", "the mock is the beta: every saved table says so, nothing reset")
+		and LefthyToolsBestiaryDB.world == "beta" and LefthyToolsEchoesDB.world == "beta", "the mock is the beta: every saved table says so, nothing reset")
 	local client, ptr, buildInfo = MOCK_CLIENT, IsPublicTestClient, GetBuildInfo
 	local function world(beta, test, pt, build)
 		MOCK_CLIENT, MOCK_BUILD = { beta = beta, test = test, ptr = pt }, build or "70532"

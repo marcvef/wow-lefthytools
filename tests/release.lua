@@ -34,12 +34,13 @@ local function notices(mark) -- the chat line since PRINTED[mark], how often
 end
 local function stamped(world)
 	return LefthyToolsDB.world == world and LefthyToolsChronicleDB.world == world and LefthyToolsBestiaryDB.world == world
+		and LefthyToolsEchoesDB.world == world
 end
 local function release() MOCK_CLIENT, MOCK_BUILD = { beta = false, test = false, ptr = false }, "70532" end
 
 -- A player copied the beta's WTF folder to the release. Its LefthyTools settings (from a build before
 -- the stamps: they say nothing), its error list, flight times, Chronicle's journal (stamped by the
--- beta) and the Bestiary's mobs (saying nothing).
+-- beta), the Bestiary's mobs (saying nothing) and Echoes' recording (the beta's).
 release()
 local betaDB = { modules = { mirage = true, beacon = false }, settings = { mirage = { delay = 9 }, tweaks = { movableBags = false } },
 	errors = { { msg = "Interface/AddOns/LefthyTools/Core/Core.lua:1: on the beta", count = 1, kind = "error" } }, changelogSeen = 3,
@@ -47,13 +48,16 @@ local betaDB = { modules = { mirage = true, beacon = false }, settings = { mirag
 local betaChronicle = { world = "beta", chars = { ["Lefthy-Realmy"] = { name = "Lefthy", realm = "Realmy", level = 12, events = {},
 	stats = { kills = 500 } } }, friends = {}, friendStats = {}, book = {} }
 local betaBestiary = { mobs = { [116] = { name = "Defias Bandit", level = 12, kills = 40, money = 900, items = {} } } }
-LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB = betaDB, betaChronicle, betaBestiary
+local betaEchoes = { world = "beta", v = 1, store = "0badc0de", session = 7, n = 3,
+	mine = { [3] = { t = 1900000000, h = "00000000", m = "t", z = "E1;..." } } }
+LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB, LefthyToolsEchoesDB = betaDB, betaChronicle, betaBestiary, betaEchoes
 local mark = #PRINTED + 1
 Start()
 local db = LefthyToolsDB
 check(LT.world == "release" and LT.betaForgotten, "the release; the beta's data found")
-check(db ~= betaDB and LefthyToolsChronicleDB ~= betaChronicle and LefthyToolsBestiaryDB ~= betaBestiary and stamped("release"),
-	"all three saved tables are new ones, and say they're the release's")
+check(db ~= betaDB and LefthyToolsChronicleDB ~= betaChronicle and LefthyToolsBestiaryDB ~= betaBestiary
+	and LefthyToolsEchoesDB ~= betaEchoes and LefthyToolsEchoesDB.store ~= "0badc0de" and stamped("release"),
+	"all four saved tables are new ones, and say they're the release's")
 check(db.modules.mirage == false and db.modules.beacon == true and db.modules.chronicle == true and LT:GetModule("beacon").enabled
 	and not LT:GetModule("mirage").enabled, "the modules as on a first install: Mirage off, the others on")
 check(db.settings.mirage.delay == LT:GetModule("mirage").defaults.delay and db.settings.tweaks.movableBags == true,
@@ -69,11 +73,11 @@ check(not (LefthyToolsNewsFrame and LefthyToolsNewsFrame:IsShown()), "no what's-
 
 -- Playing on the release: what it writes stays, /reload after /reload.
 db.settings.tweaks.movableBags = false
-local chronicle, bestiary = LefthyToolsChronicleDB, LefthyToolsBestiaryDB
+local chronicle, bestiary, echoes = LefthyToolsChronicleDB, LefthyToolsBestiaryDB, LefthyToolsEchoesDB
 mark = #PRINTED + 1
 Restart()
 check(not LT.betaForgotten and LefthyToolsDB == db and LefthyToolsChronicleDB == chronicle and LefthyToolsBestiaryDB == bestiary
-	and stamped("release") and notices(mark) == 0, "a /reload on the release: nothing goes, no chat line")
+	and LefthyToolsEchoesDB == echoes and stamped("release") and notices(mark) == 0, "a /reload on the release: nothing goes, no chat line")
 check(db.settings.tweaks.movableBags == false and LefthyToolsChronicleDB.chars["Lefthy-Realmy"] == me and not LT.freshInstall,
 	"what was set and recorded on the release stays")
 Restart()
@@ -86,12 +90,12 @@ LefthyToolsBestiaryDB = betaAgain
 mark = #PRINTED + 1
 Restart()
 check(LT.betaForgotten and LefthyToolsBestiaryDB ~= betaAgain and next(LefthyToolsBestiaryDB.mobs) == nil
-	and LefthyToolsDB == db and LefthyToolsChronicleDB == chronicle and stamped("release") and notices(mark) == 1,
-	"only the table the beta wrote goes; the release's stay")
+	and LefthyToolsDB == db and LefthyToolsChronicleDB == chronicle and LefthyToolsEchoesDB == echoes and stamped("release")
+	and notices(mark) == 1, "only the table the beta wrote goes; the release's stay")
 check(not LT.freshInstall, "(the settings stayed: not a first install)")
 
 -- A new install on the release (no saved variables at all): nothing to reset.
-LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB = nil, nil, nil
+LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB, LefthyToolsEchoesDB = nil, nil, nil, nil
 mark = #PRINTED + 1
 Restart()
 check(not LT.betaForgotten and LT.freshInstall and stamped("release") and notices(mark) == 0,
@@ -99,14 +103,14 @@ check(not LT.betaForgotten and LT.freshInstall and stamped("release") and notice
 
 -- The beta: its data stays as it is, from before the stamps too, and says it's the beta's.
 MOCK_CLIENT, MOCK_BUILD = { beta = true, test = true, ptr = false }, "70450"
-db, chronicle, bestiary = LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB
-db.world, chronicle.world, bestiary.world = nil, nil, nil
+db, chronicle, bestiary, echoes = LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB, LefthyToolsEchoesDB
+db.world, chronicle.world, bestiary.world, echoes.world = nil, nil, nil, nil
 db.settings.tweaks.movableBags = false
 mark = #PRINTED + 1
 Restart()
 check(LT.world == "beta" and not LT.betaForgotten and LefthyToolsDB == db and LefthyToolsChronicleDB == chronicle
-	and LefthyToolsBestiaryDB == bestiary and stamped("beta") and notices(mark) == 0 and db.settings.tweaks.movableBags == false,
-	"the beta: nothing goes, every table now says it's the beta's")
+	and LefthyToolsBestiaryDB == bestiary and LefthyToolsEchoesDB == echoes and stamped("beta") and notices(mark) == 0
+	and db.settings.tweaks.movableBags == false, "the beta: nothing goes, every table now says it's the beta's")
 
 -- Not known which client (a build before the release's that calls itself no beta): nothing changes.
 MOCK_CLIENT, MOCK_BUILD = { beta = false, test = false, ptr = false }, "70450"
@@ -123,8 +127,9 @@ IsBetaBuild = function() return MOCK_CLIENT.beta end
 -- Back on the release with that data (the beta's, and one table saying nothing): it all goes.
 release()
 Restart()
-check(LT.betaForgotten and LefthyToolsDB ~= db and LefthyToolsChronicleDB ~= chronicle and stamped("release")
-	and LefthyToolsDB.settings.tweaks.movableBags == true and notices(mark) == 1, "on the release the beta's data goes, settings and all")
+check(LT.betaForgotten and LefthyToolsDB ~= db and LefthyToolsChronicleDB ~= chronicle and LefthyToolsEchoesDB ~= echoes
+	and stamped("release") and LefthyToolsDB.settings.tweaks.movableBags == true and notices(mark) == 1,
+	"on the release the beta's data goes, settings and all")
 
 check(#ERRORS == 0, "no errors reported through the error handler")
 io.write(string.format("\n%d passed, %d failed (the release)\n", passes, failures))

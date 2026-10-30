@@ -75,7 +75,7 @@ local function secretsKept()
 			if type(v) == "table" and not issecretvalue(v) then walk(v, at, saved) end
 		end
 	end
-	for _, name in ipairs({ "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB" }) do
+	for _, name in ipairs({ "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB", "LefthyToolsEchoesDB" }) do
 		if type(_G[name]) == "table" then walk(_G[name], name, true) end
 	end
 	walk(ns, "ns")

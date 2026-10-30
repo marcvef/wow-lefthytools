@@ -10,7 +10,7 @@ in the [README](../README.md); this file covers how the code is organised.
 ```
 LefthyTools/                 the addon (copied or junctioned into Interface\AddOns)
   LefthyTools.toc            Interface 16001, SavedVariables LefthyToolsDB, LefthyToolsChronicleDB,
-                             LefthyToolsBestiaryDB; every file in load order
+                             LefthyToolsBestiaryDB, LefthyToolsEchoesDB; every file in load order
   Bindings.xml               LEFTHYTOOLS_MIRAGE_TOGGLE, LEFTHYTOOLS_MIRAGE_PEEK (hold),
                              LEFTHYTOOLS_CHRONICLE_TOGGLE
   Core/Locale.lua            ns.L localization table (English keys, falls back to English)
@@ -266,9 +266,10 @@ user: "any data from the beta should not be used. even if people copy the WTF fo
    `LT.FIRST_RELEASE_BUILD` (70532, the release's first) or later; unknown (nil) otherwise: an
    answer missing, broken or secret, or a client that says it's none of them on an older build (a
    beta that doesn't say so).
-2. **On the release** each of the three saved tables whose `world` isn't `"release"` (the beta's,
-   or none: written before the stamps, so on the beta) is dropped, as if LefthyTools had never been
-   installed: every module's defaults, a new journal and Bestiary, no errors, and `LT.freshInstall`
+2. **On the release** each of the saved tables (`SAVED`: the TOC's four) whose `world` isn't
+   `"release"` (the beta's, or none: written before the stamps, so on the beta) is dropped, as if
+   LefthyTools had never been installed: every module's defaults, a new journal, Bestiary and
+   Echoes recording, no errors, and `LT.freshInstall`
    (what's new counts everything as seen). Each table on its own: a copy of only one of them
    replaces only that one. At `PLAYER_LOGIN` one chat line says so ("LefthyTools: data from the
    beta was reset; WoW: Forever starts fresh.").
@@ -303,8 +304,8 @@ second (UTC), worked out once, so it's cheap for every record.
   in `Bindings.xml` as `LEFTHYTOOLS_<MODULE>_<ACTION>` with `BINDING_NAME_...` globals.
 - **Saved variables:** `LefthyToolsDB = { modules = { <key> = bool }, settings = { <key> = {...} } }`,
   plus Core's `errors` and `changelogSeen` and a few top-level keys of modules' own (data, not
-  settings); Chronicle and Bestiary keep their data in `LefthyToolsChronicleDB` and
-  `LefthyToolsBestiaryDB`. Each of the three says where it was written (`world`: `"beta"` or
+  settings); Chronicle, Bestiary and Echoes keep their data in `LefthyToolsChronicleDB`,
+  `LefthyToolsBestiaryDB` and `LefthyToolsEchoesDB`. Each of the four says where it was written (`world`: `"beta"` or
   `"release"`; the release drops the beta's, see The beta and the release). Core parts that aren't
   modules get the table through `LT.onLoad`.
   Defaults are merged on load; `defaultEnabled` only applies when no on/off choice is saved
