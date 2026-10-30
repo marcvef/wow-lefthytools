@@ -98,14 +98,8 @@ local listeners = {}             -- Bt.OnChanged
 -- The database
 ---------------------------------------------------------------------------
 
--- A creature's ID from its GUID ("Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>"); nil for
--- players, pets of players, objects and hidden ones.
-function Bt.CreatureOf(guid)
-	if type(guid) ~= "string" or issecret(guid) then
-		return nil
-	end
-	return tonumber(guid:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-") or guid:match("^Vehicle%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
-end
+-- A creature's ID from its GUID; nil for players, pets of players, objects and hidden ones (Core's).
+Bt.CreatureOf = LT.CreatureOf
 
 -- A kind of mob's record (nil: never killed or seen).
 function Bt.Mob(creature)

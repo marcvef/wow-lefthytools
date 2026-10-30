@@ -51,7 +51,7 @@ Fields added later (`pace`, `spots`, `levels`) are simply missing from older rec
 reads them as "not known" (a record without `levels` has its `level`, and starts from it).
 
 The creature ID comes from the GUID (`Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>`, also
-`Vehicle-`; `Bt.CreatureOf`). `drops` is how many corpses it came from, `count` how many in all.
+`Vehicle-`; `Bt.CreatureOf`, Core's `LT.CreatureOf`). `drops` is how many corpses it came from, `count` how many in all.
 Drop chance = drops / kills; per drop = count / drops (`Bt.Chance`; skinning: out of skinnings).
 `Bt.Drops(mob, showPoor)`: the drops, the likeliest first, the better quality first when even, then
 the same for skinning (`skin = true`); grey ones only with `showPoor`. Use `Bt.Part(mob, skin)` for

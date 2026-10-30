@@ -543,7 +543,7 @@ watch <name>`, a click on their world map dot (`streamMapClick`), or a cinematic
 (`streamFlights`). Files:
 
 - `Stream.lua`: asking the game (`B.Stream` = `S`: `S.Api`, `S.Value`, range checks, `S.Bounds`,
-  `S.YardsFrom`, `S.CreatureOf`), what a mob is called (`S.LevelText`, `S.MobTitle`,
+  `S.YardsFrom`, `S.CreatureOf` = Core's `LT.CreatureOf`), what a mob is called (`S.LevelText`, `S.MobTitle`,
   `S.ClassLabel`), the test (`/lefthy stream test` / `results`), the commands.
 - `StreamHealth.lua`: health, estimated: yours (`S.Health()`, while Beacon is on) and the mobs'
   (`S.MobHealth`, `S.MobMaxOf`, while the sensor runs); below.

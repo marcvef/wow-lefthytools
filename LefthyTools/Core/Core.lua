@@ -272,6 +272,19 @@ function LT.Position()
 end
 
 ---------------------------------------------------------------------------
+-- Creatures (the Bestiary's records, the fight stream's mobs)
+---------------------------------------------------------------------------
+
+-- A creature's ID from its GUID ("Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>", also
+-- "Vehicle-"); nil for players, pets of players, objects, a secret and anything else.
+function LT.CreatureOf(guid)
+	if type(guid) ~= "string" or issecret(guid) then
+		return nil
+	end
+	return tonumber(guid:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-") or guid:match("^Vehicle%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
+end
+
+---------------------------------------------------------------------------
 -- Your own loot (Chronicle counts it, the fight stream shows it)
 ---------------------------------------------------------------------------
 

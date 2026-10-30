@@ -177,14 +177,8 @@ function S.YardsFrom(near, far)
 	return nil
 end
 
--- A mob's creature ID, from its GUID ("Creature-0-<server>-<instance>-<zone>-<ID>-<spawn>"); nil for
--- players (and when hidden).
-function S.CreatureOf(key)
-	if type(key) ~= "string" then
-		return nil
-	end
-	return tonumber(key:match("^Creature%-%d+%-%d+%-%d+%-%d+%-(%d+)%-") or key:match("^Vehicle%-%d+%-%d+%-%d+%-%d+%-(%d+)%-"))
-end
+-- A mob's creature ID, from its GUID; nil for players (and when hidden). Core's.
+S.CreatureOf = LT.CreatureOf
 
 -- A mob's (or a player's) level as the game shows it: "??" where the game says -1 (a boss, or too
 -- far above you to tell); nil when not known.

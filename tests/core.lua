@@ -63,6 +63,15 @@ do -- shared text helpers
 		"LT.Ago: just now, minutes, hours, yesterday, days")
 	check(ns.Chronicle.Ago == LT.Ago, "Chronicle's Ago is Core's")
 end
+do -- a creature's ID from its GUID (the Bestiary's records, the fight stream's mobs)
+	local of = LT.CreatureOf
+	check(of("Creature-0-4372-0-12-327-00004A1B2C") == 327 and of("Vehicle-0-4372-0-12-28781-00004A1B2C") == 28781,
+		"LT.CreatureOf: a creature's or a vehicle's ID")
+	check(of("Player-1-0ABCDEF0") == nil and of("Pet-0-4372-0-12-416-0100ABCDEF") == nil
+		and of("GameObject-0-4372-0-12-1731-00004A1B2C") == nil and of(SECRET) == nil and of(nil) == nil and of(327) == nil,
+		"... nil for players, pets, objects, a secret and what isn't a GUID")
+	check(ns.Bestiary.CreatureOf == of and ns.Beacon.Stream.CreatureOf == of, "the Bestiary's and the fight stream's CreatureOf are Core's")
+end
 do -- character names: a first name and a surname on Forever
 	local N, surnameBefore = LT.Names, MY_SURNAME
 	check(N.First("Anna Brook") == "Anna" and N.First("Anna-Realm") == "Anna" and N.First("Anna") == "Anna"
