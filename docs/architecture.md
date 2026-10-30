@@ -2,7 +2,8 @@
 
 LefthyTools is one addon made of switchable modules: **Mirage** (fades the HUD when idle),
 **Misc Tweaks** (small fixes), **Beacon** (Battle.net friends on the map), **Chronicle** (a
-journal per character) and **Bestiary** (what mobs drop). User-facing docs are
+journal per character), **Bestiary** (what mobs drop) and **Echoes** (records your path and what
+happens on it). User-facing docs are
 in the [README](../README.md); this file covers how the code is organised.
 
 ## Layout
@@ -97,6 +98,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Bestiary/Card.lua        the card beside the mouse
   Modules/Bestiary/LedgerMap.lua   the ledger's kill map
   Modules/Bestiary/Ledger.lua      the ledger: every mob, its statistics and drops, fuzzy search over mobs and items
+  Modules/Echoes/Echoes.lua        Echoes: the module, settings, its saved table (LefthyToolsEchoesDB), its events and driver
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md

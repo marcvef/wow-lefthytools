@@ -41,6 +41,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `levelup.lua` | Misc Tweaks: the level-up window | - |
 | `bestiary.lua` | Bestiary | - |
 | `whatsnew.lua` | Core: the what's new window | - |
+| `echoes.lua` | Echoes: the module, its saved table, events and driver, recording only off the beta | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:

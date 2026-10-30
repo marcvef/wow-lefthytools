@@ -37,7 +37,10 @@ check(LefthyToolsDB.settings.tweaks.afkScreen == false and mdb.afkScreen == nil,
 check(S("LefthyTools_tweaks_comboNameplate").name == "Combopunkte an der Namensplakette deines Ziels", "combo point dot setting in German")
 check(S("LefthyTools_beacon_dingSoundKit").name == "Level-Up-Sound", "level-up sound dropdown in German")
 check(LT:GetModule("mirage").category.name == "Mirage" and LT:GetModule("tweaks").category.name == "Misc Tweaks"
-	and LT:GetModule("beacon").category.name == "Beacon", "module names are never translated")
+	and LT:GetModule("beacon").category.name == "Beacon" and LT:GetModule("echoes").category.name == "Echoes"
+	and S("LefthyTools_module_echoes").name == "Echoes", "module names are never translated")
+check(S("LefthyTools_echoes_relay").name == "Aufzeichnungen von Freunden weitergeben" and S("LefthyTools_echoes_collect").name == "Aufzeichnungen sammeln",
+	"Echoes' settings are German")
 check(S("LefthyTools_beacon_share").name == "Meine Position teilen", "Beacon settings are German")
 check(S("LefthyTools_module_tweaks").name == "Misc Tweaks", "overview switch keeps the module name")
 check(S("LefthyTools_mirage_delay").name == "Wartezeit bis zum Ausblenden", "Mirage slider label")

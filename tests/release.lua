@@ -9,9 +9,11 @@ end
 io.write("\n== WoW: Forever's release: the beta's saved data\n")
 
 -- The game loading LefthyTools (TOC order, then the events), with the saved variables as they are.
-local LT
+local LT, addonNS
+local function ns() return addonNS end -- the addon's namespace, as last loaded
 local function Start()
 	local ns = {}
+	addonNS = ns
 	for _, file in ipairs(SOURCES) do
 		local chunk = assert(load(file.src, "@Interface/AddOns/LefthyTools/" .. file.name)) -- named like in game
 		chunk("LefthyTools", ns)
@@ -58,6 +60,10 @@ check(LT.world == "release" and LT.betaForgotten, "the release; the beta's data 
 check(db ~= betaDB and LefthyToolsChronicleDB ~= betaChronicle and LefthyToolsBestiaryDB ~= betaBestiary
 	and LefthyToolsEchoesDB ~= betaEchoes and LefthyToolsEchoesDB.store ~= "0badc0de" and stamped("release"),
 	"all four saved tables are new ones, and say they're the release's")
+local echoesStore = LefthyToolsEchoesDB.store
+check(LefthyToolsEchoesDB.session == 1 and LefthyToolsEchoesDB.n == 0 and next(LefthyToolsEchoesDB.mine) == nil
+	and echoesStore:match("^%x+$") and #echoesStore == 8 and LT:GetModule("echoes").enabled and ns().Echoes.recording,
+	"Echoes as on a first install: session 1, no pages, a store of its own; it records on the release")
 check(db.modules.mirage == false and db.modules.beacon == true and db.modules.chronicle == true and LT:GetModule("beacon").enabled
 	and not LT:GetModule("mirage").enabled, "the modules as on a first install: Mirage off, the others on")
 check(db.settings.mirage.delay == LT:GetModule("mirage").defaults.delay and db.settings.tweaks.movableBags == true,
@@ -80,6 +86,7 @@ check(not LT.betaForgotten and LefthyToolsDB == db and LefthyToolsChronicleDB ==
 	and LefthyToolsEchoesDB == echoes and stamped("release") and notices(mark) == 0, "a /reload on the release: nothing goes, no chat line")
 check(db.settings.tweaks.movableBags == false and LefthyToolsChronicleDB.chars["Lefthy-Realmy"] == me and not LT.freshInstall,
 	"what was set and recorded on the release stays")
+check(LefthyToolsEchoesDB.session == 2 and LefthyToolsEchoesDB.store == echoesStore, "Echoes: every load a new session, the same store")
 Restart()
 check(LefthyToolsDB == db and LefthyToolsChronicleDB == chronicle and LefthyToolsBestiaryDB == bestiary and notices(mark) == 0,
 	"and the next time too")

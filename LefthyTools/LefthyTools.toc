@@ -95,3 +95,5 @@ Modules\Bestiary\Window.lua
 Modules\Bestiary\Card.lua
 Modules\Bestiary\LedgerMap.lua
 Modules\Bestiary\Ledger.lua
+
+Modules\Echoes\Echoes.lua

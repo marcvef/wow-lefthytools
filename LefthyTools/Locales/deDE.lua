@@ -946,3 +946,13 @@ L["Where you killed them"] = "Wo du sie getötet hast"
 L["Your last %d kills."] = "Deine letzten %d Kills."
 L["item %d"] = "Item %d"
 L["No kills on a map yet"] = "Noch keine Kills auf der Karte"
+
+-- Echoes
+L["Records the way you travel and what happens on it (level-ups, quests, kills, loot, deaths and more), on your computer. Nothing shows in game. Switched off, nothing is recorded."] =
+	"Zeichnet deinen Weg auf und was unterwegs passiert (Level-Ups, Quests, Kills, Loot, Tode und mehr), auf deinem Computer. Im Spiel wird nichts angezeigt. Ausgeschaltet wird nichts aufgezeichnet."
+L["Relay friends' recordings"] = "Aufzeichnungen von Freunden weitergeben"
+L["Keeps your Battle.net friends' recordings for a while and passes them on to whoever collects them, also when the two are never online at the same time. Needs Beacon; nothing is sent in combat."] =
+	"Hebt die Aufzeichnungen deiner Battle.net-Freunde eine Weile auf und gibt sie an den weiter, der sie sammelt, auch wenn die beiden nie gleichzeitig online sind. Braucht Beacon; im Kampf wird nichts gesendet."
+L["Collect recordings"] = "Aufzeichnungen sammeln"
+L["Gathers your Battle.net friends' recordings, and your own from other computers, on this computer, for a program outside the game to read. They take space until it has them: leave this off unless you're the one collecting."] =
+	"Sammelt die Aufzeichnungen deiner Battle.net-Freunde und deine eigenen von anderen Computern auf diesem Computer, damit ein Programm außerhalb des Spiels sie lesen kann. Bis es sie hat, brauchen sie Platz: Lass das aus, außer du bist derjenige, der sammelt."
