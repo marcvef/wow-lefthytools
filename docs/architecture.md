@@ -330,7 +330,9 @@ second (UTC), worked out once, so it's cheap for every record.
   before it, inside `PLAYER_REGEN_DISABLED`; never a secret); text: `LT.CutUTF8(text, maxBytes)`
   (a byte limit cut on a whole UTF-8 letter), `LT.Decimal(text, english)` (a number's decimal
   point as the client writes it, "4,5" in German; `english` keeps the point for chat lines),
-  `LT.Ago(t)` ("just now", "5 min ago", ..., localized); names with Forever's surnames in
+  `LT.Ago(t)` ("just now", "5 min ago", ..., localized), `LT.Hash32(text)` (8 lowercase hex
+  digits, case-sensitive; Chronicle's account hash is it of the lowercased BattleTag, so it must
+  never change); names with Forever's surnames in
   `LT.Names`: `First` ("Anna" of "Anna Brook" or "Anna-Realm"), `HasSurname`, `Same` (the same
   character however typed), `Mine` (my name as the game shows it, then the first name and the
   surname) and `IsMine`; `LT.SafeCall(m, method, ...)`; `LT.OwnLoot(text)` (your own loot from a

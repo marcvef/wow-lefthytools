@@ -63,6 +63,31 @@ do -- shared text helpers
 		"LT.Ago: just now, minutes, hours, yesterday, days")
 	check(ns.Chronicle.Ago == LT.Ago, "Chronicle's Ago is Core's")
 end
+do -- LT.Hash32: Chronicle's BattleTag hash made Core's. Chronicle's account hashes must stay what
+	-- they were (friends' journals go by them), so the old function is here as it was, and its answers
+	-- for a few BattleTags are written down.
+	local function before(text) -- Characters.lua's Hash before LT.Hash32
+		local h1, h2 = 5381, 0
+		text = text:lower()
+		for i = 1, #text do
+			local b = text:byte(i)
+			h1 = (h1 * 33 + b) % 4294967296
+			h2 = (h2 * 131 + b) % 4294967296
+		end
+		local h = (h1 + h2 * 7) % 4294967296
+		return ("%04x%04x"):format(math.floor(h / 65536), h % 65536)
+	end
+	local pinned = { ["Annie#1234"] = "9aa2ae65", ["Carl#3456"] = "58088b33", ["Dora#4567"] = "5d0a2479", ["BOB#2222"] = "91be0edd",
+		["J\195\164ger#9999"] = "a60fcc89", ["Cedric#31415"] = "e10168ab", [""] = "00001505", ["a"] = "0002b8ad" }
+	local same = true
+	for tag, hash in pairs(pinned) do
+		same = same and ns.Chronicle.Hash(tag) == hash and before(tag) == hash and LT.Hash32(tag:lower()) == hash
+	end
+	local long = ("Cedric Vale#2718;" .. ("\255\0\128|"):rep(40)):rep(30) -- (bytes of every kind, a few KB)
+	check(same and ns.Chronicle.Hash(long) == before(long), "Chronicle's account hash is LT.Hash32 of the lowercased BattleTag: the same as before")
+	check(LT.Hash32("Annie#1234") ~= LT.Hash32("annie#1234") and LT.Hash32("annie#1234") == "9aa2ae65"
+		and LT.Hash32(long):match("^%x%x%x%x%x%x%x%x$") and not LT.Hash32(long):find("%u"), "LT.Hash32: case-sensitive, 8 lowercase hex digits")
+end
 do -- a creature's ID from its GUID (the Bestiary's records, the fight stream's mobs)
 	local of = LT.CreatureOf
 	check(of("Creature-0-4372-0-12-327-00004A1B2C") == 327 and of("Vehicle-0-4372-0-12-28781-00004A1B2C") == 28781,

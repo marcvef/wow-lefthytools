@@ -296,8 +296,8 @@ ones kept from before go on start). Covered by the "Share highlights with friend
 Battle.net messages only reach friends who are online at the same time. So every client keeps
 what it learned about friends (`store.book`) and passes it on: whoever is online brings the news of
 whoever isn't. Journals go per Battle.net account, named by a hash of its BattleTag (`C.Hash`: two
-rolling 32-bit hashes of the lowercased BattleTag folded into 8 hex digits; the BattleTag itself
-is never sent). A client only asks for, and only keeps, accounts whose hash matches one of its own
+rolling 32-bit hashes of the lowercased BattleTag folded into 8 hex digits, Core's `LT.Hash32`;
+the BattleTag itself is never sent). A client only asks for, and only keeps, accounts whose hash matches one of its own
 Battle.net friends (`C_BattleNet.GetFriendAccountInfo(i).battleTag`, online or not, cached 30 s):
 nobody gets the journal of someone who isn't their friend. My own account: `BNGetInfo()`'s
 BattleTag.

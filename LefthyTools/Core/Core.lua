@@ -101,6 +101,20 @@ function LT.Ago(t)
 	return L["%d days ago"]:format(math.floor(seconds / 86400))
 end
 
+-- text's 32-bit hash as 8 lowercase hex digits, case-sensitive: two 32-bit rolling hashes folded
+-- into one, written as two 16-bit halves (%x of a number above 2^31 isn't safe in every Lua).
+-- Chronicle's account hash is this of the lowercased BattleTag (C.Hash): it must never change.
+function LT.Hash32(text)
+	local h1, h2 = 5381, 0
+	for i = 1, #text do
+		local b = text:byte(i)
+		h1 = (h1 * 33 + b) % 4294967296
+		h2 = (h2 * 131 + b) % 4294967296
+	end
+	local h = (h1 + h2 * 7) % 4294967296
+	return ("%04x%04x"):format(math.floor(h / 65536), h % 65536)
+end
+
 ---------------------------------------------------------------------------
 -- Character names (LT.Names). In WoW: Forever every character has a first name and a surname:
 -- UnitName gives them apart (the surname as its second return), the game and Battle.net show them

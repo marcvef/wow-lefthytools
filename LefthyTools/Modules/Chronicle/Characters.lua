@@ -34,18 +34,11 @@ C.NewsChanged = NewsChanged
 -- Accounts: BattleTag hashes
 ---------------------------------------------------------------------------
 
--- Two 32-bit rolling hashes over the lowercased BattleTag, folded into 8 hex digits (built from
--- two 16-bit halves: %x of a number above 2^31 isn't safe in every Lua).
+-- An account's hash: Core's LT.Hash32 (two 32-bit rolling hashes folded into 8 hex digits) of the
+-- lowercased BattleTag, so any way of writing it gives the same.
+local Hash32 = ns.LT.Hash32
 local function Hash(text)
-	local h1, h2 = 5381, 0
-	text = text:lower()
-	for i = 1, #text do
-		local b = text:byte(i)
-		h1 = (h1 * 33 + b) % 4294967296
-		h2 = (h2 * 131 + b) % 4294967296
-	end
-	local h = (h1 + h2 * 7) % 4294967296
-	return ("%04x%04x"):format(math.floor(h / 65536), h % 65536)
+	return Hash32(text:lower())
 end
 C.Hash = Hash
 
