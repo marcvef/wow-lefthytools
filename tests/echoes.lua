@@ -46,7 +46,8 @@ do
 	E.On("ECHOES_TEST_EVENT", function(a) seen[#seen + 1] = "third " .. tostring(a) end)
 	E.On("ECHOES_TEST_UNIT", function(unit) seen[#seen + 1] = "unit " .. unit end, "player")
 	E.When("start", function() starts = starts + 1 end)
-	E.When("stop", function() stops = stops + 1 end)
+	local stopRecording -- (whether Echoes still recorded when the stop hook ran)
+	E.When("stop", function() stops, stopRecording = stops + 1, E.recording end)
 
 	-- The mock is the beta: switched on, but nothing runs.
 	Advance(1)
@@ -79,6 +80,7 @@ do
 	Fire("ECHOES_TEST_EVENT", 3, 4)
 	check(not E.recording and not E.driver:IsShown() and ticks == ticksWere and #seen == 3 and stops == 1,
 		"switched off: no ticks, no events (nothing runs)")
+	check(stopRecording == true, "the stop hooks run just before: still recording (for their last lines)")
 	LT:SetModuleEnabled("echoes", true)
 	check(E.recording and starts == 2, "on again: recording again")
 

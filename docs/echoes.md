@@ -39,7 +39,8 @@ What the files share (`E`):
   `GetTime()`), each through `LT.Guard`. Subscribers throttle themselves. The driver resets its timer
   before the tick, so an error can't make it run every frame.
 - `E.When("start" | "stop", fn)`: `fn()` once recording has started (login with Echoes on, or
-  switched on: events registered, driver running) or stopped (switched off), through `LT.Guard`.
+  switched on: events registered, driver running), or just before it stops (switched off; still
+  recording, so it can write its last lines), through `LT.Guard`.
 - `E.data`: `LefthyToolsEchoesDB` (below); `E.driver`: the driver frame (for tests).
 
 **Settings** (`LefthyToolsDB.settings.echoes`), for the delivery (not built yet):

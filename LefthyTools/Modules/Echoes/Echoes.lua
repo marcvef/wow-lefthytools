@@ -141,9 +141,10 @@ end)
 E.driver = driver -- (for tests)
 
 ---------------------------------------------------------------------------
--- Recording starts and stops. E.When("start" | "stop", fn): fn() after recording started (login
--- with Echoes on, or switched on: events registered, the driver running) or stopped (switched off:
--- events unregistered, the driver stopped).
+-- Recording starts and stops. E.When("start" | "stop", fn): fn() once recording has started (login
+-- with Echoes on, or switched on: events registered, the driver running), or just before it stops
+-- (switched off; still recording, so it can write its last lines; then the events are unregistered
+-- and the driver stops).
 ---------------------------------------------------------------------------
 
 local hooks = { start = {}, stop = {} }
@@ -176,10 +177,10 @@ function M:OnDisable()
 	if not E.recording then
 		return
 	end
+	Run("stop") -- (still recording: the last lines)
 	E.recording = false
 	events:UnregisterAllEvents()
 	driver:Hide()
-	Run("stop")
 end
 
 ---------------------------------------------------------------------------
