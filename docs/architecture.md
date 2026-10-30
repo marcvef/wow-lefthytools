@@ -99,6 +99,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Bestiary/LedgerMap.lua   the ledger's kill map
   Modules/Bestiary/Ledger.lua      the ledger: every mob, its statistics and drops, fuzzy search over mobs and items
   Modules/Echoes/Echoes.lua        Echoes: the module, settings, its saved table (LefthyToolsEchoesDB), its events and driver
+  Modules/Echoes/Lines.lua         the line encoder: everything recorded as one line of text (the format: echoes.md)
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md

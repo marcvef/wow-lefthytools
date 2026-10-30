@@ -97,3 +97,4 @@ Modules\Bestiary\LedgerMap.lua
 Modules\Bestiary\Ledger.lua
 
 Modules\Echoes\Echoes.lua
+Modules\Echoes\Lines.lua

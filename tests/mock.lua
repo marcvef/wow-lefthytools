@@ -451,6 +451,8 @@ function ButtonFrameTemplate_HidePortrait(f) f._noPortrait = true end
 MOCK_EPOCH = os.time({ year = 2030, month = 5, day = 15, hour = 12, min = 0, sec = 0 })
 function time(t) if t then return os.time(t) end return MOCK_EPOCH + math.floor(now) end
 function date(fmt, t) return os.date(fmt, t or time()) end
+-- The realm's clock (Echoes writes in it): the computer's here; a test replaces it to move it.
+function GetServerTime() return time() end
 -- Which client this is (Core's LT.WhichWorld): the beta, like the game today. MOCK_CLIENT's beta,
 -- test and ptr are what IsBetaBuild, IsTestBuild and IsPublicTestClient answer, MOCK_BUILD
 -- GetBuildInfo's build (the release's first is 70532).
