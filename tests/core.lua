@@ -88,6 +88,17 @@ do -- LT.Hash32: Chronicle's BattleTag hash made Core's. Chronicle's account has
 	check(LT.Hash32("Annie#1234") ~= LT.Hash32("annie#1234") and LT.Hash32("annie#1234") == "9aa2ae65"
 		and LT.Hash32(long):match("^%x%x%x%x%x%x%x%x$") and not LT.Hash32(long):find("%u"), "LT.Hash32: case-sensitive, 8 lowercase hex digits")
 end
+do -- your own loot (LT.OwnLoot): looted, or pushed (a quest reward, a purchase)
+	local function loot(text) return { LT.OwnLoot(text) } end
+	local looted, several = loot(LOOT_ITEM_SELF:format(ItemLink(2075))), loot(LOOT_ITEM_SELF_MULTIPLE:format(ItemLink(2589), 3))
+	local pushed, pushedSeveral = loot(LOOT_ITEM_PUSHED_SELF:format(ItemLink(2075))), loot(LOOT_ITEM_PUSHED_SELF_MULTIPLE:format(ItemLink(2589), 2))
+	check(looted[2] == 2075 and looted[3] == 1 and looted[5] == false and several[2] == 2589 and several[3] == 3 and several[5] == false,
+		"LT.OwnLoot: looted (\"You receive loot:\"): not pushed")
+	check(pushed[2] == 2075 and pushed[3] == 1 and pushed[5] == true and pushedSeveral[2] == 2589 and pushedSeveral[3] == 2
+		and pushedSeveral[5] == true, "... a quest reward or a purchase (\"You receive item:\"): pushed, as the last answer")
+	check(select("#", LT.OwnLoot("Anna Brook receives loot: " .. ItemLink(2075) .. ".")) <= 1 and LT.OwnLoot(SECRET) == nil,
+		"someone else's loot, a secret: nothing")
+end
 do -- a creature's ID from its GUID (the Bestiary's records, the fight stream's mobs)
 	local of = LT.CreatureOf
 	check(of("Creature-0-4372-0-12-327-00004A1B2C") == 327 and of("Vehicle-0-4372-0-12-28781-00004A1B2C") == 28781,

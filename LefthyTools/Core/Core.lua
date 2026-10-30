@@ -303,9 +303,12 @@ end
 ---------------------------------------------------------------------------
 
 local lootPatterns
+local PUSHED_FROM = 3 -- lootPatterns from this one on are the "pushed" lines
 
--- A CHAT_MSG_LOOT line about your own loot: its link, item ID, count and quality (nil if it's
--- someone else's; the quality nil if not known).
+-- A CHAT_MSG_LOOT line about your own loot: its link, item ID, count, quality and whether the item
+-- was pushed (nil if it's someone else's; the quality nil if not known). Pushed: "You receive
+-- item:" (LOOT_ITEM_PUSHED_SELF: quest rewards, purchases and the like), not "You receive loot:"
+-- (LOOT_ITEM_SELF: looted from a corpse, a chest, a node): true or false.
 function LT.OwnLoot(text)
 	if type(text) ~= "string" or LT.IsSecret(text) then
 		return nil
@@ -319,7 +322,7 @@ function LT.OwnLoot(text)
 			lootPatterns[#lootPatterns + 1] = "^" .. pattern .. "$"
 		end
 	end
-	for _, pattern in ipairs(lootPatterns) do
+	for i, pattern in ipairs(lootPatterns) do
 		local link, count = text:match(pattern)
 		if link then
 			local itemID = tonumber(link:match("|Hitem:(%d+)"))
@@ -327,7 +330,7 @@ function LT.OwnLoot(text)
 			if type(quality) ~= "number" then
 				quality = tonumber(link:match("|cnIQ(%d):")) -- retail links carry their quality
 			end
-			return link, itemID, tonumber(count) or 1, quality
+			return link, itemID, tonumber(count) or 1, quality, i >= PUSHED_FROM
 		end
 	end
 end
