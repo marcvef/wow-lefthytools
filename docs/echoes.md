@@ -135,11 +135,11 @@ swimming, m mounted, v travel form, f on foot.
 | `r` | back to life | how: s spirit healer, p player, c corpse |
 | `k` | kill | creature; level; classification; who m/p/g |
 | `l` | loot | item; count; quality; l looted / p pushed; source creature |
-| `g` | group | size; others; guid:name,... |
+| `g` | group | size; others; then one field per friend: guid:Name-Realm |
 | `G` | gear | slot; item; enchant; suffix |
 | `f` | AFK | 1 start / 0 end |
 | `R` | reputation | faction; standing |
-| `h` | gathering | kind h/o/s/f; node or creature; item:count,... |
+| `h` | gathering | kind h/o/s/f; node or creature; then one field per item: item:count |
 | `p` / `b` | honorable kills / battleground | count / instance; e entered, x left, w won, l lost; duration |
 | `n` | new collection item | kind m/p/t/a/r (mount, pet, toy, achievement, recipe); id |
 | `s` | profession | skill; rank; max |
