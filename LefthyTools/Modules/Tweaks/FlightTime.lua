@@ -55,13 +55,16 @@ local function PathLength(slot, nodeBySlot)
 end
 
 -- The route of a slot on the taxi map, just picked: { name = "Sentinel Hill, Westfall", route =
--- "From > To", pathYards, pathWait, distance, at = when it was picked }, or nil.
+-- "From > To", pathYards, pathWait, distance, at = when it was picked }, or nil; then the taxi node
+-- IDs of where you are and of the destination (the client's TaxiNodes IDs, as in
+-- Data/FlightPaths.lua; nil where the taxi map doesn't tell).
 function FlightTime.Pick(slot)
 	local name = TaxiNodeName and TaxiNodeName(slot)
 	if not (Readable(name) and type(name) == "string") then
 		return nil
 	end
 	local route = { name = name, at = GetTime() }
+	local fromNode, toNode
 	local ok = pcall(function()
 		local mapID = GetTaxiMapID and GetTaxiMapID()
 		local nodes = mapID and C_TaxiMap and C_TaxiMap.GetAllTaxiNodes(mapID)
@@ -76,6 +79,8 @@ function FlightTime.Pick(slot)
 				there = node
 			end
 		end
+		fromNode = here and type(here.nodeID) == "number" and here.nodeID or nil
+		toNode = there and type(there.nodeID) == "number" and there.nodeID or nil
 		if here and Readable(here.name) then
 			route.route = here.name .. " > " .. name
 		end
@@ -91,7 +96,7 @@ function FlightTime.Pick(slot)
 		-- Without the taxi map's nodes: from where you stand.
 		route.route = (GetRealZoneText() or "?") .. "/" .. (GetSubZoneText() or "") .. " > " .. name
 	end
-	return route
+	return route, fromNode, toNode
 end
 
 ---------------------------------------------------------------------------

@@ -26,6 +26,8 @@ do
 	TAXI_NODES[3] = "Sentinel Hill, Westfall"
 	local route = "Stormwind, Elwynn > Sentinel Hill, Westfall"
 	LefthyToolsDB.flightTimes[route], LefthyToolsDB.flightPace = nil, nil
+	local picked, fromNode, toNode = ns.FlightTime.Pick(3)
+	check(picked.route == route and fromNode == nil and toNode == nil, "a taxi map without node IDs: the route, no node IDs")
 	TakeTaxiNode(3) -- picked on the flight map
 	ZONE, CAMERA.zoom, CAMERA.spinning = "Stormwind City", 10, false
 	Fire("PLAYER_CONTROL_LOST") -- a stun, say: no taxi
@@ -211,6 +213,9 @@ do
 	}
 	TAXI_NODES[3], TAXI_NODES[4] = "Tarren Mill, Hillsbrad", "Hammerfall, Arathi"
 	TAXI_ROUTES = { [3] = { { 1, 3 } }, [4] = { { 1, 3 }, { 3, 4 } } }
+	picked, fromNode, toNode = ns.FlightTime.Pick(4)
+	check(picked.route == "Undercity, Tirisfal > Hammerfall, Arathi" and fromNode == 11 and toNode == 17,
+		"FlightTime.Pick: also the taxi node IDs it goes from and to (the destination's, not a stop on the way)")
 	LefthyToolsDB.flightPathPace = nil
 	TakeTaxiNode(4) -- two legs: Undercity > Tarren Mill > Hammerfall, 4222 + 3532 yd
 	TRAVEL.taxi = true

@@ -463,7 +463,9 @@ left alone (a first version pulled it back and circled; that was removed).
 - **Time left** (`FlightTime.lua`: `Pick` on the taxi map, `Trip` at takeoff, `Record` on
   landing, `Left` / `Text` for the bottom bar): the game doesn't tell. The same hook reads the
   taxi map (`GetTaxiMapID`, `C_TaxiMap.GetAllTaxiNodes`): the node you're at (state `Current`)
-  names the route ("From > To"), and each slot's `nodeID`. Best first:
+  names the route ("From > To"), and each slot's `nodeID`. `Pick` also returns the node IDs of
+  where you are and of the destination, after the route (for other modules; the film doesn't use
+  them). Best first:
   1. A route flown before: each flight that lands is timed (10 s to 30 min, also when the film
      was ended early) and kept per route in `LefthyToolsDB.flightTimes`; the next flight on it
      counts down exactly ("Landing in 1:42").
