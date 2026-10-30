@@ -226,6 +226,52 @@ function LT.CompareVersions(a, b)
 end
 
 ---------------------------------------------------------------------------
+-- Where I am: my position in world yards (Beacon's state, dots, minimap and pings)
+---------------------------------------------------------------------------
+
+-- The map route (C_Map: the best map for me, my spot on it, that spot in the world; verified in
+-- game) is what Beacon sends. The minimap needs my position every frame while moving; UnitPosition
+-- gives it without creating tables, so it's used once it has been seen to agree with the map route
+-- (HereBeDragons relies on the two matching). That is checked again after every loading screen
+-- (another continent or an instance may not agree; Core's PLAYER_ENTERING_WORLD below): until it
+-- agrees again, the map route.
+local unitPositionAgrees = false
+local issecret = LT.IsSecret
+
+-- continent, north, west in world yards by the map route; nil where the game has no map position
+-- (dungeons, raids). Also notes whether UnitPosition agrees with it (same continent, < 2 yd).
+function LT.MapRoutePosition()
+	local mapID = C_Map.GetBestMapForUnit("player")
+	local mapPos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
+	if not mapPos then
+		return nil -- dungeons, raids and other places without a map position
+	end
+	local continent, worldPos = C_Map.GetWorldPosFromMapPos(mapID, mapPos)
+	if not continent or not worldPos then
+		return nil
+	end
+	local north, west = worldPos:GetXY()
+	if UnitPosition and not unitPositionAgrees then
+		local uNorth, uWest, _, uContinent = UnitPosition("player")
+		unitPositionAgrees = uNorth ~= nil and not (issecret(uNorth) or issecret(uWest) or issecret(uContinent))
+			and uContinent == continent and math.abs(uNorth - north) < 2 and math.abs(uWest - west) < 2
+	end
+	return continent, north, west
+end
+
+-- continent, north, west in world yards, or nil where the game hides positions: UnitPosition once
+-- it agrees with the map route, else the map route.
+function LT.Position()
+	if unitPositionAgrees then
+		local north, west, _, continent = UnitPosition("player")
+		if north and not (issecret(north) or issecret(west) or issecret(continent)) then
+			return continent, north, west
+		end
+	end
+	return LT.MapRoutePosition()
+end
+
+---------------------------------------------------------------------------
 -- Your own loot (Chronicle counts it, the fight stream shows it)
 ---------------------------------------------------------------------------
 
@@ -567,8 +613,13 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
+events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:SetScript("OnEvent", function(self, event, arg)
-	if event == "ADDON_LOADED" and arg == ADDON then
+	if event == "PLAYER_ENTERING_WORLD" then
+		-- A loading screen (another continent or an instance): UnitPosition has to agree with the map
+		-- route again before LT.Position uses it.
+		unitPositionAgrees = false
+	elseif event == "ADDON_LOADED" and arg == ADDON then
 		self:UnregisterEvent("ADDON_LOADED") -- (every add-on loaded later would fire it here too)
 		-- First of all, before anything reads the saved variables: the beta's go on the release.
 		LT.world = LT.WhichWorld()

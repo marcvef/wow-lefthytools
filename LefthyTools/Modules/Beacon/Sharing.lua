@@ -32,42 +32,9 @@ local lastVersionSent = 0 -- my version to every friend every VERSION_EVERY seco
 -- My own position, my state, what's on me, my level, my quest
 ---------------------------------------------------------------------------
 
--- The map route (verified in game) is what we send. The minimap needs my position every frame
--- while moving; UnitPosition gives it without creating tables, so it's used once it has been
--- seen to agree with the map route (HereBeDragons relies on the two matching), checked again
--- after every loading screen (another continent or instance).
-local unitPositionAgrees = false
+-- My position comes from Core: LT.Position (UnitPosition once it agrees with the map route, for
+-- the minimap's every frame) and LT.MapRoutePosition (the map route, verified in game: what we send).
 local issecret = LT.IsSecret
-
-local function MapRoutePosition()
-	local mapID = C_Map.GetBestMapForUnit("player")
-	local mapPos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
-	if not mapPos then
-		return nil -- dungeons, raids and other places without a map position
-	end
-	local continent, worldPos = C_Map.GetWorldPosFromMapPos(mapID, mapPos)
-	if not continent or not worldPos then
-		return nil
-	end
-	local north, west = worldPos:GetXY()
-	if UnitPosition and not unitPositionAgrees then
-		local uNorth, uWest, _, uContinent = UnitPosition("player")
-		unitPositionAgrees = uNorth ~= nil and not (issecret(uNorth) or issecret(uWest) or issecret(uContinent))
-			and uContinent == continent and math.abs(uNorth - north) < 2 and math.abs(uWest - west) < 2
-	end
-	return continent, north, west
-end
-
--- continent, north, west in world yards, or nil where the game hides positions.
-function B.MyWorldPosition()
-	if unitPositionAgrees then
-		local north, west, _, continent = UnitPosition("player")
-		if north and not (issecret(north) or issecret(west) or issecret(continent)) then
-			return continent, north, west
-		end
-	end
-	return MapRoutePosition()
-end
 
 local function CurrentState()
 	if not M.db.share then
@@ -84,7 +51,7 @@ local function CurrentState()
 		end
 	end
 	local position = ";;"
-	local continent, north, west = MapRoutePosition()
+	local continent, north, west = LT.MapRoutePosition()
 	if continent then
 		position = ("%d;%.1f;%.1f"):format(continent, north, west)
 	end
@@ -289,11 +256,10 @@ function B.SharingSettingChanged()
 	xpDirty, lastXPCheck = true, -math.huge
 end
 
--- After a loading screen: my state goes out at once, and UnitPosition has to agree with the map
--- route again (another continent or an instance).
+-- After a loading screen: my state goes out at once. (UnitPosition has to agree with the map route
+-- again too: Core sees to that, LT.Position.)
 function B.SharingEnteredWorld()
 	statusDirty, lastState = true, nil
-	unitPositionAgrees = false
 end
 
 ---------------------------------------------------------------------------

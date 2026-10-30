@@ -207,12 +207,12 @@ check(UNIT_POSITION_CALLS > calls, "my position comes from UnitPosition once it 
 do -- a loading screen: checked again (another continent or instance may not agree)
 	MOCK_UNITPOS_OFFSET = 50
 	Fire("PLAYER_ENTERING_WORLD", false, false)
-	local _, north = BB.MyWorldPosition()
+	local _, north = LT.Position()
 	check(north and math.abs(north - 500) < 1e-6, "after a loading screen: the map route until UnitPosition agrees again, got " .. tostring(north))
 	MOCK_UNITPOS_OFFSET = 0
-	BB.MyWorldPosition() -- they agree again
+	LT.Position() -- they agree again
 	MOCK_UNITPOS_OFFSET = 0.5 -- (only UnitPosition says so)
-	_, north = BB.MyWorldPosition()
+	_, north = LT.Position()
 	check(north and math.abs(north - 500.5) < 1e-6, "... and UnitPosition again once it does, got " .. tostring(north))
 	MOCK_UNITPOS_OFFSET = 0
 	Advance(0.5)

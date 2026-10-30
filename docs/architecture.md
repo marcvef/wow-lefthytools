@@ -334,7 +334,10 @@ second (UTC), worked out once, so it's cheap for every record.
   `LT.Names`: `First` ("Anna" of "Anna Brook" or "Anna-Realm"), `HasSurname`, `Same` (the same
   character however typed), `Mine` (my name as the game shows it, then the first name and the
   surname) and `IsMine`; `LT.SafeCall(m, method, ...)`; `LT.OwnLoot(text)` (your own loot from a
-  `CHAT_MSG_LOOT` line); versions (`LT.ParseVersion`, `LT.CompareVersions`). UI building blocks
+  `CHAT_MSG_LOOT` line); where I am: `LT.Position()` (continent, north, west in world yards, nil
+  where the game hides positions: `UnitPosition` once it has been seen to agree with the map route,
+  checked again after every loading screen, else the map route) and `LT.MapRoutePosition()` (the
+  map route alone); versions (`LT.ParseVersion`, `LT.CompareVersions`). UI building blocks
   are in `Core/Window.lua` (`LT.Window`), with `LT.Window.OpenCount()`: how many windows are open
   (Blizzard's panels, the bags, Mirage's window lists with ours), for Mirage, the AFK screen and
   flights.

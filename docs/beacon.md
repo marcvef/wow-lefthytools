@@ -11,7 +11,7 @@ Files, in load order:
   members), sending (one rate limiter, the queues), finding friends, receiving (`OnMessage`, the
   limits per friend), the driver tick, switching on and off, `/lefthy beacon status` (`B.PrintStatus`).
 - `Protocol.lua`: every message kind, what it says, and `B.Parse`, which reads them.
-- `Sharing.lua`: what I tell friends about myself: my position (`B.MyWorldPosition`) and state,
+- `Sharing.lua`: what I tell friends about myself: my position (Core's `LT.MapRoutePosition`) and state,
   tracked quest, level progress, enemies on me, level-ups, Chronicle highlights, my build every 10
   minutes; its event handlers only mark what changed, `B.SharingTick` sends it.
 - `Updates.lua`: a friend on a newer build (the notice, "What's coming"), and answering what's new
@@ -24,7 +24,7 @@ Files, in load order:
   reports), `Stream*.lua` (the fight stream), `Beacon.xml` (world map pin templates).
 
 They share state through `ns.Beacon` (`B`): `B.peers` (`gameAccountID -> peer`), the queues
-(`B.Queue`, `B.QueueToPeers`, `B.QueueLatest`, `B.QueueLow`, ...), `B.MyWorldPosition`, and hooks
+(`B.Queue`, `B.QueueToPeers`, `B.QueueLatest`, `B.QueueLow`, ...), and hooks
 the later files set, which Beacon.lua calls when they're there (`if B.X then B.X() end`): on the
 driver tick through `LT.Guard` (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`, `B.StreamHealthTick`,
 `B.RefreshMaps`, `B.UpdateMinimap`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
@@ -132,7 +132,9 @@ a world vector is (north, west) in yards (as in HereBeDragons, and `UnitPosition
 west, z, instanceID). The receiver converts back with `C_Map.GetMapPosFromWorldPos(continent,
 vector, openMapID)`. The minimap needs the own position every frame: `UnitPosition("player")`
 doesn't allocate and is used once it has been seen to agree (same continent, < 2 yd) with the map
-route; until then the map route is used.
+route; until then the map route is used. Both are Core's (Core.lua): `LT.Position()` (the dots,
+the minimap, pings; checked against the map route again after every loading screen) and
+`LT.MapRoutePosition()` (the map route alone: what the state message sends).
 
 ## World map
 

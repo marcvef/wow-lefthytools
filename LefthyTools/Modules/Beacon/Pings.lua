@@ -112,7 +112,7 @@ function B.PingMe()
 		M:Print("map pings are off (Beacon settings).")
 		return
 	end
-	local continent, north, west = B.MyWorldPosition()
+	local continent, north, west = LT.Position()
 	if not continent then
 		M:Print("can't ping here (no map position in dungeons and raids).")
 		return

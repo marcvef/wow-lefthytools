@@ -97,7 +97,7 @@ local DIRECTIONS = { L["north"], L["north-east"], L["east"], L["south-east"], L[
 
 -- "240 yd north-east" from me to a world position, or nil when it's on another continent.
 function B.DistanceText(theirContinent, theirNorth, theirWest)
-	local continent, north, west = B.MyWorldPosition()
+	local continent, north, west = LT.Position()
 	if not continent or theirContinent ~= continent then
 		return nil
 	end
@@ -620,7 +620,7 @@ function B.UpdateMinimap(now)
 		B.minimapDirty = true -- redraw once it's back (Mirage may hide it)
 		return
 	end
-	local continent, north, west = B.MyWorldPosition()
+	local continent, north, west = LT.Position()
 	local radius = C_Minimap and C_Minimap.GetViewRadius and C_Minimap.GetViewRadius()
 	if not continent or not radius or radius <= 0 then
 		if next(minimapPins) then
