@@ -594,7 +594,10 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
   request from them replaces theirs, being served or waiting, in its place, so a page asked again
   after 30 s keeps its turn and nobody holds two places; the page they're being served, asked
   again, goes on from the new offset. Asked from its end, only that page stops (what of it
-  already waits in Beacon's queue still goes, nothing more).
+  already waits in Beacon's queue still goes, nothing more). Friends who collect go first: a
+  free serve takes the first collector's request in the line, and a collector's request that
+  finds the line full takes the last relay's place (pages go to the collector; a relay only
+  carries them for a while).
 
 ### Checks
 

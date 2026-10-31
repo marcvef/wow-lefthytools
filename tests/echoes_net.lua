@@ -1230,6 +1230,30 @@ do
 	local after = #Sent(c, crowd[1], 1, "B2;ep;")
 	check(before > 0 and before < 40 and after - before <= 3 and #D.active == 0,
 		"a friend who restarted isn't served what they asked before (" .. before .. " parts, then " .. after - before .. ")")
+
+	-- Collectors first: pages go to the collector, a relay only carries them for a while. The line
+	-- full of relays' requests, Pal24 (collecting now) asks: the last relay's place is hers, and she
+	-- is served next.
+	Hello(c, crowd[24], "crsa")
+	Pass(c, 5)
+	mark = Mark(c)
+	c.env.EnterCombat()
+	for i = 1, 23 do
+		Ask(c, crowd[i], 600 + i)
+	end
+	Pass(c, 0.3)
+	Ask(c, crowd[24], 624)
+	Pass(c, 0.3)
+	local waiting = {}
+	for _, s in ipairs(D.serves) do
+		waiting[s.id] = true
+	end
+	check(#D.serves == 20 and waiting[crowd[24].id] and not waiting[crowd[22].id], "the line full: a collector's request takes a relay's place")
+	c.env.LeaveCombat()
+	Pass(c, 20)
+	order = Begun(c, mark)
+	check(order[3] == crowd[24].id or order[4] == crowd[24].id, "... and is served next (the two served then go on together), got "
+		.. table.concat(order, ","))
 	Stop(c)
 end
 

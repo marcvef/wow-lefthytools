@@ -794,10 +794,26 @@ local function NextMessage(now)
 	return nil
 end
 
+-- Whether a friend collects (their requests go first: pages go to the collector, a relay only
+-- carries them for a while).
+local function Collects(id)
+	return peers[id] ~= nil and peers[id].collect == true
+end
+
+-- The next request to serve: the first one of a friend who collects, else the first.
+local function NextServe()
+	for i, s in ipairs(serves) do
+		if Collects(s.id) then
+			return table.remove(serves, i)
+		end
+	end
+	return table.remove(serves, 1)
+end
+
 -- Requests waiting become serves while fewer than SERVING run.
 local function StartServes()
 	while #active < SERVING and serves[1] do
-		local s = table.remove(serves, 1)
+		local s = NextServe()
 		local page = ns.Beacon.peers[s.id] and Get(s.key, s.n)
 		if page and s.offset < #page.z then
 			nextX = nextX % 99 + 1
@@ -1291,10 +1307,19 @@ local function OnRequest(id, msg)
 		Control(id, Msg("en", msg.acct, msg.store, msg.n), "en")
 		return
 	end
+	if not stop and not turn and #serves >= SERVE_QUEUE and Collects(id) then
+		-- The line is full: a collector's request takes the place of the last relay's (they ask again).
+		for i = #serves, 1, -1 do
+			if not Collects(serves[i].id) then
+				table.remove(serves, i)
+				break
+			end
+		end
+	end
 	if not stop and (turn or #serves < SERVE_QUEUE) then
 		table.insert(serves, math.min(turn or #serves + 1, #serves + 1),
 			{ id = id, key = key, acct = msg.acct, store = msg.store, n = msg.n, offset = msg.offset })
-		StartServes() -- (SERVING of them at once, SERVE_QUEUE more waiting)
+		StartServes() -- (SERVING of them at once, collectors first; SERVE_QUEUE more waiting)
 	end
 end
 
