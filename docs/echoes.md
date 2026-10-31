@@ -747,7 +747,9 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   1.6 a second).
 - **Nothing in combat**: when a fight starts (`PLAYER_REGEN_DISABLED`), what still waits in
   Beacon's queue comes back out (`D.Withdraw`: parts are sent again from where they were, the rest
-  goes back in line).
+  goes back in line). Switched off in a fight, my "I'm out" hello waits for its end
+  (`PLAYER_REGEN_ENABLED` on a frame of its own, registered only then: Echoes' events and tick stop
+  with it); switched on again before that, it doesn't go.
 - **After a throttle or lockdown** (Beacon's `B.throttledAt`, result 3 or 11): nothing for 30 s;
   the next one right after doubles it, up to 5 minutes; after 10 calm minutes 30 s again. What
   waits comes back out the same way.

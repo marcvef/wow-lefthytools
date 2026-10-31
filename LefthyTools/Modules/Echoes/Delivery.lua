@@ -1773,8 +1773,29 @@ local function Tick(now)
 end
 E.OnTick(Tick)
 
+-- Switched off: my "I'm out" hello to these friends (gameAccountID -> true). Nothing of Echoes'
+-- goes in a fight: switched off in one, it waits for the fight's end (PLAYER_REGEN_ENABLED on a frame
+-- of its own: Echoes' events and tick stop with it); switched on again before that, it doesn't go.
+local outTo = {}
+local outFrame = CreateFrame("Frame")
+local function SayOut()
+	outFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	local beacon = Beacon()
+	if beacon and E.data and (E.data.acct or MyAccount()) then
+		for id in pairs(outTo) do
+			if beacon.peers[id] then
+				beacon.QueueLow(id, HelloMessage("a"))
+			end
+		end
+	end
+	wipe(outTo)
+end
+outFrame:SetScript("OnEvent", SayOut) -- (it only queues: Beacon sends on its own tick)
+
 -- Recording started (login, or switched on): friends already known hear my hello.
 E.When("start", function()
+	wipe(outTo) -- (switched off and on in a fight: they never heard I was out)
+	outFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
 	Reset()
 	local now = GetTime()
 	for id in pairs(ns.Beacon.peers) do
@@ -1782,16 +1803,21 @@ E.When("start", function()
 	end
 end)
 
--- Recording stops (switched off): friends hear that I'm out (no c, r or s; no answer wanted), and
--- nothing else of mine goes.
+-- Recording stops (switched off): friends hear that I'm out (no c, r or s; no answer wanted), after
+-- the fight if I'm in one, and nothing else of mine goes.
 E.When("stop", function()
 	Withdraw()
 	local beacon = Beacon()
-	if beacon and E.data and (E.data.acct or MyAccount()) then
-		for id, peer in pairs(peers) do
-			if peer.verified ~= false and beacon.peers[id] then
-				beacon.QueueLow(id, HelloMessage("a"))
-			end
+	for id, peer in pairs(beacon and peers or {}) do
+		if peer.verified ~= false and beacon.peers[id] then
+			outTo[id] = true
+		end
+	end
+	if next(outTo) then
+		if LT.InCombat() then
+			outFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		else
+			SayOut()
 		end
 	end
 	Reset()
