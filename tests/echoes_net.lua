@@ -202,7 +202,7 @@ local function Deliver()
 		local sent = c.env.GAMEDATA
 		for i = c.read + 1, #sent do
 			local m = sent[i]
-			world.log[#world.log + 1] = { from = c.who.id, to = m.id, data = m.data, at = world.time }
+			world.log[#world.log + 1] = { from = c.who.id, to = m.id, data = m.data, at = world.time, client = c }
 			local target = world.byId[m.id]
 			if target then
 				target.env.Fire("BN_CHAT_MSG_ADDON", m.prefix, m.data, "WHISPER", c.who.id)
@@ -1895,12 +1895,13 @@ do
 		"safe at Cedric: Anna drops hers, Bob his copies")
 	check(Holds(cedric, "mine", nil, mine) == 5, "Cedric's own stay (until the exporter has them), got " .. Holds(cedric, "mine", nil, mine))
 	-- The budget, all along: never more than 3 Echoes messages in a second from one client, nor 2 to
-	-- one friend; none over 255 bytes.
+	-- one friend; none over 255 bytes. (By client: a friend's last messages before a section stops
+	-- them and the next one's first, from a client of their own, aren't one client's.)
 	local sent = {}
 	for _, m in ipairs(world.log) do
 		if m.data:sub(1, 4) == "B2;e" then
-			sent[m.from] = sent[m.from] or {}
-			table.insert(sent[m.from], m)
+			sent[m.client] = sent[m.client] or {}
+			table.insert(sent[m.client], m)
 		end
 	end
 	local most, mostTo, longest = 0, 0, 0
