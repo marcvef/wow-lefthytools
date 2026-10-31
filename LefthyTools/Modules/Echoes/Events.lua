@@ -506,7 +506,9 @@ E.On("LOOT_READY", function()
 		return -- (not a node, the same window again, a node gathered before)
 	end
 	S.gatherAt, S.gatheredAt = -math.huge, now
-	local node = kind == "s" and LT.CreatureOf(source) or ObjectOf(source)
+	-- The node: the skinned creature, the herb's or the vein's game object. Fishing's source is the
+	-- bobber (always the same object), so none.
+	local node = kind == "s" and LT.CreatureOf(source) or kind ~= "f" and ObjectOf(source) or nil
 	Note("h", kind, node, items)
 end)
 

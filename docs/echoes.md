@@ -156,7 +156,7 @@ another loading screen.
 | `r` | `PLAYER_UNGHOST`: `s` after `CONFIRM_XP_LOSS` (the spirit healer, within 120 s), `p` after `RESURRECT_REQUEST` (within 70 s), else `c`; `PLAYER_ALIVE` alive without having released: `p` or `c`. Then the mode is read again |
 | `k` | `PARTY_KILL` by me, my pet (`UnitGUID("pet")`) or a group member (`C_PartyInfo.IsGUIDInGroup`), of a creature; each corpse once (the last 64). Level, classification (`n e r x w`; trivial and minus are `n`) and name from the mob cache |
 | `l` | `CHAT_MSG_LOOT` through `LT.OwnLoot`, quality 2 and better (an item not cached yet: by the link's colour): item, count, quality, `l` looted or `p` pushed, and the creature whose corpse the last loot window (within 5 s) said it came from; the item's name (`=i`) from the link |
-| `h` | `UNIT_SPELLCAST_SUCCEEDED` (player) with Herb Gathering, Mining or Skinning (each rank's ID, other ranks by name), then `LOOT_READY` within 1.5 s; or `IsFishingLoot()`. The node: the loot source's game object ID (herbs, ore, fishing), the creature for skinning; each node once (the last 32). Then one `item:count` field per item |
+| `h` | `UNIT_SPELLCAST_SUCCEEDED` (player) with Herb Gathering, Mining or Skinning (each rank's ID, other ranks by name), then `LOOT_READY` within 1.5 s; or `IsFishingLoot()`. The node: the loot source's game object ID (herbs, ore), the creature for skinning, none for fishing (its source is always the bobber, 35591); each node (each cast's bobber) once (the last 32). Then one `item:count` field per item |
 | `n` | `NEW_MOUNT_ADDED` (`m`), `NEW_PET_ADDED` (`p`: its species, `C_PetJournal.GetPetInfoByPetID`), `NEW_TOY_ADDED` (`t`), `ACHIEVEMENT_EARNED` (`a`, not one earned before), `NEW_RECIPE_LEARNED` (`r`) |
 | `B` | `ENCOUNTER_END` (success) and `BOSS_KILL`: the same encounter within 30 s once |
 | `F` | a post-hook on `TakeTaxiNode` (like Flight.lua's): `ns.FlightTime.Pick`'s taxi node IDs, from and to |
@@ -201,7 +201,7 @@ recorded. A `/played` you type sets it too.
 Whether `GetShapeshiftFormID` is 3 and 16 for the travel forms; the carried guess on a boat and a
 zeppelin; whether the silent `/played` stays silent; which of `QUEST_REMOVED` and
 `QUEST_TURNED_IN` comes first; `PARTY_KILL` for pets and group members; the gathering spell IDs and
-`GetLootSourceInfo`'s game object GUIDs for nodes and fishing; `PVP_MATCH_COMPLETE`'s winner (0 the
+`GetLootSourceInfo`'s game object GUIDs for nodes (and the bobber's for fishing); `PVP_MATCH_COMPLETE`'s winner (0 the
 Horde, 1 the Alliance, like `GetBattlefieldWinner`); `NEW_RECIPE_LEARNED`, `NEW_MOUNT_ADDED` and
 `FACTION_STANDING_CHANGED` firing (also for a faction under a closed header: a scan no longer
 writes those); `C_SkillInfo.GetSkillLineInfoByID` for professions not learned (nil, or rank 0: only
@@ -312,7 +312,7 @@ swimming, m mounted, v travel form, f on foot.
 | `G` | gear | slot; item; enchant; suffix |
 | `f` | AFK | 1 start / 0 end |
 | `R` | reputation | faction; standing |
-| `h` | gathering | kind h/o/s/f; node or creature; then one field per item: item:count |
+| `h` | gathering | kind h/o/s/f; node or creature (empty for fishing); then one field per item: item:count |
 | `p` / `b` | honorable kills / battleground | count / instance; e entered, x left, w won, l lost; duration |
 | `n` | new collection item | kind m/p/t/a/r (mount, pet, toy, achievement, recipe); id |
 | `s` | profession | skill; rank; max |

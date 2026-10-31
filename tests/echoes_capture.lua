@@ -980,6 +980,9 @@ do
 	LOOT, LOOT_FISHING = { { type = 1, id = 6303, quantity = 1, source = "GameObject-0-1-0-1-35591-000000D4" } }, true
 	Fire("LOOT_READY", true)
 	Advance(2)
+	LOOT = { { type = 1, id = 6303, quantity = 2, source = "GameObject-0-1-0-1-35591-000000D6" } } -- (the next cast's bobber)
+	Fire("LOOT_READY", true)
+	Advance(2)
 	LOOT_FISHING = false
 	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-9", 2366)
 	Advance(2)
@@ -988,8 +991,9 @@ do
 	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", SECRET, SECRET)
 	Advance(0.3)
 	LOOT = {}
-	check(seq() == "h;h;1617;2447:1 h;s;113;2318:1 h;f;35591;6303:1",
-		"herbs (h), skinning (s: the creature), fishing (f); a loot window 2 s after the spell isn't a node's, got " .. seq())
+	check(seq() == "h;h;1617;2447:1 h;s;113;2318:1 h;f;;6303:1 h;f;;6303:2",
+		"herbs (h), skinning (s: the creature), fishing (f: no node, the loot's source is the bobber; each cast once); a loot window "
+		.. "2 s after the spell isn't a node's, got " .. seq())
 end
 
 ---------------------------------------------------------------------------
