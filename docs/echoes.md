@@ -667,7 +667,12 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   not; or `GetAccountInfoByGUID`). Wrong: nothing is exchanged with them. Not known yet: checked
   again every second.
 - **Accounts taken**: pages, holdings and safe ranges only of my Battle.net friends' accounts and
-  my own.
+  my own. The friend list's accounts are read every 30 s, and sooner (at most every 5 s) when it
+  may have changed: an account that isn't in it (once per account until the list is read anew: a
+  friend just added, or one Battle.net lists late, whose pages a relay offers), or Battle.net says
+  a friend came online, changed or the list changed (`BN_FRIEND_ACCOUNT_ONLINE`,
+  `BN_FRIEND_INFO_CHANGED`, `BN_FRIEND_LIST_SIZE_CHANGED`: the handlers only note it). So a
+  friend's holdings that came before Battle.net listed them aren't dropped until the next summary.
 
 ### Pulling
 

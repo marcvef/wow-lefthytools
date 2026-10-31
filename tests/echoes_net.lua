@@ -1567,6 +1567,40 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: a friend Battle.net lists late")
+do
+	-- Bob relays Anna's pages; she isn't on my friend list yet (just added, or Battle.net slow to list
+	-- her). Her pages are taken as soon as the list has her: read again when an account isn't in it
+	-- (at most every 5 s), and after Battle.net's events; not only every 30 s.
+	local c = Start(DORA, { friends = { BOB }, fake = true })
+	MeetAll(c, { BOB })
+	local function Offered()
+		local peer = c.D.peers[BOB.id]
+		return peer and peer.holdings[ANNA.key] and c.D.Ranges.Format(peer.holdings[ANNA.key]) or ""
+	end
+	Pass(c, 6)
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":1-3")
+	Pass(c, 1.2)
+	check(Offered() == "", "Anna isn't my friend: what Bob holds of hers isn't taken")
+	-- Battle.net lists her now, and says so: Bob's next summary (5 s later) is taken.
+	c.env.BN_FRIENDS[#c.env.BN_FRIENDS + 1] = { Account(ANNA, true), battleTag = ANNA.tag }
+	c.env.Fire("BN_FRIEND_LIST_SIZE_CHANGED")
+	Pass(c, 5)
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":1-4")
+	Pass(c, 1.2)
+	check(Offered() == "1-4", "Battle.net lists her (and says so): taken within seconds, got " .. Offered())
+	-- Without an event: an account not looked for since the list was read is looked for again.
+	Pass(c, 6)
+	local dot = Person(99, "Dot Fern", "MAGE", "Dot#9999", "d0d0d0d0") -- (offline)
+	c.env.BN_FRIENDS[#c.env.BN_FRIENDS + 1] = { Account(dot, false), battleTag = dot.tag }
+	local dorothy = dot.acct .. "." .. dot.store
+	Say(c, BOB, "B2;es;" .. dorothy .. ":1")
+	Pass(c, 1.2)
+	local peer = c.D.peers[BOB.id]
+	check(peer and peer.holdings[dorothy], "a friend's account the list didn't have when last read: read again, taken")
+	Stop(c)
+end
+
 section("Echoes' delivery: the probe when sending says nothing")
 do
 	-- If SendGameData returns nothing on Forever (Beacon takes that as sent), the probe doesn't call

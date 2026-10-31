@@ -54,7 +54,8 @@ local COPIES = 2             -- a relay leaves pages alone that this many online
 local NO_ROOM_WAIT = 300     -- a page too big for the relay's cache isn't asked for again this long
 local PARTIALS_MAX, PARTIAL_AGE = 256 * 1024, 600 -- unfinished pages: bytes kept, seconds without progress
 local INCOMING_MAX, INCOMING_PER_TICK = 600, 60 -- messages waiting for the tick, handled per tick
-local FRIENDS_GAP = 30       -- the friend list's accounts are read again after this long
+local FRIENDS_GAP = 30       -- the friend list's accounts are read again after this long,
+local FRIENDS_SOON = 5       -- or after this long when it may have changed (an account not in it, Battle.net's events)
 local RECHECK = 300          -- what I hold is worked out anew at least this often (E.Store says when it changes)
 local HOUSE_GAP = 1          -- requests, timeouts, checks, summaries: once a second
 local ANSWERS_MAX = 8        -- my answers (en, ey, a stop) waiting for one friend at most: more go (they ask again)
@@ -216,12 +217,16 @@ local function MyAccount()
 end
 
 local friendAccts, idAccts, friendsAt = {}, {}, -math.huge -- acct -> true; gameAccountID -> acct
+local missed, missedCount = {}, 0 -- acct -> true: looked for since the list was read, not in it
+local friendsStale = false   -- Battle.net said a friend came online or changed: read it again soon
 
 -- Every Battle.net friend, online or not: their account, and which game accounts are theirs.
 local function ReadFriends(now)
-	friendsAt = now
+	friendsAt, friendsStale = now, false
 	wipe(friendAccts)
 	wipe(idAccts)
+	wipe(missed)
+	missedCount = 0
 	local bn = C_BattleNet
 	local count = bn and bn.GetFriendAccountInfo and BNGetNumFriends and BNGetNumFriends() or 0
 	for i = 1, count do
@@ -245,22 +250,45 @@ local function ReadFriends(now)
 end
 
 local function Friends(now)
-	if now - friendsAt >= FRIENDS_GAP then
+	if now - friendsAt >= FRIENDS_GAP or (friendsStale and now - friendsAt >= FRIENDS_SOON) then
 		ReadFriends(now)
 	end
 	return friendAccts
 end
 
--- Pages I take: my Battle.net friends' accounts' and my own (my other computers).
+-- Battle.net says a friend came online, changed (logged into a game) or the list changed: the list is
+-- read again when next needed, at most every FRIENDS_SOON (the handlers only note it).
+local function FriendsChanged()
+	friendsStale = true
+end
+E.On("BN_FRIEND_ACCOUNT_ONLINE", FriendsChanged)
+E.On("BN_FRIEND_INFO_CHANGED", FriendsChanged)
+E.On("BN_FRIEND_LIST_SIZE_CHANGED", FriendsChanged)
+
+-- Pages I take: my Battle.net friends' accounts' and my own (my other computers). An account the
+-- list as last read doesn't have (a friend just added, or one Battle.net listed late): the list is
+-- read again, at most every FRIENDS_SOON and once per account until it's read anew, so a friend's
+-- holdings that came before Battle.net listed them aren't dropped until the next summary.
 local function Accepted(acct, now)
-	return acct ~= nil and (acct == MyAccount() or Friends(now)[acct] == true)
+	if acct == nil then
+		return false
+	elseif acct == MyAccount() or Friends(now)[acct] then
+		return true
+	end
+	if not missed[acct] and now - friendsAt >= FRIENDS_SOON then
+		ReadFriends(now)
+	end
+	if not missed[acct] and missedCount < 256 then
+		missed[acct], missedCount = true, missedCount + 1
+	end
+	return friendAccts[acct] == true
 end
 
 -- A Beacon friend's account (their BattleTag's hash), nil while Battle.net doesn't say.
 local function PeerAccount(id, now)
 	Friends(now)
 	local acct = idAccts[id]
-	if not acct and now - friendsAt >= 5 then
+	if not acct and now - friendsAt >= FRIENDS_SOON then
 		ReadFriends(now) -- (a friend just came online)
 		acct = idAccts[id]
 	end
