@@ -1556,6 +1556,34 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: a saved file edited by hand")
+do
+	-- Keys that aren't 8 lowercase hex digits twice, and a safe entry that isn't a table: they stay
+	-- out of my messages (friends would refuse the whole message, or it would pass 255 bytes), and
+	-- nothing fails.
+	local c = Start(EVE, { friends = { ANNA, DORA }, fake = true })
+	local p = TheirPage(c, 5, 300)
+	local page = { t = p.t, h = p.h, m = "z", z = p.z, s = c.E.data.session - 1, a = c.env.GetServerTime() - 60 }
+	c.E.data.carry["ABCDEF01.0c77e1f2"] = { [5] = page }
+	c.E.data.carry[("0123456789abcdef"):rep(10) .. ".0c77e1f2"] = { [5] = page }
+	c.E.data.carry[ANNA.key] = { [5] = page }
+	c.E.data.safe["0badc0de.0badc0de"] = "1-5"
+	c.E.data.safe[ANNA.key] = { ["AAAAAAAA.BBBBBBBB"] = "1-3", [DORA.key] = "1-4" }
+	Touched(c)
+	local mark = Mark(c)
+	MeetAll(c, { DORA }, "crs")
+	Pass(c, 65)
+	local read, items = true, 0
+	for _, m in ipairs(Sent(c, DORA, mark, "B2;e")) do
+		local word, more = m:match("^B2;(e%l);(.*)$")
+		local msg = #m <= 255 and c.D.Read(word, more)
+		read = read and msg ~= nil
+		items = items + (msg and msg.items and #msg.items or 0)
+	end
+	check(read and items >= 2, "every message of mine reads (with Anna's page held and Dora's summary), got " .. items .. " items")
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------

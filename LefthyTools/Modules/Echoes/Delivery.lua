@@ -309,6 +309,13 @@ local function Split(key)
 	return key:sub(1, 8), key:sub(10)
 end
 
+-- A store's key as it goes on the wire ("acct.store", 8 lowercase hex digits each). One that isn't
+-- (a saved file edited by hand) stays here: it would make friends refuse the whole message it's in,
+-- or make one longer than 255 bytes.
+local function WireKey(key)
+	return type(key) == "string" and #key == 17 and key:sub(9, 9) == "." and key:match("^[0-9a-f]+%.[0-9a-f]+$") ~= nil
+end
+
 -- What I hold of where ("mine", "carry", "inbox"): { [key] = list }.
 local function HeldIn(where)
 	local id = "held>" .. where
@@ -316,7 +323,7 @@ local function HeldIn(where)
 		local out = {}
 		for key, ranges in pairs(S.Held(where)) do
 			local list = Stored(ranges)
-			if #list > 0 then
+			if #list > 0 and WireKey(key) then
 				out[key] = list
 			end
 		end
@@ -367,7 +374,8 @@ local function SafeOf(key)
 	local id = "safe>" .. key
 	if not cache[id] then
 		local list = {}
-		for _, ranges in pairs(E.data.safe[key] or {}) do
+		local collectors = E.data.safe[key]
+		for _, ranges in pairs(type(collectors) == "table" and collectors or {}) do
 			list = Ranges.Union(list, Stored(ranges))
 		end
 		cache[id] = list
@@ -383,7 +391,7 @@ end
 local SAFE_KEYS, SAFE_COLLECTORS = 200, 8
 local function Safe(key, collector, list, told)
 	local safe = E.data.safe
-	local byCollector = safe[key]
+	local byCollector = type(safe[key]) == "table" and safe[key] or nil
 	if not byCollector and Count(safe) >= SAFE_KEYS then
 		return
 	elseif byCollector and not byCollector[collector] and Count(byCollector) >= SAFE_COLLECTORS then
@@ -1045,9 +1053,9 @@ local function SafeSummary(id, now)
 	end
 	local byCollector = {}
 	for key, collectors in pairs(E.data.safe) do
-		for collector, text in pairs(collectors) do
-			local mark = collector .. ">" .. key
-			if text ~= s.sent[mark] then
+		for collector, text in pairs(WireKey(key) and type(collectors) == "table" and collectors or {}) do
+			local mark = WireKey(collector) and type(text) == "string" and collector .. ">" .. key
+			if mark and text ~= s.sent[mark] then
 				s.sent[mark] = text
 				byCollector[collector] = byCollector[collector] or {}
 				local list = byCollector[collector]

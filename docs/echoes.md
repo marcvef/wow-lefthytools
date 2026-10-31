@@ -590,7 +590,9 @@ bytes, like every Beacon message.
 
 Items of `es` and `ed` are split over as many messages as they need (a long list of ranges in
 pieces); receivers merge them. Every message is read strictly (`D.Read`: fields, sizes, lowercase
-hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
+hex, Base64 characters; at most 300 intervals in a list, 40 items in a message). What I send of my
+saved table is checked the same way: a key that isn't two times 8 lowercase hex digits (a file
+edited by hand) stays out of my messages, and an entry of the wrong type is skipped.
 
 ### Who gets B
 
