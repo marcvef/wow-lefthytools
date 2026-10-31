@@ -464,6 +464,10 @@ no line lost or doubled, each line's `dt` counting from the one before the reloa
   stale rule at login still closes it. An open page from a build before this rule (no `own`): 30
   minutes from its start.
 
+Not while the capture waits for its anchor (`E.PageMayClose`: `E.capture.Ready()`; a loading screen
+and the position after it, up to 3 s): the next page would go on from where you were before it, at a
+time after it. It closes on the first tick the capture is ready again (its anchor written).
+
 `E.Store.Close` keeps it (below), and the next page starts in the same tick: header, character, and
 `E.Continue()` (an anchor at the last position, why `c`, the mode and the zone). The tick does
 nothing else then.

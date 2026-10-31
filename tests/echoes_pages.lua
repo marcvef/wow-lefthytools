@@ -123,6 +123,10 @@ end
 -- logout or when switched off while that anchor is still to come).
 local realPosition = LT.Position
 LT.Position = function() return nil end
+-- (A page doesn't close while the capture waits for its anchor, E.PageMayClose: for the quiet capture
+-- it may, until the last sections.)
+local realMayClose = E.PageMayClose
+E.PageMayClose = function() return true end
 local function start()
 	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
 	Fire("PLAYER_LEAVING_WORLD")
@@ -1088,7 +1092,7 @@ end
 
 section("Echoes pages: with the capture")
 do
-	LT.Position = realPosition
+	LT.Position, E.PageMayClose = realPosition, realMayClose
 	local map, pos = PLAYER_MAP, PLAYER_POS
 	local function at(north, west) PLAYER_MAP, PLAYER_POS = 1429, { (1000 - west) / 1000, (1000 - north) / 1000 } end
 	at(500, 500)
@@ -1135,6 +1139,35 @@ do
 	elseif type(result) == "string" then
 		check(false, "the exporter: " .. result)
 	end
+	PLAYER_MAP, PLAYER_POS = map, pos
+end
+
+section("Echoes pages: no page closes while the capture waits after a loading screen")
+do
+	local map, pos = PLAYER_MAP, PLAYER_POS
+	local function at(north, west) PLAYER_MAP, PLAYER_POS = 1429, { (1000 - west) / 1000, (1000 - north) / 1000 } end
+	at(500, 500)
+	fresh(acct)
+	Fire("PLAYER_ENTERING_WORLD", true, false)
+	Advance(1, 0.25)
+	at(500, 520)
+	Advance(2, 0.25)
+	-- A loading screen; after it the game doesn't say where I am for 2 s, and the page's 30 minutes
+	-- are up meanwhile.
+	local n, c0 = E.data.open.n, closes
+	check(E.data.open.busy, "(a page with the capture's lines on it: its 30 minutes run)")
+	Fire("PLAYER_LEAVING_WORLD")
+	skew = skew + 1800
+	STATE.inInstance = true
+	at(800, 800)
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+	Advance(2, 0.25)
+	check(closes == c0 and E.data.open.n == n, "the capture waits for the position after a loading screen: the page stays open")
+	STATE.inInstance = false
+	tick()
+	check(closes == c0 + 1 and E.data.open.n == n + 1 and lastClosed:find("\n@%d+;0;800;800;f;l\n") and E.buffer[3] == "@0;0;800;800;f;c",
+		"the position comes: the capture's anchor, then the page closes on that tick; the next goes on from there (not from before "
+		.. "the loading screen), got " .. table.concat(E.buffer, " | "))
 	PLAYER_MAP, PLAYER_POS = map, pos
 end
 

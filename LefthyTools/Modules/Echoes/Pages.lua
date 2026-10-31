@@ -280,6 +280,13 @@ end)
 E.When("stop", Flush)
 E.On("PLAYER_LOGOUT", Flush) -- (lines written after it are in E.buffer, which is saved with the page)
 
+-- Whether the open page may close now: not while the capture waits for its anchor (a loading screen,
+-- and the position after it: up to 3 s), else the next page would go on (E.Continue) from where you
+-- were before it, at a time after it. It closes on the first tick the capture is ready again.
+function E.PageMayClose()
+	return E.capture.Ready()
+end
+
 -- The tick: a page that's full, or 30 minutes busy, closes (and nothing else this tick); my
 -- BattleTag while it isn't known; the lines joined every 60 s.
 E.OnTick(function(now)
@@ -288,11 +295,9 @@ E.OnTick(function(now)
 		return
 	end
 	local busy = Busy(open)
-	if E.bytes >= PAGE_BYTES or E.count >= PAGE_LINES then
-		Rollover("s")
-		return
-	elseif busy and E.Now() - busy >= PAGE_SECONDS then
-		Rollover("t")
+	local full = E.bytes >= PAGE_BYTES or E.count >= PAGE_LINES
+	if (full or (busy and E.Now() - busy >= PAGE_SECONDS)) and E.PageMayClose() then
+		Rollover(full and "s" or "t")
 		return
 	end
 	if not open.acct and now >= accountAt then
