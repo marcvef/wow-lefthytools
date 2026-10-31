@@ -88,7 +88,7 @@ if (!addonArg) {
 //    same state (the mock's clock and world go on from one to the next), each getting what
 //    helpers.lua returns as `...`; its Finish() makes the last checks and prints the count.
 const ENGLISH = ["core.lua", "mirage.lua", "tweaks.lua", "beacon.lua", "stream.lua", "flights.lua", "chronicle.lua",
-  "levelup.lua", "bestiary.lua", "whatsnew.lua", "echoes.lua"];
+  "levelup.lua", "bestiary.lua", "whatsnew.lua", "echoes.lua", "echoes_capture.lua"];
 
 // Every test file is in the list, and says at its top which files it needs before it (they run
 // earlier): "-- Needs: beacon.lua, ..." or "-- Needs: no other file."
