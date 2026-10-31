@@ -24,7 +24,7 @@ local E = ns.Echoes
 -- instance entered (i) or left (o), login (s), a loading screen (l), another jump (j).
 --
 -- Never lags the client: handlers only note things (PLAYER_LEAVING_WORLD and PLAYER_LOGOUT write
--- their last point and line at once: no tick comes before the loading screen); a poll is a handful
+-- their last point and Events.lua's queue at once: no tick comes before the loading screen); a poll is a handful
 -- of calls, at most a start point and one point, and makes no tables (the sample buffer is two
 -- arrays of 8 numbers).
 
@@ -146,15 +146,20 @@ local function Yes(f, ...)
 	return Value(f, ...) == true
 end
 
--- In an instance (a dungeon, a raid, a battleground), and the instance's map ID (GetInstanceInfo's
--- eighth answer; nil when it isn't readable).
+-- The instance map I'm on: GetInstanceInfo's eighth answer, outside instances the continent's (0
+-- Eastern Kingdoms, 1 Kalimdor); nil when it isn't readable.
+local function MapID()
+	local got, _, _, _, _, _, _, _, id = pcall(GetInstanceInfo)
+	return got and type(id) == "number" and not issecret(id) and id or nil
+end
+
+-- In an instance (a dungeon, a raid, a battleground), and the instance's map ID.
 local function Instance()
 	local ok, inInstance = pcall(IsInInstance)
 	if not (ok and inInstance == true) then
 		return false
 	end
-	local got, _, _, _, _, _, _, _, id = pcall(GetInstanceInfo)
-	return true, got and type(id) == "number" and not issecret(id) and id or nil
+	return true, MapID()
 end
 C.Instance = Instance
 
@@ -313,6 +318,17 @@ local function Anchor(continent, north, west, why, spell)
 	S.zoneDirty = true
 end
 
+-- No jump since the last poll (a jump is the next poll's anchor): within JUMP yd of that poll's
+-- sample, else of the last point. (Not of the last point alone: on a flight path it's up to 100 yd
+-- behind.)
+local function NoJump(north, west)
+	if S.havePrev then
+		return Distance(S.pn, S.pw, north, west) <= JUMP
+	end
+	local state = E.state
+	return Distance(state.north, state.west, north, west) <= JUMP
+end
+
 -- Not near the last point (STALE yd or more, but no jump: the next poll handles that): one here.
 local function StaleCheck(north, west)
 	local state = E.state
@@ -326,8 +342,7 @@ local function StaleCheck(north, west)
 			return false
 		end
 	end
-	local d = Distance(state.north, state.west, north, west)
-	return d >= STALE and d <= JUMP and Store(north, west)
+	return Distance(state.north, state.west, north, west) >= STALE and NoJump(north, west) and Store(north, west)
 end
 
 -- One poll: the position, then the store rule. spot: an event follows, so it must have a spot.
@@ -374,12 +389,16 @@ local function Poll(now, spot)
 	end
 	-- (MOVED yards per poll; a poll sooner, for an event, at the same pace. The poll after
 	-- PLAYER_STOPPED_MOVING is the stop, however far it came since the last.)
-	local moving = Yes(IsPlayerMoving) or (not S.stopped and d >= MOVED * math.min(1, since / POLL_MOVING))
+	local stop = S.stopped
+	local moving = Yes(IsPlayerMoving) or (not stop and d >= MOVED * math.min(1, since / POLL_MOVING))
 	S.stopped = false
 	local mode
 	if d > 0.05 or S.modeCheck then -- (the mode only where the position changed)
 		S.modeCheck = false
-		mode = NextMode(RawMode(d, since))
+		-- (Not carried on the stop's poll: the game says speed 0 by then, however far it came.)
+		mode = NextMode(RawMode(not stop and d or nil, since))
+	else
+		S.pendingMode = nil -- (two polls in a row: one that doesn't look breaks the row)
 	end
 	local stored = false
 	if moving and not S.pMoving and E.Now() > S.lastAt then
@@ -434,7 +453,7 @@ local function LastPoint()
 		return
 	end
 	local continent, north, west = LT.Position()
-	if north and continent == state.continent and Distance(state.north, state.west, north, west) <= JUMP then
+	if north and continent == state.continent and NoJump(north, west) then
 		Store(north, west)
 	end
 end
@@ -458,8 +477,8 @@ local function Arrive(now)
 		Cause() -- (a cause from before doesn't explain a login)
 	end
 	S.pending, S.polledAt = nil, now
-	if north == nil then
-		Anchor(map, nil, nil, why, spell)
+	if north == nil then -- (an instance's map; where the game hides the position, the continent it says)
+		Anchor(map or MapID() or E.state.continent, nil, nil, why, spell)
 	else
 		Anchor(continent, north, west, why, spell)
 	end
@@ -505,15 +524,22 @@ E.On("ZONE_CHANGED", ZoneSoon)
 E.On("ZONE_CHANGED_INDOORS", ZoneSoon)
 E.On("ZONE_CHANGED_NEW_AREA", ZoneSoon)
 
--- A loading screen begins: its last point now (no tick comes before it).
+-- A loading screen begins: its last point now, and what Events.lua still holds (it happened here;
+-- no tick comes before it).
 E.On("PLAYER_LEAVING_WORLD", function()
 	LastPoint()
+	if C.Flush and C.Ready() then
+		-- (Their spot is that last point: no poll now. The game may say the destination already,
+		-- and a poll would take it for a jump, using up its cause before the loading screen's anchor.)
+		S.spotAt = GetTime()
+		C.Flush()
+	end
 	S.wasInstance = S.inInstance
 	S.loading = true
 end)
 
 -- And ends: the anchor on the next tick (a login: "s"; a /reload: "l", the session goes on; else
--- what caused it).
+-- what caused it). A session whose anchor isn't written yet stays one through another loading screen.
 E.On("PLAYER_ENTERING_WORLD", function(isInitialLogin, isReloadingUi)
 	S.loading = false
 	S.pendingAt = GetTime()
@@ -521,7 +547,7 @@ E.On("PLAYER_ENTERING_WORLD", function(isInitialLogin, isReloadingUi)
 		S.pending = "s"
 	elseif isReloadingUi == true then
 		S.pending = "reload"
-	elseif S.pending ~= "s" then
+	elseif S.pending ~= "s" and S.pending ~= "reload" then
 		S.pending = "load"
 	end
 end)

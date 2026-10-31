@@ -5,7 +5,7 @@
 -- Needs: no other file (it switches Echoes on and off itself, and puts back the mock's world it changes).
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
-local afk, anna = suite.afk, suite.anna
+local afk, anna, catchErrors = suite.afk, suite.anna, suite.catchErrors
 local E = ns.Echoes
 local C = E.capture
 
@@ -50,9 +50,15 @@ mock("GetInstanceInfo", function()
 	return ZONE, "none", 0, "", 0, 0, false, 0, 0
 end)
 mock("GetInventoryItemLink", function(unit, slot) return GEAR_LINKS[slot] or baseItemLink(unit, slot) end)
+-- (FACTIONS[i].collapsed: under a closed header, so not listed; known by its ID all the same)
+local function listed()
+	local list = {}
+	for _, f in ipairs(FACTIONS) do if not f.collapsed then list[#list + 1] = f end end
+	return list
+end
 mock("C_Reputation", {
-	GetNumFactions = function() return #FACTIONS end,
-	GetFactionDataByIndex = function(i) local f = FACTIONS[i]; return f and { factionID = f.id, reaction = f.reaction, isHeader = f.header == true } end,
+	GetNumFactions = function() return #listed() end,
+	GetFactionDataByIndex = function(i) local f = listed()[i]; return f and { factionID = f.id, reaction = f.reaction, isHeader = f.header == true } end,
 	GetFactionDataByID = function(id) for _, f in ipairs(FACTIONS) do if f.id == id then return { factionID = id, reaction = f.reaction } end end end,
 })
 mock("C_SkillInfo", { GetSkillLineInfoByID = function(id) local s = SKILLS[id]; return s and { skillID = id, rank = s[1], maxRank = s[2] } end })
@@ -380,6 +386,17 @@ do
 		spaced = spaced and math.sqrt(p[i + 1].dn ^ 2 + p[i + 1].dw ^ 2) >= 100
 	end
 	check(spaced and #p <= 5, "points 100 yd apart on a flight path, got " .. seq())
+	-- An event there, more than 50 yd past the last point (no jump: polled a moment ago): a point
+	-- where I am first.
+	while spot[1] - E.state.north < 60 do
+		walk(spot[1] + 3, 150, 30, true)
+	end
+	listen()
+	Fire("NEW_TOY_ADDED", 4242)
+	Advance(0.3)
+	local list = mine()
+	check(#list >= 2 and list[1].line:find("^%d") and math.abs(list[1].n - spot[1]) <= 1 and body(list[2].line) == "n;t;4242",
+		"an event on a flight path, 60 yd past the last point: a point where I am first, got " .. seq())
 	TRAVEL.taxi = false
 	Advance(2)
 	listen()
@@ -399,6 +416,48 @@ do
 	Advance(0.3)
 	check(count("^m;f$") == 1, "walking off the boat: on foot, got " .. seq())
 	UNIT_SPEED = nil
+
+	-- Not carried: the stop (the game says speed 0, however far it came since the last poll), then
+	-- a Blink (20 yd at once, standing); two Blinks with polls standing still between them.
+	listen()
+	walk(640, 40)
+	halt()
+	Advance(2)
+	at(640, 60)
+	Advance(1.2)
+	Advance(5)
+	at(640, 80)
+	Advance(1.2)
+	Advance(2)
+	check(count("^m;") == 0, "a stop, then Blinks standing: still on foot (the guess needs two polls in a row), got " .. seq())
+
+	-- The game's speed a secret: no carried guess (a secret can't be compared).
+	listen()
+	UNIT_SPEED = SECRET
+	walk(640, 200, 10, true)
+	UNIT_SPEED = nil
+	Advance(1.2)
+	check(count("^m;") == 0 and #points() >= 4, "carried, the speed a secret: no guess, the path all the same, got " .. seq())
+
+	-- On a boat across a loading screen: its last point, an anchor (why l; not carried yet), carried
+	-- again after two polls; walking off it.
+	listen()
+	UNIT_SPEED = 0
+	walk(640, 260, 10, true)
+	Fire("PLAYER_LEAVING_WORLD")
+	at(700, 300)
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+	Advance(0.3)
+	walk(700, 360, 10, true)
+	UNIT_SPEED = nil
+	walk(710, 360)
+	halt()
+	Advance(0.3)
+	local boat = seq()
+	local before, after = boat:match("^(.-)@;0;700;300;f;l(.*)$")
+	check(before and before:find("m;c") and before:find(",%-?%d+,%-?%d+ $") and select(2, after:gsub("m;c", "")) == 1
+		and after:find("m;f"),
+		"a boat across a loading screen: carried, its last point, the anchor on foot, carried again, off it, got " .. boat)
 end
 
 ---------------------------------------------------------------------------
@@ -489,6 +548,18 @@ do
 	STATE.inInstance = false
 	Advance(1.2)
 	check(seq() == "@;0;;;f;j @;0;600;600;f;j", "the position gone: an anchor without one; back: an anchor, got " .. seq())
+	-- From Kalimdor through a loading screen to where the game hides the position (not an
+	-- instance): after 3 s an anchor without one, on the continent the game says now.
+	PLAYER_MAP, PLAYER_POS = 1414, { 0.5, 0.5 }
+	Advance(1.2)
+	listen()
+	loading(function() STATE.inInstance = true end)
+	Advance(4)
+	STATE.inInstance = false
+	at(600, 600)
+	Advance(1.2)
+	check(seq() == "@;0;;;f;l @;0;600;600;f;j z;1429;Goldshire",
+		"a loading screen to no position: an anchor without one, its continent from GetInstanceInfo, got " .. seq())
 
 	-- Released to the graveyard: the ghost starts a segment there (r); the corpse run; back to life.
 	listen()
@@ -501,12 +572,32 @@ do
 	Advance(1.2)
 	walk(610, 600)
 	halt()
+	Advance(0.3) -- (at the corpse)
 	STATE.ghost, STATE.dead = false, false
 	Fire("PLAYER_UNGHOST")
 	Advance(1.2)
 	check(seq():find("^D;19;%-;;;;0 @;0;640;600;g;r ,0,0 .* r;c m;f$") ~= nil and points()[#points()].n == 610,
 		"died, released: an anchor at the graveyard (why r, ghost); the run back; alive at the corpse (r c), on foot, got " .. seq())
 	Advance(11)
+	-- An event a moment before a loading screen (no tick between): written before it, where it was.
+	listen()
+	Fire("NEW_TOY_ADDED", 4321)
+	loading(function() at(800, 800) end)
+	Advance(1)
+	check(seq() == "n;t;4321 @;0;800;800;f;l", "an event just before a loading screen: written there, before the anchor, got " .. seq())
+	-- The hearthstone, an event in its last moment, and the game already says the destination when
+	-- the loading screen begins: the event where I was, the hearthstone for the anchor after it.
+	listen()
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-11", 8690)
+	Advance(1)
+	Fire("NEW_TOY_ADDED", 4322)
+	at(400, 900)
+	Fire("PLAYER_LEAVING_WORLD")
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+	Advance(1)
+	check(seq() == "n;t;4322 @;0;400;900;f;h;8690", "and a hearthstone just before it: the anchor after it says so, got " .. seq())
+	loading(function() at(610, 600) end)
+	Advance(2)
 end
 
 ---------------------------------------------------------------------------
@@ -542,6 +633,27 @@ do
 	Advance(0.3)
 	check(seq() == "x;19;1600;6000;1200;0 x;19;1700;6000;1300;1",
 		"XP: level, xp, max, rested, resting; each minute when it changed, at once when resting changes, got " .. seq())
+	-- In an inn: the rested XP grows every minute, the resting flag goes off and on; only that is
+	-- written at most every 10 minutes (the last state then); XP gained at once again.
+	listen()
+	for _ = 1, 9 do
+		XP.rested = XP.rested + 10
+		Advance(60)
+	end
+	STATE.resting = false
+	Fire("PLAYER_UPDATE_RESTING")
+	Advance(0.3)
+	STATE.resting = true
+	Fire("PLAYER_UPDATE_RESTING")
+	Advance(0.3)
+	local quiet = seq()
+	Advance(61)
+	local tenMinutes = seq()
+	listen()
+	XP.current, STATE.resting = 1750, false
+	Advance(61)
+	check(quiet == "" and tenMinutes == "x;19;1700;6000;1390;1" and seq() == "x;19;1750;6000;1390;0",
+		"only rested XP or resting: at most every 10 minutes; XP gained: at once, got " .. quiet .. " | " .. tenMinutes .. " | " .. seq())
 	STATE.resting = false
 end
 
@@ -568,6 +680,17 @@ do
 	Fire("QUEST_REMOVED", 9, false)
 	Advance(2)
 	check(seq() == "a;8 A;8 Q;9", "removed, not done: abandoned (A); removed and done without QUEST_TURNED_IN: turned in, got " .. seq())
+	-- Removed first, turned in a moment later (which comes first is still to be seen in game): one Q,
+	-- with its XP and money.
+	listen()
+	Fire("QUEST_ACCEPTED", 10)
+	Advance(0.3)
+	Fire("QUEST_REMOVED", 10, false)
+	Advance(0.5)
+	QUESTS_DONE[10] = true
+	Fire("QUEST_TURNED_IN", 10, 300, 50)
+	Advance(2)
+	check(seq() == "a;10 Q;10;300;50", "removed, then turned in: one Q with XP and money, got " .. seq())
 	listen()
 	Fire("QUEST_ACCEPTED", SECRET)
 	Fire("QUEST_REMOVED", SECRET)
@@ -649,6 +772,60 @@ do
 	Advance(0.3)
 	check(seq() == "D;19;-;;;;0 r;c", "the last fight more than 15 s before: no killer, got " .. seq())
 	Advance(11)
+	-- Logged in dead (no PLAYER_DEAD for it), then released 57 yd away (no jump): the graveyard
+	-- still starts a segment (r); the spirit healer.
+	at(610, 600)
+	STATE.dead = true
+	listen()
+	LT:SetModuleEnabled("echoes", false)
+	LT:SetModuleEnabled("echoes", true)
+	Fire("PLAYER_ENTERING_WORLD", true, false)
+	Advance(2)
+	STATE.ghost = true
+	Fire("PLAYER_ALIVE")
+	at(650, 560)
+	Advance(1.2)
+	Advance(1)
+	Fire("CONFIRM_XP_LOSS")
+	STATE.ghost, STATE.dead = false, false
+	Fire("PLAYER_UNGHOST")
+	Advance(1.2)
+	check(seq():find("^o;0 @;0;610;600;f;s z;1429;Goldshire o;1 .*@;0;650;560;g;r r;s m;f$") ~= nil and count("^D;") == 0,
+		"logged in dead: released, an anchor at the graveyard (r); the spirit healer, got " .. seq())
+	Advance(11)
+	-- Died, /reload: PLAYER_DEAD again after it is the same death.
+	listen()
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Advance(0.3)
+	Fire("PLAYER_LEAVING_WORLD")
+	Fire("PLAYER_LOGOUT")
+	C.Reset()
+	Fire("PLAYER_ENTERING_WORLD", false, true)
+	Fire("PLAYER_DEAD")
+	Advance(2)
+	STATE.dead = false
+	Fire("PLAYER_ALIVE")
+	Advance(0.3)
+	check(count("^D;") == 1 and count("^r;c$") == 1, "a /reload while dead: the death once, then back to life, got " .. seq())
+	Advance(11)
+	-- Released, then PLAYER_ALIVE again as a ghost: one segment for the release.
+	listen()
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Advance(0.3)
+	STATE.ghost = true
+	Fire("PLAYER_ALIVE")
+	at(700, 560)
+	Advance(1.2)
+	Advance(5)
+	Fire("PLAYER_ALIVE")
+	Advance(2)
+	STATE.ghost, STATE.dead = false, false
+	Fire("PLAYER_UNGHOST")
+	Advance(1.2)
+	check(seq() == "D;19;-;;;;0 @;0;700;560;g;r r;c m;f", "PLAYER_ALIVE twice as a ghost: released once, got " .. seq())
+	Advance(11)
 end
 
 ---------------------------------------------------------------------------
@@ -676,6 +853,16 @@ do
 		"kills: mine, my pet's, my group's (level and classification as seen, the name once); each corpse once; not "
 		.. "someone else's, a player's or a secret, got " .. seq())
 	GROUP_GUIDS["Player-1-11"], PET_GUID = nil, nil
+	-- A nameplate whose unit is a secret, a secret mouseover: nothing, no error.
+	local reported, restore = catchErrors()
+	listen()
+	Fire("NAME_PLATE_UNIT_ADDED", SECRET)
+	MOBS.mouseover = { name = "Defias Bandit", level = 12, guid = SECRET }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	MOBS.mouseover = nil
+	Advance(0.3)
+	restore()
+	check(#reported == 0 and seq() == "", "a secret nameplate unit or GUID: nothing, got " .. seq() .. " " .. table.concat(reported, " "))
 end
 
 ---------------------------------------------------------------------------
@@ -742,8 +929,8 @@ end
 section("Echoes capture: the group")
 ---------------------------------------------------------------------------
 do
-	anna("H2") -- (a friend with LefthyTools, through Beacon)
-	Advance(0.3)
+	anna("H2") -- (a friend with LefthyTools, through Beacon: known on its next tick)
+	Advance(2)
 	listen()
 	GROUP, GROUP_MEMBERS = "party", 3
 	PARTY.party1, PARTY.party2 = { guid = "Player-1-11" }, { guid = "Player-1-77" }
@@ -770,6 +957,21 @@ do
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.3)
 	check(seq() == "g;2;1 g;0;0", "a member whose GUID is secret: one of the others; left the group: g 0 0, got " .. seq())
+	-- A friend Beacon learns of only after the group was looked at (not remembered yet): named
+	-- within 15 s, without another roster change.
+	LT:SetModuleEnabled("beacon", false)
+	LefthyToolsEchoesDB.friends["Player-1-11"] = nil
+	listen()
+	GROUP, GROUP_MEMBERS, PARTY.party1 = "party", 2, { guid = "Player-1-11" }
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
+	LT:SetModuleEnabled("beacon", true)
+	anna("H2")
+	Advance(16)
+	check(seq() == "g;2;1 g;2;0;Player-1-11:Anna-Realmy", "a friend Beacon learns of later: named then, got " .. seq())
+	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
 end
 
 ---------------------------------------------------------------------------
@@ -815,7 +1017,20 @@ do
 	Advance(0.3)
 	check(seq() == "R;72;6", "a standing changed: R with the faction and the standing; a rescan waits 10 s, got " .. seq())
 	Advance(10)
-	check(seq() == "R;72;6 R;47;6 R;69;4", "the rescan (UPDATE_FACTION): what changed, a new faction, got " .. seq())
+	check(seq() == "R;72;6 R;47;6" and cap().reps[69] == 4,
+		"the rescan (UPDATE_FACTION): what changed; a faction listed for the first time is a baseline, got " .. seq())
+	-- Under closed headers: one changes (FACTION_STANDING_CHANGED names it: R), then the headers open
+	-- (listed for the first time: no lines, not even for one never seen before).
+	listen()
+	FACTIONS[5] = { id = 21, reaction = 6, collapsed = true }
+	FACTIONS[6] = { id = 93, reaction = 4, collapsed = true }
+	Fire("FACTION_STANDING_CHANGED", 21, 6)
+	Advance(0.3)
+	FACTIONS[5].collapsed, FACTIONS[6].collapsed = nil, nil
+	Fire("UPDATE_FACTION")
+	Advance(10.3)
+	check(seq() == "R;21;6" and cap().reps[93] == 4,
+		"a faction under a closed header changed: R; the headers opened: nothing more, got " .. seq())
 
 	listen()
 	SKILLS[186] = { 1, 75 }
@@ -870,6 +1085,18 @@ do
 	BG_WINNER = nil
 	loading(function() INSTANCE = nil end)
 	check(seq():find("b;489;l;%d+ ") ~= nil, "who won from GetBattlefieldWinner: lost (the Horde), got " .. seq())
+	-- Logged out inside after a minute, logged in outside 5 minutes later: it lasted about a minute.
+	listen()
+	loading(function() INSTANCE = { name = "Warsong Gulch", type = "pvp", id = 489 } end)
+	Advance(60)
+	LT:SetModuleEnabled("echoes", false)
+	INSTANCE = nil
+	Advance(300)
+	LT:SetModuleEnabled("echoes", true)
+	Fire("PLAYER_ENTERING_WORLD", true, false)
+	Advance(2)
+	local lasted = tonumber(seq():match("o;1 .*b;489;x;(%d+)"))
+	check(lasted and lasted >= 55 and lasted <= 61, "left while logged out: how long until the logout, got " .. seq())
 
 	listen()
 	Fire("NEW_MOUNT_ADDED", 6)
@@ -951,6 +1178,20 @@ do
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(1)
+	-- A /reload where the game doesn't say the position yet, then a loading screen before it does:
+	-- still the /reload's anchor and session (o1).
+	listen()
+	Fire("PLAYER_LEAVING_WORLD")
+	Fire("PLAYER_LOGOUT")
+	C.Reset()
+	STATE.inInstance = true
+	Fire("PLAYER_ENTERING_WORLD", false, true)
+	Advance(1)
+	Fire("PLAYER_LEAVING_WORLD")
+	STATE.inInstance = false
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+	Advance(1)
+	check(seq() == "o;0 @;0;500;500;f;l z;1429;Goldshire o;1", "a /reload, a loading screen before its anchor: the session goes on, got " .. seq())
 end
 
 ---------------------------------------------------------------------------
@@ -958,6 +1199,7 @@ section("Echoes capture: with Chronicle, the Bestiary and Beacon off")
 ---------------------------------------------------------------------------
 do
 	for _, key in ipairs({ "chronicle", "bestiary", "beacon" }) do LT:SetModuleEnabled(key, false) end
+	Advance(1) -- (the start point needs a second since the last line)
 	listen()
 	walk(500, 450)
 	halt()
@@ -972,8 +1214,9 @@ do
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "party", 2, { guid = "Player-1-11" }
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.5)
-	check(seq():find("^,0,0 ,0,%-28 ,0,%-22 k;116;12;n;m l;2075;1;2;l;116 g;2;0;Player%-1%-11:Anna%-Realmy$") ~= nil,
-		"the path, kills, loot and friends without them, got " .. seq())
+	local w1, w2 = seq():match("^,0,0 ,0,%-(%d+) ,0,%-(%d+) k;116;12;n;m l;2075;1;2;l;116 g;2;0;Player%-1%-11:Anna%-Realmy$")
+	check(w1 and tonumber(w1) >= 25 and tonumber(w1) + tonumber(w2) == 50,
+		"the path (a point past 25 yd, the stop), kills, loot and friends without them, got " .. seq())
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.5)
@@ -1002,7 +1245,10 @@ end
 section("Echoes capture: a whole session, read back")
 ---------------------------------------------------------------------------
 do
-	-- A login, a walk, a fight, loot, a quest, a ride, the hearthstone, a dungeon, a logout.
+	-- A login, a walk, a fight, loot, a quest, a ride, the hearthstone, a dungeon, a logout. On a
+	-- page of its own (the last one's last line more than 10 minutes old): a page starting halfway
+	-- would start its times from its header.
+	Advance(601)
 	at(500, 500)
 	QUESTS = { { id = 176, title = "Wanted: \"Hogger\"", objectives = {} } }
 	MOBS.nameplate3 = { name = "Hogger", level = 11, class = "elite", guid = "Creature-0-1-0-1-448-000000F1" }
@@ -1066,7 +1312,7 @@ do
 	local kinds = {}
 	for i, h in ipairs(list) do kinds[i] = h.kind or "." end
 	kinds = table.concat(kinds)
-	check(kinds:find("^@zo") and kinds:find("=a") and kinds:find("=kl") and kinds:find("m") and kinds:find("Q")
+	check(kinds:find("^@zo") and kinds:find("=a") and kinds:find("=k=?l") and kinds:find("m") and kinds:find("Q")
 		and kinds:find("@", 2, true) and kinds:find("d") and kinds:find("o$"), "every part of it is there, got " .. kinds)
 
 	-- For the exporter: the page and what it must read from it, as

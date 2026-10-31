@@ -68,8 +68,9 @@ forgets; for tests).
 
 - **Never lags the client.** Handlers only note things: a flag, a slot, or a few values in
   Events.lua's queue (flat arrays, written on the tick in the order they came, each tick's events at
-  one spot). Exceptions, because no tick comes in time: `PLAYER_LEAVING_WORLD` writes its last point,
-  `PLAYER_LOGOUT` its last point, the queue and `o0`, and `LOOT_READY` reads the loot window's slots
+  one spot). Exceptions, because no tick comes in time: `PLAYER_LEAVING_WORLD` writes its last point
+  and the queue (what happened before the loading screen stays where it happened), `PLAYER_LOGOUT`
+  its last point, the queue and `o0`, and `LOOT_READY` reads the loot window's slots
   (with auto loot it's gone by the next tick). A poll makes no tables.
 - **Secret values** are skipped: a secret kill, cast, loot line, quest or GUID writes nothing (a
   secret killer is unknown, a secret group member one of the others, a secret AFK answer keeps the
@@ -96,7 +97,8 @@ the stop, however far it came since the last. Standing still that's one `UnitPos
   site's dot would crawl from it through the whole time you stood there;
 - stop: the spot where you stopped;
 - a travel mode change: a point (unless you're still on A), then the `m` line;
-- before an event (`E.capture.Spot`, once per tick): a point if you're 3 yd or more from A;
+- before an event (`E.capture.Spot`, once per tick): a point if you're 3 yd or more from A (however
+  far, on a flight path too, unless you jumped since the last poll: more than 50 yd from its sample);
 - before a loading screen, logging out or switching off: the last point.
 
 At most a start point and one point per poll; a point on A again (whole yards) is left out, except
@@ -107,8 +109,10 @@ life), in this order: `t` flight path (`UnitOnTaxi`), `g` ghost (`UnitIsGhost`),
 transport API: the measured speed more than 3 yd/s above `GetUnitSpeed`), `s` swimming
 (`IsSwimming`), `m` mounted (`IsMounted`), `v` Travel Form or Ghost Wolf (`GetShapeshiftFormID` 3 or
 16; Aquatic Form shows as swimming), `f` on foot. Swimming flickers at the surface and the carried
-guess can be a knockback: a change to or from `s` or `c` needs the same answer on two polls in a
-row (not to `t` or `g`). An anchor's mode is read as it is then (never `c`).
+guess can be a knockback or a Blink: a change to or from `s` or `c` needs the same answer on two
+polls in a row (not to `t` or `g`; a poll standing still, which doesn't read the mode, breaks the
+row). The stop's poll never guesses `c` (the game's speed is 0 by then, however far it came since
+the last poll). An anchor's mode is read as it is then (never `c`).
 
 **Segments.** A new one (an anchor) starts:
 
@@ -118,8 +122,8 @@ row (not to `t` or `g`). An anchor's mode is read as it is then (never `c`).
 | a loading screen ends (`PLAYER_LEAVING_WORLD` writes the last point, the next tick after `PLAYER_ENTERING_WORLD` the anchor, as soon as the game says where you are, at most 3 s later) | what caused it, else `i` (an instance entered), `o` (left), `l`; a `/reload`: `l` |
 | a jump of more than 50 + 40 * seconds yd between two polls (the seconds at most 5) | what caused it, else `j` |
 | another continent | what caused it, else `j` |
-| the position gone (an anchor without one: the instance's map ID, else the last continent) or back | what caused it, else `j` |
-| released: the ghost at the graveyard (the first poll it moved, at most 1 s after `PLAYER_ALIVE` as a ghost; polled every tick meanwhile) | `r` |
+| the position gone (an anchor without one: the instance's map ID, else the last continent; after a loading screen the continent `GetInstanceInfo` says) or back | what caused it, else `j` |
+| released: the ghost at the graveyard (the first poll it moved, at most 1 s after `PLAYER_ALIVE` as a ghost, once per death; polled every tick meanwhile) | `r` |
 | a new page that didn't go on from the last (no anchor on the page: `E.Continue` wasn't called) | `c` |
 
 What caused it, from what was noted shortly before (used once, then forgotten): `h` the hearthstone
@@ -137,7 +141,8 @@ one; battlegrounds have positions.
 `o0` at `PLAYER_LOGOUT` and when switched off. `PLAYER_LOGOUT` comes on a `/reload` too and can't be
 told from logging out: a `/reload` writes `o0`, then `@...;l` and `o1` a few seconds later. An `o1`
 after an anchor with why `l` (not `s`) is a `/reload`: the session goes on (the exporter can join
-them).
+them). A session whose anchor isn't written yet (waiting for the position) stays one through
+another loading screen.
 
 ### What happens (Events.lua)
 
@@ -145,7 +150,7 @@ them).
 |---|---|
 | `L` level; played | `PLAYER_LEVEL_UP`; played: the time played (Changes.lua), whole seconds |
 | `a` / `Q` / `A` | `QUEST_ACCEPTED`; `QUEST_TURNED_IN` (xp, money); `QUEST_REMOVED`: 1.5 s later, abandoned (`A`) unless it was turned in, or turned in (`Q` without xp and money) when `C_QuestLog.IsQuestFlaggedCompleted` says so. The title (`=q`) from `C_QuestLog.GetTitleForQuestID`, kept from when it was accepted |
-| `D` | `PLAYER_DEAD`, once until alive again (and 10 s after: the game repeats it). The killer: your attackable target in the last fight within 15 s (looked at every tick in combat): a creature (`c`, its ID, level, classification; its name `=c`), a player (`p`, class and level, no name; pvp 1), a player's pet or a secret GUID (`-`) |
+| `D` | `PLAYER_DEAD`, once until alive again (and 10 s after: the game repeats it). Logged in or `/reload`ed dead or a ghost (`UnitIsDeadOrGhost` when recording starts; no `PLAYER_DEAD` comes then): that death was counted before, its release and coming back still are. The killer: your attackable target in the last fight within 15 s (looked at every tick in combat): a creature (`c`, its ID, level, classification; its name `=c`), a player (`p`, class and level, no name; pvp 1), a player's pet or a secret GUID (`-`) |
 | `r` | `PLAYER_UNGHOST`: `s` after `CONFIRM_XP_LOSS` (the spirit healer, within 120 s), `p` after `RESURRECT_REQUEST` (within 70 s), else `c`; `PLAYER_ALIVE` alive without having released: `p` or `c`. Then the mode is read again |
 | `k` | `PARTY_KILL` by me, my pet (`UnitGUID("pet")`) or a group member (`C_PartyInfo.IsGUIDInGroup`), of a creature; each corpse once (the last 64). Level, classification (`n e r x w`; trivial and minus are `n`) and name from the mob cache |
 | `l` | `CHAT_MSG_LOOT` through `LT.OwnLoot`, quality 2 and better: item, count, quality, `l` looted or `p` pushed, and the creature whose corpse the last loot window (within 5 s) said it came from; the item's name (`=i`) from the link |
@@ -162,15 +167,15 @@ writes only what changed. A session's start looks at everything once.
 
 | Line | Detection | Kept |
 |---|---|---|
-| `x` | every 60 s, at a session's start, on `PLAYER_UPDATE_RESTING` and level-ups: `UnitLevel`, `UnitXP`, `UnitXPMax`, `GetXPExhaustion` (none: 0), `IsResting`; when one changed | `xp` (the last line's values) |
+| `x` | every 60 s, at a session's start, on `PLAYER_UPDATE_RESTING` and level-ups: `UnitLevel`, `UnitXP`, `UnitXPMax`, `GetXPExhaustion` (none: 0), `IsResting`; when one changed. A change only of the rested XP or the resting flag at most every 10 minutes (in an inn or a city the rested XP grows all the time: a night there would write a line a minute); level, XP or max at once | `xp` (the last line's values) |
 | `f` | `PLAYER_FLAGS_CHANGED` (player), `UnitIsAFK`; when it changed (a secret answer keeps the last) | |
-| `g` | `GROUP_ROSTER_UPDATE`: `GetNumGroupMembers`, the members' GUIDs (`party1-4` or `raid1-40`, not me); a friend is a Beacon peer (`ns.Beacon.peers`, Beacon on) or remembered: `guid:First-Realm` (the realm `GetPlayerInfoByGUID` says, else mine), sorted; the others counted. Left the group: `g;0;0` | `group`; `E.data.friends[guid]` = "Anna-Realm" (named while Beacon is off) |
+| `g` | `GROUP_ROSTER_UPDATE`: `GetNumGroupMembers`, the members' GUIDs (`party1-4` or `raid1-40`, not me); a friend is a Beacon peer (`ns.Beacon.peers`, Beacon on) or remembered: `guid:First-Realm` (the realm `GetPlayerInfoByGUID` says, else mine), sorted; the others counted. Left the group: `g;0;0`. With others in it and Beacon on, looked at again every 15 s (Beacon learns of friends a few seconds after login, and a line is written only when it changed) | `group`; `E.data.friends[guid]` = "Anna-Realm" (named while Beacon is off) |
 | `G` | `PLAYER_EQUIPMENT_CHANGED` marks a slot, a session's start all 19; out of combat `GetInventoryItemLink`: item, enchant (the link's second field), suffix (seventh), 0 when none; taken off: item 0; the name `=i` | `gear[slot]` |
-| `R` | `FACTION_STANDING_CHANGED` names a faction; a session's start and `UPDATE_FACTION` (at most every 10 s) scan the listed factions (`C_Reputation.GetNumFactions`, `GetFactionDataByIndex`; headers left out); out of combat; the reaction 1-8. A character's first scan is the baseline: no lines | `reps[faction]`, `repsKnown` |
+| `R` | `FACTION_STANDING_CHANGED` names a faction; a session's start and `UPDATE_FACTION` (at most every 10 s) scan the listed factions (`C_Reputation.GetNumFactions`, `GetFactionDataByIndex`; headers left out); out of combat; the reaction 1-8. A character's first scan is the baseline: no lines; so is a faction a scan lists for the first time (the list leaves out what's under a closed header: opened, its factions would all look new; or one just met). `FACTION_STANDING_CHANGED`'s faction is written even then | `reps[faction]`, `repsKnown` |
 | `s` | `SKILL_LINES_CHANGED` and a session's start; out of combat `C_SkillInfo.GetSkillLineInfoByID` for the 12 Classic professions: rank and maximum; unlearned (rank 0): `0;0` | `skills[id]` |
 | `H` | `HEARTHSTONE_BOUND` and a session's start: `GetBindLocation()` (a place's name) | `bind` |
 | `p` | `PLAYER_PVP_KILLS_CHANGED`: `GetPVPSessionStats()`, the kills since the last line (a session's start is the baseline) | |
-| `d` / `b` | after each anchor of a loading screen or a session: in a `party` or `raid` instance (`IsInInstance`, `GetInstanceInfo`: the instance ID, difficulty) `d;e;...`, left `d;x;...`; a `pvp` one `b;<id>;e`, left `b;<id>;x;<seconds>`. Kept across a `/reload` and logging out | `dungeon` { id, difficulty }, `bg` { id, entered, result written } |
+| `d` / `b` | after each anchor of a loading screen or a session: in a `party` or `raid` instance (`IsInInstance`, `GetInstanceInfo`: the instance ID, difficulty) `d;e;...`, left `d;x;...`; a `pvp` one `b;<id>;e`, left `b;<id>;x;<seconds>` (left while logged out or switched off: the seconds until it was last seen inside, noted every 5 s, not the time offline). Kept across a `/reload` and logging out | `dungeon` { id, difficulty }, `bg` { id, entered, result written, last seen inside } |
 
 **The time played** (`played`, seconds): asked once per login (`PLAYER_ENTERING_WORLD` with
 `isInitialLogin`), out of combat, silently: the chat frames that show `TIME_PLAYED_MSG`
@@ -196,18 +201,29 @@ zeppelin; whether the silent `/played` stays silent; which of `QUEST_REMOVED` an
 `QUEST_TURNED_IN` comes first; `PARTY_KILL` for pets and group members; the gathering spell IDs and
 `GetLootSourceInfo`'s game object GUIDs for nodes and fishing; `PVP_MATCH_COMPLETE`'s winner (0 the
 Horde, 1 the Alliance, like `GetBattlefieldWinner`); `NEW_RECIPE_LEARNED`, `NEW_MOUNT_ADDED` and
-`FACTION_STANDING_CHANGED` firing; `C_SkillInfo.GetSkillLineInfoByID` for professions not learned
-(nil, or rank 0: only rank 0 is taken as unlearned).
+`FACTION_STANDING_CHANGED` firing (also for a faction under a closed header: a scan no longer
+writes those); `C_SkillInfo.GetSkillLineInfoByID` for professions not learned (nil, or rank 0: only
+rank 0 is taken as unlearned). Also: `GetInstanceInfo`'s instance ID outside instances (the
+continent, 0 or 1); `UnitPosition` at `PLAYER_LEAVING_WORLD` still where you were (the last point
+and the queue are written there); `IsPlayerMoving` on a flight path; `GetUnitSpeed` 0 right after
+`PLAYER_STOPPED_MOVING`; no `PLAYER_DEAD` at a login while dead, and whether `PLAYER_ALIVE` comes
+again for a ghost (after a dungeon's release, say: an `o` anchor then an `r` one); gear right at
+login (a slot whose link isn't there yet would read as taken off).
 
 ### Tests
 
 `tests/echoes_capture.lua` (after `echoes.lua`): a session starting, the store rule (distance,
-bends, start and stop, the idle crawl fix, an event's spot, `UnitPosition` once a second), every
-travel mode (swimming's flicker, the carried guess), every segment and cause, instances, every
-event kind as its exact line, secret values, nothing in combat that must wait, a `/reload`
-(`E.capture.Reset`), Chronicle, the Bestiary and Beacon off, the beta, and a whole session read back
-(times and positions add up line after line). It leaves `ECHOES_CAPTURE_SESSION` (the page and its
-times and positions) for a check with the exporter's parser outside this repo.
+bends, start and stop, the idle crawl fix, an event's spot, also on a flight path, `UnitPosition`
+once a second), every travel mode (swimming's flicker, the carried guess and what isn't carried: a
+stop, Blinks, a secret speed; a boat across a loading screen), every segment and cause (a loading
+screen to no position, events and a hearthstone just before one), instances, every event kind as
+its exact line (quests removed before they're turned in, a login or `/reload` while dead, a release
+heard twice, reputation under closed headers, rested XP in an inn, a battleground left while logged
+out, a friend Beacon learns of later), secret values, nothing in combat that must wait, a `/reload`
+(`E.capture.Reset`, and one with a loading screen before its anchor), Chronicle, the Bestiary and
+Beacon off, the beta, and a whole session read back on a page of its own (times and positions add
+up line after line). It leaves `ECHOES_CAPTURE_SESSION` (the page and its times and positions) for a
+check with the exporter's parser outside this repo.
 
 ## Line format
 

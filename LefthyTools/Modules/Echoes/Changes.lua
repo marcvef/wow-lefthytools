@@ -17,9 +17,11 @@ local C = E.capture
 local issecret, Value, Readable = LT.IsSecret, LT.Value, LT.Readable
 
 local XP_EVERY = 60          -- seconds between XP checks (and on resting changes, level-ups, logins)
+local RESTED_EVERY = 600     -- seconds: a change only of the rested XP or the resting flag is written at most this often
 local FACTIONS_EVERY = 10    -- seconds: UPDATE_FACTION rescans at most this often
 local PLAYED_WAIT = 10       -- seconds the chat frames go without /played's answer while it's asked silently
 local RESULT_EVERY = 5       -- seconds between asking who won a battleground
+local GROUP_EVERY = 15       -- seconds: a group with others is looked at again (Beacon may learn of a friend among them)
 local SLOTS = 19             -- equipment slots
 -- The Classic professions' skill lines (C_SkillInfo): First Aid, Blacksmithing, Leatherworking,
 -- Alchemy, Herbalism, Cooking, Mining, Tailoring, Engineering, Enchanting, Fishing, Skinning.
@@ -55,8 +57,10 @@ local function Reset()
 	wipe(repDirty)
 	S.lastTick = nil
 	S.xpAt = 0           -- (GetTime) the next XP check
+	S.xpLineAt = nil     -- (GetTime) the last x line
 	S.afk = nil          -- AFK as last written (nil: not known yet)
 	S.afkDirty, S.groupDirty, S.bindDirty, S.skillsDirty, S.hkDirty = false, false, false, false, false
+	S.groupOthers, S.groupAt = 0, 0 -- the others in the group as last looked at; (GetTime) the next look then
 	S.gearAll = false
 	S.factionsScan, S.factionsAt = false, -math.huge
 	S.hk = nil           -- honorable kills as last read
@@ -77,12 +81,20 @@ local function XP(cap)
 	local rested = Value(GetXPExhaustion)
 	rested = type(rested) == "number" and rested or 0
 	local resting = Yes(IsResting)
-	local key = level .. ":" .. xp .. ":" .. max .. ":" .. rested .. ":" .. (resting and 1 or 0)
-	if key ~= cap.xp then
-		cap.xp = key
-		C.Spot()
-		E.Line("x", level, xp, max, rested, resting)
+	local main = level .. ":" .. xp .. ":" .. max .. ":"
+	local key = main .. rested .. ":" .. (resting and 1 or 0)
+	if key == cap.xp then
+		return
 	end
+	-- Only the rested XP (it grows a little all the time in an inn or a city) or the resting flag:
+	-- at most every RESTED_EVERY seconds, else a night in an inn writes a line every minute.
+	local now = GetTime()
+	if type(cap.xp) == "string" and cap.xp:sub(1, #main) == main and S.xpLineAt and now - S.xpLineAt < RESTED_EVERY then
+		return
+	end
+	cap.xp, S.xpLineAt = key, now
+	C.Spot()
+	E.Line("x", level, xp, max, rested, resting)
 end
 
 local function AFK()
@@ -159,6 +171,7 @@ local function Group(cap)
 		end
 		table.sort(friends)
 	end
+	S.groupOthers, S.groupAt = others, GetTime() + GROUP_EVERY
 	local state = size .. ";" .. others .. ";" .. table.concat(friends, ";")
 	if state ~= (cap.group or "0;0;") then
 		cap.group = state
@@ -239,7 +252,9 @@ local function Factions(cap)
 		local data = Value(C_Reputation.GetFactionDataByIndex, i)
 		local id = type(data) == "table" and data.factionID
 		if type(id) == "number" and not issecret(id) and not data.isHeader then
-			Faction(cap, id, data, quiet)
+			-- (A faction listed for the first time is a baseline too: its header was closed until
+			-- now, or it was just met. A change while it isn't listed comes by FACTION_STANDING_CHANGED.)
+			Faction(cap, id, data, quiet or type(cap.reps) ~= "table" or cap.reps[id] == nil)
 			read = true
 		end
 	end
@@ -304,7 +319,14 @@ end
 -- /reload in E.data.capture), a battleground's result
 ---------------------------------------------------------------------------
 
-local function Instances(cap)
+-- How long a battleground lasted, left now; or, seen at a session's start (left while logged out
+-- or switched off), until it was last seen inside (bg[4], kept on the tick).
+local function Lasted(bg, start, now)
+	local left = start and type(bg[4]) == "number" and bg[4] or now
+	return left - (bg[2] or left)
+end
+
+local function Instances(cap, start)
 	local ok, inInstance, kind = pcall(IsInInstance)
 	inInstance = ok and inInstance == true
 	kind = inInstance and Readable(kind) and kind or nil
@@ -329,14 +351,14 @@ local function Instances(cap)
 	if id and kind == "pvp" then
 		if not bg or bg[1] ~= id then
 			if bg then
-				E.Line("b", bg[1], "x", now - (bg[2] or now))
+				E.Line("b", bg[1], "x", Lasted(bg, start, now))
 			end
 			cap.bg = { id, now }
 			E.Line("b", id, "e")
 		end
 	elseif bg then
 		cap.bg = nil
-		E.Line("b", bg[1], "x", now - (bg[2] or now))
+		E.Line("b", bg[1], "x", Lasted(bg, start, now))
 	end
 end
 
@@ -441,7 +463,7 @@ E.OnTick(function(now)
 		local start = C.arrived ~= "load"
 		C.arrived = nil
 		C.Spot()
-		Instances(cap)
+		Instances(cap, start)
 		if start then
 			SessionStart()
 		end
@@ -454,6 +476,15 @@ E.OnTick(function(now)
 	end
 	if S.groupDirty then
 		Group(cap)
+	elseif S.groupOthers > 0 and now >= S.groupAt then
+		-- (Beacon learns of friends a few seconds after login, or after the roster changed: one
+		-- among the others gets named without another GROUP_ROSTER_UPDATE)
+		local beacon = LT:GetModule("beacon")
+		if beacon and beacon.enabled then
+			Group(cap)
+		else
+			S.groupAt = now + GROUP_EVERY
+		end
 	end
 	if S.bindDirty then
 		Bind(cap)
@@ -462,9 +493,10 @@ E.OnTick(function(now)
 		Honor()
 	end
 	local bg = type(cap.bg) == "table" and cap.bg
-	if bg and not bg[3] and now >= S.resultAt then
+	if bg and now >= S.resultAt then
 		S.resultAt = now + RESULT_EVERY
-		local winner = Value(GetBattlefieldWinner)
+		bg[4] = E.Now() -- (still inside: left while logged out, it lasted until about now)
+		local winner = not bg[3] and Value(GetBattlefieldWinner)
 		if winner == 0 or winner == 1 then
 			C.BattlegroundResult(winner)
 		end
