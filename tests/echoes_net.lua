@@ -1257,6 +1257,40 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: a page's start I don't take")
+do
+	local c = Start(DORA, { friends = { ANNA, BOB }, fake = true, collect = true })
+	local D = c.D
+	Meet(c, ANNA, NEW)
+	Hello(c, ANNA, "s")
+	local mark = Mark(c)
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1")
+	Pass(c, 1.5)
+	check(#Sent(c, ANNA, mark, "B2;eq;") == 1, "(page 1 asked of Anna)")
+	-- She begins page 1 as transfer 5, then (a request of mine from before, say) page 9 with the same
+	-- transfer id: page 9's parts don't go into page 1, and she's asked to stop page 9.
+	local p1, p9 = TheirPage(c, 1, 1000), TheirPage(c, 9, 1000, 99)
+	Say(c, ANNA, ("B2;eb;5;%s;%s;1;%d;%s;%d;z"):format(ANNA.acct, ANNA.store, p1.len, p1.h, p1.t))
+	Pass(c, 0.5)
+	Say(c, ANNA, ("B2;eb;5;%s;%s;9;%d;%s;%d;z"):format(ANNA.acct, ANNA.store, p9.len, p9.h, p9.t))
+	Say(c, ANNA, ("B2;ep;5;0;%s"):format(p9.z:sub(1, 240)))
+	Pass(c, 1)
+	local part = D.partials[ANNA.key .. ".1"]
+	check(part and part.have == 0, "a transfer id is the page its last start said: page 9's part isn't page 1's, got "
+		.. tostring(part and part.have))
+	local stops = Sent(c, ANNA, mark, ("B2;eq;%s;%s;9;"):format(ANNA.acct, ANNA.store))
+	check(#stops == 1 and stops[1]:find(";9;1000$"), "a page I didn't ask for: she's asked to stop it (from its end), got " .. tostring(stops[1]))
+	-- One I have already: stopped too.
+	SendPage(c, ANNA, ANNA, p1, 6)
+	Pass(c, 1)
+	check(c.E.data.inbox[ANNA.key] and c.E.data.inbox[ANNA.key][1], "(page 1 whole, from transfer 5 again)")
+	mark = Mark(c)
+	Say(c, ANNA, ("B2;eb;7;%s;%s;1;%d;%s;%d;z"):format(ANNA.acct, ANNA.store, p1.len, p1.h, p1.t))
+	Pass(c, 1)
+	check(#Sent(c, ANNA, mark, ("B2;eq;%s;%s;1;1000"):format(ANNA.acct, ANNA.store)) == 1, "a page I have: stopped too")
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------

@@ -1205,12 +1205,18 @@ local function Complete(pageId, part)
 	end
 end
 
+-- A page's start. Its transfer id is that page's now (parts with it never go into another page),
+-- and one I don't take is stopped: asked from its end, the sender sends no more of it.
 local function OnBegin(id, msg, now)
 	local key = msg.acct .. "." .. msg.store
 	local pageId = PageId(key, msg.n)
 	local r, part = inflight[pageId], partials[pageId]
+	xmap[id] = xmap[id] or {}
+	xmap[id][msg.x] = nil
+	local stop = Msg("eq", msg.acct, msg.store, msg.n, msg.len)
 	if not (r or part) or Get(key, msg.n) then
-		return -- (not asked for, or got already)
+		Control(id, stop, "eq") -- (not asked for, or got already)
+		return
 	end
 	if not Accepted(msg.acct, now) or key == MyKey() then
 		bad[pageId] = bad[pageId] or {}
@@ -1219,6 +1225,7 @@ local function OnBegin(id, msg, now)
 		if r and r.from == id then
 			inflight[pageId] = nil
 		end
+		Control(id, stop, "eq")
 		return
 	end
 	if part and (part.len ~= msg.len or part.hash ~= msg.hash or part.t0 ~= msg.t0 or part.m ~= msg.m) then
@@ -1229,7 +1236,6 @@ local function OnBegin(id, msg, now)
 		partials[pageId] = part
 	end
 	part.at = now
-	xmap[id] = xmap[id] or {}
 	xmap[id][msg.x] = pageId
 	if r and r.from == id then
 		r.at = now
@@ -1239,7 +1245,7 @@ local function OnBegin(id, msg, now)
 	if where == "carry" and not M.db.collect and not Fits(key, msg.len) then
 		noRoom[pageId] = now
 		partials[pageId], inflight[pageId] = nil, nil
-		Control(id, Msg("eq", msg.acct, msg.store, msg.n, msg.len), "eq")
+		Control(id, stop, "eq")
 	end
 end
 

@@ -602,8 +602,9 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
 ### Checks
 
 - Delivery checks who and what was asked for: a page's start (`eb`) only for a page I asked for
-  and don't have, of an account I take, at most 64 KB; parts only in order (one after a gap waits
-  for the request again).
+  and don't have, of an account I take, at most 64 KB; one I don't take is stopped (asked from
+  its end), and its transfer id no longer leads to an earlier page of that friend's; parts only
+  in order (one after a gap waits for the request again).
 - A whole page goes to `E.Store.Put`, which checks the rest: the hash (`LT.Hash32`), the size, the
   start (not before the launch, not more than a day ahead), exported, safe, room. Refused for its
   hash, size or start: whoever sent parts of it isn't asked for it again this session. No room:
