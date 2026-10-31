@@ -158,7 +158,7 @@ local function Flush()
 	open.buffer, open.state = E.buffer, E.state
 	flushedAt = GetTime()
 end
-E.Flush = Flush -- (for tests and the status)
+E.Flush = Flush -- (for tests)
 
 -- The lines in a text.
 local function Lines(text)

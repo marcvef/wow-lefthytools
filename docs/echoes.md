@@ -382,7 +382,8 @@ LefthyToolsEchoesDB = {
 ```
 
 A field that isn't what it should be is made new (a table that isn't one, a store that isn't 8 hex
-digits); nothing else is touched. A stored page is `{ t, h, m, z }`:
+digits); nothing else is touched, except that a stored page without its text (`z`) goes when the
+sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
 
 - `t`: its start (the header's t0).
 - `m`: how `z` holds it: `z` Base64 of its zlib, `r` Base64 of the text (compressing failed), `t`

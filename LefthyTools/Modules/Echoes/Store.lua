@@ -134,8 +134,8 @@ function Ranges.Of(t, keep)
 end
 
 ---------------------------------------------------------------------------
--- Sizes: the bytes of the stored strings (z), kept as pages come and go; counted anew for a new
--- saved table (a load) and by the status command.
+-- Sizes: the bytes of the stored strings (z), kept as pages come and go; counted anew when recording
+-- starts, for a saved table not counted yet, and by the status command.
 ---------------------------------------------------------------------------
 
 local Store = {}
