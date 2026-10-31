@@ -9,7 +9,10 @@ local M = E.module
 --
 --   mine     my own closed pages, kept until a collector holds them: 2 MB at most, then the oldest
 --            go, the ones a relay is known to carry first; offered only once on disk (closed in an
---            earlier session: after a crash, page numbers from the last save are used again)
+--            earlier session: after a crash, page numbers from the last save are used again). A
+--            page that never went out (o = 0) whose number friends hold anyway is another page with
+--            that number (a WTF folder restored, or copied and played on two computers): it moves to
+--            a new number above all of them (E.data.top), and my next pages close above it too
 --   carry    friends' pages I relay: 512 KB, 128 KB per author, 30 days
 --   inbox    a collector's received pages, dropped only by the exporter's receipt; a chat line at
 --            4 MB asks to run the exporter, at 8 MB pulling pauses (E.Store.InboxFull)
@@ -28,6 +31,7 @@ local INBOX_NOTE, INBOX_FULL = 4096 * KB, 8192 * KB -- the collector: ask for th
 local PAGE_MAX = 64 * KB                      -- a stored page (its z) is at most this
 local AHEAD = 86400                           -- a page may start at most a day ahead
 local MAX_N = 999999999                       -- page numbers are 1 to this
+local SEEN_AHEAD = 10000                      -- my numbers friends tell beyond this above my last page: not believed
 local RECEIPT = "LefthyTools_EchoesReceipt"   -- the exporter's load-on-demand addon, on the collector's PC
 
 local issecret = LT.IsSecret
@@ -151,6 +155,7 @@ local queue = {}     -- my closed pages waiting to be packed, oldest first
 local chores = {}    -- what's left to do after the start, one a tick
 local notedSession, receiptSession -- the session the 4 MB line was said in, the receipt read in
 local noteDue = false
+local moved = 0      -- my pages moved to a new number this session (their number was in use)
 
 local function Size(page)
 	return type(page) == "table" and type(page.z) == "string" and #page.z or 0
@@ -384,6 +389,114 @@ function Store.InboxFull()
 	return bytes.inbox >= INBOX_FULL
 end
 
+---------------------------------------------------------------------------
+-- My page numbers used twice: a WTF folder restored from a backup (its n from before pages that
+-- went out since), or copied to a second computer and played on both (one store, both numbering
+-- from the same n). A page of mine that never went out (o = 0: no part of it was ever sent; one
+-- closed by a build before this rule counts as out) whose number friends hold anyway (a holder's
+-- holdings, a collector's safe summary) is another page with that number: it moves to a new
+-- number above every one of mine friends told of, so it travels as a page of its own, and my next
+-- pages close above them too (E.data.top).
+---------------------------------------------------------------------------
+
+-- The highest number of mine friends told of, or given to a moved page (E.data.top); 0: none.
+local function Told()
+	local top = E.data.top
+	return type(top) == "number" and top or 0
+end
+
+-- The text with its header's number old made new ("E1;acct;store;n;..."). Only for a page still in
+-- plain text: a packed one keeps the number it was recorded under in its header (the game never
+-- unpacks a page; the exporter files it under the number it's kept under).
+local function Renumbered(text, old, new)
+	local head, n, rest = text:match("^(E1;[^;\n]*;[^;\n]*;)(%d+)()")
+	if head and tonumber(n) == old then
+		return head .. new .. text:sub(rest)
+	end
+	return text
+end
+
+-- My page n moves to a new number: above every one in use or told of, and the open page's (that
+-- one closes above it then). Offered from the next session on, like a new page: its new number is
+-- on disk then. The new number.
+local function Move(n)
+	local data = E.data
+	local page = data.mine[n]
+	local open = type(data.open) == "table" and type(data.open.n) == "number" and data.open.n or 0
+	local new = math.max(data.n, Told(), open) + 1
+	while data.mine[new] do
+		new = new + 1
+	end
+	data.mine[n], data.mine[new] = nil, page
+	data.top = new
+	page.s = data.session
+	if page.q then
+		local text = Renumbered(page.z, n, new)
+		bytes.mine = bytes.mine - #page.z + #text
+		page.z = text
+		for i, waiting in ipairs(queue) do
+			if waiting == n then
+				queue[i] = new
+			end
+		end
+	end
+	carried[new], carried[n] = carried[n], nil
+	moved = moved + 1
+	return new
+end
+
+-- Friends hold these pages of mine (a holder's holdings, a collector's summary): my next pages close
+-- above the highest (at most SEEN_AHEAD above my last page: a broken client), and a page of mine
+-- among them that never went out moves to a new number (not one the exporter has from here: it read
+-- it from this very table). The number moved.
+local function Seen(ranges)
+	local data = E.data
+	local list = Ranges.Parse(ranges)
+	local cap = data.n + SEEN_AHEAD
+	for i = #list, 1, -1 do
+		if list[i][1] <= cap then
+			local high = math.min(list[i][2], cap)
+			if high > Told() then
+				data.top = high
+			end
+			break
+		end
+	end
+	local clash, exported = {}, data.exported[Store.Own() or ""]
+	for n, page in pairs(data.mine) do
+		if type(page) == "table" and page.o == 0 and Ranges.Contains(list, n) and not Ranges.Contains(exported, n) then
+			clash[#clash + 1] = n
+		end
+	end
+	table.sort(clash)
+	for _, n in ipairs(clash) do
+		Move(n)
+	end
+	if clash[1] then
+		Changed()
+	end
+	return #clash
+end
+
+-- Friends hold these pages of acct.store (a holder's holdings). For my own key: see above. The
+-- number of my pages moved to a new number.
+function Store.Elsewhere(acct, store, ranges)
+	local key = Store.Key(acct, store)
+	if not key or key ~= Store.Own() then
+		return 0
+	end
+	return Seen(ranges)
+end
+
+-- A part of my page n went to a friend (Delivery, when it went; page: the page it served, if that's
+-- still page n): it's out, so it keeps its number from now on.
+function Store.WentOut(n, page)
+	local mine = E.data.mine[n]
+	if mine and mine == page and mine.o == 0 then
+		mine.o = 1
+	end
+end
+
 -- Whether a collector holds page n of key safely (a summary told so).
 local function SafeSomewhere(key, n)
 	for _, ranges in pairs(E.data.safe[key] or {}) do
@@ -468,7 +581,8 @@ function Store.Drop(acct, store, ranges, where)
 end
 
 -- A collector (its "acct.store") holds these pages of acct.store safely (its summary, merged into
--- E.data.safe): they go from mine and carry. The number dropped.
+-- E.data.safe): they go from mine and carry. Of mine, a page that never went out isn't the one the
+-- collector holds: it moves to a new number instead (Seen). The number dropped.
 function Store.Safe(acct, store, ranges, collector)
 	local key = Store.Key(acct, store)
 	if not key or type(collector) ~= "string" or issecret(collector) or collector == "" then
@@ -480,6 +594,9 @@ function Store.Safe(acct, store, ranges, collector)
 	if merged ~= safe[key][collector] then
 		safe[key][collector] = merged
 		Changed()
+	end
+	if key == Store.Own() then
+		Seen(ranges)
 	end
 	return Store.Drop(acct, store, ranges, "mine") + Store.Drop(acct, store, ranges, "carry")
 end
@@ -543,19 +660,31 @@ end
 ---------------------------------------------------------------------------
 
 -- Pages.lua closes page n (started at t0): its text (ending in its "." line) is kept as plain text,
--- waiting to be packed (q), and n is the last closed page's number now. s: the session it closed in,
--- offered from the next one on; onDisk (closed as stale at login from the saved text, which any
--- later load closes the same way): the session before, offered at once.
+-- waiting to be packed (q), not out yet (o = 0), and n is the last closed page's number now. s: the
+-- session it closed in, offered from the next one on; onDisk (closed as stale at login from the
+-- saved text, which any later load closes the same way): the session before, offered at once. A
+-- number friends hold already (E.data.top: my numbering went back) or kept here: it closes above
+-- them, its header renumbered (plain text still). The number it's kept under.
 function Store.Close(n, t0, text, onDisk)
 	Counted()
 	local data = E.data
-	bytes.mine = bytes.mine - Size(data.mine[n]) + #text
-	data.mine[n] = { t = t0, m = "t", z = text, q = 1, s = onDisk and data.session - 1 or data.session }
+	local top = math.max(data.n, Told())
+	if n <= top or data.mine[n] then
+		local new = top + 1
+		while data.mine[new] do
+			new = new + 1
+		end
+		text, n = Renumbered(text, n, new), new
+		moved = moved + 1
+	end
+	bytes.mine = bytes.mine + #text
+	data.mine[n] = { t = t0, m = "t", z = text, q = 1, s = onDisk and data.session - 1 or data.session, o = 0 }
 	if n > data.n then
 		data.n = n
 	end
 	queue[#queue + 1] = n
 	Changed()
+	return n
 end
 
 -- Base64 of s, or nil if it didn't work.
@@ -699,7 +828,7 @@ E.When("start", function()
 	end
 	table.sort(queue)
 	chores = { LaunchDay, Expire, Store.Trim, Note }
-	noteDue = false
+	noteDue, moved = false, 0
 end)
 
 -- One thing a tick: a page packed, or else a chore; the receipt once a session while collecting.
@@ -789,9 +918,10 @@ local function Status()
 		waiting = waiting + (page.q and 1 or 0)
 		later = later + (OnDisk(page) and 0 or 1)
 	end
-	Line(("my pages: %d (%s), %s of %s%s%s."):format(count, count > 0 and Ranges.Of(data.mine) or "none", Amount(bytes.mine),
+	Line(("my pages: %d (%s), %s of %s%s%s%s."):format(count, count > 0 and Ranges.Of(data.mine) or "none", Amount(bytes.mine),
 		Amount(MINE_CAP), waiting > 0 and (", %d waiting to be packed"):format(waiting) or "",
-		later > 0 and (", %d offered from the next session on (a /reload is one)"):format(later) or ""))
+		later > 0 and (", %d offered from the next session on (a /reload is one)"):format(later) or "",
+		moved > 0 and (", %d moved to a new number this session (friends hold another page with theirs: a WTF folder restored, or copied?)"):format(moved) or ""))
 	local relayed = 0
 	for _, pages in pairs(data.carry) do
 		relayed = relayed + Count(pages)

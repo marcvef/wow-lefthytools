@@ -377,6 +377,7 @@ LefthyToolsEchoesDB = {
   acct = "1a2b3c4d",  -- my BattleTag's hash (LT.Hash32 of the lowercased BattleTag), filled in later
   session = 41,       -- +1 at every load (a /reload too): what came this session, what's on disk
   n = 213,            -- the last closed page's number (0: none yet)
+  top = 215,          -- the highest number of mine friends hold, or given to a moved page (nil: none; numbers used twice, below)
   open = {            -- the page being written (plain text, never shared); nil: none
     n = 214, t0 = 1793452800, char = "Anna-Realm", guid = "Player-...", acct = "1a2b3c4d",
     own = 4,            -- its own lines (header, character, going on): nothing else, it doesn't close by time
@@ -386,8 +387,8 @@ LefthyToolsEchoesDB = {
     state = { ... },    -- the encoder's state: E.state itself
   },
   mine = {            -- my closed pages
-    [212] = { t = 1793451000, h = "5e1f09aa", m = "z", z = "eJzt...", s = 40 },
-    [213] = { t = 1793452700, m = "t", z = "E1;...", q = 1, s = 41 }, -- closed, waiting to be packed
+    [212] = { t = 1793451000, h = "5e1f09aa", m = "z", z = "eJzt...", s = 40, o = 1 },
+    [213] = { t = 1793452700, m = "t", z = "E1;...", q = 1, s = 41, o = 0 }, -- closed, waiting to be packed
   },
   carry = { ["5e6f7a8b.0c77e1f2"] = { [57] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- friends' pages I relay
   safe = { ["5e6f7a8b.0c77e1f2"] = { ["c011ec70.12345678"] = "1-56" } },              -- collectors' summaries
@@ -409,8 +410,10 @@ sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
 - `h`: `LT.Hash32(z)`, the hash of what's stored (none while it waits).
 - `q`: closed, waiting to be packed (`m` is `t` meanwhile).
 - `s` (mine): the session it closed in (the session before for a page closed as stale at login
-  from the saved text; none: from a build before the rule, on disk); (carry, inbox): the session
-  it came in. `a` (carry): when it came.
+  from the saved text; none: from a build before the rule, on disk; a page moved to a new number:
+  the session it moved in); (carry, inbox): the session it came in. `a` (carry): when it came.
+- `o` (mine): `0` not out yet (no part of it was ever sent), `1` out (a part went to a friend);
+  none: closed by a build before the rule, counts as out (numbers used twice, below).
 
 **Files.** `Store.lua` (the closed pages, what's kept, the receipt, `/lefthy echoes`) loads before
 `Pages.lua` (the open page). Both load after the capture's files, so at logout and when switched off
@@ -470,7 +473,9 @@ nothing else then.
 ### Closed pages (Store.lua)
 
 `E.Store.Close(n, t0, text, onDisk)` keeps the text in `mine[n]` as it is (`m = "t"`, `q = 1`, `s` the
-session) and `n` becomes the last closed page's number. The tick packs one waiting page at a time,
+session, `o = 0`) and `n` becomes the last closed page's number (a number at or below `E.data.top`,
+or kept already: the next one above, its header renumbered; numbers used twice, below). It returns
+the number the page is kept under. The tick packs one waiting page at a time,
 oldest first:
 
 1. `C_EncodingUtil.CompressString(text, Enum.CompressionMethod.Zlib)`, then
@@ -498,9 +503,41 @@ one (`s`; a `/reload` starts a new session, `E.data.session`).
 - **The cost:** my pages travel from the next session on (the next login or `/reload`), not the
   evening they're recorded; the author keeps every page until a collector holds it, so nothing is
   lost by the wait. `/lefthy echoes` says how many wait.
-- **What's still possible:** a WTF folder copied to a second computer and played on both keeps one
-  store id (it's made once per folder), so both number their pages alike and the same ids carry
-  different pages. Copy a WTF folder only to move, not to play on both.
+
+**Numbers used twice** (a WTF folder restored from a backup, or copied to a second computer and
+played on both). The store id is made once per folder, so a restored folder numbers its pages again
+from its old `n`, and two computers with one folder number theirs alike: one id, two pages. Without
+a guard the collector keeps the first it gets, its "safe" covers the number, and the author drops
+its other page as safe: lost. So each of my pages knows whether it ever went out (`o`: `E.Store.WentOut`,
+called by the delivery when a part of it was actually sent; kept in the saved table):
+
+- **A page that never went out but whose number friends hold** (a holder's holdings `es`, or a
+  collector's safe summary `ed`, direct or passed on: `E.Store.Elsewhere`, `E.Store.Safe` for my key)
+  is another page with that number. It isn't dropped: it **moves to a new number**, above every
+  number of mine any friend told of, the last closed page's and the open page's (`E.data.top` keeps
+  the highest), and goes out under that number from the next session on (like a new page: its new
+  number is on disk then). A page still waiting to be packed gets its header renumbered too; a
+  packed one keeps the number it was recorded under in its header (the game never unpacks a page),
+  and the exporter files it under the number it's kept under (it warns that the header names
+  another).
+- **My next pages close above it:** numbers of mine friends hold above my last page raise
+  `E.data.top`, and `E.Store.Close` closes a page whose number is at or below it (or kept already)
+  above it, its header renumbered (it's still plain text then). `E.data.n` itself only moves when a
+  page closes: Pages.lua leaves an open page whose number isn't above it unclosed at the next login.
+  Numbers more than 10,000 above my last page aren't believed (a broken client).
+- **Not moved:** a page that went out (the collector may hold this one), one from a build before
+  the rule, and one the exporter has from this computer (`exported` of my own key: it read this
+  very table). Those go as before once safe.
+- Relays tell an author what they hold of its own pages (`es` with the author's key), so this
+  works before a collector's summary comes, and with only relays online.
+- **Left over:** a page whose `o = 1` wasn't saved (the game crashed after it went out, or a backup
+  from before it went out) is moved although it's the same page: the collector gets it twice, under
+  both numbers, with the same text. A restored backup's open page closes at login as a page of its
+  own, whose lines are the first ones of a page that went out after the backup: those lines come
+  twice. (The exporter can tell both: the moved page's header names the other number.) And a relay
+  that asks for my never-out page before any holder's summary reached me makes it "out" (`o = 1`),
+  though the collector may hold the other page with that number: then it's lost like before. Copy a
+  WTF folder only to move, not to play on both.
 
 **What's kept** (design section 7):
 
@@ -545,7 +582,9 @@ and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits each.
 | `E.Store.Held(where)` | `{ ["acct.store"] = "ranges" }` of `"mine"` (the pages I offer), `"carry"` or `"inbox"` |
 | `E.Store.Put(acct, store, n, page, where)` | a friend's page received, `where` `"carry"` or `"inbox"`; `page` = `{ t, h, m, z }`, kept as a copy with `s` (and `a`). `true` (`true, "have"`: had it), or `false` and why: `id`, `mine` (my own store's), `page` (not `z`/`r` Base64), `size` (over 64 KB), `time` (before the launch, more than a day ahead), `hash` (`h` isn't `LT.Hash32(z)`; Put checks it), `exported`, `safe` (relaying a page a collector holds), `full` |
 | `E.Store.Drop(acct, store, ranges, where)` | drops those pages (ranges nil: all; where nil: mine, carry and inbox); the number dropped |
-| `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine and carry |
+| `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine and carry; of mine, one that never went out moves to a new number instead (numbers used twice) |
+| `E.Store.Elsewhere(acct, store, ranges)` | a holder offers these (its holdings): for my own key, my next pages close above them and a page of mine among them that never went out moves to a new number; the number moved |
+| `E.Store.WentOut(n, page)` | a part of my page `n` was sent (`page`: the one served, if it's still page `n`): `o = 1`, it keeps its number |
 | `E.Store.SafeHere(acct, store)` | ranges this collector holds safely: received in an earlier session (on disk) or exported |
 | `E.Store.Carried(acct, store, ranges)` | a relay holds these: of mine, they go first over the cap |
 | `E.Store.Fits(acct, store, bytes)` | whether a relayed page of that size fits the cache |
@@ -630,8 +669,9 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
 ### Pulling
 
 - **What I hold** (`es`): my own pages (once on disk: Pages and storage), the ones I relay (while relaying) and a collector's inbox;
-  never a friend's own pages back to them. To a friend who collects or relays, when it changed (at
-  most every 60 s), everything every 5 minutes.
+  a friend's own pages too, back to them (they learn who holds which of theirs: `E.Store.Carried`,
+  and numbers used twice). To a friend who collects or relays, when it changed (at most every 60
+  s), everything every 5 minutes.
 - **A collector** asks for every offered page it lacks (not in its inbox, not exported, not in
   its relay cache), until its inbox reaches 8 MB. Its relay cache (from before it collected)
   moves to the inbox, one page a second (`E.Store.Put` checks its hash again), offered or not; an
@@ -686,8 +726,11 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   at most 300 intervals per collector (more isn't taken as safe: those pages are kept; a
   collector's own summary has no limit).
 - `E.Store.Safe` drops my own pages (`mine`) and the ones I relay (`carry`) once any collector
-  holds them safely.
-- A relay's holdings with my own pages: `E.Store.Carried` (over my cap, those go first).
+  holds them safely; of mine, one that never went out moves to a new number instead (Pages and
+  storage: numbers used twice).
+- A holder's holdings with my own pages: `E.Store.Carried` (a relay's: over my cap, those go first)
+  and `E.Store.Elsewhere` (numbers used twice). A page of mine I serve that moved (or went) stops:
+  nothing more of it goes under its old number. A part of my page that was sent: `E.Store.WentOut`.
 
 ### Budget (never in the way)
 
@@ -742,7 +785,7 @@ pages coming and served, traffic, a pause after a throttle.
 
 Every change to the pages goes through `E.Store` (Pages and storage): `Page` to serve, `Held`
 for what I hold, `Put` for what came, `Drop` (a page I relay that's collected now moves to the
-inbox), `Safe` and `SafeHere`, `Carried`, `Fits`, `InboxFull`, `Own`. Delivery only reads
+inbox), `Safe` and `SafeHere`, `Carried`, `Elsewhere`, `WentOut`, `Fits`, `InboxFull`, `Own`. Delivery only reads
 `exported` and `safe` for its decisions. What it works out of the pages (holdings, what I have
 of a store, what's exported or safe) is cached until they change: `E.Store` calls
 `D.PagesChanged()` on every change (and Delivery works it out anew every 5 minutes, a safety

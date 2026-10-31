@@ -27,7 +27,8 @@ local L = ns.L
 -- LefthyToolsEchoesDB (account-wide) = { world (Core's stamp), v = 1 (the layout), store (8 random
 --   hex digits, made once: this WTF folder's), acct (my BattleTag's hash, filled in later), session
 --   (+1 at every load: what's from this session, what's from disk), n (the last closed page's
---   number), open (the page being written, plain text, never shared; nil: none: Pages.lua), mine
+--   number), top (the highest number of mine friends hold: pages close above it; Store.lua), open
+--   (the page being written, plain text, never shared; nil: none: Pages.lua), mine
 --   (my closed pages), carry (friends' pages I relay), safe (what collectors hold), inbox and
 --   exported (a collector's: Store.lua), capture (the capture's baselines per character) and
 --   friends (LefthyTools friends' names: Path.lua and Changes.lua) }

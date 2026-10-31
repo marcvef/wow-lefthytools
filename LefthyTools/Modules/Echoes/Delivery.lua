@@ -739,6 +739,9 @@ local function Sent(record)
 		serve.pending = serve.pending - 1
 		if record.kind == "ep" then
 			stats.served = stats.served + #record.message
+			if serve.mine then
+				S.WentOut(serve.n, serve.page) -- (out now: it keeps its number, see E.Store)
+			end
 		end
 		if Done(serve) then
 			RemoveServe(serve)
@@ -859,9 +862,23 @@ local function StartServes()
 		if page and s.offset < #page.z then
 			nextX = nextX % 99 + 1
 			active[#active + 1] = { id = s.id, key = s.key, acct = s.acct, store = s.store, n = s.n, x = nextX,
-				offset = s.offset, len = #page.z, page = page, begun = false, pending = 0 }
+				offset = s.offset, len = #page.z, page = page, begun = false, pending = 0, mine = s.key == MyKey() }
 		elseif ns.Beacon.peers[s.id] and not page then
 			Control(s.id, Msg("en", s.acct, s.store, s.n), "en", nil, true)
+		end
+	end
+end
+
+-- A page of mine I serve that moved to a new number (E.Store: friends hold another page with its
+-- number) or went: nothing more of it goes (what of it waits in Beacon's queue still does).
+local function DropMoved()
+	for i = #active, 1, -1 do
+		local s = active[i]
+		if s.mine and not s.stopped and E.data.mine[s.n] ~= s.page then
+			s.offset, s.stopped = s.len, true
+			if Done(s) then
+				table.remove(active, i)
+			end
 		end
 	end
 end
@@ -878,6 +895,7 @@ local function Send(now)
 	if now < pausedUntil then
 		return
 	end
+	DropMoved()
 	StartServes()
 	local B = ns.Beacon
 	-- Only when nothing but mine waits in Beacon's queues: everything else goes first.
@@ -1020,10 +1038,12 @@ local function Summary(id, peer, now)
 		s.full = now
 		wipe(s.sent)
 	end
+	-- (Their own pages too: the author learns who holds which of its pages, and a page of theirs
+	-- that never went out but that I hold under its number is another page with that number.)
 	local items, head = {}, "B2;es;"
 	for key, list in pairs(Holdings()) do
 		local text = Ranges.Format(list)
-		if key ~= peer.key and text ~= s.sent[key] then
+		if text ~= s.sent[key] then
 			s.sent[key] = text
 			WriteItems(key, list, MAX_BYTES - #head, items)
 		end
@@ -1442,8 +1462,12 @@ local function OnHoldings(id, msg, now)
 			if #merged <= RANGES_MAX then
 				peer.holdings[key] = merged
 			end
-			if key == MyKey() and peer.relay then
-				Carried(key, list) -- (a relay holds these of mine: over the cap they go first)
+			if key == MyKey() then
+				if peer.relay then
+					Carried(key, list) -- (a relay holds these of mine: over the cap they go first)
+				end
+				-- (a page of mine they hold that never went out is another page with that number)
+				S.Elsewhere(acct, key:sub(10), list)
 			end
 		end
 	end
@@ -1766,8 +1790,8 @@ function D.Status()
 		if peer.verified and beacon.peers[id] then
 			local roles = (peer.collect and "collects, " or "") .. (peer.relay and "relays, " or "")
 			local pages = 0
-			for _, list in pairs(peer.holdings) do
-				for _, r in ipairs(list) do
+			for key, list in pairs(peer.holdings) do
+				for _, r in ipairs(key ~= MyKey() and list or {}) do -- (not my own pages they hold)
 					pages = pages + r[2] - r[1] + 1
 				end
 			end

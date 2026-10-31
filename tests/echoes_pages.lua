@@ -528,6 +528,7 @@ do
 	local same = true
 	for n, z in pairs(offered) do same = same and E.data.mine[n] ~= nil and E.data.mine[n].z == z end
 	check(same and size(offered) == 1, "every page offered before the crash is the same page now: no number went out with other lines")
+	Store.WentOut(1, E.data.mine[1]) -- (a collector holds it: it went out)
 	check(Store.Safe(acct, STORE, Ranges.Of(offered), "c011ec70.12345678") == 1 and E.data.mine[2] == again,
 		"what a collector can hold (only what was offered) drops only that: the new page 2 stays")
 	reload(1)
@@ -705,6 +706,73 @@ do
 	check(E.data.carry[A .. ".00000003"] and not E.data.carry[A .. ".00000003"][1] and E.data.carry[A .. ".00000003"][2],
 		"relayed pages go 30 days after they came, at the next login")
 	check(sizesAgree(), "the sizes kept as pages came and went are the pages' (carry per author too)")
+end
+
+section("Echoes pages: a page number used twice (a WTF folder restored, or copied to a second PC)")
+do
+	-- A page of mine that never went out (no part of it sent) whose number friends hold anyway is
+	-- another page with that number: it moves to a new one, above every number of mine friends told
+	-- of, and my next pages close above them too.
+	local collector = "c011ec70.12345678"
+	local function closeOne() -- (the open page closes by time, and is packed)
+		kills(1, 1)
+		tick()
+		skew = skew + 1800
+		tick()
+		tick()
+		return E.data.n
+	end
+	local function headerN(page) return tonumber(textOf(page):match("^E1;%x*;%x+;(%d+);")) end
+	fresh(acct)
+	closeOne()
+	closeOne()
+	closeOne()
+	check(E.data.mine[1].o == 0 and E.data.mine[2].o == 0 and E.data.mine[3].o == 0 and E.data.open.n == 4,
+		"pages 1-3 closed: not out yet (o = 0)")
+	reload(1) -- (on disk: offered)
+	Store.WentOut(1, E.data.mine[1])
+	Store.WentOut(2, { o = 0 })
+	check(E.data.mine[1].o == 1 and E.data.mine[2].o == 0, "a part of page 1 went to a friend: out (WentOut: only that page as it is)")
+	E.data.mine[3].o = nil -- (closed by a build before the rule: counts as out)
+	local z2 = E.data.mine[2].z
+	check(Store.Safe(acct, STORE, "1-3,6", collector) == 2 and not E.data.mine[1] and not E.data.mine[3] and not E.data.mine[2],
+		"a collector holds 1-3 and 6: pages 1 (out) and 3 (from an older build) go")
+	local moved = E.data.mine[7]
+	check(moved and moved.z == z2 and moved.o == 0 and E.data.top == 7 and E.data.n == 3 and headerN(moved) == 2,
+		"page 2 never went out: the collector's is another page 2; it moves to 7 (above 6, told, and the open page 4), its header"
+		.. " (packed) keeps the number it was recorded under")
+	check(Store.Page(acct, STORE, 7) == nil and Store.Page(acct, STORE, 2) == nil and not Ranges.Contains(Store.Held("mine")[own] or "", 7),
+		"moved: offered from the next session on (its new number is on disk then)")
+	check(closeOne() == 8 and headerN(E.data.mine[8]) == 8 and not E.data.mine[4] and E.data.open.n == 9,
+		"the open page (4) closes above them: 8, its header renumbered (still plain text when it closed)")
+
+	-- A holder's holdings of mine above my last page (my numbering went back): the next closes above.
+	check(Store.Elsewhere(acct, STORE, "9-12") == 0 and E.data.top == 12, "a holder offers 9-12 of mine: nothing of mine there, the top is 12")
+	check(closeOne() == 13 and headerN(E.data.mine[13]) == 13, "the open page 9 closes as 13")
+	-- A page waiting to be packed (plain text) that moves: its header is renumbered, and it's packed
+	-- under its new number.
+	Fire("ECHOES_PAGES_TEST", 170, 200)
+	tick()
+	local waiting = E.data.mine[14]
+	check(waiting and waiting.q and E.data.open.n == 15, "(page 14 closed by size, waiting to be packed)")
+	check(Store.Elsewhere(acct, STORE, "14") == 1 and E.data.mine[16] == waiting and not E.data.mine[14] and E.data.top == 16
+		and waiting.z:find("^E1;" .. acct .. ";" .. STORE .. ";16;"), "a holder has a page 14 I never sent: mine moves to 16 (above the open 15), its header too")
+	tick()
+	check(waiting.m == "z" and headerN(waiting) == 16 and not E.data.mine[14], "packed on the next tick, as 16")
+	check(Store.Elsewhere(acct, STORE, "50000-60000") == 0 and E.data.top == 16, "more than 10,000 above my last page: not believed (a broken client)")
+	check(Store.Elsewhere(A, B, "1-100") == 0 and E.data.top == 16 and Store.Elsewhere("x", STORE, "16") == 0 and E.data.mine[16],
+		"a friend's store, or no key: nothing to do with mine")
+	-- What the exporter has from here (it read this very table) is this page: it goes.
+	E.data.exported[own] = "16"
+	check(Store.Safe(acct, STORE, "16", own) == 1 and not E.data.mine[16], "my own summary of what the exporter has (16): dropped, not moved")
+	E.data.exported[own] = nil
+	local mark = #PRINTED + 1
+	lefthy("echoes")
+	check(printedSince(mark):find("moved to a new number this session", 1, true), "the status says so, got\n" .. printedSince(mark))
+	-- After a /reload: the top is kept, the moved page is offered under its new number.
+	reload(1)
+	check(E.data.top == 16 and Store.Page(acct, STORE, 7) == E.data.mine[7] and closeOne() == 17, "after a /reload: page 7 offered; the top kept (the open page closes as 17)")
+	check(sizesAgree(), "(the sizes agree: moved, renumbered)")
 end
 
 section("Echoes pages: my pages over 2 MB")

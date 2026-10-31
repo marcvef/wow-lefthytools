@@ -1923,3 +1923,232 @@ do
 	Stop(anna)
 	Stop(bob)
 end
+
+---------------------------------------------------------------------------
+-- Page numbers used twice: a WTF folder restored from a backup, or copied to a second computer and
+-- played on both (one store, both numbering from the same saved n)
+---------------------------------------------------------------------------
+
+-- A page's worth of lines: it closes by size on the next tick.
+local function Fill(c, seed)
+	for _ = 1, 170 do
+		c.E.Line("H", seed:rep(200))
+	end
+end
+
+-- A page's text without its header's number (a page that moves to a new number keeps the rest).
+local function Body(text)
+	return (text:gsub("^(E1;[^;\n]*;[^;\n]*;)%d+;", "%1#;", 1))
+end
+
+-- A stored page's text, unpacked as the exporter does (the game never does).
+local function TextOf(page)
+	if page.m == "z" then
+		return C_EncodingUtil.DecompressString(C_EncodingUtil.DecodeBase64(page.z), 1)
+	end
+	return page.m == "r" and C_EncodingUtil.DecodeBase64(page.z) or page.z
+end
+
+-- Every page c closes (those closed at its login, still waiting to be packed, too): its Body into
+-- closed (true).
+local function Watch(c, closed)
+	for _, page in pairs(c.E.data.mine) do
+		if page.q then
+			closed[Body(page.z)] = true
+		end
+	end
+	local close = c.E.Store.Close
+	c.E.Store.Close = function(...)
+		local n = close(...)
+		closed[Body(c.E.data.mine[n].z)] = true
+		return n
+	end
+end
+
+-- How many of closed (Bodies) c collected under key, and whether each came under one number only.
+local function Gathered(c, key, closed)
+	local got, numbers, once = {}, {}, true
+	for n, page in pairs(c.E.data.inbox[key] or {}) do
+		local body = Body(TextOf(page))
+		once = once and not got[body]
+		got[body], numbers[#numbers + 1] = true, n
+	end
+	local n, all = 0, 0
+	for body in pairs(closed) do
+		all = all + 1
+		n = n + (got[body] and 1 or 0)
+	end
+	table.sort(numbers)
+	return n, all, once, table.concat(numbers, ",")
+end
+
+-- The page numbers of a table, sorted.
+local function Numbers(t)
+	local list = {}
+	for n in pairs(t or {}) do
+		list[#list + 1] = n
+	end
+	table.sort(list)
+	return table.concat(list, ",")
+end
+
+section("Echoes' delivery: a page of mine that moves to a new number while I serve it")
+do
+	local c = Start(EVE, { friends = { ANNA, BOB }, fake = true })
+	local key = EVE.acct .. "." .. c.E.data.store
+	local p, q = MyPage(c, 701, 2400), MyPage(c, 702, 2400) -- (10 parts each)
+	p.o, q.o = 0, 0 -- (closed by this build: not out yet)
+	MeetAll(c, { ANNA, BOB })
+	local mark = Mark(c)
+	Ask(c, ANNA, 701)
+	Pass(c, 3)
+	check(#Sent(c, ANNA, mark, "B2;ep;") >= 1 and p.o == 1 and q.o == 0, "a part of 701 went to Anna: it's out")
+	-- Bob asks for 702 in a fight (nothing goes yet). Anna offers a 701 and a 702 of mine: 701 is the
+	-- one I sent; 702 never went out, so hers is another page 702 (my WTF folder copied?): mine moves,
+	-- and nothing of it goes as 702 any more.
+	c.env.EnterCombat()
+	mark = Mark(c)
+	Ask(c, BOB, 702)
+	Pass(c, 0.5)
+	Say(c, ANNA, ("B2;es;%s:701-702"):format(key))
+	Pass(c, 1.2)
+	local new = c.E.data.top
+	check(c.E.data.mine[701] == p and not c.E.data.mine[702] and new and new > 1000 and c.E.data.mine[new] == q,
+		"701 keeps its number; 702 moves (to " .. tostring(new) .. ")")
+	c.env.LeaveCombat()
+	Pass(c, 10)
+	check(#Sent(c, BOB, mark, "B2;eb;") == 0 and #Sent(c, BOB, mark, "B2;ep;") == 0 and #c.D.active == 0,
+		"after the fight nothing of it goes to Bob as 702")
+	Ask(c, BOB, 702)
+	Pass(c, 1.5)
+	check(#Sent(c, BOB, mark, "B2;en;") == 1, "asked again: I don't have a 702")
+	Stop(c)
+end
+
+section("Echoes' delivery: a WTF folder restored from a backup (page numbers used again)")
+do
+	local cedric = Start(CEDRIC, { friends = { ANNA }, collect = true })
+	local anna = Start(ANNA, { friends = { CEDRIC } })
+	Run(5)
+	anna = Reload(anna)
+	local backup = Copy(anna.opts.saved) -- (her saved table now: copied aside)
+	local key = ANNA.acct .. "." .. anna.E.data.store
+	local closed = {}
+	Watch(anna, closed)
+	for _, seed in ipairs({ "a", "b", "c" }) do
+		Fill(anna, seed)
+		Run(1)
+	end
+	check(Numbers(anna.E.data.mine) == "1,2,3" and anna.E.data.mine[1].o == 0, "Anna's pages 1-3 closed (not out yet)")
+	anna = Reload(anna)
+	Watch(anna, closed)
+	check(Run(300, function() return Numbers(cedric.E.data.inbox[key]) == "1,2,3" end), "after her /reload Cedric collects 1-3")
+	check(anna.E.data.mine[1].o == 1 and anna.E.data.mine[3].o == 1, "they went out (o = 1)")
+	-- As ever: pages that went out go once they're safe at the collector.
+	cedric = Reload(cedric)
+	check(Run(120, function() return next(anna.E.data.mine) == nil end), "safe at Cedric (his next session): Anna drops them, as before")
+	local collected = {}
+	for n, page in pairs(cedric.E.data.inbox[key]) do
+		collected[n] = page.z
+	end
+
+	-- The backup comes back, more than 10 minutes later, while Cedric is away: her saved table from
+	-- before pages 1-3. Its open page closes as 1 (stale at login); she records 2 and 3 again, with
+	-- other lines, and they're on disk after a /reload: offered, nobody there to say the numbers are
+	-- taken.
+	Stop(anna)
+	local cedricSaved = Stop(cedric)
+	Run(700)
+	anna = Start(ANNA, { friends = { CEDRIC }, saved = backup })
+	Watch(anna, closed)
+	check(anna.E.data.n == 1 and anna.E.data.mine[1] and anna.E.data.open.n == 2, "(the backup: its open page closes as 1, stale at login)")
+	for _, seed in ipairs({ "d", "e" }) do
+		Fill(anna, seed)
+		Run(1)
+	end
+	anna = Reload(anna)
+	Watch(anna, closed)
+	check(Numbers(anna.E.data.mine) == "1,2,3" and anna.E.Store.Page(ANNA.acct, anna.E.data.store, 3), "her new 1-3, offered")
+	-- Cedric is back: what he holds and his summary say 1-3 are taken. Hers never went out: they're
+	-- other pages; they move to new numbers, nothing is dropped, and he collects them after her next
+	-- /reload (a moved page is offered from the next session on).
+	cedric = Start(CEDRIC, { friends = { ANNA }, saved = cedricSaved })
+	check(Run(60, function() return anna.E.data.mine[1] == nil end), "Anna hears 1-3 are taken")
+	local moved = Numbers(anna.E.data.mine)
+	check(moved == "5,6,7" and anna.E.data.top == 7, "hers moved to 5-7 (above the open page 4), got " .. moved)
+	Fill(anna, "f")
+	Run(1)
+	check(anna.E.data.mine[8] and TextOf(anna.E.data.mine[8]):find("^E1;%x+;%x+;8;") and anna.E.data.open.n == 9,
+		"the open page 4 closes above them: 8 (its header too)")
+	anna = Reload(anna)
+	check(Run(300, function() return select(1, Gathered(cedric, key, closed)) == select(2, Gathered(cedric, key, closed)) end),
+		"Cedric collects every page Anna closed, the backup's too")
+	local n, all, once, numbers = Gathered(cedric, key, closed)
+	check(n == 7 and all == 7 and once and numbers == "1,2,3,5,6,7,8", ("all %d of %d (1-3, the backup's 1, its 2-3 again, 8), each under one number (%s)"):format(n, all, numbers))
+	local same = true
+	for i, z in pairs(collected) do
+		same = same and cedric.E.data.inbox[key][i].z == z
+	end
+	check(same, "the 1-3 he had are as they were (pages never change)")
+	cedric = Reload(cedric)
+	check(Run(120, function() return next(anna.E.data.mine) == nil end), "his next session: safe, Anna drops them")
+	Stop(anna)
+	Stop(cedric)
+end
+
+section("Echoes' delivery: one WTF folder on two computers, played by turns")
+do
+	-- Anna copies her WTF folder to a second computer and plays on both by turns (never at once: one
+	-- BattleTag): one store, both number their pages from the same n. Bob relays; Cedric collects,
+	-- online only later. Every page either computer closes reaches Cedric, each under its own number.
+	local people = { ANNA, BOB, CEDRIC }
+	local bob = Start(BOB, { friends = FriendsOf(BOB, people) })
+	local anna = Start(ANNA, { friends = FriendsOf(ANNA, people) })
+	Run(5)
+	anna = Reload(anna)
+	local savedA, savedB = anna.opts.saved, Copy(anna.opts.saved) -- (the folder copied to the second computer)
+	local key = ANNA.acct .. "." .. anna.E.data.store
+	Stop(anna)
+	local closed = {}
+	-- One turn at a computer: pages written, then a /reload (offered), time for friends to carry them.
+	local function Turn(saved, seeds)
+		local c = Start(ANNA, { friends = FriendsOf(ANNA, people), saved = saved })
+		Watch(c, closed)
+		Run(10)
+		for _, seed in ipairs(seeds) do
+			Fill(c, seed)
+			Run(1)
+		end
+		c = Reload(c)
+		Watch(c, closed)
+		Run(240)
+		return c, Stop(c)
+	end
+	local function Carried(c)
+		return Numbers(c.E.data.carry[key])
+	end
+	local first
+	first, savedA = Turn(savedA, { "a", "b" })
+	check(Numbers(first.E.data.mine) == "1,2" and Carried(bob) == "1,2", "the first computer: pages 1-2, Bob carries them, got " .. Carried(bob))
+	Run(700)
+	local second
+	second, savedB = Turn(savedB, { "c", "d" })
+	local onSecond = Numbers(second.E.data.mine)
+	check(onSecond == "3,4,5", "the second: its open page from the copy (closed as 1 at login) moves to 3 (Bob holds 1-2), then 4-5, got " .. onSecond)
+	check(Carried(bob) == "1,2,3,4,5", "Bob carries all, got " .. Carried(bob))
+	first, savedA = Turn(savedA, { "e" })
+	check(Numbers(first.E.data.mine) == "1,2,6,7", "the first again: its open page (closed as 3 at login) moves to 6, then 7, got " .. Numbers(first.E.data.mine))
+	-- Cedric comes and collects from Bob; his next session: safe, Bob drops his copies.
+	local cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), collect = true })
+	check(Run(600, function() return Numbers(cedric.E.data.inbox[key]) == "1,2,3,4,5,6,7" end),
+		"Cedric collects 1-7 from Bob, got " .. Numbers(cedric.E.data.inbox[key]))
+	local n, all, once = Gathered(cedric, key, closed)
+	check(n == all and all == 7 and once, ("every page either computer closed: %d of %d, each under one number"):format(n, all))
+	cedric = Reload(cedric)
+	check(Run(120, function() return Carried(bob) == "" end), "safe at Cedric: Bob drops his copies")
+	-- Each computer, back, drops its own (they went out).
+	second, savedB = Turn(savedB, {})
+	check(Numbers(second.E.data.mine) == "", "the second computer drops its pages, got " .. Numbers(second.E.data.mine))
+	Stop(cedric)
+	Stop(bob)
+end
