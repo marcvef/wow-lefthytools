@@ -314,10 +314,41 @@ end
 local lootPatterns
 local PUSHED_FROM = 3 -- lootPatterns from this one on are the "pushed" lines
 
+-- The quality colours (ITEM_QUALITY_COLORS' hex: poor to WoW Token, 0-8) as classic has them: what
+-- Forever's links carry ("|cff1eff00|Hitem:..."). The game's own table comes first (QualityOfColour).
+local CLASSIC_QUALITY_HEX = { [0] = "9d9d9d", "ffffff", "1eff00", "0070dd", "a335ee", "ff8000", "e6cc80", "00ccff", "00ccff" }
+local qualityOfHex -- "1eff00" -> 2, made at the first loot line
+
+-- A quality from a colour's last six hex digits ("|cff1eff00", "ff1eff00": "1eff00"), or nil.
+local function HexOf(colour)
+	return type(colour) == "string" and not LT.IsSecret(colour) and colour:match("(%x%x%x%x%x%x)$") or nil
+end
+local function QualityOfColour(hex)
+	if not qualityOfHex then
+		qualityOfHex = {}
+		local function Add(q, colour)
+			colour = HexOf(colour)
+			if colour and qualityOfHex[colour:lower()] == nil then -- (the first quality keeps a colour two share)
+				qualityOfHex[colour:lower()] = q
+			end
+		end
+		for q = 0, 8 do
+			local entry = type(ITEM_QUALITY_COLORS) == "table" and ITEM_QUALITY_COLORS[q]
+			Add(q, type(entry) == "table" and entry.hex or nil)
+		end
+		for q = 0, 8 do
+			Add(q, CLASSIC_QUALITY_HEX[q])
+		end
+	end
+	return qualityOfHex[hex:lower()]
+end
+
 -- A CHAT_MSG_LOOT line about your own loot: its link, item ID, count, quality and whether the item
 -- was pushed (nil if it's someone else's; the quality nil if not known). Pushed: "You receive
 -- item:" (LOOT_ITEM_PUSHED_SELF: quest rewards, purchases and the like), not "You receive loot:"
--- (LOOT_ITEM_SELF: looted from a corpse, a chest, a node): true or false.
+-- (LOOT_ITEM_SELF: looted from a corpse, a chest, a node): true or false. The quality: what the game
+-- knows of the item, else (not in the cache yet) the link's: retail's "|cnIQ<n>:", or its colour
+-- ("|cff1eff00": Forever's, like classic's).
 function LT.OwnLoot(text)
 	if type(text) ~= "string" or LT.IsSecret(text) then
 		return nil
@@ -338,6 +369,10 @@ function LT.OwnLoot(text)
 			local quality = itemID and C_Item and C_Item.GetItemQualityByID and C_Item.GetItemQualityByID(itemID)
 			if type(quality) ~= "number" then
 				quality = tonumber(link:match("|cnIQ(%d):")) -- retail links carry their quality
+			end
+			if type(quality) ~= "number" then
+				local colour = link:match("|c%x%x(%x%x%x%x%x%x)|H")
+				quality = colour and QualityOfColour(colour)
 			end
 			return link, itemID, tonumber(count) or 1, quality, i >= PUSHED_FROM
 		end

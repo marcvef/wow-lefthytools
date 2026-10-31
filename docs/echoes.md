@@ -153,7 +153,7 @@ another loading screen.
 | `D` | `PLAYER_DEAD`, once until alive again (and 10 s after: the game repeats it). Logged in or `/reload`ed dead or a ghost (`UnitIsDeadOrGhost` when recording starts; no `PLAYER_DEAD` comes then): that death was counted before, its release and coming back still are. The killer: your attackable target in the last fight within 15 s (looked at every tick in combat): a creature (`c`, its ID, level, classification; its name `=c`), a player (`p`, class and level, no name; pvp 1), a player's pet or a secret GUID (`-`) |
 | `r` | `PLAYER_UNGHOST`: `s` after `CONFIRM_XP_LOSS` (the spirit healer, within 120 s), `p` after `RESURRECT_REQUEST` (within 70 s), else `c`; `PLAYER_ALIVE` alive without having released: `p` or `c`. Then the mode is read again |
 | `k` | `PARTY_KILL` by me, my pet (`UnitGUID("pet")`) or a group member (`C_PartyInfo.IsGUIDInGroup`), of a creature; each corpse once (the last 64). Level, classification (`n e r x w`; trivial and minus are `n`) and name from the mob cache |
-| `l` | `CHAT_MSG_LOOT` through `LT.OwnLoot`, quality 2 and better: item, count, quality, `l` looted or `p` pushed, and the creature whose corpse the last loot window (within 5 s) said it came from; the item's name (`=i`) from the link |
+| `l` | `CHAT_MSG_LOOT` through `LT.OwnLoot`, quality 2 and better (an item not cached yet: by the link's colour): item, count, quality, `l` looted or `p` pushed, and the creature whose corpse the last loot window (within 5 s) said it came from; the item's name (`=i`) from the link |
 | `h` | `UNIT_SPELLCAST_SUCCEEDED` (player) with Herb Gathering, Mining or Skinning (each rank's ID, other ranks by name), then `LOOT_READY` within 1.5 s; or `IsFishingLoot()`. The node: the loot source's game object ID (herbs, ore, fishing), the creature for skinning; each node once (the last 32). Then one `item:count` field per item |
 | `n` | `NEW_MOUNT_ADDED` (`m`), `NEW_PET_ADDED` (`p`: its species, `C_PetJournal.GetPetInfoByPetID`), `NEW_TOY_ADDED` (`t`), `ACHIEVEMENT_EARNED` (`a`, not one earned before), `NEW_RECIPE_LEARNED` (`r`) |
 | `B` | `ENCOUNTER_END` (success) and `BOSS_KILL`: the same encounter within 30 s once |
@@ -208,7 +208,8 @@ continent, 0 or 1); `UnitPosition` at `PLAYER_LEAVING_WORLD` still where you wer
 and the queue are written there); `IsPlayerMoving` on a flight path; `GetUnitSpeed` 0 right after
 `PLAYER_STOPPED_MOVING`; no `PLAYER_DEAD` at a login while dead, and whether `PLAYER_ALIVE` comes
 again for a ghost (after a dungeon's release, say: an `o` anchor then an `r` one); gear right at
-login (a slot whose link isn't there yet would read as taken off).
+login (a slot whose link isn't there yet would read as taken off); loot links' colours
+(`|cff1eff00|Hitem:`, classic's quality colours) for an item the game hasn't cached yet.
 
 ### Tests
 

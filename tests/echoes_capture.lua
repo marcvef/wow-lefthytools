@@ -888,6 +888,12 @@ do
 	Fire("CHAT_MSG_LOOT", "You receive loot: " .. ItemLink(6125) .. "x3.", "Lefthy")
 	Advance(0.3)
 	check(seq() == "=;i;6125;Brawler's Pants l;6125;3;2;l", "the loot window long gone: no corpse; the count, got " .. seq())
+	-- An item the game hasn't cached yet: its quality from the link's colour (Forever's links: |cff...).
+	listen()
+	Fire("CHAT_MSG_LOOT", "You receive loot: |cff0070dd|Hitem:90020::::::::20:::::|h[Unseen Blade]|h|r.", "Lefthy")
+	Fire("CHAT_MSG_LOOT", "You receive loot: |cffffffff|Hitem:90021::::::::20:::::|h[Unseen Rag]|h|r.", "Lefthy")
+	Advance(0.3)
+	check(seq() == "=;i;90020;Unseen Blade l;90020;1;3;l", "an item not cached yet: its quality from the link's colour (blue: written; white: not), got " .. seq())
 
 	-- Gathering: the spell, then the loot window within 1.5 s; the node (a game object, the skinned creature).
 	listen()

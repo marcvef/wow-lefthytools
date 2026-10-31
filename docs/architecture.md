@@ -346,8 +346,9 @@ second (UTC), worked out once, so it's cheap for every record.
   `LT.Names`: `First` ("Anna" of "Anna Brook" or "Anna-Realm"), `HasSurname`, `Same` (the same
   character however typed), `Mine` (my name as the game shows it, then the first name and the
   surname) and `IsMine`; `LT.SafeCall(m, method, ...)`; `LT.OwnLoot(text)` (your own loot from a
-  `CHAT_MSG_LOOT` line: link, item ID, count, quality, and last whether it was pushed, "You receive
-  item:", a quest reward or a purchase, rather than looted); where I am: `LT.Position()` (continent, north, west in world yards, nil
+  `CHAT_MSG_LOOT` line: link, item ID, count, quality (the game's, else the link's: `|cnIQ<n>:`
+  or its colour, `|cff1eff00`, by `ITEM_QUALITY_COLORS` and classic's colours), and last whether
+  it was pushed, "You receive item:", a quest reward or a purchase, rather than looted); where I am: `LT.Position()` (continent, north, west in world yards, nil
   where the game hides positions: `UnitPosition` once it has been seen to agree with the map route,
   checked again after every loading screen, else the map route) and `LT.MapRoutePosition()` (the
   map route alone); `LT.CreatureOf(guid)` (a creature's ID from its GUID); versions (`LT.ParseVersion`, `LT.CompareVersions`). UI building blocks
