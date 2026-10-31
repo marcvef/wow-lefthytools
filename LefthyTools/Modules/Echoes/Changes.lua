@@ -22,7 +22,9 @@ local FACTIONS_EVERY = 10    -- seconds: UPDATE_FACTION rescans at most this oft
 local PLAYED_WAIT = 10       -- seconds the chat frames go without /played's answer while it's asked silently
 local RESULT_EVERY = 5       -- seconds between asking who won a battleground
 local GROUP_EVERY = 15       -- seconds: a group with others is looked at again (Beacon may learn of a friend among them)
+local INSTANCE_RETRY, INSTANCE_TRIES = 5, 6 -- an instance that couldn't be told: looked at again every 5 s, 6 times
 local SLOTS = 19             -- equipment slots
+local GEAR_RETRY, GEAR_TRIES = 1, 10 -- a worn item whose link isn't there yet: looked at again every second, 10 times
 -- The Classic professions' skill lines (C_SkillInfo): First Aid, Blacksmithing, Leatherworking,
 -- Alchemy, Herbalism, Cooking, Mining, Tailoring, Engineering, Enchanting, Fishing, Skinning.
 local PROFESSIONS = { 129, 164, 165, 171, 182, 185, 186, 197, 202, 333, 356, 393 }
@@ -40,6 +42,7 @@ end
 
 local S = {}
 local gearDirty, repDirty = {}, {} -- slot -> true; faction ID -> true
+local gearWait = {}                -- slot -> tries: a worn item whose link isn't there yet
 local hidden = {}                  -- chat frames that don't get TIME_PLAYED_MSG while /played is asked
 local friends, peersByGUID = {}, {} -- (one list and one map for every group check)
 
@@ -54,7 +57,9 @@ end
 local function Reset()
 	ShowPlayed()
 	wipe(gearDirty)
+	wipe(gearWait)
 	wipe(repDirty)
+	S.gearWaitAt = 0
 	S.lastTick = nil
 	S.xpAt = 0           -- (GetTime) the next XP check
 	S.xpLineAt = nil     -- (GetTime) the last x line
@@ -66,6 +71,7 @@ local function Reset()
 	S.hk = nil           -- honorable kills as last read
 	S.playedWanted, S.playedTotal, S.playedUntil = false, nil, nil
 	S.resultAt = 0
+	S.instanceTries, S.instanceAt, S.instanceStart = nil, 0, false -- (looking again at an instance that couldn't be told)
 end
 
 ---------------------------------------------------------------------------
@@ -116,17 +122,55 @@ end
 -- from it: E.data.friends), how many others
 ---------------------------------------------------------------------------
 
--- A character's key ("Anna-Realm"): first name and realm (the same realm's when the game says none).
+-- A realm's name for comparing: without spaces and hyphens, lowercase ("Realm Name", "RealmName" and
+-- "Realm-Name" are one realm: GetNormalizedRealmName leaves out spaces and hyphens).
+local function Squash(realm)
+	return (realm:gsub("[%s%-]", ""):lower())
+end
+
+-- shown, if it's a realm's name and the same realm as realm.
+local function Same(shown, realm)
+	return type(shown) == "string" and not issecret(shown) and shown ~= "" and Squash(shown) == Squash(realm) and shown or nil
+end
+
+-- A friend's realm as my own character's key has a realm (Pages.lua: GetRealmName, "Realm Name",
+-- spaces and all), whatever form it came in ("RealmName"): mine when it's my realm; another realm as
+-- Battle.net shows it (realmDisplayName, else realmName: their own GetRealmName's) when it's the same
+-- realm; else as it came. nil: unknown.
+local function Realm(realm, guid)
+	local mine = Value(GetRealmName)
+	mine = type(mine) == "string" and mine ~= "" and mine or nil
+	if type(realm) ~= "string" or issecret(realm) or realm == "" then
+		return mine -- (the game says none: my realm)
+	elseif Same(mine, realm) then
+		return mine
+	end
+	local info = C_BattleNet and type(guid) == "string" and Value(C_BattleNet.GetGameAccountInfoByGUID, guid)
+	if type(info) ~= "table" then
+		local account = C_BattleNet and type(guid) == "string" and Value(C_BattleNet.GetAccountInfoByGUID, guid)
+		info = type(account) == "table" and account.gameAccountInfo
+	end
+	if type(info) == "table" then
+		return Same(info.realmDisplayName, realm) or Same(info.realmName, realm) or realm
+	end
+	return realm
+end
+
+-- A character's key ("Anna-Realm"): first name and realm, the realm as my own key writes it.
 local function Key(name, guid)
 	local first = LT.Names.First(name)
 	if not first then
 		return nil
 	end
 	local ok, _, _, _, _, _, _, realm = pcall(GetPlayerInfoByGUID, guid)
-	if not (ok and type(realm) == "string" and not issecret(realm) and realm ~= "") then
-		realm = Value(GetRealmName)
-	end
-	return type(realm) == "string" and first .. "-" .. realm or first
+	realm = Realm(ok and not issecret(realm) and realm or nil, guid)
+	return realm and first .. "-" .. realm or first
+end
+
+-- A key remembered from before (maybe its realm in another form) as Key writes it now.
+local function Rekey(key, guid)
+	local first, realm = key:match("^([^%-]+)%-(.+)$")
+	return first and first .. "-" .. Realm(realm, guid) or key
 end
 
 local function Group(cap)
@@ -159,8 +203,9 @@ local function Group(cap)
 				local key = guid and peersByGUID[guid] and Key(peersByGUID[guid], guid)
 				if key then
 					remembered[guid] = key -- (named while Beacon is off too)
-				else
-					key = guid and remembered[guid]
+				elseif guid and type(remembered[guid]) == "string" then
+					key = Rekey(remembered[guid], guid) -- (remembered by a build that kept the realm as it came)
+					remembered[guid] = key
 				end
 				if key then
 					friends[#friends + 1] = guid .. ":" .. key
@@ -184,8 +229,11 @@ end
 -- Gear: item, enchant, suffix per slot (only out of combat)
 ---------------------------------------------------------------------------
 
-local function Gear(cap, slot)
-	gearDirty[slot] = nil
+-- One slot. true when it's done (written, or nothing changed); false while a worn item's link isn't
+-- there yet (at login: GetInventoryItemID says an item is worn, so it isn't taken off). last: the
+-- link didn't come in time: the item alone (enchant and suffix unknown), unless it's the one written
+-- before.
+local function Gear(cap, slot, last)
 	local link = Value(GetInventoryItemLink, "player", slot)
 	local id, enchant, suffix
 	local item = type(link) == "string" and link:match("item:([%-%d:]*)")
@@ -203,20 +251,36 @@ local function Gear(cap, slot)
 			end
 		end
 	end
-	local key = id and (id .. ":" .. (enchant or 0) .. ":" .. (suffix or 0)) or ""
 	cap.gear = type(cap.gear) == "table" and cap.gear or {}
 	local was = cap.gear[slot]
+	local key, linked = "", id ~= nil
+	if linked then
+		key = id .. ":" .. (enchant or 0) .. ":" .. (suffix or 0)
+	else
+		local worn = Value(GetInventoryItemID, "player", slot)
+		if type(worn) == "number" and worn > 0 then
+			if not last then
+				return false -- (not known yet)
+			elseif type(was) == "string" and tonumber(was:match("^(%d+):")) == worn then
+				return true -- (the item written before, as far as can be told)
+			end
+			id, key = worn, worn .. ":?:?"
+		end
+	end
 	cap.gear[slot] = key
 	if key == was or (was == nil and key == "") then
-		return
+		return true
 	end
 	C.Spot()
-	if id then
+	if linked then
 		E.Name("i", id, E.LinkName(link))
 		E.Line("G", slot, id, enchant or 0, suffix or 0)
+	elseif id then
+		E.Line("G", slot, id) -- (its link never came: enchant and suffix unknown)
 	else
 		E.Line("G", slot, 0) -- (taken off)
 	end
+	return true
 end
 
 ---------------------------------------------------------------------------
@@ -326,11 +390,19 @@ local function Lasted(bg, start, now)
 	return left - (bg[2] or left)
 end
 
+-- false when it can't be told now (inside, but which instance or what kind isn't readable): nothing
+-- changes then (a dungeon or battleground isn't left), and it's looked at again a little later.
 local function Instances(cap, start)
 	local ok, inInstance, kind = pcall(IsInInstance)
-	inInstance = ok and inInstance == true
-	kind = inInstance and Readable(kind) and kind or nil
-	local _, id = C.Instance()
+	if not ok or issecret(inInstance) then
+		return false
+	end
+	inInstance = inInstance == true
+	local id = inInstance and select(2, C.Instance()) or nil
+	if inInstance and not (id and Readable(kind)) then
+		return false
+	end
+	kind = inInstance and kind or nil
 	local got, _, _, difficulty = pcall(GetInstanceInfo)
 	difficulty = got and type(difficulty) == "number" and not issecret(difficulty) and difficulty or nil
 	local now = E.Now()
@@ -360,6 +432,7 @@ local function Instances(cap, start)
 		cap.bg = nil
 		E.Line("b", bg[1], "x", Lasted(bg, start, now))
 	end
+	return true
 end
 
 -- Who won (PVP_MATCH_COMPLETE, or GetBattlefieldWinner): 0 the Horde, 1 the Alliance. Once.
@@ -463,9 +536,18 @@ E.OnTick(function(now)
 		local start = C.arrived ~= "load"
 		C.arrived = nil
 		C.Spot()
-		Instances(cap, start)
+		S.instanceStart, S.instanceTries, S.instanceAt = start, 0, now + INSTANCE_RETRY
+		if Instances(cap, start) then
+			S.instanceTries = nil
+		end
 		if start then
 			SessionStart()
+		end
+	elseif S.instanceTries and now >= S.instanceAt then -- (the instance couldn't be told: again)
+		S.instanceTries, S.instanceAt = S.instanceTries + 1, now + INSTANCE_RETRY
+		C.Spot()
+		if Instances(cap, S.instanceStart) or S.instanceTries >= INSTANCE_TRIES then
+			S.instanceTries = nil
 		end
 	end
 	if now >= S.xpAt then
@@ -514,11 +596,24 @@ E.OnTick(function(now)
 	if S.gearAll then
 		S.gearAll = false
 		for slot = 1, SLOTS do
-			Gear(cap, slot)
+			gearDirty[slot] = true
 		end
-	else
+	end
+	if next(gearDirty) then
 		for slot in pairs(gearDirty) do
-			Gear(cap, slot)
+			if Gear(cap, slot) then
+				gearWait[slot] = nil
+			else
+				gearWait[slot] = gearWait[slot] or 0
+				S.gearWaitAt = now + GEAR_RETRY
+			end
+		end
+		wipe(gearDirty)
+	end
+	if next(gearWait) and now >= S.gearWaitAt then -- (worn items whose link wasn't there yet)
+		S.gearWaitAt = now + GEAR_RETRY
+		for slot, tries in pairs(gearWait) do
+			gearWait[slot] = not Gear(cap, slot, tries + 1 >= GEAR_TRIES) and tries + 1 or nil
 		end
 	end
 	if S.skillsDirty then

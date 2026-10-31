@@ -123,6 +123,10 @@ end
 -- logout or when switched off while that anchor is still to come).
 local realPosition = LT.Position
 LT.Position = function() return nil end
+-- (A page doesn't close while the capture waits for its anchor, E.PageMayClose: for the quiet capture
+-- it may, until the last sections.)
+local realMayClose = E.PageMayClose
+E.PageMayClose = function() return true end
 local function start()
 	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
 	Fire("PLAYER_LEAVING_WORLD")
@@ -404,13 +408,15 @@ end
 
 section("Echoes pages: a stale page at login, another character, packing one a tick")
 do
-	-- A page closes, and before the tick that packs it the game ends; back 11 minutes later.
+	-- A page closes, and before the tick that packs it the game ends (a logout: the capture's o0, written
+	-- here, as the quiet capture doesn't); back 11 minutes later.
 	local stale = E.data.open.n
 	Fire("ECHOES_PAGES_TEST", 170, 200)
 	tick()
 	local waiting = E.data.mine[stale]
 	check(waiting and waiting.q, "(a closed page waiting to be packed)")
 	kills(11, 12)
+	E.Line("o", 0)
 	local c0, before0 = compressCalls, E.data.open.text .. table.concat(E.buffer, "\n") .. "\n"
 	reload(11 * 60)
 	local open, old = E.data.open, E.data.mine[stale + 1]
@@ -483,6 +489,87 @@ do
 	tick()
 	tick()
 	check(page.m == "z" and Store.Page(acct, STORE, n) == nil, "the page closed after switching on again has this session's lines: offered from the next session on")
+end
+
+section("Echoes pages: a crash or a disconnect writes no logout: the page gets it")
+do
+	-- The game ends without PLAYER_LOGOUT (a crash, a disconnect: saved as it was), the page's last
+	-- session line a login (o1): stale at the next login, it closes with "o0;0" before its end (at the
+	-- time of its last line).
+	fresh(acct)
+	E.Anchor(0, -9046, -160, "f", "s")
+	E.Zone(1429, "Goldshire")
+	E.Line("o", 1)
+	local when = {}
+	kills(1, 2, when)
+	local n = E.data.open.n
+	reload(11 * 60, true)
+	local text = E.data.mine[n] and E.data.mine[n].z or ""
+	local times = timesOf(text)
+	check(text:sub(-10) == "o0;0\n.0;l\n" and times[#times - 1].t == when[2] and count(text, "\no") == 2,
+		"stale after a disconnect, the session not ended: \"o0;0\" before the end, at its last line's time, got\n" .. text)
+
+	-- Logged out properly (its o0): nothing added.
+	E.Anchor(0, -9046, -160, "f", "s")
+	E.Line("o", 1)
+	kills(3, 3)
+	E.Line("o", 0)
+	n = E.data.open.n
+	reload(11 * 60, true)
+	text = E.data.mine[n] and E.data.mine[n].z or ""
+	check(text:find("\no%d+;0\n%.0;l\n$") and count(text, "\no") == 2, "logged out (o0 last): nothing added, got\n" .. text)
+
+	-- A page that went on from the one before (an anchor, why c; no session line on it): the session
+	-- was going on.
+	E.Anchor(0, -9046, -160, "f", "s")
+	E.Line("o", 1)
+	kills(4, 4)
+	tick()
+	skew = skew + 1800
+	tick()
+	n = E.data.open.n
+	check(E.buffer[3] == "@0;0;-9046;-160;f;c", "(a page going on from the last one)")
+	kills(5, 5)
+	reload(11 * 60, true)
+	text = E.data.mine[n] and E.data.mine[n].z or ""
+	check(text:sub(-10) == "o0;0\n.0;l\n" and count(text, "\no") == 1, "a page going on from the last one, not ended: \"o0;0\" too, got\n" .. text)
+
+	-- Back on the same character within 10 minutes: the page goes on, with the logout first (dt 0).
+	E.Anchor(0, -9046, -160, "f", "s")
+	E.Line("o", 1)
+	kills(6, 6, when)
+	n = E.data.open.n
+	reload(3 * 60, true)
+	kills(7, 7)
+	check(E.data.open.n == n and E.buffer[1] == "o0;0" and E.buffer[2] == ("k%d;7"):format(E.Now() - when[6]),
+		"the page goes on after a disconnect: the logout first, at its last line's time, got " .. table.concat(E.buffer, " | "))
+	-- A /reload (o0 written at its logout): nothing added.
+	E.Line("o", 1)
+	E.Line("o", 0)
+	E.Flush()
+	reload(30, true)
+	check(E.data.open.n == n and #E.buffer == 0 and E.data.open.text:find("\no%d+;0\n$"), "a /reload (o0 last): nothing added")
+	-- The same save read twice (a crash after the login that closed it): the same page.
+	local save = Saved()
+	E.Line("o", 1)
+	E.Flush()
+	save = Saved()
+	reload(11 * 60, nil, save)
+	local once = E.data.mine[n] and E.data.mine[n].z
+	reload(0, nil, save)
+	check(once and once:sub(-10) == "o0;0\n.0;l\n" and E.data.mine[n] and E.data.mine[n].z == once,
+		"the same save read again: closed the same way, byte for byte")
+
+	local result = MOCK_EXPORTER(Saved())
+	if type(result) == "table" then
+		local clean = true
+		for _, p in pairs(result.parsed) do
+			clean = clean and p.ok and p.bad == 0 and p.unknown == ""
+		end
+		check(clean and result.bad == 0 and #result.warnings == 0, "the exporter reads them: " .. table.concat(result.warnings, "; "))
+	elseif type(result) == "string" then
+		check(false, "the exporter: " .. result)
+	end
 end
 
 section("Echoes pages: my pages offered once on disk (a crash)")
@@ -1191,7 +1278,7 @@ end
 
 section("Echoes pages: with the capture")
 do
-	LT.Position = realPosition
+	LT.Position, E.PageMayClose = realPosition, realMayClose
 	local map, pos = PLAYER_MAP, PLAYER_POS
 	local function at(north, west) PLAYER_MAP, PLAYER_POS = 1429, { (1000 - west) / 1000, (1000 - north) / 1000 } end
 	at(500, 500)
@@ -1238,6 +1325,35 @@ do
 	elseif type(result) == "string" then
 		check(false, "the exporter: " .. result)
 	end
+	PLAYER_MAP, PLAYER_POS = map, pos
+end
+
+section("Echoes pages: no page closes while the capture waits after a loading screen")
+do
+	local map, pos = PLAYER_MAP, PLAYER_POS
+	local function at(north, west) PLAYER_MAP, PLAYER_POS = 1429, { (1000 - west) / 1000, (1000 - north) / 1000 } end
+	at(500, 500)
+	fresh(acct)
+	Fire("PLAYER_ENTERING_WORLD", true, false)
+	Advance(1, 0.25)
+	at(500, 520)
+	Advance(2, 0.25)
+	-- A loading screen; after it the game doesn't say where I am for 2 s, and the page's 30 minutes
+	-- are up meanwhile.
+	local n, c0 = E.data.open.n, closes
+	check(E.data.open.busy, "(a page with the capture's lines on it: its 30 minutes run)")
+	Fire("PLAYER_LEAVING_WORLD")
+	skew = skew + 1800
+	STATE.inInstance = true
+	at(800, 800)
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+	Advance(2, 0.25)
+	check(closes == c0 and E.data.open.n == n, "the capture waits for the position after a loading screen: the page stays open")
+	STATE.inInstance = false
+	tick()
+	check(closes == c0 + 1 and E.data.open.n == n + 1 and lastClosed:find("\n@%d+;0;800;800;f;l\n") and E.buffer[3] == "@0;0;800;800;f;c",
+		"the position comes: the capture's anchor, then the page closes on that tick; the next goes on from there (not from before "
+		.. "the loading screen), got " .. table.concat(E.buffer, " | "))
 	PLAYER_MAP, PLAYER_POS = map, pos
 end
 

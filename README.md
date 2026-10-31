@@ -10,6 +10,7 @@ module you can switch on or off.
 | [Beacon](#beacon) | Battle.net friends who also use LefthyTools see each other on the world map and minimap, with status and level-up messages, without needing a group |
 | [Chronicle](#chronicle) | A journal for each character that writes itself: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, lots of statistics, and what your friends did, also while you weren't online, with all of you compared in graphs and leaderboards |
 | [Bestiary](#bestiary) | What the mobs you kill drop: a window that follows your target with each drop, how many you got and its drop chance, from your own kills |
+| [Echoes](#echoes) | Records where you go and what happens on the way, for a replay of the whole group on a map website. Records only, shows nothing in game |
 
 ## Settings
 
@@ -419,6 +420,39 @@ made of your last loot windows (to see why something wasn't counted).
 | Compare with a drop database | on |
 | Not seen yet in the window (the database's drops you haven't had, under yours) | off |
 | Mobs not killed yet beside the mouse (what the database says they can drop) | off |
+
+## Echoes
+
+Records your journey for a replay outside the game: a website that shows the world map with every
+friend's character as a dot moving along the way they went, on one shared clock, with what
+happened where. Echoes only records; nothing of it shows in game.
+
+**What it records:** your path (on foot, mounted, swimming, on a flight path, on a boat, as a
+ghost), hearthstones, portals and summons, zones, level-ups, quests accepted, handed in and
+abandoned, deaths and what killed you, every kill, loot of green quality and better, your group
+(LefthyTools friends by name, anyone else only counted), XP and rested XP, gear changes, AFK,
+reputation, herbs, ore, skinning and fishing, PvP and battlegrounds, dungeons and their bosses, and
+new mounts, pets, toys, achievements and recipes. **Never:** chat and whispers, mail, trades, the
+auction house, bags, gold, or anyone around you. Inside dungeons there's no position, so the path
+stops at the entrance.
+
+**Where it goes:** the recording is cut into pages (half an hour each), packed small (about 5-8 KB
+per hour of play) and kept in your saved data. A friend who collects (the *Collect recordings*
+setting) gets them over Battle.net in the background whenever you're both online, a few per second,
+never in combat and never ahead of anything else LefthyTools sends; friends in between pass them on
+when you aren't online at the same time, like Chronicle's journals. Your pages travel once the game
+has saved them (from your next login or `/reload` on), and you keep each page until the collector
+has it safely, then it's dropped. The collector's own program turns them into the website; that
+part isn't in this addon.
+
+`/lefthy echoes` shows what's recorded and kept. Switched off, Echoes does nothing at all: it
+records nothing and sends nothing, and pages you already have wait until it's on again.
+
+| Setting | Default |
+|---|---|
+| Echoes (the module) | on |
+| Relay friends' recordings | on |
+| Collect recordings | off |
 
 ---
 

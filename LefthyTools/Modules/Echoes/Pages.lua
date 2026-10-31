@@ -167,9 +167,29 @@ local function Lines(text)
 	return count
 end
 
+-- The logout a crash or a disconnect didn't write (the game ended without PLAYER_LOGOUT), at the
+-- time of the page's last line (dt 0).
+local UNENDED = "o0;0"
+
+-- Whether the session was still going on where a page's text ends: its last session line is a login
+-- ("o<dt>;1") with no logout after it, or it has none and goes on from the page before (an anchor
+-- with why c). Only from the text, so every load of the same save says the same.
+local function Unended(text)
+	local last
+	for on in text:gmatch("\no%d+;([01])") do
+		last = on
+	end
+	if last then
+		return last == "1"
+	end
+	return text:find("\n@%d+;[^\n]*;c\n") ~= nil
+end
+
 -- An open page from before (a /reload, a login soon after) goes on: its text with the lines that
--- weren't joined yet, the encoder's state, its size.
-local function Resume(open)
+-- weren't joined yet, the encoder's state, its size; the logout first if its session never ended
+-- (a crash, a disconnect: saved without one). fromDisk: not the page this session wrote (switched
+-- off and on: its lines since are in E.buffer, and its session ended when it was switched off).
+local function Resume(open, fromDisk)
 	if open.state ~= E.state then
 		local state = open.state
 		state.names = type(state.names) == "table" and state.names or {}
@@ -188,6 +208,9 @@ local function Resume(open)
 	E.bytes, E.count = #open.text + waiting, Lines(open.text) + #E.buffer
 	active = open
 	flushedAt = GetTime()
+	if fromDisk and Unended(open.text) then
+		E.Raw(UNENDED)
+	end
 end
 
 -- An open page from before that doesn't go on closes as it was: ".0;l" (stale at login), at the time
@@ -206,7 +229,8 @@ local function Retire(open, onDisk)
 		text = text .. table.concat(buffer, "\n") .. "\n"
 	end
 	if text ~= "" then
-		E.Store.Close(open.n, open.t0, text .. ".0;l\n", onDisk)
+		-- (Its session never ended, a crash or a disconnect: the logout first.)
+		E.Store.Close(open.n, open.t0, text .. (Unended(text) and UNENDED .. "\n" or "") .. ".0;l\n", onDisk)
 	end
 end
 
@@ -266,7 +290,7 @@ E.When("start", function()
 		data.open = nil -- (from before the launch: never counts)
 	elseif Fresh(open, char) then
 		Account()
-		Resume(open)
+		Resume(open, open ~= written)
 	else
 		Retire(open, open ~= written and Old(open))
 	end
@@ -280,6 +304,13 @@ end)
 E.When("stop", Flush)
 E.On("PLAYER_LOGOUT", Flush) -- (lines written after it are in E.buffer, which is saved with the page)
 
+-- Whether the open page may close now: not while the capture waits for its anchor (a loading screen,
+-- and the position after it: up to 3 s), else the next page would go on (E.Continue) from where you
+-- were before it, at a time after it. It closes on the first tick the capture is ready again.
+function E.PageMayClose()
+	return E.capture.Ready()
+end
+
 -- The tick: a page that's full, or 30 minutes busy, closes (and nothing else this tick); my
 -- BattleTag while it isn't known; the lines joined every 60 s.
 E.OnTick(function(now)
@@ -288,11 +319,9 @@ E.OnTick(function(now)
 		return
 	end
 	local busy = Busy(open)
-	if E.bytes >= PAGE_BYTES or E.count >= PAGE_LINES then
-		Rollover("s")
-		return
-	elseif busy and E.Now() - busy >= PAGE_SECONDS then
-		Rollover("t")
+	local full = E.bytes >= PAGE_BYTES or E.count >= PAGE_LINES
+	if (full or (busy and E.Now() - busy >= PAGE_SECONDS)) and E.PageMayClose() then
+		Rollover(full and "s" or "t")
 		return
 	end
 	if not open.acct and now >= accountAt then

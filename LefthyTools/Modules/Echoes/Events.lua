@@ -24,7 +24,9 @@ local NODES_KEEP = 32        -- gathered nodes remembered: each counts once
 local FOE_MEMORY = 15        -- seconds: the last enemy you fought counts as your killer this long
 local DEATH_REPEAT = 10      -- PLAYER_DEAD again this soon (or while still dead) is the same death
 local QUEST_DECIDE = 1.5     -- seconds after QUEST_REMOVED: turned in or abandoned?
+local QUEST_PAIR = 60        -- seconds: a QUEST_TURNED_IN this far before or after a QUEST_REMOVED is the same turn-in
 local GATHER_GAP = 1.5       -- seconds from a gathering spell to its loot window
+local NAMES_RETRY = 10       -- seconds: gathering spells' names still missing are asked again at most this often
 local LOOT_SOURCE_FOR = 5    -- seconds a loot window's corpses explain loot lines
 local REZ_FOR, SPIRIT_FOR = 70, 120 -- seconds a resurrection offer, the spirit healer's question count
 local BOSS_DEDUPE = 30       -- ENCOUNTER_END and BOSS_KILL report the same kill
@@ -55,7 +57,9 @@ local seenInfo, seenOrder = {}, {}   -- GUID -> { level, cls, name }; the GUIDs,
 local killed, killedOrder = {}, {}   -- corpse GUID -> true; a ring of KILLS_KEEP
 local nodes, nodesOrder = {}, {}     -- gathered node GUID -> true; a ring of NODES_KEEP
 local titles = {}                    -- quest ID -> title (it may be gone from the log when it's turned in)
-local removed, turnedIn = {}, {}     -- quest ID -> GetTime(): removed from the log, turned in
+-- quest ID -> GetTime(): removed from the log (to decide), turned in (QUEST_TURNED_IN: its Q written),
+-- turned in as its removal decided (that Q written; QUEST_TURNED_IN may still come)
+local removed, turnedIn, decided = {}, {}, {}
 local lootFrom = {}                  -- item ID -> the creature whose corpse the last loot window was
 local foe = {}                       -- the last enemy you fought: at, kind, id, level, cls, pvp, name
 
@@ -74,6 +78,7 @@ local function Reset()
 	wipe(titles)
 	wipe(removed)
 	wipe(turnedIn)
+	wipe(decided)
 	wipe(lootFrom)
 	wipe(foe)
 	S.lootAt = -math.huge
@@ -211,9 +216,17 @@ E.On("QUEST_ACCEPTED", function(questID)
 	end
 end)
 
+-- One Q per turn-in: QUEST_TURNED_IN and QUEST_REMOVED come in either order, at times seconds apart.
+-- Whichever writes it, the other one of the pair (within QUEST_PAIR) is the same turn-in; a quest
+-- turned in again (accepted again, or a repeatable one that's never in the log) counts again.
 E.On("QUEST_TURNED_IN", function(questID, xp, money)
 	if Readable(questID) then
-		turnedIn[questID] = GetTime()
+		local now = GetTime()
+		if decided[questID] and now - decided[questID] <= QUEST_PAIR then
+			decided[questID] = nil -- (its removal wrote the Q)
+			return
+		end
+		turnedIn[questID] = now
 		Note("Q", questID, Readable(xp) and xp or nil, Readable(money) and money or nil)
 	end
 end)
@@ -240,23 +253,30 @@ W.A = function(id)
 	E.Line("A", id)
 end
 
--- Removed from the log: turned in (QUEST_TURNED_IN came, or the game says it's done) or abandoned.
+-- Removed from the log: turned in (QUEST_TURNED_IN came: that's its Q; or the game says it's done:
+-- a Q now, and a QUEST_TURNED_IN after it is the same turn-in) or abandoned.
 local function Quests(now)
-	if next(removed) == nil then
-		return
-	end
 	for id, at in pairs(removed) do
 		if now - at >= QUEST_DECIDE then
 			removed[id] = nil
-			if not (turnedIn[id] and now - turnedIn[id] < 30) then
-				local done = C_QuestLog and Yes(C_QuestLog.IsQuestFlaggedCompleted, id)
-				Note(done and "Q" or "A", id)
+			if turnedIn[id] and now - turnedIn[id] <= QUEST_PAIR then
+				turnedIn[id] = nil -- (written: the pair is done)
+			elseif C_QuestLog and Yes(C_QuestLog.IsQuestFlaggedCompleted, id) then
+				decided[id] = now
+				Note("Q", id)
+			else
+				Note("A", id)
 			end
 		end
 	end
 	for id, at in pairs(turnedIn) do
-		if now - at >= 30 then
+		if now - at > QUEST_PAIR then
 			turnedIn[id] = nil
+		end
+	end
+	for id, at in pairs(decided) do
+		if now - at > QUEST_PAIR then
+			decided[id] = nil
 		end
 	end
 end
@@ -265,30 +285,59 @@ end
 -- Deaths, the last enemy, coming back
 ---------------------------------------------------------------------------
 
+local PLATES = {} -- "nameplate1" ... "nameplate40"
+for i = 1, 40 do
+	PLATES[i] = "nameplate" .. i
+end
+
+-- A player's pet, totem or guardian (unit): its owner's class and level, when the owner is a player
+-- with a nameplate (UnitIsOwnerOrControllerOfUnit); nothing otherwise. (Once per new foe.)
+local function OwnerOf(unit)
+	if not UnitIsOwnerOrControllerOfUnit then
+		return nil
+	end
+	for i = 1, #PLATES do
+		local plate = PLATES[i]
+		if Yes(UnitIsPlayer, plate) and Yes(UnitIsOwnerOrControllerOfUnit, plate, unit) then
+			local ok, _, class = pcall(UnitClass, plate)
+			return ok and Readable(class) and class or nil, Value(UnitLevel, plate)
+		end
+	end
+end
+
 -- In a fight: your attackable target is the one that'll have killed you (FOE_MEMORY). The same
--- target as on the last tick: only its time and level are read again.
+-- target as on the last tick: only its time and (a creature's, a player's) level are read again.
 local function TrackFoe(now)
 	if not (LT.InCombat() and Yes(UnitExists, "target") and Yes(UnitCanAttack, "player", "target")) then
 		return
 	end
 	local guid = Value(UnitGUID, "target")
 	if guid and guid == foe.guid and foe.at then
-		foe.at, foe.level = now, Value(UnitLevel, "target") or foe.level
+		foe.at = now
+		if foe.itself then
+			foe.level = Value(UnitLevel, "target") or foe.level
+		end
 		return
 	end
-	foe.at, foe.name, foe.guid = now, nil, guid
+	foe.at, foe.name, foe.guid, foe.itself = now, nil, guid, false
 	if Yes(UnitIsPlayer, "target") then -- (a player: only class and level, no name)
 		local ok, _, class = pcall(UnitClass, "target")
 		foe.kind, foe.id, foe.level, foe.cls, foe.pvp = "p", ok and Readable(class) and class or nil, Value(UnitLevel, "target"), nil, true
+		foe.itself = true
+		return
+	elseif Yes(UnitPlayerControlled, "target") then
+		-- A player's pet, totem or guardian (a totem's and a guardian's GUID is a creature's): a player
+		-- killed you. Its owner's class and level, if known.
+		local class, level = OwnerOf("target")
+		foe.kind, foe.id, foe.level, foe.cls, foe.pvp = "p", class, level, nil, true
 		return
 	end
 	local info, _, creature = Look("target")
 	if creature then
 		foe.kind, foe.id, foe.level, foe.cls, foe.name = "c", creature, info.level, info.cls, info.name
-		foe.pvp = false
-	else -- (not readable, or a player's pet)
-		foe.kind, foe.id, foe.level, foe.cls = "-", nil, nil, nil
-		foe.pvp = Yes(UnitPlayerControlled, "target")
+		foe.pvp, foe.itself = false, true
+	else -- (not readable)
+		foe.kind, foe.id, foe.level, foe.cls, foe.pvp = "-", nil, nil, nil, false
 	end
 end
 
@@ -316,7 +365,21 @@ end
 
 E.On("CONFIRM_XP_LOSS", function() S.spiritAt = GetTime() end)
 E.On("RESURRECT_REQUEST", function() S.rezAt = GetTime() end)
-E.On("CONFIRM_SUMMON", function() C.NoteCause("u") end)
+
+-- A summon explains the next jump or loading screen only once you accept it: the summon dialog's
+-- Accept calls C_SummonInfo.ConfirmSummon (a post-hook; CONFIRM_SUMMON only offers it, and one
+-- declined or not answered explains nothing).
+local function SummonAccepted()
+	if E.recording then
+		C.NoteCause("u")
+	end
+end
+if C_SummonInfo and type(C_SummonInfo.ConfirmSummon) == "function" then
+	hooksecurefunc(C_SummonInfo, "ConfirmSummon", SummonAccepted)
+end
+if type(ConfirmSummon) == "function" then -- (older clients' name for it)
+	hooksecurefunc("ConfirmSummon", SummonAccepted)
+end
 
 local function How()
 	local now = GetTime()
@@ -400,25 +463,46 @@ end
 -- Loot (green and better), gathering
 ---------------------------------------------------------------------------
 
--- A gathering spell's kind (h herb, o ore, s skin), by ID or, for a rank not listed, by name.
-local gatherNames
+-- A gathering spell's kind (h herb, o ore, s skin), by ID or, for a rank not listed, by name. The
+-- listed spells' names are asked when first needed; while a kind's isn't there (not loaded yet) they
+-- are asked again on a miss, at most every NAMES_RETRY seconds or after SPELLS_CHANGED; once each
+-- kind has its name, never again.
+local gatherNames = {}     -- spell name -> kind
+local namesMissing = true  -- a kind without its name yet
+local namesAt = -math.huge -- (GetTime) when they were asked last
+local function AskNames(now)
+	namesAt = now
+	local GetName = C_Spell and C_Spell.GetSpellName
+	for id, kind in pairs(GATHERING) do
+		local name = Value(GetName, id)
+		if type(name) == "string" and name ~= "" then
+			gatherNames[name] = kind
+		end
+	end
+	local h, o, s = false, false, false
+	for _, kind in pairs(gatherNames) do
+		h, o, s = h or kind == "h", o or kind == "o", s or kind == "s"
+	end
+	namesMissing = not (h and o and s)
+end
+
 local function GatherKind(spellID)
 	if GATHERING[spellID] then
 		return GATHERING[spellID]
 	end
-	local GetName = C_Spell and C_Spell.GetSpellName
-	if not gatherNames then
-		gatherNames = {}
-		for id, kind in pairs(GATHERING) do
-			local name = Value(GetName, id)
-			if type(name) == "string" then
-				gatherNames[name] = kind
-			end
-		end
+	local now = GetTime()
+	if namesMissing and now - namesAt >= NAMES_RETRY then
+		AskNames(now)
 	end
-	local name = Value(GetName, spellID)
+	local name = Value(C_Spell and C_Spell.GetSpellName, spellID)
 	return type(name) == "string" and gatherNames[name] or nil
 end
+
+E.On("SPELLS_CHANGED", function()
+	if namesMissing then
+		namesAt = -math.huge -- (names may have come: asked again on the next miss)
+	end
+end)
 
 E.On("UNIT_SPELLCAST_SUCCEEDED", function(_, _, spellID)
 	if type(spellID) ~= "number" or issecret(spellID) then
@@ -473,7 +557,9 @@ E.On("LOOT_READY", function()
 		return -- (not a node, the same window again, a node gathered before)
 	end
 	S.gatherAt, S.gatheredAt = -math.huge, now
-	local node = kind == "s" and LT.CreatureOf(source) or ObjectOf(source)
+	-- The node: the skinned creature, the herb's or the vein's game object. Fishing's source is the
+	-- bobber (always the same object), so none.
+	local node = kind == "s" and LT.CreatureOf(source) or kind ~= "f" and ObjectOf(source) or nil
 	Note("h", kind, node, items)
 end)
 

@@ -44,12 +44,19 @@ mock("GetBattlefieldWinner", function() return BG_WINNER end)
 mock("UnitPlayerControlled", function(u) return MOBS[u] ~= nil and MOBS[u].controlled == true end)
 local baseGUID, baseInstanceInfo, baseItemLink, baseAFK = UnitGUID, GetInstanceInfo, GetInventoryItemLink, UnitIsAFK
 mock("UnitGUID", function(u) if u == "pet" then return PET_GUID end return baseGUID(u) end)
--- (INSTANCE.id and .difficulty: GetInstanceInfo's instance ID and difficulty)
+-- (INSTANCE.id and .difficulty: GetInstanceInfo's instance ID and difficulty; .unreadable: the ID a secret)
 mock("GetInstanceInfo", function()
-	if INSTANCE then return INSTANCE.name, INSTANCE.type, INSTANCE.difficulty or 0, "", 5, 0, false, INSTANCE.id or 0, 5 end
+	if INSTANCE then
+		return INSTANCE.name, INSTANCE.type, INSTANCE.difficulty or 0, "", 5, 0, false, INSTANCE.unreadable and SECRET or INSTANCE.id or 0, 5
+	end
 	return ZONE, "none", 0, "", 0, 0, false, 0, 0
 end)
-mock("GetInventoryItemLink", function(unit, slot) return GEAR_LINKS[slot] or baseItemLink(unit, slot) end)
+-- (LINK_PENDING[slot]: its link isn't there yet, GetInventoryItemID says the item all the same)
+LINK_PENDING = {}
+mock("GetInventoryItemLink", function(unit, slot)
+	if LINK_PENDING[slot] then return nil end
+	return GEAR_LINKS[slot] or baseItemLink(unit, slot)
+end)
 -- (FACTIONS[i].collapsed: under a closed header, so not listed; known by its ID all the same)
 local function listed()
 	local list = {}
@@ -143,10 +150,13 @@ local function body(line)
 	return (line:gsub("^(.)%d+", "%1"))
 end
 
--- The capture's lines since listen(), each without its dt, one space apart.
-local function seq()
+-- The capture's lines since listen(), each without its dt, one space apart (unnamed: without the
+-- names, which come once per page: whether a page started in between doesn't matter then).
+local function seq(unnamed)
 	local list = {}
-	for i, h in ipairs(mine()) do list[i] = body(h.line) end
+	for _, h in ipairs(mine()) do
+		if not (unnamed and h.kind == "=") then list[#list + 1] = body(h.line) end
+	end
 	return table.concat(list, " ")
 end
 
@@ -486,17 +496,45 @@ do
 	at(100, 100)
 	Advance(1.2)
 	check(seq() == "@;0;100;100;f;j", "a hearthstone 25 s before: another jump (j), got " .. seq())
-	-- A teleport spell (Teleport: Stormwind), a summon (offered up to 120 s before).
+	-- A teleport spell (Teleport: Stormwind), a summon (accepted up to 120 s before): only one you
+	-- accepted counts, not one offered and declined, or not answered (someone's portal meanwhile).
 	listen()
 	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-3", 3561)
 	Advance(1)
 	at(900, 100)
 	Advance(1.2)
+	SUMMON_LEFT = 120
 	Fire("CONFIRM_SUMMON", 0, false)
-	Advance(60)
+	Advance(5)
+	C_SummonInfo.CancelSummon()
+	Fire("CANCEL_SUMMON")
+	Advance(5)
 	at(100, 900)
 	Advance(1.2)
-	check(seq() == "@;0;900;100;f;p;3561 @;0;100;900;f;u", "a teleport spell: p with the spell; a summon: u, got " .. seq())
+	SUMMON_LEFT = 120
+	Fire("CONFIRM_SUMMON", 0, false)
+	Advance(5)
+	at(900, 900)
+	Advance(1.2)
+	Advance(30)
+	C_SummonInfo.ConfirmSummon()
+	Advance(60)
+	at(100, 100)
+	Advance(1.2)
+	check(seq() == "@;0;900;100;f;p;3561 @;0;100;900;f;j @;0;900;900;f;j @;0;100;100;f;u",
+		"a teleport spell: p with the spell; a summon declined, or not answered yet: j; accepted: u, got " .. seq())
+	-- A summon accepted across a loading screen: u; with a teleport spell too: the spell.
+	listen()
+	SUMMON_LEFT = 120
+	Fire("CONFIRM_SUMMON", 0, false)
+	C_SummonInfo.ConfirmSummon()
+	loading(function() at(500, 500) end)
+	SUMMON_LEFT = 120
+	Fire("CONFIRM_SUMMON", 0, false)
+	C_SummonInfo.ConfirmSummon()
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-12", 3562)
+	loading(function() at(100, 100) end)
+	check(seq() == "@;0;500;500;f;u @;0;100;100;f;p;3562", "over a loading screen: u; a teleport spell as well: p, got " .. seq())
 	-- Another continent: a new segment there, and the zone.
 	listen()
 	PLAYER_MAP, PLAYER_POS = 1414, { 0.5, 0.5 }
@@ -691,6 +729,36 @@ do
 	Fire("QUEST_TURNED_IN", 10, 300, 50)
 	Advance(2)
 	check(seq() == "a;10 Q;10;300;50", "removed, then turned in: one Q with XP and money, got " .. seq())
+	-- One Q per turn-in, however far apart the two events come: turned in 3 s after the removal was
+	-- decided (done: Q); removed 40 s after it was turned in. A quest turned in again (accepted
+	-- again, or a repeatable one that never was in the log) counts again.
+	listen()
+	Fire("QUEST_ACCEPTED", 11)
+	Advance(0.3)
+	QUESTS_DONE[11] = true
+	Fire("QUEST_REMOVED", 11, false)
+	Advance(3)
+	Fire("QUEST_TURNED_IN", 11, 400, 60)
+	Advance(0.5)
+	Fire("QUEST_TURNED_IN", 12, 500, 70)
+	Advance(40)
+	QUESTS_DONE[12] = true
+	Fire("QUEST_REMOVED", 12, false)
+	Advance(2)
+	check(seq() == "a;11 Q;11 Q;12;500;70", "turned in long after its removal, removed long after it was turned in: one Q each, got " .. seq())
+	listen()
+	Fire("QUEST_TURNED_IN", 13, 100, 5)
+	Fire("QUEST_REMOVED", 13, false)
+	Advance(2)
+	Fire("QUEST_ACCEPTED", 13)
+	Fire("QUEST_TURNED_IN", 13, 100, 5)
+	Fire("QUEST_REMOVED", 13, false)
+	Advance(2)
+	Fire("QUEST_TURNED_IN", 14, 50, 0)
+	Advance(0.5)
+	Fire("QUEST_TURNED_IN", 14, 50, 0)
+	Advance(2)
+	check(seq() == "Q;13;100;5 a;13 Q;13;100;5 Q;14;50;0 Q;14;50;0", "a quest turned in again, a repeatable one twice: a Q each time, got " .. seq())
 	listen()
 	Fire("QUEST_ACCEPTED", SECRET)
 	Fire("QUEST_REMOVED", SECRET)
@@ -756,6 +824,31 @@ do
 	Advance(0.3)
 	check(seq() == "D;19;-;;;;0 r;c", "a killer that's a secret: unknown (-), got " .. seq())
 	Advance(11)
+	-- Killed by a player's totem (a creature's GUID), pet or guardian: player-controlled, so a player
+	-- killed me (pvp): its owner's class and level when the owner has a nameplate, else unknown.
+	local function diedTo(mob)
+		MOBS.target = mob
+		EnterCombat()
+		Advance(0.3)
+		STATE.dead = true
+		Fire("PLAYER_DEAD")
+		Advance(0.3)
+		LeaveCombat()
+		MOBS.target = nil
+		STATE.dead = false
+		Fire("PLAYER_ALIVE")
+		Advance(0.3)
+		Advance(11)
+	end
+	mock("UnitIsOwnerOrControllerOfUnit", function(owner, unit) return MOBS[owner] ~= nil and MOBS[owner].owns == unit end)
+	listen()
+	diedTo({ name = "Searing Totem", level = 20, guid = "Creature-0-1-0-1-2523-000000AC", controlled = true })
+	MOBS.nameplate4 = { player = true, classFile = "SHAMAN", level = 22, guid = "Player-1-98", owns = "target", friendly = false }
+	diedTo({ name = "Searing Totem", level = 20, guid = "Creature-0-1-0-1-2523-000000AD", controlled = true })
+	MOBS.nameplate4 = nil
+	diedTo({ name = "Wolf", level = 21, guid = "Pet-0-1-0-1-1234-000000AE", controlled = true })
+	check(seq() == "D;19;p;;;;1 r;c D;19;p;SHAMAN;22;;1 r;c D;19;p;;;;1 r;c",
+		"killed by a player's totem or pet: a player (p, pvp), the owner's class and level when it has a nameplate, got " .. seq())
 	-- No fight for 15 s before: unknown.
 	MOBS.target = { name = "Kobold Vermin", level = 5, guid = "Creature-0-1-0-1-327-000000AB" }
 	EnterCombat()
@@ -826,6 +919,44 @@ do
 	Advance(1.2)
 	check(seq() == "D;19;-;;;;0 @;0;700;560;g;r r;c m;f", "PLAYER_ALIVE twice as a ghost: released once, got " .. seq())
 	Advance(11)
+	-- Back to life in water, standing still: swimming then (the mode read on two polls: swimming
+	-- needs two in a row), at the corpse in a lake and after a player's resurrection there.
+	listen()
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Advance(0.3)
+	STATE.ghost = true
+	Fire("PLAYER_ALIVE")
+	at(760, 560)
+	Advance(1.2)
+	Advance(2)
+	TRAVEL.swimming = true
+	STATE.ghost, STATE.dead = false, false
+	Fire("PLAYER_UNGHOST")
+	Advance(3)
+	local unghost = seq()
+	TRAVEL.swimming = false
+	walk(770, 560)
+	walk(780, 560)
+	halt()
+	Advance(11)
+	listen()
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Advance(0.3)
+	TRAVEL.swimming = true
+	Fire("RESURRECT_REQUEST", "Anna")
+	STATE.dead = false
+	Fire("PLAYER_ALIVE")
+	Advance(3)
+	local rez = seq()
+	TRAVEL.swimming = false
+	walk(790, 560)
+	walk(800, 560)
+	halt()
+	Advance(11)
+	check(unghost == "D;19;-;;;;0 @;0;760;560;g;r r;c m;s" and rez == "D;19;-;;;;0 r;p m;s" and E.state.mode == "f",
+		"back to life in water, standing still: swimming (s), at the corpse and resurrected, got " .. unghost .. " | " .. rez)
 end
 
 ---------------------------------------------------------------------------
@@ -888,6 +1019,12 @@ do
 	Fire("CHAT_MSG_LOOT", "You receive loot: " .. ItemLink(6125) .. "x3.", "Lefthy")
 	Advance(0.3)
 	check(seq() == "=;i;6125;Brawler's Pants l;6125;3;2;l", "the loot window long gone: no corpse; the count, got " .. seq())
+	-- An item the game hasn't cached yet: its quality from the link's colour (Forever's links: |cff...).
+	listen()
+	Fire("CHAT_MSG_LOOT", "You receive loot: |cff0070dd|Hitem:90020::::::::20:::::|h[Unseen Blade]|h|r.", "Lefthy")
+	Fire("CHAT_MSG_LOOT", "You receive loot: |cffffffff|Hitem:90021::::::::20:::::|h[Unseen Rag]|h|r.", "Lefthy")
+	Advance(0.3)
+	check(seq() == "=;i;90020;Unseen Blade l;90020;1;3;l", "an item not cached yet: its quality from the link's colour (blue: written; white: not), got " .. seq())
 
 	-- Gathering: the spell, then the loot window within 1.5 s; the node (a game object, the skinned creature).
 	listen()
@@ -913,6 +1050,9 @@ do
 	LOOT, LOOT_FISHING = { { type = 1, id = 6303, quantity = 1, source = "GameObject-0-1-0-1-35591-000000D4" } }, true
 	Fire("LOOT_READY", true)
 	Advance(2)
+	LOOT = { { type = 1, id = 6303, quantity = 2, source = "GameObject-0-1-0-1-35591-000000D6" } } -- (the next cast's bobber)
+	Fire("LOOT_READY", true)
+	Advance(2)
 	LOOT_FISHING = false
 	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-9", 2366)
 	Advance(2)
@@ -921,8 +1061,38 @@ do
 	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", SECRET, SECRET)
 	Advance(0.3)
 	LOOT = {}
-	check(seq() == "h;h;1617;2447:1 h;s;113;2318:1 h;f;35591;6303:1",
-		"herbs (h), skinning (s: the creature), fishing (f); a loot window 2 s after the spell isn't a node's, got " .. seq())
+	check(seq() == "h;h;1617;2447:1 h;s;113;2318:1 h;f;;6303:1 h;f;;6303:2",
+		"herbs (h), skinning (s: the creature), fishing (f: no node, the loot's source is the bobber; each cast once); a loot window "
+		.. "2 s after the spell isn't a node's, got " .. seq())
+
+	-- A rank not in the list is known by its name. The listed spells' names may not be loaded when
+	-- they're first asked (C_Spell.GetSpellName answers nothing): asked again once they come
+	-- (SPELLS_CHANGED), else on a miss at most every 10 s; once known, never again.
+	local LISTED = { [2366] = true, [2368] = true, [3570] = true, [11993] = true, [2575] = true, [2576] = true, [3564] = true,
+		[10248] = true, [8613] = true, [8617] = true, [8618] = true, [10768] = true }
+	local spellNames, asked = { [133] = "Fireball" }, 0
+	C_Spell.GetSpellName = function(id) if LISTED[id] then asked = asked + 1 end return spellNames[id] end
+	listen()
+	for i = 1, 20 do
+		Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-F" .. i, 133)
+		Advance(0.2)
+	end
+	local first = asked
+	spellNames[2366], spellNames[2575], spellNames[8613], spellNames[99001] = "Herb Gathering", "Mining", "Skinning", "Mining"
+	Fire("SPELLS_CHANGED")
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-13", 99001) -- (Mining, a rank of a later build)
+	LOOT = { { type = 1, id = 2770, quantity = 3, source = "GameObject-0-1-0-1-1731-000000D7" } }
+	Fire("LOOT_READY", true)
+	Advance(0.3)
+	local known = asked
+	for i = 1, 20 do
+		Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-G" .. i, 133)
+		Advance(0.6)
+	end
+	LOOT, C_Spell.GetSpellName = {}, nil
+	check(seq() == "h;o;1731;2770:3", "a rank not listed, by its name: the names asked again once they came, got " .. seq())
+	check(first <= 12 and known <= 24 and asked == known, "the names asked at most every 10 s while missing (" .. first
+		.. "), then once more (" .. known .. "), never again once known (" .. asked .. ")")
 end
 
 ---------------------------------------------------------------------------
@@ -972,6 +1142,38 @@ do
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.3)
+
+	-- A friend's realm the way my character's key has it (GetRealmName: "Realmy Vale"), whatever form
+	-- the game gave it in ("RealmyVale"); another realm's as Battle.net shows it ("Stone Realm").
+	local realmName, bob = GetRealmName, BN_FRIENDS[2][1]
+	GetRealmName = function() return "Realmy Vale" end
+	KNOWN_PLAYERS["Player-1-11"], KNOWN_PLAYERS["Player-1-12"] = { "Anna", "RealmyVale" }, { "Bob", "StoneRealm" }
+	bob.realmName, bob.realmDisplayName = "StoneRealm", "Stone Realm"
+	anna("H2")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 12)
+	Advance(2)
+	listen()
+	GROUP, GROUP_MEMBERS, PARTY.party1, PARTY.party2 = "party", 3, { guid = "Player-1-11" }, { guid = "Player-1-12" }
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
+	local both = seq()
+	-- Remembered in another form (from before), Beacon off: written, and kept, in my realm's.
+	LT:SetModuleEnabled("beacon", false)
+	LefthyToolsEchoesDB.friends["Player-1-11"] = "Anna-Realmy-Vale"
+	listen()
+	GROUP_MEMBERS, PARTY.party2 = 2, nil
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
+	LT:SetModuleEnabled("beacon", true)
+	check(both == "g;3;0;Player-1-11:Anna-Realmy Vale;Player-1-12:Bob-Stone Realm" and seq() == "g;2;0;Player-1-11:Anna-Realmy Vale"
+		and LefthyToolsEchoesDB.friends["Player-1-11"] == "Anna-Realmy Vale",
+		"friends' realms as my own character's key writes them; another realm as Battle.net shows it, got " .. both .. " | " .. seq())
+	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
+	GetRealmName, bob.realmName, bob.realmDisplayName = realmName, "Realmy", nil
+	KNOWN_PLAYERS["Player-1-11"], KNOWN_PLAYERS["Player-1-12"] = nil, nil
+	LefthyToolsEchoesDB.friends["Player-1-11"], LefthyToolsEchoesDB.friends["Player-1-12"] = "Anna-Realmy", nil
 end
 
 ---------------------------------------------------------------------------
@@ -1060,6 +1262,33 @@ do
 	Fire("PLAYER_PVP_KILLS_CHANGED", "player")
 	Advance(0.3)
 	check(seq() == "p;2 p;1", "honorable kills: how many more, got " .. seq())
+
+	-- Gear at a login: a worn item whose link isn't there yet (GetInventoryItemID says one is) isn't
+	-- taken off: looked at again every second, 10 times; then the item alone, if it isn't the one
+	-- written before. Only an empty slot is taken off.
+	EQUIPPED[16], EQUIPPED[1] = 19019, 1155
+	Fire("PLAYER_EQUIPMENT_CHANGED", 16, true)
+	Fire("PLAYER_EQUIPMENT_CHANGED", 1, true)
+	Advance(0.3)
+	listen()
+	LINK_PENDING[16], LINK_PENDING[5], LINK_PENDING[1] = true, true, true
+	EQUIPPED[5], GEAR_LINKS[7] = 2075, nil -- (put on and taken off while logged out)
+	LT:SetModuleEnabled("echoes", false)
+	LT:SetModuleEnabled("echoes", true)
+	Fire("PLAYER_ENTERING_WORLD", true, false)
+	Advance(2.5)
+	local early = count("^G;")
+	LINK_PENDING[16] = nil
+	Advance(12)
+	check(early == 1 and count("^G;7;0$") == 1 and count("^G;16;") == 0 and count("^G;1;") == 0 and count("^G;5;2075$") == 1 and count("^G;") == 2,
+		"a login, links not there yet: not taken off; the same item once its link comes: nothing; a link that never comes: the item "
+		.. "alone if it changed; an empty slot: taken off, got " .. seq())
+	listen()
+	LINK_PENDING[5], LINK_PENDING[1], EQUIPPED[5], EQUIPPED[1] = nil, nil, nil, nil
+	Fire("PLAYER_EQUIPMENT_CHANGED", 5, false)
+	Fire("PLAYER_EQUIPMENT_CHANGED", 1, false)
+	Advance(0.3)
+	check(seq() == "G;5;0 G;1;0" or seq() == "G;1;0 G;5;0", "(taken off again, got " .. seq() .. ")")
 end
 
 ---------------------------------------------------------------------------
@@ -1166,6 +1395,31 @@ do
 	check(seq() == "o;0 @;36;;;f;l z;1429;Goldshire o;1", "a /reload: o0, then an anchor (why l), the zone, o1; nothing "
 		.. "written again (the dungeon, the group, gear, XP: kept per character), got " .. seq())
 	check(PLAYED.requests == 0, "and no /played (not a login)")
+	-- A /reload inside where the game can't say which instance this is (GetInstanceInfo fails), or
+	-- what kind (a secret): the dungeon isn't left; read again a few seconds later, still the same.
+	for _, unreadable in ipairs({ "info", "kind" }) do
+		listen()
+		INSTANCE.unreadable = unreadable == "info" or nil
+		INSTANCE.type = unreadable == "kind" and SECRET or "party"
+		Fire("PLAYER_LEAVING_WORLD")
+		Fire("PLAYER_LOGOUT")
+		C.Reset()
+		Fire("PLAYER_ENTERING_WORLD", false, true)
+		Advance(2)
+		INSTANCE.unreadable, INSTANCE.type = nil, "party"
+		Advance(6)
+		check(seq() == "o;0 @;36;;;f;l z;1429;Goldshire o;1", "a /reload inside, the instance's " .. unreadable
+			.. " not readable: nothing left; readable again: nothing new, got " .. seq())
+	end
+	-- Into another dungeon whose ID can't be read at first: written once it can (looked at every 5 s).
+	listen()
+	loading(function() INSTANCE = { name = "Shadowfang Keep", type = "party", id = 33, difficulty = 1, unreadable = true } end)
+	Advance(3)
+	INSTANCE.unreadable = nil
+	Advance(5)
+	check(seq() == "@;36;;;f;l d;x;36;1 d;e;33;1", "another dungeon, its ID readable only later: left and entered then, got " .. seq())
+	loading(function() INSTANCE = { name = "The Deadmines", type = "party", id = 36, difficulty = 1 } end)
+	Advance(1)
 	-- Left the dungeon while logged out: at the next login it's left.
 	listen()
 	LT:SetModuleEnabled("echoes", false)
@@ -1214,7 +1468,7 @@ do
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "party", 2, { guid = "Player-1-11" }
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.5)
-	local w1, w2 = seq():match("^,0,0 ,0,%-(%d+) ,0,%-(%d+) k;116;12;n;m l;2075;1;2;l;116 g;2;0;Player%-1%-11:Anna%-Realmy$")
+	local w1, w2 = seq(true):match("^,0,0 ,0,%-(%d+) ,0,%-(%d+) k;116;12;n;m l;2075;1;2;l;116 g;2;0;Player%-1%-11:Anna%-Realmy$")
 	check(w1 and tonumber(w1) >= 25 and tonumber(w1) + tonumber(w2) == 50,
 		"the path (a point past 25 yd, the stop), kills, loot and friends without them, got " .. seq())
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
@@ -1339,7 +1593,7 @@ for name, value in pairs(was) do _G[name] = value or nil end
 C_QuestLog.IsQuestFlaggedCompleted = questFlagged
 for id in pairs(newItems) do ITEMS[id] = nil end
 UNIT_SPEED, FORM_ID, GROUP_MEMBERS, BIND, HONOR, BG_WINNER, PET_GUID = nil, nil, nil, nil, nil, nil, nil
-PLAYED, QUESTS_DONE, FACTIONS, SKILLS, GEAR_LINKS = nil, nil, nil, nil, nil
+PLAYED, QUESTS_DONE, FACTIONS, SKILLS, GEAR_LINKS, LINK_PENDING = nil, nil, nil, nil, nil, nil
 chat:UnregisterEvent("TIME_PLAYED_MSG")
 ChatFrame3, NUM_CHAT_WINDOWS = nil, chatWindows
 PLAYER_MAP, PLAYER_POS, EQUIPPED, QUESTS, INSTANCE, GROUP = keep.map, keep.pos, keep.equipped, keep.quests, keep.instance, keep.group

@@ -98,6 +98,20 @@ do -- your own loot (LT.OwnLoot): looted, or pushed (a quest reward, a purchase)
 		and pushedSeveral[5] == true, "... a quest reward or a purchase (\"You receive item:\"): pushed, as the last answer")
 	check(select("#", LT.OwnLoot("Anna Brook receives loot: " .. ItemLink(2075) .. ".")) <= 1 and LT.OwnLoot(SECRET) == nil,
 		"someone else's loot, a secret: nothing")
+	-- An item not in the cache yet (C_Item.GetItemQualityByID answers nothing): the quality from the
+	-- link's colour, as Forever's links carry it ("|cff1eff00"), or retail's "|cnIQ2:".
+	local function uncached(colour, id) return LOOT_ITEM_SELF:format(("|c%s|Hitem:%d::::::::20:::::|h[Not Seen Yet]|h|r"):format(colour, id)) end
+	local qualities = {}
+	ITEM_QUALITY_COLORS = { [4] = { r = 0.69, g = 0.28, b = 0.97, hex = "|cffb048f8" } } -- (the game's own table: an epic of another colour)
+	for i, colour in ipairs({ "ff9d9d9d", "ffffffff", "ff1eff00", "ff0070dd", "ffa335ee", "ffff8000", "FF1EFF00", "ffb048f8", "ff123456" }) do
+		qualities[i] = tostring(loot(uncached(colour, 90000 + i))[4])
+	end
+	ITEM_QUALITY_COLORS = nil
+	check(table.concat(qualities, ",") == "0,1,2,3,4,5,2,4,nil" and loot(uncached("nIQ3:", 90010))[4] == 3 and loot(uncached("ff1eff00", 90011))[2] == 90011,
+		"an item not cached yet: its quality from the link's colour (poor to legendary, any case, the game's colours and classic's; an "
+		.. "unknown colour: none), or retail's |cnIQ, got " .. table.concat(qualities, ","))
+	check(loot(LOOT_ITEM_SELF:format(("|cff1eff00|Hitem:1155::::::::20:::::|h[Rod of the Sleepwalker]|h|r")))[4] == 3,
+		"a cached item: the quality the game knows, whatever the colour")
 end
 do -- a creature's ID from its GUID (the Bestiary's records, the fight stream's mobs)
 	local of = LT.CreatureOf
