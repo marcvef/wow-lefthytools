@@ -1423,6 +1423,40 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: long range lists of my own")
+do
+	-- What I keep (exported, safe, my inbox) may have more than the 300 intervals a message may: read
+	-- in full, not as "none". A collector: the exporter has Anna's odd pages 1-701 (351 intervals),
+	-- her even pages 702-1300 are in the inbox (300 more).
+	local odd, even = {}, {}
+	for n = 1, 701, 2 do
+		odd[#odd + 1] = tostring(n)
+	end
+	local c = Start(EVE, { friends = { ANNA, BOB }, fake = true, collect = true })
+	local inbox = {}
+	for n = 702, 1300, 2 do
+		local p = TheirPage(c, n % 600 + 1, 40)
+		inbox[n] = { t = p.t, h = p.h, m = "z", z = p.z, s = c.E.data.session - 1 }
+		even[#even + 1] = tostring(n)
+	end
+	c.E.data.exported[ANNA.key] = table.concat(odd, ",")
+	c.E.data.inbox[ANNA.key] = inbox
+	Touched(c)
+	MeetAll(c, { ANNA })
+	local D = c.D
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1-3")
+	Pass(c, 1.5)
+	check(D.inflight[ANNA.key .. ".2"] and not D.inflight[ANNA.key .. ".1"], "351 intervals exported: page 1 isn't asked for, 2 is")
+	Say(c, ANNA, ("B2;en;%s;%s;2"):format(ANNA.acct, ANNA.store))
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":702")
+	Pass(c, 1.5)
+	check(next(D.inflight) == nil, "a page in an inbox of 300 intervals: not asked for again")
+	check(c.E.data.safe[ANNA.key] and c.E.data.safe[ANNA.key][c.E.Store.Own()]
+		and c.E.Ranges.Contains(c.E.data.safe[ANNA.key][c.E.Store.Own()], 701)
+		and c.E.Ranges.Contains(c.E.data.safe[ANNA.key][c.E.Store.Own()], 1300), "my own summary has all of it (on disk, exported)")
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------

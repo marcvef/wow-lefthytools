@@ -285,6 +285,12 @@ D.PeerAccount, D.MyAccount = PeerAccount, MyAccount
 local S = E.Store
 local cache = {}
 
+-- Ranges kept here (what I hold, what's exported or safe) as a list: read leniently (E.Ranges, no
+-- limit on their number). D.Ranges.Parse is for the wire: strict, at most RANGES_MAX intervals.
+local function Stored(ranges)
+	return type(ranges) == "string" and E.Ranges.Parse(ranges) or {}
+end
+
 local function Changed()
 	wipe(cache)
 end
@@ -307,8 +313,8 @@ local function HeldIn(where)
 	if not cache[id] then
 		local out = {}
 		for key, ranges in pairs(S.Held(where)) do
-			local list = Ranges.Parse(ranges)
-			if list and #list > 0 then
+			local list = Stored(ranges)
+			if #list > 0 then
 				out[key] = list
 			end
 		end
@@ -349,7 +355,7 @@ end
 local function Exported(key)
 	local id = "exported>" .. key
 	if not cache[id] then
-		cache[id] = Ranges.Parse(E.data.exported[key] or "") or {}
+		cache[id] = Stored(E.data.exported[key])
 	end
 	return cache[id]
 end
@@ -360,7 +366,7 @@ local function SafeOf(key)
 	if not cache[id] then
 		local list = {}
 		for _, ranges in pairs(E.data.safe[key] or {}) do
-			list = Ranges.Union(list, Ranges.Parse(ranges) or {})
+			list = Ranges.Union(list, Stored(ranges))
 		end
 		cache[id] = list
 	end
@@ -380,7 +386,7 @@ local function Safe(key, collector, list)
 		return
 	end
 	local old = byCollector and byCollector[collector]
-	local merged = Ranges.Format(Ranges.Union(Ranges.Parse(old or "") or {}, list))
+	local merged = Ranges.Format(Ranges.Union(Stored(old), list))
 	if merged == "" or merged == old then
 		return
 	end
@@ -405,7 +411,7 @@ local function SafeHere()
 	end
 	for key in pairs(keys) do
 		local acct, store = Split(key)
-		local list = Ranges.Parse(S.SafeHere(acct, store)) or {}
+		local list = Stored(S.SafeHere(acct, store))
 		if #list > 0 then
 			Safe(key, mine, list)
 		end
@@ -1040,7 +1046,7 @@ local function SafeSummary(id, now)
 				s.sent[mark] = text
 				byCollector[collector] = byCollector[collector] or {}
 				local list = byCollector[collector]
-				list[#list + 1] = { key, Ranges.Parse(text) or {} }
+				list[#list + 1] = { key, Stored(text) }
 			end
 		end
 	end

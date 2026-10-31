@@ -686,8 +686,10 @@ inbox), `Safe` and `SafeHere`, `Carried`, `Fits`, `InboxFull`, `Own`. Delivery o
 `exported` and `safe` for its decisions. What it works out of the pages (holdings, what I have
 of a store, what's exported or safe) is cached until they change: `D.PagesChanged()` (also every
 30 s, and when `n` moves). Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
-`Minus`, `Has`) read the wire strictly (a bad part refuses the message) and do the set
-arithmetic pulling needs; they read and write the same strings as `E.Ranges`.
+`Minus`, `Has`) read the wire strictly (a bad part refuses the message, at most 300 intervals)
+and do the set arithmetic pulling needs; they read and write the same strings as `E.Ranges`.
+What's kept here (held, exported, safe) is read with `E.Ranges.Parse`, without a limit: a list
+of more than 300 intervals is all of it, not "none".
 
 ### Beacon's hooks
 
