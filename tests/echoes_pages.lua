@@ -826,8 +826,9 @@ do
 end
 
 section("Echoes pages: /lefthy echoes")
-local statusExtra, commandRest = false, nil
-E.OnStatus(function(add) if statusExtra then add("delivery: 2 friends online") end end)
+local statusExtra, statusRuns, commandRest = false, 0, nil
+local EXTRA = "pagestest: a line another file adds" -- (Delivery adds lines of its own)
+E.OnStatus(function(add) statusRuns = statusRuns + 1 if statusExtra then add(EXTRA) end end)
 E.Command("pagestest", function(rest) commandRest = rest end, "/lefthy echoes pagestest - a test's word")
 do
 	fresh(acct)
@@ -845,16 +846,17 @@ do
 	check(out:find("recording.", 1, true) and out:find(("account %s, store %s."):format(acct, STORE), 1, true)
 		and out:find("open page 2: %d+%.%d KB, 4 lines, started 0 min ago") and out:find("my pages: 1 %(1%), %d+%.%d KB of 2%.0 MB%.")
 		and out:find("relaying: 1 pages of 1 friends' stores, %d+%.%d KB of 512%.0 KB") and not out:find("collected:", 1, true)
-		and out:find("delivery: 2 friends online", 1, true), "the status: recording, the account, the open page, my pages, relaying, "
+		and (out:find(EXTRA, 1, true) or 0) > out:find("relaying:", 1, true), "the status: recording, the account, the open page, my pages, relaying, "
 		.. "what other files add; collecting off and nothing collected: no inbox line, got\n" .. out)
 	statusExtra = false
 	LT:SetModuleSetting(M, "collect", true)
 	Store.Put(A, B, 1, friendPage(1, E.Now()), "inbox")
 	mark = #PRINTED + 1
+	local runs = statusRuns
 	lefthy("echoes status")
 	out = printedSince(mark)
-	check(out:find("collected: 1 pages of 1 stores, %d+%.%d KB; the exporter has 0 stores' pages%.") and not out:find("delivery:", 1, true),
-		"collecting: the inbox's size, got\n" .. out)
+	check(out:find("collected: 1 pages of 1 stores, %d+%.%d KB; the exporter has 0 stores' pages%."), "collecting: the inbox's size, got\n" .. out)
+	check(statusRuns == runs + 1 and not out:find(EXTRA, 1, true), "a file that adds nothing this time: asked again, no line of it, got\n" .. out)
 	LT:SetModuleSetting(M, "collect", false)
 	MY_BATTLETAG = nil
 	fresh()
