@@ -24,6 +24,7 @@ local RESULT_EVERY = 5       -- seconds between asking who won a battleground
 local GROUP_EVERY = 15       -- seconds: a group with others is looked at again (Beacon may learn of a friend among them)
 local INSTANCE_RETRY, INSTANCE_TRIES = 5, 6 -- an instance that couldn't be told: looked at again every 5 s, 6 times
 local SLOTS = 19             -- equipment slots
+local GEAR_RETRY, GEAR_TRIES = 1, 10 -- a worn item whose link isn't there yet: looked at again every second, 10 times
 -- The Classic professions' skill lines (C_SkillInfo): First Aid, Blacksmithing, Leatherworking,
 -- Alchemy, Herbalism, Cooking, Mining, Tailoring, Engineering, Enchanting, Fishing, Skinning.
 local PROFESSIONS = { 129, 164, 165, 171, 182, 185, 186, 197, 202, 333, 356, 393 }
@@ -41,6 +42,7 @@ end
 
 local S = {}
 local gearDirty, repDirty = {}, {} -- slot -> true; faction ID -> true
+local gearWait = {}                -- slot -> tries: a worn item whose link isn't there yet
 local hidden = {}                  -- chat frames that don't get TIME_PLAYED_MSG while /played is asked
 local friends, peersByGUID = {}, {} -- (one list and one map for every group check)
 
@@ -55,7 +57,9 @@ end
 local function Reset()
 	ShowPlayed()
 	wipe(gearDirty)
+	wipe(gearWait)
 	wipe(repDirty)
+	S.gearWaitAt = 0
 	S.lastTick = nil
 	S.xpAt = 0           -- (GetTime) the next XP check
 	S.xpLineAt = nil     -- (GetTime) the last x line
@@ -186,8 +190,11 @@ end
 -- Gear: item, enchant, suffix per slot (only out of combat)
 ---------------------------------------------------------------------------
 
-local function Gear(cap, slot)
-	gearDirty[slot] = nil
+-- One slot. true when it's done (written, or nothing changed); false while a worn item's link isn't
+-- there yet (at login: GetInventoryItemID says an item is worn, so it isn't taken off). last: the
+-- link didn't come in time: the item alone (enchant and suffix unknown), unless it's the one written
+-- before.
+local function Gear(cap, slot, last)
 	local link = Value(GetInventoryItemLink, "player", slot)
 	local id, enchant, suffix
 	local item = type(link) == "string" and link:match("item:([%-%d:]*)")
@@ -205,20 +212,36 @@ local function Gear(cap, slot)
 			end
 		end
 	end
-	local key = id and (id .. ":" .. (enchant or 0) .. ":" .. (suffix or 0)) or ""
 	cap.gear = type(cap.gear) == "table" and cap.gear or {}
 	local was = cap.gear[slot]
+	local key, linked = "", id ~= nil
+	if linked then
+		key = id .. ":" .. (enchant or 0) .. ":" .. (suffix or 0)
+	else
+		local worn = Value(GetInventoryItemID, "player", slot)
+		if type(worn) == "number" and worn > 0 then
+			if not last then
+				return false -- (not known yet)
+			elseif type(was) == "string" and tonumber(was:match("^(%d+):")) == worn then
+				return true -- (the item written before, as far as can be told)
+			end
+			id, key = worn, worn .. ":?:?"
+		end
+	end
 	cap.gear[slot] = key
 	if key == was or (was == nil and key == "") then
-		return
+		return true
 	end
 	C.Spot()
-	if id then
+	if linked then
 		E.Name("i", id, E.LinkName(link))
 		E.Line("G", slot, id, enchant or 0, suffix or 0)
+	elseif id then
+		E.Line("G", slot, id) -- (its link never came: enchant and suffix unknown)
 	else
 		E.Line("G", slot, 0) -- (taken off)
 	end
+	return true
 end
 
 ---------------------------------------------------------------------------
@@ -534,11 +557,24 @@ E.OnTick(function(now)
 	if S.gearAll then
 		S.gearAll = false
 		for slot = 1, SLOTS do
-			Gear(cap, slot)
+			gearDirty[slot] = true
 		end
-	else
+	end
+	if next(gearDirty) then
 		for slot in pairs(gearDirty) do
-			Gear(cap, slot)
+			if Gear(cap, slot) then
+				gearWait[slot] = nil
+			else
+				gearWait[slot] = gearWait[slot] or 0
+				S.gearWaitAt = now + GEAR_RETRY
+			end
+		end
+		wipe(gearDirty)
+	end
+	if next(gearWait) and now >= S.gearWaitAt then -- (worn items whose link wasn't there yet)
+		S.gearWaitAt = now + GEAR_RETRY
+		for slot, tries in pairs(gearWait) do
+			gearWait[slot] = not Gear(cap, slot, tries + 1 >= GEAR_TRIES) and tries + 1 or nil
 		end
 	end
 	if S.skillsDirty then

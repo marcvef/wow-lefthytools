@@ -51,7 +51,12 @@ mock("GetInstanceInfo", function()
 	end
 	return ZONE, "none", 0, "", 0, 0, false, 0, 0
 end)
-mock("GetInventoryItemLink", function(unit, slot) return GEAR_LINKS[slot] or baseItemLink(unit, slot) end)
+-- (LINK_PENDING[slot]: its link isn't there yet, GetInventoryItemID says the item all the same)
+LINK_PENDING = {}
+mock("GetInventoryItemLink", function(unit, slot)
+	if LINK_PENDING[slot] then return nil end
+	return GEAR_LINKS[slot] or baseItemLink(unit, slot)
+end)
 -- (FACTIONS[i].collapsed: under a closed header, so not listed; known by its ID all the same)
 local function listed()
 	local list = {}
@@ -1225,6 +1230,33 @@ do
 	Fire("PLAYER_PVP_KILLS_CHANGED", "player")
 	Advance(0.3)
 	check(seq() == "p;2 p;1", "honorable kills: how many more, got " .. seq())
+
+	-- Gear at a login: a worn item whose link isn't there yet (GetInventoryItemID says one is) isn't
+	-- taken off: looked at again every second, 10 times; then the item alone, if it isn't the one
+	-- written before. Only an empty slot is taken off.
+	EQUIPPED[16], EQUIPPED[1] = 19019, 1155
+	Fire("PLAYER_EQUIPMENT_CHANGED", 16, true)
+	Fire("PLAYER_EQUIPMENT_CHANGED", 1, true)
+	Advance(0.3)
+	listen()
+	LINK_PENDING[16], LINK_PENDING[5], LINK_PENDING[1] = true, true, true
+	EQUIPPED[5], GEAR_LINKS[7] = 2075, nil -- (put on and taken off while logged out)
+	LT:SetModuleEnabled("echoes", false)
+	LT:SetModuleEnabled("echoes", true)
+	Fire("PLAYER_ENTERING_WORLD", true, false)
+	Advance(2.5)
+	local early = count("^G;")
+	LINK_PENDING[16] = nil
+	Advance(12)
+	check(early == 1 and count("^G;7;0$") == 1 and count("^G;16;") == 0 and count("^G;1;") == 0 and count("^G;5;2075$") == 1 and count("^G;") == 2,
+		"a login, links not there yet: not taken off; the same item once its link comes: nothing; a link that never comes: the item "
+		.. "alone if it changed; an empty slot: taken off, got " .. seq())
+	listen()
+	LINK_PENDING[5], LINK_PENDING[1], EQUIPPED[5], EQUIPPED[1] = nil, nil, nil, nil
+	Fire("PLAYER_EQUIPMENT_CHANGED", 5, false)
+	Fire("PLAYER_EQUIPMENT_CHANGED", 1, false)
+	Advance(0.3)
+	check(seq() == "G;5;0 G;1;0" or seq() == "G;1;0 G;5;0", "(taken off again, got " .. seq() .. ")")
 end
 
 ---------------------------------------------------------------------------
@@ -1529,7 +1561,7 @@ for name, value in pairs(was) do _G[name] = value or nil end
 C_QuestLog.IsQuestFlaggedCompleted = questFlagged
 for id in pairs(newItems) do ITEMS[id] = nil end
 UNIT_SPEED, FORM_ID, GROUP_MEMBERS, BIND, HONOR, BG_WINNER, PET_GUID = nil, nil, nil, nil, nil, nil, nil
-PLAYED, QUESTS_DONE, FACTIONS, SKILLS, GEAR_LINKS = nil, nil, nil, nil, nil
+PLAYED, QUESTS_DONE, FACTIONS, SKILLS, GEAR_LINKS, LINK_PENDING = nil, nil, nil, nil, nil, nil
 chat:UnregisterEvent("TIME_PLAYED_MSG")
 ChatFrame3, NUM_CHAT_WINDOWS = nil, chatWindows
 PLAYER_MAP, PLAYER_POS, EQUIPPED, QUESTS, INSTANCE, GROUP = keep.map, keep.pos, keep.equipped, keep.quests, keep.instance, keep.group

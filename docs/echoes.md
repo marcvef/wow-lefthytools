@@ -173,7 +173,7 @@ writes only what changed. A session's start looks at everything once.
 | `x` | every 60 s, at a session's start, on `PLAYER_UPDATE_RESTING` and level-ups: `UnitLevel`, `UnitXP`, `UnitXPMax`, `GetXPExhaustion` (none: 0), `IsResting`; when one changed. A change only of the rested XP or the resting flag at most every 10 minutes (in an inn or a city the rested XP grows all the time: a night there would write a line a minute); level, XP or max at once | `xp` (the last line's values) |
 | `f` | `PLAYER_FLAGS_CHANGED` (player), `UnitIsAFK`; when it changed (a secret answer keeps the last) | |
 | `g` | `GROUP_ROSTER_UPDATE`: `GetNumGroupMembers`, the members' GUIDs (`party1-4` or `raid1-40`, not me); a friend is a Beacon peer (`ns.Beacon.peers`, Beacon on) or remembered: `guid:First-Realm` (the realm `GetPlayerInfoByGUID` says, else mine), sorted; the others counted. Left the group: `g;0;0`. With others in it and Beacon on, looked at again every 15 s (Beacon learns of friends a few seconds after login, and a line is written only when it changed) | `group`; `E.data.friends[guid]` = "Anna-Realm" (named while Beacon is off) |
-| `G` | `PLAYER_EQUIPMENT_CHANGED` marks a slot, a session's start all 19; out of combat `GetInventoryItemLink`: item, enchant (the link's second field), suffix (seventh), 0 when none; taken off: item 0; the name `=i` | `gear[slot]` |
+| `G` | `PLAYER_EQUIPMENT_CHANGED` marks a slot, a session's start all 19; out of combat `GetInventoryItemLink`: item, enchant (the link's second field), suffix (seventh), 0 when none; the name `=i`. A worn item whose link isn't there yet (`GetInventoryItemID` says one is worn: at login) isn't taken off: looked at again every second, 10 times, then the item alone (enchant and suffix empty) unless it's the one written before. Taken off (an empty slot): item 0 | `gear[slot]` |
 | `R` | `FACTION_STANDING_CHANGED` names a faction; a session's start and `UPDATE_FACTION` (at most every 10 s) scan the listed factions (`C_Reputation.GetNumFactions`, `GetFactionDataByIndex`; headers left out); out of combat; the reaction 1-8. A character's first scan is the baseline: no lines; so is a faction a scan lists for the first time (the list leaves out what's under a closed header: opened, its factions would all look new; or one just met). `FACTION_STANDING_CHANGED`'s faction is written even then | `reps[faction]`, `repsKnown` |
 | `s` | `SKILL_LINES_CHANGED` and a session's start; out of combat `C_SkillInfo.GetSkillLineInfoByID` for the 12 Classic professions: rank and maximum; unlearned (rank 0): `0;0` | `skills[id]` |
 | `H` | `HEARTHSTONE_BOUND` and a session's start: `GetBindLocation()` (a place's name) | `bind` |
@@ -211,7 +211,7 @@ continent, 0 or 1); `UnitPosition` at `PLAYER_LEAVING_WORLD` still where you wer
 and the queue are written there); `IsPlayerMoving` on a flight path; `GetUnitSpeed` 0 right after
 `PLAYER_STOPPED_MOVING`; no `PLAYER_DEAD` at a login while dead, and whether `PLAYER_ALIVE` comes
 again for a ghost (after a dungeon's release, say: an `o` anchor then an `r` one); gear right at
-login (a slot whose link isn't there yet would read as taken off); loot links' colours
+login (a worn item's link not there yet: `GetInventoryItemID` gives the item meanwhile); loot links' colours
 (`|cff1eff00|Hitem:`, classic's quality colours) for an item the game hasn't cached yet; a summon
 accepted (the dialog's Accept going through `C_SummonInfo.ConfirmSummon`: the anchor's why `u`).
 
@@ -310,7 +310,7 @@ swimming, m mounted, v travel form, f on foot.
 | `k` | kill | creature; level; classification; who m/p/g |
 | `l` | loot | item; count; quality; l looted / p pushed; source creature |
 | `g` | group | size; others; then one field per friend: guid:Name-Realm |
-| `G` | gear | slot; item; enchant; suffix |
+| `G` | gear | slot; item (0: taken off); enchant; suffix (both empty: not known) |
 | `f` | AFK | 1 start / 0 end |
 | `R` | reputation | faction; standing |
 | `h` | gathering | kind h/o/s/f; node or creature (empty for fishing); then one field per item: item:count |
