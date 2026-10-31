@@ -914,6 +914,44 @@ do
 	Advance(1.2)
 	check(seq() == "D;19;-;;;;0 @;0;700;560;g;r r;c m;f", "PLAYER_ALIVE twice as a ghost: released once, got " .. seq())
 	Advance(11)
+	-- Back to life in water, standing still: swimming then (the mode read on two polls: swimming
+	-- needs two in a row), at the corpse in a lake and after a player's resurrection there.
+	listen()
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Advance(0.3)
+	STATE.ghost = true
+	Fire("PLAYER_ALIVE")
+	at(760, 560)
+	Advance(1.2)
+	Advance(2)
+	TRAVEL.swimming = true
+	STATE.ghost, STATE.dead = false, false
+	Fire("PLAYER_UNGHOST")
+	Advance(3)
+	local unghost = seq()
+	TRAVEL.swimming = false
+	walk(770, 560)
+	walk(780, 560)
+	halt()
+	Advance(11)
+	listen()
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Advance(0.3)
+	TRAVEL.swimming = true
+	Fire("RESURRECT_REQUEST", "Anna")
+	STATE.dead = false
+	Fire("PLAYER_ALIVE")
+	Advance(3)
+	local rez = seq()
+	TRAVEL.swimming = false
+	walk(790, 560)
+	walk(800, 560)
+	halt()
+	Advance(11)
+	check(unghost == "D;19;-;;;;0 @;0;760;560;g;r r;c m;s" and rez == "D;19;-;;;;0 r;p m;s" and E.state.mode == "f",
+		"back to life in water, standing still: swimming (s), at the corpse and resurrected, got " .. unghost .. " | " .. rez)
 end
 
 ---------------------------------------------------------------------------

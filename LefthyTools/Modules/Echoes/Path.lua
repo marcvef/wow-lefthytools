@@ -110,7 +110,7 @@ local function Reset()
 	S.lastAt = -math.huge -- E.Now() of the last point or anchor written
 	S.count = 0           -- samples in bn / bw
 	S.pendingMode = nil   -- a mode seen once (swimming and carried need two polls)
-	S.modeCheck = false   -- read the mode on the next poll, moved or not
+	S.modeCheck = 0       -- read the mode on this many polls to come, moved or not
 	S.pollNow = false     -- poll on the next tick (started or stopped moving, ...)
 	S.stopped = false     -- PLAYER_STOPPED_MOVING since the last poll: that poll is the stop
 	S.zoneDirty, S.zoneAt = false, 0
@@ -287,9 +287,10 @@ function C.NoteCause(why, spell)
 	end
 end
 
--- The travel mode is read on the next tick's poll, moved or not (back to life: no longer a ghost).
+-- The travel mode is read on the next tick's poll and the one after, moved or not (back to life: no
+-- longer a ghost; in water, swimming needs the same answer on two polls in a row).
 function C.CheckMode()
-	S.modeCheck, S.pollNow = true, true
+	S.modeCheck, S.pollNow = 2, true
 end
 
 -- The zone ("z"), when it changed (force: written anyway, after a session's anchor).
@@ -393,8 +394,8 @@ local function Poll(now, spot)
 	local moving = Yes(IsPlayerMoving) or (not stop and d >= MOVED * math.min(1, since / POLL_MOVING))
 	S.stopped = false
 	local mode
-	if d > 0.05 or S.modeCheck then -- (the mode only where the position changed)
-		S.modeCheck = false
+	if d > 0.05 or S.modeCheck > 0 then -- (the mode only where the position changed)
+		S.modeCheck = math.max(S.modeCheck - 1, 0)
 		-- (Not carried on the stop's poll: the game says speed 0 by then, however far it came.)
 		mode = NextMode(RawMode(not stop and d or nil, since))
 	else

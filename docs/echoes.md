@@ -104,9 +104,10 @@ the stop, however far it came since the last. Standing still that's one `UnitPos
 At most a start point and one point per poll; a point on A again (whole yards) is left out, except
 the start point.
 
-**Travel modes**, read only on polls where the position changed (or once after coming back to
-life), in this order: `t` flight path (`UnitOnTaxi`), `g` ghost (`UnitIsGhost`), `c` carried (no
-transport API: the measured speed more than 3 yd/s above `GetUnitSpeed`), `s` swimming
+**Travel modes**, read only on polls where the position changed (or on the two after coming back
+to life: in water, standing still, swimming needs both), in this order: `t` flight path
+(`UnitOnTaxi`), `g` ghost (`UnitIsGhost`), `c` carried (no transport API: the measured speed more
+than 3 yd/s above `GetUnitSpeed`), `s` swimming
 (`IsSwimming`), `m` mounted (`IsMounted`), `v` Travel Form or Ghost Wolf (`GetShapeshiftFormID` 3 or
 16; Aquatic Form shows as swimming), `f` on foot. Swimming flickers at the surface and the carried
 guess can be a knockback or a Blink: a change to or from `s` or `c` needs the same answer on two
@@ -153,7 +154,7 @@ another loading screen.
 | `L` level; played | `PLAYER_LEVEL_UP`; played: the time played (Changes.lua), whole seconds |
 | `a` / `Q` / `A` | `QUEST_ACCEPTED`; `QUEST_TURNED_IN` (xp, money); `QUEST_REMOVED`: 1.5 s later, abandoned (`A`) unless it was turned in, or turned in (`Q` without xp and money) when `C_QuestLog.IsQuestFlaggedCompleted` says so. One `Q` per turn-in: a `QUEST_TURNED_IN` up to 60 s before or after its `QUEST_REMOVED` is the same turn-in, whichever wrote the `Q`; a quest turned in again (accepted again, or a repeatable one never in the log) counts again. The title (`=q`) from `C_QuestLog.GetTitleForQuestID`, kept from when it was accepted |
 | `D` | `PLAYER_DEAD`, once until alive again (and 10 s after: the game repeats it). Logged in or `/reload`ed dead or a ghost (`UnitIsDeadOrGhost` when recording starts; no `PLAYER_DEAD` comes then): that death was counted before, its release and coming back still are. The killer: your attackable target in the last fight within 15 s (looked at every tick in combat): a creature (`c`, its ID, level, classification; its name `=c`), a player (`p`, class and level, no name; pvp 1); a player's pet, totem or guardian (`UnitPlayerControlled` when it became the foe; a totem's or guardian's GUID is a creature's): a player too (`p`, pvp 1), its owner's class and level when the owner has a nameplate (`UnitIsOwnerOrControllerOfUnit`), else empty; a secret GUID (`-`) |
-| `r` | `PLAYER_UNGHOST`: `s` after `CONFIRM_XP_LOSS` (the spirit healer, within 120 s), `p` after `RESURRECT_REQUEST` (within 70 s), else `c`; `PLAYER_ALIVE` alive without having released: `p` or `c`. Then the mode is read again |
+| `r` | `PLAYER_UNGHOST`: `s` after `CONFIRM_XP_LOSS` (the spirit healer, within 120 s), `p` after `RESURRECT_REQUEST` (within 70 s), else `c`; `PLAYER_ALIVE` alive without having released: `p` or `c`. Then the mode is read again, on two polls (back to life in water, standing still: swimming) |
 | `k` | `PARTY_KILL` by me, my pet (`UnitGUID("pet")`) or a group member (`C_PartyInfo.IsGUIDInGroup`), of a creature; each corpse once (the last 64). Level, classification (`n e r x w`; trivial and minus are `n`) and name from the mob cache |
 | `l` | `CHAT_MSG_LOOT` through `LT.OwnLoot`, quality 2 and better (an item not cached yet: by the link's colour): item, count, quality, `l` looted or `p` pushed, and the creature whose corpse the last loot window (within 5 s) said it came from; the item's name (`=i`) from the link |
 | `h` | `UNIT_SPELLCAST_SUCCEEDED` (player) with Herb Gathering, Mining or Skinning (each rank's ID, other ranks by name: the listed ranks' names, asked when first needed and, while one kind's isn't loaded yet, again after `SPELLS_CHANGED` or at most every 10 s), then `LOOT_READY` within 1.5 s; or `IsFishingLoot()`. The node: the loot source's game object ID (herbs, ore), the creature for skinning, none for fishing (its source is always the bobber, 35591); each node (each cast's bobber) once (the last 32). Then one `item:count` field per item |
