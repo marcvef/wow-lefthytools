@@ -1396,6 +1396,33 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: a friend asking again and again")
+do
+	-- Anna (broken, or hostile) asks for 120 pages I don't have, 20 a second, in a fight (nothing goes):
+	-- my answers to her wait, but at most 8 of them (she asks again).
+	local c = Start(EVE, { friends = { ANNA }, fake = true })
+	MeetAll(c, { ANNA })
+	Pass(c, 3)
+	c.env.EnterCombat()
+	for second = 1, 6 do
+		for i = 1, 20 do
+			Ask(c, ANNA, second * 100 + i)
+		end
+		Pass(c, 1.05)
+	end
+	local waiting = 0
+	for _, item in ipairs(c.D.out) do
+		waiting = waiting + (item.id == ANNA.id and 1 or 0)
+	end
+	check(waiting <= 8, "answers waiting for one friend: at most 8, got " .. waiting)
+	local mark = Mark(c)
+	c.env.LeaveCombat()
+	Pass(c, 10)
+	local en = #Sent(c, ANNA, mark, "B2;en;")
+	check(en >= 1 and en <= 8 and #c.D.out == 0, "after the fight: those go, nothing else piled up, got " .. en)
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------

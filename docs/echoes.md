@@ -648,7 +648,9 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
   waits comes back out the same way.
 - **Receiving**: Beacon hands B messages over (at most 400 a minute from one friend, on top of its
   20 a second); they wait for the tick (at most 600), which handles 60 per tick. Unfinished pages
-  stay in memory: 256 KB at most, 10 minutes without progress.
+  stay in memory: 256 KB at most, 10 minutes without progress. My answers to one friend (`en`,
+  `ey`, a stop) wait at most 8 at a time: a friend asking faster than they go (2 a second) can't
+  pile them up; the rest are dropped, and they ask again.
 
 ### Message size and the probe
 

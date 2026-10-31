@@ -56,6 +56,7 @@ local PARTIALS_MAX, PARTIAL_AGE = 256 * 1024, 600 -- unfinished pages: bytes kep
 local INCOMING_MAX, INCOMING_PER_TICK = 600, 60 -- messages waiting for the tick, handled per tick
 local FRIENDS_GAP = 30       -- the friend list's accounts are read again after this long
 local HOUSE_GAP = 1          -- requests, timeouts, checks, summaries: once a second
+local ANSWERS_MAX = 8        -- my answers (en, ey, a stop) waiting for one friend at most: more go (they ask again)
 local PROBE_SIZES = { 255, 500, 1000, 2000, 4000 }
 local PROBE_GAP, PROBE_WAIT = 2, 10 -- between probe messages; answers awaited after the last
 -- The first LefthyTools build with Delivery (41f011b; LT.CompareVersions goes by the commit count):
@@ -591,6 +592,7 @@ local serves = {}      -- requests waiting: { id, key, acct, store, n, offset }
 local active = {}      -- serving: { id, key, acct, store, n, x, offset, len, page, begun, pending }
 local out = {}         -- my other messages, waiting their turn: { id, message, kind, pageId }
 local queued = {}      -- record -> true: my messages in Beacon's queue, not sent yet
+local answersOut = {}  -- gameAccountID -> my answers to them waiting in out (Control)
 local outstanding = 0
 local sentHold, sentSafe = {}, {} -- gameAccountID -> { at, full, sent = { [item key] = ranges text } }
 -- The rate, in any second: when my last RATE messages went, and the last PEER_RATE to each friend
@@ -630,9 +632,29 @@ local function HelloMessage(flags)
 	return Msg("eh", acct, E.data.store, PROTO, MAX_BYTES, flags)
 end
 
--- A message for one friend, after the ones already waiting (sent on the tick, see Send).
-local function Control(id, message, kind, pageId)
-	out[#out + 1] = { id = id, message = message, kind = kind, pageId = pageId }
+-- A message for one friend, after the ones already waiting (sent on the tick, see Send). answer:
+-- one of my answers to what they sent (en, ey, a stop): at most ANSWERS_MAX of those wait for one
+-- friend, so a friend asking for pages I don't have, again and again, can't pile them up (they come
+-- in faster than they go).
+local function Control(id, message, kind, pageId, answer)
+	if answer then
+		local n = answersOut[id] or 0
+		if n >= ANSWERS_MAX then
+			return
+		end
+		answersOut[id] = n + 1
+	end
+	out[#out + 1] = { id = id, message = message, kind = kind, pageId = pageId, answer = answer }
+end
+
+-- out's item i goes (sent, or dropped).
+local function TakeOut(i)
+	local item = table.remove(out, i)
+	if item.answer then
+		local n = answersOut[item.id] - 1
+		answersOut[item.id] = n > 0 and n or nil
+	end
+	return item
 end
 
 ---------------------------------------------------------------------------
@@ -769,11 +791,10 @@ local function NextMessage(now)
 	local B = ns.Beacon
 	for i, item in ipairs(out) do
 		if not B.peers[item.id] then
-			table.remove(out, i)
+			TakeOut(i)
 			return NextMessage(now) -- (gone: theirs go)
 		elseif MayGo(item.id, now) then
-			table.remove(out, i)
-			return item
+			return TakeOut(i)
 		end
 	end
 	for _ = 1, #active do
@@ -821,7 +842,7 @@ local function StartServes()
 			active[#active + 1] = { id = s.id, key = s.key, acct = s.acct, store = s.store, n = s.n, x = nextX,
 				offset = s.offset, len = #page.z, page = page, begun = false, pending = 0 }
 		elseif ns.Beacon.peers[s.id] and not page then
-			Control(s.id, Msg("en", s.acct, s.store, s.n), "en")
+			Control(s.id, Msg("en", s.acct, s.store, s.n), "en", nil, true)
 		end
 	end
 end
@@ -907,7 +928,7 @@ local function Release(id)
 	end
 	for i = #out, 1, -1 do
 		if out[i].id == id and out[i].kind == "eq" then
-			table.remove(out, i)
+			TakeOut(i)
 		end
 	end
 end
@@ -1265,7 +1286,7 @@ local function OnBegin(id, msg, now)
 	xmap[id][msg.x] = nil
 	local stop = Msg("eq", msg.acct, msg.store, msg.n, msg.len)
 	if not (r or part) or Get(key, msg.n) then
-		Control(id, stop, "eq") -- (not asked for, or got already)
+		Control(id, stop, "eq", nil, true) -- (not asked for, or got already)
 		return
 	end
 	if not Accepted(msg.acct, now) or key == MyKey() then
@@ -1275,7 +1296,7 @@ local function OnBegin(id, msg, now)
 		if r and r.from == id then
 			inflight[pageId] = nil
 		end
-		Control(id, stop, "eq")
+		Control(id, stop, "eq", nil, true)
 		return
 	end
 	if part and (part.len ~= msg.len or part.hash ~= msg.hash or part.t0 ~= msg.t0 or part.m ~= msg.m) then
@@ -1295,7 +1316,7 @@ local function OnBegin(id, msg, now)
 	if where == "carry" and not M.db.collect and not Fits(key, msg.len) then
 		noRoom[pageId] = now
 		partials[pageId], inflight[pageId] = nil, nil
-		Control(id, stop, "eq")
+		Control(id, stop, "eq", nil, true)
 	end
 end
 
@@ -1361,7 +1382,7 @@ local function OnRequest(id, msg)
 		end
 	end
 	if not page then
-		Control(id, Msg("en", msg.acct, msg.store, msg.n), "en")
+		Control(id, Msg("en", msg.acct, msg.store, msg.n), "en", nil, true)
 		return
 	end
 	if not stop and not turn and #serves >= SERVE_QUEUE and Collects(id) then
@@ -1424,7 +1445,7 @@ end
 
 -- The probe's answer to them: how much of it arrived.
 local function OnProbe(id, size, got)
-	Control(id, Msg("ey", size, got), "ey")
+	Control(id, Msg("ey", size, got), "ey", nil, true)
 end
 
 local function OnProbeAnswer(id, msg)
@@ -1519,7 +1540,7 @@ function B.EchoesForget(id)
 	Withdraw(id)
 	for i = #out, 1, -1 do
 		if out[i].id == id then
-			table.remove(out, i)
+			TakeOut(i)
 		end
 	end
 	Release(id)
@@ -1538,7 +1559,7 @@ local function Reset()
 		end
 	end
 	for _, t in ipairs({ peers, owedHello, incoming, inflight, partials, bad, noRoom, silentAt, xmap, serves, active, out, queued,
-			sentHold, sentSafe, sentTimes, peerTimes, waitingFor }) do
+			answersOut, sentHold, sentSafe, sentTimes, peerTimes, waitingFor }) do
 		wipe(t)
 	end
 	inHead, inTail, outstanding = 1, 0, 0
