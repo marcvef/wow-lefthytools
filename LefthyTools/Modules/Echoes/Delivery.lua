@@ -930,10 +930,12 @@ local function OnHello(id, msg, now)
 	peer.proto, peer.maxBytes = msg.proto, msg.maxBytes
 	peer.collect, peer.relay, peer.share = msg.collect, msg.relay, msg.share
 	if not msg.answer then
-		-- They (re)started: they need mine, and everything I hold again; theirs comes again.
+		-- They (re)started: they need mine, and everything I hold again; theirs comes again. What
+		-- they asked of me before is gone with their session (they ask again what they still need).
 		peer.holdings = {}
 		ResetPeer(id)
 		Release(id)
+		StopServing(id)
 		owedHello[id] = owedHello[id] or { at = now, answer = true }
 	end
 	if not (peer.collect or peer.relay or peer.share) then

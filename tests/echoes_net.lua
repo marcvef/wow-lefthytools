@@ -1216,6 +1216,20 @@ do
 		.. tostring(at[crowd[3].id]))
 	local fourth = Sent(c, crowd[4], mark, "B2;eb;")
 	check(#fourth == 1 and fourth[1]:find(";630;480;"), "Pal04: only the page asked last, got " .. table.concat(fourth, " "))
+
+	-- A friend restarts (an eh without a) while I serve them a page: what they asked before is gone
+	-- with their session, so it stops (they ask again for what they still need).
+	MyPage(c, 640, 9600) -- (40 parts)
+	Pass(c, 65) -- (the summaries of it go first)
+	Ask(c, crowd[1], 640)
+	Pass(c, 4)
+	mark = Mark(c)
+	local before = #Sent(c, crowd[1], 1, "B2;ep;")
+	Hello(c, crowd[1], "rs")
+	Pass(c, 20)
+	local after = #Sent(c, crowd[1], 1, "B2;ep;")
+	check(before > 0 and before < 40 and after - before <= 3 and #D.active == 0,
+		"a friend who restarted isn't served what they asked before (" .. before .. " parts, then " .. after - before .. ")")
 	Stop(c)
 end
 

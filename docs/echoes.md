@@ -563,7 +563,8 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
   0.6.0-24 reads B2 but has no Delivery, and a build without a commit count, like the tagged
   0.6.0, counts as older), or in answer to theirs. A friend on an older build is never sent one (after 60 s without a version that reads
   B, nothing is owed any more). An `eh` without `a` is answered with one with `a`; a friend who
-  (re)starts gets everything I hold again, and theirs comes again.
+  (re)starts gets everything I hold again, and theirs comes again; what they asked of me before
+  isn't served any more (gone with their session: they ask again).
 - **Their account**: the account in `eh` must be the one Battle.net says for that friend (the
   friend list's BattleTag hashes, Chronicle's `C.Hash` the same way, whether Chronicle is on or
   not; or `GetAccountInfoByGUID`). Wrong: nothing is exchanged with them. Not known yet: checked
