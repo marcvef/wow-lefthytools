@@ -668,3 +668,109 @@ E.OnTick(function()
 		Note()
 	end
 end)
+
+---------------------------------------------------------------------------
+-- /lefthy echoes: the status, and words other files add (E.Command, E.OnStatus)
+---------------------------------------------------------------------------
+
+local commands, helps = {}, {}
+local statusHooks, statusNames = {}, {}
+
+-- "/lefthy echoes <word> ..." runs fn(rest); help is its line in the list.
+function E.Command(word, fn, help)
+	commands[word:lower()] = fn
+	if help then
+		helps[#helps + 1] = help
+	end
+end
+
+-- fn(add) while the status is printed: add(text) prints one more line (through LT.Guard).
+function E.OnStatus(fn)
+	statusHooks[#statusHooks + 1] = fn
+	statusNames[#statusHooks] = "E.OnStatus " .. #statusHooks
+end
+
+local function Amount(n)
+	if n >= KB * KB then
+		return ("%.1f MB"):format(n / KB / KB)
+	end
+	return ("%.1f KB"):format(n / KB)
+end
+
+local function Count(t)
+	local n = 0
+	for _ in pairs(t) do
+		n = n + 1
+	end
+	return n
+end
+
+local function Line(text)
+	M:Print("  " .. text)
+end
+
+local function Status()
+	Store.Recount()
+	local data = E.data
+	if E.recording then
+		M:Print("recording.")
+	elseif LT.world == "beta" and M.enabled then
+		M:Print("idle on the beta: nothing recorded there counts.")
+	else
+		M:Print("switched off: nothing is recorded.")
+	end
+	Line(data.acct and ("account %s, store %s."):format(data.acct, data.store)
+		or ("store %s; your BattleTag isn't known yet."):format(data.store))
+	local open = data.open
+	if type(open) == "table" and type(open.text) == "string" then
+		local size, lines = #open.text, select(2, open.text:gsub("\n", "\n"))
+		if E.recording and open.buffer == E.buffer then
+			size, lines = E.bytes, E.count
+		end
+		Line(("open page %d: %s, %d lines, started %d min ago."):format(open.n or 0, Amount(size), lines,
+			math.max(0, math.floor((E.Now() - (open.t0 or E.Now())) / 60))))
+	else
+		Line("no open page.")
+	end
+	local count, waiting = 0, 0
+	for _, page in pairs(data.mine) do
+		count = count + 1
+		waiting = waiting + (page.q and 1 or 0)
+	end
+	Line(("my pages: %d (%s), %s of %s%s."):format(count, count > 0 and Ranges.Of(data.mine) or "none", Amount(bytes.mine),
+		Amount(MINE_CAP), waiting > 0 and (", %d waiting to be packed"):format(waiting) or ""))
+	local relayed = 0
+	for _, pages in pairs(data.carry) do
+		relayed = relayed + Count(pages)
+	end
+	if M.db.relay or relayed > 0 then
+		Line(("relaying: %d pages of %d friends' stores, %s of %s."):format(relayed, Count(data.carry), Amount(bytes.carry), Amount(CARRY_CAP)))
+	end
+	if M.db.collect or next(data.inbox) or next(data.exported) then
+		local received = 0
+		for _, pages in pairs(data.inbox) do
+			received = received + Count(pages)
+		end
+		Line(("collected: %d pages of %d stores, %s%s; the exporter has %d stores' pages."):format(received, Count(data.inbox),
+			Amount(bytes.inbox), bytes.inbox >= INBOX_FULL and " (8 MB: collecting pauses until the exporter ran)"
+			or bytes.inbox >= INBOX_NOTE and " (over 4 MB: run the exporter)" or "", Count(data.exported)))
+	end
+	for i = 1, #statusHooks do
+		LT.Guard(statusNames[i], statusHooks[i], Line)
+	end
+end
+
+function M:OnSlashCommand(msg)
+	local word, rest = strtrim(msg or ""):match("^(%S*)%s*(.-)$")
+	word = word:lower()
+	if word == "" or word == "status" then
+		Status()
+	elseif commands[word] then
+		commands[word](rest)
+	else
+		M:Print("/lefthy echoes [status] - what's recorded and kept, in numbers")
+		for _, help in ipairs(helps) do
+			M:Print(help)
+		end
+	end
+end

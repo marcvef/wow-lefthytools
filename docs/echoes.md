@@ -28,7 +28,7 @@ Files, in `Modules/Echoes/`, in the order they load (the TOC):
 |---|---|
 | `Echoes.lua` | the module (`ns.Echoes` = `E`), its settings, the saved table, its events (`E.On`), its driver (`E.OnTick`), starting and stopping (`E.When`) |
 | `Lines.lua` | the line encoder: every recorded thing as one line (`E.Line`, `E.Anchor`, `E.Point`, `E.Mode`, `E.Zone`, `E.Name`), the pages' side of it (`E.PageStart`, `E.Raw`, `E.Continue`, `E.OnLine`, `E.Take`), the clock (`E.Now`) |
-| `Store.lua` | the closed pages (`E.Store`: packing, what's kept, the API for the delivery), range strings (`E.Ranges`), the exporter's receipt |
+| `Store.lua` | the closed pages (`E.Store`: packing, what's kept, the API for the delivery), range strings (`E.Ranges`), the exporter's receipt, `/lefthy echoes` (`E.Command`, `E.OnStatus`) |
 | `Pages.lua` | the open page: starting, joining, closing, going on after a `/reload`; my account (`E.MyAccount`) and character (`E.Character`) |
 
 What the files share (`E`):
@@ -237,7 +237,7 @@ digits); nothing else is touched. A stored page is `{ t, h, m, z }`:
 - `q`: closed, waiting to be packed (`m` is `t` meanwhile).
 - `s` (carry, inbox): the session it came in; `a` (carry): when it came.
 
-**Files.** `Store.lua` (the closed pages, what's kept, the receipt) loads before
+**Files.** `Store.lua` (the closed pages, what's kept, the receipt, `/lefthy echoes`) loads before
 `Pages.lua` (the open page). Both load before the capture's files: the pages' start hook writes the
 header before the capture's write anything.
 
@@ -350,6 +350,17 @@ Every change to mine, carry and inbox goes through `E.Store` (it keeps their siz
 number by number): `Parse(ranges)` (a list `{ { 1, 56 }, { 58, 58 } }`; bad parts skipped),
 `Format(list)`, `Union(a, b)`, `Contains(ranges, n)`, `Of(table[, keep])` (a table's page numbers).
 Each takes a string or a parsed list.
+
+### /lefthy echoes
+
+`/lefthy echoes` (or `status`) prints, in English: recording or not, the account and store, the
+open page (size, lines, age), my pages (numbers, size of 2 MB, how many wait to be packed), relaying
+(with relaying on or pages kept) and collecting (with collecting on or anything collected or
+exported). Other files add to it:
+
+- `E.OnStatus(fn)`: `fn(add)` while the status prints; `add(text)` prints one more line.
+- `E.Command(word, fn, help)`: `/lefthy echoes <word> ...` runs `fn(rest)`; `help` is its line in the
+  list that anything else prints.
 
 ## Delivery
 

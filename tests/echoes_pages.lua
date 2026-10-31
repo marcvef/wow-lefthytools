@@ -4,7 +4,7 @@
 -- open page at login; packing through the mock's C_EncodingUtil (Node's real zlib, tests/native.js),
 -- the hash and the fallbacks; my BattleTag not known yet; range strings; what's kept (mine, carry,
 -- inbox) and the API for the delivery; the exporter's receipt; the launch day; the beta untouched;
--- nothing heavy per tick. Last, the exporter's own readers on the saved file, when
+-- /lefthy echoes; nothing heavy per tick. Last, the exporter's own readers on the saved file, when
 -- the environment variable ECHOES_EXPORTER names the exporter's folder (skipped otherwise).
 -- Needs: no other file (it starts Echoes itself, on saved tables of its own, and puts back the beta).
 local suite = ...
@@ -688,6 +688,56 @@ do
 	LT.world = nil
 	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
 	check(E.data.mine[1] and E.data.mine[1].z:sub(-5) == ".0;l\n" and E.data.open.n == 2, "(off the beta again: it closes now)")
+end
+
+section("Echoes pages: /lefthy echoes")
+local statusExtra, commandRest = false, nil
+E.OnStatus(function(add) if statusExtra then add("delivery: 2 friends online") end end)
+E.Command("pagestest", function(rest) commandRest = rest end, "/lefthy echoes pagestest - a test's word")
+do
+	fresh(acct)
+	kills(1, 3)
+	skew = skew + 1800
+	tick()
+	tick()
+	kills(4, 5)
+	Store.Put(A, B, 1, friendPage(1, E.Now()), "carry")
+	local mark = #PRINTED + 1
+	statusExtra = true
+	lefthy("echoes")
+	local out = printedSince(mark)
+	check(out:find("recording.", 1, true) and out:find(("account %s, store %s."):format(acct, STORE), 1, true)
+		and out:find("open page 2: %d+%.%d KB, 4 lines, started 0 min ago") and out:find("my pages: 1 %(1%), %d+%.%d KB of 2%.0 MB%.")
+		and out:find("relaying: 1 pages of 1 friends' stores, %d+%.%d KB of 512%.0 KB") and not out:find("collected:", 1, true)
+		and out:find("delivery: 2 friends online", 1, true), "the status: recording, the account, the open page, my pages, relaying, "
+		.. "what other files add; collecting off and nothing collected: no inbox line, got\n" .. out)
+	statusExtra = false
+	LT:SetModuleSetting(M, "collect", true)
+	Store.Put(A, B, 1, friendPage(1, E.Now()), "inbox")
+	mark = #PRINTED + 1
+	lefthy("echoes status")
+	out = printedSince(mark)
+	check(out:find("collected: 1 pages of 1 stores, %d+%.%d KB; the exporter has 0 stores' pages%.") and not out:find("delivery:", 1, true),
+		"collecting: the inbox's size, got\n" .. out)
+	LT:SetModuleSetting(M, "collect", false)
+	MY_BATTLETAG = nil
+	fresh()
+	mark = #PRINTED + 1
+	lefthy("echoes")
+	check(printedSince(mark):find(("store %s; your BattleTag isn't known yet."):format(STORE), 1, true)
+		and printedSince(mark):find("my pages: 0 (none), 0.0 KB of 2.0 MB.", 1, true), "not known yet; no pages")
+	MY_BATTLETAG = "Me#1111"
+	LT:SetModuleEnabled("echoes", false)
+	mark = #PRINTED + 1
+	lefthy("echoes")
+	check(printedSince(mark):find("switched off: nothing is recorded.", 1, true), "switched off")
+	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
+	lefthy("echoes pagestest a b")
+	check(commandRest == "a b", "a word another file added runs with the rest")
+	mark = #PRINTED + 1
+	lefthy("echoes nope")
+	check(printedSince(mark):find("/lefthy echoes [status]", 1, true) and printedSince(mark):find("pagestest - a test's word", 1, true),
+		"anything else: the words")
 end
 
 section("Echoes pages: the exporter reads them")
