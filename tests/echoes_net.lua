@@ -1457,6 +1457,26 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: pages changed behind its back")
+do
+	-- E.Store tells Delivery when pages change (D.PagesChanged); a page put in without it is offered
+	-- anyway within the safety net's 5 minutes (and not worked out anew every 30 s any more).
+	local c = Start(EVE, { friends = { BOB }, fake = true })
+	MeetAll(c, { BOB })
+	MyPage(c, 701, 300)
+	Pass(c, 70)
+	local mark = Mark(c)
+	local z = Data(300, 1)
+	c.E.data.mine[702] = { t = c.env.GetServerTime() - 60, h = Hash32(z), m = "z", z = z }
+	Pass(c, 120)
+	local quiet = #Sent(c, BOB, mark, "B2;es;")
+	Pass(c, 250)
+	local offers = Sent(c, BOB, mark, "B2;es;")
+	check(quiet == 0 and #offers >= 1 and offers[#offers]:find(":701%-702$"), "offered within 5 minutes, got "
+		.. quiet .. " then " .. tostring(offers[#offers]))
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------

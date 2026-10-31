@@ -684,8 +684,9 @@ Every change to the pages goes through `E.Store` (Pages and storage): `Page` to 
 for what I hold, `Put` for what came, `Drop` (a page I relay that's collected now moves to the
 inbox), `Safe` and `SafeHere`, `Carried`, `Fits`, `InboxFull`, `Own`. Delivery only reads
 `exported` and `safe` for its decisions. What it works out of the pages (holdings, what I have
-of a store, what's exported or safe) is cached until they change: `D.PagesChanged()` (also every
-30 s, and when `n` moves). Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
+of a store, what's exported or safe) is cached until they change: `E.Store` calls
+`D.PagesChanged()` on every change (and Delivery works it out anew every 5 minutes, a safety
+net). Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
 `Minus`, `Has`) read the wire strictly (a bad part refuses the message, at most 300 intervals)
 and do the set arithmetic pulling needs; they read and write the same strings as `E.Ranges`.
 What's kept here (held, exported, safe) is read with `E.Ranges.Parse`, without a limit: a list

@@ -55,6 +55,7 @@ local NO_ROOM_WAIT = 300     -- a page too big for the relay's cache isn't asked
 local PARTIALS_MAX, PARTIAL_AGE = 256 * 1024, 600 -- unfinished pages: bytes kept, seconds without progress
 local INCOMING_MAX, INCOMING_PER_TICK = 600, 60 -- messages waiting for the tick, handled per tick
 local FRIENDS_GAP = 30       -- the friend list's accounts are read again after this long
+local RECHECK = 300          -- what I hold is worked out anew at least this often (E.Store says when it changes)
 local HOUSE_GAP = 1          -- requests, timeouts, checks, summaries: once a second
 local ANSWERS_MAX = 8        -- my answers (en, ey, a stop) waiting for one friend at most: more go (they ask again)
 local PROBE_SIZES = { 255, 500, 1000, 2000, 4000 }
@@ -294,8 +295,9 @@ end
 local function Changed()
 	wipe(cache)
 end
--- Pages changed outside Delivery (closed, dropped by the cap, the 30 days or a receipt): looked at
--- anew. (Delivery also looks again every 30 s, and when E.data.n moves.)
+-- Pages changed outside Delivery (closed, packed, dropped by the cap, the 30 days or a receipt):
+-- looked at anew. Store.lua calls it on every change; Delivery also looks again every RECHECK
+-- seconds, a safety net.
 D.PagesChanged = Changed
 
 -- My pages' key, nil while my BattleTag isn't known.
@@ -609,7 +611,7 @@ local lastHouse
 local pausedUntil, backoff, seenThrottle = 0, nil, nil
 local inCombat = false
 local lastFlags
-local seenN, seenAt = nil, -math.huge -- the pages' cache: the last page closed when last looked, and when
+local seenAt = -math.huge -- when the pages' cache was last wiped by the safety net (RECHECK)
 local probe
 local stats = { sent = 0, received = 0, pages = 0, served = 0, badHash = 0, rejected = 0 }
 
@@ -1569,7 +1571,7 @@ local function Reset()
 		wipe(t)
 	end
 	inHead, inTail, outstanding = 1, 0, 0
-	seenN, seenAt = nil, -math.huge
+	seenAt = -math.huge
 	lastHouse, lastFlags, probe = nil, nil, nil
 	inCombat = false
 	Changed()
@@ -1613,9 +1615,9 @@ end
 
 local function Housekeeping(now)
 	lastHouse = now
-	-- Pages close, and retention or receipts drop some, outside Delivery: looked at anew then.
-	if E.data.n ~= seenN or now - seenAt >= 30 then
-		seenN, seenAt = E.data.n, now
+	-- Pages change outside Delivery: E.Store says so (D.PagesChanged); this is only a safety net.
+	if now - seenAt >= RECHECK then
+		seenAt = now
 		Changed()
 	end
 	Hellos(now)
