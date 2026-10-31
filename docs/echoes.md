@@ -684,10 +684,15 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
     begins (`eb`): it asks from the page's end (stops it) and leaves that page alone for 5 minutes.
 
   What isn't wanted is worked out as ranges, once a second per store (the copies by a sweep over
-  friends' holdings), and taken out of each holder's offer: however many pages others hold, the
-  first page still wanted is found (not only among the first 50), and many friends cost little.
-  Pages are looked at one by one only to skip the ones already asked for, or that this holder's
-  copy or my room failed (at most 50 of those a holder).
+  friends' holdings), and taken out of each holder's offer: however many pages others hold, a
+  page still wanted is found (not only among the first 50), and many friends cost little. Pages
+  are looked at one by one only to skip the ones already asked for, or that this holder's copy or
+  my room failed (at most 50 of those a holder).
+
+  A relay starts at a random page among the ones it wants and goes on from there (around to the
+  first); a collector takes the oldest first. Many relays coming online with an author at once,
+  before what each holds has spread, would otherwise all fetch the same first page from the author
+  (`D.Random`: tests make it the first).
 - **Requests**: one open request per holder, 2 pages at once; a page I got part of goes on from
   there. 30 s without progress (counted from when the request went): asked again, from the
   contiguous offset, of the same holder or another; for a minute after that (or until they send a

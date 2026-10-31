@@ -947,6 +947,9 @@ end
 section("Echoes' delivery: relaying")
 do
 	-- Me: a relay. Anna (the author) offers 1-6; Dora relays too, and she and Bob hold some of them.
+	-- (A relay starts at a random page among those it wants: here the first, so the steps show.)
+	local random = D.Random
+	D.Random = function(low) return low end
 	check(next(D.inflight) == nil, "(nothing asked for from before)")
 	local mark = Mark(me)
 	Hello(me, ANNA, "s") -- (she restarted: what she offered before is gone)
@@ -1010,6 +1013,7 @@ do
 	check(#Sent(me, ANNA, mark, "B2;eq;") == 0 and not D.Holdings()[ANNA.key], "relay off: nothing asked, my cache not offered")
 	E.module.db.relay = true
 	Pass(me, 1.1)
+	D.Random = random
 end
 
 section("Echoes' delivery: safe at a collector")
@@ -1307,14 +1311,16 @@ do
 	Meet(c, ANNA, NEW)
 	Hello(c, ANNA, "s")
 	MeetAll(c, { BOB, CEDRIC })
-	-- Anna has 1-200; Bob and Cedric hold 1-60 already: past the first 50 pages, 61 is the one.
+	-- Anna has 1-200; Bob and Cedric hold 1-60 already: past the first 50 pages, one of 61-200 is
+	-- the one (a relay starts at a random one of the pages it wants).
 	local mark = Mark(c)
 	Say(c, BOB, "B2;es;" .. ANNA.key .. ":1-60")
 	Say(c, CEDRIC, "B2;es;" .. ANNA.key .. ":1-60")
 	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1-200")
 	Pass(c, 1.5)
 	local asked = Sent(c, ANNA, mark, "B2;eq;")
-	check(#asked == 1 and asked[1]:find(";61;0$"), "pages 1-60 held by two others: 61 asked for, got " .. tostring(asked[1]))
+	local first = asked[1] and tonumber(asked[1]:match(";(%d+);0$"))
+	check(#asked == 1 and first and first >= 61 and first <= 200, "pages 1-60 held by two others: one of 61-200 asked for, got " .. tostring(asked[1]))
 	-- 20 more relays hold 1-299 of hers, and of each other's own pages; one copy of 300 is around:
 	-- 300 is the page, and finding it is quick (ranges, not page by page). (Anna restarts first: what
 	-- she offered and what I asked of her go.)
@@ -1991,6 +1997,60 @@ local function Numbers(t)
 	end
 	table.sort(list)
 	return table.concat(list, ",")
+end
+
+section("Echoes' delivery: many relays at once spread over an author's pages")
+do
+	-- Four relays and Anna come online together, nobody holding anything yet: each asks her for a
+	-- page, and not all for the same first one (they'd all fetch it while what they hold spreads).
+	local people = { ANNA, BOB, DORA, EVE, GWEN }
+	local relays = {}
+	for _, p in ipairs({ BOB, DORA, EVE, GWEN }) do
+		relays[#relays + 1] = Start(p, { friends = FriendsOf(p, people) })
+	end
+	local anna = Start(ANNA, { friends = FriendsOf(ANNA, people) })
+	MyPages(anna, 101, 140, 480)
+	local mark = #world.log + 1
+	local firsts = {}
+	local function Asked()
+		for i = mark, #world.log do
+			local m = world.log[i]
+			local n = m.to == ANNA.id and m.data:match("^B2;eq;" .. ANNA.acct .. ";%x+;(%d+);0$")
+			if n and not firsts[m.from] then
+				firsts[m.from] = tonumber(n)
+			end
+		end
+		local count = 0
+		for _ in pairs(firsts) do
+			count = count + 1
+		end
+		return count == 4
+	end
+	check(Run(120, Asked), "each relay asked Anna for a page")
+	local list, same = {}, true
+	for _, n in pairs(firsts) do
+		list[#list + 1] = n
+		same = same and n == list[1]
+	end
+	table.sort(list)
+	check(not same, "their first pages: " .. table.concat(list, ", ") .. " (not all the same)")
+	local akey = ANNA.acct .. "." .. anna.E.data.store
+	check(Run(900, function()
+		for n = 101, 140 do
+			local copies = 0
+			for _, c in ipairs(relays) do
+				copies = copies + ((c.E.data.carry[akey] or {})[n] and 1 or 0)
+			end
+			if copies < 2 then
+				return false
+			end
+		end
+		return true
+	end), "every one of her 40 pages carried by at least two of them")
+	Stop(anna)
+	for _, c in ipairs(relays) do
+		Stop(c)
+	end
 end
 
 section("Echoes' delivery: a page of mine that moves to a new number while I serve it")

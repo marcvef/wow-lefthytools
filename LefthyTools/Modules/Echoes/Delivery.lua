@@ -1164,9 +1164,11 @@ local function Unwanted(key, collecting, memo)
 	return list
 end
 
--- The first page of offered (key's) I want from holder id, and where it goes; nil: none. What I
--- don't want is taken out as ranges, so the pages looked at one by one are only the ones asked
--- for already, or that this holder's copy or my room failed (a few).
+-- A page of key I want from holder id, and where it goes; nil: none. What I don't want is taken
+-- out as ranges, so the pages looked at one by one are only the ones asked for already, or that
+-- this holder's copy or my room failed (a few). A collector takes the oldest first; a relay starts
+-- at a random one of them and goes on from there (around to the first): many relays asking an
+-- author at once, before what they hold has spread, each fetch another page, not all the first.
 local function Wanted(id, key, offered, now, collecting, relaying, memo)
 	local acct = key:sub(1, 8)
 	if key == MyKey() or not Accepted(acct, now) then
@@ -1180,17 +1182,33 @@ local function Wanted(id, key, offered, now, collecting, relaying, memo)
 	else
 		return nil
 	end
+	local free, count = Ranges.Minus(offered, Unwanted(key, collecting, memo)), 0
+	for _, r in ipairs(free) do
+		count = count + r[2] - r[1] + 1
+	end
+	local start = (where == "carry" and count > 1) and D.Random(0, count - 1) or 0
 	local looked = 0
-	for _, r in ipairs(Ranges.Minus(offered, Unwanted(key, collecting, memo))) do
-		for n = r[1], r[2] do
-			local pageId = PageId(key, n)
-			if not inflight[pageId] and not (bad[pageId] and bad[pageId][id]) and not (noRoom[pageId] and now - noRoom[pageId] < NO_ROOM_WAIT) then
-				return n, where
+	for pass = 1, 2 do -- (from the start to the end, then from the first up to the start)
+		local before = 0 -- (pages of free before r)
+		for _, r in ipairs(free) do
+			local size = r[2] - r[1] + 1
+			local from, to = r[1], r[2]
+			if pass == 1 then
+				from = r[1] + math.max(0, start - before)
+			else
+				to = math.min(r[2], r[1] + start - before - 1)
 			end
-			looked = looked + 1
-			if looked >= 50 then
-				return nil -- (enough for this round: a holder whose copies failed again and again)
+			for n = from, to do
+				local pageId = PageId(key, n)
+				if not inflight[pageId] and not (bad[pageId] and bad[pageId][id]) and not (noRoom[pageId] and now - noRoom[pageId] < NO_ROOM_WAIT) then
+					return n, where
+				end
+				looked = looked + 1
+				if looked >= 50 then
+					return nil -- (enough for this round: a holder whose copies failed again and again)
+				end
 			end
+			before = before + size
 		end
 	end
 	return nil
@@ -1210,6 +1228,8 @@ local function MoveOne(now)
 		end
 	end
 end
+
+D.Random = math.random -- (a relay's start among the pages it wants; tests make it the first)
 
 local function SortedKeys(t)
 	local list = {}
