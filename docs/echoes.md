@@ -175,7 +175,7 @@ writes only what changed. A session's start looks at everything once.
 | `s` | `SKILL_LINES_CHANGED` and a session's start; out of combat `C_SkillInfo.GetSkillLineInfoByID` for the 12 Classic professions: rank and maximum; unlearned (rank 0): `0;0` | `skills[id]` |
 | `H` | `HEARTHSTONE_BOUND` and a session's start: `GetBindLocation()` (a place's name) | `bind` |
 | `p` | `PLAYER_PVP_KILLS_CHANGED`: `GetPVPSessionStats()`, the kills since the last line (a session's start is the baseline) | |
-| `d` / `b` | after each anchor of a loading screen or a session: in a `party` or `raid` instance (`IsInInstance`, `GetInstanceInfo`: the instance ID, difficulty) `d;e;...`, left `d;x;...`; a `pvp` one `b;<id>;e`, left `b;<id>;x;<seconds>`. Kept across a `/reload` and logging out | `dungeon` { id, difficulty }, `bg` { id, entered, result written } |
+| `d` / `b` | after each anchor of a loading screen or a session: in a `party` or `raid` instance (`IsInInstance`, `GetInstanceInfo`: the instance ID, difficulty) `d;e;...`, left `d;x;...`; a `pvp` one `b;<id>;e`, left `b;<id>;x;<seconds>` (left while logged out or switched off: the seconds until it was last seen inside, noted every 5 s, not the time offline). Kept across a `/reload` and logging out | `dungeon` { id, difficulty }, `bg` { id, entered, result written, last seen inside } |
 
 **The time played** (`played`, seconds): asked once per login (`PLAYER_ENTERING_WORLD` with
 `isInitialLogin`), out of combat, silently: the chat frames that show `TIME_PLAYED_MSG`

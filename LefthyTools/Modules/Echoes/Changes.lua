@@ -319,7 +319,14 @@ end
 -- /reload in E.data.capture), a battleground's result
 ---------------------------------------------------------------------------
 
-local function Instances(cap)
+-- How long a battleground lasted, left now; or, seen at a session's start (left while logged out
+-- or switched off), until it was last seen inside (bg[4], kept on the tick).
+local function Lasted(bg, start, now)
+	local left = start and type(bg[4]) == "number" and bg[4] or now
+	return left - (bg[2] or left)
+end
+
+local function Instances(cap, start)
 	local ok, inInstance, kind = pcall(IsInInstance)
 	inInstance = ok and inInstance == true
 	kind = inInstance and Readable(kind) and kind or nil
@@ -344,14 +351,14 @@ local function Instances(cap)
 	if id and kind == "pvp" then
 		if not bg or bg[1] ~= id then
 			if bg then
-				E.Line("b", bg[1], "x", now - (bg[2] or now))
+				E.Line("b", bg[1], "x", Lasted(bg, start, now))
 			end
 			cap.bg = { id, now }
 			E.Line("b", id, "e")
 		end
 	elseif bg then
 		cap.bg = nil
-		E.Line("b", bg[1], "x", now - (bg[2] or now))
+		E.Line("b", bg[1], "x", Lasted(bg, start, now))
 	end
 end
 
@@ -456,7 +463,7 @@ E.OnTick(function(now)
 		local start = C.arrived ~= "load"
 		C.arrived = nil
 		C.Spot()
-		Instances(cap)
+		Instances(cap, start)
 		if start then
 			SessionStart()
 		end
@@ -486,9 +493,10 @@ E.OnTick(function(now)
 		Honor()
 	end
 	local bg = type(cap.bg) == "table" and cap.bg
-	if bg and not bg[3] and now >= S.resultAt then
+	if bg and now >= S.resultAt then
 		S.resultAt = now + RESULT_EVERY
-		local winner = Value(GetBattlefieldWinner)
+		bg[4] = E.Now() -- (still inside: left while logged out, it lasted until about now)
+		local winner = not bg[3] and Value(GetBattlefieldWinner)
 		if winner == 0 or winner == 1 then
 			C.BattlegroundResult(winner)
 		end

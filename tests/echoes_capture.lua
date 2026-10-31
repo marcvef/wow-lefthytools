@@ -1025,6 +1025,18 @@ do
 	BG_WINNER = nil
 	loading(function() INSTANCE = nil end)
 	check(seq():find("b;489;l;%d+ ") ~= nil, "who won from GetBattlefieldWinner: lost (the Horde), got " .. seq())
+	-- Logged out inside after a minute, logged in outside 5 minutes later: it lasted about a minute.
+	listen()
+	loading(function() INSTANCE = { name = "Warsong Gulch", type = "pvp", id = 489 } end)
+	Advance(60)
+	LT:SetModuleEnabled("echoes", false)
+	INSTANCE = nil
+	Advance(300)
+	LT:SetModuleEnabled("echoes", true)
+	Fire("PLAYER_ENTERING_WORLD", true, false)
+	Advance(2)
+	local lasted = tonumber(seq():match("o;1 .*b;489;x;(%d+)"))
+	check(lasted and lasted >= 55 and lasted <= 61, "left while logged out: how long until the logout, got " .. seq())
 
 	listen()
 	Fire("NEW_MOUNT_ADDED", 6)
