@@ -1372,6 +1372,30 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: holders that go silent are asked last")
+do
+	-- Anna and Bob offer pages but don't answer (a long fight, silent after a throttle); Dora does.
+	-- Both of my requests went to them; after 30 s the next ones go to Dora first.
+	local c = Start(EVE, { friends = { ANNA, BOB, DORA }, fake = true, collect = true })
+	MeetAll(c, { ANNA, BOB, DORA })
+	local mark = Mark(c)
+	for _, f in ipairs({ ANNA, BOB, DORA }) do
+		Say(c, f, "B2;es;" .. ANNA.key .. ":1-10")
+	end
+	Pass(c, 1.5)
+	check(#Sent(c, ANNA, mark, "B2;eq;") == 1 and #Sent(c, BOB, mark, "B2;eq;") == 1 and #Sent(c, DORA, mark, "B2;eq;") == 0,
+		"(two requests: to Anna and Bob)")
+	Pass(c, 34) -- (30 s from when they went)
+	local toDora = Sent(c, DORA, mark, "B2;eq;")
+	check(#toDora == 1 and toDora[1]:find(";1;0$"), "silent for 30 s: Dora is asked first now, got " .. tostring(toDora[1]))
+	local p1 = TheirPage(c, 1, 600)
+	SendPage(c, DORA, ANNA, p1, 3)
+	Pass(c, 2)
+	check(c.E.data.inbox[ANNA.key] and c.E.data.inbox[ANNA.key][1] and #Sent(c, DORA, mark, "B2;eq;") == 2,
+		"page 1 from Dora, and the next asked of her too")
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------

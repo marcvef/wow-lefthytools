@@ -585,6 +585,7 @@ local inflight = {}    -- pageId ("<acct>.<store>.<n>") -> { from, key, n, at, s
 local partials = {}    -- pageId -> { key, n, len, hash, t0, m, chunks, have, at, from = { [id] = true } }
 local bad = {}         -- pageId -> { [id] = true }: holders whose copy didn't match its hash (this session)
 local noRoom = {}      -- pageId -> when it was too big for my relay cache (not asked again for NO_ROOM_WAIT)
+local silentAt = {}    -- gameAccountID -> when a request to them went without progress (asked last for a while)
 local xmap = {}        -- sender -> { [x] = pageId }: their transfers
 local serves = {}      -- requests waiting: { id, key, acct, store, n, offset }
 local active = {}      -- serving: { id, key, acct, store, n, x, offset, len, page, begun, pending }
@@ -1173,7 +1174,16 @@ local function Pull(now)
 	for _, r in pairs(inflight) do
 		busy[r.from] = true
 	end
+	-- Holders whose request went silent lately come last.
+	local order, later = {}, {}
 	for _, id in ipairs(SortedKeys(peers)) do
+		local list = silentAt[id] and now - silentAt[id] < 2 * SILENCE and later or order
+		list[#list + 1] = id
+	end
+	for _, id in ipairs(later) do
+		order[#order + 1] = id
+	end
+	for _, id in ipairs(order) do
 		local peer = peers[id]
 		if peer.verified and not busy[id] and ns.Beacon.peers[id] and (peer.share or peer.relay or peer.collect) then
 			for _, key in ipairs(SortedKeys(peer.holdings)) do
@@ -1303,6 +1313,7 @@ local function OnPart(id, msg, now)
 	part.have = part.have + #msg.data
 	part.at = now
 	part.from[id] = true
+	silentAt[id] = nil -- (they answer again)
 	local r = inflight[pageId]
 	if r then
 		r.at = now
@@ -1513,7 +1524,7 @@ function B.EchoesForget(id)
 	end
 	Release(id)
 	StopServing(id)
-	peers[id], owedHello[id], xmap[id], peerTimes[id], waitingFor[id] = nil, nil, nil, nil, nil
+	peers[id], owedHello[id], xmap[id], peerTimes[id], waitingFor[id], silentAt[id] = nil, nil, nil, nil, nil, nil
 	ResetPeer(id)
 	if probe and probe.id == id then
 		probe.gone = true
@@ -1526,7 +1537,7 @@ local function Reset()
 			record.serve.pending = 0
 		end
 	end
-	for _, t in ipairs({ peers, owedHello, incoming, inflight, partials, bad, noRoom, xmap, serves, active, out, queued,
+	for _, t in ipairs({ peers, owedHello, incoming, inflight, partials, bad, noRoom, silentAt, xmap, serves, active, out, queued,
 			sentHold, sentSafe, sentTimes, peerTimes, waitingFor }) do
 		wipe(t)
 	end
@@ -1590,9 +1601,14 @@ local function Housekeeping(now)
 		end
 	end
 	-- Requests without progress for SILENCE: asked again (Pull: from where they got to).
+	-- Whoever let it go silent is asked last for a while (a holder in a long fight, or silent after
+	-- a throttle, can't hold up both of my requests while others could answer).
 	for pageId, r in pairs(inflight) do
 		if r.sent and now - r.at >= SILENCE or not peers[r.from] then
 			inflight[pageId] = nil
+			if peers[r.from] then
+				silentAt[r.from] = now
+			end
 		end
 	end
 	TrimPartials(now)

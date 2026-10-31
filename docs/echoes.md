@@ -595,8 +595,10 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
   copy or my room failed (at most 50 of those a holder).
 - **Requests**: one open request per holder, 2 pages at once; a page I got part of goes on from
   there. 30 s without progress (counted from when the request went): asked again, from the
-  contiguous offset, of the same holder or another. Pages never change, so bytes from different
-  holders fit together; that's also how a page goes on after a friend went offline.
+  contiguous offset, of the same holder or another; for a minute after that (or until they send a
+  part again) that holder is asked last, so holders in a long fight, or silent after a throttle,
+  can't hold up both requests while others could answer. Pages never change, so bytes from
+  different holders fit together; that's also how a page goes on after a friend went offline.
 - **Serving**: a holder keeps 20 requests waiting and serves 2 at once (transfer ids 1-99 by
   turns). One place in the line per friend (they ask one holder for one page at a time): a new
   request from them replaces theirs, being served or waiting, in its place, so a page asked again
