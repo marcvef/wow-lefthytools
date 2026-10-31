@@ -374,12 +374,16 @@ local function Poll(now, spot)
 	end
 	-- (MOVED yards per poll; a poll sooner, for an event, at the same pace. The poll after
 	-- PLAYER_STOPPED_MOVING is the stop, however far it came since the last.)
-	local moving = Yes(IsPlayerMoving) or (not S.stopped and d >= MOVED * math.min(1, since / POLL_MOVING))
+	local stop = S.stopped
+	local moving = Yes(IsPlayerMoving) or (not stop and d >= MOVED * math.min(1, since / POLL_MOVING))
 	S.stopped = false
 	local mode
 	if d > 0.05 or S.modeCheck then -- (the mode only where the position changed)
 		S.modeCheck = false
-		mode = NextMode(RawMode(d, since))
+		-- (Not carried on the stop's poll: the game says speed 0 by then, however far it came.)
+		mode = NextMode(RawMode(not stop and d or nil, since))
+	else
+		S.pendingMode = nil -- (two polls in a row: one that doesn't look breaks the row)
 	end
 	local stored = false
 	if moving and not S.pMoving and E.Now() > S.lastAt then

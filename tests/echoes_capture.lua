@@ -399,6 +399,20 @@ do
 	Advance(0.3)
 	check(count("^m;f$") == 1, "walking off the boat: on foot, got " .. seq())
 	UNIT_SPEED = nil
+
+	-- Not carried: the stop (the game says speed 0, however far it came since the last poll), then
+	-- a Blink (20 yd at once, standing); two Blinks with polls standing still between them.
+	listen()
+	walk(640, 40)
+	halt()
+	Advance(2)
+	at(640, 60)
+	Advance(1.2)
+	Advance(5)
+	at(640, 80)
+	Advance(1.2)
+	Advance(2)
+	check(count("^m;") == 0, "a stop, then Blinks standing: still on foot (the guess needs two polls in a row), got " .. seq())
 end
 
 ---------------------------------------------------------------------------
@@ -501,6 +515,7 @@ do
 	Advance(1.2)
 	walk(610, 600)
 	halt()
+	Advance(0.3) -- (at the corpse)
 	STATE.ghost, STATE.dead = false, false
 	Fire("PLAYER_UNGHOST")
 	Advance(1.2)

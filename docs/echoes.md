@@ -107,8 +107,10 @@ life), in this order: `t` flight path (`UnitOnTaxi`), `g` ghost (`UnitIsGhost`),
 transport API: the measured speed more than 3 yd/s above `GetUnitSpeed`), `s` swimming
 (`IsSwimming`), `m` mounted (`IsMounted`), `v` Travel Form or Ghost Wolf (`GetShapeshiftFormID` 3 or
 16; Aquatic Form shows as swimming), `f` on foot. Swimming flickers at the surface and the carried
-guess can be a knockback: a change to or from `s` or `c` needs the same answer on two polls in a
-row (not to `t` or `g`). An anchor's mode is read as it is then (never `c`).
+guess can be a knockback or a Blink: a change to or from `s` or `c` needs the same answer on two
+polls in a row (not to `t` or `g`; a poll standing still, which doesn't read the mode, breaks the
+row). The stop's poll never guesses `c` (the game's speed is 0 by then, however far it came since
+the last poll). An anchor's mode is read as it is then (never `c`).
 
 **Segments.** A new one (an anchor) starts:
 
