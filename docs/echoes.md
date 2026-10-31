@@ -718,6 +718,9 @@ pages coming and served, traffic, a pause after a throttle.
    `GetAccountInfoByGUID`. Without it no friend's hello is believed and nothing is delivered.
 4. The rate in practice (about 2.4 parts a second in all): an evening's pages in well under a
    minute, nothing else of Beacon's slower.
+5. Whether `C_BattleNet.SendGameData` returns a result at all (Beacon and the probe take none as
+   sent), and with a big group of friends online (relaying is on for everyone) that the
+   collector's requests are served first and nobody's line grows long.
 
 ### The pages: E.Store
 
