@@ -392,6 +392,7 @@ LefthyToolsEchoesDB = {
   },
   carry = { ["5e6f7a8b.0c77e1f2"] = { [57] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- friends' pages I relay
   safe = { ["5e6f7a8b.0c77e1f2"] = { ["c011ec70.12345678"] = "1-56" } },              -- collectors' summaries
+  heard = { ["5e6f7a8b.0c77e1f2"] = 1793450000 },                                      -- when a store in safe was last heard of first-hand
   inbox = { ["5e6f7a8b.0c77e1f2"] = { [58] = { t, h, m, z, s = 41 } } },                 -- a collector's: received
   exported = { ["5e6f7a8b.0c77e1f2"] = "1-50" },                                         -- a collector's: from receipts
   capture = { ["Player-..."] = { ... } },  -- the capture's baselines per character (Recording)
@@ -559,7 +560,8 @@ those pages go from inbox, carry and mine, and are added to `exported`. It lists
 time, so reading it again is harmless.
 
 **After the start**, one a tick: a waiting page packed, else the next chore (the launch day, old
-relayed pages, the 2 MB cap, the 4 MB line), else the receipt.
+relayed pages, collectors' summaries of stores not heard of for 60 days, the 2 MB cap, the 4 MB
+line), else the receipt.
 
 **Costs.** A tick: a few comparisons. A minute: one join. Half an hour: one page packed. Inside
 event handlers: only the logout's join and, at login, joining a stale page's text.
@@ -587,6 +589,7 @@ and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits each.
 | `E.Store.WentOut(n, page)` | a part of my page `n` was sent (`page`: the one served, if it's still page `n`): `o = 1`, it keeps its number |
 | `E.Store.SafeHere(acct, store)` | ranges this collector holds safely: received in an earlier session (on disk) or exported |
 | `E.Store.Carried(acct, store, ranges)` | a relay holds these: of mine, they go first over the cap |
+| `E.Store.Mentioned(acct, store)` | a friend told of this store first-hand (offers pages of it, or is the collector whose summary it is): what collectors hold of it is kept 60 days from now |
 | `E.Store.Fits(acct, store, bytes)` | whether a relayed page of that size fits the cache |
 | `E.Store.InboxFull()` | 8 MB collected: stop pulling |
 | `E.Store.Bytes(where[, acct, store])` | bytes kept (carry with acct and store: that author's) |
@@ -730,6 +733,14 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   grows is merged. At most 200 stores and 8 collectors each are kept, and of what friends tell
   at most 300 intervals per collector (more isn't taken as safe: those pages are kept; a
   collector's own summary has no limit).
+- **A store's entry goes 60 days after it was last heard of first-hand** (`heard`, at the start,
+  one of the chores): a friend offered pages of it (`es`), its collector's own summary came (`ed`
+  from the collector itself; my own as a collector too), or pages of it are here (my own while I
+  hold any, ones I relay or collected: never dropped then). Summaries passed on don't count: every
+  friend passes on every summary, so they'd keep every entry forever, and a broken or hostile
+  friend could fill the 200 places for good. By then no page of that store is around (relayed
+  pages go after 30 days) to need it. `E.Store.Mentioned(acct, store)` notes it; an entry from
+  before the rule gets its 60 days from its first start.
 - `E.Store.Safe` drops my own pages (`mine`) and the ones I relay (`carry`) once any collector
   holds them safely; of mine, one that never went out moves to a new number instead (Pages and
   storage: numbers used twice).

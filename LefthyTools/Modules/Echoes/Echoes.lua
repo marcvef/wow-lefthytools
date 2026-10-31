@@ -29,7 +29,8 @@ local L = ns.L
 --   (+1 at every load: what's from this session, what's from disk), n (the last closed page's
 --   number), top (the highest number of mine friends hold: pages close above it; Store.lua), open
 --   (the page being written, plain text, never shared; nil: none: Pages.lua), mine
---   (my closed pages), carry (friends' pages I relay), safe (what collectors hold), inbox and
+--   (my closed pages), carry (friends' pages I relay), safe (what collectors hold) and heard (when
+--   a store in it was last heard of first-hand), inbox and
 --   exported (a collector's: Store.lua), capture (the capture's baselines per character) and
 --   friends (LefthyTools friends' names: Path.lua and Changes.lua) }
 

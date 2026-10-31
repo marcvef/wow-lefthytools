@@ -16,7 +16,11 @@ local M = E.module
 --   carry    friends' pages I relay: 512 KB, 128 KB per author, 30 days
 --   inbox    a collector's received pages, dropped only by the exporter's receipt; a chat line at
 --            4 MB asks to run the exporter, at 8 MB pulling pauses (E.Store.InboxFull)
---   safe     what collectors hold safely, per author; exported: what the receipts listed
+--   safe     what collectors hold safely, per author; exported: what the receipts listed. A store's
+--            entry goes 60 days after anything was last heard of it first-hand (heard: a friend
+--            offered pages of it, its collector told it, or pages of it are here): summaries
+--            passed on from friend to friend would keep every entry forever, and a broken or
+--            hostile friend could fill all 200 places for good
 --
 -- Pages from before the launch day go. E.Ranges: page numbers as range strings ("1-56,58").
 -- E.Store: the pages' API for the delivery; every change to mine, carry and inbox goes through it
@@ -32,6 +36,7 @@ local PAGE_MAX = 64 * KB                      -- a stored page (its z) is at mos
 local AHEAD = 86400                           -- a page may start at most a day ahead
 local MAX_N = 999999999                       -- page numbers are 1 to this
 local SEEN_AHEAD = 10000                      -- my numbers friends tell beyond this above my last page: not believed
+local SAFE_AGE = 60 * 86400                   -- what collectors hold of a store goes after 60 days unmentioned
 local RECEIPT = "LefthyTools_EchoesReceipt"   -- the exporter's load-on-demand addon, on the collector's PC
 
 local issecret = LT.IsSecret
@@ -580,6 +585,27 @@ function Store.Drop(acct, store, ranges, where)
 	return count
 end
 
+-- E.data.heard: "acct.store" -> when (E.Now()) something was last heard of that store first-hand,
+-- for the stores in safe only (made here if it isn't a table).
+local function Heard()
+	local heard = E.data.heard
+	if type(heard) ~= "table" then
+		heard = {}
+		E.data.heard = heard
+	end
+	return heard
+end
+
+-- A friend told of acct.store first-hand: it offers pages of it, or it's the collector whose summary
+-- it is (one passed on doesn't count: every friend passes on every summary). What collectors hold of
+-- it is kept 60 days from now.
+function Store.Mentioned(acct, store)
+	local key = Store.Key(acct, store)
+	if key and type(E.data.safe[key]) == "table" then
+		Heard()[key] = E.Now()
+	end
+end
+
 -- A collector (its "acct.store") holds these pages of acct.store safely (its summary, merged into
 -- E.data.safe): they go from mine and carry. Of mine, a page that never went out isn't the one the
 -- collector holds: it moves to a new number instead (Seen). The number dropped.
@@ -589,7 +615,10 @@ function Store.Safe(acct, store, ranges, collector)
 		return 0
 	end
 	local safe = E.data.safe
-	safe[key] = type(safe[key]) == "table" and safe[key] or {}
+	if type(safe[key]) ~= "table" then
+		safe[key] = {}
+		Heard()[key] = E.Now() -- (new: 60 days from now, unless heard of again)
+	end
 	local merged = Ranges.Union(safe[key][collector], ranges)
 	if merged ~= safe[key][collector] then
 		safe[key][collector] = merged
@@ -779,6 +808,31 @@ local function Expire()
 	end
 end
 
+-- What collectors hold of a store goes 60 days after it was last heard of first-hand (Store.Mentioned),
+-- unless pages of it are here: my own while I hold any, the ones I relay or collected (they're
+-- heard of now). An entry from before the rule gets its 60 days from now.
+local function Forget()
+	local data, now, heard = E.data, E.Now(), Heard()
+	local own, dropped = Store.Own(), false
+	for key in pairs(data.safe) do
+		if (key == own and next(data.mine) ~= nil) or data.carry[key] ~= nil or data.inbox[key] ~= nil
+			or type(heard[key]) ~= "number" then
+			heard[key] = now
+		elseif now - heard[key] > SAFE_AGE then
+			data.safe[key], heard[key] = nil, nil
+			dropped = true
+		end
+	end
+	for key in pairs(heard) do
+		if data.safe[key] == nil then
+			heard[key] = nil
+		end
+	end
+	if dropped then
+		Changed()
+	end
+end
+
 -- The exporter's receipt (collecting only): its addon loaded (load on demand; nothing if the folder
 -- isn't there), the pages it lists dropped from inbox, carry and mine, and kept in exported.
 local function Receipt()
@@ -827,7 +881,7 @@ E.When("start", function()
 		end
 	end
 	table.sort(queue)
-	chores = { LaunchDay, Expire, Store.Trim, Note }
+	chores = { LaunchDay, Expire, Forget, Store.Trim, Note }
 	noteDue, moved = false, 0
 end)
 

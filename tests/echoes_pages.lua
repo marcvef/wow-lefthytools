@@ -775,6 +775,41 @@ do
 	check(sizesAgree(), "(the sizes agree: moved, renumbered)")
 end
 
+section("Echoes pages: what collectors hold of a store goes 60 days after it was last heard of")
+do
+	fresh(acct)
+	local collector, day = "c011ec70.12345678", 86400
+	local gone, relayed, older = A .. ".0c77e1f5", A .. ".0c77e1f6", A .. ".0c77e1f7"
+	check(Store.Safe(A, B, "1-3", collector) == 0 and E.data.heard[friend] == E.Now(), "a store's first summary: heard of now")
+	E.data.heard[friend] = E.Now() - 5 * day
+	Store.Mentioned(A, B)
+	Store.Mentioned(A, "0c77e1f9")
+	check(E.data.heard[friend] == E.Now() and E.data.heard[A .. ".0c77e1f9"] == nil, "heard of first-hand: now (only stores in safe)")
+	-- 61 days later: a store heard of 10 days ago stays; one not since goes; one whose pages I relay,
+	-- my own while I hold pages, and one from before the rule (no time) stay.
+	for _, key in ipairs({ gone, relayed, older, own }) do
+		E.data.safe[key] = { [collector] = "1" }
+		E.data.heard[key] = E.Now() - 61 * day
+	end
+	E.data.heard[friend], E.data.heard[older] = E.Now() - 10 * day, nil
+	E.data.heard["0badf00d.0badf00d"] = E.Now() -- (no entry in safe)
+	check(Store.Put(A, "0c77e1f6", 9, friendPage(9, E.Now()), "carry"), "(a page of that store relayed)")
+	E.data.mine[50] = { t = E.Now(), h = "x", m = "z", z = "QUJD" }
+	reload(1)
+	Advance(2, 0.25) -- (the chores after the start)
+	local safe, heard = E.data.safe, E.data.heard
+	check(safe[friend] and not safe[gone] and heard[gone] == nil, "not heard of for 61 days: what collectors hold of it goes; 10 days: it stays")
+	check(safe[relayed] and safe[own] and safe[older] and heard[relayed] >= E.Now() - 3 and heard[own] >= E.Now() - 3 and heard[older] >= E.Now() - 3,
+		"pages of it here (relayed; my own): kept, heard of now; one from before the rule: 60 days from now")
+	check(heard["0badf00d.0badf00d"] == nil, "a time for a store not in safe goes")
+	-- My own key once I hold no pages: like any other.
+	E.data.mine[50] = nil
+	heard[own] = E.Now() - 61 * day
+	reload(1)
+	Advance(2, 0.25)
+	check(not E.data.safe[own] and E.data.safe[relayed], "my own, no pages of mine left, 61 days: goes")
+end
+
 section("Echoes pages: my pages over 2 MB")
 do
 	local hundred = ("B"):rep(100 * 1024)

@@ -427,6 +427,7 @@ local function SafeHere()
 		local list = Stored(S.SafeHere(acct, store))
 		if #list > 0 then
 			Safe(key, mine, list)
+			S.Mentioned(acct, store) -- (my own summary: first-hand)
 		end
 	end
 	cache.safeHere = true
@@ -1478,6 +1479,7 @@ local function OnHoldings(id, msg, now)
 	for _, item in ipairs(msg.items) do
 		local key, acct, list = item[1], item[2], item[3]
 		if Accepted(acct, now) and (peer.holdings[key] or Count(peer.holdings) < 200) then
+			S.Mentioned(acct, key:sub(10)) -- (pages of it are around: what collectors hold of it still counts)
 			local merged = peer.holdings[key] and Ranges.Union(peer.holdings[key], list) or list
 			if #merged <= RANGES_MAX then
 				peer.holdings[key] = merged
@@ -1493,7 +1495,7 @@ local function OnHoldings(id, msg, now)
 	end
 end
 
-local function OnSafe(_, msg, now)
+local function OnSafe(id, msg, now)
 	-- Only collectors I'd take pages from myself (a friend's account or mine), about pages I take.
 	if not Accepted(msg.acct, now) then
 		return
@@ -1502,6 +1504,9 @@ local function OnSafe(_, msg, now)
 	for _, item in ipairs(msg.items) do
 		if Accepted(item[2], now) then
 			Safe(item[1], collector, item[3], true)
+			if collector == peers[id].key then
+				S.Mentioned(item[2], item[1]:sub(10)) -- (the collector's own summary; passed on ones don't count)
+			end
 		end
 	end
 end

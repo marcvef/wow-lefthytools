@@ -1539,6 +1539,34 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: a store's safe entry is kept by what's heard of it first-hand")
+do
+	-- Summaries are passed on by every friend, so they'd keep every entry forever: only what's heard
+	-- first-hand keeps one (E.Store drops it 60 days after): the collector's own summary, or a friend
+	-- offering pages of that store.
+	local c = Start(EVE, { friends = { ANNA, BOB, DORA }, fake = true })
+	MeetAll(c, { BOB, DORA })
+	local function Heard()
+		return c.E.data.heard and c.E.data.heard[ANNA.key]
+	end
+	local t0 = c.env.GetServerTime()
+	Say(c, BOB, ("B2;ed;%s;%s;%s:1-3"):format(DORA.acct, DORA.store, ANNA.key))
+	Pass(c, 1.2)
+	check(c.E.data.safe[ANNA.key] and Heard() and Heard() >= t0, "a new entry (passed on by Bob): heard of now")
+	c.E.data.heard[ANNA.key] = 1000
+	Say(c, BOB, ("B2;ed;%s;%s;%s:1-5"):format(DORA.acct, DORA.store, ANNA.key))
+	Pass(c, 1.2)
+	check(Heard() == 1000 and c.E.data.safe[ANNA.key][DORA.key] == "1-5", "passed on by Bob again: merged, not heard of first-hand")
+	Say(c, DORA, ("B2;ed;%s;%s;%s:1-5"):format(DORA.acct, DORA.store, ANNA.key))
+	Pass(c, 1.2)
+	check(Heard() >= t0, "Dora's own summary: heard of")
+	c.E.data.heard[ANNA.key] = 1000
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":7")
+	Pass(c, 1.2)
+	check(Heard() >= t0, "Bob offers a page of it: heard of")
+	Stop(c)
+end
+
 section("Echoes' delivery: the probe when sending says nothing")
 do
 	-- If SendGameData returns nothing on Forever (Beacon takes that as sent), the probe doesn't call
