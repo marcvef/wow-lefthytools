@@ -410,5 +410,8 @@ ns.CHANGELOG = {
 	{ id = 134, module = "beacon",
 		en = { "A quick second hello is answered", "When a friend's LefthyTools says hello again within seconds (a quick /reload), Beacon answers a moment later instead of ignoring it, so the two of you find each other right away." },
 		de = { "Schnelles zweites Hallo beantwortet", "Sagt das LefthyTools eines Freundes innerhalb von Sekunden erneut Hallo (ein schnelles /reload), antwortet Beacon kurz darauf, statt es zu ignorieren, damit ihr euch sofort wiederfindet." } },
+	{ id = 135, module = "chronicle",
+		en = { "New rare drops are noticed", "A rare or epic drop of an item your game had never seen before was missed by Chronicle's highlights and the fight stream's rare finds; its quality now comes from the item link." },
+		de = { "Neue seltene Drops werden erkannt", "Ein seltener oder epischer Drop eines Items, das dein Spiel noch nie gesehen hatte, fehlte in Chronicles Highlights und bei den seltenen Funden im Kampf-Stream; seine Qualität kommt jetzt aus dem Item-Link." } },
 	-- New entries go here, at the end.
 }
