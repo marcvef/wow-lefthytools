@@ -55,10 +55,15 @@ E.recording = false
 
 local TABLES = { "mine", "carry", "safe", "inbox", "exported" }
 
--- A new store: 8 random lowercase hex digits (two 16-bit halves: %x above 2^31 isn't safe in every Lua).
+-- A new store: 8 random lowercase hex digits. It keeps two computers or two WoW accounts of one
+-- BattleTag apart, so it must never repeat: math.random's numbers mixed with the clocks (GetTime:
+-- this client's start) and a new table's address, through LT.Hash32, whatever math.random's seed.
 local function NewStore()
-	return ("%04x%04x"):format(math.random(0, 65535), math.random(0, 65535))
+	local ok, profile = pcall(debugprofilestop)
+	return LT.Hash32(("%d %d %s %s %s %s"):format(math.random(0, 65535), math.random(0, 65535), tostring(time()), tostring(GetTime()),
+		tostring(ok and profile or ""), tostring({})))
 end
+E.NewStore = NewStore -- (for tests)
 
 -- At load (Core has stamped the table's world, and dropped the beta's on the release).
 table.insert(LT.onLoad, function()

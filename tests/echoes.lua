@@ -35,6 +35,14 @@ do
 	check(data.session == 1, "the first load: session 1 (release.lua: +1 at each)")
 	check(type(data.mine) == "table" and type(data.carry) == "table" and type(data.safe) == "table" and type(data.inbox) == "table"
 		and type(data.exported) == "table" and data.acct == nil, "mine, carry, safe, inbox, exported; the account comes later")
+	-- Two clients whose math.random gives the same numbers (unseeded, or seeded alike) still make
+	-- two stores: the store keeps two computers of one BattleTag apart.
+	local random = math.random
+	math.random = function() return 4242 end
+	local a, b = E.NewStore(), E.NewStore()
+	math.random = random
+	check(a ~= b and #a == 8 and #b == 8 and a:find("^[0-9a-f]+$") and b:find("^[0-9a-f]+$"),
+		"a new store is 8 lowercase hex digits, and differs even when math.random repeats itself, got " .. a .. " and " .. b)
 end
 
 section("Echoes: recording, its events and its driver")
