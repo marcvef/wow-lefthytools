@@ -96,7 +96,8 @@ the stop, however far it came since the last. Standing still that's one `UnitPos
   site's dot would crawl from it through the whole time you stood there;
 - stop: the spot where you stopped;
 - a travel mode change: a point (unless you're still on A), then the `m` line;
-- before an event (`E.capture.Spot`, once per tick): a point if you're 3 yd or more from A;
+- before an event (`E.capture.Spot`, once per tick): a point if you're 3 yd or more from A (however
+  far, on a flight path too, unless you jumped since the last poll: more than 50 yd from its sample);
 - before a loading screen, logging out or switching off: the last point.
 
 At most a start point and one point per poll; a point on A again (whole yards) is left out, except

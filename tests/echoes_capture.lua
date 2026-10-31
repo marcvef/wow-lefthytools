@@ -380,6 +380,17 @@ do
 		spaced = spaced and math.sqrt(p[i + 1].dn ^ 2 + p[i + 1].dw ^ 2) >= 100
 	end
 	check(spaced and #p <= 5, "points 100 yd apart on a flight path, got " .. seq())
+	-- An event there, more than 50 yd past the last point (no jump: polled a moment ago): a point
+	-- where I am first.
+	while spot[1] - E.state.north < 60 do
+		walk(spot[1] + 3, 150, 30, true)
+	end
+	listen()
+	Fire("NEW_TOY_ADDED", 4242)
+	Advance(0.3)
+	local list = mine()
+	check(#list >= 2 and list[1].line:find("^%d") and math.abs(list[1].n - spot[1]) <= 1 and body(list[2].line) == "n;t;4242",
+		"an event on a flight path, 60 yd past the last point: a point where I am first, got " .. seq())
 	TRAVEL.taxi = false
 	Advance(2)
 	listen()

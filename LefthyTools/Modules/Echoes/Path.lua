@@ -318,6 +318,17 @@ local function Anchor(continent, north, west, why, spell)
 	S.zoneDirty = true
 end
 
+-- No jump since the last poll (a jump is the next poll's anchor): within JUMP yd of that poll's
+-- sample, else of the last point. (Not of the last point alone: on a flight path it's up to 100 yd
+-- behind.)
+local function NoJump(north, west)
+	if S.havePrev then
+		return Distance(S.pn, S.pw, north, west) <= JUMP
+	end
+	local state = E.state
+	return Distance(state.north, state.west, north, west) <= JUMP
+end
+
 -- Not near the last point (STALE yd or more, but no jump: the next poll handles that): one here.
 local function StaleCheck(north, west)
 	local state = E.state
@@ -331,8 +342,7 @@ local function StaleCheck(north, west)
 			return false
 		end
 	end
-	local d = Distance(state.north, state.west, north, west)
-	return d >= STALE and d <= JUMP and Store(north, west)
+	return Distance(state.north, state.west, north, west) >= STALE and NoJump(north, west) and Store(north, west)
 end
 
 -- One poll: the position, then the store rule. spot: an event follows, so it must have a spot.
@@ -443,7 +453,7 @@ local function LastPoint()
 		return
 	end
 	local continent, north, west = LT.Position()
-	if north and continent == state.continent and Distance(state.north, state.west, north, west) <= JUMP then
+	if north and continent == state.continent and NoJump(north, west) then
 		Store(north, west)
 	end
 end
