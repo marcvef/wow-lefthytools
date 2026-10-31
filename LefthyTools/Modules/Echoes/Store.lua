@@ -727,8 +727,9 @@ local function Status()
 		if E.recording and open.buffer == E.buffer then
 			size, lines = E.bytes, E.count
 		end
-		Line(("open page %d: %s, %d lines, started %d min ago."):format(open.n or 0, Amount(size), lines,
-			math.max(0, math.floor((E.Now() - (open.t0 or E.Now())) / 60))))
+		local idle = type(open.own) == "number" and lines <= open.own -- (Pages.lua: it doesn't close by time)
+		Line(("open page %d: %s, %d lines, started %d min ago%s."):format(open.n or 0, Amount(size), lines,
+			math.max(0, math.floor((E.Now() - (open.t0 or E.Now())) / 60)), idle and "; nothing recorded on it yet, so it stays open" or ""))
 	else
 		Line("no open page.")
 	end

@@ -362,6 +362,8 @@ LefthyToolsEchoesDB = {
   n = 213,            -- the last closed page's number (0: none yet)
   open = {            -- the page being written (plain text, never shared); nil: none
     n = 214, t0 = 1793452800, char = "Anna-Realm", guid = "Player-...", acct = "1a2b3c4d",
+    own = 4,            -- its own lines (header, character, going on): nothing else, it doesn't close by time
+    busy = 1793452801,  -- when a line other than its own came (its 30 minutes run from then); nil: none yet
     text = "E1;...\n...\n", -- the lines joined so far
     buffer = { ... },   -- the lines not joined yet: E.buffer itself
     state = { ... },    -- the encoder's state: E.state itself
@@ -433,7 +435,12 @@ no line lost or doubled, each line's `dt` counting from the one before the reloa
 **Closing**, on the tick only (never inside an event handler):
 
 - 32 KB of text or 2,000 lines: `.<dt>;s`;
-- 30 minutes since its start: `.<dt>;t`.
+- 30 minutes after its first line other than its own (`open.busy`, noted on the tick that first
+  sees one): `.<dt>;t`. Its own lines are the header, the character and, on a page that follows
+  one closed mid-session, the going on (`open.own` counts them). A page with nothing else on it
+  stays open however long you're away (an AFK night is one page, not one every 30 minutes); the
+  stale rule at login still closes it. An open page from a build before this rule (no `own`): 30
+  minutes from its start.
 
 `E.Store.Close` keeps it (below), and the next page starts in the same tick: header, character, and
 `E.Continue()` (an anchor at the last position, why `c`, the mode and the zone). The tick does
@@ -508,7 +515,7 @@ Each takes a string or a parsed list.
 ### /lefthy echoes
 
 `/lefthy echoes` (or `status`) prints, in English: recording or not, the account and store, the
-open page (size, lines, age), my pages (numbers, size of 2 MB, how many wait to be packed), relaying
+open page (size, lines, age; whether nothing is on it yet, so it stays open), my pages (numbers, size of 2 MB, how many wait to be packed), relaying
 (with relaying on or pages kept) and collecting (with collecting on or anything collected or
 exported). Other files add to it:
 

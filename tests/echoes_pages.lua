@@ -71,6 +71,12 @@ E.OnTick(function()
 	seenCompress, seenCloses = compressCalls, closes
 end)
 local function tick() Advance(0.25, 0.25) end -- one tick of the driver
+-- One tick at the realm's time t (whole seconds): the clock set ahead to it (the mock's time() is
+-- whole seconds of GetTime(); the tick comes 0.25 s on).
+local function tickAt(t)
+	skew = skew + t - (time() + skew + math.floor(GetTime() + 0.25) - math.floor(GetTime()))
+	tick()
+end
 
 -- The saved table as the game writes it (sorted here, so two writes compare): strings with \\, \",
 -- \n, \r and other control bytes as \ddd, everything else as it is.
@@ -345,6 +351,56 @@ do
 	check(most.compress == 1 and most.close == 1 and heavyInEvent == 0, "one a tick; nothing heavy inside an event")
 end
 
+section("Echoes pages: a page with nothing on it doesn't close by time")
+do
+	-- The page after one closed mid-session: its header, the character and the going on (an anchor
+	-- at the last position and the zone), then nothing while you're away (an AFK night).
+	local open, c0 = E.data.open, closes
+	check(open.own == 4 and E.count == 4 and not open.busy, "(the next page: its own 4 lines, nothing else yet)")
+	for _ = 1, 6 do
+		skew = skew + 1800
+		tick()
+	end
+	check(closes == c0 and E.data.open == open and not open.busy, "3 hours with nothing new on it: it stays open (no page every 30 minutes)")
+	local mark = #PRINTED + 1
+	lefthy("echoes")
+	check(printedSince(mark):find("4 lines, started 180 min ago; nothing recorded on it yet, so it stays open.", 1, true),
+		"the status says so, got\n" .. printedSince(mark))
+
+	-- Something happens: its 30 minutes run from then. One page for the whole time away.
+	local when = {}
+	kills(1, 1, when)
+	tick()
+	local busy = open.busy
+	check(busy == E.Now() and busy - when[1] <= 1, "the next tick notes when something came on it")
+	tickAt(busy + 1799)
+	check(closes == c0, "(29 minutes 59 seconds later: open)")
+	tickAt(busy + 1800)
+	local lines = linesOf(lastClosed)
+	check(closes == c0 + 1 and #lines == 6 and lines[5] == ("k%d;1"):format(when[1] - open.t0) and when[1] - open.t0 >= 10800
+		and lines[6] == (".%d;t"):format(busy + 1800 - when[1]), "30 minutes after that it closes (\".<dt>;t\"), with the hours before it, got\n" .. lastClosed)
+	check(E.data.open.own == 4 and not E.data.open.busy, "(the next page waits the same way)")
+
+	-- A /reload: when its 30 minutes started goes on with the page.
+	kills(2, 2)
+	tick()
+	busy = E.data.open.busy
+	reload(30)
+	check(busy and E.data.open.busy == busy and E.data.open.own == 4, "a /reload keeps when its 30 minutes started")
+	c0 = closes
+	tickAt(busy + 1800)
+	check(closes == c0 + 1, "and it closes 30 minutes after it")
+
+	-- A page from a build before this rule (no own): 30 minutes from its start, as before.
+	local t0 = E.data.open.t0
+	E.data.open.own, E.data.open.busy = nil, nil
+	tickAt(t0 + 1799)
+	check(closes == c0 + 1, "(an open page from before: open 29 minutes 59 seconds after it started)")
+	tickAt(t0 + 1800)
+	check(closes == c0 + 2 and lastClosed:find("\n%.1800;t\n$"), "and closed 30 minutes after it started, nothing on it or not")
+	tick()
+end
+
 section("Echoes pages: a stale page at login, another character, packing one a tick")
 do
 	-- A page closes, and before the tick that packs it the game ends; back 11 minutes later.
@@ -392,6 +448,8 @@ end
 section("Echoes pages: packing when the game's compression fails")
 do
 	local function closeNow()
+		kills(1, 1) -- (something on it: a page with nothing on it doesn't close by time)
+		tick()
 		skew = skew + 1800
 		tick()
 		local n = E.data.n
@@ -443,6 +501,8 @@ do
 		and count(open.text, "\nk0;") == 3, "known within 5 s: the open page's header gets it (once), its size counted")
 	MY_BATTLETAG = nil
 	fresh()
+	kills(1, 1)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
@@ -565,6 +625,8 @@ do
 	-- It runs after each packed page by itself.
 	E.data.mine[104] = page()
 	Store.Recount()
+	kills(1, 1)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
@@ -710,6 +772,7 @@ E.Command("pagestest", function(rest) commandRest = rest end, "/lefthy echoes pa
 do
 	fresh(acct)
 	kills(1, 3)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
@@ -767,16 +830,19 @@ do
 	E.Line("Q", 7, 250, 40)
 	E.Name("i", 2589, "Linen Cloth \195\164\195\182\195\188")
 	E.Line("l", 2589, 2, 1, "l", 327)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
 	E.Line("x", 12, 1500, 3000, 400, 1)
+	tick()
 	encoding.CompressString = function() return nil end
 	skew = skew + 1800
 	tick()
 	tick()
 	encoding.EncodeBase64 = function() return nil end
 	E.Line("o", 1)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()

@@ -9,10 +9,12 @@ local E = ns.Echoes
 -- up to the saving at logout is saved) and the encoder's state (E.state), so a /reload goes on with
 -- it. Its lines are joined into the text every 60 s and at logout: never one concatenation per line.
 --
--- A page closes on the tick (never inside an event handler) after 30 minutes, 32 KB of text or 2,000
--- lines, ending in ".<dt>;t" (time) or ".<dt>;s" (size); E.Store.Close keeps it, and a later tick
--- packs it (Store.lua). When recording starts, an open page of another character, or whose last
--- line is more than 10 minutes old, closes as it was (".0;l"); a fresh one goes on.
+-- A page closes on the tick (never inside an event handler) at 32 KB of text or 2,000 lines (".<dt>;s",
+-- size), or 30 minutes after its first line other than its own (".<dt>;t", time): a page with
+-- nothing but its header, the character and the going on from the last page (an AFK night) stays
+-- open. E.Store.Close keeps it, and a later tick packs it (Store.lua). When recording starts, an
+-- open page of another character, or whose last line is more than 10 minutes old, closes as it was
+-- (".0;l"); a fresh one goes on.
 --
 -- The page id is <acct>.<store>.<n>: acct my BattleTag's hash (E.MyAccount), store this WTF folder's
 -- (E.data.store), n one more than the last closed page's (E.data.n).
@@ -21,7 +23,7 @@ local E = ns.Echoes
 -- lines before this file joins them. The header still comes first: the capture writes nothing when
 -- recording starts (its first line comes on the first tick).
 
-local PAGE_SECONDS = 1800 -- a page closes after 30 minutes,
+local PAGE_SECONDS = 1800 -- a page closes 30 minutes after its first line other than its own,
 local PAGE_BYTES = 32768  -- 32 KB of text
 local PAGE_LINES = 2000   -- or 2,000 lines
 local STALE = 600         -- at the start an open page whose last line is older than this closes
@@ -110,18 +112,38 @@ local function Header(n, t0, acct)
 		.. F(Second(GetBuildInfo)) .. ";" .. F(LT.version)
 end
 
--- A new page, n one more than the last closed one's, from now: its header and the character.
--- (Take the last page's lines first.)
-local function StartPage(char)
+-- A new page, n one more than the last closed one's, from now: its header and the character; goOn:
+-- it goes on from the last page (E.Continue: an anchor at the last position, the mode, the zone).
+-- These are the page's own lines (open.own: how many): a page with nothing else on it doesn't close
+-- by time. (Take the last page's lines first.)
+local function StartPage(char, goOn)
 	local data = E.data
 	local t0, n = E.Now(), data.n + 1
 	E.PageStart(t0)
 	local acct = Account()
 	E.Raw(Header(n, t0, acct))
 	E.Line("C", char.key, char.full, char.guid, char.class, char.race, char.sex, char.level, char.faction)
-	data.open = { n = n, t0 = t0, char = char.key, guid = char.guid, acct = acct, text = "", buffer = E.buffer, state = E.state }
+	if goOn then
+		E.Continue()
+	end
+	data.open = { n = n, t0 = t0, char = char.key, guid = char.guid, acct = acct, own = E.count, text = "", buffer = E.buffer,
+		state = E.state }
 	active = data.open
 	flushedAt = GetTime()
+end
+
+-- When the open page's 30 minutes run from (E.Now() time), nil while nothing but its own lines is on
+-- it: open.busy, noted on the first tick that sees another line. (A page from a build before this
+-- rule, without open.own: from its start.)
+local function Busy(open)
+	if not open.busy then
+		if type(open.own) ~= "number" then
+			open.busy = open.t0
+		elseif E.count > open.own then
+			open.busy = E.Now()
+		end
+	end
+	return open.busy
 end
 
 -- The lines written so far joined into the open page's text.
@@ -204,8 +226,7 @@ local function Rollover(reason)
 	E.Line(".", reason)
 	E.Store.Close(open.n, open.t0, open.text .. E.Take())
 	E.data.open = nil
-	StartPage(E.Character())
-	E.Continue()
+	StartPage(E.Character(), true)
 end
 
 -- My BattleTag became known: the open page's header gets it (pages closed before keep an empty one).
@@ -246,17 +267,18 @@ end)
 E.When("stop", Flush)
 E.On("PLAYER_LOGOUT", Flush) -- (lines written after it are in E.buffer, which is saved with the page)
 
--- The tick: a page that's full closes (and nothing else this tick); my BattleTag while it isn't
--- known; the lines joined every 60 s.
+-- The tick: a page that's full, or 30 minutes busy, closes (and nothing else this tick); my
+-- BattleTag while it isn't known; the lines joined every 60 s.
 E.OnTick(function(now)
 	local open = active
 	if not open or E.data.open ~= open then
 		return
 	end
+	local busy = Busy(open)
 	if E.bytes >= PAGE_BYTES or E.count >= PAGE_LINES then
 		Rollover("s")
 		return
-	elseif E.Now() - open.t0 >= PAGE_SECONDS then
+	elseif busy and E.Now() - busy >= PAGE_SECONDS then
 		Rollover("t")
 		return
 	end
