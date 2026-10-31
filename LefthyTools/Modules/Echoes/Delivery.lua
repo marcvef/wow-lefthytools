@@ -1670,7 +1670,9 @@ local function ProbeTick(now)
 			local head = "B2;ex;" .. size .. ";"
 			local message = head .. ("x"):rep(size - #head)
 			local ok, result = pcall(C_BattleNet.SendGameData, probe.id, ns.Beacon.PREFIX, message)
-			probe.results[size] = { result = ok and result or "error" }
+			-- (A call that returns nothing went, as far as anyone can tell, like Beacon takes it: the
+			-- friend's answer says whether it arrived.)
+			probe.results[size] = { result = ok and (result or 0) or "error" }
 			probe.i, probe.nextAt = probe.i + 1, now + PROBE_GAP
 			probe.lastAt = now
 			if ok and (result == 3 or result == 11) then

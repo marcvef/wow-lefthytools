@@ -1502,6 +1502,31 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: the probe when sending says nothing")
+do
+	-- If SendGameData returns nothing on Forever (Beacon takes that as sent), the probe doesn't call
+	-- every size refused: what the friend answers says what arrived.
+	local c = Start(EVE, { friends = { ANNA }, fake = true })
+	MeetAll(c, { ANNA })
+	local send = c.env.C_BattleNet.SendGameData
+	c.env.C_BattleNet.SendGameData = function(...)
+		send(...)
+		return nil
+	end
+	Pass(c, 5)
+	local ok = c.D.Probe("anna")
+	Pass(c, 4)
+	Say(c, ANNA, "B2;ey;255;255")
+	Say(c, ANNA, "B2;ey;500;500")
+	local printed = #c.env.PRINTED
+	Pass(c, 25)
+	local line = table.concat(c.env.PRINTED, "\n", printed + 1)
+	check(ok and line:find("255 bytes: arrived whole; 500 bytes: arrived whole; 1000 bytes: no answer", 1, true),
+		"no result from sending: what arrived counts, got " .. line)
+	c.env.C_BattleNet.SendGameData = send
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------
