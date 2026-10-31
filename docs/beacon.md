@@ -29,9 +29,11 @@ the later files set, which Beacon.lua calls when they're there (`if B.X then B.X
 driver tick through `LT.Guard` (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`, `B.StreamHealthTick`,
 `B.RefreshMaps`, `B.UpdateMinimap`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
 `B.ReceivePing`, `B.ReceiveItem`, `B.ReceiveChat`, `B.ReceiveReportPart`, `B.ReceiveStream`,
-`B.ReceiveJournal`), with an answer (`B.CollectorMessage`, `B.StreamHello`, `B.JournalHello`), and on
-switching (`B.Attach` / `B.Detach`, `B.StreamStart` / `B.StreamStop`, `B.OnSettingChanged`).
-Other modules (Chronicle, Misc Tweaks) use the same `B` fields, and `B.listeners` (`B.Notify`).
+`B.ReceiveJournal`, `B.ReceiveEchoes`, `B.ReceiveProbe`), with an answer (`B.CollectorMessage`,
+`B.StreamHello`, `B.JournalHello`, `B.EchoesAnswer`), for a friend gone (`B.StreamForget`,
+`B.JournalForget`, `B.EchoesForget`, `B.RemovePing`), and on switching (`B.Attach` / `B.Detach`,
+`B.StreamStart` / `B.StreamStop`, `B.JournalStop`, `B.EchoesStop`, `B.OnSettingChanged`).
+Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.listeners` (`B.Notify`).
 `Chat.lua`, `Reports.lua` and `Stream.lua` add their own `/lefthy` words (`announce`, `report`,
 `reports`, `stream`) with `LT:AddCommand` (architecture.md); they answer while Beacon is off too.
 
@@ -63,7 +65,12 @@ Other modules (Chronicle, Misc Tweaks) use the same `B` fields, and `B.listeners
   a day's AFK time (Chronicle), `D2;<YYYYMMDD>;...` a day of Chronicle numbers for
   friends' graphs (see chronicle.md), `Y2;<1|0>` I collect error reports (or stopped),
   `Z2;<id>;<n>;<of>;<text>` part of an error report (see "Error reports"), `O2;<h|w|f|n>;...`
-  the fight stream (see "Fight stream"), `J2;<h|s|q|p|d|n|e>;...` Chronicle's journals, passed on between friends (see chronicle.md), `Q2` switched off. A build that doesn't
+  the fight stream (see "Fight stream"), `J2;<h|s|q|p|d|n|e>;...` Chronicle's journals, passed on between friends (see chronicle.md),
+  `B2;<module letter><word>;...` other modules' messages, a family (every other letter is taken):
+  the word's first letter is the module's, `e` Echoes (echoes.md, Delivery: only to friends whose
+  build reads them; Beacon hands them over after its own guard, at most 400 a minute from one
+  friend; the one exception to 255 bytes is Echoes' probe, `B2;ex;`, from a friend it knows, up to
+  4100 bytes, 10 a minute), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
@@ -102,6 +109,9 @@ it must never trigger a full friend-list walk.
 Bulk data (Chronicle's days for friends' graphs) goes into a low-priority queue (`B.QueueLow`)
 that `Drain` only empties when no one-off message, state or hello is waiting. `B.QueueLow(id,
 message, onSent)`: onSent is called once it actually went (error reports are kept until then).
+Echoes adds its pages to it only when nothing else waits in any queue (`B.Waiting()`: every
+message still waiting) and stays silent for a while after the server said slow down
+(`B.throttledAt`, `B.throttleResult`: when, and 3 or 11).
 The driver's tick resets its timer before running, so an error in it can't make it run every frame.
 The other files' hooks it calls (`B.SharingTick`, `B.StreamHealthTick`, `B.UpdateCalls`,
 `B.UpdatePings`, `B.TickReports`, `B.TickUpdates`, `B.RefreshMaps`, and every frame

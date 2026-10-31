@@ -63,13 +63,18 @@ local B = ns.Beacon
 --                       StreamNet.lua has all its words
 --   J2;<word>;<...>     Chronicle's journals (Chronicle/Sync.lua): h I sync, s what I hold, q send me
 --                       an account's records, p/d/n a profile, day or highlight, e that's all
+--   B2;<module><word>;<...>
+--                       other modules' messages, a family: the word's first letter is the module's
+--                       (e: Echoes, Echoes/Delivery.lua has its words), at most 255 bytes like all.
+--                       Only to friends whose build reads them (Delivery.lua says how it knows)
 --   Q2                  module switched off: forget me
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil, before the sender counts as
 -- a friend with the addon), so new kinds can be added without breaking older friends. Older builds
 -- read every kind they know strictly: a field more or less and they drop the message. So new data
--- goes in a new kind (or a new word of O2 / J2), and a changed format to each friend as their build
--- reads it (their version: Chat.lua's link levels). Every letter but B is taken.
+-- goes in a new kind (or a new word of O2 / J2 / B2), and a changed format to each friend as their
+-- build reads it (their version: Chat.lua's link levels). Every letter is taken: new modules get a
+-- letter of B2's family.
 
 local VERSION = B.VERSION
 
@@ -201,6 +206,11 @@ function B.Parse(text)
 		local word, more = rest:match("^;(%l);(.*)$")
 		if word and #more <= 250 then
 			return kind, word, more
+		end
+	elseif kind == "B" then
+		local word, more = rest:match("^;(%l%l);(.*)$") -- (the module's letter and its word; 255 bytes above)
+		if word then
+			return "B", word, more
 		end
 	end
 	return nil

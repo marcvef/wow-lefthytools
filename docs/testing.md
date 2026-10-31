@@ -49,6 +49,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `echoes.lua` | Echoes: the module, its saved table, events and driver, recording only off the beta; the line encoder | - |
 | `echoes_capture.lua` | Echoes' capture: the path (store rule, travel modes, segments), every event kind's line, secrets, combat, a `/reload`, a whole session read back | - |
 | `echoes_pages.lua` | Echoes: pages (header, joining, closing, `/reload`, stale pages), packing and its fallbacks, what's kept, the API for the delivery, the receipt, the launch day, `/lefthy echoes`, with the capture running; the exporter reading them | - |
+| `echoes_net.lua` | Beacon's B family (other modules' messages): parsing, the hooks, the guard, the probe's exception, the throttle time | - (its clients are its own) |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:
@@ -56,6 +57,18 @@ Each file begins with what it tests and a `-- Needs:` line: the files that must 
 follows from where Beacon's 0.5 s looks fall), `chronicle.lua` counts what Chronicle kept from
 `beacon.lua` (my level-ups, Anna's and Bob's deaths and level-ups), and `mirage.lua` watches the
 fade that begins at login, so no file that lets time pass may run before it.
+
+**Several clients at once** (`echoes_net.lua`): each client is a game of its own inside the suite's
+Lua state: `mock.lua` and the addon loaded into an environment of their own (a table as their
+`_ENV`, `_G` pointing at it; Lua's libraries and functions run.js gives the state are shared), with
+their own clock, Battle.net friends (`BN_FRIENDS`), BattleTag, version (`MOCK_VERSION`) and saved
+variables, on the release. The harness at the top starts them (`Start`), closes them (`Stop`:
+`PLAYER_LOGOUT`, the saved variables copied as the game would write them; friends see them go
+offline), reloads them (`Reload`: the next session) and lets time pass for all of them in steps
+(`Run`), carrying each one's `SendGameData` to the receiver's `BN_CHAT_MSG_ADDON` after every step
+(and logging it). A client can leave a file out (`without`: an older build). Friends can also be
+played by the test (`fake`: online, `Say` what they'd send, `Sent` what they got). Every client is
+checked when it closes: no errors, no globals leaked. A client is about 0.15 s to start.
 
 ### The release suite
 

@@ -46,6 +46,9 @@ local JOURNAL_LIMIT, JOURNAL_WINDOW = 700, 60 -- Chronicle journal messages acce
                              -- full sync of an account is a few hundred, low priority)
 local STREAM_LIMIT, STREAM_WINDOW = 80, 10 -- fight stream messages accepted from one friend (2 frames a
                              -- second, mob names, keepalives)
+local ECHOES_LIMIT, ECHOES_WINDOW = 400, 60 -- Echoes messages (B2;e...) accepted from one friend (they
+                             -- send at most 2 a second)
+local PROBE_LIMIT, PROBE_BYTES = 10, 4100 -- Echoes' probes accepted from one friend a minute, their size at most
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local CHAT_LIMIT, CHAT_WINDOW = 5, 5 -- LTC lines accepted from one friend (a burst of 5 per 5 s)
 local ANNOUNCE_GAP = 3       -- announcements from one friend at most this often
@@ -89,8 +92,12 @@ local M = LT:NewModule("beacon", {
 })
 
 -- Shared by Beacon's files, and used by Chronicle and Misc Tweaks (docs/beacon.md lists what).
-local B ={ module = M, VERSION = VERSION, handlers = {}, listeners = {}, pings = {} }
+local B ={ module = M, VERSION = VERSION, PREFIX = PREFIX, handlers = {}, listeners = {}, pings = {} }
 ns.Beacon = B
+
+-- When the server last said "slow down" (a throttle or lockdown: GetTime(), nil: not yet), and
+-- which (3 or 11): Echoes stays silent for a while after one.
+B.throttledAt, B.throttleResult = nil, nil
 
 -- Things that happened to a friend ("level", "death", ...), for other modules (Chronicle):
 -- table.insert(ns.Beacon.listeners, function(kind, peer, data) ... end). Called on the driver tick.
@@ -272,6 +279,7 @@ local RETRY_LATER = {
 local function SendNow(gameAccountID, message)
 	local ok, result = pcall(C_BattleNet.SendGameData, gameAccountID, PREFIX, message)
 	if ok and RETRY_LATER[result] then
+		B.throttledAt, B.throttleResult = GetTime(), result
 		return false
 	end
 	stats.sent = stats.sent + 1
@@ -425,6 +433,12 @@ function B.QueueLowToPeers(message)
 	end
 end
 
+-- How many messages wait to be sent, in every queue (states owed count as one): Echoes only adds
+-- its bulk when nothing but its own waits.
+function B.Waiting()
+	return #outbox + #helloOutbox + #lowOutbox + (next(owed) and 1 or 0)
+end
+
 -- My state goes to every friend on the next Drain (built when it goes: B.CurrentState, Sharing.lua).
 function B.OweStateToAll()
 	for gameAccountID in pairs(peers) do
@@ -474,6 +488,9 @@ local function Forget(gameAccountID)
 	end
 	if B.JournalForget then
 		B.JournalForget(gameAccountID) -- (Chronicle: what was asked of them goes to someone else)
+	end
+	if B.EchoesForget then
+		B.EchoesForget(gameAccountID) -- (Echoes: the same, and its messages to them still waiting go)
 	end
 	if B.RemovePing then
 		B.RemovePing(gameAccountID) -- (their marker goes with them)
@@ -613,7 +630,13 @@ local function OnMessage(text, senderID)
 
 	local kind, a, b, c, d, e, f = B.Parse(text)
 	if not kind then
-		return -- malformed: don't even count the sender as a friend with the addon
+		-- Malformed: don't even count the sender as a friend with the addon. One exception: Echoes'
+		-- probe from a friend already known, bigger than any other message (Delivery.lua).
+		if B.ReceiveProbe and peers[senderID] and type(text) == "string" and #text <= PROBE_BYTES
+			and text:sub(1, 6) == "B" .. VERSION .. ";ex;" and Counted(guard, "probe", PROBE_LIMIT, 60, now) then
+			B.ReceiveProbe(senderID, text)
+		end
+		return
 	end
 	stats.received = stats.received + 1
 	if kind == "version" then
@@ -728,6 +751,11 @@ local function OnMessage(text, senderID)
 		end
 	elseif kind == "W" then
 		B.ReceiveNews(senderID, a, b, c)
+	elseif kind == "B" then
+		-- The family of other modules' messages, by the word's first letter (e: Echoes).
+		if a:sub(1, 1) == "e" and Counted(guard, "echoes", ECHOES_LIMIT, ECHOES_WINDOW, now) and B.ReceiveEchoes then
+			B.ReceiveEchoes(senderID, a, b)
+		end
 	end
 	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget.
 	if answer and Spaced(guard, "answeredAt", ANSWER_GAP, now) then
@@ -748,6 +776,9 @@ local function OnMessage(text, senderID)
 		local journal = B.JournalHello and B.JournalHello()
 		if journal then
 			B.QueueLow(senderID, journal) -- Chronicle: I sync journals
+		end
+		if B.EchoesAnswer then
+			B.EchoesAnswer(senderID) -- Echoes: my hello, once their build is known to read it
 		end
 		B.SharingAnswer(senderID) -- my tracked quest and level progress
 	end
@@ -983,6 +1014,9 @@ function M:OnDisable()
 	end
 	if B.JournalStop then
 		B.JournalStop() -- Chronicle: nothing asked, offered or owed any more
+	end
+	if B.EchoesStop then
+		B.EchoesStop() -- Echoes: the same
 	end
 end
 
