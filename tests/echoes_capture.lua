@@ -489,17 +489,45 @@ do
 	at(100, 100)
 	Advance(1.2)
 	check(seq() == "@;0;100;100;f;j", "a hearthstone 25 s before: another jump (j), got " .. seq())
-	-- A teleport spell (Teleport: Stormwind), a summon (offered up to 120 s before).
+	-- A teleport spell (Teleport: Stormwind), a summon (accepted up to 120 s before): only one you
+	-- accepted counts, not one offered and declined, or not answered (someone's portal meanwhile).
 	listen()
 	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-3", 3561)
 	Advance(1)
 	at(900, 100)
 	Advance(1.2)
+	SUMMON_LEFT = 120
 	Fire("CONFIRM_SUMMON", 0, false)
-	Advance(60)
+	Advance(5)
+	C_SummonInfo.CancelSummon()
+	Fire("CANCEL_SUMMON")
+	Advance(5)
 	at(100, 900)
 	Advance(1.2)
-	check(seq() == "@;0;900;100;f;p;3561 @;0;100;900;f;u", "a teleport spell: p with the spell; a summon: u, got " .. seq())
+	SUMMON_LEFT = 120
+	Fire("CONFIRM_SUMMON", 0, false)
+	Advance(5)
+	at(900, 900)
+	Advance(1.2)
+	Advance(30)
+	C_SummonInfo.ConfirmSummon()
+	Advance(60)
+	at(100, 100)
+	Advance(1.2)
+	check(seq() == "@;0;900;100;f;p;3561 @;0;100;900;f;j @;0;900;900;f;j @;0;100;100;f;u",
+		"a teleport spell: p with the spell; a summon declined, or not answered yet: j; accepted: u, got " .. seq())
+	-- A summon accepted across a loading screen: u; with a teleport spell too: the spell.
+	listen()
+	SUMMON_LEFT = 120
+	Fire("CONFIRM_SUMMON", 0, false)
+	C_SummonInfo.ConfirmSummon()
+	loading(function() at(500, 500) end)
+	SUMMON_LEFT = 120
+	Fire("CONFIRM_SUMMON", 0, false)
+	C_SummonInfo.ConfirmSummon()
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-12", 3562)
+	loading(function() at(100, 100) end)
+	check(seq() == "@;0;500;500;f;u @;0;100;100;f;p;3562", "over a loading screen: u; a teleport spell as well: p, got " .. seq())
 	-- Another continent: a new segment there, and the zone.
 	listen()
 	PLAYER_MAP, PLAYER_POS = 1414, { 0.5, 0.5 }

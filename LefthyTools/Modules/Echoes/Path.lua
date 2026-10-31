@@ -273,7 +273,7 @@ local function Cause()
 end
 
 -- Something that explains a jump coming: "h" (hearthstone), "p" (a teleport spell: spell), "u" (a
--- summon offered), "r" (released to the graveyard: the next poll starts a segment there).
+-- summon accepted), "r" (released to the graveyard: the next poll starts a segment there).
 function C.NoteCause(why, spell)
 	local now = GetTime()
 	if why == "h" then

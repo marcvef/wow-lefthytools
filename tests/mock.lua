@@ -640,6 +640,14 @@ function IsSwimming() return TRAVEL.swimming end
 function IsMounted() return TRAVEL.mounted end
 function IsFlying() return TRAVEL.flying end
 function UnitOnTaxi() return TRAVEL.taxi end
+-- A summon offered (CONFIRM_SUMMON): SUMMON_LEFT seconds to answer it; the summon dialog's Accept
+-- calls C_SummonInfo.ConfirmSummon, its Cancel C_SummonInfo.CancelSummon (either ends the offer).
+SUMMON_LEFT = 0
+C_SummonInfo = {
+	GetSummonConfirmTimeLeft = function() return SUMMON_LEFT end,
+	ConfirmSummon = function() SUMMON_LEFT = 0 end,
+	CancelSummon = function() SUMMON_LEFT = 0 end,
+}
 THREAT = {} -- nameplate unit -> UnitThreatSituation("player", unit): nil (not on its list), 0-3, or SECRET
 THREATS = {} -- "<group unit>><nameplate unit>" -> UnitThreatSituation(unit, mob) for the rest of the group
 function UnitThreatSituation(unit, mob) if unit == "player" then return THREAT[mob] end return THREATS[unit .. ">" .. mob] end

@@ -335,7 +335,21 @@ end
 
 E.On("CONFIRM_XP_LOSS", function() S.spiritAt = GetTime() end)
 E.On("RESURRECT_REQUEST", function() S.rezAt = GetTime() end)
-E.On("CONFIRM_SUMMON", function() C.NoteCause("u") end)
+
+-- A summon explains the next jump or loading screen only once you accept it: the summon dialog's
+-- Accept calls C_SummonInfo.ConfirmSummon (a post-hook; CONFIRM_SUMMON only offers it, and one
+-- declined or not answered explains nothing).
+local function SummonAccepted()
+	if E.recording then
+		C.NoteCause("u")
+	end
+end
+if C_SummonInfo and type(C_SummonInfo.ConfirmSummon) == "function" then
+	hooksecurefunc(C_SummonInfo, "ConfirmSummon", SummonAccepted)
+end
+if type(ConfirmSummon) == "function" then -- (older clients' name for it)
+	hooksecurefunc("ConfirmSummon", SummonAccepted)
+end
 
 local function How()
 	local now = GetTime()

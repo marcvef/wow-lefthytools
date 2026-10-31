@@ -130,7 +130,9 @@ What caused it, from what was noted shortly before (used once, then forgotten): 
 (your cast of 8690 within 20 s; the spell's field 8690), `p` a teleport spell within 20 s (the
 mage's teleports 3561-3567, Astral Recall 556, Teleport: Moonglade 18960, the engineers'
 Dimensional Ripper - Everlook 23442 and Ultrasafe Transporter: Gadgetzan 23453; the spell's
-field), `u` a summon (`CONFIRM_SUMMON` within 120 s), `r` released (within 20 s). In an instance
+field), `u` a summon you accepted within 120 s (a post-hook on `C_SummonInfo.ConfirmSummon`, which the
+summon dialog's Accept calls; `CONFIRM_SUMMON` only offers it: one declined or not answered explains
+nothing), `r` released (within 20 s). In an instance
 (no positions: dungeons, raids) the anchor has none and no points follow until the next anchor with
 one; battlegrounds have positions.
 
@@ -209,7 +211,8 @@ and the queue are written there); `IsPlayerMoving` on a flight path; `GetUnitSpe
 `PLAYER_STOPPED_MOVING`; no `PLAYER_DEAD` at a login while dead, and whether `PLAYER_ALIVE` comes
 again for a ghost (after a dungeon's release, say: an `o` anchor then an `r` one); gear right at
 login (a slot whose link isn't there yet would read as taken off); loot links' colours
-(`|cff1eff00|Hitem:`, classic's quality colours) for an item the game hasn't cached yet.
+(`|cff1eff00|Hitem:`, classic's quality colours) for an item the game hasn't cached yet; a summon
+accepted (the dialog's Accept going through `C_SummonInfo.ConfirmSummon`: the anchor's why `u`).
 
 ### Tests
 
