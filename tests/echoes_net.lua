@@ -1532,6 +1532,30 @@ do
 	Stop(c)
 end
 
+section("Beacon: a hello right after my answer (a friend's quick /reload)")
+do
+	-- Beacon answers one friend's hellos at most every 5 s. Anna /reloads 2 s after my answer: her
+	-- new session's hello is answered once the 5 s are up (her build, and Echoes' hello with it),
+	-- not dropped. More hellos meanwhile still get one answer.
+	local c = Start(EVE, { friends = { ANNA }, fake = true })
+	local mark = Mark(c)
+	Meet(c, ANNA, NEW)
+	Hello(c, ANNA, "s")
+	local first = #Sent(c, ANNA, mark, "V2;")
+	mark = Mark(c)
+	Say(c, ANNA, "H2")
+	Pass(c, 2)
+	Say(c, ANNA, "H2") -- (she /reloaded)
+	Say(c, ANNA, "H2")
+	Pass(c, 1)
+	check(#Sent(c, ANNA, mark, "V2;") == 1, "(one answer, then nothing for 5 s)")
+	Pass(c, 5)
+	check(first == 1 and #Sent(c, ANNA, mark, "V2;") == 2, "the hello right after it: answered once the 5 s are up, once")
+	Pass(c, 10)
+	check(#Sent(c, ANNA, mark, "V2;") == 2 and #Sent(c, ANNA, mark, "B2;eh;") >= 2, "... with Echoes' hello, and no more")
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------
@@ -1692,8 +1716,7 @@ do
 	anna = Reload(anna)
 	check(Run(300, Got), "after her /reload it goes out: Cedric collects it")
 	check(Got().z == page.z and Got().h == page.h, "the page 1 Cedric holds is the one Anna has, not the lost one")
-	Run(10) -- (Beacon answers one friend's hellos at most every 5 s: Cedric's /reload is heard after that)
-	cedric = Reload(cedric)
+	cedric = Reload(cedric) -- (within 5 s of Anna's last answer to him: she answers when they're up)
 	check(Run(120, function() return anna.E.data.mine[1] == nil end), "safe at Cedric (on his disk): Anna drops it, rightly")
 	Stop(anna)
 	Stop(cedric)

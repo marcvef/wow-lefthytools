@@ -72,7 +72,8 @@ Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.l
   friend; the one exception to 255 bytes is Echoes' probe, `B2;ex;`, from a friend it knows, up to
   4100 bytes, 10 a minute), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
-  don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend);
+  don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend; one that
+  comes sooner, say after a quick `/reload`, is answered once the 5 s are up, not dropped);
   if a friend's build is newer (`LT.CompareVersions`), the player gets one chat notice per login
   telling them to run `Update-LefthyTools.cmd`, then `/reload` or restart the game, followed by
   "What's coming:" and one line per change (module: title, "and N more"). The notice waits for

@@ -614,6 +614,9 @@ local function Counted(guard, key, limit, window, now)
 	return true
 end
 
+local answerLater = {}  -- gameAccountID -> true: a hello to answer once ANSWER_GAP since my last answer is up
+local Answer            -- (below)
+
 local function OnMessage(text, senderID)
 	if type(senderID) ~= "number" then
 		return
@@ -757,30 +760,53 @@ local function OnMessage(text, senderID)
 			B.ReceiveEchoes(senderID, a, b)
 		end
 	end
-	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget.
-	if answer and Spaced(guard, "answeredAt", ANSWER_GAP, now) then
-		owed[senderID] = true
-		B.Queue(senderID, "F" .. VERSION .. ";" .. LT.FILES) -- my LefthyTools build and its files
-		B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40))
-		local collector = B.CollectorMessage and B.CollectorMessage()
-		if collector then
-			B.Queue(senderID, collector) -- I collect error reports
+	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget. One that
+	-- comes sooner is answered once the gap is up (the tick): a friend who /reloads right after my
+	-- last answer still learns my build and the rest, which only come in answers.
+	if answer then
+		if Spaced(guard, "answeredAt", ANSWER_GAP, now) then
+			Answer(senderID)
+		else
+			answerLater[senderID] = true
 		end
-		if B.StreamHello then
-			B.QueueLow(senderID, B.StreamHello()) -- whether they can watch my fights (after the rest)
+	end
+end
+
+-- What a friend who (re)started, or is new to me, gets (OnMessage, or the tick for one held back).
+function Answer(senderID)
+	owed[senderID] = true
+	B.Queue(senderID, "F" .. VERSION .. ";" .. LT.FILES) -- my LefthyTools build and its files
+	B.Queue(senderID, "V" .. VERSION .. ";" .. B.Clean(LT.version, 40))
+	local collector = B.CollectorMessage and B.CollectorMessage()
+	if collector then
+		B.Queue(senderID, collector) -- I collect error reports
+	end
+	if B.StreamHello then
+		B.QueueLow(senderID, B.StreamHello()) -- whether they can watch my fights (after the rest)
+	end
+	local health = B.StreamHealthHello and B.StreamHealthHello()
+	if health then
+		B.QueueLow(senderID, health) -- my health (estimated)
+	end
+	local journal = B.JournalHello and B.JournalHello()
+	if journal then
+		B.QueueLow(senderID, journal) -- Chronicle: I sync journals
+	end
+	if B.EchoesAnswer then
+		B.EchoesAnswer(senderID) -- Echoes: my hello, once their build is known to read it
+	end
+	B.SharingAnswer(senderID) -- my tracked quest and level progress
+end
+
+-- Hellos that came within ANSWER_GAP of my last answer: answered now that it's up (one each).
+local function AnswerLater(now)
+	for id in pairs(answerLater) do
+		if not peers[id] then
+			answerLater[id] = nil -- (gone)
+		elseif Spaced(inbox[id] or {}, "answeredAt", ANSWER_GAP, now) then
+			answerLater[id] = nil
+			Answer(id)
 		end
-		local health = B.StreamHealthHello and B.StreamHealthHello()
-		if health then
-			B.QueueLow(senderID, health) -- my health (estimated)
-		end
-		local journal = B.JournalHello and B.JournalHello()
-		if journal then
-			B.QueueLow(senderID, journal) -- Chronicle: I sync journals
-		end
-		if B.EchoesAnswer then
-			B.EchoesAnswer(senderID) -- Echoes: my hello, once their build is known to read it
-		end
-		B.SharingAnswer(senderID) -- my tracked quest and level progress
 	end
 end
 
@@ -871,6 +897,9 @@ local function Tick(now, elapsed)
 	end
 	-- The other files' hooks go through LT.Guard: one that fails doesn't stop the tick (sending
 	-- below), and rests a while instead of failing ten times a second.
+	if next(answerLater) then
+		AnswerLater(now)
+	end
 	LT.Guard("B.SharingTick", B.SharingTick, now) -- Sharing.lua: my level-up, state, quest, enemies, level progress
 	LT.Guard("B.StreamHealthTick", B.StreamHealthTick, now) -- my health (estimated), to everyone
 	Drain(now, elapsed)
@@ -991,8 +1020,8 @@ function M:OnDisable()
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end
-	for _, t in ipairs({ peers, helloAt, helloOutbox, helloWaiting, otherVersion, inbox, dings, deaths, pingsIn, highlightsIn, itemsIn,
-			dailyIn, comings, B.pings }) do
+	for _, t in ipairs({ peers, helloAt, helloOutbox, helloWaiting, otherVersion, inbox, answerLater, dings, deaths, pingsIn, highlightsIn,
+			itemsIn, dailyIn, comings, B.pings }) do
 		wipe(t)
 	end
 	sweepRequested, validateRequested = false, false
