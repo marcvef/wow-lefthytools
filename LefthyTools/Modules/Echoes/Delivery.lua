@@ -745,7 +745,11 @@ local function Withdraw(only)
 		local serve = record.serve
 		if serve then
 			serve.pending = serve.pending - 1
-			if record.kind == "eb" then
+			if serve.stopped then
+				if Done(serve) then
+					RemoveServe(serve) -- (asked to stop, or replaced: nothing of it goes again)
+				end
+			elseif record.kind == "eb" then
 				serve.begun = false
 			elseif record.offset < serve.offset then
 				serve.offset = record.offset
@@ -1244,36 +1248,50 @@ local function OnPart(id, msg, now)
 	end
 end
 
+-- A serve ends: nothing more of it goes (its parts already in Beacon's queue still do).
+local function Finish(s, i)
+	s.offset, s.stopped = s.len, true
+	if Done(s) then
+		table.remove(active, i)
+	end
+end
+
+-- Their request. A friend asks one holder for one page at a time, so a new request from them
+-- replaces theirs, being served or waiting: in its place in the line (asked again after SILENCE,
+-- a page keeps its turn, and nobody holds more than one place); a page they're being served
+-- already goes on from the offset asked. Offset = its length: that page stops (only that one).
 local function OnRequest(id, msg)
 	local key = msg.acct .. "." .. msg.store
 	local page = Get(key, msg.n)
-	if not page then
-		Control(id, Msg("en", msg.acct, msg.store, msg.n), "en")
-		return
-	end
-	-- The same page for them again: from the offset asked (offset = its length: they stop).
+	local stop = page ~= nil and msg.offset >= #page.z
+	local turn -- (where theirs was waiting)
 	for i = #active, 1, -1 do
 		local s = active[i]
-		if s.id == id and s.key == key and s.n == msg.n then
-			if msg.offset >= s.len then
-				s.offset = s.len
-				if Done(s) then
-					table.remove(active, i)
-				end
-			else
+		if s.id == id and not s.stopped then
+			local same = s.key == key and s.n == msg.n
+			if same and page and not stop then
 				s.offset, s.begun = msg.offset, false
+				return
+			elseif same or not stop then
+				Finish(s, i)
+				turn = 1 -- (they were being served: the new one is next)
 			end
-			return
 		end
 	end
 	for i = #serves, 1, -1 do
 		local s = serves[i]
-		if s.id == id and s.key == key and s.n == msg.n then
+		if s.id == id and (not stop or (s.key == key and s.n == msg.n)) then
 			table.remove(serves, i)
+			turn = math.min(turn or i, i)
 		end
 	end
-	if msg.offset < #page.z and #serves < SERVE_QUEUE then
-		serves[#serves + 1] = { id = id, key = key, acct = msg.acct, store = msg.store, n = msg.n, offset = msg.offset }
+	if not page then
+		Control(id, Msg("en", msg.acct, msg.store, msg.n), "en")
+		return
+	end
+	if not stop and (turn or #serves < SERVE_QUEUE) then
+		table.insert(serves, math.min(turn or #serves + 1, #serves + 1),
+			{ id = id, key = key, acct = msg.acct, store = msg.store, n = msg.n, offset = msg.offset })
 		StartServes() -- (SERVING of them at once, SERVE_QUEUE more waiting)
 	end
 end

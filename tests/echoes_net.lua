@@ -740,8 +740,9 @@ do
 	check(count > 0 and #Sent(me, ANNA, mark, "B2;ep;") <= count + 3 and #D.active == 0,
 		"asked from its end: the page stops (what was waiting aside), got " .. count .. " then " .. #Sent(me, ANNA, mark, "B2;ep;"))
 
-	-- 25 requests (in a fight: nothing goes meanwhile; in two seconds: Beacon takes 20 a second from
-	-- a friend): 2 served at a time, 20 kept, the rest dropped (they ask again).
+	-- 25 requests from one friend (in a fight: nothing goes meanwhile; in two seconds: Beacon takes
+	-- 20 a second from a friend): she asks one holder for one page at a time, so each replaces the one
+	-- before; she can't take every place in the line.
 	for n = 510, 534 do
 		MyPage(me, n, 20)
 	end
@@ -754,11 +755,13 @@ do
 		end
 	end
 	Pass(me, 0.3)
-	check(#D.active == 2 and #D.serves == 20, "a holder serves 2 at once and keeps 20, got " .. #D.active .. " and " .. #D.serves)
+	local kept = D.active[1] or D.serves[1]
+	check(#D.active + #D.serves == 1 and kept.n == 534, "one friend's requests: each replaces the one before, got "
+		.. #D.active .. " served and " .. #D.serves .. " waiting")
 	me.env.LeaveCombat()
 	Pass(me, 40)
 	local begun = Sent(me, ANNA, mark, "B2;eb;")
-	check(#begun == 22 and #D.serves == 0 and #D.active == 0, "22 served, got " .. #begun)
+	check(#begun == 1 and begun[1]:find(";534;20;") and #D.serves == 0 and #D.active == 0, "only her last one served, got " .. #begun)
 	for n = 510, 534 do
 		E.data.mine[n] = nil
 	end
@@ -1133,6 +1136,86 @@ do
 	Pass(c, 6)
 	local sent = Sent(c, GWEN, mark, "B2;")
 	check(#sent == 1 and sent[1]:find("^B2;eh;"), "0.6.0-25 (the first build with Delivery): my hello, got " .. tostring(sent[1]))
+	Stop(c)
+end
+
+-- n friends with Echoes, played by the test (ids from first + 1 on).
+local function Crowd(n, first)
+	local list = {}
+	for i = 1, n do
+		local id = (first or 100) + i
+		local p = Person(id, ("Pal%02d Stone"):format(i), "MAGE", ("Pal%02d#%d"):format(i, 1000 + id), ("%08x"):format(0x10000000 + id))
+		p.key = p.acct .. "." .. p.store
+		list[i] = p
+	end
+	return list
+end
+
+-- c meets friends with Echoes: flags for each (relay and sharing unless said).
+local function MeetAll(c, friends, flags)
+	for _, f in ipairs(friends) do
+		Meet(c, f, NEW)
+		Hello(c, f, flags or "rs")
+	end
+end
+
+-- f asks c for c's own page n from offset.
+local function Ask(c, f, n, offset)
+	Say(c, f, ("B2;eq;%s;%s;%d;%d"):format(c.who.acct, c.E.data.store, n, offset or 0))
+end
+
+-- The friends c began a page for since mark (eb), in order.
+local function Begun(c, mark)
+	local list = {}
+	for i = mark, #c.env.GAMEDATA do
+		local m = c.env.GAMEDATA[i]
+		if m.data:sub(1, 6) == "B2;eb;" then
+			list[#list + 1] = m.id
+		end
+	end
+	return list
+end
+
+section("Echoes' delivery: a holder's line (one place per friend, kept when asked again)")
+do
+	local crowd = Crowd(24)
+	local c = Start(EVE, { friends = crowd, fake = true })
+	local D = c.D
+	for i = 1, 30 do
+		MyPage(c, 600 + i, 480) -- (2 parts each)
+	end
+	MeetAll(c, crowd)
+	-- In a fight (nothing goes), each asks for a page: 2 served at once, 20 waiting, the rest dropped
+	-- (they ask again).
+	local mark = Mark(c)
+	c.env.EnterCombat()
+	for i, f in ipairs(crowd) do
+		Ask(c, f, 600 + i)
+	end
+	Pass(c, 0.3)
+	check(#D.active == 2 and #D.serves == 20, "2 served at once and 20 waiting, got " .. #D.active .. " and " .. #D.serves)
+	-- Pal03 (first in line) asks again for the same page, as after 30 s without progress: it keeps
+	-- its place. Pal04 asks for another page: it takes the place of the one before, not a second one.
+	Ask(c, crowd[3], 603)
+	Ask(c, crowd[4], 630)
+	Pass(c, 0.3)
+	check(D.serves[1].id == crowd[3].id and D.serves[2].id == crowd[4].id and D.serves[2].n == 630 and #D.serves == 20,
+		"asked again: in its place; another page: instead of the one before, got " .. tostring(D.serves[1].id) .. ", "
+		.. tostring(D.serves[2].id) .. " (page " .. tostring(D.serves[2].n) .. "), " .. #D.serves .. " waiting")
+	c.env.LeaveCombat()
+	Pass(c, 90)
+	local order, at = Begun(c, mark), {}
+	for i, id in ipairs(order) do
+		at[id] = at[id] or i
+	end
+	local inOrder = true
+	for i = 3, 22 do -- (two go at once: a neighbour may begin a moment before)
+		inOrder = inOrder and at[crowd[i].id] ~= nil and math.abs(at[crowd[i].id] - i) <= 1
+	end
+	check(#order == 22 and inOrder, "served in the order they first asked, got " .. #order .. " pages begun, Pal03 as "
+		.. tostring(at[crowd[3].id]))
+	local fourth = Sent(c, crowd[4], mark, "B2;eb;")
+	check(#fourth == 1 and fourth[1]:find(";630;480;"), "Pal04: only the page asked last, got " .. table.concat(fourth, " "))
 	Stop(c)
 end
 

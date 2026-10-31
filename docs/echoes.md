@@ -589,7 +589,11 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
   contiguous offset, of the same holder or another. Pages never change, so bytes from different
   holders fit together; that's also how a page goes on after a friend went offline.
 - **Serving**: a holder keeps 20 requests waiting and serves 2 at once (transfer ids 1-99 by
-  turns); the same page asked again goes on from the new offset.
+  turns). One place in the line per friend (they ask one holder for one page at a time): a new
+  request from them replaces theirs, being served or waiting, in its place, so a page asked again
+  after 30 s keeps its turn and nobody holds two places; the page they're being served, asked
+  again, goes on from the new offset. Asked from its end, only that page stops (what of it
+  already waits in Beacon's queue still goes, nothing more).
 
 ### Checks
 
