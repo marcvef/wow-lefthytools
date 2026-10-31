@@ -540,6 +540,28 @@ called by the delivery when a part of it was actually sent; kept in the saved ta
   though the collector may hold the other page with that number: then it's lost like before. Copy a
   WTF folder only to move, not to play on both.
 
+**A BattleTag change** (Blizzard lets a player change it): my account is the hash of my BattleTag,
+so it changes with it, and my pages' key with it (the store stays).
+
+- From the next login my key is the new one: `E.MyAccount()` and Delivery's account (read once a
+  load) say the new hash, `E.data.acct` keeps it, and friends, whose friend lists show the new
+  BattleTag, believe my `eh` with it. The numbering goes on (`E.data.n`, `top`): no number is used
+  twice under the new key.
+- Every page still in `mine` is offered under the new key, with its number, also the ones recorded
+  before: their headers keep the old account (closed pages never change; an open page keeps the
+  account it was started with), and the exporter files them under the key they're kept under (it
+  warns that the header names another account).
+- The old key is no longer anyone's friend's account: nobody takes pages, holdings or summaries of
+  it any more (Accounts taken). Copies relays still have of it go after 30 days; summaries of it are
+  forgotten after 60 days unheard of. Nothing is lost by that: I keep every page until a collector
+  holds it, and send the ones still in `mine` under the new key (except pages that went over my
+  2 MB cap because a relay carried them: those were only at the relay, under the old key).
+- **The cost:** a page a collector already had under the old key, whose "safe" hadn't reached me
+  before the change (it's ignored now), comes to it again under the new key: the exporter gets the
+  same text under both keys (its header names the old one). A collector's own pages too: ones its
+  exporter read under the old key, but whose receipt is read only after the change, stay in `mine`
+  (the receipt names the old key) and are exported again under the new one.
+
 **What's kept** (design section 7):
 
 - **mine:** until a collector holds a page safely (`E.Store.Safe`), at most 2 MB (about 250 hours).
