@@ -445,6 +445,39 @@ do
 	check(heavyInEvent == 0, "nothing heavy inside an event or at login")
 end
 
+section("Echoes pages: a disconnect, switched off for a while")
+do
+	-- The game saves without PLAYER_LOGOUT (a disconnect): the lines not joined yet are in the page's
+	-- buffer, saved with it, and go on with the page once.
+	local n = E.data.open.n
+	kills(21, 23)
+	local before0 = E.data.open.text .. table.concat(E.buffer, "\n") .. "\n"
+	check(#E.buffer >= 3, "(lines not joined yet)")
+	reload(5, true)
+	check(E.data.open.n == n and E.data.open.text == before0 and #E.buffer == 0 and count(E.data.open.text, ";23\n") == 1,
+		"no PLAYER_LOGOUT: the lines not joined yet came with the page, once")
+
+	-- Switched off for 11 minutes, then on: the page closes as it was (".0;l"), its lines in it once.
+	kills(24, 24)
+	LT:SetModuleEnabled("echoes", false)
+	skew = skew + 11 * 60
+	local c0 = closes
+	start()
+	local page = E.data.mine[n]
+	check(closes == c0 + 1 and page and page.q and count(page.z, ";24\n") == 1 and page.z:sub(-5) == ".0;l\n" and E.data.open.n == n + 1
+		and E.buffer[1] == header(n + 1, E.Now()), "switched off for 11 minutes: the page closes as it was (\".0;l\"), a new one starts")
+
+	-- Off for a minute: the same page goes on.
+	kills(25, 25)
+	LT:SetModuleEnabled("echoes", false)
+	skew = skew + 60
+	start()
+	check(E.data.open.n == n + 1 and count(E.data.open.text, ";25\n") == 1 and #E.buffer == 0 and E.bytes == #E.data.open.text
+		and E.count == #linesOf(E.data.open.text), "switched off for a minute: the same page goes on, its size counted")
+	tick()
+	tick()
+end
+
 section("Echoes pages: packing when the game's compression fails")
 do
 	local function closeNow()
@@ -536,6 +569,16 @@ end
 local big = ("A"):rep(60 * 1024) -- (a page's worth of Base64)
 local bigHash = realHash(big)
 local function bigPage(t) return { t = t or E.Now(), h = bigHash, m = "z", z = big } end
+-- Whether the sizes E.Store keeps (as pages came and went) are the pages' as they are: counted anew.
+local function sizesAgree()
+	local kept = { Store.Bytes("mine"), Store.Bytes("carry"), Store.Bytes("inbox") }
+	local authors = {}
+	for key in pairs(E.data.carry) do authors[key] = Store.Bytes("carry", key:sub(1, 8), key:sub(10)) end
+	Store.Recount()
+	local same = kept[1] == Store.Bytes("mine") and kept[2] == Store.Bytes("carry") and kept[3] == Store.Bytes("inbox")
+	for key, n in pairs(authors) do same = same and n == Store.Bytes("carry", key:sub(1, 8), key:sub(10)) end
+	return same
+end
 do
 	fresh(acct)
 	local now = E.Now()
@@ -602,6 +645,7 @@ do
 	Advance(2, 0.25)
 	check(E.data.carry[A .. ".00000003"] and not E.data.carry[A .. ".00000003"][1] and E.data.carry[A .. ".00000003"][2],
 		"relayed pages go 30 days after they came, at the next login")
+	check(sizesAgree(), "the sizes kept as pages came and went are the pages' (carry per author too)")
 end
 
 section("Echoes pages: my pages over 2 MB")
@@ -634,6 +678,7 @@ do
 		"after packing a page: back under 2 MB, the oldest gone")
 	check(Store.Safe(acct, STORE, "4-10", "c011ec70.12345678") == 5 and not E.data.mine[4] and E.data.mine[11],
 		"my pages a collector holds safely go")
+	check(sizesAgree(), "(the sizes agree: closed, packed, trimmed, safe)")
 end
 
 section("Echoes pages: collecting: 4 MB, 8 MB, the exporter's receipt")
@@ -700,6 +745,29 @@ do
 	reload(1)
 	Advance(2, 0.25)
 	check(loads == 4 and Ranges.Of(E.data.inbox[friend]) == "5" and E.data.exported[friend] == "1-4", "no receipt folder: nothing changes")
+
+	-- A receipt that isn't one, or no way to load it: nothing changes, nothing breaks.
+	local reported, stop = suite.catchErrors()
+	local inbox0, exported0, stores0 = Ranges.Of(E.data.inbox[friend]), E.data.exported[friend], size(E.data.exported)
+	for _, bad in ipairs({ "x", { v = 1 }, { v = 1, done = "1-5" }, { v = 2, done = { [friend] = 5, [7] = "1-5", [friend .. "x"] = "1-5",
+		[A .. ".0c77e1f5"] = "x-y" } } }) do
+		MOCK_RECEIPT = bad
+		reload(1)
+		Advance(2, 0.25)
+	end
+	local loader = C_AddOns.LoadAddOn
+	C_AddOns.LoadAddOn, LefthyToolsEchoesReceipt = nil, nil
+	reload(1)
+	Advance(2, 0.25)
+	C_AddOns.LoadAddOn = function() error("broken") end
+	reload(1)
+	Advance(2, 0.25)
+	stop()
+	C_AddOns.LoadAddOn, MOCK_RECEIPT, LefthyToolsEchoesReceipt = loader, nil, nil
+	check(#reported == 0 and Ranges.Of(E.data.inbox[friend]) == inbox0 and E.data.exported[friend] == exported0 and size(E.data.exported) == stores0,
+		"receipts that aren't one (not a table, no done, bad keys and ranges), no LoadAddOn, a broken one: nothing changes, got "
+		.. table.concat(reported, "; "))
+	check(sizesAgree(), "(the sizes agree after the receipts)")
 	LT:SetModuleSetting(M, "collect", false)
 end
 
