@@ -50,9 +50,15 @@ mock("GetInstanceInfo", function()
 	return ZONE, "none", 0, "", 0, 0, false, 0, 0
 end)
 mock("GetInventoryItemLink", function(unit, slot) return GEAR_LINKS[slot] or baseItemLink(unit, slot) end)
+-- (FACTIONS[i].collapsed: under a closed header, so not listed; known by its ID all the same)
+local function listed()
+	local list = {}
+	for _, f in ipairs(FACTIONS) do if not f.collapsed then list[#list + 1] = f end end
+	return list
+end
 mock("C_Reputation", {
-	GetNumFactions = function() return #FACTIONS end,
-	GetFactionDataByIndex = function(i) local f = FACTIONS[i]; return f and { factionID = f.id, reaction = f.reaction, isHeader = f.header == true } end,
+	GetNumFactions = function() return #listed() end,
+	GetFactionDataByIndex = function(i) local f = listed()[i]; return f and { factionID = f.id, reaction = f.reaction, isHeader = f.header == true } end,
 	GetFactionDataByID = function(id) for _, f in ipairs(FACTIONS) do if f.id == id then return { factionID = id, reaction = f.reaction } end end end,
 })
 mock("C_SkillInfo", { GetSkillLineInfoByID = function(id) local s = SKILLS[id]; return s and { skillID = id, rank = s[1], maxRank = s[2] } end })
@@ -915,7 +921,20 @@ do
 	Advance(0.3)
 	check(seq() == "R;72;6", "a standing changed: R with the faction and the standing; a rescan waits 10 s, got " .. seq())
 	Advance(10)
-	check(seq() == "R;72;6 R;47;6 R;69;4", "the rescan (UPDATE_FACTION): what changed, a new faction, got " .. seq())
+	check(seq() == "R;72;6 R;47;6" and cap().reps[69] == 4,
+		"the rescan (UPDATE_FACTION): what changed; a faction listed for the first time is a baseline, got " .. seq())
+	-- Under closed headers: one changes (FACTION_STANDING_CHANGED names it: R), then the headers open
+	-- (listed for the first time: no lines, not even for one never seen before).
+	listen()
+	FACTIONS[5] = { id = 21, reaction = 6, collapsed = true }
+	FACTIONS[6] = { id = 93, reaction = 4, collapsed = true }
+	Fire("FACTION_STANDING_CHANGED", 21, 6)
+	Advance(0.3)
+	FACTIONS[5].collapsed, FACTIONS[6].collapsed = nil, nil
+	Fire("UPDATE_FACTION")
+	Advance(10.3)
+	check(seq() == "R;21;6" and cap().reps[93] == 4,
+		"a faction under a closed header changed: R; the headers opened: nothing more, got " .. seq())
 
 	listen()
 	SKILLS[186] = { 1, 75 }

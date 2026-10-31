@@ -239,7 +239,9 @@ local function Factions(cap)
 		local data = Value(C_Reputation.GetFactionDataByIndex, i)
 		local id = type(data) == "table" and data.factionID
 		if type(id) == "number" and not issecret(id) and not data.isHeader then
-			Faction(cap, id, data, quiet)
+			-- (A faction listed for the first time is a baseline too: its header was closed until
+			-- now, or it was just met. A change while it isn't listed comes by FACTION_STANDING_CHANGED.)
+			Faction(cap, id, data, quiet or type(cap.reps) ~= "table" or cap.reps[id] == nil)
 			read = true
 		end
 	end
