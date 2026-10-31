@@ -370,8 +370,8 @@ LefthyToolsEchoesDB = {
     state = { ... },    -- the encoder's state: E.state itself
   },
   mine = {            -- my closed pages
-    [212] = { t = 1793451000, h = "5e1f09aa", m = "z", z = "eJzt..." },
-    [213] = { t = 1793452700, m = "t", z = "E1;...", q = 1 }, -- closed, waiting to be packed
+    [212] = { t = 1793451000, h = "5e1f09aa", m = "z", z = "eJzt...", s = 40 },
+    [213] = { t = 1793452700, m = "t", z = "E1;...", q = 1, s = 41 }, -- closed, waiting to be packed
   },
   carry = { ["5e6f7a8b.0c77e1f2"] = { [57] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- friends' pages I relay
   safe = { ["5e6f7a8b.0c77e1f2"] = { ["c011ec70.12345678"] = "1-56" } },              -- collectors' summaries
@@ -392,7 +392,9 @@ sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
 - `z`: the page. The game never decompresses one (an output without a limit): only the exporter does.
 - `h`: `LT.Hash32(z)`, the hash of what's stored (none while it waits).
 - `q`: closed, waiting to be packed (`m` is `t` meanwhile).
-- `s` (carry, inbox): the session it came in; `a` (carry): when it came.
+- `s` (mine): the session it closed in (the session before for a page closed as stale at login
+  from the saved text; none: from a build before the rule, on disk); (carry, inbox): the session
+  it came in. `a` (carry): when it came.
 
 **Files.** `Store.lua` (the closed pages, what's kept, the receipt, `/lefthy echoes`) loads before
 `Pages.lua` (the open page). Both load after the capture's files, so at logout and when switched off
@@ -409,7 +411,8 @@ last closed page's (`E.data.n`), so they're dense and holdings are ranges like `
 - goes on if it's this character's (key and GUID) and its last line (`state.t`) is at most 10
   minutes old: its unjoined lines are joined, `E.state` is put back, `E.bytes` and `E.count` go on;
 - closes as it was otherwise: `.0;l` (stale at login, at the time of its last line). Only the cheap
-  part runs there (joining the text); it's packed on a later tick;
+  part runs there (joining the text); it's packed on a later tick. It's on disk (offered at once,
+  below) when it's the saved text alone and its last line is more than 10 minutes old;
 - goes unclosed if it started before the launch day (`LT.BeforeLaunch`), or can't be a page.
 
 Then, if none is open, a new page starts: the header (`E.Raw`) and the character line. Its first
@@ -450,8 +453,9 @@ nothing else then.
 
 ### Closed pages (Store.lua)
 
-`E.Store.Close(n, t0, text)` keeps the text in `mine[n]` as it is (`m = "t"`, `q = 1`) and `n` becomes
-the last closed page's number. The tick packs one waiting page at a time, oldest first:
+`E.Store.Close(n, t0, text, onDisk)` keeps the text in `mine[n]` as it is (`m = "t"`, `q = 1`, `s` the
+session) and `n` becomes the last closed page's number. The tick packs one waiting page at a time,
+oldest first:
 
 1. `C_EncodingUtil.CompressString(text, Enum.CompressionMethod.Zlib)`, then
    `EncodeBase64(..., Enum.Base64Variant.Standard)`: `m = "z"`;
@@ -460,6 +464,27 @@ the last closed page's number. The tick packs one waiting page at a time, oldest
 
 Then `h = LT.Hash32(z)` and `q` goes. That's about once in 30 minutes: zlib and Base64 in C, the hash
 over 5-12 KB in Lua (about 1 ms).
+
+**My pages go out once they're on disk.** The game writes the saved file only at a logout or
+`/reload`; after a crash the next login goes on from the last save and numbers its pages from there
+again. A page of the lost session that had already gone to friends would then share its id with a
+different page closed after the crash: the collector keeps the first (pages never change), and its
+"safe" makes the author drop the second, which is lost. So `E.Store.Mine`, `E.Store.Held("mine")`
+and `E.Store.Page` for my own key offer only pages on disk: closed in an earlier session than this
+one (`s`; a `/reload` starts a new session, `E.data.session`).
+
+- **A page closed as stale at login** is on disk at once (its `s` is the session before): it's the
+  saved text and nothing else, and its last line is more than 10 minutes old, so any later load of
+  that save, after a crash too, closes it the same way. One closed for another character within
+  those 10 minutes waits for the next session (back on the first character, a later load would go
+  on with it), and so does one closed after switching Echoes off and on (it has this session's
+  lines).
+- **The cost:** my pages travel from the next session on (the next login or `/reload`), not the
+  evening they're recorded; the author keeps every page until a collector holds it, so nothing is
+  lost by the wait. `/lefthy echoes` says how many wait.
+- **What's still possible:** a WTF folder copied to a second computer and played on both keeps one
+  store id (it's made once per folder), so both number their pages alike and the same ids carry
+  different pages. Copy a WTF folder only to move, not to play on both.
 
 **What's kept** (design section 7):
 
@@ -498,10 +523,10 @@ and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits each.
 |---|---|
 | `E.Store.Key(acct, store)` | `"acct.store"`, nil if either isn't 8 hex digits |
 | `E.Store.Own()` | my pages' key, nil while my BattleTag isn't known |
-| `for n, page in E.Store.Mine()` | my shareable pages (`z`, `r`, not waiting), oldest first |
+| `for n, page in E.Store.Mine()` | my pages I offer: shareable (`z`, `r`, not waiting) and on disk, oldest first |
 | `E.Store.Shareable(page)` | packed (`z`) or Base64 of the text (`r`), not waiting |
-| `E.Store.Page(acct, store, n)` | a page to serve, and where (`"mine"`, `"inbox"`, `"carry"`); nil if I don't have it |
-| `E.Store.Held(where)` | `{ ["acct.store"] = "ranges" }` of `"mine"` (shareable), `"carry"` or `"inbox"` |
+| `E.Store.Page(acct, store, n)` | a page to serve, and where (`"mine"`, `"inbox"`, `"carry"`); nil if I don't have it (mine: or it isn't offered) |
+| `E.Store.Held(where)` | `{ ["acct.store"] = "ranges" }` of `"mine"` (the pages I offer), `"carry"` or `"inbox"` |
 | `E.Store.Put(acct, store, n, page, where)` | a friend's page received, `where` `"carry"` or `"inbox"`; `page` = `{ t, h, m, z }`, kept as a copy with `s` (and `a`). `true` (`true, "have"`: had it), or `false` and why: `id`, `mine` (my own store's), `page` (not `z`/`r` Base64), `size` (over 64 KB), `time` (before the launch, more than a day ahead), `hash` (`h` isn't `LT.Hash32(z)`; Put checks it), `exported`, `safe` (relaying a page a collector holds), `full` |
 | `E.Store.Drop(acct, store, ranges, where)` | drops those pages (ranges nil: all; where nil: mine, carry and inbox); the number dropped |
 | `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine and carry |
@@ -520,7 +545,7 @@ Each takes a string or a parsed list.
 ### /lefthy echoes
 
 `/lefthy echoes` (or `status`) prints, in English: recording or not, the account and store, the
-open page (size, lines, age; whether nothing is on it yet, so it stays open), my pages (numbers, size of 2 MB, how many wait to be packed), relaying
+open page (size, lines, age; whether nothing is on it yet, so it stays open), my pages (numbers, size of 2 MB, how many wait to be packed, how many are offered from the next session on), relaying
 (with relaying on or pages kept) and collecting (with collecting on or anything collected or
 exported). Other files add to it:
 
@@ -584,7 +609,7 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
 
 ### Pulling
 
-- **What I hold** (`es`): my own pages, the ones I relay (while relaying) and a collector's inbox;
+- **What I hold** (`es`): my own pages (once on disk: Pages and storage), the ones I relay (while relaying) and a collector's inbox;
   never a friend's own pages back to them. To a friend who collects or relays, when it changed (at
   most every 60 s), everything every 5 minutes.
 - **A collector** asks for every offered page it lacks (not in its inbox, not exported), until

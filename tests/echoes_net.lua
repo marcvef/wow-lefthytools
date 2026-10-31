@@ -157,11 +157,15 @@ local function Leftovers(c)
 end
 
 -- The game closes: saved variables written (returned), friends see them go offline (not on a reload).
-local function Stop(c, reload)
-	c.env.Fire("PLAYER_LOGOUT")
-	local saved = {}
-	for _, name in ipairs(SAVED) do
-		saved[name] = Copy(c.env[name])
+-- crash: nothing fired, nothing saved (nil returned).
+local function Stop(c, reload, crash)
+	local saved
+	if not crash then
+		c.env.Fire("PLAYER_LOGOUT")
+		saved = {}
+		for _, name in ipairs(SAVED) do
+			saved[name] = Copy(c.env[name])
+		end
 	end
 	Leftovers(c)
 	for i = #world.list, 1, -1 do
@@ -316,10 +320,11 @@ local function Touched(c)
 end
 
 -- (Pages.lua numbers its pages from E.data.n on: the client's own are 1, opened at login, and from
--- 1001 on, since E.data.n is set to 1000 here; the test's are 100 to 999.)
+-- 1001 on, since E.data.n is set to 1000 here; the test's are 100 to 999.) Closed in an earlier
+-- session (s): on disk, so offered (E.Store offers my pages only from the session after they closed).
 local function MyPage(c, n, len, m)
 	local z = Data(len, n * 7919 + #c.who.name)
-	local page = { t = c.env.GetServerTime() - 3600 + (n % 100) * 30, h = Hash32(z), m = m or "z", z = z }
+	local page = { t = c.env.GetServerTime() - 3600 + (n % 100) * 30, h = Hash32(z), m = m or "z", z = z, s = c.E.data.session - 1 }
 	c.E.data.mine[n] = page
 	c.E.data.n = math.max(c.E.data.n, 1000)
 	Touched(c)
@@ -1237,4 +1242,46 @@ do
 	Stop(anna)
 	Stop(bob)
 	Stop(finn)
+end
+
+section("Echoes' delivery: a crash (my pages go out once on disk)")
+do
+	-- Anna records with Cedric (collector) online. Her page 1 closes in a session that crashes: it
+	-- never went out, so the page 1 she closes after the crash (from her last save) is the one Cedric
+	-- collects, and his "safe" makes her drop that one, not one that was lost.
+	local function Write(c, seed) -- (a page's worth of lines: it closes by size on the next tick)
+		for _ = 1, 170 do
+			c.E.Line("H", seed:rep(200))
+		end
+	end
+	local cedric = Start(CEDRIC, { friends = { ANNA }, collect = true })
+	local anna = Start(ANNA, { friends = { CEDRIC } })
+	Run(5)
+	anna = Reload(anna) -- (her last save: page 1 open, nothing closed)
+	local save = anna.opts.saved
+	local store = anna.E.data.store
+	local key = ANNA.acct .. "." .. store
+	local function Got()
+		return (cedric.E.data.inbox[key] or {})[1]
+	end
+	Write(anna, "a")
+	Run(1)
+	local lost = anna.E.data.mine[1]
+	check(lost and lost.m == "z" and anna.E.Store.Page(ANNA.acct, store, 1) == nil, "Anna's page 1 closes and is packed: not offered this session")
+	check(not Run(120, Got), "Cedric, collecting and online all along, doesn't get it")
+	Stop(anna, false, true) -- (the game crashes: nothing saved)
+	anna = Start(ANNA, { friends = { CEDRIC }, saved = save })
+	check(anna.E.data.n == 0 and anna.E.data.open.n == 1, "her next login reads the last save: page 1 open again")
+	Write(anna, "b")
+	Run(1)
+	local page = anna.E.data.mine[1]
+	check(page and page.m == "z" and page.z ~= lost.z and not Got(), "page 1 closes again, with other lines (not offered yet either)")
+	anna = Reload(anna)
+	check(Run(300, Got), "after her /reload it goes out: Cedric collects it")
+	check(Got().z == page.z and Got().h == page.h, "the page 1 Cedric holds is the one Anna has, not the lost one")
+	Run(10) -- (Beacon answers one friend's hellos at most every 5 s: Cedric's /reload is heard after that)
+	cedric = Reload(cedric)
+	check(Run(120, function() return anna.E.data.mine[1] == nil end), "safe at Cedric (on his disk): Anna drops it, rightly")
+	Stop(anna)
+	Stop(cedric)
 end

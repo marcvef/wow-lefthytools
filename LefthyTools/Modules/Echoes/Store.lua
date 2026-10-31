@@ -8,7 +8,8 @@ local M = E.module
 -- one queued page at a time (zlib, Base64, LT.Hash32), never inside an event handler.
 --
 --   mine     my own closed pages, kept until a collector holds them: 2 MB at most, then the oldest
---            go, the ones a relay is known to carry first
+--            go, the ones a relay is known to carry first; offered only once on disk (closed in an
+--            earlier session: after a crash, page numbers from the last save are used again)
 --   carry    friends' pages I relay: 512 KB, 128 KB per author, 30 days
 --   inbox    a collector's received pages, dropped only by the exporter's receipt; a chat line at
 --            4 MB asks to run the exporter, at 8 MB pulling pauses (E.Store.InboxFull)
@@ -286,11 +287,24 @@ function Store.Shareable(page)
 end
 local Shareable = Store.Shareable
 
--- for n, page in E.Store.Mine(): my shareable pages, oldest (lowest n) first.
+-- Whether my page is on disk: closed in an earlier session than this one (a /reload starts a new
+-- one), closed as stale at login from the saved text (s: the session before), or from a build
+-- before this rule (no s). Only those are offered: after a crash the next session numbers its pages
+-- from the last save, so none of the lost session's pages may be out there under those numbers.
+local function OnDisk(page)
+	return type(page.s) ~= "number" or page.s < E.data.session
+end
+
+-- My page may go to others: shareable and on disk.
+local function Offered(page)
+	return Shareable(page) and OnDisk(page)
+end
+
+-- for n, page in E.Store.Mine(): my pages I offer (shareable, on disk), oldest (lowest n) first.
 function Store.Mine()
 	local list = {}
 	for n, page in pairs(E.data.mine) do
-		if type(n) == "number" and Shareable(page) then
+		if type(n) == "number" and Offered(page) then
 			list[#list + 1] = n
 		end
 	end
@@ -308,7 +322,7 @@ function Store.Mine()
 end
 
 -- A page to serve: page, where ("mine", "inbox" or "carry"); nil if I don't have it (or it isn't
--- shareable).
+-- shareable; mine: or not on disk yet).
 function Store.Page(acct, store, n)
 	local key = Store.Key(acct, store)
 	if not key or type(n) ~= "number" then
@@ -316,7 +330,7 @@ function Store.Page(acct, store, n)
 	end
 	if key == Store.Own() then
 		local page = E.data.mine[n]
-		if Shareable(page) then
+		if Offered(page) then
 			return page, "mine"
 		end
 		return nil
@@ -329,13 +343,13 @@ function Store.Page(acct, store, n)
 	end
 end
 
--- What I hold of where ("mine", "carry", "inbox") as { ["acct.store"] = "ranges" } (mine: its
--- shareable pages, under my key; nothing while my BattleTag isn't known).
+-- What I hold of where ("mine", "carry", "inbox") as { ["acct.store"] = "ranges" } (mine: the pages
+-- I offer, shareable and on disk, under my key; nothing while my BattleTag isn't known).
 function Store.Held(where)
 	local out = {}
 	if where == "mine" then
 		local own = Store.Own()
-		local ranges = own and Ranges.Of(E.data.mine, function(_, page) return Shareable(page) end)
+		local ranges = own and Ranges.Of(E.data.mine, function(_, page) return Offered(page) end)
 		if ranges and ranges ~= "" then
 			out[own] = ranges
 		end
@@ -529,12 +543,14 @@ end
 ---------------------------------------------------------------------------
 
 -- Pages.lua closes page n (started at t0): its text (ending in its "." line) is kept as plain text,
--- waiting to be packed (q), and n is the last closed page's number now.
-function Store.Close(n, t0, text)
+-- waiting to be packed (q), and n is the last closed page's number now. s: the session it closed in,
+-- offered from the next one on; onDisk (closed as stale at login from the saved text, which any
+-- later load closes the same way): the session before, offered at once.
+function Store.Close(n, t0, text, onDisk)
 	Counted()
 	local data = E.data
 	bytes.mine = bytes.mine - Size(data.mine[n]) + #text
-	data.mine[n] = { t = t0, m = "t", z = text, q = 1 }
+	data.mine[n] = { t = t0, m = "t", z = text, q = 1, s = onDisk and data.session - 1 or data.session }
 	if n > data.n then
 		data.n = n
 	end
@@ -767,13 +783,15 @@ local function Status()
 	else
 		Line("no open page.")
 	end
-	local count, waiting = 0, 0
+	local count, waiting, later = 0, 0, 0
 	for _, page in pairs(data.mine) do
 		count = count + 1
 		waiting = waiting + (page.q and 1 or 0)
+		later = later + (OnDisk(page) and 0 or 1)
 	end
-	Line(("my pages: %d (%s), %s of %s%s."):format(count, count > 0 and Ranges.Of(data.mine) or "none", Amount(bytes.mine),
-		Amount(MINE_CAP), waiting > 0 and (", %d waiting to be packed"):format(waiting) or ""))
+	Line(("my pages: %d (%s), %s of %s%s%s."):format(count, count > 0 and Ranges.Of(data.mine) or "none", Amount(bytes.mine),
+		Amount(MINE_CAP), waiting > 0 and (", %d waiting to be packed"):format(waiting) or "",
+		later > 0 and (", %d offered from the next session on (a /reload is one)"):format(later) or ""))
 	local relayed = 0
 	for _, pages in pairs(data.carry) do
 		relayed = relayed + Count(pages)

@@ -14,7 +14,8 @@ local E = ns.Echoes
 -- nothing but its header, the character and the going on from the last page (an AFK night) stays
 -- open. E.Store.Close keeps it, and a later tick packs it (Store.lua). When recording starts, an
 -- open page of another character, or whose last line is more than 10 minutes old, closes as it was
--- (".0;l"); a fresh one goes on.
+-- (".0;l"); a fresh one goes on. My pages go out only once on disk (E.Store): from the next session
+-- on, or at once for one closed here from the saved text alone that's stale by its time.
 --
 -- The page id is <acct>.<store>.<n>: acct my BattleTag's hash (E.MyAccount), store this WTF folder's
 -- (E.data.store), n one more than the last closed page's (E.data.n).
@@ -190,8 +191,9 @@ local function Resume(open)
 end
 
 -- An open page from before that doesn't go on closes as it was: ".0;l" (stale at login), at the time
--- of its last line. One with nothing in it, or that can't be a page, goes.
-local function Retire(open)
+-- of its last line. One with nothing in it, or that can't be a page, goes. onDisk: the page is the
+-- saved text and nothing else (E.Store offers it at once, see the start).
+local function Retire(open, onDisk)
 	local data = E.data
 	data.open = nil
 	if type(open.n) ~= "number" or open.n <= data.n or type(open.t0) ~= "number" or type(open.text) ~= "string" then
@@ -204,7 +206,7 @@ local function Retire(open)
 		text = text .. table.concat(buffer, "\n") .. "\n"
 	end
 	if text ~= "" then
-		E.Store.Close(open.n, open.t0, text .. ".0;l\n")
+		E.Store.Close(open.n, open.t0, text .. ".0;l\n", onDisk)
 	end
 end
 
@@ -218,6 +220,13 @@ local function Fresh(open, char)
 		return false
 	end
 	return E.Now() - state.t <= STALE
+end
+
+-- Whether an open page from before is stale by its time: its last line more than 10 minutes ago (or
+-- none readable). Every later load of the same save finds it so too.
+local function Old(open)
+	local state = open.state
+	return type(state) ~= "table" or type(state.t) ~= "number" or E.Now() - state.t > STALE
 end
 
 -- The open page closes (reason "t" or "s"), the next one starts and goes on from the last position.
@@ -245,9 +254,13 @@ local function PatchAccount(open)
 end
 
 -- Recording starts (login, /reload, switched on): the open page goes on, or closes and a new one starts.
+-- A page that closes here counts as on disk (E.Store offers it at once) when it's the saved text
+-- alone (not written this session: switched off and on) and stale by its time: any later load of
+-- this save, after a crash too, closes it the same way. One closed for another character waits for
+-- the next session (back on the first character within 10 minutes, a later load would go on with it).
 E.When("start", function()
 	local data, char = E.data, E.Character()
-	local open = data.open
+	local open, written = data.open, active -- (written: the page this session wrote, if any)
 	active = nil
 	if type(open) ~= "table" or (type(open.t0) == "number" and LT.BeforeLaunch(open.t0)) then
 		data.open = nil -- (from before the launch: never counts)
@@ -255,7 +268,7 @@ E.When("start", function()
 		Account()
 		Resume(open)
 	else
-		Retire(open)
+		Retire(open, open ~= written and Old(open))
 	end
 	if not data.open then
 		E.Take() -- (nothing may come before the header)
