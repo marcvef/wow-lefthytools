@@ -98,5 +98,8 @@ Modules\Bestiary\Ledger.lua
 
 Modules\Echoes\Echoes.lua
 Modules\Echoes\Lines.lua
+Modules\Echoes\Path.lua
+Modules\Echoes\Events.lua
+Modules\Echoes\Changes.lua
 Modules\Echoes\Store.lua
 Modules\Echoes\Pages.lua

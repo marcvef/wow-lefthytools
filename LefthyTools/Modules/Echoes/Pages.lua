@@ -17,7 +17,9 @@ local E = ns.Echoes
 -- The page id is <acct>.<store>.<n>: acct my BattleTag's hash (E.MyAccount), store this WTF folder's
 -- (E.data.store), n one more than the last closed page's (E.data.n).
 --
--- Loads before the capture's files: its start hook writes the header before theirs write anything.
+-- Loads after the capture's files: at logout and when switched off their handlers write the last
+-- lines before this file joins them. The header still comes first: the capture writes nothing when
+-- recording starts (its first line comes on the first tick).
 
 local PAGE_SECONDS = 1800 -- a page closes after 30 minutes,
 local PAGE_BYTES = 32768  -- 32 KB of text

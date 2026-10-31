@@ -47,7 +47,8 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `bestiary.lua` | Bestiary | - |
 | `whatsnew.lua` | Core: the what's new window | - |
 | `echoes.lua` | Echoes: the module, its saved table, events and driver, recording only off the beta; the line encoder | - |
-| `echoes_pages.lua` | Echoes: pages (header, joining, closing, `/reload`, stale pages), packing and its fallbacks, what's kept, the API for the delivery, the receipt, the launch day, `/lefthy echoes`; the exporter reading them | - |
+| `echoes_capture.lua` | Echoes' capture: the path (store rule, travel modes, segments), every event kind's line, secrets, combat, a `/reload`, a whole session read back | - |
+| `echoes_pages.lua` | Echoes: pages (header, joining, closing, `/reload`, stale pages), packing and its fallbacks, what's kept, the API for the delivery, the receipt, the launch day, `/lefthy echoes`, with the capture running; the exporter reading them | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:

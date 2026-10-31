@@ -4,8 +4,10 @@
 -- open page at login; packing through the mock's C_EncodingUtil (Node's real zlib, tests/native.js),
 -- the hash and the fallbacks; my BattleTag not known yet; range strings; what's kept (mine, carry,
 -- inbox) and the API for the delivery; the exporter's receipt; the launch day; the beta untouched;
--- /lefthy echoes; nothing heavy per tick. Last, the exporter's own readers on the saved file, when
--- the environment variable ECHOES_EXPORTER names the exporter's folder (skipped otherwise).
+-- /lefthy echoes; nothing heavy per tick; the exporter's own readers on the saved file, when the
+-- environment variable ECHOES_EXPORTER names the exporter's folder (skipped otherwise). The capture
+-- is kept quiet until the last section, where it runs: its lines after the header, a page going on
+-- at its last point, its last lines joined at logout and when switched off.
 -- Needs: no other file (it starts Echoes itself, on saved tables of its own, and puts back the beta).
 local suite = ...
 local check, section, ns, LT, lefthy, printedSince = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy, suite.printedSince
@@ -109,6 +111,17 @@ local function Saved()
 	return table.concat(out)
 end
 
+-- The capture (Path.lua, Events.lua, Changes.lua) kept quiet until the last section, so only the
+-- pages' own lines and the tests' are written: nowhere to be (no position), and after each start a
+-- loading screen that doesn't end (it writes nothing until its session's anchor, and nothing at
+-- logout or when switched off while that anchor is still to come).
+local realPosition = LT.Position
+LT.Position = function() return nil end
+local function start()
+	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
+	Fire("PLAYER_LEAVING_WORLD")
+end
+
 -- Echoes on a saved table of its own: as a first install would make it (session: each fresh table
 -- another number, as the module's once-a-session things go by it), recording.
 local sessions = 1000
@@ -118,9 +131,9 @@ local function fresh(acct)
 	E.buffer, E.state, E.bytes, E.count = {}, { anchored = false, names = {} }, 0, 0
 	sessions = sessions + 100
 	LefthyToolsEchoesDB = { v = 1, store = STORE, acct = acct, session = sessions, n = 0, mine = {}, carry = {}, safe = {}, inbox = {},
-		exported = {} }
+		exported = {}, capture = {}, friends = {} }
 	E.data = LefthyToolsEchoesDB
-	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
+	start()
 end
 
 -- A /reload (or a login offline seconds later): the logout's handlers run while recording (unless
@@ -138,7 +151,7 @@ local function reload(offline, loggedOut)
 	assert(load(text))()
 	LefthyToolsEchoesDB.session = LefthyToolsEchoesDB.session + 1
 	E.data = LefthyToolsEchoesDB
-	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
+	start()
 	return text
 end
 
@@ -539,7 +552,7 @@ do
 	LT:SetModuleEnabled("echoes", false)
 	for n = 1, 21 do E.data.mine[n] = page() end
 	E.data.n, E.data.open = 21, nil
-	inEvent(LT.SetModuleEnabled, LT, "echoes", true) -- (page 22 opens)
+	start() -- (page 22 opens)
 	check(Store.Bytes("mine") == 2100 * 1024 and E.data.open.n == 22, "(21 pages of 100 KB)")
 	Store.Carried(acct, STORE, "5-6")
 	Store.Carried(A, B, "1-3") -- (someone else's: nothing to do with mine)
@@ -686,7 +699,7 @@ do
 		"on the beta nothing runs: no page closes, opens or joins; the saved table stays as it is")
 	LT:SetModuleEnabled("echoes", false)
 	LT.world = nil
-	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
+	start()
 	check(E.data.mine[1] and E.data.mine[1].z:sub(-5) == ".0;l\n" and E.data.open.n == 2, "(off the beta again: it closes now)")
 end
 
@@ -731,7 +744,7 @@ do
 	mark = #PRINTED + 1
 	lefthy("echoes")
 	check(printedSince(mark):find("switched off: nothing is recorded.", 1, true), "switched off")
-	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
+	start()
 	lefthy("echoes pagestest a b")
 	check(commandRest == "a b", "a word another file added runs with the rest")
 	mark = #PRINTED + 1
@@ -809,7 +822,60 @@ do
 	end
 end
 
+section("Echoes pages: with the capture")
+do
+	LT.Position = realPosition
+	local map, pos = PLAYER_MAP, PLAYER_POS
+	local function at(north, west) PLAYER_MAP, PLAYER_POS = 1429, { (1000 - west) / 1000, (1000 - north) / 1000 } end
+	at(500, 500)
+	fresh(acct)
+	local t0 = E.data.open.t0
+	Fire("PLAYER_ENTERING_WORLD", true, false) -- (a login: the capture's session starts on the next tick)
+	Advance(1, 0.25)
+	check(E.buffer[1] == header(1, t0) and E.buffer[2] == charLine() and E.buffer[3]:find("^@%d+;0;500;500;%a;s$"),
+		"the header and the character first, then the capture's session anchor (why s), got " .. tostring(E.buffer[3]))
+	at(500, 550)
+	Advance(2, 0.25)
+	skew = skew + 1800
+	tick()
+	local first = lastClosed
+	check(first:find("\n%d+,0,50\n") and E.buffer[1] == header(2, E.Now()) and E.buffer[2] == charLine()
+		and E.buffer[3] == "@0;0;500;550;f;c" and E.buffer[4]:find("^z0;1429;"), "a page closes mid-session: the next goes on at the "
+		.. "capture's last point (why c) and zone, got " .. table.concat(E.buffer, " | "))
+	at(500, 600)
+	Advance(2, 0.25)
+	check(E.buffer[#E.buffer]:find("^%d+,0,50$"), "the capture's points go on from there, got " .. tostring(E.buffer[#E.buffer]))
+
+	-- Switched off and at logout the capture writes its last lines first; the pages join them after.
+	LT:SetModuleEnabled("echoes", false)
+	check(#E.buffer == 0 and E.data.open.text:find("\no%d+;0\n$") and E.data.open.n == 2, "switched off: joined with the capture's o0, last")
+	inEvent(LT.SetModuleEnabled, LT, "echoes", true)
+	Advance(1, 0.25)
+	check(E.data.open.n == 2 and E.buffer[1]:find("^@%d+;0;500;600;%a;s$"), "on again soon: the same page, the capture's new session")
+	Fire("PLAYER_LOGOUT")
+	check(#E.buffer == 0 and E.data.open.text:find("\no%d+;0\n$"), "at logout: joined with the capture's o0, last")
+
+	-- The exporter reads the capture's pages too.
+	skew = skew + 1800
+	tick()
+	tick()
+	local result = MOCK_EXPORTER(Saved())
+	if type(result) == "table" then
+		local clean = true
+		for _, p in pairs(result.parsed) do
+			clean = clean and p.ok and p.bad == 0 and p.unknown == ""
+		end
+		check(result.bad == 0 and result.hashBad == 0 and #result.warnings == 0 and result.new == 2 and clean
+			and result.pages[own .. ".1"] == first and result.parsed[own .. ".1"].segs >= 1,
+			"the exporter reads the pages with the capture's lines: every kind known, nothing unreadable")
+	elseif type(result) == "string" then
+		check(false, "the exporter: " .. result)
+	end
+	PLAYER_MAP, PLAYER_POS = map, pos
+end
+
 -- Back as it was: the mock's clock and calls, the beta, Echoes recording nothing.
+LT.Position = realPosition
 GetServerTime, Fire, LT.Hash32, Store.Close = serverTime, realFire, realHash, realClose
 encoding.CompressString, encoding.EncodeBase64 = realCompress, realEncode
 C_AddOns.LoadAddOn, LefthyToolsEchoesReceipt, MOCK_RECEIPT = nil, nil, nil

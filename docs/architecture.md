@@ -100,6 +100,9 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Bestiary/Ledger.lua      the ledger: every mob, its statistics and drops, fuzzy search over mobs and items
   Modules/Echoes/Echoes.lua        Echoes: the module, settings, its saved table (LefthyToolsEchoesDB), its events and driver
   Modules/Echoes/Lines.lua         the line encoder: everything recorded as one line of text (the format: echoes.md)
+  Modules/Echoes/Path.lua          the capture's path: polls, the store rule, travel modes, segments, the zone, sessions
+  Modules/Echoes/Events.lua        the capture's events: level-ups, quests, deaths, kills, loot, gathering, ...
+  Modules/Echoes/Changes.lua       what the capture compares with what it wrote: XP, group, gear, reputation, ...
   Modules/Echoes/Store.lua         the closed pages: packing, what's kept, the API for the delivery, the exporter's receipt, /lefthy echoes
   Modules/Echoes/Pages.lua         the open page: starting, joining, closing, going on after a /reload
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
