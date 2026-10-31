@@ -129,6 +129,7 @@ const release = !names.length || names.includes("release");
 function newState() {
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);
+  require("./native.js")(L); // C_EncodingUtil with Node's real zlib, MOCK_EXPORTER (tests/native.js)
   lua.lua_newtable(L);
   files.forEach((f, i) => {
     lua.lua_newtable(L);

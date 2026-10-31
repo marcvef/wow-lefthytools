@@ -1448,6 +1448,9 @@ GameTooltip = {
 TOOLTIP_POSTCALLS = {}
 Enum.TooltipDataType = { Item = 0, Unit = 2 }
 TooltipDataProcessor = { AddTooltipPostCall = function(kind, fn) TOOLTIP_POSTCALLS[#TOOLTIP_POSTCALLS + 1] = { kind, fn } end }
+-- C_EncodingUtil (compression, Base64) is Node's real zlib: tests/native.js puts it in before this file.
+Enum.CompressionMethod = { Deflate = 0, Zlib = 1, Gzip = 2 }
+Enum.Base64Variant = { Standard = 0, StandardUrlSafe = 1 }
 
 -- Trading and mail: TRADE_PARTNER is "NPC" (its GUID via PARTY.NPC), TRADE_ITEMS / MAIL_ITEMS hold
 -- my item links / item IDs per slot.

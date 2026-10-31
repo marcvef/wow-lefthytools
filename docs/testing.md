@@ -18,6 +18,10 @@
 
 The mock runs OnUpdate only on visible frames, like the game, and animation groups with
 `SetToFinalAlpha(true)` jump to their end state on `Play()`. It does not replace testing in game.
+What Lua can't fake comes from Node (`tests/native.js`, put into each Lua state before mock.lua):
+`C_EncodingUtil` with Node's real zlib and Base64, so Echoes' pages really round-trip, and
+`MOCK_EXPORTER(text)`: the Echoes exporter's own readers on a saved file's text, when the
+environment variable `ECHOES_EXPORTER` names the exporter's folder (nil without it).
 
 ### The English suite
 
