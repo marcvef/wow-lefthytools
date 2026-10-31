@@ -201,18 +201,29 @@ zeppelin; whether the silent `/played` stays silent; which of `QUEST_REMOVED` an
 `QUEST_TURNED_IN` comes first; `PARTY_KILL` for pets and group members; the gathering spell IDs and
 `GetLootSourceInfo`'s game object GUIDs for nodes and fishing; `PVP_MATCH_COMPLETE`'s winner (0 the
 Horde, 1 the Alliance, like `GetBattlefieldWinner`); `NEW_RECIPE_LEARNED`, `NEW_MOUNT_ADDED` and
-`FACTION_STANDING_CHANGED` firing; `C_SkillInfo.GetSkillLineInfoByID` for professions not learned
-(nil, or rank 0: only rank 0 is taken as unlearned).
+`FACTION_STANDING_CHANGED` firing (also for a faction under a closed header: a scan no longer
+writes those); `C_SkillInfo.GetSkillLineInfoByID` for professions not learned (nil, or rank 0: only
+rank 0 is taken as unlearned). Also: `GetInstanceInfo`'s instance ID outside instances (the
+continent, 0 or 1); `UnitPosition` at `PLAYER_LEAVING_WORLD` still where you were (the last point
+and the queue are written there); `IsPlayerMoving` on a flight path; `GetUnitSpeed` 0 right after
+`PLAYER_STOPPED_MOVING`; no `PLAYER_DEAD` at a login while dead, and whether `PLAYER_ALIVE` comes
+again for a ghost (after a dungeon's release, say: an `o` anchor then an `r` one); gear right at
+login (a slot whose link isn't there yet would read as taken off).
 
 ### Tests
 
 `tests/echoes_capture.lua` (after `echoes.lua`): a session starting, the store rule (distance,
-bends, start and stop, the idle crawl fix, an event's spot, `UnitPosition` once a second), every
-travel mode (swimming's flicker, the carried guess), every segment and cause, instances, every
-event kind as its exact line, secret values, nothing in combat that must wait, a `/reload`
-(`E.capture.Reset`), Chronicle, the Bestiary and Beacon off, the beta, and a whole session read back
-(times and positions add up line after line). It leaves `ECHOES_CAPTURE_SESSION` (the page and its
-times and positions) for a check with the exporter's parser outside this repo.
+bends, start and stop, the idle crawl fix, an event's spot, also on a flight path, `UnitPosition`
+once a second), every travel mode (swimming's flicker, the carried guess and what isn't carried: a
+stop, Blinks, a secret speed; a boat across a loading screen), every segment and cause (a loading
+screen to no position, events and a hearthstone just before one), instances, every event kind as
+its exact line (quests removed before they're turned in, a login or `/reload` while dead, a release
+heard twice, reputation under closed headers, rested XP in an inn, a battleground left while logged
+out, a friend Beacon learns of later), secret values, nothing in combat that must wait, a `/reload`
+(`E.capture.Reset`, and one with a loading screen before its anchor), Chronicle, the Bestiary and
+Beacon off, the beta, and a whole session read back on a page of its own (times and positions add
+up line after line). It leaves `ECHOES_CAPTURE_SESSION` (the page and its times and positions) for a
+check with the exporter's parser outside this repo.
 
 ## Line format
 

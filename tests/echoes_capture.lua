@@ -5,7 +5,7 @@
 -- Needs: no other file (it switches Echoes on and off itself, and puts back the mock's world it changes).
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
-local afk, anna = suite.afk, suite.anna
+local afk, anna, catchErrors = suite.afk, suite.anna, suite.catchErrors
 local E = ns.Echoes
 local C = E.capture
 
@@ -430,6 +430,34 @@ do
 	Advance(1.2)
 	Advance(2)
 	check(count("^m;") == 0, "a stop, then Blinks standing: still on foot (the guess needs two polls in a row), got " .. seq())
+
+	-- The game's speed a secret: no carried guess (a secret can't be compared).
+	listen()
+	UNIT_SPEED = SECRET
+	walk(640, 200, 10, true)
+	UNIT_SPEED = nil
+	Advance(1.2)
+	check(count("^m;") == 0 and #points() >= 4, "carried, the speed a secret: no guess, the path all the same, got " .. seq())
+
+	-- On a boat across a loading screen: its last point, an anchor (why l; not carried yet), carried
+	-- again after two polls; walking off it.
+	listen()
+	UNIT_SPEED = 0
+	walk(640, 260, 10, true)
+	Fire("PLAYER_LEAVING_WORLD")
+	at(700, 300)
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+	Advance(0.3)
+	walk(700, 360, 10, true)
+	UNIT_SPEED = nil
+	walk(710, 360)
+	halt()
+	Advance(0.3)
+	local boat = seq()
+	local before, after = boat:match("^(.-)@;0;700;300;f;l(.*)$")
+	check(before and before:find("m;c") and before:find(",%-?%d+,%-?%d+ $") and select(2, after:gsub("m;c", "")) == 1
+		and after:find("m;f"),
+		"a boat across a loading screen: carried, its last point, the anchor on foot, carried again, off it, got " .. boat)
 end
 
 ---------------------------------------------------------------------------
@@ -652,6 +680,17 @@ do
 	Fire("QUEST_REMOVED", 9, false)
 	Advance(2)
 	check(seq() == "a;8 A;8 Q;9", "removed, not done: abandoned (A); removed and done without QUEST_TURNED_IN: turned in, got " .. seq())
+	-- Removed first, turned in a moment later (which comes first is still to be seen in game): one Q,
+	-- with its XP and money.
+	listen()
+	Fire("QUEST_ACCEPTED", 10)
+	Advance(0.3)
+	Fire("QUEST_REMOVED", 10, false)
+	Advance(0.5)
+	QUESTS_DONE[10] = true
+	Fire("QUEST_TURNED_IN", 10, 300, 50)
+	Advance(2)
+	check(seq() == "a;10 Q;10;300;50", "removed, then turned in: one Q with XP and money, got " .. seq())
 	listen()
 	Fire("QUEST_ACCEPTED", SECRET)
 	Fire("QUEST_REMOVED", SECRET)
@@ -814,6 +853,16 @@ do
 		"kills: mine, my pet's, my group's (level and classification as seen, the name once); each corpse once; not "
 		.. "someone else's, a player's or a secret, got " .. seq())
 	GROUP_GUIDS["Player-1-11"], PET_GUID = nil, nil
+	-- A nameplate whose unit is a secret, a secret mouseover: nothing, no error.
+	local reported, restore = catchErrors()
+	listen()
+	Fire("NAME_PLATE_UNIT_ADDED", SECRET)
+	MOBS.mouseover = { name = "Defias Bandit", level = 12, guid = SECRET }
+	Fire("UPDATE_MOUSEOVER_UNIT")
+	MOBS.mouseover = nil
+	Advance(0.3)
+	restore()
+	check(#reported == 0 and seq() == "", "a secret nameplate unit or GUID: nothing, got " .. seq() .. " " .. table.concat(reported, " "))
 end
 
 ---------------------------------------------------------------------------
@@ -1196,7 +1245,10 @@ end
 section("Echoes capture: a whole session, read back")
 ---------------------------------------------------------------------------
 do
-	-- A login, a walk, a fight, loot, a quest, a ride, the hearthstone, a dungeon, a logout.
+	-- A login, a walk, a fight, loot, a quest, a ride, the hearthstone, a dungeon, a logout. On a
+	-- page of its own (the last one's last line more than 10 minutes old): a page starting halfway
+	-- would start its times from its header.
+	Advance(601)
 	at(500, 500)
 	QUESTS = { { id = 176, title = "Wanted: \"Hogger\"", objectives = {} } }
 	MOBS.nameplate3 = { name = "Hogger", level = 11, class = "elite", guid = "Creature-0-1-0-1-448-000000F1" }
@@ -1260,7 +1312,7 @@ do
 	local kinds = {}
 	for i, h in ipairs(list) do kinds[i] = h.kind or "." end
 	kinds = table.concat(kinds)
-	check(kinds:find("^@zo") and kinds:find("=a") and kinds:find("=kl") and kinds:find("m") and kinds:find("Q")
+	check(kinds:find("^@zo") and kinds:find("=a") and kinds:find("=k=?l") and kinds:find("m") and kinds:find("Q")
 		and kinds:find("@", 2, true) and kinds:find("d") and kinds:find("o$"), "every part of it is there, got " .. kinds)
 
 	-- For the exporter: the page and what it must read from it, as
