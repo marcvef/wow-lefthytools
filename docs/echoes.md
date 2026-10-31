@@ -121,7 +121,7 @@ the last poll). An anchor's mode is read as it is then (never `c`).
 | a jump of more than 50 + 40 * seconds yd between two polls (the seconds at most 5) | what caused it, else `j` |
 | another continent | what caused it, else `j` |
 | the position gone (an anchor without one: the instance's map ID, else the last continent) or back | what caused it, else `j` |
-| released: the ghost at the graveyard (the first poll it moved, at most 1 s after `PLAYER_ALIVE` as a ghost; polled every tick meanwhile) | `r` |
+| released: the ghost at the graveyard (the first poll it moved, at most 1 s after `PLAYER_ALIVE` as a ghost, once per death; polled every tick meanwhile) | `r` |
 | a new page that didn't go on from the last (no anchor on the page: `E.Continue` wasn't called) | `c` |
 
 What caused it, from what was noted shortly before (used once, then forgotten): `h` the hearthstone

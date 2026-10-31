@@ -701,6 +701,23 @@ do
 	Advance(0.3)
 	check(count("^D;") == 1 and count("^r;c$") == 1, "a /reload while dead: the death once, then back to life, got " .. seq())
 	Advance(11)
+	-- Released, then PLAYER_ALIVE again as a ghost: one segment for the release.
+	listen()
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Advance(0.3)
+	STATE.ghost = true
+	Fire("PLAYER_ALIVE")
+	at(700, 560)
+	Advance(1.2)
+	Advance(5)
+	Fire("PLAYER_ALIVE")
+	Advance(2)
+	STATE.ghost, STATE.dead = false, false
+	Fire("PLAYER_UNGHOST")
+	Advance(1.2)
+	check(seq() == "D;19;-;;;;0 @;0;700;560;g;r r;c m;f", "PLAYER_ALIVE twice as a ghost: released once, got " .. seq())
+	Advance(11)
 end
 
 ---------------------------------------------------------------------------

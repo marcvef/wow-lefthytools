@@ -83,6 +83,7 @@ local function Reset()
 	-- counted before it, its release and coming back to life still are.
 	S.down = DeadOrGhost()
 	S.deadAt = S.down and GetTime() or nil
+	S.released = Yes(UnitIsGhost, "player") -- (released since that death: once is its segment)
 	S.spiritAt, S.rezAt = nil, nil -- the spirit healer asked, a resurrection offered
 	S.bossID, S.bossAt = nil, -math.huge
 	S.n = 0
@@ -295,7 +296,7 @@ E.On("PLAYER_DEAD", function()
 	if S.deadAt then
 		return -- (the same death again)
 	end
-	S.deadAt, S.down = GetTime(), true
+	S.deadAt, S.down, S.released = GetTime(), true, false
 	S.spiritAt, S.rezAt = nil, nil
 	Note("D")
 end)
@@ -334,7 +335,10 @@ E.On("PLAYER_ALIVE", function()
 		return
 	end
 	if Yes(UnitIsGhost, "player") then
-		C.NoteCause("r")
+		if not S.released then -- (PLAYER_ALIVE again as a ghost isn't another release)
+			S.released = true
+			C.NoteCause("r")
+		end
 	else
 		S.down = false
 		Note("r", (S.rezAt and GetTime() - S.rezAt <= REZ_FOR) and "p" or "c")
