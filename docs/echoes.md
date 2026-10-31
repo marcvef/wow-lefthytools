@@ -223,11 +223,14 @@ form of a friend's realm from `GetPlayerInfoByGUID` and Battle.net (`realmDispla
 `tests/echoes_capture.lua` (after `echoes.lua`): a session starting, the store rule (distance,
 bends, start and stop, the idle crawl fix, an event's spot, also on a flight path, `UnitPosition`
 once a second), every travel mode (swimming's flicker, the carried guess and what isn't carried: a
-stop, Blinks, a secret speed; a boat across a loading screen), every segment and cause (a loading
-screen to no position, events and a hearthstone just before one), instances, every event kind as
-its exact line (quests removed before they're turned in, a login or `/reload` while dead, a release
-heard twice, reputation under closed headers, rested XP in an inn, a battleground left while logged
-out, a friend Beacon learns of later), secret values, nothing in combat that must wait, a `/reload`
+stop, Blinks, a secret speed; a boat across a loading screen; back to life in water), every segment
+and cause (a loading screen to no position, events and a hearthstone just before one, a summon
+declined, not answered or accepted), instances (one that can't be told yet), every event kind as its
+exact line (quests removed before they're turned in and the other way round, far apart, or turned in
+again, a login or `/reload` while dead, a release heard twice, a player's totem or pet as the
+killer, loot not cached yet, fishing, gathering ranks known by names that come late, reputation
+under closed headers, rested XP in an inn, a battleground left while logged out, gear whose link
+comes late, a friend Beacon learns of later, friends' realms in another form), secret values, nothing in combat that must wait, a `/reload`
 (`E.capture.Reset`, and one with a loading screen before its anchor), Chronicle, the Bestiary and
 Beacon off, the beta, and a whole session read back on a page of its own (times and positions add
 up line after line). It leaves `ECHOES_CAPTURE_SESSION` (the page and its times and positions) for a
