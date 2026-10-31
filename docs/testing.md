@@ -49,7 +49,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `echoes.lua` | Echoes: the module, its saved table, events and driver, recording only off the beta; the line encoder | - |
 | `echoes_capture.lua` | Echoes' capture: the path (store rule, travel modes, segments), every event kind's line, secrets, combat, a `/reload`, a whole session read back | - |
 | `echoes_pages.lua` | Echoes: pages (header, joining, closing, `/reload`, stale pages), packing and its fallbacks, what's kept, the API for the delivery, the receipt, the launch day, `/lefthy echoes`, with the capture running; the exporter reading them | - |
-| `echoes_net.lua` | Beacon's B family; Echoes' delivery: messages, ranges, who gets B, serving within the budget, back-off, collecting, relaying, safe ranges, the probe, switching off | - (its clients are its own) |
+| `echoes_net.lua` | Beacon's B family; Echoes' delivery: messages, ranges, who gets B, serving within the budget, back-off, collecting, relaying, safe ranges, the probe, switching off; three clients (author, relay, collector) and an older build | - (its clients are its own) |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:
@@ -68,7 +68,8 @@ offline), reloads them (`Reload`: the next session) and lets time pass for all o
 (`Run`), carrying each one's `SendGameData` to the receiver's `BN_CHAT_MSG_ADDON` after every step
 (and logging it). A client can leave a file out (`without`: an older build). Friends can also be
 played by the test (`fake`: online, `Say` what they'd send, `Sent` what they got). Every client is
-checked when it closes: no errors, no globals leaked. A client is about 0.15 s to start.
+checked when it closes: no errors, no globals leaked. A client is about 0.15 s to start; three
+clients for three simulated minutes take a few seconds.
 
 ### The release suite
 

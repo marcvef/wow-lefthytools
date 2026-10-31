@@ -1113,3 +1113,128 @@ do
 	Pass(me, 1)
 	Stop(me)
 end
+
+---------------------------------------------------------------------------
+-- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
+---------------------------------------------------------------------------
+
+section("Echoes' delivery: three clients (author, relay, collector)")
+do
+	local everyone = { ANNA, BOB, CEDRIC, FINN }
+	local function Others(p)
+		local list = {}
+		for _, f in ipairs(everyone) do
+			if f ~= p then
+				list[#list + 1] = f
+			end
+		end
+		return list
+	end
+	world.time = 0
+	local finn = Start(FINN, { friends = Others(FINN), version = OLD, without = "Modules/Echoes/Delivery.lua" })
+	local anna = Start(ANNA, { friends = Others(ANNA) })
+	local bob = Start(BOB, { friends = Others(BOB) })
+	-- Anna's recording: pages 101-106 (1-3 KB), and 107 in plain text (compression failed: never shared).
+	local pages = {}
+	for n = 101, 106 do
+		pages[n] = MyPage(anna, n, 1000 + (n - 100) * 300)
+	end
+	MyPage(anna, 107, 400, "t")
+	local akey = ANNA.acct .. "." .. anna.E.data.store
+	local function Carried(c)
+		local n = 0
+		for i = 101, 106 do
+			local page = (c.E.data.carry[akey] or {})[i]
+			n = n + ((page and page.z == pages[i].z and page.h == pages[i].h and page.t == pages[i].t) and 1 or 0)
+		end
+		return n
+	end
+	local function Collected(c)
+		local n = 0
+		for i = 101, 106 do
+			local page = (c.E.data.inbox[akey] or {})[i]
+			n = n + ((page and page.z == pages[i].z and page.h == pages[i].h and page.m == "z") and 1 or 0)
+		end
+		return n
+	end
+
+	-- Bob relays while Cedric is offline.
+	check(Run(300, function() return Carried(bob) == 6 end), "Bob (relay) carries all 6 of Anna's pages, got " .. Carried(bob))
+	check(not (bob.E.data.carry[akey] or {})[107] and next(bob.E.data.inbox) == nil, "not the plain-text one; nothing in Bob's inbox")
+	local annaPeer = bob.D.peers[ANNA.id]
+	check(annaPeer and annaPeer.verified and annaPeer.share and not annaPeer.collect and bob.D.peers[FINN.id] == nil,
+		"Bob knows Anna's Echoes (her account checked); Finn has none")
+
+	-- Anna goes; Cedric (collector) comes and gets them from Bob. Bob goes mid-page; Anna is back:
+	-- the page goes on from her, from where it got to.
+	local annaSaved = Stop(anna)
+	local cedric = Start(CEDRIC, { friends = Others(CEDRIC), collect = true })
+	local resumed = Run(300, function()
+		for _, part in pairs(cedric.D.partials) do
+			if part.have > 0 and Collected(cedric) >= 2 then
+				return true
+			end
+		end
+	end, 0.05)
+	check(resumed, "Cedric got " .. Collected(cedric) .. " page(s) from Bob, and part of the next")
+	local partial
+	for pageId, part in pairs(cedric.D.partials) do
+		partial = { id = pageId, have = part.have }
+	end
+	local bobSaved = Stop(bob)
+	local mark = #world.log + 1
+	anna = Start(ANNA, { friends = Others(ANNA), saved = annaSaved })
+	check(Run(300, function() return Collected(cedric) == 6 end), "Cedric collects all 6, got " .. Collected(cedric))
+	local resumedFrom
+	for i = mark, #world.log do
+		local m = world.log[i]
+		local n, offset = m.data:match("^B2;eq;" .. ANNA.acct .. ";%x+;(%d+);(%d+)$")
+		if m.from == CEDRIC.id and m.to == ANNA.id and n and akey .. "." .. n == partial.id then
+			resumedFrom = resumedFrom or tonumber(offset)
+		end
+	end
+	check(resumedFrom and resumedFrom == partial.have and resumedFrom > 0,
+		"the page Bob didn't finish: asked of Anna from byte " .. tostring(resumedFrom) .. " (had " .. partial.have .. ")")
+	local session = cedric.E.data.session
+	local sessions = true
+	for _, page in pairs(cedric.E.data.inbox[akey]) do
+		sessions = sessions and page.s == session
+	end
+	check(sessions and Keys(anna.E.data.mine) == "101,102,103,104,105,106,107", "Cedric's pages came this session: Anna keeps her copies")
+	Run(65)
+	check(Keys(anna.E.data.mine) == "101,102,103,104,105,106,107", "a minute later still (not on Cedric's disk yet)")
+
+	-- Bob is back; Anna goes. Cedric's next session: on his disk now. Bob hears it and drops his copies.
+	annaSaved = Stop(anna)
+	bob = Start(BOB, { friends = Others(BOB), saved = bobSaved })
+	Run(5)
+	check(Carried(bob) == 6, "Bob back, still carrying them")
+	cedric = Reload(cedric)
+	check(cedric.E.data.session == session + 1 and Collected(cedric) == 6, "Cedric's /reload: the next session, his pages kept")
+	check(Run(120, function() return Carried(bob) == 0 end), "Bob drops his copies: safe at Cedric")
+	check(bob.E.data.safe[akey] and bob.E.data.safe[akey][CEDRIC.acct .. "." .. cedric.E.data.store] == "101-106", "Bob keeps what Cedric holds safely")
+
+	-- Cedric goes; Anna comes back: Bob passes on what Cedric holds, and she drops her copies.
+	local cedricStore = cedric.E.data.store
+	Stop(cedric)
+	anna = Start(ANNA, { friends = Others(ANNA), saved = annaSaved })
+	check(Run(120, function() return Keys(anna.E.data.mine) == "107" end), "Anna drops pages 101-106 (Bob told her Cedric has them), got " .. Keys(anna.E.data.mine))
+	check(anna.E.data.safe[akey] and anna.E.data.safe[akey][CEDRIC.acct .. "." .. cedricStore] == "101-106", "... and keeps page 107, never shared")
+
+	-- Finn never got a B message; Beacon talked to him as ever. Every B message fits 255 bytes.
+	local toFinn, beaconToFinn, longest = 0, 0, 0
+	for _, m in ipairs(world.log) do
+		if m.to == FINN.id then
+			toFinn = toFinn + (m.data:sub(1, 2) == "B2" and 1 or 0)
+			beaconToFinn = beaconToFinn + (m.data:sub(1, 3) == "S2;" and 1 or 0)
+		end
+		if m.data:sub(1, 3) == "B2;" then
+			longest = math.max(longest, #m.data)
+		end
+	end
+	check(toFinn == 0 and beaconToFinn > 0, "Finn (an older build) never got a B message, Beacon's as ever (" .. beaconToFinn .. " states)")
+	check(longest <= 255 and longest >= 250, "every B message fits 255 bytes (the longest: " .. longest .. ")")
+	Stop(anna)
+	Stop(bob)
+	Stop(finn)
+end
