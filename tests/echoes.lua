@@ -35,6 +35,14 @@ do
 	check(data.session == 1, "the first load: session 1 (release.lua: +1 at each)")
 	check(type(data.mine) == "table" and type(data.carry) == "table" and type(data.safe) == "table" and type(data.inbox) == "table"
 		and type(data.exported) == "table" and data.acct == nil, "mine, carry, safe, inbox, exported; the account comes later")
+	-- Two clients whose math.random gives the same numbers (unseeded, or seeded alike) still make
+	-- two stores: the store keeps two computers of one BattleTag apart.
+	local random = math.random
+	math.random = function() return 4242 end
+	local a, b = E.NewStore(), E.NewStore()
+	math.random = random
+	check(a ~= b and #a == 8 and #b == 8 and a:find("^[0-9a-f]+$") and b:find("^[0-9a-f]+$"),
+		"a new store is 8 lowercase hex digits, and differs even when math.random repeats itself, got " .. a .. " and " .. b)
 end
 
 section("Echoes: recording, its events and its driver")
@@ -180,6 +188,15 @@ do
 	check(E.Line("l", 2589, 1, nil, "", nil) == "l0;2589;1" and E.Line("D", 12, "c", nil, 14) == "D0;12;c;;14" and E.Line("o") == "o0"
 		and E.Line("g", 2, SECRET, "x") == "g0;2;;x" and E.Line("r", {}, SECRET) == "r0",
 		"empty fields at the end are left out, inner ones stay; nil, a secret or a table: empty")
+
+	-- Positions that aren't readable numbers: no point; an anchor with half a position has none.
+	E.Take()
+	E.PageStart(clock)
+	E.Anchor(0, 100, 200, "f", "s")
+	check(E.Point(SECRET, 5) == nil and E.Point(0 / 0, 5) == nil and E.Point(5, math.huge) == nil and E.Point("7", 5) == nil
+		and E.Point(nil, 5) == nil and E.state.north == 100, "a position that isn't a readable number (secret, not a number, infinite, text): no point")
+	check(E.Anchor(SECRET, 5, nil, "f", "j") == "@0;;;;f;j" and E.state.north == nil and E.state.continent == nil and E.Point(1, 1) == nil
+		and E.Take() == "@0;0;100;200;f;s\n@0;;;;f;j\n", "half a position, a secret continent: an anchor without a position, no points after it")
 
 	-- Names: once per page.
 	E.Take()

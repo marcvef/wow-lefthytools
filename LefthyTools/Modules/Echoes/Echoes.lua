@@ -5,11 +5,19 @@ local L = ns.L
 -- Echoes: records the way you travel and what happens on it (level-ups, quests, kills, loot, deaths
 -- and more) as lines of text, cut into pages kept in LefthyToolsEchoesDB, for a program outside the
 -- game to read. Friends' clients can carry pages to whoever collects them (through Beacon). Nothing
--- shows in game. The module's switch is the recording's: off, nothing is recorded.
+-- shows in game. The module's switch is the recording's: off, nothing is recorded or sent.
 --
--- This file: the module, its settings, the saved table, Echoes' own event frame (E.On) and its one
--- driver (E.OnTick, every 0.25 s while recording). The others, in the order they load: Lines.lua
--- (the line encoder every recorded thing goes through: docs/echoes.md has the format).
+-- This file: the module, its settings, the saved table, Echoes' own event frame (E.On), its one
+-- driver (E.OnTick, every 0.25 s while recording), recording starting and stopping (E.When). The
+-- others, in the order they load (docs/echoes.md has each one's details):
+--   Lines.lua     the line encoder every recorded thing goes through (the line format)
+--   Path.lua      the capture's path: polls, the store rule, travel modes, segments, the zone, sessions
+--   Events.lua    the capture's events: level-ups, quests, deaths, kills, loot, gathering, bosses, ...
+--   Changes.lua   what the capture compares with what it wrote: XP, AFK, group, gear, reputation, ...
+--   Store.lua     the closed pages: packing, what's kept, the API for the delivery, the exporter's
+--                 receipt, /lefthy echoes
+--   Pages.lua     the open page: starting, joining, closing, going on after a /reload
+--   Delivery.lua  pages from friends to the collector through Beacon (the relay and collect settings)
 --
 -- Never lags the client: event handlers only note things, the tick's subscribers do the rest and
 -- each throttles itself; nothing runs while it doesn't record. Its own event frame keeps it
@@ -19,9 +27,10 @@ local L = ns.L
 -- LefthyToolsEchoesDB (account-wide) = { world (Core's stamp), v = 1 (the layout), store (8 random
 --   hex digits, made once: this WTF folder's), acct (my BattleTag's hash, filled in later), session
 --   (+1 at every load: what's from this session, what's from disk), n (the last closed page's
---   number), open (the page being written, plain text, never shared; nil: none), mine (my closed
---   pages), carry (friends' pages I relay), safe (what collectors hold), inbox and exported (a
---   collector's) }
+--   number), open (the page being written, plain text, never shared; nil: none: Pages.lua), mine
+--   (my closed pages), carry (friends' pages I relay), safe (what collectors hold), inbox and
+--   exported (a collector's: Store.lua), capture (the capture's baselines per character) and
+--   friends (LefthyTools friends' names: Path.lua and Changes.lua) }
 
 local TICK = 0.25 -- seconds between the driver's ticks
 
@@ -46,10 +55,15 @@ E.recording = false
 
 local TABLES = { "mine", "carry", "safe", "inbox", "exported" }
 
--- A new store: 8 random lowercase hex digits (two 16-bit halves: %x above 2^31 isn't safe in every Lua).
+-- A new store: 8 random lowercase hex digits. It keeps two computers or two WoW accounts of one
+-- BattleTag apart, so it must never repeat: math.random's numbers mixed with the clocks (GetTime:
+-- this client's start) and a new table's address, through LT.Hash32, whatever math.random's seed.
 local function NewStore()
-	return ("%04x%04x"):format(math.random(0, 65535), math.random(0, 65535))
+	local ok, profile = pcall(debugprofilestop)
+	return LT.Hash32(("%d %d %s %s %s %s"):format(math.random(0, 65535), math.random(0, 65535), tostring(time()), tostring(GetTime()),
+		tostring(ok and profile or ""), tostring({})))
 end
+E.NewStore = NewStore -- (for tests)
 
 -- At load (Core has stamped the table's world, and dropped the beta's on the release).
 table.insert(LT.onLoad, function()
@@ -184,7 +198,7 @@ function M:OnDisable()
 end
 
 ---------------------------------------------------------------------------
--- Settings (what Delivery.lua will do with them)
+-- Settings: the delivery's (Delivery.lua reads them)
 ---------------------------------------------------------------------------
 
 function M:BuildOptions(o)

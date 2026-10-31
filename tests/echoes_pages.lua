@@ -55,9 +55,9 @@ local function countedCompress(...)
 	return realCompress(...)
 end
 encoding.CompressString = countedCompress
-Store.Close = function(n, t0, text)
+Store.Close = function(n, t0, text, ...)
 	closes, lastClosed = closes + 1, text
-	return realClose(n, t0, text)
+	return realClose(n, t0, text, ...)
 end
 
 -- The most packed and closed in one tick since resetTicks() (a subscriber after the pages' own).
@@ -71,6 +71,12 @@ E.OnTick(function()
 	seenCompress, seenCloses = compressCalls, closes
 end)
 local function tick() Advance(0.25, 0.25) end -- one tick of the driver
+-- One tick at the realm's time t (whole seconds): the clock set ahead to it (the mock's time() is
+-- whole seconds of GetTime(); the tick comes 0.25 s on).
+local function tickAt(t)
+	skew = skew + t - (time() + skew + math.floor(GetTime() + 0.25) - math.floor(GetTime()))
+	tick()
+end
 
 -- The saved table as the game writes it (sorted here, so two writes compare): strings with \\, \",
 -- \n, \r and other control bytes as \ddd, everything else as it is.
@@ -139,12 +145,13 @@ end
 -- A /reload (or a login offline seconds later): the logout's handlers run while recording (unless
 -- loggedOut: the test fired it), the saved table is written and read back as the game does (through
 -- its text), the old interface goes (Lines.lua's buffer and state are new), Echoes' load counts a
--- new session, and it records again. The saved file's text.
-local function reload(offline, loggedOut)
-	if not loggedOut then
+-- new session, and it records again. The saved file's text. lastSave: a crash instead: nothing is
+-- written, the next load reads the file the game saved last (that text).
+local function reload(offline, loggedOut, lastSave)
+	if not loggedOut and not lastSave then
 		Fire("PLAYER_LOGOUT")
 	end
-	local text = Saved()
+	local text = lastSave or Saved()
 	LT:SetModuleEnabled("echoes", false) -- (the old interface: what it does now isn't saved)
 	E.buffer, E.state, E.bytes, E.count = {}, { anchored = false, names = {} }, 0, 0
 	skew = skew + (offline or 0)
@@ -345,6 +352,56 @@ do
 	check(most.compress == 1 and most.close == 1 and heavyInEvent == 0, "one a tick; nothing heavy inside an event")
 end
 
+section("Echoes pages: a page with nothing on it doesn't close by time")
+do
+	-- The page after one closed mid-session: its header, the character and the going on (an anchor
+	-- at the last position and the zone), then nothing while you're away (an AFK night).
+	local open, c0 = E.data.open, closes
+	check(open.own == 4 and E.count == 4 and not open.busy, "(the next page: its own 4 lines, nothing else yet)")
+	for _ = 1, 6 do
+		skew = skew + 1800
+		tick()
+	end
+	check(closes == c0 and E.data.open == open and not open.busy, "3 hours with nothing new on it: it stays open (no page every 30 minutes)")
+	local mark = #PRINTED + 1
+	lefthy("echoes")
+	check(printedSince(mark):find("4 lines, started 180 min ago; nothing recorded on it yet, so it stays open.", 1, true),
+		"the status says so, got\n" .. printedSince(mark))
+
+	-- Something happens: its 30 minutes run from then. One page for the whole time away.
+	local when = {}
+	kills(1, 1, when)
+	tick()
+	local busy = open.busy
+	check(busy == E.Now() and busy - when[1] <= 1, "the next tick notes when something came on it")
+	tickAt(busy + 1799)
+	check(closes == c0, "(29 minutes 59 seconds later: open)")
+	tickAt(busy + 1800)
+	local lines = linesOf(lastClosed)
+	check(closes == c0 + 1 and #lines == 6 and lines[5] == ("k%d;1"):format(when[1] - open.t0) and when[1] - open.t0 >= 10800
+		and lines[6] == (".%d;t"):format(busy + 1800 - when[1]), "30 minutes after that it closes (\".<dt>;t\"), with the hours before it, got\n" .. lastClosed)
+	check(E.data.open.own == 4 and not E.data.open.busy, "(the next page waits the same way)")
+
+	-- A /reload: when its 30 minutes started goes on with the page.
+	kills(2, 2)
+	tick()
+	busy = E.data.open.busy
+	reload(30)
+	check(busy and E.data.open.busy == busy and E.data.open.own == 4, "a /reload keeps when its 30 minutes started")
+	c0 = closes
+	tickAt(busy + 1800)
+	check(closes == c0 + 1, "and it closes 30 minutes after it")
+
+	-- A page from a build before this rule (no own): 30 minutes from its start, as before.
+	local t0 = E.data.open.t0
+	E.data.open.own, E.data.open.busy = nil, nil
+	tickAt(t0 + 1799)
+	check(closes == c0 + 1, "(an open page from before: open 29 minutes 59 seconds after it started)")
+	tickAt(t0 + 1800)
+	check(closes == c0 + 2 and lastClosed:find("\n%.1800;t\n$"), "and closed 30 minutes after it started, nothing on it or not")
+	tick()
+end
+
 section("Echoes pages: a stale page at login, another character, packing one a tick")
 do
 	-- A page closes, and before the tick that packs it the game ends; back 11 minutes later.
@@ -367,6 +424,8 @@ do
 	tick()
 	check(E.data.mine[stale + 1].m == "z" and textOf(E.data.mine[stale + 1]) == before0 .. ".0;l\n" and most.compress == 1,
 		"the next tick: the stale one")
+	check(Store.Page(acct, STORE, stale + 1) == E.data.mine[stale + 1] and Store.Page(acct, STORE, stale) == E.data.mine[stale],
+		"both offered at once: the one closed before the game ended is on disk, the stale one is the saved text (any later load closes it the same way)")
 
 	-- Soon after, on the same character: the page goes on.
 	kills(13, 13)
@@ -386,12 +445,100 @@ do
 	check(E.data.mine[stale + 3] and E.data.mine[stale + 3].z:find("\nC0;Anna%-Realmy;") and E.data.open.char == "Lefthy-Realmy",
 		"and back: Anna's page closes, mine starts")
 	Advance(1, 0.25)
+	check(E.data.mine[stale + 3].m == "z" and Store.Page(acct, STORE, stale + 3) == nil and Store.Page(acct, STORE, stale + 2),
+		"closed for another character a minute after its last line: offered from the next session on (after a crash, back on the "
+		.. "first character within 10 minutes, the page would go on instead); the one from the session before is offered")
 	check(heavyInEvent == 0, "nothing heavy inside an event or at login")
+end
+
+section("Echoes pages: a disconnect, switched off for a while")
+do
+	-- The game saves without PLAYER_LOGOUT (a disconnect): the lines not joined yet are in the page's
+	-- buffer, saved with it, and go on with the page once.
+	local n = E.data.open.n
+	kills(21, 23)
+	local before0 = E.data.open.text .. table.concat(E.buffer, "\n") .. "\n"
+	check(#E.buffer >= 3, "(lines not joined yet)")
+	reload(5, true)
+	check(E.data.open.n == n and E.data.open.text == before0 and #E.buffer == 0 and count(E.data.open.text, ";23\n") == 1,
+		"no PLAYER_LOGOUT: the lines not joined yet came with the page, once")
+
+	-- Switched off for 11 minutes, then on: the page closes as it was (".0;l"), its lines in it once.
+	kills(24, 24)
+	LT:SetModuleEnabled("echoes", false)
+	skew = skew + 11 * 60
+	local c0 = closes
+	start()
+	local page = E.data.mine[n]
+	check(closes == c0 + 1 and page and page.q and count(page.z, ";24\n") == 1 and page.z:sub(-5) == ".0;l\n" and E.data.open.n == n + 1
+		and E.buffer[1] == header(n + 1, E.Now()), "switched off for 11 minutes: the page closes as it was (\".0;l\"), a new one starts")
+
+	-- Off for a minute: the same page goes on.
+	kills(25, 25)
+	LT:SetModuleEnabled("echoes", false)
+	skew = skew + 60
+	start()
+	check(E.data.open.n == n + 1 and count(E.data.open.text, ";25\n") == 1 and #E.buffer == 0 and E.bytes == #E.data.open.text
+		and E.count == #linesOf(E.data.open.text), "switched off for a minute: the same page goes on, its size counted")
+	tick()
+	tick()
+	check(page.m == "z" and Store.Page(acct, STORE, n) == nil, "the page closed after switching on again has this session's lines: offered from the next session on")
+end
+
+section("Echoes pages: my pages offered once on disk (a crash)")
+do
+	-- The game writes the saved file only at a logout or /reload; after a crash the next login goes
+	-- on from the last save and numbers its pages from there again. So my pages are offered from the
+	-- session after the one they closed in: none of a lost session's pages is out there.
+	fresh(acct)
+	kills(1, 1)
+	tick()
+	skew = skew + 1800
+	tick()
+	tick()
+	local offered = {} -- n -> what was offered as page n (E.Store.Mine)
+	local function look() for n, page in Store.Mine() do offered[n] = page.z end end
+	look()
+	check(E.data.mine[1].m == "z" and Store.Page(acct, STORE, 1) == nil and Store.Held("mine")[own] == nil and next(offered) == nil,
+		"a page closed and packed this session: not offered (E.Store.Mine, Held, Page)")
+	local mark = #PRINTED + 1
+	lefthy("echoes")
+	check(printedSince(mark):find("1 offered from the next session on (a /reload is one)", 1, true), "the status says so, got\n" .. printedSince(mark))
+	local save = reload(5)
+	look()
+	check(Store.Page(acct, STORE, 1) == E.data.mine[1] and Store.Held("mine")[own] == "1" and offered[1] == E.data.mine[1].z,
+		"a /reload saved it: offered from then on")
+
+	-- The next session closes page 2 (by size) and starts page 3; then the game crashes, and the next
+	-- login, a minute later, reads the save from before: page 2 is open again and goes on.
+	Fire("ECHOES_PAGES_TEST", 170, 200)
+	tick()
+	tick()
+	look()
+	local lost = E.data.mine[2]
+	check(lost and lost.m == "z" and E.data.open.n == 3 and offered[2] == nil, "(page 2 closed and packed this session: not offered)")
+	reload(60, nil, save) -- (the crash: nothing saved)
+	check(E.data.n == 1 and E.data.open.n == 2 and not E.data.mine[2], "after the crash: the save from before, page 2 open again")
+	kills(7, 8)
+	Fire("ECHOES_PAGES_TEST", 170, 200)
+	tick()
+	tick()
+	local again = E.data.mine[2]
+	check(again and again.m == "z" and again.z ~= lost.z and Store.Page(acct, STORE, 2) == nil, "page 2 again, with other lines: not offered this session either")
+	local same = true
+	for n, z in pairs(offered) do same = same and E.data.mine[n] ~= nil and E.data.mine[n].z == z end
+	check(same and size(offered) == 1, "every page offered before the crash is the same page now: no number went out with other lines")
+	check(Store.Safe(acct, STORE, Ranges.Of(offered), "c011ec70.12345678") == 1 and E.data.mine[2] == again,
+		"what a collector can hold (only what was offered) drops only that: the new page 2 stays")
+	reload(1)
+	check(Store.Page(acct, STORE, 2) == E.data.mine[2] and E.data.mine[2].z == again.z, "after a /reload the new page 2 goes out")
 end
 
 section("Echoes pages: packing when the game's compression fails")
 do
 	local function closeNow()
+		kills(1, 1) -- (something on it: a page with nothing on it doesn't close by time)
+		tick()
 		skew = skew + 1800
 		tick()
 		local n = E.data.n
@@ -419,10 +566,13 @@ do
 	local plain = E.data.n
 	page = closeNow()
 	check(page.m == "z", "(compressing again)")
+	check(Store.Page(acct, STORE, plain + 1) == nil and not Ranges.Contains(Store.Held("mine")[own] or "", plain + 1),
+		"(closed this session: not offered yet)")
+	reload(1) -- (on disk now)
 	local shared = {}
 	for n, p in Store.Mine() do shared[#shared + 1] = n check(p == E.data.mine[n], "(Mine: the page itself)") end
 	check(not Ranges.Contains(table.concat(shared, ","), plain) and Ranges.Contains(table.concat(shared, ","), plain + 1)
-		and Store.Page(acct, STORE, plain) == nil and Store.Page(acct, STORE, plain + 1) == page,
+		and Store.Page(acct, STORE, plain) == nil and Store.Page(acct, STORE, plain + 1) == E.data.mine[plain + 1],
 		"a plain-text page is kept (the exporter reads it) but never shared: not in E.Store.Mine, E.Store.Page")
 	check(shared[1] < shared[#shared] and not Ranges.Contains(Store.Held("mine")[own], plain), "E.Store.Mine goes oldest first; Held leaves t out")
 end
@@ -443,6 +593,8 @@ do
 		and count(open.text, "\nk0;") == 3, "known within 5 s: the open page's header gets it (once), its size counted")
 	MY_BATTLETAG = nil
 	fresh()
+	kills(1, 1)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
@@ -476,6 +628,16 @@ end
 local big = ("A"):rep(60 * 1024) -- (a page's worth of Base64)
 local bigHash = realHash(big)
 local function bigPage(t) return { t = t or E.Now(), h = bigHash, m = "z", z = big } end
+-- Whether the sizes E.Store keeps (as pages came and went) are the pages' as they are: counted anew.
+local function sizesAgree()
+	local kept = { Store.Bytes("mine"), Store.Bytes("carry"), Store.Bytes("inbox") }
+	local authors = {}
+	for key in pairs(E.data.carry) do authors[key] = Store.Bytes("carry", key:sub(1, 8), key:sub(10)) end
+	Store.Recount()
+	local same = kept[1] == Store.Bytes("mine") and kept[2] == Store.Bytes("carry") and kept[3] == Store.Bytes("inbox")
+	for key, n in pairs(authors) do same = same and n == Store.Bytes("carry", key:sub(1, 8), key:sub(10)) end
+	return same
+end
 do
 	fresh(acct)
 	local now = E.Now()
@@ -542,6 +704,7 @@ do
 	Advance(2, 0.25)
 	check(E.data.carry[A .. ".00000003"] and not E.data.carry[A .. ".00000003"][1] and E.data.carry[A .. ".00000003"][2],
 		"relayed pages go 30 days after they came, at the next login")
+	check(sizesAgree(), "the sizes kept as pages came and went are the pages' (carry per author too)")
 end
 
 section("Echoes pages: my pages over 2 MB")
@@ -565,6 +728,8 @@ do
 	-- It runs after each packed page by itself.
 	E.data.mine[104] = page()
 	Store.Recount()
+	kills(1, 1)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
@@ -572,6 +737,7 @@ do
 		"after packing a page: back under 2 MB, the oldest gone")
 	check(Store.Safe(acct, STORE, "4-10", "c011ec70.12345678") == 5 and not E.data.mine[4] and E.data.mine[11],
 		"my pages a collector holds safely go")
+	check(sizesAgree(), "(the sizes agree: closed, packed, trimmed, safe)")
 end
 
 section("Echoes pages: collecting: 4 MB, 8 MB, the exporter's receipt")
@@ -638,6 +804,29 @@ do
 	reload(1)
 	Advance(2, 0.25)
 	check(loads == 4 and Ranges.Of(E.data.inbox[friend]) == "5" and E.data.exported[friend] == "1-4", "no receipt folder: nothing changes")
+
+	-- A receipt that isn't one, or no way to load it: nothing changes, nothing breaks.
+	local reported, stop = suite.catchErrors()
+	local inbox0, exported0, stores0 = Ranges.Of(E.data.inbox[friend]), E.data.exported[friend], size(E.data.exported)
+	for _, bad in ipairs({ "x", { v = 1 }, { v = 1, done = "1-5" }, { v = 2, done = { [friend] = 5, [7] = "1-5", [friend .. "x"] = "1-5",
+		[A .. ".0c77e1f5"] = "x-y" } } }) do
+		MOCK_RECEIPT = bad
+		reload(1)
+		Advance(2, 0.25)
+	end
+	local loader = C_AddOns.LoadAddOn
+	C_AddOns.LoadAddOn, LefthyToolsEchoesReceipt = nil, nil
+	reload(1)
+	Advance(2, 0.25)
+	C_AddOns.LoadAddOn = function() error("broken") end
+	reload(1)
+	Advance(2, 0.25)
+	stop()
+	C_AddOns.LoadAddOn, MOCK_RECEIPT, LefthyToolsEchoesReceipt = loader, nil, nil
+	check(#reported == 0 and Ranges.Of(E.data.inbox[friend]) == inbox0 and E.data.exported[friend] == exported0 and size(E.data.exported) == stores0,
+		"receipts that aren't one (not a table, no done, bad keys and ranges), no LoadAddOn, a broken one: nothing changes, got "
+		.. table.concat(reported, "; "))
+	check(sizesAgree(), "(the sizes agree after the receipts)")
 	LT:SetModuleSetting(M, "collect", false)
 end
 
@@ -683,6 +872,74 @@ do
 		"2 minutes of ticks: no packing, no hashing, the lines joined once a minute")
 end
 
+section("Echoes pages: the delivery hears when they change")
+do
+	-- Delivery caches what I hold (D.Holdings): E.Store tells it of every change, so a page packed
+	-- is offered at once, not at Delivery's next look (every 30 s, or when E.data.n moves).
+	local D = E.Delivery
+	local real, heard = D.PagesChanged, 0
+	D.PagesChanged = function() heard = heard + 1 return real() end
+	local function held(n) return D.Ranges.Has(D.Holdings()[own] or {}, n) end
+	fresh(acct)
+	kills(1, 1)
+	tick()
+	heard = 0
+	skew = skew + 1800
+	tick()
+	local n = E.data.n
+	check(heard > 0 and E.data.mine[n].q and not held(n), "a page closed: heard (not offered: it waits to be packed)")
+	heard = 0
+	tick()
+	check(heard > 0 and E.data.mine[n].m == "z" and not held(n), "packed on the next tick: heard (closed this session: offered from the next)")
+	-- A page closed as stale at login is on disk: offered as soon as it's packed.
+	kills(2, 2)
+	reload(11 * 60)
+	n = E.data.n
+	check(E.data.mine[n].q and E.data.mine[n].z:sub(-5) == ".0;l\n" and held(n - 1) and not held(n), "(a login 11 minutes later: the open page closed as stale, waiting)")
+	heard = 0
+	tick()
+	check(heard > 0 and E.data.mine[n].m == "z" and held(n), "packed on the next tick: heard, and offered at once")
+	local function hears(what, fn)
+		heard = 0
+		local out = fn()
+		check(heard > 0, what .. ": heard")
+		return out
+	end
+	local function quiet(what, fn)
+		heard = 0
+		fn()
+		check(heard == 0, what .. ": nothing to hear")
+	end
+	hears("a friend's page kept", function() return Store.Put(A, B, 1, friendPage(1, E.Now()), "carry") end)
+	quiet("one I have", function() Store.Put(A, B, 1, friendPage(1, E.Now()), "carry") end)
+	quiet("one refused", function() Store.Put(A, B, 2, { t = E.Now(), h = "00000000", m = "z", z = "QUJD" }, "carry") end)
+	hears("a collector's summary", function() Store.Safe(A, B, "5", "c011ec70.12345678") end)
+	quiet("the same summary again", function() Store.Safe(A, B, "5", "c011ec70.12345678") end)
+	hears("pages dropped", function() Store.Drop(A, B, "1") end)
+	quiet("nothing to drop", function() Store.Drop(A, B, "1") end)
+	for m = 1, 21 do E.data.mine[100 + m] = { t = E.Now(), h = "x", m = "z", z = ("B"):rep(100 * 1024) } end
+	Store.Recount()
+	hears("my pages over 2 MB, the oldest dropped", Store.Trim)
+	for m = 1, 21 do E.data.mine[100 + m] = nil end
+	Store.Recount()
+	E.data.carry[A .. ".0c77e1f9"] = { [1] = { t = E.Now(), h = "x", m = "z", z = "QUJD", a = E.Now() - 31 * 86400 } }
+	reload(1)
+	heard = 0
+	Advance(2, 0.25)
+	check(heard > 0 and not E.data.carry[A .. ".0c77e1f9"], "relayed pages expired at login: heard")
+
+	-- Delivery's file left out (an older build, or a test): nothing to tell, nothing breaks.
+	E.Delivery = nil
+	kills(2, 2)
+	tick()
+	skew = skew + 1800
+	tick()
+	tick()
+	E.Delivery = D
+	check(E.data.mine[E.data.n].m == "z", "no delivery: pages still close and pack")
+	D.PagesChanged = real
+end
+
 section("Echoes pages: the beta")
 do
 	fresh(acct)
@@ -704,12 +961,14 @@ do
 end
 
 section("Echoes pages: /lefthy echoes")
-local statusExtra, commandRest = false, nil
-E.OnStatus(function(add) if statusExtra then add("delivery: 2 friends online") end end)
+local statusExtra, statusRuns, commandRest = false, 0, nil
+local EXTRA = "pagestest: a line another file adds" -- (Delivery adds lines of its own)
+E.OnStatus(function(add) statusRuns = statusRuns + 1 if statusExtra then add(EXTRA) end end)
 E.Command("pagestest", function(rest) commandRest = rest end, "/lefthy echoes pagestest - a test's word")
 do
 	fresh(acct)
 	kills(1, 3)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
@@ -720,18 +979,20 @@ do
 	lefthy("echoes")
 	local out = printedSince(mark)
 	check(out:find("recording.", 1, true) and out:find(("account %s, store %s."):format(acct, STORE), 1, true)
-		and out:find("open page 2: %d+%.%d KB, 4 lines, started 0 min ago") and out:find("my pages: 1 %(1%), %d+%.%d KB of 2%.0 MB%.")
+		and out:find("open page 2: %d+%.%d KB, 4 lines, started 0 min ago")
+		and out:find("my pages: 1 %(1%), %d+%.%d KB of 2%.0 MB, 1 offered from the next session on %(a /reload is one%)%.")
 		and out:find("relaying: 1 pages of 1 friends' stores, %d+%.%d KB of 512%.0 KB") and not out:find("collected:", 1, true)
-		and out:find("delivery: 2 friends online", 1, true), "the status: recording, the account, the open page, my pages, relaying, "
+		and (out:find(EXTRA, 1, true) or 0) > out:find("relaying:", 1, true), "the status: recording, the account, the open page, my pages, relaying, "
 		.. "what other files add; collecting off and nothing collected: no inbox line, got\n" .. out)
 	statusExtra = false
 	LT:SetModuleSetting(M, "collect", true)
 	Store.Put(A, B, 1, friendPage(1, E.Now()), "inbox")
 	mark = #PRINTED + 1
+	local runs = statusRuns
 	lefthy("echoes status")
 	out = printedSince(mark)
-	check(out:find("collected: 1 pages of 1 stores, %d+%.%d KB; the exporter has 0 stores' pages%.") and not out:find("delivery:", 1, true),
-		"collecting: the inbox's size, got\n" .. out)
+	check(out:find("collected: 1 pages of 1 stores, %d+%.%d KB; the exporter has 0 stores' pages%."), "collecting: the inbox's size, got\n" .. out)
+	check(statusRuns == runs + 1 and not out:find(EXTRA, 1, true), "a file that adds nothing this time: asked again, no line of it, got\n" .. out)
 	LT:SetModuleSetting(M, "collect", false)
 	MY_BATTLETAG = nil
 	fresh()
@@ -767,16 +1028,19 @@ do
 	E.Line("Q", 7, 250, 40)
 	E.Name("i", 2589, "Linen Cloth \195\164\195\182\195\188")
 	E.Line("l", 2589, 2, 1, "l", 327)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
 	E.Line("x", 12, 1500, 3000, 400, 1)
+	tick()
 	encoding.CompressString = function() return nil end
 	skew = skew + 1800
 	tick()
 	tick()
 	encoding.EncodeBase64 = function() return nil end
 	E.Line("o", 1)
+	tick()
 	skew = skew + 1800
 	tick()
 	tick()
