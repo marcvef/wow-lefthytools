@@ -24,7 +24,7 @@ local E = ns.Echoes
 -- instance entered (i) or left (o), login (s), a loading screen (l), another jump (j).
 --
 -- Never lags the client: handlers only note things (PLAYER_LEAVING_WORLD and PLAYER_LOGOUT write
--- their last point and line at once: no tick comes before the loading screen); a poll is a handful
+-- their last point and Events.lua's queue at once: no tick comes before the loading screen); a poll is a handful
 -- of calls, at most a start point and one point, and makes no tables (the sample buffer is two
 -- arrays of 8 numbers).
 
@@ -524,9 +524,13 @@ E.On("ZONE_CHANGED", ZoneSoon)
 E.On("ZONE_CHANGED_INDOORS", ZoneSoon)
 E.On("ZONE_CHANGED_NEW_AREA", ZoneSoon)
 
--- A loading screen begins: its last point now (no tick comes before it).
+-- A loading screen begins: its last point now, and what Events.lua still holds (it happened here;
+-- no tick comes before it).
 E.On("PLAYER_LEAVING_WORLD", function()
 	LastPoint()
+	if C.Flush and C.Ready() then
+		C.Flush()
+	end
 	S.wasInstance = S.inInstance
 	S.loading = true
 end)

@@ -68,8 +68,9 @@ forgets; for tests).
 
 - **Never lags the client.** Handlers only note things: a flag, a slot, or a few values in
   Events.lua's queue (flat arrays, written on the tick in the order they came, each tick's events at
-  one spot). Exceptions, because no tick comes in time: `PLAYER_LEAVING_WORLD` writes its last point,
-  `PLAYER_LOGOUT` its last point, the queue and `o0`, and `LOOT_READY` reads the loot window's slots
+  one spot). Exceptions, because no tick comes in time: `PLAYER_LEAVING_WORLD` writes its last point
+  and the queue (what happened before the loading screen stays where it happened), `PLAYER_LOGOUT`
+  its last point, the queue and `o0`, and `LOOT_READY` reads the loot window's slots
   (with auto loot it's gone by the next tick). A poll makes no tables.
 - **Secret values** are skipped: a secret kill, cast, loot line, quest or GUID writes nothing (a
   secret killer is unknown, a secret group member one of the others, a secret AFK answer keeps the

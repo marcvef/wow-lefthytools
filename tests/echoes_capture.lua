@@ -545,6 +545,14 @@ do
 	check(seq():find("^D;19;%-;;;;0 @;0;640;600;g;r ,0,0 .* r;c m;f$") ~= nil and points()[#points()].n == 610,
 		"died, released: an anchor at the graveyard (why r, ghost); the run back; alive at the corpse (r c), on foot, got " .. seq())
 	Advance(11)
+	-- An event a moment before a loading screen (no tick between): written before it, where it was.
+	listen()
+	Fire("NEW_TOY_ADDED", 4321)
+	loading(function() at(800, 800) end)
+	Advance(1)
+	check(seq() == "n;t;4321 @;0;800;800;f;l", "an event just before a loading screen: written there, before the anchor, got " .. seq())
+	loading(function() at(610, 600) end)
+	Advance(2)
 end
 
 ---------------------------------------------------------------------------
