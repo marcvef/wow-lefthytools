@@ -664,6 +664,43 @@ do
 	Advance(0.3)
 	check(seq() == "D;19;-;;;;0 r;c", "the last fight more than 15 s before: no killer, got " .. seq())
 	Advance(11)
+	-- Logged in dead (no PLAYER_DEAD for it), then released 57 yd away (no jump): the graveyard
+	-- still starts a segment (r); the spirit healer.
+	at(610, 600)
+	STATE.dead = true
+	listen()
+	LT:SetModuleEnabled("echoes", false)
+	LT:SetModuleEnabled("echoes", true)
+	Fire("PLAYER_ENTERING_WORLD", true, false)
+	Advance(2)
+	STATE.ghost = true
+	Fire("PLAYER_ALIVE")
+	at(650, 560)
+	Advance(1.2)
+	Advance(1)
+	Fire("CONFIRM_XP_LOSS")
+	STATE.ghost, STATE.dead = false, false
+	Fire("PLAYER_UNGHOST")
+	Advance(1.2)
+	check(seq():find("^o;0 @;0;610;600;f;s z;1429;Goldshire o;1 .*@;0;650;560;g;r r;s m;f$") ~= nil and count("^D;") == 0,
+		"logged in dead: released, an anchor at the graveyard (r); the spirit healer, got " .. seq())
+	Advance(11)
+	-- Died, /reload: PLAYER_DEAD again after it is the same death.
+	listen()
+	STATE.dead = true
+	Fire("PLAYER_DEAD")
+	Advance(0.3)
+	Fire("PLAYER_LEAVING_WORLD")
+	Fire("PLAYER_LOGOUT")
+	C.Reset()
+	Fire("PLAYER_ENTERING_WORLD", false, true)
+	Fire("PLAYER_DEAD")
+	Advance(2)
+	STATE.dead = false
+	Fire("PLAYER_ALIVE")
+	Advance(0.3)
+	check(count("^D;") == 1 and count("^r;c$") == 1, "a /reload while dead: the death once, then back to life, got " .. seq())
+	Advance(11)
 end
 
 ---------------------------------------------------------------------------

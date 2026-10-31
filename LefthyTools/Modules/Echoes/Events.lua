@@ -59,6 +59,10 @@ local removed, turnedIn = {}, {}     -- quest ID -> GetTime(): removed from the 
 local lootFrom = {}                  -- item ID -> the creature whose corpse the last loot window was
 local foe = {}                       -- the last enemy you fought: at, kind, id, level, cls, pvp, name
 
+local function DeadOrGhost()
+	return Yes(UnitIsDeadOrGhost, "player")
+end
+
 local function Reset()
 	S.seenNext, S.killedNext, S.nodesNext = 0, 0, 0
 	wipe(seenInfo)
@@ -74,8 +78,11 @@ local function Reset()
 	wipe(foe)
 	S.lootAt = -math.huge
 	S.gatherKind, S.gatherAt, S.gatheredAt = nil, -math.huge, -math.huge
-	S.deadAt = nil     -- (GetTime) the death counted: the next counts once alive and DEATH_REPEAT after
-	S.down = false     -- dead or a ghost since a death seen
+	-- Dead or a ghost since a death seen; and (GetTime) the death counted: the next counts once alive
+	-- and DEATH_REPEAT after. Logged in or /reloaded dead (no PLAYER_DEAD then): that death was
+	-- counted before it, its release and coming back to life still are.
+	S.down = DeadOrGhost()
+	S.deadAt = S.down and GetTime() or nil
 	S.spiritAt, S.rezAt = nil, nil -- the spirit healer asked, a resurrection offered
 	S.bossID, S.bossAt = nil, -math.huge
 	S.n = 0
@@ -256,10 +263,6 @@ end
 ---------------------------------------------------------------------------
 -- Deaths, the last enemy, coming back
 ---------------------------------------------------------------------------
-
-local function DeadOrGhost()
-	return Yes(UnitIsDeadOrGhost, "player")
-end
 
 -- In a fight: your attackable target is the one that'll have killed you (FOE_MEMORY). The same
 -- target as on the last tick: only its time and level are read again.
