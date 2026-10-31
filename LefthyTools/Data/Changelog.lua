@@ -401,5 +401,14 @@ ns.CHANGELOG = {
 	{ id = 131, module = "tweaks",
 		en = { "Spells and quests of the release", "The level-up window's trainer spells and the markers for quests new in Forever come from the release build: 12 spells and 7 quests more." },
 		de = { "Zauber und Quests vom Release", "Die Trainer-Zauber im Level-Up-Fenster und die Markierungen für Quests, die neu in Forever sind, stammen vom Release-Build: 12 Zauber und 7 Quests mehr." } },
+	{ id = 132, module = "echoes",
+		en = { "Echoes records your journey", "New module: Echoes records where you go and what happens on the way (level-ups, quests, kills, loot, deaths, dungeons) for a replay of the whole group on a map website. It only records, nothing shows in game; your recordings travel to the friend who collects them. /lefthy echoes shows what's recorded, and you can switch Echoes off in the settings." },
+		de = { "Echoes zeichnet deine Reise auf", "Neues Modul: Echoes zeichnet auf, wo du hinläufst und was dabei passiert (Level-ups, Quests, Kills, Loot, Tode, Dungeons), für ein Replay der ganzen Gruppe auf einer Karten-Webseite. Es zeichnet nur auf, im Spiel zeigt es nichts; deine Aufzeichnungen wandern zu dem Freund, der sie sammelt. /lefthy echoes zeigt, was aufgezeichnet ist, und in den Einstellungen kannst du Echoes abschalten." } },
+	{ id = 133, module = "general",
+		en = { "Restart once after this update", "Echoes brings new files and new saved data: restart the game once, a /reload isn't enough." },
+		de = { "Nach diesem Update einmal neu starten", "Echoes bringt neue Dateien und neue gespeicherte Daten mit: starte das Spiel einmal neu, ein /reload reicht nicht." } },
+	{ id = 134, module = "beacon",
+		en = { "A quick second hello is answered", "When a friend's LefthyTools says hello again within seconds (a quick /reload), Beacon answers a moment later instead of ignoring it, so the two of you find each other right away." },
+		de = { "Schnelles zweites Hallo beantwortet", "Sagt das LefthyTools eines Freundes innerhalb von Sekunden erneut Hallo (ein schnelles /reload), antwortet Beacon kurz darauf, statt es zu ignorieren, damit ihr euch sofort wiederfindet." } },
 	-- New entries go here, at the end.
 }

@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: LefthyTools
-## Notes: Small interface tools for WoW: Forever: Mirage (fades the interface when idle), Misc Tweaks, Beacon (friends on your map), Chronicle (your journal) and Bestiary (what mobs drop).
+## Notes: Small interface tools for WoW: Forever: Mirage (fades the interface when idle), Misc Tweaks, Beacon (friends on your map), Chronicle (your journal), Bestiary (what mobs drop) and Echoes (records your journey for a replay).
 ## Author: lefthy
 ## Version: 0.6.0
 ## SavedVariables: LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB, LefthyToolsEchoesDB
