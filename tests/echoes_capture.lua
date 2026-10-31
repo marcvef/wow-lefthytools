@@ -44,9 +44,11 @@ mock("GetBattlefieldWinner", function() return BG_WINNER end)
 mock("UnitPlayerControlled", function(u) return MOBS[u] ~= nil and MOBS[u].controlled == true end)
 local baseGUID, baseInstanceInfo, baseItemLink, baseAFK = UnitGUID, GetInstanceInfo, GetInventoryItemLink, UnitIsAFK
 mock("UnitGUID", function(u) if u == "pet" then return PET_GUID end return baseGUID(u) end)
--- (INSTANCE.id and .difficulty: GetInstanceInfo's instance ID and difficulty)
+-- (INSTANCE.id and .difficulty: GetInstanceInfo's instance ID and difficulty; .unreadable: the ID a secret)
 mock("GetInstanceInfo", function()
-	if INSTANCE then return INSTANCE.name, INSTANCE.type, INSTANCE.difficulty or 0, "", 5, 0, false, INSTANCE.id or 0, 5 end
+	if INSTANCE then
+		return INSTANCE.name, INSTANCE.type, INSTANCE.difficulty or 0, "", 5, 0, false, INSTANCE.unreadable and SECRET or INSTANCE.id or 0, 5
+	end
 	return ZONE, "none", 0, "", 0, 0, false, 0, 0
 end)
 mock("GetInventoryItemLink", function(unit, slot) return GEAR_LINKS[slot] or baseItemLink(unit, slot) end)
@@ -1291,6 +1293,31 @@ do
 	check(seq() == "o;0 @;36;;;f;l z;1429;Goldshire o;1", "a /reload: o0, then an anchor (why l), the zone, o1; nothing "
 		.. "written again (the dungeon, the group, gear, XP: kept per character), got " .. seq())
 	check(PLAYED.requests == 0, "and no /played (not a login)")
+	-- A /reload inside where the game can't say which instance this is (GetInstanceInfo fails), or
+	-- what kind (a secret): the dungeon isn't left; read again a few seconds later, still the same.
+	for _, unreadable in ipairs({ "info", "kind" }) do
+		listen()
+		INSTANCE.unreadable = unreadable == "info" or nil
+		INSTANCE.type = unreadable == "kind" and SECRET or "party"
+		Fire("PLAYER_LEAVING_WORLD")
+		Fire("PLAYER_LOGOUT")
+		C.Reset()
+		Fire("PLAYER_ENTERING_WORLD", false, true)
+		Advance(2)
+		INSTANCE.unreadable, INSTANCE.type = nil, "party"
+		Advance(6)
+		check(seq() == "o;0 @;36;;;f;l z;1429;Goldshire o;1", "a /reload inside, the instance's " .. unreadable
+			.. " not readable: nothing left; readable again: nothing new, got " .. seq())
+	end
+	-- Into another dungeon whose ID can't be read at first: written once it can (looked at every 5 s).
+	listen()
+	loading(function() INSTANCE = { name = "Shadowfang Keep", type = "party", id = 33, difficulty = 1, unreadable = true } end)
+	Advance(3)
+	INSTANCE.unreadable = nil
+	Advance(5)
+	check(seq() == "@;36;;;f;l d;x;36;1 d;e;33;1", "another dungeon, its ID readable only later: left and entered then, got " .. seq())
+	loading(function() INSTANCE = { name = "The Deadmines", type = "party", id = 36, difficulty = 1 } end)
+	Advance(1)
 	-- Left the dungeon while logged out: at the next login it's left.
 	listen()
 	LT:SetModuleEnabled("echoes", false)

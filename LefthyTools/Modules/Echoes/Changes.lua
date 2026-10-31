@@ -22,6 +22,7 @@ local FACTIONS_EVERY = 10    -- seconds: UPDATE_FACTION rescans at most this oft
 local PLAYED_WAIT = 10       -- seconds the chat frames go without /played's answer while it's asked silently
 local RESULT_EVERY = 5       -- seconds between asking who won a battleground
 local GROUP_EVERY = 15       -- seconds: a group with others is looked at again (Beacon may learn of a friend among them)
+local INSTANCE_RETRY, INSTANCE_TRIES = 5, 6 -- an instance that couldn't be told: looked at again every 5 s, 6 times
 local SLOTS = 19             -- equipment slots
 -- The Classic professions' skill lines (C_SkillInfo): First Aid, Blacksmithing, Leatherworking,
 -- Alchemy, Herbalism, Cooking, Mining, Tailoring, Engineering, Enchanting, Fishing, Skinning.
@@ -66,6 +67,7 @@ local function Reset()
 	S.hk = nil           -- honorable kills as last read
 	S.playedWanted, S.playedTotal, S.playedUntil = false, nil, nil
 	S.resultAt = 0
+	S.instanceTries, S.instanceAt, S.instanceStart = nil, 0, false -- (looking again at an instance that couldn't be told)
 end
 
 ---------------------------------------------------------------------------
@@ -326,11 +328,19 @@ local function Lasted(bg, start, now)
 	return left - (bg[2] or left)
 end
 
+-- false when it can't be told now (inside, but which instance or what kind isn't readable): nothing
+-- changes then (a dungeon or battleground isn't left), and it's looked at again a little later.
 local function Instances(cap, start)
 	local ok, inInstance, kind = pcall(IsInInstance)
-	inInstance = ok and inInstance == true
-	kind = inInstance and Readable(kind) and kind or nil
-	local _, id = C.Instance()
+	if not ok or issecret(inInstance) then
+		return false
+	end
+	inInstance = inInstance == true
+	local id = inInstance and select(2, C.Instance()) or nil
+	if inInstance and not (id and Readable(kind)) then
+		return false
+	end
+	kind = inInstance and kind or nil
 	local got, _, _, difficulty = pcall(GetInstanceInfo)
 	difficulty = got and type(difficulty) == "number" and not issecret(difficulty) and difficulty or nil
 	local now = E.Now()
@@ -360,6 +370,7 @@ local function Instances(cap, start)
 		cap.bg = nil
 		E.Line("b", bg[1], "x", Lasted(bg, start, now))
 	end
+	return true
 end
 
 -- Who won (PVP_MATCH_COMPLETE, or GetBattlefieldWinner): 0 the Horde, 1 the Alliance. Once.
@@ -463,9 +474,18 @@ E.OnTick(function(now)
 		local start = C.arrived ~= "load"
 		C.arrived = nil
 		C.Spot()
-		Instances(cap, start)
+		S.instanceStart, S.instanceTries, S.instanceAt = start, 0, now + INSTANCE_RETRY
+		if Instances(cap, start) then
+			S.instanceTries = nil
+		end
 		if start then
 			SessionStart()
+		end
+	elseif S.instanceTries and now >= S.instanceAt then -- (the instance couldn't be told: again)
+		S.instanceTries, S.instanceAt = S.instanceTries + 1, now + INSTANCE_RETRY
+		C.Spot()
+		if Instances(cap, S.instanceStart) or S.instanceTries >= INSTANCE_TRIES then
+			S.instanceTries = nil
 		end
 	end
 	if now >= S.xpAt then
