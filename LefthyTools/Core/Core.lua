@@ -104,10 +104,19 @@ end
 -- text's 32-bit hash as 8 lowercase hex digits, case-sensitive: two 32-bit rolling hashes folded
 -- into one, written as two 16-bit halves (%x of a number above 2^31 isn't safe in every Lua).
 -- Chronicle's account hash is this of the lowercased BattleTag (C.Hash): it must never change.
+-- Echoes hashes whole pages with it, so it reads four bytes per string.byte call.
+local byte = string.byte
 function LT.Hash32(text)
 	local h1, h2 = 5381, 0
-	for i = 1, #text do
-		local b = text:byte(i)
+	local n, i = #text, 1
+	while i + 3 <= n do
+		local a, b, c, d = byte(text, i, i + 3)
+		h1 = (((((h1 * 33 + a) % 4294967296) * 33 + b) % 4294967296 * 33 + c) % 4294967296 * 33 + d) % 4294967296
+		h2 = (((((h2 * 131 + a) % 4294967296) * 131 + b) % 4294967296 * 131 + c) % 4294967296 * 131 + d) % 4294967296
+		i = i + 4
+	end
+	for j = i, n do
+		local b = byte(text, j)
 		h1 = (h1 * 33 + b) % 4294967296
 		h2 = (h2 * 131 + b) % 4294967296
 	end
