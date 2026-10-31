@@ -26,6 +26,7 @@ local DEATH_REPEAT = 10      -- PLAYER_DEAD again this soon (or while still dead
 local QUEST_DECIDE = 1.5     -- seconds after QUEST_REMOVED: turned in or abandoned?
 local QUEST_PAIR = 60        -- seconds: a QUEST_TURNED_IN this far before or after a QUEST_REMOVED is the same turn-in
 local GATHER_GAP = 1.5       -- seconds from a gathering spell to its loot window
+local NAMES_RETRY = 10       -- seconds: gathering spells' names still missing are asked again at most this often
 local LOOT_SOURCE_FOR = 5    -- seconds a loot window's corpses explain loot lines
 local REZ_FOR, SPIRIT_FOR = 70, 120 -- seconds a resurrection offer, the spirit healer's question count
 local BOSS_DEDUPE = 30       -- ENCOUNTER_END and BOSS_KILL report the same kill
@@ -433,25 +434,46 @@ end
 -- Loot (green and better), gathering
 ---------------------------------------------------------------------------
 
--- A gathering spell's kind (h herb, o ore, s skin), by ID or, for a rank not listed, by name.
-local gatherNames
+-- A gathering spell's kind (h herb, o ore, s skin), by ID or, for a rank not listed, by name. The
+-- listed spells' names are asked when first needed; while a kind's isn't there (not loaded yet) they
+-- are asked again on a miss, at most every NAMES_RETRY seconds or after SPELLS_CHANGED; once each
+-- kind has its name, never again.
+local gatherNames = {}     -- spell name -> kind
+local namesMissing = true  -- a kind without its name yet
+local namesAt = -math.huge -- (GetTime) when they were asked last
+local function AskNames(now)
+	namesAt = now
+	local GetName = C_Spell and C_Spell.GetSpellName
+	for id, kind in pairs(GATHERING) do
+		local name = Value(GetName, id)
+		if type(name) == "string" and name ~= "" then
+			gatherNames[name] = kind
+		end
+	end
+	local h, o, s = false, false, false
+	for _, kind in pairs(gatherNames) do
+		h, o, s = h or kind == "h", o or kind == "o", s or kind == "s"
+	end
+	namesMissing = not (h and o and s)
+end
+
 local function GatherKind(spellID)
 	if GATHERING[spellID] then
 		return GATHERING[spellID]
 	end
-	local GetName = C_Spell and C_Spell.GetSpellName
-	if not gatherNames then
-		gatherNames = {}
-		for id, kind in pairs(GATHERING) do
-			local name = Value(GetName, id)
-			if type(name) == "string" then
-				gatherNames[name] = kind
-			end
-		end
+	local now = GetTime()
+	if namesMissing and now - namesAt >= NAMES_RETRY then
+		AskNames(now)
 	end
-	local name = Value(GetName, spellID)
+	local name = Value(C_Spell and C_Spell.GetSpellName, spellID)
 	return type(name) == "string" and gatherNames[name] or nil
 end
+
+E.On("SPELLS_CHANGED", function()
+	if namesMissing then
+		namesAt = -math.huge -- (names may have come: asked again on the next miss)
+	end
+end)
 
 E.On("UNIT_SPELLCAST_SUCCEEDED", function(_, _, spellID)
 	if type(spellID) ~= "number" or issecret(spellID) then

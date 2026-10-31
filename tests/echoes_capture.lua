@@ -994,6 +994,35 @@ do
 	check(seq() == "h;h;1617;2447:1 h;s;113;2318:1 h;f;;6303:1 h;f;;6303:2",
 		"herbs (h), skinning (s: the creature), fishing (f: no node, the loot's source is the bobber; each cast once); a loot window "
 		.. "2 s after the spell isn't a node's, got " .. seq())
+
+	-- A rank not in the list is known by its name. The listed spells' names may not be loaded when
+	-- they're first asked (C_Spell.GetSpellName answers nothing): asked again once they come
+	-- (SPELLS_CHANGED), else on a miss at most every 10 s; once known, never again.
+	local LISTED = { [2366] = true, [2368] = true, [3570] = true, [11993] = true, [2575] = true, [2576] = true, [3564] = true,
+		[10248] = true, [8613] = true, [8617] = true, [8618] = true, [10768] = true }
+	local spellNames, asked = { [133] = "Fireball" }, 0
+	C_Spell.GetSpellName = function(id) if LISTED[id] then asked = asked + 1 end return spellNames[id] end
+	listen()
+	for i = 1, 20 do
+		Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-F" .. i, 133)
+		Advance(0.2)
+	end
+	local first = asked
+	spellNames[2366], spellNames[2575], spellNames[8613], spellNames[99001] = "Herb Gathering", "Mining", "Skinning", "Mining"
+	Fire("SPELLS_CHANGED")
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-13", 99001) -- (Mining, a rank of a later build)
+	LOOT = { { type = 1, id = 2770, quantity = 3, source = "GameObject-0-1-0-1-1731-000000D7" } }
+	Fire("LOOT_READY", true)
+	Advance(0.3)
+	local known = asked
+	for i = 1, 20 do
+		Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-G" .. i, 133)
+		Advance(0.6)
+	end
+	LOOT, C_Spell.GetSpellName = {}, nil
+	check(seq() == "h;o;1731;2770:3", "a rank not listed, by its name: the names asked again once they came, got " .. seq())
+	check(first <= 12 and known <= 24 and asked == known, "the names asked at most every 10 s while missing (" .. first
+		.. "), then once more (" .. known .. "), never again once known (" .. asked .. ")")
 end
 
 ---------------------------------------------------------------------------
