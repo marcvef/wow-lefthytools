@@ -20,6 +20,7 @@ local XP_EVERY = 60          -- seconds between XP checks (and on resting change
 local FACTIONS_EVERY = 10    -- seconds: UPDATE_FACTION rescans at most this often
 local PLAYED_WAIT = 10       -- seconds the chat frames go without /played's answer while it's asked silently
 local RESULT_EVERY = 5       -- seconds between asking who won a battleground
+local GROUP_EVERY = 15       -- seconds: a group with others is looked at again (Beacon may learn of a friend among them)
 local SLOTS = 19             -- equipment slots
 -- The Classic professions' skill lines (C_SkillInfo): First Aid, Blacksmithing, Leatherworking,
 -- Alchemy, Herbalism, Cooking, Mining, Tailoring, Engineering, Enchanting, Fishing, Skinning.
@@ -57,6 +58,7 @@ local function Reset()
 	S.xpAt = 0           -- (GetTime) the next XP check
 	S.afk = nil          -- AFK as last written (nil: not known yet)
 	S.afkDirty, S.groupDirty, S.bindDirty, S.skillsDirty, S.hkDirty = false, false, false, false, false
+	S.groupOthers, S.groupAt = 0, 0 -- the others in the group as last looked at; (GetTime) the next look then
 	S.gearAll = false
 	S.factionsScan, S.factionsAt = false, -math.huge
 	S.hk = nil           -- honorable kills as last read
@@ -159,6 +161,7 @@ local function Group(cap)
 		end
 		table.sort(friends)
 	end
+	S.groupOthers, S.groupAt = others, GetTime() + GROUP_EVERY
 	local state = size .. ";" .. others .. ";" .. table.concat(friends, ";")
 	if state ~= (cap.group or "0;0;") then
 		cap.group = state
@@ -456,6 +459,15 @@ E.OnTick(function(now)
 	end
 	if S.groupDirty then
 		Group(cap)
+	elseif S.groupOthers > 0 and now >= S.groupAt then
+		-- (Beacon learns of friends a few seconds after login, or after the roster changed: one
+		-- among the others gets named without another GROUP_ROSTER_UPDATE)
+		local beacon = LT:GetModule("beacon")
+		if beacon and beacon.enabled then
+			Group(cap)
+		else
+			S.groupAt = now + GROUP_EVERY
+		end
 	end
 	if S.bindDirty then
 		Bind(cap)

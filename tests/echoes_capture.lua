@@ -876,6 +876,21 @@ do
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.3)
 	check(seq() == "g;2;1 g;0;0", "a member whose GUID is secret: one of the others; left the group: g 0 0, got " .. seq())
+	-- A friend Beacon learns of only after the group was looked at (not remembered yet): named
+	-- within 15 s, without another roster change.
+	LT:SetModuleEnabled("beacon", false)
+	LefthyToolsEchoesDB.friends["Player-1-11"] = nil
+	listen()
+	GROUP, GROUP_MEMBERS, PARTY.party1 = "party", 2, { guid = "Player-1-11" }
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
+	LT:SetModuleEnabled("beacon", true)
+	anna("H2")
+	Advance(16)
+	check(seq() == "g;2;1 g;2;0;Player-1-11:Anna-Realmy", "a friend Beacon learns of later: named then, got " .. seq())
+	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
 end
 
 ---------------------------------------------------------------------------
@@ -1091,6 +1106,7 @@ section("Echoes capture: with Chronicle, the Bestiary and Beacon off")
 ---------------------------------------------------------------------------
 do
 	for _, key in ipairs({ "chronicle", "bestiary", "beacon" }) do LT:SetModuleEnabled(key, false) end
+	Advance(1) -- (the start point needs a second since the last line)
 	listen()
 	walk(500, 450)
 	halt()
