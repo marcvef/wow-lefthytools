@@ -327,7 +327,8 @@ beta): the writers return nil (`E.Name` false).
   letter or `@ = ! .` (anything else is an error). `dt` is the seconds since the last line; if the
   clock went back (or no line has a time yet), `!0;<now>` goes first and the line gets `dt` 0.
 - `E.Anchor(continent, north, west, mode, why, spell)`: an `@` line; north and west are rounded to
-  whole yards (both nil: an anchor without a position). The next points count from it.
+  whole yards (either one nil or not a readable number: an anchor without a position; a secret
+  continent is empty). The next points count from it.
 - `E.Point(north, west)`: a point, `dt,dnorth,dwest` from the last position (whole yards). Nothing
   before the page's first anchor, after an anchor without a position, or for a position that isn't
   a readable number.

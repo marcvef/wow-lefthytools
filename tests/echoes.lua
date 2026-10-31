@@ -189,6 +189,15 @@ do
 		and E.Line("g", 2, SECRET, "x") == "g0;2;;x" and E.Line("r", {}, SECRET) == "r0",
 		"empty fields at the end are left out, inner ones stay; nil, a secret or a table: empty")
 
+	-- Positions that aren't readable numbers: no point; an anchor with half a position has none.
+	E.Take()
+	E.PageStart(clock)
+	E.Anchor(0, 100, 200, "f", "s")
+	check(E.Point(SECRET, 5) == nil and E.Point(0 / 0, 5) == nil and E.Point(5, math.huge) == nil and E.Point("7", 5) == nil
+		and E.Point(nil, 5) == nil and E.state.north == 100, "a position that isn't a readable number (secret, not a number, infinite, text): no point")
+	check(E.Anchor(SECRET, 5, nil, "f", "j") == "@0;;;;f;j" and E.state.north == nil and E.state.continent == nil and E.Point(1, 1) == nil
+		and E.Take() == "@0;0;100;200;f;s\n@0;;;;f;j\n", "half a position, a secret continent: an anchor without a position, no points after it")
+
 	-- Names: once per page.
 	E.Take()
 	E.PageStart(clock)
