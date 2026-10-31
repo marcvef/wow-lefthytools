@@ -1477,6 +1477,31 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: safe summaries from friends are bounded")
+do
+	-- Bob (broken, or hostile) says Dora holds every other page of Anna's, 40 at a time, 800 in all:
+	-- at most 300 intervals are kept (a longer list isn't parsed on every message, nor saved).
+	local c = Start(EVE, { friends = { ANNA, BOB, DORA }, fake = true })
+	MeetAll(c, { BOB })
+	local n = 1001
+	for message = 1, 20 do
+		local list = {}
+		for i = 1, 40 do
+			list[i] = tostring(n)
+			n = n + 2
+		end
+		Say(c, BOB, ("B2;ed;%s;%s;%s:%s"):format(DORA.acct, DORA.store, ANNA.key, table.concat(list, ",")))
+		if message % 10 == 0 then
+			Pass(c, 1.05)
+		end
+	end
+	Pass(c, 3)
+	local kept = c.E.data.safe[ANNA.key] and c.E.data.safe[ANNA.key][DORA.key]
+	local count = kept and #c.E.Ranges.Parse(kept) or 0
+	check(count >= 280 and count <= 300, "at most 300 intervals kept for one collector, got " .. count)
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------

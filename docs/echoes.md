@@ -627,7 +627,9 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
   friend; everyone passes on what they know, when it changed (at most every 60 s, everything every
   5 minutes), and `E.Store.Safe` merges what comes by union.
 - Only collectors of a friend's account or my own count, and only about accounts I take; only what
-  grows is merged. At most 200 stores and 8 collectors each are kept.
+  grows is merged. At most 200 stores and 8 collectors each are kept, and of what friends tell
+  at most 300 intervals per collector (more isn't taken as safe: those pages are kept; a
+  collector's own summary has no limit).
 - `E.Store.Safe` drops my own pages (`mine`) and the ones I relay (`carry`) once any collector
   holds them safely.
 - A relay's holdings with my own pages: `E.Store.Carried` (over my cap, those go first).

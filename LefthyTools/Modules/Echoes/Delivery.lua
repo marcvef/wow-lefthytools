@@ -377,9 +377,11 @@ end
 
 -- A collector holds list of key safely: E.Store merges it into safe (only grows) and drops those
 -- pages from mine and carry. Only when it grows; at most SAFE_KEYS stores and SAFE_COLLECTORS
--- collectors each (a broken or hostile client can't fill the saved table).
+-- collectors each, and from friends (told) at most RANGES_MAX intervals each: a broken or hostile
+-- client can't fill the saved table, nor make every message parse a longer list. (Past that, the
+-- rest isn't taken as safe: its pages are kept, nothing is lost.)
 local SAFE_KEYS, SAFE_COLLECTORS = 200, 8
-local function Safe(key, collector, list)
+local function Safe(key, collector, list, told)
 	local safe = E.data.safe
 	local byCollector = safe[key]
 	if not byCollector and Count(safe) >= SAFE_KEYS then
@@ -388,8 +390,9 @@ local function Safe(key, collector, list)
 		return
 	end
 	local old = byCollector and byCollector[collector]
-	local merged = Ranges.Format(Ranges.Union(Stored(old), list))
-	if merged == "" or merged == old then
+	local union = Ranges.Union(Stored(old), list)
+	local merged = Ranges.Format(union)
+	if merged == "" or merged == old or (told and #union > RANGES_MAX) then
 		return
 	end
 	local acct, store = Split(key)
@@ -1446,7 +1449,7 @@ local function OnSafe(_, msg, now)
 	local collector = msg.acct .. "." .. msg.store
 	for _, item in ipairs(msg.items) do
 		if Accepted(item[2], now) then
-			Safe(item[1], collector, item[3])
+			Safe(item[1], collector, item[3], true)
 		end
 	end
 end
