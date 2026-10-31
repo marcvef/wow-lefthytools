@@ -559,8 +559,9 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
 
 - **Only friends who sent `eh` get B messages.** My own `eh` goes to a friend once Beacon has
   answered their hello (`B.EchoesAnswer`) and their build is known to read B (Beacon's `V2`:
-  `LT.CompareVersions` with `ECHOES_SINCE`, the first build with Delivery), or in answer to
-  theirs. A friend on an older build is never sent one (after 60 s without a version that reads
+  `LT.CompareVersions` with `ECHOES_SINCE`, the first build with Delivery: `0.6.0-25-g41f011b`;
+  0.6.0-24 reads B2 but has no Delivery, and a build without a commit count, like the tagged
+  0.6.0, counts as older), or in answer to theirs. A friend on an older build is never sent one (after 60 s without a version that reads
   B, nothing is owed any more). An `eh` without `a` is answered with one with `a`; a friend who
   (re)starts gets everything I hold again, and theirs comes again.
 - **Their account**: the account in `eh` must be the one Battle.net says for that friend (the

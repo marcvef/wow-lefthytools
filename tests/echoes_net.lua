@@ -43,7 +43,8 @@ local CEDRIC = Person(13, "Cedric Vale", "ROGUE", "Cedric#3456", "c3c3c3c3")
 local DORA = Person(14, "Dora Reed", "PRIEST", "Dora#4567", "d4d4d4d4")
 local EVE = Person(15, "Eve Marsh", "DRUID", "Eve#5678", "e5e5e5e5") -- nobody's friend here but Anna's
 local FINN = Person(16, "Finn Hale", "HUNTER", "Finn#6789", "f6f6f6f6") -- runs an older LefthyTools
-for _, p in ipairs({ ANNA, BOB, CEDRIC, DORA, EVE, FINN }) do
+local GWEN = Person(17, "Gwen Ash", "PALADIN", "Gwen#7890", "a7a7a7a7") -- updates from just before Delivery to it
+for _, p in ipairs({ ANNA, BOB, CEDRIC, DORA, EVE, FINN, GWEN }) do
 	p.key = p.acct .. "." .. p.store
 end
 
@@ -1112,6 +1113,27 @@ do
 	LT:SetModuleEnabled("beacon", true)
 	Pass(me, 1)
 	Stop(me)
+end
+
+-- (The sections below start a client of their own, so the ones above keep their timing.)
+
+section("Echoes' delivery: the first build with Delivery")
+do
+	-- 0.6.0-24 (0702157) reads B2 but has no Delivery; 0.6.0-25 (41f011b) is the first with it (a
+	-- "-dirty" install of it too).
+	local c = Start(DORA, { friends = { GWEN }, fake = true })
+	local mark = Mark(c)
+	Meet(c, GWEN, "0.6.0-24-g0702157")
+	Pass(c, 65)
+	Say(c, GWEN, "H2")
+	Pass(c, 65)
+	check(#Sent(c, GWEN, mark, "V2;") >= 1 and #Sent(c, GWEN, mark, "B2;") == 0, "0.6.0-24 (B2, no Delivery yet): never a B message")
+	Say(c, GWEN, "V2;0.6.0-25-g41f011b-dirty")
+	Say(c, GWEN, "H2")
+	Pass(c, 6)
+	local sent = Sent(c, GWEN, mark, "B2;")
+	check(#sent == 1 and sent[1]:find("^B2;eh;"), "0.6.0-25 (the first build with Delivery): my hello, got " .. tostring(sent[1]))
+	Stop(c)
 end
 
 ---------------------------------------------------------------------------

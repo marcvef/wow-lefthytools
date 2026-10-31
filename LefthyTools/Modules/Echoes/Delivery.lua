@@ -58,10 +58,10 @@ local FRIENDS_GAP = 30       -- the friend list's accounts are read again after 
 local HOUSE_GAP = 1          -- requests, timeouts, checks, summaries: once a second
 local PROBE_SIZES = { 255, 500, 1000, 2000, 4000 }
 local PROBE_GAP, PROBE_WAIT = 2, 10 -- between probe messages; answers awaited after the last
--- The first LefthyTools build that reads B messages (LT.CompareVersions): a friend on an older one
--- is never sent one. A friend whose build doesn't say (no commit count) gets an eh only in answer
--- to theirs.
-local ECHOES_SINCE = "0.6.0-19-g0000000"
+-- The first LefthyTools build with Delivery (41f011b; LT.CompareVersions goes by the commit count):
+-- a friend on an older one is never sent a B message (0.6.0-24 reads B2 but has no Delivery). A
+-- friend whose build doesn't say (no commit count) gets an eh only in answer to theirs.
+local ECHOES_SINCE = "0.6.0-25-g41f011b"
 
 local D = {}
 E.Delivery = D -- (status, probe, tests)
