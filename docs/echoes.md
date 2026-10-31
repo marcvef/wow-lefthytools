@@ -167,7 +167,7 @@ writes only what changed. A session's start looks at everything once.
 
 | Line | Detection | Kept |
 |---|---|---|
-| `x` | every 60 s, at a session's start, on `PLAYER_UPDATE_RESTING` and level-ups: `UnitLevel`, `UnitXP`, `UnitXPMax`, `GetXPExhaustion` (none: 0), `IsResting`; when one changed | `xp` (the last line's values) |
+| `x` | every 60 s, at a session's start, on `PLAYER_UPDATE_RESTING` and level-ups: `UnitLevel`, `UnitXP`, `UnitXPMax`, `GetXPExhaustion` (none: 0), `IsResting`; when one changed. A change only of the rested XP or the resting flag at most every 10 minutes (in an inn or a city the rested XP grows all the time: a night there would write a line a minute); level, XP or max at once | `xp` (the last line's values) |
 | `f` | `PLAYER_FLAGS_CHANGED` (player), `UnitIsAFK`; when it changed (a secret answer keeps the last) | |
 | `g` | `GROUP_ROSTER_UPDATE`: `GetNumGroupMembers`, the members' GUIDs (`party1-4` or `raid1-40`, not me); a friend is a Beacon peer (`ns.Beacon.peers`, Beacon on) or remembered: `guid:First-Realm` (the realm `GetPlayerInfoByGUID` says, else mine), sorted; the others counted. Left the group: `g;0;0`. With others in it and Beacon on, looked at again every 15 s (Beacon learns of friends a few seconds after login, and a line is written only when it changed) | `group`; `E.data.friends[guid]` = "Anna-Realm" (named while Beacon is off) |
 | `G` | `PLAYER_EQUIPMENT_CHANGED` marks a slot, a session's start all 19; out of combat `GetInventoryItemLink`: item, enchant (the link's second field), suffix (seventh), 0 when none; taken off: item 0; the name `=i` | `gear[slot]` |

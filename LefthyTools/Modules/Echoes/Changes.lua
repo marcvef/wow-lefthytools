@@ -17,6 +17,7 @@ local C = E.capture
 local issecret, Value, Readable = LT.IsSecret, LT.Value, LT.Readable
 
 local XP_EVERY = 60          -- seconds between XP checks (and on resting changes, level-ups, logins)
+local RESTED_EVERY = 600     -- seconds: a change only of the rested XP or the resting flag is written at most this often
 local FACTIONS_EVERY = 10    -- seconds: UPDATE_FACTION rescans at most this often
 local PLAYED_WAIT = 10       -- seconds the chat frames go without /played's answer while it's asked silently
 local RESULT_EVERY = 5       -- seconds between asking who won a battleground
@@ -56,6 +57,7 @@ local function Reset()
 	wipe(repDirty)
 	S.lastTick = nil
 	S.xpAt = 0           -- (GetTime) the next XP check
+	S.xpLineAt = nil     -- (GetTime) the last x line
 	S.afk = nil          -- AFK as last written (nil: not known yet)
 	S.afkDirty, S.groupDirty, S.bindDirty, S.skillsDirty, S.hkDirty = false, false, false, false, false
 	S.groupOthers, S.groupAt = 0, 0 -- the others in the group as last looked at; (GetTime) the next look then
@@ -79,12 +81,20 @@ local function XP(cap)
 	local rested = Value(GetXPExhaustion)
 	rested = type(rested) == "number" and rested or 0
 	local resting = Yes(IsResting)
-	local key = level .. ":" .. xp .. ":" .. max .. ":" .. rested .. ":" .. (resting and 1 or 0)
-	if key ~= cap.xp then
-		cap.xp = key
-		C.Spot()
-		E.Line("x", level, xp, max, rested, resting)
+	local main = level .. ":" .. xp .. ":" .. max .. ":"
+	local key = main .. rested .. ":" .. (resting and 1 or 0)
+	if key == cap.xp then
+		return
 	end
+	-- Only the rested XP (it grows a little all the time in an inn or a city) or the resting flag:
+	-- at most every RESTED_EVERY seconds, else a night in an inn writes a line every minute.
+	local now = GetTime()
+	if type(cap.xp) == "string" and cap.xp:sub(1, #main) == main and S.xpLineAt and now - S.xpLineAt < RESTED_EVERY then
+		return
+	end
+	cap.xp, S.xpLineAt = key, now
+	C.Spot()
+	E.Line("x", level, xp, max, rested, resting)
 end
 
 local function AFK()

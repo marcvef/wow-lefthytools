@@ -594,6 +594,27 @@ do
 	Advance(0.3)
 	check(seq() == "x;19;1600;6000;1200;0 x;19;1700;6000;1300;1",
 		"XP: level, xp, max, rested, resting; each minute when it changed, at once when resting changes, got " .. seq())
+	-- In an inn: the rested XP grows every minute, the resting flag goes off and on; only that is
+	-- written at most every 10 minutes (the last state then); XP gained at once again.
+	listen()
+	for _ = 1, 9 do
+		XP.rested = XP.rested + 10
+		Advance(60)
+	end
+	STATE.resting = false
+	Fire("PLAYER_UPDATE_RESTING")
+	Advance(0.3)
+	STATE.resting = true
+	Fire("PLAYER_UPDATE_RESTING")
+	Advance(0.3)
+	local quiet = seq()
+	Advance(61)
+	local tenMinutes = seq()
+	listen()
+	XP.current, STATE.resting = 1750, false
+	Advance(61)
+	check(quiet == "" and tenMinutes == "x;19;1700;6000;1390;1" and seq() == "x;19;1750;6000;1390;0",
+		"only rested XP or resting: at most every 10 minutes; XP gained: at once, got " .. quiet .. " | " .. tenMinutes .. " | " .. seq())
 	STATE.resting = false
 end
 
@@ -848,8 +869,8 @@ end
 section("Echoes capture: the group")
 ---------------------------------------------------------------------------
 do
-	anna("H2") -- (a friend with LefthyTools, through Beacon)
-	Advance(0.3)
+	anna("H2") -- (a friend with LefthyTools, through Beacon: known on its next tick)
+	Advance(2)
 	listen()
 	GROUP, GROUP_MEMBERS = "party", 3
 	PARTY.party1, PARTY.party2 = { guid = "Player-1-11" }, { guid = "Player-1-77" }
