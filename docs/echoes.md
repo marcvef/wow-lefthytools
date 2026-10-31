@@ -152,7 +152,7 @@ another loading screen.
 |---|---|
 | `L` level; played | `PLAYER_LEVEL_UP`; played: the time played (Changes.lua), whole seconds |
 | `a` / `Q` / `A` | `QUEST_ACCEPTED`; `QUEST_TURNED_IN` (xp, money); `QUEST_REMOVED`: 1.5 s later, abandoned (`A`) unless it was turned in, or turned in (`Q` without xp and money) when `C_QuestLog.IsQuestFlaggedCompleted` says so. One `Q` per turn-in: a `QUEST_TURNED_IN` up to 60 s before or after its `QUEST_REMOVED` is the same turn-in, whichever wrote the `Q`; a quest turned in again (accepted again, or a repeatable one never in the log) counts again. The title (`=q`) from `C_QuestLog.GetTitleForQuestID`, kept from when it was accepted |
-| `D` | `PLAYER_DEAD`, once until alive again (and 10 s after: the game repeats it). Logged in or `/reload`ed dead or a ghost (`UnitIsDeadOrGhost` when recording starts; no `PLAYER_DEAD` comes then): that death was counted before, its release and coming back still are. The killer: your attackable target in the last fight within 15 s (looked at every tick in combat): a creature (`c`, its ID, level, classification; its name `=c`), a player (`p`, class and level, no name; pvp 1), a player's pet or a secret GUID (`-`) |
+| `D` | `PLAYER_DEAD`, once until alive again (and 10 s after: the game repeats it). Logged in or `/reload`ed dead or a ghost (`UnitIsDeadOrGhost` when recording starts; no `PLAYER_DEAD` comes then): that death was counted before, its release and coming back still are. The killer: your attackable target in the last fight within 15 s (looked at every tick in combat): a creature (`c`, its ID, level, classification; its name `=c`), a player (`p`, class and level, no name; pvp 1); a player's pet, totem or guardian (`UnitPlayerControlled` when it became the foe; a totem's or guardian's GUID is a creature's): a player too (`p`, pvp 1), its owner's class and level when the owner has a nameplate (`UnitIsOwnerOrControllerOfUnit`), else empty; a secret GUID (`-`) |
 | `r` | `PLAYER_UNGHOST`: `s` after `CONFIRM_XP_LOSS` (the spirit healer, within 120 s), `p` after `RESURRECT_REQUEST` (within 70 s), else `c`; `PLAYER_ALIVE` alive without having released: `p` or `c`. Then the mode is read again |
 | `k` | `PARTY_KILL` by me, my pet (`UnitGUID("pet")`) or a group member (`C_PartyInfo.IsGUIDInGroup`), of a creature; each corpse once (the last 64). Level, classification (`n e r x w`; trivial and minus are `n`) and name from the mob cache |
 | `l` | `CHAT_MSG_LOOT` through `LT.OwnLoot`, quality 2 and better (an item not cached yet: by the link's colour): item, count, quality, `l` looted or `p` pushed, and the creature whose corpse the last loot window (within 5 s) said it came from; the item's name (`=i`) from the link |
@@ -200,7 +200,7 @@ recorded. A `/played` you type sets it too.
 
 Whether `GetShapeshiftFormID` is 3 and 16 for the travel forms; the carried guess on a boat and a
 zeppelin; whether the silent `/played` stays silent; which of `QUEST_REMOVED` and
-`QUEST_TURNED_IN` comes first; `PARTY_KILL` for pets and group members; the gathering spell IDs and
+`QUEST_TURNED_IN` comes first; `PARTY_KILL` for pets and group members; `UnitPlayerControlled` for an enemy's totems and guardians, and `UnitIsOwnerOrControllerOfUnit` from its owner's nameplate; the gathering spell IDs and
 `GetLootSourceInfo`'s game object GUIDs for nodes (and the bobber's for fishing); `PVP_MATCH_COMPLETE`'s winner (0 the
 Horde, 1 the Alliance, like `GetBattlefieldWinner`); `NEW_RECIPE_LEARNED`, `NEW_MOUNT_ADDED` and
 `FACTION_STANDING_CHANGED` firing (also for a faction under a closed header: a scan no longer
@@ -304,7 +304,7 @@ swimming, m mounted, v travel form, f on foot.
 | `L` | level-up | level; played seconds |
 | `x` | XP | level; xp; max; rested; resting 0/1 |
 | `a` / `Q` / `A` | quest accepted / turned in / abandoned | id (/ xp; money) |
-| `D` | death | level; killer kind c/p/-; creature id or class; killer level; classification; pvp 0/1 |
+| `D` | death | level; killer kind c/p/- (p also for a player's pet, totem or guardian: its owner's class and level, if known); creature id or class; killer level; classification; pvp 0/1 |
 | `r` | back to life | how: s spirit healer, p player, c corpse |
 | `k` | kill | creature; level; classification; who m/p/g |
 | `l` | loot | item; count; quality; l looted / p pushed; source creature |

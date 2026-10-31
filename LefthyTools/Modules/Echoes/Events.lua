@@ -285,30 +285,59 @@ end
 -- Deaths, the last enemy, coming back
 ---------------------------------------------------------------------------
 
+local PLATES = {} -- "nameplate1" ... "nameplate40"
+for i = 1, 40 do
+	PLATES[i] = "nameplate" .. i
+end
+
+-- A player's pet, totem or guardian (unit): its owner's class and level, when the owner is a player
+-- with a nameplate (UnitIsOwnerOrControllerOfUnit); nothing otherwise. (Once per new foe.)
+local function OwnerOf(unit)
+	if not UnitIsOwnerOrControllerOfUnit then
+		return nil
+	end
+	for i = 1, #PLATES do
+		local plate = PLATES[i]
+		if Yes(UnitIsPlayer, plate) and Yes(UnitIsOwnerOrControllerOfUnit, plate, unit) then
+			local ok, _, class = pcall(UnitClass, plate)
+			return ok and Readable(class) and class or nil, Value(UnitLevel, plate)
+		end
+	end
+end
+
 -- In a fight: your attackable target is the one that'll have killed you (FOE_MEMORY). The same
--- target as on the last tick: only its time and level are read again.
+-- target as on the last tick: only its time and (a creature's, a player's) level are read again.
 local function TrackFoe(now)
 	if not (LT.InCombat() and Yes(UnitExists, "target") and Yes(UnitCanAttack, "player", "target")) then
 		return
 	end
 	local guid = Value(UnitGUID, "target")
 	if guid and guid == foe.guid and foe.at then
-		foe.at, foe.level = now, Value(UnitLevel, "target") or foe.level
+		foe.at = now
+		if foe.itself then
+			foe.level = Value(UnitLevel, "target") or foe.level
+		end
 		return
 	end
-	foe.at, foe.name, foe.guid = now, nil, guid
+	foe.at, foe.name, foe.guid, foe.itself = now, nil, guid, false
 	if Yes(UnitIsPlayer, "target") then -- (a player: only class and level, no name)
 		local ok, _, class = pcall(UnitClass, "target")
 		foe.kind, foe.id, foe.level, foe.cls, foe.pvp = "p", ok and Readable(class) and class or nil, Value(UnitLevel, "target"), nil, true
+		foe.itself = true
+		return
+	elseif Yes(UnitPlayerControlled, "target") then
+		-- A player's pet, totem or guardian (a totem's and a guardian's GUID is a creature's): a player
+		-- killed you. Its owner's class and level, if known.
+		local class, level = OwnerOf("target")
+		foe.kind, foe.id, foe.level, foe.cls, foe.pvp = "p", class, level, nil, true
 		return
 	end
 	local info, _, creature = Look("target")
 	if creature then
 		foe.kind, foe.id, foe.level, foe.cls, foe.name = "c", creature, info.level, info.cls, info.name
-		foe.pvp = false
-	else -- (not readable, or a player's pet)
-		foe.kind, foe.id, foe.level, foe.cls = "-", nil, nil, nil
-		foe.pvp = Yes(UnitPlayerControlled, "target")
+		foe.pvp, foe.itself = false, true
+	else -- (not readable)
+		foe.kind, foe.id, foe.level, foe.cls, foe.pvp = "-", nil, nil, nil, false
 	end
 end
 

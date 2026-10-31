@@ -817,6 +817,31 @@ do
 	Advance(0.3)
 	check(seq() == "D;19;-;;;;0 r;c", "a killer that's a secret: unknown (-), got " .. seq())
 	Advance(11)
+	-- Killed by a player's totem (a creature's GUID), pet or guardian: player-controlled, so a player
+	-- killed me (pvp): its owner's class and level when the owner has a nameplate, else unknown.
+	local function diedTo(mob)
+		MOBS.target = mob
+		EnterCombat()
+		Advance(0.3)
+		STATE.dead = true
+		Fire("PLAYER_DEAD")
+		Advance(0.3)
+		LeaveCombat()
+		MOBS.target = nil
+		STATE.dead = false
+		Fire("PLAYER_ALIVE")
+		Advance(0.3)
+		Advance(11)
+	end
+	mock("UnitIsOwnerOrControllerOfUnit", function(owner, unit) return MOBS[owner] ~= nil and MOBS[owner].owns == unit end)
+	listen()
+	diedTo({ name = "Searing Totem", level = 20, guid = "Creature-0-1-0-1-2523-000000AC", controlled = true })
+	MOBS.nameplate4 = { player = true, classFile = "SHAMAN", level = 22, guid = "Player-1-98", owns = "target", friendly = false }
+	diedTo({ name = "Searing Totem", level = 20, guid = "Creature-0-1-0-1-2523-000000AD", controlled = true })
+	MOBS.nameplate4 = nil
+	diedTo({ name = "Wolf", level = 21, guid = "Pet-0-1-0-1-1234-000000AE", controlled = true })
+	check(seq() == "D;19;p;;;;1 r;c D;19;p;SHAMAN;22;;1 r;c D;19;p;;;;1 r;c",
+		"killed by a player's totem or pet: a player (p, pvp), the owner's class and level when it has a nameplate, got " .. seq())
 	-- No fight for 15 s before: unknown.
 	MOBS.target = { name = "Kobold Vermin", level = 5, guid = "Creature-0-1-0-1-327-000000AB" }
 	EnterCombat()
