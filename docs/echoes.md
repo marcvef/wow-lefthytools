@@ -33,6 +33,7 @@ Files, in `Modules/Echoes/`, in the order they load (the TOC):
 | `Changes.lua` | what the capture compares with what it wrote before: XP, AFK, group, gear, reputation, professions, the hearthstone, honor, dungeons and battlegrounds, /played |
 | `Store.lua` | the closed pages (`E.Store`: packing, what's kept, the API for the delivery), range strings (`E.Ranges`), the exporter's receipt, `/lefthy echoes` (`E.Command`, `E.OnStatus`) |
 | `Pages.lua` | the open page: starting, joining, closing, going on after a `/reload`; my account (`E.MyAccount`) and character (`E.Character`) |
+| `Delivery.lua` | pages from friends to the collector through Beacon (`E.Delivery`): the `B2;e...` messages, pulling, relaying, collecting, what's safe, the budget, the probe (Delivery, below) |
 
 What the files share (`E`):
 
@@ -49,7 +50,7 @@ What the files share (`E`):
   recording, so it can write its last lines), through `LT.Guard`.
 - `E.data`: `LefthyToolsEchoesDB` (below); `E.driver`: the driver frame (for tests).
 
-**Settings** (`LefthyToolsDB.settings.echoes`), for the delivery (not built yet):
+**Settings** (`LefthyToolsDB.settings.echoes`), for the delivery (Delivery, below):
 
 | Setting | Default | What |
 |---|---|---|
@@ -517,5 +518,158 @@ exported). Other files add to it:
 
 ## Delivery
 
-Not built yet: the `B2;e...` messages through Beacon, pulling, relaying and collecting, driven by
-the settings above.
+`Delivery.lua` (`E.Delivery`, `D` below): pages go from their author to whoever collects them,
+through Beacon. Battle.net messages only reach friends online right now, so every client offers
+the pages it holds and friends pass them on: a page gets from its author to the collector also
+when the two are never online together.
+
+**Roles** (each client can be several):
+
+- **Author**: every client while Echoes records. There is no consent step: sharing follows the
+  module being on (switched off, nothing is recorded or sent). Plain-text pages (`m = "t"`) never
+  travel.
+- **Relay** (`relay`, on): keeps friends' pages for a while and passes them on.
+- **Collector** (`collect`, off): gathers friends' pages, and my own account's from my other
+  computers, for the exporter. A collector doesn't relay.
+
+Delivery runs on Echoes' tick while recording, and only while Beacon is on and my BattleTag is
+known. Its state is memory only: a `/reload` starts afresh (pages half-way are asked for again).
+
+### Messages
+
+Beacon's B family (Protocol.lua): `B2;<module letter><word>;...`, module letter `e`. At most 255
+bytes, like every Beacon message.
+
+| Message | Format | What |
+|---|---|---|
+| `eh` hello | `B2;eh;<acct>;<store>;<proto>;<maxBytes>;<flags>` | proto 1, maxBytes 255. Flags: `c` collect, `r` relay, `s` share, `a` an answer (none back). Without c, r and s: switched off. Later fields are ignored (room for later builds) |
+| `es` holdings | `B2;es;<acct>.<store>:<ranges>/...` | pages I can serve (`1-56,58`) |
+| `ed` safe | `B2;ed;<collector acct>;<collector store>;<acct>.<store>:<ranges>/...` | pages safe at that collector; passed on by everyone; only grows |
+| `eq` request | `B2;eq;<acct>;<store>;<n>;<offset>` | send me page n from byte offset; offset = its length: stop sending it |
+| `eb` page begins | `B2;eb;<x>;<acct>;<store>;<n>;<len>;<hash>;<t0>;<m>` | transfer x (1-99, the sender's), length, `LT.Hash32` of the Base64 text, start, mode (`z` or `r`: the receiver stores it as it is) |
+| `ep` part | `B2;ep;<x>;<offset>;<data>` | up to 240 bytes of the page's Base64 text (a substring of the stored string): 255 bytes in all |
+| `en` don't have | `B2;en;<acct>;<store>;<n>` | ask someone else |
+| `ex` / `ey` probe | `B2;ex;<size>;<padding>` / `B2;ey;<size>;<got>` | the probe (below) and its answer |
+
+Items of `es` and `ed` are split over as many messages as they need (a long list of ranges in
+pieces); receivers merge them. Every message is read strictly (`D.Read`: fields, sizes, lowercase
+hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
+
+### Who gets B
+
+- **Only friends who sent `eh` get B messages.** My own `eh` goes to a friend once Beacon has
+  answered their hello (`B.EchoesAnswer`) and their build is known to read B (Beacon's `V2`:
+  `LT.CompareVersions` with `ECHOES_SINCE`, the first build with Delivery), or in answer to
+  theirs. A friend on an older build is never sent one (after 60 s without a version that reads
+  B, nothing is owed any more). An `eh` without `a` is answered with one with `a`; a friend who
+  (re)starts gets everything I hold again, and theirs comes again.
+- **Their account**: the account in `eh` must be the one Battle.net says for that friend (the
+  friend list's BattleTag hashes, Chronicle's `C.Hash` the same way, whether Chronicle is on or
+  not; or `GetAccountInfoByGUID`). Wrong: nothing is exchanged with them. Not known yet: checked
+  again every second.
+- **Accounts taken**: pages, holdings and safe ranges only of my Battle.net friends' accounts and
+  my own.
+
+### Pulling
+
+- **What I hold** (`es`): my own pages, the ones I relay (while relaying) and a collector's inbox;
+  never a friend's own pages back to them. To a friend who collects or relays, when it changed (at
+  most every 60 s), everything every 5 minutes.
+- **A collector** asks for every offered page it lacks (not in its inbox, not exported), until
+  its inbox reaches 8 MB. One it relays already just moves to the inbox.
+- **A relay** asks for pages of its friends' accounts (not its own) that:
+  - no collector holds safely (`safe`),
+  - no online friend who collects holds (they'll be safe at its next session),
+  - fewer than 2 online friends besides the author hold,
+  - fit its cache (`E.Store.Fits`: 512 KB in all, 128 KB per author's store). Too big when it
+    begins (`eb`): it asks from the page's end (stops it) and leaves that page alone for 5 minutes.
+- **Requests**: one open request per holder, 2 pages at once; a page I got part of goes on from
+  there. 30 s without progress (counted from when the request went): asked again, from the
+  contiguous offset, of the same holder or another. Pages never change, so bytes from different
+  holders fit together; that's also how a page goes on after a friend went offline.
+- **Serving**: a holder keeps 20 requests waiting and serves 2 at once (transfer ids 1-99 by
+  turns); the same page asked again goes on from the new offset.
+
+### Checks
+
+- Delivery checks who and what was asked for: a page's start (`eb`) only for a page I asked for
+  and don't have, of an account I take, at most 64 KB; parts only in order (one after a gap waits
+  for the request again).
+- A whole page goes to `E.Store.Put`, which checks the rest: the hash (`LT.Hash32`), the size, the
+  start (not before the launch, not more than a day ahead), exported, safe, room. Refused for its
+  hash, size or start: whoever sent parts of it isn't asked for it again this session. No room:
+  that page is left alone for 5 minutes. The game never decompresses a page.
+
+### Safe at a collector
+
+- A collector's page is safe once it came in an earlier session (on disk now) or the exporter
+  has it (`E.Store.SafeHere`). The collector puts its own summary in `safe` and sends `ed` to every
+  friend; everyone passes on what they know, when it changed (at most every 60 s, everything every
+  5 minutes), and `E.Store.Safe` merges what comes by union.
+- Only collectors of a friend's account or my own count, and only about accounts I take; only what
+  grows is merged. At most 200 stores and 8 collectors each are kept.
+- `E.Store.Safe` drops my own pages (`mine`) and the ones I relay (`carry`) once any collector
+  holds them safely.
+- A relay's holdings with my own pages: `E.Store.Carried` (over my cap, those go first).
+
+### Budget (never in the way)
+
+- Everything goes through Beacon's low-priority queue (`B.QueueLow`), and only when nothing but
+  Echoes' own waits in any of Beacon's queues (`B.Waiting`): chat, positions, the fight stream,
+  journals and everything else first.
+- At most 3 of mine waiting there; never more than 3 in any second in all, nor 2 to one friend
+  (counted when they actually went, the waiting ones included; with the tick that's about 2.4 and
+  1.6 a second).
+- **Nothing in combat**: when a fight starts (`PLAYER_REGEN_DISABLED`), what still waits in
+  Beacon's queue comes back out (`D.Withdraw`: parts are sent again from where they were, the rest
+  goes back in line).
+- **After a throttle or lockdown** (Beacon's `B.throttledAt`, result 3 or 11): nothing for 30 s;
+  the next one right after doubles it, up to 5 minutes; after 10 calm minutes 30 s again. What
+  waits comes back out the same way.
+- **Receiving**: Beacon hands B messages over (at most 400 a minute from one friend, on top of its
+  20 a second); they wait for the tick (at most 600), which handles 60 per tick. Unfinished pages
+  stay in memory: 256 KB at most, 10 minutes without progress.
+
+### Message size and the probe
+
+Messages stay at 255 bytes; `maxBytes` in `eh` lets a later build use bigger parts per friend
+once a probe on Forever shows what the server takes. `/lefthy echoes probe <friend>`
+(`E.Command`; `D.Probe(name)`): to a friend with Echoes, messages of 255, 500, 1000, 2000
+and 4000 bytes (`B2;ex;<size>;xxx...`), 2 s apart, out of combat, only when Beacon's queues are
+empty, sent directly so each one's result shows; the friend answers each with what arrived
+(`B2;ey;<size>;<got>`). Beacon lets a bigger `B2;ex;` through only for this (from a friend it
+knows, up to 4100 bytes, 10 a minute). One chat line says per size: refused (the result), no
+answer, arrived whole or cut. A throttle stops it and counts like Beacon's.
+
+### Status
+
+`/lefthy echoes` (`E.OnStatus`, `D.Status()`): friends with Echoes online and what they offer,
+pages coming and served, traffic, a pause after a throttle.
+
+### Check on launch day (delivery)
+
+1. `/lefthy echoes probe <friend>`: which sizes the server takes, and whether bigger ones trip
+   the throttle sooner (only then bigger parts per friend, through `maxBytes`).
+2. Do B messages arrive during an encounter's lockdown (result 11), or only after it?
+3. Battle.net tells a friend's account: the friend list's game accounts or
+   `GetAccountInfoByGUID`. Without it no friend's hello is believed and nothing is delivered.
+4. The rate in practice (about 2.4 parts a second in all): an evening's pages in well under a
+   minute, nothing else of Beacon's slower.
+
+### The pages: E.Store
+
+Every change to the pages goes through `E.Store` (Pages and storage): `Page` to serve, `Held`
+for what I hold, `Put` for what came, `Drop` (a page I relay that's collected now moves to the
+inbox), `Safe` and `SafeHere`, `Carried`, `Fits`, `InboxFull`, `Own`. Delivery only reads
+`exported` and `safe` for its decisions. What it works out of the pages (holdings, what I have
+of a store, what's exported or safe) is cached until they change: `D.PagesChanged()` (also every
+30 s, and when `n` moves). Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
+`Minus`, `Has`) read the wire strictly (a bad part refuses the message) and do the set
+arithmetic pulling needs; they read and write the same strings as `E.Ranges`.
+
+### Beacon's hooks
+
+`B.ReceiveEchoes(id, word, more)` (every `B2;e...`), `B.ReceiveProbe(id, text)`,
+`B.EchoesAnswer(id)` (Beacon answered their hello), `B.EchoesForget(id)` (a friend gone: what
+was asked of them goes to someone else, my messages to them still waiting go), `B.EchoesStop()`
+(Beacon off).

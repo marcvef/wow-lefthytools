@@ -105,6 +105,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Echoes/Changes.lua       what the capture compares with what it wrote: XP, group, gear, reputation, ...
   Modules/Echoes/Store.lua         the closed pages: packing, what's kept, the API for the delivery, the exporter's receipt, /lefthy echoes
   Modules/Echoes/Pages.lua         the open page: starting, joining, closing, going on after a /reload
+  Modules/Echoes/Delivery.lua      pages from friends to the collector through Beacon: messages, pulling, relaying, what's safe, the budget
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md

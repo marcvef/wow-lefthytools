@@ -103,3 +103,4 @@ Modules\Echoes\Events.lua
 Modules\Echoes\Changes.lua
 Modules\Echoes\Store.lua
 Modules\Echoes\Pages.lua
+Modules\Echoes\Delivery.lua

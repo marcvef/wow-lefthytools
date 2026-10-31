@@ -18,9 +18,10 @@ local Hash32 = suite.LT.Hash32
 -- The harness
 ---------------------------------------------------------------------------
 
--- What every client shares: Lua's libraries and whatever run.js gave the state (functions from JS).
+-- What every client shares: Lua's libraries and whatever run.js gave the state (functions from JS,
+-- and tests/native.js's C_EncodingUtil: Node's real zlib).
 local STD = { string = true, table = true, math = true, os = true, io = true, debug = true, coroutine = true, utf8 = true,
-	package = true }
+	package = true, C_EncodingUtil = true }
 local BASE = { _VERSION = _VERSION }
 for k, v in pairs(_G) do
 	if STD[k] or (type(v) == "function" and debug.getinfo(v, "S").what ~= "Lua") then
@@ -308,11 +309,20 @@ local function Data(len, seed)
 end
 
 -- A closed page of c's own (put straight into the saved table, as Pages.lua would): n, its length.
+-- The saved table changed by the test, not through E.Store: its sizes counted anew, Delivery looks again.
+local function Touched(c)
+	c.E.Store.Recount()
+	c.D.PagesChanged()
+end
+
+-- (Pages.lua numbers its pages from E.data.n on: the client's own are 1, opened at login, and from
+-- 1001 on, since E.data.n is set to 1000 here; the test's are 100 to 999.)
 local function MyPage(c, n, len, m)
 	local z = Data(len, n * 7919 + #c.who.name)
-	local page = { t = c.env.GetServerTime() - 3600 + n * 60, h = Hash32(z), m = m or "z", z = z }
+	local page = { t = c.env.GetServerTime() - 3600 + (n % 100) * 30, h = Hash32(z), m = m or "z", z = z }
 	c.E.data.mine[n] = page
-	c.E.data.n = math.max(c.E.data.n, n)
+	c.E.data.n = math.max(c.E.data.n, 1000)
+	Touched(c)
 	return page
 end
 
@@ -353,12 +363,20 @@ local function Received(c, f, mark)
 	return table.concat(out), len
 end
 
+-- A table's keys, sorted; numbers only 100 to 999 (the test's pages, not the client's own).
 local function Keys(t)
 	local list = {}
 	for k in pairs(t or {}) do
-		list[#list + 1] = k
+		if type(k) ~= "number" or (k >= 100 and k < 1000) then
+			list[#list + 1] = k
+		end
 	end
-	table.sort(list)
+	table.sort(list, function(a, b)
+		if type(a) == "number" and type(b) == "number" then
+			return a < b
+		end
+		return tostring(a) < tostring(b)
+	end)
 	return table.concat(list, ",")
 end
 
@@ -440,4 +458,658 @@ do
 	check(stopped == 1, "Beacon off: the module hears it")
 	B.ReceiveEchoes, B.EchoesAnswer, B.EchoesForget, B.EchoesStop, B.ReceiveProbe = kept[1], kept[2], kept[3], kept[4], kept[5]
 	Stop(c)
+end
+
+---------------------------------------------------------------------------
+-- One client, friends played by the test
+---------------------------------------------------------------------------
+
+section("Echoes' delivery: the B messages")
+local me = Start(CEDRIC, { friends = { ANNA, BOB, DORA, FINN }, fake = true })
+local B, D, LT, E = me.B, me.D, me.LT, me.E
+CEDRIC.store = E.data.store
+CEDRIC.key = CEDRIC.acct .. "." .. CEDRIC.store
+E.data.n = 1000 -- (the client's own pages: 1 and from 1001 on; see MyPage)
+do
+	check(LT.world == "release" and E.recording and D and B.ReceiveEchoes and B.EchoesAnswer and B.EchoesForget and B.EchoesStop
+		and B.ReceiveProbe, "the release: Echoes records, Delivery's hooks are in Beacon")
+	check(E.Store.Own() == CEDRIC.key, "E.Store knows my key (my BattleTag's hash and this store)")
+
+	local R = D.Read
+	local eh = R("eh", "1a2b3c4d;9f3a61c2;1;255;crsa")
+	check(eh and eh.acct == "1a2b3c4d" and eh.store == "9f3a61c2" and eh.proto == 1 and eh.maxBytes == 255 and eh.collect and eh.relay
+		and eh.share and eh.answer, "eh: account, store, proto, size, flags")
+	local off = R("eh", "1a2b3c4d;9f3a61c2;1;255;")
+	check(off and not (off.collect or off.relay or off.share or off.answer) and R("eh", "1a2b3c4d;9f3a61c2;2;500;s;later") ~= nil,
+		"eh without flags (switched off); later builds' extra fields are fine")
+	local es = R("es", "1a2b3c4d.9f3a61c2:1-56,58/5e6f7a8b.0c77e1f2:200-213")
+	check(es and #es.items == 2 and es.items[1][1] == "1a2b3c4d.9f3a61c2" and es.items[1][2] == "1a2b3c4d"
+		and D.Ranges.Format(es.items[1][3]) == "1-56,58" and D.Ranges.Format(es.items[2][3]) == "200-213", "es: holdings per store")
+	local ed = R("ed", "5e6f7a8b;0c77e1f2;1a2b3c4d.9f3a61c2:1-50")
+	check(ed and ed.acct == "5e6f7a8b" and ed.store == "0c77e1f2" and D.Ranges.Format(ed.items[1][3]) == "1-50", "ed: safe at a collector")
+	local eq = R("eq", "1a2b3c4d;9f3a61c2;214;480")
+	check(eq and eq.n == 214 and eq.offset == 480 and R("eq", "1a2b3c4d;9f3a61c2;214;65536").offset == 65536, "eq: page and offset")
+	local eb = R("eb", "7;1a2b3c4d;9f3a61c2;214;3000;0badc0de;1793452800;z")
+	check(eb and eb.x == 7 and eb.n == 214 and eb.len == 3000 and eb.hash == "0badc0de" and eb.t0 == 1793452800 and eb.m == "z"
+		and R("eb", "7;1a2b3c4d;9f3a61c2;214;3000;0badc0de;1793452800;r").m == "r", "eb: transfer, page, length, hash, start, mode")
+	local ep = R("ep", "7;480;QUJD+/9=")
+	check(ep and ep.x == 7 and ep.offset == 480 and ep.data == "QUJD+/9=", "ep: transfer, offset, Base64")
+	local en = R("en", "1a2b3c4d;9f3a61c2;214")
+	check(en and en.n == 214, "en: the page")
+	local bad = {
+		{ "eh", "1A2B3C4D;9f3a61c2;1;255;s" }, { "eh", "1a2b3c4;9f3a61c2;1;255;s" }, { "eh", "1a2b3c4d;9f3a61c2;1;255;CR" },
+		{ "eh", "1a2b3c4d;9f3a61c2;x;255;s" }, { "eh", "1a2b3c4d;9f3a61c2;1;255" },
+		{ "es", "1a2b3c4d:1-5" }, { "es", "1a2b3c4d.9f3a61c2:3-1" }, { "es", "1a2b3c4d.9f3a61c2:0" }, { "es", "1a2b3c4d.9f3a61c2:1,,2" },
+		{ "es", "1a2b3c4d.9f3a61c2:1;x" }, { "es", "" },
+		{ "ed", "5e6f7a8b;0c77e1f2" }, { "ed", "5e6f7a8;0c77e1f2;1a2b3c4d.9f3a61c2:1" },
+		{ "eq", "1a2b3c4d;9f3a61c2;0;0" }, { "eq", "1a2b3c4d;9f3a61c2;1;65537" }, { "eq", "1a2b3c4d;9f3a61c2;1" },
+		{ "eq", "1a2b3c4d;9f3a61c2;1;0;5" },
+		{ "eb", "0;1a2b3c4d;9f3a61c2;1;30;0badc0de;1793452800;z" }, { "eb", "100;1a2b3c4d;9f3a61c2;1;30;0badc0de;1793452800;z" },
+		{ "eb", "7;1a2b3c4d;9f3a61c2;1;0;0badc0de;1793452800;z" }, { "eb", "7;1a2b3c4d;9f3a61c2;1;65537;0badc0de;1793452800;z" },
+		{ "eb", "7;1a2b3c4d;9f3a61c2;1;30;0badc0de;1793452800;t" }, { "eb", "7;1a2b3c4d;9f3a61c2;1;30;0BADC0DE;1793452800;z" },
+		{ "eb", "7;1a2b3c4d;9f3a61c2;1;30;0badc0de;17934528000;z" }, { "eb", "7;1a2b3c4d;9f3a61c2;1;30;0badc0de;1793452800" },
+		{ "ep", "7;480;QUJD!" }, { "ep", "7;65536;QUJD" }, { "ep", "a;0;QUJD" }, { "ep", "7;0;" },
+		{ "en", "1a2b3c4d;9f3a61c2;0" }, { "en", "1a2b3c4d;9f3a61c2" },
+		{ "ez", "1" },
+	}
+	local all = true
+	for _, b in ipairs(bad) do
+		if R(b[1], b[2]) ~= nil then
+			all = false
+			io.write("    (read: " .. b[1] .. ";" .. b[2] .. ")\n")
+		end
+	end
+	check(all, "malformed fields of every word are refused (" .. #bad .. " cases)")
+end
+
+section("Echoes' delivery: ranges, summaries in messages")
+do
+	local R = D.Ranges
+	check(R.Format(R.Parse("58,1-56")) == "1-56,58" and R.Format(R.Parse("1-3,4-6,10,11")) == "1-6,10-11"
+		and R.Format(R.Parse("5-9,1-6")) == "1-9", "parsed: sorted, overlapping and adjacent ones joined")
+	check(#R.Parse("") == 0 and R.Parse("3-1") == nil and R.Parse("0") == nil and R.Parse("1,,2") == nil and R.Parse("a") == nil
+		and R.Parse("1-") == nil and R.Parse(nil) == nil and R.Parse("99999999999") == nil, "empty is none; anything else odd is refused")
+	local many = {}
+	for i = 1, 301 do
+		many[i] = tostring(i * 2)
+	end
+	check(R.Parse(table.concat(many, ",", 1, 300)) ~= nil and R.Parse(table.concat(many, ",")) == nil, "at most 300 intervals")
+	check(R.Format(R.Union(R.Parse("1-5,9"), R.Parse("6-7,20"))) == "1-7,9,20", "union")
+	check(R.Format(R.Minus(R.Parse("1-10,15-20"), R.Parse("3-4,10-16,19"))) == "1-2,5-9,17-18,20"
+		and R.Format(R.Minus(R.Parse("1-5"), R.Parse(""))) == "1-5" and #R.Minus(R.Parse("2-3"), R.Parse("1-9")) == 0
+		and R.Format(R.Minus(R.Parse("1-3,7-9"), R.Parse("2,8"))) == "1,3,7,9", "minus")
+	local list = R.Parse("1-5,9")
+	check(R.Has(list, 1) and R.Has(list, 9) and not R.Has(list, 6) and not R.Has(list, 10) and not R.Has(list, 0), "has")
+	check(R.Parse("999999999") ~= nil and R.Parse("1000000000") == nil, "page numbers up to E.Store's 999,999,999")
+	local stored = E.Ranges.Union("1-3,9", "5,4")
+	check(stored == "1-5,9" and R.Format(R.Parse(stored)) == stored, "the same strings as E.Ranges writes (E.Store's)")
+
+	-- A long, gappy list in pieces that fit; packed into messages of at most 255 bytes.
+	local gappy = {}
+	for i = 1, 150 do
+		gappy[i] = { i * 3, i * 3 + 1 }
+	end
+	local items = {}
+	D.WriteItems(ANNA.key, gappy, 249, items)
+	local fit, back = true, {}
+	for _, item in ipairs(items) do
+		fit = fit and #item <= 249 and item:sub(1, #ANNA.key + 1) == ANNA.key .. ":"
+		back = R.Union(back, R.Parse(item:sub(#ANNA.key + 2)))
+	end
+	check(#items > 1 and fit and R.Format(back) == R.Format(gappy), "a long list goes in pieces, all of it")
+	local messages = D.Pack("B2;es;", items)
+	local short, joined = true, {}
+	for _, m in ipairs(messages) do
+		short = short and #m <= 255 and B.Parse(m) == "B"
+		joined[#joined + 1] = m:sub(7)
+	end
+	check(#messages > 1 and short and table.concat(joined, "/") == table.concat(items, "/"),
+		"packed into messages of at most 255 bytes that Beacon reads, got " .. #messages)
+end
+
+section("Echoes' delivery: who gets B (hellos, builds, accounts)")
+do
+	local mark = Mark(me)
+	Say(me, ANNA, "H2")
+	me.alive[#me.alive + 1] = ANNA
+	Pass(me, 1.5)
+	check(#Sent(me, ANNA, mark, "S2;") >= 1 and #Sent(me, ANNA, mark, "B2;") == 0, "Anna says hello: Beacon answers; no B while her build isn't known")
+	Say(me, ANNA, "V2;" .. NEW)
+	Pass(me, 1.5)
+	local eh = Sent(me, ANNA, mark, "B2;eh;")
+	check(#eh == 1 and eh[1] == ("B2;eh;%s;%s;1;255;rs"):format(CEDRIC.acct, CEDRIC.store),
+		"her build reads B: my hello (relay on, collect off, sharing; it asks for hers), got " .. tostring(eh[1]))
+	check(#Sent(me, ANNA, mark, "B2;") == 1, "... and nothing else before hers")
+
+	mark = Mark(me)
+	Hello(me, ANNA, "csa")
+	local peer = D.peers[ANNA.id]
+	check(peer and peer.verified == true and peer.collect and peer.share and not peer.relay and #Sent(me, ANNA, mark, "B2;eh;") == 0,
+		"her answer: her account is the one Battle.net says, she collects; an answer gets none back")
+	Pass(me, 1)
+	check(#Sent(me, ANNA, mark, "B2;es;") == 0, "no pages of mine yet: nothing offered")
+	Hello(me, ANNA, "cs")
+	local back = Sent(me, ANNA, mark, "B2;eh;")
+	check(#back == 1 and back[1]:sub(-4) == ";rsa", "her hello (she restarted): answered once, as an answer, got " .. tostring(back[1]))
+
+	-- Finn runs an older LefthyTools: he never gets B, also when he says hello again and again.
+	mark = Mark(me)
+	Meet(me, FINN, OLD)
+	Say(me, FINN, "H2")
+	Pass(me, 70)
+	Say(me, FINN, "H2")
+	Pass(me, 10)
+	check(#Sent(me, FINN, mark, "V2;") >= 1 and #Sent(me, FINN, mark, "B2;") == 0, "Finn (an older build): Beacon as ever, never a B message")
+	Say(me, FINN, "V2;0.6.0")
+	Say(me, FINN, "H2")
+	Pass(me, 70)
+	check(#Sent(me, FINN, mark, "B2;") == 0, "nor on the tagged release before it (no commit count: not newer)")
+
+	-- Bob says he's Anna: not believed; nothing exchanged. Then rightly: he is.
+	mark = Mark(me)
+	Meet(me, BOB, NEW)
+	Hello(me, BOB, "rs", ANNA.acct)
+	check(D.peers[BOB.id] and D.peers[BOB.id].verified == false and D.stats.rejected >= 1, "an eh with another account than Battle.net's: refused")
+	Say(me, BOB, ("B2;eq;%s;%s;1;0"):format(CEDRIC.acct, CEDRIC.store))
+	Pass(me, 2)
+	check(#Sent(me, BOB, mark, "B2;en;") == 0, "... his requests get nothing (not even \"don't have\")")
+	Hello(me, BOB, "rs")
+	check(D.peers[BOB.id].verified == true, "he says hello as himself: taken")
+end
+
+section("Echoes' delivery: serving, within the budget")
+do
+	-- My pages: 501-503 (2400 bytes: 10 parts each), 504 plain text (never shared).
+	local pages = {}
+	for n = 501, 503 do
+		pages[n] = MyPage(me, n, 2400)
+	end
+	MyPage(me, 504, 500, "t")
+	local mark = Mark(me)
+	Pass(me, 62) -- (the next summary)
+	local es = Sent(me, ANNA, mark, "B2;es;")
+	check(#es == 1 and es[1] == "B2;es;" .. CEDRIC.key .. ":501-503", "my pages offered to the collector, not the plain-text one, got " .. tostring(es[1]))
+	check(#Sent(me, BOB, mark, "B2;es;") == 1, "... and to the relay")
+
+	-- Anna asks for page 501, Bob for 502: both served, by turns, within the budget.
+	mark = Mark(me)
+	local most = 0
+	Say(me, ANNA, ("B2;eq;%s;%s;501;0"):format(CEDRIC.acct, CEDRIC.store))
+	Say(me, BOB, ("B2;eq;%s;%s;502;0"):format(CEDRIC.acct, CEDRIC.store))
+	Pass(me, 12, 0.05, function()
+		most = math.max(most, D.Outstanding())
+	end)
+	local a, b = Sent(me, ANNA, mark, "B2;e"), Sent(me, BOB, mark, "B2;e")
+	check(#a == 11 and #b == 11 and a[1]:find("^B2;eb;%d+;" .. CEDRIC.acct .. ";" .. CEDRIC.store .. ";501;2400;" .. pages[501].h .. ";"
+		.. pages[501].t .. ";z$") and a[2]:find("^B2;ep;%d+;0;") and a[3]:find("^B2;ep;%d+;240;"),
+		"each gets the page's start, then its 10 parts in order")
+	check(Received(me, ANNA, mark) == pages[501].z and Received(me, BOB, mark) == pages[502].z, "the parts are the stored text, as it is")
+	check(most <= 3, "at most 3 of my messages wait in Beacon's queue, got " .. most)
+	local fit = true
+	for _, m in ipairs(a) do
+		fit = fit and #m <= 255
+	end
+	check(fit and #a[2] == 6 + #a[2]:match("^B2;ep;(%d+;%d+;)") + 240, "a part: 240 bytes of the page, 255 in all at most")
+
+	-- The rate: 3 a second in total, 2 to one friend.
+	pages[505] = MyPage(me, 505, 9600) -- (40 parts)
+	pages[506] = MyPage(me, 506, 9600)
+	mark = Mark(me)
+	local sentAt, last = {}, #me.env.GAMEDATA
+	local function Note()
+		for i = last + 1, #me.env.GAMEDATA do
+			local m = me.env.GAMEDATA[i]
+			if m.data:sub(1, 4) == "B2;e" then
+				sentAt[#sentAt + 1] = { me.env.GetTime(), m.id }
+			end
+		end
+		last = #me.env.GAMEDATA
+	end
+	Say(me, ANNA, ("B2;eq;%s;%s;505;0"):format(CEDRIC.acct, CEDRIC.store))
+	Pass(me, 10, 0.05, Note)
+	local function MostInASecond(id)
+		local top = 0
+		for i, s in ipairs(sentAt) do
+			local n = 0
+			for j = i, #sentAt do
+				if sentAt[j][1] - s[1] < 1 - 1e-9 and (not id or sentAt[j][2] == id) then
+					n = n + 1
+				end
+			end
+			top = math.max(top, (not id or s[2] == id) and n or 0)
+		end
+		return top
+	end
+	check(#sentAt >= 14 and #sentAt <= 20 and MostInASecond(ANNA.id) <= 2,
+		"one friend: never more than 2 in a second (about 16 in 10 s: the ticks), got " .. #sentAt .. ", at most "
+		.. MostInASecond(ANNA.id) .. " in a second")
+	sentAt = {}
+	Say(me, BOB, ("B2;eq;%s;%s;506;0"):format(CEDRIC.acct, CEDRIC.store))
+	Pass(me, 10, 0.05, Note)
+	check(#sentAt >= 20 and #sentAt <= 30 and MostInASecond() <= 3 and MostInASecond(BOB.id) <= 2,
+		"two friends: never more than 3 in a second in all, got " .. #sentAt .. " in 10 s, at most " .. MostInASecond() .. " in a second")
+
+	-- Everything else of Beacon's goes first.
+	local first = #me.env.GAMEDATA
+	for i = 1, 25 do
+		B.QueueLow(ANNA.id, "K2;20300515;" .. i)
+	end
+	B.Queue(BOB.id, "M2;hello there")
+	Pass(me, 4, 0.05)
+	local lastOther = 0
+	for i = first + 1, #me.env.GAMEDATA do
+		local m = me.env.GAMEDATA[i].data
+		if m:sub(1, 3) == "K2;" or m:sub(1, 3) == "M2;" then
+			lastOther = i
+		end
+	end
+	-- (up to 3 of mine were already waiting in the queue before the others came)
+	local early = 0
+	for i = first + 1, lastOther do
+		early = early + (me.env.GAMEDATA[i].data:sub(1, 4) == "B2;e" and 1 or 0)
+	end
+	check(lastOther > first and early <= 3, "26 other messages queued: they all go before any more of mine (" .. early .. " were waiting already)")
+
+	-- In combat: nothing; after it, the pages go on from where they were.
+	local before = Mark(me)
+	me.env.EnterCombat()
+	Pass(me, 8, 0.05)
+	check(#Sent(me, ANNA, before, "B2;") == 0 and #Sent(me, BOB, before, "B2;") == 0 and D.Outstanding() == 0 and not B.LowWaiting("B2;e"),
+		"in combat: nothing sent, nothing of mine left waiting in Beacon's queue")
+	me.env.LeaveCombat()
+	Pass(me, 30, 0.1)
+	check(Received(me, ANNA, mark) == pages[505].z and Received(me, BOB, mark) == pages[506].z,
+		"after the fight they go on: both pages whole, no part lost or out of place")
+
+	-- What I don't have, and a page asked to stop.
+	mark = Mark(me)
+	Say(me, ANNA, ("B2;eq;%s;%s;599;0"):format(CEDRIC.acct, CEDRIC.store))
+	Say(me, ANNA, ("B2;eq;%s;%s;504;0"):format(CEDRIC.acct, CEDRIC.store))
+	Say(me, ANNA, ("B2;eq;%s;%s;7;0"):format(BOB.acct, BOB.store))
+	Pass(me, 3)
+	local en = Sent(me, ANNA, mark, "B2;en;")
+	check(#en == 3 and en[1] == ("B2;en;%s;%s;599"):format(CEDRIC.acct, CEDRIC.store) and en[2]:find(";504$") and en[3]:find(";7$"),
+		"\"don't have\": a page I never had, a plain-text one, another store's")
+	mark = Mark(me)
+	Say(me, ANNA, ("B2;eq;%s;%s;505;0"):format(CEDRIC.acct, CEDRIC.store))
+	Pass(me, 2)
+	Say(me, ANNA, ("B2;eq;%s;%s;505;9600"):format(CEDRIC.acct, CEDRIC.store))
+	local count = #Sent(me, ANNA, mark, "B2;ep;")
+	Pass(me, 5)
+	check(count > 0 and #Sent(me, ANNA, mark, "B2;ep;") <= count + 3 and #D.active == 0,
+		"asked from its end: the page stops (what was waiting aside), got " .. count .. " then " .. #Sent(me, ANNA, mark, "B2;ep;"))
+
+	-- 25 requests (in a fight: nothing goes meanwhile; in two seconds: Beacon takes 20 a second from
+	-- a friend): 2 served at a time, 20 kept, the rest dropped (they ask again).
+	for n = 510, 534 do
+		MyPage(me, n, 20)
+	end
+	mark = Mark(me)
+	me.env.EnterCombat()
+	for n = 510, 534 do
+		Say(me, ANNA, ("B2;eq;%s;%s;%d;0"):format(CEDRIC.acct, CEDRIC.store, n))
+		if n == 521 then
+			Pass(me, 1.05)
+		end
+	end
+	Pass(me, 0.3)
+	check(#D.active == 2 and #D.serves == 20, "a holder serves 2 at once and keeps 20, got " .. #D.active .. " and " .. #D.serves)
+	me.env.LeaveCombat()
+	Pass(me, 40)
+	local begun = Sent(me, ANNA, mark, "B2;eb;")
+	check(#begun == 22 and #D.serves == 0 and #D.active == 0, "22 served, got " .. #begun)
+	for n = 510, 534 do
+		E.data.mine[n] = nil
+	end
+	Touched(me)
+end
+
+section("Echoes' delivery: Beacon told to slow down")
+do
+	-- A throttle: Echoes is silent for 30 s while Beacon (after its own 2 s) sends as before.
+	MyPage(me, 540, 24000)
+	Pass(me, 1)
+	local mark = Mark(me)
+	Say(me, ANNA, ("B2;eq;%s;%s;540;0"):format(CEDRIC.acct, CEDRIC.store))
+	Pass(me, 3)
+	local before = #Sent(me, ANNA, mark, "B2;ep;")
+	me.env.MOCK_SEND_RESULT = 3
+	B.Queue(ANNA.id, "M2;slow down")
+	Pass(me, 0.3, 0.05)
+	me.env.MOCK_SEND_RESULT = nil
+	local pausedUntil, backoff = D.Paused()
+	check(backoff == 30 and math.abs(pausedUntil - (B.throttledAt + 30)) < 1e-6 and B.throttleResult == 3, "a throttle: 30 s of silence")
+	local quiet = Mark(me)
+	Pass(me, 27)
+	check(#Sent(me, ANNA, quiet, "B2;") == 0 and #Sent(me, ANNA, quiet, "M2;slow down") == 1 and D.Outstanding() == 0,
+		"nothing of mine for 30 s (nothing left in Beacon's queue either); Beacon's own message went after its pause")
+	Pass(me, 6)
+	check(#Sent(me, ANNA, quiet, "B2;ep;") > 0, "then the page goes on")
+	-- Again right after: twice as long, up to 5 minutes; a lockdown counts the same.
+	local seen = {}
+	for i = 1, 6 do
+		pausedUntil = D.Paused()
+		Pass(me, math.max(0, pausedUntil - me.env.GetTime()) + 1, 0.5)
+		me.env.MOCK_SEND_RESULT = i == 3 and 11 or 3
+		B.Queue(ANNA.id, "M2;again")
+		Pass(me, 0.3, 0.05)
+		me.env.MOCK_SEND_RESULT = nil
+		seen[i] = select(2, D.Paused())
+	end
+	check(table.concat(seen, ",") == "60,120,240,300,300,300", "each next one doubles it, up to 5 minutes, got " .. table.concat(seen, ","))
+	pausedUntil = D.Paused()
+	Pass(me, pausedUntil - me.env.GetTime() + 610, 0.5)
+	me.env.MOCK_SEND_RESULT = 3
+	B.Queue(ANNA.id, "M2;after a calm")
+	Pass(me, 0.3, 0.05)
+	me.env.MOCK_SEND_RESULT = nil
+	check(select(2, D.Paused()) == 30, "after 10 calm minutes: 30 s again")
+	Pass(me, 32)
+	-- (Anna stops it: the rest of the page isn't needed here)
+	Say(me, ANNA, ("B2;eq;%s;%s;540;24000"):format(CEDRIC.acct, CEDRIC.store))
+	Pass(me, 3)
+	E.data.mine[540] = nil
+	Touched(me)
+	check(before > 0 and #D.active == 0, "(the page stopped)")
+end
+
+section("Echoes' delivery: collecting (pulling, checks, resuming)")
+do
+	E.module.db.collect = true
+	Pass(me, 1.1)
+	-- Anna offers her pages 1-3; Bob (a relay) has 2-3 of them, and Eve's (not my friend).
+	local mark = Mark(me)
+	local p1, p2, p3 = TheirPage(me, 1, 1000), TheirPage(me, 2, 1200), TheirPage(me, 3, 1500)
+	Hello(me, ANNA, "s")
+	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":1-3")
+	Say(me, BOB, "B2;es;" .. ANNA.key .. ":2-3/" .. EVE.key .. ":1-9")
+	Pass(me, 1.2)
+	local toAnna, toBob = Sent(me, ANNA, mark, "B2;eq;"), Sent(me, BOB, mark, "B2;eq;")
+	check(#toAnna == 1 and toAnna[1] == ("B2;eq;%s;%s;1;0"):format(ANNA.acct, ANNA.store) and #toBob == 1
+		and toBob[1] == ("B2;eq;%s;%s;2;0"):format(ANNA.acct, ANNA.store),
+		"one request per holder, 2 pages at once: page 1 from Anna, 2 from Bob; got " .. table.concat(toAnna, " ") .. " / " .. table.concat(toBob, " "))
+	Pass(me, 5)
+	check(#Sent(me, ANNA, mark, "B2;eq;") == 1 and #Sent(me, BOB, mark, "B2;eq;") == 1, "nothing more asked while those come, and nothing of Eve's (not my friend)")
+
+	-- Page 1 comes whole: kept in the inbox with this session.
+	SendPage(me, ANNA, ANNA, p1, 4)
+	Pass(me, 2)
+	local got = E.data.inbox[ANNA.key] and E.data.inbox[ANNA.key][1]
+	check(got and got.z == p1.z and got.h == p1.h and got.t == p1.t and got.m == "z" and got.s == E.data.session,
+		"page 1 is in the inbox as it was sent, with this session")
+	check(#Sent(me, ANNA, mark, "B2;eq;") == 2 and Sent(me, ANNA, mark, "B2;eq;")[2]:find(";3;0$"), "then page 3 from Anna")
+
+	-- Page 2 from Bob with a wrong hash: thrown away, and Bob isn't asked for it again.
+	SendPage(me, BOB, ANNA, p2, 9, 0, nil, "00000000")
+	Pass(me, 1.2)
+	check(not E.data.inbox[ANNA.key][2] and D.stats.badHash == 1 and not D.inflight[ANNA.key .. ".2"], "a wrong hash: not kept")
+	-- Page 3 from Anna: half of it, then she goes offline. Bob has it too: it goes on from there.
+	SendPage(me, ANNA, ANNA, p3, 5, 0, 720)
+	Pass(me, 0.5)
+	local part = D.partials[ANNA.key .. ".3"]
+	check(part and part.have == 720, "half of page 3 (in memory)")
+	Online(me, ANNA, false)
+	Pass(me, 2.5)
+	check(not me.B.peers[ANNA.id] and not D.peers[ANNA.id], "Anna went offline: forgotten")
+	local again = Sent(me, BOB, mark, "B2;eq;")
+	check(again[#again] == ("B2;eq;%s;%s;3;720"):format(ANNA.acct, ANNA.store), "page 3 asked of Bob from byte 720, got " .. tostring(again[#again]))
+	SendPage(me, BOB, ANNA, p3, 11, 720)
+	Pass(me, 1.2)
+	check(E.data.inbox[ANNA.key][3] and E.data.inbox[ANNA.key][3].z == p3.z, "page 3 whole: bytes from two holders fit together")
+	-- Page 2: only Bob has it, and his copy is broken: not asked of him again.
+	Pass(me, 5)
+	check(#Sent(me, BOB, mark, "B2;eq;") == 2, "page 2: Bob isn't asked again (his copy is broken)")
+	Online(me, ANNA, true)
+	Meet(me, ANNA, NEW)
+	Hello(me, ANNA, "s")
+	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":2")
+	Pass(me, 2)
+	mark = Mark(me)
+	local asked = Sent(me, ANNA, 1, "B2;eq;")
+	check(asked[#asked]:find(";2;0$"), "Anna back: page 2 asked of her")
+
+	-- She goes silent for 30 s after a part: asked again from where it got to.
+	local p2part = TheirPage(me, 2, 1200)
+	SendPage(me, ANNA, ANNA, p2part, 6, 0, 480)
+	Pass(me, 20)
+	check(#Sent(me, ANNA, mark, "B2;eq;") == 0, "20 s of silence: still waiting")
+	Pass(me, 12)
+	local resend = Sent(me, ANNA, mark, "B2;eq;")
+	check(#resend == 1 and resend[1]:find(";2;480$"), "30 s: asked again from byte 480, got " .. tostring(resend[1]))
+	-- A part out of place is ignored; then the rest.
+	Say(me, ANNA, ("B2;ep;6;960;%s"):format(p2part.z:sub(961, 1200)))
+	Pass(me, 0.5)
+	check(D.partials[ANNA.key .. ".2"].have == 480, "a part after a gap: ignored")
+	SendPage(me, ANNA, ANNA, p2part, 6, 480)
+	Pass(me, 1.2)
+	check(E.data.inbox[ANNA.key][2] and E.data.inbox[ANNA.key][2].z == p2part.z, "the rest: page 2 whole")
+
+	-- Checks on a page: too big (its start says so), before the launch or more than a day ahead
+	-- (E.Store.Put refuses it, once whole), not a friend's account.
+	mark = Mark(me)
+	local p7, p8, p9 = TheirPage(me, 7, 300), TheirPage(me, 8, 300), TheirPage(me, 9, 300)
+	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":7")
+	Pass(me, 2)
+	Say(me, ANNA, ("B2;eb;3;%s;%s;7;65537;%s;%d;z"):format(ANNA.acct, ANNA.store, p7.h, p7.t))
+	Pass(me, 0.5)
+	check(not D.partials[ANNA.key .. ".7"], "a page over 64 KB: refused at its start")
+	LT.LAUNCH_DAY = me.env.date("%Y-%m-%d", me.env.time() + 2 * 86400) -- (the day after tomorrow: the launch)
+	SendPage(me, ANNA, ANNA, p7, 3)
+	Pass(me, 0.5)
+	check(LT.BeforeLaunch(p7.t) and not (E.data.inbox[ANNA.key] or {})[7] and D.inflight[ANNA.key .. ".7"] == nil
+		and not D.partials[ANNA.key .. ".7"], "a page from before the launch: not kept")
+	LT.LAUNCH_DAY = nil
+	Pass(me, 6)
+	check(#Sent(me, ANNA, mark, "B2;eq;") == 1, "... and not asked of her again")
+	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":8")
+	Pass(me, 2)
+	p8.t = me.env.GetServerTime() + 2 * 86400
+	SendPage(me, ANNA, ANNA, p8, 3)
+	Pass(me, 0.5)
+	check(not (E.data.inbox[ANNA.key] or {})[8] and not D.partials[ANNA.key .. ".8"] and not D.inflight[ANNA.key .. ".8"]
+		and D.stats.rejected >= 3, "a page starting more than a day ahead: not kept")
+	SendPage(me, ANNA, EVE, p9, 2)
+	Pass(me, 1)
+	check(not E.data.inbox[EVE.key] and not D.partials[EVE.key .. ".9"], "a page of an account that isn't my friend's: not taken")
+
+	-- Full at 8 MB (until exported): nothing asked.
+	mark = Mark(me)
+	E.data.inbox[BOB.key] = { [1] = { t = 1, h = "00000000", m = "z", z = ("A"):rep(8 * 1024 * 1024), s = E.data.session } }
+	Touched(me)
+	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":10")
+	Pass(me, 5)
+	check(E.Store.InboxFull() and #Sent(me, ANNA, mark, "B2;eq;") == 0, "the inbox at 8 MB: nothing more asked")
+	E.data.inbox[BOB.key] = nil
+	Touched(me)
+	Pass(me, 2)
+	check(#Sent(me, ANNA, mark, "B2;eq;") == 1, "below it again: asked")
+	Say(me, ANNA, ("B2;en;%s;%s;10"):format(ANNA.acct, ANNA.store))
+	Hello(me, ANNA, "s") -- (she restarts: what she offered is gone)
+	Say(me, BOB, ("B2;en;%s;%s;2"):format(ANNA.acct, ANNA.store))
+	Say(me, BOB, ("B2;en;%s;%s;3"):format(ANNA.acct, ANNA.store))
+	for _, k in ipairs({ ANNA.key, EVE.key }) do
+		E.data.inbox[k] = nil
+	end
+	Touched(me)
+	E.module.db.collect = false
+	Pass(me, 1.1)
+end
+
+section("Echoes' delivery: relaying")
+do
+	-- Me: a relay. Anna (the author) offers 1-6; Dora relays too, and she and Bob hold some of them.
+	check(next(D.inflight) == nil, "(nothing asked for from before)")
+	local mark = Mark(me)
+	Hello(me, ANNA, "s") -- (she restarted: what she offered before is gone)
+	Meet(me, DORA, NEW)
+	Hello(me, DORA, "rs")
+	Hello(me, BOB, "rs")
+	Say(me, BOB, ("B2;ed;%s;%s;%s:1"):format(DORA.acct, DORA.store, ANNA.key)) -- (Dora collected page 1 once)
+	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":1-6")
+	Say(me, BOB, "B2;es;" .. ANNA.key .. ":3")
+	Say(me, DORA, "B2;es;" .. ANNA.key .. ":2-3")
+	Pass(me, 2.2)
+	-- Page 1 is safe at a collector; 3 is held by two besides Anna; 2 by one: asked for.
+	local asked = Sent(me, ANNA, mark, "B2;eq;")
+	check(#asked == 1 and asked[1]:find(";2;0$") and #Sent(me, BOB, mark, "B2;eq;") == 0 and #Sent(me, DORA, mark, "B2;eq;") == 0,
+		"a relay asks for pages no collector holds safely, that fewer than 2 others hold: 2, got " .. tostring(asked[1]))
+	SendPage(me, ANNA, ANNA, TheirPage(me, 2, 600), 1)
+	Pass(me, 1.2)
+	local carried = E.data.carry[ANNA.key]
+	check(carried and carried[2] and carried[2].s == E.data.session and not E.data.inbox[ANNA.key], "page 2 in the relay's cache")
+	asked = Sent(me, ANNA, mark, "B2;eq;")
+	check(asked[2] and asked[2]:find(";4;0$"), "then 4 (3 is held by two others), got " .. tostring(asked[2]))
+	-- Dora collects now and holds 4: as good as safe, it's left alone.
+	Hello(me, DORA, "crsa")
+	Say(me, DORA, "B2;es;" .. ANNA.key .. ":4")
+	Say(me, ANNA, ("B2;en;%s;%s;4"):format(ANNA.acct, ANNA.store)) -- (Anna: "don't have" 4 after all)
+	Pass(me, 2.5)
+	asked = Sent(me, ANNA, mark, "B2;eq;")
+	check(asked[3] and asked[3]:find(";5;0$"), "4 is held by an online collector: 5 next, got " .. tostring(asked[3]))
+	-- No room: a page bigger than what's left of Anna's 128 KB in my cache (per author's store, E.Store's)
+	-- is stopped at its start.
+	local filler = { t = me.env.GetServerTime() - 60, h = "00000000", m = "z", z = ("A"):rep(125000), s = E.data.session }
+	E.data.carry[ANNA.key][900] = filler
+	Touched(me)
+	Say(me, ANNA, ("B2;eb;2;%s;%s;5;9000;0badc0de;%d;z"):format(ANNA.acct, ANNA.store, me.env.GetServerTime() - 60))
+	Pass(me, 2.2)
+	local stop = Sent(me, ANNA, mark, "B2;eq;")
+	check(stop[4] == ("B2;eq;%s;%s;5;9000"):format(ANNA.acct, ANNA.store), "too big for my cache: asked from its end (stops it), got " .. tostring(stop[4]))
+	check(stop[5] and stop[5]:find(";6;0$"), "then 6 (it may be smaller), got " .. tostring(stop[5]))
+	Say(me, ANNA, ("B2;en;%s;%s;6"):format(ANNA.acct, ANNA.store))
+	-- Anna's 128 KB in my cache full: none of hers asked for.
+	filler.z = ("A"):rep(131072)
+	Touched(me)
+	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":11-13")
+	Pass(me, 3)
+	check(not E.Store.Fits(ANNA.acct, ANNA.store, 1) and #Sent(me, ANNA, mark, "B2;eq;") == 5,
+		"Anna's share of the cache full: nothing more of hers asked")
+	E.data.carry[ANNA.key][900] = nil
+	Touched(me)
+	Pass(me, 2.2)
+	asked = Sent(me, ANNA, mark, "B2;eq;")
+	check(asked[6] and asked[6]:find(";11;0$"), "room again: 11 (not 5: no room for it a moment ago; not 6: she hasn't it), got "
+		.. tostring(asked[6]))
+	for n = 11, 13 do
+		Say(me, ANNA, ("B2;en;%s;%s;%d"):format(ANNA.acct, ANNA.store, n))
+	end
+	-- Relaying off: my cache isn't offered, nothing asked.
+	E.module.db.relay = false
+	mark = Mark(me)
+	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":14")
+	Pass(me, 3)
+	check(#Sent(me, ANNA, mark, "B2;eq;") == 0 and not D.Holdings()[ANNA.key], "relay off: nothing asked, my cache not offered")
+	E.module.db.relay = true
+	Pass(me, 1.1)
+end
+
+section("Echoes' delivery: safe at a collector")
+do
+	-- My pages 501-506 (from above: 501-506 still kept). Bob passes on what Dora (a collector, my
+	-- friend) holds; E.Store.Safe keeps it and drops my copies.
+	for n = 501, 506 do
+		if not E.data.mine[n] then
+			MyPage(me, n, 300)
+		end
+	end
+	Say(me, BOB, ("B2;ed;%s;%s;%s:501-503"):format(DORA.acct, DORA.store, CEDRIC.key))
+	Pass(me, 1.2)
+	check(Keys(E.data.mine) == "504,505,506" and E.data.safe[CEDRIC.key][DORA.key] == "501-503",
+		"safe at Dora (passed on by Bob): my copies of 501-503 go, got " .. Keys(E.data.mine))
+	Say(me, BOB, ("B2;ed;%s;%s;%s:504-506"):format(EVE.acct, EVE.store, CEDRIC.key))
+	Pass(me, 1.2)
+	check(Keys(E.data.mine) == "504,505,506" and not (E.data.safe[CEDRIC.key][EVE.key]), "a collector who isn't my friend: not believed")
+	Say(me, BOB, ("B2;ed;%s;%s;%s:505"):format(DORA.acct, DORA.store, CEDRIC.key))
+	Say(me, BOB, ("B2;ed;%s;%s;%s:502"):format(DORA.acct, DORA.store, CEDRIC.key))
+	Pass(me, 1.2)
+	check(Keys(E.data.mine) == "504,506" and E.data.safe[CEDRIC.key][DORA.key] == "501-503,505", "summaries only grow (merged): 505 goes")
+	Say(me, BOB, ("B2;ed;%s;%s;%s:1-9"):format(DORA.acct, DORA.store, EVE.key))
+	Pass(me, 1.2)
+	check(not E.data.safe[EVE.key], "about pages of an account that isn't my friend's: not kept")
+	-- Passed on: Anna (sharing) hears what Dora holds of mine.
+	local mark = Mark(me)
+	Hello(me, ANNA, "s")
+	Pass(me, 1.2)
+	local ed = Sent(me, ANNA, mark, "B2;ed;")
+	local passed = ed[1] and ed[1]:sub(1, 24) == ("B2;ed;%s;%s;"):format(DORA.acct, DORA.store)
+		and ("/" .. ed[1]:sub(25) .. "/"):find("/" .. CEDRIC.key .. ":501-503,505/", 1, true)
+	check(#ed == 1 and passed, "passed on to friends (with what Dora holds of Anna's), got " .. tostring(ed[1]))
+
+	-- As a collector: pages that came in an earlier session and what the exporter has are safe.
+	E.module.db.collect = true
+	E.data.inbox[ANNA.key] = { [1] = { t = 1, h = "00000000", m = "z", z = "QQ==", s = E.data.session - 1 },
+		[2] = { t = 1, h = "00000000", m = "z", z = "QQ==", s = E.data.session } }
+	E.data.exported[ANNA.key] = "5-6"
+	Touched(me)
+	mark = Mark(me)
+	Pass(me, 62)
+	check(E.data.safe[ANNA.key][CEDRIC.key] == "1,5-6", "my own summary: 1 (on my disk), 5-6 (exported); 2 came this session")
+	local mine = Sent(me, ANNA, mark, "B2;ed;" .. CEDRIC.acct)
+	check(#mine == 1 and mine[1] == ("B2;ed;%s;%s;%s:1,5-6"):format(CEDRIC.acct, CEDRIC.store, ANNA.key), "told to friends, got " .. tostring(mine[1]))
+	E.data.inbox[ANNA.key], E.data.exported[ANNA.key] = nil, nil
+	Touched(me)
+	E.module.db.collect = false
+	Pass(me, 1.1)
+end
+
+section("Echoes' delivery: the probe")
+do
+	local ok, why = D.Probe("nobody")
+	check(not ok and why:find("no friend with Echoes", 1, true), "a friend without Echoes can't be probed")
+	local status = #me.env.PRINTED
+	me.env.SlashCmdList.LEFTHYTOOLS("echoes")
+	local said = table.concat(me.env.PRINTED, "\n", status + 1)
+	check(said:find("passing pages on: 3 friend(s) with Echoes online", 1, true) and said:find("Anna Brook: ", 1, true)
+		and said:find("traffic: ", 1, true), "/lefthy echoes: the delivery's lines in the status, got\n" .. said)
+	local mark = Mark(me)
+	local printedAt = #me.env.PRINTED
+	me.env.SlashCmdList.LEFTHYTOOLS("echoes probe anna")
+	check(me.env.PRINTED[printedAt + 1] and me.env.PRINTED[printedAt + 1]:find("probing", 1, true), "/lefthy echoes probe anna")
+	Pass(me, 4)
+	Say(me, ANNA, "B2;ey;255;255")
+	Say(me, ANNA, "B2;ey;500;500")
+	Pass(me, 8)
+	Say(me, ANNA, "B2;ey;2000;255")
+	local printed = #me.env.PRINTED
+	Pass(me, 15)
+	local sizes = {}
+	for _, m in ipairs(Sent(me, ANNA, mark, "B2;ex;")) do
+		sizes[#sizes + 1] = #m
+	end
+	check(table.concat(sizes, ",") == "255,500,1000,2000,4000", "five messages, 255 to 4000 bytes, got " .. table.concat(sizes, ","))
+	local line = table.concat(me.env.PRINTED, "\n", printed + 1)
+	check(line:find("probe to Anna Brook: 255 bytes: arrived whole; 500 bytes: arrived whole; 1000 bytes: no answer; 2000 bytes: arrived as 255 bytes; 4000 bytes: no answer.", 1, true),
+		"the result in one line, got " .. line)
+	-- Theirs: answered with what arrived; Beacon lets a big one through only for this.
+	mark = Mark(me)
+	Say(me, ANNA, "B2;ex;2000;" .. ("x"):rep(2000 - 11))
+	Say(me, ANNA, "B2;ex;255;" .. ("x"):rep(255 - 10))
+	Say(me, FINN, "B2;ex;500;" .. ("x"):rep(500 - 10))
+	Pass(me, 2)
+	local answers = Sent(me, ANNA, mark, "B2;ey;")
+	check(#answers == 2 and answers[1] == "B2;ey;2000;2000" and answers[2] == "B2;ey;255;255" and #Sent(me, FINN, mark, "B2;") == 0,
+		"a friend's probe is answered (not Finn's: no Echoes), got " .. table.concat(answers, " "))
+end
+
+section("Echoes' delivery: switching off")
+do
+	local mark = Mark(me)
+	LT:SetModuleEnabled("echoes", false)
+	Pass(me, 2)
+	local off = Sent(me, ANNA, mark, "B2;")
+	check(#off == 1 and off[1] == ("B2;eh;%s;%s;1;255;a"):format(CEDRIC.acct, CEDRIC.store) and #Sent(me, BOB, mark, "B2;eh;") == 1
+		and #Sent(me, FINN, mark, "B2;") == 0, "Echoes off: friends hear I'm out (no flags); nothing else, got " .. tostring(off[1]))
+	Say(me, ANNA, ("B2;eq;%s;%s;506;0"):format(CEDRIC.acct, CEDRIC.store))
+	Pass(me, 3)
+	check(#Sent(me, ANNA, mark, "B2;") == 1 and not next(D.peers), "while off: nothing heard, nothing sent")
+	LT:SetModuleEnabled("echoes", true)
+	Pass(me, 2)
+	check(#Sent(me, ANNA, mark, "B2;eh;") == 2 and Sent(me, ANNA, mark, "B2;eh;")[2]:sub(-3) == ";rs", "on again: my hello to friends known")
+	Hello(me, ANNA, "sa")
+	check(D.peers[ANNA.id] and D.peers[ANNA.id].verified, "... and theirs")
+	LT:SetModuleEnabled("beacon", false)
+	check(not next(D.peers) and #D.active == 0, "Beacon off: Echoes forgets everyone too")
+	LT:SetModuleEnabled("beacon", true)
+	Pass(me, 1)
+	Stop(me)
 end
