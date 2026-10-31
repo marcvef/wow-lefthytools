@@ -1142,6 +1142,38 @@ do
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.3)
+
+	-- A friend's realm the way my character's key has it (GetRealmName: "Realmy Vale"), whatever form
+	-- the game gave it in ("RealmyVale"); another realm's as Battle.net shows it ("Stone Realm").
+	local realmName, bob = GetRealmName, BN_FRIENDS[2][1]
+	GetRealmName = function() return "Realmy Vale" end
+	KNOWN_PLAYERS["Player-1-11"], KNOWN_PLAYERS["Player-1-12"] = { "Anna", "RealmyVale" }, { "Bob", "StoneRealm" }
+	bob.realmName, bob.realmDisplayName = "StoneRealm", "Stone Realm"
+	anna("H2")
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 12)
+	Advance(2)
+	listen()
+	GROUP, GROUP_MEMBERS, PARTY.party1, PARTY.party2 = "party", 3, { guid = "Player-1-11" }, { guid = "Player-1-12" }
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
+	local both = seq()
+	-- Remembered in another form (from before), Beacon off: written, and kept, in my realm's.
+	LT:SetModuleEnabled("beacon", false)
+	LefthyToolsEchoesDB.friends["Player-1-11"] = "Anna-Realmy-Vale"
+	listen()
+	GROUP_MEMBERS, PARTY.party2 = 2, nil
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
+	LT:SetModuleEnabled("beacon", true)
+	check(both == "g;3;0;Player-1-11:Anna-Realmy Vale;Player-1-12:Bob-Stone Realm" and seq() == "g;2;0;Player-1-11:Anna-Realmy Vale"
+		and LefthyToolsEchoesDB.friends["Player-1-11"] == "Anna-Realmy Vale",
+		"friends' realms as my own character's key writes them; another realm as Battle.net shows it, got " .. both .. " | " .. seq())
+	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(0.3)
+	GetRealmName, bob.realmName, bob.realmDisplayName = realmName, "Realmy", nil
+	KNOWN_PLAYERS["Player-1-11"], KNOWN_PLAYERS["Player-1-12"] = nil, nil
+	LefthyToolsEchoesDB.friends["Player-1-11"], LefthyToolsEchoesDB.friends["Player-1-12"] = "Anna-Realmy", nil
 end
 
 ---------------------------------------------------------------------------

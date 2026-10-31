@@ -122,17 +122,55 @@ end
 -- from it: E.data.friends), how many others
 ---------------------------------------------------------------------------
 
--- A character's key ("Anna-Realm"): first name and realm (the same realm's when the game says none).
+-- A realm's name for comparing: without spaces and hyphens, lowercase ("Realm Name", "RealmName" and
+-- "Realm-Name" are one realm: GetNormalizedRealmName leaves out spaces and hyphens).
+local function Squash(realm)
+	return (realm:gsub("[%s%-]", ""):lower())
+end
+
+-- shown, if it's a realm's name and the same realm as realm.
+local function Same(shown, realm)
+	return type(shown) == "string" and not issecret(shown) and shown ~= "" and Squash(shown) == Squash(realm) and shown or nil
+end
+
+-- A friend's realm as my own character's key has a realm (Pages.lua: GetRealmName, "Realm Name",
+-- spaces and all), whatever form it came in ("RealmName"): mine when it's my realm; another realm as
+-- Battle.net shows it (realmDisplayName, else realmName: their own GetRealmName's) when it's the same
+-- realm; else as it came. nil: unknown.
+local function Realm(realm, guid)
+	local mine = Value(GetRealmName)
+	mine = type(mine) == "string" and mine ~= "" and mine or nil
+	if type(realm) ~= "string" or issecret(realm) or realm == "" then
+		return mine -- (the game says none: my realm)
+	elseif Same(mine, realm) then
+		return mine
+	end
+	local info = C_BattleNet and type(guid) == "string" and Value(C_BattleNet.GetGameAccountInfoByGUID, guid)
+	if type(info) ~= "table" then
+		local account = C_BattleNet and type(guid) == "string" and Value(C_BattleNet.GetAccountInfoByGUID, guid)
+		info = type(account) == "table" and account.gameAccountInfo
+	end
+	if type(info) == "table" then
+		return Same(info.realmDisplayName, realm) or Same(info.realmName, realm) or realm
+	end
+	return realm
+end
+
+-- A character's key ("Anna-Realm"): first name and realm, the realm as my own key writes it.
 local function Key(name, guid)
 	local first = LT.Names.First(name)
 	if not first then
 		return nil
 	end
 	local ok, _, _, _, _, _, _, realm = pcall(GetPlayerInfoByGUID, guid)
-	if not (ok and type(realm) == "string" and not issecret(realm) and realm ~= "") then
-		realm = Value(GetRealmName)
-	end
-	return type(realm) == "string" and first .. "-" .. realm or first
+	realm = Realm(ok and not issecret(realm) and realm or nil, guid)
+	return realm and first .. "-" .. realm or first
+end
+
+-- A key remembered from before (maybe its realm in another form) as Key writes it now.
+local function Rekey(key, guid)
+	local first, realm = key:match("^([^%-]+)%-(.+)$")
+	return first and first .. "-" .. Realm(realm, guid) or key
 end
 
 local function Group(cap)
@@ -165,8 +203,9 @@ local function Group(cap)
 				local key = guid and peersByGUID[guid] and Key(peersByGUID[guid], guid)
 				if key then
 					remembered[guid] = key -- (named while Beacon is off too)
-				else
-					key = guid and remembered[guid]
+				elseif guid and type(remembered[guid]) == "string" then
+					key = Rekey(remembered[guid], guid) -- (remembered by a build that kept the realm as it came)
+					remembered[guid] = key
 				end
 				if key then
 					friends[#friends + 1] = guid .. ":" .. key
