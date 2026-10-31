@@ -1749,3 +1749,112 @@ do
 	Stop(anna)
 	Stop(cedric)
 end
+
+---------------------------------------------------------------------------
+-- More clients: two relays, reloads in the middle of a page on each side, a collector who records
+-- too, a full inbox, many pages
+---------------------------------------------------------------------------
+
+-- Pages first to last of c's own (MyPage), len bytes each: { [n] = page }.
+local function MyPages(c, first, last, len)
+	local pages = {}
+	for n = first, last do
+		pages[n] = MyPage(c, n, len)
+	end
+	return pages
+end
+
+-- How many of pages c keeps in where ("carry", "inbox", "mine") under key, as they were.
+local function Holds(c, where, key, pages)
+	local list = where == "mine" and c.E.data.mine or c.E.data[where][key] or {}
+	local n = 0
+	for i, p in pairs(pages) do
+		local got = list[i]
+		n = n + ((got and got.z == p.z and got.h == p.h) and 1 or 0)
+	end
+	return n
+end
+
+-- The friends of p among people.
+local function FriendsOf(p, people)
+	local list = {}
+	for _, f in ipairs(people) do
+		if f ~= p then
+			list[#list + 1] = f
+		end
+	end
+	return list
+end
+
+-- A page c has part of, and from whom: pageId, have, holder (nil: none).
+local function Partial(c)
+	for pageId, part in pairs(c.D.partials) do
+		local r = c.D.inflight[pageId]
+		if part.have > 0 and part.have < part.len and r then
+			return pageId, part.have, r.from
+		end
+	end
+end
+
+section("Echoes' delivery: two relays, then the collector reloading, and a relay reloading, mid-page")
+do
+	local people = { ANNA, BOB, CEDRIC, DORA }
+	local anna = Start(ANNA, { friends = FriendsOf(ANNA, people) })
+	local bob = Start(BOB, { friends = FriendsOf(BOB, people) })
+	local dora = Start(DORA, { friends = FriendsOf(DORA, people) })
+	local pages = MyPages(anna, 101, 112, 2400) -- (10 parts each)
+	local akey = ANNA.acct .. "." .. anna.E.data.store
+	-- Two relays: each sees one other copy besides Anna's (fewer than 2), so both carry them all.
+	check(Run(900, function() return Holds(bob, "carry", akey, pages) == 12 and Holds(dora, "carry", akey, pages) == 12 end),
+		"two relays carry all 12 of Anna's pages, got " .. Holds(bob, "carry", akey, pages) .. " and " .. Holds(dora, "carry", akey, pages))
+	local annaSaved = Stop(anna)
+
+	-- Cedric collects from both. Bob /reloads in the middle of a page Cedric has part of: Cedric goes
+	-- on with it from where it got to (of Bob again, or Dora).
+	local cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), collect = true })
+	local pageId, have
+	check(Run(300, function()
+		local id, got, from = Partial(cedric)
+		if id and from == BOB.id and got >= 480 then
+			pageId, have = id, got
+			return true
+		end
+	end, 0.05), "Cedric has part of a page from Bob")
+	local mark = #world.log + 1
+	bob = Reload(bob)
+	check(Run(120, function() return not cedric.D.partials[pageId] end), "... and gets the rest of it after Bob's /reload")
+	local resumed
+	for i = mark, #world.log do
+		local m = world.log[i]
+		local n, offset = m.data:match("^B2;eq;" .. ANNA.acct .. ";%x+;(%d+);(%d+)$")
+		if m.from == CEDRIC.id and n and akey .. "." .. n == pageId then
+			resumed = resumed or tonumber(offset)
+		end
+	end
+	check(resumed and resumed >= have, "asked for again from byte " .. tostring(resumed) .. " (had " .. tostring(have) .. ")")
+	local fromBoth = { [BOB.id] = 0, [DORA.id] = 0 }
+	for _, m in ipairs(world.log) do
+		if m.to == CEDRIC.id and m.data:sub(1, 6) == "B2;ep;" and fromBoth[m.from] then
+			fromBoth[m.from] = fromBoth[m.from] + 1
+		end
+	end
+	check(fromBoth[BOB.id] > 0 and fromBoth[DORA.id] > 0, "parts came from both relays (" .. fromBoth[BOB.id] .. " and " .. fromBoth[DORA.id] .. ")")
+
+	-- Cedric /reloads in the middle of a page: its parts went with his session; he gets it whole after.
+	check(Run(300, function() return Partial(cedric) ~= nil end, 0.05) or Holds(cedric, "inbox", akey, pages) == 12,
+		"(Cedric has part of another page)")
+	local before = Holds(cedric, "inbox", akey, pages)
+	cedric = Reload(cedric)
+	check(before < 12 and Run(600, function() return Holds(cedric, "inbox", akey, pages) == 12 end),
+		"Cedric /reloaded mid-page (" .. before .. " whole): he collects all 12, got " .. Holds(cedric, "inbox", akey, pages))
+	-- His next session: on his disk. Both relays drop theirs; Anna, back, drops hers.
+	cedric = Reload(cedric)
+	check(Run(300, function() return Holds(bob, "carry", akey, pages) == 0 and Holds(dora, "carry", akey, pages) == 0 end),
+		"safe at Cedric: both relays drop their copies")
+	Stop(cedric)
+	anna = Start(ANNA, { friends = FriendsOf(ANNA, people), saved = annaSaved })
+	check(Run(300, function() return Holds(anna, "mine", nil, pages) == 0 end), "Anna, back, drops hers (the relays told her)")
+	Stop(anna)
+	Stop(bob)
+	Stop(dora)
+end
