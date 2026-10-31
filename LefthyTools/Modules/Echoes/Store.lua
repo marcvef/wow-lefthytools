@@ -16,7 +16,8 @@ local M = E.module
 --
 -- Pages from before the launch day go. E.Ranges: page numbers as range strings ("1-56,58").
 -- E.Store: the pages' API for the delivery; every change to mine, carry and inbox goes through it
--- (it keeps their sizes). The game never decompresses a page: only the exporter does.
+-- (it keeps their sizes), and each one tells the delivery (D.PagesChanged: it caches what I hold).
+-- The game never decompresses a page: only the exporter does.
 
 local KB = 1024
 local MINE_CAP = 2048 * KB                    -- my pages
@@ -154,6 +155,15 @@ local function Size(page)
 	return type(page) == "table" and type(page.z) == "string" and #page.z or 0
 end
 
+-- The pages changed (closed, packed, kept, dropped, safe, exported): the delivery looks at them anew
+-- (Delivery.lua's D.PagesChanged, if it's there: it loads after this file).
+local function Changed()
+	local D = E.Delivery
+	if type(D) == "table" and D.PagesChanged then
+		LT.Guard("E.Store changed", D.PagesChanged)
+	end
+end
+
 -- The sizes counted anew (a page that isn't one is dropped on the way).
 function Store.Recount()
 	local data = E.data
@@ -189,6 +199,7 @@ function Store.Recount()
 			end
 		end
 	end
+	Changed()
 end
 
 local function Counted()
@@ -414,6 +425,7 @@ function Store.Put(acct, store, n, page, where)
 	elseif bytes.inbox >= INBOX_NOTE then
 		noteDue = true -- (said on the tick)
 	end
+	Changed()
 	return true
 end
 
@@ -435,6 +447,9 @@ function Store.Drop(acct, store, ranges, where)
 			end
 		end
 	end
+	if count > 0 then
+		Changed()
+	end
 	return count
 end
 
@@ -447,7 +462,11 @@ function Store.Safe(acct, store, ranges, collector)
 	end
 	local safe = E.data.safe
 	safe[key] = type(safe[key]) == "table" and safe[key] or {}
-	safe[key][collector] = Ranges.Union(safe[key][collector], ranges)
+	local merged = Ranges.Union(safe[key][collector], ranges)
+	if merged ~= safe[key][collector] then
+		safe[key][collector] = merged
+		Changed()
+	end
 	return Store.Drop(acct, store, ranges, "mine") + Store.Drop(acct, store, ranges, "carry")
 end
 
@@ -499,6 +518,9 @@ function Store.Trim()
 			end
 		end
 	end
+	if count > 0 then
+		Changed()
+	end
 	return count
 end
 
@@ -517,6 +539,7 @@ function Store.Close(n, t0, text)
 		data.n = n
 	end
 	queue[#queue + 1] = n
+	Changed()
 end
 
 -- Base64 of s, or nil if it didn't work.
@@ -562,6 +585,7 @@ local function PackNext()
 	local m, z = Store.Pack(text)
 	page.m, page.z, page.h, page.q = m, z, LT.Hash32(z), nil
 	bytes.mine = bytes.mine - #text + #z
+	Changed() -- (it can be shared now)
 	Store.Trim()
 end
 
@@ -574,33 +598,39 @@ local function LaunchDay()
 	if not LT.BeforeLaunch(0) then
 		return
 	end
-	local data = E.data
+	local data, dropped = E.data, false
 	for n, page in pairs(data.mine) do
 		if type(page.t) ~= "number" or LT.BeforeLaunch(page.t) then
-			DropMine(n)
+			dropped = DropMine(n) or dropped
 		end
 	end
 	for _, where in ipairs({ "carry", "inbox" }) do
 		for key, pages in pairs(data[where]) do
 			for n, page in pairs(pages) do
 				if type(page.t) ~= "number" or LT.BeforeLaunch(page.t) then
-					Remove(where, key, n)
+					dropped = Remove(where, key, n) or dropped
 				end
 			end
 		end
+	end
+	if dropped then
+		Changed()
 	end
 end
 
 -- Relayed pages go after 30 days.
 local function Expire()
-	local now = E.Now()
+	local now, dropped = E.Now(), false
 	for key, pages in pairs(E.data.carry) do
 		for n, page in pairs(pages) do
 			local at = type(page.a) == "number" and page.a or page.t
 			if type(at) ~= "number" or now - at > CARRY_SECONDS then
-				Remove("carry", key, n)
+				dropped = Remove("carry", key, n) or dropped
 			end
 		end
+	end
+	if dropped then
+		Changed()
 	end
 end
 
@@ -623,7 +653,11 @@ local function Receipt()
 			acct, store = key:match("^(%x+)%.(%x+)$")
 		end
 		if acct and Store.Key(acct, store) == key and type(ranges) == "string" and Ranges.Format(ranges) ~= "" then
-			data.exported[key] = Ranges.Union(data.exported[key], ranges)
+			local exported = Ranges.Union(data.exported[key], ranges)
+			if exported ~= data.exported[key] then
+				data.exported[key] = exported
+				Changed()
+			end
 			Store.Drop(acct, store, ranges)
 		end
 	end

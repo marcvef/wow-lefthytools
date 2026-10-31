@@ -745,6 +745,66 @@ do
 		"2 minutes of ticks: no packing, no hashing, the lines joined once a minute")
 end
 
+section("Echoes pages: the delivery hears when they change")
+do
+	-- Delivery caches what I hold (D.Holdings): E.Store tells it of every change, so a page packed
+	-- is offered at once, not at Delivery's next look (every 30 s, or when E.data.n moves).
+	local D = E.Delivery
+	local real, heard = D.PagesChanged, 0
+	D.PagesChanged = function() heard = heard + 1 return real() end
+	local function held(n) return D.Ranges.Has(D.Holdings()[own] or {}, n) end
+	fresh(acct)
+	kills(1, 1)
+	tick()
+	heard = 0
+	skew = skew + 1800
+	tick()
+	local n = E.data.n
+	check(heard > 0 and E.data.mine[n].q and not held(n), "a page closed: heard (not offered yet: it waits to be packed)")
+	heard = 0
+	tick()
+	check(heard > 0 and E.data.mine[n].m == "z" and held(n), "packed on the next tick: heard, and offered at once")
+	local function hears(what, fn)
+		heard = 0
+		local out = fn()
+		check(heard > 0, what .. ": heard")
+		return out
+	end
+	local function quiet(what, fn)
+		heard = 0
+		fn()
+		check(heard == 0, what .. ": nothing to hear")
+	end
+	hears("a friend's page kept", function() return Store.Put(A, B, 1, friendPage(1, E.Now()), "carry") end)
+	quiet("one I have", function() Store.Put(A, B, 1, friendPage(1, E.Now()), "carry") end)
+	quiet("one refused", function() Store.Put(A, B, 2, { t = E.Now(), h = "00000000", m = "z", z = "QUJD" }, "carry") end)
+	hears("a collector's summary", function() Store.Safe(A, B, "5", "c011ec70.12345678") end)
+	quiet("the same summary again", function() Store.Safe(A, B, "5", "c011ec70.12345678") end)
+	hears("pages dropped", function() Store.Drop(A, B, "1") end)
+	quiet("nothing to drop", function() Store.Drop(A, B, "1") end)
+	for m = 1, 21 do E.data.mine[100 + m] = { t = E.Now(), h = "x", m = "z", z = ("B"):rep(100 * 1024) } end
+	Store.Recount()
+	hears("my pages over 2 MB, the oldest dropped", Store.Trim)
+	for m = 1, 21 do E.data.mine[100 + m] = nil end
+	Store.Recount()
+	E.data.carry[A .. ".0c77e1f9"] = { [1] = { t = E.Now(), h = "x", m = "z", z = "QUJD", a = E.Now() - 31 * 86400 } }
+	reload(1)
+	heard = 0
+	Advance(2, 0.25)
+	check(heard > 0 and not E.data.carry[A .. ".0c77e1f9"], "relayed pages expired at login: heard")
+
+	-- Delivery's file left out (an older build, or a test): nothing to tell, nothing breaks.
+	E.Delivery = nil
+	kills(2, 2)
+	tick()
+	skew = skew + 1800
+	tick()
+	tick()
+	E.Delivery = D
+	check(E.data.mine[E.data.n].m == "z", "no delivery: pages still close and pack")
+	D.PagesChanged = real
+end
+
 section("Echoes pages: the beta")
 do
 	fresh(acct)

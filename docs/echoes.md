@@ -486,8 +486,11 @@ event handlers: only the logout's join and, at login, joining a stale page's tex
 
 ### For the delivery: E.Store and E.Ranges
 
-Every change to mine, carry and inbox goes through `E.Store` (it keeps their sizes). Keys are
-`"acct.store"`, 8 hex digits each.
+Every change to mine, carry and inbox goes through `E.Store` (it keeps their sizes), and each one
+tells the delivery, which caches what I hold: `E.Delivery.PagesChanged()` (if Delivery.lua is
+there) when a page closes, is packed (it can be shared now), kept, dropped (the cap, the 30 days,
+the launch day, a receipt, `Drop`, `Safe`), when a collector's summary or what's exported grows,
+and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits each.
 
 | Call | What |
 |---|---|
