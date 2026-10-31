@@ -145,7 +145,8 @@ one; battlegrounds have positions.
 told from logging out: a `/reload` writes `o0`, then `@...;l` and `o1` a few seconds later. An `o1`
 after an anchor with why `l` (not `s`) is a `/reload`: the session goes on (the exporter can join
 them). A session whose anchor isn't written yet (waiting for the position) stays one through
-another loading screen.
+another loading screen. A crash or a disconnect writes no `o0`: the page gets `o0;0` at the next
+start instead (The open page, below).
 
 ### What happens (Events.lua)
 
@@ -434,9 +435,17 @@ last closed page's (`E.data.n`), so they're dense and holdings are ranges like `
 - goes on if it's this character's (key and GUID) and its last line (`state.t`) is at most 10
   minutes old: its unjoined lines are joined, `E.state` is put back, `E.bytes` and `E.count` go on;
 - closes as it was otherwise: `.0;l` (stale at login, at the time of its last line). Only the cheap
-  part runs there (joining the text); it's packed on a later tick. It's on disk (offered at once,
-  below) when it's the saved text alone and its last line is more than 10 minutes old;
+  part runs there (joining the text, a look for its last session line); it's packed on a later
+  tick. It's on disk (offered at once, below) when it's the saved text alone and its last line is
+  more than 10 minutes old;
 - goes unclosed if it started before the launch day (`LT.BeforeLaunch`), or can't be a page.
+
+**A crash or a disconnect writes no logout** (the game ends without `PLAYER_LOGOUT`, saved as it
+was). A page from the saved file whose session never ended (its last session line a login,
+`o<dt>;1`, or none and an anchor with why `c`: it went on from the page before) gets it: `o0;0`
+(dt 0: at the time of its last line) right before its `.0;l` when it closes, first when it goes on.
+Only the text decides, so every load of the same save adds the same line. The exporter reads it as
+a logout, and the next session's `o1` (after an anchor with why `s`) as a login.
 
 Then, if none is open, a new page starts: the header (`E.Raw`) and the character line. Its first
 anchor is the capture's (why `s` at login, `l` after a loading screen).
