@@ -522,7 +522,7 @@ E.On("PLAYER_LEAVING_WORLD", function()
 end)
 
 -- And ends: the anchor on the next tick (a login: "s"; a /reload: "l", the session goes on; else
--- what caused it).
+-- what caused it). A session whose anchor isn't written yet stays one through another loading screen.
 E.On("PLAYER_ENTERING_WORLD", function(isInitialLogin, isReloadingUi)
 	S.loading = false
 	S.pendingAt = GetTime()
@@ -530,7 +530,7 @@ E.On("PLAYER_ENTERING_WORLD", function(isInitialLogin, isReloadingUi)
 		S.pending = "s"
 	elseif isReloadingUi == true then
 		S.pending = "reload"
-	elseif S.pending ~= "s" then
+	elseif S.pending ~= "s" and S.pending ~= "reload" then
 		S.pending = "load"
 	end
 end)

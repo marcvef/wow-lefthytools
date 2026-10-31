@@ -1032,6 +1032,20 @@ do
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(1)
+	-- A /reload where the game doesn't say the position yet, then a loading screen before it does:
+	-- still the /reload's anchor and session (o1).
+	listen()
+	Fire("PLAYER_LEAVING_WORLD")
+	Fire("PLAYER_LOGOUT")
+	C.Reset()
+	STATE.inInstance = true
+	Fire("PLAYER_ENTERING_WORLD", false, true)
+	Advance(1)
+	Fire("PLAYER_LEAVING_WORLD")
+	STATE.inInstance = false
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+	Advance(1)
+	check(seq() == "o;0 @;0;500;500;f;l z;1429;Goldshire o;1", "a /reload, a loading screen before its anchor: the session goes on, got " .. seq())
 end
 
 ---------------------------------------------------------------------------
@@ -1053,8 +1067,9 @@ do
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "party", 2, { guid = "Player-1-11" }
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.5)
-	check(seq():find("^,0,0 ,0,%-28 ,0,%-22 k;116;12;n;m l;2075;1;2;l;116 g;2;0;Player%-1%-11:Anna%-Realmy$") ~= nil,
-		"the path, kills, loot and friends without them, got " .. seq())
+	local w1, w2 = seq():match("^,0,0 ,0,%-(%d+) ,0,%-(%d+) k;116;12;n;m l;2075;1;2;l;116 g;2;0;Player%-1%-11:Anna%-Realmy$")
+	check(w1 and tonumber(w1) >= 25 and tonumber(w1) + tonumber(w2) == 50,
+		"the path (a point past 25 yd, the stop), kills, loot and friends without them, got " .. seq())
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.5)

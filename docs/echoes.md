@@ -139,7 +139,8 @@ one; battlegrounds have positions.
 `o0` at `PLAYER_LOGOUT` and when switched off. `PLAYER_LOGOUT` comes on a `/reload` too and can't be
 told from logging out: a `/reload` writes `o0`, then `@...;l` and `o1` a few seconds later. An `o1`
 after an anchor with why `l` (not `s`) is a `/reload`: the session goes on (the exporter can join
-them).
+them). A session whose anchor isn't written yet (waiting for the position) stays one through
+another loading screen.
 
 ### What happens (Events.lua)
 
