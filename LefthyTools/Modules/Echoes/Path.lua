@@ -529,6 +529,9 @@ E.On("ZONE_CHANGED_NEW_AREA", ZoneSoon)
 E.On("PLAYER_LEAVING_WORLD", function()
 	LastPoint()
 	if C.Flush and C.Ready() then
+		-- (Their spot is that last point: no poll now. The game may say the destination already,
+		-- and a poll would take it for a jump, using up its cause before the loading screen's anchor.)
+		S.spotAt = GetTime()
 		C.Flush()
 	end
 	S.wasInstance = S.inInstance

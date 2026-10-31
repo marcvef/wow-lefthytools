@@ -557,6 +557,17 @@ do
 	loading(function() at(800, 800) end)
 	Advance(1)
 	check(seq() == "n;t;4321 @;0;800;800;f;l", "an event just before a loading screen: written there, before the anchor, got " .. seq())
+	-- The hearthstone, an event in its last moment, and the game already says the destination when
+	-- the loading screen begins: the event where I was, the hearthstone for the anchor after it.
+	listen()
+	Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-11", 8690)
+	Advance(1)
+	Fire("NEW_TOY_ADDED", 4322)
+	at(400, 900)
+	Fire("PLAYER_LEAVING_WORLD")
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+	Advance(1)
+	check(seq() == "n;t;4322 @;0;400;900;f;h;8690", "and a hearthstone just before it: the anchor after it says so, got " .. seq())
 	loading(function() at(610, 600) end)
 	Advance(2)
 end
