@@ -503,6 +503,18 @@ do
 	STATE.inInstance = false
 	Advance(1.2)
 	check(seq() == "@;0;;;f;j @;0;600;600;f;j", "the position gone: an anchor without one; back: an anchor, got " .. seq())
+	-- From Kalimdor through a loading screen to where the game hides the position (not an
+	-- instance): after 3 s an anchor without one, on the continent the game says now.
+	PLAYER_MAP, PLAYER_POS = 1414, { 0.5, 0.5 }
+	Advance(1.2)
+	listen()
+	loading(function() STATE.inInstance = true end)
+	Advance(4)
+	STATE.inInstance = false
+	at(600, 600)
+	Advance(1.2)
+	check(seq() == "@;0;;;f;l @;0;600;600;f;j z;1429;Goldshire",
+		"a loading screen to no position: an anchor without one, its continent from GetInstanceInfo, got " .. seq())
 
 	-- Released to the graveyard: the ghost starts a segment there (r); the corpse run; back to life.
 	listen()

@@ -120,7 +120,7 @@ the last poll). An anchor's mode is read as it is then (never `c`).
 | a loading screen ends (`PLAYER_LEAVING_WORLD` writes the last point, the next tick after `PLAYER_ENTERING_WORLD` the anchor, as soon as the game says where you are, at most 3 s later) | what caused it, else `i` (an instance entered), `o` (left), `l`; a `/reload`: `l` |
 | a jump of more than 50 + 40 * seconds yd between two polls (the seconds at most 5) | what caused it, else `j` |
 | another continent | what caused it, else `j` |
-| the position gone (an anchor without one: the instance's map ID, else the last continent) or back | what caused it, else `j` |
+| the position gone (an anchor without one: the instance's map ID, else the last continent; after a loading screen the continent `GetInstanceInfo` says) or back | what caused it, else `j` |
 | released: the ghost at the graveyard (the first poll it moved, at most 1 s after `PLAYER_ALIVE` as a ghost, once per death; polled every tick meanwhile) | `r` |
 | a new page that didn't go on from the last (no anchor on the page: `E.Continue` wasn't called) | `c` |
 

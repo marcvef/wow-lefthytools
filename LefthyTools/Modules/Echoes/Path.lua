@@ -146,15 +146,20 @@ local function Yes(f, ...)
 	return Value(f, ...) == true
 end
 
--- In an instance (a dungeon, a raid, a battleground), and the instance's map ID (GetInstanceInfo's
--- eighth answer; nil when it isn't readable).
+-- The instance map I'm on: GetInstanceInfo's eighth answer, outside instances the continent's (0
+-- Eastern Kingdoms, 1 Kalimdor); nil when it isn't readable.
+local function MapID()
+	local got, _, _, _, _, _, _, _, id = pcall(GetInstanceInfo)
+	return got and type(id) == "number" and not issecret(id) and id or nil
+end
+
+-- In an instance (a dungeon, a raid, a battleground), and the instance's map ID.
 local function Instance()
 	local ok, inInstance = pcall(IsInInstance)
 	if not (ok and inInstance == true) then
 		return false
 	end
-	local got, _, _, _, _, _, _, _, id = pcall(GetInstanceInfo)
-	return true, got and type(id) == "number" and not issecret(id) and id or nil
+	return true, MapID()
 end
 C.Instance = Instance
 
@@ -462,8 +467,8 @@ local function Arrive(now)
 		Cause() -- (a cause from before doesn't explain a login)
 	end
 	S.pending, S.polledAt = nil, now
-	if north == nil then
-		Anchor(map, nil, nil, why, spell)
+	if north == nil then -- (an instance's map; where the game hides the position, the continent it says)
+		Anchor(map or MapID() or E.state.continent, nil, nil, why, spell)
 	else
 		Anchor(continent, north, west, why, spell)
 	end
