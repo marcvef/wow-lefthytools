@@ -1291,6 +1291,87 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: what a relay asks for, however much others hold")
+do
+	local crowd = Crowd(20, 200)
+	local friends = { ANNA, BOB, CEDRIC }
+	for _, f in ipairs(crowd) do
+		friends[#friends + 1] = f
+	end
+	local c = Start(DORA, { friends = friends, fake = true })
+	Meet(c, ANNA, NEW)
+	Hello(c, ANNA, "s")
+	MeetAll(c, { BOB, CEDRIC })
+	-- Anna has 1-200; Bob and Cedric hold 1-60 already: past the first 50 pages, 61 is the one.
+	local mark = Mark(c)
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":1-60")
+	Say(c, CEDRIC, "B2;es;" .. ANNA.key .. ":1-60")
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1-200")
+	Pass(c, 1.5)
+	local asked = Sent(c, ANNA, mark, "B2;eq;")
+	check(#asked == 1 and asked[1]:find(";61;0$"), "pages 1-60 held by two others: 61 asked for, got " .. tostring(asked[1]))
+	-- 20 more relays hold 1-299 of hers, and of each other's own pages; one copy of 300 is around:
+	-- 300 is the page, and finding it is quick (ranges, not page by page). (Anna restarts first: what
+	-- she offered and what I asked of her go.)
+	MeetAll(c, crowd)
+	Hello(c, ANNA, "s")
+	mark = Mark(c)
+	for i, f in ipairs(crowd) do
+		local items = { ANNA.key .. ":1-" .. (i == 1 and 300 or 299) }
+		for _, g in ipairs(crowd) do
+			if g ~= f then
+				items[#items + 1] = g.key .. ":1-500"
+			end
+		end
+		for first = 1, #items, 9 do
+			Say(c, f, "B2;es;" .. table.concat(items, "/", first, math.min(first + 8, #items)))
+		end
+	end
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1-300")
+	local clock = os.clock()
+	Pass(c, 1.5)
+	local took = os.clock() - clock
+	asked = {}
+	for i = mark, #c.env.GAMEDATA do
+		local m = c.env.GAMEDATA[i]
+		if m.data:sub(1, 6) == "B2;eq;" then
+			asked[#asked + 1] = m.data
+		end
+	end
+	check(#asked == 1 and asked[1]:find(";300;0$"), "everything else held by two others: 300 asked for (of Anna or Pal01), got "
+		.. table.concat(asked, " "))
+	-- (In the test's Lua, page by page took 2.7 s for these 15 ticks, ranges 0.08 s.)
+	check(took < 0.5, ("... quickly: 15 ticks with 23 friends offering 21 stores each, %.2f s in the test's Lua"):format(took))
+	Stop(c)
+end
+
+section("Echoes' delivery: a collector's relay cache moves to the inbox")
+do
+	-- Dora relayed pages of Anna's, then switched collecting on: they move over, one a second, also
+	-- when nobody offers them; one the exporter has already just goes.
+	local c = Start(DORA, { friends = { ANNA }, fake = true })
+	local carry, texts = {}, {}
+	for n = 1, 4 do
+		local p = TheirPage(c, n, 800)
+		carry[n], texts[n] = { t = p.t, h = p.h, m = "z", z = p.z, s = c.E.data.session, a = c.env.GetServerTime() - 60 }, p.z
+	end
+	c.E.data.carry[ANNA.key] = carry
+	c.E.data.exported[ANNA.key] = "4"
+	Touched(c)
+	c.E.module.db.collect = true
+	Pass(c, 1.1)
+	local moved = 0
+	for _ in pairs(c.E.data.inbox[ANNA.key] or {}) do
+		moved = moved + 1
+	end
+	check(moved <= 1, "one a second (each is hashed again), got " .. moved)
+	Pass(c, 5)
+	local inbox = c.E.data.inbox[ANNA.key] or {}
+	check(Keys(inbox) == "" and inbox[1] and inbox[2] and inbox[3] and not inbox[4] and next(c.E.data.carry) == nil
+		and inbox[1].z == texts[1] and inbox[1].s == c.E.data.session, "pages 1-3 in the inbox (this session's), 4 (exported) gone, the cache empty")
+	Stop(c)
+end
+
 ---------------------------------------------------------------------------
 -- Three clients: Anna records, Bob relays, Cedric collects; Finn runs an older build
 ---------------------------------------------------------------------------

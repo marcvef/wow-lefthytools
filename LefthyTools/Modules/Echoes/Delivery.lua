@@ -421,12 +421,12 @@ local function Put(key, n, page, where)
 	return ok, why
 end
 
--- A page I relay already, collected now: it moves to the inbox.
+-- A page I relay already, collected now: it moves to the inbox (one E.Store won't keep there,
+-- exported, from before the launch or broken, just goes).
 local function Move(key, n, page)
 	local acct, store = Split(key)
-	if S.Put(acct, store, n, page, "inbox") then
-		S.Drop(acct, store, tostring(n), "carry")
-	end
+	S.Put(acct, store, n, page, "inbox")
+	S.Drop(acct, store, tostring(n), "carry")
 	Changed()
 end
 
@@ -1051,66 +1051,103 @@ local function InFlight()
 	return Count(inflight)
 end
 
--- An online friend who collects holds n of key (it's as good as safe: no relay needed).
-local function HeldByCollector(key, n)
-	for _, peer in pairs(peers) do
-		if peer.verified and peer.collect and peer.holdings[key] and Ranges.Has(peer.holdings[key], n) then
-			return true
+-- The pages that lists cover at least times over (each list sorted, without overlaps): a sweep
+-- over their ends.
+local function CoveredBy(lists, times)
+	local points = {}
+	for _, list in ipairs(lists) do
+		for _, r in ipairs(list) do
+			points[#points + 1] = { r[1], 1 }
+			points[#points + 1] = { r[2] + 1, -1 }
 		end
 	end
-	return false
-end
-
--- Online friends besides the author who hold n of key.
-local function Copies(key, n)
-	local copies = 0
-	for _, peer in pairs(peers) do
-		if peer.verified and peer.key ~= key and peer.holdings[key] and Ranges.Has(peer.holdings[key], n) then
-			copies = copies + 1
+	table.sort(points, function(x, y) return x[1] < y[1] end)
+	local out, count, i = {}, 0, 1
+	while points[i] do
+		local at = points[i][1]
+		while points[i] and points[i][1] == at do
+			count = count + points[i][2]
+			i = i + 1
+		end
+		if count >= times and points[i] then
+			out[#out + 1] = { at, points[i][1] - 1 }
 		end
 	end
-	return copies
+	return Ranges.Normal(out)
 end
 
--- The first page of offered (key's) I want from holder id, and where it goes; nil: none.
-local function Wanted(id, key, offered, now, collecting, relaying)
+-- What of key I don't want, worked out once per Pull (memo). Collecting: what's in my inbox,
+-- exported, or in my relay cache (it moves over, MoveOne). Relaying: what's in my cache, safe at a
+-- collector, held by an online friend who collects (as good as safe: it will be at their next
+-- session), or by COPIES online friends besides the author.
+local function Unwanted(key, collecting, memo)
+	if memo[key] then
+		return memo[key]
+	end
+	local list
+	if collecting then
+		list = Ranges.Union(Ranges.Union(Have("inbox", key), Exported(key)), Have("carry", key))
+	else
+		local covered, copies = {}, {}
+		for _, peer in pairs(peers) do
+			local held = peer.verified and peer.holdings[key]
+			if held and peer.collect then
+				covered = Ranges.Union(covered, held)
+			elseif held and peer.key ~= key then
+				copies[#copies + 1] = held
+			end
+		end
+		list = Ranges.Union(Ranges.Union(Have("carry", key), SafeOf(key)), Ranges.Union(covered, CoveredBy(copies, COPIES)))
+	end
+	memo[key] = list
+	return list
+end
+
+-- The first page of offered (key's) I want from holder id, and where it goes; nil: none. What I
+-- don't want is taken out as ranges, so the pages looked at one by one are only the ones asked
+-- for already, or that this holder's copy or my room failed (a few).
+local function Wanted(id, key, offered, now, collecting, relaying, memo)
 	local acct = key:sub(1, 8)
 	if key == MyKey() or not Accepted(acct, now) then
 		return nil
 	end
-	local where, want
+	local where
 	if collecting then
 		where = "inbox"
-		want = Ranges.Minus(Ranges.Minus(offered, Have("inbox", key)), Exported(key))
 	elseif relaying and acct ~= MyAccount() and Fits(key, 1) then -- (the size comes with the page: checked then)
 		where = "carry"
-		want = Ranges.Minus(Ranges.Minus(offered, Have("carry", key)), SafeOf(key))
 	else
 		return nil
 	end
 	local looked = 0
-	for _, r in ipairs(want) do
+	for _, r in ipairs(Ranges.Minus(offered, Unwanted(key, collecting, memo))) do
 		for n = r[1], r[2] do
-			looked = looked + 1
-			if looked > 50 then
-				return nil -- (enough for this round)
-			end
 			local pageId = PageId(key, n)
 			if not inflight[pageId] and not (bad[pageId] and bad[pageId][id]) and not (noRoom[pageId] and now - noRoom[pageId] < NO_ROOM_WAIT) then
-				if where == "inbox" then
-					local carried = (E.data.carry[key] or {})[n]
-					if S.Shareable(carried) then
-						Move(key, n, carried) -- (I relay it already: it just moves)
-					else
-						return n, where
-					end
-				elseif not HeldByCollector(key, n) and Copies(key, n) < COPIES then
-					return n, where
-				end
+				return n, where
+			end
+			looked = looked + 1
+			if looked >= 50 then
+				return nil -- (enough for this round: a holder whose copies failed again and again)
 			end
 		end
 	end
 	return nil
+end
+
+-- Collecting: a page of my relay cache moves to the inbox, one a second (E.Store checks its hash
+-- again). Exported, from before the launch or broken: it just goes.
+local function MoveOne(now)
+	for key, pages in pairs(E.data.carry) do
+		if Accepted(key:sub(1, 8), now) then
+			for n, page in pairs(pages) do
+				if S.Shareable(page) then
+					Move(key, n, page)
+					return
+				end
+			end
+		end
+	end
 end
 
 local function SortedKeys(t)
@@ -1126,10 +1163,13 @@ end
 local function Pull(now)
 	local collecting = M.db.collect and not S.InboxFull()
 	local relaying = M.db.relay and not M.db.collect -- (a collector is where pages go: it doesn't relay them)
+	if collecting then
+		MoveOne(now)
+	end
 	if not (collecting or relaying) or InFlight() >= IN_FLIGHT then
 		return
 	end
-	local busy = {}
+	local busy, memo = {}, {}
 	for _, r in pairs(inflight) do
 		busy[r.from] = true
 	end
@@ -1137,7 +1177,7 @@ local function Pull(now)
 		local peer = peers[id]
 		if peer.verified and not busy[id] and ns.Beacon.peers[id] and (peer.share or peer.relay or peer.collect) then
 			for _, key in ipairs(SortedKeys(peer.holdings)) do
-				local n, where = Wanted(id, key, peer.holdings[key], now, collecting, relaying)
+				local n, where = Wanted(id, key, peer.holdings[key], now, collecting, relaying, memo)
 				if n then
 					local pageId = PageId(key, n)
 					local part = partials[pageId]

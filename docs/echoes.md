@@ -577,14 +577,22 @@ hex, Base64 characters; at most 300 intervals in a list, 40 items in a message).
 - **What I hold** (`es`): my own pages, the ones I relay (while relaying) and a collector's inbox;
   never a friend's own pages back to them. To a friend who collects or relays, when it changed (at
   most every 60 s), everything every 5 minutes.
-- **A collector** asks for every offered page it lacks (not in its inbox, not exported), until
-  its inbox reaches 8 MB. One it relays already just moves to the inbox.
+- **A collector** asks for every offered page it lacks (not in its inbox, not exported, not in
+  its relay cache), until its inbox reaches 8 MB. Its relay cache (from before it collected)
+  moves to the inbox, one page a second (`E.Store.Put` checks its hash again), offered or not; an
+  exported one just goes.
 - **A relay** asks for pages of its friends' accounts (not its own) that:
   - no collector holds safely (`safe`),
   - no online friend who collects holds (they'll be safe at its next session),
   - fewer than 2 online friends besides the author hold,
   - fit its cache (`E.Store.Fits`: 512 KB in all, 128 KB per author's store). Too big when it
     begins (`eb`): it asks from the page's end (stops it) and leaves that page alone for 5 minutes.
+
+  What isn't wanted is worked out as ranges, once a second per store (the copies by a sweep over
+  friends' holdings), and taken out of each holder's offer: however many pages others hold, the
+  first page still wanted is found (not only among the first 50), and many friends cost little.
+  Pages are looked at one by one only to skip the ones already asked for, or that this holder's
+  copy or my room failed (at most 50 of those a holder).
 - **Requests**: one open request per holder, 2 pages at once; a page I got part of goes on from
   there. 30 s without progress (counted from when the request went): asked again, from the
   contiguous offset, of the same holder or another. Pages never change, so bytes from different
