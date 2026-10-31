@@ -21,7 +21,8 @@ The mock runs OnUpdate only on visible frames, like the game, and animation grou
 What Lua can't fake comes from Node (`tests/native.js`, put into each Lua state before mock.lua):
 `C_EncodingUtil` with Node's real zlib and Base64, so Echoes' pages really round-trip, and
 `MOCK_EXPORTER(text)`: the Echoes exporter's own readers on a saved file's text, when the
-environment variable `ECHOES_EXPORTER` names the exporter's folder (nil without it).
+environment variable `ECHOES_EXPORTER` names the exporter's folder (`echoes_pages.lua` then checks
+that it archives every page byte for byte with matching hashes; without it that check is skipped).
 
 ### The English suite
 
@@ -46,6 +47,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `bestiary.lua` | Bestiary | - |
 | `whatsnew.lua` | Core: the what's new window | - |
 | `echoes.lua` | Echoes: the module, its saved table, events and driver, recording only off the beta; the line encoder | - |
+| `echoes_pages.lua` | Echoes: pages (header, joining, closing, `/reload`, stale pages), packing and its fallbacks, what's kept, the API for the delivery, the receipt, the launch day; the exporter reading them | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:

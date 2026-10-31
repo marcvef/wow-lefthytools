@@ -98,3 +98,5 @@ Modules\Bestiary\Ledger.lua
 
 Modules\Echoes\Echoes.lua
 Modules\Echoes\Lines.lua
+Modules\Echoes\Store.lua
+Modules\Echoes\Pages.lua

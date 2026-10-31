@@ -28,6 +28,8 @@ Files, in `Modules/Echoes/`, in the order they load (the TOC):
 |---|---|
 | `Echoes.lua` | the module (`ns.Echoes` = `E`), its settings, the saved table, its events (`E.On`), its driver (`E.OnTick`), starting and stopping (`E.When`) |
 | `Lines.lua` | the line encoder: every recorded thing as one line (`E.Line`, `E.Anchor`, `E.Point`, `E.Mode`, `E.Zone`, `E.Name`), the pages' side of it (`E.PageStart`, `E.Raw`, `E.Continue`, `E.OnLine`, `E.Take`), the clock (`E.Now`) |
+| `Store.lua` | the closed pages (`E.Store`: packing, what's kept, the API for the delivery), range strings (`E.Ranges`), the exporter's receipt |
+| `Pages.lua` | the open page: starting, joining, closing, going on after a `/reload`; my account (`E.MyAccount`) and character (`E.Character`) |
 
 What the files share (`E`):
 
@@ -207,17 +209,147 @@ LefthyToolsEchoesDB = {
   acct = "1a2b3c4d",  -- my BattleTag's hash (LT.Hash32 of the lowercased BattleTag), filled in later
   session = 41,       -- +1 at every load (a /reload too): what came this session, what's on disk
   n = 213,            -- the last closed page's number (0: none yet)
-  open = nil,         -- the page being written (plain text, never shared); nil: none
-  mine = {},          -- my closed pages
-  carry = {},         -- friends' pages I relay
-  safe = {},          -- what collectors hold safely
-  inbox = {},         -- a collector's: pages received
-  exported = {},      -- a collector's: pages the exporter has
+  open = {            -- the page being written (plain text, never shared); nil: none
+    n = 214, t0 = 1793452800, char = "Anna-Realm", guid = "Player-...", acct = "1a2b3c4d",
+    text = "E1;...\n...\n", -- the lines joined so far
+    buffer = { ... },   -- the lines not joined yet: E.buffer itself
+    state = { ... },    -- the encoder's state: E.state itself
+  },
+  mine = {            -- my closed pages
+    [212] = { t = 1793451000, h = "5e1f09aa", m = "z", z = "eJzt..." },
+    [213] = { t = 1793452700, m = "t", z = "E1;...", q = 1 }, -- closed, waiting to be packed
+  },
+  carry = { ["5e6f7a8b.0c77e1f2"] = { [57] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- friends' pages I relay
+  safe = { ["5e6f7a8b.0c77e1f2"] = { ["c011ec70.12345678"] = "1-56" } },              -- collectors' summaries
+  inbox = { ["5e6f7a8b.0c77e1f2"] = { [58] = { t, h, m, z, s = 41 } } },                 -- a collector's: received
+  exported = { ["5e6f7a8b.0c77e1f2"] = "1-50" },                                         -- a collector's: from receipts
 }
 ```
 
 A field that isn't what it should be is made new (a table that isn't one, a store that isn't 8 hex
-digits); nothing else is touched. Pages themselves are not built yet.
+digits); nothing else is touched. A stored page is `{ t, h, m, z }`:
+
+- `t`: its start (the header's t0).
+- `m`: how `z` holds it: `z` Base64 of its zlib, `r` Base64 of the text (compressing failed), `t`
+  the text (Base64 failed too: kept and exported, never shared).
+- `z`: the page. The game never decompresses one (an output without a limit): only the exporter does.
+- `h`: `LT.Hash32(z)`, the hash of what's stored (none while it waits).
+- `q`: closed, waiting to be packed (`m` is `t` meanwhile).
+- `s` (carry, inbox): the session it came in; `a` (carry): when it came.
+
+**Files.** `Store.lua` (the closed pages, what's kept, the receipt) loads before
+`Pages.lua` (the open page). Both load before the capture's files: the pages' start hook writes the
+header before the capture's write anything.
+
+### The open page (Pages.lua)
+
+The page id is `<acct>.<store>.<n>`: my account, this WTF folder's store, and `n`, one more than the
+last closed page's (`E.data.n`), so they're dense and holdings are ranges like `1-56,58`.
+
+**When recording starts** (login, `/reload`, switched on), the open page from before:
+
+- goes on if it's this character's (key and GUID) and its last line (`state.t`) is at most 10
+  minutes old: its unjoined lines are joined, `E.state` is put back, `E.bytes` and `E.count` go on;
+- closes as it was otherwise: `.0;l` (stale at login, at the time of its last line). Only the cheap
+  part runs there (joining the text); it's packed on a later tick;
+- goes unclosed if it started before the launch day (`LT.BeforeLaunch`), or can't be a page.
+
+Then, if none is open, a new page starts: the header (`E.Raw`) and the character line. Its first
+anchor is the capture's (why `s` at login, `l` after a loading screen).
+
+- **Header:** `E1;acct;store;n;t0;locale;build;addon` (`GetLocale()`, the build from
+  `GetBuildInfo()`, `LT.version`).
+- **Character:** `C0;key;full name;GUID;class;race;sex;level;faction`. The key is `Name-Realm` (first
+  name, `GetRealmName()`); the full name has the surname from `UnitName`, else Chronicle's record of
+  it (`LefthyToolsChronicleDB.chars[key].full`), else it's the first name; class and race are the
+  file names (`MAGE`, `Scourge`), the faction English.
+- **Account** (`E.MyAccount()`): `LT.Hash32` of my lowercased BattleTag (`BNGetInfo`), Chronicle's
+  account hash, Chronicle switched on or not. `E.data.acct` keeps the last known. While neither is
+  known the header's account is empty (`E1;;9f3a61c2;...`); the tick asks again every 5 s and puts it
+  into the open page's header once it's known. A page closed before keeps the empty one (closed pages
+  never change); the exporter files my pages under `E.data.acct` anyway. Recording doesn't wait for
+  it: Battle.net almost always answers at login, and lines must not wait for a header.
+
+**Joining.** Lines go into `E.buffer` (one string each). The tick joins them into `open.text` every
+60 s, and `PLAYER_LOGOUT` does: one concatenation a minute, never one per line. `open.buffer` is
+`E.buffer` itself and `open.state` is `E.state`, so whatever is written after the logout's join (a
+logout line from a handler after Echoes') is saved too, and a `/reload` goes on with the same page:
+no line lost or doubled, each line's `dt` counting from the one before the reload.
+
+**Closing**, on the tick only (never inside an event handler):
+
+- 32 KB of text or 2,000 lines: `.<dt>;s`;
+- 30 minutes since its start: `.<dt>;t`.
+
+`E.Store.Close` keeps it (below), and the next page starts in the same tick: header, character, and
+`E.Continue()` (an anchor at the last position, why `c`, the mode and the zone). The tick does
+nothing else then.
+
+### Closed pages (Store.lua)
+
+`E.Store.Close(n, t0, text)` keeps the text in `mine[n]` as it is (`m = "t"`, `q = 1`) and `n` becomes
+the last closed page's number. The tick packs one waiting page at a time, oldest first:
+
+1. `C_EncodingUtil.CompressString(text, Enum.CompressionMethod.Zlib)`, then
+   `EncodeBase64(..., Enum.Base64Variant.Standard)`: `m = "z"`;
+2. compressing answers nothing or fails: `EncodeBase64(text)`, `m = "r"`;
+3. Base64 answers nothing, fails or isn't Base64 (or there's no `C_EncodingUtil`): the text, `m = "t"`.
+
+Then `h = LT.Hash32(z)` and `q` goes. That's about once in 30 minutes: zlib and Base64 in C, the hash
+over 5-12 KB in Lua (about 1 ms).
+
+**What's kept** (design section 7):
+
+- **mine:** until a collector holds a page safely (`E.Store.Safe`), at most 2 MB (about 250 hours).
+  Over it, after every packed page and at the start, the oldest go, first the ones a relay is known
+  to carry (`E.Store.Carried`, this session).
+- **carry:** 512 KB in all, 128 KB per author's store (`E.Store.Put` refuses what doesn't fit), 30
+  days after a page came (at the start), and dropped once a collector holds it safely.
+- **inbox:** dropped only by the exporter's receipt. At 4 MB one chat line a session asks to run the
+  exporter; at 8 MB `E.Store.InboxFull()` says so and the delivery stops pulling (a page still on its
+  way is kept).
+- **The launch day:** on the release, once `LT.LAUNCH_DAY` is set, pages that started before it go
+  from mine, carry and inbox at the start, and `E.Store.Put` refuses them.
+
+**The exporter's receipt** (collecting on): once a session, on the tick,
+`LoadAddOn("LefthyTools_EchoesReceipt")` (load on demand; a folder that isn't there does nothing, and
+a new one needs a game restart), then `LefthyToolsEchoesReceipt.done` (`{ ["acct.store"] = "1-57" }`):
+those pages go from inbox, carry and mine, and are added to `exported`. It lists the full ranges each
+time, so reading it again is harmless.
+
+**After the start**, one a tick: a waiting page packed, else the next chore (the launch day, old
+relayed pages, the 2 MB cap, the 4 MB line), else the receipt.
+
+**Costs.** A tick: a few comparisons. A minute: one join. Half an hour: one page packed. Inside
+event handlers: only the logout's join and, at login, joining a stale page's text.
+
+### For the delivery: E.Store and E.Ranges
+
+Every change to mine, carry and inbox goes through `E.Store` (it keeps their sizes). Keys are
+`"acct.store"`, 8 hex digits each.
+
+| Call | What |
+|---|---|
+| `E.Store.Key(acct, store)` | `"acct.store"`, nil if either isn't 8 hex digits |
+| `E.Store.Own()` | my pages' key, nil while my BattleTag isn't known |
+| `for n, page in E.Store.Mine()` | my shareable pages (`z`, `r`, not waiting), oldest first |
+| `E.Store.Shareable(page)` | packed (`z`) or Base64 of the text (`r`), not waiting |
+| `E.Store.Page(acct, store, n)` | a page to serve, and where (`"mine"`, `"inbox"`, `"carry"`); nil if I don't have it |
+| `E.Store.Held(where)` | `{ ["acct.store"] = "ranges" }` of `"mine"` (shareable), `"carry"` or `"inbox"` |
+| `E.Store.Put(acct, store, n, page, where)` | a friend's page received, `where` `"carry"` or `"inbox"`; `page` = `{ t, h, m, z }`, kept as a copy with `s` (and `a`). `true` (`true, "have"`: had it), or `false` and why: `id`, `mine` (my own store's), `page` (not `z`/`r` Base64), `size` (over 64 KB), `time` (before the launch, more than a day ahead), `hash` (`h` isn't `LT.Hash32(z)`; Put checks it), `exported`, `safe` (relaying a page a collector holds), `full` |
+| `E.Store.Drop(acct, store, ranges, where)` | drops those pages (ranges nil: all; where nil: mine, carry and inbox); the number dropped |
+| `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine and carry |
+| `E.Store.SafeHere(acct, store)` | ranges this collector holds safely: received in an earlier session (on disk) or exported |
+| `E.Store.Carried(acct, store, ranges)` | a relay holds these: of mine, they go first over the cap |
+| `E.Store.Fits(acct, store, bytes)` | whether a relayed page of that size fits the cache |
+| `E.Store.InboxFull()` | 8 MB collected: stop pulling |
+| `E.Store.Bytes(where[, acct, store])` | bytes kept (carry with acct and store: that author's) |
+| `E.Store.Trim()`, `E.Store.Recount()`, `E.Store.Pack(text)` | the cap now; the sizes counted anew; packing (`m`, `z`) |
+
+`E.Ranges` (strings like `"1-56,58"`: ascending, merged, from 1 to 999,999,999; never spelled out
+number by number): `Parse(ranges)` (a list `{ { 1, 56 }, { 58, 58 } }`; bad parts skipped),
+`Format(list)`, `Union(a, b)`, `Contains(ranges, n)`, `Of(table[, keep])` (a table's page numbers).
+Each takes a string or a parsed list.
 
 ## Delivery
 
