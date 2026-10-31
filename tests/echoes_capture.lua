@@ -143,10 +143,13 @@ local function body(line)
 	return (line:gsub("^(.)%d+", "%1"))
 end
 
--- The capture's lines since listen(), each without its dt, one space apart.
-local function seq()
+-- The capture's lines since listen(), each without its dt, one space apart (unnamed: without the
+-- names, which come once per page: whether a page started in between doesn't matter then).
+local function seq(unnamed)
 	local list = {}
-	for i, h in ipairs(mine()) do list[i] = body(h.line) end
+	for _, h in ipairs(mine()) do
+		if not (unnamed and h.kind == "=") then list[#list + 1] = body(h.line) end
+	end
 	return table.concat(list, " ")
 end
 
@@ -691,6 +694,36 @@ do
 	Fire("QUEST_TURNED_IN", 10, 300, 50)
 	Advance(2)
 	check(seq() == "a;10 Q;10;300;50", "removed, then turned in: one Q with XP and money, got " .. seq())
+	-- One Q per turn-in, however far apart the two events come: turned in 3 s after the removal was
+	-- decided (done: Q); removed 40 s after it was turned in. A quest turned in again (accepted
+	-- again, or a repeatable one that never was in the log) counts again.
+	listen()
+	Fire("QUEST_ACCEPTED", 11)
+	Advance(0.3)
+	QUESTS_DONE[11] = true
+	Fire("QUEST_REMOVED", 11, false)
+	Advance(3)
+	Fire("QUEST_TURNED_IN", 11, 400, 60)
+	Advance(0.5)
+	Fire("QUEST_TURNED_IN", 12, 500, 70)
+	Advance(40)
+	QUESTS_DONE[12] = true
+	Fire("QUEST_REMOVED", 12, false)
+	Advance(2)
+	check(seq() == "a;11 Q;11 Q;12;500;70", "turned in long after its removal, removed long after it was turned in: one Q each, got " .. seq())
+	listen()
+	Fire("QUEST_TURNED_IN", 13, 100, 5)
+	Fire("QUEST_REMOVED", 13, false)
+	Advance(2)
+	Fire("QUEST_ACCEPTED", 13)
+	Fire("QUEST_TURNED_IN", 13, 100, 5)
+	Fire("QUEST_REMOVED", 13, false)
+	Advance(2)
+	Fire("QUEST_TURNED_IN", 14, 50, 0)
+	Advance(0.5)
+	Fire("QUEST_TURNED_IN", 14, 50, 0)
+	Advance(2)
+	check(seq() == "Q;13;100;5 a;13 Q;13;100;5 Q;14;50;0 Q;14;50;0", "a quest turned in again, a repeatable one twice: a Q each time, got " .. seq())
 	listen()
 	Fire("QUEST_ACCEPTED", SECRET)
 	Fire("QUEST_REMOVED", SECRET)
@@ -1220,7 +1253,7 @@ do
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "party", 2, { guid = "Player-1-11" }
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.5)
-	local w1, w2 = seq():match("^,0,0 ,0,%-(%d+) ,0,%-(%d+) k;116;12;n;m l;2075;1;2;l;116 g;2;0;Player%-1%-11:Anna%-Realmy$")
+	local w1, w2 = seq(true):match("^,0,0 ,0,%-(%d+) ,0,%-(%d+) k;116;12;n;m l;2075;1;2;l;116 g;2;0;Player%-1%-11:Anna%-Realmy$")
 	check(w1 and tonumber(w1) >= 25 and tonumber(w1) + tonumber(w2) == 50,
 		"the path (a point past 25 yd, the stop), kills, loot and friends without them, got " .. seq())
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil

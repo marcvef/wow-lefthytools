@@ -24,6 +24,7 @@ local NODES_KEEP = 32        -- gathered nodes remembered: each counts once
 local FOE_MEMORY = 15        -- seconds: the last enemy you fought counts as your killer this long
 local DEATH_REPEAT = 10      -- PLAYER_DEAD again this soon (or while still dead) is the same death
 local QUEST_DECIDE = 1.5     -- seconds after QUEST_REMOVED: turned in or abandoned?
+local QUEST_PAIR = 60        -- seconds: a QUEST_TURNED_IN this far before or after a QUEST_REMOVED is the same turn-in
 local GATHER_GAP = 1.5       -- seconds from a gathering spell to its loot window
 local LOOT_SOURCE_FOR = 5    -- seconds a loot window's corpses explain loot lines
 local REZ_FOR, SPIRIT_FOR = 70, 120 -- seconds a resurrection offer, the spirit healer's question count
@@ -55,7 +56,9 @@ local seenInfo, seenOrder = {}, {}   -- GUID -> { level, cls, name }; the GUIDs,
 local killed, killedOrder = {}, {}   -- corpse GUID -> true; a ring of KILLS_KEEP
 local nodes, nodesOrder = {}, {}     -- gathered node GUID -> true; a ring of NODES_KEEP
 local titles = {}                    -- quest ID -> title (it may be gone from the log when it's turned in)
-local removed, turnedIn = {}, {}     -- quest ID -> GetTime(): removed from the log, turned in
+-- quest ID -> GetTime(): removed from the log (to decide), turned in (QUEST_TURNED_IN: its Q written),
+-- turned in as its removal decided (that Q written; QUEST_TURNED_IN may still come)
+local removed, turnedIn, decided = {}, {}, {}
 local lootFrom = {}                  -- item ID -> the creature whose corpse the last loot window was
 local foe = {}                       -- the last enemy you fought: at, kind, id, level, cls, pvp, name
 
@@ -74,6 +77,7 @@ local function Reset()
 	wipe(titles)
 	wipe(removed)
 	wipe(turnedIn)
+	wipe(decided)
 	wipe(lootFrom)
 	wipe(foe)
 	S.lootAt = -math.huge
@@ -211,9 +215,17 @@ E.On("QUEST_ACCEPTED", function(questID)
 	end
 end)
 
+-- One Q per turn-in: QUEST_TURNED_IN and QUEST_REMOVED come in either order, at times seconds apart.
+-- Whichever writes it, the other one of the pair (within QUEST_PAIR) is the same turn-in; a quest
+-- turned in again (accepted again, or a repeatable one that's never in the log) counts again.
 E.On("QUEST_TURNED_IN", function(questID, xp, money)
 	if Readable(questID) then
-		turnedIn[questID] = GetTime()
+		local now = GetTime()
+		if decided[questID] and now - decided[questID] <= QUEST_PAIR then
+			decided[questID] = nil -- (its removal wrote the Q)
+			return
+		end
+		turnedIn[questID] = now
 		Note("Q", questID, Readable(xp) and xp or nil, Readable(money) and money or nil)
 	end
 end)
@@ -240,23 +252,30 @@ W.A = function(id)
 	E.Line("A", id)
 end
 
--- Removed from the log: turned in (QUEST_TURNED_IN came, or the game says it's done) or abandoned.
+-- Removed from the log: turned in (QUEST_TURNED_IN came: that's its Q; or the game says it's done:
+-- a Q now, and a QUEST_TURNED_IN after it is the same turn-in) or abandoned.
 local function Quests(now)
-	if next(removed) == nil then
-		return
-	end
 	for id, at in pairs(removed) do
 		if now - at >= QUEST_DECIDE then
 			removed[id] = nil
-			if not (turnedIn[id] and now - turnedIn[id] < 30) then
-				local done = C_QuestLog and Yes(C_QuestLog.IsQuestFlaggedCompleted, id)
-				Note(done and "Q" or "A", id)
+			if turnedIn[id] and now - turnedIn[id] <= QUEST_PAIR then
+				turnedIn[id] = nil -- (written: the pair is done)
+			elseif C_QuestLog and Yes(C_QuestLog.IsQuestFlaggedCompleted, id) then
+				decided[id] = now
+				Note("Q", id)
+			else
+				Note("A", id)
 			end
 		end
 	end
 	for id, at in pairs(turnedIn) do
-		if now - at >= 30 then
+		if now - at > QUEST_PAIR then
 			turnedIn[id] = nil
+		end
+	end
+	for id, at in pairs(decided) do
+		if now - at > QUEST_PAIR then
+			decided[id] = nil
 		end
 	end
 end
