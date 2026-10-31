@@ -1858,3 +1858,68 @@ do
 	Stop(bob)
 	Stop(dora)
 end
+
+section("Echoes' delivery: a collector who records too, a full inbox, many pages")
+do
+	local people = { ANNA, BOB, CEDRIC }
+	local cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), collect = true })
+	local anna = Start(ANNA, { friends = FriendsOf(ANNA, people) })
+	local bob = Start(BOB, { friends = FriendsOf(BOB, people) })
+	local mine = MyPages(cedric, 201, 205, 1200) -- (Cedric's own recording)
+	local pages = MyPages(anna, 101, 220, 1000) -- (120 pages, 5 parts each)
+	local akey, ckey = ANNA.acct .. "." .. anna.E.data.store, CEDRIC.acct .. "." .. cedric.E.data.store
+	-- Cedric's inbox is full (8 MB, waiting for the exporter): he asks for nothing. Bob relays meanwhile
+	-- (a collector online doesn't hold them); Anna keeps all of hers.
+	local filler = BOB.acct .. ".0badf00d"
+	cedric.E.data.inbox[filler] = { [1] = { t = 1, h = "00000000", m = "z", z = ("A"):rep(8 * 1024 * 1024), s = cedric.E.data.session } }
+	Touched(cedric)
+	local mark = #world.log + 1
+	Run(90)
+	local asked = 0
+	for i = mark, #world.log do
+		asked = asked + ((world.log[i].from == CEDRIC.id and world.log[i].data:sub(1, 6) == "B2;eq;") and 1 or 0)
+	end
+	check(cedric.E.Store.InboxFull() and asked == 0 and Holds(cedric, "inbox", akey, pages) == 0
+		and Holds(anna, "mine", nil, pages) == 120, "the inbox full: Cedric asks for nothing, Anna keeps hers")
+	-- The exporter ran (its receipt dropped the filler): he collects all 120, from Anna and Bob.
+	cedric.E.Store.Drop(BOB.acct, "0badf00d")
+	cedric.D.PagesChanged()
+	check(Run(1500, function() return Holds(cedric, "inbox", akey, pages) == 120 end),
+		"room again: Cedric collects all 120 of Anna's, got " .. Holds(cedric, "inbox", akey, pages))
+	-- His own pages: in his own (mine), never in an inbox or a relay's cache (he holds them: nobody
+	-- relays them), and not dropped at his next session (only the exporter's receipt does that).
+	check(Holds(cedric, "mine", nil, mine) == 5 and not cedric.E.data.inbox[ckey] and not bob.E.data.carry[ckey]
+		and not anna.E.data.carry[ckey], "Cedric's own pages: his, nobody carries them")
+	cedric = Reload(cedric)
+	check(Run(300, function() return Holds(anna, "mine", nil, pages) == 0 and Holds(bob, "carry", akey, pages) == 0 end),
+		"safe at Cedric: Anna drops hers, Bob his copies")
+	check(Holds(cedric, "mine", nil, mine) == 5, "Cedric's own stay (until the exporter has them), got " .. Holds(cedric, "mine", nil, mine))
+	-- The budget, all along: never more than 3 Echoes messages in a second from one client, nor 2 to
+	-- one friend; none over 255 bytes.
+	local sent = {}
+	for _, m in ipairs(world.log) do
+		if m.data:sub(1, 4) == "B2;e" then
+			sent[m.from] = sent[m.from] or {}
+			table.insert(sent[m.from], m)
+		end
+	end
+	local most, mostTo, longest = 0, 0, 0
+	for _, list in pairs(sent) do
+		for i, m in ipairs(list) do
+			local all, to = 0, 0
+			for j = i, #list do
+				if list[j].at - m.at > 1 - 1e-6 then
+					break
+				end
+				all = all + 1
+				to = to + (list[j].to == m.to and 1 or 0)
+			end
+			most, mostTo, longest = math.max(most, all), math.max(mostTo, to), math.max(longest, #m.data)
+		end
+	end
+	check(most <= 3 and mostTo <= 2 and longest <= 255, ("within the budget: at most %d in a second from one client, %d to one friend,"
+		.. " the longest %d bytes"):format(most, mostTo, longest))
+	Stop(cedric)
+	Stop(anna)
+	Stop(bob)
+end
