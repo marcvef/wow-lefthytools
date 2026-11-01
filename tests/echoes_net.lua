@@ -2,7 +2,8 @@
 -- safe, who gets B at all, serving within the budget, pulling, checks and resuming, relaying, dropping
 -- copies once safe, switching off, the probe, and three clients (author, relay, collector) passing
 -- pages between them; early pages (a collector online keeps them provisional until a copy from the
--- author's disk confirms them) through crashes on either side.
+-- author's disk confirms them) through crashes on either side, and what both sides' /lefthy echoes
+-- says of them.
 --
 -- Every client here is a game of its own: mock.lua and the addon loaded into an environment of their
 -- own (a table as their _ENV, in this Lua state) with their own clock, Battle.net friends and saved
@@ -2396,6 +2397,18 @@ do
 	end
 	check(Known(CEDRIC.id) and anna.D.peers[CEDRIC.id].early and not anna.D.peers[BOB.id].early and anna.D.EarlyTaker(),
 		"Cedric collects on this build: he takes pages early (e in his hello); Bob doesn't")
+	-- (/lefthy echoes on a client: what it prints)
+	local function Status(c)
+		local from = #c.env.PRINTED
+		c.env.SlashCmdList.LEFTHYTOOLS("echoes")
+		return table.concat(c.env.PRINTED, "\n", from + 1)
+	end
+	local said = Status(anna)
+	check(said:find("Cedric Vale: collects, takes early pages, ", 1, true) and said:find("Bob Stone: relays, ", 1, true)
+		and said:find("your pages go to Cedric Vale early (10-minute pages while a collector is online).", 1, true),
+		"Anna's status: Cedric takes early pages, her pages go to him early; Bob doesn't, got\n" .. said)
+	check(cedric.E.data.names[key] == "Anna" and anna.E.data.names[ckey] == "Cedric" and anna.E.data.names[BOB.acct .. "." .. bob.E.data.store] == "Bob",
+		"friends' first names kept by store, once their account is checked")
 	Varied(anna, 1)
 	Run(1)
 	local n = anna.E.data.n
@@ -2403,6 +2416,13 @@ do
 	check(page and page.m == "z" and #page.z > 2400 and anna.E.Store.Page(ANNA.acct, store, n) == nil, "(her page closes and is packed: not on her disk yet)")
 	check(Run(120, function() return Got(n) ~= nil end), "Cedric gets it within minutes")
 	check(Got(n).p == 1 and Got(n).z == page.z and page.o == 1, "provisional at Cedric (p), as Anna has it; out at Anna (o = 1)")
+	said = Status(cedric)
+	check(said:find(("Anna: 1 page (%d) up to "):format(n), 1, true) and said:find("; 1 sent early (confirmed once Anna's game saved it).", 1, true),
+		"Cedric's status: Anna's page, early, got\n" .. said)
+	said = Status(anna)
+	check(said:find("no page of yours has reached a collector yet.", 1, true) and said:find(("1 page waiting to reach a collector (%d), recorded"
+		.. " since "):format(n), 1, true) and said:find("; 1 of them sent early to a collector, safe once confirmed.", 1, true),
+		"Anna's status: nothing safe yet, her page went early, got\n" .. said)
 	Run(65)
 	local safe = (anna.E.data.safe[key] or {})[ckey]
 	check(not R.Has(bob.D.peers[CEDRIC.id].holdings[key] or {}, n) and R.Has(anna.D.peers[CEDRIC.id].holdings[key] or {}, n)
@@ -2430,8 +2450,16 @@ do
 	check(begun + begun2 == 1 and parts + parts2 <= 3 and stops == 1 and Got(n).z == page.z, ("the check: the page's start, %d of its %d"
 		.. " parts, then stopped"):format(parts + parts2, math.ceil(#page.z / 240)))
 	check(anna.E.data.mine[n] ~= nil, "Anna keeps it: it came in Cedric's session, not on his disk yet")
+	said = Status(cedric)
+	check(said:find(("Anna: 1 page (%d) up to "):format(n), 1, true) and said:find("; 1 not on disk yet (safe after your logout or /reload).", 1, true),
+		"Cedric's status: confirmed, not on his disk yet, got\n" .. said)
 	cedric = Reload(cedric)
 	check(Run(120, function() return anna.E.data.mine[n] == nil end), "his next session: safe at Cedric (his summary), Anna drops it")
+	said = Status(anna)
+	check(said:find(("your recording is safe at a collector up to [^\n]-%s[^\n]- %%(page %d%%)%%."):format(date("%H:%M", page.e), n))
+		and said:find("none of your pages waits to reach a collector.", 1, true), "Anna's status: safe at a collector up to her page's end, got\n" .. said)
+	said = Status(cedric)
+	check(said:find(("Anna: 1 page %%(%d%%) up to [^\n]-; 1 on disk%%."):format(n)), "Cedric's status: on his disk, got\n" .. said)
 
 	-- While Cedric is online her pages close 10 minutes after their first line (30 without him).
 	Varied(anna, 2)
@@ -2447,7 +2475,9 @@ do
 		.. " s), by time")
 	Stop(cedric)
 	Run(3)
-	check(not anna.D.EarlyTaker(), "Cedric gone: nobody who takes pages early")
+	said = Status(anna)
+	check(not anna.D.EarlyTaker() and not said:find("early (10-minute pages", 1, true) and not said:find("takes early pages", 1, true),
+		"Cedric gone: nobody who takes pages early, got\n" .. said)
 	Stop(anna)
 	Stop(bob)
 end

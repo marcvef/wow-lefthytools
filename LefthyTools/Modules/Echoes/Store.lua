@@ -28,6 +28,11 @@ local M = E.module
 --            passed on from friend to friend would keep every entry forever, and a broken or
 --            hostile friend could fill all 200 places for good
 --
+-- For /lefthy echoes, noted as pages come and go (one comparison each): safeTo, the newest page of
+-- mine that went because a collector holds it (my pages keep when they ended, e); latest, the newest
+-- page a collector received of each store (the exporter's receipt takes the pages themselves);
+-- names, friends' first names by store (Delivery says them).
+--
 -- Pages from before the launch day go. E.Ranges: page numbers as range strings ("1-56,58").
 -- E.Store: the pages' API for the delivery; every change to mine, carry and inbox goes through it
 -- (it keeps their sizes), and each one tells the delivery (D.PagesChanged: it caches what I hold).
@@ -44,6 +49,8 @@ local MAX_N = 999999999                       -- page numbers are 1 to this
 local SEEN_AHEAD = 10000                      -- my numbers friends tell beyond this above my last page: not believed
 local SAFE_AGE = 60 * 86400                   -- what collectors hold of a store goes after 60 days unmentioned
 local RECEIPT = "LefthyTools_EchoesReceipt"   -- the exporter's load-on-demand addon, on the collector's PC
+local NAMES_MAX = 200                         -- friends' names kept (E.data.names)
+local SHOWN, SHOWN_AGE = 10, 30 * 86400       -- the status: friends' stores shown at most, and none whose newest page is older
 
 local issecret = LT.IsSecret
 
@@ -196,6 +203,14 @@ local arrived = 0    -- one more than the latest arrival (a) in the inbox when t
 
 local function Size(page)
 	return type(page) == "table" and type(page.z) == "string" and #page.z or 0
+end
+
+local function Count(t)
+	local n = 0
+	for _ in pairs(t) do
+		n = n + 1
+	end
+	return n
 end
 
 -- The pages changed (closed, packed, kept, dropped, safe, exported): the delivery looks at them anew
@@ -600,6 +615,45 @@ local function SafeSomewhere(key, n)
 	return false
 end
 
+-- E.data[field] (heard, names, latest), made here if it isn't a table.
+local function Kept(field)
+	local t = E.data[field]
+	if type(t) ~= "table" then
+		t = {}
+		E.data[field] = t
+	end
+	return t
+end
+
+-- My page n goes because a collector holds it safely (its summary, or my own exporter has it):
+-- E.data.safeTo keeps the newest such page, { n, e (when it ended; a page from before e: its start) },
+-- for the status. Newest by its end, not its number: a page moved to a new number is an old one.
+local function Reached(n, page)
+	local e = type(page) == "table" and (type(page.e) == "number" and page.e or page.t)
+	if type(e) ~= "number" then
+		return
+	end
+	local to = E.data.safeTo
+	if type(to) ~= "table" or type(to.n) ~= "number" or type(to.e) ~= "number" then
+		E.data.safeTo = { n = n, e = e }
+	elseif e > to.e or (e == to.e and n > to.n) then
+		to.n, to.e = n, e
+	end
+end
+
+-- A collector received page n of key, started at t: E.data.latest[key] keeps the newest, { n, t },
+-- for the status ("up to"; the exporter's receipt takes the pages themselves). Newest by its start,
+-- like safeTo.
+local function Newest(key, n, t)
+	local latest = Kept("latest")
+	local was = latest[key]
+	if type(was) ~= "table" or type(was.n) ~= "number" or type(was.t) ~= "number" then
+		latest[key] = { n = n, t = t }
+	elseif t > was.t or (t == was.t and n > was.n) then
+		was.n, was.t = n, t
+	end
+end
+
 -- A friend's page received: where "carry" (relaying) or "inbox" (collecting). page = { t (its
 -- start), h (LT.Hash32 of z), m ("z" or "r"), z }; it's kept as a copy with s (this session) and a
 -- (when it came: relayed, for the 30 days; collected, for the receipt's upto, after every page of an
@@ -645,16 +699,19 @@ function Store.Put(acct, store, n, page, where, provisional)
 	bytes[where] = bytes[where] + #page.z
 	if where == "carry" then
 		carryBy[key] = (carryBy[key] or 0) + #page.z
-	elseif bytes.inbox >= INBOX_NOTE then
-		noteDue = true -- (said on the tick)
+	else
+		Newest(key, n, page.t)
+		if bytes.inbox >= INBOX_NOTE then
+			noteDue = true -- (said on the tick)
+		end
 	end
 	Changed()
 	return true
 end
 
 -- Drops pages of acct.store: those in ranges (nil: all), from where (nil: mine, carry and inbox;
--- mine only for my own key). The number dropped.
-function Store.Drop(acct, store, ranges, where)
+-- mine only for my own key); safe: a collector holds them (mine: noted in safeTo). The number dropped.
+local function Drop(acct, store, ranges, where, safe)
 	Counted()
 	local key = Store.Key(acct, store)
 	if not key then
@@ -664,9 +721,12 @@ function Store.Drop(acct, store, ranges, where)
 	local count = 0
 	for _, w in ipairs(where and { where } or WHERE) do
 		local pages = Pages(w, key)
-		for n in pairs(pages or {}) do
+		for n, page in pairs(pages or {}) do
 			if (not list or Ranges.Contains(list, n)) and Remove(w, key, n) then
 				count = count + 1
+				if safe and w == "mine" then
+					Reached(n, page)
+				end
 			end
 		end
 	end
@@ -676,15 +736,14 @@ function Store.Drop(acct, store, ranges, where)
 	return count
 end
 
+function Store.Drop(acct, store, ranges, where)
+	return Drop(acct, store, ranges, where)
+end
+
 -- E.data.heard: "acct.store" -> when (E.Now()) something was last heard of that store first-hand,
--- for the stores in safe only (made here if it isn't a table).
+-- for the stores in safe only.
 local function Heard()
-	local heard = E.data.heard
-	if type(heard) ~= "table" then
-		heard = {}
-		E.data.heard = heard
-	end
-	return heard
+	return Kept("heard")
 end
 
 -- A friend told of acct.store first-hand: it offers pages of it, or it's the collector whose summary
@@ -695,6 +754,21 @@ function Store.Mentioned(acct, store)
 	if key and type(E.data.safe[key]) == "table" then
 		Heard()[key] = E.Now()
 	end
+end
+
+-- acct.store is a friend's, whose character's first name is name (Delivery, when a verified friend
+-- says hello): E.data.names keeps it for the status. At most 200; the chores drop the names of
+-- stores nothing is kept of any more (Forget).
+function Store.Named(acct, store, name)
+	local key = Store.Key(acct, store)
+	if not key or type(name) ~= "string" or issecret(name) or name == "" then
+		return
+	end
+	local names = Kept("names")
+	if names[key] == nil and Count(names) >= NAMES_MAX then
+		return
+	end
+	names[key] = name
 end
 
 -- A collector (its "acct.store") holds these pages of acct.store safely (its summary, merged into
@@ -718,7 +792,7 @@ function Store.Safe(acct, store, ranges, collector)
 	if key == Store.Own() then
 		Seen(ranges)
 	end
-	return Store.Drop(acct, store, ranges, "mine") + Store.Drop(acct, store, ranges, "carry")
+	return Drop(acct, store, ranges, "mine", true) + Drop(acct, store, ranges, "carry")
 end
 
 -- What this collector holds safely of acct.store, as ranges: received in an earlier session (on
@@ -827,13 +901,14 @@ end
 -- Closing and packing my pages
 ---------------------------------------------------------------------------
 
--- Pages.lua closes page n (started at t0): its text (ending in its "." line) is kept as plain text,
--- waiting to be packed (q), not out yet (o = 0), and n is the last closed page's number now. s: the
--- session it closed in, offered from the next one on; onDisk (closed as stale at login from the
--- saved text, which any later load closes the same way): the session before, offered at once. A
--- number friends hold already (E.data.top: my numbering went back) or kept here: it closes above
--- them, its header renumbered (plain text still). The number it's kept under.
-function Store.Close(n, t0, text, onDisk)
+-- Pages.lua closes page n (started at t0, ended at e: its last line's time; nil: now): its text
+-- (ending in its "." line) is kept as plain text, waiting to be packed (q), not out yet (o = 0), and
+-- n is the last closed page's number now. s: the session it closed in, offered from the next one
+-- on; onDisk (closed as stale at login from the saved text, which any later load closes the same
+-- way): the session before, offered at once. A number friends hold already (E.data.top: my numbering
+-- went back) or kept here: it closes above them, its header renumbered (plain text still). The
+-- number it's kept under.
+function Store.Close(n, t0, text, onDisk, e)
 	Counted()
 	local data = E.data
 	local top = math.max(data.n, Told())
@@ -846,7 +921,8 @@ function Store.Close(n, t0, text, onDisk)
 		moved = moved + 1
 	end
 	bytes.mine = bytes.mine + #text
-	data.mine[n] = { t = t0, m = "t", z = text, q = 1, s = onDisk and data.session - 1 or data.session, o = 0 }
+	data.mine[n] = { t = t0, e = type(e) == "number" and e or E.Now(), m = "t", z = text, q = 1, s = onDisk and data.session - 1 or data.session,
+		o = 0 }
 	if n > data.n then
 		data.n = n
 	end
@@ -949,7 +1025,9 @@ end
 
 -- What collectors hold of a store goes 60 days after it was last heard of first-hand (Store.Mentioned),
 -- unless pages of it are here: my own while I hold any, the ones I relay or collected (they're
--- heard of now). An entry from before the rule gets its 60 days from now.
+-- heard of now). An entry from before the rule gets its 60 days from now. The status's names and
+-- newest pages go with the stores nothing is kept of any more (names: in inbox, exported,
+-- provisional, safe or carry; newest pages: a collector's, in the first three), and broken ones.
 local function Forget()
 	local data, now, heard = E.data, E.Now(), Heard()
 	local own, dropped = Store.Own(), false
@@ -965,6 +1043,19 @@ local function Forget()
 	for key in pairs(heard) do
 		if data.safe[key] == nil then
 			heard[key] = nil
+		end
+	end
+	local provisional = type(data.provisional) == "table" and data.provisional or {}
+	local names, latest = Kept("names"), Kept("latest")
+	for key, newest in pairs(latest) do
+		if type(newest) ~= "table" or type(newest.n) ~= "number" or type(newest.t) ~= "number"
+			or not (data.inbox[key] or data.exported[key] or provisional[key]) then
+			latest[key] = nil
+		end
+	end
+	for key, name in pairs(names) do
+		if type(name) ~= "string" or not (data.inbox[key] or data.exported[key] or provisional[key] or data.safe[key] or data.carry[key]) then
+			names[key] = nil
 		end
 	end
 	if dropped then
@@ -1015,8 +1106,8 @@ local function Take(acct, store, key, ranges, upto)
 		data.exported[key] = exported
 		Changed()
 	end
-	Store.Drop(acct, store, ranges, "carry")
-	Store.Drop(acct, store, ranges, "mine")
+	Drop(acct, store, ranges, "carry")
+	Drop(acct, store, ranges, "mine", true) -- (my own exporter has them)
 end
 
 -- The exporter's receipt (collecting only): its addon loaded (load on demand; nothing if the folder
@@ -1119,16 +1210,201 @@ local function Amount(n)
 	return ("%.1f KB"):format(n / KB)
 end
 
-local function Count(t)
+local function Line(text)
+	M:Print("  " .. text)
+end
+
+local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+
+-- A time of the realm's clock (E.Now()) as this computer shows it: "21:30" today, "Nov 1 21:30"
+-- another day; more than a day ago, it says so (", 3 days ago").
+local function When(t)
+	local ok, at = pcall(date, "*t", t)
+	if not ok or type(at) ~= "table" then
+		return "?" -- (a broken saved time)
+	end
+	local now = E.Now()
+	local today = date("*t", now)
+	local text = ("%02d:%02d"):format(at.hour, at.min)
+	if at.year ~= today.year or at.yday ~= today.yday then
+		text = ("%s %d %s"):format(MONTHS[at.month] or "?", at.day, text)
+	end
+	local days = math.floor((now - t) / 86400)
+	if days >= 1 then
+		text = text .. (", %d day%s ago"):format(days, days == 1 and "" or "s")
+	end
+	return text
+end
+
+local function PageCount(n)
+	return n == 1 and "1 page" or n .. " pages"
+end
+
+local function PageNumber(n)
+	return type(n) == "number" and n >= 1 and n <= MAX_N and n == math.floor(n)
+end
+
+-- How many page numbers a parsed list has (never spelled out).
+local function Numbers(list)
 	local n = 0
-	for _ in pairs(t) do
-		n = n + 1
+	for _, r in ipairs(list) do
+		n = n + r[2] - r[1] + 1
 	end
 	return n
 end
 
-local function Line(text)
-	M:Print("  " .. text)
+-- A parsed list for a status line: "212-214", "1-50,52-57"; in more than 3 pieces, the first and
+-- the last number and how many gaps ("1-900 with 11 gaps").
+local function Span(list)
+	if #list <= 3 then
+		return Ranges.Format(list)
+	end
+	return ("%d-%d with %d gaps"):format(list[1][1], list[#list][2], #list - 1)
+end
+
+-- My own pages: how far my recording is safe at a collector (safeTo), what still waits to reach
+-- one (and what of it went early), and what's kept of it.
+local function MineStatus(data)
+	local to = data.safeTo
+	if type(to) == "table" and type(to.n) == "number" and type(to.e) == "number" then
+		Line(("your recording is safe at a collector up to %s (page %d)."):format(When(to.e), to.n))
+	else
+		Line("no page of yours has reached a collector yet.")
+	end
+	local count, oldest, packing, later, early = 0, nil, 0, 0, 0
+	for n, page in pairs(data.mine) do
+		if PageNumber(n) then
+			count = count + 1
+			if type(page.t) == "number" and (not oldest or page.t < oldest) then
+				oldest = page.t
+			end
+			packing = packing + (page.q and 1 or 0)
+			later = later + (OnDisk(page) and 0 or 1)
+			early = early + ((not OnDisk(page) and page.o == 1) and 1 or 0)
+		end
+	end
+	if count == 0 then
+		Line("none of your pages waits to reach a collector.")
+	else
+		Line(("%s waiting to reach a collector (%s)%s%s."):format(PageCount(count), Span(Ranges.Parse(Ranges.Of(data.mine))),
+			oldest and ", recorded since " .. When(oldest) or "",
+			early > 0 and ("; %d of them sent early to a collector, safe once confirmed"):format(early) or ""))
+	end
+	if count > 0 or moved > 0 then
+		Line(("my pages: %s of %s%s%s%s."):format(Amount(bytes.mine), Amount(MINE_CAP),
+			packing > 0 and (", %d waiting to be packed"):format(packing) or "",
+			later > 0 and (", %d offered from the next session on (a /reload is one)"):format(later) or "",
+			moved > 0 and (", %d moved to a new number this session (friends hold another page with theirs: a WTF folder restored, or copied?)"):format(moved) or ""))
+	end
+end
+
+-- A collector's lines, one per friend's store with anything collected, exported or provisional (my
+-- own account's other computers too; not this one's: the lines above): how many pages, up to when
+-- (the newest one's start: latest, or the inbox), and how far they're confirmed. The 10 whose newest
+-- page is newest, sorted by name; stores whose newest page is over 30 days old left out.
+local function FriendsStatus(data)
+	local own, now = Store.Own(), E.Now()
+	local names = type(data.names) == "table" and data.names or {}
+	local latest = type(data.latest) == "table" and data.latest or {}
+	local provisional = type(data.provisional) == "table" and data.provisional or {}
+	local keys = {}
+	for _, where in ipairs({ data.inbox, data.exported, provisional }) do
+		for key in pairs(where) do
+			keys[key] = true
+		end
+	end
+	local rows, old = {}, 0
+	for key in pairs(keys) do
+		local acct, store
+		if type(key) == "string" then
+			acct, store = key:match("^(%x+)%.(%x+)$")
+		end
+		if acct and key ~= own and Store.Key(acct, store) == key then
+			local exported = Ranges.Parse(type(data.exported[key]) == "string" and data.exported[key] or "")
+			local all = {}
+			for i, r in ipairs(exported) do
+				all[i] = { r[1], r[2] }
+			end
+			local newest = type(latest[key]) == "table" and type(latest[key].t) == "number" and latest[key].t or nil
+			local inbox = type(data.inbox[key]) == "table" and data.inbox[key] or {}
+			local row = { key = key, acct = acct, store = store, exported = Numbers(exported), disk = 0, fresh = 0, early = 0 }
+			for n, page in pairs(inbox) do
+				if PageNumber(n) and type(page) == "table" then
+					all[#all + 1] = { n, n }
+					if Pending(page) then
+						row.early = row.early + 1
+					elseif type(page.s) == "number" and page.s < data.session then
+						row.disk = row.disk + 1
+					else
+						row.fresh = row.fresh + 1
+					end
+					if type(page.t) == "number" and (not newest or page.t > newest) then
+						newest = page.t -- (one that came before latest was kept)
+					end
+				end
+			end
+			local taken = provisional[key]
+			for n, h in pairs(type(taken) == "table" and taken or {}) do
+				if PageNumber(n) and type(h) == "string" and not inbox[n] then -- (an inbox page n from a disk counts)
+					all[#all + 1] = { n, n }
+					row.early = row.early + 1
+				end
+			end
+			row.all, row.newest = Merge(all), newest
+			if not row.all[1] then
+				row = nil
+			elseif newest and now - newest > SHOWN_AGE then
+				old, row = old + 1, nil
+			end
+			if row then
+				row.name = acct == data.acct and "you (" .. store .. ")" or type(names[key]) == "string" and names[key] or acct
+				rows[#rows + 1] = row
+			end
+		end
+	end
+	table.sort(rows, function(a, b)
+		local x, y = a.newest or -math.huge, b.newest or -math.huge
+		if x ~= y then
+			return x > y
+		end
+		return a.key < b.key
+	end)
+	local shown, seen = {}, {}
+	for i = 1, math.min(#rows, SHOWN) do
+		shown[i] = rows[i]
+		seen[rows[i].name] = (seen[rows[i].name] or 0) + 1
+	end
+	table.sort(shown, function(a, b)
+		local x, y = a.name:lower(), b.name:lower()
+		if x ~= y then
+			return x < y
+		end
+		return a.key < b.key
+	end)
+	for _, row in ipairs(shown) do
+		local parts = {}
+		if row.exported > 0 then
+			parts[#parts + 1] = row.exported .. " exported"
+		end
+		if row.disk > 0 then
+			parts[#parts + 1] = row.disk .. " on disk"
+		end
+		if row.fresh > 0 then
+			parts[#parts + 1] = row.fresh .. " not on disk yet (safe after your logout or /reload)"
+		end
+		if row.early > 0 then
+			parts[#parts + 1] = ("%d sent early (confirmed once %s game saved it)"):format(row.early,
+				row.acct == data.acct and "that computer's" or row.name .. "'s")
+		end
+		Line(("  %s: %s (%s)%s; %s."):format(seen[row.name] > 1 and ("%s (%s)"):format(row.name, row.store) or row.name,
+			PageCount(Numbers(row.all)), Span(row.all), row.newest and " up to " .. When(row.newest) or "", table.concat(parts, ", ")))
+	end
+	if #rows > SHOWN then
+		Line(("  ... and %d more."):format(#rows - SHOWN))
+	end
+	if old > 0 then
+		Line(("  (%d older not shown: nothing from them in 30 days.)"):format(old))
+	end
 end
 
 local function Status()
@@ -1155,18 +1431,7 @@ local function Status()
 	else
 		Line("no open page.")
 	end
-	local count, waiting, later, early = 0, 0, 0, 0
-	for _, page in pairs(data.mine) do
-		count = count + 1
-		waiting = waiting + (page.q and 1 or 0)
-		later = later + (OnDisk(page) and 0 or 1)
-		early = early + ((not OnDisk(page) and page.o == 1) and 1 or 0)
-	end
-	Line(("my pages: %d (%s), %s of %s%s%s%s."):format(count, count > 0 and Ranges.Of(data.mine) or "none", Amount(bytes.mine),
-		Amount(MINE_CAP), waiting > 0 and (", %d waiting to be packed"):format(waiting) or "",
-		later > 0 and (", %d offered from the next session on (a /reload is one)%s"):format(later,
-			early > 0 and ("; %d of them went early to a collector"):format(early) or "") or "",
-		moved > 0 and (", %d moved to a new number this session (friends hold another page with theirs: a WTF folder restored, or copied?)"):format(moved) or ""))
+	MineStatus(data)
 	local relayed = 0
 	for _, pages in pairs(data.carry) do
 		relayed = relayed + Count(pages)
@@ -1174,7 +1439,7 @@ local function Status()
 	if M.db.relay or relayed > 0 then
 		Line(("relaying: %d pages of %d friends' stores, %s of %s."):format(relayed, Count(data.carry), Amount(bytes.carry), Amount(CARRY_CAP)))
 	end
-	if M.db.collect or next(data.inbox) or next(data.exported) then
+	if M.db.collect or next(data.inbox) or next(data.exported) or (type(data.provisional) == "table" and next(data.provisional)) then
 		local received = 0
 		for _, pages in pairs(data.inbox) do
 			received = received + Count(pages)
@@ -1182,6 +1447,7 @@ local function Status()
 		Line(("collected: %d pages of %d stores, %s%s; the exporter has %d stores' pages."):format(received, Count(data.inbox),
 			Amount(bytes.inbox), bytes.inbox >= INBOX_FULL and " (8 MB: collecting pauses until the exporter ran)"
 			or bytes.inbox >= INBOX_NOTE and " (over 4 MB: run the exporter)" or "", Count(data.exported)))
+		FriendsStatus(data)
 	end
 	for i = 1, #statusHooks do
 		LT.Guard(statusNames[i], statusHooks[i], Line)

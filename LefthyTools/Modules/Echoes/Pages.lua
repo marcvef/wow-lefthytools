@@ -217,8 +217,9 @@ local function Resume(open, fromDisk)
 end
 
 -- An open page from before that doesn't go on closes as it was: ".0;l" (stale at login), at the time
--- of its last line. One with nothing in it, or that can't be a page, goes. onDisk: the page is the
--- saved text and nothing else (E.Store offers it at once, see the start).
+-- of its last line (it ends then: state.t; none readable: its start). One with nothing in it, or that
+-- can't be a page, goes. onDisk: the page is the saved text and nothing else (E.Store offers it at
+-- once, see the start).
 local function Retire(open, onDisk)
 	local data = E.data
 	data.open = nil
@@ -232,8 +233,10 @@ local function Retire(open, onDisk)
 		text = text .. table.concat(buffer, "\n") .. "\n"
 	end
 	if text ~= "" then
+		local state = open.state
+		local ended = type(state) == "table" and type(state.t) == "number" and state.t or open.t0
 		-- (Its session never ended, a crash or a disconnect: the logout first.)
-		E.Store.Close(open.n, open.t0, text .. (Unended(text) and UNENDED .. "\n" or "") .. ".0;l\n", onDisk)
+		E.Store.Close(open.n, open.t0, text .. (Unended(text) and UNENDED .. "\n" or "") .. ".0;l\n", onDisk, ended)
 	end
 end
 
@@ -256,11 +259,12 @@ local function Old(open)
 	return type(state) ~= "table" or type(state.t) ~= "number" or E.Now() - state.t > STALE
 end
 
--- The open page closes (reason "t" or "s"), the next one starts and goes on from the last position.
+-- The open page closes (reason "t" or "s"; it ends now), the next one starts and goes on from the
+-- last position.
 local function Rollover(reason)
 	local open = active
 	E.Line(".", reason)
-	E.Store.Close(open.n, open.t0, open.text .. E.Take())
+	E.Store.Close(open.n, open.t0, open.text .. E.Take(), nil, E.Now())
 	E.data.open = nil
 	StartPage(E.Character(), true)
 end

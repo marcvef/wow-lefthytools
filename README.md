@@ -447,8 +447,10 @@ the collector has it safely, then it's dropped. A page that reached a collector 
 even if your game crashes before saving it; it counts as safe only once the copy your game saved
 matches it. The collector's own program turns them into the website; that part isn't in this addon.
 
-`/lefthy echoes` shows what's recorded and kept. Switched off, Echoes does nothing at all: it
-records nothing and sends nothing, and pages you already have wait until it's on again.
+`/lefthy echoes` shows what's recorded and kept: how far your recording is safe at a collector (up
+to which time) and what still waits to get there; for a collector, each friend's pages it has and
+how far they're confirmed. Switched off, Echoes does nothing at all: it records nothing and sends
+nothing, and pages you already have wait until it's on again.
 
 | Setting | Default |
 |---|---|

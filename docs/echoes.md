@@ -398,9 +398,10 @@ LefthyToolsEchoesDB = {
     state = { ... },    -- the encoder's state: E.state itself
   },
   mine = {            -- my closed pages
-    [212] = { t = 1793451000, h = "5e1f09aa", m = "z", z = "eJzt...", s = 40, o = 1 },
-    [213] = { t = 1793452700, m = "t", z = "E1;...", q = 1, s = 41, o = 0 }, -- closed, waiting to be packed
+    [212] = { t = 1793451000, e = 1793452700, h = "5e1f09aa", m = "z", z = "eJzt...", s = 40, o = 1 },
+    [213] = { t = 1793452700, e = 1793454500, m = "t", z = "E1;...", q = 1, s = 41, o = 0 }, -- closed, waiting to be packed
   },
+  safeTo = { n = 211, e = 1793451000 },  -- the newest page of mine that went because a collector holds it (/lefthy echoes)
   carry = { ["5e6f7a8b.0c77e1f2"] = { [57] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- friends' pages I relay
   safe = { ["5e6f7a8b.0c77e1f2"] = { ["c011ec70.12345678"] = "1-56" } },              -- collectors' summaries
   heard = { ["5e6f7a8b.0c77e1f2"] = 1793450000 },                                      -- when a store in safe was last heard of first-hand
@@ -410,6 +411,8 @@ LefthyToolsEchoesDB = {
   } },
   provisional = { ["5e6f7a8b.0c77e1f2"] = { [55] = "3c1d2e4f" } },                     -- a collector's: provisional pages the receipt took
   exported = { ["5e6f7a8b.0c77e1f2"] = "1-50" },                                         -- a collector's: from receipts
+  latest = { ["5e6f7a8b.0c77e1f2"] = { n = 59, t = 1793449900 } },                     -- a collector's: the newest page received (/lefthy echoes)
+  names = { ["5e6f7a8b.0c77e1f2"] = "Bob" },                                             -- friends' first names by store (/lefthy echoes)
   capture = { ["Player-..."] = { ... } },  -- the capture's baselines per character (Recording)
   friends = { ["Player-..."] = "Bob-Realm" }, -- LefthyTools friends' names (Recording)
 }
@@ -420,6 +423,8 @@ digits); nothing else is touched, except that a stored page without its text (`z
 sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
 
 - `t`: its start (the header's t0).
+- `e` (mine): when it ended: closed by time or size, then (`E.Now()`); closed as stale at login, its
+  last line's time (`open.state.t`). None: from a build before it (its `t` counts instead).
 - `m`: how `z` holds it: `z` Base64 of its zlib, `r` Base64 of the text (compressing failed), `t`
   the text (Base64 failed too: kept and exported, never shared).
 - `z`: the page. The game never decompresses one (an output without a limit): only the exporter does.
@@ -438,6 +443,22 @@ sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
 `provisional` (a collector's): `{ ["acct.store"] = { [n] = hash } }`, provisional pages the
 exporter's receipt took out of the inbox (the exporter has them) that aren't confirmed yet. Their
 numbers aren't in `exported`. Made when first needed.
+
+For `/lefthy echoes` (below), noted as pages come and go, one comparison each (made when first
+needed, and anew when they aren't tables):
+
+- `safeTo`: `{ n, e }`, the newest page of mine that went because a collector holds it (`E.Store.Safe`
+  for my key, or my own exporter's receipt): its number and when it ended (`e`, else its `t`).
+  Newest by when it ended, not by its number: a page moved to a new number (numbers used twice,
+  below) is an old one.
+- `latest` (a collector's): `{ ["acct.store"] = { n, t } }`, the newest page received of each store
+  (`E.Store.Put` into the inbox): its number and start, newest by its start. The exporter's receipt
+  takes the pages themselves, so it's kept. It goes with the store (the chores: no inbox, `exported`
+  or `provisional` entry any more).
+- `names`: `{ ["acct.store"] = "Bob" }`, friends' first names (`E.Store.Named`, from Delivery: the
+  Battle.net name of a friend whose account is checked, `LT.Names.First`). At most 200 (a new one
+  waits for room); the chores drop the ones of stores nothing is kept of any more (in inbox,
+  `exported`, `provisional`, `safe` or carry).
 
 **Files.** `Store.lua` (the closed pages, what's kept, the receipt, `/lefthy echoes`) loads before
 `Pages.lua` (the open page). Both load after the capture's files, so at logout and when switched off
@@ -510,8 +531,8 @@ nothing else then.
 
 ### Closed pages (Store.lua)
 
-`E.Store.Close(n, t0, text, onDisk)` keeps the text in `mine[n]` as it is (`m = "t"`, `q = 1`, `s` the
-session, `o = 0`) and `n` becomes the last closed page's number (a number at or below `E.data.top`,
+`E.Store.Close(n, t0, text, onDisk, e)` keeps the text in `mine[n]` as it is (`m = "t"`, `q = 1`, `s`
+the session, `o = 0`, `e` when it ended: now if nil) and `n` becomes the last closed page's number (a number at or below `E.data.top`,
 or kept already: the next one above, its header renumbered; numbers used twice, below). It returns
 the number the page is kept under. The tick packs one waiting page at a time,
 oldest first:
@@ -661,8 +682,8 @@ by its arrival). Arrival times keep it so whatever the clock does: a page that c
 arrives after every page of an earlier one.
 
 **After the start**, one a tick: a waiting page packed, else the next chore (the launch day, old
-relayed pages, collectors' summaries of stores not heard of for 60 days, the 2 MB cap, the 4 MB
-line), else the receipt.
+relayed pages, collectors' summaries of stores not heard of for 60 days with the status's names and
+newest pages of stores nothing is kept of, the 2 MB cap, the 4 MB line), else the receipt.
 
 **Costs.** A tick: a few comparisons. A minute: one join. Half an hour (ten minutes with a collector
 who takes pages early online): one page packed. Inside event handlers: only the logout's join and, at
@@ -690,12 +711,13 @@ each.
 | `E.Store.Provisional(acct, store, n)` | whether this collector holds page `n` provisionally: its hash and where, `"inbox"` or `"provisional"` (the receipt took it); nil if not (also when the inbox has a page `n` from a disk) |
 | `E.Store.Confirm(acct, store, n, hash)` | a copy of page `n` from its author's disk has this hash: if it's the provisional one's, it's confirmed (the inbox page loses `p`; one the receipt took goes into `exported`); whether it was |
 | `E.Store.Drop(acct, store, ranges, where)` | drops those pages (ranges nil: all; where nil: mine, carry and inbox); the number dropped |
-| `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine and carry; of mine, one that never went out moves to a new number instead (numbers used twice) |
+| `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine (the newest noted in `safeTo`) and carry; of mine, one that never went out moves to a new number instead (numbers used twice) |
 | `E.Store.Elsewhere(acct, store, ranges)` | a holder offers these (its holdings): for my own key, my next pages close above them and a page of mine among them that never went out moves to a new number; the number moved |
 | `E.Store.WentOut(n, page)` | a part of my page `n` was sent (`page`: the one served, if it's still page `n`): `o = 1`, it keeps its number |
 | `E.Store.SafeHere(acct, store)` | ranges this collector holds safely: received in an earlier session (on disk) and not provisional, or exported |
 | `E.Store.Carried(acct, store, ranges)` | a relay holds these (not a collector: provisional pages are among its holdings): of mine, they go first over the cap |
 | `E.Store.Mentioned(acct, store)` | a friend told of this store first-hand (offers pages of it, or is the collector whose summary it is): what collectors hold of it is kept 60 days from now |
+| `E.Store.Named(acct, store, name)` | a friend whose account is checked says hello: their first name, kept for the status (`names`) |
 | `E.Store.Fits(acct, store, bytes)` | whether a relayed page of that size fits the cache |
 | `E.Store.InboxFull()` | 8 MB collected: stop pulling |
 | `E.Store.Bytes(where[, acct, store])` | bytes kept (carry with acct and store: that author's) |
@@ -708,10 +730,42 @@ page numbers). Each takes a string or a parsed list.
 
 ### /lefthy echoes
 
-`/lefthy echoes` (or `status`) prints, in English: recording or not, the account and store, the
-open page (size, lines, age; whether nothing is on it yet, so it stays open), my pages (numbers, size of 2 MB, how many wait to be packed, how many are offered from the next session on and how many of those went early to a collector), relaying
-(with relaying on or pages kept) and collecting (with collecting on or anything collected or
-exported). Other files add to it:
+`/lefthy echoes` (or `status`) prints, in English (chat lines, kept short), in this order:
+
+- recording or not, the account and store;
+- the open page: size, lines, age; whether nothing is on it yet, so it stays open;
+- **how far my recording is safe** (`safeTo`): "your recording is safe at a collector up to 21:30
+  (page 214)." (the end of the newest of my pages that went because a collector holds it, and its
+  number), or "no page of yours has reached a collector yet.";
+- **what waits**: "3 pages waiting to reach a collector (215-217), recorded since 21:30; 2 of them
+  sent early to a collector, safe once confirmed." (every page in `mine`, the oldest one's start;
+  sent early: not on disk yet, and a part of it went out, `o = 1`), or "none of your pages waits to
+  reach a collector.";
+- what's kept of them (when any are, or one moved this session): "my pages: 24.0 KB of 2.0 MB",
+  how many wait to be packed, how many are offered from the next session on, how many moved to a new
+  number this session;
+- relaying (with relaying on or pages kept);
+- collecting (with collecting on or anything collected, exported or provisional): the inbox's size,
+  then **a line per friend's store** with anything collected, exported or provisional (my own
+  account's other computers too, as "you (<store>)"; this computer's own pages are the lines above):
+  "Bob: 59 pages (1-59) up to 10:58; 50 exported, 5 on disk, 2 not on disk yet (safe after your
+  logout or /reload), 2 sent early (confirmed once Bob's game saved it)."
+  - the name from `names`; not known: the account's 8 hex digits; two stores of one name: each
+    with its store after it;
+  - the pages: all the numbers in `exported`, the inbox and `provisional` (counted from the
+    intervals, never spelled out; more than 3 pieces: "1-900 with 11 gaps");
+  - "up to": the newest page's start (`latest`, or an inbox page from before it); none known
+    (only exported, from a build before `latest`): left out;
+  - exported (numbers in `exported`), on disk (inbox, not provisional, an earlier session's), not on
+    disk yet (this session's), sent early (provisional: in the inbox with `p`, or in `provisional`
+    without an inbox page of that number);
+  - sorted by name; more than 10: the 10 whose newest page is newest, then "... and N more."; stores
+    whose newest page is more than 30 days old are left out: "(N older not shown: nothing from them
+    in 30 days.)".
+
+Times are the realm's clock as this computer shows it: "21:30" today, "Nov 1 21:30" another day,
+with ", 3 days ago" when it's more than a day ago. All of it is worked out on the command (the pages
+only note `safeTo` and `latest` as they come and go, one comparison each). Other files add to it:
 
 - `E.OnStatus(fn)`: `fn(add)` while the status prints; `add(text)` prints one more line.
 - `E.Command(word, fn, help)`: `/lefthy echoes <word> ...` runs `fn(rest)`; `help` is its line in the
@@ -775,7 +829,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
 - **Their account**: the account in `eh` must be the one Battle.net says for that friend (the
   friend list's BattleTag hashes, Chronicle's `C.Hash` the same way, whether Chronicle is on or
   not; or `GetAccountInfoByGUID`). Wrong: nothing is exchanged with them. Not known yet: checked
-  again every second.
+  again every second. Right: their character's first name (Beacon's, `LT.Names.First`) is kept for
+  their store (`E.Store.Named`, for the status), then and at each hello after.
 - **Accounts taken**: pages, holdings and safe ranges only of my Battle.net friends' accounts and
   my own. The friend list's accounts are read every 30 s, and sooner (at most every 5 s) when it
   may have changed: an account that isn't in it (once per account until the list is read anew: a
@@ -932,8 +987,10 @@ answer, arrived whole or cut. A throttle stops it and counts like Beacon's.
 
 ### Status
 
-`/lefthy echoes` (`E.OnStatus`, `D.Status()`): friends with Echoes online and what they offer,
-pages coming and served, traffic, a pause after a throttle.
+`/lefthy echoes` (`E.OnStatus`, `D.Status()`): friends with Echoes online, what they do (collects,
+takes early pages, relays) and what they offer; "your pages go to Cedric Vale early (10-minute pages
+while a collector is online)." while one who takes them early is online (`D.EarlyTaker()`); pages
+coming and served, traffic, a pause after a throttle.
 
 ### Check on launch day (delivery)
 

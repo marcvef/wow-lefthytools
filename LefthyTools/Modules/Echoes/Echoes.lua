@@ -31,8 +31,9 @@ local L = ns.L
 --   (the page being written, plain text, never shared; nil: none: Pages.lua), mine
 --   (my closed pages), carry (friends' pages I relay), safe (what collectors hold) and heard (when
 --   a store in it was last heard of first-hand), inbox, exported and provisional (a collector's:
---   Store.lua; provisional made when first needed), capture (the capture's baselines per character) and
---   friends (LefthyTools friends' names: Path.lua and Changes.lua) }
+--   Store.lua; provisional made when first needed), safeTo, latest and names (for /lefthy echoes:
+--   Store.lua, made when first needed), capture (the capture's baselines per character) and friends
+--   (LefthyTools friends' names: Path.lua and Changes.lua) }
 
 local TICK = 0.25 -- seconds between the driver's ticks
 

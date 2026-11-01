@@ -1061,11 +1061,20 @@ local function StopServing(id)
 	end
 end
 
+-- A verified friend's store gets their character's first name, as Battle.net says it (E.Store keeps
+-- it for the status: a collector's lines per friend).
+local function Named(id, peer)
+	local bpeer = ns.Beacon.peers[id]
+	E.Store.Named(peer.acct, peer.store, bpeer and LT.Names.First(bpeer.name))
+end
+
 local function Verify(id, peer, now)
 	local acct = PeerAccount(id, now)
 	if acct then
 		peer.verified = acct == peer.acct
-		if not peer.verified then
+		if peer.verified then
+			Named(id, peer)
+		else
 			stats.rejected = stats.rejected + 1
 		end
 	end
@@ -1101,6 +1110,8 @@ local function OnHello(id, msg, now)
 	end
 	if peer.verified == nil then
 		Verify(id, peer, now)
+	elseif peer.verified then
+		Named(id, peer) -- (Battle.net may not have said their name when they were verified)
 	end
 end
 
@@ -2067,10 +2078,14 @@ end)
 function D.Status()
 	local now = GetTime()
 	local beacon = ns.Beacon
-	local friends = {}
+	local friends, early = {}, {}
 	for id, peer in pairs(peers) do
 		if peer.verified and beacon.peers[id] then
-			local roles = (peer.collect and "collects, " or "") .. (peer.relay and "relays, " or "")
+			local takes = TakesEarly(id)
+			local roles = (peer.collect and "collects, " or "") .. (takes and "takes early pages, " or "") .. (peer.relay and "relays, " or "")
+			if takes then
+				early[#early + 1] = beacon.peers[id].name or ("#" .. id)
+			end
 			local pages = 0
 			for key, list in pairs(peer.holdings) do
 				for _, r in ipairs(key ~= MyKey() and list or {}) do -- (not my own pages they hold)
@@ -2085,6 +2100,10 @@ function D.Status()
 		#friends, InFlight(), #active, #serves) }
 	for _, line in ipairs(friends) do
 		lines[#lines + 1] = line
+	end
+	if D.EarlyTaker() then
+		table.sort(early)
+		lines[#lines + 1] = ("your pages go to %s early (10-minute pages while a collector is online)."):format(table.concat(early, ", "))
 	end
 	lines[#lines + 1] = ("traffic: %d message(s) sent, %d received, %d page(s) got, %.1f KB served, %d page(s) failed their hash."):format(
 		stats.sent, stats.received, stats.pages, stats.served / 1024, stats.badHash)

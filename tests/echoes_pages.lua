@@ -5,7 +5,8 @@
 -- the mock's C_EncodingUtil (Node's real zlib, tests/native.js), the hash and the fallbacks; my
 -- BattleTag not known yet; range strings; what's kept (mine, carry, inbox) and the API for the
 -- delivery (early pages, a collector's provisional ones); the exporter's receipt (its upto,
--- provisional pages); the launch day; the beta untouched; /lefthy echoes; nothing heavy per tick; the
+-- provisional pages); the launch day; the beta untouched; /lefthy echoes (how far my recording is
+-- safe, what waits; a collector's line per friend, with friends' names); nothing heavy per tick; the
 -- exporter's own readers on the saved file, when the environment variable ECHOES_EXPORTER names the
 -- exporter's folder (skipped otherwise). The capture is kept quiet until the last section, where it
 -- runs: its lines after the header, a page going on at its last point, its last lines joined at
@@ -874,7 +875,9 @@ do
 	page.o = 1 -- (a part of it went to a collector)
 	local mark = #PRINTED + 1
 	lefthy("echoes")
-	check(printedSince(mark):find("2 offered from the next session on (a /reload is one); 1 of them went early to a collector", 1, true),
+	check(printedSince(mark):find("2 pages waiting to reach a collector (" .. n .. "-" .. waiting .. "), recorded since ", 1, true)
+		and printedSince(mark):find("; 1 of them sent early to a collector, safe once confirmed.", 1, true)
+		and printedSince(mark):find("2 offered from the next session on (a /reload is one).", 1, true),
 		"the status says how many went early, got\n" .. printedSince(mark))
 	reload(1)
 	check(Store.Held("early")[own] == nil and Store.Held("mine")[own] == tostring(n) and Store.Page(acct, STORE, n) == E.data.mine[n],
@@ -1399,10 +1402,12 @@ do
 	local out = printedSince(mark)
 	check(out:find("recording.", 1, true) and out:find(("account %s, store %s."):format(acct, STORE), 1, true)
 		and out:find("open page 2: %d+%.%d KB, 4 lines, started 0 min ago")
-		and out:find("my pages: 1 %(1%), %d+%.%d KB of 2%.0 MB, 1 offered from the next session on %(a /reload is one%)%.")
+		and out:find("no page of yours has reached a collector yet.", 1, true)
+		and out:find("1 page waiting to reach a collector (1), recorded since ", 1, true) and out:find(date("%H:%M", E.data.mine[1].t) .. ".", 1, true)
+		and out:find("my pages: %d+%.%d KB of 2%.0 MB, 1 offered from the next session on %(a /reload is one%)%.")
 		and out:find("relaying: 1 pages of 1 friends' stores, %d+%.%d KB of 512%.0 KB") and not out:find("collected:", 1, true)
-		and (out:find(EXTRA, 1, true) or 0) > out:find("relaying:", 1, true), "the status: recording, the account, the open page, my pages, relaying, "
-		.. "what other files add; collecting off and nothing collected: no inbox line, got\n" .. out)
+		and (out:find(EXTRA, 1, true) or 0) > out:find("relaying:", 1, true), "the status: recording, the account, the open page, my pages (none"
+		.. " safe yet, one waiting), relaying, what other files add; collecting off and nothing collected: no inbox line, got\n" .. out)
 	statusExtra = false
 	LT:SetModuleSetting(M, "collect", true)
 	Store.Put(A, B, 1, friendPage(1, E.Now()), "inbox")
@@ -1418,7 +1423,8 @@ do
 	mark = #PRINTED + 1
 	lefthy("echoes")
 	check(printedSince(mark):find(("store %s; your BattleTag isn't known yet."):format(STORE), 1, true)
-		and printedSince(mark):find("my pages: 0 (none), 0.0 KB of 2.0 MB.", 1, true), "not known yet; no pages")
+		and printedSince(mark):find("none of your pages waits to reach a collector.", 1, true) and not printedSince(mark):find("my pages:", 1, true),
+		"not known yet; no pages (nothing kept: no line of what's kept)")
 	MY_BATTLETAG = "Me#1111"
 	LT:SetModuleEnabled("echoes", false)
 	mark = #PRINTED + 1
@@ -1431,6 +1437,219 @@ do
 	lefthy("echoes nope")
 	check(printedSince(mark):find("/lefthy echoes [status]", 1, true) and printedSince(mark):find("pagestest - a test's word", 1, true),
 		"anything else: the words")
+end
+
+-- The status's times: "21:30" today, "Nov 1 21:30" another day, and how long ago after a day.
+local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+local function onDay(t) local d = date("*t", t) return ("%s %d %s"):format(MONTHS[d.month], d.day, date("%H:%M", t)) end
+-- The realm's clock ahead to the next noon of this computer's: the times the status shows are
+-- today's then, a few hours either way.
+local function toNoon()
+	local d = date("*t", E.Now() + 86400)
+	tickAt(time({ year = d.year, month = d.month, day = d.day, hour = 12, min = 0, sec = 0 }))
+end
+local function status() local mark = #PRINTED + 1 lefthy("echoes") return printedSince(mark) end
+
+section("Echoes pages: /lefthy echoes: how far my recording is safe")
+do
+	-- My pages keep when they ended (e): closed by time or size, now; stale at login, at their last
+	-- line's time. The newest of them that went because a collector holds it (its summary, or my own
+	-- exporter has it) is kept (safeTo): the status says how far my recording is safe, and what waits.
+	local collector = "c011ec70.12345678"
+	toNoon()
+	fresh(acct)
+	kills(1, 1)
+	tick()
+	skew = skew + 1800
+	tick()
+	local first = E.data.mine[1]
+	check(first and first.e == E.Now() and first.e - first.t >= 1800 and date("%H", first.t) == "12", "a page closed by time ends now (e)")
+	kills(2, 3)
+	local last = E.state.t
+	reload(11 * 60)
+	local stale = E.data.mine[2]
+	check(stale and stale.z:sub(-5) == ".0;l\n" and stale.e == last and stale.e < E.Now() - 600, "a page closed as stale at login ends at its last line's time")
+	Fire("ECHOES_PAGES_TEST", 170, 200)
+	tick()
+	check(E.data.mine[3] and E.data.mine[3].e == E.Now() and lastClosed:find("\n%.%d+;s\n$"), "one closed by size: now")
+	tick()
+	tick() -- (all three packed)
+	local out = status()
+	check(out:find("no page of yours has reached a collector yet.", 1, true)
+		and out:find(("3 pages waiting to reach a collector (1-3), recorded since %s.\n"):format(date("%H:%M", first.t)), 1, true)
+		and out:find("my pages: %d+%.%d KB of 2%.0 MB, 1 offered from the next session on %(a /reload is one%)%."),
+		"nothing safe yet: 3 pages wait, since the first one's start (today: the time alone), got\n" .. out)
+
+	-- Safe at a collector: the newest page that went, by when it ended (not in the order they went).
+	for n = 1, 3 do Store.WentOut(n, E.data.mine[n]) end
+	Store.Safe(acct, STORE, "1", collector)
+	check(E.data.safeTo and E.data.safeTo.n == 1 and E.data.safeTo.e == first.e, "page 1 safe: kept, with when it ended")
+	out = status()
+	check(out:find(("your recording is safe at a collector up to %s (page 1).\n"):format(date("%H:%M", first.e)), 1, true)
+		and out:find("2 pages waiting to reach a collector (2-3), recorded since ", 1, true), "the status says so; 2 still wait, got\n" .. out)
+	local third = E.data.mine[3]
+	Store.Safe(acct, STORE, "3", collector)
+	Store.Safe(acct, STORE, "2", collector)
+	check(E.data.safeTo.n == 3 and E.data.safeTo.e == third.e, "3 then 2 safe: 3 ended last, it's kept")
+	out = status()
+	check(out:find(("up to %s (page 3)."):format(date("%H:%M", third.e)), 1, true) and out:find("none of your pages waits to reach a collector.", 1, true)
+		and not out:find("my pages:", 1, true), "all safe: nothing waits (no line of what's kept), got\n" .. out)
+	-- A page moved to a higher number is an older one: it doesn't take it back. A page from before e:
+	-- its start. Dropped for another reason (the cap, Drop): not safe, not noted.
+	local function keep(n, page) E.data.mine[n] = page Store.Recount() end
+	keep(60, { t = first.t - 3600, e = first.t - 3000, h = "x", m = "z", z = "QUJD", o = 1 })
+	Store.Safe(acct, STORE, "60", collector)
+	check(not E.data.mine[60] and E.data.safeTo.n == 3, "an older page (moved to a higher number) safe: still page 3")
+	skew = skew + 120
+	keep(61, { t = E.Now() - 30, h = "x", m = "z", z = "QUJD", o = 1 })
+	Store.Safe(acct, STORE, "61", collector)
+	check(E.data.safeTo.n == 61 and E.data.safeTo.e == E.Now() - 30, "a page from before its end was kept: its start")
+	keep(62, { t = E.Now(), e = E.Now() + 5, h = "x", m = "z", z = "QUJD", o = 1 })
+	check(Store.Drop(acct, STORE, "62", "mine") == 1 and E.data.safeTo.n == 61, "dropped, not safe: not noted")
+
+	-- My own exporter read my pages (the receipt): safe too.
+	LT:SetModuleSetting(M, "collect", true)
+	keep(63, { t = E.Now(), e = E.Now() + 1, h = "x", m = "z", z = "QUJD", o = 1 })
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [own] = "63" } }
+	local ended = E.data.mine[63].e
+	reload(1)
+	Advance(2, 0.25)
+	check(not E.data.mine[63] and E.data.safeTo.n == 63 and E.data.safeTo.e == ended, "the receipt took my page 63: safe up to it")
+	MOCK_RECEIPT, LefthyToolsEchoesReceipt = nil, nil
+	LT:SetModuleSetting(M, "collect", false)
+
+	-- Another day; more than a day ago, it says so.
+	skew = skew + 3 * 86400
+	out = status()
+	check(out:find(("up to %s, 3 days ago (page 63)."):format(onDay(ended)), 1, true), "3 days later: the day, and how long ago, got\n" .. out)
+	E.data.safeTo.e = E.Now() - 86400 + 120
+	out = status()
+	check(out:find(("up to %s (page 63).\n"):format(onDay(E.data.safeTo.e)), 1, true), "yesterday, less than a day ago: the day, got\n" .. out)
+	E.data.safeTo.e = E.Now() - 86400 - 60
+	check(status():find(("up to %s, 1 day ago (page 63)."):format(onDay(E.data.safeTo.e)), 1, true), "a day ago")
+
+	-- Broken: none, and made anew.
+	for _, broken in ipairs({ "x", { n = "3", e = 1 }, { n = 3 } }) do
+		E.data.safeTo = broken
+		check(status():find("no page of yours has reached a collector yet.", 1, true), "safeTo broken (" .. tostring(broken) .. "): none")
+	end
+	keep(70, { t = E.Now(), e = E.Now(), h = "x", m = "z", z = "QUJD", o = 1 })
+	Store.Safe(acct, STORE, "70", collector)
+	check(type(E.data.safeTo) == "table" and E.data.safeTo.n == 70 and E.data.safeTo.e == E.Now(), "made anew by the next page that's safe")
+	check(sizesAgree(), "(the sizes agree)")
+end
+
+section("Echoes pages: /lefthy echoes: a collector's friends")
+do
+	-- Per friend's store: how many pages, up to when (latest: the newest page received, kept as pages
+	-- come, since the exporter's receipt takes them), and how far they're confirmed. Friends' names:
+	-- Delivery says them; at most 200, the ones of stores nothing is kept of go.
+	toNoon()
+	fresh(acct)
+	LT:SetModuleSetting(M, "collect", true)
+	local now = E.Now()
+	Store.Named(A, B, "Bob")
+	Store.Named("x", B, "Nope")
+	Store.Named(A, "0c77e1f9", SECRET)
+	Store.Named(A, "0c77e1f9", "")
+	check(E.data.names[friend] == "Bob" and size(E.data.names) == 1, "a friend's name kept by store; not without a key or a name")
+
+	-- Bob: 1-50 exported; 51-55 on disk, 56-57 this session, 58 early (provisional), 59 provisional
+	-- (the receipt took it).
+	E.data.exported[friend] = "1-50"
+	for n = 51, 55 do Store.Put(A, B, n, friendPage(n, now - 7200 + n * 60), "inbox") end
+	reload(1)
+	for n = 56, 57 do Store.Put(A, B, n, friendPage(n, now - 7200 + n * 60), "inbox") end
+	Store.Put(A, B, 58, friendPage(58, now - 7200 + 58 * 60), "inbox", true)
+	E.data.provisional = { [friend] = { [59] = "1a2b3c4d" } }
+	local up = now - 7200 + 58 * 60
+	check(E.data.latest[friend] and E.data.latest[friend].n == 58 and E.data.latest[friend].t == up, "latest: the newest page received (58, its start)")
+	Store.Put(A, B, 60, friendPage(60, now - 3 * 86400), "carry")
+	local A2, B2 = "6a7b8c9d", "1d2e3f40"
+	Store.Put(A2, B2, 9, friendPage(9, now - 600), "inbox")
+	Store.Put(A2, B2, 10, friendPage(10, now - 900), "inbox")
+	check(E.data.latest[friend].n == 58 and E.data.latest[A2 .. "." .. B2].n == 9, "relayed pages don't count; a higher number that started"
+		.. " before isn't newer (a page moved to a new number)")
+	-- Cedric: only exported, from before latest; my other computer: one page early; this computer's
+	-- own pages the exporter has: the lines above say those.
+	local C1, C2 = "c3c3c3c3", "0c3c3c3c"
+	Store.Named(C1, C2, "Cedric")
+	E.data.exported[C1 .. "." .. C2] = "1-10,12-20,22-30,32-40,42-50"
+	Store.Put(acct, "0000aaaa", 1, friendPage(1, now - 1200), "inbox", true)
+	E.data.exported[own] = "1-5"
+	local out = status()
+	local bob = ("    Bob: 59 pages (1-59) up to %s; 50 exported, 5 on disk, 2 not on disk yet (safe after your logout or /reload), 2 sent early"
+		.. " (confirmed once Bob's game saved it)."):format(date("%H:%M", up))
+	local stranger = ("    6a7b8c9d: 2 pages (9-10) up to %s; 2 not on disk yet (safe after your logout or /reload)."):format(date("%H:%M", now - 600))
+	local cedric = "    Cedric: 46 pages (1-50 with 4 gaps); 46 exported."
+	local other = ("    you (0000aaaa): 1 page (1) up to %s; 1 sent early (confirmed once that computer's game saved it)."):format(date("%H:%M", now - 1200))
+	local at = {}
+	for i, line in ipairs({ stranger, bob, cedric, other }) do at[i] = out:find(line .. "\n", 1, true) or out:find(line, -#line, true) end
+	check(at[1] and at[2] and at[3] and at[4] and at[1] < at[2] and at[2] < at[3] and at[3] < at[4],
+		"a line per store, sorted by name: what's exported, on disk, not yet, early; up to the newest page's start; a name not known: the"
+		.. " account's digits; long lists in short; my other computer, got\n" .. out)
+	check(not out:find(own, 1, true) and out:find("collected: 11 pages of 3 stores", 1, true), "not this computer's own (the lines above)")
+
+	-- Two stores of one name: told apart by the store. More than 10: the 10 with the newest pages; over
+	-- 30 days: left out.
+	Store.Named(A, "0c77e1f3", "Anna")
+	Store.Named(A, "0c77e1f4", "Anna")
+	Store.Put(A, "0c77e1f3", 1, friendPage(1, now - 60), "inbox")
+	Store.Put(A, "0c77e1f4", 1, friendPage(1, now - 120), "inbox")
+	out = status()
+	check(out:find("    Anna (0c77e1f3): 1 page (1) up to ", 1, true) and out:find("    Anna (0c77e1f4): 1 page (1) up to ", 1, true),
+		"two stores with one name: the store tells them apart, got\n" .. out)
+	for i = 1, 6 do
+		Store.Named("d4d4d4d" .. i, "0d4d4d4d", "Dora" .. i)
+		Store.Put("d4d4d4d" .. i, "0d4d4d4d", 1, friendPage(1, now - 4000 - i * 60), "inbox")
+	end
+	Store.Named("e5e5e5e5", "0e5e5e5e", "Eve")
+	Store.Put("e5e5e5e5", "0e5e5e5e", 1, friendPage(1, now - 31 * 86400), "inbox")
+	out = status()
+	check(select(2, out:gsub("|r:     [^\n]-: %d+ pages? %(%d", "")) == 10 and out:find("Bob: ", 1, true) and out:find("Dora5: ", 1, true)
+		and not out:find("Dora6: ", 1, true) and not out:find("Cedric: ", 1, true) and out:find("    ... and 2 more.", 1, true),
+		"12 stores: the 10 with the newest pages (not Dora6's, older; not Cedric's, not known), and how many more, got\n" .. out)
+	check(not out:find("Eve", 1, true) and out:find("    (1 older not shown: nothing from them in 30 days.)", 1, true),
+		"a store whose newest page is 31 days old: left out, counted, got\n" .. out)
+
+	-- The chores: names and newest pages of stores nothing is kept of go, and broken ones.
+	Store.Named(A, "0c77e1ff", "Gone")
+	E.data.latest["0badf00d.0badf00d"] = { n = 1 }
+	E.data.latest[A .. ".0c77e1fe"] = { n = 1, t = now }
+	E.data.names[A .. ".0c77e1fd"] = 5
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.names[A .. ".0c77e1ff"] == nil and E.data.names[A .. ".0c77e1fd"] == nil and E.data.names[friend] == "Bob"
+		and E.data.names[C1 .. "." .. C2] == "Cedric", "names of stores nothing is kept of go (and broken ones); the others stay")
+	check(E.data.latest["0badf00d.0badf00d"] == nil and E.data.latest[A .. ".0c77e1fe"] == nil and E.data.latest[friend].n == 58,
+		"newest pages of stores nothing is kept of go (and broken ones)")
+	check(Store.Safe(A, "0c77e1f9", "1", "c011ec70.12345678") == 0 and Store.Named(A, "0c77e1f9", "Gwen") == nil and E.data.names[A .. ".0c77e1f9"] == "Gwen",
+		"(a store only in safe: its name is kept)")
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.names[A .. ".0c77e1f9"] == "Gwen", "a store only in safe keeps its name")
+
+	-- At most 200 names: a new one waits for room; one known is renamed.
+	local count = size(E.data.names)
+	for i = 1, 200 - count do E.data.names[("%08x.%08x"):format(i, i)] = "F" .. i end
+	Store.Named(A, "0c77e1fa", "Late")
+	Store.Named(A, B, "Robert")
+	check(size(E.data.names) == 200 and E.data.names[A .. ".0c77e1fa"] == nil and E.data.names[friend] == "Robert", "200 names at most: a new one"
+		.. " isn't kept; one known is renamed")
+
+	-- Broken saved fields: the status works; they're made anew when first needed.
+	local reported, stop = suite.catchErrors()
+	E.data.names, E.data.latest, E.data.provisional = "x", 7, { [friend] = "x" }
+	E.data.inbox[friend][51].t = "x"
+	local ok, err = pcall(lefthy, "echoes")
+	stop()
+	check(ok and #reported == 0, "names, latest and provisional broken, a page's start too: the status works, got " .. tostring(err) .. " "
+		.. table.concat(reported, "; "))
+	Store.Named(A, B, "Bob")
+	Store.Put(A, B, 61, friendPage(61, now), "inbox")
+	check(E.data.names[friend] == "Bob" and E.data.latest[friend].n == 61, "made anew by the next name, the next page")
+	check(sizesAgree(), "(the sizes agree)")
+	LT:SetModuleSetting(M, "collect", false)
 end
 
 section("Echoes pages: the exporter reads them")
