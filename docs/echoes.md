@@ -492,11 +492,13 @@ no line lost or doubled, each line's `dt` counting from the one before the reloa
 
 - 32 KB of text or 2,000 lines: `.<dt>;s`;
 - 30 minutes after its first line other than its own (`open.busy`, noted on the tick that first
-  sees one): `.<dt>;t`. Its own lines are the header, the character and, on a page that follows
-  one closed mid-session, the going on (`open.own` counts them). A page with nothing else on it
-  stays open however long you're away (an AFK night is one page, not one every 30 minutes); the
-  stale rule at login still closes it. An open page from a build before this rule (no `own`): 30
-  minutes from its start.
+  sees one): `.<dt>;t`; 10 minutes while a friend who takes pages early is online
+  (`E.Delivery.EarlyTaker()`, asked only once a page is 10 minutes busy): a closed page goes to that
+  collector within minutes (early pages, below), so a crash loses less. Its own lines are the
+  header, the character and, on a page that follows one closed mid-session, the going on
+  (`open.own` counts them). A page with nothing else on it stays open however long you're away (an
+  AFK night is one page, not one every 30 minutes); the stale rule at login still closes it. An
+  open page from a build before this rule (no `own`): 30 minutes (or 10) from its start.
 
 Not while the capture waits for its anchor (`E.PageMayClose`: `E.capture.Ready()`; a loading screen
 and the position after it, up to 3 s): the next page would go on from where you were before it, at a
@@ -519,8 +521,8 @@ oldest first:
 2. compressing answers nothing or fails: `EncodeBase64(text)`, `m = "r"`;
 3. Base64 answers nothing, fails or isn't Base64 (or there's no `C_EncodingUtil`): the text, `m = "t"`.
 
-Then `h = LT.Hash32(z)` and `q` goes. That's about once in 30 minutes: zlib and Base64 in C, the hash
-over 5-12 KB in Lua (about 1 ms).
+Then `h = LT.Hash32(z)` and `q` goes. That's about once in 30 minutes (10 with a collector who takes
+pages early online): zlib and Base64 in C, the hash over 5-12 KB in Lua (about 1 ms).
 
 **My pages go to everyone once they're on disk, and early to a collector online.** The game writes
 the saved file only at a logout or `/reload`; after a crash the next login goes on from the last
@@ -662,9 +664,10 @@ arrives after every page of an earlier one.
 relayed pages, collectors' summaries of stores not heard of for 60 days, the 2 MB cap, the 4 MB
 line), else the receipt.
 
-**Costs.** A tick: a few comparisons. A minute: one join. Half an hour: one page packed. Inside
-event handlers: only the logout's join and, at login, joining a stale page's text. A page that came
-early is downloaded once more only as far as its start (a check), once it's on its author's disk.
+**Costs.** A tick: a few comparisons. A minute: one join. Half an hour (ten minutes with a collector
+who takes pages early online): one page packed. Inside event handlers: only the logout's join and, at
+login, joining a stale page's text. A page that came early is downloaded once more only as far as
+its start (a check), once it's on its author's disk.
 
 ### For the delivery: E.Store and E.Ranges
 
@@ -793,7 +796,7 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
 - **My early pages** (`ea`): my own pages not on disk yet, to a friend who collects and takes them
   early (`c` and `e`: verified, online), the same way (when it changed, at most every 60 s,
   everything every 5 minutes). Serving one: only to such a friend; anyone else asking gets `en`.
-  A relay's holdings of my
+  `D.EarlyTaker()`: whether one is online (Pages.lua: 10-minute pages). A relay's holdings of my
   pages mark them carried (`E.Store.Carried`, over my cap they go first), a collector's don't (it
   doesn't relay, and its provisional numbers are among them); `E.Store.Elsewhere` takes both.
 - **A collector** asks for every offered page it lacks (not in its inbox, not exported, not in

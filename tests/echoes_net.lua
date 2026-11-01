@@ -2314,9 +2314,16 @@ do
 	check(n == all and all == 7 and once, ("every page either computer closed: %d of %d, each under one number"):format(n, all))
 	cedric = Reload(cedric)
 	check(Run(120, function() return Carried(bob) == "" end), "safe at Cedric: Bob drops his copies")
-	-- Each computer, back, drops its own (they went out).
+	-- Each computer, back, drops its own (they went out). The second's open page from its last turn,
+	-- busy for more than 10 minutes with Cedric online (he takes pages early), closes meanwhile: it
+	-- goes to Cedric early, and she keeps it until it's safe at him (his next session).
 	second, savedB = Turn(savedB, {})
-	check(Numbers(second.E.data.mine) == "", "the second computer drops its pages, got " .. Numbers(second.E.data.mine))
+	local left, kept = Numbers(second.E.data.mine), true
+	for n, page in pairs(second.E.data.mine) do
+		local got = (cedric.E.data.inbox[key] or {})[n]
+		kept = kept and n > 7 and got ~= nil and got.h == page.h and not cedric.E.Ranges.Contains(cedric.E.Store.SafeHere(ANNA.acct, key:sub(10)), n)
+	end
+	check(kept, "the second computer drops its pages 3-5; a page it closed this turn stays (Cedric has it, not safe yet), got " .. left)
 	Stop(cedric)
 	Stop(bob)
 end
@@ -2387,7 +2394,7 @@ do
 	local function Got(n)
 		return (cedric.E.data.inbox[key] or {})[n]
 	end
-	check(Known(CEDRIC.id) and anna.D.peers[CEDRIC.id].early and not anna.D.peers[BOB.id].early,
+	check(Known(CEDRIC.id) and anna.D.peers[CEDRIC.id].early and not anna.D.peers[BOB.id].early and anna.D.EarlyTaker(),
 		"Cedric collects on this build: he takes pages early (e in his hello); Bob doesn't")
 	Varied(anna, 1)
 	Run(1)
@@ -2425,7 +2432,22 @@ do
 	check(anna.E.data.mine[n] ~= nil, "Anna keeps it: it came in Cedric's session, not on his disk yet")
 	cedric = Reload(cedric)
 	check(Run(120, function() return anna.E.data.mine[n] == nil end), "his next session: safe at Cedric (his summary), Anna drops it")
+
+	-- While Cedric is online her pages close 10 minutes after their first line (30 without him).
+	Varied(anna, 2)
+	Run(1)
+	anna.E.Line("H", "x")
+	Run(1)
+	local open = anna.E.data.open
+	local busy = open.busy
+	check(busy and Run(700, function() return anna.E.data.open ~= open end), "her page closes by time with Cedric online")
+	local after = anna.E.Now() - busy
+	local closed = anna.E.data.mine[anna.E.data.n]
+	check(after >= 600 and after <= 602 and closed and TextOf(closed):find("\n%.%d+;t\n$"), "10 minutes after its first line (" .. after
+		.. " s), by time")
 	Stop(cedric)
+	Run(3)
+	check(not anna.D.EarlyTaker(), "Cedric gone: nobody who takes pages early")
 	Stop(anna)
 	Stop(bob)
 end
@@ -2580,7 +2602,7 @@ do
 		"ea only to Anna (collects, this build): 702; none to Dora (an older collector) or Bob (a relay), got " .. tostring(ea[1]))
 	local es = Sent(c, DORA, mark, "B2;es;")
 	check(es[1] == "B2;es;" .. key .. ":701" and Sent(c, ANNA, mark, "B2;es;")[1] == es[1], "es as ever, to both: 701 (on disk), got " .. tostring(es[1]))
-	check(c.D.peers[ANNA.id].early and not c.D.peers[DORA.id].early, "Anna takes pages early (Dora doesn't)")
+	check(c.D.peers[ANNA.id].early and not c.D.peers[DORA.id].early and c.D.EarlyTaker(), "Anna takes pages early (Dora doesn't): one is online")
 	mark = Mark(c)
 	Ask(c, DORA, 702)
 	Ask(c, BOB, 702)
@@ -2598,7 +2620,7 @@ do
 	mark = Mark(c)
 	Ask(c, ANNA, 702)
 	Pass(c, 2)
-	check(#Sent(c, ANNA, mark, "B2;en;") == 1, "Anna no longer collects: 702 is en to her")
+	check(#Sent(c, ANNA, mark, "B2;en;") == 1 and not c.D.EarlyTaker(), "Anna no longer collects: 702 is en to her; nobody takes pages early")
 	Stop(c)
 end
 

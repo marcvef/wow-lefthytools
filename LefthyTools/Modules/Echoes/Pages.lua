@@ -10,12 +10,14 @@ local E = ns.Echoes
 -- it. Its lines are joined into the text every 60 s and at logout: never one concatenation per line.
 --
 -- A page closes on the tick (never inside an event handler) at 32 KB of text or 2,000 lines (".<dt>;s",
--- size), or 30 minutes after its first line other than its own (".<dt>;t", time): a page with
--- nothing but its header, the character and the going on from the last page (an AFK night) stays
--- open. E.Store.Close keeps it, and a later tick packs it (Store.lua). When recording starts, an
--- open page of another character, or whose last line is more than 10 minutes old, closes as it was
--- (".0;l"); a fresh one goes on. My pages go out only once on disk (E.Store): from the next session
--- on, or at once for one closed here from the saved text alone that's stale by its time.
+-- size), or 30 minutes after its first line other than its own (".<dt>;t", time; 10 minutes while a
+-- friend who takes pages early is online: a page leaves me sooner, so a crash loses less): a page
+-- with nothing but its header, the character and the going on from the last page (an AFK night)
+-- stays open. E.Store.Close keeps it, and a later tick packs it (Store.lua). When recording starts,
+-- an open page of another character, or whose last line is more than 10 minutes old, closes as it
+-- was (".0;l"); a fresh one goes on. My pages go out to everyone only once on disk (E.Store): from
+-- the next session on, or at once for one closed here from the saved text alone that's stale by its
+-- time; before that early to a collector online, who keeps them provisional (Delivery.lua).
 --
 -- The page id is <acct>.<store>.<n>: acct my BattleTag's hash (E.MyAccount), store this WTF folder's
 -- (E.data.store), n one more than the last closed page's (E.data.n).
@@ -24,7 +26,8 @@ local E = ns.Echoes
 -- lines before this file joins them. The header still comes first: the capture writes nothing when
 -- recording starts (its first line comes on the first tick).
 
-local PAGE_SECONDS = 1800 -- a page closes 30 minutes after its first line other than its own,
+local PAGE_SECONDS = 1800 -- a page closes 30 minutes after its first line other than its own
+local PAGE_SECONDS_EARLY = 600 -- (10 while a friend who takes pages early is online),
 local PAGE_BYTES = 32768  -- 32 KB of text
 local PAGE_LINES = 2000   -- or 2,000 lines
 local STALE = 600         -- at the start an open page whose last line is older than this closes
@@ -311,7 +314,21 @@ function E.PageMayClose()
 	return E.capture.Ready()
 end
 
--- The tick: a page that's full, or 30 minutes busy, closes (and nothing else this tick); my
+-- Whether a friend who takes my pages early is online (Delivery.lua, loaded after this file; not
+-- there: none).
+local function EarlyTaker()
+	local D = E.Delivery
+	return type(D) == "table" and type(D.EarlyTaker) == "function" and D.EarlyTaker() == true
+end
+
+-- Whether a page busy since then is due by time: 30 minutes, or 10 while a friend who takes pages
+-- early is online (asked only from 10 minutes on).
+local function Due(busy)
+	local age = busy and E.Now() - busy
+	return age ~= nil and age >= PAGE_SECONDS_EARLY and (age >= PAGE_SECONDS or EarlyTaker())
+end
+
+-- The tick: a page that's full, or busy long enough (Due), closes (and nothing else this tick); my
 -- BattleTag while it isn't known; the lines joined every 60 s.
 E.OnTick(function(now)
 	local open = active
@@ -320,7 +337,7 @@ E.OnTick(function(now)
 	end
 	local busy = Busy(open)
 	local full = E.bytes >= PAGE_BYTES or E.count >= PAGE_LINES
-	if (full or (busy and E.Now() - busy >= PAGE_SECONDS)) and E.PageMayClose() then
+	if (full or Due(busy)) and E.PageMayClose() then
 		Rollover(full and "s" or "t")
 		return
 	end

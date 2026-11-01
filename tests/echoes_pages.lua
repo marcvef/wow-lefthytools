@@ -1,14 +1,15 @@
 -- Echoes: pages and storage (Pages.lua, Store.lua; docs/echoes.md, Pages and storage): the header and
 -- the character line; the lines joined every 60 s and at logout; /reload going on without losing or
--- doubling a line; closing by time, size and lines, on the tick only, one page packed a tick; a stale
--- open page at login; packing through the mock's C_EncodingUtil (Node's real zlib, tests/native.js),
--- the hash and the fallbacks; my BattleTag not known yet; range strings; what's kept (mine, carry,
--- inbox) and the API for the delivery (early pages, a collector's provisional ones); the exporter's
--- receipt (its upto, provisional pages); the launch day; the beta untouched; /lefthy echoes; nothing
--- heavy per tick; the exporter's own readers on the saved file, when the environment variable
--- ECHOES_EXPORTER names the exporter's folder (skipped otherwise). The capture is kept quiet until
--- the last section, where it runs: its lines after the header, a page going on at its last point,
--- its last lines joined at logout and when switched off.
+-- doubling a line; closing by time (10 minutes while a friend who takes pages early is online), size
+-- and lines, on the tick only, one page packed a tick; a stale open page at login; packing through
+-- the mock's C_EncodingUtil (Node's real zlib, tests/native.js), the hash and the fallbacks; my
+-- BattleTag not known yet; range strings; what's kept (mine, carry, inbox) and the API for the
+-- delivery (early pages, a collector's provisional ones); the exporter's receipt (its upto,
+-- provisional pages); the launch day; the beta untouched; /lefthy echoes; nothing heavy per tick; the
+-- exporter's own readers on the saved file, when the environment variable ECHOES_EXPORTER names the
+-- exporter's folder (skipped otherwise). The capture is kept quiet until the last section, where it
+-- runs: its lines after the header, a page going on at its last point, its last lines joined at
+-- logout and when switched off.
 -- Needs: no other file (it starts Echoes itself, on saved tables of its own, and puts back the beta).
 local suite = ...
 local check, section, ns, LT, lefthy, printedSince = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy, suite.printedSince
@@ -571,6 +572,55 @@ do
 	elseif type(result) == "string" then
 		check(false, "the exporter: " .. result)
 	end
+end
+
+section("Echoes pages: 10 minutes while a friend who takes pages early is online")
+do
+	-- A page leaves me sooner while a collector who takes pages early is online (Delivery's
+	-- EarlyTaker): it closes 10 minutes after its first line other than its own, not 30. The rest stays:
+	-- a page with nothing on it stays open, the size limits, a /reload keeps when it got busy.
+	fresh(acct)
+	local D = E.Delivery
+	local real, online, asked = D.EarlyTaker, true, 0
+	D.EarlyTaker = function() asked = asked + 1 return online end
+	kills(1, 1)
+	tick()
+	local busy, c0 = E.data.open.busy, closes
+	tickAt(busy + 599)
+	check(closes == c0 and asked == 0, "(9 minutes 59 seconds busy: open; nobody asked yet whether a collector is online)")
+	tickAt(busy + 600)
+	check(closes == c0 + 1 and lastClosed:find("\n%.%d+;t\n$") and asked == 1, "a collector who takes pages early online: closed 10 minutes after its"
+		.. " first line, got\n" .. tostring(lastClosed))
+	tick()
+	-- Nobody online who does: 30 minutes, as ever. One who comes online meanwhile: at once.
+	online = false
+	kills(2, 2)
+	tick()
+	busy, c0 = E.data.open.busy, closes
+	tickAt(busy + 900)
+	check(closes == c0, "nobody online who takes pages early: open after 15 minutes")
+	online = true
+	tickAt(busy + 901)
+	check(closes == c0 + 1, "one comes online: it closes")
+	tick()
+	online = false
+	kills(3, 3)
+	tick()
+	busy, c0 = E.data.open.busy, closes
+	tickAt(busy + 1799)
+	check(closes == c0, "(nobody: 29 minutes 59 seconds, open)")
+	tickAt(busy + 1800)
+	check(closes == c0 + 1, "nobody: 30 minutes")
+	-- Nothing on it: it stays open, whoever is online.
+	online = true
+	c0 = closes
+	for _ = 1, 4 do
+		skew = skew + 1800
+		tick()
+	end
+	check(closes == c0 and not E.data.open.busy, "a page with nothing on it stays open (an AFK night is one page)")
+	D.EarlyTaker = real
+	check(D.EarlyTaker() == false, "(no friends here: nobody who takes pages early)")
 end
 
 section("Echoes pages: my pages offered once on disk (a crash)")

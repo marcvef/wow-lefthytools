@@ -436,11 +436,12 @@ new mounts, pets, toys, achievements and recipes. **Never:** chat and whispers, 
 auction house, bags, gold, or anyone around you. Inside dungeons there's no position, so the path
 stops at the entrance.
 
-**Where it goes:** the recording is cut into pages (half an hour each), packed small (about 5-8 KB
-per hour of play) and kept in your saved data. A friend who collects (the *Collect recordings*
-setting) gets them over Battle.net in the background whenever you're both online, a few per second,
-never in combat and never ahead of anything else LefthyTools sends; friends in between pass them on
-when you aren't online at the same time, like Chronicle's journals. Your pages travel within minutes to a collector who's online, and from your
+**Where it goes:** the recording is cut into pages (half an hour each, ten minutes while a friend
+who collects is online), packed small (about 5-8 KB per hour of play) and kept in your saved data. A
+friend who collects (the *Collect recordings* setting) gets them over Battle.net in the background
+whenever you're both online, a few per second, never in combat and never ahead of anything else
+LefthyTools sends; friends in between pass them on when you aren't online at the same time, like
+Chronicle's journals. Your pages travel within minutes to a collector who's online, and from your
 next login or `/reload` on (once the game has saved them) to everyone else. You keep each page until
 the collector has it safely, then it's dropped. A page that reached a collector early stays with them
 even if your game crashes before saving it; it counts as safe only once the copy your game saved
