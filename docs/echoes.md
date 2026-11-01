@@ -579,6 +579,9 @@ first told the author (the holder offline at the author's next session). So:
   (Store.lua: the receipt), then fetches mine. The exporter gets both (it keeps every version of a
   number used twice); nobody drops mine before it's safe at the collector. A lost page that is never
   confirmed stays provisional.
+- **Clashes wait for the exporter.** The second page with a number is fetched only once the
+  exporter's receipt took the provisional one aside. Until then it lives in my `mine` (2 MB at most:
+  over it the oldest go) and at relays (30 days). Run the exporter regularly (its autostart does).
 - **A page closed as stale at login** is on disk at once (its `s` is the session before): it's the
   saved text and nothing else, and its last line is more than 10 minutes old, so any later load of
   that save, after a crash too, closes it the same way. One closed for another character within
@@ -590,6 +593,12 @@ first told the author (the holder offline at the author's next session). So:
   only as far as its start, to check it, once it's on my disk). The author keeps every page until a
   collector holds it safely, so nothing is lost by the wait. `/lefthy echoes` says how many wait, and
   how many of those went early to a collector.
+- **Left over:** a collector who goes back to a build from before early pages ignores `p`: its
+  provisional pages count as safe there (on its disk at its next session, served, in its summary),
+  so a page its author lost in a crash makes the author drop another page with that number. Collect
+  only on this build or later. And a friend who claims to collect (`c` and `e` in their hello) gets
+  my early pages and their hashes, as a collector would; relays aren't authenticated either, as
+  before: Echoes trusts Battle.net friends.
 
 **Numbers used twice** (a WTF folder restored from a backup, or copied to a second computer and
 played on both). The store id is made once per folder, so a restored folder numbers its pages again
