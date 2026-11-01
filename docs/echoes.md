@@ -411,6 +411,7 @@ LefthyToolsEchoesDB = {
     [59] = { t, h, m, z, s = 41, a = 1793450100, p = 1 },                              -- came early: provisional
   } },
   provisional = { ["5e6f7a8b.0c77e1f2"] = { [55] = "3c1d2e4f" } },                     -- a collector's: provisional pages the receipt took
+  arrived = 1793450100,                                                                  -- a collector's: the latest arrival (a) given (only grows)
   exported = { ["5e6f7a8b.0c77e1f2"] = "1-50" },                                         -- a collector's: from receipts
   latest = { ["5e6f7a8b.0c77e1f2"] = { n = 59, t = 1793449900 } },                     -- a collector's: the newest page received (/lefthy echoes)
   names = { ["5e6f7a8b.0c77e1f2"] = "Bob" },                                             -- friends' first names by store (/lefthy echoes)
@@ -434,9 +435,9 @@ sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
 - `s` (mine): the session it closed in (the session before for a page closed as stale at login
   from the saved text; none: from a build before the rule, on disk; a page moved to a new number:
   the session it moved in); (carry, inbox): the session it came in. `a` (carry, inbox): when it came
-  (`E.Now()`; in the inbox at least one more than every page there when the session started, so a
-  page of this session arrived after every page of an earlier one, whatever the clock says: the
-  receipt's `upto`; none: from a build before it).
+  (`E.Now()`; in the inbox at least one more than `arrived`, which becomes it, so every page arrived
+  after every page before it, whatever the clock says: the receipt's `upto`; none: from a build
+  before it).
 - `o` (mine): `0` not out yet (no part of it was ever sent), `1` out (a part went to a friend from
   my disk), `2` parts went only early (to collectors, while it wasn't on my disk: they keep it
   provisional); none: closed by a build before the rule, counts as out (numbers used twice, below).
@@ -445,6 +446,11 @@ sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
 `provisional` (a collector's): `{ ["acct.store"] = { [n] = hash } }`, provisional pages the
 exporter's receipt took out of the inbox (the exporter has them) that aren't confirmed yet. Their
 numbers aren't in `exported`. Made when first needed.
+
+`arrived` (a collector's): the latest arrival (`a`) given to an inbox page. It only grows: raised
+when a page comes and when the sizes are counted (from the inbox), never lowered (the receipt takes
+the pages, not the time). Made when the first page comes; broken (not a number from 0 to 10^10):
+counted anew from the inbox.
 
 For `/lefthy echoes` (below), noted as pages come and go, one comparison each (made when first
 needed, and anew when they aren't tables):
@@ -709,8 +715,9 @@ saved file the exporter read; it never goes down). For each key and its ranges:
 - **carry and mine:** `done` goes, as before.
 
 It lists the full ranges each time, so reading it again is harmless (a page that came since stays,
-by its arrival). Arrival times keep it so whatever the clock does: a page that comes in a session
-arrives after every page of an earlier one.
+by its arrival). Arrival times keep it so whatever the clock does: an inbox page arrives after every
+one before it (`a` at least one more than `arrived`, the latest one given, which is kept in the saved
+data and only grows: also after the receipt emptied the inbox).
 
 **After the start**, one a tick: a waiting page packed, else the next chore (the launch day, old
 relayed pages, collectors' summaries of stores not heard of for 60 days with the status's names and

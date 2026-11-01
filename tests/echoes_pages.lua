@@ -901,7 +901,8 @@ do
 	local early, disk = friendPage(1, now), friendPage(2, now)
 	check(Store.Put(A, B, 1, early, "inbox", true) and Store.Put(A, B, 2, disk, "inbox"), "(two pages: 1 came early, 2 from a disk)")
 	local p1, p2 = E.data.inbox[friend][1], E.data.inbox[friend][2]
-	check(p1.p == 1 and p1.a == now and p2.p == nil and p2.a == now, "kept with p (provisional) and when it came (a); the other without p")
+	check(p1.p == 1 and p1.a == now and p2.p == nil and p2.a == now + 1, "kept with p (provisional) and when it came (a: each after the one"
+		.. " before); the other without p")
 	check(Store.Page(A, B, 1) == nil and Store.Page(A, B, 2) == p2 and Store.Held("inbox")[friend] == "2" and Store.Held("provisional")[friend] == "1",
 		"a provisional page isn't served, nor in what I hold (Held(\"inbox\")); Held(\"provisional\") has it")
 	local h, where = Store.Provisional(A, B, 1)
@@ -1178,9 +1179,11 @@ do
 	end
 	skew = skew + 60 -- (the exporter read the saved file with 1 and 2; 3 came later)
 	Store.Put(A, B, 3, friendPage(3, read), "inbox")
-	check(E.data.inbox[friend][1].a == read and E.data.inbox[friend][3].a == read + 60, "an inbox page keeps when it came (a)")
+	local inbox = E.data.inbox[friend]
+	check(inbox[1].a == read and inbox[2].a == read + 1 and inbox[3].a == read + 60 and E.data.arrived == read + 60,
+		"an inbox page keeps when it came (a; one in the same second as the one before: a second later), the latest kept (arrived)")
 	Advance(3, 0.25)
-	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-5" }, upto = { [STORE] = read } }
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-5" }, upto = { [STORE] = inbox[2].a } }
 	reload(1)
 	Advance(2, 0.25)
 	check(Ranges.Of(E.data.inbox[friend]) == "3" and E.data.exported[friend] == "1-2,4-5", "the receipt: 1-2 (read) exported; 3 came after what"
@@ -1206,6 +1209,38 @@ do
 	Store.Put(A, B, 9, friendPage(9, read), "carry")
 	check(E.data.inbox[friend][8].a == late + 1 and E.data.carry[friend][9].a == E.Now(), "a page that came now: after the latest one before ("
 		.. tostring(E.data.inbox[friend][8].a - late) .. "); relayed: now")
+
+	-- The latest arrival is kept (arrived) when the receipt took every inbox page: a page that comes
+	-- later, while the clock reads earlier than the latest arrival the exporter read, still arrives
+	-- after it. (The exporter has the provisional page 10; another page 10 from a disk comes after.)
+	Store.Put(A, B, 10, friendPage(10, read), "inbox", true)
+	local floor = E.data.arrived
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-9" }, early = { [friend] = "10" }, upto = { [STORE] = floor } }
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.inbox[friend] == nil and E.data.exported[friend] == "1-9" and E.data.provisional[friend][10] and E.data.arrived == floor,
+		"(the receipt took them all, 10 aside: the inbox is empty, the latest arrival kept)")
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.arrived == floor, "the next session: kept (Recount never lowers it)")
+	skew = skew - 7200 -- (the realm's clock reads two hours earlier)
+	local other = friendPage(10, read + 30)
+	check(Store.Put(A, B, 10, other, "inbox") and E.data.inbox[friend][10].a == floor + 1 and E.data.arrived == floor + 1,
+		"another page 10 from a disk, the clock earlier: it came after what the exporter read")
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.inbox[friend] and E.data.inbox[friend][10] and E.data.inbox[friend][10].h == other.h and not Ranges.Contains(E.data.exported[friend], 10),
+		"the same receipt again: the page that came after it stays, its number not exported")
+	skew = skew + 7200
+	-- Broken or missing: from the inbox (never lowered by it), else from 0.
+	for _, broken in ipairs({ "x", -5, 1e15, 0 / 0 }) do
+		E.data.arrived = broken
+		Store.Recount()
+		check(E.data.arrived == floor + 1, "arrived broken (" .. tostring(broken) .. "): the inbox's latest again")
+	end
+	E.data.arrived = floor + 100
+	Store.Recount()
+	check(E.data.arrived == floor + 100, "the inbox's latest doesn't lower it")
 	check(sizesAgree(), "(the sizes agree)")
 	MOCK_RECEIPT, LefthyToolsEchoesReceipt = nil, nil
 	LT:SetModuleSetting(M, "collect", false)
@@ -1225,11 +1260,12 @@ do
 	end
 	Store.Put(A, B, 1, pages[1], "inbox", true)
 	Store.Put(A, B, 2, pages[2], "inbox")
+	local upto = E.data.inbox[friend][2].a
 	skew = skew + 60 -- (the exporter read the saved file with 1 and 2; 3 and 4 came later)
 	Store.Put(A, B, 3, pages[3], "inbox")
 	Store.Put(A, B, 4, pages[4], "inbox", true)
 	Advance(3, 0.25)
-	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-6" }, upto = { [STORE] = read } }
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-6" }, upto = { [STORE] = upto } }
 	reload(1)
 	Advance(2, 0.25)
 	local function provisional() return Ranges.Of(E.data.provisional and E.data.provisional[friend]) end

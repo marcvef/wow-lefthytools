@@ -18,12 +18,13 @@ local M = E.module
 --            safe summary or a relay's holdings cover: it moves to a new number above all of them
 --            (E.data.top), and my next pages close above it too
 --   carry    friends' pages I relay: 512 KB, 128 KB per author, 30 days
---   inbox    a collector's received pages (a: when each came), dropped only by the exporter's receipt
---            (only the ones it read: upto); a chat line at 4 MB asks to run the exporter, at 8 MB
---            pulling pauses (E.Store.InboxFull). A page that came early (p) is provisional until a
---            copy from its author's disk shows the same hash (Confirm): never safe, never served,
---            told only to its author; one the receipt takes goes to provisional (n -> its hash), not
---            exported, so a page with that number from the author's disk is still fetched
+--   inbox    a collector's received pages (a: when each came, after every one before it: arrived),
+--            dropped only by the exporter's receipt (only the ones it read: upto); a chat line at
+--            4 MB asks to run the exporter, at 8 MB pulling pauses (E.Store.InboxFull). A page that
+--            came early (p) is provisional until a copy from its author's disk shows the same hash
+--            (Confirm): never safe, never served, told only to its author; one the receipt takes goes
+--            to provisional (n -> its hash), not exported, so a page with that number from the
+--            author's disk is still fetched
 --   safe     what collectors hold safely, per author; exported: what the receipts listed in done (a
 --            version from a disk; never their early, the numbers the exporter has only early copies
 --            of). A store's entry goes 60 days after anything was last heard of it first-hand
@@ -202,7 +203,6 @@ local chores = {}    -- what's left to do after the start, one a tick
 local notedSession, receiptSession -- the session the 4 MB line was said in, the receipt read in
 local noteDue = false
 local moved = 0      -- my pages moved to a new number this session (their number was in use)
-local arrived = 0    -- one more than the latest arrival (a) in the inbox when the sizes were counted
 
 local function Size(page)
 	return type(page) == "table" and type(page.z) == "string" and #page.z or 0
@@ -225,15 +225,22 @@ local function Changed()
 	end
 end
 
--- The sizes counted anew (a page that isn't one is dropped on the way), and the latest arrival in the
--- inbox noted (this runs when recording starts: a page that comes in this session arrives after
--- every page of an earlier one, whatever the clock says; the receipt's upto relies on it).
+-- A collector's latest arrival (a) given to an inbox page, kept in E.data.arrived; it only grows (0:
+-- none, or a broken one). Every page that comes gets a later one, whatever the clock says, also
+-- after the receipt emptied the inbox: the receipt's upto relies on it.
+local function Arrived()
+	local a = E.data.arrived
+	return type(a) == "number" and a >= 0 and a < 1e10 and a or 0
+end
+
+-- The sizes counted anew (a page that isn't one is dropped on the way), and the latest arrival raised
+-- to the inbox's latest (never lowered: the receipt takes the pages, the time stays).
 function Store.Recount()
 	local data = E.data
 	countedFor = data
 	bytes.mine, bytes.carry, bytes.inbox = 0, 0, 0
 	wipe(carryBy)
-	arrived = 0
+	local arrived = Arrived()
 	for n, page in pairs(data.mine) do
 		if Size(page) == 0 then
 			data.mine[n] = nil
@@ -250,8 +257,8 @@ function Store.Recount()
 						pages[n] = nil
 					else
 						sum = sum + Size(page)
-						if where == "inbox" and type(page.a) == "number" and page.a >= arrived and page.a < 1e10 then
-							arrived = page.a + 1
+						if where == "inbox" and type(page.a) == "number" and page.a > arrived and page.a < 1e10 then
+							arrived = page.a
 						end
 					end
 				end
@@ -265,6 +272,9 @@ function Store.Recount()
 				end
 			end
 		end
+	end
+	if arrived > 0 or data.arrived ~= nil then
+		data.arrived = arrived
 	end
 	Changed()
 end
@@ -676,12 +686,12 @@ end
 
 -- A friend's page received: where "carry" (relaying) or "inbox" (collecting). page = { t (its
 -- start), h (LT.Hash32 of z), m ("z" or "r"), z }; it's kept as a copy with s (this session) and a
--- (when it came: relayed, for the 30 days; collected, for the receipt's upto, after every page of an
--- earlier session). provisional (inbox only): it came early, kept with p = 1 (Confirm). true, or
--- true and "have" (kept already); false and why not: "id" (a key or number that isn't one), "mine"
--- (my own store's), "page" (not a page: m, z, Base64), "size" (z over 64 KB), "time" (before the
--- launch or more than a day ahead), "hash" (h doesn't match), "exported" (the exporter has it),
--- "safe" (relaying: a collector holds it), "full" (relaying: no room, E.Store.Fits).
+-- (when it came: relayed, for the 30 days; collected, for the receipt's upto, after every page that
+-- came before: E.data.arrived). provisional (inbox only): it came early, kept with p = 1 (Confirm).
+-- true, or true and "have" (kept already); false and why not: "id" (a key or number that isn't
+-- one), "mine" (my own store's), "page" (not a page: m, z, Base64), "size" (z over 64 KB), "time"
+-- (before the launch or more than a day ahead), "hash" (h doesn't match), "exported" (the exporter
+-- has it), "safe" (relaying: a collector holds it), "full" (relaying: no room, E.Store.Fits).
 function Store.Put(acct, store, n, page, where, provisional)
 	if where ~= "carry" and where ~= "inbox" then
 		error("E.Store.Put: where is \"carry\" or \"inbox\", got " .. tostring(where), 2)
@@ -714,8 +724,11 @@ function Store.Put(acct, store, n, page, where, provisional)
 	end
 	list = Pages(where, key, true)
 	local inbox = where == "inbox"
-	list[n] = { t = page.t, h = page.h, m = page.m, z = page.z, s = data.session, a = inbox and math.max(E.Now(), arrived) or E.Now(),
-		p = (inbox and provisional) and 1 or nil }
+	local a = inbox and math.max(E.Now(), Arrived() + 1) or E.Now()
+	if inbox then
+		data.arrived = a
+	end
+	list[n] = { t = page.t, h = page.h, m = page.m, z = page.z, s = data.session, a = a, p = (inbox and provisional) and 1 or nil }
 	bytes[where] = bytes[where] + #page.z
 	if where == "carry" then
 		carryBy[key] = (carryBy[key] or 0) + #page.z
