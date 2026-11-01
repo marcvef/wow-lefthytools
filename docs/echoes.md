@@ -404,7 +404,7 @@ LefthyToolsEchoesDB = {
   carry = { ["5e6f7a8b.0c77e1f2"] = { [57] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- friends' pages I relay
   safe = { ["5e6f7a8b.0c77e1f2"] = { ["c011ec70.12345678"] = "1-56" } },              -- collectors' summaries
   heard = { ["5e6f7a8b.0c77e1f2"] = 1793450000 },                                      -- when a store in safe was last heard of first-hand
-  inbox = { ["5e6f7a8b.0c77e1f2"] = { [58] = { t, h, m, z, s = 41 } } },                 -- a collector's: received
+  inbox = { ["5e6f7a8b.0c77e1f2"] = { [58] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- a collector's: received
   exported = { ["5e6f7a8b.0c77e1f2"] = "1-50" },                                         -- a collector's: from receipts
   capture = { ["Player-..."] = { ... } },  -- the capture's baselines per character (Recording)
   friends = { ["Player-..."] = "Bob-Realm" }, -- LefthyTools friends' names (Recording)
@@ -423,7 +423,10 @@ sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
 - `q`: closed, waiting to be packed (`m` is `t` meanwhile).
 - `s` (mine): the session it closed in (the session before for a page closed as stale at login
   from the saved text; none: from a build before the rule, on disk; a page moved to a new number:
-  the session it moved in); (carry, inbox): the session it came in. `a` (carry): when it came.
+  the session it moved in); (carry, inbox): the session it came in. `a` (carry, inbox): when it came
+  (`E.Now()`; in the inbox at least one more than every page there when the session started, so a
+  page of this session arrived after every page of an earlier one, whatever the clock says: the
+  receipt's `upto`; none: from a build before it).
 - `o` (mine): `0` not out yet (no part of it was ever sent), `1` out (a part went to a friend);
   none: closed by a build before the rule, counts as out (numbers used twice, below).
 
@@ -592,17 +595,29 @@ so it changes with it, and my pages' key with it (the store stays).
   to carry (`E.Store.Carried`, this session).
 - **carry:** 512 KB in all, 128 KB per author's store (`E.Store.Put` refuses what doesn't fit), 30
   days after a page came (at the start), and dropped once a collector holds it safely.
-- **inbox:** dropped only by the exporter's receipt. At 4 MB one chat line a session asks to run the
-  exporter; at 8 MB `E.Store.InboxFull()` says so and the delivery stops pulling (a page still on its
-  way is kept).
+- **inbox:** dropped only by the exporter's receipt (only the pages it read). At 4 MB one chat line
+  a session asks to run the exporter; at 8 MB `E.Store.InboxFull()` says so and the delivery stops
+  pulling (a page still on its way is kept).
 - **The launch day:** on the release, once `LT.LAUNCH_DAY` is set, pages that started before it go
   from mine, carry and inbox at the start, and `E.Store.Put` refuses them.
 
 **The exporter's receipt** (collecting on): once a session, on the tick,
 `LoadAddOn("LefthyTools_EchoesReceipt")` (load on demand; a folder that isn't there does nothing, and
-a new one needs a game restart), then `LefthyToolsEchoesReceipt.done` (`{ ["acct.store"] = "1-57" }`):
-those pages go from inbox, carry and mine, and are added to `exported`. It lists the full ranges each
-time, so reading it again is harmless.
+a new one needs a game restart), then `LefthyToolsEchoesReceipt.done` (`{ ["acct.store"] = "1-57" }`,
+the pages the exporter has) and `upto` (`{ ["<store>"] = <time> }`: per collector's store, the latest
+inbox arrival `a` of its saved file the exporter read; it never goes down). For each key and its
+ranges:
+
+- **Inbox pages in the ranges** go if the exporter read them: `a` (none: 0) at most `upto[my store]`
+  (a missing store entry: none of my inbox goes). Without `upto` (an older exporter) every one goes,
+  as before. A page that goes is added to `exported`.
+- **Numbers of the ranges without an inbox page** are added to `exported`. Numbers kept in the inbox
+  aren't (the exporter doesn't have that page).
+- **carry and mine:** the ranges go, as before.
+
+It lists the full ranges each time, so reading it again is harmless (a page that came since stays,
+by its arrival). Arrival times keep it so whatever the clock does: a page that comes in a session
+arrives after every page of an earlier one.
 
 **After the start**, one a tick: a waiting page packed, else the next chore (the launch day, old
 relayed pages, collectors' summaries of stores not heard of for 60 days, the 2 MB cap, the 4 MB
@@ -627,7 +642,7 @@ and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits each.
 | `E.Store.Shareable(page)` | packed (`z`) or Base64 of the text (`r`), not waiting |
 | `E.Store.Page(acct, store, n)` | a page to serve, and where (`"mine"`, `"inbox"`, `"carry"`); nil if I don't have it (mine: or it isn't offered) |
 | `E.Store.Held(where)` | `{ ["acct.store"] = "ranges" }` of `"mine"` (the pages I offer), `"carry"` or `"inbox"` |
-| `E.Store.Put(acct, store, n, page, where)` | a friend's page received, `where` `"carry"` or `"inbox"`; `page` = `{ t, h, m, z }`, kept as a copy with `s` (and `a`). `true` (`true, "have"`: had it), or `false` and why: `id`, `mine` (my own store's), `page` (not `z`/`r` Base64), `size` (over 64 KB), `time` (before the launch, more than a day ahead), `hash` (`h` isn't `LT.Hash32(z)`; Put checks it), `exported`, `safe` (relaying a page a collector holds), `full` |
+| `E.Store.Put(acct, store, n, page, where)` | a friend's page received, `where` `"carry"` or `"inbox"`; `page` = `{ t, h, m, z }`, kept as a copy with `s` and `a`. `true` (`true, "have"`: had it), or `false` and why: `id`, `mine` (my own store's), `page` (not `z`/`r` Base64), `size` (over 64 KB), `time` (before the launch, more than a day ahead), `hash` (`h` isn't `LT.Hash32(z)`; Put checks it), `exported`, `safe` (relaying a page a collector holds), `full` |
 | `E.Store.Drop(acct, store, ranges, where)` | drops those pages (ranges nil: all; where nil: mine, carry and inbox); the number dropped |
 | `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine and carry; of mine, one that never went out moves to a new number instead (numbers used twice) |
 | `E.Store.Elsewhere(acct, store, ranges)` | a holder offers these (its holdings): for my own key, my next pages close above them and a page of mine among them that never went out moves to a new number; the number moved |
@@ -642,8 +657,8 @@ and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits each.
 
 `E.Ranges` (strings like `"1-56,58"`: ascending, merged, from 1 to 999,999,999; never spelled out
 number by number): `Parse(ranges)` (a list `{ { 1, 56 }, { 58, 58 } }`; bad parts skipped),
-`Format(list)`, `Union(a, b)`, `Contains(ranges, n)`, `Of(table[, keep])` (a table's page numbers).
-Each takes a string or a parsed list.
+`Format(list)`, `Union(a, b)`, `Minus(a, b)`, `Contains(ranges, n)`, `Of(table[, keep])` (a table's
+page numbers). Each takes a string or a parsed list.
 
 ### /lefthy echoes
 

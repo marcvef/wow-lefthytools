@@ -14,8 +14,9 @@ local M = E.module
 --            that number (a WTF folder restored, or copied and played on two computers): it moves to
 --            a new number above all of them (E.data.top), and my next pages close above it too
 --   carry    friends' pages I relay: 512 KB, 128 KB per author, 30 days
---   inbox    a collector's received pages, dropped only by the exporter's receipt; a chat line at
---            4 MB asks to run the exporter, at 8 MB pulling pauses (E.Store.InboxFull)
+--   inbox    a collector's received pages (a: when each came), dropped only by the exporter's receipt
+--            (only the ones it read: upto); a chat line at 4 MB asks to run the exporter, at 8 MB
+--            pulling pauses (E.Store.InboxFull)
 --   safe     what collectors hold safely, per author; exported: what the receipts listed. A store's
 --            entry goes 60 days after anything was last heard of it first-hand (heard: a friend
 --            offered pages of it, its collector told it, or pages of it are here): summaries
@@ -117,6 +118,31 @@ function Ranges.Union(a, b)
 	return Ranges.Format(Merge(list))
 end
 
+-- a without b, as a string.
+function Ranges.Minus(a, b)
+	local out, y, j = {}, Ranges.Parse(b), 1
+	for _, r in ipairs(Ranges.Parse(a)) do
+		local from, to = r[1], r[2]
+		while y[j] and y[j][2] < from do
+			j = j + 1
+		end
+		local k = j
+		while from <= to do
+			local s = y[k]
+			if not s or s[1] > to then
+				out[#out + 1] = { from, to }
+				break
+			end
+			if s[1] > from then
+				out[#out + 1] = { from, s[1] - 1 }
+			end
+			from = math.max(from, s[2] + 1)
+			k = k + 1
+		end
+	end
+	return Ranges.Format(out)
+end
+
 -- Whether n is in them.
 function Ranges.Contains(ranges, n)
 	if type(n) ~= "number" then
@@ -161,6 +187,7 @@ local chores = {}    -- what's left to do after the start, one a tick
 local notedSession, receiptSession -- the session the 4 MB line was said in, the receipt read in
 local noteDue = false
 local moved = 0      -- my pages moved to a new number this session (their number was in use)
+local arrived = 0    -- one more than the latest arrival (a) in the inbox when the sizes were counted
 
 local function Size(page)
 	return type(page) == "table" and type(page.z) == "string" and #page.z or 0
@@ -175,12 +202,15 @@ local function Changed()
 	end
 end
 
--- The sizes counted anew (a page that isn't one is dropped on the way).
+-- The sizes counted anew (a page that isn't one is dropped on the way), and the latest arrival in the
+-- inbox noted (this runs when recording starts: a page that comes in this session arrives after
+-- every page of an earlier one, whatever the clock says; the receipt's upto relies on it).
 function Store.Recount()
 	local data = E.data
 	countedFor = data
 	bytes.mine, bytes.carry, bytes.inbox = 0, 0, 0
 	wipe(carryBy)
+	arrived = 0
 	for n, page in pairs(data.mine) do
 		if Size(page) == 0 then
 			data.mine[n] = nil
@@ -197,6 +227,9 @@ function Store.Recount()
 						pages[n] = nil
 					else
 						sum = sum + Size(page)
+						if where == "inbox" and type(page.a) == "number" and page.a >= arrived and page.a < 1e10 then
+							arrived = page.a + 1
+						end
 					end
 				end
 			end
@@ -513,12 +546,13 @@ local function SafeSomewhere(key, n)
 end
 
 -- A friend's page received: where "carry" (relaying) or "inbox" (collecting). page = { t (its
--- start), h (LT.Hash32 of z), m ("z" or "r"), z }; it's kept as a copy with s (this session) and,
--- relayed, a (when it came). true, or true and "have" (kept already); false and why not: "id" (a
--- key or number that isn't one), "mine" (my own store's), "page" (not a page: m, z, Base64), "size"
--- (z over 64 KB), "time" (before the launch or more than a day ahead), "hash" (h doesn't match),
--- "exported" (the exporter has it), "safe" (relaying: a collector holds it), "full" (relaying: no
--- room, E.Store.Fits).
+-- start), h (LT.Hash32 of z), m ("z" or "r"), z }; it's kept as a copy with s (this session) and a
+-- (when it came: relayed, for the 30 days; collected, for the receipt's upto, after every page of an
+-- earlier session). true, or true and "have" (kept already); false and why not: "id" (a key or
+-- number that isn't one), "mine" (my own store's), "page" (not a page: m, z, Base64), "size" (z over
+-- 64 KB), "time" (before the launch or more than a day ahead), "hash" (h doesn't match), "exported"
+-- (the exporter has it), "safe" (relaying: a collector holds it), "full" (relaying: no room,
+-- E.Store.Fits).
 function Store.Put(acct, store, n, page, where)
 	if where ~= "carry" and where ~= "inbox" then
 		error("E.Store.Put: where is \"carry\" or \"inbox\", got " .. tostring(where), 2)
@@ -550,7 +584,7 @@ function Store.Put(acct, store, n, page, where)
 		return false, "full"
 	end
 	list = Pages(where, key, true)
-	list[n] = { t = page.t, h = page.h, m = page.m, z = page.z, s = data.session, a = where == "carry" and E.Now() or nil }
+	list[n] = { t = page.t, h = page.h, m = page.m, z = page.z, s = data.session, a = where == "inbox" and math.max(E.Now(), arrived) or E.Now() }
 	bytes[where] = bytes[where] + #page.z
 	if where == "carry" then
 		carryBy[key] = (carryBy[key] or 0) + #page.z
@@ -833,8 +867,39 @@ local function Forget()
 	end
 end
 
+-- The exporter has these pages of acct.store (a receipt's ranges); upto: the latest arrival (a) of
+-- my inbox it read, nil if it doesn't say (an older exporter: every one, as before). Inbox pages in
+-- the ranges go if it read them (arrived by upto), into exported. A number of the ranges with no
+-- inbox page goes into exported too; one kept in the inbox doesn't (the exporter doesn't have that
+-- page). Carry and mine: the ranges go.
+local function Take(acct, store, key, ranges, upto)
+	local data = E.data
+	local list, inbox = Ranges.Parse(ranges), data.inbox[key]
+	local taken, kept = {}, {}
+	for n, page in pairs(type(inbox) == "table" and inbox or {}) do
+		if Ranges.Contains(list, n) then
+			local take = not upto or (type(page.a) == "number" and page.a or 0) <= upto
+			local into = take and taken or kept
+			into[#into + 1] = take and n or { n, n }
+		end
+	end
+	for _, n in ipairs(taken) do
+		Remove("inbox", key, n)
+	end
+	local add = Ranges.Minus(list, Merge(kept))
+	local exported = add ~= "" and Ranges.Union(data.exported[key], add) or data.exported[key]
+	if taken[1] or exported ~= data.exported[key] then
+		data.exported[key] = exported
+		Changed()
+	end
+	Store.Drop(acct, store, ranges, "carry")
+	Store.Drop(acct, store, ranges, "mine")
+end
+
 -- The exporter's receipt (collecting only): its addon loaded (load on demand; nothing if the folder
--- isn't there), the pages it lists dropped from inbox, carry and mine, and kept in exported.
+-- isn't there), the pages it lists dropped from inbox (the ones it read), carry and mine, and kept in
+-- exported (Take). upto["<store>"]: the latest arrival of that store's inbox the exporter read (a
+-- store it didn't read: none of its inbox goes).
 local function Receipt()
 	local data = E.data
 	receiptSession = data.session
@@ -846,18 +911,19 @@ local function Receipt()
 	if type(receipt) ~= "table" or type(receipt.done) ~= "table" then
 		return
 	end
+	Counted()
+	local upto
+	if type(receipt.upto) == "table" then
+		upto = receipt.upto[data.store]
+		upto = type(upto) == "number" and upto or -1
+	end
 	for key, ranges in pairs(receipt.done) do
 		local acct, store
 		if type(key) == "string" then
 			acct, store = key:match("^(%x+)%.(%x+)$")
 		end
 		if acct and Store.Key(acct, store) == key and type(ranges) == "string" and Ranges.Format(ranges) ~= "" then
-			local exported = Ranges.Union(data.exported[key], ranges)
-			if exported ~= data.exported[key] then
-				data.exported[key] = exported
-				Changed()
-			end
-			Store.Drop(acct, store, ranges)
+			Take(acct, store, key, ranges, upto)
 		end
 	end
 end

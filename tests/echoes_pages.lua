@@ -3,11 +3,11 @@
 -- doubling a line; closing by time, size and lines, on the tick only, one page packed a tick; a stale
 -- open page at login; packing through the mock's C_EncodingUtil (Node's real zlib, tests/native.js),
 -- the hash and the fallbacks; my BattleTag not known yet; range strings; what's kept (mine, carry,
--- inbox) and the API for the delivery; the exporter's receipt; the launch day; the beta untouched;
--- /lefthy echoes; nothing heavy per tick; the exporter's own readers on the saved file, when the
--- environment variable ECHOES_EXPORTER names the exporter's folder (skipped otherwise). The capture
--- is kept quiet until the last section, where it runs: its lines after the header, a page going on
--- at its last point, its last lines joined at logout and when switched off.
+-- inbox) and the API for the delivery; the exporter's receipt (its upto); the launch day; the beta
+-- untouched; /lefthy echoes; nothing heavy per tick; the exporter's own readers on the saved file,
+-- when the environment variable ECHOES_EXPORTER names the exporter's folder (skipped otherwise). The
+-- capture is kept quiet until the last section, where it runs: its lines after the header, a page
+-- going on at its last point, its last lines joined at logout and when switched off.
 -- Needs: no other file (it starts Echoes itself, on saved tables of its own, and puts back the beta).
 local suite = ...
 local check, section, ns, LT, lefthy, printedSince = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy, suite.printedSince
@@ -1017,6 +1017,51 @@ do
 		"receipts that aren't one (not a table, no done, bad keys and ranges), no LoadAddOn, a broken one: nothing changes, got "
 		.. table.concat(reported, "; "))
 	check(sizesAgree(), "(the sizes agree after the receipts)")
+	LT:SetModuleSetting(M, "collect", false)
+end
+
+section("Echoes pages: the receipt takes only what the exporter read (upto)")
+do
+	-- The exporter's upto["<store>"]: the latest arrival (a) of this store's inbox it read. A page that
+	-- came after it stays in the inbox, its number not exported (the exporter doesn't have it).
+	fresh(acct)
+	LT:SetModuleSetting(M, "collect", true)
+	local read = E.Now()
+	for n = 1, 2 do
+		Store.Put(A, B, n, friendPage(n, read), "inbox")
+	end
+	skew = skew + 60 -- (the exporter read the saved file with 1 and 2; 3 came later)
+	Store.Put(A, B, 3, friendPage(3, read), "inbox")
+	check(E.data.inbox[friend][1].a == read and E.data.inbox[friend][3].a == read + 60, "an inbox page keeps when it came (a)")
+	Advance(3, 0.25)
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-5" }, upto = { [STORE] = read } }
+	reload(1)
+	Advance(2, 0.25)
+	check(Ranges.Of(E.data.inbox[friend]) == "3" and E.data.exported[friend] == "1-2,4-5", "the receipt: 1-2 (read) exported; 3 came after what"
+		.. " the exporter read: kept, not exported; 4-5 (no page here) exported; got " .. tostring(E.data.exported[friend]))
+	-- An older exporter (no upto): every inbox page in its ranges goes, as before.
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-5" } }
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.inbox[friend] == nil and E.data.exported[friend] == "1-5", "no upto (an older exporter): every one goes, as before")
+	-- A receipt whose upto doesn't name my store (it read another WTF folder's file): nothing of my inbox goes.
+	Store.Put(A, B, 6, friendPage(6, read), "inbox")
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-7" }, upto = { ["0badf00d"] = E.Now() + 3600 } }
+	reload(1)
+	Advance(2, 0.25)
+	check(Ranges.Of(E.data.inbox[friend]) == "6" and E.data.exported[friend] == "1-5,7", "upto without my store: no inbox page goes (6 stays,"
+		.. " not exported; 7, no page here, is), got " .. tostring(E.data.exported[friend]))
+	-- When it came: a page that comes in this session arrives after every page of an earlier one,
+	-- whatever the clock says. Relayed pages: the clock (their 30 days).
+	local late = E.Now() + 3600
+	E.data.inbox[friend][6].a = late
+	reload(1)
+	Store.Put(A, B, 8, friendPage(8, read), "inbox")
+	Store.Put(A, B, 9, friendPage(9, read), "carry")
+	check(E.data.inbox[friend][8].a == late + 1 and E.data.carry[friend][9].a == E.Now(), "a page that came now: after the latest one before ("
+		.. tostring(E.data.inbox[friend][8].a - late) .. "); relayed: now")
+	check(sizesAgree(), "(the sizes agree)")
+	MOCK_RECEIPT, LefthyToolsEchoesReceipt = nil, nil
 	LT:SetModuleSetting(M, "collect", false)
 end
 
