@@ -13,8 +13,10 @@ local M = E.module
 --            again), and before that only to collectors who take them early (Held("early"),
 --            Page(..., early)), as provisional pages. A page that never went out (o = 0) whose number
 --            friends hold anyway is another page with that number (a WTF folder restored, or copied
---            and played on two computers, or a crash's lost pages a collector holds provisionally): it
---            moves to a new number above all of them (E.data.top), and my next pages close above it too
+--            and played on two computers, or a crash's lost pages a collector holds
+--            provisionally), and so is one that went only early (o = 2) whose number a collector's
+--            safe summary covers: it moves to a new number above all of them (E.data.top), and my
+--            next pages close above it too
 --   carry    friends' pages I relay: 512 KB, 128 KB per author, 30 days
 --   inbox    a collector's received pages (a: when each came), dropped only by the exporter's receipt
 --            (only the ones it read: upto); a chat line at 4 MB asks to run the exporter, at 8 MB
@@ -501,11 +503,16 @@ end
 ---------------------------------------------------------------------------
 -- My page numbers used twice: a WTF folder restored from a backup (its n from before pages that
 -- went out since), or copied to a second computer and played on both (one store, both numbering
--- from the same n). A page of mine that never went out (o = 0: no part of it was ever sent; one
--- closed by a build before this rule counts as out) whose number friends hold anyway (a holder's
--- holdings, a collector's safe summary) is another page with that number: it moves to a new
--- number above every one of mine friends told of, so it travels as a page of its own, and my next
--- pages close above them too (E.data.top).
+-- from the same n). Each page of mine knows whether it went out (o): 0 no part of it was ever
+-- sent; 1 out (a part went from my disk); 2 parts went only early (not on my disk then), to
+-- collectors who keep them provisional. One closed by a build before this rule counts as out. A
+-- page of mine that never went out whose number friends hold anyway (a holder's holdings, a
+-- collector's safe summary) is another page with that number; so is one that went only early
+-- whose number a collector's safe summary covers (it never covers a provisional page: the
+-- collector holds another page with it, or one it has from a disk). It moves to a new number above
+-- every one of mine friends told of, so it travels as a page of its own, and my next pages close
+-- above them too (E.data.top). (Holdings don't move a page that went early: the collector that
+-- took it tells me its number, as its own provisional copy.)
 ---------------------------------------------------------------------------
 
 -- The highest number of mine friends told of, or given to a moved page (E.data.top); 0: none.
@@ -527,7 +534,7 @@ end
 
 -- My page n moves to a new number: above every one in use or told of, and the open page's (that
 -- one closes above it then). Offered from the next session on, like a new page: its new number is
--- on disk then. The new number.
+-- on disk then. Nothing of it went out under that number (o = 0). The new number.
 local function Move(n)
 	local data = E.data
 	local page = data.mine[n]
@@ -538,7 +545,7 @@ local function Move(n)
 	end
 	data.mine[n], data.mine[new] = nil, page
 	data.top = new
-	page.s = data.session
+	page.s, page.o = data.session, 0
 	if page.q then
 		local text = Renumbered(page.z, n, new)
 		bytes.mine = bytes.mine - #page.z + #text
@@ -554,11 +561,12 @@ local function Move(n)
 	return new
 end
 
--- Friends hold these pages of mine (a holder's holdings, a collector's summary): my next pages close
--- above the highest (at most SEEN_AHEAD above my last page: a broken client), and a page of mine
--- among them that never went out moves to a new number (not one the exporter has from here: it read
--- it from this very table). The number moved.
-local function Seen(ranges)
+-- Friends hold these pages of mine (a holder's holdings; safe: a collector's safe summary): my next
+-- pages close above the highest (at most SEEN_AHEAD above my last page: a broken client), and a page
+-- of mine among them that never went out moves to a new number, and from a safe summary one that
+-- went only early too (not one the exporter has from here: it read it from this very table). The
+-- number moved.
+local function Seen(ranges, safe)
 	local data = E.data
 	local list = Ranges.Parse(ranges)
 	local cap = data.n + SEEN_AHEAD
@@ -573,7 +581,7 @@ local function Seen(ranges)
 	end
 	local clash, exported = {}, data.exported[Store.Own() or ""]
 	for n, page in pairs(data.mine) do
-		if type(page) == "table" and page.o == 0 and Ranges.Contains(list, n) and not Ranges.Contains(exported, n) then
+		if type(page) == "table" and (page.o == 0 or (safe and page.o == 2)) and Ranges.Contains(list, n) and not Ranges.Contains(exported, n) then
 			clash[#clash + 1] = n
 		end
 	end
@@ -597,11 +605,21 @@ function Store.Elsewhere(acct, store, ranges)
 	return Seen(ranges)
 end
 
--- A part of my page n went to a friend (Delivery, when it went; page: the page it served, if that's
--- still page n): it's out, so it keeps its number from now on.
-function Store.WentOut(n, page)
+-- Something of my page n went to a friend (Delivery, when it went; page: the page it served, if
+-- that's still page n). A part from my disk: it's out (o = 1), so it keeps its number from now on.
+-- A part while it wasn't on my disk (early: to a collector, who keeps it provisional): o = 2 if it
+-- never went out before. Only its start from my disk (start), to a collector who takes pages early
+-- or holds that number of mine provisionally (its check: the start's hash is all it needs to confirm
+-- its copy): out too, if it went early before.
+function Store.WentOut(n, page, early, start)
 	local mine = E.data.mine[n]
-	if mine and mine == page and mine.o == 0 then
+	if not mine or mine ~= page then
+		return
+	elseif early then
+		if mine.o == 0 then
+			mine.o = 2
+		end
+	elseif mine.o == 2 or (mine.o == 0 and not start) then
 		mine.o = 1
 	end
 end
@@ -773,8 +791,9 @@ function Store.Named(acct, store, name)
 end
 
 -- A collector (its "acct.store") holds these pages of acct.store safely (its summary, merged into
--- E.data.safe): they go from mine and carry. Of mine, a page that never went out isn't the one the
--- collector holds: it moves to a new number instead (Seen). The number dropped.
+-- E.data.safe): they go from mine and carry. Of mine, a page that never went out, or went only
+-- early, isn't the one the collector holds: it moves to a new number instead (Seen). The number
+-- dropped.
 function Store.Safe(acct, store, ranges, collector)
 	local key = Store.Key(acct, store)
 	if not key or type(collector) ~= "string" or issecret(collector) or collector == "" then
@@ -791,7 +810,7 @@ function Store.Safe(acct, store, ranges, collector)
 		Changed()
 	end
 	if key == Store.Own() then
-		Seen(ranges)
+		Seen(ranges, true)
 	end
 	return Drop(acct, store, ranges, "mine", true) + Drop(acct, store, ranges, "carry")
 end
@@ -1310,7 +1329,7 @@ local function MineStatus(data)
 			end
 			packing = packing + (page.q and 1 or 0)
 			later = later + (OnDisk(page) and 0 or 1)
-			early = early + ((not OnDisk(page) and page.o == 1) and 1 or 0)
+			early = early + (page.o == 2 and 1 or 0) -- (only early: on disk or not, not confirmed yet)
 		end
 	end
 	if count == 0 then

@@ -714,6 +714,14 @@ local function TakesEarly(id)
 	return peer ~= nil and peer.verified == true and peer.collect == true and peer.early == true
 end
 
+-- Whether a friend's holdings (es) list my page n (a collector's: the ones of mine it holds
+-- provisionally too, told only to me).
+local function HoldsMine(id, n)
+	local peer, key = peers[id], MyKey()
+	local held = peer and key and peer.holdings[key]
+	return held ~= nil and Ranges.Has(held, n)
+end
+
 local function HelloMessage(flags)
 	local acct = E.data.acct or MyAccount()
 	return Msg("eh", acct, E.data.store, PROTO, MAX_BYTES, flags)
@@ -808,8 +816,14 @@ local function Sent(record)
 		if record.kind == "ep" then
 			stats.served = stats.served + #record.message
 			if serve.mine then
-				S.WentOut(serve.n, serve.page) -- (out now: it keeps its number, see E.Store)
+				S.WentOut(serve.n, serve.page, serve.early) -- (out now, or only early: see E.Store)
 			end
+		elseif record.kind == "eb" and serve.mine and not serve.early and (TakesEarly(serve.id) or HoldsMine(serve.id, serve.n)) then
+			-- (the start of my page from my disk, to a collector who takes pages early or holds that
+			-- number of mine provisionally: its check, and the start's hash is all it needs to confirm
+			-- its copy, before any part goes. Its holdings alone wouldn't do: a collector tells them
+			-- only to friends who collect or relay.)
+			S.WentOut(serve.n, serve.page, false, true)
 		end
 		if Done(serve) then
 			RemoveServe(serve)

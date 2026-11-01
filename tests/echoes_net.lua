@@ -2480,7 +2480,7 @@ do
 	local page = anna.E.data.mine[n]
 	check(page and page.m == "z" and #page.z > 2400 and anna.E.Store.Page(ANNA.acct, store, n) == nil, "(her page closes and is packed: not on her disk yet)")
 	check(Run(120, function() return Got(n) ~= nil end), "Cedric gets it within minutes")
-	check(Got(n).p == 1 and Got(n).z == page.z and page.o == 1, "provisional at Cedric (p), as Anna has it; out at Anna (o = 1)")
+	check(Got(n).p == 1 and Got(n).z == page.z and page.o == 2, "provisional at Cedric (p), as Anna has it; at Anna it went only early (o = 2)")
 	said = Status(cedric)
 	check(said:find(("Anna: 1 page (%d) up to "):format(n), 1, true) and said:find("; 1 sent early (confirmed once Anna's game saved it).", 1, true),
 		"Cedric's status: Anna's page, early, got\n" .. said)
@@ -2514,12 +2514,22 @@ do
 	local stops = #Logged(mark, CEDRIC, ANNA, stop) + #Logged(mark, CEDRIC, BOB, stop)
 	check(begun + begun2 == 1 and parts + parts2 <= 3 and stops == 1 and Got(n).z == page.z, ("the check: the page's start, %d of its %d"
 		.. " parts, then stopped"):format(parts + parts2, math.ceil(#page.z / 240)))
-	check(anna.E.data.mine[n] ~= nil, "Anna keeps it: it came in Cedric's session, not on his disk yet")
+	check(anna.E.data.mine[n] ~= nil and anna.E.data.mine[n].o == 1, ("Anna keeps it: it came in Cedric's session, not on his disk yet; it's out"
+		.. " (o = 1; the check: its start and %d part(s) from %s)"):format(parts + parts2, begun > 0 and "her" or "Bob"))
 	said = Status(cedric)
 	check(said:find(("Anna: 1 page (%d) up to "):format(n), 1, true) and said:find("; 1 not on disk yet (safe after your logout or /reload).", 1, true),
 		"Cedric's status: confirmed, not on his disk yet, got\n" .. said)
 	cedric = Reload(cedric)
-	check(Run(120, function() return anna.E.data.mine[n] == nil end), "his next session: safe at Cedric (his summary), Anna drops it")
+	local function Kept(h)
+		for _, p in pairs(anna.E.data.mine) do
+			if p.h == h then
+				return true
+			end
+		end
+		return false
+	end
+	check(Run(120, function() return anna.E.data.mine[n] == nil end) and not Kept(page.h), "his next session: safe at Cedric (his summary), Anna"
+		.. " drops it (not moved to a new number)")
 	said = Status(anna)
 	check(said:find(("your recording is safe at a collector up to [^\n]-%s[^\n]- %%(page %d%%)%%."):format(date("%H:%M", page.e), n))
 		and said:find("none of your pages waits to reach a collector.", 1, true), "Anna's status: safe at a collector up to her page's end, got\n" .. said)
@@ -2697,6 +2707,166 @@ do
 	Stop(bob)
 end
 
+-- Anna's page 1 (A) is safe at Dora. Then her WTF folder comes back from a backup (page 1 open again)
+-- while Dora is away, and she closes another page 1 (B). early: Cedric (collecting, this build) is
+-- online and takes B early (it went only early: o = 2), then his game crashes before it saved B. Dora
+-- back: what she holds and her summary say 1 is taken: B is another page. It moves to a new number,
+-- isn't dropped, and reaches Dora under it after Anna's /reload: both pages are kept.
+local function Restored(early)
+	local people = { ANNA, CEDRIC, DORA }
+	local dora = Start(DORA, { friends = FriendsOf(DORA, people), collect = true })
+	local anna = Start(ANNA, { friends = FriendsOf(ANNA, people) })
+	Run(5)
+	anna = Reload(anna)
+	local backup = anna.opts.saved
+	local key = ANNA.acct .. "." .. anna.E.data.store
+	local function Got(c, n)
+		return (c.E.data.inbox[key] or {})[n]
+	end
+	local function Under(h)
+		for n, page in pairs(anna.E.data.mine) do
+			if page.h == h then
+				return n
+			end
+		end
+	end
+	Varied(anna, 7)
+	Run(1)
+	local A = anna.E.data.mine[1]
+	check(A and Run(120, function() return Got(dora, 1) ~= nil end), "page 1 (A) goes early to Dora")
+	anna = Reload(anna)
+	check(Run(120, function() return Got(dora, 1).p == nil end), "after Anna's /reload it's confirmed")
+	dora = Reload(dora)
+	check(Run(120, function() return anna.E.data.mine[1] == nil end), "safe at Dora's next session: Anna drops A")
+	local doraSaved = Stop(dora)
+	Stop(anna)
+	Run(70)
+	local cedric = early and Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), collect = true }) or nil
+	anna = Start(ANNA, { friends = FriendsOf(ANNA, people), saved = backup })
+	Run(10)
+	check(anna.E.data.open and anna.E.data.open.n == 1, "the backup: her page 1 goes on")
+	Varied(anna, 8)
+	Run(1)
+	local B = anna.E.data.mine[1]
+	check(B and B.h ~= A.h, "another page 1 (B) closes")
+	if cedric then
+		check(Run(120, function() return Got(cedric, 1) ~= nil end) and Got(cedric, 1).p == 1 and B.o == 2,
+			"B goes early to Cedric (provisional there; at Anna it went only early: o = 2)")
+		Run(65)
+		check(anna.E.data.mine[1] == B and anna.D.Ranges.Has(anna.D.peers[CEDRIC.id].holdings[key] or {}, 1),
+			"Cedric tells Anna he holds 1 (his provisional B): it stays")
+	else
+		Run(120)
+	end
+	dora = Start(DORA, { friends = FriendsOf(DORA, people), saved = doraSaved })
+	check(Run(120, function() return anna.E.data.mine[1] == nil end), "Dora back: Anna hears 1 is taken")
+	local moved = Under(B.h)
+	check(moved and moved > 1 and anna.E.data.mine[moved].o == 0, "B moved to a new number (" .. tostring(moved) .. ", nothing of it out"
+		.. " under it), not dropped")
+	if cedric then
+		Stop(cedric, false, true) -- (his game crashes: his early copy of B is lost)
+		Run(5)
+	end
+	anna = Reload(anna)
+	check(Run(300, function()
+		local page = Got(dora, moved)
+		return page ~= nil and page.h == B.h and page.p == nil
+	end), "after her /reload B reaches Dora under its new number (from her disk, or early and then confirmed)")
+	dora = Reload(dora)
+	check(Run(120, function() return Under(B.h) == nil end) and Got(dora, 1).h == A.h and Got(dora, moved).h == B.h,
+		"safe at Dora's next session: Anna drops it; Dora has both pages, A as 1 and B as " .. moved)
+	Stop(anna)
+	Stop(dora)
+end
+
+section("Echoes' delivery: a WTF folder restored, the collector of the old page away")
+Restored(false)
+
+section("Echoes' delivery: a WTF folder restored, the new page went early to a collector who then crashes")
+Restored(true)
+
+section("Echoes' delivery: a page that went only early, checked after the author's /reload")
+do
+	-- Eve's pages 702-705 close this session (not on her disk yet) and go early to Anna (collecting,
+	-- this build): they went only early (o = 2). After Eve's /reload Anna checks them: the start of
+	-- each from Eve's disk is all she needs to confirm her copy, and her check usually stops before
+	-- any part goes. A start that went to a collector who takes pages early, or who said she holds
+	-- that number (her es; an author who doesn't relay hears none), makes the page out (o = 1), and
+	-- so does a part: her summary drops them later, none is moved. A start alone to a relay (it
+	-- holds nothing then): still only early.
+	local c = Start(EVE, { friends = { ANNA, BOB }, fake = true })
+	local key = EVE.acct .. "." .. c.E.data.store
+	c.E.data.n = 1000 -- (the client's own pages: 1 and from 1001 on)
+	for n = 702, 705 do
+		local z = Data(720, n)
+		c.E.data.mine[n] = { t = c.env.GetServerTime() - 60, h = Hash32(z), m = "z", z = z, s = c.E.data.session, o = 0 }
+	end
+	Touched(c)
+	MeetAll(c, { ANNA }, "cers")
+	MeetAll(c, { BOB }, "rs")
+	local mark = Mark(c)
+	for n = 702, 705 do
+		Ask(c, ANNA, n)
+		Pass(c, 4)
+	end
+	local only = true
+	for n = 702, 705 do
+		only = only and c.E.data.mine[n].o == 2
+	end
+	check(only and #Sent(c, ANNA, mark, "B2;ep;") == 12, "702-705 went early to Anna: only early (o = 2)")
+	Say(c, ANNA, "B2;es;" .. key .. ":702-705")
+	Pass(c, 1.5)
+	check(c.E.data.mine[702] and c.E.data.mine[703] and c.E.data.mine[704] and c.E.data.mine[705],
+		"Anna holds them (provisionally, she says): nothing moves")
+	c = Reload(c)
+	MeetAll(c, { ANNA }, "cers")
+	MeetAll(c, { BOB }, "rs")
+	Say(c, ANNA, "B2;es;" .. key .. ":702") -- (her provisional copies: only 702 told yet)
+	Pass(c, 1.5)
+	-- f's request for n, stopped once its start went (part: once a part went too). A page I don't have
+	-- asked first: its en, then the start, and nothing more may go to them for a second.
+	local function Check(f, n, part)
+		local page = c.E.data.mine[n]
+		local from = Mark(c)
+		Ask(c, f, 999)
+		Ask(c, f, n)
+		for _ = 1, 100 do
+			Pass(c, 0.05)
+			if #Sent(c, f, from, part and "B2;ep;" or "B2;eb;") > 0 then
+				break
+			end
+		end
+		Say(c, f, ("B2;eq;%s;%s;%d;%d"):format(EVE.acct, c.E.data.store, n, #page.z))
+		Pass(c, 3)
+		return #Sent(c, f, from, "B2;eb;"), #Sent(c, f, from, "B2;ep;"), page
+	end
+	local eb, ep, p702 = Check(ANNA, 702)
+	check(eb == 1 and ep == 0 and p702.o == 1, ("702: its start alone (%d start, %d parts) to Anna, who said she holds it: out (o = 1)"):format(eb, ep))
+	local p703
+	eb, ep, p703 = Check(ANNA, 703)
+	check(eb == 1 and ep == 0 and p703.o == 1, "703: its start alone to Anna, who takes pages early (she hadn't said she holds it): out")
+	local p704
+	eb, ep, p704 = Check(ANNA, 704, true)
+	check(eb == 1 and ep >= 1 and p704.o == 1, ("704: a part went too (%d): out"):format(ep))
+	local p705
+	eb, ep, p705 = Check(BOB, 705)
+	check(eb == 1 and ep == 0 and p705.o == 2, "705: its start alone to Bob (a relay): still only early (o = 2)")
+	eb, ep = Check(BOB, 705, true)
+	check(ep >= 1 and p705.o == 1, "Bob asks again, a part goes: out (from 2)")
+	-- Her summary (confirmed, on her disk at her next session): they go, none moved.
+	local function Under(h)
+		for n, page in pairs(c.E.data.mine) do
+			if page.h == h then
+				return n
+			end
+		end
+	end
+	Say(c, ANNA, ("B2;ed;%s;%s;%s:702-705"):format(ANNA.acct, ANNA.store, key))
+	Pass(c, 1.5)
+	check(not (Under(p702.h) or Under(p703.h) or Under(p704.h) or Under(p705.h)), "safe at Anna: 702-705 go (none moved)")
+	Stop(c)
+end
+
 section("Echoes' delivery: a collector's crash right after receiving")
 do
 	-- Cedric gets a page of Anna's from her disk and one early; his game crashes before it saved
@@ -2760,8 +2930,8 @@ do
 	Ask(c, DORA, 701)
 	Ask(c, ANNA, 702)
 	Pass(c, 6)
-	check(Received(c, DORA, mark) == c.E.data.mine[701].z and Received(c, ANNA, mark) == z and c.E.data.mine[702].o == 1,
-		"701 goes to Dora as ever; 702 to Anna (out now: o = 1)")
+	check(Received(c, DORA, mark) == c.E.data.mine[701].z and Received(c, ANNA, mark) == z and c.E.data.mine[702].o == 2,
+		"701 goes to Dora as ever; 702 to Anna (it went only early: o = 2)")
 	-- Anna stops collecting (her hello without c and e): nothing early to her any more.
 	Hello(c, ANNA, "rsa")
 	mark = Mark(c)

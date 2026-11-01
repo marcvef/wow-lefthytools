@@ -398,10 +398,11 @@ LefthyToolsEchoesDB = {
     state = { ... },    -- the encoder's state: E.state itself
   },
   mine = {            -- my closed pages
+    [211] = { t = 1793449200, e = 1793451000, h = "7a2b9c01", m = "z", z = "eJzt...", s = 40, o = 2 }, -- went only early
     [212] = { t = 1793451000, e = 1793452700, h = "5e1f09aa", m = "z", z = "eJzt...", s = 40, o = 1 },
     [213] = { t = 1793452700, e = 1793454500, m = "t", z = "E1;...", q = 1, s = 41, o = 0 }, -- closed, waiting to be packed
   },
-  safeTo = { n = 211, e = 1793451000 },  -- the newest page of mine that went because a collector holds it (/lefthy echoes)
+  safeTo = { n = 210, e = 1793449200 },  -- the newest page of mine that went because a collector holds it (/lefthy echoes)
   carry = { ["5e6f7a8b.0c77e1f2"] = { [57] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- friends' pages I relay
   safe = { ["5e6f7a8b.0c77e1f2"] = { ["c011ec70.12345678"] = "1-56" } },              -- collectors' summaries
   heard = { ["5e6f7a8b.0c77e1f2"] = 1793450000 },                                      -- when a store in safe was last heard of first-hand
@@ -436,8 +437,9 @@ sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
   (`E.Now()`; in the inbox at least one more than every page there when the session started, so a
   page of this session arrived after every page of an earlier one, whatever the clock says: the
   receipt's `upto`; none: from a build before it).
-- `o` (mine): `0` not out yet (no part of it was ever sent), `1` out (a part went to a friend);
-  none: closed by a build before the rule, counts as out (numbers used twice, below).
+- `o` (mine): `0` not out yet (no part of it was ever sent), `1` out (a part went to a friend from
+  my disk), `2` parts went only early (to collectors, while it wasn't on my disk: they keep it
+  provisional); none: closed by a build before the rule, counts as out (numbers used twice, below).
 - `p` (inbox): `1` provisional: it came early, not confirmed yet (early pages, below).
 
 `provisional` (a collector's): `{ ["acct.store"] = { [n] = hash } }`, provisional pages the
@@ -587,8 +589,11 @@ first told the author (the holder offline at the author's next session). So:
 played on both). The store id is made once per folder, so a restored folder numbers its pages again
 from its old `n`, and two computers with one folder number theirs alike: one id, two pages. Without
 a guard the collector keeps the first it gets, its "safe" covers the number, and the author drops
-its other page as safe: lost. So each of my pages knows whether it ever went out (`o`: `E.Store.WentOut`,
-called by the delivery when a part of it was actually sent; kept in the saved table):
+its other page as safe: lost. So each of my pages knows whether it went out (`o`: `E.Store.WentOut`,
+called by the delivery when something of it was actually sent; kept in the saved table): `0` never,
+`1` out (a part from my disk), `2` only early (parts went to collectors while it wasn't on my disk;
+they keep it provisional). An early part makes it `2` only from `0`; a part from my disk makes it `1`,
+also from `2`.
 
 - **A page that never went out but whose number friends hold** (a holder's holdings `es`, a
   collector's with the pages of mine it holds provisionally, or a collector's safe summary `ed`,
@@ -596,18 +601,31 @@ called by the delivery when a part of it was actually sent; kept in the saved ta
   number. It isn't dropped: it **moves to a new number**, above every number of mine any friend told
   of, the last closed page's and the open page's (`E.data.top` keeps the highest), and goes out under
   that number from the next session on (like a new page: its new number is on disk then; early to a
-  collector before that). A page still waiting to be packed gets its header renumbered too; a
-  packed one keeps the number it was recorded under in its header (the game never unpacks a page),
-  and the exporter files it under the number it's kept under (it warns that the header names
-  another).
+  collector before that). Nothing of it went out under the new number (`o = 0`). A page still waiting
+  to be packed gets its header renumbered too; a packed one keeps the number it was recorded under in
+  its header (the game never unpacks a page), and the exporter files it under the number it's kept
+  under (it warns that the header names another).
+- **A page that went only early** (`o = 2`) moves too when a collector's **safe summary** covers its
+  number: a summary never covers a provisional page (it covers what the collector holds from a disk,
+  or exported), so it's another page with that number, and the only copy of mine out there is a
+  provisional one (lost if that collector's game crashes before it saved it). Holdings don't move
+  it: the collector that took it early tells me its number (its provisional copy of this very page).
+  Without this, a restored folder's new page that went early would be dropped for the old page's
+  summary.
+- **Confirming a page that went early** keeps working: after my `/reload` the collector's check asks
+  for it from my disk, and a part of it that goes makes it `1`; so does its start (`eb`) alone when
+  it goes to a collector who takes pages early, or whose holdings list that number of mine (its
+  check: the start's hash is all it needs to confirm its copy, and it usually stops the page before
+  any part goes). Then its summary drops the page, as ever. (Its holdings alone wouldn't do: a
+  collector tells them only to friends who collect or relay.)
 - **My next pages close above it:** numbers of mine friends hold above my last page raise
   `E.data.top`, and `E.Store.Close` closes a page whose number is at or below it (or kept already)
   above it, its header renumbered (it's still plain text then). `E.data.n` itself only moves when a
   page closes: Pages.lua leaves an open page whose number isn't above it unclosed at the next login.
   Numbers more than 10,000 above my last page aren't believed (a broken client).
-- **Not moved:** a page that went out (the collector may hold this one), one from a build before
-  the rule, and one the exporter has from this computer (`exported` of my own key: it read this
-  very table). Those go as before once safe.
+- **Not moved:** a page that went out (`o = 1`: the collector may hold this one), one from a build
+  before the rule, and one the exporter has from this computer (`exported` of my own key: it read
+  this very table). Those go as before once safe.
 - Relays tell an author what they hold of its own pages (`es` with the author's key), so this
   works before a collector's summary comes, and with only relays online.
 - **Left over:** a page whose `o = 1` wasn't saved (the game crashed after it went out, or a backup
@@ -617,8 +635,10 @@ called by the delivery when a part of it was actually sent; kept in the saved ta
   twice. (The exporter can tell both: the moved page's header names the other number.) And a relay
   that asks for my never-out page before any holder's summary reached me makes it "out" (`o = 1`),
   though the collector may hold the other page with that number: then it's lost like before (a
-  collector that took it early keeps its provisional copy, which its exporter archives). Copy a WTF
-  folder only to move, not to play on both.
+  collector that took it early keeps its provisional copy, which its exporter archives). A page that
+  went only early and moves for another page's summary: the collector that took it early keeps that
+  copy under the old number, provisional, and its exporter archives it too (the same text twice).
+  Copy a WTF folder only to move, not to play on both.
 
 **A BattleTag change** (Blizzard lets a player change it): my account is the hash of my BattleTag,
 so it changes with it, and my pages' key with it (the store stays).
@@ -720,9 +740,9 @@ each.
 | `E.Store.Provisional(acct, store, n)` | whether this collector holds page `n` provisionally: its hash and where, `"inbox"` or `"provisional"` (the receipt took it); nil if not (also when the inbox has a page `n` from a disk) |
 | `E.Store.Confirm(acct, store, n, hash)` | a copy of page `n` from its author's disk has this hash: if it's the provisional one's, it's confirmed (the inbox page loses `p`; one the receipt took goes into `exported`); whether it was |
 | `E.Store.Drop(acct, store, ranges, where)` | drops those pages (ranges nil: all; where nil: mine, carry and inbox); the number dropped |
-| `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine (the newest noted in `safeTo`) and carry; of mine, one that never went out moves to a new number instead (numbers used twice) |
+| `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine (the newest noted in `safeTo`) and carry; of mine, one that never went out or went only early moves to a new number instead (numbers used twice) |
 | `E.Store.Elsewhere(acct, store, ranges)` | a holder offers these (its holdings): for my own key, my next pages close above them and a page of mine among them that never went out moves to a new number; the number moved |
-| `E.Store.WentOut(n, page)` | a part of my page `n` was sent (`page`: the one served, if it's still page `n`): `o = 1`, it keeps its number |
+| `E.Store.WentOut(n, page[, early, start])` | something of my page `n` was sent (`page`: the one served, if it's still page `n`): a part from my disk, `o = 1` (it keeps its number); `early` (a part while it wasn't on my disk), `o = 2` if it was `0`; `start` (only its start from my disk, to a collector who takes pages early or holds that number provisionally: its check), `o = 1` if it was `2` |
 | `E.Store.SafeHere(acct, store)` | ranges this collector holds safely: received in an earlier session (on disk) and not provisional, or exported |
 | `E.Store.Carried(acct, store, ranges)` | a relay holds these (not a collector: provisional pages are among its holdings): of mine, they go first over the cap |
 | `E.Store.Mentioned(acct, store)` | a friend told of this store first-hand (offers pages of it, or is the collector whose summary it is): what collectors hold of it is kept 60 days from now |
@@ -748,8 +768,8 @@ page numbers). Each takes a string or a parsed list.
   number), or "no page of yours has reached a collector yet.";
 - **what waits**: "3 pages waiting to reach a collector (215-217), recorded since 21:30; 2 of them
   sent early to a collector, safe once confirmed." (every page in `mine`, the oldest one's start;
-  sent early: not on disk yet, and a part of it went out, `o = 1`), or "none of your pages waits to
-  reach a collector.";
+  sent early: it went only early, `o = 2`, on disk by now or not: it waits for the confirmation), or
+  "none of your pages waits to reach a collector.";
 - what's kept of them (when any are, or one moved this session): "my pages: 24.0 KB of 2.0 MB",
   how many wait to be packed, how many are offered from the next session on, how many moved to a new
   number this session;
@@ -955,8 +975,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   pages go after 30 days) to need it. `E.Store.Mentioned(acct, store)` notes it; an entry from
   before the rule gets its 60 days from its first start.
 - `E.Store.Safe` drops my own pages (`mine`) and the ones I relay (`carry`) once any collector
-  holds them safely; of mine, one that never went out moves to a new number instead (Pages and
-  storage: numbers used twice).
+  holds them safely; of mine, one that never went out, or went only early, moves to a new number
+  instead (Pages and storage: numbers used twice).
 - A holder's holdings with my own pages: `E.Store.Carried` (a relay's: over my cap, those go first)
   and `E.Store.Elsewhere` (numbers used twice). A page of mine I serve that moved (or went) stops:
   nothing more of it goes under its old number. A part of my page that was sent: `E.Store.WentOut`.

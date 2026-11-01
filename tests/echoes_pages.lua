@@ -872,7 +872,10 @@ do
 	E.data.mine[waiting].m, E.data.mine[waiting].z = "t", "E1;\n.0;s\n" -- (as if packing had failed: plain text)
 	Store.Recount()
 	check(Store.Page(acct, STORE, waiting, true) == nil and Store.Held("early")[own] == tostring(n), "a plain-text page never goes, early or not")
-	page.o = 1 -- (a part of it went to a collector)
+	Store.WentOut(n, page, true)
+	check(page.o == 2, "a part of it went early (to a collector who keeps it provisional): o = 2")
+	Store.WentOut(n, page, true)
+	check(page.o == 2, "(again: still 2)")
 	local mark = #PRINTED + 1
 	lefthy("echoes")
 	check(printedSince(mark):find("2 pages waiting to reach a collector (" .. n .. "-" .. waiting .. "), recorded since ", 1, true)
@@ -880,8 +883,18 @@ do
 		and printedSince(mark):find("2 offered from the next session on (a /reload is one).", 1, true),
 		"the status says how many went early, got\n" .. printedSince(mark))
 	reload(1)
-	check(Store.Held("early")[own] == nil and Store.Held("mine")[own] == tostring(n) and Store.Page(acct, STORE, n) == E.data.mine[n],
+	page = E.data.mine[n]
+	check(Store.Held("early")[own] == nil and Store.Held("mine")[own] == tostring(n) and Store.Page(acct, STORE, n) == page,
 		"after a /reload: on disk, offered to everyone, not early any more")
+	mark = #PRINTED + 1
+	lefthy("echoes")
+	check(printedSince(mark):find("; 1 of them sent early to a collector, safe once confirmed.", 1, true),
+		"on disk now, it still waits for the confirmation (o = 2), got\n" .. printedSince(mark))
+	Store.WentOut(n, page, false, true)
+	check(page.o == 1, "only its start went from my disk to a collector who holds it provisionally (its check): out (o = 1)")
+	mark = #PRINTED + 1
+	lefthy("echoes")
+	check(not printedSince(mark):find("sent early", 1, true), "the status: nothing waits for a confirmation, got\n" .. printedSince(mark))
 
 	-- A collector's: a page that came early is provisional (p), with when it came (a).
 	local now = E.Now()
@@ -930,7 +943,9 @@ do
 	reload(1) -- (on disk: offered)
 	Store.WentOut(1, E.data.mine[1])
 	Store.WentOut(2, { o = 0 })
-	check(E.data.mine[1].o == 1 and E.data.mine[2].o == 0, "a part of page 1 went to a friend: out (WentOut: only that page as it is)")
+	Store.WentOut(2, E.data.mine[2], false, true)
+	check(E.data.mine[1].o == 1 and E.data.mine[2].o == 0, "a part of page 1 went to a friend: out (WentOut: only that page as it is);"
+		.. " only the start of page 2: not out (nobody can have it)")
 	E.data.mine[3].o = nil -- (closed by a build before the rule: counts as out)
 	local z2 = E.data.mine[2].z
 	check(Store.Safe(acct, STORE, "1-3,6", collector) == 2 and not E.data.mine[1] and not E.data.mine[3] and not E.data.mine[2],
@@ -970,6 +985,24 @@ do
 	-- After a /reload: the top is kept, the moved page is offered under its new number.
 	reload(1)
 	check(E.data.top == 16 and Store.Page(acct, STORE, 7) == E.data.mine[7] and closeOne() == 17, "after a /reload: page 7 offered; the top kept (the open page closes as 17)")
+
+	-- A page that went only early (o = 2: parts of it went to a collector before it was on my disk, who
+	-- keeps them provisional). That collector tells me its number (its holdings, its provisional
+	-- copy): it stays. A collector's safe summary never covers a provisional page: one that covers its
+	-- number holds another page with it (my WTF folder restored?): it moves (nothing went out under
+	-- its new number: o = 0), and isn't dropped.
+	local p18, p19 = closeOne(), closeOne()
+	local early18, early19 = E.data.mine[p18], E.data.mine[p19]
+	Store.WentOut(p18, early18, true)
+	Store.WentOut(p19, early19, true)
+	check(early18.o == 2 and early19.o == 2, "(pages " .. p18 .. " and " .. p19 .. " went early: o = 2)")
+	check(Store.Elsewhere(acct, STORE, p18 .. "-" .. p19) == 0 and E.data.mine[p18] == early18 and E.data.mine[p19] == early19,
+		"a holder offers them (the collector that took them early): they stay")
+	check(Store.Safe(acct, STORE, tostring(p18), collector) == 0 and not E.data.mine[p18] and E.data.mine[E.data.top] == early18 and early18.o == 0,
+		"a collector's safe summary covers " .. p18 .. ": another page; it moves (to " .. E.data.top .. ", o = 0), nothing dropped")
+	Store.WentOut(p19, early19)
+	check(early19.o == 1 and Store.Safe(acct, STORE, tostring(p19), collector) == 1 and not E.data.mine[p19] and E.data.mine[E.data.top] == early18,
+		"a part of " .. p19 .. " went from my disk (o = 1, from 2): a safe summary drops it, as ever")
 	check(sizesAgree(), "(the sizes agree: moved, renumbered)")
 end
 
