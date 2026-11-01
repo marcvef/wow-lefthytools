@@ -12,12 +12,23 @@ local M = E.module
 -- against its hash, never decompressed in game. Collectors say what they hold safely (on their
 -- disk, or exported); that is passed on, so authors and relays drop their copies.
 --
+-- Early pages: an author's pages closed this session aren't on its disk yet (after a crash the next
+-- session numbers its pages from the last save again), so they go to everyone only from its next
+-- session on. A collector online now gets them at once (ea), but keeps them provisional (E.Store):
+-- never safe, never served, told only to their author, until a copy from the author's disk (anyone's
+-- normal offer of that number) shows the same hash: a check asks for it and stops at its start (eb).
+-- Another hash: another page with that number; it's fetched once the receipt took the provisional
+-- one (both reach the exporter). So nobody drops a page for one that came early, and nothing is lost.
+--
 -- Messages: Beacon's B family (Protocol.lua), module letter e. Only to friends who sent eh (an
 -- eh itself only to a build that reads it, see Hello):
 --   B2;eh;<acct>;<store>;<proto>;<maxBytes>;<flags>
---                       hello: flags c collect, r relay, s share, a an answer (no answer to it);
---                       none of c, r, s: switched off. In answer to a hello, when settings change
+--                       hello: flags c collect, r relay, s share, e takes early pages (with c), a an
+--                       answer (no answer to it); none of c, r, s: switched off. In answer to a hello,
+--                       when settings change
 --   B2;es;<acct>.<store>:<ranges>/...    pages I can serve ("1-56,58")
+--   B2;ea;<acct>.<store>:<ranges>/...    my own pages not on my disk yet, to a collector who takes
+--                       them early (older builds read no ea, and send no e)
 --   B2;ed;<collector acct>;<collector store>;<acct>.<store>:<ranges>/...
 --                       pages safe at that collector; passed on by everyone; only grows
 --   B2;eq;<acct>;<store>;<n>;<offset>    send me page n from byte offset (offset = its length: stop)
@@ -344,7 +355,8 @@ local function WireKey(key)
 	return type(key) == "string" and #key == 17 and key:sub(9, 9) == "." and key:match("^[0-9a-f]+%.[0-9a-f]+$") ~= nil
 end
 
--- What I hold of where ("mine", "carry", "inbox"): { [key] = list }.
+-- What I hold of where ("mine", "carry", "inbox", or "early": mine not on disk yet, "provisional": a
+-- collector's pages that came early, E.Store.Held): { [key] = list }.
 local function HeldIn(where)
 	local id = "held>" .. where
 	if not cache[id] then
@@ -381,11 +393,21 @@ local function Holdings()
 end
 D.Holdings = Holdings
 
--- A page I can serve (of key, number n), or nil.
-local function Get(key, n)
+-- A page I can serve (of key, number n), or nil. early: my own not on disk yet too (to a collector
+-- who takes pages early).
+local function Get(key, n, early)
 	local acct, store = Split(key)
-	local page = S.Page(acct, store, n)
+	local page = S.Page(acct, store, n, early)
 	return S.Shareable(page) and page or nil
+end
+
+-- Whether I hold page n of key provisionally (it came early): its hash and where (E.Store); only
+-- while I collect (then the checks run; what a collector kept from before means nothing to a relay).
+local function Provisional(key, n)
+	if M.db.collect then
+		local acct, store = Split(key)
+		return S.Provisional(acct, store, n)
+	end
 end
 
 -- A collector's: what the exporter has of key.
@@ -461,11 +483,11 @@ local function SafeHere()
 	cache.safeHere = true
 end
 
--- A page that came, kept by E.Store where ("carry" or "inbox"): true (true, "have": had it), or
--- false and why (E.Store.Put's reasons).
-local function Put(key, n, page, where)
+-- A page that came, kept by E.Store where ("carry" or "inbox"; provisional: it came early): true
+-- (true, "have": had it), or false and why (E.Store.Put's reasons).
+local function Put(key, n, page, where, provisional)
 	local acct, store = Split(key)
-	local ok, why = S.Put(acct, store, n, page, where)
+	local ok, why = S.Put(acct, store, n, page, where, provisional)
 	Changed()
 	return ok, why
 end
@@ -573,9 +595,10 @@ function D.Read(word, more)
 		if #f >= 5 and Hex8(f[1]) and Hex8(f[2]) and proto and maxBytes and f[5]:match("^%l*$") and #f[5] <= 16 then
 			local flags = f[5]
 			return { acct = f[1], store = f[2], proto = proto, maxBytes = maxBytes, collect = flags:find("c", 1, true) ~= nil,
-				relay = flags:find("r", 1, true) ~= nil, share = flags:find("s", 1, true) ~= nil, answer = flags:find("a", 1, true) ~= nil }
+				relay = flags:find("r", 1, true) ~= nil, share = flags:find("s", 1, true) ~= nil, answer = flags:find("a", 1, true) ~= nil,
+				early = flags:find("e", 1, true) ~= nil }
 		end
-	elseif word == "es" then
+	elseif word == "es" or word == "ea" then
 		local items = #f == 1 and ReadItems(f[1])
 		if items then
 			return { items = items }
@@ -624,15 +647,21 @@ end
 ---------------------------------------------------------------------------
 
 -- Friends who sent eh: gameAccountID -> { acct, store, key, proto, maxBytes, collect, relay, share,
--- verified (true: their account is the one Battle.net says; false: it isn't; nil: not known yet),
--- holdings = { [key] = list } }
+-- early (takes pages early), verified (true: their account is the one Battle.net says; false: it
+-- isn't; nil: not known yet), holdings = { [key] = list } (es: pages on a disk somewhere),
+-- earlyHoldings = { [their key] = list } (ea: their own not on their disk yet) }
 local peers = {}
 local owedHello = {}   -- gameAccountID -> { at, answer }: my eh, once they're known to read it
 local incoming = {}    -- [inHead..inTail] = { id, word, more }: messages for the tick
 local inHead, inTail = 1, 0
-local inflight = {}    -- pageId ("<acct>.<store>.<n>") -> { from, key, n, at, sent }: my requests
-local partials = {}    -- pageId -> { key, n, len, hash, t0, m, chunks, have, at, from = { [id] = true } }
+-- pageId ("<acct>.<store>.<n>") -> { from, key, n, where, at, sent, early (from an ea), check (a
+-- number I hold provisionally: its start is compared, see OnBegin) }: my requests
+local inflight = {}
+-- pageId -> { key, n, len, hash, t0, m, chunks, have, at, from = { [id] = true }, early (no holder
+-- that sent it offered it as on a disk: it's kept provisional) }
+local partials = {}
 local bad = {}         -- pageId -> { [id] = true }: holders whose copy didn't match its hash (this session)
+local checked = {}     -- key -> { [n] = true }: provisional pages a copy from a disk didn't match (this session)
 local noRoom = {}      -- pageId -> when it was too big for my relay cache (not asked again for NO_ROOM_WAIT)
 local silentAt = {}    -- gameAccountID -> when a request to them went without progress (asked last for a while)
 local xmap = {}        -- sender -> { [x] = pageId }: their transfers
@@ -642,7 +671,7 @@ local out = {}         -- my other messages, waiting their turn: { id, message, 
 local queued = {}      -- record -> true: my messages in Beacon's queue, not sent yet
 local answersOut = {}  -- gameAccountID -> my answers to them waiting in out (Control)
 local outstanding = 0
-local sentHold, sentSafe = {}, {} -- gameAccountID -> { at, full, sent = { [item key] = ranges text } }
+local sentHold, sentSafe, sentEarly = {}, {}, {} -- gameAccountID -> { at, full, sent = { [item key] = ranges text } }
 -- The rate, in any second: when my last RATE messages went, and the last PEER_RATE to each friend
 -- (oldest first), and how many wait in Beacon's queue for each.
 local sentTimes, peerTimes, waitingFor = {}, {}, {}
@@ -656,6 +685,7 @@ local probe
 local stats = { sent = 0, received = 0, pages = 0, served = 0, badHash = 0, rejected = 0 }
 
 D.peers, D.inflight, D.partials, D.serves, D.active, D.out, D.stats = peers, inflight, partials, serves, active, out, stats
+D.checked = checked
 
 local function PageId(key, n)
 	return key .. "." .. n
@@ -671,8 +701,17 @@ local function Capable(bpeer)
 	return compare == 1 or compare == 0
 end
 
+-- (e: a collector of this build takes pages early, as provisional ones. Older builds look for each
+-- letter on its own: an unknown one changes nothing for them.)
 local function MyFlags(answer)
-	return (M.db.collect and "c" or "") .. (M.db.relay and "r" or "") .. "s" .. (answer and "a" or "")
+	return (M.db.collect and "ce" or "") .. (M.db.relay and "r" or "") .. "s" .. (answer and "a" or "")
+end
+
+-- Whether a friend takes my pages early: their account checked, they collect, their build keeps
+-- such pages provisional (e).
+local function TakesEarly(id)
+	local peer = peers[id]
+	return peer ~= nil and peer.verified == true and peer.collect == true and peer.early == true
 end
 
 local function HelloMessage(flags)
@@ -883,27 +922,36 @@ local function NextServe()
 	return table.remove(serves, 1)
 end
 
--- Requests waiting become serves while fewer than SERVING run.
+-- Requests waiting become serves while fewer than SERVING run. My own page not on my disk yet only
+-- to a friend who takes it early (early: it's such a serve); anyone else gets en, as for a page I
+-- don't have.
 local function StartServes()
 	while #active < SERVING and serves[1] do
 		local s = NextServe()
-		local page = ns.Beacon.peers[s.id] and Get(s.key, s.n)
+		local online = ns.Beacon.peers[s.id] ~= nil
+		local page = online and Get(s.key, s.n)
+		local early = false
+		if online and not page and s.key == MyKey() and TakesEarly(s.id) then
+			page = Get(s.key, s.n, true)
+			early = page ~= nil
+		end
 		if page and s.offset < #page.z then
 			nextX = nextX % 99 + 1
 			active[#active + 1] = { id = s.id, key = s.key, acct = s.acct, store = s.store, n = s.n, x = nextX,
-				offset = s.offset, len = #page.z, page = page, begun = false, pending = 0, mine = s.key == MyKey() }
-		elseif ns.Beacon.peers[s.id] and not page then
+				offset = s.offset, len = #page.z, page = page, begun = false, pending = 0, mine = s.key == MyKey(), early = early }
+		elseif online and not page then
 			Control(s.id, Msg("en", s.acct, s.store, s.n), "en", nil, true)
 		end
 	end
 end
 
 -- A page of mine I serve that moved to a new number (E.Store: friends hold another page with its
--- number) or went: nothing more of it goes (what of it waits in Beacon's queue still does).
+-- number) or went, or one not on my disk to a friend who no longer takes pages early: nothing more
+-- of it goes (what of it waits in Beacon's queue still does).
 local function DropMoved()
 	for i = #active, 1, -1 do
 		local s = active[i]
-		if s.mine and not s.stopped and E.data.mine[s.n] ~= s.page then
+		if s.mine and not s.stopped and (E.data.mine[s.n] ~= s.page or (s.early and not TakesEarly(s.id))) then
 			s.offset, s.stopped = s.len, true
 			if Done(s) then
 				table.remove(active, i)
@@ -981,7 +1029,7 @@ end
 ---------------------------------------------------------------------------
 
 local function ResetPeer(id)
-	sentHold[id], sentSafe[id] = nil, nil
+	sentHold[id], sentSafe[id], sentEarly[id] = nil, nil, nil
 end
 
 -- Requests to one holder are given up (another may answer, or the same again later), also the ones
@@ -1027,23 +1075,27 @@ local function OnHello(id, msg, now)
 	local peer = peers[id]
 	local key = msg.acct .. "." .. msg.store
 	if not peer or peer.key ~= key then
-		peer = { holdings = {} }
+		peer = { holdings = {}, earlyHoldings = {} }
 		peers[id] = peer
+	end
+	if msg.early and not peer.early then
+		sentEarly[id] = nil -- (they take pages early now: all of mine not on disk go to them at once)
 	end
 	peer.acct, peer.store, peer.key = msg.acct, msg.store, key
 	peer.proto, peer.maxBytes = msg.proto, msg.maxBytes
-	peer.collect, peer.relay, peer.share = msg.collect, msg.relay, msg.share
+	peer.collect, peer.relay, peer.share, peer.early = msg.collect, msg.relay, msg.share, msg.early
 	if not msg.answer then
-		-- They (re)started: they need mine, and everything I hold again; theirs comes again. What
-		-- they asked of me before is gone with their session (they ask again what they still need).
-		peer.holdings = {}
+		-- They (re)started: they need mine, and everything I hold again; theirs comes again (the
+		-- pages they offered early too: a crash may have lost them). What they asked of me before is
+		-- gone with their session (they ask again what they still need).
+		peer.holdings, peer.earlyHoldings = {}, {}
 		ResetPeer(id)
 		Release(id)
 		StopServing(id)
 		owedHello[id] = owedHello[id] or { at = now, answer = true }
 	end
 	if not (peer.collect or peer.relay or peer.share) then
-		peer.holdings = {} -- (switched off)
+		peer.holdings, peer.earlyHoldings = {}, {} -- (switched off)
 		Release(id)
 		StopServing(id)
 	end
@@ -1052,25 +1104,30 @@ local function OnHello(id, msg, now)
 	end
 end
 
--- What I hold, to one friend who collects or relays: only what grew since they last heard it
--- (everything the first time, and again every FULL_OFFER), at most every SUMMARY_GAP.
-local function Summary(id, peer, now)
-	local s = sentHold[id]
+-- What I told one friend (track: sentHold, sentSafe or sentEarly), if it's time to tell them again
+-- (at most every SUMMARY_GAP; what they heard is forgotten every FULL_OFFER: then all of it again);
+-- nil if not.
+local function Due(track, id, now)
+	local s = track[id]
 	if not s then
 		s = { at = -math.huge, full = now, sent = {} }
-		sentHold[id] = s
+		track[id] = s
 	end
 	if now - s.at < SUMMARY_GAP then
-		return
+		return nil
 	end
 	if now - s.full >= FULL_OFFER then
 		s.full = now
 		wipe(s.sent)
 	end
-	-- (Their own pages too: the author learns who holds which of its pages, and a page of theirs
-	-- that never went out but that I hold under its number is another page with that number.)
-	local items, head = {}, "B2;es;"
-	for key, list in pairs(Holdings()) do
+	return s
+end
+
+-- offer ({ [key] = list }) to one friend as head's messages ("B2;es;", "B2;ea;"): what changed since
+-- they last heard it (s, from Due).
+local function Tell(id, s, head, kind, offer, now)
+	local items = {}
+	for key, list in pairs(offer) do
 		local text = Ranges.Format(list)
 		if text ~= s.sent[key] then
 			s.sent[key] = text
@@ -1081,24 +1138,49 @@ local function Summary(id, peer, now)
 		s.at = now
 		table.sort(items)
 		for _, message in ipairs(Pack(head, items)) do
-			Control(id, message, "es")
+			Control(id, message, kind)
 		end
+	end
+end
+
+-- What I hold, to one friend who collects or relays: only what grew since they last heard it
+-- (everything the first time, and again every FULL_OFFER), at most every SUMMARY_GAP.
+local function Summary(id, peer, now)
+	local s = Due(sentHold, id, now)
+	if not s then
+		return
+	end
+	-- (Their own pages too: the author learns who holds which of its pages, and a page of theirs
+	-- that never went out but that I hold under its number is another page with that number. To
+	-- their author only, the ones I hold provisionally too (they came early): a page that a crash
+	-- lost has its number, so the author's next pages close above it. Nobody else hears of those:
+	-- no relay leaves a page alone for them, no collector fetches one.)
+	local offer, theirs = Holdings(), Have("provisional", peer.key)
+	if #theirs > 0 then
+		local copy = {}
+		for key, list in pairs(offer) do
+			copy[key] = list
+		end
+		copy[peer.key] = copy[peer.key] and Ranges.Union(copy[peer.key], theirs) or theirs
+		offer = copy
+	end
+	Tell(id, s, "B2;es;", "es", offer, now)
+end
+
+-- My own pages not on my disk yet, to one friend who takes them early (TakesEarly), the same way.
+local function EarlySummary(id, now)
+	local s = Due(sentEarly, id, now)
+	local key = MyKey()
+	if s and key then
+		Tell(id, s, "B2;ea;", "ea", { [key] = Have("early", key) }, now)
 	end
 end
 
 -- What collectors hold safely (theirs passed on, mine if I collect), to one friend, the same way.
 local function SafeSummary(id, now)
-	local s = sentSafe[id]
+	local s = Due(sentSafe, id, now)
 	if not s then
-		s = { at = -math.huge, full = now, sent = {} }
-		sentSafe[id] = s
-	end
-	if now - s.at < SUMMARY_GAP then
 		return
-	end
-	if now - s.full >= FULL_OFFER then
-		s.full = now
-		wipe(s.sent)
 	end
 	local byCollector = {}
 	for key, collectors in pairs(E.data.safe) do
@@ -1166,17 +1248,34 @@ local function CoveredBy(lists, times)
 	return Ranges.Normal(out)
 end
 
+-- The provisional pages of key a copy from a disk didn't match this session, still in the inbox (the
+-- receipt may take one meanwhile: then it's checked again).
+local function Checked(key)
+	local list = {}
+	for n in pairs(checked[key] or {}) do
+		local _, where = Provisional(key, n)
+		if where == "inbox" then
+			list[#list + 1] = { n, n }
+		end
+	end
+	return Ranges.Normal(list)
+end
+
 -- What of key I don't want, worked out once per Pull (memo). Collecting: what's in my inbox,
--- exported, or in my relay cache (it moves over, MoveOne). Relaying: what's in my cache, safe at a
--- collector, held by an online friend who collects (as good as safe: it will be at their next
--- session), or by COPIES online friends besides the author.
-local function Unwanted(key, collecting, memo)
-	if memo[key] then
-		return memo[key]
+-- exported, or in my relay cache (it moves over, MoveOne); offered early (early): also what I hold
+-- provisionally (a page's number taken: nothing early comes into it); offered as on a disk: not what
+-- I hold provisionally (a check: does the copy match?) unless it was checked this session and didn't.
+-- Relaying: what's in my cache, safe at a collector, held by an online friend who collects (as good as
+-- safe: it will be at their next session), or by COPIES online friends besides the author.
+local function Unwanted(key, collecting, memo, early)
+	local id = (early and "early>" or "") .. key
+	if memo[id] then
+		return memo[id]
 	end
 	local list
 	if collecting then
 		list = Ranges.Union(Ranges.Union(Have("inbox", key), Exported(key)), Have("carry", key))
+		list = Ranges.Union(list, early and Have("provisional", key) or Checked(key))
 	else
 		local covered, copies = {}, {}
 		for _, peer in pairs(peers) do
@@ -1189,7 +1288,7 @@ local function Unwanted(key, collecting, memo)
 		end
 		list = Ranges.Union(Ranges.Union(Have("carry", key), SafeOf(key)), Ranges.Union(covered, CoveredBy(copies, COPIES)))
 	end
-	memo[key] = list
+	memo[id] = list
 	return list
 end
 
@@ -1198,7 +1297,8 @@ end
 -- this holder's copy or my room failed (a few). A collector takes the oldest first; a relay starts
 -- at a random one of them and goes on from there (around to the first): many relays asking an
 -- author at once, before what they hold has spread, each fetch another page, not all the first.
-local function Wanted(id, key, offered, now, collecting, relaying, memo)
+-- early: offered early (ea; only a collector asks for those).
+local function Wanted(id, key, offered, now, collecting, relaying, memo, early)
 	local acct = key:sub(1, 8)
 	if key == MyKey() or not Accepted(acct, now) then
 		return nil
@@ -1211,7 +1311,7 @@ local function Wanted(id, key, offered, now, collecting, relaying, memo)
 	else
 		return nil
 	end
-	local free, count = Ranges.Minus(offered, Unwanted(key, collecting, memo)), 0
+	local free, count = Ranges.Minus(offered, Unwanted(key, collecting, memo, early)), 0
 	for _, r in ipairs(free) do
 		count = count + r[2] - r[1] + 1
 	end
@@ -1295,17 +1395,29 @@ local function Pull(now)
 	for _, id in ipairs(order) do
 		local peer = peers[id]
 		if peer.verified and not busy[id] and ns.Beacon.peers[id] and (peer.share or peer.relay or peer.collect) then
-			for _, key in ipairs(SortedKeys(peer.holdings)) do
-				local n, where = Wanted(id, key, peer.holdings[key], now, collecting, relaying, memo)
+			local key, n, where, early
+			for _, k in ipairs(SortedKeys(peer.holdings)) do
+				n, where = Wanted(id, k, peer.holdings[k], now, collecting, relaying, memo)
 				if n then
-					local pageId = PageId(key, n)
-					local part = partials[pageId]
-					inflight[pageId] = { from = id, key = key, n = n, where = where, at = now, sent = false }
-					Control(id, Msg("eq", key:sub(1, 8), key:sub(10), n, part and part.have or 0), "eq", pageId)
-					if InFlight() >= IN_FLIGHT then
-						return
-					end
+					key = k
 					break
+				end
+			end
+			-- Then their own pages not on their disk yet (a collector keeps them provisional).
+			local offered = collecting and not n and peer.earlyHoldings[peer.key]
+			if offered then
+				n, where = Wanted(id, peer.key, offered, now, collecting, false, memo, true)
+				key, early = peer.key, true
+			end
+			if n then
+				local pageId = PageId(key, n)
+				local part = partials[pageId]
+				-- (A number I hold provisionally, offered as on a disk: a check, OnBegin.)
+				inflight[pageId] = { from = id, key = key, n = n, where = where, at = now, sent = false, early = early,
+					check = not early and Provisional(key, n) ~= nil }
+				Control(id, Msg("eq", key:sub(1, 8), key:sub(10), n, part and part.have or 0), "eq", pageId)
+				if InFlight() >= IN_FLIGHT then
+					return
 				end
 			end
 		end
@@ -1336,17 +1448,22 @@ end
 
 -- A page whole: E.Store keeps it (into the inbox collecting, else relaying the cache) and checks it
 -- (its hash, size and start). Not the page it said: whoever sent parts of it isn't asked for it again.
+-- One that came early (no holder offered it as on a disk, or I asked for it from an ea) goes into the
+-- inbox as provisional, never into a relay's cache (relays only ever have pages from a disk):
+-- collecting switched off meanwhile, it goes (its author still has it).
 local function Complete(pageId, part)
+	local r = inflight[pageId]
+	local early = part.early or (r ~= nil and r.early == true)
 	partials[pageId], inflight[pageId] = nil, nil
 	local where
 	if M.db.collect then
 		where = "inbox"
-	elseif M.db.relay and part.key:sub(1, 8) ~= MyAccount() then
+	elseif M.db.relay and not early and part.key:sub(1, 8) ~= MyAccount() then
 		where = "carry"
 	else
 		return
 	end
-	local ok, why = Put(part.key, part.n, { t = part.t0, h = part.hash, m = part.m, z = table.concat(part.chunks) }, where)
+	local ok, why = Put(part.key, part.n, { t = part.t0, h = part.hash, m = part.m, z = table.concat(part.chunks) }, where, early)
 	if ok then
 		stats.pages = stats.pages + (why == "have" and 0 or 1)
 	elseif why == "full" then
@@ -1366,6 +1483,18 @@ end
 
 -- A page's start. Its transfer id is that page's now (parts with it never go into another page),
 -- and one I don't take is stopped: asked from its end, the sender sends no more of it.
+--
+-- A copy is from a disk when its holder offered that number in its holdings (es: my own on my disk,
+-- relayed, a collector's not provisional); one that isn't came early (its author's, ea): the page is
+-- kept provisional (part.early).
+--
+-- A number I hold provisionally (it came early): my request was a check, and its start says the
+-- hash of the copy from a disk. The same: confirmed (E.Store.Confirm), nothing more of it comes.
+-- Another, while the provisional page is in my inbox: another page with that number; it's stopped
+-- and not asked for again this session: the inbox has no room for it until the receipt took the
+-- provisional one (nobody drops it meanwhile: it isn't safe here). Another, the receipt took the
+-- provisional one: fetched like any page, into the inbox. A start for such a number that isn't the
+-- answer to my check is stopped.
 local function OnBegin(id, msg, now)
 	local key = msg.acct .. "." .. msg.store
 	local pageId = PageId(key, msg.n)
@@ -1373,6 +1502,28 @@ local function OnBegin(id, msg, now)
 	xmap[id] = xmap[id] or {}
 	xmap[id][msg.x] = nil
 	local stop = Msg("eq", msg.acct, msg.store, msg.n, msg.len)
+	local offered = peers[id].holdings[key]
+	local fromDisk = offered ~= nil and Ranges.Has(offered, msg.n)
+	local hash, pending = Provisional(key, msg.n)
+	if pending then
+		local check = r ~= nil and r.from == id and fromDisk
+		if check and hash == msg.hash then
+			local acct, store = Split(key)
+			S.Confirm(acct, store, msg.n, msg.hash)
+			Changed()
+		elseif check and pending == "inbox" then
+			checked[key] = checked[key] or {}
+			checked[key][msg.n] = true
+		end
+		if not check or hash == msg.hash or pending == "inbox" then
+			if r and r.from == id then
+				inflight[pageId], partials[pageId] = nil, nil
+			end
+			Control(id, stop, "eq", nil, true)
+			return
+		end
+		r.check = false -- (the receipt took the provisional one: this one is fetched)
+	end
 	if not (r or part) or Get(key, msg.n) then
 		Control(id, stop, "eq", nil, true) -- (not asked for, or got already)
 		return
@@ -1391,8 +1542,19 @@ local function OnBegin(id, msg, now)
 		part = nil -- (another page than the bytes so far: from the start)
 	end
 	if not part then
-		part = { key = key, n = msg.n, len = msg.len, hash = msg.hash, t0 = msg.t0, m = msg.m, chunks = {}, have = 0, from = {} }
+		part = { key = key, n = msg.n, len = msg.len, hash = msg.hash, t0 = msg.t0, m = msg.m, chunks = {}, have = 0, from = {},
+			early = not fromDisk }
 		partials[pageId] = part
+	elseif fromDisk then
+		part.early = false -- (this very page, a holder has it from a disk)
+	end
+	if part.early and not M.db.collect then
+		partials[pageId] = nil -- (an early page goes only into a collector's inbox)
+		if r and r.from == id then
+			inflight[pageId] = nil
+		end
+		Control(id, stop, "eq", nil, true)
+		return
 	end
 	part.at = now
 	xmap[id][msg.x] = pageId
@@ -1446,7 +1608,7 @@ end
 -- already goes on from the offset asked. Offset = its length: that page stops (only that one).
 local function OnRequest(id, msg)
 	local key = msg.acct .. "." .. msg.store
-	local page = Get(key, msg.n)
+	local page = Get(key, msg.n, TakesEarly(id)) -- (mine not on my disk yet: only to a collector who takes it early)
 	local stop = page ~= nil and msg.offset >= #page.z
 	local turn -- (where theirs was waiting)
 	for i = #active, 1, -1 do
@@ -1492,8 +1654,10 @@ end
 local function OnNone(id, msg)
 	local key = msg.acct .. "." .. msg.store
 	local peer = peers[id]
-	if peer and peer.holdings[key] then
-		peer.holdings[key] = Ranges.Minus(peer.holdings[key], { { msg.n, msg.n } })
+	for _, held in ipairs(peer and { peer.holdings, peer.earlyHoldings } or {}) do
+		if held[key] then
+			held[key] = Ranges.Minus(held[key], { { msg.n, msg.n } })
+		end
 	end
 	local pageId = PageId(key, msg.n)
 	local r = inflight[pageId]
@@ -1513,11 +1677,33 @@ local function OnHoldings(id, msg, now)
 				peer.holdings[key] = merged
 			end
 			if key == MyKey() then
-				if peer.relay then
-					Carried(key, list) -- (a relay holds these of mine: over the cap they go first)
+				if peer.relay and not peer.collect then
+					-- (a relay holds these of mine: over the cap they go first. Not a collector's: it
+					-- doesn't relay, and pages of mine it holds provisionally are among them)
+					Carried(key, list)
 				end
-				-- (a page of mine they hold that never went out is another page with that number)
+				-- (a page of mine they hold that never went out is another page with that number;
+				-- a collector's provisional ones too: a crash may have lost the page it holds)
 				S.Elsewhere(acct, key:sub(10), list)
+			end
+		end
+	end
+end
+
+-- Their own pages not on their disk yet (ea): taken only while I collect (as provisional pages),
+-- only of their own key; kept like holdings, until they restart or say en.
+local function OnEarly(id, msg, now)
+	local peer = peers[id]
+	if not M.db.collect then
+		return
+	end
+	for _, item in ipairs(msg.items) do
+		local key, acct, list = item[1], item[2], item[3]
+		if key == peer.key and Accepted(acct, now) then
+			S.Mentioned(acct, key:sub(10))
+			local merged = peer.earlyHoldings[key] and Ranges.Union(peer.earlyHoldings[key], list) or list
+			if #merged <= RANGES_MAX then
+				peer.earlyHoldings[key] = merged
 			end
 		end
 	end
@@ -1569,6 +1755,8 @@ local function Handle(id, word, more, now)
 	end
 	if word == "es" then
 		OnHoldings(id, msg, now)
+	elseif word == "ea" then
+		OnEarly(id, msg, now)
 	elseif word == "ed" then
 		OnSafe(id, msg, now)
 	elseif word == "eq" then
@@ -1654,8 +1842,8 @@ local function Reset()
 			record.serve.pending = 0
 		end
 	end
-	for _, t in ipairs({ peers, owedHello, incoming, inflight, partials, bad, noRoom, silentAt, xmap, serves, active, out, queued,
-			answersOut, sentHold, sentSafe, sentTimes, peerTimes, waitingFor }) do
+	for _, t in ipairs({ peers, owedHello, incoming, inflight, partials, bad, checked, noRoom, silentAt, xmap, serves, active, out, queued,
+			answersOut, sentHold, sentSafe, sentEarly, sentTimes, peerTimes, waitingFor }) do
 		wipe(t)
 	end
 	inHead, inTail, outstanding = 1, 0, 0
@@ -1737,6 +1925,9 @@ local function Housekeeping(now)
 		if peer.verified and beacon.peers[id] then
 			if peer.collect or peer.relay then
 				Summary(id, peer, now)
+			end
+			if TakesEarly(id) then
+				EarlySummary(id, now)
 			end
 			if peer.share or peer.relay or peer.collect then
 				SafeSummary(id, now)

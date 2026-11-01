@@ -8,15 +8,20 @@ local M = E.module
 -- one queued page at a time (zlib, Base64, LT.Hash32), never inside an event handler.
 --
 --   mine     my own closed pages, kept until a collector holds them: 2 MB at most, then the oldest
---            go, the ones a relay is known to carry first; offered only once on disk (closed in an
---            earlier session: after a crash, page numbers from the last save are used again). A
---            page that never went out (o = 0) whose number friends hold anyway is another page with
---            that number (a WTF folder restored, or copied and played on two computers): it moves to
---            a new number above all of them (E.data.top), and my next pages close above it too
+--            go, the ones a relay is known to carry first; offered to everyone only once on disk
+--            (closed in an earlier session: after a crash, page numbers from the last save are used
+--            again), and before that only to collectors who take them early (Held("early"),
+--            Page(..., early)), as provisional pages. A page that never went out (o = 0) whose number
+--            friends hold anyway is another page with that number (a WTF folder restored, or copied
+--            and played on two computers, or a crash's lost pages a collector holds provisionally): it
+--            moves to a new number above all of them (E.data.top), and my next pages close above it too
 --   carry    friends' pages I relay: 512 KB, 128 KB per author, 30 days
 --   inbox    a collector's received pages (a: when each came), dropped only by the exporter's receipt
 --            (only the ones it read: upto); a chat line at 4 MB asks to run the exporter, at 8 MB
---            pulling pauses (E.Store.InboxFull)
+--            pulling pauses (E.Store.InboxFull). A page that came early (p) is provisional until a
+--            copy from its author's disk shows the same hash (Confirm): never safe, never served,
+--            told only to its author; one the receipt takes goes to provisional (n -> its hash), not
+--            exported, so a page with that number from the author's disk is still fetched
 --   safe     what collectors hold safely, per author; exported: what the receipts listed. A store's
 --            entry goes 60 days after anything was last heard of it first-hand (heard: a friend
 --            offered pages of it, its collector told it, or pages of it are here): summaries
@@ -332,8 +337,10 @@ local Shareable = Store.Shareable
 
 -- Whether my page is on disk: closed in an earlier session than this one (a /reload starts a new
 -- one), closed as stale at login from the saved text (s: the session before), or from a build
--- before this rule (no s). Only those are offered: after a crash the next session numbers its pages
--- from the last save, so none of the lost session's pages may be out there under those numbers.
+-- before this rule (no s). Only those are offered to everyone: after a crash the next session
+-- numbers its pages from the last save, so a lost session's page out there would share its number
+-- with another page. The others go early only to collectors who keep them provisional (Delivery):
+-- they never count as safe until a copy from my disk shows the same hash.
 local function OnDisk(page)
 	return type(page.s) ~= "number" or page.s < E.data.session
 end
@@ -341,6 +348,37 @@ end
 -- My page may go to others: shareable and on disk.
 local function Offered(page)
 	return Shareable(page) and OnDisk(page)
+end
+
+-- My page may go early (to a collector who takes pages early): shareable, not on disk yet.
+local function Early(page)
+	return Shareable(page) and not OnDisk(page)
+end
+
+-- E.data.provisional["acct.store"]: { [n] = hash }, a collector's provisional pages the exporter's
+-- receipt took out of the inbox (the exporter has them) that aren't confirmed yet: not in exported,
+-- so a page with that number from the author's disk is still fetched. nil if there's none (make: a
+-- new one; the table made here if it isn't one).
+local function ProvisionalOf(key, make)
+	local all = E.data.provisional
+	if type(all) ~= "table" then
+		if not make then
+			return nil
+		end
+		all = {}
+		E.data.provisional = all
+	end
+	local list = key and all[key]
+	if type(list) ~= "table" and make and key then
+		list = {}
+		all[key] = list
+	end
+	return type(list) == "table" and list or nil
+end
+
+-- A provisional inbox page: it came early, not confirmed yet.
+local function Pending(page)
+	return type(page) == "table" and page.p ~= nil
 end
 
 -- for n, page in E.Store.Mine(): my pages I offer (shareable, on disk), oldest (lowest n) first.
@@ -365,40 +403,57 @@ function Store.Mine()
 end
 
 -- A page to serve: page, where ("mine", "inbox" or "carry"); nil if I don't have it (or it isn't
--- shareable; mine: or not on disk yet).
-function Store.Page(acct, store, n)
+-- shareable; mine: or not on disk yet, unless early: for a collector who takes pages early; inbox:
+-- or it's provisional).
+function Store.Page(acct, store, n, early)
 	local key = Store.Key(acct, store)
 	if not key or type(n) ~= "number" then
 		return nil
 	end
 	if key == Store.Own() then
 		local page = E.data.mine[n]
-		if Offered(page) then
+		if Offered(page) or (early and Shareable(page)) then
 			return page, "mine"
 		end
 		return nil
 	end
 	for _, where in ipairs({ "inbox", "carry" }) do
 		local list = E.data[where][key]
-		if list and list[n] then
-			return list[n], where
+		local page = list and list[n]
+		if page and not Pending(page) then
+			return page, where
 		end
 	end
 end
 
--- What I hold of where ("mine", "carry", "inbox") as { ["acct.store"] = "ranges" } (mine: the pages
--- I offer, shareable and on disk, under my key; nothing while my BattleTag isn't known).
+-- What I hold of where as { ["acct.store"] = "ranges" }: "mine" (the pages I offer, shareable and on
+-- disk, under my key; nothing while my BattleTag isn't known), "early" (mine shareable and not on
+-- disk yet: for collectors who take them early), "carry", "inbox" (provisional pages left out) or
+-- "provisional" (a collector's provisional pages: in the inbox, and the ones the receipt took).
 function Store.Held(where)
 	local out = {}
-	if where == "mine" then
+	if where == "mine" or where == "early" then
 		local own = Store.Own()
-		local ranges = own and Ranges.Of(E.data.mine, function(_, page) return Offered(page) end)
+		local ranges = own and Ranges.Of(E.data.mine, function(_, page) return (where == "mine" and Offered or Early)(page) end)
 		if ranges and ranges ~= "" then
 			out[own] = ranges
 		end
+	elseif where == "provisional" then
+		for key, pages in pairs(E.data.inbox) do
+			local ranges = Ranges.Of(pages, function(_, page) return Pending(page) end)
+			if ranges ~= "" then
+				out[key] = ranges
+			end
+		end
+		for key, list in pairs(type(E.data.provisional) == "table" and E.data.provisional or {}) do
+			local ranges = Ranges.Of(list, function(_, h) return type(h) == "string" end)
+			if ranges ~= "" then
+				out[key] = Ranges.Union(out[key], ranges)
+			end
+		end
 	else
 		for key, pages in pairs(E.data[where]) do
-			out[key] = Ranges.Of(pages)
+			out[key] = Ranges.Of(pages, where == "inbox" and function(_, page) return not Pending(page) end or nil)
 		end
 	end
 	return out
@@ -548,12 +603,12 @@ end
 -- A friend's page received: where "carry" (relaying) or "inbox" (collecting). page = { t (its
 -- start), h (LT.Hash32 of z), m ("z" or "r"), z }; it's kept as a copy with s (this session) and a
 -- (when it came: relayed, for the 30 days; collected, for the receipt's upto, after every page of an
--- earlier session). true, or true and "have" (kept already); false and why not: "id" (a key or
--- number that isn't one), "mine" (my own store's), "page" (not a page: m, z, Base64), "size" (z over
--- 64 KB), "time" (before the launch or more than a day ahead), "hash" (h doesn't match), "exported"
--- (the exporter has it), "safe" (relaying: a collector holds it), "full" (relaying: no room,
--- E.Store.Fits).
-function Store.Put(acct, store, n, page, where)
+-- earlier session). provisional (inbox only): it came early, kept with p = 1 (Confirm). true, or
+-- true and "have" (kept already); false and why not: "id" (a key or number that isn't one), "mine"
+-- (my own store's), "page" (not a page: m, z, Base64), "size" (z over 64 KB), "time" (before the
+-- launch or more than a day ahead), "hash" (h doesn't match), "exported" (the exporter has it),
+-- "safe" (relaying: a collector holds it), "full" (relaying: no room, E.Store.Fits).
+function Store.Put(acct, store, n, page, where, provisional)
 	if where ~= "carry" and where ~= "inbox" then
 		error("E.Store.Put: where is \"carry\" or \"inbox\", got " .. tostring(where), 2)
 	end
@@ -584,7 +639,9 @@ function Store.Put(acct, store, n, page, where)
 		return false, "full"
 	end
 	list = Pages(where, key, true)
-	list[n] = { t = page.t, h = page.h, m = page.m, z = page.z, s = data.session, a = where == "inbox" and math.max(E.Now(), arrived) or E.Now() }
+	local inbox = where == "inbox"
+	list[n] = { t = page.t, h = page.h, m = page.m, z = page.z, s = data.session, a = inbox and math.max(E.Now(), arrived) or E.Now(),
+		p = (inbox and provisional) and 1 or nil }
 	bytes[where] = bytes[where] + #page.z
 	if where == "carry" then
 		carryBy[key] = (carryBy[key] or 0) + #page.z
@@ -665,7 +722,9 @@ function Store.Safe(acct, store, ranges, collector)
 end
 
 -- What this collector holds safely of acct.store, as ranges: received in an earlier session (on
--- disk) or exported.
+-- disk) or exported. Never a provisional page: it came early, its author may have lost it in a crash
+-- and closed another page with that number since; until a copy from the author's disk shows the
+-- same hash, nobody may drop a page for it.
 function Store.SafeHere(acct, store)
 	local key = Store.Key(acct, store)
 	if not key then
@@ -673,9 +732,55 @@ function Store.SafeHere(acct, store)
 	end
 	local session = E.data.session
 	local onDisk = Ranges.Of(E.data.inbox[key], function(_, page)
-		return type(page.s) == "number" and page.s < session
+		return type(page) == "table" and type(page.s) == "number" and page.s < session and not Pending(page)
 	end)
 	return Ranges.Union(E.data.exported[key], onDisk)
+end
+
+-- Whether this collector holds page n of acct.store provisionally (it came early, not confirmed
+-- yet): its hash and where, "inbox" (the page is here) or "provisional" (the receipt took it); nil
+-- if not (also when the inbox has a page n from a disk: that one counts).
+function Store.Provisional(acct, store, n)
+	local key = Store.Key(acct, store)
+	if not key or type(n) ~= "number" then
+		return nil
+	end
+	local list = E.data.inbox[key]
+	local page = type(list) == "table" and list[n]
+	if type(page) == "table" then
+		if Pending(page) then
+			return type(page.h) == "string" and page.h or "", "inbox"
+		end
+		return nil
+	end
+	list = ProvisionalOf(key)
+	local h = list and list[n]
+	if type(h) == "string" then
+		return h, "provisional"
+	end
+end
+
+-- A copy of page n of acct.store from its author's disk has this hash: if it's the one I hold
+-- provisionally, it's confirmed (the inbox page loses p and is safe like any; one the receipt took
+-- is exported now). Whether it was.
+function Store.Confirm(acct, store, n, hash)
+	local h, where = Store.Provisional(acct, store, n)
+	if not h or h ~= hash then
+		return false
+	end
+	local key = Store.Key(acct, store)
+	if where == "inbox" then
+		E.data.inbox[key][n].p = nil
+	else
+		local list = ProvisionalOf(key)
+		list[n] = nil
+		if next(list) == nil then
+			E.data.provisional[key] = nil
+		end
+		E.data.exported[key] = Ranges.Union(E.data.exported[key], tostring(n))
+	end
+	Changed()
+	return true
 end
 
 -- A relay is known to carry these pages of acct.store (its holdings): if they're mine, they go first
@@ -868,25 +973,43 @@ local function Forget()
 end
 
 -- The exporter has these pages of acct.store (a receipt's ranges); upto: the latest arrival (a) of
--- my inbox it read, nil if it doesn't say (an older exporter: every one, as before). Inbox pages in
--- the ranges go if it read them (arrived by upto), into exported. A number of the ranges with no
--- inbox page goes into exported too; one kept in the inbox doesn't (the exporter doesn't have that
--- page). Carry and mine: the ranges go.
+-- my inbox it read, nil if it doesn't say (an older exporter). Inbox pages in the ranges go if it read
+-- them (arrived by upto): a provisional one into provisional (its hash), any other into exported (and
+-- out of provisional: the page with that number from a disk is archived now). Without upto every one
+-- goes, except a page from a disk whose number is provisional: it came after a provisional page of
+-- that number that the receipt took, so the receipt may be older than it. A number of the ranges
+-- with no inbox page goes into exported unless it's provisional; one kept in the inbox doesn't. Carry
+-- and mine: the ranges go.
 local function Take(acct, store, key, ranges, upto)
 	local data = E.data
-	local list, inbox = Ranges.Parse(ranges), data.inbox[key]
+	local list, inbox, provisional = Ranges.Parse(ranges), data.inbox[key], ProvisionalOf(key)
 	local taken, kept = {}, {}
 	for n, page in pairs(type(inbox) == "table" and inbox or {}) do
 		if Ranges.Contains(list, n) then
-			local take = not upto or (type(page.a) == "number" and page.a or 0) <= upto
+			local take
+			if upto then
+				take = (type(page.a) == "number" and page.a or 0) <= upto
+			else
+				take = Pending(page) or not (provisional and provisional[n])
+			end
 			local into = take and taken or kept
 			into[#into + 1] = take and n or { n, n }
 		end
 	end
 	for _, n in ipairs(taken) do
+		local page = inbox[n]
+		if Pending(page) then
+			ProvisionalOf(key, true)[n] = type(page.h) == "string" and page.h or ""
+		elseif provisional then
+			provisional[n] = nil
+		end
 		Remove("inbox", key, n)
 	end
-	local add = Ranges.Minus(list, Merge(kept))
+	provisional = ProvisionalOf(key)
+	if provisional and next(provisional) == nil then
+		data.provisional[key] = nil
+	end
+	local add = Ranges.Minus(list, Ranges.Union(Merge(kept), provisional and Ranges.Of(provisional) or ""))
 	local exported = add ~= "" and Ranges.Union(data.exported[key], add) or data.exported[key]
 	if taken[1] or exported ~= data.exported[key] then
 		data.exported[key] = exported
@@ -1032,15 +1155,17 @@ local function Status()
 	else
 		Line("no open page.")
 	end
-	local count, waiting, later = 0, 0, 0
+	local count, waiting, later, early = 0, 0, 0, 0
 	for _, page in pairs(data.mine) do
 		count = count + 1
 		waiting = waiting + (page.q and 1 or 0)
 		later = later + (OnDisk(page) and 0 or 1)
+		early = early + ((not OnDisk(page) and page.o == 1) and 1 or 0)
 	end
 	Line(("my pages: %d (%s), %s of %s%s%s%s."):format(count, count > 0 and Ranges.Of(data.mine) or "none", Amount(bytes.mine),
 		Amount(MINE_CAP), waiting > 0 and (", %d waiting to be packed"):format(waiting) or "",
-		later > 0 and (", %d offered from the next session on (a /reload is one)"):format(later) or "",
+		later > 0 and (", %d offered from the next session on (a /reload is one)%s"):format(later,
+			early > 0 and ("; %d of them went early to a collector"):format(early) or "") or "",
 		moved > 0 and (", %d moved to a new number this session (friends hold another page with theirs: a WTF folder restored, or copied?)"):format(moved) or ""))
 	local relayed = 0
 	for _, pages in pairs(data.carry) do

@@ -440,10 +440,11 @@ stops at the entrance.
 per hour of play) and kept in your saved data. A friend who collects (the *Collect recordings*
 setting) gets them over Battle.net in the background whenever you're both online, a few per second,
 never in combat and never ahead of anything else LefthyTools sends; friends in between pass them on
-when you aren't online at the same time, like Chronicle's journals. Your pages travel once the game
-has saved them (from your next login or `/reload` on), and you keep each page until the collector
-has it safely, then it's dropped. The collector's own program turns them into the website; that
-part isn't in this addon.
+when you aren't online at the same time, like Chronicle's journals. Your pages travel within minutes to a collector who's online, and from your
+next login or `/reload` on (once the game has saved them) to everyone else. You keep each page until
+the collector has it safely, then it's dropped. A page that reached a collector early stays with them
+even if your game crashes before saving it; it counts as safe only once the copy your game saved
+matches it. The collector's own program turns them into the website; that part isn't in this addon.
 
 `/lefthy echoes` shows what's recorded and kept. Switched off, Echoes does nothing at all: it
 records nothing and sends nothing, and pages you already have wait until it's on again.

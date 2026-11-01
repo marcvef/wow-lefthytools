@@ -404,7 +404,11 @@ LefthyToolsEchoesDB = {
   carry = { ["5e6f7a8b.0c77e1f2"] = { [57] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- friends' pages I relay
   safe = { ["5e6f7a8b.0c77e1f2"] = { ["c011ec70.12345678"] = "1-56" } },              -- collectors' summaries
   heard = { ["5e6f7a8b.0c77e1f2"] = 1793450000 },                                      -- when a store in safe was last heard of first-hand
-  inbox = { ["5e6f7a8b.0c77e1f2"] = { [58] = { t, h, m, z, s = 41, a = 1793450000 } } }, -- a collector's: received
+  inbox = { ["5e6f7a8b.0c77e1f2"] = {                                                  -- a collector's: received
+    [58] = { t, h, m, z, s = 41, a = 1793450000 },
+    [59] = { t, h, m, z, s = 41, a = 1793450100, p = 1 },                              -- came early: provisional
+  } },
+  provisional = { ["5e6f7a8b.0c77e1f2"] = { [55] = "3c1d2e4f" } },                     -- a collector's: provisional pages the receipt took
   exported = { ["5e6f7a8b.0c77e1f2"] = "1-50" },                                         -- a collector's: from receipts
   capture = { ["Player-..."] = { ... } },  -- the capture's baselines per character (Recording)
   friends = { ["Player-..."] = "Bob-Realm" }, -- LefthyTools friends' names (Recording)
@@ -429,6 +433,11 @@ sizes are counted (when recording starts). A stored page is `{ t, h, m, z }`:
   receipt's `upto`; none: from a build before it).
 - `o` (mine): `0` not out yet (no part of it was ever sent), `1` out (a part went to a friend);
   none: closed by a build before the rule, counts as out (numbers used twice, below).
+- `p` (inbox): `1` provisional: it came early, not confirmed yet (early pages, below).
+
+`provisional` (a collector's): `{ ["acct.store"] = { [n] = hash } }`, provisional pages the
+exporter's receipt took out of the inbox (the exporter has them) that aren't confirmed yet. Their
+numbers aren't in `exported`. Made when first needed.
 
 **Files.** `Store.lua` (the closed pages, what's kept, the receipt, `/lefthy echoes`) loads before
 `Pages.lua` (the open page). Both load after the capture's files, so at logout and when switched off
@@ -513,23 +522,43 @@ oldest first:
 Then `h = LT.Hash32(z)` and `q` goes. That's about once in 30 minutes: zlib and Base64 in C, the hash
 over 5-12 KB in Lua (about 1 ms).
 
-**My pages go out once they're on disk.** The game writes the saved file only at a logout or
-`/reload`; after a crash the next login goes on from the last save and numbers its pages from there
-again. A page of the lost session that had already gone to friends would then share its id with a
-different page closed after the crash: the collector keeps the first (pages never change), and its
-"safe" makes the author drop the second, which is lost. So `E.Store.Mine`, `E.Store.Held("mine")`
-and `E.Store.Page` for my own key offer only pages on disk: closed in an earlier session than this
-one (`s`; a `/reload` starts a new session, `E.data.session`).
+**My pages go to everyone once they're on disk, and early to a collector online.** The game writes
+the saved file only at a logout or `/reload`; after a crash the next login goes on from the last
+save and numbers its pages from there again. A page of the lost session that had already gone out
+would then share its id with a different page closed after the crash: a collector who kept the
+first (pages never change) would make the author drop the second with its "safe", and relays drop
+theirs too: lost. The guard for numbers used twice (below) only partly helps: it moves a page that
+never went out, not one that did, and a relay can take the second page before any holder of the
+first told the author (the holder offline at the author's next session). So:
 
+- **To everyone, only pages on disk:** `E.Store.Mine`, `E.Store.Held("mine")` and `E.Store.Page`
+  for my own key offer only pages closed in an earlier session than this one (`s`; a `/reload`
+  starts a new session, `E.data.session`). Relays only ever get those.
+- **Early, only to a collector:** my packed pages not on disk yet (`E.Store.Held("early")`,
+  `E.Store.Page(acct, store, n, true)`) go in an `ea` of their own, and are served, only to friends
+  who collect on a build that keeps them provisional (`e` in their hello; Delivery). The collector
+  keeps such a page **provisional** (`p = 1` in its inbox) until a copy from my disk shows the same
+  hash (a check, Delivery: Checks): never safe, never served, told (in `es`) only to me. So nobody
+  drops anything because of a page that came early.
+- **A crash after pages went early:** the collector holds the lost pages provisionally. Online at my
+  next session, it tells me their numbers (its `es` to me, `E.Store.Elsewhere`): my next pages close
+  above them, and a page of mine with such a number that never went out moves. Offline then, my next
+  page with that number goes out as ever (to relays after my `/reload`); back, the collector's check
+  shows another hash, and it waits until the exporter's receipt took its provisional page aside
+  (Store.lua: the receipt), then fetches mine. The exporter gets both (it keeps every version of a
+  number used twice); nobody drops mine before it's safe at the collector. A lost page that is never
+  confirmed stays provisional.
 - **A page closed as stale at login** is on disk at once (its `s` is the session before): it's the
   saved text and nothing else, and its last line is more than 10 minutes old, so any later load of
   that save, after a crash too, closes it the same way. One closed for another character within
   those 10 minutes waits for the next session (back on the first character, a later load would go
   on with it), and so does one closed after switching Echoes off and on (it has this session's
   lines).
-- **The cost:** my pages travel from the next session on (the next login or `/reload`), not the
-  evening they're recorded; the author keeps every page until a collector holds it, so nothing is
-  lost by the wait. `/lefthy echoes` says how many wait.
+- **The cost:** my pages travel to relays from the next session on (the next login or `/reload`),
+  not the evening they're recorded, and to a collector online within minutes (it downloads one again
+  only as far as its start, to check it, once it's on my disk). The author keeps every page until a
+  collector holds it safely, so nothing is lost by the wait. `/lefthy echoes` says how many wait, and
+  how many of those went early to a collector.
 
 **Numbers used twice** (a WTF folder restored from a backup, or copied to a second computer and
 played on both). The store id is made once per folder, so a restored folder numbers its pages again
@@ -538,12 +567,13 @@ a guard the collector keeps the first it gets, its "safe" covers the number, and
 its other page as safe: lost. So each of my pages knows whether it ever went out (`o`: `E.Store.WentOut`,
 called by the delivery when a part of it was actually sent; kept in the saved table):
 
-- **A page that never went out but whose number friends hold** (a holder's holdings `es`, or a
-  collector's safe summary `ed`, direct or passed on: `E.Store.Elsewhere`, `E.Store.Safe` for my key)
-  is another page with that number. It isn't dropped: it **moves to a new number**, above every
-  number of mine any friend told of, the last closed page's and the open page's (`E.data.top` keeps
-  the highest), and goes out under that number from the next session on (like a new page: its new
-  number is on disk then). A page still waiting to be packed gets its header renumbered too; a
+- **A page that never went out but whose number friends hold** (a holder's holdings `es`, a
+  collector's with the pages of mine it holds provisionally, or a collector's safe summary `ed`,
+  direct or passed on: `E.Store.Elsewhere`, `E.Store.Safe` for my key) is another page with that
+  number. It isn't dropped: it **moves to a new number**, above every number of mine any friend told
+  of, the last closed page's and the open page's (`E.data.top` keeps the highest), and goes out under
+  that number from the next session on (like a new page: its new number is on disk then; early to a
+  collector before that). A page still waiting to be packed gets its header renumbered too; a
   packed one keeps the number it was recorded under in its header (the game never unpacks a page),
   and the exporter files it under the number it's kept under (it warns that the header names
   another).
@@ -563,8 +593,9 @@ called by the delivery when a part of it was actually sent; kept in the saved ta
   own, whose lines are the first ones of a page that went out after the backup: those lines come
   twice. (The exporter can tell both: the moved page's header names the other number.) And a relay
   that asks for my never-out page before any holder's summary reached me makes it "out" (`o = 1`),
-  though the collector may hold the other page with that number: then it's lost like before. Copy a
-  WTF folder only to move, not to play on both.
+  though the collector may hold the other page with that number: then it's lost like before (a
+  collector that took it early keeps its provisional copy, which its exporter archives). Copy a WTF
+  folder only to move, not to play on both.
 
 **A BattleTag change** (Blizzard lets a player change it): my account is the hash of my BattleTag,
 so it changes with it, and my pages' key with it (the store stays).
@@ -598,6 +629,9 @@ so it changes with it, and my pages' key with it (the store stays).
 - **inbox:** dropped only by the exporter's receipt (only the pages it read). At 4 MB one chat line
   a session asks to run the exporter; at 8 MB `E.Store.InboxFull()` says so and the delivery stops
   pulling (a page still on its way is kept).
+- **provisional:** a number and a hash per provisional page the receipt took; it goes when the page
+  is confirmed (into `exported`) or the receipt takes a page with that number from a disk. One of a
+  page lost in its author's crash is never confirmed: it stays (a few numbers per crash).
 - **The launch day:** on the release, once `LT.LAUNCH_DAY` is set, pages that started before it go
   from mine, carry and inbox at the start, and `E.Store.Put` refuses them.
 
@@ -610,9 +644,14 @@ ranges:
 
 - **Inbox pages in the ranges** go if the exporter read them: `a` (none: 0) at most `upto[my store]`
   (a missing store entry: none of my inbox goes). Without `upto` (an older exporter) every one goes,
-  as before. A page that goes is added to `exported`.
-- **Numbers of the ranges without an inbox page** are added to `exported`. Numbers kept in the inbox
-  aren't (the exporter doesn't have that page).
+  as before, except a page from a disk whose number is in `provisional`: it came after the
+  provisional page of that number the receipt took, so the receipt may be older than it. A
+  provisional page that goes is kept in `provisional` (its number and hash), not in `exported`: the
+  exporter has it, but a page with that number from its author's disk (another page, after a crash)
+  must still be fetched. Any other page that goes is added to `exported`, and its number leaves
+  `provisional` (the page from a disk is archived now).
+- **Numbers of the ranges without an inbox page** are added to `exported`, unless `provisional` has
+  them. Numbers kept in the inbox aren't (the exporter doesn't have that page).
 - **carry and mine:** the ranges go, as before.
 
 It lists the full ranges each time, so reading it again is harmless (a page that came since stays,
@@ -624,15 +663,17 @@ relayed pages, collectors' summaries of stores not heard of for 60 days, the 2 M
 line), else the receipt.
 
 **Costs.** A tick: a few comparisons. A minute: one join. Half an hour: one page packed. Inside
-event handlers: only the logout's join and, at login, joining a stale page's text.
+event handlers: only the logout's join and, at login, joining a stale page's text. A page that came
+early is downloaded once more only as far as its start (a check), once it's on its author's disk.
 
 ### For the delivery: E.Store and E.Ranges
 
 Every change to mine, carry and inbox goes through `E.Store` (it keeps their sizes), and each one
 tells the delivery, which caches what I hold: `E.Delivery.PagesChanged()` (if Delivery.lua is
 there) when a page closes, is packed (it can be shared now), kept, dropped (the cap, the 30 days,
-the launch day, a receipt, `Drop`, `Safe`), when a collector's summary or what's exported grows,
-and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits each.
+the launch day, a receipt, `Drop`, `Safe`), confirmed (`Confirm`), when a collector's summary or
+what's exported grows, and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits
+each.
 
 | Call | What |
 |---|---|
@@ -640,15 +681,17 @@ and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits each.
 | `E.Store.Own()` | my pages' key, nil while my BattleTag isn't known |
 | `for n, page in E.Store.Mine()` | my pages I offer: shareable (`z`, `r`, not waiting) and on disk, oldest first |
 | `E.Store.Shareable(page)` | packed (`z`) or Base64 of the text (`r`), not waiting |
-| `E.Store.Page(acct, store, n)` | a page to serve, and where (`"mine"`, `"inbox"`, `"carry"`); nil if I don't have it (mine: or it isn't offered) |
-| `E.Store.Held(where)` | `{ ["acct.store"] = "ranges" }` of `"mine"` (the pages I offer), `"carry"` or `"inbox"` |
-| `E.Store.Put(acct, store, n, page, where)` | a friend's page received, `where` `"carry"` or `"inbox"`; `page` = `{ t, h, m, z }`, kept as a copy with `s` and `a`. `true` (`true, "have"`: had it), or `false` and why: `id`, `mine` (my own store's), `page` (not `z`/`r` Base64), `size` (over 64 KB), `time` (before the launch, more than a day ahead), `hash` (`h` isn't `LT.Hash32(z)`; Put checks it), `exported`, `safe` (relaying a page a collector holds), `full` |
+| `E.Store.Page(acct, store, n[, early])` | a page to serve, and where (`"mine"`, `"inbox"`, `"carry"`); nil if I don't have it (mine: or it isn't offered, unless `early`: then a shareable one not on disk too, for a collector who takes it early; inbox: or it's provisional) |
+| `E.Store.Held(where)` | `{ ["acct.store"] = "ranges" }` of `"mine"` (the pages I offer), `"early"` (mine shareable and not on disk yet), `"carry"`, `"inbox"` (provisional pages left out) or `"provisional"` (provisional pages in the inbox and in `provisional`) |
+| `E.Store.Put(acct, store, n, page, where[, provisional])` | a friend's page received, `where` `"carry"` or `"inbox"`; `page` = `{ t, h, m, z }`, kept as a copy with `s` and `a` (`provisional`, inbox only: it came early, kept with `p = 1`). `true` (`true, "have"`: had it), or `false` and why: `id`, `mine` (my own store's), `page` (not `z`/`r` Base64), `size` (over 64 KB), `time` (before the launch, more than a day ahead), `hash` (`h` isn't `LT.Hash32(z)`; Put checks it), `exported`, `safe` (relaying a page a collector holds), `full` |
+| `E.Store.Provisional(acct, store, n)` | whether this collector holds page `n` provisionally: its hash and where, `"inbox"` or `"provisional"` (the receipt took it); nil if not (also when the inbox has a page `n` from a disk) |
+| `E.Store.Confirm(acct, store, n, hash)` | a copy of page `n` from its author's disk has this hash: if it's the provisional one's, it's confirmed (the inbox page loses `p`; one the receipt took goes into `exported`); whether it was |
 | `E.Store.Drop(acct, store, ranges, where)` | drops those pages (ranges nil: all; where nil: mine, carry and inbox); the number dropped |
 | `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine and carry; of mine, one that never went out moves to a new number instead (numbers used twice) |
 | `E.Store.Elsewhere(acct, store, ranges)` | a holder offers these (its holdings): for my own key, my next pages close above them and a page of mine among them that never went out moves to a new number; the number moved |
 | `E.Store.WentOut(n, page)` | a part of my page `n` was sent (`page`: the one served, if it's still page `n`): `o = 1`, it keeps its number |
-| `E.Store.SafeHere(acct, store)` | ranges this collector holds safely: received in an earlier session (on disk) or exported |
-| `E.Store.Carried(acct, store, ranges)` | a relay holds these: of mine, they go first over the cap |
+| `E.Store.SafeHere(acct, store)` | ranges this collector holds safely: received in an earlier session (on disk) and not provisional, or exported |
+| `E.Store.Carried(acct, store, ranges)` | a relay holds these (not a collector: provisional pages are among its holdings): of mine, they go first over the cap |
 | `E.Store.Mentioned(acct, store)` | a friend told of this store first-hand (offers pages of it, or is the collector whose summary it is): what collectors hold of it is kept 60 days from now |
 | `E.Store.Fits(acct, store, bytes)` | whether a relayed page of that size fits the cache |
 | `E.Store.InboxFull()` | 8 MB collected: stop pulling |
@@ -663,7 +706,7 @@ page numbers). Each takes a string or a parsed list.
 ### /lefthy echoes
 
 `/lefthy echoes` (or `status`) prints, in English: recording or not, the account and store, the
-open page (size, lines, age; whether nothing is on it yet, so it stays open), my pages (numbers, size of 2 MB, how many wait to be packed, how many are offered from the next session on), relaying
+open page (size, lines, age; whether nothing is on it yet, so it stays open), my pages (numbers, size of 2 MB, how many wait to be packed, how many are offered from the next session on and how many of those went early to a collector), relaying
 (with relaying on or pages kept) and collecting (with collecting on or anything collected or
 exported). Other files add to it:
 
@@ -685,7 +728,8 @@ when the two are never online together.
   travel.
 - **Relay** (`relay`, on): keeps friends' pages for a while and passes them on.
 - **Collector** (`collect`, off): gathers friends' pages, and my own account's from my other
-  computers, for the exporter. A collector doesn't relay.
+  computers, for the exporter; an author online gives it its pages not on disk yet early, which it
+  keeps provisional (Pages and storage). A collector doesn't relay.
 
 Delivery runs on Echoes' tick while recording, and only while Beacon is on and my BattleTag is
 known. Its state is memory only: a `/reload` starts afresh (pages half-way are asked for again).
@@ -697,8 +741,9 @@ bytes, like every Beacon message.
 
 | Message | Format | What |
 |---|---|---|
-| `eh` hello | `B2;eh;<acct>;<store>;<proto>;<maxBytes>;<flags>` | proto 1, maxBytes 255. Flags: `c` collect, `r` relay, `s` share, `a` an answer (none back). Without c, r and s: switched off. Later fields are ignored (room for later builds) |
-| `es` holdings | `B2;es;<acct>.<store>:<ranges>/...` | pages I can serve (`1-56,58`) |
+| `eh` hello | `B2;eh;<acct>;<store>;<proto>;<maxBytes>;<flags>` | proto 1, maxBytes 255. Flags: `c` collect, `r` relay, `s` share, `e` takes pages early (sent with `c`: this build keeps them provisional), `a` an answer (none back). Without c, r and s: switched off. Later fields are ignored (room for later builds); older builds look for each letter on its own, so `e` changes nothing for them |
+| `es` holdings | `B2;es;<acct>.<store>:<ranges>/...` | pages I can serve (`1-56,58`); to a page's author, the ones of theirs I hold provisionally too |
+| `ea` early | `B2;ea;<acct>.<store>:<ranges>/...` | my own pages not on my disk yet; only to a friend who collects and takes them early (`c` and `e`), only my own key. Older builds don't read the word, and get none |
 | `ed` safe | `B2;ed;<collector acct>;<collector store>;<acct>.<store>:<ranges>/...` | pages safe at that collector; passed on by everyone; only grows |
 | `eq` request | `B2;eq;<acct>;<store>;<n>;<offset>` | send me page n from byte offset; offset = its length: stop sending it |
 | `eb` page begins | `B2;eb;<x>;<acct>;<store>;<n>;<len>;<hash>;<t0>;<m>` | transfer x (1-99, the sender's), length, `LT.Hash32` of the Base64 text, start, mode (`z` or `r`: the receiver stores it as it is) |
@@ -706,7 +751,7 @@ bytes, like every Beacon message.
 | `en` don't have | `B2;en;<acct>;<store>;<n>` | ask someone else |
 | `ex` / `ey` probe | `B2;ex;<size>;<padding>` / `B2;ey;<size>;<got>` | the probe (below) and its answer |
 
-Items of `es` and `ed` are split over as many messages as they need (a long list of ranges in
+Items of `es`, `ea` and `ed` are split over as many messages as they need (a long list of ranges in
 pieces); receivers merge them. Every message is read strictly (`D.Read`: fields, sizes, lowercase
 hex, Base64 characters; at most 300 intervals in a list, 40 items in a message). What I send of my
 saved table is checked the same way: a key that isn't two times 8 lowercase hex digits (a file
@@ -720,8 +765,10 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   0.6.0-24 reads B2 but has no Delivery, and a build without a commit count, like the tagged
   0.6.0, counts as older), or in answer to theirs. A friend on an older build is never sent one (after 60 s without a version that reads
   B, nothing is owed any more). An `eh` without `a` is answered with one with `a`; a friend who
-  (re)starts gets everything I hold again, and theirs comes again; what they asked of me before
-  isn't served any more (gone with their session: they ask again).
+  (re)starts gets everything I hold again, and theirs comes again (what they offered early is
+  forgotten: a crash may have lost it); what they asked of me before isn't served any more (gone
+  with their session: they ask again). A friend whose hello newly says `e` gets all my early pages
+  at once.
 - **Their account**: the account in `eh` must be the one Battle.net says for that friend (the
   friend list's BattleTag hashes, Chronicle's `C.Hash` the same way, whether Chronicle is on or
   not; or `GetAccountInfoByGUID`). Wrong: nothing is exchanged with them. Not known yet: checked
@@ -736,14 +783,30 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
 
 ### Pulling
 
-- **What I hold** (`es`): my own pages (once on disk: Pages and storage), the ones I relay (while relaying) and a collector's inbox;
-  a friend's own pages too, back to them (they learn who holds which of theirs: `E.Store.Carried`,
-  and numbers used twice). To a friend who collects or relays, when it changed (at most every 60
-  s), everything every 5 minutes.
+- **What I hold** (`es`): my own pages (once on disk: Pages and storage), the ones I relay (while
+  relaying) and a collector's inbox (not its provisional pages); a friend's own pages too, back to
+  them (they learn who holds which of theirs: `E.Store.Carried`, and numbers used twice), and to
+  them only the ones of theirs I hold provisionally. Nobody else hears of provisional pages: no
+  relay leaves a page alone for them ("held by an online collector" counts only what's in an `es`),
+  no other collector asks for one. To a friend who collects or relays, when it changed (at most
+  every 60 s), everything every 5 minutes.
+- **My early pages** (`ea`): my own pages not on disk yet, to a friend who collects and takes them
+  early (`c` and `e`: verified, online), the same way (when it changed, at most every 60 s,
+  everything every 5 minutes). Serving one: only to such a friend; anyone else asking gets `en`.
+  A relay's holdings of my
+  pages mark them carried (`E.Store.Carried`, over my cap they go first), a collector's don't (it
+  doesn't relay, and its provisional numbers are among them); `E.Store.Elsewhere` takes both.
 - **A collector** asks for every offered page it lacks (not in its inbox, not exported, not in
   its relay cache), until its inbox reaches 8 MB. Its relay cache (from before it collected)
   moves to the inbox, one page a second (`E.Store.Put` checks its hash again), offered or not; an
   exported one just goes.
+  - **Early offers** (`ea`, kept per friend only for their own key, until they restart, switch off
+    or say `en`; taken only while collecting): after what friends offer as on a disk, the pages
+    there it doesn't have in any way (not in its inbox, provisional or not, nor in `provisional`,
+    exported or in its relay cache). They're kept provisional (`p = 1`).
+  - **A number it holds provisionally**, offered as on a disk (anyone's `es`): asked for as a check
+    (Checks); one whose check showed another hash while the provisional page is still in the inbox
+    isn't asked for again this session.
 - **A relay** asks for pages of its friends' accounts (not its own) that:
   - no collector holds safely (`safe`),
   - no online friend who collects holds (they'll be safe at its next session),
@@ -787,11 +850,29 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   start (not before the launch, not more than a day ahead), exported, safe, room. Refused for its
   hash, size or start: whoever sent parts of it isn't asked for it again this session. No room:
   that page is left alone for 5 minutes. The game never decompresses a page.
+- **From a disk or early:** a copy is from a disk when the friend who began it offered that number
+  in their `es` (my own on my disk, relayed, a collector's not provisional); one that isn't came
+  early (its author's, from an `ea`). A page whose bytes came early (and no holder of the same page
+  offered it as on a disk, or it was asked for from an `ea`) is kept provisional (`p = 1`), and only
+  by a collector: one that switched collecting off meanwhile lets it go (relays only ever have pages
+  from a disk; the author still has it).
+- **The check** (`E.Store.Provisional`, `E.Store.Confirm`): a number I hold provisionally is asked
+  for when someone offers it as on a disk, and its start (`eb`) says the copy's hash. The same as
+  mine: confirmed (the inbox page loses `p`; one the receipt took goes into `exported`), and it's
+  stopped (asked from its end): only its start and maybe a part came again. Another hash while my
+  provisional page is in the inbox: another page with that number (its author lost mine in a crash
+  and closed this one after); stopped, not asked for again this session, and it waits: the inbox has
+  no room for it until the receipt took mine aside (nobody drops it meanwhile: a provisional page
+  isn't safe). Another hash, the receipt took mine: fetched like any page (into the inbox, from a
+  disk; not refused as exported, its number isn't). A start of such a number that isn't the answer
+  to my check is stopped.
 
 ### Safe at a collector
 
-- A collector's page is safe once it came in an earlier session (on disk now) or the exporter
-  has it (`E.Store.SafeHere`). The collector puts its own summary in `safe` and sends `ed` to every
+- A collector's page is safe once it came in an earlier session (on disk now) and isn't
+  provisional, or the exporter has it (`E.Store.SafeHere`). A provisional page never is, and its
+  number isn't in `exported` either until it's confirmed: so nothing anyone drops ever depends on a
+  page that came early. The collector puts its own summary in `safe` and sends `ed` to every
   friend; everyone passes on what they know, when it changed (at most every 60 s, everything every
   5 minutes), and `E.Store.Safe` merges what comes by union.
 - Only collectors of a friend's account or my own count, and only about accounts I take; only what
@@ -868,7 +949,8 @@ pages coming and served, traffic, a pause after a throttle.
 
 Every change to the pages goes through `E.Store` (Pages and storage): `Page` to serve, `Held`
 for what I hold, `Put` for what came, `Drop` (a page I relay that's collected now moves to the
-inbox), `Safe` and `SafeHere`, `Carried`, `Elsewhere`, `WentOut`, `Fits`, `InboxFull`, `Own`. Delivery only reads
+inbox), `Safe` and `SafeHere`, `Provisional` and `Confirm` (checks), `Carried`, `Elsewhere`,
+`WentOut`, `Fits`, `InboxFull`, `Own`. Delivery only reads
 `exported` and `safe` for its decisions. What it works out of the pages (holdings, what I have
 of a store, what's exported or safe) is cached until they change: `E.Store` calls
 `D.PagesChanged()` on every change (and Delivery works it out anew every 5 minutes, a safety

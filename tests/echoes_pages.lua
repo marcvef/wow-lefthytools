@@ -3,11 +3,12 @@
 -- doubling a line; closing by time, size and lines, on the tick only, one page packed a tick; a stale
 -- open page at login; packing through the mock's C_EncodingUtil (Node's real zlib, tests/native.js),
 -- the hash and the fallbacks; my BattleTag not known yet; range strings; what's kept (mine, carry,
--- inbox) and the API for the delivery; the exporter's receipt (its upto); the launch day; the beta
--- untouched; /lefthy echoes; nothing heavy per tick; the exporter's own readers on the saved file,
--- when the environment variable ECHOES_EXPORTER names the exporter's folder (skipped otherwise). The
--- capture is kept quiet until the last section, where it runs: its lines after the header, a page
--- going on at its last point, its last lines joined at logout and when switched off.
+-- inbox) and the API for the delivery (early pages, a collector's provisional ones); the exporter's
+-- receipt (its upto, provisional pages); the launch day; the beta untouched; /lefthy echoes; nothing
+-- heavy per tick; the exporter's own readers on the saved file, when the environment variable
+-- ECHOES_EXPORTER names the exporter's folder (skipped otherwise). The capture is kept quiet until
+-- the last section, where it runs: its lines after the header, a page going on at its last point,
+-- its last lines joined at logout and when switched off.
 -- Needs: no other file (it starts Echoes itself, on saved tables of its own, and puts back the beta).
 local suite = ...
 local check, section, ns, LT, lefthy, printedSince = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy, suite.printedSince
@@ -795,6 +796,63 @@ do
 	check(sizesAgree(), "the sizes kept as pages came and went are the pages' (carry per author too)")
 end
 
+section("Echoes pages: my pages not on disk yet go early; a collector's provisional pages")
+do
+	-- My pages closed this session go only to a collector who takes them early (Held("early"), Page
+	-- with early): they aren't on disk yet, a crash could lose them. A collector keeps such a page
+	-- provisional (p): never served, never safe, until a copy from its author's disk shows the same
+	-- hash (Confirm).
+	fresh(acct)
+	kills(1, 1)
+	tick()
+	skew = skew + 1800
+	tick()
+	tick()
+	local n = E.data.n
+	local page = E.data.mine[n]
+	check(page.m == "z" and Store.Held("early")[own] == tostring(n) and Store.Held("mine")[own] == nil and Store.Page(acct, STORE, n) == nil
+		and Store.Page(acct, STORE, n, true) == page, "a page closed this session: early (Held, Page with early), not offered to everyone")
+	Fire("ECHOES_PAGES_TEST", 170, 200)
+	tick()
+	local waiting = E.data.n
+	check(E.data.mine[waiting].q and Store.Page(acct, STORE, waiting, true) == nil and Store.Held("early")[own] == tostring(n),
+		"one waiting to be packed: not yet")
+	tick()
+	E.data.mine[waiting].m, E.data.mine[waiting].z = "t", "E1;\n.0;s\n" -- (as if packing had failed: plain text)
+	Store.Recount()
+	check(Store.Page(acct, STORE, waiting, true) == nil and Store.Held("early")[own] == tostring(n), "a plain-text page never goes, early or not")
+	page.o = 1 -- (a part of it went to a collector)
+	local mark = #PRINTED + 1
+	lefthy("echoes")
+	check(printedSince(mark):find("2 offered from the next session on (a /reload is one); 1 of them went early to a collector", 1, true),
+		"the status says how many went early, got\n" .. printedSince(mark))
+	reload(1)
+	check(Store.Held("early")[own] == nil and Store.Held("mine")[own] == tostring(n) and Store.Page(acct, STORE, n) == E.data.mine[n],
+		"after a /reload: on disk, offered to everyone, not early any more")
+
+	-- A collector's: a page that came early is provisional (p), with when it came (a).
+	local now = E.Now()
+	local early, disk = friendPage(1, now), friendPage(2, now)
+	check(Store.Put(A, B, 1, early, "inbox", true) and Store.Put(A, B, 2, disk, "inbox"), "(two pages: 1 came early, 2 from a disk)")
+	local p1, p2 = E.data.inbox[friend][1], E.data.inbox[friend][2]
+	check(p1.p == 1 and p1.a == now and p2.p == nil and p2.a == now, "kept with p (provisional) and when it came (a); the other without p")
+	check(Store.Page(A, B, 1) == nil and Store.Page(A, B, 2) == p2 and Store.Held("inbox")[friend] == "2" and Store.Held("provisional")[friend] == "1",
+		"a provisional page isn't served, nor in what I hold (Held(\"inbox\")); Held(\"provisional\") has it")
+	local h, where = Store.Provisional(A, B, 1)
+	check(h == early.h and where == "inbox" and Store.Provisional(A, B, 2) == nil and Store.Provisional(A, B, 3) == nil,
+		"Provisional: its hash, in the inbox; nothing for a page from a disk, or none")
+	reload(1)
+	p1 = E.data.inbox[friend][1] -- (the saved table read back)
+	check(Store.SafeHere(A, B) == "2", "an earlier session's: only the one from a disk is safe here, got " .. Store.SafeHere(A, B))
+	check(not Store.Confirm(A, B, 1, realHash("another page 1")) and p1.p == 1 and Store.SafeHere(A, B) == "2",
+		"a copy from a disk with another hash: not confirmed")
+	check(Store.Confirm(A, B, 1, early.h) and p1.p == nil and Store.SafeHere(A, B) == "1-2" and Store.Page(A, B, 1) == p1,
+		"the same hash: confirmed; it came in an earlier session: safe, served")
+	check(not Store.Confirm(A, B, 1, early.h) and not Store.Confirm(A, B, 2, disk.h) and not Store.Confirm(A, B, 9, disk.h),
+		"nothing provisional: nothing to confirm")
+	check(sizesAgree(), "(the sizes agree)")
+end
+
 section("Echoes pages: a page number used twice (a WTF folder restored, or copied to a second PC)")
 do
 	-- A page of mine that never went out (no part of it sent) whose number friends hold anyway is
@@ -1065,6 +1123,82 @@ do
 	LT:SetModuleSetting(M, "collect", false)
 end
 
+section("Echoes pages: the receipt and provisional pages")
+do
+	-- A provisional page the receipt takes goes into provisional (its hash), not exported: a page with
+	-- that number from its author's disk is still fetched. Pages that came after what the exporter
+	-- read stay, provisional or not.
+	fresh(acct)
+	LT:SetModuleSetting(M, "collect", true)
+	local read = E.Now()
+	local pages = {}
+	for n = 1, 4 do
+		pages[n] = friendPage(n, read)
+	end
+	Store.Put(A, B, 1, pages[1], "inbox", true)
+	Store.Put(A, B, 2, pages[2], "inbox")
+	skew = skew + 60 -- (the exporter read the saved file with 1 and 2; 3 and 4 came later)
+	Store.Put(A, B, 3, pages[3], "inbox")
+	Store.Put(A, B, 4, pages[4], "inbox", true)
+	Advance(3, 0.25)
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-6" }, upto = { [STORE] = read } }
+	reload(1)
+	Advance(2, 0.25)
+	local function provisional() return Ranges.Of(E.data.provisional and E.data.provisional[friend]) end
+	check(Ranges.Of(E.data.inbox[friend]) == "3-4" and E.data.exported[friend] == "2,5-6" and provisional() == "1"
+		and E.data.provisional[friend][1] == pages[1].h, "the receipt: the provisional 1 goes to provisional (its hash), 2 is exported; 3-4"
+		.. " came after what the exporter read: kept, not exported; 5-6 (no inbox page) exported; got inbox "
+		.. Ranges.Of(E.data.inbox[friend]) .. ", exported " .. tostring(E.data.exported[friend]) .. ", provisional " .. provisional())
+	local h, where = Store.Provisional(A, B, 1)
+	check(h == pages[1].h and where == "provisional" and Store.Held("provisional")[friend] == "1,4" and not Ranges.Contains(Store.SafeHere(A, B), 1),
+		"1 is still provisional (taken by the receipt): not safe, not exported")
+
+	-- The exporter ran again (read 3 and 4): 3 exported, 4 provisional.
+	MOCK_RECEIPT.upto[STORE] = E.Now()
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.inbox[friend] == nil and E.data.exported[friend] == "2-3,5-6" and provisional() == "1,4", "the next receipt: 3 exported, 4 provisional, got "
+		.. tostring(E.data.exported[friend]) .. " and " .. provisional())
+	-- A copy of 1 from its author's disk with the same hash: confirmed, exported now.
+	check(Store.Confirm(A, B, 1, pages[1].h) and E.data.exported[friend] == "1-3,5-6" and provisional() == "4", "1 confirmed: exported")
+	-- Page 4 from its author's disk with another hash (the early one was lost in a crash): taken (4 isn't
+	-- exported); the inbox's copy counts now.
+	local other = friendPage(4, read + 30)
+	check(other.h ~= pages[4].h and Store.Put(A, B, 4, other, "inbox") == true and Store.Provisional(A, B, 4) == nil, "another page 4 from a disk: kept")
+	-- The same receipt read again (the exporter hasn't run since): the new 4 came after it, it stays.
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.inbox[friend] and E.data.inbox[friend][4] and E.data.inbox[friend][4].h == other.h and not Ranges.Contains(E.data.exported[friend], 4)
+		and provisional() == "4", "the same receipt again: the page 4 that came after it stays, 4 not exported")
+
+	-- An older exporter (no upto): every inbox page in its ranges goes, as before, except one from a disk
+	-- whose number is provisional (it came after the provisional page the receipt took: the receipt
+	-- may be older than it).
+	Store.Put(A, B, 7, friendPage(7, read), "inbox")
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-7" } }
+	reload(1)
+	Advance(2, 0.25)
+	check(Ranges.Of(E.data.inbox[friend]) == "4" and E.data.exported[friend] == "1-3,5-7" and provisional() == "4",
+		"no upto: 7 goes (exported); the page 4 from a disk stays, its number provisional; got " .. Ranges.Of(E.data.inbox[friend]) .. ", "
+		.. tostring(E.data.exported[friend]))
+	-- A receipt whose upto doesn't name my store (it read another WTF folder's file): nothing of my inbox goes.
+	Store.Put(A, B, 8, friendPage(8, read), "inbox")
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-9" }, upto = { ["0badf00d"] = E.Now() + 3600 } }
+	reload(1)
+	Advance(2, 0.25)
+	check(Ranges.Of(E.data.inbox[friend]) == "4,8" and E.data.exported[friend] == "1-3,5-7,9", "upto without my store: no inbox page goes"
+		.. " (4 and 8 stay, not exported; 9, no page here, is), got " .. tostring(E.data.exported[friend]))
+	-- The exporter read everything: all exported, nothing provisional left.
+	MOCK_RECEIPT.upto[STORE] = E.Now()
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.inbox[friend] == nil and E.data.exported[friend] == "1-9" and (E.data.provisional or {})[friend] == nil,
+		"the exporter read them: exported, the provisional 4 cleared by its page from a disk")
+	check(sizesAgree(), "(the sizes agree)")
+	MOCK_RECEIPT, LefthyToolsEchoesReceipt = nil, nil
+	LT:SetModuleSetting(M, "collect", false)
+end
+
 section("Echoes pages: the launch day")
 do
 	fresh(acct)
@@ -1284,6 +1418,7 @@ do
 	Fire("ECHOES_PAGES_TEST", 170, 200)
 	tick() -- (closed, not packed yet)
 	Store.Put(A, B, 1, friendPage(1, E.Now()), "inbox")
+	Store.Put(A, B, 2, friendPage(2, E.Now()), "inbox", true) -- (a provisional one: p, a)
 	kills(1, 2)
 	E.Flush()
 	local kinds = {}
@@ -1300,13 +1435,14 @@ do
 			:format(tostring(result.new), tostring(result.provisional), tostring(result.bad), tostring(result.hashBad), #result.warnings))
 		check(result.bad == 0 and result.hashBad == 0 and #result.warnings == 0, "the exporter reads every page, every hash matches, no warnings: "
 			.. table.concat(result.warnings, "; "))
-		check(result.new == 5 and result.provisional == 1, "4 of mine and the friend's archived, the open page provisionally, got "
-			.. tostring(result.new) .. " and " .. tostring(result.provisional))
+		check(result.new == 6 and result.provisional == 1, "4 of mine and the friend's 2 (one of them provisional in my inbox) archived, the open"
+			.. " page provisionally, got " .. tostring(result.new) .. " and " .. tostring(result.provisional))
 		local same = true
 		for n = 1, 4 do
 			same = same and result.pages[own .. "." .. n] == textOf(E.data.mine[n])
 		end
-		check(same and result.pages[friend .. ".1"] == textOf(E.data.inbox[friend][1]) and result.open[own .. ".5"] == E.data.open.text,
+		check(same and result.pages[friend .. ".1"] == textOf(E.data.inbox[friend][1]) and result.pages[friend .. ".2"] == textOf(E.data.inbox[friend][2])
+			and result.open[own .. ".5"] == E.data.open.text,
 			"the archived texts are the recorded ones, byte for byte (UTF-8, escapes)")
 		local ends, ok = {}, true
 		for n = 1, 4 do

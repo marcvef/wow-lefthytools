@@ -1,7 +1,8 @@
 -- Echoes' delivery (Delivery.lua) and Beacon's B family: the messages, what friends hold and what's
 -- safe, who gets B at all, serving within the budget, pulling, checks and resuming, relaying, dropping
 -- copies once safe, switching off, the probe, and three clients (author, relay, collector) passing
--- pages between them.
+-- pages between them; early pages (a collector online keeps them provisional until a copy from the
+-- author's disk confirms them) through crashes on either side.
 --
 -- Every client here is a game of its own: mock.lua and the addon loaded into an environment of their
 -- own (a table as their _ENV, in this Lua state) with their own clock, Battle.net friends and saved
@@ -1803,15 +1804,21 @@ do
 	Stop(finn)
 end
 
-section("Echoes' delivery: a crash (my pages go out once on disk)")
+section("Echoes' delivery: an author's crash, the collector online at her next session")
 do
-	-- Anna records with Cedric (collector) online. Her page 1 closes in a session that crashes: it
-	-- never went out, so the page 1 she closes after the crash (from her last save) is the one Cedric
-	-- collects, and his "safe" makes her drop that one, not one that was lost.
+	-- Anna records with Cedric (collecting, this build) online. Her page 1 closes and goes to him early
+	-- (provisional); then her game crashes. Back a minute later, her last save has page 1 open again
+	-- (it goes on); Cedric tells her (her only) he holds a page 1 of hers, so it closes above it, as 2.
+	-- His page 1, the lost one, is never confirmed, nothing of Anna's is dropped for it, and her page 2
+	-- goes once a copy from her disk confirmed it and it's safe at him.
 	local function Write(c, seed) -- (a page's worth of lines: it closes by size on the next tick)
 		for _ = 1, 170 do
 			c.E.Line("H", seed:rep(200))
 		end
+	end
+	local function Header(page) -- (the number in a packed page's header)
+		local text = C_EncodingUtil.DecompressString(C_EncodingUtil.DecodeBase64(page.z), 1)
+		return tonumber(text:match("^E1;%x*;%x+;(%d+);"))
 	end
 	local cedric = Start(CEDRIC, { friends = { ANNA }, collect = true })
 	local anna = Start(ANNA, { friends = { CEDRIC } })
@@ -1820,26 +1827,33 @@ do
 	local save = anna.opts.saved
 	local store = anna.E.data.store
 	local key = ANNA.acct .. "." .. store
-	local function Got()
-		return (cedric.E.data.inbox[key] or {})[1]
+	local ckey = CEDRIC.acct .. "." .. cedric.E.data.store
+	local function Got(n)
+		return (cedric.E.data.inbox[key] or {})[n]
 	end
 	Write(anna, "a")
 	Run(1)
 	local lost = anna.E.data.mine[1]
-	check(lost and lost.m == "z" and anna.E.Store.Page(ANNA.acct, store, 1) == nil, "Anna's page 1 closes and is packed: not offered this session")
-	check(not Run(120, Got), "Cedric, collecting and online all along, doesn't get it")
+	check(lost and lost.m == "z" and anna.E.Store.Page(ANNA.acct, store, 1) == nil, "Anna's page 1 closes and is packed: not on her disk yet")
+	check(Run(120, function() return Got(1) ~= nil end) and Got(1).p == 1 and Got(1).z == lost.z, "Cedric, online, gets it early: provisional")
 	Stop(anna, false, true) -- (the game crashes: nothing saved)
+	Run(60)
 	anna = Start(ANNA, { friends = { CEDRIC }, saved = save })
-	check(anna.E.data.n == 0 and anna.E.data.open.n == 1, "her next login reads the last save: page 1 open again")
+	check(anna.E.data.n == 0 and anna.E.data.open.n == 1, "her next login a minute later reads the last save: page 1 open again (it goes on)")
+	check(Run(30, function() return anna.E.data.top == 1 end), "Cedric tells her he holds a page 1 of hers: her next pages close above it")
 	Write(anna, "b")
 	Run(1)
-	local page = anna.E.data.mine[1]
-	check(page and page.m == "z" and page.z ~= lost.z and not Got(), "page 1 closes again, with other lines (not offered yet either)")
+	local page = anna.E.data.mine[2]
+	check(not anna.E.data.mine[1] and page and page.m == "z" and Header(page) == 2, "her open page 1 closes as 2 (its header too)")
+	check(Run(120, function() return Got(2) ~= nil end) and Got(2).p == 1 and Got(2).z == page.z, "page 2 goes to Cedric early")
 	anna = Reload(anna)
-	check(Run(300, Got), "after her /reload it goes out: Cedric collects it")
-	check(Got().z == page.z and Got().h == page.h, "the page 1 Cedric holds is the one Anna has, not the lost one")
+	check(Run(120, function() return Got(2).p == nil end), "after her /reload a copy from her disk confirms page 2")
+	check(anna.E.data.mine[2] and Got(1).p == 1 and Got(1).z == lost.z, "Anna keeps page 2 (not on Cedric's disk yet); his page 1, the lost one, stays provisional")
 	cedric = Reload(cedric) -- (within 5 s of Anna's last answer to him: she answers when they're up)
-	check(Run(120, function() return anna.E.data.mine[1] == nil end), "safe at Cedric (on his disk): Anna drops it, rightly")
+	check(Run(120, function() return anna.E.data.mine[2] == nil end), "his next session: page 2 safe at Cedric, Anna drops it")
+	local told = (anna.E.data.safe[key] or {})[ckey]
+	check(Got(1).p == 1 and not cedric.E.Ranges.Contains(cedric.E.Store.SafeHere(ANNA.acct, store), 1) and anna.E.Ranges.Contains(told, 2)
+		and not anna.E.Ranges.Contains(told, 1), "page 1 is never safe at Cedric (never confirmed), got " .. tostring(told))
 	Stop(anna)
 	Stop(cedric)
 end
@@ -2188,10 +2202,15 @@ do
 		Fill(anna, seed)
 		Run(1)
 	end
-	check(Numbers(anna.E.data.mine) == "1,2,3" and anna.E.data.mine[1].o == 0, "Anna's pages 1-3 closed (not out yet)")
+	check(Numbers(anna.E.data.mine) == "1,2,3", "Anna's pages 1-3 closed")
+	local function Provisional(n)
+		return (cedric.E.data.inbox[key] or {})[n] and cedric.E.data.inbox[key][n].p
+	end
+	check(Run(120, function() return Provisional(1) and Provisional(2) and Provisional(3) end), "Cedric, online, takes them early (provisional)")
 	anna = Reload(anna)
 	Watch(anna, closed)
-	check(Run(300, function() return Numbers(cedric.E.data.inbox[key]) == "1,2,3" end), "after her /reload Cedric collects 1-3")
+	check(Run(300, function() return Numbers(cedric.E.data.inbox[key]) == "1,2,3" and not (Provisional(1) or Provisional(2) or Provisional(3)) end),
+		"after her /reload copies from her disk confirm them: Cedric collected 1-3")
 	check(anna.E.data.mine[1].o == 1 and anna.E.data.mine[3].o == 1, "they went out (o = 1)")
 	-- As ever: pages that went out go once they're safe at the collector.
 	cedric = Reload(cedric)
@@ -2300,4 +2319,352 @@ do
 	check(Numbers(second.E.data.mine) == "", "the second computer drops its pages, got " .. Numbers(second.E.data.mine))
 	Stop(cedric)
 	Stop(bob)
+end
+
+---------------------------------------------------------------------------
+-- Early pages: a collector online gets an author's pages closed this session (not on her disk yet)
+-- at once, and keeps them provisional until a copy from her disk shows the same hash
+---------------------------------------------------------------------------
+
+-- A page's worth of lines, the first 20 varied (it packs to a few KB: a page of many parts).
+local function Varied(c, seed)
+	for i = 1, 170 do
+		c.E.Line("H", i <= 20 and Data(200, seed * 1000 + i) or ("v"):rep(200))
+	end
+end
+
+-- What went from one person's client to another's since mark (world.log), starting with prefix.
+local function Logged(mark, from, to, prefix)
+	local list = {}
+	for i = mark, #world.log do
+		local m = world.log[i]
+		if m.from == from.id and m.to == to.id and m.data:sub(1, #prefix) == prefix then
+			list[#list + 1] = m.data
+		end
+	end
+	return list
+end
+
+-- Page n of acct from one person's client to another's since mark: its starts (eb), and the parts
+-- (ep) that went under their transfer ids.
+local function Transfer(mark, from, to, acct, n)
+	local begun, parts, live = 0, 0, {}
+	for i = mark, #world.log do
+		local m = world.log[i]
+		if m.from == from.id and m.to == to.id then
+			local x, a, pn = m.data:match("^B2;eb;(%d+);(%x+);%x+;(%d+);")
+			if x then
+				live[x] = (a == acct and tonumber(pn) == n) or nil
+				begun = begun + (live[x] and 1 or 0)
+			end
+			local px = m.data:match("^B2;ep;(%d+);")
+			if px and live[px] then
+				parts = parts + 1
+			end
+		end
+	end
+	return begun, parts
+end
+
+section("Echoes' delivery: early pages, to a collector online")
+do
+	-- Anna records with Cedric (collecting, this build) and Bob (relaying) online. A page she closes
+	-- goes to Cedric within minutes (ea), not to Bob: Cedric keeps it provisional (never safe, never
+	-- served, told only to Anna) until her /reload puts it on her disk and a check shows the same hash.
+	local people = { ANNA, BOB, CEDRIC }
+	local cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), collect = true })
+	local bob = Start(BOB, { friends = FriendsOf(BOB, people) })
+	local anna = Start(ANNA, { friends = FriendsOf(ANNA, people) })
+	local function Known(id)
+		local peer = anna.D.peers[id]
+		return peer ~= nil and peer.verified
+	end
+	Run(30, function() return Known(CEDRIC.id) and Known(BOB.id) end)
+	local store = anna.E.data.store
+	local key = ANNA.acct .. "." .. store
+	local ckey = CEDRIC.acct .. "." .. cedric.E.data.store
+	local R = anna.D.Ranges
+	local function Got(n)
+		return (cedric.E.data.inbox[key] or {})[n]
+	end
+	check(Known(CEDRIC.id) and anna.D.peers[CEDRIC.id].early and not anna.D.peers[BOB.id].early,
+		"Cedric collects on this build: he takes pages early (e in his hello); Bob doesn't")
+	Varied(anna, 1)
+	Run(1)
+	local n = anna.E.data.n
+	local page = anna.E.data.mine[n]
+	check(page and page.m == "z" and #page.z > 2400 and anna.E.Store.Page(ANNA.acct, store, n) == nil, "(her page closes and is packed: not on her disk yet)")
+	check(Run(120, function() return Got(n) ~= nil end), "Cedric gets it within minutes")
+	check(Got(n).p == 1 and Got(n).z == page.z and page.o == 1, "provisional at Cedric (p), as Anna has it; out at Anna (o = 1)")
+	Run(65)
+	local safe = (anna.E.data.safe[key] or {})[ckey]
+	check(not R.Has(bob.D.peers[CEDRIC.id].holdings[key] or {}, n) and R.Has(anna.D.peers[CEDRIC.id].holdings[key] or {}, n)
+		and not (bob.E.data.carry[key] or {})[n], "Cedric tells Anna he holds it (hers), not Bob; Bob doesn't get it")
+	check(not anna.E.Ranges.Contains(safe, n) and not anna.E.Ranges.Contains(cedric.E.Store.SafeHere(ANNA.acct, store), n) and anna.E.data.mine[n] == page,
+		"not in Cedric's safe summary: Anna keeps it")
+	-- A provisional page isn't served: asked for it (as Bob), Cedric says en.
+	local mark = #world.log + 1
+	cedric.env.Fire("BN_CHAT_MSG_ADDON", "LTBeacon", ("B2;eq;%s;%s;%d;0"):format(ANNA.acct, store, n), "WHISPER", BOB.id)
+	Run(3)
+	check(#Logged(mark, CEDRIC, BOB, ("B2;en;%s;%s;%d"):format(ANNA.acct, store, n)) == 1 and #Logged(mark, CEDRIC, BOB, "B2;eb;") == 0,
+		"asked for it, Cedric doesn't serve it: en")
+
+	-- Her /reload: on her disk, offered to everyone; Cedric checks it: its start (maybe a part), then
+	-- stopped; the same hash: confirmed.
+	mark = #world.log + 1
+	anna = Reload(anna)
+	check(Run(120, function() return Got(n).p == nil end), "after her /reload a copy from her disk confirms it")
+	Run(5) -- (his stop goes; what of the page already waited in her queue too)
+	-- (the copy from her disk: hers, or Bob's, who may have fetched it from her meanwhile)
+	local begun, parts = Transfer(mark, ANNA, CEDRIC, ANNA.acct, n)
+	local begun2, parts2 = Transfer(mark, BOB, CEDRIC, ANNA.acct, n)
+	local stop = ("B2;eq;%s;%s;%d;%d"):format(ANNA.acct, store, n, #page.z)
+	local stops = #Logged(mark, CEDRIC, ANNA, stop) + #Logged(mark, CEDRIC, BOB, stop)
+	check(begun + begun2 == 1 and parts + parts2 <= 3 and stops == 1 and Got(n).z == page.z, ("the check: the page's start, %d of its %d"
+		.. " parts, then stopped"):format(parts + parts2, math.ceil(#page.z / 240)))
+	check(anna.E.data.mine[n] ~= nil, "Anna keeps it: it came in Cedric's session, not on his disk yet")
+	cedric = Reload(cedric)
+	check(Run(120, function() return anna.E.data.mine[n] == nil end), "his next session: safe at Cedric (his summary), Anna drops it")
+	Stop(cedric)
+	Stop(anna)
+	Stop(bob)
+end
+
+section("Echoes' delivery: an author's crash, the collector offline at her next session")
+do
+	-- Anna's page 1 goes early to Cedric (provisional); Cedric logs out; Anna's game crashes. Her next
+	-- session numbers from her last save: another page 1, which goes to Bob (relay) after her /reload.
+	-- Cedric back: the check shows another hash; he waits (his inbox holds his page 1), and nobody
+	-- drops theirs (it isn't safe at Cedric). The exporter runs: its receipt takes his provisional page
+	-- 1 aside (provisional, not exported), and he fetches the other page 1; safe at his next session,
+	-- Anna and Bob drop theirs. Both pages 1 reached the exporter.
+	local people = { ANNA, BOB, CEDRIC }
+	local cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), collect = true })
+	local anna = Start(ANNA, { friends = FriendsOf(ANNA, people) })
+	local bob = Start(BOB, { friends = FriendsOf(BOB, people) })
+	Run(5)
+	anna = Reload(anna) -- (her last save: page 1 open, nothing closed)
+	local save = anna.opts.saved
+	local store = anna.E.data.store
+	local key = ANNA.acct .. "." .. store
+	local cstore = cedric.E.data.store
+	local function Got(n)
+		return (cedric.E.data.inbox[key] or {})[n]
+	end
+	local function Carried(n)
+		return (bob.E.data.carry[key] or {})[n]
+	end
+	-- The exporter: every version of each of Anna's pages it reads in Cedric's saved file (by hash),
+	-- and its receipt: every number it has, and the latest arrival it read (upto).
+	local archive = {}
+	local function Export(saved)
+		local upto = 0
+		for n, page in pairs(saved.LefthyToolsEchoesDB.inbox[key] or {}) do
+			archive[n] = archive[n] or {}
+			archive[n][page.h] = true
+			upto = math.max(upto, page.a or 0)
+		end
+		return { v = 1, at = world.time, done = { [key] = cedric.E.Ranges.Of(archive) }, upto = { [cstore] = upto } }
+	end
+	Varied(anna, 3)
+	Run(1)
+	local first = anna.E.data.mine[1]
+	check(first and Run(120, function() return Got(1) ~= nil end) and Got(1).p == 1 and Got(1).z == first.z and not Carried(1),
+		"Anna's page 1 goes early to Cedric (provisional), not to Bob")
+	local cedricSaved = Stop(cedric) -- (he logs out: page 1 saved, provisional)
+	Stop(anna, false, true) -- (her game crashes: nothing saved)
+	Run(60)
+	anna = Start(ANNA, { friends = FriendsOf(ANNA, people), saved = save })
+	Varied(anna, 4)
+	Run(1)
+	local second = anna.E.data.mine[1]
+	check(second and second.z ~= first.z and second.h ~= first.h, "her next session closes another page 1 (her last save's numbers)")
+	anna = Reload(anna)
+	check(Run(300, function() return Carried(1) ~= nil end) and Carried(1).z == second.z and anna.E.data.mine[1].o == 1,
+		"after her /reload it goes to Bob (out: o = 1)")
+
+	-- Cedric back: a check of page 1 shows another hash. He keeps his, fetches nothing; they keep theirs.
+	local mark = #world.log + 1
+	cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), saved = cedricSaved })
+	check(Run(60, function() return (cedric.D.checked[key] or {})[1] end), "Cedric back: a check of page 1 shows another hash")
+	Run(65)
+	local begun, parts = Transfer(mark, BOB, CEDRIC, ANNA.acct, 1)
+	local begun2, parts2 = Transfer(mark, ANNA, CEDRIC, ANNA.acct, 1)
+	check(begun + begun2 == 1 and parts + parts2 <= 3, ("the check: one start, %d part(s); nothing more asked"):format(parts + parts2))
+	check(Got(1).z == first.z and Got(1).p == 1 and anna.E.data.mine[1] and Carried(1), "he keeps his (provisional); Anna and Bob keep theirs")
+	cedric = Reload(cedric)
+	Run(65)
+	check(Got(1).z == first.z and anna.E.data.mine[1] and Carried(1), "his next session too: nothing safe, nothing dropped")
+
+	-- The exporter runs (his saved file: page 1, provisional). Its receipt takes it aside: provisional,
+	-- not exported. Then the other page 1 is fetched like any.
+	local saved = Stop(cedric)
+	local receipt = Export(saved)
+	cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), saved = saved })
+	cedric.env.LefthyToolsEchoesReceipt = receipt
+	check(Run(120, function() return Got(1) ~= nil and Got(1).z == second.z end), "the receipt took his page 1 aside: he fetches the other page 1")
+	local provisional = cedric.E.data.provisional and cedric.E.data.provisional[key]
+	check(Got(1).p == nil and provisional and provisional[1] == first.h and not cedric.E.Ranges.Contains(cedric.E.data.exported[key], 1),
+		"the other page 1 in his inbox (from a disk); his early one provisional (its hash), 1 not exported")
+	check(anna.E.data.mine[1] and Carried(1), "(it came this session: not safe yet, they keep theirs)")
+	-- His next session: safe. The same receipt again (the exporter hasn't run): the page 1 that came
+	-- after it stays.
+	cedric = Reload(cedric)
+	cedric.env.LefthyToolsEchoesReceipt = receipt
+	check(Run(120, function() return anna.E.data.mine[1] == nil and not Carried(1) end), "his next session: safe at Cedric, Anna and Bob drop theirs")
+	check(Got(1).z == second.z and not cedric.E.Ranges.Contains(cedric.E.data.exported[key], 1) and cedric.E.data.provisional[key][1] == first.h,
+		"the same receipt again: the page 1 that came after it stays, not exported")
+	-- The exporter runs again: both pages 1 reached it. Its receipt: exported, the provisional entry gone.
+	saved = Stop(cedric)
+	receipt = Export(saved)
+	check(archive[1][first.h] and archive[1][second.h], "both pages 1 reached the exporter")
+	cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), saved = saved })
+	cedric.env.LefthyToolsEchoesReceipt = receipt
+	Run(5)
+	check(not Got(1) and cedric.E.Ranges.Contains(cedric.E.data.exported[key], 1) and not (cedric.E.data.provisional or {})[key],
+		"its receipt: page 1 exported, nothing provisional left")
+	Stop(cedric)
+	Stop(anna)
+	Stop(bob)
+end
+
+section("Echoes' delivery: a collector's crash right after receiving")
+do
+	-- Cedric gets a page of Anna's from her disk and one early; his game crashes before it saved
+	-- them. Neither was safe at him (they came this session), so Anna still has both: they reach him
+	-- again in his next session.
+	local cedric = Start(CEDRIC, { friends = { ANNA }, collect = true })
+	local anna = Start(ANNA, { friends = { CEDRIC } })
+	Run(5)
+	cedric = Reload(cedric) -- (his last save)
+	local save = cedric.opts.saved
+	local key = ANNA.acct .. "." .. anna.E.data.store
+	local function Got(n)
+		return (cedric.E.data.inbox[key] or {})[n]
+	end
+	local disk = MyPage(anna, 101, 2400)
+	Varied(anna, 5)
+	Run(1)
+	local n = anna.E.data.n
+	local early = anna.E.data.mine[n]
+	check(n > 1000 and early and Run(300, function() return Got(101) and Got(n) end) and Got(101).p == nil and Got(n).p == 1,
+		"Cedric gets both: 101 from her disk, " .. n .. " early (provisional)")
+	Stop(cedric, false, true) -- (his game crashes: nothing saved)
+	Run(30)
+	check(anna.E.data.mine[101] == disk and anna.E.data.mine[n] == early, "Anna still has both (neither was safe at him)")
+	cedric = Start(CEDRIC, { friends = { ANNA }, saved = save })
+	check(not Got(101) and not Got(n), "his next session, from his last save: neither is there")
+	check(Run(300, function() return Got(101) and Got(n) end) and Got(101).z == disk.z and Got(n).z == early.z, "both reach him again")
+	Stop(cedric)
+	Stop(anna)
+end
+
+section("Echoes' delivery: early pages and older builds (the author's side)")
+do
+	-- Eve has page 701 on her disk, 702 not yet (closed this session). Dora collects on an older build
+	-- (no e in her hello): no ea; 702 is en to her; 701 goes as ever. Anna collects on this build (e):
+	-- ea, and 702 goes to her. Bob relays: no ea, en.
+	local c = Start(EVE, { friends = { ANNA, BOB, DORA }, fake = true })
+	local key = EVE.acct .. "." .. c.E.data.store
+	MyPage(c, 701, 480)
+	local z = Data(720, 702)
+	c.E.data.mine[702] = { t = c.env.GetServerTime() - 60, h = Hash32(z), m = "z", z = z, s = c.E.data.session, o = 0 }
+	Touched(c)
+	local mark = Mark(c)
+	MeetAll(c, { DORA }, "crs")
+	MeetAll(c, { ANNA }, "cers")
+	MeetAll(c, { BOB }, "rs")
+	Pass(c, 65)
+	local ea = Sent(c, ANNA, mark, "B2;ea;")
+	check(#ea == 1 and ea[1] == "B2;ea;" .. key .. ":702" and #Sent(c, DORA, mark, "B2;ea;") == 0 and #Sent(c, BOB, mark, "B2;ea;") == 0,
+		"ea only to Anna (collects, this build): 702; none to Dora (an older collector) or Bob (a relay), got " .. tostring(ea[1]))
+	local es = Sent(c, DORA, mark, "B2;es;")
+	check(es[1] == "B2;es;" .. key .. ":701" and Sent(c, ANNA, mark, "B2;es;")[1] == es[1], "es as ever, to both: 701 (on disk), got " .. tostring(es[1]))
+	check(c.D.peers[ANNA.id].early and not c.D.peers[DORA.id].early, "Anna takes pages early (Dora doesn't)")
+	mark = Mark(c)
+	Ask(c, DORA, 702)
+	Ask(c, BOB, 702)
+	Pass(c, 2)
+	check(#Sent(c, DORA, mark, "B2;en;") == 1 and #Sent(c, BOB, mark, "B2;en;") == 1 and #Sent(c, DORA, mark, "B2;eb;") == 0,
+		"702 asked for by Dora and Bob: en, as for a page I don't have")
+	mark = Mark(c)
+	Ask(c, DORA, 701)
+	Ask(c, ANNA, 702)
+	Pass(c, 6)
+	check(Received(c, DORA, mark) == c.E.data.mine[701].z and Received(c, ANNA, mark) == z and c.E.data.mine[702].o == 1,
+		"701 goes to Dora as ever; 702 to Anna (out now: o = 1)")
+	-- Anna stops collecting (her hello without c and e): nothing early to her any more.
+	Hello(c, ANNA, "rsa")
+	mark = Mark(c)
+	Ask(c, ANNA, 702)
+	Pass(c, 2)
+	check(#Sent(c, ANNA, mark, "B2;en;") == 1, "Anna no longer collects: 702 is en to her")
+	Stop(c)
+end
+
+section("Echoes' delivery: a collector's provisional pages (ea, checks)")
+do
+	-- Dora collects. Anna (an author, relaying) offers her own page 5 early (ea): kept provisional. It
+	-- isn't served, Bob doesn't hear of it, Anna does. Bob's copy of page 5 from a disk shows another
+	-- hash: stopped, not asked again this session. Page 6: Anna's from her disk shows the same hash:
+	-- confirmed by its start alone.
+	local c = Start(DORA, { friends = { ANNA, BOB }, fake = true, collect = true })
+	local D = c.D
+	MeetAll(c, { ANNA, BOB }, "rs")
+	local mark = Mark(c)
+	Say(c, ANNA, ("B2;ea;%s:5/%s:1-3"):format(ANNA.key, BOB.key))
+	Pass(c, 1.5)
+	local asked = Sent(c, ANNA, mark, "B2;eq;")
+	check(#asked == 1 and asked[1] == ("B2;eq;%s;%s;5;0"):format(ANNA.acct, ANNA.store) and not D.peers[ANNA.id].earlyHoldings[BOB.key]
+		and D.inflight[ANNA.key .. ".5"].early, "Anna's own page 5 asked for (early); the item of Bob's key ignored, got " .. tostring(asked[1]))
+	local p5 = TheirPage(c, 5, 600)
+	mark = Mark(c)
+	SendPage(c, ANNA, ANNA, p5, 3)
+	Pass(c, 1.5)
+	local got = c.E.data.inbox[ANNA.key] and c.E.data.inbox[ANNA.key][5]
+	check(got and got.p == 1 and got.z == p5.z, "kept provisional (p): it came early")
+	Say(c, BOB, ("B2;eq;%s;%s;5;0"):format(ANNA.acct, ANNA.store))
+	Pass(c, 65)
+	local toBob, toAnna = table.concat(Sent(c, BOB, mark, "B2;es;"), " "), table.concat(Sent(c, ANNA, mark, "B2;es;"), " ")
+	check(#Sent(c, BOB, mark, "B2;en;") == 1 and not toBob:find(ANNA.key, 1, true) and toAnna:find(ANNA.key .. ":5", 1, true),
+		"not served (en to Bob); told to Anna (her own), not to Bob, got \"" .. toAnna .. "\" and \"" .. toBob .. "\"")
+	-- Bob's page 5 from a disk: a check; another hash: stopped.
+	local other = TheirPage(c, 5, 600, 55)
+	mark = Mark(c)
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":5")
+	Pass(c, 1.5)
+	local r = D.inflight[ANNA.key .. ".5"]
+	check(Sent(c, BOB, mark, "B2;eq;")[1] == ("B2;eq;%s;%s;5;0"):format(ANNA.acct, ANNA.store) and r and r.check, "a check: page 5 asked of Bob")
+	Say(c, BOB, ("B2;eb;4;%s;%s;5;%d;%s;%d;z"):format(ANNA.acct, ANNA.store, other.len, other.h, other.t))
+	Say(c, BOB, ("B2;ep;4;0;%s"):format(other.z:sub(1, 240)))
+	Pass(c, 1.5)
+	check(#Sent(c, BOB, mark, ("B2;eq;%s;%s;5;600"):format(ANNA.acct, ANNA.store)) == 1 and D.checked[ANNA.key][5] and got.p == 1 and got.z == p5.z
+		and not D.inflight[ANNA.key .. ".5"] and not D.partials[ANNA.key .. ".5"], "another hash: stopped (from its end); page 5 stays provisional, as it was")
+	Pass(c, 10)
+	check(#Sent(c, BOB, mark, "B2;eq;") == 2, "not asked again this session")
+	-- Page 6: early, then (her /reload) Anna's from her disk with the same hash.
+	Say(c, ANNA, "B2;ea;" .. ANNA.key .. ":6")
+	Pass(c, 1.5)
+	local p6 = TheirPage(c, 6, 960)
+	SendPage(c, ANNA, ANNA, p6, 5)
+	Pass(c, 1.5)
+	check(c.E.data.inbox[ANNA.key][6] and c.E.data.inbox[ANNA.key][6].p == 1, "(page 6 came early: provisional)")
+	Hello(c, ANNA, "rs")
+	mark = Mark(c)
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":6")
+	Pass(c, 1.5)
+	check(Sent(c, ANNA, mark, "B2;eq;")[1] == ("B2;eq;%s;%s;6;0"):format(ANNA.acct, ANNA.store), "a check of page 6")
+	Say(c, ANNA, ("B2;eb;6;%s;%s;6;%d;%s;%d;z"):format(ANNA.acct, ANNA.store, p6.len, p6.h, p6.t))
+	Pass(c, 1.5)
+	check(c.E.data.inbox[ANNA.key][6].p == nil and #Sent(c, ANNA, mark, ("B2;eq;%s;%s;6;960"):format(ANNA.acct, ANNA.store)) == 1,
+		"the same hash: confirmed by its start alone (stopped from its end)")
+	-- Not collecting: an ea is ignored.
+	c.E.module.db.collect = false
+	Pass(c, 1.1)
+	mark = Mark(c)
+	Say(c, ANNA, "B2;ea;" .. ANNA.key .. ":7")
+	Pass(c, 2)
+	check(not D.Ranges.Has(D.peers[ANNA.id].earlyHoldings[ANNA.key] or {}, 7) and #Sent(c, ANNA, mark, ("B2;eq;%s;%s;7;"):format(ANNA.acct, ANNA.store)) == 0,
+		"not collecting: an ea is ignored")
+	Stop(c)
 end
