@@ -2797,7 +2797,7 @@ do
 	local c = Start(EVE, { friends = { ANNA, BOB }, fake = true })
 	local key = EVE.acct .. "." .. c.E.data.store
 	c.E.data.n = 1000 -- (the client's own pages: 1 and from 1001 on)
-	for n = 702, 705 do
+	for n = 702, 706 do
 		local z = Data(720, n)
 		c.E.data.mine[n] = { t = c.env.GetServerTime() - 60, h = Hash32(z), m = "z", z = z, s = c.E.data.session, o = 0 }
 	end
@@ -2805,19 +2805,26 @@ do
 	MeetAll(c, { ANNA }, "cers")
 	MeetAll(c, { BOB }, "rs")
 	local mark = Mark(c)
-	for n = 702, 705 do
+	for n = 702, 706 do
 		Ask(c, ANNA, n)
 		Pass(c, 4)
 	end
 	local only = true
-	for n = 702, 705 do
+	for n = 702, 706 do
 		only = only and c.E.data.mine[n].o == 2
 	end
-	check(only and #Sent(c, ANNA, mark, "B2;ep;") == 12, "702-705 went early to Anna: only early (o = 2)")
-	Say(c, ANNA, "B2;es;" .. key .. ":702-705")
+	check(only and #Sent(c, ANNA, mark, "B2;ep;") == 15, "702-706 went early to Anna: only early (o = 2)")
+	Say(c, ANNA, "B2;es;" .. key .. ":702-706")
 	Pass(c, 1.5)
-	check(c.E.data.mine[702] and c.E.data.mine[703] and c.E.data.mine[704] and c.E.data.mine[705],
+	check(c.E.data.mine[702] and c.E.data.mine[703] and c.E.data.mine[704] and c.E.data.mine[705] and c.E.data.mine[706],
 		"Anna holds them (provisionally, she says): nothing moves")
+	-- Bob (a relay: only pages from a disk) holds a page 706 of mine: another page (my WTF folder
+	-- copied?). Mine moves before it goes out under that number.
+	local p706 = c.E.data.mine[706]
+	Say(c, BOB, "B2;es;" .. key .. ":706")
+	Pass(c, 1.5)
+	check(not c.E.data.mine[706] and c.E.data.mine[c.E.data.top] == p706 and p706.o == 0, "Bob's holdings have 706: mine moves (to "
+		.. tostring(c.E.data.top) .. ")")
 	c = Reload(c)
 	MeetAll(c, { ANNA }, "cers")
 	MeetAll(c, { BOB }, "rs")
@@ -2997,9 +3004,14 @@ do
 	Pass(c, 1.5)
 	check(c.E.data.inbox[ANNA.key][6].p == nil and #Sent(c, ANNA, mark, ("B2;eq;%s;%s;6;960"):format(ANNA.acct, ANNA.store)) == 1,
 		"the same hash: confirmed by its start alone (stopped from its end)")
-	-- Not collecting: an ea is ignored.
+	-- Not collecting: what I tell Anna I hold no longer has her provisional page 5 (what a friend who
+	-- doesn't collect holds is only ever from a disk), and an ea is ignored.
+	mark = Mark(c)
 	c.E.module.db.collect = false
-	Pass(c, 1.1)
+	Pass(c, 3)
+	local told = table.concat(Sent(c, ANNA, mark, "B2;es;"), " ")
+	check(told:find(ANNA.key .. ":6", 1, true) and not told:find(ANNA.key .. ":5", 1, true), "not collecting: my es to Anna has 6, not her"
+		.. " provisional 5, got " .. told)
 	mark = Mark(c)
 	Say(c, ANNA, "B2;ea;" .. ANNA.key .. ":7")
 	Pass(c, 2)

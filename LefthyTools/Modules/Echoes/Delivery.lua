@@ -1177,10 +1177,11 @@ local function Summary(id, peer, now)
 	end
 	-- (Their own pages too: the author learns who holds which of its pages, and a page of theirs
 	-- that never went out but that I hold under its number is another page with that number. To
-	-- their author only, the ones I hold provisionally too (they came early): a page that a crash
-	-- lost has its number, so the author's next pages close above it. Nobody else hears of those:
-	-- no relay leaves a page alone for them, no collector fetches one.)
-	local offer, theirs = Holdings(), Have("provisional", peer.key)
+	-- their author only, while I collect, the ones I hold provisionally too (they came early): a
+	-- page that a crash lost has its number, so the author's next pages close above it. Nobody else
+	-- hears of those: no relay leaves a page alone for them, no collector fetches one; and what a
+	-- friend who doesn't collect holds is only ever from a disk, see OnHoldings.)
+	local offer, theirs = Holdings(), M.db.collect and Have("provisional", peer.key) or {}
 	if #theirs > 0 then
 		local copy = {}
 		for key, list in pairs(offer) do
@@ -1708,8 +1709,9 @@ local function OnHoldings(id, msg, now)
 					Carried(key, list)
 				end
 				-- (a page of mine they hold that never went out is another page with that number;
-				-- a collector's provisional ones too: a crash may have lost the page it holds)
-				S.Elsewhere(acct, key:sub(10), list)
+				-- a collector's provisional ones too: a crash may have lost the page it holds. One
+				-- that went only early too, if they don't collect: they hold only pages from a disk)
+				S.Elsewhere(acct, key:sub(10), list, not peer.collect)
 			end
 		end
 	end

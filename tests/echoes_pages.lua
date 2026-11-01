@@ -988,21 +988,23 @@ do
 
 	-- A page that went only early (o = 2: parts of it went to a collector before it was on my disk, who
 	-- keeps them provisional). That collector tells me its number (its holdings, its provisional
-	-- copy): it stays. A collector's safe summary never covers a provisional page: one that covers its
-	-- number holds another page with it (my WTF folder restored?): it moves (nothing went out under
-	-- its new number: o = 0), and isn't dropped.
-	local p18, p19 = closeOne(), closeOne()
-	local early18, early19 = E.data.mine[p18], E.data.mine[p19]
-	Store.WentOut(p18, early18, true)
-	Store.WentOut(p19, early19, true)
-	check(early18.o == 2 and early19.o == 2, "(pages " .. p18 .. " and " .. p19 .. " went early: o = 2)")
-	check(Store.Elsewhere(acct, STORE, p18 .. "-" .. p19) == 0 and E.data.mine[p18] == early18 and E.data.mine[p19] == early19,
-		"a holder offers them (the collector that took them early): they stay")
+	-- copy): it stays. A collector's safe summary never covers a provisional page, and a relay holds
+	-- only pages from a disk: one of those that covers its number holds another page with it (my WTF
+	-- folder restored?): it moves (nothing went out under its new number: o = 0), and isn't dropped.
+	local p18, p19, p20 = closeOne(), closeOne(), closeOne()
+	local early18, early19, early20 = E.data.mine[p18], E.data.mine[p19], E.data.mine[p20]
+	for _, n in ipairs({ p18, p19, p20 }) do Store.WentOut(n, E.data.mine[n], true) end
+	check(early18.o == 2 and early19.o == 2 and early20.o == 2, "(pages " .. p18 .. "-" .. p20 .. " went early: o = 2)")
+	check(Store.Elsewhere(acct, STORE, p18 .. "-" .. p20) == 0 and E.data.mine[p18] == early18 and E.data.mine[p19] == early19
+		and E.data.mine[p20] == early20, "a collector's holdings have them (the one that took them early): they stay")
 	check(Store.Safe(acct, STORE, tostring(p18), collector) == 0 and not E.data.mine[p18] and E.data.mine[E.data.top] == early18 and early18.o == 0,
 		"a collector's safe summary covers " .. p18 .. ": another page; it moves (to " .. E.data.top .. ", o = 0), nothing dropped")
+	check(Store.Elsewhere(acct, STORE, tostring(p20), true) == 1 and not E.data.mine[p20] and E.data.mine[E.data.top] == early20 and early20.o == 0,
+		"a relay's holdings (only pages from a disk) cover " .. p20 .. ": another page; it moves")
 	Store.WentOut(p19, early19)
-	check(early19.o == 1 and Store.Safe(acct, STORE, tostring(p19), collector) == 1 and not E.data.mine[p19] and E.data.mine[E.data.top] == early18,
-		"a part of " .. p19 .. " went from my disk (o = 1, from 2): a safe summary drops it, as ever")
+	check(early19.o == 1 and Store.Elsewhere(acct, STORE, tostring(p19), true) == 0 and Store.Safe(acct, STORE, tostring(p19), collector) == 1
+		and not E.data.mine[p19] and E.data.mine[E.data.top] == early20, "a part of " .. p19 .. " went from my disk (o = 1, from 2): it"
+		.. " stays for a relay's holdings, a safe summary drops it, as ever")
 	check(sizesAgree(), "(the sizes agree: moved, renumbered)")
 end
 

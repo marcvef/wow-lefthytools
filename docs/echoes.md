@@ -606,12 +606,14 @@ also from `2`.
   its header (the game never unpacks a page), and the exporter files it under the number it's kept
   under (it warns that the header names another).
 - **A page that went only early** (`o = 2`) moves too when a collector's **safe summary** covers its
-  number: a summary never covers a provisional page (it covers what the collector holds from a disk,
-  or exported), so it's another page with that number, and the only copy of mine out there is a
-  provisional one (lost if that collector's game crashes before it saved it). Holdings don't move
-  it: the collector that took it early tells me its number (its provisional copy of this very page).
-  Without this, a restored folder's new page that went early would be dropped for the old page's
-  summary.
+  number, or the holdings of a friend who doesn't collect (a relay) do: neither covers a provisional
+  copy (a summary covers what the collector holds from a disk, or exported; a relay holds only pages
+  from a disk, and none from mine but a part from my disk, which makes it `1`), so it's another page
+  with that number, and the only copy of mine out there is a provisional one (lost if that
+  collector's game crashes before it saved it). A collector's holdings don't move it: the one that
+  took it early tells me its number (its provisional copy of this very page). Without this, a
+  restored or copied folder's new page that went early would be dropped for the old page's summary,
+  or go out (to a relay, after my `/reload`) before that summary came.
 - **Confirming a page that went early** keeps working: after my `/reload` the collector's check asks
   for it from my disk, and a part of it that goes makes it `1`; so does its start (`eb`) alone when
   it goes to a collector who takes pages early, or whose holdings list that number of mine (its
@@ -741,7 +743,7 @@ each.
 | `E.Store.Confirm(acct, store, n, hash)` | a copy of page `n` from its author's disk has this hash: if it's the provisional one's, it's confirmed (the inbox page loses `p`; one the receipt took goes into `exported`); whether it was |
 | `E.Store.Drop(acct, store, ranges, where)` | drops those pages (ranges nil: all; where nil: mine, carry and inbox); the number dropped |
 | `E.Store.Safe(acct, store, ranges, collector)` | a collector (its key) holds these safely: merged into `safe` (only grows), dropped from mine (the newest noted in `safeTo`) and carry; of mine, one that never went out or went only early moves to a new number instead (numbers used twice) |
-| `E.Store.Elsewhere(acct, store, ranges)` | a holder offers these (its holdings): for my own key, my next pages close above them and a page of mine among them that never went out moves to a new number; the number moved |
+| `E.Store.Elsewhere(acct, store, ranges[, fromDisk])` | a holder offers these (its holdings): for my own key, my next pages close above them and a page of mine among them that never went out moves to a new number (`fromDisk`, a holder that doesn't collect: one that went only early too); the number moved |
 | `E.Store.WentOut(n, page[, early, start])` | something of my page `n` was sent (`page`: the one served, if it's still page `n`): a part from my disk, `o = 1` (it keeps its number); `early` (a part while it wasn't on my disk), `o = 2` if it was `0`; `start` (only its start from my disk, to a collector who takes pages early or holds that number provisionally: its check), `o = 1` if it was `2` |
 | `E.Store.SafeHere(acct, store)` | ranges this collector holds safely: received in an earlier session (on disk) and not provisional, or exported |
 | `E.Store.Carried(acct, store, ranges)` | a relay holds these (not a collector: provisional pages are among its holdings): of mine, they go first over the cap |
@@ -828,7 +830,7 @@ bytes, like every Beacon message.
 | Message | Format | What |
 |---|---|---|
 | `eh` hello | `B2;eh;<acct>;<store>;<proto>;<maxBytes>;<flags>` | proto 1, maxBytes 255. Flags: `c` collect, `r` relay, `s` share, `e` takes pages early (sent with `c`: this build keeps them provisional), `a` an answer (none back). Without c, r and s: switched off. Later fields are ignored (room for later builds); older builds look for each letter on its own, so `e` changes nothing for them |
-| `es` holdings | `B2;es;<acct>.<store>:<ranges>/...` | pages I can serve (`1-56,58`); to a page's author, the ones of theirs I hold provisionally too |
+| `es` holdings | `B2;es;<acct>.<store>:<ranges>/...` | pages I can serve (`1-56,58`); to a page's author, while I collect, the ones of theirs I hold provisionally too |
 | `ea` early | `B2;ea;<acct>.<store>:<ranges>/...` | my own pages not on my disk yet; only to a friend who collects and takes them early (`c` and `e`), only my own key. Older builds don't read the word, and get none |
 | `ed` safe | `B2;ed;<collector acct>;<collector store>;<acct>.<store>:<ranges>/...` | pages safe at that collector; passed on by everyone; only grows |
 | `eq` request | `B2;eq;<acct>;<store>;<n>;<offset>` | send me page n from byte offset; offset = its length: stop sending it |
@@ -873,7 +875,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
 - **What I hold** (`es`): my own pages (once on disk: Pages and storage), the ones I relay (while
   relaying) and a collector's inbox (not its provisional pages); a friend's own pages too, back to
   them (they learn who holds which of theirs: `E.Store.Carried`, and numbers used twice), and to
-  them only the ones of theirs I hold provisionally. Nobody else hears of provisional pages: no
+  them only, while I collect, the ones of theirs I hold provisionally (so what a friend who doesn't
+  collect holds is only ever from a disk). Nobody else hears of provisional pages: no
   relay leaves a page alone for them ("held by an online collector" counts only what's in an `es`),
   no other collector asks for one. To a friend who collects or relays, when it changed (at most
   every 60 s), everything every 5 minutes.
@@ -882,7 +885,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   everything every 5 minutes). Serving one: only to such a friend; anyone else asking gets `en`.
   `D.EarlyTaker()`: whether one is online (Pages.lua: 10-minute pages). A relay's holdings of my
   pages mark them carried (`E.Store.Carried`, over my cap they go first), a collector's don't (it
-  doesn't relay, and its provisional numbers are among them); `E.Store.Elsewhere` takes both.
+  doesn't relay, and its provisional numbers are among them); `E.Store.Elsewhere` takes both (a
+  relay's also moves a page of mine that went only early: numbers used twice).
 - **A collector** asks for every offered page it lacks (not in its inbox, not exported, not in
   its relay cache), until its inbox reaches 8 MB. Its relay cache (from before it collected)
   moves to the inbox, one page a second (`E.Store.Put` checks its hash again), offered or not; an

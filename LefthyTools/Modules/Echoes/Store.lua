@@ -15,8 +15,8 @@ local M = E.module
 --            friends hold anyway is another page with that number (a WTF folder restored, or copied
 --            and played on two computers, or a crash's lost pages a collector holds
 --            provisionally), and so is one that went only early (o = 2) whose number a collector's
---            safe summary covers: it moves to a new number above all of them (E.data.top), and my
---            next pages close above it too
+--            safe summary or a relay's holdings cover: it moves to a new number above all of them
+--            (E.data.top), and my next pages close above it too
 --   carry    friends' pages I relay: 512 KB, 128 KB per author, 30 days
 --   inbox    a collector's received pages (a: when each came), dropped only by the exporter's receipt
 --            (only the ones it read: upto); a chat line at 4 MB asks to run the exporter, at 8 MB
@@ -508,11 +508,11 @@ end
 -- collectors who keep them provisional. One closed by a build before this rule counts as out. A
 -- page of mine that never went out whose number friends hold anyway (a holder's holdings, a
 -- collector's safe summary) is another page with that number; so is one that went only early
--- whose number a collector's safe summary covers (it never covers a provisional page: the
--- collector holds another page with it, or one it has from a disk). It moves to a new number above
+-- whose number a collector's safe summary or a relay's holdings cover (neither covers a
+-- provisional copy: they hold another page with it, from a disk). It moves to a new number above
 -- every one of mine friends told of, so it travels as a page of its own, and my next pages close
--- above them too (E.data.top). (Holdings don't move a page that went early: the collector that
--- took it tells me its number, as its own provisional copy.)
+-- above them too (E.data.top). (A collector's holdings don't move a page that went early: the one
+-- that took it tells me its number, as its own provisional copy.)
 ---------------------------------------------------------------------------
 
 -- The highest number of mine friends told of, or given to a moved page (E.data.top); 0: none.
@@ -561,12 +561,12 @@ local function Move(n)
 	return new
 end
 
--- Friends hold these pages of mine (a holder's holdings; safe: a collector's safe summary): my next
--- pages close above the highest (at most SEEN_AHEAD above my last page: a broken client), and a page
--- of mine among them that never went out moves to a new number, and from a safe summary one that
--- went only early too (not one the exporter has from here: it read it from this very table). The
--- number moved.
-local function Seen(ranges, safe)
+-- Friends hold these pages of mine (a holder's holdings, a collector's safe summary): my next pages
+-- close above the highest (at most SEEN_AHEAD above my last page: a broken client), and a page of
+-- mine among them that never went out moves to a new number; fromDisk (a safe summary, or a holder
+-- that doesn't collect: neither has provisional copies), one that went only early too (not one the
+-- exporter has from here: it read it from this very table). The number moved.
+local function Seen(ranges, fromDisk)
 	local data = E.data
 	local list = Ranges.Parse(ranges)
 	local cap = data.n + SEEN_AHEAD
@@ -581,7 +581,7 @@ local function Seen(ranges, safe)
 	end
 	local clash, exported = {}, data.exported[Store.Own() or ""]
 	for n, page in pairs(data.mine) do
-		if type(page) == "table" and (page.o == 0 or (safe and page.o == 2)) and Ranges.Contains(list, n) and not Ranges.Contains(exported, n) then
+		if type(page) == "table" and (page.o == 0 or (fromDisk and page.o == 2)) and Ranges.Contains(list, n) and not Ranges.Contains(exported, n) then
 			clash[#clash + 1] = n
 		end
 	end
@@ -595,14 +595,15 @@ local function Seen(ranges, safe)
 	return #clash
 end
 
--- Friends hold these pages of acct.store (a holder's holdings). For my own key: see above. The
--- number of my pages moved to a new number.
-function Store.Elsewhere(acct, store, ranges)
+-- Friends hold these pages of acct.store (a holder's holdings; fromDisk: a holder that doesn't
+-- collect, so none of them is a provisional copy). For my own key: see above. The number of my pages
+-- moved to a new number.
+function Store.Elsewhere(acct, store, ranges, fromDisk)
 	local key = Store.Key(acct, store)
 	if not key or key ~= Store.Own() then
 		return 0
 	end
-	return Seen(ranges)
+	return Seen(ranges, fromDisk == true)
 end
 
 -- Something of my page n went to a friend (Delivery, when it went; page: the page it served, if
