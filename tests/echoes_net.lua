@@ -923,17 +923,30 @@ do
 	Pass(me, 1)
 	check(not E.data.inbox[EVE.key] and not D.partials[EVE.key .. ".9"], "a page of an account that isn't my friend's: not taken")
 
-	-- Full at 8 MB (until exported): nothing asked.
+	-- Full at 8 MB (until exported): nothing asked, and no pages taken early: friends hear it once (a
+	-- hello without e), and nothing more while it stays full.
 	mark = Mark(me)
+	local function Flags(f)
+		local list = {}
+		for i, m in ipairs(Sent(me, f, mark, "B2;eh;")) do
+			list[i] = m:match(";(%l*)$")
+		end
+		return table.concat(list, " ")
+	end
+	check(Flags(ANNA) == "" and D.peers[ANNA.id], "(no hello to Anna yet)")
 	E.data.inbox[BOB.key] = { [1] = { t = 1, h = "00000000", m = "z", z = ("A"):rep(8 * 1024 * 1024), s = E.data.session } }
 	Touched(me)
 	Say(me, ANNA, "B2;es;" .. ANNA.key .. ":10")
 	Pass(me, 5)
 	check(E.Store.InboxFull() and #Sent(me, ANNA, mark, "B2;eq;") == 0, "the inbox at 8 MB: nothing more asked")
+	check(Flags(ANNA) == "crsa" and Flags(BOB) == "crsa", "friends hear it once: collecting, no e (an answer: none back), got " .. Flags(ANNA))
+	Pass(me, 70)
+	check(Flags(ANNA) == "crsa" and #Sent(me, ANNA, mark, "B2;eq;") == 0, "still full a minute later: no more hellos, nothing asked")
 	E.data.inbox[BOB.key] = nil
 	Touched(me)
-	Pass(me, 2)
+	Pass(me, 5)
 	check(#Sent(me, ANNA, mark, "B2;eq;") == 1, "below it again: asked")
+	check(Flags(ANNA) == "crsa cersa" and Flags(BOB) == "crsa cersa", "and friends hear e again, once, got " .. Flags(ANNA))
 	Say(me, ANNA, ("B2;en;%s;%s;10"):format(ANNA.acct, ANNA.store))
 	Hello(me, ANNA, "s") -- (she restarts: what she offered is gone)
 	Say(me, BOB, ("B2;en;%s;%s;2"):format(ANNA.acct, ANNA.store))

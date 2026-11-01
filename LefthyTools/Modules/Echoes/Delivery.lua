@@ -23,9 +23,9 @@ local M = E.module
 -- Messages: Beacon's B family (Protocol.lua), module letter e. Only to friends who sent eh (an
 -- eh itself only to a build that reads it, see Hello):
 --   B2;eh;<acct>;<store>;<proto>;<maxBytes>;<flags>
---                       hello: flags c collect, r relay, s share, e takes early pages (with c), a an
---                       answer (no answer to it); none of c, r, s: switched off. In answer to a hello,
---                       when settings change
+--                       hello: flags c collect, r relay, s share, e takes early pages (with c,
+--                       while the inbox isn't full), a an answer (no answer to it); none of c, r,
+--                       s: switched off. In answer to a hello, when the flags change
 --   B2;es;<acct>.<store>:<ranges>/...    pages I can serve ("1-56,58")
 --   B2;ea;<acct>.<store>:<ranges>/...    my own pages not on my disk yet, to a collector who takes
 --                       them early (older builds read no ea, and send no e)
@@ -701,10 +701,12 @@ local function Capable(bpeer)
 	return compare == 1 or compare == 0
 end
 
--- (e: a collector of this build takes pages early, as provisional ones. Older builds look for each
--- letter on its own: an unknown one changes nothing for them.)
+-- (e: a collector of this build takes pages early, as provisional ones; not while its inbox is full:
+-- it asks for nothing then, and authors keep their pages to 30 minutes. A change is a hello to
+-- everyone (Hellos): the inbox fills only as pages come, and empties only by the exporter's receipt.
+-- Older builds look for each letter on its own: an unknown one changes nothing for them.)
 local function MyFlags(answer)
-	return (M.db.collect and "ce" or "") .. (M.db.relay and "r" or "") .. "s" .. (answer and "a" or "")
+	return (M.db.collect and (S.InboxFull() and "c" or "ce") or "") .. (M.db.relay and "r" or "") .. "s" .. (answer and "a" or "")
 end
 
 -- Whether a friend takes my pages early: their account checked, they collect, their build keeps

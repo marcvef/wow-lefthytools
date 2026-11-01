@@ -645,8 +645,11 @@ also from `2`.
   though the collector may hold the other page with that number: then it's lost like before (a
   collector that took it early keeps its provisional copy, which its exporter archives). A page that
   went only early and moves for another page's summary: the collector that took it early keeps that
-  copy under the old number, provisional, and its exporter archives it too (the same text twice).
-  Copy a WTF folder only to move, not to play on both.
+  copy under the old number, provisional, and its exporter archives it too (the same text twice). And
+  one whose check got only its start from my disk while that collector's hello no longer said `e`
+  (its inbox just went full) and its holdings hadn't reached me stays `2`: its summary then moves it
+  although it holds this very page (twice in the archive, nothing lost). Copy a WTF folder only to
+  move, not to play on both.
 
 **A BattleTag change** (Blizzard lets a player change it): my account is the hash of my BattleTag,
 so it changes with it, and my pages' key with it (the store stays).
@@ -679,7 +682,8 @@ so it changes with it, and my pages' key with it (the store stays).
   days after a page came (at the start), and dropped once a collector holds it safely.
 - **inbox:** dropped only by the exporter's receipt (only the pages it read). At 4 MB one chat line
   a session asks to run the exporter; at 8 MB `E.Store.InboxFull()` says so and the delivery stops
-  pulling (a page still on its way is kept).
+  pulling (a page still on its way is kept), and its hello no longer says `e` (Delivery: authors
+  keep their pages to 30 minutes and send none early) until the receipt made room.
 - **provisional:** a number and a hash per provisional page the receipt took; it goes when the page
   is confirmed (into `exported`) or the receipt takes a page with that number from a disk. One of a
   page lost in its author's crash is never confirmed: it stays (a few numbers per crash).
@@ -836,7 +840,7 @@ bytes, like every Beacon message.
 
 | Message | Format | What |
 |---|---|---|
-| `eh` hello | `B2;eh;<acct>;<store>;<proto>;<maxBytes>;<flags>` | proto 1, maxBytes 255. Flags: `c` collect, `r` relay, `s` share, `e` takes pages early (sent with `c`: this build keeps them provisional), `a` an answer (none back). Without c, r and s: switched off. Later fields are ignored (room for later builds); older builds look for each letter on its own, so `e` changes nothing for them |
+| `eh` hello | `B2;eh;<acct>;<store>;<proto>;<maxBytes>;<flags>` | proto 1, maxBytes 255. Flags: `c` collect, `r` relay, `s` share, `e` takes pages early (sent with `c` while the inbox isn't full: this build keeps them provisional), `a` an answer (none back). Without c, r and s: switched off. Later fields are ignored (room for later builds); older builds look for each letter on its own, so `e` changes nothing for them |
 | `es` holdings | `B2;es;<acct>.<store>:<ranges>/...` | pages I can serve (`1-56,58`); to a page's author, while I collect, the ones of theirs I hold provisionally too |
 | `ea` early | `B2;ea;<acct>.<store>:<ranges>/...` | my own pages not on my disk yet; only to a friend who collects and takes them early (`c` and `e`), only my own key. Older builds don't read the word, and get none |
 | `ed` safe | `B2;ed;<collector acct>;<collector store>;<acct>.<store>:<ranges>/...` | pages safe at that collector; passed on by everyone; only grows |
@@ -864,6 +868,10 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   forgotten: a crash may have lost it); what they asked of me before isn't served any more (gone
   with their session: they ask again). A friend whose hello newly says `e` gets all my early pages
   at once.
+- **When my flags change** (a setting; collecting with the inbox at 8 MB, or back under it: `e`
+  goes and comes), every friend hears one hello with `a` (no answer back), and everything I hold
+  goes to them again. Checked once a second; the inbox only fills as pages come and empties only by
+  the exporter's receipt (once a session), so it doesn't flap: one hello per change.
 - **Their account**: the account in `eh` must be the one Battle.net says for that friend (the
   friend list's BattleTag hashes, Chronicle's `C.Hash` the same way, whether Chronicle is on or
   not; or `GetAccountInfoByGUID`). Wrong: nothing is exchanged with them. Not known yet: checked
@@ -890,7 +898,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
 - **My early pages** (`ea`): my own pages not on disk yet, to a friend who collects and takes them
   early (`c` and `e`: verified, online), the same way (when it changed, at most every 60 s,
   everything every 5 minutes). Serving one: only to such a friend; anyone else asking gets `en`.
-  `D.EarlyTaker()`: whether one is online (Pages.lua: 10-minute pages). A relay's holdings of my
+  `D.EarlyTaker()`: whether one is online (Pages.lua: 10-minute pages); a collector whose inbox is
+  full doesn't say `e` (it asks for nothing then). A relay's holdings of my
   pages mark them carried (`E.Store.Carried`, over my cap they go first), a collector's don't (it
   doesn't relay, and its provisional numbers are among them); `E.Store.Elsewhere` takes both (a
   relay's also moves a page of mine that went only early: numbers used twice).
