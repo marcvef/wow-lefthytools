@@ -661,11 +661,12 @@ so it changes with it, and my pages' key with it (the store stays).
 **The exporter's receipt** (collecting on): once a session, on the tick,
 `LoadAddOn("LefthyTools_EchoesReceipt")` (load on demand; a folder that isn't there does nothing, and
 a new one needs a game restart), then `LefthyToolsEchoesReceipt.done` (`{ ["acct.store"] = "1-57" }`,
-the pages the exporter has) and `upto` (`{ ["<store>"] = <time> }`: per collector's store, the latest
-inbox arrival `a` of its saved file the exporter read; it never goes down). For each key and its
-ranges:
+the pages the exporter has a version of from a disk: an author's own, or an inbox page without `p`),
+`early` (the same form: the numbers it has only from copies that came early, inbox pages with `p`)
+and `upto` (`{ ["<store>"] = <time> }`: per collector's store, the latest inbox arrival `a` of its
+saved file the exporter read; it never goes down). For each key and its ranges:
 
-- **Inbox pages in the ranges** go if the exporter read them: `a` (none: 0) at most `upto[my store]`
+- **Inbox pages in `done`** go if the exporter read them: `a` (none: 0) at most `upto[my store]`
   (a missing store entry: none of my inbox goes). Without `upto` (an older exporter) every one goes,
   as before, except a page from a disk whose number is in `provisional`: it came after the
   provisional page of that number the receipt took, so the receipt may be older than it. A
@@ -673,9 +674,17 @@ ranges:
   exporter has it, but a page with that number from its author's disk (another page, after a crash)
   must still be fetched. Any other page that goes is added to `exported`, and its number leaves
   `provisional` (the page from a disk is archived now).
-- **Numbers of the ranges without an inbox page** are added to `exported`, unless `provisional` has
+- **Numbers of `done` without an inbox page** are added to `exported`, unless `provisional` has
   them. Numbers kept in the inbox aren't (the exporter doesn't have that page).
-- **carry and mine:** the ranges go, as before.
+- **`early`:** only provisional inbox pages in it go, by the same rule, into `provisional`. Its
+  numbers never go into `exported`, and nothing else goes for them: not a page from a disk in the
+  inbox (the exporter would have moved the number into `done`), not carry, not mine. Its author may
+  have lost that page in a crash and used the number again for another page, which the exporter
+  doesn't have: a collector that never had the early copy (another saved file the exporter reads, or
+  this one after its saved data was reset) would take the number as exported, its summary would
+  call it safe, and the author and relays would drop the other page before it's archived. A receipt
+  without `early` (an exporter from before it) lists those numbers in `done`, as before.
+- **carry and mine:** `done` goes, as before.
 
 It lists the full ranges each time, so reading it again is harmless (a page that came since stays,
 by its arrival). Arrival times keep it so whatever the clock does: a page that comes in a session

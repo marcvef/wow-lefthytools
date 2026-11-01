@@ -2353,6 +2353,71 @@ local function Logged(mark, from, to, prefix)
 	return list
 end
 
+-- A set of page numbers ({ [n] = true }) as ranges ("1-3,5").
+local function RangesOf(set)
+	local list, parts, i = {}, {}, 1
+	for n in pairs(set) do
+		list[#list + 1] = n
+	end
+	table.sort(list)
+	while list[i] do
+		local j = i
+		while list[j + 1] == list[j] + 1 do
+			j = j + 1
+		end
+		parts[#parts + 1] = i == j and tostring(list[i]) or (list[i] .. "-" .. list[j])
+		i = j + 1
+	end
+	return table.concat(parts, ",")
+end
+
+-- The exporter on a collector's PC, as far as the game sees it. Read(saved): every version of each
+-- page in a collector's saved inbox (archive[key][n][hash]: true once a copy of it came from a disk,
+-- false while only copies that came early, p); its receipt: in done the numbers it has a version of
+-- from a disk, in early the ones it has only from copies that came early, and per collector's store
+-- the latest arrival it read (upto, never lower).
+local function Exporter()
+	local x = { archive = {}, upto = {} }
+	function x.Receipt()
+		local done, early, upto = {}, {}, {}
+		for key, numbers in pairs(x.archive) do
+			local disk, only = {}, {}
+			for n, versions in pairs(numbers) do
+				local fromDisk = false
+				for _, d in pairs(versions) do
+					fromDisk = fromDisk or d
+				end
+				if fromDisk then
+					disk[n] = true
+				else
+					only[n] = true
+				end
+			end
+			done[key], early[key] = RangesOf(disk), RangesOf(only)
+		end
+		for store, a in pairs(x.upto) do
+			upto[store] = a
+		end
+		return { v = 1, at = world.time, done = done, early = early, upto = upto }
+	end
+	function x.Read(saved)
+		local db = saved.LefthyToolsEchoesDB
+		local upto = x.upto[db.store] or 0
+		for key, pages in pairs(db.inbox or {}) do
+			x.archive[key] = x.archive[key] or {}
+			for n, page in pairs(pages) do
+				local versions = x.archive[key][n] or {}
+				x.archive[key][n] = versions
+				versions[page.h] = versions[page.h] == true or page.p == nil
+				upto = math.max(upto, page.a or 0)
+			end
+		end
+		x.upto[db.store] = upto
+		return x.Receipt()
+	end
+	return x
+end
+
 -- Page n of acct from one person's client to another's since mark: its starts (eb), and the parts
 -- (ep) that went under their transfer ids.
 local function Transfer(mark, from, to, acct, n)
@@ -2506,18 +2571,9 @@ do
 	local function Carried(n)
 		return (bob.E.data.carry[key] or {})[n]
 	end
-	-- The exporter: every version of each of Anna's pages it reads in Cedric's saved file (by hash),
-	-- and its receipt: every number it has, and the latest arrival it read (upto).
-	local archive = {}
-	local function Export(saved)
-		local upto = 0
-		for n, page in pairs(saved.LefthyToolsEchoesDB.inbox[key] or {}) do
-			archive[n] = archive[n] or {}
-			archive[n][page.h] = true
-			upto = math.max(upto, page.a or 0)
-		end
-		return { v = 1, at = world.time, done = { [key] = cedric.E.Ranges.Of(archive) }, upto = { [cstore] = upto } }
-	end
+	-- The exporter reads Cedric's saved file (its receipt: done, early, upto).
+	local exporter = Exporter()
+	local Export = exporter.Read
 	Varied(anna, 3)
 	Run(1)
 	local first = anna.E.data.mine[1]
@@ -2548,10 +2604,12 @@ do
 	Run(65)
 	check(Got(1).z == first.z and anna.E.data.mine[1] and Carried(1), "his next session too: nothing safe, nothing dropped")
 
-	-- The exporter runs (his saved file: page 1, provisional). Its receipt takes it aside: provisional,
-	-- not exported. Then the other page 1 is fetched like any.
+	-- The exporter runs (his saved file: page 1, provisional). Its receipt (1 in early: only that copy)
+	-- takes it aside: provisional, not exported. Then the other page 1 is fetched like any.
 	local saved = Stop(cedric)
 	local receipt = Export(saved)
+	check(receipt.done[key] == "" and receipt.early[key] == "1" and receipt.upto[cstore] == saved.LefthyToolsEchoesDB.inbox[key][1].a,
+		"(the receipt: 1 in early, the latest arrival read)")
 	cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), saved = saved })
 	cedric.env.LefthyToolsEchoesReceipt = receipt
 	check(Run(120, function() return Got(1) ~= nil and Got(1).z == second.z end), "the receipt took his page 1 aside: he fetches the other page 1")
@@ -2569,13 +2627,72 @@ do
 	-- The exporter runs again: both pages 1 reached it. Its receipt: exported, the provisional entry gone.
 	saved = Stop(cedric)
 	receipt = Export(saved)
-	check(archive[1][first.h] and archive[1][second.h], "both pages 1 reached the exporter")
+	local versions = exporter.archive[key][1]
+	check(versions[first.h] == false and versions[second.h] == true and receipt.done[key] == "1" and receipt.early[key] == "",
+		"both pages 1 reached the exporter (the first only early, the second from a disk: 1 in done now)")
 	cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), saved = saved })
 	cedric.env.LefthyToolsEchoesReceipt = receipt
 	Run(5)
 	check(not Got(1) and cedric.E.Ranges.Contains(cedric.E.data.exported[key], 1) and not (cedric.E.data.provisional or {})[key],
 		"its receipt: page 1 exported, nothing provisional left")
 	Stop(cedric)
+	Stop(anna)
+	Stop(bob)
+end
+
+section("Echoes' delivery: two collectors on one PC share the exporter's receipt")
+do
+	-- Anna's page 1 (A) goes early to Cedric; her game crashes, and her next page 1 (B) goes to Bob
+	-- (relay) after her /reload. The exporter reads Cedric's saved file: it has only A, a copy that
+	-- came early, so its receipt lists 1 in early, not in done. Dora collects on another WoW account on
+	-- that PC (the same receipt) and has no page 1 of Anna's: she doesn't take 1 as exported (that would
+	-- make it safe, and Anna and Bob would drop B, which the exporter doesn't have), and fetches B.
+	-- Cedric back with the receipt: A goes aside (provisional), and he fetches B too.
+	local people = { ANNA, BOB, CEDRIC, DORA }
+	local cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), collect = true })
+	local anna = Start(ANNA, { friends = FriendsOf(ANNA, people) })
+	local bob = Start(BOB, { friends = FriendsOf(BOB, people) })
+	Run(5)
+	anna = Reload(anna) -- (her last save: page 1 open, nothing closed)
+	local save = anna.opts.saved
+	local key = ANNA.acct .. "." .. anna.E.data.store
+	local function Got(c, n)
+		return (c.E.data.inbox[key] or {})[n]
+	end
+	Varied(anna, 3)
+	Run(1)
+	local first = anna.E.data.mine[1]
+	check(first and Run(120, function() return Got(cedric, 1) ~= nil end) and Got(cedric, 1).p == 1, "page 1 (A) goes early to Cedric")
+	local cedricSaved = Stop(cedric)
+	Stop(anna, false, true) -- (her game crashes: nothing saved)
+	Run(60)
+	anna = Start(ANNA, { friends = FriendsOf(ANNA, people), saved = save })
+	Varied(anna, 4)
+	Run(1)
+	local second = anna.E.data.mine[1]
+	check(second and second.h ~= first.h, "her next session closes another page 1 (B)")
+	anna = Reload(anna)
+	check(Run(300, function() return (bob.E.data.carry[key] or {})[1] ~= nil end), "after her /reload B goes to Bob")
+	local exporter = Exporter()
+	local receipt = exporter.Read(cedricSaved)
+	check(receipt.done[key] == "" and receipt.early[key] == "1", "the exporter has only A, a copy that came early: 1 in early, not in done")
+	local dora = Start(DORA, { friends = FriendsOf(DORA, people), collect = true })
+	dora.env.LefthyToolsEchoesReceipt = receipt
+	check(Run(180, function() return Got(dora, 1) ~= nil end) and Got(dora, 1).h == second.h and Got(dora, 1).p == nil,
+		"Dora (another account on that PC, the same receipt) fetches B")
+	check(not dora.E.Ranges.Contains(dora.E.data.exported[key], 1) and anna.E.data.mine[1] and anna.E.data.mine[1].h == second.h
+		and (bob.E.data.carry[key] or {})[1], "she doesn't take 1 as exported: Anna and Bob keep B (not safe yet)")
+	local doraSaved = Stop(dora)
+	cedric = Start(CEDRIC, { friends = FriendsOf(CEDRIC, people), saved = cedricSaved })
+	cedric.env.LefthyToolsEchoesReceipt = receipt
+	check(Run(180, function() return Got(cedric, 1) ~= nil and Got(cedric, 1).h == second.h end)
+		and ((cedric.E.data.provisional or {})[key] or {})[1] == first.h and not cedric.E.Ranges.Contains(cedric.E.data.exported[key], 1),
+		"Cedric back with the receipt: A aside (provisional), he fetches B too")
+	-- The exporter reads both saved files: B from a disk; 1 is in done now.
+	exporter.Read(doraSaved)
+	receipt = exporter.Read(Stop(cedric))
+	check(receipt.done[key] == "1" and receipt.early[key] == "" and exporter.archive[key][1][first.h] == false and exporter.archive[key][1][second.h],
+		"the exporter has both pages 1 (A only early, B from a disk)")
 	Stop(anna)
 	Stop(bob)
 end

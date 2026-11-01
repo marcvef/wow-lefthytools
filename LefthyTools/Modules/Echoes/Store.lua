@@ -22,11 +22,12 @@ local M = E.module
 --            copy from its author's disk shows the same hash (Confirm): never safe, never served,
 --            told only to its author; one the receipt takes goes to provisional (n -> its hash), not
 --            exported, so a page with that number from the author's disk is still fetched
---   safe     what collectors hold safely, per author; exported: what the receipts listed. A store's
---            entry goes 60 days after anything was last heard of it first-hand (heard: a friend
---            offered pages of it, its collector told it, or pages of it are here): summaries
---            passed on from friend to friend would keep every entry forever, and a broken or
---            hostile friend could fill all 200 places for good
+--   safe     what collectors hold safely, per author; exported: what the receipts listed in done (a
+--            version from a disk; never their early, the numbers the exporter has only early copies
+--            of). A store's entry goes 60 days after anything was last heard of it first-hand
+--            (heard: a friend offered pages of it, its collector told it, or pages of it are here):
+--            summaries passed on from friend to friend would keep every entry forever, and a broken
+--            or hostile friend could fill all 200 places for good
 --
 -- For /lefthy echoes, noted as pages come and go (one comparison each): safeTo, the newest page of
 -- mine that went because a collector holds it (my pages keep when they ended, e); latest, the newest
@@ -1063,28 +1064,38 @@ local function Forget()
 	end
 end
 
--- The exporter has these pages of acct.store (a receipt's ranges); upto: the latest arrival (a) of
--- my inbox it read, nil if it doesn't say (an older exporter). Inbox pages in the ranges go if it read
--- them (arrived by upto): a provisional one into provisional (its hash), any other into exported (and
--- out of provisional: the page with that number from a disk is archived now). Without upto every one
--- goes, except a page from a disk whose number is provisional: it came after a provisional page of
--- that number that the receipt took, so the receipt may be older than it. A number of the ranges
--- with no inbox page goes into exported unless it's provisional; one kept in the inbox doesn't. Carry
--- and mine: the ranges go.
-local function Take(acct, store, key, ranges, upto)
+-- The exporter has these pages of acct.store (a receipt's done: a version of each from a disk; early:
+-- only copies that came early, provisional ones); upto: the latest arrival (a) of my inbox it read,
+-- nil if it doesn't say (an older exporter). Inbox pages in done go if it read them (arrived by upto):
+-- a provisional one into provisional (its hash), any other into exported (and out of provisional: the
+-- page with that number from a disk is archived now). Without upto every one goes, except a page from
+-- a disk whose number is provisional: it came after a provisional page of that number that the
+-- receipt took, so the receipt may be older than it. A number of done with no inbox page goes into
+-- exported unless it's provisional; one kept in the inbox doesn't. Carry and mine: done goes.
+--
+-- early: only my provisional inbox pages in it go (by the same rule), into provisional; nothing else.
+-- Its numbers never go into exported, and nothing is dropped for them: the author may have lost
+-- that page in a crash and used its number again for another (the exporter doesn't have that one),
+-- and a page from a disk here with such a number is one the exporter hasn't read.
+local function Take(acct, store, key, done, early, upto)
 	local data = E.data
-	local list, inbox, provisional = Ranges.Parse(ranges), data.inbox[key], ProvisionalOf(key)
+	local list, aside = Ranges.Parse(done or ""), Ranges.Parse(early or "")
+	local inbox, provisional = data.inbox[key], ProvisionalOf(key)
 	local taken, kept = {}, {}
 	for n, page in pairs(type(inbox) == "table" and inbox or {}) do
-		if Ranges.Contains(list, n) then
+		local listed = Ranges.Contains(list, n)
+		if listed or (Pending(page) and Ranges.Contains(aside, n)) then
 			local take
 			if upto then
 				take = (type(page.a) == "number" and page.a or 0) <= upto
 			else
 				take = Pending(page) or not (provisional and provisional[n])
 			end
-			local into = take and taken or kept
-			into[#into + 1] = take and n or { n, n }
+			if take then
+				taken[#taken + 1] = n
+			elseif listed then
+				kept[#kept + 1] = { n, n }
+			end
 		end
 	end
 	for _, n in ipairs(taken) do
@@ -1106,14 +1117,25 @@ local function Take(acct, store, key, ranges, upto)
 		data.exported[key] = exported
 		Changed()
 	end
-	Drop(acct, store, ranges, "carry")
-	Drop(acct, store, ranges, "mine", true) -- (my own exporter has them)
+	if list[1] then
+		Drop(acct, store, list, "carry")
+		Drop(acct, store, list, "mine", true) -- (my own exporter has them)
+	end
+end
+
+-- A receipt's ranges for a key: the string, nil if it isn't one or lists nothing.
+local function Listed(ranges)
+	if type(ranges) == "string" and Ranges.Format(ranges) ~= "" then
+		return ranges
+	end
 end
 
 -- The exporter's receipt (collecting only): its addon loaded (load on demand; nothing if the folder
 -- isn't there), the pages it lists dropped from inbox (the ones it read), carry and mine, and kept in
 -- exported (Take). upto["<store>"]: the latest arrival of that store's inbox the exporter read (a
--- store it didn't read: none of its inbox goes).
+-- store it didn't read: none of its inbox goes). early (a newer exporter's): numbers it has only from
+-- copies that came early; only my provisional pages of them go aside (no early: an older exporter,
+-- whose done lists those too).
 local function Receipt()
 	local data = E.data
 	receiptSession = data.session
@@ -1131,13 +1153,21 @@ local function Receipt()
 		upto = receipt.upto[data.store]
 		upto = type(upto) == "number" and upto or -1
 	end
-	for key, ranges in pairs(receipt.done) do
+	local early = type(receipt.early) == "table" and receipt.early or {}
+	local keys = {}
+	for _, list in ipairs({ receipt.done, early }) do
+		for key in pairs(list) do
+			keys[key] = true
+		end
+	end
+	for key in pairs(keys) do
 		local acct, store
 		if type(key) == "string" then
 			acct, store = key:match("^(%x+)%.(%x+)$")
 		end
-		if acct and Store.Key(acct, store) == key and type(ranges) == "string" and Ranges.Format(ranges) ~= "" then
-			Take(acct, store, key, ranges, upto)
+		local done, aside = Listed(receipt.done[key]), Listed(early[key])
+		if acct and Store.Key(acct, store) == key and (done or aside) then
+			Take(acct, store, key, done, aside, upto)
 		end
 	end
 end

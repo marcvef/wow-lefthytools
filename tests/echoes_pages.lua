@@ -1110,7 +1110,7 @@ do
 	local reported, stop = suite.catchErrors()
 	local inbox0, exported0, stores0 = Ranges.Of(E.data.inbox[friend]), E.data.exported[friend], size(E.data.exported)
 	for _, bad in ipairs({ "x", { v = 1 }, { v = 1, done = "1-5" }, { v = 2, done = { [friend] = 5, [7] = "1-5", [friend .. "x"] = "1-5",
-		[A .. ".0c77e1f5"] = "x-y" } } }) do
+		[A .. ".0c77e1f5"] = "x-y" } }, { v = 1, early = { [friend] = "1-5" } }, { v = 1, done = {}, early = { [friend] = 5, [7] = "1-5" } } }) do
 		MOCK_RECEIPT = bad
 		reload(1)
 		Advance(2, 0.25)
@@ -1247,6 +1247,79 @@ do
 	Advance(2, 0.25)
 	check(E.data.inbox[friend] == nil and E.data.exported[friend] == "1-9" and (E.data.provisional or {})[friend] == nil,
 		"the exporter read them: exported, the provisional 4 cleared by its page from a disk")
+	check(sizesAgree(), "(the sizes agree)")
+	MOCK_RECEIPT, LefthyToolsEchoesReceipt = nil, nil
+	LT:SetModuleSetting(M, "collect", false)
+end
+
+section("Echoes pages: the receipt's early: numbers the exporter has only from pages that came early")
+do
+	-- A newer exporter lists in done only numbers it has a version of from a disk, and in early the
+	-- ones it has only from copies that came early (provisional pages, p: its author may have lost
+	-- that page in a crash and used the number again). Of early, only my provisional inbox pages go
+	-- (aside, into provisional, by the upto rule); its numbers never become exported, and nothing is
+	-- dropped for them: not a page from a disk in the inbox, not a relayed one, not mine.
+	fresh(acct)
+	LT:SetModuleSetting(M, "collect", true)
+	local read = E.Now()
+	local other = A .. ".0c77e1f3"
+	local function latest() -- (the latest arrival in my inbox: the exporter read all of it)
+		local a = 0
+		for _, page in pairs(E.data.inbox[friend] or {}) do
+			a = math.max(a, page.a or 0)
+		end
+		return a
+	end
+	local early1 = friendPage(1, read)
+	Store.Put(A, B, 1, early1, "inbox", true) -- (came early, read by the exporter)
+	Store.Put(A, B, 2, friendPage(2, read), "inbox") -- (from a disk: the exporter has only an early copy of 2)
+	local upto = E.data.inbox[friend][2].a
+	skew = skew + 60
+	Store.Put(A, B, 4, friendPage(4, read), "inbox", true) -- (came early, after what the exporter read)
+	Store.Put(A, "0c77e1f3", 1, friendPage(1, read), "carry")
+	for n = 1, 2 do Store.Close(n, E.Now(), header(n, E.Now()) .. "\n.0;t\n") end
+	Advance(3, 0.25)
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "5" }, upto = { [STORE] = upto },
+		early = { [friend] = "1-4,6", [other] = "1", [own] = "1-2", ["bad key"] = "1", [A .. ".0c77e1f4"] = 7 } }
+	reload(1)
+	Advance(2, 0.25)
+	local function provisional() return Ranges.Of(E.data.provisional and E.data.provisional[friend]) end
+	check(Ranges.Of(E.data.inbox[friend]) == "2,4" and provisional() == "1" and E.data.provisional[friend][1] == early1.h,
+		"the provisional 1 goes aside (provisional, its hash); 2 (from a disk) and 4 (came after what the exporter read) stay, got inbox "
+		.. Ranges.Of(E.data.inbox[friend]) .. ", provisional " .. provisional())
+	check(E.data.exported[friend] == "5" and E.data.exported[other] == nil and E.data.exported[own] == nil and E.data.exported["bad key"] == nil,
+		"none of early is exported (1, 3 and 6 without an inbox page neither); 5, in done, is; got " .. tostring(E.data.exported[friend]))
+	check(E.data.carry[other] and E.data.carry[other][1] and E.data.mine[1] and E.data.mine[2], "a relayed page and my own pages in early: kept")
+	check(Store.SafeHere(A, B) == "2,5" and Store.Provisional(A, B, 1) == early1.h, "safe here: 2 (from a disk, on this disk now) and 5"
+		.. " (exported); not 1 (still provisional), 3 or 6; got " .. Store.SafeHere(A, B))
+	-- Another page 1 from its author's disk is still fetched (1 isn't exported).
+	local disk1 = friendPage(1, read + 30)
+	check(Store.Put(A, B, 1, disk1, "inbox") == true, "another page 1 from a disk: kept")
+	-- The exporter ran again: it read 2 and the new 1 from a disk (done now), 4 came early (early).
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-2,5" }, upto = { [STORE] = latest() }, early = { [friend] = "3-4,6" } }
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.inbox[friend] == nil and E.data.exported[friend] == "1-2,5" and provisional() == "4",
+		"the next receipt: 1 and 2 exported (the provisional 1 cleared), 4 aside; got " .. tostring(E.data.exported[friend]) .. ", " .. provisional())
+	-- A receipt with only early, or an early that isn't a table: nothing breaks; an older exporter (no
+	-- early) as before.
+	Store.Put(A, B, 7, friendPage(7, read), "inbox", true)
+	Store.Put(A, B, 8, friendPage(8, read), "inbox")
+	local reported, stop = suite.catchErrors()
+	for _, receipt in ipairs({ { v = 1, done = {}, early = "7-8", upto = { [STORE] = latest() } },
+			{ v = 1, done = {}, early = { [friend] = 7 }, upto = { [STORE] = latest() } } }) do
+		MOCK_RECEIPT = receipt
+		reload(1)
+		Advance(2, 0.25)
+	end
+	stop()
+	check(#reported == 0 and Ranges.Of(E.data.inbox[friend]) == "7-8" and E.data.exported[friend] == "1-2,5", "an early that isn't one: nothing"
+		.. " changes, got " .. table.concat(reported, "; "))
+	MOCK_RECEIPT = { v = 1, done = {}, early = { [friend] = "7-8" }, upto = { [STORE] = latest() } }
+	reload(1)
+	Advance(2, 0.25)
+	check(Ranges.Of(E.data.inbox[friend]) == "8" and provisional() == "4,7" and E.data.exported[friend] == "1-2,5",
+		"a receipt with only early: the provisional 7 aside, 8 (from a disk) stays")
 	check(sizesAgree(), "(the sizes agree)")
 	MOCK_RECEIPT, LefthyToolsEchoesReceipt = nil, nil
 	LT:SetModuleSetting(M, "collect", false)
