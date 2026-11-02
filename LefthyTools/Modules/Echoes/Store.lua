@@ -159,15 +159,22 @@ function Ranges.Minus(a, b)
 	return Ranges.Format(out)
 end
 
--- Whether n is in them.
+-- Whether n is in them: a binary search (it's asked once per page of a store against a list that
+-- can have hundreds of ranges). Asked many times, pass a parsed list: a string is parsed each time.
 function Ranges.Contains(ranges, n)
 	if type(n) ~= "number" then
 		return false
 	end
-	for _, r in ipairs(Ranges.Parse(ranges)) do
+	local list = Ranges.Parse(ranges)
+	local low, high = 1, #list
+	while low <= high do
+		local mid = math.floor((low + high) / 2)
+		local r = list[mid]
 		if n < r[1] then
-			return false
-		elseif n <= r[2] then
+			high = mid - 1
+		elseif n > r[2] then
+			low = mid + 1
+		else
 			return true
 		end
 	end
@@ -607,7 +614,7 @@ local function Seen(ranges, fromDisk)
 			break
 		end
 	end
-	local clash, exported = {}, data.exported[Store.Own() or ""]
+	local clash, exported = {}, Ranges.Parse(data.exported[Store.Own() or ""])
 	for n, page in pairs(data.mine) do
 		if type(page) == "table" and (page.o == 0 or (fromDisk and page.o == 2)) and Ranges.Contains(list, n) and not Ranges.Contains(exported, n) then
 			clash[#clash + 1] = n

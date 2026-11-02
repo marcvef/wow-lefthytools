@@ -773,6 +773,23 @@ do
 		same = same and of == Ranges.Format(table.concat(pieces, ",")) and Ranges.Of(t) == Ranges.Format(Ranges.Of(t))
 	end
 	check(same, "a table's page numbers: the same as each number's range merged (random tables)")
+	-- Contains: a binary search; the same as looking through every range.
+	for _ = 1, 40 do
+		local pieces = {}
+		for i = 1, math.random(0, 60) do
+			local a = math.random(1, 1000)
+			pieces[i] = a .. "-" .. a + math.random(0, 9)
+		end
+		local list = Ranges.Parse(table.concat(pieces, ","))
+		for n = 0, 1011 do
+			local inside = false
+			for _, r in ipairs(list) do
+				inside = inside or (n >= r[1] and n <= r[2])
+			end
+			same = same and Ranges.Contains(list, n) == inside and (n % 97 ~= 0 or Ranges.Contains(Ranges.Format(list), n) == inside)
+		end
+	end
+	check(same, "contains: the same as looking through every range (random lists, and their strings)")
 	check(Ranges.Format("1-99999999999") == "" and Ranges.Contains("1-999999999", 500000000), "numbers up to 999,999,999; ranges never spelled out")
 end
 

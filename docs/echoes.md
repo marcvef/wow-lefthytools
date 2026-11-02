@@ -777,7 +777,9 @@ each.
 `E.Ranges` (strings like `"1-56,58"`: ascending, merged, from 1 to 999,999,999; never spelled out
 number by number): `Parse(ranges)` (a list `{ { 1, 56 }, { 58, 58 } }`; bad parts skipped),
 `Format(list)`, `Union(a, b)`, `Minus(a, b)`, `Contains(ranges, n)`, `Of(table[, keep])` (a table's
-page numbers). Each takes a string or a parsed list.
+page numbers). Each takes a string or a parsed list; a string is parsed each time, so a caller that
+asks `Contains` for many numbers (one per page) parses once and passes the list (`Contains` is a
+binary search).
 
 ### /lefthy echoes
 
