@@ -1409,7 +1409,7 @@ end)
 E.OnTick(function(now)
 	Sweep(now)
 	if queue[1] then
-		if not LT.InCombat() then
+		if not E.InFight() then
 			PackNext()
 		end
 		return

@@ -1898,7 +1898,7 @@ do
 	-- Collecting: a page of my relay cache moves to the inbox, one a second, not in a fight (E.Store
 	-- checks its hash again). Exported, from before the launch or broken: it just goes.
 	local function MoveOne(now)
-		if LT.InCombat() or pull.putAt == now then
+		if E.InFight() or pull.putAt == now then
 			return -- (E.Store.Put hashes the page again: not in a fight, one a tick)
 		end
 		for key, pages in pairs(E.data.carry) do
@@ -2103,7 +2103,11 @@ D.Random = math.random -- (a relay's start among the pages it wants; tests make 
 -- Keeps unfinished pages within PARTIALS_MAX: the ones without progress for longest go.
 local function TrimPartials(now)
 	local total, oldest, oldestId = 0, nil, nil
+	local holding = E.InFight()
 	for pageId, part in pairs(partials) do
+		if part.done and holding then
+			part.at = now -- (a whole page waiting out a fight doesn't age: it's kept after it)
+		end
 		if now - part.at > PARTIAL_AGE then
 			partials[pageId] = nil
 			pull.idle = pull.idle and not part.done -- (a finished one that goes may be asked for again)
@@ -2137,7 +2141,7 @@ end
 -- only ever have pages from a disk): collecting switched off meanwhile, it goes (its author still
 -- has it).
 local function StoreFinished(now)
-	if LT.InCombat() then
+	if E.InFight() then
 		return
 	end
 	local pageId, part

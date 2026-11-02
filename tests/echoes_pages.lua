@@ -1668,6 +1668,26 @@ do
 		"packed after the next load, and offered (it's on disk)")
 end
 
+section("Echoes pages: a combat flag stuck for 15 minutes holds nothing up")
+do
+	-- The game's combat flag can stick: after 15 minutes of it unbroken, packing goes on (one a tick).
+	fresh(acct)
+	Advance(2, 0.25)
+	local c0 = compressCalls
+	EnterCombat()
+	local n = Store.Close(E.data.n + 1, E.Now(), header(E.data.n + 1, E.Now()) .. "\nk0;1\n.0;t\n")
+	Advance(60, 0.25)
+	check(compressCalls == c0 and E.data.mine[n].q, "a minute in a fight: the page waits")
+	Advance(900, 1)
+	check(compressCalls == c0 + 1 and not E.data.mine[n].q and E.data.mine[n].m == "z", "15 minutes in combat without a break: packed all the same")
+	check(E.InFight() == false and LT.InCombat(), "(still in combat by the game's flag)")
+	LeaveCombat()
+	tick()
+	EnterCombat()
+	check(E.InFight(), "a new fight holds again")
+	LeaveCombat()
+end
+
 section("Echoes pages: nothing heavy on a tick")
 do
 	fresh(acct)

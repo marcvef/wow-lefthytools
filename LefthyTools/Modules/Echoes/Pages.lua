@@ -347,7 +347,7 @@ E.OnTick(function(now)
 	end
 	local busy = Busy(open)
 	local full = E.bytes >= PAGE_BYTES or E.count >= PAGE_LINES
-	if (full or (Due(busy) and not LT.InCombat())) and E.PageMayClose() then
+	if (full or (Due(busy) and not E.InFight())) and E.PageMayClose() then
 		Rollover(full and "s" or "t")
 		return
 	end

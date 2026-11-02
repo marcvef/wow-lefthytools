@@ -536,7 +536,7 @@ no line lost or doubled, each line's `dt` counting from the one before the reloa
   (`open.own` counts them). A page with nothing else on it stays open however long you're away (an
   AFK night is one page, not one every 30 minutes); the stale rule at login still closes it. An
   open page from a build before this rule (no `own`): 30 minutes (or 10) from its start. Never by
-  time in combat (`LT.InCombat()`): a page due in a fight closes on the first tick after it, so its
+  time in a fight (`E.InFight()`, below): a page due in a fight closes on the first tick after it, so its
   end (`.<dt>;t`, `e`) is then, not the 30 (or 10) minutes; by size it still closes at once.
 
 Not while the capture waits for its anchor (`E.PageMayClose`: `E.capture.Ready()`; a loading screen
@@ -553,11 +553,17 @@ nothing else then.
 the session, `o = 0`, `e` when it ended: now if nil) and `n` becomes the last closed page's number (a number at or below `E.data.top`,
 or kept already: the next one above, its header renumbered; numbers used twice, below). It returns
 the number the page is kept under. The tick packs one waiting page at a time,
-oldest first, and not in a fight (`LT.InCombat()`): a page closed in one waits as it is (plain text,
+oldest first, and not in a fight (`E.InFight()`): a page closed in one waits as it is (plain text,
 `q`: offered to nobody, early or not), the chores wait behind it (the 2 MB cap would count it
 unpacked), and the first tick after the fight packs it. A logout in the fight saves it as it is, and
 the next load queues it again (`q`) and packs it then; it's on disk by then, so it's offered at once:
 nothing waits for it to be packed sooner.
+
+**`E.InFight()`** (Echoes.lua): whether heavy work waits for a fight's end: closing a page by time,
+packing, keeping a page that came (`E.Store.Put` and its hash), moving one from the relay cache to the
+inbox. In combat (`LT.InCombat()`), for up to 15 minutes unbroken (the driver notes when a fight
+began): the game's combat flag can stick out of any fight, and then the work goes on, one step a
+tick as always. Sending is never done in combat, stuck or not (Budget).
 
 1. `C_EncodingUtil.CompressString(text, Enum.CompressionMethod.Zlib)`, then
    `EncodeBase64(..., Enum.Base64Variant.Standard)`: `m = "z"`;
@@ -1108,8 +1114,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   safe list costs more than another message. What adds nothing to what's known (a holder's full
   offer every 5 minutes, the summaries every friend passes on) isn't merged at all: a walk over both
   lists finds that, nothing made. A whole page waits in memory until it's kept (`E.Store.Put` hashes
-  it, up to 64 KB): one a tick, none in a fight, and nobody is asked for it meanwhile; it counts
-  like an unfinished one. Unfinished pages
+  it, up to 64 KB): one a tick, none in a fight (`E.InFight()`), and nobody is asked for it meanwhile; it counts
+  like an unfinished one, but doesn't age while it waits out a fight. Unfinished pages
   stay in memory: 256 KB at most, 10 minutes without progress. My answers to one friend (`en`,
   `ey`, a stop) wait at most 8 at a time: a friend asking faster than they go (2 a second) can't
   pile them up; the rest are dropped, and they ask again.
