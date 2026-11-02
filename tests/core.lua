@@ -362,6 +362,8 @@ do -- Which client this is (LT.WhichWorld): the release starts fresh, also from 
 	check(LT.WhichWorld() == "beta", "(the mock is the beta again)")
 
 	-- Friends' journals dated before the launch day (Chronicle): only on the release, once it's set.
+	check(type(SHIPPED_LAUNCH_DAY) == "string" and SHIPPED_LAUNCH_DAY:match("^20%d%d%-[01]%d%-[0-3]%d$"),
+		"the build ships with the launch day as a date (YYYY-MM-DD), got " .. tostring(SHIPPED_LAUNCH_DAY))
 	local launch, was = LT.LAUNCH_DAY, LT.world
 	LT.world, LT.LAUNCH_DAY = "release", nil
 	check(not LT.BeforeLaunch("2020-01-01") and not LT.BeforeLaunch(0), "the launch day not known yet: nothing is from before it")

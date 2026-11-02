@@ -546,10 +546,10 @@ end
 ---------------------------------------------------------------------------
 
 LT.FIRST_RELEASE_BUILD = 70532 -- the release's first build (1.60.1.70532)
--- Forever's launch day, UTC ("YYYY-MM-DD"; nil until it's known). A friend on an older LefthyTools
+-- Forever's launch day, UTC ("YYYY-MM-DD"; nil: not known). A friend on an older LefthyTools
 -- that didn't start fresh can still pass on the beta's journals: on the release Chronicle leaves out
 -- what's dated before it (LT.BeforeLaunch).
-LT.LAUNCH_DAY = nil
+LT.LAUNCH_DAY = "2026-11-04"
 
 -- The client's own answers: true on a beta, test or PTR client (Blizzard's code asks IsTestBuild).
 local CLIENT_CHECKS = { "IsBetaBuild", "IsTestBuild", "IsPublicTestClient" }

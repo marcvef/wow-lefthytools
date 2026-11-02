@@ -117,6 +117,7 @@ local function Start(p, opts)
 			assert(load(file.src, "@Interface/AddOns/LefthyTools/" .. file.name, "t", env))("LefthyTools", ns)
 		end
 	end
+	ns.LT.LAUNCH_DAY = nil -- (the build's real launch day would drop the tests' made-up times: none unless a test sets it)
 	env.Fire("ADDON_LOADED", "LefthyTools")
 	env.Fire("PLAYER_LOGIN")
 	env.Fire("PLAYER_ENTERING_WORLD", true, false)

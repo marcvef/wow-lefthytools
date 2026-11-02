@@ -28,6 +28,9 @@ Advance(0.3) -- let the debounced rebuild run
 
 local LT = LefthyTools
 local lefthy = SlashCmdList.LEFTHYTOOLS
+-- The launch day this build ships with (core.lua checks it's a date); the tests start without one and set
+-- their own (the build's real one would drop the tests' made-up times).
+SHIPPED_LAUNCH_DAY, LT.LAUNCH_DAY = LT.LAUNCH_DAY, nil
 
 -- What was printed to chat since PRINTED[mark], one line each.
 local function printedSince(mark)

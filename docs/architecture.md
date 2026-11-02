@@ -294,7 +294,7 @@ as the release.
 
 **Friends' data:** a friend on an older LefthyTools (without this) who copied the beta's saved data
 still passes the beta's journals on through Chronicle's sync. `LT.LAUNCH_DAY` is Forever's launch
-day, UTC (`"YYYY-MM-DD"`; nil until it's known, and then nothing changes): on the release
+day, UTC (`"YYYY-MM-DD"`, `"2026-11-04"`; nil: not known, and then nothing changes): on the release
 `LT.BeforeLaunch(day or time)` says what's dated before it, and Chronicle leaves that out of
 friends' journals and old-style days (chronicle.md). Only what we take changes; nothing new goes
 over the network, older builds send as before. A time is compared with the launch day's first
