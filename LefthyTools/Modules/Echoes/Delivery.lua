@@ -264,6 +264,7 @@ local pull = {
 	free = {}, early = {},           -- [id][key] = { offered, unwanted, free }: what I want of a holder's offer
 	candidates = {},                 -- id -> { { key, free, where, early }, ... }: their offers with pages I want
 	dirty = {},                      -- key -> true: only that store's offers to look at again (Stir(key))
+	putAt = nil,                     -- the tick a page was last given to E.Store.Put (one a tick)
 }
 D.pull = pull -- (tests)
 
@@ -859,8 +860,9 @@ local inHead, inTail = 1, 0
 -- number I hold provisionally: its start is compared, see OnBegin) }: my requests
 local inflight = {}
 -- pageId -> { key, n, len, hash, t0, m, chunks, have, at, from = { [id] = true }, early (no holder
--- that sent it offered it as on a disk: it's kept provisional) }
+-- that sent it offered it as on a disk: it's kept provisional), done (whole, waiting to be kept) }
 local partials = {}
+local finished = {}    -- pageIds of whole pages waiting to be kept (StoreFinished), oldest first
 local bad = {}         -- pageId -> { [id] = true }: holders whose copy didn't match its hash (this session)
 local checked = {}     -- key -> { [n] = true }: provisional pages a copy from a disk didn't match (this session)
 local noRoom = {}      -- pageId -> when it was too big for my relay cache (not asked again for NO_ROOM_WAIT)
@@ -1851,10 +1853,11 @@ do
 	-- A page of free (what I want of key from holder id) to ask for; nil (and true: enough looked at for
 	-- this round, a holder whose copies failed again and again) if none. What I don't want is taken out
 	-- as ranges, so the pages looked at one by one are only the ones asked for already (taken: this
-	-- round), or that this holder's copy or my room failed (a few). A collector takes the oldest first; a
-	-- relay starts at a random one of them and goes on from there (around to the first): many relays
-	-- asking an author at once, before what they hold has spread, each fetch another page, not all the
-	-- first. (A page waiting for room: pull.soonest, when it may be asked for again.)
+	-- round), whole and waiting to be kept, or that this holder's copy or my room failed (a few). A
+	-- collector takes the oldest first; a relay starts at a random one of them and goes on from there
+	-- (around to the first): many relays asking an author at once, before what they hold has spread,
+	-- each fetch another page, not all the first. (A page waiting for room: pull.soonest, when it may be
+	-- asked for again.)
 	local function Pick(id, key, free, where, now, taken)
 		local count = 0
 		for _, r in ipairs(free) do
@@ -1877,7 +1880,8 @@ do
 					local since = noRoom[pageId]
 					if since and now - since < NO_ROOM_WAIT then
 						pull.soonest = math.min(pull.soonest, since + NO_ROOM_WAIT)
-					elseif not inflight[pageId] and not taken[pageId] and not (bad[pageId] and bad[pageId][id]) then
+					elseif not inflight[pageId] and not taken[pageId] and not (bad[pageId] and bad[pageId][id])
+						and not (partials[pageId] and partials[pageId].done) then
 						return n
 					end
 					looked = looked + 1
@@ -1891,9 +1895,12 @@ do
 		return nil
 	end
 
-	-- Collecting: a page of my relay cache moves to the inbox, one a second (E.Store checks its hash
-	-- again). Exported, from before the launch or broken: it just goes.
+	-- Collecting: a page of my relay cache moves to the inbox, one a second, not in a fight (E.Store
+	-- checks its hash again). Exported, from before the launch or broken: it just goes.
 	local function MoveOne(now)
+		if LT.InCombat() or pull.putAt == now then
+			return -- (E.Store.Put hashes the page again: not in a fight, one a tick)
+		end
 		for key, pages in pairs(E.data.carry) do
 			if Accepted(key:sub(1, 8), now) then
 				for n, page in pairs(pages) do
@@ -2099,6 +2106,7 @@ local function TrimPartials(now)
 	for pageId, part in pairs(partials) do
 		if now - part.at > PARTIAL_AGE then
 			partials[pageId] = nil
+			pull.idle = pull.idle and not part.done -- (a finished one that goes may be asked for again)
 		else
 			total = total + part.have
 			if not oldest or part.at < oldest then
@@ -2107,19 +2115,41 @@ local function TrimPartials(now)
 		end
 	end
 	if total > PARTIALS_MAX and oldestId then
+		pull.idle = pull.idle and not partials[oldestId].done
 		partials[oldestId] = nil
 	end
 end
 
--- A page whole: E.Store keeps it (into the inbox collecting, else relaying the cache) and checks it
--- (its hash, size and start). Not the page it said: whoever sent parts of it isn't asked for it again.
--- One that came early (no holder offered it as on a disk, or I asked for it from an ea) goes into the
--- inbox as provisional, never into a relay's cache (relays only ever have pages from a disk):
--- collecting switched off meanwhile, it goes (its author still has it).
+-- A page whole: it waits in memory to be kept (StoreFinished), like an unfinished one (its bytes count
+-- in PARTIALS_MAX, it goes after PARTIAL_AGE), and nobody is asked for it again meanwhile. Whether it
+-- came early is known now (no holder offered it as on a disk, or I asked for it from an ea).
 local function Complete(pageId, part)
 	local r = inflight[pageId]
-	local early = part.early or (r ~= nil and r.early == true)
-	partials[pageId], inflight[pageId] = nil, nil
+	part.early = part.early or (r ~= nil and r.early == true)
+	part.done, inflight[pageId] = true, nil
+	finished[#finished + 1] = pageId
+end
+
+-- A whole page kept by E.Store, one a tick and none in a fight: E.Store.Put hashes it (up to 64 KB),
+-- and two can finish in one tick. Into the inbox collecting, else relaying the cache; it checks the
+-- page (its hash, size and start). Not the page it said: whoever sent parts of it isn't asked for it
+-- again. One that came early goes into the inbox as provisional, never into a relay's cache (relays
+-- only ever have pages from a disk): collecting switched off meanwhile, it goes (its author still
+-- has it).
+local function StoreFinished(now)
+	if LT.InCombat() then
+		return
+	end
+	local pageId, part
+	repeat
+		pageId = table.remove(finished, 1)
+		part = pageId and partials[pageId]
+	until not pageId or (part and part.done) -- (one that went meanwhile: PARTIALS_MAX, PARTIAL_AGE)
+	if not part then
+		return
+	end
+	partials[pageId], pull.idle = nil, false
+	local early = part.early
 	local where
 	if M.db.collect then
 		where = "inbox"
@@ -2128,6 +2158,7 @@ local function Complete(pageId, part)
 	else
 		return
 	end
+	pull.putAt = now
 	local ok, why = Put(part.key, part.n, { t = part.t0, h = part.hash, m = part.m, z = table.concat(part.chunks) }, where, early)
 	if ok then
 		stats.pages = stats.pages + (why == "have" and 0 or 1)
@@ -2189,7 +2220,7 @@ local function OnBegin(id, msg, now)
 		end
 		r.check = false -- (the receipt took the provisional one: this one is fetched)
 	end
-	if not (r or part) or Get(key, msg.n) then
+	if not (r or part) or (part and part.done) or Get(key, msg.n) then
 		Control(id, stop, "eq", nil, true) -- (not asked for, or got already)
 		return
 	end
@@ -2477,6 +2508,7 @@ do
 		if inHead > inTail then
 			inHead, inTail = 1, 0
 		end
+		StoreFinished(now) -- (a whole page: one a tick)
 	end
 end
 
@@ -2541,6 +2573,7 @@ local function Reset()
 		wipe(t)
 	end
 	pull.flying = 0
+	wipe(finished)
 	seenAt = -math.huge
 	lastHouse, lastFlags, probe = nil, nil, nil
 	inCombat = false

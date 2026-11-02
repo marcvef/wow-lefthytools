@@ -1776,6 +1776,67 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: whole pages are kept one a tick, none in a fight")
+do
+	-- A page that comes whole is kept by E.Store, which hashes it (up to 64 KB): not in a fight (it
+	-- waits in memory, and nobody is asked for it again meanwhile), and one a tick (two can finish in
+	-- one). A collector's relay cache doesn't move to the inbox in a fight either.
+	local c = Start(EVE, { friends = { ANNA, BOB }, fake = true, collect = true })
+	MeetAll(c, { ANNA, BOB }, "rs")
+	local D, E, LT = c.D, c.E, c.LT
+	local p1, p2 = TheirPage(c, 1, 960), TheirPage(c, 2, 960)
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1-2")
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":1-2")
+	Pass(c, 1.5)
+	local r1, r2 = D.inflight[ANNA.key .. ".1"], D.inflight[ANNA.key .. ".2"]
+	check(r1 and r2 and r1.from ~= r2.from, "(both asked for: one of Anna, one of Bob)")
+	local from1 = r1 and r1.from == ANNA.id and ANNA or BOB
+	local hash, hashed = LT.Hash32, 0
+	LT.Hash32 = function(...)
+		hashed = hashed + (debug.getinfo(2, "S").source:sub(-9) == "Store.lua" and 1 or 0)
+		return hash(...)
+	end
+	c.env.EnterCombat()
+	local mark = Mark(c)
+	SendPage(c, from1, ANNA, p1, 3)
+	SendPage(c, from1 == ANNA and BOB or ANNA, ANNA, p2, 4)
+	Pass(c, 5)
+	local inbox = E.data.inbox[ANNA.key]
+	local part1, part2 = D.partials[ANNA.key .. ".1"], D.partials[ANNA.key .. ".2"]
+	check(not (inbox and (inbox[1] or inbox[2])) and part1 and part1.done and part2 and part2.done and not D.inflight[ANNA.key .. ".1"]
+		and not D.inflight[ANNA.key .. ".2"] and hashed == 0, "in a fight: both whole, waiting in memory, not kept (nor hashed) yet")
+	c.env.LeaveCombat()
+	local kept, most = 0, 0
+	Pass(c, 2, 0.05, function()
+		local n = 0
+		for _ in pairs(E.data.inbox[ANNA.key] or {}) do
+			n = n + 1
+		end
+		most, kept = math.max(most, n - kept), n
+	end)
+	inbox = E.data.inbox[ANNA.key] or {}
+	check(kept == 2 and most == 1 and inbox[1] and inbox[1].z == p1.z and inbox[2] and inbox[2].z == p2.z and not next(D.partials),
+		("after the fight: both kept, one a tick (got %d, at most %d a tick)"):format(kept, most))
+	check(#Sent(c, ANNA, mark, "B2;eq;") + #Sent(c, BOB, mark, "B2;eq;") == 0, "nobody asked for them again meanwhile")
+	LT.Hash32 = hash
+	Stop(c)
+
+	-- Dora relayed a page of Anna's, then collects, in a fight: it moves to the inbox after it.
+	c = Start(DORA, { friends = { ANNA }, fake = true })
+	local p = TheirPage(c, 3, 600)
+	c.E.data.carry[ANNA.key] = { [3] = { t = p.t, h = p.h, m = "z", z = p.z, s = c.E.data.session, a = c.env.GetServerTime() - 60 } }
+	Touched(c)
+	c.env.EnterCombat()
+	c.E.module.db.collect = true
+	Pass(c, 5)
+	local before = c.E.data.inbox[ANNA.key]
+	c.env.LeaveCombat()
+	Pass(c, 2)
+	check(not before and c.E.data.inbox[ANNA.key] and c.E.data.inbox[ANNA.key][3] and not c.E.data.carry[ANNA.key],
+		"the relay cache moves to the inbox after the fight, not in it")
+	Stop(c)
+end
+
 section("Echoes' delivery: holders that go silent are asked last")
 do
 	-- Anna and Bob offer pages but don't answer (a long fight, silent after a throttle); Dora does.

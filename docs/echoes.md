@@ -956,8 +956,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   relay's also moves a page of mine that went only early: numbers used twice).
 - **A collector** asks for every offered page it lacks (not in its inbox, not exported, not in
   its relay cache), until its inbox reaches 8 MB. Its relay cache (from before it collected)
-  moves to the inbox, one page a second (`E.Store.Put` checks its hash again), offered or not; an
-  exported one just goes.
+  moves to the inbox, one page a second and none in a fight (`E.Store.Put` checks its hash again),
+  offered or not; an exported one just goes.
   - **Early offers** (`ea`, kept per friend only for their own key, until they restart, switch off
     or say `en`; taken only while collecting): after what friends offer as on a disk, the pages
     there it doesn't have in any way (not in its inbox, provisional or not, nor in `provisional`,
@@ -975,8 +975,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   What isn't wanted is worked out as ranges per store (the copies by a sweep over friends'
   holdings), and taken out of each holder's offer: however many pages others hold, a
   page still wanted is found (not only among the first 50), and many friends cost little. Pages
-  are looked at one by one only to skip the ones already asked for, or that this holder's copy or
-  my room failed (at most 50 of those a holder).
+  are looked at one by one only to skip the ones already asked for, whole and waiting to be kept,
+  or that this holder's copy or my room failed (at most 50 of those a holder).
 
   A relay starts at a random page among the ones it wants and goes on from there (around to the
   first); a collector takes the oldest first. Many relays coming online with an author at once,
@@ -1017,7 +1017,7 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   and don't have, of an account I take, at most 64 KB; one I don't take is stopped (asked from
   its end), and its transfer id no longer leads to an earlier page of that friend's; parts only
   in order (one after a gap waits for the request again).
-- A whole page goes to `E.Store.Put`, which checks the rest: the hash (`LT.Hash32`), the size, the
+- A whole page goes to `E.Store.Put` (one a tick, none in a fight: Budget), which checks the rest: the hash (`LT.Hash32`), the size, the
   start (not before the launch, not more than a day ahead), exported, safe, room. Refused for its
   hash, size or start: whoever sent parts of it isn't asked for it again this session. No room:
   that page is left alone for 5 minutes. The game never decompresses a page.
@@ -1106,7 +1106,9 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   2 ms (`debugprofilestop`, where the game has it; at least one a tick): merging a long holdings or
   safe list costs more than another message. What adds nothing to what's known (a holder's full
   offer every 5 minutes, the summaries every friend passes on) isn't merged at all: a walk over both
-  lists finds that, nothing made. Unfinished pages
+  lists finds that, nothing made. A whole page waits in memory until it's kept (`E.Store.Put` hashes
+  it, up to 64 KB): one a tick, none in a fight, and nobody is asked for it meanwhile; it counts
+  like an unfinished one. Unfinished pages
   stay in memory: 256 KB at most, 10 minutes without progress. My answers to one friend (`en`,
   `ey`, a stop) wait at most 8 at a time: a friend asking faster than they go (2 a second) can't
   pile them up; the rest are dropped, and they ask again.
