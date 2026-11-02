@@ -77,6 +77,10 @@ forgets; for tests).
   last state).
 - **In combat** the silent `/played` (it touches the chat frames), gear, professions and reputation
   wait until the fight is over; the path and the events don't.
+- **One heavy check per tick**: the full gear sweep (19 slots), professions, the reputation scan
+  and `/played` never run in the same tick. A session's start looks at all four on the ticks after
+  its anchor's (in this order: gear, professions, reputation, `/played`), so the same lines come a
+  tick or so apart instead of all at once (and the end of a fight releases them the same way).
 - **It records with Chronicle, the Bestiary and Beacon switched off.** It keeps its own small cache
   of mobs seen (level, classification, name: target, mouseover, nameplates; the last 200), and uses
   Beacon only to know which group members are LefthyTools friends.

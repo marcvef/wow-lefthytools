@@ -12,7 +12,8 @@ local C = E.capture
 --
 -- Never lags the client: events only mark what to look at; the tick looks. What touches Blizzard's
 -- frames or reads a lot (the silent /played: chat frames; gear, professions, reputation) waits until
--- you're out of combat.
+-- you're out of combat, and one of them runs per tick (a session's start: gear, professions,
+-- reputation, /played on the ticks after its anchor's, not all in one).
 
 local issecret, Value, Readable = LT.IsSecret, LT.Value, LT.Readable
 
@@ -532,6 +533,7 @@ E.OnTick(function(now)
 	if not (cap and C.Ready()) then
 		return
 	end
+	local heavy = false -- (one heavy check per tick: the full gear sweep, professions, the reputation scan, /played)
 	if C.arrived then
 		local start = C.arrived ~= "load"
 		C.arrived = nil
@@ -543,6 +545,7 @@ E.OnTick(function(now)
 		if start then
 			SessionStart()
 		end
+		heavy = true -- (the anchor's tick: the heavy checks follow on the next ones)
 	elseif S.instanceTries and now >= S.instanceAt then -- (the instance couldn't be told: again)
 		S.instanceTries, S.instanceAt = S.instanceTries + 1, now + INSTANCE_RETRY
 		C.Spot()
@@ -590,11 +593,8 @@ E.OnTick(function(now)
 		S.playedUntil = nil
 		ShowPlayed()
 	end
-	if S.playedWanted then
-		AskPlayed(now)
-	end
-	if S.gearAll then
-		S.gearAll = false
+	if S.gearAll and not heavy then
+		S.gearAll, heavy = false, true
 		for slot = 1, SLOTS do
 			gearDirty[slot] = true
 		end
@@ -616,17 +616,22 @@ E.OnTick(function(now)
 			gearWait[slot] = not Gear(cap, slot, tries + 1 >= GEAR_TRIES) and tries + 1 or nil
 		end
 	end
-	if S.skillsDirty then
+	if S.skillsDirty and not heavy then
 		Professions(cap)
+		heavy = true
 	end
-	if S.factionsScan and now - S.factionsAt >= FACTIONS_EVERY then
+	if S.factionsScan and not heavy and now - S.factionsAt >= FACTIONS_EVERY then
 		Factions(cap)
+		heavy = true
 	end
 	if next(repDirty) then
 		for id in pairs(repDirty) do
 			repDirty[id] = nil
 			Faction(cap, id, nil, not cap.repsKnown)
 		end
+	end
+	if S.playedWanted and not heavy then
+		AskPlayed(now)
 	end
 end)
 

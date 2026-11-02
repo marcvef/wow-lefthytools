@@ -643,10 +643,34 @@ section("Echoes capture: level-ups, /played, XP")
 ---------------------------------------------------------------------------
 do
 	-- /played: asked once per login, silently (the chat frames don't get it), out of combat.
+	-- A login's heavy checks run one per tick, on the ticks after the anchor's (the XP is read there):
+	-- the gear (19 slots), professions, the reputation scan, /played; never two in one tick.
 	PLAYED.requests, chatGot = 0, 0
+	local first, undo = {}, {} -- what -> GetTime() of its first call
+	local function spy(t, k, what)
+		local f = t[k]
+		t[k] = function(...)
+			first[what] = first[what] or GetTime()
+			return f(...)
+		end
+		undo[#undo + 1] = function() t[k] = f end
+	end
+	spy(_G, "GetXPExhaustion", "x")
+	spy(_G, "GetInventoryItemLink", "G")
+	spy(C_SkillInfo, "GetSkillLineInfoByID", "s")
+	spy(C_Reputation, "GetNumFactions", "R")
+	spy(_G, "RequestTimePlayed", "played")
 	listen()
 	Fire("PLAYER_ENTERING_WORLD", true, false)
-	Advance(0.3)
+	Advance(1.5)
+	for i = #undo, 1, -1 do undo[i]() end
+	local order, spread = { "x", "G", "s", "R", "played" }, true
+	for i = 2, #order do
+		local a, b = first[order[i - 1]], first[order[i]]
+		spread = spread and a and b and b - a > 0.2 and b - a < 0.3
+	end
+	check(spread, ("a login's checks one per tick: XP (the anchor's tick), then gear, professions, reputation, /played, got %s %s %s %s %s")
+		:format(tostring(first.x), tostring(first.G), tostring(first.s), tostring(first.R), tostring(first.played)))
 	check(PLAYED.requests == 1 and not chatHas, "a login: /played asked, the chat frames don't get its answer")
 	Advance(1)
 	check(chatGot == 0 and chatHas and cap().played >= 7200 and cap().played < 7202, "its answer: the time played; the chat frames get it again")
@@ -1367,7 +1391,7 @@ do
 		"in combat: no /played (no chat frame touched), no gear, profession or reputation read, got " .. seq())
 	check(seq():find("^@;0;500;500;f;s z;1429;Goldshire o;1") ~= nil, "(the login's path and session lines don't wait)")
 	LeaveCombat()
-	Advance(0.3)
+	Advance(1.3) -- (gear, professions, reputation, /played: one a tick)
 	check(PLAYED.requests == 1 and not chatHas, "the fight over: /played asked")
 	Advance(1)
 	check(chatHas and chatGot == 0, "and its answer kept from the chat frames")
