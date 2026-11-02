@@ -527,7 +527,8 @@ no line lost or doubled, each line's `dt` counting from the one before the reloa
 - 32 KB of text or 2,000 lines: `.<dt>;s`;
 - 30 minutes after its first line other than its own (`open.busy`, noted on the tick that first
   sees one): `.<dt>;t`; 10 minutes while a friend who takes pages early is online
-  (`E.Delivery.EarlyTaker()`, asked only once a page is 10 minutes busy): a closed page goes to that
+  (`E.Delivery.EarlyTaker()`, asked only once a page is 10 minutes busy, and then at most every 5 s:
+  its answer is kept that long, so one who comes online closes it within 5 s): a closed page goes to that
   collector within minutes (early pages, below), so a crash loses less. Its own lines are the
   header, the character and, on a page that follows one closed mid-session, the going on
   (`open.own` counts them). A page with nothing else on it stays open however long you're away (an

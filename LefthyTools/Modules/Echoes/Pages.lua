@@ -33,12 +33,14 @@ local PAGE_LINES = 2000   -- or 2,000 lines
 local STALE = 600         -- at the start an open page whose last line is older than this closes
 local FLUSH = 60          -- seconds between joining the lines into the open page's text
 local ACCOUNT_RETRY = 5   -- seconds between asking for my BattleTag while it isn't known
+local EARLY_EVERY = 5     -- seconds an answer whether a friend who takes pages early is online is kept
 
 local issecret = LT.IsSecret
 
 local active          -- the open page this session writes (E.data.open), nil until recording starts
 local flushedAt = 0   -- GetTime() of the last join
 local accountAt = 0   -- GetTime() of the next ask for my BattleTag
+local early, earlyAt = false, -math.huge -- whether a friend who takes pages early is online; GetTime() of that answer
 
 ---------------------------------------------------------------------------
 -- Who: my account and my character
@@ -319,10 +321,14 @@ function E.PageMayClose()
 end
 
 -- Whether a friend who takes my pages early is online (Delivery.lua, loaded after this file; not
--- there: none).
+-- there: none). Asked at most every EARLY_EVERY seconds (the tick asks 4 times a second).
 local function EarlyTaker()
-	local D = E.Delivery
-	return type(D) == "table" and type(D.EarlyTaker) == "function" and D.EarlyTaker() == true
+	local now = GetTime()
+	if now - earlyAt >= EARLY_EVERY then
+		local D = E.Delivery
+		early, earlyAt = type(D) == "table" and type(D.EarlyTaker) == "function" and D.EarlyTaker() == true, now
+	end
+	return early
 end
 
 -- Whether a page busy since then is due by time: 30 minutes, or 10 while a friend who takes pages

@@ -595,16 +595,25 @@ do
 	tick()
 	-- Nobody online who does: 30 minutes, as ever. One who comes online meanwhile: at once.
 	online = false
+	Advance(5) -- (the last answer is kept 5 s)
 	kills(2, 2)
 	tick()
 	busy, c0 = E.data.open.busy, closes
 	tickAt(busy + 900)
 	check(closes == c0, "nobody online who takes pages early: open after 15 minutes")
+	asked = 0
+	for _ = 1, 40 do tick() end
+	check(closes == c0 and asked <= 3, "asked at most every 5 s (the tick comes 4 times a second): " .. asked .. " times in 10 s")
 	online = true
-	tickAt(busy + 901)
-	check(closes == c0 + 1, "one comes online: it closes")
+	local ticks = 0
+	while closes == c0 and ticks < 40 do
+		tick()
+		ticks = ticks + 1
+	end
+	check(closes == c0 + 1 and ticks <= 21, "one comes online: it closes within 5 s, got " .. ticks .. " ticks")
 	tick()
 	online = false
+	Advance(5) -- (the last answer is kept 5 s)
 	kills(3, 3)
 	tick()
 	busy, c0 = E.data.open.busy, closes
