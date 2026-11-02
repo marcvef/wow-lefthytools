@@ -359,9 +359,18 @@ end
 -- seconds, a safety net.
 D.PagesChanged = Changed
 
--- My pages' key, nil while my BattleTag isn't known.
+-- My pages' key, nil while my BattleTag isn't known. (Kept while the saved table's account and store
+-- are the same: asked for many times a second.)
+local myKey, keyData, keyAcct, keyStore
 local function MyKey()
-	return S.Own()
+	local data = E.data
+	if not data then
+		return nil
+	elseif data ~= keyData or data.acct ~= keyAcct or data.store ~= keyStore then
+		keyData, keyAcct, keyStore = data, data.acct, data.store
+		myKey = S.Own()
+	end
+	return myKey
 end
 
 local function Split(key)
@@ -459,10 +468,18 @@ end
 -- client can't fill the saved table, nor make every message parse a longer list. (Past that, the
 -- rest isn't taken as safe: its pages are kept, nothing is lost.)
 local SAFE_KEYS, SAFE_COLLECTORS = 200, 8
+-- How many stores safe has (counted once until the pages change: E.Store adds and drops them).
+local function SafeKeys()
+	if not cache.safeKeys then
+		cache.safeKeys = Count(E.data.safe)
+	end
+	return cache.safeKeys
+end
 local function Safe(key, collector, list, told)
 	local safe = E.data.safe
 	local byCollector = type(safe[key]) == "table" and safe[key] or nil
-	if not byCollector and Count(safe) >= SAFE_KEYS then
+	local stores = not byCollector and SafeKeys()
+	if stores and stores >= SAFE_KEYS then
 		return
 	elseif byCollector and not byCollector[collector] and Count(byCollector) >= SAFE_COLLECTORS then
 		return
@@ -474,8 +491,12 @@ local function Safe(key, collector, list, told)
 		return
 	end
 	local acct, store = Split(key)
+	local new = safe[key] == nil
 	S.Safe(acct, store, merged, collector)
 	Changed()
+	if stores then
+		cache.safeKeys = stores + (new and 1 or 0) -- (one more: not walked again)
+	end
 end
 
 -- A collector's own summary, like the ones friends send: what's on its disk or exported (E.Store's
@@ -1244,7 +1265,7 @@ local function OnHello(id, msg, now)
 	local peer = peers[id]
 	local key = msg.acct .. "." .. msg.store
 	if not peer or peer.key ~= key then
-		peer = { holdings = {}, earlyHoldings = {} }
+		peer = { holdings = {}, earlyHoldings = {}, keys = 0 }
 		peers[id] = peer
 	end
 	if msg.early and not peer.early then
@@ -1257,14 +1278,14 @@ local function OnHello(id, msg, now)
 		-- They (re)started: they need mine, and everything I hold again; theirs comes again (the
 		-- pages they offered early too: a crash may have lost them). What they asked of me before is
 		-- gone with their session (they ask again what they still need).
-		peer.holdings, peer.earlyHoldings = {}, {}
+		peer.holdings, peer.earlyHoldings, peer.keys = {}, {}, 0
 		ResetPeer(id)
 		Release(id)
 		StopServing(id)
 		owedHello[id] = owedHello[id] or { at = now, answer = true }
 	end
 	if not (peer.collect or peer.relay or peer.share) then
-		peer.holdings, peer.earlyHoldings = {}, {} -- (switched off)
+		peer.holdings, peer.earlyHoldings, peer.keys = {}, {}, 0 -- (switched off)
 		Release(id)
 		StopServing(id)
 	end
@@ -1985,10 +2006,11 @@ local function OnHoldings(id, msg, now)
 	local peer = peers[id]
 	for _, item in ipairs(msg.items) do
 		local key, acct, list = item[1], item[2], item[3]
-		if Accepted(acct, now) and (peer.holdings[key] or Count(peer.holdings) < 200) then
+		if Accepted(acct, now) and (peer.holdings[key] or peer.keys < 200) then
 			S.Mentioned(acct, key:sub(10)) -- (pages of it are around: what collectors hold of it still counts)
 			local merged = peer.holdings[key] and Ranges.Union(peer.holdings[key], list) or list
 			if #merged <= RANGES_MAX then
+				peer.keys = peer.keys + (peer.holdings[key] and 0 or 1)
 				peer.holdings[key] = merged
 			end
 			if key == MyKey() then

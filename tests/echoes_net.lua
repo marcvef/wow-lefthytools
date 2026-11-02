@@ -1950,6 +1950,59 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: more than 200 stores (a friend's offer, what's safe)")
+do
+	-- A friend's holdings keep at most 200 stores, safe at most 200: counted as they're added, not by
+	-- walking them for every new one; a friend who restarts counts from 0 again. My own key is worked
+	-- out once, not every time it's needed.
+	local c = Start(EVE, { friends = { ANNA, BOB, DORA }, fake = true })
+	MeetAll(c, { BOB })
+	local function Key(i)
+		return ANNA.acct .. "." .. ("%08x"):format(0x30000000 + i)
+	end
+	local function Items(first, last)
+		local items = {}
+		for i = first, last do
+			items[#items + 1] = Key(i) .. ":1"
+		end
+		return items
+	end
+	local function Tell(head, items)
+		for i = 1, #items, 9 do
+			Say(c, BOB, head .. table.concat(items, "/", i, math.min(i + 8, #items)))
+			Pass(c, 0.1) -- (Beacon takes 20 a second from one friend)
+		end
+	end
+	local function Stores(t)
+		local n = 0
+		for _ in pairs(t) do
+			n = n + 1
+		end
+		return n
+	end
+	local own, calls = c.E.Store.Own, 0
+	c.E.Store.Own = function(...)
+		calls = calls + (debug.getinfo(2, "S").source:sub(-12) == "Delivery.lua" and 1 or 0)
+		return own(...)
+	end
+	Tell("B2;es;", Items(1, 210))
+	Pass(c, 2)
+	local held = c.D.peers[BOB.id].holdings
+	check(Stores(held) == 200 and held[Key(200)] and not held[Key(201)], "a friend's offer: at most 200 stores, got " .. Stores(held))
+	Hello(c, BOB, "rs") -- (he restarts: his offer is gone, the count with it)
+	Tell("B2;es;", Items(201, 210))
+	Pass(c, 1)
+	held = c.D.peers[BOB.id].holdings
+	check(Stores(held) == 10 and held[Key(205)], "after his restart: counted from 0 again, got " .. Stores(held))
+	Tell(("B2;ed;%s;%s;"):format(DORA.acct, DORA.store), Items(1, 210))
+	Pass(c, 2)
+	check(Stores(c.E.data.safe) == 200 and c.E.data.safe[Key(200)] and not c.E.data.safe[Key(201)],
+		"what's safe: at most 200 stores, got " .. Stores(c.E.data.safe))
+	check(calls <= 1, "my own key worked out once, got " .. calls)
+	c.E.Store.Own = own
+	Stop(c)
+end
+
 section("Echoes' delivery: the friend list isn't read again for every friend's zone")
 do
 	-- Battle.net says BN_FRIEND_INFO_CHANGED whenever any friend changes zone: Echoes doesn't read the
