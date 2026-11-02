@@ -39,7 +39,8 @@ local M = E.module
 --
 -- Pages from before the launch day go. E.Ranges: page numbers as range strings ("1-56,58").
 -- E.Store: the pages' API for the delivery; every change to mine, carry and inbox goes through it
--- (it keeps their sizes), and each one tells the delivery (D.PagesChanged: it caches what I hold).
+-- (it keeps their sizes, and what Held and SafeHere say per store until that store changes), and each
+-- one tells the delivery (D.PagesChanged: it caches what I hold).
 -- The game never decompresses a page: only the exporter does.
 
 local KB = 1024
@@ -241,6 +242,77 @@ local function Count(t)
 	return n
 end
 
+-- What E.Store.Held and E.Store.SafeHere work out, kept per store until something of that store
+-- changes: held[where][key], safeHere[key] (ranges strings; my own pages under MINE, whatever my
+-- key). The delivery asks for all of it after every change, and a collector's inbox can hold
+-- thousands of pages: only the store that changed is worked out anew. Every change to mine, carry,
+-- inbox, provisional and exported is made in this file, and each one marks its store (Dirty). What's
+-- on disk goes by the session, which a load doesn't change (a new load is a new saved table:
+-- cachedFor).
+local MINE = 1
+local held = { mine = {}, early = {}, carry = {}, inbox = {}, provisional = {} }
+local safeHere = {}
+local cachedFor -- the saved table they're of
+
+-- Something of key's pages changed (MINE: my own pages; nil: anything, everything is worked out anew).
+local function Dirty(key)
+	for _, cache in pairs(held) do
+		if key == nil then
+			wipe(cache)
+		else
+			cache[key] = nil
+		end
+	end
+	if key == nil then
+		wipe(safeHere)
+	else
+		safeHere[key] = nil
+	end
+end
+
+local function Cached()
+	if cachedFor ~= E.data then
+		cachedFor = E.data
+		Dirty()
+	end
+end
+
+-- The safety net: the stores' ranges forgotten one at a time, in turn, each once in SWEEP seconds (a
+-- round: the stores kept when it began), so a change that didn't go through this file (which
+-- shouldn't happen) is seen within SWEEP, before the delivery's own safety net looks again (every 5
+-- minutes). One store at a time: never all of them worked out anew at once.
+local SWEEP = 120
+local round, inRound, turn, sweptAt = {}, {}, 0, -math.huge
+local function Sweep(now)
+	if now - sweptAt < SWEEP / math.max(#round, 1) then
+		return
+	end
+	sweptAt = now
+	turn = turn + 1
+	if round[turn] == nil then
+		wipe(round)
+		wipe(inRound)
+		for _, cache in pairs(held) do
+			for key in pairs(cache) do
+				if not inRound[key] then
+					inRound[key] = true
+					round[#round + 1] = key
+				end
+			end
+		end
+		for key in pairs(safeHere) do
+			if not inRound[key] then
+				inRound[key] = true
+				round[#round + 1] = key
+			end
+		end
+		turn = 1
+	end
+	if round[turn] ~= nil then
+		Dirty(round[turn])
+	end
+end
+
 -- The pages changed (closed, packed, kept, dropped, safe, exported): the delivery looks at them anew
 -- (Delivery.lua's D.PagesChanged, if it's there: it loads after this file).
 local function Changed()
@@ -262,7 +334,8 @@ end
 -- to the inbox's latest (never lowered: the receipt takes the pages, the time stays).
 function Store.Recount()
 	local data = E.data
-	countedFor = data
+	countedFor, cachedFor = data, data
+	Dirty() -- (a page that isn't one may go)
 	bytes.mine, bytes.carry, bytes.inbox = 0, 0, 0
 	wipe(carryBy)
 	local arrived = Arrived()
@@ -354,6 +427,7 @@ local function DropMine(n)
 	E.data.mine[n] = nil
 	bytes.mine = bytes.mine - Size(page)
 	carried[n] = nil
+	Dirty(MINE)
 	return true
 end
 
@@ -367,6 +441,7 @@ local function Remove(where, key, n)
 		return false
 	end
 	list[n] = nil
+	Dirty(key)
 	local size = Size(page)
 	bytes[where] = bytes[where] - size
 	if where == "carry" then
@@ -479,34 +554,70 @@ function Store.Page(acct, store, n, early)
 	end
 end
 
+-- Which pages Held counts (Ranges.Of's keep).
+local KEEP = {
+	mine = function(_, page) return Offered(page) end,
+	early = function(_, page) return Early(page) end,
+	inbox = function(_, page) return not Pending(page) end,
+	pending = function(_, page) return Pending(page) end,
+	hash = function(_, h) return type(h) == "string" end,
+}
+
+-- A collector's provisional pages of key: the inbox's and the ones the receipt took.
+local function ProvisionalHeld(key)
+	local ranges = Ranges.Of(E.data.inbox[key], KEEP.pending)
+	local all = E.data.provisional
+	local taken = Ranges.Of(type(all) == "table" and all[key] or nil, KEEP.hash)
+	if taken ~= "" then
+		ranges = Ranges.Union(ranges, taken)
+	end
+	return ranges
+end
+
 -- What I hold of where as { ["acct.store"] = "ranges" }: "mine" (the pages I offer, shareable and on
 -- disk, under my key; nothing while my BattleTag isn't known), "early" (mine shareable and not on
 -- disk yet: for collectors who take them early), "carry", "inbox" (provisional pages left out) or
--- "provisional" (a collector's provisional pages: in the inbox, and the ones the receipt took).
+-- "provisional" (a collector's provisional pages: in the inbox, and the ones the receipt took). A
+-- new table each time; the ranges are kept per store until it changes (held, above).
 function Store.Held(where)
-	local out = {}
+	Cached()
+	local out, cache = {}, held[where]
 	if where == "mine" or where == "early" then
 		local own = Store.Own()
-		local ranges = own and Ranges.Of(E.data.mine, function(_, page) return (where == "mine" and Offered or Early)(page) end)
-		if ranges and ranges ~= "" then
-			out[own] = ranges
-		end
-	elseif where == "provisional" then
-		for key, pages in pairs(E.data.inbox) do
-			local ranges = Ranges.Of(pages, function(_, page) return Pending(page) end)
+		if own then
+			local ranges = cache[MINE]
+			if not ranges then
+				ranges = Ranges.Of(E.data.mine, KEEP[where])
+				cache[MINE] = ranges
+			end
 			if ranges ~= "" then
-				out[key] = ranges
+				out[own] = ranges
 			end
 		end
-		for key, list in pairs(type(E.data.provisional) == "table" and E.data.provisional or {}) do
-			local ranges = Ranges.Of(list, function(_, h) return type(h) == "string" end)
-			if ranges ~= "" then
-				out[key] = Ranges.Union(out[key], ranges)
+	elseif where == "provisional" then
+		local all = E.data.provisional
+		for _, list in ipairs({ E.data.inbox, type(all) == "table" and all or {} }) do
+			for key in pairs(list) do
+				local ranges = cache[key]
+				if not ranges then
+					ranges = ProvisionalHeld(key)
+					cache[key] = ranges
+				end
+				if ranges ~= "" then
+					out[key] = ranges
+				end
 			end
 		end
 	else
 		for key, pages in pairs(E.data[where]) do
-			out[key] = Ranges.Of(pages, where == "inbox" and function(_, page) return not Pending(page) end or nil)
+			local ranges = cache and cache[key]
+			if not ranges then
+				ranges = Ranges.Of(pages, where == "inbox" and KEEP.inbox or nil)
+				if cache then
+					cache[key] = ranges
+				end
+			end
+			out[key] = ranges
 		end
 	end
 	return out
@@ -593,6 +704,7 @@ local function Move(n)
 	end
 	carried[new], carried[n] = carried[n], nil
 	moved = moved + 1
+	Dirty(MINE)
 	return new
 end
 
@@ -754,6 +866,7 @@ function Store.Put(acct, store, n, page, where, provisional)
 		data.arrived = a
 	end
 	list[n] = { t = page.t, h = page.h, m = page.m, z = page.z, s = data.session, a = a, p = (inbox and provisional) and 1 or nil }
+	Dirty(key)
 	bytes[where] = bytes[where] + #page.z
 	if where == "carry" then
 		carryBy[key] = (carryBy[key] or 0) + #page.z
@@ -857,17 +970,21 @@ end
 -- What this collector holds safely of acct.store, as ranges: received in an earlier session (on
 -- disk) or exported. Never a provisional page: it came early, its author may have lost it in a crash
 -- and closed another page with that number since; until a copy from the author's disk shows the
--- same hash, nobody may drop a page for it.
+-- same hash, nobody may drop a page for it. Kept until a page of that store changes (safeHere, above).
 function Store.SafeHere(acct, store)
 	local key = Store.Key(acct, store)
 	if not key then
 		return ""
 	end
-	local session = E.data.session
-	local onDisk = Ranges.Of(E.data.inbox[key], function(_, page)
-		return type(page) == "table" and type(page.s) == "number" and page.s < session and not Pending(page)
-	end)
-	return Ranges.Union(E.data.exported[key], onDisk)
+	Cached()
+	if not safeHere[key] then
+		local session = E.data.session
+		local onDisk = Ranges.Of(E.data.inbox[key], function(_, page)
+			return type(page) == "table" and type(page.s) == "number" and page.s < session and not Pending(page)
+		end)
+		safeHere[key] = Ranges.Union(E.data.exported[key], onDisk)
+	end
+	return safeHere[key]
 end
 
 -- Whether this collector holds page n of acct.store provisionally (it came early, not confirmed
@@ -912,6 +1029,7 @@ function Store.Confirm(acct, store, n, hash)
 		end
 		E.data.exported[key] = Ranges.Union(E.data.exported[key], tostring(n))
 	end
+	Dirty(key)
 	Changed()
 	return true
 end
@@ -986,6 +1104,7 @@ function Store.Close(n, t0, text, onDisk, e)
 		data.n = n
 	end
 	queue[#queue + 1] = n
+	Dirty(MINE)
 	Changed()
 	return n
 end
@@ -1033,6 +1152,7 @@ local function PackNext()
 	local m, z = Store.Pack(text)
 	page.m, page.z, page.h, page.q = m, z, LT.Hash32(z), nil
 	bytes.mine = bytes.mine - #text + #z
+	Dirty(MINE)
 	Changed() -- (it can be shared now)
 	Store.Trim()
 end
@@ -1163,7 +1283,7 @@ local function Take(acct, store, key, done, early, upto)
 		elseif provisional then
 			provisional[n] = nil
 		end
-		Remove("inbox", key, n)
+		Remove("inbox", key, n) -- (marks the store: Dirty)
 	end
 	provisional = ProvisionalOf(key)
 	if provisional and next(provisional) == nil then
@@ -1173,6 +1293,7 @@ local function Take(acct, store, key, done, early, upto)
 	local exported = add ~= "" and Ranges.Union(data.exported[key], add) or data.exported[key]
 	if taken[1] or exported ~= data.exported[key] then
 		data.exported[key] = exported
+		Dirty(key)
 		Changed()
 	end
 	if list[1] then
@@ -1254,7 +1375,9 @@ E.When("start", function()
 end)
 
 -- One thing a tick: a page packed, or else a chore; the receipt once a session while collecting.
-E.OnTick(function()
+-- (And the cache's safety net, Sweep: a comparison most ticks.)
+E.OnTick(function(now)
+	Sweep(now)
 	if queue[1] then
 		PackNext()
 		return

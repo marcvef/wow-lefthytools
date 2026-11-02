@@ -750,6 +750,17 @@ the launch day, a receipt, `Drop`, `Safe`), confirmed (`Confirm`), when a collec
 what's exported grows, and when the sizes are counted anew. Keys are `"acct.store"`, 8 hex digits
 each.
 
+`E.Store.Held` and `E.Store.SafeHere` keep what they work out per store (`held`, `safeHere` in
+Store.lua) until something of that store changes: every place in Store.lua that changes mine, carry,
+inbox, `provisional` or `exported` marks its store (`Dirty`; my own pages are one entry), counting
+the sizes anew forgets all of it, and so does a new saved table (what's on disk goes by the session,
+which a load doesn't change). The delivery asks for all of it after every change; on a collector
+with thousands of pages only the store that changed is worked out anew (8,000 inbox pages in 100
+stores: about 0.2 ms instead of 20 ms). A safety net forgets the stores one at a time, each once in
+2 minutes, so a change that didn't go through `E.Store` (which shouldn't happen) is seen before the
+delivery's own safety net looks again (every 5 minutes). Held returns a new table each time; the
+strings in it are the kept ones.
+
 | Call | What |
 |---|---|
 | `E.Store.Key(acct, store)` | `"acct.store"`, nil if either isn't 8 hex digits |

@@ -1431,6 +1431,91 @@ do
 	LT:SetModuleSetting(M, "collect", false)
 end
 
+section("Echoes pages: what Held and SafeHere keep is what they'd work out anew")
+do
+	-- E.Store keeps Held's and SafeHere's ranges per store until something of that store changes. A
+	-- random run of everything that changes pages (friends' pages kept, confirmed, dropped, safe,
+	-- moved, my pages closed and packed, the receipt over its ticks, a /reload): after each step, what
+	-- they say (kept from before where nothing changed) is what they say worked out anew (Recount
+	-- forgets what's kept).
+	fresh(acct)
+	LT:SetModuleSetting(M, "collect", true)
+	math.randomseed(5)
+	local keys = { friend, A .. ".0c77e1f3", "1a2b3c4d.00000001" }
+	local made = {}
+	for i = 1, 6 do made[i] = friendPage(i, E.Now() - 60) end
+	local function page() return made[math.random(1, #made)] end
+	local function ranges(top) -- (top: up to my last page and a little more)
+		local parts = {}
+		for i = 1, math.random(1, 4) do
+			local a = math.random(1, top and math.max(45, E.data.n + 3) or 45)
+			parts[i] = a .. "-" .. a + math.random(0, 6)
+		end
+		return table.concat(parts, ",")
+	end
+	local function said()
+		local out = {}
+		for _, where in ipairs({ "mine", "early", "carry", "inbox", "provisional" }) do
+			local list, held = {}, Store.Held(where)
+			for key, r in pairs(held) do list[#list + 1] = key .. "=" .. r end
+			table.sort(list)
+			out[#out + 1] = where .. ": " .. table.concat(list, " ")
+		end
+		for _, key in ipairs(keys) do
+			out[#out + 1] = "safe here " .. key .. ": " .. Store.SafeHere(key:sub(1, 8), key:sub(10))
+		end
+		return table.concat(out, "\n")
+	end
+	local steps = {
+		function() local key = keys[math.random(1, 3)] Store.Put(key:sub(1, 8), key:sub(10), math.random(1, 45), page(), "inbox", math.random() < 0.4) end,
+		function() local key = keys[math.random(1, 3)] Store.Put(key:sub(1, 8), key:sub(10), math.random(1, 45), page(), "carry") end,
+		function()
+			local key, n = keys[math.random(1, 3)], math.random(1, 45)
+			local h = Store.Provisional(key:sub(1, 8), key:sub(10), n)
+			Store.Confirm(key:sub(1, 8), key:sub(10), n, math.random() < 0.8 and h or "00000000")
+		end,
+		function()
+			local key = keys[math.random(1, 3)]
+			Store.Drop(key:sub(1, 8), key:sub(10), ranges(), ({ "inbox", "carry", nil })[math.random(1, 3)])
+		end,
+		function() local key = keys[math.random(1, 3)] Store.Safe(key:sub(1, 8), key:sub(10), ranges(), "c011ec70.12345678") end,
+		function() Store.Safe(acct, STORE, ranges(true), "c011ec70.12345678") end,
+		function() Store.Elsewhere(acct, STORE, ranges(true), math.random() < 0.5) end,
+		function() Store.Drop(acct, STORE, ranges(true), "mine") end,
+		function()
+			local n = E.data.n + math.random(1, 3)
+			Store.Close(n, E.Now(), header(n, E.Now()) .. "\n.0;t\n", math.random() < 0.3)
+		end,
+		function() local n = next(E.data.mine) if n then Store.WentOut(n, E.data.mine[n], math.random() < 0.5) end end,
+		function() for _ = 1, math.random(1, 3) do tick() end end,
+		function() for _ = 1, math.random(1, 3) do tick() end end,
+		function()
+			local done, early = {}, {}
+			for _, key in ipairs(keys) do
+				if math.random() < 0.7 then done[key] = ranges() end
+				if math.random() < 0.4 then early[key] = ranges() end
+			end
+			MOCK_RECEIPT = { v = 1, done = done, early = early, upto = math.random() < 0.8 and { [STORE] = E.data.arrived or 0 } or nil }
+			reload(1)
+		end,
+	}
+	local same, first = true, nil
+	for step = 1, 800 do
+		local which = math.random(1, #steps)
+		steps[which]()
+		local kept = said()
+		Store.Recount()
+		local anew = said()
+		if kept ~= anew and same then
+			same, first = false, ("step %d (%d): kept\n%s\nworked out anew\n%s"):format(step, which, kept, anew)
+		end
+	end
+	check(same, "after every step, what Held and SafeHere say is what they work out anew" .. (first and (", " .. first) or ""))
+	check(sizesAgree(), "(the sizes agree)")
+	MOCK_RECEIPT, LefthyToolsEchoesReceipt = nil, nil
+	LT:SetModuleSetting(M, "collect", false)
+end
+
 section("Echoes pages: the launch day")
 do
 	fresh(acct)
