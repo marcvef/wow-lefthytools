@@ -60,6 +60,7 @@ local SERVE_QUEUE, SERVING = 20, 2 -- requests a holder keeps, and serves at onc
 local SUMMARY_GAP, FULL_OFFER = 60, 300 -- what I hold: when it grew (at most this often), all of it this often
 local FULL_SAFE = 1800       -- what's safe (ed) all of it this often: it only grows, and friends keep it
 local OUT_MAX = 200          -- my messages waiting their turn at most (past it summaries wait: they come again)
+local SUMMARY_FRIENDS = 3    -- friends whose summaries are made in one second at most
 local BACKOFF_FIRST, BACKOFF_MAX, BACKOFF_CALM = 30, 300, 600 -- after a throttle: silent this long,
                              -- twice that after the next one (up to BACKOFF_MAX), back to the first after calm
 local HELLO_WAIT = 60        -- a friend's build not known to read B this long after their hello: an older one
@@ -1282,7 +1283,8 @@ local function Due(kind, id, now, stamp)
 	end
 	local every = kind == "ed" and FULL_SAFE or FULL_OFFER
 	if now - s.full >= every then
-		s.full = now
+		-- (the next one up to a quarter sooner, by chance: friends met together don't stay in step)
+		s.full = now - D.Random(0, every / 4)
 		wipe(s.sent)
 		if summariesOut[kind][id] then
 			DropOut(id, kind)
@@ -2172,21 +2174,26 @@ local function Housekeeping(now)
 	if M.db.collect then
 		SafeHere()
 	end
-	-- What I hold, my early pages, what's safe: to each friend it changed for, while out has room.
+	-- What I hold, my early pages, what's safe: to each friend it changed for, while out has room, and
+	-- to SUMMARY_FRIENDS of them a second at most (everyone's at once after a hello or a change of my
+	-- settings: spread over the next seconds; who got theirs waits SUMMARY_GAP, so all get a turn).
+	local told = 0
 	for id, peer in pairs(peers) do
-		if #out >= OUT_MAX then
+		if #out >= OUT_MAX or told >= SUMMARY_FRIENDS then
 			break
 		end
 		if peer.verified and beacon.peers[id] then
+			local went = false
 			if peer.collect or peer.relay then
-				Summary(id, peer, now)
+				went = Summary(id, peer, now)
 			end
 			if TakesEarly(id) then
-				EarlySummary(id, now)
+				went = EarlySummary(id, now) or went
 			end
 			if peer.share or peer.relay or peer.collect then
-				SafeSummary(id, now)
+				went = SafeSummary(id, now) or went
 			end
+			told = told + (went and 1 or 0)
 		end
 	end
 	Pull(now)

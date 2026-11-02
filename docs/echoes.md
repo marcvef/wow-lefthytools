@@ -931,7 +931,9 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   collect holds is only ever from a disk). Nobody else hears of provisional pages: no
   relay leaves a page alone for them ("held by an online collector" counts only what's in an `es`),
   no other collector asks for one. To a friend who collects or relays, when it changed (at most
-  every 60 s), everything every 5 minutes.
+  every 60 s), everything every 5 minutes (each friend's next one up to a quarter sooner, by
+  chance: friends met together don't stay in step; at most 3 friends' summaries are made in one
+  second, so everyone's after a hello or a change of my settings is spread over the next seconds).
 - **My early pages** (`ea`): my own pages not on disk yet, to a friend who collects and takes them
   early (`c` and `e`: verified, online), the same way (when it changed, at most every 60 s,
   everything every 5 minutes). Serving one: only to such a friend; anyone else asking gets `en`.

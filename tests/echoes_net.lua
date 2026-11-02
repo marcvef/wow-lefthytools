@@ -1684,6 +1684,64 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: everyone's summaries spread over the seconds")
+do
+	-- My settings change with 30 friends: everyone hears my hello at once, but their summaries are
+	-- made 3 friends a second (all 30 in one tick, before); the 5-minute full offers come at times of
+	-- each friend's own (all in the same second, before).
+	local crowd = Crowd(30, 550)
+	local c = Start(EVE, { friends = crowd, fake = true })
+	local k = 0
+	c.D.Random = function(low, high) -- (spread, the same each run)
+		k = k + 7
+		return low + k % (high - low + 1)
+	end
+	Stamped(c)
+	MyPage(c, 701, 300)
+	SafeOfAll(c, crowd, 1, 1)
+	MeetAll(c, crowd)
+	Pass(c, 400)
+	local mark = Mark(c)
+	Pass(c, 300)
+	local first, last = math.huge, 0
+	for _, f in ipairs(crowd) do
+		for i = mark, #c.env.GAMEDATA do
+			local m = c.env.GAMEDATA[i]
+			if m.id == f.id and m.data:sub(1, 6) == "B2;es;" then
+				first, last = math.min(first, m.at), math.max(last, m.at)
+			end
+		end
+	end
+	check(last - first >= 40, ("the full offers of 5 minutes later: over %.0f s"):format(last - first))
+	-- (the friends with summaries waiting in out, and how many)
+	local function Waiting()
+		local ids, n = {}, 0
+		for _, item in ipairs(c.D.out) do
+			if (item.kind == "es" or item.kind == "ed") and not ids[item.id] then
+				ids[item.id], n = true, n + 1
+			end
+		end
+		return ids, n
+	end
+	local most, heard, before = 0, {}, Waiting()
+	c.E.module.db.relay = false
+	Pass(c, 30, 0.25, function()
+		local now, new = Waiting(), 0
+		for id in pairs(now) do
+			new = new + (before[id] and 0 or 1)
+			heard[id] = true
+		end
+		most, before = math.max(most, new), now
+	end)
+	local all = 0
+	for _ in pairs(heard) do
+		all = all + 1
+	end
+	check(most <= 3 and all == 30, ("settings changed: 3 friends' summaries a second at most, got %d friends' in one tick (%d in all)")
+		:format(most, all))
+	Stop(c)
+end
+
 section("Echoes' delivery: long range lists of my own")
 do
 	-- What I keep (exported, safe, my inbox) may have more than the 300 intervals a message may: read
