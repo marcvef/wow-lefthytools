@@ -1052,7 +1052,9 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   (`D.PagesChanged`, the safety net every 5 minutes), the same for every friend: the ranges written
   and the messages packed once (only an author's own pages I hold provisionally are added for
   them). A friend is looked at again only after such a change or when their full offer is due:
-  while nothing changes, nothing is worked out.
+  while nothing changes, nothing is worked out. A change that leaves a summary as it was (a page
+  that came, but nothing told of it changed) keeps it: friends who heard it are passed over, and
+  what of a summary didn't change is taken over when it's built anew, not read again.
 - **What waits its turn** (`out`: hellos, requests, answers, summaries): hellos, requests and
   answers go first, then summaries and page parts by turns (summaries for many friends don't hold
   up a page). A friend's summary of a kind isn't queued while one of that kind still waits for

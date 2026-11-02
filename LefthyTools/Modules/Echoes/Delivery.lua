@@ -788,7 +788,7 @@ local function Control(id, message, kind, pageId, answer, marks)
 				Tally(item, -1)
 				local s = tracks[item.kind][item.id]
 				for _, mark in ipairs(s and item.marks or {}) do
-					s.sent[mark], s.gen = nil, nil
+					s.sent[mark], s.gen, s.told = nil, nil, nil
 				end
 				room = true
 				break
@@ -1286,6 +1286,7 @@ local function Due(kind, id, now, stamp)
 		-- (the next one up to a quarter sooner, by chance: friends met together don't stay in step)
 		s.full = now - D.Random(0, every / 4)
 		wipe(s.sent)
+		s.told = nil
 		if summariesOut[kind][id] then
 			DropOut(id, kind)
 		end
@@ -1298,25 +1299,36 @@ end
 
 -- What my summaries say, worked out once a change for every friend (Told): per message head, its
 -- items ("<key>:<ranges>", a long list in pieces) sorted, with each item's mark (what a friend
--- hears of: a key, for ed the collector and the key), each mark's text (ranges) and list.
-local told, toldGen = {}, nil
+-- hears of: a key, for ed the collector and the key), each mark's text (ranges), list and items. A
+-- change that leaves a kind's summary as it was keeps it (last): friends told it already are passed
+-- over; what of it didn't change is taken over, not worked out again.
+local told, toldGen, last = {}, nil, {}
 
--- offer ({ [key] = list }) under head into t (marks: prefix .. key).
-local function AddOffer(t, head, offer, prefix)
-	local h, markOf = { head = head, prefix = prefix or "", items = {}, marks = {} }, {}
-	for key, list in pairs(offer) do
-		local mark = (prefix or "") .. key
-		t.texts[mark], t.lists[mark] = Ranges.Format(list), list
-		local items = {}
-		WriteItems(key, list, MAX_BYTES - #head, items)
-		for _, item in ipairs(items) do
-			h.items[#h.items + 1] = item
-			markOf[item] = mark
+-- offer under head into t (marks: prefix .. key): { [key] = list }, or the ranges text as kept (read
+-- only when it changed since before, the summary built last).
+local function AddOffer(t, head, offer, prefix, before)
+	local h = { head = head, prefix = prefix or "", keys = {} }
+	for key, value in pairs(offer) do
+		local mark = h.prefix .. key
+		local text, list, items
+		if type(value) == "string" then
+			t.raws[mark] = value
+			if before and before.raws[mark] == value then
+				text, list, items = before.texts[mark], before.lists[mark], before.items[mark]
+			else
+				list = Stored(value)
+			end
+		else
+			list = value
+			text = Ranges.Format(list)
+			items = before and before.texts[mark] == text and before.items[mark] or nil
 		end
-	end
-	table.sort(h.items)
-	for i, item in ipairs(h.items) do
-		h.marks[i] = markOf[item]
+		if not items then
+			text, items = text or Ranges.Format(list), {}
+			WriteItems(key, list, MAX_BYTES - #head, items)
+		end
+		t.texts[mark], t.lists[mark], t.items[mark] = text, list, items
+		h.keys[#h.keys + 1] = mark
 	end
 	t.heads[#t.heads + 1] = h
 end
@@ -1332,13 +1344,13 @@ local function Told(kind)
 	if t then
 		return t
 	end
-	t = { texts = {}, lists = {}, heads = {}, extras = {} }
-	told[kind] = t
+	local before = last[kind]
+	t = { texts = {}, lists = {}, items = {}, raws = {}, heads = {}, extras = {} }
 	if kind == "es" then
-		AddOffer(t, "B2;es;", Holdings())
+		AddOffer(t, "B2;es;", Holdings(), nil, before)
 	elseif kind == "ea" then
 		local key = MyKey()
-		AddOffer(t, "B2;ea;", key and { [key] = Have("early", key) } or {})
+		AddOffer(t, "B2;ea;", key and { [key] = Have("early", key) } or {}, nil, before)
 	else
 		-- (What I keep of what's safe, checked once here: a key that isn't one, or an entry of the
 		-- wrong type, stays out.)
@@ -1350,16 +1362,44 @@ local function Told(kind)
 						byCollector[collector] = {}
 						collectors[#collectors + 1] = collector
 					end
-					byCollector[collector][key] = Stored(text)
+					byCollector[collector][key] = text
 				end
 			end
 		end
 		table.sort(collectors)
 		for _, collector in ipairs(collectors) do
 			local cAcct, cStore = Split(collector)
-			AddOffer(t, "B2;ed;" .. cAcct .. ";" .. cStore .. ";", byCollector[collector], collector .. ">")
+			AddOffer(t, "B2;ed;" .. cAcct .. ";" .. cStore .. ";", byCollector[collector], collector .. ">", before)
 		end
 	end
+	local same = before ~= nil
+	for mark, text in pairs(same and t.texts or {}) do
+		same = same and before.texts[mark] == text
+	end
+	for mark in pairs(same and before.texts or {}) do
+		same = same and t.texts[mark] ~= nil
+	end
+	if same then
+		wipe(before.extras) -- (what I hold provisionally may have changed: worked out again)
+		t = before
+	else
+		-- (each head's items sorted, with their marks)
+		for _, h in ipairs(t.heads) do
+			local markOf = {}
+			h.items, h.marks = {}, {}
+			for _, mark in ipairs(h.keys) do
+				for _, item in ipairs(t.items[mark]) do
+					h.items[#h.items + 1] = item
+					markOf[item] = mark
+				end
+			end
+			table.sort(h.items)
+			for i, item in ipairs(h.items) do
+				h.marks[i] = markOf[item]
+			end
+		end
+	end
+	told[kind], last[kind] = t, t
 	return t
 end
 
@@ -1367,6 +1407,10 @@ end
 -- extra: { mark, text, items } told instead of t's for that mark (only "es", one head). True if
 -- something went.
 local function Tell(id, s, kind, t, now, extra)
+	if s.told == t and not extra then
+		return false -- (all of it as they heard it last)
+	end
+	s.told = not extra and t or nil
 	local changed
 	for mark, text in pairs(t.texts) do
 		if extra and mark == extra.mark then

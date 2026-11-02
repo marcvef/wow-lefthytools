@@ -1601,6 +1601,20 @@ do
 	c.D.Ranges.Format = format
 	check(heard == 30 and formatted <= 15, ("a page closed: all 30 friends hear of it once (%d), the lists written once for all (%d times)")
 		:format(heard, formatted))
+	-- The pages change every second for half a minute, but nothing any friend hears of does (a page
+	-- coming in, say): what's safe isn't read again, nor told again.
+	c.D.Ranges.Format = function(list)
+		formatted = formatted + 1
+		return format(list)
+	end
+	formatted, mark = 0, Mark(c)
+	for _ = 1, 30 do
+		Touched(c)
+		Pass(c, 1)
+	end
+	c.D.Ranges.Format = format
+	check(formatted <= 30 and #Sent(c, crowd[2], mark, "B2;ed;") == 0, ("changes that change nothing told: %d lists written in 30 s (275 "
+		.. "before, what's safe read again each time), what's safe not told again"):format(formatted))
 	Stop(c)
 end
 
