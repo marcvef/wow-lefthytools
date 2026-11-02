@@ -248,6 +248,36 @@ function Ranges.Has(list, n)
 end
 
 ---------------------------------------------------------------------------
+-- What pulling works out is kept (Pull): pull.gen goes up with every change that may make me want
+-- other pages of what friends offer (Stir: what I hold, what's exported or safe, friends' holdings,
+-- who they are and what they do, the friend list, my key, my settings). A Pull that found nothing
+-- isn't done again until such a change, a request ends, a finished page is kept, or the time a page
+-- waits for room passes (NO_ROOM_WAIT).
+---------------------------------------------------------------------------
+
+local pull = {
+	gen = 0, scanned = -1,           -- Stir's count; the one the offers were looked at with
+	idle = false, idleUntil = 0,     -- a Pull found nothing: none until a change (or then)
+	soonest = math.huge, flying = 0, -- (Pick: the earliest a page waiting for room may go; requests open)
+	held = {}, peers = 0,            -- key -> its version: a friend's holdings of it changed; friends changed
+	unwanted = { {}, {}, {} },       -- [collecting, collecting early, relaying][key] = { list, what it's made of ... }
+	free = {}, early = {},           -- [id][key] = { offered, unwanted, free }: what I want of a holder's offer
+	candidates = {},                 -- id -> { { key, free, where, early }, ... }: their offers with pages I want
+	dirty = {},                      -- key -> true: only that store's offers to look at again (Stir(key))
+}
+D.pull = pull -- (tests)
+
+-- key: only what friends offer of that store may be wanted otherwise now (its holdings, a check).
+local function Stir(key)
+	pull.idle = false
+	if key and pull.scanned == pull.gen then
+		pull.dirty[key] = true
+	else
+		pull.gen = pull.gen + 1
+	end
+end
+
+---------------------------------------------------------------------------
 -- Accounts: mine, my Battle.net friends', a Beacon friend's (Chronicle's hashes, which work
 -- whether Chronicle is on or not)
 ---------------------------------------------------------------------------
@@ -274,6 +304,7 @@ do
 	local missed, missedCount = {}, 0 -- acct -> true: looked for since the list was read, not in it
 	local friendsStale = false   -- Battle.net said a friend came online or the list changed: read it again soon
 	local tagHashes, tagCount = {}, 0 -- BattleTag -> its hash (LT.Hash32 once per tag, not at every reading)
+	local spare = {} -- (the list as read before: compared)
 
 	local function TagHash(tag)
 		local acct = tagHashes[tag]
@@ -291,6 +322,8 @@ do
 	-- Every Battle.net friend, online or not: their account, and which game accounts are theirs.
 	local function ReadFriends(now)
 		friendsAt, friendsStale = now, false
+		local old = friendAccts
+		friendAccts, spare = spare, old
 		wipe(friendAccts)
 		wipe(idAccts)
 		wipe(missed)
@@ -314,6 +347,17 @@ do
 					end
 				end
 			end
+		end
+		-- An account more or gone: what I want of friends' offers may be other (Pull).
+		local same = true
+		for acct in pairs(friendAccts) do
+			same = same and old[acct] ~= nil
+		end
+		for acct in pairs(old) do
+			same = same and friendAccts[acct] ~= nil
+		end
+		if not same then
+			Stir()
 		end
 	end
 
@@ -428,6 +472,7 @@ local summaryGen = 0 -- (counts the changes: a summary is worked out again only 
 local function Changed()
 	wipe(cache)
 	summaryGen = summaryGen + 1
+	Stir()
 end
 -- The pages changed (E.Store calls it on every change it makes, and only then): looked at anew, but
 -- only what changed is parsed again (kept). Delivery also looks again every RECHECK seconds, a safety
@@ -445,7 +490,11 @@ do
 			return nil
 		elseif data ~= keyData or data.acct ~= keyAcct or data.store ~= keyStore then
 			keyData, keyAcct, keyStore = data, data.acct, data.store
-			myKey = S.Own()
+			local key = S.Own()
+			if key ~= myKey then
+				myKey = key
+				Stir()
+			end
 		end
 		return myKey
 	end
@@ -1354,6 +1403,8 @@ local function Verify(id, peer, now)
 		else
 			stats.rejected = stats.rejected + 1
 		end
+		pull.peers = pull.peers + 1
+		Stir()
 	end
 end
 
@@ -1390,6 +1441,10 @@ local function OnHello(id, msg, now)
 	elseif peer.verified then
 		Named(id, peer) -- (Battle.net may not have said their name when they were verified)
 	end
+	-- (What I want of their offers may be other now: Pull.)
+	peer.order, pull.free[id], pull.early[id] = nil, nil, nil
+	pull.peers = pull.peers + 1
+	Stir()
 end
 
 -- My summaries: what I hold (Summary), my early pages (EarlySummary), what's safe (SafeSummary).
@@ -1655,206 +1710,384 @@ local function InFlight()
 	return Count(inflight)
 end
 
--- The pages that lists cover at least times over (each list sorted, without overlaps): a sweep
--- over their ends.
-local function CoveredBy(lists, times)
-	local points = {}
-	for _, list in ipairs(lists) do
-		for _, r in ipairs(list) do
-			points[#points + 1] = { r[1], 1 }
-			points[#points + 1] = { r[2] + 1, -1 }
-		end
-	end
-	table.sort(points, ByStart)
-	local out, count, i = {}, 0, 1
-	while points[i] do
-		local at = points[i][1]
-		while points[i] and points[i][1] == at do
-			count = count + points[i][2]
-			i = i + 1
-		end
-		if count >= times and points[i] then
-			out[#out + 1] = { at, points[i][1] - 1 }
-		end
-	end
-	return Ranges.Normal(out)
-end
-
--- The provisional pages of key a copy from a disk didn't match this session, still in the inbox (the
--- receipt may take one meanwhile: then it's checked again).
-local function Checked(key)
-	local list = {}
-	for n in pairs(checked[key] or {}) do
-		local _, where = Provisional(key, n)
-		if where == "inbox" then
-			list[#list + 1] = { n, n }
-		end
-	end
-	return Ranges.Normal(list)
-end
-
--- What of key I don't want, worked out once per Pull (memo). Collecting: what's in my inbox,
--- exported, or in my relay cache (it moves over, MoveOne); offered early (early): also what I hold
--- provisionally (a page's number taken: nothing early comes into it); offered as on a disk: not what
--- I hold provisionally (a check: does the copy match?) unless it was checked this session and didn't.
--- Relaying: what's in my cache, safe at a collector, held by an online friend who collects (as good as
--- safe: it will be at their next session), or by COPIES online friends besides the author.
-local function Unwanted(key, collecting, memo, early)
-	local id = (early and "early>" or "") .. key
-	if memo[id] then
-		return memo[id]
-	end
-	local list
-	if collecting then
-		list = Ranges.Union(Ranges.Union(Have("inbox", key), Exported(key)), Have("carry", key))
-		list = Ranges.Union(list, early and Have("provisional", key) or Checked(key))
-	else
-		local covered, copies = {}, {}
-		for _, peer in pairs(peers) do
-			local held = peer.verified and peer.holdings[key]
-			if held and peer.collect then
-				covered = Ranges.Union(covered, held)
-			elseif held and peer.key ~= key then
-				copies[#copies + 1] = held
+-- (In a block, like the accounts: Lua's 200 locals.)
+local Pull
+do
+	-- The pages that lists cover at least times over (each list sorted, without overlaps): a sweep
+	-- over their ends.
+	local function CoveredBy(lists, times)
+		local points = {}
+		for _, list in ipairs(lists) do
+			for _, r in ipairs(list) do
+				points[#points + 1] = { r[1], 1 }
+				points[#points + 1] = { r[2] + 1, -1 }
 			end
 		end
-		list = Ranges.Union(Ranges.Union(Have("carry", key), SafeOf(key)), Ranges.Union(covered, CoveredBy(copies, COPIES)))
+		table.sort(points, ByStart)
+		local out, count, i = {}, 0, 1
+		while points[i] do
+			local at = points[i][1]
+			while points[i] and points[i][1] == at do
+				count = count + points[i][2]
+				i = i + 1
+			end
+			if count >= times and points[i] then
+				out[#out + 1] = { at, points[i][1] - 1 }
+			end
+		end
+		return Ranges.Normal(out)
 	end
-	memo[id] = list
-	return list
-end
 
--- A page of key I want from holder id, and where it goes; nil: none. What I don't want is taken
--- out as ranges, so the pages looked at one by one are only the ones asked for already, or that
--- this holder's copy or my room failed (a few). A collector takes the oldest first; a relay starts
--- at a random one of them and goes on from there (around to the first): many relays asking an
--- author at once, before what they hold has spread, each fetch another page, not all the first.
--- early: offered early (ea; only a collector asks for those).
-local function Wanted(id, key, offered, now, collecting, relaying, memo, early)
-	local acct = key:sub(1, 8)
-	if key == MyKey() or not Accepted(acct, now) then
-		return nil
+	-- The provisional pages of key a copy from a disk didn't match this session, still in the inbox (the
+	-- receipt may take one meanwhile: then it's checked again). NONE if there's none.
+	local function Checked(key)
+		if not checked[key] then
+			return NONE
+		end
+		local list = {}
+		for n in pairs(checked[key]) do
+			local _, where = Provisional(key, n)
+			if where == "inbox" then
+				list[#list + 1] = { n, n }
+			end
+		end
+		return list[1] and Ranges.Normal(list) or NONE
 	end
-	local where
-	if collecting then
-		where = "inbox"
-	elseif relaying and acct ~= MyAccount() and Fits(key, 1) then -- (the size comes with the page: checked then)
-		where = "carry"
-	else
-		return nil
+
+	local function Same(x, y)
+		if #x ~= #y then
+			return false
+		end
+		for i = 1, #x do
+			if x[i][1] ~= y[i][1] or x[i][2] ~= y[i][2] then
+				return false
+			end
+		end
+		return true
 	end
-	local free, count = Ranges.Minus(offered, Unwanted(key, collecting, memo, early)), 0
-	for _, r in ipairs(free) do
-		count = count + r[2] - r[1] + 1
+
+	-- What of key I don't want. Collecting: what's in my inbox, exported, or in my relay cache (it moves
+	-- over, MoveOne); offered early (early): also what I hold provisionally (a page's number taken:
+	-- nothing early comes into it); offered as on a disk: not what I hold provisionally (a check: does
+	-- the copy match?) unless it was checked this session and didn't. Relaying: what's in my cache, safe
+	-- at a collector, held by an online friend who collects (as good as safe: it will be at their next
+	-- session), or by COPIES online friends besides the author.
+	-- Kept (pull.unwanted) while what it's made of is the same: the same lists (kept: parsed again only
+	-- when their text changed), the same friends' holdings of key (pull.held, pull.peers). memo: worked
+	-- out anew, once per Pull (the tests' check of what's kept).
+	local function Unwanted(key, collecting, early, memo)
+		local t = (memo or pull.unwanted)[collecting and (early and 2 or 1) or 3]
+		local e = t[key]
+		if memo and e then
+			return e[1]
+		end
+		local list
+		if collecting then
+			local inbox, exported, carry = Have("inbox", key), Exported(key), Have("carry", key)
+			local last = early and Have("provisional", key) or Checked(key)
+			if e and e[2] == inbox and e[3] == exported and e[4] == carry and (e[5] == last or Same(e[5], last)) then
+				return e[1]
+			end
+			list = Ranges.Union(Ranges.Union(Ranges.Union(inbox, exported), carry), last)
+			t[key] = { list, inbox, exported, carry, last }
+		else
+			local carry, safe, held = Have("carry", key), SafeOf(key), pull.held[key] or 0
+			if e and e[2] == carry and e[3] == safe and e[4] == held and e[5] == pull.peers then
+				return e[1]
+			end
+			local covered, copies = NONE, {}
+			for _, peer in pairs(peers) do
+				local mine = peer.verified and peer.holdings[key]
+				if mine and peer.collect then
+					covered = Ranges.Union(covered, mine)
+				elseif mine and peer.key ~= key then
+					copies[#copies + 1] = mine
+				end
+			end
+			list = Ranges.Union(Ranges.Union(carry, safe), Ranges.Union(covered, CoveredBy(copies, COPIES)))
+			t[key] = { list, carry, safe, held, pull.peers }
+		end
+		return list
 	end
-	local start = (where == "carry" and count > 1) and D.Random(0, count - 1) or 0
-	local looked = 0
-	for pass = 1, 2 do -- (from the start to the end, then from the first up to the start)
-		local before = 0 -- (pages of free before r)
+
+	-- Where a page of key I'd ask for goes, and what of key I don't want; nil: none of key (my own key,
+	-- an account I don't take, no room). early: offered early (ea; only a collector asks for those).
+	local function Want(key, now, collecting, relaying, early, memo)
+		local acct = key:sub(1, 8)
+		if key == MyKey() or not Accepted(acct, now) then
+			return nil
+		end
+		local where
+		if collecting then
+			where = "inbox"
+		elseif relaying and acct ~= MyAccount() and Fits(key, 1) then -- (the size comes with the page: checked then)
+			where = "carry"
+		else
+			return nil
+		end
+		return where, Unwanted(key, collecting, early, memo)
+	end
+
+	-- What I want of what holder id offers of key (offered): unwanted taken out. Kept (pull.free,
+	-- pull.early) while what's offered and what I don't want are the same lists.
+	local function Free(id, key, offered, unwanted, early, memo)
+		if memo then
+			return Ranges.Minus(offered, unwanted)
+		end
+		local byPeer = early and pull.early or pull.free
+		local t = byPeer[id]
+		if not t then
+			t = {}
+			byPeer[id] = t
+		end
+		local e = t[key]
+		if not (e and e[1] == offered and e[2] == unwanted) then
+			e = { offered, unwanted, Ranges.Minus(offered, unwanted) }
+			t[key] = e
+		end
+		return e[3]
+	end
+
+	-- A page of free (what I want of key from holder id) to ask for; nil (and true: enough looked at for
+	-- this round, a holder whose copies failed again and again) if none. What I don't want is taken out
+	-- as ranges, so the pages looked at one by one are only the ones asked for already (taken: this
+	-- round), or that this holder's copy or my room failed (a few). A collector takes the oldest first; a
+	-- relay starts at a random one of them and goes on from there (around to the first): many relays
+	-- asking an author at once, before what they hold has spread, each fetch another page, not all the
+	-- first. (A page waiting for room: pull.soonest, when it may be asked for again.)
+	local function Pick(id, key, free, where, now, taken)
+		local count = 0
 		for _, r in ipairs(free) do
-			local size = r[2] - r[1] + 1
-			local from, to = r[1], r[2]
-			if pass == 1 then
-				from = r[1] + math.max(0, start - before)
-			else
-				to = math.min(r[2], r[1] + start - before - 1)
-			end
-			for n = from, to do
-				local pageId = PageId(key, n)
-				if not inflight[pageId] and not (bad[pageId] and bad[pageId][id]) and not (noRoom[pageId] and now - noRoom[pageId] < NO_ROOM_WAIT) then
-					return n, where
+			count = count + r[2] - r[1] + 1
+		end
+		local start = (where == "carry" and count > 1) and D.Random(0, count - 1) or 0
+		local looked = 0
+		for pass = 1, 2 do -- (from the start to the end, then from the first up to the start)
+			local before = 0 -- (pages of free before r)
+			for _, r in ipairs(free) do
+				local size = r[2] - r[1] + 1
+				local from, to = r[1], r[2]
+				if pass == 1 then
+					from = r[1] + math.max(0, start - before)
+				else
+					to = math.min(r[2], r[1] + start - before - 1)
 				end
-				looked = looked + 1
-				if looked >= 50 then
-					return nil -- (enough for this round: a holder whose copies failed again and again)
+				for n = from, to do
+					local pageId = PageId(key, n)
+					local since = noRoom[pageId]
+					if since and now - since < NO_ROOM_WAIT then
+						pull.soonest = math.min(pull.soonest, since + NO_ROOM_WAIT)
+					elseif not inflight[pageId] and not taken[pageId] and not (bad[pageId] and bad[pageId][id]) then
+						return n
+					end
+					looked = looked + 1
+					if looked >= 50 then
+						return nil, true
+					end
+				end
+				before = before + size
+			end
+		end
+		return nil
+	end
+
+	-- Collecting: a page of my relay cache moves to the inbox, one a second (E.Store checks its hash
+	-- again). Exported, from before the launch or broken: it just goes.
+	local function MoveOne(now)
+		for key, pages in pairs(E.data.carry) do
+			if Accepted(key:sub(1, 8), now) then
+				for n, page in pairs(pages) do
+					if S.Shareable(page) then
+						Move(key, n, page)
+						return
+					end
 				end
 			end
-			before = before + size
 		end
 	end
-	return nil
-end
 
--- Collecting: a page of my relay cache moves to the inbox, one a second (E.Store checks its hash
--- again). Exported, from before the launch or broken: it just goes.
-local function MoveOne(now)
-	for key, pages in pairs(E.data.carry) do
-		if Accepted(key:sub(1, 8), now) then
-			for n, page in pairs(pages) do
-				if S.Shareable(page) then
-					Move(key, n, page)
-					return
+	local function SortedKeys(t)
+		local list = {}
+		for k in pairs(t) do
+			list[#list + 1] = k
+		end
+		table.sort(list)
+		return list
+	end
+
+	-- A friend's keys in order (kept until one more comes: OnHoldings, OnHello).
+	local function HeldKeys(peer)
+		if not peer.order then
+			peer.order = SortedKeys(peer.holdings)
+		end
+		return peer.order
+	end
+
+	-- What holder id offers that I want: { { key, free, where, early }, ... }, their keys in order, then
+	-- their own pages not on their disk yet (a collector keeps them provisional). wants, lists: what Want
+	-- said of each store this time friends' offers are looked at (where or false; what I don't want),
+	-- so it's worked out once a store, not once a holder and store.
+	local function Candidates(id, peer, now, collecting, relaying, memo, wants, lists)
+		local list = {}
+		for _, key in ipairs(memo and SortedKeys(peer.holdings) or HeldKeys(peer)) do
+			local where, unwanted
+			if wants and wants[key] ~= nil then
+				where, unwanted = wants[key], lists[key]
+			else
+				where, unwanted = Want(key, now, collecting, relaying, false, memo)
+				if wants then
+					wants[key], lists[key] = where or false, unwanted
+				end
+			end
+			local free = where and Free(id, key, peer.holdings[key], unwanted, false, memo)
+			if free and free[1] then
+				list[#list + 1] = { key = key, free = free, where = where }
+			end
+		end
+		local offered = collecting and peer.earlyHoldings[peer.key]
+		if offered then
+			local where, unwanted = Want(peer.key, now, collecting, false, true, memo)
+			local free = where and Free(id, peer.key, offered, unwanted, true, memo)
+			if free and free[1] then
+				list[#list + 1] = { key = peer.key, free = free, where = where, early = true }
+			end
+		end
+		return list
+	end
+
+	-- Only some stores changed (pull.dirty): their entries in every friend's offers looked at again, kept
+	-- in order (their keys sorted, their early pages last).
+	local function Restir(now, collecting, relaying)
+		local wants, lists = {}, {}
+		for id, peer in pairs(peers) do
+			local list = pull.candidates[id]
+			if not list then
+				pull.candidates[id] = Candidates(id, peer, now, collecting, relaying, nil, wants, lists)
+			else
+				for key in pairs(pull.dirty) do
+					for i = #list, 1, -1 do
+						if list[i].key == key and not list[i].early then
+							table.remove(list, i)
+						end
+					end
+					local offered = peer.holdings[key]
+					local where, unwanted = wants[key], lists[key]
+					if offered and where == nil then
+						where, unwanted = Want(key, now, collecting, relaying, false)
+						wants[key], lists[key] = where or false, unwanted
+					end
+					local free = offered and where and Free(id, key, offered, unwanted, false)
+					if free and free[1] then
+						local at = #list + 1
+						for i = #list, 1, -1 do
+							if list[i].early or list[i].key > key then
+								at = i
+							end
+						end
+						table.insert(list, at, { key = key, free = free, where = where })
+					end
 				end
 			end
 		end
+		wipe(pull.dirty)
+	end
+
+	-- What to ask for now: { { id, key, n, where, early }, ... }, at most room of them, one per holder
+	-- that has no request open; holders whose request went silent lately come last. From what's kept:
+	-- friends' offers are looked at again only after a change (Stir), and nothing at all is worked out
+	-- while the last Pull found nothing and nothing changed since (true then). fresh: all of it worked
+	-- out anew, nothing kept (the tests' check of what's kept).
+	local function Decide(now, collecting, relaying, room, fresh)
+		local decided = {}
+		if not fresh then
+			if collecting ~= pull.collecting or relaying ~= pull.relaying then
+				pull.collecting, pull.relaying = collecting, relaying
+				Stir()
+			end
+			if pull.idle and now < pull.idleUntil then
+				return decided, true
+			end
+			if pull.scanned ~= pull.gen then
+				pull.scanned = pull.gen
+				wipe(pull.candidates)
+				wipe(pull.dirty)
+				local wants, lists = {}, {}
+				for id, peer in pairs(peers) do
+					pull.candidates[id] = Candidates(id, peer, now, collecting, relaying, nil, wants, lists)
+				end
+			elseif next(pull.dirty) then
+				Restir(now, collecting, relaying)
+			end
+		end
+		pull.soonest = math.huge
+		local busy, taken, memo, stuck = {}, {}, fresh and { {}, {}, {} }, false
+		for _, r in pairs(inflight) do
+			busy[r.from] = true
+		end
+		local order, later = {}, {}
+		for _, id in ipairs(SortedKeys(peers)) do
+			local list = silentAt[id] and now - silentAt[id] < 2 * SILENCE and later or order
+			list[#list + 1] = id
+		end
+		for _, id in ipairs(later) do
+			order[#order + 1] = id
+		end
+		for _, id in ipairs(order) do
+			local peer = peers[id]
+			if peer.verified and not busy[id] and ns.Beacon.peers[id] and (peer.share or peer.relay or peer.collect) then
+				for _, c in ipairs(fresh and Candidates(id, peer, now, collecting, relaying, memo) or pull.candidates[id] or NONE) do
+					local n, more = Pick(id, c.key, c.free, c.where, now, taken)
+					stuck = stuck or more == true
+					if n then
+						taken[PageId(c.key, n)] = true
+						decided[#decided + 1] = { id = id, key = c.key, n = n, where = c.where, early = c.early }
+						break
+					end
+				end
+				if #decided >= room then
+					break
+				end
+			end
+		end
+		if not fresh then
+			pull.idle, pull.idleUntil = decided[1] == nil and not stuck, pull.soonest
+		end
+		return decided, false
+	end
+
+	-- At most one open request per holder, IN_FLIGHT pages at once; a page I got part of goes on from there.
+	function Pull(now)
+		local collecting = M.db.collect and not S.InboxFull()
+		local relaying = M.db.relay and not M.db.collect -- (a collector is where pages go: it doesn't relay them)
+		if collecting then
+			MoveOne(now)
+		end
+		local flying = InFlight()
+		if flying < pull.flying then
+			pull.idle = false -- (a request ended: its holder and its page are free; only Pull adds one)
+		end
+		pull.flying = flying
+		if not (collecting or relaying) or flying >= IN_FLIGHT then
+			return
+		end
+		Friends(now) -- (read again now and then: an account more or gone changes what I want)
+		local decided, idle = Decide(now, collecting, relaying, IN_FLIGHT - flying)
+		if D.CheckPull then
+			D.CheckPull(decided, Decide(now, collecting, relaying, IN_FLIGHT - flying, true), idle)
+		end
+		for _, d in ipairs(decided) do
+			local pageId = PageId(d.key, d.n)
+			local part = partials[pageId]
+			-- (A number I hold provisionally, offered as on a disk: a check, OnBegin.)
+			inflight[pageId] = { from = d.id, key = d.key, n = d.n, where = d.where, at = now, sent = false, early = d.early,
+				check = not d.early and Provisional(d.key, d.n) ~= nil }
+			Control(d.id, Msg("eq", d.key:sub(1, 8), d.key:sub(10), d.n, part and part.have or 0), "eq", pageId)
+		end
+		pull.flying = InFlight()
 	end
 end
 
 D.Random = math.random -- (a relay's start among the pages it wants; tests make it the first)
-
-local function SortedKeys(t)
-	local list = {}
-	for k in pairs(t) do
-		list[#list + 1] = k
-	end
-	table.sort(list)
-	return list
-end
-
--- At most one open request per holder, IN_FLIGHT pages at once; a page I got part of goes on from there.
-local function Pull(now)
-	local collecting = M.db.collect and not S.InboxFull()
-	local relaying = M.db.relay and not M.db.collect -- (a collector is where pages go: it doesn't relay them)
-	if collecting then
-		MoveOne(now)
-	end
-	if not (collecting or relaying) or InFlight() >= IN_FLIGHT then
-		return
-	end
-	local busy, memo = {}, {}
-	for _, r in pairs(inflight) do
-		busy[r.from] = true
-	end
-	-- Holders whose request went silent lately come last.
-	local order, later = {}, {}
-	for _, id in ipairs(SortedKeys(peers)) do
-		local list = silentAt[id] and now - silentAt[id] < 2 * SILENCE and later or order
-		list[#list + 1] = id
-	end
-	for _, id in ipairs(later) do
-		order[#order + 1] = id
-	end
-	for _, id in ipairs(order) do
-		local peer = peers[id]
-		if peer.verified and not busy[id] and ns.Beacon.peers[id] and (peer.share or peer.relay or peer.collect) then
-			local key, n, where, early
-			for _, k in ipairs(SortedKeys(peer.holdings)) do
-				n, where = Wanted(id, k, peer.holdings[k], now, collecting, relaying, memo)
-				if n then
-					key = k
-					break
-				end
-			end
-			-- Then their own pages not on their disk yet (a collector keeps them provisional).
-			local offered = collecting and not n and peer.earlyHoldings[peer.key]
-			if offered then
-				n, where = Wanted(id, peer.key, offered, now, collecting, false, memo, true)
-				key, early = peer.key, true
-			end
-			if n then
-				local pageId = PageId(key, n)
-				local part = partials[pageId]
-				-- (A number I hold provisionally, offered as on a disk: a check, OnBegin.)
-				inflight[pageId] = { from = id, key = key, n = n, where = where, at = now, sent = false, early = early,
-					check = not early and Provisional(key, n) ~= nil }
-				Control(id, Msg("eq", key:sub(1, 8), key:sub(10), n, part and part.have or 0), "eq", pageId)
-				if InFlight() >= IN_FLIGHT then
-					return
-				end
-			end
-		end
-	end
-end
 
 ---------------------------------------------------------------------------
 -- Receiving: the tick handles what Beacon handed over
@@ -1945,6 +2178,7 @@ local function OnBegin(id, msg, now)
 		elseif check and pending == "inbox" then
 			checked[key] = checked[key] or {}
 			checked[key][msg.n] = true
+			Stir(key)
 		end
 		if not check or hash == msg.hash or pending == "inbox" then
 			if r and r.from == id then
@@ -2088,6 +2322,8 @@ local function OnNone(id, msg)
 	for _, held in ipairs(peer and { peer.holdings, peer.earlyHoldings } or {}) do
 		if held[key] then
 			held[key] = Ranges.Minus(held[key], { { msg.n, msg.n } })
+			pull.held[key] = (pull.held[key] or 0) + 1
+			Stir(held == peer.holdings and key or nil) -- (their early ones: all of theirs)
 		end
 	end
 	local pageId = PageId(key, msg.n)
@@ -2108,6 +2344,9 @@ local function OnHoldings(id, msg, now)
 			if merged and #merged <= RANGES_MAX then
 				peer.keys = peer.keys + (had and 0 or 1)
 				peer.holdings[key] = merged
+				peer.order = had and peer.order or nil -- (their keys in order: one more)
+				pull.held[key] = (pull.held[key] or 0) + 1
+				Stir(key)
 			end
 			if key == MyKey() then
 				if peer.relay and not peer.collect then
@@ -2139,6 +2378,7 @@ local function OnEarly(id, msg, now)
 			local merged = not had and list or (not Ranges.Covers(had, list) and Ranges.Union(had, list))
 			if merged and #merged <= RANGES_MAX then
 				peer.earlyHoldings[key] = merged
+				Stir()
 			end
 		end
 	end
@@ -2278,6 +2518,8 @@ function B.EchoesForget(id)
 	Release(id)
 	StopServing(id)
 	peers[id], owedHello[id], xmap[id], peerTimes[id], waitingFor[id], silentAt[id] = nil, nil, nil, nil, nil, nil
+	pull.free[id], pull.early[id], pull.peers = nil, nil, pull.peers + 1
+	Stir()
 	ResetPeer(id)
 	if probe and probe.id == id then
 		probe.gone = true
@@ -2295,6 +2537,10 @@ local function Reset()
 		wipe(t)
 	end
 	inHead, inTail, outstanding = 1, 0, 0
+	for _, t in ipairs({ pull.held, pull.free, pull.early, pull.candidates, pull.dirty, pull.unwanted[1], pull.unwanted[2], pull.unwanted[3] }) do
+		wipe(t)
+	end
+	pull.flying = 0
 	seenAt = -math.huge
 	lastHouse, lastFlags, probe = nil, nil, nil
 	inCombat = false

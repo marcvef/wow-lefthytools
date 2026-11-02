@@ -972,8 +972,8 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   - fit its cache (`E.Store.Fits`: 512 KB in all, 128 KB per author's store). Too big when it
     begins (`eb`): it asks from the page's end (stops it) and leaves that page alone for 5 minutes.
 
-  What isn't wanted is worked out as ranges, once a second per store (the copies by a sweep over
-  friends' holdings), and taken out of each holder's offer: however many pages others hold, a
+  What isn't wanted is worked out as ranges per store (the copies by a sweep over friends'
+  holdings), and taken out of each holder's offer: however many pages others hold, a
   page still wanted is found (not only among the first 50), and many friends cost little. Pages
   are looked at one by one only to skip the ones already asked for, or that this holder's copy or
   my room failed (at most 50 of those a holder).
@@ -982,6 +982,19 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   first); a collector takes the oldest first. Many relays coming online with an author at once,
   before what each holds has spread, would otherwise all fetch the same first page from the author
   (`D.Random`: tests make it the first).
+- **Kept, not worked out every second**: what isn't wanted of a store and what's wanted of a
+  holder's offer are kept while what they're made of stays the same (the same lists of what I hold,
+  what's exported or safe: The pages; the same holdings of that store), and friends' offers are
+  looked at again only after a change that could make me want another page: what I hold or what's
+  safe (`D.PagesChanged`), a friend's holdings (`es`, `ea`, `en`), a friend coming, going,
+  restarting or verified, a check that showed another hash, the friend list, my key, my settings
+  (a friend's holdings of a store, or a check: only that store's offers are looked at again).
+  A Pull (once a second) that found nothing isn't done again until such a change, a request ends,
+  or a page that had no room may be asked for again (5 minutes); one that stopped at 50 pages of a
+  holder is done again every second (a relay starts somewhere else each time). A test runs friends
+  offering, restarting, going and sending pages (whole, broken, too big), my pages and settings
+  changing and time passing, and compares every Pull with one worked out anew, nothing kept
+  (`D.CheckPull`).
 - **Requests**: one open request per holder, 2 pages at once; a page I got part of goes on from
   there. 30 s without progress (counted from when the request went): asked again, from the
   contiguous offset, of the same holder or another; for a minute after that (or until they send a
@@ -1142,7 +1155,8 @@ of a store, what's exported or safe) is cached until they change: `E.Store` call
 `D.PagesChanged()` on every change it makes, and only then (a page that came but wasn't kept, or
 one it had already, changes nothing; Delivery works it out anew every 5 minutes too, a safety
 net, and when my settings change). Even then only what changed is parsed again: the lists are kept
-by store with the text they were read from, and the others stay the same lists. Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
+by store with the text they were read from, and the others stay the same lists (what pulling
+worked out of them stays valid: Pulling). Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
 `Minus`, `Has`, `Covers`) read the wire strictly (a bad part refuses the message, at most 300 intervals)
 and do the set arithmetic pulling needs (`Union`, `Minus` and `Covers` each one walk over two sorted
 lists); they read and write the same strings as `E.Ranges`.

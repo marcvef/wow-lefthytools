@@ -1407,6 +1407,348 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: what Pull keeps is what it would work out anew")
+do
+	-- Pull keeps what it works out (what I don't want of a store, what I want of a holder's offer,
+	-- which offers have pages I want) while nothing it's made of changes, and does nothing at all while
+	-- the last Pull found nothing and nothing changed since. A change it doesn't hear of would be a page
+	-- never asked for. So: friends offer, restart, go and come back, send pages (some broken, some too
+	-- big), say what's safe; my pages change behind its back, my settings change, time passes; and at
+	-- every Pull its answer is compared with one worked out anew, nothing kept.
+	math.randomseed(20261102)
+	local function R(a, b)
+		return math.random(a, b)
+	end
+	local friends = { ANNA, BOB, CEDRIC, DORA, GWEN }
+	local c = Start(EVE, { friends = friends, fake = true })
+	local D, E = c.D, c.E
+	local random = D.Random
+	D.Random = function(low, high) -- (the same answer for the same question: both looks start alike)
+		return low + (high * 7 + 3) % (high - low + 1)
+	end
+	local compared, differ, first, decided, idle = 0, 0, nil, 0, 0
+	local function Text(list)
+		local parts = {}
+		for i, d in ipairs(list) do
+			parts[i] = ("%d:%s:%d:%s:%s"):format(d.id, d.key, d.n, d.where, tostring(d.early))
+		end
+		return table.concat(parts, " ")
+	end
+	D.CheckPull = function(kept, fresh, skipped)
+		compared = compared + 1
+		decided = decided + #kept
+		idle = idle + (skipped and 1 or 0)
+		if Text(kept) ~= Text(fresh) then
+			differ = differ + 1
+			first = first or ("at %.1f s: kept %s, anew %s"):format(c.env.GetTime(), Text(kept), Text(fresh))
+		end
+	end
+	-- The stores: the friends', a second one of Anna's, Finn's (not my friend), mine.
+	local owners = {}
+	for _, f in ipairs(friends) do
+		owners[#owners + 1] = f
+	end
+	owners[#owners + 1] = { acct = ANNA.acct, store = "a2a2a2a2", key = ANNA.acct .. ".a2a2a2a2" }
+	owners[#owners + 1] = FINN
+	owners[#owners + 1] = { acct = EVE.acct, store = E.data.store, key = E.Store.Own() }
+	local byKey, online = {}, {}
+	for i, o in ipairs(owners) do
+		byKey[o.key] = o
+		o.seed = i * 1000
+	end
+	local function Pick(list)
+		return list[R(1, #list)]
+	end
+	local function Ranges()
+		local parts = {}
+		for i = 1, R(1, 3) do
+			local a = R(1, 30)
+			parts[i] = a .. "-" .. math.min(30, a + R(0, 8))
+		end
+		return table.concat(parts, ",")
+	end
+	local function Here()
+		local list = {}
+		for _, f in ipairs(friends) do
+			if online[f] then
+				list[#list + 1] = f
+			end
+		end
+		return list
+	end
+	local flags = { "s", "rs", "crs", "cers", "r", "" }
+	for _, f in ipairs(friends) do
+		Meet(c, f, NEW)
+		Hello(c, f, Pick(flags))
+		online[f] = true
+	end
+	local function Page(o, n)
+		return TheirPage(c, n, 240 * R(1, 4), o.seed + n)
+	end
+	local function Stored(where, o, n, extra)
+		local p = Page(o, n)
+		E.data[where][o.key] = E.data[where][o.key] or {}
+		local page = { t = p.t, h = p.h, m = "z", z = p.z, s = E.data.session - R(0, 1), a = c.env.GetServerTime() - 60 }
+		for k, v in pairs(extra or {}) do
+			page[k] = v
+		end
+		E.data[where][o.key][n] = page
+	end
+	local steps = 0
+	for step = 1, 450 do
+		steps = step
+		local here, action = Here(), R(1, 20)
+		local f = here[1] and Pick(here)
+		if f and action <= 4 then -- a friend's holdings
+			Say(c, f, "B2;es;" .. Pick(owners).key .. ":" .. Ranges())
+		elseif f and action == 5 then -- their own early pages
+			Say(c, f, "B2;ea;" .. f.key .. ":" .. Ranges())
+		elseif f and action == 6 then -- they don't have one
+			local o = Pick(owners)
+			Say(c, f, ("B2;en;%s;%s;%d"):format(o.acct, o.store, R(1, 30)))
+		elseif f and action == 7 then -- what a collector holds safely
+			local collector, o = Pick(friends), Pick(owners)
+			Say(c, f, ("B2;ed;%s;%s;%s:%s"):format(collector.acct, collector.store, o.key, Ranges()))
+		elseif f and action == 8 then -- they restart, or say other flags
+			Hello(c, f, Pick(flags) .. (R(1, 2) == 1 and "a" or ""))
+		elseif f and action == 9 and R(1, 3) == 1 then -- they go
+			Online(c, f, false)
+			online[f] = nil
+		elseif action == 9 then -- one comes back
+			for _, g in ipairs(friends) do
+				if not online[g] then
+					Online(c, g, true)
+					Meet(c, g, NEW)
+					Hello(c, g, Pick(flags))
+					online[g] = true
+					break
+				end
+			end
+		elseif action <= 13 then -- what I asked for comes (whole, half, broken, too big for my room)
+			local ids = {}
+			for pageId in pairs(D.inflight) do
+				ids[#ids + 1] = pageId
+			end
+			table.sort(ids)
+			local pageId = ids[1] and Pick(ids)
+			local r = pageId and D.inflight[pageId]
+			local holder = r and c.D.peers[r.from] and c.B.peers[r.from]
+			if holder then
+				local g
+				for _, h in ipairs(friends) do
+					g = h.id == r.from and h or g
+				end
+				local o = byKey[r.key]
+				local p = Page(o, r.n)
+				local how = R(1, 6)
+				if how == 1 then
+					SendPage(c, g, o, p, R(1, 99), 0, nil, "0badc0de")
+				elseif how == 2 then
+					SendPage(c, g, o, p, R(1, 99), 0, 240)
+				elseif how == 3 then
+					Say(c, g, ("B2;eb;%d;%s;%s;%d;%d;%s;%d;z"):format(R(1, 99), o.acct, o.store, r.n, 65000, p.h, p.t))
+				else
+					SendPage(c, g, o, p, R(1, 99))
+				end
+			end
+		elseif action <= 16 then -- my pages change behind Delivery's back (it's told: PagesChanged)
+			local o, n, what = Pick(owners), R(1, 30), R(1, 7)
+			if o.key == E.Store.Own() or o == FINN then
+				o = ANNA
+			end
+			if what == 1 then
+				Stored("inbox", o, n)
+			elseif what == 2 then
+				Stored("inbox", o, n, { p = 1 }) -- (provisional: came early)
+			elseif what == 3 then
+				Stored("carry", o, n)
+			elseif what == 4 then
+				E.data.exported[o.key] = R(1, 2) == 1 and Ranges() or nil
+			elseif what == 5 then
+				for _, where in ipairs({ "inbox", "carry" }) do
+					if E.data[where][o.key] then
+						E.data[where][o.key][n] = nil
+					end
+				end
+			elseif what == 6 then -- a cache nearly full for that author (a big page doesn't fit), or full
+				E.data.carry[o.key] = E.data.carry[o.key] or {}
+				E.data.carry[o.key][900] = R(1, 3) > 1 and { t = c.env.GetServerTime() - 60, h = "00000000", m = "z",
+					z = ("A"):rep(R(1, 2) == 1 and 70000 or 131072), s = E.data.session, a = c.env.GetServerTime() } or nil
+			else
+				E.data.safe[o.key] = E.data.safe[o.key] or {}
+				E.data.safe[o.key][Pick(friends).key] = Ranges()
+			end
+			Touched(c)
+		elseif action == 17 then -- my settings
+			if R(1, 2) == 1 then
+				E.module.db.collect = not E.module.db.collect
+			else
+				E.module.db.relay = not E.module.db.relay
+			end
+		elseif action == 18 and R(1, 4) == 1 then -- the inbox full, or not any more
+			E.data.inbox[GWEN.key] = not E.data.inbox[GWEN.key] and { [99] = { t = 1, h = "00000000", m = "z",
+				z = ("A"):rep(8 * 1024 * 1024), s = E.data.session } } or nil
+			Touched(c)
+		end
+		local wait = R(1, 30)
+		Pass(c, wait <= 25 and wait * 0.2 or wait == 26 and 31 or wait == 27 and 61 or wait <= 29 and 12 or 301, wait == 30 and 1 or 0.1)
+	end
+	check(compared >= 400 and differ == 0, ("%d Pulls in %d steps: kept and anew the same, %d differ%s"):format(compared, steps, differ,
+		first and (" (first " .. first .. ")") or ""))
+	check(decided >= 40 and idle >= 100, ("both ways taken: %d pages asked for, %d Pulls with nothing to work out"):format(decided, idle))
+	D.CheckPull, D.Random = nil, random
+	E.data.inbox[GWEN.key] = nil
+	Stop(c)
+end
+
+section("Echoes' delivery: Pull works out only what changed")
+do
+	-- 15 relays offer 1-299 of Anna's and each other's own pages (all held by two others: nothing
+	-- wanted). Once worked out, a second with nothing changed works nothing out; a friend's new
+	-- holdings of one store work out that store again, not the others.
+	local crowd = Crowd(15, 300)
+	local friends = { ANNA }
+	for _, f in ipairs(crowd) do
+		friends[#friends + 1] = f
+	end
+	local c = Start(DORA, { friends = friends, fake = true })
+	MeetAll(c, crowd)
+	for _, f in ipairs(crowd) do
+		local items = { ANNA.key .. ":1-299" }
+		for _, g in ipairs(crowd) do
+			if g ~= f then
+				items[#items + 1] = g.key .. ":1-500"
+			end
+		end
+		for first = 1, #items, 9 do
+			Say(c, f, "B2;es;" .. table.concat(items, "/", first, math.min(first + 8, #items)))
+		end
+	end
+	Pass(c, 2)
+	local R, minus = c.D.Ranges, 0
+	local subtract = R.Minus
+	R.Minus = function(...)
+		minus = minus + 1
+		return subtract(...)
+	end
+	local pull = c.D.pull
+	Pass(c, 10)
+	check(minus == 0 and pull.idle and next(c.D.inflight) == nil, "nothing changed: nothing worked out for 10 s, got " .. minus .. " subtractions")
+	Say(c, crowd[1], "B2;es;" .. crowd[2].key .. ":501")
+	Pass(c, 1.2)
+	local asked = 0
+	for _ in pairs(c.D.inflight) do
+		asked = asked + 1
+	end
+	check(minus >= 1 and minus <= 15 and asked == 1, ("one friend's holdings of one store grew: only that store worked out again (%d subtractions of 15 x 16 offers), its new page asked for")
+		:format(minus))
+	R.Minus = subtract
+	Stop(c)
+end
+
+section("Echoes' delivery: what makes Pull look again")
+do
+	-- Each of these makes me want another page than before while nothing else changes: a Pull that
+	-- kept what it worked out (or found nothing and rests) must hear of it. Every Pull is compared with
+	-- one worked out anew, and the page that should be asked for is.
+	local differ = 0
+	local function Watch(c)
+		c.D.CheckPull = function(kept, fresh)
+			local a, b = {}, {}
+			for i, d in ipairs(kept) do
+				a[i] = d.id .. d.key .. d.n
+			end
+			for i, d in ipairs(fresh) do
+				b[i] = d.id .. d.key .. d.n
+			end
+			differ = differ + (table.concat(a, " ") == table.concat(b, " ") and 0 or 1)
+		end
+		c.D.Random = function(low) return low end
+	end
+	local function Asked(c, f, mark)
+		local list = Sent(c, f, mark, "B2;eq;")
+		return list[#list] and tonumber(list[#list]:match(";(%d+);%d+$"))
+	end
+
+	-- A collector: Bob offers Anna's 1-3; asked for 1, he says he hasn't it (en): 2 next.
+	local c = Start(EVE, { friends = { ANNA, BOB, CEDRIC }, fake = true, collect = true })
+	Watch(c)
+	MeetAll(c, { BOB }, "rs")
+	local mark = Mark(c)
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":1-3")
+	Pass(c, 1.5)
+	local first = Asked(c, BOB, mark)
+	Say(c, BOB, ("B2;en;%s;%s;1"):format(ANNA.acct, ANNA.store))
+	Pass(c, 1.5)
+	check(first == 1 and Asked(c, BOB, mark) == 2, "en: the next page, got " .. tostring(first) .. " then " .. tostring(Asked(c, BOB, mark)))
+	-- He restarts: what he offered is gone, nothing asked of him; offered again, asked.
+	mark = Mark(c)
+	Hello(c, BOB, "rs")
+	Pass(c, 3)
+	check(Asked(c, BOB, mark) == nil, "his restart: his offer gone, nothing asked")
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":3")
+	Pass(c, 1.5)
+	check(Asked(c, BOB, mark) == 3, "offered again: asked, got " .. tostring(Asked(c, BOB, mark)))
+	Say(c, BOB, ("B2;en;%s;%s;3"):format(ANNA.acct, ANNA.store))
+	-- Anna (collecting, an author) offers her own page 1 early; it comes; then page 2 early.
+	MeetAll(c, { ANNA }, "cers")
+	mark = Mark(c)
+	Say(c, ANNA, "B2;ea;" .. ANNA.key .. ":1")
+	Pass(c, 1.5)
+	local p1 = TheirPage(c, 1, 480)
+	SendPage(c, ANNA, ANNA, p1, 4)
+	Pass(c, 3)
+	local early = Asked(c, ANNA, mark)
+	Say(c, ANNA, "B2;ea;" .. ANNA.key .. ":2")
+	Pass(c, 1.5)
+	check(early == 1 and (c.E.data.inbox[ANNA.key] or {})[1] and c.E.data.inbox[ANNA.key][1].p == 1 and Asked(c, ANNA, mark) == 2, "her early page 2 after page 1: asked, got "
+		.. tostring(Asked(c, ANNA, mark)))
+	Say(c, ANNA, ("B2;en;%s;%s;2"):format(ANNA.acct, ANNA.store))
+	-- Cedric's copy of page 1 from a disk (es) is asked for as a check; its start shows another hash:
+	-- not asked again (it's another page with that number; mine is still in the inbox).
+	MeetAll(c, { CEDRIC }, "rs")
+	mark = Mark(c)
+	Say(c, CEDRIC, "B2;es;" .. ANNA.key .. ":1")
+	Pass(c, 1.5)
+	local check1 = Asked(c, CEDRIC, mark)
+	Say(c, CEDRIC, ("B2;eb;7;%s;%s;1;480;0badc0de;%d;z"):format(ANNA.acct, ANNA.store, p1.t))
+	Pass(c, 5)
+	local asked = Sent(c, CEDRIC, mark, "B2;eq;")
+	check(check1 == 1 and #asked == 2 and asked[2]:find(";1;480$") and c.D.checked[ANNA.key] and c.D.checked[ANNA.key][1],
+		"a check showing another hash: stopped, not asked again, got " .. table.concat(asked, " "))
+	Stop(c)
+
+	-- A relay: Anna offers her page 1, Bob and Cedric hold it: left alone. Cedric goes: one copy
+	-- besides hers, so it's asked for.
+	c = Start(DORA, { friends = { ANNA, BOB, CEDRIC }, fake = true })
+	Watch(c)
+	MeetAll(c, { ANNA }, "s")
+	MeetAll(c, { BOB, CEDRIC }, "rs")
+	mark = Mark(c)
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1")
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":1")
+	Say(c, CEDRIC, "B2;es;" .. ANNA.key .. ":1")
+	Pass(c, 3)
+	local before = Asked(c, ANNA, mark) or Asked(c, BOB, mark)
+	Online(c, CEDRIC, false)
+	Pass(c, 3)
+	check(before == nil and (Asked(c, ANNA, mark) or Asked(c, BOB, mark)) == 1, "a holder gone: the page asked for")
+	-- Too big for my cache (Anna's share nearly full): left alone for 5 minutes, then asked again.
+	c.E.data.carry[ANNA.key] = { [900] = { t = c.env.GetServerTime() - 60, h = "00000000", m = "z", z = ("A"):rep(70000),
+		s = c.E.data.session, a = c.env.GetServerTime() } }
+	Touched(c)
+	local holder = Asked(c, ANNA, mark) and ANNA or BOB
+	mark = Mark(c)
+	Say(c, holder, ("B2;eb;5;%s;%s;1;65000;0badc0de;%d;z"):format(ANNA.acct, ANNA.store, c.env.GetServerTime() - 60))
+	Pass(c, 290, 1)
+	local quiet = #Sent(c, ANNA, mark, "B2;eq;") + #Sent(c, BOB, mark, "B2;eq;")
+	Pass(c, 15, 1)
+	check(quiet == 1 and (Asked(c, ANNA, mark) or Asked(c, BOB, mark)) == 1 and #Sent(c, ANNA, mark, "B2;eq;") + #Sent(c, BOB, mark, "B2;eq;") == 2,
+		"no room: asked from its end, nothing for 5 minutes, then asked again, got " .. quiet)
+	Stop(c)
+	check(differ == 0, "every Pull the same as one worked out anew, " .. differ .. " differ")
+end
+
 section("Echoes' delivery: a collector's relay cache moves to the inbox")
 do
 	-- Dora relayed pages of Anna's, then switched collecting on: they move over, one a second, also
