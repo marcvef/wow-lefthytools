@@ -413,5 +413,8 @@ ns.CHANGELOG = {
 	{ id = 135, module = "chronicle",
 		en = { "New rare drops are noticed", "A rare or epic drop of an item your game had never seen before was missed by Chronicle's highlights and the fight stream's rare finds; its quality now comes from the item link." },
 		de = { "Neue seltene Drops werden erkannt", "Ein seltener oder epischer Drop eines Items, das dein Spiel noch nie gesehen hatte, fehlte in Chronicles Highlights und bei den seltenen Funden im Kampf-Stream; seine Qualität kommt jetzt aus dem Item-Link." } },
+	{ id = 136, module = "echoes",
+		en = { "Echoes stays out of the way", "Echoes does its work in small steps: nothing heavy in a fight, at login or when many friends are online, and it sends less when nothing changed." },
+		de = { "Echoes bleibt im Hintergrund", "Echoes arbeitet in kleinen Schritten: nichts Schweres im Kampf, beim Einloggen oder wenn viele Freunde online sind, und es sendet weniger, wenn sich nichts geändert hat." } },
 	-- New entries go here, at the end.
 }
