@@ -58,6 +58,8 @@ local IN_FLIGHT = 2          -- pages asked for at once (one per holder)
 local SILENCE = 30           -- a request without progress this long: asked again, from where it got to
 local SERVE_QUEUE, SERVING = 20, 2 -- requests a holder keeps, and serves at once
 local SUMMARY_GAP, FULL_OFFER = 60, 300 -- what I hold: when it grew (at most this often), all of it this often
+local FULL_SAFE = 1800       -- what's safe (ed) all of it this often: it only grows, and friends keep it
+local OUT_MAX = 200          -- my messages waiting their turn at most (past it summaries wait: they come again)
 local BACKOFF_FIRST, BACKOFF_MAX, BACKOFF_CALM = 30, 300, 600 -- after a throttle: silent this long,
                              -- twice that after the next one (up to BACKOFF_MAX), back to the first after calm
 local HELLO_WAIT = 60        -- a friend's build not known to read B this long after their hello: an older one
@@ -565,20 +567,35 @@ local function WriteItems(key, list, room, into)
 end
 
 -- head .. items joined by "/", as few messages of at most MAX_BYTES as they fit in.
-local function Pack(head, items)
+-- prefix: also what each message tells of, a list per message of prefix .. each item's key (its
+-- first 17 characters: a summary's marks, see Tell).
+local function Pack(head, items, prefix)
 	local list, current, size = {}, {}, #head
+	local marks, these = prefix and {}, prefix and {}
 	for _, item in ipairs(items) do
 		if #current > 0 and size + 1 + #item > MAX_BYTES then
 			list[#list + 1] = head .. table.concat(current, "/")
 			current, size = {}, #head
+			if prefix then
+				marks[#marks + 1], these = these, {}
+			end
 		end
 		current[#current + 1] = item
 		size = size + (#current > 1 and 1 or 0) + #item
+		if prefix then
+			local mark = prefix .. item:sub(1, 17)
+			if these[#these] ~= mark then
+				these[#these + 1] = mark
+			end
+		end
 	end
 	if #current > 0 then
 		list[#list + 1] = head .. table.concat(current, "/")
+		if prefix then
+			marks[#marks + 1] = these
+		end
 	end
-	return list
+	return list, marks
 end
 D.Pack, D.WriteItems = Pack, WriteItems
 
@@ -673,7 +690,12 @@ local out = {}         -- my other messages, waiting their turn: { id, message, 
 local queued = {}      -- record -> true: my messages in Beacon's queue, not sent yet
 local answersOut = {}  -- gameAccountID -> my answers to them waiting in out (Control)
 local outstanding = 0
-local sentHold, sentSafe, sentEarly = {}, {}, {} -- gameAccountID -> { at, full, sent = { [item key] = ranges text } }
+-- My summaries, per kind (es: what I hold, ea: my early pages, ed: what's safe): what I told each
+-- friend, gameAccountID -> { at, full, gen, stamp, sent = { [mark] = ranges text } } (Due), and how
+-- many of each kind wait in out for them (Control).
+local sentEarly = {}
+local tracks = { es = {}, ea = sentEarly, ed = {} }
+local summariesOut = { es = {}, ea = {}, ed = {} }
 -- The rate, in any second: when my last RATE messages went, and the last PEER_RATE to each friend
 -- (oldest first), and how many wait in Beacon's queue for each.
 local sentTimes, peerTimes, waitingFor = {}, {}, {}
@@ -731,33 +753,59 @@ local function HelloMessage(flags)
 	return Msg("eh", acct, E.data.store, PROTO, MAX_BYTES, flags)
 end
 
+-- An item into out, or left out (sent, or dropped): counted (step 1), or no longer (-1).
+local function Tally(item, step)
+	if item.answer then
+		local n = (answersOut[item.id] or 0) + step
+		answersOut[item.id] = n > 0 and n or nil
+	end
+	local waiting = summariesOut[item.kind]
+	if waiting then
+		local n = (waiting[item.id] or 0) + step
+		waiting[item.id] = n > 0 and n or nil
+	end
+end
+
 -- A message for one friend, after the ones already waiting (sent on the tick, see Send). answer:
 -- one of my answers to what they sent (en, ey, a stop): at most ANSWERS_MAX of those wait for one
 -- friend, so a friend asking for pages I don't have, again and again, can't pile them up (they come
--- in faster than they go).
-local function Control(id, message, kind, pageId, answer)
-	if answer then
-		local n = answersOut[id] or 0
-		if n >= ANSWERS_MAX then
+-- in faster than they go). At most OUT_MAX wait in all: past that the last summary waiting makes
+-- room, and what it told that friend is forgotten (it comes again, once there's room); with none, an
+-- answer doesn't wait (they ask again); hellos and requests always do (a few a friend at most:
+-- dropping one would leave a friend unknown, or a page asked for forever). marks: what a summary
+-- tells of (Tell).
+local function Control(id, message, kind, pageId, answer, marks)
+	if answer and (answersOut[id] or 0) >= ANSWERS_MAX then
+		return
+	end
+	if #out >= OUT_MAX and not summariesOut[kind] then
+		local room = false
+		for i = #out, 1, -1 do
+			local item = out[i]
+			if summariesOut[item.kind] then
+				table.remove(out, i)
+				Tally(item, -1)
+				local s = tracks[item.kind][item.id]
+				for _, mark in ipairs(s and item.marks or {}) do
+					s.sent[mark], s.gen = nil, nil
+				end
+				room = true
+				break
+			end
+		end
+		if not room and answer then
 			return
 		end
-		answersOut[id] = n + 1
 	end
-	out[#out + 1] = { id = id, message = message, kind = kind, pageId = pageId, answer = answer }
-end
-
--- An item left out (sent, or dropped): no longer counted.
-local function Forget(item)
-	if item.answer then
-		local n = answersOut[item.id] - 1
-		answersOut[item.id] = n > 0 and n or nil
-	end
+	local item = { id = id, message = message, kind = kind, pageId = pageId, answer = answer, marks = marks }
+	Tally(item, 1)
+	out[#out + 1] = item
 end
 
 -- out's item i goes (sent, or dropped).
 local function TakeOut(i)
 	local item = table.remove(out, i)
-	Forget(item)
+	Tally(item, -1)
 	return item
 end
 
@@ -775,7 +823,7 @@ local function DropOut(id, kind, known)
 			drop = item.id == id and (not kind or item.kind == kind)
 		end
 		if drop then
-			Forget(item)
+			Tally(item, -1)
 		else
 			j = j + 1
 			out[j] = item
@@ -873,7 +921,7 @@ end
 local function Enqueue(item)
 	seq = seq + 1
 	local record = { id = item.id, message = item.message, kind = item.kind, serve = item.serve, offset = item.offset,
-		pageId = item.pageId, seq = seq }
+		pageId = item.pageId, marks = item.marks, seq = seq }
 	queued[record] = true
 	outstanding = outstanding + 1
 	waitingFor[item.id] = (waitingFor[item.id] or 0) + 1
@@ -917,7 +965,9 @@ local function Withdraw(only)
 				serve.offset = record.offset
 			end
 		elseif record.id ~= only then
-			back[#back + 1] = { id = record.id, message = record.message, kind = record.kind, pageId = record.pageId }
+			local item = { id = record.id, message = record.message, kind = record.kind, pageId = record.pageId, marks = record.marks }
+			Tally(item, 1)
+			back[#back + 1] = item
 		end
 	end
 	local k = #back
@@ -932,37 +982,18 @@ local function Withdraw(only)
 end
 D.Withdraw = Withdraw
 
--- The next message to send: mine waiting first (hellos, requests, summaries), then the pages I
--- serve, by turns; only to a friend who may get one now (MayGo). nil: none.
--- (Asked every tick: when the rate is used up nothing is looked at, and each friend's rate once.)
+-- The next message to send: mine waiting first (hellos, requests, answers), then my summaries and
+-- the parts of the pages I serve by turns (summaries for many friends don't hold up a page), those
+-- pages by turns too; only to a friend who may get one now (MayGo). nil: none.
+-- (Asked every tick: when the rate is used up nothing is looked at, and each friend's rate once.
+-- In a block of its own: Lua allows a file 200 locals.)
+local NextMessage
+do
 local turn = 0
 local may = {} -- gameAccountID -> whether they may get one now (this look)
-local function NextMessage(now)
-	if outstanding + Recent(sentTimes, now) >= RATE then
-		return nil -- (nobody may get one now)
-	end
-	local B = ns.Beacon
-	wipe(may)
-	local gone = false
-	for i = 1, #out do
-		local id = out[i].id
-		local ok = may[id]
-		if ok == nil then
-			ok = B.peers[id] ~= nil and MayGo(id, now)
-			may[id] = ok
-			gone = gone or B.peers[id] == nil
-		end
-		if ok then
-			if gone then
-				break -- (theirs go first: then this one, below)
-			end
-			return TakeOut(i)
-		end
-	end
-	if gone then
-		DropOut(nil, nil, B.peers) -- (gone: theirs go, all at once)
-		return NextMessage(now)
-	end
+local summaryTurn = true
+
+local function NextPart(now)
 	for _ = 1, #active do
 		turn = turn % #active + 1
 		local serve = active[turn]
@@ -980,6 +1011,47 @@ local function NextMessage(now)
 		end
 	end
 	return nil
+end
+
+function NextMessage(now)
+	if outstanding + Recent(sentTimes, now) >= RATE then
+		return nil -- (nobody may get one now)
+	end
+	local B = ns.Beacon
+	wipe(may)
+	local gone, summary = false, nil
+	for i = 1, #out do
+		local item = out[i]
+		local ok = may[item.id]
+		if ok == nil then
+			ok = B.peers[item.id] ~= nil and MayGo(item.id, now)
+			may[item.id] = ok
+			gone = gone or B.peers[item.id] == nil
+		end
+		if ok and summariesOut[item.kind] then
+			summary = summary or i
+		elseif ok then
+			if gone then
+				break -- (theirs go first: then this one)
+			end
+			return TakeOut(i)
+		end
+	end
+	if gone then
+		DropOut(nil, nil, B.peers) -- (gone: theirs go, all at once)
+		return NextMessage(now)
+	end
+	if summary and summaryTurn then
+		summaryTurn = false
+		return TakeOut(summary)
+	end
+	local part = NextPart(now)
+	if part then
+		summaryTurn = true
+		return part
+	end
+	return summary and TakeOut(summary) or nil
+end
 end
 
 -- Whether a friend collects (their requests go first: pages go to the collector, a relay only
@@ -1105,7 +1177,7 @@ end
 ---------------------------------------------------------------------------
 
 local function ResetPeer(id)
-	sentHold[id], sentSafe[id], sentEarly[id] = nil, nil, nil
+	tracks.es[id], tracks.ea[id], tracks.ed[id] = nil, nil, nil
 end
 
 -- Requests to one holder are given up (another may answer, or the same again later), also the ones
@@ -1192,23 +1264,30 @@ end
 local Summary, EarlySummary, SafeSummary
 do
 
--- What I told one friend (track: sentHold, sentSafe or sentEarly), if it's time to tell them again
--- (at most every SUMMARY_GAP; what they heard is forgotten every FULL_OFFER: then all of it again);
--- nil if not. Looked at again only once something changed since (Changed: summaryGen), or what
--- stamp says about them (their key) did: else nothing would be told anyway.
-local function Due(track, id, now, stamp)
+-- What I told one friend of kind (es, ea or ed), if it's time to tell them again (at most every
+-- SUMMARY_GAP; what they heard is forgotten every FULL_OFFER, what's safe every FULL_SAFE: then all
+-- of it again); nil if not. Looked at again only once something changed since (Changed:
+-- summaryGen), or what stamp says about them (their key) did: else nothing would be told anyway.
+-- While some of that kind still wait for them in out, what changed goes after those (out doesn't
+-- grow with summaries that can't go yet); all of it goes instead of them.
+local function Due(kind, id, now, stamp)
+	local track = tracks[kind]
 	local s = track[id]
 	if not s then
-		s = { at = -math.huge, full = now, sent = {} }
+		s = { at = -math.huge, full = -math.huge, sent = {} } -- (all of it, now)
 		track[id] = s
 	end
 	if now - s.at < SUMMARY_GAP then
 		return nil
 	end
-	if now - s.full >= FULL_OFFER then
+	local every = kind == "ed" and FULL_SAFE or FULL_OFFER
+	if now - s.full >= every then
 		s.full = now
 		wipe(s.sent)
-	elseif s.gen == summaryGen and s.stamp == stamp then
+		if summariesOut[kind][id] then
+			DropOut(id, kind)
+		end
+	elseif (s.gen == summaryGen and s.stamp == stamp) or summariesOut[kind][id] then
 		return nil
 	end
 	s.gen, s.stamp = summaryGen, stamp
@@ -1222,7 +1301,7 @@ local told, toldGen = {}, nil
 
 -- offer ({ [key] = list }) under head into t (marks: prefix .. key).
 local function AddOffer(t, head, offer, prefix)
-	local h, markOf = { head = head, items = {}, marks = {} }, {}
+	local h, markOf = { head = head, prefix = prefix or "", items = {}, marks = {} }, {}
 	for key, list in pairs(offer) do
 		local mark = (prefix or "") .. key
 		t.texts[mark], t.lists[mark] = Ranges.Format(list), list
@@ -1311,11 +1390,13 @@ local function Tell(id, s, kind, t, now, extra)
 		for i = 1, every and #h.marks or 0 do
 			every = every and changed[h.marks[i]] == true
 		end
-		local messages
+		local messages, marks
 		if every then
 			-- (all of it: the same messages for everyone, made once)
-			h.full = h.full or Pack(h.head, h.items)
-			messages = h.full
+			if not h.full then
+				h.full, h.fullMarks = Pack(h.head, h.items, h.prefix)
+			end
+			messages, marks = h.full, h.fullMarks
 		else
 			local items = {}
 			for i, item in ipairs(h.items) do
@@ -1330,10 +1411,10 @@ local function Tell(id, s, kind, t, now, extra)
 				end
 				table.sort(items)
 			end
-			messages = Pack(h.head, items)
+			messages, marks = Pack(h.head, items, h.prefix)
 		end
-		for _, message in ipairs(messages) do
-			Control(id, message, kind)
+		for i, message in ipairs(messages) do
+			Control(id, message, kind, nil, nil, marks[i])
 			any = true
 		end
 	end
@@ -1346,7 +1427,7 @@ end
 -- What I hold, to one friend who collects or relays: only what grew since they last heard it
 -- (everything the first time, and again every FULL_OFFER), at most every SUMMARY_GAP.
 function Summary(id, peer, now)
-	local s = Due(sentHold, id, now, peer.key)
+	local s = Due("es", id, now, peer.key)
 	if not s then
 		return false
 	end
@@ -1371,7 +1452,7 @@ end
 
 -- My own pages not on my disk yet, to one friend who takes them early (TakesEarly), the same way.
 function EarlySummary(id, now)
-	local s = MyKey() and Due(sentEarly, id, now)
+	local s = MyKey() and Due("ea", id, now)
 	if not s then
 		return false
 	end
@@ -1380,7 +1461,7 @@ end
 
 -- What collectors hold safely (theirs passed on, mine if I collect), to one friend, the same way.
 function SafeSummary(id, now)
-	local s = Due(sentSafe, id, now)
+	local s = Due("ed", id, now)
 	if not s then
 		return false
 	end
@@ -2013,7 +2094,7 @@ local function Reset()
 		end
 	end
 	for _, t in ipairs({ peers, owedHello, incoming, inflight, partials, bad, checked, noRoom, silentAt, xmap, serves, active, out, queued,
-			answersOut, sentHold, sentSafe, sentEarly, sentTimes, peerTimes, waitingFor }) do
+			answersOut, tracks.es, tracks.ea, tracks.ed, summariesOut.es, summariesOut.ea, summariesOut.ed, sentTimes, peerTimes, waitingFor }) do
 		wipe(t)
 	end
 	inHead, inTail, outstanding = 1, 0, 0
@@ -2091,7 +2172,11 @@ local function Housekeeping(now)
 	if M.db.collect then
 		SafeHere()
 	end
+	-- What I hold, my early pages, what's safe: to each friend it changed for, while out has room.
 	for id, peer in pairs(peers) do
+		if #out >= OUT_MAX then
+			break
+		end
 		if peer.verified and beacon.peers[id] then
 			if peer.collect or peer.relay then
 				Summary(id, peer, now)

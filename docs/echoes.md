@@ -1018,7 +1018,7 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   number isn't in `exported` either until it's confirmed: so nothing anyone drops ever depends on a
   page that came early. The collector puts its own summary in `safe` and sends `ed` to every
   friend; everyone passes on what they know, when it changed (at most every 60 s, everything every
-  5 minutes), and `E.Store.Safe` merges what comes by union.
+  30 minutes: it only grows, and friends keep it), and `E.Store.Safe` merges what comes by union.
 - Only collectors of a friend's account or my own count, and only about accounts I take; only what
   grows is merged. At most 200 stores and 8 collectors each are kept, and of what friends tell
   at most 300 intervals per collector (more isn't taken as safe: those pages are kept; a
@@ -1051,6 +1051,15 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   and the messages packed once (only an author's own pages I hold provisionally are added for
   them). A friend is looked at again only after such a change or when their full offer is due:
   while nothing changes, nothing is worked out.
+- **What waits its turn** (`out`: hellos, requests, answers, summaries): hellos, requests and
+  answers go first, then summaries and page parts by turns (summaries for many friends don't hold
+  up a page). A friend's summary of a kind isn't queued while one of that kind still waits for
+  them (what changed meanwhile goes after it); their full offer takes the place of what of it
+  still waits. At most 200 wait: past that no summary is queued, and the last one waiting makes
+  room for a hello, a request or an answer (what it told is forgotten for that friend: it comes
+  again); with none to drop, an answer doesn't wait (they ask again), and hellos and requests
+  always do (a few a friend at most: dropping one would leave a friend unknown, or a page asked
+  for that never goes).
 - **Nothing in combat**: when a fight starts (`PLAYER_REGEN_DISABLED`), what still waits in
   Beacon's queue comes back out (`D.Withdraw`: parts are sent again from where they were, the rest
   goes back in line). Switched off in a fight, my "I'm out" hello waits for its end

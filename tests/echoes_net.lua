@@ -1604,6 +1604,86 @@ do
 	Stop(c)
 end
 
+-- What's safe of 2 stores of each friend's, at collectors (the first few friends), each with
+-- intervals ranges: a big safe table, as after many sessions.
+local function SafeOfAll(c, crowd, collectors, intervals)
+	for i, f in ipairs(crowd) do
+		for s = 1, 2 do
+			local entry = {}
+			for k = 1, collectors do
+				local parts = {}
+				for r = 1, intervals do
+					parts[r] = (r * 10) .. "-" .. (r * 10 + 5)
+				end
+				entry[crowd[k].key] = table.concat(parts, ",")
+			end
+			c.E.data.safe[f.acct .. "." .. ("%08x"):format(0x20000000 + i * 16 + s)] = entry
+		end
+	end
+	Touched(c)
+end
+
+section("Echoes' delivery: summaries don't pile up, pages aren't held up by them")
+do
+	-- 30 friends, a big safe table (what a collector holds of 60 stores, a dozen messages to each
+	-- friend): out stays bounded (before, summaries were queued again every 5 minutes while the last
+	-- ones still waited: it grew without end), and a page asked for goes while they wait (it waited
+	-- behind all of them, before). What's safe goes in full every 30 minutes (it only grows, and
+	-- friends keep it), not every 5.
+	local crowd = Crowd(30, 500)
+	local c = Start(EVE, { friends = crowd, fake = true })
+	MyPage(c, 701, 9600) -- (40 parts)
+	SafeOfAll(c, crowd, 1, 10)
+	local mark, most = Mark(c), 0
+	MeetAll(c, crowd)
+	Pass(c, 120, 0.25, function()
+		most = math.max(most, #c.D.out)
+	end)
+	Ask(c, crowd[5], 701)
+	local asked = c.env.GetTime()
+	local done
+	Pass(c, 480, 0.25, function()
+		most = math.max(most, #c.D.out)
+		if not done and #Sent(c, crowd[5], mark, "B2;ep;") >= 40 then
+			done = c.env.GetTime() - asked
+		end
+	end)
+	local told, twice = {}, 0
+	for _, m in ipairs(Sent(c, crowd[3], mark, "B2;ed;")) do
+		twice = twice + (told[m] and 1 or 0)
+		told[m] = true
+	end
+	check(most <= 300 and done and done < 90, ("out at most %d (200, and a friend's summaries past it); the page went in %s s")
+		:format(most, tostring(done and math.floor(done))))
+	check(next(told) and twice == 0, ("what's safe: told in full once in 11 minutes, got %d messages again"):format(twice))
+
+	-- My settings change in a fight (summaries for everyone wait), friends ask for pages I don't have:
+	-- a summary waiting makes room for each answer (it comes again), and past 200 an answer doesn't wait.
+	c.env.EnterCombat()
+	c.E.module.db.relay = false
+	Pass(c, 15)
+	local before = 0
+	for _, item in ipairs(c.D.out) do
+		before = before + ((item.kind == "es" or item.kind == "ed") and 1 or 0)
+	end
+	for _, f in ipairs(crowd) do
+		for n = 1, 8 do
+			Ask(c, f, 900 + n)
+		end
+		Pass(c, 0.3)
+	end
+	local summaries, answers = 0, 0
+	for _, item in ipairs(c.D.out) do
+		summaries = summaries + ((item.kind == "es" or item.kind == "ed") and 1 or 0)
+		answers = answers + (item.kind == "en" and 1 or 0)
+	end
+	check(before > 0 and summaries == 0 and answers == before and #c.D.out <= 230, ("out full: the %d summaries made room for "
+		.. "as many answers (%d), no more waited (%d in all, with my 30 hellos), got %d summaries left"):format(before, answers, #c.D.out, summaries))
+	c.env.LeaveCombat()
+	Pass(c, 5)
+	Stop(c)
+end
+
 section("Echoes' delivery: long range lists of my own")
 do
 	-- What I keep (exported, safe, my inbox) may have more than the 300 intervals a message may: read
