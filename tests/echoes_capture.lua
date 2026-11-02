@@ -1047,7 +1047,6 @@ do
 	Advance(0.3)
 	restore()
 	check(#reported == 0 and seq() == "", "a secret nameplate unit or GUID: nothing, got " .. seq() .. " " .. table.concat(reported, " "))
-	Fire("NAME_PLATE_UNIT_REMOVED", SECRET) -- (gone again: the Misc Tweaks' aggro tags keep nameplates in a group fight)
 end
 
 ---------------------------------------------------------------------------

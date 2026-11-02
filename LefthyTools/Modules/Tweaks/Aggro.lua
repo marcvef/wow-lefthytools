@@ -342,7 +342,9 @@ driver:SetScript("OnUpdate", function(self, elapsed)
 end)
 
 events:SetScript("OnEvent", function(_, event, unit)
-	if event == "NAME_PLATE_UNIT_ADDED" then
+	if issecret(unit) then
+		return -- (a unit the game keeps secret can't be a key, nor named)
+	elseif event == "NAME_PLATE_UNIT_ADDED" then
 		plates[unit] = true
 		Mark(unit)
 	elseif event == "NAME_PLATE_UNIT_REMOVED" then
