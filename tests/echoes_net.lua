@@ -1950,6 +1950,53 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: the friend list isn't read again for every friend's zone")
+do
+	-- Battle.net says BN_FRIEND_INFO_CHANGED whenever any friend changes zone: Echoes doesn't read the
+	-- whole list again for it (every 30 s, or sooner when a friend comes online, the list changes or an
+	-- account isn't in it), and each BattleTag is hashed once, not at every reading.
+	local c = Start(DORA, { friends = { ANNA, BOB, CEDRIC }, fake = true })
+	MeetAll(c, { BOB })
+	local bn, LT = c.env.C_BattleNet, c.LT
+	local read, hash = bn.GetFriendAccountInfo, LT.Hash32
+	local reads, hashes = 0, 0
+	local function Mine()
+		local source = debug.getinfo(3, "S").source
+		return source:sub(-12) == "Delivery.lua"
+	end
+	bn.GetFriendAccountInfo = function(...)
+		reads = reads + (Mine() and 1 or 0)
+		return read(...)
+	end
+	LT.Hash32 = function(...)
+		hashes = hashes + (Mine() and 1 or 0)
+		return hash(...)
+	end
+	-- (Bob's holdings every second: each asks whether Anna's account is one I take.)
+	local function Offer(seconds)
+		for _ = 1, seconds do
+			Say(c, BOB, "B2;es;" .. ANNA.key .. ":1")
+			Pass(c, 1)
+		end
+	end
+	Offer(31)
+	local before = reads
+	for _ = 1, 20 do
+		c.env.Fire("BN_FRIEND_INFO_CHANGED")
+		Offer(1)
+	end
+	check(before >= 3 and reads - before <= 3, ("20 s of friends changing zones: the list read at most once more (its 30 s), got %d reads of a friend, %d before")
+		:format(reads - before, before))
+	check(hashes == 0, "read again: no BattleTag hashed again, got " .. hashes)
+	Offer(10)
+	c.env.Fire("BN_FRIEND_ACCOUNT_ONLINE")
+	before = reads
+	Offer(6)
+	check(reads - before == 3, "a friend comes online: read again (within 5 s), got " .. (reads - before))
+	bn.GetFriendAccountInfo, LT.Hash32 = read, hash
+	Stop(c)
+end
+
 section("Echoes' delivery: the probe when sending says nothing")
 do
 	-- If SendGameData returns nothing on Forever (Beacon takes that as sent), the probe doesn't call

@@ -232,7 +232,21 @@ end
 
 local friendAccts, idAccts, friendsAt = {}, {}, -math.huge -- acct -> true; gameAccountID -> acct
 local missed, missedCount = {}, 0 -- acct -> true: looked for since the list was read, not in it
-local friendsStale = false   -- Battle.net said a friend came online or changed: read it again soon
+local friendsStale = false   -- Battle.net said a friend came online or the list changed: read it again soon
+local tagHashes, tagCount = {}, 0 -- BattleTag -> its hash (LT.Hash32 once per tag, not at every reading)
+
+local function TagHash(tag)
+	local acct = tagHashes[tag]
+	if not acct then
+		if tagCount >= 1024 then
+			wipe(tagHashes) -- (a bound: friends come and go over the months)
+			tagCount = 0
+		end
+		acct = Hash(tag)
+		tagHashes[tag], tagCount = acct, tagCount + 1
+	end
+	return acct
+end
 
 -- Every Battle.net friend, online or not: their account, and which game accounts are theirs.
 local function ReadFriends(now)
@@ -247,7 +261,7 @@ local function ReadFriends(now)
 		local info = bn.GetFriendAccountInfo(i)
 		local tag = info and info.battleTag
 		if Readable(tag) then
-			local acct = Hash(tag)
+			local acct = TagHash(tag)
 			friendAccts[acct] = true
 			local game = info.gameAccountInfo
 			if type(game) == "table" and type(game.gameAccountID) == "number" then
@@ -270,13 +284,14 @@ local function Friends(now)
 	return friendAccts
 end
 
--- Battle.net says a friend came online, changed (logged into a game) or the list changed: the list is
--- read again when next needed, at most every FRIENDS_SOON (the handlers only note it).
+-- Battle.net says a friend came online or the list changed: the list is read again when next needed,
+-- at most every FRIENDS_SOON (the handlers only note it). Not on BN_FRIEND_INFO_CHANGED: it fires
+-- whenever any friend changes zone; a friend who logged into a game is found anyway, PeerAccount
+-- reads the list again when their game account isn't in it (at most every FRIENDS_SOON).
 local function FriendsChanged()
 	friendsStale = true
 end
 E.On("BN_FRIEND_ACCOUNT_ONLINE", FriendsChanged)
-E.On("BN_FRIEND_INFO_CHANGED", FriendsChanged)
 E.On("BN_FRIEND_LIST_SIZE_CHANGED", FriendsChanged)
 
 -- Pages I take: my Battle.net friends' accounts' and my own (my other computers). An account the
@@ -312,7 +327,7 @@ local function PeerAccount(id, now)
 		local info = Readable(guid) and C_BattleNet and LT.Value(C_BattleNet.GetAccountInfoByGUID, guid)
 		local tag = type(info) == "table" and info.battleTag
 		if Readable(tag) then
-			acct = Hash(tag)
+			acct = TagHash(tag)
 		end
 	end
 	return acct
