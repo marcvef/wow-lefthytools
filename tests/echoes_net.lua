@@ -64,7 +64,7 @@ local function Copy(v)
 	return t
 end
 
-local world = { time = 0, list = {}, byId = {}, log = {}, errors = {}, leaked = {} }
+local world = { time = 0, list = {}, byId = {}, log = {}, errors = {}, leaked = {}, started = 0 }
 
 local function Account(p, online)
 	return { gameAccountID = p.id, isOnline = online, clientProgram = "WoW", wowProjectID = 1, isInCurrentRegion = true,
@@ -121,7 +121,8 @@ local function Start(p, opts)
 	env.Fire("PLAYER_LOGIN")
 	env.Fire("PLAYER_ENTERING_WORLD", true, false)
 	local c = { who = p, env = env, ns = ns, E = ns.Echoes, D = ns.Echoes.Delivery, B = ns.Beacon, LT = env.LefthyTools,
-		opts = opts, read = 0, before = before, alive = {} }
+		opts = opts, read = 0, before = before, alive = {}, serial = world.started + 1 }
+	world.started = c.serial
 	if c.E.module.db then
 		if opts.collect ~= nil then
 			c.E.module.db.collect = opts.collect
@@ -204,7 +205,8 @@ local function Deliver()
 		local sent = c.env.GAMEDATA
 		for i = c.read + 1, #sent do
 			local m = sent[i]
-			world.log[#world.log + 1] = { from = c.who.id, to = m.id, data = m.data, at = world.time, client = c }
+			-- (client: which client sent it, a number: the log keeps no client, and their game, alive)
+			world.log[#world.log + 1] = { from = c.who.id, to = m.id, data = m.data, at = world.time, client = c.serial }
 			local target = world.byId[m.id]
 			if target then
 				target.env.Fire("BN_CHAT_MSG_ADDON", m.prefix, m.data, "WHISPER", c.who.id)
