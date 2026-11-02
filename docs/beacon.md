@@ -112,7 +112,8 @@ that `Drain` only empties when no one-off message, state or hello is waiting. `B
 message, onSent)`: onSent is called once it actually went (error reports are kept until then).
 Echoes adds its pages to it only when nothing else waits in any queue (`B.Waiting()`: every
 message still waiting) and stays silent for a while after the server said slow down
-(`B.throttledAt`, `B.throttleResult`: when, and 3 or 11).
+(`B.throttledAt`, `B.throttleResult`: when, and 3 or 11). A refusal of a message sent past the
+queues (Echoes' probe) goes through `B.Throttled(result)`: the same pause as after Beacon's own.
 The driver's tick resets its timer before running, so an error in it can't make it run every frame.
 The other files' hooks it calls (`B.SharingTick`, `B.StreamHealthTick`, `B.UpdateCalls`,
 `B.UpdatePings`, `B.TickReports`, `B.TickUpdates`, `B.RefreshMaps`, and every frame

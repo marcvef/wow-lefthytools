@@ -286,6 +286,14 @@ local function SendNow(gameAccountID, message)
 	return true
 end
 
+-- The server said slow down (result 3 or 11) to a message sent past the queues (Echoes' probe sends
+-- directly, to see each result): Beacon pauses as after its own, and Echoes sees it (B.throttledAt).
+function B.Throttled(result)
+	local now = GetTime()
+	B.throttledAt, B.throttleResult = now, result
+	pausedUntil, stats.throttled = now + THROTTLE_PAUSE, stats.throttled + 1
+end
+
 function B.Queue(gameAccountID, message)
 	outbox[#outbox + 1] = { gameAccountID, message }
 end

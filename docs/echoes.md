@@ -1064,9 +1064,13 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   for that never goes).
 - **Nothing in combat**: when a fight starts (`PLAYER_REGEN_DISABLED`), what still waits in
   Beacon's queue comes back out (`D.Withdraw`: parts are sent again from where they were, the rest
-  goes back in line). Switched off in a fight, my "I'm out" hello waits for its end
-  (`PLAYER_REGEN_ENABLED` on a frame of its own, registered only then: Echoes' events and tick stop
-  with it); switched on again before that, it doesn't go.
+  goes back in line).
+- **Switched off**, my "I'm out" hellos go from a frame of their own (Echoes' events and tick stop
+  with it; its `OnUpdate` is set only while some are left): one at a time, handed to Beacon only
+  when nothing else waits there, half a second after the one before went (2 a second at most),
+  never in a fight: then the one still waiting comes back out, and the rest wait for its end
+  (`PLAYER_REGEN_ENABLED`, registered only then). Switched on again before they all went, the rest
+  don't go.
 - **After a throttle or lockdown** (Beacon's `B.throttledAt`, result 3 or 11): nothing for 30 s;
   the next one right after doubles it, up to 5 minutes; after 10 calm minutes 30 s again. What
   waits comes back out the same way.
@@ -1085,7 +1089,9 @@ and 4000 bytes (`B2;ex;<size>;xxx...`), 2 s apart, out of combat, only when Beac
 empty, sent directly so each one's result shows; the friend answers each with what arrived
 (`B2;ey;<size>;<got>`). Beacon lets a bigger `B2;ex;` through only for this (from a friend it
 knows, up to 4100 bytes, 10 a minute). One chat line says per size: refused (the result), no
-answer, arrived whole or cut. A throttle stops it and counts like Beacon's.
+answer, arrived whole or cut. A throttle (result 3 or 11) stops it and counts like Beacon's own:
+`B.Throttled(result)` sets `B.throttledAt` and pauses Beacon's sending, and Echoes is silent at
+once (the backoff above).
 
 ### Status
 

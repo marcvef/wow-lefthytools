@@ -2230,7 +2230,8 @@ local function ProbeTick(now)
 			probe.lastAt = now
 			if ok and (result == 3 or result == 11) then
 				probe.i = #PROBE_SIZES + 1 -- (the server says slow down: that's the answer for now)
-				Backoff(now)
+				ns.Beacon.Throttled(result) -- (Beacon pauses too, as after its own)
+				CheckThrottle() -- (and Echoes, at once)
 			end
 		end
 	elseif now - probe.lastAt >= PROBE_WAIT then
@@ -2274,29 +2275,69 @@ local function Tick(now)
 end
 E.OnTick(Tick)
 
--- Switched off: my "I'm out" hello to these friends (gameAccountID -> true). Nothing of Echoes'
--- goes in a fight: switched off in one, it waits for the fight's end (PLAYER_REGEN_ENABLED on a frame
--- of its own: Echoes' events and tick stop with it); switched on again before that, it doesn't go.
+-- Switched off: my "I'm out" hello to these friends (gameAccountID -> true). Echoes' tick and budget
+-- stop with it, so a frame of its own paces them (its OnUpdate set only while some are left): one at
+-- a time, handed to Beacon only when nothing else waits there, OUT_GAP after the one before went.
+-- Nothing of Echoes' goes in a fight: in one, the one waiting in Beacon's queue comes back out, and
+-- the rest wait for its end (PLAYER_REGEN_ENABLED, registered only then); switched on again before
+-- they all went, the rest don't go.
+do
+local OUT_GAP = 0.5
 local outTo = {}
 local outFrame = CreateFrame("Frame")
-local function SayOut()
-	outFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+local outWait, pending = 0, nil -- (pending: the one in Beacon's queue, not sent yet)
+
+local function SayOutUpdate(_, elapsed)
 	local beacon = Beacon()
-	if beacon and E.data and (E.data.acct or MyAccount()) then
-		for id in pairs(outTo) do
-			if beacon.peers[id] then
-				beacon.QueueLow(id, HelloMessage("a"))
+	if not (beacon and E.data and (E.data.acct or MyAccount())) then
+		wipe(outTo)
+		pending = nil
+	elseif LT.InCombat() then
+		if pending then
+			beacon.DropLowFor(pending, IsEchoes)
+			outTo[pending], pending = true, nil
+		end
+		outFrame:SetScript("OnUpdate", nil)
+		outFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+		return
+	elseif pending and not beacon.peers[pending] then
+		pending = nil -- (gone: Beacon drops what waits for them)
+	elseif not pending then
+		outWait = outWait - elapsed
+		if outWait <= 0 and beacon.Waiting() == 0 then
+			local id = next(outTo)
+			while id and not beacon.peers[id] do -- (gone meanwhile: the next one instead)
+				outTo[id] = nil
+				id = next(outTo)
+			end
+			if id then
+				outTo[id], pending = nil, id
+				beacon.QueueLow(id, HelloMessage("a"), function()
+					if pending == id then
+						pending, outWait = nil, OUT_GAP
+					end
+				end)
 			end
 		end
 	end
-	wipe(outTo)
+	if not pending and not next(outTo) then
+		outFrame:SetScript("OnUpdate", nil)
+	end
 end
-outFrame:SetScript("OnEvent", SayOut) -- (it only queues: Beacon sends on its own tick)
+
+local function SayOut()
+	outFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	outWait, pending = 0, nil
+	outFrame:SetScript("OnUpdate", next(outTo) and SayOutUpdate or nil)
+end
+outFrame:SetScript("OnEvent", SayOut)
 
 -- Recording started (login, or switched on): friends already known hear my hello.
 E.When("start", function()
-	wipe(outTo) -- (switched off and on in a fight: they never heard I was out)
+	wipe(outTo) -- (switched off and on in a fight, or before all heard it: the rest never hear I was out)
+	pending = nil
 	outFrame:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	outFrame:SetScript("OnUpdate", nil)
 	Reset()
 	local now = GetTime()
 	for id in pairs(ns.Beacon.peers) do
@@ -2323,6 +2364,7 @@ E.When("stop", function()
 	end
 	Reset()
 end)
+end
 
 ---------------------------------------------------------------------------
 -- Status and the probe (for /lefthy echoes status | probe <friend>)

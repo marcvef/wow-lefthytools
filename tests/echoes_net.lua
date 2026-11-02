@@ -1742,6 +1742,57 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: \"I'm out\" to many friends, paced; the probe told to slow down")
+do
+	-- Switched off with 30 friends: my hellos that I'm out go 2 a second at most (all at once, before),
+	-- none in a fight; after it, the rest.
+	local crowd = Crowd(30, 450)
+	local c = Start(EVE, { friends = crowd, fake = true })
+	Stamped(c)
+	MeetAll(c, crowd)
+	Pass(c, 5)
+	local mark = Mark(c)
+	c.LT:SetModuleEnabled("echoes", false)
+	Pass(c, 5)
+	local _, early = Burst(c, mark, "B2;eh;", 1)
+	c.env.EnterCombat()
+	local fight = Mark(c)
+	Pass(c, 5)
+	local inFight = select(2, Burst(c, fight, "B2;eh;", 1))
+	c.env.LeaveCombat()
+	Pass(c, 20)
+	local most, total = Burst(c, mark, "B2;eh;", 1)
+	check(early >= 6 and early <= 10 and inFight == 0 and total == 30 and most <= 2,
+		("\"I'm out\": %d in the first 5 s, %d in a fight, %d in all, at most %d in a second"):format(early, inFight, total, most))
+	Stop(c)
+
+	-- The probe's message refused (3): Beacon pauses as after its own refusal, Echoes too.
+	c = Start(EVE, { friends = { ANNA }, fake = true })
+	MeetAll(c, { ANNA })
+	Pass(c, 5)
+	local send = c.env.C_BattleNet.SendGameData
+	c.env.C_BattleNet.SendGameData = function(id, prefix, data)
+		if data:sub(1, 6) == "B2;ex;" then
+			return 3
+		end
+		return send(id, prefix, data)
+	end
+	c.D.Probe("anna")
+	Pass(c, 0.3, 0.05)
+	local at = c.B.throttledAt
+	local pausedUntil, backoff = c.D.Paused()
+	mark = Mark(c)
+	c.B.Queue(ANNA.id, "M2;after the probe")
+	Pass(c, 1, 0.05)
+	local held = #Sent(c, ANNA, mark, "M2;after the probe") == 0
+	Pass(c, 2, 0.05)
+	check(at and c.B.throttleResult == 3 and backoff == 30 and math.abs(pausedUntil - (at + 30)) < 1e-6 and held
+		and #Sent(c, ANNA, mark, "M2;after the probe") == 1, "the probe refused: Beacon pauses (its message after 2 s), Echoes is silent 30 s")
+	c.env.C_BattleNet.SendGameData = send
+	Pass(c, 12)
+	Stop(c)
+end
+
 section("Echoes' delivery: long range lists of my own")
 do
 	-- What I keep (exported, safe, my inbox) may have more than the 300 intervals a message may: read
