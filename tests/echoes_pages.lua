@@ -755,6 +755,24 @@ do
 		and not Ranges.Contains("1-56,58", 0) and not Ranges.Contains("1-56,58", nil) and not Ranges.Contains(nil, 1), "contains")
 	check(Ranges.Of({ [1] = 1, [2] = 1, [3] = 1, [5] = 1, [2.5] = 1, x = 1 }) == "1-3,5"
 		and Ranges.Of({ [1] = 1, [2] = 2, [3] = 1 }, function(_, v) return v == 1 end) == "1,3", "a table's page numbers (keep: some)")
+	check(Ranges.Of({}) == "" and Ranges.Of(nil) == "" and Ranges.Of({ [0] = 1, [-3] = 1, [1e10] = 1, [7] = 1 }) == "7"
+		and Ranges.Of({ [999999999] = 1, [999999998] = 1 }) == "999999998-999999999", "none, or only some that are page numbers")
+	-- Ranges.Of reads the ranges off one sorted list of numbers: the same as a range per number merged.
+	math.randomseed(11)
+	local same = true
+	for _ = 1, 40 do
+		local t, pieces = {}, {}
+		for _ = 1, math.random(0, 120) do
+			local n = math.random(1, 300)
+			t[n] = math.random(1, 3)
+		end
+		for n, v in pairs(t) do
+			if v ~= 3 then pieces[#pieces + 1] = tostring(n) end
+		end
+		local of = Ranges.Of(t, function(_, v) return v ~= 3 end)
+		same = same and of == Ranges.Format(table.concat(pieces, ",")) and Ranges.Of(t) == Ranges.Format(Ranges.Of(t))
+	end
+	check(same, "a table's page numbers: the same as each number's range merged (random tables)")
 	check(Ranges.Format("1-99999999999") == "" and Ranges.Contains("1-999999999", 500000000), "numbers up to 999,999,999; ranges never spelled out")
 end
 

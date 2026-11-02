@@ -174,15 +174,33 @@ function Ranges.Contains(ranges, n)
 	return false
 end
 
--- A table's page numbers (its keys) as a string; keep(n, value): only those it says true for.
+-- A table's page numbers (its keys) as a string; keep(n, value): only those it says true for. The
+-- numbers go into one flat list, sorted the plain way, and the ranges are read off it: no table per
+-- page (a collector's inbox can hold thousands).
 function Ranges.Of(t, keep)
-	local list = {}
-	for n, v in pairs(type(t) == "table" and t or {}) do
-		if type(n) == "number" and n >= 1 and n <= MAX_N and n == math.floor(n) and (not keep or keep(n, v)) then
-			list[#list + 1] = { n, n }
+	local list, count = {}, 0
+	if type(t) == "table" then
+		for n, v in pairs(t) do
+			if type(n) == "number" and n >= 1 and n <= MAX_N and n == math.floor(n) and (not keep or keep(n, v)) then
+				count = count + 1
+				list[count] = n
+			end
 		end
 	end
-	return Ranges.Format(Merge(list))
+	table.sort(list)
+	local parts, from, to = {}, nil, nil
+	for i = 1, count + 1 do
+		local n = list[i]
+		if n and from and n == to + 1 then
+			to = n
+		else
+			if from then
+				parts[#parts + 1] = from == to and ("%d"):format(from) or ("%d-%d"):format(from, to)
+			end
+			from, to = n, n
+		end
+	end
+	return table.concat(parts, ",")
 end
 
 ---------------------------------------------------------------------------
