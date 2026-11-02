@@ -82,7 +82,9 @@ forgets; for tests).
   its anchor's (in this order: gear, professions, reputation, `/played`), so the same lines come a
   tick or so apart instead of all at once (and the end of a fight releases them the same way).
 - **It records with Chronicle, the Bestiary and Beacon switched off.** It keeps its own small cache
-  of mobs seen (level, classification, name: target, mouseover, nameplates; the last 200), and uses
+  of mobs seen (level, classification, name: target, mouseover, nameplates; the last 200; a mob
+  known whole costs one `UnitGUID` when seen again, one at `??` level, -1, or without its name yet
+  is read again), and uses
   Beacon only to know which group members are LefthyTools friends.
 
 ### The path (Path.lua)

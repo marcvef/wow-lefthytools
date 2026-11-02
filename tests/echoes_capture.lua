@@ -1008,6 +1008,35 @@ do
 		"kills: mine, my pet's, my group's (level and classification as seen, the name once); each corpse once; not "
 		.. "someone else's, a player's or a secret, got " .. seq())
 	GROUP_GUIDS["Player-1-11"], PET_GUID = nil, nil
+	-- A mob known whole (level, classification, name) is only looked up again: one call per
+	-- nameplate (a raid pull's 40). One seen at "??" (-1: far above me) is read again: its level
+	-- once it shows. (Calls counted from Events.lua only: other modules watch nameplates too.)
+	local calls, undo = 0, {}
+	for _, name in ipairs({ "UnitGUID", "UnitIsPlayer", "UnitLevel", "UnitClassification", "UnitName" }) do
+		local f = _G[name]
+		_G[name] = function(...)
+			if debug.traceback():find("Echoes/Events.lua", 1, true) then calls = calls + 1 end
+			return f(...)
+		end
+		undo[name] = f
+	end
+	MOBS.nameplate7 = { name = "Defias Bandit", level = 12, class = "normal", guid = "Creature-0-1-0-1-116-000000B5" }
+	Fire("NAME_PLATE_UNIT_ADDED", "nameplate7")
+	local firstLook = calls
+	calls = 0
+	for _ = 1, 40 do Fire("NAME_PLATE_UNIT_ADDED", "nameplate7") end
+	local again = calls
+	MOBS.nameplate8 = { name = "Hogger", level = -1, class = "elite", guid = "Creature-0-1-0-1-448-000000B6" }
+	Fire("NAME_PLATE_UNIT_ADDED", "nameplate8")
+	MOBS.nameplate8.level = 11
+	Fire("NAME_PLATE_UNIT_ADDED", "nameplate8")
+	MOBS.nameplate7, MOBS.nameplate8 = nil, nil
+	for name, f in pairs(undo) do _G[name] = f end
+	listen()
+	Fire("PARTY_KILL", "Player-1-0", "Creature-0-1-0-1-448-000000B6")
+	Advance(0.3)
+	check(firstLook >= 5 and again == 40, "a mob known whole: one call per nameplate (first look " .. firstLook .. " calls, then " .. again .. " for 40)")
+	check(seq() == "=;c;448;Hogger k;448;11;e;m", "a mob seen at ?? first: its level once it shows, got " .. seq())
 	-- A nameplate whose unit is a secret, a secret mouseover: nothing, no error.
 	local reported, restore = catchErrors()
 	listen()

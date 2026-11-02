@@ -53,7 +53,7 @@ end
 ---------------------------------------------------------------------------
 
 local S = {}
-local seenInfo, seenOrder = {}, {}   -- GUID -> { level, cls, name }; the GUIDs, a ring of SEEN_KEEP
+local seenInfo, seenOrder = {}, {}   -- GUID -> { level, cls, name, id, whole }; the GUIDs, a ring of SEEN_KEEP
 local killed, killedOrder = {}, {}   -- corpse GUID -> true; a ring of KILLS_KEEP
 local nodes, nodesOrder = {}, {}     -- gathered node GUID -> true; a ring of NODES_KEEP
 local titles = {}                    -- quest ID -> title (it may be gone from the log when it's turned in)
@@ -139,29 +139,39 @@ end
 -- Mobs seen: level, classification, name (for kills and deaths)
 ---------------------------------------------------------------------------
 
--- Remembers a creature unit; returns what's known of it, its GUID and its creature ID.
+-- Remembers a creature unit; returns what's known of it, its GUID and its creature ID. A mob known
+-- whole (its level, classification and name: they don't change) is only looked up: one call (a raid
+-- pull's nameplates, the mouseover going back and forth). Its level as "??" (-1: far above mine, it
+-- shows once I'm closer) or a name not loaded yet are read again.
 local function Look(unit)
 	local guid = Value(UnitGUID, unit)
+	local info = guid and seenInfo[guid]
+	if info and info.whole then
+		return info, guid, info.id
+	end
 	local creature = LT.CreatureOf(guid)
 	if not creature or Yes(UnitIsPlayer, unit) then
 		return nil
 	end
-	local info = seenInfo[guid]
 	if not info then
 		S.seenNext = S.seenNext % SEEN_KEEP + 1
 		local old = seenOrder[S.seenNext]
 		if old then -- (its table goes to this one)
 			info, seenInfo[old] = seenInfo[old], nil
-			info.level, info.cls, info.name = nil, nil, nil
+			info.level, info.cls, info.name, info.whole = nil, nil, nil, nil
 		end
 		info = info or {}
 		seenOrder[S.seenNext], seenInfo[guid] = guid, info
 	end
+	info.id = creature
 	info.level = Value(UnitLevel, unit) or info.level
 	local class = Value(UnitClassification, unit)
 	info.cls = class and CLASS[class] or info.cls
 	local name = Value(UnitName, unit)
 	info.name = type(name) == "string" and name or info.name
+	local level = info.level
+	info.whole = type(level) == "number" and level > 0 and info.cls ~= nil and type(info.name) == "string" and info.name ~= ""
+		and info.name ~= UNKNOWNOBJECT or nil
 	return info, guid, creature
 end
 
