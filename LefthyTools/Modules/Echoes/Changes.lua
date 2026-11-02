@@ -19,7 +19,8 @@ local issecret, Value, Readable = LT.IsSecret, LT.Value, LT.Readable
 
 local XP_EVERY = 60          -- seconds between XP checks (and on resting changes, level-ups, logins)
 local RESTED_EVERY = 600     -- seconds: a change only of the rested XP or the resting flag is written at most this often
-local FACTIONS_EVERY = 10    -- seconds: UPDATE_FACTION rescans at most this often
+local FACTIONS_EVERY = 10    -- seconds: UPDATE_FACTION rescans at most this often,
+local FACTIONS_SAFETY = 120  -- this often once FACTION_STANDING_CHANGED was seen this session (it names what changed)
 local PLAYED_WAIT = 10       -- seconds the chat frames go without /played's answer while it's asked silently
 local RESULT_EVERY = 5       -- seconds between asking who won a battleground
 local GROUP_EVERY = 15       -- seconds: a group with others is looked at again (Beacon may learn of a friend among them)
@@ -71,6 +72,7 @@ local function Reset()
 	S.groupSize, S.groupNextAt = nil, 0 -- the size as last looked at; (GetTime) the next look at a changed roster
 	S.gearAll = false
 	S.factionsScan, S.factionsAt = false, -math.huge
+	S.standings = false  -- FACTION_STANDING_CHANGED seen this session
 	S.hk = nil           -- honorable kills as last read
 	S.playedWanted, S.playedTotal, S.playedUntil = false, nil, nil
 	S.resultAt = 0
@@ -297,7 +299,9 @@ end
 
 ---------------------------------------------------------------------------
 -- Reputation (standing 1-8; only out of combat): the faction FACTION_STANDING_CHANGED names, a scan
--- of every faction listed after login and on UPDATE_FACTION (at most every FACTIONS_EVERY seconds).
+-- of every faction listed after login and on UPDATE_FACTION (at most every FACTIONS_EVERY seconds;
+-- once FACTION_STANDING_CHANGED came this session, at most every FACTIONS_SAFETY: it names each
+-- change itself, the scan is a safety net, and UPDATE_FACTION comes with every reputation gained).
 -- The first scan of a character is the baseline: no lines.
 ---------------------------------------------------------------------------
 
@@ -514,6 +518,7 @@ end)
 E.On("FACTION_STANDING_CHANGED", function(factionID)
 	if type(factionID) == "number" and not issecret(factionID) then
 		repDirty[factionID] = true
+		S.standings = true
 	end
 end)
 E.On("UPDATE_FACTION", function() S.factionsScan = true end)
@@ -639,7 +644,7 @@ E.OnTick(function(now)
 		Professions(cap)
 		heavy = true
 	end
-	if S.factionsScan and not heavy and now - S.factionsAt >= FACTIONS_EVERY then
+	if S.factionsScan and not heavy and now - S.factionsAt >= (S.standings and FACTIONS_SAFETY or FACTIONS_EVERY) then
 		Factions(cap)
 		heavy = true
 	end

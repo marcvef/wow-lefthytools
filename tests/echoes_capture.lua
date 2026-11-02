@@ -1302,17 +1302,27 @@ do
 	Fire("UPDATE_FACTION")
 	Advance(0.3)
 	check(seq() == "" and cap().reps[72] == 5 and cap().repsKnown, "reputation: the first scan is the baseline, got " .. seq())
+	-- No FACTION_STANDING_CHANGED seen this session (yet): UPDATE_FACTION rescans at most every 10 s.
+	FACTIONS[3].reaction = 6
+	Fire("UPDATE_FACTION")
+	Advance(0.3)
+	local waited = seq()
+	Advance(10)
+	check(waited == "" and seq() == "R;47;6", "the rescan (UPDATE_FACTION): what changed, at most every 10 s, got " .. waited .. " | " .. seq())
+	-- FACTION_STANDING_CHANGED seen: it names what changed, the rescan is a safety net every 2 minutes.
+	listen()
 	FACTIONS[2].reaction = 6
 	Fire("FACTION_STANDING_CHANGED", 72, 6)
 	Advance(0.3)
-	FACTIONS[3].reaction = 6
+	FACTIONS[3].reaction = 7
 	FACTIONS[4] = { id = 69, reaction = 4 }
 	Fire("UPDATE_FACTION")
-	Advance(0.3)
-	check(seq() == "R;72;6", "a standing changed: R with the faction and the standing; a rescan waits 10 s, got " .. seq())
-	Advance(10)
-	check(seq() == "R;72;6 R;47;6" and cap().reps[69] == 4,
-		"the rescan (UPDATE_FACTION): what changed; a faction listed for the first time is a baseline, got " .. seq())
+	Advance(10.3)
+	waited = seq()
+	Advance(110)
+	check(waited == "R;72;6", "a standing changed: R with the faction and the standing; the rescan waits, got " .. waited)
+	check(seq() == "R;72;6 R;47;7" and cap().reps[69] == 4,
+		"the rescan 2 minutes after the last: what the event didn't name; a faction listed for the first time is a baseline, got " .. seq())
 	-- Under closed headers: one changes (FACTION_STANDING_CHANGED names it: R), then the headers open
 	-- (listed for the first time: no lines, not even for one never seen before).
 	listen()
@@ -1322,7 +1332,7 @@ do
 	Advance(0.3)
 	FACTIONS[5].collapsed, FACTIONS[6].collapsed = nil, nil
 	Fire("UPDATE_FACTION")
-	Advance(10.3)
+	Advance(120.3)
 	check(seq() == "R;21;6" and cap().reps[93] == 4,
 		"a faction under a closed header changed: R; the headers opened: nothing more, got " .. seq())
 
