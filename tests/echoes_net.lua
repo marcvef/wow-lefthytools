@@ -1566,6 +1566,44 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: summaries worked out once a change, not every second")
+do
+	-- 30 friends who relay; what's safe of 10 stores at one of them. Nothing changes for a minute: no
+	-- summary is worked out (each friend's, every second, before). A page of mine closes: each friend
+	-- hears of it once, the ranges written once for all of them.
+	local crowd = Crowd(30, 400)
+	local c = Start(EVE, { friends = crowd, fake = true })
+	MyPage(c, 701, 300)
+	for i = 1, 10 do
+		c.E.data.safe[crowd[i].key] = { [crowd[30].key] = "1-" .. (10 + i) }
+	end
+	Touched(c)
+	MeetAll(c, crowd)
+	Pass(c, 70)
+	local format, formatted = c.D.Ranges.Format, 0
+	c.D.Ranges.Format = function(list)
+		formatted = formatted + 1
+		return format(list)
+	end
+	local mark = Mark(c)
+	Pass(c, 60)
+	local quiet = formatted
+	check(quiet == 0 and #Sent(c, crowd[1], mark, "B2;e") == 0, "a minute without a change: nothing worked out, nothing sent, got "
+		.. quiet .. " lists written")
+	MyPage(c, 702, 300)
+	formatted = 0
+	Pass(c, 60)
+	local heard = 0
+	for _, f in ipairs(crowd) do
+		local es = Sent(c, f, mark, "B2;es;")
+		heard = heard + ((#es == 1 and es[1] == "B2;es;" .. c.E.Store.Own() .. ":701-702") and 1 or 0)
+	end
+	c.D.Ranges.Format = format
+	check(heard == 30 and formatted <= 15, ("a page closed: all 30 friends hear of it once (%d), the lists written once for all (%d times)")
+		:format(heard, formatted))
+	Stop(c)
+end
+
 section("Echoes' delivery: long range lists of my own")
 do
 	-- What I keep (exported, safe, my inbox) may have more than the 300 intervals a message may: read

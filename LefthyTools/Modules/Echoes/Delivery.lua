@@ -331,8 +331,10 @@ local function Stored(ranges)
 	return type(ranges) == "string" and E.Ranges.Parse(ranges) or {}
 end
 
+local summaryGen = 0 -- (counts the changes: a summary is worked out again only after one)
 local function Changed()
 	wipe(cache)
+	summaryGen = summaryGen + 1
 end
 -- Pages changed outside Delivery (closed, packed, dropped by the cap, the 30 days or a receipt):
 -- looked at anew. Store.lua calls it on every change; Delivery also looks again every RECHECK
@@ -1185,10 +1187,16 @@ local function OnHello(id, msg, now)
 	end
 end
 
+-- My summaries: what I hold (Summary), my early pages (EarlySummary), what's safe (SafeSummary).
+-- (In a block of their own: Lua allows a file 200 locals.)
+local Summary, EarlySummary, SafeSummary
+do
+
 -- What I told one friend (track: sentHold, sentSafe or sentEarly), if it's time to tell them again
 -- (at most every SUMMARY_GAP; what they heard is forgotten every FULL_OFFER: then all of it again);
--- nil if not.
-local function Due(track, id, now)
+-- nil if not. Looked at again only once something changed since (Changed: summaryGen), or what
+-- stamp says about them (their key) did: else nothing would be told anyway.
+local function Due(track, id, now, stamp)
 	local s = track[id]
 	if not s then
 		s = { at = -math.huge, full = now, sent = {} }
@@ -1200,36 +1208,147 @@ local function Due(track, id, now)
 	if now - s.full >= FULL_OFFER then
 		s.full = now
 		wipe(s.sent)
+	elseif s.gen == summaryGen and s.stamp == stamp then
+		return nil
 	end
+	s.gen, s.stamp = summaryGen, stamp
 	return s
 end
 
--- offer ({ [key] = list }) to one friend as head's messages ("B2;es;", "B2;ea;"): what changed since
--- they last heard it (s, from Due).
-local function Tell(id, s, head, kind, offer, now)
-	local items = {}
+-- What my summaries say, worked out once a change for every friend (Told): per message head, its
+-- items ("<key>:<ranges>", a long list in pieces) sorted, with each item's mark (what a friend
+-- hears of: a key, for ed the collector and the key), each mark's text (ranges) and list.
+local told, toldGen = {}, nil
+
+-- offer ({ [key] = list }) under head into t (marks: prefix .. key).
+local function AddOffer(t, head, offer, prefix)
+	local h, markOf = { head = head, items = {}, marks = {} }, {}
 	for key, list in pairs(offer) do
-		local text = Ranges.Format(list)
-		if text ~= s.sent[key] then
-			s.sent[key] = text
-			WriteItems(key, list, MAX_BYTES - #head, items)
+		local mark = (prefix or "") .. key
+		t.texts[mark], t.lists[mark] = Ranges.Format(list), list
+		local items = {}
+		WriteItems(key, list, MAX_BYTES - #head, items)
+		for _, item in ipairs(items) do
+			h.items[#h.items + 1] = item
+			markOf[item] = mark
 		end
 	end
-	if #items > 0 then
-		s.at = now
-		table.sort(items)
-		for _, message in ipairs(Pack(head, items)) do
+	table.sort(h.items)
+	for i, item in ipairs(h.items) do
+		h.marks[i] = markOf[item]
+	end
+	t.heads[#t.heads + 1] = h
+end
+
+-- kind's summary as it is now ("es": what I hold, "ea": my early pages, "ed": what's safe), the same
+-- for every friend (to the author, what I hold of theirs provisionally is added: Summary).
+local function Told(kind)
+	if toldGen ~= summaryGen then
+		wipe(told)
+		toldGen = summaryGen
+	end
+	local t = told[kind]
+	if t then
+		return t
+	end
+	t = { texts = {}, lists = {}, heads = {}, extras = {} }
+	told[kind] = t
+	if kind == "es" then
+		AddOffer(t, "B2;es;", Holdings())
+	elseif kind == "ea" then
+		local key = MyKey()
+		AddOffer(t, "B2;ea;", key and { [key] = Have("early", key) } or {})
+	else
+		-- (What I keep of what's safe, checked once here: a key that isn't one, or an entry of the
+		-- wrong type, stays out.)
+		local byCollector, collectors = {}, {}
+		for key, entry in pairs(E.data.safe) do
+			for collector, text in pairs(WireKey(key) and type(entry) == "table" and entry or {}) do
+				if WireKey(collector) and type(text) == "string" then
+					if not byCollector[collector] then
+						byCollector[collector] = {}
+						collectors[#collectors + 1] = collector
+					end
+					byCollector[collector][key] = Stored(text)
+				end
+			end
+		end
+		table.sort(collectors)
+		for _, collector in ipairs(collectors) do
+			local cAcct, cStore = Split(collector)
+			AddOffer(t, "B2;ed;" .. cAcct .. ";" .. cStore .. ";", byCollector[collector], collector .. ">")
+		end
+	end
+	return t
+end
+
+-- t (Told) to one friend as kind's messages: what changed since they last heard it (s, from Due).
+-- extra: { mark, text, items } told instead of t's for that mark (only "es", one head). True if
+-- something went.
+local function Tell(id, s, kind, t, now, extra)
+	local changed
+	for mark, text in pairs(t.texts) do
+		if extra and mark == extra.mark then
+			text = extra.text
+		end
+		if s.sent[mark] ~= text then
+			s.sent[mark] = text
+			changed = changed or {}
+			changed[mark] = true
+		end
+	end
+	if extra and not t.texts[extra.mark] and s.sent[extra.mark] ~= extra.text then
+		s.sent[extra.mark] = extra.text
+		changed = changed or {}
+		changed[extra.mark] = true
+	end
+	if not changed then
+		return false
+	end
+	local any = false
+	for _, h in ipairs(t.heads) do
+		local every = not extra
+		for i = 1, every and #h.marks or 0 do
+			every = every and changed[h.marks[i]] == true
+		end
+		local messages
+		if every then
+			-- (all of it: the same messages for everyone, made once)
+			h.full = h.full or Pack(h.head, h.items)
+			messages = h.full
+		else
+			local items = {}
+			for i, item in ipairs(h.items) do
+				local mark = h.marks[i]
+				if changed[mark] and not (extra and mark == extra.mark) then
+					items[#items + 1] = item
+				end
+			end
+			if extra and changed[extra.mark] then
+				for _, item in ipairs(extra.items) do
+					items[#items + 1] = item
+				end
+				table.sort(items)
+			end
+			messages = Pack(h.head, items)
+		end
+		for _, message in ipairs(messages) do
 			Control(id, message, kind)
+			any = true
 		end
 	end
+	if any then
+		s.at = now
+	end
+	return any
 end
 
 -- What I hold, to one friend who collects or relays: only what grew since they last heard it
 -- (everything the first time, and again every FULL_OFFER), at most every SUMMARY_GAP.
-local function Summary(id, peer, now)
-	local s = Due(sentHold, id, now)
+function Summary(id, peer, now)
+	local s = Due(sentHold, id, now, peer.key)
 	if not s then
-		return
+		return false
 	end
 	-- (Their own pages too: the author learns who holds which of its pages, and a page of theirs
 	-- that never went out but that I hold under its number is another page with that number. To
@@ -1237,64 +1356,36 @@ local function Summary(id, peer, now)
 	-- page that a crash lost has its number, so the author's next pages close above it. Nobody else
 	-- hears of those: no relay leaves a page alone for them, no collector fetches one; and what a
 	-- friend who doesn't collect holds is only ever from a disk, see OnHoldings.)
-	local offer, theirs = Holdings(), M.db.collect and Have("provisional", peer.key) or {}
-	if #theirs > 0 then
-		local copy = {}
-		for key, list in pairs(offer) do
-			copy[key] = list
-		end
-		copy[peer.key] = copy[peer.key] and Ranges.Union(copy[peer.key], theirs) or theirs
-		offer = copy
+	-- (Worked out once a change for each such author, and only while I collect.)
+	local t = Told("es")
+	local theirs = M.db.collect and HeldIn("provisional")[peer.key]
+	local extra = theirs and t.extras[peer.key]
+	if theirs and not extra then
+		local list = t.lists[peer.key] and Ranges.Union(t.lists[peer.key], theirs) or theirs
+		extra = { mark = peer.key, text = Ranges.Format(list), items = {} }
+		WriteItems(peer.key, list, MAX_BYTES - #t.heads[1].head, extra.items)
+		t.extras[peer.key] = extra
 	end
-	Tell(id, s, "B2;es;", "es", offer, now)
+	return Tell(id, s, "es", t, now, extra)
 end
 
 -- My own pages not on my disk yet, to one friend who takes them early (TakesEarly), the same way.
-local function EarlySummary(id, now)
-	local s = Due(sentEarly, id, now)
-	local key = MyKey()
-	if s and key then
-		Tell(id, s, "B2;ea;", "ea", { [key] = Have("early", key) }, now)
+function EarlySummary(id, now)
+	local s = MyKey() and Due(sentEarly, id, now)
+	if not s then
+		return false
 	end
+	return Tell(id, s, "ea", Told("ea"), now)
 end
 
 -- What collectors hold safely (theirs passed on, mine if I collect), to one friend, the same way.
-local function SafeSummary(id, now)
+function SafeSummary(id, now)
 	local s = Due(sentSafe, id, now)
 	if not s then
-		return
+		return false
 	end
-	local byCollector = {}
-	for key, collectors in pairs(E.data.safe) do
-		for collector, text in pairs(WireKey(key) and type(collectors) == "table" and collectors or {}) do
-			local mark = WireKey(collector) and type(text) == "string" and collector .. ">" .. key
-			if mark and text ~= s.sent[mark] then
-				s.sent[mark] = text
-				byCollector[collector] = byCollector[collector] or {}
-				local list = byCollector[collector]
-				list[#list + 1] = { key, Stored(text) }
-			end
-		end
-	end
-	local any = false
-	for collector, list in pairs(byCollector) do
-		local cAcct, cStore = collector:match("^(%x+)%.(%x+)$")
-		if cAcct then
-			local head = "B2;ed;" .. cAcct .. ";" .. cStore .. ";"
-			local items = {}
-			for _, entry in ipairs(list) do
-				WriteItems(entry[1], entry[2], MAX_BYTES - #head, items)
-			end
-			table.sort(items)
-			for _, message in ipairs(Pack(head, items)) do
-				Control(id, message, "ed")
-				any = true
-			end
-		end
-	end
-	if any then
-		s.at = now
-	end
+	return Tell(id, s, "ed", Told("ed"), now)
+end
 end
 
 ---------------------------------------------------------------------------

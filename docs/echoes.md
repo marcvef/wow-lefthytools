@@ -1046,6 +1046,11 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
 - At most 3 of mine waiting there, and one handed over per Echoes tick (so two never go out in the
   same moment); never more than 3 in any second in all, nor 2 to one friend (counted when they
   actually went, the waiting ones included; with the tick that's about 2.4 and 1.6 a second).
+- **Summaries** (`es`, `ea`, `ed`) are worked out once per change of the pages or of what's safe
+  (`D.PagesChanged`, the safety net every 5 minutes), the same for every friend: the ranges written
+  and the messages packed once (only an author's own pages I hold provisionally are added for
+  them). A friend is looked at again only after such a change or when their full offer is due:
+  while nothing changes, nothing is worked out.
 - **Nothing in combat**: when a fight starts (`PLAYER_REGEN_DISABLED`), what still waits in
   Beacon's queue comes back out (`D.Withdraw`: parts are sent again from where they were, the rest
   goes back in line). Switched off in a fight, my "I'm out" hello waits for its end
