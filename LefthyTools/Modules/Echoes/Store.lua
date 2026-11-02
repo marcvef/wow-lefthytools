@@ -1395,6 +1395,9 @@ E.When("start", function()
 	table.sort(queue)
 	chores = { LaunchDay, Expire, Forget, Store.Trim, Note }
 	noteDue, moved = false, 0
+	if taking[1] then
+		receiptSession = nil -- (switched off and on again half-way: the receipt is read again)
+	end
 	wipe(taking)
 end)
 

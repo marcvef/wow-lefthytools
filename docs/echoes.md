@@ -758,7 +758,8 @@ tick), so a collector's whole inbox never goes in one frame. Each store's pages 
 one changes nothing of another), so a store taken a few ticks later is as if the receipt had come
 that much later: a page that comes meanwhile arrived after what the exporter read (`upto`) and
 stays, as ever; without `upto` (an older exporter) the same race was there before, between the
-login and the receipt's tick (now longer by a tick per store).
+login and the receipt's tick (now longer by a tick per store). Switched off and on again before its
+last store, the receipt is read again.
 
 **Costs.** A tick: a few comparisons. A minute: one join. Half an hour (ten minutes with a collector
 who takes pages early online): one page packed, never in a fight. Inside event handlers: only the logout's join and, at

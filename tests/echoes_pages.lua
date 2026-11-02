@@ -1259,6 +1259,35 @@ do
 	LT:SetModuleSetting(M, "collect", false)
 end
 
+section("Echoes pages: switched off and on half-way through the receipt")
+do
+	-- The receipt is taken a store a tick: switched off and on before the last, it's read again, so
+	-- nothing it lists stays in the inbox.
+	fresh(acct)
+	LT:SetModuleSetting(M, "collect", true)
+	local other = A .. ".0c77e1f6"
+	for n = 1, 3 do Store.Put(A, B, n, friendPage(n, E.Now()), "inbox") end
+	Store.Put(A, "0c77e1f6", 1, friendPage(1, E.Now()), "inbox")
+	Advance(3, 0.25)
+	MOCK_RECEIPT = { v = 1, at = E.Now(), done = { [friend] = "1-3", [other] = "1" } }
+	reload(1)
+	local loads0 = loads
+	for _ = 1, 40 do
+		tick()
+		if loads > loads0 and (E.data.exported[friend] or E.data.exported[other]) then
+			break
+		end
+	end
+	local half = (E.data.exported[friend] == nil) ~= (E.data.exported[other] == nil)
+	LT:SetModuleEnabled("echoes", false)
+	start()
+	Advance(4, 0.25)
+	check(half and E.data.exported[friend] == "1-3" and E.data.exported[other] == "1" and next(E.data.inbox[friend] or {}) == nil
+		and next(E.data.inbox[other] or {}) == nil, "switched off and on half-way through the receipt: read again, every store taken")
+	MOCK_RECEIPT, LefthyToolsEchoesReceipt = nil, nil
+	LT:SetModuleSetting(M, "collect", false)
+end
+
 section("Echoes pages: the receipt takes only what the exporter read (upto)")
 do
 	-- The exporter's upto["<store>"]: the latest arrival (a) of this store's inbox it read. A page that
