@@ -1534,6 +1534,36 @@ do
 	check(together == 1 and inASecond <= 3 and total >= 60, ("one at a time: at most 1 within 0.1 s (and 3 in a second), got %d (%d) of %d")
 		:format(together, inASecond, total))
 	Stop(c)
+
+	-- 30 friends with Echoes, 8 answers waiting for each (asked in a fight): while the rate is used up,
+	-- a tick looks at nobody; else each friend once, not every message waiting.
+	crowd = Crowd(30, 330)
+	c = Start(EVE, { friends = crowd, fake = true })
+	MeetAll(c, crowd)
+	Pass(c, 5)
+	c.env.EnterCombat()
+	for _, f in ipairs(crowd) do
+		for n = 1, 8 do
+			Ask(c, f, 900 + n)
+		end
+		Pass(c, 0.5)
+	end
+	local waiting = #c.D.out
+	local peers, looked = c.B.peers, 0
+	c.B.peers = setmetatable({}, {
+		__index = function(_, id)
+			looked = looked + 1
+			return peers[id]
+		end,
+		__pairs = function()
+			return next, peers, nil
+		end,
+	})
+	c.env.LeaveCombat()
+	Pass(c, 10)
+	c.B.peers = peers
+	check(waiting >= 200 and looked < 1200, ("%d answers waiting: friends looked up %d times in 10 s (once a message, every tick: 9000)"):format(waiting, looked))
+	Stop(c)
 end
 
 section("Echoes' delivery: long range lists of my own")

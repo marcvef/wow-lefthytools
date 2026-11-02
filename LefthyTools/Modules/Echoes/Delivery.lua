@@ -744,14 +744,41 @@ local function Control(id, message, kind, pageId, answer)
 	out[#out + 1] = { id = id, message = message, kind = kind, pageId = pageId, answer = answer }
 end
 
--- out's item i goes (sent, or dropped).
-local function TakeOut(i)
-	local item = table.remove(out, i)
+-- An item left out (sent, or dropped): no longer counted.
+local function Forget(item)
 	if item.answer then
 		local n = answersOut[item.id] - 1
 		answersOut[item.id] = n > 0 and n or nil
 	end
+end
+
+-- out's item i goes (sent, or dropped).
+local function TakeOut(i)
+	local item = table.remove(out, i)
+	Forget(item)
 	return item
+end
+
+-- out's items for one friend go (of one kind, if given), in one pass; the others keep their order.
+-- known: the friends whose items stay instead (the ones of everyone else go).
+local function DropOut(id, kind, known)
+	local j = 0
+	for i = 1, #out do
+		local item = out[i]
+		out[i] = nil
+		local drop
+		if known then
+			drop = not known[item.id]
+		else
+			drop = item.id == id and (not kind or item.kind == kind)
+		end
+		if drop then
+			Forget(item)
+		else
+			j = j + 1
+			out[j] = item
+		end
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -773,7 +800,10 @@ end
 -- How many of times are within the last second.
 local function Recent(times, now)
 	local n = 0
-	for _, t in ipairs(times or {}) do
+	if not times then
+		return 0
+	end
+	for _, t in ipairs(times) do
 		if now - t < 1 then
 			n = n + 1
 		end
@@ -866,7 +896,8 @@ local function Withdraw(only)
 		B.DropLowFor(id, IsEchoes)
 	end
 	table.sort(list, function(x, y) return x.seq < y.seq end)
-	for i = #list, 1, -1 do
+	local back = {} -- (to the front of out, in the order they were queued: put there at once)
+	for i = 1, #list do
 		local record = list[i]
 		queued[record] = nil
 		outstanding = outstanding - 1
@@ -884,7 +915,16 @@ local function Withdraw(only)
 				serve.offset = record.offset
 			end
 		elseif record.id ~= only then
-			table.insert(out, 1, { id = record.id, message = record.message, kind = record.kind, pageId = record.pageId })
+			back[#back + 1] = { id = record.id, message = record.message, kind = record.kind, pageId = record.pageId }
+		end
+	end
+	local k = #back
+	if k > 0 then
+		for i = #out, 1, -1 do
+			out[i + k] = out[i]
+		end
+		for i = 1, k do
+			out[i] = back[i]
 		end
 	end
 end
@@ -892,16 +932,34 @@ D.Withdraw = Withdraw
 
 -- The next message to send: mine waiting first (hellos, requests, summaries), then the pages I
 -- serve, by turns; only to a friend who may get one now (MayGo). nil: none.
+-- (Asked every tick: when the rate is used up nothing is looked at, and each friend's rate once.)
 local turn = 0
+local may = {} -- gameAccountID -> whether they may get one now (this look)
 local function NextMessage(now)
+	if outstanding + Recent(sentTimes, now) >= RATE then
+		return nil -- (nobody may get one now)
+	end
 	local B = ns.Beacon
-	for i, item in ipairs(out) do
-		if not B.peers[item.id] then
-			TakeOut(i)
-			return NextMessage(now) -- (gone: theirs go)
-		elseif MayGo(item.id, now) then
+	wipe(may)
+	local gone = false
+	for i = 1, #out do
+		local id = out[i].id
+		local ok = may[id]
+		if ok == nil then
+			ok = B.peers[id] ~= nil and MayGo(id, now)
+			may[id] = ok
+			gone = gone or B.peers[id] == nil
+		end
+		if ok then
+			if gone then
+				break -- (theirs go first: then this one, below)
+			end
 			return TakeOut(i)
 		end
+	end
+	if gone then
+		DropOut(nil, nil, B.peers) -- (gone: theirs go, all at once)
+		return NextMessage(now)
 	end
 	for _ = 1, #active do
 		turn = turn % #active + 1
@@ -1056,11 +1114,7 @@ local function Release(id)
 			inflight[pageId] = nil
 		end
 	end
-	for i = #out, 1, -1 do
-		if out[i].id == id and out[i].kind == "eq" then
-			TakeOut(i)
-		end
-	end
+	DropOut(id, "eq")
 end
 
 -- Their requests: no more serving them.
@@ -1851,11 +1905,7 @@ end
 -- A friend went away: what was asked of them can be asked of someone else.
 function B.EchoesForget(id)
 	Withdraw(id)
-	for i = #out, 1, -1 do
-		if out[i].id == id then
-			TakeOut(i)
-		end
-	end
+	DropOut(id)
 	Release(id)
 	StopServing(id)
 	peers[id], owedHello[id], xmap[id], peerTimes[id], waitingFor[id], silentAt[id] = nil, nil, nil, nil, nil, nil
