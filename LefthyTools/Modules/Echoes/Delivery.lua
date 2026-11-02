@@ -1967,10 +1967,13 @@ local function Housekeeping(now)
 end
 
 -- Whether a friend who takes my pages early is online (Pages.lua: pages close sooner then, so they
--- leave me sooner).
+-- leave me sooner). (Asked up to 4 times a second: nothing made for it.)
 function D.EarlyTaker()
 	local beacon = Beacon()
-	for id in pairs(beacon and peers or {}) do
+	if not beacon or not next(peers) then
+		return false
+	end
+	for id in pairs(peers) do
 		if TakesEarly(id) and beacon.peers[id] then
 			return true
 		end
