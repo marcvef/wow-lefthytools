@@ -1018,6 +1018,7 @@ do
 	Advance(0.3)
 	restore()
 	check(#reported == 0 and seq() == "", "a secret nameplate unit or GUID: nothing, got " .. seq() .. " " .. table.concat(reported, " "))
+	Fire("NAME_PLATE_UNIT_REMOVED", SECRET) -- (gone again: the Misc Tweaks' aggro tags keep nameplates in a group fight)
 end
 
 ---------------------------------------------------------------------------
@@ -1130,9 +1131,9 @@ do
 	PARTY.party1, PARTY.party2 = { guid = "Player-1-11" }, { guid = "Player-1-77" }
 	Fire("GROUP_ROSTER_UPDATE")
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	check(seq() == "g;3;1;Player-1-11:Anna-Realmy", "a group: its size, the others, each LefthyTools friend as GUID:Name-Realm; only changes, got " .. seq())
 	check(LefthyToolsEchoesDB.friends["Player-1-11"] == "Anna-Realmy", "the friend is remembered")
 	-- Beacon off: the friend is still named (remembered).
@@ -1140,16 +1141,16 @@ do
 	listen()
 	GROUP_MEMBERS, PARTY.party2 = 2, nil
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	check(seq() == "g;2;0;Player-1-11:Anna-Realmy", "Beacon off: the friend remembered, got " .. seq())
 	LT:SetModuleEnabled("beacon", true)
 	listen()
 	PARTY.party1 = { guid = SECRET }
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	check(seq() == "g;2;1 g;0;0", "a member whose GUID is secret: one of the others; left the group: g 0 0, got " .. seq())
 	-- A friend Beacon learns of only after the group was looked at (not remembered yet): named
 	-- within 15 s, without another roster change.
@@ -1158,14 +1159,14 @@ do
 	listen()
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "party", 2, { guid = "Player-1-11" }
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	LT:SetModuleEnabled("beacon", true)
 	anna("H2")
 	Advance(16)
 	check(seq() == "g;2;1 g;2;0;Player-1-11:Anna-Realmy", "a friend Beacon learns of later: named then, got " .. seq())
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 
 	-- A friend's realm the way my character's key has it (GetRealmName: "Realmy Vale"), whatever form
 	-- the game gave it in ("RealmyVale"); another realm's as Battle.net shows it ("Stone Realm").
@@ -1179,7 +1180,7 @@ do
 	listen()
 	GROUP, GROUP_MEMBERS, PARTY.party1, PARTY.party2 = "party", 3, { guid = "Player-1-11" }, { guid = "Player-1-12" }
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	local both = seq()
 	-- Remembered in another form (from before), Beacon off: written, and kept, in my realm's.
 	LT:SetModuleEnabled("beacon", false)
@@ -1187,17 +1188,55 @@ do
 	listen()
 	GROUP_MEMBERS, PARTY.party2 = 2, nil
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	LT:SetModuleEnabled("beacon", true)
 	check(both == "g;3;0;Player-1-11:Anna-Realmy Vale;Player-1-12:Bob-Stone Realm" and seq() == "g;2;0;Player-1-11:Anna-Realmy Vale"
 		and LefthyToolsEchoesDB.friends["Player-1-11"] == "Anna-Realmy Vale",
 		"friends' realms as my own character's key writes them; another realm as Battle.net shows it, got " .. both .. " | " .. seq())
 	GROUP, GROUP_MEMBERS, PARTY.party1 = "none", 0, nil
 	Fire("GROUP_ROSTER_UPDATE")
-	Advance(0.3)
+	Advance(2)
 	GetRealmName, bob.realmName, bob.realmDisplayName = realmName, "Realmy", nil
 	KNOWN_PLAYERS["Player-1-11"], KNOWN_PLAYERS["Player-1-12"] = nil, nil
 	LefthyToolsEchoesDB.friends["Player-1-11"], LefthyToolsEchoesDB.friends["Player-1-12"] = "Anna-Realmy", nil
+
+	-- A roster that changes all the time (a raid: GROUP_ROSTER_UPDATE many times a second): looked
+	-- at at most every 2 s. In combat only once its size changed; another member, same size, when the
+	-- fight is over.
+	local looks, members = 0, GetNumGroupMembers
+	GetNumGroupMembers = function() looks = looks + 1 return members() end
+	GROUP, GROUP_MEMBERS, PARTY.party1 = "party", 2, { guid = "Player-1-77" }
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(2)
+	listen()
+	looks = 0
+	for _ = 1, 40 do
+		Fire("GROUP_ROSTER_UPDATE")
+		Advance(0.25)
+	end
+	local burst = looks
+	EnterCombat()
+	PARTY.party1 = { guid = "Player-1-11" }
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(5)
+	local inCombat = seq()
+	LeaveCombat()
+	Advance(2.5)
+	local over = seq()
+	listen()
+	EnterCombat()
+	GROUP_MEMBERS, PARTY.party2 = 3, { guid = "Player-1-77" }
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(2.5)
+	local grown = seq()
+	LeaveCombat()
+	GetNumGroupMembers = members
+	check(burst <= 6, "a roster changing every tick for 10 s: looked at at most every 2 s, " .. burst .. " times (40 before)")
+	check(inCombat == "" and over == "g;2;0;Player-1-11:Anna-Realmy" and grown == "g;3;1;Player-1-11:Anna-Realmy",
+		"in combat: another member (same size) waits for the fight's end; a new size doesn't, got " .. inCombat .. " | " .. over .. " | " .. grown)
+	GROUP, GROUP_MEMBERS, PARTY.party1, PARTY.party2 = "none", 0, nil, nil
+	Fire("GROUP_ROSTER_UPDATE")
+	Advance(2)
 end
 
 ---------------------------------------------------------------------------

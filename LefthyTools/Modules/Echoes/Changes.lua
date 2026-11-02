@@ -23,6 +23,7 @@ local FACTIONS_EVERY = 10    -- seconds: UPDATE_FACTION rescans at most this oft
 local PLAYED_WAIT = 10       -- seconds the chat frames go without /played's answer while it's asked silently
 local RESULT_EVERY = 5       -- seconds between asking who won a battleground
 local GROUP_EVERY = 15       -- seconds: a group with others is looked at again (Beacon may learn of a friend among them)
+local GROUP_GAP = 2          -- seconds: a changed roster is looked at at most this often (in combat only when its size changed)
 local INSTANCE_RETRY, INSTANCE_TRIES = 5, 6 -- an instance that couldn't be told: looked at again every 5 s, 6 times
 local SLOTS = 19             -- equipment slots
 local GEAR_RETRY, GEAR_TRIES = 1, 10 -- a worn item whose link isn't there yet: looked at again every second, 10 times
@@ -67,6 +68,7 @@ local function Reset()
 	S.afk = nil          -- AFK as last written (nil: not known yet)
 	S.afkDirty, S.groupDirty, S.bindDirty, S.skillsDirty, S.hkDirty = false, false, false, false, false
 	S.groupOthers, S.groupAt = 0, 0 -- the others in the group as last looked at; (GetTime) the next look then
+	S.groupSize, S.groupNextAt = nil, 0 -- the size as last looked at; (GetTime) the next look at a changed roster
 	S.gearAll = false
 	S.factionsScan, S.factionsAt = false, -math.huge
 	S.hk = nil           -- honorable kills as last read
@@ -174,6 +176,15 @@ local function Rekey(key, guid)
 	return first and first .. "-" .. Realm(realm, guid) or key
 end
 
+-- Whether the group's size isn't what was last looked at (one call: what a changed roster in combat
+-- is looked at for).
+local function Resized(cap)
+	local size = Value(GetNumGroupMembers)
+	size = type(size) == "number" and size or 0
+	local was = S.groupSize or tonumber(type(cap.group) == "string" and cap.group:match("^(%d+);") or nil) or 0
+	return size ~= was
+end
+
 local function Group(cap)
 	S.groupDirty = false
 	wipe(friends)
@@ -217,7 +228,7 @@ local function Group(cap)
 		end
 		table.sort(friends)
 	end
-	S.groupOthers, S.groupAt = others, GetTime() + GROUP_EVERY
+	S.groupOthers, S.groupAt, S.groupSize = others, GetTime() + GROUP_EVERY, size
 	local state = size .. ";" .. others .. ";" .. table.concat(friends, ";")
 	if state ~= (cap.group or "0;0;") then
 		cap.group = state
@@ -559,9 +570,17 @@ E.OnTick(function(now)
 	if S.afkDirty then
 		AFK()
 	end
+	local combat = LT.InCombat()
 	if S.groupDirty then
-		Group(cap)
-	elseif S.groupOthers > 0 and now >= S.groupAt then
+		-- (GROUP_ROSTER_UPDATE comes in bursts, in a raid many a second: looked at at most every
+		-- GROUP_GAP seconds; in combat only once the size changed, else when the fight is over)
+		if now >= S.groupNextAt then
+			S.groupNextAt = now + GROUP_GAP
+			if not combat or Resized(cap) then
+				Group(cap)
+			end
+		end
+	elseif S.groupOthers > 0 and now >= S.groupAt and not combat then
 		-- (Beacon learns of friends a few seconds after login, or after the roster changed: one
 		-- among the others gets named without another GROUP_ROSTER_UPDATE)
 		local beacon = LT:GetModule("beacon")
@@ -586,7 +605,7 @@ E.OnTick(function(now)
 			C.BattlegroundResult(winner)
 		end
 	end
-	if LT.InCombat() then
+	if combat then
 		return -- (what follows waits for the fight's end)
 	end
 	if S.playedUntil and now >= S.playedUntil then
