@@ -1043,9 +1043,9 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
 - Everything goes through Beacon's low-priority queue (`B.QueueLow`), and only when nothing but
   Echoes' own waits in any of Beacon's queues (`B.Waiting`): chat, positions, the fight stream,
   journals and everything else first.
-- At most 3 of mine waiting there; never more than 3 in any second in all, nor 2 to one friend
-  (counted when they actually went, the waiting ones included; with the tick that's about 2.4 and
-  1.6 a second).
+- At most 3 of mine waiting there, and one handed over per Echoes tick (so two never go out in the
+  same moment); never more than 3 in any second in all, nor 2 to one friend (counted when they
+  actually went, the waiting ones included; with the tick that's about 2.4 and 1.6 a second).
 - **Nothing in combat**: when a fight starts (`PLAYER_REGEN_DISABLED`), what still waits in
   Beacon's queue comes back out (`D.Withdraw`: parts are sent again from where they were, the rest
   goes back in line). Switched off in a fight, my "I'm out" hello waits for its end

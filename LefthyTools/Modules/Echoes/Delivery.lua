@@ -991,13 +991,13 @@ local function Send(now)
 	DropMoved()
 	StartServes()
 	local B = ns.Beacon
-	-- Only when nothing but mine waits in Beacon's queues: everything else goes first.
-	while outstanding < OUTSTANDING and B.Waiting() <= outstanding do
+	-- Only when nothing but mine waits in Beacon's queues: everything else goes first. One a tick at
+	-- most: Beacon sends what it holds on its next tick, so more at once would go in the same moment.
+	if outstanding < OUTSTANDING and B.Waiting() <= outstanding then
 		local item = NextMessage(now)
-		if not item then
-			break
+		if item then
+			Enqueue(item)
 		end
-		Enqueue(item)
 	end
 end
 

@@ -1434,10 +1434,10 @@ do
 	for _, f in ipairs({ ANNA, BOB, DORA }) do
 		Say(c, f, "B2;es;" .. ANNA.key .. ":1-10")
 	end
-	Pass(c, 1.5)
+	Pass(c, 2) -- (one a tick)
 	check(#Sent(c, ANNA, mark, "B2;eq;") == 1 and #Sent(c, BOB, mark, "B2;eq;") == 1 and #Sent(c, DORA, mark, "B2;eq;") == 0,
 		"(two requests: to Anna and Bob)")
-	Pass(c, 34) -- (30 s from when they went)
+	Pass(c, 33.5) -- (30 s from when they went)
 	local toDora = Sent(c, DORA, mark, "B2;eq;")
 	check(#toDora == 1 and toDora[1]:find(";1;0$"), "silent for 30 s: Dora is asked first now, got " .. tostring(toDora[1]))
 	local p1 = TheirPage(c, 1, 600)
@@ -1472,6 +1472,67 @@ do
 	Pass(c, 10)
 	local en = #Sent(c, ANNA, mark, "B2;en;")
 	check(en >= 1 and en <= 8 and #c.D.out == 0, "after the fight: those go, nothing else piled up, got " .. en)
+	Stop(c)
+end
+
+-- When each message c sends goes out (GetTime() on its GAMEDATA entry, as .at).
+local function Stamped(c)
+	local bn = c.env.C_BattleNet
+	local send = bn.SendGameData
+	bn.SendGameData = function(...)
+		local n = #c.env.GAMEDATA
+		local result = send(...)
+		if #c.env.GAMEDATA > n then
+			c.env.GAMEDATA[#c.env.GAMEDATA].at = c.env.GetTime()
+		end
+		return result
+	end
+end
+
+-- The most of c's messages since mark starting with prefix that went within window seconds of each
+-- other (to one friend: same), and how many went in all (Stamped).
+local function Burst(c, mark, prefix, window, same)
+	local list = {}
+	for i = mark, #c.env.GAMEDATA do
+		local m = c.env.GAMEDATA[i]
+		if m.at and m.data:sub(1, #prefix) == prefix then
+			list[#list + 1] = m
+		end
+	end
+	local most = 0
+	for i, m in ipairs(list) do
+		local n = 0
+		for j = i, #list do
+			if list[j].at - m.at > window - 1e-6 then
+				break
+			end
+			n = n + ((not same or list[j].id == m.id) and 1 or 0)
+		end
+		most = math.max(most, n)
+	end
+	return most, #list
+end
+
+section("Echoes' delivery: spread out, little work a tick")
+do
+	-- Six friends ask for a page each: Echoes hands Beacon one message a tick at most, so they don't
+	-- go out in the same moment (three in one of Beacon's ticks, before).
+	local crowd = Crowd(6, 300)
+	local c = Start(EVE, { friends = crowd, fake = true })
+	Stamped(c)
+	for i = 1, 6 do
+		MyPage(c, 600 + i, 4800)
+	end
+	MeetAll(c, crowd, "crs")
+	local mark = Mark(c)
+	for i = 1, 6 do
+		Ask(c, crowd[i], 600 + i)
+	end
+	Pass(c, 30)
+	local together, total = Burst(c, mark, "B2;e", 0.1)
+	local inASecond = Burst(c, mark, "B2;e", 1)
+	check(together == 1 and inASecond <= 3 and total >= 60, ("one at a time: at most 1 within 0.1 s (and 3 in a second), got %d (%d) of %d")
+		:format(together, inASecond, total))
 	Stop(c)
 end
 
