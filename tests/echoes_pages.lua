@@ -1160,7 +1160,21 @@ do
 		[A .. ".0c77e1f4"] = "nonsense" } }
 	check(loads == 1 and LefthyToolsEchoesReceipt == nil, "(switched on mid-session: tried once, no folder yet)")
 	reload(1)
-	Advance(2, 0.25)
+	-- Read in one tick, then one store of it a tick (a collector's whole inbox at once would be a spike).
+	local function takenSoFar()
+		local n = 0
+		for _, key in ipairs({ friend, A .. ".0c77e1f3", own }) do n = n + (E.data.exported[key] and 1 or 0) end
+		return n
+	end
+	local most, ticksTaking, was = 0, 0, 0
+	for _ = 1, 16 do
+		tick()
+		local now = takenSoFar()
+		most, ticksTaking = math.max(most, now - was), ticksTaking + (now > was and 1 or 0)
+		was = now
+	end
+	check(was == 3 and most == 1 and ticksTaking == 3, "the receipt's three stores taken one a tick (the ones listing nothing passed over), got "
+		.. was .. " stores, at most " .. most .. " a tick")
 	check(loads == 2 and Ranges.Of(E.data.inbox[friend]) == "4-5" and Ranges.Of(E.data.carry[A .. ".0c77e1f3"]) == "1,3"
 		and Ranges.Of(E.data.mine) == "3", "at login: the receipt's pages go from the inbox, carry and mine")
 	check(E.data.exported[friend] == "1-3" and E.data.exported[A .. ".0c77e1f3"] == "2" and E.data.exported[own] == "1-2"
@@ -1168,7 +1182,7 @@ do
 	check(Store.SafeHere(A, B) == "1-5", "safe here: exported, and the rest on disk")
 	MOCK_RECEIPT.done[friend] = "1-4"
 	reload(1)
-	Advance(2, 0.25)
+	Advance(4, 0.25)
 	check(loads == 3 and Ranges.Of(E.data.inbox[friend]) == "5" and E.data.exported[friend] == "1-4" and Ranges.Of(E.data.mine) == "3",
 		"each login reads it again; the full ranges again are harmless")
 	MOCK_RECEIPT = nil

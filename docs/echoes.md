@@ -734,7 +734,13 @@ data and only grows: also after the receipt emptied the inbox).
 
 **After the start**, one a tick: a waiting page packed, else the next chore (the launch day, old
 relayed pages, collectors' summaries of stores not heard of for 60 days with the status's names and
-newest pages of stores nothing is kept of, the 2 MB cap, the 4 MB line), else the receipt.
+newest pages of stores nothing is kept of, the 2 MB cap, the 4 MB line), else the receipt: read in
+one tick, then one of its stores a tick (one whose ranges list nothing is passed over in the same
+tick), so a collector's whole inbox never goes in one frame. Each store's pages are its own (taking
+one changes nothing of another), so a store taken a few ticks later is as if the receipt had come
+that much later: a page that comes meanwhile arrived after what the exporter read (`upto`) and
+stays, as ever; without `upto` (an older exporter) the same race was there before, between the
+login and the receipt's tick (now longer by a tick per store).
 
 **Costs.** A tick: a few comparisons. A minute: one join. Half an hour (ten minutes with a collector
 who takes pages early online): one page packed. Inside event handlers: only the logout's join and, at

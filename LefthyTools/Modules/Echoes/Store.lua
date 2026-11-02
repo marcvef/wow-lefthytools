@@ -1314,7 +1314,11 @@ end
 -- exported (Take). upto["<store>"]: the latest arrival of that store's inbox the exporter read (a
 -- store it didn't read: none of its inbox goes). early (a newer exporter's): numbers it has only from
 -- copies that came early; only my provisional pages of them go aside (no early: an older exporter,
--- whose done lists those too).
+-- whose done lists those too). Read in one tick; its stores are taken one a tick after it (TakeNext):
+-- a collector's whole inbox at once would be a spike. Each store's pages are its own (Take changes
+-- nothing of another store's), and one taken a few ticks later is one whose receipt came a few ticks
+-- later: a page that comes meanwhile arrived after what the exporter read (upto), as ever.
+local taking, takingFor = {}, nil -- the receipt's stores still to take, { acct, store, key, done, early, upto }; the saved table they're of
 local function Receipt()
 	local data = E.data
 	receiptSession = data.session
@@ -1339,14 +1343,29 @@ local function Receipt()
 			keys[key] = true
 		end
 	end
+	wipe(taking)
+	takingFor = data
 	for key in pairs(keys) do
 		local acct, store
 		if type(key) == "string" then
 			acct, store = key:match("^(%x+)%.(%x+)$")
 		end
-		local done, aside = Listed(receipt.done[key]), Listed(early[key])
-		if acct and Store.Key(acct, store) == key and (done or aside) then
-			Take(acct, store, key, done, aside, upto)
+		if acct and Store.Key(acct, store) == key then
+			taking[#taking + 1] = { acct, store, key, receipt.done[key], early[key], upto }
+		end
+	end
+end
+
+-- The receipt's next store taken (its ranges checked here, not all of them in the tick that read it;
+-- one that lists nothing is passed over in the same tick).
+local function TakeNext()
+	while taking[1] do
+		local job = table.remove(taking, 1)
+		local done, aside = Listed(job[4]), Listed(job[5])
+		if takingFor == E.data and (done or aside) then
+			Counted()
+			Take(job[1], job[2], job[3], done, aside, job[6])
+			return
 		end
 	end
 end
@@ -1372,9 +1391,11 @@ E.When("start", function()
 	table.sort(queue)
 	chores = { LaunchDay, Expire, Forget, Store.Trim, Note }
 	noteDue, moved = false, 0
+	wipe(taking)
 end)
 
--- One thing a tick: a page packed, or else a chore; the receipt once a session while collecting.
+-- One thing a tick: a page packed, or else a chore; the receipt once a session while collecting
+-- (read in one tick, then a store of it a tick).
 -- (And the cache's safety net, Sweep: a comparison most ticks.)
 E.OnTick(function(now)
 	Sweep(now)
@@ -1385,6 +1406,8 @@ E.OnTick(function(now)
 	local chore = table.remove(chores, 1)
 	if chore then
 		chore()
+	elseif taking[1] then
+		TakeNext()
 	elseif M.db.collect and receiptSession ~= E.data.session then
 		Receipt()
 	elseif noteDue then
