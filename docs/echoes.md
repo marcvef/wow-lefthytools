@@ -1089,7 +1089,11 @@ edited by hand) stays out of my messages, and an entry of the wrong type is skip
   the next one right after doubles it, up to 5 minutes; after 10 calm minutes 30 s again. What
   waits comes back out the same way.
 - **Receiving**: Beacon hands B messages over (at most 400 a minute from one friend, on top of its
-  20 a second); they wait for the tick (at most 600), which handles 60 per tick. Unfinished pages
+  20 a second); they wait for the tick (at most 600), which handles 60 per tick, and stops after
+  2 ms (`debugprofilestop`, where the game has it; at least one a tick): merging a long holdings or
+  safe list costs more than another message. What adds nothing to what's known (a holder's full
+  offer every 5 minutes, the summaries every friend passes on) isn't merged at all: a walk over both
+  lists finds that, nothing made. Unfinished pages
   stay in memory: 256 KB at most, 10 minutes without progress. My answers to one friend (`en`,
   `ey`, a stop) wait at most 8 at a time: a friend asking faster than they go (2 a second) can't
   pile them up; the rest are dropped, and they ask again.
@@ -1137,8 +1141,9 @@ inbox), `Safe` and `SafeHere`, `Provisional` and `Confirm` (checks), `Carried`, 
 of a store, what's exported or safe) is cached until they change: `E.Store` calls
 `D.PagesChanged()` on every change (and Delivery works it out anew every 5 minutes, a safety
 net). Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
-`Minus`, `Has`) read the wire strictly (a bad part refuses the message, at most 300 intervals)
-and do the set arithmetic pulling needs; they read and write the same strings as `E.Ranges`.
+`Minus`, `Has`, `Covers`) read the wire strictly (a bad part refuses the message, at most 300 intervals)
+and do the set arithmetic pulling needs (`Union`, `Minus` and `Covers` each one walk over two sorted
+lists); they read and write the same strings as `E.Ranges`.
 What's kept here (held, exported, safe) is read with `E.Ranges.Parse`, without a limit: a list
 of more than 300 intervals is all of it, not "none".
 

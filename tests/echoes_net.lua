@@ -545,6 +545,14 @@ do
 	end
 	check(R.Parse(table.concat(many, ",", 1, 300)) ~= nil and R.Parse(table.concat(many, ",")) == nil, "at most 300 intervals")
 	check(R.Format(R.Union(R.Parse("1-5,9"), R.Parse("6-7,20"))) == "1-7,9,20", "union")
+	local x, y = R.Parse("1-3,10-12,30"), R.Parse("2-5,9,13-20,25,40-41")
+	local union = R.Union(x, y)
+	check(R.Format(union) == "1-5,9-20,25,30,40-41" and R.Format(x) == "1-3,10-12,30" and R.Format(y) == "2-5,9,13-20,25,40-41"
+		and R.Format(R.Union(y, x)) == R.Format(union) and R.Format(R.Union(x, {})) == "1-3,10-12,30" and #R.Union({}, {}) == 0
+		and R.Format(R.Union(R.Parse("5"), R.Parse("1-10"))) == "1-10", "union: overlapping, adjacent and inside; x and y as they were")
+	check(R.Covers(R.Parse("1-5,9-20"), R.Parse("2-3,9,15-20")) and R.Covers(R.Parse("1-5"), {}) and not R.Covers({}, R.Parse("1"))
+		and not R.Covers(R.Parse("1-5,9-20"), R.Parse("2-3,6")) and not R.Covers(R.Parse("1-5,9-20"), R.Parse("4-9"))
+		and not R.Covers(R.Parse("1-5"), R.Parse("21")), "covers: every page of one list in the other")
 	check(R.Format(R.Minus(R.Parse("1-10,15-20"), R.Parse("3-4,10-16,19"))) == "1-2,5-9,17-18,20"
 		and R.Format(R.Minus(R.Parse("1-5"), R.Parse(""))) == "1-5" and #R.Minus(R.Parse("2-3"), R.Parse("1-9")) == 0
 		and R.Format(R.Minus(R.Parse("1-3,7-9"), R.Parse("2,8"))) == "1,3,7,9", "minus")
@@ -1947,6 +1955,52 @@ do
 	Pass(c, 1.2)
 	local peer = c.D.peers[BOB.id]
 	check(peer and peer.holdings[dorothy], "a friend's account the list didn't have when last read: read again, taken")
+	Stop(c)
+end
+
+section("Echoes' delivery: receiving costs a bounded time a tick")
+do
+	-- Messages wait for the tick, which handles at most 60 and stops after 2 ms (the game's
+	-- debugprofilestop; here a clock that goes on 0.7 ms a call): a holdings or safe message merging
+	-- long lists costs more than others. What adds nothing (a holder's full offer every 5 minutes, the
+	-- summaries every friend passes on) isn't merged at all.
+	local c = Start(EVE, { friends = { ANNA, BOB, DORA }, fake = true })
+	MeetAll(c, { BOB })
+	local D, R = c.D, c.D.Ranges
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":1-50,60-70")
+	Say(c, BOB, ("B2;ed;%s;%s;%s:1-40,45"):format(DORA.acct, DORA.store, ANNA.key))
+	Pass(c, 1)
+	local clock = 0
+	c.env.debugprofilestop = function()
+		clock = clock + 0.7
+		return clock
+	end
+	local union, merges = R.Union, 0
+	R.Union = function(...)
+		local caller = debug.getinfo(2, "n").name
+		merges = merges + ((caller == "OnHoldings" or caller == "Safe") and 1 or 0)
+		return union(...)
+	end
+	local first = D.stats.received
+	local received, most = first, 0
+	for _ = 1, 9 do
+		Say(c, BOB, "B2;es;" .. ANNA.key .. ":2-5,60")
+		Say(c, BOB, ("B2;ed;%s;%s;%s:3-9,45"):format(DORA.acct, DORA.store, ANNA.key))
+	end
+	Pass(c, 3, 0.05, function()
+		most = math.max(most, D.stats.received - received)
+		received = D.stats.received
+	end)
+	check(most == 3 and D.stats.received - first == 18, ("2 ms a tick: 3 messages (0.7 ms each here), all in the end; got at most %d a tick, %d in all")
+		:format(most, D.stats.received - first))
+	check(merges == 0, "nothing new in them: nothing merged, got " .. merges)
+	Say(c, BOB, "B2;es;" .. ANNA.key .. ":51")
+	Say(c, BOB, ("B2;ed;%s;%s;%s:41"):format(DORA.acct, DORA.store, ANNA.key))
+	Pass(c, 1)
+	check(merges == 2 and R.Format(D.peers[BOB.id].holdings[ANNA.key]) == "1-51,60-70" and c.E.data.safe[ANNA.key][DORA.key] == "1-41,45",
+		"something new: merged, got " .. merges)
+	R.Union = union
+	c.env.debugprofilestop = nil
 	Stop(c)
 end
 

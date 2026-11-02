@@ -67,7 +67,7 @@ local HELLO_WAIT = 60        -- a friend's build not known to read B this long a
 local COPIES = 2             -- a relay leaves pages alone that this many online friends besides the author hold
 local NO_ROOM_WAIT = 300     -- a page too big for the relay's cache isn't asked for again this long
 local PARTIALS_MAX, PARTIAL_AGE = 256 * 1024, 600 -- unfinished pages: bytes kept, seconds without progress
-local INCOMING_MAX, INCOMING_PER_TICK = 600, 60 -- messages waiting for the tick, handled per tick
+local INCOMING_MAX, INCOMING_PER_TICK = 600, 60 -- messages waiting for the tick, handled per tick (and INCOMING_MS)
 local FRIENDS_GAP = 30       -- the friend list's accounts are read again after this long,
 local FRIENDS_SOON = 5       -- or after this long when it may have changed (an account not in it, Battle.net's events)
 local RECHECK = 300          -- what I hold is worked out anew at least this often (E.Store says when it changes)
@@ -111,9 +111,14 @@ D.Ranges = Ranges
 local RANGES_MAX = 300   -- intervals in one list at most (a broken or hostile client)
 local N_MAX = 999999999   -- page numbers are 1 to this (E.Store's)
 
--- Sorted, overlapping and adjacent intervals joined (in place, returns the list).
+-- (Intervals are never changed once in a list: lists may share them.)
+local function ByStart(x, y)
+	return x[1] < y[1]
+end
+
+-- Sorted, overlapping and adjacent intervals joined (the list sorted in place; returns a new one).
 function Ranges.Normal(list)
-	table.sort(list, function(x, y) return x[1] < y[1] end)
+	table.sort(list, ByStart)
 	local out = {}
 	for _, r in ipairs(list) do
 		local last = out[#out]
@@ -163,15 +168,47 @@ function Ranges.Format(list)
 	return table.concat(parts, ",")
 end
 
+-- x and y joined (each sorted by start, as every list here is): one walk over both, no sort.
 function Ranges.Union(x, y)
-	local all = {}
-	for _, r in ipairs(x) do
-		all[#all + 1] = { r[1], r[2] }
+	local out, i, j, nx, ny = {}, 1, 1, #x, #y
+	local last, own -- (own: last is made here, so it may grow; one from x or y is copied first)
+	while i <= nx or j <= ny do
+		local r
+		if j > ny or (i <= nx and x[i][1] <= y[j][1]) then
+			r, i = x[i], i + 1
+		else
+			r, j = y[j], j + 1
+		end
+		if last and r[1] <= last[2] + 1 then
+			if r[2] > last[2] then
+				if not own then
+					last, own = { last[1], last[2] }, true
+					out[#out] = last
+				end
+				last[2] = r[2]
+			end
+		else
+			out[#out + 1] = r
+			last, own = r, false
+		end
 	end
-	for _, r in ipairs(y) do
-		all[#all + 1] = { r[1], r[2] }
+	return out
+end
+
+-- Whether every page of list is in have (both sorted, have's intervals joined): a walk, nothing made.
+function Ranges.Covers(have, list)
+	local j, m = 1, #have
+	for i = 1, #list do
+		local a, b = list[i][1], list[i][2]
+		while j <= m and have[j][2] < a do
+			j = j + 1
+		end
+		local h = have[j]
+		if not h or h[1] > a or h[2] < b then
+			return false
+		end
 	end
-	return Ranges.Normal(all)
+	return true
 end
 
 -- x without y (both sorted).
@@ -353,6 +390,37 @@ local function Stored(ranges)
 	return type(ranges) == "string" and E.Ranges.Parse(ranges) or {}
 end
 
+-- Lists parsed from saved strings, kept while the string is the same (kept[slot][key] = { text, list }):
+-- only what changed is parsed again. None: NONE (never changed).
+local NONE = setmetatable({}, { __newindex = function() error("Delivery's empty list is never changed", 2) end })
+local kept = { safe = {} }
+local function StoredIn(t, key, text)
+	if type(text) ~= "string" or text == "" then
+		t[key] = nil
+		return NONE
+	end
+	local e = t[key]
+	if e and e[1] == text then
+		return e[2]
+	end
+	local list = Stored(text)
+	t[key] = #list > 0 and { text, list } or nil
+	return #list > 0 and list or NONE
+end
+
+-- What a collector holds safely of key, as kept (E.data.safe[key][collector] = text): a list.
+local function SafeList(key, collector, text)
+	local byCollector = kept.safe[key]
+	if not byCollector then
+		if type(text) ~= "string" then
+			return NONE
+		end
+		byCollector = {}
+		kept.safe[key] = byCollector
+	end
+	return StoredIn(byCollector, collector, text)
+end
+
 local summaryGen = 0 -- (counts the changes: a summary is worked out again only after one)
 local function Changed()
 	wipe(cache)
@@ -459,10 +527,10 @@ end
 local function SafeOf(key)
 	local id = "safe>" .. key
 	if not cache[id] then
-		local list = {}
+		local list = NONE
 		local collectors = E.data.safe[key]
-		for _, ranges in pairs(type(collectors) == "table" and collectors or {}) do
-			list = Ranges.Union(list, Stored(ranges))
+		for collector, ranges in pairs(type(collectors) == "table" and collectors or NONE) do
+			list = Ranges.Union(list, SafeList(key, collector, ranges))
 		end
 		cache[id] = list
 	end
@@ -492,7 +560,11 @@ local function Safe(key, collector, list, told)
 		return
 	end
 	local old = byCollector and byCollector[collector]
-	local union = Ranges.Union(Stored(old), list)
+	local have = SafeList(key, collector, old)
+	if Ranges.Covers(have, list) then
+		return -- (nothing new: the usual case, every friend passes on every summary)
+	end
+	local union = Ranges.Union(have, list)
 	local merged = Ranges.Format(union)
 	if merged == "" or merged == old or (told and #union > RANGES_MAX) then
 		return
@@ -1576,7 +1648,7 @@ local function CoveredBy(lists, times)
 			points[#points + 1] = { r[2] + 1, -1 }
 		end
 	end
-	table.sort(points, function(x, y) return x[1] < y[1] end)
+	table.sort(points, ByStart)
 	local out, count, i = {}, 0, 1
 	while points[i] do
 		local at = points[i][1]
@@ -2015,9 +2087,10 @@ local function OnHoldings(id, msg, now)
 		local key, acct, list = item[1], item[2], item[3]
 		if Accepted(acct, now) and (peer.holdings[key] or peer.keys < 200) then
 			S.Mentioned(acct, key:sub(10)) -- (pages of it are around: what collectors hold of it still counts)
-			local merged = peer.holdings[key] and Ranges.Union(peer.holdings[key], list) or list
-			if #merged <= RANGES_MAX then
-				peer.keys = peer.keys + (peer.holdings[key] and 0 or 1)
+			local had = peer.holdings[key]
+			local merged = not had and list or (not Ranges.Covers(had, list) and Ranges.Union(had, list)) -- (false: nothing new)
+			if merged and #merged <= RANGES_MAX then
+				peer.keys = peer.keys + (had and 0 or 1)
 				peer.holdings[key] = merged
 			end
 			if key == MyKey() then
@@ -2046,8 +2119,9 @@ local function OnEarly(id, msg, now)
 		local key, acct, list = item[1], item[2], item[3]
 		if key == peer.key and Accepted(acct, now) then
 			S.Mentioned(acct, key:sub(10))
-			local merged = peer.earlyHoldings[key] and Ranges.Union(peer.earlyHoldings[key], list) or list
-			if #merged <= RANGES_MAX then
+			local had = peer.earlyHoldings[key]
+			local merged = not had and list or (not Ranges.Covers(had, list) and Ranges.Union(had, list))
+			if merged and #merged <= RANGES_MAX then
 				peer.earlyHoldings[key] = merged
 			end
 		end
@@ -2119,17 +2193,34 @@ local function Handle(id, word, more, now)
 	end
 end
 
-local function HandleIncoming(now)
-	local handled = 0
-	while inHead <= inTail and handled < INCOMING_PER_TICK do
-		local item = incoming[inHead]
-		incoming[inHead] = nil
-		inHead = inHead + 1
-		handled = handled + 1
-		Handle(item[1], item[2], item[3], now)
+local HandleIncoming
+do
+	local INCOMING_MS = 2 -- milliseconds a tick at most (when the game says: debugprofilestop)
+
+	-- Milliseconds (debugprofilestop), nil where there's none (tests).
+	local function Clock()
+		local ok, ms = pcall(debugprofilestop)
+		return ok and type(ms) == "number" and ms or nil
 	end
-	if inHead > inTail then
-		inHead, inTail = 1, 0
+
+	-- What Beacon handed over, by the tick: at most INCOMING_PER_TICK messages and INCOMING_MS (one at
+	-- least): a holdings or safe message can cost more than another (merging long lists).
+	function HandleIncoming(now)
+		local handled, start = 0, inHead <= inTail and Clock()
+		while inHead <= inTail and handled < INCOMING_PER_TICK do
+			local item = incoming[inHead]
+			incoming[inHead] = nil
+			inHead = inHead + 1
+			handled = handled + 1
+			Handle(item[1], item[2], item[3], now)
+			local at = start and Clock()
+			if at and at - start >= INCOMING_MS then
+				break
+			end
+		end
+		if inHead > inTail then
+			inHead, inTail = 1, 0
+		end
 	end
 end
 
