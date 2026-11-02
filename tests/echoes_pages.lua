@@ -1534,6 +1534,8 @@ section("Echoes pages: the launch day")
 do
 	fresh(acct)
 	LT.world = "release"
+	Advance(2, 0.25) -- (the chores after the start: no launch day yet)
+	check(E.data.launched == nil, "no launch day known: nothing walked, nothing noted (its pages go once it's set)")
 	local today = date("!*t", E.Now())
 	LT.LAUNCH_DAY = ("%04d-%02d-%02d"):format(today.year, today.month, today.day)
 	local launch = E.Now() - E.Now() % 86400 -- (that day's first second, UTC)
@@ -1550,7 +1552,21 @@ do
 	Advance(2, 0.25)
 	check(not E.data.mine[1] and E.data.mine[2] and not E.data.carry[friend][1] and E.data.carry[friend][2] and not E.data.inbox[friend][1]
 		and E.data.inbox[friend][2], "pages from before it go from mine, carry and inbox; from the day on they stay")
+	check(E.data.launched == LT.LAUNCH_DAY, "the walk is noted with its day (launched)")
 	check(select(2, Store.Put(A, B, 5, friendPage(5, launch - 10), "inbox")) == "time", "a page from before it isn't taken")
+	-- Once: later sessions don't walk every page again (nothing from before it comes in any more). A
+	-- page put in behind E.Store's back shows it.
+	local old = { t = launch - 2 * 86400, h = "x", m = "z", z = "QUJD", a = E.Now() }
+	E.data.carry[friend][3] = old
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.carry[friend][3] ~= nil, "the next session: not walked again")
+	local yesterday = date("!*t", launch - 86400)
+	LT.LAUNCH_DAY = ("%04d-%02d-%02d"):format(yesterday.year, yesterday.month, yesterday.day)
+	reload(1)
+	Advance(2, 0.25)
+	check(E.data.carry[friend][3] == nil and E.data.carry[friend][1] == nil and E.data.carry[friend][2] and E.data.launched == LT.LAUNCH_DAY,
+		"another launch day: walked again, once")
 	LT.LAUNCH_DAY = nil
 	LT.world = nil
 	check(Store.Put(A, B, 5, friendPage(5, launch - 10), "inbox"), "(the beta, or no launch day: any)")

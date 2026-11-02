@@ -412,6 +412,7 @@ LefthyToolsEchoesDB = {
   } },
   provisional = { ["5e6f7a8b.0c77e1f2"] = { [55] = "3c1d2e4f" } },                     -- a collector's: provisional pages the receipt took
   arrived = 1793450100,                                                                  -- a collector's: the latest arrival (a) given (only grows)
+  launched = "YYYY-MM-DD",                                                               -- the launch day whose older pages went (one walk; nil: none yet)
   exported = { ["5e6f7a8b.0c77e1f2"] = "1-50" },                                         -- a collector's: from receipts
   latest = { ["5e6f7a8b.0c77e1f2"] = { n = 59, t = 1793449900 } },                     -- a collector's: the newest page received (/lefthy echoes)
   names = { ["5e6f7a8b.0c77e1f2"] = "Bob" },                                             -- friends' first names by store (/lefthy echoes)
@@ -697,7 +698,11 @@ so it changes with it, and my pages' key with it (the store stays).
   is confirmed (into `exported`) or the receipt takes a page with that number from a disk. One of a
   page lost in its author's crash is never confirmed: it stays (a few numbers per crash).
 - **The launch day:** on the release, once `LT.LAUNCH_DAY` is set, pages that started before it go
-  from mine, carry and inbox at the start, and `E.Store.Put` refuses them.
+  from mine, carry and inbox at the start, and `E.Store.Put` refuses them. That walk over every page
+  runs once: `launched` (in the saved table, made then) keeps the day it ran for, and later sessions
+  skip it while it's the same day (nothing from before it comes in after it: `Put` refuses those, and
+  an open page from before it goes unclosed). While `LT.LAUNCH_DAY` isn't set nothing runs and nothing
+  is noted, so the pages from before it still go once it's set. Older builds ignore `launched`.
 
 **The exporter's receipt** (collecting on): once a session, on the tick,
 `LoadAddOn("LefthyTools_EchoesReceipt")` (load on demand; a folder that isn't there does nothing, and

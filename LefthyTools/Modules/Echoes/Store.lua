@@ -1161,9 +1161,12 @@ end
 -- After the start: the launch day, old relayed pages, the receipt, the cap; one a tick
 ---------------------------------------------------------------------------
 
--- Pages from before the launch day go (only on the release, once LT.LAUNCH_DAY is set).
+-- Pages from before the launch day go (only on the release, once LT.LAUNCH_DAY is set): one walk over
+-- every page, in the first session the launch day is known, and E.data.launched keeps that day (an
+-- older build ignores it). None come after it: E.Store.Put refuses them, and Pages.lua drops an open
+-- page from before it unclosed, so a closed page of mine always starts after it.
 local function LaunchDay()
-	if not LT.BeforeLaunch(0) then
+	if not LT.BeforeLaunch(0) or E.data.launched == LT.LAUNCH_DAY then
 		return
 	end
 	local data, dropped = E.data, false
@@ -1181,6 +1184,7 @@ local function LaunchDay()
 			end
 		end
 	end
+	data.launched = LT.LAUNCH_DAY -- (after the walk: one that broke off goes again)
 	if dropped then
 		Changed()
 	end
