@@ -544,7 +544,11 @@ nothing else then.
 the session, `o = 0`, `e` when it ended: now if nil) and `n` becomes the last closed page's number (a number at or below `E.data.top`,
 or kept already: the next one above, its header renumbered; numbers used twice, below). It returns
 the number the page is kept under. The tick packs one waiting page at a time,
-oldest first:
+oldest first, and not in a fight (`LT.InCombat()`): a page closed in one waits as it is (plain text,
+`q`: offered to nobody, early or not), the chores wait behind it (the 2 MB cap would count it
+unpacked), and the first tick after the fight packs it. A logout in the fight saves it as it is, and
+the next load queues it again (`q`) and packs it then; it's on disk by then, so it's offered at once:
+nothing waits for it to be packed sooner.
 
 1. `C_EncodingUtil.CompressString(text, Enum.CompressionMethod.Zlib)`, then
    `EncodeBase64(..., Enum.Base64Variant.Standard)`: `m = "z"`;
@@ -748,7 +752,7 @@ stays, as ever; without `upto` (an older exporter) the same race was there befor
 login and the receipt's tick (now longer by a tick per store).
 
 **Costs.** A tick: a few comparisons. A minute: one join. Half an hour (ten minutes with a collector
-who takes pages early online): one page packed. Inside event handlers: only the logout's join and, at
+who takes pages early online): one page packed, never in a fight. Inside event handlers: only the logout's join and, at
 login, joining a stale page's text. A page that came early is downloaded once more only as far as
 its start (a check), once it's on its author's disk.
 

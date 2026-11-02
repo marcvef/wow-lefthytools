@@ -1399,12 +1399,16 @@ E.When("start", function()
 end)
 
 -- One thing a tick: a page packed, or else a chore; the receipt once a session while collecting
--- (read in one tick, then a store of it a tick).
+-- (read in one tick, then a store of it a tick). Packing (zlib, Base64 and the hash: 1-2 ms) waits
+-- out a fight: the page stays plain text (q) meanwhile, offered to nobody, saved as it is at a logout
+-- and packed at the next load; the chores wait behind it (the cap counts it unpacked).
 -- (And the cache's safety net, Sweep: a comparison most ticks.)
 E.OnTick(function(now)
 	Sweep(now)
 	if queue[1] then
-		PackNext()
+		if not LT.InCombat() then
+			PackNext()
+		end
 		return
 	end
 	local chore = table.remove(chores, 1)

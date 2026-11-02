@@ -1572,6 +1572,30 @@ do
 	check(Store.Put(A, B, 5, friendPage(5, launch - 10), "inbox"), "(the beta, or no launch day: any)")
 end
 
+section("Echoes pages: no packing in a fight")
+do
+	-- Packing (zlib, Base64, the hash) waits out a fight: the page stays plain text, waiting (q); at a
+	-- logout in the fight it's saved so and packed at the next load.
+	fresh(acct)
+	Advance(2, 0.25) -- (the chores after the start)
+	local c0 = compressCalls
+	EnterCombat()
+	local n = Store.Close(E.data.n + 1, E.Now(), header(E.data.n + 1, E.Now()) .. "\nk0;1\n.0;t\n")
+	Advance(5, 0.25)
+	check(compressCalls == c0 and E.data.mine[n].q and E.data.mine[n].m == "t", "in a fight: not packed, it waits (plain text)")
+	LeaveCombat()
+	tick()
+	check(compressCalls == c0 + 1 and not E.data.mine[n].q and E.data.mine[n].m == "z", "the fight over: packed on the next tick")
+	EnterCombat()
+	local n2 = Store.Close(E.data.n + 1, E.Now(), header(E.data.n + 1, E.Now()) .. "\nk0;2\n.0;t\n")
+	reload(1)
+	check(E.data.mine[n2].q and E.data.mine[n2].m == "t" and compressCalls == c0 + 1, "a logout in the fight: saved as it is, waiting")
+	LeaveCombat()
+	Advance(1, 0.25)
+	check(not E.data.mine[n2].q and E.data.mine[n2].m == "z" and Store.Page(acct, STORE, n2) == E.data.mine[n2],
+		"packed after the next load, and offered (it's on disk)")
+end
+
 section("Echoes pages: nothing heavy on a tick")
 do
 	fresh(acct)
