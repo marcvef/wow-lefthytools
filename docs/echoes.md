@@ -1139,8 +1139,10 @@ inbox), `Safe` and `SafeHere`, `Provisional` and `Confirm` (checks), `Carried`, 
 `WentOut`, `Fits`, `InboxFull`, `Own`. Delivery only reads
 `exported` and `safe` for its decisions. What it works out of the pages (holdings, what I have
 of a store, what's exported or safe) is cached until they change: `E.Store` calls
-`D.PagesChanged()` on every change (and Delivery works it out anew every 5 minutes, a safety
-net). Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
+`D.PagesChanged()` on every change it makes, and only then (a page that came but wasn't kept, or
+one it had already, changes nothing; Delivery works it out anew every 5 minutes too, a safety
+net, and when my settings change). Even then only what changed is parsed again: the lists are kept
+by store with the text they were read from, and the others stay the same lists. Its own ranges (`D.Ranges`: `Parse`, `Format`, `Normal`, `Union`,
 `Minus`, `Has`, `Covers`) read the wire strictly (a bad part refuses the message, at most 300 intervals)
 and do the set arithmetic pulling needs (`Union`, `Minus` and `Covers` each one walk over two sorted
 lists); they read and write the same strings as `E.Ranges`.

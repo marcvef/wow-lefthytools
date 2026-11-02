@@ -391,9 +391,12 @@ local function Stored(ranges)
 end
 
 -- Lists parsed from saved strings, kept while the string is the same (kept[slot][key] = { text, list }):
--- only what changed is parsed again. None: NONE (never changed).
+-- after a change only what changed is parsed again, and the others stay the same lists (what's worked
+-- out of them stays valid: Pull's). None: NONE (never changed). Slots: what I hold ("mine", "carry",
+-- ...), "exported", "safehere" (a collector's own summary), "safe" (kept.safe[key][collector]) and
+-- "union" (SafeOf). Bounded by the stores there are.
 local NONE = setmetatable({}, { __newindex = function() error("Delivery's empty list is never changed", 2) end })
-local kept = { safe = {} }
+local kept = { safe = {}, exported = {}, safehere = {}, union = {} }
 local function StoredIn(t, key, text)
 	if type(text) ~= "string" or text == "" then
 		t[key] = nil
@@ -426,9 +429,9 @@ local function Changed()
 	wipe(cache)
 	summaryGen = summaryGen + 1
 end
--- Pages changed outside Delivery (closed, packed, dropped by the cap, the 30 days or a receipt):
--- looked at anew. Store.lua calls it on every change; Delivery also looks again every RECHECK
--- seconds, a safety net.
+-- The pages changed (E.Store calls it on every change it makes, and only then): looked at anew, but
+-- only what changed is parsed again (kept). Delivery also looks again every RECHECK seconds, a safety
+-- net, and when my settings change.
 D.PagesChanged = Changed
 
 -- My pages' key, nil while my BattleTag isn't known. (Kept while the saved table's account and store
@@ -464,11 +467,22 @@ end
 local function HeldIn(where)
 	local id = "held>" .. where
 	if not cache[id] then
-		local out = {}
+		local out, t = {}, kept[where]
+		if not t then
+			t = {}
+			kept[where] = t
+		end
 		for key, ranges in pairs(S.Held(where)) do
-			local list = Stored(ranges)
-			if #list > 0 and WireKey(key) then
-				out[key] = list
+			if WireKey(key) then
+				local list = StoredIn(t, key, ranges)
+				if #list > 0 then
+					out[key] = list
+				end
+			end
+		end
+		for key in pairs(t) do
+			if not out[key] then
+				t[key] = nil -- (gone from there)
 			end
 		end
 		cache[id] = out
@@ -477,7 +491,7 @@ local function HeldIn(where)
 end
 
 local function Have(where, key)
-	return HeldIn(where)[key] or {}
+	return HeldIn(where)[key] or NONE
 end
 
 -- What I can serve: { [key] = list } (my own pages, the ones I relay while relaying, a collector's).
@@ -516,25 +530,31 @@ end
 
 -- A collector's: what the exporter has of key.
 local function Exported(key)
-	local id = "exported>" .. key
-	if not cache[id] then
-		cache[id] = Stored(E.data.exported[key])
-	end
-	return cache[id]
+	return StoredIn(kept.exported, key, E.data.exported[key])
 end
 
--- What some collector holds safely of key (what collectors said, and mine if I collect).
+-- What some collector holds safely of key (what collectors said, and mine if I collect): the same
+-- list while every collector's is (kept.union[key] = { union, their lists... }).
 local function SafeOf(key)
-	local id = "safe>" .. key
-	if not cache[id] then
-		local list = NONE
-		local collectors = E.data.safe[key]
-		for collector, ranges in pairs(type(collectors) == "table" and collectors or NONE) do
-			list = Ranges.Union(list, SafeList(key, collector, ranges))
-		end
-		cache[id] = list
+	local collectors = E.data.safe[key]
+	collectors = type(collectors) == "table" and collectors or NONE
+	local e, i = kept.union[key], 1
+	local same = e ~= nil
+	for collector, ranges in pairs(collectors) do
+		i = i + 1
+		same = same and e[i] == SafeList(key, collector, ranges)
 	end
-	return cache[id]
+	if same and e[i + 1] == nil then
+		return e[1]
+	end
+	e = { NONE }
+	for collector, ranges in pairs(collectors) do
+		local list = SafeList(key, collector, ranges)
+		e[#e + 1] = list
+		e[1] = Ranges.Union(e[1], list)
+	end
+	kept.union[key] = e[2] and e or nil
+	return e[1]
 end
 
 -- A collector holds list of key safely: E.Store merges it into safe (only grows) and drops those
@@ -571,8 +591,7 @@ local function Safe(key, collector, list, told)
 	end
 	local acct, store = Split(key)
 	local new = safe[key] == nil
-	S.Safe(acct, store, merged, collector)
-	Changed()
+	S.Safe(acct, store, merged, collector) -- (E.Store says what changed: D.PagesChanged)
 	if stores then
 		cache.safeKeys = stores + (new and 1 or 0) -- (one more: not walked again)
 	end
@@ -594,7 +613,7 @@ local function SafeHere()
 	end
 	for key in pairs(keys) do
 		local acct, store = Split(key)
-		local list = Stored(S.SafeHere(acct, store))
+		local list = StoredIn(kept.safehere, key, S.SafeHere(acct, store))
 		if #list > 0 then
 			Safe(key, mine, list)
 			S.Mentioned(acct, store) -- (my own summary: first-hand)
@@ -604,12 +623,11 @@ local function SafeHere()
 end
 
 -- A page that came, kept by E.Store where ("carry" or "inbox"; provisional: it came early): true
--- (true, "have": had it), or false and why (E.Store.Put's reasons).
+-- (true, "have": had it), or false and why (E.Store.Put's reasons). Only a page it kept changes what
+-- I hold (E.Store says so: D.PagesChanged).
 local function Put(key, n, page, where, provisional)
 	local acct, store = Split(key)
-	local ok, why = S.Put(acct, store, n, page, where, provisional)
-	Changed()
-	return ok, why
+	return S.Put(acct, store, n, page, where, provisional)
 end
 
 -- A page I relay already, collected now: it moves to the inbox (one E.Store won't keep there,
@@ -617,8 +635,7 @@ end
 local function Move(key, n, page)
 	local acct, store = Split(key)
 	S.Put(acct, store, n, page, "inbox")
-	S.Drop(acct, store, tostring(n), "carry")
-	Changed()
+	S.Drop(acct, store, tostring(n), "carry") -- (E.Store says what changed: D.PagesChanged)
 end
 
 -- Whether a page of size bytes of key fits my relay cache (512 KB, 128 KB per author's store).
@@ -1924,8 +1941,7 @@ local function OnBegin(id, msg, now)
 		local check = r ~= nil and r.from == id and fromDisk
 		if check and hash == msg.hash then
 			local acct, store = Split(key)
-			S.Confirm(acct, store, msg.n, msg.hash)
-			Changed()
+			S.Confirm(acct, store, msg.n, msg.hash) -- (E.Store says it changed: D.PagesChanged)
 		elseif check and pending == "inbox" then
 			checked[key] = checked[key] or {}
 			checked[key][msg.n] = true

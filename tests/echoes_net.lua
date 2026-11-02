@@ -1871,6 +1871,36 @@ do
 	Stop(c)
 end
 
+section("Echoes' delivery: what I hold, worked out anew only when it changed")
+do
+	-- E.Store says when the pages change (D.PagesChanged), and only then: a page that came and wasn't
+	-- kept (a wrong hash) changes nothing; one kept makes Delivery look again, and of the other stores
+	-- the lists stay the same ones (only what changed is parsed again).
+	local c = Start(EVE, { friends = { ANNA, BOB }, fake = true, collect = true })
+	local R = c.D.Ranges
+	local inbox = {}
+	for n = 1, 3 do
+		local p = TheirPage(c, n, 300, 50 + n)
+		inbox[n] = { t = p.t, h = p.h, m = "z", z = p.z, s = c.E.data.session - 1 }
+	end
+	c.E.data.inbox[BOB.key] = inbox
+	Touched(c)
+	MeetAll(c, { ANNA }, "s")
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1-2")
+	Pass(c, 1.5)
+	local held = c.D.Holdings()
+	local bobs = held[BOB.key]
+	SendPage(c, ANNA, ANNA, TheirPage(c, 1, 480), 2, 0, nil, "0badc0de")
+	Pass(c, 1.5)
+	check(c.D.Holdings() == held and c.D.inflight[ANNA.key .. ".2"], "a page not kept (a wrong hash): what I hold isn't worked out anew; page 2 asked for")
+	SendPage(c, ANNA, ANNA, TheirPage(c, 2, 480), 3)
+	Pass(c, 1.5)
+	local now = c.D.Holdings()
+	check(now ~= held and R.Format(now[ANNA.key] or {}) == "2" and now[BOB.key] == bobs and R.Format(bobs) == "1-3",
+		"page 2 kept: worked out anew; Bob's store's list the same one")
+	Stop(c)
+end
+
 section("Echoes' delivery: safe summaries from friends are bounded")
 do
 	-- Bob (broken, or hostile) says Dora holds every other page of Anna's, 40 at a time, 800 in all:
