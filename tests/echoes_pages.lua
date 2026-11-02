@@ -633,6 +633,40 @@ do
 	check(D.EarlyTaker() == false, "(no friends here: nobody who takes pages early)")
 end
 
+section("Echoes pages: not closed by time in combat")
+do
+	-- A page due by time in a fight closes when it's over (its 30 minutes, or 10 with a friend who
+	-- takes pages early online); by size it still closes at once.
+	fresh(acct)
+	kills(1, 1)
+	tick()
+	local busy, c0 = E.data.open.busy, closes
+	EnterCombat()
+	tickAt(busy + 1800)
+	tickAt(busy + 1900)
+	local fighting = closes
+	LeaveCombat()
+	tick()
+	check(fighting == c0 and closes == c0 + 1 and lastClosed:find("\n%.%d+;t\n$"), "due in a fight: open until it's over, then closed by time")
+	tick()
+	local D = E.Delivery
+	local real = D.EarlyTaker
+	D.EarlyTaker = function() return true end
+	Advance(5) -- (the last answer is kept 5 s)
+	kills(2, 2)
+	tick()
+	busy, c0 = E.data.open.busy, closes
+	EnterCombat()
+	tickAt(busy + 600)
+	fighting = closes
+	Fire("ECHOES_PAGES_TEST", 170, 200) -- (past 32 KB)
+	tick()
+	check(fighting == c0 and closes == c0 + 1 and lastClosed:find("\n%.[01];s\n$"), "10-minute pages too; past 32 KB in a fight: closed by size")
+	LeaveCombat()
+	tick()
+	D.EarlyTaker = real
+end
+
 section("Echoes pages: my pages offered once on disk (a crash)")
 do
 	-- The game writes the saved file only at a logout or /reload; after a crash the next login goes

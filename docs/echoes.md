@@ -535,7 +535,9 @@ no line lost or doubled, each line's `dt` counting from the one before the reloa
   header, the character and, on a page that follows one closed mid-session, the going on
   (`open.own` counts them). A page with nothing else on it stays open however long you're away (an
   AFK night is one page, not one every 30 minutes); the stale rule at login still closes it. An
-  open page from a build before this rule (no `own`): 30 minutes (or 10) from its start.
+  open page from a build before this rule (no `own`): 30 minutes (or 10) from its start. Never by
+  time in combat (`LT.InCombat()`): a page due in a fight closes on the first tick after it, so its
+  end (`.<dt>;t`, `e`) is then, not the 30 (or 10) minutes; by size it still closes at once.
 
 Not while the capture waits for its anchor (`E.PageMayClose`: `E.capture.Ready()`; a loading screen
 and the position after it, up to 3 s): the next page would go on from where you were before it, at a

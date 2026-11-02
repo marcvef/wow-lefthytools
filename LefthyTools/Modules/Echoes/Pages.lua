@@ -11,9 +11,9 @@ local E = ns.Echoes
 --
 -- A page closes on the tick (never inside an event handler) at 32 KB of text or 2,000 lines (".<dt>;s",
 -- size), or 30 minutes after its first line other than its own (".<dt>;t", time; 10 minutes while a
--- friend who takes pages early is online: a page leaves me sooner, so a crash loses less): a page
--- with nothing but its header, the character and the going on from the last page (an AFK night)
--- stays open. E.Store.Close keeps it, and a later tick packs it (Store.lua). When recording starts,
+-- friend who takes pages early is online: a page leaves me sooner, so a crash loses less; never in
+-- combat: after the fight): a page with nothing but its header, the character and the going on from
+-- the last page (an AFK night) stays open. E.Store.Close keeps it, and a later tick packs it (Store.lua). When recording starts,
 -- an open page of another character, or whose last line is more than 10 minutes old, closes as it
 -- was (".0;l"); a fresh one goes on. My pages go out to everyone only once on disk (E.Store): from
 -- the next session on, or at once for one closed here from the saved text alone that's stale by its
@@ -338,8 +338,8 @@ local function Due(busy)
 	return age ~= nil and age >= PAGE_SECONDS_EARLY and (age >= PAGE_SECONDS or EarlyTaker())
 end
 
--- The tick: a page that's full, or busy long enough (Due), closes (and nothing else this tick); my
--- BattleTag while it isn't known; the lines joined every 60 s.
+-- The tick: a page that's full, or busy long enough (Due; not in combat: the fight's end), closes
+-- (and nothing else this tick); my BattleTag while it isn't known; the lines joined every 60 s.
 E.OnTick(function(now)
 	local open = active
 	if not open or E.data.open ~= open then
@@ -347,7 +347,7 @@ E.OnTick(function(now)
 	end
 	local busy = Busy(open)
 	local full = E.bytes >= PAGE_BYTES or E.count >= PAGE_LINES
-	if (full or Due(busy)) and E.PageMayClose() then
+	if (full or (Due(busy) and not LT.InCombat())) and E.PageMayClose() then
 		Rollover(full and "s" or "t")
 		return
 	end
