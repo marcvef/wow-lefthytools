@@ -215,122 +215,126 @@ end
 -- whether Chronicle is on or not)
 ---------------------------------------------------------------------------
 
-local function Hash(tag)
-	return LT.Hash32(tag:lower())
-end
-
-local myAcct
-local function MyAccount()
-	if not myAcct and BNGetInfo then
-		local _, tag = BNGetInfo()
-		if Readable(tag) then
-			myAcct = Hash(tag)
-		end
+-- (In a block: a Lua file has room for 200 locals of its own, Delivery.lua uses most of them.)
+local MyAccount, Friends, Accepted, PeerAccount
+do
+	local function Hash(tag)
+		return LT.Hash32(tag:lower())
 	end
-	return myAcct
-end
 
-local friendAccts, idAccts, friendsAt = {}, {}, -math.huge -- acct -> true; gameAccountID -> acct
-local missed, missedCount = {}, 0 -- acct -> true: looked for since the list was read, not in it
-local friendsStale = false   -- Battle.net said a friend came online or the list changed: read it again soon
-local tagHashes, tagCount = {}, 0 -- BattleTag -> its hash (LT.Hash32 once per tag, not at every reading)
-
-local function TagHash(tag)
-	local acct = tagHashes[tag]
-	if not acct then
-		if tagCount >= 1024 then
-			wipe(tagHashes) -- (a bound: friends come and go over the months)
-			tagCount = 0
-		end
-		acct = Hash(tag)
-		tagHashes[tag], tagCount = acct, tagCount + 1
-	end
-	return acct
-end
-
--- Every Battle.net friend, online or not: their account, and which game accounts are theirs.
-local function ReadFriends(now)
-	friendsAt, friendsStale = now, false
-	wipe(friendAccts)
-	wipe(idAccts)
-	wipe(missed)
-	missedCount = 0
-	local bn = C_BattleNet
-	local count = bn and bn.GetFriendAccountInfo and BNGetNumFriends and BNGetNumFriends() or 0
-	for i = 1, count do
-		local info = bn.GetFriendAccountInfo(i)
-		local tag = info and info.battleTag
-		if Readable(tag) then
-			local acct = TagHash(tag)
-			friendAccts[acct] = true
-			local game = info.gameAccountInfo
-			if type(game) == "table" and type(game.gameAccountID) == "number" then
-				idAccts[game.gameAccountID] = acct
+	local myAcct
+	function MyAccount()
+		if not myAcct and BNGetInfo then
+			local _, tag = BNGetInfo()
+			if Readable(tag) then
+				myAcct = Hash(tag)
 			end
-			for j = 1, (bn.GetFriendNumGameAccounts and bn.GetFriendNumGameAccounts(i) or 0) do
-				game = bn.GetFriendGameAccountInfo and bn.GetFriendGameAccountInfo(i, j)
+		end
+		return myAcct
+	end
+
+	local friendAccts, idAccts, friendsAt = {}, {}, -math.huge -- acct -> true; gameAccountID -> acct
+	local missed, missedCount = {}, 0 -- acct -> true: looked for since the list was read, not in it
+	local friendsStale = false   -- Battle.net said a friend came online or the list changed: read it again soon
+	local tagHashes, tagCount = {}, 0 -- BattleTag -> its hash (LT.Hash32 once per tag, not at every reading)
+
+	local function TagHash(tag)
+		local acct = tagHashes[tag]
+		if not acct then
+			if tagCount >= 1024 then
+				wipe(tagHashes) -- (a bound: friends come and go over the months)
+				tagCount = 0
+			end
+			acct = Hash(tag)
+			tagHashes[tag], tagCount = acct, tagCount + 1
+		end
+		return acct
+	end
+
+	-- Every Battle.net friend, online or not: their account, and which game accounts are theirs.
+	local function ReadFriends(now)
+		friendsAt, friendsStale = now, false
+		wipe(friendAccts)
+		wipe(idAccts)
+		wipe(missed)
+		missedCount = 0
+		local bn = C_BattleNet
+		local count = bn and bn.GetFriendAccountInfo and BNGetNumFriends and BNGetNumFriends() or 0
+		for i = 1, count do
+			local info = bn.GetFriendAccountInfo(i)
+			local tag = info and info.battleTag
+			if Readable(tag) then
+				local acct = TagHash(tag)
+				friendAccts[acct] = true
+				local game = info.gameAccountInfo
 				if type(game) == "table" and type(game.gameAccountID) == "number" then
 					idAccts[game.gameAccountID] = acct
+				end
+				for j = 1, (bn.GetFriendNumGameAccounts and bn.GetFriendNumGameAccounts(i) or 0) do
+					game = bn.GetFriendGameAccountInfo and bn.GetFriendGameAccountInfo(i, j)
+					if type(game) == "table" and type(game.gameAccountID) == "number" then
+						idAccts[game.gameAccountID] = acct
+					end
 				end
 			end
 		end
 	end
-end
 
-local function Friends(now)
-	if now - friendsAt >= FRIENDS_GAP or (friendsStale and now - friendsAt >= FRIENDS_SOON) then
-		ReadFriends(now)
-	end
-	return friendAccts
-end
-
--- Battle.net says a friend came online or the list changed: the list is read again when next needed,
--- at most every FRIENDS_SOON (the handlers only note it). Not on BN_FRIEND_INFO_CHANGED: it fires
--- whenever any friend changes zone; a friend who logged into a game is found anyway, PeerAccount
--- reads the list again when their game account isn't in it (at most every FRIENDS_SOON).
-local function FriendsChanged()
-	friendsStale = true
-end
-E.On("BN_FRIEND_ACCOUNT_ONLINE", FriendsChanged)
-E.On("BN_FRIEND_LIST_SIZE_CHANGED", FriendsChanged)
-
--- Pages I take: my Battle.net friends' accounts' and my own (my other computers). An account the
--- list as last read doesn't have (a friend just added, or one Battle.net listed late): the list is
--- read again, at most every FRIENDS_SOON and once per account until it's read anew, so a friend's
--- holdings that came before Battle.net listed them aren't dropped until the next summary.
-local function Accepted(acct, now)
-	if acct == nil then
-		return false
-	elseif acct == MyAccount() or Friends(now)[acct] then
-		return true
-	end
-	if not missed[acct] and now - friendsAt >= FRIENDS_SOON then
-		ReadFriends(now)
-	end
-	if not missed[acct] and missedCount < 256 then
-		missed[acct], missedCount = true, missedCount + 1
-	end
-	return friendAccts[acct] == true
-end
-
--- A Beacon friend's account (their BattleTag's hash), nil while Battle.net doesn't say.
-local function PeerAccount(id, now)
-	Friends(now)
-	local acct = idAccts[id]
-	if not acct and now - friendsAt >= FRIENDS_SOON then
-		ReadFriends(now) -- (a friend just came online)
-		acct = idAccts[id]
-	end
-	if not acct then
-		local peer = ns.Beacon.peers[id]
-		local guid = peer and peer.guid
-		local info = Readable(guid) and C_BattleNet and LT.Value(C_BattleNet.GetAccountInfoByGUID, guid)
-		local tag = type(info) == "table" and info.battleTag
-		if Readable(tag) then
-			acct = TagHash(tag)
+	function Friends(now)
+		if now - friendsAt >= FRIENDS_GAP or (friendsStale and now - friendsAt >= FRIENDS_SOON) then
+			ReadFriends(now)
 		end
+		return friendAccts
 	end
-	return acct
+
+	-- Battle.net says a friend came online or the list changed: the list is read again when next needed,
+	-- at most every FRIENDS_SOON (the handlers only note it). Not on BN_FRIEND_INFO_CHANGED: it fires
+	-- whenever any friend changes zone; a friend who logged into a game is found anyway, PeerAccount
+	-- reads the list again when their game account isn't in it (at most every FRIENDS_SOON).
+	local function FriendsChanged()
+		friendsStale = true
+	end
+	E.On("BN_FRIEND_ACCOUNT_ONLINE", FriendsChanged)
+	E.On("BN_FRIEND_LIST_SIZE_CHANGED", FriendsChanged)
+
+	-- Pages I take: my Battle.net friends' accounts' and my own (my other computers). An account the
+	-- list as last read doesn't have (a friend just added, or one Battle.net listed late): the list is
+	-- read again, at most every FRIENDS_SOON and once per account until it's read anew, so a friend's
+	-- holdings that came before Battle.net listed them aren't dropped until the next summary.
+	function Accepted(acct, now)
+		if acct == nil then
+			return false
+		elseif acct == MyAccount() or Friends(now)[acct] then
+			return true
+		end
+		if not missed[acct] and now - friendsAt >= FRIENDS_SOON then
+			ReadFriends(now)
+		end
+		if not missed[acct] and missedCount < 256 then
+			missed[acct], missedCount = true, missedCount + 1
+		end
+		return friendAccts[acct] == true
+	end
+
+	-- A Beacon friend's account (their BattleTag's hash), nil while Battle.net doesn't say.
+	function PeerAccount(id, now)
+		Friends(now)
+		local acct = idAccts[id]
+		if not acct and now - friendsAt >= FRIENDS_SOON then
+			ReadFriends(now) -- (a friend just came online)
+			acct = idAccts[id]
+		end
+		if not acct then
+			local peer = ns.Beacon.peers[id]
+			local guid = peer and peer.guid
+			local info = Readable(guid) and C_BattleNet and LT.Value(C_BattleNet.GetAccountInfoByGUID, guid)
+			local tag = type(info) == "table" and info.battleTag
+			if Readable(tag) then
+				acct = TagHash(tag)
+			end
+		end
+		return acct
+	end
 end
 D.PeerAccount, D.MyAccount = PeerAccount, MyAccount
 
@@ -361,16 +365,19 @@ D.PagesChanged = Changed
 
 -- My pages' key, nil while my BattleTag isn't known. (Kept while the saved table's account and store
 -- are the same: asked for many times a second.)
-local myKey, keyData, keyAcct, keyStore
-local function MyKey()
-	local data = E.data
-	if not data then
-		return nil
-	elseif data ~= keyData or data.acct ~= keyAcct or data.store ~= keyStore then
-		keyData, keyAcct, keyStore = data, data.acct, data.store
-		myKey = S.Own()
+local MyKey
+do
+	local myKey, keyData, keyAcct, keyStore
+	function MyKey()
+		local data = E.data
+		if not data then
+			return nil
+		elseif data ~= keyData or data.acct ~= keyAcct or data.store ~= keyStore then
+			keyData, keyAcct, keyStore = data, data.acct, data.store
+			myKey = S.Own()
+		end
+		return myKey
 	end
-	return myKey
 end
 
 local function Split(key)
