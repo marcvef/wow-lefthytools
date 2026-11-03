@@ -61,6 +61,7 @@ local PRUNE_STEP = 20    -- the book's pruning: accounts and characters a tick a
 local CHECK_GAP = 60
 local PROFILE_GAP = 300
 local PENDING_TIMEOUT = 90
+local FRIEND_FIGHT = 900 -- the friend asked is fighting: their answer may wait this long (LT.InFight's 15 minutes)
 local SERVE_MAX = 400
 local MEET_GAP, MEET_FIRST = 30, 10 -- friends' characters online on Battle.net, matched to their journals (s)
 local NAME_BYTES, TEXT_BYTES = 48, 60
@@ -78,7 +79,7 @@ local PROFILE_FIELDS = { "played", "sessions", "quests", "kills", "deaths", "zon
 local INCOMING_MAX, INCOMING_PER_TICK, TICK_MS = 2000, 200, 2
 
 local store
-local pending = {}     -- acct -> { from, at, got (records come so far), expect (how many the answer has), lost }
+local pending = {}     -- acct -> { from, at, got (records come so far), expect (how many the answer has), lost, fighting }
 local serves = {}      -- answers to build on the tick: { id, acct, since }
 local incoming, inHead, inTail = {}, 1, 0 -- friends' messages for the tick: { id, word, more }
 
@@ -1037,15 +1038,26 @@ function C.SyncTick(now)
 	end
 	Incoming(now) -- (friends' messages, merged here, not in the event)
 	-- No progress for a while: someone else may answer. Only once everything that came is merged
-	-- (each record merged is progress too).
+	-- (each record merged is progress too). While the friend asked is fighting (their state says so),
+	-- that time doesn't count: newer builds answer only after their fight (FRIEND_FIGHT at most: a
+	-- stuck combat flag).
+	local B = Beacon()
 	if inHead > inTail then
 		for acct, p in pairs(pending) do
+			local peer = B and B.peers[p.from]
+			if peer and peer.combat then
+				p.fighting = p.fighting or now
+				if now - p.fighting < FRIEND_FIGHT then
+					p.at = math.max(p.at, now)
+				end
+			else
+				p.fighting = nil
+			end
 			if now - p.at >= PENDING_TIMEOUT then
 				pending[acct] = nil
 			end
 		end
 	end
-	local B = Beacon()
 	if B then
 		Answers() -- (friends' requests, answered here, not in the event)
 		for id, peer in pairs(B.peers) do

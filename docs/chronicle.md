@@ -386,7 +386,12 @@ combat flag doesn't hold it for good) Sync.lua's tick does nothing: friends' mes
 (`incoming`), their requests too (`serves`), and no stamp is checked, no answer or summary built,
 nothing pruned, no Battle.net walk, no catch-up or recap line; the first tick after it does what's
 due. My requests don't time out meanwhile (each record merged after it is progress). What Chronicle
-hands Beacon's low-priority queue waits out fights there too (beacon.md).
+hands Beacon's low-priority queue waits out fights there too (beacon.md). The other way round: while
+the friend I asked is fighting (their state says so, Beacon's `peer.combat`), my request doesn't time
+out (newer builds answer only after their fight; `FRIEND_FIGHT`, 15 minutes at most, for a stuck
+flag), and the 90 s count from its end. A friend whose request I answer only after my fight: their
+request may have timed out by then; what comes is kept anyway (records are taken without a request),
+only its end isn't, so they ask again at the next offer, from where they are.
 
 **Keeping the book small:** a minute after starting (the friend list is known by then), accounts
 that are no longer my Battle.net friends go, and characters with nothing in the last 60 days

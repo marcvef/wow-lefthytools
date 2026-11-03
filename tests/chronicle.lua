@@ -2107,3 +2107,36 @@ do
 	C.NewsChanged()
 	Advance(0.7) -- (whole seconds in all: the later files tick as before)
 end
+
+section("Chronicle: a request to a friend who is fighting waits for their fight's end")
+do
+	local C = ns.Chronicle
+	local carl = C.Hash("Carl#3456")
+	anna("H2")
+	Advance(1.2)
+	local peer = peers()[11]
+	local from = CDB.book[carl].u
+	anna("J2;s;" .. carl .. "," .. (from + 1000))
+	Advance(1.1)
+	check(C.SyncPending()[carl] and C.SyncPending()[carl].from == 11, "(asked Anna for Carl's journal)")
+	local function state(flags, seconds) -- (her state every 30 s: fighting, C, or not)
+		for _ = 1, seconds / 30 do
+			anna("S2;" .. flags .. ";0;260.0;750.0;Goldshire;" .. (flags == "C" and "Hogger" or ""))
+			Advance(30, 0.5)
+		end
+	end
+	state("C", 240)
+	check(peer.combat and C.SyncPending()[carl], "Anna fights for 4 minutes: my request waits (newer builds answer after their fight)")
+	state("", 60)
+	check(C.SyncPending()[carl], "... and up to 90 s after it")
+	state("", 60)
+	check(not C.SyncPending()[carl], "... then it times out: someone else may answer")
+	-- Her combat flag stuck: 15 minutes at most.
+	anna("J2;s;" .. carl .. "," .. (from + 1000))
+	Advance(1.1)
+	check(C.SyncPending()[carl], "(asked her again)")
+	state("C", 1020)
+	check(not C.SyncPending()[carl], "a friend fighting for more than 15 minutes (a stuck flag): it times out")
+	state("", 30)
+	Advance(0.6) -- (whole seconds in all: the later files tick as before)
+end
