@@ -689,10 +689,11 @@ local function OnMessage(text, senderID)
 		validateRequested = true   -- fetch name and class on the next tick
 		-- Back after I'd forgotten them (65 s of silence, a loading screen): their version, quest
 		-- and progress only come in answers, and they don't see me as new. A hello asks for them
-		-- (low priority: after the answers that are owed).
+		-- (low priority: after the answers that are owed; live, so not held in a fight: their answer
+		-- says whether I can watch their fight).
 		if kind ~= "H" and (not helloAt[senderID] or now - helloAt[senderID] >= ANSWER_GAP) then
 			helloAt[senderID] = now
-			B.QueueLow(senderID, "H" .. VERSION)
+			B.QueueLow(senderID, "H" .. VERSION, nil, true)
 		end
 	end
 	peer.seen = now
