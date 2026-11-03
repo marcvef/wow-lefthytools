@@ -695,11 +695,11 @@ do
 	-- Anna holds Carl's journal (Carl is my friend, offline) and a stranger's: I ask for Carl's only.
 	mark = #GAMEDATA + 1
 	anna("J2;s;" .. carl .. ",5000/" .. zed .. ",6000")
-	Advance(0.3)
+	Advance(1.3)
 	check(sentTo(11, mark, "J2;q;" .. carl .. ";0")[1] and not sentTo(11, mark, "J2;q;" .. zed)[1],
 		"a journal of a friend of mine is asked for; a stranger's isn't")
 	bob("J2;s;" .. carl .. ",5000")
-	Advance(0.3)
+	Advance(1.3)
 	check(not sentTo(12, mark, "J2;q;")[1], "asked of Anna already: not of Bob too")
 	local yesterday = date("%Y%m%d", time() - 86400)
 	local t = time() - 3 * 3600
@@ -709,7 +709,7 @@ do
 	anna("J2;n;" .. carl .. ";Carl-Realmy;4300;2;" .. (t + 60) .. ";death;Hogger;Elwynn Forest")
 	anna("J2;n;" .. carl .. ";Carl-Realmy;4400;3;" .. (t + 120) .. ";hack;x;y")
 	anna("J2;d;" .. zed .. ";Zed-Realmy;4100;" .. yesterday .. ";1,1,1,1,1,1,1,1,1,1,1,1,1,1")
-	Advance(0.3)
+	Advance(1.3)
 	local book = CDB.book
 	local c = book[carl] and book[carl].chars["Carl-Realmy"]
 	check(c and c.classFile == "ROGUE" and c.level == 18 and c.profile.played == 360000 and c.profile.quests == 140
@@ -721,17 +721,17 @@ do
 		"his highlights (unknown kinds dropped); nothing of the stranger's")
 	check(book[carl].u == 0 and CH.SyncPending()[carl], "not complete before the end")
 	anna("J2;e;" .. carl .. ";5000")
-	Advance(0.3)
+	Advance(1.3)
 	check(book[carl].u == 5000 and not CH.SyncPending()[carl], "the end: complete up to her stamp")
 	mark = #GAMEDATA + 1
 	bob("J2;s;" .. carl .. ",5000")
-	Advance(0.3)
+	Advance(1.3)
 	check(not sentTo(12, mark, "J2;q;")[1], "Bob holds the same: nothing to ask")
 	bob("J2;s;" .. carl .. ",6000")
-	Advance(0.3)
+	Advance(1.3)
 	check(sentTo(12, mark, "J2;q;" .. carl .. ";5000")[1], "Bob holds more: only what's newer is asked for")
 	bob("J2;e;" .. carl .. ";6000")
-	Advance(0.3)
+	Advance(1.3)
 
 	-- Passing it on: Bob asks me for Carl's journal.
 	mark = #GAMEDATA + 1
@@ -757,7 +757,7 @@ do
 		and CH.Characters()[1].me and CH.Characters()[1].current, "Carl is among the characters (offline), the one I play first")
 	-- An account adds up its characters: Carl's alt's numbers join his on his page.
 	anna("J2;d;" .. carl .. ";Carlbank-Realmy;4500;" .. yesterday .. ";30,100,1,2,1,0,10,5,20,300,0,0,0,23")
-	Advance(0.3)
+	Advance(1.3)
 	local carlAccount
 	for _, a in ipairs(CH.Accounts()) do if a.acct == carl then carlAccount = a end end
 	local ad = carlAccount and carlAccount.days[date("%Y-%m-%d", time() - 86400)]
@@ -786,9 +786,9 @@ do
 	-- A live highlight and the same one synced later: once.
 	Advance(60)
 	anna("E2;boss;Murloc King;Westfall")
-	Advance(0.3)
+	Advance(1.3)
 	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;7000;9;" .. time() .. ";boss;Murloc King;Westfall")
-	Advance(0.3)
+	Advance(1.3)
 	local kings = 0
 	for _, f in ipairs(CH.FriendNews()) do if f.k == "boss" and f.a == "Murloc King" then kings = kings + 1 end end
 	check(kings == 1, "a live highlight that a synced one repeats shows once, got " .. kings)
@@ -817,7 +817,7 @@ do
 		and win.Tabs.news.New:GetText() == "", "their news is there; seen now: the dot and the tab's count go")
 	-- Anna's journal has a second character of hers; she's online (on Anna).
 	anna("J2;d;" .. annaAcct .. ";Annalt-Realmy;7100;" .. yesterday .. ";60,100,1,1,0,0,0,10,5,100,0,0,0,1")
-	Advance(0.3)
+	Advance(1.3)
 	CH.Open("friends")
 	check(not win.Tabs.friends:IsEnabled() and not win.Picker:IsShown() and win.Text:GetText() == "" and drawn("Online now")
 		and drawn("Where") and drawn("Doing") and drawn("Anna Brook|r") and drawn("Not online") and drawn("Last played")
@@ -988,7 +988,7 @@ do
 	me.daily[lastWeek] = me.daily[lastWeek] or { played = 0, xp = 0, quests = 0, kills = 0, deaths = 0, levels = 0, afk = 0 }
 	me.daily[lastWeek].played, me.daily[lastWeek].quests = 3600, 12
 	anna("J2;d;" .. carl .. ";Carl-Realmy;8000;" .. lastWeek:gsub("-", "") .. ";90,500,30,5,4,0,0,17,50,100,0,0,0,3")
-	Advance(0.3)
+	Advance(1.3)
 	CDB.recapWeek = nil
 	lefthy("disable chronicle")
 	lefthy("enable chronicle")
@@ -1034,7 +1034,7 @@ do
 	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;9000;20;" .. time() .. ";level;25;Elwynn Forest")
 	anna("D2;" .. today .. ";50;100;1;1;0;1")
 	anna("J2;d;" .. annaAcct .. ";Anna-Realmy;9001;" .. today .. ";50,100,1,1,0,1,0,25,5,100,0,0,0,1")
-	Advance(0.3)
+	Advance(1.3)
 	local levels = {}
 	for _, f in ipairs(CH.FriendNews()) do
 		if f.k == "level" and (f.level == 25 or f.a == "25") and f.name:find("^Anna") then levels[#levels + 1] = f.name end
@@ -1076,7 +1076,7 @@ do
 	CDB.identity = nil
 	lefthy("disable chronicle")
 	lefthy("enable chronicle")
-	Advance(0.3)
+	Advance(1.3)
 	check(CDB.identity == 1 and CDB.friendStats["Carl Vale"].acct == carl and carlBook.full == "Carl Vale" and liveDeath.acct == carl,
 		"once: an older build's days find their character's journal (it learns the full name), the live news too")
 	check(not CDB.friendStats["Carlbank Moor"].acct and not carlbank.full and not CDB.friendStats["Cedric Vale"].acct
@@ -1114,7 +1114,7 @@ do
 	anna("J2;a;" .. carl .. ";Carlbank-Realmy;9100;Carlbank Vale;Player-1-77")
 	anna("J2;a;" .. carl .. ";Carl-Realmy;9200;Bob Stone;") -- (not his name)
 	anna("J2;a;" .. carl .. ";Carlbank-Realmy;9050;Carlbank Old;") -- (older)
-	Advance(0.3)
+	Advance(1.3)
 	check(carlbank.full == "Carlbank Vale" and carlbank.guid == "Player-1-77" and carlBook.full == "Carl Vale",
 		"a journal's full name and GUID from its author; one that names someone else, or is older, is ignored")
 	local mark = #GAMEDATA + 1
@@ -1124,7 +1124,7 @@ do
 	lefthy("disable chronicle")
 	MY_SURNAME = "Mirewood"
 	lefthy("enable chronicle")
-	Advance(0.3)
+	Advance(1.3)
 	check(CH.CurrentKey() == "Lefthy-Realmy" and me.full == "Lefthy Mirewood" and me.guid == "Player-1-0",
 		"my character: the full name and GUID kept, the key the first name's (the one friends' builds know)")
 	anna("J2;h;" .. annaAcct)
@@ -1140,14 +1140,14 @@ do
 	lefthy("disable chronicle")
 	MY_GUID, MY_SURNAME = "Player-1-500", "Brightwater"
 	lefthy("enable chronicle")
-	Advance(0.3)
+	Advance(1.3)
 	local other = CDB.chars["Lefthy Brightwater-Realmy"]
 	check(CH.CurrentKey() == "Lefthy Brightwater-Realmy" and other and other.name == "Lefthy Brightwater" and me.full == "Lefthy Mirewood",
 		"my alt with the same first name isn't taken for me: its own record, by its full name")
 	lefthy("disable chronicle")
 	MY_GUID, MY_SURNAME = nil, "Mirewood"
 	lefthy("enable chronicle")
-	Advance(0.3)
+	Advance(1.3)
 	check(CH.CurrentKey() == "Lefthy-Realmy", "and back on mine")
 	CDB.chars["Lefthy Brightwater-Realmy"] = nil
 
@@ -1221,7 +1221,7 @@ do
 	anna("J2;p;" .. carl .. ";Corin-Realmy;9400;PALADIN;9;" .. time() .. ";600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000;;")
 	anna("J2;d;" .. carl .. ";Corin-Realmy;9401;" .. today .. ";30,300,5,20,1,1,0,9,1,1000,0,0,0,10")
 	anna("J2;n;" .. carl .. ";Corin-Realmy;9402;1;" .. time() .. ";level;9;Westfall")
-	Advance(0.3)
+	Advance(1.3)
 	local corin
 	for _, c in ipairs(CH.Characters()) do
 		if c.key == "book:" .. carl .. ":Corin-Realmy" then corin = c end
@@ -1276,7 +1276,7 @@ do
 	Advance(1.2)
 	profile("Corin-Realmy", 9500, "PALADIN")
 	profile("Cora-Realmy", 9501, "PRIEST")
-	Advance(0.3)
+	Advance(1.3)
 	local book = CDB.book[carl].chars
 	local corin, cora = book["Corin-Realmy"], book["Cora-Realmy"]
 	check(corin and cora and not corin.full and not cora.full, "two of Carl's characters from an older build's journal: first names only")
@@ -1325,7 +1325,7 @@ do
 	profile(carl, "Corin-Realmy", 9600, "PALADIN")
 	profile(carl, "Cora-Realmy", 9601, "PRIEST")
 	profile(annaAcct, "Annalt-Realmy", 9602, "MAGE")
-	Advance(0.3)
+	Advance(1.3)
 	local corin, cora, annalt = CDB.book[carl].chars["Corin-Realmy"], CDB.book[carl].chars["Cora-Realmy"],
 		CDB.book[annaAcct].chars["Annalt-Realmy"]
 	-- Bob's client saw Corin and Annalt online (Battle.net): it says so, without a stamp of their author's.
@@ -1335,7 +1335,7 @@ do
 	bob("J2;l;" .. carl .. ";Cora-Realmy;Cora;")
 	bob("J2;l;" .. annaAcct .. ";Annalt-Realmy;Annalt Brook;")
 	bob("J2;l;" .. H("Zed#9999") .. ";Zed-Realmy;Zed Moor;")
-	Advance(0.3)
+	Advance(1.3)
 	check(corin.full == "Corin Vale" and corin.guid == "Player-1-933" and not corin.aliasU and annalt.full == "Annalt Brook",
 		"a surname a friend learned fills in a journal that didn't know it")
 	check(not cora.full and not CDB.book[H("Zed#9999")], "one that names someone else, has no surname, or isn't my friend's: nothing")
@@ -1389,7 +1389,7 @@ do
 	local before = CDB.myU
 	anna("J2;l;" .. mine .. ";Oldalt-Realmy;Oldalt Mirewood;Player-1-78")
 	anna("J2;l;" .. mine .. ";Lefthy-Realmy;Lefthy Otherone;")
-	Advance(0.3)
+	Advance(1.3)
 	local oldalt = CDB.chars["Oldalt-Realmy"]
 	check(oldalt.full == "Oldalt Mirewood" and oldalt.guid == "Player-1-78" and me.full == "Lefthy",
 		"my alt takes the surname a friend saw; the one I play doesn't (UnitName says)")
@@ -1436,7 +1436,7 @@ do
 	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;9600;40;" .. t .. ";death;Twinfoe;Westfall")
 	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;9601;41;" .. (t + 3) .. ";death;Twinfoe;Westfall")
 	anna("J2;n;" .. annaAcct .. ";Anna-Realmy;9602;42;" .. (t + 40) .. ";death;Twinfoe;Westfall") -- (another death)
-	Advance(0.3)
+	Advance(1.3)
 	local twins = 0
 	for _, f in ipairs(CH.FriendNews()) do if f.foe == "Twinfoe" then twins = twins + 1 end end
 	check(twins == 2, "a friend's death saved twice: in the news once (a later one too), got " .. twins)
@@ -1529,6 +1529,7 @@ do -- (clock-neutral: no Advance)
 	-- While you were away: a profession learned has no skill level, only its milestones have.
 	anna("J2;n;" .. carl .. ";Carl-Realmy;9700;50;" .. time() .. ";profession;Herbalism;")
 	anna("J2;n;" .. carl .. ";Carl-Realmy;9701;51;" .. time() .. ";profession;Mining;150")
+	CH.SyncMergeAll() -- (merged at once, as the tick would: this section keeps the clock)
 	local line
 	for _, l in ipairs(CH.CatchUpLines(time() - 1)) do if l:find("Herbalism", 1, true) then line = l end end
 	check(line and line:find("learned Herbalism", 1, true) and line:find("reached Mining 150", 1, true)
@@ -1536,7 +1537,10 @@ do -- (clock-neutral: no Advance)
 	carlBook.news[50], carlBook.news[51] = nil, nil
 	-- A friend's journal can't name a character with escape codes, or bring numbers nobody has (a
 	-- broken or hostile client): the pages would draw them, and pass them on.
-	local function fromAnna(word, more) ns.Beacon.ReceiveJournal(11, word, more) end -- (past Beacon's spam guard)
+	local function fromAnna(word, more) -- (past Beacon's spam guard; merged at once, as the tick would)
+		ns.Beacon.ReceiveJournal(11, word, more)
+		ns.Chronicle.SyncMergeAll()
+	end
 	local numbers = "600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000"
 	local today = date("%Y%m%d")
 	fromAnna("p", carl .. ";|Tx:300|t-Realmy;9710;ROGUE;9;" .. time() .. ";" .. numbers .. ";;")
@@ -1608,7 +1612,10 @@ do
 	local dora, carl = C.Hash("Dora#4567"), C.Hash("Carl#3456")
 	anna("H2")
 	Advance(1.2)
-	local function fromAnna(word, more) ns.Beacon.ReceiveJournal(11, word, more) end -- (past Beacon's spam guard)
+	local function fromAnna(word, more) -- (past Beacon's spam guard; merged at once, as the tick would)
+		ns.Beacon.ReceiveJournal(11, word, more)
+		ns.Chronicle.SyncMergeAll()
+	end
 	local function day(back) return date("%Y%m%d", C.DayAgo(back)) end
 	local numbers = "30,300,5,20,1,1,0,9,1,1000,0,0,0,10"
 	-- A friend's account keeps its 30 most recently played characters (a broken or hostile client
@@ -1834,7 +1841,10 @@ do -- (clock-neutral: no Advance) A friend on an older LefthyTools who copied th
 	-- before it is left out; they send as before.
 	local C = ns.Chronicle
 	local carl = C.Hash("Carl#3456")
-	local function fromAnna(word, more) ns.Beacon.ReceiveJournal(11, word, more) end -- (past Beacon's spam guard)
+	local function fromAnna(word, more) -- (past Beacon's spam guard; merged at once, as the tick would)
+		ns.Beacon.ReceiveJournal(11, word, more)
+		ns.Chronicle.SyncMergeAll()
+	end
 	local function day(back) return date("%Y-%m-%d", C.DayAgo(back)) end
 	local profile, numbers = "600,1,5,20,1,2,0,0,0,0,1000,10,0,0,1,600,600,0,0,8,3000", "30,300,5,20,1,1,0,9,1,1000,0,0,0,10"
 	-- A character's journal from Anna: its profile (last played back days ago), that day and a level-up then.
@@ -1885,5 +1895,48 @@ do -- (clock-neutral: no Advance) A friend on an older LefthyTools who copied th
 	local chars = CDB.book[carl].chars
 	chars["Carlbeta-Realmy"], chars["Carlbetb-Realmy"], chars["Carlnew-Realmy"] = nil, nil, nil
 	annaDays[day(1)] = annaYesterday
+	C.NewsChanged()
+end
+
+section("Chronicle: friends' journals merged on the tick, not in the event")
+do
+	local C = ns.Chronicle
+	local carl, zed = C.Hash("Carl#3456"), C.Hash("Zed#9999")
+	local function toMe(id, word, more) ns.Beacon.ReceiveJournal(id, word, more) end -- (past Beacon's spam guard)
+	anna("H2")
+	Advance(1.2)
+	local book = CDB.book[carl]
+	local from = book.u
+	-- Anna holds more of Carl's journal: I ask her.
+	anna("J2;s;" .. carl .. "," .. (from + 1000))
+	Advance(1.1)
+	local p = C.SyncPending()[carl]
+	check(p and p.from == 11, "(asked Anna for Carl's journal)")
+	local t = time() - 3600
+	anna("J2;n;" .. carl .. ";Carlq-Realmy;" .. (from + 10) .. ";1;" .. t .. ";boss;Hogger;Westfall")
+	check(not book.chars["Carlq-Realmy"] and C.SyncWaiting and C.SyncWaiting() == 1 and p.at == GetTime(),
+		"a record isn't merged inside the event: it waits for the tick (it counts as progress now)")
+	Advance(1.1)
+	check(book.chars["Carlq-Realmy"] and book.chars["Carlq-Realmy"].news[1] and C.SyncWaiting() == 0, "... and the tick merges it")
+	-- A big batch: 200 a tick at most.
+	for _ = 1, 450 do
+		toMe(11, "s", zed .. ",5000")
+	end
+	Advance(1.05)
+	check(C.SyncWaiting() == 250, "the tick merges 200 at most, got " .. (450 - C.SyncWaiting()))
+	-- At most 2000 wait: a record that doesn't fit is dropped, and the answer it belonged to doesn't
+	-- complete the account (it's asked again).
+	for _ = 1, 1800 do
+		toMe(11, "s", zed .. ",5000")
+	end
+	toMe(11, "n", carl .. ";Carlq-Realmy;" .. (from + 20) .. ";2;" .. (t + 60) .. ";boss;Ragnaros;Molten Core")
+	check(C.SyncWaiting() == 2000 and p.lost, "at most 2000 wait; a record of an answer that didn't fit is noted")
+	Advance(11)
+	toMe(11, "c", carl .. ";2")
+	toMe(11, "e", carl .. ";" .. (from + 1000))
+	Advance(1.55) -- (whole seconds in all: the later files tick as before)
+	check(C.SyncWaiting() == 0 and not C.SyncPending()[carl] and book.u == from and not book.chars["Carlq-Realmy"].news[2],
+		"its end: not complete (the record that didn't fit is asked for again)")
+	book.chars["Carlq-Realmy"] = nil
 	C.NewsChanged()
 end

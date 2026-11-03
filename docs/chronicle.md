@@ -364,9 +364,16 @@ and a profile last played before it (a character played only then isn't taken at
 before (an earlier build): it goes when Chronicle starts (`Prune`), and a character left with
 nothing goes with the book's pruning. Requests are queued
 (`serves`, at most 50, a repeat replaces the waiting one) and answered on the tick, two per
-second, never inside the event. Everything is offered again every 5 minutes (`FULL_OFFER`: an
-offer missed or an answer cut short). `relay` off: I don't pass on what I hold of others (a
-request gets an empty end). Beacon accepts 700 J messages per friend per minute.
+second, never inside the event. Everything else a friend sends (what they hold, records, counts,
+ends) is only noted in the event too (`incoming`) and merged on the tick, in the order it came: at
+most 200 a tick and no longer than 2 ms (`TICK_MS`, where the game says: `debugprofilestop`). At
+most 2000 wait (about three minutes of one friend at Beacon's limit); one that doesn't fit is
+dropped, and the answer it belonged to doesn't complete the account (its end is taken as one with
+records missing: asked again). A record counts as progress for its request when it comes, not when
+it's merged, and a request times out only once everything that came is merged. Everything is
+offered again every 5 minutes (`FULL_OFFER`: an offer missed or an answer cut short). `relay` off: I
+don't pass on what I hold of others (a request gets an empty end). Beacon accepts 700 J messages per
+friend per minute.
 
 **Keeping the book small:** a minute after starting (the friend list is known by then), accounts
 that are no longer my Battle.net friends go, and characters with nothing in the last 60 days

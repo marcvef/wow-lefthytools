@@ -71,9 +71,15 @@ local MINUTES = { played = true, afk = true } -- sent in minutes, kept in second
 local PROFILE_FIELDS = { "played", "sessions", "quests", "kills", "deaths", "zones", "dungeons", "runs", "bosses", "rares",
 	"dist", "jumps", "mounts", "achievements", "gold", "fastest", "longest", "afk", "loot4", "levels", "xp" }
 
+-- Friends' messages wait for the tick (never merged inside the event): at most INCOMING_MAX (about
+-- three minutes of one friend's journal at Beacon's limit), merged INCOMING_PER_TICK a tick at most,
+-- and no longer than TICK_MS milliseconds (where the game says: debugprofilestop).
+local INCOMING_MAX, INCOMING_PER_TICK, TICK_MS = 2000, 200, 2
+
 local store
-local pending = {}     -- acct -> { from, at, got (records come so far), expect (how many the answer has) }
+local pending = {}     -- acct -> { from, at, got (records come so far), expect (how many the answer has), lost }
 local serves = {}      -- answers to build on the tick: { id, acct, since }
+local incoming, inHead, inTail = {}, 1, 0 -- friends' messages for the tick: { id, word, more }
 local summaries = {}   -- gameAccountID -> { at, sent = { [acct] = u } }
 local lastCheck, lastProfile = -math.huge, -math.huge
 local pruneAt          -- when the book is pruned (PruneBook)
@@ -726,41 +732,19 @@ local function Store(id, word, more, now)
 	end
 end
 
--- Beacon.lua hands every J message here (after its own spam guard). Answering a request is heavy
--- (hundreds of messages built): that waits for the tick (serves).
-function ns.Beacon.ReceiveJournal(id, word, more)
-	if not (M.enabled and store) then
-		return
-	end
+-- A friend's message, on the tick (Incoming): what they hold, the end of an answer, a record (kept
+-- also when they went meanwhile: their answer's count and end went with them, JournalForget).
+local function Handle(id, word, more, now)
 	local peer = ns.Beacon.peers[id]
-	if not peer then
-		return
-	end
-	local now = GetTime()
-	if word == "h" then
-		peer.journal = more:match("^%x%x%x%x%x%x%x%x$") or "" -- (they sync; their account, if known)
-		summaries[id] = nil -- (they (re)started: everything is offered again)
-		for _, message in ipairs(peer.journal ~= "" and ReadsNames(peer) and Learned(peer.journal) or {}) do
-			ns.Beacon.QueueLow(id, message) -- (their own characters' names I learned, if their build reads them)
+	if word == "s" then
+		if not peer then
+			return -- (gone meanwhile: nobody to ask)
 		end
-	elseif word == "s" then
 		peer.journal = peer.journal or ""
 		for acct, u in more:gmatch("(%x%x%x%x%x%x%x%x),(%d+)") do
 			u = tonumber(u)
 			if acct ~= C.MyAccount() and Friends()[acct] and Plausible(u) and u > ((store.book[acct] or {}).u or 0) then
 				Request(id, acct, now)
-			end
-		end
-	elseif word == "q" then
-		local acct, since = more:match("^(%x%x%x%x%x%x%x%x);(%d+)$")
-		if acct then
-			for i = #serves, 1, -1 do -- (asked again before it was answered: once)
-				if serves[i].id == id and serves[i].acct == acct then
-					table.remove(serves, i)
-				end
-			end
-			if #serves < 50 then
-				serves[#serves + 1] = { id = id, acct = acct, since = tonumber(since) }
 			end
 		end
 	elseif word == "c" then
@@ -775,8 +759,9 @@ function ns.Beacon.ReceiveJournal(id, word, more)
 		if p and p.from == id then
 			pending[acct] = nil
 			u = tonumber(u)
-			-- Fewer records came than were sent (lost on the way): not complete; asked again later.
-			if Plausible(u) and not (p.expect and (p.got or 0) < p.expect) then
+			-- Fewer records came than were sent (lost on the way, or not kept: too many waited), not
+			-- complete; asked again later.
+			if Plausible(u) and not p.lost and not (p.expect and (p.got or 0) < p.expect) then
 				local a = store.book[acct] or { u = 0, chars = {} } -- (nothing newer came: still, they're complete)
 				store.book[acct] = a
 				a.u = math.max(a.u or 0, u)
@@ -785,6 +770,88 @@ function ns.Beacon.ReceiveJournal(id, word, more)
 	else
 		Store(id, word, more, now)
 	end
+end
+
+-- Milliseconds (debugprofilestop), nil where there's none (tests).
+local function Clock()
+	local ok, ms = pcall(debugprofilestop)
+	return ok and type(ms) == "number" and ms or nil
+end
+
+-- The friends' messages waiting, merged by the tick: at most INCOMING_PER_TICK, and TICK_MS (one at
+-- least). all: everything waiting (tests).
+local function Incoming(now, all)
+	local handled, start = 0, inHead <= inTail and not all and Clock()
+	while inHead <= inTail and (all or handled < INCOMING_PER_TICK) do
+		local item = incoming[inHead]
+		incoming[inHead] = nil
+		inHead = inHead + 1
+		handled = handled + 1
+		Handle(item[1], item[2], item[3], now)
+		local at = start and Clock()
+		if at and at - start >= TICK_MS then
+			break
+		end
+	end
+	if inHead > inTail then
+		inHead, inTail = 1, 0
+	end
+end
+
+local function WipeIncoming()
+	wipe(incoming)
+	inHead, inTail = 1, 0
+end
+
+-- Beacon.lua hands every J message here (after its own spam guard), inside the event: only noted
+-- here. A hello and a request are noted for good (cheap; answering waits for the tick, serves),
+-- everything else waits for the tick in incoming (merging can cost: a highlight prunes its
+-- character's). An answer's record counts as progress when it comes, not when it's merged.
+function ns.Beacon.ReceiveJournal(id, word, more)
+	if not (M.enabled and store) then
+		return
+	end
+	local peer = ns.Beacon.peers[id]
+	if not peer then
+		return
+	end
+	if word == "h" then
+		peer.journal = more:match("^%x%x%x%x%x%x%x%x$") or "" -- (they sync; their account, if known)
+		summaries[id] = nil -- (they (re)started: everything is offered again)
+		for _, message in ipairs(peer.journal ~= "" and ReadsNames(peer) and Learned(peer.journal) or {}) do
+			ns.Beacon.QueueLow(id, message) -- (their own characters' names I learned, if their build reads them)
+		end
+		return
+	elseif word == "q" then
+		local acct, since = more:match("^(%x%x%x%x%x%x%x%x);(%d+)$")
+		if acct then
+			for i = #serves, 1, -1 do -- (asked again before it was answered: once)
+				if serves[i].id == id and serves[i].acct == acct then
+					table.remove(serves, i)
+				end
+			end
+			if #serves < 50 then
+				serves[#serves + 1] = { id = id, acct = acct, since = tonumber(since) }
+			end
+		end
+		return
+	end
+	local acct = word ~= "s" and more:match("^(%x%x%x%x%x%x%x%x);")
+	local p = acct and pending[acct]
+	if p and p.from ~= id then
+		p = nil
+	end
+	if inTail - inHead + 1 >= INCOMING_MAX then
+		if p then
+			p.lost = true -- (its end doesn't complete the account: asked again)
+		end
+		return
+	end
+	if p then
+		p.at = GetTime()
+	end
+	inTail = inTail + 1
+	incoming[inTail] = { id, word, more }
 end
 
 -- A friend went away: what was asked of them can be asked of someone else.
@@ -807,6 +874,7 @@ function ns.Beacon.JournalStop()
 	wipe(summaries)
 	wipe(pending)
 	wipe(serves)
+	WipeIncoming()
 end
 
 -- Friends' journals that aren't worth keeping: accounts no longer among my friends (once the friend
@@ -849,9 +917,14 @@ function C.SyncTick(now)
 		end
 		StampChar(char, true, withProfile)
 	end
-	for acct, p in pairs(pending) do
-		if now - p.at >= PENDING_TIMEOUT then
-			pending[acct] = nil
+	Incoming(now) -- (friends' messages, merged here, not in the event)
+	-- No progress for a while: someone else may answer. Only once everything that came is merged
+	-- (each record merged is progress too).
+	if inHead > inTail then
+		for acct, p in pairs(pending) do
+			if now - p.at >= PENDING_TIMEOUT then
+				pending[acct] = nil
+			end
 		end
 	end
 	local B = Beacon()
@@ -937,6 +1010,7 @@ function C.SyncEnable()
 	wipe(pending)
 	wipe(summaries)
 	wipe(serves)
+	WipeIncoming()
 	C.RecapStart(now)
 	pruneAt = now + 60 -- (the friend list is known by then)
 	meetAt = now + MEET_FIRST
@@ -955,6 +1029,7 @@ function C.SyncDisable()
 	wipe(pending)
 	wipe(summaries)
 	wipe(serves)
+	WipeIncoming()
 	pruneAt, meetAt = nil, nil
 	C.RecapStop()
 end
@@ -976,4 +1051,12 @@ end
 -- Requests waiting for an answer (Recap.lua waits while journals still come in; tests).
 function C.SyncPending()
 	return pending
+end
+
+-- Friends' messages waiting for the tick: how many; merged at once (tests).
+function C.SyncWaiting()
+	return inTail - inHead + 1
+end
+function C.SyncMergeAll()
+	Incoming(GetTime(), true)
 end
