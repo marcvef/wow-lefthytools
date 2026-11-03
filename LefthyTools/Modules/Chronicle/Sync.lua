@@ -572,7 +572,9 @@ end
 -- Friends' requests, answered within the tick's budget: one answer after another, in the order asked.
 local function Answers()
 	local B = ns.Beacon
-	while InBudget() do
+	local first = true -- (one step at least: merging may have spent the budget)
+	while first or InBudget() do
+		first = false
 		if not answer then
 			local serve = table.remove(serves, 1)
 			if not serve then
@@ -867,7 +869,10 @@ local function Incoming(now, all)
 		incoming[inHead] = nil
 		inHead = inHead + 1
 		handled = handled + 1
-		Handle(item[1], item[2], item[3], now)
+		local ok, err = pcall(Handle, item[1], item[2], item[3], now)
+		if not ok then
+			geterrorhandler()(err) -- (reported; the next one is merged as ever)
+		end
 		if not (all or InBudget()) then
 			break
 		end
@@ -912,7 +917,7 @@ function ns.Beacon.ReceiveJournal(id, word, more)
 			if answer and answer.id == id and answer.acct == acct then
 				answer = nil -- (the one being built too: it starts anew, from what they asked now)
 			end
-			if #serves < 50 then
+			if #serves < 200 then -- (one per friend and account: they pile up through a fight)
 				serves[#serves + 1] = { id = id, acct = acct, since = tonumber(since) }
 			end
 		end
@@ -982,6 +987,7 @@ local function PruneStep()
 	if not acct then
 		pruning = nil
 		Changed()
+		C.feedDirty = true -- (news it pruned may have been the only unseen: the minimap dot)
 		return
 	end
 	local a, friends = store.book[acct], Friends()
@@ -1071,7 +1077,7 @@ function C.SyncTick(now)
 		StartPruning()
 	end
 	local steps = 0
-	while pruning and steps < PRUNE_STEP and InBudget() do
+	while pruning and steps < PRUNE_STEP and (steps == 0 or InBudget()) do -- (one step at least)
 		steps = steps + 1
 		PruneStep()
 	end
@@ -1173,6 +1179,9 @@ function C.SyncSettingChanged()
 		for _, c in pairs(store.chars) do
 			Restamp(c)
 		end
+	end
+	if answer and answer.mine then
+		answer = nil -- (one being built about my account: what it shares may have changed; they ask again)
 	end
 	wipe(summaries) -- (everything offered again)
 end
