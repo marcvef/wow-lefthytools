@@ -363,8 +363,13 @@ before it is the beta's: a friend on an older build that kept the beta's saved d
 and a profile last played before it (a character played only then isn't taken at all); kept from
 before (an earlier build): it goes when Chronicle starts (`Prune`), and a character left with
 nothing goes with the book's pruning. Requests are queued
-(`serves`, at most 50, a repeat replaces the waiting one) and answered on the tick, two per
-second, never inside the event. Everything else a friend sends (what they hold, records, counts,
+(`serves`, at most 50, a repeat replaces the waiting one) and answered on the tick, one after
+another, never inside the event. An answer is built over several ticks, within the tick's budget
+(2 ms, `TICK_MS`, shared with merging): its characters listed one at a time (their records, without
+messages), then sorted, then at most 100 of its messages built and queued a tick (`SERVE_STEP`). Of
+mine it holds what's stamped up to my last stamp when it began (one stamped meanwhile comes on the
+next round, so no record of mine is skipped under a later end). Asked again while it's built, it
+starts anew with what they ask now; a friend who went, it stops. Everything else a friend sends (what they hold, records, counts,
 ends) is only noted in the event too (`incoming`) and merged on the tick, in the order it came: at
 most 200 a tick and no longer than 2 ms (`TICK_MS`, where the game says: `debugprofilestop`). At
 most 2000 wait (about three minutes of one friend at Beacon's limit); one that doesn't fit is

@@ -51,7 +51,7 @@ local DAYS_KEPT = 30
 local NEWS_KEPT = 150
 local SUMMARY_GAP = 60
 local FULL_OFFER = 300  -- everything offered again this often (an offer missed, a journal only partly got)
-local SERVES_PER_TICK = 2 -- answers built per tick (each up to SERVE_MAX messages)
+local SERVE_STEP = 100    -- an answer's messages built a tick at most (and within the tick's budget)
 local BOOK_DAYS = 60     -- a friend's character with nothing newer than this goes
 -- Characters kept per friend's account, the most recently played: a real account has a handful in
 -- BOOK_DAYS (the most in a real book: 6), so 30 keeps every one even an altoholic plays, while a
@@ -80,6 +80,19 @@ local store
 local pending = {}     -- acct -> { from, at, got (records come so far), expect (how many the answer has), lost }
 local serves = {}      -- answers to build on the tick: { id, acct, since }
 local incoming, inHead, inTail = {}, 1, 0 -- friends' messages for the tick: { id, word, more }
+
+-- Milliseconds (debugprofilestop), nil where there's none (tests).
+local function Clock()
+	local ok, ms = pcall(debugprofilestop)
+	return ok and type(ms) == "number" and ms or nil
+end
+
+-- The tick's work (merging, answering, pruning) stops for this tick once TICK_MS are spent.
+local tickStart -- (Clock() when the tick began; nil: no clock)
+local function InBudget()
+	local at = tickStart and Clock()
+	return not (at and at - tickStart >= TICK_MS)
+end
 local summaries = {}   -- gameAccountID -> { at, sent = { [acct] = u } }
 local lastCheck, lastProfile = -math.huge, -math.huge
 local pruneAt          -- when the book is pruned (PruneBook)
@@ -285,68 +298,83 @@ local function AliasMessage(acct, key, u, full, guid)
 	return J("a", acct, key, u, ns.Beacon.Clean(full or "", NAME_BYTES), guid or "")
 end
 
--- An account's records newer than since: { { u, message }, ... }, oldest first.
-local function Records(acct, since)
-	local list = {}
-	local function Add(u, message)
-		if u and u > since then
-			list[#list + 1] = { u, message }
+-- An answer's records are listed first, without their messages ({ u, kind, key, character, record,
+-- extra }): a character's records newer than since (mine: only up to held, my last stamp when the
+-- answer began; one stamped since comes on the next round).
+local function ListChar(answer, key, c)
+	local items, since, held = answer.items, answer.since, answer.held
+	local function Add(u, kind, record, extra)
+		if u and u > since and (not answer.mine or u <= held) then
+			items[#items + 1] = { u, kind, key, c, record, extra }
 		end
 	end
-	if acct == C.MyAccount() then
-		local oldest = C.DayAgo(DAYS_KEPT)
-		for _, c in ipairs(MyChars()) do
-			local key, s = CharKey(c), SyncState(c)
-			if s.profileU then
-				local numbers, foe, zone = ProfileText(c)
-				local last = c == C.Char() and time() or (c.session and c.session.last) or 0
-				Add(s.profileU, ProfileMessage(acct, key, s.profileU, c.classFile, c.level, last, numbers, foe, zone))
-				if c.full or c.guid then
-					Add(s.profileU, AliasMessage(acct, key, s.profileU, c.full or c.name, c.guid))
-				end
+	if answer.mine then
+		local s = SyncState(c)
+		if s.profileU then
+			Add(s.profileU, "p")
+			if c.full or c.guid then
+				Add(s.profileU, "a")
 			end
-			for day, u in pairs(s.dayU) do
-				local b = c.daily[day]
-				if b then
-					Add(u, J("d", acct, key, u, (day:gsub("-", "")), DayText(b)))
-				end
+		end
+		for day, u in pairs(s.dayU) do
+			local b = c.daily[day]
+			if b then
+				Add(u, "d", b, day)
 			end
-			local news = 0
-			for i = #c.events, 1, -1 do
-				local e = c.events[i]
-				if e.t and e.t < oldest then
-					break
-				end
-				if e.n and news < NEWS_KEPT then
-					news = news + 1
-					local a, b = C.NewsFields(e)
-					Add(e.u, J("n", acct, key, e.u, e.n, e.t, e.k, a, b))
-				end
+		end
+		local oldest, news = C.DayAgo(DAYS_KEPT), 0
+		for i = #c.events, 1, -1 do
+			local e = c.events[i]
+			if e.t and e.t < oldest then
+				break
+			end
+			if e.n and news < NEWS_KEPT then
+				news = news + 1
+				Add(e.u, "n", e)
 			end
 		end
 	else
-		local a = store.book[acct]
-		for key, c in pairs(a and a.chars or {}) do
-			if c.aliasU and c.full then
-				Add(c.aliasU, AliasMessage(acct, key, c.aliasU, c.full, c.guid))
-			end
-			if c.profile then
-				local p, numbers = c.profile, {}
-				for i, field in ipairs(PROFILE_FIELDS) do
-					numbers[i] = tostring(Int(MINUTES[field] and (p[field] or 0) / 60 or p[field]))
-				end
-				Add(c.u, ProfileMessage(acct, key, c.u, c.classFile, c.level, c.last, table.concat(numbers, ","), c.foe, c.zone))
-			end
-			for day, b in pairs(c.days) do
-				Add(b.u, J("d", acct, key, b.u, (day:gsub("-", "")), DayText(b)))
-			end
-			for n, e in pairs(c.news) do
-				Add(e.u, J("n", acct, key, e.u, n, e.t, e.k, e.a or "", e.b or ""))
-			end
+		if c.aliasU and c.full then
+			Add(c.aliasU, "a")
+		end
+		if c.profile then
+			Add(c.u, "p")
+		end
+		for day, b in pairs(c.days) do
+			Add(b.u, "d", b, day)
+		end
+		for n, e in pairs(c.news) do
+			Add(e.u, "n", e, n)
 		end
 	end
-	table.sort(list, function(x, y) return x[1] < y[1] end)
-	return list
+end
+
+-- A listed record's message (built when it's queued).
+local function Message(answer, item)
+	local u, kind, key, c, record, extra = item[1], item[2], item[3], item[4], item[5], item[6]
+	local acct = answer.acct
+	if kind == "d" then
+		return J("d", acct, key, u, (extra:gsub("-", "")), DayText(record))
+	elseif answer.mine then
+		if kind == "p" then
+			local numbers, foe, zone = ProfileText(c)
+			local last = c == C.Char() and time() or (c.session and c.session.last) or 0
+			return ProfileMessage(acct, key, u, c.classFile, c.level, last, numbers, foe, zone)
+		elseif kind == "a" then
+			return AliasMessage(acct, key, u, c.full or c.name, c.guid)
+		end
+		local a, b = C.NewsFields(record)
+		return J("n", acct, key, u, record.n, record.t, record.k, a, b)
+	elseif kind == "a" then
+		return AliasMessage(acct, key, u, c.full, c.guid)
+	elseif kind == "p" then
+		local p, numbers = c.profile or {}, {}
+		for i, field in ipairs(PROFILE_FIELDS) do
+			numbers[i] = tostring(Int(MINUTES[field] and (p[field] or 0) / 60 or p[field]))
+		end
+		return ProfileMessage(acct, key, u, c.classFile, c.level, c.last, table.concat(numbers, ","), c.foe, c.zone)
+	end
+	return J("n", acct, key, u, extra, record.t, record.k, record.a or "", record.b or "")
 end
 
 -- A highlight's two text fields, the way friends get them (the same as Beacon's E2 highlights).
@@ -472,33 +500,89 @@ end
 -- An answer: the account's records newer than since, at most SERVE_MAX (never cutting between two
 -- of the same stamp), the names learned of it, how many (c: a receiver that got fewer doesn't take
 -- the end's stamp; older builds ignore it) and the end. An answer to the same friend for the same
--- account still waiting goes first: asked again, they get it once.
-local function Serve(id, acct, since)
+-- account still waiting goes first: asked again, they get it once. Built over several ticks, within
+-- each tick's budget (AnswerStep): its characters listed one at a time, then sorted, then its
+-- messages built and queued, SERVE_STEP a tick at most.
+local answer -- the one being built: { id, acct, since, held, mine, chars, ci, items, i, count }
+
+local function StartAnswer(id, acct, since)
 	local B = ns.Beacon
 	B.DropLowFor(id, function(message)
 		return message:sub(1, 3) == "J" .. VERSION .. ";" and message:find(";" .. acct .. ";", 1, true) ~= nil
 	end)
-	if Held(acct) == 0 then
+	local held = Held(acct)
+	if held == 0 then
 		B.Queue(id, J("e", acct, since)) -- (nothing for them: they ask someone else)
 		return
 	end
-	local list = Records(acct, since)
-	local count = math.min(#list, SERVE_MAX)
-	while list[count + 1] and list[count + 1][1] == list[count][1] do
-		count = count + 1
+	answer = { id = id, acct = acct, since = since, held = held, mine = acct == C.MyAccount(), chars = {}, ci = 1, items = {}, i = 1 }
+	if answer.mine then
+		for _, c in ipairs(MyChars()) do
+			answer.chars[#answer.chars + 1] = { CharKey(c), c }
+		end
+	else
+		for key, c in pairs(store.book[acct] and store.book[acct].chars or {}) do
+			answer.chars[#answer.chars + 1] = { key, c }
+		end
 	end
-	for i = 1, count do
-		B.QueueLow(id, list[i][2])
+end
+
+-- One step of the answer being built; false once the tick's budget is spent.
+local function AnswerStep()
+	local B, a = ns.Beacon, answer
+	local char = a.chars[a.ci]
+	if char then
+		a.ci = a.ci + 1
+		ListChar(a, char[1], char[2])
+		return InBudget()
+	end
+	local items = a.items
+	if not a.count then
+		table.sort(items, function(x, y) return x[1] < y[1] end)
+		local count = math.min(#items, SERVE_MAX)
+		while items[count + 1] and items[count + 1][1] == items[count][1] do
+			count = count + 1
+		end
+		a.count = count
+		return InBudget()
+	end
+	local built = 0
+	while a.i <= a.count do
+		B.QueueLow(a.id, Message(a, items[a.i]))
+		a.i, built = a.i + 1, built + 1
+		if built >= SERVE_STEP or not InBudget() then
+			return false
+		end
 	end
 	-- (counted too: every build that counts counts every message about the account it asked for;
 	-- builds that don't read them get none, and a count without them)
-	local learned = ReadsNames(B.peers[id]) and Learned(acct) or {}
+	local learned = ReadsNames(B.peers[a.id]) and Learned(a.acct) or {}
 	for _, message in ipairs(learned) do
-		B.QueueLow(id, message)
+		B.QueueLow(a.id, message)
 	end
-	local upTo = #list > count and list[count][1] or Held(acct)
-	B.QueueLow(id, J("c", acct, count + #learned))
-	B.QueueLow(id, J("e", acct, upTo))
+	local upTo = #items > a.count and items[a.count][1] or a.held
+	B.QueueLow(a.id, J("c", a.acct, a.count + #learned))
+	B.QueueLow(a.id, J("e", a.acct, upTo))
+	answer = nil
+	return InBudget()
+end
+
+-- Friends' requests, answered within the tick's budget: one answer after another, in the order asked.
+local function Answers()
+	local B = ns.Beacon
+	while InBudget() do
+		if not answer then
+			local serve = table.remove(serves, 1)
+			if not serve then
+				return
+			end
+			if B.peers[serve.id] then
+				StartAnswer(serve.id, serve.acct, serve.since)
+			end
+		elseif not AnswerStep() then
+			return
+		end
+	end
 end
 
 local function Book(acct, key)
@@ -772,24 +856,17 @@ local function Handle(id, word, more, now)
 	end
 end
 
--- Milliseconds (debugprofilestop), nil where there's none (tests).
-local function Clock()
-	local ok, ms = pcall(debugprofilestop)
-	return ok and type(ms) == "number" and ms or nil
-end
-
--- The friends' messages waiting, merged by the tick: at most INCOMING_PER_TICK, and TICK_MS (one at
--- least). all: everything waiting (tests).
+-- The friends' messages waiting, merged by the tick: at most INCOMING_PER_TICK, within the tick's
+-- budget (one at least). all: everything waiting (tests).
 local function Incoming(now, all)
-	local handled, start = 0, inHead <= inTail and not all and Clock()
+	local handled = 0
 	while inHead <= inTail and (all or handled < INCOMING_PER_TICK) do
 		local item = incoming[inHead]
 		incoming[inHead] = nil
 		inHead = inHead + 1
 		handled = handled + 1
 		Handle(item[1], item[2], item[3], now)
-		local at = start and Clock()
-		if at and at - start >= TICK_MS then
+		if not (all or InBudget()) then
 			break
 		end
 	end
@@ -830,6 +907,9 @@ function ns.Beacon.ReceiveJournal(id, word, more)
 					table.remove(serves, i)
 				end
 			end
+			if answer and answer.id == id and answer.acct == acct then
+				answer = nil -- (the one being built too: it starts anew, from what they asked now)
+			end
 			if #serves < 50 then
 				serves[#serves + 1] = { id = id, acct = acct, since = tonumber(since) }
 			end
@@ -867,6 +947,9 @@ function ns.Beacon.JournalForget(id)
 			table.remove(serves, i)
 		end
 	end
+	if answer and answer.id == id then
+		answer = nil
+	end
 end
 
 -- Beacon switched off: nothing asked, offered or owed any more.
@@ -874,6 +957,7 @@ function ns.Beacon.JournalStop()
 	wipe(summaries)
 	wipe(pending)
 	wipe(serves)
+	answer = nil
 	WipeIncoming()
 end
 
@@ -908,6 +992,7 @@ function C.SyncTick(now)
 	if not store then
 		return
 	end
+	tickStart = Clock()
 	local char = C.Char()
 	if now - lastCheck >= CHECK_GAP then
 		lastCheck = now
@@ -929,15 +1014,7 @@ function C.SyncTick(now)
 	end
 	local B = Beacon()
 	if B then
-		for _ = 1, SERVES_PER_TICK do -- (answers to friends' requests, built here, not in the event)
-			local serve = table.remove(serves, 1)
-			if not serve then
-				break
-			end
-			if B.peers[serve.id] then
-				Serve(serve.id, serve.acct, serve.since)
-			end
-		end
+		Answers() -- (friends' requests, answered here, not in the event)
 		for id, peer in pairs(B.peers) do
 			if peer.journal then
 				SendSummary(id, peer, now)
@@ -1010,6 +1087,7 @@ function C.SyncEnable()
 	wipe(pending)
 	wipe(summaries)
 	wipe(serves)
+	answer = nil
 	WipeIncoming()
 	C.RecapStart(now)
 	pruneAt = now + 60 -- (the friend list is known by then)
@@ -1029,6 +1107,7 @@ function C.SyncDisable()
 	wipe(pending)
 	wipe(summaries)
 	wipe(serves)
+	answer = nil
 	WipeIncoming()
 	pruneAt, meetAt = nil, nil
 	C.RecapStop()

@@ -1940,3 +1940,69 @@ do
 	book.chars["Carlq-Realmy"] = nil
 	C.NewsChanged()
 end
+
+section("Chronicle: an answer to a friend is built over several ticks")
+do
+	local C, B = ns.Chronicle, ns.Beacon
+	local eve = C.Hash("Eve#5678")
+	anna("H2")
+	Advance(1.2)
+	-- Eve's journal (my friend's): 450 highlights, three to a stamp.
+	local t0 = time() - 2 * 86400
+	local book = { u = 7000, chars = {} }
+	for j = 1, 3 do
+		local c = { name = "Eve" .. j, realm = "Realmy", days = {}, news = {} }
+		for n = 1, 150 do
+			c.news[n] = { u = 5000 + math.floor(((j - 1) * 150 + n - 1) / 3), t = t0 + n, k = "zone", a = "Zone " .. n, b = "", g = time() }
+		end
+		book.chars["Eve" .. j .. "-Realmy"] = c
+	end
+	CDB.book[eve] = book
+	local queued, perTick, queueLow = {}, {}, B.QueueLow
+	B.QueueLow = function(id, message, ...) -- (what's queued for Anna about Eve, and when)
+		if id == 11 and message:find(";" .. eve .. ";", 1, true) then
+			queued[#queued + 1] = message
+			perTick[GetTime()] = (perTick[GetTime()] or 0) + 1
+		end
+		return queueLow(id, message, ...)
+	end
+	local function ends()
+		local list = {}
+		for _, m in ipairs(queued) do if m:find("^J2;e;") then list[#list + 1] = m end end
+		return list
+	end
+	anna("J2;q;" .. eve .. ";0")
+	Advance(7)
+	local most, ticks, ordered = 0, 0, true
+	for _, n in pairs(perTick) do most, ticks = math.max(most, n), ticks + 1 end
+	local last = 0
+	for _, m in ipairs(queued) do
+		local u = tonumber(m:match("^J2;n;%x+;[^;]+;(%d+);"))
+		if u then
+			ordered, last = ordered and u >= last, u
+		end
+	end
+	check(ticks >= 4 and most <= 102, ("an answer of hundreds of records: at most 100 built a tick, got at most %d, in %d ticks")
+		:format(most, ticks))
+	check(#queued == 404 and ordered and queued[403] == "J2;c;" .. eve .. ";402" and queued[404] == "J2;e;" .. eve .. ";5133",
+		"... 400 at most, oldest first, never cutting between two of a stamp; its count and end last, got " .. #queued)
+	-- Asked again before it was all built: it starts anew, with what they ask now (the one before
+	-- doesn't end).
+	queued = {}
+	anna("J2;q;" .. eve .. ";0")
+	Advance(1.05)
+	anna("J2;q;" .. eve .. ";5100")
+	Advance(6)
+	check(#ends() == 1 and ends()[1] == "J2;e;" .. eve .. ";7000" and queued[#queued - 1] == "J2;c;" .. eve .. ";147",
+		"asked again while it's built: only the new one goes on, got " .. table.concat(ends(), " "))
+	-- The friend went: the answer being built goes with them.
+	queued = {}
+	anna("J2;q;" .. eve .. ";0")
+	Advance(1.05)
+	B.JournalForget(11)
+	Advance(3.7) -- (whole seconds in all)
+	check(#queued > 0 and #ends() == 0, "a friend who went: the rest of their answer isn't built")
+	B.QueueLow = queueLow
+	CDB.book[eve] = nil
+	C.NewsChanged()
+end
