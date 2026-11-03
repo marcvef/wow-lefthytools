@@ -2140,3 +2140,20 @@ do
 	state("", 30)
 	Advance(0.6) -- (whole seconds in all: the later files tick as before)
 end
+
+section("Chronicle: the minimap dot is counted after a fight")
+do
+	local C = ns.Chronicle
+	anna("H2")
+	Advance(2)
+	local updates, update = 0, C.UpdateNewDot
+	C.UpdateNewDot = function(...) updates = updates + 1; return update(...) end
+	EnterCombat()
+	ns.Beacon.Notify("highlight", peers()[11], { kind = "boss", a = "Hogger", b = "Elwynn Forest" })
+	Advance(10)
+	check(updates == 0, "a friend's news in a fight: the dot isn't counted (the whole feed), got " .. updates)
+	LeaveCombat()
+	Advance(4)
+	C.UpdateNewDot = update
+	check(updates == 1, "... it is after the fight, got " .. updates)
+end

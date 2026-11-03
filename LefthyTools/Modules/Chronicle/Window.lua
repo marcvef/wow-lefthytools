@@ -795,9 +795,10 @@ end
 -- counter, not the timeline).
 function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
 	-- While journals stream in the feed changes every second: the dot and the News and Friends pages
-	-- follow at most every few seconds.
+	-- follow at most every few seconds. The dot (counting friends' news can take milliseconds) not in a
+	-- fight (LT.InFight): after it.
 	dotPending = dotPending or feedChanged
-	if dotPending and now - lastDot >= FEED_MIN_GAP and C.UpdateNewDot then
+	if dotPending and now - lastDot >= FEED_MIN_GAP and C.UpdateNewDot and not LT.InFight() then
 		dotPending, lastDot = false, now
 		C.UpdateNewDot() -- (the minimap button's blue dot)
 	end

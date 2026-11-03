@@ -132,7 +132,8 @@ look (`MiniMap-TrackingBorder`, `UI-Minimap-Background`, a book icon), `Minimap:
 from the centre at the saved `minimapAngle` (degrees, 210 = lower left; square minimaps: on the
 square's edge). Click toggles the journal, right-click opens the settings, the tooltip shows this
 session and how much is new from friends. A small blue dot while there's news from friends the
-journal hasn't shown yet (`C.UpdateNewDot`, on feed changes). Dragging sets an `OnUpdate` that turns
+journal hasn't shown yet (`C.UpdateNewDot`, on feed changes at most every 3 s; not in a fight,
+`LT.InFight`: after it). Dragging sets an `OnUpdate` that turns
 the cursor position into the angle and removes it on drop. Created on first use; Chronicle's
 enable/disable and the setting update it on the next frame.
 **Characters and accounts.** A character is shown once, by the name the game shows ("Anna Brook":
