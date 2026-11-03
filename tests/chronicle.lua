@@ -2006,3 +2006,44 @@ do
 	CDB.book[eve] = nil
 	C.NewsChanged()
 end
+
+section("Chronicle: the book's pruning is spread over ticks")
+do
+	local C = ns.Chronicle
+	lefthy("disable chronicle")
+	lefthy("enable chronicle") -- (the book is pruned a minute later)
+	-- 60 characters of friends' accounts with nothing in the last 60 days.
+	local accts = { C.Hash("Bobby#2345"), C.Hash("Dora#4567"), C.Hash("Finn#6789") }
+	local function stale()
+		local n = 0
+		for _, acct in ipairs(accts) do
+			for key in pairs(CDB.book[acct] and CDB.book[acct].chars or {}) do
+				if key:find("^Stale") then n = n + 1 end
+			end
+		end
+		return n
+	end
+	for i, acct in ipairs(accts) do
+		CDB.book[acct] = CDB.book[acct] or { u = 0, chars = {} }
+		for j = 1, 20 do
+			CDB.book[acct].chars["Stale" .. i .. "x" .. j .. "-Realmy"] = { name = "Stale" .. i .. "x" .. j, realm = "Realmy", days = {},
+				news = {}, last = time() - 90 * 86400 }
+		end
+	end
+	Advance(59.5)
+	local counts = { stale() }
+	for _ = 1, 6 do
+		Advance(1)
+		counts[#counts + 1] = stale()
+	end
+	local first
+	for i = 2, #counts do
+		if counts[i] < counts[i - 1] then first = first or counts[i - 1] - counts[i] end
+	end
+	check(counts[1] == 60 and first and first <= 20 and counts[#counts] == 0, ("60 characters to prune: at most 20 a tick, got %s")
+		:format(table.concat(counts, ", ")))
+	for _, acct in ipairs(accts) do
+		check(not CDB.book[acct] or next(CDB.book[acct].chars), "an account left with nothing goes")
+	end
+	Advance(0.5) -- (whole seconds in all: the later files tick as before)
+end

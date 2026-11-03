@@ -57,6 +57,7 @@ local BOOK_DAYS = 60     -- a friend's character with nothing newer than this go
 -- BOOK_DAYS (the most in a real book: 6), so 30 keeps every one even an altoholic plays, while a
 -- broken or hostile client can't fill my saved data with characters.
 local CHARS_KEPT = 30
+local PRUNE_STEP = 20    -- the book's pruning: accounts and characters a tick at most (and within the tick's budget)
 local CHECK_GAP = 60
 local PROFILE_GAP = 300
 local PENDING_TIMEOUT = 90
@@ -95,7 +96,7 @@ local function InBudget()
 end
 local summaries = {}   -- gameAccountID -> { at, sent = { [acct] = u } }
 local lastCheck, lastProfile = -math.huge, -math.huge
-local pruneAt          -- when the book is pruned (PruneBook)
+local pruneAt          -- when the book's pruning begins (StartPruning)
 local meetAt           -- the next walk over Battle.net's friends online (Meet)
 -- (Characters.lua: accounts, names, matching)
 local Friends, IsFriend, FirstName, HasSurname, ValidGuid = C.FriendAccounts, C.IsFriend, C.FirstName, C.HasSurname, C.ValidGuid
@@ -962,26 +963,55 @@ function ns.Beacon.JournalStop()
 end
 
 -- Friends' journals that aren't worth keeping: accounts no longer among my friends (once the friend
--- list is known), characters with nothing in the last BOOK_DAYS days.
-local function PruneBook()
-	local friends = Friends()
-	local oldest = C.DayAgo(BOOK_DAYS)
-	for acct, a in pairs(store.book) do
-		if next(friends) and not friends[acct] then
-			store.book[acct] = nil
-		else
-			for key, c in pairs(a.chars) do
-				Prune(c)
-				if not next(c.days) and not next(c.news) and ((c.last or 0) < oldest or BeforeLaunch(c.last or 0)) then
-					a.chars[key] = nil
-				end
-			end
-			if not next(a.chars) then
-				store.book[acct] = nil
-			end
+-- list is known), characters with nothing in the last BOOK_DAYS days. Over several ticks, within each
+-- tick's budget: an account or a character a step, PRUNE_STEP a tick at most (the accounts as they
+-- were when it began).
+local pruning -- { accts = { acct, ... }, i (the account at), keys (its characters), j (the character at) }
+
+local function StartPruning()
+	local accts = {}
+	for acct in pairs(store.book) do
+		accts[#accts + 1] = acct
+	end
+	pruning = { accts = accts, i = 1 }
+end
+
+local function PruneStep()
+	local acct = pruning.accts[pruning.i]
+	if not acct then
+		pruning = nil
+		Changed()
+		return
+	end
+	local a, friends = store.book[acct], Friends()
+	if not a or (next(friends) and not friends[acct]) then
+		store.book[acct] = nil -- (gone meanwhile, or no longer my friend's)
+		pruning.i, pruning.keys = pruning.i + 1, nil
+		return
+	end
+	if not pruning.keys then
+		pruning.keys, pruning.j = {}, 1
+		for key in pairs(a.chars) do
+			pruning.keys[#pruning.keys + 1] = key
 		end
 	end
-	Changed()
+	local key = pruning.keys[pruning.j]
+	if not key then
+		if not next(a.chars) then
+			store.book[acct] = nil
+		end
+		pruning.i, pruning.keys = pruning.i + 1, nil
+		return
+	end
+	pruning.j = pruning.j + 1
+	local c = a.chars[key]
+	if c then
+		Prune(c)
+		local last = c.last or 0
+		if not next(c.days) and not next(c.news) and (last < C.DayAgo(BOOK_DAYS) or BeforeLaunch(last)) then
+			a.chars[key] = nil
+		end
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -1023,7 +1053,12 @@ function C.SyncTick(now)
 	end
 	if pruneAt and now >= pruneAt then
 		pruneAt = nil
-		PruneBook()
+		StartPruning()
+	end
+	local steps = 0
+	while pruning and steps < PRUNE_STEP and InBudget() do
+		steps = steps + 1
+		PruneStep()
 	end
 	if meetAt and now >= meetAt then
 		meetAt = now + MEET_GAP
@@ -1090,7 +1125,7 @@ function C.SyncEnable()
 	answer = nil
 	WipeIncoming()
 	C.RecapStart(now)
-	pruneAt = now + 60 -- (the friend list is known by then)
+	pruneAt, pruning = now + 60, nil -- (the friend list is known by then)
 	meetAt = now + MEET_FIRST
 	-- Switched on mid-session: friends already here hear it now (at login nobody is known yet;
 	-- they learn it from my answers).
@@ -1109,7 +1144,7 @@ function C.SyncDisable()
 	wipe(serves)
 	answer = nil
 	WipeIncoming()
-	pruneAt, meetAt = nil, nil
+	pruneAt, meetAt, pruning = nil, nil, nil
 	C.RecapStop()
 end
 

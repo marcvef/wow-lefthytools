@@ -382,7 +382,9 @@ friend per minute.
 
 **Keeping the book small:** a minute after starting (the friend list is known by then), accounts
 that are no longer my Battle.net friends go, and characters with nothing in the last 60 days
-(`BOOK_DAYS`). An account keeps at most 30 characters (`CHARS_KEPT`), the most recently played
+(`BOOK_DAYS`), over several ticks: an account or a character a step, at most 20 a tick
+(`PRUNE_STEP`) and within the tick's budget (a whole book in one go took several milliseconds). An
+account keeps at most 30 characters (`CHARS_KEPT`), the most recently played
 (its profile's last played, else its latest day or highlight): a real account has a handful within
 60 days (the most in a real book: 6), so this only stops a broken or hostile client from filling
 the saved data with characters. Checked when a record brings a character new to the account (the
