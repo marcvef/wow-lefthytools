@@ -438,7 +438,7 @@ stops at the entrance.
 
 **Where it goes:** the recording is cut into pages (half an hour each, ten minutes while a friend
 who collects is online), packed small (about 5-8 KB per hour of play) and kept in your saved data. A
-friend who collects (the *Collect recordings* setting) gets them over Battle.net in the background
+friend who collects (switched on with `/lefthy echoes collect on`) gets them over Battle.net in the background
 whenever you're both online, a few per second, never in combat and never ahead of anything else
 LefthyTools sends; friends in between pass them on when you aren't online at the same time, like
 Chronicle's journals. Your pages travel within minutes to a collector who's online, and from your
@@ -456,7 +456,7 @@ nothing, and pages you already have wait until it's on again.
 |---|---|
 | Echoes (the module) | on |
 | Relay friends' recordings | on |
-| Collect recordings | off |
+| Collecting (`/lefthy echoes collect on\|off`, no checkbox) | off |
 
 ---
 

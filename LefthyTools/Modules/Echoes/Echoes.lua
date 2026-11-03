@@ -215,13 +215,12 @@ function M:OnDisable()
 end
 
 ---------------------------------------------------------------------------
--- Settings: the delivery's (Delivery.lua reads them)
+-- Settings: the delivery's (Delivery.lua reads them). Collecting has no checkbox, so nobody turns it
+-- on by accident: only "/lefthy echoes collect on" does (Delivery.lua), saved like a setting.
 ---------------------------------------------------------------------------
 
 function M:BuildOptions(o)
 	o:Header(L["Friends"])
 	o:Checkbox("relay", L["Relay friends' recordings"],
 		L["Keeps your Battle.net friends' recordings for a while and passes them on to whoever collects them, also when the two are never online at the same time. Needs Beacon; nothing is sent in combat."])
-	o:Checkbox("collect", L["Collect recordings"],
-		L["Gathers your Battle.net friends' recordings, and your own from other computers, on this computer, for a program outside the game to read. They take space until it has them: leave this off unless you're the one collecting."])
 end

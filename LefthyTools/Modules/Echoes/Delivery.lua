@@ -2918,6 +2918,25 @@ function D.ProbeCommand(rest)
 end
 
 E.Command("probe", D.ProbeCommand, "/lefthy echoes probe <friend> - which message sizes the server lets through to a friend with Echoes")
+
+-- "/lefthy echoes collect [on|off]": whether this computer collects. No checkbox (nobody switches it on
+-- by accident); saved like a setting, for the WoW account, until switched off the same way.
+E.Command("collect", function(rest)
+	local word = strtrim(rest or ""):lower()
+	if word == "on" or word == "off" then
+		local want = word == "on"
+		if (M.db.collect == true) ~= want then
+			LT:SetModuleSetting(M, "collect", want) -- (the tick sees it within a second: a hello to every friend)
+		end
+		M:Print(want and "this computer collects recordings now (saved): friends' recordings, and yours from other computers, come here for the exporter. /lefthy echoes collect off stops it."
+			or "this computer doesn't collect recordings (saved). What it collected so far stays in the saved data.")
+	elseif word == "" then
+		M:Print(M.db.collect and "this computer collects recordings. /lefthy echoes collect off stops it."
+			or "this computer doesn't collect recordings. /lefthy echoes collect on starts it (only where the exporter runs).")
+	else
+		M:Print("/lefthy echoes collect on|off - whether this computer collects friends' recordings for the exporter")
+	end
+end, "/lefthy echoes collect [on|off] - whether this computer collects friends' recordings for the exporter")
 E.OnStatus(function(add)
 	for _, line in ipairs(D.Status()) do
 		add(line)

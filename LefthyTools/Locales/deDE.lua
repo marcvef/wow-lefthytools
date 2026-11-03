@@ -953,6 +953,3 @@ L["Records the way you travel and what happens on it (level-ups, quests, kills, 
 L["Relay friends' recordings"] = "Aufzeichnungen von Freunden weitergeben"
 L["Keeps your Battle.net friends' recordings for a while and passes them on to whoever collects them, also when the two are never online at the same time. Needs Beacon; nothing is sent in combat."] =
 	"Hebt die Aufzeichnungen deiner Battle.net-Freunde eine Weile auf und gibt sie an den weiter, der sie sammelt, auch wenn die beiden nie gleichzeitig online sind. Braucht Beacon; im Kampf wird nichts gesendet."
-L["Collect recordings"] = "Aufzeichnungen sammeln"
-L["Gathers your Battle.net friends' recordings, and your own from other computers, on this computer, for a program outside the game to read. They take space until it has them: leave this off unless you're the one collecting."] =
-	"Sammelt die Aufzeichnungen deiner Battle.net-Freunde und deine eigenen von anderen Computern auf diesem Computer, damit ein Programm außerhalb des Spiels sie lesen kann. Bis es sie hat, brauchen sie Platz: Lass das aus, außer du bist derjenige, der sammelt."

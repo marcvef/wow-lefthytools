@@ -55,7 +55,7 @@ What the files share (`E`):
 | Setting | Default | What |
 |---|---|---|
 | `relay` | on | Relay friends' recordings: keep Battle.net friends' pages for a while and pass them on to whoever collects them |
-| `collect` | off | Collect recordings: gather friends' pages (and your own from other computers) for the exporter |
+| `collect` | off | Collecting: gather friends' pages (and your own from other computers) for the exporter. No checkbox, so nobody turns it on by accident: only `/lefthy echoes collect on\|off` (Delivery.lua) changes it |
 
 ## Recording
 

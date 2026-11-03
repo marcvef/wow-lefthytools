@@ -3,7 +3,7 @@
 -- Needs: no other file (it switches Echoes off and on itself, and the mock's client back to the beta).
 local suite = ...
 local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
-local catchErrors = suite.catchErrors
+local catchErrors, printedSince = suite.catchErrors, suite.printedSince
 local E = ns.Echoes
 local M = LT:GetModule("echoes")
 
@@ -22,8 +22,16 @@ do
 	local relay, collect = REGISTERED_SETTINGS.LefthyTools_echoes_relay, REGISTERED_SETTINGS.LefthyTools_echoes_collect
 	check(relay and relay:GetValue() == true and M.db.relay == true and relay.name == "Relay friends' recordings",
 		"\"Relay friends' recordings\": on by default")
-	check(collect and collect:GetValue() == false and M.db.collect == false and collect.name == "Collect recordings",
-		"\"Collect recordings\": off by default")
+	check(collect == nil and M.db.collect == false, "collecting: off by default, and no checkbox (only the command)")
+	local mark = #PRINTED + 1
+	lefthy("echoes collect")
+	check(M.db.collect == false and printedSince(mark):find("doesn't collect", 1, true), "/lefthy echoes collect: says it doesn't")
+	lefthy("echoes collect on")
+	check(M.db.collect == true and LefthyToolsDB.settings.echoes.collect == true, "/lefthy echoes collect on: on, saved")
+	lefthy("echoes collect maybe")
+	check(M.db.collect == true and printedSince(mark):find("collect on|off", 1, true), "another word: the usage, nothing changes")
+	lefthy("echoes collect off")
+	check(M.db.collect == false and LefthyToolsDB.settings.echoes.collect == false, "/lefthy echoes collect off: off, saved")
 	check(REGISTERED_SETTINGS.LefthyTools_module_echoes, "a switch on the overview page (the recording's switch)")
 end
 
