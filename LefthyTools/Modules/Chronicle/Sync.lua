@@ -1019,7 +1019,10 @@ end
 ---------------------------------------------------------------------------
 
 function C.SyncTick(now)
-	if not store then
+	if not store or LT.InFight() then
+		-- In a fight nothing of this runs (LT.InFight: up to 15 minutes unbroken): friends' messages
+		-- wait (incoming), their requests too (serves), and nothing times out meanwhile (each record
+		-- merged after it is progress). What's due is done on the first tick after it.
 		return
 	end
 	tickStart = Clock()

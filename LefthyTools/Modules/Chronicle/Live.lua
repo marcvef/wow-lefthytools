@@ -147,9 +147,9 @@ local function AfkMessage(day)
 end
 
 -- On the tick, at most every SHARE_GAP: today's and yesterday's numbers to every friend who needs
--- them (NeedsDays), if changed.
+-- them (NeedsDays), if changed. Not in a fight (LT.InFight): then on the first tick after it.
 function C.ShareDays(now)
-	if now - lastDailyShare < SHARE_GAP or not SharingOn() then
+	if now - lastDailyShare < SHARE_GAP or not SharingOn() or LT.InFight() then
 		return
 	end
 	lastDailyShare = now

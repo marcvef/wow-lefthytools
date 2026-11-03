@@ -277,7 +277,8 @@ sets only the day's `afk`, a `D2` keeps it. It also keeps the sender's account a
 so the window finds the character in their journal and counts those days for it, where the journal
 has none (older builds keep the fields and ignore them). When Beacon
 reports a friend as `known` (their name became known), they get my last 7 days; every 5 minutes
-today's and yesterday's go to them again if they changed (each message compared on its own). Only
+today's and yesterday's go to them again if they changed (each message compared on its own; not in a
+fight, `LT.InFight`: on the first tick after it). Only
 friends whose build needs them get these (`NeedsDays`): builds from 0.5.0-80 on (94d1d36,
 `JOURNALS_SINCE`) sync journals and get my days as "d" records with my journal (Sync.lua), so the
 old messages only go to builds before it, which read nothing else; a friend whose version hasn't
@@ -379,6 +380,13 @@ it's merged, and a request times out only once everything that came is merged. E
 offered again every 5 minutes (`FULL_OFFER`: an offer missed or an answer cut short). `relay` off: I
 don't pass on what I hold of others (a request gets an empty end). Beacon accepts 700 J messages per
 friend per minute.
+
+**Fights:** while I'm in one (`LT.InFight`, architecture.md: up to 15 minutes unbroken, a stuck
+combat flag doesn't hold it for good) Sync.lua's tick does nothing: friends' messages wait
+(`incoming`), their requests too (`serves`), and no stamp is checked, no answer or summary built,
+nothing pruned, no Battle.net walk, no catch-up or recap line; the first tick after it does what's
+due. My requests don't time out meanwhile (each record merged after it is progress). What Chronicle
+hands Beacon's low-priority queue waits out fights there too (beacon.md).
 
 **Keeping the book small:** a minute after starting (the friend list is known by then), accounts
 that are no longer my Battle.net friends go, and characters with nothing in the last 60 days

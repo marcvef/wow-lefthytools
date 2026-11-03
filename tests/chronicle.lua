@@ -2047,3 +2047,63 @@ do
 	end
 	Advance(0.5) -- (whole seconds in all: the later files tick as before)
 end
+
+section("Chronicle: journals wait out fights")
+do
+	local C, B = ns.Chronicle, ns.Beacon
+	local carl, mine = C.Hash("Carl#3456"), C.MyAccount()
+	anna("H2")
+	Advance(1.2)
+	local peer = peers()[11]
+	local versionWas = peer.version
+	local book = CDB.book[carl]
+	local from = book.u
+	local queued, queueLow = {}, B.QueueLow
+	B.QueueLow = function(id, message, ...) -- (what's queued for Anna)
+		if id == 11 then queued[#queued + 1] = message end
+		return queueLow(id, message, ...)
+	end
+	local function count(prefix)
+		local n = 0
+		for _, m in ipairs(queued) do if m:sub(1, #prefix) == prefix then n = n + 1 end end
+		return n
+	end
+	local function talk(seconds, step) -- (Anna keeps talking: Beacon forgets a friend silent for 65 s)
+		for _ = 1, seconds / 30 do
+			anna("S2;;0;260.0;750.0;Goldshire;")
+			Advance(30, step)
+		end
+	end
+	-- Asked Anna for Carl's journal before the fight; her answer comes during it.
+	anna("J2;s;" .. carl .. "," .. (from + 1000))
+	Advance(1.1)
+	check(C.SyncPending()[carl] and C.SyncPending()[carl].from == 11, "(asked Anna for Carl's journal)")
+	EnterCombat()
+	peer.version = "0.4.0" -- (her build takes my days the old way, every 5 minutes)
+	queued = {}
+	local t = time() - 3600
+	anna("J2;n;" .. carl .. ";Carlf-Realmy;" .. (from + 10) .. ";1;" .. t .. ";boss;Hogger;Westfall")
+	anna("J2;q;" .. mine .. ";0")
+	talk(150)
+	anna("J2;c;" .. carl .. ";1")
+	anna("J2;e;" .. carl .. ";" .. (from + 1000))
+	talk(180)
+	check(not book.chars["Carlf-Realmy"] and C.SyncWaiting() == 3 and C.SyncPending()[carl],
+		"in a fight what friends send waits for its end (and my request to Anna doesn't time out meanwhile)")
+	check(count("J2;") == 0 and count("D2;") == 0, "... nothing is answered, offered or sent the old way")
+	LeaveCombat()
+	Advance(3)
+	check(book.chars["Carlf-Realmy"] and book.u == from + 1000 and not C.SyncPending()[carl], "after it: merged, Carl's journal complete")
+	Advance(8)
+	check(count("J2;e;" .. mine) == 1 and count("D2;") >= 1, "... Anna's request answered, my days sent")
+	-- 15 minutes unbroken: the game's combat flag can stick; then the work goes on as out of combat.
+	EnterCombat()
+	anna("J2;n;" .. carl .. ";Carlf-Realmy;" .. (from + 1010) .. ";2;" .. t .. ";boss;Ragnaros;Molten Core")
+	talk(930, 0.5)
+	check(book.chars["Carlf-Realmy"].news[2], "a combat flag stuck for 15 minutes: merged as out of combat")
+	LeaveCombat()
+	B.QueueLow, peer.version = queueLow, versionWas
+	book.chars["Carlf-Realmy"] = nil
+	C.NewsChanged()
+	Advance(0.7) -- (whole seconds in all: the later files tick as before)
+end
