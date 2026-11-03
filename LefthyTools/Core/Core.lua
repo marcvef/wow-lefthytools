@@ -60,6 +60,22 @@ function LT.InCombat()
 	return (InCombatLockdown and InCombatLockdown()) or LT.Value(UnitAffectingCombat, "player") == true
 end
 
+-- Whether work that can wait (bulk sending, packing, building what's shared) waits for the fight's
+-- end: in combat (LT.InCombat), for up to 15 minutes unbroken. The game's combat flag can stick out of
+-- any fight; after that the work goes on as it would out of combat. The fight's start is noted at
+-- PLAYER_REGEN_DISABLED (or the first call that finds one), and forgotten at PLAYER_REGEN_ENABLED.
+local FIGHT_HOLD = 900
+local fightSince -- (GetTime() of the fight's start; nil: none noted)
+function LT.InFight()
+	if not LT.InCombat() then
+		fightSince = nil
+		return false
+	end
+	local now = GetTime()
+	fightSince = fightSince or now
+	return now - fightSince < FIGHT_HOLD
+end
+
 ---------------------------------------------------------------------------
 -- Text
 ---------------------------------------------------------------------------
@@ -688,8 +704,14 @@ local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_LOADED")
 events:RegisterEvent("PLAYER_LOGIN")
 events:RegisterEvent("PLAYER_ENTERING_WORLD")
+events:RegisterEvent("PLAYER_REGEN_DISABLED")
+events:RegisterEvent("PLAYER_REGEN_ENABLED")
 events:SetScript("OnEvent", function(self, event, arg)
-	if event == "PLAYER_ENTERING_WORLD" then
+	if event == "PLAYER_REGEN_DISABLED" then
+		fightSince = fightSince or GetTime() -- (LT.InFight: when the fight began)
+	elseif event == "PLAYER_REGEN_ENABLED" then
+		fightSince = nil
+	elseif event == "PLAYER_ENTERING_WORLD" then
 		-- A loading screen (another continent or an instance): UnitPosition has to agree with the map
 		-- route again before LT.Position uses it.
 		unitPositionAgrees = false

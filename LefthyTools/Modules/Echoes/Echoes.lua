@@ -137,8 +137,6 @@ end)
 
 local ticks, tickNames = {}, {}
 local sinceTick = 0
-local FIGHT_HOLD = 900 -- seconds of unbroken combat after which E.InFight says no
-local fightSince -- (GetTime() of the first tick in the fight going on; nil: not in one)
 
 function E.OnTick(fn)
 	ticks[#ticks + 1] = fn
@@ -154,7 +152,6 @@ driver:SetScript("OnUpdate", function(_, elapsed)
 	end
 	sinceTick = 0 -- first: an error in a tick must not make it run every frame
 	local now = GetTime()
-	fightSince = LT.InCombat() and (fightSince or now) or nil
 	for i = 1, #ticks do
 		LT.Guard(tickNames[i], ticks[i], now)
 	end
@@ -162,14 +159,9 @@ end)
 E.driver = driver -- (for tests)
 
 -- Whether heavy work (closing a page by time, packing, keeping a page that came, moving one to the
--- inbox) waits for the fight's end: in combat, for up to 15 minutes unbroken. The game's combat flag
--- can stick (out of any fight): after that, the work goes on, one step a tick as always.
-function E.InFight()
-	if not LT.InCombat() then
-		return false
-	end
-	return not fightSince or GetTime() - fightSince < FIGHT_HOLD
-end
+-- inbox) waits for the fight's end: LT.InFight (in combat, for up to 15 minutes unbroken: the game's
+-- combat flag can stick; after that the work goes on, one step a tick as always).
+E.InFight = function() return LT.InFight() end
 
 ---------------------------------------------------------------------------
 -- Recording starts and stops. E.When("start" | "stop", fn): fn() once recording has started (login
