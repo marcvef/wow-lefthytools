@@ -685,6 +685,43 @@ function C.UnseenCount()
 	return count
 end
 
+-- Whether anything from friends is unseen (the minimap dot), where it can tell without merging the
+-- feed (C.FriendNews builds every entry of every journal anew: milliseconds with a full book): a
+-- synced highlight not seen yet other than a death (a death may be a repeat) says yes; nothing at all
+-- newer than seen says no; else the merged feed is counted.
+function C.AnyUnseen()
+	local store = C.Store()
+	if not store then
+		return false
+	end
+	local seen, maybe = store.feedSeenAt or 0, false
+	local function Counts(f) -- (as UnseenCount counts an entry of the merged feed)
+		local at = f.g or f.t
+		return type(at) == "number" and at > seen and f.k ~= "online" and f.k ~= "offline" and f.k ~= "quest"
+	end
+	for acct, a in pairs(store.book) do
+		if acct ~= C.MyAccount() and IsFriend(acct) then
+			for _, c in pairs(a.chars) do
+				for _, e in pairs(c.name and c.news or {}) do
+					if Counts(e) then
+						if e.k ~= "death" then
+							return true
+						end
+						maybe = true
+					end
+				end
+			end
+		end
+	end
+	for _, f in ipairs(store.friends) do
+		if type(f.name) == "string" and type(f.t) == "number" and Counts(f) then
+			maybe = true -- (what came live: a synced one may repeat it)
+			break
+		end
+	end
+	return maybe and C.UnseenCount() > 0
+end
+
 function C.MarkFeedSeen()
 	local store = C.Store()
 	if store then

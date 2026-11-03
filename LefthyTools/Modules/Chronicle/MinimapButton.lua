@@ -59,10 +59,11 @@ function C.UpdateMinimapButton()
 	end
 end
 
--- The blue dot: friends' news the journal hasn't shown yet.
+-- The blue dot: friends' news the journal hasn't shown yet (Characters.lua: without merging the
+-- feed where it can tell).
 function C.UpdateNewDot()
 	if button then
-		button.New:SetShown((C.UnseenCount and C.UnseenCount() or 0) > 0)
+		button.New:SetShown(C.AnyUnseen and C.AnyUnseen() or false)
 	end
 end
 

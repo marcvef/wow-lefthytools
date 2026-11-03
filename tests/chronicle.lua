@@ -2157,3 +2157,41 @@ do
 	C.UpdateNewDot = update
 	check(updates == 1, "... it is after the fight, got " .. updates)
 end
+
+section("Chronicle: the minimap dot without merging the feed")
+do
+	local C = ns.Chronicle
+	local carl = C.Hash("Carl#3456")
+	anna("H2")
+	Advance(2)
+	local button = C.MinimapButton()
+	local merges, friendNews = 0, C.FriendNews
+	C.FriendNews = function(...) merges = merges + 1; return friendNews(...) end
+	local function same() -- (the dot says what counting the merged feed says)
+		local before = merges
+		local count = C.UnseenCount()
+		merges = before
+		return button.New:IsShown() == (count > 0)
+	end
+	C.MarkFeedSeen()
+	check(button and not button.New:IsShown() and merges == 0 and same(), "all seen: no dot, the feed not merged for it")
+	Advance(1)
+	ns.Beacon.Notify("highlight", peers()[11], { kind = "quest", a = "The Fargodeep Mine", b = "" })
+	Advance(4)
+	check(not button.New:IsShown() and merges == 0 and same(), "a friend's quest (not counted as news): still none, not merged")
+	local t = time() - 60
+	anna("J2;n;" .. carl .. ";Carl-Realmy;9990;77;" .. t .. ";boss;Hogger;Elwynn Forest")
+	Advance(5)
+	check(button.New:IsShown() and merges == 0 and same(), "a friend's boss kill came: the dot, the feed not merged for it")
+	C.MarkFeedSeen()
+	Advance(1)
+	anna("J2;n;" .. carl .. ";Carl-Realmy;9991;78;" .. t .. ";death;Hogger;Elwynn Forest")
+	Advance(5)
+	check(button.New:IsShown() and merges == 1 and same(), "only a death (it may be a repeat): the feed is counted")
+	C.FriendNews = friendNews
+	local news = CDB.book[carl].chars["Carl-Realmy"].news
+	news[77], news[78] = nil, nil
+	C.NewsChanged()
+	C.MarkFeedSeen()
+	Advance(4) -- (whole seconds in all: the later files tick as before)
+end
