@@ -129,7 +129,8 @@ local helloAt = {}      -- gameAccountID -> when we last greeted them
 local otherVersion = {} -- gameAccountID -> protocol version of a friend on another LefthyTools version
 local owed = {}         -- gameAccountID -> true: send them my current state
 local outbox = {}       -- { gameAccountID, message }: one-off messages, sent before states
-local lowOutbox = {}    -- the same, sent only when nothing else waits (bulk data); [3]: onSent()
+local lowOutbox = {}    -- the same, sent only when nothing else waits (bulk data); [3]: onSent(), [4]: goes in a fight too
+local liveLow = 0       -- how many in lowOutbox go in a fight too ([4])
 local helloOutbox = {}  -- gameAccountIDs to greet (Sweep): after states and messages, before bulk data
 local helloWaiting = {} -- gameAccountID -> true while their hello is in helloOutbox
 local inbox = {}        -- gameAccountID -> what they may still send (Spaced / Counted, in OnMessage)
@@ -336,6 +337,15 @@ function B.QueueLatest(gameAccountID, message, prefix, behind)
 	B.Queue(gameAccountID, message)
 end
 
+-- Takes the low-priority message at i out of the queue (sent, dropped).
+local function TakeLow(i)
+	local item = table.remove(lowOutbox, i)
+	if item[4] then
+		liveLow = liveLow - 1
+	end
+	return item
+end
+
 local function Drain(now, elapsed)
 	tokens = math.min(SEND_BURST, tokens + elapsed * SEND_RATE)
 	if now < pausedUntil then
@@ -381,16 +391,23 @@ local function Drain(now, elapsed)
 			tokens = tokens - 1
 		end
 	end
-	-- Bulk data (Chronicle's days for friends' graphs) only goes when nothing else waits, so it
-	-- never delays positions, states or anything someone clicked.
-	while tokens >= 1 and lowOutbox[1] and not outbox[1] and not next(owed) and not helloOutbox[1] do
-		local item = table.remove(lowOutbox, 1)
-		if peers[item[1]] then
-			if not SendNow(item[1], item[2]) then
-				table.insert(lowOutbox, 1, item)
-				pausedUntil, stats.throttled = now + THROTTLE_PAUSE, stats.throttled + 1
-				return
-			end
+	-- Bulk data (Chronicle's journals and days, error reports, Echoes) only goes when nothing else
+	-- waits, so it never delays positions, states or anything someone clicked. In a fight
+	-- (LT.InFight) it waits for the end, where it is, and goes in order after it: only what's marked
+	-- to go in a fight too (the fight stream's hello and my health, with an answer) goes past it.
+	local fight = lowOutbox[1] and LT.InFight()
+	local i = 1
+	while tokens >= 1 and lowOutbox[i] and not outbox[1] and not next(owed) and not helloOutbox[1] and not (fight and liveLow == 0) do
+		local item = lowOutbox[i]
+		if fight and not item[4] then
+			i = i + 1 -- (held)
+		elseif not peers[item[1]] then
+			TakeLow(i) -- (gone)
+		elseif not SendNow(item[1], item[2]) then
+			pausedUntil, stats.throttled = now + THROTTLE_PAUSE, stats.throttled + 1
+			return
+		else
+			TakeLow(i)
 			tokens = tokens - 1
 			if item[3] then
 				item[3]() -- (it went: an error report is no longer kept)
@@ -399,9 +416,13 @@ local function Drain(now, elapsed)
 	end
 end
 
--- Low priority (see Drain): sent when nothing else is waiting. onSent(): called once it went.
-function B.QueueLow(gameAccountID, message, onSent)
-	lowOutbox[#lowOutbox + 1] = { gameAccountID, message, onSent }
+-- Low priority (see Drain): sent when nothing else is waiting, and after the fight if I'm in one.
+-- onSent(): called once it went. live: it goes in a fight too (it's for the fight).
+function B.QueueLow(gameAccountID, message, onSent, live)
+	lowOutbox[#lowOutbox + 1] = { gameAccountID, message, onSent, live or nil }
+	if live then
+		liveLow = liveLow + 1
+	end
 end
 
 -- Drops low-priority messages still waiting that start with prefix (they'd arrive after a newer one
@@ -409,7 +430,7 @@ end
 function B.DropLow(prefix)
 	for i = #lowOutbox, 1, -1 do
 		if lowOutbox[i][2]:sub(1, #prefix) == prefix then
-			table.remove(lowOutbox, i)
+			TakeLow(i)
 		end
 	end
 end
@@ -419,7 +440,7 @@ end
 function B.DropLowFor(gameAccountID, match)
 	for i = #lowOutbox, 1, -1 do
 		if lowOutbox[i][1] == gameAccountID and match(lowOutbox[i][2]) then
-			table.remove(lowOutbox, i)
+			TakeLow(i)
 		end
 	end
 end
@@ -790,11 +811,11 @@ function Answer(senderID)
 		B.Queue(senderID, collector) -- I collect error reports
 	end
 	if B.StreamHello then
-		B.QueueLow(senderID, B.StreamHello()) -- whether they can watch my fights (after the rest)
+		B.QueueLow(senderID, B.StreamHello(), nil, true) -- whether they can watch my fights (after the rest; in a fight too)
 	end
 	local health = B.StreamHealthHello and B.StreamHealthHello()
 	if health then
-		B.QueueLow(senderID, health) -- my health (estimated)
+		B.QueueLow(senderID, health, nil, true) -- my health (estimated; in a fight too)
 	end
 	local journal = B.JournalHello and B.JournalHello()
 	if journal then
@@ -1002,6 +1023,7 @@ function M:OnEnable()
 	B.SharingStart()
 	wipe(outbox) -- goodbyes still pending from switching off just before: no longer true
 	wipe(lowOutbox)
+	liveLow = 0
 	wipe(helloOutbox)
 	wipe(helloWaiting)
 	farewellUntil = nil
@@ -1025,6 +1047,7 @@ function M:OnDisable()
 	wipe(outbox)
 	wipe(owed)
 	wipe(lowOutbox)
+	liveLow = 0
 	for gameAccountID in pairs(peers) do
 		B.Queue(gameAccountID, "Q" .. VERSION) -- friends drop my dot and stop sending to me
 	end

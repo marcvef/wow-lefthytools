@@ -107,9 +107,34 @@ it must never trigger a full friend-list walk.
 
 ## Traffic (never lag the client)
 
-Bulk data (Chronicle's days for friends' graphs) goes into a low-priority queue (`B.QueueLow`)
-that `Drain` only empties when no one-off message, state or hello is waiting. `B.QueueLow(id,
-message, onSent)`: onSent is called once it actually went (error reports are kept until then).
+Bulk data (Chronicle's journals and days for friends' graphs, error reports, the versions sent
+every 10 minutes, Echoes) goes into a low-priority queue (`B.QueueLow`) that `Drain` only empties
+when no one-off message, state or hello is waiting. `B.QueueLow(id, message, onSent, live)`: onSent
+is called once it actually went (error reports are kept until then).
+
+**Not in a fight:** while `LT.InFight()` (Core/Core.lua: in combat, for up to 15 minutes unbroken;
+the game's combat flag can stick, and then it goes as out of combat) the low-priority queue waits
+where it is and goes after the fight, in order, at the usual rate (the token bucket below: ten at
+once, then ten a second, no burst). Everything else is unchanged in a fight: one-off messages (chat,
+items, pings, level-ups, death alerts), states, hellos and the fight stream. `live` marks what goes
+in a fight too: only the fight stream's hello (`O2;h`) and my health (`O2;v`) with a hello answer,
+so a friend who comes online during my fight can watch it (a count of the live ones waiting,
+`liveLow`, lets `Drain` skip the queue in a fight without looking through it when there are none). A
+held message isn't sent and its onSent isn't called; it still counts in `B.Waiting()` and
+`B.LowWaiting()`, so Echoes adds nothing meanwhile (it takes its own back out at
+PLAYER_REGEN_DISABLED anyway) and an error report isn't queued twice. A friend who goes offline
+meanwhile: what waits for them is dropped when `Drain` gets to it after the fight, as before. The
+queue is memory only: a /reload in a fight loses what waits, as it always did (error reports stay
+saved until they went; Chronicle's days and offers are sent again after a reload). What can pile up
+in a long fight is bounded by what queues it: one answer per friend and account (Chronicle's
+`Serve`, up to SERVE_MAX records; asked again, the one still waiting is replaced, `B.DropLowFor`),
+offers at most once a minute per friend, the versions every 10 minutes, at most 10 error reports
+(Echoes queues nothing in combat). Chronicle's answers are the only ones a friend waits for: their
+request gives up after 90 s (Sync.lua `PENDING_TIMEOUT`, in every build with journals; without
+progress in newer ones). An answer held longer still arrives and its records are kept, but its end
+isn't taken (the account isn't marked complete), so they ask again on the next offer: one more
+round, not a loop (they only ask after an offer, and mine wait for the fight's end too).
+
 Echoes adds its pages to it only when nothing else waits in any queue (`B.Waiting()`: every
 message still waiting) and stays silent for a while after the server said slow down
 (`B.throttledAt`, `B.throttleResult`: when, and 3 or 11). A refusal of a message sent past the
@@ -518,7 +543,7 @@ which goes on over a /reload), and prints "N report(s) sent to Anna" (", M more 
 report stays in `reportsOut` until its last part to a collector has actually gone (`QueueLow`'s
 onSent): a /reload or the collector going offline first doesn't lose it; one not gone after 120 s
 is sent again, unless its parts still wait in the queue (`B.LowWaiting`: a long journal sync ahead
-of them, the server holding everything back), so a collector never gets it twice. An overlong report is cut without splitting a UTF-8 character.
+of them, a fight, the server holding everything back), so a collector never gets it twice. An overlong report is cut without splitting a UTF-8 character.
 
 Profession links get a closer look, since the game handles them itself: Blizzard's UI only passes
 a `trade:<GUID>:<spell>:<skill line>` link to `ItemRefTooltip:SetHyperlink`, the client asks the

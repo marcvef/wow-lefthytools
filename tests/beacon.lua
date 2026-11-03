@@ -2273,6 +2273,88 @@ do
 	wipe(reports)
 end
 
+section("Beacon: bulk data waits for the fight's end")
+do
+	local function alive() -- (friends silent for over a minute are forgotten)
+		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 12)
+		anna("S2;;0;260.0;750.0;Goldshire;")
+	end
+	local function minutes(n) -- (in steps of the tick: a long fight goes by quicker)
+		for _ = 1, n * 2 do
+			Advance(30, 0.1)
+			alive()
+		end
+	end
+	alive()
+	Advance(6) -- (what was queued before has gone; Anna's last hello was answered over 5 s ago)
+	check(peers()[11] and peers()[12] and BB.Waiting() == 0, "Anna and Bob here, nothing waiting")
+	local went = {}
+	local function onSent(n) return function() went[#went + 1] = n end end
+	EnterCombat()
+	Advance(0.3)
+	mark = #GAMEDATA + 1
+	BB.QueueLow(11, "K2;20300501;1", onSent(1))
+	BB.QueueLow(12, "K2;20300501;2", onSent(2))
+	BB.QueueLow(11, "K2;20300501;3", onSent(3))
+	BB.Queue(11, "M2;a line in the fight")
+	anna("H2") -- (she reloaded: my answer)
+	Advance(3)
+	check(sentTo(11, mark, "M2;")[1] and sentTo(11, mark, "V2;")[1] and sentTo(11, mark, "S2;")[1],
+		"in a fight: a chat line, my version and my state go as always")
+	check(sentTo(11, mark, "O2;h;")[1], "and the fight stream's hello with the answer (she can watch this fight)")
+	local journal = BB.JournalHello and BB.JournalHello()
+	check(journal and #sentTo(11, mark, journal) == 0, "Chronicle's journal hello with it waits")
+	check(#sentTo(11, mark, "K2;") == 0 and #sentTo(12, mark, "K2;") == 0 and #went == 0 and BB.LowWaiting("K2;20300501;")
+		and BB.Waiting() >= 3, "bulk data waits, still counted as waiting (Echoes adds nothing meanwhile); not sent, not called sent")
+	minutes(2)
+	check(#sentTo(11, mark, "K2;") == 0 and #went == 0, "... for the whole fight")
+	BN_FRIENDS[2][1].isOnline = false
+	Fire("BN_FRIEND_ACCOUNT_OFFLINE", 2, false)
+	Advance(1.2)
+	check(not peers()[12], "Bob logs off meanwhile")
+	LeaveCombat()
+	Advance(0.5)
+	local sent = sentTo(11, mark, "K2;")
+	check(#sent == 2 and sent[1] == "K2;20300501;1" and sent[2] == "K2;20300501;3" and went[1] == 1 and went[2] == 3 and #went == 2,
+		"the fight's over: it goes, in order, and is called sent; got " .. table.concat(sent, ", "))
+	check(#sentTo(12, mark, "K2;") == 0 and not BB.LowWaiting("K2;20300501;"), "Bob's is dropped (he's gone)")
+	check(#sentTo(11, mark, journal) == 1, "the journal hello goes too")
+	BN_FRIENDS[2][1].isOnline = true
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 12)
+	Advance(6)
+	check(peers()[12] and BB.Waiting() == 0, "Bob is back")
+
+	-- After the fight it goes at the rate it always does: no burst.
+	EnterCombat()
+	Advance(0.3)
+	for i = 1, 30 do
+		BB.QueueLow(11, "K2;20300502;" .. i)
+	end
+	Advance(5)
+	mark = #GAMEDATA + 1
+	LeaveCombat()
+	Advance(0.15)
+	local first = #sentTo(11, mark, "K2;20300502;")
+	Advance(3)
+	sent = sentTo(11, mark, "K2;20300502;")
+	check(first >= 1 and first <= 11 and #sent == 30 and sent[1] == "K2;20300502;1" and sent[30] == "K2;20300502;30",
+		"thirty after a fight: ten at once, the rest ten a second, in order; got " .. first .. " at once, " .. #sent .. " in all")
+
+	-- The game's combat flag stuck: after 15 minutes it goes all the same.
+	went = {}
+	EnterCombat()
+	Advance(0.3)
+	mark = #GAMEDATA + 1
+	BB.QueueLow(11, "K2;20300503;1", onSent(1))
+	minutes(14.5)
+	check(#sentTo(11, mark, "K2;") == 0 and #went == 0, "14 and a half minutes in a fight: still waiting")
+	minutes(1)
+	check(sentTo(11, mark, "K2;")[1] == "K2;20300503;1" and went[1] == 1, "15 minutes unbroken: the flag is taken as stuck, it goes")
+	LeaveCombat()
+	alive()
+	Advance(1)
+end
+
 section("Beacon: leaving")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 12)
 Advance(0.15)
