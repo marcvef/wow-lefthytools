@@ -416,5 +416,8 @@ ns.CHANGELOG = {
 	{ id = 136, module = "echoes",
 		en = { "Echoes stays out of the way", "Echoes does its work in small steps: nothing heavy in a fight, at login or when many friends are online, and it sends less when nothing changed." },
 		de = { "Echoes bleibt im Hintergrund", "Echoes arbeitet in kleinen Schritten: nichts Schweres im Kampf, beim Einloggen oder wenn viele Freunde online sind, und es sendet weniger, wenn sich nichts geändert hat." } },
+	{ id = 137, module = "chronicle",
+		en = { "Journals wait out fights", "Friends' journals and days are no longer sent, built or merged during a fight, but right after it, in small steps; the minimap dot for news no longer costs a hitch." },
+		de = { "Tagebücher warten Kämpfe ab", "Tagebücher und Tage von Freunden werden während eines Kampfes nicht mehr gesendet, erstellt oder eingearbeitet, sondern direkt danach, in kleinen Schritten; der Minimap-Punkt für Neues kostet keinen Ruckler mehr." } },
 	-- New entries go here, at the end.
 }
