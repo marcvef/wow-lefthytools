@@ -419,5 +419,8 @@ ns.CHANGELOG = {
 	{ id = 137, module = "chronicle",
 		en = { "Journals wait out fights", "Friends' journals and days are no longer sent, built or merged during a fight, but right after it, in small steps; the minimap dot for news no longer costs a hitch." },
 		de = { "Tagebücher warten Kämpfe ab", "Tagebücher und Tage von Freunden werden während eines Kampfes nicht mehr gesendet, erstellt oder eingearbeitet, sondern direkt danach, in kleinen Schritten; der Minimap-Punkt für Neues kostet keinen Ruckler mehr." } },
+	{ id = 138, module = "tweaks",
+		en = { "Spells of the launch build", "The level-up window's trainer spells, flight times and the quest markers come from the launch build: spells Forever took away from the trainers no longer show, its new ones do." },
+		de = { "Zauber vom Launch-Build", "Die Trainer-Zauber im Level-Up-Fenster, die Flugzeiten und die Quest-Markierungen stammen vom Launch-Build: Zauber, die Forever bei den Trainern entfernt hat, fehlen jetzt, seine neuen sind dabei." } },
 	-- New entries go here, at the end.
 }
