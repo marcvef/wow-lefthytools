@@ -425,5 +425,8 @@ ns.CHANGELOG = {
 	{ id = 139, module = "beacon",
 		en = { "Friends' levels", "Battle.net gives friends' levels as 0 on the release, so Chronicle and the friend tooltips showed level 0. Friends now tell you their level themselves; until they've updated it comes from their journal, level-ups or your group, else it shows a dash." },
 		de = { "Level von Freunden", "Battle.net meldet auf dem Release für Freunde Level 0, darum zeigten Chronicle und die Tooltips Level 0. Freunde teilen dir ihr Level jetzt selbst mit; bis sie aktualisiert haben, kommt es aus ihrem Tagebuch, ihren Level-ups oder deiner Gruppe, sonst steht dort ein Strich." } },
+	{ id = 140, module = "beacon",
+		en = { "Mail to the winner works", "When you attach an item someone won, the mail now fills in their name and surname. The server name it added before made the mail impossible to send." },
+		de = { "Post an den Gewinner funktioniert", "Hängst du ein gewonnenes Item an eine Post, trägt sie jetzt Name und Nachname des Gewinners ein. Mit dem bisher angehängten Servernamen ließ sich die Post nicht senden." } },
 	-- New entries go here, at the end.
 }
