@@ -1721,9 +1721,9 @@ do
 
 	-- Rolled again: only the newest winner keeps it reserved.
 	wipe(owed)
-	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12", 12)
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
 	pmark = #PRINTED + 1
-	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Anna", "Player-1-11", 11)
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Anna", "Player-1-11")
 	check(#owed == 1 and owed[1].winner == "Anna" and printedSince(pmark):find(ItemLink(1179) .. " is no longer reserved for Bob.", 1, true),
 		"rolled again: only the newest winner, and I'm told who no longer has it")
 	GameTooltip:SetOwner(UIParent)
@@ -1734,8 +1734,8 @@ do
 	wipe(owed)
 	BAGS[0] = { [3] = 1155, [4] = 1155 }
 	pmark = #PRINTED + 1
-	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Anna", "Player-1-11", 11, "Item-0-3")
-	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12, "Item-0-4")
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Anna", "Player-1-11", "Item-0-3")
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", "Item-0-4")
 	check(#owed == 2 and not printedSince(pmark):find("no longer reserved", 1, true), "two copies won by two people: both reserved")
 	GameTooltip:SetOwner(UIParent)
 	GameTooltip:SetBagItem(0, 3)
@@ -1744,14 +1744,14 @@ do
 	GameTooltip:SetHyperlink("item:1155::::::::20:::::")
 	check(tooltipHas("Won by Anna: still to hand over") and tooltipHas("Won by Bob: still to hand over"), "a link (no copy known) names both")
 	GameTooltip:Hide()
-	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12, "Item-0-3")
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", "Item-0-3")
 	check(#owed == 2 and owed[1].winner == "Bob" and owed[2].winner == "Bob" and printedSince(pmark):find("no longer reserved for Anna", 1, true),
 		"one copy rolled again: only that one changes hands")
 	wipe(owed)
 	BAGS = { [0] = {} }
 
 	-- Reserved items: a border in the bags; at a vendor, right-click asks first.
-	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12", 12)
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
 	BAGS[0] = { [3] = 1179, [5] = 6948 }
 	OpenBags()
 	Advance(0.1)
@@ -1796,7 +1796,7 @@ do
 		and printedSince(pmark):find("no longer reserved", 1, true), "Sell anyway: sold, no longer reserved, border and guard gone")
 	-- Two copies, one of them reserved: only that one has a border and asks.
 	BAGS[0][8], BAGS[0][9] = 1155, 1155
-	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Anna", "Player-1-11", 11, "Item-0-8")
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Anna", "Player-1-11", "Item-0-8")
 	Advance(0.1)
 	check(bagButtons[8].LefthyToolsReserved:IsShown() and bagButtons[8].LefthyToolsSellGuard:IsShown()
 		and not (bagButtons[9].LefthyToolsReserved and bagButtons[9].LefthyToolsReserved:IsShown())
@@ -1808,7 +1808,7 @@ do
 	check(SOLD[#SOLD] == 1155 and BAGS[0][8] == nil and #owed == 0, "Sell anyway on it: sold, reservation over")
 	-- Reserved without a known copy (offered from a link), two copies: selling one keeps it.
 	BAGS[0][8] = 1155
-	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12)
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12")
 	Advance(0.1)
 	check(bagButtons[8].LefthyToolsReserved:IsShown() and bagButtons[9].LefthyToolsReserved:IsShown(), "any copy reserved: both have a border")
 	pmark = #PRINTED + 1
@@ -1823,7 +1823,7 @@ do
 	check(BAGS[0][9] == nil and #owed == 0, "selling the last one: reservation over")
 	Fire("MERCHANT_CLOSED")
 	-- Gone another way (dragged onto the vendor, a bag addon): how to buy it back.
-	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", 11)
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11")
 	Fire("MERCHANT_SHOW")
 	Advance(0.1)
 	pmark = #PRINTED + 1
@@ -1839,7 +1839,7 @@ do
 	BAGS[0][5] = 6948
 	Fire("MERCHANT_SHOW")
 	Advance(0.1)
-	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", 11)
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11")
 	pmark = #PRINTED + 1
 	BAGS[0][5] = nil
 	Fire("BAG_UPDATE_DELAYED")
@@ -1849,7 +1849,7 @@ do
 	Advance(0.1)
 	-- In combat no guard is made (pass-through can't be set then).
 	wipe(owed)
-	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12)
+	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12")
 	BAGS[0][7] = 1155
 	local blocked = #BLOCKED
 	STATE.combat = true
@@ -1862,12 +1862,10 @@ do
 	Advance(0.1)
 	-- Mail: attaching it fills in the winner.
 	wipe(owed)
+	-- (Battle.net says another realm, as it may on the release: a mail takes the full name, no realm.)
 	BN_FRIENDS[1][1].realmName = "Argent Dawn"
-	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna Brook", "Player-1-11", 11) -- (Battle.net's name: with her surname)
-	BN_FRIENDS[1][1].realmName = "Realmy"
-	check(owed[1].mailName == "Anna-ArgentDawn", "a winner on another realm: mailed as Name-Realm, her character name without the surname, got "
-		.. tostring(owed[1].mailName))
-	owed[1].mailName = "Anna Brook" -- (on my realm, as builds before saved it)
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna Brook", "Player-1-11")
+	owed[1].mailName = "Anna-ArgentDawn" -- (as builds before saved it: not used any more)
 	SendMailFrame:Show()
 	SendMailNameEditBox:SetText("")
 	MAIL_ITEMS = { 6948 }
@@ -1875,8 +1873,9 @@ do
 	Fire("MAIL_SEND_INFO_UPDATE")
 	check(SendMailNameEditBox:GetText() == "", "nothing done inside the event handler")
 	Advance(0.1)
-	check(SendMailNameEditBox:GetText() == "Anna" and printedSince(pmark):find("mail to Anna Brook: they won " .. ItemLink(6948), 1, true),
-		"attaching a reserved item fills in its winner's character name (a mail takes no surname), got " .. tostring(SendMailNameEditBox:GetText()))
+	BN_FRIENDS[1][1].realmName = "Realmy"
+	check(SendMailNameEditBox:GetText() == "Anna Brook" and printedSince(pmark):find("mail to Anna Brook: they won " .. ItemLink(6948), 1, true),
+		"attaching a reserved item fills in its winner's name and surname, no realm, got " .. tostring(SendMailNameEditBox:GetText()))
 	SendMailNameEditBox:SetText("anna")
 	Fire("MAIL_SEND_INFO_UPDATE")
 	Advance(0.1)
@@ -2454,7 +2453,7 @@ Advance(0.15)
 check(not peers()[12] and peers()[11], "a friend switching Beacon off (Q2) is forgotten")
 -- A reserved item at a vendor, then Beacon goes off (below).
 local owedList = LefthyToolsDB.handover
-BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12", 12)
+BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12")
 BAGS[0] = { [3] = 1155 }
 OpenBags()
 Fire("MERCHANT_SHOW")

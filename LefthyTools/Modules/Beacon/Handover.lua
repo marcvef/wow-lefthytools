@@ -31,7 +31,7 @@ local TRADE_SLOTS = 6
 local LINE_R, LINE_G, LINE_B = 1, 0.55, 0.2
 local BORDER = "Interface\\Buttons\\UI-ActionButton-Border"
 
-local list -- LefthyToolsDB.handover: { { itemID, link, winner, mailName, guid, at }, ... }, oldest first
+local list -- LefthyToolsDB.handover: { { itemID, link, winner, guid, at }, ... }, oldest first
 local trade = { items = {} } -- the open (or last) trade: name, guid, items = { itemID, ... }
 local mail -- a mail on its way: { name, items }
 local merchantOpen = false
@@ -43,13 +43,6 @@ local Readable = LT.Readable
 -- "Anna" from "Anna", "Anna-Realm" or "Anna Surname" (Forever's display names add surnames), and
 -- whether two names are the same character, however typed ("anna", "Anna-Realm"): Core's LT.Names.
 local BaseName, SameName = LT.Names.First, LT.Names.Same
-
--- Who a mail goes to: the character's name, without the surname Battle.net shows with it (a
--- winner's name comes from there): "Anna Brook-ArgentDawn" -> "Anna-ArgentDawn". Reservations
--- saved before kept the surname, so it's also taken off when the name is used.
-local function MailName(name)
-	return (name:gsub("^([^%s%-]+)[^%-]*", "%1"))
-end
 
 local function EntryFor(itemID)
 	for _, entry in ipairs(list or {}) do
@@ -106,18 +99,12 @@ local function Soon(what, value)
 	end
 end
 
--- From Items.lua: my offer has a winner. gameAccountID: theirs, for their realm (mail needs it
--- when it isn't mine). itemGUID: the offered copy's own GUID when it came from the bags.
-function B.AddHandover(itemString, link, winner, guid, gameAccountID, itemGUID)
+-- From Items.lua: my offer has a winner, by the full name Battle.net shows ("Anna Brook"), which is
+-- also who a mail goes to. itemGUID: the offered copy's own GUID when it came from the bags.
+function B.AddHandover(itemString, link, winner, guid, itemGUID)
 	local itemID = tonumber(itemString and itemString:match("^(%d+)"))
 	if not (list and itemID and winner) then
 		return
-	end
-	local mailName = MailName(winner)
-	local info = gameAccountID and C_BattleNet.GetGameAccountInfoByID(gameAccountID)
-	local realm = info and Readable(info.realmName) and info.realmName
-	if realm and realm ~= "" and realm ~= GetRealmName() then
-		mailName = mailName .. "-" .. realm:gsub("[%s%-]", "")
 	end
 	-- Rolled again: only the newest winner keeps it reserved. The same copy (same GUID), or, when
 	-- copies aren't known, the same item; another copy of the same item is a reservation of its own.
@@ -130,8 +117,7 @@ function B.AddHandover(itemString, link, winner, guid, gameAccountID, itemGUID)
 			end
 		end
 	end
-	list[#list + 1] = { itemID = itemID, link = link, winner = winner, mailName = mailName, guid = guid,
-		itemGUID = itemGUID, at = time() }
+	list[#list + 1] = { itemID = itemID, link = link, winner = winner, guid = guid, itemGUID = itemGUID, at = time() }
 	if merchantOpen and C_Item.GetItemCount then
 		counts[itemID] = C_Item.GetItemCount(itemID) -- won while at a vendor: watched from now on
 	end
@@ -465,7 +451,7 @@ local function CheckMail()
 	local typed = SendMailNameEditBox:GetText() or ""
 	if typed == "" then
 		if count == 1 then
-			SendMailNameEditBox:SetText(MailName(first.mailName or first.winner))
+			SendMailNameEditBox:SetText(first.winner)
 			M:Print(("mail to %s: they won %s."):format(first.winner, first.link or "it"))
 		end
 		return

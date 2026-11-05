@@ -382,11 +382,10 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
 
 ### Hand-over reminder (Handover.lua)
 
-When my offer has a winner, `B.AddHandover` saves `{ itemID, link, winner, mailName, guid, at }`
+When my offer has a winner, `B.AddHandover` saves `{ itemID, link, winner, guid, at }`
 in `LefthyToolsDB.handover`: the item is reserved for them. The winner's GUID comes from their
-answer's peer; `mailName` is their character's name without the surname Battle.net shows with it
-(a mail takes no surname; entries saved before are mended when used), "Name-Realm" when
-Battle.net says their realm isn't mine. An offer from
+answer's peer; `winner` is their full name as Battle.net shows it ("Anna Brook"), which is also
+who a mail goes to: on the release a mail needs name and surname, and no realm. An offer from
 the bags (or bank) records the copy's own GUID (`C_Item.GetItemGUID` of the clicked location) as
 `itemGUID`: the reservation follows that copy, so two copies won by two people are two entries, and
 the tooltip (its data's `guid`), the bag border and the vendor question only apply to that copy.
@@ -419,7 +418,7 @@ nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` 
   recounts on the next frame and, if one went, warns in chat with an alert sound: buy it back on
   the Buyback tab.
 - **Mail:** `MAIL_SEND_INFO_UPDATE` (attachments changed) checks on the next frame: reserved
-  attachments for one winner and an empty recipient field fill in `mailName` (chat says so);
+  attachments for one winner and an empty recipient field fill in `winner` (chat says so);
   another name in the field gets one warning per name and attachment set.
 
 - **Trade:** `TRADE_SHOW` reads the partner (`UnitName("NPC")`, whose second return is a surname in Forever, and `UnitGUID("NPC")`) and, if they
