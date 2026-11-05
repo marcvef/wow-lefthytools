@@ -45,7 +45,7 @@ local function SetupMap(view, mapID)
 	end
 end
 
--- The minimap's own terrain tiles (a continent's), the 3 x 3 of the world's grid around (x0, y0 the
+-- The minimap's own terrain tiles (a continent's or Zephras Isle's), the 3 x 3 of the world's grid around (x0, y0 the
 -- top left one); shown only while they're the ones in use.
 local function LayMinimap(view, tiles, x0, y0)
 	local map, win = view.map, view.win

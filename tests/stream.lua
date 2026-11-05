@@ -56,6 +56,9 @@ do
 	-- The preview: made-up mobs around a made-up friend.
 	math.randomseed(3) -- (the learning draws random places: the same ones every run)
 	local realTiles = ns.MINIMAP_TILES
+	-- (A place near Thendal on Zephras Isle, map 2991: north 4000, west 1800 is tile 28, 24.)
+	check(realTiles[2991] and realTiles[2991][28 * 100 + 24], "the stream's map has Zephras Isle's tiles")
+	check(realTiles[0] and realTiles[1], "and the continents' still")
 	ns.MINIMAP_TILES = { [0] = {} } -- (made-up minimap tiles around the test world)
 	for x = 25, 37 do for y = 25, 37 do ns.MINIMAP_TILES[0][x * 100 + y] = 900000 + x * 100 + y end end
 	lefthy("stream preview")
