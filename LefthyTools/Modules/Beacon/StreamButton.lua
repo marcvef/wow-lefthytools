@@ -34,7 +34,8 @@ local function Entries()
 		local peer = friend.peer
 		local text = LT.Window.ClassColorCode(peer.classFile) .. (peer.name or "?") .. "|r"
 		local where = peer.subzone ~= "" and peer.subzone or peer.area
-		text = text .. "  |cff999999" .. L["Level %d"]:format(peer.level or 0) .. (where and ("  " .. where) or "") .. "|r"
+		text = text .. "  |cff999999" .. (peer.level and L["Level %d"]:format(peer.level) or "")
+			.. (where and ("  " .. where) or "") .. "|r"
 		if peer.dead or peer.ghost then
 			text = text .. "  |cffff5050" .. L["dead"] .. "|r"
 		elseif peer.combat then

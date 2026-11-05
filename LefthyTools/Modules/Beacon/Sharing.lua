@@ -18,11 +18,16 @@ local STATUS_GAP = 1         -- status changes (combat, death, target) go out at
 local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed) at most this often
 local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
 local XP_GAP = 2             -- my level progress is checked (and sent if changed) at most this often
+local LEVEL_GAP = 1          -- my level is checked (and sent to whoever hasn't got it) this often
+-- The first build that reads B2;bl (LT.CompareVersions goes by the commit count): older friends are
+-- never sent it, and a build that doesn't say (no commit count, like the tagged 0.7.0) counts as older.
+local LEVEL_SINCE = "0.7.0-1-g0000000"
 local VERSION_EVERY = 600    -- my version goes to every friend this often too (besides answers)
 
 local statusDirty = false -- combat, death, target or zone changed: look at my state soon
 local questDirty = true   -- my tracked quest may have changed
 local xpDirty = true      -- my experience may have changed
+local lastLevelCheck = -math.huge
 local pendingLevel        -- I levelled up: friends are told on the next tick
 local lastCheck, lastSent, lastQuestCheck, lastXPCheck
 local lastState, lastQuest, lastXP
@@ -111,6 +116,15 @@ local function CurrentXP()
 	return ("X%s;%d"):format(VERSION, math.min(99, math.floor(xp / xpMax * 100)))
 end
 
+-- My level (B2;bl). Not tied to sharing: Battle.net told it to friends whatever that setting said.
+local function CurrentLevel()
+	local level = UnitLevel("player")
+	if type(level) ~= "number" or issecret(level) or level <= 0 then
+		return nil
+	end
+	return ("B%s;bl;%d"):format(VERSION, level)
+end
+
 local function SendXPIfChanged(now)
 	if not xpDirty or now - lastXPCheck < XP_GAP then
 		return
@@ -120,6 +134,32 @@ local function SendXPIfChanged(now)
 	if message ~= lastXP then
 		lastXP = message
 		B.QueueToPeers(message, true)
+	end
+end
+
+-- On the tick, once a second: my level, to each friend whose build reads it and who hasn't got this
+-- one (their build comes after my first answer to them; an answer asks for it again: SharingAnswer).
+-- A build is compared once: most friends' levelSent is simply up to date.
+local function SendLevelIfOwed(now)
+	if now - lastLevelCheck < LEVEL_GAP then
+		return
+	end
+	lastLevelCheck = now
+	local level = CurrentLevel()
+	if not level then
+		return
+	end
+	for gameAccountID, peer in pairs(B.peers) do
+		if peer.levelSent ~= level and peer.version then
+			if peer.levelBuild ~= peer.version then
+				peer.levelBuild = peer.version
+				peer.readsLevel = (LT.CompareVersions(peer.version, LEVEL_SINCE) or -1) >= 0
+			end
+			if peer.readsLevel then
+				peer.levelSent = level
+				B.Queue(gameAccountID, level)
+			end
+		end
 	end
 end
 
@@ -211,6 +251,7 @@ function B.SharingTick(now)
 	SendQuestIfChanged(now)
 	SendCountIfChanged(now)
 	SendXPIfChanged(now)
+	SendLevelIfOwed(now)
 end
 
 -- With every answer to a friend (after my state, build and the rest): my tracked quest and level
@@ -222,11 +263,16 @@ function B.SharingAnswer(gameAccountID)
 	if lastXP and lastXP ~= NO_XP then
 		B.Queue(gameAccountID, lastXP)
 	end
+	local peer = B.peers[gameAccountID]
+	if peer then
+		peer.levelSent = nil -- (a friend who restarted forgot it: my next tick sends it)
+	end
 end
 
 local function Reset()
 	lastCheck, lastSent, lastQuestCheck, lastXPCheck = -math.huge, -math.huge, -math.huge, -math.huge
 	lastState, lastQuest, questDirty, lastXP, xpDirty = nil, nil, true, nil, true
+	lastLevelCheck = -math.huge
 end
 Reset()
 

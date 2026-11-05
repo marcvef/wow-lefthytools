@@ -307,13 +307,20 @@ local function FriendTables(open)
 		return account and function() open(account.key) end or nil
 	end
 
+	-- Levels from the journals, for a friend online whose build doesn't tell theirs yet.
+	local characters = C.Characters()
+	local journalLevel = {}
+	for _, c in ipairs(characters) do
+		journalLevel[c.key] = c.level
+	end
+
 	-- Online now.
 	local beacon = LT:GetModule("beacon")
 	local B = beacon and beacon.enabled and ns.Beacon
 	local online = {}
 	for _, friend in ipairs(B and B.FriendList() or {}) do
-		local status = B.FriendStatus(friend.peer, friend.id)
 		local key, acct = C.PeerChar(friend.peer)
+		local status = B.FriendStatus(friend.peer, friend.id, journalLevel[key])
 		local tip = {}
 		B.FriendLines(tip, friend.peer, friend.id)
 		if Tag(acct) then
@@ -331,7 +338,7 @@ local function FriendTables(open)
 
 	-- Not online.
 	local away = {}
-	for _, c in ipairs(C.Characters()) do
+	for _, c in ipairs(characters) do
 		if not c.me and not c.online and not c.accountOnline then
 			away[#away + 1] = c
 		end

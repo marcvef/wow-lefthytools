@@ -110,6 +110,10 @@ end
 
 -- A friend's L message, on the next tick.
 function B.ShowDing(peer, level, text)
+	if type(level) == "number" and level > 0 and level ~= peer.level then
+		peer.level = level
+		peer.rev = peer.rev + 1
+	end
 	if M.db.dingShow then
 		Announce(peer.name, peer.classFile, level, B.Clean(text, TEXT_MAX))
 	end

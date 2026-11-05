@@ -205,7 +205,7 @@ local function StoreFriendDay(peer, day)
 	local friends = C.Store().friendStats
 	local f = friends[peer.name] or { days = {} }
 	friends[peer.name] = f
-	f.classFile, f.level, f.updated = peer.classFile, peer.level, time()
+	f.classFile, f.level, f.updated = peer.classFile, peer.level or f.level, time()
 	f.acct = C.PeerAccount and C.PeerAccount(peer) or f.acct
 	f.guid = type(peer.guid) == "string" and not issecret(peer.guid) and peer.guid or f.guid
 	local old = f.days[day.day] or {}

@@ -1066,6 +1066,99 @@ do
 	WorldMapFrame:Hide()
 end
 
+section("Beacon: friends' levels when Battle.net says 0")
+do
+	-- Mine goes out: only to a build that reads it, once, again when it changes or after a hello.
+	local function peerOf(id) return BB.module:GetPeers()[id] end
+	anna("S2;;0;260.0;750.0;Goldshire;")
+	Advance(0.2)
+	local wasLevel, wasBuild = PLAYER_LEVEL, peerOf(11).version
+	mark = #GAMEDATA + 1
+	Advance(1.2)
+	check(#sentTo(11, mark, "B2;bl;") == 0, "a friend on an older build is never sent it")
+	peerOf(11).version = "0.7.0"
+	Advance(1.2)
+	check(#sentTo(11, mark, "B2;bl;") == 0, "nor on the tagged 0.7.0 (no commit count: not newer)")
+	peerOf(11).version = "0.7.0-1-gabc1234"
+	Advance(1.2)
+	check(sentTo(11, mark, "B2;bl;")[1] == "B2;bl;" .. PLAYER_LEVEL, "the first build that reads it gets my level")
+	Advance(3)
+	check(#sentTo(11, mark, "B2;bl;") == 1, "once")
+	PLAYER_LEVEL = wasLevel + 1
+	Advance(1.2)
+	check(sentTo(11, mark, "B2;bl;")[2] == "B2;bl;" .. PLAYER_LEVEL, "and when it changes")
+	check(#sentTo(12, mark, "B2;bl;") == 0, "Bob's older build got none of it")
+	Advance(5)
+	anna("H2")
+	Advance(1.5)
+	check(#sentTo(11, mark, "B2;bl;") == 3, "her hello (a /reload) gets it again")
+	PLAYER_LEVEL = wasLevel
+	Advance(1.2)
+	peerOf(11).version = wasBuild
+
+	local account = BN_FRIENDS[1][1]
+	-- Beacon reads Battle.net again (every 15 s); Anna and Bob stay around meanwhile.
+	local function reread()
+		Advance(16)
+		anna("S2;;0;260.0;750.0;Goldshire;")
+		Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;;;;;", "WHISPER", 12)
+	end
+	account.characterLevel = 0
+	local function level()
+		OpenWorldMap(1429)
+		Advance(0.6)
+		local pin = pinOf(11)
+		pin:OnMouseEnter()
+		local line
+		for _, text in ipairs(TOOLTIP.lines) do
+			if text:find("Level", 1, true) then line = text end
+		end
+		pin:OnMouseLeave()
+		WorldMapFrame:Hide()
+		return line
+	end
+	anna("X2;64")
+	reread()
+	check(level():find("Level 20 (64%)", 1, true), "Battle.net's 0 doesn't overwrite a level I know")
+
+	anna("B2;bl;37")
+	check(level():find("Level 37 (64%)", 1, true), "they tell me theirs")
+	reread()
+	check(level():find("Level 37 (64%)", 1, true), "it stays when Beacon reads Battle.net again")
+	for _, bad in ipairs({ "B2;bl;abc", "B2;bl;", "B2;bl;0", "B2;bl;1000", "B2;bl;37;1" }) do
+		anna(bad)
+	end
+	check(level():find("Level 37 (64%)", 1, true), "malformed: ignored")
+	anna("L2;38;")
+	Advance(0.6)
+	check(level():find("Level 38 (64%)", 1, true), "a level-up says it too")
+
+	-- Another character of theirs: what they said of the last one is gone, nothing shows 0.
+	local wasName = account.characterName
+	account.characterName = "Annie Alt"
+	reread()
+	check(level() == nil or not level():find("Level 38", 1, true), "another character: not the last one's level")
+	check(not (level() or ""):find("Level 0", 1, true), "never level 0")
+	check(BB.FriendStatus(peerOf(11), 11).level == nil, "the Friends page has no level to show")
+	check(BB.FriendStatus(peerOf(11), 11, 12).level:find("^12"), "or the one from their journal")
+	account.characterName = wasName
+
+	-- In my group the game tells it.
+	PARTY.party1 = { guid = "Player-1-11", level = 41 }
+	GROUP_GUIDS["Player-1-11"], GROUP = true, "party"
+	Fire("GROUP_ROSTER_UPDATE")
+	reread()
+	check(peerOf(11).level == 41, "a group member's level comes from the game")
+	GROUP_GUIDS["Player-1-11"], PARTY.party1, GROUP = nil, nil, "none"
+	Fire("GROUP_ROSTER_UPDATE")
+
+	-- Battle.net's own level still wins where it has one.
+	account.characterLevel = 20
+	reread()
+	check(peerOf(11).level == 20, "Battle.net's level, when it has one")
+	anna("X2;")
+end
+
 section("Beacon: friends' health")
 do
 	-- Hers (estimated on her side), for everyone, not only who watches her stream: beside her level

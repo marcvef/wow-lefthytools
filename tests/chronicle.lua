@@ -313,6 +313,16 @@ do
 		and annaStats.days["2030-05-15"].quests == 2 and not annaStats.days["2030-05-13"] and annaStats.classFile == "MAGE",
 		"and I keep theirs (malformed days are dropped)")
 	check(annaStats.days["2030-05-14"].afk == 2700 and not annaStats.days["2030-05-12"], "their AFK time joins the day")
+	do -- A level of 0 (Battle.net's, saved on launch day) isn't shown, and doesn't replace a real one.
+		local was = annaStats.level
+		annaStats.level = 0
+		for _, c in ipairs(CH.Characters()) do
+			if c.name == "Anna Brook" or c.key == "Anna Brook" then
+				check(c.level == nil, "a saved level 0 is no level, got " .. tostring(c.level))
+			end
+		end
+		annaStats.level = was
+	end
 	check(annaStats.acct == CH.Hash("Annie#1234"), "with their BattleTag's hash (from Battle.net): the days are that person's")
 	annaStats.days["2030-05-14"].played = nil -- (to see it written again)
 	anna("D2;20300514;90;5000;3;20;1;1") -- the day again, later

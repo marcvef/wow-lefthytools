@@ -420,6 +420,7 @@ function C.Characters()
 							end
 							last, level = math.max(last or 0, f.updated or 0), math.max(level or 0, f.level or 0)
 						end
+						level = level and level > 0 and level or nil -- (0: Battle.net's, saved on launch day)
 						for day, b in pairs(c.days) do
 							days[day] = b
 						end
@@ -434,7 +435,8 @@ function C.Characters()
 	end
 	for _, item in ipairs(loose) do
 		local f, acct = item.f, ValidAcct(item.f.acct)
-		list[#list + 1] = { key = item.key, name = item.name, partial = false, classFile = f.classFile, level = f.level,
+		list[#list + 1] = { key = item.key, name = item.name, partial = false, classFile = f.classFile,
+			level = f.level and f.level > 0 and f.level or nil, -- (0: Battle.net's, saved on launch day)
 			online = online[item.key] or false, accountOnline = (acct and onlineAccounts[acct]) or online[item.key] or false,
 			last = f.updated or 0, days = type(f.days) == "table" and f.days or {}, legacy = true, acct = acct,
 			account = acct and C.AccountLabel(acct) }

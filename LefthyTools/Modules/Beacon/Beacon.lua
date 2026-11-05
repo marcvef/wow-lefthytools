@@ -245,6 +245,11 @@ local function UpdateGroupUnits()
 			peer.groupUnit = unit
 			peer.rev = peer.rev + 1
 		end
+		local level = unit and UnitLevel(unit)
+		if level and not LT.IsSecret(level) and level > 0 and level ~= peer.level then
+			peer.level = level
+			peer.rev = peer.rev + 1
+		end
 	end
 end
 
@@ -486,8 +491,21 @@ local function IsUsableAccount(info)
 		and info.wowProjectID == WOW_PROJECT_ID
 end
 
+-- A level worth showing, else nil: Battle.net's characterLevel is 0 on the release (1.60.1.70790).
+local function KnownLevel(level)
+	return type(level) == "number" and not LT.IsSecret(level) and level > 0 and level or nil
+end
+
+-- A friend's level: Battle.net's when it knows it, else what they told me (B2;bl, L2, my group).
+function B.FriendLevel(peer, info)
+	return KnownLevel(info and info.characterLevel) or peer.level
+end
+
 local function CopyInfo(peer, info)
-	if peer.name ~= info.characterName or peer.level ~= info.characterLevel or peer.classFile ~= info.classFilename then
+	-- What they told me stays while Battle.net has no level, until they play another character.
+	local level = KnownLevel(info.characterLevel)
+		or ((not peer.name or peer.name == info.characterName) and peer.level or nil)
+	if peer.name ~= info.characterName or peer.level ~= level or peer.classFile ~= info.classFilename then
 		peer.rev = peer.rev + 1
 		Changed()
 	end
@@ -499,7 +517,7 @@ local function CopyInfo(peer, info)
 		end
 	end
 	peer.name, peer.classFile, peer.guid = info.characterName, info.classFilename, info.playerGuid
-	peer.level, peer.area = info.characterLevel, info.areaName
+	peer.level, peer.area = level, info.areaName
 end
 
 local function Forget(gameAccountID)
@@ -785,8 +803,16 @@ local function OnMessage(text, senderID)
 	elseif kind == "W" then
 		B.ReceiveNews(senderID, a, b, c)
 	elseif kind == "B" then
-		-- The family of other modules' messages, by the word's first letter (e: Echoes).
-		if a:sub(1, 1) == "e" and Counted(guard, "echoes", ECHOES_LIMIT, ECHOES_WINDOW, now) and B.ReceiveEchoes then
+		-- The family of other modules' messages, by the word's first letter (e: Echoes), and
+		-- Beacon's own word, their level.
+		if a == "bl" then
+			local level = KnownLevel(tonumber(b:match("^%d%d?%d?$") or ""))
+			if level and level ~= peer.level then
+				peer.level = level
+				peer.rev = peer.rev + 1
+				Changed()
+			end
+		elseif a:sub(1, 1) == "e" and Counted(guard, "echoes", ECHOES_LIMIT, ECHOES_WINDOW, now) and B.ReceiveEchoes then
 			B.ReceiveEchoes(senderID, a, b)
 		end
 	end

@@ -95,7 +95,7 @@ end
 
 -- Name (and <AFK>), level and progress, health, "In your group".
 local function Head(peer, info)
-	local level = info and info.characterLevel or peer.level
+	local level = B.FriendLevel(peer, info)
 	local head = ColouredName(peer)
 	if info and info.isGameAFK then
 		head = head .. " |cff999999<AFK>|r"
@@ -135,10 +135,11 @@ end
 
 -- A friend's status in parts, for a table (Chronicle's Friends page): name (class colour, <AFK>),
 -- level (and progress), where (zone - subzone, distance, grey), doing (dead or fighting, else the
--- quest they track, else "In your group"; nil: none of it).
-function B.FriendStatus(peer, gameAccountID)
+-- quest they track, else "In your group"; nil: none of it). otherLevel: a level from elsewhere
+-- (their journal), for a friend who doesn't tell theirs yet.
+function B.FriendStatus(peer, gameAccountID, otherLevel)
 	local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
-	local level = info and info.characterLevel or peer.level
+	local level = B.FriendLevel(peer, info) or otherLevel
 	return {
 		name = ColouredName(peer) .. ((info and info.isGameAFK) and " |cff999999<AFK>|r" or ""),
 		level = level and (peer.xpPercent and ("%d |cff999999(%d%%)|r"):format(level, peer.xpPercent) or tostring(level)),
