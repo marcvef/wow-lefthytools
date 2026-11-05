@@ -422,5 +422,8 @@ ns.CHANGELOG = {
 	{ id = 138, version = "0.7.0", module = "tweaks",
 		en = { "Spells of the launch build", "The level-up window's trainer spells, flight times and the quest markers come from the launch build: spells Forever took away from the trainers no longer show, its new ones do." },
 		de = { "Zauber vom Launch-Build", "Die Trainer-Zauber im Level-Up-Fenster, die Flugzeiten und die Quest-Markierungen stammen vom Launch-Build: Zauber, die Forever bei den Trainern entfernt hat, fehlen jetzt, seine neuen sind dabei." } },
+	{ id = 139, module = "beacon",
+		en = { "Friends' levels", "Battle.net gives friends' levels as 0 on the release, so Chronicle and the friend tooltips showed level 0. Friends now tell you their level themselves; until they've updated it comes from their journal, level-ups or your group, else it shows a dash." },
+		de = { "Level von Freunden", "Battle.net meldet auf dem Release für Freunde Level 0, darum zeigten Chronicle und die Tooltips Level 0. Freunde teilen dir ihr Level jetzt selbst mit; bis sie aktualisiert haben, kommt es aus ihrem Tagebuch, ihren Level-ups oder deiner Gruppe, sonst steht dort ein Strich." } },
 	-- New entries go here, at the end.
 }
