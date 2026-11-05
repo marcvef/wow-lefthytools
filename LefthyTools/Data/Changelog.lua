@@ -428,5 +428,8 @@ ns.CHANGELOG = {
 	{ id = 140, module = "beacon",
 		en = { "Mail to the winner works", "When you attach an item someone won, the mail now fills in their name and surname. The server name it added before made the mail impossible to send." },
 		de = { "Post an den Gewinner funktioniert", "Hängst du ein gewonnenes Item an eine Post, trägt sie jetzt Name und Nachname des Gewinners ein. Mit dem bisher angehängten Servernamen ließ sich die Post nicht senden." } },
+	{ id = 141, module = "beacon",
+		en = { "The stream's map on Zephras Isle", "The fight stream's map now shows the terrain on Zephras Isle too, as it does on the continents." },
+		de = { "Die Stream-Karte auf Zephras Isle", "Die Karte im Kampf-Stream zeigt jetzt auch auf Zephras Isle das Gelände, wie auf den Kontinenten." } },
 	-- New entries go here, at the end.
 }
