@@ -172,6 +172,7 @@ minimap, and you on theirs, without being in a group.
 - **Announcements:** `/la <text>` (or `/lefthy announce <text>`) puts the line in the middle of their screens,
   where shared items show, with the whisper sound (and in their chat). On a cinematic flight
   both come as subtitles.
+- **Invites:** **Shift+left click** a friend's dot on the world map to invite them to your group.
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.
   The chat line has a map pin: click it and your waypoint arrow points there.

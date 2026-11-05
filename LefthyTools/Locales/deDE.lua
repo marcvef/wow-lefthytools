@@ -490,6 +490,8 @@ L["The window with a made-up fight. Drag it to move it, the corner at the bottom
 	"Das Fenster mit einem ausgedachten Kampf. Zieh es, um es zu verschieben, und die Ecke unten rechts, um die Größe zu ändern. /lefthy stream preview macht dasselbe."
 L["Click: watch their fight"] = "Klick: beim Kampf zuschauen"
 L["Click: close their fight stream"] = "Klick: Kampf-Stream schließen"
+L["Shift+click: invite"] = "Shift+Klick: einladen"
+L["Invited %s."] = "%s eingeladen."
 L["Watching your fights"] = "Schauen dir zu"
 L["Beacon settings: Friends can watch my fights."] = "Beacon-Einstellungen: Freunde dürfen meine Kämpfe sehen."
 L["Waiting for %s's stream..."] = "Warte auf den Stream von %s ..."

@@ -1116,10 +1116,31 @@ do
 	check(tooltipHas("Click: watch their fight"), "her dot's tooltip: a click watches her")
 	ClickWorldMap()
 	check(S.IsWatching(11) and fwin:IsShown() and tooltipHas("Click: close their fight stream"), "clicked: her stream opens; the tooltip says how to close it")
+	check(tooltipHas("Shift+click: invite"), "her tooltip says Shift+click invites")
+	wipe(INVITES)
+	local pmarkInvite = #PRINTED + 1
 	STATE.shift = true
 	ClickWorldMap()
+	check(INVITES[1] == 11 and #INVITES == 1 and printedSince(pmarkInvite):find("Invited Anna Brook.", 1, true),
+		"with Shift: she's invited, through Battle.net, and I'm told")
+	check(S.IsWatching(11), "with Shift: her stream stays as it is")
+	pin._mouse = false
+	ClickWorldMap()
+	check(#INVITES == 1, "with Shift, on no dot: nobody is invited")
+	pin._mouse = true
+	STATE.alt = true
+	ClickWorldMap()
+	STATE.alt = nil
+	check(#INVITES == 1, "Shift+Alt: no invite")
+	local peer11 = BB.peers[11]
+	peer11.groupUnit = "party1"
+	pin:OnMouseEnter()
+	check(not tooltipHas("Shift+click: invite"), "in my group: the tooltip doesn't offer an invite")
+	ClickWorldMap()
+	check(#INVITES == 1, "in my group: no invite")
+	peer11.groupUnit = nil
+	pin:OnMouseEnter()
 	STATE.shift = false
-	check(S.IsWatching(11), "with Shift: nothing")
 	ClickWorldMap()
 	check(not S.IsWatching(11), "clicked again: closed")
 	pin._mouse = false
@@ -1129,12 +1150,20 @@ do
 	bobPin:OnMouseEnter()
 	ClickWorldMap()
 	check(not tooltipHas("Click: watch their fight") and not S.IsWatching(12), "Bob can't be watched: no hint, a click does nothing")
+	STATE.shift = true
+	ClickWorldMap()
+	STATE.shift = false
+	check(INVITES[2] == 12 and tooltipHas("Shift+click: invite"), "but Bob can be invited")
 	bobPin._mouse = false
 	bobPin:OnMouseLeave()
 	B("streamMapClick"):SetValue(false)
 	pin._mouse = true
 	ClickWorldMap()
 	check(not S.IsWatching(11), "setting off: clicks don't open streams")
+	STATE.shift = true
+	ClickWorldMap()
+	STATE.shift = false
+	check(INVITES[3] == 11, "setting off: Shift+click still invites")
 	pin._mouse = false
 	B("streamMapClick"):SetValue(true)
 	WorldMapFrame:Hide()

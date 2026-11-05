@@ -304,6 +304,8 @@ installer from GitHub instead.
     gone); dragging it onto the vendor warns in chat to buy it back. At a mailbox, attaching it
     fills in their name. Opening a trade with them says so in chat, and trading (or mailing) it to
     them removes the line and the border. `/lefthy beacon handover` lists what's still owed.
+    Invite: hover a friend's world map dot: "Shift+click: invite"; Shift+left click it: they get
+    the game's invite, also on another realm, and chat says "Invited <them>." In your group: no line.
     Fight stream (both on this build): hover their world map dot: "Click: watch their fight";
     click it: their window at the top left (small; drag it, drag its bottom right corner to
     resize, a second window goes beside it); their map, their arrow turning, the mobs they fight,

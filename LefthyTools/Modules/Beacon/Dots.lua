@@ -282,6 +282,9 @@ function B.ShowTooltip(owner, peer, group)
 		GameTooltip:AddLine(B.StreamIsWatching(id) and L["Click: close their fight stream"] or L["Click: watch their fight"],
 			0.5, 0.8, 1)
 	end
+	if owner.streamHint and not peer.groupUnit then
+		GameTooltip:AddLine(L["Shift+click: invite"], 0.5, 0.8, 1)
+	end
 	GameTooltip:Show()
 	owner.tooltipSig = Signature(peer, group)
 end
@@ -673,19 +676,28 @@ function B.RefreshMaps()
 	B.minimapDirty = true
 end
 
--- A plain left click on a friend's dot opens or closes their fight stream (StreamNet.lua). The pins
+-- A plain left click on a friend's dot opens or closes their fight stream (StreamNet.lua); with Shift
+-- it invites them, through Battle.net as the friends list does (their realm doesn't matter). The pins
 -- don't take clicks (see CheckMouseButtonPassthrough), so the map gets the click and this hook
 -- looks which dot is under the mouse; the map does what it always does with a click.
 local mapClickHooked = false
 local function OnMapMouseDown(_, button)
-	if button ~= "LeftButton" or IsAltKeyDown() or IsControlKeyDown() or IsShiftKeyDown()
-		or not (M.enabled and M.db.streamMapClick and B.StreamToggle) then
+	if button ~= "LeftButton" or IsAltKeyDown() or IsControlKeyDown() or not M.enabled then
+		return
+	end
+	local invite = IsShiftKeyDown()
+	if not invite and not (M.db.streamMapClick and B.StreamToggle) then
 		return
 	end
 	for id, pin in pairs(mapPins) do
 		if pin:IsShown() and pin:IsMouseOver() then
 			local peer = B.peers[id]
-			if peer and (B.StreamCanWatch(id) or B.StreamIsWatching(id)) then
+			if invite then
+				if peer and peer.name and not peer.groupUnit then
+					C_BattleNet.InviteFriend(id)
+					M:Print(L["Invited %s."]:format(peer.name))
+				end
+			elseif peer and (B.StreamCanWatch(id) or B.StreamIsWatching(id)) then
 				B.StreamToggle(id, "map")
 				if GameTooltip:IsOwned(pin) then
 					B.ShowTooltip(pin, peer, pin.group) -- (its hint changes)

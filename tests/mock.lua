@@ -1136,7 +1136,9 @@ MY_BATTLETAG = "Me#1111"
 function BNGetInfo() return 1, MY_BATTLETAG end
 GAMEDATA = {} -- every C_BattleNet.SendGameData call that went through
 MOCK_SEND_RESULT = nil -- set to 3 to make the server answer "throttled"
+INVITES = {} -- every C_BattleNet.InviteFriend call
 C_BattleNet = {
+	InviteFriend = function(id) INVITES[#INVITES + 1] = id end,
 	GetFriendNumGameAccounts = function(i) return BN_FRIENDS[i] and #BN_FRIENDS[i] or 0 end,
 	GetFriendGameAccountInfo = function(i, j) return BN_FRIENDS[i] and BN_FRIENDS[i][j] end,
 	GetGameAccountInfoByID = function(id)
