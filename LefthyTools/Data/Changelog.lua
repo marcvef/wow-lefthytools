@@ -431,5 +431,8 @@ ns.CHANGELOG = {
 	{ id = 141, module = "beacon",
 		en = { "The stream's map on Zephras Isle", "The fight stream's map now shows the terrain on Zephras Isle too, as it does on the continents." },
 		de = { "Die Stream-Karte auf Zephras Isle", "Die Karte im Kampf-Stream zeigt jetzt auch auf Zephras Isle das Gelände, wie auf den Kontinenten." } },
+	{ id = 142, module = "beacon",
+		en = { "Invite friends from the map", "Shift+left click a friend's dot on the world map to invite them to your group." },
+		de = { "Freunde von der Karte einladen", "Shift+Linksklick auf den Punkt eines Freundes auf der Weltkarte lädt ihn in deine Gruppe ein." } },
 	-- New entries go here, at the end.
 }
