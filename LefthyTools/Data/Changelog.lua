@@ -434,5 +434,8 @@ ns.CHANGELOG = {
 	{ id = 142, module = "beacon",
 		en = { "Invite friends from the map", "Shift+left click a friend's dot on the world map to invite them to your group." },
 		de = { "Freunde von der Karte einladen", "Shift+Linksklick auf den Punkt eines Freundes auf der Weltkarte lädt ihn in deine Gruppe ein." } },
+	{ id = 143, module = "beacon",
+		en = { "Friends' real levels", "Friends now always show the level their character really has. Battle.net's number can be wrong, and it's only used for friends who haven't updated yet. Everyone needs this version for it." },
+		de = { "Die echten Level deiner Freunde", "Freunde zeigen jetzt immer das Level, das ihr Charakter wirklich hat. Die Zahl von Battle.net kann falsch sein und wird nur noch für Freunde genutzt, die noch nicht aktualisiert haben. Dafür brauchen alle diese Version." } },
 	-- New entries go here, at the end.
 }
