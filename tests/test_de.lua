@@ -123,6 +123,12 @@ check(cw and cw:IsShown() and cw.Tabs.timeline:GetText() == "Zeitleiste" and cw.
 	"Chronicle in German, with German dates, got " .. tostring(cw and cw.Text:GetText()))
 cw.Tabs.stats:Click()
 check(cw.Text:GetText():find("Todesstöße", 1, true) and cw.Text:GetText():find("Diese Session", 1, true), "Chronicle statistics in German")
+cw.Tabs.professions:Click()
+check(cw.Tabs.professions:GetText() == "Berufe" and not cw.Picker:IsShown()
+	and ns.Chronicle.ProfessionsView().Box ~= nil, "Chronicle's Professions tab in German, without the picker")
+for key, button in pairs(cw.Tabs) do
+	check(#button:GetText() * 6 <= button:GetWidth() - 6, "the German tab label fits its button: " .. key)
+end
 cw:Hide()
 check(LT:GetModule("chronicle").category.name == "Chronicle", "Chronicle's name isn't translated either")
 

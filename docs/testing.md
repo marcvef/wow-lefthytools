@@ -52,6 +52,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `echoes_net.lua` | Beacon's B family; Echoes' delivery: messages, ranges, who gets B (the first build with Delivery), serving within the budget, back-off, collecting, relaying, safe ranges, the probe, switching off; a holder's line (one place per friend, collectors first), page starts not taken, what a relay asks for with many friends, silent holders, bounds on answers and safe summaries, what keeps a store's safe entry, a friend Battle.net lists late, long range lists, a hello right after an answer, a hand-edited saved file; three clients (author, relay, collector) and an older build; an author's crash with the collector online at her next session (her pages close above the lost one's number, never confirmed); two relays and reloads mid-page; a collector who records, a full inbox, 120 pages within the budget; many relays at once spreading over an author's pages; a page of mine moving while I serve it; a WTF folder restored from a backup, and one folder on two computers played by turns (every page reaches the collector, each under one number); early pages to a collector online (provisional: not safe, not served, told only to the author; checked by its start and confirmed after her `/reload`; 10-minute pages; both sides' `/lefthy echoes` along the way, friends' names); an author's crash with the collector offline at her next session (the check shows another hash, the receipt takes the provisional page aside, the other page is fetched: both reach the exporter, nothing is dropped before it's safe); two collectors on one PC sharing the exporter's receipt (a number it has only early is no one's exported); a WTF folder restored while the new page went early to a collector who then crashes (moved, both pages kept); a page that went only early, checked after the author's `/reload` by its start alone or with a part (out, dropped once safe, not moved), and moved by a relay's holdings of its number; a collector's crash right after receiving; early pages and older builds (no `ea`, `en`); a collector's `ea` and checks with friends played by the test (one that stops collecting no longer tells an author its provisional pages); a full inbox (no `e`: one hello each way) | - (its clients are its own) |
 | `recipes_data.lua` | `Data/Recipes.lua`'s shape: the lines, every recipe's fields and reagents, known recipes, names in both languages | - |
 | `recipes.lua` | Chronicle's recipes: the data, the lists' encoding, the scan in steps and when it runs, what goes out and when (a skill change sends no list), older builds get none, broken messages, the caps, the setting, pruning and a character with only recipes, `R.People`, `R.Search`, `R.Crafters`; several clients: a friend gets my list, a third friend gets it relayed while I'm offline, only friends of that account | - (its clients are its own) |
+| `professions.lua` | Chronicle's Professions tab, with a fake `C.Recipes` (the last section: the real one's data, when it's loaded): the row of tabs, defaults, people, groups and sorting, difficulty, details and the real tooltip, search, gathering, empty states, pools, what's redrawn, names coming in, in a fight, the fallback (last in the suite's order) | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:
@@ -368,3 +369,36 @@ installer from GitHub instead.
     copied over: one line "LefthyTools: data from the beta was reset; WoW: Forever starts fresh.",
     Mirage off, every setting its default, an empty journal and Bestiary, no what's-new window;
     then `/reload` and a restart: no line, and what you set since stays.
+17. Chronicle's Professions tab (`/chronicle`, the leftmost tab; needs recipe lists, so log in on a
+    crafter once, and on a friend's build with the same version for their lists). **The real
+    tooltip first, it's what the tests can't show:**
+    - Hover a piece of gear: the item's real tooltip is inside the right panel, under the name:
+      armour, stats, required level, with its border. Not over the window's edge, and nothing
+      shows through behind it. If it comes up beside the window instead, the fallback ran: note the
+      item and tell.
+    - An item with a long text (a set of stats, an "Equip:" line): wider ones are scaled to fit the panel,
+      the text still readable. A very tall one is cut at the bottom and "Needs:" stays on screen.
+    - A recipe not seen before this session (`/reload` first): the name comes shortly, then the tooltip
+      fills in without another hover, and "Needs:" moves down.
+    - An enchant: the spell's tooltip in the panel.
+    - Open the Bestiary's or Beacon's tooltip lines on an item that has them: those lines show in here too
+      (they're added to every item tooltip).
+    - Move the window half off the screen: the tooltip stays in its place, doesn't jump. Close the
+      window with a recipe clicked and open it: it's still there, tooltip too. Open the What's new window
+      or a bag over it: the tooltip doesn't sit above other windows (a tooltip's usual strata would).
+    - Controller: click a row (no hovering there): the details stay. No "action blocked" afterwards.
+
+    Then the rest:
+    - The tab row: seven tabs fit, "Professions" and in German "Statistiken" aren't cut or touching
+      the edges; on Timeline, Statistics and Graphs the dropdown isn't overlapped.
+    - Top: every profession's icon and count; the chosen one is in gold, one of yours at first.
+    - People: by skill, class colours, grey line with account and level; a list older than three days says
+      so. Middle: gear by slot in the sheet's order, with the highest ilvl first, slot names in the client's
+      language; potions and such under their types; enchants under their categories (German on deDE);
+      headers fold. Dots: compare a recipe you know with the profession window's colour for it.
+    - "Needs:": the bag count changes when you loot one, red when short; a reagent hovered: its tooltip.
+    - Search "leather": about 0.3 s after you stop typing; matches from all professions, who knows them;
+      clear it: back where you were. A nonsense word: "No recipes found".
+    - Herbalism: people and skill, "No recipes: gathering".
+    - In a fight: all of it still works, no errors. Scrolling a long list (Tailoring, Everyone) is smooth,
+      and standing with the tab open costs nothing noticeable (`/lefthy` has no meter: watch the frame rate).

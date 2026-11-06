@@ -959,3 +959,29 @@ L["Records the way you travel and what happens on it (level-ups, quests, kills, 
 L["Relay friends' recordings"] = "Aufzeichnungen von Freunden weitergeben"
 L["Keeps your Battle.net friends' recordings for a while and passes them on to whoever collects them, also when the two are never online at the same time. Needs Beacon; nothing is sent in combat."] =
 	"Hebt die Aufzeichnungen deiner Battle.net-Freunde eine Weile auf und gibt sie an den weiter, der sie sammelt, auch wenn die beiden nie gleichzeitig online sind. Braucht Beacon; im Kampf wird nichts gesendet."
+
+-- Chronicle: the Professions tab
+L["Professions"] = "Berufe"
+L["Everyone"] = "Alle"
+L["Search everyone:"] = "Alle durchsuchen:"
+L["No recipes found"] = "Keine Rezepte gefunden"
+L["No recipes: gathering"] = "Keine Rezepte: Sammelberuf"
+L["Nobody here has this profession yet. Friends appear when they've updated LefthyTools and logged in once."] =
+	"Noch hat hier niemand diesen Beruf. Freunde tauchen auf, sobald sie LefthyTools aktualisiert haben und einmal eingeloggt waren."
+L["No recipes from %s yet: their list comes when they've updated LefthyTools and logged in once."] =
+	"Noch keine Rezepte von %s: Die Liste kommt, sobald LefthyTools aktualisiert ist und der Charakter einmal eingeloggt war."
+L["No recipe lists here yet: they come when friends have updated LefthyTools and logged in once."] =
+	"Noch keine Rezeptlisten da: Sie kommen, sobald Freunde LefthyTools aktualisiert haben und einmal eingeloggt waren."
+L["Hover a recipe to see it here, click it to keep it here."] = "Fahr mit der Maus über ein Rezept, um es hier zu sehen; ein Klick hält es fest."
+L["%s finds it: %s"] = "Für %s: %s"
+L["hard (orange)"] = "schwer (orange)"
+L["medium (yellow)"] = "mittel (gelb)"
+L["easy (green)"] = "leicht (grün)"
+L["trivial (grey)"] = "trivial (grau)"
+L["Needs:"] = "Braucht:"
+L["(you: %d)"] = "(du: %d)"
+L["Also known by: %s"] = "Können auch: %s"
+L["Known by: %s"] = "Können: %s"
+L["ilvl %d"] = "ilvl %d"
+L["lvl %d"] = "Lvl %d"
+L["Other"] = "Sonstiges"

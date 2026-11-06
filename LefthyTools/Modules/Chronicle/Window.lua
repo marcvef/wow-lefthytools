@@ -5,13 +5,14 @@ local C = ns.Chronicle
 local M = C.module
 
 -- The Chronicle window: an account picker (you or a friend by BattleTag, each with their
--- characters) and six pages. Timeline (all your characters' journals in one, newest first, by
+-- characters) and seven pages. Timeline (all your characters' journals in one, newest first, by
 -- day), Statistics (yours, all your characters added up, plus this session and each character's
 -- level; labels left and values right in two text blocks of the same line count), Graphs (you or a
 -- friend, all their characters), Compare (every character, yours and your friends', in every graph,
 -- Compare.lua's G.DrawCompare), News (what friends' characters did: synced journals and live news,
--- Characters.lua's C.FriendNews) and Friends (who's online, who isn't: a row per character, its BattleTag
--- beside it; two tables, G.DrawTables; a click on a row opens their account's graphs). A character
+-- Characters.lua's C.FriendNews), Friends (who's online, who isn't: a row per character, its BattleTag
+-- beside it; two tables, G.DrawTables; a click on a row opens their account's graphs) and Professions
+-- (everyone's professions and recipes, Professions.lua's C.DrawProfessions). A character
 -- is shown by the name the game shows (with its surname), and only ever once.
 -- Built on first open; redrawn only while open and only when something changed (the Statistics
 -- page also every few seconds, for the time and distance counters).
@@ -20,7 +21,9 @@ local TIMELINE_SHOW = 250  -- entries drawn; older ones are summarized in one li
 local STATS_REFRESH = 5
 local GRAPHS_MIN_GAP, GRAPHS_REFRESH = 10, 30 -- graphs: redraw on changes at most every 10 s, else every 30 s
 local FEED_MIN_GAP = 3 -- friends' news: the News and Friends pages and the minimap dot follow at most this often
-local TAB_WIDTH = 80 -- (six tabs and the picker fit in a row)
+local TAB_WIDTH, TAB_GAP = 72, 3 -- (seven tabs and the picker fit in a row; the longest labels, "Professions" and "Statistiken", in these)
+local PICKER_WIDTH = 226 -- (its list stays wider, Core/Window.lua's 240)
+local INSET_W, INSET_H = 10, 86 -- how much smaller than the window the template's Inset is
 local LIST_CHARS = 10 -- a friend's characters listed in a row's tooltip, one per line
 
 local ICONS = C.Graphs.EVENT_ICONS
@@ -674,15 +677,16 @@ local function Build()
 
 	frame.Picker = LT.Window.AddPicker(frame, 240, PickerEntries, Select)
 	frame.Picker:SetPoint("TOPLEFT", 14, -30)
+	frame.Picker:SetWidth(PICKER_WIDTH)
 
 	frame.Tabs = {}
 	for i, info in ipairs({ { "friends", L["Friends"] }, { "news", L["News"] }, { "compare", L["Compare"] },
-			{ "graphs", L["Graphs"] }, { "stats", L["Statistics"] }, { "timeline", L["Timeline"] } }) do
+			{ "graphs", L["Graphs"] }, { "stats", L["Statistics"] }, { "timeline", L["Timeline"] }, { "professions", L["Professions"] } }) do
 		local key = info[1]
 		local button = LT.Window.AddButton(frame, info[2], function()
 			tab = key
 			Refresh()
-		end, { "TOPRIGHT", frame, "TOPRIGHT", -10 - (i - 1) * (TAB_WIDTH + 4), -30 })
+		end, { "TOPRIGHT", frame, "TOPRIGHT", -10 - (i - 1) * (TAB_WIDTH + TAB_GAP), -30 })
 		button:SetSize(TAB_WIDTH, 22)
 		frame.Tabs[key] = button
 		-- New from friends: a blue count on the News tab.
@@ -692,7 +696,10 @@ local function Build()
 			button.New:SetTextColor(0.4, 0.75, 1)
 		end
 	end
-	frame:SetScript("OnHide", function() selectedKey = nil end)
+	frame:SetScript("OnHide", function()
+		selectedKey = nil
+		C.HideProfessions()
+	end)
 end
 
 -- top: scrolled to the top (a small chart picked for the big one).
@@ -711,7 +718,7 @@ function Refresh(keepScroll)
 		end
 	end
 	selectedKey = selectedKey or "me"
-	local picking = tab ~= "friends" and tab ~= "news" and tab ~= "compare" -- (the pages that are about one person)
+	local picking = tab ~= "friends" and tab ~= "news" and tab ~= "compare" and tab ~= "professions" -- (the pages that are about one person)
 	local mine = picking and not friend and C.Totals() -- all my characters
 	if picking then
 		frame.Picker:SetLabel(Label(friend or mine)) -- (its list is built only when it opens)
@@ -734,6 +741,12 @@ function Refresh(keepScroll)
 	end
 	local unseen = C.UnseenCount and C.UnseenCount() or 0
 	frame.Tabs.news.New:SetText(unseen > 0 and tostring(unseen) or "")
+	frame.Scroll:SetShown(tab ~= "professions") -- (it has panes of its own in the Inset)
+	if tab == "professions" then
+		C.DrawProfessions(frame.Inset, frame:GetWidth() - INSET_W, frame:GetHeight() - INSET_H)
+		return
+	end
+	C.HideProfessions()
 	if onCanvas then
 		frame.Text:SetText("")
 		frame.Values:SetText("")
@@ -814,7 +827,9 @@ function C.OnTick(now, statsChanged, eventsChanged, feedChanged)
 	end
 	feedPending = feedPending or feedChanged
 	local redraw
-	if tab == "timeline" then
+	if tab == "professions" then
+		C.ProfessionsTick() -- (redraws itself when its lists moved)
+	elseif tab == "timeline" then
 		redraw = eventsChanged
 	elseif tab == "friends" then
 		local since = now - lastStatsRefresh

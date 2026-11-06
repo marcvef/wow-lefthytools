@@ -87,7 +87,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Chronicle/Canvas.lua     the pages' drawing kit: pooled canvas (bars, lines, text), cards, tables
   Modules/Chronicle/Graphs.lua     the Graphs page (yours, a friend's)
   Modules/Chronicle/Compare.lua    the Compare page: everyone in every graph, leaderboard, hall of fame
-  Modules/Chronicle/Window.lua     the journal window (timeline, statistics, graphs, friends)
+  Modules/Chronicle/Professions.lua  the Professions tab: everyone's professions and recipes (C.Recipes' data)
+  Modules/Chronicle/Window.lua     the journal window (timeline, statistics, graphs, friends, professions)
   Modules/Chronicle/MinimapButton.lua  the book button on the minimap's edge
   Modules/Bestiary/Bestiary.lua    Bestiary: the module, shared helpers, reading records (LefthyToolsBestiaryDB), /bestiary
   Modules/Bestiary/Classic.lua     the classic drop database (LefthyTools_DropData), mob health

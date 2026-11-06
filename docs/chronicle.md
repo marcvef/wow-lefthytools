@@ -122,9 +122,9 @@ forgotten (went offline, silent for 65 s, or switched Beacon off).
 
 `LefthyToolsChronicleFrame` (Core/Window.lua's template, 780 x 620), opened with `/chronicle`,
 `/lefthy chronicle`, the settings button, the key binding `LEFTHYTOOLS_CHRONICLE_TOGGLE` or the
-minimap button (`C.Open(page)` opens it on a page). Six pages: Timeline, Statistics, Graphs,
-Compare, News, Friends (tabs right to left from the top right corner, 80 px each, so six fit
-right of the dropdown).
+minimap button (`C.Open(page)` opens it on a page). Seven pages: Professions, Timeline, Statistics,
+Graphs, Compare, News, Friends (tabs right to left from the top right corner, 72 px each, 3 apart,
+so seven fit right of the 226 px dropdown; the longest labels are "Professions" and "Statistiken").
 
 **Minimap button** (`MinimapButton.lua`, setting `minimapButton`, on by default; `/chronicle
 minimap` switches it), made by `LT.Window.MinimapButton` (Core/Window.lua, shared with Beacon's
@@ -269,6 +269,60 @@ lines), `C.feedDirty` for Friends (at most every 3 s, like the book's blue dot: 
 stream in the feed changes every second), `C.dirty` (counters) for Statistics, which also refreshes
 every 5 s for the time and distance. Graphs: a change is remembered and drawn at most every 10 s,
 otherwise every 30 s (the session curve). A redraw keeps the scroll position.
+
+## Professions tab
+
+`Professions.lua`, `C.DrawProfessions(parent, width, height)` and `C.HideProfessions()`: everyone's
+professions and recipes, since a profession's link doesn't open across realms. It uses only the API
+of `C.Recipes` (read when drawing, so load order doesn't matter), plus `ns.RecipeData.categories`
+for enchants' group names, and has the window's Inset to itself: the dropdown and the journal's
+scroll area are hidden on it.
+
+- **Top:** "Search everyone" and a button per profession (`R.Professions()`, six to a row): its icon,
+  name and how many have it. Chosen by itself until the player clicks one: the first with people,
+  one of mine if I have any.
+- **People, far left:** "Everyone", then `R.People(line)` in its order: the name in class colour,
+  the skill, and under them the account, the level and, past 3 days, how old the list is. Selected
+  by itself: me if I have the profession, else Everyone.
+- **Recipes, middle,** under group headers a click folds (for the session, by profession and group):
+  - gear (`slot`, or `GetItemInfoInstant`'s equip location for an item the data has no numbers for)
+    by slot in the character sheet's order (`SLOTS`, named by the game's `INVTYPE_*` strings), chest
+    and robe as one, highest ilvl first;
+  - other items by type: the subclass's name, else the class's, alphabetically, by `low` highest first;
+  - enchants by `categories[cat]` (German on deDE), by `low` highest first;
+  - what fits none of them under "Other", last.
+
+  A row is an icon, the name in its quality's colour (the spell's name until the item is loaded) and
+  the ilvl for gear. Under a person a dot in the skill-up colours (below `low` orange, below the
+  middle of `low` and `high` yellow, below `high` green, else grey; no numbers: no dot), under
+  Everyone how many know it.
+- **Details, right:** a hover fills them at once; a click keeps them while the mouse moves on (click
+  again: free, another: that one). Icon and name, the selected person's difficulty, the real tooltip,
+  "Needs:" (icon, name, how many, `(you: 12)` from `C_Item.GetItemCount`, red when short; hovered: its
+  normal tooltip) and who else knows it (`R.Crafters`).
+- **The real tooltip** (`ShowTip`, `FitTip`, all of it there): a `GameTooltip` of our own,
+  `LefthyToolsProfessionsTooltip`, child of a frame that clips it (`TipClip`), `ANCHOR_NONE`, in the
+  window's strata (the template's is TOOLTIP, over everything) and not clamped to the screen;
+  `SetHyperlink` for an item, `SetSpellByID` for an enchant. Wider than the panel it's scaled down; taller
+  than what's left above "Needs:" it's cut at the bottom. It measures itself only in sight, so with
+  the window closed it waits for the tab's `OnShow`. If it can't be made, a call fails or a loaded
+  item gives no lines, `view.tipBroken` is set and the normal `GameTooltip` beside the window takes
+  over for the session.
+- **Search:** `R.Search` about 0.3 s after the last key. The middle shows the matches by profession,
+  each row who knows it, a click all crafters. Emptied it goes back at once, with the scroll and the
+  clicked recipe as they were; clicking a person or a profession ends it there instead.
+- **Empty:** nobody with the profession: a friendly line; gathering: "No recipes: gathering"; a person
+  or Everyone with no list yet: says so.
+
+**Cost.** Both lists are pools (`NewList`) of what can be in sight, laid where they're scrolled to, so
+600 recipes cost 23 rows. A profession's recipes are grouped and sorted once per `R.Parse` list
+(`Classified`), the data doesn't change; a person or Everyone only filters them. `C.ProfessionsTick`
+(Chronicle's second, only on this tab) draws when `R.Revision()` moved, at most every 3 s and not at
+the start of a fight (`LT.InFight`); opening the tab draws only if it moved. A click draws at once.
+`GET_ITEM_INFO_RECEIVED` and `BAG_UPDATE_DELAYED` are listened to only while the tab is open and only
+fill what's in sight, once per bunch; an `OnUpdate` exists only while a search or a fill is due.
+
+Nothing is protected, so it all works in a fight; no Blizzard menu is opened (gamepad mode).
 
 ## Days for friends' graphs (Live.lua)
 

@@ -83,6 +83,7 @@ Modules\Chronicle\Recap.lua
 Modules\Chronicle\Canvas.lua
 Modules\Chronicle\Graphs.lua
 Modules\Chronicle\Compare.lua
+Modules\Chronicle\Professions.lua
 Modules\Chronicle\Window.lua
 Modules\Chronicle\MinimapButton.lua
 

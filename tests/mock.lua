@@ -140,6 +140,8 @@ function FrameMethods:GetHeight() return self._height or 0 end
 function FrameMethods:SetFrameLevel(l) self._level = l end
 function FrameMethods:GetFrameLevel() return self._level or 1 end
 function FrameMethods:SetFrameStrata(s) self._strata = s end
+function FrameMethods:GetFrameStrata() return self._strata or "MEDIUM" end
+function FrameMethods:SetClipsChildren(c) self._clips = c end
 function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
@@ -149,8 +151,10 @@ function FrameMethods:SetHyperlinksEnabled(e) self._hyperlinks = e end
 function FrameMethods:SetOwner(owner, anchor) self._owner, self._anchor = owner, anchor end
 function FrameMethods:SetHyperlink(link)
 	if not link:find("^item:") and not link:find("^spell:") then error("unknown link type") end
-	self._hyperlink = link
+	self._hyperlink, self._spellID = link, nil
 end
+function FrameMethods:SetSpellByID(id) self._spellID, self._hyperlink = id, nil end
+function FrameMethods:NumLines() return self._numLines or 1 end
 function FrameMethods:RegisterForClicks(...) self._clicks = { ... } end
 function FrameMethods:SetHighlightTexture(t) self._highlight = t end
 function FrameMethods:SetNormalTexture(t) self._normal = t end
@@ -671,7 +675,7 @@ C_Item = {
 	-- (ITEMS[id].classID: 2 weapon, 4 armour; equipLoc: where it's worn)
 	GetItemInfoInstant = function(id)
 		local item = ITEMS[id]
-		if item then return id, "", "", item.equipLoc or "", 1000 + id, item.classID or 0, 0 end
+		if item then return id, "", "", item.equipLoc or "", 1000 + id, item.classID or 0, item.subClassID or 0 end
 	end,
 	GetItemQualityByID = function(id) return ITEMS[id] and ITEMS[id].quality end,
 	GetItemIconByID = function(id) return ITEMS[id] and 1000 + id end,
@@ -1857,6 +1861,17 @@ C_Spell.IsSpellInRange = function(id, u)
 end
 ITEM_RANGES = { [10645] = 20, [835] = 30, [18904] = 35 } -- the rest: items this client doesn't know
 C_Item.RequestLoadItemDataByID = function() end
+-- Item types' names: ITEM_CLASSES[class] = { name = its name, [subclass] = that one's name }.
+ITEM_CLASSES = { [0] = { name = "Consumable", [1] = "Potion" }, [7] = { name = "Trade Goods", [5] = "Cloth" }, [15] = { name = "Miscellaneous" } }
+C_Item.GetItemClassInfo = function(class) return ITEM_CLASSES[class] and ITEM_CLASSES[class].name end
+C_Item.GetItemSubClassInfo = function(class, subclass) return ITEM_CLASSES[class] and ITEM_CLASSES[class][subclass] end
+-- The game's names for the equipment slots.
+INVTYPE_HEAD, INVTYPE_NECK, INVTYPE_SHOULDER, INVTYPE_CLOAK, INVTYPE_CHEST = "Head", "Neck", "Shoulder", "Back", "Chest"
+INVTYPE_BODY, INVTYPE_TABARD, INVTYPE_WRIST, INVTYPE_HAND, INVTYPE_WAIST = "Shirt", "Tabard", "Wrist", "Hands", "Waist"
+INVTYPE_LEGS, INVTYPE_FEET, INVTYPE_FINGER, INVTYPE_TRINKET = "Legs", "Feet", "Finger", "Trinket"
+INVTYPE_WEAPONMAINHAND, INVTYPE_WEAPON, INVTYPE_2HWEAPON, INVTYPE_WEAPONOFFHAND = "Main Hand", "One-Hand", "Two-Hand", "Off Hand"
+INVTYPE_HOLDABLE, INVTYPE_RANGED, INVTYPE_THROWN, INVTYPE_RELIC = "Held In Off-hand", "Ranged", "Thrown", "Relic"
+INVTYPE_BAG, INVTYPE_QUIVER, INVTYPE_AMMO = "Bag", "Quiver", "Ammo"
 C_Item.IsItemInRange = function(id, u)
 	local mob = MOBS[u]
 	if not (mob and MobYards(mob) and ITEM_RANGES[id]) or STATE.combat then return nil end
