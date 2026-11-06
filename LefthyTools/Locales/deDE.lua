@@ -589,6 +589,10 @@ L["Bosses, rares, first dungeon visits, epic loot, new mounts, achievements and 
 L["Share all my characters"] = "Alle meine Charaktere teilen"
 L["Friends see the journals of all your characters, not only the one you're playing."] =
 	"Freunde sehen die Tagebücher all deiner Charaktere, nicht nur von dem, den du gerade spielst."
+L["Share my professions and recipes"] = "Meine Berufe und Rezepte teilen"
+L["Friends see your professions and the recipes you know in the journal's Professions tab, also while you're offline (needs Beacon, and sharing highlights on). Switched off, nothing new goes out; what friends already have stays with them until it's replaced."] =
+	"Freunde sehen deine Berufe und die Rezepte, die du kennst, im Berufe-Tab des Tagebuchs, auch wenn du offline bist (braucht Beacon und geteilte Highlights). Ausgeschaltet geht nichts Neues mehr raus; was Freunde schon haben, bleibt bei ihnen, bis es ersetzt wird."
+L["you"] = "du"
 L["Pass on friends' journals"] = "Tagebücher von Freunden weitergeben"
 L["Battle.net messages only reach friends who are online, so friends' clients pass each other's journals on: whoever is online brings the news of those who aren't. Only to people who have that player as a Battle.net friend too."] =
 	"Battle.net-Nachrichten erreichen nur Freunde, die gerade online sind, deshalb geben die Clients von Freunden ihre Tagebücher untereinander weiter: wer online ist, bringt die Neuigkeiten derer mit, die es nicht sind. Nur an Leute, die diesen Spieler auch als Battle.net-Freund haben."

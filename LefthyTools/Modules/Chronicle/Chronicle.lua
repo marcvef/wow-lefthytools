@@ -49,6 +49,7 @@ local M = LT:NewModule("chronicle", {
 		share = true,
 		shareAlts = true,     -- Sync.lua: friends see all my characters, not only the one I play
 		relay = true,         -- Sync.lua: pass on friends' journals to other friends
+		shareRecipes = true,  -- Recipes.lua: friends see my professions and recipes (also needs share)
 		catchUp = true,       -- Recap.lua: "while you were away" after logging in
 		weeklyRecap = true,   -- Recap.lua: last week's leaderboard in chat, once a week
 		friendsChat = true,
@@ -550,6 +551,9 @@ end
 
 local function CheckProfessions()
 	professionsDirty = false
+	if C.RecipesDirty then
+		C.RecipesDirty() -- Recipes.lua: my skills and recipes are looked at
+	end
 	if not GetProfessions then
 		return
 	end
@@ -666,6 +670,7 @@ local function Tick(now, elapsed)
 	-- while instead of failing every second.
 	LT.Guard("C.ShareDays", C.ShareDays, now) -- Live.lua: my days for friends' graphs (older builds')
 	LT.Guard("C.SyncTick", C.SyncTick, now) -- Sync.lua: my journal for friends, theirs from whoever is online
+	LT.Guard("C.RecipesTick", C.RecipesTick, now) -- Recipes.lua: my recipes scanned, friends' passed on
 	store.lastSeenAt = time()
 	LT.Guard("C.ShareHighlights", C.ShareHighlights, now) -- Live.lua: this tick's highlights to friends
 	-- Window.lua: redraws only while open, and only the page whose data changed (marked until a
@@ -781,6 +786,9 @@ function M:OnEnable()
 	if C.SyncEnable then
 		C.SyncEnable() -- Sync.lua
 	end
+	if C.RecipesEnable then
+		C.RecipesEnable() -- Recipes.lua
+	end
 end
 
 function M:OnDisable()
@@ -789,6 +797,9 @@ function M:OnDisable()
 	C.LiveDisable() -- (highlights not sent yet go)
 	if C.SyncDisable then
 		C.SyncDisable()
+	end
+	if C.RecipesDisable then
+		C.RecipesDisable()
 	end
 	if C.window then
 		C.window:Hide()
@@ -800,6 +811,9 @@ function M:OnSettingChanged()
 	C_Timer.After(0, UpdateMinimapButton) -- the minimap button's checkbox
 	if C.SyncSettingChanged then
 		C.SyncSettingChanged() -- Sync.lua: sharing all characters or not
+	end
+	if C.RecipesSettingChanged then
+		C.RecipesSettingChanged() -- Recipes.lua: the same, and sharing them at all
 	end
 end
 
@@ -981,6 +995,8 @@ function M:BuildOptions(o)
 		L["Friends see the journals of all your characters, not only the one you're playing."])
 	o:Checkbox("relay", L["Pass on friends' journals"],
 		L["Battle.net messages only reach friends who are online, so friends' clients pass each other's journals on: whoever is online brings the news of those who aren't. Only to people who have that player as a Battle.net friend too."])
+	o:Checkbox("shareRecipes", L["Share my professions and recipes"],
+		L["Friends see your professions and the recipes you know in the journal's Professions tab, also while you're offline (needs Beacon, and sharing highlights on). Switched off, nothing new goes out; what friends already have stays with them until it's replaced."])
 	o:Checkbox("friendsChat", L["Show friends' highlights in chat"],
 		L["A chat line when a friend shares a highlight. They're always in Chronicle's News tab."])
 	o:Checkbox("catchUp", L["While you were away"],

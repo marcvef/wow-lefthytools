@@ -7,7 +7,8 @@ Characters and accounts). Files, in load order: `Modules/Chronicle/Chronicle.lua
 session, settings, `/chronicle`, formatting helpers), `Live.lua` (friends live through Beacon: E2
 highlights, D2/K2 days, the feed), `Characters.lua` (who is who:
 accounts, names, matching; the characters, accounts and news every page uses), `Sync.lua` (friends'
-journals: publishing, passing on), `Recap.lua` (chat: catch-up, weekly recap, sharing; the
+journals: publishing, passing on), `Recipes.lua` (professions and recipes: the scan, their sync, the lists
+for the Professions tab), `Recap.lua` (chat: catch-up, weekly recap, sharing; the
 leaderboards), `Canvas.lua` (the pages' drawing kit: a pooled canvas, cards, bars, tables),
 `Graphs.lua` (the Graphs page, a friend's too), `Compare.lua` (the Compare page), `Window.lua` (the
 window) and `MinimapButton.lua`. They share `ns.Chronicle` (`C`).
@@ -424,6 +425,89 @@ with its own chat line): the most notable three (level-ups first), zones and dea
 counted ("died 3 times"), "+N more". **Weekly recap** (`weeklyRecap`): 2 minutes after starting,
 once per week (`store.recapWeek`, the week's Monday): last week's leading character of each
 category, if characters of at least two accounts played. Both in English like all chat output.
+
+## Recipes: scanning and syncing
+
+`Recipes.lua`, `C.Recipes` (`R`): which professions and recipes my characters and my friends' have, for the
+Professions tab, whose only source it is (`R.Parse`, `R.RecipeOf`, `R.Professions`, `R.People`, `R.Search`,
+`R.Crafters`, `R.Revision`). A friend's profession link doesn't open across realms (a game limit), which is why
+friends tell each other.
+
+**Saved** on the character's record, mine (`store.chars`) and friends' (`store.book[acct].chars`) alike:
+`trade[line] = { skill, max }` (base lines: 165, not its child 2945; gathering too), `tradeU` its stamp,
+`recipes[line] = { u, v, of, n, parts = { [k] = text } }`: a list's version `v`, its parts, how many spells came.
+Part k's stamp is `v + k - 1`, `u` the last of them (`v + of - 1`). Mine also `tradeScan` (last scan), `tradeDirty` (a skill
+changed, not stamped yet). `store.recipeU`: my last stamp; `a.recipeU` (`a = store.book[acct]`): how far I hold that
+account, complete; `store.recipeAlts`, `store.recipeChar`: as `sharedAlts`, `sharedChar`.
+
+**The scan** asks `C_SpellBook.IsSpellKnown` for every recipe of the professions the character has (in the game:
+right with the profession window closed; `C_TradeSkillUI.GetRecipeInfo`'s `learned` isn't). `GetProfessions()`
+(prof1, prof2, first aid, fishing, cooking, in Forever's own `Blizzard_ProfessionsBook`) and `GetProfessionInfo(i)`
+say which professions; its 7th return is the skill line, resolved through `RecipeData.parents`. A line missing or
+unknown goes by its name (English or German: `RecipeData.names`); one that can't be told is skipped, and nothing is
+dropped because of it. A profession goes (with its list) when a read that told them all no longer has it; none at all
+within `DROP_AFTER` (60 s) of a loading screen isn't believed. A scan finding nothing known keeps the list (the game
+may not be ready).
+
+It starts 10 s after entering the world (`SCAN_FIRST`); 2 s after learning something (`NEW_RECIPE_LEARNED`,
+`LEARNED_SPELL_IN_SKILL_LINE`; `SCAN_SOON`); at once on a new profession; and at most once a minute (`SCAN_GAP`) on what only
+might mean something: `SKILL_LINES_CHANGED` (Chronicle's `professionsDirty`, which every skill-up sets) and
+`TRADE_SKILL_LIST_UPDATE`. Events only note when; the rest happens on Chronicle's tick, in a fight not at all: at most 50
+recipes a tick (`SCAN_STEP`) and within 1.5 ms (`TICK_MS`, shared with the sync). It walks the data's text itself, spell by spell;
+nothing is parsed for it. The longest scan (every crafting profession a character can have, about 1200 recipes) is half a minute.
+A list that came out different is encoded and stamped anew; the same list changes nothing. A skill that changed is saved at
+once and stamped at most every 5 minutes (`SKILL_GAP`); a new or lost profession at once. Each character is saved when it's played.
+
+**The stream.** Recipes aren't records in `Sync.lua`'s journals: an older build holding an account would answer "complete up
+to u" without having any, and a new client would think it has them all. So they have their own stamps (`store.recipeU`, strictly
+increasing like `NextU`, a run of them for a list) and their own messages in Beacon's B family, letter `c`, low priority, only to
+builds from `RECIPES_SINCE` on (`LT.CompareVersions` against their V2; the first is 0.7.0-14; a build not known yet, or without a
+commit count like the tagged 0.7.0, gets none, not even when it asks):
+
+| Word | Message | |
+|---|---|---|
+| `co` | `B2;co;<acct>,<u>/...` | what I hold, per account (ten a message): to a friend when it grew, at most every 60 s (`OFFER_GAP`), all of it after their hello (`B.RecipesAnswer`, from Beacon's answer) and every 10 minutes (`FULL_OFFER`). Their own account left out once they've said which it is |
+| `cq` | `B2;cq;<acct>;<since>` | send me that account's records newer than since |
+| `ct` | `B2;ct;<acct>;<char>;<u>;<class>;<level>;<line:skill:max,...>` | a character's professions (a newer one without a line takes away that line's older list). Class and level fill in what its journal hasn't told yet |
+| `cr` | `B2;cr;<acct>;<char>;<line>;<v>;<k>;<of>;<text>` | part k of a list. Same version: added; newer: replaces the list; older: ignored |
+| `ce` | `B2;ce;<acct>;<u>;<count>` | that's all: complete up to u, if count records came |
+
+A `<text>` is the list's sorted spell IDs as differences in base 36, comma-separated, each part's first one whole, at most 160 bytes
+(`PART_BYTES`): with the longest character key a message stays under 250 bytes. The longest real list is 9 parts. Relaying sends the
+same fields again: author's stamps, author's text. Because each part has its own stamp, an answer cut between two parts loses nothing:
+it holds at most 300 records (`SERVE_MAX`), oldest first, its end says how far, and the rest is asked for at once. An end with fewer
+records than it counted (one lost, or `incoming` full) doesn't complete the account: asked again after 2 minutes (`ASK_AGAIN`). An end that brings
+nothing new takes back the wish: nobody is asked again and again for more than they have.
+
+A skill change is only a `ct` and a new recipe only that line's parts: the rest isn't sent again. Same rules as the journals: an
+account is asked of one friend at a time (90 s without a record: another may answer), only if it's one of my Battle.net friends' (`C.FriendAccounts`);
+what comes is kept only for those; never about my own account. I can't tell who else a friend is friends with, so a request itself
+isn't checked: it's the asker's client that keeps to its friends, as with journals. Nothing is built or merged in the event (`B.ReceiveRecipes` notes
+it): merged on the tick, at most 100 a tick and within the budget, at most 1000 waiting; requests answered on the tick one after another, at most 50
+messages a tick, at most 100 waiting. Beacon takes 700 of these per friend per minute (`RECIPES_LIMIT`).
+
+**Checked** on the way in: 8-hex accounts, plausible stamps (`C.Plausible`), keys (`C.ValidKey`), crafting lines the data knows (a line unknown in a `ct`
+is left out, for a build with newer data), whole small numbers, part number within `of`, at most 30 parts (`PARTS_MAX`), each at most 200 bytes of `0-9a-z,`, rising IDs below 5,000,000,
+at most 1500 spells a list (`RECIPES_MAX`), 12 lines a `ct` (`LINES_MAX`), and 30 characters an account (`C.CapBook`, the book's own).
+
+**What goes out** (settings): `shareRecipes` (default on) and `share`: both needed for mine. Off, mine aren't offered, a request gets an empty
+end, and what was waiting to go doesn't go; my own lists go on being scanned for my own tab, and their stamps keep rising, so switching it on
+brings friends what changed. `shareAlts` as with journals: off, only the character I play (and playing another one stamps its records
+anew; switching it stamps everything anew). `relay` off: nobody else's lists are passed on.
+
+**Known limits.** A friend who switched it off: what others already hold stays, and is still passed on to their friends, until it's replaced; a holder can't
+tell "switched off" from "hasn't changed", since nothing says so. Friends' characters follow the book: nothing in 60 days (`BOOK_DAYS`) and the
+character goes, recipes and all: a crafter alt nobody plays for 60 days leaves friends' tabs. Played again it comes back: a scan that finds a character's stamps older than 30 days
+(`RESTAMP_AFTER`) stamps them anew, so friends ask for them (without this a list that never changes wouldn't). One stamp per account: the same account on two PCs is two authors, as with journals (Sync.lua's known limit).
+
+**A character with only recipes so far** (they came before its journal, or it isn't sharing one): `C.Book` made it like any, with empty days and news. Pages and
+`C.Characters` leave it out (nothing to show), its name is its first name until the journal or Battle.net tells more, pruning and `Cap` go by `tradeU` when it has nothing newer.
+
+**For the tab:** lists built when asked, kept until `R.Revision` moves (any list or skill changed, mine or a friend's, or pruning removed a character). A list's
+spells are read once (`KnownOf`). A person: `id` (`me:<key>`, `book:<acct>:<key>`, like `C.Characters`' keys), `name`, `partial` (only the first name known, `C.Partial`), `classFile`,
+`level`, `account` (the BattleTag's name; mine "you"), `mine`, `skill`, `max`, `known`, `updated` (a friend's: its latest stamp; mine: the last scan), and beside the contract
+`incomplete` (a part hasn't come yet) and `record` (the character's record). `R.Search` goes by what the client has loaded: `C_Spell.GetSpellName`, and the item's name once
+`C_Item.IsItemDataCachedByID` says so; others are asked for (`RequestLoadItemDataByID`) once each, at most 20 a search; names are fetched for at most 5 ms a search and kept. Case-insensitive, German capital umlauts too.
 
 ## Characters and accounts
 

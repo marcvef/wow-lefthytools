@@ -82,6 +82,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Chronicle/Live.lua       friends live through Beacon: highlights (E2), days (D2/K2), the feed
   Modules/Chronicle/Characters.lua  who is who: accounts, names, matching; characters, accounts, news
   Modules/Chronicle/Sync.lua       friends' journals passed on between friends (kind J)
+  Modules/Chronicle/Recipes.lua    professions and known recipes: the scan, their sync (B2;c...), the tab's lists
   Modules/Chronicle/Recap.lua      in chat: catch-up, weekly recap, sharing; the leaderboards
   Modules/Chronicle/Canvas.lua     the pages' drawing kit: pooled canvas (bars, lines, text), cards, tables
   Modules/Chronicle/Graphs.lua     the Graphs page (yours, a friend's)

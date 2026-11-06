@@ -261,6 +261,7 @@ end
 local function CharKey(c)
 	return ns.Beacon.Clean((c.name or "?") .. "-" .. (c.realm or ""), NAME_BYTES)
 end
+C.CharKey = CharKey
 
 local function MyChars()
 	local list, current = {}, C.Char()
@@ -271,6 +272,7 @@ local function MyChars()
 	end
 	return list
 end
+C.MyChars = MyChars
 
 -- How far I hold an account (0: not at all; friends' journals only while they're still my friends).
 local function Held(acct)
@@ -604,6 +606,7 @@ local function Book(acct, key)
 	a.seen = time()
 	return c
 end
+C.Book = Book -- (Recipes.lua)
 
 local function Prune(c)
 	local oldestDay, oldestT = Oldest(), C.DayAgo(DAYS_KEPT)
@@ -632,7 +635,8 @@ local function Prune(c)
 end
 
 -- When a friend's character last played, as far as its journal says: its profile's last played,
--- its latest day, its latest highlight (never ahead of now: a wrong clock).
+-- its latest day, its latest highlight, its professions' stamp (one with only recipes so far,
+-- Recipes.lua) (never ahead of now: a wrong clock).
 local function LastSeen(c)
 	local t, latest = tonumber(c.last) or 0, nil
 	for day in pairs(c.days) do
@@ -645,6 +649,7 @@ local function LastSeen(c)
 	for _, e in pairs(c.news) do
 		t = math.max(t, tonumber(e.t) or 0)
 	end
+	t = math.max(t, tonumber(c.tradeU) or 0)
 	return math.min(t, time())
 end
 
@@ -663,6 +668,7 @@ local function Cap(a)
 		a.chars[list[i].key] = nil
 	end
 end
+C.CapBook = Cap -- (Recipes.lua)
 
 -- A record's numbers ("12,3400,5,..."), exactly count of them, or nil. Each at most 10 digits: more is
 -- nobody's real number (a broken or hostile client), and too large to show or add up.
@@ -693,11 +699,13 @@ end
 local function ValidKey(key)
 	return type(key) == "string" and #key <= NAME_BYTES and key:match("^[^%-]+%-.+$") ~= nil and not key:find("[|%c]")
 end
+C.ValidKey = ValidKey
 
 -- A stamp that can be real: an author's clock, give or take a week.
 local function Plausible(u)
 	return u and u > 0 and u <= time() + 7 * 86400
 end
+C.Plausible = Plausible
 
 -- A full name a friend learned ("l", see Learned): for a character of one of my friends' journals,
 -- or an alt of mine, that doesn't know its surname yet; never instead of one it knows, nor for the
@@ -985,6 +993,9 @@ end
 local function PruneStep()
 	local acct = pruning.accts[pruning.i]
 	if not acct then
+		if pruning.gone and C.RecipesPruned then
+			C.RecipesPruned() -- (the Professions tab's lists)
+		end
 		pruning = nil
 		Changed()
 		C.feedDirty = true -- (news it pruned may have been the only unseen: the minimap dot)
@@ -993,7 +1004,7 @@ local function PruneStep()
 	local a, friends = store.book[acct], Friends()
 	if not a or (next(friends) and not friends[acct]) then
 		store.book[acct] = nil -- (gone meanwhile, or no longer my friend's)
-		pruning.i, pruning.keys = pruning.i + 1, nil
+		pruning.i, pruning.keys, pruning.gone = pruning.i + 1, nil, true
 		return
 	end
 	if not pruning.keys then
@@ -1014,9 +1025,10 @@ local function PruneStep()
 	local c = a.chars[key]
 	if c then
 		Prune(c)
-		local last = c.last or 0
+		local last = math.max(c.last or 0, c.tradeU or 0) -- (one with only recipes so far: by their stamp, Recipes.lua)
 		if not next(c.days) and not next(c.news) and (last < C.DayAgo(BOOK_DAYS) or BeforeLaunch(last)) then
 			a.chars[key] = nil
+			pruning.gone = true
 		end
 	end
 end

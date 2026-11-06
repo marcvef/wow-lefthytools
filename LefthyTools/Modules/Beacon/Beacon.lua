@@ -48,6 +48,8 @@ local STREAM_LIMIT, STREAM_WINDOW = 80, 10 -- fight stream messages accepted fro
                              -- second, mob names, keepalives)
 local ECHOES_LIMIT, ECHOES_WINDOW = 400, 60 -- Echoes messages (B2;e...) accepted from one friend (they
                              -- send at most 2 a second)
+local RECIPES_LIMIT, RECIPES_WINDOW = 700, 60 -- Chronicle's recipes (B2;c...) accepted from one friend (at
+                             -- most what Beacon can send in a minute: every friend's lists they hold)
 local PROBE_LIMIT, PROBE_BYTES = 10, 4100 -- Echoes' probes accepted from one friend a minute, their size at most
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
 local CHAT_LIMIT, CHAT_WINDOW = 5, 5 -- LTC lines accepted from one friend (a burst of 5 per 5 s)
@@ -813,7 +815,7 @@ local function OnMessage(text, senderID)
 	elseif kind == "W" then
 		B.ReceiveNews(senderID, a, b, c)
 	elseif kind == "B" then
-		-- The family of other modules' messages, by the word's first letter (e: Echoes), and
+		-- The family of other modules' messages, by the word's first letter (e: Echoes, c: Chronicle's recipes), and
 		-- Beacon's own word, their level.
 		if a == "bl" then
 			local level = KnownLevel(tonumber(b:match("^%d%d?%d?$") or ""))
@@ -822,6 +824,8 @@ local function OnMessage(text, senderID)
 			end
 		elseif a:sub(1, 1) == "e" and Counted(guard, "echoes", ECHOES_LIMIT, ECHOES_WINDOW, now) and B.ReceiveEchoes then
 			B.ReceiveEchoes(senderID, a, b)
+		elseif a:sub(1, 1) == "c" and Counted(guard, "recipes", RECIPES_LIMIT, RECIPES_WINDOW, now) and B.ReceiveRecipes then
+			B.ReceiveRecipes(senderID, a, b)
 		end
 	end
 	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget. One that
@@ -858,6 +862,9 @@ function Answer(senderID)
 	end
 	if B.EchoesAnswer then
 		B.EchoesAnswer(senderID) -- Echoes: my hello, once their build is known to read it
+	end
+	if B.RecipesAnswer then
+		B.RecipesAnswer(senderID) -- Chronicle: my recipes are offered again, once their build is known to read them
 	end
 	B.SharingAnswer(senderID) -- my tracked quest and level progress
 end

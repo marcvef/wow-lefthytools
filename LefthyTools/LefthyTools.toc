@@ -78,6 +78,7 @@ Modules\Chronicle\Chronicle.lua
 Modules\Chronicle\Live.lua
 Modules\Chronicle\Characters.lua
 Modules\Chronicle\Sync.lua
+Modules\Chronicle\Recipes.lua
 Modules\Chronicle\Recap.lua
 Modules\Chronicle\Canvas.lua
 Modules\Chronicle\Graphs.lua

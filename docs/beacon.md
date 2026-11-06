@@ -70,7 +70,11 @@ Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.l
   the word's first letter is the module's, `e` Echoes (echoes.md, Delivery: only to friends whose
   build reads them; Beacon hands them over after its own guard, at most 400 a minute from one
   friend; the one exception to 255 bytes is Echoes' probe, `B2;ex;`, from a friend it knows, up to
-  4100 bytes, 10 a minute), `Q2` switched off. A build that doesn't
+  4100 bytes, 10 a minute), `c` Chronicle's recipes (chronicle.md, Recipes: `B2;co;<acct>,<u>/...` what I hold,
+  `B2;cq;<acct>;<since>` send me what's newer, `B2;ct;<acct>;<char>;<u>;<class>;<level>;<line:skill:max,...>` a
+  character's professions, `B2;cr;<acct>;<char>;<line>;<v>;<k>;<of>;<text>` part k of a list,
+  `B2;ce;<acct>;<u>;<count>` that's all; only to builds from `RECIPES_SINCE` on, at most 700 a minute from one
+  friend), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend; one that
   comes sooner, say after a quick `/reload`, is answered once the 5 s are up, not dropped);

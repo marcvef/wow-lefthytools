@@ -768,8 +768,11 @@ C_PetJournal = { GetPetInfoByPetID = function() return 40, nil, 1, 0, 100, 1, fa
 C_ToyBox = { GetToyInfo = function(id) return id, "Toy Train Set", 2000 end }
 function GetAchievementInfo(id) return id, "Level 20", 10, true, 10, 3, 26, "", 0, 3000 end
 PROFESSIONS = {} -- { { name, level }, ... }
-function GetProfessions() return PROFESSIONS[1] and 1 or nil, PROFESSIONS[2] and 2 or nil end
-function GetProfessionInfo(i) local p = PROFESSIONS[i]; if p then return p.name, 4000 + i, p.level, 300 end end
+function GetProfessions() -- (prof1, prof2, first aid, fishing, cooking: any of them nil, as in the game)
+	return PROFESSIONS[1] and 1 or nil, PROFESSIONS[2] and 2 or nil, PROFESSIONS[3] and 3 or nil, PROFESSIONS[4] and 4 or nil, PROFESSIONS[5] and 5 or nil
+end
+-- name, icon, rank, max rank, spells, spell offset, skill line (p.line)
+function GetProfessionInfo(i) local p = PROFESSIONS[i]; if p then return p.name, 4000 + i, p.level, p.max or 300, 0, 0, p.line end end
 CAMERA = { spinning = false, stops = 0, zoom = 10 }
 function MoveViewLeftStart(speed) CAMERA.spinning, CAMERA.speed = true, speed end
 function MoveViewLeftStop() CAMERA.spinning, CAMERA.stops = false, CAMERA.stops + 1 end
@@ -1836,6 +1839,8 @@ C_SpellBook = C_SpellBook or {}
 C_SpellBook.GetNumSpellBookSkillLines = function() return 1 end
 C_SpellBook.GetSpellBookSkillLineInfo = function(i) if i == 1 then return { itemIndexOffset = 0, numSpellBookItems = #BOOK, shouldHide = false } end end
 C_SpellBook.GetSpellBookItemInfo = function(slot) return BOOK[slot] end
+KNOWN_SPELLS = {} -- [spellID] = true: recipes this character knows
+C_SpellBook.IsSpellKnown = function(id) return KNOWN_SPELLS[id] == true end
 local baseSpellInfo = C_Spell.GetSpellInfo
 C_Spell.GetSpellInfo = function(id)
 	local info = baseSpellInfo(id)

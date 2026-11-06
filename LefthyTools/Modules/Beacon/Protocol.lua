@@ -65,8 +65,17 @@ local B = ns.Beacon
 --                       an account's records, p/d/n a profile, day or highlight, e that's all
 --   B2;<module><word>;<...>
 --                       other modules' messages, a family: the word's first letter is the module's
---                       (e: Echoes, Echoes/Delivery.lua has its words), at most 255 bytes like all.
---                       Only to friends whose build reads them (Delivery.lua says how it knows)
+--                       (e: Echoes, Echoes/Delivery.lua has its words; c: Chronicle's recipes), at most
+--                       255 bytes like all. Only to friends whose build reads them (Delivery.lua says
+--                       how it knows)
+--   B2;co;<acct>,<u>/...
+--   B2;cq;<acct>;<since>
+--   B2;ct;<acct>;<char>;<u>;<class>;<level>;<line:skill:max,...>
+--   B2;cr;<acct>;<char>;<line>;<v>;<k>;<of>;<text>
+--   B2;ce;<acct>;<u>;<count>
+--                       Chronicle's recipes (Chronicle/Recipes.lua), only to builds from its
+--                       RECIPES_SINCE on: what I hold per account, send me what's newer, a character's
+--                       professions, part k of a list (stamp v + k - 1), that's all
 --   B2;bl;<level>       Beacon's own word: my level, only to friends whose build reads it (their
 --                       V2; Sharing.lua's LEVEL_SINCE). When it changes, again after their hello,
 --                       and every 5 minutes: Battle.net's number for friends can be wrong
