@@ -53,6 +53,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Data/SpellSchools.lua      generated magic school of the class spells (tools/update-spell-schools.js)
   Data/MinimapTiles.lua      generated minimap tile file IDs (tools/update-minimap-tiles.js)
   Data/RetailUnitFrames.lua  generated retail unit frame atlases (tools/update-retail-frames.js)
+  Data/Recipes.lua           generated professions' recipes, reagents and names (tools/update-recipes.js)
   Modules/Beacon/Beacon.lua  Beacon: transport (rate limiter, queues), finding friends, receiving, the tick
   Modules/Beacon/Protocol.lua  every message kind, B.Parse, highlights
   Modules/Beacon/Sharing.lua  what I tell friends about myself (state, quest, progress, level-ups)
@@ -115,7 +116,8 @@ tools/update-class-spells.js     regenerates Data/ClassSpells.lua from wago.tool
 tools/update-spell-schools.js    regenerates Data/SpellSchools.lua from wago.tools (node)
 tools/update-minimap-tiles.js    regenerates Data/MinimapTiles.lua from wago.tools (node)
 tools/update-retail-frames.js    regenerates Data/RetailUnitFrames.lua from wago.tools (node)
-tools/wago.js                    shared by the four node tools above: latest Forever build, tables (CSV, --cache), arguments
+tools/update-recipes.js          regenerates Data/Recipes.lua from wago.tools (node)
+tools/wago.js                    shared by the five node tools above: latest Forever build, tables (CSV, --cache, a locale), arguments
 tools/update-drop-data.js    regenerates LefthyTools_DropData/Drops.lua from a classic world DB dump (node)
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)

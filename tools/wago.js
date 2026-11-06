@@ -1,8 +1,8 @@
 // What the data tools share for reading WoW: Forever's client on wago.tools: the latest Forever
 // build, a client table (a DB2 export as CSV, optionally kept in a cache folder) and the arguments
-// of the tools that read tables. Used by update-class-spells.js, update-spell-schools.js and
-// update-retail-frames.js (tables), and update-minimap-tiles.js (the latest build). Not a tool
-// itself: the tools require it.
+// of the tools that read tables. Used by update-class-spells.js, update-spell-schools.js,
+// update-retail-frames.js and update-recipes.js (tables), and update-minimap-tiles.js (the latest
+// build). Not a tool itself: the tools require it.
 const fs = require("fs");
 const path = require("path");
 
@@ -41,14 +41,15 @@ async function latestBuild() {
 
 // A client table of a build, as rows (parseCsv). With a cache folder, the export is kept there as
 // <name>-<build>.csv and read from there the next time. Fewer than 10 rows is an error: a failed
-// or cut-off export.
-async function table(name, build, cache) {
-  const file = cache && path.join(cache, `${name}-${build}.csv`);
+// or cut-off export. A locale ("deDE") gives the table's texts in that language instead of English
+// (<name>-<build>-<locale>.csv in the cache).
+async function table(name, build, cache, locale) {
+  const file = cache && path.join(cache, `${name}-${build}${locale ? `-${locale}` : ""}.csv`);
   let text;
   if (file && fs.existsSync(file)) {
     text = fs.readFileSync(file, "utf8");
   } else {
-    const response = await fetch(`https://wago.tools/db2/${name}/csv?build=${build}`);
+    const response = await fetch(`https://wago.tools/db2/${name}/csv?build=${build}${locale ? `&locale=${locale}` : ""}`);
     if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`);
     text = await response.text();
     if (file) fs.writeFileSync(file, text);

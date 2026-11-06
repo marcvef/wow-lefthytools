@@ -27,6 +27,7 @@ Data\ClassSpells.lua
 Data\SpellSchools.lua
 Data\MinimapTiles.lua
 Data\RetailUnitFrames.lua
+Data\Recipes.lua
 
 # Modules
 Modules\Mirage\Groups.lua

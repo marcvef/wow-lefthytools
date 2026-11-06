@@ -499,6 +499,28 @@ it went on, is never more than the journal's day, and on some day about the same
 entries, by the full names that taught the journals. The account is noted with them (`acct`) and the
 journal learns the full name. Nothing is deleted or moved.
 
+## Recipe data
+
+`Data/Recipes.lua` (`ns.RecipeData`, generated: don't edit by hand) is what the Professions tab
+knows about recipes without asking the game: the client answers for its own character only, with the
+profession window open, and profession links don't open across realms. It has the eight crafting
+lines in the tab's order (`order`), the four gathering lines (`gathering`, no recipes), child line ->
+base line (`parents`: the client's rows hang under the base lines, 165 and not 2945), names in English and
+German (`names`, `categories`: the client's own texts), icons (`icons`), and per crafting line one long
+string (`recipes`), parsed only when needed. Its format is the file's header. Reading it:
+`spell:item:count:slot:ilvl:quality:low:high:cat:reagents`; `low` and `high` are the skill where the
+recipe turns yellow and grey (not the skill it needs: the client's `MinSkillLineRank` is just 1), 0 in a
+few recipes that have none.
+
+Everything a character could know is in it, not only what's on Forever today: about 290 recipes in
+the client's "SEASON OF DISCOVERY" categories (spell IDs above 60000) look like leftovers no one can
+learn, and about 930 more above 60000 in ordinary categories look like Forever's own. Nothing depends
+on telling them apart: the tab only shows what a character knows. Mining's smelting isn't in it.
+
+Regenerate it when Forever gets a new build, with `node tools/update-recipes.js` (`[<build>] [--cache
+<dir>]`; the head of the tool says which tables it reads and what their rows mean), then `npm test --
+recipes_data`, whose checks are the file's shape.
+
 ## Cost, and what goes over the network
 
 The 1-second tick is local only: a few cheap API reads (position, target), adding up counters,
