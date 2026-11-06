@@ -329,6 +329,12 @@ version they have), or once they play it with an up-to-date LefthyTools.
   Only to people who have that player as a Battle.net friend too (journals go by a hash of the
   BattleTag; the BattleTag itself never leaves your client). Up to 30 characters per friend are
   kept, the ones they played most recently. Needs Beacon.
+- **Professions:** every friend's professions and known recipes in one place, also while they're
+  offline (profession links don't open across realms). Pick a profession on top and a person on the
+  left, ordered by skill, or Everyone. The recipes are sorted by slot and item level. Hover one for
+  the item, what it needs against your bags and who else knows it; click to keep it there. **Search
+  everyone** finds who can craft something in any profession. Lists update by themselves. Friends
+  appear once they've updated and logged in.
 - **While you were away:** a minute after you log in, a chat line per friend with what they did
   since you last played. Once a week, **last week's leaderboard** in chat.
 - `/chronicle session` prints this session in one line; the AFK screen shows it too.
@@ -340,6 +346,7 @@ once a second, so it costs nothing you'd notice.
 |---|---|
 | Share highlights with friends (and your days, for their graphs) | on |
 | Share all my characters | on |
+| Share my professions and recipes | on |
 | Pass on friends' journals | on |
 | Show friends' highlights in chat | on |
 | While you were away | on |
