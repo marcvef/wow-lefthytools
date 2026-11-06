@@ -437,5 +437,8 @@ ns.CHANGELOG = {
 	{ id = 143, module = "beacon",
 		en = { "Friends' real levels", "Friends now always show the level their character really has. Battle.net's number can be wrong, and it's only used for friends who haven't updated yet. Everyone needs this version for it." },
 		de = { "Die echten Level deiner Freunde", "Freunde zeigen jetzt immer das Level, das ihr Charakter wirklich hat. Die Zahl von Battle.net kann falsch sein und wird nur noch für Freunde genutzt, die noch nicht aktualisiert haben. Dafür brauchen alle diese Version." } },
+	{ id = 144, module = "beacon",
+		en = { "Health moves in the fight stream again", "The game now hides how much a hit takes, so friends' streams showed full health until the end. Your health and the mobs' are now estimated from the hits themselves and set right after each fight from the damage meter (it can stay switched off). They are rough at first and get better as you fight. Hits no longer show numbers; dodges and misses are back. Whoever is fighting needs this version." },
+		de = { "Leben im Kampf-Stream bewegt sich wieder", "Das Spiel verbirgt jetzt, wie viel ein Treffer abzieht, darum zeigten Streams von Freunden bis zum Ende volles Leben. Dein Leben und das der Mobs werden jetzt aus den Treffern selbst geschätzt und nach jedem Kampf mit dem Damage Meter korrigiert (es kann ausgeschaltet bleiben). Am Anfang ist das grob und wird mit jedem Kampf besser. Treffer zeigen keine Zahlen mehr, Ausweichen und Verfehlen sind zurück. Wer kämpft, braucht diese Version." } },
 	-- New entries go here, at the end.
 }
