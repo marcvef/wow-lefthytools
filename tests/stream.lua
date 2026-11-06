@@ -480,7 +480,7 @@ do
 		check(win.Health:IsShown() and win.HealthText:GetText() == "~100%" and win.Health.width == 120,
 			"the window: a green bar over the power bar, ~100%")
 		win.HealthHover._scripts.OnEnter(win.HealthHover)
-		check(TOOLTIP.title == "Health (estimated)" and tooltipFind("added up from hits and heals"), "hover: it's estimated, and how")
+		check(TOOLTIP.title == "Health (estimated)" and tooltipFind("estimated from the hits and heals it counts"), "hover: it's estimated, and how")
 		win.HealthHover._scripts.OnLeave(win.HealthHover)
 		hit("WOUND", 250)
 		Advance(0.6)
@@ -1856,4 +1856,198 @@ do
 	Advance(0.3)
 	check(sets == 2, "her window closed: not followed any more")
 	fwin.SetScale = nil
+end
+
+section("Beacon: fight stream when the game hides what a hit takes")
+do
+	local started = GetTime()
+	local S = BB.Stream
+	local function near(a, b) return a and math.abs(a - b) < 0.001 end
+	local function hit(unit, kind, flags) Fire("UNIT_COMBAT", unit, kind, flags or "", SECRET, 1) end
+	local wasBuild, wasMeter, wasMax = MOCK_BUILD, C_DamageMeter, HEALTH_MAX
+	check(not S.AmountsHidden(), "an older client: amounts can be read")
+	MOCK_BUILD = "70790"
+	check(S.AmountsHidden(), "this one: hidden")
+	HEALTH_MAX = 1000
+	LefthyToolsDB.streamHitSize = nil
+
+	-- The meter, as seen in game: secret in combat, exact out of it.
+	local meter, asked, meterShut = {}, 0, false
+	C_DamageMeter = { GetCombatSessionFromType = function(_, kind)
+		asked = asked + 1
+		local total = (STATE.combat or meterShut) and SECRET or meter[kind] or 0
+		return { totalAmount = total, combatSources = { { isLocalPlayer = true, totalAmount = total } } }
+	end }
+	local function mySizes() return LefthyToolsDB.streamHitSize[UnitGUID("player")] or {} end
+	local function fullAgain()
+		STATE.combat, STATE.dead = false, false
+		Advance(4.5)
+	end
+
+	-- My health: each hit counts as a usual one, a share of my maximum until learned.
+	S.LifeStart()
+	fullAgain()
+	check(S.Health() == 1, "full before the fight")
+	EnterCombat()
+	hit("player", "WOUND")
+	check(near(S.Health(), 0.94), "a hit, amount hidden: my health moves (6% of my maximum, until learned)")
+	hit("player", "WOUND", "CRITICAL")
+	check(near(S.Health(), 0.82), "a crit counts about double")
+	hit("player", "WOUND", "BLOCK")
+	check(near(S.Health(), 0.82), "nothing got through: nothing lost")
+	hit("player", "HEAL")
+	check(S.Health() == 1, "a heal: a quarter of my maximum, at most full")
+	for _ = 1, 30 do hit("player", "WOUND") end
+	check(near(S.Health(), 0.05), "a guess never kills: alive, it stays above nothing")
+	STATE.dead = true
+	check(S.Health() == 0, "really dead: nothing")
+	STATE.dead = false
+
+	-- After the fight: the meter's total sets it right and teaches what a hit takes.
+	STATE.combat = false
+	S.LifeStart()
+	fullAgain()
+	EnterCombat()
+	for _ = 1, 4 do hit("player", "WOUND") end
+	meter[7] = 200
+	Advance(1)
+	check(near(S.Health(), 0.76), "in the fight: the guess")
+	LeaveCombat()
+	check(asked == 0, "not asked in the same moment")
+	Advance(1.1)
+	check(near(S.Health(), 0.8) and mySizes().taken[1] == 50 and mySizes().taken[2] == 1,
+		"a second later the meter's 200 of 1000 sets it right, and a hit takes 50")
+	fullAgain()
+	check(S.Health() == 1, "the ticks stopped: full")
+	EnterCombat()
+	hit("player", "WOUND")
+	check(near(S.Health(), 0.95), "the next fight: a hit takes what's learned")
+	meter[7] = 150
+	meterShut = true
+	LeaveCombat()
+	Advance(1.1)
+	check(near(S.Health(), 0.95), "the meter doesn't answer yet: the estimate stays")
+	meterShut = false
+	Advance(2.1)
+	check(near(S.Health(), 0.85), "asked once more: set right")
+	meter[7] = nil
+	fullAgain()
+	asked = 0
+	EnterCombat()
+	LeaveCombat()
+	Advance(4)
+	check(asked == 0, "a fight without hits: the meter isn't asked")
+
+	-- Mobs: hits count as usual hits against its kind's health.
+	lefthy("stream me")
+	check(S.SenseRunning(), "the sensor runs")
+	local function wolf(n) return { name = "Hidden Wolf", level = 5, guid = "Creature-0-1-0-1-777-0000000" .. n, yards = 6, x = 0.5, y = 0.5 } end
+	local function healthOf(mob) return S.MobHealth({ key = mob.guid, creature = 777, level = 5, class = "normal", combat = true, dead = mob.dead }, GetTime()) end
+	local one = wolf(1)
+	MOBS.nameplate5, MOBS.target = one, one
+	Advance(0.6)
+	one.combat, one.attacking = true, true
+	EnterCombat()
+	Advance(0.6)
+	hit("nameplate5", "WOUND")
+	hit("target", "WOUND") -- (the same hit, for my target)
+	check(near(healthOf(one), 1 - 1 / 6), "a hit, not learned: it takes a sixth, counted once")
+	Advance(0.1)
+	hit("nameplate5", "WOUND", "CRITICAL")
+	check(near(healthOf(one), 0.5), "a crit: two more")
+	hit("target", "WOUND", "ABSORB")
+	check(near(healthOf(one), 0.5), "absorbed: nothing")
+	Advance(0.1)
+	hit("target", "HEAL")
+	check(near(healthOf(one), 1 - 2 / 6), "healed: one back")
+	for _ = 1, 8 do
+		Advance(0.1)
+		hit("target", "WOUND")
+	end
+	check(near(healthOf(one), 0.05), "it lives: it stays above nothing")
+	one.dead = true
+	Advance(0.6)
+	check(healthOf(one) == 0, "dead: 0")
+	meter[0], meter[7] = 900, 0
+	LeaveCombat()
+	Advance(1.1)
+	check(mySizes().dealt and math.abs(mySizes().dealt[1] - 900 / 11) < 0.2, "the meter's total over the hits counted: what a hit of mine takes")
+	check(LefthyToolsDB.streamMobHealth[777] and near(LefthyToolsDB.streamMobHealth[777][1], 900 / 102),
+		"killed alone, seen from full: the meter's total is its kind's health")
+	LefthyToolsDB.streamHitSize[UnitGUID("player")].dealt = { 25, 1 }
+	LefthyToolsDB.streamMobHealth[777] = { 1, 2 }
+	local two = wolf(2)
+	MOBS.nameplate5, MOBS.target = two, two
+	Advance(0.6)
+	two.combat, two.attacking = true, true
+	EnterCombat()
+	Advance(0.6)
+	hit("target", "WOUND")
+	check(near(healthOf(two), 1 - 25 / 102), "the next one: a hit takes what's learned, of what its kind has")
+	local three = wolf(3)
+	three.combat, three.attacking = true, true
+	MOBS.nameplate6 = three
+	Advance(0.6)
+	hit("nameplate6", "WOUND")
+	two.dead = true
+	Advance(0.6)
+	meter[0] = 500
+	LeaveCombat()
+	Advance(1.1)
+	check(LefthyToolsDB.streamMobHealth[777][2] == 2, "two mobs hit: the total isn't one mob's health, nothing learned of its kind")
+	MOBS.nameplate6 = nil
+
+	-- What happens to me: no numbers the game doesn't give; what's avoided comes as ever.
+	local function floatText(text)
+		for _, float in ipairs(LefthyToolsStreamFrame.Floats.list) do
+			if float.on and float:IsShown() and float:GetText() == text then return float end
+		end
+	end
+	local four = wolf(4)
+	MOBS.nameplate5, MOBS.target = four, four
+	Advance(0.6)
+	four.combat, four.attacking = true, true
+	EnterCombat()
+	Advance(0.6)
+	hit("player", "WOUND")
+	hit("player", "HEAL")
+	hit("player", "DODGE")
+	Advance(1)
+	check(floatText("Dodge") and not floatText("-0") and not floatText("+0"), "a dodge floats up; a hit and a heal have no number")
+	hit("target", "WOUND")
+	Advance(1.5)
+	check(not floatText("-25") and not floatText("-25%"), "what a mob lost floats up only if the game gave it")
+	LeaveCombat()
+	MOBS.nameplate5, MOBS.target = nil, nil
+	Advance(1.2)
+	LefthyToolsStreamFrame.Close:Click()
+
+	-- Without the sensor: hits on my target still teach what a hit takes.
+	check(not S.SenseRunning(), "the sensor stopped")
+	LefthyToolsDB.streamHitSize[UnitGUID("player")].dealt = nil
+	meter[0] = 120
+	local five = wolf(5)
+	MOBS.target = five
+	EnterCombat()
+	for _ = 1, 3 do hit("target", "WOUND") end
+	LeaveCombat()
+	Advance(1.1)
+	check(mySizes().dealt and mySizes().dealt[1] == 40, "nobody watching: my target's hits count all the same")
+	MOBS.target = nil
+
+	-- No meter at all: just the estimate.
+	C_DamageMeter = nil
+	fullAgain()
+	EnterCombat()
+	hit("player", "WOUND")
+	LeaveCombat()
+	Advance(3.5)
+	check(S.Health() ~= nil, "no damage meter: no error, the estimate stays")
+	fullAgain()
+
+	MOCK_BUILD, C_DamageMeter, HEALTH_MAX = wasBuild, wasMeter, wasMax
+	LefthyToolsDB.streamHitSize, LefthyToolsDB.streamMobHealth[777] = nil, nil
+	-- (Whole seconds in all: the suites after this one depend on where the clock stands.)
+	local spent = GetTime() - started
+	Advance(math.ceil(spent) - spent)
 end

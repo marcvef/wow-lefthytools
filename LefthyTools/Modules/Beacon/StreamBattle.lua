@@ -839,15 +839,21 @@ end
 
 local Number = S.Number
 
--- What a mob lost, as text: roughly how much (its kind's health), else the percent.
+-- What a mob lost, as text: roughly how much (its kind's health), else the percent. Nothing while the
+-- game hides amounts: the loss itself is only a count of hits then, not a number worth showing.
 local function LossText(loss)
-	if loss.amount then
+	if S.AmountsHidden() then
+		return nil
+	elseif loss.amount then
 		return "-" .. Number(math.max(1, math.floor(loss.amount + 0.5)))
 	end
 	return ("-%d%%"):format(math.max(1, math.floor(loss.frac * 100 + 0.5)))
 end
 
 local function Float(view, text, anchor, dy, color, scale, life)
+	if not text then
+		return
+	end
 	S.Float(view, text, 0, 6, (math.random() - 0.5) * 10, dy or 30, color, scale, life, anchor)
 end
 
@@ -929,7 +935,9 @@ function S.BattleImpact(view, a, now)
 			Act(hero.model, a.big and ANIM.crit or ANIM.wound, 0.45, now)
 			hero.Flash:SetAlpha(a.big and 0.7 or 0.5)
 		end
-		Float(view, "-" .. Number(a.amount), hero, 34, HURT_COLOR, a.big and 1.35 or 1)
+		if a.amount > 0 then -- (0: the game hides how much)
+			Float(view, "-" .. Number(a.amount), hero, 34, HURT_COLOR, a.big and 1.35 or 1)
+		end
 	elseif a.kind == "miss" then
 		if not a.skipped and AVOID_ANIM[a.avoid] then
 			Act(hero.model, AVOID_ANIM[a.avoid], 0.5, now)
@@ -1204,7 +1212,9 @@ function S.BattleMoment(view, m, rare)
 	elseif m.kind == "avoid" then
 		Enqueue(view, { kind = "miss", avoid = m.avoid }, now)
 	elseif m.kind == "heal" then
-		Float(view, "+" .. Number(m.amount), hero, 34, HEAL_COLOR, m.big and 1.35 or 1)
+		if m.amount > 0 then
+			Float(view, "+" .. Number(m.amount), hero, 34, HEAL_COLOR, m.big and 1.35 or 1)
+		end
 	elseif m.kind == "xp" then
 		Float(view, L["+%d XP"]:format(m.amount), SlotOf(view, m.key) or hero, 28, XP_COLOR, 0.9)
 	elseif m.kind == "loot" then

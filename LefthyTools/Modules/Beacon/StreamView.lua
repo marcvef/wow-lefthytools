@@ -734,7 +734,7 @@ local function Build(view, name, parent)
 			GameTooltip:AddLine(L["Not known yet: it is after a few seconds out of combat at full health (a /reload starts over)."],
 				1, 0.6, 0.3, true)
 		end
-		GameTooltip:AddLine(L["The game hides health from addons, so this one is added up from hits and heals. It can be a little off until the next time it's full."],
+		GameTooltip:AddLine(L["The game hides health from addons, so this one is estimated from the hits and heals it counts, and set right after each fight. It can be off during a fight."],
 			0.8, 0.8, 0.8, true)
 		GameTooltip:Show()
 	end)

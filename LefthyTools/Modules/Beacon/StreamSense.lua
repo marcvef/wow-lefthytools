@@ -392,7 +392,19 @@ end
 
 -- A UNIT_COMBAT on you (from the health estimate's events).
 function S.Happened(kind, flags, amount)
-	if issecret(kind) or issecret(flags) or issecret(amount) then
+	if issecret(kind) then
+		return
+	elseif issecret(amount) then -- (amounts are hidden: a hit without a number, 0; what's avoided as ever)
+		local flag = not issecret(flags) and flags or nil
+		if kind == "WOUND" and S.AVOIDED[flag] then
+			pending.avoid = flag
+		elseif kind == "WOUND" then
+			pending.struck, pending.crit = true, pending.crit or flag == "CRITICAL"
+		elseif S.AVOIDED[kind] then
+			pending.avoid = kind
+		end
+		return
+	elseif issecret(flags) then
 		return
 	end
 	if (kind == "WOUND" or kind == "HEAL") and type(amount) == "number" and amount > 0 then
@@ -415,6 +427,11 @@ local function Flush(now)
 			moment.amount, moment.big = amount, max ~= nil and amount >= BIG * max
 			pending[field] = 0
 		end
+	end
+	if pending.struck then
+		local moment = Moment("hurt")
+		moment.amount, moment.big = 0, pending.crit
+		pending.struck, pending.crit = nil, nil
 	end
 	if pending.avoid then
 		Moment("avoid").avoid = pending.avoid
@@ -474,7 +491,7 @@ end)
 local function SenseMoments(on)
 	momentWatch:UnregisterAllEvents()
 	wipe(picture.moments)
-	pending.hurt, pending.heal, pending.avoid = 0, 0, nil
+	pending.hurt, pending.heal, pending.avoid, pending.struck, pending.crit = 0, 0, nil, nil, nil
 	if on then
 		for _, event in ipairs({ "PLAYER_XP_UPDATE", "PARTY_KILL", "CHAT_MSG_LOOT" }) do
 			momentWatch:RegisterEvent(event)

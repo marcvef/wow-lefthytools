@@ -46,7 +46,7 @@ local function PreviewMoments(view, was, t)
 			view.previewSeq = (view.previewSeq or 0) % 99 + 1
 			local m = { seq = view.previewSeq, kind = kind, at = view.clock }
 			if kind == "hurt" or kind == "heal" then
-				m.amount, m.big = e[3], e[4] or false
+				m.amount, m.big = S.AmountsHidden() and 0 or e[3], e[4] or false
 			elseif kind == "avoid" then
 				m.avoid = e[3]
 			elseif kind == "xp" then

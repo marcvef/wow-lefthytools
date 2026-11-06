@@ -189,10 +189,9 @@ minimap, and you on theirs, without being in a group.
   calendar button at the minimap. `/lefthy stream me` shows what they see; the game tells addons
   only how far a mob is, so the directions are learned as you move and turn (faint dots are still
   unsure). Under the map, **the battle row**: their model and the mobs they fight, and the fight
-  played on them, Pokémon style: they cast or step up and strike, the mob flinches and roughly
-  what it lost floats up (a kind's health comes from the Bestiary's classic database, elites
-  too, until two of your kills have measured it on Forever); mobs lunge at them, their hits and
-  heals float up from their model, the dead fall; spells glow in their school's colour as they fly
+  played on them, Pokémon style: they cast or step up and strike, the mob flinches and its health
+  goes down (a kind's health comes from the Bestiary's classic database, elites too, until two of
+  your kills have measured it on Forever); mobs lunge at them, they flinch, the dead fall; spells glow in their school's colour as they fly
   and hit (fire orange, frost blue, shadow purple, ...), and a mob they polymorph turns into a sheep
   (or pig, turtle, cow) until it's hit. In a group, a tiny tag on each mob says who has
   its aggro, like on the nameplates: **>YOU<** in your own stream, else the first three letters of
@@ -229,8 +228,10 @@ minimap, and you on theirs, without being in a group.
 - **Not shown:**
   - anyone in a dungeon or raid (the game hides positions there),
   - friends on another continent than the map you're looking at,
-  - exact health: the game keeps health hidden from addons in Forever, so the health you see is
-    an estimate (from the hits and heals their game tells them).
+  - exact health: the game keeps health hidden from addons in Forever, and how much a hit takes
+    too, so the health you see is an estimate: from how many hits and heals their game reports, set
+    right after each fight from the damage meter (it can stay switched off). It's rough at first
+    and gets better as they fight.
 
 | Setting | Default | Command |
 |---|---|---|

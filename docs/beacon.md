@@ -657,13 +657,36 @@ target begin it, `STOP`, `CHANNEL_STOP`, `INTERRUPTED`, `FAILED` end it (10 s at
 mob key while the sensor runs; such a mob is casting "a spell" (no spell ID goes out, so a
 friend's client says "a spell" too).
 
+**When the game hides what a hit takes** (StreamHealth.lua, `S.AmountsHidden`). Since build
+1.60.1.70755 `UNIT_COMBAT`'s amount is secret (tested in game, 70790); the unit and the kind of hit
+aren't. Also secret in combat: `UnitHealth`, `UnitHealthPercent`, `UnitHealthMissing` for me and my
+target, my target's `UnitHealthMax` and a status bar's value, fill width and position when it holds
+a secret. My own `UnitHealthMax` answers. The combat log can't be registered (a `ForceTaint_Strong`
+"blocked" dialog: don't try it). What's left is `C_DamageMeter.GetCombatSessionFromType(1, kind)`:
+secret in combat, exact once out of it, the last fight only, also with Blizzard's meter switched off
+(all seen in game). So a hit with a hidden amount counts as a usual one: its weight (crit 2, crushing
+1.5, glancing 0.7, a `WOUND` flagged as avoided 0) times the average in
+`LefthyToolsDB.streamHitSize[GUID]` = `{ dealt = { size, fights }, taken = ..., heal = ... }`, the
+last 5 fights, kept per character; until learned 6% of my maximum for a hit on me, 25% for a heal, and
+a sixth of a mob's health for a hit on it. An estimate stays at 5% while its owner lives. From
+`PLAYER_REGEN_DISABLED` a fight counts its hits; 1 s after it (once more 2 s later if the meter doesn't
+answer) `ReadFight` divides the totals by them, sets `life.missing` right (what I lacked before it,
+plus what I took, less what I healed; alone the meter's healing, in a group the count) unless I died,
+and when I killed the one mob I hit, alone and seen from full, teaches its kind's ratio (`LearnKind`, as
+a readable amount would). A group's total and hits are everyone's, so a hit's average is too; on me only
+my `isLocalPlayer` entry counts (not yet tested in a group). A session longer than the fight is left
+alone. Hits on my target count while the sensor is off too, so what a hit takes is known when someone
+starts watching. No meter: just the estimate. An amount that can be read is used as before.
+
 **What happens to you** (StreamSense.lua, `picture.moments`, while the sensor runs): hits and
 heals from `UNIT_COMBAT` (added up per look; big: 15% of the maximum or more), what you avoided
 (`MISS`, `DODGE`, `PARRY`, `BLOCK`, `RESIST`, `IMMUNE`, `EVADE`, `DEFLECT`, `REFLECT`, `ABSORB`; a
 `WOUND` of 0 by its flag), XP (`PLAYER_XP_UPDATE`, the difference; with the mob it came from when
 a `PARTY_KILL` was within 1.5 s, either way round), your killing blows (`PARTY_KILL` with you as
 the attacker) and loot of green and better (`LT.OwnLoot`, Core.lua: the same reading of
-`CHAT_MSG_LOOT` that Chronicle counts). Each moment gets a number (1-99, going round) and stays
+`CHAT_MSG_LOOT` that Chronicle counts). Amounts hidden: a hit is a moment with amount 0 (`w0`, a crit
+`W0`; its animation plays without a number, builds before this one float "-0"), a heal none, and what
+you avoided comes as ever. Each moment gets a number (1-99, going round) and stays
 2.5 s in the picture.
 
 **Mobs' health, estimated** (StreamHealth.lua, `mob.health`, while the sensor runs). A mob's
@@ -844,7 +867,7 @@ the picture already holds, one action after another like turns (about half a sec
   1 s into the loop, so it's itself again when the loop starts over.
 - **Their target loses health** (the estimate, a drop of 0.4% or more): theirs. It joins their
   spell or ability on the way (its number lands with it), else a swing at it still waiting its turn
-  (what it lost adds up), else it's a swing: they step forward 16 px and strike (17). The mob flinches (9) with a red flash, and what it lost floats up from it in gold:
+  (what it lost adds up), else it's a swing: they step forward 16 px and strike (17). The mob flinches (9) with a red flash, and (not while `S.AmountsHidden`: then it's only a count of hits) what it lost floats up from it in gold:
   the loss times what its kind has (`S.MobMaxOf`, StreamSense's maximum: learned, the classic
   database or usual for its level), a percent when that isn't known (an elite in neither). The
   combat log is closed, so who hit isn't known: their target's loss is taken as theirs; **another

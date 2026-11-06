@@ -554,8 +554,8 @@ L["Not known here: the game hides the maximum health in this place, and none is 
 	"Hier nicht bekannt: Das Spiel verbirgt an diesem Ort das maximale Leben, und von vorher ist keins bekannt."
 L["Not known yet: it is after a few seconds out of combat at full health (a /reload starts over)."] =
 	"Noch nicht bekannt: Das ist es nach ein paar Sekunden außerhalb des Kampfes mit vollem Leben (ein /reload fängt neu an)."
-L["The game hides health from addons, so this one is added up from hits and heals. It can be a little off until the next time it's full."] =
-	"Das Spiel verbirgt das Leben vor Addons, deshalb wird es aus Treffern und Heilungen zusammengezählt. Bis es das nächste Mal voll ist, kann es etwas danebenliegen."
+L["The game hides health from addons, so this one is estimated from the hits and heals it counts, and set right after each fight. It can be off during a fight."] =
+	"Das Spiel verbirgt das Leben vor Addons. Das hier ist also eine Schätzung aus den gezählten Treffern und Heilungen, die nach jedem Kampf korrigiert wird. Während eines Kampfes kann sie danebenliegen."
 L["off your screen for %d s"] = "seit %d s nicht im Bild"
 L["direction still unsure: move and turn"] = "Richtung noch unsicher: beweg und dreh dich"
 L["Westfall"] = "Westfall"

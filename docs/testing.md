@@ -306,6 +306,13 @@ installer from GitHub instead.
     them removes the line and the border. `/lefthy beacon handover` lists what's still owed.
     Invite: hover a friend's world map dot: "Shift+click: invite"; Shift+left click it: they get
     the game's invite, also on another realm, and chat says "Invited <them>." In your group: no line.
+    Health in the stream (the fighter on this build; `/lefthy stream me` or a friend's window):
+    fight a mob: your "~%" goes down with its hits and the mob's bar in a friend's window too, no
+    numbers float, a dodge or miss still says so. A few seconds after the fight your "~%" jumps to
+    about what you really have, and the next fight's steps fit better. Kill the same kind alone
+    twice: its bar should reach about nothing as it dies. In a group, after a fight:
+    `/run for _,c in ipairs(C_DamageMeter.GetCombatSessionFromType(1,0).combatSources) do print(c.isLocalPlayer,c.totalAmount) end`
+    should print one line per person, `true` on yours (not tested yet; without it your health isn't set right in groups).
     Fight stream (both on this build): hover their world map dot: "Click: watch their fight";
     click it: their window at the top left (small; drag it, drag its bottom right corner to
     resize, a second window goes beside it); their map, their arrow turning, the mobs they fight,

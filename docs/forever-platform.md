@@ -8,6 +8,9 @@ Facts verified against client builds 1.60.1.70009 and 1.60.1.70170.
   Mode, the Cooldown Manager, a built-in damage meter and swing timer, and Midnight's addon
   restrictions.
 - **Mail:** the recipient is the full name, "Anna Brook"; a realm suffix doesn't work (the user, on the release).
+- **Hits and health:** `UNIT_COMBAT`'s amount has been secret since 1.60.1.70755, and addons can't read live
+  health in any other way; `C_DamageMeter` gives exact totals once out of combat. `docs/beacon.md`, "When the
+  game hides what a hit takes", has what was tested.
 - **Friends' levels:** `C_BattleNet`'s `characterLevel` was 0 on the release (build 1.60.1.70790) and wrong
   since: the name, class and zone are right, the level isn't. Beacon's friends tell theirs themselves (`B2;bl`).
 - **TOC:** `## Interface: 16001` (version 1.60.1). The flavor suffix is `_Camelot`, but a plain
