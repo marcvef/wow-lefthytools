@@ -440,5 +440,8 @@ ns.CHANGELOG = {
 	{ id = 144, module = "beacon",
 		en = { "Health moves in the fight stream again", "The game now hides how much a hit takes, so friends' streams showed full health until the end. Your health and the mobs' are now estimated from the hits themselves and set right after each fight from the damage meter (it can stay switched off). They are rough at first and get better as you fight. Hits no longer show numbers; dodges and misses are back. Whoever is fighting needs this version." },
 		de = { "Leben im Kampf-Stream bewegt sich wieder", "Das Spiel verbirgt jetzt, wie viel ein Treffer abzieht, darum zeigten Streams von Freunden bis zum Ende volles Leben. Dein Leben und das der Mobs werden jetzt aus den Treffern selbst geschätzt und nach jedem Kampf mit dem Damage Meter korrigiert (es kann ausgeschaltet bleiben). Am Anfang ist das grob und wird mit jedem Kampf besser. Treffer zeigen keine Zahlen mehr, Ausweichen und Verfehlen sind zurück. Wer kämpft, braucht diese Version." } },
+	{ id = 145, module = "chronicle",
+		en = { "Everyone's recipes in Chronicle", "A new Professions tab shows your friends' professions and known recipes, also while they're offline, with the item, its reagents against your bags, and a search for who can craft what." },
+		de = { "Alle Rezepte in Chronicle", "Der neue Tab Berufe zeigt die Berufe und bekannten Rezepte deiner Freunde, auch wenn sie offline sind, mit dem Item, den Reagenzien im Vergleich zu deinen Taschen und einer Suche, wer was herstellen kann." } },
 	-- New entries go here, at the end.
 }
