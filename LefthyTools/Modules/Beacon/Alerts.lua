@@ -95,7 +95,7 @@ end
 
 -- Name (and <AFK>), level and progress, health, "In your group".
 local function Head(peer, info)
-	local level = B.FriendLevel(peer, info)
+	local level = peer.level
 	local head = ColouredName(peer)
 	if info and info.isGameAFK then
 		head = head .. " |cff999999<AFK>|r"
@@ -139,7 +139,7 @@ end
 -- (their journal), for a friend who doesn't tell theirs yet.
 function B.FriendStatus(peer, gameAccountID, otherLevel)
 	local info = C_BattleNet.GetGameAccountInfoByID(gameAccountID)
-	local level = B.FriendLevel(peer, info) or otherLevel
+	local level = peer.level or otherLevel
 	return {
 		name = ColouredName(peer) .. ((info and info.isGameAFK) and " |cff999999<AFK>|r" or ""),
 		level = level and (peer.xpPercent and ("%d |cff999999(%d%%)|r"):format(level, peer.xpPercent) or tostring(level)),

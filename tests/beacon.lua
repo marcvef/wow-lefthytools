@@ -1014,7 +1014,7 @@ do
 	check(peers()[11].mobs == 1, "malformed counts are ignored")
 	anna("S2;;0;260.0;750.0;Goldshire;")
 	Advance(0.6)
-	check(not pin.Count.shown and tooltipHas("Level 20") and not tooltipHas("In combat with 1 enemy"), "fight over: the count goes")
+	check(not pin.Count.shown and tooltipHas("Level 27") and not tooltipHas("In combat with 1 enemy"), "fight over: the count goes")
 	pin:OnMouseLeave()
 	WorldMapFrame:Hide()
 end
@@ -1055,13 +1055,13 @@ do
 	Advance(0.6)
 	local pin = pinOf(11)
 	pin:OnMouseEnter()
-	check(tooltipHas("Level 20 (64%)"), "her tooltip: level and progress, got " .. table.concat(TOOLTIP.lines, " | "))
+	check(tooltipHas("Level 27 (64%)"), "her tooltip: level and progress, got " .. table.concat(TOOLTIP.lines, " | "))
 	anna("X2;abc")
 	Advance(0.6)
-	check(tooltipHas("Level 20 (64%)"), "malformed: ignored")
+	check(tooltipHas("Level 27 (64%)"), "malformed: ignored")
 	anna("X2;")
 	Advance(0.6)
-	check(tooltipHas("Level 20"), "not shared: just the level")
+	check(tooltipHas("Level 27"), "not shared: just the level")
 	pin:OnMouseLeave()
 	WorldMapFrame:Hide()
 end
@@ -1088,10 +1088,12 @@ do
 	Advance(1.2)
 	check(sentTo(11, mark, "B2;bl;")[2] == "B2;bl;" .. PLAYER_LEVEL, "and when it changes")
 	check(#sentTo(12, mark, "B2;bl;") == 0, "Bob's older build got none of it")
+	peerOf(11).levelSentAt = GetTime() - 299
 	Advance(5)
+	check(#sentTo(11, mark, "B2;bl;") == 3, "and again every 5 minutes")
 	anna("H2")
 	Advance(1.5)
-	check(#sentTo(11, mark, "B2;bl;") == 3, "her hello (a /reload) gets it again")
+	check(#sentTo(11, mark, "B2;bl;") == 4, "her hello (a /reload) gets it again")
 	PLAYER_LEVEL = wasLevel
 	Advance(1.2)
 	peerOf(11).version = wasBuild
@@ -1119,7 +1121,7 @@ do
 	end
 	anna("X2;64")
 	reread()
-	check(level():find("Level 20 (64%)", 1, true), "Battle.net's 0 doesn't overwrite a level I know")
+	check(level():find("Level 27 (64%)", 1, true), "Battle.net's 0 doesn't overwrite a level I know")
 
 	anna("B2;bl;37")
 	check(level():find("Level 37 (64%)", 1, true), "they tell me theirs")
@@ -1152,10 +1154,23 @@ do
 	GROUP_GUIDS["Player-1-11"], PARTY.party1, GROUP = nil, nil, "none"
 	Fire("GROUP_ROSTER_UPDATE")
 
-	-- Battle.net's own level still wins where it has one.
+	-- Battle.net's number can be wrong: what's known beats it; it's only for a friend who doesn't tell.
 	account.characterLevel = 20
 	reread()
-	check(peerOf(11).level == 20, "Battle.net's level, when it has one")
+	check(peerOf(11).level == 41 and BB.FriendStatus(peerOf(11), 11).level:find("^41"), "Battle.net's number doesn't beat the real level")
+	anna("B2;bl;42")
+	Fire("BN_FRIEND_INFO_CHANGED")
+	Advance(0)
+	check(peerOf(11).level == 42 and BB.FriendStatus(peerOf(11), 11).level:find("^42"), "nor what they told, on the Friends page too")
+	account.characterName = "Annie Alt"
+	reread()
+	check(peerOf(11).level == 20, "another character who hasn't told theirs: Battle.net's number")
+	anna("B2;bl;9")
+	reread()
+	check(peerOf(11).level == 9, "then what that character tells")
+	account.characterName = wasName
+	reread()
+	check(peerOf(11).level == 20 and not peerOf(11).toldLevel, "back on the first: forgotten, until they tell again")
 	anna("X2;")
 end
 
@@ -1190,7 +1205,7 @@ do
 	-- Mine, to every friend: when it changes (in steps of 5), at most every 2 s, and with answers.
 	STATE.combat, STATE.dead = false, false
 	BB.Stream.LifeStart()
-	Advance(4.5) -- (no ticks: full)
+	Advance(7.5) -- (no ticks: full; and the 2 s since that's told have passed)
 	local hmark = #GAMEDATA + 1
 	EnterCombat()
 	Fire("UNIT_COMBAT", "player", "WOUND", "", 300, 1)

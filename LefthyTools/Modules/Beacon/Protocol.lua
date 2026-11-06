@@ -68,8 +68,8 @@ local B = ns.Beacon
 --                       (e: Echoes, Echoes/Delivery.lua has its words), at most 255 bytes like all.
 --                       Only to friends whose build reads them (Delivery.lua says how it knows)
 --   B2;bl;<level>       Beacon's own word: my level, only to friends whose build reads it (their
---                       V2; Sharing.lua's LEVEL_SINCE). When it changes, and again after their
---                       hello: Battle.net tells friends' levels as 0 on the release
+--                       V2; Sharing.lua's LEVEL_SINCE). When it changes, again after their hello,
+--                       and every 5 minutes: Battle.net's number for friends can be wrong
 --   Q2                  module switched off: forget me
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil, before the sender counts as

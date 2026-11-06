@@ -205,7 +205,7 @@ local function AddPeer(peer, first)
 		GameTooltip:AddLine(L["In your group"], GROUP_R, GROUP_G, GROUP_B)
 	end
 	-- Level, with their progress on it, and their health (estimated) beside it.
-	local level = B.FriendLevel(peer, game)
+	local level = peer.level
 	local health = B.HealthText(peer)
 	if level then
 		local text = peer.xpPercent and L["Level %d (%d%%)"]:format(level, peer.xpPercent) or L["Level %d"]:format(level)

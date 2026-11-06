@@ -441,8 +441,10 @@ nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` 
 ## Level progress
 
 `B2;bl;<level>`: my level, once a second if a friend hasn't got this one, only to builds from 0.7.0-1 on (`LEVEL_SINCE`,
-Sharing.lua), and again after their hello. Battle.net's `characterLevel` is 0 on the release, so `peer.level` is Battle.net's
-when above 0 (`B.FriendLevel`), else from `B2;bl`, `L2` or the group; what they said goes when they change character.
+Sharing.lua), again after their hello, and every 5 minutes (a friend drops it if it arrives before Battle.net shows my new
+character's name; messages can get lost). Battle.net's `characterLevel` was 0 on the release and is often wrong since, so the real
+level wins: `B.TellLevel` sets `peer.toldLevel` (and `peer.level`) from `B2;bl`, `L2` or the group, and `CopyInfo` keeps it until
+they change character. Only a friend who hasn't told theirs (a build before 0.7.0-1, and no level-up or group yet) shows Battle.net's.
 
 `X2;<percent>`: whole percent of the current level (`UnitXP / UnitXPMax`, at most 99), empty at
 max level (`IsPlayerAtEffectiveMaxLevel`) or with `share` off. `PLAYER_XP_UPDATE` and

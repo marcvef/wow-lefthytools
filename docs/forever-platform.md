@@ -8,8 +8,8 @@ Facts verified against client builds 1.60.1.70009 and 1.60.1.70170.
   Mode, the Cooldown Manager, a built-in damage meter and swing timer, and Midnight's addon
   restrictions.
 - **Mail:** the recipient is the full name, "Anna Brook"; a realm suffix doesn't work (the user, on the release).
-- **Friends' levels:** `C_BattleNet`'s `characterLevel` is 0 on the release (build 1.60.1.70790): the name,
-  class and zone are right, the level isn't. Beacon's friends tell theirs themselves (`B2;bl`).
+- **Friends' levels:** `C_BattleNet`'s `characterLevel` was 0 on the release (build 1.60.1.70790) and wrong
+  since: the name, class and zone are right, the level isn't. Beacon's friends tell theirs themselves (`B2;bl`).
 - **TOC:** `## Interface: 16001` (version 1.60.1). The flavor suffix is `_Camelot`, but a plain
   `<Addon>.toc` loads fine. The game type "camelot" is part of the **Mainline family**: in
   Blizzard TOCs `[Family]` resolves to `Mainline` and `[Game]` to `Camelot`. Frame names are the

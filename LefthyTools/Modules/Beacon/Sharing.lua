@@ -19,6 +19,8 @@ local QUEST_GAP = 2          -- my tracked quest is checked (and sent if changed
 local COUNT_GAP = 1          -- in combat: enemies counted (and sent if changed) at most this often
 local XP_GAP = 2             -- my level progress is checked (and sent if changed) at most this often
 local LEVEL_GAP = 1          -- my level is checked (and sent to whoever hasn't got it) this often
+local LEVEL_AGAIN = 300      -- and sent again this often: a friend drops it if it reaches them before
+                             -- Battle.net shows my new character's name, and a message can get lost
 -- The first build that reads B2;bl (LT.CompareVersions goes by the commit count): older friends are
 -- never sent it, and a build that doesn't say (no commit count, like the tagged 0.7.0) counts as older.
 local LEVEL_SINCE = "0.7.0-1-g0000000"
@@ -150,13 +152,13 @@ local function SendLevelIfOwed(now)
 		return
 	end
 	for gameAccountID, peer in pairs(B.peers) do
-		if peer.levelSent ~= level and peer.version then
+		if (peer.levelSent ~= level or now - peer.levelSentAt >= LEVEL_AGAIN) and peer.version then
 			if peer.levelBuild ~= peer.version then
 				peer.levelBuild = peer.version
 				peer.readsLevel = (LT.CompareVersions(peer.version, LEVEL_SINCE) or -1) >= 0
 			end
 			if peer.readsLevel then
-				peer.levelSent = level
+				peer.levelSent, peer.levelSentAt = level, now
 				B.Queue(gameAccountID, level)
 			end
 		end

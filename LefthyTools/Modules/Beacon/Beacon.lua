@@ -112,7 +112,9 @@ end
 
 -- peers[gameAccountID] = {
 --   seen                             time of their last message
---   name, classFile, guid, level, area   from Battle.net (CopyInfo); name nil until the first check
+--   name, classFile, guid, area      from Battle.net (CopyInfo); name nil until the first check
+--   level, toldLevel                 what to show; toldLevel: their real one (B.TellLevel), until
+--                                    they play another character. Without it, Battle.net's
 --   hasPos, continent, north, west   their last world position, posTime when it arrived
 --   fromNorth, fromWest, glide       where the minimap dot glides from, over how many seconds
 --   dead, ghost, combat, subzone, target   their last state (S2); stateSeen, blank (sharing off)
@@ -246,9 +248,8 @@ local function UpdateGroupUnits()
 			peer.rev = peer.rev + 1
 		end
 		local level = unit and UnitLevel(unit)
-		if level and not LT.IsSecret(level) and level > 0 and level ~= peer.level then
-			peer.level = level
-			peer.rev = peer.rev + 1
+		if level and not LT.IsSecret(level) and level > 0 then
+			B.TellLevel(peer, level)
 		end
 	end
 end
@@ -491,20 +492,29 @@ local function IsUsableAccount(info)
 		and info.wowProjectID == WOW_PROJECT_ID
 end
 
--- A level worth showing, else nil: Battle.net's characterLevel is 0 on the release (1.60.1.70790).
+-- A level worth showing, else nil: Battle.net's characterLevel was 0 on the release (1.60.1.70790).
 local function KnownLevel(level)
 	return type(level) == "number" and not LT.IsSecret(level) and level > 0 and level or nil
 end
 
--- A friend's level: Battle.net's when it knows it, else what they told me (B2;bl, L2, my group).
-function B.FriendLevel(peer, info)
-	return KnownLevel(info and info.characterLevel) or peer.level
+-- A friend's real level, from themselves (B2;bl, L2) or my group. It counts until they play another
+-- character: Battle.net's number can be wrong, so that's only for a friend who doesn't tell (CopyInfo).
+-- True if the level shown changed.
+function B.TellLevel(peer, level)
+	peer.toldLevel = level
+	if level ~= peer.level then
+		peer.level = level
+		peer.rev = peer.rev + 1
+		return true
+	end
 end
 
 local function CopyInfo(peer, info)
-	-- What they told me stays while Battle.net has no level, until they play another character.
-	local level = KnownLevel(info.characterLevel)
-		or ((not peer.name or peer.name == info.characterName) and peer.level or nil)
+	local sameCharacter = not peer.name or peer.name == info.characterName
+	if not sameCharacter then
+		peer.toldLevel = nil
+	end
+	local level = peer.toldLevel or KnownLevel(info.characterLevel) or (sameCharacter and peer.level or nil)
 	if peer.name ~= info.characterName or peer.level ~= level or peer.classFile ~= info.classFilename then
 		peer.rev = peer.rev + 1
 		Changed()
@@ -807,9 +817,7 @@ local function OnMessage(text, senderID)
 		-- Beacon's own word, their level.
 		if a == "bl" then
 			local level = KnownLevel(tonumber(b:match("^%d%d?%d?$") or ""))
-			if level and level ~= peer.level then
-				peer.level = level
-				peer.rev = peer.rev + 1
+			if level and B.TellLevel(peer, level) then
 				Changed()
 			end
 		elseif a:sub(1, 1) == "e" and Counted(guard, "echoes", ECHOES_LIMIT, ECHOES_WINDOW, now) and B.ReceiveEchoes then
