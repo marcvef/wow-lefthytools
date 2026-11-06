@@ -443,5 +443,8 @@ ns.CHANGELOG = {
 	{ id = 145, module = "chronicle",
 		en = { "Everyone's recipes in Chronicle", "A new Professions tab shows your friends' professions and known recipes, also while they're offline, with the item, its reagents against your bags, and a search for who can craft what." },
 		de = { "Alle Rezepte in Chronicle", "Der neue Tab Berufe zeigt die Berufe und bekannten Rezepte deiner Freunde, auch wenn sie offline sind, mit dem Item, den Reagenzien im Vergleich zu deinen Taschen und einer Suche, wer was herstellen kann." } },
+	{ id = 146, module = "chronicle",
+		en = { "Recipes against your gear", "In the Professions tab, gear shows what it would change against what you wear, and a recipe you know opens in your profession window with a click." },
+		de = { "Rezepte im Vergleich zur Ausrüstung", "Im Tab Berufe zeigt Ausrüstung, was sie gegenüber deiner aktuellen ändern würde, und ein Rezept, das du kennst, öffnest du per Klick in deinem Berufsfenster." } },
 	-- New entries go here, at the end.
 }
