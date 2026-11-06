@@ -316,6 +316,10 @@ installer from GitHub instead.
     twice: its bar should reach about nothing as it dies. In a group, after a fight:
     `/run for _,c in ipairs(C_DamageMeter.GetCombatSessionFromType(1,0).combatSources) do print(c.isLocalPlayer,c.totalAmount) end`
     should print one line per person, `true` on yours (not tested yet; without it your health isn't set right in groups).
+    Professions tab, comparing: hover gear whose slot you wear: "Replaces: <your item>" with stat
+    lines as in your bags (rings and trinkets: both of yours); hover the name: its tooltip. Change
+    what you wear: the lines follow. A recipe you know: "Show in my profession window" opens yours on
+    that recipe, also when another profession or none was open; in a fight it only says so.
     Fight stream (both on this build): hover their world map dot: "Click: watch their fight";
     click it: their window at the top left (small; drag it, drag its bottom right corner to
     resize, a second window goes beside it); their map, their arrow turning, the mobs they fight,

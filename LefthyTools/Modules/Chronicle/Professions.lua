@@ -22,11 +22,15 @@ local PAD, GAP = 6, 8
 local SEARCH_Y, SEARCH_H = 5, 24
 local PROF_Y, PROF_H, PROF_GAP, PROF_PER_ROW, PROF_ROWS = 34, 24, 3, 6, 2
 local PANES_Y = PROF_Y + PROF_ROWS * (PROF_H + PROF_GAP) + 4
-local PEOPLE_W, MIDDLE_W = 170, 262 -- (each with its scroll bar)
+local PEOPLE_W, MIDDLE_W = 170, 306 -- (each with its scroll bar)
 local BAR_W = 24                    -- a scroll bar, right of its list
+local EDGE = 10                     -- kept free at the window's right edge
 local PERSON_H, ITEM_H = 32, 20
 local HEAD_H = 40                   -- the details' icon and name
 local REAGENT_H = 18
+local COMPARE_H = 16                -- "Replaces: ..."; the stat lines come under it
+local COMPARE_ROWS = 2              -- a second ring or trinket
+local OPEN_H = 26                   -- the button on my own profession window
 local REAGENTS = 8                  -- what a recipe can need (SpellReagents' columns)
 local KNOWN_NAMES = 12              -- names in "Also known by", at most
 local SEARCH_GAP = 0.3              -- typing: searched this long after the last key
@@ -89,6 +93,7 @@ local asked, waiting = {}, {} -- items asked for this session; those not here ye
 local searchAt, fillAt        -- when the search or a fill of what's in sight is due
 local namesOld, bagsOld       -- what the fill does
 local tipCame, tipOld         -- the tooltip's item came in; it waits until the tab is in sight
+local gearOld                 -- what I wear changed
 local lastDraw = -math.huge
 
 ---------------------------------------------------------------------------
@@ -506,16 +511,114 @@ local function FillCrafters(recipe)
 	view.Also:SetText((under and L["Also known by: %s"] or L["Known by: %s"]):format(list))
 end
 
+-- Against what I wear (this character, whoever's recipe it is): the game's own comparison, as in the
+-- bags. It takes an item I don't have (tested in game). Only gear; nothing worn there: nothing to say.
+local function CompareRow(i, worn, delta)
+	local row = view.compare[i]
+	local name = LT.Value(C_Item.GetItemNameByID, worn.guid or worn.hyperlink)
+	row.worn = worn
+	row.Name:SetText(L["Replaces: %s"]:format(
+		C.QualityText(name or "...", LT.Value(C_Item.GetItemQualityByID, worn.guid or worn.hyperlink))))
+	row.Lines:SetText(delta)
+	row:Show()
+end
+
+local function ItemDelta(item, worn, paired, together)
+	local ok, lines = pcall(C_TooltipComparison.GetItemComparisonDelta, item, worn, paired, together)
+	return ok and type(lines) == "table" and table.concat(lines, "\n") or ""
+end
+
+local function FillCompare(recipe)
+	for _, row in ipairs(view.compare) do
+		row.worn = nil
+		row:Hide()
+	end
+	if not (C_TooltipComparison and recipe.item and (recipe.slot or 0) > 0) then
+		return
+	end
+	local item = { hyperlink = ("item:%d"):format(recipe.item) }
+	local ok, info = pcall(C_TooltipComparison.GetItemComparisonInfo, item)
+	local worn = ok and type(info) == "table" and type(info.item) == "table" and info.item or nil
+	if not (worn and (worn.guid or worn.hyperlink)) then
+		return
+	end
+	local more = type(info.additionalItems) == "table" and info.additionalItems[1] or nil
+	if info.method == 0 then -- (TooltipComparisonMethod.Single: a second ring or trinket is its own comparison)
+		CompareRow(1, worn, ItemDelta(item, worn))
+		if more then
+			CompareRow(2, more, ItemDelta(item, more))
+		end
+	else
+		CompareRow(1, worn, ItemDelta(item, worn, more, info.method == 2 or info.method == 3))
+	end
+end
+
 -- The part under the tooltip: its height decides how much room the tooltip has.
 local function LayBelow(recipe)
+	local y = 0
+	for _, row in ipairs(view.compare) do
+		if row:IsShown() then
+			local lines = (row.Lines:GetText() or "") ~= "" and row.Lines:GetStringHeight() or 0
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", view.Below, "TOPLEFT", 0, -y)
+			row:SetHeight(COMPARE_H + lines)
+			y = y + COMPARE_H + lines + 6
+		end
+	end
+	view.NeedsBox:ClearAllPoints()
+	view.NeedsBox:SetPoint("TOPLEFT", view.Below, "TOPLEFT", 0, -y)
 	local count = #(recipe.reagents or {})
 	local needs = count > 0 and (16 + count * REAGENT_H) or 0
 	view.Also:ClearAllPoints()
-	view.Also:SetPoint("TOPLEFT", view.Below, "TOPLEFT", 0, -needs - 4)
+	view.Also:SetPoint("TOPLEFT", view.Below, "TOPLEFT", 0, -y - needs - 4)
 	local also = (view.Also:GetText() or "") ~= "" and (view.Also:GetStringHeight() + 6) or 0
-	local height = needs + also
+	local height = y + needs + also
+	local mine = C_SpellBook and LT.Value(C_SpellBook.IsSpellKnown, recipe.spell) == true
+	view.OpenMine:SetShown(mine)
 	view.Below:SetHeight(math.max(1, height))
-	view.tipRoom = view.detailH - HEAD_H - height - 12
+	view.tipRoom = view.detailH - HEAD_H - height - 12 - (mine and OPEN_H or 0)
+end
+
+-- My own profession window on this recipe (I know it). OpenTradeSkill makes the game open it itself,
+-- so nothing of ours touches Blizzard's panels (no taint); OpenRecipe then picks the recipe, once
+-- the window is there to hear it.
+local openWatch
+local function OpenRecipeNow(spell)
+	if openWatch then
+		openWatch:UnregisterAllEvents()
+		openWatch.spell = nil
+	end
+	pcall(C_TradeSkillUI.OpenRecipe, spell)
+end
+
+local function OpenInMine()
+	local recipe = shown and shown.recipe
+	local R = C.Recipes
+	local line = recipe and R and select(2, R.RecipeOf(recipe.spell))
+	if not (line and C_TradeSkillUI) then
+		return
+	elseif InCombatLockdown() then
+		C.module:Print(L["You can't open your profession window during a fight."])
+		return
+	end
+	local base = LT.Value(C_TradeSkillUI.GetBaseProfessionInfo)
+	if ProfessionsFrame and ProfessionsFrame:IsShown() and type(base) == "table" and base.professionID == line then
+		OpenRecipeNow(recipe.spell)
+		return
+	end
+	local spell = recipe.spell
+	openWatch = openWatch or CreateFrame("Frame")
+	openWatch.spell = spell
+	openWatch:RegisterEvent("TRADE_SKILL_SHOW")
+	openWatch:SetScript("OnEvent", function(self)
+		self:UnregisterAllEvents()
+		C_Timer.After(0, function() OpenRecipeNow(spell) end) -- (the window hears the same event)
+	end)
+	local ok = pcall(C_TradeSkillUI.OpenTradeSkill, line)
+	if not ok then
+		openWatch:UnregisterAllEvents()
+		C.module:Print(L["The game didn't open your profession window."])
+	end
 end
 
 local function FillHead(recipe)
@@ -537,6 +640,7 @@ local function FillDetail()
 	FillHead(recipe)
 	FillReagents(recipe)
 	FillCrafters(recipe)
+	FillCompare(recipe)
 	LayBelow(recipe)
 	if view.root:IsVisible() then
 		tipOld = false
@@ -951,7 +1055,12 @@ local function RunDue(self)
 		elseif bagsOld and shown then
 			FillReagents(shown.recipe)
 		end
-		namesOld, bagsOld, tipCame = false, false, false
+		if shown and (gearOld or tipCame) then -- (what I wear changed; the item came: it can compare now)
+			FillCompare(shown.recipe)
+			LayBelow(shown.recipe)
+			FitTip()
+		end
+		namesOld, bagsOld, tipCame, gearOld = false, false, false, false
 	end
 	if not (searchAt or fillAt) then
 		self:SetScript("OnUpdate", nil)
@@ -999,8 +1108,9 @@ local function OnEvent(_, event, id)
 		tipCame = tipCame or (shown ~= nil and shown.recipe.item == id)
 		fillAt = fillAt or GetTime() + NAMES_GAP
 		Due()
-	elseif shown then -- BAG_UPDATE_DELAYED: the "(you: 12)" lines
+	elseif shown then -- BAG_UPDATE_DELAYED: the "(you: 12)" lines; PLAYER_EQUIPMENT_CHANGED: the comparison
 		bagsOld = true
+		gearOld = gearOld or event == "PLAYER_EQUIPMENT_CHANGED"
 		fillAt = fillAt or GetTime() + NAMES_GAP
 		Due()
 	end
@@ -1110,6 +1220,36 @@ local function NewReagentRow(parent, i)
 	return row
 end
 
+-- "Replaces: <what I wear>" and the game's stat lines under it. Hovered: its tooltip, beside the window.
+local function NewCompareRow(parent)
+	local row = CreateFrame("Button", nil, parent)
+	row:SetSize(view.detailW, COMPARE_H)
+	row.Name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	row.Name:SetPoint("TOPLEFT", 2, -1)
+	row.Name:SetPoint("RIGHT", -2, 0)
+	row.Name:SetJustifyH("LEFT")
+	row.Name:SetWordWrap(false)
+	row.Lines = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.Lines:SetPoint("TOPLEFT", 12, -COMPARE_H)
+	row.Lines:SetWidth(view.detailW - 14)
+	row.Lines:SetJustifyH("LEFT")
+	row:SetScript("OnEnter", function(self)
+		local worn = self.worn
+		local link = worn and (worn.hyperlink or LT.Value(C_Item.GetItemLinkByGUID, worn.guid))
+		if link then
+			GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+			GameTooltip:SetHyperlink(link)
+			GameTooltip:Show()
+		end
+	end)
+	row:SetScript("OnLeave", function(self)
+		if GameTooltip:IsOwned(self) then
+			GameTooltip:Hide()
+		end
+	end)
+	return row
+end
+
 local function BuildDetail(root, x, width, height)
 	view.detailW, view.detailH = width, height
 	local panel = CreateFrame("Frame", nil, root)
@@ -1147,16 +1287,25 @@ local function BuildDetail(root, x, width, height)
 	view.Below = CreateFrame("Frame", nil, body)
 	view.Below:SetPoint("TOPLEFT", view.TipClip, "BOTTOMLEFT", 0, -6)
 	view.Below:SetSize(width, 1)
-	view.Needs = view.Below:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	view.compare = {}
+	for i = 1, COMPARE_ROWS do
+		view.compare[i] = NewCompareRow(view.Below)
+	end
+	view.NeedsBox = CreateFrame("Frame", nil, view.Below)
+	view.NeedsBox:SetSize(width, 1)
+	view.Needs = view.NeedsBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 	view.Needs:SetPoint("TOPLEFT", 2, 0)
 	view.Needs:SetText(L["Needs:"])
 	view.reagents = {}
 	for i = 1, REAGENTS do
-		view.reagents[i] = NewReagentRow(view.Below, i)
+		view.reagents[i] = NewReagentRow(view.NeedsBox, i)
 	end
 	view.Also = view.Below:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	view.Also:SetWidth(width - 4)
 	view.Also:SetJustifyH("LEFT")
+	view.OpenMine = LT.Window.AddButton(body, L["Show in my profession window"], OpenInMine, { "BOTTOMLEFT", body, "BOTTOMLEFT", 2, 2 })
+	view.OpenMine:SetSize(math.min(width - 4, 220), 22)
+	view.OpenMine:Hide()
 	body:Hide()
 end
 
@@ -1169,6 +1318,7 @@ local function Build(parent, width, height)
 	root:SetScript("OnShow", function(self)
 		self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 		self:RegisterEvent("BAG_UPDATE_DELAYED")
+		self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 		if tipOld and shown then
 			FillDetail()
 		end
@@ -1176,6 +1326,7 @@ local function Build(parent, width, height)
 	root:SetScript("OnHide", function(self)
 		self:UnregisterEvent("GET_ITEM_INFO_RECEIVED")
 		self:UnregisterEvent("BAG_UPDATE_DELAYED")
+		self:UnregisterEvent("PLAYER_EQUIPMENT_CHANGED")
 	end)
 	BuildSearch(root)
 	view.NewProfButton = ProfButtonMaker(root, width)
@@ -1196,7 +1347,7 @@ local function Build(parent, width, height)
 		split:SetHeight(paneH)
 	end
 	local detailX = middleX + MIDDLE_W + GAP
-	BuildDetail(root, detailX, width - detailX - PAD, paneH)
+	BuildDetail(root, detailX, width - detailX - PAD - EDGE, paneH)
 end
 
 ---------------------------------------------------------------------------

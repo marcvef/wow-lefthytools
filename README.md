@@ -332,7 +332,9 @@ version they have), or once they play it with an up-to-date LefthyTools.
 - **Professions:** every friend's professions and known recipes in one place, also while they're
   offline (profession links don't open across realms). Pick a profession on top and a person on the
   left, ordered by skill, or Everyone. The recipes are sorted by slot and item level. Hover one for
-  the item, what it needs against your bags and who else knows it; click to keep it there. **Search
+  the item, what it would change against what you wear, what it needs against your bags and who else
+  knows it; click to keep it there. A recipe you know opens in your own profession window with a
+  button. **Search
   everyone** finds who can craft something in any profession. Lists update by themselves. Friends
   appear once they've updated and logged in.
 - **While you were away:** a minute after you log in, a chat line per friend with what they did

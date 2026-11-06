@@ -635,7 +635,105 @@ do
 	check(tip:IsShown() and tip._hyperlink == "item:95001", "(the real one again, for what follows)")
 end
 
--- The real thing, if it's loaded: everyone knowing everything, in every crafting profession.
+-- The real thing, if it's loaded: everyone knowing everything, in every crafting profession.
+section("Chronicle: the Professions tab, comparing with what I wear and opening my window")
+do
+	local wasCompare, wasTrade, wasItemName, wasLink = C_TooltipComparison, C_TradeSkillUI, C_Item.GetItemNameByID, C_Item.GetItemLinkByGUID
+	local worn = { [1] = { guid = "Item-1", name = "Old Pants", quality = 1 }, [2] = { guid = "Item-2", name = "Old Ring", quality = 2 } }
+	local method, additional = 0, {}
+	local nothingWorn = false
+	C_Item.GetItemNameByID = function(id)
+		for _, item in pairs(worn) do if item.guid == id then return item.name end end
+		return wasItemName and wasItemName(id)
+	end
+	C_Item.GetItemLinkByGUID = function(guid) return guid == worn[1].guid and "item:42" or nil end
+	C_TooltipComparison = {
+		GetItemComparisonInfo = function() return { method = method, item = nothingWorn and {} or { guid = worn[1].guid }, additionalItems = additional } end,
+		GetItemComparisonDelta = function(_, against, paired, together)
+			return { "+2 Armor", "-1 Agility " .. against.guid .. (paired and " paired" or "") .. (together and " together" or "") }
+		end,
+	}
+	local opened, picked = {}, {}
+	local base
+	C_TradeSkillUI = {
+		OpenTradeSkill = function(line) opened[#opened + 1] = line; return true end,
+		OpenRecipe = function(spell) picked[#picked + 1] = spell end,
+		GetBaseProfessionInfo = function() return base end,
+	}
+	world.people = { [LEATHER] = { ANNA, BOB, ME } }
+	open()
+	moved()
+	button(LEATHER):Click()
+	personRow("anna"):Click()
+	hover(91003)
+	local row = v.compare[1]
+	check(row:IsShown() and plain(row.Name:GetText()) == "Replaces: Old Pants" and row.Lines:GetText():find("+2 Armor\n-1 Agility Item-1", 1, true)
+		and not v.compare[2]:IsShown(), "gear: what I wear, and the game's stat lines")
+	row._scripts.OnEnter(row)
+	check(TOOLTIP.owner == row and TOOLTIP.link == "item:42", "the name hovered: my item's tooltip")
+	row._scripts.OnLeave(row)
+	additional = { { guid = worn[2].guid } }
+	hover(91001)
+	check(v.compare[2]:IsShown() and plain(v.compare[2].Name:GetText()) == "Replaces: Old Ring", "a second ring or trinket: a row of its own")
+	method = 1
+	hover(91003)
+	check(v.compare[1].Lines:GetText():find("Item-1 paired", 1, true) and not v.compare[2]:IsShown(), "both hands: one comparison, as the game does")
+	method = 2
+	hover(91001)
+	check(v.compare[1].Lines:GetText():find("Item-1 paired together", 1, true), "paired with a bag item")
+	method, additional = 0, {}
+	nothingWorn = true
+	hover(91003)
+	check(not v.compare[1]:IsShown(), "nothing worn there: nothing to compare")
+	nothingWorn = false
+	hover(91009)
+	check(not v.compare[1]:IsShown(), "not gear: nothing to compare")
+	local stale = worn[1].name
+	hover(91003)
+	worn[1].name = "New Pants"
+	v.root._scripts.OnEvent(v.root, "PLAYER_EQUIPMENT_CHANGED")
+	Advance(1)
+	check(plain(v.compare[1].Name:GetText()) == "Replaces: New Pants", "what I wear changes: it follows")
+	worn[1].name = stale
+	C_TooltipComparison = nil
+	hover(91001)
+	check(not v.compare[1]:IsShown() and v.DetailBody:IsShown(), "no such API: the rest still works")
+	C_TooltipComparison = wasCompare
+
+	-- My own window: only for a recipe this character knows.
+	local wasKnown = KNOWN_SPELLS[91003]
+	KNOWN_SPELLS[91003] = nil
+	hover(91003)
+	check(not v.OpenMine:IsShown(), "a recipe I don't know: no button")
+	KNOWN_SPELLS[91003] = true
+	hover(91001)
+	hover(91003)
+	check(v.OpenMine:IsShown() and v.tipRoom > 0, "one I know: the button")
+	v.OpenMine:Click()
+	check(opened[1] == LEATHER and #picked == 0, "the game opens my window on its profession, the recipe waits")
+	Fire("TRADE_SKILL_SHOW")
+	Advance(0.1)
+	check(picked[1] == 91003, "then the window hears which recipe")
+	Fire("TRADE_SKILL_SHOW")
+	Advance(0.1)
+	check(#picked == 1, "only once")
+	local wasFrame = ProfessionsFrame
+	ProfessionsFrame = { IsShown = function() return true end }
+	base = { professionID = LEATHER }
+	v.OpenMine:Click()
+	check(#opened == 1 and picked[2] == 91003, "that profession's window is open already: just the recipe")
+	ProfessionsFrame = wasFrame
+	base = nil
+	STATE.combat = true
+	local mark = #PRINTED + 1
+	v.OpenMine:Click()
+	check(#opened == 1 and suite.printedSince(mark):find("during a fight", 1, true), "in a fight: it says so")
+	STATE.combat = false
+	KNOWN_SPELLS[91003] = wasKnown
+	C_TradeSkillUI, C_Item.GetItemNameByID, C_Item.GetItemLinkByGUID = wasTrade, wasItemName, wasLink
+	win:Hide()
+end
+
 section("Chronicle: the Professions tab, on C.Recipes' own data")
 do
 	local source = realRecipes or fake

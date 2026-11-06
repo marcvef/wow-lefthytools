@@ -297,7 +297,13 @@ scroll area are hidden on it.
   middle of `low` and `high` yellow, below `high` green, else grey; no numbers: no dot), under
   Everyone how many know it.
 - **Details, right:** a hover fills them at once; a click keeps them while the mouse moves on (click
-  again: free, another: that one). Icon and name, the selected person's difficulty, the real tooltip,
+  again: free, another: that one). Under the tooltip, for gear, what it would change against what this
+  character wears: `C_TooltipComparison` (it takes an item I don't have, tested in game), "Replaces:
+  <item>" (hovered: its tooltip) and the game's own stat lines; a second row for a second ring or
+  trinket, refreshed on `PLAYER_EQUIPMENT_CHANGED`. A recipe this character knows (`IsSpellKnown`)
+  has a button: `C_TradeSkillUI.OpenTradeSkill` makes the game open my window itself, so nothing of
+  ours touches Blizzard's panels, and on `TRADE_SKILL_SHOW` `OpenRecipe` picks it. Not in a fight.
+  Icon and name, the selected person's difficulty, the real tooltip,
   "Needs:" (icon, name, how many, `(you: 12)` from `C_Item.GetItemCount`, red when short; hovered: its
   normal tooltip) and who else knows it (`R.Crafters`).
 - **The real tooltip** (`ShowTip`, `FitTip`, all of it there): a `GameTooltip` of our own,
