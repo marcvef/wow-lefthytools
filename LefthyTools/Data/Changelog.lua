@@ -458,5 +458,8 @@ ns.CHANGELOG = {
 	{ id = 150, module = "tweaks",
 		en = { "Xbox or PlayStation symbols", "A new setting in Misc Tweaks chooses which symbols the game shows for your controller's buttons." },
 		de = { "Xbox- oder PlayStation-Symbole", "Eine neue Einstellung in Misc Tweaks wählt, welche Symbole das Spiel für die Tasten deines Controllers zeigt." } },
+	{ id = 151, module = "general",
+		en = { "A settings window of its own", "LefthyTools' settings moved out of Blizzard's Options into their own window, with a search and real dropdowns. Your settings stay as they were. Open it with /lefthy." },
+		de = { "Ein eigenes Einstellungsfenster", "Die Einstellungen von LefthyTools sind aus Blizzards Optionen in ein eigenes Fenster gezogen, mit Suche und echten Auswahllisten. Deine Einstellungen bleiben, wie sie waren. Du öffnest es mit /lefthy." } },
 	-- New entries go here, at the end.
 }
