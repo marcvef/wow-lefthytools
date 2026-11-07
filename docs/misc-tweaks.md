@@ -37,6 +37,20 @@ A gamepad sort button was tried and dropped: controller mode already has "Clean 
 backpack's menu (`Gamepad_SetupMenuOptions`), and `ContainerFrameMixin:UpdateSearchBox()` hides
 `BagItemAutoSortButton` in gamepad mode, where `GamepadBagBar` covers its spot.
 
+## gamepadSymbols: the controller's button symbols
+
+A controller's config has a `labelStyle`, which picks the prompts' symbols: `Generic` and `Letters` (Xbox),
+`Shapes` (PlayStation), `Reverse`. Blizzard's `InputDeviceIconSetManager` reads it from
+`C_GamePad.GetDeviceMappedState`. `GetConfig` returns nil for the game's built-in configs, so there's nothing
+to copy; but a config of ours with only `labelStyle` and empty lists works: the game keeps the
+built-in mappings beside it (in game, a Steam Controller, 10462:4866: `Shapes`, 32 buttons, 10 axes, all
+working). Blizzard's prompts read the symbols once, so a change shows after a `/reload`: changing the
+setting says so, and a button under it reloads. `SetConfig`, `ApplyConfigs` and `DeleteConfig` are marked `HasRestrictions` but
+answer from addon code out of combat. Set per controller (vendor and product, `GetDeviceRawState`) when
+the setting changes, at login, on `GAME_PAD_CONNECTED`; in combat it waits for `PLAYER_REGEN_ENABLED`. Ours
+are remembered in `padSymbolConfigs`, and "default" deletes them. It wrote no file in `WTF` that a look found, so
+it's applied again at each login. The settings panel can hang in gamepad mode, so `/lefthy tweaks padsymbols` does the same.
+
 ## gamepadBagSort: the bags' clean-up button (Bags.lua)
 
 Since 1.60.1.70291 the bags' clean-up button (`BagItemAutoSortButton`) no longer shows, with mouse

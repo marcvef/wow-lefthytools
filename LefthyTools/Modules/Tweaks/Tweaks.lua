@@ -15,6 +15,8 @@ local M = LT:NewModule("tweaks", {
 		statusText = true,
 		movableBags = true,
 		gamepadBagSort = true,
+		gamepadSymbols = "default", -- "default" | "xbox" | "playstation": the controller's button symbols
+		padSymbolConfigs = {}, -- "vendor:product" -> true: controllers whose symbols this set (to undo it)
 		bagPositions = {},     -- key ("combined" / "bag<id>") -> { left, top } in UIParent units
 		savedStatusText = {},  -- CVar values to restore when statusText is switched off
 		questAnnounce = true,
@@ -215,7 +217,80 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyCinematicFlights(on) end }, -- Flight.lua
 }
 
+---------------------------------------------------------------------------
+-- The controller's button symbols (gamepadSymbols)
+--
+-- A controller's config says which symbols it shows (labelStyle): Generic, Letters (Xbox) or Shapes
+-- (PlayStation). A config of ours holds only that: the game keeps its own button mappings beside it
+-- (seen in game, a Steam Controller: 32 buttons and 10 axes as before, Create and movement working).
+-- It's set per controller by its vendor and product, undone by deleting ours. Not in a fight (the
+-- calls are marked restricted), so one then waits for its end. Nothing runs at the game's default,
+-- unless there's something of ours to undo. Blizzard's prompts read the symbols once, so a change
+-- shows after a /reload (seen in game): a change of the setting says so.
+---------------------------------------------------------------------------
+
+local PAD_STYLES = { xbox = "Letters", playstation = "Shapes" }
+local padWatch = CreateFrame("Frame")
+local padSaid -- the setting as last seen: a change says /reload
+
+local function ApplyPadSymbols()
+	local api = C_GamePad
+	if not (api and api.SetConfig and api.GetAllDeviceIDs and api.GetDeviceRawState) then
+		return
+	end
+	local style = M.enabled and PAD_STYLES[M.db.gamepadSymbols] or nil
+	local ours = M.db.padSymbolConfigs
+	if not style and not next(ours) then
+		padWatch:UnregisterAllEvents()
+		padSaid = M.db.gamepadSymbols
+		return
+	end
+	padWatch:RegisterEvent("GAME_PAD_CONNECTED")
+	if InCombatLockdown() then
+		padWatch:RegisterEvent("PLAYER_REGEN_ENABLED")
+		return
+	end
+	padWatch:UnregisterEvent("PLAYER_REGEN_ENABLED")
+	local changed = false
+	if style then
+		for _, id in ipairs(LT.Value(api.GetAllDeviceIDs) or {}) do
+			local raw = LT.Value(api.GetDeviceRawState, id)
+			local mapped = LT.Value(api.GetDeviceMappedState, id)
+			if type(raw) == "table" and raw.vendorID and raw.productID and not (type(mapped) == "table" and mapped.labelStyle == style) then
+				local ok = pcall(api.SetConfig, { configID = { vendorID = raw.vendorID, productID = raw.productID }, labelStyle = style,
+					rawButtonMappings = {}, rawAxisMappings = {}, axisConfigs = {}, stickConfigs = {} })
+				if ok then
+					ours[raw.vendorID .. ":" .. raw.productID] = true
+					changed = true
+				end
+			end
+		end
+	else
+		for key in pairs(ours) do
+			local vendor, product = key:match("^(%d+):(%d+)$")
+			if vendor then
+				pcall(api.DeleteConfig, { vendorID = tonumber(vendor), productID = tonumber(product) })
+				changed = true
+			end
+		end
+		wipe(ours)
+		padWatch:UnregisterAllEvents()
+	end
+	if changed then
+		pcall(api.ApplyConfigs)
+	end
+	if changed and padSaid and padSaid ~= M.db.gamepadSymbols then
+		M:Print(L["Controller symbols changed: /reload to see them."])
+	end
+	padSaid = M.db.gamepadSymbols
+end
+
+padWatch:SetScript("OnEvent", function()
+	C_Timer.After(0, ApplyPadSymbols) -- (not inside the event)
+end)
+
 local function Reconcile()
+	ApplyPadSymbols()
 	for _, tweak in ipairs(TWEAKS) do
 		local want = M.enabled and M.db[tweak.key] == true
 		if want ~= (active[tweak.key] == true) then
@@ -284,6 +359,12 @@ end
 ---------------------------------------------------------------------------
 
 function M:BuildOptions(o)
+	o:Header(L["Controller"])
+	o:Choice("gamepadSymbols", L["Controller button symbols"],
+		L["Which symbols the game shows for your controller's buttons, after a /reload. PlayStation: cross, circle, square and triangle. The buttons themselves stay the same. /lefthy tweaks padsymbols does the same, handy in gamepad mode."],
+		{ { "default", L["The game's default"] }, { "xbox", L["Xbox"] }, { "playstation", L["PlayStation"] } })
+	o:Button(L["Show the new symbols"], L["Reload"], function() ReloadUI() end,
+		L["Reloads the interface, so the symbols you chose show. The same as /reload."])
 	o:Header(L["Unit frames"])
 	o:Checkbox("statusText", L["Always show health & power values"],
 		L["Show current / max on the health and power bars all the time instead of only on mouseover. Applies to every unit frame (player, target, focus, pet, party), like Blizzard's Options > Interface > Status Text set to Numeric."])
@@ -364,6 +445,13 @@ function M:OnSlashCommand(msg)
 		self:Print(ns.AggroRoleCheck()) -- Aggro.lua
 	elseif cmd == "aggrotest" then
 		self:AggroPreview()
+	elseif cmd == "padsymbols" then
+		if arg == "default" or PAD_STYLES[arg or ""] then
+			LT:SetModuleSetting(self, "gamepadSymbols", arg)
+			self:Print(L["Controller symbols: %s."]:format(arg))
+		else
+			self:Print(L["/lefthy tweaks padsymbols xbox | playstation | default (now: %s)"]:format(tostring(self.db.gamepadSymbols)))
+		end
 	elseif cmd == "levelup" and arg == "test" then
 		ns.LevelUp.Preview()
 	elseif cmd == "status" then

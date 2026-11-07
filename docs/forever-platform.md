@@ -8,6 +8,8 @@ Facts verified against client builds 1.60.1.70009 and 1.60.1.70170.
   Mode, the Cooldown Manager, a built-in damage meter and swing timer, and Midnight's addon
   restrictions.
 - **Mail:** the recipient is the full name, "Anna Brook"; a realm suffix doesn't work (the user, on the release).
+- **Controller symbols:** a config's `labelStyle` picks them; a config holding only that keeps the game's
+  mappings (`docs/misc-tweaks.md`).
 - **Hits and health:** `UNIT_COMBAT`'s amount has been secret since 1.60.1.70755, and addons can't read live
   health in any other way; `C_DamageMeter` gives exact totals once out of combat. `docs/beacon.md`, "When the
   game hides what a hit takes", has what was tested.
