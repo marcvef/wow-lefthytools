@@ -639,6 +639,7 @@ end
 section("Chronicle: the Professions tab, comparing with what I wear and opening my window")
 do
 	local wasCompare, wasTrade, wasItemName, wasLink = C_TooltipComparison, C_TradeSkillUI, C_Item.GetItemNameByID, C_Item.GetItemLinkByGUID
+	local wasRecipes
 	local worn = { [1] = { guid = "Item-1", name = "Old Pants", quality = 1 }, [2] = { guid = "Item-2", name = "Old Ring", quality = 2 } }
 	local method, additional = 0, {}
 	local nothingWorn = false
@@ -655,10 +656,13 @@ do
 	}
 	local opened, picked = {}, {}
 	local base
+	local recipeInfos, listed = {}, nil -- (nothing known: the recipe is asked for as it is)
 	C_TradeSkillUI = {
 		OpenTradeSkill = function(line) opened[#opened + 1] = line; return true end,
 		OpenRecipe = function(spell) picked[#picked + 1] = spell end,
 		GetBaseProfessionInfo = function() return base end,
+		GetRecipeInfo = function(id) return recipeInfos[id] end,
+		GetFilteredRecipeIDs = function() return listed end,
 	}
 	world.people = { [LEATHER] = { ANNA, BOB, ME } }
 	open()
@@ -713,21 +717,87 @@ do
 	check(opened[1] == LEATHER and #picked == 0, "the game opens my window on its profession, the recipe waits")
 	Fire("TRADE_SKILL_SHOW")
 	Advance(0.1)
-	check(picked[1] == 91003, "then the window hears which recipe")
-	Fire("TRADE_SKILL_SHOW")
-	Advance(0.1)
+	check(#picked == 0, "the window is there, its list isn't yet")
+	Fire("TRADE_SKILL_LIST_UPDATE")
+	Advance(0.2)
+	Fire("TRADE_SKILL_LIST_UPDATE")
+	Advance(0.2)
+	check(#picked == 0, "the list is still coming in")
+	Advance(0.2)
+	check(picked[1] == 91003, "settled: then the window hears which recipe")
+	Fire("TRADE_SKILL_LIST_UPDATE")
+	Advance(4)
 	check(#picked == 1, "only once")
+	v.OpenMine:Click()
+	Advance(3.1)
+	check(#opened == 2 and picked[2] == 91003, "no event at all: it's asked for at the latest after 3 s")
 	local wasFrame = ProfessionsFrame
-	ProfessionsFrame = { IsShown = function() return true end }
+	ProfessionsFrame = { IsShown = function() return true end, CraftingPage = nil }
 	base = { professionID = LEATHER }
 	v.OpenMine:Click()
-	check(#opened == 1 and picked[2] == 91003, "that profession's window is open already: just the recipe")
+	check(#opened == 2 and picked[3] == 91003, "that profession's window is open already: just the recipe")
+
+	Advance(0.3)
+	-- The window's list has it under another ID: that one is asked for; the window not moving: selected.
+	local selected, moves = {}, true
+	local showing
+	local page = {
+		SchematicForm = { GetRecipeInfo = function() return showing end },
+		RecipeList = { SelectRecipe = function(_, info, scroll)
+			selected[#selected + 1] = info.recipeID
+			check(scroll == true, "selected directly: scrolled to")
+			if moves then showing = info end
+		end },
+	}
+	ProfessionsFrame.CraftingPage = page
+	wasRecipes = C_TradeSkillUI.OpenRecipe
+	C_TradeSkillUI.OpenRecipe = function(id)
+		picked[#picked + 1] = id
+		if moves == "game" then showing = recipeInfos[id] end
+	end
+	recipeInfos[91003] = { recipeID = 91003, name = "Rugged Leather Pants", previousRecipeID = 91000 }
+	recipeInfos[91000] = { recipeID = 91000, name = "Rugged Leather Pants" }
+	recipeInfos[88888] = { recipeID = 88888, name = "Rugged Leather Pants" }
+	recipeInfos[70000] = { recipeID = 70000, name = "Other" }
+	listed = { 70000, 91000 }
+	moves = "game"
+	v.OpenMine:Click()
+	check(picked[#picked] == 91000, "its first rank is what the window's list holds, so that's asked for")
+	Advance(0.3)
+	check(#selected == 0, "the window went there: nothing of ours touches it")
+	listed = { 70000, 88888 }
+	showing = nil
+	v.OpenMine:Click()
+	check(picked[#picked] == 88888, "a copy under another ID: that one")
+	Advance(0.3)
+	check(#selected == 0, "(there too)")
+	moves = true
+	showing = recipeInfos[70000]
+	listed = { 70000, 91000 }
+	v.OpenMine:Click()
+	Advance(0.3)
+	check(selected[1] == 91000 and showing == recipeInfos[91000], "the answer came but the window stayed: selected directly")
+	moves = false
+	showing = recipeInfos[70000]
+	local say = #PRINTED + 1
+	v.OpenMine:Click()
+	Advance(0.3)
+	check(suite.printedSince(say):find("Its group may be folded", 1, true), "even that doesn't move it: it says so")
+	listed = { 70000 }
+	recipeInfos[88888] = nil
+	say = #PRINTED + 1
+	local asked = #picked
+	v.OpenMine:Click()
+	check(#picked == asked and suite.printedSince(say):find("filter hides", 1, true), "not in the list at all: a filter, and it says so")
+	listed = nil
+	C_TradeSkillUI.OpenRecipe = wasRecipes
+	Advance(0.3)
 	ProfessionsFrame = wasFrame
 	base = nil
 	STATE.combat = true
 	local mark = #PRINTED + 1
 	v.OpenMine:Click()
-	check(#opened == 1 and suite.printedSince(mark):find("during a fight", 1, true), "in a fight: it says so")
+	check(#opened == 2 and suite.printedSince(mark):find("during a fight", 1, true), "in a fight: it says so")
 	STATE.combat = false
 	KNOWN_SPELLS[91003] = wasKnown
 	C_TradeSkillUI, C_Item.GetItemNameByID, C_Item.GetItemLinkByGUID = wasTrade, wasItemName, wasLink

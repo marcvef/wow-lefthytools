@@ -31,6 +31,8 @@ local REAGENT_H = 18
 local COMPARE_H = 16                -- "Replaces: ..."; the stat lines come under it
 local COMPARE_ROWS = 2              -- a second ring or trinket
 local OPEN_H = 26                   -- the button on my own profession window
+local OPEN_SETTLE, OPEN_LATEST = 0.25, 3 -- seconds: its list has settled; or at the latest
+local OPEN_CHECK = 0.2              -- seconds to go to the recipe, before it's selected directly
 local REAGENTS = 8                  -- what a recipe can need (SpellReagents' columns)
 local KNOWN_NAMES = 12              -- names in "Also known by", at most
 local SEARCH_GAP = 0.3              -- typing: searched this long after the last key
@@ -581,14 +583,103 @@ end
 
 -- My own profession window on this recipe (I know it). OpenTradeSkill makes the game open it itself,
 -- so nothing of ours touches Blizzard's panels (no taint); OpenRecipe then picks the recipe, once
--- the window is there to hear it.
+-- the window's list has settled: it selects its first recipe as the list loads, over one picked
+-- earlier (seen in game). Settled: no list update for OPEN_SETTLE; at the latest OPEN_LATEST.
+-- The window's list holds a recipe's first rank, and Forever has copies of some recipes under other
+-- IDs, so the one to ask for is the one the list holds. The game's answer doesn't always move the
+-- window (seen in game: the right answer comes, the selection stays), so if it hasn't moved a moment
+-- later the recipe is selected directly: that kept Create working in game, but it's Blizzard's frame, so
+-- only then.
 local openWatch
+
+local function RecipeInfo(id)
+	local info = LT.Value(C_TradeSkillUI.GetRecipeInfo, id)
+	return type(info) == "table" and info or nil
+end
+
+-- A recipe's first rank.
+local function FirstRank(info)
+	local previous = info.previousRecipeID
+	while previous do
+		local before = RecipeInfo(previous)
+		if not before then
+			break
+		end
+		info, previous = before, before.previousRecipeID
+	end
+	return info.recipeID
+end
+
+-- The ID the window's list has for it; nil: it isn't listed (a filter); the same if that can't be told.
+local function ListedRecipe(spell)
+	local info = RecipeInfo(spell)
+	local list = LT.Value(C_TradeSkillUI.GetFilteredRecipeIDs)
+	if not info or type(list) ~= "table" then
+		return spell
+	end
+	local first = FirstRank(info)
+	for _, id in ipairs(list) do
+		if id == spell or id == first then
+			return id
+		end
+	end
+	for _, id in ipairs(list) do
+		local other = RecipeInfo(id)
+		if other and other.name == info.name then
+			return id
+		end
+	end
+	return nil
+end
+
+local function WindowShows(id)
+	local page = ProfessionsFrame and ProfessionsFrame.CraftingPage
+	local form = page and page.SchematicForm
+	local ok, info = pcall(function() return form:GetRecipeInfo() end)
+	return ok and type(info) == "table" and (info.recipeID == id or FirstRank(info) == id)
+end
+
 local function OpenRecipeNow(spell)
 	if openWatch then
 		openWatch:UnregisterAllEvents()
 		openWatch.spell = nil
 	end
-	pcall(C_TradeSkillUI.OpenRecipe, spell)
+	local id = ListedRecipe(spell)
+	if not id then
+		C.module:Print(L["Your profession window's filter hides that recipe."])
+		return
+	end
+	pcall(C_TradeSkillUI.OpenRecipe, id)
+	C_Timer.After(OPEN_CHECK, function()
+		local page = ProfessionsFrame and ProfessionsFrame.CraftingPage
+		if not (page and page.RecipeList and ProfessionsFrame:IsShown()) or WindowShows(id) then
+			return
+		end
+		pcall(page.RecipeList.SelectRecipe, page.RecipeList, RecipeInfo(id), true)
+		if not WindowShows(id) then
+			C.module:Print(L["Your profession window didn't go to that recipe. Its group may be folded."])
+		end
+	end)
+end
+
+local function OpenWhenSettled(spell)
+	openWatch = openWatch or CreateFrame("Frame")
+	openWatch.spell = spell
+	local function After(seconds)
+		local mine = {}
+		openWatch.waiting = mine
+		C_Timer.After(seconds, function()
+			if openWatch.waiting == mine and openWatch.spell == spell then
+				OpenRecipeNow(spell)
+			end
+		end)
+	end
+	openWatch:RegisterEvent("TRADE_SKILL_SHOW")
+	openWatch:RegisterEvent("TRADE_SKILL_LIST_UPDATE")
+	openWatch:SetScript("OnEvent", function()
+		After(OPEN_SETTLE)
+	end)
+	After(OPEN_LATEST)
 end
 
 local function OpenInMine()
@@ -606,17 +697,10 @@ local function OpenInMine()
 		OpenRecipeNow(recipe.spell)
 		return
 	end
-	local spell = recipe.spell
-	openWatch = openWatch or CreateFrame("Frame")
-	openWatch.spell = spell
-	openWatch:RegisterEvent("TRADE_SKILL_SHOW")
-	openWatch:SetScript("OnEvent", function(self)
-		self:UnregisterAllEvents()
-		C_Timer.After(0, function() OpenRecipeNow(spell) end) -- (the window hears the same event)
-	end)
-	local ok = pcall(C_TradeSkillUI.OpenTradeSkill, line)
-	if not ok then
+	OpenWhenSettled(recipe.spell)
+	if not pcall(C_TradeSkillUI.OpenTradeSkill, line) then
 		openWatch:UnregisterAllEvents()
+		openWatch.spell = nil
 		C.module:Print(L["The game didn't open your profession window."])
 	end
 end

@@ -302,7 +302,11 @@ scroll area are hidden on it.
   <item>" (hovered: its tooltip) and the game's own stat lines; a second row for a second ring or
   trinket, refreshed on `PLAYER_EQUIPMENT_CHANGED`. A recipe this character knows (`IsSpellKnown`)
   has a button: `C_TradeSkillUI.OpenTradeSkill` makes the game open my window itself, so nothing of
-  ours touches Blizzard's panels, and on `TRADE_SKILL_SHOW` `OpenRecipe` picks it. Not in a fight.
+  ours touches Blizzard's panels, and once its list has settled (no `TRADE_SKILL_LIST_UPDATE` for 0.25 s,
+  3 s at the latest; it selects its first recipe as the list loads) `OpenRecipe` asks for the ID its list
+  holds (first rank, or a copy of that name; not listed: a filter, it says so). `OPEN_RECIPE_RESPONSE` comes
+  but doesn't always move the window (seen in game), so if it hasn't after 0.2 s, `RecipeList:SelectRecipe`
+  (Create still worked after that in game; only then, it's Blizzard's frame). Not in a fight.
   Icon and name, the selected person's difficulty, the real tooltip,
   "Needs:" (icon, name, how many, `(you: 12)` from `C_Item.GetItemCount`, red when short; hovered: its
   normal tooltip) and who else knows it (`R.Crafters`).
