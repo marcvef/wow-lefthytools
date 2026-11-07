@@ -210,7 +210,7 @@ do
 	check(BagItemSearchBox:GetWidth() == 98 and select(4, BagItemSearchBox:GetPoint(1)) == 74, "Blizzard's updates again: still the same, not narrower each time")
 	GAMEPAD_STATE.ui = true
 	ContainerFrameCombinedBags:UpdateSearchBox()
-	check(BagItemAutoSortButton:IsShown() and BagItemAutoSortButton:GetParent() == ContainerFrameCombinedBags, "gamepad mode: there too")
+	check(not BagItemAutoSortButton:IsShown(), "gamepad mode: none, its bag menu has clean-up")
 	GAMEPAD_STATE.ui = false
 	ContainerFrameCombinedBags:Hide()
 	BagItemAutoSortButton:Hide()
@@ -1040,4 +1040,20 @@ do
 	THREAT.nameplate1, THREAT.nameplate2, THREATS = nil, nil, {}
 	Fire("GROUP_ROSTER_UPDATE")
 	Advance(0.1)
+end
+
+section("Misc Tweaks: the clean-up button with a controller")
+do
+	local button = BagItemAutoSortButton
+	local bag = ContainerFrameCombinedBags
+	bag:Show()
+	bag._scripts.OnShow(bag)
+	check(button:IsShown(), "with mouse and keyboard: there")
+	GAMEPAD_STATE.ui = true
+	bag._scripts.OnShow(bag)
+	check(not button:IsShown(), "with the controller UI: none, its bag menu has clean-up")
+	GAMEPAD_STATE.ui = false
+	bag._scripts.OnShow(bag)
+	check(button:IsShown(), "back to mouse and keyboard: there again")
+	bag:Hide()
 end

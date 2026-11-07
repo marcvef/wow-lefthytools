@@ -188,8 +188,8 @@ L["Small dots in the middle of your target's health bar, one for each combo poin
 	"Kleine Punkte in der Mitte der Lebensleiste deines Ziels, einer für jeden Combopunkt, den du haben kannst: die aktiven in der Farbe deiner Punkte, die übrigen dunkel. Nur solange du Punkte darauf hast. Sie brauchen keinen eigenen Platz, an der Namensplakette verschiebt sich also nichts. Für Schurken und Druiden in Katzengestalt."
 L["Colour combo points by count"] = "Combopunkte nach Anzahl färben"
 L["Clean-up button on the bags"] = "Aufräumen-Knopf an den Taschen"
-L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, at the left of the bags' search box."] =
-	"Seit dem letzten Forever-Patch fehlt der Aufräumen-Knopf der Taschen, mit Maus und Tastatur wie im Gamepad-Modus. Das holt ihn zurück, links neben das Suchfeld der Taschen."
+L["Since Forever's latest patch the bags' clean-up button is gone with mouse and keyboard. This puts it back, at the left of the bags' search box. With a controller it's in the bag menu instead."] =
+	"Seit Forevers letztem Patch fehlt der Aufräumen-Knopf der Taschen mit Maus und Tastatur. Das holt ihn zurück, links neben dem Suchfeld der Taschen. Mit einem Controller ist er stattdessen im Taschenmenü."
 L["Clean up bags"] = "Taschen aufräumen"
 L["Combo dots: size"] = "Combopunkte: Größe"
 L["Each dot's size in pixels. While you move the slider, they show on your target's nameplate for a few seconds."] =

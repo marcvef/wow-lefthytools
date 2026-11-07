@@ -322,6 +322,8 @@ installer from GitHub instead.
     lines as in your bags (rings and trinkets: both of yours); hover the name: its tooltip. Change
     what you wear: the lines follow. A recipe you know: "Show in my profession window" opens yours on
     that recipe, also when another profession or none was open; in a fight it only says so.
+    Clean-up button: with a controller none, moving through the slots stays on slots, clean-up is in the bag menu.
+    With mouse and keyboard: as ever, left of the search box.
     Controller symbols: Misc Tweaks (or /lefthy tweaks padsymbols playstation): chat says /reload, the Reload button under the setting does it; after it cross,
     circle, square, triangle, buttons and sticks working; still so after a restart; in a fight it waits until
     after. Default and /reload: back. Xbox, then disconnect and reconnect the controller: it stays.

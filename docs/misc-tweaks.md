@@ -53,6 +53,10 @@ it's applied again at each login. The settings panel can hang in gamepad mode, s
 
 ## gamepadBagSort: the bags' clean-up button (Bags.lua)
 
+With the controller UI (`InputUtil.IsGamepadUIEnabled`) there's no button and the search box stays as Blizzard put
+it: the controller's bag menu has clean-up, and `SmartNavigationMixin:GetButtonInfoInDirection` goes to the nearest
+valid button, so at the top of a bag this one got in the way of moving through the slots (seen in game).
+
 Since 1.60.1.70291 the bags' clean-up button (`BagItemAutoSortButton`) no longer shows, with mouse
 and keyboard or in gamepad mode (seen in game; before, `ContainerFrameMixin:UpdateSearchBox`
 hid it in gamepad mode only, where the gamepad bag bar, `GamepadBagBar`, offered clean-up in each

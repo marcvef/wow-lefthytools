@@ -390,7 +390,7 @@ function M:BuildOptions(o)
 	o:Checkbox("movableBags", L["Movable bags"],
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])
 	o:Checkbox("gamepadBagSort", L["Clean-up button on the bags"],
-		L["Since Forever's latest patch the bags' clean-up button is gone, with mouse and keyboard and in gamepad mode. This puts it back, at the left of the bags' search box."])
+		L["Since Forever's latest patch the bags' clean-up button is gone with mouse and keyboard. This puts it back, at the left of the bags' search box. With a controller it's in the bag menu instead."])
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])

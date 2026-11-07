@@ -167,6 +167,15 @@ local function OwnSortButtonOnEnter(self)
 end
 
 -- Blizzard's button, or ours where this client has none.
+local function CleanUpBags()
+	if SOUNDKIT and SOUNDKIT.UI_BAG_SORTING_01 then
+		PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
+	end
+	if C_Container and C_Container.SortBags then
+		C_Container.SortBags()
+	end
+end
+
 local function SortButton()
 	if BagItemAutoSortButton then
 		return BagItemAutoSortButton
@@ -181,14 +190,7 @@ local function SortButton()
 			button:SetNormalTexture("Interface\\Icons\\INV_Pet_Broom")
 		end
 		button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
-		button:SetScript("OnClick", function()
-			if SOUNDKIT and SOUNDKIT.UI_BAG_SORTING_01 then
-				PlaySound(SOUNDKIT.UI_BAG_SORTING_01)
-			end
-			if C_Container and C_Container.SortBags then
-				C_Container.SortBags()
-			end
-		end)
+		button:SetScript("OnClick", CleanUpBags)
 		button:SetScript("OnEnter", OwnSortButtonOnEnter)
 		button:SetScript("OnLeave", function() GameTooltip:Hide() end)
 		button:Hide()
@@ -211,6 +213,8 @@ end
 -- The button goes at the left end of the search row (top right something of Forever's sits where
 -- Blizzard had it): where the search box starts, the box moved right to make room. Blizzard puts
 -- the box back on each update, and this runs after it.
+local RestoreSearchBox -- (below)
+
 local function ShowSortButton(frame)
 	if not (M.enabled and M.db.gamepadBagSort and frame:IsShown()) then
 		return
@@ -219,6 +223,13 @@ local function ShowSortButton(frame)
 		local button = SortButton()
 		button:SetParent(frame)
 		button:ClearAllPoints()
+		-- Not with the controller UI: its bag menu has clean-up, and a button here gets in the way of moving
+		-- through the slots (the controller goes to the nearest button; seen in game).
+		if InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() then
+			RestoreSearchBox()
+			button:Hide()
+			return
+		end
 		local search = BagItemSearchBox
 		local point, relative, relativePoint, x, y
 		if search and search:IsShown() and search:GetParent() == frame and search:GetNumPoints() == 1 then
@@ -247,7 +258,7 @@ end
 
 -- Off: the search box as Blizzard had it, its width and its place (also with the bags closed:
 -- Blizzard may not place it again when they open).
-local function RestoreSearchBox()
+function RestoreSearchBox()
 	local search = BagItemSearchBox
 	if not (search and search.lefthyWidth) then
 		return
