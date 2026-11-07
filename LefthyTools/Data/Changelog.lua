@@ -455,5 +455,8 @@ ns.CHANGELOG = {
 	{ id = 149, module = "beacon",
 		en = { "A choice of sounds for LTC", "Beacon's settings now let you choose the sound a friend's LTC line plays." },
 		de = { "Töne für LTC zur Auswahl", "In den Beacon-Einstellungen wählst du jetzt den Ton für die LTC-Zeilen deiner Freunde." } },
+	{ id = 150, module = "tweaks",
+		en = { "Xbox or PlayStation symbols", "A new setting in Misc Tweaks chooses which symbols the game shows for your controller's buttons." },
+		de = { "Xbox- oder PlayStation-Symbole", "Eine neue Einstellung in Misc Tweaks wählt, welche Symbole das Spiel für die Tasten deines Controllers zeigt." } },
 	-- New entries go here, at the end.
 }
