@@ -4,8 +4,19 @@ local L = ns.L
 
 BINDING_HEADER_LEFTHYTOOLS = "LefthyTools"
 
+-- The settings' data: pages (an overview, one per module) of rows, each row what the window needs to
+-- draw it, and setting objects that read and write the module's saved table. The window itself is
+-- SettingsWindow.lua. Not Blizzard's settings list: it reuses its rows from page to page, so our pages
+-- could leave its own (Social, Audio) running tainted, and the game blamed us for what they do then
+-- (seen in friends' reports: IsUserOAuthed, Frame:SetPoint with the panel open). Blizzard's AddOns list
+-- only has a small page of its own with a button to this window.
+
 local Options = {}
 LT.Options = Options
+Options.pages = {}      -- the overview, then the modules' pages
+Options.registered = {} -- variable -> setting
+Options.buttons = {}    -- a button's name -> its row
+Options.headers = {}    -- every section header's text
 
 function Options.Seconds(value)
 	-- 0.25 -> "0.25 s", 1.50 -> "1.5 s", 3.00 -> "3 s" ("1,5 s" in German)
@@ -14,6 +25,47 @@ end
 
 function Options.Percent(value)
 	return string.format("%d%%", math.floor(value * 100 + 0.5))
+end
+
+---------------------------------------------------------------------------
+-- A setting: what a row shows and changes, and what slash commands go through (LT:SetModuleSetting).
+-- Every change runs the callback (the module's OnSettingChanged) and updates the rows showing it.
+---------------------------------------------------------------------------
+
+local SettingMethods = {}
+SettingMethods.__index = SettingMethods
+
+function SettingMethods:GetValue()
+	return self.get()
+end
+
+function SettingMethods:SetValue(value)
+	if self.get() ~= value then
+		self.set(value)
+		self:NotifyUpdate()
+	end
+end
+
+-- The value may have changed: everyone who shows it, and the module, hear.
+function SettingMethods:NotifyUpdate()
+	self.uiUpdates = self.uiUpdates + 1
+	if self.callback then
+		self.callback(self, self.get())
+	end
+	if Options.SettingChanged then
+		Options.SettingChanged(self)
+	end
+end
+
+function SettingMethods:SetValueChangedCallback(callback)
+	self.callback = callback
+end
+
+local function NewSetting(variable, name, tooltip, get, set)
+	local setting = setmetatable({ variable = variable, name = name, tooltip = tooltip, get = get, set = set, uiUpdates = 0 },
+		SettingMethods)
+	Options.registered[variable] = setting
+	return setting
 end
 
 ---------------------------------------------------------------------------
@@ -36,8 +88,7 @@ local function Describe(builder, key, opts)
 	return opts.tbl or builder.module.db, default, id, "LefthyTools_" .. builder.module.key .. "_" .. id
 end
 
--- Every change runs the module's OnSettingChanged. Kept in module.settings, so slash commands and
--- resets go through the setting too (LT:SetModuleSetting) and an open settings page follows.
+-- Kept in module.settings, so slash commands and resets go through the setting too and an open page follows.
 local function Keep(builder, setting, id)
 	setting:SetValueChangedCallback(builder.onChange)
 	builder.module.settings = builder.module.settings or {}
@@ -45,69 +96,59 @@ local function Keep(builder, setting, id)
 	return setting
 end
 
--- A slider's range and step, and the label at its right end (formatter(value) -> text).
-local function SliderOptions(minValue, maxValue, step, formatter)
-	local options = Settings.CreateSliderOptions(minValue, maxValue, step)
-	options:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, formatter)
-	return options
+local function AddRow(builder, row)
+	row.page = builder.page
+	builder.page.rows[#builder.page.rows + 1] = row
+	return row
 end
 
 function Builder:Header(text)
-	self.layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(text))
+	Options.headers[#Options.headers + 1] = text
+	AddRow(self, { kind = "header", name = text })
 end
 
--- A setting whose value lives in a table (see Describe for opts).
-function Builder:Register(key, name, varType, opts)
+-- A setting whose value lives in a table (see Describe for opts). A value not saved yet takes the default.
+function Builder:Register(key, name, tooltip, opts)
 	local tbl, default, id, variable = Describe(self, key, opts or {})
-	local setting = Settings.RegisterAddOnSetting(self.category, variable, key, tbl, varType or type(default), name, default)
-	return Keep(self, setting, id)
+	if tbl[key] == nil then
+		tbl[key] = default
+	end
+	return Keep(self, NewSetting(variable, name, tooltip, function() return tbl[key] end, function(value) tbl[key] = value end), id)
 end
 
 function Builder:Checkbox(key, name, tooltip, opts)
-	local setting = self:Register(key, name, "boolean", opts)
-	Settings.CreateCheckbox(self.category, setting, tooltip)
+	local setting = self:Register(key, name, tooltip, opts)
+	AddRow(self, { kind = "checkbox", name = name, tooltip = tooltip, setting = setting })
 	return setting
 end
 
 function Builder:Slider(key, name, tooltip, minValue, maxValue, step, formatter, opts)
-	local setting = self:Register(key, name, "number", opts)
-	Settings.CreateSlider(self.category, setting, SliderOptions(minValue, maxValue, step, formatter), tooltip)
+	local setting = self:Register(key, name, tooltip, opts)
+	setting.sliderOptions = { min = minValue, max = maxValue, step = step, formatter = formatter }
+	AddRow(self, { kind = "slider", name = name, tooltip = tooltip, setting = setting, min = minValue, max = maxValue,
+		step = step, formatter = formatter })
 	return setting
 end
 
--- A checkbox and a slider in one row (Blizzard's CreateSettingsCheckboxSliderInitializer); the
--- slider is greyed out while the checkbox is off. cbOpts/sliderOpts as for Register.
+-- A checkbox and, under it, a slider that's greyed out while the checkbox is off. cbOpts/sliderOpts as for Register.
 function Builder:CheckboxSlider(cbKey, cbName, cbTooltip, sliderKey, sliderName, sliderTooltip, minValue, maxValue, step,
 		formatter, cbOpts, sliderOpts)
-	local cbSetting = self:Register(cbKey, cbName, "boolean", cbOpts)
-	local sliderSetting = self:Register(sliderKey, sliderName, "number", sliderOpts)
-	local options = SliderOptions(minValue, maxValue, step, formatter)
-	if CreateSettingsCheckboxSliderInitializer then
-		self.layout:AddInitializer(CreateSettingsCheckboxSliderInitializer(cbSetting, cbName, cbTooltip,
-			sliderSetting, options, sliderName, sliderTooltip))
-	else
-		Settings.CreateCheckbox(self.category, cbSetting, cbTooltip)
-		Settings.CreateSlider(self.category, sliderSetting, options, sliderTooltip)
-	end
+	local cbSetting = self:Checkbox(cbKey, cbName, cbTooltip, cbOpts)
+	local sliderSetting = self:Slider(sliderKey, sliderName, sliderTooltip, minValue, maxValue, step, formatter, sliderOpts)
+	self.page.rows[#self.page.rows].dependsOn = cbSetting
 	return cbSetting, sliderSetting
 end
 
--- Free text. Blizzard's settings list has no text field, so this uses our own list element
--- (LefthyToolsSettingsTextTemplate in Options.xml). opts.maxLetters limits the length.
+-- Free text. opts.maxLetters limits the length.
 function Builder:TextInput(key, name, tooltip, opts)
-	local setting = self:Register(key, name, "string", opts)
-	local data = Settings.CreateSettingInitializerData(setting, { maxLetters = opts and opts.maxLetters }, tooltip)
-	local initializer = Settings.CreateSettingInitializer("LefthyToolsSettingsTextTemplate", data)
-	initializer:AddSearchTags(name)
-	self.layout:AddInitializer(initializer)
+	local setting = self:Register(key, name, tooltip, opts)
+	setting.maxLetters = opts and opts.maxLetters
+	AddRow(self, { kind = "text", name = name, tooltip = tooltip, setting = setting, maxLetters = setting.maxLetters })
 	return setting
 end
 
--- One of a few values, as a slider whose label names the value; the module's db keeps the value
--- itself (a proxy setting maps it to the slider's position). Not a dropdown: a Blizzard menu
--- opened from addon settings taints gamepad mode's focus manager, and a protected click through
--- it later (a role check's Accept) is blocked; see LT.Window.AddPicker. LT:SetModuleSetting takes
--- the value too: module.choices[id] finds its position.
+-- One of a few values, as a dropdown; the module's db keeps the value itself, the setting its position
+-- among them. LT:SetModuleSetting takes the value too: module.choices[id] finds its position.
 -- values: { { value, label }, ... } in display order.
 function Builder:Choice(key, name, tooltip, values, opts)
 	local tbl, default, id, variable = Describe(self, key, opts or {})
@@ -118,6 +159,9 @@ function Builder:Choice(key, name, tooltip, values, opts)
 			end
 		end
 	end
+	if tbl[key] == nil then
+		tbl[key] = default
+	end
 	local function Get()
 		return IndexOf(tbl[key]) or IndexOf(default) or 1
 	end
@@ -127,103 +171,18 @@ function Builder:Choice(key, name, tooltip, values, opts)
 			tbl[key] = v[1]
 		end
 	end
-	local setting = Settings.RegisterProxySetting(self.category, variable, "number", name, IndexOf(default) or 1, Get, Set)
+	local setting = NewSetting(variable, name, tooltip, Get, Set)
+	setting.proxy, setting.values = true, values
 	Keep(self, setting, id)
 	self.module.choices = self.module.choices or {}
 	self.module.choices[id] = IndexOf
-	Settings.CreateSlider(self.category, setting, SliderOptions(1, #values, 1, function(index)
-		local v = values[math.floor(index + 0.5)]
-		return v and v[2] or ""
-	end), tooltip)
+	AddRow(self, { kind = "choice", name = name, tooltip = tooltip, setting = setting, values = values })
 	return setting
 end
 
 function Builder:Button(name, buttonText, onClick, tooltip)
-	self.layout:AddInitializer(CreateSettingsButtonInitializer(name, buttonText, onClick, tooltip, true))
-end
-
--- The text field's list element, built on Blizzard's SettingsControlMixin (Init subscribes
--- OnSettingValueChanged to the setting). Commits when focus leaves: Enter, or a click elsewhere
--- (GLOBAL_MOUSE_DOWN clears keyboard focus). Tab does nothing here: InputBoxTemplate's
--- EditBox_OnTabPressed needs a nextEditBox. Escape restores the saved text.
-LefthyToolsSettingsTextMixin = CreateFromMixins(SettingsControlMixin or {})
-
-function LefthyToolsSettingsTextMixin:OnLoad()
-	SettingsControlMixin.OnLoad(self)
-	local box = self.EditBox
-	box:SetScript("OnEnterPressed", box.ClearFocus)
-	box:SetScript("OnEscapePressed", function()
-		local setting = self.data and self:GetSetting()
-		box:SetText(setting and setting:GetValue() or "")
-		box:ClearFocus()
-	end)
-	box:HookScript("OnEditFocusLost", function()
-		self:Commit()
-	end)
-end
-
-function LefthyToolsSettingsTextMixin:Init(initializer)
-	SettingsControlMixin.Init(self, initializer)
-	local options = initializer:GetOptions()
-	self.EditBox:SetMaxLetters(options and options.maxLetters or 0)
-	self:SetValue(self:GetSetting():GetValue())
-	self.EditBox:SetCursorPosition(0)
-end
-
--- Also called when the value changes elsewhere, e.g. by a slash command while the panel is open.
-function LefthyToolsSettingsTextMixin:SetValue(value)
-	if not self.EditBox:HasFocus() then
-		self.EditBox:SetText(value or "")
-	end
-end
-
-function LefthyToolsSettingsTextMixin:Commit()
-	local setting = self.data and self:GetSetting()
-	if setting then
-		local text = strtrim(self.EditBox:GetText() or "")
-		if text ~= setting:GetValue() then
-			setting:SetValue(text)
-		end
-	end
-end
-
-function LefthyToolsSettingsTextMixin:Release()
-	self.EditBox:ClearFocus() -- commits a pending edit while self.data is still set
-	SettingsControlMixin.Release(self)
-end
-
----------------------------------------------------------------------------
--- Info rows on the overview page (version, updates): a label, and a value that is read every
--- time the settings list shows the row (Init), so it's current whenever the page is opened.
--- Optionally a button at the right end (data.button = { text, onClick, shown }). Template in
--- Options.xml.
----------------------------------------------------------------------------
-
-LefthyToolsSettingsInfoMixin = CreateFromMixins(SettingsListElementMixin or {})
-
-function LefthyToolsSettingsInfoMixin:OnLoad()
-	SettingsListElementMixin.OnLoad(self)
-	self.Button = CreateFrame("Button", nil, self, "UIPanelButtonTemplate")
-	self.Button:SetSize(100, 22)
-	self.Button:SetPoint("RIGHT", self, "RIGHT", -10, 0)
-	self.Button:SetScript("OnClick", function()
-		if self.button then
-			self.button.onClick()
-		end
-	end)
-end
-
-function LefthyToolsSettingsInfoMixin:Init(initializer)
-	SettingsListElementMixin.Init(self, initializer)
-	local data = initializer:GetData()
-	local ok, value = pcall(data.getValue)
-	self.Value:SetText(ok and value or "?")
-	self.button = data.button -- (rows are pooled: another row may have had one)
-	local shown = data.button and (not data.button.shown or data.button.shown())
-	self.Button:SetShown(shown and true or false)
-	if shown then
-		self.Button:SetText(data.button.text)
-	end
+	local row = AddRow(self, { kind = "button", name = name, text = buttonText, onClick = onClick, tooltip = tooltip })
+	Options.buttons[name] = row
 end
 
 local GREEN, ORANGE, GRAY = "|cff80ff80", "|cffffa040", "|cffa0a0a0"
@@ -295,54 +254,63 @@ function Options.ErrorStatus()
 	return ORANGE .. count .. "|r"
 end
 
-local function AddInfoRow(layout, name, tooltip, getValue, button)
-	local initializer = Settings.CreateElementInitializer("LefthyToolsSettingsInfoTemplate",
-		{ name = name, tooltip = tooltip, getValue = getValue, button = button })
-	layout:AddInitializer(initializer)
-end
+---------------------------------------------------------------------------
+-- The pages: an overview (module switches, info) and one per module.
+---------------------------------------------------------------------------
 
----------------------------------------------------------------------------
--- Settings panel: "LefthyTools" overview (module switches, info) + one sub-page per module,
--- following Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua: only the parent
--- category is passed to RegisterAddOnCategory.
----------------------------------------------------------------------------
+local function NewPage(name, module)
+	local page = { name = name, module = module, rows = {} }
+	Options.pages[#Options.pages + 1] = page
+	return page
+end
 
 -- The overview: a switch per module (LT.db.modules is the single source of truth; keybindings and
 -- slash commands go through the switch's setting, LT:SetModuleEnabled), then the Info rows.
-local function BuildOverview(category, layout)
-	layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(L["Modules"]))
+local function BuildOverview(page)
+	local function Row(row)
+		row.page = page
+		page.rows[#page.rows + 1] = row
+		return row
+	end
+	Options.headers[#Options.headers + 1] = L["Modules"]
+	Row({ kind = "header", name = L["Modules"] })
 	for _, m in ipairs(LT.modules) do
-		local setting = Settings.RegisterAddOnSetting(category, "LefthyTools_module_" .. m.key, m.key,
-			LT.db.modules, "boolean", m.title, m.defaultEnabled)
+		local tooltip = m.description .. "\n\n" .. L["Settings: LefthyTools > %s"]:format(m.title)
+		if LT.db.modules[m.key] == nil then
+			LT.db.modules[m.key] = m.defaultEnabled
+		end
+		local setting = NewSetting("LefthyTools_module_" .. m.key, m.title, tooltip,
+			function() return LT.db.modules[m.key] end, function(value) LT.db.modules[m.key] = value end)
 		setting:SetValueChangedCallback(function()
 			LT:ApplyModuleState(m)
 		end)
-		Settings.CreateCheckbox(category, setting,
-			m.description .. "\n\n" .. L["Settings: LefthyTools > %s"]:format(m.title))
+		Row({ kind = "checkbox", name = m.title, tooltip = tooltip, setting = setting, module = m })
 		m.enabledSetting = setting
 	end
 
-	layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(L["Info"]))
-	AddInfoRow(layout, L["Version"],
-		L["The installed LefthyTools build. 0.4.0 is a release, 0.4.0-3-g1a2b3c4 is three changes after it."],
-		function() return LT.version end)
-	AddInfoRow(layout, L["Updates"], Options.UpdateTooltip, Options.UpdateStatus) -- a tooltip function: built on hover
-	layout:AddInitializer(CreateSettingsButtonInitializer(L["What's new"], L["Show"], function() LT.WhatsNew.Show(false) end,
-		L["Every change to LefthyTools, newest first. After an update this opens by itself once."], true))
-	AddInfoRow(layout, L["Errors"],
-		L["LefthyTools' own Lua errors, kept across sessions until you clear them. Show lists them, ready to copy; the list can clear them too."],
-		Options.ErrorStatus,
-		{ text = L["Show"], onClick = function() LT.Errors.Show() end, shown = function() return LT.Errors.Count() > 0 end })
+	Options.headers[#Options.headers + 1] = L["Info"]
+	Row({ kind = "header", name = L["Info"] })
+	Row({ kind = "info", name = L["Version"],
+		tooltip = L["The installed LefthyTools build. 0.4.0 is a release, 0.4.0-3-g1a2b3c4 is three changes after it."],
+		getValue = function() return LT.version end })
+	Row({ kind = "info", name = L["Updates"], tooltip = Options.UpdateTooltip, getValue = Options.UpdateStatus }) -- (a function: built on hover)
+	local whatsNew = Row({ kind = "button", name = L["What's new"], text = L["Show"], onClick = function() LT.WhatsNew.Show(false) end,
+		tooltip = L["Every change to LefthyTools, newest first. After an update this opens by itself once."] })
+	Options.buttons[L["What's new"]] = whatsNew
+	Row({ kind = "info", name = L["Errors"],
+		tooltip = L["LefthyTools' own Lua errors, kept across sessions until you clear them. Show lists them, ready to copy; the list can clear them too."],
+		getValue = Options.ErrorStatus,
+		button = { text = L["Show"], onClick = function() LT.Errors.Show() end, shown = function() return LT.Errors.Count() > 0 end } })
 end
 
--- A module's own page, filled by its BuildOptions through a Builder.
-local function BuildModulePage(category, m)
-	local sub, subLayout = Settings.RegisterVerticalLayoutSubcategory(category, m.title)
-	m.category = sub
+-- A module's own page, filled by its BuildOptions through a Builder; first its switch.
+local function BuildModulePage(m)
+	local page = NewPage(m.title, m)
+	m.category = page
+	page.rows[1] = { kind = "checkbox", name = L["Switched on"], tooltip = m.description, setting = m.enabledSetting, page = page, module = m }
 	local builder = setmetatable({
 		module = m,
-		category = sub,
-		layout = subLayout,
+		page = page,
 		onChange = function()
 			LT.Trail(m.key .. " setting changed")
 			LT.SafeCall(m, "OnSettingChanged")
@@ -351,42 +319,43 @@ local function BuildModulePage(category, m)
 	LT.SafeCall(m, "BuildOptions", builder)
 end
 
-function ns.SetupOptions()
-	if not (Settings and Settings.RegisterVerticalLayoutCategory) then
+-- Blizzard's AddOns list: a page of our own (a canvas, none of its shared rows) with a way to the window.
+local function AddBlizzardPage()
+	if not (Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory) then
 		return
 	end
-	local category, layout = Settings.RegisterVerticalLayoutCategory("LefthyTools")
-	LT.category = category
-	BuildOverview(category, layout)
-	for _, m in ipairs(LT.modules) do
-		if type(m.BuildOptions) == "function" then
-			BuildModulePage(category, m)
-		end
-	end
-	Settings.RegisterAddOnCategory(category)
+	local panel = CreateFrame("Frame")
+	panel.name = "LefthyTools"
+	local text = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	text:SetPoint("TOPLEFT", 16, -16)
+	text:SetPoint("RIGHT", -16, 0)
+	text:SetJustifyH("LEFT")
+	text:SetText(L["LefthyTools has its own settings window."])
+	local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+	button:SetSize(220, 24)
+	button:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -12)
+	button:SetText(L["Open LefthyTools settings"])
+	button:SetScript("OnClick", function() LT:OpenSettings() end)
+	Options.blizzardButton = button
+	Options.blizzardCategory = Settings.RegisterCanvasLayoutCategory(panel, "LefthyTools")
+	Settings.RegisterAddOnCategory(Options.blizzardCategory)
 end
 
--- Opens the overview, or a module's page when given a module.
+function ns.SetupOptions()
+	LT.category = NewPage(L["Overview"])
+	BuildOverview(LT.category)
+	for _, m in ipairs(LT.modules) do
+		if type(m.BuildOptions) == "function" then
+			BuildModulePage(m)
+		end
+	end
+	AddBlizzardPage()
+end
+
+-- Opens the overview, or a module's page when given a module. Any time: it's a window of our own, so
+-- neither a fight nor gamepad mode stands in the way.
 function LT:OpenSettings(m)
-	local target = (m and m.category) or self.category
-	if not target then
-		LT.Print("the settings panel isn't available; use /lefthy help.")
-		return
-	end
-	if InCombatLockdown() then
-		LT.Print("can't open settings in combat.")
-		return
-	end
-	-- In gamepad mode the settings can't be opened from addon code safely: ShowUIPanel tells the
-	-- gamepad's focus manager (FrameControlsManager) about the panel from our code, which taints
-	-- it, and a protected click through it later (a role check's Accept) is blocked. The game
-	-- menu's own way there is fine.
-	if InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() then
-		LT.Print("in gamepad mode, open the settings from the game menu: Options > AddOns > LefthyTools"
-			.. " (opening them from an addon would block the next role check).")
-		return
-	end
-	Settings.OpenToCategory(target:GetID())
+	Options.Open((m and m.category) or self.category)
 end
 
 -- Minimap addon compartment (## AddonCompartmentFunc).

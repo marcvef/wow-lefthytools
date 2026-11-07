@@ -17,7 +17,7 @@ Core\MapArt.lua
 Core\Errors.lua
 Core\WhatsNew.lua
 Core\Options.lua
-Core\Options.xml
+Core\SettingsWindow.lua
 
 # Data
 Data\Changelog.lua

@@ -14,8 +14,9 @@ module you can switch on or off.
 
 ## Settings
 
-Open **Options → AddOns → LefthyTools**, click LefthyTools in the minimap's addon
-compartment, or type `/lefthy` (short: `/lt`).
+Type `/lefthy` (short: `/lt`), click LefthyTools in the minimap's addon compartment, or use the button
+in **Options → AddOns → LefthyTools**. LefthyTools has its own settings window, with a search over all
+settings; it also opens in a fight and in gamepad mode.
 
 - **LefthyTools** (overview): a switch for each module, and an **Info** section with your
   version, whether a newer one is out, and LefthyTools errors. LefthyTools can't go online
@@ -95,9 +96,8 @@ addon, which is now part of LefthyTools. How it works inside (for developers): s
 
 ## Known limitations (Forever beta)
 
-- **Closing the settings panel can freeze the game in gamepad mode.** With the
-  controller UI enabled, closing Options after changing a setting hangs the client.
-  Turn gamepad mode off while changing settings.
+- **Closing Blizzard's Options can freeze the game in gamepad mode** after changing one of its settings.
+  LefthyTools' own settings window isn't part of that.
 
 ---
 
@@ -129,8 +129,7 @@ LefthyTools → Misc Tweaks**, and all but Retail unit frames are on by default.
 /lefthy tweaks resetbags   move all bags back to Blizzard's spot
 ```
 
-The commands work in controller mode, so you don't need the settings panel, which
-can freeze in gamepad mode (see Known limitations).
+The commands work in controller mode too.
 
 ---
 

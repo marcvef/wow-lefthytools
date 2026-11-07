@@ -27,6 +27,7 @@ Fire("PLAYER_ENTERING_WORLD", true, false)
 Advance(0.3) -- let the debounced rebuild run
 
 local LT = LefthyTools
+REGISTERED_SETTINGS, SETTINGS_BUTTONS, HEADERS = LT.Options.registered, LT.Options.buttons, LT.Options.headers
 local lefthy = SlashCmdList.LEFTHYTOOLS
 -- The launch day this build ships with (core.lua checks it's a date); the tests start without one and set
 -- their own (the build's real one would drop the tests' made-up times).

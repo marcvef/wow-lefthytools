@@ -49,7 +49,7 @@ setting says so, and a button under it reloads. `SetConfig`, `ApplyConfigs` and 
 answer from addon code out of combat. Set per controller (vendor and product, `GetDeviceRawState`) when
 the setting changes, at login, on `GAME_PAD_CONNECTED`; in combat it waits for `PLAYER_REGEN_ENABLED`. Ours
 are remembered in `padSymbolConfigs`, and "default" deletes them. It wrote no file in `WTF` that a look found, so
-it's applied again at each login. The settings panel can hang in gamepad mode, so `/lefthy tweaks padsymbols` does the same.
+it's applied again at each login. `/lefthy tweaks padsymbols` does the same.
 
 ## gamepadBagSort: the bags' clean-up button (Bags.lua)
 

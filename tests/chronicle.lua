@@ -617,7 +617,8 @@ do
 	mmb:Click("LeftButton")
 	check(not journal:IsShown(), "click again: it closes")
 	mmb:Click("RightButton")
-	check(OPENED_CATEGORY == CH.module.category:GetID(), "right-click: Chronicle's settings")
+	check(LT.Options.shownPage == CH.module.category, "right-click: Chronicle's settings")
+	LefthyToolsSettingsFrame:Hide()
 	mmb._scripts.OnEnter(mmb)
 	check(TOOLTIP.title == "Chronicle" and (TOOLTIP.lines[1] or ""):find("^This session: ")
 		and tooltipHas("Click: open or close the journal") and tooltipHas("Right-click: settings"),

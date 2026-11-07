@@ -62,8 +62,8 @@ no crash report) when the settings panel is closed after changing an option. It 
 every version of the addon and never with gamepad mode off; whether it also happens without any
 addons is still open. With gamepad mode on, the close path goes through
 `SettingsPanelMixin:OnHide` (SmartNavigation callbacks unregistered) and
-`TransitionBackOpeningPanel` → `ToggleGameMenu()`. Workaround: change settings with gamepad mode
-off, or use the slash commands.
+`TransitionBackOpeningPanel` → `ToggleGameMenu()`. LefthyTools' settings aren't in that panel any
+more (`docs/architecture.md`, Settings window), so this is only about Blizzard's own pages now.
 
 ## Gamepad mode and taint: no Blizzard menus, no panel opening from addon code
 
@@ -81,9 +81,8 @@ execution:
 
 `FrameShown` returns at once unless `InputUtil.IsGamepadUIEnabled()`, so only gamepad mode is
 affected. Once tainted, protected clicks routed through the manager later (gamepad confirm on a
-popup) are blocked. LefthyTools therefore: uses its own dropdown (`LT.Window.AddPicker`), shows
-choices in settings as named sliders (`Builder:Choice`, a proxy setting), and in gamepad mode
-`LT:OpenSettings` prints the way through the game menu instead of opening the panel.
+popup) are blocked. LefthyTools therefore uses its own dropdown (`LT.Window.AddPicker`) and its own
+settings window, never Blizzard's panel from addon code.
 
 ## Getting the real UI source
 

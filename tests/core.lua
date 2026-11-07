@@ -34,11 +34,11 @@ Advance(0.3) -- let the debounced rebuild run
 check(Mirage.enabled, "mirage switched on")
 check(LefthyToolsDB.modules.mirage == true, "module switch saved in LefthyToolsDB.modules")
 check(REGISTERED_SETTINGS.LefthyTools_module_mirage, "overview page has a switch for Mirage")
-check(LT.category and LT.category.name == "LefthyTools", "LefthyTools overview category")
-check(Mirage.category and Mirage.category.parent == LT.category and Mirage.category.name == "Mirage",
+check(LT.category and LT.category == LT.Options.pages[1] and LT.category.name == "Overview", "the overview is the first page")
+check(Mirage.category and Mirage.category.module == Mirage and Mirage.category.name == "Mirage",
 	"Mirage has its own sub-page under LefthyTools")
-check(#ADDON_CATEGORIES == 1 and ADDON_CATEGORIES[1] == LT.category,
-	"only the parent category is registered as an addon category")
+check(#ADDON_CATEGORIES == 1 and ADDON_CATEGORIES[1] == LT.Options.blizzardCategory and ADDON_CATEGORIES[1].panel,
+	"Blizzard's list has one page of ours: a canvas, none of its shared rows")
 do -- shared helpers for Forever's secret values
 	check(LT.IsSecret(SECRET) and not LT.IsSecret(1) and not LT.IsSecret(nil), "LT.IsSecret")
 	check(LT.Readable(0) and LT.Readable(false) and LT.Readable("") and not LT.Readable(nil) and not LT.Readable(SECRET),
@@ -164,8 +164,8 @@ end
 
 section("error catcher")
 local function errorRow() -- the overview's "Errors" info row
-	for _, init in ipairs(LAYOUTS["LefthyTools"]) do
-		if init.template == "LefthyToolsSettingsInfoTemplate" and init.data.name == "Errors" then return init.data.getValue() end
+	for _, row in ipairs(LT.Options.pages[1].rows) do
+		if row.kind == "info" and row.name == "Errors" then return row.getValue() end
 	end
 end
 local errorsBefore, emark = #ERRORS, #PRINTED + 1
@@ -201,16 +201,10 @@ LT.Errors.Add("error", "another " .. "trail test", "")
 check(kept[#kept].context == firstContext and kept[#kept].count == 2, "a repeat keeps the first one's and just counts")
 table.remove(kept)
 check(#kept == 3 and kept[3].kind == "blocked" and kept[3].msg:find("SetPassThroughButtons", 1, true), "blocked actions of ours are kept too")
-local function renderRow(name) -- an overview info row, built the way the settings list builds it
-	for _, init in ipairs(LAYOUTS["LefthyTools"]) do
-		if init.template == "LefthyToolsSettingsInfoTemplate" and init.data.name == name then
-			local row = CreateFrame("Frame")
-			for k, v in pairs(LefthyToolsSettingsInfoMixin) do row[k] = v end
-			row.Value = row:CreateFontString()
-			row:OnLoad()
-			row:Init(init)
-			return row
-		end
+local function renderRow(name) -- an overview info row, as the settings window draws it
+	LT.Options.Open(LT.category)
+	for _, row in ipairs(LT.category.rows) do
+		if row.kind == "info" and row.name == name then return row.frame end
 	end
 end
 do
@@ -220,7 +214,8 @@ do
 	row.Button:Click()
 	check(LefthyToolsErrorsFrame and LefthyToolsErrorsFrame:IsShown(), "the button opens the error list")
 	LefthyToolsErrorsFrame:Hide()
-	check(not renderRow("Version").Button:IsShown(), "rows without a button don't show one")
+	check(not renderRow("Version").Button, "rows without a button don't have one")
+	LefthyToolsSettingsFrame:Hide()
 end
 lefthy("errors")
 local errWindow = LefthyToolsErrorsFrame
@@ -392,3 +387,4 @@ do -- Which client this is (LT.WhichWorld): the release starts fresh, also from 
 	check(not LT.BeforeLaunch("2030-05-09"), "nor when it isn't known which client this is")
 	LT.world, LT.LAUNCH_DAY = was, launch
 end
+if LefthyToolsSettingsFrame then LefthyToolsSettingsFrame:Hide() end -- (mirage.lua watches the interface fade)

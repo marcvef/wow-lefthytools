@@ -18,7 +18,7 @@ end
 section("Echoes: the module")
 do
 	check(M and M.title == "Echoes" and M.enabled and LefthyToolsDB.modules.echoes == true, "on by default")
-	check(M.category and M.category.name == "Echoes" and M.category.parent == LT.category, "its own settings page, its name untranslated")
+	check(M.category and M.category.name == "Echoes" and M.category.module == M, "its own settings page, its name untranslated")
 	local relay, collect = REGISTERED_SETTINGS.LefthyTools_echoes_relay, REGISTERED_SETTINGS.LefthyTools_echoes_collect
 	check(relay and relay:GetValue() == true and M.db.relay == true and relay.name == "Relay friends' recordings",
 		"\"Relay friends' recordings\": on by default")

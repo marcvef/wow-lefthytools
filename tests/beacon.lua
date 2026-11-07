@@ -13,7 +13,7 @@ local BDB = LefthyToolsDB.settings.beacon
 local function B(id) return REGISTERED_SETTINGS["LefthyTools_beacon_" .. id] end
 local function last(list) return list[#list] end
 check(Beacon and Beacon.enabled, "beacon module registered and enabled at login")
-check(Beacon.category and Beacon.category.parent == LT.category and Beacon.category.name == "Beacon",
+check(LT:GetModule("beacon").category and LT:GetModule("beacon").category.module == LT:GetModule("beacon"),
 	"Beacon has its own sub-page under LefthyTools")
 local allSettings = true
 for _, id in ipairs({ "share", "interval", "showFriends", "showMinimap", "minimapEdge", "dingAnnounce", "dingText", "dingShow", "dingSound" }) do
@@ -22,8 +22,8 @@ end
 check(allSettings and REGISTERED_SETTINGS.LefthyTools_module_beacon, "settings and module switch")
 check(BDB.interval == 3 and BDB.share and BDB.showFriends and BDB.showMinimap and BDB.minimapEdge
 	and BDB.dingAnnounce and BDB.dingText == "" and BDB.dingShow and BDB.dingSound, "defaults: everything on, default ding text")
-local textInput = TEXT_INPUTS.LefthyTools_beacon_dingText
-check(textInput and textInput.template == "LefthyToolsSettingsTextTemplate" and textInput.data.options.maxLetters == 100,
+local textInput = B("dingText")
+check(textInput and textInput.maxLetters == 100,
 	"level-up message is a text field in the settings panel")
 check(SETTINGS_BUTTONS["Test your message"] and SETTINGS_BUTTONS["Test your message"].text == "Preview", "preview button")
 check(ADDON_PREFIXES.LTBeacon, "addon message prefix registered")
@@ -414,8 +414,8 @@ Advance(1.2)
 
 section("Beacon: a friend with a newer LefthyTools")
 local function infoRow(name)
-	for _, init in ipairs(LAYOUTS["LefthyTools"]) do
-		if init.template == "LefthyToolsSettingsInfoTemplate" and init.data.name == name then return init end
+	for _, row in ipairs(LT.Options.pages[1].rows) do
+		if row.kind == "info" and row.name == name then return { data = row } end
 	end
 end
 local function updateStatus() return infoRow("Updates").data.getValue() end
@@ -921,10 +921,10 @@ lefthy("beacon ding test")
 MY_SURNAME = nil
 check(printedSince(pmark):find("Lefthy Mirewood|r reached level 20!", 1, true) ~= nil,
 	"/lefthy beacon ding test: as friends see it, my name with its surname, got " .. printedSince(pmark))
--- A slider whose label names the sound (no dropdown: a Blizzard menu from addon settings taints gamepad mode).
+-- A choice of sounds, named (a dropdown of ours; its setting's value is the position).
 local soundSlider = B("dingSoundKit")
-local soundOptions = soundSlider and soundSlider.sliderOptions
-check(soundSlider and soundSlider.proxy and not DROPDOWNS.LefthyTools_beacon_dingSoundKit and BDB.dingSoundKit == 50111
+local soundOptions = soundSlider and { min = 1, max = #soundSlider.values, formatter = function(i) return soundSlider.values[i][2] end }
+check(soundSlider and soundSlider.proxy and BDB.dingSoundKit == 50111
 	and soundSlider:GetValue() == 1 and soundOptions.min == 1 and soundOptions.max == 6 and soundOptions.formatter(1) == "Boss defeated fanfare",
 	"level-up sound: a slider over 6 sounds that names them, boss defeated fanfare by default")
 local hasLevelUpFanfare = false

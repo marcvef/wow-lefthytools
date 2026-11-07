@@ -26,8 +26,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
                              the Bestiary ledger's kill map, the fight stream's map without minimap tiles)
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
   Core/WhatsNew.lua          what's-new window after an update, /lefthy news (entries: Data/Changelog.lua)
-  Core/Options.lua           settings panel (overview + one page per module), option builder, /lefthy
-  Core/Options.xml           text field row for the settings list (Builder:TextInput)
+  Core/Options.lua           the settings' data (overview + one page per module), option builder, /lefthy
+  Core/SettingsWindow.lua    the settings window: pages, search, a row for each kind of setting
   Modules/Mirage/Groups.lua  frame names per group, window list, chat events (edit to add frames)
   Modules/Mirage/Mirage.lua  engine: frame adoption + alpha hooks, visibility, fading, events
   Modules/Mirage/Options.lua settings page, /mirage, keybinding labels
@@ -210,11 +210,10 @@ tag), written into the installed TOC by the installer; `X.Y.Z-gHASH` when N is u
 tells friends on older builds to update. Beacon also reports every friend's build to
 `LT:NoteFriendVersion`, which keeps the newest one above ours in `LT.newerVersion`: addons can't go
 online, so friends are the only source. The overview settings page has an Info section with two
-read-only rows (`LefthyToolsSettingsInfoTemplate` in `Core/Options.xml`, a list element built on
-`SettingsListElementMixin` whose `Init` reads the value each time the row is shown): Version, and
+read-only rows (kind `info`, whose `getValue` is read each time the row is shown): Version, and
 Updates (`Options.UpdateStatus`: newer version available / up to date compared with N friends /
 unknown, no friend with LefthyTools online or Beacon off). The Updates row's tooltip is a
-function (`Options.UpdateTooltip`; `Settings.InitTooltip` calls a function tooltip each time it
+function (`Options.UpdateTooltip`; a row calls a function tooltip each time it
 opens): your build, then every Beacon friend's build marked newer / same / older.
 
 **Reload or restart:** the game reads a TOC only at startup, so an update that adds or removes
@@ -326,7 +325,7 @@ second (UTC), worked out once, so it's cheap for every record.
   modules get the table through `LT.onLoad`.
   Defaults are merged on load; `defaultEnabled` only applies when no on/off choice is saved
   (Mirage defaults to off, the others to on). `LT:ResetModuleSettings(m)` resets in place,
-  keeping the same tables, because the settings panel holds references to them.
+  keeping the same tables, because the settings hold references to them.
 - **Module switch:** single source of truth `LefthyToolsDB.modules[key]`. `LT:SetModuleEnabled`
   goes through the switch's setting object, so the overview checkbox stays in sync when a
   keybinding or slash command flips it. `LT:ApplyModuleState` is idempotent and only runs after
@@ -363,30 +362,13 @@ second (UTC), worked out once, so it's cheap for every record.
   (Blizzard's panels, the bags, Mirage's window lists with ours), for Mirage, the AFK screen and
   flights.
 
-## Settings panel
+## Settings window
 
-Blizzard's official pattern (`Blizzard_Settings_Shared/Blizzard_ImplementationReadme.lua`):
-`RegisterVerticalLayoutCategory("LefthyTools")` for the overview, `RegisterVerticalLayoutSubcategory`
-per module, and only the parent goes to `RegisterAddOnCategory`. Setting variables are
-`LefthyTools_<module>_<id>`; module switches are `LefthyTools_module_<key>`.
+`Core/Options.lua` keeps the data, `Core/SettingsWindow.lua` draws it, in a window of our own (`LT.Window.Create`), not Blizzard's settings panel. That panel's list reuses its rows from page to page, so our pages could leave Blizzard's own (Social, Audio) running tainted, and the game blamed LefthyTools for what they did then (friends' reports: `IsUserOAuthed`, `Frame:SetPoint`, with `SettingsPanel` open). Blizzard's AddOns list keeps one canvas page of ours with a button to the window (`Settings.RegisterCanvasLayoutCategory`).
 
-Every setting the builder registers is kept in `module.settings[id]`. Code that changes a setting
-(slash commands) uses `LT:SetModuleSetting(m, id, value)`, which goes through the setting object
-like a click would: an open settings page shows the new value and `OnSettingChanged` runs. Writing
-`m.db` directly would leave the panel showing the old value. The value is always what the db
-keeps, for a `Choice` too: its slider works with positions, and the builder keeps the lookup from
-value to position in `module.choices[id]` (a value that isn't one of the choices changes nothing).
+A module's `BuildOptions(o)` calls the builder: `Header`, `Checkbox`, `Slider`, `CheckboxSlider`, `Choice` (a dropdown, `LT.Window.AddPicker`), `TextInput` and `Button`. Each adds a row to the page, and a setting (`Options.registered`, `module.settings`) reading and writing the module's saved table directly, so the saved format is what it always was. `setting:SetValue` and `NotifyUpdate` run the module's `OnSettingChanged` and refresh what's shown; `LT:SetModuleSetting` goes through them. A `Choice` setting's value is its position among the values, the saved table keeps the value itself.
 
-The builder handed to `BuildOptions` has `Header`, `Checkbox`, `Slider`, `CheckboxSlider` (both in
-one row, Blizzard's `CreateSettingsCheckboxSliderInitializer`), `Choice` (one of
-`{ { value, label }, ... }` as a slider whose label names it: a proxy setting maps the db's value
-to the slider's position; not a dropdown, see forever-platform.md on gamepad mode), `Button` (wraps
-`CreateSettingsButtonInitializer`; its `addSearchTags` argument is asserted non-nil) and
-`TextInput`. Blizzard's list has no text control, so `TextInput` uses `Core/Options.xml`'s
-`LefthyToolsSettingsTextTemplate` (inherits `SettingsListElementTemplate`, mixin built on
-`SettingsControlMixin`, an `InputBoxTemplate` EditBox) through `Settings.CreateSettingInitializer`.
-It commits on focus loss, Escape reverts, and `SetValue` updates the box when the value changes
-elsewhere (e.g. a slash command).
+The window: the pages on the left, each with whether its module is on; a search over every page's names and text tooltips; a page's own switch first. Built when first opened, a row's frame when it's first shown. It's a plain frame, so it opens in a fight and in gamepad mode and nothing goes through `ShowUIPanel`.
 
 ## Localization
 

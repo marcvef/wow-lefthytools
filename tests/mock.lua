@@ -446,6 +446,18 @@ function CreateFrame(kind, name, parent, template)
 		function f:GetValue() return self._value end
 		function f:SetStatusBarColor(r, g, b) self._barColor = { r, g, b } end
 	end
+	if kind == "Slider" then
+		function f:SetOrientation() end
+		function f:SetValueStep(step) self._step = step end
+		function f:SetObeyStepOnDrag() end
+		function f:SetThumbTexture() end
+		function f:SetMinMaxValues(lo, hi) self._min, self._max = lo, hi end
+		function f:GetValue() return self._value end
+		function f:SetValue(v)
+			self._value = v
+			if self._scripts.OnValueChanged then self._scripts.OnValueChanged(self, v) end
+		end
+	end
 	if template then ApplyTemplate(f, template) end
 	return f
 end
@@ -885,6 +897,7 @@ Settings = {
 		return s
 	end,
 	RegisterAddOnCategory = function(cat) ADDON_CATEGORIES[#ADDON_CATEGORIES + 1] = cat end,
+	RegisterCanvasLayoutCategory = function(panel, name) return { panel = panel, name = name } end,
 	OpenToCategory = function(id) OPENED_CATEGORY = id end,
 	CreateSettingInitializerData = function(setting, options, tooltip)
 		return { setting = setting, name = setting.name, options = options or {}, tooltip = tooltip }

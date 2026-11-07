@@ -291,7 +291,7 @@ local function Meet(c, f, version)
 end
 
 local function Set(c, key, value)
-	c.env.REGISTERED_SETTINGS["LefthyTools_chronicle_" .. key]:SetValue(value)
+	c.env.LefthyTools.Options.registered["LefthyTools_chronicle_" .. key]:SetValue(value)
 end
 
 -- The spells of a list's parts (the ones it has).
@@ -665,7 +665,7 @@ do
 	Pass(me, 65)
 
 	-- The setting off: none of mine go out, a request gets nothing, what waits doesn't go.
-	check(env.REGISTERED_SETTINGS.LefthyTools_chronicle_shareRecipes ~= nil and me.C.module.db.shareRecipes == true, "a setting, on by default")
+	check(env.LefthyTools.Options.registered.LefthyTools_chronicle_shareRecipes ~= nil and me.C.module.db.shareRecipes == true, "a setting, on by default")
 	mark = Mark(me)
 	Say(me, BOB, "B2;cq;" .. ANNA.acct .. ";0")
 	Set(me, "shareRecipes", false)

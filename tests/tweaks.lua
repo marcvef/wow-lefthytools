@@ -129,7 +129,7 @@ local TDB = LefthyToolsDB.settings.tweaks
 local function T(id) return REGISTERED_SETTINGS["LefthyTools_tweaks_" .. id] end
 check(Tweaks and Tweaks.enabled, "tweaks module registered and enabled at login")
 check(REGISTERED_SETTINGS.LefthyTools_module_tweaks, "overview page has a switch for Misc Tweaks")
-check(Tweaks.category and Tweaks.category.parent == LT.category and Tweaks.category.name == "Misc Tweaks",
+check(LT:GetModule("tweaks").category and LT:GetModule("tweaks").category.module == LT:GetModule("tweaks"),
 	"Misc Tweaks has its own sub-page under LefthyTools")
 check(T("statusText") and T("movableBags") and T("questAnnounce") and not T("gamepadSortButton"),
 	"one checkbox per tweak (sort button removed)")

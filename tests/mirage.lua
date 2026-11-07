@@ -264,13 +264,13 @@ check(not Mirage.enabled and near(a("MainActionBar"), 1), "/lefthy disable mirag
 lefthy("enable mirage")
 check(Mirage.enabled, "/lefthy enable mirage")
 lefthy("")
-check(OPENED_CATEGORY == LT.category:GetID(), "/lefthy opens the overview")
--- Gamepad mode: opening the panel from addon code would taint its focus manager (a role check's
--- Accept then gets blocked), so it says where to find the settings instead.
-OPENED_CATEGORY, GAMEPAD_STATE.ui = nil, true
+check(LT.Options.shownPage == LT.category and LefthyToolsSettingsFrame:IsShown(), "/lefthy opens the overview")
+-- Gamepad mode: it's a window of our own, so it opens there too (and in a fight).
+LefthyToolsSettingsFrame:Hide()
+GAMEPAD_STATE.ui = true
 lefthy("")
-check(OPENED_CATEGORY == nil and (PRINTED[#PRINTED] or ""):find("in gamepad mode, open the settings from the game menu", 1, true),
-	"gamepad mode: /lefthy points to the game menu instead of opening the panel")
+check(LefthyToolsSettingsFrame:IsShown(), "gamepad mode: it opens")
+LefthyToolsSettingsFrame:Hide()
 GAMEPAD_STATE.ui = false
 do -- /lefthy's list: Core's words and the ones modules add (LT:AddCommand), each where it always was.
 	local hmark = #PRINTED + 1
@@ -299,7 +299,8 @@ end
 lefthy("modules")
 lefthy("mirage status")
 lefthy("mirage")
-check(OPENED_CATEGORY == Mirage.category:GetID(), "/lefthy mirage opens Mirage's page")
+check(LT.Options.shownPage == Mirage.category, "/lefthy mirage opens Mirage's page")
+LefthyToolsSettingsFrame:Hide()
 
 section("switching off after an engine-side alpha change")
 STATE.target = true; Fire("PLAYER_TARGET_CHANGED"); Advance(1) -- HUD fully visible
@@ -351,7 +352,8 @@ mirage("on")
 check(Mirage.enabled, "/mirage on")
 mirage("status")
 mirage("")
-check(OPENED_CATEGORY == Mirage.category:GetID(), "/mirage opens Mirage's settings page")
+check(LT.Options.shownPage == Mirage.category, "/mirage opens Mirage's settings page")
+LefthyToolsSettingsFrame:Hide()
 local delayUpdates, chatUpdates = S("delay").uiUpdates, S("group_chat").uiUpdates
 mirage("reset")
 check(MDB.fadeOutTime == 1.5 and MDB.groups.chat == true and MDB.delay == 5, "/mirage reset")
@@ -462,9 +464,12 @@ Advance(0.5)
 check(near(a("MainActionBar"), 0.5, 0.02), "settings panel change applies live")
 
 section("fade strength per element")
-local row = CHECKBOX_SLIDERS.LefthyTools_mirage_group_minimap
-check(row and row.checkbox == S("group_minimap") and row.slider == S("alpha_minimap") and row.cbLabel == "Minimap",
-	"each element: its checkbox and its own opacity slider in one row")
+local sliderRow
+for _, row in ipairs(Mirage.category.rows) do
+	if row.setting == S("alpha_minimap") then sliderRow = row end
+end
+check(sliderRow and sliderRow.dependsOn == S("group_minimap") and S("group_minimap").name == "Minimap",
+	"each element: its checkbox and, under it, its own opacity slider, greyed while it's off")
 check(MDB.groupAlpha.minimap == 0.5 and MDB.groupAlpha.chat == 0.5 and S("alpha_chat").uiUpdates > 0,
 	"'Faded opacity' sets every element (and an open settings page shows it)")
 S("alpha_minimap"):SetValue(0.8)

@@ -28,6 +28,7 @@ for _, key in ipairs(missing) do io.write("  untranslated: " .. key .. "\n") end
 check(#missing == 0, "every settings text looked up while building the panel has a German translation")
 
 local LT = LefthyTools
+REGISTERED_SETTINGS, SETTINGS_BUTTONS, HEADERS = LT.Options.registered, LT.Options.buttons, LT.Options.headers
 local function S(variable) return REGISTERED_SETTINGS[variable] end
 check(LT:GetModule("mirage").enabled, "a saved 'Mirage on' survives the new default (off)")
 local mdb = LefthyToolsDB.settings.mirage
