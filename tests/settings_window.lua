@@ -148,7 +148,14 @@ do
 	-- Blizzard's list only leads here.
 	Options.blizzardButton:Click()
 	check(win:IsShown() and Options.shownPage == LT.category, "the button on Blizzard's page opens it")
+	-- Closing that panel behind it: the way back to the game menu closes what Escape would.
+	EventRegistry:TriggerEvent("SettingsPanel.OnHide")
 	win:Hide()
+	Advance(1)
+	check(win:IsShown() and Options.shownPage == LT.category, "closing Blizzard's panel behind it leaves it open, on its page")
+	win:Hide()
+	Advance(1)
+	check(not win:IsShown(), "closing it afterwards closes it")
 
 	-- Saved values stay put: nothing in the window keeps a copy.
 	local tbl = LefthyToolsDB.settings.beacon

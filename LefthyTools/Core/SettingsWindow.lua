@@ -405,6 +405,18 @@ end
 
 local function BuildWindow()
 	frame = LT.Window.Create("LefthyToolsSettingsFrame", L["LefthyTools settings"], WIDTH, HEIGHT)
+	-- Blizzard's panel closing goes back to the game menu, which first closes what Escape would close:
+	-- this window too, though it may have just been opened from that panel. So it comes straight back.
+	local panelClosedAt
+	if EventRegistry then
+		EventRegistry:RegisterCallback("SettingsPanel.OnHide", function() panelClosedAt = GetTime() end, frame)
+	end
+	frame:HookScript("OnHide", function()
+		if panelClosedAt == GetTime() then
+			panelClosedAt = nil
+			C_Timer.After(0, function() frame:Show() end)
+		end
+	end)
 	local inset = frame.Inset
 	local side = CreateFrame("Frame", nil, frame)
 	side:SetPoint("TOPLEFT", inset, "TOPLEFT", 6, -6)
