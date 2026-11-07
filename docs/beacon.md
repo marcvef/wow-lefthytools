@@ -541,7 +541,7 @@ Sending (`sendReports`, on by default): every LefthyTools error new this session
 (LefthyTools version and `LT.FILES`, WoW build, client language, realm, faction, level and class),
 kind, count, first time, message and stack. `/lefthy report <what happened>` adds a hand-written
 one: the player's words, the context, Beacon on/off and friends with their versions, the last 8
-links clicked (a post-hook on `SetItemRef`: the link and, for professions/enchants after 2 s,
+links clicked (a post-hook on `SetItemRef`: the link and, for professions after 2 s,
 whether `ProfessionsFrame`/`TradeSkillFrame` opened; for map pins whether a waypoint is set) and
 how many errors are kept. Reports wait in `LefthyToolsDB.reportsOut` (at most 10, across
 sessions) until a collector is online; every 2 s the tick sends waiting ones to every collector
@@ -564,8 +564,10 @@ realm and faction if they're a Beacon friend (Battle.net game account info), my 
 combat and modifier keys, and listens 3 s to `UI_ERROR_MESSAGE`, `UI_INFO_MESSAGE`,
 `CHAT_MSG_SYSTEM` and the trade skill events; on `TRADE_SKILL_DATA_SOURCE_CHANGED`, `LIST_UPDATE`
 and `SHOW` it also notes what `C_TradeSkillUI` holds right then (linked, how many recipes, the
-profession, ready) and which profession window exists. If no profession window opened, that's a
-report by itself (once per session). `/lefthy beacon status` lists each friend's realm and faction
+profession, ready) and which profession window exists. If no profession window opened from a link that
+should have opened one (not mine, on my server id), that's a report by itself (once per session): from
+another realm nothing ever opens, and my own link is closed again (seen in game, also on the release). An
+`enchant:` link shows a tooltip, so it's only listed. `/lefthy beacon status` lists each friend's realm and faction
 and mine, to compare who can open profession links with who can't. Found so far (1.60.1.70291):
 links from another realm (ClassicBetaPvE2 vs Classic Beta PvE) open nothing; even a player's own
 link, in any chat, goes `DATA_SOURCE_CHANGED`, `LIST_UPDATE`, `CLOSE`, `CLOSE` without

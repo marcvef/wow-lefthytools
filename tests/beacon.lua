@@ -2206,6 +2206,13 @@ do
 	end
 	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "H2", "WHISPER", 12)
 	Advance(1.2)
+	-- Links the game won't open anyway: no report by themselves (whole seconds: the clock goes on to later suites).
+	local reportsBefore = #LefthyToolsDB.reportsOut
+	SetItemRef("trade:Player-2-11:2259:171", "[Alchemy]", "LeftButton")
+	SetItemRef("trade:" .. UnitGUID("player") .. ":2259:171", "[Alchemy]", "LeftButton")
+	SetItemRef("enchant:3761", "[Enchant]", "LeftButton")
+	Advance(10)
+	check(#LefthyToolsDB.reportsOut == reportsBefore, "from another realm, my own, an enchant: nothing opens, but no report")
 	-- Anna's profession link, clicked: nothing opens, the game says why; that's a report by itself.
 	SetItemRef("trade:Player-1-11:2259:171", "[Alchemy]", "LeftButton")
 	Fire("UI_ERROR_MESSAGE", 51, "That player is on another realm.")

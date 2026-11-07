@@ -377,7 +377,9 @@ end
 -- server id against mine, whether this client knows the linker, their realm and faction from
 -- Battle.net, combat, a modifier) and listen for 3 s to what the game says (UI error and info
 -- messages, system messages, the trade skill events). If nothing opened, that goes to friends who
--- collect reports by itself (once per session).
+-- collect reports by itself (once per session), but only for a link that should have opened: from
+-- another realm the game opens nothing, and it closes a player's own link again (both seen in game).
+-- An enchant's link shows a tooltip: no window to wait for.
 ---------------------------------------------------------------------------
 
 local WATCH_TIME = 3
@@ -437,7 +439,7 @@ watcher:SetScript("OnEvent", function(_, event, a, b)
 end)
 
 local function Opened(kind)
-	if kind == "trade" or kind == "enchant" then
+	if kind == "trade" then
 		local frame = ProfessionsFrame or TradeSkillFrame
 		return frame and frame:IsShown() and "the profession window opened" or "nothing opened"
 	elseif kind == "worldmap" then
@@ -492,8 +494,10 @@ local function OnLinkClicked(link)
 	local kind = link:match("^(%a+):")
 	if kind == "worldmap" then
 		C_Timer.After(2, function() click.result = Opened(kind) end)
-	elseif kind == "trade" or kind == "enchant" then
-		click.linker = Linker(link:match("^trade:(Player%-[%w%-]+)") or "?")
+	elseif kind == "trade" then
+		local guid, mine = link:match("^trade:(Player%-[%w%-]+)") or "?", UnitGUID("player")
+		local shouldOpen = guid ~= mine and ServerID(guid) ~= nil and ServerID(guid) == ServerID(mine)
+		click.linker = Linker(guid)
 		click.me = ("%s, %s%s%s"):format(GetRealmName() or "?", UnitFactionGroup("player") or "?",
 			InCombatLockdown() and ", in combat" or "", (IsModifiedClick and IsModifiedClick()) and ", a modified click" or "")
 		watching = { events = {} }
@@ -508,7 +512,7 @@ local function OnLinkClicked(link)
 			end
 			click.result = Opened(kind)
 			click.events = #watched.events > 0 and table.concat(watched.events, " / ") or "nothing"
-			if click.result == "nothing opened" and not linkFailureSent and M.enabled and M.db.sendReports then
+			if click.result == "nothing opened" and shouldOpen and not linkFailureSent and M.enabled and M.db.sendReports then
 				linkFailureSent = true
 				Keep(LinkReport(click)) -- goes out on the tick
 			end
