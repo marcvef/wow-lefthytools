@@ -146,6 +146,8 @@ function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
 function FrameMethods:EnableMouseWheel(e) self._wheelEnabled = e end
+function FrameMethods:SetChecked(on) self._checked = on and true or false end
+function FrameMethods:GetChecked() return self._checked == true end
 function FrameMethods:SetHyperlinksEnabled(e) self._hyperlinks = e end
 -- Tooltips made with CreateFrame("GameTooltip"): what they were asked to show.
 function FrameMethods:SetOwner(owner, anchor) self._owner, self._anchor = owner, anchor end

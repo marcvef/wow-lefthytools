@@ -357,6 +357,14 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   sends nothing. Another sticky chat type typed in the box (`/s`, `/g`, `/p`, `/1`:
   `ChatTypeInfo[type].sticky == 1`) ends it and repaints the header; whispers don't, as in the
   game. Temporary whisper windows keep their own type. Hooks on `ChatFrame1-10EditBox` at login.
+- **Tabs and colour:** a line goes through `ShowInChat`: per character `LefthyToolsDB.ltcTabs[GUID] = {
+  [window] = true }`; none chosen: `print`, so the main window, as ever. It can't be a real chat type
+  (above), and a real channel would take a numbered slot, could be joined by anyone and wouldn't reach other realms.
+  So the choice is a `CheckButton` of ours, parented to `ChatConfigChatSettings` (nothing of ours in Blizzard's
+  `CHAT_CONFIG_*` lists), for `FCF_GetCurrentChatFrame()`; `/lefthy beacon ltctab` does the same for the tab
+  in front. The last one unticked: the main window again, a line is never shown nowhere. `FCF_Close`
+  forgets that window. A chosen tab out of sight flashes (`FCF_StartAlertFlash`). `lefthyChatColour`
+  (hex, Blizzard's `ColorPickerFrame`) colours new lines and the box's header.
 - **Announcements** (`/la <text>` or `/lefthy announce <text>`, quotes optional; setting `announcements`):
   `A2;<text>`; `B.ShowAnnouncement` puts "Name: text" into the notice stack of shared items
   (`call.message`, already "done", `hold` 10 s instead of 7; the line wraps at 700 px), with the

@@ -76,6 +76,7 @@ local M = LT:NewModule("beacon", {
 		shareItems = true,
 		lefthyChat = true,    -- Chat.lua: LTC (/ltc, /l) lines in the chat window
 		lefthyChatSound = true, -- a soft tick when a friend writes there
+		lefthyChatColour = "ffb84d", -- its colour (Chat.lua)
 		announcements = true, -- /lefthy announce: lines in the middle of the screen
 		dingAnnounce = true,
 		dingText = "",

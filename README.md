@@ -173,6 +173,8 @@ minimap, and you on theirs, without being in a group.
   where shared items show, with the whisper sound (and in their chat). On a cinematic flight
   both come as subtitles.
 - **Invites:** **Shift+left click** a friend's dot on the world map to invite them to your group.
+- **LTC in its own tab:** right-click a chat tab, **Settings**, and tick **LTC** at the top of the Chat page.
+  The colour is in Beacon's settings. `/l` works from any tab.
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.
   The chat line has a map pin: click it and your waypoint arrow points there.

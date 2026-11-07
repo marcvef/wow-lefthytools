@@ -2123,7 +2123,7 @@ do
 	Advance(0.6)
 	check(sentTo(11, mark, "M2;")[1] == "M2;first line", "/l in the chat box: sent")
 	box:UpdateHeader() -- the box opens again
-	check(header:GetText() == "LTC: " and header.color[2] == 0.72 and box._inset > 15,
+	check(header:GetText() == "LTC: " and math.abs(header.color[2] - 184 / 255) < 0.001 and box._inset > 15,
 		"the box stays on LTC, and its header says so, got " .. tostring(header:GetText()))
 	local said = #SENT_CHAT
 	TypeChat("second line, no /l")

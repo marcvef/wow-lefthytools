@@ -1,5 +1,6 @@
 local _, ns = ...
 local LT = ns.LT
+local L = ns.L
 local M = LT:GetModule("beacon")
 local B = ns.Beacon
 
@@ -16,12 +17,23 @@ local B = ns.Beacon
 -- {<type>:<data>[<text>]<colour>} (the text in the sender's language) and become clickable links
 -- again, in their own colour; any other link keeps its "[text]".
 --
+-- Which chat tabs show its lines is per character (LefthyToolsDB.ltcTabs[GUID] = { [window] = true };
+-- none chosen: the main window, as ever). A checkbox of ours on Blizzard's Chat Settings page, for the
+-- tab being set up: it can't be a row of theirs (see "Sticky /ltc" below), and a real channel would
+-- take a numbered slot, could be joined by anyone and wouldn't reach other realms. A chosen tab out
+-- of sight flashes. /lefthy beacon ltctab does the same for the tab in front. Its colour: a setting.
+--
 -- Friends on older builds get what theirs understands (LinkLevel, from their version): links as
 -- tokens only where their build turns them back into links, everything else as "[text]", the way
 -- it reached them before.
 
 local TEXT_BYTES = 200
-local CHAT_COLOUR = "|cffffb84d"
+local DEFAULT_COLOUR = "ffb84d"
+-- The colour of LTC: "|cffrrggbb".
+local function ChatColour()
+	local hex = M.db and M.db.lefthyChatColour
+	return "|cff" .. (type(hex) == "string" and hex:match("^%x%x%x%x%x%x$") and hex or DEFAULT_COLOUR)
+end
 -- Friends take 5 lines per 5 s and an announcement per 3 s from me (Beacon's CHAT_LIMIT and
 -- ANNOUNCE_GAP); mine stay under that, with a second to spare for the way there.
 local SEND_LIMIT = { chat = 5, announce = 1 } -- at most this many
@@ -161,7 +173,177 @@ end
 
 -- "[LTC] [Anna]: text", the name in its class colour.
 local function ChatLine(name, classFile, text)
-	return ("%s[LTC] [|r%s%s]: %s|r"):format(CHAT_COLOUR, B.ColouredName(name, classFile), CHAT_COLOUR, text)
+	local colour = ChatColour()
+	return ("%s[LTC] [|r%s%s]: %s|r"):format(colour, B.ColouredName(name, classFile), colour, text)
+end
+
+-- This character's chosen tabs: { [window] = true }, nil if it can't be told.
+local function ChosenTabs(create)
+	local guid = LT.Value(UnitGUID, "player")
+	if not (guid and LT.db) then
+		return nil
+	end
+	local all = type(LT.db.ltcTabs) == "table" and LT.db.ltcTabs or (create and {}) or nil
+	if not all then
+		return nil
+	end
+	LT.db.ltcTabs = all
+	if create and type(all[guid]) ~= "table" then
+		all[guid] = {}
+	end
+	return type(all[guid]) == "table" and all[guid] or nil
+end
+
+local function ChatWindow(window)
+	local frame = _G["ChatFrame" .. window]
+	return frame and frame.AddMessage and frame or nil
+end
+
+-- A tab that can show LTC: one of the player's windows, not the combat log.
+local function UsableTab(frame)
+	local window = frame and frame.GetID and frame:GetID()
+	if type(window) ~= "number" or window < 1 or window > (NUM_CHAT_WINDOWS or 10) or frame == COMBATLOG then
+		return nil
+	end
+	return window
+end
+
+local function MainWindow()
+	return UsableTab(DEFAULT_CHAT_FRAME) or 1
+end
+
+local function TabChosen(window)
+	local tabs = ChosenTabs()
+	if tabs and next(tabs) then
+		return tabs[window] == true
+	end
+	return window == MainWindow()
+end
+
+-- A line of LTC, in the tabs chosen. Out of sight, a tab flashes as for any chat line (Blizzard's function;
+-- its failing must not lose the line).
+local function ShowInChat(line)
+	local tabs = ChosenTabs()
+	local shown = false
+	for window in pairs(tabs or {}) do
+		local frame = ChatWindow(window)
+		if frame then
+			frame:AddMessage(line)
+			shown = true
+			if frame.IsShown and not frame:IsShown() and FCF_StartAlertFlash then
+				pcall(FCF_StartAlertFlash, frame)
+			end
+		end
+	end
+	if not shown then
+		print(line)
+	end
+end
+
+-- One tab switched. Nothing left: the main window again (a line is never shown nowhere).
+local function SetTab(window, on)
+	local tabs = ChosenTabs(true)
+	if not tabs then
+		return
+	end
+	if not next(tabs) then
+		tabs[MainWindow()] = true -- (it was the default: it stays until unticked)
+	end
+	tabs[window] = on and true or nil
+end
+
+-- The tab in front, for Blizzard's settings and the command.
+local function CurrentTab()
+	local frame = FCF_GetCurrentChatFrame and FCF_GetCurrentChatFrame() or SELECTED_CHAT_FRAME or DEFAULT_CHAT_FRAME
+	return UsableTab(frame), frame
+end
+
+function B.LTCTabCommand()
+	local window, frame = CurrentTab()
+	if not window then
+		M:Print(L["LTC can't show in this tab."])
+		return
+	end
+	SetTab(window, not TabChosen(window))
+	local name = frame.name or (GetChatWindowInfo and GetChatWindowInfo(window)) or tostring(window)
+	M:Print((TabChosen(window) and L["LTC now shows in %s."] or L["LTC no longer shows in %s."]):format(tostring(name)))
+end
+
+-- The checkbox on Blizzard's Chat Settings page: a frame of ours, parented there, with nothing of
+-- ours in Blizzard's lists. The band over its list, at the right, stays free.
+function B.BuildLTCTabBox()
+	if B.ltcTabBox or not (ChatConfigChatSettings and ChatConfigBackgroundFrame) then
+		return B.ltcTabBox
+	end
+	local box = CreateFrame("CheckButton", nil, ChatConfigChatSettings, "UICheckButtonTemplate")
+	B.ltcTabBox = box
+	box:SetSize(24, 24)
+	box:SetPoint("TOPRIGHT", ChatConfigBackgroundFrame, "TOPRIGHT", -170, -3)
+	box.Label = box:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	box.Label:SetPoint("LEFT", box, "RIGHT", 2, 0)
+	box.Label:SetText(L["LTC (LefthyTools chat)"])
+	local function Refresh()
+		local window = CurrentTab()
+		box:SetShown(window ~= nil)
+		box:SetChecked(window ~= nil and TabChosen(window))
+	end
+	box:SetScript("OnClick", function(self)
+		local window = CurrentTab()
+		if window then
+			SetTab(window, self:GetChecked() and true or false)
+		end
+		Refresh()
+	end)
+	box:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L["LTC (LefthyTools chat)"])
+		GameTooltip:AddLine(L["Shows your friends' LTC lines in this chat tab. /l works from any tab."], 1, 1, 1, true)
+		GameTooltip:Show()
+	end)
+	box:SetScript("OnLeave", function(self)
+		if GameTooltip:IsOwned(self) then
+			GameTooltip:Hide()
+		end
+	end)
+	box:SetScript("OnShow", Refresh)
+	ChatConfigChatSettings:HookScript("OnShow", Refresh)
+	Refresh()
+	return box
+end
+
+-- A window closed may come back as another tab: it starts without LTC.
+local function OnTabClosed(frame)
+	local window = UsableTab(frame)
+	local tabs = window and ChosenTabs()
+	if tabs then
+		tabs[window] = nil
+	end
+end
+
+-- The colour, from the settings: Blizzard's picker.
+function B.PickLTCColour()
+	if not (ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow) then
+		return
+	end
+	local was = ChatColour():sub(5)
+	local function Hex(r, g, b)
+		return ("%02x%02x%02x"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+	end
+	ColorPickerFrame:SetupColorPickerAndShow({
+		r = tonumber(was:sub(1, 2), 16) / 255, g = tonumber(was:sub(3, 4), 16) / 255, b = tonumber(was:sub(5, 6), 16) / 255,
+		swatchFunc = function()
+			M.db.lefthyChatColour = Hex(ColorPickerFrame:GetColorRGB())
+			if B.RepaintLTCHeaders then
+				B.RepaintLTCHeaders()
+			end
+		end,
+		cancelFunc = function()
+			M.db.lefthyChatColour = was
+			if B.RepaintLTCHeaders then
+				B.RepaintLTCHeaders()
+			end
+		end,
+	})
 end
 
 -- A friend whose build turns fewer links back into links than mine sent (they get "[text]"
@@ -242,7 +424,7 @@ local function Send(kind, text)
 	UnpackLinks(text, function(shown) -- what my friends see
 		if kind == "chat" then
 			local _, classFile = UnitClass("player")
-			print(ChatLine(B.MyName(), classFile, shown)) -- my own line, as in guild chat (named as friends see me)
+			ShowInChat(ChatLine(B.MyName(), classFile, shown)) -- my own line, as in guild chat (named as friends see me)
 		else
 			B.ShowAnnouncement(nil, shown)
 		end
@@ -267,7 +449,7 @@ function B.ReceiveChat(peer, text)
 			return -- (switched off while an item was loading)
 		end
 		local line = ChatLine(peer.name, peer.classFile, shown)
-		print(line)
+		ShowInChat(line)
 		local now = GetTime()
 		if M.db.lefthyChatSound and now - lastSound >= SOUND_GAP then
 			lastSound = now
@@ -286,7 +468,7 @@ function B.ReceiveAnnouncement(peer, text)
 		if not (M.enabled and M.db.announcements) then
 			return
 		end
-		print(ChatLine(peer.name, peer.classFile, shown)) -- in the chat window too, for the record
+		ShowInChat(ChatLine(peer.name, peer.classFile, shown)) -- in the chat window too, for the record
 		B.ShowAnnouncement(peer, shown)
 		B.Notify("announce", peer, { text = shown })
 	end)
@@ -306,7 +488,11 @@ end
 ---------------------------------------------------------------------------
 
 local HEADER = "LTC: "
-local HEADER_R, HEADER_G, HEADER_B = 1, 0.72, 0.3 -- CHAT_COLOUR
+-- The box's header, in LTC's colour.
+local function HeaderColour()
+	local hex = ChatColour():sub(5)
+	return tonumber(hex:sub(1, 2), 16) / 255, tonumber(hex:sub(3, 4), 16) / 255, tonumber(hex:sub(5, 6), 16) / 255
+end
 local LEFTHY_COMMANDS = { ["/L"] = true, ["/LTC"] = true, ["/LCHAT"] = true }
 local sticky = false -- Lefthy mode
 local stickyType     -- the box's chat type it stands in for (what the box showed when /l came)
@@ -334,13 +520,13 @@ local function PaintHeader(editBox)
 	end
 	header:SetWidth(0)
 	header:SetText(HEADER)
-	header:SetTextColor(HEADER_R, HEADER_G, HEADER_B)
+	header:SetTextColor(HeaderColour())
 	if suffix then
 		suffix:Hide()
 	end
 	local language = editBox.UpdateLanguageHeader and editBox:UpdateLanguageHeader() or 0
 	editBox:SetTextInsets(15 + header:GetWidth() + language, 13, 0, 0) -- as Blizzard's UpdateHeader does
-	editBox:SetTextColor(HEADER_R, HEADER_G, HEADER_B)
+	editBox:SetTextColor(HeaderColour())
 end
 
 -- A command typed in the box (also while typing, before Enter: send 0).
@@ -375,7 +561,21 @@ local function OnPreSendText(_, editBox)
 	end
 end
 
+-- The colour changed: a box in LTC mode follows.
+function B.RepaintLTCHeaders()
+	for i = 1, NUM_CHAT_WINDOWS or 10 do
+		local editBox = _G["ChatFrame" .. i .. "EditBox"]
+		if editBox and editBox.GetName then
+			PaintHeader(editBox)
+		end
+	end
+end
+
 table.insert(LT.onLogin, function()
+	B.BuildLTCTabBox()
+	if FCF_Close then
+		hooksecurefunc("FCF_Close", OnTabClosed)
+	end
 	for i = 1, NUM_CHAT_WINDOWS or 10 do
 		local editBox = _G["ChatFrame" .. i .. "EditBox"]
 		if editBox and editBox.UpdateHeader and editBox.HandleChatType then
