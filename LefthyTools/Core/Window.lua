@@ -73,6 +73,8 @@ function Window.Create(name, title, width, height)
 	table.insert(UISpecialFrames, name) -- Escape closes it
 	Window.Register(name)
 	frame:Hide()
+	frame:HookScript("OnShow", function() LT.Trail("window " .. name) end)
+	frame:HookScript("OnHide", function() LT.Trail("window closed " .. name) end)
 	return frame
 end
 

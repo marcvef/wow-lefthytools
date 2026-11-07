@@ -660,6 +660,9 @@ function LT:ApplyModuleState(m)
 		return
 	end
 	m.enabled = want
+	if LT.Trail then
+		LT.Trail(m.key .. (want and " on" or " off"))
+	end
 	SafeCall(m, want and "OnEnable" or "OnDisable")
 	m:Print(want and "enabled." or "disabled.")
 end

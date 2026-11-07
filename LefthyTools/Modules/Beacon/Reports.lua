@@ -83,6 +83,9 @@ local function ErrorReport(entry)
 	if entry.stack and entry.stack ~= "" then
 		lines[#lines + 1] = entry.stack
 	end
+	if entry.context then
+		lines[#lines + 1] = entry.context -- (last: a report too long for its parts loses this first)
+	end
 	return table.concat(lines, "\n")
 end
 
@@ -107,6 +110,7 @@ local function HandReport(text)
 	end
 	local errors = LT.Errors.Count()
 	lines[#lines + 1] = ("Errors kept: %d (/lefthy errors)"):format(errors)
+	lines[#lines + 1] = LT.Errors.Context()
 	return table.concat(lines, "\n")
 end
 

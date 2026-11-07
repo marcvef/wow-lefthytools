@@ -236,8 +236,11 @@ only Blizzard code may extend with `AddLuaErrorHandler`) to
 Lua errors" off. A `hooksecurefunc` post-hook there sees each error with its stack, without
 replacing the error handler. Errors whose message or stack contains `AddOns/LefthyTools/` are kept
 in `LefthyToolsDB.errors` (at most 25, the same message counted instead of repeated, with the
-build and first/last time), and so are `ADDON_ACTION_BLOCKED`/`FORBIDDEN` events (with what was going on: combat, gamepad, the frame under the mouse, panels and our windows open) naming
-LefthyTools. Secret messages are skipped; locals are never kept (they can hold chat text). The
+build and first/last time), and so are `ADDON_ACTION_BLOCKED`/`FORBIDDEN` events naming
+LefthyTools. Each new one also keeps `context`, so a report can be understood without asking the player: state (combat, controller UI,
+instance, what's under the mouse, panels and our windows open), `LT.Trail` (the last 16 things: windows, panels, `/lefthy` words, settings, modules,
+fights, zones, logins), modules off, settings not at their default (strings by key only) and other addons loaded. No chat text, typed words or names.
+Secret messages are skipped; locals are never kept (they can hold chat text). The
 hook body runs in `pcall`, so it can't cause errors itself. Errors before the saved variables load
 wait in a list; the first one per session prints one chat line, on the next frame (never from
 inside the error handler). `/lefthy errors` shows a plain-text report (build, client, every error

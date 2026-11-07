@@ -2302,7 +2302,7 @@ do
 	LT.Errors.Add("error", "Interface/AddOns/LefthyTools/Core/Core.lua:9: something broke", "the stack")
 	Advance(3)
 	local first = sentTo(11, mark, "Z2;")[1] or ""
-	check(first:find(";1;%d+;Error: LefthyTools ") and #sentTo(11, mark, "Z2;") <= 3,
+	check(first:find(";1;%d+;Error: LefthyTools ") and #sentTo(11, mark, "Z2;") == tonumber(first:match("^Z2;%d+;1;(%d+);")),
 		"a LefthyTools error goes to her by itself, once, got " .. first)
 	B("sendReports"):SetValue(false)
 	mark = #GAMEDATA + 1

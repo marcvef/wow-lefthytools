@@ -189,7 +189,17 @@ for i = emark, #PRINTED do if PRINTED[i]:find("Type /lefthy errors", 1, true) th
 check(notices == 1, "one chat notice per session (not from inside the error handler), got " .. notices)
 Fire("ADDON_ACTION_BLOCKED", "LefthyTools", "SetPassThroughButtons")
 Fire("ADDON_ACTION_BLOCKED", "OtherAddon", "CastSpellByName")
-check(kept[3] and kept[3].stack:find("combat: no", 1, true), "a blocked action says what was going on, got " .. tostring(kept[3] and kept[3].stack))
+local context = kept[3] and kept[3].context or ""
+check(context:find("State: combat no; controller UI no", 1, true), "a new error keeps what was going on, got " .. context)
+check(context:find("Settings changed:", 1, true) and context:find("Modules off:", 1, true), "... the modules and settings, got " .. context)
+LT.Trail("a test step")
+LT.Errors.Add("error", "another " .. "trail test", "")
+check(kept[#kept].context:find("Before it, newest first: -0s a test step", 1, true), "... and what happened before it, newest first, got " .. kept[#kept].context)
+local firstContext = kept[#kept].context
+LT.Trail("later")
+LT.Errors.Add("error", "another " .. "trail test", "")
+check(kept[#kept].context == firstContext and kept[#kept].count == 2, "a repeat keeps the first one's and just counts")
+table.remove(kept)
 check(#kept == 3 and kept[3].kind == "blocked" and kept[3].msg:find("SetPassThroughButtons", 1, true), "blocked actions of ours are kept too")
 local function renderRow(name) -- an overview info row, built the way the settings list builds it
 	for _, init in ipairs(LAYOUTS["LefthyTools"]) do

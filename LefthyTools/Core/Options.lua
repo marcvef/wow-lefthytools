@@ -344,6 +344,7 @@ local function BuildModulePage(category, m)
 		category = sub,
 		layout = subLayout,
 		onChange = function()
+			LT.Trail(m.key .. " setting changed")
 			LT.SafeCall(m, "OnSettingChanged")
 		end,
 	}, Builder)
@@ -459,6 +460,7 @@ SlashCmdList.LEFTHYTOOLS = function(msg)
 	end
 	local cmd, rest = strtrim(msg or ""):match("^(%S*)%s*(.-)$")
 	cmd = cmd:lower()
+	LT.Trail("/lefthy " .. cmd) -- (only the word: what follows can be anything typed)
 	local target = LT:GetModule(rest:lower())
 
 	if commands[cmd] then
