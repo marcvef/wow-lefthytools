@@ -118,13 +118,49 @@ if ScriptErrorsFrame and ScriptErrorsFrame.DisplayMessageInternal then
 	end)
 end
 
+-- What was going on when the game refused something: all the event says is a function, often
+-- "UNKNOWN()", and by then there's no stack worth having.
+local function BlockedContext()
+	local parts = { "combat: " .. (InCombatLockdown() and "yes" or "no") }
+	if C_CVar and C_CVar.GetCVarBool and C_CVar.GetCVarBool("GamePadEnable") then
+		parts[#parts + 1] = "gamepad"
+	end
+	local function Named(frame)
+		local name = frame and frame.GetDebugName and frame:GetDebugName()
+		return type(name) == "string" and not issecret(name) and name ~= "" and name or nil
+	end
+	local focus = GetMouseFoci and GetMouseFoci()
+	local over = focus and focus[1] and Named(focus[1])
+	if over then
+		parts[#parts + 1] = "mouse over: " .. over
+	end
+	if GetUIPanel then
+		local panels = {}
+		for _, area in ipairs({ "left", "center", "right", "doublewide", "fullscreen" }) do
+			local name = Named(GetUIPanel(area))
+			if name then
+				panels[#panels + 1] = name
+			end
+		end
+		if panels[1] then
+			parts[#parts + 1] = "panels: " .. table.concat(panels, ", ")
+		end
+	end
+	local windows = LT.Window and LT.Window.OpenCount and LT.Window.OpenCount()
+	if windows and windows > 0 then
+		parts[#parts + 1] = ("%d window(s) open"):format(windows)
+	end
+	return table.concat(parts, ", ")
+end
+
 -- Protected calls the game refused; the event names the addon whose code made them.
 local events = CreateFrame("Frame")
 events:RegisterEvent("ADDON_ACTION_BLOCKED")
 events:RegisterEvent("ADDON_ACTION_FORBIDDEN")
 events:SetScript("OnEvent", function(_, event, addon, func)
 	if addon == "LefthyTools" then
-		Errors.Add("blocked", ("%s: %s()"):format(event, tostring(func)))
+		local ok, context = pcall(BlockedContext)
+		Errors.Add("blocked", ("%s: %s()"):format(event, tostring(func)), ok and context or nil)
 	end
 end)
 

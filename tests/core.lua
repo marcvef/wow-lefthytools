@@ -189,6 +189,7 @@ for i = emark, #PRINTED do if PRINTED[i]:find("Type /lefthy errors", 1, true) th
 check(notices == 1, "one chat notice per session (not from inside the error handler), got " .. notices)
 Fire("ADDON_ACTION_BLOCKED", "LefthyTools", "SetPassThroughButtons")
 Fire("ADDON_ACTION_BLOCKED", "OtherAddon", "CastSpellByName")
+check(kept[3] and kept[3].stack:find("combat: no", 1, true), "a blocked action says what was going on, got " .. tostring(kept[3] and kept[3].stack))
 check(#kept == 3 and kept[3].kind == "blocked" and kept[3].msg:find("SetPassThroughButtons", 1, true), "blocked actions of ours are kept too")
 local function renderRow(name) -- an overview info row, built the way the settings list builds it
 	for _, init in ipairs(LAYOUTS["LefthyTools"]) do
