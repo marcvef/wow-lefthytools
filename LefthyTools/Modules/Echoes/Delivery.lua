@@ -337,6 +337,9 @@ do
 			if Readable(tag) then
 				local acct = TagHash(tag)
 				friendAccts[acct] = true
+				if M.db.collect then
+					E.Store.Tagged(acct, tag)
+				end
 				local game = info.gameAccountInfo
 				if type(game) == "table" and type(game.gameAccountID) == "number" then
 					idAccts[game.gameAccountID] = acct
@@ -347,6 +350,12 @@ do
 						idAccts[game.gameAccountID] = acct
 					end
 				end
+			end
+		end
+		if M.db.collect and BNGetInfo then
+			local ok, _, mine = pcall(BNGetInfo)
+			if ok and Readable(mine) then
+				E.Store.Tagged(TagHash(mine), mine)
 			end
 		end
 		-- An account more or gone: what I want of friends' offers may be other (Pull).

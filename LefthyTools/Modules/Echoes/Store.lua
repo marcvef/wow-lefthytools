@@ -942,6 +942,21 @@ function Store.Named(acct, store, name)
 	names[key] = name
 end
 
+-- A collector's Battle.net friend, or the collector, is called tag: E.data.tags keeps the name without
+-- its number per account, for the exporter (the website's players). Only on the collector's own disk:
+-- it's never sent to anyone. At most 200.
+function Store.Tagged(acct, tag)
+	if type(acct) ~= "string" or type(tag) ~= "string" or issecret(tag) then
+		return
+	end
+	local name = tag:match("^[^#]+")
+	local tags = Kept("tags")
+	if not name or tags[acct] == name or (tags[acct] == nil and Count(tags) >= NAMES_MAX) then
+		return
+	end
+	tags[acct] = name
+end
+
 -- A collector (its "acct.store") holds these pages of acct.store safely (its summary, merged into
 -- E.data.safe): they go from mine and carry. Of mine, a page that never went out, or went only
 -- early, isn't the one the collector holds: it moves to a new number instead (Seen). The number

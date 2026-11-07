@@ -421,6 +421,7 @@ LefthyToolsEchoesDB = {
   launched = "YYYY-MM-DD",                                                               -- the launch day whose older pages went (one walk; nil: none yet)
   exported = { ["5e6f7a8b.0c77e1f2"] = "1-50" },                                         -- a collector's: from receipts
   latest = { ["5e6f7a8b.0c77e1f2"] = { n = 59, t = 1793449900 } },                     -- a collector's: the newest page received (/lefthy echoes)
+  tags = { ["5e6f7a8b"] = "Bobby" },                                                     -- a collector's: BattleTag names by account, for the website (never sent)
   names = { ["5e6f7a8b.0c77e1f2"] = "Bob" },                                             -- friends' first names by store (/lefthy echoes)
   capture = { ["Player-..."] = { ... } },  -- the capture's baselines per character (Recording)
   friends = { ["Player-..."] = "Bob-Realm" }, -- LefthyTools friends' names (Recording)

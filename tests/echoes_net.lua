@@ -1328,6 +1328,8 @@ do
 	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":1")
 	Pass(c, 1.5)
 	check(#Sent(c, ANNA, mark, "B2;eq;") == 1, "(page 1 asked of Anna)")
+	check(c.E.data.tags and c.E.data.tags[ANNA.acct] == "Annie" and c.E.data.tags[BOB.acct] == "Bobby",
+		"a collector keeps friends' BattleTag names by account, without the number, for the website's players")
 	-- She begins page 1 as transfer 5, then (a request of mine from before, say) page 9 with the same
 	-- transfer id: page 9's parts don't go into page 1, and she's asked to stop page 9.
 	local p1, p9 = TheirPage(c, 1, 1000), TheirPage(c, 9, 1000, 99)
@@ -3409,6 +3411,12 @@ do
 		"Anna's status: Cedric takes early pages, her pages go to him early; Bob doesn't, got\n" .. said)
 	check(cedric.E.data.names[key] == "Anna" and anna.E.data.names[ckey] == "Cedric" and anna.E.data.names[BOB.acct .. "." .. bob.E.data.store] == "Bob",
 		"friends' first names kept by store, once their account is checked")
+	check(anna.E.data.tags == nil, "someone who doesn't collect keeps no BattleTag names")
+	for _, part in ipairs({ "#1234", "#2345", "#3456" }) do
+		for _, line in ipairs(anna.env.GAMEDATA or {}) do
+			check(not tostring(line.data):find(part, 1, true), "no BattleTag goes over the network")
+		end
+	end
 	Varied(anna, 1)
 	Run(1)
 	local n = anna.E.data.n
