@@ -363,7 +363,9 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   So the choice is a `CheckButton` of ours, parented to `ChatConfigChatSettings` (nothing of ours in Blizzard's
   `CHAT_CONFIG_*` lists), for `FCF_GetCurrentChatFrame()`; `/lefthy beacon ltctab` does the same for the tab
   in front. The last one unticked: the main window again, a line is never shown nowhere. `FCF_Close`
-  forgets that window. A chosen tab out of sight flashes (`FCF_StartAlertFlash`). `lefthyChatColour`
+  forgets that window. A chosen tab out of sight flashes (`FCF_StartAlertFlash`). `lefthyChatSoundKit`:
+  the sound of a friend's line (`LTCSounds`, the game's own; picking one plays it; one it can't play: the
+  tick). `lefthyChatColour`
   (hex, Blizzard's `ColorPickerFrame`) colours new lines and the box's header.
 - **Announcements** (`/la <text>` or `/lefthy announce <text>`, quotes optional; setting `announcements`):
   `A2;<text>`; `B.ShowAnnouncement` puts "Name: text" into the notice stack of shared items

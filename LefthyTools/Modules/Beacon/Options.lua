@@ -38,6 +38,8 @@ function M:BuildOptions(o)
 		L["A chat for your Battle.net friends with LefthyTools, like guild or party chat: /ltc <text> (or /l) sends a line, and theirs show in your chat window as [LTC]."])
 	o:Checkbox("lefthyChatSound", L["Soft sound for LTC"],
 		L["A quiet tick when a friend writes in LTC."])
+	o:Choice("lefthyChatSoundKit", L["Sound for LTC"], L["Which sound a friend's LTC line plays. Picking one plays it."], B.LTCSounds)
+	B.LTCSoundKnown()
 	o:Button(L["LTC colour"], L["Choose"], function() B.PickLTCColour() end,
 		L["The colour of LTC's lines and of the chat box while you're writing in it. To show LTC in a chat tab of its own: right-click the tab, Settings, and tick it at the top of the Chat page."])
 	o:Checkbox("announcements", L["Announcements"],

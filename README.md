@@ -174,7 +174,7 @@ minimap, and you on theirs, without being in a group.
   both come as subtitles.
 - **Invites:** **Shift+left click** a friend's dot on the world map to invite them to your group.
 - **LTC in its own tab:** right-click a chat tab, **Settings**, and tick **LTC** at the top of the Chat page.
-  The colour is in Beacon's settings. `/l` works from any tab.
+  Its colour and sound are in Beacon's settings. `/l` works from any tab.
 - **Map pings:** **Alt+click** on the world map shows your friends a spot ("meet here"): a
   rippling marker on their world map and minimap for a minute, a chat line and a ping sound.
   The chat line has a map pin: click it and your waypoint arrow points there.
@@ -337,7 +337,8 @@ version they have), or once they play it with an up-to-date LefthyTools.
   the item, what it would change against what you wear, what it needs against your bags and who else
   knows it; click to keep it there. A recipe you know opens in your own profession window with a
   button. **Search
-  everyone** finds who can craft something in any profession. Lists update by themselves. Friends
+  everyone** finds who can craft something in any profession, and a character or BattleTag name finds that
+  person and lights up their professions. Lists update by themselves. Friends
   appear once they've updated and logged in.
 - **While you were away:** a minute after you log in, a chat line per friend with what they did
   since you last played. Once a week, **last week's leaderboard** in chat.

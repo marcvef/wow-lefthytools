@@ -1284,6 +1284,48 @@ end
 
 -- Recipes someone knows by what the client has loaded of their names, the spell's or the item's. Names
 -- are kept once fetched; a search fetches them for SEARCH_MS at most, the next one goes on from there.
+-- People whose character or BattleTag name holds text, by BattleTag, then level: { { who, professions =
+-- { { line, name, icon, skill, max, count, gathering }, ... } }, ... }, in the professions' order. At
+-- most SEARCH_MAX. It only asks what the lists hold already: nothing to wait for.
+function R.SearchPeople(text)
+	local needle = type(text) == "string" and Fold(strtrim(text)) or ""
+	if needle == "" then
+		return {}
+	end
+	local found, byId = {}, {}
+	for _, prof in ipairs(R.Professions()) do
+		for _, who in ipairs(R.People(prof.line)) do
+			local entry = byId[who.id]
+			if not entry and (Fold(who.name or ""):find(needle, 1, true) or Fold(who.account or ""):find(needle, 1, true)) then
+				entry = { who = who, professions = {} }
+				byId[who.id] = entry
+				found[#found + 1] = entry
+			end
+			if entry then
+				local count = 0
+				for _ in pairs(who.known or {}) do
+					count = count + 1
+				end
+				entry.professions[#entry.professions + 1] = { line = prof.line, name = prof.name, icon = prof.icon,
+					skill = who.skill, max = who.max, count = count, gathering = prof.gathering }
+			end
+		end
+	end
+	table.sort(found, function(x, y)
+		local a, b = x.who.account or "", y.who.account or ""
+		if a ~= b then
+			return a < b
+		elseif (x.who.level or 0) ~= (y.who.level or 0) then
+			return (x.who.level or 0) > (y.who.level or 0)
+		end
+		return x.who.id < y.who.id
+	end)
+	for i = #found, SEARCH_MAX + 1, -1 do
+		found[i] = nil
+	end
+	return found
+end
+
 function R.Search(text)
 	Fresh()
 	local needle = type(text) == "string" and Fold(strtrim(text)) or ""

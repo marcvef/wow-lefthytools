@@ -77,6 +77,7 @@ local M = LT:NewModule("beacon", {
 		lefthyChat = true,    -- Chat.lua: LTC (/ltc, /l) lines in the chat window
 		lefthyChatSound = true, -- a soft tick when a friend writes there
 		lefthyChatColour = "ffb84d", -- its colour (Chat.lua)
+		lefthyChatSoundKit = 826, -- which sound (Chat.lua lists them): the soft tick
 		announcements = true, -- /lefthy announce: lines in the middle of the screen
 		dingAnnounce = true,
 		dingText = "",
@@ -1130,6 +1131,9 @@ function M:OnSettingChanged()
 		for key in pairs(B.pings) do
 			B.RemovePing(key) -- "Map pings" off: the markers up now go too
 		end
+	end
+	if B.LTCSoundChanged then
+		B.LTCSoundChanged()
 	end
 	if B.OnSettingChanged then
 		B.OnSettingChanged() -- Ding.lua: a newly picked level-up sound is played

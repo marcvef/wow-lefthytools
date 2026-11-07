@@ -296,6 +296,13 @@ scroll area are hidden on it.
   the ilvl for gear. Under a person a dot in the skill-up colours (below `low` orange, below the
   middle of `low` and `high` yellow, below `high` green, else grey; no numbers: no dot), under
   Everyone how many know it.
+- **Search:** "Search everyone" also finds people (`R.SearchPeople`: a character's name or BattleTag name, in what
+  the lists hold, by BattleTag then level) as a "People" group above the recipes. Their professions' buttons
+  light up and the rest dim; a person hovered or clicked shows their professions on the right, with skill and
+  recipes. The search stays until it's cleared: clicking a profession or person during it (`drilled`) shows those
+  recipes under a "Back to the search results" row: all of them if the search found that person or matches no
+  recipe there, else the ones that match. Clicking a lit profession selects the found person who has it.
+  Cleared: back where it began, or, after such a click, on what was clicked last.
 - **Details, right:** a hover fills them at once; a click keeps them while the mouse moves on (click
   again: free, another: that one). Under the tooltip, for gear, what it would change against what this
   character wears: `C_TooltipComparison` (it takes an item I don't have, tested in game), "Replaces:
@@ -320,7 +327,7 @@ scroll area are hidden on it.
   over for the session.
 - **Search:** `R.Search` about 0.3 s after the last key. The middle shows the matches by profession,
   each row who knows it, a click all crafters. Emptied it goes back at once, with the scroll and the
-  clicked recipe as they were; clicking a person or a profession ends it there instead.
+  clicked recipe as they were; clicking a person or a profession stays in it (see above).
 - **Empty:** nobody with the profession: a friendly line; gathering: "No recipes: gathering"; a person
   or Everyone with no list yet: says so.
 

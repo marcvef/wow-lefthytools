@@ -321,6 +321,9 @@ installer from GitHub instead.
     lines as in your bags (rings and trinkets: both of yours); hover the name: its tooltip. Change
     what you wear: the lines follow. A recipe you know: "Show in my profession window" opens yours on
     that recipe, also when another profession or none was open; in a fight it only says so.
+    Professions tab, finding people: search a character's name, then a BattleTag name: a People group above
+    the recipes, their professions light up. Hover one: their professions on the right; click one of those: it
+    opens with them selected. Settings, Beacon, Sound for LTC: each plays when picked and on friends' lines.
     LTC in its own tab: make a chat tab, right-click it, Settings, Chat page: "LTC" at the top right, ticked on the
     main tab only. Tick it on the new one and untick General: friends' lines and your own go there, /l works
     from any tab, the tab flashes behind General; then write in /g and /say to see that chat still sends, and

@@ -429,7 +429,7 @@ do
 	check(outline() == "# Tailoring 93001", "another search, another profession, got " .. outline())
 	v.Box:SetText("zzz")
 	Advance(0.35)
-	check(#v.middle.entries == 0 and v.Message:IsShown() and v.Message:GetText() == "No recipes found", "nothing: it says so")
+	check(#v.middle.entries == 0 and v.Message:IsShown() and v.Message:GetText() == "Nothing found", "nothing: it says so")
 	v.Clear:Click()
 	check(not v.Clear:IsShown() and outline() == outlineBefore and not v.Message:IsShown()
 		and plain(v.Name:GetText()) == "Rugged Leather Pants" and recipeRow(91003).Picked.shown,
@@ -439,15 +439,16 @@ do
 	v.Box:SetText("")
 	Advance(0.5)
 	check(calls.Search == before + 4 and outline() == outlineBefore, "emptied before it ran: no search")
-	-- A selection while searching: the search ends and the new selection stays.
+	-- A selection while searching: the search stays, and what was clicked shows inside it.
 	v.Box:SetText("bag")
 	Advance(0.35)
 	personRow("bob"):Click()
-	check(v.Box:GetText() == "" and not v.Clear:IsShown() and outline():find("91004", 1, true) and not outline():find("93001", 1, true), "a person clicked: the search ends")
-	v.Box:SetText("bag")
-	Advance(0.35)
+	check(v.Box:GetText() == "bag" and v.Clear:IsShown() and outline():find("91004", 1, true) and not outline():find("93001", 1, true) and personRow("bob").Picked.shown,
+		"a person clicked: theirs show, the search stays")
 	button(ENCHANTING):Click()
-	check(v.Box:GetText() == "" and outline():find("# Armour bits", 1, true) == nil and personRow("me").Picked.shown, "a profession clicked too")
+	check(v.Box:GetText() == "bag" and outline():find("# Armour bits", 1, true) == nil and personRow("me").Picked.shown, "a profession clicked: the same")
+	v.Clear:Click()
+	check(v.Box:GetText() == "" and not v.Clear:IsShown(), "only clearing ends it")
 end
 
 section("Chronicle: the Professions tab, enchants")
@@ -801,6 +802,97 @@ do
 	STATE.combat = false
 	KNOWN_SPELLS[91003] = wasKnown
 	C_TradeSkillUI, C_Item.GetItemNameByID, C_Item.GetItemLinkByGUID = wasTrade, wasItemName, wasLink
+	win:Hide()
+end
+
+section("Chronicle: the Professions tab, searching for people")
+do
+	world.people = { [LEATHER] = { ANNA, BOB, ALT }, [TAILORING] = { ANNA }, [HERBALISM] = { ANNA, ME } }
+	fake.SearchPeople = function(text)
+		local found = {}
+		for _, who in ipairs({ ANNA, ALT, BOB, ME }) do
+			if who.name:lower():find(text:lower(), 1, true) or who.account:lower():find(text:lower(), 1, true) then
+				local profs = {}
+				for _, line in ipairs({ LEATHER, TAILORING, HERBALISM }) do
+					for _, other in ipairs(world.people[line] or {}) do
+						if other == who then
+							profs[#profs + 1] = { line = line, name = NAMES[line], icon = 1000 + line, skill = who.skill, count = 5, gathering = line == HERBALISM }
+						end
+					end
+				end
+				found[#found + 1] = { who = who, professions = profs }
+			end
+		end
+		return found
+	end
+	open()
+	moved()
+	button(LEATHER):Click()
+	local function search(text)
+		v.Box:SetText(text)
+		Advance(0.35)
+	end
+	local function personIn(id)
+		for _, row in ipairs(v.middle.rows) do
+			local e = row:IsShown() and row.entry
+			if e and e.who and e.who.id == id then return row end
+		end
+	end
+	search("Anna")
+	check(personIn("anna") ~= nil, "a character's name finds them")
+	check(personIn("anna") and personIn("alt") and not personIn("bob"), "... and only them")
+	local row = personIn("anna")
+	check(plain(row.Name:GetText()) == "Anna Brook" and row.Right:GetText():find("annie, level 41", 1, true), "the row: who, their BattleTag name and level")
+	check(button(LEATHER).Picked:IsShown() and button(TAILORING).Picked:IsShown() and button(HERBALISM).Picked:IsShown()
+		and not button(ENCHANTING).Picked:IsShown(), "their professions light up")
+	check(button(ENCHANTING)._alpha == 0.35 and button(LEATHER)._alpha == 1, "the others dim")
+	row._scripts.OnEnter(row)
+	local box = v.PersonBox
+	check(box:IsShown() and not v.DetailBody:IsShown() and plain(box.Name:GetText()) == "Anna Brook", "hovered: them on the right, no recipe")
+	check(box.rows[1]:IsShown() and box.rows[1].Name:GetText() == "Leatherworking" and box.rows[1].Skill:GetText() == "245" and box.rows[1].Count:GetText() == "5 recipes"
+		and box.rows[3]:IsShown() and box.rows[3].Count:GetText() == "" and not box.rows[4]:IsShown(), "a row per profession: skill and recipes; gathering has none")
+	row._scripts.OnClick(row)
+	local other = personIn("alt")
+	other._scripts.OnEnter(other)
+	check(plain(box.Name:GetText()) == "Anna Brook", "a click keeps them there")
+	box.rows[2]:Click()
+	check(v.Box:GetText() == "Anna" and not box:IsShown() and button(TAILORING).Picked:IsShown(),
+		"one of their professions clicked: its recipes, and the search stays")
+	check(button(LEATHER).Picked:IsShown() and button(ENCHANTING)._alpha == 0.35, "still lit up")
+	local picked = personRow("anna")
+	check(picked and picked.Picked:IsShown(), "with them selected")
+	check(v.middle.entries[1].back and plain(v.middle.rows[1].Name:GetText()) == "Back to the search results", "a way back on top")
+	-- Lit professions and other people, clicked: the search stays through all of it.
+	button(LEATHER):Click()
+	check(v.Box:GetText() == "Anna" and recipeRow(91003) and personRow("anna").Picked:IsShown(), "another lit profession: that person's recipes there")
+	personRow("bob"):Click()
+	check(v.Box:GetText() == "Anna" and recipeRow(91004) and personRow("bob").Picked:IsShown(), "another person: theirs, all of them (no recipe matches)")
+	v.middle.rows[1]:Click()
+	check(personIn("anna") and v.Box:GetText() == "Anna" and not v.middle.entries[1].back, "back: the results again")
+	-- Recipes that match: only those, under a profession clicked.
+	search("Rugged")
+	check(recipeRow(91003) and not recipeRow(91004), "recipes found")
+	button(LEATHER):Click()
+	personRow("bob"):Click()
+	check(recipeRow(91003) and not recipeRow(91004) and v.Box:GetText() == "Rugged", "a person clicked: of theirs, the ones that match")
+	recipeRow(91003):Click()
+	check(v.Box:GetText() == "Rugged" and v.DetailBody:IsShown(), "a recipe clicked: it stays too")
+	v.Clear:Click()
+	check(v.Box:GetText() == "" and not v.middle.entries[1].back and recipeRow(91004) and personRow("bob").Picked:IsShown(), "cleared after a click: on what was clicked, all of it")
+	-- A BattleTag name finds all their characters.
+	search("annie")
+	check(personIn("anna") and personIn("alt"), "a BattleTag name: all their characters")
+	v.Clear:Click()
+	check(button(ENCHANTING)._alpha == 1 and not v.PersonBox:IsShown(), "cleared: back as it was")
+	search("zzz")
+	check(v.Message:IsShown() and v.Message:GetText() == "Nothing found", "nobody and no recipe: it says so")
+	check(button(ENCHANTING)._alpha == 1, "nothing to light up: nothing dims")
+	v.Clear:Click()
+	-- The real thing.
+	if realRecipes and realRecipes.SearchPeople then
+		check(type(realRecipes.SearchPeople("zzzz-nobody")) == "table" and #realRecipes.SearchPeople("") == 0, "C.Recipes' own search for people answers")
+	end
+	fake.SearchPeople = nil
 	win:Hide()
 end
 

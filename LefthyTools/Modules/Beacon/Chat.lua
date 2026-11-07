@@ -40,6 +40,15 @@ local SEND_LIMIT = { chat = 5, announce = 1 } -- at most this many
 local SEND_WINDOW = { chat = 6, announce = 4 } -- in any this many seconds
 local sentAt = { chat = {}, announce = {} } -- my last ones, oldest first
 local CHAT_SOUND = SOUNDKIT and SOUNDKIT.IG_CHAT_SCROLL_UP or 826 -- a very soft tick (setting lefthyChatSound)
+-- What a friend's line can play (setting lefthyChatSoundKit; the game's own sounds, SoundKitConstants).
+local CHAT_SOUNDS = {
+	{ 826, L["Soft tick"] },            -- IG_CHAT_SCROLL_UP
+	{ 3081, L["Whisper"] },             -- TELL_MESSAGE
+	{ 18019, L["Battle.net message"] }, -- UI_BNET_TOAST
+	{ 46893, L["Gentle chime"] },       -- as for a level-up (Ding.lua)
+}
+B.LTCSounds = CHAT_SOUNDS
+local lastSoundKit
 local SOUND_GAP = 1.5 -- a burst of lines ticks once
 local lastSound = -math.huge
 
@@ -320,6 +329,19 @@ local function OnTabClosed(frame)
 	end
 end
 
+-- Picking a sound plays it.
+function B.LTCSoundChanged()
+	local kit = M.db.lefthyChatSoundKit
+	if lastSoundKit and kit ~= lastSoundKit and kit then
+		PlaySound(kit, "SFX")
+	end
+	lastSoundKit = kit
+end
+
+function B.LTCSoundKnown()
+	lastSoundKit = M.db.lefthyChatSoundKit
+end
+
 -- The colour, from the settings: Blizzard's picker.
 function B.PickLTCColour()
 	if not (ColorPickerFrame and ColorPickerFrame.SetupColorPickerAndShow) then
@@ -453,7 +475,9 @@ function B.ReceiveChat(peer, text)
 		local now = GetTime()
 		if M.db.lefthyChatSound and now - lastSound >= SOUND_GAP then
 			lastSound = now
-			PlaySound(CHAT_SOUND, "SFX")
+			if not PlaySound(M.db.lefthyChatSoundKit or CHAT_SOUND, "SFX") then
+				PlaySound(CHAT_SOUND, "SFX")
+			end
 		end
 		FlightSubtitle(line)
 		B.Notify("chat", peer, { text = shown }) -- (the AFK screen)

@@ -954,6 +954,30 @@ do
 	check(#R.Crafters(LEATHER[3]) == 2 and #R.Crafters(2330) == 0, "only those who know it (Anna unlearned it)")
 	check(#R.Crafters(1) == 0, "a spell no line has: nobody")
 
+	-- People: by a character's name or BattleTag name, each once, with all their professions.
+	local someone = first
+	local byName = R.SearchPeople(someone.name:sub(1, 3):upper())
+	local hit
+	for _, match in ipairs(byName) do
+		if match.who.id == someone.id then hit = match end
+	end
+	check(hit and hit.professions[1] and hit.professions[1].line and hit.professions[1].name and hit.professions[1].skill,
+		"a character's name, any case: them, with their professions")
+	local inline = 0
+	for _, prof in ipairs(hit and hit.professions or {}) do
+		if prof.line == 165 then inline = inline + 1; check(prof.count == (function() local n = 0; for _ in pairs(someone.known) do n = n + 1 end return n end)(), "their recipes counted") end
+	end
+	check(inline == 1, "each profession once")
+	check(#R.SearchPeople("") == 0 and #R.SearchPeople("zzzz-nobody") == 0, "nothing typed, or nobody: none")
+	if someone.account and someone.account ~= "" then
+		local byTag = R.SearchPeople(someone.account)
+		local tagged = false
+		for _, match in ipairs(byTag) do
+			tagged = tagged or match.who.id == someone.id
+		end
+		check(tagged, "a BattleTag name finds them too")
+	end
+
 	-- Search.
 	local results = R.Search("HEAVY armor")
 	check(#results == 1 and results[1].recipe.spell == LEATHER[1] and results[1].line == 165 and #results[1].people == 2,

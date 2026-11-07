@@ -101,6 +101,35 @@ do
 	check(printedSince(mark):find("no longer shows", 1, true), "the command: off")
 	LefthyToolsDB.ltcTabs = nil
 
+	-- The sound: the soft tick unless another is picked, and picking one plays it.
+	local options = REGISTERED_SETTINGS["LefthyTools_beacon_lefthyChatSoundKit"]
+	check(options and BB.module.db.lefthyChatSoundKit == 826, "a setting: the soft tick by default")
+	local function soundsSince(mark) local out = {}; for i = mark, #SOUNDS do out[#out + 1] = SOUNDS[i] end; return out end
+	Advance(2)
+	local heard = #SOUNDS + 1
+	say("tick")
+	check(soundsSince(heard)[1] == 826, "a friend's line: the tick")
+	heard = #SOUNDS + 1
+	options:SetValue(2)
+	check(BB.module.db.lefthyChatSoundKit == 3081 and soundsSince(heard)[1] == 3081, "picked: it plays once")
+	Advance(2)
+	heard = #SOUNDS + 1
+	say("whisper")
+	check(soundsSince(heard)[1] == 3081 and #soundsSince(heard) == 1, "then a friend's line plays that")
+	Advance(2)
+	heard = #SOUNDS + 1
+	MOCK_SOUND_MISSING = 3081
+	say("missing")
+	check(soundsSince(heard)[2] == 826, "one the game can't play: the tick")
+	MOCK_SOUND_MISSING = nil
+	options:SetValue(1)
+	BB.module.db.lefthyChatSound = false
+	Advance(2)
+	heard = #SOUNDS + 1
+	say("quiet")
+	check(#soundsSince(heard) == 0, "the sound off: none")
+	BB.module.db.lefthyChatSound = true
+
 	-- The colour.
 	local shown
 	ColorPickerFrame = {

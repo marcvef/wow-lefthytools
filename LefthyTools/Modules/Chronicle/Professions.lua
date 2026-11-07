@@ -30,7 +30,9 @@ local HEAD_H = 40                   -- the details' icon and name
 local REAGENT_H = 18
 local COMPARE_H = 16                -- "Replaces: ..."; the stat lines come under it
 local COMPARE_ROWS = 2              -- a second ring or trinket
+local BACK = "Interface\\Buttons\\UI-SpellbookIcon-PrevPage-Up"
 local OPEN_H = 26                   -- the button on my own profession window
+local PERSON_PROFS, PERSON_ROW_H = 14, 22 -- a person's professions, in the details
 local OPEN_SETTLE, OPEN_LATEST = 0.25, 3 -- seconds: its list has settled; or at the latest
 local OPEN_CHECK = 0.2              -- seconds to go to the recipe, before it's selected directly
 local REAGENTS = 8                  -- what a recipe can need (SpellReagents' columns)
@@ -85,6 +87,8 @@ local line, linePicked        -- the profession shown; chosen by the player (els
 local personId, personPicked  -- who is shown, or EVERYONE; the same
 local person                  -- their entry in people (nil: Everyone)
 local query = ""              -- the search drawn
+local litLines = {}           -- the professions of the people the search found
+local drilled                 -- a profession or person clicked during a search: its recipes show, the search stays
 local beforeSearch            -- where the list and details were when a search began
 local currentGroups = {}      -- what the middle shows: { key, label, entries, ... }
 local collapsed = {}          -- group key -> true: folded
@@ -290,9 +294,45 @@ local function KnownGroups(R)
 	return groups
 end
 
--- A search's matches, by profession in the buttons' order.
+-- During a search, what's shown of the profession or person clicked: all of it if the search found
+-- that person, or nothing of its recipes; else the recipes that match.
+local function DrilledGroups(R)
+	local groups = KnownGroups(R)
+	local found = R.SearchPeople and R.SearchPeople(query) or {}
+	for _, match in ipairs(found) do
+		if person and match.who.id == person.id then
+			return groups
+		end
+	end
+	local matches = {}
+	for _, match in ipairs(R.Search(query)) do
+		if match.line == line then
+			matches[match.recipe.spell] = true
+		end
+	end
+	if not next(matches) then
+		return groups
+	end
+	local kept = {}
+	for _, group in ipairs(groups) do
+		local entries = {}
+		for _, entry in ipairs(group.entries) do
+			if matches[entry.recipe.spell] then
+				entries[#entries + 1] = entry
+			end
+		end
+		if entries[1] then
+			kept[#kept + 1] = { key = group.key, label = group.label, entries = entries }
+		end
+	end
+	return kept[1] and kept or groups
+end
+
+-- A search's matches: the people it finds, then recipes by profession in the buttons' order.
 local function SearchGroups(R)
 	local byLine = {}
+	wipe(litLines)
+	local found = R.SearchPeople and R.SearchPeople(query) or {}
 	for _, match in ipairs(R.Search(query)) do
 		local group = byLine[match.line]
 		if not group then
@@ -302,6 +342,14 @@ local function SearchGroups(R)
 		group.entries[#group.entries + 1] = match
 	end
 	local groups = {}
+	if found[1] then
+		for _, match in ipairs(found) do
+			for _, prof in ipairs(match.professions) do
+				litLines[prof.line] = true
+			end
+		end
+		groups[1] = { key = "search:people", label = L["People"], entries = found }
+	end
 	for _, prof in ipairs(profs) do
 		local group = byLine[prof.line]
 		if group then
@@ -712,11 +760,42 @@ local function FillHead(recipe)
 	view.Difficulty:SetText(color and L["%s finds it: %s"]:format(NameText(person), DIFFICULTY_TEXT[color]()) or "")
 end
 
+-- Who they are, in short: their BattleTag name and level.
+local function PersonSub(who)
+	local level = who.level and who.level > 0 and L["level %d"]:format(who.level) or nil
+	return who.account and level and (who.account .. ", " .. level) or who.account or level or ""
+end
+
+-- A person the search found: who they are, and a row per profession; a click there selects it.
+local function FillPerson(entry)
+	local box = view.PersonBox
+	box:SetShown(entry ~= nil)
+	if not entry then
+		return
+	end
+	box.Name:SetText(NameText(entry.who))
+	box.Sub:SetText(PersonSub(entry.who))
+	for i = 1, PERSON_PROFS do
+		local row, prof = box.rows[i], entry.professions[i]
+		if prof then
+			row.line, row.who = prof.line, entry.who.id
+			row.Icon:SetTexture(prof.icon)
+			row.Name:SetText(prof.name)
+			row.Skill:SetText(tostring(prof.skill or 0))
+			row.Count:SetText(prof.gathering and "" or L["%d recipes"]:format(prof.count or 0))
+			row:Show()
+		else
+			row:Hide()
+		end
+	end
+end
+
 -- Fills the panel from what's in it (shown).
 local function FillDetail()
 	local recipe = shown and shown.recipe
 	view.DetailBody:SetShown(recipe ~= nil)
-	view.Hint:SetShown(recipe == nil and currentGroups[1] ~= nil)
+	view.Hint:SetShown(recipe == nil and currentGroups[1] ~= nil and not (shown and shown.who))
+	FillPerson(shown and shown.who and shown or nil)
 	if not recipe then
 		HideTip()
 		return
@@ -735,7 +814,12 @@ local function FillDetail()
 end
 
 local function SameRecipe(a, b)
-	return a ~= nil and b ~= nil and a.recipe.spell == b.recipe.spell
+	if a == nil or b == nil then
+		return false
+	elseif a.who or b.who then
+		return a.who ~= nil and b.who ~= nil and a.who.id == b.who.id
+	end
+	return a.recipe.spell == b.recipe.spell
 end
 
 local function ShowEntry(entry)
@@ -759,6 +843,9 @@ end
 
 local function Flatten()
 	local entries = {}
+	if query ~= "" and drilled then
+		entries[1] = { header = true, back = true, key = "search:back", label = L["Back to the search results"] }
+	end
 	for _, group in ipairs(currentGroups) do
 		local closed = collapsed[group.key] == true
 		entries[#entries + 1] = { header = true, key = group.key, label = group.label, n = #group.entries, closed = closed }
@@ -771,21 +858,24 @@ local function Flatten()
 	return entries
 end
 
+local DrawButtons -- (below: the search lights them up)
+
 -- The list again: what the selection or search asks for. offset: as in SetEntries.
 local function DrawMiddle(offset)
 	local R = C.Recipes
 	local message
 	view.groupings = view.groupings + 1
 	currentGroups = {}
-	if query ~= "" then
+	if query ~= "" and not drilled then
 		currentGroups = R and SearchGroups(R) or {}
-		message = not currentGroups[1] and L["No recipes found"] or nil
+		message = not currentGroups[1] and L["Nothing found"] or nil
+		DrawButtons()
 	elseif not (R and people[1]) then
 		message = L["Nobody here has this profession yet. Friends appear when they've updated LefthyTools and logged in once."]
 	elseif GatheringNow() then
 		message = L["No recipes: gathering"]
 	else
-		currentGroups = KnownGroups(R)
+		currentGroups = query ~= "" and DrilledGroups(R) or KnownGroups(R)
 		if not currentGroups[1] then
 			message = person and L["No recipes from %s yet: their list comes when they've updated LefthyTools and logged in once."]:format(NameText(person))
 				or L["No recipe lists here yet: they come when friends have updated LefthyTools and logged in once."]
@@ -806,13 +896,22 @@ local function FillItemRow(row, entry)
 	row.Icon:SetShown(not header)
 	local left, right
 	if header then
-		row.Toggle:SetTexture(entry.closed and PLUS or MINUS)
+		row.Toggle:SetTexture(entry.back and BACK or entry.closed and PLUS or MINUS)
 		row.Dot:Hide()
 		row.Count:Hide()
 		row.Picked:Hide()
 		row.Name:SetText(GOLD_TEXT .. entry.label .. "|r")
-		row.Right:SetText(tostring(entry.n))
+		row.Right:SetText(entry.n and tostring(entry.n) or "")
 		left, right = 20, 30
+	elseif entry.who then -- (a search found this person)
+		local who = entry.who
+		row.Icon:SetTexture(entry.professions[1] and entry.professions[1].icon or nil)
+		row.Name:SetText(NameText(who))
+		row.Picked:SetShown(SameRecipe(entry, pinned))
+		row.Dot:Hide()
+		row.Count:Hide()
+		row.Right:SetText(PersonSub(who))
+		left, right = 34, 110
 	else
 		local recipe = entry.recipe
 		row.Icon:SetTexture(RecipeIcon(recipe))
@@ -897,7 +996,9 @@ local function NewItemRow(parent, width, height)
 		if not entry then
 			return
 		end
-		if entry.header then
+		if entry.back then
+			view.BackToResults()
+		elseif entry.header then
 			collapsed[entry.key] = not collapsed[entry.key] or nil
 			view.middle:SetEntries(Flatten(), true)
 			MarkPinned()
@@ -946,7 +1047,7 @@ local function DrawPeople(offset)
 	view.people:SetEntries(entries, offset)
 end
 
-local function DrawButtons()
+function DrawButtons()
 	for i, prof in ipairs(profs) do
 		local button = view.profs[i]
 		if not button then
@@ -959,7 +1060,9 @@ local function DrawButtons()
 		button.Count:SetText(tostring(prof.count or 0))
 		local nobody = (prof.count or 0) == 0
 		button.Name:SetTextColor(nobody and 0.5 or 1, nobody and 0.5 or 1, nobody and 0.5 or 1)
-		button.Picked:SetShown(prof.line == line)
+		local searching = query ~= "" and next(litLines) ~= nil -- (their professions light up, the rest dim)
+		button.Picked:SetShown((searching and litLines[prof.line] == true) or (prof.line == line and (not searching or drilled == true)))
+		button:SetAlpha((searching and not litLines[prof.line]) and 0.35 or 1)
 		button:Show()
 	end
 	for i = #profs + 1, #view.profs do
@@ -1006,13 +1109,10 @@ local function DrawAll()
 	end
 end
 
--- Leaves a search without going back to where it began (a new selection takes over).
-local function DropSearch()
-	searchAt = nil
-	if query ~= "" or (view.Box:GetText() or "") ~= "" then
-		query, beforeSearch = "", nil
-		view.Box:SetText("")
-		view.Clear:Hide()
+-- A click during a search: the search stays, and this is looked at inside it.
+local function Drill()
+	if query ~= "" then
+		drilled = true
 	end
 end
 
@@ -1027,23 +1127,53 @@ local function DrawSelection()
 end
 
 local function SelectProfession(picked)
-	if picked == line and query == "" then
+	if picked == line and (query == "" or drilled) then
 		return
 	end
-	DropSearch()
+	Drill()
 	local R = C.Recipes
 	line, linePicked, personPicked = picked, true, false
 	people = R and R.People(line) or {}
+	-- (searching for a person: them, if they have it)
+	for _, match in ipairs(query ~= "" and R and R.SearchPeople and R.SearchPeople(query) or {}) do
+		local has = false
+		for _, who in ipairs(people) do
+			has = has or who.id == match.who.id
+		end
+		if has then
+			personId, personPicked = match.who.id, true
+			break
+		end
+	end
 	view.people.scroll:SetVerticalScroll(0)
 	DrawSelection()
 end
 
 local function SelectPerson(id)
-	if id == personId and query == "" then
+	if id == personId and (query == "" or drilled) then
 		return
 	end
-	DropSearch()
+	Drill()
 	personId, personPicked = id, true
+	DrawSelection()
+end
+
+-- The search's results again.
+local function BackToResults()
+	drilled = nil
+	pinned, shown = nil, nil
+	DrawMiddle(0)
+	DrawButtons()
+	FillDetail()
+end
+
+-- A found person's profession, clicked: its recipes, inside the search.
+local function OpenPerson(picked, id)
+	Drill()
+	local R = C.Recipes
+	line, linePicked, personId, personPicked = picked, true, id, true
+	people = R and R.People(line) or {}
+	view.people.scroll:SetVerticalScroll(0)
 	DrawSelection()
 end
 
@@ -1118,7 +1248,7 @@ local function RunDue(self)
 				beforeSearch = { offset = view.middle.scroll:GetVerticalScroll() or 0, pinned = pinned, shown = shown }
 			end
 			if text ~= query then
-				query = text
+				query, drilled = text, nil
 				pinned, shown = nil, nil
 				DrawMiddle(0)
 				FillDetail()
@@ -1129,17 +1259,17 @@ local function RunDue(self)
 		fillAt = nil
 		if namesOld then
 			view.middle:Lay()
-			if shown then
+			if shown and shown.recipe then
 				FillHead(shown.recipe)
 				FillReagents(shown.recipe)
 				if tipCame then
 					ShowTip(shown.recipe)
 				end
 			end
-		elseif bagsOld and shown then
+		elseif bagsOld and shown and shown.recipe then
 			FillReagents(shown.recipe)
 		end
-		if shown and (gearOld or tipCame) then -- (what I wear changed; the item came: it can compare now)
+		if shown and shown.recipe and (gearOld or tipCame) then -- (what I wear changed; the item came: it can compare now)
 			FillCompare(shown.recipe)
 			LayBelow(shown.recipe)
 			FitTip()
@@ -1162,10 +1292,17 @@ local function EndSearch()
 		return
 	end
 	query = ""
+	wipe(litLines)
+	DrawButtons()
 	local before = beforeSearch or {}
 	beforeSearch = nil
-	pinned, shown = before.pinned, before.shown
-	DrawMiddle(before.offset or 0)
+	if drilled then -- (it stays on what was clicked last)
+		drilled, pinned, shown = nil, nil, nil
+		DrawMiddle(0)
+	else
+		pinned, shown = before.pinned, before.shown
+		DrawMiddle(before.offset or 0)
+	end
 	FillDetail()
 end
 
@@ -1189,7 +1326,7 @@ local function OnEvent(_, event, id)
 		end
 		waiting[id] = nil
 		namesOld = true
-		tipCame = tipCame or (shown ~= nil and shown.recipe.item == id)
+		tipCame = tipCame or (shown ~= nil and shown.recipe ~= nil and shown.recipe.item == id)
 		fillAt = fillAt or GetTime() + NAMES_GAP
 		Due()
 	elseif shown then -- BAG_UPDATE_DELAYED: the "(you: 12)" lines; PLAYER_EQUIPMENT_CHANGED: the comparison
@@ -1304,6 +1441,35 @@ local function NewReagentRow(parent, i)
 	return row
 end
 
+-- One of a found person's professions: a click selects it, with them.
+local function NewPersonProfRow(parent, i)
+	local row = CreateFrame("Button", nil, parent)
+	row:SetSize(view.detailW - 4, PERSON_ROW_H)
+	row:SetPoint("TOPLEFT", 2, -44 - (i - 1) * PERSON_ROW_H)
+	row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+	row.Icon = row:CreateTexture(nil, "ARTWORK")
+	row.Icon:SetSize(16, 16)
+	row.Icon:SetPoint("LEFT", 2, 0)
+	row.Icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+	row.Name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.Name:SetPoint("LEFT", 22, 0)
+	row.Name:SetPoint("RIGHT", -96, 0)
+	row.Name:SetJustifyH("LEFT")
+	row.Name:SetWordWrap(false)
+	row.Count = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	row.Count:SetPoint("RIGHT", -2, 0)
+	row.Count:SetWidth(60)
+	row.Count:SetJustifyH("RIGHT")
+	row.Skill = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	row.Skill:SetPoint("RIGHT", row.Count, "LEFT", -4, 0)
+	row:SetScript("OnClick", function(self)
+		if self.line then
+			view.OpenPerson(self.line, self.who)
+		end
+	end)
+	return row
+end
+
 -- "Replaces: <what I wear>" and the game's stat lines under it. Hovered: its tooltip, beside the window.
 local function NewCompareRow(parent)
 	local row = CreateFrame("Button", nil, parent)
@@ -1391,6 +1557,23 @@ local function BuildDetail(root, x, width, height)
 	view.OpenMine:SetSize(math.min(width - 4, 220), 22)
 	view.OpenMine:Hide()
 	body:Hide()
+	local box = CreateFrame("Frame", nil, panel)
+	view.PersonBox = box
+	box:SetAllPoints()
+	box.Name = box:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	box.Name:SetPoint("TOPLEFT", 4, -4)
+	box.Name:SetPoint("RIGHT", -4, 0)
+	box.Name:SetJustifyH("LEFT")
+	box.Name:SetWordWrap(false)
+	box.Sub = box:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	box.Sub:SetPoint("TOPLEFT", 4, -24)
+	box.Sub:SetPoint("RIGHT", -4, 0)
+	box.Sub:SetJustifyH("LEFT")
+	box.rows = {}
+	for i = 1, PERSON_PROFS do
+		box.rows[i] = NewPersonProfRow(box, i)
+	end
+	box:Hide()
 end
 
 local function Build(parent, width, height)
@@ -1430,6 +1613,7 @@ local function Build(parent, width, height)
 		split:SetPoint("TOPLEFT", x, -PANES_Y)
 		split:SetHeight(paneH)
 	end
+	view.OpenPerson, view.BackToResults = OpenPerson, BackToResults
 	local detailX = middleX + MIDDLE_W + GAP
 	BuildDetail(root, detailX, width - detailX - PAD - EDGE, paneH)
 end
@@ -1448,7 +1632,7 @@ function C.DrawProfessions(parent, width, height)
 	if view.draws == 0 or view.drawnRecipes ~= R or (R and R.Revision() ~= view.drawnRevision) then
 		DrawAll()
 	elseif shown then
-		FillReagents(shown.recipe) -- (the bags may have changed while it was closed)
+		FillDetail() -- (the bags may have changed while it was closed)
 	end
 end
 
