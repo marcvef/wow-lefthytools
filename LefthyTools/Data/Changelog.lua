@@ -446,5 +446,8 @@ ns.CHANGELOG = {
 	{ id = 146, module = "chronicle",
 		en = { "Recipes against your gear", "In the Professions tab, gear shows what it would change against what you wear, and a recipe you know opens in your profession window with a click." },
 		de = { "Rezepte im Vergleich zur Ausrüstung", "Im Tab Berufe zeigt Ausrüstung, was sie gegenüber deiner aktuellen ändern würde, und ein Rezept, das du kennst, öffnest du per Klick in deinem Berufsfenster." } },
+	{ id = 147, module = "beacon",
+		en = { "LTC in its own chat tab", "Tick LTC in a chat tab's settings to show it there. A tab out of sight flashes on new lines, and LTC's colour is now a setting." },
+		de = { "LTC in einem eigenen Chat-Tab", "Kreuze LTC in den Einstellungen eines Chat-Tabs an, um es dort anzuzeigen. Ein verdeckter Tab blinkt bei neuen Zeilen, und die Farbe von LTC lässt sich einstellen." } },
 	-- New entries go here, at the end.
 }
