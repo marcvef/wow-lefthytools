@@ -449,5 +449,11 @@ ns.CHANGELOG = {
 	{ id = 147, module = "beacon",
 		en = { "LTC in its own chat tab", "Tick LTC in a chat tab's settings to show it there. A tab out of sight flashes on new lines, and LTC's colour is now a setting." },
 		de = { "LTC in einem eigenen Chat-Tab", "Kreuze LTC in den Einstellungen eines Chat-Tabs an, um es dort anzuzeigen. Ein verdeckter Tab blinkt bei neuen Zeilen, und die Farbe von LTC lässt sich einstellen." } },
+	{ id = 148, module = "chronicle",
+		en = { "Find people in the Professions tab", "The search in the Professions tab also finds a character or BattleTag name, and lights up their professions." },
+		de = { "Personen im Tab Berufe finden", "Die Suche im Tab Berufe findet auch Charakter- und BattleTag-Namen und hebt deren Berufe hervor." } },
+	{ id = 149, module = "beacon",
+		en = { "A choice of sounds for LTC", "Beacon's settings now let you choose the sound a friend's LTC line plays." },
+		de = { "Töne für LTC zur Auswahl", "In den Beacon-Einstellungen wählst du jetzt den Ton für die LTC-Zeilen deiner Freunde." } },
 	-- New entries go here, at the end.
 }
