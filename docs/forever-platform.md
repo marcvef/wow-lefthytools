@@ -7,7 +7,7 @@ Facts verified against client builds 1.60.1.70009 and 1.60.1.70170.
 - Forever is Classic content on the **retail (Midnight 12.x) client and API**, including Edit
   Mode, the Cooldown Manager, a built-in damage meter and swing timer, and Midnight's addon
   restrictions.
-- **Mail:** the recipient is the full name, "Anna Brook"; a realm suffix doesn't work (the user, on the release).
+- **Mail:** the recipient is the full name, "Anna Brook"; a realm suffix doesn't work (seen on the release).
 - **Controller symbols:** a config's `labelStyle` picks them; a config holding only that keeps the game's
   mappings (`docs/misc-tweaks.md`).
 - **Hits and health:** `UNIT_COMBAT`'s amount has been secret since 1.60.1.70755, and addons can't read live
