@@ -461,5 +461,8 @@ ns.CHANGELOG = {
 	{ id = 151, module = "general",
 		en = { "A settings window of its own", "LefthyTools' settings moved out of Blizzard's Options into their own window, with a search and real dropdowns. Your settings stay as they were. Open it with /lefthy." },
 		de = { "Ein eigenes Einstellungsfenster", "Die Einstellungen von LefthyTools sind aus Blizzards Optionen in ein eigenes Fenster gezogen, mit Suche und echten Auswahllisten. Deine Einstellungen bleiben, wie sie waren. Du öffnest es mit /lefthy." } },
+	{ id = 152, module = "tweaks",
+		en = { "Quest lines wait out the fight", "Quest progress in party chat is now sent after the fight, so the game no longer blocks it in dungeons and shows an error." },
+		de = { "Quest-Zeilen warten den Kampf ab", "Questfortschritt im Gruppenchat wird jetzt nach dem Kampf gesendet, damit das Spiel ihn in Dungeons nicht mehr blockiert und einen Fehler zeigt." } },
 	-- New entries go here, at the end.
 }
