@@ -9,9 +9,10 @@ local LT = ns.LT
 -- after Blizzard's own layout (a post-hook on the bag's UpdateItemLayout) and after its item updates
 -- (UpdateItems, on the next frame): the bag buttons in a row at the top, then the items in sections
 -- with a small header each (gear, consumables, trade goods, quest items, other, junk, the free
--- slots), sorted in each. Unless asked for (Misc Tweaks), only the backpack's button stays in the row
--- (the way to the bag menu; the others are needed only to change bags) and one free slot stands for
--- all, its header saying how many. The selected item's tooltip goes beside the bag. Blizzard's item buttons stay
+-- slots), sorted in each. The bag buttons' row folds away under a "Bags" header of its own (a button:
+-- click it, or A with the controller; Misc Tweaks' gamepadBagButtons keeps the choice), since they're
+-- needed only to change bags; and unless asked for, one free slot stands for all, its header saying
+-- how many. The selected item's tooltip goes beside the bag. Blizzard's item buttons stay
 -- Blizzard's (they do the secure use, equip, sell, split and drag); only where they sit changes.
 --
 -- Navigation: SmartNavigation's grid mode counts the buttons of each column, which sections with
@@ -56,6 +57,7 @@ local contentWidth    -- the bag's width for our columns (Misc Tweaks' gamepadBa
 local freeCount = 0   -- free slots in the last layout (one of them shown, unless all are wanted)
 local tucked = {}     -- Blizzard's buttons we hid (the other bags' buttons, the other free slots)
 local countText       -- the free slots' count on the one shown
+local bagsToggle      -- the "Bags" header: a button that folds the bag buttons' row away and back
 local placedColumns   -- the columns of the last layout
 local placedCount     -- the free slots' count in the last layout
 local placedAllFree   -- whether that layout had every free slot
@@ -232,13 +234,41 @@ local function StripButtons()
 	if keyring then
 		list[#list + 1] = keyring
 	end
+	list.count = #list
 	if not Setting("gamepadBagButtons", false) then
 		list.tucked = {}
-		for i = #list, 2, -1 do
-			table.insert(list.tucked, table.remove(list, i)) -- (the backpack's stays: the bag menu)
+		for i = #list, 1, -1 do
+			table.insert(list.tucked, table.remove(list, i)) -- (folded under the "Bags" header)
 		end
 	end
 	return list
+end
+
+-- The "Bags" header: a button on the bag (so the controller can land on it), folding the row away or
+-- back. The choice goes through the setting (its checkbox follows); laid out again on the next frame.
+local function Toggle(frame)
+	if not bagsToggle then
+		bagsToggle = CreateFrame("Button", nil, frame)
+		bagsToggle.Sign = bagsToggle:CreateTexture(nil, "ARTWORK")
+		bagsToggle.Sign:SetSize(12, 12)
+		bagsToggle.Sign:SetPoint("LEFT", 1, 0)
+		bagsToggle.Text = bagsToggle:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		bagsToggle.Text:SetPoint("LEFT", bagsToggle.Sign, "RIGHT", 4, 0)
+		bagsToggle.Line = bagsToggle:CreateTexture(nil, "ARTWORK")
+		bagsToggle.Line:SetColorTexture(1, 0.82, 0, 0.25)
+		bagsToggle.Line:SetHeight(1)
+		bagsToggle.Line:SetPoint("LEFT", bagsToggle.Text, "RIGHT", 5, 0)
+		bagsToggle:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		bagsToggle:SetScript("OnClick", function()
+			local tweaks = LT:GetModule("tweaks")
+			if tweaks and tweaks.db then
+				LT:SetModuleSetting(tweaks, "gamepadBagButtons", not Setting("gamepadBagButtons", false))
+			end
+		end)
+	end
+	bagsToggle:SetParent(frame)
+	bagsToggle:SetFrameLevel(frame:GetFrameLevel() + 4)
+	return bagsToggle
 end
 
 -- Blizzard's buttons back that we hid (ours gone, or wanted again). Not a protected one in a fight.
@@ -424,7 +454,8 @@ local function Place(frame, groups, strip)
 	placedColumns, placedCount = cols, freeCount
 	placedAllFree = Setting("gamepadBagAllFree", false)
 	contentWidth = cols * w + (cols - 1) * SPACING + (frame.GetPaddingWidth and frame:GetPaddingWidth() or 15)
-	local height = #strip > 0 and h + STRIP_GAP or 0
+	local open = #strip > 0
+	local height = HEADER + (open and h + STRIP_GAP or SECTION_GAP) -- (the "Bags" header, the row when open)
 	for _, group in ipairs(groups) do
 		if group[1] then
 			local rows = math.ceil(#group / cols)
@@ -437,22 +468,30 @@ local function Place(frame, groups, strip)
 		button:ClearAllPoints()
 		button:SetPoint("BOTTOMRIGHT", rel, relPoint, ax - (cols - col) * (w + SPACING), ay + height - top - h)
 	end
+	local left, gridWidth = ax - cols * (w + SPACING) + SPACING, cols * w + (cols - 1) * SPACING
+	local toggle = Toggle(frame)
+	toggle:ClearAllPoints()
+	toggle:SetPoint("BOTTOMLEFT", rel, relPoint, left, ay + height - HEADER)
+	toggle:SetSize(gridWidth, HEADER)
+	toggle.Sign:SetTexture(open and "Interface\\Buttons\\UI-MinusButton-Up" or "Interface\\Buttons\\UI-PlusButton-Up")
+	toggle.Text:SetText(L["Bags (%d)"]:format(strip.count or #strip))
+	toggle.Line:SetWidth(math.max(1, gridWidth - toggle.Text:GetStringWidth() - 25))
+	toggle:Show()
 	wipe(stripped)
 	stripped.all = Setting("gamepadBagButtons", false)
 	for i, b in ipairs(strip) do
-		Put(b, math.min(i, cols), 0)
+		Put(b, math.min(i, cols), HEADER)
 		stripped[i] = b
 		bagButtons[b] = true
 	end
-	local rows = { stripped[1] and stripped or nil }
+	local rows = { { toggle }, stripped[1] and stripped or nil }
 	overlay:SetParent(frame)
 	overlay:ClearAllPoints()
 	overlay:SetAllPoints(frame)
 	overlay:SetFrameLevel(frame:GetFrameLevel() + 3)
 	overlay:Show()
 	wipe(order); wipe(laidOut); wipe(starts)
-	local top, shown = #strip > 0 and h + STRIP_GAP or 0, 0
-	local left, gridWidth = ax - cols * (w + SPACING) + SPACING, cols * w + (cols - 1) * SPACING
+	local top, shown = HEADER + (open and h + STRIP_GAP or SECTION_GAP), 0
 	for s, group in ipairs(groups) do
 		if group[1] then
 			shown = shown + 1
@@ -516,6 +555,9 @@ local function Unapply()
 	Untuck() -- (Blizzard's layout has them all)
 	if overlay then
 		overlay:Hide()
+	end
+	if bagsToggle then
+		bagsToggle:Hide()
 	end
 end
 
@@ -647,7 +689,8 @@ local function Relayout()
 		return
 	end
 	local groups = Sort(frame)
-	if applied and SameLayout(groups) and placedColumns == Columns() and placedCount == freeCount then
+	if applied and SameLayout(groups) and placedColumns == Columns() and placedCount == freeCount
+		and stripped.all == Setting("gamepadBagButtons", false) and placedAllFree == Setting("gamepadBagAllFree", false) then
 		return
 	end
 	local current = SmartNavigation and SmartNavigation.GetCurrentButton and SmartNavigation:GetCurrentButton()
@@ -749,6 +792,11 @@ function ns.GamepadBagsColumns()
 		dirty = true
 		driver:Show()
 	end
+end
+
+-- For the tests: the "Bags" header's button.
+function ns.GamepadBagsToggle()
+	return bagsToggle
 end
 
 -- For the tests: whether ours is shown, the item buttons in its order, the bag buttons' row, the

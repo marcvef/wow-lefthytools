@@ -95,7 +95,8 @@ do
 	check(x == -378 and y == 382 - 56, "the next section a row lower")
 	x, y = At(Slot(0, 4))
 	check(x == -378 and y == 4 + 474 - (44 + 6 * 56 + 15) - 37, "the free slots last")
-	check(bag:GetHeight() == 214 - 121 + 474, "the bag as high as our rows (Blizzard's grid's height taken out): " .. bag:GetHeight())
+	check(bag:GetHeight() == 214 - 121 + 15 + 474, "the bag as high as our rows and the \"Bags\" header (Blizzard's grid's height taken out): "
+		.. bag:GetHeight())
 	-- Up and down where the next row is shorter: a jump to its last button (SmartNavigation looks only
 	-- 45 degrees to each side); straight below or above otherwise.
 	local function Down(b) return b["smartNavigationOverride-down"] end
@@ -188,8 +189,18 @@ do
 	st = State()
 	local freeHeader = st.headers[#st.headers] or ""
 	local free = tonumber(freeHeader:match("^Free slots %((%d+)%)$"))
-	check(#st.strip == 1 and st.strip[1] == GamepadBagBar.BagButtonArray[1] and not GamepadBagBar.BagButtonArray[2]:IsShown(),
-		"the backpack's button alone in the row, the other bags' hidden")
+	local toggle = ns.GamepadBagsToggle()
+	check(#st.strip == 0 and not GamepadBagBar.BagButtonArray[1]:IsShown() and not GamepadBagBar.BagButtonArray[2]:IsShown()
+		and toggle and toggle:IsShown() and toggle.Text:GetText() == "Bags (5)",
+		"the bag buttons' row folded away under its header, got " .. tostring(toggle and toggle.Text:GetText()))
+	local foldedHigh = bag:GetHeight()
+	toggle:Click()
+	Wait(1)
+	check(M.db.gamepadBagButtons == true and #State().strip == 5 and GamepadBagBar.BagButtonArray[2]:IsShown()
+		and bag:GetHeight() == foldedHigh + 37 + 7 - 4, "clicking the header: the row open (its setting follows), the bag a row higher")
+	toggle:Click()
+	Wait(1)
+	check(M.db.gamepadBagButtons == false and #State().strip == 0 and bag:GetHeight() == foldedHigh, "clicking it again: folded")
 	check(free and free > 1 and #st.order == everyItem - (free - 1), "one free slot for all, its header says how many: " .. freeHeader)
 	check(#BLOCKED == blocked and #ERRORS == errors, "nothing blocked, no errors")
 	T("gamepadBagButtons"):SetValue(true)

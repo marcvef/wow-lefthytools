@@ -79,9 +79,10 @@ still says gamepad (it began there).
 
 ## gamepadBags: the bags with a controller (GamepadBags.lua)
 
-Shown by default: only the backpack's button in the row (the way to the bag menu; the others matter only to
-change a bag) and one free slot (the first in the bags' order) for all, with the count on it and in its header
-("Free slots (12)"). `gamepadBagButtons` and `gamepadBagAllFree` bring the rest back. The others are hidden
+By default the bag buttons' row is folded away under a "Bags (5)" header: our own button on the bag, so the
+controller lands on it too; a click (A) flips `gamepadBagButtons` (its checkbox follows) and the bag is laid
+out again on the next frame. One free slot (the first in the bags' order) stands for all, with the count on
+it and in its header ("Free slots (12)"); `gamepadBagAllFree` brings every one back. The others are hidden
 (`Tuck`) and shown again whenever ours goes (`Untuck`), so Blizzard's own layout always has them all.
 
 Columns: `gamepadBagColumns` (a slider, 6 to 24, default 10 like Blizzard's grid). Our layout sets the bag's
