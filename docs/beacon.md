@@ -20,7 +20,8 @@ Files, in load order:
 - `Dots.lua` (dot look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
   toast, sounds), `Alerts.lua` (death alerts; a friend in a few lines for lists: `B.FriendLines`,
   `B.FriendRows`, `B.FriendStatus`), `Pings.lua` (map pings), `Items.lua` (showing and offering
-  items), `Handover.lua` (reserved items), `Chat.lua` (LTC, announcements), `Reports.lua` (error
+  items), `Handover.lua` (reserved items), `Chat.lua` (LTC, announcements), `ChatMissed.lua` (LTC lines
+  friends missed), `ChatCalls.lua` (LTC's who's in), `Reports.lua` (error
   reports), `Stream*.lua` (the fight stream), `Beacon.xml` (world map pin templates).
 
 They share state through `ns.Beacon` (`B`): `B.peers` (`gameAccountID -> peer`), the queues
@@ -74,8 +75,10 @@ Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.l
   `B2;cq;<acct>;<since>` send me what's newer, `B2;ct;<acct>;<char>;<u>;<class>;<level>;<line:skill:max,...>` a
   character's professions, `B2;cr;<acct>;<char>;<line>;<v>;<k>;<of>;<text>` part k of a list,
   `B2;ce;<acct>;<u>;<count>` that's all; only to builds from `RECIPES_SINCE` on, at most 700 a minute from one
-  friend), `B2;bf;<build>;<1|0>;<what>` the error you reported is fixed in that build (see "Error
-  reports"; only to builds from `FIXED_SINCE` on), `Q2` switched off. A build that doesn't
+  friend), `b` Beacon's own (`B2;bl` my level, below; `bf;<build>;<1|0>;<what>` the error you reported is fixed in
+  that build, see "Error reports", only to builds from `FIXED_SINCE` on; LTC's `bo`/`bq`/`bm` missed lines and `bw`/`ba` who's in,
+  only to builds from Chat.lua's `LTC_SINCE` on: a call counts as a chat line, the rest at most 80 a minute from one
+  friend; see LTC), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend; one that
   comes sooner, say after a quick `/reload`, is answered once the 5 s are up, not dropped);
@@ -368,6 +371,62 @@ account-bound items aren't shared. An empty slot (no link) is ignored.
   the sound of a friend's line (`LTCSounds`, the game's own; picking one plays it; one it can't play: the
   tick). `lefthyChatColour`
   (hex, Blizzard's `ColorPickerFrame`) colours new lines and the box's header.
+- **Mentions** (setting `lefthyChatMentions`, on): a friend's line (live, missed, a call) with my character's
+  first name or my BattleTag's name part (`BNGetInfo`, "Me" of "Me#1234"), each at least 3 bytes, as a word
+  of its own (no letter, digit or UTF-8 byte on either side; case ignored for ASCII), outside links
+  (`|H...|h...|h` is skipped, so a link's text and data stay whole): the name in white, then LTC's
+  colour again. It flashes the game's taskbar icon (`FlashClientIcon`) and LTC's tabs out of sight
+  (chosen tabs flash for every line anyway; with none chosen the main window's tab flashes for a
+  mention), and plays LTC's sound when `lefthyChatSound` is on: even right after a plain line's tick,
+  but not twice within 1.5 s. My own lines are never mentions.
+- **Lines a friend missed** (`ChatMissed.lua`, setting `lefthyChatMissed`, on): a friend who wasn't online
+  when lines were written gets them when they come online, as `[LTC] (missed, 14:05) [Anna]: text`
+  ("yesterday 23:50" for the day before), with links rebuilt and mentions as usual, no sound unless
+  it's a mention. Only between builds from `LTC_SINCE` on (`B.ReadsLTC(peer)`, Chat.lua; a build that
+  doesn't say, or one without its commit count, counts as older).
+  - *Who keeps them:* the writer, and every friend who got the line live (a relay: so a line reaches
+    a friend who comes online after its writer left), each for their own friends who aren't online
+    now (not a Beacon peer): friends seen on such a build in the last 30 days
+    (`LefthyToolsDB.ltcFriends`, account -> server time; an account is `LT.Hash32` of the lowercased
+    BattleTag, as Chronicle's) who are still Battle.net friends, never the line's writer or me. A friend
+    online on an older build gets the line live and isn't kept for; one never seen on a new build
+    neither. Lines from friends on older builds are kept by relays too (their writers keep nothing).
+    A call goes in as the plain line "Who's in? <text>". Kept in `LefthyToolsDB.ltcHeld`
+    (account-wide: another character passes on what this one kept): `{ a, n, c, t, x, f }` (writer's
+    account, name, class, server time, the text as LTC sends it to new builds, the friends still to
+    get it). The last 24 hours, at most 50 per friend (the newest), 300 in all.
+  - *Passing them on* (`B.TickMissed` on Beacon's tick; friends online looked at every 2 s, once per
+    peer): `B2;bo;<acct>/<acct>/...` whose lines I keep for you (up to 20 writers); the friend answers
+    `B2;bq;<acct>/...` with the writers they take, only their Battle.net friends' and not their own (so
+    no one is sent lines from someone who isn't their friend; the others are forgotten for them), and
+    with LTC or missed lines off they don't answer, so the lines stay for later; then
+    `B2;bm;<acct>;<time>;<class>;<name>;<text>` per line, oldest first, one every 0.5 s through the
+    normal queue (in a fight too: it's chat), each forgotten for that friend once queued. The text is
+    cut to keep the message within 255 bytes (a long line with a long name; a link cut in half goes).
+    Receivers take 80 a minute of these from one friend; a line whose time is more than 24 hours (and
+    10 minutes) old, or in the future, from an account that isn't their friend's, or their own, is
+    dropped.
+  - *Once only:* a line is known by its writer's account and the first 100 bytes of its text, and by its
+    time: copies less than 30 s apart (the holders' times differ by the way there) are one. What was
+    shown (lines that came live too) is kept in `LefthyToolsDB.ltcSeen` for 25 hours (key ->
+    the last 4 times). The cost: the same words from the same friend twice within 30 s show once if
+    both were missed; two holders online at once both send (each friend's copy is dropped on arrival).
+  - Not handled: a friend who `/reload`s while lines come loses those (they're forgotten once queued).
+- **Who's in** (`ChatCalls.lua`): `/ltc who <text>` (`/ltc` only: `/l who wants to come?` stays a line;
+  `/ltc` has a slash command of its own, `LEFTHYTOOLS_LTC`, which passes everything else to `/l`'s).
+  Counts as a chat line for the limits. `B2;bw;<call id>;<text>` (id 1-999, per session) to friends on
+  new builds, who see `[LTC] [Anna]: Who's in? text [I'm in] [Not now]`; older builds get
+  `M2;Who's in? <text>` (the caller's language) and answer by typing. The links are `addon` links
+  (`|Haddon:lefthytools:who:in|out:<gameAccountID>:<id>|h`): Blizzard's `SetItemRef` hands them to
+  `EventRegistry`'s `"SetItemRef"` event (ItemRefHandlersShared.lua), which ChatCalls.lua listens to; they're
+  local lines only. A click sends `B2;ba;<call id>;<1|0>` to the caller (one a second; the last
+  answer counts) and says so in chat. The caller's tally line under their own: "Who's in? text: 2 in
+  (Anna, Bob), 1 not now (Cedric). [Invite all]", redrawn in place (`ScrollingMessageFrame:
+  TransformMessages`, found by its Invite all link's data, at most once a second; a window without it,
+  or with the line gone, gets a new line). Answers count only from friends the call went to.
+  [Invite all] invites, from the click, everyone who's in, online and not in my group
+  (`C_BattleNet.InviteFriend`, as the map's Shift+click). After 15 minutes a call ends: the tally says so
+  without its link, and a friend's links answer "The call has ended."
 - **Announcements** (`/la <text>` or `/lefthy announce <text>`, quotes optional; setting `announcements`):
   `A2;<text>`; `B.ShowAnnouncement` puts "Name: text" into the notice stack of shared items
   (`call.message`, already "done", `hold` 10 s instead of 7; the line wraps at 700 px), with the

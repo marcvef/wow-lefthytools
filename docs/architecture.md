@@ -65,7 +65,9 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Pings.lua   map pings: Alt+click, markers on both maps
   Modules/Beacon/Items.lua   showing and offering items (Need / Pass, the roll)
   Modules/Beacon/Handover.lua  tooltip reminder for won items until traded or mailed
-  Modules/Beacon/Chat.lua    LTC, LefthyTools chat (/ltc, /l) and announcements (/lefthy announce)
+  Modules/Beacon/Chat.lua    LTC, LefthyTools chat (/ltc, /l) and announcements (/lefthy announce), mentions
+  Modules/Beacon/ChatMissed.lua  LTC lines friends missed while offline: kept, passed on, shown once
+  Modules/Beacon/ChatCalls.lua   LTC's who's in (/ltc who): the call, answers, the tally, Invite all
   Modules/Beacon/Reports.lua error reports to friends who collect them (/lefthy report, /lefthy reports)
   Modules/Beacon/Stream.lua  fight stream: asking the game, the test, /lefthy stream
   Modules/Beacon/StreamHealth.lua  fight stream: health, estimated (yours and the mobs')

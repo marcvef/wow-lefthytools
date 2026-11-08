@@ -79,6 +79,8 @@ local M = LT:NewModule("beacon", {
 		lefthyChatSound = true, -- a soft tick when a friend writes there
 		lefthyChatColour = "ffb84d", -- its colour (Chat.lua)
 		lefthyChatSoundKit = 826, -- which sound (Chat.lua lists them): the soft tick
+		lefthyChatMentions = true, -- a line with my name stands out, flashes and plays the sound
+		lefthyChatMissed = true, -- ChatMissed.lua: lines friends missed while offline, kept and passed on
 		announcements = true, -- /lefthy announce: lines in the middle of the screen
 		dingAnnounce = true,
 		dingText = "",
@@ -833,6 +835,13 @@ local function OnMessage(text, senderID)
 			B.ReceiveEchoes(senderID, a, b)
 		elseif a:sub(1, 1) == "c" and Counted(guard, "recipes", RECIPES_LIMIT, RECIPES_WINDOW, now) and B.ReceiveRecipes then
 			B.ReceiveRecipes(senderID, a, b)
+		elseif a:sub(1, 1) == "b" then
+			-- LTC's words (Chat.lua): a call (bw) counts as a chat line; missed lines, their offers and
+			-- answers to calls at most 80 a minute (missed lines come one every half second).
+			local call = a == "bw"
+			if Counted(guard, call and "chat" or "ltc", call and CHAT_LIMIT or 80, call and CHAT_WINDOW or 60, now) then
+				itemsIn[#itemsIn + 1] = { "ltc", senderID, a, b }
+			end
 		end
 	end
 	-- At most one answer per ANSWER_GAP, so repeated hellos can't eat the send budget. One that
@@ -950,6 +959,8 @@ local function HandleItem(peer, item)
 		B.ReceiveChat(peer, item[3]) -- Chat.lua
 	elseif item[1] == "announce" then
 		B.ReceiveAnnouncement(peer, item[3])
+	elseif item[1] == "ltc" then
+		B.ReceiveLTC(peer, item[2], item[3], item[4]) -- Chat.lua: missed lines, who's in
 	elseif item[1] == "answer" then
 		B.ReceiveAnswer(peer, item[2], item[3], item[4])
 	else
@@ -996,6 +1007,8 @@ local function Tick(now, elapsed)
 	LT.Guard("B.UpdatePings", B.UpdatePings, now)
 	LT.Guard("B.TickReports", B.TickReports, now)
 	LT.Guard("B.TickUpdates", B.TickUpdates, now) -- Updates.lua: a friend's newer build, what's new in mine
+	LT.Guard("B.TickMissed", B.TickMissed, now) -- ChatMissed.lua: LTC lines friends missed, offered and passed on
+	LT.Guard("B.TickCalls", B.TickCalls, now) -- ChatCalls.lua: who's in: tallies, calls ending
 	if now - lastExpire >= 1 then
 		Expire(now)
 	end

@@ -169,6 +169,13 @@ minimap, and you on theirs, without being in a group.
   switched off). Links work and can be clicked: items, map pins, professions, spells, quests,
   achievements and the like. The chat box stays on it ("LTC:") until you switch with
   `/s`, `/g`, `/p`, ...
+  - **Missed lines:** if you were offline, you get the LTC lines of the last 24 hours when you come
+    online, marked as missed with their time, from whichever friend was there.
+  - **Mentions:** a line with your character's name or your BattleTag's name stands out, flashes the
+    game's taskbar icon and LTC's tab, and plays LTC's sound.
+  - **Who's in:** `/ltc who <text>` (`/ltc who Deadmines`) asks everyone; they click **I'm in** or
+    **Not now**, you see the tally under your line, and **Invite all** invites those who are in.
+    Friends need this version or newer for these; older ones just see the line.
 - **Announcements:** `/la <text>` (or `/lefthy announce <text>`) puts the line in the middle of their screens,
   where shared items show, with the whisper sound (and in their chat). On a cinematic flight
   both come as subtitles.
@@ -248,8 +255,10 @@ minimap, and you on theirs, without being in a group.
 | Show friends in my group too | on | |
 | Tell me when a friend dies | on | |
 | Show items to friends (Ctrl+right-click) | on | |
-| LTC (LefthyTools chat) | on | `/ltc <text>` (or `/l`) |
+| LTC (LefthyTools chat) | on | `/ltc <text>` (or `/l`), `/ltc who <text>` |
 | Soft sound for LTC | on | |
+| Mentions in LTC | on | |
+| LTC lines you missed | on | |
 | Announcements | on | `/la <text>`, `/lefthy announce <text>` |
 | Map pings (Alt+click on the world map) | on | `/lefthy beacon ping` |
 | Tell my friends when I level up | on | |

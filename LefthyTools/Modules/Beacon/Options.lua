@@ -40,6 +40,10 @@ function M:BuildOptions(o)
 		L["A quiet tick when a friend writes in LTC."])
 	o:Choice("lefthyChatSoundKit", L["Sound for LTC"], L["Which sound a friend's LTC line plays. Picking one plays it."], B.LTCSounds)
 	B.LTCSoundKnown()
+	o:Checkbox("lefthyChatMentions", L["Mentions in LTC"],
+		L["A friend's LTC line with your character's name or your BattleTag's name in it stands out: the name in white, the game's taskbar icon and LTC's chat tab flash, and LTC's sound plays (if it's on)."])
+	o:Checkbox("lefthyChatMissed", L["LTC lines you missed"],
+		L["Friends who were offline get the LTC lines of the last 24 hours when they come online, from whoever was there, marked as missed with their time; you get theirs the same way. Only between friends with this version or newer."])
 	o:Button(L["LTC colour"], L["Choose"], function() B.PickLTCColour() end,
 		L["The colour of LTC's lines and of the chat box while you're writing in it. To show LTC in a chat tab of its own: right-click the tab, Settings, and tick it at the top of the Chat page."])
 	o:Checkbox("announcements", L["Announcements"],
@@ -117,6 +121,7 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy beacon offer <item> - offer it for Need or Pass, like Ctrl+Shift+right-click")
 		self:Print("/lefthy beacon handover [clear] - items you offered that winners still have to get")
 		self:Print("/ltc <text> (or /l) - LTC, LefthyTools chat: a line for every friend with LefthyTools, like guild chat")
+		self:Print("/ltc who <text> - ask who's in (/ltc who Deadmines): friends click I'm in or Not now, you get a tally with Invite all")
 		self:Print("/la <text> (or /lefthy announce <text>) - a line in the middle of your friends' screens")
 	end
 end

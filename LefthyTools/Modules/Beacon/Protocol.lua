@@ -83,7 +83,16 @@ local B = ns.Beacon
 --                       Beacon's own word, from a friend who collects error reports: the error you
 --                       reported (<what>) is fixed (1) or should be (0) in <build>. Only to builds from
 --                       Reports.lua's FIXED_SINCE on; older ones get it as an M2 line, which they show
---   Q2                 module switched off: forget me
+--   B2;bo;<acct>/...    LTC (ChatMissed.lua): whose lines I keep for you, missed while you were offline
+--   B2;bq;<acct>/...    the writers I take (my friends)
+--   B2;bm;<acct>;<time>;<class>;<name>;<text>
+--                       one line I missed: its writer's account, when (server time), their class and name
+--   B2;bw;<call id>;<text>
+--                       LTC's who's in (ChatCalls.lua): /ltc who <text>; older builds get an M2 instead
+--   B2;ba;<call id>;<1|0>
+--                       my answer to it: I'm in, not now
+--                       (the five only to builds from Chat.lua's LTC_SINCE on)
+--   Q2                  module switched off: forget me
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil, before the sender counts as
 -- a friend with the addon), so new kinds can be added without breaking older friends. Older builds

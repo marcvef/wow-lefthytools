@@ -26,8 +26,16 @@ local B = ns.Beacon
 -- Friends on older builds get what theirs understands (LinkLevel, from their version): links as
 -- tokens only where their build turns them back into links, everything else as "[text]", the way
 -- it reached them before.
+--
+-- A line with my character's name or my BattleTag's name in it stands out (setting
+-- lefthyChatMentions): the name in white, the game's taskbar icon and LTC's tab out of sight flash,
+-- and LTC's sound plays. Lines a friend missed while offline: ChatMissed.lua; /ltc who <text>:
+-- ChatCalls.lua. Both speak Beacon's B family (B2;b<word>), only to builds from LTC_SINCE on.
 
 local TEXT_BYTES = 200
+B.LTC_TEXT_BYTES = TEXT_BYTES
+-- The first build that reads LTC's B2;b words (missed lines, who's in): older builds get none of them.
+local LTC_SINCE = "0.7.0-39-g0000000"
 local DEFAULT_COLOUR = "ffb84d"
 -- The colour of LTC: "|cffrrggbb".
 local function ChatColour()
@@ -50,7 +58,9 @@ local CHAT_SOUNDS = {
 B.LTCSounds = CHAT_SOUNDS
 local lastSoundKit
 local SOUND_GAP = 1.5 -- a burst of lines ticks once
-local lastSound = -math.huge
+local lastSound, lastMention = -math.huge, -math.huge
+local MENTION = "|cffffffff" -- my name in a friend's line
+local MENTION_BYTES = 3 -- names shorter than this aren't looked for (they'd be in every other word)
 
 -- The kinds of links that travel besides items (what players link in chat), with the colour the
 -- game gives them for a link that comes without one. Their data may only hold these characters
@@ -87,6 +97,20 @@ local function LinkLevel(version)
 		end
 	end
 	return 1
+end
+B.LTCLinkLevel, B.LTC_FULL = LinkLevel, FULL
+
+-- Does their build read LTC's B2;b words? A build that doesn't say, or one without its commit count
+-- (0.7.0, 0.7.0-g1a2b3c4), counts as older: it gets none.
+function B.ReadsLTC(peer)
+	if not (peer and peer.version) then
+		return false
+	end
+	if peer.ltcBuild ~= peer.version then
+		peer.ltcBuild = peer.version
+		peer.readsLTC = (LT.CompareVersions(peer.version, LTC_SINCE) or -1) >= 0
+	end
+	return peer.readsLTC
 end
 
 local function Token(level, colour, data, shown)
@@ -180,11 +204,99 @@ local function InOrder(text, show)
 	end, LOAD_WAIT)
 end
 
--- "[LTC] [Anna]: text", the name in its class colour.
-local function ChatLine(name, classFile, text)
-	local colour = ChatColour()
-	return ("%s[LTC] [|r%s%s]: %s|r"):format(colour, B.ColouredName(name, classFile), colour, text)
+-- "missed, 14:05" (or "missed, yesterday 23:50"): when a line I missed was written.
+local function MissedNote(t)
+	local clock = date("%H:%M", t)
+	if date("%Y%m%d", t) ~= date("%Y%m%d") then
+		clock = L["yesterday %s"]:format(clock)
+	end
+	return L["missed, %s"]:format(clock)
 end
+
+-- "[LTC] [Anna]: text", the name in its class colour; a line I missed: "[LTC] (missed, 14:05) [Anna]: text".
+local function ChatLine(name, classFile, text, missedAt)
+	local colour = ChatColour()
+	local note = missedAt and ("|cffa0a0a0(" .. MissedNote(missedAt) .. ")|r" .. colour .. " ") or ""
+	return ("%s[LTC] %s[|r%s%s]: %s|r"):format(colour, note, B.ColouredName(name, classFile), colour, text)
+end
+
+-- A line of LTC's own, not a friend's: "[LTC] text" (a call's tally, an answer given).
+function B.LTCNoteLine(text)
+	return ChatColour() .. "[LTC] " .. text .. "|r"
+end
+
+-- The names a friend's line may mention me by, in lower case: my character's first name and my
+-- BattleTag's name ("Me" of "Me#1234"), each MENTION_BYTES long at least.
+local function MyNames()
+	local names = {}
+	local first = LT.Names.First(LT.Value(UnitName, "player"))
+	local tag = BNGetInfo and select(3, pcall(BNGetInfo)) -- (ok, presence ID, BattleTag)
+	tag = LT.Readable(tag) and type(tag) == "string" and tag:match("^([^#]+)") or nil
+	if first and #first >= MENTION_BYTES then
+		names[#names + 1] = first:lower()
+	end
+	if tag and #tag >= MENTION_BYTES and tag:lower() ~= names[1] then
+		names[#names + 1] = tag:lower()
+	end
+	return names
+end
+
+-- A letter or digit (UTF-8's bytes count as letters): what a name mustn't touch to be a word of its own.
+local function IsLetter(byte)
+	return byte ~= nil and (byte >= 128 or (byte >= 48 and byte <= 57) or (byte >= 65 and byte <= 90) or (byte >= 97 and byte <= 122))
+end
+
+-- One piece of a line outside its links: my names in it in MENTION (then the line's colour again).
+local function MarkNames(part, names, colour)
+	local lower, out, pos, found = part:lower(), {}, 1, false
+	while true do
+		local first, last
+		for _, name in ipairs(names) do
+			local from = pos
+			while true do
+				local i, j = lower:find(name, from, true)
+				if not i then
+					break
+				elseif not IsLetter(lower:byte(i - 1)) and not IsLetter(lower:byte(j + 1)) then
+					if not first or i < first then
+						first, last = i, j
+					end
+					break
+				end
+				from = i + 1
+			end
+		end
+		if not first then
+			break
+		end
+		out[#out + 1] = part:sub(pos, first - 1) .. MENTION .. part:sub(first, last) .. "|r" .. colour
+		pos, found = last + 1, true
+	end
+	out[#out + 1] = part:sub(pos)
+	return table.concat(out), found
+end
+
+-- A friend's line as shown: my names stand out, links stay as they are. Second value: it mentions me.
+local function Highlight(text)
+	local names = MyNames()
+	if #names == 0 then
+		return text, false
+	end
+	local colour, out, pos, found = ChatColour(), {}, 1, false
+	while true do
+		local i, j = text:find("|H[^|]*|h.-|h", pos)
+		local part, mentioned = MarkNames(text:sub(pos, i and i - 1 or -1), names, colour)
+		out[#out + 1] = part
+		found = found or mentioned
+		if not i then
+			break
+		end
+		out[#out + 1] = text:sub(i, j)
+		pos = j + 1
+	end
+	return table.concat(out), found
+end
+B.LTCHighlight = Highlight
 
 -- This character's chosen tabs: { [window] = true }, nil if it can't be told.
 local function ChosenTabs(create)
@@ -229,25 +341,36 @@ local function TabChosen(window)
 	return window == MainWindow()
 end
 
--- A line of LTC, in the tabs chosen. Out of sight, a tab flashes as for any chat line (Blizzard's function;
--- its failing must not lose the line).
-local function ShowInChat(line)
-	local tabs = ChosenTabs()
-	local shown = false
-	for window in pairs(tabs or {}) do
+-- A tab out of sight flashes, as for any chat line (Blizzard's function; its failing must not lose the line).
+local function Flash(frame)
+	if frame.IsShown and not frame:IsShown() and FCF_StartAlertFlash then
+		pcall(FCF_StartAlertFlash, frame)
+	end
+end
+
+-- A line of LTC, in the tabs chosen (a chosen tab out of sight flashes); none chosen: the main window,
+-- which flashes too for a line that mentions me (alert). Returns the windows it went to (a call's
+-- tally is redrawn there).
+local function ShowInChat(line, alert)
+	local frames = {}
+	for window in pairs(ChosenTabs() or {}) do
 		local frame = ChatWindow(window)
 		if frame then
 			frame:AddMessage(line)
-			shown = true
-			if frame.IsShown and not frame:IsShown() and FCF_StartAlertFlash then
-				pcall(FCF_StartAlertFlash, frame)
-			end
+			frames[#frames + 1] = frame
+			Flash(frame)
 		end
 	end
-	if not shown then
+	if not frames[1] then
 		print(line)
+		frames[1] = ChatWindow(MainWindow())
+		if alert and frames[1] then
+			Flash(frames[1])
+		end
 	end
+	return frames
 end
+B.LTCShowInChat = ShowInChat
 
 -- One tab switched. Nothing left: the main window again (a line is never shown nowhere).
 local function SetTab(window, on)
@@ -397,43 +520,78 @@ local function FlightSubtitle(text)
 	end
 end
 
-local function Send(kind, text)
-	local raw = (strtrim(text or ""):gsub('^"(.*)"$', "%1")) -- /lefthy announce "text"
+-- The line as each build gets it: Packer(raw)(level), worked out once per level.
+local function Packer(raw)
 	local packed = {} -- level -> the line as that build gets it
-	local function Packed(level)
+	return function(level)
 		if not packed[level] then
 			-- (cut to size: a link cut in half goes)
 			packed[level] = (B.Clean(PackLinks(raw, level), TEXT_BYTES):gsub("{%a+:[^}]*$", ""))
 		end
 		return packed[level]
 	end
-	text = Packed(FULL)
+end
+B.LTCPacker = Packer
+
+local USAGE = {
+	chat = "/ltc <text> (or /l) sends a line to every friend with LefthyTools.",
+	announce = "/la <text> (or /lefthy announce <text>) puts a line in the middle of your friends' screens.",
+	who = "/ltc who <text> asks your friends with LefthyTools who's in (/ltc who Deadmines): they answer with a click.",
+}
+
+-- Whether a line of this kind ("chat", "announce", "who": a call counts as a chat line) may go now; if
+-- not, chat says why. empty: there's nothing to send. True: it's counted as sent.
+local function MaySend(kind, empty)
+	local announce = kind == "announce"
 	if not M.enabled then
 		M:Print("Beacon is off: /lefthy enable beacon.")
-		return
+		return false
 	end
-	if not M.db[kind == "chat" and "lefthyChat" or "announcements"] then
-		M:Print((kind == "chat" and "LTC is" or "announcements are") .. " off (Beacon settings).")
-		return
+	if not M.db[announce and "announcements" or "lefthyChat"] then
+		M:Print((announce and "announcements are" or "LTC is") .. " off (Beacon settings).")
+		return false
 	end
-	if text == "" then
-		M:Print(kind == "chat" and "/ltc <text> (or /l) sends a line to every friend with LefthyTools."
-			or "/la <text> (or /lefthy announce <text>) puts a line in the middle of your friends' screens.")
-		return
+	if empty then
+		M:Print(USAGE[kind])
+		return false
 	end
 	local now = GetTime()
+	kind = announce and "announce" or "chat"
 	local times, limit = sentAt[kind], SEND_LIMIT[kind]
 	if #times >= limit and now - times[#times - limit + 1] < SEND_WINDOW[kind] then
 		M:Print("not so fast: try again in a moment.")
-		return
+		return false
 	end
 	if not next(B.peers) then
 		M:Print("no friends with LefthyTools online.")
-		return
+		return false
 	end
 	times[#times + 1] = now
 	if #times > limit then
 		table.remove(times, 1)
+	end
+	return true
+end
+B.LTCMaySend = MaySend
+
+-- My own line in my chat window, as in guild chat (named as friends see me); then(shown) after it.
+local function ShowMine(text, after)
+	UnpackLinks(text, function(shown) -- what my friends see
+		local _, classFile = UnitClass("player")
+		ShowInChat(ChatLine(B.MyName(), classFile, shown))
+		if after then
+			after(shown)
+		end
+	end)
+end
+B.LTCShowMine = ShowMine
+
+local function Send(kind, text)
+	local raw = (strtrim(text or ""):gsub('^"(.*)"$', "%1")) -- /lefthy announce "text"
+	local Packed = Packer(raw)
+	text = Packed(FULL)
+	if not MaySend(kind, text == "") then
+		return
 	end
 	local prefix = (kind == "chat" and "M" or "A") .. B.VERSION .. ";"
 	for gameAccountID, peer in pairs(M:GetPeers()) do
@@ -443,14 +601,16 @@ local function Send(kind, text)
 		end
 	end
 	WarnOldFriends(text)
-	UnpackLinks(text, function(shown) -- what my friends see
-		if kind == "chat" then
-			local _, classFile = UnitClass("player")
-			ShowInChat(ChatLine(B.MyName(), classFile, shown)) -- my own line, as in guild chat (named as friends see me)
-		else
-			B.ShowAnnouncement(nil, shown)
+	if kind == "chat" then
+		if B.LTCHold then
+			B.LTCHold(text) -- ChatMissed.lua: kept for friends who aren't online now
 		end
-	end)
+		ShowMine(text)
+	else
+		UnpackLinks(text, function(shown)
+			B.ShowAnnouncement(nil, shown)
+		end)
+	end
 end
 
 function B.SendChat(text)
@@ -461,27 +621,74 @@ function B.Announce(text)
 	Send("announce", text)
 end
 
+-- A friend's line plays LTC's sound: once for a burst; a line that mentions me always (but not
+-- twice within SOUND_GAP), a line I missed only then (they come in a row).
+local function LineSound(mention, missed)
+	local now = GetTime()
+	if not M.db.lefthyChatSound then
+		return
+	elseif mention then
+		if now - lastMention < SOUND_GAP then
+			return
+		end
+		lastMention = now
+	elseif missed or now - lastSound < SOUND_GAP then
+		return
+	end
+	lastSound = now
+	if not PlaySound(M.db.lefthyChatSoundKit or CHAT_SOUND, "SFX") then
+		PlaySound(CHAT_SOUND, "SFX")
+	end
+end
+
+-- A friend's line (cleaned), in the order they came: links rebuilt, my name standing out, the sound.
+-- opts: missed (the time it was written: a line I missed), after (text after it: a call's
+-- buttons), peer (who sent it live: the AFK screen and flights hear of it).
+local function ShowFriend(name, classFile, text, opts)
+	InOrder(text, function(shown)
+		if not (M.enabled and M.db.lefthyChat) then
+			return -- (switched off while an item was loading)
+		end
+		local marked, mention = shown, false
+		if M.db.lefthyChatMentions then
+			marked, mention = Highlight(shown)
+		end
+		local line = ChatLine(name, classFile, marked .. (opts.after or ""), opts.missed)
+		ShowInChat(line, mention)
+		LineSound(mention, opts.missed)
+		if mention and FlashClientIcon then
+			pcall(FlashClientIcon) -- (the game's icon on the taskbar)
+		end
+		if opts.peer then
+			FlightSubtitle(line)
+			B.Notify("chat", opts.peer, { text = shown }) -- (the AFK screen)
+		end
+	end)
+end
+B.LTCShowFriend = ShowFriend
+
 -- On Beacon's tick (Beacon.lua hands them over).
 function B.ReceiveChat(peer, text)
 	if not M.db.lefthyChat then
 		return
 	end
-	InOrder(B.Clean(text, TEXT_BYTES), function(shown)
-		if not (M.enabled and M.db.lefthyChat) then
-			return -- (switched off while an item was loading)
+	text = B.Clean(text, TEXT_BYTES)
+	if B.LTCHeard then
+		B.LTCHeard(peer, text) -- ChatMissed.lua: seen, and kept for my friends who aren't online now
+	end
+	ShowFriend(peer.name, peer.classFile, text, { peer = peer })
+end
+
+-- LTC's B2;b words (Beacon.lua hands them over on its tick): who's in (ChatCalls.lua), missed lines
+-- (ChatMissed.lua).
+function B.ReceiveLTC(peer, id, word, rest)
+	if word == "bw" or word == "ba" then
+		if B.ReceiveCall then
+			B.ReceiveCall(peer, id, word, rest)
 		end
-		local line = ChatLine(peer.name, peer.classFile, shown)
-		ShowInChat(line)
-		local now = GetTime()
-		if M.db.lefthyChatSound and now - lastSound >= SOUND_GAP then
-			lastSound = now
-			if not PlaySound(M.db.lefthyChatSoundKit or CHAT_SOUND, "SFX") then
-				PlaySound(CHAT_SOUND, "SFX")
-			end
-		end
-		FlightSubtitle(line)
-		B.Notify("chat", peer, { text = shown }) -- (the AFK screen)
-	end)
+	elseif B.ReceiveMissed then
+		B.ReceiveMissed(peer, id, word, rest)
+	end
 end
 
 function B.ReceiveAnnouncement(peer, text)
@@ -615,13 +822,23 @@ end)
 -- /ltc or /l like /g or /p, and the box stays on it; /lchat in case another addon has /l. /la: announce.
 SLASH_LEFTHYTOOLS_CHAT1 = "/l"
 SLASH_LEFTHYTOOLS_CHAT2 = "/lchat"
-SLASH_LEFTHYTOOLS_CHAT3 = "/ltc"
 SlashCmdList.LEFTHYTOOLS_CHAT = function(msg, editBox)
 	EnterLefthyMode(editBox) -- (typed in a chat box; nil from a macro)
 	if strtrim(msg or "") == "" and M.enabled and M.db.lefthyChat then
 		M:Print("LTC: what you type now goes to your friends with LefthyTools. /s, /g, /p, ... switch back.")
 	else
 		B.SendChat(msg) -- (or why it can't)
+	end
+end
+-- /ltc is /l, and /ltc who <text> asks who's in (ChatCalls.lua). Only /ltc: "/l who wants to come?" is a line.
+SLASH_LEFTHYTOOLS_LTC1 = "/ltc"
+SlashCmdList.LEFTHYTOOLS_LTC = function(msg, editBox)
+	local word, rest = strtrim(msg or ""):match("^(%S+)%s*(.-)$")
+	if word and word:lower() == "who" and B.WhoCall then
+		EnterLefthyMode(editBox)
+		B.WhoCall(rest)
+	else
+		SlashCmdList.LEFTHYTOOLS_CHAT(msg, editBox)
 	end
 end
 SLASH_LEFTHYTOOLS_ANNOUNCE1 = "/la"
