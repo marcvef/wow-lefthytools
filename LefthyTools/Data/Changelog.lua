@@ -489,7 +489,7 @@ ns.CHANGELOG = {
 		en = { "Fight stream: no blocked action", "Sharing your fights no longer causes an error about a blocked action a few seconds into a fight: distances to enemies come from spell ranges only while you fight." },
 		de = { "Kampf-Stream: keine blockierte Aktion", "Das Teilen deiner Kämpfe verursacht keinen Fehler über eine blockierte Aktion mehr kurz nach Kampfbeginn: Entfernungen zu Gegnern kommen im Kampf nur noch aus Zauberreichweiten." } },
 	{ id = 161, module = "tweaks",
-		en = { "Controller bags: tidier", "The sorted controller bags fold the bag buttons' row away under a \"Bags\" header (click it, or A, to open it) and show one free slot that says how many are free. A setting brings back every free slot." },
-		de = { "Controller-Taschen: aufgeräumter", "Die sortierten Controller-Taschen klappen die Reihe der Taschen-Buttons unter einer Überschrift „Taschen“ ein (Klick oder A klappt sie auf) und zeigen einen freien Platz, der sagt, wie viele frei sind. Eine Einstellung holt jeden freien Platz zurück." } },
+		en = { "Controller bags: tidier", "The sorted controller bags fold the bag buttons' row away under a \"Bags\" header (the controller's cursor on it opens it) and show one free slot that says how many are free. A setting brings back every free slot." },
+		de = { "Controller-Taschen: aufgeräumter", "Die sortierten Controller-Taschen klappen die Reihe der Taschen-Buttons unter einer Überschrift „Taschen“ ein (der Controller-Cursor darauf klappt sie auf) und zeigen einen freien Platz, der sagt, wie viele frei sind. Eine Einstellung holt jeden freien Platz zurück." } },
 	-- New entries go here, at the end.
 }

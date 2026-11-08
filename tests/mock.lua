@@ -1722,6 +1722,12 @@ end)
 SmartNavigation_AddJumpNavigationOverride = NavCall("AddJumpNavigationOverride", function(button, dir, target)
 	button["smartNavigationOverride-" .. dir.dirKey] = target
 end)
+-- Run after the cursor moved out of the button that way (the test calls them).
+SmartNavigation_RegisterOutgoingDirNavCallback = NavCall("RegisterOutgoingDirNavCallback", function(button, dir, callback)
+	local key = "smartNavigationOutgoingCallbacks-" .. dir.dirKey
+	button[key] = button[key] or {}
+	table.insert(button[key], callback)
+end)
 -- The combined bag's panel (its SmartNavPanelInfoAdded): grid navigation, wrapping, the backpack's button first.
 ContainerFrameCombinedBags.smartNavPanelInfoAddedCallback = function(info)
 	info.useGrid, info.isWrapping, info.targetButton = true, true, GamepadBagBar:GetBagButton(0)

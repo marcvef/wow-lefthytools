@@ -9,10 +9,13 @@ local LT = ns.LT
 -- after Blizzard's own layout (a post-hook on the bag's UpdateItemLayout) and after its item updates
 -- (UpdateItems, on the next frame): the bag buttons in a row at the top, then the items in sections
 -- with a small header each (gear, consumables, trade goods, quest items, other, junk, the free
--- slots), sorted in each. The bag buttons' row folds away under a "Bags" header of its own (a button:
--- click it, or A with the controller; Misc Tweaks' gamepadBagButtons keeps the choice), since they're
--- needed only to change bags; and unless asked for, one free slot stands for all, its header saying
--- how many. The selected item's tooltip goes beside the bag. Blizzard's item buttons stay
+-- slots), sorted in each. The bag buttons' row folds away under a "Bags" header of its own, since
+-- they're needed only to change bags: the controller's cursor on the header opens it, the cursor going
+-- down from there into the items folds it again; a click (the mouse) keeps it open (Misc Tweaks'
+-- gamepadBagButtons). Not A on the header: the bag's A only takes an item or a bag button, and passing
+-- the header off as one (its buttonContext, isBag) had Blizzard's bindings read our values, which
+-- tainted them (B on the header: "SpellStopCasting" forbidden). And unless asked for, one free slot
+-- stands for all, its header saying how many. The selected item's tooltip goes beside the bag. Blizzard's item buttons stay
 -- Blizzard's (they do the secure use, equip, sell, split and drag); only where they sit changes.
 --
 -- Navigation: SmartNavigation's grid mode counts the buttons of each column, which sections with
@@ -58,6 +61,8 @@ local freeCount = 0   -- free slots in the last layout (one of them shown, unles
 local tucked = {}     -- Blizzard's buttons we hid (the other bags' buttons, the other free slots)
 local countText       -- the free slots' count on the one shown
 local bagsToggle      -- the "Bags" header: a button that folds the bag buttons' row away and back
+local peeking = false -- the row open while the controller's cursor is up there (not kept)
+local folding = {}    -- buttons with our "down out of the row: fold" callback (SmartNavigation's)
 local placedColumns   -- the columns of the last layout
 local placedCount     -- the free slots' count in the last layout
 local placedAllFree   -- whether that layout had every free slot
@@ -76,6 +81,11 @@ local function Setting(key, default)
 		return default
 	end
 	return v
+end
+
+-- The bag buttons' row: open for good (the setting), or while the cursor is up there.
+local function RowOpen()
+	return Setting("gamepadBagButtons", false) == true or peeking
 end
 local dirty, navPending = false, false
 local driver = CreateFrame("Frame")
@@ -235,7 +245,7 @@ local function StripButtons()
 		list[#list + 1] = keyring
 	end
 	list.count = #list
-	if not Setting("gamepadBagButtons", false) then
+	if not RowOpen() then
 		list.tucked = {}
 		for i = #list, 1, -1 do
 			table.insert(list.tucked, table.remove(list, i)) -- (folded under the "Bags" header)
@@ -259,28 +269,48 @@ local function Toggle(frame)
 		bagsToggle.Line:SetHeight(1)
 		bagsToggle.Line:SetPoint("LEFT", bagsToggle.Text, "RIGHT", 5, 0)
 		bagsToggle:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-		local function Flip()
+		-- A click (the mouse): open for good, or folded.
+		bagsToggle:SetScript("OnClick", function()
 			local tweaks = LT:GetModule("tweaks")
+			peeking = false
 			if tweaks and tweaks.db then
-				LT:SetModuleSetting(tweaks, "gamepadBagButtons", not Setting("gamepadBagButtons", false))
+				LT:SetModuleSetting(tweaks, "gamepadBagButtons", not RowOpen())
 			end
-			return true
-		end
-		bagsToggle:SetScript("OnClick", Flip)
-		-- The controller's A: SmartNavigation calls this (else it only fakes MouseDown / MouseUp,
-		-- which doesn't click an addon's button).
-		bagsToggle.OnSmartNavClick = Flip
-		-- ... but the bag's A ("Select", its footer) only works on what its condition takes: an item, or
-		-- a bag button (its context, isBag; ContainerFrame.lua's Gamepad_IsClickContextActionValid). So
-		-- the header passes for a bag button. Blizzard's footer reads these while the cursor is on the
-		-- header only (taint stays there: the next button's refresh reads Blizzard's own values again),
-		-- and the bag's other buttons (Y, the menu) want HasBag, which the header hasn't.
-		bagsToggle.buttonContext = "ButtonContext_OpenBagDropdownSettings"
-		bagsToggle.isBag = true
+		end)
+		-- The controller's cursor on it (SmartNavigation's FocusEnter runs OnEnter): the row opens,
+		-- laid out on the next frame (the header stays where it is, under the cursor).
+		bagsToggle:SetScript("OnEnter", function()
+			if PadUI() and not RowOpen() then
+				peeking = true
+				dirty = true
+				driver:Show()
+			end
+		end)
 	end
 	bagsToggle:SetParent(frame)
 	bagsToggle:SetFrameLevel(frame:GetFrameLevel() + 4)
 	return bagsToggle
+end
+
+-- The cursor went down out of the row (or the header) into the items: folded again, if it was only
+-- open for the cursor. SmartNavigation runs the callback after moving (each callback keeps its own
+-- taint), registered once per button.
+local function FoldBelow()
+	local now = SmartNavigation and SmartNavigation.GetCurrentButton and SmartNavigation:GetCurrentButton()
+	if peeking and now and laidOut[now] then
+		peeking = false
+		dirty = true
+		driver:Show()
+	end
+end
+
+local function WatchDown(button)
+	local dirs = SMART_NAV_INPUT_DIRECTION
+	if button and not folding[button] and dirs and dirs.DOWN and SmartNavigation_RegisterOutgoingDirNavCallback
+		and not Restricted() then
+		folding[button] = true
+		SmartNavigation_RegisterOutgoingDirNavCallback(button, dirs.DOWN, FoldBelow)
+	end
 end
 
 -- Blizzard's buttons back that we hid (ours gone, or wanted again). Not a protected one in a fight.
@@ -486,15 +516,17 @@ local function Place(frame, groups, strip)
 	toggle:SetPoint("BOTTOMLEFT", rel, relPoint, left, ay + height - HEADER)
 	toggle:SetSize(gridWidth, HEADER)
 	toggle.Sign:SetTexture(open and "Interface\\Buttons\\UI-MinusButton-Up" or "Interface\\Buttons\\UI-PlusButton-Up")
+	WatchDown(toggle)
 	toggle.Text:SetText(L["Bags (%d)"]:format(strip.count or #strip))
 	toggle.Line:SetWidth(math.max(1, gridWidth - toggle.Text:GetStringWidth() - 25))
 	toggle:Show()
 	wipe(stripped)
-	stripped.all = Setting("gamepadBagButtons", false)
+	stripped.all = RowOpen()
 	for i, b in ipairs(strip) do
 		Put(b, math.min(i, cols), HEADER)
 		stripped[i] = b
 		bagButtons[b] = true
+		WatchDown(b)
 	end
 	local rows = { { toggle }, stripped[1] and stripped or nil }
 	overlay:SetParent(frame)
@@ -702,7 +734,7 @@ local function Relayout()
 	end
 	local groups = Sort(frame)
 	if applied and SameLayout(groups) and placedColumns == Columns() and placedCount == freeCount
-		and stripped.all == Setting("gamepadBagButtons", false) and placedAllFree == Setting("gamepadBagAllFree", false) then
+		and stripped.all == RowOpen() and placedAllFree == Setting("gamepadBagAllFree", false) then
 		return
 	end
 	local current = SmartNavigation and SmartNavigation.GetCurrentButton and SmartNavigation:GetCurrentButton()
@@ -722,6 +754,7 @@ end
 
 -- The bag closed: our jumps go (a bag opened in a fight gets Blizzard's layout, which they don't fit).
 local function OnBagHidden()
+	peeking = false -- (opened for the cursor: folded at the next opening)
 	wipe(wantUp); wipe(wantDown)
 	ApplyJumps(false)
 	if next(jumped) then
@@ -799,7 +832,7 @@ end
 function ns.GamepadBagsColumns()
 	local frame = Bag()
 	if wanted and hooked and frame and frame:IsShown() and PadUI() and applied
-		and (placedColumns ~= Columns() or (stripped.all ~= nil and stripped.all ~= Setting("gamepadBagButtons", false))
+		and (placedColumns ~= Columns() or (stripped.all ~= nil and stripped.all ~= RowOpen())
 			or (placedAllFree ~= nil and placedAllFree ~= Setting("gamepadBagAllFree", false))) then
 		dirty = true
 		driver:Show()

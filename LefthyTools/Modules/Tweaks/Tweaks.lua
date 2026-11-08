@@ -406,7 +406,7 @@ function M:BuildOptions(o)
 		L["How many items side by side in the sorted controller bags. More columns make them wider and less tall; Blizzard's own is 10."],
 		6, 24, 1, function(v) return tostring(math.floor((tonumber(v) or 10) + 0.5)) end)
 	o:Checkbox("gamepadBagButtons", L["Controller bags: the bag buttons' row open"],
-		L["The sorted controller bags show every bag's button in a row under their \"Bags\" header, to change a bag. Off, the row is folded away; clicking the header (A with the controller) opens and folds it too."])
+		L["The sorted controller bags show every bag's button in a row under their \"Bags\" header, to change a bag. Off, the row is folded away and opens while the controller's cursor is on the header or the row; a click on the header opens and folds it for good."])
 	o:Checkbox("gamepadBagAllFree", L["Controller bags: every free slot"],
 		L["The sorted controller bags show each free slot. Off, one stands for all and says how many there are."])
 	o:Header(L["Quests"])

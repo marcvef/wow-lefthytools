@@ -80,8 +80,13 @@ still says gamepad (it began there).
 ## gamepadBags: the bags with a controller (GamepadBags.lua)
 
 By default the bag buttons' row is folded away under a "Bags (5)" header: our own button on the bag, so the
-controller lands on it too; a click (A) flips `gamepadBagButtons` (its checkbox follows) and the bag is laid
-out again on the next frame. One free slot (the first in the bags' order) stands for all, with the count on
+controller lands on it too. The cursor landing there (`FocusEnter` runs its OnEnter) opens the row for as long
+as the cursor stays up there (`peeking`); moving down into the items folds it (SmartNavigation's outgoing-down
+callbacks on the header and the bag buttons, `SmartNavigation_RegisterOutgoingDirNavCallback`, which keep their
+own taint). A mouse click flips `gamepadBagButtons` (open for good; its checkbox follows). A on the header does
+nothing: the bag's A ("Select") only takes an item or a bag button, and passing the header off as one (setting its
+`buttonContext` and `isBag`) had Blizzard's bindings read our values while the cursor was on it: B there then ran
+the close chain tainted (`SpellStopCasting`, `SpellStopTargeting`, `ClearTarget` forbidden). One free slot (the first in the bags' order) stands for all, with the count on
 it and in its header ("Free slots (12)"); `gamepadBagAllFree` brings every one back. The others are hidden
 (`Tuck`) and shown again whenever ours goes (`Untuck`), so Blizzard's own layout always has them all.
 

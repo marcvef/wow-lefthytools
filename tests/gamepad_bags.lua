@@ -198,11 +198,28 @@ do
 	Wait(1)
 	check(M.db.gamepadBagButtons == true and #State().strip == 5 and GamepadBagBar.BagButtonArray[2]:IsShown()
 		and bag:GetHeight() == foldedHigh + 37 + 7 - 4, "clicking the header: the row open (its setting follows), the bag a row higher")
-	check(toggle.isBag and not toggle.isBackpack and toggle.buttonContext == "ButtonContext_OpenBagDropdownSettings" and not toggle.HasBag,
-		"the bag's A (Select) takes the header like a bag button; its menu (Y) doesn't")
-	toggle.OnSmartNavClick(toggle) -- (the controller's A: SmartNavigation calls this)
+	toggle:Click()
 	Wait(1)
-	check(M.db.gamepadBagButtons == false and #State().strip == 0 and bag:GetHeight() == foldedHigh, "A on it with the controller: folded")
+	check(M.db.gamepadBagButtons == false and #State().strip == 0 and bag:GetHeight() == foldedHigh, "clicking it again: folded")
+	-- The controller: the cursor on the header opens the row (not kept); down into the items folds it.
+	check(not toggle.isBag and not toggle.buttonContext and not toggle.OnSmartNavClick,
+		"none of Blizzard's values on the header (its bindings read them: B there ran tainted)")
+	toggle:GetScript("OnEnter")(toggle)
+	Wait(1)
+	check(#State().strip == 5 and M.db.gamepadBagButtons == false and bag:GetHeight() == foldedHigh + 37 + 7 - 4,
+		"the cursor on the header: the row open, the setting as it was")
+	local down = SMART_NAV_INPUT_DIRECTION.DOWN
+	local back = GamepadBagBar.BagButtonArray[2]["smartNavigationOutgoingCallbacks-" .. down.dirKey]
+	check(back and #back == 1 and toggle["smartNavigationOutgoingCallbacks-" .. down.dirKey], "down out of the header and the bag buttons: watched, once")
+	SMART_NAV.current = GamepadBagBar.BagButtonArray[2] -- (down from the header: onto a bag button, still open)
+	for _, cb in ipairs(toggle["smartNavigationOutgoingCallbacks-" .. down.dirKey]) do cb() end
+	Wait(1)
+	check(#State().strip == 5, "from the header down onto the row: still open")
+	SMART_NAV.current = Slot(1, 1) -- (down from a bag button into the items)
+	for _, cb in ipairs(back) do cb() end
+	Wait(1)
+	check(#State().strip == 0 and bag:GetHeight() == foldedHigh, "down into the items: folded again")
+	SMART_NAV.current = nil
 	check(free and free > 1 and #st.order == everyItem - (free - 1), "one free slot for all, its header says how many: " .. freeHeader)
 	check(#BLOCKED == blocked and #ERRORS == errors, "nothing blocked, no errors")
 	T("gamepadBagButtons"):SetValue(true)
