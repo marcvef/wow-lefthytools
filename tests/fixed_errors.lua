@@ -70,7 +70,7 @@ do
 	local kind, w, more = BB.Parse(word)
 	check(kind == "B" and w == "bf" and more == "0.7.0-90-g1234567;1;a test error",
 		"a build that reads it: Beacon's word, the whole build and what it was in English (its chat lines are), got " .. word)
-	check(BB.FixedMessage(fix, "en", "0.7.0-49-gabcdef0"):sub(1, 3) == "M2;" and BB.FixedMessage(fix, "en", "garbage"):sub(1, 3) == "M2;",
+	check(BB.FixedMessage(fix, "en", "0.7.0-38-gabcdef0"):sub(1, 3) == "M2;" and BB.FixedMessage(fix, "en", "garbage"):sub(1, 3) == "M2;",
 		"a build before it, or one that can't be told: the LTC line")
 end
 

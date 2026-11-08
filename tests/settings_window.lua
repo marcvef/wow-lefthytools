@@ -373,3 +373,4 @@ do
 	check(newRows == 0 and all == count, "no saved list yet: everything counts as seen, no flood of tags")
 	check(LefthyToolsDB.settings.beacon == db and LefthyToolsDB.settings.mirage == mirage.db, "settings are still the same saved tables")
 end
+Advance(0.1) -- (this file advances 11.9 s; whole seconds for the suites after it)

@@ -287,7 +287,7 @@ B.FIXED_ERRORS = {
 		en = "a blocked action in fights, from the combo point dots", de = "eine blockierte Aktion im Kampf, durch die Combopunkte" },
 }
 
-local FIXED_SINCE = "0.7.0-50-g0000000" -- the first build that reads B2;bf (or later: one before gets M2, which it shows)
+local FIXED_SINCE = "0.7.0-39-g0000000" -- the first build that reads B2;bf (or later: one before gets M2, which it shows)
 local FIXED_GAP = 5       -- one such line at most this often (to any friend)
 local FIXED_WAITING = 10  -- friends to tell, at most
 local FIXED_LINES = {     -- the LTC line for older builds, in the friend's language (TEXT_BYTES in Chat.lua: 200)
