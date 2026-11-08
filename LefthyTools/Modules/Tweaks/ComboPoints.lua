@@ -20,9 +20,8 @@ local _, ns = ...
 --     (buffs, debuffs) or beside it (the level) is touched. Only while you have points on that
 --     target. Our own frame, put on the nameplate (it shows, fades and scales with it) and found
 --     again whenever the target, the points or the target's nameplate change. In a fight a
---     nameplate can be protected: putting the dots on it then is blocked ("UNKNOWN()" in friends'
---     reports, rogues and druids a few seconds into a fight), so they wait for the fight's end; on
---     a nameplate they're on already they just change.
+--     nameplate can be protected: putting the dots on it then would be refused, so they wait for
+--     the fight's end; on a nameplate they're on already they just change.
 --
 -- Nothing of Blizzard's is replaced; the only hooks are hooksecurefunc post-hooks. Updates run on
 -- the next frame, never inside an event.

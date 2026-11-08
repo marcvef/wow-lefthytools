@@ -684,9 +684,10 @@ collector gets a chat line saying whom it told. How it gets there (`B.FixedMessa
 Listed so far (from `git log v0.7.0..`): `ADDON_ACTION_FORBIDDEN: IsUserOAuthed()` (Blizzard's
 settings panel, fixed in 0.7.0-34 when the settings moved to a window of our own), and as "should
 be fixed" the same build's `ADDON_ACTION_FORBIDDEN: UNKNOWN()` and `ADDON_ACTION_BLOCKED: Frame:...`
-with `SettingsPanel` in the report, and `ADDON_ACTION_BLOCKED: UNKNOWN()` (the combo point dots on
-a protected nameplate, 0.7.0-38). A fix that removes an error with recognisable text gets an
-entry here.
+with `SettingsPanel` in the report, and `ADDON_ACTION_BLOCKED: UNKNOWN()` (the fight stream's item
+and interact range checks on an enemy in a fight, 0.7.0-52; first put down to the combo point dots,
+until a report's stack showed `RangeAnswer`). A fix that removes an error with recognisable text gets
+an entry here.
 
 ## Fight stream (Stream*.lua)
 

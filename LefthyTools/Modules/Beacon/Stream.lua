@@ -21,6 +21,8 @@ local B = ns.Beacon
 -- (UnitPosition answers for group members only), the combat log is closed, raid markers are
 -- hidden. Found by the tests on Forever: range checks answer in combat (harmful spells you know,
 -- items of known range, CheckInteractDistance), so distances work up to 30 yd (further: "beyond",
+-- but the item and interact checks on an enemy in a fight are blocked: "ADDON_ACTION_BLOCKED:
+-- UNKNOWN()" in friends' reports, the stack at RangeAnswer's pcall; only spells are asked then),
 -- on the rim of the 40 yd ring); where a nameplate is on the screen can't be read at all ("Can't
 -- measure restricted regions"); a mob has a nameplate only while it's on your screen; your own
 -- place and facing are exact. So directions are learned as you move and turn (StreamSense.lua).
@@ -136,11 +138,19 @@ function S.RangeChecks()
 	return checks
 end
 
--- ok, answer (like pcall); false, "missing" where this client has no such call.
+-- Range checks that may be asked about an enemy in a fight (the others are blocked then, and the
+-- player is shown "Interface action failed because of an AddOn").
+local IN_COMBAT = { ["C_Spell.IsSpellInRange"] = true }
+
+-- ok, answer (like pcall); false, "missing" where this client has no such call; false, "combat" for
+-- one that isn't asked about an enemy in a fight.
 local function RangeAnswer(check, unit)
 	local f = Api(check.path)
 	if not f then
 		return false, "missing"
+	end
+	if not IN_COMBAT[check.path] and InCombatLockdown() and Value("UnitCanAttack", "player", unit) ~= false then
+		return false, "combat"
 	end
 	if check.unitFirst then
 		return pcall(f, unit, check.arg)

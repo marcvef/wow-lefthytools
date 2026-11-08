@@ -9,9 +9,9 @@ local M = ns.LT:GetModule("tweaks")
 -- when first seen (accepted that way, or at login) stay silent. Quests are tracked by questID, so
 -- collapsed quest log headers don't hide progress. Party chat in a normal party, instance chat in
 -- an instance group, nothing solo or in a raid. Addon chat can be locked down by the client
--- (C_ChatInfo.InChatMessagingLockdown); messages wait until that lifts. They also wait out a fight:
--- sending in combat was blocked in a dungeon (a friend's report; "UNKNOWN()", the call goes through
--- pcall), and being blocked shows the player an error. The objective text comes
+-- (C_ChatInfo.InChatMessagingLockdown); messages wait until that lifts. They also wait out a fight
+-- (sending from addon code in a fight can be restricted, and a blocked call shows the player an
+-- error). The objective text comes
 -- from the client in its language, so the wrapper text is localized too (party members read it).
 
 local ANNOUNCE_MARKER = "{rt1} " -- star icon, like Questie

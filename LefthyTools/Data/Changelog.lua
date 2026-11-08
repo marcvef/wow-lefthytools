@@ -485,5 +485,8 @@ ns.CHANGELOG = {
 	{ id = 159, module = "tweaks",
 		en = { "Sorted bags with a controller", "In gamepad mode the bags show the bag buttons in a row at the top and your items in sections: gear, consumables, trade goods, quest items, other and junk, sorted by quality and name. The selected item's tooltip sits beside the bags. A slider sets how many columns wide they are." },
 		de = { "Sortierte Taschen mit Controller", "Im Gamepad-Modus zeigen die Taschen oben die Taschen-Buttons in einer Reihe und deine Items in Abschnitten: Ausrüstung, Verbrauchsgüter, Handwerkswaren, Questgegenstände, Sonstiges und Plunder, nach Qualität und Name sortiert. Der Tooltip des gewählten Items steht neben den Taschen. Ein Regler legt fest, wie viele Spalten breit sie sind." } },
+	{ id = 160, module = "beacon",
+		en = { "Fight stream: no blocked action", "Sharing your fights no longer causes an error about a blocked action a few seconds into a fight: distances to enemies come from spell ranges only while you fight." },
+		de = { "Kampf-Stream: keine blockierte Aktion", "Das Teilen deiner Kämpfe verursacht keinen Fehler über eine blockierte Aktion mehr kurz nach Kampfbeginn: Entfernungen zu Gegnern kommen im Kampf nur noch aus Zauberreichweiten." } },
 	-- New entries go here, at the end.
 }

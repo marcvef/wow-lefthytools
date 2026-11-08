@@ -732,8 +732,8 @@ do
 	check(has("UnitName: value 180 | value 180") and has("e.g. Defias Thug; Defias Pillager") and has("UnitHealth: hidden 180 | hidden 180")
 		and has("UnitGUID: value 180 | value 180\n") and has("UnitPosition(player): value 60 | value 60\n"),
 		"what answers and what's hidden, in and out of combat, with examples (none of GUIDs and my position)")
-	check(has("spell Throw (30 yd): true 120, false 60 | true 120, false 60") and has("item 835 (30 yd): nil 180 | true 120, false 60")
-		and has("CheckInteractDistance 3 (10 yd): error 180 |") and has("e.g. CheckInteractDistance: blocked in combat"),
+	check(has("spell Throw (30 yd): true 120, false 60 | true 120, false 60") and has("item 835 (30 yd): error 180 | true 120, false 60")
+		and has("CheckInteractDistance 3 (10 yd): error 180 |") and has("e.g. combat"), -- (not asked about an enemy in a fight: blocked)
 		"each range check, in and out of combat, with what the errors say")
 	check(has("nameplate position: GetCenter: nil 60, onscreen 60, error 60 |") and has("e.g. 0.50,0.45; can't measure this region"),
 		"nameplate positions, with what the errors say")
