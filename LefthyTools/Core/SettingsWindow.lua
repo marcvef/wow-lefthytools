@@ -7,20 +7,30 @@ local Options = LT.Options
 -- module is on; a search over all of them; the rows of the page, or of what was found, on the right.
 -- A plain window, nothing protected: it opens in a fight and in gamepad mode, and it never touches
 -- Blizzard's settings panel. Built when first opened; a row's frame when it's first shown.
+-- A setting not at its default has a gold dot before its name and a button that puts it back; one the
+-- account hasn't seen yet a "New" tag (Options.FindNew), its page one in the sidebar, until the page
+-- has been opened.
 
 local WIDTH, HEIGHT = 860, 620
 local SIDEBAR = 176          -- the left column's width
 local PAGE_H = 26            -- a page's button
-local ROW_H = { header = 34, checkbox = 30, slider = 34, choice = 32, text = 32, button = 32, info = 30 }
+local ROW_H = { header = 34, checkbox = 30, slider = 34, choice = 32, text = 32, button = 32, info = 30, reset = 46 }
 local CONTROL_W = 230        -- what's at the right of a row: slider, dropdown, text field, button
 local RIGHT_GAP = 12
+local UNDO = 20              -- the button that puts a setting back: its size
+local UNDO_X = CONTROL_W + RIGHT_GAP + 10 -- its right edge, left of the control (a checkbox's: at the row's end)
+local UNDO_ATLAS = "common-icon-undo"
+local CONFIRM_TIME = 5       -- seconds "Yes, reset" waits for its second click
 local SEARCH_GAP = 0.2       -- seconds after the last key
 local GOLD = "|cffffd200"
 local ON, OFF = "|cff80ff80", "|cff808080"
+local NEW, ORANGE = "|cff40c8ff", "|cffffa040"
+local DOT = "\226\128\162"   -- the bullet
 
 local frame, content, scroll, searchBox, clearButton
 local pageButtons = {}
 local current          -- the page shown
+local visited          -- the page whose "New" tags are up (the page shown, or the last one while searching)
 local found            -- what's being searched for, or nil
 local searchAt
 local shownRows = {}   -- the rows laid out now
@@ -65,7 +75,8 @@ local function NewRowFrame(row)
 	end)
 	f.Name = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	f.Name:SetPoint("LEFT", row.kind == "checkbox" and 30 or 6, 0)
-	f.Name:SetPoint("RIGHT", row.kind == "checkbox" and -6 or -(CONTROL_W + RIGHT_GAP + 8), 0)
+	local undo = row.setting and row.setting.default ~= nil and (UNDO + 4) or 0 -- (room for it)
+	f.Name:SetPoint("RIGHT", row.kind ~= "checkbox" and -(CONTROL_W + RIGHT_GAP + 8 + undo) or undo > 0 and -(RIGHT_GAP + undo) or -6, 0)
 	f.Name:SetJustifyH("LEFT")
 	f.Name:SetWordWrap(false)
 	f.Name:SetText(row.name)
@@ -276,6 +287,112 @@ function Build.info(row)
 	return f
 end
 
+-- A page's foot: everything on it back to its default (Options.ResetPage). The first click asks
+-- (the button says "Yes, reset" for a few seconds, the row what it will do), the second does it; the
+-- same button both times, so a controller only presses twice. Leaving the page asks again next time.
+function Build.reset(row)
+	local f = NewRowFrame(row)
+	local line = f:CreateTexture(nil, "ARTWORK")
+	line:SetColorTexture(1, 1, 1, 0.1)
+	line:SetHeight(1)
+	line:SetPoint("TOPLEFT", 2, -4)
+	line:SetPoint("TOPRIGHT", -2, -4)
+	local button = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+	f.Button = button
+	button:SetSize(CONTROL_W, 24)
+	button:SetPoint("RIGHT", -RIGHT_GAP, -4)
+	f.Name:ClearAllPoints() -- (under the line, like the button)
+	f.Name:SetPoint("LEFT", 6, -4)
+	f.Name:SetPoint("RIGHT", -(CONTROL_W + RIGHT_GAP + 8), -4)
+	local asked = 0 -- (which question a timer belongs to)
+	local function Disarm()
+		f.armed = nil -- (else when it asked)
+		button:SetText(L["Reset"])
+		f.Name:SetText(row.name)
+	end
+	f.Disarm = Disarm
+	button:SetScript("OnClick", function()
+		if f.armed and GetTime() - f.armed <= CONFIRM_TIME then -- (the time too, should the timer be late)
+			Disarm()
+			Options.ResetPage(row.page)
+			return
+		end
+		asked = asked + 1
+		local question = asked
+		f.armed = GetTime()
+		button:SetText(L["Yes, reset"])
+		f.Name:SetText(ORANGE .. L["Everything on this page back to its default?"] .. "|r")
+		C_Timer.After(CONFIRM_TIME, function()
+			if f.armed and asked == question then
+				Disarm()
+			end
+		end)
+	end)
+	f:SetScript("OnHide", Disarm)
+	KeepsTip(button, f, row)
+	Disarm()
+	f.Refresh = function()
+		button:SetEnabled(f.armed ~= nil or Options.Changed(row.page) > 0)
+	end
+	return f
+end
+
+-- What a setting's default is, for its button's tooltip.
+local function DefaultText(row)
+	local default = row.setting.default
+	if row.kind == "checkbox" then
+		return default and L["On"] or L["Off"]
+	elseif row.kind == "slider" then
+		return row.formatter and row.formatter(default) or tostring(default)
+	elseif row.kind == "choice" then
+		local v = row.values[default]
+		return v and v[2] or "?"
+	end
+	return default ~= "" and tostring(default) or L["(empty)"]
+end
+
+-- A row's button that puts its setting back to the default; made the first time it's changed. A
+-- checkbox's sits at the row's end, the others' left of their control: a column a controller passes.
+local function UndoButton(row)
+	local f = row.frame
+	local b = CreateFrame("Button", nil, f)
+	b:SetSize(UNDO, UNDO)
+	b:SetPoint("RIGHT", row.kind == "checkbox" and -RIGHT_GAP or -UNDO_X, 0)
+	b.Icon = b:CreateTexture(nil, "ARTWORK")
+	b.Icon:SetAllPoints()
+	b.Icon:SetAtlas(UNDO_ATLAS)
+	b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	b:SetScript("OnClick", function(self)
+		HideTip(self)
+		row.setting:Reset()
+	end)
+	b:SetScript("OnEnter", function(self)
+		f.Hover:Show()
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L["Back to the default"], 1, 1, 1)
+		GameTooltip:AddLine(L["Default: %s"]:format(DefaultText(row)), nil, nil, nil, true)
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", function(self)
+		f.Hover:Hide()
+		HideTip(self)
+	end)
+	return b
+end
+
+-- A setting's row: a gold dot when it isn't at its default (and its button back), "New" when it's new.
+local function Mark(row)
+	local f, setting = row.frame, row.setting
+	local changed = not setting:IsDefault()
+	if changed and not f.Undo then
+		f.Undo = UndoButton(row)
+	end
+	if f.Undo then
+		f.Undo:SetShown(changed)
+	end
+	f.Name:SetText((changed and (GOLD .. DOT .. "|r ") or "") .. row.name .. (row.new and ("  " .. NEW .. L["New"] .. "|r") or ""))
+end
+
 -- A row whose module is off, or whose checkbox is, is dimmer; it can still be changed.
 local function RefreshRow(row)
 	local f = row.frame
@@ -283,6 +400,9 @@ local function RefreshRow(row)
 		return
 	end
 	f.Refresh()
+	if row.setting then
+		Mark(row)
+	end
 	local module = row.page and row.page.module
 	local off = row.dependsOn and row.dependsOn:GetValue() ~= true
 	local moduleOff = module and row.kind ~= "header" and row.setting ~= module.enabledSetting and not module.enabled
@@ -301,7 +421,7 @@ local function RefreshPages()
 		if page.module then
 			state = page.module.enabled and (ON .. "\226\128\162|r ") or (OFF .. "\226\128\162|r ")
 		end
-		button.Text:SetText(state .. page.name)
+		button.Text:SetText(state .. page.name .. (page.new and ("  " .. NEW .. L["New"] .. "|r") or ""))
 		button.Picked:SetShown(found == nil and page == current)
 	end
 end
@@ -351,7 +471,19 @@ local function Lay(rows)
 	scroll:SetVerticalScroll(0)
 end
 
+-- The "New" tags of the page left go; the page opened counts as seen, its tags stay while it's shown.
+local function Visit(page)
+	if visited and visited ~= page then
+		Options.Forget(visited)
+	end
+	visited = page
+	if page then
+		Options.Seen(page)
+	end
+end
+
 local function ShowPage(page)
+	Visit(page)
 	current, found = page, nil
 	Options.shownPage = page
 	Lay(page.rows)
@@ -360,14 +492,14 @@ local function ShowPage(page)
 end
 
 -- What matches the words: anywhere in a setting's name or (a text) tooltip, by page; the page's own
--- headers aren't results.
+-- headers and resets aren't results.
 local function Search(text)
 	local needle = text:lower()
 	local rows = {}
 	for _, page in ipairs(Options.pages) do
 		local first = true
 		for _, row in ipairs(page.rows) do
-			if row.kind ~= "header" then
+			if row.kind ~= "header" and row.kind ~= "reset" then
 				local tip = type(row.tooltip) == "string" and row.tooltip or ""
 				if row.name:lower():find(needle, 1, true) or tip:lower():find(needle, 1, true) then
 					if first then
@@ -454,7 +586,7 @@ local function BuildWindow()
 		ShowPage(current)
 	end)
 	clearButton:Hide()
-	frame.Clear, frame.SearchBox = clearButton, searchBox
+	frame.Clear, frame.SearchBox, frame.Pages = clearButton, searchBox, pageButtons
 
 	for i, page in ipairs(Options.pages) do
 		local button = CreateFrame("Button", nil, side)
@@ -501,11 +633,21 @@ local function BuildWindow()
 			ShowPage(current)
 		end
 	end)
+	-- Closed: the page's "New" tags go, a question to reset is forgotten.
+	frame:HookScript("OnHide", function()
+		Visit(nil)
+		for _, row in ipairs(shownRows) do
+			if row.frame.Disarm then
+				row.frame.Disarm()
+			end
+		end
+	end)
 end
 
 -- A setting changed, here or by a command: whoever shows it follows; a module's switch, the pages too.
-function Options.SettingChanged(setting)
-	if not (frame and frame:IsShown()) then
+-- A page's reset says so once, at its end (Options.holding meanwhile).
+function Options.SettingChanged()
+	if Options.holding or not (frame and frame:IsShown()) then
 		return
 	end
 	for _, row in ipairs(shownRows) do

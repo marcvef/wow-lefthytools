@@ -321,7 +321,7 @@ second (UTC), worked out once, so it's cheap for every record.
   settings sub-page (with `BuildOptions`), saved settings and `/lefthy` routing. Keybindings go
   in `Bindings.xml` as `LEFTHYTOOLS_<MODULE>_<ACTION>` with `BINDING_NAME_...` globals.
 - **Saved variables:** `LefthyToolsDB = { modules = { <key> = bool }, settings = { <key> = {...} } }`,
-  plus Core's `errors` and `changelogSeen` and a few top-level keys of modules' own (data, not
+  plus Core's `errors`, `changelogSeen` and `settingsSeen` (Settings window) and a few top-level keys of modules' own (data, not
   settings); Chronicle, Bestiary and Echoes keep their data in `LefthyToolsChronicleDB`,
   `LefthyToolsBestiaryDB` and `LefthyToolsEchoesDB`. Each of the four says where it was written (`world`: `"beta"` or
   `"release"`; the release drops the beta's, see The beta and the release). Core parts that aren't
@@ -372,6 +372,12 @@ second (UTC), worked out once, so it's cheap for every record.
 A module's `BuildOptions(o)` calls the builder: `Header`, `Checkbox`, `Slider`, `CheckboxSlider`, `Choice` (a dropdown, `LT.Window.AddPicker`), `TextInput` and `Button`. Each adds a row to the page, and a setting (`Options.registered`, `module.settings`) reading and writing the module's saved table directly, so the saved format is what it always was. `setting:SetValue` and `NotifyUpdate` run the module's `OnSettingChanged` and refresh what's shown; `LT:SetModuleSetting` goes through them. A `Choice` setting's value is its position among the values, the saved table keeps the value itself.
 
 The window: the pages on the left, each with whether its module is on; a search over every page's names and text tooltips; a page's own switch first. Built when first opened, a row's frame when it's first shown. It's a plain frame, so it opens in a fight and in gamepad mode and nothing goes through `ShowUIPanel`.
+
+**Defaults and resets.** A builder setting knows its default (`setting.default`: the value `Describe` found, a `Choice`'s position of it; table defaults and the module switches have none, so a module's on or off is never "changed"). `setting:IsDefault()` (numbers within 1e-6, a slider's steps are rounded) and `setting:Reset()` (through `SetValue`, so the module and every row hear). A row not at its default has a gold dot before its name and a button with the `common-icon-undo` atlas, made the first time it's needed: at a checkbox row's end, left of the other rows' controls (one column, next to the slider's -, so a controller's nearest-button navigation passes it without being caught; it's not marked ignored, so a controller can reach it). A module page with any default ends with a `reset` row (`Options.ResetPage`): the first click turns the button into "Yes, reset" for 5 s, the second resets (only within those 5 s, also if the timer that puts the button back is late); leaving the page or closing the window forgets the question. It uses the module's own `ResetSettings` where there is one (Mirage's, as `/mirage reset`), else resets each setting the page shows, so nothing else in the saved table (positions, lists, learned data) and no module switch changes. `Options.holding` keeps the window from redrawing for each of them; it refreshes once at the end. Searches don't list the resets.
+
+**New settings.** `LefthyToolsDB.settingsSeen = { [variable] = true }` (the setting variables, `LefthyTools_<module>_<id>`, which never change). `Options.FindNew()` runs once at login: without the table (a fresh install, or the first build with it) every setting counts as seen; after that a setting missing from it is `row.new` (a "New" tag after its name) and its page `page.new` (a tag in the sidebar). Opening the page (`Options.Seen`, not a search) writes them as seen; the tags stay while the page is shown and go when it's left or the window closes (`Options.Forget`). Settings a later build removes stay in the table (a few bytes): pruning could lose a page whose `BuildOptions` failed once.
+
+**Per character?** No: `## SavedVariables` only, no `SavedVariablesPerCharacter`, so every setting is the account's (all characters share them). The few things kept per character (Beacon's LTC chat tabs, `LefthyToolsDB.ltcTabs[GUID]`; Chronicle's journals) aren't settings rows, so there's nothing to copy from another character.
 
 ## Localization
 

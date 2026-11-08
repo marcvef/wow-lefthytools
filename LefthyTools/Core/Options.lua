@@ -61,6 +61,26 @@ function SettingMethods:SetValueChangedCallback(callback)
 	self.callback = callback
 end
 
+-- At its default (a setting without one, like a module's switch, always is). Numbers within a hair:
+-- a slider's steps are rounded.
+function SettingMethods:IsDefault()
+	local default, value = self.default, self.get()
+	if default == nil then
+		return true
+	end
+	if type(default) == "number" and type(value) == "number" then
+		return math.abs(value - default) < 1e-6
+	end
+	return value == default
+end
+
+-- Back to its default, like any change: the module and whoever shows it hear.
+function SettingMethods:Reset()
+	if not self:IsDefault() then
+		self:SetValue(self.default)
+	end
+end
+
 local function NewSetting(variable, name, tooltip, get, set)
 	local setting = setmetatable({ variable = variable, name = name, tooltip = tooltip, get = get, set = set, uiUpdates = 0 },
 		SettingMethods)
@@ -113,7 +133,11 @@ function Builder:Register(key, name, tooltip, opts)
 	if tbl[key] == nil then
 		tbl[key] = default
 	end
-	return Keep(self, NewSetting(variable, name, tooltip, function() return tbl[key] end, function(value) tbl[key] = value end), id)
+	local setting = NewSetting(variable, name, tooltip, function() return tbl[key] end, function(value) tbl[key] = value end)
+	if type(default) ~= "table" then
+		setting.default = default -- (what Reset goes back to; nil: none)
+	end
+	return Keep(self, setting, id)
 end
 
 function Builder:Checkbox(key, name, tooltip, opts)
@@ -172,7 +196,7 @@ function Builder:Choice(key, name, tooltip, values, opts)
 		end
 	end
 	local setting = NewSetting(variable, name, tooltip, Get, Set)
-	setting.proxy, setting.values = true, values
+	setting.proxy, setting.values, setting.default = true, values, IndexOf(default) or 1
 	Keep(self, setting, id)
 	self.module.choices = self.module.choices or {}
 	self.module.choices[id] = IndexOf
@@ -303,7 +327,90 @@ local function BuildOverview(page)
 		button = { text = L["Show"], onClick = function() LT.Errors.Show() end, shown = function() return LT.Errors.Count() > 0 end } })
 end
 
--- A module's own page, filled by its BuildOptions through a Builder; first its switch.
+---------------------------------------------------------------------------
+-- What changed and what's new
+---------------------------------------------------------------------------
+
+-- How many of the page's settings aren't at their default.
+function Options.Changed(page)
+	local count = 0
+	for _, row in ipairs(page.rows) do
+		if row.setting and not row.setting:IsDefault() then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+-- A page's settings back to their defaults: the module's own reset where it has one (Mirage's
+-- ResetSettings, as /mirage reset), else each setting the page shows, through the setting. Nothing
+-- else in its saved table changes (positions, lists, what it has learned), nor whether the module is
+-- on. The window is told once, at the end.
+function Options.ResetPage(page)
+	local m = page.module
+	LT.Trail((m and m.key or "overview") .. " page reset")
+	Options.holding = true
+	if m and type(m.ResetSettings) == "function" then
+		LT.SafeCall(m, "ResetSettings")
+	else
+		for _, row in ipairs(page.rows) do
+			if row.setting then
+				row.setting:Reset()
+			end
+		end
+	end
+	Options.holding = nil
+	if Options.SettingChanged then
+		Options.SettingChanged()
+	end
+end
+
+-- "New": settings the account hasn't seen yet. LefthyToolsDB.settingsSeen = { [variable] = true }
+-- keeps what was shown when its page opened. Without that table (a fresh install, or the first build
+-- with it) everything counts as seen, so only what later builds add is new. row.new: a "New" tag on
+-- the row; page.new: one in the sidebar. Runs once, at login (SetupOptions).
+function Options.FindNew()
+	local seen = LT.db.settingsSeen
+	local first = type(seen) ~= "table"
+	if first then
+		seen = {}
+		LT.db.settingsSeen = seen
+	end
+	for _, page in ipairs(Options.pages) do
+		page.new = nil
+		for _, row in ipairs(page.rows) do
+			local variable = row.setting and row.setting.variable
+			if variable then
+				if first then
+					seen[variable] = true
+				end
+				row.new = not seen[variable] or nil
+				page.new = page.new or row.new
+			end
+		end
+	end
+end
+
+-- The page is open: what's new on it counts as seen from now on. Its tags stay while it's open.
+function Options.Seen(page)
+	local seen = LT.db.settingsSeen
+	for _, row in ipairs(page.rows) do
+		if row.new then
+			seen[row.setting.variable] = true
+		end
+	end
+	page.new = nil
+end
+
+-- The page was left: its tags go.
+function Options.Forget(page)
+	for _, row in ipairs(page.rows) do
+		row.new = nil
+	end
+end
+
+-- A module's own page, filled by its BuildOptions through a Builder; first its switch, at its foot a
+-- way to reset it (when it has settings with a default).
 local function BuildModulePage(m)
 	local page = NewPage(m.title, m)
 	m.category = page
@@ -317,6 +424,13 @@ local function BuildModulePage(m)
 		end,
 	}, Builder)
 	LT.SafeCall(m, "BuildOptions", builder)
+	for _, row in ipairs(page.rows) do
+		if row.setting and row.setting.default ~= nil then
+			AddRow(builder, { kind = "reset", name = L["Reset this page"],
+				tooltip = L["Every setting on this page back to its default. It asks first. Whether the module is on stays as it is."] })
+			break
+		end
+	end
 end
 
 -- Blizzard's AddOns list: a page of our own (a canvas, none of its shared rows) with a way to the window.
@@ -349,6 +463,7 @@ function ns.SetupOptions()
 			BuildModulePage(m)
 		end
 	end
+	Options.FindNew()
 	AddBlizzardPage()
 end
 

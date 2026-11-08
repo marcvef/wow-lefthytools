@@ -16,7 +16,10 @@ module you can switch on or off.
 
 Type `/lefthy` (short: `/lt`), click LefthyTools in the minimap's addon compartment, or use the button
 in **Options → AddOns → LefthyTools**. LefthyTools has its own settings window, with a search over all
-settings; it also opens in a fight and in gamepad mode.
+settings; it also opens in a fight and in gamepad mode. A setting you changed has a gold dot and a
+button that puts it back to its default; each module's page can be reset at its foot (it asks first).
+Settings an update adds say **New** until you've opened their page. Settings are the same for all
+your characters.
 
 - **LefthyTools** (overview): a switch for each module, and an **Info** section with your
   version, whether a newer one is out, and LefthyTools errors. LefthyTools can't go online
