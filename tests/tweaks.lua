@@ -432,6 +432,29 @@ do
 	check(row:IsShown() and lit() == 5, "moving the slider without points: the dots show a moment (full points), to see them")
 	Advance(5.2)
 	check(not row:IsShown(), "then they go")
+	-- A new target in a fight, its nameplate protected: putting the dots on it would be blocked.
+	local firstTarget = MOBS.target
+	MOBS.target = { name = "Kobold Miner", level = 9, x = 0.4, y = 0.5 }
+	local guarded = C_NamePlate.GetNamePlateForUnit("target").UnitFrame
+	guarded.IsProtected = function() return true end
+	EnterCombat()
+	COMBO.points = 2
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	Advance(0.05)
+	check(row:GetParent() ~= guarded and not row:IsShown(), "a protected nameplate in a fight: the dots wait, not moved there")
+	LeaveCombat()
+	Advance(0.05)
+	check(row:GetParent() == guarded and row:IsShown() and lit() == 2, "the fight over: on its nameplate, two lit")
+	EnterCombat()
+	COMBO.points = 4
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	Advance(0.05)
+	check(row:GetParent() == guarded and row:IsShown() and lit() == 4, "the next fight on that nameplate: they just change")
+	LeaveCombat()
+	COMBO.points = 0
+	Fire("UNIT_POWER_FREQUENT", "player", "COMBO_POINTS")
+	Advance(0.85) -- (whole seconds for the suites after this one)
+	MOBS.target = firstTarget
 	-- Nameplates coming and going in a crowd: nothing to do while no points wait for the target's.
 	local plateLookups, getPlate = 0, C_NamePlate.GetNamePlateForUnit
 	C_NamePlate.GetNamePlateForUnit = function(...) plateLookups = plateLookups + 1; return getPlate(...) end

@@ -19,7 +19,10 @@ local _, ns = ...
 --     ring, so it reads on a red bar too. They take no room of their own: nothing above the bar
 --     (buffs, debuffs) or beside it (the level) is touched. Only while you have points on that
 --     target. Our own frame, put on the nameplate (it shows, fades and scales with it) and found
---     again whenever the target, the points or the target's nameplate change.
+--     again whenever the target, the points or the target's nameplate change. In a fight a
+--     nameplate can be protected: putting the dots on it then is blocked ("UNKNOWN()" in friends'
+--     reports, rogues and druids a few seconds into a fight), so they wait for the fight's end; on
+--     a nameplate they're on already they just change.
 --
 -- Nothing of Blizzard's is replaced; the only hooks are hooksecurefunc post-hooks. Updates run on
 -- the next frame, never inside an event.
@@ -259,10 +262,16 @@ local function UpdateDots()
 		return
 	end
 	row = row or NewRow()
+	local locked = InCombatLockdown() and plate.IsProtected and plate:IsProtected()
+	if locked and row:GetParent() ~= plate then
+		row:Hide() -- (PLAYER_REGEN_ENABLED brings them)
+		return
+	end
 	local bar = Util.PlateHealthBar(plate)
-	local ok = pcall(function()
+	local ok = locked or pcall(function()
 		if row:GetParent() ~= plate then
 			row:SetParent(plate)
+			ns.LT.Trail("combo dots on a nameplate")
 		end
 		row:ClearAllPoints()
 		row:SetPoint("CENTER", bar, "CENTER", 0, 0) -- in the middle of the bar, whatever their size
@@ -489,6 +498,7 @@ local function Listen()
 	if onNameplate then
 		pcall(events.RegisterEvent, events, "NAME_PLATE_UNIT_ADDED")
 		pcall(events.RegisterEvent, events, "NAME_PLATE_UNIT_REMOVED")
+		pcall(events.RegisterEvent, events, "PLAYER_REGEN_ENABLED") -- (dots that waited for the fight's end)
 	end
 	for _, event in ipairs({ "UNIT_POWER_FREQUENT", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER" }) do
 		pcall(events.RegisterUnitEvent, events, event, "player")

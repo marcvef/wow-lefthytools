@@ -267,7 +267,9 @@ events:SetScript("OnEvent", function(_, event, addon, func)
 	elseif event == "ZONE_CHANGED_NEW_AREA" then
 		LT.Trail("zone " .. tostring(GetRealZoneText and GetRealZoneText() or "?"))
 	elseif addon == "LefthyTools" then
-		Errors.Add("blocked", ("%s: %s()"):format(event, tostring(func)))
+		-- The game sends this while the refused call runs, so the stack shows whose line it was
+		-- (the name alone can be "UNKNOWN").
+		Errors.Add("blocked", ("%s: %s()"):format(event, tostring(func)), debugstack and debugstack(2) or nil)
 	end
 end)
 

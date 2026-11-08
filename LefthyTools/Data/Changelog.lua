@@ -462,7 +462,10 @@ ns.CHANGELOG = {
 		en = { "A settings window of its own", "LefthyTools' settings moved out of Blizzard's Options into their own window, with a search and real dropdowns. Your settings stay as they were. Open it with /lefthy." },
 		de = { "Ein eigenes Einstellungsfenster", "Die Einstellungen von LefthyTools sind aus Blizzards Optionen in ein eigenes Fenster gezogen, mit Suche und echten Auswahllisten. Deine Einstellungen bleiben, wie sie waren. Du öffnest es mit /lefthy." } },
 	{ id = 152, module = "tweaks",
-		en = { "Quest lines wait out the fight", "Quest progress in party chat is now sent after the fight, so the game no longer blocks it in dungeons and shows an error." },
-		de = { "Quest-Zeilen warten den Kampf ab", "Questfortschritt im Gruppenchat wird jetzt nach dem Kampf gesendet, damit das Spiel ihn in Dungeons nicht mehr blockiert und einen Fehler zeigt." } },
+		en = { "Quest lines wait out the fight", "Quest progress in party chat is now sent once the fight is over." },
+		de = { "Quest-Zeilen warten den Kampf ab", "Questfortschritt im Gruppenchat wird jetzt gesendet, sobald der Kampf vorbei ist." } },
+	{ id = 153, module = "tweaks",
+		en = { "Combo dots: no blocked action", "A new target in a fight: the combo point dots come onto its nameplate once the game allows it, instead of an error about a blocked action." },
+		de = { "Combopunkte: keine blockierte Aktion", "Neues Ziel im Kampf: Die Combopunkte kommen an seine Namensplakette, sobald das Spiel es erlaubt, statt eines Fehlers über eine blockierte Aktion." } },
 	-- New entries go here, at the end.
 }
