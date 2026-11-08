@@ -50,6 +50,8 @@ local laidOut = {}    -- item button -> its place in `order`
 local starts = {}     -- the section each place in `order` begins (place -> section), for comparing layouts
 local stripped = {}   -- the bag buttons in the row
 local contentHeight   -- the items' and the row's height in our layout
+local contentWidth    -- the bag's width for our columns (Misc Tweaks' gamepadBagColumns)
+local placedColumns   -- the columns of the last layout
 local buttonHeight    -- an item button's height (Blizzard's grid rows are as high)
 local overlay, headers = nil, {}
 local wantUp, wantDown = {}, {} -- button -> the button its up / down jump goes to (our layout's short rows)
@@ -319,6 +321,19 @@ local function SetBagHeight(frame, height)
 	end
 end
 
+-- Items side by side (Misc Tweaks' slider; Blizzard's grid has 10): more make the bag wider, less tall.
+local function Columns()
+	local tweaks = LT:GetModule("tweaks")
+	local n = tweaks and tweaks.db and tonumber(tweaks.db.gamepadBagColumns)
+	return math.max(6, math.min(24, math.floor((n or 10) + 0.5)))
+end
+
+local function SetBagWidth(frame, width)
+	if width and math.abs(frame:GetWidth() - width) > 0.5 then
+		frame:SetWidth(width)
+	end
+end
+
 local function ButtonSize(groups, strip)
 	for _, group in ipairs(groups) do
 		if group[1] then
@@ -341,7 +356,9 @@ local function Place(frame, groups, strip)
 		return false -- not the grid this was made for: Blizzard's layout stays
 	end
 	local w, h = ButtonSize(groups, strip)
-	local cols = frame.GetColumns and frame:GetColumns() or 10
+	local cols = Columns()
+	placedColumns = cols
+	contentWidth = cols * w + (cols - 1) * SPACING + (frame.GetPaddingWidth and frame:GetPaddingWidth() or 15)
 	local height = #strip > 0 and h + STRIP_GAP or 0
 	for _, group in ipairs(groups) do
 		if group[1] then
@@ -401,6 +418,7 @@ local function Place(frame, groups, strip)
 		end
 	end
 	HideHeaders(shown + 1)
+	SetBagWidth(frame, contentWidth)
 	SetBagHeight(frame, OurHeight(frame, h))
 	applied = true
 	PlanJumps(rows)
@@ -411,6 +429,10 @@ end
 -- Ours gone (off, mouse and keyboard, or Blizzard laid the bag out in a fight): the headers hidden.
 -- Blizzard's next layout puts its own back (with mouse and keyboard and in a fight it already has).
 local function Unapply()
+	local frame = applied and Bag()
+	if frame and frame.CalculateWidth and not (InCombatLockdown() and frame:IsProtected()) then
+		SetBagWidth(frame, frame:CalculateWidth()) -- (Blizzard's columns again)
+	end
 	applied = false
 	wipe(wantUp); wipe(wantDown)
 	ApplyJumps(false)
@@ -499,6 +521,7 @@ local function OnItemLayout(frame)
 		-- In a fight: Blizzard's layout stands (SmartNavigation knows it), ours when the fight ends.
 		if applied and frame.CalculateHeight and not frame:IsProtected() then
 			SetBagHeight(frame, frame:CalculateHeight())
+			SetBagWidth(frame, frame.CalculateWidth and frame:CalculateWidth())
 		end
 		Unapply()
 		dirty = true
@@ -516,6 +539,7 @@ end
 -- Blizzard sized the bag (also without laying it out, a currency watched): ours while ours is shown.
 local function OnFrameSize(frame)
 	if applied and Wanted(frame) and not (InCombatLockdown() and frame:IsProtected()) then
+		SetBagWidth(frame, contentWidth)
 		SetBagHeight(frame, OurHeight(frame, buttonHeight))
 	end
 end
@@ -546,7 +570,7 @@ local function Relayout()
 		return
 	end
 	local groups = Sort(frame)
-	if applied and SameLayout(groups) then
+	if applied and SameLayout(groups) and placedColumns == Columns() then
 		return
 	end
 	local current = SmartNavigation and SmartNavigation.GetCurrentButton and SmartNavigation:GetCurrentButton()
@@ -635,6 +659,15 @@ function ns.ApplyGamepadBags(on)
 		else
 			watch:UnregisterAllEvents()
 		end
+	end
+end
+
+-- Misc Tweaks' columns slider moved: laid out again (on the next frame).
+function ns.GamepadBagsColumns()
+	local frame = Bag()
+	if wanted and hooked and frame and frame:IsShown() and PadUI() then
+		dirty = true
+		driver:Show()
 	end
 end
 

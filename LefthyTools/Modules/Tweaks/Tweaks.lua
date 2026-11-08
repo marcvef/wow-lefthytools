@@ -16,6 +16,7 @@ local M = LT:NewModule("tweaks", {
 		movableBags = true,
 		gamepadBagSort = true,
 		gamepadBags = true,    -- GamepadBags.lua: with a controller, the bags in sections
+		gamepadBagColumns = 10, -- ... with this many items side by side (Blizzard's grid has 10)
 		gamepadSymbols = "default", -- "default" | "xbox" | "playstation": the controller's button symbols
 		padSymbolConfigs = {}, -- "vendor:product" -> true: controllers whose symbols this set (to undo it)
 		bagPositions = {},     -- key ("combined" / "bag<id>") -> { left, top } in UIParent units
@@ -337,6 +338,9 @@ function M:OnSettingChanged()
 		ns.PreviewComboNameplate()
 	end
 	lastDotSize = size
+	if ns.GamepadBagsColumns then
+		ns.GamepadBagsColumns() -- (only lays out again if the columns changed)
+	end
 end
 
 function M:IsTweakActive(key)
@@ -396,6 +400,9 @@ function M:BuildOptions(o)
 		L["Since Forever's latest patch the bags' clean-up button is gone with mouse and keyboard. This puts it back, at the left of the bags' search box. With a controller it's in the bag menu instead."])
 	o:Checkbox("gamepadBags", L["Sorted bags with a controller"],
 		L["In gamepad mode the bags show each bag's button in a row at the top, then your items in sections: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name. The selected item's tooltip shows beside the bags. With mouse and keyboard nothing changes. Off: Blizzard's layout, from the next time the bags open."])
+	o:Slider("gamepadBagColumns", L["Controller bags: columns"],
+		L["How many items side by side in the sorted controller bags. More columns make them wider and less tall; Blizzard's own is 10."],
+		6, 24, 1, function(v) return tostring(math.floor((tonumber(v) or 10) + 0.5)) end)
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])

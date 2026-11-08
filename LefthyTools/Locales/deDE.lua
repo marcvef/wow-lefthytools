@@ -192,6 +192,8 @@ L["Since Forever's latest patch the bags' clean-up button is gone with mouse and
 	"Seit Forevers letztem Patch fehlt der Aufräumen-Knopf der Taschen mit Maus und Tastatur. Das holt ihn zurück, links neben dem Suchfeld der Taschen. Mit einem Controller ist er stattdessen im Taschenmenü."
 L["Clean up bags"] = "Taschen aufräumen"
 L["Sorted bags with a controller"] = "Sortierte Taschen mit Controller"
+L["Controller bags: columns"] = "Controller-Taschen: Spalten"
+L["How many items side by side in the sorted controller bags. More columns make them wider and less tall; Blizzard's own is 10."] = "Wie viele Items nebeneinander in den sortierten Controller-Taschen stehen. Mehr Spalten machen sie breiter und weniger hoch; Blizzards eigene hat 10."
 L["In gamepad mode the bags show each bag's button in a row at the top, then your items in sections: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name. The selected item's tooltip shows beside the bags. With mouse and keyboard nothing changes. Off: Blizzard's layout, from the next time the bags open."] =
 	"Im Gamepad-Modus zeigen die Taschen oben in einer Reihe den Button jeder Tasche, darunter deine Items in Abschnitten: Ausrüstung, Verbrauchsgüter, Handwerkswaren, Questgegenstände, Sonstiges, Plunder und die freien Plätze, jeweils nach Qualität und Name sortiert. Der Tooltip des gewählten Items erscheint neben den Taschen. Mit Maus und Tastatur ändert sich nichts. Aus: Blizzards Anordnung, ab dem nächsten Öffnen der Taschen."
 L["Gear"] = "Ausrüstung"

@@ -79,6 +79,9 @@ still says gamepad (it began there).
 
 ## gamepadBags: the bags with a controller (GamepadBags.lua)
 
+Columns: `gamepadBagColumns` (a slider, 6 to 24, default 10 like Blizzard's grid). Our layout sets the bag's
+width for them (`Columns`, after Blizzard's `UpdateFrameSize` too); Blizzard's own width comes back when ours goes.
+
 With the controller UI (`InputUtil.IsGamepadUIEnabled`) Blizzard's combined bag puts each bag's button
 (`GamepadBagBar:GetBagButton(bagID)`, Camelot's `MainMenuBarBagButtons.xml`) into the item grid:
 `ContainerFrameMixin:UpdateItemLayout` adds them to the items, `UpdateItemSort` sorts by bag (the bag's

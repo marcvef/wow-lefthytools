@@ -75,6 +75,18 @@ do
 	check(x == -378 and y == 4 + 474 - 59 - 37, "the best gear first, below the row and its header")
 	x, y = At(Slot(0, 1))
 	check(x == -294 and y == 382, "a section's items side by side")
+	-- More columns: wider (12 × 37 + 11 × 5 + 15), the free slots' 12 fit one row (42 less high).
+	local tallAs, wideAs = bag:GetHeight(), bag:GetWidth()
+	check(T("gamepadBagColumns") and M.db.gamepadBagColumns == 10 and wideAs == 430, "10 columns by default, with a slider")
+	T("gamepadBagColumns"):SetValue(12)
+	Wait(1)
+	x = At(Slot(1, 1))
+	check(bag:GetWidth() == 514 and bag:GetHeight() == tallAs - 42 and x == -462,
+		"12 columns: the bag wider and less tall, the first item further left, got " .. bag:GetWidth() .. " x " .. bag:GetHeight())
+	T("gamepadBagColumns"):SetValue(10)
+	Wait(1)
+	x = At(Slot(1, 1))
+	check(bag:GetWidth() == wideAs and bag:GetHeight() == tallAs and x == -378, "back to 10: as before")
 	x, y = At(Slot(1, 2))
 	check(x == -378 and y == 382 - 56, "the next section a row lower")
 	x, y = At(Slot(0, 4))
