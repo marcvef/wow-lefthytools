@@ -418,6 +418,12 @@ param(
 		$describe = Invoke-Git -C $root describe --tags --long --dirty --match 'v[0-9]*'
 		if ($describe -match '^v(.+)-(\d+)-g([0-9a-f]+)(-dirty)?$') {
 			$version = if ($Matches[2] -eq '0' -and -not $Matches[4]) { $Matches[1] } else { "$($Matches[1])-$($Matches[2])-g$($Matches[3])$($Matches[4])" }
+			# Not on GitHub yet (no remote branch has it): a test build. Friends' builds then don't
+			# tell them to update to it (LT.IsPublishedBuild); push first, then install.
+			if (-not $Matches[4]) {
+				$remote = Invoke-Git -C $root branch -r --contains HEAD
+				if (-not $remote) { $version = "$version-local" }
+			}
 		} else {
 			$hash = Invoke-Git -C $root rev-parse --short=7 HEAD
 			if ($hash) { $version = "$base-g$hash" }
@@ -540,7 +546,7 @@ param(
 			$installed = if ((Test-Path -LiteralPath $targetToc) -and -not (Get-Item -LiteralPath $target -Force).LinkType) { Get-TocVersion $targetToc } else { $null }
 			# Which of the add-ons that come with it aren't installed here yet.
 			$newCompanions = @($companions | Where-Object { -not (Test-Path -LiteralPath (Join-Path $addons "$_\$_.toc")) })
-			if (-not $Force -and -not $Link -and $installed -eq $build.Version -and $build.Version -notmatch 'dirty|dev' -and $newCompanions.Count -eq 0) {
+			if (-not $Force -and -not $Link -and $installed -eq $build.Version -and $build.Version -notmatch 'dirty|dev|local' -and $newCompanions.Count -eq 0) {
 				Write-Host "LefthyTools $installed is already the latest version." -ForegroundColor Green
 				continue
 			}

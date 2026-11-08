@@ -25,10 +25,11 @@ local newsAsked = {}    -- { gameAccountID, after id, language }: friends who as
 ---------------------------------------------------------------------------
 
 -- Their V2 (peer.version is set): the settings overview learns it, and a build newer than mine is
--- asked what's new in it.
+-- asked what's new in it. A test build isn't one anybody can update to: no notice for it.
 function B.FriendBuild(gameAccountID, peer, now)
 	LT:NoteFriendVersion(peer.version, peer.files) -- the settings overview shows it
-	if not newerNoticeShown and not newerFrom and LT.CompareVersions(peer.version, LT.version) == 1 then
+	if not newerNoticeShown and not newerFrom and LT.IsPublishedBuild(peer.version)
+		and LT.CompareVersions(peer.version, LT.version) == 1 then
 		-- Told on a tick, once their name is known and their news are in: ask what's new.
 		newerFrom, newerAt, news = gameAccountID, now, { lines = {}, more = 0 }
 		B.Queue(gameAccountID, ("U%s;%d;%s"):format(VERSION, LT.WhatsNew.LatestID(), ns.LOCALE == "deDE" and "de" or "en"))

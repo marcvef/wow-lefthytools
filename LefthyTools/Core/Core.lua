@@ -195,6 +195,7 @@ end
 --   0.3.0-12-g1a2b3c4   12 commits later (comparable: more commits = newer)
 --   0.3.0-g1a2b3c4      commit count unknown (GitHub couldn't be asked)
 --   ...-dirty / -dev    a development install
+--   ...-local           installed from a clone before that commit was on GitHub: a test build
 ---------------------------------------------------------------------------
 
 local GetMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
@@ -227,7 +228,7 @@ LT.FILES = "3c7eef25"
 -- (nil if that friend's build doesn't send them). Addons can't go online, so friends are the
 -- only way to learn about updates.
 function LT:NoteFriendVersion(version, files)
-	if LT.CompareVersions(version, LT.version) == 1
+	if LT.IsPublishedBuild(version) and LT.CompareVersions(version, LT.version) == 1
 		and (not LT.newerVersion or LT.CompareVersions(version, LT.newerVersion) == 1) then
 		LT.newerVersion, LT.newerFiles = version, files
 	elseif version == LT.newerVersion and files then
@@ -244,6 +245,14 @@ function LT.UpdateHint(files)
 		return run .. "/reload (no restart needed)."
 	end
 	return run .. "/reload (or restart the game if the updater says so)."
+end
+
+-- False for a build nobody can update to: a test build (-local) or a development install (-dirty,
+-- -dev). Its number still counts everywhere else (which messages a friend gets); it just isn't
+-- an update to tell anyone about.
+function LT.IsPublishedBuild(version)
+	return type(version) == "string" and not (version:find("-local", 1, true)
+		or version:find("-dirty", 1, true) or version:find("-dev", 1, true))
 end
 
 -- 1 if a is newer than b, -1 if older, 0 if the same; nil if that can't be told.

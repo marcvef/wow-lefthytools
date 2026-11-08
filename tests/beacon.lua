@@ -2523,6 +2523,14 @@ local seenNewer = LT.newerVersion
 LT.newerVersion = nil
 check(updateStatus():find("Unknown (Beacon is off)", 1, true), "update status with Beacon off: unknown")
 LT.newerVersion = seenNewer
+-- A friend's test build (installed before it was on GitHub, -local) or a development install: no update
+-- anyone can get, so no notice and no "newer" in the overview; its number still counts for messages.
+check(LT.IsPublishedBuild("0.7.0-48-gad7f15c") and LT.IsPublishedBuild("0.7.0")
+	and not LT.IsPublishedBuild("0.7.0-49-gabc1234-local") and not LT.IsPublishedBuild("0.7.0-49-gabc1234-dirty")
+	and not LT.IsPublishedBuild("0.7.0-dev") and not LT.IsPublishedBuild(nil), "published builds and test builds told apart")
+LT:NoteFriendVersion("9.9.9-1-gabc1234-local", "0123abcd")
+check(LT.newerVersion == seenNewer and LT.CompareVersions("0.7.0-49-gabc1234-local", "0.7.0-48-gad7f15c") == 1,
+	"a friend's newer test build isn't noted as an update (its number still compares)")
 do -- Beacon's /lefthy words while it's off: they answer as they always did (no time passes here).
 	pmark = #PRINTED + 1
 	lefthy("announce hello")
