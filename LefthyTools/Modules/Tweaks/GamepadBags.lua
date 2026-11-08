@@ -9,7 +9,9 @@ local LT = ns.LT
 -- after Blizzard's own layout (a post-hook on the bag's UpdateItemLayout) and after its item updates
 -- (UpdateItems, on the next frame): the bag buttons in a row at the top, then the items in sections
 -- with a small header each (gear, consumables, trade goods, quest items, other, junk, the free
--- slots), sorted in each. The selected item's tooltip goes beside the bag. Blizzard's item buttons stay
+-- slots), sorted in each. Unless asked for (Misc Tweaks), only the backpack's button stays in the row
+-- (the way to the bag menu; the others are needed only to change bags) and one free slot stands for
+-- all, its header saying how many. The selected item's tooltip goes beside the bag. Blizzard's item buttons stay
 -- Blizzard's (they do the secure use, equip, sell, split and drag); only where they sit changes.
 --
 -- Navigation: SmartNavigation's grid mode counts the buttons of each column, which sections with
@@ -51,13 +53,28 @@ local starts = {}     -- the section each place in `order` begins (place -> sect
 local stripped = {}   -- the bag buttons in the row
 local contentHeight   -- the items' and the row's height in our layout
 local contentWidth    -- the bag's width for our columns (Misc Tweaks' gamepadBagColumns)
+local freeCount = 0   -- free slots in the last layout (one of them shown, unless all are wanted)
+local tucked = {}     -- Blizzard's buttons we hid (the other bags' buttons, the other free slots)
+local countText       -- the free slots' count on the one shown
 local placedColumns   -- the columns of the last layout
+local placedCount     -- the free slots' count in the last layout
+local placedAllFree   -- whether that layout had every free slot
 local buttonHeight    -- an item button's height (Blizzard's grid rows are as high)
 local overlay, headers = nil, {}
 local wantUp, wantDown = {}, {} -- button -> the button its up / down jump goes to (our layout's short rows)
 local jumped = {}     -- buttons that have a jump of ours
 local bagButtons = {} -- the bag buttons ever in our row (their up is Blizzard's)
 local hooked, hookedCallback = false, nil
+
+-- A Misc Tweaks setting (the bag buttons, the free slots, the columns).
+local function Setting(key, default)
+	local tweaks = LT:GetModule("tweaks")
+	local v = tweaks and tweaks.db and tweaks.db[key]
+	if v == nil then
+		return default
+	end
+	return v
+end
 local dirty, navPending = false, false
 local driver = CreateFrame("Frame")
 driver:Hide()
@@ -181,6 +198,23 @@ local function Sort(frame)
 	for i = 1, #SECTIONS do
 		table.sort(groups[i], Before)
 	end
+	-- One free slot for all (the first in the bags' order, where loot goes first), unless all are wanted.
+	local empty = groups[EMPTY]
+	freeCount = 0
+	for _, e in ipairs(empty) do
+		if e.order < 1000000 then
+			freeCount = freeCount + 1
+		end
+	end
+	if not Setting("gamepadBagAllFree", false) then
+		groups.tucked = {}
+		for i = #empty, 2, -1 do
+			table.insert(groups.tucked, table.remove(empty, i).button)
+		end
+		if empty[1] and empty[1].order >= 1000000 then
+			table.insert(groups.tucked, table.remove(empty, 1).button) -- (slots the account can't use yet)
+		end
+	end
 	return groups
 end
 
@@ -198,7 +232,33 @@ local function StripButtons()
 	if keyring then
 		list[#list + 1] = keyring
 	end
+	if not Setting("gamepadBagButtons", false) then
+		list.tucked = {}
+		for i = #list, 2, -1 do
+			table.insert(list.tucked, table.remove(list, i)) -- (the backpack's stays: the bag menu)
+		end
+	end
 	return list
+end
+
+-- Blizzard's buttons back that we hid (ours gone, or wanted again). Not a protected one in a fight.
+local function Untuck(keep)
+	for b in pairs(tucked) do
+		if not (keep and keep[b]) and not (InCombatLockdown() and b:IsProtected()) then
+			b:Show()
+			tucked[b] = nil
+		end
+	end
+end
+
+local function Tuck(list, keep)
+	for _, b in ipairs(list or {}) do
+		keep[b] = true
+		if b:IsShown() then
+			b:Hide() -- (again, if Blizzard showed it since)
+		end
+		tucked[b] = true
+	end
 end
 
 -- The same order and sections as the last layout: nothing to move.
@@ -355,9 +415,14 @@ local function Place(frame, groups, strip)
 	if point ~= "BOTTOMRIGHT" or not rel or not (frame.GetRows and frame.CalculateHeight) then
 		return false -- not the grid this was made for: Blizzard's layout stays
 	end
+	local keep = {}
+	Tuck(strip.tucked, keep)
+	Tuck(groups.tucked, keep)
+	Untuck(keep) -- (the ones wanted again: shown)
 	local w, h = ButtonSize(groups, strip)
 	local cols = Columns()
-	placedColumns = cols
+	placedColumns, placedCount = cols, freeCount
+	placedAllFree = Setting("gamepadBagAllFree", false)
 	contentWidth = cols * w + (cols - 1) * SPACING + (frame.GetPaddingWidth and frame:GetPaddingWidth() or 15)
 	local height = #strip > 0 and h + STRIP_GAP or 0
 	for _, group in ipairs(groups) do
@@ -373,6 +438,7 @@ local function Place(frame, groups, strip)
 		button:SetPoint("BOTTOMRIGHT", rel, relPoint, ax - (cols - col) * (w + SPACING), ay + height - top - h)
 	end
 	wipe(stripped)
+	stripped.all = Setting("gamepadBagButtons", false)
 	for i, b in ipairs(strip) do
 		Put(b, math.min(i, cols), 0)
 		stripped[i] = b
@@ -393,7 +459,7 @@ local function Place(frame, groups, strip)
 			local hd = Header(shown)
 			hd.text:ClearAllPoints()
 			hd.text:SetPoint("BOTTOMLEFT", rel, relPoint, left + 1, ay + height - top - HEADER + 3)
-			hd.text:SetText(SECTIONS[s].title)
+			hd.text:SetText(s == EMPTY and groups.tucked and L["Free slots (%d)"]:format(freeCount) or SECTIONS[s].title)
 			hd.text:Show()
 			hd.line:ClearAllPoints()
 			hd.line:SetPoint("LEFT", hd.text, "RIGHT", 5, 0)
@@ -418,6 +484,16 @@ local function Place(frame, groups, strip)
 		end
 	end
 	HideHeaders(shown + 1)
+	countText = countText or overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+	local free = groups.tucked and groups[EMPTY][1]
+	if free and freeCount > 1 then
+		countText:ClearAllPoints()
+		countText:SetPoint("BOTTOMRIGHT", free.button, "BOTTOMRIGHT", -3, 3)
+		countText:SetText(freeCount)
+		countText:Show()
+	else
+		countText:Hide()
+	end
 	SetBagWidth(frame, contentWidth)
 	SetBagHeight(frame, OurHeight(frame, h))
 	applied = true
@@ -437,6 +513,7 @@ local function Unapply()
 	wipe(wantUp); wipe(wantDown)
 	ApplyJumps(false)
 	wipe(order); wipe(laidOut); wipe(starts); wipe(stripped)
+	Untuck() -- (Blizzard's layout has them all)
 	if overlay then
 		overlay:Hide()
 	end
@@ -570,7 +647,7 @@ local function Relayout()
 		return
 	end
 	local groups = Sort(frame)
-	if applied and SameLayout(groups) and placedColumns == Columns() then
+	if applied and SameLayout(groups) and placedColumns == Columns() and placedCount == freeCount then
 		return
 	end
 	local current = SmartNavigation and SmartNavigation.GetCurrentButton and SmartNavigation:GetCurrentButton()
@@ -662,10 +739,13 @@ function ns.ApplyGamepadBags(on)
 	end
 end
 
--- Misc Tweaks' columns slider moved: laid out again (on the next frame).
+-- Misc Tweaks' columns slider moved, or what's shown of the bag buttons and free slots: laid out
+-- again (on the next frame).
 function ns.GamepadBagsColumns()
 	local frame = Bag()
-	if wanted and hooked and frame and frame:IsShown() and PadUI() then
+	if wanted and hooked and frame and frame:IsShown() and PadUI() and applied
+		and (placedColumns ~= Columns() or (stripped.all ~= nil and stripped.all ~= Setting("gamepadBagButtons", false))
+			or (placedAllFree ~= nil and placedAllFree ~= Setting("gamepadBagAllFree", false))) then
 		dirty = true
 		driver:Show()
 	end

@@ -13,6 +13,10 @@ do
 	local function Wait(s) Advance(s); waited = waited + s end
 	local function State() return ns.GamepadBagsState() end
 	check(M.db.gamepadBags == true and T("gamepadBags"), "on by default, with a checkbox")
+	check(M.db.gamepadBagButtons == false and M.db.gamepadBagAllFree == false and T("gamepadBagButtons") and T("gamepadBagAllFree"),
+		"by default the backpack's button alone and one free slot for all, each with a checkbox")
+	-- Every bag button and free slot for the checks below (the defaults are checked further down).
+	M.db.gamepadBagButtons, M.db.gamepadBagAllFree = true, true
 
 	-- Two bags: the mock's 16 slots of the backpack and 8 of bag 1.
 	local made = {}
@@ -176,6 +180,25 @@ do
 	bag:UpdateItemLayout()
 	Wait(0.05)
 
+	-- The defaults: the backpack's button alone (the bag menu), one free slot standing for all.
+	local everyItem = #State().order
+	T("gamepadBagButtons"):SetValue(false)
+	T("gamepadBagAllFree"):SetValue(false)
+	Wait(1)
+	st = State()
+	local freeHeader = st.headers[#st.headers] or ""
+	local free = tonumber(freeHeader:match("^Free slots %((%d+)%)$"))
+	check(#st.strip == 1 and st.strip[1] == GamepadBagBar.BagButtonArray[1] and not GamepadBagBar.BagButtonArray[2]:IsShown(),
+		"the backpack's button alone in the row, the other bags' hidden")
+	check(free and free > 1 and #st.order == everyItem - (free - 1), "one free slot for all, its header says how many: " .. freeHeader)
+	check(#BLOCKED == blocked and #ERRORS == errors, "nothing blocked, no errors")
+	T("gamepadBagButtons"):SetValue(true)
+	T("gamepadBagAllFree"):SetValue(true)
+	Wait(1)
+	st = State()
+	check(#st.strip == 5 and GamepadBagBar.BagButtonArray[2]:IsShown() and #st.order == everyItem,
+		"both ticked: every bag's button and every free slot again")
+
 	-- Mouse and keyboard: Blizzard's bag as it is.
 	GAMEPAD_STATE.ui = false
 	CloseBags()
@@ -236,6 +259,7 @@ do
 		"the bag closed: our jumps gone")
 
 	-- Back as it was for the files after this one.
+	M.db.gamepadBagButtons, M.db.gamepadBagAllFree = false, false
 	GAMEPAD_STATE.ui = false
 	for _, b in ipairs(made) do
 		for i = #bag.buttons, 1, -1 do

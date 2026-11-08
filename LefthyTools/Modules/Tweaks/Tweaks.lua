@@ -17,6 +17,8 @@ local M = LT:NewModule("tweaks", {
 		gamepadBagSort = true,
 		gamepadBags = true,    -- GamepadBags.lua: with a controller, the bags in sections
 		gamepadBagColumns = 10, -- ... with this many items side by side (Blizzard's grid has 10)
+		gamepadBagButtons = false, -- ... every bag's button in the row (else the backpack's alone)
+		gamepadBagAllFree = false, -- ... every free slot (else one, with how many)
 		gamepadSymbols = "default", -- "default" | "xbox" | "playstation": the controller's button symbols
 		padSymbolConfigs = {}, -- "vendor:product" -> true: controllers whose symbols this set (to undo it)
 		bagPositions = {},     -- key ("combined" / "bag<id>") -> { left, top } in UIParent units
@@ -403,6 +405,10 @@ function M:BuildOptions(o)
 	o:Slider("gamepadBagColumns", L["Controller bags: columns"],
 		L["How many items side by side in the sorted controller bags. More columns make them wider and less tall; Blizzard's own is 10."],
 		6, 24, 1, function(v) return tostring(math.floor((tonumber(v) or 10) + 0.5)) end)
+	o:Checkbox("gamepadBagButtons", L["Controller bags: every bag's button"],
+		L["The row at the top of the sorted controller bags shows every bag's button, to change a bag. Off, only the backpack's is there (the way to the bag menu)."])
+	o:Checkbox("gamepadBagAllFree", L["Controller bags: every free slot"],
+		L["The sorted controller bags show each free slot. Off, one stands for all and says how many there are."])
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
