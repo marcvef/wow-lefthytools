@@ -259,12 +259,17 @@ local function Toggle(frame)
 		bagsToggle.Line:SetHeight(1)
 		bagsToggle.Line:SetPoint("LEFT", bagsToggle.Text, "RIGHT", 5, 0)
 		bagsToggle:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
-		bagsToggle:SetScript("OnClick", function()
+		local function Flip()
 			local tweaks = LT:GetModule("tweaks")
 			if tweaks and tweaks.db then
 				LT:SetModuleSetting(tweaks, "gamepadBagButtons", not Setting("gamepadBagButtons", false))
 			end
-		end)
+			return true
+		end
+		bagsToggle:SetScript("OnClick", Flip)
+		-- The controller's A: SmartNavigation calls this (else it only fakes MouseDown / MouseUp,
+		-- which doesn't click an addon's button).
+		bagsToggle.OnSmartNavClick = Flip
 	end
 	bagsToggle:SetParent(frame)
 	bagsToggle:SetFrameLevel(frame:GetFrameLevel() + 4)
@@ -725,7 +730,7 @@ driver:SetScript("OnUpdate", function(self)
 	end
 	if navPending then
 		navPending = false
-		FixNavigation(Bag())
+		FixNavigation(Bag(), true) -- (our "Bags" header among its buttons, also the first time it's made)
 	end
 end)
 
