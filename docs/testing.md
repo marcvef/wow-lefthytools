@@ -2,7 +2,7 @@
 
 ## Automated (`npm test`)
 
-`npm install` once, then `npm test` (about 80 s), or a part of it (below). `tests/run.js`:
+`npm install` once, then `npm test` (about 2 minutes), or a part of it (below). `tests/run.js`:
 
 1. reads the file list from the TOC, checks that every file it names exists (XML too) and each
    Lua file's syntax as Lua 5.1 (luaparse);
@@ -14,10 +14,26 @@
 4. runs the addon in fengari (Lua 5.3) against `tests/mock.lua`, which fakes the WoW API: once as
    an English client (the files below), once as German (`tests/test_de.lua`, which also fails
    on formal terms, translated module names and runtime translation fallbacks) and once for
-   WoW: Forever's release (`tests/release.lua`, below).
+   WoW: Forever's release (`tests/release.lua`, below). The German and release suites need nothing
+   of the English one, so each runs in a process of its own (`node tests/run.js --side <job>`,
+   with the sources the main run read at its start) while the English suite runs; their output is
+   printed after the English suite's, in that order, and the first suite that fails ends the run
+   (exit code 1), as if they ran one after the other.
 
 The mock runs OnUpdate only on visible frames, like the game, and animation groups with
 `SetToFinalAlpha(true)` jump to their end state on `Play()`. It does not replace testing in game.
+
+Where the time goes: almost all of it is the English suite's `Advance` steps (OnUpdate scripts and
+timers, 60 steps per simulated second), most in `echoes_net.lua` (its clients), `beacon.lua`,
+`echoes_capture.lua` and `chronicle.lua`. So `Advance` goes only over the frames that ever had an
+OnUpdate (in the order they were made, as going over every frame would) and looks at the timers
+only once one is due. run.js's `load` compiles a source text once per Lua state and loads it
+again from its bytecode (the same function, a new closure), since the addon is loaded once per
+client and fengari's compiler is slow. The suite's files can't be split over processes: they share
+the clock, the world and `math.random` (seeded by `echoes_pages.lua`; before that fengari's is
+random, so e.g. Beacon's item rolls in `beacon.lua` differ from run to run), so each file's
+results depend on everything before it.
+
 What Lua can't fake comes from Node (`tests/native.js`, put into each Lua state before mock.lua):
 `C_EncodingUtil` with Node's real zlib and Base64, so Echoes' pages really round-trip, and
 `MOCK_EXPORTER(text)`: the Echoes exporter's own readers on a saved file's text, when the
@@ -94,9 +110,11 @@ and the beta's data back on the release.
 `npm test -- stream` runs steps 1-3, then helpers.lua, `stream.lua` and what its Needs line names
 (`beacon.lua`), in the suite's order, and the last checks. Several names add up
 (`npm test -- chronicle levelup`); `german` is the German suite (`npm test -- german`), `release`
-the release's. Without names everything runs. Alone a file takes seconds (`beacon.lua` and `chronicle.lua` the longest);
-the whole suite takes longer than its files added up, since each `Advance` step goes over every
-frame made so far.
+the release's. Without names everything runs. Alone a file takes seconds (`echoes_net.lua` about a
+minute, `beacon.lua`, `echoes_capture.lua` and `chronicle.lua` 10-20 s); the whole suite takes
+longer than its files added up, since each `Advance` step goes over every OnUpdate made so far.
+Alone a file can see other random numbers than in the whole suite (`math.random` isn't seeded
+yet when `echoes_pages.lua` doesn't run before it).
 
 ### Adding a test
 

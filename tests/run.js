@@ -5,10 +5,23 @@
 // order; several names add up, "german" is the German suite and "release" the release's (the beta's
 // saved data going). A folder is the add-on to test.
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+const { spawn } = require("child_process");
 const { lua, lauxlib, lualib, to_luastring } = require("fengari");
-const luaparse = require("luaparse");
 
+// A suite of its own in a process of its own: the German and release suites run beside the English
+// one (below, "Side suites"). `node tests/run.js --side <job.json>` runs the scripts the job names in
+// one Lua state, with the sources the main run read at its start; what it prints goes to its stdout
+// (a file the main run prints after the English suite), a failure exits with 1 as in the main run.
+if (process.argv[2] === "--side") {
+  const job = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+  const L = newState(job.files, job.sources);
+  for (const script of job.scripts) run(L, script.name, undefined, script.src);
+  return;
+}
+
+const luaparse = require("luaparse");
 const args = process.argv.slice(2);
 const addonArg = args.find((a) => fs.existsSync(a) && fs.statSync(a).isDirectory());
 const names = args.filter((a) => a !== addonArg).map((a) => a.replace(/\.lua$/, ""));
@@ -126,7 +139,7 @@ const english = names.length ? ENGLISH.filter((f) => picked.has(f)) : ENGLISH;
 const german = !names.length || names.includes("german");
 const release = !names.length || names.includes("release");
 
-function newState() {
+function newState(files, sources) {
   const L = lauxlib.luaL_newstate();
   lualib.luaL_openlibs(L);
   require("./native.js")(L); // C_EncodingUtil with Node's real zlib, MOCK_EXPORTER (tests/native.js)
@@ -140,12 +153,65 @@ function newState() {
     lua.lua_rawseti(L, -2, i + 1);
   });
   lua.lua_setglobal(L, to_luastring("SOURCES"));
+  compileOnce(L);
   return L;
 }
 
-// Runs a script with the suite table (a registry reference) as its argument; returns its first result.
-function run(L, script, suite) {
-  const src = fs.readFileSync(path.join(__dirname, script), "utf8");
+// load() compiles a text once per Lua state: the addon is loaded many times (every client in
+// echoes_net.lua and recipes.lua, every start in release.lua) from the same SOURCES strings, and
+// fengari's compiler is slow. A string load() compiled before (the same Lua string, chunk name and
+// a mode that allows text) is loaded again from the bytecode string.dump would give: the same
+// function (code, constants, line numbers, chunk name), a new closure with its own upvalues, the
+// env argument set as in Lua's load. Everything else (reader functions, binary chunks, a load that
+// fails) goes the usual way, so errors read the same.
+function compileOnce(L) {
+  const T = 0x74, ESC = 0x1b, DEFAULT_NAME = Symbol("the source"); // "t", a binary chunk's first byte, no name given
+  const compiled = new WeakMap(); // the source's bytes (one per Lua string) -> Map(chunk name -> bytecode)
+  lua.lua_getglobal(L, to_luastring("load"));
+  const original = lauxlib.luaL_ref(L, lua.LUA_REGISTRYINDEX);
+  lua.lua_pushcfunction(L, (L) => {
+    const top = lua.lua_gettop(L);
+    const nameType = lua.lua_type(L, 2), modeType = lua.lua_type(L, 3);
+    const s = lua.lua_type(L, 1) === lua.LUA_TSTRING ? lua.lua_tolstring(L, 1) : null;
+    const mode = modeType === lua.LUA_TSTRING ? lua.lua_tolstring(L, 3) : null;
+    if (s === null || s[0] === ESC || !(nameType === lua.LUA_TSTRING || nameType <= lua.LUA_TNIL)
+        || !(mode ? mode.includes(T) : modeType <= lua.LUA_TNIL)) {
+      lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, original); // (the usual way)
+      lua.lua_insert(L, 1);
+      lua.lua_call(L, top, lua.LUA_MULTRET);
+      return lua.lua_gettop(L);
+    }
+    const name = nameType === lua.LUA_TSTRING ? lua.lua_tolstring(L, 2) : s;
+    const key = nameType === lua.LUA_TSTRING ? Buffer.from(name).toString("latin1") : DEFAULT_NAME;
+    let byName = compiled.get(s);
+    let bytecode = byName && byName.get(key);
+    if (bytecode) {
+      lauxlib.luaL_loadbufferx(L, bytecode, bytecode.length, name, to_luastring("b"));
+    } else {
+      if (lauxlib.luaL_loadbufferx(L, s, s.length, name, mode) !== lua.LUA_OK) {
+        lua.lua_pushnil(L);
+        lua.lua_insert(L, -2);
+        return 2; // (nil and the message, as Lua's load answers)
+      }
+      const parts = [];
+      lua.lua_dump(L, (_, b, size) => { parts.push(b.slice(0, size)); return 0; }, null, false);
+      bytecode = new Uint8Array(Buffer.concat(parts));
+      if (!byName) compiled.set(s, byName = new Map());
+      byName.set(key, bytecode);
+    }
+    if (top >= 4) { // (an env argument, nil too: the first upvalue, like Lua's load)
+      lua.lua_pushvalue(L, 4);
+      if (!lua.lua_setupvalue(L, -2, 1)) lua.lua_pop(L, 1);
+    }
+    return 1;
+  });
+  lua.lua_setglobal(L, to_luastring("load"));
+}
+
+// Runs a script (its text: src, or read now) with the suite table (a registry reference) as its
+// argument; returns its first result.
+function run(L, script, suite, src) {
+  if (src === undefined) src = fs.readFileSync(path.join(__dirname, script), "utf8");
   if (lauxlib.luaL_loadbuffer(L, to_luastring(src), null, to_luastring("@" + script)) !== lua.LUA_OK) fail(L);
   if (suite !== undefined) lua.lua_rawgeti(L, lua.LUA_REGISTRYINDEX, suite);
   if (lua.lua_pcall(L, suite !== undefined ? 1 : 0, 1, 0) !== lua.LUA_OK) fail(L);
@@ -156,10 +222,34 @@ function fail(L) {
   process.exit(1);
 }
 
+// Side suites: the German client and the release (the beta's saved data going; release.lua starts
+// the game itself, several times) need nothing of the English suite, so each runs in a process of
+// its own (`--side`, at the top) while the English suite runs here. Their output is printed after
+// the English suite's, in this order, as if they ran after it; the first that fails ends the run.
+const side = [];
+let sideDir;
+function startSide(scripts) {
+  sideDir = sideDir || fs.mkdtempSync(path.join(os.tmpdir(), "lefthytools-test-"));
+  const n = side.length;
+  const job = path.join(sideDir, `job${n}.json`), out = path.join(sideDir, `out${n}.txt`);
+  fs.writeFileSync(job, JSON.stringify({ files, sources,
+    scripts: scripts.map((name) => ({ name, src: fs.readFileSync(path.join(__dirname, name), "utf8") })) }));
+  const fd = fs.openSync(out, "w"); // (a file, not a pipe: this process is busy with the English suite)
+  const child = spawn(process.execPath, [__filename, "--side", job], { cwd: process.cwd(), stdio: ["ignore", fd, "inherit"] });
+  fs.closeSync(fd);
+  side.push({ child, out, done: new Promise((resolve) => child.on("close", (code) => resolve(code))) });
+}
+process.on("exit", () => {
+  for (const s of side) if (s.child.exitCode === null) s.child.kill();
+  if (sideDir) try { fs.rmSync(sideDir, { recursive: true, force: true }); } catch (e) { /* (a child still closing) */ }
+});
+if (german) startSide(["mock.lua", "test_de.lua"]);
+if (release) startSide(["mock.lua", "release.lua"]);
+
 // English client
 if (english.length) {
   if (names.length) console.log(`English suite: ${english.join(", ")}`);
-  const L = newState();
+  const L = newState(files, sources);
   run(L, "mock.lua");
   const suite = run(L, "helpers.lua");
   for (const file of english) run(L, file, suite);
@@ -168,16 +258,13 @@ if (english.length) {
   if (lua.lua_pcall(L, 0, 0, 0) !== lua.LUA_OK) fail(L);
 }
 
-// German client
-if (german) {
-  const L = newState();
-  run(L, "mock.lua");
-  run(L, "test_de.lua");
-}
-
-// The release: the beta's saved data going (release.lua starts the game itself, several times)
-if (release) {
-  const L = newState();
-  run(L, "mock.lua");
-  run(L, "release.lua");
-}
+(async () => {
+  for (const s of side) {
+    const code = await s.done;
+    process.stdout.write(fs.readFileSync(s.out));
+    if (code !== 0) {
+      process.exitCode = 1;
+      return;
+    }
+  }
+})();

@@ -61,15 +61,33 @@ end
 SECRET = setmetatable({}, secretMeta)
 function issecretvalue(v) return rawequal(v, SECRET) end
 
--- timers
-local timers = {}
-C_Timer = { After = function(d, fn) timers[#timers + 1] = { at = now + d, fn = fn } end }
+-- timers (soonest: none is due before it, so Advance looks at them only from then on)
+local timers, soonest = {}, math.huge
+C_Timer = { After = function(d, fn)
+	local at = now + d
+	timers[#timers + 1] = { at = at, fn = fn }
+	if at < soonest then soonest = at end
+end }
 
 -- frames
 local allFrames, eventFrames = {}, {}
+-- The frames that ever had an OnUpdate, in the order they were made (allFrames' order): Advance goes
+-- over these instead of every frame (it calls the same frames in the same order). made[f]: f's
+-- place in that order; updated: the list; changes: counts changes to it (Advance then finds its
+-- place in it again).
+local made, madeCount, updated, inUpdated, changes = {}, 0, {}, {}, 0
+local function Updated(f)
+	local n = made[f]
+	if not n or inUpdated[f] then return end
+	inUpdated[f] = true
+	local i = #updated
+	while i > 0 and made[updated[i]] > n do updated[i + 1] = updated[i]; i = i - 1 end
+	updated[i + 1] = f
+	changes = changes + 1
+end
 local FrameMethods = {}
 FrameMethods.__index = FrameMethods
-function FrameMethods:SetScript(k, fn) self._scripts[k] = fn end
+function FrameMethods:SetScript(k, fn) self._scripts[k] = fn; if k == "OnUpdate" and fn then Updated(self) end end
 function FrameMethods:GetScript(k) return self._scripts[k] end
 function FrameMethods:RegisterEvent(e) eventFrames[e] = eventFrames[e] or {}; eventFrames[e][self] = true end
 function FrameMethods:RegisterUnitEvent(e, ...) self._units[e] = { ... }; self:RegisterEvent(e) end
@@ -115,6 +133,7 @@ function FrameMethods:RegisterForDrag(...) self._dragButtons = { ... } end
 function FrameMethods:HookScript(k, fn)
 	local prev = self._scripts[k]
 	self._scripts[k] = function(...) if prev then prev(...) end fn(...) end
+	if k == "OnUpdate" then Updated(self) end
 end
 function FrameMethods:SetMovable(m) self._movable = m end
 function FrameMethods:SetClampedToScreen(c) self._clamped = c end
@@ -433,6 +452,8 @@ function CreateFrame(kind, name, parent, template)
 		parent._children[#parent._children + 1] = f
 	end
 	allFrames[#allFrames + 1] = f
+	madeCount = madeCount + 1
+	made[f] = madeCount
 	if kind == "StatusBar" then -- (only status bars have a fill texture)
 		function f:SetStatusBarTexture(asset)
 			self._fill = self._fill or self:CreateTexture()
@@ -520,17 +541,38 @@ function Fire(event, ...)
 	lockdownStarting = starting
 end
 
+-- The first place in `updated` of a frame made after the n-th.
+local function UpdatedAfter(n)
+	local lo, hi = 1, #updated + 1
+	while lo < hi do
+		local mid = math.floor((lo + hi) / 2)
+		if made[updated[mid]] > n then hi = mid else lo = mid + 1 end
+	end
+	return lo
+end
+
 function Advance(seconds, step)
 	step = step or 1 / 60
 	local target = now + seconds
 	while now < target - 1e-9 do
 		local dt = math.min(step, target - now)
 		now = now + dt
-		for i = #timers, 1, -1 do
-			local t = timers[i]
-			if t.at <= now then table.remove(timers, i); t.fn() end
+		if soonest <= now then
+			for i = #timers, 1, -1 do
+				local t = timers[i]
+				if t.at <= now then table.remove(timers, i); t.fn() end
+			end
+			soonest = math.huge
+			for _, t in ipairs(timers) do if t.at < soonest then soonest = t.at end end
 		end
-		for _, f in ipairs(allFrames) do
+		-- Every frame with an OnUpdate, in the order they were made, like going over all of them; one
+		-- given an OnUpdate meanwhile runs in this step if it was made after the one running now.
+		local i, last, seen = 1, 0, changes
+		while true do
+			if seen ~= changes then seen = changes; i = UpdatedAfter(last) end
+			local f = updated[i]
+			if not f then break end
+			i, last = i + 1, made[f] or last
 			if f._scripts.OnUpdate and f:IsVisible() then f._scripts.OnUpdate(f, dt) end -- like the game: visible frames only
 		end
 	end
@@ -1935,7 +1977,11 @@ local mockFrames = #allFrames -- (the mock's own)
 function MockReload()
 	wipe(eventFrames)
 	wipe(timers)
-	for i = #allFrames, mockFrames + 1, -1 do allFrames[i] = nil end
+	for i = #allFrames, mockFrames + 1, -1 do made[allFrames[i]] = nil; allFrames[i] = nil end
+	for i = #updated, 1, -1 do
+		if not made[updated[i]] then inUpdated[updated[i]] = nil; table.remove(updated, i) end
+	end
+	changes = changes + 1
 	for _, list in ipairs({ REGISTERED_SETTINGS, CATEGORIES, LAYOUTS, ADDON_CATEGORIES, TEXT_INPUTS, DROPDOWNS, CHECKBOX_SLIDERS,
 			SETTINGS_BUTTONS, HEADERS }) do
 		wipe(list)
