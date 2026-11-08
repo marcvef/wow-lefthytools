@@ -79,6 +79,11 @@ still says gamepad (it began there).
 
 ## gamepadBags: the bags with a controller (GamepadBags.lua)
 
+With mouse and keyboard (`mouseBags`, on by default; `Active()` asks the one for the mode the interface
+is in) the same sections, columns and folded free slots, without the "Bags" header and its row (the bag
+buttons sit on the main bar), without SmartNavigation's jumps and with the tooltip where Blizzard puts it.
+Switched off there, Blizzard's grid comes back at once (`UpdateItemLayout`).
+
 By default the bag buttons' row is folded away under a "Bags (5)" header: our own button on the bag, so the
 controller lands on it too. The cursor landing there (`FocusEnter` runs its OnEnter) opens the row for as long
 as the cursor stays up there (`peeking`); moving down into the items folds it (SmartNavigation's outgoing-down

@@ -16,6 +16,7 @@ local M = LT:NewModule("tweaks", {
 		movableBags = true,
 		gamepadBagSort = true,
 		gamepadBags = true,    -- GamepadBags.lua: with a controller, the bags in sections
+		mouseBags = true,      -- ... and with mouse and keyboard
 		gamepadBagColumns = 10, -- ... with this many items side by side (Blizzard's grid has 10)
 		gamepadBagButtons = false, -- ... the bag buttons' row open under the "Bags" header (else folded)
 		gamepadBagAllFree = false, -- ... every free slot (else one, with how many)
@@ -201,6 +202,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyGamepadBagSort(on) end }, -- Bags.lua
 	{ key = "gamepadBags", command = "padbags", label = "Sorted bags with a controller",
 		apply = function(on) ns.ApplyGamepadBags(on) end }, -- GamepadBags.lua
+	{ key = "mouseBags", command = "mousebags", label = "Sorted bags with mouse and keyboard",
+		apply = function(on) ns.ApplyMouseBags(on) end }, -- GamepadBags.lua
 	{ key = "questAnnounce", command = "quests", label = "Announce quest progress in party chat",
 		apply = function(on) ns.ApplyQuestAnnounce(on) end }, -- QuestAnnounce.lua
 	{ key = "comboNameplate", command = "combo", label = "Combo points on your target's nameplate",
@@ -402,13 +405,15 @@ function M:BuildOptions(o)
 		L["Since Forever's latest patch the bags' clean-up button is gone with mouse and keyboard. This puts it back, at the left of the bags' search box. With a controller it's in the bag menu instead."])
 	o:Checkbox("gamepadBags", L["Sorted bags with a controller"],
 		L["In gamepad mode the bags show each bag's button in a row at the top, then your items in sections: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name. The selected item's tooltip shows beside the bags. With mouse and keyboard nothing changes. Off: Blizzard's layout, from the next time the bags open."])
-	o:Slider("gamepadBagColumns", L["Controller bags: columns"],
-		L["How many items side by side in the sorted controller bags. More columns make them wider and less tall; Blizzard's own is 10."],
+	o:Checkbox("mouseBags", L["Sorted bags with mouse and keyboard"],
+		L["The same sections with mouse and keyboard: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name. Off: Blizzard's own bag."])
+	o:Slider("gamepadBagColumns", L["Sorted bags: columns"],
+		L["How many items side by side in the sorted bags. More columns make them wider and less tall; Blizzard's own is 10."],
 		6, 24, 1, function(v) return tostring(math.floor((tonumber(v) or 10) + 0.5)) end)
 	o:Checkbox("gamepadBagButtons", L["Controller bags: the bag buttons' row open"],
 		L["The sorted controller bags show every bag's button in a row under their \"Bags\" header, to change a bag. Off, the row is folded away and opens while the controller's cursor is on the header or the row; a click on the header opens and folds it for good."])
-	o:Checkbox("gamepadBagAllFree", L["Controller bags: every free slot"],
-		L["The sorted controller bags show each free slot. Off, one stands for all and says how many there are."])
+	o:Checkbox("gamepadBagAllFree", L["Sorted bags: every free slot"],
+		L["The sorted bags show each free slot. Off, one stands for all and says how many there are."])
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
@@ -496,7 +501,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | bagsort | padbags | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | bagsort | padbags | mousebags | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
 		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 		self:Print("/lefthy tweaks combopos - preview the combo point dots on nameplates (no mob needed)")

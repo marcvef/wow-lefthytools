@@ -2,7 +2,9 @@ local _, ns = ...
 local L = ns.L
 local LT = ns.LT
 
--- Misc Tweaks: the bags with a controller (gamepadBags).
+-- Misc Tweaks: the sorted bags, with a controller (gamepadBags) and with mouse and keyboard (mouseBags).
+-- With mouse and keyboard the same sections, without the "Bags" header and its row (the bag buttons
+-- sit on the main bar there), the navigation (SmartNavigation) and the tooltip beside the bag.
 --
 -- With the controller UI the combined bag puts each bag's button (GamepadBagBar) into its item grid,
 -- in front of that bag's slots: one long grid of bags and items. This places the same buttons anew,
@@ -49,7 +51,8 @@ local HEADER = 15     -- a section's header row
 local STRIP_GAP = 7   -- below the row of bag buttons
 local SECTION_GAP = 4 -- below a section's last row
 
-local wanted = false  -- the tweak is on
+local wanted = false  -- the tweak is on (with a controller)
+local wantedMouse = false -- ... with mouse and keyboard (mouseBags)
 local applied = false -- the bag shows our layout
 local order = {}      -- the item buttons in our order (the last layout)
 local laidOut = {}    -- item button -> its place in `order`
@@ -98,6 +101,14 @@ end
 
 local function PadUI()
 	return InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() == true
+end
+
+-- Ours wanted in the interface's mode now.
+local function Active()
+	if PadUI() then
+		return wanted
+	end
+	return wantedMouse
 end
 
 local function BagButton(bagID)
@@ -233,6 +244,10 @@ end
 -- The bag buttons Blizzard puts into the grid, backpack first, the key ring last.
 local function StripButtons()
 	local list = {}
+	if not PadUI() then
+		list.count = 0
+		return list -- (mouse and keyboard: the bag buttons are on the main bar)
+	end
 	local first, last = STARTING_BAG_INDEX or 0, ENDING_BAG_INDEX or 4
 	for bag = first, last do
 		local b = bag ~= KEYRING_CONTAINER and BagButton(bag)
@@ -496,8 +511,9 @@ local function Place(frame, groups, strip)
 	placedColumns, placedCount = cols, freeCount
 	placedAllFree = Setting("gamepadBagAllFree", false)
 	contentWidth = cols * w + (cols - 1) * SPACING + (frame.GetPaddingWidth and frame:GetPaddingWidth() or 15)
-	local open = #strip > 0
-	local height = HEADER + (open and h + STRIP_GAP or SECTION_GAP) -- (the "Bags" header, the row when open)
+	local pad, open = PadUI(), #strip > 0
+	local base = pad and HEADER + (open and h + STRIP_GAP or SECTION_GAP) or 0 -- (the "Bags" header, the row when open)
+	local height = base
 	for _, group in ipairs(groups) do
 		if group[1] then
 			local rows = math.ceil(#group / cols)
@@ -511,7 +527,8 @@ local function Place(frame, groups, strip)
 		button:SetPoint("BOTTOMRIGHT", rel, relPoint, ax - (cols - col) * (w + SPACING), ay + height - top - h)
 	end
 	local left, gridWidth = ax - cols * (w + SPACING) + SPACING, cols * w + (cols - 1) * SPACING
-	local toggle = Toggle(frame)
+	local toggle = pad and Toggle(frame)
+	if toggle then
 	toggle:ClearAllPoints()
 	toggle:SetPoint("BOTTOMLEFT", rel, relPoint, left, ay + height - HEADER)
 	toggle:SetSize(gridWidth, HEADER)
@@ -520,6 +537,9 @@ local function Place(frame, groups, strip)
 	toggle.Text:SetText(L["Bags (%d)"]:format(strip.count or #strip))
 	toggle.Line:SetWidth(math.max(1, gridWidth - toggle.Text:GetStringWidth() - 25))
 	toggle:Show()
+	elseif bagsToggle then
+		bagsToggle:Hide()
+	end
 	wipe(stripped)
 	stripped.all = RowOpen()
 	for i, b in ipairs(strip) do
@@ -528,14 +548,15 @@ local function Place(frame, groups, strip)
 		bagButtons[b] = true
 		WatchDown(b)
 	end
-	local rows = { { toggle }, stripped[1] and stripped or nil }
+	local rows = { toggle and { toggle } or nil }
+	rows[#rows + 1] = stripped[1] and stripped or nil
 	overlay:SetParent(frame)
 	overlay:ClearAllPoints()
 	overlay:SetAllPoints(frame)
 	overlay:SetFrameLevel(frame:GetFrameLevel() + 3)
 	overlay:Show()
 	wipe(order); wipe(laidOut); wipe(starts)
-	local top, shown = HEADER + (open and h + STRIP_GAP or SECTION_GAP), 0
+	local top, shown = base, 0
 	for s, group in ipairs(groups) do
 		if group[1] then
 			shown = shown + 1
@@ -580,7 +601,11 @@ local function Place(frame, groups, strip)
 	SetBagWidth(frame, contentWidth)
 	SetBagHeight(frame, OurHeight(frame, h))
 	applied = true
-	PlanJumps(rows)
+	if pad then
+		PlanJumps(rows)
+	else
+		wipe(wantUp); wipe(wantDown) -- (no cursor with the mouse: none of ours)
+	end
 	ApplyJumps()
 	return true
 end
@@ -647,7 +672,7 @@ end
 -- The selected item's tooltip beside the bag (the side with room), not over the other items. Blizzard
 -- sets it up on selecting (OnEnter) and every refresh; this runs after each SetBagItem.
 local function PlaceTooltip(tooltip)
-	if not applied then
+	if not applied or not PadUI() then -- (with the mouse it follows the mouse, as ever)
 		return
 	end
 	local owner = tooltip.GetOwner and tooltip:GetOwner()
@@ -670,7 +695,7 @@ end
 ---------------------------------------------------------------------------
 
 local function Wanted(frame)
-	return wanted and PadUI() and frame:IsShown()
+	return Active() and frame:IsShown()
 end
 
 -- Blizzard's layout of the bag (opening it, a bag collapsed, a bag changed, ...): ours after it.
@@ -816,6 +841,8 @@ function ns.ApplyGamepadBags(on)
 			dirty = true
 			driver:Show()
 		end
+	elseif not PadUI() then
+		return -- (the mouse's sorted bags may stay)
 	else
 		Unapply()
 		dirty, navPending = false, false
@@ -827,11 +854,36 @@ function ns.ApplyGamepadBags(on)
 	end
 end
 
+-- Called by Tweaks.lua for mouseBags (on the next frame): the same, with mouse and keyboard.
+function ns.ApplyMouseBags(on)
+	wantedMouse = on
+	if on then
+		Hook()
+	end
+	local frame = Bag()
+	if PadUI() or not (frame and hooked and frame:IsShown()) then
+		return
+	end
+	if on then
+		dirty = true
+		driver:Show()
+	else
+		if frame.CalculateHeight then
+			SetBagHeight(frame, frame:CalculateHeight()) -- (Blizzard's own, before ours lets go)
+		end
+		Unapply()
+		dirty = false
+		if frame.UpdateItemLayout then
+			frame:UpdateItemLayout() -- (Blizzard's grid back now, not at the next opening)
+		end
+	end
+end
+
 -- Misc Tweaks' columns slider moved, or what's shown of the bag buttons and free slots: laid out
 -- again (on the next frame).
 function ns.GamepadBagsColumns()
 	local frame = Bag()
-	if wanted and hooked and frame and frame:IsShown() and PadUI() and applied
+	if Active() and hooked and frame and frame:IsShown() and applied
 		and (placedColumns ~= Columns() or (stripped.all ~= nil and stripped.all ~= RowOpen())
 			or (placedAllFree ~= nil and placedAllFree ~= Setting("gamepadBagAllFree", false))) then
 		dirty = true

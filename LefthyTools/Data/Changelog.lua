@@ -491,5 +491,8 @@ ns.CHANGELOG = {
 	{ id = 161, module = "tweaks",
 		en = { "Controller bags: tidier", "The sorted controller bags fold the bag buttons' row away under a \"Bags\" header (the controller's cursor on it opens it) and show one free slot that says how many are free. A setting brings back every free slot." },
 		de = { "Controller-Taschen: aufgeräumter", "Die sortierten Controller-Taschen klappen die Reihe der Taschen-Buttons unter einer Überschrift „Taschen“ ein (der Controller-Cursor darauf klappt sie auf) und zeigen einen freien Platz, der sagt, wie viele frei sind. Eine Einstellung holt jeden freien Platz zurück." } },
+	{ id = 162, module = "tweaks",
+		en = { "Sorted bags with mouse and keyboard", "The sorted bags (sections, one free slot with the count, the columns slider) now come with mouse and keyboard too. Misc Tweaks switches them off for Blizzard's own bag." },
+		de = { "Sortierte Taschen mit Maus und Tastatur", "Die sortierten Taschen (Abschnitte, ein freier Platz mit der Anzahl, der Spalten-Regler) gibt es jetzt auch mit Maus und Tastatur. Misc Tweaks schaltet sie für Blizzards eigene Tasche aus." } },
 	-- New entries go here, at the end.
 }

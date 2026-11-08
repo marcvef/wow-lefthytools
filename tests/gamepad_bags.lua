@@ -229,13 +229,24 @@ do
 	check(#st.strip == 5 and GamepadBagBar.BagButtonArray[2]:IsShown() and #st.order == everyItem,
 		"both ticked: every bag's button and every free slot again")
 
-	-- Mouse and keyboard: Blizzard's bag as it is.
+	-- Mouse and keyboard: sorted too (mouseBags), without the "Bags" header and its row.
+	check(M.db.mouseBags == true and T("mouseBags"), "with mouse and keyboard on by default, with a checkbox")
 	GAMEPAD_STATE.ui = false
 	CloseBags()
 	OpenBags()
 	st = State()
+	check(st.applied and #st.strip == 0 and #st.headers >= 6 and not ns.GamepadBagsToggle():IsShown()
+		and GamepadBagBar.BagButtonArray[1]:IsShown() == GamepadBagBar.BagButtonArray[1]:IsShown(),
+		"mouse and keyboard: the sections, no bag header or row: " .. table.concat(st.headers, ", "))
+	GameTooltip:SetOwner(Slot(1, 1), "ANCHOR_NONE")
+	GameTooltip:SetBagItem(1, 1)
+	check(TOOLTIP.points == nil, "its tooltip where Blizzard puts it (it follows the mouse)")
+	T("mouseBags"):SetValue(false)
+	Wait(1)
+	-- Off: Blizzard's bag as it is.
+	st = State()
 	x, y = At(Slot(0, 1))
-	check(not st.applied and #st.headers == 0 and x == -126 and y == 88, "mouse and keyboard: Blizzard's grid, nothing of ours")
+	check(not st.applied and #st.headers == 0 and x == -126 and y == 88, "mouseBags off: Blizzard's grid, nothing of ours")
 	check(bag:GetHeight() == bag:CalculateHeight(), "Blizzard's height")
 	GameTooltip:SetOwner(Slot(0, 10), "ANCHOR_NONE")
 	GameTooltip:SetBagItem(0, 10)
@@ -290,6 +301,7 @@ do
 
 	-- Back as it was for the files after this one.
 	M.db.gamepadBagButtons, M.db.gamepadBagAllFree = false, false
+	M.db.mouseBags = true
 	GAMEPAD_STATE.ui = false
 	for _, b in ipairs(made) do
 		for i = #bag.buttons, 1, -1 do

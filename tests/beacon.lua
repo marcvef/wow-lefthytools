@@ -1766,6 +1766,11 @@ do
 	BAGS = { [0] = {} }
 
 	-- Reserved items: a border in the bags; at a vendor, right-click asks first.
+	-- (Blizzard's own bag here: these slots fill without a bag update; Misc Tweaks' sorted bags follow those.)
+	local tweaksDB = LefthyTools:GetModule("tweaks").db
+	local sortedBefore = tweaksDB.mouseBags
+	tweaksDB.mouseBags = false
+	ns.ApplyMouseBags(false)
 	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
 	BAGS[0] = { [3] = 1179, [5] = 6948 }
 	OpenBags()
@@ -1907,6 +1912,8 @@ do
 	wipe(owed)
 	BAGS = { [0] = {} }
 	ContainerFrameCombinedBags:Hide()
+	tweaksDB.mouseBags = sortedBefore
+	ns.ApplyMouseBags(sortedBefore)
 	Advance(0.1)
 
 	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
@@ -2474,6 +2481,8 @@ Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "Q2", "WHISPER", 12)
 Advance(0.15)
 check(not peers()[12] and peers()[11], "a friend switching Beacon off (Q2) is forgotten")
 -- A reserved item at a vendor, then Beacon goes off (below).
+LefthyTools:GetModule("tweaks").db.mouseBags = false -- (Blizzard's own bag: see above)
+ns.ApplyMouseBags(false)
 local owedList = LefthyToolsDB.handover
 BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12")
 BAGS[0] = { [3] = 1155 }
@@ -2551,6 +2560,8 @@ Fire("MERCHANT_CLOSED")
 wipe(owedList)
 BAGS = { [0] = {} }
 CloseBags()
+LefthyTools:GetModule("tweaks").db.mouseBags = true
+ns.ApplyMouseBags(true)
 Advance(0.1)
 
 section("Beacon: a hook that fails doesn't stop the tick")
