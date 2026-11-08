@@ -479,5 +479,8 @@ ns.CHANGELOG = {
 	{ id = 157, module = "beacon",
 		en = { "LTC: missed lines, mentions, who's in", "Friends who were offline get the LTC lines of the last 24 hours when they come online, with their time. A line with your name stands out and flashes. /ltc who <text> asks who's in: friends click I'm in or Not now, and Invite all invites them. Everyone needs this version for it." },
 		de = { "LTC: Verpasstes, Erwähnungen, Wer dabei", "Freunde, die offline waren, bekommen beim Einloggen die LTC-Zeilen der letzten 24 Stunden, mit Uhrzeit. Eine Zeile mit deinem Namen fällt auf und blinkt. /ltc who <Text> fragt, wer dabei ist: Freunde klicken Bin dabei oder Grad nicht, und Alle einladen lädt sie ein. Dafür brauchen alle diese Version." } },
+	{ id = 158, module = "chronicle",
+		en = { "Crafting margins at the AH", "A Margins button on your profession window shows what a recipe costs and brings, and gold per hour, from the auction house's and vendors' prices. At the auction house it checks them, or scans all your recipes; the list shows the best first." },
+		de = { "Handwerks-Margen am AH", "Ein Margen-Button an deinem Berufsfenster zeigt, was ein Rezept kostet und einbringt, und Gold pro Stunde, aus den Preisen von AH und Händlern. Am AH prüft er sie oder scannt alle deine Rezepte; die Liste zeigt die besten zuerst." } },
 	-- New entries go here, at the end.
 }

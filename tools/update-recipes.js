@@ -17,6 +17,10 @@
 //   range when Variance says it varies (Heavy Dynamite: 3 for 1 to 5).
 // - The reagent columns can have a gap (White Wedding Dress).
 // - Enchanting mostly enchants, so most of its recipes make no item.
+// `vendor` is what Chronicle's margins (Modules/Chronicle/Margins.lua) count a vendor-sold reagent at
+// until the client has seen a merchant sell it: the client has no table of what vendors sell, so the
+// items are a hand list (VENDOR, below), each priced by ItemSparse's BuyPrice per VendorStackCount
+// (copper for one), and only those some recipe uses.
 // Run it when Forever gets new builds:
 //   node tools/update-recipes.js                      the latest Forever build
 //   node tools/update-recipes.js 1.60.1.70790
@@ -29,6 +33,17 @@ const ORDER = [171, 164, 333, 202, 165, 197, 185, 129]; // crafting, in the tab'
 const GATHERING = [182, 186, 393, 356]; // Herbalism, Mining, Skinning, Fishing
 const CREATE_ITEM = "24"; // SpellEffect.Effect
 const REAGENTS = 8; // Reagent_0..7, ReagentCount_0..7
+// Reagents Classic's trade-goods vendors sell. Forever's own new reagents aren't here: nothing tells
+// whether a vendor has them, so they're learned from merchants in game.
+const VENDOR = [
+  2320, 2321, 4291, 8343, 14341, // threads: coarse, fine, silken, heavy silken, rune
+  2880, 3466, 18567, // flux: weak, strong, elemental
+  3371, 3372, 8925, 18256, // vials: empty, leaded, crystal, imbued
+  2324, 2604, 2605, 6260, 4340, 4341, 2325, 6261, 4342, 10290, // bleach and the dyes
+  4289, 2678, 2692, 3713, // salt; mild, hot and soothing spices
+  159, 1179, 2596, 2894, 4536, // spring water, ice cold milk, dwarven stout, rhapsody malt, shiny red apple
+  6217, 4470, 11291, 4399, 4400, 10647, 10648, // copper rod, simple and star wood, wooden and heavy stock, engineer's ink, blank parchment
+];
 
 const lua = (text) => `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 const pair = (en, de) => `{ ${lua(en)}, ${lua(de || en)} }`;
@@ -98,6 +113,17 @@ async function main() {
     ].join(":") });
   }
 
+  // Every reagent some recipe uses, and what a vendor asks for one of them.
+  const used = new Set();
+  for (const id of ORDER) {
+    for (const r of recipes[id] || []) for (const m of r.text.split(":")[9].matchAll(/(\d+)\*/g)) used.add(+m[1]);
+  }
+  const unitPrice = (id) => {
+    const row = item[id];
+    if (!row || !(+row.BuyPrice > 0)) throw new Error(`no buy price for the vendor reagent ${id} in ${build}`);
+    return Math.round((+row.BuyPrice / Math.max(1, +row.VendorStackCount)) * 100) / 100;
+  };
+
   const parents = lines.filter((l) => all.includes(+l.ParentSkillLineID)).sort((a, b) => a.ID - b.ID);
   const out = [
     "local _, ns = ...",
@@ -107,7 +133,8 @@ async function main() {
     "-- spell:item:count:slot:ilvl:quality:low:high:cat:reagents, reagents being item*n+item*n: what it makes",
     "-- (empty when no item; count: the middle of the range when it varies), the item's InventoryType, ItemLevel",
     "-- and OverallQualityID (empty when ItemSparse doesn't have it), the skill where it turns yellow and grey",
-    "-- (0: no such skill), its category (empty when none). names, categories: { English, German }.",
+    "-- (0: no such skill), its category (empty when none). names, categories: { English, German }. vendor[item]:",
+    "-- what a trade-goods vendor asks for one of a reagent, in copper (a hand list of items, VENDOR in the tool).",
     "ns.RecipeData = {",
     `\tbuild = ${lua(build)},`,
     `\torder = { ${ORDER.join(", ")} },`,
@@ -123,6 +150,9 @@ async function main() {
     "\t},",
     "\tcategories = {",
     ...[...usedCategories].sort((a, b) => a - b).map((c) => `\t\t[${c}] = ${pair(category[c].Name_lang, categoryDe[c] && categoryDe[c].Name_lang)},`),
+    "\t},",
+    "\tvendor = {",
+    ...VENDOR.filter((id) => used.has(id)).sort((a, b) => a - b).map((id) => `\t\t[${id}] = ${unitPrice(id)},`),
     "\t},",
     "\trecipes = {",
     ...ORDER.map((id) => `\t\t[${id}] = "${(recipes[id] || []).sort((a, b) => a.spell - b.spell).map((r) => r.text).join(";")}",`),

@@ -74,6 +74,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `recipes.lua` | Chronicle's recipes: the data, the lists' encoding, the scan in steps and when it runs, what goes out and when (a skill change sends no list), older builds get none, broken messages, the caps, the setting, pruning and a character with only recipes, `R.People`, `R.Search`, `R.Crafters`; "Craftable by" in item tooltips (`R.Makers` built on the tick, order, names, "+N more", reagents with Shift, kept per revision, new data, the setting, other tooltips); several clients: a friend gets my list, a third friend gets it relayed while I'm offline, only friends of that account | - (its clients are its own) |
 | `professions.lua` | Chronicle's Professions tab, with a fake `C.Recipes` (the last section: the real one's data, when it's loaded): the row of tabs, defaults, people, groups and sorting, difficulty, details and the real tooltip, search, gathering, empty states, pools, what's redrawn, names coming in, in a fight, the fallback (last in the suite's order) | - |
 | `ltc_more.lua` | LTC: a line that mentions me (case, words of their own, links left alone, the flash, the sound, a tab out of sight, my own lines, the setting); lines a friend missed while offline (kept by the writer and by friends who got them, passed on after an offer and its answer, paced, marked with their time, links rebuilt, shown once when two friends bring them, only from the friend's own friends, 50 per friend, 24 hours, yesterday's); /ltc who (the call, the links, answers changing, answers from friends not asked, the tally redrawn in place or anew, Invite all and a friend already in the group, a call missed as a plain line, the end after 15 minutes); an older build's client (without the new files) gets nothing but plain LTC lines | - (its clients are its own) |
+| `margins.lua` | Chronicle's crafting margins: my recipes (the real recipe scan and data), vendor prices (the data's, a merchant's, not for other currencies), one recipe at the auction house (only with it open, what's asked, 0.65 s apart, gear by item level, none listed, no answer, the throttle, a fight), the numbers (cost, both revenues, the cut, profit, time, gold per hour, age), a full scan (one ReplicateItems read over frames, only my recipes' items kept, too soon: by items, stopped: what's left), the window (order, sorting, greyed stale prices, the details, the scan button, the auction house closed), the buttons on the profession window and the auction house, closing mid-scan, idle, the setting, pruning, secret prices | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:
@@ -169,6 +170,11 @@ From the mock (globals):
 - The world: `STATE` (target, cursor, panel, bags, afk, ...), `PLAYER_POS`, `ZONE`, `MOBS`
   (nameplates), `PARTY`, `QUESTS`, `QUESTS_ON_MAP`, `MAP_RECTS`, `ITEMS`, `BAGS`, and `MOCK_*`
   knobs (`MOCK_SEND_RESULT`, `MOCK_ITEM_UNCACHED`, ...): each is described where mock.lua sets it.
+- The auction house and merchants: `C_AuctionHouse` (searches answered after `AH_ANSWER_DELAY` with the
+  commodity or item event, `ReplicateItems`), fed by `AH_LISTINGS`, `AH_COMMODITY`, `AH_SILENT`,
+  `AH_THROTTLED`, `AH_REPLICATE_FILLER`; what was asked in `AH_SEARCHES`, `AH_REPLICATES`. `MERCHANT` (a
+  merchant's window: `GetMerchantNumItems`, `GetMerchantItemID`, `C_MerchantFrame.GetItemInfo`),
+  `SPELL_CAST_MS` (`C_Spell.GetSpellInfo`'s `castTime`).
 
 ## The installer (by hand)
 
@@ -463,3 +469,15 @@ installer from GitHub instead.
       profession and skill, best first, at most three and "+N more". Hold Shift over a bag item: the
       reagents line comes within a moment (elsewhere: hover again with Shift held). An item nobody makes:
       no line. Chronicle's setting off: gone. Right after logging in the first hover may have nothing yet.
+    - Crafting margins: open your profession window on a recipe that makes an item: a Margins button at the
+      top right corner of the recipe (does it cover anything? with a controller, can you reach it and move
+      away from it?). Click: the margins window opens right of it on that recipe, "Open the auction house to
+      update the prices." Visit a trade-goods vendor: thread, flux, vials now cost what it asks (hover a
+      reagent row: Vendor). At the auction house: open your profession window there (does the auction
+      house stay open?), click Margins: "Checking...", a second or two, then AH prices with "just now";
+      compare a reagent's price with what the auction house shows for one. The auction house's own
+      Margins button opens the list; Scan all my recipes: "Asking the auction house for everything...",
+      then "Reading the auction house: N of M" without a hitch in the frame rate, then the list, best
+      first; Sort switches. Scan again at once: item by item ("Scanning: N of M items"); Stop, then "Go on
+      (N left)". Close the auction house mid-scan: it stops. A recipe whose product sells better on the AH
+      says AH under Sells. In a fight: no errors, nothing is asked until it's over.

@@ -10,7 +10,8 @@ accounts, names, matching; the characters, accounts and news every page uses), `
 journals: publishing, passing on), `Recipes.lua` (professions and recipes: the scan, their sync, the lists
 for the Professions tab), `Recap.lua` (chat: catch-up, weekly recap, sharing; the
 leaderboards), `Canvas.lua` (the pages' drawing kit: a pooled canvas, cards, bars, tables),
-`Graphs.lua` (the Graphs page, a friend's too), `Compare.lua` (the Compare page), `Window.lua` (the
+`Graphs.lua` (the Graphs page, a friend's too), `Compare.lua` (the Compare page), `Professions.lua` (the
+Professions tab), `Margins.lua` and `MarginsWindow.lua` (crafting margins), `Window.lua` (the
 window) and `MinimapButton.lua`. They share `ns.Chronicle` (`C`).
 
 ## Data
@@ -360,6 +361,96 @@ recipe begins, on Chronicle's tick after the first tooltip asked (a line at leas
 budget, never in a fight); about 2300 recipes, once per data. Until then the line is left out. A
 surname learned without a list changing shows at the next change (the line is kept as made).
 
+## Crafting margins (Margins.lua, MarginsWindow.lua)
+
+Setting `margins` (on): what my recipes cost to make and bring, and gold per hour, from auction house and
+vendor prices. `Margins.lua` (`C.Margins`, `Mg`) keeps the prices, scans and works the numbers out;
+`MarginsWindow.lua` is the window and the buttons. All local: no Beacon message, nothing shared.
+
+**The client.** WoW: Forever has retail's profession window (`Blizzard_Professions`, `ProfessionsFrame`,
+with Camelot overrides; the recipe shown is `ProfessionsFrame.CraftingPage.SchematicForm:GetRecipeInfo()`)
+and retail's auction house (`Blizzard_AuctionHouseUI`, `AuctionHouseFrame`, its TOC allows camelot through
+a `[Game]` file): `C_AuctionHouse` with `SendSearchQuery` (100 a minute, its documentation says),
+`ReplicateItems` (the whole auction house) and `IsThrottledMessageSystemReady`, not classic's
+`QueryAuctionItems`. None of the query functions is marked `HasRestrictions` (only buying, bidding and
+posting are), so they're called from our driver, not only from a click. Search results: a commodity's rows
+have a price for one (`unitPrice`); an item's an auction's `buyoutAmount` for its whole `quantity` (what
+`PlaceBid` is given), so one is the buyout divided by the quantity; replicate rows (0-based indexes) have a
+stack's `buyoutPrice` and `count`. Merchants: `GetMerchantNumItems`, `GetMerchantItemID`,
+`C_MerchantFrame.GetItemInfo(i)` (`price` for `stackCount`, `hasExtendedCost`).
+
+**Prices** (`LefthyToolsDB.margins`, account-wide): `ah["<realm>-<faction>"][item] = { p, q, t }` (the
+lowest buyout for one, nil when none is listed; how many; when), `vendor[item] = { p, t }` (what a merchant
+asked for one; any realm), `replicated["<realm>-<faction>"]` (the last full scan). Each realm and faction has
+an auction house of its own. Only the items of my recipes are kept (a full scan drops the rest of this realm's),
+and a price older than 14 days goes (`KEEP`, when it starts). A merchant's window is read on the next frames
+(`MERCHANT_SHOW`, `MERCHANT_UPDATE`): its reagents (every reagent of the data: a set built a line a frame the
+first time), for gold only. A vendor-sold reagent no merchant has shown costs what `Data/Recipes.lua`'s
+`vendor` says (a hand list of Classic's trade-goods reagents, priced from ItemSparse: Recipe data, below).
+
+**My recipes** (`Mg.MyRecipes`, kept per `R.Revision`): what my characters on this realm know (`R.People`'s
+`mine`, the record's `realm`) that makes an item; a recipe two of them know goes by the one I play, else the
+best skill. `Mg.Items`: every reagent and product of them (kept) and those the auction house is asked for
+(the products and the reagents no vendor sells: threads and the like aren't searched).
+
+**The numbers** (`Mg.Recipe(spell)`, `Mg.Compute(entry)`):
+
+- a reagent's price: the cheaper of the AH's (any age) and a vendor's; none: the recipe has no cost and no
+  profit ("missing a price"). Reagents in my bags count at that price too (they could be sold instead);
+  `covers` says how many crafts the bags hold. An AH reagent with fewer listed than for 5 crafts is "few";
+- cost: the reagents' prices times how many it needs;
+- revenue: at a vendor `C_Item.GetItemInfo`'s sell price times how many a craft makes (the data's `count`,
+  the middle of a range); on the AH its lowest buyout for one times as many, less the 5% cut (`AH_CUT`; the
+  deposit isn't counted, and the details say so). Both, and their profits, are shown;
+- profit: the better revenue minus the cost (`best`: vendor on a tie, it's certain);
+- time per craft: the spell's `castTime` (`C_Spell.GetSpellInfo`) plus `OVERHEAD` (0.5 s); unknown: 3 s,
+  and the details say so; gold per hour: profit × 3600 / time;
+- `oldest`: the oldest AH price used (the reagents bought there, the product when it's sold there).
+
+**Scanning**, only with the auction house open (`AUCTION_HOUSE_SHOW`/`CLOSED`), never in a fight
+(`LT.InFight`): a driver frame, shown only while there's work.
+
+- One recipe (`Mg.ScanRecipe`: the profession window's button, the details' Check AH): its product, then
+  its reagents no vendor sells; during a scan by items they go first. One search at a time
+  (`SendSearchQuery(itemKey, price ascending, true)`), at least 0.65 s apart (`QUERY_GAP`) and only when
+  `IsThrottledMessageSystemReady` isn't false. Gear's key has its item level
+  (`C_Item.GetDetailedItemLevelInfo`, else the data's), the rest none. Its answer
+  (`COMMODITY_SEARCH_RESULTS_UPDATED`, `ITEM_SEARCH_RESULTS_UPDATED`) is read 0.2 s later (`SETTLE`): the
+  first 50 rows' lowest price for one, my own auctions left out, and the listed quantity; no rows: none
+  listed. No answer in 3 s (`QUERY_WAIT`): the price it had stays (rows still there are an older search's).
+- Everything (`Mg.ScanAll`, "Scan all my recipes"): `ReplicateItems` once the last was 15 minutes ago
+  (`REPLICATE_GAP`, saved: the game's limit); `REPLICATE_ITEM_LIST_UPDATE`, then the rows read 2 ms a frame
+  (`READ_MS`, a look at the clock every 50 rows), only the kept items counted (the lowest for one, all
+  listed); one not in it is none listed. Too soon, no answer in 30 s or nothing in it: by items, the wanted
+  ones without a price younger than 30 minutes (`FRESH`), so a scan that stopped goes on where it was
+  (the button says "Go on (N left)").
+- The auction house closing ends a scan; Stop (`Mg.Cancel`) too.
+
+**The window** (`LefthyToolsMarginsFrame`, `C.OpenMargins(spell, nextTo)`, `C.ToggleMargins`; `/chronicle
+margins`): its own (`LT.Window`), not a page of the journal: it belongs with the auction house and my own
+profession window, and opens next to them (right of the window it was opened from, if there's room). On
+top a profession to pick (`AddPicker`), the sort (gold per hour, profit per craft) and the scan button with
+its state in the bottom bar. Left the list (`C.NewList`, Professions.lua's pool): every recipe of mine with
+a profit, a skill-up dot (the character's skill), name, profit, gold per hour, where it sells best, the
+prices' age; older than 3 hours (`STALE`) greyed; how many have no price yet. A click shows the details on
+the right: the crafter, each reagent (source, its cost, a hover with vendor and AH prices, how many listed,
+in the bags), cost, both revenues with their profits, profit, time, gold per hour, the bags, the age, notes
+(few on the AH, open the auction house, the deposit, an unknown cast time), Check AH and Show in my
+profession window (`C.OpenInMyProfessionWindow`, Professions.lua's). While shown it looks at the scan every
+0.25 s and works the list out again a few recipes a frame (2 ms): at once when prices or recipes changed,
+at most every 2 s during a scan or for items' data and the bags (`GET_ITEM_INFO_RECEIVED`,
+`BAG_UPDATE_DELAYED`, listened to only while it's shown). Hidden: nothing.
+
+**The buttons.** "Margins" on the profession window's recipe (a child of the `SchematicForm`, at its top
+right corner; shown for a recipe that makes an item; the form's `Init` is post-hooked to update it, on the
+next frame) opens the window on it and checks it at an open auction house. The recipe's ID is the data's
+spell; Forever's copies under other IDs go by the name of one of mine. "Margins" on the auction house (a
+child of `AuctionHouseFrame`, its top right, left of the close button) opens the window. Both are made after
+`ADDON_LOADED` of Blizzard's add-on, on the next frame; children of Blizzard's frames so the controller's
+navigation (it collects the panel's descendants) reaches them, at corners where they don't stand between
+Blizzard's buttons. Not verified in game yet: whether the profession window and the auction house can be
+open together (both are UI panels), and that the corners are free.
+
 ## Days for friends' graphs (Live.lua)
 
 Battle.net messages only arrive while both are online, so each friend's own Chronicle sends its
@@ -690,6 +781,13 @@ Everything a character could know is in it, not only what's on Forever today: ab
 the client's "SEASON OF DISCOVERY" categories (spell IDs above 60000) look like leftovers no one can
 learn, and about 930 more above 60000 in ordinary categories look like Forever's own. Nothing depends
 on telling them apart: the tab only shows what a character knows. Mining's smelting isn't in it.
+
+`vendor[item]` is what a trade-goods vendor asks for one of a reagent (copper), for the crafting margins
+until a merchant has shown it: the client has no table of what vendors sell, so the items are a hand list
+(`VENDOR` in the tool: Classic's threads, fluxes, vials, dyes, salt and spices, water and milk, rods, wood,
+stocks, ink and parchment), each priced by ItemSparse's `BuyPrice` per `VendorStackCount`, only those some
+recipe uses. Forever's own new reagents (dyes and the like with IDs above 200000) aren't in it: whether a
+vendor sells them is learned from merchants in game.
 
 Regenerate it when Forever gets a new build, with `node tools/update-recipes.js` (`[<build>] [--cache
 <dir>]`; the head of the tool says which tables it reads and what their rows mean), then `npm test --

@@ -86,6 +86,8 @@ Modules\Chronicle\Canvas.lua
 Modules\Chronicle\Graphs.lua
 Modules\Chronicle\Compare.lua
 Modules\Chronicle\Professions.lua
+Modules\Chronicle\Margins.lua
+Modules\Chronicle\MarginsWindow.lua
 Modules\Chronicle\CraftedBy.lua
 Modules\Chronicle\Window.lua
 Modules\Chronicle\MinimapButton.lua

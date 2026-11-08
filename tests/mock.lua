@@ -628,7 +628,8 @@ SPELL_NAMES = { [5487] = "Bear Form" } -- [id] = a name of its own (default "Spe
 -- Auras: AURAS[unit][name] = true (AuraUtil.FindAuraByName).
 AURAS = {}
 AuraUtil = { FindAuraByName = function(name, unit) return AURAS[unit] and AURAS[unit][name] and name or nil end }
-C_Spell = { GetSpellInfo = function(id) return { name = SPELL_NAMES[id] or ("Spell " .. id), iconID = 100000 + id, spellID = id } end }
+SPELL_CAST_MS = {} -- [id] = its cast time (ms; nil: the mock doesn't say)
+C_Spell = { GetSpellInfo = function(id) return { name = SPELL_NAMES[id] or ("Spell " .. id), iconID = 100000 + id, spellID = id, castTime = SPELL_CAST_MS[id] } end }
 function SetPortraitTexture(texture, unit) texture.portrait = unit end
 -- A link clicked in chat (ItemRef.lua): nothing opens here.
 LINKS_CLICKED = {}
@@ -1967,6 +1968,78 @@ EXPLORED = {
 	},
 }
 C_MapExplorationInfo = { GetExploredMapTextures = function(mapID) return EXPLORED[mapID] end }
+
+-- The auction house, the retail one WoW: Forever has (C_AuctionHouse). AH_LISTINGS[itemID] = { { price for
+-- one, quantity, own = true (an auction of mine) }, ... }, cheapest first; AH_COMMODITY[itemID] = true: listed as
+-- a commodity (a price for one), else as items (an auction's buyout is for all of its quantity). A search
+-- answers AH_ANSWER_DELAY later with its kind's event (AH_SILENT[itemID]: never); AH_SEARCHES lists them
+-- ({ item, level, at }). ReplicateItems answers after AH_REPLICATE_DELAY with every listing, plus
+-- AH_REPLICATE_FILLER auctions of another item (a big auction house); AH_REPLICATE_NONE: no answer.
+-- AH_REPLICATES counts the calls, AH_THROTTLED: the throttle isn't ready.
+AH_LISTINGS, AH_COMMODITY, AH_SILENT, AH_SEARCHES = {}, {}, {}, {}
+AH_ANSWER_DELAY, AH_REPLICATE_DELAY, AH_REPLICATES, AH_REPLICATE_FILLER, AH_REPLICATE_NONE, AH_THROTTLED = 0.3, 1, 0, 0, false, false
+local ahAnswered, replicateRows = {}, {}
+local function AHRows(id) return ahAnswered[id] or {} end
+local function AHTotal(id) local n = 0; for _, r in ipairs(AHRows(id)) do n = n + r[2] end return n end
+C_AuctionHouse = {
+	MakeItemKey = function(itemID, itemLevel) return { itemID = itemID, itemLevel = itemLevel or 0, itemSuffix = 0, battlePetSpeciesID = 0 } end,
+	IsThrottledMessageSystemReady = function() return not AH_THROTTLED end,
+	SendSearchQuery = function(key, sorts, separateOwnerItems)
+		assert(type(key) == "table" and type(sorts) == "table" and type(separateOwnerItems) == "boolean", "SendSearchQuery: bad arguments")
+		local id = key.itemID
+		AH_SEARCHES[#AH_SEARCHES + 1] = { item = id, level = key.itemLevel, at = GetTime() }
+		if AH_SILENT[id] then return end
+		C_Timer.After(AH_ANSWER_DELAY, function()
+			ahAnswered[id] = AH_LISTINGS[id] or {}
+			if AH_COMMODITY[id] then Fire("COMMODITY_SEARCH_RESULTS_UPDATED", id) else Fire("ITEM_SEARCH_RESULTS_UPDATED", key) end
+		end)
+	end,
+	GetNumCommoditySearchResults = function(id) return AH_COMMODITY[id] and #AHRows(id) or 0 end,
+	GetCommoditySearchResultInfo = function(id, i)
+		local r = AH_COMMODITY[id] and AHRows(id)[i]
+		if r then
+			return { itemID = id, quantity = r[2], unitPrice = r[1], auctionID = i, owners = {}, totalNumberOfOwners = 1,
+				numOwnerItems = r.own and r[2] or 0, containsOwnerItem = r.own == true, containsAccountItem = false }
+		end
+	end,
+	GetCommoditySearchResultsQuantity = function(id) return AH_COMMODITY[id] and AHTotal(id) or 0 end,
+	GetNumItemSearchResults = function(key) return not AH_COMMODITY[key.itemID] and #AHRows(key.itemID) or 0 end,
+	GetItemSearchResultInfo = function(key, i)
+		local r = not AH_COMMODITY[key.itemID] and AHRows(key.itemID)[i]
+		if r then
+			return { itemKey = key, owners = {}, totalNumberOfOwners = 1, timeLeft = 2, auctionID = i, quantity = r[2],
+				buyoutAmount = issecretvalue(r[1]) and r[1] or r[1] * r[2], containsOwnerItem = r.own == true,
+				containsAccountItem = false, containsSocketedItem = false }
+		end
+	end,
+	GetItemSearchResultsQuantity = function(key) return not AH_COMMODITY[key.itemID] and AHTotal(key.itemID) or 0 end,
+	ReplicateItems = function()
+		AH_REPLICATES = AH_REPLICATES + 1
+		if AH_REPLICATE_NONE then return end
+		C_Timer.After(AH_REPLICATE_DELAY, function()
+			replicateRows = {}
+			for id, rows in pairs(AH_LISTINGS) do
+				for _, r in ipairs(rows) do replicateRows[#replicateRows + 1] = { id, r[1] * r[2], r[2] } end
+			end
+			for i = 1, AH_REPLICATE_FILLER do replicateRows[#replicateRows + 1] = { 999999, 100 + i, 1 } end
+			Fire("REPLICATE_ITEM_LIST_UPDATE")
+		end)
+	end,
+	GetNumReplicateItems = function() return #replicateRows end,
+	GetReplicateItemInfo = function(index) -- (0-based, like the game's)
+		local r = replicateRows[index + 1]
+		if r then return "Item " .. r[1], 1, r[3], 1, true, 1, "", 0, 0, r[2], 0, nil, nil, "Someone", "Someone-Realmy", 0, r[1], true end
+	end,
+}
+-- A merchant's window: MERCHANT = { { itemID, price (for its stack), stack, extended = true (other currencies) }, ... }.
+MERCHANT = {}
+function GetMerchantNumItems() return #MERCHANT end
+function GetMerchantItemID(i) return MERCHANT[i] and MERCHANT[i][1] end
+C_MerchantFrame = { GetItemInfo = function(i)
+	local m = MERCHANT[i] or {}
+	return { name = "Item", texture = 1, price = m[2] or 0, stackCount = m[3] or 1, numAvailable = -1, isPurchasable = true,
+		isUsable = true, hasExtendedCost = m.extended == true, isQuestStartItem = false }
+end }
 
 -- A /reload (or the game started again), for a suite that loads the addon itself (release.lua): the
 -- interface loaded so far goes (its frames get no more events or updates, its timers don't run, the

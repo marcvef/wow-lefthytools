@@ -358,6 +358,18 @@ version they have), or once they play it with an up-to-date LefthyTools.
   links) says who of your characters and friends knows a recipe for it, with their profession and
   skill, best first: "Craftable by: Anna (Tailoring 152), ... +2 more". Hold Shift for the recipe's
   reagents.
+- **Crafting margins:** what your recipes cost to make and bring, and gold per hour. A **Margins**
+  button on your profession window shows the recipe's numbers; with the auction house open it checks
+  its prices there first (a few searches, a moment). On the auction house, **Margins** opens the list
+  of all your recipes, best first (by gold per hour or profit per craft), and **Scan all my recipes**
+  fetches every price at once (the game allows that every 15 minutes; else item by item, and a scan
+  you stop goes on where it was). A reagent costs the cheaper of the auction house and a vendor:
+  threads, flux, vials, dyes and spices come from vendors, at what a merchant asked you (learned
+  whenever you open one) or at the usual price. Revenue: a vendor's price (certain) and the auction
+  house's lowest buyout less its 5% cut (the deposit isn't counted); profit uses the better one. Time
+  is the craft's cast plus half a second. Your bags say how many crafts they cover; prices older than
+  3 hours are greyed. Prices are kept per realm and faction on your computer; nothing is sent.
+  `/chronicle margins` opens the list.
 - **While you were away:** a minute after you log in, a chat line per friend with what they did
   since you last played. Once a week, **last week's leaderboard** in chat.
 - `/chronicle session` prints this session in one line; the AFK screen shows it too.
@@ -375,6 +387,7 @@ once a second, so it costs nothing you'd notice.
 | While you were away | on |
 | Weekly recap | on |
 | Who can craft it, in item tooltips | on |
+| Crafting margins | on |
 
 ---
 

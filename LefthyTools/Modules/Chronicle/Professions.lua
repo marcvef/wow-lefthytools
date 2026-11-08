@@ -429,6 +429,7 @@ local function NewList(parent, x, y, width, height, rowHeight, newRow, fillRow)
 	end)
 	return list
 end
+C.NewList = NewList -- (Margins' list too)
 
 ---------------------------------------------------------------------------
 -- Details: the recipe hovered or clicked
@@ -730,10 +731,11 @@ local function OpenWhenSettled(spell)
 	After(OPEN_LATEST)
 end
 
-local function OpenInMine()
-	local recipe = shown and shown.recipe
+-- (Margins.lua's list has the same button.)
+function C.OpenInMyProfessionWindow(spell)
 	local R = C.Recipes
-	local line = recipe and R and select(2, R.RecipeOf(recipe.spell))
+	local recipe = spell and R and R.RecipeOf(spell)
+	local line = recipe and select(2, R.RecipeOf(spell))
 	if not (line and C_TradeSkillUI) then
 		return
 	elseif InCombatLockdown() then
@@ -751,6 +753,10 @@ local function OpenInMine()
 		openWatch.spell = nil
 		C.module:Print(L["The game didn't open your profession window."])
 	end
+end
+
+local function OpenInMine()
+	C.OpenInMyProfessionWindow(shown and shown.recipe and shown.recipe.spell)
 end
 
 local function FillHead(recipe)
