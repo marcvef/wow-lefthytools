@@ -12,10 +12,11 @@ local B = ns.Beacon
 -- they clicked and whether a window opened). Reports wait (LefthyToolsDB.reportsOut) until a
 -- collector is online. Collected ones are kept (LefthyToolsDB.friendReports); /lefthy reports
 -- shows them, ready to copy. Setting sendReports (on) switches sending off, collectReports (off)
--- collecting on.
+-- collecting on. A collected error that a newer build fixed (FIXED_ERRORS) tells its sender to update.
 --
 -- Protocol: Y2;<1|0> I collect reports (or stopped); Z2;<id>;<n>;<of>;<text> part n of a report.
--- The text has no colour codes, "|" or ";", and its newlines as "^".
+-- The text has no colour codes, "|" or ";", and its newlines as "^". B2;bf;<build>;<1|0>;<what>: the
+-- error you reported is fixed (1) or should be (0) in that build (older builds: an M2 line instead).
 --
 -- Cost: nothing while nothing happens; the tick looks at waiting reports at most every 2 s.
 
@@ -260,6 +261,162 @@ table.insert(LT.Errors.listeners, function(entry)
 end)
 
 ---------------------------------------------------------------------------
+-- Errors already fixed (collectors): a friend on an older build who reports one is told to update
+--
+-- A report's error line (its third: kind and count come before it) is looked up in FIXED_ERRORS.
+-- Friends on a build before the fix get one line in their chat, at most once per friend, fix and
+-- day (saved, LefthyToolsDB.fixedTold), never while either of us is in a fight, only while I
+-- collect. Builds from FIXED_SINCE on read it as B2;bf;<build>;<1|0>;<what> (Beacon's own word,
+-- shown as a LefthyTools line); older ones ignore that word, so they get it as an LTC line (M2,
+-- which every build that sends reports shows), in the language their report names.
+---------------------------------------------------------------------------
+
+-- pattern: plain text in the error line; also: plain text that must be in the report too (where it
+-- happened); fixed: the first build without it (LT.CompareVersions); sure false: the fix should
+-- help, but no one has proven it in game yet ("should be fixed"); en/de: what it was, for the friend.
+B.FIXED_ERRORS = {
+	-- df90faf: the settings left Blizzard's panel, whose reused rows our pages left tainted.
+	{ pattern = "ADDON_ACTION_FORBIDDEN: IsUserOAuthed()", fixed = "0.7.0-34-gdf90faf", sure = true,
+		en = "a blocked action in Blizzard's settings panel", de = "eine blockierte Aktion in Blizzards Einstellungen" },
+	{ pattern = "ADDON_ACTION_FORBIDDEN: UNKNOWN()", also = "SettingsPanel", fixed = "0.7.0-34-gdf90faf",
+		en = "a blocked action in Blizzard's settings panel", de = "eine blockierte Aktion in Blizzards Einstellungen" },
+	{ pattern = "ADDON_ACTION_BLOCKED: Frame:", also = "SettingsPanel", fixed = "0.7.0-34-gdf90faf",
+		en = "a blocked action with Blizzard's settings panel open", de = "eine blockierte Aktion bei offenen Blizzard-Einstellungen" },
+	-- a809fad: the combo point dots wait for the fight's end on a protected nameplate.
+	{ pattern = "ADDON_ACTION_BLOCKED: UNKNOWN()", fixed = "0.7.0-38-ga809fad",
+		en = "a blocked action in fights, from the combo point dots", de = "eine blockierte Aktion im Kampf, durch die Combopunkte" },
+}
+
+local FIXED_SINCE = "0.7.0-50-g0000000" -- the first build that reads B2;bf (or later: one before gets M2, which it shows)
+local FIXED_GAP = 5       -- one such line at most this often (to any friend)
+local FIXED_WAITING = 10  -- friends to tell, at most
+local FIXED_LINES = {     -- the LTC line for older builds, in the friend's language (TEXT_BYTES in Chat.lua: 200)
+	en = { sure = "LefthyTools note: the error you reported (%s) is fixed in build %s. Update with Update-LefthyTools.cmd and restart the game.",
+		likely = "LefthyTools note: the error you reported (%s) should be fixed in build %s. Update with Update-LefthyTools.cmd and restart the game." },
+	de = { sure = "LefthyTools-Hinweis: Dein gemeldeter Fehler (%s) ist in Build %s behoben. Update mit Update-LefthyTools.cmd und starte das Spiel neu.",
+		likely = "LefthyTools-Hinweis: Dein gemeldeter Fehler (%s) sollte in Build %s behoben sein. Update mit Update-LefthyTools.cmd und starte das Spiel neu." },
+}
+local fixedOut = {}       -- { gameAccountID, fix, language }: friends to tell
+local fixedIn = {}        -- what collectors told me (B2;bf): { build, sure, what }, printed on the tick
+local lastFixed = -math.huge
+
+local function Older(version, than)
+	return LT.CompareVersions(version, than) == -1
+end
+
+local function ShortBuild(version)
+	return version:match("^%d+%.%d+%.%d+%-%d+") or version
+end
+
+-- The known fix for a collected report (its text, newlines kept), the build that sent it and the
+-- friend's language ("de" or "en"); nil for a report that isn't an error, or from a build with the fix.
+function B.FixedFor(text)
+	if type(text) ~= "string" then
+		return nil
+	end
+	local version, locale = text:match("^Error: LefthyTools (%S+) %(files [^)]*%), WoW [^,]*, (%a+),")
+	local line = text:match("^[^\n]*\n[^\n]*\n([^\n]*)")
+	if not version or not line then
+		return nil
+	end
+	for _, fix in ipairs(B.FIXED_ERRORS) do
+		if line:find(fix.pattern, 1, true) and (not fix.also or text:find(fix.also, 1, true)) and Older(version, fix.fixed) then
+			return fix, version, locale == "deDE" and "de" or "en"
+		end
+	end
+	return nil
+end
+
+-- Told today already (one key per friend and fix; other days' keys go when one is added).
+local function ToldToday(name, fix, mark)
+	local told, today, key = Saved("fixedTold"), date("%Y-%m-%d"), name .. " / " .. fix.pattern .. (fix.also or "")
+	if told[key] == today then
+		return true
+	elseif mark then
+		for k, day in pairs(told) do
+			if day ~= today then
+				told[k] = nil
+			end
+		end
+		told[key] = today
+	end
+	return false
+end
+
+-- A collected report: its sender is told on the tick if it's a known fix and their build is older.
+local function QueueFixed(gameAccountID, text)
+	local fix, _, language = B.FixedFor(text)
+	if fix and #fixedOut < FIXED_WAITING then
+		fixedOut[#fixedOut + 1] = { gameAccountID, fix, language }
+	end
+end
+
+-- The message for a friend on that build (nil: not known yet) whose report language was this:
+-- B2;bf for builds that read it, else an LTC line (M2), which every build shows as it is.
+function B.FixedMessage(fix, language, version)
+	if version and LT.ParseVersion(version) and not Older(version, FIXED_SINCE) then
+		return ("B%s;bf;%s;%d;%s"):format(B.VERSION, fix.fixed, fix.sure and 1 or 0, B.Clean(fix.en, 100))
+	end
+	local line = FIXED_LINES[language == "de" and "de" or "en"][fix.sure and "sure" or "likely"]
+	return ("M%s;%s"):format(B.VERSION, B.Clean(line:format(fix[language] or fix.en, ShortBuild(fix.fixed)), 200))
+end
+
+-- One line to them. Nothing if they've updated since (their V2; the report's build was older) or
+-- were told today.
+local function TellFixed(gameAccountID, peer, fix, language)
+	local known = peer.version and LT.ParseVersion(peer.version) -- (unknown: the report's build counts, older)
+	if (known and not Older(peer.version, fix.fixed)) or ToldToday(peer.name, fix, true) then
+		return
+	end
+	B.Queue(gameAccountID, B.FixedMessage(fix, language, peer.version))
+	M:Print(("told %s the error they reported %s in %s (they have %s)."):format(peer.name,
+		fix.sure and "is fixed" or "should be fixed", ShortBuild(fix.fixed), peer.version or "an older build"))
+end
+
+-- On the tick: the first friend who can be told (we're both out of a fight), one per FIXED_GAP.
+local function TickFixed(now)
+	if not fixedOut[1] then
+		return
+	elseif not M.db.collectReports then
+		wipe(fixedOut)
+		return
+	elseif LT.InFight() or now - lastFixed < FIXED_GAP then
+		return
+	end
+	local peers = M:GetPeers()
+	for i, item in ipairs(fixedOut) do
+		local peer = peers[item[1]]
+		if not peer or (peer.name and not peer.combat) then
+			table.remove(fixedOut, i)
+			if peer then
+				lastFixed = now
+				TellFixed(item[1], peer, item[2], item[3])
+			end
+			return
+		end
+	end
+end
+
+-- B2;bf from a friend (OnMessage: state only): the error I reported is fixed in their newer build.
+-- Only from a collector, only while my build is older.
+function B.ReceiveFixed(gameAccountID, more)
+	local peer = M:GetPeers()[gameAccountID]
+	local build, sure, what = more:match("^([%w%.%-]+);([01]);([^;]+)$")
+	if peer and peer.collects and build and #build <= 40 and LT.ParseVersion(build) and #fixedIn < 3
+		and LT.CompareVersions(LT.version, build) ~= 0 and LT.CompareVersions(LT.version, build) ~= 1 then
+		fixedIn[#fixedIn + 1] = { build = ShortBuild(build), sure = sure == "1", what = B.Clean(what, 100) }
+	end
+end
+
+local function ShowFixed()
+	while fixedIn[1] do
+		local item = table.remove(fixedIn, 1)
+		M:Print(("the error you reported (%s) %s in build %s (you have %s). Update with Update-LefthyTools.cmd and restart the game.")
+			:format(item.what, item.sure and "is fixed" or "should be fixed", item.build, LT.version))
+	end
+end
+
+---------------------------------------------------------------------------
 -- Receiving (collectors)
 ---------------------------------------------------------------------------
 
@@ -280,11 +437,13 @@ local function Store(report)
 		texts[n] = report.parts[n] or ("[part %d of %d missing]"):format(n, report.of)
 	end
 	local list = Saved("friendReports")
-	list[#list + 1] = { at = date("%Y-%m-%d %H:%M"), from = NameOf(report.sender), text = (table.concat(texts):gsub("%^", "\n")) }
+	local text = table.concat(texts):gsub("%^", "\n")
+	list[#list + 1] = { at = date("%Y-%m-%d %H:%M"), from = NameOf(report.sender), text = text }
 	while #list > KEEP_COLLECTED do
 		table.remove(list, 1)
 	end
 	M:Print(("%s sent a LefthyTools error report: /lefthy reports shows it."):format(list[#list].from))
+	QueueFixed(report.sender, text) -- (already fixed in a newer build: they're told on the tick)
 	if B.reportsWindow and B.reportsWindow:IsShown() then
 		B.ShowReports()
 	end
@@ -358,6 +517,8 @@ function B.TickReports(now)
 		end
 		announced = collect
 	end
+	TickFixed(now)
+	ShowFixed()
 	if now - lastFlush < FLUSH_GAP then
 		return
 	end

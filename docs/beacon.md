@@ -74,7 +74,8 @@ Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.l
   `B2;cq;<acct>;<since>` send me what's newer, `B2;ct;<acct>;<char>;<u>;<class>;<level>;<line:skill:max,...>` a
   character's professions, `B2;cr;<acct>;<char>;<line>;<v>;<k>;<of>;<text>` part k of a list,
   `B2;ce;<acct>;<u>;<count>` that's all; only to builds from `RECIPES_SINCE` on, at most 700 a minute from one
-  friend), `Q2` switched off. A build that doesn't
+  friend), `B2;bf;<build>;<1|0>;<what>` the error you reported is fixed in that build (see "Error
+  reports"; only to builds from `FIXED_SINCE` on), `Q2` switched off. A build that doesn't
   know a kind ignores it (`Parse` returns nil before the sender is registered), so new kinds
   don't break older friends. A hello is answered with the version and the state (at most every 5 s per friend; one that
   comes sooner, say after a quick `/reload`, is answered once the 5 s are up, not dropped);
@@ -591,6 +592,42 @@ friend per minute); complete ones, or after 120 s with "[part n of m missing]", 
 `LefthyToolsDB.friendReports` (newest 40) with the sender's name and time, and a chat line says
 so. `/lefthy reports` (or the settings button) shows them newest first in a copy box, with Clear.
 Not collecting: parts are ignored.
+
+**Already fixed:** friends on old builds keep hitting errors fixed since, so a collected report is
+looked up in `B.FIXED_ERRORS` (Reports.lua): a plain-text `pattern` found in the report's error
+line (its third line, after the context and "kind, count"), optionally `also` anywhere in the
+report (where it happened, e.g. `SettingsPanel` for an unnamed blocked call), the first build
+without it (`fixed`, `X.Y.Z-N-gHASH` so `LT.CompareVersions` reads it), `sure` (false: worded
+"should be fixed") and what it was in English and German. `B.FixedFor(text)` matches only
+`Error:` reports from a build before the fix. The sender is then told in one line, unless their
+build (`peer.version`, from `V2`; the report may have waited since an older session) has the fix
+already: once per friend (by name), fix and day (`LefthyToolsDB.fixedTold`, keys of other days
+dropped when one is added), never while I'm `LT.InFight()` or their state says combat (it waits),
+one line every 5 s at most, only while `collectReports` is on (switched off, what waits goes); the
+collector gets a chat line saying whom it told. How it gets there (`B.FixedMessage`):
+
+- **Older builds** (before `FIXED_SINCE`, or a build not known yet): an LTC line, `M2;<text>`, in
+  the language the report names (deDE: German), e.g. "LefthyTools note: the error you reported (a
+  blocked action in Blizzard's settings panel) is fixed in build 0.7.0-34. Update with
+  Update-LefthyTools.cmd and restart the game." `M2`'s parsing (Protocol.lua) and showing (Chat.lua
+  `ReceiveChat`: "[LTC] [Name]: text", cleaned to 200 bytes) are the same in every build that sends
+  reports, back past 0.7.0-24, so they show it as it is: no `;`, `|` or braces (no link tokens),
+  at most 200 bytes (tests check every entry in both languages). It needs their LTC on (the
+  default); with it off they see nothing.
+- **Builds from `FIXED_SINCE` on:** `B2;bf;<build>;<1|0>;<what>` (Beacon's own word, like
+  `B2;bl`; older builds ignore an unknown `b` word), taken only from a friend who `collects`, at
+  most one per 3 s, and only while my build is older than `<build>`; printed on the tick as a
+  Beacon line in English like all chat output ("the error you reported (...) is fixed in build
+  0.7.0-34 (you have ...). Update with Update-LefthyTools.cmd and restart the game.").
+  `FIXED_SINCE` must not be lower than the first build with this code (a build between would get a
+  word it ignores); a higher one only means more friends get the LTC line.
+
+Listed so far (from `git log v0.7.0..`): `ADDON_ACTION_FORBIDDEN: IsUserOAuthed()` (Blizzard's
+settings panel, fixed in 0.7.0-34 when the settings moved to a window of our own), and as "should
+be fixed" the same build's `ADDON_ACTION_FORBIDDEN: UNKNOWN()` and `ADDON_ACTION_BLOCKED: Frame:...`
+with `SettingsPanel` in the report, and `ADDON_ACTION_BLOCKED: UNKNOWN()` (the combo point dots on
+a protected nameplate, 0.7.0-38). A fix that removes an error with recognisable text gets an
+entry here.
 
 ## Fight stream (Stream*.lua)
 

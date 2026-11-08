@@ -215,7 +215,9 @@ minimap, and you on theirs, without being in a group.
   error once per session; a chat line says where it went), and anyone can write one:
   `/lefthy report <what happened>` adds the LefthyTools and WoW build, language, realm, faction
   and the last links clicked. Reports wait until a collector is online; `/lefthy reports` shows
-  the collected ones, ready to copy.
+  the collected ones, ready to copy. A friend on an older build who reports an error that's
+  already fixed gets one line in their chat (at most once a day per error): update with
+  `Update-LefthyTools.cmd` and restart the game.
 - **No server needed:** everything goes through the game's own Battle.net addon
   messages. Each player's LefthyTools sends their own position and status to friends
   who have the addon.

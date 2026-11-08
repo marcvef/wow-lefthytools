@@ -79,7 +79,11 @@ local B = ns.Beacon
 --   B2;bl;<level>       Beacon's own word: my level, only to friends whose build reads it (their
 --                       V2; Sharing.lua's LEVEL_SINCE). When it changes, again after their hello,
 --                       and every 5 minutes: Battle.net's number for friends can be wrong
---   Q2                  module switched off: forget me
+--   B2;bf;<build>;<1|0>;<what>
+--                       Beacon's own word, from a friend who collects error reports: the error you
+--                       reported (<what>) is fixed (1) or should be (0) in <build>. Only to builds from
+--                       Reports.lua's FIXED_SINCE on; older ones get it as an M2 line, which they show
+--   Q2                 module switched off: forget me
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil, before the sender counts as
 -- a friend with the addon), so new kinds can be added without breaking older friends. Older builds

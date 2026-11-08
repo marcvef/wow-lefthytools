@@ -470,5 +470,8 @@ ns.CHANGELOG = {
 	{ id = 154, module = "chronicle",
 		en = { "Who can craft it, in tooltips", "An item's tooltip names who of you and your friends can craft it, best skill first. Hold Shift for the reagents. A setting in Chronicle switches it off." },
 		de = { "Wer es herstellen kann, im Tooltip", "Der Tooltip eines Items nennt, wer von dir und deinen Freunden es herstellen kann, der höchste Skill zuerst. Halte Shift für die Reagenzien. Eine Einstellung in Chronicle schaltet es ab." } },
+	{ id = 155, module = "beacon",
+		en = { "Told when your error is already fixed", "Report an error that a newer build already fixed, and you get one chat line from the friend who collects reports: update with Update-LefthyTools.cmd and restart the game." },
+		de = { "Hinweis, wenn dein Fehler behoben ist", "Meldest du einen Fehler, den ein neuerer Build schon behoben hat, bekommst du vom Freund, der die Berichte sammelt, eine Chatzeile: Update mit Update-LefthyTools.cmd und starte das Spiel neu." } },
 	-- New entries go here, at the end.
 }

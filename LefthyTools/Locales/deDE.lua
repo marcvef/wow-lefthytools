@@ -407,8 +407,8 @@ L["Send my LefthyTools errors to friends who collect them"] = "Meine LefthyTools
 L["When LefthyTools has an error, it goes to your Battle.net friends who collect error reports (each error once per session), so whoever looks after LefthyTools can fix it. /lefthy report <what happened> sends a report in your own words."] =
 	"Hat LefthyTools einen Fehler, geht er an deine Battle.net-Freunde, die Fehlerberichte sammeln (jeder Fehler einmal pro Session), damit sich darum gekümmert werden kann. /lefthy report <was passiert ist> schickt einen Bericht in deinen eigenen Worten."
 L["Collect my friends' error reports"] = "Fehlerberichte meiner Freunde sammeln"
-L["Your friends' LefthyTools send you their errors and the reports they write (/lefthy report). /lefthy reports shows them, ready to copy."] =
-	"Das LefthyTools deiner Freunde schickt dir ihre Fehler und die Berichte, die sie schreiben (/lefthy report). /lefthy reports zeigt sie, fertig zum Kopieren."
+L["Your friends' LefthyTools send you their errors and the reports they write (/lefthy report). /lefthy reports shows them, ready to copy. A friend on an older build whose error is already fixed gets one line telling them to update."] =
+	"Das LefthyTools deiner Freunde schickt dir ihre Fehler und die Berichte, die sie schreiben (/lefthy report). /lefthy reports zeigt sie, fertig zum Kopieren. Ein Freund mit einem älteren Build, dessen Fehler schon behoben ist, bekommt eine Zeile, dass er updaten soll."
 L["Friends' error reports"] = "Fehlerberichte von Freunden"
 L["The reports your friends sent you, newest first, ready to copy. /lefthy reports does the same."] =
 	"Die Berichte, die deine Freunde dir geschickt haben, die neuesten zuerst, fertig zum Kopieren. /lefthy reports macht dasselbe."

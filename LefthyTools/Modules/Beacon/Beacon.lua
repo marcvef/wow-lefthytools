@@ -42,6 +42,7 @@ local ITEM_GAP = 2           -- shared items accepted from one friend at most th
 local CALL_LIMIT, CALL_WINDOW = 10, 10 -- Need / Pass answers and verdicts accepted from one friend
 local DAILY_LIMIT = 30       -- Chronicle days accepted from one friend per minute (7 + their AFK times arrive at once)
 local REPORT_PARTS = 60      -- error report parts accepted from one friend per minute (a report has up to 16)
+local FIXED_GAP = 3          -- "the error you reported is fixed" (B2;bf) from one friend at most this often (they send one per 5 s)
 local JOURNAL_LIMIT, JOURNAL_WINDOW = 700, 60 -- Chronicle journal messages accepted from one friend (a
                              -- full sync of an account is a few hundred, low priority)
 local STREAM_LIMIT, STREAM_WINDOW = 80, 10 -- fight stream messages accepted from one friend (2 frames a
@@ -823,6 +824,10 @@ local function OnMessage(text, senderID)
 			local level = KnownLevel(tonumber(b:match("^%d%d?%d?$") or ""))
 			if level and B.TellLevel(peer, level) then
 				Changed()
+			end
+		elseif a == "bf" then
+			if B.ReceiveFixed and Spaced(guard, "fixedAt", FIXED_GAP, now) then
+				B.ReceiveFixed(senderID, b) -- Reports.lua: an error I reported is fixed in their build
 			end
 		elseif a:sub(1, 1) == "e" and Counted(guard, "echoes", ECHOES_LIMIT, ECHOES_WINDOW, now) and B.ReceiveEchoes then
 			B.ReceiveEchoes(senderID, a, b)

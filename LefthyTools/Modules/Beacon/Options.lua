@@ -55,7 +55,7 @@ function M:BuildOptions(o)
 	o:Checkbox("sendReports", L["Send my LefthyTools errors to friends who collect them"],
 		L["When LefthyTools has an error, it goes to your Battle.net friends who collect error reports (each error once per session), so whoever looks after LefthyTools can fix it. /lefthy report <what happened> sends a report in your own words."])
 	o:Checkbox("collectReports", L["Collect my friends' error reports"],
-		L["Your friends' LefthyTools send you their errors and the reports they write (/lefthy report). /lefthy reports shows them, ready to copy."])
+		L["Your friends' LefthyTools send you their errors and the reports they write (/lefthy report). /lefthy reports shows them, ready to copy. A friend on an older build whose error is already fixed gets one line telling them to update."])
 	o:Button(L["Friends' error reports"], L["Show"], function() B.ShowReports() end,
 		L["The reports your friends sent you, newest first, ready to copy. /lefthy reports does the same."])
 
