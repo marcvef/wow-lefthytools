@@ -241,12 +241,33 @@ do
 	GameTooltip:SetOwner(Slot(1, 1), "ANCHOR_NONE")
 	GameTooltip:SetBagItem(1, 1)
 	check(TOOLTIP.points == nil, "its tooltip where Blizzard puts it (it follows the mouse)")
+	-- The reagent bag's own window (mouse and keyboard): its items come into ours, the window unseen.
+	BAGS[5] = { [1] = 9006, [3] = 9004 }
+	ContainerFrame6:Show()
+	Wait(1)
+	st = State()
+	local reagent = ContainerFrame6.buttons[1]
+	check(reagent:GetParent() == bag and Order(st.order):find("5:1", 1, true) and ContainerFrame6:IsShown()
+		and ContainerFrame6:GetAlpha() == 0 and not ContainerFrame6:IsMouseEnabled() and not ContainerFrame6.CloseButton:IsMouseEnabled(),
+		"the reagent bag's items in ours (its window open for Blizzard, unseen and unclickable): " .. Order(st.order))
+	ContainerFrame6:Hide()
+	Wait(1)
+	check(reagent:GetParent() == ContainerFrame6 and ContainerFrame6:GetAlpha() == 1 and ContainerFrame6:IsMouseEnabled()
+		and ContainerFrame6.CloseButton:IsMouseEnabled() and not Order(State().order):find("5:", 1, true),
+		"its window closed: its buttons back, the window as it was")
+	ContainerFrame6:Show()
+	Wait(1)
+	check(reagent:GetParent() == bag, "open again: in ours again")
 	T("mouseBags"):SetValue(false)
 	Wait(1)
 	-- Off: Blizzard's bag as it is.
 	st = State()
 	x, y = At(Slot(0, 1))
 	check(not st.applied and #st.headers == 0 and x == -126 and y == 88, "mouseBags off: Blizzard's grid, nothing of ours")
+	check(reagent:GetParent() == ContainerFrame6 and ContainerFrame6:GetAlpha() == 1 and ContainerFrame6:IsMouseEnabled(),
+		"... and the reagent bag's window its own again")
+	ContainerFrame6:Hide()
+	BAGS[5] = nil
 	check(bag:GetHeight() == bag:CalculateHeight(), "Blizzard's height")
 	GameTooltip:SetOwner(Slot(0, 10), "ANCHOR_NONE")
 	GameTooltip:SetBagItem(0, 10)

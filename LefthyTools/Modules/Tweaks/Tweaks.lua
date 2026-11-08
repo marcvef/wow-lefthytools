@@ -406,7 +406,7 @@ function M:BuildOptions(o)
 	o:Checkbox("gamepadBags", L["Sorted bags with a controller"],
 		L["In gamepad mode the bags show each bag's button in a row at the top, then your items in sections: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name. The selected item's tooltip shows beside the bags. With mouse and keyboard nothing changes. Off: Blizzard's layout, from the next time the bags open."])
 	o:Checkbox("mouseBags", L["Sorted bags with mouse and keyboard"],
-		L["The same sections with mouse and keyboard: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name. Off: Blizzard's own bag."])
+		L["The same sections with mouse and keyboard: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name; the reagent bag's items in them too, not in a window of their own. Off: Blizzard's own bag."])
 	o:Slider("gamepadBagColumns", L["Sorted bags: columns"],
 		L["How many items side by side in the sorted bags. More columns make them wider and less tall; Blizzard's own is 10."],
 		6, 24, 1, function(v) return tostring(math.floor((tonumber(v) or 10) + 0.5)) end)

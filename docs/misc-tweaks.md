@@ -82,7 +82,11 @@ still says gamepad (it began there).
 With mouse and keyboard (`mouseBags`, on by default; `Active()` asks the one for the mode the interface
 is in) the same sections, columns and folded free slots, without the "Bags" header and its row (the bag
 buttons sit on the main bar), without SmartNavigation's jumps and with the tooltip where Blizzard puts it.
-Switched off there, Blizzard's grid comes back at once (`UpdateItemLayout`).
+Switched off there, Blizzard's grid comes back at once (`UpdateItemLayout`). The reagent bag has its own window
+with mouse and keyboard (the combined bag holds bags 0 to `ENDING_BAG_INDEX`, 4 then; a global we leave alone): its
+item buttons are reparented into ours (`Adopt`) and sorted with the rest, its window stays open for Blizzard (so it
+keeps updating them) but at alpha 0 with its mouse off, close button and portrait too (`Hush`). They go back
+(`GiveBack`, its own `UpdateItemLayout`) when ours goes or that window closes.
 
 By default the bag buttons' row is folded away under a "Bags (5)" header: our own button on the bag, so the
 controller lands on it too. The cursor landing there (`FocusEnter` runs its OnEnter) opens the row for as long

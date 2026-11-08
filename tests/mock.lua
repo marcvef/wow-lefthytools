@@ -164,6 +164,7 @@ function FrameMethods:SetClipsChildren(c) self._clips = c end
 function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
+function FrameMethods:IsMouseEnabled() return self._mouseEnabled == true end
 function FrameMethods:EnableMouseWheel(e) self._wheelEnabled = e end
 function FrameMethods:SetChecked(on) self._checked = on and true or false end
 function FrameMethods:GetChecked() return self._checked == true end
@@ -1600,6 +1601,32 @@ for slot = 1, 16 do
 	ContainerFrameCombinedBags.buttons[slot] = b
 end
 function ContainerFrameCombinedBags:EnumerateValidItems() return ipairs(self.buttons) end
+-- The reagent bag's own window (mouse and keyboard: the combined bag holds bags 0 to 4 then), with
+-- REAGENT_SLOTS buttons; ContainerFrameUtil_GetShownFrameForID finds the window shown for a bag.
+REAGENT_SLOTS = 4
+CreateFrame("Frame", "ContainerFrame6", UIParent)
+ContainerFrame6:Hide()
+ContainerFrame6.buttons = {}
+function ContainerFrame6:GetBagID() return 5 end
+function ContainerFrame6:IsCombinedBagContainer() return false end
+function ContainerFrame6:EnumerateValidItems() return ipairs(self.buttons) end
+function ContainerFrame6:UpdateItemLayout()
+	for i, b in ipairs(self.buttons) do b:ClearAllPoints(); b:SetPoint("TOPLEFT", self, "TOPLEFT", 8 + (i - 1) * 42, -40) end
+end
+ContainerFrame6.CloseButton = CreateFrame("Button", nil, ContainerFrame6)
+ContainerFrame6.CloseButton:EnableMouse(true)
+ContainerFrame6:EnableMouse(true)
+for slot = 1, REAGENT_SLOTS do
+	local b = CreateFrame("Button", nil, ContainerFrame6)
+	b:SetSize(37, 37)
+	b:SetID(slot)
+	function b:GetBagID() return 5 end
+	ContainerFrame6.buttons[slot] = b
+end
+function ContainerFrameUtil_GetShownFrameForID(id)
+	if id == 5 and ContainerFrame6:IsShown() then return ContainerFrame6 end
+	if ContainerFrameCombinedBags:IsShown() then return ContainerFrameCombinedBags end
+end
 function ContainerFrameCombinedBags:UpdateItems() end -- Blizzard's own drawing: nothing to do here
 
 -- The combined bag's layout (ContainerFrame.lua): ten columns of 37 px buttons 5 px apart, laid out

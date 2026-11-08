@@ -4,7 +4,10 @@ local LT = ns.LT
 
 -- Misc Tweaks: the sorted bags, with a controller (gamepadBags) and with mouse and keyboard (mouseBags).
 -- With mouse and keyboard the same sections, without the "Bags" header and its row (the bag buttons
--- sit on the main bar there), the navigation (SmartNavigation) and the tooltip beside the bag.
+-- sit on the main bar there), the navigation (SmartNavigation) and the tooltip beside the bag. There
+-- the reagent bag has a window of its own (the combined bag holds bags 0 to 4 then; with a controller
+-- all): its item buttons come into ours, and its window stays open for Blizzard (so it keeps them
+-- up to date) but can't be seen or clicked. Given back whenever ours goes or that window closes.
 --
 -- With the controller UI the combined bag puts each bag's button (GamepadBagBar) into its item grid,
 -- in front of that bag's slots: one long grid of bags and items. This places the same buttons anew,
@@ -65,6 +68,9 @@ local tucked = {}     -- Blizzard's buttons we hid (the other bags' buttons, the
 local countText       -- the free slots' count on the one shown
 local bagsToggle      -- the "Bags" header: a button that folds the bag buttons' row away and back
 local peeking = false -- the row open while the controller's cursor is up there (not kept)
+local REAGENT_BAG = (Enum and Enum.BagIndex and Enum.BagIndex.ReagentBag) or 5
+local adopted = {}    -- the reagent bag's item buttons in ours -> the window they belong to
+local hushed = {}     -- that window (and its clickable parts) we made unseen -> how they were
 local folding = {}    -- buttons with our "down out of the row: fold" callback (SmartNavigation's)
 local placedColumns   -- the columns of the last layout
 local placedCount     -- the free slots' count in the last layout
@@ -204,6 +210,17 @@ local function Before(a, b)
 	return a.order < b.order
 end
 
+-- The reagent bag's own window, open (mouse and keyboard, ours wanted there), or nil.
+local function ReagentWindow(frame)
+	if PadUI() or not wantedMouse or not ContainerFrameUtil_GetShownFrameForID then
+		return nil
+	end
+	local ok, window = pcall(ContainerFrameUtil_GetShownFrameForID, REAGENT_BAG)
+	if ok and window and window ~= frame and window:IsShown() and window.EnumerateValidItems then
+		return window
+	end
+end
+
 -- The sections' items, sorted: groups[section] = { entry, ... }. Only the slots Blizzard lays out
 -- (a bag collapsed in its menu keeps its slots hidden).
 local function Sort(frame)
@@ -214,6 +231,14 @@ local function Sort(frame)
 	for _, button in frame:EnumerateValidItems() do
 		local bagButton = BagButton(button:GetBagID())
 		if not (bagButton and bagButton.isCollapsed == true) then
+			local e = Classify(button)
+			table.insert(groups[e.section], e)
+		end
+	end
+	local reagents = ReagentWindow(frame)
+	groups.reagents = reagents
+	if reagents then
+		for _, button in reagents:EnumerateValidItems() do
 			local e = Classify(button)
 			table.insert(groups[e.section], e)
 		end
@@ -325,6 +350,75 @@ local function WatchDown(button)
 		and not Restricted() then
 		folding[button] = true
 		SmartNavigation_RegisterOutgoingDirNavCallback(button, dirs.DOWN, FoldBelow)
+	end
+end
+
+-- The reagent bag's window unseen and unclickable (it stays open: Blizzard updates its buttons then),
+-- or as it was. Its clickable parts too (the close button, the portrait), not its item buttons.
+local function Hush(window, on)
+	if on and not hushed[window] then
+		local parts = { [window] = { window:GetAlpha(), window:IsMouseEnabled() } }
+		for _, child in ipairs({ window:GetChildren() }) do
+			if not adopted[child] and child.IsMouseEnabled and child:IsMouseEnabled() then
+				parts[child] = { nil, true }
+			end
+		end
+		hushed[window] = parts
+		window:SetAlpha(0)
+		for part in pairs(parts) do
+			part:EnableMouse(false)
+		end
+	elseif not on and hushed[window] then
+		for part, was in pairs(hushed[window]) do
+			if part == window then
+				window:SetAlpha(was[1] or 1)
+			end
+			part:EnableMouse(was[2])
+		end
+		hushed[window] = nil
+	end
+end
+
+-- The reagent bag's buttons into ours (laid out with the rest), or all given back to their window,
+-- which lays them out again (its own Blizzard layout).
+local function Adopt(frame, window)
+	if not window then
+		return
+	end
+	local level
+	for _, b in frame:EnumerateValidItems() do
+		level = b:GetFrameLevel()
+		break
+	end
+	for _, b in window:EnumerateValidItems() do
+		adopted[b] = window
+		if b:GetParent() ~= frame then
+			b:SetParent(frame)
+		end
+		if level then
+			b:SetFrameLevel(level)
+		end
+	end
+	Hush(window, true)
+end
+
+local function GiveBack()
+	local windows = {}
+	for b, window in pairs(adopted) do
+		if not (InCombatLockdown() and b:IsProtected()) then
+			b:SetParent(window)
+			adopted[b] = nil
+			windows[window] = true
+		end
+	end
+	for window in pairs(hushed) do
+		windows[window] = true
+	end
+	for window in pairs(windows) do
+		Hush(window, false)
+		if window:IsShown() and window.UpdateItemLayout then
+			window:UpdateItemLayout() -- (its grid again)
+		end
 	end
 end
 
@@ -506,6 +600,11 @@ local function Place(frame, groups, strip)
 	Tuck(strip.tucked, keep)
 	Tuck(groups.tucked, keep)
 	Untuck(keep) -- (the ones wanted again: shown)
+	if groups.reagents then
+		Adopt(frame, groups.reagents)
+	elseif next(adopted) or next(hushed) then
+		GiveBack()
+	end
 	local w, h = ButtonSize(groups, strip)
 	local cols = Columns()
 	placedColumns, placedCount = cols, freeCount
@@ -622,6 +721,7 @@ local function Unapply()
 	ApplyJumps(false)
 	wipe(order); wipe(laidOut); wipe(starts); wipe(stripped)
 	Untuck() -- (Blizzard's layout has them all)
+	GiveBack()
 	if overlay then
 		overlay:Hide()
 	end
@@ -759,6 +859,7 @@ local function Relayout()
 	end
 	local groups = Sort(frame)
 	if applied and SameLayout(groups) and placedColumns == Columns() and placedCount == freeCount
+		and (groups.reagents ~= nil) == (next(adopted) ~= nil)
 		and stripped.all == RowOpen() and placedAllFree == Setting("gamepadBagAllFree", false) then
 		return
 	end
@@ -805,6 +906,23 @@ watch:SetScript("OnEvent", function(self)
 	driver:Show() -- (not inside the event)
 end)
 
+-- A bag window (the reagent bag's) opening or closing: ours laid out again on the next frame; closing,
+-- its buttons go back to it at once.
+local function OnWindowShown(window)
+	if window ~= Bag() and wantedMouse and not PadUI() and window.GetBagID and window:GetBagID() == REAGENT_BAG then
+		dirty = true
+		driver:Show()
+	end
+end
+
+local function OnWindowHidden(window)
+	if hushed[window] then
+		GiveBack()
+		dirty = true
+		driver:Show()
+	end
+end
+
 local function Hook()
 	local frame = Bag()
 	if hooked or not (frame and type(frame.UpdateItemLayout) == "function" and frame.EnumerateValidItems) then
@@ -821,6 +939,13 @@ local function Hook()
 		hooksecurefunc(frame, "UpdateItems", OnItemsUpdated)
 	end
 	frame:HookScript("OnHide", OnBagHidden)
+	for i = 1, (NUM_CONTAINER_FRAMES or 13) + 1 do
+		local window = _G["ContainerFrame" .. i]
+		if window and window.HookScript then
+			window:HookScript("OnShow", OnWindowShown)
+			window:HookScript("OnHide", OnWindowHidden)
+		end
+	end
 	if type(frame.ApplySmartNavOverrideForLeftmostButton) == "function" then
 		hooksecurefunc(frame, "ApplySmartNavOverrideForLeftmostButton", OnPanelAdded) -- (the bag's first frame open)
 	end
