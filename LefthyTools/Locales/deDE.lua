@@ -191,6 +191,15 @@ L["Clean-up button on the bags"] = "Aufräumen-Knopf an den Taschen"
 L["Since Forever's latest patch the bags' clean-up button is gone with mouse and keyboard. This puts it back, at the left of the bags' search box. With a controller it's in the bag menu instead."] =
 	"Seit Forevers letztem Patch fehlt der Aufräumen-Knopf der Taschen mit Maus und Tastatur. Das holt ihn zurück, links neben dem Suchfeld der Taschen. Mit einem Controller ist er stattdessen im Taschenmenü."
 L["Clean up bags"] = "Taschen aufräumen"
+L["Sorted bags with a controller"] = "Sortierte Taschen mit Controller"
+L["In gamepad mode the bags show each bag's button in a row at the top, then your items in sections: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name. The selected item's tooltip shows beside the bags. With mouse and keyboard nothing changes. Off: Blizzard's layout, from the next time the bags open."] =
+	"Im Gamepad-Modus zeigen die Taschen oben in einer Reihe den Button jeder Tasche, darunter deine Items in Abschnitten: Ausrüstung, Verbrauchsgüter, Handwerkswaren, Questgegenstände, Sonstiges, Plunder und die freien Plätze, jeweils nach Qualität und Name sortiert. Der Tooltip des gewählten Items erscheint neben den Taschen. Mit Maus und Tastatur ändert sich nichts. Aus: Blizzards Anordnung, ab dem nächsten Öffnen der Taschen."
+L["Gear"] = "Ausrüstung"
+L["Consumables"] = "Verbrauchsgüter"
+L["Trade goods"] = "Handwerkswaren"
+L["Quest items"] = "Questgegenstände"
+L["Junk"] = "Plunder"
+L["Free slots"] = "Freie Plätze"
 L["Combo dots: size"] = "Combopunkte: Größe"
 L["Each dot's size in pixels. While you move the slider, they show on your target's nameplate for a few seconds."] =
 	"Die Größe jedes Punkts in Pixeln. Während du den Regler bewegst, zeigen sie sich ein paar Sekunden an der Namensplakette deines Ziels."

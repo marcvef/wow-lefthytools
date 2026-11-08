@@ -75,6 +75,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `professions.lua` | Chronicle's Professions tab, with a fake `C.Recipes` (the last section: the real one's data, when it's loaded): the row of tabs, defaults, people, groups and sorting, difficulty, details and the real tooltip, search, gathering, empty states, pools, what's redrawn, names coming in, in a fight, the fallback (last in the suite's order) | - |
 | `ltc_more.lua` | LTC: a line that mentions me (case, words of their own, links left alone, the flash, the sound, a tab out of sight, my own lines, the setting); lines a friend missed while offline (kept by the writer and by friends who got them, passed on after an offer and its answer, paced, marked with their time, links rebuilt, shown once when two friends bring them, only from the friend's own friends, 50 per friend, 24 hours, yesterday's); /ltc who (the call, the links, answers changing, answers from friends not asked, the tally redrawn in place or anew, Invite all and a friend already in the group, a call missed as a plain line, the end after 15 minutes); an older build's client (without the new files) gets nothing but plain LTC lines | - (its clients are its own) |
 | `margins.lua` | Chronicle's crafting margins: my recipes (the real recipe scan and data), vendor prices (the data's, a merchant's, not for other currencies), one recipe at the auction house (only with it open, what's asked, 0.65 s apart, gear by item level, none listed, no answer, the throttle, a fight), the numbers (cost, both revenues, the cut, profit, time, gold per hour, age), a full scan (one ReplicateItems read over frames, only my recipes' items kept, too soon: by items, stopped: what's left), the window (order, sorting, greyed stale prices, the details, the scan button, the auction house closed), the buttons on the profession window and the auction house, closing mid-scan, idle, the setting, pruning, secret prices | - |
+| `gamepad_bags.lua` | Misc Tweaks' bags with a controller: the bag buttons' row, the sections and their order, positions and the bag's height, SmartNavigation (grid off, jumps at shorter rows, Blizzard's jump cleared, told after our moves, the cursor kept in place, jumps gone when the bag closes), the tooltip beside the bag, a fight (nothing placed or called, Blizzard's layout standing, ours after it), a collapsed bag, mouse and keyboard untouched, the setting and its command, opened in a fight | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:
@@ -245,6 +246,24 @@ installer from GitHub instead.
    off); `/run error("x")` from chat must *not* show up there (not ours).
 10. Controller: the bar cluster and legend fade when idle; holding a trigger brings them back
     instantly; HUD mode, the radial menu and open bar flyouts keep them visible.
+    Sorted bags (gamepad mode, Misc Tweaks *Sorted bags with a controller* on): open the bags. At the
+    top a row of bag buttons (backpack first), below it headers (Gear, Consumables, Trade goods, Quest
+    items, Other, Junk, Free slots) with the items sorted under each (best quality first; gear by item
+    level). The cursor starts on the backpack's button. D-pad down: into the first section; down and up
+    go row by row through the sections (no row skipped, no jump into the wrong column at a section's
+    short last row); left and right along a row, wrapping at the ends; up from the first row: the bag
+    buttons; up from the backpack's button: the bag menu. On a bag button: its menu (filters, clean-up,
+    collapse) works; collapse a bag: its items leave the sections, expand it: they're back. Shoulder
+    buttons: jump between the bag buttons (Blizzard's; no section jumps). Select an item: its tooltip
+    sits left of the bags at their top, not over them; with *Compare items* on in the backpack's menu,
+    gear shows the comparison next to it. With the cursor on an item: use (a potion), equip (gear),
+    split a stack (More actions), pick up and drop into a free slot: all as before, no "action blocked".
+    At a vendor: sell the first junk item: the cursor moves to the next junk. Loot something: it shows
+    up in its section a moment later. Pull a mob with the bags open, loot or use an item in the fight:
+    the bags stay as they are (no "Interface action blocked", no Lua error); after the fight they're
+    sorted again. Open the bags in a fight: Blizzard's layout; after the fight ours. Switch gamepad mode
+    off with the bags open: Blizzard's mouse layout, exactly as before. `/lefthy tweaks padbags off`:
+    the headers go, close and open the bags: Blizzard's controller layout as before.
 11. Misc Tweaks: player/target bars show `current / max` without hovering; a dragged bag reopens
     where it was left. In a party, finishing a quest objective posts `[Quest]: 10/10 ...` with a
     star icon; finishing the quest posts `quest complete!`.

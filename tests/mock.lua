@@ -1104,10 +1104,21 @@ function UpdateContainerFrameAnchors()
 		end
 	end
 end
-function OpenBags() -- what Blizzard does when the bag opens
-	ContainerFrameCombinedBags:Show()
+function OpenBags() -- what Blizzard does when the bag opens (ContainerFrameCombinedBagsMixin:OnShow)
+	local f = ContainerFrameCombinedBags
+	f:Show()
+	f:UpdateFrameSize()
+	f:UpdateItemLayout()
 	UpdateContainerFrameAnchors()
-	if ContainerFrameCombinedBags.UpdateItems then ContainerFrameCombinedBags:UpdateItems() end
+	if f.UpdateItems then f:UpdateItems() end
+	if GAMEPAD_STATE.ui then -- one frame later: the bag's SmartNavigation panel, then the jump to the bag menu
+		C_Timer.After(0, function()
+			if f:IsShown() then
+				SMART_NAV.Open(f)
+				f:ApplySmartNavOverrideForLeftmostButton()
+			end
+		end)
+	end
 end
 function CloseBags() ContainerFrameCombinedBags:Hide() end
 
@@ -1506,6 +1517,9 @@ GameTooltip = {
 	Show = function() TOOLTIP.shown = true end,
 	Hide = function() TOOLTIP.shown = false end,
 	IsOwned = function(_, frame) return TOOLTIP.shown and TOOLTIP.owner == frame end,
+	GetOwner = function() return TOOLTIP.owner end,
+	ClearAllPoints = function() TOOLTIP.points = {} end,
+	SetPoint = function(_, ...) TOOLTIP.points = TOOLTIP.points or {}; TOOLTIP.points[#TOOLTIP.points + 1] = { ... } end,
 	SetSpellByID = function(_, id) TOOLTIP.spell, TOOLTIP.title = id, "Spell " .. id end,
 	SetBagItem = function(self, bag, slot) -- its data knows the copy (guid)
 		local id = BAGS[bag] and BAGS[bag][slot]
@@ -1560,7 +1574,18 @@ C_Container = {
 	UseContainerItem = function(bag, slot) SOLD[#SOLD + 1] = BAGS[bag][slot]; BAGS[bag][slot] = nil end,
 	PickupContainerItem = function(bag, slot) PICKED_UP[#PICKED_UP + 1] = BAGS[bag][slot] end,
 	SortBags = function() SORTED_BAGS = SORTED_BAGS + 1 end,
+	-- QUEST_BAG_ITEMS[itemID] = a quest's ID: the item starts or belongs to it
+	GetContainerItemQuestInfo = function(bag, slot)
+		local id = BAGS[bag] and BAGS[bag][slot]
+		local quest = id and QUEST_BAG_ITEMS[id]
+		return { isQuestItem = quest ~= nil, questID = quest, isActive = false }
+	end,
 }
+QUEST_BAG_ITEMS = {}
+C_Item.GetDetailedItemLevelInfo = function(link) -- (ITEMS[id].level)
+	local id = tonumber(tostring(link):match("item:(%d+)"))
+	return id and ITEMS[id] and ITEMS[id].level
+end
 C_Item.GetItemCount = function(itemID)
 	local n = 0
 	for _, slots in pairs(BAGS) do for _, id in pairs(slots) do if id == itemID then n = n + 1 end end end
@@ -1576,6 +1601,132 @@ for slot = 1, 16 do
 end
 function ContainerFrameCombinedBags:EnumerateValidItems() return ipairs(self.buttons) end
 function ContainerFrameCombinedBags:UpdateItems() end -- Blizzard's own drawing: nothing to do here
+
+-- The combined bag's layout (ContainerFrame.lua): ten columns of 37 px buttons 5 px apart, laid out
+-- from the bottom right (BOTTOMRIGHT at the money frame's TOPRIGHT, 0, 4) to the top left. With the
+-- controller UI each bag's button (GamepadBagBar) goes into the grid, before (above-left of) its
+-- slots; a bag collapsed in its menu (isCollapsed) keeps its slots out. The bag's height has room for
+-- NUM_CONTAINER_FRAMES more buttons then.
+KEYRING_CONTAINER, STARTING_BAG_INDEX, ENDING_BAG_INDEX, NUM_CONTAINER_FRAMES = -2, 0, 4, 5
+ContainerFrameCombinedBags.MoneyFrame = CreateFrame("Frame", nil, ContainerFrameCombinedBags)
+ContainerFrameCombinedBags.PortraitButton = CreateFrame("Button", nil, ContainerFrameCombinedBags)
+CreateFrame("Frame", "GamepadBagBar", ContainerFrameCombinedBags)
+GamepadBagBar.BagButtonArray = {}
+for bag = 0, 4 do
+	local b = CreateFrame("Button", nil, GamepadBagBar)
+	b:SetSize(37, 37)
+	b.isBag = true
+	function b:GetBagID() return bag end
+	GamepadBagBar.BagButtonArray[bag + 1] = b
+end
+function GamepadBagBar:GetBagButton(bagID)
+	if not GAMEPAD_STATE.ui then return nil end
+	return self.BagButtonArray[bagID + 1]
+end
+local function MockShown(f)
+	local n = 0
+	for _, b in f:EnumerateValidItems() do
+		local bagButton = GamepadBagBar:GetBagButton(b:GetBagID())
+		if not (bagButton and bagButton.isCollapsed) then n = n + 1 end
+	end
+	return n
+end
+function ContainerFrameCombinedBags:GetColumns() return 10 end
+function ContainerFrameCombinedBags:GetRows()
+	local slots = GAMEPAD_STATE.ui and (MockShown(self) + NUM_CONTAINER_FRAMES) or #self.buttons
+	return math.ceil(slots / 10)
+end
+function ContainerFrameCombinedBags:CalculateHeight()
+	local rows = self:GetRows()
+	return rows * 37 + (rows - 1) * 5 + 63 + 30
+end
+function ContainerFrameCombinedBags:UpdateFrameSize() self:SetSize(430, self:CalculateHeight()) end
+function ContainerFrameCombinedBags:GetInitialItemAnchor()
+	local frame = self
+	return { Get = function() return "BOTTOMRIGHT", frame.MoneyFrame, "TOPRIGHT", 0, 4 end }
+end
+function ContainerFrameCombinedBags:UpdateItemLayout()
+	local list = {}
+	for _, b in self:EnumerateValidItems() do
+		local bagButton = GamepadBagBar:GetBagButton(b:GetBagID())
+		if not (bagButton and bagButton.isCollapsed) then list[#list + 1] = b end
+	end
+	if GAMEPAD_STATE.ui then
+		for bag = ENDING_BAG_INDEX, STARTING_BAG_INDEX, -1 do
+			local bagButton = GamepadBagBar:GetBagButton(bag)
+			if bagButton then list[#list + 1] = bagButton end
+		end
+	end
+	table.sort(list, function(a, b)
+		if a:GetBagID() ~= b:GetBagID() then return a:GetBagID() > b:GetBagID() end
+		if (a.isBag == true) ~= (b.isBag == true) then return b.isBag == true end
+		return a:GetID() > b:GetID()
+	end)
+	for i, b in ipairs(list) do
+		b:ClearAllPoints()
+		b:SetPoint("BOTTOMRIGHT", self.MoneyFrame, "TOPRIGHT", -((i - 1) % 10) * 42, 4 + math.floor((i - 1) / 10) * 42)
+	end
+end
+-- One frame after it opens: the top left item (smallest x, then highest y) gets a jump up to the bag menu.
+function ContainerFrameCombinedBags:ApplySmartNavOverrideForLeftmostButton()
+	local best, bx, by
+	for _, b in self:EnumerateValidItems() do
+		if b:GetNumPoints() > 0 then
+			local x, y = select(4, b:GetPoint(1))
+			if not best or x < bx or (x == bx and y > by) then best, bx, by = b, x, y end
+		end
+	end
+	if best then best["smartNavigationOverride-up"] = self.PortraitButton end
+end
+
+-- SmartNavigation (Blizzard_GamepadSmartNavigation): the controller's cursor over a panel's buttons.
+-- SMART_NAV.panels[frame]: the panel's info (useGrid, targetButton), made when it opens (SMART_NAV.Open,
+-- Blizzard's side: then the frame's smartNavPanelInfoAddedCallback), gone when it closes; current: the
+-- selected button; calls: what addon code called. Those calls are refused in combat, as its
+-- SecureHelper does (BLOCKED gets "SmartNavigation:<name>").
+SMART_NAV_INPUT_DIRECTION = { UP = { x = 0, y = 1, dirKey = "up" }, DOWN = { x = 0, y = -1, dirKey = "down" },
+	LEFT = { x = -1, y = 0, dirKey = "left" }, RIGHT = { x = 1, y = 0, dirKey = "right" } }
+SMART_NAV = { panels = {}, current = nil, calls = {} }
+function SMART_NAV.Open(frame)
+	local info = SMART_NAV.panels[frame]
+	if not info then
+		info = { frame = frame }
+		SMART_NAV.panels[frame] = info
+		if frame.smartNavPanelInfoAddedCallback then frame.smartNavPanelInfoAddedCallback(info) end
+	end
+	return info
+end
+local function NavCall(name, fn)
+	return function(...)
+		if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SmartNavigation:" .. name; return end
+		SMART_NAV.calls[name] = (SMART_NAV.calls[name] or 0) + 1
+		return fn(...)
+	end
+end
+SmartNavigation = {
+	GetPanelInfo = function(_, frame, dontCreate) if dontCreate then return SMART_NAV.panels[frame] end return SMART_NAV.Open(frame) end,
+	GetCurrentButton = function() return SMART_NAV.current end,
+	RefreshButtonGroups = NavCall("RefreshButtonGroups", function(_, frame) SMART_NAV.Open(frame) end),
+	SetUseGridNavigation = NavCall("SetUseGridNavigation", function(_, frame, on)
+		local info = SMART_NAV.panels[frame]
+		if info then info.useGrid = on end
+	end),
+	SetTargetButtonForFrame = NavCall("SetTargetButtonForFrame", function(_, frame, button)
+		local info = SMART_NAV.panels[frame]
+		if info then info.targetButton, SMART_NAV.current = button, button end
+	end),
+}
+SmartNavigation_ClearJumpNavigationOverridesInDirection = NavCall("ClearJumpNavigationOverridesInDirection", function(button, dir)
+	button["smartNavigationOverride-" .. dir.dirKey] = nil
+end)
+SmartNavigation_AddJumpNavigationOverride = NavCall("AddJumpNavigationOverride", function(button, dir, target)
+	button["smartNavigationOverride-" .. dir.dirKey] = target
+end)
+-- The combined bag's panel (its SmartNavPanelInfoAdded): grid navigation, wrapping, the backpack's button first.
+ContainerFrameCombinedBags.smartNavPanelInfoAddedCallback = function(info)
+	info.useGrid, info.isWrapping, info.targetButton = true, true, GamepadBagBar:GetBagButton(0)
+end
+ContainerFrameCombinedBags:HookScript("OnHide", function(self) SMART_NAV.panels[self], SMART_NAV.current = nil, nil end)
 
 -- Personal resource display: Forever builds retail's combo point bar on it (RogueComboPointBarTemplate,
 -- bound to the target): classFrame.classResourceButtonTable, a point per max combo point, each with

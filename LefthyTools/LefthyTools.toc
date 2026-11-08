@@ -36,6 +36,7 @@ Modules\Mirage\Options.lua
 
 Modules\Tweaks\Tweaks.lua
 Modules\Tweaks\Bags.lua
+Modules\Tweaks\GamepadBags.lua
 Modules\Tweaks\QuestAnnounce.lua
 Modules\Tweaks\ComboPoints.lua
 Modules\Tweaks\Aggro.lua

@@ -8,7 +8,7 @@ are open, "1:05", a unit's nameplate and its health bar) and the list of indepen
 the tweak's file (`ns.ApplyMovableBags`, ...). `Reconcile()` compares what's wanted (module enabled
 and the tweak's setting on) with what's active, and runs on the next frame via `C_Timer.After(0)`.
 All tweaks default to on, except `retailFrames`. The other files, in load order: `Bags.lua`
-(`movableBags`, `gamepadBagSort`), `QuestAnnounce.lua`, `ComboPoints.lua`, `Aggro.lua`,
+(`movableBags`, `gamepadBagSort`), `GamepadBags.lua` (`gamepadBags`), `QuestAnnounce.lua`, `ComboPoints.lua`, `Aggro.lua`,
 `RetailFrames.lua`, `ForeverQuests.lua`, `AFK.lua`, `FlightTime.lua` and `Flight.lua`, `LevelUp.lua` and
 `LevelUpWindow.lua`, `QuestMap.lua` (+ `QuestMap.xml`).
 
@@ -60,7 +60,8 @@ valid button, so at the top of a bag this one got in the way of moving through t
 Since 1.60.1.70291 the bags' clean-up button (`BagItemAutoSortButton`) no longer shows, with mouse
 and keyboard or in gamepad mode (seen in game; before, `ContainerFrameMixin:UpdateSearchBox`
 hid it in gamepad mode only, where the gamepad bag bar, `GamepadBagBar`, offered clean-up in each
-bag's menu; 70291 also stopped showing that bar on the bags). So nobody had a way to clean up. A
+bag's menu; 70291 seemed to stop showing that bar on the bags, but later builds show its buttons in the
+controller's item grid again, see gamepadBags). So nobody had a way to clean up. A
 `hooksecurefunc` on each bag frame's `UpdateSearchBox` and a `HookScript("OnShow")` (in case that
 function isn't called any more; `ContainerFrames()`: the combined bags and every
 `ContainerFrameN`) show the button on the backpack or the combined bags, at the left end of the search row: where
@@ -75,6 +76,94 @@ Forever's frame art. If the search box isn't anchored that way: left of it; with
 `C_Container.SortBags`). Off: the search box's width and place back (also with the bags closed),
 `UpdateSearchBox` again (as Blizzard has it), ours hidden and taken off the bag. The key
 still says gamepad (it began there).
+
+## gamepadBags: the bags with a controller (GamepadBags.lua)
+
+With the controller UI (`InputUtil.IsGamepadUIEnabled`) Blizzard's combined bag puts each bag's button
+(`GamepadBagBar:GetBagButton(bagID)`, Camelot's `MainMenuBarBagButtons.xml`) into the item grid:
+`ContainerFrameMixin:UpdateItemLayout` adds them to the items, `UpdateItemSort` sorts by bag (the bag's
+button before its slots) and `AnchorUtil.GridLayout` lays them out from the bottom right, so the bag reads
+"bag, its slots, next bag, its slots". This tweak (on by default) places the same buttons anew; with mouse
+and keyboard nothing changes.
+
+**The layout.** The bag buttons in a row at the top (backpack first, the key ring last, as Blizzard orders
+them; they still open their bag menu, collapse their bag, and the shoulder buttons still jump between
+them: Blizzard's `Gamepad_SetCursorToBag`). Below it the items in sections, each with a small gold header
+and a line: Gear (weapons and armour that are worn: `GetItemInfoInstant`'s class 2 or 4 with an
+`equipLoc`, not bags, quivers or ammo), Consumables (class 0 and projectiles), Trade goods (trade goods,
+reagents, gems, enhancements), Quest items (`C_Container.GetContainerItemQuestInfo`, or the quest class),
+Other, Junk (grey quality, gear too), then the free slots (by bag and slot; slots of an unsecured account
+last). In a section: best quality first, then item level (gear, `C_Item.GetDetailedItemLevelInfo`), the
+name (from the link), the bigger stack, the bag's order. A bag collapsed in its menu (`isCollapsed`) keeps
+its slots out, as Blizzard does. Everything is anchored like Blizzard's grid (`BOTTOMRIGHT` at
+`GetInitialItemAnchor()`, the money frame, 37 px buttons 5 apart, `GetColumns()` 10), worked out from the
+top. The bag's height is Blizzard's (`CalculateHeight()`) with its grid's rows (`GetRows()`, which in
+gamepad mode keeps room for `NUM_CONTAINER_FRAMES` more buttons) taken out and ours put in;
+`UpdateContainerFrameAnchors` runs right after Blizzard's layout, so it places and scales the bag with it.
+The headers are font strings on a frame of ours made without a parent and then put on the bag:
+SmartNavigation hooks `CreateFrame` and refreshes the panel a frame is made on (from addon code that's
+refused in combat). They aren't buttons, so the cursor never stops on them.
+
+**When it runs.** Post-hooks only (`hooksecurefunc` on the bag frame's methods; Blizzard calls them as
+`self:...`): `UpdateItemLayout` (opening the bag, a bag collapsed, a bag changed, gamepad mode switched:
+ours right after Blizzard's, in the same frame, so there's no flicker), `UpdateFrameSize` (Blizzard sizing
+the bag without laying it out, a currency watched: our height kept) and `UpdateItems` (Blizzard redrew the
+items after `BAG_UPDATE`: sorted again on the next frame, moved only if the order or the sections changed).
+Selling or using up the selected item: the cursor goes to the button now in its place
+(`SetTargetButtonForFrame`), so selling junk goes on to the next junk instead of jumping to the free slots.
+
+**Navigation.** `ContainerFrameCombinedBagsMixin:SmartNavPanelInfoAdded` turns on SmartNavigation's grid
+mode, which sorts the buttons into columns by their x and moves by index within a column
+(`GetButtonInDirectionGrid`, with `SetGridHeightCompensation` assuming columns differ only at the top): with
+sections whose last rows are part-filled, left and right would land a row off. So while ours is shown the
+bag's panel goes by direction (`SetUseGridNavigation(bag, false)`: `GetButtonInfoInDirection`, the nearest
+button within 45 degrees, positions read live), with Blizzard's wrapping kept: down and up go row by row
+through the sections, across the headers' gaps, up from the first row into the bag buttons, up from the
+backpack's button to the bag menu (Blizzard's jump), and wrapping at the edges as before. A shorter row's
+last button is outside those 45 degrees from two columns or more away (down would skip a section of one or
+two items), so where the row below or above is shorter a jump goes to its last button
+(`SmartNavigation_AddJumpNavigationOverride`, values SmartNavigation keeps securely; on items up and down,
+on the bag buttons only down). Blizzard's jump from the top left item up to the bag menu
+(`ApplySmartNavOverrideForLeftmostButton`) is cleared on our items
+(`SmartNavigation_ClearJumpNavigationOverridesInDirection`), since the bag buttons are above it now. Our
+jumps are set with each layout of ours and cleared when the bag closes, when ours goes, or after the fight
+they couldn't be cleared in; a bag closed and opened again in the same fight can still have them on
+Blizzard's layout until the fight ends (a few D-pad moves at its short rows go somewhere odd; no error).
+The panel is made anew each time the bag opens (and dropped when it closes), so grid mode is turned off
+from a post-hook on the bag's `smartNavPanelInfoAddedCallback` (the field Blizzard's
+`SetSmartNavPanelInfoAddedCallback` sets; hooked again if Blizzard sets it again) and on
+`ApplySmartNavOverrideForLeftmostButton` (the frame after opening). After our own moves (not Blizzard's
+layout calls) `RefreshButtonGroups(bag)`. Other panels: as before (the bag wraps; switching panels is
+Blizzard's input).
+
+These SmartNavigation calls are the ones it lets addon code make (`SecureHelper:WrapFunction` and its
+registered keys): run securely through an attribute handler, but only while
+`C_RestrictedActions.IsAddOnRestrictionActive(Combat)` is off; in combat they're refused with Blizzard's
+"Interface action blocked". Bag item buttons and the combined bag aren't protected (no secure templates in
+`ContainerFrame.xml`), so moving them in combat would work, but SmartNavigation couldn't be told. So
+**nothing is placed in a fight**: an item that changes keeps the last layout until the fight ends; a
+layout Blizzard makes in the fight (the bag opened, a bag collapsed) stands, with Blizzard's height and
+without our headers, and SmartNavigation knows it; at `PLAYER_REGEN_ENABLED` (on the next frame) ours
+comes back. The UpdateFrameSize hook keeps our height in a fight only while ours is shown (and the bag
+isn't protected).
+
+**Shoulder buttons to jump between sections: not done.** The bag's shoulder buttons are Blizzard's
+binding group (`navigateCombinedBagsFrame`: `GAMEPAD_SHOULDER_LEFT/RIGHT` to `Gamepad_SetCursorToBag`),
+and `GamepadMode.CreateBindingGroup`/`ActivateBindingGroup` have no guard for addon code: a group of ours
+would write the binding manager's stack and its `nextBindingGroupId` upvalue tainted, which every later
+controller input reads (item use through SmartNavigation's click included). Replacing Blizzard's binding
+isn't a post-hook. So the shoulder buttons keep jumping between the bag buttons.
+
+**The tooltip.** A post-hook on `GameTooltip:SetBagItem` (Blizzard calls it on selecting an item, as its
+`OnEnter`, and on each tooltip refresh, `UpdateTooltip`): for our items it moves the tooltip beside the bag
+(left of it, at its top; right of it when the bag is on the left half of the screen), where it doesn't
+cover the grid. The comparison with what's worn comes from Blizzard as with the mouse (with *Compare items*
+on in the backpack's menu, `alwaysCompareItems`, or the modifier) and follows the tooltip. Nothing runs per
+frame: the tooltip only moves when Blizzard sets it up.
+
+**Off** (`/lefthy tweaks padbags off`): the headers go at once; Blizzard's layout comes with its next one
+(the bag opened again), and its new panel is in grid mode again. Our layout code never calls Blizzard's
+`UpdateItemLayout` itself.
 
 ## questAnnounce: quest progress in party chat (QuestAnnounce.lua)
 

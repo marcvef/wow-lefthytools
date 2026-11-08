@@ -33,6 +33,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Mirage/Options.lua settings page, /mirage, keybinding labels
   Modules/Tweaks/Tweaks.lua  Misc Tweaks: settings, the tweak list and switching, /lefthy tweaks, status text, hiding the interface
   Modules/Tweaks/Bags.lua    movable bags, the bags' clean-up button
+  Modules/Tweaks/GamepadBags.lua  the bags with a controller: the bag buttons in a row, the items in sorted sections, the tooltip beside them
   Modules/Tweaks/QuestAnnounce.lua  quest progress in party chat
   Modules/Tweaks/ComboPoints.lua  combo points: coloured by count, dots on the target's nameplate
   Modules/Tweaks/Aggro.lua   who has aggro, on enemy nameplates (role colours, role check); also the fight stream's tags

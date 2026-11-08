@@ -15,6 +15,7 @@ local M = LT:NewModule("tweaks", {
 		statusText = true,
 		movableBags = true,
 		gamepadBagSort = true,
+		gamepadBags = true,    -- GamepadBags.lua: with a controller, the bags in sections
 		gamepadSymbols = "default", -- "default" | "xbox" | "playstation": the controller's button symbols
 		padSymbolConfigs = {}, -- "vendor:product" -> true: controllers whose symbols this set (to undo it)
 		bagPositions = {},     -- key ("combined" / "bag<id>") -> { left, top } in UIParent units
@@ -195,6 +196,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyMovableBags(on) end }, -- Bags.lua
 	{ key = "gamepadBagSort", command = "bagsort", label = "Clean-up button on the bags",
 		apply = function(on) ns.ApplyGamepadBagSort(on) end }, -- Bags.lua
+	{ key = "gamepadBags", command = "padbags", label = "Sorted bags with a controller",
+		apply = function(on) ns.ApplyGamepadBags(on) end }, -- GamepadBags.lua
 	{ key = "questAnnounce", command = "quests", label = "Announce quest progress in party chat",
 		apply = function(on) ns.ApplyQuestAnnounce(on) end }, -- QuestAnnounce.lua
 	{ key = "comboNameplate", command = "combo", label = "Combo points on your target's nameplate",
@@ -391,6 +394,8 @@ function M:BuildOptions(o)
 		L["Drag a bag by its title bar or any empty spot to move it. It reopens where you left it. /lefthy tweaks resetbags puts all bags back."])
 	o:Checkbox("gamepadBagSort", L["Clean-up button on the bags"],
 		L["Since Forever's latest patch the bags' clean-up button is gone with mouse and keyboard. This puts it back, at the left of the bags' search box. With a controller it's in the bag menu instead."])
+	o:Checkbox("gamepadBags", L["Sorted bags with a controller"],
+		L["In gamepad mode the bags show each bag's button in a row at the top, then your items in sections: gear, consumables, trade goods, quest items, other, junk and the free slots, each sorted by quality and name. The selected item's tooltip shows beside the bags. With mouse and keyboard nothing changes. Off: Blizzard's layout, from the next time the bags open."])
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
@@ -478,7 +483,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | bagsort | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | bagsort | padbags | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
 		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 		self:Print("/lefthy tweaks combopos - preview the combo point dots on nameplates (no mob needed)")
