@@ -198,6 +198,8 @@ do
 	Wait(1)
 	check(M.db.gamepadBagButtons == true and #State().strip == 5 and GamepadBagBar.BagButtonArray[2]:IsShown()
 		and bag:GetHeight() == foldedHigh + 37 + 7 - 4, "clicking the header: the row open (its setting follows), the bag a row higher")
+	check(toggle.isBag and not toggle.isBackpack and toggle.buttonContext == "ButtonContext_OpenBagDropdownSettings" and not toggle.HasBag,
+		"the bag's A (Select) takes the header like a bag button; its menu (Y) doesn't")
 	toggle.OnSmartNavClick(toggle) -- (the controller's A: SmartNavigation calls this)
 	Wait(1)
 	check(M.db.gamepadBagButtons == false and #State().strip == 0 and bag:GetHeight() == foldedHigh, "A on it with the controller: folded")

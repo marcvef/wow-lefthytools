@@ -270,6 +270,13 @@ local function Toggle(frame)
 		-- The controller's A: SmartNavigation calls this (else it only fakes MouseDown / MouseUp,
 		-- which doesn't click an addon's button).
 		bagsToggle.OnSmartNavClick = Flip
+		-- ... but the bag's A ("Select", its footer) only works on what its condition takes: an item, or
+		-- a bag button (its context, isBag; ContainerFrame.lua's Gamepad_IsClickContextActionValid). So
+		-- the header passes for a bag button. Blizzard's footer reads these while the cursor is on the
+		-- header only (taint stays there: the next button's refresh reads Blizzard's own values again),
+		-- and the bag's other buttons (Y, the menu) want HasBag, which the header hasn't.
+		bagsToggle.buttonContext = "ButtonContext_OpenBagDropdownSettings"
+		bagsToggle.isBag = true
 	end
 	bagsToggle:SetParent(frame)
 	bagsToggle:SetFrameLevel(frame:GetFrameLevel() + 4)
