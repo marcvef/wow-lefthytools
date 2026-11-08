@@ -50,6 +50,7 @@ local M = LT:NewModule("chronicle", {
 		shareAlts = true,     -- Sync.lua: friends see all my characters, not only the one I play
 		relay = true,         -- Sync.lua: pass on friends' journals to other friends
 		shareRecipes = true,  -- Recipes.lua: friends see my professions and recipes (also needs share)
+		craftTooltip = true,  -- CraftedBy.lua: who can craft an item, in its tooltip
 		catchUp = true,       -- Recap.lua: "while you were away" after logging in
 		weeklyRecap = true,   -- Recap.lua: last week's leaderboard in chat, once a week
 		friendsChat = true,
@@ -1006,6 +1007,8 @@ function M:BuildOptions(o)
 	o:Header(L["Journal"])
 	o:Button(L["Open the journal"], L["Open"], function() M:Toggle() end,
 		L["Your timeline, your statistics and your friends' news. Also /chronicle or a key binding."])
+	o:Checkbox("craftTooltip", L["Who can craft it, in item tooltips"],
+		L["An item's tooltip says which of your characters and friends know a recipe for it, best skill first, from the journal's Professions tab. Hold Shift for its reagents."])
 	o:Checkbox("minimapButton", L["Minimap button"],
 		L["A button on the edge of the minimap: click opens the journal, right-click these settings. Drag it to move it."])
 end

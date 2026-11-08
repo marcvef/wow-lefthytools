@@ -340,6 +340,10 @@ version they have), or once they play it with an up-to-date LefthyTools.
   everyone** finds who can craft something in any profession, and a character or BattleTag name finds that
   person and lights up their professions. Lists update by themselves. Friends
   appear once they've updated and logged in.
+- **Who can craft it:** an item's tooltip (bags, vendors, the auction house, quest rewards, chat
+  links) says who of your characters and friends knows a recipe for it, with their profession and
+  skill, best first: "Craftable by: Anna (Tailoring 152), ... +2 more". Hold Shift for the recipe's
+  reagents.
 - **While you were away:** a minute after you log in, a chat line per friend with what they did
   since you last played. Once a week, **last week's leaderboard** in chat.
 - `/chronicle session` prints this session in one line; the AFK screen shows it too.
@@ -356,6 +360,7 @@ once a second, so it costs nothing you'd notice.
 | Show friends' highlights in chat | on |
 | While you were away | on |
 | Weekly recap | on |
+| Who can craft it, in item tooltips | on |
 
 ---
 

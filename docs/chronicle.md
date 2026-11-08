@@ -341,6 +341,25 @@ fill what's in sight, once per bunch; an `OnUpdate` exists only while a search o
 
 Nothing is protected, so it all works in a fight; no Blizzard menu is opened (gamepad mode).
 
+## Who can craft it, in item tooltips (CraftedBy.lua)
+
+Setting `craftTooltip` (on): a `TooltipDataProcessor` post-call on items (through `LT.Guard`) adds
+"Craftable by: <name> (<profession> <skill>), ..." to `GameTooltip` and `ItemRefTooltip` (bags, vendors,
+the auction house, quest rewards, chat links); not to the comparison tooltips nor the Professions tab's
+own, which says who knows it already. Everyone who knows a recipe making the item (`R.Makers`, then
+`R.People(line)`'s `known`), mine and friends' alike, best skill first (the tab's order on a tie), each
+character once (two recipes or professions: its best), the tab's names (class colour, `C.Mark`), at most 3,
+then "+N more". With Shift held a second line: the best one's recipe's reagents, "Reagents: <name> x<n>,
+..." (`R.MakerRecipe`; a name the client hasn't loaded is "..." and asked for once; bags refresh their
+tooltip, so it fills in; elsewhere at the next hover).
+
+**Cost.** A hover is a lookup: an item's line is made the first time it's hovered and kept until
+`R.Revision` moves (`false`: nobody, kept too). `R.Makers` (what makes an item) isn't parsed from the
+lines: Recipes.lua scans the data's text for `;spell:item:` (reagents hold no `;`), remembering where each
+recipe begins, on Chronicle's tick after the first tooltip asked (a line at least, more within the tick's
+budget, never in a fight); about 2300 recipes, once per data. Until then the line is left out. A
+surname learned without a list changing shows at the next change (the line is kept as made).
+
 ## Days for friends' graphs (Live.lua)
 
 Battle.net messages only arrive while both are online, so each friend's own Chronicle sends its
@@ -501,7 +520,7 @@ category, if characters of at least two accounts played. Both in English like al
 
 `Recipes.lua`, `C.Recipes` (`R`): which professions and recipes my characters and my friends' have, for the
 Professions tab, whose only source it is (`R.Parse`, `R.RecipeOf`, `R.Professions`, `R.People`, `R.Search`,
-`R.Crafters`, `R.Revision`). A friend's profession link doesn't open across realms (a game limit), which is why
+`R.Crafters`, `R.Revision`) and item tooltips' (`R.Makers`, `R.MakerRecipe`). A friend's profession link doesn't open across realms (a game limit), which is why
 friends tell each other.
 
 **Saved** on the character's record, mine (`store.chars`) and friends' (`store.book[acct].chars`) alike:

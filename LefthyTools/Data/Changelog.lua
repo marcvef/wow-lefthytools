@@ -467,5 +467,8 @@ ns.CHANGELOG = {
 	{ id = 153, module = "tweaks",
 		en = { "Combo dots: no blocked action", "A new target in a fight: the combo point dots come onto its nameplate once the game allows it, instead of an error about a blocked action." },
 		de = { "Combopunkte: keine blockierte Aktion", "Neues Ziel im Kampf: Die Combopunkte kommen an seine Namensplakette, sobald das Spiel es erlaubt, statt eines Fehlers über eine blockierte Aktion." } },
+	{ id = 154, module = "chronicle",
+		en = { "Who can craft it, in tooltips", "An item's tooltip names who of you and your friends can craft it, best skill first. Hold Shift for the reagents. A setting in Chronicle switches it off." },
+		de = { "Wer es herstellen kann, im Tooltip", "Der Tooltip eines Items nennt, wer von dir und deinen Freunden es herstellen kann, der höchste Skill zuerst. Halte Shift für die Reagenzien. Eine Einstellung in Chronicle schaltet es ab." } },
 	-- New entries go here, at the end.
 }

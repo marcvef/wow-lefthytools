@@ -1229,3 +1229,134 @@ do
 	Stop(a2)
 	Stop(b)
 end
+
+---------------------------------------------------------------------------
+section("Recipes: who can craft it, in item tooltips")
+---------------------------------------------------------------------------
+do
+	world.time = 0
+	local me = Start(ANNA, { friends = { BOB, CEDRIC }, fake = true, professions = { { name = "Leatherworking", level = 150, max = 225, line = 2945 } },
+		known = { LEATHER[1], LEATHER[2], LEATHER[4] } })
+	local env, R = me.env, me.R
+	Meet(me, BOB, NEW)
+	Meet(me, CEDRIC, NEW)
+	Pass(me, 16) -- (my scan)
+	local t = env.time()
+	local function Trade(f, key, u, level, trade)
+		Say(me, f, ("B2;ct;%s;%s;%d;%s;%d;%s"):format(f.acct, key, u, f.class, level, trade))
+	end
+	local function List(f, key, line, u, spells)
+		local parts = R.Encode(spells)
+		for k, text in ipairs(parts) do
+			Say(me, f, ("B2;cr;%s;%s;%d;%d;%d;%d;%s"):format(f.acct, key, line, u, k, #parts, text))
+		end
+	end
+	Trade(BOB, "Bob-Realmy", t + 1, 40, "165:300:300")
+	Trade(BOB, "Bobby-Realmy", t + 2, 30, "165:200:300")
+	Trade(BOB, "Bo-Realmy", t + 3, 20, "165:120:300")
+	Trade(CEDRIC, "Cedric-Realmy", t + 4, 60, "165:180:300")
+	List(BOB, "Bob-Realmy", 165, t + 5, { LEATHER[1], LEATHER[2], LEATHER[3] })
+	List(BOB, "Bobby-Realmy", 165, t + 6, { LEATHER[1] })
+	List(BOB, "Bo-Realmy", 165, t + 7, { LEATHER[1] })
+	List(CEDRIC, "Cedric-Realmy", 165, t + 8, { LEATHER[1], LEATHER[2] })
+	Pass(me, 30) -- (and Battle.net shows Bob and Cedric online: their full names)
+
+	local function plain(text)
+		return ((text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+	end
+	local function Hover(item, tooltip)
+		env.GameTooltip:SetOwner(env.UIParent)
+		env.GameTooltip:SetHyperlink("item:" .. item)
+		local found = {}
+		for _, line in ipairs(env.TOOLTIP.lines) do
+			local text = plain(line)
+			if text:find("^Craftable by: ") then
+				found.by = text
+			elseif text:find("^Reagents: ") then
+				found.reagents = text
+			end
+		end
+		return found
+	end
+
+	-- The first hover asks for what makes items; Chronicle's next tick reads it from the data.
+	check(Hover(5001).by == nil, "the very first hover: nothing yet")
+	Pass(me, 1)
+	check(Hover(5001).by == "Craftable by: Bob Stone (Leatherworking 300), Bobby ? (Leatherworking 200), Cedric Vale (Leatherworking 180) +2 more",
+		"best skill first, the tab's names, at most three, got " .. tostring(Hover(5001).by))
+	check(Hover(5002).by == "Craftable by: Bob Stone (Leatherworking 300), Cedric Vale (Leatherworking 180), Anna Brook (Leatherworking 150)",
+		"three: no more, mine too, got " .. tostring(Hover(5002).by))
+	check(Hover(5004).by == "Craftable by: Anna Brook (Leatherworking 150)", "only my own character")
+	check(Hover(5005).by == nil and Hover(118).by == nil and Hover(6948).by == nil, "nobody knows it, or nothing makes it: no line")
+	check(Hover(5001).reagents == nil, "no Shift: no reagents")
+
+	-- Shift: the recipe's reagents, by name once the game has them.
+	local asked = {}
+	local request = env.C_Item.RequestLoadItemDataByID
+	env.C_Item.RequestLoadItemDataByID = function(id)
+		asked[#asked + 1] = id
+	end
+	env.STATE.shift = true
+	check(Hover(5001).reagents == "Reagents: ... x2, ... x1", "names not loaded yet, got " .. tostring(Hover(5001).reagents))
+	check(#asked == 2, "and asked for, once each, got " .. #asked)
+	env.ITEMS[2318], env.ITEMS[2320] = { name = "Light Leather", quality = 1 }, { name = "Coarse Thread", quality = 1 }
+	check(Hover(5001).reagents == "Reagents: Light Leather x2, Coarse Thread x1", "then by name, got " .. tostring(Hover(5001).reagents))
+	check(Hover(5003).reagents == "Reagents: Light Leather x4, Coarse Thread x1", "each recipe its own")
+	local recipe = R.MakerRecipe(R.Makers(5007)[1])
+	local parsed = R.RecipeOf(LEATHER[7])
+	check(recipe.spell == parsed.spell and recipe.item == 5007 and recipe.low == parsed.low and recipe.cat == parsed.cat
+		and recipe.reagents[1].item == 2318 and recipe.reagents[1].n == parsed.reagents[1].n, "a maker's recipe is the data's")
+	env.STATE.shift = false
+	env.C_Item.RequestLoadItemDataByID = request
+
+	-- A hover is a lookup: nothing is built again until a list or a skill changes.
+	local people = R.People
+	local calls = 0
+	R.People = function(line)
+		calls = calls + 1
+		return people(line)
+	end
+	for _ = 1, 20 do
+		Hover(5001)
+		Hover(5005)
+	end
+	check(calls == 0, "the same hovers again: kept, got " .. calls .. " lookups of people")
+	Trade(CEDRIC, "Cedric-Realmy", t + 20, 60, "165:310:310")
+	Pass(me, 2)
+	check(Hover(5001).by:find("^Craftable by: Cedric Vale %(Leatherworking 310%), Bob Stone") ~= nil, "a skill went up: the line follows")
+	check(calls > 0, "built anew once")
+	R.People = people
+
+	-- Two recipes make an item (another profession): each character once, by its best.
+	local data = {}
+	for k, v in pairs(DATA) do
+		data[k] = v
+	end
+	data.recipes = { [171] = DATA.recipes[171], [165] = DATA.recipes[165], [185] = DATA.recipes[185] .. ";3372:5001:1:::1:15:30::6889*2" }
+	me.ns.RecipeData = data
+	Trade(BOB, "Bo-Realmy", t + 21, 20, "165:120:300,185:250:300")
+	List(BOB, "Bo-Realmy", 185, t + 22, { 3372 })
+	Trade(CEDRIC, "Cedric-Realmy", t + 23, 60, "165:310:310,185:50:75")
+	List(CEDRIC, "Cedric-Realmy", 185, t + 24, { 3372 })
+	Pass(me, 2)
+	Hover(5001)
+	Pass(me, 1)
+	check(Hover(5001).by == "Craftable by: Cedric Vale (Leatherworking 310), Bob Stone (Leatherworking 300), Bo ? (Cooking 250) +2 more",
+		"new data: read anew; Bo by her better profession, Cedric once, got " .. tostring(Hover(5001).by))
+	me.ns.RecipeData = DATA
+	Hover(5002)
+	Pass(me, 1)
+
+	-- The setting; tooltips that aren't the game's own.
+	Set(me, "craftTooltip", false)
+	check(Hover(5002).by == nil, "switched off: no line")
+	Set(me, "craftTooltip", true)
+	check(Hover(5002).by ~= nil, "on again")
+	local added = 0
+	local other = { AddLine = function() added = added + 1 end }
+	for _, call in ipairs(env.TOOLTIP_POSTCALLS) do
+		call[2](other, { type = 0, id = 5002 })
+	end
+	check(added == 0, "a tooltip of someone else's (a comparison, the Professions tab's own): nothing added")
+	Stop(me)
+end

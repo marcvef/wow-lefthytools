@@ -54,7 +54,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `gamepad_symbols.lua` | Misc Tweaks' controller symbols: what's set per controller, nothing but the symbols, the default undoing it, not in a fight, a controller connected later, the command | - |
 | `ltc_tabs.lua` | LTC's chat tabs: the main window by default, chosen tabs, nothing lost, a closed tab, flashing, the checkbox on Blizzard's page, the command, the colour | `beacon.lua` |
 | `recipes_data.lua` | `Data/Recipes.lua`'s shape: the lines, every recipe's fields and reagents, known recipes, names in both languages | - |
-| `recipes.lua` | Chronicle's recipes: the data, the lists' encoding, the scan in steps and when it runs, what goes out and when (a skill change sends no list), older builds get none, broken messages, the caps, the setting, pruning and a character with only recipes, `R.People`, `R.Search`, `R.Crafters`; several clients: a friend gets my list, a third friend gets it relayed while I'm offline, only friends of that account | - (its clients are its own) |
+| `recipes.lua` | Chronicle's recipes: the data, the lists' encoding, the scan in steps and when it runs, what goes out and when (a skill change sends no list), older builds get none, broken messages, the caps, the setting, pruning and a character with only recipes, `R.People`, `R.Search`, `R.Crafters`; "Craftable by" in item tooltips (`R.Makers` built on the tick, order, names, "+N more", reagents with Shift, kept per revision, new data, the setting, other tooltips); several clients: a friend gets my list, a third friend gets it relayed while I'm offline, only friends of that account | - (its clients are its own) |
 | `professions.lua` | Chronicle's Professions tab, with a fake `C.Recipes` (the last section: the real one's data, when it's loaded): the row of tabs, defaults, people, groups and sorting, difficulty, details and the real tooltip, search, gathering, empty states, pools, what's redrawn, names coming in, in a fight, the fallback (last in the suite's order) | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
@@ -426,3 +426,8 @@ installer from GitHub instead.
     - Herbalism: people and skill, "No recipes: gathering".
     - In a fight: all of it still works, no errors. Scrolling a long list (Tailoring, Everyone) is smooth,
       and standing with the tab open costs nothing noticeable (`/lefthy` has no meter: watch the frame rate).
+    - Who can craft it: hover something a friend or one of your characters crafts (in the bags, at a vendor
+      or the auction house, a quest reward, a chat link): "Craftable by:" with names in class colours,
+      profession and skill, best first, at most three and "+N more". Hold Shift over a bag item: the
+      reagents line comes within a moment (elsewhere: hover again with Shift held). An item nobody makes:
+      no line. Chronicle's setting off: gone. Right after logging in the first hover may have nothing yet.

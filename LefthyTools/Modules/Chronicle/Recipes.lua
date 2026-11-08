@@ -102,12 +102,14 @@ C.RecipesPruned = Changed -- (Sync.lua: characters left the book)
 local data                                -- ns.RecipeData, once seen
 local crafting, lines = {}, {}            -- line -> true: has recipes; every line it knows
 local parsed, bySpell, lineOf = {}, {}, {} -- line -> its recipes; spell -> recipe, line (of the lines parsed)
+local makers, makersNext, makersWanted    -- R.Makers: item -> what makes it; the next line to scan (nil: done); asked for
 
 local function Data()
 	local d = type(ns.RecipeData) == "table" and ns.RecipeData or nil
 	if d ~= data then
 		data = d
 		crafting, lines, parsed, bySpell, lineOf = {}, {}, {}, {}, {}
+		makers, makersNext = nil, nil -- (R.Makers: scanned anew)
 		for _, line in ipairs(d and d.order or {}) do
 			crafting[line], lines[line] = true, true
 		end
@@ -122,6 +124,21 @@ end
 -- spell:item:count:slot:ilvl:quality:low:high:cat:reagents, reagents being item*n+item*n.
 local RECIPE = "^(%d+):(%d*):(%d*):(%d*):(%d*):(%d*):(%d*):(%d*):(%d*):(.*)$"
 
+-- One recipe of the data's text (nil: not one).
+local function ReadRecipe(entry)
+	local spell, item, count, slot, ilvl, quality, low, high, cat, reagents = entry:match(RECIPE)
+	spell = tonumber(spell)
+	if not spell then
+		return nil
+	end
+	local recipe = { spell = spell, item = tonumber(item), count = tonumber(count), slot = tonumber(slot), ilvl = tonumber(ilvl),
+		quality = tonumber(quality), low = tonumber(low), high = tonumber(high), cat = tonumber(cat), reagents = {} }
+	for id, n in reagents:gmatch("(%d+)%*(%d+)") do
+		recipe.reagents[#recipe.reagents + 1] = { item = tonumber(id), n = tonumber(n) }
+	end
+	return recipe
+end
+
 function R.Parse(line)
 	local d = Data()
 	local list = parsed[line]
@@ -132,17 +149,11 @@ function R.Parse(line)
 	parsed[line] = list
 	local text = d and d.recipes and d.recipes[line]
 	for entry in (type(text) == "string" and text or ""):gmatch("[^;]+") do
-		local spell, item, count, slot, ilvl, quality, low, high, cat, reagents = entry:match(RECIPE)
-		spell = tonumber(spell)
-		if spell then
-			local recipe = { spell = spell, item = tonumber(item), count = tonumber(count), slot = tonumber(slot), ilvl = tonumber(ilvl),
-				quality = tonumber(quality), low = tonumber(low), high = tonumber(high), cat = tonumber(cat), reagents = {} }
-			for id, n in reagents:gmatch("(%d+)%*(%d+)") do
-				recipe.reagents[#recipe.reagents + 1] = { item = tonumber(id), n = tonumber(n) }
-			end
+		local recipe = ReadRecipe(entry)
+		if recipe then
 			list[#list + 1] = recipe
-			if not bySpell[spell] then
-				bySpell[spell], lineOf[spell] = recipe, line
+			if not bySpell[recipe.spell] then
+				bySpell[recipe.spell], lineOf[recipe.spell] = recipe, line
 			end
 		end
 	end
@@ -163,6 +174,64 @@ function R.RecipeOf(spell)
 		end
 	end
 	return bySpell[spell], lineOf[spell]
+end
+
+-- What makes an item, for item tooltips: R.Makers(item) = { { spell, line, at }, ... } in the data's
+-- order (at: where the recipe begins in its line's text), false when nothing does, nil until it's built.
+-- A tooltip can't wait for R.Parse (every line takes several ms), so this only scans the text for
+-- ";spell:item:" (reagents hold no ";"), on Chronicle's tick after a tooltip first asked: a line at
+-- least, more within the tick's budget, never in a fight. Once per data: the data doesn't change.
+local function ScanMakers(line, text)
+	for at, spell, item in (";" .. text):gmatch(";()(%d+):(%d+):") do
+		item = tonumber(item)
+		local list = makers[item]
+		if not list then
+			list = {}
+			makers[item] = list
+		end
+		list[#list + 1] = { spell = tonumber(spell), line = line, at = at - 1 } -- (at in the text without the ";")
+	end
+end
+
+local function MakersTick()
+	local d = Data()
+	if not (makersWanted and d) or (makers and not makersNext) then
+		return
+	end
+	if not makers then
+		makers, makersNext = {}, 1
+	end
+	local order = d.order or {}
+	repeat
+		local line = order[makersNext]
+		local text = line and d.recipes and d.recipes[line]
+		if type(text) == "string" then
+			ScanMakers(line, text)
+		end
+		makersNext = makersNext + 1
+		if not order[makersNext] then
+			makersNext = nil -- (all done)
+			return
+		end
+	until not InBudget()
+end
+
+function R.Makers(item)
+	Data()
+	if not makers or makersNext then
+		makersWanted = true
+		return nil
+	end
+	return makers[item] or false
+end
+
+-- A maker's recipe as R.Parse has it, read from its own place in the text: its line isn't parsed for it.
+function R.MakerRecipe(maker)
+	if maker.recipe == nil then
+		local text = data and data.recipes and data.recipes[maker.line]
+		maker.recipe = bySpell[maker.spell] or (type(text) == "string" and ReadRecipe(text:match("^[^;]+", maker.at) or "")) or false
+	end
+	return maker.recipe or nil
 end
 
 ---------------------------------------------------------------------------
@@ -957,6 +1026,7 @@ function C.RecipesTick(now)
 	tickStart = Clock()
 	ScanTick(now)
 	Incoming(now)
+	MakersTick()
 	local B = Beacon()
 	if not B then
 		if next(offers) or next(pending) or next(wanted) or serves[1] or answer then
