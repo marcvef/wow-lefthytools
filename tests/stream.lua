@@ -732,7 +732,7 @@ do
 	check(has("UnitName: value 180 | value 180") and has("e.g. Defias Thug; Defias Pillager") and has("UnitHealth: hidden 180 | hidden 180")
 		and has("UnitGUID: value 180 | value 180\n") and has("UnitPosition(player): value 60 | value 60\n"),
 		"what answers and what's hidden, in and out of combat, with examples (none of GUIDs and my position)")
-	check(has("spell Throw (30 yd): true 120, false 60 | true 120, false 60") and has("item 835 (30 yd): error 180 | true 120, false 60")
+	check(has("spell Throw (30 yd): error 180 | true 120, false 60") and has("item 835 (30 yd): error 180 | true 120, false 60")
 		and has("CheckInteractDistance 3 (10 yd): error 180 |") and has("e.g. combat"), -- (not asked about an enemy in a fight: blocked)
 		"each range check, in and out of combat, with what the errors say")
 	check(has("nameplate position: GetCenter: nil 60, onscreen 60, error 60 |") and has("e.g. 0.50,0.45; can't measure this region"),
@@ -742,7 +742,7 @@ do
 	check(has("your casts: UNIT_SPELLCAST_SUCCEEDED (true: harmful, at a hostile target): false 1 |")
 		and has("the game's error messages: UI_ERROR_MESSAGE (true: not in front): true 1 | -   e.g. Target needs to be in front of you."),
 		"my casts and the game's error messages, with their words, got\n" .. report)
-	check(has("Distance: 2 of 10 range checks answered in combat, 5 only out of combat."), "a short summary, got\n" .. report)
+	check(has("Distance: 0 of 10 range checks answered in combat, 7 only out of combat."), "a short summary, got\n" .. report)
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
 	LefthyToolsStreamTestsFrame:Hide()
@@ -1791,20 +1791,21 @@ do
 	lefthy("stream me")
 	EnterCombat()
 	Advance(0.6)
-	check(reads == 1 and about(yards(), 17.5),
-		"the sensor starts: the range checks are read (in a fight Sinister Strike 5 yd and Throw 30: the miner at 8 yd is about 17)")
+	check(reads == 1 and yards() == nil,
+		"the sensor starts: the range checks are read, but in a fight none is asked about an enemy (blocked): its distance unknown")
 	BOOK[#BOOK + 1] = { spellID = 2094, itemType = 1, isPassive = false }
 	SPELL_RANGES[2094], SPELL_NAMES[2094] = 10, "Blind"
 	for _ = 1, 3 do Fire("SPELLS_CHANGED") end
 	Fire("LEARNED_SPELL_IN_SKILL_LINE", 2094, 1, false)
 	Advance(1.6)
-	check(reads == 1 and about(yards(), 17.5), "the spellbook changes in a fight: not read until it's over")
+	check(reads == 1 and yards() == nil, "the spellbook changes in a fight: not read until it's over")
 	LeaveCombat()
 	Advance(0.6)
 	check(reads == 2, "the fight is over: read again, once for the four events")
+	check(about(yards(), 7.5), "... and out of the fight Blind (10 yd) tells distances: the miner is about 7 yd away, got " .. tostring(yards()))
 	EnterCombat()
 	Advance(0.6)
-	check(about(yards(), 7.5), "... and Blind (10 yd) tells distances now: the miner is about 7 yd away, got " .. tostring(yards()))
+	check(yards() == nil, "in a fight again: unknown")
 	LeaveCombat()
 	Fire("SPELLS_CHANGED")
 	Advance(0.4)

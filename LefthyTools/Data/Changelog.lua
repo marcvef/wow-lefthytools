@@ -494,5 +494,8 @@ ns.CHANGELOG = {
 	{ id = 162, module = "tweaks",
 		en = { "Sorted bags with mouse and keyboard", "The sorted bags (sections, one free slot with the count, the columns slider) now come with mouse and keyboard too, the reagent bag's items in them instead of a window of its own. Misc Tweaks switches them off for Blizzard's own bag." },
 		de = { "Sortierte Taschen mit Maus und Tastatur", "Die sortierten Taschen (Abschnitte, ein freier Platz mit der Anzahl, der Spalten-Regler) gibt es jetzt auch mit Maus und Tastatur, mit den Items der Reagenzientasche statt eines eigenen Fensters. Misc Tweaks schaltet sie für Blizzards eigene Tasche aus." } },
+	{ id = 163, module = "beacon",
+		en = { "Fight stream: really no blocked action", "Spell range checks on enemies are blocked in a fight too, so sharing your fights no longer asks any: an enemy's distance is unknown while you fight." },
+		de = { "Kampf-Stream: wirklich keine Blockade", "Auch Zauberreichweiten zu Gegnern werden im Kampf blockiert, deshalb fragt das Teilen deiner Kämpfe keine mehr ab: Die Entfernung eines Gegners ist im Kampf unbekannt." } },
 	-- New entries go here, at the end.
 }
