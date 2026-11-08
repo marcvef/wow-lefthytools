@@ -15,8 +15,8 @@ local M = Bt.module
 -- whether it's open are kept. (Its drops are cells: Cells.lua; its texts: Format.lua.)
 --
 -- The classic drop database (Classic.lua, setting dropData) beside your numbers: each drop's
--- tooltip has its chance there. With the setting windowUnseen (off: the user wanted the window
--- without it), what it says the mob drops that you haven't had yet is a section of its own under
+-- tooltip has its chance there. With the setting windowUnseen (off by default: the window stays
+-- lean without it), what it says the mob drops that you haven't had yet is a section of its own under
 -- your drops, smaller and faded (grey icons, how many of its drops you've found), each with the
 -- item's tooltip, the database's chance and how many you'd have expected by now; for a mob you
 -- haven't killed, what it can drop.

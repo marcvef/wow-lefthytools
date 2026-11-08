@@ -30,8 +30,8 @@ local M = Bt.module
 -- on any drop here pins it, as in the window.
 
 -- The picked mob's pane: its details (model, numbers, what a kill pays) and beside them the map of
--- where you killed it, both seen without scrolling (the user: "the map should be also on the right
--- of the mob details so that you dont have to scroll down"); its drops under them, the pane wide.
+-- where you killed it, both seen without scrolling; its drops
+-- under them, the pane wide.
 -- 986 x 580 fits a 1366 x 768 screen at the default UI scale (768 units tall) with room around it.
 local PAD = 12
 local LIST_W, ROW_H = 282, 36

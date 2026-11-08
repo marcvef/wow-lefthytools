@@ -866,7 +866,7 @@ window opened ("3 kills"). What happens to them floats up from their model in th
 big), a miss or dodge in the game's own word, XP in violet from the mob it came from (else from
 them), loot rising through them with its icon and name in its quality's colour (3.5 s; an item the
 client doesn't know yet is asked for and says "an item"). At most 10 at once. **Rare finds**
-(`RareChance`; the user picked "the database chance pops up with it"): a loot moment carries only
+(`RareChance`: the database's drop chance pops up with the item): a loot moment carries only
 the item and its quality, so the watcher's client works the chance out, nothing more goes over the
 network. Where it may have come from: the mobs killed lately (kill and XP moments with a mob, the
 last 45 s, at most 8; a creature ID from the picture's mob, else your own GUID, else a friend's
@@ -878,8 +878,8 @@ bigger and 5 s. Looked up when the moment comes; the classic database loads the 
 asked (as for the Bestiary's window). The Bestiary switched off: plain loot. The preview's Malachite
 carries a made-up 1.28% (the classic database's for a Defias Bandit). Under the radar: the spell being cast with its bar, the
 last spells fading over 12 s. Bottom: "2 on Anna · 5 near · X casts Y"; a friend's stream with no
-frame for 6 s says "Waiting for Anna's stream...". **After a fight** (`FightLook`; the user: "if it
-remains only in the stream", nothing in chat) a line takes the bottom line's place: a fight seen
+frame for 6 s says "Waiting for Anna's stream...". **After a fight** (`FightLook`; it stays in the
+stream, nothing in chat) a line takes the bottom line's place: a fight seen
 from its start (a picture out of combat, then one in combat; one going on when the window opened,
 before a friend's first frame or before your sensor's first look, isn't summed up: its numbers would
 be short) is followed per window: how long, its kill moments, its XP moments, the lowest
@@ -910,16 +910,16 @@ says how it's learned). The hover of an estimate says where its kind's health co
 client knows it (`S.MobMaxOf`: "learned from kills", "the classic database", "usual for its level";
 a friend's percent may rest on their own kills); known only to the friend: "Estimated by their
 client". Under the rest of a foe's hover, **your own Bestiary card** for its kind
-(`FoeBestiary`; the user picked "Hovering a foe in the row shows your own card for it: kills and
-drops"), short: "Bestiary" and your kills and the coin each (`Bt.KillsLine`, short form), then its 3
+(`FoeBestiary`: hovering a foe in the row shows your own card for it, kills and
+drops), short: "Bestiary" and your kills and the coin each (`Bt.KillsLine`, short form), then its 3
 likeliest drops (`Bt.Drops`, the world drops' group left out) with their chances in their quality's
 colour (`Bt.ListDrops`); a kind you haven't killed: "Not killed yet: classic database" and the
 database's 3 likeliest (`Bt.Compare`), greyed, or only "Not killed yet". Grey items as the
 Bestiary's `showPoor` says; an item the client doesn't know yet is asked for (named on the next
 hover). Read on hover only; the Bestiary switched off: nothing of it.
 
-**Who has aggro** on each foe, in a group (the user picked it: "each foe gets the tiny role-coloured
-tag from the nameplate aggro tweak"): Misc Tweaks' nameplate tag (misc-tweaks.md, `aggroNameplate`),
+**Who has aggro** on each foe, in a group (each foe gets the tiny role-coloured tag of the
+nameplate aggro tweak): Misc Tweaks' nameplate tag (misc-tweaks.md, `aggroNameplate`),
 the same look through `ns.AggroTag`: `>YOU<` (deDE `>DU<`) in your own window, else the first three
 letters of the holder's name in their role's colour (tank blue, healer green, damage red, no role
 white, a pet tan, outside the group grey), 8 px outlined with a shadow, no backing, on the top edge of
@@ -935,9 +935,9 @@ a group member near, nothing. A dead mob has none. Set only when text or colour 
 (`ShowAggro`). The preview: her Fireball pulls the leader ("Ann", red) until Bob, the tank, takes it at
 8 s (blue); the bandit is on her; the mage on Cedric, passing by (grey).
 
-**The battle row** (StreamBattle.lua; the user: a Pokémon-style fight, "your model does something
-and affects the enemy models", in the foes' row, the radar staying above; "doesn't need to be shown
-exact. just an approximation with the data available", and no more data for it).
+**The battle row** (StreamBattle.lua): a Pokémon-style fight, their model acting on the foes'
+models, in the foes' row, the radar staying above; not exact, only an approximation from the data
+already there, and no more data goes over the network for it.
 Left their model (50 x 58 px), the foes right of it, the space between the stage. Played from what
 the picture already holds, one action after another like turns (about half a second each; at most
 4 waiting, an older one goes but its number still floats; one waiting over 2.5 s goes too):
@@ -955,10 +955,10 @@ the picture already holds, one action after another like turns (about half a sec
   wago.tools): every spell of the class skill lines (no pets, mounts, runes; Season of Discovery IDs
   left out), all ranks, physical ones not listed; several schools: the first in the game's order
   (holy, fire, nature, frost, shadow, arcane: Frostfire Bolt is fire); consecutive IDs as `{ first,
-  last }` (1289 spells, 8 KB, from 1.60.1.70790, the launch build). Turned into `[spell ID] =
+  last }` (1289 spells, 8 KB, from 1.60.1.70862; the launch build 1.60.1.70790 gave the same). Turned into `[spell ID] =
   school` the first time a spell is looked at (`S.SpellSchool`, when an action starts; nothing per
   frame). The preview casts Fireballs and a Frostbolt and a Fire Blast now and then.
-- **Polymorph** (picked by the user: "polymorphed mobs as sheep in the battle row"): their own
+- **Polymorph** (polymorphed mobs show as sheep in the battle row): their own
   Polymorph that went off at their target (the cast, or new in their last spells when the cast
   wasn't seen; a mob's debuffs aren't read, nothing more goes over the network; only a foe that is
   their target: other spells go to the first foe when it isn't in the row) turns it into the animal
@@ -990,29 +990,29 @@ the picture already holds, one action after another like turns (about half a sec
   strikes (16), they flinch (9; a big hit 10, harder flash), the red number floats up from them. A
   dodge, parry or block (`a`): that move (30, 21, 24) and the word. A heal floats up green from them,
   loot rises through them, XP from the mob it came from.
-- **Deaths** take precedence (the user: a nameplate's death "should take preference"): a mob seen
+- **Deaths** take precedence (a death seen on a nameplate comes first): a mob seen
   dead, or their killing blow on it (`k`, read before the row is laid out: its mob may be gone from
   the picture already), falls at once (1); turns still waiting at it go (their numbers float now)
   and it doesn't flinch any more. It keeps its place 1.4 s lying (6), then fades over 1.2 s, from a
   copy of it (`st.last`, kept while it's alive) when it's gone from the picture. They die: they fall
   and lie until they're up. Standing: ready (26) in a fight, else stand (0), casting (51) while they
   or a mob cast; **kneeling** (50, the loot animation) while they skin, mine, gather herbs or pick a
-  pocket (`GATHER` by spell ID, other ranks by name; the user: "the skinning animation is wrong"),
+  pocket (`GATHER` by spell ID, other ranks by name; a casting pose looked wrong for skinning),
   with no cast at anyone when it's done. Animation IDs from AnimationData (1.60.1.70425, checked by
   their fallbacks: Attack2H falls back to Attack1H, then AttackUnarmed; CombatCritical to
   CombatWound; SpellCastDirected to SpellCastOmni ...), all seen playing in game.
 
 **Their model**: yours is you (`DressUpModel:SetUnit("player", false, false)`; in a form a
 `PlayerModel:SetUnit` instead: in game the DressUpModel kept the native form even so, and a
-PlayerModel showed the bear; the user: "when a druid is in cat form it should show cat form"); a
+PlayerModel showed the bear, and a druid in cat form should show as a cat); a
 friend whose character your client has (in your group, nearby: `UnitTokenFromGUID(peer.guid)` and
 `UnitIsVisible`) is them; a model loads anew when their form changes. The camera just a little back
 (`SetCamDistanceScale(1.05)`; 1.4 was too far for a character, in game); per form, from what fit
 in game: a bear 1.4 (closer it didn't fit), a cat 1 (at 1.4 too small), Travel Form 2 for a
 Skyborne (race 95/96: a bird, too large at 1.4) and 1 for other races (a cheetah, as a cat; not
 seen in game), other forms 1.4; turned 0.75 rad towards the foes; reloaded like the foes (when who it is or the
-window's size changes, retried while nothing's there). **Weapons** (`SetSheathed`; the user: "when
-I cast, the weapon should be sheathed"): sheathed while they cast and out of a fight, drawn for a
+window's size changes, retried while nothing's there). **Weapons** (`SetSheathed`; a cast
+looks right with the weapon sheathed): sheathed while they cast and out of a fight, drawn for a
 swing; a caster (mage, priest, warlock) keeps them sheathed and casts their instant spells (53, no
 lunge).
 
@@ -1022,15 +1022,15 @@ colour behind it read as a blue disc in game and went), "out of reach" in small 
 its tooltip saying why. In your group (a unit token, not visible) **their face** sits on it: the
 portrait their party frame has from afar (`SetPortraitTexture`, round through
 `TempPortraitAlphaMask`, asked for again every 5 s: their look may come late), 26 px on a 24 px
-emblem, a bobblehead (the user: "use the head of this 2d as in the party frame and then the class
-emblem as the body"). The preview's made-up friend is that too, with your face. It steps up,
+emblem, a bobblehead (the head of the party frame's 2D portrait, the class emblem as the
+body). The preview's made-up friend is that too, with your face. It steps up,
 flashes when hit, pulses while they cast and greys when they die (the head nods forward as they
 step up, jolts back when hit, lolls over when they die: `SetRotation`); the numbers float up from
-it. Tried first, in game, and given up (the user: "use the class emblem if
-you cant render their actual model"): a race's plain model (ChrRaceXChrModel -> ChrModel.DisplayID)
+it. Tried first, in game, and given up (the class emblem stands
+in when their actual model can't be rendered): a race's plain model (ChrRaceXChrModel -> ChrModel.DisplayID)
 comes out white in a default outfit of its own (a staff, a robe, a cloak with red squares inside)
-and gear tried on (`TryOn`) doesn't show; a class trainer NPC of their race and sex ("doesn't look
-like me"); a form's own model; a ModelScene actor of your own character with a `customRaceID` and
+and gear tried on (`TryOn`) doesn't show; a class trainer NPC of their race and sex (it didn't look
+like them); a form's own model; a ModelScene actor of your own character with a `customRaceID` and
 their gear (not looked at: "all not satisfying"). The game shows no player as they look unless
 their character is loaded on your client.
 Dots follow their mob and glide; a friend's map

@@ -116,7 +116,7 @@ display (the old `comboPoints` tweak) is gone; its saved value is simply no long
 - **Nameplate dots** (`comboNameplate`, on): small round dots in the middle of the target's health
   bar (the bar itself: `healthBar`, else `HealthBarsContainer.healthBar`, else the container, whose
   height can differ; the row's CENTER on the bar's, so any dot size stays centred; it sat on the
-  bottom edge at first, the user wanted it centred), one per point the bar can hold (`UnitPowerMax`
+  bottom edge at first; centred now), one per point the bar can hold (`UnitPowerMax`
   for combo points, 5 if unknown or secret), centred horizontally too. Lit ones in the count's colour (colouring off: Blizzard's red), the rest dark sockets
   (grey 0.22 at 75%); each sits on a black ring (85%) a pixel wider all round, so it reads on a red
   bar too. Round through a mask (`TempPortraitAlphaMask`, like Beacon's map dots). Size: slider
@@ -141,21 +141,20 @@ display (the old `comboPoints` tweak) is gone; its saved value is simply no long
 
 ## aggroNameplate: who has aggro, on enemy nameplates (Aggro.lua)
 
-The user, a tank or healer: "on top of the HP bar similar to combo points on the very left it should
-tell you who has aggro of that mob. If its you it should say >You< otherwise it should show the
-first 3 characters of the other player in the color of their role ... people will mostly look for
-the color first".
+For tanks and healers: at the very left of the health bar, like the combo points, it tells you who
+has aggro of that mob: `>YOU<` when it's you, otherwise the first three letters of the other
+player's name in the colour of their role. People will mostly look for the colour first.
 
 - **The tag**: our own frame on the plate's `UnitFrame` (it shows, fades and scales with it; kept
   in a weak table by unit frame, nothing written into Blizzard's frames), at the health bar's left
   end (`LEFT`, 1 px in; the bar found like the combo dots'), 10 levels above it: the text in 8 px,
-  outlined with a black shadow (1, -1), no backing (the user: no black background, a shadow
-  instead), so the colour reads on the red bar. `>YOU<` (deDE `>DU<`, capitals: the user) or the
+  outlined with a black shadow (1, -1), no backing (no black background, a shadow
+  instead), so the colour reads on the red bar. `>YOU<` (deDE `>DU<`, in capitals) or the
   first three letters of the name, whole UTF-8 letters ("Ölrik" -> "Ölr"). Colours: tank (0.35,
   0.62, 1), healer (0.3, 0.95, 0.4), damage (1, 0.32, 0.26), no role (0.92 white), pet (0.85, 0.72,
   0.45), outside the group (0.6 grey). Takes no room: nothing on the nameplate moves.
 - **When**: in a group (`IsInGroup`), on an enemy (`UnitCanAttack`, not a player, not dead) that's
-  in combat (`UnitAffectingCombat`). Solo nothing (the user's case is the group).
+  in combat (`UnitAffectingCombat`). Solo nothing (it's meant for groups).
 - **Who** (`Holder`): the mob's target (`UnitGUID(<plate>target)`) when it's in the group and its
   `UnitThreatSituation(member, mob)` isn't 0 or 1 (tanking, or not readable); else whoever is
   tanking it (status 3, else 2) over the group, pets included (a spell at the healer while you

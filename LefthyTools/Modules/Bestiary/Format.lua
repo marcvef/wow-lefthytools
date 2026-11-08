@@ -100,7 +100,7 @@ end
 
 -- "34 kills · 12s 40c each · (pelt) 12" (the coin on average over all its kills, "no coin" for
 -- beasts; skinnings when there were some). short: nothing about coin when there was none (the card
--- beside the mouse: the user didn't need "no coin" there).
+-- beside the mouse: "no coin" isn't needed there).
 local function KillsLine(mob, short)
 	local text = mob.kills == 1 and L["1 kill"] or L["%d kills"]:format(mob.kills)
 	if mob.kills > 0 and mob.money > 0 then

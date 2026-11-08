@@ -6,7 +6,7 @@ local S = B.Stream
 -- The fight stream's battle row, under the spells (StreamView.lua builds the window; the radar stays
 -- above). On the left the one shown, their model; on the right the mobs they fight (S.Foes: fighting
 -- them or their target; the target first, gold), each with a health bar. The fight is played on
--- them, Pokémon style (the user: "your model does something and affects the enemy models"), as an
+-- them, Pokémon style (their model acts and it affects the foes' models), as an
 -- approximation from what the picture already holds; nothing more goes over the network for it but
 -- who has aggro (below):
 --   * they cast: a casting pose while the bar fills; a harmful spell that went off is cast at their
@@ -37,15 +37,15 @@ local S = B.Stream
 --
 -- Their model: you are you (SetUnit, in the form you're in: cat, bear, ...); a friend whose
 -- character your client has (in your group, nearby) is them. A friend elsewhere is their class's
--- emblem, "out of reach" under it (the user chose it, after a race's plain model, a ghost of it
--- and an NPC of their class: the game shows no player as they look from afar, and "if you cant
--- render their actual model" the emblem). In your group, their face sits on it: the portrait
+-- emblem, "out of reach" under it (chosen after a race's plain model, a ghost of it and an NPC
+-- of their class were tried: the game shows no player as they look from afar, and when their
+-- actual model can't be rendered, the emblem stands in). In your group, their face sits on it: the portrait
 -- their party frame has from afar (SetPortraitTexture), a bobblehead on a smaller emblem (the
--- user: "use the head of this 2d ... and then the class emblem as the body"). It still steps up,
+-- head of the 2D portrait, the class emblem as the body). It still steps up,
 -- flashes when hit, pulses while they cast and greys when they die (the head nods as they step
 -- up, jolts back when hit and lolls over when they die); the numbers float up from it. The
 -- preview's made-up friend is that too, with your face. Weapons: sheathed while they cast and out
--- of a fight, drawn when they swing (the user: "when I cast, the weapon should be sheathed");
+-- of a fight, drawn when they swing (a cast looks right with the weapon sheathed);
 -- casters (mages, priests, warlocks) keep them sheathed, their instant spells cast too.
 --
 -- Cost: an OnUpdate per open window already runs (StreamView.lua); this adds a few comparisons per
@@ -101,8 +101,8 @@ local Value, issecret = S.Value, S.issecret
 local ANIM = { stand = 0, death = 1, dead = 6, wound = 9, crit = 10, punch = 16, strike = 17, parry = 21, block = 24,
 	ready = 26, dodge = 30, loot = 50, aim = 51, cast = 53, release = 54, special = 57 }
 -- Casts that kneel (the loot animation) instead of casting, and go off without a cast at anyone:
--- Skinning, Mining, Herb Gathering, Pick Pocket (each rank; other ranks by name). The user: "the
--- skinning animation is wrong in the box".
+-- Skinning, Mining, Herb Gathering, Pick Pocket (each rank; other ranks by name): a casting
+-- pose looked wrong for skinning in the box.
 local GATHER = { 8613, 8617, 8618, 10768, 2575, 2576, 3564, 10248, 2366, 2368, 3570, 11993, 921 }
 local gatherIDs, gatherNames
 local function Gathering(spellID)
@@ -151,8 +151,8 @@ local function School(spellID)
 end
 S.SpellSchool = School
 
--- Polymorph: the mob it hits becomes the animal in the row (picked by the user: "polymorphed mobs
--- as sheep in the battle row").
+-- Polymorph: the mob it hits becomes the animal in the row (polymorphed mobs
+-- show as sheep in the battle row).
 -- Known from their own spells only (a Polymorph of theirs that went off at their target; a mob's
 -- debuffs aren't read, nothing more goes over the network), until it takes damage (a loss on it),
 -- dies, the spell's time runs out or it leaves the row. { spell ID, creature display, seconds }:
@@ -258,8 +258,8 @@ end
 -- Where a kind's health comes from (S.MobMaxOf), for the hover.
 local HEALTH_FROM = { learned = L["learned from kills"], database = L["the classic database"], usual = L["usual for its level"] }
 
--- Your own Bestiary card for a foe's kind, under the rest of its tooltip (the user picked it:
--- "Hovering a foe in the row shows your own card for it: kills and drops"), short: your kills and
+-- Your own Bestiary card for a foe's kind, under the rest of its tooltip (hovering a foe
+-- in the row shows your own card for it: kills and drops), short: your kills and
 -- the coin each brought, its CARD_DROPS likeliest drops with their chances in their quality's colour;
 -- a kind you haven't killed: "Not killed yet" and the classic database's likeliest, greyed. Read
 -- on hover only; nothing without the Bestiary (switched off) or a creature ID.
@@ -1085,7 +1085,7 @@ local function Instants(view, b, now)
 end
 
 -- A mob died (dead in the picture, or their killing blow): its box falls now, before anything
--- waiting (the user: the nameplate's death "should take preference"). Turns at it go (their numbers
+-- waiting (a death seen on the nameplate comes first). Turns at it go (their numbers
 -- float now); a copy keeps its place while it falls and fades, even if it's gone from the picture.
 local function Fall(view, b, key, now)
 	local st = key and b.foe[key]

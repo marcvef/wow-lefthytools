@@ -2,8 +2,8 @@
 
 What the mobs you kill drop: a database of your own per kind of mob, a window for your target,
 (settings) a card beside the mouse over an enemy and drop chances in item tooltips, and a ledger
-of every mob with a fuzzy search. Nothing goes over the network (the user: "just your own, I want
-to limit traffic"). Beside your own numbers: a classic drop database, an add-on of its own
+of every mob with a fuzzy search. Nothing goes over the network (just your own, to keep
+traffic low). Beside your own numbers: a classic drop database, an add-on of its own
 (`LefthyTools_DropData`, below).
 
 ## Files
@@ -61,15 +61,15 @@ needs them; a client may not know an item yet). `Bt.Sources(itemID)`: where an i
 the likeliest first, built over the whole database when first asked after a change.
 
 **World drops** (`Bt.IsWorldDrop`): random green and better gear drops from any mob of about its
-level, so with one mob it says nothing about that mob (the user: a random BoE "forever stuck to that
-mob's loot window"). An item is one when it's gear (`C_Item.GetItemInfoInstant`: class 2 weapon or
+level, so with one mob it says nothing about that mob (else a random BoE would stay
+in that mob's loot window forever). An item is one when it's gear (`C_Item.GetItemInfoInstant`: class 2 weapon or
 4 armour, worn somewhere) of green or better that doesn't bind on pickup (`GetItemInfo`'s bind type
 1 = a mob's own; not known yet: taken as a world drop), or when it dropped as loot from 3 or more
-kinds of mobs (`Bt.Sources`; skinning doesn't count: every beast gives leather, and the user found an
+kinds of mobs (`Bt.Sources`; skinning doesn't count: every beast gives leather, and an
 item skinned from three kinds counting as a world drop made no sense). They're still counted per mob, but `Bt.Drops` gathers them in one entry at the end
 (`group`): in the window a single place with a map icon, how many and "world"; its tooltip explains
 and lists them with their chances. In the ledger they're a section of their own under the mob's
-drops, each a normal drop with its item tooltip (the user: a list in a tooltip can't show an item's
+drops, each a normal drop with its item tooltip (a list in a tooltip can't show an item's
 own tooltip). The ledger's tiny "best drops" leave them out; item tooltips add "A world drop:
 random gear from mobs of its level, anywhere."
 
@@ -96,13 +96,13 @@ in the ledger's rows. The card beside the mouse shows no level (it stays small).
 
 ## The classic drop database (LefthyTools_DropData)
 
-The user wanted to "compare my mob against what it can drop". Wowhead has no API and doesn't allow
+The aim: compare your own record of a mob against what it can drop. Wowhead has no API and doesn't allow
 scraping; the classic emulator databases have the loot tables. `LefthyTools_DropData/` (a folder of
 its own in the repo, next to `LefthyTools/`) is generated from CMaNGOS Classic DB's full dump by
 `tools/update-drop-data.js` and is **GPL v3** like its source (its `LICENSE.md` and `COPYRIGHT.md`
 must go with it); the rest of the repo stays BSD-2. Its README says how the chances are worked out
-(groups, references, quest items) and how to make it again; the user: "we may want to rerun the
-emulator or something when we have more access to forever data". World loot is left out (the level
+(groups, references, quest items) and how to make it again, for when
+more of Forever's own data is known. World loot is left out (the level
 world drop tables, bags, scrolls, recipes, zone drops: reached only through a reference and not
 bound on pickup, gear or a reference shared by 8+ tables), so a mob's list is its own loot: 11
 items for a Defias Bandit, 27 for Ragnaros, 69 at most; 5046 mobs with loot. It also has each
@@ -187,7 +187,7 @@ kind's health, for Beacon's fight stream (below): 9791 of them; 9921 creatures i
 
 ## The pace: XP and time per kill
 
-To compare leveling spots (the user: "85 XP, 14 s per kill, about 21k XP per hour"). Recorded with
+To compare leveling spots ("85 XP, 14 s per kill, about 21k XP per hour"). Recorded with
 each kill of yours that counts (a `PARTY_KILL` of yours, then looted or said empty; a corpse looted
 without your killing blow seen has none), into `pace`:
 
@@ -210,7 +210,7 @@ without your killing blow seen has none), into `pace`:
 
 ## Worth per kill
 
-"About 45s per kill" (the user: "which tells you where farming pays"). `Bt.Worth(mob)`: the coin
+"About 45s per kill", which tells you where farming pays. `Bt.Worth(mob)`: the coin
 plus each drop's count (all of them, over all kills) times its vendor price, over the kills; also
 the coin's and the drops' parts. Grey items and world drops count (it's all money), skinning
 doesn't (not everyone skins). Worked out when shown, nothing stored. The price is
@@ -229,7 +229,7 @@ when needed).
 
 ## Where you killed them
 
-The user: "could just be a map with a dot on where it was killed". With each counted kill, where
+A map with a dot where each kill was. With each counted kill, where
 you were at its killing blow (`C_Map.GetBestMapForUnit("player")`, `C_Map.GetPlayerMapPosition`;
 a corpse looted without your killing blow seen: where you are at the loot), the last 50 per kind
 in `spots`. Nothing in instances (`IsInInstance()`, and the position is nil there anyway), nor
@@ -262,8 +262,8 @@ flights.
   "12 in all, 1.3 each time". Shift-click links it (`HandleModifiedItemClick`). More than fit: the
   last place says "+N", its tooltip lists the rest with their chances (at most 20, then "and N more
   (the Bestiary's ledger)", like the world drops' tooltip: a mob farmed for long can have dozens).
-- **Not seen yet** (the drop database; setting `windowUnseen`, off: the user wanted the window
-  without it, the ledger always has it): under your drops a heading "Not seen yet" with a thin rule
+- **Not seen yet** (the drop database; setting `windowUnseen`, off by default: the window
+  stays lean without it, the ledger always has it): under your drops a heading "Not seen yet" with a thin rule
   and "6 of 11 found" on the right, then the database's drops you haven't had, 22 px, 7 per row, at
   most 2 rows ("+N" for the rest, its tooltip greyed). A mob you haven't killed: "What it can
   drop", "classic database". All found: a tick and "All 11 drops of the classic database found."
@@ -277,20 +277,20 @@ flights.
 Setting `hoverCard` (off by default). Over an enemy (attackable or dead) you've killed: "34 kills ·
 12s each" (no coin: nothing said, unlike the window's "no coin") and its 6 likeliest drops (22 px, chance under each), at the cursor's lower right,
 `TOOLTIP` strata, no mouse. An OnUpdate while it's shown follows the cursor and hides it once the
-mouseover is gone or another unit. **Small on purpose** (the user: it mustn't be "too large and
-intrusive"): one line and one row of 6, never more (a quest's line, below, the only one more). **Not in combat** (setting `cardHideInCombat`,
-on; the user: not "infight"): `LT.InCombat()` (the lockdown or the moment before it), checked when
+mouseover is gone or another unit. **Small on purpose** (it mustn't be too large and
+intrusive): one line and one row of 6, never more (a quest's line, below, the only one more). **Not in combat** (setting `cardHideInCombat`,
+on; not during a fight): `LT.InCombat()` (the lockdown or the moment before it), checked when
 the mouseover changes, in its OnUpdate and at `PLAYER_REGEN_DISABLED`, so it goes the moment a fight
 starts (the lockdown begins only after that event: asking `InCombatLockdown()` alone left it a frame
 into the fight); `PLAYER_REGEN_ENABLED` looks at the mouseover again, so it
 comes back if the mouse is still over an enemy. A mob killed before shows only your drops (no
 database cells on top); one you haven't killed, with the setting `cardUnseen` (off, like the
-window's `windowUnseen`: the user wanted neither by default), shows the database's 6 likeliest,
+window's `windowUnseen`: neither is on by default), shows the database's 6 likeliest,
 faded, under "Not killed yet: classic database"; without it, no card.
 
 ## Quest drops
 
-While a quest wants an item a mob can drop, the window and the card say so (the user: "Gnoll Paw:
+While a quest wants an item a mob can drop, the window and the card say so ("Gnoll Paw:
 3/8, 40% each, about 12 more kills").
 
 - **What your quests want**: `C_QuestLog.GetQuestObjectives` of each quest in the log (`GetInfo`;
@@ -319,8 +319,8 @@ While a quest wants an item a mob can drop, the window and the card say so (the 
 
 ## The wish list
 
-Items you're after (the user: "Pin an item ... Mobs that drop it get a small mark on the card. When
-it finally drops, a quiet line says 'after 87 kills (expected about 40)'"). Your own only, like the
+Items you're after: pin an item, mobs that drop it get a small mark on the card, and when it
+finally drops a quiet line says "after 87 kills (expected about 40)". Your own only, like the
 rest.
 
 - **Pinning**: Alt-click on a drop in the window or the ledger (also one not seen yet), or
@@ -390,12 +390,11 @@ map wide).
   killed it (below). Under both, its drops in a scrolling area (all of them, 19 per row, no "+N"):
   "Drops (N)" (skinning marked), "Not seen yet (N), classic database" (faded, as in the window) and
   "World drops (N)" when it has any.
-- **Where you killed it**, beside the details, seen without scrolling (the user: "the map should be
-  also on the right of the mob details so that you dont have to scroll down"; it was under the
+- **Where you killed it**, beside the details, seen without scrolling (it was under the
   drops at first). A heading "Where you killed them" with a rule, at its right the zone's name, or,
   when its kills were in more than one zone, a picker of them (`LT.Window.AddPicker`, like the
-  sort's: the most kills first, each "Elwynn Forest (12)"; the user: "if there are multiple regions
-  there needs to be a drop down"). Under it the zone's map in a 330 x 220 box as the world map shows
+  sort's: the most kills first, each "Elwynn Forest (12)").
+  Under it the zone's map in a 330 x 220 box as the world map shows
   it, laid by `LT.MapArt` (Core/MapArt.lua, shared with the fight stream's map where that has no
   minimap tiles): its first art layer, `C_Map.GetMapArtLayers` / `GetMapArtLayerTextures`, tiles laid
   like `Blizzard_MapCanvasDetailLayer`, as large as fits the box (`fit`), centred; the last column
@@ -405,8 +404,8 @@ map wide).
   mob starts again with its most. Under the map "Your last 50 kills." once that many are kept. No
   kill with a place (older records, only instances): the box says "No kills on a map yet", quietly,
   and the layout stays as it is.
-- **What you've explored** is on the map as your world map shows it (the user: "should be fully
-  explored or ideally the same visibility the player has"). The art leaves unexplored areas blank;
+- **What you've explored** is on the map as your world map shows it (the same visibility
+  the player has). The art leaves unexplored areas blank;
   explored ones are overlays, `C_MapExplorationInfo.GetExploredMapTextures(mapID)`: each a
   `textureWidth` x `textureHeight` area at `offsetX`, `offsetY` (the layer's pixels), its
   `fileDataIDs` tiles of the layer's tile size in rows, the last column and row in a smaller file

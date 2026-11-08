@@ -39,8 +39,8 @@ Mirage fades the default HUD when the player is out of combat and idle (like Dun
   group shows, like holding the peek key, and Mirage stays on (switching the module off would take
   the button with it). Resuming counts as activity, so the idle delay starts over. Not saved: a
   restart or switching Mirage off ends it. `/mirage status` says "paused". **For good**
-  (`M:SetPaused(true, true)`: Shift-click on the button, `/mirage pause keep`; the user: "a shift
-  click to permanently toggle it"): saved (`db.pauseKept`), so it's paused again after a restart
+  (`M:SetPaused(true, true)`: Shift-click on the button, `/mirage pause keep`):
+  saved (`db.pauseKept`), so it's paused again after a restart
   (`OnEnable`), and chat says so then (a forgotten pause mustn't look like Mirage being broken); the
   button's "II" turns orange. Any resume (a click, `/mirage resume`) clears it.
 - **Minimap button** (Options.lua, setting `minimapButton`, on; `LT.Window.MinimapButton` like

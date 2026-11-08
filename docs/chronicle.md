@@ -210,8 +210,8 @@ the open one's button greyed out:
   about what will appear while it's empty. Showing
   it marks the news seen (`C.MarkFeedSeen`): the tab's blue count and the book's blue dot
   (`C.UnseenCount`: news that came after `store.feedSeenAt`) go. Redrawn when the feed changes (at
-  most every 3 s). (Once one page with who's online, who isn't and the news; the user had to scroll
-  too far to reach the news, so they're separate now.)
+  most every 3 s). (Once one page with who's online, who isn't and the news; reaching the news took
+  too much scrolling, so they're separate now.)
 - **Friends:** everyone at a glance, two tables (`G.DrawTables` in Canvas.lua: a card each, a
   header row, a row per entry with faint alternate stripes; a cell is text, cut to its width, or an
   icon and text; a row's hover shows all of it, a click opens their account's graphs through

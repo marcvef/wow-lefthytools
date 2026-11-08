@@ -24,8 +24,8 @@ end
 
 -- The world map's art of a zone with what you've explored of it (LT.MapArt, Core/MapArt.lua: laid
 -- like Blizzard_MapCanvasDetailLayer and MapExplorationPin, as the fight stream's map), as large as
--- fits the map's box (MAP_W x MAP_H), so the map shows what your world map shows (the user: "ideally
--- the same visibility the player has"). No art: the box's dark back alone. Returns its width and
+-- fits the map's box (MAP_W x MAP_H), so the map shows what your world map shows (the
+-- same visibility the player has). No art: the box's dark back alone. Returns its width and
 -- height; laid again only for another map, or once you've explored more.
 local function LayMap(where, mapID)
 	local width, height = LT.MapArt.Lay(where.art, mapID, MAP_W, MAP_H, true)

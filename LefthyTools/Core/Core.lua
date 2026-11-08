@@ -555,8 +555,8 @@ end
 ---------------------------------------------------------------------------
 -- The beta or the release. WoW: Forever's release is an install of its own (_forever_, beside the
 -- beta's _classic_beta_), with saved variables of its own, so LefthyTools starts empty there, unless
--- a player copies the beta's WTF folder over. The release starts fresh all the same (the user: "any
--- data from the beta should not be used. even if people copy the WTF folder"): each saved table says
+-- a player copies the beta's WTF folder over. The release starts fresh all the same (no data
+-- from the beta is used, even from a copied WTF folder): each saved table says
 -- where it was written (its world), and on the release one the beta wrote is replaced by a new one,
 -- as on a first install. Only our own saved variables; nothing else of the game's is touched.
 ---------------------------------------------------------------------------

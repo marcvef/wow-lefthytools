@@ -294,11 +294,11 @@ end
 Bt.Likelier = Likelier
 
 -- World drops: random green and better gear drops from any mob of about its level, so with one mob
--- it says nothing about that mob (the user: a random BoE "forever stuck to that mob"). An item is
+-- it says nothing about that mob (else a random BoE would stay stuck to that mob forever). An item is
 -- one when it's gear (a weapon or armour that can be worn: GetItemInfoInstant) of green or better
 -- that doesn't bind on pickup (unknown yet: taken as one), or when it dropped as loot from WORLD_KINDS
--- or more kinds of mobs. Skinning doesn't count: every beast gives leather (the user, on an item
--- skinned from three kinds counting as a world drop: "no that doesnt make sense does it"). They
+-- or more kinds of mobs. Skinning doesn't count: every beast gives leather (an item
+-- skinned from three kinds counting as a world drop made no sense). They
 -- gather in one place at the end of a mob's drops.
 local WORLD_KINDS = 3
 

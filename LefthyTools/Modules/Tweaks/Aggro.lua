@@ -6,8 +6,8 @@ local L = ns.L
 -- In a group, the left end of each enemy's health bar says whom it's on: ">YOU<" when it's you,
 -- else the first three letters of their name, in the colour of their role (tank blue, healer
 -- green, damage red; white when it isn't known; a pet tan; someone outside the group grey). Small,
--- outlined with a shadow so the colour reads on the red bar (no backing: the user) (the user: "people will mostly look for the
--- color first"). Like the combo dots in the middle of the bar it takes no room: nothing on the
+-- outlined with a shadow so the colour reads on the red bar (no backing; people will mostly look for the
+-- colour first). Like the combo dots in the middle of the bar it takes no room: nothing on the
 -- nameplate moves.
 --
 -- Who has it: the mob's target, when that's someone in the group whose threat says they're tanking

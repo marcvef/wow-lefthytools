@@ -143,8 +143,8 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
   editing `install.ps1`, run `npm run build-installer`; `npm test` fails while the `.cmd` is out
   of date, and the build fails on non-ASCII text in `install.ps1` (cmd.exe reads the file in the
   console code page). Copies of an older `.cmd` keep working, they only run the code they carry.
-  **It updates itself** (since 0.5.0-136; the user: "I dont want to repeatetly send them new
-  installers"): started from a `.cmd` (`LEFTHYTOOLS_INSTALLER` set, not a clone, not `-Link`), it
+  **It updates itself** (since 0.5.0-136, so nobody has to be sent a new installer again):
+  started from a `.cmd` (`LEFTHYTOOLS_INSTALLER` set, not a clone, not `-Link`), it
   first fetches the newest `.cmd` (`raw.githubusercontent.com/.../<sha>/Update-LefthyTools.cmd`,
   the sha from the commits API so no CDN cache is in the way). Different: it runs that one in the
   same process (`[ScriptBlock]::Create`, the same arguments; `LEFTHYTOOLS_SELF_UPDATED` stops it
@@ -274,8 +274,8 @@ entry, in English and German, with every change players notice.**
 
 WoW: Forever's release is an install of its own (`_forever_`, product `wowf`) beside the beta's
 (`_classic_beta_`), and saved variables live per install (`WTF`), so LefthyTools starts empty there.
-A player can still copy the beta's `WTF` folder over; the release starts fresh all the same (the
-user: "any data from the beta should not be used. even if people copy the WTF folder"). At
+A player can still copy the beta's `WTF` folder over; the release starts fresh all the same (no
+data from the beta is used, even from a copied WTF folder). At
 `ADDON_LOADED`, first of all (before `LT.onLoad` and the modules read anything):
 
 1. **Which client** (`LT.WhichWorld()`, the one rule, kept in `LT.world`): `"beta"` when

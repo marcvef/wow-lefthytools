@@ -24,7 +24,7 @@ local SEEN_FOR = 6         -- seconds a moment's number counts as shown (they co
 -- After a fight: one line, fading
 ---------------------------------------------------------------------------
 
--- The user: "if it remains only in the stream". A fight seen from its start (out of combat, then
+-- A fight's summary stays in the stream (nothing in chat). A fight seen from its start (out of combat, then
 -- in) is followed per window: how long it lasted, their kills (killing blows), the XP, their lowest
 -- health (estimated). When it's over, a line takes the bottom line's place for SUMMARY_TIME, fading
 -- in and out: "38 s · 3 kills · 420 XP · lowest ~10%", only what's known (no XP: none said). Their
@@ -222,8 +222,8 @@ local function LootText(m, chance)
 end
 S.LootText = LootText
 
--- Rare finds (the user picked it: "When a friend loots something rare, the database chance pops up
--- with it"). A loot moment carries only the item and its quality, so the chance is worked out here,
+-- Rare finds: when a friend loots something rare, the database's drop chance pops up
+-- with it. A loot moment carries only the item and its quality, so the chance is worked out here,
 -- from what this client has (nothing more over the network): the mobs killed lately (their kill and
 -- XP moments, the last LATELY seconds; a friend's by the creature their stream named) and the dead
 -- ones in the picture now are where it may have come from; the one likeliest to drop it is taken,

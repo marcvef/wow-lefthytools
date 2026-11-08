@@ -8,7 +8,7 @@ local Dress, Lay, KillsLine, QuestLine = Bt.Dress, Bt.Lay, Bt.KillsLine, Bt.Ques
 
 -- The card next to the mouse (setting hoverCard): over an enemy you've killed before, your kills and
 -- its likeliest drops, small, following the mouse while it's over it. With the setting cardUnseen
--- (off, like the window's windowUnseen: the user wanted both without it), a mob you haven't killed
+-- (off, like the window's windowUnseen: both are off by default), a mob you haven't killed
 -- gets the classic database's likeliest drops, faded. A quest that wants one of its drops adds a
 -- line; wished items it drops come first.
 
@@ -18,7 +18,7 @@ local LINE = 14
 
 local card, cardGUID
 
--- In combat with the setting cardHideInCombat (on): no card (the user: not while fighting). Core's
+-- In combat with the setting cardHideInCombat (on): no card (not while fighting). Core's
 -- LT.InCombat: the lockdown begins only after PLAYER_REGEN_DISABLED, so InCombatLockdown alone still
 -- says no inside it (the card stayed a frame into the fight).
 local function CardHidden()
@@ -93,8 +93,8 @@ local function WishedFirst(creature, mob, drops)
 	return first
 end
 
--- Over an enemy: its card (setting hoverCard), small on purpose (the user: not "too large and
--- intrusive"): a line and one row of CARD_CELLS icons, never more, and none in combat (setting
+-- Over an enemy: its card (setting hoverCard), small on purpose (not too large and
+-- intrusive): a line and one row of CARD_CELLS icons, never more, and none in combat (setting
 -- cardHideInCombat, on; it goes when a fight starts, comes back after). Killed before: your kills and
 -- your likeliest drops (not the database's on top); not yet, with the setting cardUnseen (off): the
 -- classic database's likeliest, faded. The only line more: a quest that still wants one of its drops

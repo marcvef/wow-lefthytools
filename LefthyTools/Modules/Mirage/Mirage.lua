@@ -688,8 +688,8 @@ end
 
 -- Paused: nothing fades until resumed (the minimap button, /mirage pause). Not kept over a
 -- restart (a forgotten pause would look like Mirage being broken) unless asked for: keep
--- (Shift-click on the button, /mirage pause keep; the user: "a shift click to permanently toggle
--- it") saves it, and switching Mirage on (a login) says so in chat.
+-- (Shift-click on the button, /mirage pause keep)
+-- saves it, and switching Mirage on (a login) says so in chat.
 function M:SetPaused(on, keep)
 	if not self.enabled then
 		return
