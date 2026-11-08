@@ -26,8 +26,9 @@ local LT = ns.LT
 -- Navigation: SmartNavigation's grid mode counts the buttons of each column, which sections with
 -- part-filled rows throw off, so while ours is shown the bag goes by the nearest button in a direction
 -- (its other mode). SmartNavigation's calls that addon code may make (RefreshButtonGroups,
--- SetUseGridNavigation, ...) are refused in a fight, so nothing is placed then: in a fight the layout
--- stays as it is (Blizzard's, if Blizzard laid the bag out), and ours comes after it.
+-- SetUseGridNavigation, our jumps) are refused in a fight: the layout is ours in a fight too (the bag
+-- and its item buttons aren't protected: placing, hiding and reparenting them is allowed), only telling
+-- SmartNavigation waits for the fight's end (with the controller the cursor may go oddly till then).
 
 local SECTIONS = {
 	{ key = "gear", title = L["Gear"] },
@@ -133,6 +134,31 @@ local function Restricted()
 		return LT.Value(api.IsAddOnRestrictionActive, kind) == true
 	end
 	return false
+end
+
+-- The bag (or its item buttons) protected in a fight: then nothing of it is moved. Not so far.
+local function Locked(frame)
+	if not InCombatLockdown() then
+		return false
+	end
+	if frame:IsProtected() then
+		return true
+	end
+	for _, b in frame:EnumerateValidItems() do
+		return b:IsProtected() and true or false
+	end
+	return false
+end
+
+-- With the controller in a fight: SmartNavigation hears of our layout when it's over.
+local function NavLater()
+	if Restricted() and PadUI() then
+		if InCombatLockdown() then
+			watch:RegisterEvent("PLAYER_REGEN_ENABLED")
+		else
+			C_Timer.After(1, function() navPending = true; driver:Show() end)
+		end
+	end
 end
 
 -- SmartNavigation's calls addon code may make (it runs them securely, out of combat only).
@@ -805,12 +831,8 @@ local function OnItemLayout(frame)
 		Unapply()
 		return
 	end
-	if Restricted() then
-		-- In a fight: Blizzard's layout stands (SmartNavigation knows it), ours when the fight ends.
-		if applied and frame.CalculateHeight and not frame:IsProtected() then
-			SetBagHeight(frame, frame:CalculateHeight())
-			SetBagWidth(frame, frame.CalculateWidth and frame:CalculateWidth())
-		end
+	if Locked(frame) then
+		-- Protected in a fight (not so far): Blizzard's layout stands, ours when the fight ends.
 		Unapply()
 		dirty = true
 		watch:RegisterEvent("PLAYER_REGEN_ENABLED")
@@ -819,6 +841,7 @@ local function OnItemLayout(frame)
 	if Place(frame, Sort(frame), StripButtons()) then
 		navPending = true
 		driver:Show()
+		NavLater()
 	else
 		Unapply()
 	end
@@ -849,12 +872,8 @@ local function Relayout()
 		ApplyJumps(false) -- (ours gone or the bag closed in a fight: our jumps go now)
 		return
 	end
-	if Restricted() then
-		if InCombatLockdown() then
-			watch:RegisterEvent("PLAYER_REGEN_ENABLED")
-		else
-			C_Timer.After(1, function() dirty = true; driver:Show() end)
-		end
+	if Locked(frame) then
+		watch:RegisterEvent("PLAYER_REGEN_ENABLED")
 		return
 	end
 	local groups = Sort(frame)
@@ -870,6 +889,7 @@ local function Relayout()
 		return
 	end
 	FixNavigation(frame, true)
+	NavLater()
 	if was and laidOut[current] ~= was then
 		local now = order[math.min(was, #order)]
 		if now and now ~= current then
@@ -902,7 +922,7 @@ end)
 
 watch:SetScript("OnEvent", function(self)
 	self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-	dirty = true
+	dirty, navPending = true, true -- (SmartNavigation told what changed in the fight)
 	driver:Show() -- (not inside the event)
 end)
 

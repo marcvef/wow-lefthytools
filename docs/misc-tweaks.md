@@ -163,12 +163,12 @@ These SmartNavigation calls are the ones it lets addon code make (`SecureHelper:
 registered keys): run securely through an attribute handler, but only while
 `C_RestrictedActions.IsAddOnRestrictionActive(Combat)` is off; in combat they're refused with Blizzard's
 "Interface action blocked". Bag item buttons and the combined bag aren't protected (no secure templates in
-`ContainerFrame.xml`), so moving them in combat would work, but SmartNavigation couldn't be told. So
-**nothing is placed in a fight**: an item that changes keeps the last layout until the fight ends; a
-layout Blizzard makes in the fight (the bag opened, a bag collapsed) stands, with Blizzard's height and
-without our headers, and SmartNavigation knows it; at `PLAYER_REGEN_ENABLED` (on the next frame) ours
-comes back. The UpdateFrameSize hook keeps our height in a fight only while ours is shown (and the bag
-isn't protected).
+`ContainerFrame.xml`), so **ours is placed in a fight too** (new loot sorted in, the bag opened in a fight
+sorted at once); only SmartNavigation isn't told then (`NavLater`): at `PLAYER_REGEN_ENABLED` it hears of
+the layout (grid mode off, its buttons, our jumps). Till then the controller's cursor may go by Blizzard's
+grid. (Holding the whole layout back in fights, as the first version did, put Blizzard's bag back in every
+fight, which nothing required.) Were the bag or its buttons ever protected in a fight (`Locked`), Blizzard's
+layout would stand until it ends.
 
 **Shoulder buttons to jump between sections: not done.** The bag's shoulder buttons are Blizzard's
 binding group (`navigateCombinedBagsFrame`: `GAMEPAD_SHOULDER_LEFT/RIGHT` to `Gamepad_SetCursorToBag`),

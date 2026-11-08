@@ -149,25 +149,29 @@ do
 	Wait(0.05)
 	check((SMART_NAV.calls.RefreshButtonGroups or 0) == refreshes + 1, "nothing changed: nothing moved, nothing told")
 
-	-- A fight: nothing placed, SmartNavigation not called (it refuses addon calls then).
+	-- A fight: ours stays and sorts new items in (the bag and its buttons aren't protected); only
+	-- SmartNavigation hears of it after the fight (it refuses addon calls then).
 	EnterCombat()
+	local told = SMART_NAV.calls.RefreshButtonGroups or 0
 	BAGS[0][12] = 9013
 	bag:UpdateItems()
 	Wait(0.05)
-	check(Order(State().order):find("0:12", 1, true) and State().order[1] == Slot(1, 1), "a new item in a fight: the layout stays as it is")
+	check(State().applied and State().order[1] == Slot(0, 12), "a new item in a fight: sorted in at once, the ring first")
 	bag:UpdateFrameSize() -- Blizzard lays the bag out in the fight (a bag collapsed, ...)
 	bag:UpdateItemLayout()
 	st = State()
 	x, y = At(GamepadBagBar.BagButtonArray[1])
-	check(not st.applied and #st.headers == 0 and y ~= 441, "Blizzard's layout in a fight: it stands, without our headers")
-	check(bag:GetHeight() == bag:CalculateHeight(), "and Blizzard's height")
+	check(st.applied and #st.headers == 7 and y == 441, "Blizzard lays the bag out in a fight: ours right after it, headers and all")
+	check(bag:GetHeight() ~= bag:CalculateHeight(), "and our height")
 	GameTooltip:SetOwner(Slot(0, 10), "ANCHOR_NONE")
 	GameTooltip:SetBagItem(0, 10)
-	check(TOOLTIP.points == nil, "the tooltip where Blizzard puts it then")
+	check(TOOLTIP.points ~= nil, "the tooltip beside the bag in a fight too")
+	check((SMART_NAV.calls.RefreshButtonGroups or 0) == told and #BLOCKED == blocked, "SmartNavigation not called in the fight: nothing blocked")
 	LeaveCombat()
 	Wait(0.05)
 	st = State()
-	check(st.applied and st.order[1] == Slot(0, 12) and #st.headers == 7, "the fight over: ours again, the ring first")
+	check(st.applied and st.order[1] == Slot(0, 12) and #st.headers == 7 and (SMART_NAV.calls.RefreshButtonGroups or 0) > told,
+		"the fight over: SmartNavigation told of the new layout")
 	check(#BLOCKED == blocked, "nothing blocked")
 
 	-- A bag collapsed in its menu (Blizzard lays the bag out again): its slots stay out.
@@ -304,16 +308,16 @@ do
 	Wait(0.05)
 	check(State().applied and Down(Slot(0, 16)) == Slot(1, 8), "on again: ours, with its jumps")
 
-	-- Opened in a fight: Blizzard's until it ends.
+	-- Opened in a fight: ours at once; SmartNavigation keeps Blizzard's grid mode until the fight ends.
 	CloseBags()
 	EnterCombat()
 	OpenBags()
 	Wait(0.05)
-	check(not State().applied and SMART_NAV.panels[bag].useGrid == true and Down(Slot(0, 16)) == nil,
-		"opened in a fight: Blizzard's bag, none of our jumps (cleared when it closed)")
+	check(State().applied and #State().headers == 7 and SMART_NAV.panels[bag].useGrid == true and #BLOCKED == blocked,
+		"opened in a fight: sorted at once (SmartNavigation's grid mode stays till the fight ends)")
 	LeaveCombat()
 	Wait(0.05)
-	check(State().applied and SMART_NAV.panels[bag].useGrid == false, "and ours after it")
+	check(State().applied and SMART_NAV.panels[bag].useGrid == false, "and SmartNavigation told after it")
 	check(#BLOCKED == blocked and #ERRORS == errors, "nothing blocked, no errors")
 
 	CloseBags()
