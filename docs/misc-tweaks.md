@@ -188,6 +188,20 @@ frame: the tooltip only moves when Blizzard sets it up.
 (the bag opened again), and its new panel is in grid mode again. Our layout code never calls Blizzard's
 `UpdateItemLayout` itself.
 
+## movableLootRolls: the Need / Greed windows where you want them (LootRolls.lua)
+
+Blizzard's roll windows (`GroupLootFrame1..4`) sit in `GroupLootContainer`, one of the bottom managed frames
+(`BottomManagedFrameTemplate`) laid out with the action bars, and can't be moved. The container stays where
+it is (taking it out of that stack from addon code would touch the action bars' layout, protected in a
+fight); its roll windows are placed anew right after Blizzard places them (a post-hook on
+`GroupLootContainer_Update`, which runs for every roll added or gone), stacked up from the bottom of an anchor
+of ours, 100 apart like Blizzard's. Dragging any roll window moves the anchor (the first drag starts it where
+that window's stack is); the spot (`lootRollPos`, left and top in UIParent units) is kept. `/lefthy tweaks
+lootpos` (or the settings' Place button) shows the anchor to drag without a roll, right-click hides it;
+`resetloot` and switching it off put the windows back on Blizzard's spot (the same SetPoint Blizzard uses). The
+roll windows aren't protected, so it works in fights. With the controller UI Blizzard hides the container and
+shows rolls in a window of its own: nothing is done then.
+
 ## questAnnounce: quest progress in party chat (QuestAnnounce.lua)
 
 Lines go at once, in fights too: an ordinary fight doesn't restrict party chat, only the client's chat

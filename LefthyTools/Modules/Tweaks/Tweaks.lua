@@ -17,6 +17,7 @@ local M = LT:NewModule("tweaks", {
 		gamepadBagSort = true,
 		gamepadBags = true,    -- GamepadBags.lua: with a controller, the bags in sections
 		mouseBags = true,      -- ... and with mouse and keyboard
+		movableLootRolls = true, -- LootRolls.lua: the Need / Greed windows where they were dragged (lootRollPos)
 		gamepadBagColumns = 10, -- ... with this many items side by side (Blizzard's grid has 10)
 		gamepadBagButtons = false, -- ... the bag buttons' row open under the "Bags" header (else folded)
 		gamepadBagAllFree = false, -- ... every free slot (else one, with how many)
@@ -204,6 +205,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyGamepadBags(on) end }, -- GamepadBags.lua
 	{ key = "mouseBags", command = "mousebags", label = "Sorted bags with mouse and keyboard",
 		apply = function(on) ns.ApplyMouseBags(on) end }, -- GamepadBags.lua
+	{ key = "movableLootRolls", command = "lootrolls", label = "Movable loot rolls",
+		apply = function(on) ns.ApplyLootRolls(on) end }, -- LootRolls.lua
 	{ key = "questAnnounce", command = "quests", label = "Announce quest progress in party chat",
 		apply = function(on) ns.ApplyQuestAnnounce(on) end }, -- QuestAnnounce.lua
 	{ key = "comboNameplate", command = "combo", label = "Combo points on your target's nameplate",
@@ -414,6 +417,13 @@ function M:BuildOptions(o)
 		L["The sorted controller bags show every bag's button in a row under their \"Bags\" header, to change a bag. Off, the row is folded away and opens while the controller's cursor is on the header or the row; a click on the header opens and folds it for good."])
 	o:Checkbox("gamepadBagAllFree", L["Sorted bags: every free slot"],
 		L["The sorted bags show each free slot. Off, one stands for all and says how many there are."])
+	o:Header(L["Loot rolls"])
+	o:Checkbox("movableLootRolls", L["Movable loot rolls"],
+		L["Drag a Need / Greed window to move them all; they come up there from then on. /lefthy tweaks lootpos shows where, without a roll; /lefthy tweaks resetloot puts them back. Not with the controller (Blizzard's own roll window there)."])
+	o:Button(L["Loot rolls: place them"], L["Place"], function() ns.LootRollPreview(true) end,
+		L["Shows where loot rolls come up: drag it where you want them, right-click when done."])
+	o:Button(L["Loot rolls: Blizzard's spot"], L["Reset"], function() M:ResetLootRolls() end,
+		L["Puts the loot rolls back where Blizzard has them."])
 	o:Header(L["Quests"])
 	o:Checkbox("questAnnounce", L["Announce quest progress in party chat"],
 		L["When you finish a quest objective or a whole quest while in a party, your character posts it in party chat, like Questie does. Not solo and not in raids."])
@@ -462,6 +472,11 @@ function M:OnSlashCommand(msg)
 	elseif cmd == "resetbags" then
 		self:ResetBagPositions()
 		self:Print("bag positions reset.")
+	elseif cmd == "lootpos" then
+		ns.LootRollPreview() -- LootRolls.lua: where the loot rolls come up, to drag
+	elseif cmd == "resetloot" then
+		self:ResetLootRolls()
+		self:Print("loot rolls back on Blizzard's spot.")
 	elseif cmd == "combopos" then
 		ns.ComboTrial(true) -- ComboPoints.lua: the nameplate dots' preview, without a mob
 	elseif cmd == "rolecheck" then
@@ -501,9 +516,10 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | bagsort | padbags | mousebags | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | bagsort | padbags | mousebags | lootrolls | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
 		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
+		self:Print("/lefthy tweaks lootpos | resetloot - place the loot rolls, or put them back on Blizzard's spot")
 		self:Print("/lefthy tweaks combopos - preview the combo point dots on nameplates (no mob needed)")
 		self:Print("/lefthy tweaks aggrotest - examples of who has aggro on the enemy nameplates you see")
 		self:Print("/lefthy tweaks rolecheck - start a role check (group leader or assistant)")

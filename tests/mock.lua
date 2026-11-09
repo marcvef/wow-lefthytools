@@ -1122,6 +1122,26 @@ function OpenBags() -- what Blizzard does when the bag opens (ContainerFrameComb
 	end
 end
 function CloseBags() ContainerFrameCombinedBags:Hide() end
+-- Blizzard's loot rolls (GroupLootFrame.lua): the container stacks its roll windows from its bottom.
+CreateFrame("Frame", "GroupLootContainer", UIParent)
+GroupLootContainer.rollFrames, GroupLootContainer.maxIndex, GroupLootContainer.reservedSize = {}, 0, 100
+for i = 1, 4 do CreateFrame("Frame", "GroupLootFrame" .. i, UIParent) end
+function GroupLootContainer_Update(self)
+	if GAMEPAD_STATE and GAMEPAD_STATE.ui then return end
+	for i = 1, self.maxIndex do
+		local frame = self.rollFrames[i]
+		if frame then frame:ClearAllPoints(); frame:SetPoint("CENTER", self, "BOTTOM", 0, self.reservedSize * (i - 1 + 0.5)) end
+	end
+end
+function GroupLootContainer_AddFrame(self, frame)
+	self.maxIndex = self.maxIndex + 1
+	self.rollFrames[self.maxIndex] = frame
+	GroupLootContainer_Update(self) -- (by name, like Blizzard's: hooks see it)
+end
+function GroupLootContainer_RemoveFrame(self, frame)
+	for i, f in pairs(self.rollFrames) do if f == frame then self.rollFrames[i] = nil end end
+	GroupLootContainer_Update(self)
+end
 
 -- Quest log: QUESTS = { { id, title, objectives = { { text, finished [, type, numFulfilled, numRequired] } } ,
 -- complete, header } } (type and the numbers: as the modern client gives them, when a test sets them)

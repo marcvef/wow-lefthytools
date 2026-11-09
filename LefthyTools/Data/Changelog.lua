@@ -503,5 +503,8 @@ ns.CHANGELOG = {
 	{ id = 165, module = "tweaks",
 		en = { "Quest lines right away again", "Quest progress in party chat goes out at once again, in fights too. Only the game's own chat lockdown (boss encounters, challenge modes, PvP) holds it back." },
 		de = { "Quest-Zeilen wieder sofort", "Questfortschritt im Gruppenchat geht wieder sofort raus, auch im Kampf. Nur die Chat-Sperre des Spiels (Bossbegegnungen, Herausforderungen, PvP) hält ihn zurück." } },
+	{ id = 166, module = "tweaks",
+		en = { "Movable loot rolls", "Drag a Need / Greed window and the loot rolls come up there from then on. Misc Tweaks can place them without a roll, or put them back." },
+		de = { "Verschiebbare Würfelfenster", "Zieh ein Bedarf/Gier-Fenster, und die Würfelfenster erscheinen von da an dort. Misc Tweaks kann sie ohne Würfeln platzieren oder zurücksetzen." } },
 	-- New entries go here, at the end.
 }
