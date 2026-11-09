@@ -500,5 +500,8 @@ ns.CHANGELOG = {
 	{ id = 164, module = "beacon",
 		en = { "Fight stream: distances in fights again", "Enemies in a shared fight have their distance again. The blocked action came from range checks on friendly players, which the game refuses in a fight; those are skipped now." },
 		de = { "Kampf-Stream: Entfernungen im Kampf", "Gegner in einem geteilten Kampf haben wieder ihre Entfernung. Die blockierte Aktion kam von Reichweiten-Abfragen zu freundlichen Spielern, die das Spiel im Kampf verweigert; die fallen jetzt weg." } },
+	{ id = 165, module = "tweaks",
+		en = { "Quest lines right away again", "Quest progress in party chat goes out at once again, in fights too. Only the game's own chat lockdown (boss encounters, challenge modes, PvP) holds it back." },
+		de = { "Quest-Zeilen wieder sofort", "Questfortschritt im Gruppenchat geht wieder sofort raus, auch im Kampf. Nur die Chat-Sperre des Spiels (Bossbegegnungen, Herausforderungen, PvP) hält ihn zurück." } },
 	-- New entries go here, at the end.
 }

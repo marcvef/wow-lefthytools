@@ -190,8 +190,9 @@ frame: the tooltip only moves when Blizzard sets it up.
 
 ## questAnnounce: quest progress in party chat (QuestAnnounce.lua)
 
-Lines wait out a fight, then go (sending chat from addon code in a fight can be restricted, and a
-blocked call shows the player an error).
+Lines go at once, in fights too: an ordinary fight doesn't restrict party chat, only the client's chat
+lockdown does (`C_ChatInfo.InChatMessagingLockdown`: encounters, challenge modes, PvP), which they wait out.
+(0.7.0-37 to -62 held them through every fight, on a wrong guess about a friend's blocked action.)
 
 Modelled on Questie's `Modules/QuestieAnnounce.lua`: an objective is announced only when it goes
 from unfinished to finished, prefixed with the `{rt1}` star icon. `questState[questID]` holds

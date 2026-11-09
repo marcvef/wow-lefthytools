@@ -300,17 +300,17 @@ QuestUpdate(); Finish(QUESTS[6], 1, "1/1 Z"); QuestUpdate()
 check(#SENT == 4 and SENT[4].channel == "INSTANCE_CHAT", "instance group uses instance chat")
 
 GROUP = "party"
--- In a fight: sending would be blocked, so it waits for the fight's end, however long that takes.
+-- In a fight: sent at once (an ordinary fight doesn't restrict party chat; the chat lockdown is below).
 QUESTS[7] = Q(109, "Fight Quest", "0/1 F")
 QuestUpdate()
 EnterCombat()
 Finish(QUESTS[7], 1, "1/1 F")
 QuestUpdate()
+check(#SENT == 5 and SENT[5].msg:find("Fight Quest", 1, true), "in a fight: sent at once")
 Advance(15)
-check(#SENT == 4, "in combat: nothing is sent")
 LeaveCombat()
 Advance(1.2)
-check(#SENT == 5 and SENT[5].msg:find("Fight Quest", 1, true), "the fight over: sent, not stale")
+check(#SENT == 5, "nothing more after the fight")
 table.remove(SENT, 5)
 QUESTS[7] = nil
 QuestUpdate()

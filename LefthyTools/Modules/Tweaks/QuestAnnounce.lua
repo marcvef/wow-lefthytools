@@ -9,9 +9,10 @@ local M = ns.LT:GetModule("tweaks")
 -- when first seen (accepted that way, or at login) stay silent. Quests are tracked by questID, so
 -- collapsed quest log headers don't hide progress. Party chat in a normal party, instance chat in
 -- an instance group, nothing solo or in a raid. Addon chat can be locked down by the client
--- (C_ChatInfo.InChatMessagingLockdown); messages wait until that lifts. They also wait out a fight
--- (sending from addon code in a fight can be restricted, and a blocked call shows the player an
--- error). The objective text comes
+-- (C_ChatInfo.InChatMessagingLockdown: encounters, challenge modes, PvP); messages wait until that
+-- lifts. An ordinary fight doesn't restrict party chat, so lines go at once then (0.7.0-37 held them
+-- through fights on a wrong guess about a friend's blocked action; that came from the fight stream's
+-- range checks). The objective text comes
 -- from the client in its language, so the wrapper text is localized too (party members read it).
 
 local ANNOUNCE_MARKER = "{rt1} " -- star icon, like Questie
@@ -41,14 +42,6 @@ local function FlushAnnouncements()
 		table.remove(announceQueue, 1) -- a lockdown that lasts (a whole dungeon): old news by now
 	end
 	if #announceQueue == 0 then
-		return
-	end
-	if InCombatLockdown() then
-		for _, item in ipairs(announceQueue) do
-			item.at = now -- (its time to go stale starts when the fight is over)
-		end
-		flushScheduled = true
-		C_Timer.After(1, FlushAnnouncements)
 		return
 	end
 	local chat = C_ChatInfo
