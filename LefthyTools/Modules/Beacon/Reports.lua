@@ -282,9 +282,10 @@ B.FIXED_ERRORS = {
 		en = "a blocked action in Blizzard's settings panel", de = "eine blockierte Aktion in Blizzards Einstellungen" },
 	{ pattern = "ADDON_ACTION_BLOCKED: Frame:", also = "SettingsPanel", fixed = "0.7.0-34-gdf90faf",
 		en = "a blocked action with Blizzard's settings panel open", de = "eine blockierte Aktion bei offenen Blizzard-Einstellungen" },
-	-- The fight stream's distances: no range check is asked about an enemy in a fight any more (the
-	-- stacks in reports on 0.7.0-38 and -52 showed items, then spells; the combo dots weren't it).
-	{ pattern = "ADDON_ACTION_BLOCKED: UNKNOWN()", fixed = "0.7.0-60-g0000000",
+	-- The fight stream's distances: item and interact range checks about friendly players aren't asked
+	-- in a fight any more (every stack in the reports went through that branch; the combo dots, and in
+	-- 0.7.0-52 / -60 enemies, weren't it).
+	{ pattern = "ADDON_ACTION_BLOCKED: UNKNOWN()", fixed = "0.7.0-62-g0000000",
 		en = "a blocked action in fights, from the fight stream's distances", de = "eine blockierte Aktion im Kampf, durch die Entfernungen des Kampf-Streams" },
 }
 

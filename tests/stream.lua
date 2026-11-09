@@ -732,9 +732,9 @@ do
 	check(has("UnitName: value 180 | value 180") and has("e.g. Defias Thug; Defias Pillager") and has("UnitHealth: hidden 180 | hidden 180")
 		and has("UnitGUID: value 180 | value 180\n") and has("UnitPosition(player): value 60 | value 60\n"),
 		"what answers and what's hidden, in and out of combat, with examples (none of GUIDs and my position)")
-	check(has("spell Throw (30 yd): error 180 | true 120, false 60") and has("item 835 (30 yd): error 180 | true 120, false 60")
-		and has("CheckInteractDistance 3 (10 yd): error 180 |") and has("e.g. combat"), -- (not asked about an enemy in a fight: blocked)
-		"each range check, in and out of combat, with what the errors say")
+	check(has("spell Throw (30 yd): true 120, false 60 | true 120, false 60") and has("item 835 (30 yd): true 120, false 60 | true 120, false 60")
+		and has("CheckInteractDistance 3 (10 yd): true 60, false 120 | true 60, false 120"), -- (about enemies they answer in a fight too)
+		"each range check, in and out of combat")
 	check(has("nameplate position: GetCenter: nil 60, onscreen 60, error 60 |") and has("e.g. 0.50,0.45; can't measure this region"),
 		"nameplate positions, with what the errors say")
 	check(has("soft target: UnitExists(softenemy): false 60 | false 60") and has("is the soft target: UnitIsUnit(<unit>, softenemy): false 180 | false 180")
@@ -742,7 +742,7 @@ do
 	check(has("your casts: UNIT_SPELLCAST_SUCCEEDED (true: harmful, at a hostile target): false 1 |")
 		and has("the game's error messages: UI_ERROR_MESSAGE (true: not in front): true 1 | -   e.g. Target needs to be in front of you."),
 		"my casts and the game's error messages, with their words, got\n" .. report)
-	check(has("Distance: 0 of 10 range checks answered in combat, 7 only out of combat."), "a short summary, got\n" .. report)
+	check(has("Distance: 7 of 10 range checks answered in combat, 0 only out of combat."), "a short summary, got\n" .. report)
 	lefthy("stream results")
 	check(LefthyToolsStreamTestsFrame and LefthyToolsStreamTestsFrame:IsShown(), "/lefthy stream results: ready to copy")
 	LefthyToolsStreamTestsFrame:Hide()
@@ -1791,21 +1791,28 @@ do
 	lefthy("stream me")
 	EnterCombat()
 	Advance(0.6)
-	check(reads == 1 and yards() == nil,
-		"the sensor starts: the range checks are read, but in a fight none is asked about an enemy (blocked): its distance unknown")
+	check(reads == 1 and about(yards(), 7.5),
+		"the sensor starts: the range checks are read; in a fight they answer about an enemy (items and spells): the miner at 8 yd is about 7")
 	BOOK[#BOOK + 1] = { spellID = 2094, itemType = 1, isPassive = false }
 	SPELL_RANGES[2094], SPELL_NAMES[2094] = 10, "Blind"
 	for _ = 1, 3 do Fire("SPELLS_CHANGED") end
 	Fire("LEARNED_SPELL_IN_SKILL_LINE", 2094, 1, false)
 	Advance(1.6)
-	check(reads == 1 and yards() == nil, "the spellbook changes in a fight: not read until it's over")
+	check(reads == 1 and about(yards(), 7.5), "the spellbook changes in a fight: not read until it's over")
 	LeaveCombat()
 	Advance(0.6)
 	check(reads == 2, "the fight is over: read again, once for the four events")
 	check(about(yards(), 7.5), "... and out of the fight Blind (10 yd) tells distances: the miner is about 7 yd away, got " .. tostring(yards()))
 	EnterCombat()
 	Advance(0.6)
-	check(yards() == nil, "in a fight again: unknown")
+	check(about(yards(), 7.5), "in a fight again: known")
+	-- A friendly player's nameplate in the fight: no item or interact check about them (the game blocks
+	-- those for units you can't attack in combat: the UNKNOWN() in friends' reports); spells still.
+	MOBS.nameplate2 = { name = "Cedric", level = 22, player = true, friendly = true, classFile = "PRIEST", yards = 12, x = 0.4, y = 0.5 }
+	local blockedBefore = #BLOCKED
+	Advance(1)
+	check(#BLOCKED == blockedBefore, "a friendly player's nameplate in a fight: no item or interact check about them, nothing blocked")
+	MOBS.nameplate2 = nil
 	LeaveCombat()
 	Fire("SPELLS_CHANGED")
 	Advance(0.4)

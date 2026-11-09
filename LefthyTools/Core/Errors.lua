@@ -269,7 +269,12 @@ events:SetScript("OnEvent", function(_, event, addon, func)
 	elseif addon == "LefthyTools" then
 		-- The game sends this while the refused call runs, so the stack shows whose line it was
 		-- (the name alone can be "UNKNOWN").
-		Errors.Add("blocked", ("%s: %s()"):format(event, tostring(func)), debugstack and debugstack(2) or nil)
+		local message = ("%s: %s()"):format(event, tostring(func))
+		local check = LT.rangeCheck -- (the fight stream's range check under way: which one, about whom)
+		if type(check) == "table" then
+			message = ("%s (during %s about %s)"):format(message, tostring(check.label), tostring(LT.rangeUnit))
+		end
+		Errors.Add("blocked", message, debugstack and debugstack(2) or nil)
 	end
 end)
 

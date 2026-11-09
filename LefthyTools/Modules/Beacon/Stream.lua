@@ -21,10 +21,10 @@ local B = ns.Beacon
 -- (UnitPosition answers for group members only), the combat log is closed, raid markers are
 -- hidden. Found by the tests on Forever: range checks answer in combat (harmful spells you know,
 -- items of known range, CheckInteractDistance), so distances work up to 30 yd (further: "beyond",
--- but no range check may be asked about an enemy in a fight: items and CheckInteractDistance, and
--- spells too, are blocked then ("ADDON_ACTION_BLOCKED: UNKNOWN()" in friends' reports, the stack at
--- RangeAnswer's pcall; the game reports it once a session, while the answers still come), so in a
--- fight an enemy's distance is unknown),
+-- but in a fight items and CheckInteractDistance may only be asked about a unit you can attack: about
+-- a friendly player they're blocked ("ADDON_ACTION_BLOCKED: UNKNOWN()" in friends' reports, every
+-- stack through the friendly-player branch; Blizzard's rule since 10.2.0, LibRangeCheck-3.0's
+-- InCombatLockdownRestriction does the same). Spells may be asked about anyone, any time),
 -- on the rim of the 40 yd ring); where a nameplate is on the screen can't be read at all ("Can't
 -- measure restricted regions"); a mob has a nameplate only while it's on your screen; your own
 -- place and facing are exact. So directions are learned as you move and turn (StreamSense.lua).
@@ -140,21 +140,30 @@ function S.RangeChecks()
 	return checks
 end
 
--- ok, answer (like pcall); false, "missing" where this client has no such call; false, "combat": not
--- asked about an enemy in a fight (blocked then, and the player is shown "Interface action failed
--- because of an AddOn"; spells too, though their docs allow it when tainted).
+-- Range checks asked about anyone, in a fight too (the others only about units you can attack then).
+local ANY_UNIT = { ["C_Spell.IsSpellInRange"] = true }
+
+-- ok, answer (like pcall); false, "missing" where this client has no such call; false, "combat": an
+-- item or interact check about a unit you can't attack, in a fight (blocked then, and the player is
+-- shown "Interface action failed because of an AddOn"). LT.rangeCheck / LT.rangeUnit name the call
+-- under way, for an error report should the game block it anyway (no string made per call).
 local function RangeAnswer(check, unit)
 	local f = Api(check.path)
 	if not f then
 		return false, "missing"
 	end
-	if InCombatLockdown() and Value("UnitCanAttack", "player", unit) ~= false then
+	if not ANY_UNIT[check.path] and LT.InCombat() and Value("UnitCanAttack", "player", unit) ~= true then
 		return false, "combat"
 	end
+	LT.rangeCheck, LT.rangeUnit = check, unit
+	local ok, v
 	if check.unitFirst then
-		return pcall(f, unit, check.arg)
+		ok, v = pcall(f, unit, check.arg)
+	else
+		ok, v = pcall(f, check.arg, unit)
 	end
-	return pcall(f, check.arg, unit)
+	LT.rangeCheck, LT.rangeUnit = nil, nil
+	return ok, v
 end
 
 -- The shortest known range a hostile unit is within, and the longest it's beyond (nil: none of the

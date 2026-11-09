@@ -497,5 +497,8 @@ ns.CHANGELOG = {
 	{ id = 163, module = "beacon",
 		en = { "Fight stream: really no blocked action", "Spell range checks on enemies are blocked in a fight too, so sharing your fights no longer asks any: an enemy's distance is unknown while you fight." },
 		de = { "Kampf-Stream: wirklich keine Blockade", "Auch Zauberreichweiten zu Gegnern werden im Kampf blockiert, deshalb fragt das Teilen deiner Kämpfe keine mehr ab: Die Entfernung eines Gegners ist im Kampf unbekannt." } },
+	{ id = 164, module = "beacon",
+		en = { "Fight stream: distances in fights again", "Enemies in a shared fight have their distance again. The blocked action came from range checks on friendly players, which the game refuses in a fight; those are skipped now." },
+		de = { "Kampf-Stream: Entfernungen im Kampf", "Gegner in einem geteilten Kampf haben wieder ihre Entfernung. Die blockierte Aktion kam von Reichweiten-Abfragen zu freundlichen Spielern, die das Spiel im Kampf verweigert; die fallen jetzt weg." } },
 	-- New entries go here, at the end.
 }

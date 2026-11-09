@@ -35,10 +35,10 @@ do
 		and not BB.FixedFor(report(old, "ADDON_ACTION_BLOCKED: Frame:SetPoint()()", "combat: yes, gamepad")),
 		"a frame call blocked with the settings panel open, not without it")
 	local combo = BB.FixedFor(report("0.7.0-33-g91aaf59", "ADDON_ACTION_BLOCKED: UNKNOWN()()", "State: combat yes controller UI no instance party"))
-	check(combo and combo.fixed == "0.7.0-60-g0000000" and not combo.sure
+	check(combo and combo.fixed == "0.7.0-62-g0000000" and not combo.sure
 		and BB.FixedFor(report("0.7.0-38-ga809fad", "ADDON_ACTION_BLOCKED: UNKNOWN()()", ""))
-		and not BB.FixedFor(report("0.7.0-60-gabcdef0", "ADDON_ACTION_BLOCKED: UNKNOWN()()", "")),
-		"a blocked call in fights (the fight stream's range checks): should be fixed in 0.7.0-60")
+		and not BB.FixedFor(report("0.7.0-62-gabcdef0", "ADDON_ACTION_BLOCKED: UNKNOWN()()", "")),
+		"a blocked call in fights (the fight stream's range checks): should be fixed in 0.7.0-62")
 	check(select(3, BB.FixedFor(report(old, "ADDON_ACTION_FORBIDDEN: IsUserOAuthed()()", panel, "deDE"))) == "de",
 		"a German client's report: the German line")
 	check(not BB.FixedFor(report(old, "ADDON_ACTION_FORBIDDEN: SetPreferredGamepadInteractTarget()()", ""))
@@ -66,7 +66,7 @@ do
 	check(en == "LefthyTools note: the error you reported (a blocked action in Blizzard's settings panel) is fixed in build "
 		.. "0.7.0-34. Update with Update-LefthyTools.cmd and restart the game.", "the English line, got " .. tostring(en))
 	check(de:find("^LefthyTools%-Hinweis: Dein gemeldeter Fehler %(eine blockierte Aktion im Kampf, durch die Entfernungen des Kampf%-Streams%) "
-		.. "sollte in Build 0%.7%.0%-60 behoben sein%."), "the German one, \"should be fixed\" (a build not known yet: the line), got " .. de)
+		.. "sollte in Build 0%.7%.0%-62 behoben sein%."), "the German one, \"should be fixed\" (a build not known yet: the line), got " .. de)
 	local word = BB.FixedMessage({ fixed = "0.7.0-90-g1234567", sure = true, en = "a test error", de = "ein Testfehler" }, "de", "0.7.0-60-gabcdef0")
 	local kind, w, more = BB.Parse(word)
 	check(kind == "B" and w == "bf" and more == "0.7.0-90-g1234567;1;a test error",
@@ -138,7 +138,7 @@ do
 	LeaveCombat()
 	Advance(1)
 	lines = toAnna(mark, "M2;")
-	check(#lines == 1 and lines[1]:find("should be fixed in build 0.7.0-60", 1, true), "after it: told, \"should be fixed\"")
+	check(#lines == 1 and lines[1]:find("should be fixed in build 0.7.0-62", 1, true), "after it: told, \"should be fixed\"")
 	mark = #GAMEDATA + 1
 	anna("S2;C;;;;;")
 	annaReports(report("0.7.0-24-g121bdc3", "ADDON_ACTION_FORBIDDEN: UNKNOWN()()", panel))
@@ -171,7 +171,7 @@ do
 	-- A build that reads Beacon's word gets that instead (a fix newer than hers, for the test).
 	table.insert(BB.FIXED_ERRORS, { pattern = "A TEST ERROR", fixed = "0.7.0-90-g1234567", sure = true, en = "a test error", de = "ein Testfehler" })
 	anna("V2;0.7.0-60-gabcdef0")
-	annaReports(report("0.7.0-60-gabcdef0", "A TEST ERROR here", "", "deDE"))
+	annaReports(report("0.7.0-62-gabcdef0", "A TEST ERROR here", "", "deDE"))
 	Advance(1)
 	check(#toAnna(mark, "M2;") == 0 and toAnna(mark, "B2;bf;")[1] == "B2;bf;0.7.0-90-g1234567;1;a test error",
 		"a friend whose build reads it: B2;bf, no LTC line")

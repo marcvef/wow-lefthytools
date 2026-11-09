@@ -1959,8 +1959,9 @@ end
 
 -- Mobs with a nameplate (Beacon's fight stream): MOBS["nameplate1"] = { name, level, class, dead,
 -- combat, attacking (its target is me), casting, yards, x, y (its nameplate's spot, 0-1 across and
--- up the screen; nil: no nameplate frame), guid, north, west }. Range calls answer by yards. Like
--- retail, items don't answer for hostile units in combat, and CheckInteractDistance fails there.
+-- up the screen; nil: no nameplate frame), guid, north, west }. Range calls answer by yards. Like the
+-- game (since 10.2.0): in combat, items and CheckInteractDistance about a unit you can't attack (a
+-- friendly player) are blocked (BLOCKED, "UNKNOWN()"; no answer); about enemies they answer.
 -- A mob with a place in the world (north, west): its distance follows from where I stand, and its
 -- nameplate unit exists only while it's on my screen (within 45 degrees of where I face, 41 yd).
 MOBS = {}
@@ -2114,13 +2115,19 @@ INVTYPE_LEGS, INVTYPE_FEET, INVTYPE_FINGER, INVTYPE_TRINKET = "Legs", "Feet", "F
 INVTYPE_WEAPONMAINHAND, INVTYPE_WEAPON, INVTYPE_2HWEAPON, INVTYPE_WEAPONOFFHAND = "Main Hand", "One-Hand", "Two-Hand", "Off Hand"
 INVTYPE_HOLDABLE, INVTYPE_RANGED, INVTYPE_THROWN, INVTYPE_RELIC = "Held In Off-hand", "Ranged", "Thrown", "Relic"
 INVTYPE_BAG, INVTYPE_QUIVER, INVTYPE_AMMO = "Bag", "Quiver", "Ammo"
+local function FriendInCombat(u)
+	if STATE.combat and MOBS[u] and MOBS[u].friendly then
+		BLOCKED[#BLOCKED + 1] = "UNKNOWN()"
+		return true
+	end
+end
 C_Item.IsItemInRange = function(id, u)
 	local mob = MOBS[u]
-	if not (mob and MobYards(mob) and ITEM_RANGES[id]) or STATE.combat then return nil end
+	if FriendInCombat(u) or not (mob and MobYards(mob) and ITEM_RANGES[id]) then return nil end
 	return MobYards(mob) <= ITEM_RANGES[id]
 end
 function CheckInteractDistance(u, i)
-	if STATE.combat then error("CheckInteractDistance: blocked in combat") end
+	if FriendInCombat(u) then return nil end
 	local mob = MOBS[u]
 	return mob ~= nil and MobYards(mob) ~= nil and MobYards(mob) <= ({ 28, 11, 10 })[i]
 end

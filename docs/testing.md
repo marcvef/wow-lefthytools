@@ -339,7 +339,7 @@ installer from GitHub instead.
     their game said, their server id against yours, whether their client knows you, realm and
     faction. `/lefthy beacon status`: every friend's realm and faction next to yours.
     A friend on a build before 0.7.0-34 whose report says `ADDON_ACTION_FORBIDDEN: IsUserOAuthed()`
-    (or a blocked call with Blizzard's settings panel open; before 0.7.0-60 `ADDON_ACTION_BLOCKED:
+    (or a blocked call with Blizzard's settings panel open; before 0.7.0-62 `ADDON_ACTION_BLOCKED:
     UNKNOWN()`): out of a fight, your chat says "told <friend> the error they reported is fixed in
     ...", theirs one LTC line "LefthyTools note: the error you reported (...) is fixed in build ...
     Update with Update-LefthyTools.cmd and restart the game." (German on a German client). The same

@@ -685,8 +685,10 @@ Listed so far (from `git log v0.7.0..`): `ADDON_ACTION_FORBIDDEN: IsUserOAuthed(
 settings panel, fixed in 0.7.0-34 when the settings moved to a window of our own), and as "should
 be fixed" the same build's `ADDON_ACTION_FORBIDDEN: UNKNOWN()` and `ADDON_ACTION_BLOCKED: Frame:...`
 with `SettingsPanel` in the report, and `ADDON_ACTION_BLOCKED: UNKNOWN()` (the fight stream's item
-and interact range checks on an enemy in a fight, and then the spell ones too, 0.7.0-60; first put down
-to the combo point dots, until a report's stack showed `RangeAnswer`). A fix that removes an error with recognisable text gets
+and interact range checks about a friendly player's nameplate in a fight, 0.7.0-62: Blizzard's rule since
+10.2.0 blocks those in combat for units you can't attack. First put down to the combo point dots, then, wrongly,
+to enemies (0.7.0-52 / -60 dropped enemies' distances in fights for nothing); every report's stack went through
+StreamSense's friendly-player branch). A fix that removes an error with recognisable text gets
 an entry here.
 
 ## Fight stream (Stream*.lua)
