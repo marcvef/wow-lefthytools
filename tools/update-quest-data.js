@@ -628,8 +628,20 @@ async function main() {
     actors.set(key, actor);
   }
 
-  // Zones, faction for quests without one, from their givers.
+  // Zones, faction for quests without one, from their givers. A Forever quest filed under a city (its
+  // server's quest log header) where neither its giver nor its ender stands goes to its giver's zone
+  // (Never Coming Back: given and done in Ashenvale, filed under Thunder Bluff). One filed under a zone
+  // stays: a city's quest for that zone (Beasts of Thunder Ridge, given in Orgrimmar) is that zone's.
+  let moved = 0;
   for (const q of quests.values()) {
+    if (q.source === "forever" && q.zone && world.ui.get(q.zone) && world.ui.get(q.zone).city) {
+      const zonesOf = (keys) => keys.flatMap((k) => (actors.get(k) ? actors.get(k).points : []).flat().map((p) => p[0]));
+      const giver = zonesOf(q.starts.filter((k) => k[0] !== "i")), ender = zonesOf(q.ends);
+      if (giver.length && !giver.includes(q.zone) && !ender.includes(q.zone)) {
+        q.zone = giver[0];
+        moved++;
+      }
+    }
     if (!q.zone && !q.dungeon) {
       for (const k of q.starts.concat(q.ends)) {
         const a = actors.get(k);
@@ -642,6 +654,7 @@ async function main() {
       if (sides.length === 1 && sides[0]) q.faction = sides[0];
     }
   }
+  console.log(`Forever quests moved to their giver's zone: ${moved}`);
 
   // --- objectives and rewards (EG Link's, what Forever's server says, for the quests it has; else classic-db's)
   const xpRows = new Map(t.QuestXP.map((r) => [+r.ID, r]));
