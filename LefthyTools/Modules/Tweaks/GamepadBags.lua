@@ -69,6 +69,7 @@ local tucked = {}     -- Blizzard's buttons we hid (the other bags' buttons, the
 local countText       -- the free slots' count on the one shown
 local bagsToggle      -- the "Bags" header: a button that folds the bag buttons' row away and back
 local peeking = false -- the row open while the controller's cursor is up there (not kept)
+local retargetFrom, retargetTo -- an item used up while another window had the cursor: where it goes on
 local REAGENT_BAG = (Enum and Enum.BagIndex and Enum.BagIndex.ReagentBag) or 5
 local adopted = {}    -- the reagent bag's item buttons in ours -> the window they belong to
 local hushed = {}     -- that window (and its clickable parts) we made unseen -> how they were
@@ -882,25 +883,55 @@ local function Relayout()
 		and stripped.all == RowOpen() and placedAllFree == Setting("gamepadBagAllFree", false) then
 		return
 	end
+	-- The item the cursor is on, or (another window has it: a clam opened, its loot window) the one
+	-- SmartNavigation goes back to in the bag (its last button, else its target).
 	local current = SmartNavigation and SmartNavigation.GetCurrentButton and SmartNavigation:GetCurrentButton()
-	local was = current and laidOut[current]
+	local focus = current and laidOut[current] and current
+	if not focus and SmartNavigation and SmartNavigation.GetPanelInfo then
+		local info = SmartNavigation:GetPanelInfo(frame, true)
+		local back = info and (info.lastButton or info.targetButton)
+		focus = back and laidOut[back] and back
+	end
+	local was = focus and laidOut[focus]
 	if not Place(frame, groups, StripButtons()) then
 		Unapply()
 		return
 	end
 	FixNavigation(frame, true)
 	NavLater()
-	if was and laidOut[current] ~= was then
+	if was and laidOut[focus] ~= was then
+		-- That slot moved or emptied (sold, used up): the item now in its place, like the next junk.
 		local now = order[math.min(was, #order)]
-		if now and now ~= current then
+		if now and now ~= focus then
 			Nav("SetTargetButtonForFrame", frame, now)
+			if focus ~= current then
+				-- Not the bag's turn: back in it, SmartNavigation picks its last button first (which
+				-- addon code may not change), so that's moved on as soon as it's picked (OnSelect).
+				retargetFrom, retargetTo = focus, now
+			end
 		end
+	end
+end
+
+-- SmartNavigation picked a button (post-hook): the slot of an item used up while another window had
+-- the cursor: on the next frame the cursor goes on to the item in its place.
+local function OnSelect(_, button)
+	if retargetFrom and button == retargetFrom then
+		local to = retargetTo
+		retargetFrom, retargetTo = nil, nil
+		C_Timer.After(0, function()
+			local frame = Bag()
+			if applied and frame:IsShown() and laidOut[to] then
+				Nav("SetTargetButtonForFrame", frame, to)
+			end
+		end)
 	end
 end
 
 -- The bag closed: our jumps go (a bag opened in a fight gets Blizzard's layout, which they don't fit).
 local function OnBagHidden()
 	peeking = false -- (opened for the cursor: folded at the next opening)
+	retargetFrom, retargetTo = nil, nil
 	wipe(wantUp); wipe(wantDown)
 	ApplyJumps(false)
 	if next(jumped) then
@@ -971,6 +1002,9 @@ local function Hook()
 	end
 	if GameTooltip and type(GameTooltip.SetBagItem) == "function" then
 		hooksecurefunc(GameTooltip, "SetBagItem", PlaceTooltip)
+	end
+	if SmartNavigation and type(SmartNavigation.SelectButton) == "function" then
+		hooksecurefunc(SmartNavigation, "SelectButton", OnSelect)
 	end
 	HookPanelCallback(frame)
 end

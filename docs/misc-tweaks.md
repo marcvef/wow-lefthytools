@@ -134,6 +134,9 @@ the bag without laying it out, a currency watched: our height kept) and `UpdateI
 items after `BAG_UPDATE`: sorted again on the next frame, moved only if the order or the sections changed).
 Selling or using up the selected item: the cursor goes to the button now in its place
 (`SetTargetButtonForFrame`), so selling junk goes on to the next junk instead of jumping to the free slots.
+An item used up while another window has the cursor (a clam opened: its loot window takes it) works the same:
+back in the bag SmartNavigation picks its `lastButton` first (only Blizzard's code may change it), the emptied slot,
+so a post-hook on `SmartNavigation:SelectButton` moves the cursor on to the item in its place on the next frame.
 
 **Navigation.** `ContainerFrameCombinedBagsMixin:SmartNavPanelInfoAdded` turns on SmartNavigation's grid
 mode, which sorts the buttons into columns by their x and moves by index within a column

@@ -149,6 +149,26 @@ do
 	Wait(0.05)
 	check((SMART_NAV.calls.RefreshButtonGroups or 0) == refreshes + 1, "nothing changed: nothing moved, nothing told")
 
+	-- Used up while another window has the cursor (a clam opened: its loot window): back in the bag,
+	-- the cursor goes on to the item in its place, not the emptied slot.
+	local used = Slot(0, 3)
+	local usedAt
+	for i, b in ipairs(State().order) do if b == used then usedAt = i end end
+	SMART_NAV.panels[bag].lastButton = used
+	SMART_NAV.current = nil -- (the loot window's button)
+	BAGS[0][3] = nil
+	bag:UpdateItems()
+	Wait(0.05)
+	local inPlace = State().order[usedAt]
+	check(usedAt and inPlace and inPlace ~= used and SMART_NAV.panels[bag].targetButton == inPlace, "used up elsewhere: the bag's target, the item in its place")
+	SmartNavigation:SelectButton(used) -- (the loot window closed: SmartNavigation goes back to its last button)
+	Wait(0.05)
+	check(SMART_NAV.current == inPlace, "back in the bag: the cursor on the item in its place, not the emptied slot")
+	SMART_NAV.panels[bag].lastButton = nil
+	BAGS[0][3] = 9004
+	bag:UpdateItems()
+	Wait(0.05)
+
 	-- A fight: ours stays and sorts new items in (the bag and its buttons aren't protected); only
 	-- SmartNavigation hears of it after the fight (it refuses addon calls then).
 	EnterCombat()

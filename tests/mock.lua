@@ -1763,6 +1763,7 @@ end
 SmartNavigation = {
 	GetPanelInfo = function(_, frame, dontCreate) if dontCreate then return SMART_NAV.panels[frame] end return SMART_NAV.Open(frame) end,
 	GetCurrentButton = function() return SMART_NAV.current end,
+	SelectButton = function(_, button) SMART_NAV.current = button end,
 	RefreshButtonGroups = NavCall("RefreshButtonGroups", function(_, frame) SMART_NAV.Open(frame) end),
 	SetUseGridNavigation = NavCall("SetUseGridNavigation", function(_, frame, on)
 		local info = SMART_NAV.panels[frame]
