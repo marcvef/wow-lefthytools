@@ -130,6 +130,58 @@ function V.OpenQuest(id)
 	end
 end
 
+-- A quest's chain in the window: its zone, the quest picked, the chain in the middle with its card in
+-- sight (Q.OpenChain; without it the quest).
+function V.OpenChain(id)
+	if id and Q.OpenChain then
+		Q.OpenChain(id)
+	else
+		V.OpenQuest(id)
+	end
+end
+
+-- A chain's badge on a row ("2/4"): a Button of its own over the row (the controller reaches it), a
+-- faint gold pill; hovering lights it and says what it is (b.title, b.line), a click opens the chain
+-- (b.quest: V.OpenChain). The row's own click stays the row's.
+function V.NewBadge(parent)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(40, 16)
+	b.Back = b:CreateTexture(nil, "BACKGROUND")
+	b.Back:SetAllPoints()
+	b.Back:SetColorTexture(1, 0.82, 0, 0.1)
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	b.Text:SetPoint("CENTER", 0, 0)
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:SetScript("OnEnter", V.BadgeEnter)
+	b:SetScript("OnLeave", V.Untip)
+	b:SetScript("OnClick", function(self)
+		V.Untip(self)
+		V.OpenChain(self.quest)
+	end)
+	b:Hide()
+	return b
+end
+
+-- A badge for a quest: "2/4" (nil text: hidden), its tooltip's title and line.
+function V.SetBadge(b, id, text, title, line)
+	b.quest, b.title, b.line = text and id or nil, title, line
+	b.Text:SetText(text and (Q.COLOR.progress .. text .. "|r") or "")
+	b:SetShown(text ~= nil)
+end
+
+function V.BadgeEnter(self)
+	if not self.quest then
+		return
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(self.title or "?", 1, 0.82, 0)
+	if self.line then
+		GameTooltip:AddLine(self.line, 1, 1, 1)
+	end
+	GameTooltip:AddLine(L["Click: open the chain"], 0.5, 0.75, 1)
+	GameTooltip:Show()
+end
+
 -- The module's setting friends (on without the module).
 function V.FriendsOn()
 	local m = Q.module
@@ -1052,6 +1104,9 @@ function C.QuestEnter(self)
 		GameTooltip:AddLine(L["Turn in: %s"]:format(EnderText(e)) .. (e.ready and e.far and (" · " .. e.far) or ""), 0.8, 0.8, 0.8, true)
 	end
 	GameTooltip:AddLine(L["Click: open it in the quest browser"], 0.5, 0.75, 1)
+	if e.chain then
+		GameTooltip:AddLine(L["Click %s: open the chain"]:format(e.at .. "/" .. #e.chain), 0.5, 0.75, 1)
+	end
 	if e.spot then
 		local where = e.spotObjective and (e.spotObjective.name or e.spotObjective.text) or (e.ender and e.ender.name) or ""
 		GameTooltip:AddLine(L["Right-click: map pin at %s"]:format(where), 0.5, 0.75, 1, true)
@@ -1059,9 +1114,10 @@ function C.QuestEnter(self)
 	GameTooltip:Show()
 end
 
--- A quest of my log, one line in columns: its verb icon, "[12] Title", its chain's "2/4", its first
--- objective not done ("3/10 Defias Bandit", how far) or "Ready to turn in", and at the right where
--- it's turned in. A click opens it in the window; a right-click sets the map pin where to go.
+-- A quest of my log, one line in columns: its verb icon, "[12] Title", its chain's "2/4" (a badge: a
+-- click opens the chain), its first objective not done ("3/10 Defias Bandit", how far) or "Ready to
+-- turn in", and at the right where it's turned in. A click opens it in the window; a right-click
+-- sets the map pin where to go.
 function C.NewQuest(parent, width)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(width, QUEST_H)
@@ -1083,7 +1139,7 @@ function C.NewQuest(parent, width)
 	end
 	b.Title = Column("GameFontHighlight")
 	b.Title:SetPoint("LEFT", 28, 0)
-	b.Badge = Column("GameFontNormalSmall", "RIGHT")
+	b.Badge = V.NewBadge(b)
 	b.Badge:SetPoint("LEFT", b.Title, "RIGHT", 4, 0)
 	b.Todo = Column("GameFontHighlightSmall")
 	b.Todo:SetPoint("LEFT", b.Badge, "RIGHT", 12, 0)
@@ -1115,8 +1171,11 @@ function C.FillQuest(b, entry)
 	local todoW = math.floor(w * 0.3)
 	b.Title:SetWidth(titleW - 28)
 	b.Title:SetText(Q.LevelTitle(e.id, e.quest))
-	b.Badge:SetWidth(40)
-	b.Badge:SetText(e.chain and Q.COLOR.progress .. e.at .. "/" .. #e.chain .. "|r" or "")
+	if e.chain then
+		V.SetBadge(b.Badge, e.id, e.at .. "/" .. #e.chain, Q.Title(e.chain[1]), L["Step %d of %d"]:format(e.at, #e.chain))
+	else
+		V.SetBadge(b.Badge, nil, nil)
+	end
 	b.Todo:SetWidth(todoW)
 	b.Todo:SetText(TodoText(e))
 	b.Right:SetWidth(math.max(40, w - titleW - 40 - 16 - todoW - 16))
@@ -1177,13 +1236,15 @@ function C.NextEnter(self)
 		GameTooltip:AddLine(L["From %s"]:format((n.giver.name or L["unknown"]) .. (zone and (", " .. zone) or "")), 0.8, 0.8, 0.8, true)
 	end
 	GameTooltip:AddLine(L["Click: open it in the quest browser"], 0.5, 0.75, 1)
+	GameTooltip:AddLine(L["Click %s: open the chain"]:format(c.done .. "/" .. c.total), 0.5, 0.75, 1)
 	if n.point then
 		GameTooltip:AddLine(L["Right-click: map pin at %s"]:format(n.giver and n.giver.name or ""), 0.5, 0.75, 1, true)
 	end
 	GameTooltip:Show()
 end
 
--- A storyline to go on with: "<chain> - next: [12] <title>, <giver> (<zone>)", its "3/7" at the right.
+-- A storyline to go on with: "<chain> - next: [12] <title>, <giver> (<zone>)", its "3/7" at the right
+-- (a badge: a click opens the chain, its next step picked).
 function C.NewNext(parent, width)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(width, QUEST_H)
@@ -1196,9 +1257,8 @@ function C.NewNext(parent, width)
 	b.Text:SetPoint("LEFT", 28, 0)
 	b.Text:SetJustifyH("LEFT")
 	b.Text:SetWordWrap(false)
-	b.Right = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	b.Right:SetPoint("RIGHT", -8, 0)
-	b.Right:SetJustifyH("RIGHT")
+	b.Badge = V.NewBadge(b)
+	b.Badge:SetPoint("RIGHT", -8, 0)
 	b:SetScript("OnEnter", C.NextEnter)
 	b:SetScript("OnLeave", V.Untip)
 	b:SetScript("OnClick", function(self, button)
@@ -1228,8 +1288,7 @@ function C.FillNext(b, entry)
 	else
 		text = L["%s - next: %s"]:format(GOLD .. n.title .. "|r", title)
 	end
-	b.Right:SetText(n.chain.done .. "/" .. n.chain.total)
-	b.Right:SetWidth(50)
+	V.SetBadge(b.Badge, n.id, n.chain.done .. "/" .. n.chain.total, n.title, L["%d of %d steps done"]:format(n.chain.done, n.chain.total))
 	b.Text:SetWidth(w - 28 - 60)
 	b.Text:SetText(text)
 end

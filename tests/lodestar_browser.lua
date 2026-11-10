@@ -22,7 +22,10 @@
 -- stubs for other zones and a click on one, the way back to a locked quest across zones, the pulse,
 -- the line under it); the filters (all levels, not for me, a skipped quest stays), the canvas (pools,
 -- scrolling, zoom, a card the controller reaches out of sight), the quest list (groups, the skipped
--- with the done ones, reasons; a dungeon's Zone tab), the search, the views other files register
+-- with the done ones, reasons; a dungeon's Zone tab), the switch Map | Chain over the middle (greyed
+-- when no chain applies, saying why; one click each way; its label following the quest picked; cut
+-- short beside the way back to the results), the chain badges on the rows ("2/4": the chain opened,
+-- the quest picked, its card in sight; the rows' tooltips; Q.OpenChain), the search, the views other files register
 -- (lazily built, shown, hidden, refreshed, Q.ShowBrowserView, Q.SelectZone, Q.OpenBrowser from one,
 -- one that fails), events and data changes redrawn on the next frame only while it's open (my
 -- progress in the quest log, items the client learns), a small screen, the controller's buttons.
@@ -624,9 +627,13 @@ do
 	openChain(CHAIN1)
 	check(st.chain == CHAIN1 and view.g.frame:IsShown() and not view.zp:IsShown() and view.tabs.zone.Line:IsShown(), "a click on its card: the chain's page")
 	local h = view.head
-	check(h.Back:IsShown() and plain(h.Back.Text:GetText()) == "Elwynn Forest" and h.Title:GetText() == "Elwynn's Kobolds" and h.Dot:IsShown()
+	check(not h.Back and h.Title:GetText() == "Elwynn's Kobolds" and h.Dot:IsShown() and h.Dot.points[1][2] == 0
 		and plain(h.Count:GetText()) == "2 of 9 steps done" and plain(h.Sub:GetText()) == "In your log: Investigate Echo Ridge",
-		"its head: back to the zone, its colour, name, how far along, what's next")
+		"its head: its colour, name, how far along, what's next (the way back is the switch's Map above it)")
+	local sw = view.switch
+	check(sw:IsShown() and sw.chain.on and not sw.map.on and sw.chain.Line:IsShown() and not sw.map.Line:IsShown()
+		and plain(sw.chain.Text:GetText()) == "Chain: Elwynn's Kobolds" and sw.chain.Count:GetText() == "2/9",
+		"the switch: Chain lit, its name and how far along")
 	check(graphOutline() == "101@0 107@0 102@1 104@2 103@2 106@3 105@3 108@4 201@4*",
 		"a row per stage, side by side where it forks, ordered by where what leads to them is; another zone's step a stub, got " .. graphOutline())
 	local a, b, c, d = item(101), item(102), item(103), item(104)
@@ -638,10 +645,15 @@ do
 		and plain(br.Sub:GetText()) == "Level 1-10 · 9 quests · 1 steps elsewhere" and plain(br.Count:GetText()) == "2 of 9 steps done"
 		and plain(br.Line:GetText()) == "In your log: Investigate Echo Ridge" and heads(br.heads) == "Steps | Friends",
 		"nothing picked: the chain's briefing on the right: its colour, name, levels, how far along, what's next, got " .. plain(br.Sub:GetText()))
-	check(briefRows() == "101 102 107 103 104 105 106 108 201" and plain(br.rows[1].Text:GetText()) == "1. [1] A Threat Within"
+	check(briefRows() == "101 102 107 103 104 105 106 108 201" and plain(br.rows[1].Text:GetText()) == "[1] A Threat Within"
 		and plain(br.rows[1].Right:GetText()) == "Completed" and br.rows[1].Icon.atlas == "common-icon-checkmark"
 		and plain(br.rows[5].Right:GetText()) == "Marshal Dughan" and plain(br.rows[6].Right:GetText()) == "Needs Investigate Echo Ridge",
 		"its steps, each a row: done ones ticked, the giver for one I can take, else the reason, got " .. briefRows())
+	check(br.rows[1].Badge:IsShown() and plain(br.rows[1].Badge.Text:GetText()) == "1/9" and plain(br.rows[6].Badge.Text:GetText()) == "6/9"
+		and br.rows[6].Badge._kind == "Button" and br.rows[6].Badge._points[1][1] == "RIGHT"
+		and br.rows[6].Badge._points[1][2] == -(br.rows[6].Right:GetStringWidth() + 12),
+		"each step's badge says which (\"6/9\"), left of its reason, got " .. tostring(br.rows[1].Badge:IsShown()) .. " "
+		.. plain(br.rows[1].Badge.Text:GetText()) .. " " .. plain(br.rows[6].Badge.Text:GetText()) .. " " .. tostring(br.rows[6].Badge._points[1][2]))
 	check(plain(br.Friends:GetText()) == "Anna Brook  1 of 9\nBob  0 of 9", "friends on it, got " .. plain(br.Friends:GetText()))
 	br.rows[6]:Click()
 	check(st.picked == 105 and st.chain == CHAIN1 and view.g.frame:IsShown() and plain(view.d.Back.Text:GetText()) == "Elwynn's Kobolds",
@@ -753,7 +765,7 @@ do
 	check(st.path and st.path.elsewhere == 2 and card(105).Order:GetText() == "2" and card(105):GetAlpha() == 1
 		and plain(view.head.Sub:GetText()) == "To take it, do 2 quests first, 2 of them in other zones",
 		"locked: the way back across zones (the stub lights up), got " .. plain(view.head.Sub:GetText()))
-	view.head.Back:Click()
+	view.switch.map:Click()
 	check(st.chain == nil and view.zp:IsShown() and st.path == nil and view.zp.map.map == WESTFALL and st.picked == 201,
 		"back: the zone's page, the quest still picked")
 	zoneRow("z:1429"):Click()
@@ -770,13 +782,13 @@ do
 	view.filters.allLevels:Click()
 	check(filters.allLevels and graphOutline() == before, "an opened chain shows every level anyway")
 	view.filters.allLevels:Click()
-	view.head.Back:Click()
+	view.switch.map:Click()
 	view.filters.showOther:Click()
 	openChain(SINGLES)
 	check(graphOutline() == "110 112 111" and card(112):GetAlpha() == 0.55, "not for me: shown, dimmed, got " .. graphOutline())
 	view.filters.showOther:Click()
 	check(graphOutline() == "110 111", "off: not shown, the quests without a chain every level too, got " .. graphOutline())
-	view.head.Back:Click()
+	view.switch.map:Click()
 	-- A step not for me between two shown: the line passes through, fainter; a skipped one stays.
 	STATUS_OF[102], WHY[102] = "other", "class"
 	Q.ToggleBrowser(); Q.ToggleBrowser()
@@ -794,7 +806,7 @@ do
 	STATUS_OF[102], WHY[102] = "done", nil
 	Q.ToggleBrowser(); Q.ToggleBrowser()
 	check(not filters.allLevels and not filters.showOther, "all off again")
-	view.head.Back:Click()
+	view.switch.map:Click()
 	-- The zone page: a chain with nothing within my levels left out (a line says so), the done ones folded.
 	FAR[201], STATUS_OF[301], STATUS_OF[202] = true, "done", "done"
 	zoneRow("z:1436"):Click()
@@ -1002,7 +1014,7 @@ do
 	check(#pins == 4 and pins[1].uiMapID == ELWYNN and pins[1].x == 0.42 and pins[2].x == 0.48 and pins[3].x == 0.42 and pins[4].x == 0.47
 		and pins.tracked == true, "its giver's, its turn-in's and its objective's line, Map pin: a pin there, tracked")
 	-- An item: its best drop, the rest in the tooltip.
-	view.head.Back:Click()
+	view.switch.map:Click()
 	unpick()
 	openChain(SINGLES)
 	card(110):Click()
@@ -1016,7 +1028,7 @@ do
 	d.places[1]:Click()
 	check(pins[5] and pins[5].x == 0.3, "a drop's line: a pin there")
 	pins.off()
-	view.head.Back:Click()
+	view.switch.map:Click()
 	-- From the details: the chain opened in the middle.
 	Q.OpenBrowser(101)
 	check(st.chain == nil and st.picked == 101 and view.zp:IsShown() and marker("Marshal Dughan").Ring:IsShown(),
@@ -1031,7 +1043,7 @@ do
 	check(st.picked == 104 and not d.ObjHead:IsShown() and not d.RewardHead:IsShown() and d.places[1]:IsShown() and d.Pin.point.x == 0.42,
 		"without Q.Objectives and Q.Rewards: no objectives or rewards, the rest there")
 	Q.Objectives, Q.Rewards = stand.Objectives, stand.Rewards
-	view.head.Back:Click()
+	view.switch.map:Click()
 end
 
 section("Lodestar: the big window, across zones")
@@ -1120,6 +1132,151 @@ do
 	view.filters.allLevels:Click()
 	view.tabs.zone:Click()
 	check(st.tab == "zone" and view.zp:IsShown() and st.chain == nil, "the zone's tab: its page")
+end
+
+section("Lodestar: the big window, the switch Map | Chain")
+do
+	local sw = view.switch
+	zoneRow("z:1429"):Click()
+	local right = 0
+	for _, tab in pairs(view.tabs) do
+		if tab:IsShown() then right = math.max(right, tab._points[1][2] + tab:GetWidth()) end
+	end
+	local at = sw._points[1][2]
+	check(sw:IsShown() and sw:GetParent() == view.tabBar and at == right + 4 + 12 and sw.map._kind == "Button" and sw.chain._kind == "Button",
+		"on the Zone tab a switch of our own two buttons, right after the tabs, got x " .. tostring(at))
+	check(plain(sw.map.Text:GetText()) == "Map" and sw.map.on and sw.map.Line:IsShown() and plain(sw.chain.Text:GetText()) == "Chain"
+		and sw.chain.off and not sw.chain.on and sw.chain.Text.color[1] == 0.45 and sw.chain.Count:GetText() == "",
+		"nothing picked: Map lit, Chain greyed")
+	sw.chain._scripts.OnEnter(sw.chain)
+	check(TOOLTIP.title == "Chain" and plain(TOOLTIP.lines[1]) == "Pick a quest of a chain (on the map or on the right): its chain opens here."
+		and not sw.chain.Hover:IsShown(), "its tooltip says why (no hover light on a greyed half)")
+	sw.chain._scripts.OnLeave(sw.chain)
+	sw.chain:Click()
+	check(st.chain == nil and view.zp:IsShown(), "a click on it: nothing")
+	marker("drops here (12%)"):Click()
+	check(st.picked == 110 and sw.chain.off and plain(sw.chain.Text:GetText()) == "Chain", "a quest in no chain picked: still greyed")
+	sw.chain._scripts.OnEnter(sw.chain)
+	check(plain(TOOLTIP.lines[1]) == "Wolves Across the Border is in no quest chain.", "it says so, got " .. plain(TOOLTIP.lines[1]))
+	sw.chain._scripts.OnLeave(sw.chain)
+	-- A quest of a chain picked: its chain offered, how far along.
+	local trees, layouts = st.trees_built, st.layouts_built
+	marker("Wanted Poster")._scripts.OnEnter(marker("Wanted Poster"))
+	check(TOOLTIP.lines[#TOOLTIP.lines - 1] == "Then Chain above the map: its quest chain", "a pin of a chain's quest: its tooltip says where its chain is")
+	marker("Wanted Poster")._scripts.OnLeave(marker("Wanted Poster"))
+	marker("Wanted Poster"):Click()
+	check(st.picked == 104 and not sw.chain.off and not sw.chain.on and sw.map.on and plain(sw.chain.Text:GetText()) == "Chain: Elwynn's Kobolds"
+		and sw.chain.Count:GetText() == "2/9" and sw.chain.Text.color[1] == 0.8, "picked: Chain offers its chain and how far along")
+	check(st.trees_built == trees and st.layouts_built == layouts, "nothing worked out again for it (kept)")
+	sw.chain._scripts.OnEnter(sw.chain)
+	check(TOOLTIP.title == "Elwynn's Kobolds" and TOOLTIP.lines[1] == "2 of 9 steps done" and TOOLTIP.lines[2] == "Click: open the chain"
+		and sw.chain.Hover:IsShown(), "its tooltip, a hover light")
+	sw.chain._scripts.OnLeave(sw.chain)
+	sw.chain:Click()
+	check(st.chain == CHAIN1 and view.g.frame:IsShown() and not view.zp:IsShown() and st.picked == 104 and card(104) and card(104).Glow:IsShown()
+		and sw.chain.on and not sw.map.on and sw._points[1][2] == at, "one click: the chain, the quest picked in it; the switch where it was, Chain lit")
+	local it = item(104)
+	check(it.x * view.g.zoom >= view.g.sx * view.g.zoom - 1 and it.y >= view.g.sy and it.y + 48 <= view.g.sy + view.g.h / view.g.zoom,
+		"its card in sight")
+	sw.map._scripts.OnEnter(sw.map)
+	check(TOOLTIP.title == "Elwynn Forest" and TOOLTIP.lines[1] == "Click: back to the map", "Map's tooltip")
+	sw.map._scripts.OnLeave(sw.map)
+	sw.map:Click()
+	check(st.chain == nil and view.zp:IsShown() and st.picked == 104 and marker("Wanted Poster").Ring:IsShown() and sw.map.on and not sw.chain.on
+		and plain(sw.chain.Text:GetText()) == "Chain: Elwynn's Kobolds", "and one click back: the map, the quest still picked")
+	-- Another quest picked: the label follows.
+	Q.OpenBrowser(301)
+	check(st.where == "z:1436" and st.picked == 301 and plain(sw.chain.Text:GetText()) == "Chain: Red Silk Bandanas" and sw.chain.Count:GetText() == "0/2",
+		"another quest picked: its chain's name, got " .. plain(sw.chain.Text:GetText()))
+	Q.OpenBrowser(201)
+	check(st.picked == 201 and plain(sw.chain.Text:GetText()) == "Chain: Elwynn's Kobolds", "and again")
+	-- A chain opened from its card (nothing picked): Map and back to it, one click each.
+	zoneRow("z:1429"):Click()
+	openChain(CHAIN1)
+	check(st.picked == nil and sw.chain.on and plain(sw.chain.Text:GetText()) == "Chain: Elwynn's Kobolds", "a chain's card: Chain lit")
+	sw.map:Click()
+	check(st.chain == nil and not sw.chain.off and plain(sw.chain.Text:GetText()) == "Chain: Elwynn's Kobolds", "Map: the chain left is still offered")
+	sw.chain:Click()
+	check(st.chain == CHAIN1 and view.g.frame:IsShown(), "and back to it")
+	sw.map:Click()
+	zoneRow("z:1436"):Click()
+	check(sw.chain.off, "another zone: nothing offered (nothing picked there)")
+	-- The quests without a chain opened: named as they are.
+	zoneRow("z:1429"):Click()
+	openChain(SINGLES)
+	check(plain(sw.chain.Text:GetText()) == "Quests without a chain" and sw.chain.on, "the quests without a chain: their name")
+	sw.map:Click()
+	-- Only on the Zone tab; a dungeon's left half is its quest list.
+	view.tabs.overview:Click()
+	check(not sw:IsShown(), "not on the quest list")
+	view.tabs.zone:Click()
+	zoneRow("d:The Deadmines"):Click()
+	check(sw:IsShown() and plain(sw.map.Text:GetText()) == "Quests" and sw.chain.off, "a dungeon: Quests | Chain")
+	sw.map._scripts.OnEnter(sw.map)
+	check(TOOLTIP.title == "The Deadmines" and TOOLTIP.lines[1] == "Shown now", "its tooltip")
+	sw.map._scripts.OnLeave(sw.map)
+	zoneRow("z:1429"):Click()
+	-- A long name: the chain's half as wide as there's room for (beside the way back to the results too).
+	local step = Q.ChainStep
+	Q.ChainStep = function(id) local a, b = step(id); return a, b, a and string.rep("A very long chain name ", 12) end
+	view.Box:SetText("echo")
+	Wait(0.5)
+	listRow(103):Click()
+	check(view.Back:IsShown() and sw:IsShown() and sw._points[1][2] + sw:GetWidth() <= view.tabBar:GetWidth() - view.Back:GetWidth() - 8
+		and sw.chain.Text.width < #sw.chain.Text:GetText() * 6, "a long name is cut short: the switch keeps beside the way back to the results")
+	view.Clear:Click()
+	Q.ChainStep = step
+	unpick()
+end
+
+section("Lodestar: the big window, chain badges")
+do
+	view.tabs.overview:Click()
+	local row, plainRow = listRow(104), listRow(110)
+	check(row.Badge:IsShown() and plain(row.Badge.Text:GetText()) == "5/9" and row.Badge._kind == "Button" and not plainRow.Badge:IsShown()
+		and row.Badge._points[1][2] == -168, "the quest list: a quest of a chain has its badge (its step, as the details count it), left of the giver; one in none hasn't")
+	check(row.Name._points[2][2] == -170 - row.Badge:GetWidth() - 6 and plainRow.Name._points[2][2] == -170, "the title leaves it room")
+	row._scripts.OnEnter(row)
+	check(TOOLTIP.lines[#TOOLTIP.lines - 1] == "Click: details" and TOOLTIP.lines[#TOOLTIP.lines] == "Click 5/9: open the chain",
+		"the row's tooltip says what each click does")
+	row._scripts.OnLeave(row)
+	row.Badge._scripts.OnEnter(row.Badge)
+	check(TOOLTIP.title == "Elwynn's Kobolds" and TOOLTIP.lines[1] == "Step 5 of 9" and TOOLTIP.lines[2] == "Click: open the chain",
+		"the badge's own tooltip")
+	row.Badge._scripts.OnLeave(row.Badge)
+	plainRow:Click()
+	check(st.tab == "overview" and st.picked == 110, "a click on a row elsewhere: as before (picked, the quest list stays)")
+	row.Badge:Click()
+	check(st.tab == "zone" and st.chain == CHAIN1 and view.g.frame:IsShown() and st.picked == 104 and card(104).Glow:IsShown()
+		and view.switch.chain.on and M.db.browser.tab == "zone", "the badge clicked: the chain in the middle on the Zone tab, the quest picked")
+	-- The right pane's rows: in progress here (and the chain's steps).
+	view.switch.map:Click()
+	unpick()
+	local b = view.b.rows[1]
+	check(b.quest == 103 and b.Sub:IsShown() and b.Badge:IsShown() and plain(b.Badge.Text:GetText()) == "4/9" and b.Badge._points[1][1] == "TOPRIGHT",
+		"in progress here: its badge at the right of its title line")
+	b._scripts.OnEnter(b)
+	check(TOOLTIP.lines[#TOOLTIP.lines] == "Click 4/9: open the chain", "its tooltip")
+	b._scripts.OnLeave(b)
+	b.Badge:Click()
+	check(st.chain == CHAIN1 and st.picked == 103 and card(103).Glow:IsShown(), "clicked: its chain, the quest picked")
+	unpick()
+	local step = view.b.rows[8]
+	check(step.quest == 108 and plain(step.Badge.Text:GetText()) == "8/9", "the chain's steps")
+	step.Badge:Click()
+	check(st.chain == CHAIN1 and st.picked == 108 and card(108).Glow:IsShown(), "a step's badge: picked on the chain shown")
+	unpick()
+	view.b.rows[9].Badge:Click()
+	check(st.where == "z:1436" and st.chain == "z:1436:101" and st.picked == 201, "a step elsewhere: its place, the chain there")
+	-- Q.OpenChain (other files: My quests' badges).
+	Q.ToggleBrowser()
+	check(Q.OpenChain(105) == true and win:IsShown() and st.where == "z:1429" and st.tab == "zone" and st.chain == CHAIN1 and st.picked == 105
+		and card(105) and card(105).Glow:IsShown(), "Q.OpenChain(id): the window opens on its zone, its chain shown, the quest picked")
+	Q.ShowBrowserView("overview")
+	check(Q.OpenChain(110) == false and st.picked == 110 and st.chain == nil, "a quest in no chain: opened as Q.OpenBrowser does, false")
+	check(Q.OpenChain(424242) == false and Q.OpenChain(nil) == false, "an unknown quest: false")
+	view.tabs.zone:Click()
+	unpick()
 end
 
 section("Lodestar: the big window, the search")
@@ -1264,7 +1421,7 @@ do
 	Wait(0.6)
 	check(st.draws == draws + 4, "two right after each other: one drawing")
 	check(win:GetScript("OnUpdate") == nil, "nothing due: no OnUpdate")
-	view.head.Back:Click()
+	view.switch.map:Click()
 	unpick()
 	check(plain(chainCard(CHAIN1).Count:GetText()) == "3/9" and plain(chainCard(CHAIN1).Next:GetText()) == "Next: Speak with Willem · Guard Roberts",
 		"the zone page's card too: nothing in my log, the first I can take, got " .. plain(chainCard(CHAIN1).Next:GetText()))
@@ -1296,7 +1453,7 @@ do
 	check(plain(card(111).Title:GetText()) == "[9] Prinzessin muss sterben", "it came: the card shows it")
 	QUESTS = {}
 	C_QuestLog.RequestLoadQuestByID = nil
-	view.head.Back:Click()
+	view.switch.map:Click()
 end
 
 section("Lodestar: the big window, the data changing")
@@ -1428,10 +1585,17 @@ do
 		for _, b in pairs(list) do buttons = buttons and b._kind == "Button" end
 	end
 	for _, a in ipairs(m.areas) do buttons = buttons and a.Button._kind == "Button" end
+	local badges = 0
+	for _, list in ipairs({ view.list.rows, view.b.rows }) do
+		for _, row in pairs(list) do
+			buttons = buttons and row.Badge._kind == "Button" and row.Badge:GetParent() == row
+			badges = badges + 1
+		end
+	end
 	check(buttons and view.d.Small._kind == "Button" and view.d.Pin._kind == "Button" and view.d.Back._kind == "Button" and view.d.ChainBtn._kind == "Button"
-		and view.Clear._kind == "Button" and view.Back._kind == "Button" and view.head.Back._kind == "Button" and view.zp.Suggest._kind == "Button"
-		and #view.d.objectives > 0 and #view.d.items > 0 and #m.areas > 0,
-		"every card, pin, area, row, tab, filter, link, reward, the map's zoom and the pane's buttons: buttons the controller reaches")
+		and view.Clear._kind == "Button" and view.Back._kind == "Button" and view.switch.map._kind == "Button" and view.switch.chain._kind == "Button"
+		and view.zp.Suggest._kind == "Button" and badges > 0 and #view.d.objectives > 0 and #view.d.items > 0 and #m.areas > 0,
+		"every card, pin, area, row, its chain badge, tab, the switch's halves, filter, link, reward, the map's zoom and the pane's buttons: buttons the controller reaches")
 	check(view.g.frame:GetScript("OnMouseDown") == nil and view.g.frame:GetScript("OnMouseUp") == nil
 		and m.frame:GetScript("OnMouseDown") == nil and m.frame:GetScript("OnMouseUp") == nil,
 		"the canvas and the map themselves aren't (no mouse down or up script)")
@@ -1441,7 +1605,7 @@ do
 	end
 	check(not blizzard, "nothing of Blizzard's on our frames")
 	-- The controller's cursor on a pin out of sight: the map moves there.
-	view.head.Back:Click()
+	view.switch.map:Click()
 	m.buttons.plus:Click()
 	m.buttons.plus:Click()
 	m.buttons.plus:Click()

@@ -11,8 +11,11 @@ ns.Lodestar = Q
 -- (by continent, each with its level range, how many of its quests I've done and a thin bar, dimmed
 -- when it's far from my level; then the dungeons), in the middle a tab bar (the zone page, the quest
 -- list, every view another file registers: Q.RegisterBrowserView, built the first time it's shown),
--- and on the right a pane that's never empty. Each surface shows what to do now and how far along;
--- the rest is in tooltips.
+-- beside the tabs on the Zone tab a switch "Map | Chain: <name> 3/7" (the zone's map, or the chain of
+-- the quest picked or opened last: one click each way), and on the right a pane that's never empty.
+-- Each surface shows what to do now and how far along; the rest is in tooltips. A quest's chain
+-- badge ("2/4") on the rows (the quest list, the right pane's) opens its chain, its card in sight
+-- (Q.OpenChain does it for other files).
 --   * The zone page: the zone's map, as large as the middle (3:2): its art, a pin per quest giver
 --     with how many quests it has (the game's icons: available "!", a low level one's, a grey "!" for
 --     later ones, "?" ready to turn in, a grey "?" still in progress, repeatable ones blue; where items
@@ -38,7 +41,8 @@ ns.Lodestar = Q
 --     small map when the zone's isn't in sight; its rewards (the game's item icons and tooltips, money,
 --     experience: Q.Rewards); requirements not met, the first quest it needs and what it leads to,
 --     friends; at the bottom Map pin (where to go next) and Companion (Q.ShowQuest).
---   * A chain opened (a click on its card, a stub, "Open the chain"): its quests (every level) as cards
+--   * A chain opened (a click on its card, a stub, a badge, "Chain" above the middle, "Open the
+--     chain"): its quests (every level) as cards
 --     from top to bottom, a row per stage (how many quests come before it), side by side where it
 --     forks; lines in the gaps (their own lane each, so lines that aren't joined never look joined),
 --     "one of" where any one of several is enough, dashed lines for a lead-in that isn't needed first,
@@ -162,6 +166,7 @@ local state = {
 	picked = nil,     -- the quest in the details
 	tab = "zone",     -- "zone" | "overview" (the quest list) | a registered view's key
 	chain = nil,      -- on the zone tab: the chain opened (its group's key), nil: the zone page
+	lastChain = nil,  -- the chain left for the map (the switch's way back to it while nothing is picked)
 	path = nil,       -- the way back to a locked quest picked in a chain (Path.Update)
 	pulse = nil,      -- a card to pulse once when it's next filled (the next step of a chain opened)
 	query = "",       -- the search shown
@@ -586,6 +591,25 @@ function Rule.SkippedFor(id)
 	end
 	local q = Quest(id)
 	return (q and q.breadcrumbFor == by and L["No longer needed: you have %s"] or L["You took %s instead"]):format(Title(by))
+end
+
+-- Which step of its chain a quest is, counted as the details count it (Q.ChainFor: the steps as I can
+-- do them; else Q.ChainStep / Q.Chain): step, total; nil for a quest in no chain. (Q.ChainFor keeps
+-- its answers until my progress changes: cheap for every row.)
+function Rule.Step(id)
+	if not id then
+		return nil
+	elseif Q.ChainFor then
+		local list, at = Q.ChainFor(id)
+		if type(list) == "table" and at and #list >= 2 then
+			return at, #list
+		end
+		return nil
+	end
+	local step, total = StepOf(id)
+	if step and total and total >= 2 then
+		return step, total
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -1143,8 +1167,9 @@ local function Untip(self)
 	end
 end
 
--- A quest's tooltip: title, status, level, chain step, where it starts, what's next, friends.
-local function QuestTip(owner, id)
+-- A quest's tooltip: title, status, level, chain step, where it starts, what's next, friends, what a
+-- click does (badge: the row's chain badge, "2/4", which opens the chain).
+local function QuestTip(owner, id, badge)
 	local q = Quest(id)
 	if not q then
 		return
@@ -1213,6 +1238,9 @@ local function QuestTip(owner, id)
 		GameTooltip:AddLine(LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r " .. HEX[fs] .. Word(fs) .. "|r")
 	end
 	GameTooltip:AddLine(L["Click: details"], 0.5, 0.75, 1)
+	if badge then
+		GameTooltip:AddLine(L["Click %s: open the chain"]:format(badge), 0.5, 0.75, 1)
+	end
 	GameTooltip:Show()
 end
 
@@ -2308,6 +2336,9 @@ local function MarkerEnter(self)
 		GameTooltip:AddLine(L["Click: choose one of its %d quests"]:format(#self.quests), 0.5, 0.75, 1)
 	elseif m.onClick and self.quests[1] then
 		GameTooltip:AddLine(L["Click: show %s"]:format(Title(self.quests[1])), 0.5, 0.75, 1)
+		if m.zoomable and Rule.Step(self.quests[1]) then -- (the zone page's: the switch above it)
+			GameTooltip:AddLine(L["Then Chain above the map: its quest chain"], 0.5, 0.75, 1)
+		end
 	end
 	GameTooltip:AddLine(m.onClick and L["Right-click or Shift-click: map pin"] or L["Click: put a map pin there"], 0.5, 0.75, 1)
 	GameTooltip:Show()
@@ -4011,19 +4042,136 @@ function Tabs.Layout()
 			b:Hide()
 		end
 	end
+	-- The Zone tab's switch right after the tabs: always at that spot.
+	local sw = view.switch
+	if sw then
+		sw.x = x + 12
+		sw:ClearAllPoints()
+		sw:SetPoint("TOPLEFT", sw.x, 0)
+	end
 	Tabs.Paint()
 end
 
--- The head over a page: (a way back,) the chain's colour, the title, a line under it, how far along.
-function Head.Set(back, color, title, sub, countText, done, total)
+-- The chain the switch offers: the one opened; else the picked quest's (a chain of more than one
+-- quest); nothing picked, the one left last for the map. nil: none applies.
+function Tabs.SwitchChain(place)
+	local tree = Structure(place)
+	if state.chain then
+		return tree.byKey[state.chain]
+	end
+	if state.picked then
+		local group = tree.groupOf[state.picked]
+		return group and not group.single and Rule.Step(state.picked) and group or nil
+	end
+	return state.lastChain and tree.byKey[state.lastChain] or nil
+end
+
+-- One half of the switch: on (shown now: gold, a line under it), off (greyed: nothing to show).
+function Tabs.PaintHalf(b, on, off)
+	b.on, b.off = on, off
+	b.Line:SetShown(on)
+	b.Back:SetColorTexture(1, 0.82, 0, on and 0.2 or 0.05)
+	if off then
+		b.Text:SetTextColor(0.45, 0.45, 0.45)
+	elseif on then
+		b.Text:SetTextColor(1, 0.82, 0)
+	else
+		b.Text:SetTextColor(0.8, 0.8, 0.8)
+	end
+end
+
+-- The switch on the Zone tab: "Map" (a dungeon: "Quests") | "Chain: <name> 3/7" (greyed when no chain
+-- applies), the half shown now lit; the chain's half as wide as there's room for (its name cut short).
+-- Drawn with the middle and when a quest is picked: what it reads is all kept (Structure, Chains.Info).
+function Tabs.Switch()
+	local sw = view.switch
+	local place = CurrentPlace()
+	local shown = place ~= nil and Mode() == "zone"
+	sw:SetShown(shown)
+	if not shown then
+		sw.group = nil
+		return
+	end
+	local group = Tabs.SwitchChain(place)
+	local open = group ~= nil and state.chain == group.key
+	sw.group = group
+	sw.map.Text:SetText(place.kind == "zone" and L["Map"] or L["Quests"])
+	local mapW = math.max(64, sw.map.Text:GetStringWidth() + 28)
+	sw.map:SetWidth(mapW)
+	local chain = sw.chain
+	local count = ""
+	if group then
+		local info = Chains.Info(group, place)
+		chain.Text:SetText(group.single and Chains.Name(group) or L["Chain: %s"]:format(Chains.Name(group)))
+		count = info.total > 0 and (info.done .. "/" .. info.total) or ""
+	else
+		chain.Text:SetText(L["Chain"])
+	end
+	chain.Count:SetText(count)
+	local countW = count ~= "" and chain.Count:GetStringWidth() + 8 or 0
+	local room = view.tabBar:GetWidth() - (sw.x or 0) - mapW - (view.Back:IsShown() and view.Back:GetWidth() + 8 or 0)
+	local w = math.floor(math.max(72, math.min(chain.Text:GetStringWidth() + countW + 28, room)))
+	chain:SetWidth(w)
+	chain.Text:SetWidth(w - countW - 20)
+	sw:SetWidth(mapW + w)
+	Tabs.PaintHalf(sw.map, not open, false)
+	Tabs.PaintHalf(chain, open, group == nil)
+end
+
+-- A half's tooltip: what it shows, what a click does; the chain's greyed half says why.
+function Tabs.HalfEnter(self)
+	local sw = view.switch
+	local place = CurrentPlace()
+	if not place then
+		return
+	end
+	if not self.off then
+		self.Hover:Show()
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+	if self.key == "map" then
+		GameTooltip:SetText(place.name, 1, 0.82, 0)
+		GameTooltip:AddLine(self.on and L["Shown now"] or (place.kind == "zone" and L["Click: back to the map"] or L["Click: back to the quest list"]), 0.5, 0.75, 1)
+	elseif sw.group then
+		local info = Chains.Info(sw.group, place)
+		GameTooltip:SetText(Chains.Name(sw.group), 1, 0.82, 0)
+		if info.total > 0 then
+			GameTooltip:AddLine(L["%d of %d steps done"]:format(info.done, info.total), 1, 1, 1)
+		end
+		GameTooltip:AddLine(self.on and L["Shown now"] or L["Click: open the chain"], 0.5, 0.75, 1)
+	else
+		GameTooltip:SetText(L["Chain"], 0.6, 0.6, 0.6)
+		GameTooltip:AddLine(state.picked and Quest(state.picked) and L["%s is in no quest chain."]:format(Title(state.picked))
+			or L["Pick a quest of a chain (on the map or on the right): its chain opens here."], 1, 1, 1, true)
+	end
+	GameTooltip:Show()
+end
+
+function Tabs.HalfLeave(self)
+	self.Hover:Hide()
+	Untip(self)
+end
+
+-- A click: the map (from a chain: the quest picked stays), or the chain offered; the half shown now
+-- and a greyed one do nothing.
+function Tabs.HalfClick(self)
+	local sw = view.switch
+	if self.on or self.off then
+		return
+	end
+	Untip(self)
+	self.Hover:Hide()
+	if self.key == "map" then
+		Tabs.BackToZone()
+	elseif sw.group then
+		Side.OpenChain(sw.group.key)
+	end
+end
+
+-- The head over a page: the chain's colour, the title, a line under it, how far along.
+function Head.Set(color, title, sub, countText, done, total)
 	local h = view.head
 	local x = 0
-	h.Back:SetShown(back ~= nil)
-	if back then
-		h.Back.Text:SetText(back)
-		h.Back:SetWidth(h.Back.Text:GetStringWidth() + 24)
-		x = h.Back:GetWidth() + 8
-	end
 	h.Dot:SetShown(color ~= nil)
 	if color then
 		h.Dot:ClearAllPoints()
@@ -4088,7 +4236,7 @@ local function DrawChain(place, group, keep, focus)
 	elseif path then
 		sub = HEX.level .. L["To take it, do %d quests first"]:format(path.n) .. "|r"
 	end
-	Head.Set(place.name, Chains.Color(group), Chains.Name(group), sub, L["%d of %d steps done"]:format(info.done, info.total), info.done, info.total)
+	Head.Set(Chains.Color(group), Chains.Name(group), sub, L["%d of %d steps done"]:format(info.done, info.total), info.done, info.total)
 	Graph.Draw(place, group, keep, focus)
 	view.ZoomText:SetText(("%d%%"):format(math.floor(view.g.zoom * 100 + 0.5)))
 	local lay = view.g.layout
@@ -4101,7 +4249,7 @@ local function HeadZone(place, extra)
 	local done, total = CountOf(place)
 	local parts = { LevelSpan(place.minLevel, place.maxLevel) }
 	parts[#parts + 1] = extra
-	Head.Set(nil, nil, place.name, GREY .. table.concat(parts, SEP) .. "|r", L["%d of %d done"]:format(done, total), done, total)
+	Head.Set(nil, place.name, GREY .. table.concat(parts, SEP) .. "|r", L["%d of %d done"]:format(done, total), done, total)
 end
 
 -- keep: the page stays where it's scrolled; focus: a quest to bring into sight; noSide: the right
@@ -4129,11 +4277,12 @@ local function DrawMiddle(keep, focus, noSide)
 	view.Zoom:SetShown(group ~= nil)
 	Views.Show(v)
 	Tabs.Paint()
+	Tabs.Switch()
 	local message
 	if v then
 		message = nil
 	elseif mode == "results" then
-		Head.Set(nil, nil, L["Search results"], state.results and GREY .. L["%d quests"]:format(#state.results) .. "|r" or "")
+		Head.Set(nil, L["Search results"], state.results and GREY .. L["%d quests"]:format(#state.results) .. "|r" or "")
 		if #state.query < 2 and not tonumber(state.query) then
 			view.list:SetEntries({}, 0)
 			message = L["Type at least two letters."]
@@ -4149,7 +4298,7 @@ local function DrawMiddle(keep, focus, noSide)
 		if place then
 			HeadZone(place)
 		else
-			Head.Set(nil, nil, "", "")
+			Head.Set(nil, "", "")
 		end
 		local entries = place and Overview.Entries(place) or {}
 		local offset = keep and true or 0
@@ -4182,6 +4331,9 @@ local function FillListRow(row, e)
 	row.Toggle:SetShown(header and not e.search)
 	row.Band:SetShown(header)
 	row.Icon:SetShown(not header and not e.more)
+	if header or e.more then
+		Make.FillBadge(row.Badge, nil)
+	end
 	if e.more then -- (what the level filter left out; a click shows all levels)
 		row.Picked:Hide()
 		row.Name:SetText(GREY .. L["%d more outside your levels"]:format(e.n) .. SEP .. "|r" .. GOLD .. L["Show all levels"] .. "|r")
@@ -4215,9 +4367,13 @@ local function FillListRow(row, e)
 	end
 	row.Right:SetText(right and (GREY .. right .. "|r") or "")
 	row.Picked:SetShown(id == state.picked)
+	-- Its chain's badge ("2/4": a click opens the chain), left of the right column.
+	local badgeW = Make.FillBadge(row.Badge, id)
+	row.Badge:ClearAllPoints()
+	row.Badge:SetPoint("RIGHT", right and -168 or -4, 0)
 	row.Name:ClearAllPoints()
 	row.Name:SetPoint("LEFT", 24, 0)
-	row.Name:SetPoint("RIGHT", right and -170 or -4, 0)
+	row.Name:SetPoint("RIGHT", (right and -170 or -4) - badgeW, 0)
 end
 
 ---------------------------------------------------------------------------
@@ -4311,9 +4467,10 @@ function Brief.NewRow(parent, width)
 	b.Right:SetPoint("RIGHT", -4, 0)
 	b.Right:SetJustifyH("RIGHT")
 	b.Right:SetWordWrap(false)
+	b.Badge = Make.NewBadge(b)
 	b:SetScript("OnEnter", function(self)
 		if self.quest then
-			QuestTip(self, self.quest)
+			QuestTip(self, self.quest, Make.BadgeText(self.Badge))
 		end
 	end)
 	b:SetScript("OnLeave", Untip)
@@ -4327,6 +4484,7 @@ function Brief.NewRow(parent, width)
 end
 
 -- text: "[12] Title" (and more); sub: the grey line under it; right: a grey word at its right (one line).
+-- A quest of a chain has its badge ("2/4": a click opens the chain) at the right of its title line.
 function Brief.FillRow(b, id, text, sub, right)
 	local q = Quest(id)
 	local status = StatusOf(id)
@@ -4351,15 +4509,20 @@ function Brief.FillRow(b, id, text, sub, right)
 	b.Icon:ClearAllPoints()
 	b.Icon:SetPoint(sub and "TOPLEFT" or "LEFT", 2, sub and -2 or 0)
 	b.Text:ClearAllPoints()
+	local badgeW = Make.FillBadge(b.Badge, id)
+	b.Badge:ClearAllPoints()
 	if sub then
+		b.Badge:SetPoint("TOPRIGHT", -4, -2)
 		b.Text:SetPoint("TOPLEFT", 26, -3)
-		b.Text:SetPoint("RIGHT", -4, 0)
+		b.Text:SetPoint("RIGHT", -4 - badgeW, 0)
 		b.Sub:ClearAllPoints()
 		b.Sub:SetPoint("TOPLEFT", 26, -19)
 		b.Sub:SetPoint("RIGHT", -4, 0)
 	else
+		local rightW = right and (b.Right:GetStringWidth() + 12) or 4
+		b.Badge:SetPoint("RIGHT", -rightW, 0)
 		b.Text:SetPoint("LEFT", 26, 0)
-		b.Text:SetPoint("RIGHT", right and -(b.Right:GetStringWidth() + 12) or -4, 0)
+		b.Text:SetPoint("RIGHT", -rightW - badgeW, 0)
 	end
 	b.Picked:SetShown(id == state.picked)
 end
@@ -4549,8 +4712,8 @@ function Brief.Zone(place, top)
 end
 
 -- An opened chain's briefing: its colour and name, its levels and steps, how far along, what's
--- next; every step as a row (a tick when done, its status's reason or its giver at the right; a
--- click picks it); friends on it.
+-- next; every step as a row (a tick when done, its badge "3/9", its status's reason or its giver at
+-- the right; a click picks it); friends on it.
 function Brief.Chain(place, group, top)
 	local b = view.b
 	Brief.Begin()
@@ -4585,7 +4748,8 @@ function Brief.Chain(place, group, top)
 					right = Rule.Reason(id, status)
 				end
 				local c = TONE[status]
-				Brief.Row(id, GREY .. n .. ".|r " .. LevelTag(q) .. Hex(c[1], c[2], c[3]) .. Title(id) .. "|r", nil, right and (GREY .. right .. "|r") or nil)
+				-- (its step: the badge at its right, "3/9")
+				Brief.Row(id, LevelTag(q) .. Hex(c[1], c[2], c[3]) .. Title(id) .. "|r", nil, right and (GREY .. right .. "|r") or nil)
 			end
 		end
 	end
@@ -5437,6 +5601,7 @@ local function Pick(id, user)
 		ZonePage.ShowPick(CurrentPlace())
 		Map.Follow(view.zp.map) -- (zoomed in with nothing of it in sight: the map goes to it)
 	end
+	Tabs.Switch() -- (the chain it offers is the quest's)
 	Side.Draw(changed)
 	if user and id and Q.ShowQuest and SmallOpen() then
 		Q.ShowQuest(id)
@@ -5458,7 +5623,7 @@ local function SelectPlace(id)
 		state.drilled = true
 	end
 	state.where = id
-	state.chain, state.path, state.picked = nil, nil, nil
+	state.chain, state.path, state.picked, state.lastChain = nil, nil, nil, nil
 	if state.tab ~= "zone" and state.tab ~= "overview" then
 		state.tab = "zone"
 		Save()
@@ -5528,9 +5693,10 @@ function Side.Go(id)
 	Open(id, true, mode == "zone" and state.chain ~= nil)
 end
 
--- The details' "Chain" button: the picked quest's chain opened in the middle, its card in sight.
-function Side.OpenChain()
-	local key = view.d.ChainBtn.key
+-- The details' "Open the chain" button, the switch's Chain: a chain of the place shown (key; else the
+-- details' quest's) opened in the middle, the quest picked in sight.
+function Side.OpenChain(key)
+	key = key or view.d.ChainBtn.key
 	if not key then
 		return
 	end
@@ -5543,13 +5709,34 @@ function Side.OpenChain()
 	DrawMiddle(false, state.picked)
 end
 
+-- A quest's chain badge ("2/4") clicked, Q.OpenChain: its chain in the middle on the Zone tab, the
+-- quest picked, its card in sight (on that chain's page already: picked there; else its place opens
+-- with the chain, as a stub's click does). True when its chain shows.
+function Side.ShowChain(id)
+	if not Quest(id) then
+		return false
+	end
+	local g = view.g
+	local it = Mode() == "zone" and g.frame:IsShown() and g.layout and g.layout.byQuest[id]
+	if it and not it.stub then
+		Pick(id, true)
+		Graph.Reveal(it, G.W, G.H)
+		return true
+	end
+	state.tab = "zone" -- (Open keeps the quest list the quest list)
+	Open(id, true, true)
+	return state.chain ~= nil
+end
+
 local function BackToResults()
 	state.drilled = false
 	DrawMiddle(false)
 end
 
--- From a chain back to its zone's page.
-local function BackToZone()
+-- From a chain back to its zone's page (the switch's Map; the quest picked stays): the chain is kept
+-- as the switch's way back to it.
+function Tabs.BackToZone()
+	state.lastChain = state.chain or state.lastChain
 	state.chain, state.path = nil, nil
 	DrawMiddle(true)
 end
@@ -5559,6 +5746,7 @@ function Tabs.Set(tab)
 		state.drilled = true -- (a tab clicked during a search: the place, the search stays)
 	end
 	if tab == "zone" and state.tab == "zone" then
+		state.lastChain = state.chain or state.lastChain
 		state.chain, state.path = nil, nil -- (the zone's tab again: its page)
 	end
 	state.tab = tab
@@ -5806,8 +5994,67 @@ end
 function Make.ListTip(self)
 	local e = self.entry
 	if e and e.quest then
-		QuestTip(self, e.quest)
+		QuestTip(self, e.quest, Make.BadgeText(self.Badge))
 	end
+end
+
+-- A quest's chain badge on a row: "2/4" (its step, as the details count it) on a faint gold pill, a
+-- Button of its own over the row (the controller reaches it): hovering lights it and says what it
+-- is, a click opens the chain in the middle, the quest picked, its card in sight (Side.ShowChain).
+function Make.NewBadge(parent)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(36, 16)
+	b.Back = b:CreateTexture(nil, "BACKGROUND")
+	b.Back:SetAllPoints()
+	b.Back:SetColorTexture(1, 0.82, 0, 0.1)
+	NewEdges(b)
+	Edges(b, 1, 0.82, 0, 0.3)
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	b.Text:SetPoint("CENTER", 0, 0)
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:SetScript("OnEnter", Make.BadgeTip)
+	b:SetScript("OnLeave", Untip)
+	b:SetScript("OnClick", function(self)
+		Untip(self)
+		if self.quest then
+			Side.ShowChain(self.quest)
+		end
+	end)
+	b:Hide()
+	return b
+end
+
+-- A badge for a quest (nil: hidden); the room it takes (its width and a gap), 0 when hidden.
+function Make.FillBadge(b, id)
+	local step, total = Rule.Step(id)
+	b.quest, b.step, b.total = step and id or nil, step, total
+	if not step then
+		b:Hide()
+		return 0
+	end
+	b.label = step .. "/" .. total
+	b.Text:SetText(HEX.available .. b.label .. "|r")
+	b:SetWidth(math.max(30, b.Text:GetStringWidth() + 12))
+	b:Show()
+	return b:GetWidth() + 6
+end
+
+-- What a row's tooltip names as its badge ("2/4"), nil without one.
+function Make.BadgeText(b)
+	return b and b:IsShown() and b.quest and b.label or nil
+end
+
+-- The badge's tooltip: its chain, the step, what a click does.
+function Make.BadgeTip(self)
+	if not self.quest then
+		return
+	end
+	local _, _, name = StepOf(self.quest)
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(name or L["Chain"], 1, 0.82, 0)
+	GameTooltip:AddLine(L["Step %d of %d"]:format(self.step, self.total), 1, 1, 1)
+	GameTooltip:AddLine(L["Click: open the chain"], 0.5, 0.75, 1)
+	GameTooltip:Show()
 end
 
 function Make.NewListRow(parent, width)
@@ -5820,6 +6067,7 @@ function Make.NewListRow(parent, width)
 	row.Right:SetWidth(160)
 	row.Right:SetJustifyH("RIGHT")
 	row.Right:SetWordWrap(false)
+	row.Badge = Make.NewBadge(row)
 	row:SetScript("OnEnter", Make.ListTip)
 	row:SetScript("OnLeave", Untip)
 	row:SetScript("OnClick", function(self)
@@ -6448,31 +6696,13 @@ function Make.BuildZonePage(parent, x, y, w, h)
 	zp:Hide()
 end
 
--- The head over a page: a way back (a chain's page), the title, a line under it, how far along with
--- a bar; the zoom at its right.
+-- The head over a page (a chain's way back to the map is the switch's Map, above it): the title, a
+-- line under it, how far along with a bar; the zoom at its right.
 function Make.BuildHead(root, x, y, w)
 	local h = CreateFrame("Frame", nil, root)
 	h:SetPoint("TOPLEFT", x, -y)
 	h:SetSize(w, HEAD_H)
 	view.head = h
-	h.Back = CreateFrame("Button", nil, h)
-	h.Back:SetSize(120, 22)
-	h.Back:SetPoint("TOPLEFT", 0, -1)
-	h.Back.Icon = h.Back:CreateTexture(nil, "ARTWORK")
-	h.Back.Icon:SetTexture(T.back)
-	h.Back.Icon:SetSize(18, 18)
-	h.Back.Icon:SetPoint("LEFT")
-	h.Back.Text = h.Back:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	h.Back.Text:SetPoint("LEFT", 20, 0)
-	h.Back:SetHighlightTexture(T.highlight, "ADD")
-	h.Back:SetScript("OnClick", BackToZone)
-	h.Back:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-		GameTooltip:SetText(L["Back to the zone's map and chains"], 1, 1, 1)
-		GameTooltip:Show()
-	end)
-	h.Back:SetScript("OnLeave", Untip)
-	h.Back:Hide()
 	h.Dot = h:CreateTexture(nil, "ARTWORK")
 	h.Dot:SetTexture(T.circle)
 	h.Dot:SetSize(10, 10)
@@ -6502,12 +6732,58 @@ function Make.BuildHead(root, x, y, w)
 	view.Zoom:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, -6)
 end
 
--- The tab bar (the zone page, the overview, the views registered) and the way back to the results.
+-- One half of the Zone tab's switch (key "map" or "chain"): a Button of ours, its own hover light (not
+-- on a greyed half), a gold line under it while it's the one shown.
+function Make.NewHalf(parent, key)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetHeight(TABS_H - 4)
+	b.key = key
+	b.Back = b:CreateTexture(nil, "BACKGROUND")
+	b.Back:SetAllPoints()
+	b.Hover = b:CreateTexture(nil, "ARTWORK") -- (shown by OnEnter: the controller's focus too)
+	b.Hover:SetAllPoints()
+	b.Hover:SetTexture(T.highlight)
+	b.Hover:SetBlendMode("ADD")
+	b.Hover:Hide()
+	b.Line = b:CreateTexture(nil, "ARTWORK")
+	b.Line:SetPoint("BOTTOMLEFT")
+	b.Line:SetPoint("BOTTOMRIGHT")
+	b.Line:SetHeight(2)
+	b.Line:SetColorTexture(1, 0.82, 0, 1)
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	b.Text:SetJustifyH("LEFT")
+	b.Text:SetWordWrap(false)
+	b.Text:SetPoint("LEFT", 10, 1)
+	b:SetScript("OnEnter", Tabs.HalfEnter)
+	b:SetScript("OnLeave", Tabs.HalfLeave)
+	b:SetScript("OnClick", Tabs.HalfClick)
+	return b
+end
+
+-- The tab bar (the zone page, the overview, the views registered), the Zone tab's switch "Map |
+-- Chain" right after the tabs, and the way back to the results.
 function Make.BuildTabs(root, x, y, w)
 	local bar = CreateFrame("Frame", nil, root)
 	bar:SetPoint("TOPLEFT", x, -y)
 	bar:SetSize(w, TABS_H)
 	view.tabBar, view.tabs = bar, {}
+	local sw = CreateFrame("Frame", nil, bar)
+	sw:SetSize(200, TABS_H - 4)
+	view.switch = sw
+	sw.map, sw.chain = Make.NewHalf(sw, "map"), Make.NewHalf(sw, "chain")
+	sw.map:SetPoint("TOPLEFT", 0, 0)
+	sw.chain:SetPoint("TOPLEFT", sw.map, "TOPRIGHT", 0, 0)
+	sw.chain.Count = sw.chain:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	sw.chain.Count:SetPoint("RIGHT", -10, 1)
+	sw.chain.Count:SetJustifyH("RIGHT")
+	sw.Split = sw:CreateTexture(nil, "OVERLAY")
+	sw.Split:SetPoint("TOPLEFT", sw.chain, "TOPLEFT", 0, -4)
+	sw.Split:SetPoint("BOTTOMLEFT", sw.chain, "BOTTOMLEFT", 0, 4)
+	sw.Split:SetWidth(1)
+	sw.Split:SetColorTexture(1, 0.82, 0, 0.35)
+	NewEdges(sw)
+	Edges(sw, 1, 0.82, 0, 0.35)
+	sw:Hide()
 	view.Back = CreateFrame("Button", nil, bar)
 	view.Back:SetSize(190, TABS_H - 4)
 	view.Back:SetPoint("TOPRIGHT", 0, 0)
@@ -6721,6 +6997,21 @@ function Q.OpenBrowser(id)
 		end
 	end
 	return ready
+end
+
+-- Opens the big window on a quest's chain (a chain badge elsewhere, My quests'): the quest's zone on
+-- the Zone tab, the quest picked, its chain in the middle with its card in sight. A quest in no chain
+-- opens as Q.OpenBrowser(id) does. True when its chain shows.
+function Q.OpenChain(id)
+	id = tonumber(id)
+	if not (id and Q.OpenBrowser()) then
+		return false
+	end
+	if not (Quest(id) and Rule.Step(id)) then
+		Open(id, true)
+		return false
+	end
+	return Side.ShowChain(id)
 end
 
 function Q.ToggleBrowser()
