@@ -1,7 +1,7 @@
 local _, ns = ...
-local Q = ns.Questtree or {}; ns.Questtree = Q
+local Q = ns.Lodestar or {}; ns.Lodestar = Q
 
--- Questtree's engine (docs/questtree.md, Engine): where a quest stands for me or a friend, what's
+-- Lodestar's engine (docs/lodestar.md, Engine): where a quest stands for me or a friend, what's
 -- missing before it, what it leads to, its whole chain and its step in it, what's next for me, what I
 -- can take nearby, a zone's count, the race rule (Q.RaceAllowed) and quest difficulty colours
 -- (Q.LevelColor). It reads the data
@@ -53,7 +53,7 @@ local function OnEvent(_, event, id)
 	end
 end
 
--- The events, registered with the first question (nothing before a Questtree window opens).
+-- The events, registered with the first question (nothing before a Lodestar window opens).
 local function Listen()
 	if listening or not CreateFrame then return end
 	listening = true

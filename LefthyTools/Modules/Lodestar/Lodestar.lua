@@ -1,15 +1,15 @@
 local _, ns = ...
 local LT = ns.LT
 local L = ns.L
-local Q = ns.Questtree or {}; ns.Questtree = Q
+local Q = ns.Lodestar or {}; ns.Lodestar = Q
 
--- Questtree: quest chains for every zone of WoW: Forever. What a quest needs first, where it starts
+-- Lodestar: quest chains for every zone of WoW: Forever. What a quest needs first, where it starts
 -- and ends, what it leads to, and which friends have done it. The data is an add-on of its own
--- (LefthyTools_QuestData, load on demand), loaded the first time a Questtree window opens, never at
--- login (Data.lua: Q.Load). The files share the table Q (ns.Questtree), whatever order they load in:
+-- (LefthyTools_QuestData, load on demand), loaded the first time a Lodestar window opens, never at
+-- login (Data.lua: Q.Load). The files share the table Q (ns.Lodestar), whatever order they load in:
 --   Data.lua      loading the data, the accessors (Q.Quest, Q.Zones, Q.Search, Q.AddLearned, ...)
 --   Engine.lua    my status for a quest, what it needs first, what it opens, what's next (Q.Status, ...)
---   Questtree.lua this file: the module, its settings, /questtree, what the windows share
+--   Lodestar.lua this file: the module, its settings, /lodestar, what the windows share
 --   MiniMap.lua   a zone's map with markers in a frame of ours (Q.NewMiniMap)
 --   Small.lua     the small window, the companion: what I'm on now, what to pick up next, any quest
 --                 (Q.ToggleSmall, Q.ShowQuest)
@@ -17,19 +17,32 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --   Learn.lua     learning while playing (the setting learn)
 --   Dialog.lua    in the game's quest UI: a panel beside the quest dialog, chain steps on the quest
 --                 log's titles (settings dialog, logBadges)
--- This file also puts Questtree's lines into NPC tooltips (setting tooltips) and lets the small
+-- This file also puts Lodestar's lines into NPC tooltips (setting tooltips) and lets the small
 -- window follow the quest you open in your quest log (setting followLog), both post-hooks only.
--- docs/questtree.md has each part. Nothing runs while no window is open: no data, no events, no
+-- docs/lodestar.md has each part. Nothing runs while no window is open: no data, no events, no
 -- OnUpdate (the small window listens to the quest log only while it's shown); a tooltip's lines are
 -- a table lookup.
 
-local M = LT:NewModule("questtree", {
-	title = "Questtree",
-	description = L["Quest chains for every zone: what a quest needs first, where it starts and ends, what it leads to and which friends have done it. /questtree opens the small window."],
+-- The module was called Questtree in test builds (0.7.0-70 to -102): what it saved under that name
+-- (on or off, its settings, what Learn.lua learned) goes over to Lodestar, before the modules read it.
+table.insert(LT.onLoad, function(db)
+	for _, t in ipairs({ db.modules, db.settings, db }) do
+		if type(t) == "table" and t.questtree ~= nil then
+			if t.lodestar == nil then
+				t.lodestar = t.questtree
+			end
+			t.questtree = nil
+		end
+	end
+end)
+
+local M = LT:NewModule("lodestar", {
+	title = "Lodestar",
+	description = L["Quest chains for every zone: what a quest needs first, where it starts and ends, what it leads to and which friends have done it. /lodestar opens the small window."],
 	defaults = {
 		keepPlace = true, -- the small window opens where it was left, at its size
 		followLog = true, -- the small window shows the quest opened in the quest log (or clicked in the tracker)
-		tooltips = true,  -- "Questtree: starts ..." in NPC tooltips
+		tooltips = true,  -- "Lodestar: starts ..." in NPC tooltips
 		friends = true,   -- friends' progress (Beacon friends with LefthyTools; Learn.lua and QuestShare.lua)
 		learn = true,     -- learning givers, turn-ins and prerequisites while playing (Learn.lua reads it)
 		autoHide = true,  -- the companion hides itself when there's nothing to show, and comes back
@@ -42,7 +55,7 @@ local M = LT:NewModule("questtree", {
 })
 Q.module = M
 
--- What each file does when Questtree is switched on or off or a setting changes (Q.When "enable",
+-- What each file does when Lodestar is switched on or off or a setting changes (Q.When "enable",
 -- "disable", "settings").
 local hooks = { enable = {}, disable = {}, settings = {} }
 
@@ -284,7 +297,7 @@ function Q.ChainFor(id)
 	return nil
 end
 
--- The colours the research found players know (docs/questtree.md, Small window), as "|cff" codes:
+-- The colours the research found players know (docs/lodestar.md, Small window), as "|cff" codes:
 -- done green, in progress gold, locked grey (always with a word or an icon too), what closes orange.
 Q.COLOR = { done = "|cff5fba46", progress = "|cffd99b00", locked = "|cff737373", grey = "|cff9d9d9d",
 	light = "|cffbebebe", gold = "|cffffd200", closes = "|cffff8040" }
@@ -734,9 +747,9 @@ end
 function M:BuildOptions(o)
 	o:Header(L["Window"])
 	o:Button(L["Open the small window"], L["Open"], function() Q.ToggleSmall() end,
-		L["Your quest companion: the quest you're on with its chain and turn-in, and what to pick up next nearby, nearest first. It follows what you do. Also /questtree, or /questtree <name> for any quest."])
+		L["Your quest companion: the quest you're on with its chain and turn-in, and what to pick up next nearby, nearest first. It follows what you do. Also /lodestar, or /lodestar <name> for any quest."])
 	o:Button(L["Open the quest browser"], L["Open"], OpenBrowser,
-		L["Every zone's quest chains, with a search over all of them. Also /questtree browse."])
+		L["Every zone's quest chains, with a search over all of them. Also /lodestar browse."])
 	o:Checkbox("keepPlace", L["The small window keeps its place"],
 		L["The small window opens where you left it, at the size you gave it. Off: it opens at its usual place and size."])
 	o:Checkbox("followLog", L["Follow the quest log"],
@@ -747,25 +760,25 @@ function M:BuildOptions(o)
 		L["The companion shrinks to its title and one line: the quest you're on, its step and how far its turn-in is. The button in its title bar does the same."])
 	o:Header(L["In the game's quest UI"])
 	o:Checkbox("dialog", L["Beside the quest dialog"],
-		L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Questtree. Hidden when there's nothing to tell."])
+		L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Lodestar. Hidden when there's nothing to tell."])
 	o:Checkbox("logBadges", L["Chain steps in the quest log"],
-		L["Each quest of a chain gets its step (\"2/4\") at the end of its line in your quest log, and its tooltip shows the chain. Alt-click a quest there to open it in Questtree."])
+		L["Each quest of a chain gets its step (\"2/4\") at the end of its line in your quest log, and its tooltip shows the chain. Alt-click a quest there to open it in Lodestar."])
 	o:Header(L["Tooltips"])
 	o:Checkbox("tooltips", L["Quest lines in NPC tooltips"],
-		L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Questtree: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."])
+		L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Lodestar: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."])
 	o:Header(L["Friends"])
 	o:Checkbox("friends", L["Friends' progress"],
 		L["Which of your Beacon friends have done a quest, have it in their log or can take it. Needs Beacon, and friends with LefthyTools."])
 	o:Header(L["Learning"])
 	o:Checkbox("learn", L["Learn while questing"],
-		L["Where the quest data has gaps, Questtree notes quest givers, turn-ins and what a quest needed first while you play, and fills them in. Kept for all your characters."])
+		L["Where the quest data has gaps, Lodestar notes quest givers, turn-ins and what a quest needed first while you play, and fills them in. Kept for all your characters."])
 end
 
 local function Help()
-	M:Print("/questtree - open or close the small window: the quest you're on, what to pick up next")
-	M:Print("/questtree <name or ID> - show a quest (a quest link works too)")
-	M:Print("/questtree browse - the quest browser: every zone's chains")
-	M:Print("/questtree settings - Questtree's settings")
+	M:Print("/lodestar - open or close the small window: the quest you're on, what to pick up next")
+	M:Print("/lodestar <name or ID> - show a quest (a quest link works too)")
+	M:Print("/lodestar browse - the quest browser: every zone's chains")
+	M:Print("/lodestar settings - Lodestar's settings")
 end
 
 function M:OnSlashCommand(msg)
@@ -778,7 +791,7 @@ function M:OnSlashCommand(msg)
 		Help()
 		return
 	elseif not self.enabled then
-		LT.Print("Questtree is switched off (LefthyTools settings).")
+		LT.Print("Lodestar is switched off (LefthyTools settings).")
 		return
 	end
 	if cmd == "" then
@@ -792,7 +805,7 @@ function M:OnSlashCommand(msg)
 		if not id then
 			self:Print(("no quest matches \"%s\"."):format(text))
 		elseif count > 1 then
-			self:Print(("%d quests match \"%s\": showing %s. /questtree browse to see them all."):format(count, text, Q.Title(id)))
+			self:Print(("%d quests match \"%s\": showing %s. /lodestar browse to see them all."):format(count, text, Q.Title(id)))
 			Q.ShowQuest(id)
 		else
 			Q.ShowQuest(id)
@@ -801,13 +814,13 @@ function M:OnSlashCommand(msg)
 end
 
 ---------------------------------------------------------------------------
--- NPC tooltips: "Questtree: starts <title> (step 2 of 5)"
+-- NPC tooltips: "Lodestar: starts <title> (step 2 of 5)"
 ---------------------------------------------------------------------------
 
 -- A post-call on the game's unit tooltips (TooltipDataProcessor, as Chronicle's "Craftable by"),
 -- GameTooltip only and its primary data, outside instances (there the data is secret), the NPC
 -- from the data's GUID. Only once the quest data is loaded (below: a few seconds after the loading
--- screen, or when a Questtree window opens), never loaded by a hover. An NPC's lines
+-- screen, or when a Lodestar window opens), never loaded by a hover. An NPC's lines
 -- are made once and kept until the data or my progress changes (Q.dataGen, Q.progressGen, the
 -- quest log's size): a hover is a table lookup. Objects: the game's object tooltips carry no ID,
 -- so they get nothing.
@@ -870,20 +883,20 @@ local function TipLines(npc)
 	end
 	for _, id in ipairs(ends or {}) do
 		if Q.StatusOf(id) == "active" then
-			Add(END_ICON .. L["Questtree: ends %s"]:format(Q.Title(id)), 1, 0.82, 0)
+			Add(END_ICON .. L["Lodestar: ends %s"]:format(Q.Title(id)), 1, 0.82, 0)
 		end
 	end
 	for _, id in ipairs(starts or {}) do
 		local status = Q.StatusOf(id)
 		local quest = Q.Quest(id)
 		if status == "available" then
-			Add(START_ICON .. L["Questtree: starts %s"]:format(Q.Title(id, quest)) .. StepText(id), 1, 0.82, 0)
+			Add(START_ICON .. L["Lodestar: starts %s"]:format(Q.Title(id, quest)) .. StepText(id), 1, 0.82, 0)
 		elseif status == "level" and quest and tonumber(quest.minLevel) then
-			Add(START_ICON .. L["Questtree: starts %s at level %d"]:format(Q.Title(id, quest), quest.minLevel), 0.6, 0.6, 0.6)
+			Add(START_ICON .. L["Lodestar: starts %s at level %d"]:format(Q.Title(id, quest), quest.minLevel), 0.6, 0.6, 0.6)
 		end
 	end
 	if more > 0 then
-		lines[#lines + 1] = { L["Questtree: and %d more"]:format(more), 0.6, 0.6, 0.6 }
+		lines[#lines + 1] = { L["Lodestar: and %d more"]:format(more), 0.6, 0.6, 0.6 }
 	end
 	tipLines[npc] = lines
 	return lines
@@ -920,7 +933,7 @@ local function Warm()
 	if warmed or not warmer then
 		return
 	end
-	C_Timer.After(WARM_DELAY, function() LT.Guard("Questtree.warm", WarmNow) end)
+	C_Timer.After(WARM_DELAY, function() LT.Guard("Lodestar.warm", WarmNow) end)
 end
 
 warmer = CreateFrame("Frame")
@@ -957,7 +970,7 @@ end
 if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType
 	and Enum.TooltipDataType.Unit then
 	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip, data)
-		LT.Guard("Questtree.tooltip", OnUnitTooltip, tooltip, data)
+		LT.Guard("Lodestar.tooltip", OnUnitTooltip, tooltip, data)
 	end)
 end
 
@@ -982,18 +995,18 @@ function Q.HookQuestLog()
 			return
 		end
 		if M.db.followLog and Q.SmallFollow then
-			LT.Guard("Questtree.log", Q.SmallFollow, questID)
+			LT.Guard("Lodestar.log", Q.SmallFollow, questID)
 		end
-		-- Alt-click: Dialog.lua opens it in Questtree on the next frame, in its own code.
+		-- Alt-click: Dialog.lua opens it in Lodestar on the next frame, in its own code.
 		if Q.LogAltClick and IsAltKeyDown and IsAltKeyDown() then
-			LT.Guard("Questtree.logclick", Q.LogAltClick, questID)
+			LT.Guard("Lodestar.logclick", Q.LogAltClick, questID)
 		end
 	end)
 end
 
 Q.When("enable", Q.HookQuestLog)
 
-SLASH_LEFTHYTOOLS_QUESTTREE1 = "/questtree"
-SlashCmdList.LEFTHYTOOLS_QUESTTREE = function(msg)
+SLASH_LEFTHYTOOLS_LODESTAR1 = "/lodestar"
+SlashCmdList.LEFTHYTOOLS_LODESTAR = function(msg)
 	M:OnSlashCommand(msg)
 end

@@ -81,7 +81,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/StreamPreview.lua fight stream: the preview's made-up fight
   Modules/Beacon/StreamNet.lua    fight stream between friends (kind O), the being-watched dot
   Modules/Beacon/StreamButton.lua the spyglass minimap button: friends to watch
-  Modules/Beacon/QuestShare.lua  Questtree between friends (B2;q...): their progress, learned quest data passed on
+  Modules/Beacon/QuestShare.lua  Lodestar between friends (B2;q...): their progress, learned quest data passed on
   Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
   Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, /chronicle
   Modules/Chronicle/Live.lua       friends live through Beacon: highlights (E2), days (D2/K2), the feed
@@ -117,12 +117,12 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Echoes/Store.lua         the closed pages: packing, what's kept, the API for the delivery, the exporter's receipt, /lefthy echoes
   Modules/Echoes/Pages.lua         the open page: starting, joining, closing, going on after a /reload
   Modules/Echoes/Delivery.lua      pages from friends to the collector through Beacon: messages, pulling, relaying, what's safe, the budget
-  Modules/Questtree/Data.lua       Questtree's quest data (LefthyTools_QuestData, loaded when a window opens): quests, zones, search, learned data
-  Modules/Questtree/Engine.lua     Questtree's engine: a quest's status for me or a friend, what's missing, its chain, what's next
-  Modules/Questtree/Learn.lua     Questtree's learning: givers, enders, prerequisites while playing (LefthyToolsDB.questtree.learned)
+  Modules/Lodestar/Data.lua       Lodestar's quest data (LefthyTools_QuestData, loaded when a window opens): quests, zones, search, learned data
+  Modules/Lodestar/Engine.lua     Lodestar's engine: a quest's status for me or a friend, what's missing, its chain, what's next
+  Modules/Lodestar/Learn.lua     Lodestar's learning: givers, enders, prerequisites while playing (LefthyToolsDB.lodestar.learned)
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
-LefthyTools_QuestData/       Questtree's quest chains, givers and places (CMaNGOS Classic DB, EG Link's Forever data), an add-on of its own (load on demand), GPL v3
+LefthyTools_QuestData/       Lodestar's quest chains, givers and places (CMaNGOS Classic DB, EG Link's Forever data), an add-on of its own (load on demand), GPL v3
   QuestData.lua              generated (tools/update-quest-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
@@ -266,9 +266,9 @@ variables ready) and `LT.onLogin`.
 
 `ns.CHANGELOG` lists every change players notice: `{ id, version, module, en = { title,
 sentence }, de = { title, sentence } }`, ids 1, 2, 3, ... in order; module is `mirage`, `tweaks`,
-`beacon`, `chronicle`, `bestiary`, `echoes`, `questtree` or `general` (the tests check all of that, and titles stay short). The
+`beacon`, `chronicle`, `bestiary`, `echoes`, `lodestar` or `general` (the tests check all of that, and titles stay short). The
 window groups them: per version (newest first) a large gold heading with a divider, then a
-section per module in a fixed order (Mirage, Misc Tweaks, Beacon, Chronicle, Bestiary, Echoes, Questtree, General; module
+section per module in a fixed order (Mirage, Misc Tweaks, Beacon, Chronicle, Bestiary, Echoes, Lodestar, General; module
 names untranslated), then each entry as a bullet with its title and, below it in grey, the
 sentence; wrapped lines stay under the text. Drawn with pooled font strings (`Render`);
 `WhatsNew.Text` gives the same as plain text. Ids instead of versions, because

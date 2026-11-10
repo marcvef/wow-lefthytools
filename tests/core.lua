@@ -329,7 +329,7 @@ do -- The world map's art of a zone and what you've explored of it, laid into a 
 	Fire("MAP_EXPLORATION_UPDATED")
 	check(not MapArt.Stale(map) and #ERRORS == errorsWere, "no art: never stale; no errors")
 	C_Map.GetMapArtLayers = layers
-	-- Revealed (Questtree's maps): every area's overlay from the client's tables (Data/MapOverlays.lua),
+	-- Revealed (Lodestar's maps): every area's overlay from the client's tables (Data/MapOverlays.lua),
 	-- explored or not; a zone the data doesn't have: what's explored.
 	check(type(ns.MAP_OVERLAYS) == "table" and ns.MAP_ART[1429] and type(ns.MAP_OVERLAYS[ns.MAP_ART[1429]]) == "string",
 		"the overlay data: Elwynn Forest's art and its areas")

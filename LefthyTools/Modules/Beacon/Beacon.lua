@@ -51,7 +51,7 @@ local ECHOES_LIMIT, ECHOES_WINDOW = 400, 60 -- Echoes messages (B2;e...) accepte
                              -- send at most 2 a second)
 local RECIPES_LIMIT, RECIPES_WINDOW = 700, 60 -- Chronicle's recipes (B2;c...) accepted from one friend (at
                              -- most what Beacon can send in a minute: every friend's lists they hold)
-local QUESTTREE_LIMIT, QUESTTREE_WINDOW = 300, 60 -- Questtree's messages (B2;q..., QuestShare.lua) accepted from one
+local LODESTAR_LIMIT, LODESTAR_WINDOW = 300, 60 -- Lodestar's messages (B2;q..., QuestShare.lua) accepted from one
                              -- friend (they queue at most 4 records a second, and a request or answer every second)
 local PROBE_LIMIT, PROBE_BYTES = 10, 4100 -- Echoes' probes accepted from one friend a minute, their size at most
 local ANSWER_GAP = 5         -- answer one friend's hellos at most this often
@@ -826,7 +826,7 @@ local function OnMessage(text, senderID)
 		B.ReceiveNews(senderID, a, b, c)
 	elseif kind == "B" then
 		-- The family of other modules' messages, by the word's first letter (e: Echoes, c: Chronicle's recipes,
-		-- q: Questtree), and Beacon's own words (b). (This function's upvalues stay under Lua 5.1's 60: 52 now.)
+		-- q: Lodestar), and Beacon's own words (b). (This function's upvalues stay under Lua 5.1's 60: 52 now.)
 		if a == "bl" then
 			local level = KnownLevel(tonumber(b:match("^%d%d?%d?$") or ""))
 			if level and B.TellLevel(peer, level) then
@@ -840,8 +840,8 @@ local function OnMessage(text, senderID)
 			B.ReceiveEchoes(senderID, a, b)
 		elseif a:sub(1, 1) == "c" and Counted(guard, "recipes", RECIPES_LIMIT, RECIPES_WINDOW, now) and B.ReceiveRecipes then
 			B.ReceiveRecipes(senderID, a, b)
-		elseif a:sub(1, 1) == "q" and Counted(guard, "questtree", QUESTTREE_LIMIT, QUESTTREE_WINDOW, now) and B.ReceiveQuesttree then
-			B.ReceiveQuesttree(senderID, a, b) -- QuestShare.lua: friends' progress, learned quest data
+		elseif a:sub(1, 1) == "q" and Counted(guard, "lodestar", LODESTAR_LIMIT, LODESTAR_WINDOW, now) and B.ReceiveLodestar then
+			B.ReceiveLodestar(senderID, a, b) -- QuestShare.lua: friends' progress, learned quest data
 		elseif a:sub(1, 1) == "b" then
 			-- LTC's words (Chat.lua): a call (bw) counts as a chat line; missed lines, their offers and
 			-- answers to calls at most 80 a minute (missed lines come one every half second).
@@ -1016,7 +1016,7 @@ local function Tick(now, elapsed)
 	LT.Guard("B.TickUpdates", B.TickUpdates, now) -- Updates.lua: a friend's newer build, what's new in mine
 	LT.Guard("B.TickMissed", B.TickMissed, now) -- ChatMissed.lua: LTC lines friends missed, offered and passed on
 	LT.Guard("B.TickCalls", B.TickCalls, now) -- ChatCalls.lua: who's in: tallies, calls ending
-	LT.Guard("B.TickQuests", B.TickQuests, now) -- QuestShare.lua: Questtree's progress requests and learned records
+	LT.Guard("B.TickQuests", B.TickQuests, now) -- QuestShare.lua: Lodestar's progress requests and learned records
 	if now - lastExpire >= 1 then
 		Expire(now)
 	end

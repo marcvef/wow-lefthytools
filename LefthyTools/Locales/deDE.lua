@@ -1145,13 +1145,13 @@ L["Its cast time isn't known: 3 s counted."] = "Seine Herstellzeit ist unbekannt
 L["Check AH"] = "AH prüfen"
 L["Checking..."] = "Prüfe..."
 
--- Questtree
-L["Quest chains for every zone: what a quest needs first, where it starts and ends, what it leads to and which friends have done it. /questtree opens the small window."] =
-	"Questreihen für jede Zone: was eine Quest vorher braucht, wo sie beginnt und endet, wozu sie führt und welche Freunde sie schon erledigt haben. /questtree öffnet das kleine Fenster."
+-- Lodestar
+L["Quest chains for every zone: what a quest needs first, where it starts and ends, what it leads to and which friends have done it. /lodestar opens the small window."] =
+	"Questreihen für jede Zone: was eine Quest vorher braucht, wo sie beginnt und endet, wozu sie führt und welche Freunde sie schon erledigt haben. /lodestar öffnet das kleine Fenster."
 L["Open the small window"] = "Kleines Fenster öffnen"
 L["Open the quest browser"] = "Quest-Browser öffnen"
-L["Every zone's quest chains, with a search over all of them. Also /questtree browse."] =
-	"Die Questreihen jeder Zone, mit einer Suche über alle. Auch /questtree browse."
+L["Every zone's quest chains, with a search over all of them. Also /lodestar browse."] =
+	"Die Questreihen jeder Zone, mit einer Suche über alle. Auch /lodestar browse."
 L["The small window keeps its place"] = "Kleines Fenster merkt sich seinen Platz"
 L["The small window opens where you left it, at the size you gave it. Off: it opens at its usual place and size."] =
 	"Das kleine Fenster öffnet sich da, wo du es gelassen hast, in der Größe, die du ihm gegeben hast. Aus: Es öffnet sich an seinem üblichen Platz in normaler Größe."
@@ -1160,8 +1160,8 @@ L["Which of your Beacon friends have done a quest, have it in their log or can t
 	"Welche deiner Beacon-Freunde eine Quest schon erledigt haben, sie im Questlog haben oder sie annehmen können. Braucht Beacon und Freunde mit LefthyTools."
 L["Learning"] = "Lernen"
 L["Learn while questing"] = "Beim Questen lernen"
-L["Where the quest data has gaps, Questtree notes quest givers, turn-ins and what a quest needed first while you play, and fills them in. Kept for all your characters."] =
-	"Wo die Questdaten Lücken haben, merkt sich Questtree beim Spielen Questgeber, Abgaben und was eine Quest vorher gebraucht hat, und füllt sie auf. Gespeichert für alle deine Charaktere."
+L["Where the quest data has gaps, Lodestar notes quest givers, turn-ins and what a quest needed first while you play, and fills them in. Kept for all your characters."] =
+	"Wo die Questdaten Lücken haben, merkt sich Lodestar beim Spielen Questgeber, Abgaben und was eine Quest vorher gebraucht hat, und füllt sie auf. Gespeichert für alle deine Charaktere."
 L["Quest %d"] = "Quest %d"
 L["You've done it"] = "Schon erledigt"
 L["In your quest log"] = "In deinem Questlog"
@@ -1209,20 +1209,20 @@ L["SW"] = "SW"
 L["W"] = "W"
 L["NW"] = "NW"
 L["right here"] = "direkt hier"
-L["Your quest companion: the quest you're on with its chain and turn-in, and what to pick up next nearby, nearest first. It follows what you do. Also /questtree, or /questtree <name> for any quest."] =
-	"Dein Quest-Begleiter: die Quest, an der du gerade bist, mit ihrer Questreihe und Abgabe, und was du in der Nähe als Nächstes annehmen kannst, das Nächste zuerst. Er folgt dem, was du tust. Auch /questtree, oder /questtree <Name> für jede Quest."
+L["Your quest companion: the quest you're on with its chain and turn-in, and what to pick up next nearby, nearest first. It follows what you do. Also /lodestar, or /lodestar <name> for any quest."] =
+	"Dein Quest-Begleiter: die Quest, an der du gerade bist, mit ihrer Questreihe und Abgabe, und was du in der Nähe als Nächstes annehmen kannst, das Nächste zuerst. Er folgt dem, was du tust. Auch /lodestar, oder /lodestar <Name> für jede Quest."
 L["Follow the quest log"] = "Dem Questlog folgen"
 L["While the small window is open, a quest you open in your quest log (or click in the objective tracker) becomes the one it shows as now."] =
 	"Solange das kleine Fenster offen ist, wird eine Quest, die du im Questlog öffnest (oder im Questtracker anklickst), die, die es als aktuell zeigt."
 L["Tooltips"] = "Tooltips"
 L["Quest lines in NPC tooltips"] = "Quest-Zeilen in NPC-Tooltips"
-L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Questtree: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."] =
-	"Zeigst du auf jemanden, der eine Quest vergibt, die du annehmen kannst, oder eine aus deinem Questlog annimmt, kommt eine Zeile dazu: „Questtree: vergibt ...“ mit ihrem Schritt in der Questreihe. Dafür werden die Questdaten ein paar Sekunden nach dem Ladebildschirm geladen, nie im Kampf."
+L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Lodestar: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."] =
+	"Zeigst du auf jemanden, der eine Quest vergibt, die du annehmen kannst, oder eine aus deinem Questlog annimmt, kommt eine Zeile dazu: „Lodestar: vergibt ...“ mit ihrem Schritt in der Questreihe. Dafür werden die Questdaten ein paar Sekunden nach dem Ladebildschirm geladen, nie im Kampf."
 L["(step %d of %d)"] = "(Schritt %d von %d)"
-L["Questtree: ends %s"] = "Questtree: Abgabe von %s"
-L["Questtree: starts %s"] = "Questtree: vergibt %s"
-L["Questtree: starts %s at level %d"] = "Questtree: vergibt %s ab Level %d"
-L["Questtree: and %d more"] = "Questtree: und %d weitere"
+L["Lodestar: ends %s"] = "Lodestar: Abgabe von %s"
+L["Lodestar: starts %s"] = "Lodestar: vergibt %s"
+L["Lodestar: starts %s at level %d"] = "Lodestar: vergibt %s ab Level %d"
+L["Lodestar: and %d more"] = "Lodestar: und %d weitere"
 L["Drops here"] = "Droppt hier"
 L["Click: map pin. Shift-click: also in chat."] = "Klick: Kartenmarkierung. Shift-Klick: auch in den Chat."
 L["right-click: whole zone"] = "Rechtsklick: ganze Zone"
@@ -1259,7 +1259,7 @@ L["The quest you're on and what to pick up next."] = "Die Quest, an der du bist,
 L["« Back to now"] = "« Zurück zu jetzt"
 L["Drops %s (%s)"] = "Droppt %s (%s)"
 L["Requires: %s"] = "Setzt voraus: %s"
--- Questtree: the big window
+-- Lodestar: the big window
 L["Completed"] = "Abgeschlossen"
 L["Available"] = "Verfügbar"
 L["Locked"] = "Gesperrt"
@@ -1288,7 +1288,7 @@ L["Show in the small window"] = "Im kleinen Fenster zeigen"
 L["Search all zones:"] = "Alle Gebiete durchsuchen:"
 L["The quest data isn't there: LefthyTools_QuestData is missing or switched off in the AddOns list."] =
 	"Die Questdaten fehlen: LefthyTools_QuestData ist nicht installiert oder in der AddOn-Liste ausgeschaltet."
--- Questtree: the big window, chains as a graph, the overview, the zone map, the filters
+-- Lodestar: the big window, chains as a graph, the overview, the zone map, the filters
 L["%d of %d steps done"] = "%d von %d Schritten erledigt"
 L["%s drops here (%s%%)"] = "%s droppt hier (%s%%)"
 L["All done"] = "Alles erledigt"
@@ -1314,7 +1314,7 @@ L["Step %d of %d"] = "Schritt %d von %d"
 L["Then: %s"] = "Danach: %s"
 L["Turn in at"] = "Abgabe bei"
 L["every %s race"] = "jedes Volk der %s"
--- Questtree: the big window's zone page (map and chains side by side), a chain opened, the views' tabs
+-- Lodestar: the big window's zone page (map and chains side by side), a chain opened, the views' tabs
 L["Zone"] = "Gebiet"
 L["%d to pick up now"] = "%d jetzt annehmbar"
 L["%d in progress"] = "%d in Arbeit"
@@ -1337,7 +1337,7 @@ L["Click: go there"] = "Klick: dorthin"
 L["To take it, do %d quests first"] = "Um sie anzunehmen, erst %d Quests erledigen"
 L["To take it, do %d quests first, %d of them in other zones"] = "Um sie anzunehmen, erst %d Quests erledigen, %d davon in anderen Gebieten"
 L["This view couldn't be built."] = "Diese Ansicht konnte nicht erstellt werden."
--- Questtree: the big window's views (my quests, level path)
+-- Lodestar: the big window's views (my quests, level path)
 L["Level path"] = "Levelpfad"
 L["Turn in: %s"] = "Abgeben: %s"
 L["From %s"] = "Bei %s"
@@ -1357,7 +1357,7 @@ L["Best next: %s, %d quests for your level"] = "Am besten als Nächstes: %s, %d 
 L["%d you can take now"] = "%d kannst du jetzt annehmen"
 L["Counting quests... %d%%"] = "Zähle Quests... %d%%"
 L["Counting the quests of every zone... %d%%"] = "Zähle die Quests jeder Zone... %d%%"
--- Questtree: in the game's quest UI, the companion's one line and hiding (Dialog.lua, Small.lua)
+-- Lodestar: in the game's quest UI, the companion's one line and hiding (Dialog.lua, Small.lua)
 L["The small window hides when there's nothing to do"] = "Das kleine Fenster blendet sich aus, wenn es nichts zu tun gibt"
 L["With no quest in your log and nothing to pick up nearby, the companion hides itself, and comes back when you take a quest or reach a zone with quests for you. Closed by you, it stays closed."] =
 	"Ohne Quest im Questlog und ohne etwas zum Annehmen in der Nähe blendet sich das kleine Fenster aus und kommt wieder, sobald du eine Quest annimmst oder in eine Zone mit Quests für dich kommst. Schließt du es selbst, bleibt es zu."
@@ -1366,11 +1366,11 @@ L["The companion shrinks to its title and one line: the quest you're on, its ste
 	"Das kleine Fenster schrumpft auf seinen Titel und eine Zeile: die Quest, an der du bist, ihr Schritt und wie weit es zur Abgabe ist. Der Button in seiner Titelleiste macht dasselbe."
 L["In the game's quest UI"] = "Im Quest-Interface des Spiels"
 L["Beside the quest dialog"] = "Neben dem Questfenster"
-L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Questtree. Hidden when there's nothing to tell."] =
-	"Bietet dir ein NPC eine Quest an, fragt nach ihr oder belohnt dich, zeigt ein Feld neben dem Questfenster ihre Questreihe: der wievielte Teil das ist, die Schritte um sie herum, wozu sie führt, was ihr Annehmen ausschließt, welche Freunde sie erledigt haben, und einen Button, der sie in Questtree öffnet. Ausgeblendet, wenn es nichts zu sagen gibt."
+L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Lodestar. Hidden when there's nothing to tell."] =
+	"Bietet dir ein NPC eine Quest an, fragt nach ihr oder belohnt dich, zeigt ein Feld neben dem Questfenster ihre Questreihe: der wievielte Teil das ist, die Schritte um sie herum, wozu sie führt, was ihr Annehmen ausschließt, welche Freunde sie erledigt haben, und einen Button, der sie in Lodestar öffnet. Ausgeblendet, wenn es nichts zu sagen gibt."
 L["Chain steps in the quest log"] = "Questreihen-Schritte im Questlog"
-L["Each quest of a chain gets its step (\"2/4\") at the end of its line in your quest log, and its tooltip shows the chain. Alt-click a quest there to open it in Questtree."] =
-	"Jede Quest einer Questreihe bekommt ihren Schritt („2/4“) am Ende ihrer Zeile in deinem Questlog, ihr Tooltip zeigt die Questreihe. Alt-Klick auf eine Quest dort öffnet sie in Questtree."
+L["Each quest of a chain gets its step (\"2/4\") at the end of its line in your quest log, and its tooltip shows the chain. Alt-click a quest there to open it in Lodestar."] =
+	"Jede Quest einer Questreihe bekommt ihren Schritt („2/4“) am Ende ihrer Zeile in deinem Questlog, ihr Tooltip zeigt die Questreihe. Alt-Klick auf eine Quest dort öffnet sie in Lodestar."
 L["closes %s"] = "schließt %s aus"
 L["Only one of them can be done."] = "Nur eine davon lässt sich erledigen."
 L["Nothing to pick up nearby."] = "In der Nähe gibt es nichts anzunehmen."
@@ -1378,15 +1378,15 @@ L["Click: the whole companion"] = "Klick: das ganze Fenster"
 L["The quest data isn't there."] = "Die Questdaten fehlen."
 L["The whole companion"] = "Das ganze Fenster"
 L["One line"] = "Eine Zeile"
-L["Click: open it in Questtree"] = "Klick: in Questtree öffnen"
+L["Click: open it in Lodestar"] = "Klick: in Lodestar öffnen"
 L["Part %d of %d"] = "Teil %d von %d"
 L["Opens %d quests"] = "Öffnet %d Quests"
 L["(for %s)"] = "(für %s)"
 L["%s needs it too, not only this quest."] = "%s braucht sie auch, nicht nur diese Quest."
 L["A lead-in: %s can be taken without it."] = "Eine Hinführung: %s lässt sich auch ohne sie annehmen."
-L["Open in Questtree"] = "In Questtree öffnen"
-L["Alt-click: open it in Questtree"] = "Alt-Klick: in Questtree öffnen"
--- Questtree: the big window's defaults, its words for a status's reason, less on screen
+L["Open in Lodestar"] = "In Lodestar öffnen"
+L["Alt-click: open it in Lodestar"] = "Alt-Klick: in Lodestar öffnen"
+-- Lodestar: the big window's defaults, its words for a status's reason, less on screen
 L["Needs %s"] = "Braucht %s"
 L["%s with %s"] = "%s bei %s"
 L["Skipped"] = "Übersprungen"
@@ -1404,7 +1404,7 @@ L["Show all levels"] = "Alle Level zeigen"
 L["Quest list"] = "Questliste"
 L["dashed: lead-in · one of: any one is enough · orange: the way to a locked quest"] =
 	"gestrichelt: Hinführung · eine davon: eine reicht · orange: der Weg zu einer gesperrten Quest"
--- Questtree: less on screen (Views.lua, Small.lua, Dialog.lua)
+-- Lodestar: less on screen (Views.lua, Small.lua, Dialog.lua)
 L["All zones"] = "Alle Zonen"
 L["Also the zones without quests for your level."] = "Auch die Zonen ohne Quests für dein Level."
 L["Nothing for your level. Next up: %s, from level %d."] = "Nichts für dein Level. Als Nächstes: %s, ab Level %d."
@@ -1419,7 +1419,7 @@ L["Click: hide the chain's steps"] = "Klick: die Schritte der Questreihe ausblen
 L["Step %d of %d · %s"] = "Schritt %d von %d · %s"
 L["Leads to: %s"] = "Führt zu: %s"
 L["%d ready to turn in"] = "%d bereit zur Abgabe"
--- Questtree: my quests, objective areas (Views.lua, Small.lua, MiniMap.lua)
+-- Lodestar: my quests, objective areas (Views.lua, Small.lua, MiniMap.lua)
 L["Objective area"] = "Questziel-Gebiet"
 L["Where: %s"] = "Wo: %s"
 L["Click: map pin at the nearest spot. Shift-click: in chat too."] = "Klick: Kartenmarkierung an der nächsten Stelle. Shift-Klick: auch in den Chat."
@@ -1442,7 +1442,7 @@ L["Continue your storylines"] = "Mach mit deinen Handlungssträngen weiter"
 L["started, the next step for your level"] = "angefangen, der nächste Schritt passt zu deinem Level"
 L["Looking through your storylines..."] = "Gehe deine Handlungsstränge durch..."
 L["No storyline you've started has a next step for your level now."] = "Keiner deiner angefangenen Handlungsstränge hat gerade einen nächsten Schritt für dein Level."
--- Questtree: the big window's large map, its right pane (briefing, details: objectives, rewards)
+-- Lodestar: the big window's large map, its right pane (briefing, details: objectives, rewards)
 L["Kill %d x %s"] = "%d x %s töten"
 L["Kill %s"] = "%s töten"
 L["Collect %d x %s"] = "%d x %s sammeln"

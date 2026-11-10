@@ -1,13 +1,13 @@
 local _, ns = ...
 local LT = ns.LT
 local B = ns.Beacon
-local Q = ns.Questtree or {}
-ns.Questtree = Q
+local Q = ns.Lodestar or {}
+ns.Lodestar = Q
 
--- Questtree between friends (docs/questtree.md, "Learning and friends"; the words: docs/beacon.md):
--- friends' progress on the quests I look at, and what everyone's client learned (Questtree/Learn.lua)
--- passed on, so everyone's data fills in. Beacon's B family, Questtree's letter q, only to builds from
--- QUESTTREE_SINCE on (their V2; before it's known, nothing), only while the Questtree module and its
+-- Lodestar between friends (docs/lodestar.md, "Learning and friends"; the words: docs/beacon.md):
+-- friends' progress on the quests I look at, and what everyone's client learned (Lodestar/Learn.lua)
+-- passed on, so everyone's data fills in. Beacon's B family, Lodestar's letter q, only to builds from
+-- LODESTAR_SINCE on (their V2; before it's known, nothing), only while the Lodestar module and its
 -- `friends` setting are on (both sides). Friends' answers fill Q.friends (Engine.lua's shape, below).
 --
 --   B2;qp;<req>;<questID>,...          what of these have you done? (the quest I opened and its chain, up to
@@ -30,7 +30,7 @@ ns.Questtree = Q
 -- Nothing of it in a fight (LT.InFight): it waits for the end. Event work only notes; Beacon's tick
 -- (B.TickQuests) does the rest.
 
-local QUESTTREE_SINCE = "0.7.0-70-g0000000" -- the first build that reads these (LT.CompareVersions)
+local LODESTAR_SINCE = "0.7.0-70-g0000000" -- the first build that reads these (LT.CompareVersions)
 
 local VERSION = B.VERSION
 local IDS_MAX = 40          -- quests a request asks about at most
@@ -78,9 +78,9 @@ local myAcct
 -- Who takes part
 ---------------------------------------------------------------------------
 
--- The Questtree module on, with its friends setting (Questtree.lua; nothing while it isn't there).
+-- The Lodestar module on, with its friends setting (Lodestar.lua; nothing while it isn't there).
 local function Sharing()
-	local m = LT:GetModule("questtree")
+	local m = LT:GetModule("lodestar")
 	return m ~= nil and m.enabled and type(m.db) == "table" and m.db.friends == true and B.module.enabled
 end
 
@@ -92,11 +92,11 @@ local function Reads(peer)
 	end
 	if peer.questBuild ~= peer.version then
 		peer.questBuild = peer.version
-		peer.readsQuests = (LT.CompareVersions(peer.version, QUESTTREE_SINCE) or -1) >= 0
+		peer.readsQuests = (LT.CompareVersions(peer.version, LODESTAR_SINCE) or -1) >= 0
 	end
 	return peer.readsQuests
 end
-B.ReadsQuesttree = Reads
+B.ReadsLodestar = Reads
 
 local function MyAccount()
 	if not myAcct and BNGetInfo then
@@ -592,7 +592,7 @@ local function Handle(id, word, more, now)
 end
 
 -- Beacon.lua hands every B2;q... here (after its own guard), inside the event: only noted.
-function B.ReceiveQuesttree(id, word, more)
+function B.ReceiveLodestar(id, word, more)
 	if not (WORDS[word] and B.peers[id]) then
 		return
 	end

@@ -1,11 +1,11 @@
 local _, ns = ...
 local LT = ns.LT
 local L = ns.L
-local Q = ns.Questtree or {}; ns.Questtree = Q
+local Q = ns.Lodestar or {}; ns.Lodestar = Q
 
 -- The small window: the companion. It follows what you're doing without being asked.
 --
--- Opened on its own (/questtree) it shows, top down, only what to do now and how far along (the
+-- Opened on its own (/lodestar) it shows, top down, only what to do now and how far along (the
 -- rest is in the lines' tooltips or behind a click):
 --   Now: the quest you're on (the last one you accepted, super-tracked or opened in the quest log;
 --     else the first on your tracker, else one of your log in this zone), "[18] Title" in its
@@ -34,7 +34,7 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --
 -- While it's shown it listens to the quest log (accepted, turned in, abandoned, progress), super
 -- tracking, the tracker, level-ups and zone changes, and redraws a moment later; every 2 s it looks
--- whether you've moved (the distances); the quest log's "show details" (Questtree.lua's hook) hands
+-- whether you've moved (the distances); the quest log's "show details" (Lodestar.lua's hook) hands
 -- it the quest you opened there. Hidden, it listens to nothing and nothing of it runs. A window of
 -- ours (LT.Window.Create: Escape closes it, it counts as an open window for Mirage), movable and
 -- resizable, where it is and its size kept (setting keepPlace). Built the first time it opens; the
@@ -43,7 +43,7 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --   Q.ToggleSmall(), Q.ShowQuest(id), Q.RedrawSmall(now), Q.IsSmallShown(), Q.SmallFollow(id);
 --   Q.SmallFrame() for tests.
 
-local NAME = "LefthyToolsQuesttreeSmall"
+local NAME = "LefthyToolsLodestarSmall"
 local WIDTH, HEIGHT = 340, 580
 local MIN_W, MIN_H, MAX_W, MAX_H = 300, 300, 600, 950
 local SCROLL_SIDE = 60 -- the scroll area's child is the window's width less this (LT.Window.AddScroll)
@@ -90,7 +90,7 @@ local collapsedNow       -- whether the window is laid out as one line (nil: not
 local asleep = false     -- hidden by itself: comes back when there's something to show
 local selfHiding = false
 
--- A verb icon and a space (Questtree.lua's Q.Icon: the game's quest icons).
+-- A verb icon and a space (Lodestar.lua's Q.Icon: the game's quest icons).
 local function I(kind, size)
 	return Q.Icon(kind, size) .. " "
 end
@@ -345,7 +345,7 @@ local function NowQuest(zone)
 end
 
 -- Its chain as I can do it (quests not for me left out) and where it is in it; nil: no chain
--- (Questtree.lua's Q.ChainFor, kept per data and progress change).
+-- (Lodestar.lua's Q.ChainFor, kept per data and progress change).
 local function ChainOf(id)
 	return Q.ChainFor(id)
 end
@@ -363,7 +363,7 @@ local function ClassRGB(classFile)
 	return 0.8, 0.8, 0.8
 end
 
--- Why a quest has its status, in words (docs/questtree.md, Small window): a status "other" closed by
+-- Why a quest has its status, in words (docs/lodestar.md, Small window): a status "other" closed by
 -- another one "Skipped" (and a line saying by which), not for my race, class or faction, a
 -- profession I don't have; "locked" by a reputation or a profession's rank, or by the quest to do
 -- first. nil: the status's own words. The professions' and standings' names: the game's, else
@@ -953,7 +953,7 @@ local function DrawPick(y, ctx, lists)
 				y = Row(y, { text = GREY .. L["%d more here: the quest browser"]:format(lists.more) .. "|r", indent = INDENT,
 					onClick = function()
 						if Q.OpenBrowser then Q.OpenBrowser(nextId) else Q.ToggleBrowser() end
-					end, tooltip = { L["Quest browser"], L["Every zone's quest chains, with a search over all of them. Also /questtree browse."] } })
+					end, tooltip = { L["Quest browser"], L["Every zone's quest chains, with a search over all of them. Also /lodestar browse."] } })
 			end
 		end
 	end
@@ -1346,7 +1346,7 @@ local function Moved()
 end
 
 local function Build()
-	win = LT.Window.Create(NAME, "Questtree", WIDTH, HEIGHT)
+	win = LT.Window.Create(NAME, "Lodestar", WIDTH, HEIGHT)
 	win:SetResizable(true)
 	win:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
 	win:SetScript("OnDragStop", function(self)
@@ -1563,7 +1563,7 @@ function Q.ToggleSmall()
 	Open()
 end
 
--- A quest opened in the quest log (Questtree.lua's hook): it's what I'm on from now; shown, the
+-- A quest opened in the quest log (Lodestar.lua's hook): it's what I'm on from now; shown, the
 -- window goes to now and redraws a moment later (in its own code, not the quest log's).
 function Q.SmallFollow(id)
 	id = tonumber(id)

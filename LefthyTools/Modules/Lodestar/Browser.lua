@@ -1,10 +1,10 @@
 local _, ns = ...
 local LT = ns.LT
 local L = ns.L
-local Q = ns.Questtree or {}
-ns.Questtree = Q
+local Q = ns.Lodestar or {}
+ns.Lodestar = Q
 
--- Questtree's big window (Q.ToggleBrowser, Q.OpenBrowser(id)): every zone's quest chains. Near full
+-- Lodestar's big window (Q.ToggleBrowser, Q.OpenBrowser(id)): every zone's quest chains. Near full
 -- screen (at least 1400 x 760, wider where the screen has room, scaled down to fit a smaller one),
 -- movable, Escape closes it. On top a search across all zones and two filters (all levels, show what
 -- isn't for me; by default only what's within my levels, Q.InRange); under it the zones on the left
@@ -2248,7 +2248,7 @@ local OPEN = { ready = true, repeatturnin = true, available = true, daily = true
 Map.GOLD = { 1, 0.82, 0 }  -- (the colour of a quest without a chain on the map)
 Map.AREA = { lit = { 0.42, 1 }, normal = { 0.22, 0.75 }, dim = { 0.07, 0.25 }, done = { 0.07, 0.2 } } -- fill, glow
 
--- The game's own map pin there (Q.Waypoint, Questtree.lua; else C_Map's own here), a chat line saying so.
+-- The game's own map pin there (Q.Waypoint, Lodestar.lua; else C_Map's own here), a chat line saying so.
 -- Nothing of the world map is touched.
 function Map.PinAt(map, x, y, name)
 	if not (map and x and y) then
@@ -2267,7 +2267,7 @@ function Map.PinAt(map, x, y, name)
 		end)
 	end
 	if ok then
-		LT.Print(("Questtree: map pin set at %s (%s)."):format(name or "?", MapName(map) or "?"))
+		LT.Print(("Lodestar: map pin set at %s (%s)."):format(name or "?", MapName(map) or "?"))
 	end
 	return ok
 end
@@ -6573,7 +6573,7 @@ end
 
 local function Build()
 	WIDTH, HEIGHT, DETAILS_W = Make.Size()
-	frame = LT.Window.Create("LefthyToolsQuesttreeBrowser", "Questtree", WIDTH, HEIGHT)
+	frame = LT.Window.Create("LefthyToolsLodestarBrowser", "Lodestar", WIDTH, HEIGHT)
 	view = { registry = registry, W = WIDTH, H = HEIGHT, Size = Make.Size }
 	LoadSaved()
 	local width, height = WIDTH - INSET_W, HEIGHT - INSET_H
@@ -6671,9 +6671,9 @@ end
 ---------------------------------------------------------------------------
 
 local function Allowed()
-	local m = LT:GetModule("questtree")
+	local m = LT:GetModule("lodestar")
 	if m and not m.enabled then
-		LT.Print("Questtree is switched off (/lefthy enable questtree).")
+		LT.Print("Lodestar is switched off (/lefthy enable lodestar).")
 		return false
 	end
 	return true

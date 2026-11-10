@@ -1,10 +1,10 @@
 local _, ns = ...
 local LT = ns.LT
 local L = ns.L
-local Q = ns.Questtree or {}
-ns.Questtree = Q
+local Q = ns.Lodestar or {}
+ns.Lodestar = Q
 
--- Two more views of the quest browser (docs/questtree.md, Views), tabs of its window through its
+-- Two more views of the quest browser (docs/lodestar.md, Views), tabs of its window through its
 -- registry (Q.RegisterBrowserView(key, label, build): build(parent) gives { frame, Refresh, OnShow,
 -- OnHide }), registered when the registry is there: at load (Browser.lua comes before this file) or
 -- when the module is switched on; without it nothing happens.
@@ -558,7 +558,7 @@ function Census.Tick()
 end
 
 pulse:SetScript("OnUpdate", function()
-	LT.Guard("Questtree.views", Census.Tick)
+	LT.Guard("Lodestar.views", Census.Tick)
 end)
 
 -- The data changed (learned quests, the data loaded): counted again; friends' answers: drawn again.

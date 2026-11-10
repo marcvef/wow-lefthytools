@@ -1,4 +1,4 @@
--- Questtree: the module (on by default, its settings, /questtree and /lefthy questtree, the best
+-- Lodestar: the module (on by default, its settings, /lodestar and /lefthy lodestar, the best
 -- pick of a search), the companion (nothing loaded or listened to until it opens; Now: the quest
 -- I'm on and why, its chain and steps, objectives, turn-in, what's next; it follows super tracking,
 -- the quest log's details, accepting and turning in; Pick up next: in progress, available now
@@ -20,9 +20,9 @@
 local suite = ...
 local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
 local printedSince = suite.printedSince
-local Q = ns.Questtree
-local M = LT:GetModule("questtree")
-local slash = SlashCmdList.LEFTHYTOOLS_QUESTTREE
+local Q = ns.Lodestar
+local M = LT:GetModule("lodestar")
+local slash = SlashCmdList.LEFTHYTOOLS_LODESTAR
 
 -- What this file replaces on Q, put back at the end.
 local replaced = {}
@@ -165,7 +165,7 @@ local realLoad, realStatus = Q.Load, Q.Status
 Replace("Load", function(...) loads = loads + 1; return realLoad(...) end)
 Replace("Status", function(...) asked = asked + 1; return realStatus(...) end)
 
-local function S(key) return REGISTERED_SETTINGS["LefthyTools_questtree_" .. key] end
+local function S(key) return REGISTERED_SETTINGS["LefthyTools_lodestar_" .. key] end
 local function Small() return Q.SmallFrame() end
 local function Plain(text) return (text:gsub("|T.-|t", ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
 local function Has(list, text)
@@ -195,16 +195,16 @@ local function Progress() -- the engine reads my progress again (as after a load
 	Fire("QUEST_LOG_UPDATE")
 end
 
-section("Questtree: the module")
-check(M and M.title == "Questtree" and M.enabled, "the module is there and on by default")
+section("Lodestar: the module")
+check(M and M.title == "Lodestar" and M.enabled, "the module is there and on by default")
 check(M.db.learn == true and M.db.friends == true and M.db.keepPlace == true and M.db.followLog == true and M.db.tooltips == true
 	and type(M.db.small) == "table", "its defaults: learning, friends, keeps its place, follows the quest log, tooltip lines")
 check(S("keepPlace") and S("followLog") and S("tooltips") and S("friends") and S("learn") and SETTINGS_BUTTONS["Open the small window"]
 	and SETTINGS_BUTTONS["Open the quest browser"], "its settings page: five checkboxes and the two windows' buttons")
-check(LefthyToolsQuesttreeSmall == nil and loads == 0, "nothing built or loaded before a window opens")
+check(LefthyToolsLodestarSmall == nil and loads == 0, "nothing built or loaded before a window opens")
 
 ---------------------------------------------------------------------------
-section("Questtree: difficulty colours")
+section("Lodestar: difficulty colours")
 do
 	local levelColor = Q.LevelColor
 	Q.LevelColor = nil
@@ -219,7 +219,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree: the companion (Now)")
+section("Lodestar: the companion (Now)")
 Q.SetTestData(QUESTS_DATA, ZONES)
 completed = { [9001] = true }
 Log({ 9002, { 9005, true } })
@@ -227,10 +227,10 @@ PLAYER_MAP, PLAYER_POS[1], PLAYER_POS[2], SUPER_TRACKED, PLAYER_LEVEL = 1429, 0.
 Progress()
 slash("")
 local s = Small()
-check(s.win and s.win:IsShown() and loads > 0 and s.mode == "now", "/questtree opens it on now, and the data loads now")
+check(s.win and s.win:IsShown() and loads > 0 and s.mode == "now", "/lodestar opens it on now, and the data loads now")
 local escapes = false
-for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsQuesttreeSmall" then escapes = true end end
-check(escapes and s.win:GetScript("OnUpdate") == nil and s.win.TitleContainer.TitleText:GetText() == "Questtree",
+for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsLodestarSmall" then escapes = true end end
+check(escapes and s.win:GetScript("OnUpdate") == nil and s.win.TitleContainer.TitleText:GetText() == "Lodestar",
 	"Escape closes it, no OnUpdate on it, its title is the module's name")
 check(s.now == 9002 and Has(s.texts, "Now  in this zone"), "now: the quest of my log in this zone, and why: " .. tostring(s.now))
 check(RowWith("[6] The Second Step") and Has(s.texts, "Step 2 of 3 · A Fine Start") and s.win.Bar:IsShown(),
@@ -288,7 +288,7 @@ do
 	Q.RedrawSmall(true)
 end
 
-section("Questtree: the companion (Pick up next)")
+section("Lodestar: the companion (Pick up next)")
 check(Has(s.texts, "Pick up next  Elwynn Forest") and Has(s.texts, "In progress") and Has(s.texts, "Available now")
 	and not Has(s.texts, "Coming up") and not Has(s.texts, "Blocked"), "Pick up next: this zone, two groups (coming up and blocked are the big window's)")
 local pelts = RowWith("[7] Fine Wolf Pelts")
@@ -338,7 +338,7 @@ check(follow and Plain(s.rows[follow].Text:GetText()):find("after The Second Ste
 	"turned in: what it opens comes first in Available now, saying what it follows")
 
 ---------------------------------------------------------------------------
-section("Questtree: a quest looked at")
+section("Lodestar: a quest looked at")
 s.rows[follow]:Click()
 s = Small()
 check(s.mode == "quest" and s.quest == 9003 and RowWith("« Back to now") and #s.history == 0, "a click shows it, with « Back to now")
@@ -412,7 +412,7 @@ Q.RedrawSmall(true)
 -- The search: an exact title first, then one starting with the text; none; a link.
 local mark = #PRINTED
 slash("a fine start")
-check(Small().quest == 9001, "/questtree <name>: the quest with that title")
+check(Small().quest == 9001, "/lodestar <name>: the quest with that title")
 slash("fine")
 check(Small().quest == 9005 and printedSince(mark + 1):find("2 quests match \"fine\": showing Fine Wolf Pelts", 1, true),
 	"several match: the one whose title starts with it, and chat says how many")
@@ -421,24 +421,24 @@ slash("zzzz")
 check(Small().quest == 9005 and printedSince(mark + 1):find("no quest matches \"zzzz\"", 1, true), "none: chat says so, the window stays")
 slash("|cffffff00|Hquest:9003:10|h[Westward Bound]|h|r")
 check(Small().quest == 9003, "a quest link")
-lefthy("questtree 9011")
-check(Small().quest == 9011, "/lefthy questtree 9011")
+lefthy("lodestar 9011")
+check(Small().quest == 9011, "/lefthy lodestar 9011")
 
--- /questtree browse: the big window (Browser.lua), when it's there.
+-- /lodestar browse: the big window (Browser.lua), when it's there.
 mark = #PRINTED
 if Q.ToggleBrowser then
 	local browsed = 0
 	Replace("ToggleBrowser", function() browsed = browsed + 1 end)
 	slash("browse")
-	check(browsed == 1, "/questtree browse opens the quest browser")
+	check(browsed == 1, "/lodestar browse opens the quest browser")
 	PutBack("ToggleBrowser")
 else
 	slash("browse")
-	check(printedSince(mark + 1):find("the quest browser isn't there", 1, true), "/questtree browse without the browser: says so")
+	check(printedSince(mark + 1):find("the quest browser isn't there", 1, true), "/lodestar browse without the browser: says so")
 end
 
 ---------------------------------------------------------------------------
-section("Questtree: NPC tooltips")
+section("Lodestar: NPC tooltips")
 do
 	local call
 	for _, c in ipairs(TOOLTIP_POSTCALLS) do if c[1] == Enum.TooltipDataType.Unit then call = c[2] end end
@@ -448,10 +448,10 @@ do
 		return TOOLTIP.lines
 	end
 	check(call ~= nil, "a post-call on unit tooltips")
-	check(Has(Hover(902), "Questtree: starts Westward Bound (step 3 of 3)"), "a giver: the quest I can take there, its step")
-	check(Has(Hover(906), "Questtree: ends Kobold Candles"), "a turn-in of a quest in my log")
-	check(Has(Hover(908), "Questtree: starts Later Wolves at level 22"), "a quest for later: from which level")
-	check(Has(Hover(904), "Questtree: starts Far Too Hard at level 30") and #Hover(900) == 0 and #Hover(901) == 0,
+	check(Has(Hover(902), "Lodestar: starts Westward Bound (step 3 of 3)"), "a giver: the quest I can take there, its step")
+	check(Has(Hover(906), "Lodestar: ends Kobold Candles"), "a turn-in of a quest in my log")
+	check(Has(Hover(908), "Lodestar: starts Later Wolves at level 22"), "a quest for later: from which level")
+	check(Has(Hover(904), "Lodestar: starts Far Too Hard at level 30") and #Hover(900) == 0 and #Hover(901) == 0,
 		"too high a level: from which; done: nothing")
 	local asks = giverAsks
 	Hover(902)
@@ -473,7 +473,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree: only while it's shown")
+section("Lodestar: only while it's shown")
 Small().win:Hide()
 slash("")
 asked = 0
@@ -495,7 +495,7 @@ check(asked == 0, "hidden: nothing listened to, nothing drawn")
 SUPER_TRACKED = 0
 
 ---------------------------------------------------------------------------
-section("Questtree: the small window's place and size")
+section("Lodestar: the small window's place and size")
 slash("9001")
 s = Small()
 local win = s.win
@@ -562,15 +562,15 @@ do
 	for name, fn in pairs(saved) do Q[name] = fn end
 end
 
--- Switched off: the window goes, /questtree says so.
-LT:SetModuleEnabled("questtree", false)
+-- Switched off: the window goes, /lodestar says so.
+LT:SetModuleEnabled("lodestar", false)
 mark = #PRINTED
 slash("")
-check(not win:IsShown() and printedSince(mark + 1):find("Questtree is switched off", 1, true), "switched off: hidden, /questtree says so")
-LT:SetModuleEnabled("questtree", true)
+check(not win:IsShown() and printedSince(mark + 1):find("Lodestar is switched off", 1, true), "switched off: hidden, /lodestar says so")
+LT:SetModuleEnabled("lodestar", true)
 
 ---------------------------------------------------------------------------
-section("Questtree: the companion's lines, one line, hiding itself")
+section("Lodestar: the companion's lines, one line, hiding itself")
 do
 	-- Its own quests: one in my log ready to turn in, one that opens two, two that close each other,
 	-- one for later.
@@ -633,7 +633,7 @@ do
 	check(Small().collapsed and win:GetHeight() == 54, "the setting does the same")
 	LT:SetModuleSetting(M, "collapsed", false)
 
-	-- Alt-click in the quest log: Questtree (Dialog.lua's Q.LogAltClick, on the next frame).
+	-- Alt-click in the quest log: Lodestar (Dialog.lua's Q.LogAltClick, on the next frame).
 	local opened = {}
 	Replace("OpenBrowser", function(id) opened[#opened + 1] = id end)
 	STATE.alt = true
@@ -676,7 +676,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree: the companion's status words (the real reason)")
+section("Lodestar: the companion's status words (the real reason)")
 do
 	local factions = C_Reputation
 	C_Reputation = { GetFactionDataByID = function(id) return id == 72 and { currentStanding = 2000, name = "Stormwind" } or nil end }
@@ -730,7 +730,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree: the small map")
+section("Lodestar: the small map")
 do
 	local m = Q.NewMiniMap(UIParent)
 	check(not m.frame:IsShown() and m.width == 240 and m.height == 160 and m.frame._clips == true, "made hidden, 240 x 160, clipping its art")

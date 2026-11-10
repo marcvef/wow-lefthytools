@@ -1,4 +1,4 @@
--- Questtree's learning (Questtree/Learn.lua) and sharing (Beacon/QuestShare.lua): givers and enders (NPCs,
+-- Lodestar's learning (Lodestar/Learn.lua) and sharing (Beacon/QuestShare.lua): givers and enders (NPCs,
 -- objects, items) with where I stood, titles and levels, prerequisites inferred from offers and turn-ins
 -- (strong, weak, proven wrong), what the data knows already, secrets, the learn switch, pruning and feeding
 -- at login; friends' progress on request, learned records passed on between two current builds (paced,
@@ -7,7 +7,7 @@
 -- Every client here is a game of its own, like in recipes.lua: mock.lua and the addon in an environment of
 -- their own, with their own clock, Battle.net friends and saved variables.
 --
--- Stand-ins (until the lead merges the other parts): the Questtree module (Questtree.lua) with
+-- Stand-ins (until the lead merges the other parts): the Lodestar module (Lodestar.lua) with
 -- `learn = true`, `friends = true`, and Data.lua's Q.SetTestData / Q.Quest / Q.IsLoaded / Q.AddLearned and
 -- Engine's Q.Chain, each only where the addon doesn't have it; Q.AddLearned is wrapped to see what it gets.
 -- The game's quest dialogs, gossip and completed quests are the test's too (UnitGUID/UnitName "npc",
@@ -31,9 +31,9 @@ for k, v in pairs(_G) do
 end
 local BASE_META = { __index = BASE }
 
-local NEW, OLD = "0.7.0-70-gabc1234", "0.7.0-69-gabc1234" -- the first build that reads Questtree's words, the one before
+local NEW, OLD = "0.7.0-70-gabc1234", "0.7.0-69-gabc1234" -- the first build that reads Lodestar's words, the one before
 -- What an older build doesn't have (its client here runs without them).
-local OLD_FILES = { ["Modules/Beacon/QuestShare.lua"] = true, ["Modules/Questtree/Learn.lua"] = true }
+local OLD_FILES = { ["Modules/Beacon/QuestShare.lua"] = true, ["Modules/Lodestar/Learn.lua"] = true }
 local SAVED = { "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB", "LefthyToolsEchoesDB" }
 
 local function Person(id, name, class, tag)
@@ -121,11 +121,11 @@ end
 
 local CHAINS = { [101] = { 101, 102, 103 }, [102] = { 101, 102, 103 }, [103] = { 101, 102, 103 } }
 
--- Stand-ins for the parts of Questtree not in this tree (each only where the addon doesn't have it).
-local function Questtree(ns)
-	local LT, Q = ns.LT, ns.Questtree
-	if not LT:GetModule("questtree") then
-		LT:NewModule("questtree", { title = "Questtree", defaults = { learn = true, friends = true } })
+-- Stand-ins for the parts of Lodestar not in this tree (each only where the addon doesn't have it).
+local function Lodestar(ns)
+	local LT, Q = ns.LT, ns.Lodestar
+	if not LT:GetModule("lodestar") then
+		LT:NewModule("lodestar", { title = "Lodestar", defaults = { learn = true, friends = true } })
 	end
 	if not Q.SetTestData then
 		local data, loaded = {}, false
@@ -204,12 +204,12 @@ local function Start(p, opts)
 		end
 	end
 	ns.LT.LAUNCH_DAY = nil
-	ns.Questtree = ns.Questtree or {}
-	Questtree(ns)
+	ns.Lodestar = ns.Lodestar or {}
+	Lodestar(ns)
 	env.Fire("ADDON_LOADED", "LefthyTools")
 	env.Fire("PLAYER_LOGIN")
 	env.Fire("PLAYER_ENTERING_WORLD", true, false)
-	local c = { who = p, env = env, ns = ns, Q = ns.Questtree, B = ns.Beacon, LT = env.LefthyTools, opts = opts, read = 0,
+	local c = { who = p, env = env, ns = ns, Q = ns.Lodestar, B = ns.Beacon, LT = env.LefthyTools, opts = opts, read = 0,
 		before = before, alive = {} }
 	if not opts.fake then
 		world.list[#world.list + 1] = c
@@ -453,7 +453,7 @@ local function Count(t)
 end
 
 ---------------------------------------------------------------------------
-section("Questtree learning: givers, enders, levels")
+section("Lodestar learning: givers, enders, levels")
 ---------------------------------------------------------------------------
 
 local anna = Start(ANNA, { friends = { BOB, DORA } })
@@ -504,7 +504,7 @@ TurnIn(anna, 101)
 Frame(anna)
 
 ---------------------------------------------------------------------------
-section("Questtree learning: prerequisites")
+section("Lodestar learning: prerequisites")
 ---------------------------------------------------------------------------
 
 local mark = #anna.Q.added + 1
@@ -556,7 +556,7 @@ opens = Added(anna, 105, mark)
 check(opens[1] and opens[1].opens and opens[1].opens[1] == 106, "only as what the earlier one leads to")
 
 ---------------------------------------------------------------------------
-section("Questtree learning: objects, items, players, secrets, the switch, the data")
+section("Lodestar learning: objects, items, players, secrets, the switch, the data")
 ---------------------------------------------------------------------------
 
 At(anna, SHRINE, 0.6, 0.6)
@@ -600,7 +600,7 @@ check(r and r.s.m == 1429 and r.s.x == nil and r.s.y == nil, "a secret position:
 check(#anna.env.ERRORS == 0, "secrets: no errors")
 anna.env.PLAYER_POS = { 0.5, 0.5 }
 
-local module = anna.LT:GetModule("questtree")
+local module = anna.LT:GetModule("lodestar")
 module.db.learn = false
 At(anna, MARSHAL)
 Gossip(anna, { Q(113, "Off", 9) })
@@ -629,7 +629,7 @@ check(not Store(anna)[114] and Store(anna)[115] and Store(anna)[115].e and not S
 	"an ender the data lacks: learned, and only that")
 
 ---------------------------------------------------------------------------
-section("Questtree learning: kept, checked and fed at login, pruned")
+section("Lodestar learning: kept, checked and fed at login, pruned")
 ---------------------------------------------------------------------------
 
 local before = Count(Store(anna))
@@ -644,9 +644,9 @@ end
 check(Count(fedAt) == before, "every record fed into Q.AddLearned (" .. Count(fedAt) .. " of " .. before .. ")")
 Leftovers(anna)
 
-local cedricSaved = { LefthyToolsDB = { world = "release", questtree = { learned = {}, share = { seq = 1700, epoch = "0badf00d" } } } }
+local cedricSaved = { LefthyToolsDB = { world = "release", lodestar = { learned = {}, share = { seq = 1700, epoch = "0badf00d" } } } }
 do
-	local learned = cedricSaved.LefthyToolsDB.questtree.learned
+	local learned = cedricSaved.LefthyToolsDB.lodestar.learned
 	for i = 1, 1600 do
 		learned[1000 + i] = { u = i, s = { k = "n", i = 50 + i % 7, n = "Npc", m = 1429, x = 0.5, y = 0.5 }, t = "Q" .. i }
 	end
@@ -666,13 +666,13 @@ cedric.env.Advance(2)
 check(#cedric.Q.added >= 1350, "then all of them")
 
 ---------------------------------------------------------------------------
-section("Questtree sharing: two current builds, an older one")
+section("Lodestar sharing: two current builds, an older one")
 ---------------------------------------------------------------------------
 
 local logFrom = #world.log + 1
 local bob = Start(BOB, { friends = { ANNA, DORA } })
 local dora = Start(DORA, { friends = { ANNA, BOB }, version = OLD })
-check(not dora.ns.Questtree.LearnedStore, "the older build has none of it")
+check(not dora.ns.Lodestar.LearnedStore, "the older build has none of it")
 local annaCount = Count(Store(anna))
 Run(60, function() return Count(Store(bob)) >= annaCount end)
 check(Count(Store(bob)) == annaCount, "Bob got every record Anna learned (" .. Count(Store(bob)) .. " of " .. annaCount .. ")")
@@ -697,7 +697,7 @@ for i, m in ipairs(records) do
 end
 check(#records >= 10 and busiest <= 16, "paced: about 4 records a second (at most 16 in any 3 s), got " .. busiest)
 check(#Logged(ANNA, DORA, "B2;q", logFrom) == 0 and #Logged(BOB, DORA, "B2;q", logFrom) == 0,
-	"the older build gets none of Questtree's words")
+	"the older build gets none of Lodestar's words")
 
 -- Once each way: Bob holds Anna's records now, and offers what he has; nothing comes back to her.
 local annaSeq = anna.Q.LearnedMeta().seq
@@ -717,7 +717,7 @@ Run(2)
 check(#Logged(BOB, ANNA, "B2;qr;", logFrom) == 1, "only that one")
 
 ---------------------------------------------------------------------------
-section("Questtree sharing: friends' progress")
+section("Lodestar sharing: friends' progress")
 ---------------------------------------------------------------------------
 
 -- Anna: 101 done, 102 in her log, 103 not; 140 ready to turn in (complete).
@@ -757,15 +757,15 @@ Run(3)
 check(#Logged(BOB, ANNA, "B2;qp;", logFrom) == 0, "the same quest again a moment later: not asked again")
 
 -- Anna's friends setting off: she answers "not shared" and offers nothing.
-anna.LT:GetModule("questtree").db.friends = false
+anna.LT:GetModule("lodestar").db.friends = false
 bob.Q.RequestFriendProgress(101)
 Run(3)
 check(not bob.Q.FriendProgress(ANNA.id).shares and bob.Q.FriendStatus(ANNA.id, 101) == "done", "not shared: said so (what was known stays)")
 check(not anna.Q.RequestFriendProgress(102), "and she doesn't ask")
-anna.LT:GetModule("questtree").db.friends = true
+anna.LT:GetModule("lodestar").db.friends = true
 
 ---------------------------------------------------------------------------
-section("Questtree learning: a prerequisite proven wrong, passed on")
+section("Lodestar learning: a prerequisite proven wrong, passed on")
 ---------------------------------------------------------------------------
 
 -- Anna's alt hasn't done 101, yet Marshal offers it 102: 101 wasn't needed after all.
@@ -781,7 +781,7 @@ check(Store(bob)[102].x and Store(bob)[102].x[101] and not Store(bob)[102].p, "p
 Stop(dora)
 
 ---------------------------------------------------------------------------
-section("Questtree sharing: limits, fights, older builds (friends the test plays)")
+section("Lodestar sharing: limits, fights, older builds (friends the test plays)")
 ---------------------------------------------------------------------------
 
 local m0 = Mark(cedric)
@@ -842,10 +842,10 @@ check(odd and odd.s.n == "Red" and odd.t == "Title", "a friend's name and title:
 
 Pass(cedric, 60) -- (a quiet minute: Beacon's count starts anew)
 
--- Beacon's limit: at most 300 of Questtree's messages a minute from one friend.
+-- Beacon's limit: at most 300 of Lodestar's messages a minute from one friend.
 local got = 0
-local receive = cedric.B.ReceiveQuesttree
-cedric.B.ReceiveQuesttree = function(...)
+local receive = cedric.B.ReceiveLodestar
+cedric.B.ReceiveLodestar = function(...)
 	got = got + 1
 	return receive(...)
 end
@@ -856,7 +856,7 @@ for _ = 1, 25 do
 	Pass(cedric, 1)
 end
 check(got == 300, "Beacon takes 300 a minute from one friend, got " .. got)
-cedric.B.ReceiveQuesttree = receive
+cedric.B.ReceiveLodestar = receive
 
 Leftovers(cedric)
 Stop(bob)

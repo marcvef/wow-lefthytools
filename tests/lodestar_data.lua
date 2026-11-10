@@ -1,4 +1,4 @@
--- Questtree's data and engine (Modules/Questtree/Data.lua, Engine.lua; docs/questtree.md): the quest
+-- Lodestar's data and engine (Modules/Lodestar/Data.lua, Engine.lua; docs/lodestar.md): the quest
 -- data add-on loaded only when asked, once; the real generated data (LefthyTools_QuestData/QuestData.lua)
 -- through the accessors: quests, givers and their places, zones, dungeons, search; real chains (Elwynn
 -- Forest's Northshire, Westfall's Defias Brotherhood, a Forever chain); where a quest stands with a
@@ -12,7 +12,7 @@
 
 local suite = ...
 local check, section, ns = suite.check, suite.section, suite.ns
-local Q = ns.Questtree
+local Q = ns.Lodestar
 
 local function has(list, v)
 	for _, x in ipairs(list or {}) do if x == v then return true end end
@@ -42,7 +42,7 @@ local function inLog(list)
 	Fire("QUEST_ACCEPTED", list[#list])
 end
 
-section("Questtree data: loaded only when asked")
+section("Lodestar data: loaded only when asked")
 do
 	check(type(Q) == "table" and Q.Load and Q.Quest and Q.Status and Q.SetTestData, "the data and engine are there")
 	check(LefthyToolsQuestData == nil, "nothing loaded at login")
@@ -77,7 +77,7 @@ do
 		and info.source:find("EG Link", 1, true), "the data says what it is: " .. tostring(info and info.quests) .. " quests, " .. tostring(info and info.build))
 end
 
-section("Questtree data: quests, givers, places")
+section("Lodestar data: quests, givers, places")
 do
 	local hogger = Q.Quest(176)
 	check(hogger and hogger.title == 'Wanted:  "Hogger"' and hogger.level == 11 and hogger.minLevel == 5 and hogger.zone == 1429
@@ -114,7 +114,7 @@ do
 	check(Q.Quest(64).starts[1].points[1].map == 1436, "without the game's word: the tool's guess (Westfall)")
 end
 
-section("Questtree data: zones, dungeons, search")
+section("Lodestar data: zones, dungeons, search")
 do
 	local zones = Q.Zones()
 	local elwynn
@@ -146,7 +146,7 @@ do
 	check(#Q.Search("") == 0 and #Q.Search("zzqqxx") == 0, "nothing for nothing")
 end
 
-section("Questtree data: races, item drops, who gives what")
+section("Lodestar data: races, item drops, who gives what")
 do
 	local races, byId = Q.Races(), {}
 	for _, r in ipairs(races) do byId[r.id] = r end
@@ -189,7 +189,7 @@ do
 		"Westfall: the Deadmines' quests given there, listed under the dungeon")
 end
 
-section("Questtree data: objectives, rewards, turn-in")
+section("Lodestar data: objectives, rewards, turn-in")
 do
 	check(type(LefthyToolsQuestData.quests[7]) == "string", "the data stays strings: nothing parsed at load")
 	-- Kill: the creature with its spawns' clusters.
@@ -257,7 +257,7 @@ do
 		"turned in at Marshal Dughan")
 end
 
-section("Questtree engine: Northshire with a made-up progress")
+section("Lodestar engine: Northshire with a made-up progress")
 do
 	login({})
 	PLAYER_LEVEL = 1
@@ -302,7 +302,7 @@ do
 	check(Q.Quest(Q.Next()[1]).zone == 1429 and #westfallFirst == #Q.Next(), "next: my zone's first")
 end
 
-section("Questtree engine: not for me, exclusive, across zones, a Forever chain")
+section("Lodestar engine: not for me, exclusive, across zones, a Forever chain")
 do
 	PLAYER_LEVEL = 19
 	Fire("PLAYER_LEVEL_UP", 19)
@@ -358,7 +358,7 @@ do
 	check(#Q.Friends(176) == 0, "no friends known: none")
 end
 
-section("Questtree engine: a Skyborne, zone counts, chain steps, nearby, colours")
+section("Lodestar engine: a Skyborne, zone counts, chain steps, nearby, colours")
 do
 	-- I'm a Windshaper Skyborne (Horde): every quest for all of the Horde is mine.
 	local race, side = UnitRace, UnitFactionGroup
@@ -457,7 +457,7 @@ do
 	Fire("PLAYER_LEVEL_UP", 19)
 end
 
-section("Questtree data: learned data fills gaps")
+section("Lodestar data: learned data fills gaps")
 do
 	local learned = Q.Quest(999001)
 	check(learned and learned.source == "learned" and learned.title == "A Learned Quest" and has(learned.pre, 783)
@@ -493,7 +493,7 @@ do
 	Advance(1)
 end
 
-section("Questtree data: the test hook")
+section("Lodestar data: the test hook")
 do
 	local heard = 0
 	Q.OnDataChanged(function() heard = heard + 1 end)
@@ -523,7 +523,7 @@ do
 		"a test quest's own objectives and rewards; none without")
 end
 
-section("Questtree engine: why not for me, what blocks it, my levels")
+section("Lodestar engine: why not for me, what blocks it, my levels")
 do
 	local factions = C_Reputation
 	local standing = { [72] = 2000 }

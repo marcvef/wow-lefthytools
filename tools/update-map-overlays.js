@@ -1,6 +1,6 @@
 // Regenerates LefthyTools/Data/MapOverlays.lua: every explorable area's art of each zone map (the
 // overlays the world map lays over a zone's art where you've explored), for maps of ours that show a
-// zone uncovered (Core/MapArt.lua's reveal: Questtree's maps).
+// zone uncovered (Core/MapArt.lua's reveal: Lodestar's maps).
 //
 // The world map draws a zone's art (UiMapArtTile) with its fog, and over it an overlay per area you've
 // explored (C_MapExplorationInfo.GetExploredMapTextures: only the explored ones). Every overlay is in

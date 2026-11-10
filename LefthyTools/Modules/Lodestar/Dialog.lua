@@ -1,9 +1,9 @@
 local _, ns = ...
 local LT = ns.LT
 local L = ns.L
-local Q = ns.Questtree or {}; ns.Questtree = Q
+local Q = ns.Lodestar or {}; ns.Lodestar = Q
 
--- Questtree in the game's quest UI (docs/questtree.md, "In the game's quest UI"):
+-- Lodestar in the game's quest UI (docs/lodestar.md, "In the game's quest UI"):
 --
 --   * Beside the quest dialog (setting dialog): when an NPC offers a quest (QUEST_DETAIL), asks for
 --     it (QUEST_PROGRESS), rewards it (QUEST_COMPLETE) or lists several (QUEST_GREETING), a panel of
@@ -11,12 +11,12 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --     before, this one bold, two after, done ones ticked, "... N more"), what it leads to when that
 --     isn't the next step listed ("Leads to ..." / "Opens 3 quests"), what the next steps need
 --     besides it that isn't listed or done ("Requires ..."), what taking it closes, which friends did
---     it (one line), and has a button "Open in Questtree". Nothing to tell (no chain, nothing it
+--     it (one line), and has a button "Open in Lodestar". Nothing to tell (no chain, nothing it
 --     opens): no panel.
 --   * The quest log (setting logBadges): "2/4" at the right end of each chain quest's line (a font
 --     string of ours on Blizzard's title button, the way Misc Tweaks' NEW label is: a post-hook on
 --     QuestLogQuests_Update), the chain in the line's tooltip (a HookScript on its OnEnter, as Misc
---     Tweaks does), and Alt-click opens the quest in Questtree (Questtree.lua's post-hook on
+--     Tweaks does), and Alt-click opens the quest in Lodestar (Lodestar.lua's post-hook on
 --     QuestMapFrame_ShowQuestDetails hands it here; it opens on the next frame, in our own code).
 --
 -- Taint and the controller: the panel is a frame of ours on UIParent, only anchored to QuestFrame,
@@ -42,7 +42,7 @@ local NAMES_MAX = 3        -- quests named in a tooltip ("Opens 3 quests"), need
 local FRIENDS_MAX = 3      -- friends named (one line)
 local GREETING_MAX = 8
 local WATCH_EVERY = 0.5    -- s: whether QuestFrame is still shown, while the panel is
-local HOOK_DELAY = 1       -- s after Questtree is switched on: the quest log's hook (after Misc Tweaks')
+local HOOK_DELAY = 1       -- s after Lodestar is switched on: the quest log's hook (after Misc Tweaks')
 local C = Q.COLOR or {}
 local GOLD, GREY, LIGHT, GREEN = C.gold or "|cffffd200", C.grey or "|cff9d9d9d", C.light or "|cffbebebe", C.done or "|cff5fba46"
 local CLOSES, BADGE = C.closes or "|cffff8040", C.progress or "|cffd99b00"
@@ -51,7 +51,7 @@ local PAGES = { QUEST_DETAIL = "detail", QUEST_PROGRESS = "progress", QUEST_COMP
 
 local Soon                 -- (below: a draw on the next frame)
 local panel                -- our frame beside the quest dialog (built the first time it has something to say)
-local listener             -- the quest dialog's events (while Questtree and the setting are on)
+local listener             -- the quest dialog's events (while Lodestar and the setting are on)
 local page                 -- the dialog's page: "detail" | "progress" | "complete" | "greeting" | nil (closed)
 local shownQuest           -- the quest the panel shows (nil: the greeting's list)
 local due = false
@@ -71,7 +71,7 @@ local function Loaded()
 	return Q.IsLoaded == nil or Q.IsLoaded() == true
 end
 
--- Opens a quest in Questtree: the big window on it, else the small one.
+-- Opens a quest in Lodestar: the big window on it, else the small one.
 local function OpenQuest(id)
 	if not (id and Q.module.enabled) then
 		return
@@ -147,7 +147,7 @@ local function RowClick(self)
 	OpenQuest(self.questID)
 end
 
--- A line for a quest (a click opens it in Questtree): o = { text, id, font, indent, tooltip }.
+-- A line for a quest (a click opens it in Lodestar): o = { text, id, font, indent, tooltip }.
 local function Row(y, o)
 	rowsUsed = rowsUsed + 1
 	local row = rows[rowsUsed]
@@ -166,7 +166,7 @@ local function Row(y, o)
 	local indent = o.indent or 0
 	local w = WIDTH - 2 * PAD - indent
 	row.questID = o.id
-	row.tooltip = o.tooltip or { Q.LevelTitle(o.id), Q.StatusText(Q.StatusOf(o.id)), L["Click: open it in Questtree"] }
+	row.tooltip = o.tooltip or { Q.LevelTitle(o.id), Q.StatusText(Q.StatusOf(o.id)), L["Click: open it in Lodestar"] }
 	row:ClearAllPoints()
 	row:SetPoint("TOPLEFT", panel.Body, "TOPLEFT", indent, -y)
 	row.Text:SetFontObject(o.font or "GameFontHighlightSmall")
@@ -299,14 +299,14 @@ local function DrawQuest(y, id)
 		if #opens > NAMES_MAX then
 			tip[#tip + 1] = L["and %d more"]:format(#opens - NAMES_MAX)
 		end
-		tip[#tip + 1] = L["Click: open it in Questtree"]
+		tip[#tip + 1] = L["Click: open it in Lodestar"]
 		y = Row(y, { id = id, text = GOLD .. L["Opens %d quests"]:format(#opens) .. "|r", tooltip = tip })
 	end
 	for _, need in ipairs(OtherNeeds(id, opens, listed)) do
 		y = Row(y, { id = need.id, text = Q.StatusCode("locked") .. L["Requires: %s"]:format(Q.Title(need.id)) .. "|r"
 			.. GREY .. " " .. L["(for %s)"]:format(Q.Title(need.forID)) .. "|r",
 			tooltip = { Q.LevelTitle(need.id), Q.StatusText(Q.StatusOf(need.id)),
-				L["%s needs it too, not only this quest."]:format(Q.Title(need.forID)), L["Click: open it in Questtree"] } })
+				L["%s needs it too, not only this quest."]:format(Q.Title(need.forID)), L["Click: open it in Lodestar"] } })
 	end
 	if closes[1] then
 		y = Text(y, CLOSES .. L["Taking it closes: %s"]:format(Names(closes)) .. "|r", "GameFontHighlightSmall")
@@ -348,7 +348,7 @@ local function DrawGreeting(y)
 		if quest and (list or opens[1]) then
 			if not any then
 				any = true
-				y = Text(y, GOLD .. "Questtree" .. "|r", "GameFontNormal")
+				y = Text(y, GOLD .. "Lodestar" .. "|r", "GameFontNormal")
 			end
 			local note = list and (L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list)) or L["opens %d"]:format(#opens)
 			y = Row(y, { id = id, text = Q.QuestIcon(id) .. " " .. Q.LevelTitle(id, quest) .. "\n" .. GREY .. note .. "|r" })
@@ -369,7 +369,7 @@ local function Hide()
 end
 
 local function Build()
-	panel = CreateFrame("Frame", "LefthyToolsQuesttreeDialog", UIParent)
+	panel = CreateFrame("Frame", "LefthyToolsLodestarDialog", UIParent)
 	panel:SetSize(WIDTH, 100)
 	panel:SetClampedToScreen(true)
 	panel:EnableMouse(true)
@@ -395,7 +395,7 @@ local function Build()
 	panel.Open = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
 	panel.Open:SetSize(WIDTH - 2 * PAD, 22)
 	panel.Open:SetPoint("BOTTOM", 0, PAD)
-	panel.Open:SetText(L["Open in Questtree"])
+	panel.Open:SetText(L["Open in Lodestar"])
 	panel.Open:SetScript("OnClick", function() OpenQuest(shownQuest) end)
 	-- While shown: is the dialog still there (it can close without QUEST_FINISHED reaching us first).
 	local wait = WATCH_EVERY
@@ -482,7 +482,7 @@ Soon = function()
 	due = true
 	C_Timer.After(0, function()
 		due = false
-		LT.Guard("Questtree.dialog", Draw)
+		LT.Guard("Lodestar.dialog", Draw)
 	end)
 end
 
@@ -497,7 +497,7 @@ local function OnEvent(_, event)
 	Soon()
 end
 
--- The dialog's events, while Questtree and the setting are on.
+-- The dialog's events, while Lodestar and the setting are on.
 local function Listen()
 	local want = On("dialog")
 	if want and not listener then
@@ -555,7 +555,7 @@ local function BadgeTip(button)
 		return
 	end
 	GameTooltip:AddLine(" ")
-	GameTooltip:AddLine("Questtree: " .. L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list), 1, 0.82, 0, true)
+	GameTooltip:AddLine("Lodestar: " .. L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list), 1, 0.82, 0, true)
 	local first, last = Window(list, at, TIP_STEPS)
 	if first > 1 then
 		GameTooltip:AddLine("   " .. L["... %d before"]:format(first - 1), 0.6, 0.6, 0.6)
@@ -578,13 +578,13 @@ local function BadgeTip(button)
 		GameTooltip:AddLine(L["Leads to:"] .. " " .. Names(opens), 0.8, 0.8, 0.8, true)
 	end
 	if Q.OpenBrowser or Q.ShowQuest then
-		GameTooltip:AddLine(L["Alt-click: open it in Questtree"], 0.5, 0.8, 1)
+		GameTooltip:AddLine(L["Alt-click: open it in Lodestar"], 0.5, 0.8, 1)
 	end
 	GameTooltip:Show()
 end
 
 local function SafeTip(button)
-	LT.Guard("Questtree.logtip", BadgeTip, button)
+	LT.Guard("Lodestar.logtip", BadgeTip, button)
 end
 
 -- Our label on a title button, at the right end of its line (left of Misc Tweaks' NEW when that's
@@ -616,7 +616,7 @@ local function LoadSoon()
 	C_Timer.After(0, function()
 		loading = false
 		if not LT.InCombat() and On("logBadges") and Q.Ready() then
-			LT.Guard("Questtree.badges", UpdateBadges)
+			LT.Guard("Lodestar.badges", UpdateBadges)
 		end
 	end)
 end
@@ -648,7 +648,7 @@ UpdateBadges = function()
 end
 
 -- A post-hook on QuestLogQuests_Update (Blizzard has just filled the titles), as Misc Tweaks' NEW
--- marker; made a second after Questtree is switched on, so it runs after that one's (its label's
+-- marker; made a second after Lodestar is switched on, so it runs after that one's (its label's
 -- place is known then).
 local function HookLog()
 	if logHooked or type(QuestLogQuests_Update) ~= "function" then
@@ -656,17 +656,17 @@ local function HookLog()
 	end
 	logHooked = true
 	hooksecurefunc("QuestLogQuests_Update", function()
-		LT.Guard("Questtree.badges", UpdateBadges)
+		LT.Guard("Lodestar.badges", UpdateBadges)
 	end)
 end
 
--- Alt-click on a quest in the log (Questtree.lua's hook): opened on the next frame, in our code.
+-- Alt-click on a quest in the log (Lodestar.lua's hook): opened on the next frame, in our code.
 function Q.LogAltClick(id)
 	if not On("logBadges") then
 		return
 	end
 	C_Timer.After(0, function()
-		LT.Guard("Questtree.logopen", OpenQuest, id)
+		LT.Guard("Lodestar.logopen", OpenQuest, id)
 	end)
 end
 

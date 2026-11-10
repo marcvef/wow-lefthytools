@@ -1,4 +1,4 @@
--- Questtree: the quest browser's two views (Views.lua): My quests (my quest log organised: ready to
+-- Lodestar: the quest browser's two views (Views.lua): My quests (my quest log organised: ready to
 -- turn in first, then by zone with mine first and the nearest first, by level or by storyline; a
 -- line per quest with its chain's "2/4", its first objective not done or "Ready to turn in", where
 -- it's turned in; a click opens it in the window, a right-click sets the map pin; "Continue your
@@ -20,8 +20,8 @@
 
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
-local Q = ns.Questtree
-local M = LT:GetModule("questtree")
+local Q = ns.Lodestar
+local M = LT:GetModule("lodestar")
 
 local replaced = {}
 local function Replace(name, fn)
@@ -114,7 +114,7 @@ local OBJECTIVES = {
 		{ kind = "object", id = 400, name = "Red Crystal", points = { { map = DARKSHORE, x = 0.5, y = 0.2, r = 0.02 } } } } } },
 }
 -- (Always the stand-in: the test quests have no objectives in the data's own format; the data part's
--- Q.Objectives has its tests in questtree_data.)
+-- Q.Objectives has its tests in lodestar_data.)
 Replace("Objectives", function(id) return OBJECTIVES[id] or {} end)
 -- The contract's Q.InRange (the data part's tests check the engine's own; here what the views do
 -- with it): in my log; else my level reached, not grey, at most 4 levels above me (a level -1 / 0:
@@ -198,7 +198,7 @@ local census, K = state.census, state.K
 local startsBefore = census.starts
 
 ---------------------------------------------------------------------------
-section("Questtree views: registering with the window")
+section("Lodestar views: registering with the window")
 ---------------------------------------------------------------------------
 -- A stand-in for the window's registry (the big window's part makes the real one): it records.
 local registry = {}
@@ -254,7 +254,7 @@ end
 local function RowOf(view, key) return view.list:Row(key) end
 
 ---------------------------------------------------------------------------
-section("Questtree views: the quest log's objectives (Q.LogObjectives)")
+section("Lodestar views: the quest log's objectives (Q.LogObjectives)")
 ---------------------------------------------------------------------------
 do
 	local list = Q.LogObjectives(1101)
@@ -280,7 +280,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree views: my quests")
+section("Lodestar views: my quests")
 ---------------------------------------------------------------------------
 do
 	local slice = K.SLICE
@@ -360,7 +360,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree views: events while shown, moving, turning in, the data changing")
+section("Lodestar views: events while shown, moving, turning in, the data changing")
 ---------------------------------------------------------------------------
 do
 	local starts, draws = census.starts, mine.draws
@@ -406,7 +406,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree views: the level path")
+section("Lodestar views: the level path")
 ---------------------------------------------------------------------------
 local function Rows(view)
 	local out = {}
@@ -490,7 +490,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree views: hidden, nothing runs; shown again, counted if needed")
+section("Lodestar views: hidden, nothing runs; shown again, counted if needed")
 ---------------------------------------------------------------------------
 do
 	Hide(levelpath)
@@ -513,7 +513,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree views: a full quest log, many storylines, only the rows in sight")
+section("Lodestar views: a full quest log, many storylines, only the rows in sight")
 ---------------------------------------------------------------------------
 do
 	local many = {}
@@ -554,7 +554,7 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("Questtree views: no data, the controller, a fight")
+section("Lodestar views: no data, the controller, a fight")
 ---------------------------------------------------------------------------
 do
 	local load = Q.Load

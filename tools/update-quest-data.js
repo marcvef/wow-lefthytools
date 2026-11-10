@@ -1,7 +1,7 @@
 // Regenerates LefthyTools_QuestData/QuestData.lua: every quest's chain (what it needs first, what it
 // leads to), its levels, who it's for, its zone, and who gives and takes it and where they stand, for
-// the Questtree module (Modules/Questtree/Data.lua reads it; docs/questtree.md, Data). A separate
-// add-on (GPL v3, like its main source), loaded only when a Questtree window opens.
+// the Lodestar module (Modules/Lodestar/Data.lua reads it; docs/lodestar.md, Data). A separate
+// add-on (GPL v3, like its main source), loaded only when a Lodestar window opens.
 //
 // Sources:
 // - Classic quests: CMaNGOS Classic DB's full dump (https://github.com/cmangos/classic-db, Full_DB

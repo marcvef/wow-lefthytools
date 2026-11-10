@@ -1,4 +1,4 @@
--- Questtree: the big window (Browser.lua), against a small made-up world. The data and engine (Q.Load,
+-- Lodestar: the big window (Browser.lua), against a small made-up world. The data and engine (Q.Load,
 -- Q.Quest, Q.Zones, Q.Status, Q.Chain, ...), the iterations' ones (Q.ZoneCount, Q.ChainStep,
 -- Q.LevelColor, Q.Races, Q.ZoneGiven, Q.Available, Q.IsTrivial, Q.InRange in its new meaning: from my
 -- level on, not grey, not red; Q.WhyOther, Q.Needs), this round's Q.Objectives and Q.Rewards (Data.lua
@@ -29,7 +29,7 @@
 -- Needs: no other file.
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
-local Q = ns.Questtree
+local Q = ns.Lodestar
 
 local function plain(text)
 	return ((text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):gsub("|A.-|a", ""))
@@ -193,7 +193,7 @@ for key, fn in pairs(stand) do
 	saved[key] = Q[key] or false
 	Q[key] = fn
 end
-local M = LT:GetModule("questtree")
+local M = LT:GetModule("lodestar")
 local browserSaved = M and M.db and M.db.browser
 if M and M.db then M.db.browser = nil end
 
@@ -309,24 +309,24 @@ end
 local function openChain(key) chainCard(key):Click() end
 local CHAIN1, SINGLES = "z:1429:101", "z:1429:single"
 
-section("Questtree: the big window without the data")
+section("Lodestar: the big window without the data")
 do
 	Q.OpenBrowser()
 	refs()
-	check(win == LefthyToolsQuesttreeBrowser and win:IsShown() and win.TitleContainer.TitleText:GetText() == "Questtree",
-		"it opens, called Questtree (never translated)")
+	check(win == LefthyToolsLodestarBrowser and win:IsShown() and win.TitleContainer.TitleText:GetText() == "Lodestar",
+		"it opens, called Lodestar (never translated)")
 	check(view.Empty:IsShown() and not view.root:IsShown() and not view.Box:IsShown() and not view.filters.allLevels:IsShown()
 		and plain(view.Empty:GetText()):find("LefthyTools_QuestData", 1, true),
 		"no data addon: a line saying so, no panes, no search, no filters")
 	check(#dataCallbacks == 1 or st.listening, "it listens for data changes")
 	local found
-	for _, name in ipairs(UISpecialFrames) do found = found or name == "LefthyToolsQuesttreeBrowser" end
+	for _, name in ipairs(UISpecialFrames) do found = found or name == "LefthyToolsLodestarBrowser" end
 	check(found, "Escape closes it (UISpecialFrames)")
 	Q.ToggleBrowser()
 	check(not win:IsShown(), "toggled: closed")
 end
 
-section("Questtree: the big window, zones on the left")
+section("Lodestar: the big window, zones on the left")
 do
 	loaded = true
 	Q.ToggleBrowser()
@@ -359,7 +359,7 @@ do
 		"zones near my level (19): not dimmed")
 end
 
-section("Questtree: the big window, the tab bar")
+section("Lodestar: the big window, the tab bar")
 do
 	check(view.tabs.zone and view.tabs.overview and view.tabs.zone:IsShown() and view.tabs.overview:IsShown()
 		and plain(view.tabs.zone.Text:GetText()) == "Zone" and plain(view.tabs.overview.Text:GetText()) == "Quest list"
@@ -371,7 +371,7 @@ do
 		and not view.head:IsShown(), "the zone page shows, right under the tabs (no head: the briefing on the right has it)")
 end
 
-section("Questtree: the big window, the zone page's map")
+section("Lodestar: the big window, the zone page's map")
 do
 	local m = view.zp.map
 	check(m.frame:IsShown() and m.map == ELWYNN and m.width == 1012 and m.height == 674 and m.shown == 5,
@@ -542,7 +542,7 @@ do
 	check(marker("Deputy Willem").look == "progress" and heads(view.b.heads) == "In progress here (1) | Quest chains", "and back")
 end
 
-section("Questtree: the big window, the zone's briefing")
+section("Lodestar: the big window, the zone's briefing")
 do
 	local b = view.b
 	check(b.Scroll:IsShown() and not view.d.Panel:IsShown() and plain(b.Title:GetText()) == "Elwynn Forest"
@@ -619,7 +619,7 @@ do
 	check(view.zp.map.frame:IsShown() and view.zp:IsShown() and not view.head:IsShown(), "back in Elwynn")
 end
 
-section("Questtree: the big window, a chain opened")
+section("Lodestar: the big window, a chain opened")
 do
 	openChain(CHAIN1)
 	check(st.chain == CHAIN1 and view.g.frame:IsShown() and not view.zp:IsShown() and view.tabs.zone.Line:IsShown(), "a click on its card: the chain's page")
@@ -726,7 +726,7 @@ do
 	Q.ToggleBrowser(); Q.ToggleBrowser()
 end
 
-section("Questtree: the big window, why it's locked")
+section("Lodestar: the big window, why it's locked")
 do
 	card(108):Click()
 	local path = st.path
@@ -759,7 +759,7 @@ do
 	zoneRow("z:1429"):Click()
 end
 
-section("Questtree: the big window, the filters")
+section("Lodestar: the big window, the filters")
 do
 	openChain(CHAIN1)
 	check(view.filters.allLevels._kind == "Button" and not view.filters.allLevels.Tick.shown and plain(view.filters.allLevels.Text:GetText()) == "All levels"
@@ -819,7 +819,7 @@ do
 	zoneRow("z:1429"):Click()
 end
 
-section("Questtree: the big window, the details")
+section("Lodestar: the big window, the details")
 do
 	local d = view.d
 	st.picked = nil
@@ -1034,7 +1034,7 @@ do
 	view.head.Back:Click()
 end
 
-section("Questtree: the big window, across zones")
+section("Lodestar: the big window, across zones")
 do
 	zoneRow("z:1436"):Click()
 	check(st.where == "z:1436" and cardsOutline() == "z:1436:101 z:1436:301",
@@ -1080,7 +1080,7 @@ do
 	check(m.areas[3].Fill.vertex[4] == 0.22, "left: as before")
 end
 
-section("Questtree: the big window, the overview")
+section("Lodestar: the big window, the overview")
 do
 	view.tabs.overview:Click()
 	check(st.tab == "overview" and view.list.scroll:IsShown() and not view.g.frame:IsShown() and not view.zp:IsShown() and M.db.browser.tab == "overview",
@@ -1122,7 +1122,7 @@ do
 	check(st.tab == "zone" and view.zp:IsShown() and st.chain == nil, "the zone's tab: its page")
 end
 
-section("Questtree: the big window, the search")
+section("Lodestar: the big window, the search")
 do
 	view.Box:SetText("echo")
 	check(view.Clear:IsShown() and st.query == "", "typing: not searched yet")
@@ -1161,7 +1161,7 @@ do
 	view.Clear:Click()
 end
 
-section("Questtree: the big window, views other files register")
+section("Lodestar: the big window, views other files register")
 do
 	local log = {}
 	local built
@@ -1238,7 +1238,7 @@ do
 	registry.current = nil
 end
 
-section("Questtree: the big window, quests changing")
+section("Lodestar: the big window, quests changing")
 do
 	Q.OpenBrowser(103)
 	view.d.ChainBtn:Click()
@@ -1299,7 +1299,7 @@ do
 	view.head.Back:Click()
 end
 
-section("Questtree: the big window, the data changing")
+section("Lodestar: the big window, the data changing")
 do
 	local _, _, _, changed = Q.BrowserView()
 	QUESTS_DATA[113] = { id = 113, title = "Lost Necklace", level = 6, minLevel = 5, zone = ELWYNN }
@@ -1324,7 +1324,7 @@ do
 	check(st.trees_built == before + 1, "a zone's chains are worked out once, then kept")
 end
 
-section("Questtree: the big window, a big zone and the canvas")
+section("Lodestar: the big window, a big zone and the canvas")
 do
 	local list = {}
 	for i = 1, 400 do
@@ -1397,7 +1397,7 @@ do
 	check(st.where == "z:1429" and st.chain == nil, "the zone gone: back to mine, its page")
 end
 
-section("Questtree: the big window, a small screen and the controller")
+section("Lodestar: the big window, a small screen and the controller")
 do
 	local width, height = GetScreenWidth, GetScreenHeight
 	GetScreenWidth, GetScreenHeight = function() return 1024 end, function() return 768 end

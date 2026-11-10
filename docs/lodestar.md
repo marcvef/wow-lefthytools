@@ -1,24 +1,24 @@
-# Questtree
+# Lodestar
 
 Quest chains for every zone of WoW: Forever: what a quest needs first, what it leads to, who gives
 and takes it and where, and where each quest stands for you and your friends.
 
 | File | What |
 |---|---|
-| `Modules/Questtree/Data.lua` | the quest data (`LefthyTools_QuestData`): loading it, the accessors, search, learned data |
-| `Modules/Questtree/Engine.lua` | a quest's status for me or a friend, what's missing, what it opens, its chain, what's next |
+| `Modules/Lodestar/Data.lua` | the quest data (`LefthyTools_QuestData`): loading it, the accessors, search, learned data |
+| `Modules/Lodestar/Engine.lua` | a quest's status for me or a friend, what's missing, what it opens, its chain, what's next |
 | `LefthyTools_QuestData/` | the data, an add-on of its own (load on demand, GPL v3) |
 | `tools/update-quest-data.js` | makes the data |
-| `Modules/Questtree/Questtree.lua` | the module: settings, `/questtree`, shared helpers (status and difficulty colours, titles, distances, the map pin, the quest log's objectives matched to the data), NPC tooltip lines, the quest log hook |
-| `Modules/Questtree/MiniMap.lua` | the small zone map (our own frame, the zone's map art uncovered, the game's quest icons, drop and objective areas, zoom, your arrow) |
-| `Modules/Questtree/Small.lua` | the small window, the companion: the quest you're on (its objectives' areas on the small map) and what to pick up next nearby; any quest looked at |
-| `Modules/Questtree/Browser.lua` | the big window: zones; a zone's large map (pins, the quest picked's objective areas and way, zoom, my arrow); the right pane: the zone's or chain's briefing (its chains' cards, its steps), a quest's details (steps, objectives, giver and turn-in, rewards); a chain opened (cards, lines, joins, stubs, the way to a locked quest); a quest list; filters (my levels by default); search; tabs for views other files register |
-| `Modules/Questtree/Views.lua` | the big window's other views: my quests (the quest log, organised; the storylines to go on with), the level path (where to go next) |
-| `Modules/Questtree/Learn.lua` | learning givers, enders and prerequisites while playing |
-| `Modules/Questtree/Dialog.lua` | in the game's quest UI: the panel beside the quest dialog, chain steps on the quest log's lines, Alt-click there |
+| `Modules/Lodestar/Lodestar.lua` | the module: settings, `/lodestar`, shared helpers (status and difficulty colours, titles, distances, the map pin, the quest log's objectives matched to the data), NPC tooltip lines, the quest log hook |
+| `Modules/Lodestar/MiniMap.lua` | the small zone map (our own frame, the zone's map art uncovered, the game's quest icons, drop and objective areas, zoom, your arrow) |
+| `Modules/Lodestar/Small.lua` | the small window, the companion: the quest you're on (its objectives' areas on the small map) and what to pick up next nearby; any quest looked at |
+| `Modules/Lodestar/Browser.lua` | the big window: zones; a zone's large map (pins, the quest picked's objective areas and way, zoom, my arrow); the right pane: the zone's or chain's briefing (its chains' cards, its steps), a quest's details (steps, objectives, giver and turn-in, rewards); a chain opened (cards, lines, joins, stubs, the way to a locked quest); a quest list; filters (my levels by default); search; tabs for views other files register |
+| `Modules/Lodestar/Views.lua` | the big window's other views: my quests (the quest log, organised; the storylines to go on with), the level path (where to go next) |
+| `Modules/Lodestar/Learn.lua` | learning givers, enders and prerequisites while playing |
+| `Modules/Lodestar/Dialog.lua` | in the game's quest UI: the panel beside the quest dialog, chain steps on the quest log's lines, Alt-click there |
 | `Modules/Beacon/QuestShare.lua` | friends' progress and learned records over Beacon (`B2;q…`, from 0.7.0-70) |
 
-Every Questtree file starts with `local Q = ns.Questtree or {}; ns.Questtree = Q`, so the order they
+Every Lodestar file starts with `local Q = ns.Lodestar or {}; ns.Lodestar = Q`, so the order they
 load in doesn't matter for the table.
 
 ## Data
@@ -323,33 +323,33 @@ classic's seasonal events (Seasonal quests are listed but not marked as event-on
 
 ## Module
 
-`Modules/Questtree/Questtree.lua`: the module `questtree`, shown as "Questtree" (never translated),
-on by default. Every file of the module starts with `local Q = ns.Questtree or {}; ns.Questtree = Q`,
+`Modules/Lodestar/Lodestar.lua`: the module `lodestar`, shown as "Lodestar" (never translated),
+on by default. Every file of the module starts with `local Q = ns.Lodestar or {}; ns.Lodestar = Q`,
 so the order they load in doesn't matter for the table; `Q.module` is the module.
 
-**Settings** (`LefthyToolsDB.settings.questtree`, the module's defaults table is here):
+**Settings** (`LefthyToolsDB.settings.lodestar`, the module's defaults table is here):
 
 | Key | Default | What |
 |---|---|---|
 | `keepPlace` | true | the small window opens where it was left, at its size; off: right of the middle, 340 x 580 |
 | `followLog` | true | while the small window is open, a quest opened in the quest log (or clicked in the objective tracker) becomes its "Now" |
-| `tooltips` | true | "Questtree: starts ..." lines in NPC tooltips (below); the data loads a few seconds after the loading screen for them |
+| `tooltips` | true | "Lodestar: starts ..." lines in NPC tooltips (below); the data loads a few seconds after the loading screen for them |
 | `friends` | true | friends' progress in the windows (`Q.Friends`) |
 | `learn` | true | learning while playing (Learn.lua reads `M.db.learn`) |
 | `autoHide` | true | the companion hides itself when it has nothing to show, and comes back (Small window) |
 | `collapsed` | false | the companion is one line (its title bar's button does the same) |
 | `stepsOpen` | false | the companion's chain steps unfolded (its "Steps (7)" line; no checkbox) |
 | `dialog` | true | the panel beside the quest dialog (In the game's quest UI) |
-| `logBadges` | true | "2/4" on the quest log's lines, the chain in their tooltip, Alt-click to open one in Questtree |
+| `logBadges` | true | "2/4" on the quest log's lines, the chain in their tooltip, Alt-click to open one in Lodestar |
 | `small` | `{}` | the small window's `left`, `top`, `width`, `height` (always kept; used while `keepPlace` is on; one line doesn't change the height kept) |
 
 The settings page: Open the small window, Open the quest browser (`Q.ToggleBrowser`, or a chat line
 when Browser.lua isn't there), the checkboxes under Window (with `autoHide` and `collapsed`), "In the
 game's quest UI" (`dialog`, `logBadges`), Tooltips, Friends and Learning.
 
-**Commands:** `/questtree` opens or closes the small window (on "Now"), `/questtree <name or ID>`
-shows a quest (a quest link works too), `/questtree browse` the quest browser, `/questtree settings`,
-`/questtree help`. `/lefthy questtree ...` is the same. Switched off, each says so (settings and
+**Commands:** `/lodestar` opens or closes the small window (on "Now"), `/lodestar <name or ID>`
+shows a quest (a quest link works too), `/lodestar browse` the quest browser, `/lodestar settings`,
+`/lodestar help`. `/lefthy lodestar ...` is the same. Switched off, each says so (settings and
 help still work). Chat lines are English.
 
 **Finding a quest by name** (`Q.Find(text)`): a number or a quest link is that quest; otherwise
@@ -358,7 +358,7 @@ with it, or only contains it (or the giver's name does); then my status (in my l
 needs one first, level too low, done, not for me); then nearest my level; then the lower ID. When
 several match, chat says how many and which is shown.
 
-**What the files share** (Questtree.lua):
+**What the files share** (Lodestar.lua):
 
 - `Q.When("enable" | "disable" | "settings", fn)` (what a file does when the module is switched on or
   off or a setting changes), `Q.Ready()` (the data is there: loads it on the first call, so only call
@@ -418,9 +418,9 @@ several match, chat says how many and which is shown.
 **NPC tooltips** (setting `tooltips`): a `TooltipDataProcessor` post-call on `Unit` tooltips, as
 Chronicle's "Craftable by" and Questie's: `GameTooltip` only (not forbidden), the primary data block
 only (an appended one isn't the unit pointed at), nothing in an instance (the data is secret there),
-nothing for a secret GUID; the NPC from `data.guid` (`LT.CreatureOf`). Lines: "Questtree: ends
-<title>" for a quest in my log it takes back, "Questtree: starts <title> (step 2 of 5)" for one I can
-take, "Questtree: starts <title> at level 12" in grey for one my level is too low for, at most 4,
+nothing for a secret GUID; the NPC from `data.guid` (`LT.CreatureOf`). Lines: "Lodestar: ends
+<title>" for a quest in my log it takes back, "Lodestar: starts <title> (step 2 of 5)" for one I can
+take, "Lodestar: starts <title> at level 12" in grey for one my level is too low for, at most 4,
 then "and N more". An NPC's lines are made the first time and kept until `Q.dataGen`,
 `Q.progressGen` or the quest log's size changes: a hover is a table lookup. A hover never loads the
 data: with the setting on, it loads once, 5 s after the first loading screen (or after the module
@@ -435,9 +435,9 @@ It runs when a quest's details open in the quest log, and when a quest is clicke
 tracker (its click opens them). The hook only hands the ID to `Q.SmallFollow` (it becomes "Now",
 redrawn a moment later in our own code); nothing of the quest log's frames is touched or read.
 With Alt held the same hook hands the ID to Dialog.lua's `Q.LogAltClick` (setting `logBadges`), which
-opens the quest in Questtree on the next frame (In the game's quest UI). Blizzard's own click is
+opens the quest in Lodestar on the next frame (In the game's quest UI). Blizzard's own click is
 untouched: Alt is a modifier its title buttons don't use (Shift tracks or links, a right click opens its
-menu), so the details open as with any left click. Not done, and why: a "Show in Questtree" button in
+menu), so the details open as with any left click. Not done, and why: a "Show in Lodestar" button in
 the quest details (the quest log is part of `WorldMapFrame`: a button of ours in it becomes part of that
 panel for SmartNavigation, whose focus and confirm then run our scripts from Blizzard's code, the taint
 chain in forever-platform.md; a button over it parented to UIParent wouldn't be reachable with a
@@ -449,13 +449,13 @@ seconds after it (setting `tooltips`); the windows load the data when they open.
 
 ## Small window
 
-`Modules/Questtree/Small.lua`: `Q.ToggleSmall()`, `Q.ShowQuest(id)`, `Q.RedrawSmall(now)` (a
+`Modules/Lodestar/Small.lua`: `Q.ToggleSmall()`, `Q.ShowQuest(id)`, `Q.RedrawSmall(now)` (a
 redraw 0.3 s later, several at once: one; `now`: at once; for other parts whose data changed, e.g.
 friends' progress arriving), `Q.IsSmallShown()`, `Q.SmallFollow(id)` (the quest log's hook),
 `Q.SmallFrame()` (tests).
 
 The companion: it follows what you're doing without being asked. Two modes: **Now** (what
-`/questtree` opens) and **a quest looked at** (a click on any quest, `/questtree <name>`,
+`/lodestar` opens) and **a quest looked at** (a click on any quest, `/lodestar <name>`,
 `Q.ShowQuest`, the big window's clicks).
 
 **Now**, top down: only what to do now and how far along (the guides' "this now, then those");
@@ -532,8 +532,8 @@ height kept in `small`. It follows the same events as the whole window.
 I'm on, nothing in Pick up next), the companion hides; while hidden like that it listens only to
 `QUEST_ACCEPTED`, `SUPER_TRACKING_CHANGED`, `PLAYER_LEVEL_UP` and `ZONE_CHANGED_NEW_AREA` (rare), and
 0.3 s after one of them it opens again where it was if there's something now. Opened by me
-(`/questtree`, a quest shown) it never hides itself in that draw: "Nothing to pick up nearby" stays.
-Closed by me (Escape, its X, `/questtree`) it stays closed and listens to nothing. Switching the
+(`/lodestar`, a quest shown) it never hides itself in that draw: "Nothing to pick up nearby" stays.
+Closed by me (Escape, its X, `/lodestar`) it stays closed and listens to nothing. Switching the
 setting off while it's hidden brings it back.
 
 **A quest looked at**: at the top "« Back to now" or, after clicking from one quest to another,
@@ -556,7 +556,7 @@ The data add-on missing: the window says so (run the updater, restart), nothing 
 data doesn't know: its title and that line. At the bottom: **Quest browser** (`Q.OpenBrowser` on the
 quest looked at or Now's, else `Q.ToggleBrowser()`; hidden without Browser.lua).
 
-**What it costs.** The window: `LT.Window.Create` (`LefthyToolsQuesttreeSmall`: Escape closes it, it
+**What it costs.** The window: `LT.Window.Create` (`LefthyToolsLodestarSmall`: Escape closes it, it
 counts as an open window for Mirage, the AFK screen and flights), DIALOG strata, raised when a quest
 is shown. Movable, resizable by its corner grip (300-600 x 300-950); where it is and its size are
 saved on every drag and resize (`small`). The content is in a scroll area; its width and the map's
@@ -573,7 +573,7 @@ are buttons of ours, so SmartNavigation's cursor reaches them (its focus runs On
 show; its button clicks: a quest shows, a marker sets the pin). Nothing of Blizzard's is set on our
 frames, no Blizzard menu, no panel opening.
 
-**Small map** (`Modules/Questtree/MiniMap.lua`, also for the big window):
+**Small map** (`Modules/Lodestar/MiniMap.lua`, also for the big window):
 `local m = Q.NewMiniMap(parent[, width, height])` (240 x 160 by default), `m.frame`,
 `m:Show(map, points[, name])` with `points = { { x, y, kind, label [, note, look, grey, chance,
 radius, group] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPlayer(on)`,
@@ -608,7 +608,7 @@ radius, group] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPl
 - No art: "No map of this zone" with the markers on the dark box. Laid only when the map, the size
   or the zoom changes (or you've explored more); never touches `WorldMapFrame`.
 
-**Tests** (`tests/questtree_small.lua`): the module, settings and commands; difficulty colours;
+**Tests** (`tests/lodestar_small.lua`): the module, settings and commands; difficulty colours;
 the lines' verb icons, the first full size and the rest grey, no "opens", exclusive quests closing each
 other, Available now only for my levels and at most three, nothing for later, one line (the button,
 the line's click, the setting), hiding itself and coming back and staying closed when I closed it,
@@ -634,14 +634,14 @@ checked; the mock's map pin API and the quest log's
 
 ## In the game's quest UI (Dialog.lua)
 
-Questtree where players already look: the quest dialog and the quest log. Built from established
+Lodestar where players already look: the quest dialog and the quest log. Built from established
 add-ons' ways (BtWQuests and QuestWeaver open from the quest log, Wowhead's numbered "Series" box with
 the current quest bold), with our own frames and post-hooks only.
 
 ### Beside the quest dialog (setting `dialog`)
 
 When an NPC offers a quest (`QUEST_DETAIL`), asks for it (`QUEST_PROGRESS`), rewards it
-(`QUEST_COMPLETE`) or lists several (`QUEST_GREETING`), a panel of ours (`LefthyToolsQuesttreeDialog`,
+(`QUEST_COMPLETE`) or lists several (`QUEST_GREETING`), a panel of ours (`LefthyToolsLodestarDialog`,
 250 px wide, a dark background with a thin gold edge) sits right of `QuestFrame`, its top at the
 dialog's top:
 
@@ -650,10 +650,10 @@ dialog's top:
 - **The steps**, numbered, in a window of four: one before this one, this one, two after (fewer
   before it at the chain's start, more at its end), "... N before" and "... N more" for the rest;
   done ones ticked green, this one bold (`GameFontHighlight`) with an arrow, the rest grey; each a
-  line that opens that quest in Questtree.
+  line that opens that quest in Lodestar.
 - **Leads to: [7] Title** when it opens one quest that isn't one of the steps listed (the next step
   usually is); when it opens several, **Opens 3 quests** alone (their names in the line's tooltip; a
-  click opens this quest in Questtree, where they're listed).
+  click opens this quest in Lodestar, where they're listed).
 - **Requires: <title> (for <the next step>)**: what the quests it leads to need besides this one
   (`Q.Missing` of each, at most 3) that isn't done and isn't one of the steps listed, in the locked
   colour; its tooltip says the next step needs it too. (Every quest's prerequisites are part of its
@@ -664,13 +664,13 @@ dialog's top:
   icon), in class colours, at most 3 named, then "+2" (`Q.Friends`, setting `friends`; their progress
   asked for once per quest while the dialog is open, `Q.RequestFriendProgress`; their answers redraw
   it, `Q.OnFriendProgress`).
-- **Open in Questtree** (a button at the bottom): `Q.OpenBrowser(id)`, else `Q.ShowQuest(id)`.
+- **Open in Lodestar** (a button at the bottom): `Q.OpenBrowser(id)`, else `Q.ShowQuest(id)`.
 
 The greeting lists each of the NPC's quests that's in a chain or leads on: "[12] Title" with its verb
 icon and "Part 2 of 4 · <chain>" (or "opens N") under it, a click opens it; no button. Nothing to tell
 (no chain of two or more, nothing it leads to or closes, no lead-in, no friends): no panel at all.
 
-**Events and cost.** The five events (`QUEST_FINISHED` too) are listened to while Questtree and the
+**Events and cost.** The five events (`QUEST_FINISHED` too) are listened to while Lodestar and the
 setting are on; each only notes the page and draws on the next frame (`C_Timer.After(0)`: the dialog
 shows itself in its own handler first). The data is loaded for it only out of a fight, when the add-on
 is there (usually the tooltips loaded it already); in a fight before that: no panel. `QUEST_FINISHED`
@@ -694,15 +694,15 @@ hooked; no Blizzard template but the button's `UIPanelButtonTemplate`, no Backdr
   font string of ours on each pooled title button (`QuestScrollFrame.titleFramePool`) whose quest is
   in a chain, at `RIGHT` of the track checkbox's `LEFT` - 4 (where Forever never shows the quest type
   icon), or left of Misc Tweaks' own NEW label when that one is there (a long title). The title's text
-  is never changed. The hook is made a second after Questtree is switched on, so it runs after Misc
+  is never changed. The hook is made a second after Lodestar is switched on, so it runs after Misc
   Tweaks' and knows where its label is. Each "2/4" is kept per data and progress change: a redraw of
   the log is a table lookup per line. Data not loaded yet: loaded once on the next frame, out of a
   fight, then the open log is marked.
 - **The tooltip**: one `HookScript("OnEnter")` per title button (as Misc Tweaks'): when the game's
-  tooltip is the line's, it adds "Questtree: Part 2 of 4 · <chain>", at most 5 steps from one before
+  tooltip is the line's, it adds "Lodestar: Part 2 of 4 · <chain>", at most 5 steps from one before
   this one, windowed as the panel's ("... N before", "... N more"; this one white with the arrow, done
-  ones ticked green, the rest grey), "Leads to: ..." and "Alt-click: open it in Questtree".
-- **Alt-click** a quest there: Questtree.lua's post-hook on `QuestMapFrame_ShowQuestDetails` (Module,
+  ones ticked green, the rest grey), "Leads to: ..." and "Alt-click: open it in Lodestar".
+- **Alt-click** a quest there: Lodestar.lua's post-hook on `QuestMapFrame_ShowQuestDetails` (Module,
   The quest log) calls `Q.LogAltClick(id)`, which opens it on the next frame (`Q.OpenBrowser`, else
   `Q.ShowQuest`) from a timer of ours, not inside Blizzard's click. A click on the "2/4" itself would
   need a frame of ours (a Button) inside the quest log, which is part of `WorldMapFrame`: SmartNavigation
@@ -714,10 +714,10 @@ hooked; no Blizzard template but the button's `UIPanelButtonTemplate`, no Backdr
 
 `Q.DialogView()` gives the tests the panel, its strings, the quest shown, the page and the labels.
 
-**Tests** (`tests/questtree_dialog.lua`): nothing built before a dialog; the offered page drawn on the
+**Tests** (`tests/lodestar_dialog.lua`): nothing built before a dialog; the offered page drawn on the
 next frame, not in the event (heading, the steps' window with done ticked and this one bold and "... 2
 more", what it leads to when it isn't listed, a need that's a step listed not said again, what taking
-it closes, the button and a step's line opening Questtree); a frame of ours on UIParent anchored beside
+it closes, the button and a step's line opening Lodestar); a frame of ours on UIParent anchored beside
 the dialog, nothing written into `QuestFrame` or its scripts; closed by `QUEST_FINISHED` and without it;
 a quest with nothing to tell; a lead-in; the progress and reward pages (the chain without the quest
 taking it closed; what it leads to listed as the next step); two it opens (the count, the names in its
@@ -761,7 +761,7 @@ statuses keep the plain words. Without `Q.WhyOther`, every "other" is "Not for y
 least 1400 x 760; where the screen has room (its width less 80) wider in steps of 20 up to 1700, the
 right pane 400 instead of 360 from 1560 on, the height what the map needs (its 3:2 under the tab bar and
 the line under it), as long as that fits the screen's height less 100 (1920 x 1080: 1700 x 868; the
-default UI's 1366 x 768: 1400 x 760). `LT.Window.Create` (`LefthyToolsQuesttreeBrowser`, in
+default UI's 1366 x 768: 1400 x 760). `LT.Window.Create` (`LefthyToolsLodestarBrowser`, in
 `UISpecialFrames` so Escape closes it, movable), scaled down to fit when the screen is smaller than that
 plus 40 x 80. In the band under the title: "Search all zones:" with its box on the left, the two
 **filters** on the right (below). Under it, on an 8 px grid:
@@ -1143,7 +1143,7 @@ map have no OnMouseDown/OnMouseUp (they'd be buttons to SmartNavigation), only t
 Nothing of Blizzard's (navigation flags, mixins, Backdrop) is set on our frames. A registered view's frames
 are its own file's: the same rules apply.
 
-Tests: `tests/questtree_browser.lua`, with stand-ins for every `Q.*` it calls (the data, the engine, the
+Tests: `tests/lodestar_browser.lua`, with stand-ins for every `Q.*` it calls (the data, the engine, the
 iterations' `Q.ZoneCount`, `Q.ChainStep`, `Q.LevelColor`, `Q.Races`, `Q.ZoneGiven`, `Q.Available`,
 `Q.IsTrivial`, `Q.InRange` (this round's meaning), `Q.WhyOther`, `Q.Needs`, this round's `Q.Objectives` and
 `Q.Rewards` (the shared contract's shapes: Data.lua makes them in parallel), the small window), put back at
@@ -1292,7 +1292,7 @@ SmartNavigation reaches them (its focus runs OnEnter: the tooltips; a right-clic
 same as the window's "Map pin" for a controller); the group headings and notes are plain frames it
 skips; the lists are scroll frames (it scrolls them); nothing of Blizzard's is set on our frames.
 
-Tests: `tests/questtree_views.lua` (the real Data.lua and Engine.lua through `Q.SetTestData`; the
+Tests: `tests/lodestar_views.lua` (the real Data.lua and Engine.lua through `Q.SetTestData`; the
 registry is a stand-in that records, the real one put back after; `Q.OpenBrowser`, `Q.SelectZone` and
 `Q.Waypoint` record; `Q.Objectives` and `Q.InRange` are stand-ins with the contract's meaning, the data
 part's own tests check theirs): `Q.LogObjectives` (the name without its count in the game's and a German
@@ -1317,12 +1317,12 @@ controller, a fight.
 
 ## Learning and friends
 
-Files: `Modules/Questtree/Learn.lua` (learning while playing) and `Modules/Beacon/QuestShare.lua`
-(friends' progress and learned data over Beacon; its words are in [beacon.md](beacon.md), "Questtree").
+Files: `Modules/Lodestar/Learn.lua` (learning while playing) and `Modules/Beacon/QuestShare.lua`
+(friends' progress and learned data over Beacon; its words are in [beacon.md](beacon.md), "Lodestar").
 
 ### Learning (Learn.lua)
 
-Only while the Questtree module is on with its `learn` setting, and only for quests the data
+Only while the Lodestar module is on with its `learn` setting, and only for quests the data
 doesn't know fully. A quest I already have a record of is kept whole: my records are merged into
 the data's tables (`Q.AddLearned`), so those can't tell what came from where. The data is asked
 (`Q.Quest`) only once it's loaded (`Q.IsLoaded()`, Data.lua): asking must never load it, that's
@@ -1357,11 +1357,11 @@ What it reads, all read-only (no Blizzard frames, nothing that could taint):
 **Never lags:** the handlers read the dialog (it's gone later) into a note; a frame of our own,
 shown only while notes wait, stores them, infers and feeds on the next frame, then hides.
 
-**Kept** account-wide in `LefthyToolsDB.questtree.learned[questID]` = `{ u, t, l, s, e, p, x, f }`
+**Kept** account-wide in `LefthyToolsDB.lodestar.learned[questID]` = `{ u, t, l, s, e, p, x, f }`
 (stamp, title, level, giver, ender, prerequisites, proven not, the friend's account whose record
 changed it last); giver and ender `{ k = "n" | "o" | "i", i, n, m, x, y }`. At most 1500 records:
 over that, the oldest changes go, down to 1350. At most 4 prerequisites and 8 proven-not per
-quest. `LefthyToolsDB.questtree.share = { seq, epoch, got }`: the store's change counter (each
+quest. `LefthyToolsDB.lodestar.share = { seq, epoch, got }`: the store's change counter (each
 change stamps its record with the next), a random id made with the store, and how far I hold each
 friend's (below). Broken records are dropped at load; a stamp above `seq` is stamped anew.
 **Fed** into `Q.AddLearned(id, fields)` at login (50 a frame, not in a fight, once the module is on;
@@ -1377,7 +1377,7 @@ with a point beats one without, prerequisites keep the strongest, proven-not win
 
 A window showing a quest calls `Q.RequestFriendProgress(id)` (false when no friend's build can
 answer, or the module's `friends` setting is off): the quest and its chain (`Q.Chain`, Engine.lua;
-at most 40) go to every friend on a build from `QUESTTREE_SINCE` on, at most one request every 2 s
+at most 40) go to every friend on a build from `LODESTAR_SINCE` on, at most one request every 2 s
 (the latest wins), the same quest again only after 20 s. A friend answers the latest of mine at most
 once a second: a letter per quest, from `C_QuestLog` (done, ready to turn in, in the log, none); or
 nothing when their `friends` setting is off ("not shared"). Answers count for 60 s and only from

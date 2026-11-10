@@ -93,7 +93,7 @@ says so in chat. Your data on the beta stays as it is.
 ```
 
 The installer also installs `LefthyTools_DropData` next to it (the Bestiary's drop database, also
-mobs' health for the fight stream, an add-on of its own), `LefthyTools_QuestData` (Questtree's quest
+mobs' health for the fight stream, an add-on of its own), `LefthyTools_QuestData` (Lodestar's quest
 chains, another one) and removes the old standalone `Mirage`
 addon, which is now part of LefthyTools. How it works inside (for developers): see
 [docs/](docs/architecture.md).

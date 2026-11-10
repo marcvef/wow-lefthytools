@@ -9,7 +9,7 @@ local LT = ns.LT
 -- overlays on it (C_MapExplorationInfo.GetExploredMapTextures, laid like Blizzard's
 -- MapExplorationPin), so the map shows what your world map shows. Both checked against the
 -- forever branch of Blizzard's UI source. A map made to reveal shows every area uncovered, explored
--- or not (Questtree's maps): all of the zone's overlays, from the client's tables (Data/MapOverlays.lua,
+-- or not (Lodestar's maps): all of the zone's overlays, from the client's tables (Data/MapOverlays.lua,
 -- tools/update-map-overlays.js, the way map addons' "reveal" does it), laid the same way; a zone the
 -- data doesn't have shows what you've explored.
 --   * New(frame, drawLayer, subLevel, mask, reveal): a map on that frame, its textures pooled.

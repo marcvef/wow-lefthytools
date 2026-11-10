@@ -5,7 +5,7 @@ local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, sui
 
 section("what's new")
 local news = ns.CHANGELOG
-local MODULES = { mirage = true, tweaks = true, beacon = true, chronicle = true, bestiary = true, echoes = true, questtree = true, general = true }
+local MODULES = { mirage = true, tweaks = true, beacon = true, chronicle = true, bestiary = true, echoes = true, lodestar = true, general = true }
 local goodData = #news > 0
 for i, e in ipairs(news) do
 	goodData = goodData and e.id == i and (e.version == nil or LT.ParseVersion(e.version) ~= nil) and MODULES[e.module]

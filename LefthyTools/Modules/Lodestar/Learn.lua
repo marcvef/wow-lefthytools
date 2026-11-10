@@ -1,17 +1,17 @@
 local _, ns = ...
 local LT = ns.LT
-local Q = ns.Questtree or {}
-ns.Questtree = Q
+local Q = ns.Lodestar or {}
+ns.Lodestar = Q
 
--- Questtree's learning while playing (docs/questtree.md, "Learning and friends"): who gives a quest and
+-- Lodestar's learning while playing (docs/lodestar.md, "Learning and friends"): who gives a quest and
 -- who takes it back (an NPC, an object or an item, with where I stood), its title and level, and what
 -- had to be done before it (inferred). Only while the module's `learn` setting is on, and only for quests
 -- the data doesn't know fully (or doesn't know at all: without the data add-on everything is kept).
 --
--- Kept account-wide in LefthyToolsDB.questtree.learned[questID] (at most RECORDS_MAX, the oldest changes
+-- Kept account-wide in LefthyToolsDB.lodestar.learned[questID] (at most RECORDS_MAX, the oldest changes
 -- go first), fed into Q.AddLearned (Data.lua) at login and with every change, and passed on to friends by
 -- Beacon's QuestShare.lua (the records' stamps are its sync's):
---   { u = stamp (this store's change counter: LefthyToolsDB.questtree.share.seq),
+--   { u = stamp (this store's change counter: LefthyToolsDB.lodestar.share.seq),
 --     t = title, l = level,
 --     s = giver, e = ender: { k = "n" npc | "o" object | "i" item, i = id, n = name, m = uiMapID, x, y (0..1) },
 --     p = { [questID] = 2 strong | 1 weak }: done before it (inferred), x = { [questID] = true }: proven not,
@@ -41,7 +41,7 @@ local NAME_BYTES, TITLE_BYTES = 32, 48
 
 local issecret, Value = LT.IsSecret, LT.Value
 
-local saved   -- LefthyToolsDB.questtree
+local saved   -- LefthyToolsDB.lodestar
 local store   -- saved.learned
 local meta    -- saved.share = { seq, epoch, got } (got: QuestShare.lua's)
 local count = 0
@@ -59,9 +59,9 @@ local fed = false
 -- Small helpers
 ---------------------------------------------------------------------------
 
--- The Questtree module's switch and its learn setting (Questtree.lua; nil while that isn't there).
+-- The Lodestar module's switch and its learn setting (Lodestar.lua; nil while that isn't there).
 local function Learning()
-	local m = LT:GetModule("questtree")
+	local m = LT:GetModule("lodestar")
 	return store ~= nil and m ~= nil and m.enabled and type(m.db) == "table" and m.db.learn == true
 end
 Q.Learning = Learning
@@ -565,7 +565,7 @@ local driver = CreateFrame("Frame")
 driver:Hide()
 
 local function FeedStep()
-	local m = LT:GetModule("questtree")
+	local m = LT:GetModule("lodestar")
 	if not (m and m.enabled) or not Q.AddLearned then
 		feedList = nil -- (the module off: Q.FeedLearned when it's switched on)
 		return
@@ -591,10 +591,10 @@ driver:SetScript("OnUpdate", function(self)
 	local list = notes
 	notes = {}
 	for _, note in ipairs(list) do
-		LT.Guard("Questtree learn", Handle, note, now)
+		LT.Guard("Lodestar learn", Handle, note, now)
 	end
 	if feedList then
-		LT.Guard("Questtree feed", FeedStep)
+		LT.Guard("Lodestar feed", FeedStep)
 	end
 	if not notes[1] and not feedList then
 		self:Hide()
@@ -608,7 +608,7 @@ local function Note(kind, a, b, c, d)
 	driver:Show()
 end
 
--- Every record into Q.AddLearned, a few a frame (at login; Questtree.lua may call it when switched on).
+-- Every record into Q.AddLearned, a few a frame (at login; Lodestar.lua may call it when switched on).
 function Q.FeedLearned()
 	if not store or feedList then
 		return
@@ -761,8 +761,8 @@ local function ValidRecord(id, rec)
 end
 
 table.insert(LT.onLoad, function(db)
-	saved = type(db.questtree) == "table" and db.questtree or {}
-	db.questtree = saved
+	saved = type(db.lodestar) == "table" and db.lodestar or {}
+	db.lodestar = saved
 	store = type(saved.learned) == "table" and saved.learned or {}
 	saved.learned = store
 	meta = type(saved.share) == "table" and saved.share or {}

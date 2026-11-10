@@ -1,10 +1,10 @@
 # LefthyTools Quest Data
 
-Every quest's chain for LefthyTools' Questtree: what a quest needs first and what it leads to, its
+Every quest's chain for LefthyTools' Lodestar: what a quest needs first and what it leads to, its
 levels, who it's for (races, classes, faction), its zone or dungeon, who gives and takes it and
 where they stand, what it asks for (creatures to kill, objects to use, items to collect, and where
 they are or drop) and what it gives (items, money, experience). It's an add-on of its own (load on demand: LefthyTools loads it the first time a
-Questtree window opens) because it's under a different license from LefthyTools.
+Lodestar window opens) because it's under a different license from LefthyTools.
 
 ## Where it comes from
 

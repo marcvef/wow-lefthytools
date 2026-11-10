@@ -1,7 +1,7 @@
 local _, ns = ...
 local LT = ns.LT
 local L = ns.L
-local Q = ns.Questtree or {}; ns.Questtree = Q
+local Q = ns.Lodestar or {}; ns.Lodestar = Q
 
 -- The small zone map: a zone's map as your world map draws it (LT.MapArt, Core/MapArt.lua: the
 -- world map's art tiles and every area's overlay on them, all uncovered: MapArt's reveal), in a frame of ours that clips it, with the game's own quest icons for givers

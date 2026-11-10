@@ -43,8 +43,8 @@ check(LT:GetModule("mirage").category.name == "Mirage" and LT:GetModule("tweaks"
 check(S("LefthyTools_echoes_relay").name == "Aufzeichnungen von Freunden weitergeben" and S("LefthyTools_echoes_collect") == nil,
 	"Echoes' settings are German (collecting has no checkbox)")
 check(S("LefthyTools_beacon_share").name == "Meine Position teilen", "Beacon settings are German")
-check(LT:GetModule("questtree").category.name == "Questtree" and S("LefthyTools_questtree_learn").name == "Beim Questen lernen",
-	"Questtree's settings are German, its name isn't translated")
+check(LT:GetModule("lodestar").category.name == "Lodestar" and S("LefthyTools_lodestar_learn").name == "Beim Questen lernen",
+	"Lodestar's settings are German, its name isn't translated")
 check(S("LefthyTools_module_tweaks").name == "Misc Tweaks", "overview switch keeps the module name")
 check(S("LefthyTools_mirage_delay").name == "Wartezeit bis zum Ausblenden", "Mirage slider label")
 check(S("LefthyTools_mirage_delay").tooltip == "Wie lange du inaktiv sein musst, bis das Interface ausgeblendet wird.",

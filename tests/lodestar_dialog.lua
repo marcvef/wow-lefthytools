@@ -1,9 +1,9 @@
--- Questtree in the game's quest UI (Dialog.lua): the panel beside the quest dialog (offered,
+-- Lodestar in the game's quest UI (Dialog.lua): the panel beside the quest dialog (offered,
 -- progress, reward, an NPC's greeting): "Part 2 of 6 · <chain>", the numbered steps around it (one
 -- before, this one bold, two after, done ones ticked, "... N more"), what it leads to (not when it's
 -- a step listed; "Opens 2 quests" with their names in its tooltip), what the next step needs besides
 -- it that isn't listed or done, what taking it closes, a lead-in, friends on one line (at most three);
--- "Open in Questtree"; hidden with nothing to tell, when the dialog closes (also
+-- "Open in Lodestar"; hidden with nothing to tell, when the dialog closes (also
 -- without QUEST_FINISHED), with the setting off; drawn on the next frame, never in the event; the
 -- data not loaded in a fight; a frame of ours on UIParent, nothing written into QuestFrame. The quest
 -- log: "2/5" on a chain quest's line (left of Misc Tweaks' NEW when that's there), kept until the
@@ -15,8 +15,8 @@
 
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
-local Q = ns.Questtree
-local M = LT:GetModule("questtree")
+local Q = ns.Lodestar
+local M = LT:GetModule("lodestar")
 
 -- What this file replaces on Q, put back at the end.
 local replaced = {}
@@ -127,8 +127,8 @@ Q.SetTestData(QUESTS_DATA, ZONES)
 Log({})
 Progress()
 
-section("Questtree: beside the quest dialog")
-check(LefthyToolsQuesttreeDialog == nil and M.db.dialog == true and M.db.logBadges == true,
+section("Lodestar: beside the quest dialog")
+check(LefthyToolsLodestarDialog == nil and M.db.dialog == true and M.db.logBadges == true,
 	"on by default, nothing built before a quest dialog opens")
 -- Offered: The Lost Axe.
 local questFrameKeys = {}
@@ -151,7 +151,7 @@ check(not RowWith("5. ") and not RowWith("6. ") and Has("... 2 more"), "one befo
 check(RowWith("Leads to: [7] Back to Camp"), "what it leads to (step 5: not listed)")
 check(RowWith("4. Wolf Trouble") and not RowWith("Requires:"), "what the next step needs besides it is a step listed: no Requires")
 check(Has("Taking it closes: A Different Path"), "what taking it closes (its exclusive one)")
-check(v.panel.Open:IsShown() and v.panel.Open:GetText() == "Open in Questtree", "the button to open it in Questtree")
+check(v.panel.Open:IsShown() and v.panel.Open:GetText() == "Open in Lodestar", "the button to open it in Lodestar")
 v.panel.Open:Click()
 check(opened[#opened] == 9102, "the button opens it in the quest browser")
 first:Click()
@@ -278,7 +278,7 @@ PutBack("Ready")
 PutBack("IsLoaded")
 
 ---------------------------------------------------------------------------
-section("Questtree: chain steps in the quest log")
+section("Lodestar: chain steps in the quest log")
 Log({ 9102, 9109, 86576, 9125 })
 Progress()
 local function TitleButton(id) for _, b in ipairs(QUEST_LOG_BUTTONS) do if b.questID == id then return b end end end
@@ -309,8 +309,8 @@ axe._scripts.OnEnter(axe)
 local tip = {}
 for _, line in ipairs(TOOLTIP.lines) do tip[#tip + 1] = Plain(line) end
 tip = table.concat(tip, "|")
-check(tip:find("Questtree: Part 2 of 5 · Into the Woods", 1, true) and tip:find("2. The Lost Axe", 1, true)
-	and tip:find("Leads to: Back to Camp", 1, true) and tip:find("Alt-click: open it in Questtree", 1, true),
+check(tip:find("Lodestar: Part 2 of 5 · Into the Woods", 1, true) and tip:find("2. The Lost Axe", 1, true)
+	and tip:find("Leads to: Back to Camp", 1, true) and tip:find("Alt-click: open it in Lodestar", 1, true),
 	"its tooltip: the chain, its steps, what it leads to, Alt-click")
 GameTooltip:Hide()
 local herb = TitleButton(9125)
@@ -322,7 +322,7 @@ tip = table.concat(tip, "|")
 check(tip:find("Part 6 of 8", 1, true) and tip:find("... 3 before", 1, true) and tip:find("5. Herbs Three", 1, true)
 	and tip:find("8. Report Back", 1, true) and not tip:find("3. ", 1, true), "a long chain in the tooltip: five steps from one before (" .. tip .. ")")
 GameTooltip:Hide()
--- Alt-click (Questtree.lua's hook on the quest log's details hands it over): opened on the next frame.
+-- Alt-click (Lodestar.lua's hook on the quest log's details hands it over): opened on the next frame.
 local before = #opened
 Q.LogAltClick(9102)
 check(#opened == before, "Alt-click: nothing opened in the quest log's own click")

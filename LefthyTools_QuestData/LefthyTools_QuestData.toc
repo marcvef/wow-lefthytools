@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: LefthyTools Quest Data
-## Notes: Every quest's chain, levels, zone and who gives and takes it, from a classic world database (CMaNGOS Classic DB, GPL v3) and WoW: Forever's own quests (EG Link, CC BY 4.0), for LefthyTools' Questtree. Loaded only when a Questtree window opens.
-## Notes-deDE: Die Questreihen aller Quests, ihre Level, Zonen und wer sie vergibt und annimmt, aus einer Classic-Weltdatenbank (CMaNGOS Classic DB, GPL v3) und den neuen Quests von WoW: Forever (EG Link, CC BY 4.0), für Questtree von LefthyTools. Wird erst geladen, wenn ein Questtree-Fenster aufgeht.
+## Notes: Every quest's chain, levels, zone and who gives and takes it, from a classic world database (CMaNGOS Classic DB, GPL v3) and WoW: Forever's own quests (EG Link, CC BY 4.0), for LefthyTools' Lodestar. Loaded only when a Lodestar window opens.
+## Notes-deDE: Die Questreihen aller Quests, ihre Level, Zonen und wer sie vergibt und annimmt, aus einer Classic-Weltdatenbank (CMaNGOS Classic DB, GPL v3) und den neuen Quests von WoW: Forever (EG Link, CC BY 4.0), für Lodestar von LefthyTools. Wird erst geladen, wenn ein Lodestar-Fenster aufgeht.
 ## Author: lefthy
 ## Version: z2815
 ## LoadOnDemand: 1

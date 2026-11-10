@@ -1,9 +1,9 @@
 local _, ns = ...
-local Q = ns.Questtree or {}; ns.Questtree = Q
+local Q = ns.Lodestar or {}; ns.Lodestar = Q
 
--- Questtree's quest data (docs/questtree.md, Data): LefthyTools_QuestData, an add-on of its own (GPL v3
+-- Lodestar's quest data (docs/lodestar.md, Data): LefthyTools_QuestData, an add-on of its own (GPL v3
 -- like its source, CMaNGOS Classic DB, with EG Link's Forever data, CC BY 4.0), made by
--- tools/update-quest-data.js and loaded the first time a Questtree window asks (Q.Load), never at
+-- tools/update-quest-data.js and loaded the first time a Lodestar window asks (Q.Load), never at
 -- login. Its quests are strings, read one at a time when asked for (Q.Quest) and kept; what the game
 -- teaches while playing (Learn.lua) fills the gaps (Q.AddLearned). Also Forever's playable races
 -- (Q.Races), where items that start quests drop (an item's drops), who gives and takes what
@@ -254,7 +254,7 @@ local function Normalize(id, t)
 	return q
 end
 
--- The quest table (see the contract in docs/questtree.md), or nil. Shared: never written by callers.
+-- The quest table (see the contract in docs/lodestar.md), or nil. Shared: never written by callers.
 function Q.Quest(id)
 	id = tonumber(id)
 	if not id or not db then return nil end
@@ -785,7 +785,7 @@ local function Use(data)
 end
 
 -- Loads the data the first time (LefthyTools_QuestData through C_AddOns.LoadAddOn); true when it's
--- there. Only a Questtree window asks: never at login.
+-- there. Only a Lodestar window asks: never at login.
 function Q.Load()
 	if db then return true end
 	local data = rawget(_G, "LefthyToolsQuestData")
