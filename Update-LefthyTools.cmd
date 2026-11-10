@@ -23,7 +23,7 @@ exit /b
 #   update. Settings are kept (they live in the WTF folder).
 #
 # Development, from a clone of the repo:
-#   .\install.ps1             install this checkout's LefthyTools folder (and LefthyTools_DropData)
+#   .\install.ps1             install this checkout's LefthyTools folder (and its data add-ons)
 #   .\install.ps1 -Link       junction AddOns\LefthyTools (and the rest) to this checkout (edits only need /reload)
 #   .\install.ps1 -Download   install the latest version from GitHub instead
 #   -GameDir <dir>            the World of Warcraft folder (...\World of Warcraft), or one WoW: Forever
@@ -54,8 +54,8 @@ param(
 	$KnownFlavors = @('_forever_', '_classic_beta_')
 	$Legacy = @('Mirage') # addons that are now part of LefthyTools; left installed they'd run twice
 	# Add-ons that come with it, each a folder of its own next to LefthyTools in the repo: the drop
-	# database (GPL v3 like its source, so apart from the BSD-licensed rest).
-	$Companions = @('LefthyTools_DropData')
+	# database and the quest data (GPL v3 like their source, so apart from the BSD-licensed rest).
+	$Companions = @('LefthyTools_DropData', 'LefthyTools_QuestData')
 	$Remembered = Join-Path $env:LOCALAPPDATA 'LefthyTools\game-folder.txt'
 
 	# Any game folder (also just an Interface folder): what -GameDir may name when it isn't recognised.

@@ -93,7 +93,8 @@ says so in chat. Your data on the beta stays as it is.
 ```
 
 The installer also installs `LefthyTools_DropData` next to it (the Bestiary's drop database, also
-mobs' health for the fight stream, an add-on of its own) and removes the old standalone `Mirage`
+mobs' health for the fight stream, an add-on of its own), `LefthyTools_QuestData` (Questtree's quest
+chains, another one) and removes the old standalone `Mirage`
 addon, which is now part of LefthyTools. How it works inside (for developers): see
 [docs/](docs/architecture.md).
 
@@ -619,5 +620,10 @@ LefthyTools is under the BSD 2-Clause License ([LICENSE](LICENSE)). The drop dat
 [LefthyTools_DropData](LefthyTools_DropData/), is generated from CMaNGOS Classic DB and is under the GPL v3
 like its source ([its LICENSE.md](LefthyTools_DropData/LICENSE.md) and
 [COPYRIGHT.md](LefthyTools_DropData/COPYRIGHT.md)). It's rebuilt with
-`node tools/update-drop-data.js` ([its README](LefthyTools_DropData/README.md)). World of Warcraft
-content and names belong to Blizzard.
+`node tools/update-drop-data.js` ([its README](LefthyTools_DropData/README.md)). The quest data
+add-on, [LefthyTools_QuestData](LefthyTools_QuestData/), is generated from CMaNGOS Classic DB and EG
+Link's WoW: Forever data (Data from [Efficient Games](https://efficient.games), licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) and is under the GPL v3 too
+([its LICENSE.md](LefthyTools_QuestData/LICENSE.md) and [COPYRIGHT.md](LefthyTools_QuestData/COPYRIGHT.md));
+it's rebuilt with `node tools/update-quest-data.js` ([its README](LefthyTools_QuestData/README.md)).
+World of Warcraft content and names belong to Blizzard.
