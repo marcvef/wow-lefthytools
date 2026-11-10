@@ -618,7 +618,7 @@ function M:BuildOptions(o)
 		L["The companion shrinks to its title and one line: the quest you're on, its step and how far its turn-in is. The button in its title bar does the same."])
 	o:Header(L["In the game's quest UI"])
 	o:Checkbox("dialog", L["Beside the quest dialog"],
-		L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, every step, what it leads to, what taking it closes, friends who did it, and a button to open it in Questtree. Hidden when there's nothing to tell."])
+		L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Questtree. Hidden when there's nothing to tell."])
 	o:Checkbox("logBadges", L["Chain steps in the quest log"],
 		L["Each quest of a chain gets its step (\"2/4\") at the end of its line in your quest log, and its tooltip shows the chain. Alt-click a quest there to open it in Questtree."])
 	o:Header(L["Tooltips"])

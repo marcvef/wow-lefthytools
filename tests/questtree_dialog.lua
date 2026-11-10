@@ -1,11 +1,14 @@
 -- Questtree in the game's quest UI (Dialog.lua): the panel beside the quest dialog (offered,
--- progress, reward, an NPC's greeting): "Part 2 of 6 · <chain>", the numbered steps (this one bold,
--- done ones ticked), what it leads to, what the next step needs besides it, what taking it closes,
--- a lead-in, friends; "Open in Questtree"; hidden with nothing to tell, when the dialog closes (also
+-- progress, reward, an NPC's greeting): "Part 2 of 6 · <chain>", the numbered steps around it (one
+-- before, this one bold, two after, done ones ticked, "... N more"), what it leads to (not when it's
+-- a step listed; "Opens 2 quests" with their names in its tooltip), what the next step needs besides
+-- it that isn't listed or done, what taking it closes, a lead-in, friends on one line (at most three);
+-- "Open in Questtree"; hidden with nothing to tell, when the dialog closes (also
 -- without QUEST_FINISHED), with the setting off; drawn on the next frame, never in the event; the
 -- data not loaded in a fight; a frame of ours on UIParent, nothing written into QuestFrame. The quest
 -- log: "2/5" on a chain quest's line (left of Misc Tweaks' NEW when that's there), kept until the
--- data or progress changes, the chain in its tooltip, the setting off, Alt-click (Q.LogAltClick).
+-- data or progress changes, the chain in its tooltip (at most 5 steps, from one before), the setting
+-- off, Alt-click (Q.LogAltClick).
 -- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. Whatever this
 -- file replaces is put back at its end.
 -- Needs: no other file.
@@ -60,6 +63,21 @@ local QUESTS_DATA = {
 	[9111] = { id = 9111, title = "The Captain's Need", level = 7, zone = 1429,
 		starts = { Npc(926, "Captain Lee", 0.55, 0.2) }, ends = { Npc(926, "Captain Lee", 0.55, 0.2) } },
 }
+-- A second chain: Scout Ahead opens Side Errand and Report Back; Report Back also needs the last of
+-- five herb quests (far down the chain, out of sight beside Scout Ahead).
+local function Herbs(id, title, level, extra)
+	local q = { id = id, title = title, level = level, zone = 1429, starts = { Npc(927, "Herbalist Una", 0.2, 0.2) }, ends = { Npc(927, "Herbalist Una", 0.2, 0.2) } }
+	for k, v in pairs(extra or {}) do q[k] = v end
+	QUESTS_DATA[id] = q
+end
+Herbs(9120, "Scout Ahead", 3)
+Herbs(9127, "Side Errand", 4, { pre = { 9120 } })
+Herbs(9122, "Herbs One", 4)
+Herbs(9123, "Herbs Two", 5, { pre = { 9122 } })
+Herbs(9124, "Herbs Three", 6, { pre = { 9123 } })
+Herbs(9125, "Herbs Four", 7, { pre = { 9124 } })
+Herbs(9126, "Herbs Five", 8, { pre = { 9125 } })
+Herbs(9121, "Report Back", 9, { pre = { 9120, 9126 } })
 local ZONES = { { map = 1429, name = "Elwynn Forest", continent = 1415, minLevel = 1, maxLevel = 10 } }
 
 -- My progress: Into the Woods done; the quest log as each part needs it.
@@ -125,12 +143,13 @@ local list, at = Q.ChainFor(9102)
 check(v.panel and v.panel:IsShown() and v.quest == 9102 and v.page == "detail" and #list == 6 and at == 2,
 	"the next frame: the panel shows the quest offered, part 2 of the chain's 6")
 check(Has("Part 2 of 6 · Into the Woods"), "its heading: which part of which chain")
-local first, current, later = RowWith("1. Into the Woods"), RowWith("2. The Lost Axe"), RowWith("6. The Final Word of the Old Guard")
+local first, current, later = RowWith("1. Into the Woods"), RowWith("2. The Lost Axe"), RowWith("4. ")
 check(first and first.Text:GetText():find("UI-QuestTracker-Tracker-Check", 1, true) and current
 	and current.Text.font == "GameFontHighlight" and later and later.Text.font == "GameFontHighlightSmall",
-	"every step numbered: done ticked, this one bold, the rest small")
-check(RowWith("Leads to: [7] Back to Camp"), "what it leads to")
-check(RowWith("Requires: Wolf Trouble (for Back to Camp)"), "what the next step needs besides it")
+	"the steps numbered: done ticked, this one bold, the rest small")
+check(not RowWith("5. ") and not RowWith("6. ") and Has("... 2 more"), "one before, this one, two after; ... 2 more")
+check(RowWith("Leads to: [7] Back to Camp"), "what it leads to (step 5: not listed)")
+check(RowWith("4. Wolf Trouble") and not RowWith("Requires:"), "what the next step needs besides it is a step listed: no Requires")
 check(Has("Taking it closes: A Different Path"), "what taking it closes (its exclusive one)")
 check(v.panel.Open:IsShown() and v.panel.Open:GetText() == "Open in Questtree", "the button to open it in Questtree")
 v.panel.Open:Click()
@@ -183,18 +202,38 @@ check(View().page == "progress" and Has("Part 2 of 5") and not Has("Taking it cl
 	"asked for it: the chain without the quest it closed, nothing it would close")
 Fire("QUEST_COMPLETE")
 Step()
-check(View().page == "complete" and View().panel:IsShown() and RowWith("Leads to: [7] Back to Camp"), "rewarded: what it leads to")
+check(View().page == "complete" and View().panel:IsShown() and RowWith("4. Back to Camp") and not RowWith("Leads to:"),
+	"rewarded: what it leads to is the next step listed, no Leads to")
+CloseDialog()
+
+-- Two quests it opens, a need far down the chain.
+Dialog("QUEST_DETAIL", 9120)
+Step()
+local opens = RowWith("Opens 2 quests")
+check(opens and not RowWith("[4] Side Errand") and not RowWith("Leads to:"), "two it opens: how many, no names under it")
+opens._scripts.OnEnter(opens)
+local tip = {}
+for _, line in ipairs(TOOLTIP.lines) do tip[#tip + 1] = Plain(line) end
+check(table.concat(tip, "|"):find("[9] Report Back", 1, true) and table.concat(tip, "|"):find("[4] Side Errand", 1, true), "... their names in its tooltip")
+opens._scripts.OnLeave(opens)
+check(RowWith("Requires: Herbs Three (for Report Back)") and not RowWith("Requires: Herbs One") and not RowWith("Requires: Herbs Two"),
+	"what the next step needs that isn't a step listed (nor done): Requires")
 CloseDialog()
 
 -- Friends who did it.
 local requests = 0
 Replace("RequestFriendProgress", function() requests = requests + 1; return true end)
-Replace("Friends", function(id) return id == 9102 and { { name = "Anna Brook", classFile = "MAGE", status = "done" } } or {} end)
+Replace("Friends", function(id) return id == 9102 and { { name = "Anna Brook", classFile = "MAGE", status = "done" },
+	{ name = "Bo", classFile = "WARRIOR", status = "active" }, { name = "Cy", classFile = "PRIEST", status = "available" },
+	{ name = "Dee", classFile = "ROGUE", status = "done" }, { name = "Eve", classFile = "MAGE", status = "done" } } or {} end)
 Dialog("QUEST_DETAIL", 9102)
 Step()
 Fire("QUEST_DETAIL")
 Step()
-check(Has("Friends: Anna Brook (done)") and requests == 1, "friends who did it; their progress asked for once while the dialog is open")
+local friends = Has("Friends: Anna Brook")
+check(friends and friends:find("UI-QuestTracker-Tracker-Check", 1, true) and Plain(friends):find("Bo", 1, true) and Plain(friends):find("Dee", 1, true)
+	and not Plain(friends):find("Cy", 1, true) and not Plain(friends):find("Eve", 1, true) and Plain(friends):find("+1", 1, true)
+	and requests == 1, "friends who did it or are on it, three on one line, +1; their progress asked for once while the dialog is open")
 CloseDialog()
 PutBack("Friends")
 PutBack("RequestFriendProgress")
@@ -240,7 +279,7 @@ PutBack("IsLoaded")
 
 ---------------------------------------------------------------------------
 section("Questtree: chain steps in the quest log")
-Log({ 9102, 9109, 86576 })
+Log({ 9102, 9109, 86576, 9125 })
 Progress()
 local function TitleButton(id) for _, b in ipairs(QUEST_LOG_BUTTONS) do if b.questID == id then return b end end end
 local chainAsks = 0
@@ -273,6 +312,15 @@ tip = table.concat(tip, "|")
 check(tip:find("Questtree: Part 2 of 5 · Into the Woods", 1, true) and tip:find("2. The Lost Axe", 1, true)
 	and tip:find("Leads to: Back to Camp", 1, true) and tip:find("Alt-click: open it in Questtree", 1, true),
 	"its tooltip: the chain, its steps, what it leads to, Alt-click")
+GameTooltip:Hide()
+local herb = TitleButton(9125)
+GameTooltip:SetOwner(herb); TOOLTIP.shown = true
+herb._scripts.OnEnter(herb)
+tip = {}
+for _, line in ipairs(TOOLTIP.lines) do tip[#tip + 1] = Plain(line) end
+tip = table.concat(tip, "|")
+check(tip:find("Part 6 of 8", 1, true) and tip:find("... 3 before", 1, true) and tip:find("5. Herbs Three", 1, true)
+	and tip:find("8. Report Back", 1, true) and not tip:find("3. ", 1, true), "a long chain in the tooltip: five steps from one before (" .. tip .. ")")
 GameTooltip:Hide()
 -- Alt-click (Questtree.lua's hook on the quest log's details hands it over): opened on the next frame.
 local before = #opened

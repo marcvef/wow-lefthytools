@@ -1408,8 +1408,8 @@ L["The companion shrinks to its title and one line: the quest you're on, its ste
 	"Das kleine Fenster schrumpft auf seinen Titel und eine Zeile: die Quest, an der du bist, ihr Schritt und wie weit es zur Abgabe ist. Der Button in seiner Titelleiste macht dasselbe."
 L["In the game's quest UI"] = "Im Quest-Interface des Spiels"
 L["Beside the quest dialog"] = "Neben dem Questfenster"
-L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, every step, what it leads to, what taking it closes, friends who did it, and a button to open it in Questtree. Hidden when there's nothing to tell."] =
-	"Bietet dir ein NPC eine Quest an, fragt nach ihr oder belohnt dich, zeigt ein Feld neben dem Questfenster ihre Questreihe: der wievielte Teil das ist, jeden Schritt, wozu sie führt, was ihr Annehmen ausschließt, welche Freunde sie erledigt haben, und einen Button, der sie in Questtree öffnet. Ausgeblendet, wenn es nichts zu sagen gibt."
+L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Questtree. Hidden when there's nothing to tell."] =
+	"Bietet dir ein NPC eine Quest an, fragt nach ihr oder belohnt dich, zeigt ein Feld neben dem Questfenster ihre Questreihe: der wievielte Teil das ist, die Schritte um sie herum, wozu sie führt, was ihr Annehmen ausschließt, welche Freunde sie erledigt haben, und einen Button, der sie in Questtree öffnet. Ausgeblendet, wenn es nichts zu sagen gibt."
 L["Chain steps in the quest log"] = "Questreihen-Schritte im Questlog"
 L["Each quest of a chain gets its step (\"2/4\") at the end of its line in your quest log, and its tooltip shows the chain. Alt-click a quest there to open it in Questtree."] =
 	"Jede Quest einer Questreihe bekommt ihren Schritt („2/4“) am Ende ihrer Zeile in deinem Questlog, ihr Tooltip zeigt die Questreihe. Alt-Klick auf eine Quest dort öffnet sie in Questtree."
@@ -1422,7 +1422,7 @@ L["The whole companion"] = "Das ganze Fenster"
 L["One line"] = "Eine Zeile"
 L["Click: open it in Questtree"] = "Klick: in Questtree öffnen"
 L["Part %d of %d"] = "Teil %d von %d"
-L["Opens %d quests:"] = "Öffnet %d Quests:"
+L["Opens %d quests"] = "Öffnet %d Quests"
 L["(for %s)"] = "(für %s)"
 L["%s needs it too, not only this quest."] = "%s braucht sie auch, nicht nur diese Quest."
 L["A lead-in: %s can be taken without it."] = "Eine Hinführung: %s lässt sich auch ohne sie annehmen."

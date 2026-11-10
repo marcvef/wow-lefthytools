@@ -562,18 +562,23 @@ dialog's top:
 
 - **"Part 2 of 4 · <chain>"** (gold, `GameFontNormal`): the quest's place in `Q.ChainFor` and the
   chain's first quest's title (the client's when it knows it).
-- **The steps**, numbered (at most 10 in sight, from three before this one, "... N before/more"):
+- **The steps**, numbered, in a window of four: one before this one, this one, two after (fewer
+  before it at the chain's start, more at its end), "... N before" and "... N more" for the rest;
   done ones ticked green, this one bold (`GameFontHighlight`) with an arrow, the rest grey; each a
   line that opens that quest in Questtree.
-- **Leads to: [7] Title** (one), or **Opens 3 quests:** with up to three of them (their verb icons)
-  and "and N more".
+- **Leads to: [7] Title** when it opens one quest that isn't one of the steps listed (the next step
+  usually is); when it opens several, **Opens 3 quests** alone (their names in the line's tooltip; a
+  click opens this quest in Questtree, where they're listed).
 - **Requires: <title> (for <the next step>)**: what the quests it leads to need besides this one
-  (`Q.Missing` of each, at most 3), in the locked colour; its tooltip says the next step needs it too.
+  (`Q.Missing` of each, at most 3) that isn't done and isn't one of the steps listed, in the locked
+  colour; its tooltip says the next step needs it too. (Every quest's prerequisites are part of its
+  `Q.Chain`, so "outside the chain" is "not in sight": a need listed as a step isn't said again.)
 - Offered only (`QUEST_DETAIL`): **"Taking it closes: ..."** (`Q.Closes`, orange) and for a lead-in
   "A lead-in: <quest> can be taken without it." (`breadcrumbFor`).
-- **Friends:** "Anna (done), Bo (on it)" in class colours (`Q.Friends`, setting `friends`, at most 4;
-  their progress asked for once per quest while the dialog is open, `Q.RequestFriendProgress`; their
-  answers redraw it, `Q.OnFriendProgress`).
+- **Friends:** on one line (no wrapping), those who did it (a tick) or are on it (the in-progress
+  icon), in class colours, at most 3 named, then "+2" (`Q.Friends`, setting `friends`; their progress
+  asked for once per quest while the dialog is open, `Q.RequestFriendProgress`; their answers redraw
+  it, `Q.OnFriendProgress`).
 - **Open in Questtree** (a button at the bottom): `Q.OpenBrowser(id)`, else `Q.ShowQuest(id)`.
 
 The greeting lists each of the NPC's quests that's in a chain or leads on: "[12] Title" with its verb
@@ -609,9 +614,9 @@ hooked; no Blizzard template but the button's `UIPanelButtonTemplate`, no Backdr
   the log is a table lookup per line. Data not loaded yet: loaded once on the next frame, out of a
   fight, then the open log is marked.
 - **The tooltip**: one `HookScript("OnEnter")` per title button (as Misc Tweaks'): when the game's
-  tooltip is the line's, it adds "Questtree: Part 2 of 4 · <chain>", up to 7 steps (this one white
-  with the arrow, done ones ticked green, the rest grey), "Leads to: ..." and "Alt-click: open it in
-  Questtree".
+  tooltip is the line's, it adds "Questtree: Part 2 of 4 · <chain>", at most 5 steps from one before
+  this one, windowed as the panel's ("... N before", "... N more"; this one white with the arrow, done
+  ones ticked green, the rest grey), "Leads to: ..." and "Alt-click: open it in Questtree".
 - **Alt-click** a quest there: Questtree.lua's post-hook on `QuestMapFrame_ShowQuestDetails` (Module,
   The quest log) calls `Q.LogAltClick(id)`, which opens it on the next frame (`Q.OpenBrowser`, else
   `Q.ShowQuest`) from a timer of ours, not inside Blizzard's click. A click on the "2/4" itself would
@@ -625,14 +630,17 @@ hooked; no Blizzard template but the button's `UIPanelButtonTemplate`, no Backdr
 `Q.DialogView()` gives the tests the panel, its strings, the quest shown, the page and the labels.
 
 **Tests** (`tests/questtree_dialog.lua`): nothing built before a dialog; the offered page drawn on the
-next frame, not in the event (heading, numbered steps with done ticked and this one bold, what it leads
-to, what the next step needs besides it, what taking it closes, the button and a step's line opening
-Questtree); a frame of ours on UIParent anchored beside the dialog, nothing written into `QuestFrame` or
-its scripts; closed by `QUEST_FINISHED` and without it; a quest with nothing to tell; a lead-in; the
-progress and reward pages (the chain without the quest taking it closed); friends (asked for once); a
-greeting; the setting off; the data not loaded in a fight. The quest log: "2/5" on a chain quest's line
-(the title unchanged), nothing on one in no chain, left of Misc Tweaks' NEW, kept until progress
-changes, the tooltip, Alt-click on the next frame, the setting off and on again.
+next frame, not in the event (heading, the steps' window with done ticked and this one bold and "... 2
+more", what it leads to when it isn't listed, a need that's a step listed not said again, what taking
+it closes, the button and a step's line opening Questtree); a frame of ours on UIParent anchored beside
+the dialog, nothing written into `QuestFrame` or its scripts; closed by `QUEST_FINISHED` and without it;
+a quest with nothing to tell; a lead-in; the progress and reward pages (the chain without the quest
+taking it closed; what it leads to listed as the next step); two it opens (the count, the names in its
+tooltip) and a need far down the chain (Requires); friends (who did it or is on it, three, "+1"; asked
+for once); a greeting; the setting off; the data not loaded in a fight. The quest log: "2/5" on a chain
+quest's line (the title unchanged), nothing on one in no chain, left of Misc Tweaks' NEW, kept until
+progress changes, the tooltip (a long chain: five steps from one before), Alt-click on the next frame,
+the setting off and on again.
 
 ## Big window (Browser.lua)
 
