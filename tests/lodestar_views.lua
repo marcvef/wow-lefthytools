@@ -1,8 +1,9 @@
 -- Lodestar: the quest browser's two views (Views.lua): My quests (my quest log organised: ready to
 -- turn in first, then by zone with mine first and the nearest first, by level or by storyline; a
--- line per quest with its chain's "2/4", its first objective not done or "Ready to turn in", where
--- it's turned in; a click opens it in the window, a right-click sets the map pin; "Continue your
--- storylines": the chains I've started whose next step I can take now, at most 8) and the level path
+-- line per quest with its chain's "2/4" (a badge: a click opens the chain, Q.OpenChain), its first
+-- objective not done or "Ready to turn in", where it's turned in; a click opens it in the window, a
+-- right-click sets the map pin; "Continue your storylines": the chains I've started whose next step
+-- I can take now, at most 8, their "1/2" a badge too) and the level path
 -- (the zones with something for my levels or friends there, all of them with a toggle, as bars
 -- across the levels, shaded per level, my level, sorted by what there is for my level, a click opens
 -- the zone). Registering with the window's registry once it's there (the module's enable), building
@@ -11,8 +12,8 @@
 -- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. The window's
 -- registry (Q.RegisterBrowserView) and Q.SelectZone come from the big window's part in parallel:
 -- here the registry is a stand-in that records what's registered, put in for the checks and the
--- real one (if there is one) put back; Q.OpenBrowser, Q.SelectZone and Q.Waypoint are recorders
--- while this file runs. The data part's Q.Objectives and the new Q.InRange (in my log; else minimum
+-- real one (if there is one) put back; Q.OpenBrowser, Q.OpenChain, Q.SelectZone and Q.Waypoint are
+-- recorders while this file runs. The data part's Q.Objectives and the new Q.InRange (in my log; else minimum
 -- level reached, not grey, at most Q.RANGE_RED levels above me) are stand-ins with the contract's
 -- meaning (the data part builds them in parallel; its own tests check them).
 -- Whatever it replaces is put back at its end.
@@ -161,8 +162,9 @@ local function Progress() -- the engine reads my progress again (as after a load
 end
 
 -- The jumps into the window and the map pins, recorded.
-local opened, selected, pins = {}, {}, {}
+local opened, selected, pins, chained = {}, {}, {}, {}
 Replace("OpenBrowser", function(id) opened[#opened + 1] = id end)
+Replace("OpenChain", function(id) chained[#chained + 1] = id return true end)
 Replace("SelectZone", function(map) selected[#selected + 1] = map end)
 Replace("Waypoint", function(map, x, y) pins[#pins + 1] = { map = map, x = x, y = y } return true end)
 
@@ -302,16 +304,16 @@ do
 	check(plain(mine.Head:GetText()) == "4 quests in your log · 1 ready to turn in", "on top: how many, how many ready")
 	-- A quest's line.
 	local row = RowOf(mine, "q1101")
-	check(plain(row.Title:GetText()) == "[12] The Defias Brotherhood" and plain(row.Badge:GetText()) == "2/5"
+	check(plain(row.Title:GetText()) == "[12] The Defias Brotherhood" and plain(row.Badge.Text:GetText()) == "2/5"
 		and plain(row.Todo:GetText()):find("^2/10 Defias Looter · ") and plain(row.Right:GetText()) == "Gryan Stoutmantle",
 		"a line: [12] Title, its chain's 2/5, its first objective with progress and how far, its turn-in: "
 		.. plain(row.Todo:GetText()) .. " | " .. plain(row.Right:GetText()))
 	check(row._kind == "Button" and row:GetHeight() <= 24, "one line, a Button")
 	local oats = RowOf(mine, "q1120")
-	check(plain(oats.Badge:GetText()) == "" and plain(oats.Todo:GetText()):find("^3/8 Handful of Oats"), "a quest in no chain: no badge")
+	check(plain(oats.Badge.Text:GetText()) == "" and not oats.Badge:IsShown() and plain(oats.Todo:GetText()):find("^3/8 Handful of Oats"), "a quest in no chain: no badge")
 	local ready = RowOf(mine, "q1011")
 	check(plain(ready.Todo:GetText()) == "Ready to turn in" and plain(ready.Right:GetText()) == "Marshal Dughan, Elwynn Forest"
-		and plain(ready.Badge:GetText()) == "2/2", "ready: says so, its turn-in with its zone (not mine)")
+		and plain(ready.Badge.Text:GetText()) == "2/2", "ready: says so, its turn-in with its zone (not mine)")
 	local crystal = RowOf(mine, "q1400")
 	check(plain(crystal.Right:GetText()) == "Farmer Saldean, Westfall" and plain(crystal.Todo:GetText()) == "0/1 Red Crystal",
 		"turned in in another zone than its own: the zone said; far away: no distance")
@@ -319,9 +321,22 @@ do
 	row._scripts.OnEnter(row)
 	check(plain(TOOLTIP.title) == "[12] The Defias Brotherhood" and tipHas("In your quest log") and tipHas("Westfall")
 		and tipHas("Step 2 of 5 · The People's Militia") and tipHas("- Defias Looter slain: 2/10") and tipHas("Turn in: Gryan Stoutmantle")
-		and tipHas("Click: open it in the quest browser") and tipHas("Right-click: map pin at Defias Looter"),
-		"its tooltip: status, zone, step, every objective, turn-in, what the clicks do")
+		and tipHas("Click: open it in the quest browser") and tipHas("Click 2/5: open the chain") and tipHas("Right-click: map pin at Defias Looter"),
+		"its tooltip: status, zone, step, every objective, turn-in, what the clicks do (its badge too)")
 	row._scripts.OnLeave(row)
+	oats._scripts.OnEnter(oats)
+	check(not tipHas("open the chain"), "a quest in no chain: no badge's click in its tooltip")
+	oats._scripts.OnLeave(oats)
+	-- Its chain badge: a button of its own, its tooltip, a click opens the chain (Q.OpenChain).
+	local badge = row.Badge
+	check(badge._kind == "Button" and badge:GetParent() == row and badge:IsShown() and badge._points[1][1] == "LEFT" and badge._points[1][2] == row.Title
+		and badge._highlight ~= nil, "the badge: a Button on the row, after the title, lit when hovered")
+	badge._scripts.OnEnter(badge)
+	check(TOOLTIP.title == "The People's Militia" and tipHas("Step 2 of 5") and TOOLTIP.lines[#TOOLTIP.lines] == "Click: open the chain", "its tooltip")
+	badge._scripts.OnLeave(badge)
+	local openedBefore = #opened
+	badge:Click()
+	check(chained[#chained] == 1101 and #opened == openedBefore, "a click on it: the quest's chain in the window (Q.OpenChain), not the row's click")
 	oats._scripts.OnEnter(oats)
 	check(tipHas("- Handful of Oats: 3/8 (from Oat Sack, 100%)"), "an item's objective: where it comes from")
 	oats._scripts.OnLeave(oats)
@@ -334,12 +349,19 @@ do
 	-- Continue your storylines.
 	local nxt = RowOf(mine, "n1111")
 	check(nxt and plain(nxt.Text:GetText()) == "Westfall Stew - next: [13] Goretusk Liver Pie, Farmer Saldean (Westfall)"
-		and plain(nxt.Right:GetText()) == "1/2", "Continue: a chain I've started whose next step I can take, its giver and zone")
+		and plain(nxt.Badge.Text:GetText()) == "1/2", "Continue: a chain I've started whose next step I can take, its giver and zone")
 	check(not Entries(mine):find("n:1201", 1, true) and not Entries(mine):find("n:1102", 1, true),
 		"not a chain whose next step is too high for me (Redridge), nor one whose next step needs the one in my log")
 	nxt._scripts.OnEnter(nxt)
-	check(TOOLTIP.title == "Westfall Stew" and tipHas("1 of 2 steps done") and tipHas("From Farmer Saldean, Westfall"), "its tooltip")
+	check(TOOLTIP.title == "Westfall Stew" and tipHas("1 of 2 steps done") and tipHas("From Farmer Saldean, Westfall")
+		and tipHas("Click 1/2: open the chain"), "its tooltip")
 	nxt._scripts.OnLeave(nxt)
+	check(nxt.Badge._kind == "Button" and nxt.Badge:IsShown(), "its 1/2: a badge too")
+	nxt.Badge._scripts.OnEnter(nxt.Badge)
+	check(TOOLTIP.title == "Westfall Stew" and tipHas("1 of 2 steps done") and TOOLTIP.lines[#TOOLTIP.lines] == "Click: open the chain", "its tooltip")
+	nxt.Badge._scripts.OnLeave(nxt.Badge)
+	nxt.Badge:Click()
+	check(chained[#chained] == 1111, "a click: the chain, its next step picked")
 	nxt:Click()
 	check(opened[#opened] == 1111, "a click opens its next step")
 	nxt:Click("RightButton")
@@ -587,14 +609,14 @@ do
 	for _, list in ipairs({ mine.list, levelpath.list }) do
 		for _, row in pairs(list.used) do
 			if row.kind == "quest" or row.kind == "next" or row.kind == "zone" then
-				buttons = buttons and row._kind == "Button"
+				buttons = buttons and row._kind == "Button" and (row.kind == "zone" or row.Badge._kind == "Button")
 				count = count + 1
 			end
 		end
 	end
 	for _, chip in pairs(mine.sorts) do buttons = buttons and chip._kind == "Button" end
 	buttons = buttons and levelpath.Guide._kind == "Button" and levelpath.All._kind == "Button"
-	check(buttons and count >= 5, "every quest, storyline and zone row, chip and button is a Button the controller reaches (" .. count .. ")")
+	check(buttons and count >= 5, "every quest, storyline and zone row, chain badge, chip and button is a Button the controller reaches (" .. count .. ")")
 	local blizzard = false
 	for _, v in ipairs({ mine, levelpath }) do
 		for _, f in ipairs({ v.frame, v.list.scroll, v.list.child }) do

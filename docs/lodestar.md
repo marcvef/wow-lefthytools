@@ -733,8 +733,10 @@ the setting off and on again.
 the left, on the Zone tab its zone's map with the quest picked on it, a dungeon's quest list, its details
 on the right; true when it's open with the data); `Q.SelectZone(map)` opens it on a zone's page (a
 uiMapID, a city's floor or a cave counting as its zone, or a dungeon's name; nothing picked, its
-briefing on the right; false when there's no such place); `Q.HideBrowser()` closes it (the module
-switched off); `Q.BrowserShown()` says whether it's open. Other files add tabs with
+briefing on the right; false when there's no such place); `Q.OpenChain(id)` opens it on a quest's chain
+(the quest's zone on the Zone tab, the quest picked, its chain in the middle with its card in sight: what a
+chain badge does, My quests' too; a quest in no chain opens as `Q.OpenBrowser(id)`; true when its chain
+shows); `Q.HideBrowser()` closes it (the module switched off); `Q.BrowserShown()` says whether it's open. Other files add tabs with
 `Q.RegisterBrowserView` and open them with `Q.ShowBrowserView` (below). With the module off it doesn't
 open (one chat line says how to switch it on). `Q.BrowserView()` gives the tests its frames, state and
 views.
@@ -777,14 +779,41 @@ plus 40 x 80. In the band under the title: "Search all zones:" with its box on t
   zone. A click shows that place, nothing picked.
 - **Middle (the rest; 752 px at 1400, 1012 at 1700):** the **tab bar** (our own Buttons): **Zone** (the
   zone's map, a chain opened from it, a dungeon's quest list), **Quest list** (its key is still
-  "overview"), then each registered view, and at its right "Back to the search results" during a search.
-  The zone's map sits right under it; a chain's page, the quest list and the search have the **head**
-  under it: a chain's way back to its zone, the chain's colour, the title (`GameFontNormalLarge`), a grey
-  line under it, "x of y done" with a bar, and the chain's zoom (-, the zoom, +, Fit), a gold divider
-  under it. Under a chain's page one short line on its lines (below); under a dungeon's list that its
+  "overview"), then each registered view, on the Zone tab **the switch** right after the tabs (below),
+  and at its right "Back to the search results" during a search. The zone's map sits right under it; a
+  chain's page, the quest list and the search have the **head** under it: the chain's colour, the title
+  (`GameFontNormalLarge`), a grey line under it, "x of y done" with a bar, and the chain's zoom (-, the
+  zoom, +, Fit), a gold divider under it. Under a chain's page one short line on its lines (below); under a dungeon's list that its
   quests are given in many places. The tab is kept.
 - **Right (360 px, 400 on a wide window): never empty.** The details of the quest picked; nothing
   picked, the briefing of what the middle shows (an opened chain's, else the place's).
+
+**The switch "Map | Chain".** Players missed that a chain opens at all (only its card, a stub or the details'
+"Open the chain" did it). On the Zone tab, always at the same spot (on the tab bar right after the last tab,
+so it doesn't move between the map and a chain's page), a segmented control of two Buttons of ours in a thin
+gold frame: **Map** (a dungeon: **Quests**, its list) and **Chain: Elwynn's Kobolds 3/7** (the name cut short
+to the room there is, beside "Back to the search results" too; the quests without a chain opened: "Quests
+without a chain 0/2"). The chain it offers: the one opened; else the picked quest's (a chain of more than one
+quest, `Rule.Step`); nothing picked, the one left last for the map (so it switches both ways with one click;
+another place forgets it). The half shown now is lit (gold, a line under it, "Shown now" in its tooltip); the
+other has a hover light and its tooltip says what a click does ("Click: back to the map" / "Click: open the
+chain" with how far along); one click switches (Map: the chain's page goes, the quest picked stays, on the
+map; Chain: the chain's page, the quest picked in it, its card in sight). When no chain applies (nothing
+picked and none left, or the quest picked is in none) the Chain half is greyed (no hover light, a click does
+nothing) and its tooltip says why: "Pick a quest of a chain (on the map or on the right): its chain opens
+here." / "Wolves Across the Border is in no quest chain." Picking another quest changes its label. It's the
+way back from a chain to the map (the head's "< Elwynn Forest" is gone; the Zone tab clicked again does it
+too). Hidden on the quest list, the views and the search results.
+
+**Chain badges.** A quest of a chain has its badge on its row: "2/4" (its step, counted as the details count
+it: `Q.ChainFor`, the steps as I can do them; else `Q.ChainStep`), amber on a faint gold pill with a thin
+edge, a Button of its own on the row (the controller reaches it), lit when hovered; its tooltip: the chain's
+name, "Step 2 of 4", "Click: open the chain". A click opens that chain in the middle on the Zone tab, the quest
+picked, its card in sight (on that chain's page already: picked there; a step in another place: that place,
+the chain there; `Side.ShowChain`). On the quest list's (and the search results') rows left of the right
+column, on the right pane's rows (Turn in now and In progress here: at the right of the title line; a chain's
+steps: left of the giver or reason), and on My quests' (Views.lua, through `Q.OpenChain`). A click on the row
+elsewhere does what it did; the row's tooltip names both ("Click: details", "Click 2/4: open the chain").
 
 A zone's pages show its quests (`Q.ZoneQuests`) and those given there but listed elsewhere
 (`Q.ZoneGiven(map)`: the Deadmines' quests at Sentinel Hill); its count stays its own quests'.
@@ -814,7 +843,8 @@ Spots within 8 px are one pin (drop areas only with drop areas): its look the mo
 count badge** (the quests still to do there, from two), its tooltip the giver and each quest in its
 status's colour with what the pin is ("[4] Brotherhood of Thieves · repeatable": ready to turn in, in
 progress, low level, repeatable, or the reason it can't be taken yet, `ZonePage.PinNote`, asked only when
-the tooltip shows; there's no legend under the map), then what a click does.
+the tooltip shows; there's no legend under the map), then what a click does (a pin of one quest of a chain:
+also "Then Chain above the map: its quest chain").
 
 - **Hovering a pin** (the mouse, or the controller's cursor) lights its chains: their threads at full
   colour, their pins, every other pin dim (30%), and their cards in the briefing (below).
@@ -867,9 +897,9 @@ quest's details show where it's given; its chains' cards are in its briefing.
 2 to pick up now" (its quests not done that are `Q.InRange`, and of them what I can take now; none:
 "Nothing for your level."); then, only when there are any, **Turn in now (N)** (my quests ready to turn in
 that are the place's, or whose turn-in or an objective's area is on its map: `C_QuestLog`'s quest log;
-each a row: the "?", "[12] Title", "Turn in at <ender>" under it, its zone when that's another) and **In
-progress here (N)** (the rest of those: the first line of my progress not done yet, "3/10 Kobold Vermin
-slain", else "In your quest log"), at most 6 each, the lowest level first; then **Quest chains**: the
+each a row: the "?", "[12] Title" and its chain badge, "Turn in at <ender>" under it, its zone when that's
+another) and **In progress here (N)** (the rest of those: the first line of my progress not done yet, "3/10
+Kobold Vermin slain", else "In your quest log"), at most 6 each, the lowest level first; then **Quest chains**: the
 chains with a quest of this place not done yet within my levels (`Q.InRange`; all levels: any the filters
 show), then the quests without a chain, then a **"Completed (N)"** row for the chains with every quest
 for me done (folded at first, a click opens it: their cards under it), and when the level filter left
@@ -886,9 +916,9 @@ quests known here yet." or "Nothing to show with these filters.". A row clicked 
 map, which stays).
 
 An opened chain's briefing: its colour and name, "Level 1-10 · 9 quests · 1 steps elsewhere", "2 of 9
-steps done" with a bar, what's next; **Steps**: every step shown (the filters'), a row each, "3. [12]
-Title" in its status's colour, a tick when done, at its right the giver for one I can take or have, else
-its reason; at most 60 ("... and N more"); **Friends** ("Anna 3 of 9") when any. A row clicked picks it
+steps done" with a bar, what's next; **Steps**: every step shown (the filters'), a row each, "[12] Title"
+in its status's colour, a tick when done, its badge "3/9", at its right the giver for one I can take or
+have, else its reason; at most 60 ("... and N more"); **Friends** ("Anna 3 of 9") when any. A row clicked picks it
 (the chain stays).
 
 **Lighting the other side.** Hovering a chain's card (the mouse, or the controller's cursor: its focus runs
@@ -952,8 +982,8 @@ quest in the small window, `Q.ShowQuest`).
 
 ### A chain opened
 
-Its head: "< Elwynn Forest" (back to the zone's page), the chain's colour, its name, "3 of 7 steps done"
-and a bar, what's next. An opened chain shows **every level** of its steps (cutting steps out would break
+Its head: the chain's colour, its name, "3 of 7 steps done" and a bar, what's next (the way back to the
+zone's map is the switch's Map above it, which stays where it was). An opened chain shows **every level** of its steps (cutting steps out would break
 it): only what isn't for me is left out, with its filter off (a skipped one stays). The page is a canvas
 of its own (below) with the chain's quests as **cards** (170
 x 48, Buttons) from top to bottom, **a row per stage** (a quest's stage: one more than the latest of what
@@ -1026,7 +1056,8 @@ too low), Blocked (needs something first), Completed (folded at first; the skipp
 don't have), each with how many; then, when the level filter left some out, a quiet line "5 more outside
 your levels · Show all levels" (a click turns the filter on). A row: the start's icon, "[12] title" (level
 coloured, title in its status's colour), at the right the giver, or for a blocked, later or not-for-me one
-its reason ("Needs Investigate Echo Ridge", "Needs level 7", "Not for your faction"). A click picks the
+its reason ("Needs Investigate Echo Ridge", "Needs level 7", "Not for your faction"), left of it a quest of
+a chain's badge ("5/9": a click opens the chain on the Zone tab). A click elsewhere on the row picks the
 quest (the details); a link there keeps the quest list.
 
 ### Views other files add
@@ -1076,7 +1107,7 @@ quest list). The search and the counts aren't filtered.
 
 ### Going to a quest, the search
 
-**Going to a quest** (a link, a search result, a stub, `Q.OpenBrowser(id)`): it stays in the place shown
+**Going to a quest** (a link, a search result, a stub, a chain badge, `Q.OpenBrowser(id)`, `Q.OpenChain(id)`): it stays in the place shown
 if that place lists it (its own quests and those given there), else goes to the quest's zone if that
 zone lists it, else its dungeon, else its zone. Its continent unfolds, the left list scrolls to the place
 when it changed, and on the Zone tab its zone's map shows it picked (a dungeon: its list; a stub, or a
@@ -1111,7 +1142,10 @@ drawn and for the cards near sight when they're filled. The quest picked's areas
 (`Q.Objectives`, Data.lua's cache) when it's picked or the map is drawn. The lists (left, quest list,
 results) are pools of the rows in sight plus 2 above and below; entry i always has row `(i - 1) % pool + 1`;
 the briefing's rows and cards, the details' lines and reward buttons are pools too (a zone has tens of
-chains; a chain's briefing at most 60 steps). Hovering only sets alphas and line widths. While it's open it
+chains; a chain's briefing at most 60 steps), each row's chain badge with it (its step from `Q.ChainFor`,
+which the engine keeps until my progress changes). The switch is set when the middle is drawn and when a
+quest is picked, from what's kept (the place's chains, `Chains.Info`): nothing is worked out for it.
+Hovering only sets alphas and line widths. While it's open it
 listens to `QUEST_TURNED_IN`, `QUEST_ACCEPTED`, `QUEST_REMOVED`, `PLAYER_LEVEL_UP`, `QUEST_DATA_LOAD_RESULT` (a
 title asked for with `C_QuestLog.RequestLoadQuestByID`, once per quest a session, came),
 `ITEM_DATA_LOAD_RESULT` (a reward asked for came), `QUEST_LOG_UPDATE` and `ZONE_CHANGED_NEW_AREA` (looked at
@@ -1130,9 +1164,9 @@ Our frames only; nothing protected, so it opens in a fight and in gamepad mode. 
 list of quests is `LT.Window.PopupList`, ours), no Blizzard panel opened (not the world map either: the
 zone map is our own frame with `LT.MapArt`'s textures; no data provider, no pins on `WorldMapFrame`; the
 map pin is `C_Map.SetUserWaypoint`). `GameTooltip:SetItemByID` on our own buttons. Every card, chain card,
-pin, objective area, the map's -, + and Fit, list row, the briefing's rows, the details' lines, steps,
-objectives and rewards, tab, filter, zoom button, link, place line, the ways back, Map pin, Companion and
-the suggestion are plain Buttons, so SmartNavigation finds them as the panel's descendants (its focus runs
+pin, objective area, the map's -, + and Fit, list row, the briefing's rows, every chain badge, the details'
+lines, steps, objectives and rewards, tab, the switch's two halves, filter, zoom button, link, place line,
+the ways back, Map pin, Companion and the suggestion are plain Buttons, so SmartNavigation finds them as the panel's descendants (its focus runs
 OnEnter: the tooltips show, a chain's card or a pin lights the other side, an objective's line its areas,
 as with the mouse). The briefing and the details are ScrollFrames (SmartNavigation scrolls them); the
 chain's canvas and the map aren't (SmartNavigation only scrolls those up and down, and only takes their
@@ -1149,7 +1183,11 @@ iterations' `Q.ZoneCount`, `Q.ChainStep`, `Q.LevelColor`, `Q.Races`, `Q.ZoneGive
 `Q.Rewards` (the shared contract's shapes: Data.lua makes them in parallel), the small window), put back at
 the end; it also checks the window without `Q.ZoneCount`, `Q.ChainStep`, `Q.LevelColor`, `Q.Objectives`
 and `Q.Rewards`, the size for four screens, and registers views of its own (removed at its end); the mock's
-map pin API and `GameTooltip:SetItemByID` are made for it and put back.
+map pin API and `GameTooltip:SetItemByID` are made for it and put back. The switch (its spot, greyed with
+its reason, one click each way, the label following the quest picked, the chain left kept, a dungeon's
+Quests, cut short beside the way back to the results, nothing worked out for it) and the chain badges (the
+quest list's, the right pane's, a step's on its chain, a step elsewhere, the rows' tooltips, a row's own
+click unchanged, `Q.OpenChain`) have sections of their own.
 
 ### Open questions (in game)
 
@@ -1181,7 +1219,8 @@ tabs: `myquests` "My quests", `levelpath` "Level path" (a window that kept the t
 builds before opens on the zone page: the window's own rule for a tab it doesn't know). A view is built
 by the window when its tab is first shown (`Q.BuildView(key, parent)` makes one; the tests use it),
 fills its parent, and lays itself out again when the parent's size changes. They jump with
-`Q.OpenBrowser(id)` (a quest: its zone, picked, its objectives on the map) and `Q.SelectZone(map)` (a
+`Q.OpenBrowser(id)` (a quest: its zone, picked, its objectives on the map), `Q.OpenChain(id)` (a chain
+badge: the quest's chain, its card in sight; without it `Q.OpenBrowser`) and `Q.SelectZone(map)` (a
 zone; without it the zone's first quest).
 
 Each view: a bar on top (a headline and chips), the list on a darker panel (a scroll frame of ours; only
@@ -1219,7 +1258,7 @@ per step):
 - A group's heading: its name in gold, "(3)" and the rest in grey, a thin gold rule.
 - **A quest** (one line, 24 px, a Button): its verb icon (`QuestTurnin` when ready, else
   `SideInProgressquesticon`), "[12] Title" (the level in its difficulty colour, `Q.LevelTitle`), its
-  chain's "2/4" (`Q.ChainFor`, in progress gold), its first objective not done with its progress
+  chain's "2/4" (`Q.ChainFor`, in progress gold: a badge, below), its first objective not done with its progress
   ("2/10 Defias Looter", from `Q.LogObjectives`: the client's numbers and the name without its count),
   how far its area is when it's in my zone (" · 170 yd N"), or "Ready to turn in" in green; at the right
   the turn-in's icon and name, with its zone when it isn't the quest's own (or, ready, isn't mine), and
@@ -1230,10 +1269,14 @@ per step):
   the turn-in.
 - Its tooltip: "[12] Title", ready or "In your quest log", its zone, "Step 2 of 5 · <chain>", every
   objective from the quest log (done ones ticked, grey; an item's "(from Oat Sack, 100%)": the data's
-  likeliest source), "Turn in: <name>, <zone>", "Click: open it in the quest browser", "Right-click: map
-  pin at <the objective, or the turn-in's name>".
+  likeliest source), "Turn in: <name>, <zone>", "Click: open it in the quest browser", "Click 2/5: open
+  the chain" (with a badge), "Right-click: map pin at <the objective, or the turn-in's name>".
 - A click: `Q.OpenBrowser(id)` (its zone, the quest picked, its objectives on the map: the big window's).
   A right-click: the game's map pin there (`Q.Waypoint`; Shift: its link in chat too).
+- **Its badge** ("2/5", a Button of its own on the row, a faint gold pill lit when hovered; its tooltip
+  the chain's name, "Step 2 of 5", "Click: open the chain"): a click opens the quest's chain in the big
+  window, the quest picked, its card in sight (`Q.OpenChain(id)`; without it `Q.OpenBrowser`). The row's
+  own click stays as it is.
 - An empty log: "Your quest log is empty. The Zone tab has what you can pick up here."
 
 **Continue your storylines** (a heading, "started, the next step for your level" in grey): the chains I've
@@ -1241,9 +1284,10 @@ started (a step done or in my log, not all done) whose next step I can take now:
 (in `Q.Chain`'s order) that's "available" and `Q.InRange` (so a step too high or one that needs the step
 in my log isn't listed). Its giver in my zone first, then the lowest level, then the chain's title; at
 most 8. A line: the `QuestNormal` "!", "<chain> - next: [13] <title>, <giver> (<zone>)" (the chain's name
-gold), "1/2" (its steps done) at the right. Its tooltip: the chain, "1 of 2 steps done", "Next: ...",
-"From <giver>, <zone>", the clicks. A click: `Q.OpenBrowser` on that step; a right-click: the map pin at
-its giver (nearest me). It comes from the counts (below): while they're made, "Looking through your
+gold), "1/2" (its steps done) at the right, a badge as the quests' (its tooltip: the chain, "1 of 2 steps
+done", "Click: open the chain"; a click: `Q.OpenChain` on that step). Its tooltip: the chain, "1 of 2 steps
+done", "Next: ...", "From <giver>, <zone>", the clicks. A click: `Q.OpenBrowser` on that step; a
+right-click: the map pin at its giver (nearest me). It comes from the counts (below): while they're made, "Looking through your
 storylines..." (the log above shows at once); none: "No storyline you've started has a next step for
 your level now."
 
@@ -1287,18 +1331,19 @@ Hidden: no events, no OnUpdate.
 ### Controller and taint
 
 Our own frames only, nothing protected (it works in a fight), no Blizzard menu. Every quest and storyline
-row, zone row, chip (the level path's toggle too) and the empty state's button is a Button, so
+row, its chain badge, zone row, chip (the level path's toggle too) and the empty state's button is a Button, so
 SmartNavigation reaches them (its focus runs OnEnter: the tooltips; a right-click is the map pin, the
 same as the window's "Map pin" for a controller); the group headings and notes are plain frames it
 skips; the lists are scroll frames (it scrolls them); nothing of Blizzard's is set on our frames.
 
 Tests: `tests/lodestar_views.lua` (the real Data.lua and Engine.lua through `Q.SetTestData`; the
-registry is a stand-in that records, the real one put back after; `Q.OpenBrowser`, `Q.SelectZone` and
-`Q.Waypoint` record; `Q.Objectives` and `Q.InRange` are stand-ins with the contract's meaning, the data
+registry is a stand-in that records, the real one put back after; `Q.OpenBrowser`, `Q.OpenChain`,
+`Q.SelectZone` and `Q.Waypoint` record; `Q.Objectives` and `Q.InRange` are stand-ins with the contract's meaning, the data
 part's own tests check theirs): `Q.LogObjectives` (the name without its count in the game's and a German
 client's format, the numbers from the text, the data's objective by kind and by name) and
 `Q.ObjectiveSpot`; My quests (the log at once while the storylines are counted, the groups and their
-order, a line's columns and tooltip, a click and right-click, Continue and what it leaves out, the three
+order, a line's columns and tooltip, a click and right-click, the chain badges (theirs and the rows'
+tooltips, a click: `Q.OpenChain`), Continue and what it leaves out, the three
 sorts kept, the storylines' old settings, events, walking, turning in, an empty log); the level path;
 hidden and shown again; a full log and 300 storylines with only the rows in sight; no data, the
 controller, a fight.
