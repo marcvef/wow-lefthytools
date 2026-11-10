@@ -115,8 +115,12 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Echoes/Store.lua         the closed pages: packing, what's kept, the API for the delivery, the exporter's receipt, /lefthy echoes
   Modules/Echoes/Pages.lua         the open page: starting, joining, closing, going on after a /reload
   Modules/Echoes/Delivery.lua      pages from friends to the collector through Beacon: messages, pulling, relaying, what's safe, the budget
+  Modules/Questtree/Data.lua       Questtree's quest data (LefthyTools_QuestData, loaded when a window opens): quests, zones, search, learned data
+  Modules/Questtree/Engine.lua     Questtree's engine: a quest's status for me or a friend, what's missing, its chain, what's next
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
+LefthyTools_QuestData/       Questtree's quest chains, givers and places (CMaNGOS Classic DB, EG Link's Forever data), an add-on of its own (load on demand), GPL v3
+  QuestData.lua              generated (tools/update-quest-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
@@ -127,6 +131,7 @@ tools/update-retail-frames.js    regenerates Data/RetailUnitFrames.lua from wago
 tools/update-recipes.js          regenerates Data/Recipes.lua from wago.tools (node)
 tools/wago.js                    shared by the five node tools above: latest Forever build, tables (CSV, --cache, a locale), arguments
 tools/update-drop-data.js    regenerates LefthyTools_DropData/Drops.lua from a classic world DB dump (node)
+tools/update-quest-data.js   regenerates LefthyTools_QuestData/QuestData.lua: the classic dump, EG Link, Forever's client tables (node)
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
 Update-LefthyTools.cmd       players' one-file installer: batch header + install.ps1 (generated)
@@ -195,7 +200,7 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
   what was left out is listed ("Not searched: ..."). The registry's WoW path isn't used (on some
   PCs it belongs to another launcher). In each folder it replaces `Interface\AddOns\LefthyTools`
   (settings live in `WTF`, untouched) and the add-ons that come with it (`$Companions`: folders
-  next to `LefthyTools/` in the repo, `LefthyTools_DropData`; checked the same way, not stamped
+  next to `LefthyTools/` in the repo, `LefthyTools_DropData` and `LefthyTools_QuestData`; checked the same way, not stamped
   with a version; a new one means "restart the game"), removes the old standalone `Mirage` addon,
   and skips the install if that exact version is already there and nothing is missing (`-Force`
   reinstalls). "/reload" or "restart the game" is said once at the end, a restart if any folder

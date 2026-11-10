@@ -1,0 +1,303 @@
+-- Questtree's data and engine (Modules/Questtree/Data.lua, Engine.lua; docs/questtree.md): the quest
+-- data add-on loaded only when asked, once; the real generated data (LefthyTools_QuestData/QuestData.lua)
+-- through the accessors: quests, givers and their places, zones, dungeons, search; real chains (Elwynn
+-- Forest's Northshire, Westfall's Defias Brotherhood, a Forever chain); where a quest stands with a
+-- made-up progress (done, in the log, locked, too low, not for me), what's missing across zones,
+-- exclusive groups, what's next; learned data filling gaps only; the test hook Q.SetTestData.
+-- Needs: no other file.
+
+local suite = ...
+local check, section, ns = suite.check, suite.section, suite.ns
+local Q = ns.Questtree
+
+local function has(list, v)
+	for _, x in ipairs(list or {}) do if x == v then return true end end
+	return false
+end
+local function at(list, v)
+	for i, x in ipairs(list or {}) do if x == v then return i end end
+end
+
+-- My progress, the game's way: completed quests and the quest log (the mock's QUESTS).
+local completed = {}
+C_QuestLog.GetAllCompletedQuestIDs = function()
+	local list = {}
+	for id in pairs(completed) do list[#list + 1] = id end
+	return list
+end
+local savedQuests, savedLevel, savedMap = QUESTS, PLAYER_LEVEL, PLAYER_MAP
+QUESTS, PLAYER_LEVEL, PLAYER_MAP = {}, 1, 1429
+local function login(list) -- the server's completed quests, read again after a loading screen
+	completed = {}
+	for _, id in ipairs(list or {}) do completed[id] = true end
+	Fire("PLAYER_ENTERING_WORLD", false, false)
+end
+local function inLog(list)
+	QUESTS = {}
+	for _, id in ipairs(list) do QUESTS[#QUESTS + 1] = { id = id, title = "Quest " .. id, objectives = {} } end
+	Fire("QUEST_ACCEPTED", list[#list])
+end
+
+section("Questtree data: loaded only when asked")
+do
+	check(type(Q) == "table" and Q.Load and Q.Quest and Q.Status and Q.SetTestData, "the data and engine are there")
+	check(LefthyToolsQuestData == nil, "nothing loaded at login")
+	check(Q.Quest(176) == nil and #Q.Zones() == 0 and #Q.Search("hogger") == 0 and Q.Status(176) == nil and #Q.Next() == 0,
+		"without data: no quests, zones, search hits, status or next steps")
+	check(Q.HasData() == false and Q.DataProblem() == nil, "not there yet (the mock has no add-on list), nothing tried")
+
+	-- Learned before the data is there: it waits.
+	Q.AddLearned(176, { title = "Learned Hogger", starts = { { kind = "npc", id = 999990, name = "Not The Poster" } } })
+	Q.AddLearned(999001, { title = "A Learned Quest", level = 7, zone = 1429, pre = { 783 },
+		starts = { { kind = "npc", id = 999991, name = "Learned Giver", points = { { map = 1429, x = 0.5, y = 0.5 } } } } })
+
+	-- The add-on missing: asked once, the reason kept.
+	local loads, loader = {}, C_AddOns.LoadAddOn
+	C_AddOns.LoadAddOn = function(name) loads[#loads + 1] = name; return false, "MISSING" end
+	check(Q.Load() == false and Q.DataProblem() == "MISSING" and loads[1] == "LefthyTools_QuestData", "missing: Load says no, and why")
+	check(Q.Load() == false and #loads == 1 and Q.HasData() == false, "asked only once")
+
+	-- There: the real data.
+	C_AddOns.LoadAddOn = function(name)
+		loads[#loads + 1] = name
+		assert(loadfile("LefthyTools_QuestData/QuestData.lua"))()
+		return true
+	end
+	check(Q.Load() == false and #loads == 1, "still not asked again")
+	assert(loadfile("LefthyTools_QuestData/QuestData.lua"))() -- (the add-on loaded by someone else meanwhile)
+	check(Q.HasData() == true and Q.Load() == true and Q.DataProblem() == nil, "loaded since: taken")
+	check(Q.Load() == true and #loads == 1, "loaded once")
+	C_AddOns.LoadAddOn = loader
+	local info = Q.DataInfo()
+	check(info and info.quests > 5000 and info.build:match("^1%.60%.") and info.source:find("CMaNGOS", 1, true)
+		and info.source:find("EG Link", 1, true), "the data says what it is: " .. tostring(info and info.quests) .. " quests, " .. tostring(info and info.build))
+end
+
+section("Questtree data: quests, givers, places")
+do
+	local hogger = Q.Quest(176)
+	check(hogger and hogger.title == 'Wanted:  "Hogger"' and hogger.level == 11 and hogger.minLevel == 5 and hogger.zone == 1429
+		and hogger.zoneName == "Elwynn Forest" and hogger.faction == "Alliance" and hogger.source == "classic" and not hogger.new,
+		"Wanted: Hogger: its title, levels, zone, faction (learned title not taken)")
+	check(hogger.races == 77 and hogger.classes == nil and hogger.repeatable == false, "races as a mask (the Alliance's), no class")
+	local poster = hogger.starts[1]
+	check(#hogger.starts == 2 and poster.kind == "object" and poster.name and #hogger.ends == 1, "given by the wanted posters (objects), the learned giver not added")
+	local dughan = hogger.ends[1]
+	local p = dughan.points[1]
+	check(dughan.kind == "npc" and dughan.id == 240 and dughan.name == "Marshal Dughan" and p and p.map == 1429
+		and suite.near(p.x, 0.421, 0.002) and suite.near(p.y, 0.659, 0.002), "taken by Marshal Dughan in Goldshire, 42.1, 65.9")
+	check(Q.Quest(54).ends[1] == dughan, "a giver's table is shared by its quests")
+	check(Q.Quest(166).dungeon == "Deadmines" and Q.Quest(166).zone == nil and Q.Quest(166).zoneName == "Deadmines", "a dungeon quest: its dungeon, no zone")
+	local warrior = Q.Quest(1638)
+	check(warrior.classes == 1 and warrior.sort == "Warrior" and has(warrior.excl, 1679) and has(warrior.excl, 1684), "a class quest: the class, its sort, the exclusive ones")
+	check(Q.Quest(1097).breadcrumbFor == 353 and has(Q.Quest(1097).opens, 353), "a breadcrumb leads to its quest")
+	check(Q.Quest(784).faction == "Horde", "a Horde quest")
+	local new = Q.Quest(91743)
+	check(new and new.new and new.source == "forever" and new.title == "Rascally Rodents" and new.zone == 1429,
+		"a quest new in WoW: Forever, from its own data")
+	check(Q.Quest(999999999) == nil and Q.Quest("x") == nil, "unknown: nil")
+
+	-- Where zones' rectangles overlap the game's map decides: Farmer Saldean stands where Westfall's
+	-- and Elwynn Forest's rectangles overlap.
+	local mapAt = C_Map.GetMapInfoAtPosition
+	local asked
+	C_Map.GetMapInfoAtPosition = function(map, x, y) asked = { map, x, y }; return C_Map.GetMapInfo(1429) end
+	local saldean = Q.Quest(9).starts[1]
+	C_Map.GetMapInfoAtPosition = mapAt
+	check(saldean.id == 233 and saldean.points[1].map == 1429 and suite.near(saldean.points[1].x, 0.138, 0.002) and asked and asked[1] == 1415,
+		"an overlap: the zone the game's continent map has there")
+	check(Q.Quest(64).starts[1].points[1].map == 1436, "without the game's word: the tool's guess (Westfall)")
+end
+
+section("Questtree data: zones, dungeons, search")
+do
+	local zones = Q.Zones()
+	local elwynn
+	for i, z in ipairs(zones) do
+		if z.map == 1429 then elwynn = z end
+		local nextZone = zones[i + 1]
+		if nextZone and (nextZone.continent < z.continent or (nextZone.continent == z.continent and nextZone.minLevel < z.minLevel)) then
+			elwynn = false
+			break
+		end
+	end
+	check(#zones > 40 and elwynn and elwynn.name == "Elwynn Forest" and elwynn.continent == 1415 and elwynn.count > 100
+		and elwynn.minLevel >= 1 and elwynn.maxLevel <= 15, "zones by continent, then level; Elwynn Forest with its quests")
+	local list = Q.ZoneQuests(1429)
+	check(#list == elwynn.count and has(list, 176) and has(list, 999001), "a zone's quests (with a learned one)")
+	local sorted = true
+	for i = 2, #list do
+		local a, b = Q.Quest(list[i - 1]), Q.Quest(list[i])
+		if (a.level or a.minLevel or 0) > (b.level or b.minLevel or 0) then sorted = false end
+	end
+	check(sorted, "the lowest level first")
+	local deadmines
+	for _, d in ipairs(Q.Dungeons()) do if d.name == "Deadmines" then deadmines = d end end
+	check(deadmines and deadmines.count >= 5 and has(Q.DungeonQuests("Deadmines"), 166) and deadmines.minLevel >= 15,
+		"dungeons: the Deadmines with its quests")
+	local hits = Q.Search("hogger")
+	check(hits[1] == 176 or (has(hits, 176) and at(hits, 176) <= 3), "search: by title")
+	check(has(Q.Search("Marshal Dughan"), 54) and has(Q.Search("  DUGHAN "), 176), "search: by giver or ender, any case")
+	check(#Q.Search("") == 0 and #Q.Search("zzqqxx") == 0, "nothing for nothing")
+end
+
+section("Questtree engine: Northshire with a made-up progress")
+do
+	login({})
+	PLAYER_LEVEL = 1
+	Fire("PLAYER_LEVEL_UP", 1)
+	check(Q.Status(783) == "available" and Q.Status(7) == "locked" and Q.Status(54) == "locked", "a new character: the first quest available, the next ones locked")
+	local missing = Q.Missing(54)
+	local ids = {}
+	for i, m in ipairs(missing) do ids[i] = m.id end
+	check(table.concat(ids, ",") == "783,7,15,21" and missing[1].status == "available" and missing[1].reason == "done"
+		and missing[4].status == "locked", "missing before Report to Goldshire: the whole chain, the first to do first")
+	local chain = Q.Chain(54)
+	check(at(chain, 783) < at(chain, 7) and at(chain, 7) < at(chain, 15) and at(chain, 15) < at(chain, 21) and at(chain, 21) < at(chain, 54),
+		"its chain in order")
+	check(Q.Chain(15) == chain, "the same chain for each of its quests")
+
+	inLog({ 783 })
+	check(Q.Status(783) == "active", "taken: in the log")
+	Fire("QUEST_TURNED_IN", 783, 40, 0)
+	QUESTS = {}
+	Fire("QUEST_REMOVED", 783)
+	check(Q.Status(783) == "done" and Q.Status(7) == "available" and Q.Status(5261) == "available", "turned in: done (before the server's list has it), the next ones open")
+	check(Q.Status(18) == "level", "too low for one of them")
+	local nxt = Q.Next()
+	check(has(nxt, 7) and has(nxt, 5261) and not has(nxt, 18) and not has(nxt, 783), "next up: what it leads to, not what's too low or done")
+	check(Q.Opens(783) == Q.Quest(783).opens and has(Q.Opens(783), 7), "what it opens")
+
+	PLAYER_LEVEL = 4
+	Fire("PLAYER_LEVEL_UP", 4)
+	check(Q.Status(18) == "available" and has(Q.Next(), 18), "a level up: it's there")
+	local reads, get = 0, C_QuestLog.GetAllCompletedQuestIDs
+	C_QuestLog.GetAllCompletedQuestIDs = function() reads = reads + 1; return get() end
+	login({ 783, 7 })
+	check(Q.Status(7) == "done" and Q.Status(15) == "available" and #Q.Missing(15) == 0, "after a loading screen: the server's list")
+	for _ = 1, 50 do Q.Status(15); Q.Status(21); Q.Next() end
+	Fire("QUEST_TURNED_IN", 15, 0, 0)
+	check(Q.Status(15) == "done" and Q.Status(21) == "available" and reads == 1, "the list read once, a quest turned in added to it")
+	C_QuestLog.GetAllCompletedQuestIDs = get
+	-- In my zone first.
+	PLAYER_MAP = 1436
+	local westfallFirst = Q.Next()
+	PLAYER_MAP = 1429
+	check(Q.Quest(Q.Next()[1]).zone == 1429 and #westfallFirst == #Q.Next(), "next: my zone's first")
+end
+
+section("Questtree engine: not for me, exclusive, across zones, a Forever chain")
+do
+	PLAYER_LEVEL = 19
+	Fire("PLAYER_LEVEL_UP", 19)
+	login({})
+	check(Q.Status(784) == "other", "a Horde quest: not for me")
+	check(Q.Status(1638) == "other", "a warrior's quest for a rogue: not for me")
+	check(Q.Quest(2205).classes == 8 and Q.Status(2205) ~= "other", "a rogue's quest: for me")
+	local friend = { name = "Anna", classFile = "WARRIOR", race = 1, faction = "Alliance", level = 10, done = {}, active = {} }
+	check(Q.Status(1638, friend) == "available", "for a warrior friend: available")
+	friend.done[1679] = true
+	check(Q.Status(1638, friend) == "other", "an exclusive one done: closed")
+	friend.done, friend.active = {}, { [1684] = true }
+	check(Q.Status(1638, friend) == "other", "an exclusive one taken: closed too")
+	friend.active = {}
+	check(Q.Status(1638, { classFile = "WARRIOR", faction = "Horde", level = 10 }) == "other", "a Horde friend: not theirs")
+
+	-- Across zones: Dead-tooth Jack (Elwynn Forest) needs Marshal Haggard (Stormwind City) first.
+	local missing = Q.Missing(1667)
+	local last = missing[#missing]
+	check(last and last.id == 1666 and Q.Quest(1666).zone == 1453 and Q.Quest(1667).zone == 1429, "missing: the one before it in another zone")
+
+	-- An "all of" group: A Warden of the Alliance needs both Children's Week quests.
+	local warden = Q.Quest(171)
+	check(#warden.pre == 2 and has(warden.pre, 558) and has(warden.pre, 4822), "an all-of group: both needed")
+	friend.done = { [558] = true }
+	local ids = {}
+	for i, m in ipairs(Q.Missing(171, friend)) do ids[i] = m.id end
+	check(table.concat(ids, ",") == "4822", "one done: the other missing")
+
+	-- One of several: the Burning Blade Medallion needs one of two.
+	local medallion = Q.Quest(794)
+	check(#medallion.preAny == 2 and has(medallion.preAny, 1499) and #medallion.pre == 0, "one of two needed")
+	local orc = { name = "Grunt", classFile = "WARRIOR", race = 2, faction = "Horde", level = 5, done = {}, active = {} }
+	local need = Q.Missing(794, orc)
+	check(Q.Status(794, orc) == "locked" and #need >= 1 and need[#need].reason == "any" and has(medallion.preAny, need[#need].id),
+		"none done: locked, the best of them missing")
+	orc.done[1499] = true
+	check(Q.Status(794, orc) == "available" and #Q.Missing(794, orc) == 0, "one done: available")
+
+	-- Forever's own chain in Elwynn Forest (a book that drops starts it).
+	local chain = Q.Chain(91777)
+	check(at(chain, 91743) and at(chain, 91743) < at(chain, 91745) and at(chain, 91752) < at(chain, 91758) and at(chain, 91775) < at(chain, 91777),
+		"Forever's kobold chain, in order")
+	local walk = Q.Missing(91777)
+	check(#walk == 7 and walk[1].id == 91741 and walk[2].id == 91743 and walk[7].id == 91775,
+		"missing before its last quest: seven, from the book that starts it")
+
+	-- Friends' progress (Learn.lua's Q.friends).
+	Q.friends = { a = friend, b = { name = "Bob", classFile = "MAGE", race = 7, faction = "Alliance", done = { [176] = true } } }
+	local friends = Q.Friends(176)
+	check(#friends == 2 and friends[1].name == "Anna" and friends[2].status == "done", "friends' status of a quest")
+	Q.friends = nil
+	check(#Q.Friends(176) == 0, "no friends known: none")
+end
+
+section("Questtree data: learned data fills gaps")
+do
+	local learned = Q.Quest(999001)
+	check(learned and learned.source == "learned" and learned.title == "A Learned Quest" and has(learned.pre, 783)
+		and has(Q.Quest(783).opens, 999001) and learned.starts[1].points[1].map == 1429, "learned before the load: applied, what it needs leads to it")
+	check(Q.Quest(176).title == 'Wanted:  "Hogger"', "classic's title stays")
+
+	local changed = 0
+	Q.OnDataChanged(function() changed = changed + 1 end)
+	-- A classic quest's giver without a place gets one; its own lists stay.
+	local orphanQuest = Q.Quest(558)
+	local orphan = orphanQuest.starts[1]
+	check(orphan and #orphan.points == 0, "the Human Orphan: no place in the data (an event's)")
+	Q.AddLearned(558, { level = 1, pre = { 1 }, starts = { { kind = "npc", id = orphan.id, points = { { map = 1453, x = 0.6, y = 0.7 } } },
+		{ kind = "npc", id = 999992, name = "Someone Else" } } })
+	check(orphan.points[1] and orphan.points[1].map == 1453 and #orphanQuest.starts == 1 and orphanQuest.level == 60
+		and #orphanQuest.pre == 0, "classic: the place filled; no new giver, level and needs kept")
+	-- Forever's quest: new givers and needs add up.
+	local rodents = Q.Quest(91745)
+	local starts = #rodents.starts
+	Q.AddLearned(91745, { pre = { 91741 }, starts = { { kind = "npc", id = 999993, name = "Learned Kobold Expert" } }, title = "Other Title" })
+	check(#rodents.starts == starts + 1 and has(rodents.pre, 91741) and has(rodents.pre, 91743) and rodents.title == "Mining Consultant",
+		"Forever's: a giver and a need added, the title kept")
+	check(has(Q.Search("kobold expert"), 91745), "search finds what's learned")
+	check(changed == 0, "the windows hear of it on the next frame")
+	Advance(1)
+	check(changed == 1, "once for both")
+	Q.AddLearned(999002, { title = "Somewhere New", zone = 1436, level = 12 })
+	check(has(Q.ZoneQuests(1436), 999002) and Q.Quest(999002).zoneName == "Westfall", "a learned quest in a zone: listed there")
+	Advance(1)
+end
+
+section("Questtree data: the test hook")
+do
+	local heard = 0
+	Q.OnDataChanged(function() heard = heard + 1 end)
+	Q.SetTestData({
+		{ id = 1, title = "First", level = 2, minLevel = 1, zone = 1429, starts = { { kind = "npc", id = 1, name = "Giver", points = { { map = 1429, x = 0.5, y = 0.5 } } } } },
+		{ id = 2, title = "Second", level = 4, minLevel = 2, zone = 1429, pre = { 1 } },
+		{ id = 3, title = "Elsewhere", level = 9, minLevel = 8, zone = 1436, preAny = { 1, 2 } },
+		{ id = 4, title = "Deep", level = 20, dungeon = "Deadmines", pre = { 3 } },
+	}, { { map = 1429, name = "Elwynn Forest", continent = 1415 }, { map = 1436, name = "Westfall", continent = 1415, minLevel = 10, maxLevel = 20 } })
+	check(heard >= 1, "the windows hear of it at once")
+	check(Q.Quest(176) == nil and Q.Quest(999001) == nil and Q.Quest(1).title == "First" and has(Q.Quest(1).opens, 2) and has(Q.Quest(1).opens, 3),
+		"the real data and learned ones gone; what's needed leads to it")
+	local zones = Q.Zones()
+	check(#zones == 2 and zones[1].map == 1429 and zones[1].minLevel == 2 and zones[1].maxLevel == 4 and zones[1].count == 2
+		and zones[2].minLevel == 10 and zones[2].count == 1, "zones: levels from the quests unless given")
+	check(#Q.Dungeons() == 1 and Q.DungeonQuests("Deadmines")[1] == 4 and Q.Quest(3).zoneName == "Westfall", "dungeons from the quests")
+	login({})
+	PLAYER_LEVEL = 5
+	Fire("PLAYER_LEVEL_UP", 5)
+	check(Q.Status(1) == "available" and Q.Status(2) == "locked" and Q.Status(3) == "locked", "status in the test data")
+	login({ 1 })
+	check(Q.Status(2) == "available" and Q.Status(3) == "level" and Q.Status(4) == "locked", "one of two is enough; too low")
+	check(#Q.Search("deep") == 1 and table.concat(Q.Chain(4), ",") == "1,2,3,4", "search and chain in it")
+end
+
+QUESTS, PLAYER_LEVEL, PLAYER_MAP = savedQuests, savedLevel, savedMap
