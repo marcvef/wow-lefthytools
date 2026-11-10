@@ -15,6 +15,8 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --                 (Q.ToggleSmall, Q.ShowQuest)
 --   Browser.lua   the big window (Q.ToggleBrowser, Q.OpenBrowser)
 --   Learn.lua     learning while playing (the setting learn)
+--   Dialog.lua    in the game's quest UI: a panel beside the quest dialog, chain steps on the quest
+--                 log's titles (settings dialog, logBadges)
 -- This file also puts Questtree's lines into NPC tooltips (setting tooltips) and lets the small
 -- window follow the quest you open in your quest log (setting followLog), both post-hooks only.
 -- docs/questtree.md has each part. Nothing runs while no window is open: no data, no events, no
@@ -30,6 +32,10 @@ local M = LT:NewModule("questtree", {
 		tooltips = true,  -- "Questtree: starts ..." in NPC tooltips
 		friends = true,   -- friends' progress (Beacon friends with LefthyTools; Learn.lua and QuestShare.lua)
 		learn = true,     -- learning givers, turn-ins and prerequisites while playing (Learn.lua reads it)
+		autoHide = true,  -- the companion hides itself when there's nothing to show, and comes back
+		collapsed = false, -- the companion is one line (its title bar's button)
+		dialog = true,    -- a panel beside the quest dialog: the chain, its steps, what it leads to (Dialog.lua)
+		logBadges = true, -- "2/4" on the quest log's titles, the chain in their tooltip, Alt-click (Dialog.lua)
 		small = {},       -- the small window: left, top, width, height (Small.lua)
 	},
 })
@@ -233,6 +239,120 @@ function Q.StepOf(id)
 			return i, #chain, Q.Title(chain[1])
 		end
 	end
+end
+
+-- A quest's chain as I can do it: Q.Chain without the quests that aren't for me (the quest itself
+-- stays), and where the quest is in it: list, at; nil when it's in no chain of two or more. These
+-- are the steps the windows number ("Part 2 of 4", the quest log's "2/4"). Kept per data and
+-- progress change.
+local chainFor, chainForKey = {}, nil
+
+function Q.ChainFor(id)
+	id = tonumber(id)
+	if not (id and Q.Chain) then
+		return nil
+	end
+	Q.StatusOf(id) -- (the engine reads my progress first: a change there moves Q.progressGen)
+	local key = tostring(Q.dataGen) .. ":" .. tostring(Q.progressGen)
+	if key ~= chainForKey then
+		chainFor, chainForKey = {}, key
+	end
+	local known = chainFor[id]
+	if known == nil then
+		known = false
+		local chain = Q.Chain(id)
+		if type(chain) == "table" and #chain >= 2 then
+			local list, at = {}, nil
+			for _, other in ipairs(chain) do
+				if other == id or Q.StatusOf(other) ~= "other" then
+					list[#list + 1] = other
+					if other == id then
+						at = #list
+					end
+				end
+			end
+			if at and #list >= 2 then
+				known = { list = list, at = at }
+			end
+		end
+		chainFor[id] = known
+	end
+	if known then
+		return known.list, known.at
+	end
+	return nil
+end
+
+-- The colours the research found players know (docs/questtree.md, Small window), as "|cff" codes:
+-- done green, in progress gold, locked grey (always with a word or an icon too), what closes orange.
+Q.COLOR = { done = "|cff5fba46", progress = "|cffd99b00", locked = "|cff737373", grey = "|cff9d9d9d",
+	light = "|cffbebebe", gold = "|cffffd200", closes = "|cffff8040" }
+
+-- Verb icons for a line: the game's own quest icons (atlases Forever has; else the gossip window's
+-- files): "available" (!), "repeatable", "trivial" (the grey !), "level" (the ! dimmed: later),
+-- "locked" (a lock), "turnin" (?), "progress" (in your log, not done), "done" (a tick), "here".
+local ICONS = {
+	available = { "QuestNormal", "Interface\\GossipFrame\\AvailableQuestIcon" },
+	repeatable = { "QuestDaily", "Interface\\GossipFrame\\DailyQuestIcon" },
+	trivial = { "TrivialQuests", "Interface\\GossipFrame\\AvailableQuestIcon" },
+	level = { "QuestNormal", "Interface\\GossipFrame\\AvailableQuestIcon", "150:150:150" },
+	locked = { "questlog-questtypeicon-lock", "Interface\\GossipFrame\\AvailableQuestIcon" },
+	turnin = { "QuestTurnin", "Interface\\GossipFrame\\ActiveQuestIcon" },
+	progress = { "SideInProgressquesticon", "Interface\\GossipFrame\\IncompleteQuestIcon" },
+	done = { "UI-QuestTracker-Tracker-Check", "Interface\\RaidFrame\\ReadyCheck-Ready" },
+	here = { nil, "Interface\\ChatFrame\\ChatFrameExpandArrow" },
+}
+local iconMarkup = {}
+
+-- An icon's markup ("|A...|a" or "|T...|t"), size px (default 14); no space after it.
+function Q.Icon(kind, size)
+	size = size or 14
+	local key = tostring(kind) .. ":" .. size
+	local markup = iconMarkup[key]
+	if not markup then
+		local icon = ICONS[kind] or ICONS.available
+		local atlas = icon[1] and C_Texture and C_Texture.GetAtlasInfo and LT.Value(C_Texture.GetAtlasInfo, icon[1])
+		if atlas then
+			markup = ("|A:%s:%d:%d%s|a"):format(icon[1], size, size, icon[3] and (":0:0:" .. icon[3]) or "")
+		else
+			markup = ("|T%s:%d:%d|t"):format(icon[2], size, size)
+		end
+		iconMarkup[key] = markup
+	end
+	return markup
+end
+
+-- A quest's verb icon for me, by its status (in my log: ready to turn in or not).
+function Q.QuestIcon(id, status, size)
+	status = status or Q.StatusOf(id)
+	if status == "active" then
+		return Q.Icon(C_QuestLog and LT.Value(C_QuestLog.IsComplete, id) == true and "turnin" or "progress", size)
+	elseif status == "done" then
+		return Q.Icon("done", size)
+	elseif status == "available" then
+		local quest = Q.Quest and Q.Quest(id)
+		if quest and quest.repeatable then
+			return Q.Icon("repeatable", size)
+		end
+		return Q.Icon(Q.DifficultyKey(id, quest) == "trivial" and "trivial" or "available", size)
+	elseif status == "locked" then
+		return Q.Icon("locked", size)
+	end
+	return Q.Icon("level", size)
+end
+
+-- What taking a quest closes (its exclusive ones: only one of them can be done) that isn't done or
+-- closed already: a list of IDs.
+function Q.Closes(id)
+	local quest = Q.Quest and Q.Quest(id)
+	local list = {}
+	for _, other in ipairs(quest and quest.excl or {}) do
+		local status = Q.StatusOf(other)
+		if other ~= id and status ~= "done" and status ~= "other" then
+			list[#list + 1] = other
+		end
+	end
+	return list
 end
 
 ---------------------------------------------------------------------------
@@ -491,6 +611,15 @@ function M:BuildOptions(o)
 		L["The small window opens where you left it, at the size you gave it. Off: it opens at its usual place and size."])
 	o:Checkbox("followLog", L["Follow the quest log"],
 		L["While the small window is open, a quest you open in your quest log (or click in the objective tracker) becomes the one it shows as now."])
+	o:Checkbox("autoHide", L["The small window hides when there's nothing to do"],
+		L["With no quest in your log and nothing to pick up nearby, the companion hides itself, and comes back when you take a quest or reach a zone with quests for you. Closed by you, it stays closed."])
+	o:Checkbox("collapsed", L["The small window as one line"],
+		L["The companion shrinks to its title and one line: the quest you're on, its step and how far its turn-in is. The button in its title bar does the same."])
+	o:Header(L["In the game's quest UI"])
+	o:Checkbox("dialog", L["Beside the quest dialog"],
+		L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, every step, what it leads to, what taking it closes, friends who did it, and a button to open it in Questtree. Hidden when there's nothing to tell."])
+	o:Checkbox("logBadges", L["Chain steps in the quest log"],
+		L["Each quest of a chain gets its step (\"2/4\") at the end of its line in your quest log, and its tooltip shows the chain. Alt-click a quest there to open it in Questtree."])
 	o:Header(L["Tooltips"])
 	o:Checkbox("tooltips", L["Quest lines in NPC tooltips"],
 		L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Questtree: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."])
@@ -719,8 +848,15 @@ function Q.HookQuestLog()
 	end
 	logHooked = true
 	hooksecurefunc("QuestMapFrame_ShowQuestDetails", function(questID)
-		if M.enabled and M.db.followLog and Q.SmallFollow and type(questID) == "number" and not LT.IsSecret(questID) then
+		if not (M.enabled and type(questID) == "number") or LT.IsSecret(questID) then
+			return
+		end
+		if M.db.followLog and Q.SmallFollow then
 			LT.Guard("Questtree.log", Q.SmallFollow, questID)
+		end
+		-- Alt-click: Dialog.lua opens it in Questtree on the next frame, in its own code.
+		if Q.LogAltClick and IsAltKeyDown and IsAltKeyDown() then
+			LT.Guard("Questtree.logclick", Q.LogAltClick, questID)
 		end
 	end)
 end

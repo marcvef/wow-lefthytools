@@ -19,6 +19,7 @@ and takes it and where, and where each quest stands for you and your friends.
 | `Modules/Questtree/Browser.lua` | the big window: zones, chains as cards and lines, an overview, the zone map, details, filters, search |
 | `Modules/Questtree/Views.lua` | the big window's other views: storylines (every chain), the level path (where to go next), continents |
 | `Modules/Questtree/Learn.lua` | learning givers, enders and prerequisites while playing |
+| `Modules/Questtree/Dialog.lua` | in the game's quest UI: the panel beside the quest dialog, chain steps on the quest log's lines, Alt-click there |
 | `Modules/Beacon/QuestShare.lua` | friends' progress and learned records over Beacon (`B2;q…`, from 0.7.0-70) |
 
 Every Questtree file starts with `local Q = ns.Questtree or {}; ns.Questtree = Q`, so the order they
@@ -274,10 +275,15 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 | `tooltips` | true | "Questtree: starts ..." lines in NPC tooltips (below); the data loads a few seconds after the loading screen for them |
 | `friends` | true | friends' progress in the windows (`Q.Friends`) |
 | `learn` | true | learning while playing (Learn.lua reads `M.db.learn`) |
-| `small` | `{}` | the small window's `left`, `top`, `width`, `height` (always kept; used while `keepPlace` is on) |
+| `autoHide` | true | the companion hides itself when it has nothing to show, and comes back (Small window) |
+| `collapsed` | false | the companion is one line (its title bar's button does the same) |
+| `dialog` | true | the panel beside the quest dialog (In the game's quest UI) |
+| `logBadges` | true | "2/4" on the quest log's lines, the chain in their tooltip, Alt-click to open one in Questtree |
+| `small` | `{}` | the small window's `left`, `top`, `width`, `height` (always kept; used while `keepPlace` is on; one line doesn't change the height kept) |
 
 The settings page: Open the small window, Open the quest browser (`Q.ToggleBrowser`, or a chat line
-when Browser.lua isn't there), the checkboxes under Window, Tooltips, Friends and Learning.
+when Browser.lua isn't there), the checkboxes under Window (with `autoHide` and `collapsed`), "In the
+game's quest UI" (`dialog`, `logBadges`), Tooltips, Friends and Learning.
 
 **Commands:** `/questtree` opens or closes the small window (on "Now"), `/questtree <name or ID>`
 shows a quest (a quest link works too), `/questtree browse` the quest browser, `/questtree settings`,
@@ -308,6 +314,20 @@ several match, chat says how many and which is shown.
   `Q.LevelCode(...)` (its `|cff` code), `Q.LevelTitle(id)` ("[12] Title" in it, as the quest log).
 - `Q.StepOf(id)` → step, total, chain name: Data.lua's `Q.ChainStep` when it's there, else the quest's
   place in `Q.Chain`.
+- `Q.ChainFor(id)` → list, at: the chain as I can do it (`Q.Chain` without the quests that are `"other"`
+  for me, the quest itself kept) and the quest's place in it; nil for none of two or more. What the
+  windows number ("step 3 of 7", "Part 2 of 4", the quest log's "2/4"). Kept per `Q.dataGen` and
+  `Q.progressGen` (the engine is asked first, so a change of progress it notices moves the key).
+- **The look** (the research's, checked against Forever's atlas list): `Q.COLOR` (`|cff` codes: done
+  `5fba46`, in progress `d99b00`, locked `737373`, grey, light grey, gold, what closes `ff8040`),
+  `Q.Icon(kind[, size])` (markup of the game's quest icons, 14 px by default, the atlas when the client
+  has it, else the gossip window's file: `available` `QuestNormal`, `repeatable` `QuestDaily`, `trivial`
+  `TrivialQuests`, `level` `QuestNormal` dimmed (`150:150:150`), `locked`
+  `questlog-questtypeicon-lock`, `turnin` `QuestTurnin`, `progress` `SideInProgressquesticon`, `done`
+  `UI-QuestTracker-Tracker-Check`, `here` the chat's arrow; made once per kind and size),
+  `Q.QuestIcon(id[, status, size])` (a quest's by my status: in my log ready `turnin`, else `progress`;
+  available: repeatable, trivial or not; locked; else `level`), `Q.Closes(id)` (its `excl` quests that
+  aren't done or closed: what taking it closes).
 - **Where I am**: `Q.PlayerAt(map)` (my spot 0..1, nil off it or in an instance), `Q.HereZone()` (my
   zone map, walked up from a city floor or cave, and my spot on it), `Q.Toward(map, fx, fy, x, y)`
   (yards from `C_Map.GetWorldPosFromMapPos`, and the compass direction), `Q.TowardText(...)`
@@ -341,13 +361,15 @@ object tooltips carry no ID (Questie's findings on Forever), so they get nothing
 It runs when a quest's details open in the quest log, and when a quest is clicked in the objective
 tracker (its click opens them). The hook only hands the ID to `Q.SmallFollow` (it becomes "Now",
 redrawn a moment later in our own code); nothing of the quest log's frames is touched or read.
-Not done, and why: a "Show in Questtree" button in the quest details (the quest log is part of
-`WorldMapFrame`: a button of ours in it becomes part of that panel for SmartNavigation, whose focus
-and confirm then run our scripts from Blizzard's code, the taint chain in forever-platform.md; a
-button over it parented to UIParent wouldn't be reachable with a controller), and Alt-click on a
-tracker line (the tracker has no free modifier: every left click opens the quest details, which
-the hook already follows, a right click opens Blizzard's menu; it would mean a hook on a method of
-the tracker's frame).
+With Alt held the same hook hands the ID to Dialog.lua's `Q.LogAltClick` (setting `logBadges`), which
+opens the quest in Questtree on the next frame (In the game's quest UI). Blizzard's own click is
+untouched: Alt is a modifier its title buttons don't use (Shift tracks or links, a right click opens its
+menu), so the details open as with any left click. Not done, and why: a "Show in Questtree" button in
+the quest details (the quest log is part of `WorldMapFrame`: a button of ours in it becomes part of that
+panel for SmartNavigation, whose focus and confirm then run our scripts from Blizzard's code, the taint
+chain in forever-platform.md; a button over it parented to UIParent wouldn't be reachable with a
+controller), and a tracker-only Alt-click (an Alt-click on a tracker line opens the details too, so
+the hook sees it the same way; nothing of the tracker is hooked).
 
 Never lags: nothing is loaded, registered or run at login, except the tooltips' one load a few
 seconds after it (setting `tooltips`); the windows load the data when they open.
@@ -398,6 +420,34 @@ The companion: it follows what you're doing without being asked. Two modes: **No
   - *Blocked*: `Q.Next()`'s locked ones with what each needs first ("needs <title>"), at most 3.
     What Now leads to is its "Next:", not listed again.
   None at all: "Nothing to pick up nearby. The quest browser has every zone."
+
+  **How a line looks** (the guides' step lists: this now, then those): a verb icon first (`Q.Icon`,
+  the game's own: `QuestTurnin` "?" for one ready to turn in, `SideInProgressquesticon` for one in
+  progress, `QuestNormal` "!" to pick up (`QuestDaily` repeatable, `TrivialQuests` grey for a low one),
+  the "!" dimmed for later, a lock for a blocked one). The first line of Pick up next is full size
+  (`GameFontHighlight`, a 16 px icon, the title in its difficulty colour): what to do now; the rest are
+  smaller (13 px) with only "[level]" in its colour and the title grey (`bebebe`). The second line also
+  says what a quest opens ("opens 3", `Q.Opens`; Available now and Coming up) and, in Available now, what
+  taking it closes ("closes <title>" in orange, `Q.Closes`: its exclusive quests, at most 2 named; the
+  tooltip: "Taking it closes: ... Only one of them can be done."). Section rules are the game's
+  `Options_HorizontalDivider` tinted gold (a gold line without the atlas). Done steps are ticked with
+  `UI-QuestTracker-Tracker-Check` in the research's green.
+
+**One line** (setting `collapsed`, or the button left of the close button in the title bar,
+`QuestLog-icon-shrink` / `QuestLog-icon-Expand`): the window shrinks to its title bar and a line
+(54 px high, its height fixed then; the scroll area, its inset, the grip and the bottom button hidden):
+the quest I'm on with its verb icon, "[18] Title · 3/7" (`Q.ChainFor`) and how far its turn-in is,
+else the first thing to pick up with how far its giver is, else "Nothing to pick up nearby."; a quest
+looked at: that quest. A click on the line (or the button again) shows the whole companion at the
+height kept in `small`. It follows the same events as the whole window.
+
+**Hiding itself** (setting `autoHide`): when a redraw after an event finds nothing to show (no quest
+I'm on, nothing in Pick up next), the companion hides; while hidden like that it listens only to
+`QUEST_ACCEPTED`, `SUPER_TRACKING_CHANGED`, `PLAYER_LEVEL_UP` and `ZONE_CHANGED_NEW_AREA` (rare), and
+0.3 s after one of them it opens again where it was if there's something now. Opened by me
+(`/questtree`, a quest shown) it never hides itself in that draw: "Nothing to pick up nearby" stays.
+Closed by me (Escape, its X, `/questtree`) it stays closed and listens to nothing. Switching the
+setting off while it's hidden brings it back.
 
 **A quest looked at**: at the top "« Back to now" or, after clicking from one quest to another,
 "« Back to <the quest before>" (up to 20 back) and "Back to now" side by side. Then its "[level]
@@ -466,6 +516,9 @@ radius] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPlayer(on
   or the zoom changes (or you've explored more); never touches `WorldMapFrame`.
 
 **Tests** (`tests/questtree_small.lua`): the module, settings and commands; difficulty colours;
+the lines' verb icons, the first full size and the rest grey, "opens 2", exclusive quests closing each
+other, one line (the button, the line's click, the setting), hiding itself and coming back and staying
+closed when I closed it, Alt-click in the quest log (through the hook);
 Now (why that quest, the chain, its bar and steps, objectives, turn-in, Next, the map and its
 markers) and Pick up next (each group, nearest first with distance and direction, the zone's count);
 following super tracking, the quest log's hook and its setting, accepting and turning in (the
@@ -478,6 +531,93 @@ without the data part's new calls; switched off; the small map alone (icons, one
 spot, the arrow, zoom). Data.lua's `Q.ChainStep`, `Q.Available`, `Q.LevelColor`, `Q.ZoneCount` and
 `Q.GiverQuests` get stand-ins only while they're missing; the mock's map pin API and the quest log's
 `QuestMapFrame_ShowQuestDetails` are made for it and put back at its end.
+
+## In the game's quest UI (Dialog.lua)
+
+Questtree where players already look: the quest dialog and the quest log. Built from established
+add-ons' ways (BtWQuests and QuestWeaver open from the quest log, Wowhead's numbered "Series" box with
+the current quest bold), with our own frames and post-hooks only.
+
+### Beside the quest dialog (setting `dialog`)
+
+When an NPC offers a quest (`QUEST_DETAIL`), asks for it (`QUEST_PROGRESS`), rewards it
+(`QUEST_COMPLETE`) or lists several (`QUEST_GREETING`), a panel of ours (`LefthyToolsQuesttreeDialog`,
+250 px wide, a dark background with a thin gold edge) sits right of `QuestFrame`, its top at the
+dialog's top:
+
+- **"Part 2 of 4 · <chain>"** (gold, `GameFontNormal`): the quest's place in `Q.ChainFor` and the
+  chain's first quest's title (the client's when it knows it).
+- **The steps**, numbered (at most 10 in sight, from three before this one, "... N before/more"):
+  done ones ticked green, this one bold (`GameFontHighlight`) with an arrow, the rest grey; each a
+  line that opens that quest in Questtree.
+- **Leads to: [7] Title** (one), or **Opens 3 quests:** with up to three of them (their verb icons)
+  and "and N more".
+- **Requires: <title> (for <the next step>)**: what the quests it leads to need besides this one
+  (`Q.Missing` of each, at most 3), in the locked colour; its tooltip says the next step needs it too.
+- Offered only (`QUEST_DETAIL`): **"Taking it closes: ..."** (`Q.Closes`, orange) and for a lead-in
+  "A lead-in: <quest> can be taken without it." (`breadcrumbFor`).
+- **Friends:** "Anna (done), Bo (on it)" in class colours (`Q.Friends`, setting `friends`, at most 4;
+  their progress asked for once per quest while the dialog is open, `Q.RequestFriendProgress`; their
+  answers redraw it, `Q.OnFriendProgress`).
+- **Open in Questtree** (a button at the bottom): `Q.OpenBrowser(id)`, else `Q.ShowQuest(id)`.
+
+The greeting lists each of the NPC's quests that's in a chain or leads on: "[12] Title" with its verb
+icon and "Part 2 of 4 · <chain>" (or "opens N") under it, a click opens it; no button. Nothing to tell
+(no chain of two or more, nothing it leads to or closes, no lead-in, no friends): no panel at all.
+
+**Events and cost.** The five events (`QUEST_FINISHED` too) are listened to while Questtree and the
+setting are on; each only notes the page and draws on the next frame (`C_Timer.After(0)`: the dialog
+shows itself in its own handler first). The data is loaded for it only out of a fight, when the add-on
+is there (usually the tooltips loaded it already); in a fight before that: no panel. `QUEST_FINISHED`
+hides it; while shown it also looks twice a second whether `QuestFrame` is still visible (a dialog can
+close without that event reaching us first). Hidden: nothing runs.
+
+**Taint and the controller.** The panel is a frame of ours on `UIParent`, only anchored to
+`QuestFrame` (`TOPLEFT` to its `TOPRIGHT`, its strata and a level above it, clamped to the screen);
+it's never a child of it. So it isn't part of the dialog's panel for SmartNavigation (which collects a
+panel's descendants when `ShowUIPanel` opens it, and rebuilds them when a frame is made with a parent
+inside it): the controller's cursor stays on Blizzard's Accept, Decline and Complete, nothing of ours
+runs from Blizzard's code, and the controller can't get caught on our lines. That's the taint-free
+choice; the price is that the panel's lines and button are for the mouse only (with a controller the
+companion follows the quest once accepted). Nothing is written into `QuestFrame`, none of its scripts is
+hooked; no Blizzard template but the button's `UIPanelButtonTemplate`, no Backdrop, no navigation values.
+
+### The quest log (setting `logBadges`)
+
+- **"2/4"** at the right end of each chain quest's line (in the research's in-progress gold), as Misc
+  Tweaks' NEW does it (misc-tweaks.md, foreverQuests): a post-hook on `QuestLogQuests_Update` puts a
+  font string of ours on each pooled title button (`QuestScrollFrame.titleFramePool`) whose quest is
+  in a chain, at `RIGHT` of the track checkbox's `LEFT` - 4 (where Forever never shows the quest type
+  icon), or left of Misc Tweaks' own NEW label when that one is there (a long title). The title's text
+  is never changed. The hook is made a second after Questtree is switched on, so it runs after Misc
+  Tweaks' and knows where its label is. Each "2/4" is kept per data and progress change: a redraw of
+  the log is a table lookup per line. Data not loaded yet: loaded once on the next frame, out of a
+  fight, then the open log is marked.
+- **The tooltip**: one `HookScript("OnEnter")` per title button (as Misc Tweaks'): when the game's
+  tooltip is the line's, it adds "Questtree: Part 2 of 4 · <chain>", up to 7 steps (this one white
+  with the arrow, done ones ticked green, the rest grey), "Leads to: ..." and "Alt-click: open it in
+  Questtree".
+- **Alt-click** a quest there: Questtree.lua's post-hook on `QuestMapFrame_ShowQuestDetails` (Module,
+  The quest log) calls `Q.LogAltClick(id)`, which opens it on the next frame (`Q.OpenBrowser`, else
+  `Q.ShowQuest`) from a timer of ours, not inside Blizzard's click. A click on the "2/4" itself would
+  need a frame of ours (a Button) inside the quest log, which is part of `WorldMapFrame`: SmartNavigation
+  would take it into the map's panel and run its scripts from its own code, the gamepad taint in
+  forever-platform.md. So the badge is a font string (no mouse), its tooltip is the line's, and the
+  click is the line's with Alt. Without a keyboard (gamepad mode) there's no Alt: the tooltip and the
+  companion's following of the quest log are the way there.
+- The setting off: the open log loses its "2/4" at once, the tooltip lines and Alt-click stop.
+
+`Q.DialogView()` gives the tests the panel, its strings, the quest shown, the page and the labels.
+
+**Tests** (`tests/questtree_dialog.lua`): nothing built before a dialog; the offered page drawn on the
+next frame, not in the event (heading, numbered steps with done ticked and this one bold, what it leads
+to, what the next step needs besides it, what taking it closes, the button and a step's line opening
+Questtree); a frame of ours on UIParent anchored beside the dialog, nothing written into `QuestFrame` or
+its scripts; closed by `QUEST_FINISHED` and without it; a quest with nothing to tell; a lead-in; the
+progress and reward pages (the chain without the quest taking it closed); friends (asked for once); a
+greeting; the setting off; the data not loaded in a fight. The quest log: "2/5" on a chain quest's line
+(the title unchanged), nothing on one in no chain, left of Misc Tweaks' NEW, kept until progress
+changes, the tooltip, Alt-click on the next frame, the setting off and on again.
 
 ## Big window (Browser.lua)
 

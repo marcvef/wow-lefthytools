@@ -5,8 +5,10 @@
 -- nearest first with distance and direction, follow-ups first, coming up, blocked), a quest looked
 -- at ("« Back to", "Back to now", the drops of an item that starts it, Requires), the game's map
 -- pin from a giver's line or a marker, NPC tooltip lines, events only while shown, its place and
--- size, a fight, the controller, switched off; difficulty colours; the small map alone (the game's
--- icons, drop spots, zoom, your arrow).
+-- size, a fight, the controller, switched off; difficulty colours; the companion's lines (verb
+-- icons, the first full size and the rest grey, "opens 2", what taking a quest closes), one line,
+-- hiding itself and coming back, Alt-click in the quest log; the small map alone (the game's icons,
+-- drop spots, zoom, your arrow).
 -- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. The calls the
 -- data part adds in parallel (Q.ChainStep, Q.Available, Q.LevelColor, Q.ZoneCount, Q.GiverQuests)
 -- get stand-ins here only while they're missing; with them gone it checks the window still works.
@@ -236,7 +238,7 @@ check(Has(s.texts, "In your quest log") and Has(s.texts, "- Wolf Pelts: 2/5") an
 check(RowWith("Turn-in: Farmer Saldean, Westfall") and RowWith("Next: [10] Westward Bound - Farmer Saldean, Westfall"),
 	"where to turn it in, what comes next and who gives it")
 local done, current, future = RowWith("A Fine Start"), RowWith("2. The Second Step"), RowWith("3. Westward Bound")
-check(Has(s.texts, "Steps") and done and done.Text:GetText():find("ReadyCheck-Ready", 1, true) and current
+check(Has(s.texts, "Steps") and done and done.Text:GetText():find("UI-QuestTracker-Tracker-Check", 1, true) and current
 	and current.Text.font == "GameFontNormal" and future, "the chain's steps: done ticked, this one bold, the next one numbered")
 check(s.map.frame:IsShown() and s.map.map == 1436 and #s.map:Markers() == 1 and s.map:Markers()[1].look == "progress",
 	"the small map: the turn-in's zone, its marker (not done yet)")
@@ -526,6 +528,108 @@ check(not win:IsShown() and printedSince(mark + 1):find("Questtree is switched o
 LT:SetModuleEnabled("questtree", true)
 
 ---------------------------------------------------------------------------
+section("Questtree: the companion's lines, one line, hiding itself")
+do
+	-- Its own quests: one in my log ready to turn in, one that opens two, two that close each other,
+	-- one for later.
+	local function Giver(id, name, x) return { Npc(id, name, 1429, x, 0.5) } end
+	local LINES = {
+		[9206] = { id = 9206, title = "Mail Run", level = 18, zone = 1429, starts = Giver(930, "Postman Pat", 0.5), ends = Giver(930, "Postman Pat", 0.5) },
+		[9201] = { id = 9201, title = "Old Debts", level = 18, zone = 1429, starts = Giver(931, "Banker Lou", 0.52), ends = Giver(931, "Banker Lou", 0.52) },
+		[9202] = { id = 9202, title = "Debts Paid", level = 19, zone = 1429, pre = { 9201 }, starts = Giver(931, "Banker Lou", 0.52), ends = {} },
+		[9203] = { id = 9203, title = "Debts Forgiven", level = 19, zone = 1429, pre = { 9201 }, starts = Giver(931, "Banker Lou", 0.52), ends = {} },
+		[9204] = { id = 9204, title = "Choose the Blade", level = 18, zone = 1429, excl = { 9205 }, starts = Giver(932, "Smith Ivy", 0.6), ends = {} },
+		[9205] = { id = 9205, title = "Choose the Shield", level = 18, zone = 1429, excl = { 9204 }, starts = Giver(932, "Smith Ivy", 0.6), ends = {} },
+		[9207] = { id = 9207, title = "Later Work", level = 26, minLevel = 25, zone = 1429, starts = Giver(933, "Foreman Gus", 0.7), ends = {} },
+	}
+	local savedData = QUESTS_DATA
+	QUESTS_DATA = LINES -- (Log() reads the titles from it)
+	Q.SetTestData(LINES, { { map = 1429, name = "Elwynn Forest", continent = 1415, minLevel = 1, maxLevel = 30 } })
+	completed = {}
+	Log({ { 9206, true } })
+	PLAYER_MAP, PLAYER_POS[1], PLAYER_POS[2], SUPER_TRACKED = 1429, 0.5, 0.5, 0
+	Progress()
+	win:Hide()
+	slash("")
+	s = Small()
+	local mail, debts, blade, later = RowLast("[18] Mail Run"), RowWith("[18] Old Debts"), RowWith("[18] Choose the Blade"), RowWith("[26] Later Work")
+	local turnin = RowWith("Turn-in: Postman Pat")
+	check(s.now == 9206 and mail and turnin and turnin.Text:GetText():find("|A:QuestTurnin:14:14|a", 1, true),
+		"now: the quest in my log, its turn-in line with the game's ? (ready)")
+	check(debts and debts.Text.font == "GameFontHighlight" and debts.Text:GetText():find("|A:QuestNormal:16:16|a", 1, true),
+		"the first line of Pick up next: full size, its verb icon (! to pick up)")
+	check(blade and blade.Text.font == "GameFontHighlightSmall" and blade.Text:GetText():find("|A:QuestNormal:13:13|a", 1, true)
+		and blade.Text:GetText():find("|cffbebebeChoose the Blade|r", 1, true), "the rest smaller, their titles grey")
+	check(debts and Plain(debts.Text:GetText()):find("opens 2", 1, true), "what a quest opens: opens 2")
+	local shield = RowWith("[18] Choose the Shield")
+	check(blade and shield and Plain(blade.Text:GetText()):find("closes Choose the Shield", 1, true)
+		and Plain(shield.Text:GetText()):find("closes Choose the Blade", 1, true),
+		"exclusive quests: taking one closes the other, said on both")
+	if blade then
+		blade:GetScript("OnEnter")(blade)
+		check(Has(TOOLTIP.lines, "Only one of them can be done."), "... its tooltip says only one can be done")
+		blade:GetScript("OnLeave")(blade)
+	end
+	check(later and later.Text:GetText():find("|A:QuestNormal:13:13:0:0:150:150:150|a", 1, true), "for later: the ! dimmed")
+
+	-- One line: the title bar's button, the line, a click on it.
+	local height = win:GetHeight()
+	win.Collapse:Click()
+	s = Small()
+	check(M.db.collapsed == true and s.collapsed and win:GetHeight() == 54 and s.line:IsShown() and not win.Grip:IsShown()
+		and not win.Browser:IsShown(), "one line: the window shrinks to its title bar and a line")
+	check(Plain(s.line.Text:GetText()):find("[18] Mail Run", 1, true) and s.line.Text:GetText():find("QuestTurnin", 1, true),
+		"the line: the quest I'm on with its verb icon")
+	s.line:Click()
+	check(M.db.collapsed == false and not Small().collapsed and win:GetHeight() == height and win.Grip:IsShown(),
+		"a click on it: the whole companion again, at its size")
+	LT:SetModuleSetting(M, "collapsed", true)
+	check(Small().collapsed and win:GetHeight() == 54, "the setting does the same")
+	LT:SetModuleSetting(M, "collapsed", false)
+
+	-- Alt-click in the quest log: Questtree (Dialog.lua's Q.LogAltClick, on the next frame).
+	local opened = {}
+	Replace("OpenBrowser", function(id) opened[#opened + 1] = id end)
+	STATE.alt = true
+	QuestMapFrame_ShowQuestDetails(9206)
+	STATE.alt = false
+	check(#opened == 0, "Alt-click in the quest log: nothing opened in its own click")
+	Advance(0.5)
+	check(opened[1] == 9206, "... the quest browser opens on it on the next frame")
+	PutBack("OpenBrowser")
+
+	-- Nothing to show: it hides itself; something again: it comes back. Closed by me: it stays closed.
+	for id in pairs(LINES) do completed[id] = true end
+	Log({})
+	Progress()
+	Fire("QUEST_REMOVED", 9206)
+	Advance(0.5)
+	check(not win:IsShown() and Small().asleep, "nothing in my log, nothing to pick up: it hides itself")
+	completed[9201] = nil
+	Log({ 9201 })
+	Progress()
+	Fire("QUEST_ACCEPTED", 9201)
+	Advance(0.5)
+	check(win:IsShown() and not Small().asleep and Small().now == 9201, "a quest taken: it comes back on it")
+	win:Hide()
+	Fire("QUEST_ACCEPTED", 9201)
+	Advance(0.5)
+	check(not win:IsShown() and not Small().asleep, "closed by me: it stays closed")
+	completed[9201] = true
+	Log({})
+	Progress()
+	slash("")
+	check(win:IsShown() and Has(Small().texts, "Nothing to pick up nearby"), "opened with nothing to show: it says so and stays")
+	LT:SetModuleSetting(M, "autoHide", false)
+	Fire("QUEST_REMOVED", 9201)
+	Advance(0.5)
+	check(win:IsShown(), "the setting off: it stays")
+	LT:SetModuleSetting(M, "autoHide", true)
+	win:Hide()
+	QUESTS_DATA = savedData
+end
+
+---------------------------------------------------------------------------
 section("Questtree: the small map")
 do
 	local m = Q.NewMiniMap(UIParent)
@@ -542,8 +646,8 @@ do
 		{ x = 0.3, y = 0.7, kind = "start", look = "trivial", label = "F" } })
 	list = m:Markers()
 	check(#list == 4 and list[1].Icon.atlas == "QuestTurnin" and #list[1].lines == 2, "a turn-in's ?, and a giver at the same spot in one marker")
-	check(list[2].Icon.atlas == "SideInProgressquesticon" and list[3].Icon.atlas == "QuestDaily" and list[4].Icon.vertex[4] < 1,
-		"not done yet; repeatable; low level paler")
+	check(list[2].Icon.atlas == "SideInProgressquesticon" and list[3].Icon.atlas == "QuestDaily" and list[4].Icon.atlas == "TrivialQuests"
+		and list[4].Icon.vertex[4] == 1, "not done yet; repeatable; low level: the game's grey !, solid")
 	list[1]:GetScript("OnEnter")(list[1])
 	check(TOOLTIP.title == "B" and Has(TOOLTIP.lines, "C") and Has(TOOLTIP.lines, "Quest giver") and Has(TOOLTIP.lines, "Turn-in"),
 		"its tooltip lists both")

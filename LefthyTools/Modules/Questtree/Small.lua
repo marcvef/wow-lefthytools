@@ -18,6 +18,12 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --     (follow-ups of what you just finished or have, then this zone's quests, the nearest giver
 --     first, each with its giver, how far and which way), Coming up (level too low yet) and
 --     Blocked (what each needs first).
+-- Each line of Pick up next has a verb icon (the game's own: ? to turn in, ! to pick up, in
+-- progress, a lock, the grey ! of a low quest), the first line full size and the rest smaller with
+-- their titles grey (the guides' "this now, then those"), and notes what a quest opens ("opens 3")
+-- and what taking it closes (exclusive quests). The window can be one line (setting collapsed, the
+-- button in its title bar) and hides itself when there's nothing to show (setting autoHide), coming
+-- back on its own when there is.
 -- A click on a quest shows everything about it (its title, chain, status, what it needs first,
 -- giver and turn-in, where its item drops, the map, what it leads to, friends); at the top then
 -- "« Back to <the quest before>" and "Back to now". A click on a giver, turn-in or map marker sets
@@ -48,17 +54,15 @@ local HISTORY = 20       -- quests "back to" goes through
 local REDRAW_DELAY = 0.3
 local REDRAW_FIGHT = 1   -- s: in a fight (the quest log changes with every kill and loot)
 local MOVE_EVERY, MOVE_FAR = 2, 0.02 -- s between looks whether I moved; how far (of the map) is a move
-local GOLD, GREY, LIGHT, GREEN = "|cffffd200", "|cff9d9d9d", "|cffbebebe", "|cff40c040"
-local ICON = {
-	start = "|TInterface\\GossipFrame\\AvailableQuestIcon:0|t ",
-	turnin = "|TInterface\\GossipFrame\\ActiveQuestIcon:0|t ",
-	progress = "|TInterface\\GossipFrame\\IncompleteQuestIcon:0|t ",
-	check = "|TInterface\\RaidFrame\\ReadyCheck-Ready:0|t ",
-	here = "|TInterface\\ChatFrame\\ChatFrameExpandArrow:0|t ",
-}
+local COLLAPSED_H = 54   -- the window as one line: its title bar and the line
+local CLOSES_MAX = 2     -- quests named in "closes ..."
+local C = Q.COLOR
+local GOLD, GREY, LIGHT, GREEN, CLOSES = C.gold, C.grey, C.light, C.done, C.closes
 local DOT = "|TInterface\\CharacterFrame\\TempPortraitAlphaMask:8:8:0:0:64:64:0:64:0:64:%d:%d:%d|t"
 local EVENTS = { "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "QUEST_LOG_UPDATE", "QUEST_WATCH_LIST_CHANGED",
 	"SUPER_TRACKING_CHANGED", "PLAYER_LEVEL_UP", "ZONE_CHANGED_NEW_AREA", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS" }
+-- Hidden by itself (nothing to show): what may bring something (rare events, listened to only then).
+local WAKE_EVENTS = { "QUEST_ACCEPTED", "SUPER_TRACKING_CHANGED", "PLAYER_LEVEL_UP", "ZONE_CHANGED_NEW_AREA" }
 local WHY = { accepted = L["just accepted"], track = L["tracked"], log = L["opened in your quest log"],
 	watch = L["on your tracker"], zone = L["in this zone"], first = L["in your quest log"] }
 
@@ -78,6 +82,15 @@ local texts, textsUsed = {}, 0
 local rules, rulesUsed = {}, 0
 local soon = false
 local width = WIDTH - SCROLL_SIDE
+local picked = 0         -- rows of Pick up next drawn (the first is full size)
+local collapsedNow       -- whether the window is laid out as one line (nil: not laid out yet)
+local asleep = false     -- hidden by itself: comes back when there's something to show
+local selfHiding = false
+
+-- A verb icon and a space (Questtree.lua's Q.Icon: the game's quest icons).
+local function I(kind, size)
+	return Q.Icon(kind, size) .. " "
+end
 
 ---------------------------------------------------------------------------
 -- Where it is
@@ -94,7 +107,10 @@ local function SavePlace()
 		local ratio = win:GetEffectiveScale() / UIParent:GetEffectiveScale()
 		saved.left, saved.top = left * ratio, top * ratio
 	end
-	saved.width, saved.height = math.floor(win:GetWidth() + 0.5), math.floor(win:GetHeight() + 0.5)
+	saved.width = math.floor(win:GetWidth() + 0.5)
+	if not collapsedNow then
+		saved.height = math.floor(win:GetHeight() + 0.5)
+	end
 end
 
 local function Clamp(v, low, high, default)
@@ -108,10 +124,10 @@ local function Place()
 	win:ClearAllPoints()
 	if DB().keepPlace and tonumber(saved.left) and tonumber(saved.top) then
 		win:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", saved.left, saved.top)
-		win:SetSize(Clamp(saved.width, MIN_W, MAX_W, WIDTH), Clamp(saved.height, MIN_H, MAX_H, HEIGHT))
+		win:SetSize(Clamp(saved.width, MIN_W, MAX_W, WIDTH), collapsedNow and COLLAPSED_H or Clamp(saved.height, MIN_H, MAX_H, HEIGHT))
 	else
 		win:SetPoint("CENTER", UIParent, "CENTER", 280, 40)
-		win:SetSize(WIDTH, HEIGHT)
+		win:SetSize(WIDTH, collapsedNow and COLLAPSED_H or HEIGHT)
 	end
 end
 
@@ -209,7 +225,12 @@ local function Header(y, text, note)
 		rule:SetHeight(1)
 		rules[rulesUsed] = rule
 	end
-	rule:SetColorTexture(1, 0.82, 0, 0.25)
+	if C_Texture and C_Texture.GetAtlasInfo and LT.Value(C_Texture.GetAtlasInfo, "Options_HorizontalDivider") then
+		rule:SetAtlas("Options_HorizontalDivider")
+		rule:SetVertexColor(1, 0.82, 0, 0.6)
+	else
+		rule:SetColorTexture(1, 0.82, 0, 0.25)
+	end
 	rule:ClearAllPoints()
 	rule:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(y - 2))
 	rule:SetWidth(width)
@@ -312,25 +333,10 @@ local function NowQuest(zone)
 	return first, first and "first" or nil
 end
 
--- Its chain as I can do it (quests not for me left out) and where it is in it; nil: no chain.
+-- Its chain as I can do it (quests not for me left out) and where it is in it; nil: no chain
+-- (Questtree.lua's Q.ChainFor, kept per data and progress change).
 local function ChainOf(id)
-	local chain = Q.Chain and Q.Chain(id)
-	if type(chain) ~= "table" or #chain < 2 then
-		return nil
-	end
-	local list, at = {}, nil
-	for _, other in ipairs(chain) do
-		if other == id or Q.StatusOf(other) ~= "other" then
-			list[#list + 1] = other
-			if other == id then
-				at = #list
-			end
-		end
-	end
-	if not at or #list < 2 then
-		return nil
-	end
-	return list, at
+	return Q.ChainFor(id)
 end
 
 local function Dot(r, g, b)
@@ -510,9 +516,9 @@ local function Steps(y, chain, at)
 		local status = Q.StatusOf(id)
 		local text, font
 		if i == at then
-			text, font = ICON.here .. i .. ". " .. Q.Title(id), "GameFontNormal"
+			text, font = I("here") .. i .. ". " .. Q.Title(id), "GameFontNormal"
 		elseif status == "done" then
-			text = ICON.check .. GREEN .. Q.Title(id) .. "|r"
+			text = I("done") .. GREEN .. Q.Title(id) .. "|r"
 		else
 			text = LIGHT .. i .. ". " .. Q.Title(id) .. "|r"
 		end
@@ -656,30 +662,67 @@ local function PickLists(ctx)
 	return lists
 end
 
--- A quest of "Pick up next": icon, "[12] Title", how far; its giver and what it follows under it.
+-- What a quest opens and what taking it closes, for its second line: "opens 3", "closes X".
+local function Leads(id, group)
+	local parts = {}
+	local opens = Q.Opens and Q.Opens(id) or {}
+	if #opens > 0 then
+		parts[1] = L["opens %d"]:format(#opens)
+	end
+	local closes = group == "now" and Q.Closes and Q.Closes(id) or {}
+	if closes[1] then
+		local names = {}
+		for i = 1, math.min(#closes, CLOSES_MAX) do
+			names[i] = Q.Title(closes[i])
+		end
+		parts[#parts + 1] = CLOSES .. L["closes %s"]:format(table.concat(names, ", ")) .. "|r"
+	end
+	return table.concat(parts, " · ")
+end
+
+-- "[12] Title" with only the level in its difficulty colour, the title grey (the lines after the first).
+local function GreyTitle(id, quest)
+	local level = quest and tonumber(quest.level)
+	return (level and level > 0 and (Q.LevelCode(id, quest) .. "[" .. level .. "]|r ") or "") .. LIGHT .. Q.Title(id, quest) .. "|r"
+end
+
+-- A quest of "Pick up next": its verb icon, "[12] Title", how far; its giver, what it follows, what
+-- it opens and closes under it. The first one drawn is full size, the rest smaller and grey.
 local function PickRow(y, entry, ctx, group)
 	local id = entry.id
 	local quest = Q.Quest(id)
 	local status = Q.StatusOf(id)
-	local icon, right, note = ICON.start, nil, nil
+	picked = picked + 1
+	local top = picked == 1
+	local size = top and 16 or 13
+	local icon, right, note = nil, nil, nil
 	if group == "log" then
 		local ready = IsComplete(id)
-		icon = ready and ICON.turnin or ICON.progress
+		icon = I(ready and "turnin" or "progress", size)
 		right = quest and Far(quest.ends, ctx)
 		local ender = quest and quest.ends and quest.ends[1]
 		note = (ready and (GREEN .. L["ready to turn in"] .. "|r") or L["in your log"])
 			.. (ender and (" · " .. (ender.name or L["unknown"])) or "")
 	elseif group == "soon" then
+		icon = I("level", size)
 		note = Q.StatusCode("level") .. L["from level %d"]:format(quest and (quest.minLevel or quest.level) or 0) .. "|r"
 			.. " · " .. GiverNote(quest, id, ctx)
 	elseif group == "blocked" then
+		icon = I("locked", size)
 		local missing = Q.Missing and Q.Missing(id) or {}
 		note = Q.StatusCode("locked") .. (missing[1] and L["needs %s"]:format(Q.Title(missing[1].id)) or L["needs one first"]) .. "|r"
 	else
+		icon = Q.QuestIcon(id, status, size) .. " "
 		right = quest and Far(quest.starts, ctx)
 		note = GiverNote(quest, id, ctx, entry.follows)
 	end
-	local text = icon .. Q.LevelTitle(id, quest)
+	if group == "now" or group == "soon" then
+		local leads = Leads(id, group)
+		if leads ~= "" then
+			note = (note and note ~= "" and (note .. " · ") or "") .. leads
+		end
+	end
+	local text = icon .. (top and Q.LevelTitle(id, quest) or GreyTitle(id, quest))
 	if note and note ~= "" then
 		text = text .. "\n" .. GREY .. note .. "|r"
 	end
@@ -688,8 +731,13 @@ local function PickRow(y, entry, ctx, group)
 	if step then
 		tooltip[#tooltip + 1] = L["%s: step %d of %d"]:format(chain or "", step, total)
 	end
+	local closes = group == "now" and Q.Closes and Q.Closes(id) or {}
+	if closes[1] then
+		tooltip[#tooltip + 1] = CLOSES .. L["Taking it closes: %s"]:format(Q.Title(closes[1])) .. "|r " .. L["Only one of them can be done."]
+	end
 	tooltip[#tooltip + 1] = L["Click: show this quest"]
-	return Row(y, { text = text, right = right, onClick = Shows(id), tooltip = tooltip, indent = 2 })
+	return Row(y, { text = text, right = right, onClick = Shows(id), tooltip = tooltip, indent = 2,
+		font = top and "GameFontHighlight" or "GameFontHighlightSmall" })
 end
 
 -- Now: the quest I'm on (none: says so). Notes the map it wants and its markers in ctx.
@@ -715,14 +763,14 @@ local function DrawNow(y, ctx)
 			break
 		end
 		if type(o) == "table" and type(o.text) == "string" and not LT.IsSecret(o.text) and o.text ~= "" then
-			y = Text(y, o.finished and (ICON.check .. GREY .. o.text .. "|r") or ("- " .. o.text), "GameFontHighlightSmall", INDENT)
+			y = Text(y, o.finished and (I("done", 12) .. GREY .. o.text .. "|r") or ("- " .. o.text), "GameFontHighlightSmall", INDENT)
 		end
 	end
 	if not quest then
 		return y
 	end
 	-- Where to turn it in (on the map with it), and what it leads to.
-	y = PlaceRow(y + 2, L["Turn-in:"], quest.ends, "end", ctx, ready and ICON.turnin or ICON.progress)
+	y = PlaceRow(y + 2, L["Turn-in:"], quest.ends, "end", ctx, I(ready and "turnin" or "progress"))
 	local point = Q.NearestPoint(quest.ends, ctx.zone)
 	local first = quest.ends and quest.ends[1]
 	ctx.map = point and ctx.zone or (first and first.points and first.points[1] and first.points[1].map) or nil
@@ -784,6 +832,7 @@ local function DrawPick(y, ctx, lists)
 	local groups = { { "log", L["In progress"] }, { "now", L["Available now"] }, { "soon", L["Coming up"] },
 		{ "blocked", L["Blocked"] } }
 	local any = false
+	picked = 0
 	for _, group in ipairs(groups) do
 		local list = lists[group[1]]
 		if #list > 0 then
@@ -804,7 +853,7 @@ local function DrawPick(y, ctx, lists)
 	if not any then
 		y = Text(y, L["Nothing to pick up nearby. The quest browser has every zone."], "GameFontDisableSmall", INDENT)
 	end
-	return y
+	return y, any
 end
 
 local function DrawCompanion(y)
@@ -825,7 +874,67 @@ local function DrawCompanion(y)
 	ctx.points = points
 	PickPoints(ctx, lists)
 	y = PutMap(y, ctx.map, ctx.points)
-	return DrawPick(y, ctx, lists)
+	local any
+	y, any = DrawPick(y, ctx, lists)
+	return y, ctx.now ~= nil or any
+end
+
+-- Whether the companion has anything to show: a quest I'm on, or something to pick up nearby.
+local function Useful()
+	local zone, x, y = Q.HereZone()
+	local ctx = { zone = zone, x = x, y = y, points = {} }
+	ctx.now = NowQuest(zone)
+	if ctx.now then
+		return true
+	end
+	local lists = PickLists(ctx)
+	return #lists.log + #lists.now + #lists.soon + #lists.blocked > 0
+end
+
+-- The window as one line: the quest I'm on ("[18] Title · 3/7 · 170 yd SW", its verb icon), else
+-- the first thing to pick up, else a word. A click shows the whole companion. true: something to show.
+local function DrawLine()
+	local zone, x, py = Q.HereZone()
+	drawnAt = { zone, x, py }
+	local ctx = { zone = zone, x = x, y = py, points = {} }
+	local text, id, useful
+	if mode == "quest" and shown then
+		id, useful = shown, true
+		text = Q.QuestIcon(id) .. " " .. Q.LevelTitle(id)
+	else
+		ctx.now, ctx.why = NowQuest(zone)
+		nowId = ctx.now
+		id = ctx.now
+		if id then
+			useful = true
+			local quest = Q.Quest(id)
+			local list, at = ChainOf(id)
+			text = Q.QuestIcon(id, "active") .. " " .. Q.LevelTitle(id, quest) .. (list and (GREY .. " · " .. at .. "/" .. #list .. "|r") or "")
+			local far = quest and Far(quest.ends, ctx)
+			if far then
+				text = text .. GREY .. " · " .. far .. "|r"
+			end
+		else
+			local lists = PickLists(ctx)
+			local entry = lists.now[1] or lists.soon[1] or lists.blocked[1]
+			useful = entry ~= nil
+			if entry then
+				local quest = Q.Quest(entry.id)
+				text = Q.QuestIcon(entry.id) .. " " .. Q.LevelTitle(entry.id, quest)
+				local far = quest and Far(quest.starts, ctx)
+				if far then
+					text = text .. GREY .. " · " .. far .. "|r"
+				end
+			else
+				text = GREY .. L["Nothing to pick up nearby."] .. "|r"
+			end
+		end
+	end
+	local line = win.Line
+	line.Text:SetText(text)
+	line.tooltip = { id and Q.Title(id) or L["Pick up next"], L["Click: the whole companion"] }
+	line:Show()
+	return useful
 end
 
 ---------------------------------------------------------------------------
@@ -968,11 +1077,11 @@ local function DrawQuest(y, id)
 	y = Requires(y, id, chain)
 	y = List(y, L["Needs first:"], Q.Missing and Q.Missing(id) or {}, true)
 	local starter = quest.starts and quest.starts[1]
-	y = PlaceRow(y + GAP, L["Quest giver:"], quest.starts, "start", ctx, ICON.start)
+	y = PlaceRow(y + GAP, L["Quest giver:"], quest.starts, "start", ctx, I("available"))
 	if starter and starter.kind == "item" then
 		y = DropLines(y, quest)
 	end
-	y = PlaceRow(y, L["Turn-in:"], quest.ends, "end", ctx, ICON.turnin)
+	y = PlaceRow(y, L["Turn-in:"], quest.ends, "end", ctx, I("turnin"))
 	y = QuestMap(y, id, quest, status, ctx)
 	y = List(y, L["Leads to:"], Q.Opens and Q.Opens(id) or {}, false)
 	if chain then
@@ -986,7 +1095,50 @@ end
 -- Drawing it all
 ---------------------------------------------------------------------------
 
-Draw = function()
+-- One line or the whole window (setting collapsed): the scroll area, its inset, the grip and the
+-- bottom button only in the whole one; one line can't be made taller.
+local function Lay(collapsed)
+	if collapsedNow == collapsed then
+		return
+	end
+	collapsedNow = collapsed
+	scroll:SetShown(not collapsed)
+	if win.Inset then
+		win.Inset:SetShown(not collapsed)
+	end
+	win.Grip:SetShown(not collapsed)
+	win.Line:SetShown(collapsed)
+	win.Collapse.Icon:SetAtlas(collapsed and "QuestLog-icon-Expand" or "QuestLog-icon-shrink")
+	if collapsed then
+		win:SetResizeBounds(MIN_W, COLLAPSED_H, MAX_W, COLLAPSED_H)
+		win:SetHeight(COLLAPSED_H)
+	else
+		win:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
+		local height = Clamp(DB().keepPlace and DB().small.height, MIN_H, MAX_H, HEIGHT)
+		if math.abs(win:GetHeight() - height) > 0.5 then
+			win:SetHeight(height)
+		end
+	end
+end
+
+-- Hidden by itself: nothing to show. It comes back (Wake) when a rare event brings something.
+local function Sleep()
+	asleep = true
+	selfHiding = true
+	win:Hide()
+	selfHiding = false
+	for _, event in ipairs(WAKE_EVENTS) do
+		win.Sleeper:RegisterEvent(event)
+	end
+end
+
+local function Awake()
+	asleep = false
+	win.Sleeper:UnregisterAllEvents()
+end
+
+-- opened: drawn as it opens (then it never hides itself: you asked for it).
+Draw = function(opened)
 	if not (win and win:IsShown()) then
 		return
 	end
@@ -994,17 +1146,28 @@ Draw = function()
 	win.Bar:Hide()
 	width = math.max(100, win:GetWidth() - SCROLL_SIDE)
 	content:SetWidth(width)
-	local y = 2
+	local collapsed = DB().collapsed == true
+	Lay(collapsed)
+	local y, useful = 2, true
 	local ready = Q.Ready()
 	if not ready then
 		nowId = nil
 		y = Text(y, L["The quest data isn't there. It's an add-on of its own, LefthyTools Quest Data, installed with LefthyTools: run the updater again, then restart the game."], "GameFontHighlight")
+		if collapsed then
+			win.Line.Text:SetText(GREY .. L["The quest data isn't there."] .. "|r")
+		end
+	elseif collapsed then
+		useful = DrawLine()
 	elseif mode == "quest" and shown then
 		y = DrawNav(y)
 		y = DrawQuest(y, shown)
 	else
 		mode = "now"
-		y = DrawCompanion(y)
+		y, useful = DrawCompanion(y)
+	end
+	if ready and not useful and opened ~= true and DB().autoHide and mode == "now" then
+		Sleep()
+		return
 	end
 	if not mapUsed then
 		map:Hide()
@@ -1020,7 +1183,7 @@ Draw = function()
 		rules[i]:Hide()
 	end
 	content:SetHeight(math.max(y, 10))
-	win.Browser:SetShown(ready and (Q.OpenBrowser ~= nil or Q.ToggleBrowser ~= nil))
+	win.Browser:SetShown(not collapsed and ready and (Q.OpenBrowser ~= nil or Q.ToggleBrowser ~= nil))
 end
 
 -- A redraw in a moment (several changes at once: one), or now.
@@ -1118,6 +1281,68 @@ local function Build()
 	win.Grip = grip
 	win:SetScript("OnSizeChanged", function() Q.RedrawSmall() end)
 
+	-- The title bar's button: one line or the whole window (setting collapsed).
+	local collapse = CreateFrame("Button", nil, win)
+	collapse:SetSize(20, 20)
+	if win.CloseButton then
+		collapse:SetPoint("RIGHT", win.CloseButton, "LEFT", -2, 0)
+	else
+		collapse:SetPoint("TOPRIGHT", -26, -2)
+	end
+	collapse.Icon = collapse:CreateTexture(nil, "ARTWORK")
+	collapse.Icon:SetAllPoints()
+	collapse.Icon:SetAtlas("QuestLog-icon-shrink")
+	collapse:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+	collapse:SetScript("OnClick", function()
+		LT:SetModuleSetting(Q.module, "collapsed", not DB().collapsed)
+	end)
+	collapse:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(DB().collapsed and L["The whole companion"] or L["One line"], 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	collapse:SetScript("OnLeave", RowLeave)
+	win.Collapse = collapse
+
+	-- The one line (collapsed): under the title bar, a click shows the whole companion.
+	local line = CreateFrame("Button", nil, win)
+	line:SetPoint("TOPLEFT", win, "TOPLEFT", 10, -26)
+	line:SetPoint("TOPRIGHT", win, "TOPRIGHT", -10, -26)
+	line:SetHeight(20)
+	line:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+	line.Text = line:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	line.Text:SetPoint("LEFT", 2, 0)
+	line.Text:SetPoint("RIGHT", -2, 0)
+	line.Text:SetJustifyH("LEFT")
+	line.Text:SetWordWrap(false)
+	line:SetScript("OnClick", function(self)
+		RowLeave(self)
+		LT:SetModuleSetting(Q.module, "collapsed", false)
+	end)
+	line:SetScript("OnEnter", RowEnter)
+	line:SetScript("OnLeave", RowLeave)
+	line:Hide()
+	win.Line = line
+
+	-- Hidden by itself: a few rare events may bring something to show (then it opens again).
+	local sleeper = CreateFrame("Frame")
+	local waking = false
+	sleeper:SetScript("OnEvent", function()
+		if waking then
+			return
+		end
+		waking = true
+		C_Timer.After(REDRAW_DELAY, function()
+			waking = false
+			if asleep and Q.module.enabled and DB().autoHide and Q.Ready() and Useful() then
+				Awake()
+				win:Show()
+				Draw()
+			end
+		end)
+	end)
+	win.Sleeper = sleeper
+
 	win.Browser = LT.Window.AddButton(win, L["Quest browser"], function()
 		local id = mode == "quest" and shown or nowId
 		if Q.OpenBrowser and id then
@@ -1147,6 +1372,9 @@ local function Build()
 		end
 	end)
 	win:HookScript("OnHide", function(self)
+		if not selfHiding then
+			Awake() -- (closed by you: it stays closed)
+		end
 		self:UnregisterAllEvents()
 		for _, row in ipairs(rows) do
 			RowLeave(row)
@@ -1162,6 +1390,7 @@ local function Build()
 end
 
 local function Open()
+	Awake()
 	if not win:IsShown() then
 		Place()
 		win:Show()
@@ -1169,7 +1398,7 @@ local function Open()
 	if win.Raise then
 		win:Raise()
 	end
-	Draw()
+	Draw(true)
 end
 
 -- Shows a quest looked at, the one looked at before kept for "back to".
@@ -1247,7 +1476,13 @@ Q.When("disable", function()
 end)
 
 Q.When("settings", function()
-	Q.RedrawSmall()
+	if asleep and not DB().autoHide then -- (it hid itself: it comes back)
+		Awake()
+		win:Show()
+	end
+	if win and win:IsShown() then
+		Draw(true)
+	end
 end)
 
 -- For tests: the window, its small map, the rows in use (clickable lines), the texts in use (their
@@ -1263,5 +1498,6 @@ function Q.SmallFrame()
 		strings[#strings + 1] = texts[i]:GetText()
 	end
 	return { win = win, map = map, rows = list, texts = strings, quest = mode == "quest" and shown or nil, now = nowId,
-		mode = mode, history = history, content = content }
+		mode = mode, history = history, content = content, asleep = asleep, collapsed = collapsedNow,
+		line = win and win.Line }
 end

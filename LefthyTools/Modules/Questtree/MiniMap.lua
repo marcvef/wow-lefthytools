@@ -17,7 +17,7 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 -- quest's item drops: a soft orange spot, as big as its radius (0..1 of the map's width) or
 -- more; the likeliest one says "drops here (12%)"). look, the
 -- icon (the ones players know from the game's maps): "available" (yellow !), "repeatable" (blue !),
--- "trivial" (a pale !: low level), "locked" (grey !: not open yet), "turnin" (yellow ?),
+-- "trivial" (the game's grey ! of a low quest), "locked" (grey !: not open yet), "turnin" (yellow ?),
 -- "repeatturnin", "progress" (in your log, not done yet). Without look: a start is "available", an
 -- end "turnin"; grey = true makes them "locked" / "progress". note: a line for the tooltip (the
 -- quest). Markers within a few pixels are one, its tooltip listing each (several givers at a
@@ -40,10 +40,11 @@ local NEAR = 8           -- px: markers this close are one
 local MAX_MARKERS = 40   -- (an item from mobs can start a quest in many places)
 local PLAYER_EVERY = 0.1 -- s between moves of your arrow
 local ZOOM_STEP, ZOOM_MAX = 1.35, 8
+-- { atlas, file, alpha, grey, the file's alpha (when the atlas is missing) }
 local LOOKS = { -- the game's map icons (atlas; a dark rim of their own), else the gossip window's
 	available = { "QuestNormal", "Interface\\GossipFrame\\AvailableQuestIcon" },
 	repeatable = { "QuestDaily", "Interface\\GossipFrame\\DailyQuestIcon" },
-	trivial = { "QuestNormal", "Interface\\GossipFrame\\AvailableQuestIcon", 0.55 },
+	trivial = { "TrivialQuests", "Interface\\GossipFrame\\AvailableQuestIcon", nil, nil, 0.55 },
 	locked = { "QuestNormal", "Interface\\GossipFrame\\AvailableQuestIcon", 1, true },
 	turnin = { "QuestTurnin", "Interface\\GossipFrame\\ActiveQuestIcon" },
 	repeatturnin = { "QuestRepeatableTurnin", "Interface\\GossipFrame\\DailyActiveQuestIcon" },
@@ -78,13 +79,15 @@ local function LookOf(point)
 	return point.grey and "locked" or "available"
 end
 
+-- The icon on a texture; its alpha (the file's own when the atlas is missing).
 local function SetArt(texture, look)
 	local art = LOOKS[look] or LOOKS.available
 	if C_Texture and C_Texture.GetAtlasInfo and LT.Value(C_Texture.GetAtlasInfo, art[1]) then
 		texture:SetAtlas(art[1])
-	else
-		texture:SetTexture(art[2])
+		return art[3] or 1
 	end
+	texture:SetTexture(art[2])
+	return art[5] or art[3] or 1
 end
 
 local function MarkerEnter(self)
@@ -166,12 +169,12 @@ local function Dress(m, marker, point)
 	marker.look = not drop and LookOf(point) or nil
 	if not drop then
 		local art = LOOKS[marker.look]
-		SetArt(marker.Icon, marker.look)
+		local alpha = SetArt(marker.Icon, marker.look)
 		SetArt(marker.Shadow, marker.look)
 		marker.Shadow:SetVertexColor(0, 0, 0, 0.7)
 		marker.Icon:SetDesaturated(art[4] == true)
 		local v = art[4] and 0.85 or 1
-		marker.Icon:SetVertexColor(v, v, v, art[3] or 1)
+		marker.Icon:SetVertexColor(v, v, v, alpha)
 	end
 end
 
