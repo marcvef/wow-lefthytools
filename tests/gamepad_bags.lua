@@ -283,12 +283,33 @@ do
 	Wait(1)
 	check(reagent:GetParent() == bag, "open again: in ours again")
 	CloseBags() -- (the bag's close button: only the combined bag closes)
+	check(ContainerFrame6:IsShown() and ContainerFrame6:GetAlpha() == 0, "ours closed: the reagent window not at once (see below)")
+	Wait(1)
 	check(not ContainerFrame6:IsShown() and reagent:GetParent() == ContainerFrame6 and ContainerFrame6:GetAlpha() == 1,
-		"ours closed: the unseen reagent window closes with it (else it stays open, counted as an open bag)")
+		"... but on the next frame: the unseen reagent window closes with it (else it stays open, counted as an open bag)")
 	OpenBags()
 	ContainerFrame6:Show()
 	Wait(1)
 	check(reagent:GetParent() == bag, "both open again: in ours")
+	-- The "open all bags" key (Blizzard's ToggleAllBags): the backpack closes first, then each other bag
+	-- open is counted as it's closed; fewer counted than there are bags, it opens them all again.
+	CloseBags()
+	local counted = 0
+	if ContainerFrame6:IsShown() then
+		counted = counted + 1
+		ContainerFrame6:Hide()
+	end
+	Wait(1)
+	check(counted == 1 and not ContainerFrame6:IsShown() and not ContainerFrameCombinedBags:IsShown()
+		and reagent:GetParent() == ContainerFrame6 and ContainerFrame6:GetAlpha() == 1,
+		"the open-all-bags key: the reagent bag still open when it's counted, so the key closes the bags")
+	OpenBags()
+	ContainerFrame6:Show()
+	Wait(1)
+	CloseBags()
+	OpenBags()
+	Wait(1)
+	check(ContainerFrame6:IsShown() and reagent:GetParent() == bag, "closed and opened again at once: the reagent bag stays in ours")
 	T("mouseBags"):SetValue(false)
 	Wait(1)
 	-- Off: Blizzard's bag as it is.
