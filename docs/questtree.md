@@ -277,6 +277,7 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 | `learn` | true | learning while playing (Learn.lua reads `M.db.learn`) |
 | `autoHide` | true | the companion hides itself when it has nothing to show, and comes back (Small window) |
 | `collapsed` | false | the companion is one line (its title bar's button does the same) |
+| `stepsOpen` | false | the companion's chain steps unfolded (its "Steps (7)" line; no checkbox) |
 | `dialog` | true | the panel beside the quest dialog (In the game's quest UI) |
 | `logBadges` | true | "2/4" on the quest log's lines, the chain in their tooltip, Alt-click to open one in Questtree |
 | `small` | `{}` | the small window's `left`, `top`, `width`, `height` (always kept; used while `keepPlace` is on; one line doesn't change the height kept) |
@@ -385,7 +386,8 @@ The companion: it follows what you're doing without being asked. Two modes: **No
 `/questtree` opens) and **a quest looked at** (a click on any quest, `/questtree <name>`,
 `Q.ShowQuest`, the big window's clicks).
 
-**Now**, top down:
+**Now**, top down: only what to do now and how far along (the guides' "this now, then those");
+what's secondary is in the lines' tooltips or behind a click.
 
 - **Now** (a gold heading with why that quest, a rule under it): the quest I'm on is the last one I
   did something with while the window was open (accepted: `QUEST_ACCEPTED`; super-tracked:
@@ -394,44 +396,52 @@ The companion: it follows what you're doing without being asked. Two modes: **No
   the first on the tracker (`C_QuestLog.GetQuestIDForQuestWatchIndex`), else one of my log in this
   zone (its zone or its turn-in here), else the first of my log; none: "No quest in your log. Pick
   one up below." Then: "[18] Title" in its difficulty colour (large; a click shows everything about
-  it), its chain ("<first quest>: step 3 of 7" and a green bar: the chain is `Q.Chain` without the
-  quests not for me), friends ("Friends: 2 of 5 done" with a dot in each one's class colour; its
-  tooltip names each with their status; setting `friends`), "Ready to turn in"
-  (`C_QuestLog.IsComplete`) or "In your quest log", its objectives (`C_QuestLog.GetQuestObjectives`,
-  at most 6, done ones ticked), **Turn-in:** (name, zone, how far and which way when it's in my zone;
-  a click sets the map pin), **Next:** "[19] Title - giver, zone" (`Q.Opens`, "+N more"), and
-  **Steps**: the chain's steps around this one (from two before, at most 8, "... N before/more"):
-  done ones ticked in green, this one bold with an arrow, the rest numbered in grey, friends' dots
-  after each; a click shows that step.
+  it; its tooltip says what it leads to: "Leads to: [19] Title - giver, zone", `Q.Opens`, "+N more"),
+  "Step 3 of 7 · <first quest>" and a green bar (the chain is `Q.Chain` without the quests not for
+  me), friends on one line only when there are any ("Friends: 2 of 5 done" with a dot in the class
+  colour of each who did it; its tooltip names each with their status; setting `friends`), its
+  objectives (`C_QuestLog.GetQuestObjectives`, at most 6, done ones ticked) or, when it's complete
+  (`C_QuestLog.IsComplete`), "Ready to turn in" instead, **Turn-in:** on one line (name, zone, how far
+  and which way when it's in my zone; a click sets the map pin), and **"Steps (7)"**: a line (a plus or
+  minus icon) that unfolds and folds the chain's steps, folded at first, kept in the setting
+  `stepsOpen`; unfolded, the steps around this one (from two before, at most 8, "... N before/more"):
+  done ones ticked in green, this one bold with an arrow, the rest numbered in grey; a click shows
+  that step.
 - **The small map**: the turn-in's zone (my zone when the turn-in is in it, else the first turn-in's),
   else my zone: the turn-in ("?" yellow when ready, the in-progress icon when not), the turn-ins of
   my other quests and the givers of what I can pick up on that map, and my arrow.
 - **Pick up next** (a heading with my zone and its count, `Q.ZoneCount`: "Elwynn Forest · 12 of 40
-  done"), in groups like Quest Herald's (each quest a row: icon, "[level] Title" in its difficulty
+  done"), in two groups like Quest Herald's (each quest a row: icon, "[level] Title" in its difficulty
   colour, a grey second line, how far and which way at the right):
-  - *In progress*: my other quests, ready ones first, then those turned in in this zone (at most 4):
+  - *In progress*: my other quests, ready ones first, then those turned in in this zone (at most 3):
     "ready to turn in · <ender>" or "in your log · <ender>".
-  - *Available now*: follow-ups of the quest I just turned in (while the window was open) first,
-    then `Q.Next()`'s that I can take ("after <the quest it follows>"), then the zone's
-    (`Q.AvailableIn`: the nearest giver first), at most 6 with "N more here: the quest browser";
-    the second line: the giver (and their zone when it's another) and its step in its chain.
-  - *Coming up*: `Q.Next()`'s and the zone's quests my level is too low for, the lowest first
-    ("from level 22 · <giver>"), at most 3.
-  - *Blocked*: `Q.Next()`'s locked ones with what each needs first ("needs <title>"), at most 3.
-    What Now leads to is its "Next:", not listed again.
-  None at all: "Nothing to pick up nearby. The quest browser has every zone."
+  - *Available now*, only quests for my levels (`Q.InRange`: not grey, at most 2 levels above me):
+    follow-ups of the quest I just turned in (while the window was open) first, then `Q.Next()`'s
+    that I can take ("after <the quest it follows>"), then the zone's (`Q.AvailableIn`: the nearest
+    giver first), at most 3 with "N more here: the quest browser"; the second line: the giver (and
+    their zone when it's another) and its step in its chain. What Now leads to isn't listed again.
+  None at all: "Nothing to pick up nearby. The quest browser has every zone." What's coming up later
+  (level too low) or blocked (needs another first) isn't here: the big window has it.
 
   **How a line looks** (the guides' step lists: this now, then those): a verb icon first (`Q.Icon`,
   the game's own: `QuestTurnin` "?" for one ready to turn in, `SideInProgressquesticon` for one in
-  progress, `QuestNormal` "!" to pick up (`QuestDaily` repeatable, `TrivialQuests` grey for a low one),
-  the "!" dimmed for later, a lock for a blocked one). The first line of Pick up next is full size
-  (`GameFontHighlight`, a 16 px icon, the title in its difficulty colour): what to do now; the rest are
-  smaller (13 px) with only "[level]" in its colour and the title grey (`bebebe`). The second line also
-  says what a quest opens ("opens 3", `Q.Opens`; Available now and Coming up) and, in Available now, what
-  taking it closes ("closes <title>" in orange, `Q.Closes`: its exclusive quests, at most 2 named; the
-  tooltip: "Taking it closes: ... Only one of them can be done."). Section rules are the game's
+  progress, `QuestNormal` "!" to pick up, `QuestDaily` repeatable). The first line of Pick up next is
+  full size (`GameFontHighlight`, a 16 px icon, the title in its difficulty colour): what to do now;
+  the rest are smaller (13 px) with only "[level]" in its colour and the title grey (`bebebe`). The
+  second line of Available now also says what taking it closes ("closes <title>" in orange,
+  `Q.Closes`: its exclusive quests, at most 2 named; the tooltip: "Taking it closes: ... Only one of
+  them can be done."); what a quest opens isn't on the line. Section rules are the game's
   `Options_HorizontalDivider` tinted gold (a gold line without the atlas). Done steps are ticked with
   `UI-QuestTracker-Tracker-Check` in the research's green.
+
+  **Status words say the real reason** (a quest looked at, its lists, the tooltips): a quest "other"
+  for me that another closed (`Q.WhyOther` "closed") is "Skipped", with "You took <title> instead"
+  (for a lead-in: "No longer needed: you have <title>"); not for my race, class or side "Not for your
+  race" / "class" / "faction"; a profession I don't have "Needs <profession>"; a locked one blocked by
+  a reputation or a profession's rank (`Q.Needs`) "Needs Friendly with Stormwind" / "Needs Alchemy
+  100" (the game's names: `FACTION_STANDING_LABEL<n>`, `C_Reputation`, `C_TradeSkillUI`; else
+  English ones, as the big window's), by a quest "Needs <the first of `Q.Missing`>". After a quest's
+  name the same with a small first letter ("needs Start"). The other statuses keep their words.
 
 **One line** (setting `collapsed`, or the button left of the close button in the title bar,
 `QuestLog-icon-shrink` / `QuestLog-icon-Expand`): the window shrinks to its title bar and a line
@@ -451,17 +461,18 @@ setting off while it's hidden brings it back.
 
 **A quest looked at**: at the top "« Back to now" or, after clicking from one quest to another,
 "« Back to <the quest before>" (up to 20 back) and "Back to now" side by side. Then its "[level]
-Title", its chain and bar, a grey line (level, zone, dungeon, repeatable, new in WoW: Forever), my
-status ("Your level is too low: from level 30", "Ready to turn in"), **Requires:** (what it needs
+Title", its step in its chain and bar, a grey line (level, zone, dungeon, repeatable, new in WoW:
+Forever), my status with its real reason ("Your level is too low: from level 30", "Ready to turn in",
+"Skipped" and under it "You took <title> instead", "Needs Friendly with Stormwind"), **Requires:** (what it needs
 first from other chains, by their names), **Needs first:** (`Q.Missing`, numbered, the one to do
 first at the top; at most 8, "and N more"), **Quest giver:** and **Turn-in:** (name, zone, how far;
 an item or object says so, "+2 more"; not known: says so), for an item that starts it **Drops
 from:** "Defias Pillager (12%), ..." (the item's `drops`), the **small map** (the giver's zone, the
 turn-in's for a quest in my log, where the item drops for a quest that only an item starts, unless a
 line picked one; every giver, turn-in and drop spot on it, a person in several places: the spot on
-my map, else the first), **Leads to:** (`Q.Opens`), **Steps** and **Friends:**. Each quest line is a
-button showing that quest (its tooltip: the title, the status, the engine's reason, "Click: show
-this quest"); a giver's or turn-in's line puts its side on the map and sets the game's map pin at
+my map, else the first), **Leads to:** (`Q.Opens`), **"Steps (7)"** (folded or not as in Now) and
+**Friends:**. Each quest line is a button showing that quest (its tooltip: the title, the status and
+its reason, "Click: show this quest"); a giver's or turn-in's line puts its side on the map and sets the game's map pin at
 its spot nearest me (`Q.Waypoint`; Shift-click: its link in chat too).
 
 The data add-on missing: the window says so (run the updater, restart), nothing else. A quest the
@@ -516,11 +527,15 @@ radius] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPlayer(on
   or the zoom changes (or you've explored more); never touches `WorldMapFrame`.
 
 **Tests** (`tests/questtree_small.lua`): the module, settings and commands; difficulty colours;
-the lines' verb icons, the first full size and the rest grey, "opens 2", exclusive quests closing each
-other, one line (the button, the line's click, the setting), hiding itself and coming back and staying
-closed when I closed it, Alt-click in the quest log (through the hook);
-Now (why that quest, the chain, its bar and steps, objectives, turn-in, Next, the map and its
-markers) and Pick up next (each group, nearest first with distance and direction, the zone's count);
+the lines' verb icons, the first full size and the rest grey, no "opens", exclusive quests closing each
+other, Available now only for my levels and at most three, nothing for later, one line (the button,
+the line's click, the setting), hiding itself and coming back and staying closed when I closed it,
+Alt-click in the quest log (through the hook); the status words (skipped and by which, not for my
+class or side, a profession missing or too low, a reputation, the quest first; as a word after a
+name);
+Now (why that quest, its step and bar, objectives, turn-in, what it leads to in the title's
+tooltip, the steps folded and unfolded and kept, the map and its markers) and Pick up next (the two
+groups, nearest first with distance and direction, the zone's count);
 following super tracking, the quest log's hook and its setting, accepting and turning in (the
 follow-up first); a quest looked at ("« Back to", "Back to now", an item's drops and their map, too
 low, done); the map pin from a giver's line and a marker (Shift: chat); friends' dots and their

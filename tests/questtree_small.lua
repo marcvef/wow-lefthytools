@@ -86,7 +86,7 @@ C_QuestLog.GetAllCompletedQuestIDs = function()
 	for id in pairs(completed) do list[#list + 1] = id end
 	return list
 end
-local savedQuests, savedSuper, savedPos, savedMap = QUESTS, SUPER_TRACKED, { PLAYER_POS[1], PLAYER_POS[2] }, PLAYER_MAP
+local savedQuests, savedSuper, savedPos, savedMap, savedLevel = QUESTS, SUPER_TRACKED, { PLAYER_POS[1], PLAYER_POS[2] }, PLAYER_MAP, PLAYER_LEVEL
 local function Log(list) -- the quest log: { id, ... } or { { id, complete } }
 	QUESTS = {}
 	for _, e in ipairs(list) do
@@ -221,7 +221,7 @@ section("Questtree: the companion (Now)")
 Q.SetTestData(QUESTS_DATA, ZONES)
 completed = { [9001] = true }
 Log({ 9002, { 9005, true } })
-PLAYER_MAP, PLAYER_POS[1], PLAYER_POS[2], SUPER_TRACKED = 1429, 0.5, 0.5, 0
+PLAYER_MAP, PLAYER_POS[1], PLAYER_POS[2], SUPER_TRACKED, PLAYER_LEVEL = 1429, 0.5, 0.5, 0, 8
 Progress()
 slash("")
 local s = Small()
@@ -231,21 +231,29 @@ for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsQuesttreeSmall"
 check(escapes and s.win:GetScript("OnUpdate") == nil and s.win.TitleContainer.TitleText:GetText() == "Questtree",
 	"Escape closes it, no OnUpdate on it, its title is the module's name")
 check(s.now == 9002 and Has(s.texts, "Now  in this zone"), "now: the quest of my log in this zone, and why: " .. tostring(s.now))
-check(RowWith("[6] The Second Step") and Has(s.texts, "A Fine Start: step 2 of 3") and s.win.Bar:IsShown(),
-	"its title with its level, its chain's step and the bar")
-check(Has(s.texts, "In your quest log") and Has(s.texts, "- Wolf Pelts: 2/5") and Has(s.texts, "Candles: 3/3"),
-	"in my log, its objectives (done ones ticked)")
-check(RowWith("Turn-in: Farmer Saldean, Westfall") and RowWith("Next: [10] Westward Bound - Farmer Saldean, Westfall"),
-	"where to turn it in, what comes next and who gives it")
+check(RowWith("[6] The Second Step") and Has(s.texts, "Step 2 of 3 · A Fine Start") and s.win.Bar:IsShown(),
+	"its title with its level, its step in its chain and the bar")
+check(not Has(s.texts, "In your quest log") and Has(s.texts, "- Wolf Pelts: 2/5") and Has(s.texts, "Candles: 3/3"),
+	"its objectives (done ones ticked); no line saying it's in my log")
+check(RowWith("Turn-in: Farmer Saldean, Westfall") and not RowWith("Next:"), "where to turn it in, one line; what comes next isn't a line")
+local title = RowWith("[6] The Second Step")
+title:GetScript("OnEnter")(title)
+check(Has(TOOLTIP.lines, "Leads to: [10] Westward Bound - Farmer Saldean, Westfall"), "... it's in the title's tooltip, with who gives it")
+title:GetScript("OnLeave")(title)
+local stepsRow = RowWith("Steps (3)")
+check(stepsRow and not RowWith("2. The Second Step") and M.db.stepsOpen == false, "the chain's steps folded behind \"Steps (3)\" at first")
+stepsRow:Click()
 local done, current, future = RowWith("A Fine Start"), RowWith("2. The Second Step"), RowWith("3. Westward Bound")
-check(Has(s.texts, "Steps") and done and done.Text:GetText():find("UI-QuestTracker-Tracker-Check", 1, true) and current
-	and current.Text.font == "GameFontNormal" and future, "the chain's steps: done ticked, this one bold, the next one numbered")
+check(M.db.stepsOpen == true and done and done.Text:GetText():find("UI-QuestTracker-Tracker-Check", 1, true) and current
+	and current.Text.font == "GameFontNormal" and future, "a click unfolds them (kept): done ticked, this one bold, the next one numbered")
+RowWith("Steps (3)"):Click()
+check(M.db.stepsOpen == false and not RowWith("2. The Second Step"), "another click folds them")
 check(s.map.frame:IsShown() and s.map.map == 1436 and #s.map:Markers() == 1 and s.map:Markers()[1].look == "progress",
 	"the small map: the turn-in's zone, its marker (not done yet)")
 
 section("Questtree: the companion (Pick up next)")
 check(Has(s.texts, "Pick up next  Elwynn Forest") and Has(s.texts, "In progress") and Has(s.texts, "Available now")
-	and Has(s.texts, "Coming up") and Has(s.texts, "Blocked"), "Pick up next: this zone, in groups")
+	and not Has(s.texts, "Coming up") and not Has(s.texts, "Blocked"), "Pick up next: this zone, two groups (coming up and blocked are the big window's)")
 local pelts = RowWith("[7] Fine Wolf Pelts")
 check(pelts and Plain(pelts.Text:GetText()):find("ready to turn in · Tailor Ann", 1, true) and pelts.Right:GetText() == "right here",
 	"in progress: my other quest, ready, its turn-in right here")
@@ -253,12 +261,8 @@ local candles, farm = RowIndex("[8] Kobold Candles"), RowIndex("[9] Far Away Far
 check(candles and farm and candles < farm and Small().rows[candles].Right:GetText() == "30 yd NE"
 	and Small().rows[farm].Right:GetText() == "570 yd NE", "available now: the nearest giver first, how far and which way")
 check(Plain(Small().rows[candles].Text:GetText()):find("William Pestle", 1, true), "each with its giver")
-local later = RowWith("[25] Later Wolves")
-check(later and Plain(later.Text:GetText()):find("from level 22", 1, true), "coming up: a quest of this zone for a higher level")
-local blocked = RowLast("[10] Westward Bound")
-check(not (blocked and Plain(blocked.Text:GetText()):find("needs", 1, true)), "what now leads to isn't blocked again (it's its Next)")
-local order = RowWith("[8] Ann's Second Order")
-check(order and Plain(order.Text:GetText()):find("needs Fine Wolf Pelts", 1, true), "blocked: what it needs first")
+check(not RowWith("[25] Later Wolves") and not RowWith("[8] Ann's Second Order") and not RowWith("[10] Westward Bound"),
+	"nothing for later or blocked, nor what now leads to")
 check(Has(s.texts, "Elwynn Forest · 1 of 7 done"), "the zone's count (Q.ZoneCount)")
 
 -- It follows: super tracking, the quest log's details, accepting, turning in.
@@ -301,8 +305,9 @@ section("Questtree: a quest looked at")
 s.rows[follow]:Click()
 s = Small()
 check(s.mode == "quest" and s.quest == 9003 and RowWith("« Back to now") and #s.history == 0, "a click shows it, with « Back to now")
-check(Has(s.texts, "[10] Westward Bound") and Has(s.texts, "A Fine Start: step 3 of 3") and RowWith("Turn-in: Old Chest (an object), Westfall"),
+check(Has(s.texts, "[10] Westward Bound") and Has(s.texts, "Step 3 of 3 · A Fine Start") and RowWith("Turn-in: Old Chest (an object), Westfall"),
 	"its title, chain and turn-in")
+RowWith("Steps (3)"):Click()
 RowWith("A Fine Start"):Click()
 s = Small()
 check(s.quest == 9001 and RowWith("« Back to Westward Bound") and RowWith("Back to now"), "a step clicked: « Back to the one before, and Back to now")
@@ -515,7 +520,7 @@ do
 	Progress()
 	Q.RedrawSmall(true)
 	s = Small()
-	check(s.now == 9002 and Has(s.texts, "A Fine Start: step 2 of 3") and RowWith("[8] Kobold Candles"),
+	check(s.now == 9002 and Has(s.texts, "Step 2 of 3 · A Fine Start") and RowWith("[8] Kobold Candles"),
 		"without Q.ChainStep, Q.Available, Q.LevelColor: its chain from Q.Chain, the zone's quests, the level colours")
 	for name, fn in pairs(saved) do Q[name] = fn end
 end
@@ -541,18 +546,20 @@ do
 		[9204] = { id = 9204, title = "Choose the Blade", level = 18, zone = 1429, excl = { 9205 }, starts = Giver(932, "Smith Ivy", 0.6), ends = {} },
 		[9205] = { id = 9205, title = "Choose the Shield", level = 18, zone = 1429, excl = { 9204 }, starts = Giver(932, "Smith Ivy", 0.6), ends = {} },
 		[9207] = { id = 9207, title = "Later Work", level = 26, minLevel = 25, zone = 1429, starts = Giver(933, "Foreman Gus", 0.7), ends = {} },
+		[9208] = { id = 9208, title = "Low Chores", level = 5, zone = 1429, starts = Giver(934, "Old Nan", 0.51), ends = {} },
+		[9209] = { id = 9209, title = "Fourth Errand", level = 18, zone = 1429, starts = Giver(935, "Runner Tim", 0.65), ends = {} },
 	}
 	local savedData = QUESTS_DATA
 	QUESTS_DATA = LINES -- (Log() reads the titles from it)
 	Q.SetTestData(LINES, { { map = 1429, name = "Elwynn Forest", continent = 1415, minLevel = 1, maxLevel = 30 } })
 	completed = {}
 	Log({ { 9206, true } })
-	PLAYER_MAP, PLAYER_POS[1], PLAYER_POS[2], SUPER_TRACKED = 1429, 0.5, 0.5, 0
+	PLAYER_MAP, PLAYER_POS[1], PLAYER_POS[2], SUPER_TRACKED, PLAYER_LEVEL = 1429, 0.5, 0.5, 0, 18
 	Progress()
 	win:Hide()
 	slash("")
 	s = Small()
-	local mail, debts, blade, later = RowLast("[18] Mail Run"), RowWith("[18] Old Debts"), RowWith("[18] Choose the Blade"), RowWith("[26] Later Work")
+	local mail, debts, blade = RowLast("[18] Mail Run"), RowWith("[18] Old Debts"), RowWith("[18] Choose the Blade")
 	local turnin = RowWith("Turn-in: Postman Pat")
 	check(s.now == 9206 and mail and turnin and turnin.Text:GetText():find("|A:QuestTurnin:14:14|a", 1, true),
 		"now: the quest in my log, its turn-in line with the game's ? (ready)")
@@ -560,7 +567,7 @@ do
 		"the first line of Pick up next: full size, its verb icon (! to pick up)")
 	check(blade and blade.Text.font == "GameFontHighlightSmall" and blade.Text:GetText():find("|A:QuestNormal:13:13|a", 1, true)
 		and blade.Text:GetText():find("|cffbebebeChoose the Blade|r", 1, true), "the rest smaller, their titles grey")
-	check(debts and Plain(debts.Text:GetText()):find("opens 2", 1, true), "what a quest opens: opens 2")
+	check(debts and not Plain(debts.Text:GetText()):find("opens", 1, true), "what a quest opens isn't on its line")
 	local shield = RowWith("[18] Choose the Shield")
 	check(blade and shield and Plain(blade.Text:GetText()):find("closes Choose the Shield", 1, true)
 		and Plain(shield.Text:GetText()):find("closes Choose the Blade", 1, true),
@@ -570,7 +577,9 @@ do
 		check(Has(TOOLTIP.lines, "Only one of them can be done."), "... its tooltip says only one can be done")
 		blade:GetScript("OnLeave")(blade)
 	end
-	check(later and later.Text:GetText():find("|A:QuestNormal:13:13:0:0:150:150:150|a", 1, true), "for later: the ! dimmed")
+	check(not RowWith("[26] Later Work"), "one for later isn't there (the big window's)")
+	check(not RowWith("Low Chores") and not RowWith("Fourth Errand") and RowWith("1 more here: the quest browser"),
+		"available now: only for my levels (not a grey one, however near), at most three, then how many more")
 
 	-- One line: the title bar's button, the line, a click on it.
 	local height = win:GetHeight()
@@ -627,6 +636,60 @@ do
 	LT:SetModuleSetting(M, "autoHide", true)
 	win:Hide()
 	QUESTS_DATA = savedData
+end
+
+---------------------------------------------------------------------------
+section("Questtree: the companion's status words (the real reason)")
+do
+	local factions = C_Reputation
+	C_Reputation = { GetFactionDataByID = function(id) return id == 72 and { currentStanding = 2000, name = "Stormwind" } or nil end }
+	PROFESSIONS = { { name = "Alchemy", level = 60, line = 171 } }
+	local function Q20(id, title, extra)
+		local q = { id = id, title = title, level = 20, minLevel = 18, zone = 1429, starts = { Npc(940, "Clerk May", 1429, 0.5, 0.5) }, ends = {} }
+		for k, v in pairs(extra or {}) do q[k] = v end
+		return q
+	end
+	local WORDS = {
+		[9401] = Q20(9401, "Brew", { skill = { id = 171, value = 100 } }),
+		[9402] = Q20(9402, "Forge", { skill = { id = 164, value = 50 } }),
+		[9403] = Q20(9403, "Friends", { rep = { faction = 72, min = 3000 } }),
+		[9404] = Q20(9404, "Mage", { classes = 128 }),
+		[9405] = Q20(9405, "One way", { excl = { 9406 } }),
+		[9406] = Q20(9406, "Other way", { excl = { 9405 } }),
+		[9407] = Q20(9407, "Report in", { breadcrumbFor = 9408 }),
+		[9408] = Q20(9408, "The Real Work"),
+		[9409] = Q20(9409, "Start"),
+		[9410] = Q20(9410, "Second", { pre = { 9409 } }),
+		[9411] = Q20(9411, "Horde Only", { faction = "Horde" }),
+	}
+	local savedData = QUESTS_DATA
+	QUESTS_DATA = WORDS
+	Q.SetTestData(WORDS, { { map = 1429, name = "Elwynn Forest", continent = 1415, minLevel = 15, maxLevel = 25 } })
+	completed = { [9406] = true }
+	Log({ 9408 })
+	PLAYER_LEVEL = 20
+	Progress()
+	local function Shown(id) slash(tostring(id)); return Small().texts end
+	check(Has(Shown(9401), "Needs Alchemy 100"), "a profession's rank too low: needs it, with the rank")
+	check(Has(Shown(9402), "Needs Blacksmithing"), "a profession I don't have: needs it (not \"not for you\")")
+	check(Has(Shown(9403), "Needs Friendly with Stormwind"), "a reputation too low: the standing and the faction")
+	check(Has(Shown(9404), "Not for your class") and Has(Shown(9411), "Not for your faction"), "another class's, the other side's: says which")
+	local texts = Shown(9405)
+	check(Has(texts, "Skipped") and Has(texts, "You took Other way instead") and not Has(texts, "Not for this character"),
+		"closed by the other way I took: skipped, and by which")
+	check(Has(Shown(9407), "Skipped") and Has(Small().texts, "No longer needed: you have The Real Work"), "a lead-in to a quest I have: no longer needed")
+	check(Has(Shown(9410), "Needs Start"), "needs another quest first: which")
+	slash("9409")
+	local second = RowWith("[20] Second")
+	check(second and Plain(second.Text:GetText()):find("needs Start", 1, true), "after a quest's name: the same, as a word")
+	second:GetScript("OnEnter")(second)
+	check(Has(TOOLTIP.lines, "Needs Start"), "... and in its tooltip")
+	second:GetScript("OnLeave")(second)
+	Small().win:Hide()
+	C_Reputation, PROFESSIONS, QUESTS_DATA = factions, {}, savedData
+	completed = {}
+	Log({})
+	Progress()
 end
 
 ---------------------------------------------------------------------------
@@ -687,7 +750,7 @@ end
 -- keep theirs) and the mock's world.
 for name in pairs(replaced) do PutBack(name) end
 Small().win:Hide()
-QUESTS, SUPER_TRACKED, PLAYER_MAP = savedQuests, savedSuper, savedMap
+QUESTS, SUPER_TRACKED, PLAYER_MAP, PLAYER_LEVEL = savedQuests, savedSuper, savedMap, savedLevel
 PLAYER_POS[1], PLAYER_POS[2] = savedPos[1], savedPos[2]
 C_QuestLog.GetAllCompletedQuestIDs = savedCompleted
 C_Map.SetUserWaypoint, C_Map.CanSetUserWaypointOnMap, C_Map.GetUserWaypointHyperlink =

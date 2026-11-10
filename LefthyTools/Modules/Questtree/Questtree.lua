@@ -34,6 +34,7 @@ local M = LT:NewModule("questtree", {
 		learn = true,     -- learning givers, turn-ins and prerequisites while playing (Learn.lua reads it)
 		autoHide = true,  -- the companion hides itself when there's nothing to show, and comes back
 		collapsed = false, -- the companion is one line (its title bar's button)
+		stepsOpen = false, -- the companion shows the chain's steps (its "Steps (7)" line folds and unfolds them)
 		dialog = true,    -- a panel beside the quest dialog: the chain, its steps, what it leads to (Dialog.lua)
 		logBadges = true, -- "2/4" on the quest log's titles, the chain in their tooltip, Alt-click (Dialog.lua)
 		small = {},       -- the small window: left, top, width, height (Small.lua)
