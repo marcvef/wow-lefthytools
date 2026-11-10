@@ -8,7 +8,8 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 -- teaches while playing (Learn.lua) fills the gaps (Q.AddLearned). Also Forever's playable races
 -- (Q.Races), where items that start quests drop (an item's drops), who gives and takes what
 -- (Q.GiverQuests), the quests given in a zone but listed elsewhere (Q.ZoneGiven), a quest's objectives
--- with where to do them (Q.Objectives), its rewards (Q.Rewards) and turn-in (Q.Ends). Without the add-on
+-- with where to do them (Q.Objectives), its rewards (Q.Rewards) and turn-in (Q.Ends), which quests an
+-- item is for (Q.ItemQuests: an index made over a few frames the first time it's asked). Without the add-on
 -- everything here answers nil or empty lists, and Q.DataProblem() says why.
 
 local DATA_ADDON = "LefthyTools_QuestData"
@@ -557,6 +558,134 @@ function Q.GiverQuests(id, kind)
 	return entry.starts, entry.ends
 end
 
+-- ---------------------------------------------------------------- quest items
+
+-- Q.ItemQuests: which quests an item is for. Made from the quests' raw strings (only their starts and
+-- objectives fields, and only of quests whose string has an item in it: no quest is parsed), a few
+-- hundred quests a frame, the first time it's asked after the data is loaded; quests changed by
+-- learning (Apply) go over it, per data generation.
+local ITEM_STEP = 300 -- quests a frame at most
+local ITEM_MS = 3     -- and no longer than this a frame (where the game says: debugprofilestop)
+local itemRaw, itemRawOf  -- item -> { { id, role } } of the data, and the data table it's of
+local itemScan            -- the build going on: { db, key (the last quest read), index }
+local itemTop, itemTopGen = {}, nil -- learned quests' items over itemRaw (lists copied), and the data generation
+local itemSorted = setmetatable({}, { __mode = "k" }) -- lists put in order (Q.ItemQuests)
+local touched = {}        -- quests Apply changed: their items go over the data's
+Q.itemGen = 0             -- goes up when the index is made (the tooltips' caches read it)
+
+local ROLE_ORDER = { objective = 1, provided = 2, starts = 3 }
+
+local function AddItem(index, item, quest, role)
+	if not item then return end
+	local list = index[item]
+	if not list then
+		list = {}
+		index[item] = list
+	end
+	for _, e in ipairs(list) do
+		if e.id == quest and e.role == role then return end
+	end
+	list[#list + 1] = { id = quest, role = role }
+end
+
+-- A quest's items into the index: its raw string's starts (field 19: "n12,i345") and objectives
+-- (field 21: "k6:10,i745p"), or a quest table's (test or learned data) starts and objectives.
+local function ScanQuest(index, id, raw)
+	if type(raw) == "string" then
+		if not raw:find("i%d") then return end -- (no item anywhere in it: most quests)
+		local f = Fields(raw, "|")
+		for item in (f[19] or ""):gmatch("i(%d+)") do AddItem(index, tonumber(item), id, "starts") end
+		for letter, item, provided in (f[21] or ""):gmatch("(%a)(%d+):?%d*(p?)") do
+			if letter == "i" then AddItem(index, tonumber(item), id, provided == "p" and "provided" or "objective") end
+		end
+	elseif type(raw) == "table" then
+		for _, a in ipairs(type(raw.starts) == "table" and raw.starts or {}) do
+			if type(a) == "table" and a.kind == "item" then AddItem(index, tonumber(a.id), id, "starts") end
+		end
+		for _, o in ipairs(type(raw.objectives) == "table" and raw.objectives or {}) do
+			if type(o) == "table" and o.kind == "item" then AddItem(index, tonumber(o.id), id, o.provided and "provided" or "objective") end
+		end
+	end
+end
+
+-- Milliseconds (debugprofilestop), nil where there's none (tests).
+local function Clock()
+	local ok, ms = pcall(debugprofilestop)
+	return ok and type(ms) == "number" and ms or nil
+end
+
+-- One frame's part of the build; the next on the next frame. The data replaced meanwhile: it stops
+-- (the next question starts again).
+local function ScanStep(scan)
+	if itemScan ~= scan or scan.db ~= db then return end
+	local list, key, n, start = db.quests, scan.key, 0, Clock()
+	while true do
+		local id, raw = next(list, key)
+		if id == nil then
+			itemRaw, itemRawOf, itemScan, itemTopGen = scan.index, db, nil, nil
+			Q.itemGen = Q.itemGen + 1
+			return
+		end
+		key = id
+		ScanQuest(scan.index, id, raw)
+		n = n + 1
+		if n >= ITEM_STEP or (start and n % 25 == 0 and (Clock() or start) - start >= ITEM_MS) then break end
+	end
+	scan.key = key
+	C_Timer.After(0, function() ScanStep(scan) end)
+end
+
+-- The learned quests' items over the data's (the lists they change are copies).
+local function ItemTop()
+	if itemTopGen == Q.dataGen then return end
+	itemTop, itemTopGen = {}, Q.dataGen
+	for id in pairs(touched) do
+		local q = Q.Quest(id)
+		if q then
+			local extra = {}
+			ScanQuest(extra, id, { starts = q.starts, objectives = Q.Objectives(id) })
+			for item, list in pairs(extra) do
+				local merged = itemTop[item]
+				if not merged then
+					merged = {}
+					for i, e in ipairs(itemRaw[item] or NONE) do merged[i] = e end
+					itemTop[item] = merged
+				end
+				for _, e in ipairs(list) do AddItem(itemTop, item, e.id, e.role) end
+			end
+		end
+	end
+end
+
+-- The quests an item is for: { { id = questID, role = "objective" (collected for it) | "provided" (the
+-- giver hands it over) | "starts" (it starts the quest) } }, objectives first, then by quest ID; an
+-- empty list for an item of no quest. Shared, never written by callers. nil while the index isn't
+-- made yet (without data, or for the few frames after the first question: it's made then, never in
+-- one go).
+function Q.ItemQuests(item)
+	if not db then return nil end
+	if itemRawOf ~= db then
+		if not (itemScan and itemScan.db == db) then
+			local scan = { db = db, index = {} }
+			itemScan, itemRaw, itemRawOf = scan, nil, nil
+			C_Timer.After(0, function() ScanStep(scan) end)
+		end
+		return nil
+	end
+	ItemTop()
+	item = tonumber(item)
+	local list = item and (itemTop[item] or itemRaw[item])
+	if not list then return NONE end
+	if not itemSorted[list] then
+		table.sort(list, function(a, b)
+			if a.role ~= b.role then return ROLE_ORDER[a.role] < ROLE_ORDER[b.role] end
+			return a.id < b.id
+		end)
+		itemSorted[list] = true
+	end
+	return list
+end
+
 -- A zone a learned quest is in, for Q.Zones (the client's name and continent).
 local function ZoneEntry(map)
 	local entry = zoneById[map]
@@ -684,6 +813,7 @@ local function MergeActors(q, key, list)
 end
 
 local function Apply(id, fields)
+	touched[id] = true -- (its items, for Q.ItemQuests)
 	local q = Q.Quest(id)
 	local zoneBefore = q and q.zone
 	if not q then
@@ -770,6 +900,7 @@ local function Reset()
 	raceList, raceById = nil, nil
 	searchIndex = nil
 	objectivesOf, rewardsOf, extrasGen = {}, {}, nil
+	touched, itemTop, itemTopGen = {}, {}, nil -- (Q.ItemQuests: the index is made again for other data)
 end
 
 local function Use(data)
@@ -837,6 +968,13 @@ function Q.DataInfo()
 	local n = 0
 	for _ in pairs(db.quests) do n = n + 1 end
 	return { source = db.source, build = db.build, quests = n }
+end
+
+-- Test hook: uses a data table in the add-on's own format (LefthyToolsQuestData: strings) as if it
+-- had just been loaded (Q.Load).
+function Q.SetTestRawData(data)
+	tried, why, pending = true, nil, {}
+	Use(data)
 end
 
 -- Test hook: replaces the data with quests (a list of quest tables, or { [id] = table }) and zones

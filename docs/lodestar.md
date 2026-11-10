@@ -16,6 +16,7 @@ and takes it and where, and where each quest stands for you and your friends.
 | `Modules/Lodestar/Views.lua` | the big window's other views: my quests (the quest log, organised; the storylines to go on with), the level path (where to go next) |
 | `Modules/Lodestar/Learn.lua` | learning givers, enders and prerequisites while playing |
 | `Modules/Lodestar/Dialog.lua` | in the game's quest UI: the panel beside the quest dialog, chain steps on the quest log's lines, Alt-click there |
+| `Modules/Lodestar/Items.lua` | quest items: item tooltips (which quest it's for, where that stands, whether to discard it), `Q.ItemDone` and the sorted bags' mark |
 | `Modules/Beacon/QuestShare.lua` | friends' progress and learned records over Beacon (`B2;q…`, from 0.7.0-70) |
 
 Every Lodestar file starts with `local Q = ns.Lodestar or {}; ns.Lodestar = Q`, so the order they
@@ -217,6 +218,17 @@ read.
   the zone that are listed elsewhere (the Deadmines' at Sentinel Hill), the lowest level first.
 - `Q.Races()`: Forever's playable races, `{ { id, bit, faction, name, classic } }` by ID (the data's;
   without it the ten known when this was written); `Q.RaceInfo(id)`: one of them or nil.
+- `Q.ItemQuests(item)`: the quests an item is for, `{ { id = questID, role = "objective" | "provided" |
+  "starts" } }` (collected for it, handed over by its giver, starts it), objectives first, then by
+  quest ID; an empty shared list for an item of no quest; nil while the index isn't made. Shared,
+  never written by callers. The index is made the first time it's asked after the data is loaded,
+  over the next frames (300 quests a frame at most, and no longer than 3 ms where `debugprofilestop`
+  answers: the real data's 5257 quests take about 18 frames): from each quest's raw string, only
+  those with an item in it (`i<digits>`), only its `starts` (field 19) and `objectives` (field 21):
+  no quest is parsed. A test quest's table (`Q.SetTestData`) gives its `starts` and `objectives`.
+  Quests changed by learning (`Q.AddLearned`: an item that starts one) go over the data's per
+  `Q.dataGen` (the lists they change are copies). New data (another table): made again. `Q.itemGen`
+  goes up when it's made. Needs the data loaded: it doesn't load it.
 - `Q.GiverQuests(id[, kind])`: the quests an NPC (`"npc"`, the default) or object (`"object"`) starts
   and ends, two lists of quest IDs (shared), learned ones added; for tooltips: no quest is read. Needs
   the data loaded (`Q.IsLoaded()`): it doesn't load it.
@@ -238,7 +250,8 @@ read.
   a quest needs leads to it (`opens`) without saying so; `Q.GiverQuests` answers from the quests'
   `starts` and `ends`; an item's `drops` as given; `objectives` and `rewards` (as `Q.Objectives` and
   `Q.Rewards` answer) as given; `Q.Races()` the known ten; `Q.ZoneGiven` empty.
-  Learned data and caches go; the callbacks run at once.
+  Learned data and caches go; the callbacks run at once. `Q.SetTestRawData(data)`: a table in the
+  add-on's own format (`LefthyToolsQuestData`, strings) used as if it had just been loaded.
 
 ## Engine
 
@@ -334,6 +347,7 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 | `keepPlace` | true | the small window opens where it was left, at its size; off: right of the middle, 340 x 580 |
 | `followLog` | true | while the small window is open, a quest opened in the quest log (or clicked in the objective tracker) becomes its "Now" |
 | `tooltips` | true | "Lodestar: starts ..." lines in NPC tooltips (below); the data loads a few seconds after the loading screen for them |
+| `itemTooltips` | true | quest items: "Lodestar: for <quest> ..." in item tooltips, the sorted bags' mark (Quest items); the data loads for it as for `tooltips` |
 | `friends` | true | friends' progress in the windows (`Q.Friends`) |
 | `learn` | true | learning while playing (Learn.lua reads `M.db.learn`) |
 | `autoHide` | true | the companion hides itself when it has nothing to show, and comes back (Small window) |
@@ -345,7 +359,7 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 
 The settings page: Open the small window, Open the quest browser (`Q.ToggleBrowser`, or a chat line
 when Browser.lua isn't there), the checkboxes under Window (with `autoHide` and `collapsed`), "In the
-game's quest UI" (`dialog`, `logBadges`), Tooltips, Friends and Learning.
+game's quest UI" (`dialog`, `logBadges`), Tooltips (`tooltips`, `itemTooltips`), Friends and Learning.
 
 **Commands:** `/lodestar` opens or closes the small window (on "Now"), `/lodestar <name or ID>`
 shows a quest (a quest link works too), `/lodestar browse` the quest browser, `/lodestar settings`,
@@ -445,7 +459,8 @@ controller), and a tracker-only Alt-click (an Alt-click on a tracker line opens 
 the hook sees it the same way; nothing of the tracker is hooked).
 
 Never lags: nothing is loaded, registered or run at login, except the tooltips' one load a few
-seconds after it (setting `tooltips`); the windows load the data when they open.
+seconds after it (setting `tooltips` or `itemTooltips`; a second later the NPC index and, for
+`itemTooltips`, the start of the item index); the windows load the data when they open.
 
 ## Small window
 
@@ -726,6 +741,68 @@ for once); a greeting; the setting off; the data not loaded in a fight. The ques
 quest's line (the title unchanged), nothing on one in no chain, left of Misc Tweaks' NEW, kept until
 progress changes, the tooltip (a long chain: five steps from one before), Alt-click on the next frame,
 the setting off and on again.
+
+## Quest items (Items.lua)
+
+Which quests an item in your bags is for and where they stand, so you know what to keep and what to
+discard (setting `itemTooltips`).
+
+**Item tooltips**: a `TooltipDataProcessor` post-call on `Item` tooltips, as Chronicle's "Craftable
+by": `GameTooltip` and `ItemRefTooltip` (chat links) only, not forbidden ones; so bags, the bank, loot,
+vendors, chat links (not the comparison tooltips). Nothing for a secret item ID or data. Lines, for
+each quest of `Q.ItemQuests(item)` with my status (`Q.Status`):
+
+- collected for it (or handed over by its giver): "Lodestar: for <title> · in your log (3/8)" (my
+  progress: the quest log's objective the data names, `Q.LogObjectives`, else the one with the item's
+  name), "· ready to turn in" (`C_QuestLog.IsComplete`), "· not taken yet: you can take it" / "...: from
+  level 40" / "...: needs another quest first", "· done", "· skipped" (`Q.WhyOther` "closed": an
+  exclusive one taken), "· not for you";
+- an item that starts it: "Lodestar: starts the quest <title> · you can start it" / "· in your log" /
+  "· from level 30" / "· needs another quest first" / "· already done: you can discard it";
+- the quests that still need it first (then starters, by status, by ID), at most 4, then "Lodestar: and
+  N more";
+- last: "No quest needs it any more: you can discard it" (green-grey) when none does (not under a
+  single starter's line, which says it already), or "Still needed for <title> [and N more]" when only
+  some do.
+
+A quest needs the item unless it's done or "other" (skipped, not for me); one it starts also not
+when it's in my log. Quests the data doesn't have with the item (Forever's own quests EG Link hasn't
+described): a quest of my log whose objective names it, by the item's name from the client
+(`C_Item.GetItemInfo`, so in the client's language: "Leinenstoffbündel: 1/4" matches on a German
+client), its name exactly or inside the objective's text: "Lodestar: for <title> · in your log (1/4)".
+An item the client hasn't loaded yet gets those on a later hover.
+
+**Cost**: only once the quest data is loaded (Module, NPC tooltips: a few seconds after the loading
+screen, the item index started a second later); a hover never loads it. An item's lines are made the
+first time it's hovered and kept until `Q.dataGen`, `Q.progressGen`, `Q.itemGen` or the quest log
+changes (`QUEST_LOG_UPDATE`, `QUEST_ACCEPTED`, `QUEST_REMOVED`, `QUEST_TURNED_IN`, only counted, and
+only while the setting is on): a hover is a table lookup. While the index is being made (the first
+frames), nothing, and nothing kept. The quest log's item objectives are read once per change, for
+all items.
+
+**`Q.ItemDone(item)`**: true when the data ties the item to quests and none needs it any more (as
+above: each done, skipped or not for me, and nothing it starts I can still take); false when one
+does; nil for an item of no quest the data knows, or before the data or its index is there. Kept per
+data, progress and quest log change. `Q.ItemMarked(item)`: the same with Lodestar and `itemTooltips`
+on (false otherwise).
+
+**The sorted bags** (Misc Tweaks' `gamepadBags`/`mouseBags`, GamepadBags.lua): an item of the quest
+items section with `Q.ItemMarked` gets a small dim red x (`Interface\RaidFrame\ReadyCheck-NotReady`,
+14 px, 75%) in its top left corner, a texture of ours on Blizzard's item button (as Beacon's reserved
+border, kept in a table of ours, nothing written into the button), at `OVERLAY` 7. Only there: a trade
+good that was some done quest's objective (Linen Cloth) is still worth keeping. Set with each layout
+and each sort that keeps the order (an item moved, a quest done meanwhile); hidden when ours goes. The
+top left corner is free on a quest item (Blizzard's junk coin and upgrade arrow are for grey items and
+gear). Nothing taints: a texture on the button isn't protected and no Blizzard code reads it.
+
+**Tests** (`tests/lodestar_items.lua`): the index (nil at the first question, made on the next frame;
+objectives, the giver's items, starters; an item of no quest; shared lists; a learned quest's item on
+top; the real data over 17 frames or more, Hogger's claw, Furlbrow's Deed); each tooltip line (in my
+log with progress, ready, done and skipped: discard, a starter's three, many quests: four and "and 1
+more", "Still needed for ..."); quests of my log by the item's name, a German one; kept until the log
+or progress changes; ItemRefTooltip, another tooltip, a secret ID, the setting; nothing before the data
+is loaded and no load; `Q.ItemDone`; the bags' mark (marked, not marked, moved with its item, the
+setting off).
 
 ## Big window (Browser.lua)
 

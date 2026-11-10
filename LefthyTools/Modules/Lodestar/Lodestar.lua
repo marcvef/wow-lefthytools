@@ -43,6 +43,7 @@ local M = LT:NewModule("lodestar", {
 		keepPlace = true, -- the small window opens where it was left, at its size
 		followLog = true, -- the small window shows the quest opened in the quest log (or clicked in the tracker)
 		tooltips = true,  -- "Lodestar: starts ..." in NPC tooltips
+		itemTooltips = true, -- "Lodestar: for <quest> ..." in item tooltips, the sorted bags' mark (Items.lua)
 		friends = true,   -- friends' progress (Beacon friends with LefthyTools; Learn.lua and QuestShare.lua)
 		learn = true,     -- learning givers, turn-ins and prerequisites while playing (Learn.lua reads it)
 		autoHide = true,  -- the companion hides itself when there's nothing to show, and comes back
@@ -823,6 +824,8 @@ function M:BuildOptions(o)
 	o:Header(L["Tooltips"])
 	o:Checkbox("tooltips", L["Quest lines in NPC tooltips"],
 		L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Lodestar: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."])
+	o:Checkbox("itemTooltips", L["Quest items in tooltips"],
+		L["An item's tooltip says which quest it's for and where that quest stands: in your log with your progress, not taken yet, or done. When no quest needs it any more, it says you can discard it, and the sorted bags mark it."])
 	o:Header(L["Friends"])
 	o:Checkbox("friends", L["Friends' progress"],
 		L["Which of your Beacon friends have done a quest, have it in their log or can take it. Needs Beacon, and friends with LefthyTools."])
@@ -972,7 +975,7 @@ local WARM_DELAY = 5
 local warmer, warmed = nil, false
 
 local function WarmNow()
-	if warmed or not (M.enabled and M.db.tooltips) then
+	if warmed or not (M.enabled and (M.db.tooltips or M.db.itemTooltips)) then
 		return
 	end
 	if LT.InCombat() then
@@ -987,6 +990,9 @@ local function WarmNow()
 	C_Timer.After(1, function()
 		if Q.IsLoaded and Q.IsLoaded() and Q.GiverQuests and not LT.InCombat() then
 			pcall(Q.GiverQuests, 0)
+			if Q.ItemQuests and M.db.itemTooltips then
+				pcall(Q.ItemQuests, 0) -- (the item index starts, made over the next frames: Items.lua)
+			end
 		end
 	end)
 end

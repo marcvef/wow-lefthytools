@@ -83,6 +83,11 @@ local wantUp, wantDown = {}, {} -- button -> the button its up / down jump goes 
 local jumped = {}     -- buttons that have a jump of ours
 local bagButtons = {} -- the bag buttons ever in our row (their up is Blizzard's)
 local hooked, hookedCallback = false, nil
+-- Quest items no quest needs any more (Lodestar's Q.ItemMarked: every quest it's for done or skipped,
+-- nothing it starts left to take): a small dim red x in the button's top left corner, a texture of
+-- ours on Blizzard's item button (as Beacon's reserved border), only in the quest items section.
+local QUEST_MARK = "Interface\\RaidFrame\\ReadyCheck-NotReady"
+local questMarks = setmetatable({}, { __mode = "k" }) -- item button -> our mark on it
 
 -- A Misc Tweaks setting (the bag buttons, the free slots, the columns).
 local function Setting(key, default)
@@ -208,6 +213,11 @@ local function Classify(button)
 		e.section = JUNK
 	elseif classID == QUEST_CLASS or (type(quest) == "table" and (quest.isQuestItem or quest.questID)) then
 		e.section = QUEST
+		local Q = ns.Lodestar
+		if Q and Q.ItemMarked then
+			local ok, done = pcall(Q.ItemMarked, id) -- (a lookup: kept per data and progress change)
+			e.questDone = ok and done == true
+		end
 	elseif (classID == WEAPON or classID == ARMOR) and type(equipLoc) == "string" and equipLoc ~= "" and not NOT_WORN[equipLoc] then
 		e.section = GEAR
 		e.level = (link and C_Item.GetDetailedItemLevelInfo and tonumber(LT.Value(C_Item.GetDetailedItemLevelInfo, link))) or 0
@@ -613,6 +623,33 @@ local function ButtonSize(groups, strip)
 	return b and b:GetWidth() or 37, b and b:GetHeight() or 37
 end
 
+-- The marks on the quest items section's items no quest needs any more; every other button's hidden.
+local function QuestMarks(groups)
+	local want = {}
+	for _, e in ipairs(groups and groups[QUEST] or {}) do
+		if e.questDone then
+			want[e.button] = true
+		end
+	end
+	for button, mark in pairs(questMarks) do
+		if not want[button] then
+			mark:Hide()
+		end
+	end
+	for button in pairs(want) do
+		local mark = questMarks[button]
+		if not mark then
+			mark = button:CreateTexture(nil, "OVERLAY", nil, 7)
+			mark:SetTexture(QUEST_MARK)
+			mark:SetSize(14, 14)
+			mark:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+			mark:SetAlpha(0.75)
+			questMarks[button] = mark
+		end
+		mark:Show()
+	end
+end
+
 -- Everything anchored like Blizzard's grid (BOTTOMRIGHT at its first item's anchor, the money frame),
 -- worked out from the top: `top` is how far an element's top is below the content's top.
 local function Place(frame, groups, strip)
@@ -727,6 +764,7 @@ local function Place(frame, groups, strip)
 	end
 	SetBagWidth(frame, contentWidth)
 	SetBagHeight(frame, OurHeight(frame, h))
+	QuestMarks(groups)
 	applied = true
 	if pad then
 		PlanJumps(rows)
@@ -750,6 +788,7 @@ local function Unapply()
 	wipe(order); wipe(laidOut); wipe(starts); wipe(stripped)
 	Untuck() -- (Blizzard's layout has them all)
 	GiveBack()
+	QuestMarks(nil)
 	if overlay then
 		overlay:Hide()
 	end
@@ -882,6 +921,7 @@ local function Relayout()
 	if applied and SameLayout(groups) and placedColumns == Columns() and placedCount == freeCount
 		and (groups.reagents ~= nil) == (next(adopted) ~= nil)
 		and stripped.all == RowOpen() and placedAllFree == Setting("gamepadBagAllFree", false) then
+		QuestMarks(groups) -- (the same order: a quest done meanwhile still marks its item)
 		return
 	end
 	-- The item the cursor is on, or (another window has it: a clam opened, its loot window) the one
@@ -1116,13 +1156,18 @@ function ns.GamepadBagsToggle()
 end
 
 -- For the tests: whether ours is shown, the item buttons in its order, the bag buttons' row, the
--- headers shown.
+-- headers shown, the item buttons with the quest mark shown (button -> its texture).
 function ns.GamepadBagsState()
-	local shown = {}
+	local shown, marked = {}, {}
 	for _, h in ipairs(headers) do
 		if h.text:IsShown() and overlay:IsShown() then
 			shown[#shown + 1] = h.text:GetText()
 		end
 	end
-	return { applied = applied, order = order, strip = stripped, headers = shown }
+	for button, mark in pairs(questMarks) do
+		if mark:IsShown() then
+			marked[button] = mark
+		end
+	end
+	return { applied = applied, order = order, strip = stripped, headers = shown, marked = marked }
 end

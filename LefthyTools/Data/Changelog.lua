@@ -554,5 +554,8 @@ ns.CHANGELOG = {
 	{ id = 182, module = "lodestar",
 		en = { "Lodestar: My quests", "The quest browser's Storylines tab is now My quests: your quest log with what's ready to turn in first, then your zone's quests nearest first, each with its next objective and where to turn it in (sort by zone, level or storyline), and the storylines you can go on with. The companion's map shows where your objectives are." },
 		de = { "Lodestar: Meine Quests", "Der Tab Handlungsstränge im Quest-Browser ist jetzt Meine Quests: dein Questlog, zuerst was bereit zur Abgabe ist, dann die Quests deiner Zone, das Nächste zuerst, jede mit ihrem nächsten Questziel und wo du sie abgibst (sortiert nach Zone, Level oder Handlungsstrang), dazu die Handlungsstränge, mit denen du weitermachen kannst. Die Karte des kleinen Fensters zeigt, wo deine Questziele sind." } },
+	{ id = 183, module = "lodestar",
+		en = { "Lodestar: quest items in tooltips", "A quest item's tooltip says which quest it's for and where that stands: in your log with your progress, ready to turn in, not taken yet or done. When no quest needs it any more, it says you can discard it, and the sorted bags mark it with a small red x." },
+		de = { "Lodestar: Questgegenstände im Tooltip", "Der Tooltip eines Questgegenstands sagt, für welche Quest er ist und wo sie steht: im Questlog mit deinem Fortschritt, bereit zur Abgabe, noch nicht angenommen oder erledigt. Braucht ihn keine Quest mehr, sagt er, dass du ihn wegwerfen kannst, und die sortierten Taschen markieren ihn mit einem kleinen roten x." } },
 	-- New entries go here, at the end.
 }
