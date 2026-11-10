@@ -798,6 +798,34 @@ do
 	check(not m.frame:IsShown(), "hidden")
 end
 
+section("Lodestar: the minimap button")
+do
+	Advance(0.1)
+	local mmb = Q.MinimapButton()
+	check(mmb and mmb:IsShown() and mmb:GetParent() == Minimap and M.db.minimapButton == true and M.db.minimapAngle == 125,
+		"a minimap button, on by default, upper left")
+	local browsed, small = 0, 0
+	Replace("ToggleBrowser", function() browsed = browsed + 1 end)
+	Replace("ToggleSmall", function() small = small + 1 end)
+	mmb:Click("LeftButton")
+	mmb:Click("RightButton")
+	check(browsed == 1 and small == 1, "click: the quest browser; right-click: the companion")
+	mmb._scripts.OnEnter(mmb)
+	local said = {}
+	for _, line in ipairs(TOOLTIP.lines or {}) do said[#said + 1] = tostring(line) end
+	check(TOOLTIP.title == "Lodestar" and table.concat(said, "|"):find("Click: the quest browser", 1, true)
+		and table.concat(said, "|"):find("Right-click: the companion", 1, true), "its tooltip says what the clicks do")
+	GameTooltip:Hide()
+	slash("minimap")
+	Advance(0.1)
+	check(M.db.minimapButton == false and not mmb:IsShown(), "/lodestar minimap: hidden")
+	slash("minimap")
+	Advance(0.1)
+	check(M.db.minimapButton == true and mmb:IsShown(), "... and back")
+	PutBack("ToggleBrowser")
+	PutBack("ToggleSmall")
+end
+
 -- Put back what this file replaced (the stand-ins too: the real parts, once they're in the build,
 -- keep theirs) and the mock's world.
 for name in pairs(replaced) do PutBack(name) end

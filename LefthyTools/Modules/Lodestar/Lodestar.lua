@@ -51,6 +51,8 @@ local M = LT:NewModule("lodestar", {
 		dialog = true,    -- a panel beside the quest dialog: the chain, its steps, what it leads to (Dialog.lua)
 		logBadges = true, -- "2/4" on the quest log's titles, the chain in their tooltip, Alt-click (Dialog.lua)
 		small = {},       -- the small window: left, top, width, height (Small.lua)
+		minimapButton = true,
+		minimapAngle = 125, -- degrees, 0 = right, counter-clockwise: the upper left, above the Bestiary's
 	},
 })
 Q.module = M
@@ -724,24 +726,77 @@ end
 -- The module
 ---------------------------------------------------------------------------
 
-function M:OnEnable()
-	Run("enable")
-end
-
-function M:OnDisable()
-	Run("disable")
-end
-
-function M:OnSettingChanged()
-	Run("settings")
-end
-
 local function OpenBrowser()
 	if Q.ToggleBrowser then
 		Q.ToggleBrowser()
 	else
 		M:Print("the quest browser isn't there in this build.")
 	end
+end
+
+-- The minimap button (Core/Window.lua's LT.Window.MinimapButton, as Chronicle's and the Bestiary's):
+-- a star. Click: the quest browser; right-click: the companion. Its tooltip says what's here for you
+-- once the quest data is loaded (a hover never loads it).
+local MINIMAP_ICON = "Interface\\Icons\\Spell_Arcane_StarFire"
+local minimapButton
+
+local function MinimapEnter(self)
+	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	GameTooltip:SetText("Lodestar", 1, 0.82, 0)
+	local map = C_Map and C_Map.GetBestMapForUnit and tonumber(LT.Value(C_Map.GetBestMapForUnit, "player"))
+	if map and Q.IsLoaded and Q.IsLoaded() and Q.Available then
+		local okList, list = pcall(Q.Available, map)
+		local name = C_Map.GetMapInfo and LT.Value(C_Map.GetMapInfo, map)
+		if okList and type(list) == "table" and type(name) == "table" and type(name.name) == "string" then
+			GameTooltip:AddLine(L["%s: %d to pick up"]:format(name.name, #list), 1, 1, 1)
+		end
+	end
+	GameTooltip:AddLine(L["Click: the quest browser"], 0.8, 0.8, 0.8)
+	GameTooltip:AddLine(L["Right-click: the companion"], 0.8, 0.8, 0.8)
+	GameTooltip:AddLine(L["Drag: move it along the minimap"], 0.8, 0.8, 0.8)
+	GameTooltip:Show()
+end
+
+local function MinimapClick(_, mouseButton)
+	if mouseButton == "RightButton" then
+		Q.ToggleSmall()
+	else
+		OpenBrowser()
+	end
+end
+
+-- After switching Lodestar on or off and the setting (on the next frame).
+local function UpdateMinimapButton()
+	local show = M.enabled and M.db and M.db.minimapButton and Minimap ~= nil
+	if show and not minimapButton then
+		minimapButton = LT.Window.MinimapButton("LefthyToolsLodestarMinimapButton", { icon = MINIMAP_ICON, db = M.db,
+			angleKey = "minimapAngle", angle = 125, onClick = MinimapClick, onEnter = MinimapEnter })
+	end
+	if minimapButton then
+		minimapButton:SetShown(show and true or false)
+		if show then
+			minimapButton:Place()
+		end
+	end
+end
+
+function Q.MinimapButton()
+	return minimapButton
+end
+
+function M:OnEnable()
+	Run("enable")
+	C_Timer.After(0, UpdateMinimapButton)
+end
+
+function M:OnDisable()
+	Run("disable")
+	C_Timer.After(0, UpdateMinimapButton)
+end
+
+function M:OnSettingChanged()
+	Run("settings")
+	C_Timer.After(0, UpdateMinimapButton)
 end
 
 function M:BuildOptions(o)
@@ -763,6 +818,8 @@ function M:BuildOptions(o)
 		L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Lodestar. Hidden when there's nothing to tell."])
 	o:Checkbox("logBadges", L["Chain steps in the quest log"],
 		L["Each quest of a chain gets its step (\"2/4\") at the end of its line in your quest log, and its tooltip shows the chain. Alt-click a quest there to open it in Lodestar."])
+	o:Checkbox("minimapButton", L["Minimap button"],
+		L["A button on the edge of the minimap: click opens the quest browser, right-click the companion. Drag it to move it."])
 	o:Header(L["Tooltips"])
 	o:Checkbox("tooltips", L["Quest lines in NPC tooltips"],
 		L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Lodestar: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."])
@@ -778,6 +835,7 @@ local function Help()
 	M:Print("/lodestar - open or close the small window: the quest you're on, what to pick up next")
 	M:Print("/lodestar <name or ID> - show a quest (a quest link works too)")
 	M:Print("/lodestar browse - the quest browser: every zone's chains")
+	M:Print("/lodestar minimap - show or hide the minimap button")
 	M:Print("/lodestar settings - Lodestar's settings")
 end
 
@@ -789,6 +847,10 @@ function M:OnSlashCommand(msg)
 		return
 	elseif cmd == "help" or cmd == "?" then
 		Help()
+		return
+	elseif cmd == "minimap" then
+		LT:SetModuleSetting(self, "minimapButton", not self.db.minimapButton)
+		self:Print("minimap button " .. (self.db.minimapButton and "on." or "off."))
 		return
 	elseif not self.enabled then
 		LT.Print("Lodestar is switched off (LefthyTools settings).")

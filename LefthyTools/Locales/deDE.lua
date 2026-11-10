@@ -1482,3 +1482,9 @@ L["Open the chain"] = "Questreihe öffnen"
 L["Where to go next: %s"] = "Wohin als Nächstes: %s"
 L["No spot known for it."] = "Dafür ist kein Ort bekannt."
 L["Companion"] = "Kleines Fenster"
+-- Lodestar: the minimap button
+L["%s: %d to pick up"] = "%s: %d zum Annehmen"
+L["Click: the quest browser"] = "Klick: der Quest-Browser"
+L["Right-click: the companion"] = "Rechtsklick: das kleine Fenster"
+L["A button on the edge of the minimap: click opens the quest browser, right-click the companion. Drag it to move it."] =
+	"Ein Button am Rand der Minimap: Klick öffnet den Quest-Browser, Rechtsklick das kleine Fenster. Zum Verschieben ziehen."
