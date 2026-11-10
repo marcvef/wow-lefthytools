@@ -84,6 +84,53 @@ affected. Once tainted, protected clicks routed through the manager later (gamep
 popup) are blocked. LefthyTools therefore uses its own dropdown (`LT.Window.AddPicker`) and its own
 settings window, never Blizzard's panel from addon code.
 
+## The world map: never AddDataProvider or AcquirePin on WorldMapFrame
+
+The world map is Lua (`Blizzard_MapCanvas`, `Blizzard_WorldMap`) that the controller UI runs from
+Blizzard's code, so a value an addon wrote into the map's tables is run there as the addon's. Seen
+as 130+ `ADDON_ACTION_FORBIDDEN: SetPreferredGamepadInteractTarget()` after closing the map with
+a controller, then `SpellStopCasting`, `SpellStopTargeting`, `ClearTarget`, `TargetNearestFriend`
+forbidden on B (the same chain hit Questie #7899, GatherLite #197, Offhand-DualMonitor #84):
+
+- An addon's data provider and the pins it acquires (`AcquirePin`, `RemovePin`) write the map's
+  shared state: `pinPools[template]`, the pins' scripts, `ScrollContainer.currentScale` through
+  `MarkCanvasDirty`.
+- In gamepad mode the map's cursor (`MapCanvasMixin:UpdateGamepadCursor` → `CheckPinDistance` over
+  every pin → `currentPoIPins` → `EnterMapPin` / `ExitMapPin`) runs those pins' `OnMouseEnter` /
+  `OnMouseLeave` from its own code, and keeps them in its list.
+- `WorldMapMixin:OnHide` then runs tainted → `ClearBindings` → `InputBindingManager`
+  (`currentCoreBindingActive` tainted) → every later `SetPreferredGamepadInteractTarget` of the
+  action bars (the interact icons) is forbidden, and B runs the close chain tainted. In combat
+  Blizzard's own Button pins then hit `Button:SetPassThroughButtons()` blocked.
+- `Blizzard_GamepadSmartNavigation` hooks `CreateFrame`: a frame made with a parent inside an open
+  panel (the map's canvas) makes it rebuild that panel's button list in the caller's code. As it
+  focuses the map it takes a Button, an EditBox or a frame with an `OnMouseDown` or `OnMouseUp`
+  script for a button and reads that script back (`GetScript`).
+
+**The rule** (LefthyTools' `Core/MapOverlay.lua`, the technique Polestar uses): no data provider,
+no `AcquirePin`, no hook on a map method, no map method that writes. Frames of our own are made
+with no parent (`CreateFrame(type, nil, nil, template)`) and then `SetParent(WorldMapFrame:GetCanvas())`
+(`SetParent` isn't hooked; the canvas clips them, they show and hide with the map). The map is only
+read: `GetMapID`, `GetCanvas`, `GetCanvasScale`, `HasZoomLevels`, `GetCanvasZoomPercent`,
+`GetGlobalPinScale`, `GetPinFrameLevelsManager():GetValidFrameLevel(type, index)`,
+`GetNormalizedCursorPosition`, `IsCanvasMouseFocus`, the canvas's size, `GetLeft`, `GetTop` and
+`GetEffectiveScale` (not `GetViewRect`, which caches). A pin's look is copied:
+`scale = Lerp(start, end, Saturate(zoom)) / canvasScale * globalPinScale` (as
+`MapCanvasPinMixin:ApplyCurrentScale` for `SetScalingLimits(1, start, end)`), placed with
+`SetPoint("CENTER", canvas, "TOPLEFT", w * x / scale, -h * y / scale)`. One watcher frame on the
+canvas compares those values each frame while the map is shown (nothing while it's closed) and
+redraws on a change. None of the frames is a button to SmartNavigation: mouse motion or
+`EnableMouse` with `OnEnter` / `OnLeave` only; clicks come from `GLOBAL_MOUSE_DOWN` /
+`GLOBAL_MOUSE_UP` (registered while the map is open). Right-clicks pass through with
+`SetPassThroughButtons("RightButton")`, protected in combat: once per frame, out of combat.
+
+**The controller's map cursor** no longer sees these frames (it walks only the map's pins), so
+the overlay looks for it: every 0.05 s while `SoftCursor:IsShown()`, the nearest frame within 12 UI
+units (the map's own reach), from the cursor's `GetCenter()` times its effective scale and the
+frame's map position on the canvas, shows its tooltip on a `GameTooltip`-template frame of our own
+(Questie found that `GameTooltip` from there taints the gamepad UI). The controller's button stays
+the map's (it zooms in or changes the zone): our frames take no controller clicks.
+
 ## Getting the real UI source
 
 The community mirror has a `forever` branch matching the live build (`version.txt`):

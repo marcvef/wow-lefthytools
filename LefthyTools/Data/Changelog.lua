@@ -509,5 +509,8 @@ ns.CHANGELOG = {
 	{ id = 167, module = "chronicle",
 		en = { "Chronicle: hover loot for its tooltip", "Loot in Chronicle's timeline and news can be hovered for the item's tooltip and clicked like a chat link (Shift-click puts it in the chat box)." },
 		de = { "Chronicle: Tooltip für Beute", "Beute in Chronicles Zeitleiste und Neuigkeiten zeigt beim Drüberfahren den Tooltip des Items und lässt sich wie ein Chat-Link anklicken (Shift-Klick setzt ihn in den Chat)." } },
+	{ id = 168, module = "general",
+		en = { "Map: no blocked controller actions", "Friends' dots, pings and quests on the world map are LefthyTools' own frames now, so closing the map with the controller no longer gets the game's actions blocked (interact icons, B, targeting). The controller's map cursor shows their tooltips." },
+		de = { "Karte: keine Blockaden mit Controller", "Freunde, Pings und Quests auf der Weltkarte sind jetzt eigene Frames von LefthyTools, deshalb blockiert das Schließen der Karte mit dem Controller keine Aktionen des Spiels mehr (Interaktions-Icons, B, Ziele). Der Karten-Cursor des Controllers zeigt ihre Tooltips." } },
 	-- New entries go here, at the end.
 }

@@ -24,6 +24,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
                              buttons (MinimapButton), class colours, how many windows are open
   Core/MapArt.lua            a zone's map from the world map's art with what you've explored (LT.MapArt:
                              the Bestiary ledger's kill map, the fight stream's map without minimap tiles)
+  Core/MapOverlay.lua        drawing on the world map without writing into it (LT.MapOverlay): our frames
+                             on its canvas, the watcher, clicks, the controller's map cursor (forever-platform.md)
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
   Core/WhatsNew.lua          what's-new window after an update, /lefthy news (entries: Data/Changelog.lua)
   Core/Options.lua           the settings' data (overview + one page per module), option builder, /lefthy
@@ -45,8 +47,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Tweaks/Flight.lua  cinematic flights (a tweak): letterbox, title cards, subtitles, friends in the bars
   Modules/Tweaks/LevelUp.lua  level-up window (a tweak): what a level brings (stat gains, trainer spells, talents, class quests), when it shows
   Modules/Tweaks/LevelUpWindow.lua  the level-up window itself: drawing, count-ups, pin, arrows
-  Modules/Tweaks/QuestMap.lua  quests on continent and world maps: icons and areas (world map provider)
-  Modules/Tweaks/QuestMap.xml  its world map pin templates (quest icon, quest area)
+  Modules/Tweaks/QuestMap.lua  quests on continent and world maps: icons and areas (Core/MapOverlay.lua)
   Data/Changelog.lua         what's new: one entry per player-visible change, English and German
   Data/ForeverQuests.lua     generated list of those quests (tools/update-forever-quests.ps1)
   Data/FlightPaths.lua       generated length of every flight path (tools/update-flight-paths.ps1)
@@ -60,7 +61,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/Sharing.lua  what I tell friends about myself (state, quest, progress, level-ups)
   Modules/Beacon/Updates.lua  a friend's newer build, the what's-new exchange
   Modules/Beacon/Options.lua  Beacon's settings page, /lefthy beacon
-  Modules/Beacon/Dots.lua    dot look, tooltip, world map provider, minimap pins
+  Modules/Beacon/Dots.lua    dot look, tooltip, world map dots (Core/MapOverlay.lua), minimap pins
   Modules/Beacon/Ding.lua    level-up messages and the on-screen toast
   Modules/Beacon/Alerts.lua  death alerts
   Modules/Beacon/Pings.lua   map pings: Alt+click, markers on both maps
@@ -80,7 +81,6 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/StreamPreview.lua fight stream: the preview's made-up fight
   Modules/Beacon/StreamNet.lua    fight stream between friends (kind O), the being-watched dot
   Modules/Beacon/StreamButton.lua the spyglass minimap button: friends to watch
-  Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
   Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, /chronicle
   Modules/Chronicle/Live.lua       friends live through Beacon: highlights (E2), days (D2/K2), the feed
   Modules/Chronicle/Characters.lua  who is who: accounts, names, matching; characters, accounts, news

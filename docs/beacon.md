@@ -17,12 +17,12 @@ Files, in load order:
 - `Updates.lua`: a friend on a newer build (the notice, "What's coming"), and answering what's new
   in mine (`U2` / `W2`).
 - `Options.lua`: the settings page and `/lefthy beacon` (each command is done by its own file).
-- `Dots.lua` (dot look, tooltip, world map provider, minimap pins), `Ding.lua` (level-up messages,
+- `Dots.lua` (dot look, tooltip, world map dots, minimap pins), `Ding.lua` (level-up messages,
   toast, sounds), `Alerts.lua` (death alerts; a friend in a few lines for lists: `B.FriendLines`,
   `B.FriendRows`, `B.FriendStatus`), `Pings.lua` (map pings), `Items.lua` (showing and offering
   items), `Handover.lua` (reserved items), `Chat.lua` (LTC, announcements), `ChatMissed.lua` (LTC lines
   friends missed), `ChatCalls.lua` (LTC's who's in), `Reports.lua` (error
-  reports), `Stream*.lua` (the fight stream), `Beacon.xml` (world map pin templates).
+  reports), `Stream*.lua` (the fight stream).
 
 They share state through `ns.Beacon` (`B`): `B.peers` (`gameAccountID -> peer`), the queues
 (`B.Queue`, `B.QueueToPeers`, `B.QueueLatest`, `B.QueueLow`, ...), and hooks
@@ -183,16 +183,23 @@ the minimap, pings; checked against the map route again after every loading scre
 
 ## World map
 
-A `MapCanvasDataProviderMixin` provider on `WorldMapFrame` with pins from the
-`LefthyToolsBeaconPinTemplate` XML template. `AcquirePin` pools by template name, calls the
-mixin's `OnLoad` once for new pins and wires `OnMouseEnter`/`OnMouseLeave`; the template must not
-define OnEnter/OnLeave scripts (the canvas asserts). `enableMouseMotion` only, so clicks pass
-through. Provider code still runs as addon code (also from our own refresh), so it must not call
-protected functions: `AcquirePin` calls `pin:CheckMouseButtonPassthrough`, whose base version
-uses the protected `SetPassThroughButtons` (blocked in combat), so the pin mixin replaces it with
-an empty function (as HereBeDragons-Pins does). Pins are
-kept per friend and updated in place (`RemovePin` only when a friend disappears), so a hovered dot
-keeps its tooltip. Refreshed at most twice a second, only while the map is open.
+Frames of our own on the map's canvas, through `LT.MapOverlay` (`Core/MapOverlay.lua`), never the
+map's pins: no data provider, no `AcquirePin`, no hook on the map (forever-platform.md, "The world
+map", has the taint chain this avoids). A dot is made with no parent and then put on the canvas,
+14 px, scaled as a pin with `SetScalingLimits(1, 1.0, 1.2)` (`Overlay.PinScale`), at the frame
+level the map gives `PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER`. Mouse motion only (`OnEnter` /
+`OnLeave`, no click script), so every click still reaches the map. Dots are kept per friend and
+updated in place (released only when a friend disappears, or the map closes), so a hovered dot
+keeps its tooltip. Drawn when the map opens or shows another map, again on zoom (the overlay's
+watcher compares the map, the canvas and the zoom each frame while the map is open, and nothing
+while it's closed), and on Beacon's changes at most twice a second.
+
+**Controller:** the map's own cursor doesn't see our dots any more (it hovers only the map's
+pins), so the overlay looks for it itself: every 0.05 s while `SoftCursor` is shown, the dot (or
+ping marker, quest icon) within 12 UI units of it shows its tooltip, on `LefthyToolsMapTooltip`
+(a tooltip of our own: `GameTooltip` from there would taint the controller UI), following changes
+like the mouse's. Not with the right stick's tooltips off (CVar `GamepadDisableTooltips`). The
+controller's button is the map's: it doesn't watch or invite.
 
 ## Minimap
 
@@ -218,7 +225,7 @@ middle), more in a small ring; the order is by gameAccountID, so dots don't swap
 its group (`pin.group`); hovering any of them shows all of them in one tooltip (the hovered
 friend first, the others below with their name as a line), and an open tooltip is rebuilt when
 anyone in it changes (`Signature`: the revs of everyone in it). World map: the spread is
-recomputed on every refresh and on zoom (`OnCanvasScaleChanged`); friends in my group keep the
+recomputed on every refresh and on zoom (the overlay's `"scale"`); friends in my group keep the
 offset on their live position (`pin.fanX/fanY`). Minimap: the per-frame update first checks for
 any overlap without making tables (`AnyOverlap`) and only then groups; the per-dot records are
 reused. The grouping depends only on where the dots are relative to each other, so it's cached
@@ -559,15 +566,19 @@ Alt+click on the world map (or `/lefthy beacon ping` for where you stand) sends
 `P2;<continent>;<north>;<west>;<uiMapID>` to every peer: the world position as in the state
 message, and the zone for its name (`C_Map.GetMapInfoAtPosition` picks the zone under the cursor
 on a continent map; receivers name it with `C_Map.GetMapInfo` in their own language). The click
-is caught with `WorldMapFrame.ScrollContainer:HookScript("OnMouseDown")`: a post-hook, so
-Blizzard's click handling (canvas click handlers, navigation, zoom) runs first and untainted;
-mouse *down* because mouse up may zoom into the zone and move what's under the cursor. Not a
-canvas click handler: those run inside Blizzard's click code, which would carry on tainted.
+is read from `GLOBAL_MOUSE_DOWN` (`Overlay.OnMouse`, registered only while the map is open), when
+the mouse is on the map's canvas (`IsCanvasMouseFocus`, or one of our frames there, or a Blizzard
+pin that takes no clicks: the click goes through them), with `GetNormalizedCursorPosition`; so
+Blizzard's click handling (canvas click handlers, navigation, zoom) runs on its own, untouched.
+Mouse *down* because mouse up may zoom into the zone and move what's under the cursor. Not a canvas
+click handler and not a hook on the scroll container: both run inside Blizzard's click code, which
+would carry on tainted. The click on a friend's dot (watch, Shift+click invite) is read the same
+way.
 Own pings at most every 2.5 s (else "not so fast"); received ones at most one per friend per 2 s, malformed ones
 dropped by `Parse`.
 
 Every ping (`B.pings[gameAccountID or "me"]`, a newer one from the same sender replaces it) shows
-for 60 s on the world map (own data provider, `LefthyToolsBeaconPingPinTemplate`) and the minimap
+for 60 s on the world map (frames of our own like the dots, 20 px) and the minimap
 (frames placed by `Dots.lua`'s minimap update through `B.MinimapOffset`, the same projection and
 edge rule as the dots): the game's "look here" ping icon (`Ping_Marker_Icon_NonThreat`; a plain
 round marker if the atlas is missing) over a ripple in the sender's class colour (scale + alpha
@@ -576,12 +587,12 @@ Receiving prints "Anna pinged a spot in Elwynn Forest: see your map. [Map Pin Lo
 `SOUNDKIT.MAP_PING`; the last part is the game's own map pin link for the spot on the zone map
 (`worldmap:<uiMapID>:<x*10000>:<y*10000>`, text `MAP_PIN_HYPERLINK`; left out where
 `C_Map.CanSetUserWaypointOnMap` says no), so a click sets the waypoint arrow there and opens the
-map. Alt+click on my own marker (the world map hook checks whether the `"me"` pin is under the
+map. Alt+click on my own marker (the click handler checks whether the `"me"` marker is under the
 mouse first; the markers take only mouse motion, so the click reaches the map) or
 `/lefthy beacon ping clear` takes it back: removed here and `G2` to everyone, whose clients drop
 my ping (and one still waiting for their tick). My marker's tooltip says so. `B.UpdatePings` on the driver tick expires and fades them and redraws the open
 map when the list changed. Setting `pings` switches sending, showing and the Alt+click off (the
-hook stays, it checks the setting); switching it off also removes the markers up at the time. A
+listener stays, it checks the setting); switching it off also removes the markers up at the time. A
 friend who's forgotten (`Q2`, offline, silent) takes their marker along.
 
 ## Level-ups
@@ -1103,8 +1114,8 @@ with the most mobs on them (`peer.combat`, `peer.mobs`), else a random one who c
 friend in the top bar who can be watched has a small button right of their name ("Watch" grey /
 "Live" red) to open or close theirs. Streams opened on the flight close when the film ends.
 **World map** (`streamMapClick`, Dots.lua): a plain left click on a friend's dot opens or closes
-their stream (a hook on the map's `ScrollContainer` `OnMouseDown`; the pins themselves take no
-clicks), and the dot's tooltip says so. Shift+left click invites them instead, whatever
+their stream (read from `GLOBAL_MOUSE_DOWN` on the open map, Core/MapOverlay.lua; the dots themselves
+take no clicks), and the dot's tooltip says so. Shift+left click invites them instead, whatever
 `streamMapClick` says and whether or not they can be watched: `C_BattleNet.InviteFriend(gameAccountID)`, as
 Forever's friends list does, with a chat line; the tooltip says so and neither happens for a friend already in my
 group. `/lefthy stream stop [<name>]` closes them. A typed name

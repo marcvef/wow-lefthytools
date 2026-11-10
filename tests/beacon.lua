@@ -4,7 +4,7 @@
 local suite = ...
 local check, section, ns, LT, lefthy = suite.check, suite.section, suite.ns, suite.LT, suite.lefthy
 local printedSince, sentTo, anna, peers = suite.printedSince, suite.sentTo, suite.anna, suite.peers
-local pinOf, tooltipHas, afk, catchErrors = suite.pinOf, suite.tooltipHas, suite.afk, suite.catchErrors
+local pinOf, tooltipHas, afk, catchErrors, mapPins = suite.pinOf, suite.tooltipHas, suite.afk, suite.catchErrors, suite.mapPins
 
 section("Beacon: setup")
 local Beacon = LT:GetModule("beacon")
@@ -27,7 +27,8 @@ check(textInput and textInput.maxLetters == 100,
 	"level-up message is a text field in the settings panel")
 check(SETTINGS_BUTTONS["Test your message"] and SETTINGS_BUTTONS["Test your message"].text == "Preview", "preview button")
 check(ADDON_PREFIXES.LTBeacon, "addon message prefix registered")
-check(next(WorldMapFrame.providers) ~= nil, "data provider attached to the world map")
+check(#MAP_WRITES == 0 and not WorldMapFrame.ScrollContainer._scripts.OnMouseDown,
+	"no data provider, no hook on the world map: it is only read (Core/MapOverlay.lua)")
 do -- Free text cut to a size: no letter split, and none dropped that fits whole ("\195\164" is a two-byte letter).
 	local cut = BB.Clean("ab\195\164c", 4)
 	check(cut == "ab\195\164" and BB.Clean("abc\195\164", 4) == "abc" and BB.Clean("ab\226\130\172", 4) == "ab"
@@ -94,41 +95,42 @@ check(peers()[12].subzone == "Zone20", "flood guard: at most 20 messages a secon
 section("Beacon: friends on the world map")
 PLAYER_POS = { 0.5, 0.5 } -- me: north 500, west 500
 Advance(0.6)
-check(#PinsOf("LefthyToolsBeaconPinTemplate") == 0, "map closed: nothing drawn")
+check(#mapPins("beaconDot") == 0, "map closed: nothing drawn")
 OpenWorldMap(1429)
 local annaPin = pinOf(11)
-check(#PINS == 2 and annaPin and pinOf(12), "map open: Anna's and Bob's dots")
-check(math.abs(annaPin.x - 0.25) < 1e-6 and math.abs(annaPin.y - 0.75) < 1e-6, "at her position on the zone map")
+check(#mapPins("beaconDot") == 2 and annaPin and pinOf(12), "map open: Anna's and Bob's dots")
+check(math.abs(annaPin.mapX - 0.25) < 1e-6 and math.abs(annaPin.mapY - 0.75) < 1e-6, "at her position on the zone map")
 local c = annaPin.Dot.color
 check(c and math.abs(c[1] - 0.25) < 1e-6 and math.abs(c[3] - 0.92) < 1e-6, "in mage blue")
-check(annaPin.frameLevelType == "PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER", "drawn just above Blizzard's group member dots")
+check(PinLevelType(annaPin) == "PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER" and annaPin:GetParent() == WorldMapFrame:GetCanvas()
+	and not annaPin._click and annaPin._motion, "on the map's canvas, just above Blizzard's group member dots, hover only")
 STATE.combat = true
 OpenWorldMap(1414); OpenWorldMap(1429) -- dots are released and acquired again, in combat
-check(#PINS == 2 and #BLOCKED == 0, "opening the map in combat creates dots without blocked actions, got " .. table.concat(BLOCKED, ", "))
+check(#mapPins("beaconDot") == 2 and #BLOCKED == 0, "opening the map in combat creates dots without blocked actions, got " .. table.concat(BLOCKED, ", "))
 STATE.combat = false
 annaPin = pinOf(11)
 check(annaPin.Ring.color[1] == 0 and not annaPin.Skull.shown and not annaPin.Pulse:IsPlaying(), "normal look: dark ring, no skull")
-annaPin:OnMouseEnter()
+HoverMap(annaPin)
 check(TOOLTIP.title == "Anna Brook" and TOOLTIP.shown, "tooltip: name")
 check(TOOLTIP.lines[1] == "Annie" and tooltipHas("Level 20") and tooltipHas("Elwynn Forest - Goldshire"),
 	"tooltip: BattleTag, level, zone and subzone; got " .. table.concat(TOOLTIP.lines, " | "))
 check(tooltipHas("355 yd south-west"), "tooltip: distance and direction from me")
-annaPin:OnMouseLeave()
+LeaveMap(annaPin)
 check(not TOOLTIP.shown, "tooltip hides on leave")
 OpenWorldMap(1415)
-check(#PINS == 2 and math.abs(pinOf(11).x - 0.3125) < 1e-6 and math.abs(pinOf(11).y - 0.4375) < 1e-6,
+check(#mapPins("beaconDot") == 2 and math.abs(pinOf(11).mapX - 0.3125) < 1e-6 and math.abs(pinOf(11).mapY - 0.4375) < 1e-6,
 	"continent map: same friends, continent coordinates")
 OpenWorldMap(1414)
-check(#PINS == 0, "map of another continent: not shown")
+check(#mapPins("beaconDot") == 0, "map of another continent: not shown")
 OpenWorldMap(1429)
 annaPin = pinOf(11)
-local created = PINS_CREATED
+local created = #mapPins("beaconDot", true)
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;C;0;260.0;750.0;Goldshire;Hogger", "WHISPER", 11)
 Advance(0.6)
-check(pinOf(11) == annaPin and PINS_CREATED == created and math.abs(annaPin.y - 0.74) < 1e-6,
+check(pinOf(11) == annaPin and #mapPins("beaconDot", true) == created and math.abs(annaPin.mapY - 0.74) < 1e-6,
 	"moving dots are updated in place, not recreated")
 check(annaPin.Ring.color[1] == 1 and annaPin.Pulse:IsPlaying(), "in combat: red pulsing ring")
-annaPin:OnMouseEnter()
+HoverMap(annaPin)
 check(tooltipHas("Fighting Hogger"), "tooltip: who she's fighting")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;D;0;260.0;750.0;Goldshire;", "WHISPER", 11)
 Advance(0.6)
@@ -137,13 +139,13 @@ check(tooltipHas("Dead") and TOOLTIP.owner == annaPin, "the open tooltip updates
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;G;0;260.0;750.0;Goldshire;", "WHISPER", 11)
 Advance(0.6)
 check(annaPin.Skull.shown and annaPin.Skull.alpha < 1 and tooltipHas("Ghost"), "ghost: a faded skull")
-annaPin:OnMouseLeave()
+LeaveMap(annaPin)
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 11)
 BN_FRIENDS[1][1].isGameAFK = true
 Advance(0.6)
-annaPin:OnMouseEnter()
+HoverMap(annaPin)
 check(TOOLTIP.title == "Anna Brook <AFK>" and not annaPin.Skull.shown, "alive again; AFK shows in the tooltip")
-annaPin:OnMouseLeave()
+LeaveMap(annaPin)
 BN_FRIENDS[1][1].isGameAFK = false
 GROUP_GUIDS["Player-1-11"] = true
 PARTY.party1 = { guid = "Player-1-11", continent = 0, north = 300, west = 700 } -- her live position
@@ -151,41 +153,41 @@ GROUP = "party"
 Fire("GROUP_ROSTER_UPDATE")
 Advance(0.6)
 annaPin = pinOf(11)
-check(#PINS == 2 and annaPin, "Anna joined the group: her Beacon dot stays")
-check(math.abs(annaPin.x - 0.3) < 1e-6 and math.abs(annaPin.y - 0.7) < 1e-6,
+check(#mapPins("beaconDot") == 2 and annaPin, "Anna joined the group: her Beacon dot stays")
+check(math.abs(annaPin.mapX - 0.3) < 1e-6 and math.abs(annaPin.mapY - 0.7) < 1e-6,
 	"at her live group position (where Blizzard's dot is), not her last Beacon report")
 check(annaPin.Ring.color[3] == 1 and annaPin.Ring.color[1] < 0.5, "marked as a group member: blue ring")
-annaPin:OnMouseEnter()
+HoverMap(annaPin)
 check(tooltipHas("In your group"), "tooltip: in your group")
-annaPin:OnMouseLeave()
+LeaveMap(annaPin)
 PARTY.party1.north = 320
 Advance(0.05)
-check(math.abs(annaPin.y - 0.68) < 1e-6, "follows her live position every frame while the map is open")
+check(math.abs(annaPin.mapY - 0.68) < 1e-6, "follows her live position every frame while the map is open")
 B("showGroup"):SetValue(false)
 Advance(0.6)
-check(#PINS == 1 and pinOf(12), "'show friends in my group too' off: only Blizzard's dot")
+check(#mapPins("beaconDot") == 1 and pinOf(12), "'show friends in my group too' off: only Blizzard's dot")
 B("showGroup"):SetValue(true)
 GROUP_GUIDS["Player-1-11"], PARTY.party1, GROUP = nil, nil, "none"
 Fire("GROUP_ROSTER_UPDATE")
 Advance(0.6)
-check(#PINS == 2 and pinOf(11) and pinOf(11).Ring.color[1] == 0, "left the group: a normal dot again")
+check(#mapPins("beaconDot") == 2 and pinOf(11) and pinOf(11).Ring.color[1] == 0, "left the group: a normal dot again")
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;;;;;", "WHISPER", 12)
 Advance(0.6)
-check(#PINS == 1 and pinOf(11), "Bob went into a dungeon (no position): his dot goes away")
+check(#mapPins("beaconDot") == 1 and pinOf(11), "Bob went into a dungeon (no position): his dot goes away")
 BN_FRIENDS[1][1].isOnline = false
 Fire("BN_FRIEND_ACCOUNT_OFFLINE", 1, false)
 Advance(1.2)
-check(not peers()[11] and #PINS == 0, "Anna logged off: forgotten at once")
+check(not peers()[11] and #mapPins("beaconDot") == 0, "Anna logged off: forgotten at once")
 BN_FRIENDS[1][1].isOnline = true
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;250.0;750.0;Goldshire;", "WHISPER", 11)
 Advance(1.2)
-check(#PINS == 1, "she's back")
+check(#mapPins("beaconDot") == 1, "she's back")
 B("showFriends"):SetValue(false)
 Advance(0.6)
-check(#PINS == 0, "'show friends on the world map' off: no dots")
+check(#mapPins("beaconDot") == 0, "'show friends on the world map' off: no dots")
 B("showFriends"):SetValue(true)
 Advance(0.6)
-check(#PINS == 1, "on again: dots back")
+check(#mapPins("beaconDot") == 1, "on again: dots back")
 WorldMapFrame:Hide()
 Advance(70)
 check(not peers()[12], "Bob went silent (no heartbeat for over a minute): forgotten")
@@ -629,7 +631,7 @@ Advance(1.2)
 section("Beacon: map pings")
 check(BDB.pings == true and B("pings") ~= nil, "a setting, on by default")
 local function pingPin(key)
-	for _, p in ipairs(PINS) do if p.pinTemplate == "LefthyToolsBeaconPingPinTemplate" and p.key == key then return p end end
+	for _, p in ipairs(mapPins("beaconPing")) do if p.key == key then return p end end
 end
 PLAYER_POS = { 0.5, 0.5 } -- me: north 500, west 500
 OpenWorldMap(1429)
@@ -647,7 +649,7 @@ check(printedSince(pmark):find("pinged Elwynn Forest for 1 friend(s).", 1, true)
 	"with a chat line and the map ping sound")
 Advance(0.15)
 local myPing = pingPin("me")
-check(myPing and math.abs(myPing.x - 0.25) < 1e-6 and math.abs(myPing.y - 0.75) < 1e-6 and myPing.RippleAnim:IsPlaying(),
+check(myPing and math.abs(myPing.mapX - 0.25) < 1e-6 and math.abs(myPing.mapY - 0.75) < 1e-6 and myPing.RippleAnim:IsPlaying(),
 	"my own marker on my map, rippling")
 check(myPing.Icon.atlas == "Ping_Marker_Icon_NonThreat", "the game's 'look here' ping icon")
 pmark = #PRINTED + 1
@@ -677,12 +679,12 @@ check(printedSince(pmark):find("map. |cffffff00|Hworldmap:1429:5000:4500|h[Map p
 	"with the game's map pin link for the spot (a click sets the waypoint), got " .. printedSince(pmark))
 Advance(0.15)
 local annaPing = pingPin(11)
-check(annaPing and math.abs(annaPing.x - 0.5) < 1e-6 and math.abs(annaPing.y - 0.45) < 1e-6
+check(annaPing and math.abs(annaPing.mapX - 0.5) < 1e-6 and math.abs(annaPing.mapY - 0.45) < 1e-6
 	and math.abs(annaPing.Ripple.color[3] - 0.92) < 1e-6, "her marker on my map, rippling in her class colour")
-annaPing:OnMouseEnter()
+HoverMap(annaPing)
 check(TOOLTIP.title == "Anna Brook" and tooltipHas("Map ping, 0 s ago") and tooltipHas("Elwynn Forest") and tooltipHas("50 yd north"),
 	"tooltip: whose ping, how old, where, how far, got " .. table.concat(TOOLTIP.lines, " | "))
-annaPing:OnMouseLeave()
+LeaveMap(annaPing)
 local mmPings = BB.GetMinimapPings()
 local _, _, _, pingX, pingY = mmPings[11]:GetPoint(1)
 check(math.abs(pingX) < 1e-6 and math.abs(pingY - 35) < 1e-6 and mmPings[11]:GetParent() == Minimap, "and on the minimap, 50 yd north")
@@ -709,9 +711,9 @@ check(sentTo(11, mark, "P2;")[1] == "P2;0;500.0;500.0;1429", "/lefthy beacon pin
 -- Taking it back: Alt+click on my own marker (or /lefthy beacon ping clear), for everyone.
 Advance(2)
 local mine = pingPin("me")
-mine:OnMouseEnter()
+HoverMap(mine)
 check(tooltipHas("Alt+click it on the world map to take it back."), "my own marker's tooltip says how to take it back")
-mine:OnMouseLeave()
+LeaveMap(mine)
 mark, pmark = #GAMEDATA + 1, #PRINTED + 1
 mine._mouse, STATE.alt = true, true
 ClickWorldMap()
@@ -792,7 +794,7 @@ Advance(0.2)
 OpenWorldMap(1429)
 anna("T2;176;0;Wanted: Hogger;Huge Gnoll Claw: 0/1")
 Advance(0.6)
-pinOf(11):OnMouseEnter()
+HoverMap(pinOf(11))
 check(tooltipHas("Quest: Wanted: Hogger") and tooltipHas("  Huge Gnoll Claw: 0/1") and tooltipHas("  You have this quest too"),
 	"tooltip: their quest, their progress, and that I have it too, got " .. table.concat(TOOLTIP.lines, " | "))
 anna("T2;176;1;Wanted: Hogger;")
@@ -809,7 +811,7 @@ Advance(0.6)
 local questLine = false
 for _, l in ipairs(TOOLTIP.lines) do if l:find("^Quest: ") then questLine = true end end
 check(not questLine, "none tracked: no quest lines")
-pinOf(11):OnMouseLeave()
+LeaveMap(pinOf(11))
 WorldMapFrame:Hide()
 QUESTS, WATCHED, SUPER_TRACKED = {}, {}, 0
 Fire("QUEST_LOG_UPDATE")
@@ -999,7 +1001,7 @@ do
 	anna("C2;3")
 	Advance(0.6)
 	local pin = pinOf(11)
-	pin:OnMouseEnter()
+	HoverMap(pin)
 	check(tooltipHas("Fighting Stitches and 2 more") and pin.Count.shown and pin.Count.text == "3",
 		"her dot: a 3, and the tooltip says it, got " .. table.concat(TOOLTIP.lines, " | "))
 	anna("S2;C;0;260.0;750.0;Goldshire;")
@@ -1015,7 +1017,7 @@ do
 	anna("S2;;0;260.0;750.0;Goldshire;")
 	Advance(0.6)
 	check(not pin.Count.shown and tooltipHas("Level 27") and not tooltipHas("In combat with 1 enemy"), "fight over: the count goes")
-	pin:OnMouseLeave()
+	LeaveMap(pin)
 	WorldMapFrame:Hide()
 end
 
@@ -1054,7 +1056,7 @@ do
 	anna("X2;64")
 	Advance(0.6)
 	local pin = pinOf(11)
-	pin:OnMouseEnter()
+	HoverMap(pin)
 	check(tooltipHas("Level 27 (64%)"), "her tooltip: level and progress, got " .. table.concat(TOOLTIP.lines, " | "))
 	anna("X2;abc")
 	Advance(0.6)
@@ -1062,7 +1064,7 @@ do
 	anna("X2;")
 	Advance(0.6)
 	check(tooltipHas("Level 27"), "not shared: just the level")
-	pin:OnMouseLeave()
+	LeaveMap(pin)
 	WorldMapFrame:Hide()
 end
 
@@ -1110,12 +1112,12 @@ do
 		OpenWorldMap(1429)
 		Advance(0.6)
 		local pin = pinOf(11)
-		pin:OnMouseEnter()
+		HoverMap(pin)
 		local line
 		for _, text in ipairs(TOOLTIP.lines) do
 			if text:find("Level", 1, true) then line = text end
 		end
-		pin:OnMouseLeave()
+		LeaveMap(pin)
 		WorldMapFrame:Hide()
 		return line
 	end
@@ -1181,7 +1183,7 @@ do
 	OpenWorldMap(1429)
 	Advance(0.6)
 	local pin = pinOf(11)
-	pin:OnMouseEnter()
+	HoverMap(pin)
 	local lines = #TOOLTIP.lines
 	anna("O2;v;80")
 	Advance(0.6)
@@ -1200,7 +1202,7 @@ do
 	anna("O2;v;")
 	Advance(0.6)
 	check(tooltipHas("Level 20") and #TOOLTIP.lines == lines, "not known (or not shared): just the level")
-	pin:OnMouseLeave()
+	LeaveMap(pin)
 	WorldMapFrame:Hide()
 	-- Mine, to every friend: when it changes (in steps of 5), at most every 2 s, and with answers.
 	STATE.combat, STATE.dead = false, false
@@ -1266,21 +1268,21 @@ do
 	OpenWorldMap(1429)
 	Advance(0.6)
 	local a, b = pinOf(11), pinOf(12)
-	check(a and b and math.abs(a.y - b.y) < 1e-9 and math.abs((b.x - a.x) * 1000 - 11.2) < 0.01 and math.abs((a.x + b.x) / 2 - 0.5) < 1e-6,
+	check(a and b and math.abs(a.mapY - b.mapY) < 1e-9 and math.abs((b.mapX - a.mapX) * 1000 - 11.2) < 0.01 and math.abs((a.mapX + b.mapX) / 2 - 0.5) < 1e-6,
 		"two friends on one spot: their dots sit side by side around it (map: 1 yd = 1 px here), got "
-		.. tostring(a and a.x) .. " / " .. tostring(b and b.x))
-	a:OnMouseEnter()
+		.. tostring(a and a.mapX) .. " / " .. tostring(b and b.mapX))
+	HoverMap(a)
 	check(TOOLTIP.title == "Anna Brook" and tooltipHas("Bob Stone") and tooltipHas("Level 20"), "hovering either shows both")
 	bob("S2;C;0;520.0;500.0;Goldshire;Hogger")
 	Advance(0.6)
 	check(tooltipHas("Fighting Hogger"), "the open tooltip follows the other one too")
-	a:OnMouseLeave()
-	b:OnMouseEnter()
+	LeaveMap(a)
+	HoverMap(b)
 	check(TOOLTIP.title == "Bob Stone" and tooltipHas("Anna Brook"), "the hovered one comes first")
-	b:OnMouseLeave()
+	LeaveMap(b)
 	bob("S2;;0;380.0;500.0;Goldshire;") -- 140 yd apart now
 	Advance(0.6)
-	check(math.abs(pinOf(11).x - 0.5) < 1e-6 and not pinOf(11).group and not pinOf(12).group, "apart again: exact positions")
+	check(math.abs(pinOf(11).mapX - 0.5) < 1e-6 and not pinOf(11).group and not pinOf(12).group, "apart again: exact positions")
 	bob("S2;;0;520.0;500.0;Goldshire;")
 	Advance(0.6)
 	WorldMapFrame:Hide()
@@ -2493,8 +2495,6 @@ local reservedButton = ContainerFrameCombinedBags.buttons[3]
 check(reservedButton.LefthyToolsReserved:IsShown() and reservedButton.LefthyToolsSellGuard:IsShown(), "a reserved item at a vendor, Beacon on")
 mark = #GAMEDATA + 1
 MOCK_SEND_RESULT = 3 -- the server is throttling right now
-local mapProviders = {} -- (Beacon's and others' on the world map)
-for p in pairs(WorldMapFrame.providers) do mapProviders[p] = true end
 lefthy("disable beacon")
 check(#GameDataTo(11, mark) == 0, "switching off sends nothing inside the settings callback")
 Advance(1)
@@ -2502,12 +2502,10 @@ check(#GameDataTo(11, mark) == 0, "throttled: the goodbye waits")
 MOCK_SEND_RESULT = nil
 Advance(3)
 check(GameDataTo(11, mark)[1] == "Q2", "... and then tells friends (through the rate limiter, not lost)")
-local providersLeft, providersGone = 0, 0
-for p in pairs(mapProviders) do
-	if WorldMapFrame.providers[p] then providersLeft = providersLeft + 1 else providersGone = providersGone + 1 end
-end
-check(providersGone == 2 and providersLeft == 1 and next(BB.GetMinimapPins()) == nil,
-	"and removes the dots from both maps (its two map providers go, the quest map's stays)")
+OpenWorldMap(1429)
+check(#mapPins("beaconDot") == 0 and #mapPins("beaconPing") == 0 and next(BB.GetMinimapPins()) == nil,
+	"and removes the dots from both maps")
+WorldMapFrame:Hide()
 check(not reservedButton.LefthyToolsReserved:IsShown() and not reservedButton.LefthyToolsSellGuard:IsShown(),
 	"and the reserved item's border and vendor question")
 pmark = #PRINTED + 1
@@ -2553,7 +2551,7 @@ do -- Beacon's /lefthy words while it's off: they answer as they always did (no 
 end
 lefthy("enable beacon")
 Advance(0.15)
-check(next(WorldMapFrame.providers) ~= nil, "on again: back on the map")
+check(#MAP_WRITES == 0, "on again: still nothing written into the world map")
 check(reservedButton.LefthyToolsReserved:IsShown() and reservedButton.LefthyToolsSellGuard:IsShown(),
 	"and the reserved item's border and vendor question")
 Fire("MERCHANT_CLOSED")

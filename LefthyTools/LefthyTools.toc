@@ -14,6 +14,7 @@ Locales\deDE.lua
 Core\Core.lua
 Core\Window.lua
 Core\MapArt.lua
+Core\MapOverlay.lua
 Core\Errors.lua
 Core\WhatsNew.lua
 Core\Options.lua
@@ -49,7 +50,6 @@ Modules\Tweaks\Flight.lua
 Modules\Tweaks\LevelUp.lua
 Modules\Tweaks\LevelUpWindow.lua
 Modules\Tweaks\QuestMap.lua
-Modules\Tweaks\QuestMap.xml
 
 Modules\Beacon\Beacon.lua
 Modules\Beacon\Protocol.lua
@@ -76,7 +76,6 @@ Modules\Beacon\StreamMap.lua
 Modules\Beacon\StreamPreview.lua
 Modules\Beacon\StreamNet.lua
 Modules\Beacon\StreamButton.lua
-Modules\Beacon\Beacon.xml
 
 Modules\Chronicle\Chronicle.lua
 Modules\Chronicle\Live.lua

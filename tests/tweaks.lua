@@ -808,40 +808,49 @@ do
 	local asked = 0
 	local getQuestsOnMap = C_QuestLog.GetQuestsOnMap
 	C_QuestLog.GetQuestsOnMap = function(mapID) asked = asked + 1; return getQuestsOnMap(mapID) end
-	local ICONS, AREAS = "LefthyToolsQuestMapPinTemplate", "LefthyToolsQuestAreaPinTemplate"
+	local ICONS, AREAS = "questIcon", "questArea" -- (our frames on the map's canvas, Core/MapOverlay.lua)
+	local PinsOf = suite.mapPins
 	local function iconOf(id) for _, pin in ipairs(PinsOf(ICONS)) do if pin.quest.questID == id then return pin end end end
 	local function areaOf(zone) for _, pin in ipairs(PinsOf(AREAS)) do if pin.mapID == zone then return pin end end end
+	-- A click on an icon: the mouse on it, a click (GLOBAL_MOUSE_DOWN and _UP), the mouse off it.
+	local function clickIcon(icon, button) HoverMap(icon); ClickWorldMap(button); LeaveMap(icon) end
 
 	OpenWorldMap(1429)
 	check(#PinsOf(ICONS) == 0 and #PinsOf(AREAS) == 0, "a zone map: Blizzard's own icons and area, nothing added")
 	OpenWorldMap(1415)
 	local kobolds, defias, errand = iconOf(101), iconOf(102), iconOf(103)
 	check(#PinsOf(ICONS) == 3 and kobolds and defias and errand, "continent map: an icon per quest in its zones, the city's quest once")
-	check(near(kobolds.x, 0.375) and near(kobolds.y, 0.375) and near(defias.x, 0.25) and near(defias.y, 0.5625),
+	check(near(kobolds.mapX, 0.375) and near(kobolds.mapY, 0.375) and near(defias.mapX, 0.25) and near(defias.mapY, 0.5625),
 		"... at the zone map's spot, carried over to the continent")
-	check(near(errand.x, 0.3) and near(errand.y, 0.3), "... a quest in the city at its spot in the city")
+	check(near(errand.mapX, 0.3) and near(errand.mapY, 0.3), "... a quest in the city at its spot in the city")
 	check(kobolds.Icon.atlas == "Quest-In-Progress-Icon-yellow" and defias.Icon.atlas == "UI-QuestIcon-TurnIn-Normal"
 		and kobolds.Back.atlas == "UI-QuestPoi-QuestNumber", "Blizzard's quest icons: in progress, ready to turn in")
 	local elwynn = areaOf(1429)
 	check(#PinsOf(AREAS) == 3 and elwynn and #elwynn.blobs == 1 and elwynn.blobs[1] == 101 and areaOf(1453).blobs[1] == 103
 		and areaOf(1436).blobs[1] == 102, "... and the quest areas, each drawn for its own zone")
-	check(elwynn:GetWidth() == 250 and elwynn:GetHeight() == 250 and near(elwynn.x, 0.375) and near(elwynn.y, 0.375),
+	check(elwynn:GetWidth() == 250 and elwynn:GetHeight() == 250 and near(elwynn.mapX, 0.375) and near(elwynn.mapY, 0.375),
 		"... laid over that zone on the continent")
-	kobolds:OnMouseEnter()
+	check(kobolds:GetParent() == WorldMapFrame:GetCanvas() and kobolds._kind == "Frame" and not kobolds._scripts.OnMouseDown
+		and not kobolds._scripts.OnMouseUp and not kobolds._scripts.OnClick and kobolds._scripts.OnEnter
+		and elwynn._kind == "QuestPOIFrame" and elwynn:GetParent() == WorldMapFrame:GetCanvas() and #MAP_WRITES == 0,
+		"our own frames on the map's canvas, no map pins: icons take the mouse without a click script, areas are QuestPOIFrames")
+	check(PinLevelType(kobolds) == "PIN_FRAME_LEVEL_ACTIVE_QUEST" and PinLevelType(elwynn) == "PIN_FRAME_LEVEL_QUEST_BLOB",
+		"... at the frame levels the map gives its quest pins and areas")
+	HoverMap(kobolds)
 	local tip = table.concat(TOOLTIP.lines, "|")
 	check(TOOLTIP.title == "Kobold Camp Cleanup" and tip:find("Elwynn Forest", 1, true) and tip:find("Kobold Vermin slain: 4/10", 1, true)
 		and not tip:find("Map found", 1, true), "hovering an icon: the quest, its zone and what's left, got " .. tip)
 	check(#PinsOf(AREAS) == 3, "... areas already shown: none added")
-	kobolds:OnMouseLeave()
+	LeaveMap(kobolds)
 	check(not TOOLTIP.shown, "the tooltip goes on leave")
-	defias:OnMouseEnter()
+	HoverMap(defias)
 	check(table.concat(TOOLTIP.lines, "|"):find("Ready to turn in", 1, true), "a finished quest: ready to turn in")
-	defias:OnMouseLeave()
+	LeaveMap(defias)
 
 	OpenWorldMap(947)
-	check(#PinsOf(ICONS) == 3 and near(iconOf(101).x, 0.65) and near(iconOf(101).y, 0.325) and near(iconOf(103).x, 0.62),
+	check(#PinsOf(ICONS) == 3 and near(iconOf(101).mapX, 0.65) and near(iconOf(101).mapY, 0.325) and near(iconOf(103).mapX, 0.62),
 		"world map: the same quests, placed through their continent")
-	check(areaOf(1429) and near(areaOf(1429).x, 0.65) and near(areaOf(1429):GetWidth(), 100), "... with their areas")
+	check(areaOf(1429) and near(areaOf(1429).mapX, 0.65) and near(areaOf(1429):GetWidth(), 100), "... with their areas")
 
 	SUPER_TRACKED = 101
 	OpenWorldMap(1415)
@@ -849,7 +858,7 @@ do
 		"the selected quest: Blizzard shows its icon on continent maps, so only its area is added")
 	OpenWorldMap(947)
 	check(iconOf(101) and iconOf(101).Back.atlas == "UI-QuestPoi-QuestNumber-SuperTracked"
-		and iconOf(101).frameLevelType == "PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST", "... the world map shows it, marked as selected")
+		and PinLevelType(iconOf(101)) == "PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST", "... the world map shows it, marked as selected")
 	SUPER_TRACKED = 0
 
 	-- Clicking an icon selects its quest, as on zone maps.
@@ -860,18 +869,18 @@ do
 		and iconOf(102)._passThrough and iconOf(102)._passThrough[1] == "RightButton",
 		"icons take left clicks (a setting, on); right-clicks go through to the map, which zooms out")
 	local soundMark = #SOUNDS
-	iconOf(102):OnClick("LeftButton")
+	clickIcon(iconOf(102), "LeftButton")
 	check(SUPER_TRACKED == 102 and WATCHED[1] == 102 and #SOUNDS == soundMark + 1, "a click selects the quest and tracks it, with a click sound")
 	Advance(0.05)
 	check(not iconOf(102) and #PinsOf(ICONS) == 2, "... the map is redrawn right away: on continent maps Blizzard shows the selected quest's icon")
 	OpenWorldMap(947)
-	iconOf(102):OnClick("LeftButton")
+	clickIcon(iconOf(102), "LeftButton")
 	check(SUPER_TRACKED == 0 and WATCHED[1] == 102, "clicking the selected quest unselects it (it stays tracked)")
 	STATE.shift = true
-	iconOf(102):OnClick("LeftButton")
+	clickIcon(iconOf(102), "LeftButton")
 	STATE.shift = false
 	check(SUPER_TRACKED == 0 and #WATCHED == 0, "Shift-click on a tracked quest stops tracking it")
-	iconOf(101):OnClick("RightButton")
+	clickIcon(iconOf(101), "RightButton")
 	check(SUPER_TRACKED == 0, "a right-click doesn't select")
 	T("questMapContinent"):SetValue(2) -- icons only
 	SUPER_TRACKED = 101
@@ -882,13 +891,14 @@ do
 	T("questMapContinent"):SetValue(4)
 	T("questMapClick"):SetValue(false)
 	OpenWorldMap(1415)
-	iconOf(102):OnClick("LeftButton")
+	clickIcon(iconOf(102), "LeftButton")
 	check(iconOf(102)._click == false and SUPER_TRACKED == 0, "setting off: icons take no clicks, a click zooms the map in")
 	T("questMapClick"):SetValue(true)
 	GAMEPAD_STATE.ui = true
 	OpenWorldMap(1415)
-	check(iconOf(102)._click == false and not iconOf(102).OnMouseClickAction,
-		"gamepad mode: no click action (the controller's button would run it inside Blizzard's map code)")
+	clickIcon(iconOf(102), "LeftButton")
+	check(iconOf(102)._click == false and SUPER_TRACKED == 0,
+		"gamepad mode: the icons take no clicks (the controller's button is the map's: it zooms in)")
 	GAMEPAD_STATE.ui = false
 	WATCHED = savedWatched
 	Advance(0.6)
@@ -898,9 +908,9 @@ do
 	OpenWorldMap(1415)
 	check(#PinsOf(ICONS) == 3 and #PinsOf(AREAS) == 0, "... no areas")
 	kobolds = iconOf(101)
-	kobolds:OnMouseEnter()
+	HoverMap(kobolds)
 	check(#PinsOf(AREAS) == 1 and areaOf(1429).blobs[1] == 101 and #areaOf(1429).blobs == 1, "... hovering an icon shows its area")
-	kobolds:OnMouseLeave()
+	LeaveMap(kobolds)
 	check(#PinsOf(AREAS) == 0, "... until the mouse leaves")
 	T("questMapContinent"):SetValue(3) -- areas only
 	Advance(0.6) -- the open map follows the setting

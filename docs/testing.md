@@ -76,6 +76,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `ltc_more.lua` | LTC: a line that mentions me (case, words of their own, links left alone, the flash, the sound, a tab out of sight, my own lines, the setting); lines a friend missed while offline (kept by the writer and by friends who got them, passed on after an offer and its answer, paced, marked with their time, links rebuilt, shown once when two friends bring them, only from the friend's own friends, 50 per friend, 24 hours, yesterday's); /ltc who (the call, the links, answers changing, answers from friends not asked, the tally redrawn in place or anew, Invite all and a friend already in the group, a call missed as a plain line, the end after 15 minutes); an older build's client (without the new files) gets nothing but plain LTC lines | - (its clients are its own) |
 | `margins.lua` | Chronicle's crafting margins: my recipes (the real recipe scan and data), vendor prices (the data's, a merchant's, not for other currencies), one recipe at the auction house (only with it open, what's asked, 0.65 s apart, gear by item level, none listed, no answer, the throttle, a fight), the numbers (cost, both revenues, the cut, profit, time, gold per hour, age), a full scan (one ReplicateItems read over frames, only my recipes' items kept, too soon: by items, stopped: what's left), the window (order, sorting, greyed stale prices, the details, the scan button, the auction house closed), the buttons on the profession window and the auction house, closing mid-scan, idle, the setting, pruning, secret prices | - |
 | `gamepad_bags.lua` | Misc Tweaks' bags with a controller: the bag buttons' row, the sections and their order, positions and the bag's height, SmartNavigation (grid off, jumps at shorter rows, Blizzard's jump cleared, told after our moves, the cursor kept in place, jumps gone when the bag closes), the tooltip beside the bag, a fight (nothing placed or called, Blizzard's layout standing, ours after it), a collapsed bag, mouse and keyboard untouched, the setting and its command, opened in a fight | - |
+| `map_overlay.lua` | the world map only read (Core/MapOverlay.lua): nothing written into it, no frame made on it, none a button to the controller's navigation; nothing while it's closed, only a compare while it's still; our frames scaled and placed like the map's pins, hidden off the map; clicks only while it's open and on it; the controller's map cursor: a dot's and a quest icon's tooltip on our own tooltip (following changes, gone when the cursor moves away or tooltips are off); a quest icon made in a fight passing right-clicks through after it | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:
@@ -141,8 +142,10 @@ alpha), `section(title)`; `ns`, `LT`, `lefthy` (`/lefthy`); `printedSince(mark)`
 `PRINTED[mark]`); `sentTo(id, from, prefix)` (Beacon messages to a game account since
 `GAMEDATA[from]` that start with prefix); `anna(msg)` (a Beacon message from Anna, game account 11;
 Bob is 12: `Fire("BN_CHAT_MSG_ADDON", "LTBeacon", msg, "WHISPER", 12)`); `peers()`; `pinOf(id)` (a
-friend's world map dot); `tooltipHas(line)`; `afk(on)`; `catchErrors()` (what reaches the error
-handler meanwhile).
+friend's world map dot); `mapPins(kind[, all])` (our frames of a kind shown on the world map:
+`"beaconDot"`, `"beaconPing"`, `"questIcon"`, `"questArea"`; `all`: every one made); `tooltipHas(line)`;
+`afk(on)`; `catchErrors()` (what reaches the error handler meanwhile). The last checks also want
+`MAP_WRITES` and `MAP_PARENTED` empty: nothing written into the world map, no frame made on it.
 
 From the mock (globals):
 - `Fire(event, ...)`; `Advance(seconds)` moves the clock in 1/60 s steps (timers, then each
@@ -166,8 +169,13 @@ From the mock (globals):
   `peer.name` is "Anna Brook"); a journal keys a character by first name and realm ("Anna-Realmy").
 - What happened: `PRINTED` (chat), `GAMEDATA` and `GameDataTo(id, from)` (Beacon messages),
   `SENT_CHAT`, `SOUNDS`, `BLOCKED` (protected calls in combat), `ERRORS`, `TOOLTIP`.
-- Doing things: `TypeChat(text)` / `TypeChatSpace(text)` (the chat box), `OpenWorldMap(mapID)`,
-  `ClickWorldMap()`, `PinsOf(template)`.
+- Doing things: `TypeChat(text)` / `TypeChatSpace(text)` (the chat box), `OpenWorldMap(mapID)`
+  (the map opens and its next frame runs; the same map again: closed and opened), `MapTick()` (the
+  open map's next frame, after changing `MAP_VIEW`: scale, zoom, pin scale), `HoverMap(frame)` /
+  `LeaveMap(frame)` (the mouse on a frame on the map and off it), `ClickWorldMap([button])` (a
+  click where the mouse is: `GLOBAL_MOUSE_DOWN`, `GLOBAL_MOUSE_UP`), `SoftCursor` (the controller's
+  map cursor: `_centerX`, `_centerY`, `Show()`), `PinLevelType(frame)` (the map's frame level type of
+  a frame's level).
 - The world: `STATE` (target, cursor, panel, bags, afk, ...), `PLAYER_POS`, `ZONE`, `MOBS`
   (nameplates), `PARTY`, `QUESTS`, `QUESTS_ON_MAP`, `MAP_RECTS`, `ITEMS`, `BAGS`, and `MOCK_*`
   knobs (`MOCK_SEND_RESULT`, `MOCK_ITEM_UNCACHED`, ...): each is described where mock.lua sets it.
@@ -296,7 +304,8 @@ installer from GitHub instead.
     (arrow, tracked, its area shows; Blizzard's own icon replaces ours on the continent), click
     it again: unselected; Shift-click: untracked; right-click on an icon zooms out; also in combat,
     no "action blocked". Setting "Click an icon to select its quest" off: a click zooms into the
-    zone. Gamepad mode: the A button zooms in as before. Zoom out to the world map: the same, smaller. Settings, Misc Tweaks,
+    zone. Gamepad mode: the A button zooms in as before; the map's cursor near an icon shows its tooltip
+    (and, with icons only, its area); close the map with B: no "action blocked" (see Beacon below). Zoom out to the world map: the same, smaller. Settings, Misc Tweaks,
     Quests: "On continent maps" on Icons: no areas, hovering an icon shows its area; Areas; Nothing.
     "Quest areas on zone maps" on All quests: every quest's area on a zone map. Open a quest's
     details on the map: only that quest. The map's filter menu, quest objectives off: all gone.
@@ -317,6 +326,12 @@ installer from GitHub instead.
     the right direction. Invite them: their dot gets a blue ring and sits exactly on Blizzard's
     group dot on both maps, moving along live; the tooltip says "In your group". With "Show
     friends in my group too" off, only Blizzard's dot is left.
+    The map with a controller (gamepad mode): open it, move the map's cursor onto a friend's dot, a
+    ping and a quest icon: each shows its tooltip beside it; close the map with B, walk to an NPC:
+    the action bar's interact icon shows, B clears the target, no "action blocked" (also after a
+    fight). Zoom in and out with the mouse and the controller: dots, pings and icons stay on their
+    spots, the same size as Blizzard's pins. A plain click, Alt+click and Shift+click on the map
+    work as before, also in combat.
     Updates (both on this build or newer): when one of you has a newer build, the other gets one
     notice per login that ends with "then /reload (no restart needed)" or, if that build adds
     files, "then restart the game"; the settings overview's Updates row says "(needs a game

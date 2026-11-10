@@ -85,11 +85,12 @@ Advance(1)
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;C;0;250.0;750.0;Goldshire;Hogger", "WHISPER", 11)
 Advance(1.5)
 OpenWorldMap(1429)
-PINS[1]:OnMouseEnter()
+local dot = ns.LT.MapOverlay.Frames("beaconDot")[1]
+HoverMap(dot)
 local lines = table.concat(TOOLTIP.lines, "|")
 check(lines:find("Level 20", 1, true) and lines:find("Kämpft gegen Hogger", 1, true) and lines:find("355 m südwestlich", 1, true),
 	"friend tooltip in German, got " .. lines)
-PINS[1]:OnMouseLeave()
+LeaveMap(dot)
 local before = #PRINTED
 Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "L2;21;", "WHISPER", 11)
 Advance(0.2)

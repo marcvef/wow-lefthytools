@@ -1048,8 +1048,8 @@ handlers.PLAYER_ENTERING_WORLD = function()
 	B.SharingEnteredWorld()
 end
 handlers.GROUP_ROSTER_UPDATE = function() groupChanged = true end
--- (Sharing.lua adds its own: nameplates, quests, experience, combat, death, target, zone; Dots.lua
--- ADDON_LOADED. All are registered while Beacon is on.)
+-- (Sharing.lua adds its own: nameplates, quests, experience, combat, death, target, zone. All are
+-- registered while Beacon is on.)
 
 events:SetScript("OnEvent", function(_, event, ...)
 	local handler = handlers[event]

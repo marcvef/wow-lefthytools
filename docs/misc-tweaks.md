@@ -10,7 +10,7 @@ and the tweak's setting on) with what's active, and runs on the next frame via `
 All tweaks default to on, except `retailFrames`. The other files, in load order: `Bags.lua`
 (`movableBags`, `gamepadBagSort`), `GamepadBags.lua` (`gamepadBags`), `QuestAnnounce.lua`, `ComboPoints.lua`, `Aggro.lua`,
 `RetailFrames.lua`, `ForeverQuests.lua`, `AFK.lua`, `FlightTime.lua` and `Flight.lua`, `LevelUp.lua` and
-`LevelUpWindow.lua`, `QuestMap.lua` (+ `QuestMap.xml`).
+`LevelUpWindow.lua`, `QuestMap.lua`.
 
 ## statusText: always show health and power values
 
@@ -421,10 +421,12 @@ Blizzard's world map draws the quests in your log on zone maps only
 (`MapUtil.ShouldMapTypeShowQuests` is false for World, Continent and Cosmic): `QuestDataProvider`
 an icon per quest, `QuestBlobDataProvider` the area ("blob") of the selected (super-tracked),
 hovered or focused quest. On a continent map it shows only the selected quest's icon, on the world
-map nothing. A `MapCanvasDataProviderMixin` provider on `WorldMapFrame` adds them, per zoom level:
-`questMapContinent` and `questMapWorld` ("off", "icons", "areas", "both"; default both) and
-`questMapZone` ("blizzard", or "areas": every quest's area), and `questMapClick` (a checkbox). The
-choices are `Builder:Choice` sliders (no dropdowns, see forever-platform.md).
+map nothing. Frames of our own on the map's canvas add them (`LT.MapOverlay`, `Core/MapOverlay.lua`:
+no data provider, no `AcquirePin`, nothing written into the map; forever-platform.md, "The world
+map", has why), per zoom level: `questMapContinent` and `questMapWorld` ("off", "icons", "areas",
+"both"; default both) and `questMapZone` ("blizzard", or "areas": every quest's area), and
+`questMapClick` (a checkbox). The choices are `Builder:Choice` sliders (no dropdowns, see
+forever-platform.md).
 
 - **Which quests, where:** `C_QuestLog.GetQuestsOnMap(zone)` for every zone on the shown map
   (`C_Map.GetMapChildrenInfo(map, Zone, true)`), the same list the zone map draws; each spot is
@@ -436,37 +438,45 @@ choices are `Builder:Choice` sliders (no dropdowns, see forever-platform.md).
   (`QuestMapFrame_GetFocusedQuestID`) only that one. The selected quest's icon is left out on
   continent maps (Blizzard draws it there), its area on zone maps. The map's own filter (CVar
   `questPOI`, "quest objectives") switches everything off, like Blizzard's.
-- **Icons:** pins from `LefthyToolsQuestMapPinTemplate` (QuestMap.xml), Blizzard's art from
-  `POIButton.lua` at 80%: `UI-QuestPoi-QuestNumber` (`-SuperTracked` for the selected quest) behind
-  `Quest-In-Progress-Icon-yellow` or `UI-QuestIcon-TurnIn-Normal`; frame levels
-  `PIN_FRAME_LEVEL_ACTIVE_QUEST` / `_SUPER_TRACKED_QUEST`. Icons that would cover each other are
-  spread with Blizzard's `WorldMapPOIQuantizerMixin` (75 cells high, as on zone maps). Tooltip:
-  title (with level and difficulty colour through `SetQuestTitleLevelAndDifficultyColor`, as the
-  map's options say), zone, unfinished objectives or "Ready to turn in". With icons only, hovering
-  one draws its area until the mouse leaves, and the selected quest's area is always drawn (zone
-  maps show it too).
+- **Icons:** plain frames (not Buttons), made with no parent and then put on the canvas, the i-th
+  icon of a draw always the i-th frame; scaled like a map pin with `SetScalingLimits(1, 1.0, 1.2)`
+  and placed again on zoom. Blizzard's art from `POIButton.lua` at 80%: `UI-QuestPoi-QuestNumber`
+  (`-SuperTracked` for the selected quest) behind `Quest-In-Progress-Icon-yellow` or
+  `UI-QuestIcon-TurnIn-Normal`; the frame levels the map gives `PIN_FRAME_LEVEL_ACTIVE_QUEST` /
+  `_SUPER_TRACKED_QUEST` (`GetValidFrameLevel`, a read). Icons that would cover each other are
+  spread with Blizzard's `WorldMapPOIQuantizerMixin` (an object of our own, 75 cells high, as on
+  zone maps). Tooltip: title (with level and difficulty colour through
+  `SetQuestTitleLevelAndDifficultyColor`, as the map's options say), zone, unfinished objectives or
+  "Ready to turn in". With icons only, hovering one draws its area (a frame of its own) until the
+  mouse leaves, and the selected quest's area is always drawn (zone maps show it too). The
+  controller's map cursor shows the tooltip (and the area) too, on the overlay's own tooltip
+  (beacon.md, "World map").
 - **Clicks** (`questMapClick`, on): a left click does what `POIButtonMixin:OnClick` does on zone
   maps: select the quest (`C_SuperTrack.SetSuperTrackedQuestID`, tracked with
   `C_QuestLog.AddQuestWatch` if it wasn't), unselect the selected one (`ClearAllSuperTracked`),
   Shift-click on a tracked quest stops tracking it, and with the chat box open the quest link goes
   in (`ChatFrameUtil.TryInsertQuestLinkForQuestID`); then the map redraws on the next frame. The
-  template takes clicks (`enableMouse`, so `AcquirePin` wires `OnMouseUp` to `OnClick`, which calls
-  `OnMouseClickAction`); `OnAcquired` sets `OnMouseClickAction` and `SetMouseClickEnabled` from
-  the setting, so with it off clicks reach the map and it zooms in. Right-clicks pass through
-  (`SetPassThroughButtons("RightButton")` in `CheckMouseButtonPassthrough`, once and only out of
-  combat: it's protected in combat). **Not in gamepad mode:** the controller's button calls
-  `ClickHoveredPins` from `WorldMapMixin:GamepadMapClick`, which then navigates the map; our action
-  running inside it would leave that navigation (and the pins it acquires, with protected
-  `SetPassThroughButtons`) tainted, so there the pins take no clicks and the button zooms in.
+  icons take the mouse (`EnableMouse`) with `OnEnter` / `OnLeave` only: a frame with an
+  `OnMouseDown`, `OnMouseUp` or `OnClick` script is a button to the controller's navigation, which
+  reads the script back from Blizzard's code. So a click is a `GLOBAL_MOUSE_DOWN` and a
+  `GLOBAL_MOUSE_UP` of one button on the hovered icon (`Overlay.OnMouse`, only while the map is
+  open). With the setting off the icons take no clicks (`SetMouseClickEnabled(false)`): they reach
+  the map and it zooms in. Right-clicks pass through (`SetPassThroughButtons("RightButton")`, once
+  per icon and only out of combat: it's protected in combat; an icon made in a fight gets it on the
+  frame after `PLAYER_REGEN_ENABLED`, until then a right-click on it doesn't zoom out). **Not in
+  gamepad mode:** the controller's button is the map's (`WorldMapMixin:GamepadMapClick`: it zooms
+  in or changes the zone), so there the icons take no clicks.
 - **Areas:** the engine draws quest blobs into a `QuestPOIFrame` for one `uiMapID` (`SetMapID`,
-  `DrawBlob(questID, true)`), filling the frame. `LefthyToolsQuestAreaPinTemplate` is one, set up
-  like Blizzard's `QuestBlobPinMixin` (blob textures, fill 128, border 192); each zone with quests
-  gets its own, set to that zone, sized to the zone's rectangle on the canvas
-  (`DenormalizeHorizontalSize`) and centred on it. No mouse.
-- **Cost:** nothing while the map is closed: the provider registers its events (`QUEST_LOG_UPDATE`,
-  `QUEST_POI_UPDATE`, `QUEST_WATCH_LIST_CHANGED`, `SUPER_TRACKING_CHANGED`, `CVAR_UPDATE`) in
-  `OnShow` and drops them in `OnHide`. While it's open an event queues one redraw 0.5 s later; a
-  burst of events makes one. A redraw asks each zone once (about 25 on a continent).
+  `DrawBlob(questID, true)`), filling the frame. Ours are `CreateFrame("QuestPOIFrame")` (no parent,
+  then the canvas), set up like Blizzard's `QuestBlobPinMixin` (blob textures, fill 128, border
+  192), at `PIN_FRAME_LEVEL_QUEST_BLOB`'s level; each zone with quests gets its own, set to that zone,
+  sized to the zone's rectangle in canvas units (`Overlay.PlaceRect`: they zoom with the map) and
+  centred on it. No mouse.
+- **Cost:** nothing while the map is closed: its events (`QUEST_LOG_UPDATE`, `QUEST_POI_UPDATE`,
+  `QUEST_WATCH_LIST_CHANGED`, `SUPER_TRACKING_CHANGED`, `CVAR_UPDATE`) are registered when the map
+  opens (the overlay's `"show"`) and dropped when it closes. While it's open an event queues one
+  redraw 0.5 s later; a burst of events makes one. A redraw asks each zone once (about 25 on a
+  continent); zooming only places the icons again.
 - **Unverified in game:** whether `QuestPOIFrame` draws a zone's blob correctly in a frame that
   small, and how thick the border looks there (`SetBorderScalar`).
 

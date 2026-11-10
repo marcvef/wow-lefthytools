@@ -50,8 +50,10 @@ end
 local function anna(state) Fire("BN_CHAT_MSG_ADDON", "LTBeacon", state, "WHISPER", 11) end
 local function peers() return LT:GetModule("beacon"):GetPeers() end
 
--- A friend's dot on the world map; a line of the tooltip.
-local function pinOf(id) for _, p in ipairs(PINS) do if p.gameAccountID == id then return p end end end
+-- Our frames of a kind shown on the world map ("beaconDot", "beaconPing", "questIcon", "questArea":
+-- Core/MapOverlay.lua), a friend's dot there; a line of the tooltip.
+local function mapPins(kind, all) return LT.MapOverlay.Frames(kind, all) end
+local function pinOf(id) for _, p in ipairs(mapPins("beaconDot")) do if p.gameAccountID == id then return p end end end
 local function tooltipHas(text) for _, l in ipairs(TOOLTIP.lines) do if l == text then return true end end return false end
 
 -- Going away (/afk) and coming back.
@@ -89,6 +91,9 @@ end
 -- After the last file: nothing reached the error handler, no secret kept, no globals leaked, the count.
 function suite.Finish()
 	check(#ERRORS == 0, "no errors reported through the error handler")
+	-- The world map is only read (Core/MapOverlay.lua): nothing written into it, no frame made on it.
+	check(#MAP_WRITES == 0 and #MAP_PARENTED == 0 and not WorldMapFrame.ScrollContainer._scripts.OnMouseDown,
+		"nothing written into the world map, no frame made on it, got " .. table.concat(MAP_WRITES, ", ") .. " / " .. #MAP_PARENTED)
 	local kept = secretsKept()
 	check(not kept, "no secret as a table key, none in saved variables, found: " .. tostring(kept))
 
@@ -109,5 +114,5 @@ end
 suite.check, suite.near, suite.a, suite.section = check, near, a, section
 suite.ns, suite.LT, suite.lefthy = ns, LT, lefthy
 suite.printedSince, suite.sentTo, suite.anna, suite.peers = printedSince, sentTo, anna, peers
-suite.pinOf, suite.tooltipHas, suite.afk, suite.catchErrors = pinOf, tooltipHas, afk, catchErrors
+suite.pinOf, suite.tooltipHas, suite.afk, suite.catchErrors, suite.mapPins = pinOf, tooltipHas, afk, catchErrors, mapPins
 return suite

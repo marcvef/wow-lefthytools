@@ -127,7 +127,12 @@ function FrameMethods:GetPoint(i) local p = (self._points or {})[i or 1]; if p t
 function FrameMethods:GetNumPoints() return #(self._points or {}) end
 function FrameMethods:GetLeft() local p = (self._points or {})[1]; if p and p[1] == "TOPLEFT" then return p[4] end end
 function FrameMethods:GetTop() local p = (self._points or {})[1]; if p and p[1] == "TOPLEFT" then return p[5] end end
-function FrameMethods:SetParent(p) self._parent = p end
+function FrameMethods:SetParent(p)
+	local old = self._parent and self._parent._children
+	for i = #(old or {}), 1, -1 do if old[i] == self then table.remove(old, i) end end
+	self._parent = p
+	if p then p._children = p._children or {}; p._children[#p._children + 1] = self end
+end
 function FrameMethods:GetChildren() return unpack(self._children or {}) end
 function FrameMethods:RegisterForDrag(...) self._dragButtons = { ... } end
 function FrameMethods:HookScript(k, fn)
@@ -164,13 +169,19 @@ function FrameMethods:SetClipsChildren(c) self._clips = c end
 function FrameMethods:SetMouseMotionEnabled(e) self._motion = e end
 function FrameMethods:SetMouseClickEnabled(e) self._click = e end
 function FrameMethods:EnableMouse(e) self._mouseEnabled = e end
+function FrameMethods:IsMouseClickEnabled() if self._click ~= nil then return self._click end return self._mouseEnabled == true end
 function FrameMethods:IsMouseEnabled() return self._mouseEnabled == true end
 function FrameMethods:EnableMouseWheel(e) self._wheelEnabled = e end
 function FrameMethods:SetChecked(on) self._checked = on and true or false end
 function FrameMethods:GetChecked() return self._checked == true end
 function FrameMethods:SetHyperlinksEnabled(e) self._hyperlinks = e end
 -- Tooltips made with CreateFrame("GameTooltip"): what they were asked to show.
-function FrameMethods:SetOwner(owner, anchor) self._owner, self._anchor = owner, anchor end
+function FrameMethods:SetOwner(owner, anchor) self._owner, self._anchor, self._lines = owner, anchor, {} end
+function FrameMethods:AddLine(text) self._lines = self._lines or {}; self._lines[#self._lines + 1] = text end
+function FrameMethods:AddDoubleLine(left, right) self:AddLine(left .. "  " .. right) end
+function FrameMethods:IsOwned(frame) return self._shown and self._owner == frame end
+function FrameMethods:GetOwner() return self._owner end
+function FrameMethods:SetAnchorType(anchor) self._anchor = anchor end
 function FrameMethods:SetHyperlink(link)
 	if not link:find("^item:") and not link:find("^spell:") then error("unknown link type") end
 	self._hyperlink, self._spellID = link, nil
@@ -445,9 +456,12 @@ local function ApplyTemplate(f, template)
 	end
 end
 
+MOCK_FRAME_KINDS = {} -- kind -> methods frames of that kind have (QuestPOIFrame, below)
 function CreateFrame(kind, name, parent, template)
 	local f = setmetatable({ _scripts = {}, _units = {}, _alpha = 1, _shown = true, _parent = parent, _name = name, _kind = kind }, FrameMethods)
 	if name then _G[name] = f end
+	for k, v in pairs(MOCK_FRAME_KINDS[kind] or {}) do f[k] = v end
+	if parent and MAP_FRAMES and MAP_FRAMES[parent] then MAP_PARENTED[#MAP_PARENTED + 1] = f end
 	if parent then
 		parent._children = parent._children or {}
 		parent._children[#parent._children + 1] = f
@@ -1369,36 +1383,13 @@ MINIMAP_RADIUS = 100 -- yards from the centre to the edge
 C_Minimap = { GetViewRadius = function() return MINIMAP_RADIUS end }
 Minimap:SetSize(140, 140)
 
--- World map canvas with data providers and pooled pins, like MapCanvasMixin.
-MapCanvasDataProviderMixin = {
-	OnAdded = function(self, map) self.owningMap = map end,
-	OnRemoved = function(self) self:RemoveAllData(); self.owningMap = nil end,
-	GetMap = function(self) return self.owningMap end,
-	RemoveAllData = function() end,
-	RefreshAllData = function() end,
-	OnMapChanged = function(self) self:RefreshAllData() end,
-	OnShow = function() end, -- the canvas calls these when the map opens and closes
-	OnHide = function() end,
-}
-MapCanvasPinMixin = {
-	UseFrameLevelType = function(self, level) self.frameLevelType = level end,
-	SetScalingLimits = function() end,
-	SetIgnoreGlobalPinScale = function() end,
-	SetPosition = function(self, x, y) self.x, self.y = x, y end,
-	GetMap = function() return WorldMapFrame end,
-	-- A click on a pin that takes clicks (the canvas wires OnMouseUp to this).
-	OnClick = function(self, ...) if self.OnMouseClickAction then self:OnMouseClickAction(...) end end,
-	-- Like MapCanvas_DataProviderBase.lua: SetPassThroughButtons is protected, so calling it from
-	-- addon code in combat is blocked by the game.
-	CheckMouseButtonPassthrough = function(self) self:SetPassThroughButtons() end,
-	SetPassThroughButtons = function(self, ...)
-		if InCombatLockdown() then BLOCKED[#BLOCKED + 1] = "SetPassThroughButtons" return end
-		self._passThrough = { ... }
-	end,
-}
-PIN_MIXINS = { LefthyToolsBeaconPinTemplate = "LefthyToolsBeaconPinMixin", LefthyToolsBeaconPingPinTemplate = "LefthyToolsBeaconPingPinMixin",
-	LefthyToolsQuestMapPinTemplate = "LefthyToolsQuestMapPinMixin", LefthyToolsQuestAreaPinTemplate = "LefthyToolsQuestAreaPinMixin" }
--- The engine's quest area frame (QuestPOIFrame): pin.blobs = the quests it draws, for pin.mapID.
+-- The world map (MapCanvasMixin), as far as addon code may use it: what it reads. Every map method
+-- that writes into the map's tables (a data provider, a pin, the canvas's scale) only notes the
+-- call in MAP_WRITES, and frames made with a map frame as their parent are noted in MAP_PARENTED:
+-- the controller UI would run either as the addon's (docs/forever-platform.md); helpers.lua's last
+-- checks want both empty.
+MAP_WRITES, MAP_PARENTED = {}, {}
+-- The engine's quest area frame (QuestPOIFrame): frame.blobs = the quests it draws, for frame.mapID.
 local QuestPOIFrameMethods = {
 	SetMapID = function(self, mapID) self.mapID = mapID end,
 	DrawNone = function(self) self.blobs = {} end,
@@ -1407,73 +1398,92 @@ local QuestPOIFrameMethods = {
 for _, m in ipairs({ "SetFillTexture", "SetBorderTexture", "SetFillAlpha", "SetBorderAlpha", "SetBorderScalar" }) do
 	QuestPOIFrameMethods[m] = function() end
 end
-PIN_TYPES = { LefthyToolsQuestAreaPinTemplate = QuestPOIFrameMethods }
-PINS = {} -- currently acquired pins
-PINS_CREATED = 0
-local pinPools = {} -- one pool per template, like MapCanvasMixin
+MOCK_FRAME_KINDS.QuestPOIFrame = QuestPOIFrameMethods
+-- The frame levels the map gives its pins (MapCanvas_PinFrameLevelsManager): 100 levels per type.
+PIN_LEVELS = { PIN_FRAME_LEVEL_DEFAULT = 500, PIN_FRAME_LEVEL_QUEST_BLOB = 1100, PIN_FRAME_LEVEL_ACTIVE_QUEST = 1300,
+	PIN_FRAME_LEVEL_SUPER_TRACKED_QUEST = 1500, PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER = 1700 }
+function PinLevelType(frame) -- the level type a frame's level belongs to
+	for levelType, base in pairs(PIN_LEVELS) do
+		if frame:GetFrameLevel() >= base and frame:GetFrameLevel() < base + 100 then return levelType end
+	end
+end
+-- What the map shows besides its map: the canvas scale, the zoom (0-1) and the pin scale. A test
+-- changes them, then MapTick() runs the map's next frame.
+MAP_VIEW = { scale = 1, zoom = 0, pinScale = 1 }
 CreateFrame("Frame", "SettingsPanel", UIParent):Hide()
 CreateFrame("Frame", "WorldMapFrame", UIParent)
 WorldMapFrame:Hide()
 WorldMapFrame.mapID = 1429
-WorldMapFrame.providers = {}
 function WorldMapFrame:GetMapID() return self.mapID end
--- The canvas the pins sit on: 1000 x 1000 at scale 1, so on map 1429 (1000 yd wide) 1 yd = 1 pixel.
-WorldMapFrame.canvas = CreateFrame("Frame", nil, WorldMapFrame)
+-- The canvas (the scroll container's child) the pins sit on: 1000 x 1000 at scale 1, so on map 1429
+-- (1000 yd wide) 1 yd = 1 pixel; its top left corner at (100, 1100) on the screen.
+WorldMapFrame.ScrollContainer = CreateFrame("Frame", nil, WorldMapFrame)
+WorldMapFrame.canvas = CreateFrame("Frame", nil, WorldMapFrame.ScrollContainer)
 WorldMapFrame.canvas:SetSize(1000, 1000)
+WorldMapFrame.canvas:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", 100, 1100)
 function WorldMapFrame:GetCanvas() return self.canvas end
-function WorldMapFrame:AddDataProvider(p) self.providers[p] = true; p:OnAdded(self) end
-function WorldMapFrame:RemoveDataProvider(p) self.providers[p] = nil; p:OnRemoved(self) end
-function WorldMapFrame:AcquirePin(template, ...)
-	pinPools[template] = pinPools[template] or {}
-	local pin = table.remove(pinPools[template])
-	if not pin then
-		pin = CreateFrame("Frame", nil, self)
-		for k, v in pairs(PIN_TYPES[template] or {}) do pin[k] = v end
-		for k, v in pairs(_G[PIN_MIXINS[template]]) do pin[k] = v end
-		pin:OnLoad() -- the canvas calls OnLoad once, for new pins only
-		PINS_CREATED = PINS_CREATED + 1
+function WorldMapFrame:GetCanvasScale() return MAP_VIEW.scale end
+function WorldMapFrame:HasZoomLevels() return true end
+function WorldMapFrame:GetCanvasZoomPercent() return MAP_VIEW.zoom end
+function WorldMapFrame:GetGlobalPinScale() return MAP_VIEW.pinScale end
+local pinLevels = { GetValidFrameLevel = function(_, levelType, index)
+	return (PIN_LEVELS[levelType] or PIN_LEVELS.PIN_FRAME_LEVEL_DEFAULT) + math.min(math.max(index or 1, 1), 100) - 1
+end }
+function WorldMapFrame:GetPinFrameLevelsManager() return pinLevels end
+-- The mouse on the bare map: the scroll container has the mouse focus (GetMouseFoci, MOCK_FOCUS).
+function WorldMapFrame:IsCanvasMouseFocus() return MOCK_FOCUS == self.ScrollContainer end
+for _, method in ipairs({ "AddDataProvider", "RemoveDataProvider", "AcquirePin", "RemovePin", "RemoveAllPinsByTemplate",
+		"RefreshAllDataProviders", "MarkCanvasDirty", "AddCanvasClickHandler", "AddOverlayFrame", "SetMapID", "ResetZoom",
+		"SetGlobalPinScale" }) do
+	WorldMapFrame[method] = function() MAP_WRITES[#MAP_WRITES + 1] = method end
+end
+MAP_FRAMES = { [WorldMapFrame] = true, [WorldMapFrame.ScrollContainer] = true, [WorldMapFrame.canvas] = true }
+-- The map's next frame: the OnUpdate of what sits on its canvas (what the game runs every frame
+-- while the map is shown).
+function MapTick()
+	for _, f in ipairs(allFrames) do
+		if f._parent == WorldMapFrame.canvas and f._scripts.OnUpdate and f:IsVisible() then f._scripts.OnUpdate(f, 0) end
 	end
-	pin.pinTemplate = template
-	PINS[#PINS + 1] = pin
-	pin:Show()
-	if pin.OnAcquired then pin:OnAcquired(...) end
-	pin:CheckMouseButtonPassthrough("RightButton") -- Blizzard does this on every acquire
-	return pin
 end
-function WorldMapFrame:RemovePin(pin)
-	for i = #PINS, 1, -1 do if PINS[i] == pin then table.remove(PINS, i) end end
-	pin:Hide()
-	table.insert(pinPools[pin.pinTemplate], pin)
-end
-function WorldMapFrame:RemoveAllPinsByTemplate(template)
-	for i = #PINS, 1, -1 do
-		if PINS[i].pinTemplate == template then
-			PINS[i]:Hide()
-			table.insert(pinPools[template], table.remove(PINS, i))
+-- Closing the map: what's shown on its canvas hides with it (OnHide), as in the game.
+function WorldMapFrame:Hide()
+	local closing = self:IsShown()
+	FrameMethods.Hide(self)
+	if closing then
+		for _, f in ipairs(allFrames) do
+			if f._parent == self.canvas and f._shown and f._scripts.OnHide then f._scripts.OnHide(f) end
 		end
 	end
 end
-function WorldMapFrame:Hide() -- closing the map: the canvas tells every provider
-	local closing = self:IsShown()
-	FrameMethods.Hide(self)
-	if closing then for p in pairs(self.providers) do p:OnHide() end end
-end
-function PinsOf(template) -- the acquired pins of one template, in acquire order
-	local list = {}
-	for _, pin in ipairs(PINS) do if pin.pinTemplate == template then list[#list + 1] = pin end end
-	return list
-end
--- Canvas units: the mock canvas is 1000 x 1000.
-function WorldMapFrame:DenormalizeHorizontalSize(size) return size * 1000 end
-function WorldMapFrame:DenormalizeVerticalSize(size) return size * 1000 end
--- Clicks land on the canvas' scroll container; the cursor is in map coordinates (0-1).
-WorldMapFrame.ScrollContainer = CreateFrame("Frame", nil, WorldMapFrame)
+-- The cursor in map coordinates (0-1).
 MOCK_CURSOR = { 0.5, 0.5 }
 function WorldMapFrame:GetNormalizedCursorPosition() return MOCK_CURSOR[1], MOCK_CURSOR[2] end
-function ClickWorldMap(button) -- what the engine does on mouse down over the map
-	local onDown = WorldMapFrame.ScrollContainer._scripts.OnMouseDown
-	if onDown then onDown(WorldMapFrame.ScrollContainer, button or "LeftButton") end
+-- The mouse over a frame on the map (OnEnter, the mouse focus) and off it again (OnLeave).
+function HoverMap(f)
+	f._mouse, MOCK_FOCUS = true, f
+	if f._scripts.OnEnter then f._scripts.OnEnter(f) end
 end
+function LeaveMap(f)
+	f._mouse = false
+	if MOCK_FOCUS == f then MOCK_FOCUS = nil end
+	if f._scripts.OnLeave then f._scripts.OnLeave(f) end
+end
+-- A click on the map, where the mouse is (on the bare map unless a frame is hovered): the engine's
+-- GLOBAL_MOUSE_DOWN, the scroll container's OnMouseDown (nothing of ours may hook it) and
+-- GLOBAL_MOUSE_UP.
+function ClickWorldMap(button)
+	button = button or "LeftButton"
+	local focus = MOCK_FOCUS
+	MOCK_FOCUS = focus or WorldMapFrame.ScrollContainer
+	Fire("GLOBAL_MOUSE_DOWN", button)
+	local onDown = WorldMapFrame.ScrollContainer._scripts.OnMouseDown
+	if onDown then onDown(WorldMapFrame.ScrollContainer, button) end
+	Fire("GLOBAL_MOUSE_UP", button)
+	MOCK_FOCUS = focus
+end
+-- The controller UI's map cursor: tests place it (SoftCursor._centerX, _centerY: UI units) and show it.
+CreateFrame("Frame", "SoftCursor", UIParent)
+SoftCursor:Hide()
 function IsAltKeyDown() return STATE.alt == true end
 local MODIFIED_CLICKS = { CHATLINK = "shift", DRESSUP = "ctrl" } -- (the game's default bindings)
 function IsModifiedClick(action)
@@ -1532,12 +1542,13 @@ C_QuestLog.GetQuestsOnMap = function(mapID)
 	return list
 end
 SOUNDKIT = { MAP_PING = 3175, TELL_MESSAGE = 3081 }
-function OpenWorldMap(mapID) -- the canvas refreshes every provider when it opens or changes map
+-- The map opens (or shows another map), and its next frame runs. The same map while it's open: it's
+-- closed and opened again (drawn anew).
+function OpenWorldMap(mapID)
+	if WorldMapFrame:IsShown() and (mapID or WorldMapFrame.mapID) == WorldMapFrame.mapID then WorldMapFrame:Hide() end
 	WorldMapFrame.mapID = mapID or WorldMapFrame.mapID
-	local opening = not WorldMapFrame:IsShown()
 	WorldMapFrame:Show()
-	for p in pairs(WorldMapFrame.providers) do p:OnMapChanged() end
-	if opening then for p in pairs(WorldMapFrame.providers) do p:OnShow() end end
+	MapTick()
 end
 TOOLTIP = { lines = {} }
 GameTooltip = {

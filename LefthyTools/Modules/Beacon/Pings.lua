@@ -12,19 +12,19 @@ local B = ns.Beacon
 -- ping sound. `/lefthy beacon ping` pings where you stand. Alt+click on your own marker (or
 -- `/lefthy beacon ping clear`) takes it back before its minute is up, for everyone (G2).
 --
--- The click is caught with a post-hook (HookScript) on the map's scroll container: Blizzard's
--- own click handling runs first and untouched. Mouse down, not up: on mouse up the map may zoom
--- into the zone under the cursor, and the spot is read before that.
+-- The click is read from GLOBAL_MOUSE_DOWN, not from the map (Core/MapOverlay.lua): Blizzard's own
+-- click handling stays untouched. Mouse down, not up: on mouse up the map may zoom into the zone
+-- under the cursor, and the spot is read before that.
 
 local PING_TIME = 60     -- seconds a marker stays
 local RIPPLE_TIME = 10   -- the ripple runs this long, then the marker just sits there
 local FADE_TIME = 10     -- and fades out over its last seconds
 local SEND_GAP = 2.5     -- my own pings at most this often (friends take one per 2 s: Beacon's PING_GAP)
 local EDGE_ALPHA = 0.6
-local PIN_TEMPLATE = "LefthyToolsBeaconPingPinTemplate"
 local MARKER_ATLAS = "Ping_Marker_Icon_NonThreat" -- the game's "look here" ping
 local ROUND_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local MINIMAP_SIZE = 16
+local MAP_SIZE = 20 -- the world map marker's
 
 -- B.pings[gameAccountID or "me"] = { name, classFile, continent, north, west, mapID, at }
 local pings = B.pings
@@ -199,58 +199,53 @@ local function StyleMarker(frame, ping, now, fadeBase)
 	frame:SetAlpha(fadeBase * math.min(1, (PING_TIME - age) / FADE_TIME))
 end
 
-local function ShowPingTooltip(owner, ping)
-	GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-	GameTooltip:SetText(ping.name or "?", B.ClassColor(ping.classFile))
-	GameTooltip:AddLine(L["Map ping, %d s ago"]:format(math.floor(GetTime() - ping.at)), 1, 1, 1)
+-- tip: GameTooltip (the mouse), or the world map's own for the controller's map cursor.
+local function ShowPingTooltip(owner, ping, tip)
+	tip = tip or GameTooltip
+	tip:SetOwner(owner, "ANCHOR_RIGHT")
+	tip:SetText(ping.name or "?", B.ClassColor(ping.classFile))
+	tip:AddLine(L["Map ping, %d s ago"]:format(math.floor(GetTime() - ping.at)), 1, 1, 1)
 	if ZoneName(ping.mapID) then
-		GameTooltip:AddLine(ZoneName(ping.mapID), 1, 1, 1)
+		tip:AddLine(ZoneName(ping.mapID), 1, 1, 1)
 	end
 	local distance = B.DistanceText(ping.continent, ping.north, ping.west)
 	if distance then
-		GameTooltip:AddLine(distance, 0.75, 0.75, 0.75)
+		tip:AddLine(distance, 0.75, 0.75, 0.75)
 	end
 	if owner.key == "me" then
-		GameTooltip:AddLine(L["Alt+click it on the world map to take it back."], 0.5, 0.8, 1)
+		tip:AddLine(L["Alt+click it on the world map to take it back."], 0.5, 0.8, 1)
 	end
-	GameTooltip:Show()
+	tip:Show()
 end
 
 ---------------------------------------------------------------------------
--- World map
+-- World map: markers of our own on the map's canvas (Core/MapOverlay.lua), hover only, like
+-- Dots.lua's dots.
 ---------------------------------------------------------------------------
 
-LefthyToolsBeaconPingPinMixin = CreateFromMixins(MapCanvasPinMixin)
+local Overlay = LT.MapOverlay
+local MARKER_LEVEL = "PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER"
+local SCALE_FROM, SCALE_TO = 1.0, 1.2 -- as a map pin with SetScalingLimits(1, 1.0, 1.2)
+local mapPins, spareMapPins = {}, {} -- key -> marker on the open map; markers not in use
+local vector = CreateVector2D(0, 0)
 
-function LefthyToolsBeaconPingPinMixin:OnLoad()
-	self:UseFrameLevelType("PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER")
-	self:SetScalingLimits(1, 1.0, 1.2)
-	BuildMarker(self)
-end
-
-function LefthyToolsBeaconPingPinMixin:OnAcquired(key)
-	self.key = key
-end
-
-function LefthyToolsBeaconPingPinMixin:OnMouseEnter()
+local function MapMarkerOnEnter(self)
 	local ping = pings[self.key]
 	if ping then
 		ShowPingTooltip(self, ping)
 	end
 end
 
-function LefthyToolsBeaconPingPinMixin:OnMouseLeave()
+local function MapMarkerOnLeave()
 	GameTooltip:Hide()
 end
 
--- See LefthyToolsBeaconPinMixin: the base version calls a protected function.
-function LefthyToolsBeaconPingPinMixin:CheckMouseButtonPassthrough()
+local function MapMarkerHover(self, tip)
+	local ping = pings[self.key]
+	if ping then
+		ShowPingTooltip(self, ping, tip)
+	end
 end
-
-local provider = CreateFromMixins(MapCanvasDataProviderMixin)
-local mapPins = {} -- key -> pin
-local providerAdded, hooked = false, false
-local vector = CreateVector2D(0, 0)
 
 local function MapPosition(ping, mapID)
 	vector:SetXY(ping.north, ping.west)
@@ -264,77 +259,114 @@ local function MapPosition(ping, mapID)
 	end
 end
 
-function provider:RemoveAllData()
-	self:GetMap():RemoveAllPinsByTemplate(PIN_TEMPLATE)
-	wipe(mapPins)
+local function ReleaseMapMarker(key)
+	local frame = mapPins[key]
+	mapPins[key] = nil
+	if Overlay.TooltipOf(frame) then
+		Overlay.TooltipOf(frame):Hide()
+	end
+	frame.RippleAnim:Stop()
+	frame:Hide()
+	spareMapPins[#spareMapPins + 1] = frame
 end
 
-function provider:RefreshAllData()
-	local map = self:GetMap()
-	local mapID = map:GetMapID()
+local function ReleaseAllMapMarkers()
+	for key in pairs(mapPins) do
+		ReleaseMapMarker(key)
+	end
+end
+
+local function AcquireMapMarker(key)
+	local frame = table.remove(spareMapPins)
+	if not frame then
+		frame = Overlay.Frame("beaconPing")
+		if not frame then
+			return nil
+		end
+		frame:SetSize(MAP_SIZE, MAP_SIZE)
+		BuildMarker(frame)
+		frame:SetMouseMotionEnabled(true) -- hover only: clicks go through to the map
+		frame:SetMouseClickEnabled(false)
+		frame:SetScript("OnEnter", MapMarkerOnEnter)
+		frame:SetScript("OnLeave", MapMarkerOnLeave)
+		Overlay.SetHover(frame, MapMarkerHover)
+	end
+	frame:SetFrameLevel(Overlay.Level(MARKER_LEVEL))
+	frame.key = key
+	mapPins[key] = frame
+	return frame
+end
+
+local function DrawWorldMap()
+	local view = Overlay.view
+	local mapID = view.shown and M.enabled and view.mapID
 	local now = GetTime()
-	for key, pin in pairs(mapPins) do
-		local ping = M.enabled and pings[key]
+	for key, frame in pairs(mapPins) do
+		local ping = mapID and pings[key]
 		local x, y
-		if ping and mapID then
+		if ping then
 			x, y = MapPosition(ping, mapID)
 		end
 		if x then
-			pin:SetPosition(x, y)
-			StyleMarker(pin, ping, now, 1)
+			Overlay.Place(frame, x, y, SCALE_FROM, SCALE_TO)
+			StyleMarker(frame, ping, now, 1)
 		else
-			map:RemovePin(pin)
-			mapPins[key] = nil
+			ReleaseMapMarker(key)
 		end
 	end
-	if not (M.enabled and mapID) then
+	if not mapID then
 		return
 	end
 	for key, ping in pairs(pings) do
 		if not mapPins[key] then
 			local x, y = MapPosition(ping, mapID)
-			if x then
-				local pin = map:AcquirePin(PIN_TEMPLATE, key)
-				mapPins[key] = pin
-				pin:SetPosition(x, y)
-				StyleMarker(pin, ping, now, 1)
+			local frame = x and AcquireMapMarker(key)
+			if frame then
+				Overlay.Place(frame, x, y, SCALE_FROM, SCALE_TO)
+				StyleMarker(frame, ping, now, 1)
 			end
 		end
 	end
 end
 
-function provider:OnMapChanged()
-	self:RefreshAllData()
-end
+Overlay.Watch("B.WorldMapPings", function(what)
+	if what == "hide" then
+		ReleaseAllMapMarkers()
+	elseif what == "scale" then
+		for _, frame in pairs(mapPins) do -- (the same spots, another zoom)
+			if frame.mapX then
+				Overlay.Place(frame, frame.mapX, frame.mapY, SCALE_FROM, SCALE_TO)
+			end
+		end
+	else
+		DrawWorldMap()
+	end
+end)
 
-local function OnMapMouseDown(_, button)
-	if button == "LeftButton" and IsAltKeyDown() and M.enabled and M.db.pings then
+-- Alt+click on the world map pings that spot; on my own marker it takes my ping back. Read from
+-- GLOBAL_MOUSE_DOWN (Core/MapOverlay.lua: only while the map is open, only on the map), mouse down
+-- because on mouse up the map may zoom into the zone and move what's under the cursor. No hook on
+-- the map: a script hooked there runs inside Blizzard's click handling.
+Overlay.OnMouse("B.MapPingClick", function(event, button)
+	if event == "down" and button == "LeftButton" and IsAltKeyDown() and M.enabled and M.db.pings and Overlay.MouseOnMap() then
 		local mine = mapPins.me
 		if mine and mine:IsShown() and mine:IsMouseOver() then
 			B.ClearMyPing() -- on my own marker: take it back
 		else
-			B.PingMapPosition(WorldMapFrame:GetMapID(), WorldMapFrame:GetNormalizedCursorPosition())
+			B.PingMapPosition(Overlay.view.mapID, Overlay.CursorPosition())
 		end
 	end
-end
+end)
 
+-- Beacon on (Dots.lua's B.Attach): an open map shows the markers at once.
 function B.AttachPings()
-	if providerAdded then
-		return
-	end
-	WorldMapFrame:AddDataProvider(provider)
-	providerAdded = true
-	if not hooked and WorldMapFrame.ScrollContainer then
-		hooked = true -- a hook stays for good; it checks whether Beacon and pings are on
-		WorldMapFrame.ScrollContainer:HookScript("OnMouseDown", OnMapMouseDown)
+	if Overlay.view.shown then
+		DrawWorldMap()
 	end
 end
 
 function B.DetachPings()
-	if providerAdded then
-		WorldMapFrame:RemoveDataProvider(provider)
-		providerAdded = false
-	end
+	ReleaseAllMapMarkers()
 end
 
 ---------------------------------------------------------------------------
@@ -427,9 +459,9 @@ function B.UpdatePings(now)
 			StyleMarker(frame, ping, now, frame.edgeAlpha or 1)
 		end
 	end
-	if providerAdded and WorldMapFrame:IsShown() then
+	if Overlay.view.shown then
 		if B.pingsDirty then
-			provider:RefreshAllData()
+			DrawWorldMap()
 		else
 			for key, pin in pairs(mapPins) do
 				if pings[key] then

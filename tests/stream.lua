@@ -1112,7 +1112,7 @@ do
 	OpenWorldMap(1429)
 	local pin = pinOf(11)
 	pin._mouse = true
-	pin:OnMouseEnter()
+	HoverMap(pin)
 	check(tooltipHas("Click: watch their fight"), "her dot's tooltip: a click watches her")
 	ClickWorldMap()
 	check(S.IsWatching(11) and fwin:IsShown() and tooltipHas("Click: close their fight stream"), "clicked: her stream opens; the tooltip says how to close it")
@@ -1134,20 +1134,20 @@ do
 	check(#INVITES == 1, "Shift+Alt: no invite")
 	local peer11 = BB.peers[11]
 	peer11.groupUnit = "party1"
-	pin:OnMouseEnter()
+	HoverMap(pin)
 	check(not tooltipHas("Shift+click: invite"), "in my group: the tooltip doesn't offer an invite")
 	ClickWorldMap()
 	check(#INVITES == 1, "in my group: no invite")
 	peer11.groupUnit = nil
-	pin:OnMouseEnter()
+	HoverMap(pin)
 	STATE.shift = false
 	ClickWorldMap()
 	check(not S.IsWatching(11), "clicked again: closed")
 	pin._mouse = false
-	pin:OnMouseLeave()
+	LeaveMap(pin)
 	local bobPin = pinOf(12)
 	bobPin._mouse = true
-	bobPin:OnMouseEnter()
+	HoverMap(bobPin)
 	ClickWorldMap()
 	check(not tooltipHas("Click: watch their fight") and not S.IsWatching(12), "Bob can't be watched: no hint, a click does nothing")
 	STATE.shift = true
@@ -1155,7 +1155,7 @@ do
 	STATE.shift = false
 	check(INVITES[2] == 12 and tooltipHas("Shift+click: invite"), "but Bob can be invited")
 	bobPin._mouse = false
-	bobPin:OnMouseLeave()
+	LeaveMap(bobPin)
 	B("streamMapClick"):SetValue(false)
 	pin._mouse = true
 	ClickWorldMap()

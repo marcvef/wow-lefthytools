@@ -6,9 +6,9 @@ local B = ns.Beacon
 
 -- Friends' dots: one look for the world map and the minimap, and the tooltip on hover.
 --
--- World map: pins of a map data provider (the official MapCanvas extension point; the map runs
--- every provider call through secureexecuterange, so it can't taint Blizzard's map code).
--- Pins are updated in place, so a hovered dot keeps its tooltip while it moves.
+-- World map: frames of our own laid over the map (Core/MapOverlay.lua), not the map's pins: the map
+-- is only read, so the controller UI never runs anything of ours. Dots are updated in place, so a
+-- hovered dot keeps its tooltip while it moves.
 --
 -- Minimap: plain frames on Minimap, placed relative to my own world position (same maths as
 -- HereBeDragons-Pins: yards to pixels via C_Minimap.GetViewRadius, rotated by the facing when
@@ -16,10 +16,9 @@ local B = ns.Beacon
 -- the zoom or the rotation. Standing still with friends standing still costs a few cheap calls
 -- per frame and no drawing.
 
-local PIN_TEMPLATE = "LefthyToolsBeaconPinTemplate"
 local ROUND_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
-local PIN_SIZE = 14 -- the world map pin's size (LefthyToolsBeaconPinTemplate in Beacon.xml)
+local PIN_SIZE = 14 -- the world map dot's size
 local MINIMAP_DOT_SIZE = 10
 local EDGE_INSET = 5   -- pixels between an edge dot's centre and the minimap border
 local EDGE_ALPHA = 0.6
@@ -181,7 +180,7 @@ function B.Spread(items, size)
 end
 
 -- One friend's lines; the first friend's name is the tooltip title, the others' follow below.
-local function AddPeer(peer, first)
+local function AddPeer(tip, peer, first)
 	-- AFK/DND, level and zone straight from Battle.net, so they're current.
 	local account = peer.guid and C_BattleNet.GetAccountInfoByGUID and C_BattleNet.GetAccountInfoByGUID(peer.guid)
 	local game = account and account.gameAccountInfo
@@ -192,38 +191,38 @@ local function AddPeer(peer, first)
 		title = title .. " <DND>"
 	end
 	if first then
-		GameTooltip:SetText(title, B.ClassColor(peer.classFile))
+		tip:SetText(title, B.ClassColor(peer.classFile))
 	else
-		GameTooltip:AddLine(" ")
-		GameTooltip:AddLine(title, B.ClassColor(peer.classFile))
+		tip:AddLine(" ")
+		tip:AddLine(title, B.ClassColor(peer.classFile))
 	end
 	local battleTag = account and account.battleTag and account.battleTag:match("^[^#]+")
 	if battleTag then
-		GameTooltip:AddLine(battleTag, BNET_BLUE_R, BNET_BLUE_G, BNET_BLUE_B)
+		tip:AddLine(battleTag, BNET_BLUE_R, BNET_BLUE_G, BNET_BLUE_B)
 	end
 	if peer.groupUnit then
-		GameTooltip:AddLine(L["In your group"], GROUP_R, GROUP_G, GROUP_B)
+		tip:AddLine(L["In your group"], GROUP_R, GROUP_G, GROUP_B)
 	end
 	-- Level, with their progress on it, and their health (estimated) beside it.
 	local level = peer.level
 	local health = B.HealthText(peer)
 	if level then
 		local text = peer.xpPercent and L["Level %d (%d%%)"]:format(level, peer.xpPercent) or L["Level %d"]:format(level)
-		GameTooltip:AddLine(health and (text .. "  " .. health) or text, 1, 1, 1)
+		tip:AddLine(health and (text .. "  " .. health) or text, 1, 1, 1)
 	elseif health then
-		GameTooltip:AddLine(health, 1, 1, 1)
+		tip:AddLine(health, 1, 1, 1)
 	end
 	local area = game and game.areaName or peer.area
 	local subzone = peer.subzone ~= "" and peer.subzone ~= area and peer.subzone or nil
 	if area and subzone then
-		GameTooltip:AddLine(area .. " - " .. subzone, 1, 1, 1)
+		tip:AddLine(area .. " - " .. subzone, 1, 1, 1)
 	elseif area or subzone then
-		GameTooltip:AddLine(area or subzone, 1, 1, 1)
+		tip:AddLine(area or subzone, 1, 1, 1)
 	end
 	if peer.ghost then
-		GameTooltip:AddLine(L["Ghost"], STATUS_R, STATUS_G, STATUS_B)
+		tip:AddLine(L["Ghost"], STATUS_R, STATUS_G, STATUS_B)
 	elseif peer.dead then
-		GameTooltip:AddLine(L["Dead"], STATUS_R, STATUS_G, STATUS_B)
+		tip:AddLine(L["Dead"], STATUS_R, STATUS_G, STATUS_B)
 	end
 	if peer.combat then
 		local mobs, text = peer.mobs or 0, nil
@@ -236,23 +235,23 @@ local function AddPeer(peer, first)
 		else
 			text = L["In combat"]
 		end
-		GameTooltip:AddLine(text, STATUS_R, STATUS_G, STATUS_B)
+		tip:AddLine(text, STATUS_R, STATUS_G, STATUS_B)
 	end
 	local quest = peer.quest
 	if quest then
-		GameTooltip:AddLine(L["Quest: %s"]:format(quest.title), 1, 0.82, 0)
+		tip:AddLine(L["Quest: %s"]:format(quest.title), 1, 0.82, 0)
 		if quest.done then
-			GameTooltip:AddLine("  " .. L["Ready to turn in"], 0.3, 1, 0.3)
+			tip:AddLine("  " .. L["Ready to turn in"], 0.3, 1, 0.3)
 		elseif quest.objective ~= "" then
-			GameTooltip:AddLine("  " .. quest.objective, 0.85, 0.85, 0.85)
+			tip:AddLine("  " .. quest.objective, 0.85, 0.85, 0.85)
 		end
 		if C_QuestLog.GetLogIndexForQuestID(quest.id) then
-			GameTooltip:AddLine("  " .. L["You have this quest too"], GROUP_R, GROUP_G, GROUP_B)
+			tip:AddLine("  " .. L["You have this quest too"], GROUP_R, GROUP_G, GROUP_B)
 		end
 	end
 	local distance = DistanceText(peer)
 	if distance then
-		GameTooltip:AddLine(distance, 0.75, 0.75, 0.75)
+		tip:AddLine(distance, 0.75, 0.75, 0.75)
 	end
 end
 
@@ -266,33 +265,37 @@ local function Signature(peer, group)
 	return sig
 end
 
--- The hovered friend first, then everyone whose dot is on top of theirs (group).
-function B.ShowTooltip(owner, peer, group)
-	GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-	AddPeer(peer, true)
+-- The hovered friend first, then everyone whose dot is on top of theirs (group). tip: GameTooltip
+-- (the mouse), or the world map's own tooltip for the controller's map cursor (Core/MapOverlay.lua).
+function B.ShowTooltip(owner, peer, group, tip)
+	tip = tip or GameTooltip
+	tip:SetOwner(owner, "ANCHOR_RIGHT")
+	AddPeer(tip, peer, true)
 	for _, key in ipairs(group or {}) do
 		local other = B.peers[key]
 		if other and other ~= peer and other.name then
-			AddPeer(other, false)
+			AddPeer(tip, other, false)
 		end
 	end
 	-- On the world map: a click opens (or closes) the hovered friend's fight stream.
 	local id = owner.gameAccountID
 	if owner.streamHint and M.db.streamMapClick and B.StreamCanWatch and (B.StreamCanWatch(id) or B.StreamIsWatching(id)) then
-		GameTooltip:AddLine(B.StreamIsWatching(id) and L["Click: close their fight stream"] or L["Click: watch their fight"],
+		tip:AddLine(B.StreamIsWatching(id) and L["Click: close their fight stream"] or L["Click: watch their fight"],
 			0.5, 0.8, 1)
 	end
 	if owner.streamHint and not peer.groupUnit then
-		GameTooltip:AddLine(L["Shift+click: invite"], 0.5, 0.8, 1)
+		tip:AddLine(L["Shift+click: invite"], 0.5, 0.8, 1)
 	end
-	GameTooltip:Show()
+	tip:Show()
 	owner.tooltipSig = Signature(peer, group)
 end
 
--- An open tooltip on this dot follows changes of anyone in it (cheap when nothing changed).
+-- An open tooltip on this dot (the mouse's or the map cursor's) follows changes of anyone in it
+-- (cheap when nothing changed).
 local function RefreshTooltip(frame, peer)
-	if GameTooltip:IsOwned(frame) and Signature(peer, frame.group) ~= frame.tooltipSig then
-		B.ShowTooltip(frame, peer, frame.group)
+	local tip = LT.MapOverlay.TooltipOf(frame)
+	if tip and Signature(peer, frame.group) ~= frame.tooltipSig then
+		B.ShowTooltip(frame, peer, frame.group, tip)
 	end
 end
 
@@ -306,44 +309,75 @@ local function Restyle(frame, peer)
 end
 
 ---------------------------------------------------------------------------
--- World map
+-- World map: frames of our own on the map's canvas (Core/MapOverlay.lua), never the map's pins:
+-- a data provider or AcquirePin would put our values into the map's tables, which the controller
+-- UI then runs (and blocks) as ours. Hover only (mouse motion), so every click still reaches the
+-- map; the click on a dot is read from GLOBAL_MOUSE_DOWN (OnMapMouse, below).
 ---------------------------------------------------------------------------
 
-LefthyToolsBeaconPinMixin = CreateFromMixins(MapCanvasPinMixin)
+local Overlay = LT.MapOverlay
+local DOT_LEVEL = "PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER" -- just above Blizzard's group member dots
+local SCALE_FROM, SCALE_TO = 1.0, 1.2 -- the size a map pin with SetScalingLimits(1, 1.0, 1.2) has
+local mapPins, spareMapPins = {}, {} -- gameAccountID -> dot on the open map; dots not in use
+local vector = CreateVector2D(0, 0) -- reused for every conversion
 
-function LefthyToolsBeaconPinMixin:OnLoad()
-	-- Just above Blizzard's group member dots, so a friend in my group shows our marked dot.
-	self:UseFrameLevelType("PIN_FRAME_LEVEL_VEHICLE_ABOVE_GROUP_MEMBER")
-	self:SetScalingLimits(1, 1.0, 1.2)
-	self.streamHint = true -- (the tooltip says a click opens their stream)
-	BuildDot(self)
-end
-
-function LefthyToolsBeaconPinMixin:OnAcquired(gameAccountID)
-	self.gameAccountID, self.styledPeer = gameAccountID, nil
-end
-
-function LefthyToolsBeaconPinMixin:OnMouseEnter()
+local function MapPinOnEnter(self)
 	local peer = B.peers[self.gameAccountID]
 	if peer then
 		B.ShowTooltip(self, peer, self.group)
 	end
 end
 
-function LefthyToolsBeaconPinMixin:OnMouseLeave()
+local function MapPinOnLeave()
 	GameTooltip:Hide()
 end
 
--- AcquirePin calls this on every acquire, and the base version uses SetPassThroughButtons,
--- which is protected: from addon code in combat it raises ADDON_ACTION_BLOCKED. Our pins don't
--- take clicks at all (enableMouseMotion only), so every click reaches the map anyway.
-function LefthyToolsBeaconPinMixin:CheckMouseButtonPassthrough()
+-- The controller's map cursor near the dot (Core/MapOverlay.lua): the same tooltip, on the map's own.
+local function MapPinHover(self, tip)
+	local peer = B.peers[self.gameAccountID]
+	if peer then
+		B.ShowTooltip(self, peer, self.group, tip)
+	end
 end
 
-local provider = CreateFromMixins(MapCanvasDataProviderMixin)
-local mapPins = {} -- gameAccountID -> pin on the open map
-local providerAdded = false
-local vector = CreateVector2D(0, 0) -- reused for every conversion
+local function AcquireMapPin(gameAccountID)
+	local pin = table.remove(spareMapPins)
+	if not pin then
+		pin = Overlay.Frame("beaconDot")
+		if not pin then
+			return nil
+		end
+		pin:SetSize(PIN_SIZE, PIN_SIZE)
+		BuildDot(pin)
+		pin:SetMouseMotionEnabled(true) -- hover only: clicks go through to the map
+		pin:SetMouseClickEnabled(false)
+		pin:SetScript("OnEnter", MapPinOnEnter)
+		pin:SetScript("OnLeave", MapPinOnLeave)
+		pin.streamHint = true -- (the tooltip says a click opens their stream)
+		Overlay.SetHover(pin, MapPinHover)
+	end
+	pin:SetFrameLevel(Overlay.Level(DOT_LEVEL))
+	pin.gameAccountID, pin.styledPeer, pin.liveX, pin.liveY = gameAccountID, nil, nil, nil
+	mapPins[gameAccountID] = pin
+	return pin
+end
+
+local function ReleaseMapPin(gameAccountID)
+	local pin = mapPins[gameAccountID]
+	mapPins[gameAccountID] = nil
+	if Overlay.TooltipOf(pin) then
+		Overlay.TooltipOf(pin):Hide()
+	end
+	pin.Pulse:Stop()
+	pin:Hide()
+	spareMapPins[#spareMapPins + 1] = pin
+end
+
+local function ReleaseAllMapPins()
+	for gameAccountID in pairs(mapPins) do
+		ReleaseMapPin(gameAccountID)
+	end
+end
 
 local function MapPosition(peer, mapID)
 	-- In my group: the live position, the same one Blizzard's group dot uses, so ours sits exactly
@@ -368,14 +402,10 @@ local function MapPosition(peer, mapID)
 	end
 end
 
-function provider:RemoveAllData()
-	self:GetMap():RemoveAllPinsByTemplate(PIN_TEMPLATE)
-	wipe(mapPins)
-end
-
-function provider:RefreshAllData()
-	local map = self:GetMap()
-	local mapID = map:GetMapID()
+-- Every dot on the open map; also on zoom, which changes which dots overlap on screen.
+local function DrawWorldMap()
+	local view = Overlay.view
+	local mapID = view.shown and view.mapID
 	local placed, wanted = {}, {}
 	if M.enabled and M.db.showFriends and mapID then
 		for gameAccountID, peer in pairs(B.peers) do
@@ -388,43 +418,39 @@ function provider:RefreshAllData()
 			end
 		end
 	end
-	for gameAccountID, pin in pairs(mapPins) do
+	for gameAccountID in pairs(mapPins) do
 		if not wanted[gameAccountID] then
-			map:RemovePin(pin)
-			mapPins[gameAccountID] = nil
+			ReleaseMapPin(gameAccountID)
 		end
 	end
 	if not placed[1] then
 		return
 	end
 	-- Map units to screen pixels at the current zoom, to find dots that really overlap.
-	local canvas = map:GetCanvas()
-	local scale = canvas:GetEffectiveScale()
-	local pxW, pxH = canvas:GetWidth() * scale, canvas:GetHeight() * scale
+	local scale = Overlay.Canvas():GetEffectiveScale()
+	local pxW, pxH = view.width * scale, view.height * scale
 	for _, item in ipairs(placed) do
-		item.pin = mapPins[item.key] or map:AcquirePin(PIN_TEMPLATE, item.key)
-		mapPins[item.key] = item.pin
+		item.pin = mapPins[item.key] or AcquireMapPin(item.key)
 		item.x, item.y = item.nx * pxW, item.ny * pxH
 	end
-	B.Spread(placed, PIN_SIZE * placed[1].pin:GetEffectiveScale())
+	B.Spread(placed, PIN_SIZE * Overlay.PinScale(SCALE_FROM, SCALE_TO) * scale)
 	for _, item in ipairs(placed) do
 		local pin = item.pin
 		pin.fanX, pin.fanY = pxW > 0 and item.dx / pxW or 0, pxH > 0 and item.dy / pxH or 0
 		pin.group = item.group
-		pin:SetPosition(item.nx + pin.fanX, item.ny + pin.fanY)
+		Overlay.Place(pin, item.nx + pin.fanX, item.ny + pin.fanY, SCALE_FROM, SCALE_TO)
 		Restyle(pin, item.peer)
 		RefreshTooltip(pin, item.peer)
 	end
 end
 
-function provider:OnMapChanged()
-	self:RefreshAllData()
-end
-
--- Zooming changes which dots overlap on screen.
-function provider:OnCanvasScaleChanged()
-	self:RefreshAllData()
-end
+Overlay.Watch("B.WorldMapDots", function(what)
+	if what == "hide" then
+		ReleaseAllMapPins()
+	else
+		DrawWorldMap()
+	end
+end)
 
 ---------------------------------------------------------------------------
 -- Minimap
@@ -652,10 +678,11 @@ end
 -- Called every frame by the driver while friends are known: dots of friends in my group follow
 -- their live position on the open world map, like Blizzard's group dot underneath.
 function B.UpdateWorldMapGroupPins()
-	if not (providerAdded and WorldMapFrame:IsShown() and next(mapPins)) then
+	local view = Overlay.view
+	if not (view.shown and next(mapPins)) then
 		return
 	end
-	local mapID = WorldMapFrame:GetMapID()
+	local mapID = view.mapID
 	for gameAccountID, pin in pairs(mapPins) do
 		local peer = B.peers[gameAccountID]
 		local pos = peer and peer.groupUnit and mapID and C_Map.GetPlayerMapPosition(mapID, peer.groupUnit)
@@ -663,30 +690,34 @@ function B.UpdateWorldMapGroupPins()
 			local x, y = pos:GetXY()
 			if x >= 0 and x <= 1 and y >= 0 and y <= 1 and (x ~= pin.liveX or y ~= pin.liveY) then
 				pin.liveX, pin.liveY = x, y
-				pin:SetPosition(x + (pin.fanX or 0), y + (pin.fanY or 0)) -- spread from a dot on top of it
+				-- (spread from a dot on top of it)
+				Overlay.Place(pin, x + (pin.fanX or 0), y + (pin.fanY or 0), SCALE_FROM, SCALE_TO)
 			end
 		end
 	end
 end
 
 function B.RefreshMaps()
-	if providerAdded and WorldMapFrame:IsShown() then
-		provider:RefreshAllData()
+	if Overlay.view.shown then
+		DrawWorldMap()
 	end
 	B.minimapDirty = true
 end
 
 -- A plain left click on a friend's dot opens or closes their fight stream (StreamNet.lua); with Shift
--- it invites them, through Battle.net as the friends list does (their realm doesn't matter). The pins
--- don't take clicks (see CheckMouseButtonPassthrough), so the map gets the click and this hook
--- looks which dot is under the mouse; the map does what it always does with a click.
-local mapClickHooked = false
-local function OnMapMouseDown(_, button)
-	if button ~= "LeftButton" or IsAltKeyDown() or IsControlKeyDown() or not M.enabled then
+-- it invites them, through Battle.net as the friends list does (their realm doesn't matter). The dots
+-- take no clicks, so the map gets the click and does what it always does with it; GLOBAL_MOUSE_DOWN
+-- (Core/MapOverlay.lua: only while the map is open, only on the map) says which dot is under the
+-- mouse. No hook on the map: a script hooked there runs inside Blizzard's click handling.
+local function OnMapMouse(event, button)
+	if event ~= "down" or button ~= "LeftButton" or IsAltKeyDown() or IsControlKeyDown() or not M.enabled then
 		return
 	end
 	local invite = IsShiftKeyDown()
 	if not invite and not (M.db.streamMapClick and B.StreamToggle) then
+		return
+	end
+	if not Overlay.MouseOnMap() then
 		return
 	end
 	for id, pin in pairs(mapPins) do
@@ -699,24 +730,21 @@ local function OnMapMouseDown(_, button)
 				end
 			elseif peer and (B.StreamCanWatch(id) or B.StreamIsWatching(id)) then
 				B.StreamToggle(id, "map")
-				if GameTooltip:IsOwned(pin) then
-					B.ShowTooltip(pin, peer, pin.group) -- (its hint changes)
+				local tip = Overlay.TooltipOf(pin)
+				if tip then
+					B.ShowTooltip(pin, peer, pin.group, tip) -- (its hint changes)
 				end
 			end
 			return
 		end
 	end
 end
+Overlay.OnMouse("B.MapDotClick", OnMapMouse)
 
+-- Beacon switched on: an open map shows the dots at once.
 function B.Attach()
-	if providerAdded or not M.enabled or not (WorldMapFrame and WorldMapFrame.AddDataProvider) then
-		return
-	end
-	WorldMapFrame:AddDataProvider(provider)
-	providerAdded = true
-	if not mapClickHooked and WorldMapFrame.ScrollContainer then
-		mapClickHooked = true -- a hook stays for good; it checks whether Beacon and the setting are on
-		WorldMapFrame.ScrollContainer:HookScript("OnMouseDown", OnMapMouseDown)
+	if M.enabled and Overlay.view.shown then
+		DrawWorldMap()
 	end
 	if B.AttachPings then
 		B.AttachPings()
@@ -724,9 +752,8 @@ function B.Attach()
 end
 
 function B.Detach()
-	if providerAdded and not M.enabled then
-		WorldMapFrame:RemoveDataProvider(provider) -- removes the pins too
-		providerAdded = false
+	if not M.enabled then
+		ReleaseAllMapPins()
 		if B.DetachPings then
 			B.DetachPings()
 		end
@@ -734,12 +761,6 @@ function B.Detach()
 	ReleaseAllMinimapPins()
 	if B.ReleaseMinimapPings then
 		B.ReleaseMinimapPings()
-	end
-end
-
-function B.handlers.ADDON_LOADED(name)
-	if name == "Blizzard_WorldMap" then
-		C_Timer.After(0, B.Attach)
 	end
 end
 
