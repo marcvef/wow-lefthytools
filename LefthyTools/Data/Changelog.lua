@@ -527,5 +527,8 @@ ns.CHANGELOG = {
 	{ id = 173, module = "questtree",
 		en = { "Questtree: chains as a map of cards", "The quest browser draws each chain as cards joined by lines, with what's next on its banner, and adds an overview and a zone map with every quest giver. Filters hide done quests, show only what you can take now, or show quests not for you." },
 		de = { "Questtree: Questreihen als Karten", "Der Quest-Browser zeigt jede Questreihe als verbundene Karten, mit dem nächsten Schritt im Banner, dazu eine Übersicht und eine Gebietskarte mit jedem Questgeber. Filter blenden Erledigtes aus, zeigen nur, was du jetzt annehmen kannst, oder auch Quests, die nicht für dich sind." } },
+	{ id = 174, module = "questtree",
+		en = { "Questtree: zone map beside chains", "The quest browser shows a zone's map beside its chains: quest givers with how many quests they have, each chain in its own colour on the map, lit up when you hover it. An opened chain shows which steps are all or one of, lead-ins and steps in other zones, and lights the way to a locked quest." },
+		de = { "Questtree: Karte neben Questreihen", "Der Quest-Browser zeigt die Karte eines Gebiets neben seinen Questreihen: Questgeber mit der Anzahl ihrer Quests, jede Questreihe in ihrer eigenen Farbe auf der Karte, hervorgehoben beim Drüberfahren. Eine geöffnete Questreihe zeigt, ob alle oder einer der Schritte davor nötig sind, Hinführungen und Schritte in anderen Gebieten, und hebt den Weg zu einer gesperrten Quest hervor." } },
 	-- New entries go here, at the end.
 }

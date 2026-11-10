@@ -5,65 +5,74 @@ local Q = ns.Questtree or {}
 ns.Questtree = Q
 
 -- Questtree's big window (Q.ToggleBrowser, Q.OpenBrowser(id)): every zone's quest chains. Near full
--- screen (1320 x 800, scaled down to fit a smaller screen), movable, Escape closes it. On top a search
+-- screen (1400 x 820, scaled down to fit a smaller screen), movable, Escape closes it. On top a search
 -- across all zones and three filters (hide done, only what I can take now, show what isn't for me);
--- under it three panes:
---   * left: the zones by continent (each continent folds), each with its level range, how many of its
---     quests I've done (Q.ZoneCount: every quest for me, any level) and a thin progress bar; then the
---     dungeons;
---   * middle: the zone in three views (tabs):
---       - Chains: each chain under a banner (its name, done of total with a bar, what's next), its
---         quests as cards from top to bottom, a row per stage (how many quests come before it), the
---         quests of a stage side by side and centred; lines from each quest down to what it leads to
---         (three straight segments; green between done ones, amber from a done or ready one, grey);
---         "OR" between quests of which one is enough. A card: the status strip on its left, the start
---         (the quest giver's "!", the item's icon, an object), the title, the level in its difficulty
---         colour and the giver or the zone, a check when done, friends who've done it;
---       - Overview: the zone's quests grouped: in progress, available now, coming up (level), blocked
---         (needs another first), done;
---       - Map: the zone's map art with every quest giver as a marker in its status (available now a
---         bright "!", turn-ins of what's in my log a "?", later ones grey, done ones a dim dot) and
---         where items that start a quest drop; zoom with the wheel, drag to move; a click on a marker
---         shows its quest;
---   * right: the quest picked: its title in its difficulty colour, status, level, chain step, who gives
---     it and where (an item: what drops it and how often), a click on a place puts a map pin there,
---     the small map, requirements, "Needs first" and "Leads to" (buttons to those quests), friends,
---     and a button that shows it in the small window (Q.ShowQuest).
+-- under it the zones on the left (by continent, each with its level range, how many of its quests
+-- I've done and a thin bar; then the dungeons), the quest picked on the right, and in the middle a
+-- tab bar: the zone page, the overview, and every view another file registers
+-- (Q.RegisterBrowserView: built the first time it's shown).
+--   * The zone page: the zone's map (its art, a pin per quest giver with how many quests it has, the
+--     game's icons: available "!", a low level one's, a grey "!" for later ones, "?" ready to turn in,
+--     a grey "?" still in progress, repeatable ones blue; where items that start a quest drop) beside
+--     the zone's chains as cards (a status strip, the chain's own colour, how far along with a bar,
+--     what's next and who gives it, how many quests it opens, its levels, friends). Each chain has a
+--     colour of its own (from its first quest's ID), drawn on the map as a thin thread from giver to
+--     turn-in to the next giver. Hovering a card lights its pins and thread (the rest dim), hovering
+--     a pin lights its chains' cards. Under the map: how many quests are in progress, available,
+--     coming up, blocked and done, and when nothing is there to take, a zone that has some.
+--   * A chain opened (a click on its card, or any quest): its quests as cards from top to bottom, a
+--     row per stage (how many quests come before it), side by side where it forks; lines in the gaps
+--     (their own lane each, so lines that aren't joined never look joined), "all of" / "one of" where
+--     several lead to one, dashed lines for a lead-in that isn't needed first, "closes" on a quest
+--     that shuts others, the steps in another zone as stubs with the zone's name (a click goes
+--     there). A locked quest picked: the way back to it (Q.Missing) lit and numbered, across zones
+--     (the stubs light up), the rest dim. The next step pulses once when the chain opens.
+--   * The overview: the zone's quests grouped: in progress, available now, coming up (level),
+--     blocked (needs another first), done.
+--   * The details: the quest's title in its difficulty colour, status, level, chain step, who gives
+--     it and where (an item: what drops it and how often; a click puts a map pin there), the small
+--     map, requirements, "Needs first" and "Leads to" (buttons to those quests), friends, and a
+--     button that shows it in the small window (Q.ShowQuest).
 -- A search (Q.Search: titles and giver names, across all zones) shows its results in the middle; a
 -- click on a result or a zone goes there with "Back to the search results" on top, and the search
 -- stays until the box is emptied. A click on a quest also shows it in the small window while that's
 -- open (Q.IsSmallShown).
 --
--- What it costs: built when first opened; the data addon loads then too (Q.Load), never at login. The
--- chains are a canvas of our own: only the cards, lines and banners near sight exist (pooled, each
--- card kept on its quest while it stays near, so a controller's cursor stays on it), laid again only
--- when the view moves a good bit. A zone's chains are worked out once (Q.Chain, Q.Opens) and kept
--- until the data changes; the cards' places when the filters, the folding or a status change. Events
--- (QUEST_TURNED_IN, QUEST_ACCEPTED, QUEST_REMOVED, PLAYER_LEVEL_UP, QUEST_DATA_LOAD_RESULT) only while
--- it's open; they note what changed and the redraw comes on the next frame, at most every half second.
--- Closed, nothing runs. Our own frames only, nothing protected (it opens in a fight), no Blizzard menu
--- (gamepad mode), every card, marker, row, tab and filter a plain Button the controller's navigation
--- reaches; a card the cursor moves to out of sight brings itself into view.
+-- What it costs: built when first opened; the data addon loads then too (Q.Load), never at login.
+-- A zone's chains are worked out once (Q.Chain, Q.Opens) and kept until the data changes; a chain's
+-- cards, a zone's pins and threads when the filters or a status change. The chain's canvas has only
+-- the cards and lines near sight (pooled, each card kept on its quest while it stays near, so a
+-- controller's cursor stays on it); the lists (zones, chain cards, overview, results) only their
+-- rows in sight. Hovering only sets the alpha of what's there. Events (QUEST_TURNED_IN,
+-- QUEST_ACCEPTED, QUEST_REMOVED, PLAYER_LEVEL_UP, QUEST_DATA_LOAD_RESULT, QUEST_LOG_UPDATE) only while
+-- it's open; they note what changed and the redraw comes on the next frame, at most every half
+-- second. Closed, nothing runs. Our own frames only, nothing protected (it opens in a fight), no
+-- Blizzard menu (gamepad mode), every card, pin, row, tab and filter a plain Button the controller's
+-- navigation reaches; a card or pin the cursor moves to out of sight brings itself into view.
 
-local WIDTH, HEIGHT = 1320, 800
+local WIDTH, HEIGHT = 1400, 820
 local SCREEN_W, SCREEN_H = 40, 80 -- kept free around it on a small screen
 local INSET_W, INSET_H = 10, 86   -- how much smaller than the window the template's Inset is
 local PAD, GAP, EDGE = 6, 8, 10
-local ZONES_W, DETAILS_W = 250, 350 -- (each with its scroll bar)
+local ZONES_W, DETAILS_W = 240, 330 -- (each with its scroll bar)
 local BAR_W = 24
 local ROW_H = 20
-local HEAD_H, TABS_H, LEGEND_H = 24, 28, 22
+local TABS_H, HEAD_H, LEGEND_H = 28, 44, 22
 local BEYOND = 2                  -- list rows laid beyond sight, above and below (the controller's next one)
 local LINK_H = 18
-local SHOWN = { links = 12, friends = 12, places = 3, drops = 3, points = 20 }
-local SEARCH_GAP, REFRESH_GAP, NAMES_GAP = 0.3, 0.5, 0.2
+local SHOWN = { links = 12, friends = 12, places = 3, drops = 3, points = 20, threads = 500, dots = 5, chainFriends = 60 }
+local SEARCH_GAP, REFRESH_GAP, NAMES_GAP, READY_GAP = 0.3, 0.5, 0.2, 1
 local GOLD, GREY = "|cffffd200", "|cff888888"
 local EMPTY = {}
 
--- The chains' canvas: cards, gaps, banners (canvas units, before the zoom).
+-- The zone page: the map (3:2) on the left, the chains' cards on the right (8 px grid).
+local Z = { MAP_W = 432, CARD_H = 64, CARD_GAP = 8, DIM = 0.4, PIN_DIM = 0.3, BAR = 56 }
+Z.MAP_H = Z.MAP_W * 2 / 3
+
+-- A chain's canvas: cards, gaps, lanes (canvas units, before the zoom).
 local G = {
-	W = 170, H = 48, HGAP = 14, VGAP = 30, DUMMY = 22, LINE = 2, ICON = 32,
-	BANNER = 56, BANNER_GAP = 16, GROUP_GAP = 26,
+	W = 170, H = 48, HGAP = 14, VGAP = 34, DUMMY = 22, LINE = 2, ICON = 32,
+	LANE = 6, DASH = 5, DASH_GAP = 4, PILL_W = 46, PILL_H = 14,
 	MARGIN = 190,                  -- laid beyond sight (the controller's next card)
 	ZOOM_MIN = 0.5, ZOOM_MAX = 1, ZOOM_STEP = 0.1,
 	MAP_MIN = 1, MAP_MAX = 8, MAP_STEP = 1.35,
@@ -79,9 +88,12 @@ local T = {
 	flat = "Interface\\ChatFrame\\ChatFrameBackground",
 	circle = "Interface\\CharacterFrame\\TempPortraitAlphaMask",
 	available = "Interface\\GossipFrame\\AvailableQuestIcon",
+	daily = "Interface\\GossipFrame\\DailyQuestIcon",
 	turnin = "Interface\\GossipFrame\\ActiveQuestIcon",
+	progress = "Interface\\GossipFrame\\IncompleteQuestIcon",
 	object = "Interface\\Icons\\INV_Misc_Note_01",
 	item = "Interface\\Icons\\INV_Misc_Bag_10",
+	map = "Interface\\Icons\\INV_Misc_Map_01",
 	check = "Interface\\RaidFrame\\ReadyCheck-Ready",
 	box = "Interface\\Buttons\\UI-CheckBox-Up", tick = "Interface\\Buttons\\UI-CheckBox-Check",
 }
@@ -91,7 +103,7 @@ local TONE = {
 	done = { 0.37, 0.73, 0.28 }, active = { 0.35, 0.65, 1 }, available = { 0.85, 0.61, 0 },
 	locked = { 0.55, 0.55, 0.55 }, level = { 0.9, 0.45, 0.25 }, other = { 0.4, 0.4, 0.4 },
 }
-local STATUS_ORDER = { "active", "available", "level", "locked", "done", "other" }
+local PATH_TONE = { 1, 0.5, 0.15 } -- the way back to a locked quest
 local HEX = {}
 local function Hex(r, g, b)
 	return ("|cff%02x%02x%02x"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
@@ -118,22 +130,30 @@ local filters = { hideDone = false, onlyAvailable = false, showOther = false }
 local state = {
 	where = nil,      -- the place shown: "z:<uiMapID>" or "d:<dungeon>"
 	picked = nil,     -- the quest in the details
-	tab = "chains",   -- "chains" | "overview" | "map"
+	tab = "zone",     -- "zone" | "overview" | a registered view's key
+	chain = nil,      -- on the zone tab: the chain opened (its group's key), nil: the zone page
+	path = nil,       -- the way back to a locked quest picked in a chain (Path.Update)
+	pulse = nil,      -- a card to pulse once when it's next filled (the next step of a chain opened)
 	query = "",       -- the search shown
 	results = nil,    -- its quest IDs
 	drilled = false,  -- a zone or quest clicked during a search: it shows, the search stays
 	folded = {},      -- group or continent key -> true (the overview's done bucket starts folded)
 	counts = {},      -- place -> { done, total }
 	trees = {},       -- place -> its chains
-	layouts = {},     -- place -> the cards' places (for the filters and statuses of now)
+	layouts = {},     -- chain -> its cards' places (for the filters and statuses of now)
+	infos = {},       -- chain -> how far along, what's next (Chains.Info)
+	spots = {},       -- place -> the zone map's pins and threads
+	suggest = nil,    -- a zone with quests for my level (ZonePage.Suggest), false: none
 	zones = nil, dungeons = nil, places = nil,
 	asked = {}, waiting = {}, -- titles asked of the client (QUEST_DATA_LOAD_RESULT)
 	turn = {},        -- a map marker clicked again: its next quest
-	dataOld = false, statusOld = false, nextRefresh = 0, searchAt = nil, namesAt = nil,
+	dataOld = false, statusOld = false, nextRefresh = 0, searchAt = nil, namesAt = nil, readyAt = nil, ready = nil,
 	listening = false,
 	draws = 0, trees_built = 0, layouts_built = 0, -- (for the tests)
 }
-local Graph, Map, Overview, Details = {}, {}, {}, {}
+-- Views other files add as tabs (Q.RegisterBrowserView): key -> { key, label, build, built, holder }.
+local registry = { order = {}, byKey = {}, current = nil }
+local Graph, Map, Overview, Details, Chains, ZonePage, Views, Head, Tabs, Path, Make = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
 
 ---------------------------------------------------------------------------
 -- What's shown of a quest
@@ -175,18 +195,39 @@ local function Visible(status)
 	return true
 end
 
+local function Has(list, x)
+	for _, v in ipairs(list or EMPTY) do
+		if v == x then
+			return true
+		end
+	end
+	return false
+end
+
 -- An atlas when the client has it, else the file.
 local atlasKnown = {}
-local function Art(texture, atlas, file)
+local function Known(atlas)
 	if atlas and atlasKnown[atlas] == nil then
 		atlasKnown[atlas] = (C_Texture and LT.Value(C_Texture.GetAtlasInfo, atlas)) and true or false
 	end
-	if atlas and atlasKnown[atlas] then
+	return atlas ~= nil and atlasKnown[atlas]
+end
+
+local function Art(texture, atlas, file)
+	if Known(atlas) then
 		texture:SetAtlas(atlas)
 	else
 		texture:SetTexture(file)
 		texture:SetTexCoord(0, 1, 0, 1)
 	end
+end
+
+-- The same as an icon in a text: "|A:atlas|a" or "|Tfile|t".
+local function Icon(atlas, file, size)
+	if Known(atlas) then
+		return ("|A:%s:%d:%d|a"):format(atlas, size, size)
+	end
+	return ("|T%s:%d:%d|t"):format(file, size, size)
 end
 
 -- The client's title, when it knows the quest (asked once, it may come later); else the data's.
@@ -211,6 +252,20 @@ local function Title(id)
 	Ask(id)
 	local q = Quest(id)
 	return q and q.title or ("#" .. tostring(id))
+end
+
+-- A quest in my log that's ready to turn in.
+local function IsReady(id)
+	return C_QuestLog ~= nil and LT.Value(C_QuestLog.IsComplete, id) == true
+end
+
+-- Grey for me (the game's low-level "!"): Engine.lua's Q.IsTrivial.
+local function Trivial(id)
+	if not Q.IsTrivial then
+		return false
+	end
+	local ok, grey = pcall(Q.IsTrivial, id)
+	return ok and grey == true
 end
 
 -- What Q.LevelColor answers (a colour table, three numbers or a colour code), as r, g, b.
@@ -321,7 +376,8 @@ local function FirstStart(q)
 	return q and q.starts and q.starts[1] or nil
 end
 
--- The card's start: the giver's "!" (bright when I can take it), an item's icon, an object.
+-- The card's start: the giver's "!" (bright when I can take it, a low level one's when it's grey for
+-- me), an item's icon, an object.
 local function StartIcon(texture, q, status)
 	local s = FirstStart(q)
 	texture:SetDesaturated(false)
@@ -335,6 +391,8 @@ local function StartIcon(texture, q, status)
 		texture:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 	elseif status == "active" then
 		Art(texture, "SideInProgressquesticon", T.turnin)
+	elseif status == "available" and not (q and q.repeatable) and q and Trivial(q.id) then
+		Art(texture, "TrivialQuests", T.available)
 	else
 		Art(texture, q and q.repeatable and "QuestDaily" or "QuestNormal", T.available)
 		texture:SetDesaturated(status ~= "available")
@@ -362,6 +420,11 @@ local function Chance(c)
 		return tostring(math.floor(c + 0.5))
 	end
 	return (("%.1f"):format(c):gsub("%.0$", ""))
+end
+
+local function GamepadCursor(self)
+	local pad = InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled()
+	return pad or not self:IsMouseOver() -- (the controller's cursor, not the mouse)
 end
 
 ---------------------------------------------------------------------------
@@ -466,7 +529,7 @@ end
 -- A chain's quests in order (Q.Chain's: each after what it needs) and who leads to whom inside it:
 -- each quest's pre, preAny and preActive and Q.Opens, only from an earlier one to a later one.
 local function NewGroup(key, chain)
-	local index, parents = {}, {}
+	local index, parents, children = {}, {}, {}
 	for i, id in ipairs(chain) do
 		index[id] = index[id] or i
 	end
@@ -485,6 +548,8 @@ local function NewGroup(key, chain)
 			end
 		end
 		list[#list + 1] = from
+		children[from] = children[from] or {}
+		table.insert(children[from], to)
 	end
 	local faction, mixed = nil, false
 	for _, id in ipairs(chain) do
@@ -509,7 +574,7 @@ local function NewGroup(key, chain)
 	for _, list in pairs(parents) do
 		table.sort(list, function(a, b) return index[a] < index[b] end)
 	end
-	return { key = key, chain = chain, index = index, parents = parents, faction = not mixed and faction or nil }
+	return { key = key, chain = chain, index = index, parents = parents, children = children, faction = not mixed and faction or nil }
 end
 
 -- A place's chains (a group each, the lowest level first, then the quests without one), worked out once.
@@ -521,7 +586,7 @@ local function Structure(place)
 	state.trees_built = state.trees_built + 1
 	local ids = PlaceQuests(place)
 	local member, assigned, singles = {}, {}, {}
-	tree = { groups = {}, member = member, shown = {}, groupOf = {}, ids = ids }
+	tree = { groups = {}, member = member, shown = {}, groupOf = {}, byKey = {}, ids = ids }
 	for _, id in ipairs(ids) do
 		member[id] = true
 	end
@@ -560,10 +625,11 @@ local function Structure(place)
 			return a < b
 		end)
 		local group = NewGroup(place.id .. ":single", singles)
-		group.single, group.parents = true, {}
+		group.single, group.parents, group.children = true, {}, {}
 		tree.groups[#tree.groups + 1] = group
 	end
 	for _, group in ipairs(tree.groups) do
+		tree.byKey[group.key] = group
 		for _, id in ipairs(group.chain) do
 			tree.shown[id] = true
 			tree.groupOf[id] = tree.groupOf[id] or group
@@ -573,11 +639,11 @@ local function Structure(place)
 	return tree
 end
 
--- Where a quest's chains are: the place shown if it's in them, else its zone or its dungeon, the one
--- that lists it (a dungeon's quest may be given in a zone that doesn't).
+-- Where a quest's chains are: the place shown if it's one of its quests, else its zone or its
+-- dungeon, the one that lists it (a dungeon's quest may be given in a zone that doesn't).
 local function PlaceOf(q, id)
 	local current = state.where and state.places[state.where]
-	if current and Structure(current).shown[id] then
+	if current and Structure(current).member[id] then
 		return current.id
 	end
 	local zone = q.zone and state.places["z:" .. tostring(q.zone)]
@@ -588,21 +654,34 @@ local function PlaceOf(q, id)
 		return dungeon.id
 	end
 	local place = zone or dungeon
-	return place and place.id or nil
+	if place then
+		return place.id
+	end
+	return current and Structure(current).shown[id] and current.id or nil
 end
 
--- Where I am, or the first zone.
-local function DefaultPlace()
-	local map = C_Map and LT.Value(C_Map.GetBestMapForUnit, "player")
+-- A zone (a uiMap) or a dungeon (its name) on the left, walking up from a city's floor or a cave.
+local function PlaceFor(map)
+	if type(map) == "string" then
+		return state.places["d:" .. map] and ("d:" .. map) or nil
+	end
 	for _ = 1, 4 do
 		if type(map) ~= "number" then
-			break
+			return nil
 		end
 		if state.places["z:" .. map] then
 			return "z:" .. map
 		end
-		local info = LT.Value(C_Map.GetMapInfo, map)
+		local info = C_Map and LT.Value(C_Map.GetMapInfo, map)
 		map = type(info) == "table" and info.parentMapID or nil
+	end
+end
+
+-- Where I am, or the first zone.
+local function DefaultPlace()
+	local here = PlaceFor(C_Map and LT.Value(C_Map.GetBestMapForUnit, "player"))
+	if here then
+		return here
 	end
 	local first = state.zones[1] or nil
 	if first then
@@ -612,12 +691,20 @@ local function DefaultPlace()
 	return dungeon and ("d:" .. tostring(dungeon.name)) or nil
 end
 
+-- Statuses changed (or the filters): what was laid out from them goes.
+local function Restatus()
+	wipe(state.layouts)
+	wipe(state.infos)
+	wipe(state.spots)
+	state.suggest = nil
+end
+
 -- The data changed: everything worked out from it goes.
 local function Forget()
 	state.places, state.zones, state.dungeons = nil, nil, nil
 	wipe(state.trees)
-	wipe(state.layouts)
 	wipe(state.counts)
+	Restatus()
 	state.results = nil
 end
 
@@ -640,6 +727,11 @@ local function Saved()
 	return db.browser
 end
 
+-- A tab there is: the zone page, the overview, a view registered.
+local function TabKnown(key)
+	return key == "zone" or key == "overview" or (type(key) == "string" and registry.byKey[key] ~= nil)
+end
+
 local function LoadSaved()
 	local saved = Saved()
 	if not saved then
@@ -650,7 +742,9 @@ local function LoadSaved()
 			filters[key] = saved[key]
 		end
 	end
-	if saved.tab == "chains" or saved.tab == "overview" or saved.tab == "map" then
+	if saved.tab == "chains" or saved.tab == "map" then
+		state.tab = "zone" -- (the tabs before the zone page)
+	elseif TabKnown(saved.tab) then
 		state.tab = saved.tab
 	end
 end
@@ -666,24 +760,27 @@ local function Save()
 end
 
 ---------------------------------------------------------------------------
--- Lists: a pool of rows, each kept on its entry while it's in sight (zones, the overview, results)
+-- Lists: a pool of rows, each kept on its entry while it's in sight (zones, chain cards, the
+-- overview, results)
 ---------------------------------------------------------------------------
 
-local function NewList(parent, x, y, width, height, newRow, fillRow)
+local function NewList(parent, x, y, width, height, newRow, fillRow, rowH)
+	rowH = rowH or ROW_H
 	local scroll = CreateFrame("ScrollFrame", nil, parent, "UIPanelScrollFrameTemplate")
 	scroll:SetPoint("TOPLEFT", x, -y)
 	scroll:SetSize(width, height)
 	local child = CreateFrame("Frame", nil, scroll)
 	child:SetSize(width, 1)
 	scroll:SetScrollChild(child)
-	local sight = math.ceil(height / ROW_H) + 1
+	local sight = math.ceil(height / rowH) + 1
 	local pool = sight + 2 * BEYOND
-	local list = { scroll = scroll, child = child, rows = {}, entries = {}, first = 1, made = 0, fills = 0, height = height, pool = pool }
+	local list = { scroll = scroll, child = child, rows = {}, entries = {}, first = 1, made = 0, fills = 0, height = height, pool = pool,
+		sight = sight, rowH = rowH }
 
 	-- The rows from just above to just below sight. Entry i always has row (i - 1) % pool + 1, so a row
 	-- the controller's cursor is on keeps its entry when the list scrolls under it.
 	function list:Lay(offset)
-		local top = math.max(0, math.floor((offset or scroll:GetVerticalScroll() or 0) / ROW_H))
+		local top = math.max(0, math.floor((offset or scroll:GetVerticalScroll() or 0) / rowH))
 		self.first = top + 1
 		local from, to = math.max(1, top + 1 - BEYOND), math.min(#self.entries, top + sight + BEYOND)
 		for i = from, to do
@@ -697,7 +794,7 @@ local function NewList(parent, x, y, width, height, newRow, fillRow)
 			if row.index ~= i then
 				row.index = i
 				row:ClearAllPoints()
-				row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_H)
+				row:SetPoint("TOPLEFT", 0, -(i - 1) * rowH)
 			end
 			row.entry = self.entries[i]
 			self.fills = self.fills + 1
@@ -716,12 +813,12 @@ local function NewList(parent, x, y, width, height, newRow, fillRow)
 	-- New entries, scrolled to offset (true: where it is, as far as it still goes).
 	function list:SetEntries(entries, offset)
 		self.entries = entries
-		local total = #entries * ROW_H
+		local total = #entries * rowH
 		child:SetHeight(math.max(1, total))
 		local now = scroll:GetVerticalScroll() or 0
 		local want = offset == true and now or offset or 0
 		want = math.max(0, math.min(want, total - height))
-		self.first = math.floor(want / ROW_H) + 1
+		self.first = math.floor(want / rowH) + 1
 		if want ~= now then
 			scroll:SetVerticalScroll(want)
 		end
@@ -732,11 +829,23 @@ local function NewList(parent, x, y, width, height, newRow, fillRow)
 	end
 
 	function list:Centered(i)
-		return math.max(0, (i - 1) * ROW_H - height / 2 + ROW_H / 2)
+		return math.max(0, (i - 1) * rowH - height / 2 + rowH / 2)
+	end
+
+	-- Entry i in sight (in the middle, as far as the list goes).
+	function list:ScrollTo(i)
+		local want = math.max(0, math.min(self:Centered(i), #self.entries * rowH - height))
+		scroll:SetVerticalScroll(want)
+		self:Lay(want)
+	end
+
+	-- Whether entry i is in sight now.
+	function list:InSight(i)
+		return i >= self.first and i < self.first + sight - 1
 	end
 
 	scroll:HookScript("OnVerticalScroll", function(_, offset)
-		if math.floor((offset or 0) / ROW_H) + 1 ~= list.first then
+		if math.floor((offset or 0) / rowH) + 1 ~= list.first then
 			list:Lay(offset)
 		end
 	end)
@@ -784,6 +893,20 @@ local function QuestTip(owner, id)
 			GameTooltip:AddLine(L["Drops from %s (%s%%)"]:format(d.name or "?", Chance(d.chance)), 0.8, 0.8, 0.8)
 		end
 	end
+	if q.breadcrumbFor then
+		GameTooltip:AddLine(L["A lead-in: not needed for what comes after."], 0.7, 0.7, 0.7, true)
+	end
+	if q.excl and q.excl[1] then
+		local names = {}
+		for i, x in ipairs(q.excl) do
+			if i > 3 then
+				names[#names + 1] = "..."
+				break
+			end
+			names[#names + 1] = Title(x)
+		end
+		GameTooltip:AddLine(L["Taking it closes: %s"]:format(table.concat(names, ", ")), 1, 0.45, 0.35, true)
+	end
 	local opens = Q.Opens and Q.Opens(id) or EMPTY
 	if opens[1] then
 		local names = {}
@@ -809,13 +932,313 @@ local function QuestTip(owner, id)
 end
 
 ---------------------------------------------------------------------------
--- The chains: the layout
+-- Chains: each one's colour, how far along, what's next (for its card and its page)
 ---------------------------------------------------------------------------
+
+-- HSV (s 0.6, v 0.95) as r, g, b.
+local function Hue(h)
+	local s, v = 0.6, 0.95
+	local i = math.floor(h * 6)
+	local f = h * 6 - i
+	local p, qq, t = v * (1 - s), v * (1 - s * f), v * (1 - s * (1 - f))
+	i = i % 6
+	if i == 0 then
+		return v, t, p
+	elseif i == 1 then
+		return qq, v, p
+	elseif i == 2 then
+		return p, v, t
+	elseif i == 3 then
+		return p, qq, v
+	elseif i == 4 then
+		return t, p, v
+	end
+	return v, p, qq
+end
+
+-- A chain's own colour, the same everywhere (its first quest's ID, spread by the golden ratio).
+function Chains.Color(group)
+	if not group.color then
+		if group.single then
+			group.color = { 0.8, 0.8, 0.8 }
+		else
+			local h = ((tonumber(group.chain[1]) or 0) * 0.6180339887) % 1
+			group.color = { Hue(h) }
+		end
+	end
+	return group.color
+end
+
+function Chains.Name(group)
+	if group.single then
+		return L["Quests without a chain"]
+	end
+	local _, _, name = StepOf(group.chain[1])
+	return name or Title(group.chain[1])
+end
+
+-- How many quests of the chain doing from comes before, not done yet (what it opens).
+function Chains.Opens(group, from)
+	local seen, queue, n, i = { [from] = true }, { from }, 0, 1
+	while queue[i] do
+		for _, c in ipairs(group.children[queue[i]] or EMPTY) do
+			if not seen[c] then
+				seen[c] = true
+				queue[#queue + 1] = c
+				local s = StatusOf(c)
+				if s ~= "done" and s ~= "other" then
+					n = n + 1
+				end
+			end
+		end
+		i = i + 1
+	end
+	return n
+end
+
+-- A chain's progress for me: done, total (not counting what isn't for me), visible (as the filters
+-- show), its levels, steps in other zones, what's next (kind: "active" | "available" | "coming" |
+-- "done") and what that opens, the strip's status. Kept until a status or the filters change.
+function Chains.Info(group, place)
+	local info = state.infos[group.key]
+	if info then
+		return info
+	end
+	local member = place and Structure(place).member or EMPTY
+	info = { done = 0, total = 0, visible = 0, elsewhere = 0, opens = 0, open = 0 }
+	local first = {}
+	for _, id in ipairs(group.chain) do
+		local status = StatusOf(id)
+		first[status] = first[status] or id
+		if Visible(status) then
+			info.visible = info.visible + 1
+		end
+		if status ~= "other" then
+			info.total = info.total + 1
+			if status == "done" then
+				info.done = info.done + 1
+			elseif status == "available" then
+				info.open = info.open + 1
+			end
+			local q = Quest(id)
+			local level = q and tonumber(q.level)
+			if level and level > 0 then
+				info.low = math.min(info.low or level, level)
+				info.high = math.max(info.high or level, level)
+			end
+			if not member[id] then
+				info.elsewhere = info.elsewhere + 1
+			end
+		end
+	end
+	local coming = first.level
+	if first.locked and (not coming or group.index[first.locked] < group.index[coming]) then
+		coming = first.locked
+	end
+	if first.active then
+		info.kind, info.next = "active", first.active
+	elseif first.available then
+		info.kind, info.next = "available", first.available
+	elseif coming then
+		info.kind, info.next = "coming", coming
+	elseif first.done then
+		info.kind = "done"
+	end
+	info.status = first.active and "active" or first.available and "available" or first.level and "level" or first.locked and "locked"
+		or first.done and "done" or "other"
+	if info.next and not group.single then
+		info.opens = Chains.Opens(group, info.next)
+	end
+	state.infos[group.key] = info
+	return info
+end
+
+-- What's next in a chain (its card's and its page's line) and that quest.
+function Chains.NextText(group, info)
+	if group.single then
+		if info.open > 0 then
+			return L["%d to pick up now"]:format(info.open)
+		end
+		return L["%d quests"]:format(info.total)
+	end
+	local id = info.next
+	if info.kind == "active" then
+		return L["In your log: %s"]:format(Title(id)), id
+	elseif info.kind == "available" then
+		local q = Quest(id)
+		local s = FirstStart(q)
+		local where = s and s.name or (q and ZoneOf(q))
+		return L["Next: %s"]:format(Title(id)) .. (where and (GREY .. " - " .. where .. "|r") or ""), id
+	elseif info.kind == "coming" then
+		return L["Coming up: %s"]:format(Title(id)), id
+	elseif info.kind == "done" then
+		return L["All done"], nil
+	end
+	return "", nil
+end
+
+-- Friends' progress on a chain: { name, classFile, done } each, the furthest first (Q.Friends).
+function Chains.Friends(group, info)
+	if info.friends then
+		return info.friends
+	end
+	local list, by = {}, {}
+	if Q.Friends then
+		for i, id in ipairs(group.chain) do
+			if i > SHOWN.chainFriends then
+				break
+			end
+			for _, f in ipairs(Q.Friends(id) or EMPTY) do
+				local key = tostring(f.name)
+				local e = by[key]
+				if not e then
+					e = { name = f.name, classFile = f.classFile, done = 0 }
+					by[key] = e
+					list[#list + 1] = e
+				end
+				if f.status == "done" then
+					e.done = e.done + 1
+				end
+			end
+		end
+		table.sort(list, function(a, b)
+			if a.done ~= b.done then
+				return a.done > b.done
+			end
+			return tostring(a.name) < tostring(b.name)
+		end)
+	end
+	info.friends = list
+	return list
+end
+
+local function LevelSpan(low, high)
+	if not low then
+		return nil
+	end
+	return L["Level %s"]:format(low == high and tostring(low) or (low .. "-" .. high))
+end
+
+---------------------------------------------------------------------------
+-- A chain opened: the layout
+---------------------------------------------------------------------------
+
+-- Whether "to" needs "from" first (its pre, preAny, preActive), or only follows it (a lead-in: a
+-- breadcrumb, or a quest the ender offers next that doesn't need it).
+function Graph.Needed(from, to)
+	local q = Quest(to)
+	if not q then
+		return true
+	end
+	return Has(q.pre, from) or Has(q.preAny, from) or q.preActive == from
+end
+
+-- Each gap between two stages: a lane (a height of its own) per quest the lines in it go to, so two
+-- lines that aren't joined never share a stretch (EQ's gutters). Lines into one quest share one
+-- (they join there), and so do the lines of a fork (one quest to several, each from it alone). A line
+-- going into a quest right under another quest it doesn't come from would look like that one's: it
+-- comes in a little to the side (a passing line's slot moves within itself). The lanes stay above
+-- the "all of" / "one of" labels at the gap's bottom.
+function Graph.Lanes(hops, maxStage)
+	local byGap, groupOf = {}, {}
+	for _, h in ipairs(hops) do
+		local a, b = h[1], h[2]
+		local g = groupOf[b]
+		if not g then
+			g = { b = b, from = {}, n = 0 }
+			groupOf[b] = g
+			local list = byGap[a.stage]
+			if not list then
+				list = {}
+				byGap[a.stage] = list
+			end
+			list[#list + 1] = g
+		end
+		if not g.from[a] then
+			g.from[a], g.n, g.one = true, g.n + 1, a
+		end
+		g.bottom = a.bottom
+	end
+	local function Apart(g, h)
+		return h.max < g.min - G.HGAP / 2 or g.max < h.min - G.HGAP / 2 or (g.n == 1 and h.n == 1 and g.one == h.one)
+	end
+	local function Clear(g, x, exits)
+		for a in pairs(exits) do
+			if not g.from[a] and math.abs(a.cx - x) < 4 then
+				return false
+			end
+		end
+		return true
+	end
+	local top, bottom = 5, G.VGAP - G.PILL_H - 2 -- (the lanes' band in a gap)
+	for s = 0, maxStage - 1 do -- (in order: a passing line's slot moved here goes on from there)
+		local list = byGap[s] or EMPTY
+		local exits = {}
+		for _, g in ipairs(list) do
+			for a in pairs(g.from) do
+				exits[a] = true
+			end
+		end
+		for _, g in ipairs(list) do
+			local b = g.b
+			local x = b.cx
+			if not Clear(g, x, exits) then
+				x = Clear(g, b.cx + 9, exits) and b.cx + 9 or b.cx - 9
+				if b.dummy then
+					b.cx = x
+				else
+					b.inX = x
+				end
+			end
+			g.min, g.max = x, x
+			for a in pairs(g.from) do
+				g.min, g.max = math.min(g.min, a.cx), math.max(g.max, a.cx)
+			end
+		end
+		table.sort(list, function(x, y)
+			if x.min ~= y.min then
+				return x.min < y.min
+			elseif x.max ~= y.max then
+				return x.max < y.max
+			end
+			return x.b.seq < y.b.seq
+		end)
+		local lanes = {}
+		for _, g in ipairs(list) do
+			if g.max - g.min >= 1 then -- (straight down: no stretch across, no lane)
+				local lane
+				for i, members in ipairs(lanes) do
+					local ok = true
+					for _, h in ipairs(members) do
+						ok = ok and Apart(g, h)
+					end
+					if ok then
+						lane = i
+						break
+					end
+				end
+				if not lane then
+					lane = #lanes + 1
+					lanes[lane] = {}
+				end
+				table.insert(lanes[lane], g)
+				g.lane = lane
+			end
+		end
+		local n = #lanes
+		local step = n > 1 and math.min(G.LANE, (bottom - top) / (n - 1)) or 0
+		for _, g in ipairs(list) do
+			local off = g.lane and (g.lane - 1 - (n - 1) / 2) * step or 0
+			g.b.laneY = g.bottom + (top + bottom) / 2 + off
+		end
+	end
+end
 
 -- A chain's cards by stage (how many quests come before it), with a slot of its own for a line that
 -- passes a stage (so it never runs through a card), the stages' quests ordered by where what leads to
--- them is, each stage centred in the chain's width. Lines: down from a card, across, down into the next.
-function Graph.LayChain(out, group, vis, top, viewW)
+-- them is, each stage centred in the chain's width. Lines: down from a card, across in its lane, down
+-- into the next. vis: the quests shown (their status), stub: those of another zone among them.
+function Graph.LayChain(out, group, vis, stub, top, viewW)
 	local index, parents = group.index, group.parents
 	local vpar = {}
 	-- What leads to a quest among those shown: a hidden one is passed through to what leads to it.
@@ -860,7 +1283,7 @@ function Graph.LayChain(out, group, vis, top, viewW)
 			maxStage = math.max(maxStage, s)
 		end
 	end
-	local rows, item, edges, seq = {}, {}, {}, 0
+	local rows, item, edgesTo, hops, seq = {}, {}, {}, {}, 0
 	for s = 0, maxStage do
 		rows[s] = {}
 	end
@@ -872,19 +1295,23 @@ function Graph.LayChain(out, group, vis, top, viewW)
 		return it
 	end
 	for _, id in ipairs(order) do
-		item[id] = New({ quest = id, stage = stage[id], w = G.W, order = index[id], status = vis[id], group = group })
+		item[id] = New({ quest = id, stage = stage[id], w = G.W, order = index[id], status = vis[id], group = group, stub = stub[id] })
 	end
 	for _, id in ipairs(order) do
+		edgesTo[id] = {}
 		for _, p in ipairs(VP(id)) do
-			local path, prev = { item[p] }, item[p]
+			local bridged = VP(id).bridged[p] == true
+			local e = { from = p, to = id, bridged = bridged, dashed = not bridged and not Graph.Needed(p, id) }
+			local prev = item[p]
 			for s = stage[p] + 1, stage[id] - 1 do
-				prev = New({ dummy = true, stage = s, w = G.DUMMY, order = index[id], preds = { prev } })
-				path[#path + 1] = prev
+				local d = New({ dummy = true, stage = s, w = G.DUMMY, order = index[id], preds = { prev } })
+				hops[#hops + 1] = { prev, d, e }
+				prev = d
 			end
 			local child = item[id]
 			child.preds[#child.preds + 1] = prev
-			path[#path + 1] = child
-			edges[#edges + 1] = { path = path, from = p, to = id, bridged = VP(id).bridged[p] == true }
+			hops[#hops + 1] = { prev, child, e }
+			table.insert(edgesTo[id], e)
 		end
 	end
 	-- Each stage ordered by where what leads to it is (the first stage in the chain's order), then sized.
@@ -932,60 +1359,82 @@ function Graph.LayChain(out, group, vis, top, viewW)
 			end
 		end
 	end
+	Graph.Lanes(hops, maxStage)
 	-- The lines: green between done ones, amber from a done or ready one, grey; a passed-through
-	-- (hidden) step: fainter.
+	-- (hidden) step fainter; a lead-in that isn't needed first dashed and dim.
 	local half = G.LINE / 2
-	for _, e in ipairs(edges) do
+	for _, h in ipairs(hops) do
+		local a, b, e = h[1], h[2], h[3]
 		local fs, ts = vis[e.from], vis[e.to]
 		local tone = (fs == "done" and ts == "done") and 2 or (fs == "done" or fs == "available" or fs == "active") and 1 or 0
-		for i = 1, #e.path - 1 do
-			local a, b = e.path[i], e.path[i + 1]
-			local ym = a.bottom + G.VGAP / 2
-			Graph.Seg(out, a.cx, a.bottom, a.cx, ym + half, tone, e.bridged)
-			Graph.Seg(out, math.min(a.cx, b.cx) - half, ym, math.max(a.cx, b.cx) + half, ym, tone, e.bridged)
-			Graph.Seg(out, b.cx, ym - half, b.cx, b.y, tone, e.bridged)
-			if b.dummy then
-				Graph.Seg(out, b.cx, b.y - half, b.cx, b.bottom + half, tone, e.bridged)
-			end
+		local faint = e.bridged or e.dashed
+		local ym = b.laneY or (a.bottom + G.VGAP / 2)
+		local bx = b.inX or b.cx
+		if math.abs(a.cx - bx) < 0.5 then
+			Graph.Seg(out, a.cx, a.bottom, bx, b.y, tone, faint, e) -- (straight down)
+		else
+			Graph.Seg(out, a.cx, a.bottom, a.cx, ym + half, tone, faint, e)
+			Graph.Seg(out, math.min(a.cx, bx) - half, ym, math.max(a.cx, bx) + half, ym, tone, faint, e)
+			Graph.Seg(out, bx, ym - half, bx, b.y, tone, faint, e)
+		end
+		if b.dummy then
+			Graph.Seg(out, b.cx, b.y - half, b.cx, b.bottom + half, tone, faint, e)
 		end
 	end
-	-- "OR" between quests next to each other of which one is enough (preAny).
+	-- Where several lead to one: "all of" (it needs each) or "one of" (any is enough); on a card: a
+	-- lead-in, or that taking it closes others of the chain.
 	for _, id in ipairs(order) do
 		local q = Quest(id)
-		local any = q and q.preAny or EMPTY
-		if any[2] then
-			local mine = {}
-			for _, p in ipairs(any) do
-				local it = item[p]
-				if it then
-					mine[#mine + 1] = it
+		local it = item[id]
+		if q then
+			local any, all = 0, 0
+			for _, e in ipairs(edgesTo[id]) do
+				if not e.bridged then
+					if Has(q.preAny, e.from) then
+						any = any + 1
+					elseif Has(q.pre, e.from) or q.preActive == e.from then
+						all = all + 1
+					end
 				end
 			end
-			table.sort(mine, function(a, b)
-				if a.stage ~= b.stage then
-					return a.stage < b.stage
-				end
-				return a.slot < b.slot
-			end)
-			for i = 2, #mine do
-				local a, b = mine[i - 1], mine[i]
-				if a.stage == b.stage and b.slot == a.slot + 1 then
-					out.pills[#out.pills + 1] = { x = (a.x + a.w + b.x) / 2, y = a.y + G.H / 2 }
-				end
+			if any >= 2 or all >= 2 then
+				out.pills[#out.pills + 1] = { x = it.inX or it.cx, y = it.y - G.PILL_H / 2, kind = any >= 2 and "any" or "all", quest = id }
 			end
+			local closes = 0
+			for _, x in ipairs(q.excl or EMPTY) do
+				closes = closes + (index[x] and 1 or 0)
+			end
+			it.closes = closes > 0 and closes or nil
+			it.lead = q.breadcrumbFor ~= nil and not stub[id]
 		end
 	end
 	out.width = math.max(out.width, blockW + 2 * PAD)
 	return top + (maxStage + 1) * G.PY - G.VGAP
 end
 
--- A line segment (canvas units, y down); zero-length ones aren't kept.
-function Graph.Seg(out, x1, y1, x2, y2, tone, faint)
+-- A line segment (canvas units, y down) of an edge; zero-length ones aren't kept. A dashed edge's
+-- in pieces.
+function Graph.Seg(out, x1, y1, x2, y2, tone, faint, e)
 	if math.abs(x2 - x1) < 0.5 and math.abs(y2 - y1) < 0.5 then
 		return
 	end
-	out.segs[#out.segs + 1] = { x1 = x1, y1 = y1, x2 = x2, y2 = y2, tone = tone, faint = faint,
-		minX = math.min(x1, x2), maxX = math.max(x1, x2), minY = math.min(y1, y2), maxY = math.max(y1, y2) }
+	local function Add(ax, ay, bx, by)
+		out.segs[#out.segs + 1] = { x1 = ax, y1 = ay, x2 = bx, y2 = by, tone = tone, faint = faint, dashed = e and e.dashed,
+			from = e and e.from, to = e and e.to,
+			minX = math.min(ax, bx), maxX = math.max(ax, bx), minY = math.min(ay, by), maxY = math.max(ay, by) }
+	end
+	if not (e and e.dashed) then
+		Add(x1, y1, x2, y2)
+		return
+	end
+	local len = math.max(math.abs(x2 - x1), math.abs(y2 - y1))
+	local dx, dy = (x2 - x1) / len, (y2 - y1) / len
+	local d = 0
+	while d < len do
+		local stop = math.min(len, d + G.DASH)
+		Add(x1 + dx * d, y1 + dy * d, x1 + dx * stop, y1 + dy * stop)
+		d = stop + G.DASH_GAP
+	end
 end
 
 -- The quests without a chain: cards in rows.
@@ -999,6 +1448,8 @@ function Graph.LaySingles(out, group, vis, top, viewW)
 			local it = { quest = id, status = vis[id], group = group, w = G.W,
 				x = PAD + col * (G.W + G.HGAP), y = top + row * G.PY }
 			it.cx, it.bottom = it.x + G.W / 2, it.y + G.H
+			local q = Quest(id)
+			it.lead = q and q.breadcrumbFor ~= nil
 			out.cards[#out.cards + 1] = it
 			out.byQuest[id] = it
 		end
@@ -1007,82 +1458,53 @@ function Graph.LaySingles(out, group, vis, top, viewW)
 	return top + math.ceil(n / perRow) * G.PY - G.VGAP
 end
 
--- A place's cards, banners and lines with the filters and statuses of now (kept until one changes).
-function Graph.Layout(place)
-	local cached = state.layouts[place.id]
+-- A chain's cards and lines with the filters and statuses of now (kept until one changes). The
+-- place's own quests as the filters show them; another zone's only next to one of them, as a stub
+-- (the rest are passed through).
+function Graph.Layout(place, group)
+	local cached = state.layouts[group.key]
 	if cached then
 		return cached
 	end
 	state.layouts_built = state.layouts_built + 1
 	local viewW = view.g.w
-	local out = { cards = {}, banners = {}, segs = {}, pills = {}, byQuest = {}, width = viewW, height = 0, hidden = 0 }
-	local y = PAD
-	for _, group in ipairs(Structure(place).groups) do
-		local vis, n, done, total, nextUp = {}, 0, 0, 0, nil
-		for _, id in ipairs(group.chain) do
-			local status = StatusOf(id)
-			if status ~= "other" then
-				total = total + 1
-				done = done + (status == "done" and 1 or 0)
+	local out = { cards = {}, segs = {}, pills = {}, byQuest = {}, width = viewW, height = 0, hidden = 0, group = group }
+	local member = Structure(place).member
+	local vis, stub, n = {}, {}, 0
+	for _, id in ipairs(group.chain) do
+		local status = StatusOf(id)
+		if not Visible(status) then
+			out.hidden = out.hidden + (member[id] and 1 or 0)
+		elseif member[id] or group.single then
+			vis[id], n = status, n + 1
+		else
+			local near = false
+			for _, p in ipairs(group.parents[id] or EMPTY) do
+				near = near or member[p] == true
 			end
-			if Visible(status) then
-				vis[id], n = status, n + 1
-			else
-				out.hidden = out.hidden + 1
+			for _, c in ipairs(group.children[id] or EMPTY) do
+				near = near or member[c] == true
+			end
+			if near then
+				vis[id], stub[id], n = status, true, n + 1
 			end
 		end
-		if n > 0 then
-			local closed = state.folded[group.key] == true
-			local banner = { group = group, key = group.key, x = PAD, y = y, done = done, total = total, closed = closed, n = n }
-			out.banners[#out.banners + 1] = banner
-			local bottom = y + G.BANNER
-			if not closed then
-				local top = y + G.BANNER + G.BANNER_GAP
-				if group.single then
-					bottom = Graph.LaySingles(out, group, vis, top, viewW)
-				else
-					bottom = Graph.LayChain(out, group, vis, top, viewW)
-				end
-			end
-			banner.w = math.max(viewW - 2 * PAD, out.width - 2 * PAD)
-			y = bottom + G.GROUP_GAP
+	end
+	local bottom = PAD
+	if n > 0 then
+		if group.single then
+			bottom = Graph.LaySingles(out, group, vis, PAD, viewW)
+		else
+			bottom = Graph.LayChain(out, group, vis, stub, PAD, viewW)
 		end
 	end
-	for _, banner in ipairs(out.banners) do
-		banner.w = math.max(banner.w, out.width - 2 * PAD) -- (as wide as the widest chain)
-	end
-	out.height = math.max(1, y - G.GROUP_GAP + PAD)
-	state.layouts[place.id] = out
+	out.height = math.max(1, bottom + PAD)
+	state.layouts[group.key] = out
 	return out
 end
 
--- What the banner says is next: the quest in my log, else the first I can take, else the first coming.
-local function NextOf(group)
-	local found = {}
-	for _, id in ipairs(group.chain) do
-		local status = StatusOf(id)
-		if not found[status] then
-			found[status] = id
-		end
-	end
-	if found.active then
-		return L["In your log: %s"]:format(Title(found.active)), found.active
-	elseif found.available then
-		local s = FirstStart(Quest(found.available))
-		local q = Quest(found.available)
-		local where = s and s.name or (q and ZoneOf(q))
-		return L["Next: %s"]:format(Title(found.available)) .. (where and (GREY .. " - " .. where .. "|r") or ""), found.available
-	elseif found.level or found.locked then
-		local id = found.level or found.locked
-		return L["Coming up: %s"]:format(Title(id)), id
-	elseif found.done then
-		return L["All done"], nil
-	end
-	return nil, nil
-end
-
 ---------------------------------------------------------------------------
--- The chains: the canvas (our own scrolling both ways, a zoom) and its pools
+-- A chain opened: the canvas (our own scrolling both ways, a zoom) and its pools
 ---------------------------------------------------------------------------
 
 local LINE_TONES = {
@@ -1138,7 +1560,7 @@ function Graph.ScrollTo(sx, sy, force)
 	Graph.Lay(force)
 end
 
--- A card (or banner) the controller's cursor moved to out of sight: brought into view.
+-- A card the controller's cursor moved to out of sight: brought into view.
 function Graph.Reveal(it, w, h)
 	local g = view.g
 	local vx0, vx1, vy0, vy1 = SightRect(g, 0)
@@ -1160,8 +1582,25 @@ function Graph.Reveal(it, w, h)
 	Graph.ScrollTo(sx, sy)
 end
 
--- The cards, banners, lines and pills near sight, from the pools; laid again only when the view moved
--- a good bit (half a card), or force.
+-- A line's look: its tone; on the way back to a locked quest picked: lit, the rest dim.
+function Graph.LineLook(line, s)
+	local c = LINE_TONES[s.tone]
+	local a, w = s.faint and 0.45 or c[4], G.LINE
+	local path = state.path
+	if path and path.on[s.from] and path.on[s.to] then
+		c, a, w = PATH_TONE, 1, G.LINE + 1
+	elseif path then
+		a = a * 0.3
+	end
+	line:SetThickness(w)
+	line:SetColorTexture(c[1], c[2], c[3], a)
+	if line.SetDrawLayer then
+		line:SetDrawLayer("ARTWORK", (path and path.on[s.from] and path.on[s.to]) and 3 or s.tone) -- (the lit ones over the grey)
+	end
+end
+
+-- The cards, lines and pills near sight, from the pools; laid again only when the view moved a
+-- good bit (half a card), or force.
 function Graph.Lay(force)
 	local g = view.g
 	local lay = g.layout
@@ -1206,34 +1645,6 @@ function Graph.Lay(force)
 		Graph.FillCard(card, it)
 		card:Show()
 	end
-	-- Banners, the same by their chain.
-	local banners = {}
-	for _, b in ipairs(lay.banners) do
-		if b.y + G.BANNER >= y0 and b.y <= y1 and b.x <= x1 and b.x + b.w >= x0 then
-			banners[b.key] = b
-		end
-	end
-	for key, f in pairs(g.banners) do
-		if not banners[key] then
-			g.banners[key] = nil
-			f.item = nil
-			f:Hide()
-			g.freeBanners[#g.freeBanners + 1] = f
-		end
-	end
-	for key, b in pairs(banners) do
-		local f = g.banners[key]
-		if not f then
-			f = table.remove(g.freeBanners) or Graph.NewBanner(g.canvas)
-			g.banners[key] = f
-		end
-		f:ClearAllPoints()
-		f:SetPoint("TOPLEFT", g.canvas, "TOPLEFT", b.x, -b.y)
-		f:SetWidth(b.w)
-		f.item = b
-		Graph.FillBanner(f, b)
-		f:Show()
-	end
 	-- Lines and pills: only what's near.
 	local n = 0
 	for _, s in ipairs(lay.segs) do
@@ -1242,20 +1653,17 @@ function Graph.Lay(force)
 			local line = g.lines[n]
 			if not line then
 				line = g.canvas:CreateLine(nil, "ARTWORK")
-				line:SetThickness(G.LINE)
 				g.lines[n] = line
 			end
-			local c = LINE_TONES[s.tone]
-			line:SetColorTexture(c[1], c[2], c[3], s.faint and 0.45 or c[4])
-			if line.SetDrawLayer then
-				line:SetDrawLayer("ARTWORK", s.tone) -- (the lit ones over the grey)
-			end
+			line.seg = s
+			Graph.LineLook(line, s)
 			line:SetStartPoint("TOPLEFT", g.canvas, s.x1, -s.y1)
 			line:SetEndPoint("TOPLEFT", g.canvas, s.x2, -s.y2)
 			line:Show()
 		end
 	end
 	for i = n + 1, #g.lines do
+		g.lines[i].seg = nil
 		g.lines[i]:Hide()
 	end
 	g.linesShown = n
@@ -1267,6 +1675,7 @@ function Graph.Lay(force)
 			g.pills[p] = f
 			f:ClearAllPoints()
 			f:SetPoint("CENTER", g.canvas, "TOPLEFT", pill.x, -pill.y)
+			Graph.FillPill(f, pill)
 			f:Show()
 		end
 	end
@@ -1275,24 +1684,19 @@ function Graph.Lay(force)
 	end
 end
 
--- The cards in sight filled again (a pick, titles that came).
+-- The cards in sight filled again (titles that came).
 function Graph.Refill()
 	for _, card in pairs(view.g.cards) do
 		if card.item then
 			Graph.FillCard(card, card.item)
 		end
 	end
-	for _, f in pairs(view.g.banners) do
-		if f.item then
-			Graph.FillBanner(f, f.item)
-		end
-	end
 end
 
--- The place's chains drawn (keep: where it's scrolled; focus: a quest to bring into the middle).
-function Graph.Draw(place, keep, focus)
+-- A chain drawn (keep: where it's scrolled; focus: a quest to bring into the middle).
+function Graph.Draw(place, group, keep, focus)
 	local g = view.g
-	g.layout = place and Graph.Layout(place) or nil
+	g.layout = place and group and Graph.Layout(place, group) or nil
 	local lay = g.layout
 	g.canvas:SetSize(math.max(1, lay and lay.width or 1), math.max(1, lay and lay.height or 1))
 	local sx, sy = keep and g.sx or 0, keep and g.sy or 0
@@ -1346,16 +1750,27 @@ local function NewEdges(f, layer)
 	end
 end
 
+-- A card's tooltip: its quest's, or a stub's (the quest's zone, a click goes there).
 local function CardEnter(self)
 	local it = self.item
 	if not it then
 		return
 	end
-	local pad = InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled()
-	if pad or not self:IsMouseOver() then -- (the controller's cursor, not the mouse)
+	if GamepadCursor(self) then
 		Graph.Reveal(it, G.W, G.H)
 	end
-	QuestTip(self, it.quest)
+	if not it.stub then
+		QuestTip(self, it.quest)
+		return
+	end
+	local q = Quest(it.quest)
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(q and ZoneOf(q) or "?", 1, 0.82, 0)
+	GameTooltip:AddLine(L["In another zone: %s"]:format(LevelTag(q) .. Title(it.quest)), 1, 1, 1, true)
+	local c = TONE[it.status] or TONE.other
+	GameTooltip:AddLine(Word(it.status), c[1], c[2], c[3])
+	GameTooltip:AddLine(L["Click: go there"], 0.5, 0.75, 1)
+	GameTooltip:Show()
 end
 
 function Graph.NewCard(canvas)
@@ -1369,6 +1784,24 @@ function Graph.NewCard(canvas)
 	b.Glow:SetPoint("BOTTOMRIGHT", 3, -3)
 	b.Glow:SetColorTexture(1, 0.82, 0, 0.35)
 	b.Glow:Hide()
+	-- The next step's one-time pulse when its chain opens.
+	b.Pulse = b:CreateTexture(nil, "BACKGROUND", nil, -2)
+	b.Pulse:SetPoint("TOPLEFT", -7, 7)
+	b.Pulse:SetPoint("BOTTOMRIGHT", 7, -7)
+	b.Pulse:SetColorTexture(1, 0.82, 0, 0.6)
+	b.Pulse:SetAlpha(0)
+	b.Pulse.Anim = b.Pulse:CreateAnimationGroup()
+	local up = b.Pulse.Anim:CreateAnimation("Alpha")
+	up:SetFromAlpha(0)
+	up:SetToAlpha(1)
+	up:SetDuration(0.35)
+	up:SetOrder(1)
+	local down = b.Pulse.Anim:CreateAnimation("Alpha")
+	down:SetFromAlpha(1)
+	down:SetToAlpha(0)
+	down:SetDuration(0.9)
+	down:SetOrder(2)
+	b.Pulse.Anim:SetToFinalAlpha(true)
 	NewEdges(b)
 	b.Strip = b:CreateTexture(nil, "ARTWORK")
 	b.Strip:SetPoint("TOPLEFT", 1, -1)
@@ -1388,18 +1821,36 @@ function Graph.NewCard(canvas)
 	b.Title:SetWordWrap(false)
 	b.Info = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	b.Info:SetPoint("BOTTOMLEFT", G.ICON + 14, 8)
-	b.Info:SetPoint("RIGHT", -6, 0)
+	b.Info:SetPoint("RIGHT", -44, 0)
 	b.Info:SetJustifyH("LEFT")
 	b.Info:SetWordWrap(false)
 	b.Friends = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	b.Friends:SetPoint("TOPRIGHT", -5, -4)
 	b.Friends:SetJustifyH("RIGHT")
+	-- "lead-in" or "closes" at the bottom right.
+	b.Tag = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	b.Tag:SetPoint("BOTTOMRIGHT", -5, 8)
+	b.Tag:SetJustifyH("RIGHT")
+	-- Its place on the way back to a locked quest (1: do it first).
+	b.OrderBack = b:CreateTexture(nil, "OVERLAY")
+	b.OrderBack:SetTexture(T.circle)
+	b.OrderBack:SetSize(18, 18)
+	b.OrderBack:SetPoint("CENTER", b, "TOPLEFT", 2, -2)
+	b.OrderBack:SetVertexColor(PATH_TONE[1], PATH_TONE[2], PATH_TONE[3], 1)
+	b.Order = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	b.Order:SetPoint("CENTER", b.OrderBack, "CENTER", 0, 0)
+	b.OrderBack:Hide()
+	b.Order:Hide()
 	b:SetHighlightTexture(T.highlight, "ADD")
 	b:SetScript("OnEnter", CardEnter)
 	b:SetScript("OnLeave", Untip)
 	b:SetScript("OnClick", function(self)
-		if self.item then
-			Graph.Pick(self.item.quest)
+		local it = self.item
+		if it and it.stub then
+			Untip(self)
+			Graph.Jump(it.quest)
+		elseif it then
+			Graph.Pick(it.quest)
 		end
 	end)
 	view.g.made = view.g.made + 1
@@ -1407,194 +1858,152 @@ function Graph.NewCard(canvas)
 end
 
 -- A card: its tone (Attune's: done green, ready amber, in the log blue, the rest grey), the strip in
--- its status's colour, the start, the title, "[12] Marshal Dughan" (another zone: its name), friends.
+-- its status's colour, the start, the title, "[12] Marshal Dughan" (another zone: its name), friends,
+-- "lead-in" or "closes". A stub (a step in another zone): that zone's name and the quest, dark. On
+-- the way back to a locked quest picked: lit and numbered, the rest dim.
 function Graph.FillCard(b, it)
 	local id = it.quest
 	local q = Quest(id)
 	local status = StatusOf(id)
 	local c = TONE[status]
-	local bright = status == "done" or status == "available" or status == "active"
-	b.Bg:SetVertexColor(bright and c[1] or 0.1, bright and c[2] or 0.1, bright and c[3] or 0.1, bright and 0.3 or 0.6)
-	if id == state.picked then
-		Edges(b, 1, 0.82, 0)
-	elseif bright then
-		Edges(b, c[1], c[2], c[3])
-	else
-		Edges(b, 0.4, 0.4, 0.4)
-	end
+	local path = state.path
+	local lit = path ~= nil and (path.on[id] ~= nil or (it.stub == true and q ~= nil and path.zones[ZoneOf(q) or ""] ~= nil))
 	b.Glow:SetShown(id == state.picked)
 	b.Strip:SetColorTexture(c[1], c[2], c[3], 1)
-	StartIcon(b.Icon, q, status)
 	b.Check:SetShown(status == "done")
-	b.Title:SetText(Title(id))
-	if status == "done" or status == "other" then
-		b.Title:SetTextColor(0.7, 0.7, 0.7)
-	else
-		b.Title:SetTextColor(1, 1, 1)
-	end
-	local zone = q and ZoneOf(q)
-	local here = CurrentPlace()
-	local where
-	if zone and here and zone ~= here.name then
-		where = zone
-	else
-		local s = FirstStart(q)
-		where = s and s.name or zone
-	end
-	b.Info:SetText(LevelTag(q) .. GREY .. (where or "") .. "|r")
-	local friends = Q.Friends and Q.Friends(id) or EMPTY
-	if friends[1] then
-		local done = 0
-		for _, f in ipairs(friends) do
-			done = done + (f.status == "done" and 1 or 0)
-		end
-		b.Friends:SetText("|cff80c0ff" .. done .. "/" .. #friends .. "|r")
-		b.Friends:Show()
-	else
+	if it.stub then
+		b.Bg:SetVertexColor(0.04, 0.04, 0.04, 0.9)
+		Edges(b, 0.45, 0.45, 0.45, 0.7)
+		b.Icon:SetTexture(T.map)
+		b.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+		b.Icon:SetDesaturated(status ~= "available" and status ~= "active")
+		b.Icon:SetVertexColor(1, 1, 1)
+		b.Title:SetText(q and ZoneOf(q) or "?")
+		b.Title:SetTextColor(1, 0.82, 0)
+		b.Info:SetText(LevelTag(q) .. GREY .. Title(id) .. "|r")
 		b.Friends:Hide()
-	end
-	b:SetAlpha(status == "other" and 0.55 or 1)
-end
-
-local function BannerEnter(self)
-	local it = self.item
-	if not it then
-		return
-	end
-	local pad = InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled()
-	if pad or not self:IsMouseOver() then
-		Graph.Reveal({ x = view.g.sx > it.x and view.g.sx + PAD or it.x, y = it.y }, math.min(it.w, view.g.w / view.g.zoom - 2 * PAD), G.BANNER)
-	end
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetText(self.Name:GetText() or "", 1, 0.82, 0)
-	GameTooltip:AddLine(L["%d of %d steps done"]:format(it.done, it.total), 1, 1, 1)
-	GameTooltip:AddLine(it.closed and L["Click: open"] or L["Click: fold"], 0.5, 0.75, 1)
-	GameTooltip:Show()
-end
-
-function Graph.NewBanner(canvas)
-	local f = CreateFrame("Button", nil, canvas)
-	f:SetHeight(G.BANNER)
-	f.Art = f:CreateTexture(nil, "BACKGROUND")
-	f.Art:SetAllPoints()
-	f.Shade = f:CreateTexture(nil, "BACKGROUND", nil, 1)
-	f.Shade:SetAllPoints()
-	f.Shade:SetColorTexture(0, 0, 0, 0.35)
-	NewEdges(f)
-	Edges(f, 1, 0.82, 0, 0.35)
-	f.Toggle = f:CreateTexture(nil, "ARTWORK")
-	f.Toggle:SetSize(14, 14)
-	f.Toggle:SetPoint("TOPLEFT", 8, -9)
-	f.Name = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	f.Name:SetPoint("TOPLEFT", 28, -8)
-	f.Name:SetPoint("RIGHT", -150, 0)
-	f.Name:SetJustifyH("LEFT")
-	f.Name:SetWordWrap(false)
-	f.Count = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	f.Count:SetPoint("TOPRIGHT", -10, -10)
-	f.Count:SetJustifyH("RIGHT")
-	f.BarBack = f:CreateTexture(nil, "ARTWORK")
-	f.BarBack:SetPoint("TOPRIGHT", -10, -26)
-	f.BarBack:SetSize(130, 6)
-	f.BarBack:SetColorTexture(0, 0, 0, 0.6)
-	f.Bar = f:CreateTexture(nil, "ARTWORK", nil, 1)
-	f.Bar:SetPoint("TOPLEFT", f.BarBack, "TOPLEFT")
-	f.Bar:SetHeight(6)
-	f.Next = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	f.Next:SetPoint("BOTTOMLEFT", 28, 9)
-	f.Next:SetPoint("RIGHT", -10, 0)
-	f.Next:SetJustifyH("LEFT")
-	f.Next:SetWordWrap(false)
-	f:SetHighlightTexture(T.highlight, "ADD")
-	f:SetScript("OnEnter", BannerEnter)
-	f:SetScript("OnLeave", Untip)
-	f:SetScript("OnClick", function(self)
-		local it = self.item
-		if it then
-			Untip(self)
-			state.folded[it.key] = not state.folded[it.key] or nil
-			state.layouts[state.where] = nil
-			Graph.Draw(CurrentPlace(), true)
+		b.Tag:SetText("")
+	else
+		local bright = status == "done" or status == "available" or status == "active"
+		b.Bg:SetVertexColor(bright and c[1] or 0.1, bright and c[2] or 0.1, bright and c[3] or 0.1, bright and 0.3 or 0.6)
+		if id == state.picked then
+			Edges(b, 1, 0.82, 0)
+		elseif bright then
+			Edges(b, c[1], c[2], c[3])
+		else
+			Edges(b, 0.4, 0.4, 0.4)
 		end
-	end)
-	return f
-end
-
--- A chain's banner (Blizzard's story header; a faction's chain its campaign's), desaturated when done.
-function Graph.FillBanner(f, b)
-	local group = b.group
-	local atlas = group.faction == "Alliance" and "Campaign_Alliance" or group.faction == "Horde" and "Campaign_Horde" or "StoryHeader-BG"
-	Art(f.Art, atlas, T.flat)
-	local all = b.total > 0 and b.done == b.total
-	f.Art:SetDesaturated(all)
-	if not (atlasKnown[atlas]) then
-		f.Art:SetVertexColor(0.16, 0.13, 0.08, 0.95)
-	else
-		f.Art:SetVertexColor(1, 1, 1, all and 0.55 or 1)
+		StartIcon(b.Icon, q, status)
+		b.Title:SetText(Title(id))
+		if status == "done" or status == "other" then
+			b.Title:SetTextColor(0.7, 0.7, 0.7)
+		else
+			b.Title:SetTextColor(1, 1, 1)
+		end
+		local zone = q and ZoneOf(q)
+		local here = CurrentPlace()
+		local where
+		if zone and here and zone ~= here.name then
+			where = zone
+		else
+			local s = FirstStart(q)
+			where = s and s.name or zone
+		end
+		b.Info:SetText(LevelTag(q) .. GREY .. (where or "") .. "|r")
+		local friends = Q.Friends and Q.Friends(id) or EMPTY
+		if friends[1] then
+			local done = 0
+			for _, f in ipairs(friends) do
+				done = done + (f.status == "done" and 1 or 0)
+			end
+			b.Friends:SetText("|cff80c0ff" .. done .. "/" .. #friends .. "|r")
+			b.Friends:Show()
+		else
+			b.Friends:Hide()
+		end
+		if it.closes then
+			b.Tag:SetText("|cffff7359" .. L["closes"] .. "|r")
+		elseif it.lead then
+			b.Tag:SetText(L["lead-in"])
+		else
+			b.Tag:SetText("")
+		end
 	end
-	f.Toggle:SetTexture(b.closed and T.plus or T.minus)
-	local name
-	if group.single then
-		name = L["Quests without a chain"]
-	else
-		local _, _, chainName = StepOf(group.chain[1])
-		name = chainName or Title(group.chain[1])
+	if lit and id ~= state.picked then
+		Edges(b, PATH_TONE[1], PATH_TONE[2], PATH_TONE[3])
 	end
-	f.Name:SetText(name)
-	f.Count:SetText(L["%d of %d steps done"]:format(b.done, b.total))
-	local fill = b.total > 0 and b.done / b.total or 0
-	f.Bar:SetWidth(math.max(1, 130 * fill))
-	f.Bar:SetShown(fill > 0)
-	local c = all and TONE.done or TONE.available
-	f.Bar:SetColorTexture(c[1], c[2], c[3], 1)
-	local nextText = not group.single and NextOf(group) or nil
-	if group.single then
-		nextText = L["%d quests"]:format(b.n)
+	local order = path and path.order[id]
+	b.Order:SetText(order and tostring(order) or "")
+	b.Order:SetShown(order ~= nil)
+	b.OrderBack:SetShown(order ~= nil)
+	local alpha = status == "other" and 0.55 or it.lead and 0.8 or 1
+	if path and not lit then
+		alpha = alpha * Z.DIM
 	end
-	f.Next:SetText(nextText or "")
+	b:SetAlpha(alpha)
+	if state.pulse == id then
+		state.pulse = nil
+		b.Pulse.Anim:Stop()
+		b.Pulse.Anim:Play()
+	end
 end
 
 function Graph.NewPill(canvas)
 	local f = CreateFrame("Frame", nil, canvas)
-	f:SetSize(30, 16)
+	f:SetSize(G.PILL_W, G.PILL_H)
 	f:SetFrameLevel(canvas:GetFrameLevel() + 5)
 	local back = f:CreateTexture(nil, "BACKGROUND")
 	back:SetAllPoints()
 	back:SetColorTexture(0.05, 0.05, 0.05, 0.95)
 	NewEdges(f)
-	Edges(f, 0.851, 0.608, 0, 1)
 	f.Text = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-	f.Text:SetPoint("CENTER")
-	f.Text:SetText(L["OR"])
+	f.Text:SetPoint("CENTER", 0, 0)
 	return f
 end
 
+-- "all of" (grey: each is needed) or "one of" (amber: any is enough), where the lines meet.
+function Graph.FillPill(f, pill)
+	if pill.kind == "any" then
+		Edges(f, 0.851, 0.608, 0, 1)
+		f.Text:SetText(L["one of"])
+		f.Text:SetTextColor(1, 0.82, 0)
+	else
+		Edges(f, 0.6, 0.6, 0.6, 1)
+		f.Text:SetText(L["all of"])
+		f.Text:SetTextColor(0.9, 0.9, 0.9)
+	end
+	f:SetWidth(math.max(G.PILL_W, f.Text:GetStringWidth() + 10))
+end
+
 ---------------------------------------------------------------------------
--- Zone maps (the map tab's and the details' small one): the zone's art (LT.MapArt), markers of ours
+-- Zone maps (the zone page's and the details' small one): the zone's art (LT.MapArt), markers and
+-- threads of ours
 ---------------------------------------------------------------------------
 
 local NEAR = 8     -- px: markers this close are one
 local MARKERS = 150
--- Markers' looks: size, the art, the order a shared marker takes the look in.
+-- Markers' looks (the game's map icons): size, the art, the order a shared marker takes the look in.
 local LOOK = {
-	available = { size = 24, atlas = "QuestNormal", file = T.available, back = true, prio = 1 },
-	active = { size = 24, atlas = "QuestTurnin", file = T.turnin, back = true, prio = 2 },
-	start = { size = 22, atlas = "QuestNormal", file = T.available, back = true, prio = 1 },
-	["end"] = { size = 22, atlas = "QuestTurnin", file = T.turnin, back = true, prio = 2 },
-	drop = { size = 34, circle = true, tint = { 1, 0.82, 0 }, alpha = 0.35, prio = 3 },
-	level = { size = 18, atlas = "QuestNormal", file = T.available, back = true, desat = true, tint = TONE.level, prio = 4 },
-	locked = { size = 18, atlas = "QuestNormal", file = T.available, back = true, desat = true, tint = { 0.8, 0.8, 0.8 }, prio = 5 },
-	done = { size = 11, circle = true, tint = TONE.done, alpha = 0.6, ring = true, prio = 6 },
-	other = { size = 10, circle = true, tint = TONE.other, alpha = 0.55, ring = true, prio = 7 },
+	ready = { size = 24, atlas = "QuestTurnin", file = T.turnin, back = true, prio = 1 },
+	repeatturnin = { size = 24, atlas = "QuestRepeatableTurnin", file = T.turnin, back = true, prio = 1 },
+	["end"] = { size = 22, atlas = "QuestTurnin", file = T.turnin, back = true, prio = 1 },
+	available = { size = 24, atlas = "QuestNormal", file = T.available, back = true, prio = 2 },
+	daily = { size = 24, atlas = "QuestDaily", file = T.daily, back = true, prio = 2 },
+	start = { size = 22, atlas = "QuestNormal", file = T.available, back = true, prio = 2 },
+	trivial = { size = 20, atlas = "TrivialQuests", file = T.available, back = true, prio = 3 },
+	progress = { size = 20, atlas = "QuestTurnin", file = T.progress, back = true, desat = true, tint = { 0.85, 0.85, 0.85 }, prio = 4 },
+	level = { size = 18, atlas = "QuestNormal", file = T.available, back = true, desat = true, tint = { 0.85, 0.85, 0.85 }, prio = 5 },
+	locked = { size = 16, atlas = "QuestNormal", file = T.available, back = true, desat = true, tint = { 0.6, 0.6, 0.6 }, prio = 6 },
+	drop = { size = 34, circle = true, tint = { 1, 0.82, 0 }, alpha = 0.35, prio = 7 },
+	done = { size = 11, circle = true, tint = TONE.done, alpha = 0.6, ring = true, prio = 8 },
+	other = { size = 10, circle = true, tint = TONE.other, alpha = 0.55, ring = true, prio = 9 },
 }
+local OPEN = { ready = true, repeatturnin = true, available = true, daily = true, trivial = true, progress = true, level = true, locked = true }
 
 local function MarkerEnter(self)
 	local m = self.owner
-	if m.zoomable then
-		local pad = InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled()
-		if pad or not self:IsMouseOver() then
-			Map.Reveal(m, self.px, self.py)
-		end
+	if m.zoomable and GamepadCursor(self) then
+		Map.Reveal(m, self.px, self.py)
 	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 	local first, lastLabel = true, nil
@@ -1625,6 +2034,17 @@ local function MarkerEnter(self)
 		GameTooltip:AddLine(L["Click: show %s"]:format(Title(self.quests[turn])), 0.5, 0.75, 1)
 	end
 	GameTooltip:Show()
+	if m.onEnter then
+		m.onEnter(self)
+	end
+end
+
+local function MarkerLeave(self)
+	Untip(self)
+	local m = self.owner
+	if m.onLeave then
+		m.onLeave(self)
+	end
 end
 
 local function MarkerClick(self)
@@ -1638,7 +2058,8 @@ local function MarkerClick(self)
 end
 
 function Map.New(parent, width, height, zoomable)
-	local m = { markers = {}, used = 0, shown = 0, width = width, height = height, zoom = 1, ox = 0, oy = 0, zoomable = zoomable }
+	local m = { markers = {}, used = 0, shown = 0, width = width, height = height, zoom = 1, ox = 0, oy = 0, zoomable = zoomable,
+		lines = {}, linesShown = 0 }
 	local box = CreateFrame("Frame", nil, parent)
 	box:SetSize(width, height)
 	box:SetClipsChildren(true)
@@ -1724,18 +2145,21 @@ function Map.SetZoom(m, zoom)
 	local fx = ((m.width / 2) - m.ox) / (m.artW or m.width)
 	local fy = ((m.height / 2) - m.oy) / (m.artH or m.height)
 	m.zoom = zoom
-	Map.Show(m, m.map, m.spots, m.name)
+	Map.Show(m, m.map, m.spots, m.name, m.threads)
 	Map.Pan(m, m.width / 2 - fx * m.artW, m.height / 2 - fy * m.artH)
 	if m.onZoom then
 		m.onZoom(zoom)
 	end
 end
 
--- The map's art and the markers on it. spots = { { x, y, look, label, quest, status, note } }: spots
--- closer than a few px are one marker (its tooltip lists them all; its look the first by LOOK's order).
-function Map.Show(m, map, spots, name)
+-- The map's art, the markers and the threads on it. spots = { { x, y, look, label, quest, status,
+-- note, chain } }: spots closer than a few px are one marker (its tooltip lists them all; its look the
+-- first by LOOK's order; how many quests to do it has in a badge); a drop area only with drop areas.
+-- threads = { { key, color, segs = { { x1, y1, x2, y2, done } } } } (0..1 on the map): a chain's
+-- line from giver to turn-in to the next giver.
+function Map.Show(m, map, spots, name, threads)
 	local same = m.map == map
-	m.map, m.spots, m.name = map, spots, name
+	m.map, m.spots, m.name, m.threads = map, spots, name, threads
 	m.frame:Show()
 	if not same then
 		m.zoom, m.ox, m.oy = 1, 0, 0
@@ -1758,35 +2182,34 @@ function Map.Show(m, map, spots, name)
 		local x, y = tonumber(spot.x), tonumber(spot.y)
 		if x and y and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
 			local px, py = x * width, y * height
+			local drop = spot.look == "drop"
 			local near
 			for i = 1, n do
 				local marker = m.markers[i]
-				if math.abs(marker.px - px) <= NEAR and math.abs(marker.py - py) <= NEAR then
+				if marker.drop == drop and math.abs(marker.px - px) <= NEAR and math.abs(marker.py - py) <= NEAR then
 					near = marker
 					break
 				end
 			end
 			if near then
 				near.spots[#near.spots + 1] = spot
-				if spot.quest then
-					near.quests[#near.quests + 1] = spot.quest
-				end
 				if (LOOK[spot.look] or LOOK.other).prio < (LOOK[near.look] or LOOK.other).prio then
 					near.look = spot.look
 				end
 			elseif n < MARKERS then
 				n = n + 1
 				local marker = Map.Marker(m, n)
-				marker.px, marker.py, marker.look = px, py, spot.look
-				marker.area = tonumber(spot.r) and spot.look == "drop" and math.floor(spot.r * width * 2 + 0.5) or nil
-				marker.spots, marker.quests = { spot }, { spot.quest }
+				marker.px, marker.py, marker.look, marker.drop = px, py, spot.look, drop
+				marker.area = tonumber(spot.r) and drop and math.floor(spot.r * width * 2 + 0.5) or nil
+				marker.spots = { spot }
 				marker.key = ("%s:%d:%d"):format(tostring(map), math.floor(x * 1000), math.floor(y * 1000))
 				marker:ClearAllPoints()
 				marker:SetPoint("CENTER", m.Map, "TOPLEFT", px, -py)
 			end
 		end
 	end
-	-- Each marker's quests, the one to do first first (a click shows it; the next click the next one).
+	-- Each marker's quests, the one to do first first (a click shows it; the next click the next one),
+	-- how many of them are still to do, its chains.
 	local function Prio(spot)
 		return (LOOK[spot.look] or LOOK.other).prio
 	end
@@ -1800,14 +2223,18 @@ function Map.Show(m, map, spots, name)
 				return (a.quest or 0) < (b.quest or 0)
 			end)
 		end
-		local quests, seen = {}, {}
+		local quests, seen, chains, open = {}, {}, {}, 0
 		for _, spot in ipairs(marker.spots) do
 			if spot.quest and not seen[spot.quest] then
 				seen[spot.quest] = true
 				quests[#quests + 1] = spot.quest
+				open = open + (OPEN[spot.look] and 1 or 0)
+			end
+			if spot.chain then
+				chains[spot.chain] = true
 			end
 		end
-		marker.quests = quests
+		marker.quests, marker.chains, marker.open = quests, chains, open
 		Map.Paint(marker)
 	end
 	for i = n + 1, m.used do
@@ -1816,6 +2243,7 @@ function Map.Show(m, map, spots, name)
 	end
 	m.used = math.max(n, m.used)
 	m.shown = n
+	Map.DrawThreads(m, map and threads or nil, width, height)
 	-- Me, when I'm on this map.
 	local pos = map and C_Map and LT.Value(C_Map.GetPlayerMapPosition, map, "player")
 	local px, py
@@ -1849,8 +2277,16 @@ function Map.Marker(m, i)
 		marker.Back:SetPoint("CENTER")
 		marker.Icon = marker:CreateTexture(nil, "ARTWORK")
 		marker.Icon:SetPoint("CENTER")
+		-- How many quests to do it has (two or more), on a dark dot at its top right.
+		marker.BadgeBack = marker:CreateTexture(nil, "OVERLAY")
+		marker.BadgeBack:SetTexture(T.circle)
+		marker.BadgeBack:SetVertexColor(0.05, 0.05, 0.05, 0.95)
+		marker.BadgeBack:SetSize(15, 15)
+		marker.BadgeBack:SetPoint("CENTER", marker, "TOPRIGHT", 0, 0)
+		marker.Badge = marker:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		marker.Badge:SetPoint("CENTER", marker.BadgeBack, "CENTER", 0, 0)
 		marker:SetScript("OnEnter", MarkerEnter)
-		marker:SetScript("OnLeave", Untip)
+		marker:SetScript("OnLeave", MarkerLeave)
 		marker:SetScript("OnClick", MarkerClick)
 		m.markers[i] = marker
 	end
@@ -1859,7 +2295,7 @@ function Map.Marker(m, i)
 end
 
 -- A marker's look: solid and clear (a dark disc under the "!" and "?"), done and not-for-me dim dots,
--- drop areas soft circles; a gold ring when it has the quest picked.
+-- drop areas soft circles; a gold ring when it has the quest picked; how many it has to do.
 function Map.Paint(marker)
 	local look = LOOK[marker.look] or LOOK.other
 	local size = look.circle and marker.area and math.max(look.size, math.min(160, marker.area)) or look.size
@@ -1884,6 +2320,10 @@ function Map.Paint(marker)
 	end
 	marker.Ring:SetShown(picked)
 	marker.Ring:SetSize(size + 12, size + 12)
+	local badge = (marker.open or 0) >= 2 and not marker.drop
+	marker.Badge:SetText(badge and tostring(marker.open) or "")
+	marker.Badge:SetShown(badge)
+	marker.BadgeBack:SetShown(badge)
 	marker:SetAlpha(1)
 end
 
@@ -1892,22 +2332,115 @@ function Map.Repaint(m)
 	for i = 1, m.shown do
 		Map.Paint(m.markers[i])
 	end
+	Map.Light(m, m.lit)
 end
 
--- The map tab: every giver of the place's quests (as the filters show them), turn-ins of quests in
--- my log, where items that start a quest drop.
-function Map.Spots(place)
-	local spots = {}
+-- The chains' threads (pooled lines on the map, under the markers).
+function Map.DrawThreads(m, threads, width, height)
+	local n = 0
+	for _, t in ipairs(threads or EMPTY) do
+		for _, s in ipairs(t.segs) do
+			if n >= SHOWN.threads then
+				break
+			end
+			n = n + 1
+			local line = m.lines[n]
+			if not line then
+				line = m.Map:CreateLine(nil, "OVERLAY", nil, 1)
+				m.lines[n] = line
+			end
+			line.key, line.done, line.color = t.key, s.done, t.color
+			line:SetStartPoint("TOPLEFT", m.Map, s.x1 * width, -s.y1 * height)
+			line:SetEndPoint("TOPLEFT", m.Map, s.x2 * width, -s.y2 * height)
+			line:Show()
+		end
+	end
+	for i = n + 1, #m.lines do
+		m.lines[i].key = nil
+		m.lines[i]:Hide()
+	end
+	m.linesShown = n
+	Map.Light(m, m.lit)
+end
+
+-- One chain lit (a card hovered: its pins and thread, the rest dim), or none (nil).
+function Map.Light(m, key)
+	m.lit = key
+	for i = 1, m.linesShown do
+		local line = m.lines[i]
+		local c = line.color
+		local a, w
+		if key == nil then
+			a, w = line.done and 0.25 or 0.7, 2
+		elseif line.key == key then
+			a, w = 1, 3.5
+		else
+			a, w = 0.08, 2
+		end
+		line:SetThickness(w)
+		line:SetColorTexture(c[1], c[2], c[3], a)
+	end
+	for i = 1, m.shown do
+		local marker = m.markers[i]
+		marker:SetAlpha((key == nil or marker.chains[key]) and 1 or Z.PIN_DIM)
+	end
+end
+
+---------------------------------------------------------------------------
+-- The zone page: the map with its pins and threads, the chains' cards, what's here for me
+---------------------------------------------------------------------------
+
+-- A quest's pin on the zone map: in my log its turn-in ("?", grey while not done yet), else its
+-- giver: "!" (a low level one's, a repeatable one's), a grey "!" for later, dots for done and not for me.
+function ZonePage.Look(id, q, status)
+	if status == "active" then
+		if IsReady(id) then
+			return q.repeatable and "repeatturnin" or "ready"
+		end
+		return "progress"
+	elseif status == "available" then
+		if q.repeatable then
+			return "daily"
+		end
+		return Trivial(id) and "trivial" or "available"
+	end
+	return status
+end
+
+-- The first spot on this map of a list of givers or enders.
+local function FirstOn(list, map)
+	for _, s in ipairs(list or EMPTY) do
+		for _, p in ipairs(s.points or EMPTY) do
+			if p.map == map then
+				return p
+			end
+		end
+	end
+end
+
+-- The zone map's pins (every giver of the zone's quests as the filters show them, the turn-ins of
+-- quests in my log, where items that start a quest drop) and each chain's thread (giver -> turn-in
+-- -> the next giver, the spots on this map). Kept until a status or the filters change.
+function ZonePage.Spots(place)
+	local cached = state.spots[place.id]
+	if cached then
+		return cached.spots, cached.threads
+	end
+	local tree = Structure(place)
 	local map = place.map
-	for _, id in ipairs(Structure(place).ids) do
+	local spots, threads, segs = {}, {}, 0
+	for _, id in ipairs(tree.ids) do
 		local status = StatusOf(id)
 		local q = Quest(id)
 		if q and Visible(status) then
+			local group = tree.groupOf[id]
+			local key = group and group.key
+			local look = ZonePage.Look(id, q, status)
 			local list = status == "active" and q.ends or q.starts
 			for _, s in ipairs(list or EMPTY) do
 				for _, p in ipairs(s.points or EMPTY) do
 					if p.map == map then
-						spots[#spots + 1] = { x = p.x, y = p.y, look = status, label = s.name, quest = id, status = status,
+						spots[#spots + 1] = { x = p.x, y = p.y, look = look, label = s.name, quest = id, status = status, chain = key,
 							note = status == "active" and L["(turn in)"] or nil }
 					end
 				end
@@ -1916,7 +2449,7 @@ function Map.Spots(place)
 						for _, p in ipairs(d.points or EMPTY) do
 							if p.map == map then
 								spots[#spots + 1] = { x = p.x, y = p.y, r = p.r, look = "drop", label = L["%s drops here (%s%%)"]:format(s.name or "?", Chance(d.chance)),
-									quest = id, status = status, note = d.name and ("- " .. d.name) or nil }
+									quest = id, status = status, chain = key, note = d.name and ("- " .. d.name) or nil }
 							end
 						end
 					end
@@ -1924,26 +2457,384 @@ function Map.Spots(place)
 			end
 		end
 	end
-	return spots
-end
-
-function Map.Draw(place)
-	local mp = view.mapPane
-	if not place or place.kind ~= "zone" then
-		mp.map.frame:Hide()
-		mp.Note:SetText(L["Dungeon quests are given in many places: each quest's details show where."])
-		return
-	end
-	local spots = Map.Spots(place)
-	Map.Show(mp.map, place.map, spots, place.name)
-	local counts = {}
-	for _, s in ipairs(spots) do
-		if s.look ~= "drop" then
-			counts[s.status] = (counts[s.status] or 0) + 1
+	for _, group in ipairs(tree.groups) do
+		if not group.single then
+			local list, giver, ender, shown = {}, {}, {}, {}
+			local function Seg(a, b, done)
+				if a and b and segs < SHOWN.threads and (math.abs(a.x - b.x) > 0.004 or math.abs(a.y - b.y) > 0.004) then
+					segs = segs + 1
+					list[#list + 1] = { x1 = a.x, y1 = a.y, x2 = b.x, y2 = b.y, done = done }
+				end
+			end
+			for _, id in ipairs(group.chain) do
+				local q = Quest(id)
+				local status = StatusOf(id)
+				if q and Visible(status) then
+					shown[id] = status
+					giver[id], ender[id] = FirstOn(q.starts, map), FirstOn(q.ends, map)
+					Seg(giver[id], ender[id], status == "done")
+				end
+			end
+			for _, to in ipairs(group.chain) do
+				for _, from in ipairs(shown[to] and group.parents[to] or EMPTY) do
+					if shown[from] then
+						Seg(ender[from] or giver[from], giver[to], shown[from] == "done" and shown[to] == "done")
+					end
+				end
+			end
+			if list[1] then
+				threads[#threads + 1] = { key = group.key, color = Chains.Color(group), segs = list }
+			end
 		end
 	end
-	mp.Note:SetText(L["Quest givers: %d available now, %d in your log, %d later, %d done"]:format(counts.available or 0, counts.active or 0,
-		(counts.level or 0) + (counts.locked or 0), counts.done or 0))
+	state.spots[place.id] = { spots = spots, threads = threads }
+	return spots, threads
+end
+
+function ZonePage.DrawMap(place)
+	local zp = view.zp
+	if not place or place.kind ~= "zone" then
+		zp.map.frame:Hide()
+		zp.Note:SetText(place and L["Dungeon quests are given in many places: each quest's details show where."] or "")
+		zp.Note:Show()
+		return
+	end
+	zp.Note:Hide()
+	local spots, threads = ZonePage.Spots(place)
+	Map.Show(zp.map, place.map, spots, place.name, threads)
+end
+
+-- A zone (my level, give or take 3) with the most quests I can take now, for when this one has none.
+function ZonePage.Suggest(place)
+	if state.suggest ~= nil and state.suggestFor == place.id then
+		return state.suggest or nil
+	end
+	local my = tonumber(UnitLevel and LT.Value(UnitLevel, "player")) or 1
+	local best, most = nil, 0
+	for _, z in ipairs(state.zones or EMPTY) do
+		if z.map ~= place.map and (z.minLevel or 1) <= my + 3 and (z.maxLevel or 60) >= my - 3 then
+			local n = 0
+			if Q.Available then
+				local ok, list = pcall(Q.Available, z.map)
+				n = ok and type(list) == "table" and #list or 0
+			else
+				for _, id in ipairs(Q.ZoneQuests and Q.ZoneQuests(z.map) or EMPTY) do
+					n = n + (StatusOf(id) == "available" and 1 or 0)
+				end
+			end
+			if n > most then
+				best, most = z, n
+			end
+		end
+	end
+	state.suggest = best and { map = best.map, name = best.name or MapName(best.map) or "?", n = most } or false
+	state.suggestFor = place.id
+	return state.suggest or nil
+end
+
+-- Under the map: how many quests are in progress, available, coming up, blocked, done; with none to
+-- take here, a zone that has some.
+function ZonePage.DrawSummary(place)
+	local zp = view.zp
+	local n = {}
+	for _, id in ipairs(place and Structure(place).ids or EMPTY) do
+		local s = StatusOf(id)
+		n[s] = (n[s] or 0) + 1
+	end
+	zp.Counts:SetText(place and table.concat({
+		HEX.active .. L["%d in progress"]:format(n.active or 0) .. "|r",
+		HEX.available .. L["%d available"]:format(n.available or 0) .. "|r",
+		HEX.level .. L["%d coming up"]:format(n.level or 0) .. "|r",
+		HEX.locked .. L["%d blocked"]:format(n.locked or 0) .. "|r",
+		HEX.done .. L["%d done"]:format(n.done or 0) .. "|r" }, "   ") or "")
+	local suggest = place and (n.available or 0) == 0 and ZonePage.Suggest(place) or nil
+	zp.Guide:SetShown(place ~= nil and (n.available or 0) == 0)
+	zp.Guide:SetText(L["Nothing for you to pick up here right now."])
+	zp.Suggest.map = suggest and suggest.map or nil
+	if suggest then
+		zp.Suggest.Text:SetText(L["%s has %d for your level"]:format(suggest.name, suggest.n) .. "  >")
+		zp.Suggest:SetWidth(zp.Suggest.Text:GetStringWidth() + 12)
+	end
+	zp.Suggest:SetShown(suggest ~= nil)
+	return n
+end
+
+-- The chains' cards: those with something the filters show, the done ones last, then the quests
+-- without a chain.
+function ZonePage.Entries(place)
+	local entries, later, single = {}, {}, nil
+	for _, group in ipairs(Structure(place).groups) do
+		local info = Chains.Info(group, place)
+		if info.visible > 0 then
+			local e = { group = group, info = info, key = group.key }
+			if group.single then
+				single = e
+			elseif info.kind == "done" then
+				later[#later + 1] = e
+			else
+				entries[#entries + 1] = e
+			end
+		end
+	end
+	for _, e in ipairs(later) do
+		entries[#entries + 1] = e
+	end
+	entries[#entries + 1] = single
+	return entries
+end
+
+-- keep: the cards stay where they're scrolled.
+function ZonePage.Draw(place, keep)
+	local zp = view.zp
+	zp.lit = nil
+	local entries = place and ZonePage.Entries(place) or {}
+	zp.cards:SetEntries(entries, keep and true or 0)
+	local message
+	if place and not entries[1] then
+		message = Structure(place).ids[1] and L["Nothing to show with these filters."] or L["No quests known here yet."]
+	end
+	zp.Empty:SetText(message or "")
+	zp.Empty:SetShown(message ~= nil)
+	ZonePage.DrawMap(place)
+	local chains = 0
+	for _, e in ipairs(entries) do
+		chains = chains + (e.group.single and 0 or 1)
+	end
+	return ZonePage.DrawSummary(place), chains
+end
+
+-- A chain's card lit by a pin hovered, dim beside it, gold when it has the quest picked.
+function ZonePage.PaintCard(b)
+	local e = b.entry
+	if not e then
+		return
+	end
+	local lit = view.zp.lit
+	local mine = state.picked ~= nil and e.group.index[state.picked] ~= nil
+	if lit and lit[e.key] then
+		Edges(b, 1, 0.82, 0)
+		b.Glow:Show()
+		b:SetAlpha(1)
+	elseif lit then
+		Edges(b, 0.25, 0.25, 0.25)
+		b.Glow:Hide()
+		b:SetAlpha(Z.DIM)
+	else
+		if mine then
+			Edges(b, 1, 0.82, 0)
+		else
+			Edges(b, 0.3, 0.3, 0.3)
+		end
+		b.Glow:SetShown(mine)
+		b:SetAlpha(1)
+	end
+end
+
+-- Pins hovered: their chains' cards lit (set: chain keys; nil: none); none of them in sight: the
+-- list goes to the first.
+function ZonePage.LightCards(set)
+	local zp = view.zp
+	zp.lit = set and next(set) and set or nil
+	local list = zp.cards
+	local seen = false
+	for _, row in pairs(list.rows) do
+		if row.entry then
+			ZonePage.PaintCard(row)
+			seen = seen or (zp.lit ~= nil and zp.lit[row.entry.key] == true and list:InSight(row.index))
+		end
+	end
+	if zp.lit and not seen then
+		for i, e in ipairs(list.entries) do
+			if zp.lit[e.key] then
+				list:ScrollTo(i)
+				break
+			end
+		end
+	end
+end
+
+local function ChainCardEnter(self)
+	local e = self.entry
+	if not e then
+		return
+	end
+	view.zp.hot = e.key
+	Map.Light(view.zp.map, e.key)
+	local info = e.info
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(Chains.Name(e.group), 1, 0.82, 0)
+	if info.total > 0 then
+		GameTooltip:AddLine(L["%d of %d steps done"]:format(info.done, info.total), 1, 1, 1)
+	end
+	local nextText = Chains.NextText(e.group, info)
+	if nextText ~= "" then
+		GameTooltip:AddLine(nextText, 0.9, 0.9, 0.9, true)
+	end
+	if info.opens > 0 then
+		GameTooltip:AddLine(L["Doing it opens %d more of the chain"]:format(info.opens), 0.8, 0.8, 0.8, true)
+	end
+	if info.elsewhere > 0 then
+		GameTooltip:AddLine(L["%d steps elsewhere"]:format(info.elsewhere), 0.8, 0.8, 0.8)
+	end
+	for i, f in ipairs(Chains.Friends(e.group, info)) do
+		if i > 6 then
+			break
+		end
+		GameTooltip:AddLine(LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r  " .. L["%d of %d"]:format(f.done, info.total), 1, 1, 1)
+	end
+	GameTooltip:AddLine(L["Click: open the chain"], 0.5, 0.75, 1)
+	GameTooltip:Show()
+end
+
+local function ChainCardLeave(self)
+	local zp = view.zp
+	if self.entry and zp.hot == self.entry.key then
+		zp.hot = nil
+		Map.Light(zp.map, nil)
+	end
+	Untip(self)
+end
+
+function ZonePage.NewCard(parent, width)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(width, Z.CARD_H)
+	b.Bg = b:CreateTexture(nil, "BACKGROUND")
+	b.Bg:SetAllPoints()
+	b.Bg:SetColorTexture(0.07, 0.07, 0.07, 0.92)
+	b.Glow = b:CreateTexture(nil, "BACKGROUND", nil, -1)
+	b.Glow:SetPoint("TOPLEFT", -3, 3)
+	b.Glow:SetPoint("BOTTOMRIGHT", 3, -3)
+	b.Glow:SetColorTexture(1, 0.82, 0, 0.3)
+	b.Glow:Hide()
+	NewEdges(b)
+	b.Strip = b:CreateTexture(nil, "ARTWORK")
+	b.Strip:SetPoint("TOPLEFT", 1, -1)
+	b.Strip:SetPoint("BOTTOMLEFT", 1, 1)
+	b.Strip:SetWidth(4)
+	b.Dot = b:CreateTexture(nil, "ARTWORK")
+	b.Dot:SetTexture(T.circle)
+	b.Dot:SetSize(10, 10)
+	b.Dot:SetPoint("TOPLEFT", 12, -10)
+	b.Title = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	b.Title:SetPoint("TOPLEFT", 28, -8)
+	b.Title:SetPoint("RIGHT", -(Z.BAR + 20), 0)
+	b.Title:SetJustifyH("LEFT")
+	b.Title:SetWordWrap(false)
+	b.Count = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	b.Count:SetPoint("TOPRIGHT", -10, -8)
+	b.Count:SetJustifyH("RIGHT")
+	b.Check = b:CreateTexture(nil, "OVERLAY")
+	b.Check:SetSize(14, 14)
+	b.Check:SetPoint("RIGHT", b.Count, "LEFT", -3, 0)
+	Art(b.Check, "common-icon-checkmark", T.check)
+	b.BarBack = b:CreateTexture(nil, "ARTWORK")
+	b.BarBack:SetPoint("TOPRIGHT", -10, -24)
+	b.BarBack:SetSize(Z.BAR, 4)
+	b.BarBack:SetColorTexture(0, 0, 0, 0.7)
+	b.Bar = b:CreateTexture(nil, "ARTWORK", nil, 1)
+	b.Bar:SetPoint("TOPLEFT", b.BarBack, "TOPLEFT")
+	b.Bar:SetHeight(4)
+	b.Next = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	b.Next:SetPoint("TOPLEFT", 28, -28)
+	b.Next:SetPoint("RIGHT", -(Z.BAR + 20), 0)
+	b.Next:SetJustifyH("LEFT")
+	b.Next:SetWordWrap(false)
+	b.Meta = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	b.Meta:SetPoint("BOTTOMLEFT", 28, 8)
+	b.Meta:SetPoint("RIGHT", -(8 + SHOWN.dots * 10), 0)
+	b.Meta:SetJustifyH("LEFT")
+	b.Meta:SetWordWrap(false)
+	b.Dots = {}
+	for i = 1, SHOWN.dots do
+		local dot = b:CreateTexture(nil, "ARTWORK")
+		dot:SetTexture(T.circle)
+		dot:SetSize(8, 8)
+		dot:SetPoint("BOTTOMRIGHT", -10 - (i - 1) * 10, 10)
+		dot:Hide()
+		b.Dots[i] = dot
+	end
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:SetScript("OnEnter", ChainCardEnter)
+	b:SetScript("OnLeave", ChainCardLeave)
+	b:SetScript("OnClick", function(self)
+		if self.entry then
+			Untip(self)
+			ZonePage.OpenChain(self.entry.key)
+		end
+	end)
+	return b
+end
+
+-- A chain's card: the strip in what's to do in it, its colour (its thread's on the map), its name,
+-- "3/7" and a bar, what's next and who gives it, its levels, how many it opens, steps elsewhere,
+-- friends who've done some of it (a dot each in their class colour, dim: none yet).
+function ZonePage.FillCard(b, e)
+	local group, info = e.group, e.info
+	local c = TONE[info.status] or TONE.other
+	local color = Chains.Color(group)
+	local all = info.total > 0 and info.done == info.total
+	b.Strip:SetColorTexture(c[1], c[2], c[3], 1)
+	b.Dot:SetVertexColor(color[1], color[2], color[3], 1)
+	b.Title:SetText(Chains.Name(group))
+	if all then
+		b.Title:SetTextColor(0.65, 0.65, 0.65)
+	else
+		b.Title:SetTextColor(1, 0.82, 0)
+	end
+	b.Count:SetText(info.total > 0 and (info.done .. "/" .. info.total) or "")
+	b.Check:SetShown(all)
+	local fill = info.total > 0 and info.done / info.total or 0
+	b.Bar:SetWidth(math.max(1, Z.BAR * fill))
+	b.Bar:SetShown(fill > 0)
+	local bc = all and TONE.done or TONE.available
+	b.Bar:SetColorTexture(bc[1], bc[2], bc[3], 1)
+	b.Next:SetText((Chains.NextText(group, info)))
+	local meta = {}
+	meta[#meta + 1] = LevelSpan(info.low, info.high)
+	if info.opens > 0 then
+		meta[#meta + 1] = L["opens %d"]:format(info.opens)
+	end
+	if info.elsewhere > 0 then
+		meta[#meta + 1] = L["%d steps elsewhere"]:format(info.elsewhere)
+	end
+	b.Meta:SetText(table.concat(meta, " · "))
+	local friends = Chains.Friends(group, info)
+	for i, dot in ipairs(b.Dots) do
+		local f = friends[i]
+		if f then
+			local fc = RAID_CLASS_COLORS and f.classFile and RAID_CLASS_COLORS[f.classFile]
+			dot:SetVertexColor(fc and fc.r or 0.5, fc and fc.g or 0.75, fc and fc.b or 1, f.done > 0 and 1 or 0.35)
+			dot:Show()
+		else
+			dot:Hide()
+		end
+	end
+	ZonePage.PaintCard(b)
+end
+
+-- A chain's card clicked: its page, its next step in sight and pulsing once.
+function ZonePage.OpenChain(key)
+	local place = CurrentPlace()
+	local group = place and Structure(place).byKey[key]
+	if not group then
+		return
+	end
+	state.chain, state.path = key, nil
+	local _, nextId = Chains.NextText(group, Chains.Info(group, place))
+	state.pulse = nextId
+	Graph.Open(nextId)
+end
+
+-- A quest's state on the map has changed when one in my log got ready to turn in (QUEST_LOG_UPDATE):
+-- the zone's quests in my log and whether each is ready.
+function ZonePage.ReadyKey(place)
+	local parts = {}
+	for _, id in ipairs(place and Structure(place).ids or EMPTY) do
+		if StatusOf(id) == "active" then
+			parts[#parts + 1] = id .. (IsReady(id) and "+" or "-")
+		end
+	end
+	return table.concat(parts, ",")
 end
 
 ---------------------------------------------------------------------------
@@ -2085,7 +2976,82 @@ local function FillZoneRow(row, e)
 end
 
 ---------------------------------------------------------------------------
--- The middle: the tabs, the search's results
+-- Views other files add (Q.RegisterBrowserView): built the first time they're shown
+---------------------------------------------------------------------------
+
+local function Report(err)
+	local handler = geterrorhandler and geterrorhandler()
+	if handler then
+		handler(err)
+	end
+end
+
+-- A view's function, its errors reported (the error window) instead of breaking the big window.
+function Views.Call(fn, self)
+	if type(fn) == "function" then
+		local ok, err = pcall(fn, self)
+		if not ok then
+			Report(err)
+		end
+	end
+end
+
+-- Its holder (the area under the tab bar, the zones and the details beside it) and what build(holder)
+-- returns: { frame, Refresh, OnShow, OnHide } (a frame without points fills the holder).
+function Views.Build(v)
+	local holder = CreateFrame("Frame", nil, view.root)
+	holder:SetPoint("TOPLEFT", view.viewX, -view.viewY)
+	holder:SetSize(view.viewW, view.viewH)
+	holder:Hide()
+	v.holder = holder
+	local ok, built = pcall(v.build, holder)
+	if not ok then
+		Report(built)
+	end
+	if type(built) ~= "table" then
+		built = {}
+		if not ok then
+			local fs = holder:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+			fs:SetPoint("TOPLEFT", 12, -14)
+			fs:SetText(L["This view couldn't be built."])
+		end
+	end
+	if type(built.frame) ~= "table" then
+		built.frame = holder
+	elseif built.frame ~= holder and built.frame.GetNumPoints and built.frame:GetNumPoints() == 0 then
+		built.frame:SetAllPoints(holder)
+	end
+	v.built = built
+	state.viewsBuilt = (state.viewsBuilt or 0) + 1
+end
+
+-- A registered view shown (nil: none); the one shown before hidden (OnHide). Each time: Refresh.
+function Views.Show(v)
+	local current = registry.current
+	if current and current ~= v then
+		registry.current = nil
+		Views.Call(current.built.OnHide, current.built)
+		current.holder:Hide()
+	end
+	if not v then
+		return
+	end
+	if not v.built then
+		Views.Build(v)
+	end
+	if registry.current ~= v then
+		registry.current = v
+		v.holder:Show()
+		if v.built.frame.Show then
+			v.built.frame:Show()
+		end
+		Views.Call(v.built.OnShow, v.built)
+	end
+	Views.Call(v.built.Refresh, v.built)
+end
+
+---------------------------------------------------------------------------
+-- The middle: the tab bar, the head over the page, the pages
 ---------------------------------------------------------------------------
 
 local function Searching()
@@ -2100,39 +3066,194 @@ local function SearchEntries()
 	return entries
 end
 
-local function HeadText(place)
-	local done, total = CountOf(place)
-	local range = Range(place)
-	return GOLD .. place.name .. "|r" .. (range ~= "" and ("  " .. GREY .. L["Level %s"]:format(range) .. "|r") or "")
-		.. "   " .. L["%d of %d done"]:format(done, total)
-end
-
 local function Mode()
-	return Searching() and "results" or state.tab
+	if Searching() then
+		return "results"
+	end
+	return TabKnown(state.tab) and state.tab or "zone"
 end
 
-local function PaintTabs()
+-- The zone page, the overview, then each view registered.
+function Tabs.List()
+	local list = { { key = "zone", label = L["Zone"] }, { key = "overview", label = L["Overview"] } }
+	for _, v in ipairs(registry.order) do
+		list[#list + 1] = { key = v.key, label = v.label }
+	end
+	return list
+end
+
+function Tabs.Paint()
+	local mode = Mode()
 	for key, tab in pairs(view.tabs) do
-		local on = key == state.tab and not Searching()
+		local on = key == mode
 		tab.Line:SetShown(on)
 		tab.Back:SetColorTexture(1, 0.82, 0, on and 0.14 or 0.04)
 		tab.Text:SetTextColor(on and 1 or 0.75, on and 0.82 or 0.75, on and 0 or 0.75)
 	end
 end
 
--- keep: the chains stay where they're scrolled; focus: a quest to bring into sight.
+function Tabs.New(parent, key)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetHeight(TABS_H - 4)
+	b.key = key
+	b.Back = b:CreateTexture(nil, "BACKGROUND")
+	b.Back:SetAllPoints()
+	b.Line = b:CreateTexture(nil, "ARTWORK")
+	b.Line:SetPoint("BOTTOMLEFT")
+	b.Line:SetPoint("BOTTOMRIGHT")
+	b.Line:SetHeight(2)
+	b.Line:SetColorTexture(1, 0.82, 0, 1)
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	b.Text:SetPoint("CENTER", 0, 1)
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:SetScript("OnClick", function(self)
+		Tabs.Set(self.key)
+	end)
+	return b
+end
+
+-- The tab bar laid again (a view registered after the window was built gets its tab).
+function Tabs.Layout()
+	if not view then
+		return
+	end
+	local x, seen = 0, {}
+	for _, t in ipairs(Tabs.List()) do
+		local b = view.tabs[t.key]
+		if not b then
+			b = Tabs.New(view.tabBar, t.key)
+			view.tabs[t.key] = b
+		end
+		b.Text:SetText(t.label)
+		b:SetWidth(math.max(84, b.Text:GetStringWidth() + 28))
+		b:ClearAllPoints()
+		b:SetPoint("TOPLEFT", x, 0)
+		b:Show()
+		x = x + b:GetWidth() + 4
+		seen[t.key] = true
+	end
+	for key, b in pairs(view.tabs) do
+		if not seen[key] then
+			b:Hide()
+		end
+	end
+	Tabs.Paint()
+end
+
+-- The head over a page: (a way back,) the chain's colour, the title, a line under it, how far along.
+function Head.Set(back, color, title, sub, countText, done, total)
+	local h = view.head
+	local x = 0
+	h.Back:SetShown(back ~= nil)
+	if back then
+		h.Back.Text:SetText(back)
+		h.Back:SetWidth(h.Back.Text:GetStringWidth() + 24)
+		x = h.Back:GetWidth() + 8
+	end
+	h.Dot:SetShown(color ~= nil)
+	if color then
+		h.Dot:ClearAllPoints()
+		h.Dot:SetPoint("TOPLEFT", x, -7)
+		h.Dot:SetVertexColor(color[1], color[2], color[3], 1)
+		x = x + 16
+	end
+	h.Title:ClearAllPoints()
+	h.Title:SetPoint("TOPLEFT", x, -4)
+	h.Title:SetPoint("RIGHT", h, "RIGHT", -360, 0)
+	h.Title:SetText(title or "")
+	h.Sub:SetText(sub or "")
+	local bar = total and total > 0
+	h.Count:SetText(bar and countText or "")
+	h.BarBack:SetShown(bar == true)
+	local fill = bar and done / total or 0
+	h.Bar:SetShown(fill > 0)
+	h.Bar:SetWidth(math.max(1, 150 * fill))
+	local c = fill >= 1 and TONE.done or TONE.available
+	h.Bar:SetColorTexture(c[1], c[2], c[3], 1)
+end
+
+-- The way back to a locked quest picked in a chain (Q.Missing, across zones): its quests numbered,
+-- the zones of those not shown here.
+function Path.Update()
+	state.path = nil
+	local id = state.picked
+	local place = CurrentPlace()
+	local group = id and state.chain and place and Structure(place).byKey[state.chain]
+	if not (group and group.index[id] and Mode() == "zone") or StatusOf(id) ~= "locked" or not Q.Missing then
+		return
+	end
+	local miss = Q.Missing(id) or EMPTY
+	if not miss[1] then
+		return
+	end
+	local path = { target = id, on = { [id] = 0 }, order = {}, zones = {}, n = 0, elsewhere = 0 }
+	for _, m in ipairs(miss) do
+		if m.id and not path.order[m.id] then
+			path.n = path.n + 1
+			path.on[m.id], path.order[m.id] = path.n, path.n
+			local q = Quest(m.id)
+			local zone = q and ZoneOf(q)
+			if zone and not Structure(place).member[m.id] then -- (a quest given here isn't elsewhere)
+				path.zones[zone] = (path.zones[zone] or 0) + 1
+				path.elsewhere = path.elsewhere + 1
+			end
+		end
+	end
+	state.path = path
+end
+
+-- A chain's page: its head (back to the zone, how far along, what's next or what a locked quest
+-- needs first) and its cards.
+local function DrawChain(place, group, keep, focus)
+	Path.Update()
+	local info = Chains.Info(group, place)
+	local sub = (Chains.NextText(group, info))
+	local path = state.path
+	if path and path.elsewhere > 0 then
+		sub = HEX.level .. L["To take it, do %d quests first, %d of them in other zones"]:format(path.n, path.elsewhere) .. "|r"
+	elseif path then
+		sub = HEX.level .. L["To take it, do %d quests first"]:format(path.n) .. "|r"
+	end
+	Head.Set(place.name, Chains.Color(group), Chains.Name(group), sub, L["%d of %d steps done"]:format(info.done, info.total), info.done, info.total)
+	Graph.Draw(place, group, keep, focus)
+	view.ZoomText:SetText(("%d%%"):format(math.floor(view.g.zoom * 100 + 0.5)))
+	local lay = view.g.layout
+	if not (lay and lay.cards[1]) then
+		return lay and lay.hidden > 0 and L["Nothing to show with these filters."] or L["No quests known here yet."]
+	end
+end
+
+local function HeadZone(place, extra)
+	local done, total = CountOf(place)
+	local parts = { LevelSpan(place.minLevel, place.maxLevel) }
+	parts[#parts + 1] = extra
+	Head.Set(nil, nil, place.name, GREY .. table.concat(parts, " · ") .. "|r", L["%d of %d done"]:format(done, total), done, total)
+end
+
+-- keep: the page stays where it's scrolled; focus: a quest to bring into sight.
 local function DrawMiddle(keep, focus)
 	state.draws = state.draws + 1
 	local mode = Mode()
-	view.g.frame:SetShown(mode == "chains")
-	view.mapPane:SetShown(mode == "map")
-	view.list.scroll:SetShown(mode == "results" or mode == "overview")
-	view.Zoom:SetShown(mode == "chains" or mode == "map")
-	view.Back:SetShown(state.query ~= "" and state.drilled)
-	PaintTabs()
 	local place = CurrentPlace()
-	local message, head
-	if mode == "results" then
+	local v = registry.byKey[mode]
+	local group = mode == "zone" and state.chain and place and Structure(place).byKey[state.chain] or nil
+	if not group then
+		state.chain = nil
+	end
+	view.zp:SetShown(mode == "zone" and group == nil)
+	view.g.frame:SetShown(group ~= nil)
+	view.list.scroll:SetShown(mode == "results" or mode == "overview")
+	view.Back:SetShown(state.query ~= "" and state.drilled)
+	view.head:SetShown(v == nil)
+	view.Legend:SetShown(v == nil)
+	view.Zoom:SetShown(mode == "zone" and (group ~= nil or (place ~= nil and place.kind == "zone")))
+	Views.Show(v)
+	Tabs.Paint()
+	local message
+	if v then
+		message = nil
+	elseif mode == "results" then
+		Head.Set(nil, nil, L["Search results"], state.results and GREY .. L["%d quests"]:format(#state.results) .. "|r" or "")
 		if #state.query < 2 and not tonumber(state.query) then
 			view.list:SetEntries({}, 0)
 			message = L["Type at least two letters."]
@@ -2140,39 +3261,43 @@ local function DrawMiddle(keep, focus)
 			view.list:SetEntries(SearchEntries(), keep and true or 0)
 			message = not state.results[1] and L["Nothing found"] or nil
 		end
-		head = GOLD .. L["Search results"] .. "|r"
+	elseif group then
+		message = DrawChain(place, group, keep, focus)
+	elseif mode == "zone" then
+		if place then
+			local n, chains = ZonePage.Draw(place, keep)
+			HeadZone(place, L["%d to pick up now"]:format(n.available or 0) .. " · " .. L["%d chains"]:format(chains))
+		else
+			ZonePage.Draw(nil)
+			Head.Set(nil, nil, "", "")
+		end
+		view.ZoomText:SetText(("%d%%"):format(math.floor(view.zp.map.zoom * 100 + 0.5)))
 	else
-		head = place and HeadText(place) or ""
-		if mode == "chains" then
-			Graph.Draw(place, keep, focus)
-			local lay = view.g.layout
-			if place and not (lay and lay.cards[1]) then
-				message = (lay and lay.hidden > 0) and L["Nothing to show with these filters."] or L["No quests known here yet."]
-			end
-			view.ZoomText:SetText(("%d%%"):format(math.floor(view.g.zoom * 100 + 0.5)))
-		elseif mode == "overview" then
-			local entries = place and Overview.Entries(place) or {}
-			local offset = keep and true or 0
-			if focus then
-				for i, e in ipairs(entries) do
-					if e.quest == focus then
-						offset = view.list:Centered(i)
-						break
-					end
+		if place then
+			HeadZone(place)
+		end
+		local entries = place and Overview.Entries(place) or {}
+		local offset = keep and true or 0
+		if focus then
+			for i, e in ipairs(entries) do
+				if e.quest == focus then
+					offset = view.list:Centered(i)
+					break
 				end
 			end
-			view.list:SetEntries(entries, offset)
-			if place and not entries[1] then
-				message = L["Nothing to show with these filters."]
-			end
-		else
-			Map.Draw(place)
-			view.ZoomText:SetText(("%d%%"):format(math.floor(view.mapPane.map.zoom * 100 + 0.5)))
+		end
+		view.list:SetEntries(entries, offset)
+		if place and not entries[1] then
+			message = L["Nothing to show with these filters."]
 		end
 	end
-	view.Head:SetText(head)
+	view.Legend:SetText(group and view.legends.chain or view.legends.status)
 	view.Message:SetText(message or "")
 	view.Message:SetShown(message ~= nil)
+end
+
+function Graph.Open(focus)
+	DrawMiddle(false, focus)
 end
 
 local function FillListRow(row, e)
@@ -2644,6 +3769,7 @@ local function FillDetails(top)
 	end
 end
 
+
 ---------------------------------------------------------------------------
 -- Choosing
 ---------------------------------------------------------------------------
@@ -2657,13 +3783,20 @@ local function Pick(id, user)
 	local changed = id ~= state.picked
 	state.picked = id
 	if view.g.frame:IsShown() then
-		Graph.Refill()
+		local before = state.path
+		Path.Update()
+		if before or state.path then
+			DrawChain(CurrentPlace(), view.g.layout.group, true) -- (the way back lit, the head says what it needs)
+		else
+			Graph.Refill()
+		end
 	end
 	if view.list.scroll:IsShown() then
 		view.list:Lay()
 	end
-	if view.mapPane:IsShown() then
-		Map.Repaint(view.mapPane.map)
+	if view.zp:IsShown() then
+		Map.Repaint(view.zp.map)
+		view.zp.cards:Lay()
 	end
 	FillDetails(changed)
 	if user and Q.ShowQuest and SmallOpen() then
@@ -2675,11 +3808,17 @@ function Graph.Pick(id)
 	Pick(id, true)
 end
 
+-- A place on the left: its zone page (or its overview), the search staying.
 local function SelectPlace(id)
 	if state.query ~= "" then
 		state.drilled = true
 	end
 	state.where = id
+	state.chain, state.path = nil, nil
+	if state.tab ~= "zone" and state.tab ~= "overview" then
+		state.tab = "zone"
+		Save()
+	end
 	view.zones:Lay()
 	DrawMiddle(false)
 	if view.d.Body:IsShown() then
@@ -2687,7 +3826,8 @@ local function SelectPlace(id)
 	end
 end
 
--- A quest anywhere: its zone (or dungeon) on the left, its chain open and in sight, the details.
+-- A quest anywhere: its zone (or dungeon) on the left, its chain opened with its card in sight (the
+-- overview stays the overview), the details.
 local function Open(id, user)
 	local q = Quest(id)
 	if not q then
@@ -2703,24 +3843,27 @@ local function Open(id, user)
 		state.where = target
 		local place = state.places[target]
 		state.folded[place.kind == "zone" and ("c:" .. tostring(place.continent)) or "c:dungeons"] = nil
-		local group = Structure(place).groupOf[id]
-		if group and state.folded[group.key] then
-			state.folded[group.key] = nil
-			state.layouts[target] = nil
-		end
 	end
-	state.picked = nil
+	if state.tab ~= "overview" then
+		state.tab = "zone"
+		local place = CurrentPlace()
+		local group = place and Structure(place).groupOf[id]
+		state.chain = group and group.key or nil
+		Save()
+	end
+	state.picked, state.path = nil, nil
 	if moved then
 		DrawZones(true, target)
 	else
 		view.zones:Lay()
 	end
-	if state.tab == "map" then
-		state.tab = "chains" -- (a quest is found in its chain)
-		Save()
-	end
 	DrawMiddle(not moved, id)
 	Pick(id, user)
+end
+
+-- A stub clicked: that step in its own zone.
+function Graph.Jump(id)
+	Open(id, true)
 end
 
 local function BackToResults()
@@ -2728,9 +3871,18 @@ local function BackToResults()
 	DrawMiddle(false)
 end
 
-local function SetTab(tab)
+-- From a chain back to its zone's page.
+local function BackToZone()
+	state.chain, state.path = nil, nil
+	DrawMiddle(true)
+end
+
+function Tabs.Set(tab)
 	if state.query ~= "" and not state.drilled then
 		state.drilled = true -- (a tab clicked during a search: the place, the search stays)
+	end
+	if tab == "zone" and state.tab == "zone" then
+		state.chain, state.path = nil, nil -- (the zone's tab again: its page)
 	end
 	state.tab = tab
 	Save()
@@ -2740,7 +3892,7 @@ end
 local function SetFilter(key, on)
 	filters[key] = on
 	Save()
-	wipe(state.layouts)
+	Restatus()
 	view.filters[key].Tick:SetShown(on)
 	DrawMiddle(true)
 end
@@ -2812,12 +3964,23 @@ local function RunDue(self)
 		DrawAll()
 	end
 	if state.statusOld and now >= state.nextRefresh then
-		state.statusOld = false
+		state.statusOld, state.readyAt = false, nil
 		state.nextRefresh = now + REFRESH_GAP
-		wipe(state.layouts) -- (statuses changed: what the filters show, the lines' colours)
+		Restatus() -- (statuses changed: what the filters show, the lines' colours, the pins)
 		view.zones:Lay()
 		DrawMiddle(true)
 		FillDetails()
+	end
+	if state.readyAt and now >= state.readyAt then
+		state.readyAt = nil
+		-- (objectives done: a "?" may turn yellow; only the zone's pins are drawn again, and only then)
+		local place = CurrentPlace()
+		local key = view.zp:IsShown() and ZonePage.ReadyKey(place) or nil
+		if key and key ~= state.ready then
+			state.ready = key
+			state.spots[place.id] = nil
+			ZonePage.DrawMap(place)
+		end
 	end
 	if state.namesAt and now >= state.namesAt then
 		state.namesAt = nil
@@ -2827,9 +3990,12 @@ local function RunDue(self)
 		if view.list.scroll:IsShown() then
 			view.list:Lay()
 		end
+		if view.zp:IsShown() then
+			view.zp.cards:Lay()
+		end
 		FillDetails()
 	end
-	if not (state.searchAt or state.statusOld or state.namesAt) then
+	if not (state.searchAt or state.statusOld or state.namesAt or state.readyAt) then
 		self:SetScript("OnUpdate", nil)
 	end
 end
@@ -2851,7 +4017,7 @@ local function ForgetCounts(id)
 	state.counts["d:" .. tostring(q.dungeon)] = nil
 end
 
-local EVENTS = { "QUEST_TURNED_IN", "QUEST_ACCEPTED", "QUEST_REMOVED", "PLAYER_LEVEL_UP", "QUEST_DATA_LOAD_RESULT" }
+local EVENTS = { "QUEST_TURNED_IN", "QUEST_ACCEPTED", "QUEST_REMOVED", "PLAYER_LEVEL_UP", "QUEST_DATA_LOAD_RESULT", "QUEST_LOG_UPDATE" }
 
 local function OnEvent(_, event, id)
 	if event == "QUEST_DATA_LOAD_RESULT" then
@@ -2860,6 +4026,11 @@ local function OnEvent(_, event, id)
 		end
 		state.waiting[id] = nil
 		state.namesAt = state.namesAt or GetTime() + NAMES_GAP
+	elseif event == "QUEST_LOG_UPDATE" then
+		if state.readyAt or not view.zp:IsShown() then
+			return -- (often, and only the zone page's pins can change: looked at once a second at most)
+		end
+		state.readyAt = GetTime() + READY_GAP
 	else
 		if event == "QUEST_TURNED_IN" then
 			ForgetCounts(id)
@@ -2883,7 +4054,7 @@ end
 -- The frames
 ---------------------------------------------------------------------------
 
-local function NewRowBase(parent, width)
+function Make.NewRowBase(parent, width)
 	local row = CreateFrame("Button", nil, parent)
 	row:SetSize(width, ROW_H)
 	row:SetHighlightTexture(T.highlight, "ADD")
@@ -2903,8 +4074,8 @@ local function NewRowBase(parent, width)
 	return row
 end
 
-local function NewZoneRow(parent, width)
-	local row = NewRowBase(parent, width)
+function Make.NewZoneRow(parent, width)
+	local row = Make.NewRowBase(parent, width)
 	row.Name:SetPoint("LEFT", 20, 1)
 	row.Name:SetPoint("RIGHT", -106, 1)
 	row.Count = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -2937,15 +4108,15 @@ local function NewZoneRow(parent, width)
 	return row
 end
 
-local function ListTip(self)
+function Make.ListTip(self)
 	local e = self.entry
 	if e and e.quest then
 		QuestTip(self, e.quest)
 	end
 end
 
-local function NewListRow(parent, width)
-	local row = NewRowBase(parent, width)
+function Make.NewListRow(parent, width)
+	local row = Make.NewRowBase(parent, width)
 	row.Icon = row:CreateTexture(nil, "ARTWORK")
 	row.Icon:SetSize(16, 16)
 	row.Icon:SetPoint("LEFT", 4, 0)
@@ -2954,7 +4125,7 @@ local function NewListRow(parent, width)
 	row.Right:SetWidth(160)
 	row.Right:SetJustifyH("RIGHT")
 	row.Right:SetWordWrap(false)
-	row:SetScript("OnEnter", ListTip)
+	row:SetScript("OnEnter", Make.ListTip)
 	row:SetScript("OnLeave", Untip)
 	row:SetScript("OnClick", function(self)
 		local e = self.entry
@@ -2974,7 +4145,7 @@ local function NewListRow(parent, width)
 	return row
 end
 
-local function NewLink(parent, width)
+function Make.NewLink(parent, width)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(width, LINK_H)
 	b:SetHighlightTexture(T.highlight, "ADD")
@@ -2990,7 +4161,7 @@ local function NewLink(parent, width)
 	return b
 end
 
-local function PlaceTip(self)
+function Make.PlaceTip(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 	GameTooltip:SetText(self.name or self.Text:GetText() or "", 1, 1, 1)
 	if self.point then
@@ -3000,24 +4171,30 @@ local function PlaceTip(self)
 	GameTooltip:Show()
 end
 
-local function NewHead(parent, width)
-	local h = CreateFrame("Frame", nil, parent)
-	h:SetSize(width, 18)
-	h.Text = h:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	h.Text:SetPoint("TOPLEFT")
-	local line = h:CreateTexture(nil, "ARTWORK")
+-- A gold divider (Blizzard's when the client has it).
+function Make.NewDivider(parent)
+	local line = parent:CreateTexture(nil, "ARTWORK")
 	Art(line, "Options_HorizontalDivider", T.flat)
 	if not atlasKnown.Options_HorizontalDivider then
 		line:SetVertexColor(1, 0.82, 0, 0.25)
 	end
+	line:SetHeight(1)
+	return line
+end
+
+function Make.NewHead(parent, width)
+	local h = CreateFrame("Frame", nil, parent)
+	h:SetSize(width, 18)
+	h.Text = h:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	h.Text:SetPoint("TOPLEFT")
+	local line = Make.NewDivider(h)
 	line:SetPoint("BOTTOMLEFT", 0, 1)
 	line:SetPoint("BOTTOMRIGHT", 0, 1)
-	line:SetHeight(1)
 	h:Hide()
 	return h
 end
 
-local function BuildDetails(root, x, y, width, height)
+function Make.BuildDetails(root, x, y, width, height)
 	local d = { links = {}, places = {} }
 	view.d = d
 	local panel = CreateFrame("Frame", nil, root)
@@ -3049,14 +4226,14 @@ local function BuildDetails(root, x, y, width, height)
 	d.Req = Text("GameFontHighlightSmall")
 	d.NeedsMore, d.LeadsMore = Text("GameFontHighlightSmall"), Text("GameFontHighlightSmall")
 	d.Friends = Text("GameFontHighlightSmall")
-	d.StartsHead, d.EndsHead = NewHead(d.Body, bodyW - 4), NewHead(d.Body, bodyW - 4)
-	d.ReqHead, d.NeedsHead = NewHead(d.Body, bodyW - 4), NewHead(d.Body, bodyW - 4)
-	d.LeadsHead, d.FriendsHead = NewHead(d.Body, bodyW - 4), NewHead(d.Body, bodyW - 4)
+	d.StartsHead, d.EndsHead = Make.NewHead(d.Body, bodyW - 4), Make.NewHead(d.Body, bodyW - 4)
+	d.ReqHead, d.NeedsHead = Make.NewHead(d.Body, bodyW - 4), Make.NewHead(d.Body, bodyW - 4)
+	d.LeadsHead, d.FriendsHead = Make.NewHead(d.Body, bodyW - 4), Make.NewHead(d.Body, bodyW - 4)
 	d.map = Map.New(d.Body, bodyW - 4, math.floor((bodyW - 4) * 2 / 3), false)
 	function d.Link(i)
 		local b = d.links[i]
 		if not b then
-			b = NewLink(d.Body, bodyW - 4)
+			b = Make.NewLink(d.Body, bodyW - 4)
 			b:SetScript("OnEnter", function(self) QuestTip(self, self.quest) end)
 			b:SetScript("OnLeave", Untip)
 			b:SetScript("OnClick", function(self)
@@ -3072,8 +4249,8 @@ local function BuildDetails(root, x, y, width, height)
 	function d.Place(i)
 		local b = d.places[i]
 		if not b then
-			b = NewLink(d.Body, bodyW - 4)
-			b:SetScript("OnEnter", PlaceTip)
+			b = Make.NewLink(d.Body, bodyW - 4)
+			b:SetScript("OnEnter", Make.PlaceTip)
 			b:SetScript("OnLeave", Untip)
 			b:SetScript("OnClick", function(self)
 				if self.point then
@@ -3094,7 +4271,7 @@ local function BuildDetails(root, x, y, width, height)
 	d.Body:Hide()
 end
 
-local function OnSearchTyped(box)
+function Make.OnSearchTyped(box)
 	local text = strtrim(box:GetText() or "")
 	view.Clear:SetShown(text ~= "")
 	if text == "" then
@@ -3108,7 +4285,7 @@ local function OnSearchTyped(box)
 end
 
 -- A checkbox of ours (a Button: the controller reaches it; no Blizzard template).
-local function NewFilter(parent, key, label, tip)
+function Make.NewFilter(parent, key, label, tip)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(24, 24)
 	b.Box = b:CreateTexture(nil, "ARTWORK")
@@ -3137,7 +4314,7 @@ local function NewFilter(parent, key, label, tip)
 	return b
 end
 
-local function BuildTop()
+function Make.BuildTop()
 	local label = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	label:SetPoint("TOPLEFT", 16, -37)
 	label:SetText(L["Search all zones:"])
@@ -3165,17 +4342,17 @@ local function BuildTop()
 	view.Clear:SetScript("OnClick", function()
 		box:SetText("")
 		box:ClearFocus()
-		OnSearchTyped(box)
+		Make.OnSearchTyped(box)
 	end)
 	view.Clear:Hide()
-	box:SetScript("OnTextChanged", OnSearchTyped)
+	box:SetScript("OnTextChanged", Make.OnSearchTyped)
 	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 	-- The filters, on the right.
 	view.filters = {
-		hideDone = NewFilter(frame, "hideDone", L["Hide done"], L["Quests you've done aren't shown (a chain's line passes through them)."]),
-		onlyAvailable = NewFilter(frame, "onlyAvailable", L["Only available now"], L["Only the quests you can take right now."]),
-		showOther = NewFilter(frame, "showOther", L["Show quests not for you"], L["Also the quests for another race, class or faction (dimmed)."]),
+		hideDone = Make.NewFilter(frame, "hideDone", L["Hide done"], L["Quests you've done aren't shown (a chain's line passes through them)."]),
+		onlyAvailable = Make.NewFilter(frame, "onlyAvailable", L["Only available now"], L["Only the quests you can take right now."]),
+		showOther = Make.NewFilter(frame, "showOther", L["Show quests not for you"], L["Also the quests for another race, class or faction (dimmed)."]),
 	}
 	local x = -16
 	for _, key in ipairs({ "showOther", "onlyAvailable", "hideDone" }) do
@@ -3186,35 +4363,17 @@ local function BuildTop()
 	view.Search = { label, box, view.filters.hideDone, view.filters.onlyAvailable, view.filters.showOther }
 end
 
-local function NewTab(parent, key, label, x)
-	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(96, TABS_H - 4)
-	b:SetPoint("TOPLEFT", x, 0)
-	b.Back = b:CreateTexture(nil, "BACKGROUND")
-	b.Back:SetAllPoints()
-	b.Line = b:CreateTexture(nil, "ARTWORK")
-	b.Line:SetPoint("BOTTOMLEFT")
-	b.Line:SetPoint("BOTTOMRIGHT")
-	b.Line:SetHeight(2)
-	b.Line:SetColorTexture(1, 0.82, 0, 1)
-	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.Text:SetPoint("CENTER", 0, 1)
-	b.Text:SetText(label)
-	b:SetHighlightTexture(T.highlight, "ADD")
-	b:SetScript("OnClick", function()
-		SetTab(key)
-	end)
-	return b
-end
-
--- -, the zoom, +, Fit: the chains' zoom, or the map's.
-local function BuildZoom(parent)
+-- -, the zoom, +, Fit: a chain's zoom, or the zone map's.
+function Make.BuildZoom(parent)
 	local z = CreateFrame("Frame", nil, parent)
-	z:SetSize(170, TABS_H - 4)
+	z:SetSize(170, 24)
 	view.Zoom = z
+	local function OnMap()
+		return view.zp:IsShown()
+	end
 	local function Step(dir)
-		if state.tab == "map" then
-			local m = view.mapPane.map
+		if OnMap() then
+			local m = view.zp.map
 			Map.SetZoom(m, m.zoom * (dir > 0 and G.MAP_STEP or 1 / G.MAP_STEP))
 			view.ZoomText:SetText(("%d%%"):format(math.floor(m.zoom * 100 + 0.5)))
 		else
@@ -3229,8 +4388,8 @@ local function BuildZoom(parent)
 	local plus = LT.Window.AddButton(z, "+", function() Step(1) end, { "LEFT", view.ZoomText, "RIGHT", 4, 0 })
 	plus:SetSize(26, 22)
 	local fit = LT.Window.AddButton(z, L["Fit"], function()
-		if state.tab == "map" then
-			Map.SetZoom(view.mapPane.map, 1)
+		if OnMap() then
+			Map.SetZoom(view.zp.map, 1)
 			view.ZoomText:SetText("100%")
 		else
 			Graph.Fit()
@@ -3240,11 +4399,10 @@ local function BuildZoom(parent)
 	view.ZoomButtons = { minus = minus, plus = plus, fit = fit }
 end
 
--- The chains' viewport: our own scrolling (wheel up and down, Shift: sideways, Ctrl: zoom; dragging
+-- A chain's viewport: our own scrolling (wheel up and down, Shift: sideways, Ctrl: zoom; dragging
 -- moves it), a frame that clips the canvas.
-local function BuildGraph(parent, x, y, w, h)
-	local g = { w = w, h = h, sx = 0, sy = 0, zoom = 1, cards = {}, freeCards = {}, banners = {}, freeBanners = {}, lines = {},
-		pills = {}, made = 0, lays = 0, linesShown = 0 }
+function Make.BuildGraph(parent, x, y, w, h)
+	local g = { w = w, h = h, sx = 0, sy = 0, zoom = 1, cards = {}, freeCards = {}, lines = {}, pills = {}, made = 0, lays = 0, linesShown = 0 }
 	view.g = g
 	local f = CreateFrame("Frame", nil, parent)
 	f:SetPoint("TOPLEFT", x, -y)
@@ -3293,76 +4451,162 @@ local function BuildGraph(parent, x, y, w, h)
 	g.VThumb:SetWidth(4)
 	g.VThumb:SetColorTexture(1, 0.82, 0, 0.45)
 	g.VThumb:Hide()
+	f:Hide()
 end
 
-local function BuildMapPane(parent, x, y, w, h)
-	local mp = CreateFrame("Frame", nil, parent)
-	mp:SetPoint("TOPLEFT", x, -y)
-	mp:SetSize(w, h)
-	view.mapPane = mp
-	mp.map = Map.New(mp, w, h - 22, true)
-	mp.map.frame:SetPoint("TOPLEFT")
-	mp.map.onClick = function(id)
+-- The legend under the map: what the pins mean.
+function Make.MapLegend()
+	local parts = {
+		Icon("QuestNormal", T.available, 16) .. " " .. L["to pick up"],
+		Icon("TrivialQuests", T.available, 16) .. " " .. L["low level"],
+		Icon("QuestDaily", T.daily, 16) .. " " .. L["repeatable"],
+		"|cff999999!|r " .. L["later"],
+		Icon("QuestTurnin", T.turnin, 16) .. " " .. L["ready to turn in"],
+		"|cff999999?|r " .. L["in progress"],
+		"|cffffd200o|r " .. L["item drops"],
+		HEX.done .. "o|r " .. L["done"],
+	}
+	return table.concat(parts, "   ", 1, 4) .. "\n" .. table.concat(parts, "   ", 5, 8)
+end
+
+-- The zone page: the map on the left with what's here under it, the chains' cards on the right.
+function Make.BuildZonePage(parent, x, y, w, h)
+	local zp = CreateFrame("Frame", nil, parent)
+	zp:SetPoint("TOPLEFT", x, -y)
+	zp:SetSize(w, h)
+	view.zp = zp
+	zp.map = Map.New(zp, Z.MAP_W, Z.MAP_H, true)
+	zp.map.frame:SetPoint("TOPLEFT")
+	zp.map.onClick = function(id)
 		Pick(id, true)
 	end
-	mp.map.onZoom = function(zoom)
+	zp.map.onZoom = function(zoom)
 		view.ZoomText:SetText(("%d%%"):format(math.floor(zoom * 100 + 0.5)))
 	end
-	mp.Note = mp:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	mp.Note:SetPoint("BOTTOMLEFT", 4, 4)
-	mp.Note:SetPoint("BOTTOMRIGHT", -4, 4)
-	mp.Note:SetJustifyH("LEFT")
-	mp:Hide()
-end
-
--- The legend under the middle: the statuses' colours, and what the map's markers mean.
-local function BuildLegend(parent, x, y, w)
-	local parts = {}
-	for _, status in ipairs({ "done", "active", "available", "locked", "level", "other" }) do
-		parts[#parts + 1] = HEX[status] .. "|T" .. T.flat .. ":10:10|t " .. Word(status) .. "|r"
+	zp.map.onEnter = function(marker)
+		ZonePage.LightCards(marker.chains)
 	end
-	view.Legend = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	view.Legend:SetPoint("TOPLEFT", x + 4, -y)
-	view.Legend:SetWidth(w - 8)
-	view.Legend:SetJustifyH("LEFT")
-	view.Legend:SetWordWrap(false)
-	view.Legend:SetText(table.concat(parts, "   "))
+	zp.map.onLeave = function()
+		ZonePage.LightCards(nil)
+	end
+	zp.Note = zp:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	zp.Note:SetPoint("TOPLEFT", 8, -8)
+	zp.Note:SetWidth(Z.MAP_W - 16)
+	zp.Note:SetJustifyH("LEFT")
+	zp.Note:Hide()
+	local below = Z.MAP_H + 16
+	zp.Counts = zp:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	zp.Counts:SetPoint("TOPLEFT", 4, -below)
+	zp.Counts:SetWidth(Z.MAP_W - 8)
+	zp.Counts:SetJustifyH("LEFT")
+	zp.Guide = zp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	zp.Guide:SetPoint("TOPLEFT", 4, -(below + 24))
+	zp.Guide:SetWidth(Z.MAP_W - 8)
+	zp.Guide:SetJustifyH("LEFT")
+	zp.Guide:Hide()
+	zp.Suggest = CreateFrame("Button", nil, zp)
+	zp.Suggest:SetSize(200, 22)
+	zp.Suggest:SetPoint("TOPLEFT", 0, -(below + 44))
+	zp.Suggest.Back = zp.Suggest:CreateTexture(nil, "BACKGROUND")
+	zp.Suggest.Back:SetAllPoints()
+	zp.Suggest.Back:SetColorTexture(1, 0.82, 0, 0.1)
+	zp.Suggest.Text = zp.Suggest:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	zp.Suggest.Text:SetPoint("LEFT", 6, 0)
+	zp.Suggest:SetHighlightTexture(T.highlight, "ADD")
+	zp.Suggest:SetScript("OnClick", function(self)
+		if self.map then
+			Q.SelectZone(self.map)
+		end
+	end)
+	zp.Suggest:Hide()
+	local rule = Make.NewDivider(zp)
+	rule:SetPoint("TOPLEFT", 0, -(below + 80))
+	rule:SetWidth(Z.MAP_W)
+	zp.Legend = zp:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	zp.Legend:SetPoint("TOPLEFT", 4, -(below + 90))
+	zp.Legend:SetWidth(Z.MAP_W - 8)
+	zp.Legend:SetJustifyH("LEFT")
+	zp.Legend:SetSpacing(6)
+	zp.Legend:SetText(Make.MapLegend())
+	-- The cards' column: a darker panel, the cards (a pooled list).
+	local cx = Z.MAP_W + GAP
+	local cw = w - cx
+	local panel = zp:CreateTexture(nil, "BACKGROUND")
+	panel:SetPoint("TOPLEFT", cx, 0)
+	panel:SetSize(cw, h)
+	panel:SetColorTexture(0, 0, 0, 0.25)
+	zp.cards = NewList(zp, cx + 4, 4, cw - BAR_W - 4, h - 8, ZonePage.NewCard, ZonePage.FillCard, Z.CARD_H + Z.CARD_GAP)
+	zp.Empty = zp:CreateFontString(nil, "OVERLAY", "GameFontDisable")
+	zp.Empty:SetPoint("TOPLEFT", cx + 12, -14)
+	zp.Empty:SetWidth(cw - 24)
+	zp.Empty:SetJustifyH("LEFT")
+	zp.Empty:Hide()
+	zp:Hide()
 end
 
-local function Build()
-	frame = LT.Window.Create("LefthyToolsQuesttreeBrowser", "Questtree", WIDTH, HEIGHT)
-	view = {}
-	LoadSaved()
-	local width, height = WIDTH - INSET_W, HEIGHT - INSET_H
-	local root = CreateFrame("Frame", nil, frame.Inset)
-	root:SetPoint("TOPLEFT")
-	root:SetSize(width, height)
-	view.root = root
-	BuildTop()
-	local paneH = height - 2 * PAD
-	view.zones = NewList(root, PAD, PAD, ZONES_W - BAR_W, paneH, NewZoneRow, FillZoneRow)
-	local middleX = PAD + ZONES_W + GAP
-	local detailX = width - PAD - EDGE - DETAILS_W
-	local middleW = detailX - GAP - middleX
-	view.Head = root:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	view.Head:SetPoint("TOPLEFT", middleX + 4, -PAD - 5)
-	view.Head:SetWidth(middleW - 8)
-	view.Head:SetJustifyH("LEFT")
-	view.Head:SetWordWrap(false)
-	-- Tabs, the way back to the results, the zoom.
-	local tabs = CreateFrame("Frame", nil, root)
-	tabs:SetPoint("TOPLEFT", middleX, -PAD - HEAD_H)
-	tabs:SetSize(middleW, TABS_H)
-	view.tabs = {
-		chains = NewTab(tabs, "chains", L["Chains"], 0),
-		overview = NewTab(tabs, "overview", L["Overview"], 100),
-		map = NewTab(tabs, "map", L["Map"], 200),
-	}
-	BuildZoom(tabs)
-	view.Zoom:SetPoint("TOPRIGHT", tabs, "TOPRIGHT", 0, 0)
-	view.Back = CreateFrame("Button", nil, tabs)
+-- The head over a page: a way back (a chain's page), the title, a line under it, how far along with
+-- a bar; the zoom at its right.
+function Make.BuildHead(root, x, y, w)
+	local h = CreateFrame("Frame", nil, root)
+	h:SetPoint("TOPLEFT", x, -y)
+	h:SetSize(w, HEAD_H)
+	view.head = h
+	h.Back = CreateFrame("Button", nil, h)
+	h.Back:SetSize(120, 22)
+	h.Back:SetPoint("TOPLEFT", 0, -1)
+	h.Back.Icon = h.Back:CreateTexture(nil, "ARTWORK")
+	h.Back.Icon:SetTexture(T.back)
+	h.Back.Icon:SetSize(18, 18)
+	h.Back.Icon:SetPoint("LEFT")
+	h.Back.Text = h.Back:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	h.Back.Text:SetPoint("LEFT", 20, 0)
+	h.Back:SetHighlightTexture(T.highlight, "ADD")
+	h.Back:SetScript("OnClick", BackToZone)
+	h.Back:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:SetText(L["Back to the zone's map and chains"], 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	h.Back:SetScript("OnLeave", Untip)
+	h.Back:Hide()
+	h.Dot = h:CreateTexture(nil, "ARTWORK")
+	h.Dot:SetTexture(T.circle)
+	h.Dot:SetSize(10, 10)
+	h.Dot:Hide()
+	h.Title = h:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+	h.Title:SetJustifyH("LEFT")
+	h.Title:SetWordWrap(false)
+	h.Sub = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	h.Sub:SetPoint("TOPLEFT", 0, -26)
+	h.Sub:SetPoint("RIGHT", h, "RIGHT", -346, 0) -- (left of the bar)
+	h.Sub:SetJustifyH("LEFT")
+	h.Sub:SetWordWrap(false)
+	h.Count = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	h.Count:SetPoint("TOPRIGHT", -186, -6)
+	h.Count:SetJustifyH("RIGHT")
+	h.BarBack = h:CreateTexture(nil, "ARTWORK")
+	h.BarBack:SetPoint("TOPRIGHT", -186, -22)
+	h.BarBack:SetSize(150, 5)
+	h.BarBack:SetColorTexture(0, 0, 0, 0.6)
+	h.Bar = h:CreateTexture(nil, "ARTWORK", nil, 1)
+	h.Bar:SetPoint("TOPLEFT", h.BarBack, "TOPLEFT")
+	h.Bar:SetHeight(5)
+	local rule = Make.NewDivider(h)
+	rule:SetPoint("BOTTOMLEFT", 0, 2)
+	rule:SetPoint("BOTTOMRIGHT", 0, 2)
+	Make.BuildZoom(h)
+	view.Zoom:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, -6)
+end
+
+-- The tab bar (the zone page, the overview, the views registered) and the way back to the results.
+function Make.BuildTabs(root, x, y, w)
+	local bar = CreateFrame("Frame", nil, root)
+	bar:SetPoint("TOPLEFT", x, -y)
+	bar:SetSize(w, TABS_H)
+	view.tabBar, view.tabs = bar, {}
+	view.Back = CreateFrame("Button", nil, bar)
 	view.Back:SetSize(190, TABS_H - 4)
-	view.Back:SetPoint("TOPLEFT", 306, 0)
+	view.Back:SetPoint("TOPRIGHT", 0, 0)
 	view.Back.Icon = view.Back:CreateTexture(nil, "ARTWORK")
 	view.Back.Icon:SetTexture(T.back)
 	view.Back.Icon:SetSize(18, 18)
@@ -3373,13 +4617,66 @@ local function Build()
 	view.Back:SetHighlightTexture(T.highlight, "ADD")
 	view.Back:SetScript("OnClick", BackToResults)
 	view.Back:Hide()
-	local contentY = PAD + HEAD_H + TABS_H
-	local contentH = paneH - HEAD_H - TABS_H - LEGEND_H
-	BuildGraph(root, middleX, contentY, middleW, contentH)
-	BuildMapPane(root, middleX, contentY, middleW, contentH)
-	view.list = NewList(root, middleX, contentY, middleW - BAR_W, contentH, NewListRow, FillListRow)
+	Tabs.Layout()
+end
+
+-- The legend under the middle: the statuses' colours (a chain's page: its lines too).
+function Make.BuildLegend(parent, x, y, w)
+	local parts = {}
+	for _, status in ipairs({ "done", "active", "available", "locked", "level", "other" }) do
+		parts[#parts + 1] = HEX[status] .. "|T" .. T.flat .. ":10:10|t " .. Word(status) .. "|r"
+	end
+	local status = table.concat(parts, "   ")
+	view.legends = { status = status, chain = status .. "   " .. GREY .. "- - " .. L["not needed first"] .. "|r" }
+	view.Legend = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	view.Legend:SetPoint("TOPLEFT", x + 4, -y)
+	view.Legend:SetWidth(w - 8)
+	view.Legend:SetJustifyH("LEFT")
+	view.Legend:SetWordWrap(false)
+	view.Legend:SetText(status)
+end
+
+function Make.OnHidden(self)
+	for _, event in ipairs(EVENTS) do
+		self:UnregisterEvent(event)
+	end
+	state.listening = false
+	state.searchAt, state.statusOld, state.namesAt, state.readyAt = nil, false, nil, nil
+	self:SetScript("OnUpdate", nil)
+	view.g.drag, view.zp.map.drag = nil, nil
+	view.g.frame:SetScript("OnUpdate", nil)
+	view.zp.map.frame:SetScript("OnUpdate", nil)
+	view.Box:ClearFocus()
+	Views.Show(nil) -- (a view registered: its OnHide)
+	GameTooltip:Hide()
+end
+
+local function Build()
+	frame = LT.Window.Create("LefthyToolsQuesttreeBrowser", "Questtree", WIDTH, HEIGHT)
+	view = { registry = registry }
+	LoadSaved()
+	local width, height = WIDTH - INSET_W, HEIGHT - INSET_H
+	local root = CreateFrame("Frame", nil, frame.Inset)
+	root:SetPoint("TOPLEFT")
+	root:SetSize(width, height)
+	view.root = root
+	Make.BuildTop()
+	local paneH = height - 2 * PAD
+	view.zones = NewList(root, PAD, PAD, ZONES_W - BAR_W, paneH, Make.NewZoneRow, FillZoneRow)
+	local middleX = PAD + ZONES_W + GAP
+	local detailX = width - PAD - EDGE - DETAILS_W
+	local middleW = detailX - GAP - middleX
+	Make.BuildTabs(root, middleX, PAD, middleW)
+	Make.BuildHead(root, middleX, PAD + TABS_H, middleW)
+	local contentY = PAD + TABS_H + HEAD_H
+	local contentH = paneH - TABS_H - HEAD_H - LEGEND_H
+	-- (a view registered gets everything under the tab bar)
+	view.viewX, view.viewY, view.viewW, view.viewH = middleX, PAD + TABS_H, middleW, paneH - TABS_H
+	Make.BuildZonePage(root, middleX, contentY, middleW, contentH)
+	Make.BuildGraph(root, middleX, contentY, middleW, contentH)
+	view.list = NewList(root, middleX, contentY, middleW - BAR_W, contentH, Make.NewListRow, FillListRow)
 	view.list.scroll:Hide()
-	BuildLegend(root, middleX, contentY + contentH + 5, middleW)
+	Make.BuildLegend(root, middleX, contentY + contentH + 5, middleW)
 	view.Message = root:CreateFontString(nil, "OVERLAY", "GameFontDisable")
 	view.Message:SetPoint("TOPLEFT", middleX + 12, -contentY - 14)
 	view.Message:SetWidth(middleW - 24)
@@ -3392,7 +4689,7 @@ local function Build()
 		split:SetPoint("TOPLEFT", x, -PAD)
 		split:SetHeight(paneH)
 	end
-	BuildDetails(root, detailX, PAD, DETAILS_W, paneH)
+	Make.BuildDetails(root, detailX, PAD, DETAILS_W, paneH)
 	view.Empty = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	view.Empty:SetPoint("CENTER", frame.Inset, "CENTER", 0, 20)
 	view.Empty:SetWidth(WIDTH - 200)
@@ -3405,25 +4702,14 @@ local function Build()
 		end
 		state.listening = true
 	end)
-	frame:HookScript("OnHide", function(self)
-		for _, event in ipairs(EVENTS) do
-			self:UnregisterEvent(event)
-		end
-		state.listening = false
-		state.searchAt, state.statusOld, state.namesAt = nil, false, nil
-		self:SetScript("OnUpdate", nil)
-		view.g.drag, view.mapPane.map.drag = nil, nil
-		view.g.frame:SetScript("OnUpdate", nil)
-		view.mapPane.map.frame:SetScript("OnUpdate", nil)
-		view.Box:ClearFocus()
-		GameTooltip:Hide()
-	end)
+	frame:HookScript("OnHide", Make.OnHidden)
 	if Q.OnDataChanged then
 		Q.OnDataChanged(DataChanged)
 	end
 	if Q.OnFriendProgress then
 		Q.OnFriendProgress(function() -- (QuestShare.lua: friends' answers came: redrawn)
 			if frame and frame:IsShown() then
+				wipe(state.infos) -- (the chains' friends)
 				state.namesAt = state.namesAt or GetTime()
 				Due()
 			end
@@ -3463,10 +4749,11 @@ local function Allowed()
 	return true
 end
 
--- Opens the big window, on a quest if one is given (its zone, its card, its details).
+-- Opens the big window, on a quest if one is given (its zone, its chain with its card in sight, its
+-- details). True when it's open with the data.
 function Q.OpenBrowser(id)
 	if not Allowed() then
-		return
+		return false
 	end
 	if not frame then
 		Build()
@@ -3479,7 +4766,7 @@ function Q.OpenBrowser(id)
 			Forget()
 		end
 		wipe(state.counts) -- (quests may have been turned in while it was closed)
-		wipe(state.layouts)
+		Restatus()
 		DrawAll()
 	end
 	local wasShown = frame:IsShown()
@@ -3503,6 +4790,7 @@ function Q.OpenBrowser(id)
 			Due()
 		end
 	end
+	return ready
 end
 
 function Q.ToggleBrowser()
@@ -3524,7 +4812,76 @@ function Q.BrowserShown()
 	return frame ~= nil and frame:IsShown()
 end
 
--- The window's frames and state, what Q.OnDataChanged calls, the filters (for the tests).
+-- Opens the big window on a zone's page (a uiMapID: a city's floor or a cave counts as its zone; or
+-- a dungeon's name). True when it's there.
+function Q.SelectZone(map)
+	local shown = frame ~= nil and frame:IsShown()
+	if not shown and not Q.OpenBrowser() then
+		return false
+	end
+	if not view.root:IsShown() then
+		return false
+	end
+	Lists()
+	local id = PlaceFor(map)
+	if not id then
+		return false
+	end
+	local place = state.places[id]
+	state.folded[place.kind == "zone" and ("c:" .. tostring(place.continent)) or "c:dungeons"] = nil
+	SelectPlace(id) -- (a view registered: the zone page)
+	DrawZones(true, id)
+	return true
+end
+
+-- A view of another file as a tab of the big window, after the zone page and the overview:
+-- build(parent) is called the first time it's shown, with the frame it has (the area under the tab
+-- bar, between the zones and the details), and returns { frame, Refresh = function(self) end,
+-- OnShow = function(self) end, OnHide = function(self) end } (each optional; a frame without points
+-- fills the parent). Refresh runs each time it's shown and when quests or the data change while it
+-- is. The same key again: its label and build are replaced (a view already built stays). True when
+-- registered ("zone" and "overview" are the window's own).
+function Q.RegisterBrowserView(key, label, build)
+	if type(key) ~= "string" or key == "" or key == "zone" or key == "overview" or key == "results" or type(build) ~= "function" then
+		return false
+	end
+	local v = registry.byKey[key]
+	if v then
+		v.label, v.build = label or v.label, build
+	else
+		v = { key = key, label = label or key, build = build }
+		registry.byKey[key] = v
+		registry.order[#registry.order + 1] = v
+	end
+	Tabs.Layout()
+	return true
+end
+
+-- Opens the big window on a tab: "zone", "overview" or a registered view's key. True when shown.
+function Q.ShowBrowserView(key)
+	if not TabKnown(key) then
+		return false
+	end
+	local shown = frame ~= nil and frame:IsShown()
+	if not shown and not Q.OpenBrowser() then
+		return false
+	end
+	if not view.root:IsShown() then
+		return false
+	end
+	if state.query ~= "" then
+		state.drilled = true
+	end
+	if key == "zone" then
+		state.chain, state.path = nil, nil
+	end
+	state.tab = key
+	Save()
+	DrawMiddle(false, state.picked)
+	return true
+end
+
+-- The window's frames and state, what Q.OnDataChanged calls, the filters, the views (for the tests).
 function Q.BrowserView()
-	return view, state, frame, DataChanged, filters
+	return view, state, frame, DataChanged, filters, registry
 end
