@@ -56,7 +56,7 @@ local QUESTS_DATA = {
 		starts = { Npc(921, "Woodcutter Lin", 0.5, 0.5) }, ends = { Npc(920, "Ranger Ash", 0.4, 0.4) } },
 	[86576] = { id = 86576, title = "The Final Word of the Old Guard", level = 8, zone = 1429, pre = { 9103 },
 		starts = { Npc(920, "Ranger Ash", 0.4, 0.4) }, ends = { Npc(920, "Ranger Ash", 0.4, 0.4) } },
-	[9109] = { id = 9109, title = "Lonely Errand", level = 5, zone = 1429,
+	[9109] = { id = 9109, title = "Lonely Errand", level = 5, minLevel = 3, zone = 1429, rewards = { xp = 1250 },
 		starts = { Npc(924, "Peasant Jo", 0.7, 0.3) }, ends = { Npc(924, "Peasant Jo", 0.7, 0.3) } },
 	[9110] = { id = 9110, title = "Herald's Call", level = 6, zone = 1429, breadcrumbFor = 9111,
 		starts = { Npc(925, "Herald Kim", 0.45, 0.45) }, ends = { Npc(926, "Captain Lee", 0.55, 0.2) } },
@@ -179,10 +179,20 @@ Step(0.75)
 check(not View().panel:IsShown(), "the dialog hidden without QUEST_FINISHED: gone a moment later")
 Fire("QUEST_FINISHED")
 
--- Nothing to tell: a quest on its own.
+-- A quest on its own: its level (the dialog doesn't say it before it's accepted), the XP and the button.
+opened = {}
 Dialog("QUEST_DETAIL", 9109)
 Step()
-check(not View().panel:IsShown(), "a quest in no chain that leads nowhere: no panel")
+v = View()
+check(v.panel:IsShown() and Has("Lonely Errand") and Has("Level 5 (from 3)") and (Has("1,250 XP") or Has("1250 XP")) and not Has("Part ")
+	and v.panel.Open:IsShown(), "a quest in no chain: its title, level, from which level, its XP, the button")
+v.panel.Open:Click()
+Step()
+check(opened[#opened] == 9109, "... and it opens in Lodestar too")
+CloseDialog()
+Dialog("QUEST_DETAIL", 9102)
+Step()
+check(Has("Level 6") and Has("Part 2 of 6"), "a chain's quest: its level under its part")
 CloseDialog()
 
 -- A lead-in.
@@ -238,7 +248,7 @@ CloseDialog()
 PutBack("Friends")
 PutBack("RequestFriendProgress")
 
--- An NPC with several quests: each in a chain with its part; the one on its own isn't listed.
+-- An NPC with several quests: each with its level, those in a chain with their part.
 local greeting = { active = { 9102 }, available = { 9109, 9110 } }
 GetNumActiveQuests = function() return #greeting.active end
 GetActiveQuestID = function(i) return greeting.active[i] end
@@ -248,8 +258,8 @@ Dialog("QUEST_GREETING")
 Step()
 v = View()
 check(v.panel:IsShown() and v.page == "greeting" and RowWith("[6] The Lost Axe") and RowWith("Part 2 of 5 · Into the Woods")
-	and RowWith("[6] Herald's Call") and not RowWith("Lonely Errand") and not v.panel.Open:IsShown(),
-	"a greeting: each quest in a chain with its part, a click opens it; no button")
+	and RowWith("[6] Herald's Call") and RowWith("[5] Lonely Errand") and not v.panel.Open:IsShown(),
+	"a greeting: every quest with its level, those in a chain with their part, a click opens it; no button")
 CloseDialog()
 GetNumActiveQuests, GetActiveQuestID, GetNumAvailableQuests, GetAvailableQuestInfo = nil, nil, nil, nil
 

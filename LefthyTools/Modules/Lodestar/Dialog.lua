@@ -7,12 +7,13 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 --
 --   * Beside the quest dialog (setting dialog): when an NPC offers a quest (QUEST_DETAIL), asks for
 --     it (QUEST_PROGRESS), rewards it (QUEST_COMPLETE) or lists several (QUEST_GREETING), a panel of
---     ours next to QuestFrame says "Part 2 of 4 · <chain>", numbers the chain's steps around it (one
---     before, this one bold, two after, done ones ticked, "... N more"), what it leads to when that
---     isn't the next step listed ("Leads to ..." / "Opens 3 quests"), what the next steps need
---     besides it that isn't listed or done ("Requires ..."), what taking it closes, which friends did
---     it (one line), and has a button "Open in Lodestar". Nothing to tell (no chain, nothing it
---     opens): no panel.
+--     ours next to QuestFrame shows any quest the data knows: its level in its difficulty colour (the
+--     dialog doesn't say it before you accept), from which level, the XP it gives; in a chain "Part 2
+--     of 4 · <chain>" and the chain's steps around it (one before, this one bold, two after, done ones
+--     ticked, "... N more"), what it leads to when that isn't the next step listed ("Leads to ..." /
+--     "Opens 3 quests"), what the next steps need besides it that isn't listed or done ("Requires
+--     ..."), what taking it closes, which friends did it (one line), and a button "Open in Lodestar".
+--     An NPC with several quests: each of them with its level (and its part of a chain).
 --   * The quest log (setting logBadges): "2/4" at the right end of each chain quest's line (a font
 --     string of ours on Blizzard's title button, the way Misc Tweaks' NEW label is: a post-hook on
 --     QuestLogQuests_Update), the chain in the line's tooltip (a HookScript on its OnEnter, as Misc
@@ -259,8 +260,23 @@ local function FriendsText(id)
 	return GOLD .. L["Friends:"] .. "|r " .. table.concat(parts, ", ") .. more
 end
 
--- A quest's panel: nil when there's nothing to tell (no chain, nothing it leads to or closes, no
--- friends).
+-- "Level 23 (from 18) · 1,400 XP" in the quest's difficulty colour (a quest that scales: "Your
+-- level"); nil when the data has neither.
+local function LevelLine(id, quest)
+	local text = quest.scales and L["Your level"] or Q.LevelText(quest)
+	local rewards = Q.Rewards and Q.Rewards(id)
+	local xp = type(rewards) == "table" and tonumber(rewards.xp)
+	local parts = {}
+	if text then
+		parts[1] = Q.LevelCode(id, quest) .. text .. "|r"
+	end
+	if xp and xp > 0 then
+		parts[#parts + 1] = LIGHT .. L["%s XP"]:format(BreakUpLargeNumbers and BreakUpLargeNumbers(xp) or tostring(xp)) .. "|r"
+	end
+	return parts[1] and table.concat(parts, GREY .. " · |r") or nil
+end
+
+-- A quest's panel (any quest the data knows; nil for one it doesn't).
 local function DrawQuest(y, id)
 	local quest = id and Q.Quest(id)
 	if not quest then
@@ -272,12 +288,13 @@ local function DrawQuest(y, id)
 	local closes = offered and Q.Closes and Q.Closes(id) or {}
 	local crumb = offered and quest.breadcrumbFor
 	local friends = FriendsText(id)
-	if not (list or opens[1] or closes[1] or crumb or friends) then
-		return nil
-	end
 	local listed = {}
+	local level = LevelLine(id, quest)
 	if list then
 		y = Text(y, GOLD .. L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list) .. "|r", "GameFontNormal")
+		if level then
+			y = Text(y, level, "GameFontHighlight")
+		end
 		y = Steps(y + 1, list, at)
 		local first, last = Window(list, at, STEPS_MAX)
 		for i = first, last do
@@ -285,6 +302,9 @@ local function DrawQuest(y, id)
 		end
 	else
 		y = Text(y, GOLD .. Q.Title(id, quest) .. "|r", "GameFontNormal")
+		if level then
+			y = Text(y, level, "GameFontHighlight")
+		end
 	end
 	y = y + GAP
 	-- What it leads to: the one quest (unless it's a step listed already), else how many (their names
@@ -320,7 +340,7 @@ local function DrawQuest(y, id)
 	return y
 end
 
--- An NPC with several quests (the greeting): each that's in a chain or leads on, with its part.
+-- An NPC with several quests (the greeting): each with its level, and its part of a chain or what it opens.
 local function DrawGreeting(y)
 	local ids = {}
 	local function Add(id)
@@ -345,13 +365,13 @@ local function DrawGreeting(y)
 		local quest = Q.Quest(id)
 		local list, at = Q.ChainFor(id)
 		local opens = Q.Opens and Q.Opens(id) or {}
-		if quest and (list or opens[1]) then
+		if quest then
 			if not any then
 				any = true
 				y = Text(y, GOLD .. "Lodestar" .. "|r", "GameFontNormal")
 			end
-			local note = list and (L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list)) or L["opens %d"]:format(#opens)
-			y = Row(y, { id = id, text = Q.QuestIcon(id) .. " " .. Q.LevelTitle(id, quest) .. "\n" .. GREY .. note .. "|r" })
+			local note = list and (L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list)) or opens[1] and L["opens %d"]:format(#opens)
+			y = Row(y, { id = id, text = Q.QuestIcon(id) .. " " .. Q.LevelTitle(id, quest) .. (note and ("\n" .. GREY .. note .. "|r") or "") })
 		end
 	end
 	return any and y or nil
