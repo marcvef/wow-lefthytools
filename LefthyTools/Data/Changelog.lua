@@ -512,5 +512,8 @@ ns.CHANGELOG = {
 	{ id = 168, module = "general",
 		en = { "Map: no blocked controller actions", "Friends' dots, pings and quests on the world map are LefthyTools' own frames now, so closing the map with the controller no longer gets the game's actions blocked (interact icons, B, targeting). The controller's map cursor shows their tooltips." },
 		de = { "Karte: keine Blockaden mit Controller", "Freunde, Pings und Quests auf der Weltkarte sind jetzt eigene Frames von LefthyTools, deshalb blockiert das Schließen der Karte mit dem Controller keine Aktionen des Spiels mehr (Interaktions-Icons, B, Ziele). Der Karten-Cursor des Controllers zeigt ihre Tooltips." } },
+	{ id = 169, module = "questtree",
+		en = { "Questtree: quest chains", "A new module for quest chains. /questtree shows what's next for you, /questtree <name> any quest: what it needs first, where it starts and ends on a small map, what it leads to and which friends have done it." },
+		de = { "Questtree: Questreihen", "Ein neues Modul für Questreihen. /questtree zeigt, was als Nächstes für dich ansteht, /questtree <Name> jede Quest: was sie vorher braucht, wo sie auf einer kleinen Karte beginnt und endet, wozu sie führt und welche Freunde sie schon erledigt haben." } },
 	-- New entries go here, at the end.
 }

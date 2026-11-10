@@ -263,9 +263,9 @@ variables ready) and `LT.onLogin`.
 
 `ns.CHANGELOG` lists every change players notice: `{ id, version, module, en = { title,
 sentence }, de = { title, sentence } }`, ids 1, 2, 3, ... in order; module is `mirage`, `tweaks`,
-`beacon`, `chronicle`, `bestiary` or `general` (the tests check all of that, and titles stay short). The
+`beacon`, `chronicle`, `bestiary`, `echoes`, `questtree` or `general` (the tests check all of that, and titles stay short). The
 window groups them: per version (newest first) a large gold heading with a divider, then a
-section per module in a fixed order (Mirage, Misc Tweaks, Beacon, Chronicle, Bestiary, General; module
+section per module in a fixed order (Mirage, Misc Tweaks, Beacon, Chronicle, Bestiary, Echoes, Questtree, General; module
 names untranslated), then each entry as a bullet with its title and, below it in grey, the
 sentence; wrapped lines stay under the text. Drawn with pooled font strings (`Render`);
 `WhatsNew.Text` gives the same as plain text. Ids instead of versions, because

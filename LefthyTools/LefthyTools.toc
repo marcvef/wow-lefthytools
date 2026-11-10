@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: LefthyTools
-## Notes: Small interface tools for WoW: Forever: Mirage (fades the interface when idle), Misc Tweaks, Beacon (friends on your map), Chronicle (your journal), Bestiary (what mobs drop) and Echoes (records your journey for a replay).
+## Notes: Small interface tools for WoW: Forever: Mirage (fades the interface when idle), Misc Tweaks, Beacon (friends on your map), Chronicle (your journal), Bestiary (what mobs drop), Echoes (records your journey for a replay) and Questtree (quest chains).
 ## Author: lefthy
 ## Version: 0.7.0
 ## SavedVariables: LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB, LefthyToolsEchoesDB
@@ -116,3 +116,6 @@ Modules\Echoes\Delivery.lua
 
 Modules\Questtree\Data.lua
 Modules\Questtree\Engine.lua
+Modules\Questtree\Questtree.lua
+Modules\Questtree\MiniMap.lua
+Modules\Questtree\Small.lua

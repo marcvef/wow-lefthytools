@@ -144,11 +144,22 @@ function FrameMethods:SetMovable(m) self._movable = m end
 function FrameMethods:SetClampedToScreen(c) self._clamped = c end
 function FrameMethods:StartMoving() self._moving = true end
 function FrameMethods:StopMovingOrSizing() -- the engine leaves the frame where the cursor dropped it
-	self._moving = false
+	self._moving, self._sizing = false, nil
 	if self._dropAt then
 		self._points = { { "TOPLEFT", UIParent, "BOTTOMLEFT", self._dropAt.left, self._dropAt.top } }
 	end
+	if self._dropSize then -- (a resize: the size the cursor left it at, within its bounds)
+		local b = self._resizeBounds or {}
+		self:SetSize(math.max(b[1] or 0, math.min(b[3] or math.huge, self._dropSize[1])),
+			math.max(b[2] or 0, math.min(b[4] or math.huge, self._dropSize[2])))
+		self._dropSize = nil
+	end
 end
+-- Resizing (a window's corner grip): StartSizing remembers the corner, StopMovingOrSizing applies _dropSize.
+function FrameMethods:SetResizable(r) self._resizable = r end
+function FrameMethods:SetResizeBounds(...) self._resizeBounds = { ... } end
+function FrameMethods:StartSizing(point) self._sizing = point or "BOTTOMRIGHT" end
+function FrameMethods:Raise() self._raised = (self._raised or 0) + 1 end
 function FrameMethods:SetUserPlaced(u) self._userPlaced = u end
 function FrameMethods:SetShown(s) self._shown = s and true or false end
 function FrameMethods:SetSize(w, h)
