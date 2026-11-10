@@ -99,6 +99,7 @@ local function RowOpen()
 	return Setting("gamepadBagButtons", false) == true or peeking
 end
 local dirty, navPending = false, false
+local closeReagent = false -- ours closed: the reagent bag's unseen window closes on the next frame
 local driver = CreateFrame("Frame")
 driver:Hide()
 local watch = CreateFrame("Frame")
@@ -928,13 +929,18 @@ local function OnSelect(_, button)
 	end
 end
 
--- The bag closed: our jumps go (a bag opened in a fight gets Blizzard's layout, which they don't fit).
-local function OnBagHidden()
-	peeking = false -- (opened for the cursor: folded at the next opening)
-	retargetFrom, retargetTo = nil, nil
-	-- The reagent bag's window, kept open unseen for its items in ours, closes with ours (closing the
-	-- bag with its close button leaves the other windows open): else it stayed open, unseen, and
-	-- counted as an open bag for good (a flight's film never paused for the bag then, Mirage kept up).
+-- The reagent bag's window, kept open unseen for its items in ours, closes with ours (closing the
+-- bag with its close button leaves the other windows open): else it stayed open, unseen, and counted
+-- as an open bag for good (a flight's film never paused for the bag then, Mirage kept up). On the
+-- next frame, not while ours hides: Blizzard's ToggleAllBags (the "open all bags" key) closes the
+-- backpack first and then counts the other bags it closes; one we'd closed in between went uncounted,
+-- so it took the bags for not all open and opened them all again (the key never closed them). It has
+-- closed that window itself by now; ours opened again meanwhile: it stays ours.
+local function CloseReagentWindow()
+	local frame = Bag()
+	if frame and frame:IsShown() then
+		return
+	end
 	local windows = {}
 	for window in pairs(hushed) do
 		windows[#windows + 1] = window
@@ -952,6 +958,16 @@ local function OnBagHidden()
 			end
 		end
 	end
+end
+
+-- The bag closed: our jumps go (a bag opened in a fight gets Blizzard's layout, which they don't fit).
+local function OnBagHidden()
+	peeking = false -- (opened for the cursor: folded at the next opening)
+	retargetFrom, retargetTo = nil, nil
+	if next(hushed) then
+		closeReagent = true
+		driver:Show()
+	end
 	wipe(wantUp); wipe(wantDown)
 	ApplyJumps(false)
 	if next(jumped) then
@@ -961,6 +977,10 @@ end
 
 driver:SetScript("OnUpdate", function(self)
 	self:Hide()
+	if closeReagent then
+		closeReagent = false
+		CloseReagentWindow()
+	end
 	if dirty then
 		dirty = false
 		Relayout()
