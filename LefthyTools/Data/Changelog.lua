@@ -530,5 +530,12 @@ ns.CHANGELOG = {
 	{ id = 174, module = "questtree",
 		en = { "Questtree: zone map beside chains", "The quest browser shows a zone's map beside its chains: quest givers with how many quests they have, each chain in its own colour on the map, lit up when you hover it. An opened chain shows which steps are all or one of, lead-ins and steps in other zones, and lights the way to a locked quest." },
 		de = { "Questtree: Karte neben Questreihen", "Der Quest-Browser zeigt die Karte eines Gebiets neben seinen Questreihen: Questgeber mit der Anzahl ihrer Quests, jede Questreihe in ihrer eigenen Farbe auf der Karte, hervorgehoben beim Drüberfahren. Eine geöffnete Questreihe zeigt, ob alle oder einer der Schritte davor nötig sind, Hinführungen und Schritte in anderen Gebieten, und hebt den Weg zu einer gesperrten Quest hervor." } },
+	-- PLACEHOLDER (merge: replace with the big window's real entry 174 from its branch; it's only here so
+	-- the ids run 1, 2, 3, ... in this branch's tests).
+		en = { "Questtree: the big window", "(placeholder)" },
+		de = { "Questtree: das große Fenster", "(Platzhalter)" } },
+	{ id = 175, module = "questtree",
+		en = { "Questtree: storylines, level path", "Three new views in the quest browser. Storylines: every chain for you in all zones, filtered and sorted by what it's worth. Level path: where to go next for your level, with friends on it. Continents: how much of each zone you've done." },
+		de = { "Questtree: Handlungsstränge, Levelpfad", "Drei neue Ansichten im Quest-Browser. Handlungsstränge: jede Questreihe für dich in allen Zonen, gefiltert und danach sortiert, wie sehr sie sich lohnt. Levelpfad: wohin es für dein Level als Nächstes geht, mit Freunden darauf. Kontinente: wie viel du von jeder Zone erledigt hast." } },
 	-- New entries go here, at the end.
 }

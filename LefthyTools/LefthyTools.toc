@@ -121,4 +121,5 @@ Modules\Questtree\Questtree.lua
 Modules\Questtree\MiniMap.lua
 Modules\Questtree\Small.lua
 Modules\Questtree\Browser.lua
+Modules\Questtree\Views.lua
 Modules\Questtree\Learn.lua
