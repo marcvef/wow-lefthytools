@@ -15,8 +15,7 @@ and takes it and where, and where each quest stands for you and your friends.
 | `Modules/Questtree/Questtree.lua` | the module: settings, `/questtree`, shared helpers (status colours, titles) |
 | `Modules/Questtree/MiniMap.lua` | the small zone map (our own frame, the zone's map art) |
 | `Modules/Questtree/Small.lua` | the small window: one quest, what it needs, giver and turn-in on the small map |
-| `Modules/Questtree/Browser.lua` | the big window: zones; a zone's map beside its chains' cards; a chain opened (cards, lines, joins, stubs, the way to a locked quest); a quest list; details; filters (my levels by default); search; tabs for views other files register |
-| `Modules/Questtree/Browser.lua` | the big window: zones, chains as cards and lines, an overview, the zone map, details, filters, search |
+| `Modules/Questtree/Browser.lua` | the big window: zones; a zone's large map (pins, the quest picked's objective areas and way, zoom, my arrow); the right pane: the zone's or chain's briefing (its chains' cards, its steps), a quest's details (steps, objectives, giver and turn-in, rewards); a chain opened (cards, lines, joins, stubs, the way to a locked quest); a quest list; filters (my levels by default); search; tabs for views other files register |
 | `Modules/Questtree/Views.lua` | the big window's other views: storylines (every chain), the level path (where to go next) |
 | `Modules/Questtree/Learn.lua` | learning givers, enders and prerequisites while playing |
 | `Modules/Questtree/Dialog.lua` | in the game's quest UI: the panel beside the quest dialog, chain steps on the quest log's lines, Alt-click there |
@@ -645,9 +644,10 @@ the setting off and on again.
 ## Big window (Browser.lua)
 
 `Q.ToggleBrowser()` opens or closes it; `Q.OpenBrowser(id)` opens it on a quest (its zone or dungeon on
-the left, its chain opened with its card in the middle of sight, its details; true when it's open with
-the data); `Q.SelectZone(map)` opens it on a zone's page (a uiMapID, a city's floor or a cave counting as
-its zone, or a dungeon's name; false when there's no such place); `Q.HideBrowser()` closes it (the module
+the left, on the Zone tab its zone's map with the quest picked on it, a dungeon's quest list, its details
+on the right; true when it's open with the data); `Q.SelectZone(map)` opens it on a zone's page (a
+uiMapID, a city's floor or a cave counting as its zone, or a dungeon's name; nothing picked, its
+briefing on the right; false when there's no such place); `Q.HideBrowser()` closes it (the module
 switched off); `Q.BrowserShown()` says whether it's open. Other files add tabs with
 `Q.RegisterBrowserView` and open them with `Q.ShowBrowserView` (below). With the module off it doesn't
 open (one chat line says how to switch it on). `Q.BrowserView()` gives the tests its frames, state and
@@ -655,25 +655,30 @@ views.
 
 The look follows what players know from the quest add-ons researched for it (BtWQuests' and
 ForeverQuestChain's cards, BeautifulAttune's flat cards and lines, EQ's gutters and hover lighting,
-pfQuest's colour per quest, Questie's map highlight, Blizzard's map icons and story headers), built from
-our own frames. Each surface shows at a glance what to do now and how far along (Guidelime's and
-BtWQuests' "this now, then those"); the rest is in tooltips or behind a click. By default it shows what's
-within my levels (the filters, below).
+pfQuest's colour per quest and its spawn areas, Questie's map highlight and objective glow, map add-ons'
+zoom where the cursor is, Blizzard's map icons and story headers), built from our own frames. Each
+surface shows at a glance what to do now and how far along (Guidelime's and BtWQuests' "this now, then
+those"); the rest is in tooltips or behind a click. By default it shows what's within my levels (the
+filters, below).
 
 **Status words** (`Rule.Reason`) always say the real reason, everywhere (tooltips, the quest list, the
-details, the pins): "Completed", "In your quest log", "Available"; level too low: "Needs level 12";
-locked: "Needs Friendly with Stormwind" / "Needs Leatherworking 50" (`Q.Needs`: a reputation or a
-profession's rank), else "Needs <the first of `Q.Missing`>"; not for me (`Q.WhyOther`): "Not for your race"
-/ "class" / "faction", "Needs <profession>" (one I don't have), and "Skipped" for one closed by another
-(an exclusive one I took, or a lead-in whose quest I have): its tooltip says "You took <title> instead" /
-"No longer needed: you have <title>". A skipped quest is grouped with the done ones and shown in its
-chain, not with "not for you". Friends' statuses keep the plain words. Without `Q.WhyOther`, every "other"
-is "Not for you".
+details, the pins): "Completed", "In your quest log" ("Ready to turn in" in the details when it's done),
+"Available"; level too low: "Needs level 12"; locked: "Needs Friendly with Stormwind" / "Needs
+Leatherworking 50" (`Q.Needs`: a reputation or a profession's rank), else "Needs <the first of
+`Q.Missing`>"; not for me (`Q.WhyOther`): "Not for your race" / "class" / "faction", "Needs <profession>"
+(one I don't have), and "Skipped" for one closed by another (an exclusive one I took, or a lead-in whose
+quest I have): its tooltip says "You took <title> instead" / "No longer needed: you have <title>". A
+skipped quest is grouped with the done ones and shown in its chain, not with "not for you". Friends'
+statuses keep the plain words. Without `Q.WhyOther`, every "other" is "Not for you".
 
-**Size.** 1400 x 820 (`LT.Window.Create`, `LefthyToolsQuesttreeBrowser`, in `UISpecialFrames` so Escape
-closes it, movable), scaled down to fit when the screen (`GetScreenWidth`/`GetScreenHeight`, UI units) is
-smaller than that plus 40 x 80. In the band under the title: "Search all zones:" with its box on the
-left, the two **filters** on the right (below). Under it, on an 8 px grid:
+**Size.** Worked out when it's built (`Make.Size`, from `GetScreenWidth`/`GetScreenHeight`, UI units): at
+least 1400 x 760; where the screen has room (its width less 80) wider in steps of 20 up to 1700, the
+right pane 400 instead of 360 from 1560 on, the height what the map needs (its 3:2 under the tab bar and
+the line under it), as long as that fits the screen's height less 100 (1920 x 1080: 1700 x 868; the
+default UI's 1366 x 768: 1400 x 760). `LT.Window.Create` (`LefthyToolsQuesttreeBrowser`, in
+`UISpecialFrames` so Escape closes it, movable), scaled down to fit when the screen is smaller than that
+plus 40 x 80. In the band under the title: "Search all zones:" with its box on the left, the two
+**filters** on the right (below). Under it, on an 8 px grid:
 
 - **Left (240 px): places.** `Q.Zones()` grouped by continent in the order it gives them (a header per
   continent, its name from `C_Map.GetMapInfo`; a click folds it), then a "Dungeons" header and
@@ -683,84 +688,180 @@ left, the two **filters** on the right (below). Under it, on an 8 px grid:
   `Q.ZoneQuests` / `Q.DungeonQuests`. A dash when none is for me. A place far from my level (its top
   below my level - 10, or its bottom above my level + 5) has its name dimmed, its count kept. The first
   time it opens, the zone I'm in is chosen (`C_Map.GetBestMapForUnit`, then its parents), else the first
-  zone.
-- **Middle (782 px):** the **tab bar** (our own Buttons): **Zone** (the zone page, or a chain opened from
-  it), **Quest list** (its key is still "overview"), then each registered view, and at its right "Back to
-  the search results" during a search. Under it the **head** (except for a registered view): a chain's
-  way back to its zone, the chain's colour, the title (`GameFontNormalLarge`), a grey line under it, "x of
-  y done" with a bar, and the zoom (-, the zoom, +, Fit: the zone map's or the chain's), a gold divider
-  under it. Under a chain's page one short line on its lines (below); no legend of the statuses (their
-  words say the reason). The tab is kept.
-- **Right (330 px): the details** of the quest picked.
+  zone. A click shows that place, nothing picked.
+- **Middle (the rest; 752 px at 1400, 1012 at 1700):** the **tab bar** (our own Buttons): **Zone** (the
+  zone's map, a chain opened from it, a dungeon's quest list), **Quest list** (its key is still
+  "overview"), then each registered view, and at its right "Back to the search results" during a search.
+  The zone's map sits right under it; a chain's page, the quest list and the search have the **head**
+  under it: a chain's way back to its zone, the chain's colour, the title (`GameFontNormalLarge`), a grey
+  line under it, "x of y done" with a bar, and the chain's zoom (-, the zoom, +, Fit), a gold divider
+  under it. Under a chain's page one short line on its lines (below); under a dungeon's list that its
+  quests are given in many places. The tab is kept.
+- **Right (360 px, 400 on a wide window): never empty.** The details of the quest picked; nothing
+  picked, the briefing of what the middle shows (an opened chain's, else the place's).
 
 A zone's pages show its quests (`Q.ZoneQuests`) and those given there but listed elsewhere
 (`Q.ZoneGiven(map)`: the Deadmines' quests at Sentinel Hill); its count stays its own quests'.
 
-### The zone page
+### The zone page: the map
 
 Every quest of the place goes through `Q.Chain(id)` once; a chain of more than one quest is a group,
 ordered by the lowest level of its quests in this place; the quests without a chain are a group of their
 own. Who leads to whom: each quest's `pre`, `preAny`, `preActive` and `Q.Opens`, only from an earlier
 quest in the chain's order to a later one (a loop in the data is cut). Each chain has **a colour of its
 own**: its first quest's ID times the golden ratio as a hue (HSV 0.6 / 0.95), the same in every zone and
-every session; the quests without a chain are light grey.
+every session; the quests without a chain are light grey (gold on the map for the quest picked).
 
-The head: the zone's name, "Level 1-10 · 3 to pick up now · 2 chains" (what I can take within my levels,
-the chains listed), "12 of 40 done" and its bar.
+**The map fills the middle** (its width, 3:2: 1012 x 674 on a 1700 window), right under the tab bar. The
+zone's art (`LT.MapArt`: the world map's tiles, every area uncovered, as the small map) in a clipping
+frame of ours. On a dark strip over its top: the zone's name and levels, and at its right **-, + and Fit**
+(Buttons of ours: the controller's way to zoom) with the zoom when it's above 100%. A pin per spot of a
+quest giver of the place's quests as the filters show them (within my levels by default; done ones too,
+as dim dots; `starts[].points` on that map), a quest in my log at its turn-in's (`ends`), in the game's
+own map icons on a dark disc: `QuestNormal` "!" (24 px) to pick up, `QuestDaily` for a repeatable one,
+`TrivialQuests` for one that's grey for me (`Q.IsTrivial`), `QuestTurnin` "?" when it's ready to turn in
+(`C_QuestLog.IsComplete`; `QuestRepeatableTurnin` for a repeatable one), the same "?" grey while it's in
+progress, a grey "!" (18 px) for one my level is too low for and a smaller, darker one for one that needs
+another first, dim dots for done and not-for-me ones; where an item that starts a quest drops
+(`starts[].drops[].points`) a soft gold circle ("Wolf Fang drops here (12%)", sized by the point's `r`).
+Spots within 8 px are one pin (drop areas only with drop areas): its look the most urgent one's, **a
+count badge** (the quests still to do there, from two), its tooltip the giver and each quest in its
+status's colour with what the pin is ("[4] Brotherhood of Thieves · repeatable": ready to turn in, in
+progress, low level, repeatable, or the reason it can't be taken yet, `ZonePage.PinNote`, asked only when
+the tooltip shows; there's no legend under the map), then what a click does.
 
-**The map (left, 432 x 288, the zone's 3:2).** The zone's art (`LT.MapArt`: the world map's tiles, every
-area uncovered, as the small map) in a clipping frame of ours. A pin per spot of a quest giver of the
-place's quests as the filters show them (within my levels by default; done ones too, as dim dots;
-`starts[].points` on that map), a quest in my log at its
-turn-in's (`ends`), in the game's own map icons on a dark disc: `QuestNormal` "!" (24 px) to pick up,
-`QuestDaily` for a repeatable one, `TrivialQuests` for one that's grey for me (`Q.IsTrivial`),
-`QuestTurnin` "?" when it's ready to turn in (`C_QuestLog.IsComplete`; `QuestRepeatableTurnin` for a
-repeatable one), the same "?" grey while it's in progress, a grey "!" (18 px) for one my level is too low
-for and a smaller, darker one for one that needs another first, dim dots for done and not-for-me ones;
-where an item that starts a quest drops (`starts[].drops[].points`) a soft gold circle ("Wolf Fang drops
-here (12%)", sized by the point's `r`). Spots within 8 px are one pin (drop areas only with drop areas):
-its look the most urgent one's, **a count badge** (the quests still to do there, from two), its tooltip
-the giver and each quest in its status's colour with what the pin is ("[4] Brotherhood of Thieves ·
-repeatable": ready to turn in, in progress, low level, repeatable, or the reason it can't be taken yet,
-`ZonePage.PinNote`, asked only when the tooltip shows; there's no legend under the map); a click shows its most
-urgent quest, the next click the next one; the quest picked has a gold ring. Me as a blue dot when I'm on
-that map. The wheel zooms (x 1.35, up to 8), dragging moves it, "-", "+", "Fit" too; a pin the
-controller's cursor moves to out of sight brings the map to it.
+- **Hovering a pin** (the mouse, or the controller's cursor) lights its chains: their threads at full
+  colour, their pins, every other pin dim (30%), and their cards in the briefing (below).
+- **A click** picks its quest; a pin with several quests opens **a small list of ours beside it**
+  (`LT.Window.PopupList`, on the zone page so the map doesn't clip it; left of the pin near the map's
+  right edge): the giver on top, each quest with its icon, "[4] Title" in its status's colour and what
+  it is, the one picked ticked, at most 12 ("... and N more"); a row clicked picks that one; the pin
+  clicked again, a click elsewhere, zooming or dragging closes it.
+- **Right-click or Shift-click**: the game's own map pin there (`Q.Waypoint`, a chat line says so).
+- **The wheel zooms where the cursor is** (x 1.35 a step, up to 8: the map's spot under the cursor stays
+  under it), -, + zoom around the middle, Fit shows the whole zone; dragging moves it; a pin the
+  controller's cursor moves to out of sight brings the map to it. Another zone starts whole.
+- **My arrow** (`Interface\Minimap\MinimapArrow`, turned by `GetPlayerFacing`) where I am when I'm on that
+  map (`Q.PlayerAt`), moved ten times a second by an OnUpdate on a frame of the map that's shown only
+  while I'm on it (off it, or in an instance: hidden, nothing runs; looked at again after
+  `ZONE_CHANGED_NEW_AREA`).
 
 **Threads.** Each chain's quests on the map, in the chain's colour, as thin lines from giver to turn-in and
 from a turn-in (else the giver) to the next quest's giver, the spots on this map; at most 500 a zone,
-pooled `Line`s under the pins. A thread shows only while its chain's card is hovered (3.5 px, full colour)
-or while the quest picked is of that chain (`map.keep`: 2 px, 70%; a done step's 25%); the others are
-hidden.
+pooled `Line`s under the pins. A thread shows only while its chain's card or one of its pins is hovered
+(3.5 px, full colour) or while the quest picked is of that chain (`map.keep`: 2 px, 70%, a done step's
+25%; both 60% of that while the quest's own way shows); the others are hidden.
 
-**Under the map**, one line with only what's there of "1 in progress · 1 ready to turn in · 3 available"
-(the place's quests in my log, not ready and ready (`C_QuestLog.IsComplete`), and what I can take within
-my levels, in their colours; how far along is in the head), and with none to take here: "Nothing for you to
-pick up here right now." and a button "Redridge Mountains has 9 for your level >" (`Q.SelectZone`): the
-zone whose level range is within 3 of mine with the most quests I can take now (`Q.Available`, else
-counted from the statuses), kept until a status changes.
+**The quest picked on the map** (`ZonePage.PickOn`, `Map.SetPick`): its pin ringed in gold; its
+**objectives' areas** (`Q.Objectives`' points on this map: a kill's spawn clusters, where an item drops,
+an object's spots) as soft circles in its chain's colour (a flat disc at 22% and an added glow around
+it, `Spells\GenericGlow64`, sized by the point's `r`, at least 28 px), each with a small button at its
+middle (its tooltip: the objective, where it drops; a click: the game's map pin there); an objective my
+quest log says is done stays faint, ticked; its **giver and turn-in** where no pin of it is (a ringed "!"
+or "?", grey while it isn't done); and **its way**: a dashed line in its colour from the giver to each
+objective's area nearest the last spot in turn, then to the turn-in. Hovering an objective's line in the
+details (or its area's button) lights its areas (42%) and dims the others (7%).
 
-**The chains' cards (right, on a darker panel; a pooled list, 48 px cards 8 px apart):** the chains with a
-quest of this place not done yet within my levels (`Q.InRange`; all levels: any the filters show), then
-the quests without a chain (listed the same way), then a **"Completed (N)"** row for the chains with every
-quest for me done (folded at first, a click opens it: their cards under it), and when the level filter
-left chains out, a quiet line at the end: "2 more outside your levels · Show all levels" (a click turns
-the filter on). A card (a Button), two lines: a dot in the chain's colour, its name (gold; grey when done:
-`Q.ChainStep`'s chain title, else the first quest's), "3/7" with a check when done and a thin bar; then in
-grey what's next ("In your log: ...", else "Next: <title> · <giver>", else "Coming up: ...", else "All
-done"; the quests without a chain: "2 to pick up now", within my levels), and a dot per friend who's done
-some of it (`Q.Friends`, at most 5, class colours). Its tooltip: how far along, what's next, its levels
-("Level 5-12"), "Doing it opens 4 more of the chain" (how many of its quests not done yet come after the
-next one), "2 steps elsewhere" (its steps for me in other places) and each friend's "3 of 7". A click
-opens the chain. Nothing to show: "No quests known here yet." or "Nothing to show with these filters.".
+**Under the map**, one line with only what's there of "1 ready to turn in · 1 in progress · 3 available"
+(the place's quests in my log, ready (`C_QuestLog.IsComplete`) and not, and what I can take within my
+levels, in their colours; how far along is in the briefing), at its right how the map works ("Wheel: zoom ·
+drag: move · right-click a pin: map pin"); with none to take here: "Nothing for you to pick up here right
+now." and a button "Redridge Mountains has 9 for your level >" (`Q.SelectZone`): the zone whose level
+range is within 3 of mine with the most quests I can take now (`Q.Available`, else counted from the
+statuses), kept until a status changes.
+
+A dungeon has no map: its Zone tab is its quest list (as the Quest list tab), the line under it says each
+quest's details show where it's given; its chains' cards are in its briefing.
+
+### The right pane
+
+**The briefing** (nothing picked; a scroll area of ours). A place's: its name (`GameFontNormalLarge`), "Level
+1-10 · Eastern Kingdoms" (a dungeon: "Dungeon"), "12 of 40 done" with a bar across, "6 for your level ·
+2 to pick up now" (its quests not done that are `Q.InRange`, and of them what I can take now; none:
+"Nothing for your level."); then, only when there are any, **Turn in now (N)** (my quests ready to turn in
+that are the place's, or whose turn-in or an objective's area is on its map: `C_QuestLog`'s quest log;
+each a row: the "?", "[12] Title", "Turn in at <ender>" under it, its zone when that's another) and **In
+progress here (N)** (the rest of those: the first line of my progress not done yet, "3/10 Kobold Vermin
+slain", else "In your quest log"), at most 6 each, the lowest level first; then **Quest chains**: the
+chains with a quest of this place not done yet within my levels (`Q.InRange`; all levels: any the filters
+show), then the quests without a chain, then a **"Completed (N)"** row for the chains with every quest
+for me done (folded at first, a click opens it: their cards under it), and when the level filter left
+chains out, a quiet line at the end: "2 more outside your levels · Show all levels" (a click turns the
+filter on). A card (a Button, 48 px, 8 apart, as wide as the pane), two lines: a dot in the chain's
+colour, its name (gold; grey when done: `Q.ChainStep`'s chain title, else the first quest's), "3/7" with
+a check when done and a thin bar; then in grey what's next ("In your log: ...", else "Next: <title> ·
+<giver>", else "Coming up: ...", else "All done"; the quests without a chain: "2 to pick up now", within
+my levels), and a dot per friend who's done some of it (`Q.Friends`, at most 5, class colours). Its
+tooltip: how far along, what's next, its levels ("Level 5-12"), "Doing it opens 4 more of the chain"
+(how many of its quests not done yet come after the next one), "2 steps elsewhere" (its steps for me in
+other places) and each friend's "3 of 7". A click opens the chain in the middle. Nothing to show: "No
+quests known here yet." or "Nothing to show with these filters.". A row clicked picks its quest (on the
+map, which stays).
+
+An opened chain's briefing: its colour and name, "Level 1-10 · 9 quests · 1 steps elsewhere", "2 of 9
+steps done" with a bar, what's next; **Steps**: every step shown (the filters'), a row each, "3. [12]
+Title" in its status's colour, a tick when done, at its right the giver for one I can take or have, else
+its reason; at most 60 ("... and N more"); **Friends** ("Anna 3 of 9") when any. A row clicked picks it
+(the chain stays).
 
 **Lighting the other side.** Hovering a chain's card (the mouse, or the controller's cursor: its focus runs
 OnEnter) lights its pins and thread and dims every other pin (30%). Hovering a pin lights the cards of its
-quests' chains (gold edge and glow) and dims the others (40%); when none of them is in sight, the list
-scrolls to the first. Leaving puts it back. The card of the picked quest's chain has a gold edge. Only
-alphas, line widths and which thread shows change: nothing is laid again.
+quests' chains (gold edge and glow) and dims the others (40%); when none of them is in sight, the
+briefing scrolls to the first. Leaving puts it back. The card of the picked quest's chain has a gold edge.
+Only alphas, line widths and which thread shows change: nothing is laid again.
 
-A dungeon has no map: a line says each quest's details show where; its chains' cards as for a zone.
+**The details** (a quest picked). On top, fixed: **"< Elwynn Forest"** (the chain's name on a chain's
+page), back to the briefing (nothing picked). Then in a scroll area, on the 8 px grid:
+
+- Its icon (32 px: the start's "!" by my status, the "?" when it's ready, an item's own), beside it the
+  title ("[12] Title", in its difficulty colour, the client's title when it answers) and one status line
+  with its reason (above; a skipped one: what I took instead) and the tags after it (new in WoW: Forever,
+  repeatable, learned while playing).
+- **"Step 3 of 7 · <the chain>"** (a section heading; the steps as I can do them, `Q.ChainFor`, else the
+  place's chain without what isn't for me), a bar of the steps done under it, **"Open the chain >"** at its
+  right (the chain in the middle, the quest in sight), and the steps around it as links: one before, this
+  one (white, an arrow, marked), two after (more at the chain's ends), "... N before" / "... and N more";
+  done ones ticked; a click picks that step (where it's shown: the map, the chain's page, the list; else
+  its place opens).
+- **Objectives** (`Q.Objectives`): a line each, "Kill 10 x Kobold Vermin", "Collect 8 x Gold Dust" (the
+  client's item name when it has it) with its likeliest source under it ("from Kobold Miner, 32%"), "Use
+  Wanted Poster"; for a quest in my log the quest log's own lines with my progress
+  (`C_QuestLog.GetQuestObjectives`: "Kobold Vermin slain: 3/10"), matched to the data's by the name in the
+  line, else by the order of their kind, else by their place; done ones ticked and grey. A dot in the map's
+  colour when it has an area on the map in sight; hovering lights its areas there (its tooltip: every
+  source with its chance and zone), a click puts the game's map pin at its area. No objectives known (or
+  no `Q.Objectives`): no section.
+- **Quest giver and turn-in**: a line each (`GameFontHighlight`), "Marshal Dughan · Elwynn Forest" with
+  the "!", the ender with the "?" (grey until it's done); objects and items said so; an item: its icon,
+  and its best drop under it ("Drops from Young Wolf (12%) · Elwynn Forest"; an object "In ... (x%)"). A
+  line is a Button: its tooltip has the spot and the rest (the other drops, "Starts at" the other givers,
+  "Turn in at" the other enders, three each, "... and N more"), a click puts **a map pin** there.
+- The small map (the same widget as the zone page's, not zoomable), only when the zone page's map isn't in
+  sight (a chain's page, the quest list, another tab, the search): for a quest in my log the map of its
+  objectives (else its turn-in's), else its first giver's map (else a drop's, else the first ender's),
+  with every giver, ender and drop area and the quest's own areas and way on it; a click on a pin puts the
+  map pin there.
+- **Rewards** (`Q.Rewards`): "Choose one of:" and its items, "You get:" (or "You also get:" after a
+  choice) and its items: the game's icons (36 px, `C_Item.GetItemIconByID`), the count, a border in the
+  quality's colour (`C_Item.GetItemQualityByID`, not for a common one; an item the client doesn't know yet
+  is asked for, `C_Item.RequestLoadItemDataByID`, and drawn again when `ITEM_DATA_LOAD_RESULT` says it
+  came), nine a row; hovering one: the game's item tooltip (`GameTooltip:SetItemByID`), a modified click
+  the game's (`HandleModifiedItemClick`: Shift links it, Ctrl tries it on); then the money
+  (`GetCoinTextureString`) and "1250 XP". None known (or no `Q.Rewards`): no section.
+- **Requirements**, only those not met: for a quest not for me the one that keeps me from it (faction,
+  races: a mask with all of one side's classic races is "every Horde race", as the engine counts it for
+  the new ones too, else each race whose bit is set, named by `Q.Races()`' `{ id, bit, name }` /
+  `Q.RaceInfo(id)`, the game's `C_CreatureInfo.GetRaceInfo`, classic's names; classes; a profession), for a
+  locked one the reputation or profession rank `Q.Needs` names, and what taking it closes while it can
+  still be taken (without `Q.WhyOther` all of a not-for-me quest's).
+- **Needs first:** only the first of `Q.Missing` ("... and N more") and **Leads to:** (`Q.Opens`, at most
+  three), a button per quest, its zone named when it isn't the place shown (a click: as the steps').
+- **Friends** only when any (`Q.Friends`: at most three names in class colour with their status, "+N").
+
+At the bottom, outside the scroll area: **Map pin** (the game's map pin where to go next: the turn-in when
+it's ready, in my log the first objective not done yet that has an area, else the turn-in; not taken yet
+its giver, an item's best drop; greyed without a spot; its tooltip says where) and **Companion** (the
+quest in the small window, `Q.ShowQuest`).
 
 ### A chain opened
 
@@ -781,7 +882,8 @@ it the giver in grey (in another zone the zone's name). No words on the cards: a
 is a bit dimmer and its line dashed, its tooltip says it isn't needed for what comes after; what taking it
 closes (`excl`) and friends are in its tooltip. Not for me, or skipped: dimmed.
 The quest picked: a gold edge and glow. **The next step pulses once** (a gold glow in and out) when the
-chain is opened from its card, and is brought into sight.
+chain is opened from its card, and is brought into sight. The right pane: the quest picked, else the
+chain's briefing (its steps).
 
 **Lines** (`CreateLine`, 2 px): down from a card, across the gap, down into the next; green when both are
 done, amber from a done, available or in-log one, grey otherwise (the lit ones on a higher sublevel). A
@@ -830,59 +932,36 @@ quests blue.
 
 ### Quest list
 
-The tab "Quest list" (key "overview"): the place's quests within my levels (all levels: every one) in
-groups (a pooled list, the left's rows): In progress, Available now, Coming up (level too low), Blocked
-(needs something first), Completed (folded at first; the skipped ones in it too, "Skipped" at their
-right), Not for you (only with that filter, only race, class, faction or a profession I don't have), each
-with how many; then, when the level filter left some out, a quiet line "5 more outside your levels · Show
-all levels" (a click turns the filter on). A row: the start's icon, "[12] title" (level coloured, title in
-its status's colour), at the right the giver, or for a blocked, later or not-for-me one its reason
-("Needs Investigate Echo Ridge", "Needs level 7", "Not for your faction"). A click shows the quest in the
-details; a link there keeps the quest list.
+The tab "Quest list" (key "overview"), and a dungeon's Zone tab: the place's quests within my levels (all
+levels: every one) in groups (a pooled list, the left's rows): In progress, Available now, Coming up (level
+too low), Blocked (needs something first), Completed (folded at first; the skipped ones in it too,
+"Skipped" at their right), Not for you (only with that filter, only race, class, faction or a profession I
+don't have), each with how many; then, when the level filter left some out, a quiet line "5 more outside
+your levels · Show all levels" (a click turns the filter on). A row: the start's icon, "[12] title" (level
+coloured, title in its status's colour), at the right the giver, or for a blocked, later or not-for-me one
+its reason ("Needs Investigate Echo Ridge", "Needs level 7", "Not for your faction"). A click picks the
+quest (the details); a link there keeps the quest list.
 
 ### Views other files add
 
 `Q.RegisterBrowserView(key, label, build)` adds a tab after Zone and Quest list (in the order registered;
 a view registered after the window was built gets its tab at once). `build(parent)` is called the
-first time the tab is shown, with a frame of ours under the tab bar, between the zones and the details
-(782 x 694: the head and the legend are hidden for it), and returns `{ frame, Refresh = function(self)
-end, OnShow = function(self) end, OnHide = function(self) end }` (each optional; a frame without points
-fills the parent; `self` is that table). OnShow runs when its tab is shown, OnHide when another tab is or
-the window closes; Refresh each time it's shown and while it's shown when quests change (the window's
-events, on the next frame) or the data changes. Errors in them go to the error handler (the error window)
-and don't break the window; a build that fails leaves "This view couldn't be built." `key` must be a
-string other than "zone", "overview" and "results", `build` a function; the same key again replaces its
-label and build (a view already built stays). Returns true when registered.
+first time the tab is shown, with a frame of ours under the tab bar, between the zones and the right
+pane (the middle's width and its height under the tab bar: 752 x 634 at 1400 x 760, 1012 x 742 at
+1700 x 868; the head and the legend are hidden for it), and returns `{ frame, Refresh =
+function(self) end, OnShow = function(self) end, OnHide = function(self) end }` (each optional; a frame
+without points fills the parent; `self` is that table). OnShow runs when its tab is shown, OnHide when
+another tab is or the window closes; Refresh each time it's shown and while it's shown when quests change
+(the window's events, on the next frame) or the data changes. Errors in them go to the error handler (the
+error window) and don't break the window; a build that fails leaves "This view couldn't be built." `key`
+must be a string other than "zone", "overview" and "results", `build` a function; the same key again
+replaces its label and build (a view already built stays). Returns true when registered. The right pane
+shows the briefing of the place shown (or the quest picked) beside it.
 
 `Q.ShowBrowserView(key)` opens the window (if it isn't) on that tab: "zone" (the zone's page), "overview"
-(the quest list) or a registered view's key; false for an unknown one. From a view, `Q.OpenBrowser(questID)` goes to the
-quest's chain and `Q.SelectZone(map)` to a zone's page (both on the Zone tab).
-
-### Details
-
-In a scroll area: the title ("[12] Title", in its difficulty colour, the client's title when it
-answers); one status line with its reason (above; a skipped one: what I took instead) and the tags after
-it (new in WoW: Forever, repeatable, learned while playing); "Step 3 of 7 · <the chain>" (`Q.ChainStep`,
-else its place in `Q.Chain`). Then **where it starts**, one line: the first giver and its zone ("Marshal
-Dughan · Elwynn Forest", objects and items said so); an item: its best drop ("Wolf Fang (an item) · Drops
-from Young Wolf (12%) · Elwynn Forest", the most likely one; an object "In ... (x%)"); a quest in my log:
-where it's turned in instead (the "?"). The line is a Button: its tooltip has the spot and the rest (the
-other drops, "Starts at" the other givers, "Turn in at" the enders, three each, "... and N more"), a click
-puts **a map pin** there (`C_Map.SetUserWaypoint` with `UiMapPoint.CreateFromCoordinates`, when
-`C_Map.CanSetUserWaypointOnMap` allows it, then `C_SuperTrack.SetSuperTrackedUserWaypoint(true)`; a chat
-line says so; the world map isn't opened or touched). Then the small map (the same widget as the zone
-page's, not zoomable), only when the zone page's map isn't in sight (a chain's page, the quest list,
-another tab, the search): the first giver's map (else a drop's, else the first ender's) with every giver,
-ender and drop area on it; **Requirements**, only those not met: for a quest not for me the one that keeps
-me from it (faction, races: a mask with all of one side's classic races is "every Horde race", as the
-engine counts it for the new ones too, else each race whose bit is set, named by `Q.Races()`' `{ id, bit,
-name }` / `Q.RaceInfo(id)`, the game's `C_CreatureInfo.GetRaceInfo`, classic's names; classes; a
-profession), for a locked one the reputation or profession rank `Q.Needs` names, and what taking it closes
-while it can still be taken (without `Q.WhyOther` all of a not-for-me quest's); **Needs first:** only the
-first of `Q.Missing` ("... and N more") and **Leads to:** (`Q.Opens`, at most three), a button per quest, its
-zone named when it isn't the place shown; **Friends** only when any (`Q.Friends`: at most three names in
-class colour with their status, "+N"); and at the bottom, outside the scroll area, "Show in the small
-window" (`Q.ShowQuest`).
+(the quest list) or a registered view's key; false for an unknown one. From a view, `Q.OpenBrowser(questID)`
+goes to the quest (its zone's map, picked) and `Q.SelectZone(map)` to a zone's page (both on the Zone
+tab).
 
 ### Filters
 
@@ -890,20 +969,22 @@ Two checkboxes of ours (Buttons with the game's checkbox art), kept in the modul
 (`browser = { allLevels, showOther, tab }`, made when first needed; a tab of the version before, "chains" or
 "map", becomes "zone"; the earlier `hideDone` and `onlyAvailable` are just ignored):
 
-- **All levels** (off): off, the zone page (pins, threads, the chains' cards, the line under the map, the
-  head's "to pick up now") and the quest list show only what's within my levels: `Q.InRange(id)` (a quest
-  in my log; else not grey for me and its `minLevel` at most `Q.RANGE_ABOVE`, 2, above my level; done and
-  skipped ones always; without `Q.InRange` everything), kept per status change. A chain's card is listed
-  when one of its quests here not done yet is within my levels; what's left out is counted in a quiet
-  line at the end of the list ("N more outside your levels · Show all levels", a click turns this on).
-  An opened chain and the search always show every level.
+- **All levels** (off): off, the zone page (pins, threads, the line under the map) and the briefing (its
+  chains' cards) and the quest list show only what's within my levels: `Q.InRange(id)` (a quest in my log;
+  else what I can take now and is worth it: its `minLevel` at most mine, not grey for me, its level at most
+  `Q.RANGE_RED`, 4, above mine (red: far too hard; a level of -1 / 0 counts as mine); done and skipped ones
+  always; without `Q.InRange` everything), kept per status change. A chain's card is listed when one of its
+  quests here not done yet is within my levels; what's left out is counted in a quiet line at the end of
+  the list ("N more outside your levels · Show all levels", a click turns this on). "N for your level" in
+  the briefing counts `Q.InRange` whatever the filter. An opened chain and the search always show every
+  level.
 - **Show quests not for you** (off): off, quests for another race, class, faction or a profession I don't
   have are left out everywhere (a skipped one isn't "not for you": it stays, with the done ones); on,
   they're shown, dimmed. A hidden quest in a chain is passed through: what came before it leads to what
   comes after (a fainter line), and the stages close up. A chain with nothing left to show has no card
   either.
 
-The done ones are folded instead of hidden ("Completed (N)" on the zone page, the Completed group in the
+The done ones are folded instead of hidden ("Completed (N)" in the briefing, the Completed group in the
 quest list). The search and the counts aren't filtered.
 
 ### Going to a quest, the search
@@ -911,10 +992,13 @@ quest list). The search and the counts aren't filtered.
 **Going to a quest** (a link, a search result, a stub, `Q.OpenBrowser(id)`): it stays in the place shown
 if that place lists it (its own quests and those given there), else goes to the quest's zone if that
 zone lists it, else its dungeon, else its zone. Its continent unfolds, the left list scrolls to the place
-when it changed, and its chain opens on the Zone tab with its card in the middle (the quest list stays the
-quest list). A click on a quest (a card, a row, a pin, a link) also shows it in the small window when
-that's open (`Q.IsSmallShown()`; without it this is skipped). A click on a place on the left shows its
-page (the quest list stays the quest list; a registered view goes back to Zone).
+when it changed, and on the Zone tab its zone's map shows it picked (a dungeon: its list; a stub, or a
+link while a chain is open: its chain opened there, its card in the middle); the quest list stays the
+quest list. A quest clicked in the right pane (a row, a step, a link) is picked where it's shown when the
+page shows it (the map, the chain's page, the list), else it's gone to. A click on a quest (a card, a
+row, a pin, a link) also shows it in the small window when that's open (`Q.IsSmallShown()`; without it
+this is skipped). A click on a place on the left shows its page with nothing picked (the quest list stays
+the quest list; a registered view goes back to Zone).
 
 **Search.** Typed into the box, searched 0.3 s after the last key: a quest ID finds that quest, two
 letters or more go to `Q.Search(text)` (titles, the client's too, and givers). The results replace the
@@ -934,50 +1018,71 @@ Built the first time it opens; nothing at login. A place's chains (`Q.Chain`, wh
 worked out once and kept until the data changes; a chain's progress (its card, its head), a chain page's
 cards and lines, a zone's pins and threads, why a quest isn't for me (`Q.WhyOther`) and whether it's within
 my levels (`Q.InRange`), the zone to suggest when the filters or a status change (an event), or the window
-opens; what a pin is only when its tooltip shows; a place's count once, until a quest of it is turned in (or one is taken or
-dropped: that can close others). Statuses are read for the place's quests when its page is drawn and for
-the cards near sight when they're filled. The lists (left, chain cards, quest list, results) are pools of
-the rows in sight plus 2 above and below; entry i always has row `(i - 1) % pool + 1`. Hovering only sets
-alphas and line widths. While it's open it listens to `QUEST_TURNED_IN`, `QUEST_ACCEPTED`,
-`QUEST_REMOVED`, `PLAYER_LEVEL_UP`, `QUEST_DATA_LOAD_RESULT` (a title asked for with
-`C_QuestLog.RequestLoadQuestByID`, once per quest a session, came) and `QUEST_LOG_UPDATE` (only while the
-zone page shows, looked at a second later at most: if a quest in my log got ready to turn in, only the
-map's pins and the line under it are drawn again); the handlers only note it, the window redraws on the next frame (an OnUpdate
-set only while something is due), at most every 0.5 s for statuses, 0.2 s after titles. `Q.OnDataChanged`:
-open, everything worked out goes and it's drawn again on the next frame; closed, when it opens. Dragging
-(the canvas, the map) runs an OnUpdate only while the button is held. Closed: no events, no OnUpdate.
+opens; what a pin is only when its tooltip shows; a place's count once, until a quest of it is turned in (or
+one is taken or dropped: that can close others). Statuses are read for the place's quests when its page is
+drawn and for the cards near sight when they're filled. The quest picked's areas and way
+(`Q.Objectives`, Data.lua's cache) when it's picked or the map is drawn. The lists (left, quest list,
+results) are pools of the rows in sight plus 2 above and below; entry i always has row `(i - 1) % pool + 1`;
+the briefing's rows and cards, the details' lines and reward buttons are pools too (a zone has tens of
+chains; a chain's briefing at most 60 steps). Hovering only sets alphas and line widths. While it's open it
+listens to `QUEST_TURNED_IN`, `QUEST_ACCEPTED`, `QUEST_REMOVED`, `PLAYER_LEVEL_UP`, `QUEST_DATA_LOAD_RESULT` (a
+title asked for with `C_QuestLog.RequestLoadQuestByID`, once per quest a session, came),
+`ITEM_DATA_LOAD_RESULT` (a reward asked for came), `QUEST_LOG_UPDATE` and `ZONE_CHANGED_NEW_AREA` (looked at
+a second later at most: if a quest in my log got ready to turn in, only the map's pins and the line under
+it are drawn again; if what the right pane shows of my quest log changed (`Side.LogKey`: the details'
+quest's lines, the briefing's quests in progress), only the right pane and the quest's areas; my arrow
+placed again); the handlers only note it, the window redraws on the next frame (an OnUpdate set only while
+something is due), at most every 0.5 s for statuses, 0.2 s after titles and items. `Q.OnDataChanged`: open,
+everything worked out goes and it's drawn again on the next frame; closed, when it opens. Dragging (the
+canvas, the map) runs an OnUpdate only while the button is held; my arrow's only while I'm on the map
+shown. Closed: no events, no OnUpdate.
 
 ### Controller and taint
 
-Our frames only; nothing protected, so it opens in a fight and in gamepad mode. No Blizzard menu, no
-Blizzard panel opened (not the world map either: the zone map is our own frame with `LT.MapArt`'s
-textures; no data provider, no pins on `WorldMapFrame`). Every card, chain card, pin, list row, tab,
-filter, zoom button, link, place line, the head's way back and the suggestion are plain Buttons, so
-SmartNavigation finds them as the panel's descendants (its focus runs OnEnter: the tooltips show, and a
-chain's card lights its pins as with the mouse). The chain cards' list is a ScrollFrame (SmartNavigation
-scrolls it); the chain's canvas and the map aren't (SmartNavigation only scrolls those up and down, and
-only takes their buttons in sight): their buttons are the panel's own, and a card or pin the cursor moves
-to out of sight (its middle outside, in gamepad mode or without the mouse over it) moves the view to it.
-The canvas and the map have no OnMouseDown/OnMouseUp (they'd be buttons to SmartNavigation), only the
-wheel and dragging. Nothing of Blizzard's (navigation flags, mixins, Backdrop) is set on our frames. A
-registered view's frames are its own file's: the same rules apply.
+Our frames only; nothing protected, so it opens in a fight and in gamepad mode. No Blizzard menu (a pin's
+list of quests is `LT.Window.PopupList`, ours), no Blizzard panel opened (not the world map either: the
+zone map is our own frame with `LT.MapArt`'s textures; no data provider, no pins on `WorldMapFrame`; the
+map pin is `C_Map.SetUserWaypoint`). `GameTooltip:SetItemByID` on our own buttons. Every card, chain card,
+pin, objective area, the map's -, + and Fit, list row, the briefing's rows, the details' lines, steps,
+objectives and rewards, tab, filter, zoom button, link, place line, the ways back, Map pin, Companion and
+the suggestion are plain Buttons, so SmartNavigation finds them as the panel's descendants (its focus runs
+OnEnter: the tooltips show, a chain's card or a pin lights the other side, an objective's line its areas,
+as with the mouse). The briefing and the details are ScrollFrames (SmartNavigation scrolls them); the
+chain's canvas and the map aren't (SmartNavigation only scrolls those up and down, and only takes their
+buttons in sight): their buttons are the panel's own, and a card or pin the cursor moves to out of sight
+(its middle outside, in gamepad mode or without the mouse over it) moves the view to it; -, + and Fit zoom
+the map. A right-click or Shift has no controller button: the details' Map pin does it. The canvas and the
+map have no OnMouseDown/OnMouseUp (they'd be buttons to SmartNavigation), only the wheel and dragging.
+Nothing of Blizzard's (navigation flags, mixins, Backdrop) is set on our frames. A registered view's frames
+are its own file's: the same rules apply.
 
 Tests: `tests/questtree_browser.lua`, with stand-ins for every `Q.*` it calls (the data, the engine, the
 iterations' `Q.ZoneCount`, `Q.ChainStep`, `Q.LevelColor`, `Q.Races`, `Q.ZoneGiven`, `Q.Available`,
-`Q.IsTrivial`, `Q.InRange`, `Q.WhyOther`, `Q.Needs`, the small window), put back at the end; it also checks the window without `Q.ZoneCount`,
-`Q.ChainStep` and `Q.LevelColor`, and registers views of its own (removed at its end).
+`Q.IsTrivial`, `Q.InRange` (this round's meaning), `Q.WhyOther`, `Q.Needs`, this round's `Q.Objectives` and
+`Q.Rewards` (the shared contract's shapes: Data.lua makes them in parallel), the small window), put back at
+the end; it also checks the window without `Q.ZoneCount`, `Q.ChainStep`, `Q.LevelColor`, `Q.Objectives`
+and `Q.Rewards`, the size for four screens, and registers views of its own (removed at its end); the mock's
+map pin API and `GameTooltip:SetItemByID` are made for it and put back.
 
 ### Open questions (in game)
 
 - That the canvas's anchor offsets count in its own (zoomed) units, so zooming and scrolling line up.
 - That SmartNavigation's cursor moves onto a card or pin that's clipped out of sight (it's visible to it)
-  and runs its OnEnter, so the view follows; and onto the chain cards' rows inside their ScrollFrame.
+  and runs its OnEnter, so the view follows; and onto the briefing's rows and cards inside its ScrollFrame,
+  and a pin's list of quests (a PopupList at FULLSCREEN_DIALOG strata) when a pin's click opened it.
 - The atlases `TrivialQuests`, `QuestRepeatableTurnin`, `SideInProgressquesticon`,
   `QuestDaily`, `common-icon-checkmark`, `Options_HorizontalDivider` on Forever (each falls back when
   missing).
 - That a desaturated `QuestTurnin` reads as the game's grey "?".
-- That `Line` objects on the map frame (OVERLAY) draw over `LT.MapArt`'s tiles (ARTWORK) and under the pins.
+- That `Line` objects on the map frame (OVERLAY) draw over `LT.MapArt`'s tiles (ARTWORK) and under the pins;
+  that `Spells\GenericGlow64` added in a chain's colour reads as a soft area on every zone's art.
 - That `C_Map.SetUserWaypoint` from addon code doesn't taint anything in gamepad mode.
+- That `GetCursorPosition` over `GetLeft`/`GetTop` of the map box gives the cursor's spot at any window
+  scale (the wheel's zoom keeps it under the cursor).
+- That `GameTooltip:SetItemByID` shows a reward's tooltip for an item the client hasn't seen yet (it asks
+  the server itself), and `C_Item.GetItemQualityByID` answers after `ITEM_DATA_LOAD_RESULT`.
+- Whether the quest log's objective lines (`C_QuestLog.GetQuestObjectives`) come in the data's order on a
+  German client (the names there are German: matched by kind and order).
 
 ## Views (Views.lua)
 
