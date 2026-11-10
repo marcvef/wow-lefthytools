@@ -530,17 +530,9 @@ ns.CHANGELOG = {
 	{ id = 174, module = "questtree",
 		en = { "Questtree: zone map beside chains", "The quest browser shows a zone's map beside its chains: quest givers with how many quests they have, each chain in its own colour on the map, lit up when you hover it. An opened chain shows which steps are all or one of, lead-ins and steps in other zones, and lights the way to a locked quest." },
 		de = { "Questtree: Karte neben Questreihen", "Der Quest-Browser zeigt die Karte eines Gebiets neben seinen Questreihen: Questgeber mit der Anzahl ihrer Quests, jede Questreihe in ihrer eigenen Farbe auf der Karte, hervorgehoben beim Drüberfahren. Eine geöffnete Questreihe zeigt, ob alle oder einer der Schritte davor nötig sind, Hinführungen und Schritte in anderen Gebieten, und hebt den Weg zu einer gesperrten Quest hervor." } },
-	-- PLACEHOLDER (merge: replace with the big window's real entry 174 from its branch; it's only here so
-	-- the ids run 1, 2, 3, ... in this branch's tests).
-		en = { "Questtree: the big window", "(placeholder)" },
-		de = { "Questtree: das große Fenster", "(Platzhalter)" } },
 	{ id = 175, module = "questtree",
 		en = { "Questtree: storylines, level path", "Three new views in the quest browser. Storylines: every chain for you in all zones, filtered and sorted by what it's worth. Level path: where to go next for your level, with friends on it. Continents: how much of each zone you've done." },
 		de = { "Questtree: Handlungsstränge, Levelpfad", "Drei neue Ansichten im Quest-Browser. Handlungsstränge: jede Questreihe für dich in allen Zonen, gefiltert und danach sortiert, wie sehr sie sich lohnt. Levelpfad: wohin es für dein Level als Nächstes geht, mit Freunden darauf. Kontinente: wie viel du von jeder Zone erledigt hast." } },
-	-- PLACEHOLDERS (merge: replace with the big window's real entry 174 and the views' 175 from their
-	-- branches; they're only here so the ids run 1, 2, 3, ... in this branch's tests).
-		en = { "Questtree: new views", "(placeholder)" },
-		de = { "Questtree: neue Ansichten", "(Platzhalter)" } },
 	{ id = 176, module = "questtree",
 		en = { "Questtree in the quest window", "Beside a quest's dialog, Questtree shows which part of its chain it is, every step, and what it leads to and closes. Your quest log shows each chain quest's step (2/4); Alt-click opens it in Questtree. The companion has the game's quest icons and can shrink to one line." },
 		de = { "Questtree im Questfenster", "Neben dem Questfenster zeigt Questtree, der wievielte Teil ihrer Questreihe eine Quest ist, jeden Schritt und wozu sie führt und was sie ausschließt. Dein Questlog zeigt bei jeder Quest einer Questreihe ihren Schritt (2/4); Alt-Klick öffnet sie in Questtree. Das kleine Fenster hat die Quest-Icons des Spiels und lässt sich auf eine Zeile verkleinern." } },
