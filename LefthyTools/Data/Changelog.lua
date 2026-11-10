@@ -539,5 +539,12 @@ ns.CHANGELOG = {
 	{ id = 177, module = "questtree",
 		en = { "Questtree: maps fully uncovered", "Questtree's maps show the whole zone, also the parts you haven't explored yet. Quests blocked by a reputation or a profession's rank say what they need instead of \"not for you\"." },
 		de = { "Questtree: Karten ganz aufgedeckt", "Die Karten von Questtree zeigen das ganze Gebiet, auch die Teile, die du noch nicht erkundet hast. Quests, denen Ruf oder ein Berufsrang fehlt, sagen, was ihnen fehlt, statt „nicht für dich“." } },
+	-- PLACEHOLDER (the Views agent's worktree only): id 178 is the Browser agent's entry; the lead puts theirs here.
+	{ id = 178, module = "questtree",
+		en = { "Questtree: the big window (placeholder)", "The Browser agent's entry goes here." },
+		de = { "Questtree: großes Fenster (Platzhalter)", "Hier kommt der Eintrag des Browser-Agenten hin." } },
+	{ id = 179, module = "questtree",
+		en = { "Questtree: less on screen", "The companion shows what to do now and quests for your level, with the chain's steps folded away, and says why a quest is blocked or skipped. Storylines and the level path start with what's for your level; the panel beside the quest dialog lists only the steps around the quest. The Continents view is gone." },
+		de = { "Questtree: weniger auf einmal", "Das kleine Fenster zeigt, was jetzt zu tun ist, und Quests für dein Level, die Schritte der Questreihe eingeklappt, und sagt, warum eine Quest gesperrt oder übersprungen ist. Handlungsstränge und der Levelpfad zeigen zuerst, was zu deinem Level passt; das Feld neben dem Questfenster nur die Schritte um die Quest herum. Die Ansicht Kontinente gibt es nicht mehr." } },
 	-- New entries go here, at the end.
 }
