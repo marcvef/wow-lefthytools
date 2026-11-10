@@ -539,5 +539,8 @@ ns.CHANGELOG = {
 	{ id = 177, module = "questtree",
 		en = { "Questtree: maps fully uncovered", "Questtree's maps show the whole zone, also the parts you haven't explored yet. Quests blocked by a reputation or a profession's rank say what they need instead of \"not for you\"." },
 		de = { "Questtree: Karten ganz aufgedeckt", "Die Karten von Questtree zeigen das ganze Gebiet, auch die Teile, die du noch nicht erkundet hast. Quests, denen Ruf oder ein Berufsrang fehlt, sagen, was ihnen fehlt, statt „nicht für dich“." } },
+	{ id = 178, module = "questtree",
+		en = { "Questtree: your levels, less clutter", "The quest browser shows what's within your levels by default (All levels shows the rest), with done chains folded. Quests say why you can't take them: what they need, or that you skipped them for another. Cards, map and details show less; the rest is in their tooltips." },
+		de = { "Questtree: dein Level, aufgeräumt", "Der Quest-Browser zeigt erst mal, was zu deinem Level passt (Alle Level zeigt den Rest), erledigte Questreihen eingeklappt. Quests sagen, warum du sie nicht annehmen kannst: was ihnen fehlt, oder dass du stattdessen eine andere genommen hast. Karten, Gebietskarte und Details zeigen weniger, der Rest steht in ihren Tooltips." } },
 	-- New entries go here, at the end.
 }

@@ -1,19 +1,23 @@
 -- Questtree: the big window (Browser.lua), against a small made-up world. The data and engine (Q.Load,
--- Q.Quest, Q.Zones, Q.Status, Q.Chain, ...), the iteration's ones (Q.ZoneCount, Q.ChainStep,
--- Q.LevelColor, Q.Races, Q.ZoneGiven, Q.Available, Q.IsTrivial), the small window (Q.ShowQuest,
--- Q.IsSmallShown) are stand-ins installed here, so every card is certain; the real ones are put back
--- at the end. Without some of them the window works too (counted here, the step from Q.Chain, the
--- level against mine). The empty window without the data, the zones by continent with their counts;
--- the zone page (the map's pins grouped with a count, the game's icons, threads in each chain's
--- colour, the chains' cards, hovering a card or a pin lights the other, what's here, a zone to go to
--- when there's nothing); a chain opened (stages, centred, lanes, lines that never run through a card
--- or look joined when they aren't, their colours, "all of" / "one of", dashed lead-ins, "closes",
--- stubs for other zones and a click on one, the way back to a locked quest across zones, the pulse);
--- the filters, the canvas (pools, scrolling, zoom, a card the controller reaches out of sight), the
--- overview, the details (level colour, chain step, drops, map pins, races), the search, the views
--- other files register (lazily built, shown, hidden, refreshed, Q.ShowBrowserView, Q.SelectZone,
--- Q.OpenBrowser from one, one that fails), events and data changes redrawn on the next frame only
--- while it's open, a small screen, the controller's buttons.
+-- Q.Quest, Q.Zones, Q.Status, Q.Chain, ...), the iterations' ones (Q.ZoneCount, Q.ChainStep,
+-- Q.LevelColor, Q.Races, Q.ZoneGiven, Q.Available, Q.IsTrivial, Q.InRange, Q.WhyOther, Q.Needs), the
+-- small window (Q.ShowQuest, Q.IsSmallShown) are stand-ins installed here, so every card is certain;
+-- the real ones are put back at the end. Without some of them the window works too (counted here, the
+-- step from Q.Chain, the level against mine). The empty window without the data, the zones by
+-- continent with their counts (far ones dimmed); the zone page within my levels by default (the map's
+-- pins grouped with a count, the game's icons, what each pin is in its tooltip, a chain's thread only
+-- while hovered or picked, the chains' two-line cards, the done ones folded, a line saying how many
+-- more, hovering a card or a pin lights the other, one line under the map, a zone to go to when
+-- there's nothing); a chain opened (every level, stages, centred, lanes, lines that never run through
+-- a card or look joined when they aren't, their colours, "one of", dashed lead-ins, stubs for other
+-- zones and a click on one, the way back to a locked quest across zones, the pulse, the line under
+-- it); the filters (all levels, not for me, a skipped quest stays), the canvas (pools, scrolling,
+-- zoom, a card the controller reaches out of sight), the quest list (groups, the skipped with the done
+-- ones, reasons), the details (the reason, chain step, one start line with the rest in its tooltip,
+-- drops, map pins, requirements not met, races), the search, the views other files register (lazily
+-- built, shown, hidden, refreshed, Q.ShowBrowserView, Q.SelectZone, Q.OpenBrowser from one, one that
+-- fails), events and data changes redrawn on the next frame only while it's open, a small screen, the
+-- controller's buttons.
 -- Needs: no other file.
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
@@ -81,6 +85,9 @@ local MISSING = { [105] = { { id = 103, status = "active" } }, [201] = { { id = 
 	[108] = { { id = 103, status = "active" }, { id = 105, status = "locked" } } }
 local FRIENDS = { [104] = { { name = "Anna Brook", classFile = "MAGE", status = "done" }, { name = "Bob", classFile = "WARRIOR", status = "active" } } }
 local TRIVIAL = { [107] = true }
+local FAR = { [111] = true } -- (more than 2 levels above mine: with TRIVIAL, outside my levels: Q.InRange)
+local WHY = { [112] = "faction", [401] = "race" } -- (why an "other" one isn't for me: Q.WhyOther)
+local NEEDS = {} -- (a reputation or profession rank a locked one needs: Q.Needs)
 local function ChainOf(id)
 	for _, chain in ipairs(CHAINS) do
 		for _, c in ipairs(chain) do if c == id then return chain end end
@@ -140,6 +147,17 @@ local stand = {
 		return out
 	end,
 	IsTrivial = function(id) return TRIVIAL[id] == true end,
+	InRange = function(id)
+		local q = QUESTS_DATA[id]
+		local need = q and (q.minLevel or q.level)
+		return STATUS_OF[id] == "active" or not (TRIVIAL[id] or FAR[id] or (need and need > UnitLevel("player") + 2))
+	end,
+	WhyOther = function(id)
+		local w = STATUS_OF[id] == "other" and WHY[id]
+		if type(w) == "table" then return w[1], w[2] end
+		return w or nil
+	end,
+	Needs = function(id) return NEEDS[id] end,
 	Friends = function(id) return FRIENDS[id] or {} end,
 	OnDataChanged = function(fn) dataCallbacks[#dataCallbacks + 1] = fn end,
 	ShowQuest = function(id) shownInSmall[#shownInSmall + 1] = id end,
@@ -161,6 +179,7 @@ do
 	if view then Q.HideBrowser(); view.Box:SetText("") end
 	st.where, st.picked, st.query, st.results, st.drilled, st.places, st.opened, st.tab, st.chain = nil, nil, "", nil, false, nil, nil, "zone", nil
 	wipe(st.folded); wipe(st.trees); wipe(st.counts); wipe(st.layouts); wipe(st.infos); wipe(st.spots)
+	if st.why then wipe(st.why); wipe(st.range) end
 end
 
 local view, st, win, filters, registry
@@ -177,7 +196,7 @@ end
 local function listRow(match)
 	for _, row in pairs(view.list.rows) do
 		local e = row:IsShown() and row.entry
-		if e and (e.quest == match or e.key == match or (match == "search" and e.search)) then return row end
+		if e and (e.quest == match or e.key == match or (match == "search" and e.search) or (match == "more" and e.more)) then return row end
 	end
 end
 local function chainCard(key) -- a chain's card on the zone page (its key: "z:1429:101")
@@ -198,7 +217,7 @@ local function zonesOutline()
 end
 local function listOutline()
 	local out = {}
-	for _, e in ipairs(view.list.entries) do out[#out + 1] = e.header and ("#" .. e.label) or tostring(e.quest) end
+	for _, e in ipairs(view.list.entries) do out[#out + 1] = e.header and ("#" .. e.label) or e.more and ("+" .. e.n) or tostring(e.quest) end
 	return table.concat(out, " ")
 end
 local function lay() return view.g.layout end
@@ -236,7 +255,7 @@ do
 	refs()
 	check(win == LefthyToolsQuesttreeBrowser and win:IsShown() and win.TitleContainer.TitleText:GetText() == "Questtree",
 		"it opens, called Questtree (never translated)")
-	check(view.Empty:IsShown() and not view.root:IsShown() and not view.Box:IsShown() and not view.filters.hideDone:IsShown()
+	check(view.Empty:IsShown() and not view.root:IsShown() and not view.Box:IsShown() and not view.filters.allLevels:IsShown()
 		and plain(view.Empty:GetText()):find("LefthyTools_QuestData", 1, true),
 		"no data addon: a line saying so, no panes, no search, no filters")
 	check(#dataCallbacks == 1 or st.listening, "it listens for data changes")
@@ -274,17 +293,16 @@ do
 		"a continent folds")
 	zoneRow("c:1415"):Click()
 	check(zonesOutline():find("Elwynn Forest", 1, true), "and opens again")
-	local legend = plain(view.Legend:GetText())
-	check(legend:find("Completed", 1, true) and legend:find("In your quest log", 1, true) and legend:find("Available", 1, true)
-		and legend:find("Locked", 1, true) and legend:find("Level too low", 1, true) and legend:find("Not for you", 1, true),
-		"the legend names every status, got " .. legend)
+	check(not view.Legend:IsShown(), "no legend of the statuses on the zone page (they say their reason themselves)")
+	check(not zoneRow("z:1429").Name:GetText():find("|c", 1, true) and not zoneRow("d:The Deadmines").Name:GetText():find("|c", 1, true),
+		"zones near my level (19): not dimmed")
 end
 
 section("Questtree: the big window, the tab bar")
 do
 	check(view.tabs.zone and view.tabs.overview and view.tabs.zone:IsShown() and view.tabs.overview:IsShown()
-		and plain(view.tabs.zone.Text:GetText()) == "Zone" and plain(view.tabs.overview.Text:GetText()) == "Overview"
-		and view.tabs.zone.Line:IsShown() and not view.tabs.overview.Line:IsShown(), "the zone page's tab first, then the overview")
+		and plain(view.tabs.zone.Text:GetText()) == "Zone" and plain(view.tabs.overview.Text:GetText()) == "Quest list"
+		and view.tabs.zone.Line:IsShown() and not view.tabs.overview.Line:IsShown(), "the zone page's tab first, then the quest list (key overview)")
 	local x1 = view.tabs.zone._points[1][2]
 	local x2 = view.tabs.overview._points[1][2]
 	check(x1 == 0 and x2 == view.tabs.zone:GetWidth() + 4, "side by side")
@@ -294,10 +312,23 @@ end
 section("Questtree: the big window, the zone page's map")
 do
 	local m = view.zp.map
-	check(m.frame:IsShown() and m.map == ELWYNN and m.width == 432 and m.height == 288 and m.shown == 7,
-		"the zone's map (3:2) beside the cards: givers, turn-ins, drop areas, got " .. m.shown)
-	local dughan, poster, willem, roberts, remy, wolf = marker("Marshal Dughan"), marker("Wanted Poster"), marker("Deputy Willem"),
-		marker("Guard Roberts"), marker("Remy"), marker("drops here (12%)")
+	check(m.frame:IsShown() and m.map == ELWYNN and m.width == 432 and m.height == 288 and m.shown == 5,
+		"the zone's map (3:2) beside the cards: givers, turn-ins, drop areas within my levels, got " .. m.shown)
+	check(not marker("Guard Roberts") and not marker("Remy"), "a low level quest and one far above me: not by default (Q.InRange)")
+	view.filters.allLevels:Click()
+	check(filters.allLevels and m.shown == 7 and M.db.browser.allLevels == true, "all levels: they're there too, kept in the settings, got " .. m.shown)
+	local roberts, remy = marker("Guard Roberts"), marker("Remy")
+	check(roberts and roberts.look == "trivial" and roberts.Icon.atlas == "TrivialQuests", "a low level quest: the game's grey-ish !")
+	check(remy and remy.look == "level" and remy.Icon.desaturated and remy.Icon.width == 18, "later ones: a smaller grey !")
+	remy._scripts.OnEnter(remy)
+	check(plain(TOOLTIP.lines[1]) == "  [9] Princess Must Die · Needs level 7", "a pin's tooltip says what it is (no legend), got " .. plain(TOOLTIP.lines[1]))
+	remy._scripts.OnLeave(remy)
+	roberts._scripts.OnEnter(roberts)
+	check(plain(TOOLTIP.lines[1]) == "  [2] Speak with Willem · low level", "a low level one's")
+	roberts._scripts.OnLeave(roberts)
+	view.filters.allLevels:Click()
+	check(not filters.allLevels and m.shown == 5, "off again")
+	local dughan, poster, willem, wolf = marker("Marshal Dughan"), marker("Wanted Poster"), marker("Deputy Willem"), marker("drops here (12%)")
 	check(poster and poster.look == "daily" and poster.Icon.atlas == "QuestDaily" and poster.Back:IsShown() and poster.Icon.width == 24,
 		"a repeatable quest's giver: the blue !, full size, on a dark disc")
 	check(dughan and dughan.look == "daily" and #dughan.quests == 2 and dughan.quests[1] == 104 and dughan.quests[2] == 101
@@ -305,12 +336,11 @@ do
 	check(willem and willem.look == "progress" and willem.Icon.atlas == "QuestTurnin" and willem.Icon.desaturated == true
 		and willem.Badge:IsShown() and willem.Badge:GetText() == "2" and willem.BadgeBack:IsShown(),
 		"a turn-in of a quest still in progress: a grey ?, and a count: two quests to do there")
-	check(roberts and roberts.look == "trivial" and roberts.Icon.atlas == "TrivialQuests", "a low level quest: the game's grey-ish !")
-	check(remy and remy.look == "level" and remy.Icon.desaturated and remy.Icon.width == 18, "later ones: a smaller grey !")
 	check(wolf and wolf.look == "drop" and wolf.Icon.path == "Interface\\CharacterFrame\\TempPortraitAlphaMask" and not wolf.Badge:IsShown(),
 		"where an item drops: a soft circle")
 	check(m.You:IsShown(), "me on the map")
-	-- Threads: each chain's colour, giver -> turn-in -> the next giver.
+	check(not view.zp.Legend, "no legend under the map")
+	-- Threads: each chain's colour, giver -> turn-in -> the next giver; only for the chain hovered or picked.
 	local lines, color = 0, nil
 	for i = 1, m.linesShown do
 		local line = m.lines[i]
@@ -319,7 +349,18 @@ do
 			color = line.color
 		end
 	end
-	check(lines == 2 and m.linesShown == 2 and color, "the chain's thread: from Dughan to Willem (two quests), got " .. m.linesShown)
+	check(lines == 2 and m.linesShown == 2 and not m.lines[1]:IsShown() and not m.lines[2]:IsShown(),
+		"the chain's thread: from Dughan to Willem (two quests), not shown while nothing of it is picked, got " .. m.linesShown)
+	dughan._scripts.OnEnter(dughan)
+	check(TOOLTIP.title == "Marshal Dughan" and plain(TOOLTIP.lines[1]) == "  [4] Brotherhood of Thieves · repeatable"
+		and plain(TOOLTIP.lines[2]) == "  [1] A Threat Within · Completed"
+		and TOOLTIP.lines[3] == "Click: show Brotherhood of Thieves", "its tooltip: the giver and each quest, what it is, got " .. plain(TOOLTIP.lines[1]))
+	dughan._scripts.OnLeave(dughan)
+	dughan:Click()
+	check(st.picked == 104 and dughan.Ring:IsShown() and plain(view.d.Title:GetText()) == "[4] Brotherhood of Thieves", "a click: that quest, its marker ringed")
+	check(chainCard(CHAIN1).Glow:IsShown() and chainCard(CHAIN1).Edges[1].color[2] == 0.82, "... and its chain's card marked")
+	color = m.lines[1].color
+	check(m.lines[1]:IsShown() and m.lines[2]:IsShown(), "its chain picked: its thread shows")
 	local done = m.lines[1].done and m.lines[1] or m.lines[2]
 	local open = m.lines[1].done and m.lines[2] or m.lines[1]
 	check(done.color[4] == 0.25 and open.color[4] == 0.7 and open.thickness == 2, "a done step's thread fainter")
@@ -327,13 +368,7 @@ do
 	check(card1 and card1.Dot.vertex[1] == color[1] and card1.Dot.vertex[2] == color[2] and card1.Dot.vertex[3] == color[3],
 		"the thread in the chain's own colour, its card's dot the same")
 	check(color[1] >= 0 and color[1] <= 1 and not (color[1] == color[2] and color[2] == color[3]), "a colour, not grey")
-	dughan._scripts.OnEnter(dughan)
-	check(TOOLTIP.title == "Marshal Dughan" and plain(TOOLTIP.lines[1]) == "  [4] Brotherhood of Thieves" and plain(TOOLTIP.lines[2]) == "  [1] A Threat Within"
-		and TOOLTIP.lines[3] == "Click: show Brotherhood of Thieves", "its tooltip: the giver and each quest")
-	dughan._scripts.OnLeave(dughan)
-	dughan:Click()
-	check(st.picked == 104 and dughan.Ring:IsShown() and plain(view.d.Title:GetText()) == "[4] Brotherhood of Thieves", "a click: that quest, its marker ringed")
-	check(chainCard(CHAIN1).Glow:IsShown() and chainCard(CHAIN1).Edges[1].color[2] == 0.82, "... and its chain's card marked")
+	check(not view.d.map.frame:IsShown(), "the details' small map: not while the zone's map is in sight")
 	dughan:Click()
 	check(st.picked == 101, "again: the next one there")
 	local px = marker("Marshal Dughan").px
@@ -350,6 +385,7 @@ do
 	check(marker("Deputy Willem").look == "progress", "not in the event")
 	Wait(1.1)
 	check(marker("Deputy Willem").look == "ready" and not marker("Deputy Willem").Icon.desaturated, "a moment later: ready to turn in, a yellow ?")
+	check(plain(view.zp.Counts:GetText()) == "1 ready to turn in · 2 available", "and under the map, got " .. plain(view.zp.Counts:GetText()))
 	QUESTS = {}
 	Fire("QUEST_LOG_UPDATE")
 	Wait(1.1)
@@ -362,32 +398,32 @@ do
 	local c = chainCard(CHAIN1)
 	check(c._kind == "Button" and c.Title:GetText() == "Elwynn's Kobolds" and c.Count:GetText() == "2/9" and math.abs(c.Bar.width - 56 * 2 / 9) < 0.01,
 		"a chain's card: its name (Q.ChainStep), how far along, a bar")
-	check(plain(c.Next:GetText()) == "In your log: Investigate Echo Ridge" and c.Strip.color[1] == 0.35, "what's next, the strip: something in my log")
-	check(plain(c.Meta:GetText()) == "Level 1-10 · opens 4 · 1 steps elsewhere", "its levels, what the next step opens, steps elsewhere, got " .. plain(c.Meta:GetText()))
-	check(c.Dots[1]:IsShown() and c.Dots[2]:IsShown() and not c.Dots[3]:IsShown() and c.Dots[1].vertex[4] == 1 and c.Dots[2].vertex[4] == 0.35,
-		"friends: a dot each, dim when they've done none yet")
+	check(plain(c.Next:GetText()) == "In your log: Investigate Echo Ridge" and c.Next:GetText():find("|cff888888", 1, true) and not c.Strip and not c.Meta
+		and c:GetHeight() == 48, "what's next in grey, two lines (48 px), no strip, no third line")
+	check(c.Dots[1]:IsShown() and not c.Dots[2]:IsShown() and c.Dots[1].vertex[4] == 1,
+		"friends: a dot only for those who've done some of it")
 	local s = chainCard(SINGLES)
 	check(s.Title:GetText() == "Quests without a chain" and plain(s.Next:GetText()) == "1 to pick up now" and s.Count:GetText() == "0/2",
 		"the quests without a chain, got " .. plain(s.Next:GetText()))
 	local h = view.head
-	check(h.Title:GetText() == "Elwynn Forest" and plain(h.Sub:GetText()) == "Level 1-10 · 3 to pick up now · 1 chains"
+	check(h.Title:GetText() == "Elwynn Forest" and plain(h.Sub:GetText()) == "Level 1-10 · 2 to pick up now · 1 chains"
 		and plain(h.Count:GetText()) == "2 of 10 done" and h.BarBack:IsShown() and not h.Back:IsShown(),
 		"the head: the zone, its levels, what's to take, how far along, got " .. plain(h.Sub:GetText()))
-	check(plain(view.zp.Counts:GetText()) == "1 in progress   3 available   1 coming up   3 blocked   2 done" and not view.zp.Guide:IsShown(),
-		"under the map: how many of each, got " .. plain(view.zp.Counts:GetText()))
-	check(plain(view.zp.Legend:GetText()):find("to pick up", 1, true) and plain(view.zp.Legend:GetText()):find("ready to turn in", 1, true),
-		"and what the pins mean")
+	check(plain(view.zp.Counts:GetText()) == "1 in progress · 2 available" and not view.zp.Guide:IsShown(),
+		"under the map one line: in progress, available within my levels (nothing ready, nothing of the rest), got " .. plain(view.zp.Counts:GetText()))
 	-- Hovering a card: its pins and thread lit, the rest dim.
 	local m = view.zp.map
 	c._scripts.OnEnter(c)
-	local lit, dim = marker("Marshal Dughan"), marker("Remy")
+	local lit, dim = marker("Marshal Dughan"), marker("drops here (12%)")
 	local thread
 	for i = 1, m.linesShown do if m.lines[i].key == CHAIN1 then thread = m.lines[i] end end
 	check(lit:GetAlpha() == 1 and dim:GetAlpha() == 0.3 and thread.thickness == 3.5 and thread.color[4] == 1,
 		"hovering a chain's card: its pins and thread light up, the others dim")
 	check(TOOLTIP.title == "Elwynn's Kobolds" and TOOLTIP.lines[#TOOLTIP.lines] == "Click: open the chain", "its tooltip")
 	local tip = table.concat(TOOLTIP.lines, "|")
-	check(tip:find("2 of 9 steps done", 1, true) and tip:find("Anna Brook", 1, true), "how far along, friends")
+	check(tip:find("2 of 9 steps done", 1, true) and tip:find("Anna Brook", 1, true) and tip:find("Bob", 1, true) and tip:find("Level 1-10", 1, true)
+		and tip:find("Doing it opens 4 more of the chain", 1, true) and tip:find("1 steps elsewhere", 1, true),
+		"how far along, its levels, what the next step opens, steps elsewhere, friends (all of them), got " .. tip)
 	c._scripts.OnLeave(c)
 	check(dim:GetAlpha() == 1 and thread.thickness == 2, "left: all as before")
 	-- Hovering a pin: its chains' cards lit.
@@ -458,25 +494,26 @@ do
 	check(#dashed > 3 and dashed[1].dashed and dashed[1].faint and not amber.dashed, "a lead-in that isn't needed first: dashed and dim")
 	local kinds = {}
 	for _, p in ipairs(lay().pills) do kinds[#kinds + 1] = p.quest .. ":" .. p.kind end
-	check(table.concat(kinds, " ") == "106:any 108:all", "where several lead to one: one of / all of, got " .. table.concat(kinds, " "))
+	check(table.concat(kinds, " ") == "106:any", "where any one of several is enough: one of (where each is needed, no label), got " .. table.concat(kinds, " "))
 	local pills = {}
 	for _, f in ipairs(view.g.pills) do if f:IsShown() then pills[#pills + 1] = plain(f.Text:GetText()) end end
-	table.sort(pills)
-	check(table.concat(pills, ",") == "all of,one of", "drawn, got " .. table.concat(pills, ","))
+	check(table.concat(pills, ",") == "one of", "drawn, got " .. table.concat(pills, ","))
+	check(view.Legend:IsShown() and plain(view.Legend:GetText()) == "dashed: lead-in · one of: any one is enough · orange: the way to a locked quest",
+		"under it one short line on its lines")
 	local p106 = lay().pills[1]
 	check(p106.x == (item(106).inX or item(106).cx) and p106.y == item(106).y - 7, "just above the quest, where the lines meet")
 	-- The cards.
 	local done, active, avail, lead, stub = card(101), card(103), card(104), card(107), card(201)
-	check(done.Title:GetText() == "A Threat Within" and plain(done.Info:GetText()) == "[1] Marshal Dughan" and done.Check:IsShown()
-		and done.Strip.color[2] == 0.73 and done.Bg.vertex[4] == 0.3, "a done card: title, [level] and giver, a check, the green strip and tone")
-	check(done.Info:GetText():find("|cff336699[1]|r", 1, true), "the level in its difficulty colour (Q.LevelColor)")
+	check(plain(done.Title:GetText()) == "[1] A Threat Within" and plain(done.Info:GetText()) == "Marshal Dughan" and done.Check:IsShown()
+		and done.Strip.color[2] == 0.73 and done.Bg.vertex[4] == 0.3, "a done card: [level] and title, the giver only, a check, the green strip and tone")
+	check(done.Title:GetText():find("|cff336699[1]|r", 1, true), "the level in its difficulty colour (Q.LevelColor)")
 	check(done.Icon.atlas == "QuestNormal" and done.Icon.desaturated == true and avail.Icon.atlas == "QuestDaily" and avail.Icon.desaturated == false
 		and lead.Icon.atlas == "TrivialQuests", "the start: the giver's ! (a repeatable one's blue, a low one's), bright only when I can take it")
 	check(active.Icon.atlas == "SideInProgressquesticon", "in my log: in progress")
 	check(not card(105).Check:IsShown() and card(105).Bg.vertex[1] == 0.1 and card(105).Edges[1].color[1] == 0.4, "locked: grey")
-	check(avail.Friends:IsShown() and plain(avail.Friends:GetText()) == "1/2" and not done.Friends:IsShown(), "friends who've done it")
-	check(plain(avail.Tag:GetText()) == "closes" and plain(lead.Tag:GetText()) == "lead-in" and lead:GetAlpha() == 0.8 and plain(done.Tag:GetText()) == "",
-		"taking it closes another: says so; a lead-in: says so, a bit dimmer")
+	check(not avail.Friends and not avail.Tag and lead:GetAlpha() == 0.8,
+		"no friends, \"closes\" or \"lead-in\" on the cards (in the tooltip; a lead-in's line is dashed, its card a bit dimmer)")
+	check(item(107) and graphOutline():find("107@0", 1, true), "every level of the chain (a low level step too)")
 	check(stub and item(201).stub and stub.Title:GetText() == "Westfall" and plain(stub.Info:GetText()) == "[10] The People's Militia"
 		and stub.Icon.path == "Interface\\Icons\\INV_Misc_Map_01", "a step in another zone: a stub with the zone's name")
 	-- The next step pulses once.
@@ -489,7 +526,7 @@ do
 	check(TOOLTIP.shown and TOOLTIP.title == "Investigate Echo Ridge" and TOOLTIP.lines[1] == "In your quest log"
 		and TOOLTIP.lines[#TOOLTIP.lines] == "Click: details", "hovering: a tooltip")
 	local tip = table.concat(TOOLTIP.lines, "|")
-	check(tip:find("Step 4 of 9 - Elwynn's Kobolds", 1, true) and tip:find("Then: Skirmish at Echo Ridge", 1, true), "with its step and what's next")
+	check(tip:find("Step 4 of 9 · Elwynn's Kobolds", 1, true) and tip:find("Then: Skirmish at Echo Ridge", 1, true), "with its step and what's next")
 	active._scripts.OnLeave(active)
 	check(not TOOLTIP.shown, "gone when the mouse leaves")
 	lead._scripts.OnEnter(lead)
@@ -505,7 +542,7 @@ do
 	wipe(st.layouts)
 	view.g.bucket = nil
 	Q.ToggleBrowser(); Q.ToggleBrowser()
-	check(st.chain == CHAIN1 and view.head.Title:GetText() == "A Threat Within" and card(101).Info:GetText():find("|cff808080[1]|r", 1, true),
+	check(st.chain == CHAIN1 and view.head.Title:GetText() == "A Threat Within" and card(101).Title:GetText():find("|cff808080[1]|r", 1, true),
 		"without them: the first quest's title, level 1 grey (trivial at 19); opened again: still the chain")
 	Q.ChainStep, Q.LevelColor = stand.ChainStep, stand.LevelColor
 	Q.ToggleBrowser(); Q.ToggleBrowser()
@@ -546,37 +583,57 @@ end
 section("Questtree: the big window, the filters")
 do
 	openChain(CHAIN1)
-	check(view.filters.hideDone._kind == "Button" and not view.filters.hideDone.Tick.shown and plain(view.filters.hideDone.Text:GetText()) == "Hide done",
-		"filters: buttons of ours, off")
-	view.filters.hideDone:Click()
-	check(filters.hideDone and view.filters.hideDone.Tick.shown and M.db.browser.hideDone == true, "hide done: on, kept in the settings")
-	check(graphOutline() == "107@0 104@0 103@1 105@2 106@2 108@3 201@3*", "done ones gone, the rest moves up, got " .. graphOutline())
-	view.filters.hideDone:Click()
-	view.filters.onlyAvailable:Click()
-	check(graphOutline() == "107@0 104@0", "only available now, got " .. graphOutline())
+	check(view.filters.allLevels._kind == "Button" and not view.filters.allLevels.Tick.shown and plain(view.filters.allLevels.Text:GetText()) == "All levels"
+		and view.filters.showOther._kind == "Button" and not view.filters.showOther.Tick.shown, "two filters: buttons of ours, off")
+	check(filters.hideDone == nil and filters.onlyAvailable == nil and not view.filters.hideDone and not view.filters.onlyAvailable,
+		"\"Hide done\" and \"Only available now\" are gone (their saved keys ignored)")
+	local before = graphOutline()
+	view.filters.allLevels:Click()
+	check(filters.allLevels and graphOutline() == before, "an opened chain shows every level anyway")
+	view.filters.allLevels:Click()
 	view.head.Back:Click()
-	check(cardsOutline() == CHAIN1 .. " " .. SINGLES and view.zp.map.shown == 5,
-		"the zone page too: the chains with something to take, the pins of what I can take now, got " .. view.zp.map.shown)
-	view.filters.onlyAvailable:Click()
 	view.filters.showOther:Click()
 	openChain(SINGLES)
 	check(graphOutline() == "110 112 111" and card(112):GetAlpha() == 0.55, "not for me: shown, dimmed, got " .. graphOutline())
 	view.filters.showOther:Click()
+	check(graphOutline() == "110 111", "off: not shown, the quests without a chain every level too, got " .. graphOutline())
 	view.head.Back:Click()
-	-- A hidden step between two shown: the line passes through, fainter.
-	STATUS_OF[101] = "active"
+	-- A step not for me between two shown: the line passes through, fainter; a skipped one stays.
+	STATUS_OF[102], WHY[102] = "other", "class"
+	Q.ToggleBrowser(); Q.ToggleBrowser()
 	openChain(CHAIN1)
-	view.filters.hideDone:Click()
 	local faint = 0
 	for _, s in ipairs(lay().segs) do faint = faint + ((s.faint and not s.dashed) and 1 or 0) end
-	check(graphOutline():find("101@0", 1, true) and graphOutline():find("103@1", 1, true) and faint > 0,
-		"a hidden step: its line passes through, fainter, got " .. graphOutline())
-	view.filters.hideDone:Click()
-	STATUS_OF[101] = "done"
-	wipe(st.layouts); wipe(st.infos); wipe(st.spots)
+	check(not item(102) and graphOutline():find("101@0", 1, true) and graphOutline():find("103@1", 1, true) and faint > 0,
+		"a step not for me: hidden, its line passes through, fainter, got " .. graphOutline())
+	WHY[102] = { "closed", 107 }
 	Q.ToggleBrowser(); Q.ToggleBrowser()
-	check(not filters.hideDone and not filters.onlyAvailable and not filters.showOther, "all off again")
+	check(item(102) and card(102):GetAlpha() <= 0.55, "one I skipped (closed by another I took): it stays, dimmed")
+	card(102)._scripts.OnEnter(card(102))
+	check(TOOLTIP.lines[1] == "Skipped" and TOOLTIP.lines[2] == "You took Speak with Willem instead", "its tooltip says why, got " .. tostring(TOOLTIP.lines[2]))
+	card(102)._scripts.OnLeave(card(102))
+	STATUS_OF[102], WHY[102] = "done", nil
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	check(not filters.allLevels and not filters.showOther, "all off again")
 	view.head.Back:Click()
+	-- The zone page: a chain with nothing within my levels left out (a line says so), the done ones folded.
+	FAR[201], STATUS_OF[301], STATUS_OF[202] = true, "done", "done"
+	zoneRow("z:1436"):Click()
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	check(cardsOutline() == "z:1436:done z:1436:more", "Westfall: its chain out of my levels left out, its done chain folded, got " .. cardsOutline())
+	local fold, more = chainCard("z:1436:done"), chainCard("z:1436:more")
+	check(plain(fold.Line:GetText()) == "Completed (1)" and fold.Toggle:IsShown() and fold.Toggle.path:find("Plus", 1, true) and not fold.Title:IsShown(),
+		"the fold: Completed (1)")
+	check(plain(more.Line:GetText()) == "1 more outside your levels · Show all levels" and not more.Bg:IsShown(), "a quiet line: how many more")
+	fold:Click()
+	check(cardsOutline() == "z:1436:done z:1436:301 z:1436:more" and chainCard("z:1436:301").Check:IsShown(), "the fold opened: the done chain")
+	chainCard("z:1436:more"):Click()
+	check(filters.allLevels and view.filters.allLevels.Tick.shown and cardsOutline() == "z:1436:101 z:1436:done z:1436:301",
+		"a click on the line: all levels, got " .. cardsOutline())
+	view.filters.allLevels:Click()
+	FAR[201], STATUS_OF[301], STATUS_OF[202] = nil, "level", "locked"
+	st.folded["z:1436:done"] = nil
+	Q.ToggleBrowser(); Q.ToggleBrowser()
 	-- Everything hidden: says so.
 	zoneRow("z:1411"):Click()
 	check(view.zp.Empty:IsShown() and plain(view.zp.Empty:GetText()) == "Nothing to show with these filters.", "Durotar: nothing for me shows")
@@ -593,35 +650,48 @@ do
 		"a click: its card marked")
 	local sub = plain(view.d.Sub:GetText())
 	check(plain(view.d.Title:GetText()) == "[5] Skirmish at Echo Ridge" and view.d.Title:GetText():find("|cff336699", 1, true)
-		and sub:find("Locked: an earlier quest comes first", 1, true) and sub:find("Level 5, from level 3", 1, true)
-		and sub:find("Step 6 of 9 - Elwynn's Kobolds", 1, true), "title in its level's colour, status, level, the step, got " .. sub)
+		and sub == "Needs Investigate Echo Ridge\nStep 6 of 9 · Elwynn's Kobolds",
+		"title in its level's colour, one status line with the reason, the step (no level or zone lines), got " .. sub)
 	check(view.d.NeedsHead:IsShown() and view.d.links[1]:IsShown() and view.d.links[1].quest == 103
-		and plain(view.d.links[1].Text:GetText()) == "[3] Investigate Echo Ridge", "Needs first: a button to the quest")
-	check(view.d.LeadsHead:IsShown() and view.d.links[2].quest == 201 and plain(view.d.links[2].Text:GetText()) == "[10] The People's Militia - Westfall",
+		and plain(view.d.links[1].Text:GetText()) == "[3] Investigate Echo Ridge" and not view.d.NeedsMore:IsShown(), "Needs first: a button to the quest")
+	check(view.d.LeadsHead:IsShown() and view.d.links[2].quest == 201 and plain(view.d.links[2].Text:GetText()) == "[10] The People's Militia · Westfall",
 		"Leads to: the next one, its zone named")
+	check(plain(view.d.place.Text:GetText()) == "Deputy Willem · Elwynn Forest" and view.d.map.frame:IsShown(),
+		"where it starts: one line; the small map (the zone's map isn't in sight)")
 	check(#shownInSmall == 0, "the small window closed: it isn't asked")
+	card(108):Click()
+	check(view.d.links[1].quest == 103 and view.d.links[2].quest ~= 105 and view.d.NeedsMore:IsShown()
+		and plain(view.d.NeedsMore:GetText()) == "... and 1 more", "Needs first: only the first step, and how many more")
+	local opens = QUESTS_DATA[101].opens
+	QUESTS_DATA[101].opens = { 102, 103, 104, 105, 106 }
+	card(101):Click()
+	check(view.d.links[3].quest == 104 and not (view.d.links[4] and view.d.links[4]:IsShown()) and plain(view.d.LeadsMore:GetText()) == "... and 2 more",
+		"Leads to: at most three")
+	QUESTS_DATA[101].opens = opens
+	card(105):Click()
 	view.d.links[1]:Click()
 	check(st.picked == 103 and st.where == "z:1429" and plain(view.d.Title:GetText()) == "[3] Investigate Echo Ridge" and card(103).Glow:IsShown(),
 		"a link opens that quest")
+	check(plain(view.d.place.Text:GetText()) == "Deputy Willem · Elwynn Forest" and view.d.place.Icon.atlas == "QuestTurnin",
+		"in my log: where it's turned in instead")
 
 	-- The client's title, requirements, givers and their places, the map, friends.
 	QUESTS = { { id = 104, title = "Bruderschaft der Diebe", objectives = {} } }
 	smallOpen = true
 	card(104):Click()
 	check(shownInSmall[1] == 104, "the small window open: it shows the quest too")
-	check(plain(view.d.Title:GetText()) == "[4] Bruderschaft der Diebe" and card(104).Title:GetText() == "Bruderschaft der Diebe",
+	check(plain(view.d.Title:GetText()) == "[4] Bruderschaft der Diebe" and plain(card(104).Title:GetText()) == "[4] Bruderschaft der Diebe",
 		"the client's title when it knows the quest")
-	local req = plain(view.d.Req:GetText())
-	check(view.d.ReqHead:IsShown() and req:find("Races: every Alliance race", 1, true) and req:find("Classes: Warrior", 1, true)
-		and req:find("Skill: Leatherworking 50", 1, true) and req:find("Reputation: #72, Friendly", 1, true)
-		and req:find("Taking it closes: Report to Goldshire", 1, true),
-		"requirements: a side's every race (the new ones too), classes, skill, reputation, what it closes, got " .. req)
-	check(plain(view.d.Sub:GetText()):find("New in WoW: Forever, Repeatable", 1, true), "new and repeatable")
-	local places = {}
-	for _, b in ipairs(view.d.places) do if b:IsShown() then places[#places + 1] = plain(b.Text:GetText()) end end
-	check(view.d.StartsHead:IsShown() and view.d.EndsHead:IsShown() and table.concat(places, "|")
-		== "Marshal Dughan - Elwynn Forest|Wanted Poster (an object) - Elwynn Forest|Deputy Willem - Elwynn Forest",
-		"who gives it and where to turn it in, got " .. table.concat(places, "|"))
+	check(plain(view.d.Req:GetText()) == "Taking it closes: Report to Goldshire" and view.d.ReqHead:IsShown(),
+		"requirements met aren't listed; what taking it closes is, got " .. plain(view.d.Req:GetText()))
+	check(plain(view.d.Sub:GetText()):find("Available · New in WoW: Forever, Repeatable", 1, true), "its status, new and repeatable on that line")
+	check(plain(view.d.place.Text:GetText()) == "Marshal Dughan · Elwynn Forest" and view.d.place.Icon.atlas == "QuestNormal",
+		"who gives it, where: one line")
+	view.d.place._scripts.OnEnter(view.d.place)
+	local tip = plain(table.concat(TOOLTIP.lines, "|"))
+	check(tip == "Elwynn Forest  42.0, 66.0|Starts at|Wanted Poster (an object) · Elwynn Forest|Turn in at|Deputy Willem · Elwynn Forest|Click: put a map pin there",
+		"the other givers and where it's turned in: in its tooltip, got " .. tip)
+	view.d.place._scripts.OnLeave(view.d.place)
 	local m = view.d.map
 	check(m.frame:IsShown() and m.map == ELWYNN and m.shown == 3 and m.markers[1].look == "start" and m.markers[3].look == "end",
 		"the small map: the zone, givers and the ender")
@@ -631,6 +701,34 @@ do
 	smallOpen = false
 	view.d.Small:Click()
 	check(shownInSmall[2] == 104, "... which shows it there")
+	local friends = FRIENDS[104]
+	FRIENDS[104] = { { name = "A", status = "done" }, { name = "B", status = "done" }, { name = "C", status = "active" }, { name = "D", status = "done" },
+		{ name = "E", status = "done" } }
+	card(104):Click()
+	check(plain(view.d.Friends:GetText()) == "A (Completed), B (Completed), C (In your quest log)  +2", "at most three friends, got " .. plain(view.d.Friends:GetText()))
+	FRIENDS[104] = friends
+	-- What isn't met, with the reason: a reputation, a profession's rank, a race, a class.
+	local function again() Q.ToggleBrowser(); Q.ToggleBrowser() end
+	STATUS_OF[104], NEEDS[104] = "locked", { kind = "rep", faction = 72, min = 3000, have = 0 }
+	again()
+	check(plain(view.d.Sub:GetText()):find("^Needs Friendly with #72") and plain(view.d.Req:GetText()) == "Reputation: #72, Friendly\nTaking it closes: Report to Goldshire",
+		"a reputation too low: says which, got " .. plain(view.d.Sub:GetText()) .. " / " .. plain(view.d.Req:GetText()))
+	NEEDS[104] = { kind = "skill", id = 165, value = 50, have = 10 }
+	again()
+	check(plain(view.d.Sub:GetText()):find("^Needs Leatherworking 50") and plain(view.d.Req:GetText()):find("^Skill: Leatherworking 50"),
+		"a profession's rank too low, got " .. plain(view.d.Sub:GetText()))
+	STATUS_OF[104], NEEDS[104], WHY[104] = "other", nil, "race"
+	again()
+	check(plain(view.d.Sub:GetText()):find("^Not for your race") and plain(view.d.Req:GetText()) == "Races: every Alliance race",
+		"not for my race: only that (a side's every race: the new ones too), got " .. plain(view.d.Req:GetText()))
+	WHY[104] = "class"
+	again()
+	check(plain(view.d.Sub:GetText()):find("^Not for your class") and plain(view.d.Req:GetText()) == "Classes: Warrior", "not for my class")
+	WHY[104] = "skill"
+	again()
+	check(plain(view.d.Sub:GetText()):find("^Needs Leatherworking") and plain(view.d.Req:GetText()) == "Skill: Leatherworking 50", "a profession I don't have")
+	STATUS_OF[104], WHY[104] = "available", nil
+	again()
 	QUESTS = {}
 	-- A place's line puts a map pin there (the game's own waypoint, nothing of the world map).
 	local pins = {}
@@ -638,27 +736,27 @@ do
 	C_Map.CanSetUserWaypointOnMap = function(map) return map == ELWYNN end
 	UiMapPoint = { CreateFromCoordinates = function(map, x, y) return { uiMapID = map, x = x, y = y } end }
 	C_SuperTrack.SetSuperTrackedUserWaypoint = function(on) pins.tracked = on end
-	view.d.places[1]._scripts.OnEnter(view.d.places[1])
-	check(TOOLTIP.lines[#TOOLTIP.lines] == "Click: put a map pin there", "a place's tooltip says so")
-	view.d.places[1]:Click()
+	card(104):Click()
+	view.d.place:Click()
 	check(pins[1] and pins[1].uiMapID == ELWYNN and pins[1].x == 0.42 and pins.tracked == true, "clicked: a pin there, tracked")
-	-- An item: what drops it, how often, where.
+	-- An item: its best drop, the rest in the tooltip.
 	view.head.Back:Click()
 	openChain(SINGLES)
 	card(110):Click()
-	places = {}
-	for _, b in ipairs(view.d.places) do if b:IsShown() then places[#places + 1] = plain(b.Text:GetText()) end end
-	check(table.concat(places, "|") == "Wolf Fang (an item)|   Drops from Young Wolf (12%) - Elwynn Forest|   Drops from Timber Wolf (0.5%) - Elwynn Forest",
-		"an item: what drops it, how often, got " .. table.concat(places, "|"))
+	check(plain(view.d.place.Text:GetText()) == "Wolf Fang (an item) · Drops from Young Wolf (12%) · Elwynn Forest",
+		"an item: what drops it most often, got " .. plain(view.d.place.Text:GetText()))
+	view.d.place._scripts.OnEnter(view.d.place)
+	check(plain(table.concat(TOOLTIP.lines, "|")):find("Drops from Timber Wolf (0.5%) · Elwynn Forest", 1, true), "the other drops: in its tooltip")
+	view.d.place._scripts.OnLeave(view.d.place)
 	check(m.frame:IsShown() and m.map == ELWYNN and m.shown == 2 and m.markers[1].look == "drop", "the small map: where it drops")
-	check(plain(card(110).Info:GetText()) == "[2] Wolf Fang" and card(110).Icon.path == "Interface\\Icons\\INV_Misc_Bag_10", "its card: the item")
-	view.d.places[2]:Click()
+	check(plain(card(110).Info:GetText()) == "Wolf Fang" and card(110).Icon.path == "Interface\\Icons\\INV_Misc_Bag_10", "its card: the item")
+	view.d.place:Click()
 	check(pins[2] and pins[2].x == 0.3, "a drop's line: a pin there")
 	C_Map.SetUserWaypoint, C_Map.CanSetUserWaypointOnMap, UiMapPoint, C_SuperTrack.SetSuperTrackedUserWaypoint = nil, nil, nil, nil
 	view.head.Back:Click()
 	Q.OpenBrowser(101)
 	check(st.chain == CHAIN1 and st.picked == 101 and card(101).Glow:IsShown(), "Q.OpenBrowser(id): its chain, its card")
-	check(not view.d.Req:IsShown() and not view.d.ReqHead:IsShown() and view.d.EndsHead:IsShown() and not view.d.Friends:IsShown()
+	check(not view.d.Req:IsShown() and not view.d.ReqHead:IsShown() and view.d.place:IsShown() and not view.d.Friends:IsShown()
 		and not view.d.NeedsHead:IsShown() and view.d.LeadsHead:IsShown(), "a plain quest: only what it has")
 end
 
@@ -668,11 +766,14 @@ do
 	check(st.where == "z:1436" and cardsOutline() == "z:1436:101 z:1436:301",
 		"another zone: the chain from Elwynn too, and a quest given here that's listed with a dungeon (Q.ZoneGiven), got " .. cardsOutline())
 	local c = chainCard("z:1436:101")
-	check(plain(c.Meta:GetText()) == "Level 1-10 · opens 4 · 8 steps elsewhere" and c.Title:GetText() == "Elwynn's Kobolds",
-		"its card counts the steps elsewhere, got " .. plain(c.Meta:GetText()))
+	c._scripts.OnEnter(c)
+	check(table.concat(TOOLTIP.lines, "|"):find("8 steps elsewhere", 1, true) and c.Title:GetText() == "Elwynn's Kobolds",
+		"its card's tooltip counts the steps elsewhere")
+	c._scripts.OnLeave(c)
 	check(plain(view.head.Count:GetText()) == "0 of 2 done", "its count: its own quests")
 	openChain("z:1436:301")
-	check(graphOutline() == "301@0 202@1" and plain(card(301).Info:GetText()) == "[17] The Deadmines", "the dungeon's chain given here, it says where")
+	check(graphOutline() == "301@0 202@1" and plain(card(301).Info:GetText()) == "The Deadmines" and plain(card(301).Title:GetText()) == "[17] Red Silk Bandanas",
+		"the dungeon's chain given here, it says where")
 	card(202):Click()
 	view.d.links[1]:Click()
 	check(st.where == "z:1436" and st.picked == 301, "Needs first in a dungeon, given here: it stays")
@@ -684,9 +785,9 @@ do
 	Q.OpenBrowser(401)
 	check(win:IsShown() and st.where == "z:1411" and st.picked == 401 and zoneRow("z:1411") and zoneRow("z:1411").Picked:IsShown()
 		and st.chain == "z:1411:single", "Q.OpenBrowser(id): its zone, its continent opened")
-	check(plain(view.d.Sub:GetText()):find("Not for you", 1, true) and plain(view.d.Sub:GetText()):find("Learned while playing", 1, true)
-		and plain(view.d.Req:GetText()):find("Faction: Horde", 1, true), "not for me: faction and where it came from")
-	check(plain(view.d.Req:GetText()):find("Races: Human, High Order Skyborne", 1, true), "races named by Q.Races (Forever's new ones), got "
+	check(plain(view.d.Sub:GetText()):find("Not for your race", 1, true) and plain(view.d.Sub:GetText()):find("Learned while playing", 1, true)
+		and not plain(view.d.Req:GetText()):find("Faction", 1, true), "not for me: why and where it came from (its faction isn't what keeps me)")
+	check(plain(view.d.Req:GetText()) == "Races: Human, High Order Skyborne", "races named by Q.Races (Forever's new ones), got "
 		.. plain(view.d.Req:GetText()))
 	view.filters.showOther:Click()
 	Q.OpenBrowser(103)
@@ -697,20 +798,40 @@ section("Questtree: the big window, the overview")
 do
 	view.tabs.overview:Click()
 	check(st.tab == "overview" and view.list.scroll:IsShown() and not view.g.frame:IsShown() and not view.zp:IsShown() and M.db.browser.tab == "overview",
-		"the overview's tab (kept)")
-	check(listOutline() == "#In progress 103 #Available now 104 107 110 #Coming up 111 #Blocked 105 106 108 #Completed",
-		"in groups, the done ones folded, got " .. listOutline())
-	check(plain(listRow(105).Right:GetText()) == "needs Investigate Echo Ridge" and plain(listRow(111).Right:GetText()) == "from level 7"
+		"the quest list's tab (kept)")
+	check(listOutline() == "#In progress 103 #Available now 104 110 #Blocked 105 106 108 #Completed +2",
+		"in groups within my levels, the done ones folded, how many more, got " .. listOutline())
+	check(plain(listRow("more").Name:GetText()) == "2 more outside your levels · Show all levels" and not listRow("more").Icon:IsShown(),
+		"a quiet line at the end: how many the level filter left out")
+	check(view.d.map.frame:IsShown(), "the details' small map: shown (the zone's map isn't in sight)")
+	listRow("more"):Click()
+	check(filters.allLevels and listOutline() == "#In progress 103 #Available now 104 107 110 #Coming up 111 #Blocked 105 106 108 #Completed",
+		"a click: all levels, got " .. listOutline())
+	check(plain(listRow(105).Right:GetText()) == "Needs Investigate Echo Ridge" and plain(listRow(111).Right:GetText()) == "Needs level 7"
 		and plain(listRow(104).Right:GetText()) == "Marshal Dughan" and plain(listRow("z:1429:b:available").Right:GetText()) == "3",
 		"what blocks it, the level it needs, the giver; how many")
 	check(plain(listRow(104).Name:GetText()) == "[4] Brotherhood of Thieves" and listRow(103).Picked:IsShown(), "level and title; the quest picked marked")
 	check(view.head.Title:GetText() == "Elwynn Forest" and not view.Zoom:IsShown(), "the zone's head, no zoom")
 	listRow("z:1429:b:done"):Click()
 	check(listOutline():find("#Completed 101 102", 1, true), "the done ones open")
+	-- One I skipped goes with the done ones; not for me only with its filter, saying why.
+	STATUS_OF[106], WHY[106] = "other", { "closed", 104 }
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	check(listOutline():find("#Completed 101 102 106", 1, true) and plain(listRow(106).Right:GetText()) == "Skipped", "skipped: with the completed ones")
+	listRow(106)._scripts.OnEnter(listRow(106))
+	check(TOOLTIP.lines[1] == "Skipped" and TOOLTIP.lines[2] == "You took Brotherhood of Thieves instead", "its tooltip: what I took instead")
+	listRow(106)._scripts.OnLeave(listRow(106))
+	view.filters.showOther:Click()
+	check(listOutline():find("#Not for you 112$") and plain(listRow(112).Right:GetText()) == "Not for your faction",
+		"not for you: only with the filter, saying why, got " .. listOutline())
+	view.filters.showOther:Click()
+	STATUS_OF[106], WHY[106] = "locked", nil
+	Q.ToggleBrowser(); Q.ToggleBrowser()
 	listRow(111):Click()
 	check(st.picked == 111 and plain(view.d.Title:GetText()) == "[9] Princess Must Die", "a click: the details")
 	view.d.links[1]:Click()
 	check(st.tab == "overview", "a link from the overview: it stays the overview")
+	view.filters.allLevels:Click()
 	view.tabs.zone:Click()
 	check(st.tab == "zone" and view.zp:IsShown() and st.chain == nil, "the zone's tab: its page")
 end
@@ -855,7 +976,7 @@ do
 	check(st.draws == draws + 4, "two right after each other: one drawing")
 	check(win:GetScript("OnUpdate") == nil, "nothing due: no OnUpdate")
 	view.head.Back:Click()
-	check(plain(chainCard(CHAIN1).Count:GetText()) == "3/9" and plain(chainCard(CHAIN1).Next:GetText()) == "Next: Speak with Willem - Guard Roberts",
+	check(plain(chainCard(CHAIN1).Count:GetText()) == "3/9" and plain(chainCard(CHAIN1).Next:GetText()) == "Next: Speak with Willem · Guard Roberts",
 		"the zone page's card too: nothing in my log, the first I can take, got " .. plain(chainCard(CHAIN1).Next:GetText()))
 
 	-- Closed: nothing heard, nothing runs; opened: as it is now.
@@ -882,7 +1003,7 @@ do
 	QUESTS = { { id = 111, title = "Prinzessin muss sterben", objectives = {} } }
 	Fire("QUEST_DATA_LOAD_RESULT", 111, true)
 	Wait(0.5)
-	check(card(111).Title:GetText() == "Prinzessin muss sterben", "it came: the card shows it")
+	check(plain(card(111).Title:GetText()) == "[9] Prinzessin muss sterben", "it came: the card shows it")
 	QUESTS = {}
 	C_QuestLog.RequestLoadQuestByID = nil
 	view.head.Back:Click()
@@ -926,9 +1047,16 @@ do
 	local _, _, _, changed = Q.BrowserView()
 	changed()
 	Wait(0.5)
+	check(zoneRow("z:1434").Name:GetText() == "|cff888888Stranglethorn Vale|r" and plain(zoneRow("z:1434").Count:GetText()) == "0 of 400",
+		"a zone far above my level (19, its levels 30-45): dimmed on the left, its count kept")
 	zoneRow("z:1434"):Click()
-	check(cardsOutline() == "z:1434:single" and view.zp.cards.made <= view.zp.cards.pool, "the zone page: one card, its rows pooled")
+	check(cardsOutline() == "z:1434:more" and plain(chainCard("z:1434:more").Line:GetText()):find("^1 more outside your levels"),
+		"the zone page: nothing within my levels, a line says so, got " .. cardsOutline())
+	view.filters.allLevels:Click()
+	check(cardsOutline() == "z:1434:single" and view.zp.cards.made <= view.zp.cards.pool, "all levels: one card, its rows pooled")
 	openChain("z:1434:single")
+	view.filters.allLevels:Click()
+	check(st.chain == "z:1434:single", "its page stays when the filter goes off (a chain's page shows every level)")
 	local g = view.g
 	local near = 0
 	for _ in pairs(g.cards) do near = near + 1 end
@@ -1012,7 +1140,7 @@ do
 	GAMEPAD_STATE.ui = true
 	local c = chainCard(CHAIN1)
 	c._scripts.OnEnter(c)
-	check(view.zp.map.lit == CHAIN1 and marker("Remy"):GetAlpha() == 0.3, "a chain's card the controller is on: its pins lit")
+	check(view.zp.map.lit == CHAIN1 and marker("drops here (12%)"):GetAlpha() == 0.3, "a chain's card the controller is on: its pins lit")
 	c._scripts.OnLeave(c)
 	Q.ToggleBrowser()
 	Q.ToggleBrowser()
