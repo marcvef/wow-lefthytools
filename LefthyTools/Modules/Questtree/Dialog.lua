@@ -7,10 +7,12 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --
 --   * Beside the quest dialog (setting dialog): when an NPC offers a quest (QUEST_DETAIL), asks for
 --     it (QUEST_PROGRESS), rewards it (QUEST_COMPLETE) or lists several (QUEST_GREETING), a panel of
---     ours next to QuestFrame says "Part 2 of 4 · <chain>", numbers the chain's steps (this one
---     bold, done ones ticked), what it leads to ("Leads to ..." / "Opens 3 quests"), what the next
---     steps need besides it ("Requires ..."), what taking it closes, which friends did it, and has a
---     button "Open in Questtree". Nothing to tell (no chain, nothing it opens): no panel.
+--     ours next to QuestFrame says "Part 2 of 4 · <chain>", numbers the chain's steps around it (one
+--     before, this one bold, two after, done ones ticked, "... N more"), what it leads to when that
+--     isn't the next step listed ("Leads to ..." / "Opens 3 quests"), what the next steps need
+--     besides it that isn't listed or done ("Requires ..."), what taking it closes, which friends did
+--     it (one line), and has a button "Open in Questtree". Nothing to tell (no chain, nothing it
+--     opens): no panel.
 --   * The quest log (setting logBadges): "2/4" at the right end of each chain quest's line (a font
 --     string of ours on Blizzard's title button, the way Misc Tweaks' NEW label is: a post-hook on
 --     QuestLogQuests_Update), the chain in the line's tooltip (a HookScript on its OnEnter, as Misc
@@ -34,10 +36,10 @@ local WIDTH = 250
 local PAD = 10
 local GAP = 3
 local INDENT = 8
-local STEPS_MAX = 10       -- steps in sight (from three before this one)
-local TIP_STEPS = 7        -- steps in the quest log's tooltip
-local NAMES_MAX = 3        -- quests named on one line ("Opens 3 quests: ...")
-local FRIENDS_MAX = 4
+local STEPS_MAX = 4        -- steps in sight: one before this one, this one, two after
+local TIP_STEPS = 5        -- steps in the quest log's tooltip (from one before this one)
+local NAMES_MAX = 3        -- quests named in a tooltip ("Opens 3 quests"), needs listed ("Requires ...")
+local FRIENDS_MAX = 3      -- friends named (one line)
 local GREETING_MAX = 8
 local WATCH_EVERY = 0.5    -- s: whether QuestFrame is still shown, while the panel is
 local HOOK_DELAY = 1       -- s after Questtree is switched on: the quest log's hook (after Misc Tweaks')
@@ -102,7 +104,7 @@ end
 -- The panel's lines, pooled
 ---------------------------------------------------------------------------
 
-local function Text(y, text, font, indent)
+local function Text(y, text, font, indent, oneLine)
 	textsUsed = textsUsed + 1
 	local fs = texts[textsUsed]
 	if not fs then
@@ -111,6 +113,7 @@ local function Text(y, text, font, indent)
 		texts[textsUsed] = fs
 	end
 	indent = indent or 0
+	fs:SetWordWrap(not oneLine)
 	fs:SetFontObject(font or "GameFontHighlightSmall")
 	fs:ClearAllPoints()
 	fs:SetPoint("TOPLEFT", panel.Body, "TOPLEFT", indent, -y)
@@ -179,11 +182,17 @@ end
 -- What the panel says
 ---------------------------------------------------------------------------
 
+-- Which of a chain's steps are in sight: from one before this one, at most max (fewer before it at
+-- the chain's start, more before it at its end): first, last.
+local function Window(list, at, max)
+	local first = math.max(1, math.min(at - 1, #list - max + 1))
+	return first, math.min(#list, first + max - 1)
+end
+
 -- The chain's steps around this one, numbered: done ones ticked green, this one bold with an
--- arrow, the rest grey.
+-- arrow, the rest grey; "... N before" and "... N more" for the rest.
 local function Steps(y, list, at)
-	local first = math.max(1, math.min(at - 3, #list - STEPS_MAX + 1))
-	local last = math.min(#list, first + STEPS_MAX - 1)
+	local first, last = Window(list, at, STEPS_MAX)
 	if first > 1 then
 		y = Text(y, GREY .. L["... %d before"]:format(first - 1) .. "|r", "GameFontHighlightSmall", INDENT)
 	end
@@ -205,12 +214,13 @@ local function Steps(y, list, at)
 	return y
 end
 
--- What the quests it leads to need besides it: { { id, forID } } (at most NAMES_MAX).
-local function OtherNeeds(id, opens)
+-- What the quests it leads to need besides it that isn't one of the steps listed (listed: a set) or
+-- done: { { id, forID } } (at most NAMES_MAX).
+local function OtherNeeds(id, opens, listed)
 	local list, seen = {}, { [id] = true }
 	for _, nextID in ipairs(opens) do
 		for _, entry in ipairs(Q.Missing and Q.Missing(nextID) or {}) do
-			if not seen[entry.id] and #list < NAMES_MAX then
+			if not (seen[entry.id] or listed[entry.id]) and Q.StatusOf(entry.id) ~= "done" and #list < NAMES_MAX then
 				seen[entry.id] = true
 				list[#list + 1] = { id = entry.id, forID = nextID }
 			end
@@ -219,8 +229,9 @@ local function OtherNeeds(id, opens)
 	return list
 end
 
--- Friends who did it or are on it: "Anna (done), Bo (on it)" in their class colours; nil: none
--- known (or the setting off). Asks their progress once per dialog (QuestShare.lua).
+-- Friends who did it or are on it, on one line: "Friends: Anna, Bo" in their class colours, each with
+-- a tick or the in-progress icon (at most FRIENDS_MAX, then "+2"); nil: none (or the setting off).
+-- Asks their progress once per dialog (QuestShare.lua).
 local function FriendsText(id)
 	if not (DB().friends and Q.Friends) then
 		return nil
@@ -229,20 +240,23 @@ local function FriendsText(id)
 		asked[id] = true
 		pcall(Q.RequestFriendProgress, id)
 	end
-	local list = Q.Friends(id) or {}
+	local list = {}
+	for _, friend in ipairs(Q.Friends(id) or {}) do
+		if friend.status == "done" or friend.status == "active" then
+			list[#list + 1] = friend
+		end
+	end
 	local parts = {}
 	for i = 1, math.min(#list, FRIENDS_MAX) do
 		local friend = list[i]
-		parts[i] = LT.Window.ClassColorCode(friend.classFile) .. (friend.name or "?") .. "|r " .. GREY .. "("
-			.. Q.StatusText(friend.status, "friend") .. GREY .. ")|r"
+		parts[i] = LT.Window.ClassColorCode(friend.classFile) .. (friend.name or "?") .. "|r "
+			.. Q.Icon(friend.status == "done" and "done" or "progress", 12)
 	end
 	if #parts == 0 then
 		return nil
 	end
-	if #list > #parts then
-		parts[#parts + 1] = GREY .. L["(+%d more)"]:format(#list - #parts) .. "|r"
-	end
-	return GOLD .. L["Friends:"] .. "|r " .. table.concat(parts, ", ")
+	local more = #list > #parts and (" " .. GREY .. "+" .. (#list - #parts) .. "|r") or ""
+	return GOLD .. L["Friends:"] .. "|r " .. table.concat(parts, ", ") .. more
 end
 
 -- A quest's panel: nil when there's nothing to tell (no chain, nothing it leads to or closes, no
@@ -261,25 +275,34 @@ local function DrawQuest(y, id)
 	if not (list or opens[1] or closes[1] or crumb or friends) then
 		return nil
 	end
+	local listed = {}
 	if list then
 		y = Text(y, GOLD .. L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list) .. "|r", "GameFontNormal")
 		y = Steps(y + 1, list, at)
+		local first, last = Window(list, at, STEPS_MAX)
+		for i = first, last do
+			listed[list[i]] = true
+		end
 	else
 		y = Text(y, GOLD .. Q.Title(id, quest) .. "|r", "GameFontNormal")
 	end
 	y = y + GAP
-	if #opens == 1 then
+	-- What it leads to: the one quest (unless it's a step listed already), else how many (their names
+	-- in the line's tooltip).
+	if #opens == 1 and not listed[opens[1]] then
 		y = Row(y, { id = opens[1], text = GOLD .. L["Leads to:"] .. "|r " .. Q.LevelTitle(opens[1]) })
 	elseif #opens > 1 then
-		y = Text(y, GOLD .. L["Opens %d quests:"]:format(#opens) .. "|r", "GameFontHighlightSmall")
+		local tip = { L["Opens %d quests"]:format(#opens) }
 		for i = 1, math.min(#opens, NAMES_MAX) do
-			y = Row(y, { id = opens[i], text = Q.QuestIcon(opens[i]) .. " " .. Q.LevelTitle(opens[i]), indent = INDENT })
+			tip[#tip + 1] = Q.LevelTitle(opens[i])
 		end
 		if #opens > NAMES_MAX then
-			y = Text(y, GREY .. L["and %d more"]:format(#opens - NAMES_MAX) .. "|r", "GameFontHighlightSmall", INDENT)
+			tip[#tip + 1] = L["and %d more"]:format(#opens - NAMES_MAX)
 		end
+		tip[#tip + 1] = L["Click: open it in Questtree"]
+		y = Row(y, { id = id, text = GOLD .. L["Opens %d quests"]:format(#opens) .. "|r", tooltip = tip })
 	end
-	for _, need in ipairs(OtherNeeds(id, opens)) do
+	for _, need in ipairs(OtherNeeds(id, opens, listed)) do
 		y = Row(y, { id = need.id, text = Q.StatusCode("locked") .. L["Requires: %s"]:format(Q.Title(need.id)) .. "|r"
 			.. GREY .. " " .. L["(for %s)"]:format(Q.Title(need.forID)) .. "|r",
 			tooltip = { Q.LevelTitle(need.id), Q.StatusText(Q.StatusOf(need.id)),
@@ -292,7 +315,7 @@ local function DrawQuest(y, id)
 		y = Text(y, GREY .. L["A lead-in: %s can be taken without it."]:format(Q.Title(crumb)) .. "|r", "GameFontHighlightSmall")
 	end
 	if friends then
-		y = Text(y + 2, friends, "GameFontHighlightSmall")
+		y = Text(y + 2, friends, "GameFontHighlightSmall", nil, true)
 	end
 	return y
 end
@@ -533,8 +556,11 @@ local function BadgeTip(button)
 	end
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddLine("Questtree: " .. L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list), 1, 0.82, 0, true)
-	local first = math.max(1, math.min(at - 2, #list - TIP_STEPS + 1))
-	for i = first, math.min(#list, first + TIP_STEPS - 1) do
+	local first, last = Window(list, at, TIP_STEPS)
+	if first > 1 then
+		GameTooltip:AddLine("   " .. L["... %d before"]:format(first - 1), 0.6, 0.6, 0.6)
+	end
+	for i = first, last do
 		local other = list[i]
 		if i == at then
 			GameTooltip:AddLine(Q.Icon("here") .. " " .. i .. ". " .. Q.Title(other), 1, 1, 1)
@@ -543,6 +569,9 @@ local function BadgeTip(button)
 		else
 			GameTooltip:AddLine("   " .. i .. ". " .. Q.Title(other), 0.6, 0.6, 0.6)
 		end
+	end
+	if last < #list then
+		GameTooltip:AddLine("   " .. L["... %d more"]:format(#list - last), 0.6, 0.6, 0.6)
 	end
 	local opens = Q.Opens and Q.Opens(id) or {}
 	if opens[1] then

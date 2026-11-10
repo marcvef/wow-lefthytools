@@ -4,20 +4,20 @@ local L = ns.L
 local Q = ns.Questtree or {}
 ns.Questtree = Q
 
--- Three more views of the quest browser (docs/questtree.md, Views), tabs of its window through its
+-- Two more views of the quest browser (docs/questtree.md, Views), tabs of its window through its
 -- registry (Q.RegisterBrowserView(key, label, build): build(parent) gives { frame, Refresh, OnShow,
 -- OnHide }), registered when the registry is there: at load (Browser.lua comes before this file) or
 -- when the module is switched on; without it nothing happens.
---   * Storylines: every chain for me, in all zones, as a grid of cards (its title, zone, levels, steps
---     done with a bar, its next step), filtered (in progress, ready to turn in, for my level, done)
---     and sorted by what it's worth (the quests left in it, by their levels) or by level; a click
---     opens the chain in the window (Q.OpenBrowser).
---   * Level path ("Where to go next"): the zones of my side as rows, each a bar across the levels
---     1-60 from its lowest to its highest quest level, shaded per level (done, available, later), a
---     line at my level, friends there as dots at their level; sorted by the quests I can take within
---     3 levels of mine; a click opens the zone (Q.SelectZone).
---   * Continents: a tile per zone by continent, coloured by how much of it I've done, with what's
---     available and ready to turn in, friends' progress as a second bar; a click opens the zone.
+--   * Storylines: every chain for me, in all zones, as a grid of cards of three lines (its title and
+--     steps done, its zone and levels, its next step), filtered (for my level by default, in
+--     progress, ready to turn in, done, all) and sorted by what it's worth (the quests left in it, by
+--     their levels) or by level; the rest in a card's tooltip; a click opens the chain in the window
+--     (Q.OpenBrowser).
+--   * Level path ("Where to go next"): the zones with something for my levels (Q.InRange) or friends
+--     there (all zones with a toggle) as rows: the name, a bar across the levels 1-60 from its lowest
+--     to its highest quest level, shaded per level (done, available, later), a line at my level, and
+--     how many quests there are for my level; the rest in the row's tooltip. A click opens the zone
+--     (Q.SelectZone).
 -- What it costs: the counts (every zone's quests by status and level, every chain's) are made once
 -- per data and progress change (Q.dataGen, Q.progressGen, my level), a few hundred quests a frame
 -- (no hitch), only while a view is shown; what's ready to turn in is read from the quest log when a
@@ -29,11 +29,9 @@ local K = {
 	W = 1060, H = 640,          -- a view's size when its parent has none yet
 	TOP = 34, FOOT = 20, PAD = 8, GAP = 10, BAR = 24,
 	SLICE = 200,                -- quests counted per frame
-	NEAR = 3,                   -- "around my level": this many levels either side
 	BEYOND = 120,               -- px of rows laid beyond sight (the controller's next one)
-	CARD_W = 280, CARD_H = 78,  -- storylines' cards (the width is the least)
-	ROW_H = 34, NAME_W = 200, RIGHT_W = 150, RUNS = 16, DOTS = 6, MAX_LEVEL = 60, -- level path
-	TILE_W = 200, TILE_H = 76, HEAD_H = 38, -- continents
+	CARD_W = 280, CARD_H = 58,  -- storylines' cards (the width is the least)
+	ROW_H = 26, NAME_W = 200, RIGHT_W = 150, MAX_LEVEL = 60, -- level path
 	REDRAW = 0.5,
 }
 
@@ -45,7 +43,6 @@ local T = {
 	progress = "Interface\\GossipFrame\\IncompleteQuestIcon",
 	lock = "Interface\\LFGFrame\\UI-LFG-ICON-LOCK",
 	check = "Interface\\RaidFrame\\ReadyCheck-Ready",
-	circle = "Interface\\CharacterFrame\\TempPortraitAlphaMask",
 }
 
 -- The window's status colours (Browser.lua's tones), and gold for "ready to turn in".
@@ -57,7 +54,7 @@ local GOLD, GREY = "|cffffd200", "|cff888888"
 
 local V = {}      -- what the views share
 local Census = {} -- the counts
-local C, D, E = {}, {}, {} -- the views: storylines, level path, continents
+local C, D = {}, {} -- the views: storylines, level path
 
 ---------------------------------------------------------------------------
 -- Shared bits
@@ -137,13 +134,13 @@ function V.SetBar(bar, width, fraction, c)
 	bar.fraction = fraction
 end
 
-function V.ClassRGB(classFile)
-	local c = classFile and C_ClassColor and C_ClassColor.GetClassColor and LT.Value(C_ClassColor.GetClassColor, classFile)
-	c = type(c) == "table" and c or (RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile])
-	if type(c) == "table" and c.r then
-		return c.r, c.g, c.b
+-- Within my levels (Engine.lua's Q.InRange: in my log, or neither grey nor too far above me); true
+-- without it.
+function V.InRange(id)
+	if not Q.InRange then
+		return true
 	end
-	return 0.8, 0.8, 0.8
+	return Q.InRange(id) == true
 end
 
 -- "[12]" or "[12-18]" in their difficulty colours.
@@ -184,17 +181,24 @@ function V.FriendsOn()
 	return not (m and m.db) or m.db.friends ~= false
 end
 
--- What the storylines view keeps (the module's settings: views = { filter, sort }).
+-- What the views keep (the module's settings: views = { show, sort, allZones }): the storylines'
+-- filter (for my level at first) and sort, the level path's toggle. (An older build's "filter" is
+-- left alone: the new default wins once.)
 function V.Saved()
 	local m = Q.module
+	local saved
 	if not (m and m.db) then
-		V.fallback = V.fallback or { filter = "all", sort = "worth" }
-		return V.fallback
+		V.fallback = V.fallback or {}
+		saved = V.fallback
+	else
+		if type(m.db.views) ~= "table" then
+			m.db.views = {}
+		end
+		saved = m.db.views
 	end
-	if type(m.db.views) ~= "table" then
-		m.db.views = { filter = "all", sort = "worth" }
-	end
-	return m.db.views
+	saved.show = saved.show or "level"
+	saved.sort = saved.sort or "worth"
+	return saved
 end
 
 -- My quests that are ready to turn in (complete, in the log): a set. Read when a view draws.
@@ -470,9 +474,9 @@ function Census.Quest(w, z, id)
 				elseif s == "available" or s == "active" then
 					b.open = b.open + 1
 				end
-				if s == "available" and math.abs(lv - w.me) <= K.NEAR then
-					z.near = z.near + 1
-				end
+			end
+			if s ~= "done" and V.InRange(id) then
+				z.near = z.near + 1 -- (for my levels: to do, in my log or neither grey nor far above me)
 			end
 		end
 	end
@@ -498,7 +502,7 @@ end
 
 -- One chain: its quests for me by status, levels, zones, what's next, what it's worth.
 function Census.Chain(w, chain)
-	local c = { first = chain[1], ids = chain, total = 0, done = 0, active = 0, available = 0, level = 0, locked = 0, forLevel = 0,
+	local c = { first = chain[1], ids = chain, total = 0, done = 0, active = 0, available = 0, level = 0, locked = 0,
 		left = 0, worth = 0, zones = {}, zoneList = {} }
 	local nextRank
 	for _, m in ipairs(chain) do
@@ -523,9 +527,6 @@ function Census.Chain(w, chain)
 			if s ~= "done" then
 				c.left = c.left + 1
 				c.worth = c.worth + Census.Worth(m, q, s, w.me)
-				if s == "available" and not (Q.IsTrivial and Q.IsTrivial(m)) then
-					c.forLevel = c.forLevel + 1
-				end
 				local rank = NEXT_RANK[s]
 				if rank and (not nextRank or rank < nextRank) then
 					c.next, c.nextStatus, nextRank = m, s, rank
@@ -547,6 +548,7 @@ function Census.Chain(w, chain)
 	local z = type(best) == "number" and w.byMap[best]
 	c.zoneName = z and z.name or (type(best) == "number" and Q.MapName(best)) or (type(best) == "string" and best) or nil
 	c.title = Q.Title(c.first)
+	c.inRange = c.next ~= nil and V.InRange(c.next) -- (its next step is for my levels)
 	w.list[#w.list + 1] = c
 end
 
@@ -831,13 +833,13 @@ end
 -- Storylines: every chain for me, a grid of cards
 ---------------------------------------------------------------------------
 
-local FILTERS = { "all", "progress", "ready", "level", "done" }
+local FILTERS = { "level", "progress", "ready", "done", "all" }
 local FILTER_LABEL = { all = L["All"], progress = L["In progress"], ready = L["Ready to turn in"], level = L["For your level"], done = L["Done"] }
 local FILTER_TIP = {
 	all = L["Every storyline with quests for you, in every zone."],
 	progress = L["Started and not finished: you've done a step, or have one in your log."],
 	ready = L["A step is ready to turn in."],
-	level = L["A step you can take now that isn't grey for your level."],
+	level = L["Its next step is for your level: in your log, or not grey and at most %d levels above you."]:format(Q.RANGE_ABOVE or 2),
 	done = L["Every step done."],
 }
 
@@ -859,7 +861,7 @@ function C.Passes(c, filter, ready)
 	elseif filter == "ready" then
 		return ready[c.first] ~= nil
 	elseif filter == "level" then
-		return c.forLevel > 0
+		return c.inRange and c.done < c.total
 	elseif filter == "done" then
 		return c.done >= c.total
 	end
@@ -957,45 +959,44 @@ function C.CardEnter(self)
 	GameTooltip:Show()
 end
 
+-- A card of three lines: the title and "3/7", the zone and levels, the next step; the status strip
+-- and icon at the left, a thin bar of the steps done along its bottom.
 function C.NewCard(parent)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(K.CARD_W, K.CARD_H)
 	b.Bg = b:CreateTexture(nil, "BACKGROUND")
 	b.Bg:SetAllPoints()
-	b.Bg:SetTexture(T.flat)
-	b.Band = b:CreateTexture(nil, "BACKGROUND", nil, 1)
-	b.Band:SetPoint("TOPLEFT", 1, -1)
-	b.Band:SetPoint("TOPRIGHT", -1, -1)
-	b.Band:SetHeight(22)
-	b.Band:SetColorTexture(0, 0, 0, 0.3)
+	b.Bg:SetColorTexture(0.1, 0.1, 0.1, 0.6)
 	V.Edges(b)
+	V.EdgeColor(b, 0.3, 0.3, 0.3, 1)
 	b.Strip = b:CreateTexture(nil, "ARTWORK")
 	b.Strip:SetPoint("TOPLEFT", 1, -1)
 	b.Strip:SetPoint("BOTTOMLEFT", 1, 1)
 	b.Strip:SetWidth(3)
 	b.Icon = b:CreateTexture(nil, "ARTWORK")
-	b.Icon:SetSize(26, 26)
-	b.Icon:SetPoint("TOPLEFT", 9, -4)
+	b.Icon:SetSize(24, 24)
+	b.Icon:SetPoint("LEFT", 9, 0)
+	b.Steps = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	b.Steps:SetPoint("TOPRIGHT", -8, -7)
+	b.Steps:SetJustifyH("RIGHT")
 	b.Title = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	b.Title:SetPoint("TOPLEFT", 42, -6)
-	b.Title:SetPoint("RIGHT", -8, 0)
+	b.Title:SetPoint("TOPLEFT", 40, -6)
+	b.Title:SetPoint("RIGHT", b.Steps, "LEFT", -6, 0)
 	b.Title:SetJustifyH("LEFT")
 	b.Title:SetWordWrap(false)
 	b.Meta = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	b.Meta:SetPoint("TOPLEFT", 42, -27)
-	b.Meta:SetPoint("RIGHT", -64, 0)
+	b.Meta:SetPoint("TOPLEFT", 40, -23)
+	b.Meta:SetPoint("RIGHT", -8, 0)
 	b.Meta:SetJustifyH("LEFT")
 	b.Meta:SetWordWrap(false)
-	b.Steps = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.Steps:SetPoint("TOPRIGHT", -8, -27)
-	b.Steps:SetJustifyH("RIGHT")
-	b.Bar = V.NewBar(b, 3)
-	b.Bar.Back:SetPoint("TOPLEFT", 42, -43)
 	b.Next = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.Next:SetPoint("BOTTOMLEFT", 42, 9)
+	b.Next:SetPoint("TOPLEFT", 40, -38)
 	b.Next:SetPoint("RIGHT", -8, 0)
 	b.Next:SetJustifyH("LEFT")
 	b.Next:SetWordWrap(false)
+	b.Next:SetTextColor(0.8, 0.8, 0.8)
+	b.Bar = V.NewBar(b, 2)
+	b.Bar.Back:SetPoint("BOTTOMLEFT", 4, 1)
 	b:SetHighlightTexture(T.highlight, "ADD")
 	b:SetScript("OnEnter", C.CardEnter)
 	b:SetScript("OnLeave", V.Untip)
@@ -1019,9 +1020,6 @@ function C.FillCard(b, c, width, ready)
 	b:SetWidth(width)
 	local state = C.State(c, ready)
 	local tone = TONE[state] or TONE.locked
-	local bright = state ~= "level" and state ~= "locked"
-	b.Bg:SetVertexColor(bright and tone[1] or 0.1, bright and tone[2] or 0.1, bright and tone[3] or 0.1, bright and 0.22 or 0.6)
-	V.EdgeColor(b, bright and tone[1] or 0.35, bright and tone[2] or 0.35, bright and tone[3] or 0.35, bright and 0.9 or 1)
 	b.Strip:SetColorTexture(tone[1], tone[2], tone[3], 1)
 	local icon = CHAIN_ICON[state] or CHAIN_ICON.locked
 	V.Art(b.Icon, icon[1], icon[2])
@@ -1035,6 +1033,7 @@ function C.FillCard(b, c, width, ready)
 	else
 		b.Title:SetTextColor(1, 0.82, 0)
 	end
+	b.Steps:SetText((c.left > 0 and GREY or V.Hex(TONE.done)) .. c.done .. "/" .. c.total .. "|r")
 	local parts = {}
 	if c.zoneName then
 		parts[#parts + 1] = c.zoneName
@@ -1043,12 +1042,10 @@ function C.FillCard(b, c, width, ready)
 	if levels ~= "" then
 		parts[#parts + 1] = levels
 	end
-	b.Meta:SetText(table.concat(parts, GREY .. "  ·  |r"))
-	b.Steps:SetText(c.left > 0 and (GREY .. L["%d/%d steps"]:format(c.done, c.total) .. "|r") or (V.Hex(TONE.done) .. L["%d/%d steps"]:format(c.done, c.total) .. "|r"))
-	V.SetBar(b.Bar, width - 50, c.done / math.max(1, c.total), TONE.done)
-	local color, line = C.NextLine(c, state, ready)
+	b.Meta:SetText(table.concat(parts, GREY .. " · |r"))
+	V.SetBar(b.Bar, width - 8, c.done / math.max(1, c.total), TONE.done)
+	local _, line = C.NextLine(c, state, ready)
 	b.Next:SetText(line)
-	b.Next:SetTextColor(color[1], color[2], color[3])
 	b.state = state
 	b:Show()
 end
@@ -1080,7 +1077,7 @@ function C.FillRow(row, e)
 end
 
 function C.SetFilter(inst, filter)
-	V.Saved().filter = filter
+	V.Saved().show = filter
 	inst:Draw(true)
 end
 
@@ -1099,7 +1096,7 @@ end
 -- The chips, the counts in them; the cards in rows.
 function C.Fill(inst, data, top)
 	local saved = V.Saved()
-	local filter = FILTER_LABEL[saved.filter] and saved.filter or "all"
+	local filter = FILTER_LABEL[saved.show] and saved.show or "level"
 	local sort = saved.sort == "level" and "level" or "worth"
 	local readyQuests = V.ReadySet()
 	local ready = {}
@@ -1178,9 +1175,6 @@ function C.Build(parent)
 		self.SortLabel:ClearAllPoints()
 		self.SortLabel:SetPoint("RIGHT", self.sorts.worth, "LEFT", -8, 0)
 	end
-	inst.Legend:SetText(V.Hex(TONE.ready) .. "|T" .. T.flat .. ":10:10|t " .. L["Ready to turn in"] .. "|r   " .. V.Hex(TONE.active) .. "|T" .. T.flat
-		.. ":10:10|t " .. L["In your log"] .. "|r   " .. V.Hex(TONE.available) .. "|T" .. T.flat .. ":10:10|t " .. L["Available"] .. "|r   "
-		.. V.Hex(TONE.locked) .. "|T" .. T.flat .. ":10:10|t " .. L["Later"] .. "|r   " .. V.Hex(TONE.done) .. "|T" .. T.flat .. ":10:10|t " .. L["Done"] .. "|r")
 	inst.Draw = function(self, top)
 		V.Fit(self)
 		V.Draw(self, function(i, data) C.Fill(i, data, top) end)
@@ -1301,9 +1295,11 @@ function D.RowEnter(self)
 	GameTooltip:SetText(z.name, 1, 0.82, 0)
 	GameTooltip:AddLine(L["Levels %s"]:format(V.Levels(z.minLevel, z.maxLevel)), 1, 1, 1)
 	GameTooltip:AddLine(L["%d of %d done"]:format(z.done, z.total), 1, 1, 1)
+	if z.near > 0 then
+		GameTooltip:AddLine(L["%d for your level"]:format(z.near), TONE.available[1], TONE.available[2], TONE.available[3])
+	end
 	if z.available > 0 then
-		GameTooltip:AddLine(L["%d you can take now, %d of them within %d levels of yours"]:format(z.available, z.near, K.NEAR), TONE.available[1],
-			TONE.available[2], TONE.available[3], true)
+		GameTooltip:AddLine(L["%d you can take now"]:format(z.available), 0.85, 0.85, 0.85)
 	end
 	if (z.active or 0) > 0 then
 		GameTooltip:AddLine(L["%d in your quest log"]:format(z.active), TONE.active[1], TONE.active[2], TONE.active[3])
@@ -1329,6 +1325,8 @@ function D.RowEnter(self)
 	GameTooltip:Show()
 end
 
+-- A row: the zone's name, its bar across the levels with my level's line, how many quests there are
+-- for my level (all done: says so). The zone I'm in has a faint blue band; the rest is its tooltip's.
 function D.NewRow(parent, width)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(width, K.ROW_H)
@@ -1342,25 +1340,18 @@ function D.NewRow(parent, width)
 	b.Line:SetHeight(1)
 	b.Line:SetColorTexture(1, 1, 1, 0.05)
 	b.Name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	b.Name:SetPoint("TOPLEFT", 8, -4)
+	b.Name:SetPoint("LEFT", 8, 0)
 	b.Name:SetWidth(K.NAME_W - 16)
 	b.Name:SetJustifyH("LEFT")
 	b.Name:SetWordWrap(false)
-	b.Sub = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	b.Sub:SetPoint("BOTTOMLEFT", 8, 4)
-	b.Sub:SetWidth(K.NAME_W - 16)
-	b.Sub:SetJustifyH("LEFT")
-	b.Sub:SetWordWrap(false)
 	b.Right = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	b.Right:SetPoint("RIGHT", -8, 0)
 	b.Right:SetWidth(K.RIGHT_W - 12)
 	b.Right:SetJustifyH("RIGHT")
 	b.Right:SetWordWrap(false)
-	b.Band = b:CreateTexture(nil, "BORDER") -- my level, give or take NEAR
-	b.Band:SetColorTexture(1, 0.82, 0, 0.07)
 	b.Track = b:CreateTexture(nil, "BORDER", nil, 1)
 	b.Track:SetColorTexture(1, 1, 1, 0.06)
-	b.Runs, b.Dots = {}, {}
+	b.Runs = {}
 	b.Me = b:CreateTexture(nil, "OVERLAY")
 	b.Me:SetColorTexture(1, 0.82, 0, 0.85)
 	b.Me:SetWidth(2)
@@ -1379,14 +1370,13 @@ function D.FillRow(b, e)
 	local inst, z = e.inst, e.zone
 	b:SetWidth(inst.listW)
 	b.Here:SetShown(e.here)
-	b.Name:SetText(z.name .. (e.here and (" |cff66ccff" .. L["(you're here)"] .. "|r") or ""))
-	b.Sub:SetText(V.Levels(z.minLevel, z.maxLevel) .. GREY .. "  " .. L["%d of %d done"]:format(z.done, z.total) .. "|r")
+	b.Name:SetText(z.name)
 	if z.near > 0 then
 		b.Right:SetText(V.Hex(TONE.available) .. L["%d for your level"]:format(z.near) .. "|r")
 	elseif z.done >= z.total then
 		b.Right:SetText(V.Hex(TONE.done) .. L["All done"] .. "|r")
 	else
-		b.Right:SetText(GREY .. L["nothing at your level"] .. "|r")
+		b.Right:SetText("")
 	end
 	local mid, barH = -K.ROW_H / 2, 10
 	local function place(t, from, to, h)
@@ -1395,7 +1385,6 @@ function D.FillRow(b, e)
 		t:SetSize(math.max(1, D.X(inst, to) + inst.per - D.X(inst, from)), h)
 	end
 	place(b.Track, z.minLevel, math.max(z.minLevel, z.maxLevel), barH + 4)
-	place(b.Band, inst.me - K.NEAR, inst.me + K.NEAR, K.ROW_H - 2)
 	for i, run in ipairs(e.runs) do
 		local t = b.Runs[i]
 		if not t then
@@ -1413,28 +1402,6 @@ function D.FillRow(b, e)
 	b.Me:ClearAllPoints()
 	b.Me:SetPoint("TOP", b, "TOPLEFT", D.X(inst, inst.me) + inst.per / 2, 0)
 	b.Me:SetHeight(K.ROW_H)
-	local shown = 0
-	for i, p in ipairs(e.friends or {}) do
-		if i > K.DOTS then
-			break
-		end
-		local dot = b.Dots[i]
-		if not dot then
-			dot = b:CreateTexture(nil, "OVERLAY", nil, 1)
-			dot:SetTexture(T.circle)
-			dot:SetSize(9, 9)
-			b.Dots[i] = dot
-		end
-		dot:SetVertexColor(V.ClassRGB(p.classFile))
-		dot:ClearAllPoints()
-		dot:SetPoint("CENTER", b, "TOPLEFT", D.X(inst, tonumber(p.level) or z.minLevel) + inst.per / 2 + (i - 1) * 3, mid + 9)
-		dot:Show()
-		shown = i
-	end
-	for i = shown + 1, #b.Dots do
-		b.Dots[i]:Hide()
-	end
-	b.friendDots = shown
 end
 
 -- The axis over the rows: levels every ten, "You" at mine.
@@ -1462,6 +1429,14 @@ function D.Layout(inst, w)
 	inst.Axis:SetSize(w, 28)
 end
 
+-- The toggle "All zones" (kept: views.allZones).
+function D.SetAll(inst, on)
+	V.Saved().allZones = on and true or nil
+	inst:Draw()
+end
+
+-- The zones of my side with something for my levels or friends there (all of them with the toggle),
+-- the most for my levels first; on top the best next one.
 function D.Fill(inst, data)
 	local me = V.MyLevel()
 	local maxL = K.MAX_LEVEL
@@ -1473,12 +1448,17 @@ function D.Fill(inst, data)
 		D.Layout(inst, inst.w)
 	end
 	D.Axis(inst)
+	local all = V.Saved().allZones == true
+	V.SetChip(inst.All, L["All zones"], all)
 	local here = Q.HereZone and Q.HereZone()
 	local friends = D.FriendsHere(data)
-	local list = {}
+	local mine, list = {}, {}
 	for _, z in ipairs(data.zones) do
 		if D.Mine(z) then
-			list[#list + 1] = z
+			mine[#mine + 1] = z
+			if all or z.near > 0 or friends[z.map] then
+				list[#list + 1] = z
+			end
 		end
 	end
 	D.Sort(list, me)
@@ -1489,26 +1469,24 @@ function D.Fill(inst, data)
 	end
 	inst.zones = list
 	local best = list[1]
-	if not best then
-		inst.Head:SetText("")
-		V.Say(inst, L["No zone has quests for this character."])
+	if best and best.near > 0 then
+		inst.Head:SetText(L["Best next: %s, %d quests for your level"]:format(GOLD .. best.name .. "|r", best.near))
 	else
-		V.Say(inst, nil)
-		if best.near > 0 then
-			inst.Head:SetText(L["Best next: %s, %d quests for your level"]:format(GOLD .. best.name .. "|r", best.near))
-		else
-			local soon
-			for _, z in ipairs(list) do
-				if z.done < z.total and z.minLevel > me and (not soon or z.minLevel < soon.minLevel) then
-					soon = z
-				end
-			end
-			if soon then
-				inst.Head:SetText(L["Nothing to take within %d levels of you. Next up: %s, from level %d."]:format(K.NEAR, GOLD .. soon.name .. "|r", soon.minLevel))
-			else
-				inst.Head:SetText(L["Nothing to take within %d levels of you."]:format(K.NEAR))
+		local soon
+		for _, z in ipairs(mine) do
+			if z.done < z.total and z.minLevel > me and (not soon or z.minLevel < soon.minLevel) then
+				soon = z
 			end
 		end
+		inst.Head:SetText(soon and L["Nothing for your level. Next up: %s, from level %d."]:format(GOLD .. soon.name .. "|r", soon.minLevel)
+			or (mine[1] and L["Nothing for your level."]) or "")
+	end
+	if not mine[1] then
+		V.Say(inst, L["No zone has quests for this character."])
+	elseif not best then
+		V.Say(inst, L["No zone has quests for your level."], { L["Show all zones"], function() D.SetAll(inst, true) end })
+	else
+		V.Say(inst, nil)
 	end
 	inst.list:SetEntries(entries, true)
 end
@@ -1517,9 +1495,12 @@ function D.Build(parent)
 	local inst = V.NewView(parent, "levelpath")
 	inst.axis = 28
 	inst.maxL, inst.me = K.MAX_LEVEL, V.MyLevel()
+	inst.All = V.NewChip(inst.frame, function() D.SetAll(inst, not V.Saved().allZones) end)
+	inst.All.tip = L["Also the zones without quests for your level."]
+	inst.All:SetPoint("TOPRIGHT", inst.frame, "TOPRIGHT", -K.PAD, -6)
 	inst.Head = inst.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
 	inst.Head:SetPoint("TOPLEFT", K.PAD, -10)
-	inst.Head:SetPoint("RIGHT", inst.frame, "RIGHT", -K.PAD, 0)
+	inst.Head:SetPoint("RIGHT", inst.All, "LEFT", -K.PAD, 0)
 	inst.Head:SetJustifyH("LEFT")
 	inst.Head:SetWordWrap(false)
 	inst.Axis = CreateFrame("Frame", nil, inst.frame)
@@ -1534,285 +1515,10 @@ function D.Build(parent)
 		D.Layout(self, w)
 	end
 	inst.Legend:SetText(V.Hex(TONE.done) .. "|T" .. T.flat .. ":10:10|t " .. L["Done"] .. "|r   " .. V.Hex(TONE.available) .. "|T" .. T.flat .. ":10:10|t "
-		.. L["Quests to take"] .. "|r   |cff6b6b6b|T" .. T.flat .. ":10:10|t " .. L["Later"] .. "|r   " .. GOLD .. "| " .. L["Your level"] .. "|r   |cffbbbbbb"
-		.. L["Dots: friends there, at their level"] .. "|r")
+		.. L["Quests to take"] .. "|r   |cff6b6b6b|T" .. T.flat .. ":10:10|t " .. L["Later"] .. "|r   " .. GOLD .. "| " .. L["Your level"] .. "|r")
 	inst.Draw = function(self)
 		V.Fit(self)
 		V.Draw(self, D.Fill)
-	end
-	return inst
-end
-
----------------------------------------------------------------------------
--- Continents: a tile per zone, coloured by how much of it I've done
----------------------------------------------------------------------------
-
--- Friends' progress (QuestShare.lua's Q.friends) per zone: { [map] = { { name, classFile, done } } },
--- the most done first. Only what they told (the quests asked about).
-function E.FriendsDone(data)
-	local out = {}
-	if not V.FriendsOn() then
-		return out
-	end
-	local all = (Q.FriendProgress and Q.FriendProgress()) or Q.friends
-	for _, p in pairs(type(all) == "table" and all or {}) do
-		if type(p) == "table" and p.name and type(p.done) == "table" then
-			local per = {}
-			for id in pairs(p.done) do
-				local q = type(id) == "number" and Q.Quest(id)
-				local z = q and q.zone and data.byMap[q.zone]
-				if z then
-					per[z.map] = (per[z.map] or 0) + 1
-				end
-			end
-			for map, n in pairs(per) do
-				out[map] = out[map] or {}
-				table.insert(out[map], { name = p.name, classFile = p.classFile, done = n })
-			end
-		end
-	end
-	for _, list in pairs(out) do
-		table.sort(list, function(a, b)
-			if a.done ~= b.done then
-				return a.done > b.done
-			end
-			return tostring(a.name) < tostring(b.name)
-		end)
-	end
-	return out
-end
-
-function E.TileEnter(self)
-	local t = self.tile
-	if not t then
-		return
-	end
-	local z = t.zone
-	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetText(z.name, 1, 0.82, 0)
-	GameTooltip:AddLine(L["Levels %s"]:format(V.Levels(z.minLevel, z.maxLevel)), 1, 1, 1)
-	GameTooltip:AddLine(L["%d of %d done"]:format(z.done, z.total), 1, 1, 1)
-	if z.available > 0 then
-		GameTooltip:AddLine(L["%d you can take now"]:format(z.available), TONE.available[1], TONE.available[2], TONE.available[3])
-	end
-	if t.ready > 0 then
-		GameTooltip:AddLine(L["%d ready to turn in"]:format(t.ready), TONE.ready[1], TONE.ready[2], TONE.ready[3])
-	end
-	if (z.active or 0) > t.ready then
-		GameTooltip:AddLine(L["%d in your quest log"]:format(z.active - t.ready), TONE.active[1], TONE.active[2], TONE.active[3])
-	end
-	for _, f in ipairs(t.friends or {}) do
-		GameTooltip:AddLine(LT.Window.ClassColorCode(f.classFile) .. tostring(f.name) .. "|r " .. GREY .. L["%d done (that you know of)"]:format(f.done) .. "|r",
-			1, 1, 1)
-	end
-	if t.here then
-		GameTooltip:AddLine(L["You're here."], 0.4, 0.8, 1)
-	end
-	GameTooltip:AddLine(L["Click: open this zone"], 0.5, 0.75, 1)
-	GameTooltip:Show()
-end
-
-function E.NewTile(parent)
-	local b = CreateFrame("Button", nil, parent)
-	b:SetSize(K.TILE_W, K.TILE_H)
-	b.Bg = b:CreateTexture(nil, "BACKGROUND")
-	b.Bg:SetAllPoints()
-	b.Bg:SetTexture(T.flat)
-	V.Edges(b)
-	b.Name = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	b.Name:SetPoint("TOPLEFT", 8, -7)
-	b.Name:SetPoint("RIGHT", -52, 0)
-	b.Name:SetJustifyH("LEFT")
-	b.Name:SetWordWrap(false)
-	b.Pct = b:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	b.Pct:SetPoint("TOPRIGHT", -8, -6)
-	b.Pct:SetJustifyH("RIGHT")
-	b.Sub = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-	b.Sub:SetPoint("TOPLEFT", 8, -25)
-	b.Sub:SetPoint("RIGHT", -8, 0)
-	b.Sub:SetJustifyH("LEFT")
-	b.Sub:SetWordWrap(false)
-	b.Counts = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.Counts:SetPoint("BOTTOMLEFT", 8, 16)
-	b.Counts:SetPoint("RIGHT", -8, 0)
-	b.Counts:SetJustifyH("LEFT")
-	b.Counts:SetWordWrap(false)
-	b.Bar = V.NewBar(b, 4)
-	b.Bar.Back:SetPoint("BOTTOMLEFT", 8, 8)
-	b.FBar = V.NewBar(b, 2)
-	b.FBar.Back:SetPoint("BOTTOMLEFT", 8, 4)
-	b:SetHighlightTexture(T.highlight, "ADD")
-	b:SetScript("OnEnter", E.TileEnter)
-	b:SetScript("OnLeave", V.Untip)
-	b:SetScript("OnClick", function(self)
-		if self.tile then
-			V.Untip(self)
-			V.OpenZone(self.tile.zone.map)
-		end
-	end)
-	return b
-end
-
-local DIM, FULL = { 0.16, 0.16, 0.18 }, TONE.done
-
-function E.FillTile(b, t, width)
-	local z = t.zone
-	b.tile = t
-	b:SetWidth(width)
-	local p = z.done / math.max(1, z.total)
-	b.Bg:SetVertexColor(DIM[1] + (FULL[1] - DIM[1]) * p, DIM[2] + (FULL[2] - DIM[2]) * p, DIM[3] + (FULL[3] - DIM[3]) * p, 0.45 + 0.3 * p)
-	if t.here then
-		V.EdgeColor(b, 0.4, 0.8, 1, 1)
-	elseif p >= 1 then
-		V.EdgeColor(b, FULL[1], FULL[2], FULL[3], 1)
-	else
-		V.EdgeColor(b, 0.35, 0.35, 0.35, 1)
-	end
-	b.Name:SetText(z.name)
-	b.Pct:SetText(("%d%%"):format(math.floor(p * 100)))
-	b.Sub:SetText(V.Levels(z.minLevel, z.maxLevel) .. GREY .. "  " .. L["%d of %d done"]:format(z.done, z.total) .. "|r")
-	local parts = {}
-	if z.available > 0 then
-		parts[#parts + 1] = "|T" .. T.available .. ":12:12|t" .. V.Hex(TONE.available) .. L["%d available"]:format(z.available) .. "|r"
-	end
-	if t.ready > 0 then
-		parts[#parts + 1] = "|T" .. T.turnin .. ":12:12|t" .. V.Hex(TONE.ready) .. L["%d ready"]:format(t.ready) .. "|r"
-	end
-	if not parts[1] then
-		parts[1] = p >= 1 and (V.Hex(TONE.done) .. L["All done"] .. "|r") or (GREY .. L["nothing to take now"] .. "|r")
-	end
-	b.Counts:SetText(table.concat(parts, "  "))
-	V.SetBar(b.Bar, width - 16, p, FULL)
-	local best = t.friends and t.friends[1]
-	b.FBar.Back:SetShown(best ~= nil)
-	if best then
-		local r, g, bb = V.ClassRGB(best.classFile)
-		V.SetBar(b.FBar, width - 16, best.done / math.max(1, z.total), { r, g, bb })
-	else
-		b.FBar.Fill:Hide()
-	end
-	b:Show()
-end
-
-function E.NewTiles(parent, width)
-	local row = CreateFrame("Frame", nil, parent)
-	row:SetSize(width, K.TILE_H + K.GAP)
-	row.tiles = {}
-	return row
-end
-
-function E.FillTiles(row, e)
-	local inst = e.inst
-	for i, t in ipairs(e.tiles) do
-		local b = row.tiles[i]
-		if not b then
-			b = E.NewTile(row)
-			row.tiles[i] = b
-		end
-		b:ClearAllPoints()
-		b:SetPoint("TOPLEFT", (i - 1) * (inst.tileW + K.GAP), 0)
-		E.FillTile(b, t, inst.tileW)
-	end
-	for i = #e.tiles + 1, #row.tiles do
-		row.tiles[i]:Hide()
-		row.tiles[i].tile = nil
-	end
-end
-
-function E.NewHead(parent, width)
-	local h = CreateFrame("Frame", nil, parent)
-	h:SetSize(width, K.HEAD_H)
-	h.Name = h:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-	h.Name:SetPoint("BOTTOMLEFT", 2, 9)
-	h.Right = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	h.Right:SetPoint("BOTTOMRIGHT", -4, 10)
-	h.Right:SetJustifyH("RIGHT")
-	h.Divider = h:CreateTexture(nil, "ARTWORK")
-	h.Divider:SetPoint("BOTTOMLEFT", 0, 4)
-	h.Divider:SetPoint("BOTTOMRIGHT", 0, 4)
-	h.Divider:SetHeight(1)
-	h.Divider:SetColorTexture(1, 0.82, 0, 0.3)
-	return h
-end
-
-function E.FillHead(h, e)
-	h:SetWidth(e.inst.listW)
-	h.Name:SetText(e.name)
-	h.Right:SetText(L["%d of %d done"]:format(e.done, e.total) .. GREY .. ("  (%d%%)"):format(math.floor(100 * e.done / math.max(1, e.total))) .. "|r")
-end
-
-function E.Layout(inst)
-	local inner = inst.listW
-	inst.cols = math.max(1, math.floor((inner + K.GAP) / (K.TILE_W + K.GAP)))
-	inst.tileW = math.floor((inner - (inst.cols - 1) * K.GAP) / inst.cols)
-end
-
-function E.Fill(inst, data)
-	local here = Q.HereZone and Q.HereZone()
-	local friends = E.FriendsDone(data)
-	local readyQuests = V.ReadySet()
-	local ready = {}
-	for id in pairs(readyQuests) do
-		local q = Q.Quest(id)
-		if q and q.zone then
-			ready[q.zone] = (ready[q.zone] or 0) + 1
-		end
-	end
-	local entries, groups, order = {}, {}, {}
-	for _, z in ipairs(data.zones) do
-		if z.total > 0 then
-			local key = z.continent or 0
-			local g = groups[key]
-			if not g then
-				g = { tiles = {}, done = 0, total = 0 }
-				groups[key] = g
-				order[#order + 1] = key
-			end
-			g.tiles[#g.tiles + 1] = { zone = z, ready = ready[z.map] or 0, friends = friends[z.map], here = z.map == here }
-			g.done, g.total = g.done + z.done, g.total + z.total
-		end
-	end
-	local allDone, allTotal = 0, 0
-	for _, key in ipairs(order) do
-		local g = groups[key]
-		allDone, allTotal = allDone + g.done, allTotal + g.total
-		local name = key ~= 0 and Q.MapName(key) or L["Other zones"]
-		entries[#entries + 1] = { kind = "head", key = "c" .. key, h = K.HEAD_H, inst = inst, name = name, done = g.done, total = g.total }
-		for i = 1, #g.tiles, inst.cols do
-			local e = { kind = "tiles", key = "c" .. key .. ":" .. i, h = K.TILE_H + K.GAP, inst = inst, tiles = {} }
-			for j = i, math.min(#g.tiles, i + inst.cols - 1) do
-				e.tiles[#e.tiles + 1] = g.tiles[j]
-			end
-			entries[#entries + 1] = e
-		end
-	end
-	inst.groups, inst.order = groups, order
-	if #order == 0 then
-		inst.Head:SetText("")
-		V.Say(inst, L["No zone has quests for this character."])
-	else
-		inst.Head:SetText(L["Every zone: %d of %d quests done (%d%%)"]:format(allDone, allTotal, math.floor(100 * allDone / math.max(1, allTotal))))
-		V.Say(inst, nil)
-	end
-	inst.list:SetEntries(entries, true)
-end
-
-function E.Build(parent)
-	local inst = V.NewView(parent, "continents")
-	inst.Head = inst.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-	inst.Head:SetPoint("TOPLEFT", K.PAD, -10)
-	inst.Head:SetPoint("RIGHT", inst.frame, "RIGHT", -K.PAD, 0)
-	inst.Head:SetJustifyH("LEFT")
-	inst.Head:SetWordWrap(false)
-	inst.list = V.NewList(inst.frame, { head = { new = E.NewHead, fill = E.FillHead }, tiles = { new = E.NewTiles, fill = E.FillTiles } })
-	inst.Layout = function(self)
-		E.Layout(self)
-	end
-	inst.Legend:SetText(V.Hex(TONE.done) .. "|T" .. T.flat .. ":10:10|t " .. L["How much of the zone you've done"] .. "|r   |cffbbbbbb"
-		.. L["The thin bar: the friend furthest along there (what they told)"] .. "|r")
-	inst.Draw = function(self)
-		V.Fit(self)
-		V.Draw(self, E.Fill)
 	end
 	return inst
 end
@@ -1824,7 +1530,6 @@ end
 local DEFS = {
 	{ key = "storylines", label = L["Storylines"], build = C.Build },
 	{ key = "levelpath", label = L["Level path"], build = D.Build },
-	{ key = "continents", label = L["Continents"], build = E.Build },
 }
 local built = {}      -- key -> the view made (the last one)
 local registered = false

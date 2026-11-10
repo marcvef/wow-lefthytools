@@ -542,5 +542,8 @@ ns.CHANGELOG = {
 	{ id = 178, module = "questtree",
 		en = { "Questtree: your levels, less clutter", "The quest browser shows what's within your levels by default (All levels shows the rest), with done chains folded. Quests say why you can't take them: what they need, or that you skipped them for another. Cards, map and details show less; the rest is in their tooltips." },
 		de = { "Questtree: dein Level, aufgeräumt", "Der Quest-Browser zeigt erst mal, was zu deinem Level passt (Alle Level zeigt den Rest), erledigte Questreihen eingeklappt. Quests sagen, warum du sie nicht annehmen kannst: was ihnen fehlt, oder dass du stattdessen eine andere genommen hast. Karten, Gebietskarte und Details zeigen weniger, der Rest steht in ihren Tooltips." } },
+	{ id = 179, module = "questtree",
+		en = { "Questtree: less on screen", "The companion shows what to do now and quests for your level, with the chain's steps folded away, and says why a quest is blocked or skipped. Storylines and the level path start with what's for your level; the panel beside the quest dialog lists only the steps around the quest. The Continents view is gone." },
+		de = { "Questtree: weniger auf einmal", "Das kleine Fenster zeigt, was jetzt zu tun ist, und Quests für dein Level, die Schritte der Questreihe eingeklappt, und sagt, warum eine Quest gesperrt oder übersprungen ist. Handlungsstränge und der Levelpfad zeigen zuerst, was zu deinem Level passt; das Feld neben dem Questfenster nur die Schritte um die Quest herum. Die Ansicht Kontinente gibt es nicht mehr." } },
 	-- New entries go here, at the end.
 }

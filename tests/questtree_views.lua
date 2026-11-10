@@ -1,11 +1,11 @@
--- Questtree: the quest browser's three views (Views.lua): storylines (every chain for me as cards,
--- filters, sorted by worth or level, a click opens the chain), the level path (zones of my side as
--- bars across the levels, shaded per level, my level, friends' dots, sorted by what I can take
--- around my level, a click opens the zone) and continents (a tile per zone by how much is done,
--- available and ready counts, friends' progress). Registering with the window's registry once it's
--- there (the module's enable), building on the registry's build(parent), the counts made a slice a
--- frame and only again when the data or my progress changes, events only while a view is shown,
--- pools, no data, the controller.
+-- Questtree: the quest browser's two views (Views.lua): storylines (every chain for me as cards of
+-- three lines, for my level by default, filters, sorted by worth or level, a click opens the chain)
+-- and the level path (the zones with something for my levels or friends there, all of them with a
+-- toggle, as bars across the levels, shaded per level, my level, sorted by what there is for my
+-- level, a click opens the zone). Registering with the window's registry once it's there (the
+-- module's enable), building on the registry's build(parent), the counts made a slice a frame and
+-- only again when the data or my progress changes, events only while a view is shown, pools, no
+-- data, the controller.
 -- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. The window's
 -- registry (Q.RegisterBrowserView) and Q.SelectZone come from the big window's part in parallel:
 -- here the registry is a stand-in that records what's registered, put in for the checks and the
@@ -15,7 +15,6 @@
 
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
-local tooltipHas = suite.tooltipHas
 local Q = ns.Questtree
 local M = LT:GetModule("questtree")
 
@@ -170,8 +169,9 @@ do
 	M:OnEnable()
 	local keys = {}
 	for _, r in ipairs(registry) do keys[#keys + 1] = r.key .. "=" .. r.label end
-	check(Q.ViewsState().registered and table.concat(keys, ", ") == "storylines=Storylines, levelpath=Level path, continents=Continents",
-		"the registry there: the three views registered once, on the module's enable, got " .. table.concat(keys, ", "))
+	check(Q.ViewsState().registered and table.concat(keys, ", ") == "storylines=Storylines, levelpath=Level path",
+		"the registry there: the two views registered once, on the module's enable (no continents), got " .. table.concat(keys, ", "))
+	check(Q.BuildView("continents", UIParent) == nil, "the continents view is gone")
 	check(census.starts == startsBefore, "nothing counted before a view is shown")
 end
 
@@ -182,7 +182,7 @@ local function BuildOn(index)
 	view.frame:Hide() -- (the registry shows a view when its tab is picked)
 	return view, parent
 end
-local storylines, levelpath, continents = BuildOn(1), BuildOn(2), BuildOn(3)
+local storylines, levelpath = BuildOn(1), BuildOn(2)
 check(type(storylines.frame) == "table" and type(storylines.Refresh) == "function" and type(storylines.OnShow) == "function"
 	and type(storylines.OnHide) == "function" and storylines.frame:GetParent() ~= nil, "build(parent): { frame, Refresh, OnShow, OnHide } in the parent")
 
@@ -199,7 +199,6 @@ end
 ---------------------------------------------------------------------------
 section("Questtree views: storylines")
 ---------------------------------------------------------------------------
-local cards
 local function Cards(view)
 	local out = {}
 	for _, e in ipairs(view.list.entries) do
@@ -229,17 +228,25 @@ do
 		"counted over several frames (" .. (census.slices - slices) .. "), then nothing runs")
 	K.SLICE = slice
 	check(not storylines.Message:IsShown() and storylines.list.scroll:IsShown(), "then the cards")
-	check(Titles(storylines) == "The People's Militia, The Red Crystal, Westfall Stew, Encroaching Gnolls, Princess Must Die, A Threat Within",
-		"every chain for me, by worth (what's left, by level; done ones last): " .. Titles(storylines))
 	local chips = storylines.chips
-	check(plain(chips.all.Text:GetText()) == "All (6)" and plain(chips.progress.Text:GetText()) == "In progress (2)"
-		and plain(chips.ready.Text:GetText()) == "Ready to turn in (1)" and plain(chips.level.Text:GetText()) == "For your level (2)"
-		and plain(chips.done.Text:GetText()) == "Done (1)" and chips.all.on, "the filters with their counts, All picked")
+	check(chips.level.on and Titles(storylines) == "The People's Militia, The Red Crystal, Westfall Stew, Princess Must Die",
+		"at first: for my level (the next step in my log or within my levels; not Redridge's, too high), by worth: " .. Titles(storylines))
+	check(plain(chips.level.Text:GetText()) == "For your level (4)" and plain(chips.progress.Text:GetText()) == "In progress (2)"
+		and plain(chips.ready.Text:GetText()) == "Ready to turn in (1)" and plain(chips.done.Text:GetText()) == "Done (1)"
+		and plain(chips.all.Text:GetText()) == "All (6)", "the filters with their counts")
+	local x1 = select(4, chips.level:GetPoint(1))
+	local x2 = select(4, chips.all:GetPoint(1))
+	check(x1 < x2, "For your level first, All last")
+	chips.all:Click()
+	check(Titles(storylines) == "The People's Militia, The Red Crystal, Westfall Stew, Encroaching Gnolls, Princess Must Die, A Threat Within",
+		"All: every chain for me, by worth (what's left, by level; done ones last): " .. Titles(storylines))
 	local card, chain = CardOf(storylines, 1100)
-	check(card and plain(card.Title:GetText()) == "The People's Militia" and plain(card.Meta:GetText()) == "Westfall  ·  [10-18]"
-		and plain(card.Steps:GetText()) == "0/5 steps" and plain(card.Next:GetText()) == "Next: [10] The People's Militia"
-		and card.state == "available", "a card: title, its zone (most of its steps) and levels, steps, the next one")
+	check(card and plain(card.Title:GetText()) == "The People's Militia" and plain(card.Steps:GetText()) == "0/5"
+		and plain(card.Meta:GetText()) == "Westfall · [10-18]" and plain(card.Next:GetText()) == "Next: [10] The People's Militia"
+		and card.state == "available", "a card of three lines: the title and 0/5, its zone (most of its steps) and levels, the next step")
+	check(card:GetHeight() < 60 and not card.Band, "a card is small (" .. card:GetHeight() .. " px)")
 	check(chain.zoneList[2] == DARKSHORE and #chain.ids == 5, "a chain across zones is one storyline")
+	check(plain(storylines.Legend:GetText()) == "", "no colour legend under the cards (the icons are the game's, the tooltips say)")
 	card._scripts.OnEnter(card)
 	check(TOOLTIP.title == "The People's Militia" and tipHas("Westfall, Darkshore") and tipHas("0 of 5 steps done")
 		and tipHas("From Gryan Stoutmantle") and tipHas("Worth: 5 quests left for you") and tipHas("Click: open this storyline"),
@@ -252,20 +259,25 @@ do
 	ready:Click()
 	check(opened[#opened] == 1011, "its click: the quest to turn in")
 	local done = CardOf(storylines, 1001)
-	check(done.state == "done" and plain(done.Next:GetText()) == "All done" and done.Bar.fraction == 1, "a chain done: all done, a full bar")
+	check(done.state == "done" and plain(done.Next:GetText()) == "All done" and plain(done.Steps:GetText()) == "3/3" and done.Bar.fraction == 1,
+		"a chain done: all done, a full bar")
 	-- Filters and sorting, kept in the module's settings.
 	chips.ready:Click()
-	check(Titles(storylines) == "Princess Must Die" and M.db.views.filter == "ready" and chips.ready.on, "Ready to turn in: only that one; kept")
+	check(Titles(storylines) == "Princess Must Die" and M.db.views.show == "ready" and chips.ready.on, "Ready to turn in: only that one; kept")
 	chips.progress:Click()
 	check(Titles(storylines) == "Westfall Stew, Princess Must Die", "In progress: started, not finished")
-	chips.level:Click()
-	check(Titles(storylines) == "The People's Militia, The Red Crystal", "For your level: a step I can take that isn't grey")
 	chips.all:Click()
 	storylines.sorts.level:Click()
 	check(Titles(storylines) == "Princess Must Die, The People's Militia, Westfall Stew, The Red Crystal, Encroaching Gnolls, A Threat Within"
 		and M.db.views.sort == "level", "sorted by the next step's level (done ones last): " .. Titles(storylines))
 	storylines.sorts.worth:Click()
 	check(M.db.views.sort == "worth", "and by worth again")
+	-- An older build's saved filter: the new default wins.
+	M.db.views = { filter = "all", sort = "worth" }
+	storylines:Refresh()
+	Wait(0.1)
+	check(chips.level.on and M.db.views.show == "level", "an older build's saved filter (\"all\"): for my level now")
+	chips.all:Click()
 end
 
 ---------------------------------------------------------------------------
@@ -288,7 +300,7 @@ do
 	check(storylines.Message:IsShown() and plain(storylines.Message:GetText()) == "No storyline matches this filter."
 		and storylines.Guide:IsShown(), "a filter with nothing: says so, with a way back")
 	storylines.Guide:Click()
-	check(M.db.views.filter == "all" and not storylines.Message:IsShown(), "the button shows them all again")
+	check(M.db.views.show == "all" and not storylines.Message:IsShown(), "the button shows them all again")
 	-- Refresh (the window's): drawn on the next frame, counted again only if something changed.
 	draws, starts = storylines.draws, census.starts
 	storylines:Refresh()
@@ -308,9 +320,9 @@ local function RowOf(view, map) return view.list:Row("z" .. map), view.list.entr
 do
 	Hide(storylines)
 	Show(levelpath)
-	check(Rows(levelpath) == "Westfall, Darkshore, Elwynn Forest, Redridge Mountains",
-		"the zones of my side (not the Horde's), most to take around my level first: " .. Rows(levelpath))
-	check(plain(levelpath.Head:GetText()) == "Best next: Westfall, 2 quests for your level", "the best next zone on top")
+	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains, Elwynn Forest",
+		"the zones of my side (not the Horde's) with something for my levels or a friend there, the most for my level first: " .. Rows(levelpath))
+	check(plain(levelpath.Head:GetText()) == "Best next: Westfall, 7 quests for your level", "the best next zone on top")
 	local row = RowOf(levelpath, WESTFALL)
 	local e = row.entry
 	local function runs(entry)
@@ -321,14 +333,16 @@ do
 	check(runs(e) == "9-18 open" or runs(e) == "9-12 open, 13-18 later", "Westfall's levels: open, then later: " .. runs(e))
 	local elwynn = RowOf(levelpath, ELWYNN).entry
 	check(runs(elwynn) == "1-3 done, 4-4 open, 5-10 done", "Elwynn's: done, one open, done: " .. runs(elwynn))
-	check(e.here and row.Here:IsShown() and plain(row.Name:GetText()) == "Westfall (you're here)", "the zone I'm in is marked")
-	check(plain(row.Right:GetText()) == "2 for your level" and plain(row.Sub:GetText()) == "[9-18]  0 of 8 done", "its counts")
-	check(row.friendDots == 1 and #e.friends == 1 and e.friends[1].name == "Anna Brook", "a friend there: a dot at her level")
+	check(e.here and row.Here:IsShown() and plain(row.Name:GetText()) == "Westfall", "the zone I'm in: a faint band, only its name")
+	check(plain(row.Right:GetText()) == "7 for your level" and not row.Sub and not row.Band and not row.Dots,
+		"the row: its name, its bar, what's there for my level; nothing else")
+	check(plain(RowOf(levelpath, ELWYNN).Right:GetText()) == "", "nothing for my level (Cleo is there): nothing at the right")
 	local me = levelpath.x0 + (12 - 1) * levelpath.per + levelpath.per / 2
 	check(math.abs(select(4, row.Me:GetPoint(1)) - me) < 0.01 and plain(levelpath.Axis.You:GetText()) == "You (12)", "a line at my level")
 	row._scripts.OnEnter(row)
-	check(TOOLTIP.title == "Westfall" and tipHas("2 you can take now, 2 of them within 3 levels of yours") and tipHas("1 in your quest log")
-		and tipHas("Anna Brook level 13") and tipHas("You're here.") and tipHas("Click: open this zone"), "its tooltip")
+	check(TOOLTIP.title == "Westfall" and tipHas("7 for your level") and tipHas("2 you can take now") and tipHas("1 in your quest log")
+		and tipHas("0 of 8 done") and tipHas("Anna Brook level 13") and tipHas("You're here.") and tipHas("Click: open this zone"),
+		"its tooltip: the rest (done, what I can take, in my log, friends there)")
 	row._scripts.OnLeave(row)
 	row:Click()
 	check(selected[#selected] == WESTFALL, "a click opens the zone in the window")
@@ -338,87 +352,66 @@ do
 	RowOf(levelpath, ELWYNN):Click()
 	Q.SelectZone = select
 	check(opened[#opened] == 1001, "without Q.SelectZone: the window opens on the zone's first quest")
-	-- A level up: counted again, the order follows.
-	PLAYER_LEVEL = 15
-	Fire("PLAYER_LEVEL_UP", 15)
-	Wait(0.6)
-	check(Rows(levelpath) == "Redridge Mountains, Westfall, Darkshore, Elwynn Forest" and plain(levelpath.Axis.You:GetText()) == "You (15)",
-		"a level up: Redridge comes first, my line moves: " .. Rows(levelpath))
-	PLAYER_LEVEL = 12
-	Fire("PLAYER_LEVEL_UP", 12)
-	Wait(0.6)
-	-- Friends' setting off: no dots.
+	-- Friends' setting off: Elwynn (only Cleo there) goes; "All zones" brings it back, kept.
 	M.db.friends = false
 	levelpath:Refresh()
 	Wait(0.1)
-	check(RowOf(levelpath, WESTFALL).friendDots == 0, "friends off: no dots")
+	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains" and not levelpath.All.on, "no friends: only the zones with something for my levels")
+	levelpath.All:Click()
+	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains, Elwynn Forest" and levelpath.All.on and M.db.views.allZones == true,
+		"All zones: every zone of my side; kept")
+	levelpath.All:Click()
+	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains" and M.db.views.allZones == nil, "and off again")
 	M.db.friends = true
-end
-
----------------------------------------------------------------------------
-section("Questtree views: continents")
----------------------------------------------------------------------------
-local function TileOf(view, map)
-	for _, e in ipairs(view.list.entries) do
-		local row = view.list:Row(e.key)
-		for i, t in ipairs(e.tiles or {}) do
-			if t.zone.map == map then return row and row.tiles[i], t end
-		end
-	end
-end
-do
-	Hide(levelpath)
-	Show(continents)
-	local outline = {}
-	for _, e in ipairs(continents.list.entries) do
-		if e.kind == "head" then
-			outline[#outline + 1] = "#" .. e.name .. " " .. e.done .. "/" .. e.total
-		else
-			for _, t in ipairs(e.tiles) do outline[#outline + 1] = t.zone.name end
-		end
-	end
-	check(table.concat(outline, ", ") == "#Kalimdor 0/3, Darkshore, #Eastern Kingdoms 5/17, Elwynn Forest, Westfall, Redridge Mountains",
-		"by continent (in the data's order) with their counts, a tile per zone with quests for me: " .. table.concat(outline, ", "))
-	check(plain(continents.Head:GetText()) == "Every zone: 5 of 20 quests done (25%)", "all of it on top")
-	local tile = TileOf(continents, ELWYNN)
-	check(tile and plain(tile.Pct:GetText()) == "83%" and plain(tile.Counts:GetText()) == "1 available" and math.abs(tile.Bar.fraction - 5 / 6) < 1e-6,
-		"a tile: how much is done, what I can take, a bar")
-	check(tile.FBar.Back:IsShown() and math.abs(tile.FBar.fraction - 2 / 6) < 1e-6, "friends' progress: the one furthest along, a second bar")
-	tile._scripts.OnEnter(tile)
-	check(TOOLTIP.title == "Elwynn Forest" and tipHas("5 of 6 done") and tipHas("Anna Brook 2 done (that you know of)") and tipHas("Cleo 1 done"),
-		"its tooltip names the friends")
-	tile._scripts.OnLeave(tile)
-	-- Ready to turn in, from the quest log.
-	Log({ { 1110, true } })
-	Fire("QUEST_LOG_UPDATE")
+	-- A level up: counted again, the order follows.
+	PLAYER_LEVEL = 18
+	Fire("PLAYER_LEVEL_UP", 18)
 	Wait(0.6)
-	local west = TileOf(continents, WESTFALL)
-	check(plain(west.Counts:GetText()) == "2 available  1 ready" and not TileOf(continents, DUROTAR), "ready to turn in counted; the Horde's zone isn't there")
-	west:Click()
-	check(selected[#selected] == WESTFALL, "a click opens the zone")
+	check(Rows(levelpath) == "Westfall, Redridge Mountains, Darkshore, Elwynn Forest" and plain(levelpath.Axis.You:GetText()) == "You (18)",
+		"a level up: Redridge moves up (Westfall's low ones are grey now), my line moves: " .. Rows(levelpath))
+	Log({})
+	Progress()
+	PLAYER_LEVEL = 30
+	Fire("PLAYER_LEVEL_UP", 30)
+	Wait(0.6)
+	check(Rows(levelpath) == "Westfall, Elwynn Forest" and levelpath.Message:IsShown() == false
+		and plain(levelpath.Head:GetText()) == "Nothing for your level.", "far above them all (" .. Rows(levelpath) .. ", " .. plain(levelpath.Head:GetText()) .. "): only where friends are, nothing for my level: says so")
+	M.db.friends = false
+	levelpath:Refresh()
+	Wait(0.1)
+	check(levelpath.Message:IsShown() and plain(levelpath.Message:GetText()) == "No zone has quests for your level." and levelpath.Guide:IsShown(),
+		"no zone left: says so, with a way to all of them")
+	levelpath.Guide:Click()
+	check(Rows(levelpath):find("Westfall", 1, true) and not levelpath.Message:IsShown(), "its button: all zones")
+	levelpath.All:Click()
+	M.db.friends = true
 	Log({ 1110 })
+	Progress()
+	PLAYER_LEVEL = 12
+	Fire("PLAYER_LEVEL_UP", 12)
+	Wait(0.6)
 end
 
 ---------------------------------------------------------------------------
 section("Questtree views: hidden, nothing runs; shown again, counted if needed")
 ---------------------------------------------------------------------------
 do
-	Hide(continents)
+	Hide(levelpath)
 	check(not census.listening and not census.pulse:IsShown(), "no view shown: no events, no OnUpdate")
-	local starts, draws = census.starts, continents.draws
+	local starts, draws = census.starts, levelpath.draws
 	completed[1100] = true
 	Fire("QUEST_TURNED_IN", 1100, 0, 0)
 	Wait(1)
-	check(census.starts == starts and continents.draws == draws, "an event while hidden: nothing")
-	Show(continents)
+	check(census.starts == starts and levelpath.draws == draws, "an event while hidden: nothing")
+	Show(levelpath)
 	Wait(0.2)
-	check(census.starts == starts + 1 and plain(TileOf(continents, WESTFALL).Pct:GetText()) == "12%", "shown again: counted again, as it is now")
+	check(census.starts == starts + 1 and plain(RowOf(levelpath, WESTFALL).Right:GetText()) == "6 for your level", "shown again: counted again, as it is now")
 	-- The data changing while shown.
 	starts = census.starts
 	Q.SetTestData(QUESTS_DATA, ZONES)
 	Wait(0.2)
 	check(census.starts == starts + 1, "the data changed: counted again")
-	Hide(continents)
+	Hide(levelpath)
 end
 
 ---------------------------------------------------------------------------
@@ -439,9 +432,9 @@ do
 	local slices = census.slices
 	Wait(1)
 	local list = storylines.list
-	check(#storylines.shown == 306 and #list.entries == 102 and census.slices - slices >= 4,
+	check(M.db.views.show == "all" and #storylines.shown == 306 and #list.entries == 102 and census.slices - slices >= 4,
 		"306 storylines in rows of 3, counted over " .. (census.slices - slices) .. " frames")
-	check(list.made <= 12, "only the rows near sight are made: " .. list.made)
+	check(list.made <= 14, "only the rows near sight are made: " .. list.made)
 	local key = list.entries[2].key
 	local kept = list:Row(key)
 	list.scroll:SetVerticalScroll(60)
@@ -449,7 +442,7 @@ do
 	check(list:Row(key) == kept and kept.entry.key == key, "scrolled a bit: a row stays on its entry (a controller's cursor stays on it)")
 	list.scroll:SetVerticalScroll(4000)
 	list.scroll._scripts.OnVerticalScroll(list.scroll, 4000)
-	check(list:Row(list.entries[50].key) and not list:Row(key) and list.made <= 14, "scrolled far: the rows go round")
+	check(list:Row(list.entries[60].key) and not list:Row(key) and list.made <= 16, "scrolled far: the rows go round (" .. list.made .. " made)")
 	Hide(storylines)
 	Q.SetTestData(QUESTS_DATA, ZONES)
 end
@@ -460,24 +453,24 @@ section("Questtree views: no data, the controller, a fight")
 do
 	local load = Q.Load
 	Replace("Load", function() return false end)
-	Show(continents)
-	check(continents.Message:IsShown() and plain(continents.Message:GetText()):find("The quest data isn't there", 1, true)
-		and not continents.list.scroll:IsShown(), "no data: says so")
-	Hide(continents)
+	Show(levelpath)
+	check(levelpath.Message:IsShown() and plain(levelpath.Message:GetText()):find("The quest data isn't there", 1, true)
+		and not levelpath.list.scroll:IsShown(), "no data: says so")
+	Hide(levelpath)
 	Q.Load = load
-	Show(continents)
+	Show(levelpath)
 	Wait(0.5)
-	check(not continents.Message:IsShown() and continents.list.scroll:IsShown(), "the data there again: the tiles")
-	Hide(continents)
+	check(not levelpath.Message:IsShown() and levelpath.list.scroll:IsShown(), "the data there again: the rows")
+	Hide(levelpath)
 	-- The registry's OnShow before the frame shows: drawn all the same.
-	local draws = continents.draws
-	continents:OnShow()
-	check(continents.draws == draws + 1 and not continents.frame:IsShown(), "OnShow before its frame shows: drawn all the same")
-	continents.frame:Show()
+	local draws = levelpath.draws
+	levelpath:OnShow()
+	check(levelpath.draws == draws + 1 and not levelpath.frame:IsShown(), "OnShow before its frame shows: drawn all the same")
+	levelpath.frame:Show()
 	Wait(0.1)
-	check(continents.draws == draws + 1, "and once")
-	Hide(continents)
-	-- Every card, row, tile and chip is a Button of ours; nothing of Blizzard's on our frames.
+	check(levelpath.draws == draws + 1, "and once")
+	Hide(levelpath)
+	-- Every card, row and chip is a Button of ours; nothing of Blizzard's on our frames.
 	Show(storylines)
 	Show(levelpath)
 	Wait(0.5)
@@ -495,13 +488,10 @@ do
 	Each(storylines.list, "cards")
 	Each(levelpath.list)
 	for _, chip in pairs(storylines.chips) do buttons = buttons and chip._kind == "Button" end
-	buttons = buttons and storylines.sorts.worth._kind == "Button" and storylines.Guide._kind == "Button"
-	Show(continents)
-	Wait(0.5)
-	Each(continents.list, "tiles")
-	check(buttons and count > 10, "every card, row, tile, chip and button is a Button the controller reaches")
+	buttons = buttons and storylines.sorts.worth._kind == "Button" and storylines.Guide._kind == "Button" and levelpath.All._kind == "Button"
+	check(buttons and count > 8, "every card, row, chip and button is a Button the controller reaches")
 	local blizzard = false
-	for _, v in ipairs({ storylines, levelpath, continents }) do
+	for _, v in ipairs({ storylines, levelpath }) do
 		for _, f in ipairs({ v.frame, v.list.scroll, v.list.child }) do
 			blizzard = blizzard or f.useCustomNavigation ~= nil or f.smartNavigationIgnored ~= nil
 		end
@@ -516,7 +506,6 @@ do
 	storylines.chips.all:Click()
 	Hide(storylines)
 	Hide(levelpath)
-	Hide(continents)
 	Wait(0.1)
 	check(not census.pulse:IsShown() and not census.listening, "all hidden: nothing runs")
 end
