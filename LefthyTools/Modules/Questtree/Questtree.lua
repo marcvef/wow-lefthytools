@@ -11,17 +11,23 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --   Engine.lua    my status for a quest, what it needs first, what it opens, what's next (Q.Status, ...)
 --   Questtree.lua this file: the module, its settings, /questtree, what the windows share
 --   MiniMap.lua   a zone's map with markers in a frame of ours (Q.NewMiniMap)
---   Small.lua     the small window: one quest (Q.ShowQuest, Q.ToggleSmall)
+--   Small.lua     the small window, the companion: what I'm on now, what to pick up next, any quest
+--                 (Q.ToggleSmall, Q.ShowQuest)
 --   Browser.lua   the big window (Q.ToggleBrowser, Q.OpenBrowser)
 --   Learn.lua     learning while playing (the setting learn)
+-- This file also puts Questtree's lines into NPC tooltips (setting tooltips) and lets the small
+-- window follow the quest you open in your quest log (setting followLog), both post-hooks only.
 -- docs/questtree.md has each part. Nothing runs while no window is open: no data, no events, no
--- OnUpdate (the small window listens to the quest log only while it's shown).
+-- OnUpdate (the small window listens to the quest log only while it's shown); a tooltip's lines are
+-- a table lookup.
 
 local M = LT:NewModule("questtree", {
 	title = "Questtree",
 	description = L["Quest chains for every zone: what a quest needs first, where it starts and ends, what it leads to and which friends have done it. /questtree opens the small window."],
 	defaults = {
 		keepPlace = true, -- the small window opens where it was left, at its size
+		followLog = true, -- the small window shows the quest opened in the quest log (or clicked in the tracker)
+		tooltips = true,  -- "Questtree: starts ..." in NPC tooltips
 		friends = true,   -- friends' progress (Beacon friends with LefthyTools; Learn.lua and QuestShare.lua)
 		learn = true,     -- learning givers, turn-ins and prerequisites while playing (Learn.lua reads it)
 		small = {},       -- the small window: left, top, width, height (Small.lua)
@@ -122,6 +128,289 @@ function Q.MapName(map)
 	return not LT.IsSecret(name) and type(name) == "string" and name ~= "" and name or nil
 end
 
+---------------------------------------------------------------------------
+-- Difficulty colours, chain steps (for the windows and the tooltip lines)
+---------------------------------------------------------------------------
+
+-- The game's quest difficulty colours (QuestDifficultyColors), and blue for a repeatable quest.
+Q.DIFFICULTY = {
+	trivial = { 0.5, 0.5, 0.5 }, standard = { 0.25, 0.75, 0.25 }, difficult = { 1, 0.82, 0 },
+	verydifficult = { 1, 0.5, 0.25 }, impossible = { 1, 0.1, 0.1 }, repeatable = { 0.25, 0.6, 1 },
+}
+local NATIVE_DIFFICULTY = { [0] = "trivial", [1] = "standard", [2] = "difficult", [3] = "verydifficult", [4] = "impossible" }
+
+local function Hex(r, g, b)
+	return ("|cff%02x%02x%02x"):format(math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+end
+
+-- How hard a quest is for me: a key of Q.DIFFICULTY (nil: no level known) and its colour. Data.lua's
+-- Q.LevelColor when it's there; else the game's own answer
+-- (C_PlayerInfo.GetContentDifficultyQuestForPlayer) for a quest the client knows, else the level
+-- difference as the game's quest log colours it: 5 or more above me impossible, 3 or more very
+-- difficult, down to 4 below difficult, within UnitQuestTrivialLevelRange standard, else trivial.
+function Q.DifficultyKey(id, quest, level)
+	quest = quest or (id and Q.Quest and Q.Quest(id))
+	if quest and quest.repeatable then
+		return "repeatable"
+	end
+	level = tonumber(level or quest and quest.level)
+	if Q.LevelColor and level and level > 0 then
+		local ok, c = pcall(Q.LevelColor, level, id)
+		if ok and type(c) == "table" and tonumber(c.r or c[1]) then
+			return Q.DIFFICULTY[c.key] and c.key or "custom", c
+		end
+	end
+	if id and C_PlayerInfo and C_PlayerInfo.GetContentDifficultyQuestForPlayer then
+		local title = C_QuestLog and LT.Value(C_QuestLog.GetTitleForQuestID, id)
+		if type(title) == "string" and title ~= "" then
+			local native = NATIVE_DIFFICULTY[LT.Value(C_PlayerInfo.GetContentDifficultyQuestForPlayer, id)]
+			if native then
+				return native
+			end
+		end
+	end
+	if not level or level <= 0 then
+		return nil
+	end
+	local me = tonumber(LT.Value(UnitLevel, "player")) or 1
+	local diff = level - me
+	if diff >= 5 then
+		return "impossible"
+	elseif diff >= 3 then
+		return "verydifficult"
+	elseif diff >= -4 then
+		return "difficult"
+	end
+	local range = tonumber(LT.Value(UnitQuestTrivialLevelRange, "player"))
+		or (me < 40 and 5 + math.floor(me / 10) or 1 + math.floor(me / 5))
+	return -diff <= range and "standard" or "trivial"
+end
+
+-- "|cffRRGGBB" of a quest's difficulty for me (white without a level).
+function Q.LevelCode(id, quest, level)
+	local key, color = Q.DifficultyKey(id, quest, level)
+	if color then
+		return Hex(tonumber(color.r or color[1]) or 1, tonumber(color.g or color[2]) or 1, tonumber(color.b or color[3]) or 1)
+	end
+	local c = key and Q.DIFFICULTY[key]
+	return c and Hex(c[1], c[2], c[3]) or "|cffffffff"
+end
+
+-- "[12] Title" in its difficulty colour, as the game's quest log writes it (no level: the title).
+function Q.LevelTitle(id, quest)
+	quest = quest or (Q.Quest and Q.Quest(id))
+	local level = quest and tonumber(quest.level)
+	local title = Q.Title(id, quest)
+	if not level or level <= 0 then
+		return Q.LevelCode(id, quest) .. title .. "|r"
+	end
+	return Q.LevelCode(id, quest) .. "[" .. level .. "] " .. title .. "|r"
+end
+
+-- Which step of its chain a quest is: step, total, the chain's name (its first quest's title);
+-- nil when it's no chain's. Data.lua's Q.ChainStep when it's there, else its place in Q.Chain.
+function Q.StepOf(id)
+	if not id then
+		return nil
+	end
+	if Q.ChainStep then
+		local ok, step, total, name = pcall(Q.ChainStep, id)
+		if ok and type(step) == "table" then
+			step, total, name = step.step, step.total, step.chainTitle or step.title
+		end
+		step, total = ok and tonumber(step), ok and tonumber(total)
+		if step and total and total > 1 then
+			return step, total, type(name) == "string" and name or nil
+		end
+		return nil
+	end
+	local chain = Q.Chain and Q.Chain(id)
+	if type(chain) ~= "table" or #chain < 2 then
+		return nil
+	end
+	for i, other in ipairs(chain) do
+		if other == id then
+			return i, #chain, Q.Title(chain[1])
+		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- Where I am, how far a spot is, the game's map pin
+---------------------------------------------------------------------------
+
+-- My spot on a map (0..1; nil: not on it, or the game won't say, as in an instance).
+function Q.PlayerAt(map)
+	if not (map and C_Map and C_Map.GetPlayerMapPosition) then
+		return nil
+	end
+	local pos = LT.Value(C_Map.GetPlayerMapPosition, map, "player")
+	if type(pos) ~= "table" then
+		return nil
+	end
+	local ok, x, y = pcall(pos.GetXY, pos)
+	if not (ok and type(x) == "number" and type(y) == "number") or LT.IsSecret(x) or LT.IsSecret(y) then
+		return nil
+	end
+	if x < 0 or x > 1 or y < 0 or y > 1 or (x == 0 and y == 0) then
+		return nil
+	end
+	return x, y
+end
+
+-- The zone I'm in (a zone map, not a city's floor or a cave) and my spot on it.
+function Q.HereZone()
+	local map = C_Map and LT.Value(C_Map.GetBestMapForUnit, "player")
+	if type(map) ~= "number" then
+		return nil
+	end
+	local zone = map
+	for _ = 1, 6 do
+		local info = LT.Value(C_Map.GetMapInfo, zone)
+		if type(info) ~= "table" or info.mapType == 3 then
+			break
+		end
+		local parent = info.parentMapID
+		if not parent or parent == 0 or (info.mapType and info.mapType < 3) then
+			zone = map
+			break
+		end
+		zone = parent
+	end
+	local x, y = Q.PlayerAt(zone)
+	return zone, x, y
+end
+
+local DIRECTIONS = { L["N"], L["NE"], L["E"], L["SE"], L["S"], L["SW"], L["W"], L["NW"] }
+local atan2 = math.atan2 or math.atan -- WoW's Lua 5.1 / the tests' Lua 5.3
+
+local function World(map, x, y)
+	if not (C_Map.GetWorldPosFromMapPos and CreateVector2D) then
+		return nil
+	end
+	local ok, _, pos = pcall(C_Map.GetWorldPosFromMapPos, map, CreateVector2D(x, y))
+	if not ok or type(pos) ~= "table" or LT.IsSecret(pos) then
+		return nil
+	end
+	local okXY, north, west = pcall(pos.GetXY, pos)
+	if okXY and type(north) == "number" and type(west) == "number" then
+		return north, west
+	end
+end
+
+-- From (fx, fy) to (x, y) on a map: yards (nil: the game won't say) and the compass direction.
+function Q.Toward(map, fx, fy, x, y)
+	if not (map and fx and fy and x and y) then
+		return nil
+	end
+	local n1, w1 = World(map, fx, fy)
+	local n2, w2 = World(map, x, y)
+	local north, east, yards
+	if n1 and n2 then
+		north, east = n2 - n1, w1 - w2
+		yards = math.sqrt(north * north + east * east)
+	else
+		north, east = fy - y, (x - fx) * 1.5 -- (a zone's map is 3:2)
+	end
+	local angle = atan2(east, north) -- 0 north, clockwise
+	return yards, DIRECTIONS[math.floor(angle / (math.pi / 4) + 0.5) % 8 + 1]
+end
+
+-- "170 yd SW", "right here"; nil without a spot.
+function Q.TowardText(map, fx, fy, x, y)
+	local yards, direction = Q.Toward(map, fx, fy, x, y)
+	if not direction then
+		return nil
+	end
+	if not yards then
+		return direction
+	elseif yards < 20 then
+		return L["right here"]
+	end
+	return L["%d yd %s"]:format(yards < 100 and math.floor(yards / 5 + 0.5) * 5 or math.floor(yards / 10 + 0.5) * 10, direction)
+end
+
+-- The spot of a giver or turn-in on map nearest (x, y) (nil x: the first): the point, who, its
+-- distance squared (in map units, 3:2).
+function Q.NearestPoint(people, map, x, y)
+	local best, bestWho, bestD
+	for _, who in ipairs(people or {}) do
+		for _, point in ipairs(who.points or {}) do
+			if point.map == map then
+				local d = x and ((point.x - x) * 1.5) ^ 2 + (point.y - y) ^ 2 or 0
+				if not bestD or d < bestD then
+					best, bestWho, bestD = point, who, d
+				end
+			end
+		end
+	end
+	return best, bestWho, bestD
+end
+
+-- The quests I can take now in a zone, the nearest giver first when my spot is given: Data.lua's
+-- Q.Available when it's there, else the zone's quests whose status is "available".
+function Q.AvailableIn(map, x, y)
+	if not map then
+		return {}
+	end
+	if Q.Available then
+		local ok, list = pcall(Q.Available, map, x, y)
+		if ok and type(list) == "table" then
+			local ids = {}
+			for i, entry in ipairs(list) do
+				ids[i] = type(entry) == "table" and entry.id or entry
+			end
+			return ids
+		end
+	end
+	local list, far = {}, {}
+	for _, id in ipairs(Q.ZoneQuests and Q.ZoneQuests(map) or {}) do
+		if Q.StatusOf(id) == "available" then
+			local quest = Q.Quest(id)
+			local _, _, d = Q.NearestPoint(quest and quest.starts, map, x, y)
+			list[#list + 1] = id
+			far[id] = d or 99
+		end
+	end
+	table.sort(list, function(a, b)
+		if far[a] ~= far[b] then
+			return far[a] < far[b]
+		end
+		return a < b
+	end)
+	return list
+end
+
+-- The game's own map pin at a spot, tracked (the arrow on screen and on the minimap; the world map
+-- shows it when you open it): C_Map.SetUserWaypoint, never the world map's frames. share: its link
+-- in the chat box too. true when it was set.
+function Q.Waypoint(map, x, y, share)
+	if not (map and x and y and C_Map and C_Map.SetUserWaypoint and UiMapPoint and UiMapPoint.CreateFromCoordinates) then
+		return false
+	end
+	if C_Map.CanSetUserWaypointOnMap and LT.Value(C_Map.CanSetUserWaypointOnMap, map) ~= true then
+		return false
+	end
+	local ok = pcall(C_Map.SetUserWaypoint, UiMapPoint.CreateFromCoordinates(map, x, y))
+	if not ok then
+		return false
+	end
+	if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
+		pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
+	end
+	local link = share and LT.Value(C_Map.GetUserWaypointHyperlink)
+	if type(link) == "string" then
+		local insert = ChatFrameUtil and ChatFrameUtil.InsertLink or ChatEdit_InsertLink
+		if not (insert and LT.Value(insert, link)) and ChatFrameUtil and ChatFrameUtil.OpenChat then
+			pcall(ChatFrameUtil.OpenChat, link)
+		end
+	end
+	if PlaySound and SOUNDKIT and SOUNDKIT.UI_MAP_WAYPOINT_CONTROL_CLICK then
+		pcall(PlaySound, SOUNDKIT.UI_MAP_WAYPOINT_CONTROL_CLICK)
+	end
+	return true
+end
+
 -- What a typed text means: a quest's number, a quest link's, or the best of Q.Search's quests (the
 -- title just that, then one starting with it, then one containing it or its giver's name; among
 -- those: in your log, ready to take, then the others, nearest your level). Returns the id (nil:
@@ -195,11 +484,16 @@ end
 function M:BuildOptions(o)
 	o:Header(L["Window"])
 	o:Button(L["Open the small window"], L["Open"], function() Q.ToggleSmall() end,
-		L["One quest at a time: what it needs first, where it starts and ends, what it leads to. Opened on its own it shows what's next for you. Also /questtree, or /questtree <name> for a quest."])
+		L["Your quest companion: the quest you're on with its chain and turn-in, and what to pick up next nearby, nearest first. It follows what you do. Also /questtree, or /questtree <name> for any quest."])
 	o:Button(L["Open the quest browser"], L["Open"], OpenBrowser,
 		L["Every zone's quest chains, with a search over all of them. Also /questtree browse."])
 	o:Checkbox("keepPlace", L["The small window keeps its place"],
 		L["The small window opens where you left it, at the size you gave it. Off: it opens at its usual place and size."])
+	o:Checkbox("followLog", L["Follow the quest log"],
+		L["While the small window is open, a quest you open in your quest log (or click in the objective tracker) becomes the one it shows as now."])
+	o:Header(L["Tooltips"])
+	o:Checkbox("tooltips", L["Quest lines in NPC tooltips"],
+		L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Questtree: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."])
 	o:Header(L["Friends"])
 	o:Checkbox("friends", L["Friends' progress"],
 		L["Which of your Beacon friends have done a quest, have it in their log or can take it. Needs Beacon, and friends with LefthyTools."])
@@ -209,7 +503,7 @@ function M:BuildOptions(o)
 end
 
 local function Help()
-	M:Print("/questtree - open or close the small window (what's next for you)")
+	M:Print("/questtree - open or close the small window: the quest you're on, what to pick up next")
 	M:Print("/questtree <name or ID> - show a quest (a quest link works too)")
 	M:Print("/questtree browse - the quest browser: every zone's chains")
 	M:Print("/questtree settings - Questtree's settings")
@@ -246,6 +540,192 @@ function M:OnSlashCommand(msg)
 		end
 	end
 end
+
+---------------------------------------------------------------------------
+-- NPC tooltips: "Questtree: starts <title> (step 2 of 5)"
+---------------------------------------------------------------------------
+
+-- A post-call on the game's unit tooltips (TooltipDataProcessor, as Chronicle's "Craftable by"),
+-- GameTooltip only and its primary data, outside instances (there the data is secret), the NPC
+-- from the data's GUID. Only once the quest data is loaded (below: a few seconds after the loading
+-- screen, or when a Questtree window opens), never loaded by a hover. An NPC's lines
+-- are made once and kept until the data or my progress changes (Q.dataGen, Q.progressGen, the
+-- quest log's size): a hover is a table lookup. Objects: the game's object tooltips carry no ID,
+-- so they get nothing.
+local TIP_MAX = 4
+local START_ICON = "|TInterface\\GossipFrame\\AvailableQuestIcon:0|t "
+local END_ICON = "|TInterface\\GossipFrame\\ActiveQuestIcon:0|t "
+local tipLines, tipKey = {}, nil
+
+-- The quests an NPC starts and ends, as two lists of IDs (Data.lua's Q.GiverQuests; nil: not there).
+function Q.GiverLists(id, kind)
+	if not Q.GiverQuests then
+		return nil
+	end
+	local ok, a, b = pcall(Q.GiverQuests, id, kind)
+	if not ok then
+		return nil
+	end
+	if type(a) == "table" and (a.starts or a.ends) then
+		a, b = a.starts, a.ends
+	end
+	local function Ids(list)
+		local ids = {}
+		for _, entry in ipairs(type(list) == "table" and list or {}) do
+			local qid = type(entry) == "table" and entry.id or entry
+			if type(qid) == "number" then
+				ids[#ids + 1] = qid
+			end
+		end
+		return ids
+	end
+	return Ids(a), Ids(b)
+end
+
+local function StepText(id)
+	local step, total = Q.StepOf(id)
+	return step and (" " .. L["(step %d of %d)"]:format(step, total)) or ""
+end
+
+-- The lines for an NPC: { { text, r, g, b }, ... } (an empty list: none).
+local function TipLines(npc)
+	local _, inLog = C_QuestLog.GetNumQuestLogEntries()
+	local key = tostring(Q.dataGen) .. ":" .. tostring(Q.progressGen) .. ":" .. tostring(inLog)
+	if key ~= tipKey then
+		tipKey = key
+		wipe(tipLines)
+	end
+	local lines = tipLines[npc]
+	if lines then
+		return lines
+	end
+	lines = {}
+	local starts, ends = Q.GiverLists(npc)
+	local more = 0
+	local function Add(text, r, g, b)
+		if #lines < TIP_MAX then
+			lines[#lines + 1] = { text, r, g, b }
+		else
+			more = more + 1
+		end
+	end
+	for _, id in ipairs(ends or {}) do
+		if Q.StatusOf(id) == "active" then
+			Add(END_ICON .. L["Questtree: ends %s"]:format(Q.Title(id)), 1, 0.82, 0)
+		end
+	end
+	for _, id in ipairs(starts or {}) do
+		local status = Q.StatusOf(id)
+		local quest = Q.Quest(id)
+		if status == "available" then
+			Add(START_ICON .. L["Questtree: starts %s"]:format(Q.Title(id, quest)) .. StepText(id), 1, 0.82, 0)
+		elseif status == "level" and quest and tonumber(quest.minLevel) then
+			Add(START_ICON .. L["Questtree: starts %s at level %d"]:format(Q.Title(id, quest), quest.minLevel), 0.6, 0.6, 0.6)
+		end
+	end
+	if more > 0 then
+		lines[#lines + 1] = { L["Questtree: and %d more"]:format(more), 0.6, 0.6, 0.6 }
+	end
+	tipLines[npc] = lines
+	return lines
+end
+
+-- The data for the tooltips (setting tooltips): loaded once, a few seconds after the loading screen,
+-- out of a fight (in one: a few seconds after it), never at a hover; nothing when the data add-on
+-- isn't installed (Q.HasData). Then Data.lua's NPC index is made a moment later, also not at a
+-- hover. The frame stops listening once it's done.
+local WARM_DELAY = 5
+local warmer, warmed = nil, false
+
+local function WarmNow()
+	if warmed or not (M.enabled and M.db.tooltips) then
+		return
+	end
+	if LT.InCombat() then
+		warmer:RegisterEvent("PLAYER_REGEN_ENABLED")
+		return
+	end
+	warmed = true
+	warmer:UnregisterAllEvents()
+	if Q.IsLoaded and not Q.IsLoaded() and Q.HasData and Q.HasData() then
+		Q.Ready()
+	end
+	C_Timer.After(1, function()
+		if Q.IsLoaded and Q.IsLoaded() and Q.GiverQuests and not LT.InCombat() then
+			pcall(Q.GiverQuests, 0)
+		end
+	end)
+end
+
+local function Warm()
+	if warmed or not warmer then
+		return
+	end
+	C_Timer.After(WARM_DELAY, function() LT.Guard("Questtree.warm", WarmNow) end)
+end
+
+warmer = CreateFrame("Frame")
+warmer:RegisterEvent("PLAYER_ENTERING_WORLD")
+warmer:SetScript("OnEvent", function(self, event)
+	self:UnregisterEvent(event)
+	Warm()
+end)
+Q.When("settings", Warm)
+Q.When("enable", Warm)
+
+local function OnUnitTooltip(tooltip, data)
+	if tooltip ~= GameTooltip or not (M.enabled and M.db.tooltips) or (tooltip.IsForbidden and tooltip:IsForbidden()) then
+		return
+	end
+	if type(data) ~= "table" or LT.IsSecret(data) or (IsInInstance and IsInInstance()) then
+		return
+	end
+	if tooltip.GetPrimaryTooltipData and tooltip:GetPrimaryTooltipData() ~= data then
+		return -- (an appended block: not the unit pointed at)
+	end
+	local npc = LT.CreatureOf(data.guid)
+	if not npc then
+		return
+	end
+	if not (Q.IsLoaded and Q.IsLoaded()) then
+		return
+	end
+	for _, line in ipairs(TipLines(npc)) do
+		tooltip:AddLine(line[1], line[2], line[3], line[4])
+	end
+end
+
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType
+	and Enum.TooltipDataType.Unit then
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tooltip, data)
+		LT.Guard("Questtree.tooltip", OnUnitTooltip, tooltip, data)
+	end)
+end
+
+---------------------------------------------------------------------------
+-- The quest log: the small window follows the quest opened there
+---------------------------------------------------------------------------
+
+-- A post-hook on QuestMapFrame_ShowQuestDetails (a global function, as Misc Tweaks' quest markers
+-- hook QuestLogQuests_Update): it runs when you open a quest's details in the quest log, and when
+-- you click a quest in the objective tracker (which opens them). The hook only hands the quest's ID
+-- to the small window (Q.SmallFollow), which notes it and, while it's shown, redraws a moment later
+-- in its own code. Nothing of the quest log's frames is touched or read.
+local logHooked = false
+
+function Q.HookQuestLog()
+	if logHooked or type(QuestMapFrame_ShowQuestDetails) ~= "function" then
+		return
+	end
+	logHooked = true
+	hooksecurefunc("QuestMapFrame_ShowQuestDetails", function(questID)
+		if M.enabled and M.db.followLog and Q.SmallFollow and type(questID) == "number" and not LT.IsSecret(questID) then
+			LT.Guard("Questtree.log", Q.SmallFollow, questID)
+		end
+	end)
+end
+
+Q.When("enable", Q.HookQuestLog)
 
 SLASH_LEFTHYTOOLS_QUESTTREE1 = "/questtree"
 SlashCmdList.LEFTHYTOOLS_QUESTTREE = function(msg)

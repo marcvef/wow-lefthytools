@@ -521,5 +521,8 @@ ns.CHANGELOG = {
 	{ id = 171, module = "questtree",
 		en = { "Questtree learns, friends share", "While you quest, Questtree notes who gives and takes back the quests its data doesn't know, and what comes before them. Friends on this build pass it on, and see how far each of you got on a quest." },
 		de = { "Questtree lernt, Freunde teilen", "Beim Questen merkt sich Questtree, wer die Quests vergibt und annimmt, die seine Daten nicht kennen, und was davor kommt. Freunde mit diesem Build geben das weiter und sehen, wie weit ihr bei einer Quest seid." } },
+	{ id = 172, module = "questtree",
+		en = { "Questtree: a quest companion", "/questtree now follows what you do: the quest you're on with its chain steps and turn-in, and what to pick up next nearby, nearest first. Clear quest icons, item drop areas and your arrow on its map; NPC tooltips say which quests they start." },
+		de = { "Questtree: ein Quest-Begleiter", "/questtree folgt jetzt dem, was du tust: die Quest, an der du bist, mit den Schritten ihrer Questreihe und der Abgabe, und was du in der Nähe als Nächstes annehmen kannst, das Nächste zuerst. Klare Quest-Icons, Drop-Gebiete von Items und dein Pfeil auf seiner Karte; NPC-Tooltips sagen, welche Quests sie vergeben." } },
 	-- New entries go here, at the end.
 }

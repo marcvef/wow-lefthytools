@@ -9,9 +9,9 @@ and takes it and where, and where each quest stands for you and your friends.
 | `Modules/Questtree/Engine.lua` | a quest's status for me or a friend, what's missing, what it opens, its chain, what's next |
 | `LefthyTools_QuestData/` | the data, an add-on of its own (load on demand, GPL v3) |
 | `tools/update-quest-data.js` | makes the data |
-| `Modules/Questtree/Questtree.lua` | the module: settings, `/questtree`, shared helpers (status colours, titles) |
-| `Modules/Questtree/MiniMap.lua` | the small zone map (our own frame, the zone's map art) |
-| `Modules/Questtree/Small.lua` | the small window: one quest, what it needs, giver and turn-in on the small map |
+| `Modules/Questtree/Questtree.lua` | the module: settings, `/questtree`, shared helpers (status and difficulty colours, titles, distances, the map pin), NPC tooltip lines, the quest log hook |
+| `Modules/Questtree/MiniMap.lua` | the small zone map (our own frame, the zone's map art, the game's quest icons, drop areas, zoom, your arrow) |
+| `Modules/Questtree/Small.lua` | the small window, the companion: the quest you're on and what to pick up next nearby; any quest looked at |
 | `Modules/Questtree/Browser.lua` | the big window: zones, chains as a tree, details, search |
 | `Modules/Questtree/Learn.lua` | learning givers, enders and prerequisites while playing |
 | `Modules/Beacon/QuestShare.lua` | friends' progress and learned records over Beacon (`B2;q…`, from 0.7.0-70) |
@@ -264,16 +264,18 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 
 | Key | Default | What |
 |---|---|---|
-| `keepPlace` | true | the small window opens where it was left, at its size; off: right of the middle, 320 x 470 |
+| `keepPlace` | true | the small window opens where it was left, at its size; off: right of the middle, 340 x 580 |
+| `followLog` | true | while the small window is open, a quest opened in the quest log (or clicked in the objective tracker) becomes its "Now" |
+| `tooltips` | true | "Questtree: starts ..." lines in NPC tooltips (below); the data loads a few seconds after the loading screen for them |
 | `friends` | true | friends' progress in the windows (`Q.Friends`) |
 | `learn` | true | learning while playing (Learn.lua reads `M.db.learn`) |
 | `small` | `{}` | the small window's `left`, `top`, `width`, `height` (always kept; used while `keepPlace` is on) |
 
 The settings page: Open the small window, Open the quest browser (`Q.ToggleBrowser`, or a chat line
-when Browser.lua isn't there), the three checkboxes.
+when Browser.lua isn't there), the checkboxes under Window, Tooltips, Friends and Learning.
 
-**Commands:** `/questtree` opens or closes the small window, `/questtree <name or ID>` shows a
-quest (a quest link works too), `/questtree browse` the quest browser, `/questtree settings`,
+**Commands:** `/questtree` opens or closes the small window (on "Now"), `/questtree <name or ID>`
+shows a quest (a quest link works too), `/questtree browse` the quest browser, `/questtree settings`,
 `/questtree help`. `/lefthy questtree ...` is the same. Switched off, each says so (settings and
 help still work). Chat lines are English.
 
@@ -283,72 +285,195 @@ with it, or only contains it (or the giver's name does); then my status (in my l
 needs one first, level too low, done, not for me); then nearest my level; then the lower ID. When
 several match, chat says how many and which is shown.
 
-**What the files share** (Questtree.lua): `Q.When("enable" | "disable" | "settings", fn)` (what a
-file does when the module is switched on or off or a setting changes), `Q.Ready()` (the data is
-there: loads it on the first call, so only call it when a window opens or draws), `Q.Title(id)`
-(`C_QuestLog.GetTitleForQuestID` when it answers, else the data's English title, else
-"Quest 1234"), `Q.StatusOf(id, who)` (`Q.Status`, "other" without the engine), `Q.STATUS` (each
-status's colour and words), `Q.StatusCode(status)`, `Q.StatusText(status, kind)` (coloured:
-the window's line, `"word"` after a quest's name, `"friend"` for a friend's), `Q.LevelText(quest)`
-("Level 12 (from 10)"), `Q.MapName(map)`.
+**What the files share** (Questtree.lua):
 
-Never lags: nothing is loaded, registered or run at login; the data loads when a window opens.
+- `Q.When("enable" | "disable" | "settings", fn)` (what a file does when the module is switched on or
+  off or a setting changes), `Q.Ready()` (the data is there: loads it on the first call, so only call
+  it when a window opens or draws), `Q.Title(id)` (`C_QuestLog.GetTitleForQuestID` when it answers,
+  else the data's English title, else "Quest 1234"), `Q.StatusOf(id, who)` (`Q.Status`, "other"
+  without the engine), `Q.STATUS` (each status's colour and words), `Q.StatusCode(status)`,
+  `Q.StatusText(status, kind)` (coloured: the window's line, `"word"` after a quest's name,
+  `"friend"` for a friend's), `Q.LevelText(quest)` ("Level 12 (from 10)"), `Q.MapName(map)`.
+- **Difficulty colours**: `Q.DIFFICULTY` (the game's QuestDifficultyColors: trivial grey, standard
+  green, difficult yellow, very difficult orange, impossible red, and blue for repeatable),
+  `Q.DifficultyKey(id, quest, level)` (Data.lua's `Q.LevelColor(level, id)` when it's there; else the
+  game's `C_PlayerInfo.GetContentDifficultyQuestForPlayer` for a quest the client knows; else the
+  level difference as the game's quest log: 5 or more above impossible, 3 or more very difficult,
+  down to 4 below difficult, within `UnitQuestTrivialLevelRange` standard, else trivial),
+  `Q.LevelCode(...)` (its `|cff` code), `Q.LevelTitle(id)` ("[12] Title" in it, as the quest log).
+- `Q.StepOf(id)` → step, total, chain name: Data.lua's `Q.ChainStep` when it's there, else the quest's
+  place in `Q.Chain`.
+- **Where I am**: `Q.PlayerAt(map)` (my spot 0..1, nil off it or in an instance), `Q.HereZone()` (my
+  zone map, walked up from a city floor or cave, and my spot on it), `Q.Toward(map, fx, fy, x, y)`
+  (yards from `C_Map.GetWorldPosFromMapPos`, and the compass direction), `Q.TowardText(...)`
+  ("170 yd SW", "right here"), `Q.NearestPoint(people, map, x, y)`, `Q.AvailableIn(map, x, y)`
+  (Data.lua's `Q.Available` when it's there, else the zone's quests whose status is `available`,
+  the nearest giver first).
+- `Q.Waypoint(map, x, y, share)`: the game's own map pin (`C_Map.SetUserWaypoint` with a `UiMapPoint`,
+  `C_SuperTrack.SetSuperTrackedUserWaypoint(true)`: the arrow on screen and the minimap; the world map
+  shows it when opened), `share`: its link (`C_Map.GetUserWaypointHyperlink`) into the chat box. The
+  world map is never opened or touched (`OpenWorldMap` from addon code is `ShowUIPanel`: the gamepad
+  taint in forever-platform.md).
+- `Q.GiverLists(npcID)` → the quests an NPC starts and ends (Data.lua's `Q.GiverQuests`, its shapes
+  normalized to two lists of IDs).
+
+**NPC tooltips** (setting `tooltips`): a `TooltipDataProcessor` post-call on `Unit` tooltips, as
+Chronicle's "Craftable by" and Questie's: `GameTooltip` only (not forbidden), the primary data block
+only (an appended one isn't the unit pointed at), nothing in an instance (the data is secret there),
+nothing for a secret GUID; the NPC from `data.guid` (`LT.CreatureOf`). Lines: "Questtree: ends
+<title>" for a quest in my log it takes back, "Questtree: starts <title> (step 2 of 5)" for one I can
+take, "Questtree: starts <title> at level 12" in grey for one my level is too low for, at most 4,
+then "and N more". An NPC's lines are made the first time and kept until `Q.dataGen`,
+`Q.progressGen` or the quest log's size changes: a hover is a table lookup. A hover never loads the
+data: with the setting on, it loads once, 5 s after the first loading screen (or after the module
+or the setting is switched on), out of a fight (in one: a few seconds after it), only when the data
+add-on is installed (`Q.HasData`), and Data.lua's NPC index a second later (`Q.GiverQuests(0)`).
+Before that (or without Data.lua's `Q.GiverQuests`) the tooltips get nothing. Objects: the game's
+object tooltips carry no ID (Questie's findings on Forever), so they get nothing.
+
+**The quest log** (setting `followLog`): a post-hook (`hooksecurefunc`) on the global
+`QuestMapFrame_ShowQuestDetails(questID)`, as Misc Tweaks' quest markers hook `QuestLogQuests_Update`.
+It runs when a quest's details open in the quest log, and when a quest is clicked in the objective
+tracker (its click opens them). The hook only hands the ID to `Q.SmallFollow` (it becomes "Now",
+redrawn a moment later in our own code); nothing of the quest log's frames is touched or read.
+Not done, and why: a "Show in Questtree" button in the quest details (the quest log is part of
+`WorldMapFrame`: a button of ours in it becomes part of that panel for SmartNavigation, whose focus
+and confirm then run our scripts from Blizzard's code, the taint chain in forever-platform.md; a
+button over it parented to UIParent wouldn't be reachable with a controller), and Alt-click on a
+tracker line (the tracker has no free modifier: every left click opens the quest details, which
+the hook already follows, a right click opens Blizzard's menu; it would mean a hook on a method of
+the tracker's frame).
+
+Never lags: nothing is loaded, registered or run at login, except the tooltips' one load a few
+seconds after it (setting `tooltips`); the windows load the data when they open.
 
 ## Small window
 
-`Modules/Questtree/Small.lua`: `Q.ShowQuest(id)`, `Q.ToggleSmall()`, `Q.RedrawSmall(now)` (a
+`Modules/Questtree/Small.lua`: `Q.ToggleSmall()`, `Q.ShowQuest(id)`, `Q.RedrawSmall(now)` (a
 redraw 0.3 s later, several at once: one; `now`: at once; for other parts whose data changed, e.g.
-friends' progress arriving), `Q.SmallFrame()` (tests).
+friends' progress arriving), `Q.IsSmallShown()`, `Q.SmallFollow(id)` (the quest log's hook),
+`Q.SmallFrame()` (tests).
 
-One quest at a time, top down: its title, a grey line (level, zone, dungeon, repeatable, new in
-WoW: Forever), my status in its colour ("Your level is too low: from level 30" for `level`),
-**Needs first:** (`Q.Missing`, numbered, the one to do first at the top; at most 8 lines, then
-"and N more"), the **giver** and the **turn-in** (name and zone; an item or object says so, "+2
-more" when there are several; not known: says so), the **small map**, **Leads to:** (`Q.Opens`),
-and **Friends:** (`Q.Friends`, class-coloured names with their status; setting `friends`). Each
-quest line is a button showing that quest (its tooltip: the title, the status, the engine's reason,
-"Click: show this quest"); the giver's and turn-in's lines put their zone on the map. The map shows
-the giver's zone, or the turn-in's for a quest in my log, unless a line picked one; a person in
-several places: the one on my map, else the first. Every giver and turn-in on that zone has a
-marker.
+The companion: it follows what you're doing without being asked. Two modes: **Now** (what
+`/questtree` opens) and **a quest looked at** (a click on any quest, `/questtree <name>`,
+`Q.ShowQuest`, the big window's clicks).
 
-Opened on its own (`/questtree`, `Q.ToggleSmall`) it shows `Q.Next()[1]` (none: what it showed
-last; nothing: "Nothing up next found"). Buttons at the bottom: **Back** (the quest shown before,
-up to 20), **Next up** (`Q.Next()[1]`), **Quest browser** (`Q.OpenBrowser(id)`, else
-`Q.ToggleBrowser()`; hidden without Browser.lua). The data add-on missing: the window says so
-(run the updater, restart), nothing else. A quest the data doesn't know: its title and that line.
+**Now**, top down:
 
-The window: `LT.Window.Create` (`LefthyToolsQuesttreeSmall`: Escape closes it, it counts as an
-open window for Mirage, the AFK screen and flights), DIALOG strata, raised when a quest is shown
-(the browser's clicks bring it up). Movable, resizable by its corner grip (300-600 x 260-900);
-where it is and its size are saved on every drag and resize (`small`). The content is in a scroll
-area; its width and the map's follow the window's. Built the first time it opens. While shown it
-listens to `QUEST_ACCEPTED`, `QUEST_TURNED_IN`, `QUEST_REMOVED` and `PLAYER_LEVEL_UP` (and
-`Q.OnDataChanged`) and redraws 0.3 s later; hidden, no events and no OnUpdate. Nothing protected:
+- **Now** (a gold heading with why that quest, a rule under it): the quest I'm on is the last one I
+  did something with while the window was open (accepted: `QUEST_ACCEPTED`; super-tracked:
+  `SUPER_TRACKING_CHANGED`; opened in the quest log: the hook, also while closed) while it's in my
+  log; a quest super-tracked since I last looked counts as new; else the super-tracked quest, else
+  the first on the tracker (`C_QuestLog.GetQuestIDForQuestWatchIndex`), else one of my log in this
+  zone (its zone or its turn-in here), else the first of my log; none: "No quest in your log. Pick
+  one up below." Then: "[18] Title" in its difficulty colour (large; a click shows everything about
+  it), its chain ("<first quest>: step 3 of 7" and a green bar: the chain is `Q.Chain` without the
+  quests not for me), friends ("Friends: 2 of 5 done" with a dot in each one's class colour; its
+  tooltip names each with their status; setting `friends`), "Ready to turn in"
+  (`C_QuestLog.IsComplete`) or "In your quest log", its objectives (`C_QuestLog.GetQuestObjectives`,
+  at most 6, done ones ticked), **Turn-in:** (name, zone, how far and which way when it's in my zone;
+  a click sets the map pin), **Next:** "[19] Title - giver, zone" (`Q.Opens`, "+N more"), and
+  **Steps**: the chain's steps around this one (from two before, at most 8, "... N before/more"):
+  done ones ticked in green, this one bold with an arrow, the rest numbered in grey, friends' dots
+  after each; a click shows that step.
+- **The small map**: the turn-in's zone (my zone when the turn-in is in it, else the first turn-in's),
+  else my zone: the turn-in ("?" yellow when ready, the in-progress icon when not), the turn-ins of
+  my other quests and the givers of what I can pick up on that map, and my arrow.
+- **Pick up next** (a heading with my zone and its count, `Q.ZoneCount`: "Elwynn Forest · 12 of 40
+  done"), in groups like Quest Herald's (each quest a row: icon, "[level] Title" in its difficulty
+  colour, a grey second line, how far and which way at the right):
+  - *In progress*: my other quests, ready ones first, then those turned in in this zone (at most 4):
+    "ready to turn in · <ender>" or "in your log · <ender>".
+  - *Available now*: follow-ups of the quest I just turned in (while the window was open) first,
+    then `Q.Next()`'s that I can take ("after <the quest it follows>"), then the zone's
+    (`Q.AvailableIn`: the nearest giver first), at most 6 with "N more here: the quest browser";
+    the second line: the giver (and their zone when it's another) and its step in its chain.
+  - *Coming up*: `Q.Next()`'s and the zone's quests my level is too low for, the lowest first
+    ("from level 22 · <giver>"), at most 3.
+  - *Blocked*: `Q.Next()`'s locked ones with what each needs first ("needs <title>"), at most 3.
+    What Now leads to is its "Next:", not listed again.
+  None at all: "Nothing to pick up nearby. The quest browser has every zone."
+
+**A quest looked at**: at the top "« Back to now" or, after clicking from one quest to another,
+"« Back to <the quest before>" (up to 20 back) and "Back to now" side by side. Then its "[level]
+Title", its chain and bar, a grey line (level, zone, dungeon, repeatable, new in WoW: Forever), my
+status ("Your level is too low: from level 30", "Ready to turn in"), **Requires:** (what it needs
+first from other chains, by their names), **Needs first:** (`Q.Missing`, numbered, the one to do
+first at the top; at most 8, "and N more"), **Quest giver:** and **Turn-in:** (name, zone, how far;
+an item or object says so, "+2 more"; not known: says so), for an item that starts it **Drops
+from:** "Defias Pillager (12%), ..." (the item's `drops`), the **small map** (the giver's zone, the
+turn-in's for a quest in my log, where the item drops for a quest that only an item starts, unless a
+line picked one; every giver, turn-in and drop spot on it, a person in several places: the spot on
+my map, else the first), **Leads to:** (`Q.Opens`), **Steps** and **Friends:**. Each quest line is a
+button showing that quest (its tooltip: the title, the status, the engine's reason, "Click: show
+this quest"); a giver's or turn-in's line puts its side on the map and sets the game's map pin at
+its spot nearest me (`Q.Waypoint`; Shift-click: its link in chat too).
+
+The data add-on missing: the window says so (run the updater, restart), nothing else. A quest the
+data doesn't know: its title and that line. At the bottom: **Quest browser** (`Q.OpenBrowser` on the
+quest looked at or Now's, else `Q.ToggleBrowser()`; hidden without Browser.lua).
+
+**What it costs.** The window: `LT.Window.Create` (`LefthyToolsQuesttreeSmall`: Escape closes it, it
+counts as an open window for Mirage, the AFK screen and flights), DIALOG strata, raised when a quest
+is shown. Movable, resizable by its corner grip (300-600 x 300-950); where it is and its size are
+saved on every drag and resize (`small`). The content is in a scroll area; its width and the map's
+follow the window's. Built the first time it opens; rows, texts and header rules are pooled. While
+shown it listens to `QUEST_ACCEPTED`, `QUEST_TURNED_IN`, `QUEST_REMOVED`, `QUEST_LOG_UPDATE`,
+`QUEST_WATCH_LIST_CHANGED`, `SUPER_TRACKING_CHANGED`, `PLAYER_LEVEL_UP`, `ZONE_CHANGED`,
+`ZONE_CHANGED_INDOORS`, `ZONE_CHANGED_NEW_AREA` (and `Q.OnDataChanged`); the handlers note what
+happened and redraw 0.3 s later. A child frame looks every 2 s whether I moved (2% of the map, or
+another zone) and redraws then (the distances). Hidden: no events, no OnUpdate. Nothing protected:
 it opens and works in a fight.
 
-**Controller:** every line that does something, the map's markers, the bottom buttons and the
-grip are buttons of ours, so SmartNavigation's cursor reaches them (its focus runs OnEnter: the
-tooltips show). Nothing of Blizzard's is set on our frames, no Blizzard menu, no panel opening.
+**Controller:** every line that does something, the map's markers, the bottom button and the grip
+are buttons of ours, so SmartNavigation's cursor reaches them (its focus runs OnEnter: the tooltips
+show; its button clicks: a quest shows, a marker sets the pin). Nothing of Blizzard's is set on our
+frames, no Blizzard menu, no panel opening.
 
 **Small map** (`Modules/Questtree/MiniMap.lua`, also for the big window):
 `local m = Q.NewMiniMap(parent[, width, height])` (240 x 160 by default), `m.frame`,
-`m:Show(map, points[, name])` with `points = { { x, y, kind = "start" | "end", label } }` (0..1 on
-that map), `m:SetSize(w, h)`, `m:Hide()`, `m:Markers()` (tests). The zone's art and what you've
-explored of it (`LT.MapArt`, as the fight stream's map and the Bestiary ledger's), as large as
-fits, on a dark box; the zone's name on a strip over its top. Markers: the gossip `!` for a giver,
-`?` for a turn-in; points within 6 px share one marker, its tooltip naming each with what it is
-(a giver who's also the turn-in); at most 40; points off the map are left out. No art: "No map of
-this zone" with the markers on the dark box. Laid only when the map or the size changes (or you've
-explored more); never touches `WorldMapFrame`.
+`m:Show(map, points[, name])` with `points = { { x, y, kind, label [, note, look, grey, chance,
+radius] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPlayer(on)`,
+`m:Zoom(factor[, x, y])`, `m:Markers()` (tests).
 
-**Tests** (`tests/questtree_small.lua`): the module, settings and commands; the window opened on
-its own and by ID, name and link (the best pick), every part of a quest, rows, Back, Next up, the
-map and its markers, friends and their setting, an unknown quest, the data missing, the browser
-command, events only while shown, place and size kept and the setting off, a fight, buttons for
-the controller, switched off; the small map alone. Without Data.lua and Engine.lua in the build it
-puts stand-ins of their functions on `ns.Questtree` (and takes them away at its end); with them it
-installs its quests through `Q.SetTestData` and checks against the engine's answers.
+- The zone's art and what you've explored of it (`LT.MapArt`: the art tiles of
+  `C_Map.GetMapArtLayerTextures` and the explored overlays of `C_MapExplorationInfo`, as Attune's
+  detail map and the fight stream's), as large as fits, on a dark box that clips it; the zone's name
+  on a strip over its top, "wheel: zoom" / "right-click: whole zone" at its right.
+- Markers: the game's own map icons, solid (full alpha), 22 px on a dark copy of themselves (an
+  outline that reads on any ground): `kind` "start" a giver, "end" a turn-in, "drop" where an item
+  drops. `look`: "available" (`QuestNormal`, yellow !), "repeatable" (`QuestDaily`), "trivial" (the !
+  paler), "locked" (the ! grey), "turnin" (`QuestTurnin`), "repeatturnin" (`QuestRepeatableTurnin`),
+  "progress" (`SideInProgressquesticon`); without `look` a start is "available", an end "turnin",
+  `grey` makes them "locked" / "progress". The atlas missing: the gossip window's icon. A drop: a
+  soft orange spot (`Spells\GenericGlow64` added) at least 34 px, as big as its `radius` (0..1 of the
+  map's width, at most 140 px); the likeliest (`chance`) says "drops here (12%)" beside it.
+- Points within 8 px share one marker (drops only with drops), its tooltip naming each with what it
+  is and its `note` (the quest); at most 40; points off the map are left out. A click sets the game's
+  map pin at the marker (`Q.Waypoint`), Shift-click puts it in chat too.
+- The mouse wheel zooms by 1.35 a step around the cursor (1 to 8 times), dragging moves the zoomed
+  map (an OnUpdate only while the button is held), a right-click shows the whole zone again; another
+  map starts whole.
+- My arrow (`Interface\Minimap\MinimapArrow`, turned by `GetPlayerFacing`) where I am when I'm on that
+  map (`Q.PlayerAt`), moved ten times a second by an OnUpdate on a frame of the map (hidden: it
+  doesn't run); `m:ShowPlayer(false)` leaves it out.
+- No art: "No map of this zone" with the markers on the dark box. Laid only when the map, the size
+  or the zoom changes (or you've explored more); never touches `WorldMapFrame`.
+
+**Tests** (`tests/questtree_small.lua`): the module, settings and commands; difficulty colours;
+Now (why that quest, the chain, its bar and steps, objectives, turn-in, Next, the map and its
+markers) and Pick up next (each group, nearest first with distance and direction, the zone's count);
+following super tracking, the quest log's hook and its setting, accepting and turning in (the
+follow-up first); a quest looked at ("« Back to", "Back to now", an item's drops and their map, too
+low, done); the map pin from a giver's line and a marker (Shift: chat); friends' dots and their
+setting; an unknown quest, the data missing, the search, the browser command; the NPC tooltip lines
+(giver, turn-in, too low, done, kept, other frames, instance, setting, data not loaded); events only
+while shown, moving; place and size kept and the setting off; a fight; buttons for the controller;
+without the data part's new calls; switched off; the small map alone (icons, one marker for one
+spot, the arrow, zoom). Data.lua's `Q.ChainStep`, `Q.Available`, `Q.LevelColor`, `Q.ZoneCount` and
+`Q.GiverQuests` get stand-ins only while they're missing; the mock's map pin API and the quest log's
+`QuestMapFrame_ShowQuestDetails` are made for it and put back at its end.
+
 ## Big window (Browser.lua)
 
 `Q.ToggleBrowser()` opens or closes it, `Q.OpenBrowser(id)` opens it on a quest (its zone or dungeon on
