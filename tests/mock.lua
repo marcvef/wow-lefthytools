@@ -1143,6 +1143,11 @@ function GroupLootContainer_AddFrame(self, frame)
 	self.rollFrames[self.maxIndex] = frame
 	GroupLootContainer_Update(self) -- (by name, like Blizzard's: hooks see it)
 end
+-- The controller UI's roll window: Blizzard's drag scripts, not movable, no drag registered.
+CreateFrame("Frame", "GamepadGroupLootRollFrame", UIParent)
+GamepadGroupLootRollFrame:SetPoint("TOPLEFT", UIParent, "TOPLEFT", 38, -347)
+GamepadGroupLootRollFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+GamepadGroupLootRollFrame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
 function GroupLootContainer_RemoveFrame(self, frame)
 	for i, f in pairs(self.rollFrames) do if f == frame then self.rollFrames[i] = nil end end
 	GroupLootContainer_Update(self)

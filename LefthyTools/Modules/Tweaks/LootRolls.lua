@@ -1,26 +1,28 @@
 local _, ns = ...
-local L = ns.L
 local LT = ns.LT
 local M = LT:GetModule("tweaks")
 
--- Misc Tweaks: movable loot rolls (movableLootRolls).
+-- Misc Tweaks: movable loot rolls (movableLootRolls), like the movable bags: drag the roll window, it
+-- comes up there from then on. /lefthy tweaks resetloot puts it back.
 --
--- Blizzard's Need / Greed windows (GroupLootFrame1..4) sit in GroupLootContainer, which Blizzard keeps
--- in its bottom stack of managed frames (BottomManagedFrameTemplate: above the action bars, laid out
--- with them) and never lets you move. Moving that container from addon code would mean taking it
--- out of the stack the action bars are laid out in (a protected layout in a fight). So the container
--- stays; its roll windows are placed anew right after Blizzard places them (a post-hook on
--- GroupLootContainer_Update, which runs for each roll added or gone): stacked on an anchor of ours,
--- where the player dragged them (any roll window drags them all), saved in Misc Tweaks' settings.
--- The roll windows aren't protected, so this works in fights too. With nothing saved, Blizzard's spot.
--- Controller UI: Blizzard shows rolls in a window of its own (the container is hidden then), untouched.
+--   * Controller UI: rolls show in GamepadGroupLootRollFrame. Blizzard gave it OnDragStart/OnDragStop
+--     (StartMoving, StopMovingOrSizing) but never made it movable or registered a drag: that's all
+--     this adds, plus its spot kept (lootRollPadPos) and put back whenever it shows.
+--   * Mouse and keyboard: the Need / Greed windows (GroupLootFrame1..4) sit in GroupLootContainer, one
+--     of the bottom managed frames laid out with the action bars (taking it out of that stack from
+--     addon code would touch the action bars' layout, protected in a fight). So the container stays;
+--     its roll windows are placed anew right after Blizzard places them (a post-hook on
+--     GroupLootContainer_Update), stacked on an anchor of ours that dragging any of them moves
+--     (lootRollPos). The roll windows aren't protected, so this works in fights too.
 
 local DEFAULT_GAP = 100 -- between rolls, like the container's reservedSize
-local anchor            -- ours: the rolls stack up from its bottom
+local PAD_DEFAULT = { "TOPLEFT", 38, -347 } -- GamepadGroupLootRollFrame's anchor in Blizzard's XML
+local anchor            -- ours (mouse and keyboard): the rolls stack up from its bottom
 local on = false
-local hooked = false
+local hooked, padHooked = false, false
 local hookedFrames = {}
-local moved = false     -- roll windows are on our anchor (to give back when switched off or reset)
+local moved = false     -- roll windows on our anchor (to give back when switched off or reset)
+local padMoved = false  -- the controller's roll window on our saved spot
 local dragging = false
 
 local function PadUI()
@@ -35,51 +37,84 @@ local function Gap(container)
 	return (container and tonumber(container.reservedSize)) or DEFAULT_GAP
 end
 
-local function Anchor()
-	if anchor then
-		return anchor
+-- Where a dragged frame was dropped, in UIParent units (left, top), or nil.
+local function Spot(frame)
+	local left, top = frame:GetLeft(), frame:GetTop()
+	if left and top then
+		local scale = (frame.GetEffectiveScale and frame:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1)
+		return { left = left * scale, top = top * scale }
 	end
-	anchor = CreateFrame("Frame", "LefthyToolsLootRollAnchor", UIParent)
-	anchor:SetSize(243, 84) -- (a roll window's size)
-	anchor:SetFrameStrata("DIALOG")
-	anchor:SetMovable(true)
-	anchor:SetClampedToScreen(true)
-	anchor:EnableMouse(false) -- (only while being placed: it's not in the way otherwise)
-	anchor.Back = anchor:CreateTexture(nil, "BACKGROUND")
-	anchor.Back:SetAllPoints()
-	anchor.Back:SetColorTexture(0.04, 0.05, 0.07, 0.85)
-	anchor.Edge = anchor:CreateTexture(nil, "BORDER")
-	anchor.Edge:SetPoint("TOPLEFT")
-	anchor.Edge:SetPoint("TOPRIGHT")
-	anchor.Edge:SetHeight(1)
-	anchor.Edge:SetColorTexture(1, 0.82, 0, 0.6)
-	anchor.Label = anchor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	anchor.Label:SetPoint("CENTER")
-	anchor.Label:SetWidth(225)
-	anchor.Label:SetText(L["Loot rolls appear here. Drag to move, right-click when done."])
-	anchor.Back:Hide()
-	anchor.Edge:Hide()
-	anchor.Label:Hide()
+end
+
+---------------------------------------------------------------------------
+-- Controller UI: Blizzard's own roll window, made movable
+---------------------------------------------------------------------------
+
+local function PlacePad()
+	local frame = GamepadGroupLootRollFrame
+	if not frame then
+		return
+	end
+	local pos = on and M.db.lootRollPadPos
+	if pos then
+		frame:ClearAllPoints()
+		frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.left, pos.top)
+		padMoved = true
+	elseif padMoved then
+		frame:ClearAllPoints()
+		frame:SetPoint(PAD_DEFAULT[1], UIParent, PAD_DEFAULT[1], PAD_DEFAULT[2], PAD_DEFAULT[3])
+		padMoved = false
+	end
+end
+
+local function PadDragStopped(frame)
+	if not on then
+		return
+	end
+	frame:SetUserPlaced(false) -- (the spot lives in our settings, not the client's layout cache)
+	M.db.lootRollPadPos = Spot(frame)
+	padMoved = M.db.lootRollPadPos ~= nil
+end
+
+local function SetupPad()
+	local frame = GamepadGroupLootRollFrame
+	if not frame then
+		return
+	end
+	if not padHooked then
+		padHooked = true
+		frame:HookScript("OnDragStop", PadDragStopped)
+		frame:HookScript("OnShow", PlacePad)
+	end
+	frame:SetMovable(on)
+	frame:SetClampedToScreen(true)
+	if on then
+		frame:RegisterForDrag("LeftButton") -- (Blizzard's OnDragStart / OnDragStop do the moving)
+	else
+		frame:RegisterForDrag()
+	end
+	PlacePad()
+end
+
+---------------------------------------------------------------------------
+-- Mouse and keyboard: the roll windows on an anchor of ours
+---------------------------------------------------------------------------
+
+local function Anchor()
+	if not anchor then
+		anchor = CreateFrame("Frame", "LefthyToolsLootRollAnchor", UIParent)
+		anchor:SetSize(243, 84) -- (a roll window's size)
+		anchor:SetMovable(true)
+		anchor:SetClampedToScreen(true)
+	end
 	return anchor
 end
 
--- Where the anchor goes: the saved spot, or (being placed with nothing saved) above the action bars.
 local function PlaceAnchor()
-	local a = Anchor()
 	local pos = M.db.lootRollPos
-	a:ClearAllPoints()
 	if pos then
-		a:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.left, pos.top)
-	else
-		a:SetPoint("BOTTOM", UIParent, "BOTTOM", 0, 260)
-	end
-end
-
-local function Save()
-	local a = Anchor()
-	local left, top = a:GetLeft(), a:GetTop()
-	if left and top then
-		M.db.lootRollPos = { left = left, top = top }
+		Anchor():ClearAllPoints()
+		anchor:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.left, pos.top)
 	end
 end
 
@@ -118,7 +153,6 @@ local function StartDrag(frame)
 		return
 	end
 	local container = Container()
-	local a = Anchor()
 	if not M.db.lootRollPos then
 		local index = 1
 		for i, f in pairs(container and container.rollFrames or {}) do
@@ -126,18 +160,16 @@ local function StartDrag(frame)
 				index = i
 			end
 		end
-		local left, top = frame:GetLeft(), frame:GetTop()
-		if left and top then
-			local scale = (frame:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1)
-			M.db.lootRollPos = { left = left * scale, top = top * scale - Gap(container) * (index - 1) }
-		else
-			PlaceAnchor() -- (its spot can't be read: above the action bars)
-			Save()
+		local spot = Spot(frame)
+		if not spot then
+			return -- (where it is can't be read)
 		end
+		spot.top = spot.top - Gap(container) * (index - 1)
+		M.db.lootRollPos = spot
 		Relayout(container)
 	end
 	dragging = true
-	a:StartMoving()
+	Anchor():StartMoving()
 end
 
 local function StopDrag()
@@ -146,8 +178,8 @@ local function StopDrag()
 	end
 	dragging = false
 	anchor:StopMovingOrSizing()
-	anchor:SetUserPlaced(false) -- (the spot lives in our settings, not the client's layout cache)
-	Save()
+	anchor:SetUserPlaced(false)
+	M.db.lootRollPos = Spot(anchor) or M.db.lootRollPos
 	Relayout()
 end
 
@@ -176,44 +208,13 @@ local function Hook()
 	end
 	hooked = true
 	hooksecurefunc("GroupLootContainer_Update", OnUpdate)
-	local a = Anchor()
-	a:RegisterForDrag("LeftButton")
-	a:SetScript("OnDragStart", function()
-		dragging = true
-		a:StartMoving()
-	end)
-	a:SetScript("OnDragStop", StopDrag)
-	a:SetScript("OnMouseUp", function(_, button)
-		if button == "RightButton" then
-			ns.LootRollPreview(false)
-		end
-	end)
 end
 
--- The anchor shown to place the rolls without one (Misc Tweaks' button, /lefthy tweaks lootpos);
--- show == nil: the other way round.
-function ns.LootRollPreview(show)
-	local a = Anchor()
-	if show == nil then
-		show = not a.Label:IsShown()
-	end
-	show = show and on and not PadUI()
-	if show then
-		Hook()
-		PlaceAnchor()
-	end
-	a:EnableMouse(show)
-	a.Back:SetShown(show)
-	a.Edge:SetShown(show)
-	a.Label:SetShown(show)
-	return show
-end
-
--- Back to Blizzard's spot (/lefthy tweaks resetloot, the settings' button).
+-- Back to Blizzard's spots (/lefthy tweaks resetloot).
 function M:ResetLootRolls()
-	self.db.lootRollPos = nil
-	ns.LootRollPreview(false)
+	self.db.lootRollPos, self.db.lootRollPadPos = nil, nil
 	Relayout()
+	PlacePad()
 end
 
 -- Called by Tweaks.lua when the switch changes (on the next frame).
@@ -221,8 +222,7 @@ function ns.ApplyLootRolls(value)
 	on = value
 	if on then
 		Hook()
-	else
-		ns.LootRollPreview(false)
 	end
 	Relayout()
+	SetupPad()
 end
