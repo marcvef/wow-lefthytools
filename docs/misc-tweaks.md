@@ -114,8 +114,9 @@ them; they still open their bag menu, collapse their bag, and the shoulder butto
 them: Blizzard's `Gamepad_SetCursorToBag`). Below it the items in sections, each with a small gold header
 and a line: Gear (weapons and armour that are worn: `GetItemInfoInstant`'s class 2 or 4 with an
 `equipLoc`, not bags, quivers or ammo), Consumables (class 0 and projectiles), Trade goods (trade goods,
-reagents, gems, enhancements), Quest items (`C_Container.GetContainerItemQuestInfo`, or the quest class),
-Other, Junk (grey quality, gear too), then the free slots (by bag and slot; slots of an unsecured account
+reagents, gems, enhancements), Quest items (`C_Container.GetContainerItemQuestInfo`, or the quest class;
+one no quest needs any more has a small dim red x in its top left corner: Lodestar's `Q.ItemMarked`,
+lodestar.md Quest items), Other, Junk (grey quality, gear too), then the free slots (by bag and slot; slots of an unsecured account
 last). In a section: best quality first, then item level (gear, `C_Item.GetDetailedItemLevelInfo`), the
 name (from the link), the bigger stack, the bag's order. A bag collapsed in its menu (`isCollapsed`) keeps
 its slots out, as Blizzard does. Everything is anchored like Blizzard's grid (`BOTTOMRIGHT` at

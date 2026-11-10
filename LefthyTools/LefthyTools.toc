@@ -124,4 +124,5 @@ Modules\Lodestar\Small.lua
 Modules\Lodestar\Browser.lua
 Modules\Lodestar\Views.lua
 Modules\Lodestar\Dialog.lua
+Modules\Lodestar\Items.lua
 Modules\Lodestar\Learn.lua
