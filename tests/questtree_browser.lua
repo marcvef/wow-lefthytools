@@ -443,6 +443,13 @@ do
 	dughan:Click()
 	check(not list:IsShown(), "the pin clicked again: closed")
 	dughan:Click()
+	dughan._mouse = true
+	Fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+	dughan._mouse = nil
+	check(list:IsShown(), "a click on its pin: it stays (the pin's own click closes it)")
+	Fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+	check(not list:IsShown(), "a click anywhere else (the map too): closed")
+	dughan:Click()
 	list.rows[2]:Click()
 	check(st.picked == 104 and not list:IsShown() and dughan.Ring:IsShown() and plain(view.d.Title:GetText()) == "[4] Brotherhood of Thieves"
 		and view.d.Panel:IsShown() and not view.b.Scroll:IsShown(), "a quest of the list clicked: picked, its pin ringed, its details on the right")
@@ -503,6 +510,16 @@ do
 	m.frame:GetScript("OnUpdate")(m.frame, 0.01)
 	m.frame._scripts.OnDragStop(m.frame)
 	check(m.ox == ox - 50 and m.frame:GetScript("OnUpdate") == nil, "dragging moves it (an OnUpdate only while it's held)")
+	-- Zoomed in on a corner, a quest picked with nothing of it in sight: the map goes to it.
+	CURSOR.x, CURSOR.y = 4, -4
+	for _ = 1, 4 do m.frame._scripts.OnMouseWheel(m.frame, 1) end
+	local function seen(x, y)
+		local sx, sy = m.ox + x * m.artW, m.oy + y * m.artH
+		return sx >= 0 and sx <= m.width and sy >= 0 and sy <= m.height
+	end
+	check(m.zoom > 3 and not seen(0.48, 0.42) and not seen(0.4, 0.5), "zoomed in on the map's corner")
+	Q.OpenBrowser(103)
+	check(st.picked == 103 and m.zoom > 3 and seen(0.48, 0.42) and seen(0.56, 0.46), "a quest picked out of sight: the map goes to it (its turn-in, its areas)")
 	m.buttons.fit:Click()
 	check(m.zoom == 1 and plain(m.ZoomText:GetText()) == "", "Fit: the whole zone")
 	-- Ready to turn in: the ? turns yellow (QUEST_LOG_UPDATE, looked at a second later).

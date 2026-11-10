@@ -5,37 +5,48 @@ local Q = ns.Questtree or {}
 ns.Questtree = Q
 
 -- Questtree's big window (Q.ToggleBrowser, Q.OpenBrowser(id)): every zone's quest chains. Near full
--- screen (1400 x 820, scaled down to fit a smaller screen), movable, Escape closes it. On top a search
--- across all zones and two filters (all levels, show what isn't for me; by default only what's
--- within my levels, Q.InRange); under it the zones on the left (by continent, each with its level
--- range, how many of its quests I've done and a thin bar, dimmed when it's far from my level; then
--- the dungeons), the quest picked on the right, and in the middle a tab bar: the zone page, the quest
--- list, and every view another file registers (Q.RegisterBrowserView: built the first time it's
--- shown). Each surface shows what to do now and how far along; the rest is in tooltips.
---   * The zone page: the zone's map (its art, a pin per quest giver with how many quests it has, the
---     game's icons: available "!", a low level one's, a grey "!" for later ones, "?" ready to turn in,
---     a grey "?" still in progress, repeatable ones blue; where items that start a quest drop; each
---     pin's tooltip says what it is) beside the zone's chains as cards (the chain's own colour, how
---     far along with a bar, what's next and who gives it; levels, what it opens and friends in its
---     tooltip; the done chains folded at the end). Each chain has a colour of its own (from its first
---     quest's ID), drawn on the map as a thin thread from giver to turn-in to the next giver while its
---     card is hovered or it has the quest picked. Hovering a card lights its pins (the rest dim),
---     hovering a pin lights its chains' cards. Under the map: how many quests are in progress, ready
---     to turn in and available, and when nothing is there to take, a zone that has some.
---   * A chain opened (a click on its card, or any quest): its quests (every level) as cards from top
---     to bottom, a row per stage (how many quests come before it), side by side where it forks; lines
---     in the gaps (their own lane each, so lines that aren't joined never look joined), "one of" where
---     any one of several is enough, dashed lines for a lead-in that isn't needed first, the steps in
---     another zone as stubs with the zone's name (a click goes there). A locked quest picked: the way
---     back to it (Q.Missing) lit and numbered, across zones (the stubs light up), the rest dim. The
---     next step pulses once when the chain opens.
+-- screen (at least 1400 x 760, wider where the screen has room, scaled down to fit a smaller one),
+-- movable, Escape closes it. On top a search across all zones and two filters (all levels, show what
+-- isn't for me; by default only what's within my levels, Q.InRange); under it the zones on the left
+-- (by continent, each with its level range, how many of its quests I've done and a thin bar, dimmed
+-- when it's far from my level; then the dungeons), in the middle a tab bar (the zone page, the quest
+-- list, every view another file registers: Q.RegisterBrowserView, built the first time it's shown),
+-- and on the right a pane that's never empty. Each surface shows what to do now and how far along;
+-- the rest is in tooltips.
+--   * The zone page: the zone's map, as large as the middle (3:2): its art, a pin per quest giver
+--     with how many quests it has (the game's icons: available "!", a low level one's, a grey "!" for
+--     later ones, "?" ready to turn in, a grey "?" still in progress, repeatable ones blue; where items
+--     that start a quest drop; each pin's tooltip says what it is), my arrow. The wheel zooms where
+--     the cursor is, dragging moves it, -, + and Fit on its strip. Hovering a pin lights its chain (and
+--     its card on the right); a click picks its quest (several: a small list of ours beside it to pick
+--     one); a right-click or Shift-click sets the game's map pin there. The quest picked: its giver
+--     ringed, its turn-in, its objectives' areas (Q.Objectives) as soft circles in its chain's colour,
+--     a dashed way giver -> objectives -> turn-in. Each chain has a colour of its own (from its first
+--     quest's ID), drawn as a thin thread from giver to turn-in to the next giver while its card or a
+--     pin of it is hovered or it has the quest picked. Under the map one line: what's here for me now
+--     (ready to turn in, in progress, available), and when nothing is there to take, a zone that has
+--     some. A dungeon has no map: its Zone tab is its quest list.
+--   * The right pane, nothing picked: the briefing of what the middle shows. A zone's: its name,
+--     levels, how far along with a bar, what's for my level; what to turn in now and what's in progress
+--     here (my quest log); its chains as cards (the chain's own colour, how far along with a bar,
+--     what's next and who gives it; levels, what it opens and friends in its tooltip; a click opens it;
+--     the done chains folded; how many more outside my levels). An opened chain's: its steps as rows.
+--   * The right pane, a quest picked: its details. The way back on top; its icon, title in its
+--     difficulty colour and status with the reason; its chain's step with the steps around it (and a
+--     button opening the chain); its objectives (with my progress from the quest log; hovering one
+--     lights its area on the map); who gives it and takes it back (a click puts a map pin there); the
+--     small map when the zone's isn't in sight; its rewards (the game's item icons and tooltips, money,
+--     experience: Q.Rewards); requirements not met, the first quest it needs and what it leads to,
+--     friends; at the bottom Map pin (where to go next) and Companion (Q.ShowQuest).
+--   * A chain opened (a click on its card, a stub, "Open the chain"): its quests (every level) as cards
+--     from top to bottom, a row per stage (how many quests come before it), side by side where it
+--     forks; lines in the gaps (their own lane each, so lines that aren't joined never look joined),
+--     "one of" where any one of several is enough, dashed lines for a lead-in that isn't needed first,
+--     the steps in another zone as stubs with the zone's name (a click goes there). A locked quest
+--     picked: the way back to it (Q.Missing) lit and numbered, across zones (the stubs light up), the
+--     rest dim. The next step pulses once when the chain opens.
 --   * The quest list: the zone's quests grouped: in progress, available now, coming up (level),
 --     blocked (needs another first), completed (with the skipped ones), not for you (with its filter).
---   * The details: the quest's title in its difficulty colour, its status with the reason, its chain
---     step, where it starts (or, in my log, where it's turned in; an item: its best drop; a click puts
---     a map pin there), the small map when the zone's isn't in sight, requirements not met, the first
---     quest it needs and what it leads to (buttons to those quests), friends, and a button that shows
---     it in the small window (Q.ShowQuest).
 -- A search (Q.Search: titles and giver names, across all zones) shows its results in the middle; a
 -- click on a result or a zone goes there with "Back to the search results" on top, and the search
 -- stays until the box is emptied. A click on a quest also shows it in the small window while that's
@@ -43,15 +54,18 @@ ns.Questtree = Q
 --
 -- What it costs: built when first opened; the data addon loads then too (Q.Load), never at login.
 -- A zone's chains are worked out once (Q.Chain, Q.Opens) and kept until the data changes; a chain's
--- cards, a zone's pins and threads when the filters or a status change. The chain's canvas has only
--- the cards and lines near sight (pooled, each card kept on its quest while it stays near, so a
--- controller's cursor stays on it); the lists (zones, chain cards, overview, results) only their
--- rows in sight. Hovering only sets the alpha of what's there. Events (QUEST_TURNED_IN,
--- QUEST_ACCEPTED, QUEST_REMOVED, PLAYER_LEVEL_UP, QUEST_DATA_LOAD_RESULT, QUEST_LOG_UPDATE) only while
--- it's open; they note what changed and the redraw comes on the next frame, at most every half
--- second. Closed, nothing runs. Our own frames only, nothing protected (it opens in a fight), no
--- Blizzard menu (gamepad mode), every card, pin, row, tab and filter a plain Button the controller's
--- navigation reaches; a card or pin the cursor moves to out of sight brings itself into view.
+-- cards, a zone's pins and threads when the filters or a status change; the quest picked's areas when
+-- it's picked or the map is drawn. The chain's canvas has only the cards and lines near sight (pooled,
+-- each card kept on its quest while it stays near, so a controller's cursor stays on it); the lists
+-- (zones, overview, results) only their rows in sight; the right pane's rows, cards, lines and rewards
+-- are pooled. Hovering only sets the alpha of what's there. Events (QUEST_TURNED_IN, QUEST_ACCEPTED,
+-- QUEST_REMOVED, PLAYER_LEVEL_UP, QUEST_DATA_LOAD_RESULT, ITEM_DATA_LOAD_RESULT, QUEST_LOG_UPDATE,
+-- ZONE_CHANGED_NEW_AREA) only while it's open; they note what changed and the redraw comes on the next
+-- frame, at most every half second (my quest log's lines: once a second, only when they changed). My
+-- arrow moves ten times a second only while I'm on the map shown. Closed, nothing runs. Our own frames
+-- only, nothing protected (it opens in a fight), no Blizzard menu (gamepad mode), every card, pin,
+-- area, row, line, reward, tab and filter a plain Button the controller's navigation reaches; a card or
+-- pin the cursor moves to out of sight brings itself into view.
 
 -- The window's size: at least 1400 x 760; wider (up to 1700) where the screen has room, the map
 -- in the middle growing with it (3:2), its height following; scaled down to fit a smaller screen.
@@ -2336,6 +2350,13 @@ function Map.Choose(m, marker)
 				m.onClick(id)
 			end
 		end)
+		-- A click anywhere but on it or its pin closes it (its owner is the whole page; the pin's own
+		-- click opens or closes it).
+		m.chooser:SetScript("OnEvent", function(self)
+			if not (self:IsMouseOver() or (m.choosing and m.choosing:IsMouseOver())) then
+				self:Hide()
+			end
+		end)
 	end
 	local list = m.chooser
 	if list:IsShown() and m.choosing == marker then
@@ -3233,6 +3254,42 @@ function ZonePage.ShowPick(place)
 	ZonePage.Keep(place)
 	Map.SetPick(m, place and place.kind == "zone" and ZonePage.PickOn(place.map, state.picked, Structure(place).groupOf[state.picked or 0]) or nil)
 	Map.Repaint(m)
+end
+
+-- Zoomed in, nothing of the quest picked in sight (its giver, turn-in, areas): the map centred on them.
+function Map.Follow(m)
+	local pick = m.pick
+	if not (pick and m.zoom > 1 and m.artW) then
+		return
+	end
+	local x0, x1, y0, y1
+	for _, s in ipairs({ pick.start or false, pick.finish or false }) do
+		if s then
+			x0, x1, y0, y1 = math.min(x0 or s.x, s.x), math.max(x1 or s.x, s.x), math.min(y0 or s.y, s.y), math.max(y1 or s.y, s.y)
+		end
+	end
+	for _, a in ipairs(pick.areas) do
+		x0, x1, y0, y1 = math.min(x0 or a.x, a.x), math.max(x1 or a.x, a.x), math.min(y0 or a.y, a.y), math.max(y1 or a.y, a.y)
+	end
+	if not x0 then
+		return
+	end
+	local function Seen(x, y)
+		local px, py = m.ox + x * m.artW, m.oy + y * m.artH
+		return px >= 0 and px <= m.width and py >= 0 and py <= m.height
+	end
+	for _, s in ipairs({ pick.start or false, pick.finish or false }) do
+		if s and Seen(s.x, s.y) then
+			return
+		end
+	end
+	for _, a in ipairs(pick.areas) do
+		if Seen(a.x, a.y) then
+			return
+		end
+	end
+	Map.CloseChooser(m)
+	Map.Pan(m, m.width / 2 - (x0 + x1) / 2 * m.artW, m.height / 2 - (y0 + y1) / 2 * m.artH)
 end
 
 -- The thread shown while no card is hovered: the chain of the quest picked (none: no thread).
@@ -5378,6 +5435,7 @@ local function Pick(id, user)
 	end
 	if view.zp:IsShown() then
 		ZonePage.ShowPick(CurrentPlace())
+		Map.Follow(view.zp.map) -- (zoomed in with nothing of it in sight: the map goes to it)
 	end
 	Side.Draw(changed)
 	if user and id and Q.ShowQuest and SmallOpen() then
@@ -6487,6 +6545,7 @@ function Make.OnHidden(self)
 	view.g.drag, view.zp.map.drag = nil, nil
 	view.g.frame:SetScript("OnUpdate", nil)
 	view.zp.map.frame:SetScript("OnUpdate", nil)
+	Map.CloseChooser(view.zp.map)
 	view.Box:ClearFocus()
 	Views.Show(nil) -- (a view registered: its OnHide)
 	GameTooltip:Hide()

@@ -740,7 +740,8 @@ the tooltip shows; there's no legend under the map), then what a click does.
 - **Right-click or Shift-click**: the game's own map pin there (`Q.Waypoint`, a chat line says so).
 - **The wheel zooms where the cursor is** (x 1.35 a step, up to 8: the map's spot under the cursor stays
   under it), -, + zoom around the middle, Fit shows the whole zone; dragging moves it; a pin the
-  controller's cursor moves to out of sight brings the map to it. Another zone starts whole.
+  controller's cursor moves to out of sight brings the map to it, and so does a quest picked while
+  nothing of it (giver, turn-in, areas) is in sight (`Map.Follow`). Another zone starts whole.
 - **My arrow** (`Interface\Minimap\MinimapArrow`, turned by `GetPlayerFacing`) where I am when I'm on that
   map (`Q.PlayerAt`), moved ten times a second by an OnUpdate on a frame of the map that's shown only
   while I'm on it (off it, or in an instance: hidden, nothing runs; looked at again after
