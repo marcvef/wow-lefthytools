@@ -536,5 +536,8 @@ ns.CHANGELOG = {
 	{ id = 176, module = "questtree",
 		en = { "Questtree in the quest window", "Beside a quest's dialog, Questtree shows which part of its chain it is, every step, and what it leads to and closes. Your quest log shows each chain quest's step (2/4); Alt-click opens it in Questtree. The companion has the game's quest icons and can shrink to one line." },
 		de = { "Questtree im Questfenster", "Neben dem Questfenster zeigt Questtree, der wievielte Teil ihrer Questreihe eine Quest ist, jeden Schritt und wozu sie führt und was sie ausschließt. Dein Questlog zeigt bei jeder Quest einer Questreihe ihren Schritt (2/4); Alt-Klick öffnet sie in Questtree. Das kleine Fenster hat die Quest-Icons des Spiels und lässt sich auf eine Zeile verkleinern." } },
+	{ id = 177, module = "questtree",
+		en = { "Questtree: maps fully uncovered", "Questtree's maps show the whole zone, also the parts you haven't explored yet. Quests blocked by a reputation or a profession's rank say what they need instead of \"not for you\"." },
+		de = { "Questtree: Karten ganz aufgedeckt", "Die Karten von Questtree zeigen das ganze Gebiet, auch die Teile, die du noch nicht erkundet hast. Quests, denen Ruf oder ein Berufsrang fehlt, sagen, was ihnen fehlt, statt „nicht für dich“." } },
 	-- New entries go here, at the end.
 }

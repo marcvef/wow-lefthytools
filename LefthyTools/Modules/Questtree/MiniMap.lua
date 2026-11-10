@@ -4,8 +4,7 @@ local L = ns.L
 local Q = ns.Questtree or {}; ns.Questtree = Q
 
 -- The small zone map: a zone's map as your world map draws it (LT.MapArt, Core/MapArt.lua: the
--- world map's art tiles and the explored overlays on them, as the fight stream's map and the
--- Bestiary ledger's), in a frame of ours that clips it, with the game's own quest icons for givers
+-- world map's art tiles and every area's overlay on them, all uncovered: MapArt's reveal), in a frame of ours that clips it, with the game's own quest icons for givers
 -- and turn-ins, soft spots where a quest's item drops, and your own arrow when you're on that map.
 -- Never the world map itself: nothing of WorldMapFrame is touched (no pins, no data providers, no
 -- opening it).
@@ -287,7 +286,7 @@ function Q.NewMiniMap(parent, width, height)
 	m.Map = CreateFrame("Frame", nil, box)
 	m.Map:SetPoint("TOPLEFT")
 	m.Map:SetSize(m.width, m.height)
-	m.art = LT.MapArt.New(m.Map)
+	m.art = LT.MapArt.New(m.Map, nil, nil, nil, true) -- (every area uncovered)
 	-- Over the markers: the drop label and your arrow, moved while shown.
 	m.Top = CreateFrame("Frame", nil, m.Map)
 	m.Top:SetAllPoints()

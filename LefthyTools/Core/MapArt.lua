@@ -8,8 +8,11 @@ local LT = ns.LT
 -- so nothing hangs over. That art leaves what you haven't explored blank; what you have is
 -- overlays on it (C_MapExplorationInfo.GetExploredMapTextures, laid like Blizzard's
 -- MapExplorationPin), so the map shows what your world map shows. Both checked against the
--- forever branch of Blizzard's UI source.
---   * New(frame, drawLayer, subLevel, mask): a map on that frame, its textures pooled.
+-- forever branch of Blizzard's UI source. A map made to reveal shows every area uncovered, explored
+-- or not (Questtree's maps): all of the zone's overlays, from the client's tables (Data/MapOverlays.lua,
+-- tools/update-map-overlays.js, the way map addons' "reveal" does it), laid the same way; a zone the
+-- data doesn't have shows what you've explored.
+--   * New(frame, drawLayer, subLevel, mask, reveal): a map on that frame, its textures pooled.
 --   * Lay(map, mapID, width, height, fit): the zone's art at that size, its top left at the frame's.
 --   * SetShown(map, shown), Stale(map), Forget(map).
 -- Laid only when the zone, the size or what you've explored changes; never per frame.
@@ -26,6 +29,34 @@ local function Number(v)
 	if not IsSecret(v) and type(v) == "number" then
 		return v
 	end
+end
+
+-- Every area's overlay of a zone (as GetExploredMapTextures gives the explored ones), from
+-- Data/MapOverlays.lua, read once per zone art; nil when the data doesn't have the zone.
+local revealed = {}
+local function Revealed(mapID)
+	local art = C_Map and C_Map.GetMapArtID and Number(Value(C_Map.GetMapArtID, mapID)) or (ns.MAP_ART and ns.MAP_ART[mapID])
+	local text = art and ns.MAP_OVERLAYS and ns.MAP_OVERLAYS[art]
+	if not text then
+		return nil
+	end
+	local list = revealed[art]
+	if not list then
+		list = {}
+		for part in text:gmatch("[^;]+") do
+			local w, h, x, y, top, files = part:match("^(%d+):(%d+):(%d+):(%d+):(%d):([%d,]+)$")
+			if w then
+				local ids = {}
+				for id in files:gmatch("%d+") do
+					ids[#ids + 1] = tonumber(id)
+				end
+				list[#list + 1] = { textureWidth = tonumber(w), textureHeight = tonumber(h), offsetX = tonumber(x),
+					offsetY = tonumber(y), isDrawOnTopLayer = top == "1", fileDataIDs = ids }
+			end
+		end
+		revealed[art] = list
+	end
+	return list
 end
 
 -- A zone's first art layer: its size and its tiles' size, in the art's pixels (nil: no art, or the
@@ -117,9 +148,10 @@ end
 
 -- A map on a frame: the art's tiles at drawLayer's subLevel (default ARTWORK 0), what you've
 -- explored over them (subLevel + 1 and + 2: keep those free), each texture cut by mask if given.
--- Shown when laid (SetShown hides it, also what's laid later). Once one exists, a frame of ours
+-- Shown when laid (SetShown hides it, also what's laid later). reveal: every area uncovered, not
+-- only what you've explored. Once one exists, a frame of ours
 -- notes MAP_EXPLORATION_UPDATED (only a count: maps are laid again when next asked for).
-function MapArt.New(frame, drawLayer, subLevel, mask)
+function MapArt.New(frame, drawLayer, subLevel, mask, reveal)
 	if not watcher then
 		watcher = CreateFrame("Frame")
 		watcher:RegisterEvent("MAP_EXPLORATION_UPDATED")
@@ -128,10 +160,10 @@ function MapArt.New(frame, drawLayer, subLevel, mask)
 		end)
 	end
 	return { frame = frame, drawLayer = drawLayer or "ARTWORK", subLevel = subLevel or 0, mask = mask,
-		tiles = {}, overlays = {}, tileCount = 0, overlayCount = 0, shown = true }
+		tiles = {}, overlays = {}, tileCount = 0, overlayCount = 0, shown = true, reveal = reveal == true }
 end
 
--- Lays the world map's art of mapID and what you've explored of it, from the frame's top left: the
+-- Lays the world map's art of mapID and what you've explored of it (a map that reveals: all of it), from the frame's top left: the
 -- whole layer width x height (the art's pixels scaled to it; fit: as large as fits in it, the art's
 -- own shape), the textures from the pool, the rest of it hidden. Returns the width and height it
 -- takes, or nil: no art (nothing shown); the game saying nothing about what you've explored: the art
@@ -170,7 +202,8 @@ function MapArt.Lay(map, mapID, width, height, fit)
 				end
 			end
 		end
-		local areas = C_MapExplorationInfo and Value(C_MapExplorationInfo.GetExploredMapTextures, mapID)
+		local areas = map.reveal and Revealed(mapID)
+			or C_MapExplorationInfo and Value(C_MapExplorationInfo.GetExploredMapTextures, mapID)
 		for _, info in ipairs(type(areas) == "table" and areas or {}) do
 			if not IsSecret(info) and type(info) == "table" then
 				o = LayOverlay(map, info, layer, sx, sy, o)

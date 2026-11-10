@@ -27,6 +27,7 @@ Data\FlightPaths.lua
 Data\ClassSpells.lua
 Data\SpellSchools.lua
 Data\MinimapTiles.lua
+Data\MapOverlays.lua
 Data\RetailUnitFrames.lua
 Data\Recipes.lua
 

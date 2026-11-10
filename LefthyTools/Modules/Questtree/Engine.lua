@@ -214,8 +214,10 @@ local function Standing(faction)
 	return nil
 end
 
--- For this character (me: who nil, or a friend's progress table)? Race, class, faction, skill and
--- reputation; what isn't known counts as yes.
+-- For this character (me: who nil, or a friend's progress table)? Race, class, faction and a
+-- profession (mine: one I don't have isn't for me; a rank too low or a reputation too low only
+-- blocks it, Gate); what isn't known counts as yes. Not for me: false and why ("race", "class",
+-- "faction", "skill").
 local function ForMe(q, who)
 	local race, class, faction
 	if who then
@@ -225,29 +227,37 @@ local function ForMe(q, who)
 	else
 		race, class, faction = MyRace(), MyClass(), MyFaction()
 	end
-	if q.races and race and not Q.RaceAllowed(q, race) then return false end
-	if q.classes and class and not HasBit(q.classes, class) then return false end
-	if q.faction and faction and (faction == "Alliance" or faction == "Horde") and q.faction ~= faction then return false end
-	if not who then
-		if q.skill then
-			local rank = SkillRank(q.skill.id)
-			if rank and rank < (q.skill.value or 0) then return false end
-		end
-		if q.rep then
-			local standing = Standing(q.rep.faction)
-			if standing and standing < (q.rep.min or 0) then return false end
-		end
-	end
+	if q.races and race and not Q.RaceAllowed(q, race) then return false, "race" end
+	if q.classes and class and not HasBit(q.classes, class) then return false, "class" end
+	if q.faction and faction and (faction == "Alliance" or faction == "Horde") and q.faction ~= faction then return false, "faction" end
+	if not who and q.skill and SkillRank(q.skill.id) == 0 and (q.skill.value or 0) > 0 then return false, "skill" end
 	return true
 end
 
--- Closed by another: an exclusive one done or taken, or the quest a breadcrumb leads to.
+-- What besides quests keeps me from a quest for me: a profession's rank or a reputation too low
+-- (nil: nothing, or a friend's: not known).
+local function Gate(q, who)
+	if who then return nil end
+	if q.skill then
+		local rank = SkillRank(q.skill.id)
+		if rank and rank > 0 and rank < (q.skill.value or 0) then return { kind = "skill", id = q.skill.id, value = q.skill.value, have = rank } end
+	end
+	if q.rep then
+		local standing = Standing(q.rep.faction)
+		if standing and standing < (q.rep.min or 0) then return { kind = "rep", faction = q.rep.faction, min = q.rep.min, have = standing } end
+	end
+	return nil
+end
+
+-- Closed by another: an exclusive one done or taken, or the quest a breadcrumb leads to (true and
+-- that quest).
 local function Closed(q, who)
 	for _, other in ipairs(q.excl or {}) do
-		if IsDone(other, who) or IsActive(other, who) then return true end
+		if IsDone(other, who) or IsActive(other, who) then return true, other end
 	end
 	local target = q.breadcrumbFor
-	return target and (IsDone(target, who) or IsActive(target, who)) or false
+	if target and (IsDone(target, who) or IsActive(target, who)) then return true, target end
+	return false
 end
 
 local function NeedsMet(q, who)
@@ -271,7 +281,7 @@ local function Compute(id, who)
 	if IsDone(id, who) then return "done" end
 	if IsActive(id, who) then return "active" end
 	if not ForMe(q, who) or Closed(q, who) then return "other" end
-	if not NeedsMet(q, who) then return "locked" end
+	if not NeedsMet(q, who) or Gate(q, who) then return "locked" end
 	local level = who and tonumber(who.level) or not who and MyLevel()
 	if level and q.minLevel and level < q.minLevel then return "level" end
 	return "available"
@@ -295,6 +305,41 @@ function Q.Status(id, who)
 		statusOf[id] = s
 	end
 	return s or nil
+end
+
+-- Why a quest is "other" for me: "closed" and the quest that closed it (an exclusive one taken, the
+-- quest a breadcrumb leads to), or "race", "class", "faction", "skill" (a profession I don't have);
+-- nil when it isn't "other".
+function Q.WhyOther(id)
+	id = tonumber(id)
+	local q = id and Q.Quest(id)
+	if not q or Q.Status(id) ~= "other" then return nil end
+	local ok, why = ForMe(q)
+	if not ok then return why end
+	local _, by = Closed(q)
+	return "closed", by
+end
+
+-- What besides quests blocks a quest of mine: { kind = "skill", id, value, have } (a profession's
+-- rank) or { kind = "rep", faction, min, have } (a reputation), nil if nothing.
+function Q.Needs(id)
+	id = tonumber(id)
+	local q = id and Q.Quest(id)
+	return q and Gate(q) or nil
+end
+
+-- Within my levels, what the windows show unless asked for all levels: a quest in my log, or one
+-- neither grey for me nor more than RANGE_ABOVE levels above mine to take (no level known: yes).
+local RANGE_ABOVE = 2
+Q.RANGE_ABOVE = RANGE_ABOVE
+function Q.InRange(id)
+	id = tonumber(id)
+	local q = id and Q.Quest(id)
+	if not q then return false end
+	if Q.Status(id) == "active" then return true end
+	if Q.IsTrivial(id) then return false end
+	local my, need = MyLevel(), q.minLevel or q.level
+	return not (my and need and need > my + RANGE_ABOVE)
 end
 
 -- The best of several quests one of which is needed: one in my log, then one I can take, then

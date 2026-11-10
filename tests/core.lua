@@ -329,6 +329,29 @@ do -- The world map's art of a zone and what you've explored of it, laid into a 
 	Fire("MAP_EXPLORATION_UPDATED")
 	check(not MapArt.Stale(map) and #ERRORS == errorsWere, "no art: never stale; no errors")
 	C_Map.GetMapArtLayers = layers
+	-- Revealed (Questtree's maps): every area's overlay from the client's tables (Data/MapOverlays.lua),
+	-- explored or not; a zone the data doesn't have: what's explored.
+	check(type(ns.MAP_OVERLAYS) == "table" and ns.MAP_ART[1429] and type(ns.MAP_OVERLAYS[ns.MAP_ART[1429]]) == "string",
+		"the overlay data: Elwynn Forest's art and its areas")
+	local art, real = ns.MAP_ART[1429], ns.MAP_OVERLAYS[ns.MAP_ART[1429]]
+	ns.MAP_OVERLAYS[art] = "100:100:10:20:0:9001;300:100:600:0:1:9002,9003"
+	EXPLORED[1429] = nil
+	local open = MapArt.New(frame, "BACKGROUND", 0, nil, true)
+	MapArt.Lay(open, 1429, 1002, 668)
+	local r1, r2, r3 = open.overlays[1], open.overlays[2], open.overlays[3]
+	local rx3 = at(r3)
+	check(open.overlayCount == 3 and r1.path == 9001 and r2.path == 9002 and r3.path == 9003 and at(r1) == 10 and rx3 == 856
+		and r2.sub == 2 and r1.sub == 1 and r3.width == 44,
+		"revealed: every area of the data's, none explored, laid like explored ones (tiles by rows, the top layer's over)")
+	MapArt.Lay(map, 1429, 1002, 668)
+	check(map.overlayCount == 0, "a map that doesn't reveal: still only what's explored")
+	ns.MAP_OVERLAYS[art] = real
+	EXPLORED[1429] = elwynn
+	local westfall = ns.MAP_ART[1436]
+	ns.MAP_ART[1436] = nil
+	check(MapArt.Lay(open, 1436, 1002, 668) and open.overlayCount == #(EXPLORED[1436] or {}) and #ERRORS == errorsWere,
+		"a zone without the data: what's explored")
+	ns.MAP_ART[1436] = westfall
 end
 
 section("the beta or the release")

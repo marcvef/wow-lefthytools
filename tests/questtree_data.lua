@@ -445,4 +445,48 @@ do
 	check(#Q.Search("deep") == 1 and table.concat(Q.Chain(4), ",") == "1,2,3,4", "search and chain in it")
 end
 
+section("Questtree engine: why not for me, what blocks it, my levels")
+do
+	local factions = C_Reputation
+	local standing = { [72] = 2000 }
+	C_Reputation = { GetFactionDataByID = function(id) return standing[id] and { currentStanding = standing[id] } end }
+	PROFESSIONS = { { name = "Alchemy", level = 60, line = 171 } }
+	Q.SetTestData({
+		{ id = 1, title = "Trivial", level = 2, minLevel = 1, zone = 1429 },
+		{ id = 2, title = "Mine", level = 20, minLevel = 18, zone = 1429 },
+		{ id = 3, title = "Soon", level = 23, minLevel = 22, zone = 1429 },
+		{ id = 4, title = "Later", level = 30, minLevel = 25, zone = 1429 },
+		{ id = 5, title = "Brew", level = 20, minLevel = 18, zone = 1429, skill = { id = 171, value = 100 } },
+		{ id = 6, title = "Forge", level = 20, minLevel = 18, zone = 1429, skill = { id = 164, value = 50 } },
+		{ id = 7, title = "Friends", level = 20, minLevel = 18, zone = 1429, rep = { faction = 72, min = 3000 } },
+		{ id = 8, title = "Mage", level = 20, minLevel = 18, zone = 1429, classes = 128 },
+		{ id = 9, title = "One way", level = 20, minLevel = 18, zone = 1429, excl = { 10 } },
+		{ id = 10, title = "Other way", level = 20, minLevel = 18, zone = 1429, excl = { 9 } },
+		{ id = 11, title = "Report in", level = 20, minLevel = 18, zone = 1429, breadcrumbFor = 2 },
+	}, { { map = 1429, name = "Elwynn Forest", continent = 1415 } })
+	PLAYER_LEVEL = 20
+	Fire("PLAYER_LEVEL_UP", 20)
+	login({})
+	QUESTS = { { id = 10 }, { id = 2 } }
+	Fire("QUEST_LOG_UPDATE")
+	check(Q.Status(5) == "locked" and Q.Needs(5) and Q.Needs(5).kind == "skill" and Q.Needs(5).value == 100 and Q.Needs(5).have == 60,
+		"a profession I have, its rank too low: blocked, and by what")
+	check(Q.Status(6) == "other" and Q.WhyOther(6) == "skill", "a profession I don't have: not for me")
+	check(Q.Status(7) == "locked" and Q.Needs(7).kind == "rep" and Q.Needs(7).min == 3000 and Q.Needs(7).faction == 72,
+		"a reputation too low: blocked, not 'not for you'")
+	check(Q.WhyOther(8) == "class" and Q.Needs(8) == nil, "another class's: not for me")
+	local why, by = Q.WhyOther(9)
+	check(why == "closed" and by == 10, "the other way taken: closed by it")
+	why, by = Q.WhyOther(11)
+	check(why == "closed" and by == 2 and Q.WhyOther(2) == nil and Q.WhyOther(1) == nil, "a breadcrumb to a quest I have: closed; others aren't 'other'")
+	check(not Q.InRange(1) and Q.InRange(2) and Q.InRange(3) and not Q.InRange(4) and Q.RANGE_ABOVE == 2,
+		"my levels: not grey, not more than two levels above me to take")
+	PLAYER_LEVEL = 30
+	Fire("PLAYER_LEVEL_UP", 30)
+	check(Q.InRange(2) and Q.InRange(3) and Q.InRange(4), "in my log: always in my levels (grey or not)")
+	QUESTS = {}
+	Fire("QUEST_LOG_UPDATE")
+	C_Reputation, PROFESSIONS = factions, {}
+end
+
 QUESTS, PLAYER_LEVEL, PLAYER_MAP = savedQuests, savedLevel, savedMap
