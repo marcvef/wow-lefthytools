@@ -545,5 +545,8 @@ ns.CHANGELOG = {
 	{ id = 179, module = "questtree",
 		en = { "Questtree: less on screen", "The companion shows what to do now and quests for your level, with the chain's steps folded away, and says why a quest is blocked or skipped. Storylines and the level path start with what's for your level; the panel beside the quest dialog lists only the steps around the quest. The Continents view is gone." },
 		de = { "Questtree: weniger auf einmal", "Das kleine Fenster zeigt, was jetzt zu tun ist, und Quests für dein Level, die Schritte der Questreihe eingeklappt, und sagt, warum eine Quest gesperrt oder übersprungen ist. Handlungsstränge und der Levelpfad zeigen zuerst, was zu deinem Level passt; das Feld neben dem Questfenster nur die Schritte um die Quest herum. Die Ansicht Kontinente gibt es nicht mehr." } },
+	{ id = 180, module = "questtree",
+		en = { "Questtree: objectives and rewards", "Questtree knows what each quest asks for (what to kill, use or collect, and where) and what it gives (items, money, experience), with Forever's own levels and counts. For your level now means quests you can take now that aren't red or grey." },
+		de = { "Questtree: Ziele und Belohnungen", "Questtree kennt jetzt die Ziele jeder Quest (was du töten, benutzen oder sammeln musst, und wo) und was sie gibt (Items, Geld, EP), mit den Leveln und Anzahlen von Forever. Für dein Level heißt jetzt: Quests, die du jetzt annehmen kannst und die nicht rot oder grau sind." } },
 	-- New entries go here, at the end.
 }

@@ -12,12 +12,14 @@ Sources
   is below, as it is.
 - **EG Link output for World of Warcraft: Forever** (https://github.com/JIVESCORP/eg-link-output-wowf):
   Data from [Efficient Games](https://efficient.games), licensed under
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changed: only quests, their givers and
-  enders, what was done before them, where items that start quests were looted and creatures' names
-  were taken, and converted to this file's format. Its license
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changed: only quests (their levels,
+  objectives and rewards), their givers and enders, what was done before them, the money players got
+  for them, where items were looted, where creatures were met and creatures' and objects' names were
+  taken, and converted to this file's format. Its license
   covers Efficient Games' own contribution (the selection, structure, compilation and
   player-contributed observations); it grants no rights in Blizzard's content.
-- **WoW: Forever's client tables** (maps, zones, areas, quest lines, item names, races), read from the
+- **WoW: Forever's client tables** (maps, zones, areas, quest lines, item names, races, quest
+  experience), read from the
   exports of https://wago.tools: Blizzard's data.
 
 World of Warcraft content and materials (names, quest titles, places) are trademarks and copyrights of

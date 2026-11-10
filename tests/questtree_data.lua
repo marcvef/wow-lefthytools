@@ -5,7 +5,9 @@
 -- made-up progress (done, in the log, locked, too low, not for me), what's missing across zones,
 -- exclusive groups, what's next; Forever's races (the Skyborne) and the race rule, item starters'
 -- drops, who gives what, zone counts over every level, chain steps, what's available nearby, quest
--- difficulty colours; learned data filling gaps only; the test hook Q.SetTestData.
+-- difficulty colours; objectives (kill, collect, use) with their places, rewards, the turn-in, Forever's
+-- levels and ones that scale; my levels (Q.InRange: nothing red or coming up); learned data filling
+-- gaps only; the test hook Q.SetTestData.
 -- Needs: no other file.
 
 local suite = ...
@@ -185,6 +187,74 @@ do
 	check(has((Q.GiverQuests(240)), 999003), "a learned quest at him: there too")
 	check(has(Q.ZoneGiven(1436), 166) and not has(Q.ZoneQuests(1436), 166) and #Q.ZoneGiven(999) == 0,
 		"Westfall: the Deadmines' quests given there, listed under the dungeon")
+end
+
+section("Questtree data: objectives, rewards, turn-in")
+do
+	check(type(LefthyToolsQuestData.quests[7]) == "string", "the data stays strings: nothing parsed at load")
+	-- Kill: the creature with its spawns' clusters.
+	local cleanup = Q.Objectives(7)
+	local kill = cleanup[1]
+	local vermin = kill and kill.sources[1]
+	check(#cleanup == 1 and kill.kind == "kill" and kill.id == 6 and kill.name == "Kobold Vermin" and kill.count == 10
+		and vermin.kind == "npc" and vermin.id == 6 and vermin.name == "Kobold Vermin" and vermin.chance == nil,
+		"Kobold Camp Cleanup: kill 10 Kobold Vermin")
+	local area = vermin.points[1]
+	check(area and area.map == 1429 and area.x > 0.4 and area.x < 0.6 and area.y > 0.2 and area.y < 0.5 and area.r >= 0.015 and area.r <= 0.15,
+		"where they are: a cluster in Northshire (" .. tostring(area and area.x) .. ", " .. tostring(area and area.y) .. ")")
+	check(Q.Objectives(7) == cleanup, "kept: the same list asked again")
+	-- Item: where it drops, with the chance.
+	local claw = Q.Objectives(176)[1]
+	local hogger = claw and claw.sources[1]
+	check(claw.kind == "item" and claw.id == 1931 and claw.name == "Huge Gnoll Claw" and claw.count == 1 and hogger.kind == "npc"
+		and hogger.id == 448 and hogger.name == "Hogger" and suite.near(hogger.chance, 100, 0.01) and hogger.points[1].map == 1429,
+		"Wanted: Hogger: his claw, from Hogger (100%) in Elwynn Forest")
+	check(claw.sources == Q.Quest(176).starts[1].drops or claw.sources == (Q.Objectives(176)[1].sources), "an item's sources are shared")
+	-- Several kinds, the order the quest log has them; an object to use.
+	local hillsbrad = Q.Objectives(532)
+	local kinds = {}
+	for i, o in ipairs(hillsbrad) do kinds[i] = o.kind .. o.id .. "x" .. o.count end
+	check(table.concat(kinds, ",") == "kill2335x1,kill2387x5,object1761x1,item3657x1", "Battle of Hillsbrad: " .. table.concat(kinds, ","))
+	local proclamation = hillsbrad[3]
+	check(proclamation.name == "Hillsbrad Proclamation" and proclamation.sources[1].kind == "object" and proclamation.sources[1].points[1].map == 1424,
+		"an object to destroy: where it stands")
+	local registry = hillsbrad[4].sources[1]
+	check(registry and registry.kind == "object" and registry.id == 1759 and registry.points[1], "an item from an object (the Town Registry's)")
+	-- What Forever changed: its server's counts (EG Link), not classic's.
+	local thistlefur = Q.Objectives(216)
+	check(thistlefur[1] and thistlefur[1].count == 12, "Between a Rock and a Thistlefur: 12 on Forever (classic: 8)")
+	-- An item the giver hands over; Forever's own quest.
+	local documents = Q.Objectives(54)[1]
+	check(documents and documents.kind == "item" and documents.id == 745 and documents.provided == true and #documents.sources == 0,
+		"Report to Goldshire: the documents you were given")
+	local books = Q.Objectives(91743)[1]
+	check(books and books.kind == "item" and books.id == 247839 and books.count == 8 and books.name == "Stolen Book", "Forever's own quest: its objectives (EG Link)")
+	check(#Q.Objectives(999999999) == 0 and #Q.Objectives(nil) == 0 and #Q.Objectives(999001) == 0, "unknown, nothing, a learned quest: none")
+
+	-- Rewards: IDs and counts, money, experience.
+	local r = Q.Rewards(176)
+	local choice = {}
+	for i, c in ipairs(r.choice) do choice[i] = c.id .. "x" .. c.count end
+	check(table.concat(choice, ",") == "6085x1,6084x1,6215x1,270000x1" and #r.items == 0 and r.money == nil and r.xp == 875,
+		"Hogger: one of four (Forever added one), 875 XP: " .. table.concat(choice, ",") .. ", " .. tostring(r.xp))
+	r = Q.Rewards(7)
+	check(r and #r.choice == 0 and r.money == 25 and r.xp == 170 and Q.Rewards(7) == r, "Kobold Camp Cleanup: 25 copper, 170 XP; kept")
+	r = Q.Rewards(91743)
+	check(r and #r.choice == 3 and r.money == 17 and r.xp == 170, "Forever's quest: its rewards")
+	r = Q.Rewards(448)
+	check(r and r.choice[1] and r.choice[1].id == 3240 and r.choice[1].count == 5 and r.choice[2].count == 5 and r.items[1].id == 2313
+		and r.items[1].count == 1, "Report to Hadrec: one of 5 x two items, and one for sure")
+	check(Q.Rewards(999999999) == nil and Q.Rewards(999001) == nil, "nothing known: nil")
+
+	-- Levels as Forever has them; a level that scales.
+	check(Q.Quest(952).level == 17 and Q.Quest(952).minLevel == 6, "Grove of the Ancients: level 17 on Forever (classic: 11)")
+	local angler = Q.Quest(8194)
+	check(angler.scales == true and angler.level == nil and Q.Quest(176).scales == false, "Apprentice Angler scales to you")
+
+	-- Where it's turned in.
+	local ends = Q.Ends(176)
+	check(ends == Q.Quest(176).ends and ends[1].id == 240 and ends[1].points[1].map == 1429 and #Q.Ends(999999999) == 0,
+		"turned in at Marshal Dughan")
 end
 
 section("Questtree engine: Northshire with a made-up progress")
@@ -414,8 +484,12 @@ do
 	check(changed == 0, "the windows hear of it on the next frame")
 	Advance(1)
 	check(changed == 1, "once for both")
+	local before, rewards = Q.Objectives(7), Q.Rewards(7)
 	Q.AddLearned(999002, { title = "Somewhere New", zone = 1436, level = 12 })
 	check(has(Q.ZoneQuests(1436), 999002) and Q.Quest(999002).zoneName == "Westfall", "a learned quest in a zone: listed there")
+	local after = Q.Objectives(7)
+	check(after ~= before and after[1].id == before[1].id and after[1].sources[1] == before[1].sources[1] and Q.Rewards(7) ~= rewards,
+		"objectives and rewards read again after a change of the data (the places stay shared)")
 	Advance(1)
 end
 
@@ -427,7 +501,9 @@ do
 		{ id = 1, title = "First", level = 2, minLevel = 1, zone = 1429, starts = { { kind = "npc", id = 1, name = "Giver", points = { { map = 1429, x = 0.5, y = 0.5 } } } } },
 		{ id = 2, title = "Second", level = 4, minLevel = 2, zone = 1429, pre = { 1 } },
 		{ id = 3, title = "Elsewhere", level = 9, minLevel = 8, zone = 1436, preAny = { 1, 2 } },
-		{ id = 4, title = "Deep", level = 20, dungeon = "Deadmines", pre = { 3 } },
+		{ id = 4, title = "Deep", level = 20, dungeon = "Deadmines", pre = { 3 },
+			objectives = { { kind = "kill", id = 7, name = "Boss", count = 1, sources = { { kind = "npc", id = 7, name = "Boss", points = {} } } } },
+			rewards = { choice = {}, items = { { id = 5, count = 1 } }, xp = 100 } },
 	}, { { map = 1429, name = "Elwynn Forest", continent = 1415 }, { map = 1436, name = "Westfall", continent = 1415, minLevel = 10, maxLevel = 20 } })
 	check(heard >= 1, "the windows hear of it at once")
 	check(Q.Quest(176) == nil and Q.Quest(999001) == nil and Q.Quest(1).title == "First" and has(Q.Quest(1).opens, 2) and has(Q.Quest(1).opens, 3),
@@ -443,6 +519,8 @@ do
 	login({ 1 })
 	check(Q.Status(2) == "available" and Q.Status(3) == "level" and Q.Status(4) == "locked", "one of two is enough; too low")
 	check(#Q.Search("deep") == 1 and table.concat(Q.Chain(4), ",") == "1,2,3,4", "search and chain in it")
+	check(Q.Objectives(4)[1].name == "Boss" and Q.Rewards(4).xp == 100 and #Q.Objectives(1) == 0 and Q.Rewards(1) == nil,
+		"a test quest's own objectives and rewards; none without")
 end
 
 section("Questtree engine: why not for me, what blocks it, my levels")

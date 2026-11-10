@@ -9,18 +9,22 @@
 //   gameobject_questrelation / involvedrelation (givers, enders), item_template.startquest (items
 //   that start a quest), creature and gameobject (where they stand), creature_template and
 //   gameobject_template (names, factions, loot), creature_ / gameobject_ / reference_loot_template
-//   (where the items that start quests drop).
+//   (where the items that start quests drop), quest_template's objectives (ReqCreatureOrGOId, ReqItemId and
+//   their counts) and rewards (RewChoiceItemId, RewItemId, RewOrReqMoney, RewMoneyMaxLevel).
 // - WoW: Forever's own quests (new since classic): EG Link output (Efficient Games,
 //   https://github.com/JIVESCORP/eg-link-output-wowf, CC BY 4.0: what players' games recorded on
 //   Forever): quests.enUS (title, levels, races, zone, the next quest, the item that starts it),
 //   npcs (who offers and takes each quest, where they stand), quest_prerequisites (what every
 //   character had done before taking it) and loot (what players looted from what, and where: for
-//   the items that start quests classic-db has no source of). Selected and converted, not changed
-//   otherwise.
+//   the items that start quests classic-db has no source of), the quests' objectives and rewards (what
+//   Forever's server says: for every quest it has, classic's too) and turn_ins (the money players got),
+//   creatures (where players met Forever's own creatures). Selected and converted, not changed otherwise.
 // - Forever's client tables (wago.tools exports of the build): UiMap, UiMapAssignment (zones and
 //   their world rectangles), AreaTable, Map, QuestSort (names), FactionTemplate (which side an NPC
 //   is on), ChrRaces (Forever's playable races: their race-mask bits, sides), QuestV2 (the quests the client knows), QuestLineXQuest (Forever's quest
-//   lines), ItemSparse (StartQuestID, names) and QuestPOIBlob (a quest's map, when nothing else says).
+//   lines), ItemSparse (StartQuestID, names), QuestPOIBlob (a quest's map, when nothing else says) and
+//   QuestXP (a quest's experience by its level and XP difficulty). The client has no QuestObjective table
+//   (wago.tools: "Table not found" for Forever's builds): objectives come from EG Link and classic-db.
 // - Data/ForeverQuests.lua (tools/update-forever-quests.ps1): which quests are new in Forever.
 // Not used: Wowhead and anything taken from Questie (the project's rule), ForeverCore's sniffs
 // (GPL-2.0 without "or later", so not combinable with the GPL v3 here, and it credits Questie).
@@ -46,6 +50,17 @@
 // - Items that start a quest: where they drop (classic-db's creature and gameobject loot, through
 //   references; else EG Link's loot): the likeliest sources (MAX_SOURCES), each with its spawns in
 //   up to MAX_CLUSTERS clusters (centre and radius).
+// - Objectives: EG Link's (kill a creature, use or loot an object, collect an item; by storage index)
+//   for the quests it has, else classic-db's (ReqCreatureOrGOId: a creature, negative an object; then
+//   ReqItemId). Each objective's target has a place: a creature's and an object's spawns in clusters
+//   (dropNpcs, dropObjects, as drop sources), an item where it drops (items, as for starters).
+// - Rewards: EG Link's (choices, items, money, XP difficulty) for the quests it has, else classic-db's.
+//   XP: the client's QuestXP row of the quest's level at its difficulty, times the multiplier, the game's
+//   rounding (as players got it on turn-in: 425 of 482 exactly, the rest a 3% bonus); classic-db's
+//   RewMoneyMaxLevel / 0.6 put on the nearest value of that row, rounded (97% of Forever's for normal quests;
+//   none for dungeon, raid and PvP quests, which Forever multiplies).
+// - Levels: EG Link's for the quests it has (Forever changed some of classic's); a level of -1 or 0
+//   scales to the player (flag s, no level).
 // - Who starts and ends what (npcQuests, objectQuests) and the quests given in a zone that are
 //   listed elsewhere (a dungeon's, a city's): for tooltips and "what's here" without reading all.
 // - Left out: quests the client doesn't know (not in QuestV2, unless repeatable: those have no
@@ -80,6 +95,8 @@ const MAX_POINTS = 5; // spawns kept per NPC or object (a 1% grid apart)
 const SIMILAR = 4; // zones' rectangles at most this many times the other's size can be a place's alternative
 const UNUSED = /\[UNUSED\]|<UNUSED>|UNUSED |<NYI>|\bNYI\b|<TXT>|\[PH\]|<CHANGE TO GOSSIP>|^ZZOLD|\(OLD\)|<TEST>|\bTEST\b|^Test |^REUSE|\[DEPRECATED\]|<DEPRECATED>|Deprecated/;
 const ZONE_TYPES = { 3: 0, 4: 1 }; // UiMap types a position goes on (zone, dungeon floor), in that order of preference
+const OBJECTIVE_KINDS = { monster: "k", gameObject: "o", item: "i" }; // EG Link's objective types kept (kill, object, item)
+const XP_UNKNOWN = new Set([41, 62, 81]); // quest types (PvP, raid, dungeon) whose XP Forever multiplies: no classic formula
 
 const byNumber = (a, b) => a - b;
 const uniq = (list) => [...new Set(list)];
@@ -132,6 +149,8 @@ async function eglink(build, ref, cache) {
     prerequisites: ((await get("quest_prerequisites")) || {}).quests || {},
     loot: ((await get("loot")) || {}).sources || {},
     creatures: ((await get("creatures")) || {}).creatures || {},
+    turnIns: ((await get("turn_ins")) || {}).quests || {},
+    objects: ((await get("object_details.enUS")) || {}).objects || {},
   };
 }
 
@@ -301,6 +320,70 @@ function clusters(points) {
     .map((c) => ({ ui: c.ui, x: c.x, y: c.y, r: c.r, n: c.n }));
 }
 
+// The game's rounding of quest experience (to 5, 10, 25 or 50 by its size).
+function roundXp(xp) {
+  if (xp <= 100) return 5 * Math.floor((xp + 2) / 5);
+  if (xp <= 500) return 10 * Math.floor((xp + 5) / 10);
+  if (xp <= 1000) return 25 * Math.floor((xp + 12) / 25);
+  return 50 * Math.floor((xp + 25) / 50);
+}
+
+// A quest's objectives: [{ kind: "k" (kill) | "o" (object) | "i" (item), id, count }]. EG Link's (e, by
+// storage index) when it lists them, else classic-db's (c: creatures and objects, then items).
+function objectivesOf(e, c) {
+  if (e && Array.isArray(e.objectives)) {
+    return e.objectives.filter((o) => OBJECTIVE_KINDS[o.type] && o.objectId > 0)
+      .sort((a, b) => (a.storageIndex || 0) - (b.storageIndex || 0) || (a.id || 0) - (b.id || 0))
+      .map((o) => ({ kind: OBJECTIVE_KINDS[o.type], id: o.objectId, count: Math.max(1, o.amount || 1) }));
+  }
+  const out = [];
+  if (!c) return out;
+  for (let i = 1; i <= 4; i++) {
+    const id = c["ReqCreatureOrGOId" + i];
+    if (id) out.push({ kind: id > 0 ? "k" : "o", id: Math.abs(id), count: Math.max(1, c["ReqCreatureOrGOCount" + i] || 1) });
+  }
+  for (let i = 1; i <= 4; i++) {
+    if (c["ReqItemId" + i]) out.push({ kind: "i", id: c["ReqItemId" + i], count: Math.max(1, c["ReqItemCount" + i] || 1) });
+  }
+  return out;
+}
+
+// A quest's rewards: { choice: [[item, count]], items: [[item, count]], money (copper), xp } (undefined
+// where none). EG Link's (e) for the quests it has, else classic-db's (c). xpRow(level): the client's
+// QuestXP row; paid: money players got on turn-in below level 60 (EG Link's turn_ins), or undefined.
+function rewardsOf(e, c, xpRow, paid) {
+  const pairs = (list) => (list || []).filter((x) => x.itemId > 0).map((x) => [x.itemId, Math.max(1, x.count || 1)]);
+  const out = {};
+  if (e && e.rewards) {
+    const r = e.rewards;
+    out.choice = pairs(r.choices);
+    out.items = pairs(r.items);
+    if (r.money > 0) out.money = r.money;
+    else if (paid !== undefined) out.money = paid > 0 ? paid : undefined;
+    else if (c && c.RewOrReqMoney > 0) out.money = c.RewOrReqMoney;
+    const row = e.level > 0 && xpRow(e.level);
+    const base = row && +row["Difficulty_" + r.xpDifficulty];
+    if (base > 0) out.xp = roundXp(Math.floor(base * (r.xpMultiplier > 0 ? r.xpMultiplier : 1)));
+  } else if (c) {
+    out.choice = [], out.items = [];
+    for (let i = 1; i <= 6; i++) if (c["RewChoiceItemId" + i]) out.choice.push([c["RewChoiceItemId" + i], Math.max(1, c["RewChoiceItemCount" + i] || 1)]);
+    for (let i = 1; i <= 4; i++) if (c["RewItemId" + i]) out.items.push([c["RewItemId" + i], Math.max(1, c["RewItemCount" + i] || 1)]);
+    if (c.RewOrReqMoney > 0) out.money = c.RewOrReqMoney;
+    // (classic's experience is RewMoneyMaxLevel / 0.6; Forever's the nearest of its level's QuestXP row)
+    const row = c.QuestLevel > 0 && c.RewMoneyMaxLevel > 0 && !XP_UNKNOWN.has(c.Type) && xpRow(c.QuestLevel);
+    if (row) {
+      const want = c.RewMoneyMaxLevel / 0.6;
+      let best;
+      for (let d = 1; d <= 9; d++) {
+        const v = +row["Difficulty_" + d];
+        if (v > 0 && (best === undefined || Math.abs(v - want) < Math.abs(best - want))) best = v;
+      }
+      if (best !== undefined && Math.abs(best - want) <= want * 0.05) out.xp = roundXp(best);
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- main
 
 function parseArgs(args) {
@@ -323,7 +406,7 @@ async function main() {
   if (!build) throw new Error("could not determine the Forever build; pass it as an argument");
   console.log(`WoW: Forever ${build}`);
   const tables = ["UiMap", "UiMapAssignment", "AreaTable", "Map", "QuestSort", "FactionTemplate", "QuestV2",
-    "QuestLineXQuest", "ItemSparse", "QuestPOIBlob", "ChrRaces"];
+    "QuestLineXQuest", "ItemSparse", "QuestPOIBlob", "ChrRaces", "QuestXP"];
   const t = {};
   for (const name of tables) t[name] = await table(name, build, o.cache);
   const eg = await eglink(build, o.eglink, o.cache);
@@ -381,13 +464,19 @@ async function main() {
   // --- which quests
   const quests = new Map(); // id -> the fields below
   const dropped = { unused: 0, client: 0, nobody: 0 };
+  let levelsChanged = 0;
   for (const q of qt) {
     const id = q.entry;
     if (UNUSED.test(q.Title)) { dropped.unused++; continue; }
     if (!clientQuests.has(id) && !(q.SpecialFlags & 1)) { dropped.client++; continue; }
     if (!starts.has(id) && !ends.has(id)) { dropped.nobody++; continue; }
+    // (levels: Forever's server's where EG Link has the quest; -1 and 0 scale to the player)
+    const e = eg.quests[id];
+    const level = e && Number.isInteger(e.level) ? e.level : q.QuestLevel;
+    if (e && (e.level !== q.QuestLevel || (e.minLevel > 0 && e.minLevel !== q.MinLevel))) levelsChanged++;
     quests.set(id, {
-      id, title: q.Title.trim(), level: q.QuestLevel > 0 ? q.QuestLevel : undefined, minLevel: q.MinLevel || undefined,
+      id, title: q.Title.trim(), level: level > 0 ? level : undefined, scales: level <= 0,
+      minLevel: (e && e.minLevel > 0 ? e.minLevel : q.MinLevel) || undefined,
       races: races.expand(q.RequiredRaces & CLASSIC_RACES), classes: q.RequiredClasses || undefined,
       zoneOrSort: q.ZoneOrSort, skill: q.RequiredSkill ? `${q.RequiredSkill}:${q.RequiredSkillValue}` : undefined,
       rep: q.RequiredMinRepFaction ? `${q.RequiredMinRepFaction}:${q.RequiredMinRepValue}` : undefined,
@@ -441,7 +530,8 @@ async function main() {
     if (e.startItemId) startList.push("i" + e.startItemId);
     for (const item of itemStarts.get(id) || []) startList.push("i" + item);
     quests.set(id, {
-      id, title: e.title.trim(), level: e.level > 0 ? e.level : undefined, minLevel: e.minLevel > 0 ? e.minLevel : undefined,
+      id, title: e.title.trim(), level: e.level > 0 ? e.level : undefined, scales: Number.isInteger(e.level) && e.level <= 0,
+      minLevel: e.minLevel > 0 ? e.minLevel : undefined,
       races: races.expand(races.fromHex(String(e.raceMask || ""))), classes: undefined,
       zoneOrSort: e.zoneAreaId || (e.categoryId ? -e.categoryId : 0), poi: poiMap.has(id) ? poiMap.get(id)[0] : undefined,
       repeatable: (flags & 0x1000) !== 0 || (flags & 0x8000) !== 0, isNew: NEW.has(id), source: "forever",
@@ -553,13 +643,38 @@ async function main() {
     }
   }
 
-  // --- where the items that start quests drop
-  const starterZones = new Map(); // item -> its quests' zones (where its sources' spawns are preferred)
+  // --- objectives and rewards (EG Link's, what Forever's server says, for the quests it has; else classic-db's)
+  const xpRows = new Map(t.QuestXP.map((r) => [+r.ID, r]));
+  // (the money players got on turn-in below level 60, the most often seen; at 60 experience is paid as money)
+  const paidOf = (id) => {
+    const seen = new Map();
+    for (const r of eg.turnIns[id] || []) if (r.level < 60 && Number.isFinite(r.money)) seen.set(r.money, (seen.get(r.money) || 0) + 1);
+    return [...seen].sort((a, b) => b[1] - a[1] || a[0] - b[0]).map((x) => x[0])[0];
+  };
   for (const q of quests.values()) {
-    for (const k of q.starts) {
-      if (k[0] !== "i") continue;
-      if (!starterZones.has(+k.slice(1))) starterZones.set(+k.slice(1), new Set());
-      if (q.zone) starterZones.get(+k.slice(1)).add(q.zone);
+    const e = eg.quests[q.id], c = q.source === "classic" ? cq.get(q.id) : undefined;
+    q.objectives = objectivesOf(e, c);
+    // (an item the giver hands over to bring somewhere: classic's SrcItemId)
+    for (const o of q.objectives) if (o.kind === "i" && c && c.SrcItemId === o.id) o.provided = true;
+    q.rewards = rewardsOf(e, c, (level) => xpRows.get(level), e ? paidOf(q.id) : undefined);
+  }
+
+  // --- where the items that start quests or are collected for one drop
+  const starterZones = new Map(); // item -> its quests' zones (where its sources' spawns are preferred)
+  const addItemZone = (item, zone) => {
+    if (!starterZones.has(item)) starterZones.set(item, new Set());
+    if (zone) starterZones.get(item).add(zone);
+  };
+  let starterItems = 0;
+  for (const q of quests.values()) {
+    for (const k of q.starts) if (k[0] === "i") addItemZone(+k.slice(1), q.zone);
+  }
+  starterItems = starterZones.size;
+  for (const q of quests.values()) {
+    for (const o of q.objectives) {
+      if (o.kind !== "i") continue;
+      addItemZone(o.id, q.zone);
+      if (!actors.has("i" + o.id)) actors.set("i" + o.id, { name: itemName.get(o.id), points: [] });
     }
   }
   const dropsOf = new Map(); // item -> Map(source key -> chance 0..1)
@@ -627,13 +742,21 @@ async function main() {
     const kind = key[0], id = +key.slice(1);
     const tmpl = kind === "n" ? creatureT.get(id) : objectT.get(id);
     const egr = egNpc.get(key);
-    const name = tmpl ? (kind === "n" ? tmpl.Name : tmpl.name) : (egr && egr.name) || (kind === "n" && eg.creatures[id] && eg.creatures[id].name);
+    const name = tmpl ? (kind === "n" ? tmpl.Name : tmpl.name) : (egr && egr.name) || (kind === "n" && eg.creatures[id] && eg.creatures[id].name)
+      || (kind === "o" && eg.objects[id] && eg.objects[id].name) || undefined;
     let pts = [];
     for (const [m, x, y, z] of spawns.get(key) || []) {
       const p = places(world, m, x, y, z, prefer);
       if (p.length) pts.push(p[0]);
     }
     if (!pts.length) pts = egLootPoints.get(key) || [];
+    // (where players met Forever's own creatures)
+    if (!pts.length && kind === "n" && eg.creatures[id]) {
+      for (const pos of eg.creatures[id].positions || []) {
+        const u = world.ui.get(pos.uiMap);
+        if (u && u.type in ZONE_TYPES) pts.push([pos.uiMap, Math.round(pos.mapX * 1000), Math.round(pos.mapY * 1000)]);
+      }
+    }
     if (!pts.length && egr) {
       for (const pos of egr.positions || []) {
         const u = world.ui.get(pos.uiMap);
@@ -647,13 +770,24 @@ async function main() {
   const itemDrops = new Map(); // item -> [[key, chance 0..1]]
   for (const [item, m] of [...dropsOf].sort((a, b) => a[0] - b[0])) {
     const prefer = [...starterZones.get(item)].sort(byNumber);
+    // (with places first, then those in its quests' zones, then the likeliest)
+    const here = (s) => s.points.some((c) => prefer.includes(c.ui));
     const list = [...m].map(([key, p]) => ({ key, p, s: sourceOf(key, prefer) }))
-      .sort((a, b) => (b.s.spawns > 0) - (a.s.spawns > 0) || b.p - a.p || b.s.spawns - a.s.spawns || (a.key < b.key ? -1 : 1))
+      .sort((a, b) => (b.s.spawns > 0) - (a.s.spawns > 0) || here(b.s) - here(a.s) || b.p - a.p || b.s.spawns - a.s.spawns || (a.key < b.key ? -1 : 1))
       .slice(0, MAX_SOURCES);
     itemDrops.set(item, list.map((d) => [d.key, d.p]));
   }
   const usedSources = new Set();
   for (const list of itemDrops.values()) for (const [key] of list) usedSources.add(key);
+  // Creatures to kill and objects to use: their spawns, as drop sources' (shared with them).
+  for (const q of [...quests.values()].sort((a, b) => a.id - b.id)) {
+    for (const o of q.objectives) {
+      if (o.kind === "i") continue;
+      const key = (o.kind === "k" ? "n" : "o") + o.id;
+      sourceOf(key, q.zone ? [q.zone] : []);
+      usedSources.add(key);
+    }
+  }
 
   // --- the chains
   const prev = new Map(); // quest -> signed previous quests
@@ -780,7 +914,10 @@ async function main() {
   const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, " ");
   const ids = (list) => (list && list.length ? list.join(",") : "");
   const questLine = (q) => {
-    const flags = (q.faction === "Alliance" ? "A" : q.faction === "Horde" ? "H" : "") + (q.repeatable ? "r" : "") + (q.isNew ? "n" : "") + (q.source === "forever" ? "f" : "");
+    const flags = (q.faction === "Alliance" ? "A" : q.faction === "Horde" ? "H" : "") + (q.repeatable ? "r" : "") + (q.isNew ? "n" : "") + (q.source === "forever" ? "f" : "")
+      + (q.scales ? "s" : "");
+    const r = q.rewards || {};
+    const counted = (list) => (list || []).map(([id, n]) => (n > 1 ? `${id}:${n}` : `${id}`)).join(",");
     const f = [
       q.title ? q.title.replace(/\|/g, "/") : "", // (the first field: only "|" separates it)
       q.level || "", q.minLevel || "", q.races || "", q.classes || "",
@@ -788,6 +925,8 @@ async function main() {
       q.dungeon ? nameIndex.get(q.dungeon) : "",
       ids(q.pre), ids(q.preAny), q.preActive || "", ids(q.excl), ids(q.opens), q.breadcrumbFor && quests.has(q.breadcrumbFor) ? q.breadcrumbFor : "",
       flags, q.skill || "", q.rep || "", q.starts.join(","), q.ends.join(","),
+      (q.objectives || []).map((o) => `${o.kind}${o.id}${o.count > 1 ? ":" + o.count : ""}${o.provided ? "p" : ""}`).join(","),
+      counted(r.choice), counted(r.items), r.money || "", r.xp || "",
     ].map(String);
     while (f.length && f[f.length - 1] === "") f.pop();
     return f.join("|");
@@ -801,14 +940,19 @@ async function main() {
   const lua = [
     `-- Generated by tools/update-quest-data.js: don't edit, run the tool again. Sources: ${source}.`,
     "-- quests[id] = \"title|level|minLevel|races|classes|zone|zoneName|sort|dungeon|pre|preAny|preActive|excl|opens|",
-    "-- breadcrumbFor|flags|skill|rep|starts|ends\" (empty fields left empty, the last ones left out): races and classes",
-    "-- as bit masks; zone a uiMap; zoneName, sort, dungeon an index into names; pre, preAny, excl, opens quest IDs",
-    "-- (\",\"); flags: A/H faction, r repeatable, n new in WoW: Forever, f from Forever's data (not classic's); skill",
-    "-- \"skill line:value\", rep \"faction:min\"; starts, ends: n<NPC>, o<object>, i<item> (\",\").",
+    "-- breadcrumbFor|flags|skill|rep|starts|ends|objectives|choice|items|money|xp\" (empty fields left empty, the last",
+    "-- ones left out): races and classes as bit masks; zone a uiMap; zoneName, sort, dungeon an index into names; pre,",
+    "-- preAny, excl, opens quest IDs (\",\"); flags: A/H faction, r repeatable, n new in WoW: Forever, f from Forever's",
+    "-- data (not classic's), s its level scales to the player; skill \"skill line:value\", rep \"faction:min\"; starts,",
+    "-- ends: n<NPC>, o<object>, i<item> (\",\"); objectives k<creature to kill>, o<object to use>, i<item to collect>,",
+    "-- \":count\" when more than one, \"p\" an item the giver hands over (the creatures' and objects' places in dropNpcs,",
+    "-- dropObjects; the items' in items); choice (one of them) and items (all of them) rewards item[:count]; money in",
+    "-- copper; xp the experience at the quest's level.",
     "-- npcs[id], objects[id] = \"name|map,x,y;map,x,y/map,x,y\": places (x, y in 1/1000 of the uiMap), \"/\" alternatives",
     "-- for a place where zones' rectangles overlap (the first is the best guess); items[id] = \"name|drops\": where it",
-    "-- drops, \"n<NPC>:chance,o<object>:chance\" (hundredths of a percent, the likeliest first), the sources' places in",
-    "-- dropNpcs[id], dropObjects[id] = \"name|map,x,y,r;...\" (clusters of spawns: centre, radius r in 1/1000 of the map's",
+    "-- drops, \"n<NPC>:chance,o<object>:chance\" (hundredths of a percent, at most 3: with places, in its quests' zones,",
+    "-- the likeliest first), the sources' and the objectives' creatures' and objects' places in dropNpcs[id],",
+    "-- dropObjects[id] = \"name|map,x,y,r;...\" (clusters of spawns: centre, radius r in 1/1000 of the map's",
     "-- width, the most spawns first). npcQuests[id], objectQuests[id] = \"quests it starts|quests it ends\".",
     "-- zones[uiMap] = \"continent|minLevel|maxLevel|name|quest IDs|quests given here but listed elsewhere\";",
     "-- dungeons[names index] = \"minLevel|maxLevel|quest IDs\". races[raceID] = \"race-mask bit|A or H|name|c (classic's)\":",
@@ -889,7 +1033,9 @@ async function main() {
   console.log(`${quests.size} quests (${all.filter((q) => q.source === "classic").length} classic, ${foreverCount} Forever's), ${chained.length} in ${comps} chains, ${withGiver} with a giver on the map or an item`);
   console.log(`new in Forever: ${newOnes.length} of ${NEW.size}; with chain info ${newOnes.filter((q) => q.pre || q.preAny || q.opens).length} (EG next ${egPre}, quest lines ${linePre}, earlier quests ${beforePre}); with a giver ${newOnes.filter((q) => q.starts.length).length}, a zone ${newOnes.filter((q) => q.zone || q.dungeon).length}`);
   console.log(`${zoneQuests.size} zones, ${dungeonQuests.size} dungeons, ${actorKeys("n").length} NPCs, ${actorKeys("o").length} objects, ${actorKeys("i").length} items; ${ambiguous} places with alternatives`);
-  console.log(`items that start quests: ${starterZones.size}, ${itemDrops.size} with drop sources (${egItems.size} from EG Link), ${usedSources.size} sources (${[...usedSources].filter((k) => sources.get(k).points.length).length} with places)`);
+  const withObjectives = all.filter((q) => q.objectives.length);
+  console.log(`objectives: ${withObjectives.length} quests (${withObjectives.filter((q) => eg.quests[q.id] && Array.isArray(eg.quests[q.id].objectives)).length} EG Link's), ${all.reduce((n, q) => n + q.objectives.length, 0)} objectives; rewards: ${all.filter((q) => q.rewards.choice && q.rewards.choice.length).length} with choices, ${all.filter((q) => q.rewards.items && q.rewards.items.length).length} with items, ${all.filter((q) => q.rewards.money).length} money, ${all.filter((q) => q.rewards.xp).length} XP; levels from EG Link: ${levelsChanged} changed; scaling: ${all.filter((q) => q.scales).length}`);
+  console.log(`items that start quests: ${starterItems}, with objective items ${starterZones.size}, ${itemDrops.size} with drop sources (${egItems.size} from EG Link), ${usedSources.size} sources (${[...usedSources].filter((k) => sources.get(k).points.length).length} with places)`);
   console.log(`races with a mask: ${all.filter((q) => q.races).length} (${all.filter((q) => q.races && races.list.some((r) => !r.classic && races.has(q.races, r.bit))).length} with a new race)`);
   console.log(`no zone: ${all.filter((q) => !q.zone && !q.dungeon).length}; ${(Buffer.byteLength(lua) / 1024 / 1024).toFixed(2)} MB`);
   if (o.stats) return;

@@ -7,7 +7,8 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 -- login. Its quests are strings, read one at a time when asked for (Q.Quest) and kept; what the game
 -- teaches while playing (Learn.lua) fills the gaps (Q.AddLearned). Also Forever's playable races
 -- (Q.Races), where items that start quests drop (an item's drops), who gives and takes what
--- (Q.GiverQuests) and the quests given in a zone but listed elsewhere (Q.ZoneGiven). Without the add-on
+-- (Q.GiverQuests), the quests given in a zone but listed elsewhere (Q.ZoneGiven), a quest's objectives
+-- with where to do them (Q.Objectives), its rewards (Q.Rewards) and turn-in (Q.Ends). Without the add-on
 -- everything here answers nil or empty lists, and Q.DataProblem() says why.
 
 local DATA_ADDON = "LefthyTools_QuestData"
@@ -17,10 +18,11 @@ local db               -- the loaded data (LefthyToolsQuestData, or the test dat
 local tried, why       -- loading was tried; why the data isn't there ("MISSING", "DISABLED", ...)
 local quests = {}      -- id -> quest table (false: not in the data), read when first asked for
 local actors = { n = {}, o = {}, i = {} } -- a giver's or ender's table, shared by its quests
-local sources = { n = {}, o = {} } -- a drop source's { name, points } (dropNpcs, dropObjects), shared
+local sources = { n = {}, o = {} } -- a drop source's or objective's { kind, id, name, points } (dropNpcs, dropObjects), shared
 local roles = { n = {}, o = {} }   -- Q.GiverQuests: id -> { starts, ends } (the data's, read when asked)
 local learnedRoles = { n = {}, o = {} } -- givers and enders learned (Q.AddLearned) or of the test data: id -> { starts, ends }
 local raceList, raceById -- Q.Races()
+local objectivesOf, rewardsOf, extrasGen = {}, {}, nil -- Q.Objectives, Q.Rewards: per quest, kept per data generation
 
 -- Forever's playable races when the data doesn't say (race ID, race-mask bit, side, classic's).
 local RACES = {
@@ -133,14 +135,15 @@ local function Place(text)
 	return best
 end
 
--- A drop source's table (shared by the items it drops): { name, points = { { map, x, y, r } } }, r the
--- radius of the spawns' cluster (a share of the map's width).
+-- A drop source's table (shared by the items it drops and the objectives to kill or use it): { kind =
+-- "npc"|"object", id, name, points = { { map, x, y, r } } }, r the radius of the spawns' cluster (a
+-- share of the map's width).
 local function Source(letter, id)
 	local known = sources[letter][id]
 	if known then return known end
 	local list = db and db[letter == "n" and "dropNpcs" or "dropObjects"]
 	local text = list and list[id]
-	local source = { points = {} }
+	local source = { kind = KIND[letter], id = id, points = {} }
 	if type(text) == "string" then
 		local name, places = text:match("^([^|]*)|?(.*)$")
 		source.name = name ~= "" and name or nil
@@ -217,7 +220,7 @@ local function Parse(id, text)
 		pre = Ids(f[10]), preAny = Ids(f[11]), preActive = Num(f[12]), excl = Ids(f[13]), opens = Ids(f[14]),
 		breadcrumbFor = Num(f[15]),
 		faction = flags:find("A", 1, true) and "Alliance" or flags:find("H", 1, true) and "Horde" or nil,
-		repeatable = flags:find("r", 1, true) ~= nil, new = flags:find("n", 1, true) ~= nil,
+		repeatable = flags:find("r", 1, true) ~= nil, new = flags:find("n", 1, true) ~= nil, scales = flags:find("s", 1, true) ~= nil,
 		source = flags:find("f", 1, true) and "forever" or "classic",
 		starts = Actors(f[19]), ends = Actors(f[20]),
 	}
@@ -269,6 +272,103 @@ function Q.Quest(id)
 		quests[id] = q
 	end
 	return q or nil
+end
+
+-- ---------------------------------------------------------------- objectives, rewards, turn-in
+
+local OBJECTIVE = { k = "kill", o = "object", i = "item" }
+local NONE = {} -- (Q.Objectives' answer without any: shared, never written)
+
+-- A quest's extra fields (objectives, choice, items, money, xp: after its ends), read only when asked.
+local function Extras(id)
+	local raw = db and db.quests[id]
+	if type(raw) ~= "string" then return nil end
+	local f = Fields(raw, "|")
+	return f[21] or "", f[22] or "", f[23] or "", f[24] or "", f[25] or ""
+end
+
+local function Fresh()
+	if extrasGen ~= Q.dataGen then objectivesOf, rewardsOf, extrasGen = {}, {}, Q.dataGen end
+end
+
+-- "k6:10,i745p" -> { { kind, id, name, count, sources, provided } }
+local function ParseObjectives(text)
+	local list = {}
+	for letter, id, count, provided in text:gmatch("(%a)(%d+):?(%d*)(p?)") do
+		local kind = OBJECTIVE[letter]
+		if kind then
+			id = tonumber(id)
+			local o = { kind = kind, id = id, count = tonumber(count) or 1 }
+			if kind == "item" then
+				local item = Actor("i" .. id)
+				o.name, o.sources = item and item.name, item and item.drops or {}
+				if provided == "p" then o.provided = true end
+			else
+				local source = Source(letter == "k" and "n" or "o", id)
+				o.name, o.sources = source.name, { source }
+			end
+			list[#list + 1] = o
+		end
+	end
+	return list
+end
+
+-- What a quest asks for: { { kind = "kill"|"item"|"object", id, name, count, sources = { { kind =
+-- "npc"|"object", id, name, chance (0..100, items only), points = { { map, x, y, r } } } }, provided (an
+-- item the giver hands over) } }, empty when none. kill: the creature with its spawns' clusters; item:
+-- where it drops (at most 3, with places first, in the quest's zone, the likeliest), object: its spawns.
+-- Shared (never written by callers), kept per data generation. A test or learned quest's own objectives.
+function Q.Objectives(id)
+	id = tonumber(id)
+	if not id or not db then return NONE end
+	Fresh()
+	local list = objectivesOf[id]
+	if list then return list end
+	local raw = db.quests[id]
+	if type(raw) == "string" then
+		local ok, parsed = pcall(ParseObjectives, (Extras(id)))
+		list = ok and parsed or {}
+	else
+		local q = Q.Quest(id)
+		list = q and type(q.objectives) == "table" and q.objectives or {}
+	end
+	objectivesOf[id] = list
+	return list
+end
+
+-- "6085,9030:5" -> { { id, count } }
+local function Counted(text)
+	local list = {}
+	for item, count in text:gmatch("(%d+):?(%d*)") do list[#list + 1] = { id = tonumber(item), count = tonumber(count) or 1 } end
+	return list
+end
+
+-- What a quest gives: { choice = { { id, count } } (one of them), items = { { id, count } } (all of them),
+-- money (copper) or nil, xp (at the quest's level) or nil }, nil when nothing's known. Item IDs only
+-- (names and icons: the client's). Shared, kept per data generation. A test or learned quest's own.
+function Q.Rewards(id)
+	id = tonumber(id)
+	if not id or not db then return nil end
+	Fresh()
+	local r = rewardsOf[id]
+	if r ~= nil then return r or nil end
+	local raw = db.quests[id]
+	if type(raw) == "string" then
+		local _, choice, items, money, xp = Extras(id)
+		r = { choice = Counted(choice), items = Counted(items), money = Num(money), xp = Num(xp) }
+		if #r.choice == 0 and #r.items == 0 and not r.money and not r.xp then r = false end
+	else
+		local q = Q.Quest(id)
+		r = q and type(q.rewards) == "table" and q.rewards or false
+	end
+	rewardsOf[id] = r
+	return r or nil
+end
+
+-- Where a quest is turned in: its enders ({ kind, id, name, points }, the quest's own list: shared).
+function Q.Ends(id)
+	local q = Q.Quest(id)
+	return q and q.ends or NONE
 end
 
 -- ---------------------------------------------------------------- zones and dungeons
@@ -669,6 +769,7 @@ local function Reset()
 	sources, roles, learnedRoles = { n = {}, o = {} }, { n = {}, o = {} }, { n = {}, o = {} }
 	raceList, raceById = nil, nil
 	searchIndex = nil
+	objectivesOf, rewardsOf, extrasGen = {}, {}, nil
 end
 
 local function Use(data)

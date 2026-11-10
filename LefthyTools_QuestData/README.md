@@ -1,8 +1,9 @@
 # LefthyTools Quest Data
 
 Every quest's chain for LefthyTools' Questtree: what a quest needs first and what it leads to, its
-levels, who it's for (races, classes, faction), its zone or dungeon, and who gives and takes it and
-where they stand. It's an add-on of its own (load on demand: LefthyTools loads it the first time a
+levels, who it's for (races, classes, faction), its zone or dungeon, who gives and takes it and
+where they stand, what it asks for (creatures to kill, objects to use, items to collect, and where
+they are or drop) and what it gives (items, money, experience). It's an add-on of its own (load on demand: LefthyTools loads it the first time a
 Questtree window opens) because it's under a different license from LefthyTools.
 
 ## Where it comes from
@@ -12,15 +13,19 @@ Questtree window opens) because it's under a different license from LefthyTools.
 - [CMaNGOS Classic DB](https://github.com/cmangos/classic-db), the Full_DB dump
   `ClassicDB_1_12_1_z2815.sql.gz` (GPL v3): the classic quests, their chains, givers and enders,
   where those stand, and where the items that start quests drop (loot tables). A classic (1.12) world database: WoW: Forever is classic content with the
-  same quest IDs, but its own new quests aren't in there.
+  same quest IDs, but its own new quests aren't in there. Also the quests' objectives and rewards,
+  the spawns of the creatures and objects they need and where their items drop.
 - [EG Link's output for WoW: Forever](https://github.com/JIVESCORP/eg-link-output-wowf) (Data from
   [Efficient Games](https://efficient.games), licensed under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)): what players' games recorded on
   Forever, for its new quests: titles, levels, races, zones, the quest each one leads to, who
-  offers and takes them and where, and where its items that start quests were looted. Changed:
+  offers and takes them and where, and where its items that start quests were looted. For every quest
+  it has seen (classic's too): its levels, objectives and rewards as Forever's server gives them, the
+  money players got, and where players met Forever's own creatures. Changed:
   selected and converted to this format.
 - WoW: Forever's own client tables (the exports on [wago.tools](https://wago.tools)): zones and their
-  places on the map, areas, quest lines, items that start quests, the playable races.
+  places on the map, areas, quest lines, items that start quests, the playable races, a quest's
+  experience by its level (QuestXP). The client has no table of quest objectives.
 
 Races: a quest open to every classic race of a side is open to every race of that side (Forever's
 Skyborne too).
@@ -39,6 +44,13 @@ How the chains are read (the tool's header has the details):
 Positions are each giver's spawns put on the smallest zone map holding them. Zones' rectangles
 overlap at their borders: there the zone of the NPC's own quests is the guess, and the other zones
 come along so LefthyTools can ask the game's own map which one it is.
+
+Objectives, rewards and levels are EG Link's where it has the quest (what Forever's server says:
+Forever changed some counts, levels and rewards), else classic-db's. A creature to kill or an object
+to use comes with its spawns in up to 3 clusters; an item with up to 3 places it drops. Experience:
+the client's QuestXP row for the quest's level and XP difficulty, rounded as the game does; for a
+quest EG Link hasn't seen, classic-db's RewMoneyMaxLevel / 0.6 put on that row and rounded (none for dungeon,
+raid and PvP quests, which Forever multiplies).
 
 Format: see the comment at the top of `QuestData.lua`.
 

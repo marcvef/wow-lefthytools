@@ -36,16 +36,25 @@ load in doesn't matter for the table.
   comes from): `quest_template`, `creature_`/`gameobject_questrelation` (givers),
   `..._involvedrelation` (enders), `item_template.startquest`, the spawns (`creature`,
   `creature_spawn_entry`, `gameobject`), the templates' names, factions and loot IDs, and
-  `creature_`/`gameobject_`/`reference_loot_template` (where items that start quests drop).
+  `creature_`/`gameobject_`/`reference_loot_template` (where items that start quests or are collected
+  for one drop), and `quest_template`'s objectives (`ReqCreatureOrGOId1-4`/`Count`, `ReqItemId1-4`/
+  `Count`, `SrcItemId`) and rewards (`RewChoiceItemId1-6`/`Count`, `RewItemId1-4`/`Count`,
+  `RewOrReqMoney` above 0, `RewMoneyMaxLevel` for the experience).
 - **Forever's new quests: EG Link** (`github.com/JIVESCORP/eg-link-output-wowf`, CC BY 4.0: "Data
   from Efficient Games (https://efficient.games), licensed under CC BY 4.0"): `quests.enUS`
   (title, levels, race mask, zone, `nextQuestId`, `startItemId`), `npcs` (who offers and takes each
   quest, their uiMap positions, their side), `quest_prerequisites` (what every character seen
   taking a quest had done before: `before`, `characters`), `loot` (what players looted from which
-  NPC or object, and where) and `creatures` (names). The commit used is in `source`.
+  NPC or object, and where), `creatures` (names, where players met them), `object_details` (objects'
+  names), and for every quest it has seen (classic's too) its `objectives` (type, ID, amount, storage
+  index), `rewards` (choices, items, money, XP difficulty and multiplier) and `turn_ins` (the money
+  players got). The commit used is in `source`.
 - **Forever's client tables** (wago.tools): UiMap, UiMapAssignment, AreaTable, Map, QuestSort,
   FactionTemplate, QuestV2, QuestLineXQuest, ItemSparse (StartQuestID, item names), QuestPOIBlob,
-  ChrRaces (the playable races, their race-mask bits and sides).
+  ChrRaces (the playable races, their race-mask bits and sides), QuestXP (a quest's experience by its
+  level and XP difficulty). Forever's client has no QuestObjective table (wago.tools: "Table not
+  found" for 1.60.1.70862 and 70888, the locale exports too): objectives come from EG Link and
+  classic-db.
 - `Data/ForeverQuests.lua`: which quests are new in Forever (the `new` flag).
 
 Not used: Wowhead and anything taken from Questie (the project's rule), and ForeverCore's sniffs
@@ -101,6 +110,28 @@ file, and it credits Questie for quest data).
   and clustered: a spawn within 7% of the map's width of a cluster's centre (heights counted 1.5
   times, a zone map being 3:2) joins it; the 3 clusters with the most spawns, each a centre and a
   radius (its farthest spawn plus 1%, 1.5% to 15%).
+- **Objectives:** EG Link's for a quest it has (Forever's server's: it changed some of classic's
+  counts, Thistlefur's 8 to 12), in its storage order, only `monster` (kill), `gameObject` (use or
+  loot) and `item` (collect) ones; else classic-db's: `ReqCreatureOrGOId` (above 0 a creature, below
+  0 an object) then `ReqItemId`, with their counts. Forever's own quests EG Link hasn't described
+  have none. An item that is the quest's `SrcItemId` is handed over by the giver (`provided`). The
+  places: a creature's or object's spawns (else where players met it, EG Link's `creatures`, else its
+  NPC record's positions) in clusters as for drops (put on the quest's zone where rectangles
+  overlap), shared with the drop sources; an item's sources as for items that start quests, with
+  places first, then in its quests' zones, then the likeliest. Not kept: area triggers, talking to
+  someone, criteria (Forever's scenario steps) and spells.
+- **Rewards:** EG Link's for a quest it has (Forever added a choice to many classic quests, Hogger's
+  270000), else classic-db's: choices, items (with counts), money (EG Link's; when it has none, what
+  players got on turn-in below level 60, the most often seen; else classic-db's `RewOrReqMoney`).
+  **Experience:** EG Link's quests: the QuestXP row of its level at `xpDifficulty`, times
+  `xpMultiplier`, floored, then the game's rounding (to 5 up to 100, 10 up to 500, 25 up to 1000,
+  else 50): 425 of 482 turn-ins seen got exactly that, the other 57 exactly 3% more (a bonus).
+  Classic-db's: `RewMoneyMaxLevel / 0.6` put on the nearest value of its level's QuestXP row (within
+  5%), rounded the same way: 97% of the quests both have get Forever's value; none for dungeon, raid and PvP quests
+  (`Type` 81, 62, 41: Forever multiplies those).
+- **Levels:** EG Link's level and minimum level for a quest it has (Forever changed 95 of classic's:
+  Grove of the Ancients 11 to 17), else classic-db's. A level of -1 or 0 scales to the player: flag
+  `s`, no level.
 - **Who gives what:** each NPC's and object's quests it starts and ends (`npcQuests`,
   `objectQuests`), and per zone the quests given there (a giver's first place) that are listed
   elsewhere: a dungeon's quests at its town, another zone's.
@@ -111,8 +142,13 @@ file, and it credits Questie for quest data).
 Numbers (Forever 1.60.1.70862, EG Link 9fcae73): 5257 quests (4031 classic, 1226 Forever's), 3473
 of them in 784 chains, 4312 with a giver on the map or an item; of the 1817 new quests 1213 are in
 it, 415 with chain info, 492 with a giver, 808 with a zone; 50 zones, 35 dungeons, 1667 NPCs, 239
-objects, 599 items (104 with drop sources, 7 of them from EG Link; 143 sources, 108 with places);
-3372 quests with a race mask, 3010 of them with a Skyborne bit; 0.63 MB.
+objects, 3434 items (599 start quests; 1602 with drop sources, 45 of them from EG Link; 2830
+sources of drops and objectives, 2070 with places); 3786 quests with objectives (5699, 2556 quests'
+from EG Link), 727 with a choice of rewards, 1266 with reward items, 1058 with money, 4016 with
+experience; 95 quests with Forever's levels instead of classic's, 12 that scale; 3372 quests with a
+race mask, 3010 of them with a Skyborne bit; 0.98 MB (0.63 MB before objectives and rewards).
+Forever's own quests' objectives mostly have no places (1064 of 1212: its new items' drops and
+creatures aren't in classic-db, and EG Link's loot has no quest items).
 
 ### Format
 
@@ -124,18 +160,23 @@ LefthyToolsQuestData = {
   zones = { [uiMap] = "continent|minLevel|maxLevel|name|quest IDs|given here, listed elsewhere" },
   dungeons = { [names index] = "minLevel|maxLevel|quest IDs" },
   npcs = { [id] = "name|map,x,y;map,x,y/map,x,y" }, objects = (the same),
-  items = { [id] = "name|n<NPC>:chance,o<object>:chance" },  -- where it drops, 1/100 %
-  dropNpcs = { [id] = "name|map,x,y,r;..." }, dropObjects = (the same), -- drop sources' clusters
+  items = { [id] = "name|n<NPC>:chance,o<object>:chance" },  -- where it drops, 1/100 %: starters, objectives
+  dropNpcs = { [id] = "name|map,x,y,r;..." }, dropObjects = (the same), -- drop sources' and objectives' clusters
   npcQuests = { [id] = "quests it starts|quests it ends" }, objectQuests = (the same),
   quests = { [id] = "title|level|minLevel|races|classes|zone|zoneName|sort|dungeon|pre|preAny|
-                     preActive|excl|opens|breadcrumbFor|flags|skill|rep|starts|ends" },
+                     preActive|excl|opens|breadcrumbFor|flags|skill|rep|starts|ends|
+                     objectives|choice|items|money|xp" },
 }
 ```
 
 x, y in thousandths, r (a cluster's radius) in thousandths of the map's width; `/` separates a
 place's alternatives; races a number (bit b = 2^b); quest IDs with `,`; flags: `A`/`H`
-faction, `r` repeatable, `n` new in Forever, `f` from Forever's data; skill `line:value`, rep
-`faction:min`; starts and ends `n<NPC>`, `o<object>`, `i<item>`. A zone's quests are in level order;
+faction, `r` repeatable, `n` new in Forever, `f` from Forever's data, `s` its level scales to the
+player; skill `line:value`, rep `faction:min`; starts and ends `n<NPC>`, `o<object>`, `i<item>`;
+objectives `k<creature>`, `o<object>`, `i<item>` with `:count` when more than one and `p` for an
+item the giver hands over (`k6:10,i745p`); choice and items `item[:count]`; money in copper; xp the
+experience at the quest's level. The last five fields are read only by `Q.Objectives` and
+`Q.Rewards`. A zone's quests are in level order;
 a zone's levels are its own quests' (not class or profession quests) without the lowest and highest
 tenth (a city's level-60 quests). Strings, so loading is quick and only the quests asked for are
 read.
@@ -150,7 +191,8 @@ read.
   never write into it):
   `{ id, title, level, minLevel, races, classes, faction, zone, zoneName, sort, dungeon, skill = { id,
   value }, rep = { faction, min }, pre, preAny, preActive, excl, opens, breadcrumbFor, repeatable,
-  starts, ends, source = "classic"|"forever"|"learned", new }`. The lists are always tables (maybe
+  starts, ends, source = "classic"|"forever"|"learned", new, scales }` (`scales`: its level is the
+  player's, `level` nil). The lists are always tables (maybe
   empty). `starts`/`ends`: `{ kind = "npc"|"object"|"item", id, name, points = { { map, x, y } } }`,
   one table per NPC shared by all its quests. An item's (`kind = "item"`, no points) has `drops`:
   `{ { kind = "npc"|"object", id, name, chance (0..100), points = { { map, x, y, r } } } }`, the
@@ -159,6 +201,20 @@ read.
   of that source. `zoneName`: the area's name, else the zone's, the dungeon's or the sort's. The
   title is English: the UI prefers `C_QuestLog.GetTitleForQuestID`. `races`: the mask with the race
   rule applied (Data, The rules); `Q.RaceAllowed` (Engine) reads it.
+- `Q.Objectives(id)`: what the quest asks for, `{ { kind = "kill"|"item"|"object", id, name, count,
+  sources = { { kind = "npc"|"object", id, name, chance (0..100, items only), points = { { map, x,
+  y, r } } } }, provided } }`, empty when none (a shared empty table without data). kill: the creature
+  itself with its spawn clusters; item: where it drops (the item's `drops`, shared with a starter's:
+  at most 3, up to 3 clusters each), `provided` when the giver hands it over (then no sources); object:
+  the object's spawn clusters. Names are the data's English ones (the UI can ask the client). The
+  source tables (`kind`, `id`, `name`, `points`) are shared with the drops. Read from the quest's
+  string the first time it's asked and kept until the data changes (`Q.dataGen`); a test or learned
+  quest's own `objectives` list.
+- `Q.Rewards(id)`: `{ choice = { { id, count } }, items = { { id, count } }, money = copper or nil, xp
+  = number or nil }` or nil when nothing's known; item IDs only (names and icons: `GetItemInfo` /
+  `C_Item`, async). Kept like the objectives; a test or learned quest's own `rewards`.
+- `Q.Ends(id)`: where it's turned in, the quest's `ends` (`{ kind, id, name, points }`, shared; an
+  empty shared table for an unknown quest).
 - `Q.Zones()`: `{ map, name, continent, minLevel, maxLevel, count }` by continent, then level.
   `Q.Dungeons()`: `{ name, minLevel, maxLevel, count }` by level. `Q.ZoneQuests(map)`,
   `Q.DungeonQuests(name)`: quest IDs, the lowest level first. `Q.ZoneGiven(map)`: quests given in
@@ -184,7 +240,8 @@ read.
   ID; `source` defaults to `"classic"`) and zones (`{ { map, name, continent [, minLevel, maxLevel]
   } }`; levels and counts from the quests when not given; dungeons from the quests' `dungeon`). What
   a quest needs leads to it (`opens`) without saying so; `Q.GiverQuests` answers from the quests'
-  `starts` and `ends`; an item's `drops` as given; `Q.Races()` the known ten; `Q.ZoneGiven` empty.
+  `starts` and `ends`; an item's `drops` as given; `objectives` and `rewards` (as `Q.Objectives` and
+  `Q.Rewards` answer) as given; `Q.Races()` the known ten; `Q.ZoneGiven` empty.
   Learned data and caches go; the callbacks run at once.
 
 ## Engine
