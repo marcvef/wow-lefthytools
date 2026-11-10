@@ -3,7 +3,9 @@
 -- through the accessors: quests, givers and their places, zones, dungeons, search; real chains (Elwynn
 -- Forest's Northshire, Westfall's Defias Brotherhood, a Forever chain); where a quest stands with a
 -- made-up progress (done, in the log, locked, too low, not for me), what's missing across zones,
--- exclusive groups, what's next; learned data filling gaps only; the test hook Q.SetTestData.
+-- exclusive groups, what's next; Forever's races (the Skyborne) and the race rule, item starters'
+-- drops, who gives what, zone counts over every level, chain steps, what's available nearby, quest
+-- difficulty colours; learned data filling gaps only; the test hook Q.SetTestData.
 -- Needs: no other file.
 
 local suite = ...
@@ -79,7 +81,8 @@ do
 	check(hogger and hogger.title == 'Wanted:  "Hogger"' and hogger.level == 11 and hogger.minLevel == 5 and hogger.zone == 1429
 		and hogger.zoneName == "Elwynn Forest" and hogger.faction == "Alliance" and hogger.source == "classic" and not hogger.new,
 		"Wanted: Hogger: its title, levels, zone, faction (learned title not taken)")
-	check(hogger.races == 77 and hogger.classes == nil and hogger.repeatable == false, "races as a mask (the Alliance's), no class")
+	check(hogger.races == 77 + 2 ^ 32 and hogger.classes == nil and hogger.repeatable == false,
+		"races as a mask (the Alliance's: classic's four and the High Order Skyborne), no class")
 	local poster = hogger.starts[1]
 	check(#hogger.starts == 2 and poster.kind == "object" and poster.name and #hogger.ends == 1, "given by the wanted posters (objects), the learned giver not added")
 	local dughan = hogger.ends[1]
@@ -139,6 +142,49 @@ do
 	check(hits[1] == 176 or (has(hits, 176) and at(hits, 176) <= 3), "search: by title")
 	check(has(Q.Search("Marshal Dughan"), 54) and has(Q.Search("  DUGHAN "), 176), "search: by giver or ender, any case")
 	check(#Q.Search("") == 0 and #Q.Search("zzqqxx") == 0, "nothing for nothing")
+end
+
+section("Questtree data: races, item drops, who gives what")
+do
+	local races, byId = Q.Races(), {}
+	for _, r in ipairs(races) do byId[r.id] = r end
+	check(#races == 10 and byId[1].bit == 0 and byId[1].classic and byId[8].faction == "Horde"
+		and byId[95].bit == 32 and byId[95].faction == "Alliance" and not byId[95].classic and byId[95].name == "High Order Skyborne"
+		and byId[96].bit == 33 and byId[96].faction == "Horde" and byId[96].name == "Windshaper Skyborne" and Q.RaceInfo(96) == byId[96],
+		"Forever's ten playable races: classic's eight and both Skyborne (their mask bits, sides)")
+	check(Q.Quest(784).races == 178 + 2 ^ 33 and Q.Quest(363).races == 16 and Q.Quest(98340).races == 32 + 2 ^ 33
+		and Q.Quest(92598).races == 2 ^ 33, "masks: all of the Horde's classic races widened, one race's kept, Forever's own as recorded")
+	check(Q.RaceAllowed(176, 95) and not Q.RaceAllowed(176, 96) and Q.RaceAllowed(784, 96) and not Q.RaceAllowed(363, 96)
+		and Q.RaceAllowed(363, 5) and not Q.RaceAllowed(92598, 2) and Q.RaceAllowed(92598, 96) and Q.RaceAllowed(176, 12345)
+		and Q.RaceAllowed(7, 1), "Q.RaceAllowed by the data's masks (a race the data doesn't know: yes)")
+
+	-- An item that starts a quest: where it drops.
+	local schedule = Q.Quest(123).starts[1]
+	local first = schedule.drops and schedule.drops[1]
+	check(schedule.kind == "item" and schedule.id == 1307 and #schedule.points == 0 and first and first.kind == "npc" and first.id == 100
+		and first.name == "Gruff Swiftbite" and suite.near(first.chance, 80, 0.01) and #schedule.drops <= 3,
+		"The Collector's Gold Pickup Schedule drops from Gruff Swiftbite (80%), the likeliest first")
+	local spot = first.points[1]
+	check(spot and spot.map == 1429 and spot.x > 0.2 and spot.x < 0.35 and spot.y > 0.8 and spot.r > 0 and spot.r <= 0.15,
+		"its spawns as a cluster: centre and radius on Elwynn Forest's map")
+	local riverpaw
+	for _, d in ipairs(schedule.drops) do if d.id == 478 then riverpaw = d end end
+	check(riverpaw and riverpaw.chance < first.chance and #riverpaw.points >= 1, "the other sources, less likely")
+	local writ
+	for _, a in ipairs(Q.Quest(96294).starts) do if a.id == 273658 then writ = a end end
+	check(writ and writ.drops[1] and writ.drops[1].id == 264082 and writ.drops[1].name == "Broodmother Valraxx" and writ.drops[1].points[1],
+		"a Forever item: where players looted it (EG Link)")
+	check(#Q.Quest(176).starts[1].points > 0 and Q.Quest(176).starts[1].drops == nil, "givers that aren't items have no drops")
+
+	-- Who starts and ends what (tooltips).
+	local starts, ends = Q.GiverQuests(240)
+	check(has(ends, 176) and has(ends, 54) and #starts > 0 and Q.GiverQuests(240) == starts, "Marshal Dughan: what he gives and takes")
+	local poster = Q.Quest(176).starts[1]
+	check(has((Q.GiverQuests(poster.id, "object")), 176) and #Q.GiverQuests(999999999) == 0, "a wanted poster (an object); nobody: nothing")
+	Q.AddLearned(999003, { title = "Learned At Dughan", zone = 1429, level = 8, starts = { { kind = "npc", id = 240, name = "Marshal Dughan" } } })
+	check(has((Q.GiverQuests(240)), 999003), "a learned quest at him: there too")
+	check(has(Q.ZoneGiven(1436), 166) and not has(Q.ZoneQuests(1436), 166) and #Q.ZoneGiven(999) == 0,
+		"Westfall: the Deadmines' quests given there, listed under the dungeon")
 end
 
 section("Questtree engine: Northshire with a made-up progress")
@@ -240,6 +286,105 @@ do
 	check(#friends == 2 and friends[1].name == "Anna" and friends[2].status == "done", "friends' status of a quest")
 	Q.friends = nil
 	check(#Q.Friends(176) == 0, "no friends known: none")
+end
+
+section("Questtree engine: a Skyborne, zone counts, chain steps, nearby, colours")
+do
+	-- I'm a Windshaper Skyborne (Horde): every quest for all of the Horde is mine.
+	local race, side = UnitRace, UnitFactionGroup
+	UnitRace = function(unit) if unit == "player" then return "Windshaper Skyborne", "Skyborne", 96 end end
+	UnitFactionGroup = function(unit) if unit == "player" then return "Horde", "Horde" end end
+	login({})
+	check(Q.Status(784) ~= "other" and Q.Status(92598) ~= "other" and Q.Status(98340) ~= "other", "Skyborne: the Horde's quests, Skyborne ones, a Tauren-and-Skyborne one")
+	check(Q.Status(363) == "other" and Q.Status(176) == "other" and Q.RaceAllowed(784) and not Q.RaceAllowed(363), "not an Undead's or the Alliance's")
+	UnitRace = function(unit) if unit == "player" then return "Skyborne", "Skyborne" end end
+	login({})
+	check(Q.Status(784) ~= "other" and Q.Status(363) == "other", "the race's file and my side are enough")
+	UnitRace, UnitFactionGroup = race, side
+	login({})
+	check(Q.Status(784) == "other" and Q.Status(176) ~= "other", "a human again")
+	local friend = { name = "Sky", classFile = "SHAMAN", race = "Windshaper Skyborne", faction = "Horde", level = 20, done = {}, active = {} }
+	local other = { name = "Lin", classFile = "MAGE", raceFile = "Skyborne", faction = "Alliance", level = 20, done = {}, active = {} }
+	check(Q.Status(784, friend) ~= "other" and Q.Status(363, friend) == "other" and Q.Status(176, other) ~= "other" and Q.Status(784, other) == "other",
+		"friends: a race by its name (Battle.net's), the Skyborne by file and side")
+	-- The engine widens a classic mask itself (data made before the rule, learned quests).
+	local hordeOnly, orcsOnly = { races = 178 }, { races = 2 }
+	check(Q.RaceAllowed(hordeOnly, 96) and not Q.RaceAllowed(hordeOnly, 95) and not Q.RaceAllowed(orcsOnly, 96) and Q.RaceAllowed(orcsOnly, 2)
+		and Q.RaceAllowed({}, 96), "the rule in the engine too")
+
+	-- X of N: every level, only "not for me" left out.
+	PLAYER_LEVEL = 19
+	Fire("PLAYER_LEVEL_UP", 19)
+	login({})
+	local function count(map)
+		local n = 0
+		for _, id in ipairs(Q.ZoneQuests(map)) do
+			local s = Q.Status(id)
+			if s and s ~= "other" then n = n + 1 end
+		end
+		return n
+	end
+	local done, total = Q.ZoneCount(1429)
+	check(done == 0 and total == count(1429) and total < #Q.ZoneQuests(1429) and total > 80, "Elwynn Forest: " .. tostring(total) .. " for me")
+	local status, asked = Q.Status, 0
+	Q.Status = function(...) asked = asked + 1; return status(...) end
+	for _ = 1, 20 do Q.ZoneCount(1429); Q.Available(1429); Q.Available(1429, 0.5, 0.5) end
+	local asks = asked
+	for _ = 1, 20 do Q.ZoneCount(1429); Q.Available(1429, 0.5, 0.5) end
+	Q.Status = status
+	check(asked == asks, "kept: asked again, nothing worked out again")
+	login({ 783, 7, 176 })
+	done, total = Q.ZoneCount(1429)
+	check(done == 3 and total == count(1429), "low ones done count too")
+	local dd, dt = Q.ZoneCount("Deadmines")
+	check(dd == 0 and dt >= 5 and Q.ZoneCount(nil) == 0, "a dungeon by its name")
+	login({})
+
+	-- Which step.
+	local s783, total783, title = Q.ChainStep(783)
+	local s54, total54 = Q.ChainStep(54)
+	check(s783 == 1 and title == Q.Quest(Q.Chain(54)[1]).title and s54 >= 5 and select(1, Q.ChainStep(21)) == s54 - 1
+		and total54 == total783 and total54 >= s54, "Report to Goldshire: step " .. tostring(s54) .. " of " .. tostring(total54) .. " (" .. tostring(title) .. ")")
+	check(select(2, Q.ChainStep(3100)) >= 1 and Q.ChainStep(999999999) == nil, "steps of a branch; unknown: nil")
+
+	-- Nearby: what I can take now, the nearest giver first.
+	PLAYER_LEVEL = 10
+	Fire("PLAYER_LEVEL_UP", 10)
+	local here = Q.Available(1429)
+	check(has(here, 783) and not has(here, 7) and not has(here, 123) and Q.Status(123) == "available", "Elwynn: available ones; not locked ones, not an item's")
+	local all = true
+	for _, id in ipairs(here) do if Q.Status(id) ~= "available" then all = false end end
+	check(all and Q.Available(1429) == here, "only available ones; kept")
+	local willem = Q.Quest(783).starts[1].points[1]
+	local near = Q.Available(1429, willem.x, willem.y)
+	check(Q.IsTrivial(783) and at(near, 783) > #near - 12 and not Q.IsTrivial(near[1]), "grey ones last, even right by their giver")
+	PLAYER_LEVEL = 1
+	Fire("PLAYER_LEVEL_UP", 1)
+	near = Q.Available(1429, willem.x, willem.y)
+	local here1 = Q.Available(1429)
+	check(near[1] == 783 and #near == #here1, "by Deputy Willem: his quest first")
+	local far = Q.Available(1429, 0.1, 0.9)
+	check(far[1] ~= near[1] and #far == #here1, "elsewhere: another first")
+	check(has(Q.Available(1436), 166) == (Q.Status(166) == "available"), "Westfall: the Deadmines' quests given there too")
+	check(#Q.Available(nil) == 0, "no map: none")
+
+	-- Colours as the game's quest difficulty.
+	PLAYER_LEVEL = 20
+	Fire("PLAYER_LEVEL_UP", 20)
+	check(Q.LevelColor(25).key == "impossible" and Q.LevelColor(23).key == "difficult" and Q.LevelColor(22).key == "fair"
+		and Q.LevelColor(18).key == "fair" and Q.LevelColor(17).key == "easy" and Q.LevelColor(14).key == "easy"
+		and Q.LevelColor(13).key == "trivial" and Q.LevelColor(nil).key == "fair", "by level: red, orange, yellow, green, grey (13 is grey at 20)")
+	check(Q.LevelColor(25).hex == "ffff1a1a" and Q.LevelColor(23).hex == "ffff8040" and Q.LevelColor(13).r == 0.5, "the game's colours")
+	check(Q.IsTrivial(783) and not Q.IsTrivial(166) and Q.Difficulty(166) == "fair" and Q.Difficulty(999999999) == nil,
+		"a level-1 quest is grey at 20, the Defias Brotherhood (22) yellow")
+	local enum = Enum.RelativeContentDifficulty
+	Enum.RelativeContentDifficulty = { Trivial = 0, Easy = 1, Fair = 2, Difficult = 3, Impossible = 4 }
+	C_PlayerInfo.GetContentDifficultyQuestForPlayer = function(id) return id == 783 and 4 or nil end
+	check(Q.LevelColor(1, 783).key == "impossible" and Q.LevelColor(1, 7).key == "trivial" and Q.Difficulty(783) == "impossible",
+		"the client's own difficulty first, when it answers")
+	C_PlayerInfo.GetContentDifficultyQuestForPlayer, Enum.RelativeContentDifficulty = nil, enum
+	PLAYER_LEVEL = 19
+	Fire("PLAYER_LEVEL_UP", 19)
 end
 
 section("Questtree data: learned data fills gaps")

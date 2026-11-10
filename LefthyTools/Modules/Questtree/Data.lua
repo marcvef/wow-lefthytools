@@ -5,8 +5,10 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 -- like its source, CMaNGOS Classic DB, with EG Link's Forever data, CC BY 4.0), made by
 -- tools/update-quest-data.js and loaded the first time a Questtree window asks (Q.Load), never at
 -- login. Its quests are strings, read one at a time when asked for (Q.Quest) and kept; what the game
--- teaches while playing (Learn.lua) fills the gaps (Q.AddLearned). Without the add-on everything
--- here answers nil or empty lists, and Q.DataProblem() says why.
+-- teaches while playing (Learn.lua) fills the gaps (Q.AddLearned). Also Forever's playable races
+-- (Q.Races), where items that start quests drop (an item's drops), who gives and takes what
+-- (Q.GiverQuests) and the quests given in a zone but listed elsewhere (Q.ZoneGiven). Without the add-on
+-- everything here answers nil or empty lists, and Q.DataProblem() says why.
 
 local DATA_ADDON = "LefthyTools_QuestData"
 local KIND = { n = "npc", o = "object", i = "item" }
@@ -15,6 +17,17 @@ local db               -- the loaded data (LefthyToolsQuestData, or the test dat
 local tried, why       -- loading was tried; why the data isn't there ("MISSING", "DISABLED", ...)
 local quests = {}      -- id -> quest table (false: not in the data), read when first asked for
 local actors = { n = {}, o = {}, i = {} } -- a giver's or ender's table, shared by its quests
+local sources = { n = {}, o = {} } -- a drop source's { name, points } (dropNpcs, dropObjects), shared
+local roles = { n = {}, o = {} }   -- Q.GiverQuests: id -> { starts, ends } (the data's, read when asked)
+local learnedRoles = { n = {}, o = {} } -- givers and enders learned (Q.AddLearned) or of the test data: id -> { starts, ends }
+local raceList, raceById -- Q.Races()
+
+-- Forever's playable races when the data doesn't say (race ID, race-mask bit, side, classic's).
+local RACES = {
+	{ 1, 0, "Alliance", "Human" }, { 2, 1, "Horde", "Orc" }, { 3, 2, "Alliance", "Dwarf" }, { 4, 3, "Alliance", "Night Elf" },
+	{ 5, 4, "Horde", "Undead" }, { 6, 5, "Horde", "Tauren" }, { 7, 6, "Alliance", "Gnome" }, { 8, 7, "Horde", "Troll" },
+	{ 95, 32, "Alliance", "High Order Skyborne" }, { 96, 33, "Horde", "Windshaper Skyborne" },
+}
 local zoneList, zoneById, dungeonList, dungeonByName -- Q.Zones(), Q.Dungeons() and their quests
 local searchIndex      -- { { id, text } } for Q.Search, made by the first search after a change
 local pending = {}     -- Q.AddLearned before the data was loaded: { id, fields }
@@ -120,7 +133,41 @@ local function Place(text)
 	return best
 end
 
--- A giver's or ender's table: { kind = "npc"|"object"|"item", id, name, points = { { map, x, y } } }.
+-- A drop source's table (shared by the items it drops): { name, points = { { map, x, y, r } } }, r the
+-- radius of the spawns' cluster (a share of the map's width).
+local function Source(letter, id)
+	local known = sources[letter][id]
+	if known then return known end
+	local list = db and db[letter == "n" and "dropNpcs" or "dropObjects"]
+	local text = list and list[id]
+	local source = { points = {} }
+	if type(text) == "string" then
+		local name, places = text:match("^([^|]*)|?(.*)$")
+		source.name = name ~= "" and name or nil
+		for m, x, y, r in (places or ""):gmatch("(%d+),(%d+),(%d+),(%d+)") do
+			source.points[#source.points + 1] = { map = tonumber(m), x = tonumber(x) / 1000, y = tonumber(y) / 1000, r = tonumber(r) / 1000 }
+		end
+	end
+	sources[letter][id] = source
+	return source
+end
+
+-- An item's drops ("n123:4500,o45:100", hundredths of a percent): { { kind, id, name, chance (0..100),
+-- points } }, the likeliest first.
+local function Drops(text)
+	local list = {}
+	for letter, id, chance in (text or ""):gmatch("(%a)(%d+):(%d+)") do
+		if letter == "n" or letter == "o" then
+			id = tonumber(id)
+			local source = Source(letter, id)
+			list[#list + 1] = { kind = KIND[letter], id = id, name = source.name, chance = tonumber(chance) / 100, points = source.points }
+		end
+	end
+	return list
+end
+
+-- A giver's or ender's table: { kind = "npc"|"object"|"item", id, name, points = { { map, x, y } } }; an
+-- item's has drops (where it drops: Drops) and no points.
 local function Actor(key)
 	local letter, id = key:match("^(%a)(%d+)$")
 	if not KIND[letter] then return nil end
@@ -130,11 +177,14 @@ local function Actor(key)
 	local text = db and db[KIND[letter] == "npc" and "npcs" or KIND[letter] == "object" and "objects" or "items"]
 	text = text and text[id]
 	local actor = { kind = KIND[letter], id = id, points = {} }
+	if letter == "i" then actor.drops = {} end
 	if type(text) == "string" then
-		local name, places = text:match("^([^|]*)|?(.*)$")
+		local name, rest = text:match("^([^|]*)|?(.*)$")
 		actor.name = name ~= "" and name or nil
-		if places and places ~= "" then
-			for place in places:gmatch("[^;]+") do actor.points[#actor.points + 1] = Place(place) end
+		if letter == "i" then
+			actor.drops = Drops(rest)
+		elseif rest and rest ~= "" then
+			for place in rest:gmatch("[^;]+") do actor.points[#actor.points + 1] = Place(place) end
 		end
 	end
 	actors[letter][id] = actor
@@ -242,10 +292,11 @@ local function BuildIndex()
 		local entry
 		if type(text) == "string" then
 			local f = Fields(text, "|")
-			entry = { map = map, continent = Num(f[1]), minLevel = Num(f[2]) or 0, maxLevel = Num(f[3]) or 0, name = f[4], quests = Ids(f[5]) }
+			entry = { map = map, continent = Num(f[1]), minLevel = Num(f[2]) or 0, maxLevel = Num(f[3]) or 0, name = f[4], quests = Ids(f[5]),
+				given = Ids(f[6]) }
 		elseif type(text) == "table" then
 			entry = { map = map, continent = text.continent, minLevel = text.minLevel or 0, maxLevel = text.maxLevel or 0, name = text.name,
-				quests = {} }
+				quests = {}, given = {} }
 			for i, id in ipairs(text.quests or {}) do entry.quests[i] = id end
 		end
 		if entry then
@@ -290,7 +341,7 @@ local function BuildTestIndex(list, zones)
 		if q.zone then
 			local entry = zoneById[q.zone]
 			if not entry then
-				entry = { map = q.zone, name = q.zoneName or tostring(q.zone), minLevel = 0, maxLevel = 0, quests = {}, count = 0 }
+				entry = { map = q.zone, name = q.zoneName or tostring(q.zone), minLevel = 0, maxLevel = 0, quests = {}, given = {}, count = 0 }
 				zoneById[q.zone] = entry
 				zoneList[#zoneList + 1] = entry
 			end
@@ -329,13 +380,90 @@ function Q.DungeonQuests(name)
 	return entry and entry.quests or {}
 end
 
+-- Quests given in a zone (a giver stands there) that are listed elsewhere: a dungeon's quests at its
+-- town, another zone's. Shared, never written by callers.
+function Q.ZoneGiven(map)
+	local entry = zoneById and zoneById[tonumber(map) or map]
+	return entry and entry.given or {}
+end
+
+-- ---------------------------------------------------------------- races
+
+-- Forever's playable races: { { id, bit, faction, name, classic } } (bit: the race mask's, 0 = the
+-- lowest), the data's or, without it, the ones known when this was written.
+function Q.Races()
+	if raceList then return raceList end
+	local list = {}
+	if db and type(db.races) == "table" then
+		for id, text in pairs(db.races) do
+			local f = type(text) == "string" and Fields(text, "|")
+			if f and Num(f[1]) then
+				list[#list + 1] = { id = id, bit = Num(f[1]), faction = f[2] == "A" and "Alliance" or f[2] == "H" and "Horde" or nil,
+					name = f[3] ~= "" and f[3] or nil, classic = f[4] == "c" }
+			end
+		end
+	end
+	if #list == 0 then
+		for i, r in ipairs(RACES) do list[i] = { id = r[1], bit = r[2], faction = r[3], name = r[4], classic = r[1] <= 8 } end
+	end
+	table.sort(list, function(a, b) return a.id < b.id end)
+	raceList, raceById = list, {}
+	for _, r in ipairs(list) do raceById[r.id] = r end
+	return list
+end
+
+-- A race's entry of Q.Races() by its ID, nil if it isn't a playable race.
+function Q.RaceInfo(id)
+	if not raceList then Q.Races() end
+	return raceById[tonumber(id) or id]
+end
+
+-- ---------------------------------------------------------------- who gives and takes what
+
+local function AddRole(letter, id, quest, which)
+	local list = learnedRoles[letter]
+	list[id] = list[id] or { starts = {}, ends = {} }
+	local into = list[id][which]
+	for _, v in ipairs(into) do if v == quest then return end end
+	into[#into + 1] = quest
+end
+
+-- The quests an NPC (kind "npc", the default) or object ("object") starts and ends: two lists of quest
+-- IDs (shared, never written by callers; empty without data). For tooltips: cheap, no quest is read.
+function Q.GiverQuests(id, kind)
+	id = tonumber(id)
+	local letter = kind == "object" and "o" or "n"
+	if not id or not db then return {}, {} end
+	local known = roles[letter][id]
+	if known and known.gen == Q.dataGen then return known.starts, known.ends end
+	local entry = { gen = Q.dataGen, starts = {}, ends = {} }
+	local list = db[letter == "n" and "npcQuests" or "objectQuests"]
+	local text = type(list) == "table" and list[id]
+	if type(text) == "string" then
+		local s, e = text:match("^([^|]*)|?(.*)$")
+		entry.starts, entry.ends = Ids(s), Ids(e)
+	end
+	local learned = learnedRoles[letter][id]
+	if learned then
+		for _, which in ipairs({ "starts", "ends" }) do
+			local into, seen = entry[which], {}
+			for _, v in ipairs(into) do seen[v] = true end
+			for _, v in ipairs(learned[which]) do
+				if not seen[v] then seen[v] = true; into[#into + 1] = v end
+			end
+		end
+	end
+	roles[letter][id] = entry
+	return entry.starts, entry.ends
+end
+
 -- A zone a learned quest is in, for Q.Zones (the client's name and continent).
 local function ZoneEntry(map)
 	local entry = zoneById[map]
 	if entry then return entry end
 	local info = C_Map and C_Map.GetMapInfo and select(2, pcall(C_Map.GetMapInfo, map))
 	entry = { map = map, name = type(info) == "table" and info.name or tostring(map), continent = ContinentOf(map),
-		minLevel = 0, maxLevel = 0, quests = {}, count = 0 }
+		minLevel = 0, maxLevel = 0, quests = {}, given = {}, count = 0 }
 	zoneById[map] = entry
 	zoneList[#zoneList + 1] = entry
 	return entry
@@ -491,7 +619,13 @@ local function Apply(id, fields)
 		if before and not HasId(before.opens, id) then before.opens[#before.opens + 1] = id end
 	end
 	for _, k in ipairs({ "starts", "ends" }) do
-		if type(fields[k]) == "table" then MergeActors(q, k, fields[k]) end
+		if type(fields[k]) == "table" then
+			MergeActors(q, k, fields[k])
+			-- (who gives or takes it, for Q.GiverQuests: the ones the quest has now)
+			for _, a in ipairs(q[k]) do
+				if (a.kind == "npc" or a.kind == "object") and a.id then AddRole(a.kind == "npc" and "n" or "o", a.id, id, k) end
+			end
+		end
 	end
 	-- A zone it wasn't in before: its list (and the zone itself, when the data has none).
 	if q.zone and q.zone ~= zoneBefore then
@@ -532,6 +666,8 @@ end
 
 local function Reset()
 	quests, actors = {}, { n = {}, o = {}, i = {} }
+	sources, roles, learnedRoles = { n = {}, o = {} }, { n = {}, o = {} }, { n = {}, o = {} }
+	raceList, raceById = nil, nil
 	searchIndex = nil
 end
 
@@ -641,6 +777,11 @@ function Q.SetTestData(list, zones)
 		if active and not HasId(active.opens, q.id) then active.opens[#active.opens + 1] = q.id end
 		local target = q.breadcrumbFor and quests[q.breadcrumbFor]
 		if target and not HasId(q.opens, target.id) then q.opens[#q.opens + 1] = target.id end
+		for _, k in ipairs({ "starts", "ends" }) do
+			for _, a in ipairs(q[k]) do
+				if type(a) == "table" and (a.kind == "npc" or a.kind == "object") and a.id then AddRole(a.kind == "npc" and "n" or "o", a.id, q.id, k) end
+			end
+		end
 	end
 	BuildTestIndex(normalized, zones)
 	for _, q in ipairs(normalized) do

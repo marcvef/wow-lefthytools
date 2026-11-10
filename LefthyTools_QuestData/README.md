@@ -11,15 +11,19 @@ Questtree window opens) because it's under a different license from LefthyTools.
 
 - [CMaNGOS Classic DB](https://github.com/cmangos/classic-db), the Full_DB dump
   `ClassicDB_1_12_1_z2815.sql.gz` (GPL v3): the classic quests, their chains, givers and enders,
-  and where those stand. A classic (1.12) world database: WoW: Forever is classic content with the
+  where those stand, and where the items that start quests drop (loot tables). A classic (1.12) world database: WoW: Forever is classic content with the
   same quest IDs, but its own new quests aren't in there.
 - [EG Link's output for WoW: Forever](https://github.com/JIVESCORP/eg-link-output-wowf) (Data from
   [Efficient Games](https://efficient.games), licensed under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)): what players' games recorded on
   Forever, for its new quests: titles, levels, races, zones, the quest each one leads to, who
-  offers and takes them and where. Changed: selected and converted to this format.
+  offers and takes them and where, and where its items that start quests were looted. Changed:
+  selected and converted to this format.
 - WoW: Forever's own client tables (the exports on [wago.tools](https://wago.tools)): zones and their
-  places on the map, areas, quest lines, items that start quests.
+  places on the map, areas, quest lines, items that start quests, the playable races.
+
+Races: a quest open to every classic race of a side is open to every race of that side (Forever's
+Skyborne too).
 
 How the chains are read (the tool's header has the details):
 

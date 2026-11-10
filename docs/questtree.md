@@ -29,14 +29,17 @@ load in doesn't matter for the table.
 - **Classic quests: CMaNGOS Classic DB** (Full_DB z2815, GPL v3, the dump the Bestiary's drop data
   comes from): `quest_template`, `creature_`/`gameobject_questrelation` (givers),
   `..._involvedrelation` (enders), `item_template.startquest`, the spawns (`creature`,
-  `creature_spawn_entry`, `gameobject`) and the templates' names and factions.
+  `creature_spawn_entry`, `gameobject`), the templates' names, factions and loot IDs, and
+  `creature_`/`gameobject_`/`reference_loot_template` (where items that start quests drop).
 - **Forever's new quests: EG Link** (`github.com/JIVESCORP/eg-link-output-wowf`, CC BY 4.0: "Data
   from Efficient Games (https://efficient.games), licensed under CC BY 4.0"): `quests.enUS`
   (title, levels, race mask, zone, `nextQuestId`, `startItemId`), `npcs` (who offers and takes each
-  quest, their uiMap positions, their side) and `quest_prerequisites` (what every character seen
-  taking a quest had done before: `before`, `characters`). The commit used is in `source`.
+  quest, their uiMap positions, their side), `quest_prerequisites` (what every character seen
+  taking a quest had done before: `before`, `characters`), `loot` (what players looted from which
+  NPC or object, and where) and `creatures` (names). The commit used is in `source`.
 - **Forever's client tables** (wago.tools): UiMap, UiMapAssignment, AreaTable, Map, QuestSort,
-  FactionTemplate, QuestV2, QuestLineXQuest, ItemSparse (StartQuestID, item names), QuestPOIBlob.
+  FactionTemplate, QuestV2, QuestLineXQuest, ItemSparse (StartQuestID, item names), QuestPOIBlob,
+  ChrRaces (the playable races, their race-mask bits and sides).
 - `Data/ForeverQuests.lua`: which quests are new in Forever (the `new` flag).
 
 Not used: Wowhead and anything taken from Questie (the project's rule), and ForeverCore's sniffs
@@ -72,10 +75,29 @@ file, and it credits Questie for quest data).
   (`C_Map.GetMapInfoAtPosition` on the continent) which one it is when it reads the NPC, and keeps
   the guess if the answer is none of them. Up to 5 places per NPC, 1% apart. No spawn: EG Link's
   positions; none at all: no points (event NPCs).
+- **Races:** Forever's playable races are ChrRaces' rows with a `PlayableRaceBit` and the playable
+  flags classic's eight have (`0x600000`): Human 1 ... Troll 8 (bits 0-7, as in classic), High Order
+  Skyborne 95 (bit 32, Alliance) and Windshaper Skyborne 96 (bit 33, Horde). A race mask has bit
+  `PlayableRaceBit` per race (numbers up to 2^33: no bit operators, `HasBit` divides). **The race
+  rule:** a mask with every classic race of a side gets every race of that side (classic-db knows
+  only the eight: an Alliance quest, 77, becomes 77 + 2^32); a mask with every playable race is
+  none (all). EG Link's 64-bit masks (hex) keep the playable races' bits, then the same rule
+  (Forever's own quests for Skyborne only, or Tauren and Windshaper, stay as recorded).
 - **Faction:** races only of one side; else, without races, when every NPC giver is on one side
-  (FactionTemplate's groups, EG Link's `side`). Races and classes are classic's bit masks (race ID
-  r is bit r, Human 1 ... Troll 8; class Warrior 1, ..., Druid 11); EG Link's 64-bit race mask: its
-  low 8 bits.
+  (FactionTemplate's groups, EG Link's `side`). Classes are classic's bit mask (class ID c is bit
+  c - 1: Warrior 1, ..., Druid 11).
+- **Item drops:** for each item that starts a quest, every creature (`LootId`) and chest or fishing
+  hole (gameobject type 3 or 25, `data1`) whose loot has it, through references, with its chance
+  (the Bestiary's drop-data rules: groups, references rolled `maxcount` times; world loot isn't
+  left out here). Items classic-db has no source of: EG Link's `loot` (`npc:<id>`/`object:<id>`
+  sources, chance = drops / loot windows). The 3 likeliest sources with places (then without), each
+  with its spawns (else EG Link's loot spots, else its NPC's places) put on zone maps as for givers
+  and clustered: a spawn within 7% of the map's width of a cluster's centre (heights counted 1.5
+  times, a zone map being 3:2) joins it; the 3 clusters with the most spawns, each a centre and a
+  radius (its farthest spawn plus 1%, 1.5% to 15%).
+- **Who gives what:** each NPC's and object's quests it starts and ends (`npcQuests`,
+  `objectQuests`), and per zone the quests given there (a giver's first place) that are listed
+  elsewhere: a dungeon's quests at its town, another zone's.
 - **Left out:** classic quests the Forever client doesn't have (not in QuestV2, unless repeatable;
   137, mostly Naxxramas' tier quests), unused ones by title, quests nobody gives or takes; Forever's
   test quests; later classic content (IDs 10000+) no one was seen offered.
@@ -83,23 +105,29 @@ file, and it credits Questie for quest data).
 Numbers (Forever 1.60.1.70862, EG Link 9fcae73): 5257 quests (4031 classic, 1226 Forever's), 3473
 of them in 784 chains, 4312 with a giver on the map or an item; of the 1817 new quests 1213 are in
 it, 415 with chain info, 492 with a giver, 808 with a zone; 50 zones, 35 dungeons, 1667 NPCs, 239
-objects, 599 items; 0.53 MB.
+objects, 599 items (104 with drop sources, 7 of them from EG Link; 143 sources, 108 with places);
+3372 quests with a race mask, 3010 of them with a Skyborne bit; 0.63 MB.
 
 ### Format
 
 ```
 LefthyToolsQuestData = {
   source, build,
+  races = { [raceID] = "bit|A or H|name[|c]" },     -- Forever's playable races, c: classic's
   names = { "Ahn'Qiraj Temple", ... },              -- zoneName, sort and dungeon are indexes into it
-  zones = { [uiMap] = "continent|minLevel|maxLevel|name|quest IDs" },
+  zones = { [uiMap] = "continent|minLevel|maxLevel|name|quest IDs|given here, listed elsewhere" },
   dungeons = { [names index] = "minLevel|maxLevel|quest IDs" },
-  npcs = { [id] = "name|map,x,y;map,x,y/map,x,y" }, objects = (the same), items = { [id] = "name" },
+  npcs = { [id] = "name|map,x,y;map,x,y/map,x,y" }, objects = (the same),
+  items = { [id] = "name|n<NPC>:chance,o<object>:chance" },  -- where it drops, 1/100 %
+  dropNpcs = { [id] = "name|map,x,y,r;..." }, dropObjects = (the same), -- drop sources' clusters
+  npcQuests = { [id] = "quests it starts|quests it ends" }, objectQuests = (the same),
   quests = { [id] = "title|level|minLevel|races|classes|zone|zoneName|sort|dungeon|pre|preAny|
                      preActive|excl|opens|breadcrumbFor|flags|skill|rep|starts|ends" },
 }
 ```
 
-x, y in thousandths; `/` separates a place's alternatives; quest IDs with `,`; flags: `A`/`H`
+x, y in thousandths, r (a cluster's radius) in thousandths of the map's width; `/` separates a
+place's alternatives; races a number (bit b = 2^b); quest IDs with `,`; flags: `A`/`H`
 faction, `r` repeatable, `n` new in Forever, `f` from Forever's data; skill `line:value`, rep
 `faction:min`; starts and ends `n<NPC>`, `o<object>`, `i<item>`. A zone's quests are in level order;
 a zone's levels are its own quests' (not class or profession quests) without the lowest and highest
@@ -118,11 +146,22 @@ read.
   value }, rep = { faction, min }, pre, preAny, preActive, excl, opens, breadcrumbFor, repeatable,
   starts, ends, source = "classic"|"forever"|"learned", new }`. The lists are always tables (maybe
   empty). `starts`/`ends`: `{ kind = "npc"|"object"|"item", id, name, points = { { map, x, y } } }`,
-  one table per NPC shared by all its quests. `zoneName`: the area's name, else the zone's, the
-  dungeon's or the sort's. The title is English: the UI prefers `C_QuestLog.GetTitleForQuestID`.
+  one table per NPC shared by all its quests. An item's (`kind = "item"`, no points) has `drops`:
+  `{ { kind = "npc"|"object", id, name, chance (0..100), points = { { map, x, y, r } } } }`, the
+  likeliest first (at most 3; empty when nothing's known), `points` the source's spawn clusters
+  (centre, `r` the radius as a share of the map's width; the most spawns first), shared by every item
+  of that source. `zoneName`: the area's name, else the zone's, the dungeon's or the sort's. The
+  title is English: the UI prefers `C_QuestLog.GetTitleForQuestID`. `races`: the mask with the race
+  rule applied (Data, The rules); `Q.RaceAllowed` (Engine) reads it.
 - `Q.Zones()`: `{ map, name, continent, minLevel, maxLevel, count }` by continent, then level.
   `Q.Dungeons()`: `{ name, minLevel, maxLevel, count }` by level. `Q.ZoneQuests(map)`,
-  `Q.DungeonQuests(name)`: quest IDs, the lowest level first.
+  `Q.DungeonQuests(name)`: quest IDs, the lowest level first. `Q.ZoneGiven(map)`: quests given in
+  the zone that are listed elsewhere (the Deadmines' at Sentinel Hill), the lowest level first.
+- `Q.Races()`: Forever's playable races, `{ { id, bit, faction, name, classic } }` by ID (the data's;
+  without it the ten known when this was written); `Q.RaceInfo(id)`: one of them or nil.
+- `Q.GiverQuests(id[, kind])`: the quests an NPC (`"npc"`, the default) or object (`"object"`) starts
+  and ends, two lists of quest IDs (shared), learned ones added; for tooltips: no quest is read. Needs
+  the data loaded (`Q.IsLoaded()`): it doesn't load it.
 - `Q.Search(text)`: quest IDs whose title (English, or the client's when it knows the quest) or
   giver's or ender's name contains the text, any case; title matches first, then by level. The
   index is made by the first search after a change (all quests' titles and people, one
@@ -138,8 +177,9 @@ read.
 - **Test hook** `Q.SetTestData(quests, zones)`: replaces the data with quest tables (a list, or by
   ID; `source` defaults to `"classic"`) and zones (`{ { map, name, continent [, minLevel, maxLevel]
   } }`; levels and counts from the quests when not given; dungeons from the quests' `dungeon`). What
-  a quest needs leads to it (`opens`) without saying so. Learned data and caches go; the callbacks
-  run at once.
+  a quest needs leads to it (`opens`) without saying so; `Q.GiverQuests` answers from the quests'
+  `starts` and `ends`; an item's `drops` as given; `Q.Races()` the known ten; `Q.ZoneGiven` empty.
+  Learned data and caches go; the callbacks run at once.
 
 ## Engine
 
@@ -157,8 +197,33 @@ read.
   `minLevel`), `"available"`; nil for a quest the data doesn't know. Mine are kept per data and
   progress change. What isn't known (no race, a reputation the client doesn't answer) counts as
   met. A friend's progress table (`who`): `{ done = { [id] = true }, active = { [id] = true }, level,
-  faction, race (raceID) or raceFile, class (classID) or classFile }`; skill and reputation aren't
-  checked for friends.
+  faction, race (raceID, or the race's name: English or the client's, as Battle.net gives it) or
+  raceFile, class (classID) or classFile }`; skill and reputation aren't checked for friends.
+- `Q.RaceAllowed(quest, race)` (a quest table or ID; a race ID, nil: mine, `select(3,
+  UnitRace("player"))`; the file `"Skyborne"` is 95 or 96 by my side): the mask's bit for that race;
+  a race new in Forever (not classic's) also when the mask has every classic race of its side (the
+  race rule again, for data made before it and learned quests). No mask, or a race that isn't
+  playable or isn't known: true. `Q.Status` uses it.
+- `Q.ZoneCount(map)` → `done, total`: a zone's quests (a dungeon by its name) that are for me, every
+  level (low ones too), only `"other"` left out; kept per data and progress change.
+- `Q.ChainStep(id)` → `step, total, chainTitle, firstID`: which column of its chain the quest is in
+  (one more than the longest way to it inside `Q.Chain`, so quests side by side share a step), the
+  last column, and the chain's first quest's (English) title and ID; a quest on its own `1, 1`; nil
+  for one the data doesn't know. Kept per data change.
+- `Q.Available(map[, x, y])`: quest IDs I can take now (`"available"`) in a zone: `Q.ZoneQuests`
+  and `Q.ZoneGiven` (a cave or a city's floor without quests counts as its zone, the position put on
+  it with `C_Map.GetMapRectOnMap`); not quests only an item starts. Grey ones (`Q.IsTrivial`) last;
+  with my position on that map (0..1) the nearest giver on it first (widths counted 1.5 times), then
+  those without a giver there; without a position the nearest my level first. Kept per data,
+  progress and map; the order for the last position asked (1% steps).
+- `Q.LevelColor(level[, questID])` → `{ r, g, b, hex = "ffrrggbb", key }` (shared, `Q.DIFFICULTY`):
+  the game's quest difficulty colours against my level. With a quest ID the client's own answer
+  first (`C_PlayerInfo.GetContentDifficultyQuestForPlayer`, `Enum.RelativeContentDifficulty`);
+  else by level: 5 or more above me `impossible` (red, ff1a1a), 3-4 `difficult` (orange, ff8040),
+  2 below to 2 above `fair` (yellow), above classic's grey level `easy` (green), else `trivial`
+  (grey; grey up to level - 5 - level/10 until 39, level - 1 - level/5 until 59, then level - 9; none
+  up to level 5). No level: `fair`. `Q.Difficulty(id)`: a quest's key (its level or the client's);
+  `Q.IsTrivial(id)`: grey for me (the game's grey "!" rather than the yellow one).
 - `Q.Missing(id, who)` → `{ { id, status, reason } }`: what's missing, walked back through the chain
   across zones, the first one to do first. `reason`: `"done"` (must be completed), `"any"` (one of
   several: the best one, in the log, then available, then for me, the lowest level), `"log"` (must
@@ -183,6 +248,11 @@ classic's seasonal events (Seasonal quests are listed but not marked as event-on
   The Barrens), and `GetMapRectOnMap` gives the zone's rectangle there.
 - That `C_QuestLog.GetAllCompletedQuestIDs` answers on Forever, and QUEST_TURNED_IN's quest ID.
 - How long the first search takes (one `GetTitleForQuestID` per quest).
+- That `UnitRace("player")` gives 96 (95) for a Windshaper (High Order) Skyborne, and whether the
+  High Order Skyborne is playable (ChrRaces gives it the playable flags and the Alliance's bit 32;
+  EG Link's Alliance masks have it).
+- That `C_PlayerInfo.GetContentDifficultyQuestForPlayer` answers for quests not in my log on
+  Forever, and with the same colours as the quest log.
 
 ## Module
 

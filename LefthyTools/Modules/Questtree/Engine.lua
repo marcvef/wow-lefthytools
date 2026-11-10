@@ -2,7 +2,9 @@ local _, ns = ...
 local Q = ns.Questtree or {}; ns.Questtree = Q
 
 -- Questtree's engine (docs/questtree.md, Engine): where a quest stands for me or a friend, what's
--- missing before it, what it leads to, its whole chain, and what's next for me. It reads the data
+-- missing before it, what it leads to, its whole chain and its step in it, what's next for me, what I
+-- can take nearby, a zone's count, the race rule (Q.RaceAllowed) and quest difficulty colours
+-- (Q.LevelColor). It reads the data
 -- (Data.lua) and my progress: completed quests (C_QuestLog.GetAllCompletedQuestIDs, read once and
 -- kept, a turned-in quest added when it happens) and the quest log. Answers are kept until the data
 -- or my progress changes. Nothing runs before the first question: the events are registered then,
@@ -118,10 +120,59 @@ local function HasBit(mask, n)
 	return math.floor(mask / 2 ^ (n - 1)) % 2 == 1
 end
 
+local function MyFaction()
+	local ok, faction = pcall(UnitFactionGroup, "player")
+	return ok and type(faction) == "string" and faction or nil
+end
+
+-- A race's ID from its file name ("Skyborne" is two races: the side tells which).
+local function RaceOfFile(file, faction)
+	if file == "Skyborne" then return faction == "Alliance" and 95 or faction == "Horde" and 96 or nil end
+	return RACE_IDS[file]
+end
+
 local function MyRace()
 	local ok, _, file, id = pcall(UnitRace, "player")
 	if ok and type(id) == "number" and Readable(id) then return id end
-	return ok and RACE_IDS[file] or nil
+	return ok and Readable(file) and RaceOfFile(file, MyFaction()) or nil
+end
+
+-- A race's ID from its name, English (the data's) or the client's (a friend's Battle.net race).
+local raceByName
+local function RaceOfName(name)
+	if type(name) ~= "string" or not Readable(name) then return nil end
+	if not raceByName then
+		raceByName = {}
+		for _, r in ipairs(Q.Races and Q.Races() or {}) do
+			if r.name then raceByName[r.name:lower()] = r.id end
+			local info = C_CreatureInfo and C_CreatureInfo.GetRaceInfo
+			local ok, got = pcall(info or error, r.id)
+			if ok and type(got) == "table" and type(got.raceName) == "string" and Readable(got.raceName) then raceByName[got.raceName:lower()] = r.id end
+		end
+	end
+	return raceByName[name:lower()]
+end
+
+-- Whether a quest is open to a race (an ID; nil: mine). Its mask's bit; a race new in WoW: Forever (the
+-- Skyborne) also where the mask has every classic race of its side. Not known (no mask, a race that
+-- isn't playable or not known): yes.
+function Q.RaceAllowed(quest, race)
+	local q = type(quest) == "table" and quest or Q.Quest and Q.Quest(quest)
+	local mask = q and tonumber(q.races)
+	if not mask or mask <= 0 then return true end
+	if race == nil then race = MyRace() end
+	local info = race and Q.RaceInfo and Q.RaceInfo(race)
+	if not info then return true end
+	if HasBit(mask, info.bit + 1) then return true end
+	if info.classic then return false end
+	local any = false
+	for _, r in ipairs(Q.Races()) do
+		if r.classic and r.faction == info.faction then
+			if not HasBit(mask, r.bit + 1) then return false end
+			any = true
+		end
+	end
+	return any
 end
 
 local function MyClass()
@@ -133,11 +184,6 @@ end
 local function MyLevel()
 	local ok, level = pcall(UnitLevel, "player")
 	return ok and type(level) == "number" and Readable(level) and level or nil
-end
-
-local function MyFaction()
-	local ok, faction = pcall(UnitFactionGroup, "player")
-	return ok and type(faction) == "string" and faction or nil
 end
 
 -- A profession's rank (skill line), nil if not known.
@@ -173,13 +219,13 @@ end
 local function ForMe(q, who)
 	local race, class, faction
 	if who then
-		race = tonumber(who.race) or RACE_IDS[who.raceFile]
-		class = tonumber(who.class) or CLASS_IDS[who.classFile]
 		faction = who.faction
+		race = tonumber(who.race) or RaceOfFile(who.raceFile, faction) or RaceOfName(who.race)
+		class = tonumber(who.class) or CLASS_IDS[who.classFile]
 	else
 		race, class, faction = MyRace(), MyClass(), MyFaction()
 	end
-	if q.races and race and not HasBit(q.races, race) then return false end
+	if q.races and race and not Q.RaceAllowed(q, race) then return false end
 	if q.classes and class and not HasBit(q.classes, class) then return false end
 	if q.faction and faction and (faction == "Alliance" or faction == "Horde") and q.faction ~= faction then return false end
 	if not who then
@@ -390,6 +436,144 @@ function Q.Chain(id)
 	return order
 end
 
+-- Which step of its chain a quest is: step, total, the chain's title (its first quest's, the data's
+-- English one), the first quest's ID. A step is a column: one more than the longest way to it inside
+-- the chain (quests side by side share a step); total: the last step. A quest on its own: 1, 1.
+local stepOf, stepKey = {}, nil
+function Q.ChainStep(id)
+	id = tonumber(id)
+	local chain = id and Q.Chain(id)
+	if not chain or #chain == 0 then return nil end
+	if stepKey ~= Q.dataGen then stepOf, stepKey = {}, Q.dataGen end
+	local steps = stepOf[chain]
+	if not steps then
+		steps = { depth = {}, total = 1 }
+		local members, before = {}, {}
+		for _, m in ipairs(chain) do members[m], before[m] = true, {} end
+		local function edge(a, b) -- a before b
+			if members[a] and members[b] and a ~= b then before[b][#before[b] + 1] = a end
+		end
+		for _, m in ipairs(chain) do
+			local mq = Q.Quest(m)
+			for _, p in ipairs(mq.pre) do edge(p, m) end
+			for _, p in ipairs(mq.preAny) do edge(p, m) end
+			if mq.preActive then edge(mq.preActive, m) end
+			for _, o in ipairs(mq.opens) do edge(m, o) end
+		end
+		-- (in the chain's order everything before a quest is placed first; a loop's back edge is left out)
+		for _, m in ipairs(chain) do
+			local d = 1
+			for _, p in ipairs(before[m]) do
+				local pd = steps.depth[p]
+				if pd and pd + 1 > d then d = pd + 1 end
+			end
+			steps.depth[m] = d
+			if d > steps.total then steps.total = d end
+		end
+		stepOf[chain] = steps
+	end
+	local first = Q.Quest(chain[1])
+	return steps.depth[id] or 1, steps.total, first and first.title, chain[1]
+end
+
+-- How many of a zone's quests (a uiMap; a dungeon by its name) I've done: done, total. Every level;
+-- only quests that aren't for me ("other") are left out. Kept per data and progress change.
+local countOf, countKey = {}, nil
+function Q.ZoneCount(map)
+	if map == nil then return 0, 0 end
+	local list = type(map) == "string" and Q.DungeonQuests(map) or Q.ZoneQuests(map)
+	Listen()
+	ReadActive()
+	ReadDone()
+	local key = Q.dataGen .. ":" .. progress
+	if countKey ~= key then countOf, countKey = {}, key end
+	local c = countOf[map]
+	if not c then
+		local doneCount, total = 0, 0
+		for _, id in ipairs(list) do
+			local s = Q.Status(id)
+			if s and s ~= "other" then
+				total = total + 1
+				if s == "done" then doneCount = doneCount + 1 end
+			end
+		end
+		c = { doneCount, total }
+		countOf[map] = c
+	end
+	return c[1], c[2]
+end
+
+-- ---------------------------------------------------------------- difficulty
+
+-- The game's quest difficulty colours (impossible, difficult, fair, easy, trivial). Shared tables.
+local DIFFICULTY = {
+	impossible = { r = 1, g = 0.1, b = 0.1, hex = "ffff1a1a", key = "impossible" },
+	difficult = { r = 1, g = 0.5, b = 0.25, hex = "ffff8040", key = "difficult" },
+	fair = { r = 1, g = 0.82, b = 0, hex = "ffffd100", key = "fair" },
+	easy = { r = 0.25, g = 0.75, b = 0.25, hex = "ff40bf40", key = "easy" },
+	trivial = { r = 0.5, g = 0.5, b = 0.5, hex = "ff808080", key = "trivial" },
+}
+Q.DIFFICULTY = DIFFICULTY
+
+-- The highest quest level that's grey (trivial) at a level (classic's rule).
+local function GreyLevel(level)
+	if level <= 5 then return 0 end
+	if level <= 39 then return level - 5 - math.floor(level / 10) end
+	if level <= 59 then return level - 1 - math.floor(level / 5) end
+	return level - 9
+end
+
+-- A quest level against mine: a key of DIFFICULTY.
+local function LevelKey(level)
+	local mine = MyLevel()
+	if not mine or type(level) ~= "number" or level <= 0 then return "fair" end
+	local diff = level - mine
+	if diff >= 5 then return "impossible" end
+	if diff >= 3 then return "difficult" end
+	if diff >= -2 then return "fair" end
+	if level > GreyLevel(mine) then return "easy" end
+	return "trivial"
+end
+
+-- The client's own difficulty of a quest for me (Enum.RelativeContentDifficulty), a key or nil.
+local nativeKeys
+local function NativeKey(id)
+	local get = C_PlayerInfo and C_PlayerInfo.GetContentDifficultyQuestForPlayer
+	if not (get and id) then return nil end
+	if not nativeKeys then
+		nativeKeys = {}
+		local enum = Enum and Enum.RelativeContentDifficulty
+		for name, value in pairs(type(enum) == "table" and enum or {}) do
+			if DIFFICULTY[tostring(name):lower()] then nativeKeys[value] = tostring(name):lower() end
+		end
+	end
+	local ok, value = pcall(get, id)
+	if ok and type(value) == "number" and Readable(value) then return nativeKeys[value] end
+	return nil
+end
+
+-- The colour of a quest level as the game shows quest difficulty, against my level: { r, g, b, hex
+-- ("ffrrggbb"), key = "impossible" | "difficult" | "fair" | "easy" | "trivial" } (shared). With a quest
+-- ID the client's own difficulty of that quest comes first (C_PlayerInfo.GetContentDifficultyQuestForPlayer);
+-- else the level: 5 or more above mine red, 3-4 orange, 2 below to 2 above yellow, green above the grey
+-- level, grey (classic's grey levels). No level: yellow.
+function Q.LevelColor(level, questID)
+	return DIFFICULTY[NativeKey(tonumber(questID)) or LevelKey(tonumber(level))]
+end
+
+-- A quest's difficulty key for me (the client's, else its level's), nil for one the data doesn't know.
+function Q.Difficulty(id)
+	id = tonumber(id)
+	local q = id and Q.Quest(id)
+	if not q then return nil end
+	return NativeKey(id) or LevelKey(q.level or q.minLevel)
+end
+
+-- Grey for me: too low to be worth much (the game's grey "!").
+function Q.IsTrivial(id)
+	return Q.Difficulty(id) == "trivial"
+end
+
 -- The zone I'm in (a zone map, not a city's floor or a cave), nil if not known.
 local function MyZone()
 	if not (C_Map and C_Map.GetBestMapForUnit) then return nil end
@@ -403,6 +587,104 @@ local function MyZone()
 		map = info.parentMapID
 	end
 	return map
+end
+
+-- The zone with quests a map is in (itself, or a parent: a cave, a city's floor), and x, y on it.
+local function QuestZone(map, x, y)
+	for _ = 1, 5 do
+		if #Q.ZoneQuests(map) > 0 or #Q.ZoneGiven(map) > 0 then return map, x, y end
+		local ok, info = pcall(C_Map and C_Map.GetMapInfo or error, map)
+		local parent = ok and type(info) == "table" and info.parentMapID
+		if not parent or parent == 0 or (info.mapType and info.mapType <= 2) then return map, x, y end
+		if x and y then
+			local okRect, minX, maxX, minY, maxY = pcall(C_Map.GetMapRectOnMap or error, map, parent)
+			if okRect and type(minX) == "number" and type(maxY) == "number" and Readable(minX) then
+				x, y = minX + x * (maxX - minX), minY + y * (maxY - minY)
+			else
+				x, y = nil, nil
+			end
+		end
+		map = parent
+	end
+	return map, x, y
+end
+
+-- The spots a quest is started at on a map: its givers' (NPCs, objects) places there.
+local function StartSpots(q, map)
+	local spots, onlyItems = {}, #q.starts > 0
+	for _, a in ipairs(q.starts) do
+		if a.kind ~= "item" then onlyItems = false end
+		for _, p in ipairs(a.kind ~= "item" and a.points or {}) do
+			if p.map == map then spots[#spots + 1] = p end
+		end
+	end
+	return spots, onlyItems
+end
+
+-- Quests I can take now in a zone (a uiMap; a cave or a city's floor counts as its zone): its quests and
+-- the ones given there that are listed elsewhere (a dungeon's), "available" for me, not started by an
+-- item only (no one offers those). With my position on that map (x, y: 0..1) the nearest giver first;
+-- without, the nearest my level first. Grey (trivial) ones after the others; ones without a giver on
+-- the map after those with. Kept per data, progress and map; the order for the last position asked (to 1%).
+local availBase, availKey, availSorted = {}, nil, {}
+function Q.Available(map, x, y)
+	map = tonumber(map)
+	if not map then return {} end
+	Listen()
+	ReadActive()
+	ReadDone()
+	local zone
+	zone, x, y = QuestZone(map, tonumber(x), tonumber(y))
+	local level = MyLevel()
+	local key = Q.dataGen .. ":" .. progress .. ":" .. tostring(level)
+	if key ~= availKey then availBase, availKey, availSorted = {}, key, {} end
+	local base = availBase[zone]
+	if not base then
+		base = {}
+		local seen = {}
+		for _, list in ipairs({ Q.ZoneQuests(zone), Q.ZoneGiven(zone) }) do
+			for _, id in ipairs(list) do
+				local q = not seen[id] and Q.Quest(id)
+				seen[id] = true
+				if q and Q.Status(id) == "available" then
+					local spots, onlyItems = StartSpots(q, zone)
+					if not onlyItems then
+						base[#base + 1] = { id = id, spots = spots, grey = Q.IsTrivial(id) and 1 or 0, level = q.level or q.minLevel or level or 0 }
+					end
+				end
+			end
+		end
+		availBase[zone] = base
+	end
+	local sortKey = zone .. ":" .. (x and y and (math.floor(x * 100) .. "," .. math.floor(y * 100)) or "-")
+	if availSorted.key == sortKey then return availSorted.list end
+	local far = {}
+	for _, e in ipairs(base) do
+		local best
+		if x and y then
+			for _, p in ipairs(e.spots) do
+				local d = ((p.x - x) * 1.5) ^ 2 + (p.y - y) ^ 2 -- (a zone map is half again as wide as high)
+				if not best or d < best then best = d end
+			end
+		end
+		far[e] = best or (#e.spots > 0 and not x and 0) or false
+	end
+	local sorted = {}
+	for i, e in ipairs(base) do sorted[i] = e end
+	table.sort(sorted, function(a, b)
+		if a.grey ~= b.grey then return a.grey < b.grey end
+		local fa, fb = far[a], far[b]
+		if (fa ~= false) ~= (fb ~= false) then return fa ~= false end
+		if fa and fb and fa ~= fb then return fa < fb end
+		local la, lb = math.abs(a.level - (level or a.level)), math.abs(b.level - (level or b.level))
+		if la ~= lb then return la < lb end
+		if a.level ~= b.level then return a.level < b.level end
+		return a.id < b.id
+	end)
+	local out = {}
+	for i, e in ipairs(sorted) do out[i] = e.id end
+	availSorted = { key = sortKey, list = out } -- (the last one: a position keeps moving)
+	return out
 end
 
 -- What's next for me: what the quests I finished or have in my log lead to, that I can take or that

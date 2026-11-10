@@ -8,15 +8,18 @@
 //   z2815, GPL v3; the same dump as tools/update-drop-data.js): quest_template, creature_ and
 //   gameobject_questrelation / involvedrelation (givers, enders), item_template.startquest (items
 //   that start a quest), creature and gameobject (where they stand), creature_template and
-//   gameobject_template (names, factions).
+//   gameobject_template (names, factions, loot), creature_ / gameobject_ / reference_loot_template
+//   (where the items that start quests drop).
 // - WoW: Forever's own quests (new since classic): EG Link output (Efficient Games,
 //   https://github.com/JIVESCORP/eg-link-output-wowf, CC BY 4.0: what players' games recorded on
 //   Forever): quests.enUS (title, levels, races, zone, the next quest, the item that starts it),
-//   npcs (who offers and takes each quest, where they stand) and quest_prerequisites (what every
-//   character had done before taking it). Selected and converted, not changed otherwise.
+//   npcs (who offers and takes each quest, where they stand), quest_prerequisites (what every
+//   character had done before taking it) and loot (what players looted from what, and where: for
+//   the items that start quests classic-db has no source of). Selected and converted, not changed
+//   otherwise.
 // - Forever's client tables (wago.tools exports of the build): UiMap, UiMapAssignment (zones and
 //   their world rectangles), AreaTable, Map, QuestSort (names), FactionTemplate (which side an NPC
-//   is on), QuestV2 (the quests the client knows), QuestLineXQuest (Forever's quest
+//   is on), ChrRaces (Forever's playable races: their race-mask bits, sides), QuestV2 (the quests the client knows), QuestLineXQuest (Forever's quest
 //   lines), ItemSparse (StartQuestID, names) and QuestPOIBlob (a quest's map, when nothing else says).
 // - Data/ForeverQuests.lua (tools/update-forever-quests.ps1): which quests are new in Forever.
 // Not used: Wowhead and anything taken from Questie (the project's rule), ForeverCore's sniffs
@@ -37,6 +40,14 @@
 //   alternatives ("/"), which Data.lua checks with the client's own map (C_Map.GetMapInfoAtPosition).
 // - Faction: the races' (only Alliance or only Horde), else the givers' side (FactionTemplate's
 //   groups, EG Link's "side"), when every giver is on the same one.
+// - Races: Forever's playable races (ChrRaces: classic's eight and the ones with their playable
+//   flags, the Skyborne), each by its PlayableRaceBit. A quest open to every classic race of a side
+//   is open to every race of that side (classic-db knows only the eight); open to all: no mask.
+// - Items that start a quest: where they drop (classic-db's creature and gameobject loot, through
+//   references; else EG Link's loot): the likeliest sources (MAX_SOURCES), each with its spawns in
+//   up to MAX_CLUSTERS clusters (centre and radius).
+// - Who starts and ends what (npcQuests, objectQuests) and the quests given in a zone that are
+//   listed elsewhere (a dungeon's, a city's): for tooltips and "what's here" without reading all.
 // - Left out: quests the client doesn't know (not in QuestV2, unless repeatable: those have no
 //   completion bit), unused ones by their title, quests nobody gives or takes.
 //
@@ -50,7 +61,7 @@
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
-const { rows } = require("./update-drop-data");
+const { rows, byEntry, referenceUsers, chances } = require("./update-drop-data");
 const { table, latestBuild } = require("./wago");
 
 const DUMP_URL = "https://raw.githubusercontent.com/cmangos/classic-db/master/Full_DB/ClassicDB_1_12_1_z2815.sql.gz";
@@ -59,9 +70,12 @@ const EG_REPO = "JIVESCORP/eg-link-output-wowf";
 const OUT = path.join(__dirname, "..", "LefthyTools_QuestData", "QuestData.lua");
 const FOREVER_QUESTS = path.join(__dirname, "..", "LefthyTools", "Data", "ForeverQuests.lua");
 
-const ALLIANCE = 1 | 4 | 8 | 64; // Human, Dwarf, Night Elf, Gnome (classic's race bits)
-const HORDE = 2 | 16 | 32 | 128; // Orc, Undead, Tauren, Troll
-const ALL_RACES = 255;
+const CLASSIC_RACES = 255; // classic's race bits (race ID r: bit r - 1)
+const PLAYABLE_FLAGS = 0x600000; // ChrRaces.Flags every playable race of Forever has (classic's eight, the Skyborne)
+const MAX_SOURCES = 3; // drop sources kept per item
+const MAX_CLUSTERS = 3; // clusters of a drop source's spawns kept
+const CLUSTER = 70; // spawns this close (thousandths of the map's width) are one cluster
+const ASPECT = 1.5; // a zone map's width over its height
 const MAX_POINTS = 5; // spawns kept per NPC or object (a 1% grid apart)
 const SIMILAR = 4; // zones' rectangles at most this many times the other's size can be a place's alternative
 const UNUSED = /\[UNUSED\]|<UNUSED>|UNUSED |<NYI>|\bNYI\b|<TXT>|\[PH\]|<CHANGE TO GOSSIP>|^ZZOLD|\(OLD\)|<TEST>|\bTEST\b|^Test |^REUSE|\[DEPRECATED\]|<DEPRECATED>|Deprecated/;
@@ -116,6 +130,8 @@ async function eglink(build, ref, cache) {
     quests: (await get("quests.enUS")).quests,
     npcs: (await get("npcs")) || {},
     prerequisites: ((await get("quest_prerequisites")) || {}).quests || {},
+    loot: ((await get("loot")) || {}).sources || {},
+    creatures: ((await get("creatures")) || {}).creatures || {},
   };
 }
 
@@ -229,11 +245,60 @@ function sideOf(templates, id) {
   return undefined;
 }
 
-function factionOfRaces(races) {
-  if (!races) return undefined;
-  if ((races & ALLIANCE) === races) return "Alliance";
-  if ((races & HORDE) === races) return "Horde";
-  return undefined;
+// Forever's playable races (ChrRaces' rows) and race masks. Masks are numbers with bits above 31 (the
+// Skyborne's 32 and 33), so no bit operators: bit b is 2^b.
+function raceModel(rows) {
+  const list = rows
+    .filter((r) => +r.PlayableRaceBit >= 0 && (+r.Flags & PLAYABLE_FLAGS) === PLAYABLE_FLAGS && (+r.Alliance === 0 || +r.Alliance === 1))
+    .map((r) => ({ id: +r.ID, bit: +r.PlayableRaceBit, faction: +r.Alliance === 0 ? "Alliance" : "Horde", name: r.Name_lang, classic: +r.ID <= 8 }))
+    .sort((a, b) => a.id - b.id);
+  if (list.filter((r) => r.classic && r.bit === r.id - 1).length !== 8) throw new Error("ChrRaces: classic's eight races aren't there as before");
+  const has = (mask, bit) => Math.floor(mask / 2 ** bit) % 2 === 1;
+  const sum = (races) => races.reduce((m, r) => m + 2 ** r.bit, 0);
+  const all = sum(list);
+  // Every classic race of a side: every race of that side. Only playable races' bits; all: undefined.
+  const expand = (mask) => {
+    let m = sum(list.filter((r) => has(mask || 0, r.bit)));
+    for (const side of ["Alliance", "Horde"]) {
+      if (list.filter((r) => r.classic && r.faction === side).every((r) => has(m, r.bit))) {
+        m = sum(list.filter((r) => has(m, r.bit) || r.faction === side));
+      }
+    }
+    return m && m !== all ? m : undefined;
+  };
+  // A 64-bit mask in hex (EG Link's raceMask), only the playable races' bits.
+  const fromHex = (hex) => {
+    if (!hex || !/^[0-9a-fA-F]+$/.test(hex)) return 0;
+    const big = BigInt("0x" + hex);
+    return sum(list.filter((r) => ((big >> BigInt(r.bit)) & 1n) === 1n));
+  };
+  // "Alliance" or "Horde" when every race of the mask is of that side.
+  const faction = (mask) => {
+    if (!mask) return undefined;
+    const sides = uniq(list.filter((r) => has(mask, r.bit)).map((r) => r.faction));
+    return sides.length === 1 ? sides[0] : undefined;
+  };
+  return { list, all, has, expand, fromHex, faction };
+}
+
+// Points ([ui, x, y], thousandths) in clusters: [{ ui, x, y, r, n }] the most points first, at most
+// MAX_CLUSTERS. r: the farthest point from the centre plus a margin, in thousandths of the map's width.
+function clusters(points) {
+  const dist = (c, p) => Math.hypot(c.x - p[1], (c.y - p[2]) / ASPECT);
+  const out = [];
+  for (const p of points.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2])) {
+    let c = out.find((k) => k.ui === p[0] && dist(k, p) <= CLUSTER);
+    if (!c) { c = { ui: p[0], x: p[1], y: p[2], sx: 0, sy: 0, n: 0, members: [] }; out.push(c); }
+    c.sx += p[1]; c.sy += p[2]; c.n++;
+    c.x = c.sx / c.n; c.y = c.sy / c.n;
+    c.members.push(p);
+  }
+  for (const c of out) {
+    c.x = Math.round(c.x); c.y = Math.round(c.y);
+    c.r = Math.max(15, Math.min(150, Math.round(Math.max(0, ...c.members.map((p) => dist(c, p))) + 10)));
+  }
+  return out.sort((a, b) => b.n - a.n || a.ui - b.ui || a.x - b.x || a.y - b.y).slice(0, MAX_CLUSTERS)
+    .map((c) => ({ ui: c.ui, x: c.x, y: c.y, r: c.r, n: c.n }));
 }
 
 // ---------------------------------------------------------------- main
@@ -258,7 +323,7 @@ async function main() {
   if (!build) throw new Error("could not determine the Forever build; pass it as an argument");
   console.log(`WoW: Forever ${build}`);
   const tables = ["UiMap", "UiMapAssignment", "AreaTable", "Map", "QuestSort", "FactionTemplate", "QuestV2",
-    "QuestLineXQuest", "ItemSparse", "QuestPOIBlob"];
+    "QuestLineXQuest", "ItemSparse", "QuestPOIBlob", "ChrRaces"];
   const t = {};
   for (const name of tables) t[name] = await table(name, build, o.cache);
   const eg = await eglink(build, o.eglink, o.cache);
@@ -266,6 +331,8 @@ async function main() {
   const sql = await readDump(o.dump, o.cache);
 
   const world = worldMaps(t);
+  const races = raceModel(t.ChrRaces);
+  console.log(`races: ${races.list.map((r) => `${r.name} (${r.id}, bit ${r.bit}, ${r.faction})`).join(", ")}`);
   const NEW = foreverIds("ns.FOREVER_QUEST_IDS");
   const clientQuests = new Set(t.QuestV2.map((r) => +r.ID));
   const sortName = new Map(t.QuestSort.map((r) => [+r.ID, r.SortName_lang]));
@@ -319,10 +386,9 @@ async function main() {
     if (UNUSED.test(q.Title)) { dropped.unused++; continue; }
     if (!clientQuests.has(id) && !(q.SpecialFlags & 1)) { dropped.client++; continue; }
     if (!starts.has(id) && !ends.has(id)) { dropped.nobody++; continue; }
-    const races = q.RequiredRaces & ALL_RACES;
     quests.set(id, {
       id, title: q.Title.trim(), level: q.QuestLevel > 0 ? q.QuestLevel : undefined, minLevel: q.MinLevel || undefined,
-      races: races && races !== ALL_RACES ? races : undefined, classes: q.RequiredClasses || undefined,
+      races: races.expand(q.RequiredRaces & CLASSIC_RACES), classes: q.RequiredClasses || undefined,
       zoneOrSort: q.ZoneOrSort, skill: q.RequiredSkill ? `${q.RequiredSkill}:${q.RequiredSkillValue}` : undefined,
       rep: q.RequiredMinRepFaction ? `${q.RequiredMinRepFaction}:${q.RequiredMinRepValue}` : undefined,
       repeatable: (q.SpecialFlags & 1) !== 0, isNew: NEW.has(id), source: "classic",
@@ -370,14 +436,13 @@ async function main() {
     const offered = egOffers.has(id) || egTakes.has(id);
     if (!NEW.has(id) && !offered) continue; // later classic content nobody was seen being offered
     if (!e.title || UNUSED.test(e.title) || /\(\d+\)aa$/.test(e.title)) continue;
-    const low = parseInt(String(e.raceMask || "").slice(-2), 16) || 0;
     const flags = Number(e.flags) || 0;
     const startList = (egOffers.get(id) || []).slice();
     if (e.startItemId) startList.push("i" + e.startItemId);
     for (const item of itemStarts.get(id) || []) startList.push("i" + item);
     quests.set(id, {
       id, title: e.title.trim(), level: e.level > 0 ? e.level : undefined, minLevel: e.minLevel > 0 ? e.minLevel : undefined,
-      races: low && low !== ALL_RACES ? low : undefined, classes: undefined,
+      races: races.expand(races.fromHex(String(e.raceMask || ""))), classes: undefined,
       zoneOrSort: e.zoneAreaId || (e.categoryId ? -e.categoryId : 0), poi: poiMap.has(id) ? poiMap.get(id)[0] : undefined,
       repeatable: (flags & 0x1000) !== 0 || (flags & 0x8000) !== 0, isNew: NEW.has(id), source: "forever",
       starts: uniq(startList), ends: uniq(egTakes.get(id) || []),
@@ -481,12 +546,114 @@ async function main() {
         if (a && a.points.length) { q.zone = a.points[0][0][0]; break; }
       }
     }
-    q.faction = factionOfRaces(q.races);
+    q.faction = races.faction(q.races);
     if (!q.faction && !q.races) {
       const sides = uniq(q.starts.filter((k) => k[0] === "n").map((k) => actors.get(k).side));
       if (sides.length === 1 && sides[0]) q.faction = sides[0];
     }
   }
+
+  // --- where the items that start quests drop
+  const starterZones = new Map(); // item -> its quests' zones (where its sources' spawns are preferred)
+  for (const q of quests.values()) {
+    for (const k of q.starts) {
+      if (k[0] !== "i") continue;
+      if (!starterZones.has(+k.slice(1))) starterZones.set(+k.slice(1), new Set());
+      if (q.zone) starterZones.get(+k.slice(1)).add(q.zone);
+    }
+  }
+  const dropsOf = new Map(); // item -> Map(source key -> chance 0..1)
+  const addDrop = (item, key, p) => {
+    if (!(p > 0)) return;
+    if (!dropsOf.has(item)) dropsOf.set(item, new Map());
+    const m = dropsOf.get(item);
+    m.set(key, Math.max(m.get(key) || 0, p));
+  };
+  {
+    const lootRows = rows(sql, "creature_loot_template"), objectRows = rows(sql, "gameobject_loot_template");
+    const refRows = rows(sql, "reference_loot_template");
+    const refs = byEntry(refRows), users = referenceUsers(lootRows, objectRows, refRows);
+    const owners = (templates, lootOf) => {
+      const m = new Map();
+      for (const [id, tmpl] of templates) {
+        const loot = lootOf(tmpl);
+        if (loot > 0) (m.get(loot) || m.set(loot, []).get(loot)).push(id);
+      }
+      return m;
+    };
+    // (chests and fishing holes keep their loot in data1)
+    for (const [letter, list, byLoot] of [
+      ["n", lootRows, owners(creatureT, (c) => c.LootId)],
+      ["o", objectRows, owners(objectT, (g) => (g.type === 3 || g.type === 25 ? g.data1 : 0))],
+    ]) {
+      for (const [loot, entries] of byEntry(list)) {
+        const who = byLoot.get(loot);
+        if (!who || !entries.some((r) => r.mincountOrRef < 0 || starterZones.has(r.item))) continue;
+        for (const [item, v] of chances(entries, refs, users, 0)) {
+          if (starterZones.has(item)) for (const id of who) addDrop(item, letter + id, Math.min(1, v.p));
+        }
+      }
+    }
+  }
+  // EG Link's loot, for items classic-db has no source of (Forever's own): "npc:<id>[|...]".
+  const egLootPoints = new Map(); // source key -> [[ui, x, y]]
+  const egItems = new Set();
+  {
+    const egDrops = new Map(); // item -> Map(key -> [drops, windows])
+    for (const [skey, s] of Object.entries(eg.loot).sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+      const m = skey.match(/^(npc|object):(\d+)/);
+      if (!m) continue;
+      const key = (m[1] === "npc" ? "n" : "o") + m[2];
+      for (const [sitem, v] of Object.entries(s.items || {})) {
+        const item = +sitem;
+        if (!starterZones.has(item) || dropsOf.has(item)) continue;
+        if (!egDrops.has(item)) egDrops.set(item, new Map());
+        const had = egDrops.get(item).get(key) || [0, 0];
+        egDrops.get(item).set(key, [had[0] + (Number(v.drops) || 0), had[1] + (Number(s.windows) || 0)]);
+        for (const pos of s.positions || []) {
+          const u = world.ui.get(pos.uiMap);
+          if (!u || !(u.type in ZONE_TYPES)) continue;
+          (egLootPoints.get(key) || egLootPoints.set(key, []).get(key)).push([pos.uiMap, Math.round(pos.mapX * 1000), Math.round(pos.mapY * 1000)]);
+        }
+      }
+    }
+    for (const [item, m] of egDrops) for (const [key, [drops, windows]] of m) addDrop(item, key, windows > 0 ? Math.min(1, drops / windows) : 0);
+    for (const item of egDrops.keys()) if (dropsOf.has(item)) egItems.add(item);
+  }
+  // The sources' places: their spawns (EG Link's loot spots, its NPCs' places), in clusters.
+  const sources = new Map(); // key -> { name, points: [{ ui, x, y, r }], spawns }
+  const sourceOf = (key, prefer) => {
+    if (sources.has(key)) return sources.get(key);
+    const kind = key[0], id = +key.slice(1);
+    const tmpl = kind === "n" ? creatureT.get(id) : objectT.get(id);
+    const egr = egNpc.get(key);
+    const name = tmpl ? (kind === "n" ? tmpl.Name : tmpl.name) : (egr && egr.name) || (kind === "n" && eg.creatures[id] && eg.creatures[id].name);
+    let pts = [];
+    for (const [m, x, y, z] of spawns.get(key) || []) {
+      const p = places(world, m, x, y, z, prefer);
+      if (p.length) pts.push(p[0]);
+    }
+    if (!pts.length) pts = egLootPoints.get(key) || [];
+    if (!pts.length && egr) {
+      for (const pos of egr.positions || []) {
+        const u = world.ui.get(pos.uiMap);
+        if (u && u.type in ZONE_TYPES) pts.push([pos.uiMap, Math.round(pos.mapX * 1000), Math.round(pos.mapY * 1000)]);
+      }
+    }
+    const s = { name, points: clusters(pts), spawns: pts.length };
+    sources.set(key, s);
+    return s;
+  };
+  const itemDrops = new Map(); // item -> [[key, chance 0..1]]
+  for (const [item, m] of [...dropsOf].sort((a, b) => a[0] - b[0])) {
+    const prefer = [...starterZones.get(item)].sort(byNumber);
+    const list = [...m].map(([key, p]) => ({ key, p, s: sourceOf(key, prefer) }))
+      .sort((a, b) => (b.s.spawns > 0) - (a.s.spawns > 0) || b.p - a.p || b.s.spawns - a.s.spawns || (a.key < b.key ? -1 : 1))
+      .slice(0, MAX_SOURCES);
+    itemDrops.set(item, list.map((d) => [d.key, d.p]));
+  }
+  const usedSources = new Set();
+  for (const list of itemDrops.values()) for (const [key] of list) usedSources.add(key);
 
   // --- the chains
   const prev = new Map(); // quest -> signed previous quests
@@ -594,6 +761,20 @@ async function main() {
   for (const q of quests.values()) if (q.zone) (zoneQuests.get(q.zone) || zoneQuests.set(q.zone, []).get(q.zone)).push(q.id);
   const dungeonQuests = new Map();
   for (const q of quests.values()) if (q.dungeon) (dungeonQuests.get(q.dungeon) || dungeonQuests.set(q.dungeon, []).get(q.dungeon)).push(q.id);
+  // Quests given in a zone that are listed elsewhere (a dungeon's at its town, another zone's).
+  const givenIn = new Map();
+  for (const q of quests.values()) {
+    const maps = new Set();
+    for (const k of q.starts) if (k[0] !== "i") for (const list of actors.get(k).points) maps.add(list[0][0]);
+    for (const m of maps) if (zoneQuests.has(m) && q.zone !== m) (givenIn.get(m) || givenIn.set(m, []).get(m)).push(q.id);
+  }
+  // Who starts and ends what.
+  const questsOf = new Map(); // "n123" -> [[starts], [ends]]
+  const role = (k, i, id) => (questsOf.get(k) || questsOf.set(k, [[], []]).get(k))[i].push(id);
+  for (const id of [...quests.keys()].sort(byNumber)) {
+    for (const k of quests.get(id).starts) if (k[0] !== "i") role(k, 0, id);
+    for (const k of quests.get(id).ends) if (k[0] !== "i") role(k, 1, id);
+  }
 
   // --- encoding
   const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, " ");
@@ -611,7 +792,8 @@ async function main() {
     while (f.length && f[f.length - 1] === "") f.pop();
     return f.join("|");
   };
-  const actorLine = (a) => `${a.name ? a.name.replace(/[|;]/g, " ") : ""}|${a.points.map((list) => list.map((p) => p.join(",")).join("/")).join(";")}`;
+  const cleanName = (name) => (name ? name.replace(/[|;]/g, " ") : "");
+  const actorLine = (a) => `${cleanName(a.name)}|${a.points.map((list) => list.map((p) => p.join(",")).join("/")).join(";")}`;
   const sortedIds = [...quests.keys()].sort(byNumber);
   const zoneIds = [...zoneQuests.keys()].sort((a, b) => world.continentOf(a) - world.continentOf(b) || a - b);
   const actorKeys = (kind) => [...actors.keys()].filter((k) => k[0] === kind).sort((a, b) => +a.slice(1) - +b.slice(1));
@@ -624,12 +806,20 @@ async function main() {
     "-- (\",\"); flags: A/H faction, r repeatable, n new in WoW: Forever, f from Forever's data (not classic's); skill",
     "-- \"skill line:value\", rep \"faction:min\"; starts, ends: n<NPC>, o<object>, i<item> (\",\").",
     "-- npcs[id], objects[id] = \"name|map,x,y;map,x,y/map,x,y\": places (x, y in 1/1000 of the uiMap), \"/\" alternatives",
-    "-- for a place where zones' rectangles overlap (the first is the best guess); items[id] = \"name\".",
-    "-- zones[uiMap] = \"continent|minLevel|maxLevel|name|quest IDs\"; dungeons[names index] = \"minLevel|maxLevel|quest IDs\".",
+    "-- for a place where zones' rectangles overlap (the first is the best guess); items[id] = \"name|drops\": where it",
+    "-- drops, \"n<NPC>:chance,o<object>:chance\" (hundredths of a percent, the likeliest first), the sources' places in",
+    "-- dropNpcs[id], dropObjects[id] = \"name|map,x,y,r;...\" (clusters of spawns: centre, radius r in 1/1000 of the map's",
+    "-- width, the most spawns first). npcQuests[id], objectQuests[id] = \"quests it starts|quests it ends\".",
+    "-- zones[uiMap] = \"continent|minLevel|maxLevel|name|quest IDs|quests given here but listed elsewhere\";",
+    "-- dungeons[names index] = \"minLevel|maxLevel|quest IDs\". races[raceID] = \"race-mask bit|A or H|name|c (classic's)\":",
+    "-- Forever's playable races (a quest open to all of a side's classic races is open to all of that side's).",
     "-- GPL v3 (LICENSE.md); sources and World of Warcraft's copyright: COPYRIGHT.md.",
     "LefthyToolsQuestData = {",
     `\tsource = "${esc(source)}",`,
     `\tbuild = "${build}",`,
+    "\traces = {",
+    ...races.list.map((r) => `\t\t[${r.id}] = "${r.bit}|${r.faction === "Alliance" ? "A" : "H"}|${esc(r.name)}${r.classic ? "|c" : ""}",`),
+    "\t},",
     "\tnames = {",
     ...nameList.map((n) => `\t\t"${esc(n)}",`),
     "\t},",
@@ -637,7 +827,8 @@ async function main() {
     ...zoneIds.map((z) => {
       const list = sortQ(zoneQuests.get(z));
       const [lo, hi] = range(list);
-      return `\t\t[${z}] = "${world.continentOf(z)}|${lo}|${hi}|${esc(world.ui.get(z).name)}|${list.join(",")}",`;
+      const given = givenIn.has(z) ? "|" + sortQ(uniq(givenIn.get(z))).join(",") : "";
+      return `\t\t[${z}] = "${world.continentOf(z)}|${lo}|${hi}|${esc(world.ui.get(z).name)}|${list.join(",")}${given}",`;
     }),
     "\t},",
     "\tdungeons = {",
@@ -654,8 +845,27 @@ async function main() {
     ...actorKeys("o").map((k) => `\t\t[${k.slice(1)}] = "${esc(actorLine(actors.get(k)))}",`),
     "\t},",
     "\titems = {",
-    ...actorKeys("i").map((k) => `\t\t[${k.slice(1)}] = "${esc((actors.get(k).name || "").replace(/[|;]/g, " "))}",`),
+    ...actorKeys("i").map((k) => {
+      const drops = (itemDrops.get(+k.slice(1)) || []).map(([key, p]) => `${key}:${Math.max(1, Math.round(p * 10000))}`).join(",");
+      return `\t\t[${k.slice(1)}] = "${esc(cleanName(actors.get(k).name))}${drops ? "|" + drops : ""}",`;
+    }),
     "\t},",
+    ...[["dropNpcs", "n"], ["dropObjects", "o"]].flatMap(([name, letter]) => [
+      `\t${name} = {`,
+      ...[...usedSources].filter((k) => k[0] === letter).sort((a, b) => +a.slice(1) - +b.slice(1)).map((k) => {
+        const s = sources.get(k);
+        return `\t\t[${k.slice(1)}] = "${esc(cleanName(s.name))}|${s.points.map((c) => `${c.ui},${c.x},${c.y},${c.r}`).join(";")}",`;
+      }),
+      "\t},",
+    ]),
+    ...[["npcQuests", "n"], ["objectQuests", "o"]].flatMap(([name, letter]) => [
+      `\t${name} = {`,
+      ...[...questsOf.keys()].filter((k) => k[0] === letter).sort((a, b) => +a.slice(1) - +b.slice(1)).map((k) => {
+        const [s, e] = questsOf.get(k);
+        return `\t\t[${k.slice(1)}] = "${s.join(",")}${e.length ? "|" + e.join(",") : ""}",`;
+      }),
+      "\t},",
+    ]),
     "\tquests = {",
     ...sortedIds.map((id) => `\t\t[${id}] = "${esc(questLine(quests.get(id)))}",`),
     "\t},",
@@ -679,6 +889,8 @@ async function main() {
   console.log(`${quests.size} quests (${all.filter((q) => q.source === "classic").length} classic, ${foreverCount} Forever's), ${chained.length} in ${comps} chains, ${withGiver} with a giver on the map or an item`);
   console.log(`new in Forever: ${newOnes.length} of ${NEW.size}; with chain info ${newOnes.filter((q) => q.pre || q.preAny || q.opens).length} (EG next ${egPre}, quest lines ${linePre}, earlier quests ${beforePre}); with a giver ${newOnes.filter((q) => q.starts.length).length}, a zone ${newOnes.filter((q) => q.zone || q.dungeon).length}`);
   console.log(`${zoneQuests.size} zones, ${dungeonQuests.size} dungeons, ${actorKeys("n").length} NPCs, ${actorKeys("o").length} objects, ${actorKeys("i").length} items; ${ambiguous} places with alternatives`);
+  console.log(`items that start quests: ${starterZones.size}, ${itemDrops.size} with drop sources (${egItems.size} from EG Link), ${usedSources.size} sources (${[...usedSources].filter((k) => sources.get(k).points.length).length} with places)`);
+  console.log(`races with a mask: ${all.filter((q) => q.races).length} (${all.filter((q) => q.races && races.list.some((r) => !r.classic && races.has(q.races, r.bit))).length} with a new race)`);
   console.log(`no zone: ${all.filter((q) => !q.zone && !q.dungeon).length}; ${(Buffer.byteLength(lua) / 1024 / 1024).toFixed(2)} MB`);
   if (o.stats) return;
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
@@ -687,4 +899,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
-module.exports = { worldMaps, places, onBox, sideOf, factionOfRaces };
+module.exports = { worldMaps, places, onBox, sideOf, raceModel, clusters };
