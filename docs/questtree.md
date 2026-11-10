@@ -17,7 +17,7 @@ and takes it and where, and where each quest stands for you and your friends.
 | `Modules/Questtree/Small.lua` | the small window: one quest, what it needs, giver and turn-in on the small map |
 | `Modules/Questtree/Browser.lua` | the big window: zones; a zone's map beside its chains' cards; a chain opened (cards, lines, joins, stubs, the way to a locked quest); an overview; details; filters; search; tabs for views other files register |
 | `Modules/Questtree/Browser.lua` | the big window: zones, chains as cards and lines, an overview, the zone map, details, filters, search |
-| `Modules/Questtree/Views.lua` | the big window's other views: storylines (every chain), the level path (where to go next), continents |
+| `Modules/Questtree/Views.lua` | the big window's other views: storylines (every chain), the level path (where to go next) |
 | `Modules/Questtree/Learn.lua` | learning givers, enders and prerequisites while playing |
 | `Modules/Questtree/Dialog.lua` | in the game's quest UI: the panel beside the quest dialog, chain steps on the quest log's lines, Alt-click there |
 | `Modules/Beacon/QuestShare.lua` | friends' progress and learned records over Beacon (`B2;q…`, from 0.7.0-70) |
@@ -908,90 +908,90 @@ iterations' `Q.ZoneCount`, `Q.ChainStep`, `Q.LevelColor`, `Q.Races`, `Q.ZoneGive
 
 ## Views (Views.lua)
 
-Three more views of the big window, each a tab of its own: registered with the window's registry
+Two more views of the big window, each a tab of its own: registered with the window's registry
 (`Q.RegisterBrowserView(key, label, build)`; `build(parent)` gives `{ frame, Refresh, OnShow, OnHide }`)
 when it's there: at load (Browser.lua comes before this file in the TOC), else when the module is
 switched on (`Q.When("enable")`); without a registry nothing is registered and nothing breaks. Keys and
-tabs: `storylines` "Storylines", `levelpath` "Level path", `continents` "Continents". A view is built
-by the window when its tab is first shown (`Q.BuildView(key, parent)` makes one; the tests use it), fills
-its parent, and lays itself out again when the parent's size changes. They jump with `Q.OpenBrowser(id)`
-(a quest: its zone and chain) and `Q.SelectZone(map)` (a zone; without it the zone's first quest).
+tabs: `storylines` "Storylines", `levelpath` "Level path". A view is built by the window when its tab is
+first shown (`Q.BuildView(key, parent)` makes one; the tests use it), fills its parent, and lays itself
+out again when the parent's size changes. They jump with `Q.OpenBrowser(id)` (a quest: its zone and
+chain) and `Q.SelectZone(map)` (a zone; without it the zone's first quest).
 
 Each view: a bar on top (chips or a headline), the list on a darker panel (a scroll frame of ours; only
 the rows near sight exist, pooled, each kept on its entry while it stays near, so the controller's
-cursor stays on it), a footer with a legend and, while counting, "Counting quests... 40%". No data
-(`Q.Ready()` not true): the window's line that the data add-on is missing.
+cursor stays on it), a footer (the level path's legend) and, while counting, "Counting quests... 40%".
+No data (`Q.Ready()` not true): the window's line that the data add-on is missing.
+
+The **Continents** view of earlier builds (a tile per zone by continent with its percentage done,
+what's available and ready, friends' progress as a second bar) is gone: the zone list on the window's
+left already shows each zone's progress.
+
+**For my levels** is the engine's `Q.InRange(id)` (a quest in my log; else not grey for me and its
+minimum level at most `Q.RANGE_ABOVE`, 2, above mine); without it everything counts as in range.
 
 ### Storylines
 
 Every chain for me in every zone (`Q.Chain` of every zone's and dungeon's quests; 2 or more quests that
-aren't "not for me"), as cards in rows (as many 280 px or wider as fit): the status strip and tone (the
-big window's: ready to turn in gold, in my log blue, available amber, done green, later grey), the icon
-(`QuestTurnin`, `SideInProgressquesticon`, `QuestNormal`, a lock, a check; the gossip icons without the
-atlases), the chain's title (its first quest's, the client's when it has it), its zone (where most of
-its quests are) and levels "[10-18]" in difficulty colours, "3/7 steps" with a bar, and its next step:
-"Turn in: [7] ..." (a quest of it ready in my log), "In your log: ...", "Next: ...", "Coming up: ...",
-"All done". The tooltip: every zone it's in, steps done, the next step and its giver, what it's worth,
-friends who did the next step (`Q.Friends`), "Click: open this storyline". A click: `Q.OpenBrowser` on
-the quest to turn in, else the next step, else the first.
+aren't "not for me"), as cards in rows (as many 280 px or wider as fit), each of three lines (58 px):
+the chain's title (its first quest's, the client's when it has it) and "3/7" (green when done); its
+zone (where most of its quests are) and levels "[10-18]" in difficulty colours; its next step: "Turn
+in: [7] ..." (a quest of it ready in my log), "In your log: ...", "Next: ...", "Coming up: ...", "All
+done". At the left the status strip (the big window's tones: ready to turn in gold, in my log blue,
+available amber, done green, later grey) and the icon (`QuestTurnin`, `SideInProgressquesticon`,
+`QuestNormal`, a lock, a check; the gossip icons without the atlases); a thin green bar of the steps
+done along its bottom. No colour legend. The tooltip: every zone it's in, steps done, the next step and
+its giver, what it's worth, friends who did the next step (`Q.Friends`), "Click: open this storyline". A
+click: `Q.OpenBrowser` on the quest to turn in, else the next step, else the first.
 
-- **Filters** (chips with counts, one at a time): All, In progress (a step done or in my log, not all
-  done), Ready to turn in, For your level (a step I can take now that isn't grey, `Q.IsTrivial`), Done.
-  Nothing left: "No storyline matches this filter." and a button that shows them all.
+- **Filters** (chips with counts, one at a time): **For your level** (the default: its next step is
+  `Q.InRange`, not all done), In progress (a step done or in my log, not all done), Ready to turn in,
+  Done, All. Nothing left: "No storyline matches this filter." and a button that shows them all.
 - **Sort**: Worth (Quest Chain Helper's idea, "is it worth it"): the quests left in it for me, each
   counted by its level, a grey one a tenth, one whose level is too high for me (or more than 4 above
   mine) half; or Level: the next step's level, the lowest first. Done chains last either way.
-- Kept in the module's settings: `views = { filter, sort }` (made when first needed).
+- Kept in the module's settings: `views = { show, sort, allZones }` (made when first needed; `show` the
+  filter, "level" at first; the key `filter` of the builds before is ignored, so the new default wins
+  once).
 
 ### Level path ("where to go next")
 
-The zones of my side (a zone with quests for me: 5 or more, or a quarter of its quests) as rows: the
-name ("(you're here)" and a blue band for the zone I'm in, `Q.HereZone`), its levels and "12 of 40
-done", and a bar across the levels 1-60 (more if a zone goes higher; ticks every ten on top) from the
-zone's lowest to its highest level, shaded per level: done (all its quests done, green), quests to
-take (one I can take or have, amber), later (grey); a level without quests takes the shade before it,
-quests outside the zone's range count at its ends. A gold line at my level ("You (12)") and a faint
-band 3 levels either side. Friends (Beacon's, with the module's `friends` setting) whose zone
-(Battle.net's `area`, matched to the zone's name, the client's or the data's) it is: a dot in their
-class colour at their level (6 at most). At the right "8 for your level" (quests I can take within 3
-levels of mine), "All done" or "nothing at your level". Sorted by that count, then the zones my level
-is in, then the nearest. On top: "Best next: Westfall, 9 quests for your level", or "Nothing to take
-within 3 levels of you. Next up: Redridge Mountains, from level 15." The tooltip: levels, done, what I
-can take, in my log, later, each run of levels, friends there. A click: `Q.SelectZone`.
-
-### Continents
-
-A gold heading per continent (`C_Map`'s name; "Other zones" without one) with its done of total and
-percentage, then a tile per zone with quests for me (the data's order): its name, the percentage done
-(large), levels and "12 of 35 done", what I can take now ("! 5 available") and what's ready to turn in
-("? 2 ready", from my quest log), a green bar of what's done and, under it, a thin bar in a friend's
-class colour: the friend furthest along there, from the quests they told (QuestShare.lua's
-`Q.friends`: their completed quests by zone; only those asked about are known, so "that you know of").
-The tile's colour goes from dark to green with how much is done; the zone I'm in has a blue edge, a
-finished one a green edge. On top: every zone's quests done. The tooltip names the friends. A click:
-`Q.SelectZone`.
+The zones of my side (a zone with quests for me: 5 or more, or a quarter of its quests) that have
+something for my levels (a quest not done that's `Q.InRange`) or a friend there (Beacon's, with the
+module's `friends` setting, whose zone, Battle.net's `area` matched to the zone's name, the client's or
+the data's, it is); the chip **All zones** at the top right shows every zone of my side (kept:
+`views.allZones`). A row (26 px) has only: the name (a faint blue band for the zone I'm in,
+`Q.HereZone`), a bar across the levels 1-60 (more if a zone goes higher; ticks every ten and "You (12)"
+on top) from the zone's lowest to its highest level, shaded per level: done (all its quests done,
+green), quests to take (one I can take or have, amber), later (grey); a level without quests takes the
+shade before it, quests outside the zone's range count at its ends; a gold line at my level; at the
+right "7 for your level" (its quests `Q.InRange` not done), else "All done", else nothing. Sorted by that
+count, then the zones my level is in, then the nearest. On top: "Best next: Westfall, 7 quests for your
+level", or "Nothing for your level. Next up: Redridge Mountains, from level 15." No zone left: "No zone
+has quests for your level." and a button that shows all zones. The tooltip has the rest: levels, done,
+for my level, what I can take now, in my log, later, each run of levels, friends there (name, level),
+"You're here.". A click: `Q.SelectZone`. The legend: done, quests to take, later, my level's line.
 
 ### What it costs
 
-The counts are made once and kept: every zone's quests by status (`Q.Status`) and level, every chain's
-(`Q.Chain`: done, in the log, available, levels, zones, next step, worth), 200 quests a frame on a
-frame of ours that's shown only while counting (5257 quests, 3473 of them in chains: well under a
-second, no hitch), and only while a view is shown. They're for a data, progress and level
-(`Q.dataGen`, `Q.progressGen`, `UnitLevel`): made again when one changed (checked when a view shows or
-draws; `Q.Status(0)` first, so a quest taken while no view was shown is read), or after
-`QUEST_TURNED_IN`, `QUEST_ACCEPTED`, `QUEST_REMOVED`, `PLAYER_LEVEL_UP` or `Q.OnDataChanged`; the last
-counts stay drawn meanwhile. What's ready to turn in is read from the quest log when a view draws
-(`QUEST_LOG_UPDATE` only draws again, it doesn't count). Events are registered only while a view is
-shown; they're noted and drawn half a second later (several: once); friends' answers
-(`Q.OnFriendProgress`) draw again. Friends' places and progress are read when a view draws. A view's
+The counts are made once and kept: every zone's quests by status (`Q.Status`), level and range
+(`Q.InRange`), every chain's (`Q.Chain`: done, in the log, available, levels, zones, next step and
+whether it's in range, worth), 200 quests a frame on a frame of ours that's shown only while counting
+(5257 quests, 3473 of them in chains: well under a second, no hitch), and only while a view is shown.
+They're for a data, progress and level (`Q.dataGen`, `Q.progressGen`, `UnitLevel`): made again when one
+changed (checked when a view shows or draws; `Q.Status(0)` first, so a quest taken while no view was
+shown is read), or after `QUEST_TURNED_IN`, `QUEST_ACCEPTED`, `QUEST_REMOVED`, `PLAYER_LEVEL_UP` or
+`Q.OnDataChanged`; the last counts stay drawn meanwhile. What's ready to turn in is read from the quest
+log when a view draws (`QUEST_LOG_UPDATE` only draws again, it doesn't count). Events are registered
+only while a view is shown; they're noted and drawn half a second later (several: once); friends'
+answers (`Q.OnFriendProgress`) draw again. Friends' places are read when a view draws. A view's
 `Refresh` (the window's) draws on the next frame. Hidden: no events, no OnUpdate.
 
 ### Controller and taint
 
-Our own frames only, nothing protected (it works in a fight), no Blizzard menu. Every card, row, tile,
-chip and the empty state's button is a Button, so SmartNavigation reaches them (its focus runs
-OnEnter: the tooltips); the lists are scroll frames (it scrolls them); nothing of Blizzard's is set on
-our frames.
+Our own frames only, nothing protected (it works in a fight), no Blizzard menu. Every card, row, chip
+(the level path's toggle too) and the empty state's button is a Button, so SmartNavigation reaches them
+(its focus runs OnEnter: the tooltips); the lists are scroll frames (it scrolls them); nothing of
+Blizzard's is set on our frames.
 
 Tests: `tests/questtree_views.lua` (the real Data.lua and Engine.lua through `Q.SetTestData`; the
 registry is a stand-in that records, the real one put back after; `Q.OpenBrowser` and `Q.SelectZone`
