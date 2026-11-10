@@ -506,6 +506,11 @@ function Q.ShowQuest(id)
 end
 
 -- Opens it on what's next for me (Q.Next()[1]; none: what it showed last), or closes it.
+-- Whether the small window is open (the big window shows a clicked quest in it then).
+function Q.IsSmallShown()
+	return win ~= nil and win:IsShown() == true
+end
+
 function Q.ToggleSmall()
 	if win and win:IsShown() then
 		win:Hide()

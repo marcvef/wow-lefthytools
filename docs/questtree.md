@@ -9,6 +9,12 @@ and takes it and where, and where each quest stands for you and your friends.
 | `Modules/Questtree/Engine.lua` | a quest's status for me or a friend, what's missing, what it opens, its chain, what's next |
 | `LefthyTools_QuestData/` | the data, an add-on of its own (load on demand, GPL v3) |
 | `tools/update-quest-data.js` | makes the data |
+| `Modules/Questtree/Questtree.lua` | the module: settings, `/questtree`, shared helpers (status colours, titles) |
+| `Modules/Questtree/MiniMap.lua` | the small zone map (our own frame, the zone's map art) |
+| `Modules/Questtree/Small.lua` | the small window: one quest, what it needs, giver and turn-in on the small map |
+| `Modules/Questtree/Browser.lua` | the big window: zones, chains as a tree, details, search |
+| `Modules/Questtree/Learn.lua` | learning givers, enders and prerequisites while playing |
+| `Modules/Beacon/QuestShare.lua` | friends' progress and learned records over Beacon (`B2;q…`, from 0.7.0-70) |
 
 Every Questtree file starts with `local Q = ns.Questtree or {}; ns.Questtree = Q`, so the order they
 load in doesn't matter for the table.
@@ -177,11 +183,6 @@ classic's seasonal events (Seasonal quests are listed but not marked as event-on
   The Barrens), and `GetMapRectOnMap` gives the zone's rectangle there.
 - That `C_QuestLog.GetAllCompletedQuestIDs` answers on Forever, and QUEST_TURNED_IN's quest ID.
 - How long the first search takes (one `GetTitleForQuestID` per quest).
-# Questtree design
-
-Quest chains for every zone of WoW: Forever: what a quest needs first, where it starts and ends,
-what it leads to, and which friends have done it. The data is a companion add-on
-(`LefthyTools_QuestData`, load on demand), loaded the first time a Questtree window opens.
 
 ## Module
 
@@ -363,7 +364,6 @@ is set on our frames.
 
 Tests: `tests/questtree_browser.lua`, with stand-ins for every `Q.*` it calls (the data, the engine, the
 small window, the small map), put back at the end.
-# Questtree design
 
 ## Learning and friends
 

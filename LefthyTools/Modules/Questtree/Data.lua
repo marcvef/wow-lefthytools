@@ -573,6 +573,11 @@ function Q.Load()
 	return true
 end
 
+-- Whether the data is loaded now (Learn.lua asks before it looks a quest up: asking mustn't load it).
+function Q.IsLoaded()
+	return db ~= nil
+end
+
 -- Whether the data is loaded or can be (installed and enabled), without loading it.
 function Q.HasData()
 	if db or type(rawget(_G, "LefthyToolsQuestData")) == "table" then return true end

@@ -1619,6 +1619,13 @@ local function Build()
 	if Q.OnDataChanged then
 		Q.OnDataChanged(DataChanged)
 	end
+	if Q.OnFriendProgress then
+		Q.OnFriendProgress(function() -- (QuestShare.lua: friends' answers came: the details redrawn)
+			if frame and frame:IsShown() then
+				Due()
+			end
+		end)
+	end
 end
 
 -- Scaled down to fit a smaller screen (or a large UI scale).

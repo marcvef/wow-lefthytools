@@ -157,6 +157,7 @@ local mark = #PRINTED
 slash("")
 local s = Small()
 local nextUp = Q.Next()
+local firstShown = s.quest
 check(s.win and s.win:IsShown() and loads > 0, "/questtree opens it, and the data loads now")
 check(s.quest == nextUp[1], "opened on its own it shows what's next for me: " .. tostring(nextUp[1]) .. ", got " .. tostring(s.quest))
 local escapes = false
@@ -196,7 +197,7 @@ check(Small().quest == 9001, "Back: the one before")
 s.win.Back:Click()
 check(Small().quest == 9002, "and the one before that")
 s.win.Back:Click()
-check(Small().quest == 9001 and #Small().history == 0 and not s.win.Back:IsShown(), "back to the first: nothing left to go back to")
+check(Small().quest == (firstShown or 9002) and #Small().history == 0 and not s.win.Back:IsShown(), "back to the first (what was next up): nothing left to go back to")
 slash("9002")
 
 -- The turn-in's line puts its zone on the map; its marker's tooltip.

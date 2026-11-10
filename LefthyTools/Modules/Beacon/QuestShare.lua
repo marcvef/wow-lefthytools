@@ -30,7 +30,7 @@ ns.Questtree = Q
 -- Nothing of it in a fight (LT.InFight): it waits for the end. Event work only notes; Beacon's tick
 -- (B.TickQuests) does the rest.
 
-local QUESTTREE_SINCE = "0.7.0-69-g0000000" -- the first build that reads these (LT.CompareVersions)
+local QUESTTREE_SINCE = "0.7.0-70-g0000000" -- the first build that reads these (LT.CompareVersions)
 
 local VERSION = B.VERSION
 local IDS_MAX = 40          -- quests a request asks about at most

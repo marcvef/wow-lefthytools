@@ -31,7 +31,7 @@ for k, v in pairs(_G) do
 end
 local BASE_META = { __index = BASE }
 
-local NEW, OLD = "0.7.0-69-gabc1234", "0.7.0-68-gabc1234" -- the first build that reads Questtree's words, the one before
+local NEW, OLD = "0.7.0-70-gabc1234", "0.7.0-69-gabc1234" -- the first build that reads Questtree's words, the one before
 -- What an older build doesn't have (its client here runs without them).
 local OLD_FILES = { ["Modules/Beacon/QuestShare.lua"] = true, ["Modules/Questtree/Learn.lua"] = true }
 local SAVED = { "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB", "LefthyToolsEchoesDB" }
@@ -138,9 +138,9 @@ local function Questtree(ns)
 		Q.Quest = function(id) return data[id] end
 		Q.IsLoaded = function() return loaded end
 	end
-	if not Q.Chain then
-		Q.Chain = function(id) return CHAINS[id] or { id } end
-	end
+	-- (the chains this test asks about: its own, also over the engine's, which has no data for them)
+	local engineChain = Q.Chain
+	Q.Chain = function(id) return CHAINS[id] or (engineChain and engineChain(id)) or { id } end
 	if not Q.RedrawSmall then
 		Q.redraws = {}
 		Q.RedrawSmall = function(now) Q.redraws[#Q.redraws + 1] = now end
