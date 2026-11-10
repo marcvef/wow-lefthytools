@@ -4656,7 +4656,7 @@ local function RaceNames(mask)
 	local classic = mask % 256
 	for _, side in ipairs(SIDES) do
 		if classic == side[1] then
-			local name = side[2] == "Alliance" and _G.FACTION_ALLIANCE or _G.FACTION_HORDE
+			local name = _G[side[2] == "Alliance" and "FACTION_ALLIANCE" or "FACTION_HORDE"]
 			return L["every %s race"]:format(type(name) == "string" and name or side[2])
 		end
 	end
