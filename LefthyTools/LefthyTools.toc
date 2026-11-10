@@ -76,6 +76,8 @@ Modules\Beacon\StreamMap.lua
 Modules\Beacon\StreamPreview.lua
 Modules\Beacon\StreamNet.lua
 Modules\Beacon\StreamButton.lua
+Modules\Beacon\Beacon.xml
+Modules\Beacon\QuestShare.lua
 
 Modules\Chronicle\Chronicle.lua
 Modules\Chronicle\Live.lua
@@ -120,3 +122,4 @@ Modules\Questtree\Questtree.lua
 Modules\Questtree\MiniMap.lua
 Modules\Questtree\Small.lua
 Modules\Questtree\Browser.lua
+Modules\Questtree\Learn.lua

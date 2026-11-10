@@ -363,3 +363,103 @@ is set on our frames.
 
 Tests: `tests/questtree_browser.lua`, with stand-ins for every `Q.*` it calls (the data, the engine, the
 small window, the small map), put back at the end.
+# Questtree design
+
+## Learning and friends
+
+Files: `Modules/Questtree/Learn.lua` (learning while playing) and `Modules/Beacon/QuestShare.lua`
+(friends' progress and learned data over Beacon; its words are in [beacon.md](beacon.md), "Questtree").
+
+### Learning (Learn.lua)
+
+Only while the Questtree module is on with its `learn` setting, and only for quests the data
+doesn't know fully. A quest I already have a record of is kept whole: my records are merged into
+the data's tables (`Q.AddLearned`), so those can't tell what came from where. The data is asked
+(`Q.Quest`) only once it's loaded (`Q.IsLoaded()`, Data.lua): asking must never load it, that's
+for the windows. Without the data add-on (or before a window loaded it) everything is kept.
+
+What it reads, all read-only (no Blizzard frames, nothing that could taint):
+
+- **Who:** `UnitGUID("npc")`: a creature (`LT.CreatureOf`) or a `GameObject-...-<id>-...`; a
+  player sharing a quest, or a secret GUID, gives nothing. The name from `UnitName("npc")`. A
+  quest from an item: `QUEST_DETAIL`'s `questStartItemID`. **Where:** my spot
+  (`C_Map.GetBestMapForUnit("player")`, `C_Map.GetPlayerMapPosition`), rounded to thousandths; in
+  an instance the map only. Secret values are left out, never stored.
+- **Givers:** the quests offered in a gossip (`GOSSIP_SHOW`, `C_GossipInfo.GetAvailableQuests`:
+  title, level) or a greeting (`QUEST_GREETING`, `GetAvailableQuestInfo`'s fifth return,
+  `GetAvailableTitle`, `GetAvailableLevel`), a quest dialog (`QUEST_DETAIL`, `GetQuestID`,
+  `GetTitleText`) and accepting (`QUEST_ACCEPTED`: the dialog's giver if it was the same quest in
+  the last 120 s, else whoever I talk to). The level from the quest log once accepted
+  (`C_QuestLog.GetInfo(index).level`).
+- **Enders:** the active quests of a gossip or greeting (an NPC lists the quests that end with it),
+  and turning in (`QUEST_COMPLETE`'s dialog, `QUEST_TURNED_IN`).
+- **Prerequisites** (`p`: 2 strong, 1 weak). Each NPC's last full list of offers is remembered
+  (this session, 40 NPCs), and the last 5 turn-ins. A quest an NPC offers now that it didn't
+  offer the last time I looked (at the same level: a level-up may be what opened it), after
+  exactly one turn-in since (or exactly one at that NPC), has that turn-in before it: strong. At
+  an NPC whose list I never saw: a quest offered within 3 s of a turn-in there is its follow-up
+  (strong, the game's own chain), within 60 s only a hint (weak). Strong ones are fed as `pre`
+  (and the earlier quest's `opens`), weak ones only as `opens`. **Proven wrong** (`x`): a quest
+  offered while one of its prerequisites isn't completed (`C_QuestLog.IsQuestFlaggedCompleted`
+  false: another character of the account, or a friend's record) didn't need it. Known limit: a
+  quest that needs one of several (the data's `preAny`) loses the one this character skipped.
+
+**Never lags:** the handlers read the dialog (it's gone later) into a note; a frame of our own,
+shown only while notes wait, stores them, infers and feeds on the next frame, then hides.
+
+**Kept** account-wide in `LefthyToolsDB.questtree.learned[questID]` = `{ u, t, l, s, e, p, x, f }`
+(stamp, title, level, giver, ender, prerequisites, proven not, the friend's account whose record
+changed it last); giver and ender `{ k = "n" | "o" | "i", i, n, m, x, y }`. At most 1500 records:
+over that, the oldest changes go, down to 1350. At most 4 prerequisites and 8 proven-not per
+quest. `LefthyToolsDB.questtree.share = { seq, epoch, got }`: the store's change counter (each
+change stamps its record with the next), a random id made with the store, and how far I hold each
+friend's (below). Broken records are dropped at load; a stamp above `seq` is stamped anew.
+**Fed** into `Q.AddLearned(id, fields)` at login (50 a frame, not in a fight, once the module is on;
+`Q.FeedLearned()` again when it's switched on later) and with each change: `title`, `level`, `zone`
+(the giver's map, not for items), `starts` / `ends` (`{ { kind = "npc" | "object" | "item", id, name,
+points = { { map, x, y } } } }`), `pre`; the earlier quest of each prerequisite gets `opens`.
+
+For QuestShare.lua and the windows: `Q.LearnedStore()`, `Q.LearnedMeta()`, `Q.Learned(id)`,
+`Q.MergeLearned(id, rec, fromAccount)` (true if it taught me something: only gaps are filled, a place
+with a point beats one without, prerequisites keep the strongest, proven-not wins), `Q.LearnText`.
+
+### Friends' progress (QuestShare.lua)
+
+A window showing a quest calls `Q.RequestFriendProgress(id)` (false when no friend's build can
+answer, or the module's `friends` setting is off): the quest and its chain (`Q.Chain`, Engine.lua;
+at most 40) go to every friend on a build from `QUESTTREE_SINCE` on, at most one request every 2 s
+(the latest wins), the same quest again only after 20 s. A friend answers the latest of mine at most
+once a second: a letter per quest, from `C_QuestLog` (done, ready to turn in, in the log, none); or
+nothing when their `friends` setting is off ("not shared"). Answers count for 60 s and only from
+friends asked. Kept in memory per friend (400 quests, then the oldest answers go), dropped when
+Beacon forgets them:
+
+- `Q.FriendProgress(gameAccountID)` -> `{ name, classFile, level, gameAccountID, at, shares, quests =
+  { [questID] = "done" | "ready" | "active" | "none" } }` or nil; `Q.FriendProgress()`: every
+  online friend's, by gameAccountID. **Engine:** `Q.Status(id, who)` takes such a table as `who`
+  (`who.quests[id]`: done -> "done", ready or active -> "active", none or missing: work it out from
+  `who.quests` of the prerequisites, which were asked with the chain).
+- `Q.FriendStatus(gameAccountID, id)` -> that word, or nil (not known).
+- `Q.Friends(id)` -> `{ { gameAccountID, name, classFile, level, status, ready } }` (status done,
+  active, none), sorted by name. Engine.lua's own `Q.Friends` loads later and replaces it; it should
+  walk `Q.FriendProgress()` and use `Q.Status(id, p)`.
+- `Q.OnFriendProgress(fn)`: `fn()` on Beacon's tick after answers came (the windows redraw).
+
+### Learned data between friends (QuestShare.lua)
+
+Like Chronicle's recipes, but simpler: every holder serves its own store (which holds what it
+learned from others too), so a record goes on from friend to friend. To every friend on a
+reading build, at low priority: what I hold (my account, the store's epoch and `seq`), after
+their build is known, again when it grew (at most once a minute) and every 10 minutes. A friend
+whose offer is beyond what I hold of their store (`got[account] = { epoch, seq }`, saved; another
+epoch: from 0) is asked for what changed since, one friend at a time (given up after 120 s
+without a record, asked again after 30 s). The answer: at most 100 records in stamp order, then
+the end with how far it got; the end counts only if every record came, then the rest is asked
+for at once. Records go 4 a second at most and only while fewer than 8 messages wait in Beacon's
+queues. A record whose last change came from the asking friend's account isn't sent back to them,
+and one that teaches nothing isn't stamped anew: each record goes once each way.
+Merged with `Q.MergeLearned` (from the asked friend only), and so fed into `Q.AddLearned`.
+
+Nothing of it in a fight (`LT.InFight`): friends' messages wait (300 at most; a request for
+records that lost one isn't counted complete), one request per friend waits, nothing is sent.
+Older builds get nothing (their `V2`; before it's known, nothing either).

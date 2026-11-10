@@ -65,7 +65,7 @@ local B = ns.Beacon
 --                       an account's records, p/d/n a profile, day or highlight, e that's all
 --   B2;<module><word>;<...>
 --                       other modules' messages, a family: the word's first letter is the module's
---                       (e: Echoes, Echoes/Delivery.lua has its words; c: Chronicle's recipes), at most
+--                       (e: Echoes, Echoes/Delivery.lua has its words; c: Chronicle's recipes; q: Questtree), at most
 --                       255 bytes like all. Only to friends whose build reads them (Delivery.lua says
 --                       how it knows)
 --   B2;co;<acct>,<u>/...
@@ -92,6 +92,15 @@ local B = ns.Beacon
 --   B2;ba;<call id>;<1|0>
 --                       my answer to it: I'm in, not now
 --                       (the five only to builds from Chat.lua's LTC_SINCE on)
+--   B2;qp;<req>;<questID>,...
+--   B2;qs;<req>;<letters>
+--   B2;qo;<acct>;<epoch>;<seq>
+--   B2;qq;<epoch>;<since>;<acct>
+--   B2;qr;<questID>;<level>;<giver>;<ender>;<pre>;<not>;<title>
+--   B2;qe;<epoch>;<upto>;<count>
+--                       Questtree (QuestShare.lua), only to builds from its QUESTTREE_SINCE on: what of
+--                       these quests have you done (d done, r ready, a in the log, n none), and the learned
+--                       quest records passed on (what I hold, send me yours after since, one record, that's all)
 --   Q2                  module switched off: forget me
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil, before the sender counts as

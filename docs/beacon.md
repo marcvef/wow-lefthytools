@@ -23,17 +23,19 @@ Files, in load order:
   items), `Handover.lua` (reserved items), `Chat.lua` (LTC, announcements), `ChatMissed.lua` (LTC lines
   friends missed), `ChatCalls.lua` (LTC's who's in), `Reports.lua` (error
   reports), `Stream*.lua` (the fight stream).
+  reports), `Stream*.lua` (the fight stream), `Beacon.xml` (world map pin templates), `QuestShare.lua`
+  (Questtree between friends: their progress, learned quest data; below).
 
 They share state through `ns.Beacon` (`B`): `B.peers` (`gameAccountID -> peer`), the queues
 (`B.Queue`, `B.QueueToPeers`, `B.QueueLatest`, `B.QueueLow`, ...), and hooks
 the later files set, which Beacon.lua calls when they're there (`if B.X then B.X() end`): on the
 driver tick through `LT.Guard` (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`, `B.StreamHealthTick`,
-`B.RefreshMaps`, `B.UpdateMinimap`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
+`B.RefreshMaps`, `B.UpdateMinimap`, `B.TickQuests`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
 `B.ReceivePing`, `B.ReceiveItem`, `B.ReceiveChat`, `B.ReceiveReportPart`, `B.ReceiveStream`,
-`B.ReceiveJournal`, `B.ReceiveEchoes`, `B.ReceiveProbe`), with an answer (`B.CollectorMessage`,
+`B.ReceiveJournal`, `B.ReceiveEchoes`, `B.ReceiveQuesttree`, `B.ReceiveProbe`), with an answer (`B.CollectorMessage`,
 `B.StreamHello`, `B.JournalHello`, `B.EchoesAnswer`), for a friend gone (`B.StreamForget`,
-`B.JournalForget`, `B.EchoesForget`, `B.RemovePing`), and on switching (`B.Attach` / `B.Detach`,
-`B.StreamStart` / `B.StreamStop`, `B.JournalStop`, `B.EchoesStop`, `B.OnSettingChanged`).
+`B.JournalForget`, `B.EchoesForget`, `B.QuestForget`, `B.RemovePing`), and on switching (`B.Attach` / `B.Detach`,
+`B.StreamStart` / `B.StreamStop`, `B.JournalStop`, `B.EchoesStop`, `B.QuestStop`, `B.OnSettingChanged`).
 Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.listeners` (`B.Notify`).
 `Chat.lua`, `Reports.lua` and `Stream.lua` add their own `/lefthy` words (`announce`, `report`,
 `reports`, `stream`) with `LT:AddCommand` (architecture.md); they answer while Beacon is off too.
@@ -75,7 +77,8 @@ Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.l
   `B2;cq;<acct>;<since>` send me what's newer, `B2;ct;<acct>;<char>;<u>;<class>;<level>;<line:skill:max,...>` a
   character's professions, `B2;cr;<acct>;<char>;<line>;<v>;<k>;<of>;<text>` part k of a list,
   `B2;ce;<acct>;<u>;<count>` that's all; only to builds from `RECIPES_SINCE` on, at most 700 a minute from one
-  friend), `b` Beacon's own (`B2;bl` my level, below; `bf;<build>;<1|0>;<what>` the error you reported is fixed in
+  friend), `q` Questtree (QuestShare.lua, below: `qp` / `qs` friends' progress, `qo` / `qq` / `qr` / `qe` learned
+  quest data; only to builds from `QUESTTREE_SINCE` on, at most 300 a minute from one friend), `b` Beacon's own (`B2;bl` my level, below; `bf;<build>;<1|0>;<what>` the error you reported is fixed in
   that build, see "Error reports", only to builds from `FIXED_SINCE` on; LTC's `bo`/`bq`/`bm` missed lines and `bw`/`ba` who's in,
   only to builds from Chat.lua's `LTC_SINCE` on: a call counts as a chat line, the rest at most 80 a minute from one
   friend; see LTC), `Q2` switched off. A build that doesn't
@@ -1125,6 +1128,35 @@ someone. Click: our own list (`LT.Window.PopupList`; Blizzard's menu taints game
 "Stream": the online friends who can be watched (level, where, dead or in combat; ticked while
 watching; a click opens or closes theirs), then your own stream and "Close all streams". Right-click:
 Beacon's settings. The tooltip says whom you watch and who watches you.
+
+## Questtree (QuestShare.lua)
+
+Questtree's words in the B family, letter `q` (what's shared and why: [questtree.md](questtree.md),
+"Learning and friends"). Only to friends whose build is from `QUESTTREE_SINCE` (`0.7.0-69`) on, by
+their `V2` (`B.ReadsQuesttree(peer)`: a build that doesn't say, or one without its commit count, counts
+as older and gets nothing; older builds also ignore an unknown `q` word), and only while the Questtree
+module and its `friends` setting are on. Beacon.lua takes at most 300 of them a minute from one friend
+(`QUESTTREE_LIMIT`, on top of the 20 a second of all kinds) and hands them to `B.ReceiveQuesttree`, which
+only notes them; `B.TickQuests` (Beacon's tick, through `LT.Guard`) does the rest, at most 25 a tick, and
+nothing in a fight (`LT.InFight`).
+
+- `B2;qp;<req>;<questID>,...` what of these quests have you done (up to 40: the quest a window shows and its
+  chain; req 1-999 per session). Normal queue, at most one every 2 s (the latest wins).
+- `B2;qs;<req>;<letters>` the answer, a letter per quest in the order asked: `d` done, `r` ready to turn in,
+  `a` in the quest log, `n` none; no letters: not shared. The latest request of a friend, at most one a second.
+- `B2;qo;<acct>;<epoch>;<seq>` the learned records I hold, up to my store's stamp `seq` (`acct`: my
+  BattleTag's hash, as Chronicle's; `epoch`: 8 hex digits made with the store). Low priority, after the
+  friend's build is known, when it grew (at most once a minute) and every 10 minutes.
+- `B2;qq;<epoch>;<since>;<acct>` send me yours changed after `since` (`acct`: mine, so what came from me isn't
+  sent back). One friend asked at a time.
+- `B2;qr;<questID>;<level>;<giver>;<ender>;<pre>;<not>;<title>` one record; giver and ender
+  `<k><id>:<uiMapID>:<x>:<y>:<name>` (`k`: `n` NPC, `o` object, `i` item; x and y in thousandths, empty
+  without a point; empty when unknown), `pre` `<questID>[*],...` (`*` weak, at most 4), `not` `<questID>,...`
+  (proven not before it, at most 8); names and titles without `|`, `;`, `:`, `,` or control characters, the
+  title cut to keep the message within 250 bytes. Low priority, 4 a second at most, and only while fewer
+  than 8 messages wait in all of Beacon's queues.
+- `B2;qe;<epoch>;<upto>;<count>` that's all: you hold mine up to `upto` if `count` records came (at most
+  100 an answer; the rest is asked for at once).
 
 ## Open questions (check in game)
 

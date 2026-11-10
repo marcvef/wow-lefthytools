@@ -81,6 +81,8 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Beacon/StreamPreview.lua fight stream: the preview's made-up fight
   Modules/Beacon/StreamNet.lua    fight stream between friends (kind O), the being-watched dot
   Modules/Beacon/StreamButton.lua the spyglass minimap button: friends to watch
+  Modules/Beacon/QuestShare.lua  Questtree between friends (B2;q...): their progress, learned quest data passed on
+  Modules/Beacon/Beacon.xml  world map pin templates (friend dot, ping)
   Modules/Chronicle/Chronicle.lua  Chronicle: recording, statistics, session, /chronicle
   Modules/Chronicle/Live.lua       friends live through Beacon: highlights (E2), days (D2/K2), the feed
   Modules/Chronicle/Characters.lua  who is who: accounts, names, matching; characters, accounts, news
@@ -117,6 +119,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Echoes/Delivery.lua      pages from friends to the collector through Beacon: messages, pulling, relaying, what's safe, the budget
   Modules/Questtree/Data.lua       Questtree's quest data (LefthyTools_QuestData, loaded when a window opens): quests, zones, search, learned data
   Modules/Questtree/Engine.lua     Questtree's engine: a quest's status for me or a friend, what's missing, its chain, what's next
+  Modules/Questtree/Learn.lua     Questtree's learning: givers, enders, prerequisites while playing (LefthyToolsDB.questtree.learned)
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 LefthyTools_QuestData/       Questtree's quest chains, givers and places (CMaNGOS Classic DB, EG Link's Forever data), an add-on of its own (load on demand), GPL v3
