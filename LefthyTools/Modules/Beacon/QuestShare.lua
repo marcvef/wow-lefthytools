@@ -8,7 +8,7 @@ ns.Questtree = Q
 -- friends' progress on the quests I look at, and what everyone's client learned (Questtree/Learn.lua)
 -- passed on, so everyone's data fills in. Beacon's B family, Questtree's letter q, only to builds from
 -- QUESTTREE_SINCE on (their V2; before it's known, nothing), only while the Questtree module and its
--- `friends` setting are on (both sides):
+-- `friends` setting are on (both sides). Friends' answers fill Q.friends (Engine.lua's shape, below).
 --
 --   B2;qp;<req>;<questID>,...          what of these have you done? (the quest I opened and its chain, up to
 --                                      IDS_MAX; req 1-999 per session)
@@ -55,7 +55,6 @@ local MESSAGE_BYTES = 250
 
 local issecret, Value = LT.IsSecret, LT.Value
 
-local progress = {}   -- gameAccountID -> { quests = { [questID] = "done" | "ready" | "active" | "none" }, n, at, shares }
 local requests = {}   -- req -> { ids, at, to = { [gameAccountID] = true } }
 local nextReq = 0
 local want            -- the ids to ask about next (Q.RequestFriendProgress)
@@ -71,6 +70,7 @@ local serving         -- { id, list, i, upto, sent }: the answer going out
 local incoming, inHead, inTail = {}, 1, 0
 local listeners = {}  -- Q.OnFriendProgress
 local progressChanged = false
+local answeredFor = {} -- the quests (first of each request answered: the one a window shows) since the last redraw
 local lastSlow = -math.huge
 local myAcct
 
@@ -222,7 +222,6 @@ Q.DecodeLearned = Decode
 -- Friends' progress
 ---------------------------------------------------------------------------
 
-local LETTERS = { d = "done", r = "ready", a = "active", n = "none" }
 
 local function Letter(id)
 	if C_QuestLog and Value(C_QuestLog.IsQuestFlaggedCompleted, id) == true then
@@ -271,45 +270,38 @@ function Q.RequestFriendProgress(id)
 	return true
 end
 
--- What a friend has done (the quests they were asked about): { name, classFile, level, at, quests =
--- { [questID] = "done" | "ready" | "active" | "none" } }, or nil. Without an account: every online friend's,
--- by gameAccountID. Engine's Q.Status(id, who) takes such a table as who.
+-- Friends' progress lives in Q.friends[gameAccountID], the shape Engine.lua reads (its Q.Friends,
+-- Q.Status(id, progress), Q.Missing(id, progress)): { done = { [questID] = true }, active = { [questID] =
+-- true }, name, classFile, class, level, faction, race, gameAccountID }, plus QuestShare's own ready (in the
+-- log and ready to turn in; also in active), known (asked and answered: absent from done and active = none),
+-- n, at, shares (false: their friends setting is off). Only friends who answered; dropped when Beacon forgets
+-- them. Got anew each call (Engine.lua may make the table itself: it loads later).
+local function Friends()
+	Q.friends = type(Q.friends) == "table" and Q.friends or {}
+	return Q.friends
+end
+
+-- One friend's progress table (above), or nil; without an account: Q.friends (every friend who answered).
 function Q.FriendProgress(gameAccountID)
 	if gameAccountID == nil then
-		local all = {}
-		for id in pairs(progress) do
-			all[id] = Q.FriendProgress(id)
-		end
-		return all
+		return Friends()
 	end
-	local p, peer = progress[gameAccountID], B.peers[gameAccountID]
-	if not (p and peer and peer.name) then
-		return nil
-	end
-	p.name, p.classFile, p.level, p.gameAccountID = peer.name, peer.classFile, peer.level, gameAccountID
-	return p
+	return Friends()[gameAccountID]
 end
 
--- One friend's status of a quest: "done", "ready" (done, to turn in), "active", "none", or nil (not known).
+-- One friend's status of a quest: "done", "ready" (in the log, to turn in), "active", "none", or nil (not known).
 function Q.FriendStatus(gameAccountID, id)
-	local p = Q.FriendProgress(gameAccountID)
-	return p and p.quests[id] or nil
-end
-
--- Engine.lua has its own Q.Friends (it loads later and replaces this one); without it: friends known to
--- have the quest done or in their log, else known not to (status "none").
-function Q.Friends(id)
-	local list = {}
-	for gameAccountID in pairs(progress) do
-		local p = Q.FriendProgress(gameAccountID)
-		local status = p and p.quests[id]
-		if status then
-			list[#list + 1] = { gameAccountID = gameAccountID, name = p.name, classFile = p.classFile, level = p.level,
-				status = status == "ready" and "active" or status, ready = status == "ready" }
-		end
+	local p = Friends()[gameAccountID]
+	if not p then
+		return nil
+	elseif p.done[id] then
+		return "done"
+	elseif p.ready[id] then
+		return "ready"
+	elseif p.active[id] then
+		return "active"
 	end
-	table.sort(list, function(a, b) return a.name < b.name end)
-	return list
+	return p.known[id] and "none" or nil
 end
 
 -- fn() after friends' answers came (on Beacon's tick): the windows redraw.
@@ -370,29 +362,40 @@ local function TakeAnswer(id, req, letters, now)
 		return
 	end
 	r.to[id] = nil
-	local p = progress[id]
+	local friends, peer = Friends(), B.peers[id]
+	local p = friends[id]
 	if not p then
-		p = { quests = {}, n = 0 }
-		progress[id] = p
+		p = { done = {}, active = {}, ready = {}, known = {}, n = 0 }
+		friends[id] = p
 	end
+	-- Who they are (Engine checks race, class and faction): Beacon's peer, Battle.net for the rest.
+	local info = C_BattleNet and Value(C_BattleNet.GetGameAccountInfoByID, id)
+	info = type(info) == "table" and info or {}
+	p.gameAccountID, p.name, p.classFile, p.class = id, peer.name, peer.classFile, peer.classFile
+	p.level = peer.level
+	p.faction = type(info.factionName) == "string" and not issecret(info.factionName) and info.factionName or p.faction
+	p.race = type(info.raceName) == "string" and not issecret(info.raceName) and info.raceName or p.race
 	p.at, p.shares = now, letters ~= ""
-	if letters == "" then
-		return
-	end
-	if #letters ~= #r.ids then
+	if letters == "" or #letters ~= #r.ids then
 		return
 	end
 	if p.n + #letters > PROGRESS_MAX then
-		wipe(p.quests) -- (the oldest answers go; what's shown now is asked again)
+		for _, set in ipairs({ p.done, p.active, p.ready, p.known }) do
+			wipe(set) -- (the oldest answers go; what's shown now is asked again)
+		end
 		p.n = 0
 	end
 	for i = 1, #letters do
-		local quest = r.ids[i]
-		if not p.quests[quest] then
+		local quest, letter = r.ids[i], letters:sub(i, i)
+		if not p.known[quest] then
 			p.n = p.n + 1
 		end
-		p.quests[quest] = LETTERS[letters:sub(i, i)]
+		p.known[quest] = true
+		p.done[quest] = letter == "d" or nil
+		p.active[quest] = (letter == "a" or letter == "r") or nil
+		p.ready[quest] = letter == "r" or nil
 	end
+	answeredFor[r.ids[1]] = true
 	progressChanged = true
 end
 
@@ -644,6 +647,10 @@ function B.TickQuests(now)
 	end
 	if progressChanged then
 		progressChanged = false
+		if Q.RedrawSmall and next(answeredFor) then
+			LT.Guard("Q.RedrawSmall", Q.RedrawSmall, now) -- (the small window: a friend's progress on the quest it shows)
+		end
+		wipe(answeredFor)
 		for _, fn in ipairs(listeners) do
 			local ok, err = pcall(fn)
 			if not ok then
@@ -663,7 +670,8 @@ end
 
 -- A friend gone (Beacon.lua's Forget).
 function B.QuestForget(id)
-	progress[id], asked[id], answeredAt[id], offers[id], holders[id] = nil, nil, nil, nil, nil
+	Friends()[id] = nil
+	asked[id], answeredAt[id], offers[id], holders[id] = nil, nil, nil, nil
 	if pending and pending.id == id then
 		pending = nil
 	end
@@ -680,7 +688,7 @@ end
 
 -- Beacon switched off.
 function B.QuestStop()
-	for _, t in ipairs({ progress, requests, askedAbout, asked, answeredAt, offers, holders, serves, incoming }) do
+	for _, t in ipairs({ Friends(), requests, askedAbout, asked, answeredAt, offers, holders, serves, incoming, answeredFor }) do
 		wipe(t)
 	end
 	want, pending, serving = nil, nil, nil

@@ -431,19 +431,19 @@ at most 40) go to every friend on a build from `QUESTTREE_SINCE` on, at most one
 (the latest wins), the same quest again only after 20 s. A friend answers the latest of mine at most
 once a second: a letter per quest, from `C_QuestLog` (done, ready to turn in, in the log, none); or
 nothing when their `friends` setting is off ("not shared"). Answers count for 60 s and only from
-friends asked. Kept in memory per friend (400 quests, then the oldest answers go), dropped when
-Beacon forgets them:
+friends asked. They fill **`Q.friends[gameAccountID]`**, the table Engine.lua reads (its `Q.Friends(id)`,
+`Q.Status(id, progress)`, `Q.Missing(id, progress)`), in memory, dropped when Beacon forgets the friend:
 
-- `Q.FriendProgress(gameAccountID)` -> `{ name, classFile, level, gameAccountID, at, shares, quests =
-  { [questID] = "done" | "ready" | "active" | "none" } }` or nil; `Q.FriendProgress()`: every
-  online friend's, by gameAccountID. **Engine:** `Q.Status(id, who)` takes such a table as `who`
-  (`who.quests[id]`: done -> "done", ready or active -> "active", none or missing: work it out from
-  `who.quests` of the prerequisites, which were asked with the chain).
-- `Q.FriendStatus(gameAccountID, id)` -> that word, or nil (not known).
-- `Q.Friends(id)` -> `{ { gameAccountID, name, classFile, level, status, ready } }` (status done,
-  active, none), sorted by name. Engine.lua's own `Q.Friends` loads later and replaces it; it should
-  walk `Q.FriendProgress()` and use `Q.Status(id, p)`.
-- `Q.OnFriendProgress(fn)`: `fn()` on Beacon's tick after answers came (the windows redraw).
+- `{ done = { [questID] = true }, active = { [questID] = true }, name, classFile, class, level, faction,
+  race, gameAccountID }` (who they are from Beacon's peer: level as they told it; faction and race from
+  Battle.net's game account info, the race localized), plus `ready` (in the log and ready to turn in,
+  also in `active`), `known` (asked and answered: in neither set means not done and not in the log),
+  `n`, `at`, `shares` (false: not shared). At most 400 quests per friend, then the oldest answers go.
+  `Q.friends` is looked up at each use, so Engine.lua may make the table itself.
+- `Q.FriendProgress(gameAccountID)` -> that table or nil; `Q.FriendProgress()` -> `Q.friends`.
+- `Q.FriendStatus(gameAccountID, id)` -> "done", "ready", "active", "none" or nil (not known).
+- After answers came (on Beacon's tick): `Q.RedrawSmall(now)` when the small window has it (the
+  request's first quest is the one a window shows), and every `Q.OnFriendProgress(fn)`.
 
 ### Learned data between friends (QuestShare.lua)
 

@@ -141,6 +141,10 @@ local function Questtree(ns)
 	if not Q.Chain then
 		Q.Chain = function(id) return CHAINS[id] or { id } end
 	end
+	if not Q.RedrawSmall then
+		Q.redraws = {}
+		Q.RedrawSmall = function(now) Q.redraws[#Q.redraws + 1] = now end
+	end
 	local real = Q.AddLearned
 	Q.added = {}
 	Q.AddLearned = function(id, fields)
@@ -734,16 +738,19 @@ Run(2)
 local asks = Logged(BOB, ANNA, "B2;qp;", logFrom)
 check(#asks == 2 and asks[2].data:match(";160$"), "then the latest one")
 check(#Logged(BOB, DORA, "B2;qp;", logFrom) == 0, "the older build isn't asked")
-local friends = bob.Q.Friends(102)
-check(#friends == 1 and friends[1].name == ANNA.name and friends[1].status == "active" and friends[1].classFile == "MAGE",
-	"Q.Friends: who has it, and how far")
-local p = bob.Q.FriendProgress(ANNA.id)
-check(p and p.quests[101] == "done" and p.name == ANNA.name and bob.Q.FriendProgress()[ANNA.id] == p, "Q.FriendProgress, one or all")
+local p = bob.Q.friends and bob.Q.friends[ANNA.id]
+check(p and p.done[101] and not p.active[101] and p.active[102] and not p.done[102] and not p.done[103] and not p.active[103],
+	"Q.friends: Engine's shape, done and active")
+check(p and p.name == ANNA.name and p.classFile == "MAGE" and p.class == "MAGE" and p.level == 19 and p.faction == "Alliance",
+	"with who they are (name, class, level, faction)")
+check(bob.Q.FriendProgress(ANNA.id) == p and bob.Q.FriendProgress() == bob.Q.friends, "Q.FriendProgress reads it, one or all")
+check(bob.Q.redraws == nil or #bob.Q.redraws >= 1, "the small window is redrawn (Q.RedrawSmall)")
 check(bob.Q.RequestFriendProgress(140), "asked about another")
 local told = 0
 bob.Q.OnFriendProgress(function() told = told + 1 end)
 Run(3)
-check(bob.Q.FriendStatus(ANNA.id, 140) == "ready" and told >= 1, "ready to turn in; the windows are told")
+check(bob.Q.FriendStatus(ANNA.id, 140) == "ready" and bob.Q.friends[ANNA.id].active[140] and told >= 1,
+	"ready to turn in (active for Engine); the windows are told")
 logFrom = #world.log + 1
 bob.Q.RequestFriendProgress(140)
 Run(3)
