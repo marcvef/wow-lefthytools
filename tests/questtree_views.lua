@@ -320,9 +320,9 @@ local function RowOf(view, map) return view.list:Row("z" .. map), view.list.entr
 do
 	Hide(storylines)
 	Show(levelpath)
-	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains, Elwynn Forest",
+	check(Rows(levelpath) == "Westfall, Darkshore, Elwynn Forest",
 		"the zones of my side (not the Horde's) with something for my levels or a friend there, the most for my level first: " .. Rows(levelpath))
-	check(plain(levelpath.Head:GetText()) == "Best next: Westfall, 7 quests for your level", "the best next zone on top")
+	check(plain(levelpath.Head:GetText()) == "Best next: Westfall, 6 quests for your level", "the best next zone on top")
 	local row = RowOf(levelpath, WESTFALL)
 	local e = row.entry
 	local function runs(entry)
@@ -334,13 +334,13 @@ do
 	local elwynn = RowOf(levelpath, ELWYNN).entry
 	check(runs(elwynn) == "1-3 done, 4-4 open, 5-10 done", "Elwynn's: done, one open, done: " .. runs(elwynn))
 	check(e.here and row.Here:IsShown() and plain(row.Name:GetText()) == "Westfall", "the zone I'm in: a faint band, only its name")
-	check(plain(row.Right:GetText()) == "7 for your level" and not row.Sub and not row.Band and not row.Dots,
+	check(plain(row.Right:GetText()) == "6 for your level" and not row.Sub and not row.Band and not row.Dots,
 		"the row: its name, its bar, what's there for my level; nothing else")
 	check(plain(RowOf(levelpath, ELWYNN).Right:GetText()) == "", "nothing for my level (Cleo is there): nothing at the right")
 	local me = levelpath.x0 + (12 - 1) * levelpath.per + levelpath.per / 2
 	check(math.abs(select(4, row.Me:GetPoint(1)) - me) < 0.01 and plain(levelpath.Axis.You:GetText()) == "You (12)", "a line at my level")
 	row._scripts.OnEnter(row)
-	check(TOOLTIP.title == "Westfall" and tipHas("7 for your level") and tipHas("2 you can take now") and tipHas("1 in your quest log")
+	check(TOOLTIP.title == "Westfall" and tipHas("6 for your level") and tipHas("2 you can take now") and tipHas("1 in your quest log")
 		and tipHas("0 of 8 done") and tipHas("Anna Brook level 13") and tipHas("You're here.") and tipHas("Click: open this zone"),
 		"its tooltip: the rest (done, what I can take, in my log, friends there)")
 	row._scripts.OnLeave(row)
@@ -356,12 +356,12 @@ do
 	M.db.friends = false
 	levelpath:Refresh()
 	Wait(0.1)
-	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains" and not levelpath.All.on, "no friends: only the zones with something for my levels")
+	check(Rows(levelpath) == "Westfall, Darkshore" and not levelpath.All.on, "no friends: only the zones with something for my levels")
 	levelpath.All:Click()
-	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains, Elwynn Forest" and levelpath.All.on and M.db.views.allZones == true,
+	check(Rows(levelpath) == "Westfall, Darkshore, Elwynn Forest, Redridge Mountains" and levelpath.All.on and M.db.views.allZones == true,
 		"All zones: every zone of my side; kept")
 	levelpath.All:Click()
-	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains" and M.db.views.allZones == nil, "and off again")
+	check(Rows(levelpath) == "Westfall, Darkshore" and M.db.views.allZones == nil, "and off again")
 	M.db.friends = true
 	-- A level up: counted again, the order follows.
 	PLAYER_LEVEL = 18
@@ -405,7 +405,7 @@ do
 	check(census.starts == starts and levelpath.draws == draws, "an event while hidden: nothing")
 	Show(levelpath)
 	Wait(0.2)
-	check(census.starts == starts + 1 and plain(RowOf(levelpath, WESTFALL).Right:GetText()) == "6 for your level", "shown again: counted again, as it is now")
+	check(census.starts == starts + 1 and plain(RowOf(levelpath, WESTFALL).Right:GetText()) == "5 for your level", "shown again: counted again, as it is now")
 	-- The data changing while shown.
 	starts = census.starts
 	Q.SetTestData(QUESTS_DATA, ZONES)

@@ -463,6 +463,13 @@ do
 		{ id = 9, title = "One way", level = 20, minLevel = 18, zone = 1429, excl = { 10 } },
 		{ id = 10, title = "Other way", level = 20, minLevel = 18, zone = 1429, excl = { 9 } },
 		{ id = 11, title = "Report in", level = 20, minLevel = 18, zone = 1429, breadcrumbFor = 2 },
+		{ id = 12, title = "Red", level = 25, minLevel = 18, zone = 1429 },
+		{ id = 13, title = "Orange", level = 24, minLevel = 18, zone = 1429 },
+		{ id = 14, title = "Scales", level = -1, minLevel = 10, zone = 1429 },
+		{ id = 15, title = "Zero", level = 0, minLevel = 5, zone = 1429 },
+		{ id = 16, title = "Flagged", minLevel = 5, scales = true, zone = 1429 },
+		{ id = 17, title = "Grey", level = 10, minLevel = 5, zone = 1429 },
+		{ id = 18, title = "No level", zone = 1429 },
 	}, { { map = 1429, name = "Elwynn Forest", continent = 1415 } })
 	PLAYER_LEVEL = 20
 	Fire("PLAYER_LEVEL_UP", 20)
@@ -479,8 +486,20 @@ do
 	check(why == "closed" and by == 10, "the other way taken: closed by it")
 	why, by = Q.WhyOther(11)
 	check(why == "closed" and by == 2 and Q.WhyOther(2) == nil and Q.WhyOther(1) == nil, "a breadcrumb to a quest I have: closed; others aren't 'other'")
-	check(not Q.InRange(1) and Q.InRange(2) and Q.InRange(3) and not Q.InRange(4) and Q.RANGE_ABOVE == 2,
-		"my levels: not grey, not more than two levels above me to take")
+	check(not Q.InRange(1) and Q.InRange(2) and not Q.InRange(3) and not Q.InRange(4) and Q.RANGE_RED == 4 and Q.RANGE_ABOVE == nil,
+		"my levels: not grey, nothing I can't take yet (coming up is out)")
+	check(not Q.InRange(12) and Q.InRange(13) and Q.Status(12) == "available" and Q.Difficulty(12) == "impossible",
+		"a red quest I could take: still available, not in my levels; orange is")
+	check(Q.InRange(14) and Q.InRange(15) and Q.InRange(16) and Q.InRange(18) and not Q.InRange(17),
+		"levels -1, 0 and the data's flag count as mine; no level: in; grey: out")
+	check(Q.Difficulty(14) == "fair" and Q.Difficulty(15) == "fair" and Q.Difficulty(16) == "fair" and not Q.IsTrivial(16)
+		and Q.LevelColor(-1).key == "fair" and Q.LevelColor(0).key == "fair" and Q.Difficulty(17) == "trivial",
+		"a level that scales: yellow (fair), never grey")
+	PLAYER_LEVEL = 4
+	Fire("PLAYER_LEVEL_UP", 4)
+	check(not Q.InRange(14) and not Q.InRange(15) and Q.Status(14) == "level", "below its minimum level: out, even when it scales")
+	PLAYER_LEVEL = 20
+	Fire("PLAYER_LEVEL_UP", 20)
 	PLAYER_LEVEL = 30
 	Fire("PLAYER_LEVEL_UP", 30)
 	check(Q.InRange(2) and Q.InRange(3) and Q.InRange(4), "in my log: always in my levels (grey or not)")

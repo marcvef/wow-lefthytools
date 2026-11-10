@@ -220,15 +220,23 @@ read.
   and `Q.ZoneGiven` (a cave or a city's floor without quests counts as its zone, the position put on
   it with `C_Map.GetMapRectOnMap`); not quests only an item starts. Grey ones (`Q.IsTrivial`) last;
   with my position on that map (0..1) the nearest giver on it first (widths counted 1.5 times), then
-  those without a giver there; without a position the nearest my level first. Kept per data,
+  those without a giver there; without a position the nearest my level first (a level that scales
+  counts as mine, here and in `Q.Next` and `Q.Missing`'s best of several). Kept per data,
   progress and map; the order for the last position asked (1% steps).
+- `Q.InRange(id)`: within my levels, what the windows show unless asked for all levels: a quest in
+  my log; else one I can take now by its levels and that's worth it: its `minLevel` at most my level,
+  not grey (`Q.IsTrivial`) and its level at most `Q.RANGE_RED` (4) above mine (not red). A level that
+  scales (-1, 0, `scales`) counts as mine; no level: its minimum level; nothing known (or my level
+  not known): in range. Levels only: what else stands in its way is `Q.Status`'s (a red quest is
+  still `"available"`). Quests coming up (a minimum level above mine) are out (`Q.RANGE_ABOVE` is gone).
 - `Q.LevelColor(level[, questID])` → `{ r, g, b, hex = "ffrrggbb", key }` (shared, `Q.DIFFICULTY`):
   the game's quest difficulty colours against my level. With a quest ID the client's own answer
   first (`C_PlayerInfo.GetContentDifficultyQuestForPlayer`, `Enum.RelativeContentDifficulty`);
   else by level: 5 or more above me `impossible` (red, ff1a1a), 3-4 `difficult` (orange, ff8040),
   2 below to 2 above `fair` (yellow), above classic's grey level `easy` (green), else `trivial`
   (grey; grey up to level - 5 - level/10 until 39, level - 1 - level/5 until 59, then level - 9; none
-  up to level 5). No level: `fair`. `Q.Difficulty(id)`: a quest's key (its level or the client's);
+  up to level 5). No level, or -1 / 0: `fair`. `Q.Difficulty(id)`: a quest's key (the client's, else
+  `fair` for a level that scales, else its level, without one its minimum level);
   `Q.IsTrivial(id)`: grey for me (the game's grey "!" rather than the yellow one).
 - `Q.Missing(id, who)` → `{ { id, status, reason } }`: what's missing, walked back through the chain
   across zones, the first one to do first. `reason`: `"done"` (must be completed), `"any"` (one of

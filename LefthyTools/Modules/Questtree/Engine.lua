@@ -186,6 +186,21 @@ local function MyLevel()
 	return ok and type(level) == "number" and Readable(level) and level or nil
 end
 
+-- Whether a quest's level scales to the player's (a level of -1 or 0, or the data's flag).
+local function Scales(q)
+	return q.scales == true or (tonumber(q.level) or 1) <= 0
+end
+
+-- A quest's level to compare with mine (mine: my level, nil if not known): its level; one that scales
+-- to me counts as mine; without a level its minimum level.
+local function LevelOf(q, mine)
+	if Scales(q) then return mine end
+	local level = tonumber(q.level)
+	if level and level > 0 then return level end
+	level = tonumber(q.minLevel)
+	return level and level > 0 and level or nil
+end
+
 -- A profession's rank (skill line), nil if not known.
 local function SkillRank(line)
 	if not (GetProfessions and GetProfessionInfo) then return nil end
@@ -328,18 +343,24 @@ function Q.Needs(id)
 	return q and Gate(q) or nil
 end
 
--- Within my levels, what the windows show unless asked for all levels: a quest in my log, or one
--- neither grey for me nor more than RANGE_ABOVE levels above mine to take (no level known: yes).
-local RANGE_ABOVE = 2
-Q.RANGE_ABOVE = RANGE_ABOVE
+-- Within my levels, what the windows show unless asked for all levels: a quest in my log, or one I can
+-- take now by its levels and that's worth it: its minimum level reached, not grey for me (Q.IsTrivial)
+-- and not red, at most RANGE_RED levels above mine (a level that scales to me counts as mine; no level
+-- known: yes). What else stands in its way is Q.Status's.
+local RANGE_RED = 4
+Q.RANGE_RED = RANGE_RED
 function Q.InRange(id)
 	id = tonumber(id)
 	local q = id and Q.Quest(id)
 	if not q then return false end
 	if Q.Status(id) == "active" then return true end
+	local my = MyLevel()
+	if not my then return true end
+	local need = tonumber(q.minLevel)
+	if need and need > my then return false end
 	if Q.IsTrivial(id) then return false end
-	local my, need = MyLevel(), q.minLevel or q.level
-	return not (my and need and need > my + RANGE_ABOVE)
+	local level = LevelOf(q, my)
+	return not (level and level > my + RANGE_RED)
 end
 
 -- The best of several quests one of which is needed: one in my log, then one I can take, then
@@ -350,7 +371,9 @@ local function Best(list, who)
 	for _, id in ipairs(list) do
 		local q = Q.Quest(id)
 		local rank = RANK[Q.Status(id, who) or "other"] or 7
-		local level = q and (q.level or q.minLevel) or 99
+		local mine
+		if who then mine = tonumber(who.level) else mine = MyLevel() end
+		local level = q and LevelOf(q, mine) or 99
 		if not best or rank < bestRank or (rank == bestRank and (level < bestLevel or (level == bestLevel and id < best))) then
 			best, bestRank, bestLevel = id, rank, level
 		end
@@ -568,7 +591,7 @@ local function GreyLevel(level)
 	return level - 9
 end
 
--- A quest level against mine: a key of DIFFICULTY.
+-- A quest level against mine: a key of DIFFICULTY (no level, or -1 / 0, a level that scales to me: fair).
 local function LevelKey(level)
 	local mine = MyLevel()
 	if not mine or type(level) ~= "number" or level <= 0 then return "fair" end
@@ -606,12 +629,13 @@ function Q.LevelColor(level, questID)
 	return DIFFICULTY[NativeKey(tonumber(questID)) or LevelKey(tonumber(level))]
 end
 
--- A quest's difficulty key for me (the client's, else its level's), nil for one the data doesn't know.
+-- A quest's difficulty key for me (the client's, else its level's: one that scales to me is fair), nil
+-- for one the data doesn't know.
 function Q.Difficulty(id)
 	id = tonumber(id)
 	local q = id and Q.Quest(id)
 	if not q then return nil end
-	return NativeKey(id) or LevelKey(q.level or q.minLevel)
+	return NativeKey(id) or (Scales(q) and "fair") or LevelKey(LevelOf(q))
 end
 
 -- Grey for me: too low to be worth much (the game's grey "!").
@@ -694,7 +718,7 @@ function Q.Available(map, x, y)
 				if q and Q.Status(id) == "available" then
 					local spots, onlyItems = StartSpots(q, zone)
 					if not onlyItems then
-						base[#base + 1] = { id = id, spots = spots, grey = Q.IsTrivial(id) and 1 or 0, level = q.level or q.minLevel or level or 0 }
+						base[#base + 1] = { id = id, spots = spots, grey = Q.IsTrivial(id) and 1 or 0, level = LevelOf(q, level) or level or 0 }
 					end
 				end
 			end
@@ -758,7 +782,7 @@ function Q.Next()
 	from(active)
 	local function rank(id)
 		local q = Q.Quest(id)
-		return (zone and q.zone == zone) and 0 or 1, q.level or q.minLevel or 0, Q.Status(id) == "available" and 0 or 1
+		return (zone and q.zone == zone) and 0 or 1, LevelOf(q, level) or 0, Q.Status(id) == "available" and 0 or 1
 	end
 	table.sort(list, function(a, b)
 		local za, la, sa = rank(a)
