@@ -12,6 +12,8 @@
 -- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. The calls the
 -- data part adds in parallel (Q.ChainStep, Q.Available, Q.LevelColor, Q.ZoneCount, Q.GiverQuests)
 -- get stand-ins here only while they're missing; with them gone it checks the window still works.
+-- Q.Objectives (the data part's, iteration 5) is a stand-in while Now's objective areas are checked
+-- (Now's areas on the map instead of the turn-in, their lines lighting them; the map's areas alone).
 -- Whatever it replaces is put back at its end.
 -- Needs: no other file.
 
@@ -250,6 +252,41 @@ RowWith("Steps (3)"):Click()
 check(M.db.stepsOpen == false and not RowWith("2. The Second Step"), "another click folds them")
 check(s.map.frame:IsShown() and s.map.map == 1436 and #s.map:Markers() == 1 and s.map:Markers()[1].look == "progress",
 	"the small map: the turn-in's zone, its marker (not done yet)")
+-- The data's objectives (Q.Objectives, the data part's: a stand-in here): the areas of those not done
+-- on the map instead of the turn-in, their lines light them.
+do
+	local OBJ = { [9002] = {
+		{ kind = "item", id = 750, name = "Wolf Pelts", count = 5, sources = {
+			{ kind = "npc", id = 299, name = "Young Wolf", chance = 40, points = { { map = 1429, x = 0.3, y = 0.6, r = 0.1 } } },
+			{ kind = "npc", id = 300, name = "Gray Wolf", chance = 20, points = { { map = 1436, x = 0.7, y = 0.2, r = 0.05 } } } } },
+		{ kind = "item", id = 751, name = "Candles", count = 3, sources = {
+			{ kind = "npc", id = 301, name = "Kobold Vermin", chance = 50, points = { { map = 1429, x = 0.6, y = 0.2, r = 0.05 } } } } } } }
+	Replace("Objectives", function(id) return OBJ[id] or {} end)
+	Q.RedrawSmall(true)
+	s = Small()
+	local areas, turnin = {}, false
+	for _, mk in ipairs(s.map:Markers()) do
+		if mk.kind == "area" then areas[#areas + 1] = mk end
+		if mk.kind == "end" and mk.lines[1][1] == "Farmer Saldean" then turnin = true end
+	end
+	check(s.map.map == 1429 and #areas == 1 and areas[1].lines[1][1] == "Young Wolf" and areas[1].group == 1 and areas[1].Glow:IsShown()
+		and areas[1].size > 34 and not turnin, "not ready: the open objective's area in my zone (not the done one's, not the turn-in)")
+	local pelts = RowWith("- Wolf Pelts: 2/5")
+	check(pelts and pelts.Right:GetText() and pelts.Right:GetText() ~= "" and not RowWith("Candles: 3/3"),
+		"its line: a button with how far (the done one stays a line)")
+	pelts:GetScript("OnEnter")(pelts)
+	check(areas[1].alpha == 1 and Has(TOOLTIP.lines, "Where: Young Wolf (40%), Gray Wolf (20%)"), "hovering it lights its area; its tooltip says where")
+	pelts:GetScript("OnLeave")(pelts)
+	check(areas[1].alpha == 0.7, "leaving: as it was")
+	local pinned = #pins
+	pelts:Click()
+	check(#pins == pinned + 1 and pins[#pins].uiMapID == 1429 and pins[#pins].position.x == 0.3, "a click: the map pin at its nearest area")
+	areas[1]:GetScript("OnEnter")(areas[1])
+	check(Has(TOOLTIP.lines, "Objective area") and Has(TOOLTIP.lines, "Wolf Pelts"), "the area's tooltip: what it is, the objective")
+	areas[1]:GetScript("OnLeave")(areas[1])
+	PutBack("Objectives")
+	Q.RedrawSmall(true)
+end
 
 section("Questtree: the companion (Pick up next)")
 check(Has(s.texts, "Pick up next  Elwynn Forest") and Has(s.texts, "In progress") and Has(s.texts, "Available now")
@@ -331,14 +368,14 @@ check(Has(Small().texts, "You've done it") and #Small().history == 2, "done; the
 -- A giver's line and a marker: the game's map pin (Shift: in chat too).
 slash("9010")
 RowWith("Quest giver: William Pestle"):Click()
-local pin = pins[#pins]
+local pin, pinned = pins[#pins], #pins
 check(pin and pin.uiMapID == 1429 and pin.position.x == 0.52 and pins.tracked == true and #links == 0,
 	"the giver's line: the game's map pin at the giver, tracked")
 STATE.shift = true
 markers = Small().map:Markers()
 markers[1]:Click()
 STATE.shift = false
-check(#pins == 2 and links[1] and links[1]:find("worldmap", 1, true), "a marker, Shift-clicked: the pin, and its link in chat")
+check(#pins == pinned + 1 and links[1] and links[1]:find("worldmap", 1, true), "a marker, Shift-clicked: the pin, and its link in chat")
 markers[1]:GetScript("OnEnter")(markers[1])
 check(TOOLTIP.title == "William Pestle" and Has(TOOLTIP.lines, "Click: map pin"), "a marker's tooltip: who, what a click does")
 markers[1]:GetScript("OnLeave")(markers[1])
@@ -740,6 +777,21 @@ do
 	check(m.zoom == 1, "another map: the whole of it")
 	m:Show(9999, { { x = 0.5, y = 0.5, kind = "end", label = "B" } })
 	check(m.Empty:IsShown() and #m:Markers() == 1, "a map without art: says so, the marker on the dark box")
+	-- An objective's areas: soft gold circles as big as their radius, two objectives at one spot two
+	-- markers, a giver over them; lit and dimmed by objective.
+	m:Show(1429, { { x = 0.3, y = 0.3, kind = "area", group = 1, radius = 0.1, label = "Kobold Vermin", note = "Kobold Vermin slain" },
+		{ x = 0.31, y = 0.3, kind = "area", group = 2, radius = 0.05, label = "Kobold Worker" },
+		{ x = 0.6, y = 0.6, kind = "area", group = 1, label = "Kobold Vermin" }, { x = 0.3, y = 0.3, kind = "start", label = "Giver" } })
+	list = m:Markers()
+	check(#list == 4 and list[1].kind == "area" and list[1].Glow:IsShown() and not list[1].Icon:IsShown() and not list[1].Dot:IsShown()
+		and list[1].size > list[2].size and list[3].size == 34 and list[1].Glow.vertex[2] > 0.7 and list[4].Icon:IsShown()
+		and list[4]:GetFrameLevel() > list[1]:GetFrameLevel(), "areas: soft gold circles by their radius, one per objective, a giver over them")
+	m:Light(1)
+	check(list[1].alpha == 1 and list[3].alpha == 1 and list[2].alpha < 0.5, "an objective lit: its areas, the other's dimmed")
+	m:Show(1429, m.points)
+	check(list[2].alpha < 0.5, "laid again: still lit")
+	m:Light(nil)
+	check(list[1].alpha == 0.7 and list[2].alpha == 0.7, "and back")
 	m:Show(nil, {})
 	check(m.Empty:IsShown() and #m:Markers() == 0 and not m.markers[1]:IsShown(), "no map: no markers")
 	m:Hide()

@@ -545,5 +545,14 @@ ns.CHANGELOG = {
 	{ id = 179, module = "questtree",
 		en = { "Questtree: less on screen", "The companion shows what to do now and quests for your level, with the chain's steps folded away, and says why a quest is blocked or skipped. Storylines and the level path start with what's for your level; the panel beside the quest dialog lists only the steps around the quest. The Continents view is gone." },
 		de = { "Questtree: weniger auf einmal", "Das kleine Fenster zeigt, was jetzt zu tun ist, und Quests für dein Level, die Schritte der Questreihe eingeklappt, und sagt, warum eine Quest gesperrt oder übersprungen ist. Handlungsstränge und der Levelpfad zeigen zuerst, was zu deinem Level passt; das Feld neben dem Questfenster nur die Schritte um die Quest herum. Die Ansicht Kontinente gibt es nicht mehr." } },
+	{ id = 180, module = "questtree", -- PLACEHOLDER
+		en = { "Placeholder", "The data part's entry." },
+		de = { "Platzhalter", "Der Eintrag des Datenteils." } },
+	{ id = 181, module = "questtree", -- PLACEHOLDER
+		en = { "Placeholder", "The big window's entry." },
+		de = { "Platzhalter", "Der Eintrag des großen Fensters." } },
+	{ id = 182, module = "questtree",
+		en = { "Questtree: My quests", "The quest browser's Storylines tab is now My quests: your quest log with what's ready to turn in first, then your zone's quests nearest first, each with its next objective and where to turn it in (sort by zone, level or storyline), and the storylines you can go on with. The companion's map shows where your objectives are." },
+		de = { "Questtree: Meine Quests", "Der Tab Handlungsstränge im Quest-Browser ist jetzt Meine Quests: dein Questlog, zuerst was bereit zur Abgabe ist, dann die Quests deiner Zone, das Nächste zuerst, jede mit ihrem nächsten Questziel und wo du sie abgibst (sortiert nach Zone, Level oder Handlungsstrang), dazu die Handlungsstränge, mit denen du weitermachen kannst. Die Karte des kleinen Fensters zeigt, wo deine Questziele sind." } },
 	-- New entries go here, at the end.
 }

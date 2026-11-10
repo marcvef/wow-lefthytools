@@ -10,11 +10,13 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 -- opening it).
 --   local m = Q.NewMiniMap(parent[, width, height])  -- default 240 x 160 (a zone's art is 3:2)
 --   m.frame                                         -- to anchor it
---   m:Show(map, points[, name])                     -- points = { { x, y, kind, label [, note, look, grey, chance, radius] } }
---   m:SetSize(width, height), m:Hide(), m:ShowPlayer(on), m:Zoom(factor[, x, y]), m:Markers()
+--   m:Show(map, points[, name])                     -- points = { { x, y, kind, label [, note, look, grey, chance, radius, group] } }
+--   m:SetSize(width, height), m:Hide(), m:ShowPlayer(on), m:Zoom(factor[, x, y]), m:Markers(), m:Light(group)
 -- x and y are 0..1 on that map. kind: "start" (a quest giver), "end" (a turn-in), "drop" (where a
 -- quest's item drops: a soft orange spot, as big as its radius (0..1 of the map's width) or
--- more; the likeliest one says "drops here (12%)"). look, the
+-- more; the likeliest one says "drops here (12%)"), "area" (where a quest's objective is done: a
+-- soft gold circle as big as its radius; group: which objective, m:Light(group) lights its areas
+-- and dims the others', m:Light() puts them back). look, the
 -- icon (the ones players know from the game's maps): "available" (yellow !), "repeatable" (blue !),
 -- "trivial" (the game's grey ! of a low quest), "locked" (grey !: not open yet), "turnin" (yellow ?),
 -- "repeatturnin", "progress" (in your log, not done yet). Without look: a start is "available", an
@@ -53,7 +55,14 @@ local GLOW = "Spells\\GenericGlow64" -- (soft and round, black around it: drawn 
 local DOT = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local ARROW = "Interface\\Minimap\\MinimapArrow"
 local DROP_R, DROP_G, DROP_B = 1, 0.55, 0.12
-local KINDS = { start = L["Quest giver"], ["end"] = L["Turn-in"], drop = L["Drops here"] }
+local AREA_R, AREA_G, AREA_B = 1, 0.82, 0.25 -- an objective's area (the quest log's gold)
+local AREA_ALPHA, AREA_DIM, AREA_LIT = 0.7, 0.2, 1
+local KINDS = { start = L["Quest giver"], ["end"] = L["Turn-in"], drop = L["Drops here"], area = L["Objective area"] }
+
+-- A soft spot under the icons: a drop's or an objective's area.
+local function Soft(kind)
+	return kind == "drop" or kind == "area"
+end
 
 local Widget = {}
 Widget.__index = Widget
@@ -103,7 +112,7 @@ local function MarkerEnter(self)
 			GameTooltip:AddLine(line[3], 1, 0.82, 0, true)
 		end
 	end
-	if self.kind ~= "drop" and Q.Waypoint then
+	if self.kind ~= "drop" and Q.Waypoint then -- (an area's spot is where to go: a pin too)
 		GameTooltip:AddLine(L["Click: map pin. Shift-click: also in chat."], 0.5, 0.8, 1, true)
 	end
 	GameTooltip:Show()
@@ -156,16 +165,21 @@ end
 -- A marker's look for its kind: a drop's soft spot under the others; a giver's or turn-in's icon,
 -- solid, on a dark copy of itself (the outline that keeps it readable on any ground).
 local function Dress(m, marker, point)
-	local drop = point.kind == "drop"
+	local drop = Soft(point.kind)
 	local size = drop and math.max(DROP, math.min(DROP_MAX, (tonumber(point.radius) or 0) * 2 * m.artW)) or MARKER
-	marker.kind, marker.size = point.kind, size
+	marker.kind, marker.size, marker.group = point.kind, size, point.group
 	marker:SetSize(size, size)
 	marker:SetFrameLevel(m.Map:GetFrameLevel() + (drop and 1 or 3))
 	marker.Glow:SetShown(drop)
-	marker.Dot:SetShown(drop)
+	marker.Dot:SetShown(point.kind == "drop")
 	marker.Icon:SetShown(not drop)
 	marker.Shadow:SetShown(not drop)
 	marker.look = not drop and LookOf(point) or nil
+	if point.kind == "area" then
+		marker.Glow:SetVertexColor(AREA_R, AREA_G, AREA_B, AREA_ALPHA)
+	elseif drop then
+		marker.Glow:SetVertexColor(DROP_R, DROP_G, DROP_B, 0.9)
+	end
 	if not drop then
 		local art = LOOKS[marker.look]
 		local alpha = SetArt(marker.Icon, marker.look)
@@ -402,8 +416,9 @@ local function Put(m, n, point, width, height)
 	local drop = point.kind == "drop"
 	local line = { point.label or "", point.kind, point.note }
 	for i = 1, n do
-		local marker = m.markers[i]
-		if (marker.kind == "drop") == drop and math.abs(marker.px - px) <= NEAR and math.abs(marker.py - py) <= NEAR then
+		local marker = m.markers[i] -- (one marker: givers and turn-ins, drops, an objective's areas)
+		local same = Soft(marker.kind) == Soft(point.kind) and (marker.kind ~= "area" or (point.kind == "area" and marker.group == point.group))
+		if same and math.abs(marker.px - px) <= NEAR and math.abs(marker.py - py) <= NEAR then
 			marker.lines[#marker.lines + 1] = line
 			return n, nil
 		end
@@ -427,7 +442,7 @@ end
 -- zone's name over it. Another map than before shows the whole zone.
 function Widget:Show(map, points, name, keepZoom)
 	if map ~= self.map and not keepZoom then
-		self.zoom, self.cx, self.cy = 1, 0.5, 0.5
+		self.zoom, self.cx, self.cy, self.lit = 1, 0.5, 0.5, nil
 		Hint(self)
 	end
 	self.map, self.points, self.name = map, points, name
@@ -461,6 +476,23 @@ function Widget:Show(map, points, name, keepZoom)
 	self.shown = n
 	PlaceLabel(self, best)
 	PlacePlayer(self)
+	if self.lit ~= nil then
+		self:Light(self.lit)
+	end
+end
+
+-- Lights an objective's areas (group) and dims the other objectives' (only alphas change); nil:
+-- all as they were.
+function Widget:Light(group)
+	self.lit = group
+	for i = 1, self.shown or 0 do
+		local marker = self.markers[i]
+		if marker.kind == "area" then
+			local alpha = group == nil and AREA_ALPHA or (marker.group == group and AREA_LIT or AREA_DIM)
+			marker.Glow:SetVertexColor(AREA_R, AREA_G, AREA_B, alpha)
+			marker.alpha = alpha
+		end
+	end
 end
 
 -- For tests: the markers shown.

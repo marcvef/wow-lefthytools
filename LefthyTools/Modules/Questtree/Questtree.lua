@@ -356,6 +356,135 @@ function Q.Closes(id)
 	return list
 end
 
+-- A quest log objective's text as a pattern (the game's own formats: "%s slain: %d/%d", "%s: %d/%d";
+-- positional ones too): the name captured. Made again only when the formats differ (they don't, in
+-- the game).
+local OBJECTIVE_FORMATS = { "QUEST_MONSTERS_KILLED", "QUEST_ITEMS_NEEDED", "QUEST_OBJECTS_FOUND" }
+local objectivePatterns, objectiveFormats
+local function ObjectivePatterns()
+	local key = tostring(_G.QUEST_MONSTERS_KILLED) .. "\0" .. tostring(_G.QUEST_ITEMS_NEEDED) .. "\0" .. tostring(_G.QUEST_OBJECTS_FOUND)
+	if objectivePatterns and key == objectiveFormats then
+		return objectivePatterns
+	end
+	objectivePatterns, objectiveFormats = {}, key
+	for _, name in ipairs(OBJECTIVE_FORMATS) do
+		local format = _G[name]
+		if type(format) == "string" and format:find("%%") then
+			local p = format:gsub("%%%d*%$?s", "\1"):gsub("%%%d*%$?d", "\2")
+			p = p:gsub("([%^%$%(%)%.%[%]%*%+%-%?%%])", "%%%1"):gsub("\1", "(.-)"):gsub("\2", "%%d+")
+			objectivePatterns[#objectivePatterns + 1] = "^" .. p .. "$"
+		end
+	end
+	return objectivePatterns
+end
+
+-- An objective's name without its count ("Defias Bandit slain: 3/10" -> "Defias Bandit").
+local function ObjectiveName(text)
+	for _, p in ipairs(ObjectivePatterns()) do
+		local name = text:match(p)
+		if name and name ~= "" then
+			return name
+		end
+	end
+	local name = text:gsub("%s*:?%s*%d+%s*/%s*%d+%s*$", ""):gsub("^%s*%d+%s*/%s*%d+%s*", "")
+	return name ~= "" and name or text
+end
+
+local LOG_KIND = { monster = "kill", item = "item", object = "object" }
+
+-- My quest's objectives from the quest log, each with what the data knows of it (Q.Objectives: the
+-- n-th of a kind to the n-th of that kind, else by its name in the text, else by place when both
+-- have as many): { { text, name, have, need, done, data } }, {} when it isn't in my log or has none.
+-- name: the text without its count; have/need: the numbers (nil when it has none).
+function Q.LogObjectives(id)
+	local log = id and C_QuestLog and C_QuestLog.GetQuestObjectives and LT.Value(C_QuestLog.GetQuestObjectives, id)
+	local out = {}
+	if type(log) ~= "table" then
+		return out
+	end
+	local data = Q.Objectives and Q.Objectives(id)
+	data = type(data) == "table" and data or {}
+	for _, o in ipairs(log) do
+		if type(o) == "table" and type(o.text) == "string" and not LT.IsSecret(o.text) and o.text ~= "" then
+			local have, need = tonumber(o.numFulfilled), tonumber(o.numRequired)
+			if not (need and need > 0) then
+				have, need = o.text:match("(%d+)%s*/%s*(%d+)")
+				have, need = tonumber(have), tonumber(need)
+			end
+			out[#out + 1] = { text = o.text, name = ObjectiveName(o.text), have = have, need = need, done = o.finished == true,
+				kind = LOG_KIND[o.type] }
+		end
+	end
+	local used, seen = {}, {}
+	for _, o in ipairs(out) do -- the n-th of a kind
+		if o.kind then
+			seen[o.kind] = (seen[o.kind] or 0) + 1
+			local n = 0
+			for i, d in ipairs(data) do
+				if d.kind == o.kind then
+					n = n + 1
+					if n == seen[o.kind] and not used[i] then
+						o.data, used[i] = d, true
+					end
+				end
+			end
+		end
+	end
+	for _, o in ipairs(out) do -- its name in the text
+		local text = o.text:lower()
+		for i, d in ipairs(data) do
+			if not o.data and not used[i] and type(d.name) == "string" and d.name ~= "" and text:find(d.name:lower(), 1, true) then
+				o.data, used[i] = d, true
+			end
+		end
+	end
+	if #out == #data then -- by place
+		for i, o in ipairs(out) do
+			if not o.data and not used[i] then
+				o.data, used[i] = data[i], true
+			end
+		end
+	end
+	return out
+end
+
+-- Where to go for a quest's objective: the spot of an area of an objective not done yet (the data's,
+-- Q.Objectives' sources' points) nearest my spot on map (else its first), and that objective. A quest
+-- in my log takes its log's objectives (done ones left out); else the data's. nil: no place known.
+function Q.ObjectiveSpot(id, map, x, y)
+	local list = {}
+	local logged = Q.LogObjectives(id)
+	if logged[1] then
+		for _, o in ipairs(logged) do
+			if not o.done and o.data then
+				list[#list + 1] = o
+			end
+		end
+	else
+		local data = Q.Objectives and Q.Objectives(id)
+		for _, d in ipairs(type(data) == "table" and data or {}) do
+			list[#list + 1] = { name = d.name, data = d }
+		end
+	end
+	local best, bestO, bestD, first, firstO
+	for _, o in ipairs(list) do
+		local sources = o.data.sources or {}
+		local point, _, d = Q.NearestPoint(sources, map, x, y)
+		if point and (not bestD or (d or 0) < bestD) then
+			best, bestO, bestD = point, o, d or 0
+		end
+		for _, source in ipairs(sources) do
+			if not first and source.points and source.points[1] then
+				first, firstO = source.points[1], o
+			end
+		end
+	end
+	if best then
+		return best, bestO
+	end
+	return first, firstO
+end
+
 ---------------------------------------------------------------------------
 -- Where I am, how far a spot is, the game's map pin
 ---------------------------------------------------------------------------
