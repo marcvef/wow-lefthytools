@@ -548,5 +548,11 @@ ns.CHANGELOG = {
 	{ id = 180, module = "questtree",
 		en = { "Questtree: objectives and rewards", "Questtree knows what each quest asks for (what to kill, use or collect, and where) and what it gives (items, money, experience), with Forever's own levels and counts. For your level now means quests you can take now that aren't red or grey." },
 		de = { "Questtree: Ziele und Belohnungen", "Questtree kennt jetzt die Ziele jeder Quest (was du töten, benutzen oder sammeln musst, und wo) und was sie gibt (Items, Geld, EP), mit den Leveln und Anzahlen von Forever. Für dein Level heißt jetzt: Quests, die du jetzt annehmen kannst und die nicht rot oder grau sind." } },
+	{ id = 181, module = "questtree", -- PLACEHOLDER
+		en = { "Placeholder", "The big window's entry." },
+		de = { "Platzhalter", "Der Eintrag des großen Fensters." } },
+	{ id = 182, module = "questtree",
+		en = { "Questtree: My quests", "The quest browser's Storylines tab is now My quests: your quest log with what's ready to turn in first, then your zone's quests nearest first, each with its next objective and where to turn it in (sort by zone, level or storyline), and the storylines you can go on with. The companion's map shows where your objectives are." },
+		de = { "Questtree: Meine Quests", "Der Tab Handlungsstränge im Quest-Browser ist jetzt Meine Quests: dein Questlog, zuerst was bereit zur Abgabe ist, dann die Quests deiner Zone, das Nächste zuerst, jede mit ihrem nächsten Questziel und wo du sie abgibst (sortiert nach Zone, Level oder Handlungsstrang), dazu die Handlungsstränge, mit denen du weitermachen kannst. Die Karte des kleinen Fensters zeigt, wo deine Questziele sind." } },
 	-- New entries go here, at the end.
 }

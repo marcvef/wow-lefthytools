@@ -13,8 +13,9 @@ local Q = ns.Questtree or {}; ns.Questtree = Q
 --     who did it (one line, only when there are any), its objectives or "Ready to turn in", where to
 --     turn it in (one line, with how far and which way), and "Steps (7)": the chain's steps, folded
 --     until clicked (setting stepsOpen keeps it).
---   The small map: the turn-in's zone (else yours) with the turn-in, your other quests' turn-ins and
---     the givers of what you can pick up there, and your arrow.
+--   The small map: not ready, the areas of its objectives not done (Q.Objectives; hovering an
+--     objective's line lights its areas); else the turn-in's zone (else yours) with the turn-in; your
+--     other quests' turn-ins and the givers of what you can pick up there, and your arrow.
 --   Pick up next, in two groups of at most three: In progress (your other quests, ready ones first)
 --     and Available now (for your levels, Q.InRange: follow-ups of what you just finished or have,
 --     then this zone's quests, the nearest giver first, each with its giver, how far and which way).
@@ -156,6 +157,9 @@ local function Text(y, text, font, indent)
 end
 
 local function RowEnter(self)
+	if self.onEnter then
+		self.onEnter()
+	end
 	local tip = self.tooltip
 	if not tip then
 		return
@@ -169,6 +173,9 @@ local function RowEnter(self)
 end
 
 local function RowLeave(self)
+	if self.onLeave then
+		self.onLeave()
+	end
 	if GameTooltip:IsOwned(self) then
 		GameTooltip:Hide()
 	end
@@ -182,7 +189,8 @@ local function RowClick(self, button)
 end
 
 -- A line that does something when clicked: o = { text, right (grey, at the right), font, onClick,
--- tooltip = { title, line, ... }, indent, x, w (a part of the line's width) }.
+-- tooltip = { title, line, ... }, indent, x, w (a part of the line's width), onEnter, onLeave (also
+-- run on hover: an objective lights its areas on the map) }.
 local function Row(y, o)
 	rowsUsed = rowsUsed + 1
 	local row = rows[rowsUsed]
@@ -203,7 +211,7 @@ local function Row(y, o)
 	end
 	local indent = o.indent or 0
 	local w = (o.w or width) - indent
-	row.onClick, row.tooltip = o.onClick, o.tooltip
+	row.onClick, row.tooltip, row.onEnter, row.onLeave = o.onClick, o.tooltip, o.onEnter, o.onLeave
 	row:ClearAllPoints()
 	row:SetPoint("TOPLEFT", content, "TOPLEFT", (o.x or 0) + indent, -y)
 	row.Right:SetText(o.right or "")
@@ -263,6 +271,7 @@ end
 ---------------------------------------------------------------------------
 
 local Look, Draw -- (below: shows a quest looked at; draws it all)
+local ObjectiveRow -- (Now's objective lines)
 
 local function Shows(id)
 	return function() Look(id) end
@@ -789,6 +798,51 @@ local function PickRow(y, entry, ctx, group)
 		font = top and "GameFontHighlight" or "GameFontHighlightSmall" })
 end
 
+-- Where an objective is done, in words: "Defias Bandit", "Defias Pillager (32%), ..." (an item's
+-- likeliest sources first).
+local function Sources(data)
+	local parts = {}
+	for i, source in ipairs(data and data.sources or {}) do
+		if i > 3 then
+			break
+		end
+		local chance = tonumber(source.chance)
+		parts[#parts + 1] = (source.name or L["unknown"]) .. (data.kind == "item" and chance and chance > 0 and (" (" .. Q.Percent(chance) .. ")") or "")
+	end
+	return table.concat(parts, ", ")
+end
+
+-- An objective of Now ("- Wolf Pelts: 2/5", a done one ticked). One not done whose areas the data
+-- knows: its areas on the map (group i; hovering the line lights them), a click sets the map pin at
+-- the nearest. Returns y and the map of its area nearest me (nil: none).
+function ObjectiveRow(y, i, o, ctx)
+	local text = o.done and (I("done", 12) .. GREY .. o.text .. "|r") or ("- " .. o.text)
+	local sources = not o.done and o.data and o.data.sources or {}
+	local nearest = Q.NearestPoint(sources, ctx.zone, ctx.x, ctx.y)
+	local first
+	for _, source in ipairs(sources) do
+		for _, p in ipairs(source.points or {}) do
+			first = first or p
+			ctx.points[#ctx.points + 1] = { x = p.x, y = p.y, kind = "area", group = i, radius = tonumber(p.r), label = source.name or L["unknown"],
+				note = o.name or o.text, map = p.map }
+		end
+	end
+	local spot = nearest or first
+	if not spot then
+		return Text(y, text, "GameFontHighlightSmall", INDENT), nil
+	end
+	local where = Sources(o.data)
+	local tip = { o.text }
+	if where ~= "" then
+		tip[#tip + 1] = L["Where: %s"]:format(where)
+	end
+	tip[#tip + 1] = L["Click: map pin at the nearest spot. Shift-click: in chat too."]
+	y = Row(y, { text = text, indent = INDENT - 3, right = Far(sources, ctx), tooltip = tip,
+		onClick = function() Q.Waypoint(spot.map, spot.x, spot.y, IsShiftKeyDown and IsShiftKeyDown()) end,
+		onEnter = function() map:Light(i) end, onLeave = function() map:Light(nil) end })
+	return y, spot.map
+end
+
 -- Now: the quest I'm on (none: says so): its title (the tooltip: what it leads to), its step and
 -- bar, friends, its objectives or "Ready to turn in", the turn-in, the steps folded. Notes the map
 -- it wants and its markers in ctx.
@@ -815,31 +869,36 @@ local function DrawNow(y, ctx)
 	end
 	y = FriendsRow(y, id)
 	local ready = IsComplete(id)
+	local areaMap
 	if ready then
 		y = Text(y + 2, GREEN .. L["Ready to turn in"] .. "|r", "GameFontHighlight")
 	else
-		local objectives = C_QuestLog and LT.Value(C_QuestLog.GetQuestObjectives, id)
-		for i, o in ipairs(type(objectives) == "table" and objectives or {}) do
+		for i, o in ipairs(Q.LogObjectives(id)) do
 			if i > OBJECTIVES_MAX then
 				break
 			end
-			if type(o) == "table" and type(o.text) == "string" and not LT.IsSecret(o.text) and o.text ~= "" then
-				y = Text(y, o.finished and (I("done", 12) .. GREY .. o.text .. "|r") or ("- " .. o.text), "GameFontHighlightSmall", INDENT)
-			end
+			local map
+			y, map = ObjectiveRow(y, i, o, ctx)
+			areaMap = (map == ctx.zone and map) or areaMap or map
 		end
 	end
 	if not quest then
+		ctx.map = areaMap
 		return y
 	end
-	-- Where to turn it in (on the map with it).
+	-- Where to turn it in (on the map with it when it's ready, or no objective's area is known).
 	y = PlaceRow(y + 2, L["Turn-in:"], quest.ends, "end", ctx, I(ready and "turnin" or "progress"))
-	local point = Q.NearestPoint(quest.ends, ctx.zone)
-	local first = quest.ends and quest.ends[1]
-	ctx.map = point and ctx.zone or (first and first.points and first.points[1] and first.points[1].map) or nil
-	for _, who in ipairs(quest.ends or {}) do
-		for _, p in ipairs(who.points or {}) do
-			ctx.points[#ctx.points + 1] = { x = p.x, y = p.y, kind = "end", look = ready and "turnin" or "progress",
-				label = who.name or L["unknown"], note = Q.Title(id, quest), map = p.map }
+	if areaMap then
+		ctx.map = areaMap
+	else
+		local point = Q.NearestPoint(quest.ends, ctx.zone)
+		local first = quest.ends and quest.ends[1]
+		ctx.map = point and ctx.zone or (first and first.points and first.points[1] and first.points[1].map) or nil
+		for _, who in ipairs(quest.ends or {}) do
+			for _, p in ipairs(who.points or {}) do
+				ctx.points[#ctx.points + 1] = { x = p.x, y = p.y, kind = "end", look = ready and "turnin" or "progress",
+					label = who.name or L["unknown"], note = Q.Title(id, quest), map = p.map }
+			end
 		end
 	end
 	if chain then
