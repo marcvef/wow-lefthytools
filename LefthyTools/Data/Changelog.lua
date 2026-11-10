@@ -515,5 +515,8 @@ ns.CHANGELOG = {
 	{ id = 169, module = "questtree",
 		en = { "Questtree: quest chains", "A new module for quest chains. /questtree shows what's next for you, /questtree <name> any quest: what it needs first, where it starts and ends on a small map, what it leads to and which friends have done it." },
 		de = { "Questtree: Questreihen", "Ein neues Modul für Questreihen. /questtree zeigt, was als Nächstes für dich ansteht, /questtree <Name> jede Quest: was sie vorher braucht, wo sie auf einer kleinen Karte beginnt und endet, wozu sie führt und welche Freunde sie schon erledigt haben." } },
+	{ id = 170, module = "questtree",
+		en = { "Questtree: the big window", "/questtree browse shows every zone's quest chains as a tree: done, next and locked quests in colour, what a quest needs first, who gives it and where. A search covers all zones." },
+		de = { "Questtree: das große Fenster", "/questtree browse zeigt die Questreihen jedes Gebiets als Baum: erledigte, nächste und gesperrte Quests in Farbe, was eine Quest vorher braucht, wer sie vergibt und wo. Eine Suche geht über alle Gebiete." } },
 	-- New entries go here, at the end.
 }

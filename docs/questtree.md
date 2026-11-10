@@ -278,3 +278,88 @@ command, events only while shown, place and size kept and the setting off, a fig
 the controller, switched off; the small map alone. Without Data.lua and Engine.lua in the build it
 puts stand-ins of their functions on `ns.Questtree` (and takes them away at its end); with them it
 installs its quests through `Q.SetTestData` and checks against the engine's answers.
+## Big window (Browser.lua)
+
+`Q.ToggleBrowser()` opens or closes it, `Q.OpenBrowser(id)` opens it on a quest (its zone or dungeon on
+the left, its group unfolded, its row in the middle of sight, its details), `Q.HideBrowser()` closes it
+(the module switched off), `Q.BrowserShown()` says whether it's open. With the module off it doesn't open
+(one chat line says how to switch it on).
+
+**Size.** 1200 x 760 (`LT.Window.Create`, `LefthyToolsQuesttreeBrowser`, in `UISpecialFrames` so Escape
+closes it, movable), scaled down to fit when the screen (`GetScreenWidth`/`GetScreenHeight`, UI units) is
+smaller than that plus 40 x 80. In the band under the title: "Search all zones:" with its box, and a
+legend of the status colours on the right. Under it three panes in the inset:
+
+- **Left (270 px): places.** `Q.Zones()` grouped by continent in the order it gives them (a header per
+  continent, its name from `C_Map.GetMapInfo`; a click folds it), then a "Dungeons" header and
+  `Q.Dungeons()`. Each row: the name, the level range, "done of total": `Q.Status` over
+  `Q.ZoneQuests(map)` / `Q.DungeonQuests(name)`, quests whose status is `other` (another race, class or
+  faction) not counted, in green when all are done, a dash when none is for me. The first time it opens, the zone I'm in is chosen
+  (`C_Map.GetBestMapForUnit`, then its parents), else the first zone.
+- **Middle (500 px): the tree.** A title (the place, its levels, done of total), then a group per chain:
+  every quest of the place goes through `Q.Chain(id)` once; a chain of more than one quest is a group
+  (its header: the first quest's title, done/total of the whole chain, a click folds it), ordered by the
+  lowest level of its quests in this place. Inside, the rows are a tree: who leads to whom is each
+  quest's `pre`, `preAny` and `preActive` and `Q.Opens`, inside the chain; the first quests are those
+  nothing in the chain leads to. A quest that leads to one other has it under it in the same column, one
+  that leads to several has them one column (14 px) further in, each with a line from it (a vertical
+  line through the rows between, a short stub to the row), like a file tree; columns stop at the tenth.
+  A quest two earlier ones lead to is drawn once, under the first one visited (the details' "Needs
+  first" names the rest). Steps of the chain in another zone are shown with that zone at the right.
+  The quests without a chain come last, under "Quests without a chain", by level. Each row: a dot in the
+  status's colour (a lock for locked), "[level] title" in that colour: done green, in my log yellow,
+  available white, locked grey, level too low orange, not for me dim. Hover: a tooltip (title, status,
+  zone); a click: the details.
+- **Right: the details** of the quest clicked, in a scroll area: the title (the client's,
+  `C_QuestLog.GetTitleForQuestID`, when it answers, else the data's), its status (level too low: which
+  level it needs), level and minimum level, its zone, which step of its chain it is, tags (new in WoW:
+  Forever, repeatable, learned while playing); "Requirements": faction, races and classes (the masks'
+  bits, names from `C_CreatureInfo.GetRaceInfo` and `GetClassInfo` when they answer), skill
+  (`C_TradeSkillUI.GetTradeSkillDisplayName`), reputation (`C_Reputation.GetFactionDataByID` and the
+  standing's `FACTION_STANDING_LABEL<n>`), what it's a breadcrumb to, what taking it closes; "Starts at"
+  and "Turn in at" (up to three each, objects and items said so, the zone of the first spot); the small
+  map (`Q.NewMiniMap(box)` made once into a box under them; `m:Show(map, points)` with the first giver's
+  map, else the first ender's, and every start and end spot on that map, at most 20 of each; no
+  `Q.NewMiniMap`, or one that fails: no map); "Needs first:" (`Q.Missing(id)`) and "Leads to:"
+  (`Q.Opens(id)`), a button per quest (at most 12 each, "... and N more"), in its status's colour, its zone
+  named when it isn't the place shown; friends (`Q.Friends(id)`: names in class colour, their status;
+  at most 12); and at the bottom, outside the scroll area, "Show in the small window" (`Q.ShowQuest`).
+
+**Going to a quest** (a link, a search result, `Q.OpenBrowser(id)`): it stays in the place shown if that
+place's tree has it (a chain reaching into it), else goes to the quest's zone if that zone lists it, else
+its dungeon if that lists it, else its zone. Its continent and its group unfold, the left list scrolls to
+the place when it changed. A click on a quest (a row or a link) also shows it in the small window when
+that's open (`Q.IsSmallShown()`, the small window's part; without it this is skipped).
+
+**Search.** Typed into the box, searched 0.3 s after the last key: a quest ID finds that quest, two letters
+or more go to `Q.Search(text)` (titles, the client's too, and givers). The results replace the tree, each
+with its zone. A click on a result goes to it (above), with "Back to the search results" as the first
+row; a click on a place does the same with that place. The search stays (the box keeps its text) until
+it's emptied (the box's X, or deleting it), which goes back to the tree where it is, the quest in the
+details in sight. One letter: "Type at least two letters." Closed before a search was due, it runs when
+the window opens again.
+
+**No data.** `Q.Load()` (it loads `LefthyTools_QuestData` the first time) not true, or no `Q.Load`: the
+window says the data isn't there (missing or switched off in the AddOns list), without panes, search or
+legend.
+
+**What it costs.** Built the first time it opens; nothing at login. Both lists are pools of the rows in
+sight plus 2 above and below (a controller's cursor finds the next row; Blizzard's SmartNavigation then
+scrolls it to the middle), and entry i always has row `(i - 1) % pool + 1`, so a row keeps its quest while
+the list scrolls under it (only rows whose entry changed are moved). A place's tree is worked out once and
+kept; a place's count once, until a quest of it is turned in. Statuses are read for the rows in sight and
+the open place's group headers. While it's open it listens to `QUEST_TURNED_IN` (that quest's places
+counted again), `QUEST_ACCEPTED`, `QUEST_REMOVED`, `PLAYER_LEVEL_UP` and `QUEST_DATA_LOAD_RESULT` (a title
+asked for with `C_QuestLog.RequestLoadQuestByID`, once per quest a session, came); the handlers only note
+it, the window redraws on the next frame (an OnUpdate set only while something is due), at most every
+0.5 s for statuses, 0.2 s after titles. `Q.OnDataChanged` (registered when the window is first built):
+open, everything worked out goes and it's drawn again on the next frame; closed, when it opens. Closed:
+no events, no OnUpdate. Opening again draws what's true now (counts counted again).
+
+**Controller and taint.** Our frames only; nothing protected, so it opens in a fight and in gamepad
+mode. No Blizzard menu. Every row, link, the clear button and the small window's button are plain Buttons
+(SmartNavigation finds them as the panel's descendants); nothing of Blizzard's (navigation flags, mixins)
+is set on our frames.
+
+Tests: `tests/questtree_browser.lua`, with stand-ins for every `Q.*` it calls (the data, the engine, the
+small window, the small map), put back at the end.
