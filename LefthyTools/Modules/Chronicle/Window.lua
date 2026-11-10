@@ -47,6 +47,18 @@ local function Where(zone, sub)
 	return (zone ~= "" and zone) or sub
 end
 
+-- An item's link from its name, if the game has it (friends' loot and older entries carry the name
+-- only): a link can be hovered for its tooltip; nil if the game doesn't know the item yet.
+local function LinkByName(name)
+	if type(name) ~= "string" or name == "" or not (C_Item and C_Item.GetItemInfo) then
+		return nil
+	end
+	local ok, _, link = pcall(C_Item.GetItemInfo, name)
+	if ok and type(link) == "string" and LT.Readable(link) then
+		return link
+	end
+end
+
 -- One timeline line (localized), for my events and friends' alike.
 local TEXT = {
 	level = function(e)
@@ -78,7 +90,7 @@ local TEXT = {
 	rare = function(e)
 		return L["Killed the rare %s"]:format(e.name) .. ((e.zone and e.zone ~= "") and (" - " .. e.zone) or "")
 	end,
-	loot = function(e) return L["Looted %s"]:format(e.link or C.QualityText(e.name or "?", e.quality)) end,
+	loot = function(e) return L["Looted %s"]:format(e.link or LinkByName(e.name) or C.QualityText(e.name or "?", e.quality)) end,
 	mount = function(e) return L["New mount: %s"]:format(e.name) end,
 	pet = function(e) return L["New pet: %s"]:format(e.name) end,
 	toy = function(e) return L["New toy: %s"]:format(e.name) end,
@@ -653,10 +665,51 @@ local function PickerEntries()
 	return items
 end
 
+-- Links in the pages' text (loot, mostly): the item's tooltip on hover; a click opens it like a chat
+-- link, Shift-click puts it in the chat box. (The text frame takes links like the flight subtitles do;
+-- in gamepad mode not SetItemRef: from addon code its ShowUIPanel taints the focus manager.)
+local function LinkEnter(self, link)
+	GameTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT")
+	if pcall(GameTooltip.SetHyperlink, GameTooltip, link) then
+		GameTooltip:Show()
+	else
+		GameTooltip:Hide()
+	end
+end
+
+local function LinkLeave()
+	GameTooltip:Hide()
+end
+
+local function LinkClick(_, link, text, button)
+	local B = ns.Beacon
+	local isItem = type(link) == "string" and link:find("^item:") ~= nil
+	if isItem and IsModifiedClick() and B and B.ModifiedItemClick then
+		B.ModifiedItemClick(text or link)
+	elseif InputUtil and InputUtil.IsGamepadUIEnabled and InputUtil.IsGamepadUIEnabled() then
+		if isItem and ItemRefTooltip then
+			if not ItemRefTooltip:IsShown() then
+				ItemRefTooltip:SetOwner(UIParent, "ANCHOR_PRESERVE")
+			end
+			if pcall(ItemRefTooltip.SetHyperlink, ItemRefTooltip, link) then
+				ItemRefTooltip:Show()
+			end
+		end
+	else
+		pcall(SetItemRef, link, text, button)
+	end
+end
+
 local function Build()
 	frame = LT.Window.Create("LefthyToolsChronicleFrame", "Chronicle", 780, 620)
 	C.window = frame
 	LT.Window.AddText(frame)
+	if frame.Content.SetHyperlinksEnabled then
+		frame.Content:SetHyperlinksEnabled(true)
+	end
+	frame.Content:SetScript("OnHyperlinkEnter", LinkEnter)
+	frame.Content:SetScript("OnHyperlinkLeave", LinkLeave)
+	frame.Content:SetScript("OnHyperlinkClick", LinkClick)
 	frame.Canvas = C.Graphs.NewCanvas(frame.Content)
 	for _, metric in ipairs(C.Graphs.METRICS) do
 		local button = CreateFrame("Button", nil, frame.Content, "UIPanelButtonTemplate")

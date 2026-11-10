@@ -164,6 +164,10 @@ page, the only one friends have. The list is built when it opens; a refresh only
 text. A click elsewhere closes it. Hidden on the News, Friends and Compare pages. Then the pages,
 the open one's button greyed out:
 
+- **Links in the pages' text** (loot): the text frame takes links (`SetHyperlinksEnabled`, as the flight
+  subtitles' frame does): hovering one shows its tooltip, a click opens it like a chat link (Shift-click: into the
+  chat box; in gamepad mode the item's tooltip directly, not `SetItemRef`). Loot with a name only (friends', older
+  entries) becomes a link when the game knows the item (`C_Item.GetItemInfo` by name).
 - **Timeline:** all your characters' journals in one, newest first, a heading per day
   (`L["%Y-%m-%d"]`: German `%d.%m.%Y`), time, an inline icon (the item's or achievement's own where
   known), whose it is ("Alty Moss: ", once there's more than one character with entries) and the

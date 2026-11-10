@@ -787,6 +787,11 @@ end }
 C_Item.GetItemInfo = function(itemLink)
 	assert(itemLink ~= nil, "Usage: local itemInfo = C_Item.GetItemInfo(itemInfo)") -- not nilable, like the game's
 	local id = tonumber(tostring(itemLink):match("item:(%d+)"))
+	if not id and type(itemLink) == "string" and not itemLink:find("^%d+$") then
+		for i, item in pairs(ITEMS) do -- (by name too, like the game's: an item it has seen)
+			if item.name == itemLink then id = i break end
+		end
+	end
 	if ITEMS[id] and not Uncached(id) then
 		-- name, link, ..., the 11th: sellPrice (ITEMS[id].price, copper), the 14th: bindType
 		-- (ITEMS[id].bind: 1 = on pickup, 2 = on equip)

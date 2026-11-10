@@ -375,6 +375,12 @@ do
 		check(text:find(expected, 1, true), "timeline: " .. expected)
 	end
 	check(text:find("New mount: Brown Horse", 1, true) < text:find("Learned Mining", 1, true), "newest first")
+	-- Loot can be hovered: the text frame takes links, the item's tooltip under the mouse.
+	check(win.Content._hyperlinks == true and win.Content:GetScript("OnHyperlinkEnter"), "the text takes links")
+	win.Content:GetScript("OnHyperlinkEnter")(win.Content, "item:19019")
+	check(TOOLTIP.shown and TOOLTIP.link == "item:19019", "hovering the loot: its tooltip")
+	win.Content:GetScript("OnHyperlinkLeave")(win.Content)
+	check(not TOOLTIP.shown, "and away again")
 	win.Tabs.stats:Click()
 	local labels, values = win.Text:GetText(), win.Values:GetText()
 	local function lines(s) local n = 1 for _ in s:gmatch("\n") do n = n + 1 end return n end

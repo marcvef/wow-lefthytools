@@ -506,5 +506,8 @@ ns.CHANGELOG = {
 	{ id = 166, module = "tweaks",
 		en = { "Movable loot rolls", "Drag a Need / Greed window and the loot rolls come up there from then on. Misc Tweaks can place them without a roll, or put them back." },
 		de = { "Verschiebbare Würfelfenster", "Zieh ein Bedarf/Gier-Fenster, und die Würfelfenster erscheinen von da an dort. Misc Tweaks kann sie ohne Würfeln platzieren oder zurücksetzen." } },
+	{ id = 167, module = "chronicle",
+		en = { "Chronicle: hover loot for its tooltip", "Loot in Chronicle's timeline and news can be hovered for the item's tooltip and clicked like a chat link (Shift-click puts it in the chat box)." },
+		de = { "Chronicle: Tooltip für Beute", "Beute in Chronicles Zeitleiste und Neuigkeiten zeigt beim Drüberfahren den Tooltip des Items und lässt sich wie ein Chat-Link anklicken (Shift-Klick setzt ihn in den Chat)." } },
 	-- New entries go here, at the end.
 }
