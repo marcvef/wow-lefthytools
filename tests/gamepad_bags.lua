@@ -282,6 +282,13 @@ do
 	ContainerFrame6:Show()
 	Wait(1)
 	check(reagent:GetParent() == bag, "open again: in ours again")
+	CloseBags() -- (the bag's close button: only the combined bag closes)
+	check(not ContainerFrame6:IsShown() and reagent:GetParent() == ContainerFrame6 and ContainerFrame6:GetAlpha() == 1,
+		"ours closed: the unseen reagent window closes with it (else it stays open, counted as an open bag)")
+	OpenBags()
+	ContainerFrame6:Show()
+	Wait(1)
+	check(reagent:GetParent() == bag, "both open again: in ours")
 	T("mouseBags"):SetValue(false)
 	Wait(1)
 	-- Off: Blizzard's bag as it is.

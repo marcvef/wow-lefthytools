@@ -932,6 +932,26 @@ end
 local function OnBagHidden()
 	peeking = false -- (opened for the cursor: folded at the next opening)
 	retargetFrom, retargetTo = nil, nil
+	-- The reagent bag's window, kept open unseen for its items in ours, closes with ours (closing the
+	-- bag with its close button leaves the other windows open): else it stayed open, unseen, and
+	-- counted as an open bag for good (a flight's film never paused for the bag then, Mirage kept up).
+	local windows = {}
+	for window in pairs(hushed) do
+		windows[#windows + 1] = window
+	end
+	if windows[1] then
+		GiveBack()
+		for _, window in ipairs(windows) do
+			if window:IsShown() then
+				if CloseBag then
+					pcall(CloseBag, REAGENT_BAG)
+				end
+				if window:IsShown() then
+					window:Hide()
+				end
+			end
+		end
+	end
 	wipe(wantUp); wipe(wantDown)
 	ApplyJumps(false)
 	if next(jumped) then
