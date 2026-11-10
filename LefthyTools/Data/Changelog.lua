@@ -518,5 +518,8 @@ ns.CHANGELOG = {
 	{ id = 170, module = "questtree",
 		en = { "Questtree: the big window", "/questtree browse shows every zone's quest chains as a tree: done, next and locked quests in colour, what a quest needs first, who gives it and where. A search covers all zones." },
 		de = { "Questtree: das große Fenster", "/questtree browse zeigt die Questreihen jedes Gebiets als Baum: erledigte, nächste und gesperrte Quests in Farbe, was eine Quest vorher braucht, wer sie vergibt und wo. Eine Suche geht über alle Gebiete." } },
+	{ id = 171, module = "questtree",
+		en = { "Questtree learns, friends share", "While you quest, Questtree notes who gives and takes back the quests its data doesn't know, and what comes before them. Friends on this build pass it on, and see how far each of you got on a quest." },
+		de = { "Questtree lernt, Freunde teilen", "Beim Questen merkt sich Questtree, wer die Quests vergibt und annimmt, die seine Daten nicht kennen, und was davor kommt. Freunde mit diesem Build geben das weiter und sehen, wie weit ihr bei einer Quest seid." } },
 	-- New entries go here, at the end.
 }
