@@ -524,5 +524,12 @@ ns.CHANGELOG = {
 	{ id = 172, module = "questtree",
 		en = { "Questtree: a quest companion", "/questtree now follows what you do: the quest you're on with its chain steps and turn-in, and what to pick up next nearby, nearest first. Clear quest icons, item drop areas and your arrow on its map; NPC tooltips say which quests they start." },
 		de = { "Questtree: ein Quest-Begleiter", "/questtree folgt jetzt dem, was du tust: die Quest, an der du bist, mit den Schritten ihrer Questreihe und der Abgabe, und was du in der Nähe als Nächstes annehmen kannst, das Nächste zuerst. Klare Quest-Icons, Drop-Gebiete von Items und dein Pfeil auf seiner Karte; NPC-Tooltips sagen, welche Quests sie vergeben." } },
+	-- PLACEHOLDER (merge: replace with the small window's real entry 172 from its branch; it's only here so
+	-- the ids run 1, 2, 3, ... in this branch's tests).
+		en = { "Questtree: the small window", "(placeholder)" },
+		de = { "Questtree: das kleine Fenster", "(Platzhalter)" } },
+	{ id = 173, module = "questtree",
+		en = { "Questtree: chains as a map of cards", "The quest browser draws each chain as cards joined by lines, with what's next on its banner, and adds an overview and a zone map with every quest giver. Filters hide done quests, show only what you can take now, or show quests not for you." },
+		de = { "Questtree: Questreihen als Karten", "Der Quest-Browser zeigt jede Questreihe als verbundene Karten, mit dem nächsten Schritt im Banner, dazu eine Übersicht und eine Gebietskarte mit jedem Questgeber. Filter blenden Erledigtes aus, zeigen nur, was du jetzt annehmen kannst, oder auch Quests, die nicht für dich sind." } },
 	-- New entries go here, at the end.
 }
