@@ -545,5 +545,11 @@ ns.CHANGELOG = {
 	{ id = 179, module = "questtree",
 		en = { "Questtree: less on screen", "The companion shows what to do now and quests for your level, with the chain's steps folded away, and says why a quest is blocked or skipped. Storylines and the level path start with what's for your level; the panel beside the quest dialog lists only the steps around the quest. The Continents view is gone." },
 		de = { "Questtree: weniger auf einmal", "Das kleine Fenster zeigt, was jetzt zu tun ist, und Quests für dein Level, die Schritte der Questreihe eingeklappt, und sagt, warum eine Quest gesperrt oder übersprungen ist. Handlungsstränge und der Levelpfad zeigen zuerst, was zu deinem Level passt; das Feld neben dem Questfenster nur die Schritte um die Quest herum. Die Ansicht Kontinente gibt es nicht mehr." } },
+	{ id = 180, module = "questtree", -- PLACEHOLDER (the Data agent's entry; the lead replaces it)
+		en = { "Placeholder", "The Data agent's entry goes here." },
+		de = { "Platzhalter", "Hier kommt der Eintrag des Data-Agenten hin." } },
+	{ id = 181, module = "questtree",
+		en = { "Questtree: a big map, a full pane", "The quest browser's zone map fills the middle: the wheel zooms where you point, drag it, see where you are. A quest picked shows where its objectives are, its turn-in and the way there. The right pane always has something: the zone's briefing with what to turn in and what's in progress, or the quest's steps, objectives with your progress and its rewards." },
+		de = { "Questtree: große Karte, volles Fenster", "Die Gebietskarte im Quest-Browser füllt die Mitte: Das Mausrad zoomt dort, wo du hinzeigst, ziehen verschiebt sie, und du siehst, wo du bist. Eine gewählte Quest zeigt, wo ihre Ziele sind, ihre Abgabe und den Weg dorthin. Rechts steht immer etwas: die Übersicht des Gebiets mit dem, was du abgeben kannst und gerade machst, oder die Schritte der Quest, ihre Ziele mit deinem Fortschritt und ihre Belohnungen." } },
 	-- New entries go here, at the end.
 }
