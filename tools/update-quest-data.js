@@ -10,15 +10,17 @@
 //   that start a quest), creature and gameobject (where they stand), creature_template and
 //   gameobject_template (names, factions, loot), creature_ / gameobject_ / reference_loot_template
 //   (where the items that start quests drop), quest_template's objectives (ReqCreatureOrGOId, ReqItemId and
-//   their counts) and rewards (RewChoiceItemId, RewItemId, RewOrReqMoney, RewMoneyMaxLevel).
+//   their counts) and rewards (RewChoiceItemId, RewItemId, RewOrReqMoney, RewMoneyMaxLevel), game_event,
+//   game_event_quest and game_event_creature / _gameobject (the holidays' quests and who stands only then).
 // - WoW: Forever's own quests (new since classic): EG Link output (Efficient Games,
 //   https://github.com/JIVESCORP/eg-link-output-wowf, CC BY 4.0: what players' games recorded on
 //   Forever): quests.enUS (title, levels, races, zone, the next quest, the item that starts it),
 //   npcs (who offers and takes each quest, where they stand), quest_prerequisites (what every
 //   character had done before taking it) and loot (what players looted from what, and where: for
 //   the items that start quests classic-db has no source of), the quests' objectives and rewards (what
-//   Forever's server says: for every quest it has, classic's too) and turn_ins (the money players got),
-//   creatures (where players met Forever's own creatures). Selected and converted, not changed otherwise.
+//   Forever's server says: for every quest it has, classic's too) and turn_ins (the money players got, their
+//   side), creatures (where players met Forever's own creatures, how they reacted to each side), the quests'
+//   objectivesText and description (whom a quest is for, below). Selected and converted, not changed otherwise.
 // - Forever's client tables (wago.tools exports of the build): UiMap, UiMapAssignment (zones and
 //   their world rectangles), AreaTable, Map, QuestSort (names), FactionTemplate (which side an NPC
 //   is on), ChrRaces (Forever's playable races: their race-mask bits, sides), QuestV2 (the quests the client knows), QuestLineXQuest (Forever's quest
@@ -43,7 +45,13 @@
 //   borders: the zone of the NPC's own quests wins, and the others go with the point as
 //   alternatives ("/"), which Data.lua checks with the client's own map (C_Map.GetMapInfoAtPosition).
 // - Faction: the races' (only Alliance or only Horde), else the givers' side (FactionTemplate's
-//   groups, EG Link's "side"), when every giver is on the same one.
+//   groups, EG Link's "side"), when every giver is on the same one; else, with no NPC giver, the enders'.
+//   Forever's own quests with none of that (EG Link's raceMask is all bits for them): an NPC their text
+//   names ("for Foreman Oslow in Redridge"), else their zone when it's a side's own (HOME_ZONES); never
+//   a side whose other side's players were seen turning it in (sideFromText).
+// - Events (flag e): the holidays' quests (QuestSort Seasonal, Lunar Festival, Midsummer, Darkmoon Faire,
+//   ...; game_event_quest; givers that stand only while a holiday is on), and what needs one of them with
+//   no giver standing outside it (markEvents).
 // - Races: Forever's playable races (ChrRaces: classic's eight and the ones with their playable
 //   flags, the Skyborne), each by its PlayableRaceBit. A quest open to every classic race of a side
 //   is open to every race of that side (classic-db knows only the eight); open to all: no mask.
@@ -97,6 +105,14 @@ const UNUSED = /\[UNUSED\]|<UNUSED>|UNUSED |<NYI>|\bNYI\b|<TXT>|\[PH\]|<CHANGE T
 const ZONE_TYPES = { 3: 0, 4: 1 }; // UiMap types a position goes on (zone, dungeon floor), in that order of preference
 const OBJECTIVE_KINDS = { monster: "k", gameObject: "o", item: "i" }; // EG Link's objective types kept (kill, object, item)
 const XP_UNKNOWN = new Set([41, 62, 81]); // quest types (PvP, raid, dungeon) whose XP Forever multiplies: no classic formula
+// Quest sorts and classic-db game events of holidays (and the Darkmoon Faire, the weekly fishing contest).
+const HOLIDAY = /Seasonal|Lunar Festival|Love is in the Air|Noblegarden|Children's Week|Midsummer|Brewfest|Hallow's End|Harvest Festival|Pilgrim's Bounty|Winter Veil|New Year|Darkmoon Faire|Fishing Extravaganza|Day of the Dead|Pirates' Day|Scourge Invasion|^Invasion$/;
+// Each side's own zones (UiMap names): a Forever quest there with nothing else saying its side is that side's.
+const HOME_ZONES = {
+  Alliance: ["Elwynn Forest", "Westfall", "Redridge Mountains", "Duskwood", "Loch Modan", "Dun Morogh", "Teldrassil", "Darkshore",
+    "Stormwind City", "Ironforge", "Darnassus"],
+  Horde: ["Durotar", "Mulgore", "Tirisfal Glades", "Silverpine Forest", "Orgrimmar", "Thunder Bluff", "Undercity"],
+};
 
 const byNumber = (a, b) => a - b;
 const uniq = (list) => [...new Set(list)];
@@ -382,6 +398,161 @@ function rewardsOf(e, c, xpRow, paid) {
     }
   }
   return out;
+}
+
+// A Forever quest with no race mask, no faction and no giver or ender on a side (EG Link's raceMask is
+// all bits for them: the server leaves it to the giver's faction, which players' games don't record
+// when they took it from a giver EG Link didn't see): (a) an NPC its objectives text (else its
+// description) names, "for <Name>", "to <Name>", "<Name> at/in ...", found by its exact name among
+// classic-db's creatures and EG Link's NPCs and creatures, all of that name on the same side
+// (FactionTemplate, EG Link's side, players' reactions on both sides); a kill objective's creature
+// isn't one; (b) else its zone when it's one side's own (HOME_ZONES). Classic quests keep classic-db's
+// word: neutral givers there give to both sides (Captain Grayson in Westfall).
+function sideFromText(quests, eg, actors, creatureT, egNpc, templates, world) {
+  const nameSides = new Map(); // name -> Set of sides ("" for neither)
+  const addName = (name, side) => {
+    if (!name) return;
+    (nameSides.get(name) || nameSides.set(name, new Set()).get(name)).add(side || "");
+  };
+  for (const c of creatureT.values()) addName(c.Name, sideOf(templates, c.Faction));
+  for (const [k, r] of egNpc) if (k[0] === "n") addName(r.name, r.side === "Alliance" || r.side === "Horde" ? r.side : "");
+  for (const [id, c] of Object.entries(eg.creatures)) {
+    if (creatureT.has(+id) || egNpc.has("n" + id) || !c.reactions) continue;
+    const friendly = (side) => (c.reactions[side] || []).some((v) => v >= 5);
+    const hostile = (side) => (c.reactions[side] || []).some((v) => v <= 2);
+    addName(c.name, friendly("Alliance") && hostile("Horde") ? "Alliance" : friendly("Horde") && hostile("Alliance") ? "Horde" : "");
+  }
+  const sideOfName = (name) => {
+    const set = nameSides.get(name);
+    return set && set.size === 1 && [...set][0] ? [...set][0] : undefined;
+  };
+  const creatureName = (id) => (creatureT.get(id) && creatureT.get(id).Name) || (eg.creatures[id] && eg.creatures[id].name)
+    || (egNpc.get("n" + id) && egNpc.get("n" + id).name);
+  const WORD = "[A-Z][A-Za-z'\u2019-]*";
+  const NAME = `${WORD}(?:\\s+(?:${WORD}|of|the|de|von|van))*`;
+  const AFTER = new RegExp(`\\b(?:for|to|with|from)\\s+(${NAME})`, "g");
+  const BEFORE = new RegExp(`(${NAME})\\s+(?:at|in)\\s`, "g");
+  // The sides of the NPCs a text names (each candidate: whole, then without leading, then trailing words).
+  const named = (text, skip) => {
+    const found = [];
+    for (const re of [AFTER, BEFORE]) {
+      for (const m of String(text || "").replace(/\$\w+/g, " ").matchAll(re)) {
+        const words = m[1].split(/\s+/);
+        const tries = [];
+        for (let i = 0; i < words.length; i++) tries.push(words.slice(i).join(" "));
+        for (let j = words.length - 1; j >= 1; j--) tries.push(words.slice(0, j).join(" "));
+        for (const name of tries) {
+          if (skip.has(name)) continue;
+          const side = sideOfName(name);
+          if (side) { found.push([name, side]); break; }
+        }
+      }
+    }
+    return found;
+  };
+  const allianceMaps = new Set(), hordeMaps = new Set();
+  for (const u of world.ui.values()) {
+    if (u.type !== 3) continue;
+    if (HOME_ZONES.Alliance.includes(u.name)) allianceMaps.add(u.id);
+    if (HOME_ZONES.Horde.includes(u.name)) hordeMaps.add(u.id);
+  }
+  const missing = [...HOME_ZONES.Alliance, ...HOME_ZONES.Horde].filter((n) => ![...world.ui.values()].some((u) => u.type === 3 && u.name === n));
+  if (missing.length) throw new Error(`UiMap has no zone named ${missing.join(", ")}`);
+  console.log(`home zones: Alliance ${[...allianceMaps].sort(byNumber).join(",")}; Horde ${[...hordeMaps].sort(byNumber).join(",")}`);
+  const byEnder = [], byText = [], byZone = [], both = [];
+  // (a side players of the other one were seen turning it in can't be: EG Link's turn_ins)
+  const turnedIn = (q, side) => (eg.turnIns[q.id] || []).some((r) => r.faction === side);
+  const give = (q, side, list, line) => {
+    if (turnedIn(q, side === "Alliance" ? "Horde" : "Alliance")) { both.push(`${q.id} ${q.title}`); return; }
+    q.faction = side;
+    list.push(line);
+  };
+  for (const q of [...quests.values()].sort((a, b) => a.id - b.id)) {
+    if (q.races || q.faction) continue;
+    // (no NPC gives it, an item or an object does or nobody seen: the side of whom it's turned in to)
+    const enders = uniq(q.ends.map((k) => actors.get(k) && actors.get(k).side).filter(Boolean));
+    if (!q.starts.some((k) => k[0] === "n") && enders.length === 1) {
+      give(q, enders[0], byEnder, `${q.id} ${q.title} (${q.source}: ${q.ends.map((k) => actors.get(k).name).join(", ")}, ${enders[0]})`);
+      continue;
+    }
+    if (q.source !== "forever" || q.starts.concat(q.ends).some((k) => actors.get(k) && actors.get(k).side)) continue;
+    const e = eg.quests[q.id] || {};
+    const skip = new Set(q.objectives.filter((o) => o.kind === "k").map((o) => creatureName(o.id)).filter(Boolean));
+    let found = named(e.objectivesText, skip);
+    if (!found.length) found = named(e.description, skip);
+    const sides = uniq(found.map((f) => f[1]));
+    if (sides.length === 1) {
+      give(q, sides[0], byText, `${q.id} ${q.title}: ${uniq(found.map((f) => f[0])).join(", ")} (${sides[0]})`);
+    } else if (!sides.length && q.zone && (allianceMaps.has(q.zone) || hordeMaps.has(q.zone))) {
+      const side = allianceMaps.has(q.zone) ? "Alliance" : "Horde";
+      give(q, side, byZone, `${q.id} ${q.title} (${world.ui.get(q.zone).name}: ${side})`);
+    }
+  }
+  console.log(`left to both sides as players of the other one turned them in (EG Link's turn_ins): ${both.length}${both.length ? ": " + both.join("; ") : ""}`);
+  console.log(`side from the ender (no NPC giver): ${byEnder.length} (${byEnder.filter((s) => s.endsWith("Alliance)")).length} Alliance, ${byEnder.filter((s) => s.includes("(classic:")).length} classic), e.g. ${byEnder.slice(0, 12).join("; ")}`);
+  console.log(`side from an NPC named in the text: ${byText.length} (${byText.filter((s) => s.endsWith("(Alliance)")).length} Alliance), e.g. ${byText.slice(0, 12).join("; ")}`);
+  console.log(`side from the zone: ${byZone.length} (${byZone.filter((s) => s.endsWith("Alliance)")).length} Alliance), e.g. ${byZone.slice(0, 12).join("; ")}`);
+  return { byEnder, byText, byZone, both };
+}
+
+// Quests only takeable while their holiday or event is on (Q.IsEvent, flag e): a holiday's quest sort
+// (QuestSort's name: Seasonal, Lunar Festival, Midsummer, Darkmoon Faire, ...; classic-db's ZoneOrSort,
+// EG Link's categoryId), a holiday's quest in classic-db's game_event_quest, or one whose every giver
+// stands only while a holiday is on (game_event_creature / _gameobject); then a quest that needs one of
+// those and whose givers stand only then or nowhere (Children's Week's orphans).
+function markEvents(quests, eg, sql, sortName, creatures) {
+  const holidaySort = (id) => id > 0 && HOLIDAY.test(sortName.get(id) || "");
+  const events = new Map(rows(sql, "game_event").map((e) => [e.entry, e]));
+  const holiday = (id) => {
+    const e = events.get(id);
+    if (!e) return false;
+    if (e.holiday > 0 || HOLIDAY.test(e.description || "")) return true;
+    return e.linkedTo > 0 && events.has(e.linkedTo) && (events.get(e.linkedTo).holiday > 0 || HOLIDAY.test(events.get(e.linkedTo).description || ""));
+  };
+  const eventQuests = new Set(rows(sql, "game_event_quest").filter((r) => holiday(r.event)).map((r) => r.quest));
+  // Every spawn of each giver: false when one stands outside a holiday.
+  const spawnEvent = new Map(); // guid key -> event
+  for (const r of rows(sql, "game_event_creature")) spawnEvent.set("n" + r.guid, r.event);
+  for (const r of rows(sql, "game_event_gameobject")) spawnEvent.set("o" + r.guid, r.event);
+  const onlyHoliday = new Map(); // "n123" -> true (every spawn a holiday's) / false
+  const note = (key, guid) => {
+    const ev = spawnEvent.get(key[0] + guid);
+    const yes = ev > 0 && holiday(ev);
+    onlyHoliday.set(key, (onlyHoliday.has(key) ? onlyHoliday.get(key) : true) && yes);
+  };
+  const byGuid = new Map(creatures.map((r) => [r.guid, r]));
+  for (const r of creatures) if (r.id) note("n" + r.id, r.guid);
+  for (const r of rows(sql, "creature_spawn_entry")) if (byGuid.has(r.guid)) note("n" + r.entry, r.guid);
+  for (const r of rows(sql, "gameobject")) note("o" + r.id, r.guid);
+  const why = { sort: [], event: [], giver: [], follow: [] };
+  const mark = (q, kind) => { q.event = true; why[kind].push(`${q.id} ${q.title}`); };
+  const givers = (q) => q.starts.filter((k) => k[0] !== "i");
+  for (const q of [...quests.values()].sort((a, b) => a.id - b.id)) {
+    const e = eg.quests[q.id];
+    if (holidaySort(-q.zoneOrSort) || (e && holidaySort(e.categoryId))) mark(q, "sort");
+    else if (eventQuests.has(q.id)) mark(q, "event");
+    else if (givers(q).length && givers(q).every((k) => onlyHoliday.get(k) === true)) mark(q, "giver");
+  }
+  // What needs an event quest, with no giver standing outside it; what a giver that stands nowhere
+  // (summoned: an orphan) gives besides an event quest.
+  const gives = new Map(); // giver -> its quests
+  for (const q of quests.values()) for (const k of givers(q)) (gives.get(k) || gives.set(k, []).get(k)).push(q);
+  const isEvent = (id) => quests.has(id) && quests.get(id).event;
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const q of [...quests.values()].sort((a, b) => a.id - b.id)) {
+      if (q.event || q.source !== "classic" || givers(q).some((k) => onlyHoliday.get(k) === false)) continue;
+      const needs = (q.pre || []).some(isEvent) || (q.preAny && q.preAny.length && q.preAny.every(isEvent));
+      const summoned = givers(q).length && givers(q).every((k) => !onlyHoliday.has(k) && gives.get(k).some((o) => o.event));
+      if (!needs && !summoned) continue;
+      mark(q, "follow");
+      changed = true;
+    }
+  }
+  const n = Object.values(why).reduce((s, l) => s + l.length, 0);
+  console.log(`event quests: ${n} (holiday sorts ${why.sort.length}, game_event_quest ${why.event.length}, givers only at a holiday ${why.giver.length}, follow-ups ${why.follow.length})`);
+  for (const kind of ["event", "giver", "follow"]) console.log(`  ${kind}: ${why[kind].slice(0, 40).join("; ")}`);
+  return why;
 }
 
 // ---------------------------------------------------------------- main
@@ -886,6 +1057,12 @@ async function main() {
   const levelOf = (id) => quests.get(id).level || quests.get(id).minLevel || 0;
   for (const [a, set] of opens) quests.get(a).opens = [...set].sort((x, y) => levelOf(x) - levelOf(y) || x - y);
 
+  // --- the side of Forever's quests nothing else gives one (after their objectives: a creature to kill isn't the giver)
+  const textSides = sideFromText(quests, eg, actors, creatureT, egNpc, templates, world);
+
+  // --- event quests: only takeable while their holiday is on (flag e)
+  markEvents(quests, eg, sql, sortName, creatures);
+
   // --- names, zones, dungeons
   const names = new Set();
   for (const q of quests.values()) {
@@ -899,7 +1076,7 @@ async function main() {
   // A zone's levels: its own quests' (not class or profession quests), the lowest and highest tenth left
   // out (a city's few quests for level 60).
   const range = (ids) => {
-    const own = ids.filter((id) => !quests.get(id).sort);
+    const own = ids.filter((id) => !quests.get(id).sort && !quests.get(id).event);
     const levels = (own.length ? own : ids).map(levelOf).filter((l) => l > 0).sort(byNumber);
     if (!levels.length) return [0, 0];
     const cut = levels.length >= 10 ? Math.floor(levels.length / 10) : 0;
@@ -928,7 +1105,7 @@ async function main() {
   const ids = (list) => (list && list.length ? list.join(",") : "");
   const questLine = (q) => {
     const flags = (q.faction === "Alliance" ? "A" : q.faction === "Horde" ? "H" : "") + (q.repeatable ? "r" : "") + (q.isNew ? "n" : "") + (q.source === "forever" ? "f" : "")
-      + (q.scales ? "s" : "");
+      + (q.scales ? "s" : "") + (q.event ? "e" : "");
     const r = q.rewards || {};
     const counted = (list) => (list || []).map(([id, n]) => (n > 1 ? `${id}:${n}` : `${id}`)).join(",");
     const f = [
@@ -956,8 +1133,9 @@ async function main() {
     "-- breadcrumbFor|flags|skill|rep|starts|ends|objectives|choice|items|money|xp\" (empty fields left empty, the last",
     "-- ones left out): races and classes as bit masks; zone a uiMap; zoneName, sort, dungeon an index into names; pre,",
     "-- preAny, excl, opens quest IDs (\",\"); flags: A/H faction, r repeatable, n new in WoW: Forever, f from Forever's",
-    "-- data (not classic's), s its level scales to the player; skill \"skill line:value\", rep \"faction:min\"; starts,",
-    "-- ends: n<NPC>, o<object>, i<item> (\",\"); objectives k<creature to kill>, o<object to use>, i<item to collect>,",
+    "-- data (not classic's), s its level scales to the player, e an event's (only while its holiday is on); skill",
+    "-- \"skill line:value\", rep \"faction:min\"; starts, ends: n<NPC>, o<object>, i<item> (\",\"); objectives k<creature",
+    "-- to kill>, o<object to use>, i<item to collect>,",
     "-- \":count\" when more than one, \"p\" an item the giver hands over (the creatures' and objects' places in dropNpcs,",
     "-- dropObjects; the items' in items); choice (one of them) and items (all of them) rewards item[:count]; money in",
     "-- copper; xp the experience at the quest's level.",
@@ -1050,6 +1228,7 @@ async function main() {
   console.log(`objectives: ${withObjectives.length} quests (${withObjectives.filter((q) => eg.quests[q.id] && Array.isArray(eg.quests[q.id].objectives)).length} EG Link's), ${all.reduce((n, q) => n + q.objectives.length, 0)} objectives; rewards: ${all.filter((q) => q.rewards.choice && q.rewards.choice.length).length} with choices, ${all.filter((q) => q.rewards.items && q.rewards.items.length).length} with items, ${all.filter((q) => q.rewards.money).length} money, ${all.filter((q) => q.rewards.xp).length} XP; levels from EG Link: ${levelsChanged} changed; scaling: ${all.filter((q) => q.scales).length}`);
   console.log(`items that start quests: ${starterItems}, with objective items ${starterZones.size}, ${itemDrops.size} with drop sources (${egItems.size} from EG Link), ${usedSources.size} sources (${[...usedSources].filter((k) => sources.get(k).points.length).length} with places)`);
   console.log(`races with a mask: ${all.filter((q) => q.races).length} (${all.filter((q) => q.races && races.list.some((r) => !r.classic && races.has(q.races, r.bit))).length} with a new race)`);
+  console.log(`sides: ${all.filter((q) => q.faction).length} quests one side's (${textSides.byEnder.length} by their ender, ${textSides.byText.length} by an NPC their text names, ${textSides.byZone.length} by their zone), ${all.filter((q) => !q.faction && !q.races).length} without races or a side; events: ${all.filter((q) => q.event).length}`);
   console.log(`no zone: ${all.filter((q) => !q.zone && !q.dungeon).length}; ${(Buffer.byteLength(lua) / 1024 / 1024).toFixed(2)} MB`);
   if (o.stats) return;
   fs.mkdirSync(path.dirname(OUT), { recursive: true });

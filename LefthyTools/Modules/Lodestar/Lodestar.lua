@@ -736,8 +736,9 @@ local function OpenBrowser()
 end
 
 -- The minimap button (Core/Window.lua's LT.Window.MinimapButton, as Chronicle's and the Bestiary's):
--- a star. Click: the quest browser; right-click: the companion. Its tooltip says what's here for you
--- once the quest data is loaded (a hover never loads it).
+-- a star. Click: the quest browser; right-click: the companion. Its tooltip says what's here for you to
+-- pick up within your levels (Q.InRange: not grey, red or an event's) once the quest data is loaded (a
+-- hover never loads it).
 local MINIMAP_ICON = "Interface\\Icons\\Spell_Arcane_StarFire"
 local minimapButton
 
@@ -749,7 +750,11 @@ local function MinimapEnter(self)
 		local okList, list = pcall(Q.Available, map)
 		local name = C_Map.GetMapInfo and LT.Value(C_Map.GetMapInfo, map)
 		if okList and type(list) == "table" and type(name) == "table" and type(name.name) == "string" then
-			GameTooltip:AddLine(L["%s: %d to pick up"]:format(name.name, #list), 1, 1, 1)
+			local n = 0
+			for _, id in ipairs(list) do
+				n = n + ((not Q.InRange or Q.InRange(id)) and 1 or 0)
+			end
+			GameTooltip:AddLine(L["%s: %d to pick up"]:format(name.name, n), 1, 1, 1)
 		end
 	end
 	GameTooltip:AddLine(L["Click: the quest browser"], 0.8, 0.8, 0.8)

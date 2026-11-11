@@ -6,8 +6,11 @@
 -- exclusive groups, what's next; Forever's races (the Skyborne) and the race rule, item starters'
 -- drops, who gives what, zone counts over every level, chain steps, what's available nearby, quest
 -- difficulty colours; objectives (kill, collect, use) with their places, rewards, the turn-in, Forever's
--- levels and ones that scale; my levels (Q.InRange: nothing red or coming up); learned data filling
--- gaps only; the test hook Q.SetTestData.
+-- levels and ones that scale; my levels (Q.InRange: nothing red or coming up, no event's), for my level
+-- (Q.ForMyLevel) and event quests (Q.IsEvent); with the real data, every zone's count for a level-22 Horde
+-- Skyborne and a level-22 Human (nothing of the other side, nothing locked or an event's; the Alliance's
+-- zones empty for the Horde but for quests both sides take); learned data filling gaps only; the test
+-- hook Q.SetTestData.
 -- Needs: no other file.
 
 local suite = ...
@@ -457,6 +460,82 @@ do
 	Fire("PLAYER_LEVEL_UP", 19)
 end
 
+section("Lodestar engine: for my level with the real data (a level-22 Horde Skyborne, a level-22 Human)")
+do
+	-- Forever's own quests the data had no side for: an NPC their text names, else a side's own zone.
+	check(Q.Quest(98386).faction == "Alliance" and Q.Quest(98013).faction == "Alliance" and Q.Quest(87760).faction == "Alliance"
+		and Q.Quest(97234).faction == "Alliance", "Alther's Mill (for Foreman Oslow), Swelling Forces, Holy Diver, Reading Room: the Alliance's")
+	check(Q.Quest(95883).faction == "Horde" and Q.Quest(78149).faction == "Horde", "Silverpine's Tortured Soul, Owen Thadd's book: the Horde's")
+	check(Q.Quest(79975).faction == nil and Q.Quest(103).faction == nil,
+		"Eagle's Fist (Horde players turned it in) and Captain Grayson's Keeper of the Flame stay both sides'")
+	-- Holidays' quests: only while their event is on.
+	check(Q.IsEvent(9388) and Q.IsEvent(8768) and Q.IsEvent(7882) and Q.IsEvent(172) and Q.IsEvent(558) and Q.IsEvent(8193)
+		and not Q.IsEvent(176) and not Q.IsEvent(999999999),
+		"events: Flickering Flames, A Gaily Wrapped Present, Carnival Jerkins, Children's Week (its orphan's too), the fishing contest; not Hogger")
+
+	local race, side, level = UnitRace, UnitFactionGroup, PLAYER_LEVEL
+	local function As(raceName, raceID, faction)
+		UnitRace = function(unit) if unit == "player" then return raceName, raceName, raceID end end
+		UnitFactionGroup = function(unit) if unit == "player" then return faction, faction end end
+		PLAYER_LEVEL = 22
+		Fire("PLAYER_LEVEL_UP", 22)
+		login({})
+	end
+	-- Every zone's quests for my level as the windows count them (Q.ForMyLevel), and what's wrong with any.
+	local function Census(faction)
+		local per, wrong = {}, {}
+		for _, z in ipairs(Q.Zones()) do
+			local list = {}
+			for _, id in ipairs(Q.ZoneQuests(z.map)) do
+				if Q.ForMyLevel(id) then
+					list[#list + 1] = id
+					local q, s = Q.Quest(id), Q.Status(id)
+					if (q.faction and q.faction ~= faction) or not Q.RaceAllowed(q) or s == "locked" or s == "level" or q.event then
+						wrong[#wrong + 1] = id .. " " .. tostring(q.title)
+					end
+				end
+			end
+			per[z.map] = list
+		end
+		return per, wrong
+	end
+	local function Titles(list)
+		local out = {}
+		for _, id in ipairs(list or {}) do out[#out + 1] = id .. " " .. tostring(Q.Quest(id).title) .. (Q.Quest(id).faction and "" or " (both)") end
+		return table.concat(out, "; ")
+	end
+
+	As("Windshaper Skyborne", 96, "Horde")
+	local horde, wrong = Census("Horde")
+	check(#wrong == 0, "Horde: no zone counts a quest of the Alliance, one that needs another first, one too high or an event's: " .. table.concat(wrong, "; "))
+	local function Only(list, allowed)
+		for _, id in ipairs(list or {}) do
+			if not allowed[id] then return false end
+		end
+		return true
+	end
+	-- Left in the Alliance's zones for a Horde character: quests both sides can take (neutral givers).
+	check(#horde[1429] == 0 and #horde[1433] == 0 and #horde[1439] == 0, "Horde: Elwynn Forest, Redridge Mountains, Darkshore: nothing for my level: "
+		.. Titles(horde[1429]) .. " | " .. Titles(horde[1433]) .. " | " .. Titles(horde[1439]))
+	check(Only(horde[1436], { [103] = true, [104] = true, [152] = true, [136] = true }),
+		"Horde: Westfall only Captain Grayson's and Captain Sander's treasure (a ghost and a map both sides can use): " .. Titles(horde[1436]))
+	check(#horde[1413] > 10 and #horde[1421] > 0, "Horde: The Barrens and Silverpine Forest have quests for my level: " .. #horde[1413] .. ", " .. #horde[1421])
+	local hordeSuggest = {}
+	for _, z in ipairs(Q.Zones()) do hordeSuggest[z.map] = #horde[z.map] end
+
+	As("Human", 1, "Alliance")
+	local alliance
+	alliance, wrong = Census("Alliance")
+	check(#wrong == 0, "Alliance: no zone counts a quest of the Horde, one that needs another first, one too high or an event's: " .. table.concat(wrong, "; "))
+	check(#alliance[1413] < hordeSuggest[1413] and #alliance[1421] == 0 and #alliance[1411] == 0 and #alliance[1412] == 0,
+		"Alliance: Silverpine, Durotar, Mulgore nothing; The Barrens fewer than for the Horde: " .. Titles(alliance[1421]) .. " | " .. #alliance[1413])
+	check(#alliance[1433] > 0 and #alliance[1431] > 0, "Alliance: Redridge Mountains and Duskwood have quests for my level: " .. #alliance[1433] .. ", " .. #alliance[1431])
+
+	UnitRace, UnitFactionGroup, PLAYER_LEVEL = race, side, level
+	Fire("PLAYER_LEVEL_UP", level)
+	login({})
+end
+
 section("Lodestar data: learned data fills gaps")
 do
 	local learned = Q.Quest(999001)
@@ -548,6 +627,8 @@ do
 		{ id = 16, title = "Flagged", minLevel = 5, scales = true, zone = 1429 },
 		{ id = 17, title = "Grey", level = 10, minLevel = 5, zone = 1429 },
 		{ id = 18, title = "No level", zone = 1429 },
+		{ id = 19, title = "Feast", level = 20, minLevel = 18, zone = 1429, event = true },
+		{ id = 20, title = "After the feast", level = 20, minLevel = 18, zone = 1429, pre = { 19 } },
 	}, { { map = 1429, name = "Elwynn Forest", continent = 1415 } })
 	PLAYER_LEVEL = 20
 	Fire("PLAYER_LEVEL_UP", 20)
@@ -570,6 +651,11 @@ do
 		"a red quest I could take: still available, not in my levels; orange is")
 	check(Q.InRange(14) and Q.InRange(15) and Q.InRange(16) and Q.InRange(18) and not Q.InRange(17),
 		"levels -1, 0 and the data's flag count as mine; no level: in; grey: out")
+	check(Q.IsEvent(19) and not Q.IsEvent(2) and Q.Status(19) == "available" and not Q.InRange(19),
+		"an event's quest (only while its holiday is on): available, but never in my levels")
+	check(Q.ForMyLevel(2) and Q.ForMyLevel(13) and not Q.ForMyLevel(19) and not Q.ForMyLevel(20) and Q.Status(20) == "locked" and Q.InRange(20)
+		and not Q.ForMyLevel(1) and not Q.ForMyLevel(3) and not Q.ForMyLevel(12) and not Q.ForMyLevel(5),
+		"for my level: in my log or to take now within my levels; not what needs another first (in my levels or not), an event's, grey, too high, red or blocked")
 	check(Q.Difficulty(14) == "fair" and Q.Difficulty(15) == "fair" and Q.Difficulty(16) == "fair" and not Q.IsTrivial(16)
 		and Q.LevelColor(-1).key == "fair" and Q.LevelColor(0).key == "fair" and Q.Difficulty(17) == "trivial",
 		"a level that scales: yellow (fair), never grey")
@@ -580,7 +666,9 @@ do
 	Fire("PLAYER_LEVEL_UP", 20)
 	PLAYER_LEVEL = 30
 	Fire("PLAYER_LEVEL_UP", 30)
-	check(Q.InRange(2) and Q.InRange(3) and Q.InRange(4), "in my log: always in my levels (grey or not)")
+	QUESTS = { { id = 10 }, { id = 2 }, { id = 3 }, { id = 4 }, { id = 19 } }
+	Fire("QUEST_LOG_UPDATE")
+	check(Q.InRange(2) and Q.InRange(3) and Q.InRange(4) and Q.InRange(19) and Q.ForMyLevel(19), "in my log: always in my levels (grey or not, an event's too)")
 	QUESTS = {}
 	Fire("QUEST_LOG_UPDATE")
 	C_Reputation, PROFESSIONS = factions, {}

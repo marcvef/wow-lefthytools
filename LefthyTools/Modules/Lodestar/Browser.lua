@@ -520,6 +520,12 @@ function Rule.InRange(id)
 	return yes
 end
 
+-- For my level, as the counts say it: in my log, or one I can take now within my levels (not one that
+-- needs another quest first, nor an event's: Q.InRange).
+function Rule.ForMyLevel(id, status)
+	return status == "active" or (status == "available" and Rule.InRange(id))
+end
+
 -- Within my levels, as the zone page and the quest list show them unless all levels are asked for;
 -- done and skipped ones always are.
 function Rule.InLevels(id, status)
@@ -3346,7 +3352,8 @@ function ZonePage.PinNote(spot)
 	end
 end
 
--- A zone (my level, give or take 3) with the most quests I can take now, for when this one has none.
+-- A zone (my level, give or take 3) with the most quests for my level (Rule.ForMyLevel: I can take them
+-- now within my levels, or have them), for when this one has none to pick up.
 function ZonePage.Suggest(place)
 	if state.suggest ~= nil and state.suggestFor == place.id then
 		return state.suggest or nil
@@ -3356,13 +3363,8 @@ function ZonePage.Suggest(place)
 	for _, z in ipairs(state.zones or EMPTY) do
 		if z.map ~= place.map and (z.minLevel or 1) <= my + 3 and (z.maxLevel or 60) >= my - 3 then
 			local n = 0
-			if Q.Available then
-				local ok, list = pcall(Q.Available, z.map)
-				n = ok and type(list) == "table" and #list or 0
-			else
-				for _, id in ipairs(Q.ZoneQuests and Q.ZoneQuests(z.map) or EMPTY) do
-					n = n + (StatusOf(id) == "available" and 1 or 0)
-				end
+			for _, id in ipairs(Q.ZoneQuests and Q.ZoneQuests(z.map) or EMPTY) do
+				n = n + (Rule.ForMyLevel(id, StatusOf(id)) and 1 or 0)
 			end
 			if n > most then
 				best, most = z, n
@@ -4665,10 +4667,9 @@ function Brief.Zone(place, top)
 	Brief.Bar(done, total, L["%d of %d done"]:format(done, total))
 	local mine, open = 0, 0
 	for _, id in ipairs(Structure(place).ids) do
-		local status = StatusOf(id)
-		if status ~= "done" and status ~= "other" and Rule.InRange(id) then
+		if Rule.ForMyLevel(id, StatusOf(id)) then
 			mine = mine + 1
-			open = open + (status == "available" and 1 or 0)
+			open = open + (StatusOf(id) == "available" and 1 or 0)
 		end
 	end
 	local line = mine > 0 and (HEX.available .. L["%d for your level"]:format(mine) .. "|r" .. GREY .. SEP .. "|r" .. L["%d to pick up now"]:format(open))
