@@ -11,6 +11,7 @@ module you can switch on or off.
 | [Chronicle](#chronicle) | A journal for each character that writes itself: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, lots of statistics, and what your friends did, also while you weren't online, with all of you compared in graphs and leaderboards |
 | [Bestiary](#bestiary) | What the mobs you kill drop: a window that follows your target with each drop, how many you got and its drop chance, from your own kills |
 | [Echoes](#echoes) | Records where you go and what happens on the way, for a replay of the whole group on a map website. Records only, shows nothing in game |
+| [Lodestar](#lodestar) | Quest chains for every zone: what's for your level, where quests start, where their objectives are and where to turn them in, the whole chain a quest is part of, your quest log sorted, the level and XP of a quest before you accept it, which quest an item in your bags is for, and how far your friends got |
 
 ## Settings
 
@@ -506,6 +507,82 @@ nothing, and pages you already have wait until it's on again.
 | Echoes (the module) | on |
 | Relay friends' recordings | on |
 | Collecting (`/lefthy echoes collect on\|off`, no checkbox) | off |
+
+## Lodestar
+
+Quest chains for every zone, and what's worth doing at your level. Click the star on the minimap's
+edge (or type `/lodestar browse`) for the quest browser; right-click it (or `/lodestar`) for the
+small companion window. Its quest data comes as an add-on of its own, `LefthyTools_QuestData`
+(every quest's chain, levels, givers, objectives and rewards, from a classic world database and
+WoW: Forever's own quests), and loads only when first needed.
+
+**The quest browser.** The zones on the left, by continent, with their levels and how much of each
+you've done. In the middle the zone's map, uncovered (also what you haven't explored yet), with a
+pin for every quest giver that has something for you: the game's own quest icons, a count where
+one has several (click for a list), your own arrow. The wheel zooms where you point, drag to move
+it; right-click or Shift-click a pin for the game's map pin there. On the right, nothing picked,
+the zone's briefing: what to turn in now, what's in progress here, and the zone's quest chains as
+cards (how far along, what's next and who gives it), done ones folded away.
+
+Pick a quest (on the map, a card or a list) and the right side shows all of it: its level and why
+you can or can't take it yet ("Needs Friendly with Darnassus", "Needs <the quest before>",
+"Skipped: you took the other one"), its step in its chain with the steps around it, its objectives
+(with your progress when it's in your log; hover one to light where it is on the map), where it
+starts and ends, its rewards with the game's item tooltips, money and XP, what it needs first and
+what it leads to, and friends who did it. **Chain** above the map shows the quest's whole chain as
+cards joined by lines: which steps come first, "one of" where any of several will do, lead-ins
+dashed, steps in other zones with a click to go there; pick a locked quest and the way to it lights
+up, across zones. Every "2/4" badge opens its chain too.
+
+By default only quests **for your level** show: the ones you can take now that aren't grey for you
+or far above you (red), and the ones in your log. *All levels* shows the rest; *Show quests not for
+you* also another race's, class's or faction's. A search at the top finds any quest by its title
+or giver, in every zone.
+
+More tabs: **Quest list** (the zone's quests by status: in progress, available, coming up, blocked,
+done), **My quests** (your quest log in order: ready to turn in first, then your zone's quests
+nearest first, each with its next objective and where to turn it in; sort by zone, level or chain;
+under it the chains you've started whose next step you can take now) and **Level path** (where to
+go next: the zones with quests for your level, each as a bar across its levels with yours marked,
+the best one on top).
+
+**The companion** follows what you do: the quest you're on with its step in its chain, its
+objectives and where they are on its small map, where to turn it in (how far and which way), and
+what to pick up next nearby, nearest first. A click on a quest shows everything about it; a click
+on a giver or a turn-in sets the game's map pin. It can shrink to one line, and hides itself when
+there's nothing to do.
+
+**In the game's quest windows.** Beside a quest's dialog a small panel shows its level, from which
+level and the XP it gives (the game only says so once you've accepted it), and in a chain which part
+it is, the steps around it and what it leads to, with a button to open it in Lodestar. Your quest
+log shows each chain quest's step ("2/4") with the chain in its tooltip; Alt-click a quest there
+to open it in Lodestar. A quest giver's tooltip says what they start and take back for you.
+
+**Quest items.** A quest item's tooltip (bags, the bank, chat links) says which quest it's for and
+where that stands: in your log with your progress, not taken yet, or done. When no quest needs it
+any more it says you can throw it away, and the sorted bags mark it with a small red x.
+
+**Learning and friends.** Where the quest data has gaps (WoW: Forever's own quests), Lodestar notes
+quest givers, turn-ins and what a quest needed first while you play, for all your characters.
+Friends with LefthyTools pass that on, and see how far each of you got on a quest: their names on
+quests and chains they've done.
+
+Slash commands: `/lodestar` (the companion), `/lodestar <name or ID>` (show a quest; a quest link
+works too), `/lodestar browse`, `/lodestar minimap`, `/lodestar settings`.
+
+| Setting | Default |
+|---|---|
+| Minimap button | on |
+| The small window keeps its place | on |
+| Follow the quest log (the companion shows the quest you open there) | on |
+| The small window hides when there's nothing to do | on |
+| The small window as one line | off |
+| Beside the quest dialog | on |
+| Chain steps in the quest log | on |
+| Quest lines in NPC tooltips | on |
+| Quest items in tooltips | on |
+| Friends' progress | on |
+| Learn while questing | on |
 
 ---
 
