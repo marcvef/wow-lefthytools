@@ -56,6 +56,12 @@ the client's QuestXP row for the quest's level and XP difficulty, rounded as the
 quest EG Link hasn't seen, classic-db's RewMoneyMaxLevel / 0.6 put on that row and rounded (none for dungeon,
 raid and PvP quests, which Forever multiplies).
 
+Mob levels: the levels of what a quest makes you fight, its creatures to kill and the creatures its
+items drop from often enough (classic-db's creature levels; EG Link's, as players saw them, for
+Forever's own creatures and the ones Forever changed). Group quests (elite, dungeon, raid): EG Link's
+quest type where it has the quest, else classic-db's. LefthyTools colours a quest by the harder of its
+own level and its mobs', a group quest one step harder.
+
 Format: see the comment at the top of `QuestData.lua`.
 
 ## Making it again

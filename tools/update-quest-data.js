@@ -69,6 +69,12 @@
 //   none for dungeon, raid and PvP quests, which Forever multiplies).
 // - Levels: EG Link's for the quests it has (Forever changed some of classic's); a level of -1 or 0
 //   scales to the player (flag s, no level).
+// - Mob levels (mobs): what a quest's objectives make you fight: kill targets, and for an item to collect the
+//   easiest of the creatures it's likely to drop from (itemFight); each creature's levels classic-db's
+//   creature_template MinLevel..MaxLevel, EG Link's creatures (the levels players saw) where classic-db hasn't
+//   it or Forever changed it (creatureLevels). Not triggers or friends of the quest's side.
+// - Group (flag g): quest type elite (1), dungeon (81) or raid (62): EG Link's questInfoId for the quests it
+//   has (Forever's server's), else classic-db's Type.
 // - Who starts and ends what (npcQuests, objectQuests) and the quests given in a zone that are
 //   listed elsewhere (a dungeon's, a city's): for tooltips and "what's here" without reading all.
 // - Left out: quests the client doesn't know (not in QuestV2, unless repeatable: those have no
@@ -105,6 +111,13 @@ const UNUSED = /\[UNUSED\]|<UNUSED>|UNUSED |<NYI>|\bNYI\b|<TXT>|\[PH\]|<CHANGE T
 const ZONE_TYPES = { 3: 0, 4: 1 }; // UiMap types a position goes on (zone, dungeon floor), in that order of preference
 const OBJECTIVE_KINDS = { monster: "k", gameObject: "o", item: "i" }; // EG Link's objective types kept (kill, object, item)
 const XP_UNKNOWN = new Set([41, 62, 81]); // quest types (PvP, raid, dungeon) whose XP Forever multiplies: no classic formula
+const GROUP_TYPES = new Set([1, 62, 81]); // quest types (classic-db's Type, EG Link's questInfoId) for a group: elite, raid, dungeon
+const NOT_SELECTABLE = 0x2000000; // creature_template.UnitFlags: a trigger nobody can target
+const INVISIBLE = 0x80; // creature_template.ExtraFlags (CMaNGOS' CREATURE_EXTRA_FLAG_INVISIBLE)
+const MANY_SOURCES = 40; // an item dropping from more creatures and objects than this: a world drop, not a mob's level
+const RARE_CHANCE = 0.05; // an item's likeliest drop below this: made or bought, not a mob's level
+const MOB_GAP = 10; // mobs more levels than this above a quest's own aren't its (a drop source elsewhere)
+const MIN_CHANCE = 0.2; // a creature that drops an item this often (or a quarter as often as the likeliest one) is where you get it
 // Quest sorts and classic-db game events of holidays (and the Darkmoon Faire, the weekly fishing contest).
 const HOLIDAY = /Seasonal|Lunar Festival|Love is in the Air|Noblegarden|Children's Week|Midsummer|Brewfest|Hallow's End|Harvest Festival|Pilgrim's Bounty|Winter Veil|New Year|Darkmoon Faire|Fishing Extravaganza|Day of the Dead|Pirates' Day|Scourge Invasion|^Invasion$/;
 // Each side's own zones (UiMap names): a Forever quest there with nothing else saying its side is that side's.
@@ -342,6 +355,43 @@ function roundXp(xp) {
   if (xp <= 500) return 10 * Math.floor((xp + 5) / 10);
   if (xp <= 1000) return 25 * Math.floor((xp + 12) / 25);
   return 50 * Math.floor((xp + 25) / 50);
+}
+
+// A creature's levels, [min, max], for the quests that make you fight it (levelOf(id, side): side the quest's,
+// "Alliance" or "Horde", or undefined): classic-db's creature_template MinLevel..MaxLevel; EG Link's (the levels players
+// saw it at on Forever) where classic-db doesn't have it, or where players saw it at a level outside classic-db's
+// range (Forever changed it: Silithid Swarm 1 to 21-22); EG Link's -1 (a boss's "??") isn't a level. None for one you
+// don't fight: a trigger (not selectable, invisible), a friend of the quest's side (one of both sides' without a side).
+function creatureLevels(creatureT, egCreatures, templates) {
+  const friendly = (factionId, side) => {
+    const t = templates.get(factionId);
+    if (!t) return false;
+    const of = (bit) => ((+t.FactionGroup | +t.FriendGroup) & bit) !== 0 && (+t.EnemyGroup & bit) === 0;
+    return side === "Alliance" ? of(2) : side === "Horde" ? of(4) : of(2) && of(4);
+  };
+  return (id, side) => {
+    const c = creatureT.get(id), e = egCreatures[id];
+    const seen = Object.keys((e && e.levels) || {}).map(Number).filter((l) => l > 0);
+    if (c) {
+      if ((c.UnitFlags & NOT_SELECTABLE) || (c.ExtraFlags & INVISIBLE) || friendly(c.Faction, side)) return undefined;
+      if (!(c.MinLevel > 0)) return undefined;
+      const lo = c.MinLevel, hi = Math.max(c.MinLevel, c.MaxLevel);
+      if (seen.length && seen.some((l) => l < lo || l > hi)) return [Math.min(...seen), Math.max(...seen)];
+      return [lo, hi];
+    }
+    if (!seen.length) return undefined;
+    const r = (e && e.reactions) || {};
+    const friend = (s) => (r[s] || []).some((v) => v >= 5);
+    if (side ? friend(side) : friend("Alliance") && friend("Horde")) return undefined;
+    return [Math.min(...seen), Math.max(...seen)];
+  };
+}
+
+// A quest's mob levels from its targets' ([[min, max]]): [the highest of their lowest levels (what you have to fight
+// at least), the highest level of any], undefined without any.
+function mobLevelsOf(list) {
+  if (!list.length) return undefined;
+  return [Math.max(...list.map((l) => l[0])), Math.max(...list.map((l) => l[1]))];
 }
 
 // A quest's objectives: [{ kind: "k" (kill) | "o" (object) | "i" (item), id, count }]. EG Link's (e, by
@@ -947,7 +997,8 @@ async function main() {
         if (u && u.type in ZONE_TYPES) pts.push([pos.uiMap, Math.round(pos.mapX * 1000), Math.round(pos.mapY * 1000)]);
       }
     }
-    const s = { name, points: clusters(pts), spawns: pts.length };
+    // (spawned: it stands somewhere, on a map or in an instance without one)
+    const s = { name, points: clusters(pts), spawns: pts.length, spawned: pts.length > 0 || (spawns.get(key) || []).length > 0 };
     sources.set(key, s);
     return s;
   };
@@ -972,6 +1023,47 @@ async function main() {
       usedSources.add(key);
     }
   }
+
+  // --- the levels of what a quest makes you fight (field mobs), whether it's for a group (flag g)
+  const levelOfCreature = creatureLevels(creatureT, eg.creatures, templates);
+  // An item to collect: the easiest of the creatures it's likely to drop from (of all its sources, those with
+  // MIN_CHANCE or more, or a quarter of the likeliest one's chance; that stand somewhere, not summoned ones); none when
+  // an object is among them (it can be gathered), it drops from very many
+  // (MANY_SOURCES: cloth, herbs, a world drop's pages: from whatever is around) or rarely (made, bought).
+  const itemFight = (item, side, zone) => {
+    const all = dropsOf.get(item);
+    if (!all || all.size > MANY_SOURCES) return undefined;
+    const best = Math.max(0, ...all.values());
+    let likely = [...all].filter(([, p]) => p >= Math.min(best / 4, MIN_CHANCE));
+    if (best < RARE_CHANCE || likely.some(([key]) => key[0] !== "n")) return undefined;
+    likely = likely.filter(([key]) => sourceOf(key, zone ? [zone] : []).spawned);
+    let easiest;
+    for (const [key] of likely) {
+      const lv = levelOfCreature(+key.slice(1), side);
+      if (lv && (!easiest || lv[0] < easiest[0] || (lv[0] === easiest[0] && lv[1] < easiest[1]))) easiest = lv;
+    }
+    return easiest;
+  };
+  const mobStats = { quests: 0, above: [0, 0, 0], group: 0, far: 0 };
+  for (const q of quests.values()) {
+    const fight = [];
+    for (const o of q.objectives) {
+      const lv = o.kind === "k" ? levelOfCreature(o.id, q.faction) : o.kind === "i" && !o.provided ? itemFight(o.id, q.faction, q.zone) : undefined;
+      if (lv) fight.push(lv);
+    }
+    q.mobs = mobLevelsOf(fight);
+    // (mobs far above the quest's own level aren't its: a drop source somewhere else, The Dormant Shade's candle)
+    if (q.mobs && q.level && q.mobs[0] > q.level + MOB_GAP) { q.mobs = undefined; mobStats.far++; }
+    if (q.mobs) {
+      mobStats.quests++;
+      if (q.level && q.mobs[0] > q.level) mobStats.above[Math.min(3, q.mobs[0] - q.level) - 1]++;
+    }
+    // (EG Link's type for a quest it has: Forever's server's; else classic-db's)
+    const e = eg.quests[q.id], c = q.source === "classic" ? cq.get(q.id) : undefined;
+    q.group = GROUP_TYPES.has(e ? Number(e.questInfoId) || 0 : c ? c.Type : 0);
+    if (q.group) mobStats.group++;
+  }
+  console.log(`mob levels: ${mobStats.quests} quests, their mobs above their level by 1: ${mobStats.above[0]}, 2: ${mobStats.above[1]}, 3 or more: ${mobStats.above[2]}, more than ${MOB_GAP} (left out): ${mobStats.far}; for a group: ${mobStats.group}`);
 
   // --- the chains
   const prev = new Map(); // quest -> signed previous quests
@@ -1105,7 +1197,7 @@ async function main() {
   const ids = (list) => (list && list.length ? list.join(",") : "");
   const questLine = (q) => {
     const flags = (q.faction === "Alliance" ? "A" : q.faction === "Horde" ? "H" : "") + (q.repeatable ? "r" : "") + (q.isNew ? "n" : "") + (q.source === "forever" ? "f" : "")
-      + (q.scales ? "s" : "") + (q.event ? "e" : "");
+      + (q.scales ? "s" : "") + (q.event ? "e" : "") + (q.group ? "g" : "");
     const r = q.rewards || {};
     const counted = (list) => (list || []).map(([id, n]) => (n > 1 ? `${id}:${n}` : `${id}`)).join(",");
     const f = [
@@ -1117,6 +1209,7 @@ async function main() {
       flags, q.skill || "", q.rep || "", q.starts.join(","), q.ends.join(","),
       (q.objectives || []).map((o) => `${o.kind}${o.id}${o.count > 1 ? ":" + o.count : ""}${o.provided ? "p" : ""}`).join(","),
       counted(r.choice), counted(r.items), r.money || "", r.xp || "",
+      q.mobs ? (q.mobs[0] === q.mobs[1] ? `${q.mobs[0]}` : `${q.mobs[0]}:${q.mobs[1]}`) : "",
     ].map(String);
     while (f.length && f[f.length - 1] === "") f.pop();
     return f.join("|");
@@ -1130,10 +1223,12 @@ async function main() {
   const lua = [
     `-- Generated by tools/update-quest-data.js: don't edit, run the tool again. Sources: ${source}.`,
     "-- quests[id] = \"title|level|minLevel|races|classes|zone|zoneName|sort|dungeon|pre|preAny|preActive|excl|opens|",
-    "-- breadcrumbFor|flags|skill|rep|starts|ends|objectives|choice|items|money|xp\" (empty fields left empty, the last",
-    "-- ones left out): races and classes as bit masks; zone a uiMap; zoneName, sort, dungeon an index into names; pre,",
-    "-- preAny, excl, opens quest IDs (\",\"); flags: A/H faction, r repeatable, n new in WoW: Forever, f from Forever's",
-    "-- data (not classic's), s its level scales to the player, e an event's (only while its holiday is on); skill",
+    "-- breadcrumbFor|flags|skill|rep|starts|ends|objectives|choice|items|money|xp|mobs\" (empty fields left empty, the",
+    "-- last ones left out): races and classes as bit masks; zone a uiMap; zoneName, sort, dungeon an index into names;",
+    "-- pre, preAny, excl, opens quest IDs (\",\"); flags: A/H faction, r repeatable, n new in WoW: Forever, f from Forever's",
+    "-- data (not classic's), s its level scales to the player, e an event's (only while its holiday is on), g for a group",
+    "-- (elite, dungeon, raid); mobs \"min[:max]\": the levels of the mobs its objectives make you fight (min: the highest of",
+    "-- each target's lowest level, max: the highest of any); skill",
     "-- \"skill line:value\", rep \"faction:min\"; starts, ends: n<NPC>, o<object>, i<item> (\",\"); objectives k<creature",
     "-- to kill>, o<object to use>, i<item to collect>,",
     "-- \":count\" when more than one, \"p\" an item the giver hands over (the creatures' and objects' places in dropNpcs,",
