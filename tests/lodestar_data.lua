@@ -536,6 +536,81 @@ do
 	login({})
 end
 
+section("Lodestar engine: tiers with the real data (a level-22 Horde character), mobs' levels, group quests")
+do
+	local race, side, level = UnitRace, UnitFactionGroup, PLAYER_LEVEL
+	UnitRace = function(unit) if unit == "player" then return "Orc", "Orc", 2 end end
+	UnitFactionGroup = function(unit) if unit == "player" then return "Horde", "Horde" end end
+	PLAYER_LEVEL = 22
+	Fire("PLAYER_LEVEL_UP", 22)
+	login({})
+	-- The data: a quest's mobs' levels (field mobs) and the group flag (g).
+	local hogger = Q.Quest(176)
+	check(hogger.group == true and Q.Group(176) and select(1, Q.MobLevels(176)) == 11 and select(2, Q.MobLevels(176)) == 11,
+		"Hogger: a group quest (classic-db's elite), its mob level 11")
+	check(not Q.Group(155) and Q.Group(1487) and Q.Group(6284) and Q.MobLevels(783) == nil and not Q.Group(999999999) and Q.MobLevels(999999999) == nil,
+		"The Defias Brotherhood (155): Forever made it a normal quest (EG Link); Deviate Eradication (a dungeon's) and Arachnophobia (elite) are for a group; no mobs, unknown: nil")
+	local lo, hi = Q.MobLevels(821)
+	check(lo == 18 and hi == 19, "Chen's Empty Keg (15): its thunder lizards' blood, from mobs 18-19")
+
+	-- Tiers by zone for a level-22 Horde character: what the windows count.
+	local function Tiers(list)
+		local by, wrong = { trivial = 0, easy = 0, fair = 0, difficult = 0, impossible = 0 }, {}
+		for _, id in ipairs(list) do
+			local s = Q.Status(id)
+			if s == "available" or s == "active" then
+				local t = Q.Tier(id)
+				by[t] = by[t] + 1
+				local fits = Q.ForMyLevel(id)
+				if fits ~= (s == "active" or ((t == "easy" or t == "fair") and Q.InRange(id))) or Q.IsHard(id) ~= (s == "available" and t == "difficult" and Q.InRange(id))
+					or (fits and Q.IsHard(id)) or (s == "available" and (t == "trivial" or t == "impossible") and Q.InRange(id)) then
+					wrong[#wrong + 1] = id
+				end
+			end
+		end
+		return by, wrong
+	end
+	local function Say(by)
+		return ("grey %d, green %d, yellow %d, orange %d, red %d"):format(by.trivial, by.easy, by.fair, by.difficult, by.impossible)
+	end
+	local barrens, wrong = Tiers(Q.ZoneQuests(1413))
+	check(#wrong == 0 and barrens.easy + barrens.fair >= 15 and barrens.difficult >= 3 and barrens.impossible >= 3 and barrens.trivial >= 5,
+		"The Barrens at 22: " .. Say(barrens) .. "; for my level only green and yellow, hard only orange: " .. table.concat(wrong, ","))
+	for _, z in ipairs({ { 1442, "Stonetalon Mountains" }, { 1440, "Ashenvale" }, { 1421, "Silverpine Forest" }, { 1424, "Hillsbrad Foothills" } }) do
+		local by, bad = Tiers(Q.ZoneQuests(z[1]))
+		check(#bad == 0 and by.easy + by.fair + by.difficult > 0, z[2] .. " at 22: " .. Say(by) .. " " .. table.concat(bad, ","))
+	end
+	-- A group quest a tier up: Arachnophobia (21, elite) and Wailing Caverns' Deviate Eradication (21) orange, not yellow.
+	check(Q.Difficulty(6284) == "fair" and Q.Tier(6284) == "difficult" and Q.Difficulty(1487) == "fair" and Q.Tier(1487) == "difficult"
+		and Q.Tier(1486) == "fair" and Q.Difficulty(1486) == "easy", "group quests a tier up: Arachnophobia, Deviate Eradication orange; Deviate Hides (17) yellow, not green")
+	check(Q.Status(6284) ~= "available" or (Q.IsHard(6284) and not Q.ForMyLevel(6284) and Q.StatusRank(6284) == 4), "Arachnophobia: hard, not for my level")
+	-- Mobs higher than the quest: Battle of Hillsbrad (26) has Magistrate Burnside (30) to kill: red, not orange.
+	check(Q.Difficulty(532) == "difficult" and Q.Tier(532) == "impossible" and Q.MobLevels(532) == 30 and Q.EffectiveLevel(532) == 30,
+		"Battle of Hillsbrad: its level orange, its mobs (30) red")
+	PLAYER_LEVEL = 15
+	Fire("PLAYER_LEVEL_UP", 15)
+	check(Q.Difficulty(821) == "fair" and Q.Tier(821) == "difficult" and Q.EffectiveLevel(821) == 18,
+		"at 15, Chen's Empty Keg (15) is orange: its lizards are 18-19")
+	PLAYER_LEVEL = 22
+	Fire("PLAYER_LEVEL_UP", 22)
+	check(Q.Tier(821) == "easy", "at 22 it's green again")
+
+	-- The one order: the Barrens' quests sorted by Q.Compare, rank by rank, each by its effective level.
+	local list = {}
+	for i, id in ipairs(Q.ZoneQuests(1413)) do list[i] = id end
+	table.sort(list, Q.Compare)
+	local ok, last = true, nil
+	for _, id in ipairs(list) do
+		local key = { Q.StatusRank(id), Q.EffectiveLevel(id) or math.huge }
+		if last and (key[1] < last[1] or (key[1] == last[1] and key[2] < last[2])) then ok = false end
+		last = key
+	end
+	check(ok and Q.StatusRank(list[1]) <= 3 and Q.StatusRank(list[#list]) == 9, "the Barrens in order: for my level first, rank by rank, by level (" .. #list .. " quests)")
+	UnitRace, UnitFactionGroup, PLAYER_LEVEL = race, side, level
+	Fire("PLAYER_LEVEL_UP", level)
+	login({})
+end
+
 section("Lodestar data: learned data fills gaps")
 do
 	local learned = Q.Quest(999001)
@@ -653,9 +728,9 @@ do
 		"levels -1, 0 and the data's flag count as mine; no level at all (Forever's untitled hidden quests): out; grey: out")
 	check(Q.IsEvent(19) and not Q.IsEvent(2) and Q.Status(19) == "available" and not Q.InRange(19),
 		"an event's quest (only while its holiday is on): available, but never in my levels")
-	check(Q.ForMyLevel(2) and Q.ForMyLevel(13) and not Q.ForMyLevel(19) and not Q.ForMyLevel(20) and Q.Status(20) == "locked" and Q.InRange(20)
-		and not Q.ForMyLevel(1) and not Q.ForMyLevel(3) and not Q.ForMyLevel(12) and not Q.ForMyLevel(5),
-		"for my level: in my log or to take now within my levels; not what needs another first (in my levels or not), an event's, grey, too high, red or blocked")
+	check(Q.ForMyLevel(2) and not Q.ForMyLevel(13) and Q.IsHard(13) and not Q.IsHard(2) and not Q.ForMyLevel(19) and not Q.ForMyLevel(20) and Q.Status(20) == "locked" and Q.InRange(20)
+		and not Q.IsHard(20) and not Q.ForMyLevel(1) and not Q.ForMyLevel(3) and not Q.ForMyLevel(12) and not Q.IsHard(12) and not Q.ForMyLevel(5),
+		"for my level: in my log or to take now within my levels, green or yellow (orange is hard, apart); not what needs another first (in my levels or not), an event's, grey, too high, red or blocked")
 	check(Q.Difficulty(14) == "fair" and Q.Difficulty(15) == "fair" and Q.Difficulty(16) == "fair" and not Q.IsTrivial(16)
 		and Q.LevelColor(-1).key == "fair" and Q.LevelColor(0).key == "fair" and Q.Difficulty(17) == "trivial",
 		"a level that scales: yellow (fair), never grey")
@@ -672,6 +747,118 @@ do
 	QUESTS = {}
 	Fire("QUEST_LOG_UPDATE")
 	C_Reputation, PROFESSIONS = factions, {}
+end
+
+section("Lodestar engine: tiers (level, mobs, group, the client's), my levels, the one order")
+do
+	Q.SetTestData({
+		{ id = 1, title = "Grey", level = 10, zone = 1429 },
+		{ id = 2, title = "Green", level = 16, zone = 1429 },
+		{ id = 3, title = "Yellow", level = 20, zone = 1429 },
+		{ id = 4, title = "Orange", level = 23, zone = 1429 },
+		{ id = 5, title = "Red", level = 25, zone = 1429 },
+		{ id = 6, title = "Mobs above", level = 20, zone = 1429, mobMin = 23, mobMax = 24 },
+		{ id = 7, title = "Group", level = 20, zone = 1429, group = true },
+		{ id = 8, title = "Group orange", level = 23, zone = 1429, group = true },
+		{ id = 9, title = "Group grey", level = 10, zone = 1429, group = true },
+		{ id = 10, title = "Group green", level = 16, zone = 1429, group = true },
+		{ id = 11, title = "Scales", level = -1, zone = 1429, mobMin = 30 },
+		{ id = 12, title = "Mobs below", level = 21, zone = 1429, mobMin = 15 },
+		{ id = 13, title = "The client's", level = 20, zone = 1429, mobMin = 25 },
+		{ id = 14, title = "The client's too", level = 24, zone = 1429 },
+		{ id = 15, title = "Mobs red", level = 20, zone = 1429, mobMin = 26 },
+	}, { { map = 1429, name = "Elwynn Forest", continent = 1415 } })
+	PLAYER_LEVEL = 20
+	Fire("PLAYER_LEVEL_UP", 20)
+	login({})
+	local function tiers(from, to)
+		local out = {}
+		for id = from, to do out[#out + 1] = tostring(Q.Tier(id)) end
+		return table.concat(out, ",")
+	end
+	check(tiers(1, 5) == "trivial,easy,fair,difficult,impossible", "by level, at 20: grey, green, yellow, orange, red: " .. tiers(1, 5))
+	check(Q.Tier(6) == "difficult" and Q.Difficulty(6) == "fair" and Q.EffectiveLevel(6) == 23 and select(1, Q.MobLevels(6)) == 23
+		and select(2, Q.MobLevels(6)) == 24 and Q.Tier(15) == "impossible", "mobs above the quest make it harder: 23-24 orange, 26 red")
+	check(tiers(7, 10) == "difficult,impossible,trivial,fair" and Q.Group(7) and not Q.Group(3),
+		"a group quest a tier up (yellow to orange, orange to red, green to yellow); grey stays grey: " .. tiers(7, 10))
+	check(Q.Tier(11) == "fair" and Q.Tier(12) == "fair" and Q.EffectiveLevel(12) == 21 and Q.Tier(999) == nil and Q.MobLevels(3) == nil,
+		"one that scales: yellow, its mobs scale too; mobs below never make it easier; unknown: nil")
+	check(Q.TierColor("difficult").hex == "ffff8040" and Q.TierColor("fair").r == 1 and Q.TierColor("nope") == nil
+		and Q.TierCode(5) == "|cffff1a1a" and Q.TierCode(2) == "|cff40bf40" and Q.TierCode(999) == "|cffffd100", "colours: the tier's, yellow for an unknown quest")
+	check(Q.TIER_WORD.trivial == "Trivial" and Q.TIER_WORD.easy == "Easy" and Q.TIER_WORD.fair == "Fair" and Q.TIER_WORD.difficult == "Hard"
+		and Q.TIER_WORD.impossible == "Too hard", "the tiers' words")
+	-- My levels: green and yellow for my level, orange hard (in range, apart), red and grey out.
+	check(Q.ForMyLevel(2) and Q.ForMyLevel(3) and not Q.ForMyLevel(4) and Q.IsHard(4) and Q.InRange(4) and not Q.InRange(5) and not Q.InRange(1)
+		and Q.IsHard(6) and Q.IsHard(7) and not Q.InRange(8) and not Q.InRange(15) and Q.ForMyLevel(10) and not Q.IsHard(3),
+		"for my level green and yellow; hard: orange by level, mobs or group; red (a group's orange too) and grey out")
+
+	-- The client's own difficulty wins, unless the mobs make it harder.
+	local enum = Enum.RelativeContentDifficulty
+	Enum.RelativeContentDifficulty = { Trivial = 0, Easy = 1, Fair = 2, Difficult = 3, Impossible = 4 }
+	C_PlayerInfo.GetContentDifficultyQuestForPlayer = function(id) return (id == 13 or id == 14) and 1 or nil end
+	login({})
+	check(Q.Tier(14) == "easy" and Q.Tier(13) == "impossible", "the client's green wins; mobs (25) still make one red")
+	C_PlayerInfo.GetContentDifficultyQuestForPlayer, Enum.RelativeContentDifficulty = nil, enum
+	-- Kept: worked out once per progress change; my level moves it.
+	local difficulty, asked = Q.Difficulty, 0
+	Q.Difficulty = function(...) asked = asked + 1; return difficulty(...) end
+	login({})
+	for _ = 1, 5 do for id = 1, 15 do Q.Tier(id); Q.ForMyLevel(id); Q.IsHard(id) end end
+	local once = asked
+	for _ = 1, 5 do for id = 1, 15 do Q.Tier(id) end end
+	check(asked == once and once <= 15, "tiers kept: " .. once .. " worked out for 15 quests")
+	PLAYER_LEVEL = 23
+	Fire("PLAYER_LEVEL_UP", 23)
+	check(Q.Tier(4) == "fair" and Q.Tier(5) == "fair" and asked > once, "at 23: what was orange and red is yellow")
+	Q.Difficulty = difficulty
+	PLAYER_LEVEL = 20
+	Fire("PLAYER_LEVEL_UP", 20)
+
+	-- The one order, everywhere: ready to turn in, in my log, for my level, hard, other available ones,
+	-- coming up, needing another first, done, not for me; then by level, title (any case), ID.
+	Q.SetTestData({
+		{ id = 101, title = "Zeta", level = 20, zone = 1429 },
+		{ id = 102, title = "alpha", level = 20, zone = 1429 },
+		{ id = 103, title = "Beta", level = 18, zone = 1429 },
+		{ id = 104, title = "Hard one", level = 23, zone = 1429 },
+		{ id = 105, title = "Red one", level = 26, zone = 1429 },
+		{ id = 106, title = "Grey one", level = 5, zone = 1429 },
+		{ id = 107, title = "Later", level = 25, minLevel = 22, zone = 1429 },
+		{ id = 108, title = "Locked", level = 20, zone = 1429, pre = { 107 } },
+		{ id = 109, title = "Done", level = 10, zone = 1429 },
+		{ id = 110, title = "Mage only", level = 20, zone = 1429, classes = 128 },
+		{ id = 111, title = "In my log", level = 21, zone = 1429 },
+		{ id = 112, title = "Ready", level = 24, zone = 1429 },
+		{ id = 113, title = "No level", zone = 1429 },
+		{ id = 114, title = "Alpha", level = 20, zone = 1429 },
+		{ id = 115, title = "Mobs make it later", level = 18, zone = 1429, mobMin = 21 },
+	}, { { map = 1429, name = "Elwynn Forest", continent = 1415 } })
+	QUESTS = { { id = 111, title = "In my log", objectives = { { text = "Boars slain: 1/5", finished = false } } },
+		{ id = 112, title = "Ready", objectives = { { text = "Boars slain: 5/5", finished = true } } } }
+	Fire("QUEST_ACCEPTED", 112)
+	login({ 109 })
+	local list = { 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115 }
+	table.sort(list, Q.Compare)
+	local ranks = {}
+	for i, id in ipairs(list) do ranks[i] = Q.StatusRank(id) end
+	check(table.concat(list, ",") == "112,111,103,102,114,101,115,104,106,105,113,107,108,109,110",
+		"ready, in my log, for my level (by level, then title in any case, then ID), hard, the others available, coming up, locked, done, not for me: "
+		.. table.concat(list, ","))
+	check(table.concat(ranks, ",") == "1,2,3,3,3,3,3,4,5,5,5,6,7,8,9" and Q.StatusRank(999) == 9 and not Q.Compare(101, 101)
+		and Q.Compare(101, nil) and not Q.Compare(nil, 101), "the ranks; a quest isn't before itself; unknown last")
+	-- The client's title (German): the order follows it.
+	local titleOf = C_QuestLog.GetTitleForQuestID
+	C_QuestLog.GetTitleForQuestID = function(id) if id == 101 then return "Aal" end return titleOf(id) end
+	login({ 109 })
+	table.sort(list, Q.Compare)
+	check(list[3] == 103 and list[4] == 101 and list[5] == 102, "the client's title: Aal before alpha")
+	C_QuestLog.GetTitleForQuestID = titleOf
+	-- Turned in: done, near the end.
+	QUESTS = { { id = 111, title = "In my log", objectives = { { text = "Boars slain: 1/5", finished = false } } } }
+	Fire("QUEST_TURNED_IN", 112)
+	check(Q.StatusRank(112) == 8 and Q.StatusRank(111) == 2, "turned in: done")
+	QUESTS = {}
+	Fire("QUEST_LOG_UPDATE")
 end
 
 QUESTS, PLAYER_LEVEL, PLAYER_MAP = savedQuests, savedLevel, savedMap

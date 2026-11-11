@@ -1506,3 +1506,9 @@ L["not taken yet: needs another quest first"] = "noch nicht angenommen: braucht 
 L["No quest needs it any more: you can discard it"] = "Keine Quest braucht es mehr: Du kannst es wegwerfen"
 L["Still needed for %s"] = "Noch gebraucht für %s"
 L["Still needed for %s and %d more"] = "Noch gebraucht für %s und %d weitere"
+-- Lodestar: how hard a quest is for me (Q.TIER_WORD: Engine.lua's tiers)
+L["Trivial"] = "Trivial"
+L["Easy"] = "Leicht"
+L["Fair"] = "Passend"
+L["Hard"] = "Schwer"
+L["Too hard"] = "Zu schwer"

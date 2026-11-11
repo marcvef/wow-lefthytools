@@ -18,6 +18,7 @@ local done = {}           -- my completed quests (set), valid while doneRead
 local doneRead = false
 local turnedIn = {}       -- turned in since the last loading screen (the server's list may not have them yet)
 local active = {}         -- my quest log (set), valid while activeRead
+local ready = {}          -- the quests of my log that are ready to turn in (set), read with it
 local activeRead = false
 local progress = 0        -- goes up when my progress changes
 local listening = false
@@ -85,20 +86,22 @@ end
 local function ReadActive()
 	if activeRead then return end
 	activeRead = true
-	local set, log = {}, C_QuestLog
+	local set, complete, log = {}, {}, C_QuestLog
 	if log and log.GetNumQuestLogEntries and log.GetInfo then
 		local ok, n = pcall(log.GetNumQuestLogEntries)
 		for i = 1, ok and type(n) == "number" and n or 0 do
 			local okInfo, info = pcall(log.GetInfo, i)
 			if okInfo and type(info) == "table" and not info.isHeader and type(info.questID) == "number" and Readable(info.questID) then
 				set[info.questID] = true
+				local okDone, isDone = pcall(log.IsComplete or error, info.questID)
+				if okDone and Readable(isDone) and isDone == true then complete[info.questID] = true end
 			end
 		end
 	end
 	local changed = false
-	for id in pairs(set) do if not active[id] then changed = true end end
+	for id in pairs(set) do if not active[id] or not ready[id] ~= not complete[id] then changed = true end end
 	for id in pairs(active) do if not set[id] then changed = true end end
-	active = set
+	active, ready = set, complete
 	if changed then Bump() end
 end
 
@@ -351,12 +354,13 @@ function Q.IsEvent(id)
 end
 
 -- Within my levels, what the windows show unless asked for all levels: a quest in my log, or one I can
--- take now by its levels and that's worth it: its minimum level reached, not grey for me (Q.IsTrivial)
--- and not red, at most RANGE_RED levels above mine (a level that scales to me counts as mine; no level
--- known at all: no, those are Forever's untitled hidden quests); never an event quest that isn't in my
--- log (its holiday may not be on). What else stands in its way is Q.Status's.
-local RANGE_RED = 4
+-- take now by its levels and that's worth doing now: its minimum level reached, its tier (Q.Tier) easy,
+-- fair or difficult (not grey, not red), a level known (a level that scales to me counts as mine; none at
+-- all: no, those are Forever's untitled hidden quests); never an event quest that isn't in my log (its
+-- holiday may not be on). My level not known: yes. What else stands in its way is Q.Status's.
+local RANGE_RED = 4 -- (a quest this many levels above me is still orange, one more is red: the classic rule)
 Q.RANGE_RED = RANGE_RED
+local IN_RANGE = { easy = true, fair = true, difficult = true }
 function Q.InRange(id)
 	id = tonumber(id)
 	local q = id and Q.Quest(id)
@@ -367,16 +371,24 @@ function Q.InRange(id)
 	if not my then return true end
 	local need = tonumber(q.minLevel)
 	if need and need > my then return false end
-	if Q.IsTrivial(id) then return false end
-	local level = LevelOf(q, my)
-	return level ~= nil and level <= my + RANGE_RED
+	return LevelOf(q, my) ~= nil and IN_RANGE[Q.Tier(id)] == true
 end
 
 -- For my level, what the windows count as that: in my log, or one I can take now ("available") within my
--- levels (Q.InRange). Not a quest that needs another first, one too high or an event's.
+-- levels (Q.InRange) whose tier is easy or fair. Not a hard one (orange: Q.IsHard), one that needs another
+-- first, one too high, grey or an event's.
 function Q.ForMyLevel(id)
 	local s = Q.Status(id)
-	return s == "active" or (s == "available" and Q.InRange(id))
+	if s == "active" then return true end
+	if s ~= "available" or not Q.InRange(id) then return false end
+	local tier = Q.Tier(id)
+	return tier == "easy" or tier == "fair"
+end
+
+-- Hard for me: one I can take now within my levels whose tier is difficult (orange: its level or its mobs
+-- 3-4 above mine, or a group quest a tier up). Counted apart from Q.ForMyLevel ("M hard").
+function Q.IsHard(id)
+	return Q.Status(id) == "available" and Q.InRange(id) and Q.Tier(id) == "difficult"
 end
 
 -- The best of several quests one of which is needed: one in my log, then one I can take, then
@@ -654,9 +666,134 @@ function Q.Difficulty(id)
 	return NativeKey(id) or (Scales(q) and "fair") or LevelKey(LevelOf(q))
 end
 
--- Grey for me: too low to be worth much (the game's grey "!").
+-- Grey for me: too low to be worth much (the game's grey "!"): its tier (Q.Tier) trivial.
 function Q.IsTrivial(id)
-	return Q.Difficulty(id) == "trivial"
+	return Q.Tier(id) == "trivial"
+end
+
+-- ---------------------------------------------------------------- tiers: how hard a quest is for me
+
+local TIERS = { "trivial", "easy", "fair", "difficult", "impossible" }
+local TIER_RANK = { trivial = 1, easy = 2, fair = 3, difficult = 4, impossible = 5 }
+
+-- A quest for a group (elite, dungeon, raid: the data's flag g).
+function Q.Group(id)
+	local q = tonumber(id) and Q.Quest(id)
+	return q and q.group == true or false
+end
+
+-- The levels of the mobs a quest's objectives make me fight: min (what I have to fight at least: the
+-- highest of each target's lowest level), max (the highest level among them); nil when none is known.
+function Q.MobLevels(id)
+	local q = tonumber(id) and Q.Quest(id)
+	local low = q and tonumber(q.mobMin)
+	if not low then return nil end
+	return low, tonumber(q.mobMax) or low
+end
+
+-- A quest's effective level for me (mine: my level): the higher of its own (LevelOf: one that scales is
+-- mine, none: its minimum level) and its mobs' (Q.MobLevels' min; not for one that scales: its mobs do too).
+local function Effective(q, mine)
+	local level = LevelOf(q, mine)
+	if Scales(q) then return level end
+	local mob = tonumber(q.mobMin)
+	if mob and (not level or mob > level) then return mob end
+	return level
+end
+
+-- How hard a quest is for me: "trivial" (grey), "easy" (green), "fair" (yellow), "difficult" (orange),
+-- "impossible" (red); nil for one the data doesn't know. Its own difficulty (Q.Difficulty: the client's,
+-- for a quest in my log, else its level's; one that scales is fair), harder when its mobs are (their
+-- level, Q.MobLevels' min, by the same colour rule), then one tier harder for a group (Q.Group: easy to
+-- fair, fair to difficult, difficult to impossible; grey stays grey): never easier. Kept per data and
+-- progress (my level too) change.
+local tierOf, tierData, tierProgress = {}, nil, nil
+function Q.Tier(id)
+	id = tonumber(id)
+	local q = id and Q.Quest(id)
+	if not q then return nil end
+	Listen()
+	ReadActive() -- (a change bumps progress before the cache is checked)
+	if tierData ~= Q.dataGen or tierProgress ~= progress then tierOf, tierData, tierProgress = {}, Q.dataGen, progress end
+	local tier = tierOf[id]
+	if not tier then
+		tier = Q.Difficulty(id) or "fair"
+		local mob = not Scales(q) and tonumber(q.mobMin)
+		if mob then
+			local byMobs = LevelKey(mob)
+			if TIER_RANK[byMobs] > TIER_RANK[tier] then tier = byMobs end
+		end
+		if q.group and tier ~= "trivial" then tier = TIERS[math.min(#TIERS, TIER_RANK[tier] + 1)] end
+		tierOf[id] = tier
+	end
+	return tier
+end
+
+-- A tier's colour: { r, g, b, hex = "ffrrggbb", key } (the engine's quest difficulty colours; shared), nil
+-- for a key that isn't one.
+function Q.TierColor(tier)
+	return DIFFICULTY[tier]
+end
+
+-- "|cffrrggbb" of a quest's tier (fair's yellow for one the data doesn't know).
+function Q.TierCode(id)
+	return "|c" .. DIFFICULTY[Q.Tier(id) or "fair"].hex
+end
+
+-- A quest's effective level for me (the higher of its own and its mobs'), nil without any.
+function Q.EffectiveLevel(id)
+	local q = tonumber(id) and Q.Quest(id)
+	return q and Effective(q, MyLevel()) or nil
+end
+
+-- ---------------------------------------------------------------- the one order of quests
+
+-- Where a quest stands for me as lists put it: 1 ready to turn in, 2 in my log, 3 for my level
+-- (Q.ForMyLevel), 4 hard (Q.IsHard), 5 available otherwise (grey, red, an event's: where they're shown),
+-- 6 coming up ("level"), 7 needs another first ("locked"), 8 done, 9 not for me ("other"; unknown).
+function Q.StatusRank(id)
+	id = tonumber(id)
+	local s = id and Q.Status(id)
+	if s == "active" then return ready[id] and 1 or 2 end
+	if s == "available" then return Q.ForMyLevel(id) and 3 or Q.IsHard(id) and 4 or 5 end
+	if s == "level" then return 6 end
+	if s == "locked" then return 7 end
+	if s == "done" then return 8 end
+	return 9
+end
+
+-- A quest's keys for Q.Compare: { rank, effective level (none: last), title (the client's, else the
+-- data's; lower case) }. Kept per data and progress change.
+local orderOf, orderData, orderProgress = {}, nil, nil
+local function OrderOf(id)
+	if orderData ~= Q.dataGen or orderProgress ~= progress then orderOf, orderData, orderProgress = {}, Q.dataGen, progress end
+	local o = orderOf[id]
+	if not o then
+		local q = Q.Quest(id)
+		local get = C_QuestLog and C_QuestLog.GetTitleForQuestID
+		local ok, title = pcall(get or error, id)
+		if not (ok and type(title) == "string" and Readable(title) and title ~= "") then title = q and q.title or "" end
+		o = { Q.StatusRank(id), q and Effective(q, MyLevel()) or math.huge, title:lower() }
+		orderOf[id] = o
+	end
+	return o
+end
+
+-- The one order of quests, everywhere a list of them is shown: true when quest a goes before b. By
+-- Q.StatusRank, then the effective level (the lowest first, none last), then the title (the client's, any
+-- case), then the ID. For table.sort; a list that is a chain's steps keeps the chain's order instead.
+function Q.Compare(a, b)
+	a, b = tonumber(a), tonumber(b)
+	if a == b then return false end
+	if not (a and b) then return a ~= nil end
+	Listen()
+	ReadActive()
+	ReadDone()
+	local oa, ob = OrderOf(a), OrderOf(b)
+	if oa[1] ~= ob[1] then return oa[1] < ob[1] end
+	if oa[2] ~= ob[2] then return oa[2] < ob[2] end
+	if oa[3] ~= ob[3] then return oa[3] < ob[3] end
+	return a < b
 end
 
 -- The zone I'm in (a zone map, not a city's floor or a cave), nil if not known.

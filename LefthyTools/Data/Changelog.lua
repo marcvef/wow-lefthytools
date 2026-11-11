@@ -530,5 +530,8 @@ ns.CHANGELOG = {
 	{ id = 174, module = "lodestar",
 		en = { "Lodestar: only quests you can take", "The level path and the zones' \"7 for your level\" count only quests you can take now or have in your log: none of the other faction, none that need another quest first, no holiday quests outside their event. All levels still shows holiday quests." },
 		de = { "Lodestar: nur annehmbare Quests", "Der Levelpfad und das \"7 für dein Level\" der Zonen zählen nur Quests, die du jetzt annehmen kannst oder im Questlog hast: keine der anderen Fraktion, keine, die erst eine andere Quest brauchen, keine Feiertagsquests außerhalb ihres Events. Alle Level zeigt Feiertagsquests weiterhin." } },
+	{ id = 175, module = "lodestar",
+		en = { "Lodestar: difficulty and order", "Quests are coloured by how hard they are for you, counting the mobs you fight, group quests a step harder: \"for your level\" counts green and yellow ones, orange ones are counted as hard. Every list has one order: ready to turn in, in your log, for your level, hard, then by level. Click a quest to see it on the map, right-click for its chain; the quest browser has a button for your current zone and lists zones alphabetically." },
+		de = { "Lodestar: Schwierigkeit und Ordnung", "Quests haben die Farbe ihrer Schwierigkeit für dich, mit den Mobs, die du bekämpfst, Gruppenquests eine Stufe schwerer: \"für dein Level\" zählt grüne und gelbe, orange zählen als schwer. Jede Liste hat dieselbe Ordnung: abgabebereit, im Questlog, für dein Level, schwer, dann nach Level. Klick auf eine Quest zeigt sie auf der Karte, Rechtsklick ihre Questreihe; der Quest-Browser hat einen Button für deine aktuelle Zone und listet die Zonen alphabetisch." } },
 	-- New entries go here, at the end.
 }

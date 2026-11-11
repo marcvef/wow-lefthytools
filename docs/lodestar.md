@@ -37,7 +37,9 @@ load in doesn't matter for the table.
   for one drop), and `quest_template`'s objectives (`ReqCreatureOrGOId1-4`/`Count`, `ReqItemId1-4`/
   `Count`, `SrcItemId`) and rewards (`RewChoiceItemId1-6`/`Count`, `RewItemId1-4`/`Count`,
   `RewOrReqMoney` above 0, `RewMoneyMaxLevel` for the experience), and the game events (`game_event`,
-  `game_event_quest`, `game_event_creature`/`_gameobject`: the holidays' quests, who stands only then).
+  `game_event_quest`, `game_event_creature`/`_gameobject`: the holidays' quests, who stands only then),
+  `creature_template`'s `MinLevel`/`MaxLevel` (the mobs' levels), `UnitFlags`/`ExtraFlags` (triggers) and
+  `quest_template.Type` (elite, dungeon, raid).
 - **Forever's new quests: EG Link** (`github.com/JIVESCORP/eg-link-output-wowf`, CC BY 4.0: "Data
   from Efficient Games (https://efficient.games), licensed under CC BY 4.0"): `quests.enUS`
   (title, levels, race mask, zone, `nextQuestId`, `startItemId`), `npcs` (who offers and takes each
@@ -47,8 +49,9 @@ load in doesn't matter for the table.
   names), and for every quest it has seen (classic's too) its `objectives` (type, ID, amount, storage
   index), `rewards` (choices, items, money, XP difficulty and multiplier) and `turn_ins` (the money
   players got, and their side). The quests' `objectivesText` and `description` (whom a quest is for) and
-  `creatures`' `reactions` (how a creature met each side) for Forever's quests without a side. The commit
-  used is in `source`.
+  `creatures`' `reactions` (how a creature met each side) for Forever's quests without a side. The
+  quests' `questInfoId` (elite 1, dungeon 81, raid 62, as classic-db's `Type`) and `creatures`' `levels`
+  (the levels players saw a creature at). The commit used is in `source`.
 - **Forever's client tables** (wago.tools): UiMap, UiMapAssignment, AreaTable, Map, QuestSort,
   FactionTemplate, QuestV2, QuestLineXQuest, ItemSparse (StartQuestID, item names), QuestPOIBlob,
   ChrRaces (the playable races, their race-mask bits and sides), QuestXP (a quest's experience by its
@@ -151,6 +154,26 @@ file, and it credits Questie for quest data).
 - **Levels:** EG Link's level and minimum level for a quest it has (Forever changed 95 of classic's:
   Grove of the Ancients 11 to 17), else classic-db's. A level of -1 or 0 scales to the player: flag
   `s`, no level.
+- **Mob levels** (field `mobs`, `min[:max]`): the levels of what a quest's objectives make you fight.
+  A creature's levels: classic-db's `MinLevel`..`MaxLevel`; EG Link's `creatures` (the levels players saw
+  it at, -1 a boss's "??" left out) where classic-db doesn't have it, or where players saw it outside
+  classic-db's range (Forever changed it: Silithid Swarm 1 to 21-22). Not a trigger (`UnitFlags`
+  not selectable `0x2000000`, `ExtraFlags` invisible `0x80`) nor a friend of the quest's side (one of
+  both sides' for a quest without a side: FactionTemplate's groups; EG Link's reactions for its own).
+  The targets: each kill objective's creature; for an item to collect, the easiest of the creatures it
+  drops from often enough (all its sources with 20% or more, or a quarter of the likeliest one's
+  chance, that stand somewhere: not summoned ones), none when an object is among those (it can be
+  gathered), when it drops from more than 40 creatures and objects (cloth, herbs, Green Hills of
+  Stranglethorn's pages: from whatever is around) or when its likeliest source has under 5% (made,
+  bought); objects to use have no level. `min`: the highest of the targets' lowest levels (what you
+  have to fight at least), `max`: the highest level of any. Mobs more than 10 levels above the quest's
+  own aren't its (a source elsewhere: The Dormant Shade's candle from the Hinterlands, the only one).
+  The sources' zones don't pick among them: where zones' rectangles overlap, a source's places can be
+  on the neighbour's map (the Barrens' Stormsnout on Mulgore's, whose rectangle lies inside the
+  Barrens').
+- **Group** (flag `g`): the quest's type elite (1), dungeon (81) or raid (62): EG Link's `questInfoId`
+  for a quest it has (Forever's server's: it made The Defias Brotherhood 155, classic's elite escort,
+  a normal quest), else classic-db's `Type`.
 - **Who gives what:** each NPC's and object's quests it starts and ends (`npcQuests`,
   `objectQuests`), and per zone the quests given there (a giver's first place) that are listed
   elsewhere: a dungeon's quests at its town, another zone's.
@@ -167,7 +190,9 @@ from EG Link), 727 with a choice of rewards, 1266 with reward items, 1058 with m
 experience; 95 quests with Forever's levels instead of classic's, 12 that scale; 3372 quests with a
 race mask, 3010 of them with a Skyborne bit; 3515 of one side (69 given one by the rules for quests
 without: 8 by their ender, 37 by an NPC their text names, 24 by their zone; 1728 left without races or a
-side), 232 event quests; 0.98 MB (0.63 MB before objectives and rewards).
+side), 232 event quests; 1259 quests with mob levels (229 of them above the quest's own level: 49 by 1,
+62 by 2, 118 by 3 or more, mostly raids' bosses at 63), 991 for a group; 0.99 MB (1,037,544 bytes; 0.98 MB,
+1,029,989, before mob levels and the group flag; 0.63 MB before objectives and rewards).
 Forever's own quests' objectives mostly have no places (1064 of 1212: its new items' drops and
 creatures aren't in classic-db, and EG Link's loot has no quest items).
 
@@ -186,18 +211,20 @@ LefthyToolsQuestData = {
   npcQuests = { [id] = "quests it starts|quests it ends" }, objectQuests = (the same),
   quests = { [id] = "title|level|minLevel|races|classes|zone|zoneName|sort|dungeon|pre|preAny|
                      preActive|excl|opens|breadcrumbFor|flags|skill|rep|starts|ends|
-                     objectives|choice|items|money|xp" },
+                     objectives|choice|items|money|xp|mobs" },
 }
 ```
 
 x, y in thousandths, r (a cluster's radius) in thousandths of the map's width; `/` separates a
 place's alternatives; races a number (bit b = 2^b); quest IDs with `,`; flags: `A`/`H`
 faction, `r` repeatable, `n` new in Forever, `f` from Forever's data, `s` its level scales to the
-player, `e` an event's (only while its holiday is on); skill `line:value`, rep `faction:min`; starts and ends `n<NPC>`, `o<object>`, `i<item>`;
+player, `e` an event's (only while its holiday is on), `g` for a group (elite, dungeon, raid); skill
+`line:value`, rep `faction:min`; starts and ends `n<NPC>`, `o<object>`, `i<item>`;
 objectives `k<creature>`, `o<object>`, `i<item>` with `:count` when more than one and `p` for an
 item the giver hands over (`k6:10,i745p`); choice and items `item[:count]`; money in copper; xp the
-experience at the quest's level. The last five fields are read only by `Q.Objectives` and
-`Q.Rewards`. A zone's quests are in level order;
+experience at the quest's level; mobs `min[:max]` (`22:24`, `11`: both the same) the levels of the mobs its
+objectives make you fight (The rules). Fields 21-25 are read only by `Q.Objectives` and `Q.Rewards`;
+`mobs` with the quest (`Q.Quest`'s `mobMin`, `mobMax`). A zone's quests are in level order;
 a zone's levels are its own quests' (not class or profession quests) without the lowest and highest
 tenth (a city's level-60 quests). Strings, so loading is quick and only the quests asked for are
 read.
@@ -212,8 +239,10 @@ read.
   never write into it):
   `{ id, title, level, minLevel, races, classes, faction, zone, zoneName, sort, dungeon, skill = { id,
   value }, rep = { faction, min }, pre, preAny, preActive, excl, opens, breadcrumbFor, repeatable,
-  starts, ends, source = "classic"|"forever"|"learned", new, scales, event }` (`scales`: its level is the
-  player's, `level` nil; `event`: only while its holiday is on). The lists are always tables (maybe
+  starts, ends, source = "classic"|"forever"|"learned", new, scales, event, group, mobMin, mobMax }`
+  (`scales`: its level is the player's, `level` nil; `event`: only while its holiday is on; `group`: an
+  elite, dungeon or raid quest; `mobMin`, `mobMax`: its mobs' levels, nil when none is known: `Q.MobLevels`
+  in the Engine reads them). The lists are always tables (maybe
   empty). `starts`/`ends`: `{ kind = "npc"|"object"|"item", id, name, points = { { map, x, y } } }`,
   one table per NPC shared by all its quests. An item's (`kind = "item"`, no points) has `drops`:
   `{ { kind = "npc"|"object", id, name, chance (0..100), points = { { map, x, y, r } } } }`, the
@@ -273,7 +302,8 @@ read.
   } }`; levels and counts from the quests when not given; dungeons from the quests' `dungeon`). What
   a quest needs leads to it (`opens`) without saying so; `Q.GiverQuests` answers from the quests'
   `starts` and `ends`; an item's `drops` as given; `objectives` and `rewards` (as `Q.Objectives` and
-  `Q.Rewards` answer) as given; `Q.Races()` the known ten; `Q.ZoneGiven` empty.
+  `Q.Rewards` answer) as given; `group`, `mobMin`, `mobMax` as given (`mobMax` defaults to `mobMin`);
+  `Q.Races()` the known ten; `Q.ZoneGiven` empty.
   Learned data and caches go; the callbacks run at once. `Q.SetTestRawData(data)`: a table in the
   add-on's own format (`LefthyToolsQuestData`, strings) used as if it had just been loaded.
 
@@ -282,10 +312,11 @@ read.
 - **My progress:** completed quests from `C_QuestLog.GetAllCompletedQuestIDs`, read once and kept
   until the next loading screen (`PLAYER_ENTERING_WORLD`, `PLAYER_LOGIN`); a quest turned in
   (`QUEST_TURNED_IN`) is added at once and kept until then, as the server's list may not have it
-  yet. The quest log (`C_QuestLog.GetInfo`) is read again after `QUEST_ACCEPTED`/`REMOVED`/
-  `LOG_UPDATE`. The events are registered with the first question (nothing runs before a window
-  opens), and the handlers only note what changed. `Q.progressGen` goes up with a change of
-  progress, level, skill or reputation.
+  yet. The quest log (`C_QuestLog.GetInfo`, and `C_QuestLog.IsComplete` for each: ready to turn in) is
+  read again after `QUEST_ACCEPTED`/`REMOVED`/`LOG_UPDATE`. The events are registered with the first
+  question (nothing runs before a window opens), and the handlers only note what changed.
+  `Q.progressGen` goes up with a change of progress (a quest taken, dropped, ready, turned in), level,
+  skill or reputation.
 - `Q.Status(id, who)` → `"done"` (completed), `"active"` (in the log), `"other"` (not for this
   character: race, class, faction, profession skill, reputation; or closed by another: an exclusive
   one done or taken, or the quest a breadcrumb leads to done or taken), `"locked"` (something it
@@ -314,18 +345,18 @@ read.
   counts as mine, here and in `Q.Next` and `Q.Missing`'s best of several). Kept per data,
   progress and map; the order for the last position asked (1% steps).
 - `Q.InRange(id)`: within my levels, what the windows show unless asked for all levels: a quest in
-  my log; else one I can take now by its levels and that's worth it: its `minLevel` at most my level,
-  not grey (`Q.IsTrivial`) and its level at most `Q.RANGE_RED` (4) above mine (not red); never an event
-  quest (`Q.IsEvent`) that isn't in my log (its holiday may not be on: "All levels" shows them). A level
-  that scales (-1, 0, `scales`) counts as mine; no level: its minimum level; neither (Forever's untitled
-  hidden quests): out of range; my level
-  not known: in range. Levels only: what else stands in its way is `Q.Status`'s (a red quest is
-  still `"available"`, so is an event's). Quests coming up (a minimum level above mine) are out
-  (`Q.RANGE_ABOVE` is gone).
+  my log; else one I can take now by its levels and that's worth doing now: its `minLevel` at most my
+  level, its tier (`Q.Tier`) `easy`, `fair` or `difficult` (not grey, not red: orange stays in range,
+  as hard); never an event quest (`Q.IsEvent`) that isn't in my log (its holiday may not be on: "All
+  levels" shows them). A level that scales (-1, 0, `scales`) counts as mine; no level: its minimum
+  level; neither (Forever's untitled hidden quests): out of range; my level not known: in range.
+  Levels only: what else stands in its way is `Q.Status`'s (a red quest is still `"available"`, so is
+  an event's). Quests coming up (a minimum level above mine) are out (`Q.RANGE_ABOVE` is gone).
 - `Q.IsEvent(id)`: an event's quest (the data's flag `e`: a holiday's, the Darkmoon Faire's, ...).
-- `Q.ForMyLevel(id)`: "for your level" as every count says it: in my log (`"active"`), or `"available"`
-  and `Q.InRange`; not a quest that needs another first (`"locked"`, within my levels or not), one too
-  high, grey or red, nor an event's.
+- `Q.ForMyLevel(id)`: "for your level" as every count says it: in my log (`"active"`), or `"available"`,
+  `Q.InRange` and its tier `easy` or `fair`; not a hard one (orange), a quest that needs another first
+  (`"locked"`, within my levels or not), one too high, grey or red, nor an event's. `Q.IsHard(id)`:
+  `"available"`, `Q.InRange` and its tier `difficult`: counted apart ("N for your level · M hard").
 - `Q.LevelColor(level[, questID])` → `{ r, g, b, hex = "ffrrggbb", key }` (shared, `Q.DIFFICULTY`):
   the game's quest difficulty colours against my level. With a quest ID the client's own answer
   first (`C_PlayerInfo.GetContentDifficultyQuestForPlayer`, `Enum.RelativeContentDifficulty`);
@@ -333,8 +364,30 @@ read.
   2 below to 2 above `fair` (yellow), above classic's grey level `easy` (green), else `trivial`
   (grey; grey up to level - 5 - level/10 until 39, level - 1 - level/5 until 59, then level - 9; none
   up to level 5). No level, or -1 / 0: `fair`. `Q.Difficulty(id)`: a quest's key (the client's, else
-  `fair` for a level that scales, else its level, without one its minimum level);
-  `Q.IsTrivial(id)`: grey for me (the game's grey "!" rather than the yellow one).
+  `fair` for a level that scales, else its level, without one its minimum level): its own level only;
+  `Q.IsTrivial(id)`: grey for me (the game's grey "!" rather than the yellow one): its tier `trivial`.
+- **Tiers:** `Q.Tier(id)` → how hard a quest is for me, one of the keys above: `"trivial"` (grey),
+  `"easy"` (green), `"fair"` (yellow), `"difficult"` (orange), `"impossible"` (red); nil for a quest the
+  data doesn't know. By its effective level: `Q.Difficulty` (the client's for a quest in my log, else its
+  own level's), made harder when its mobs are (the same colour rule for `Q.MobLevels`' min; not for a
+  quest that scales: its mobs do too), then a group quest (`Q.Group`) one tier harder (easy to fair,
+  fair to difficult, difficult to impossible; grey stays grey). Never easier than `Q.Difficulty`. Kept
+  per data and progress change (my level is progress). The words: `Q.TIER_WORD` (Lodestar.lua: Trivial,
+  Easy, Fair, Hard, Too hard; German Trivial, Leicht, Passend, Schwer, Zu schwer). `Q.TierColor(tier)` →
+  the colour table (`{ r, g, b, hex, key }`, shared; nil for another key; not Lodestar.lua's
+  `Q.DIFFICULTY`, which has the quest log's keys). `Q.TierCode(id)` → `"|cffrrggbb"` of the quest's tier
+  (yellow for an unknown quest). `Q.Group(id)`: an elite, dungeon or raid quest (the data's `g`).
+  `Q.MobLevels(id)` → `min, max` of the objective mobs' levels (min: what I have to fight at least, the
+  highest of the targets' lowest levels; max: the highest of any), nil when none is known.
+  `Q.EffectiveLevel(id)`: the higher of its own level (one that scales: mine; none: its minimum level)
+  and its mobs' min, nil without either.
+- **The one order:** `Q.Compare(a, b)` → true when quest a goes before b, for `table.sort` everywhere a
+  list of quests is shown: by `Q.StatusRank(id)` (1 ready to turn in, 2 in my log, 3 for my level, 4
+  hard, 5 available otherwise: grey, red, an event's, no level; 6 coming up `"level"`, 7 needs another
+  first `"locked"`, 8 done, 9 not for me `"other"` or unknown), then the effective level (the lowest
+  first, none last), then the title (the client's, else the data's, any case), then the ID. Each
+  quest's keys are kept per data and progress change: sorting a few hundred is cheap, on a change,
+  never per frame. A list that is a chain's steps keeps the chain's order.
 - `Q.Missing(id, who)` → `{ { id, status, reason } }`: what's missing, walked back through the chain
   across zones, the first one to do first. `reason`: `"done"` (must be completed), `"any"` (one of
   several: the best one, in the log, then available, then for me, the lowest level), `"log"` (must

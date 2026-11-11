@@ -230,6 +230,10 @@ function Q.LevelTitle(id, quest)
 	return Q.LevelCode(id, quest) .. "[" .. level .. "] " .. title .. "|r"
 end
 
+-- The words of Engine.lua's tiers (Q.Tier: how hard a quest is for me, its level and its mobs', a group
+-- quest a tier up), one table for every window.
+Q.TIER_WORD = { trivial = L["Trivial"], easy = L["Easy"], fair = L["Fair"], difficult = L["Hard"], impossible = L["Too hard"] }
+
 -- Which step of its chain a quest is: step, total, the chain's name (its first quest's title);
 -- nil when it's no chain's. Data.lua's Q.ChainStep when it's there, else its place in Q.Chain.
 function Q.StepOf(id)
