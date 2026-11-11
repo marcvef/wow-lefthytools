@@ -16,10 +16,12 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 --   The small map: not ready, the areas of its objectives not done (Q.Objectives; hovering an
 --     objective's line lights its areas); else the turn-in's zone (else yours) with the turn-in; your
 --     other quests' turn-ins and the givers of what you can pick up there, and your arrow.
---   Pick up next, in two groups of at most three: In progress (your other quests, ready ones first)
---     and Available now (for your levels, Q.InRange: follow-ups of what you just finished or have,
---     then this zone's quests, the nearest giver first, each with its giver, how far and which way).
---     What's coming up later or blocked is the big window's.
+--   Pick up next, in two groups of at most three, each in the one order of quests (Q.Compare: ready
+--     first, then by level; for your level before hard ones): In progress (your other quests) and
+--     Available now (for your levels, Q.InRange: follow-ups of what you just finished or have, and
+--     this zone's quests, each with its giver, how far and which way; a hard one, orange, says so).
+--     What's coming up later or blocked is the big window's. Titles are in their difficulty tier's
+--     colour (Q.Tier: the quest's level, its mobs', a group quest one harder).
 -- Each line of Pick up next has a verb icon (the game's own: ? to turn in, ! to pick up, in
 -- progress, the grey ! of a low quest), the first line full size and the rest smaller with their
 -- titles grey (the guides' "this now, then those"), and notes what taking a quest closes
@@ -93,6 +95,60 @@ local selfHiding = false
 -- A verb icon and a space (Lodestar.lua's Q.Icon: the game's quest icons).
 local function I(kind, size)
 	return Q.Icon(kind, size) .. " "
+end
+
+-- Difficulty for me (the engine's tiers, Q.Tier: the quest's level, its mobs', a group quest one
+-- harder): a quest's colour code (Q.TierCode; without it, or for a quest the data doesn't know, its
+-- level's), "[12] Title" in it, and whether it's hard (Q.IsHard: I can take it, orange).
+local HARD = "|cffff8040"
+local function TierCode(id, quest)
+	local code = Q.TierCode and quest and Q.TierCode(id)
+	return type(code) == "string" and code ~= "" and code or Q.LevelCode(id, quest)
+end
+
+local function TierTitle(id, quest)
+	quest = quest or Q.Quest(id)
+	if not quest then
+		return Q.LevelTitle(id)
+	end
+	local level = tonumber(quest.level)
+	return TierCode(id, quest) .. ((level and level > 0) and ("[" .. level .. "] ") or "") .. Q.Title(id, quest) .. "|r"
+end
+
+local function IsHard(id)
+	return Q.IsHard ~= nil and Q.IsHard(id) == true
+end
+
+-- Grey for me (the game's grey "!" of a low quest).
+local function Trivial(id, quest)
+	if Q.Tier and quest then
+		return Q.Tier(id) == "trivial"
+	end
+	return Q.DifficultyKey(id, quest) == "trivial"
+end
+
+-- "Hard" (Lodestar.lua's Q.TIER_WORD), orange; with "mobs up to 26" when its mobs (Q.MobLevels) are
+-- above its level.
+local function HardWord(id, quest)
+	local word = Q.TIER_WORD and Q.TIER_WORD.difficult
+	local _, high = nil, nil
+	if Q.MobLevels and quest then
+		_, high = Q.MobLevels(id)
+	end
+	local mobs = tonumber(high) and tonumber(high) > (tonumber(quest.level) or 0) and (", " .. L["mobs up to %d"]:format(high)) or ""
+	return HARD .. (type(word) == "string" and word or "Hard") .. mobs .. "|r"
+end
+
+-- The one order of quests (Engine.lua's Q.Compare: ready, in my log, for my level, hard, ..., then by
+-- level and title); without it by ID.
+local function Before(a, b)
+	if a == b then
+		return false
+	end
+	if Q.Compare then
+		return Q.Compare(a, b) == true
+	end
+	return a < b
 end
 
 ---------------------------------------------------------------------------
@@ -550,7 +606,7 @@ end
 local function QuestRow(y, id, prefix, reason)
 	local quest = Q.Quest(id)
 	local status = Q.StatusOf(id)
-	local text = prefix .. Q.LevelTitle(id, quest) .. "  " .. StatusWord(id, status)
+	local text = prefix .. TierTitle(id, quest) .. "  " .. StatusWord(id, status)
 	local tooltip = QuestTip(id, Q.Title(id, quest))
 	if type(reason) == "string" and reason ~= "" then
 		table.insert(tooltip, #tooltip, reason)
@@ -617,7 +673,7 @@ local function Steps(y, chain, at)
 		else
 			text = LIGHT .. i .. ". " .. Q.Title(id) .. "|r"
 		end
-		y = Row(y, { text = text, font = font, indent = INDENT, onClick = Shows(id), tooltip = QuestTip(id, Q.LevelTitle(id)) })
+		y = Row(y, { text = text, font = font, indent = INDENT, onClick = Shows(id), tooltip = QuestTip(id, TierTitle(id)) })
 	end
 	if last < #chain then
 		y = Text(y, GREY .. L["... %d more"]:format(#chain - last) .. "|r", "GameFontHighlightSmall", INDENT)
@@ -677,59 +733,50 @@ local function Follows(quest)
 end
 
 -- The groups of "Pick up next": { log, now, more } of { id, follows } (more: what Available now
--- left out). Available now only for my levels (Q.InRange); what's coming up later or blocked is the
--- big window's.
+-- left out), each in the one order of quests (Q.Compare: ready first, then by level; for my level
+-- before hard ones). In progress: my other quests. Available now only for my levels (Q.InRange):
+-- follow-ups of what I just turned in and of everything done or in my log (Q.Next), and this zone's
+-- (its givers' distance stays on each line). What's coming up later or blocked is the big window's.
 local function PickLists(ctx)
 	local seen = { [ctx.now or 0] = true }
 	for _, id in ipairs(ctx.now and Q.Opens and Q.Opens(ctx.now) or {}) do
 		seen[id] = true -- (what Now leads to: its tooltip says)
 	end
 	local lists = { log = {}, now = {}, more = 0 }
-	local function Add(list, id, max, follows)
-		if seen[id] then
+	local log = LogQuests()
+	table.sort(log, Before)
+	for _, id in ipairs(log) do
+		if not seen[id] then
+			seen[id] = true
+			if #lists.log < LOG_MAX then
+				lists.log[#lists.log + 1] = { id = id }
+			end
+		end
+	end
+	local takes, follows = {}, {}
+	local function Take(id, after)
+		if seen[id] or Q.StatusOf(id) ~= "available" or (Q.InRange and not Q.InRange(id)) then
 			return
 		end
 		seen[id] = true
-		if #list < max then
-			list[#list + 1] = { id = id, follows = follows }
-		elseif list == lists.now then
-			lists.more = lists.more + 1
-		end
+		takes[#takes + 1] = id
+		follows[id] = after
 	end
-	local function Takes(id)
-		return Q.StatusOf(id) == "available" and (not Q.InRange or Q.InRange(id))
-	end
-	-- In progress: ready to turn in first, then those turned in here.
-	local log = LogQuests()
-	local rank = {}
-	for _, id in ipairs(log) do
-		local quest = Q.Quest(id)
-		rank[id] = (IsComplete(id) and 0 or 2) + ((ctx.zone and quest and Q.NearestPoint(quest.ends, ctx.zone)) and 0 or 1)
-	end
-	table.sort(log, function(a, b)
-		if rank[a] ~= rank[b] then
-			return rank[a] < rank[b]
-		end
-		return a < b
-	end)
-	for _, id in ipairs(log) do
-		Add(lists.log, id, LOG_MAX)
-	end
-	-- Follow-ups: of what I just turned in, then of everything done or in my log (Q.Next).
 	for _, id in ipairs(justDone and Q.Opens and Q.Opens(justDone) or {}) do
-		if Takes(id) then
-			Add(lists.now, id, PICK_MAX, justDone)
-		end
+		Take(id, justDone)
 	end
 	for _, id in ipairs(Q.Next and Q.Next() or {}) do
-		if Takes(id) then
-			Add(lists.now, id, PICK_MAX, Follows(Q.Quest(id)))
-		end
+		Take(id, Follows(Q.Quest(id)))
 	end
-	-- This zone's, the nearest giver first.
 	for _, id in ipairs(Q.AvailableIn(ctx.zone, ctx.x, ctx.y)) do
-		if not Q.InRange or Q.InRange(id) then
-			Add(lists.now, id, PICK_MAX)
+		Take(id)
+	end
+	table.sort(takes, Before)
+	for i, id in ipairs(takes) do
+		if i <= PICK_MAX then
+			lists.now[i] = { id = id, follows = follows[id] }
+		else
+			lists.more = lists.more + 1
 		end
 	end
 	return lists
@@ -751,7 +798,7 @@ end
 -- "[12] Title" with only the level in its difficulty colour, the title grey (the lines after the first).
 local function GreyTitle(id, quest)
 	local level = quest and tonumber(quest.level)
-	return (level and level > 0 and (Q.LevelCode(id, quest) .. "[" .. level .. "]|r ") or "") .. LIGHT .. Q.Title(id, quest) .. "|r"
+	return (level and level > 0 and (TierCode(id, quest) .. "[" .. level .. "]|r ") or "") .. LIGHT .. Q.Title(id, quest) .. "|r"
 end
 
 -- A quest of "Pick up next": its verb icon, "[12] Title", how far; its giver, what it follows and
@@ -779,8 +826,11 @@ local function PickRow(y, entry, ctx, group)
 		if closes ~= "" then
 			note = (note ~= "" and (note .. " · ") or "") .. closes
 		end
+		if quest and IsHard(id) then -- (orange: after the ones for my level, marked)
+			note = HardWord(id, quest) .. (note ~= "" and (GREY .. " · " .. note) or "")
+		end
 	end
-	local text = icon .. (top and Q.LevelTitle(id, quest) or GreyTitle(id, quest))
+	local text = icon .. (top and TierTitle(id, quest) or GreyTitle(id, quest))
 	if note and note ~= "" then
 		text = text .. "\n" .. GREY .. note .. "|r"
 	end
@@ -788,6 +838,9 @@ local function PickRow(y, entry, ctx, group)
 	local step, total, chain = Q.StepOf(id)
 	if step then
 		tooltip[#tooltip + 1] = L["Step %d of %d · %s"]:format(step, total, chain or "")
+	end
+	if group == "now" and quest and IsHard(id) then
+		tooltip[#tooltip + 1] = HardWord(id, quest)
 	end
 	local closes = group == "now" and Q.Closes and Q.Closes(id) or {}
 	if closes[1] then
@@ -858,11 +911,11 @@ local function DrawNow(y, ctx)
 	if opens[1] then
 		local nextQuest = Q.Quest(opens[1])
 		local giver = nextQuest and Who(nextQuest.starts, ctx.zone)
-		tip[2] = L["Leads to: %s"]:format(Q.LevelTitle(opens[1], nextQuest) .. (giver and (" - " .. giver) or "")
+		tip[2] = L["Leads to: %s"]:format(TierTitle(opens[1], nextQuest) .. (giver and (" - " .. giver) or "")
 			.. (#opens > 1 and (" " .. L["(+%d more)"]:format(#opens - 1)) or ""))
 	end
 	tip[#tip + 1] = L["Click: everything about it"]
-	y = Row(y, { text = Q.LevelTitle(id, quest), font = "GameFontNormalLarge", onClick = Shows(id), tooltip = tip })
+	y = Row(y, { text = TierTitle(id, quest), font = "GameFontNormalLarge", onClick = Shows(id), tooltip = tip })
 	local chain, at = ChainOf(id)
 	if chain then
 		y = ChainLine(y, chain, at)
@@ -909,20 +962,21 @@ end
 
 -- The markers of "Pick up next" on the map shown: givers to pick up, my quests' turn-ins.
 local function PickPoints(ctx, lists)
-	local function Add(people, kind, look, note)
+	local function Add(people, kind, look, note, hard)
 		for _, who in ipairs(people or {}) do
 			for _, p in ipairs(who.points or {}) do
 				if p.map == ctx.map then
 					ctx.points[#ctx.points + 1] = { x = p.x, y = p.y, kind = kind, look = look, label = who.name or L["unknown"],
-						note = note, map = p.map }
+						note = note, map = p.map, hard = hard }
 				end
 			end
 		end
 	end
 	for _, entry in ipairs(lists.now) do
 		local quest = Q.Quest(entry.id)
-		local look = quest and quest.repeatable and "repeatable" or (Q.DifficultyKey(entry.id, quest) == "trivial" and "trivial" or "available")
-		Add(quest and quest.starts, "start", look, Q.Title(entry.id, quest))
+		local look = quest and quest.repeatable and "repeatable" or (Trivial(entry.id, quest) and "trivial" or "available")
+		local hard = quest ~= nil and IsHard(entry.id)
+		Add(quest and quest.starts, "start", look, Q.Title(entry.id, quest) .. (hard and ("  " .. HardWord(entry.id, quest)) or ""), hard)
 	end
 	for _, entry in ipairs(lists.log) do
 		local quest = Q.Quest(entry.id)
@@ -1007,7 +1061,7 @@ local function DrawLine()
 	local text, id, useful
 	if mode == "quest" and shown then
 		id, useful = shown, true
-		text = Q.QuestIcon(id) .. " " .. Q.LevelTitle(id)
+		text = Q.QuestIcon(id) .. " " .. TierTitle(id)
 	else
 		ctx.now, ctx.why = NowQuest(zone)
 		nowId = ctx.now
@@ -1016,7 +1070,7 @@ local function DrawLine()
 			useful = true
 			local quest = Q.Quest(id)
 			local list, at = ChainOf(id)
-			text = Q.QuestIcon(id, "active") .. " " .. Q.LevelTitle(id, quest) .. (list and (GREY .. " · " .. at .. "/" .. #list .. "|r") or "")
+			text = Q.QuestIcon(id, "active") .. " " .. TierTitle(id, quest) .. (list and (GREY .. " · " .. at .. "/" .. #list .. "|r") or "")
 			local far = quest and Far(quest.ends, ctx)
 			if far then
 				text = text .. GREY .. " · " .. far .. "|r"
@@ -1027,7 +1081,7 @@ local function DrawLine()
 			useful = entry ~= nil
 			if entry then
 				local quest = Q.Quest(entry.id)
-				text = Q.QuestIcon(entry.id) .. " " .. Q.LevelTitle(entry.id, quest)
+				text = Q.QuestIcon(entry.id) .. " " .. TierTitle(entry.id, quest)
 				local far = quest and Far(quest.starts, ctx)
 				if far then
 					text = text .. GREY .. " · " .. far .. "|r"
@@ -1112,7 +1166,7 @@ local function QuestMap(y, id, quest, status, ctx)
 	end
 	mapID = mapID or quest.zone
 	local points = {}
-	local startLook = status == "available" and (quest.repeatable and "repeatable" or (Q.DifficultyKey(id, quest) == "trivial" and "trivial" or "available"))
+	local startLook = status == "available" and (quest.repeatable and "repeatable" or (Trivial(id, quest) and "trivial" or "available"))
 		or (status == "done" and "trivial") or "locked"
 	local endLook = status == "active" and (IsComplete(id) and "turnin" or "progress") or "turnin"
 	for _, set in ipairs({ { npcStarts, "start", startLook }, { quest.ends or {}, "end", endLook }, { drops, "drop" } }) do
@@ -1154,7 +1208,7 @@ end
 
 local function DrawQuest(y, id)
 	local quest = Q.Quest(id)
-	y = Text(y + 2, quest and Q.LevelTitle(id, quest) or Q.Title(id), "GameFontNormalLarge")
+	y = Text(y + 2, quest and TierTitle(id, quest) or Q.Title(id), "GameFontNormalLarge")
 	if not quest then
 		return Text(y, L["This quest isn't in the quest data."], "GameFontDisableSmall")
 	end

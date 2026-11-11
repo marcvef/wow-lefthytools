@@ -7,13 +7,15 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 --
 --   * Beside the quest dialog (setting dialog): when an NPC offers a quest (QUEST_DETAIL), asks for
 --     it (QUEST_PROGRESS), rewards it (QUEST_COMPLETE) or lists several (QUEST_GREETING), a panel of
---     ours next to QuestFrame shows any quest the data knows: its level in its difficulty colour (the
---     dialog doesn't say it before you accept), from which level, the XP it gives; in a chain "Part 2
+--     ours next to QuestFrame shows any quest the data knows: its level in its difficulty tier's
+--     colour (Q.Tier; the dialog doesn't say it before you accept), from which level, "Hard" / "Too
+--     hard" with its mobs' level when that's higher, the XP it gives; in a chain "Part 2
 --     of 4 · <chain>" and the chain's steps around it (one before, this one bold, two after, done ones
 --     ticked, "... N more"), what it leads to when that isn't the next step listed ("Leads to ..." /
 --     "Opens 3 quests"), what the next steps need besides it that isn't listed or done ("Requires
 --     ..."), what taking it closes, which friends did it (one line), and a button "Open in Lodestar".
---     An NPC with several quests: each of them with its level (and its part of a chain).
+--     An NPC with several quests: each of them with its level (and its part of a chain), in the one
+--     order of quests (Q.Compare: ready, in my log, for my level, hard, ..., then by level).
 --   * The quest log (setting logBadges): "2/4" at the right end of each chain quest's line (a font
 --     string of ours on Blizzard's title button, the way Misc Tweaks' NEW label is: a post-hook on
 --     QuestLogQuests_Update), the chain in the line's tooltip (a HookScript on its OnEnter, as Misc
@@ -87,6 +89,45 @@ end
 -- The chain's name: its first quest's title (the client's when it knows it).
 local function ChainName(list)
 	return Q.Title(list[1])
+end
+
+-- Difficulty for me (the engine's tiers, Q.Tier: the quest's level, its mobs', a group quest one
+-- harder): a quest's tier, its colour code (Q.TierCode; without it, or for a quest the data doesn't
+-- know, its level's) and "[12] Title" in it.
+local function Tier(id, quest)
+	return quest and Q.Tier and Q.Tier(id) or nil
+end
+
+local function TierCode(id, quest)
+	local code = Q.TierCode and quest and Q.TierCode(id)
+	return type(code) == "string" and code ~= "" and code or Q.LevelCode(id, quest)
+end
+
+local function TierTitle(id, quest)
+	quest = quest or Q.Quest(id)
+	if not quest then
+		return Q.LevelTitle(id)
+	end
+	local level = tonumber(quest.level)
+	return TierCode(id, quest) .. ((level and level > 0) and ("[" .. level .. "] ") or "") .. Q.Title(id, quest) .. "|r"
+end
+
+-- A tier's word (Lodestar.lua's Q.TIER_WORD: "Hard", "Too hard").
+local function TierWord(tier)
+	local word = Q.TIER_WORD and Q.TIER_WORD[tier]
+	return type(word) == "string" and word or (tier == "impossible" and "Too hard" or "Hard")
+end
+
+-- The one order of quests (Engine.lua's Q.Compare: ready, in my log, for my level, hard, ..., then by
+-- level and title); without it as the NPC lists them.
+local function Order(ids)
+	if not Q.Compare then
+		return ids
+	end
+	table.sort(ids, function(a, b)
+		return a ~= b and Q.Compare(a, b) == true
+	end)
+	return ids
 end
 
 -- "A, B, C (+2 more)" of quest titles.
@@ -167,7 +208,7 @@ local function Row(y, o)
 	local indent = o.indent or 0
 	local w = WIDTH - 2 * PAD - indent
 	row.questID = o.id
-	row.tooltip = o.tooltip or { Q.LevelTitle(o.id), Q.StatusText(Q.StatusOf(o.id)), L["Click: open it in Lodestar"] }
+	row.tooltip = o.tooltip or { TierTitle(o.id), Q.StatusText(Q.StatusOf(o.id)), L["Click: open it in Lodestar"] }
 	row:ClearAllPoints()
 	row:SetPoint("TOPLEFT", panel.Body, "TOPLEFT", indent, -y)
 	row.Text:SetFontObject(o.font or "GameFontHighlightSmall")
@@ -260,15 +301,36 @@ local function FriendsText(id)
 	return GOLD .. L["Friends:"] .. "|r " .. table.concat(parts, ", ") .. more
 end
 
--- "Level 23 (from 18) · 1,400 XP" in the quest's difficulty colour (a quest that scales: "Your
--- level"); nil when the data has neither.
+-- "Level 23 (from 18) · Hard, mobs up to 26 · 1,400 XP" in the quest's difficulty tier's colour (a
+-- quest that scales: "Your level"): orange "Hard", red "Too hard" (Q.Tier), its mobs' level when
+-- it's above the quest's (Q.MobLevels), a group quest says so (Q.Group); nil when the data has
+-- neither a level nor XP.
 local function LevelLine(id, quest)
 	local text = quest.scales and L["Your level"] or Q.LevelText(quest)
 	local rewards = Q.Rewards and Q.Rewards(id)
 	local xp = type(rewards) == "table" and tonumber(rewards.xp)
+	local code, tier = TierCode(id, quest), Tier(id, quest)
 	local parts = {}
 	if text then
-		parts[1] = Q.LevelCode(id, quest) .. text .. "|r"
+		parts[1] = code .. text .. "|r"
+	end
+	local hard = {}
+	if tier == "difficult" or tier == "impossible" then
+		hard[1] = TierWord(tier)
+	end
+	local _, high = nil, nil
+	if Q.MobLevels then
+		_, high = Q.MobLevels(id)
+	end
+	high = tonumber(high)
+	if high and high > (tonumber(quest.level) or 0) and not quest.scales then
+		hard[#hard + 1] = L["mobs up to %d"]:format(high)
+	end
+	if Q.Group and Q.Group(id) then
+		hard[#hard + 1] = L["a group quest"]
+	end
+	if hard[1] then
+		parts[#parts + 1] = code .. table.concat(hard, ", ") .. "|r"
 	end
 	if xp and xp > 0 then
 		parts[#parts + 1] = LIGHT .. L["%s XP"]:format(BreakUpLargeNumbers and BreakUpLargeNumbers(xp) or tostring(xp)) .. "|r"
@@ -310,11 +372,11 @@ local function DrawQuest(y, id)
 	-- What it leads to: the one quest (unless it's a step listed already), else how many (their names
 	-- in the line's tooltip).
 	if #opens == 1 and not listed[opens[1]] then
-		y = Row(y, { id = opens[1], text = GOLD .. L["Leads to:"] .. "|r " .. Q.LevelTitle(opens[1]) })
+		y = Row(y, { id = opens[1], text = GOLD .. L["Leads to:"] .. "|r " .. TierTitle(opens[1]) })
 	elseif #opens > 1 then
 		local tip = { L["Opens %d quests"]:format(#opens) }
 		for i = 1, math.min(#opens, NAMES_MAX) do
-			tip[#tip + 1] = Q.LevelTitle(opens[i])
+			tip[#tip + 1] = TierTitle(opens[i])
 		end
 		if #opens > NAMES_MAX then
 			tip[#tip + 1] = L["and %d more"]:format(#opens - NAMES_MAX)
@@ -325,7 +387,7 @@ local function DrawQuest(y, id)
 	for _, need in ipairs(OtherNeeds(id, opens, listed)) do
 		y = Row(y, { id = need.id, text = Q.StatusCode("locked") .. L["Requires: %s"]:format(Q.Title(need.id)) .. "|r"
 			.. GREY .. " " .. L["(for %s)"]:format(Q.Title(need.forID)) .. "|r",
-			tooltip = { Q.LevelTitle(need.id), Q.StatusText(Q.StatusOf(need.id)),
+			tooltip = { TierTitle(need.id), Q.StatusText(Q.StatusOf(need.id)),
 				L["%s needs it too, not only this quest."]:format(Q.Title(need.forID)), L["Click: open it in Lodestar"] } })
 	end
 	if closes[1] then
@@ -342,10 +404,11 @@ end
 
 -- An NPC with several quests (the greeting): each with its level, and its part of a chain or what it opens.
 local function DrawGreeting(y)
-	local ids = {}
+	local ids, seen = {}, {}
 	local function Add(id)
 		id = tonumber(id)
-		if id and not LT.IsSecret(id) and #ids < GREETING_MAX then
+		if id and not LT.IsSecret(id) and not seen[id] and Q.Quest(id) then
+			seen[id] = true
 			ids[#ids + 1] = id
 		end
 	end
@@ -361,7 +424,10 @@ local function DrawGreeting(y)
 		end
 	end
 	local any = false
-	for _, id in ipairs(ids) do
+	for i, id in ipairs(Order(ids)) do
+		if i > GREETING_MAX then
+			break
+		end
 		local quest = Q.Quest(id)
 		local list, at = Q.ChainFor(id)
 		local opens = Q.Opens and Q.Opens(id) or {}
@@ -371,7 +437,11 @@ local function DrawGreeting(y)
 				y = Text(y, GOLD .. "Lodestar" .. "|r", "GameFontNormal")
 			end
 			local note = list and (L["Part %d of %d"]:format(at, #list) .. " · " .. ChainName(list)) or opens[1] and L["opens %d"]:format(#opens)
-			y = Row(y, { id = id, text = Q.QuestIcon(id) .. " " .. Q.LevelTitle(id, quest) .. (note and ("\n" .. GREY .. note .. "|r") or "") })
+			local tier = Tier(id, quest)
+			if tier == "difficult" or tier == "impossible" then -- (orange "Hard", red "Too hard": said, not only coloured)
+				note = TierCode(id, quest) .. TierWord(tier) .. "|r" .. (note and (GREY .. " · " .. note) or "")
+			end
+			y = Row(y, { id = id, text = Q.QuestIcon(id) .. " " .. TierTitle(id, quest) .. (note and ("\n" .. GREY .. note .. "|r") or "") })
 		end
 	end
 	return any and y or nil

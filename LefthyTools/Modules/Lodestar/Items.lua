@@ -9,7 +9,8 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 --   * Item tooltips (setting itemTooltips): "Lodestar: for <quest> · in your log (3/8)", "... · ready
 --     to turn in", "... · not taken yet: you can take it", "... · done"; for an item that starts one
 --     "Lodestar: starts the quest <quest> · you can start it" (or "already done: you can discard it");
---     at most four, then "and N more". Last, when no quest needs it any more: "No quest needs it any
+--     those that need it first, each in the one order of quests (Q.Compare), at most four, then "and N
+--     more". Last, when no quest needs it any more: "No quest needs it any
 --     more: you can discard it"; when only some do: "Still needed for <quest>". The data's (Data.lua's
 --     Q.ItemQuests) and, for a quest the data doesn't know with it (Forever's own), the quest log: a
 --     quest of my log whose objective names the item (its name from the client, so any language).
@@ -32,7 +33,9 @@ local LOCKED = { 1, 0.55, 0.2 }
 local GREY = { 0.6, 0.6, 0.6 }
 local DISCARD = { 0.55, 0.8, 0.55 }
 local KEEP = { 0.85, 0.85, 0.85 }
-local RANK = { active = 1, available = 2, locked = 3, level = 4, done = 5, other = 6 }
+-- The one order's statuses (Engine.lua's Q.Compare: ready, in my log, to take, coming up, blocked, done,
+-- other), also for a quest of my log the data doesn't have (Q.Compare doesn't know it).
+local RANK = { ready = 1, active = 2, available = 3, level = 4, locked = 5, done = 6, other = 7 }
 
 local M = Q.module
 local lines, linesKey = {}, nil -- item -> { { text, r, g, b } }, and what they're of
@@ -169,9 +172,31 @@ local function State(id, role, status, entry)
 	return starts and L["needs another quest first"] or L["not taken yet: needs another quest first"], LOCKED
 end
 
+-- Whether quest line a goes before b: the ones that need the item first, then by status (ready, in my
+-- log, to take, coming up, blocked, done), then the one order of quests (Q.Compare: for my level, hard,
+-- ...; by level and title); a quest of my log the data doesn't have after those it has, by its ID.
+local function Before(a, b)
+	if a.needed ~= b.needed then
+		return a.needed
+	end
+	if a.id == b.id then
+		return a.role ~= "starts" and b.role == "starts"
+	end
+	if a.rank ~= b.rank then
+		return a.rank < b.rank
+	end
+	if a.known ~= b.known then
+		return a.known
+	end
+	if Q.Compare and a.known then
+		return Q.Compare(a.id, b.id) == true
+	end
+	return a.id < b.id
+end
+
 -- The item's quests: the data's (Q.ItemQuests), then quests of my log whose objective names the item
 -- that the data doesn't have with it: { { id, role, status, needed, entry } }, the ones that need it
--- first. nil: the index isn't made yet. complete: false when the item's name was wanted but the
+-- first, in the one order. nil: the index isn't made yet. complete: false when the item's name was wanted but the
 -- client doesn't know it yet (then not kept).
 local function Entries(item)
 	local data = Q.ItemQuests and Q.ItemQuests(item)
@@ -183,7 +208,7 @@ local function Entries(item)
 	local list, seen = {}, {}
 	for _, e in ipairs(data) do
 		local status = Q.StatusOf(e.id)
-		list[#list + 1] = { id = e.id, role = e.role, status = status, needed = Needs(e.role, status),
+		list[#list + 1] = { id = e.id, role = e.role, status = status, needed = Needs(e.role, status), known = true,
 			entry = status == "active" and LogEntry(index, e.id, item, name) or nil }
 		if e.role ~= "starts" then
 			seen[e.id] = true
@@ -193,22 +218,16 @@ local function Entries(item)
 		for _, entry in ipairs(ByName(index, name)) do
 			if not seen[entry.quest] then
 				seen[entry.quest] = true
-				list[#list + 1] = { id = entry.quest, role = "objective", status = "active", needed = true, entry = entry }
+				list[#list + 1] = { id = entry.quest, role = "objective", status = "active", needed = true, entry = entry,
+					known = Q.Quest and Q.Quest(entry.quest) ~= nil }
 			end
 		end
 	end
-	table.sort(list, function(a, b)
-		if a.needed ~= b.needed then
-			return a.needed
-		end
-		if (a.role == "starts") ~= (b.role == "starts") then
-			return b.role == "starts"
-		end
-		if RANK[a.status] ~= RANK[b.status] then
-			return (RANK[a.status] or 9) < (RANK[b.status] or 9)
-		end
-		return a.id < b.id
-	end)
+	for _, e in ipairs(list) do
+		local ready = e.status == "active" and C_QuestLog and C_QuestLog.IsComplete and LT.Value(C_QuestLog.IsComplete, e.id) == true
+		e.rank = RANK[ready and "ready" or e.status] or 9
+	end
+	table.sort(list, Before)
 	return list, name ~= nil or #index.list == 0
 end
 

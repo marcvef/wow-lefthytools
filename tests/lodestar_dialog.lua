@@ -9,8 +9,11 @@
 -- log: "2/5" on a chain quest's line (left of Misc Tweaks' NEW when that's there), kept until the
 -- data or progress changes, the chain in its tooltip (at most 5 steps, from one before), the setting
 -- off, Alt-click (Q.LogAltClick).
--- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. Whatever this
--- file replaces is put back at its end.
+-- The level line in the quest's difficulty tier's colour ("Hard" / "Too hard", its mobs' level, a
+-- group quest); the greeting in the one order (Q.Compare).
+-- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. Round 6's
+-- contract (Q.Tier, Q.Compare, ...) gets stand-ins while it's missing. Whatever this file replaces is
+-- put back at its end.
 -- Needs: no other file.
 
 local suite = ...
@@ -31,6 +34,71 @@ local function PutBack(name)
 		Q[name] = replaced[name] or nil
 		replaced[name] = nil
 	end
+end
+
+-- The round's shared contract (docs/lodestar.md, Engine: difficulty tiers, "for your level", "hard"
+-- and the one order of quests), the data part's, built in parallel: while it's missing (no Q.Tier),
+-- stand-ins with its meaning (Q.InRange and Q.ForMyLevel then too: theirs before were the old
+-- meaning). Their own test fields: a quest's q.mobs = { lo, hi } (its objectives' mobs) and q.group.
+if not (Q.Tier and Q.Compare) then
+	local HARDER, KEYS = { trivial = 1, easy = 2, fair = 3, difficult = 4, impossible = 5 }, { "trivial", "easy", "fair", "difficult", "impossible" }
+	local RGB = { trivial = { 0.5, 0.5, 0.5 }, easy = { 0.25, 0.75, 0.25 }, fair = { 1, 0.82, 0 }, difficult = { 1, 0.5, 0.25 }, impossible = { 1, 0.1, 0.1 } }
+	Replace("TIER_WORD", { trivial = "Trivial", easy = "Easy", fair = "Fair", difficult = "Hard", impossible = "Too hard" })
+	Replace("Group", function(id) local q = Q.Quest(id) return q ~= nil and q.group == true end)
+	Replace("MobLevels", function(id) local q = Q.Quest(id) if q and q.mobs then return q.mobs[1], q.mobs[2] end end)
+	Replace("Tier", function(id)
+		local q = Q.Quest(id)
+		if not q then return nil end
+		local tier = Q.Difficulty(id) or "fair"
+		local _, hi = Q.MobLevels(id)
+		local mobs = hi and hi > (tonumber(q.level) or 0) and Q.LevelColor(hi).key
+		if mobs and HARDER[mobs] > HARDER[tier] then tier = mobs end
+		if Q.Group(id) then tier = KEYS[math.min(5, HARDER[tier] + 1)] end
+		return tier
+	end)
+	Replace("TierColor", function(tier) local c = RGB[tier] or RGB.fair return { r = c[1], g = c[2], b = c[3] } end)
+	Replace("TierCode", function(id)
+		local c = Q.TierColor(Q.Tier(id) or "fair")
+		return ("|cff%02x%02x%02x"):format(math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5))
+	end)
+	local function Level(q) -- (the effective level: its own, a scaling one mine, its mobs' if higher; nil: none)
+		local level = tonumber(q.level) or tonumber(q.minLevel)
+		if q.scales or (level and level <= 0) then level = UnitLevel("player") end
+		local _, hi = Q.MobLevels(q.id)
+		if hi and (not level or hi > level) then level = hi end
+		return level
+	end
+	Replace("InRange", function(id)
+		local q = Q.Quest(id)
+		if not q then return false end
+		if Q.Status(id) == "active" then return true end
+		if q.event or (tonumber(q.minLevel) or 0) > UnitLevel("player") or not Level(q) then return false end
+		local tier = Q.Tier(id)
+		return tier == "easy" or tier == "fair" or tier == "difficult"
+	end)
+	Replace("ForMyLevel", function(id)
+		local s = Q.Status(id)
+		return s == "active" or (s == "available" and Q.InRange(id) and (Q.Tier(id) == "easy" or Q.Tier(id) == "fair"))
+	end)
+	Replace("IsHard", function(id) return Q.Status(id) == "available" and Q.InRange(id) and Q.Tier(id) == "difficult" end)
+	local RANK = { active = 2, available = 5, level = 6, locked = 7, done = 8, other = 9 }
+	Replace("StatusRank", function(id)
+		local s = Q.Status(id) or "other"
+		if s == "active" and C_QuestLog.IsComplete(id) then return 1 end
+		if Q.ForMyLevel(id) then return s == "active" and 2 or 3 end
+		if Q.IsHard(id) then return 4 end
+		return RANK[s] or 9
+	end)
+	Replace("Compare", function(a, b)
+		local ra, rb = Q.StatusRank(a), Q.StatusRank(b)
+		if ra ~= rb then return ra < rb end
+		local qa, qb = Q.Quest(a), Q.Quest(b)
+		local la, lb = qa and Level(qa) or 1000, qb and Level(qb) or 1000
+		if la ~= lb then return la < lb end
+		local ta, tb = Q.Title(a):lower(), Q.Title(b):lower()
+		if ta ~= tb then return ta < tb end
+		return a < b
+	end)
 end
 
 -- The clock moves in quarters of a second here (and whole seconds in all at the end).
@@ -62,6 +130,9 @@ local QUESTS_DATA = {
 		starts = { Npc(925, "Herald Kim", 0.45, 0.45) }, ends = { Npc(926, "Captain Lee", 0.55, 0.2) } },
 	[9111] = { id = 9111, title = "The Captain's Need", level = 7, zone = 1429,
 		starts = { Npc(926, "Captain Lee", 0.55, 0.2) }, ends = { Npc(926, "Captain Lee", 0.55, 0.2) } },
+	-- (three levels above me at 19: hard, orange)
+	[9130] = { id = 9130, title = "Ogre Hunt", level = 22, minLevel = 18, zone = 1429,
+		starts = { Npc(928, "Captain Lee", 0.55, 0.2) }, ends = { Npc(928, "Captain Lee", 0.55, 0.2) } },
 }
 -- A second chain: Scout Ahead opens Side Errand and Report Back; Report Back also needs the last of
 -- five herb quests (far down the chain, out of sight beside Scout Ahead).
@@ -88,7 +159,7 @@ C_QuestLog.GetAllCompletedQuestIDs = function()
 	for id in pairs(completed) do list[#list + 1] = id end
 	return list
 end
-local savedQuests, savedDialogQuest = QUESTS, DIALOG_QUEST
+local savedQuests, savedDialogQuest, savedLevel = QUESTS, DIALOG_QUEST, PLAYER_LEVEL
 local function Log(ids)
 	QUESTS = {}
 	for _, id in ipairs(ids) do QUESTS[#QUESTS + 1] = { id = id, title = QUESTS_DATA[id].title, objectives = {} } end
@@ -248,8 +319,38 @@ CloseDialog()
 PutBack("Friends")
 PutBack("RequestFriendProgress")
 
--- An NPC with several quests: each with its level, those in a chain with their part.
-local greeting = { active = { 9102 }, available = { 9109, 9110 } }
+-- Difficulty: the level line in the quest's tier's colour, "Hard" / "Too hard", the mobs' level when
+-- it's higher, a group quest.
+PLAYER_LEVEL = 19
+Progress()
+Dialog("QUEST_DETAIL", 9130)
+Step()
+local line = Has("Level 22 (from 18)")
+check(line and Plain(line) == "Level 22 (from 18) · Hard" and line:find("|cffff8040Level 22", 1, true) and line:find("|cffff8040Hard", 1, true),
+	"three levels above me: the level line orange, \"Hard\": " .. Plain(line or ""))
+CloseDialog()
+Dialog("QUEST_DETAIL", 9109)
+Step()
+check(Plain(Has("Level 5 (from 3)")) == "Level 5 (from 3) · 1,250 XP" or Plain(Has("Level 5 (from 3)")) == "Level 5 (from 3) · 1250 XP",
+	"a grey one: no word, only its colour")
+CloseDialog()
+do
+	local tier, mobs, group = Q.Tier, Q.MobLevels, Q.Group
+	Q.Tier = function(id) if id == 9130 then return "impossible" end return tier(id) end
+	Q.MobLevels = function(id) if id == 9130 then return 23, 25 end end
+	Q.Group = function(id) return id == 9130 end
+	Dialog("QUEST_DETAIL", 9130)
+	Step()
+	line = Has("Level 22 (from 18)")
+	check(line and Plain(line) == "Level 22 (from 18) · Too hard, mobs up to 25, a group quest",
+		"its mobs higher, a group quest, too hard: says so: " .. Plain(line or ""))
+	CloseDialog()
+	Q.Tier, Q.MobLevels, Q.Group = tier, mobs, group
+end
+
+-- An NPC with several quests: each with its level, those in a chain with their part, in the one order
+-- (in my log, hard, the rest by level).
+local greeting = { active = { 9102 }, available = { 9110, 9109, 9130 } }
 GetNumActiveQuests = function() return #greeting.active end
 GetActiveQuestID = function(i) return greeting.active[i] end
 GetNumAvailableQuests = function() return #greeting.available end
@@ -260,6 +361,11 @@ v = View()
 check(v.panel:IsShown() and v.page == "greeting" and RowWith("[6] The Lost Axe") and RowWith("Part 2 of 5 · Into the Woods")
 	and RowWith("[6] Herald's Call") and RowWith("[5] Lonely Errand") and not v.panel.Open:IsShown(),
 	"a greeting: every quest with its level, those in a chain with their part, a click opens it; no button")
+local order = {}
+for _, row in ipairs(v.rows) do order[#order + 1] = Plain(row.Text:GetText()):match("%[%d+%] ([^\n]+)") end
+check(table.concat(order, ", ") == "The Lost Axe, Ogre Hunt, Lonely Errand, Herald's Call",
+	"... in the one order: in my log, the hard one, the grey ones by level: " .. table.concat(order, ", "))
+check(Plain(RowWith("Ogre Hunt").Text:GetText()):find("\nHard", 1, true), "... the hard one says so")
 CloseDialog()
 GetNumActiveQuests, GetActiveQuestID, GetNumAvailableQuests, GetAvailableQuestInfo = nil, nil, nil, nil
 
@@ -356,7 +462,7 @@ check(badges[axe] and badges[axe]:IsShown(), "on again: the open log has them at
 
 -- Put back what this file replaced, the mock's world; the clock on a whole second.
 for name in pairs(replaced) do PutBack(name) end
-QUESTS, DIALOG_QUEST = savedQuests, savedDialogQuest
+QUESTS, DIALOG_QUEST, PLAYER_LEVEL = savedQuests, savedDialogQuest, savedLevel
 C_QuestLog.GetAllCompletedQuestIDs = savedCompleted
 QuestLogQuests_Update()
 Progress()

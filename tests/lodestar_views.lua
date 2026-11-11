@@ -1,22 +1,23 @@
 -- Lodestar: the quest browser's two views (Views.lua): My quests (my quest log organised: ready to
--- turn in first, then by zone with mine first and the nearest first, by level or by storyline; a
--- line per quest with its chain's "2/4" (a badge: a click opens the chain, Q.OpenChain), its first
--- objective not done or "Ready to turn in", where it's turned in; a click opens it in the window, a
--- right-click sets the map pin; "Continue your storylines": the chains I've started whose next step
--- I can take now, at most 8, their "1/2" a badge too) and the level path
--- (the zones with something for my levels or friends there, all of them with a toggle, as bars
--- across the levels, shaded per level, my level, sorted by what there is for my level: in my log or
--- to take now within my levels, not a quest that needs another first nor an event's; a click opens
--- the zone). Registering with the window's registry once it's there (the module's enable), building
+-- turn in first, then by zone with mine first, by level or by storyline, each group in the one order
+-- (Q.Compare); a line per quest with its chain's "2/4" (a badge: a click opens the chain,
+-- Q.OpenChain), its first objective not done or "Ready to turn in", where it's turned in; a click
+-- shows it on the window's map, a right-click opens its chain, Shift-click sets the map pin;
+-- "Continue your storylines": the chains I've started whose next step I can take now, in the one
+-- order of those steps (a hard one after, orange, marked), at most 8, their "1/2" a badge too) and
+-- the level path (the zones with something for my levels or friends there, all of them with a
+-- toggle, as bars across the levels, each level in its quests' difficulty tier's colour, done a thin
+-- line, my level, "N for your level · M hard", sorted by them; the tooltip's counts by tier; a click
+-- opens the zone). Registering with the window's registry once it's there (the module's enable), building
 -- on the registry's build(parent), the counts made a slice a frame and only again when the data or
 -- my progress changes, events only while a view is shown, moving, pools, no data, the controller.
 -- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. The window's
 -- registry (Q.RegisterBrowserView) and Q.SelectZone come from the big window's part in parallel:
 -- here the registry is a stand-in that records what's registered, put in for the checks and the
 -- real one (if there is one) put back; Q.OpenBrowser, Q.OpenChain, Q.SelectZone and Q.Waypoint are
--- recorders while this file runs. The data part's Q.Objectives and the new Q.InRange (in my log; else minimum
--- level reached, not grey, at most Q.RANGE_RED levels above me) are stand-ins with the contract's
--- meaning (the data part builds them in parallel; its own tests check them).
+-- recorders while this file runs. The data part's Q.Objectives is a stand-in; round 6's contract (Q.Tier,
+-- Q.Compare, the new Q.InRange and Q.ForMyLevel, Q.IsHard, ...) gets stand-ins with its meaning while
+-- it's missing (the data part builds it in parallel; its own tests check it).
 -- Whatever it replaces is put back at its end.
 -- Needs: no other file.
 
@@ -99,6 +100,9 @@ local QUESTS_DATA = {
 	[1400] = Quest(1400, "The Red Crystal", 12, 10, DARKSHORE, { starts = { THERYLUNE }, ends = { SALDEAN } }),
 	[1401] = Quest(1401, "As Water Cascades", 14, 11, DARKSHORE, { pre = { 1400 } }),
 	[1402] = Quest(1402, "The Absent Minded Prospector", 18, 15, DARKSHORE, { pre = { 1103 } }),
+	-- A chain started whose next step is three levels above me at 12: hard, orange.
+	[1420] = Quest(1420, "Washed Ashore", 10, 9, DARKSHORE, { starts = { THERYLUNE } }),
+	[1410] = Quest(1410, "Bones of the Dead", 15, 11, DARKSHORE, { pre = { 1420 }, starts = { THERYLUNE } }),
 }
 local ZONES = {
 	{ map = ELWYNN, name = "Elwynn Forest", continent = EK, minLevel = 1, maxLevel = 10 },
@@ -120,19 +124,70 @@ local OBJECTIVES = {
 -- (Always the stand-in: the test quests have no objectives in the data's own format; the data part's
 -- Q.Objectives has its tests in lodestar_data.)
 Replace("Objectives", function(id) return OBJECTIVES[id] or {} end)
--- The contract's Q.InRange (the data part's tests check the engine's own; here what the views do
--- with it): in my log; else my level reached, not grey, at most 4 levels above me (a level -1 / 0:
--- mine).
-Replace("InRange", function(id)
-	local q = Q.Quest(id)
-	if not q then return false end
-	if Q.Status(id) == "active" then return true end
-	if q.event or Q.IsTrivial(id) then return false end
-	local me = UnitLevel("player")
-	if q.minLevel and q.minLevel > me then return false end
-	local level = (q.level and q.level > 0) and q.level or me
-	return level <= me + (Q.RANGE_RED or 4)
-end)
+-- The round's shared contract (docs/lodestar.md, Engine: difficulty tiers, "for your level", "hard"
+-- and the one order of quests), the data part's, built in parallel: while it's missing (no Q.Tier),
+-- stand-ins with its meaning (Q.InRange and Q.ForMyLevel then too: theirs before were the old
+-- meaning). Their own test fields: a quest's q.mobs = { lo, hi } (its objectives' mobs) and q.group.
+if not (Q.Tier and Q.Compare) then
+	local HARDER, KEYS = { trivial = 1, easy = 2, fair = 3, difficult = 4, impossible = 5 }, { "trivial", "easy", "fair", "difficult", "impossible" }
+	local RGB = { trivial = { 0.5, 0.5, 0.5 }, easy = { 0.25, 0.75, 0.25 }, fair = { 1, 0.82, 0 }, difficult = { 1, 0.5, 0.25 }, impossible = { 1, 0.1, 0.1 } }
+	Replace("TIER_WORD", { trivial = "Trivial", easy = "Easy", fair = "Fair", difficult = "Hard", impossible = "Too hard" })
+	Replace("Group", function(id) local q = Q.Quest(id) return q ~= nil and q.group == true end)
+	Replace("MobLevels", function(id) local q = Q.Quest(id) if q and q.mobs then return q.mobs[1], q.mobs[2] end end)
+	Replace("Tier", function(id)
+		local q = Q.Quest(id)
+		if not q then return nil end
+		local tier = Q.Difficulty(id) or "fair"
+		local _, hi = Q.MobLevels(id)
+		local mobs = hi and hi > (tonumber(q.level) or 0) and Q.LevelColor(hi).key
+		if mobs and HARDER[mobs] > HARDER[tier] then tier = mobs end
+		if Q.Group(id) then tier = KEYS[math.min(5, HARDER[tier] + 1)] end
+		return tier
+	end)
+	Replace("TierColor", function(tier) local c = RGB[tier] or RGB.fair return { r = c[1], g = c[2], b = c[3] } end)
+	Replace("TierCode", function(id)
+		local c = Q.TierColor(Q.Tier(id) or "fair")
+		return ("|cff%02x%02x%02x"):format(math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5))
+	end)
+	local function Level(q) -- (the effective level: its own, a scaling one mine, its mobs' if higher; nil: none)
+		local level = tonumber(q.level) or tonumber(q.minLevel)
+		if q.scales or (level and level <= 0) then level = UnitLevel("player") end
+		local _, hi = Q.MobLevels(q.id)
+		if hi and (not level or hi > level) then level = hi end
+		return level
+	end
+	Replace("InRange", function(id)
+		local q = Q.Quest(id)
+		if not q then return false end
+		if Q.Status(id) == "active" then return true end
+		if q.event or (tonumber(q.minLevel) or 0) > UnitLevel("player") or not Level(q) then return false end
+		local tier = Q.Tier(id)
+		return tier == "easy" or tier == "fair" or tier == "difficult"
+	end)
+	Replace("ForMyLevel", function(id)
+		local s = Q.Status(id)
+		return s == "active" or (s == "available" and Q.InRange(id) and (Q.Tier(id) == "easy" or Q.Tier(id) == "fair"))
+	end)
+	Replace("IsHard", function(id) return Q.Status(id) == "available" and Q.InRange(id) and Q.Tier(id) == "difficult" end)
+	local RANK = { active = 2, available = 5, level = 6, locked = 7, done = 8, other = 9 }
+	Replace("StatusRank", function(id)
+		local s = Q.Status(id) or "other"
+		if s == "active" and C_QuestLog.IsComplete(id) then return 1 end
+		if Q.ForMyLevel(id) then return s == "active" and 2 or 3 end
+		if Q.IsHard(id) then return 4 end
+		return RANK[s] or 9
+	end)
+	Replace("Compare", function(a, b)
+		local ra, rb = Q.StatusRank(a), Q.StatusRank(b)
+		if ra ~= rb then return ra < rb end
+		local qa, qb = Q.Quest(a), Q.Quest(b)
+		local la, lb = qa and Level(qa) or 1000, qb and Level(qb) or 1000
+		if la ~= lb then return la < lb end
+		local ta, tb = Q.Title(a):lower(), Q.Title(b):lower()
+		if ta ~= tb then return ta < tb end
+		return a < b
+	end)
+end
 
 -- My progress: completed quests and the quest log ({ id, ... } or { { id, complete } }), with the
 -- quest log's objectives.
@@ -141,7 +196,7 @@ local LOG_OBJECTIVES = {
 	[1120] = { { text = "Handful of Oats: 3/8", type = "item", numFulfilled = 3, numRequired = 8, finished = false } },
 	[1400] = { { text = "Red Crystal: 0/1", type = "object", numFulfilled = 0, numRequired = 1, finished = false } },
 }
-local completed = { [1001] = true, [1002] = true, [1003] = true, [1010] = true, [1100] = true, [1110] = true, [1200] = true }
+local completed = { [1001] = true, [1002] = true, [1003] = true, [1010] = true, [1100] = true, [1110] = true, [1200] = true, [1420] = true }
 local savedCompleted = C_QuestLog.GetAllCompletedQuestIDs
 C_QuestLog.GetAllCompletedQuestIDs = function()
 	local list = {}
@@ -302,8 +357,8 @@ do
 	K.SLICE = slice
 	check(mine.sorts.zone.on and M.db.views.mySort == "zone", "sorted by zone at first")
 	check(Entries(mine) == "h:Ready to turn in (1), q:1011, h:Westfall (2)  you're here, q:1120, q:1101, h:Darkshore (1), q:1400, "
-		.. "h:Continue your storylines started, the next step for your level, n:1111",
-		"ready to turn in first (every zone), then my zone (the nearest objective first), then the others; then Continue: " .. Entries(mine))
+		.. "h:Continue your storylines started, the next step for your level, n:1111, n:1410",
+		"ready to turn in first (every zone), then my zone, then the others, each in the one order (by level, then title); then Continue: " .. Entries(mine))
 	check(plain(mine.Head:GetText()) == "4 quests in your log · 1 ready to turn in", "on top: how many, how many ready")
 	-- A quest's line.
 	local row = RowOf(mine, "q1101")
@@ -324,11 +379,11 @@ do
 	row._scripts.OnEnter(row)
 	check(plain(TOOLTIP.title) == "[12] The Defias Brotherhood" and tipHas("In your quest log") and tipHas("Westfall")
 		and tipHas("Step 2 of 5 · The People's Militia") and tipHas("- Defias Looter slain: 2/10") and tipHas("Turn in: Gryan Stoutmantle")
-		and tipHas("Click: open it in the quest browser") and tipHas("Click 2/5: open the chain") and tipHas("Right-click: map pin at Defias Looter"),
+		and tipHas("Click: show it on the map") and tipHas("Right-click (or 2/5): open the chain") and tipHas("Shift-click: map pin at Defias Looter"),
 		"its tooltip: status, zone, step, every objective, turn-in, what the clicks do (its badge too)")
 	row._scripts.OnLeave(row)
 	oats._scripts.OnEnter(oats)
-	check(not tipHas("open the chain"), "a quest in no chain: no badge's click in its tooltip")
+	check(not tipHas("open the chain") and tipHas("Click: show it on the map"), "a quest in no chain: no chain in its tooltip")
 	oats._scripts.OnLeave(oats)
 	-- Its chain badge: a button of its own, its tooltip, a click opens the chain (Q.OpenChain).
 	local badge = row.Badge
@@ -343,21 +398,35 @@ do
 	oats._scripts.OnEnter(oats)
 	check(tipHas("- Handful of Oats: 3/8 (from Oat Sack, 100%)"), "an item's objective: where it comes from")
 	oats._scripts.OnLeave(oats)
+	local chainedBefore, pinsBefore = #chained, #pins
 	row:Click()
-	check(opened[#opened] == 1101, "a click opens it in the quest browser")
+	check(opened[#opened] == 1101 and #chained == chainedBefore and #pins == pinsBefore, "a click shows it on the window's map (Q.OpenBrowser), never the chain")
+	openedBefore = #opened
 	row:Click("RightButton")
-	check(pins[#pins] and pins[#pins].map == WESTFALL and pins[#pins].x == 0.45, "a right-click: the map pin at its objective's area")
+	check(chained[#chained] == 1101 and #chained == chainedBefore + 1 and #opened == openedBefore and #pins == pinsBefore,
+		"a right-click: its chain (Q.OpenChain)")
+	oats:Click("RightButton")
+	check(opened[#opened] == 1120 and #chained == chainedBefore + 1, "a quest in no chain: a right-click shows it as a click does")
+	STATE.shift = true
+	row:Click()
+	check(pins[#pins] and pins[#pins].map == WESTFALL and pins[#pins].x == 0.45 and #chained == chainedBefore + 1, "Shift-click: the map pin at its objective's area")
 	ready:Click("RightButton")
+	STATE.shift = false
 	check(pins[#pins].map == ELWYNN and pins[#pins].x == 0.42, "a ready one: at its turn-in")
 	-- Continue your storylines.
 	local nxt = RowOf(mine, "n1111")
 	check(nxt and plain(nxt.Text:GetText()) == "Westfall Stew - next: [13] Goretusk Liver Pie, Farmer Saldean (Westfall)"
 		and plain(nxt.Badge.Text:GetText()) == "1/2", "Continue: a chain I've started whose next step I can take, its giver and zone")
+	local bones = RowOf(mine, "n1410")
+	check(bones and plain(bones.Text:GetText()) == "Washed Ashore - next: [15] Bones of the Dead (Hard), Gwennyth Bly'Leggonde (Darkshore)"
+		and bones.Text:GetText():find("|cffff8040[15] Bones of the Dead", 1, true),
+		"a storyline whose next step is hard (three levels above me): after the one for my level, its title orange, marked: " .. plain(bones and bones.Text:GetText() or ""))
+	check(nxt.Text:GetText():find("|cffffd100[13] Goretusk Liver Pie", 1, true), "the one for my level: its title in its tier's colour (yellow)")
 	check(not Entries(mine):find("n:1201", 1, true) and not Entries(mine):find("n:1102", 1, true),
 		"not a chain whose next step is too high for me (Redridge), nor one whose next step needs the one in my log")
 	nxt._scripts.OnEnter(nxt)
 	check(TOOLTIP.title == "Westfall Stew" and tipHas("1 of 2 steps done") and tipHas("From Farmer Saldean, Westfall")
-		and tipHas("Click 1/2: open the chain"), "its tooltip")
+		and tipHas("Click: show it on the map") and tipHas("Right-click (or 1/2): open the chain") and tipHas("Shift-click: map pin at Farmer Saldean"), "its tooltip")
 	nxt._scripts.OnLeave(nxt)
 	check(nxt.Badge._kind == "Button" and nxt.Badge:IsShown(), "its 1/2: a badge too")
 	nxt.Badge._scripts.OnEnter(nxt.Badge)
@@ -366,9 +435,13 @@ do
 	nxt.Badge:Click()
 	check(chained[#chained] == 1111, "a click: the chain, its next step picked")
 	nxt:Click()
-	check(opened[#opened] == 1111, "a click opens its next step")
+	check(opened[#opened] == 1111, "a click shows its next step on the map")
 	nxt:Click("RightButton")
-	check(pins[#pins].x == 0.56 and pins[#pins].y == 0.31, "a right-click: the map pin at its giver")
+	check(chained[#chained] == 1111 and #chained == chainedBefore + 3, "a right-click: the chain")
+	STATE.shift = true
+	nxt:Click("RightButton")
+	STATE.shift = false
+	check(pins[#pins].x == 0.56 and pins[#pins].y == 0.31, "Shift-click: the map pin at its giver")
 	-- Sorting, kept.
 	mine.sorts.level:Click()
 	check(M.db.views.mySort == "level" and Entries(mine):find("^h:Ready to turn in %(1%), q:1011, h:In progress %(3%), q:1120, q:1101, q:1400, h:Continue"),
@@ -396,11 +469,13 @@ do
 	Wait(0.6)
 	check(mine.draws == draws + 1 and census.starts == starts and plain(RowOf(mine, "q1101").Todo:GetText()):find("^3/10 Defias Looter"),
 		"drawn half a second later, once, with the progress; the log alone doesn't count again")
-	-- Walking: the nearest first.
+	-- Walking: the distances drawn again, the order stays the one order (by level, not the nearest).
 	draws = mine.draws
+	local far = plain(RowOf(mine, "q1101").Todo:GetText())
 	PLAYER_POS[1], PLAYER_POS[2] = 0.45, 0.32
 	Wait(2.1)
-	check(mine.draws == draws + 1 and Entries(mine):find("you're here, q:1101, q:1120", 1, true), "walked near the looters: drawn again, they come first")
+	check(mine.draws == draws + 1 and plain(RowOf(mine, "q1101").Todo:GetText()) ~= far and Entries(mine):find("you're here, q:1120, q:1101", 1, true),
+		"walked near the looters: drawn again with the distance, the order stays: " .. plain(RowOf(mine, "q1101").Todo:GetText()))
 	draws = mine.draws
 	Wait(4.1)
 	check(mine.draws == draws, "standing still: nothing")
@@ -452,8 +527,11 @@ do
 		for _, r in ipairs(entry.runs) do out[#out + 1] = r[1] .. "-" .. r[2] .. " " .. r[3] end
 		return table.concat(out, ", ")
 	end
-	check(runs(e) == "9-12 done, 13-13 open, 14-18 later" or runs(e) == "9-11 done, 12-13 open, 14-18 later",
-		"Westfall's levels: done, open, later: " .. runs(e))
+	check(runs(e) == "9-11 done, 12-15 fair, 16-17 difficult, 18-18 impossible",
+		"Westfall's levels: done, then each level in its quests' difficulty for me (a level without quests as the one before): " .. runs(e))
+	local fair, hardBand, done = row.Runs[2], row.Runs[3], row.Runs[1]
+	check(fair.color and math.abs(fair.color[2] - 0.82) < 0.01 and math.abs(hardBand.color[2] - 0.5) < 0.01 and done.height < fair.height,
+		"the bands in the tiers' colours (yellow, orange); done a thin line")
 	check(e.here and row.Here:IsShown() and plain(row.Name:GetText()) == "Westfall", "the zone I'm in: a faint band, only its name")
 	local z = e.zone
 	check(z.near == 2 and z.active == 1 and z.locked == 2 and z.event == 1 and z.available == 1,
@@ -462,12 +540,20 @@ do
 	check(plain(row.Right:GetText()) == "2 for your level" and not row.Sub and not row.Band and not row.Dots,
 		"the row: its name, its bar, what's there for my level (not what's too high: no coming up); nothing else")
 	check(plain(ZoneRow(levelpath, REDRIDGE).Right:GetText()) == "", "nothing for my level (Bob is there): nothing at the right")
+	-- Hard ones (orange: three or four levels above me) apart.
+	local dark = ZoneRow(levelpath, DARKSHORE)
+	check(plain(dark.Right:GetText()) == "1 for your level · 1 hard" and dark.entry.zone.hard == 1,
+		"Darkshore: the one in my log for my level, the one three levels above me hard: " .. plain(dark.Right:GetText()))
+	check(dark.Right:GetText():find("|cffff8040", 1, true), "... the hard count orange")
 	local me = levelpath.x0 + (12 - 1) * levelpath.per + levelpath.per / 2
 	check(math.abs(select(4, row.Me:GetPoint(1)) - me) < 0.01 and plain(levelpath.Axis.You:GetText()) == "You (12)", "a line at my level")
 	row._scripts.OnEnter(row)
 	check(TOOLTIP.title == "Westfall" and tipHas("2 for your level") and tipHas("1 you can take now") and tipHas("1 in your quest log")
 		and tipHas("3 of 9 done") and tipHas("Anna Brook level 13") and tipHas("You're here.") and tipHas("Click: open this zone"),
 		"its tooltip: the rest (done, what I can take, in my log, friends there)")
+	check(tipHas("Left to do, by difficulty:") and tipHas("Fair: 4") and tipHas("Hard: 1") and tipHas("Too hard: 1") and not tipHas("Easy:")
+		and tipHas("Level 12-15: Fair") and tipHas("Level 9-11: done") and not tipHas("1 hard"),
+		"... what's left by difficulty for me (each tier's count, each run of levels); no hard one to take there: " .. table.concat(TOOLTIP.lines, " | "))
 	row._scripts.OnLeave(row)
 	row:Click()
 	check(selected[#selected] == WESTFALL, "a click opens the zone in the window")
@@ -492,8 +578,8 @@ do
 	PLAYER_LEVEL = 18
 	Fire("PLAYER_LEVEL_UP", 18)
 	Wait(0.6)
-	check(Rows(levelpath) == "Westfall, Redridge Mountains, Darkshore, Elwynn Forest" and plain(levelpath.Axis.You:GetText()) == "You (18)",
-		"a level up: Redridge's quests are for my level now, my line moves: " .. Rows(levelpath))
+	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains, Elwynn Forest" and plain(levelpath.Axis.You:GetText()) == "You (18)",
+		"a level up: Redridge's quests are for my level now (as many as Darkshore's, whose hard one is fair now), my line moves: " .. Rows(levelpath))
 	check(plain(ZoneRow(levelpath, REDRIDGE).Right:GetText()) == "2 for your level", "Redridge: 2 now")
 	Log({})
 	Progress()

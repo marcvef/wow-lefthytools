@@ -10,7 +10,7 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 -- opening it).
 --   local m = Q.NewMiniMap(parent[, width, height])  -- default 240 x 160 (a zone's art is 3:2)
 --   m.frame                                         -- to anchor it
---   m:Show(map, points[, name])                     -- points = { { x, y, kind, label [, note, look, grey, chance, radius, group] } }
+--   m:Show(map, points[, name])                     -- points = { { x, y, kind, label [, note, look, grey, chance, radius, group, hard] } }
 --   m:SetSize(width, height), m:Hide(), m:ShowPlayer(on), m:Zoom(factor[, x, y]), m:Markers(), m:Light(group)
 -- x and y are 0..1 on that map. kind: "start" (a quest giver), "end" (a turn-in), "drop" (where a
 -- quest's item drops: a soft orange spot, as big as its radius (0..1 of the map's width) or
@@ -20,7 +20,8 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 -- icon (the ones players know from the game's maps): "available" (yellow !), "repeatable" (blue !),
 -- "trivial" (the game's grey ! of a low quest), "locked" (grey !: not open yet), "turnin" (yellow ?),
 -- "repeatturnin", "progress" (in your log, not done yet). Without look: a start is "available", an
--- end "turnin"; grey = true makes them "locked" / "progress". note: a line for the tooltip (the
+-- end "turnin"; grey = true makes them "locked" / "progress". hard = true: its dark outline is an
+-- orange ring (a hard quest's giver, its icon the game's). note: a line for the tooltip (the
 -- quest). Markers within a few pixels are one, its tooltip listing each (several givers at a
 -- spot, a giver who's also the turn-in).
 -- A click on a marker sets the game's own map pin there and tracks it (Q.Waypoint: the arrow on
@@ -57,6 +58,7 @@ local ARROW = "Interface\\Minimap\\MinimapArrow"
 local DROP_R, DROP_G, DROP_B = 1, 0.55, 0.12
 local AREA_R, AREA_G, AREA_B = 1, 0.82, 0.25 -- an objective's area (the quest log's gold)
 local AREA_ALPHA, AREA_DIM, AREA_LIT = 0.7, 0.2, 1
+local HARD_R, HARD_G, HARD_B = 1, 0.5, 0.25 -- a hard quest's ring (the game's orange difficulty)
 local KINDS = { start = L["Quest giver"], ["end"] = L["Turn-in"], drop = L["Drops here"], area = L["Objective area"] }
 
 -- A soft spot under the icons: a drop's or an objective's area.
@@ -184,7 +186,12 @@ local function Dress(m, marker, point)
 		local art = LOOKS[marker.look]
 		local alpha = SetArt(marker.Icon, marker.look)
 		SetArt(marker.Shadow, marker.look)
-		marker.Shadow:SetVertexColor(0, 0, 0, 0.7)
+		marker.hard = point.hard == true
+		if marker.hard then -- (a hard quest's giver: the game's icon on an orange ring)
+			marker.Shadow:SetVertexColor(HARD_R, HARD_G, HARD_B, 0.95)
+		else
+			marker.Shadow:SetVertexColor(0, 0, 0, 0.7)
+		end
 		marker.Icon:SetDesaturated(art[4] == true)
 		local v = art[4] and 0.85 or 1
 		marker.Icon:SetVertexColor(v, v, v, alpha)
