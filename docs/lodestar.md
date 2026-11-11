@@ -317,8 +317,9 @@ read.
   my log; else one I can take now by its levels and that's worth it: its `minLevel` at most my level,
   not grey (`Q.IsTrivial`) and its level at most `Q.RANGE_RED` (4) above mine (not red); never an event
   quest (`Q.IsEvent`) that isn't in my log (its holiday may not be on: "All levels" shows them). A level
-  that scales (-1, 0, `scales`) counts as mine; no level: its minimum level; nothing known (or my level
-  not known): in range. Levels only: what else stands in its way is `Q.Status`'s (a red quest is
+  that scales (-1, 0, `scales`) counts as mine; no level: its minimum level; neither (Forever's untitled
+  hidden quests): out of range; my level
+  not known: in range. Levels only: what else stands in its way is `Q.Status`'s (a red quest is
   still `"available"`, so is an event's). Quests coming up (a minimum level above mine) are out
   (`Q.RANGE_ABOVE` is gone).
 - `Q.IsEvent(id)`: an event's quest (the data's flag `e`: a holiday's, the Darkmoon Faire's, ...).

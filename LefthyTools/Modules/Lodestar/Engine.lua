@@ -353,8 +353,8 @@ end
 -- Within my levels, what the windows show unless asked for all levels: a quest in my log, or one I can
 -- take now by its levels and that's worth it: its minimum level reached, not grey for me (Q.IsTrivial)
 -- and not red, at most RANGE_RED levels above mine (a level that scales to me counts as mine; no level
--- known: yes); never an event quest that isn't in my log (its holiday may not be on). What else stands
--- in its way is Q.Status's.
+-- known at all: no, those are Forever's untitled hidden quests); never an event quest that isn't in my
+-- log (its holiday may not be on). What else stands in its way is Q.Status's.
 local RANGE_RED = 4
 Q.RANGE_RED = RANGE_RED
 function Q.InRange(id)
@@ -369,7 +369,7 @@ function Q.InRange(id)
 	if need and need > my then return false end
 	if Q.IsTrivial(id) then return false end
 	local level = LevelOf(q, my)
-	return not (level and level > my + RANGE_RED)
+	return level ~= nil and level <= my + RANGE_RED
 end
 
 -- For my level, what the windows count as that: in my log, or one I can take now ("available") within my

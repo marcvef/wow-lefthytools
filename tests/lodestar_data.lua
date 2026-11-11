@@ -649,8 +649,8 @@ do
 		"my levels: not grey, nothing I can't take yet (coming up is out)")
 	check(not Q.InRange(12) and Q.InRange(13) and Q.Status(12) == "available" and Q.Difficulty(12) == "impossible",
 		"a red quest I could take: still available, not in my levels; orange is")
-	check(Q.InRange(14) and Q.InRange(15) and Q.InRange(16) and Q.InRange(18) and not Q.InRange(17),
-		"levels -1, 0 and the data's flag count as mine; no level: in; grey: out")
+	check(Q.InRange(14) and Q.InRange(15) and Q.InRange(16) and not Q.InRange(18) and not Q.InRange(17),
+		"levels -1, 0 and the data's flag count as mine; no level at all (Forever's untitled hidden quests): out; grey: out")
 	check(Q.IsEvent(19) and not Q.IsEvent(2) and Q.Status(19) == "available" and not Q.InRange(19),
 		"an event's quest (only while its holiday is on): available, but never in my levels")
 	check(Q.ForMyLevel(2) and Q.ForMyLevel(13) and not Q.ForMyLevel(19) and not Q.ForMyLevel(20) and Q.Status(20) == "locked" and Q.InRange(20)
