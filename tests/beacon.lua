@@ -1674,8 +1674,9 @@ do
 	GameTooltip:SetHyperlink("item:1155::::::::20:::::")
 	check(not tooltipHas("Won by"), "other items' tooltips don't")
 	GameTooltip:Hide()
-	-- Traded to Bob: still owed, and no nudge.
+	-- Another copy traded to Bob (the reserved one still in my bags): still owed, and no nudge.
 	TRADE_PARTNER, PARTY.NPC = "Bob", { guid = "Player-1-12" }
+	BAGS[0] = { [3] = 6948 }
 	pmark = #PRINTED + 1
 	Fire("TRADE_SHOW")
 	TRADE_ITEMS = { ItemLink(6948) }
@@ -1683,8 +1684,10 @@ do
 	Fire("TRADE_ACCEPT_UPDATE", 1, 1)
 	Fire("TRADE_CLOSED")
 	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
-	Advance(0.1)
-	check(#owed == 1 and not printedSince(pmark):find("put it in", 1, true), "traded to someone else: still owed, no nudge")
+	Advance(1.1)
+	check(#owed == 1 and not printedSince(pmark):find("put it in", 1, true) and not printedSince(pmark):find("no longer reserved", 1, true),
+		"another copy traded to someone else: the reserved one is still owed, no nudge")
+	BAGS = { [0] = {} }
 	-- Trading with Anna: a nudge; she gets it: gone.
 	TRADE_PARTNER, PARTY.NPC, TRADE_ITEMS = "Anna", { guid = "Player-1-11" }, {}
 	pmark = #PRINTED + 1
@@ -1716,13 +1719,71 @@ do
 	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
 	check(#owed == 0, "... and handed over")
 	TRADE_SURNAME = nil
+	-- The slots empty as the trade completes, before it says so: what I accepted counts.
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11")
+	TRADE_PARTNER, PARTY.NPC, TRADE_ITEMS = "Anna", { guid = "Player-1-11" }, {}
+	Fire("TRADE_SHOW")
+	TRADE_ITEMS = { ItemLink(6948) }
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 1)
+	Fire("TRADE_ACCEPT_UPDATE", 1, 0)
+	Fire("TRADE_ACCEPT_UPDATE", 1, 1)
+	TRADE_ITEMS = {}
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 1)
+	Fire("TRADE_CLOSED")
+	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
+	Advance(0.1)
+	check(#owed == 0, "the trade's slots emptied before it said it's done: still handed over")
+	-- Taken out again before accepting: not handed over.
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11")
+	Fire("TRADE_SHOW")
+	TRADE_ITEMS = { ItemLink(6948) }
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 1)
+	Fire("TRADE_ACCEPT_UPDATE", 1, 0)
+	TRADE_ITEMS = {}
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 1)
+	Fire("TRADE_ACCEPT_UPDATE", 0, 0)
+	Fire("TRADE_ACCEPT_UPDATE", 1, 1)
+	Fire("TRADE_CLOSED")
+	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
+	Advance(1.1)
+	check(#owed == 1, "taken out of the trade before accepting: still owed")
+	-- Any copy reserved (offered from a link, a crafted item: all alike), one traded to Bob: over.
+	TRADE_PARTNER, PARTY.NPC = "Bob", { guid = "Player-1-12" }
+	pmark = #PRINTED + 1
+	Fire("TRADE_SHOW")
+	TRADE_ITEMS = { ItemLink(6948) }
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 1)
+	Fire("TRADE_ACCEPT_UPDATE", 1, 1)
+	Fire("TRADE_CLOSED")
+	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
+	Advance(0.1)
+	check(#owed == 1, "given to someone else: looked at a moment later (the trade's items may still be in the bags)")
+	Advance(1)
+	check(#owed == 0 and printedSince(pmark):find(ItemLink(6948) .. " went to Bob, not to Anna who won it: no longer reserved.", 1, true),
+		"given to someone else: no longer reserved, and I'm told")
+	-- The reserved copy itself given to someone else: over; it's not in my bags any more.
+	BAGS[0] = { [3] = 6948 }
+	BB.AddHandover("6948::::::::20:::::", ItemLink(6948), "Anna", "Player-1-11", "Item-0-3")
+	Fire("TRADE_SHOW")
+	TRADE_ITEMS = { ItemLink(6948) }
+	Fire("TRADE_PLAYER_ITEM_CHANGED", 1)
+	Fire("TRADE_ACCEPT_UPDATE", 1, 1)
+	BAGS = { [0] = {} }
+	Fire("TRADE_CLOSED")
+	Fire("UI_INFO_MESSAGE", 0, ERR_TRADE_COMPLETE)
+	Advance(1.1)
+	check(#owed == 0, "the reserved copy given to someone else: no longer reserved")
 	TRADE_PARTNER, PARTY.NPC, TRADE_ITEMS = nil, nil, {}
 	-- Mail.
 	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
 	MAIL_ITEMS = { 1179 }
+	pmark = #PRINTED + 1
 	SendMail("Anna", "hi", "")
 	Fire("MAIL_SEND_SUCCESS")
-	check(#owed == 1, "mailed to someone else: still owed")
+	Advance(1.1)
+	check(#owed == 0 and printedSince(pmark):find(ItemLink(1179) .. " went to Anna, not to Bob who won it", 1, true),
+		"mailed to someone else: no longer reserved")
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
 	SendMail("Bob-Realmy", "yours", "")
 	Fire("MAIL_FAILED")
 	Fire("MAIL_SEND_SUCCESS") -- a later, unrelated mail
@@ -1734,7 +1795,22 @@ do
 	SendMail("bob", "yours", "")
 	Fire("MAIL_SEND_SUCCESS")
 	check(#owed == 0, "the name typed in lower case: still them")
+	-- The attachments already gone when the hook runs: as last seen.
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
+	Fire("MAIL_SEND_INFO_UPDATE")
 	MAIL_ITEMS = {}
+	SendMail("Bob", "yours", "")
+	Fire("MAIL_SEND_SUCCESS")
+	Advance(0.1)
+	check(#owed == 0, "the mail's attachments gone before the hook: as last seen, handed over")
+	BB.AddHandover("1179::::::::20:::::", ItemLink(1179), "Bob", "Player-1-12")
+	SendMail("Bob", "no items", "")
+	Fire("MAIL_SEND_SUCCESS")
+	Advance(1.1)
+	check(#owed == 1, "a later mail without attachments: nothing handed over")
+	wipe(owed)
+	MAIL_ITEMS = {}
+	Fire("BN_CHAT_MSG_ADDON", "LTBeacon", "S2;;0;260.0;750.0;Goldshire;", "WHISPER", 12) -- (Bob still here after the waits above)
 
 	-- Rolled again: only the newest winner keeps it reserved.
 	wipe(owed)

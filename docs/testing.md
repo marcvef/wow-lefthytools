@@ -378,7 +378,8 @@ installer from GitHub instead.
     right-clicking asks "Sell it anyway?" (Keep it: nothing happens; Sell anyway: sold, border
     gone); dragging it onto the vendor warns in chat to buy it back. At a mailbox, attaching it
     fills in their name. Opening a trade with them says so in chat, and trading (or mailing) it to
-    them removes the line and the border. `/lefthy beacon handover` lists what's still owed.
+    them removes the line and the border. Trading or mailing it to someone else removes them too,
+    a second later, with a line in chat ("went to Bob, not to Anna who won it"). `/lefthy beacon handover` lists what's still owed.
     Invite: hover a friend's world map dot: "Shift+click: invite"; Shift+left click it: they get
     the game's invite, also on another realm, and chat says "Invited <them>." In your group: no line.
     Health in the stream (the fighter on this build; `/lefthy stream me` or a friend's window):

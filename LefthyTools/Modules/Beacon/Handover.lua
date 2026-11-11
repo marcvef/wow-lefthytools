@@ -22,9 +22,13 @@ local B = ns.Beacon
 --     means done (it may come after TRADE_CLOSED, so the snapshot lives until the next trade);
 --   * mail: a post-hook on SendMail gives the recipient and the attachments, MAIL_SEND_SUCCESS means
 --     done, MAIL_FAILED drops it.
--- An item given to someone else stays reserved. The partner is matched by GUID when both are
--- known, else by name; if the game won't tell who it is (a secret value), the item counts as
--- handed over. Event handlers only note things down; anything shown waits for the next frame.
+-- (The trade's items are also kept as they were when I accepted, and a mail's attachments as last
+-- seen: the game may empty them before the trade's or the mail's end is known.)
+-- Given to someone else, that copy's reservation is over too: it's gone, and a note that stuck on
+-- the same item's other copies (crafted ones are all alike) would only mislead. The partner is
+-- matched by GUID when both are known, else by name; if the game won't tell who it is (a secret
+-- value), the item counts as handed over. Event handlers only note things down; anything shown
+-- waits for the next frame.
 
 local MAX, KEEP_DAYS = 20, 7
 local TRADE_SLOTS = 6
@@ -32,8 +36,9 @@ local LINE_R, LINE_G, LINE_B = 1, 0.55, 0.2
 local BORDER = "Interface\\Buttons\\UI-ActionButton-Border"
 
 local list -- LefthyToolsDB.handover: { { itemID, link, winner, guid, at }, ... }, oldest first
-local trade = { items = {} } -- the open (or last) trade: name, guid, items = { itemID, ... }
+local trade = { items = {} } -- the open (or last) trade: name, guid, items = { itemID, ... }, accepted
 local mail -- a mail on its way: { name, items }
+local attached = {} -- the mail being written: its attachments' itemIDs as last seen
 local merchantOpen = false
 local counts = {} -- at a vendor: itemID -> how many are in my bags (to notice one going)
 local mailWarned -- the recipient + attachments last warned about
@@ -147,7 +152,47 @@ local function HandedOver(itemID, name, guid)
 	end
 end
 
+-- Is this copy (its item GUID) still in my bags?
+local function InBags(itemID, itemGUID)
+	local NumSlots = C_Container.GetContainerNumSlots
+	for bag = 0, NumSlots and (NUM_TOTAL_EQUIPPED_BAG_SLOTS or NUM_BAG_SLOTS or 4) or -1 do
+		for slot = 1, NumSlots(bag) or 0 do
+			if C_Container.GetContainerItemID(bag, slot) == itemID and SlotGUID(bag, slot) == itemGUID then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Given to someone other than the winner: the reservation of what went is over. One for a known
+-- copy ends if that copy has left my bags (I may have given another one away); else one for any copy.
+local function GivenAway(items, name)
+	for _, itemID in ipairs(items) do
+		local ended
+		for _, entry in ipairs(list or {}) do
+			if entry.itemID == itemID and entry.itemGUID and not InBags(itemID, entry.itemGUID) then
+				ended = entry
+				break
+			end
+		end
+		for _, entry in ipairs(not ended and list or {}) do
+			if entry.itemID == itemID and not entry.itemGUID then
+				ended = entry
+				break
+			end
+		end
+		if ended then
+			Remove(ended)
+			M:Print(("%s went to %s, not to %s who won it: no longer reserved."):format(ended.link or ("item " .. itemID),
+				name or "someone else", ended.winner))
+			Soon("bags")
+		end
+	end
+end
+
 local function Delivered(items, name, guid)
+	local others = {}
 	for _, itemID in ipairs(items) do
 		local entry = HandedOver(itemID, name, guid)
 		if entry then
@@ -155,7 +200,13 @@ local function Delivered(items, name, guid)
 				M:Print(("%s handed over to %s."):format(entry.link or ("item " .. itemID), entry.winner))
 			end)
 			Soon("bags")
+		elseif EntryFor(itemID) then
+			others[#others + 1] = itemID
 		end
+	end
+	if others[1] then
+		-- (a trade's items may stay in my bags for a moment after it's done: looked at once they've left)
+		C_Timer.After(1, function() GivenAway(others, name) end)
 	end
 end
 
@@ -473,6 +524,20 @@ end
 -- Events
 ---------------------------------------------------------------------------
 
+-- The mail's attachments (readable itemIDs) into items.
+local function ReadMailItems(items)
+	wipe(items)
+	for slot = 1, ATTACHMENTS_MAX_SEND or 12 do
+		if HasSendMailItem and HasSendMailItem(slot) then
+			local _, itemID = GetSendMailItem(slot)
+			if Readable(itemID) then
+				items[#items + 1] = itemID
+			end
+		end
+	end
+	return items
+end
+
 local function ReadTradeItems()
 	wipe(trade.items)
 	for slot = 1, TRADE_SLOTS do
@@ -493,28 +558,43 @@ function handlers.TRADE_SHOW()
 	local name = UnitName("NPC")
 	trade.name, trade.guid = BaseName(name), Readable(guid) and guid or nil
 	wipe(trade.items)
+	trade.accepted = nil
 	if list and list[1] then
 		Soon("tradeNudge")
 	end
 end
 
 handlers.TRADE_PLAYER_ITEM_CHANGED = ReadTradeItems
-handlers.TRADE_ACCEPT_UPDATE = ReadTradeItems
+
+-- What I accepted is what goes (the slots empty as the trade completes, maybe before it says so).
+function handlers.TRADE_ACCEPT_UPDATE(playerAccepted)
+	ReadTradeItems()
+	if playerAccepted == 1 or playerAccepted == true then
+		trade.accepted = { unpack(trade.items) }
+	end
+end
 
 function handlers.UI_INFO_MESSAGE(_, message)
-	if message == ERR_TRADE_COMPLETE and trade.items[1] then
-		local items = { unpack(trade.items) }
+	local items = trade.items[1] and trade.items or trade.accepted
+	if message == ERR_TRADE_COMPLETE and items and items[1] then
+		items = { unpack(items) }
 		wipe(trade.items)
+		trade.accepted = nil
 		Delivered(items, trade.name, trade.guid)
 	end
 end
 
 function handlers.MAIL_SEND_SUCCESS()
+	wipe(attached)
 	if mail then
 		local sent = mail
 		mail = nil
 		Delivered(sent.items, sent.name, nil)
 	end
+end
+
+function handlers.MAIL_CLOSED()
+	wipe(attached)
 end
 
 function handlers.MAIL_FAILED()
@@ -523,6 +603,7 @@ end
 
 function handlers.MAIL_SEND_INFO_UPDATE()
 	if list and list[1] then
+		ReadMailItems(attached)
 		Soon("mail")
 	end
 end
@@ -593,14 +674,9 @@ local function OnSendMail(recipient)
 	if not (list and list[1]) then
 		return
 	end
-	local items = {}
-	for slot = 1, ATTACHMENTS_MAX_SEND or 12 do
-		if HasSendMailItem and HasSendMailItem(slot) then
-			local _, itemID = GetSendMailItem(slot)
-			if Readable(itemID) then
-				items[#items + 1] = itemID
-			end
-		end
+	local items = ReadMailItems({})
+	if not items[1] then
+		items = { unpack(attached) } -- (already taken off the mail by the time this runs)
 	end
 	if items[1] then
 		mail = { name = BaseName(recipient), items = items }

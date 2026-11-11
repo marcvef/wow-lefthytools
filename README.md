@@ -166,7 +166,7 @@ minimap, and you on theirs, without being in a group.
   to the winner, the item is reserved for them: its tooltip says "Won by Anna: still to hand
   over", its bag slot has an orange border, a vendor asks before selling it, a trade with them
   reminds you in chat, and attaching it to a mail fills in their name (`/lefthy beacon handover`
-  lists what you still owe). (For gear, Ctrl+click also opens the
+  lists what you still owe). Given to someone else instead, it's no longer reserved. (For gear, Ctrl+click also opens the
   game's preview, as always.)
 - **Without a click:** `/lefthy beacon show` or `/lefthy beacon offer`, then Shift-click the
   item into the chat box, for when a click doesn't reach it (some bag addons, gamepad). If an

@@ -508,13 +508,21 @@ nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` 
 - **Trade:** `TRADE_SHOW` reads the partner (`UnitName("NPC")`, whose second return is a surname in Forever, and `UnitGUID("NPC")`) and, if they
   won something, says so in chat ("Anna won [item]: put it in the trade."). `TRADE_PLAYER_ITEM_CHANGED`
   / `TRADE_ACCEPT_UPDATE` read my slots 1-6 (`GetTradePlayerItemLink`; slot 7 is "will not be
-  traded"). `UI_INFO_MESSAGE` with `ERR_TRADE_COMPLETE` removes the matching reminders; it can come
-  after `TRADE_CLOSED`, so the snapshot lives until the next `TRADE_SHOW`.
+  traded"); `TRADE_ACCEPT_UPDATE` with my side accepted also keeps them as `trade.accepted`, since
+  the slots may empty as the trade completes. `UI_INFO_MESSAGE` with `ERR_TRADE_COMPLETE` removes
+  the matching reminders (the slots as read, else what I accepted); it can come after
+  `TRADE_CLOSED`, so the snapshot lives until the next `TRADE_SHOW`.
 - **Mail:** a post-hook on `SendMail` keeps the recipient and the attachments' item IDs
-  (`HasSendMailItem` / `GetSendMailItem`); `MAIL_SEND_SUCCESS` removes the matching reminders,
+  (`HasSendMailItem` / `GetSendMailItem`; if they're already gone, the attachments as
+  `MAIL_SEND_INFO_UPDATE` last saw them); `MAIL_SEND_SUCCESS` removes the matching reminders,
   `MAIL_FAILED` drops the snapshot.
 - **Matching:** by GUID when both are known, else by name, ignoring case, realm and surname (`strcmputf8i`); if the game won't say
-  (a secret value), the item counts as handed over. An item given to anyone else keeps its line.
+  (a secret value), the item counts as handed over. Given to anyone else (traded or mailed), the
+  reservation of what went ends too, a second later (a trade's items may still be in the bags):
+  one for a known copy if that copy is no longer in my bags (`InBags`: the bags' slots by item
+  GUID; I may have given another copy), else one for any copy. Chat says so ("[item] went to Bob,
+  not to Anna who won it: no longer reserved."). A note that stayed would stick to the item's
+  other copies, and crafted items are all alike.
   Chat output waits for the next frame (`C_Timer.After(0)`), never inside the event handler.
 - **Beacon off:** borders, vendor guards and the question go (`B.HandoverRefresh` on the next
   frame after switching), and the warnings, trade nudges and mail help stay quiet; trades and

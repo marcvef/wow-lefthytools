@@ -1619,6 +1619,7 @@ SendMailNameEditBox:SetText("")
 BAGS, SOLD, PICKED_UP = { [0] = {} }, {}, {}
 C_Container = {
 	GetContainerItemID = function(bag, slot) return BAGS[bag] and BAGS[bag][slot] end,
+	GetContainerNumSlots = function(bag) return BAGS[bag] and 36 or 0 end,
 	GetContainerItemLink = function(bag, slot) local id = BAGS[bag] and BAGS[bag][slot]; return id and ItemLink(id) end,
 	GetContainerItemInfo = function(bag, slot)
 		local id = BAGS[bag] and BAGS[bag][slot]
