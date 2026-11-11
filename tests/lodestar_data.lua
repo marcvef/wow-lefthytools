@@ -1,6 +1,7 @@
 -- Lodestar's data and engine (Modules/Lodestar/Data.lua, Engine.lua; docs/lodestar.md): the quest
 -- data add-on loaded only when asked, once; the real generated data (LefthyTools_QuestData/QuestData.lua)
--- through the accessors: quests, givers and their places, zones, dungeons, search; real chains (Elwynn
+-- through the accessors: quests, givers and their places, zones, dungeons, search; places where zones'
+-- rectangles overlap on their own zone's map (the Barrens' mobs, a city's surroundings, givers in cities); real chains (Elwynn
 -- Forest's Northshire, Westfall's Defias Brotherhood, a Forever chain); where a quest stands with a
 -- made-up progress (done, in the log, locked, too low, not for me), what's missing across zones,
 -- exclusive groups, what's next; Forever's races (the Skyborne) and the race rule, item starters'
@@ -258,6 +259,60 @@ do
 	local ends = Q.Ends(176)
 	check(ends == Q.Quest(176).ends and ends[1].id == 240 and ends[1].points[1].map == 1429 and #Q.Ends(999999999) == 0,
 		"turned in at Marshal Dughan")
+end
+
+section("Lodestar data: places on their own zone's map (zones' rectangles overlap)")
+do
+	-- The maps an objective's sources stand on (every cluster of every source), and how many clusters.
+	local function mapsOf(quest, id)
+		local maps, n, sources = {}, 0, {}
+		for _, o in ipairs(Q.Objectives(quest)) do
+			if o.id == id then
+				for _, s in ipairs(o.sources) do
+					sources[s.id] = s
+					for _, p in ipairs(s.points) do
+						maps[p.map] = true
+						n = n + 1
+						if not (p.x >= 0 and p.x <= 1 and p.y >= 0 and p.y <= 1) then maps.outside = true end
+					end
+				end
+			end
+		end
+		return maps, n, sources
+	end
+	local function only(maps, map)
+		for m in pairs(maps) do if m ~= map then return false end end
+		return maps[map] == true
+	end
+	-- The Barrens' rectangle holds all of Mulgore's and most of Durotar's: its mobs on its own map.
+	local maps, n, sources = mapsOf(907, 5143)
+	local stormsnout = sources[3240] and sources[3240].points[1]
+	check(only(maps, 1413) and n >= 3 and stormsnout and stormsnout.x > 0.4 and stormsnout.x < 0.56 and stormsnout.y > 0.45
+		and stormsnout.y < 0.6, "Enraged Thunder Lizards: Stormsnout and the thunder lizards on the Barrens' map (EG Link saw "
+		.. "Stormsnout at 50, 53), not Mulgore's, Durotar's or Dustwallow's")
+	maps, n = mapsOf(855, 5030)
+	check(only(maps, 1413) and n >= 3, "Centaur Bracers: the Kolkar on the Barrens' map")
+	maps, n = mapsOf(845, 5086)
+	check(only(maps, 1413) and n >= 3, "The Zhevra: the zhevras on the Barrens' map")
+	maps, n = mapsOf(747, 4739)
+	check(only(maps, 1412) and n >= 1, "The Hunt Begins: Mulgore's plainstriders on Mulgore's map")
+	maps, n = mapsOf(7, 6)
+	check(only(maps, 1429) and n >= 1, "Kobold Camp Cleanup: Elwynn's kobolds on Elwynn Forest's map")
+	-- A city's rectangle holds some of its zone around it: those spawns on the zone's map.
+	maps, n = mapsOf(827, 4871)
+	check(only(maps, 1411) and n >= 1, "Skull Rock (outside Orgrimmar's gate): the Burning Blade on Durotar's map, not Orgrimmar's")
+	maps, n = mapsOf(429, 3164)
+	check(only(maps, 1421) and n >= 1, "Wild Hearts: Silverpine's worgs on its map, not the Undercity's")
+	-- Givers in cities stay on the city's map; the Valley of Trials on Durotar's (the Barrens' as the alternative).
+	local function giver(quest, id)
+		for _, a in ipairs(Q.Quest(quest).starts) do if a.id == id then return a end end
+		for _, a in ipairs(Q.Quest(quest).ends) do if a.id == id then return a end end
+	end
+	local thrall, cairne, osric = giver(4002, 4949), giver(776, 3057), giver(6261, 1323)
+	check(thrall and thrall.points[1].map == 1454 and cairne and cairne.points[1].map == 1456 and osric and osric.points[1].map == 1453,
+		"Thrall in Orgrimmar, Cairne in Thunder Bluff, Osric Strang in Stormwind City: on the city's map")
+	local frang = giver(2383, 3153)
+	check(frang and frang.points[1].map == 1411, "Frang in the Valley of Trials: Durotar's map")
 end
 
 section("Lodestar engine: Northshire with a made-up progress")

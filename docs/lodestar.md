@@ -51,11 +51,14 @@ load in doesn't matter for the table.
   players got, and their side). The quests' `objectivesText` and `description` (whom a quest is for) and
   `creatures`' `reactions` (how a creature met each side) for Forever's quests without a side. The
   quests' `questInfoId` (elite 1, dungeon 81, raid 62, as classic-db's `Type`) and `creatures`' `levels`
-  (the levels players saw a creature at). The commit used is in `source`.
+  (the levels players saw a creature at). Every position it has with its uiMap (`npcs`, `creatures`,
+  `loot`: 9703) tells which zone's map a spot is on where zones' rectangles overlap (Places). The
+  commit used is in `source`.
 - **Forever's client tables** (wago.tools): UiMap, UiMapAssignment, AreaTable, Map, QuestSort,
   FactionTemplate, QuestV2, QuestLineXQuest, ItemSparse (StartQuestID, item names), QuestPOIBlob,
   ChrRaces (the playable races, their race-mask bits and sides), QuestXP (a quest's experience by its
-  level and XP difficulty). Forever's client has no QuestObjective table (wago.tools: "Table not
+  level and XP difficulty), WorldMapOverlay with UiMapXMapArt (the explored-area images of a zone's
+  map: where its own areas are, for places). Forever's client has no QuestObjective table (wago.tools: "Table not
   found" for 1.60.1.70862 and 70888, the locale exports too): objectives come from EG Link and
   classic-db.
 - `Data/ForeverQuests.lua`: which quests are new in Forever (the `new` flag).
@@ -84,15 +87,45 @@ file, and it credits Questie for quest data).
   uiMap (UiMapAssignment by area, else its parent areas'). Below 0 it's a QuestSort (class,
   profession, Seasonal, Camping, ...): `sort`, and the zone is the first giver's. Forever's quests:
   EG Link's area or category, QuestPOIBlob's map, the giver's zone.
-- **Places:** each spawn's world x/y on the smallest zone (or dungeon floor, by height) rectangle of
+- **Places:** each spawn's world x/y on a zone (or dungeon floor, by height) rectangle of
   UiMapAssignment holding it: `mapX = (maxY - y) / (maxY - minY)`, `mapY = (maxX - x) / (maxX -
   minX)`, then into the assignment's `UiMin`..`UiMax` (Marshal Dughan comes out at 42.1, 65.9, as in
-  game). Rectangles of neighbouring zones overlap at the borders: the zone of the NPC's own quests
-  wins there and the others are stored as alternatives (a zone at most 4 times the other's size; a
-  city and the zone around it never: a city's spawn stays in the city). Data.lua asks the client
-  (`C_Map.GetMapInfoAtPosition` on the continent) which one it is when it reads the NPC, and keeps
-  the guess if the answer is none of them. Up to 5 places per NPC, 1% apart. No spawn: EG Link's
-  positions; none at all: no points (event NPCs).
+  game). Which rectangle: the client takes the one of the area the position is in (the terrain's
+  area; the smallest only among that area's), and the data has no areas. Zones' rectangles overlap
+  a lot: the Barrens' holds all of Mulgore's and most of Durotar's and Dustwallow's, so "the
+  smallest" would be right for only 45% of the spawns where rectangles overlap (the old rule put
+  the Barrens' Stormsnout and Kolkar on Mulgore's and Durotar's maps). The tool (`bestBox`) decides
+  by what the data has of the areas, each spawn on its own, the first step that decides:
+  - **A city's rectangle** (it lies inside its zone's but holds some of the zone around it: Skull
+    Rock outside Orgrimmar's gate, Silverpine's coast west of the Undercity): the map EG Link
+    recorded this NPC or creature on, if exactly one of them; the nearest position players' games
+    recorded (EG Link's `npcs`, `creatures` and `loot` positions with their uiMap: the client's own
+    answer there) within 150 yards; on its zone's explored-area images (WorldMapOverlay's hit
+    rectangles, not the city's own drawn on its zone's map): the zone; else the city. Each step
+    is right for every EG Link position in a city's rectangle it decides (the city alone: 87.5%).
+  - **Zones whose rectangles overlap:** on the explored-area images (their bounds; the zone's own
+    areas) of exactly one of them; a recorded position within 150 yards; the one map EG Link
+    recorded this NPC or creature on; 25 yards inside exactly one zone's images' hit rectangles;
+    a recorded position within 400 yards when every other of the zones' nearest is 1.5 times as
+    far (not across a river where only one bank was played: the Valley of Trials has no recorded
+    positions, the Barrens' bank 400 yards off has); inside exactly one's hit rectangles; the zone
+    nearest its images and their hit rectangles (both distances added, negative inside); for zones
+    without images the NPC's quests' zones (the most quests), then the nearest rectangle centre
+    (relative to its size). On this data's spawns where rectangles overlap and a recorded position
+    within 100 yards tells the zone: 99.9% right, 98.5% not using the positions within 100 yards,
+    96.9% not those within 600 (as where nobody played). The quests' zones alone would be right for
+    85% (a quest's mobs are often across its zone's border), so they come last.
+  - Dungeon floors: the smallest (by height, then size), unless one of the NPC's quests' holds it.
+
+  A drop source's or objective target's places are the same for every quest and item that uses it.
+  An NPC's or object's other zones of about the same size whose rectangles hold the spot are stored
+  as alternatives (a zone at most 4 times the other's size; a city and the zone around it never),
+  and Data.lua asks the client (`C_Map.GetMapInfoAtPosition` on the continent) which one it is when
+  it reads the NPC, keeping the tool's choice if the answer is none of them. Up to 5 places per NPC,
+  1% apart. No spawn: EG Link's positions; none at all: no points (event NPCs). On a map EG Link
+  recorded the same NPC or creature on: givers' and enders' first places 307 of 307 (96% with the
+  old rule), drop and objective clusters 525 of 532 (64%; the rest at borders: the Southfury's
+  crocolisks, Hillsbrad and Alterac).
 - **Races:** Forever's playable races are ChrRaces' rows with a `PlayableRaceBit` and the playable
   flags classic's eight have (`0x600000`): Human 1 ... Troll 8 (bits 0-7, as in classic), High Order
   Skyborne 95 (bit 32, Alliance) and Windshaper Skyborne 96 (bit 33, Horde). A race mask has bit
@@ -138,8 +171,8 @@ file, and it credits Questie for quest data).
   0 an object) then `ReqItemId`, with their counts. Forever's own quests EG Link hasn't described
   have none. An item that is the quest's `SrcItemId` is handed over by the giver (`provided`). The
   places: a creature's or object's spawns (else where players met it, EG Link's `creatures`, else its
-  NPC record's positions) in clusters as for drops (put on the quest's zone where rectangles
-  overlap), shared with the drop sources; an item's sources as for items that start quests, with
+  NPC record's positions) in clusters as for drops (each spawn on its zone as for places), shared
+  with the drop sources; an item's sources as for items that start quests, with
   places first, then in its quests' zones, then the likeliest. Not kept: area triggers, talking to
   someone, criteria (Forever's scenario steps) and spells.
 - **Rewards:** EG Link's for a quest it has (Forever added a choice to many classic quests, Hogger's
@@ -168,9 +201,6 @@ file, and it credits Questie for quest data).
   bought); objects to use have no level. `min`: the highest of the targets' lowest levels (what you
   have to fight at least), `max`: the highest level of any. Mobs more than 10 levels above the quest's
   own aren't its (a source elsewhere: The Dormant Shade's candle from the Hinterlands, the only one).
-  The sources' zones don't pick among them: where zones' rectangles overlap, a source's places can be
-  on the neighbour's map (the Barrens' Stormsnout on Mulgore's, whose rectangle lies inside the
-  Barrens').
 - **Group** (flag `g`): the quest's type elite (1), dungeon (81) or raid (62): EG Link's `questInfoId`
   for a quest it has (Forever's server's: it made The Defias Brotherhood 155, classic's elite escort,
   a normal quest), else classic-db's `Type`.
@@ -183,15 +213,17 @@ file, and it credits Questie for quest data).
 
 Numbers (Forever 1.60.1.70862, EG Link 9fcae73): 5257 quests (4031 classic, 1226 Forever's), 3473
 of them in 784 chains, 4312 with a giver on the map or an item; of the 1817 new quests 1213 are in
-it, 415 with chain info, 492 with a giver, 808 with a zone; 50 zones, 35 dungeons, 1667 NPCs, 239
-objects, 3434 items (599 start quests; 1602 with drop sources, 45 of them from EG Link; 2830
-sources of drops and objectives, 2070 with places); 3786 quests with objectives (5699, 2556 quests'
+it, 415 with chain info, 492 with a giver, 808 with a zone; 49 zones (Deadwind Pass had only a
+Duskwood quest, by a giver put on the wrong map), 35 dungeons, 1667 NPCs (789 places with
+alternatives), 239 objects, 3434 items (599 start quests; 1602 with drop sources, 45 of them from EG
+Link; 2834 sources of drops and objectives, 2074 with places); 3786 quests with objectives (5699, 2556 quests'
 from EG Link), 727 with a choice of rewards, 1266 with reward items, 1058 with money, 4016 with
 experience; 95 quests with Forever's levels instead of classic's, 12 that scale; 3372 quests with a
 race mask, 3010 of them with a Skyborne bit; 3515 of one side (69 given one by the rules for quests
 without: 8 by their ender, 37 by an NPC their text names, 24 by their zone; 1728 left without races or a
 side), 232 event quests; 1259 quests with mob levels (229 of them above the quest's own level: 49 by 1,
-62 by 2, 118 by 3 or more, mostly raids' bosses at 63), 991 for a group; 0.99 MB (1,037,544 bytes; 0.98 MB,
+62 by 2, 118 by 3 or more, mostly raids' bosses at 63), 991 for a group; 0.99 MB (1,037,581 bytes; 1,037,544 before
+places by the zones' areas; 0.98 MB,
 1,029,989, before mob levels and the group flag; 0.63 MB before objectives and rewards).
 Forever's own quests' objectives mostly have no places (1064 of 1212: its new items' drops and
 creatures aren't in classic-db, and EG Link's loot has no quest items).

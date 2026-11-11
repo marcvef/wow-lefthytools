@@ -24,8 +24,9 @@
 // - Forever's client tables (wago.tools exports of the build): UiMap, UiMapAssignment (zones and
 //   their world rectangles), AreaTable, Map, QuestSort (names), FactionTemplate (which side an NPC
 //   is on), ChrRaces (Forever's playable races: their race-mask bits, sides), QuestV2 (the quests the client knows), QuestLineXQuest (Forever's quest
-//   lines), ItemSparse (StartQuestID, names), QuestPOIBlob (a quest's map, when nothing else says) and
-//   QuestXP (a quest's experience by its level and XP difficulty). The client has no QuestObjective table
+//   lines), ItemSparse (StartQuestID, names), QuestPOIBlob (a quest's map, when nothing else says),
+//   QuestXP (a quest's experience by its level and XP difficulty) and WorldMapOverlay with UiMapXMapArt (the
+//   explored-area images of a zone's map: where its own areas are). The client has no QuestObjective table
 //   (wago.tools: "Table not found" for Forever's builds): objectives come from EG Link and classic-db.
 // - Data/ForeverQuests.lua (tools/update-forever-quests.ps1): which quests are new in Forever.
 // Not used: Wowhead and anything taken from Questie (the project's rule), ForeverCore's sniffs
@@ -39,11 +40,15 @@
 // - ExclusiveGroup > 0: the quests of the group close each other (excl).
 // - NextQuestInChain and BreadcrumbForQuestId lead to a quest without being needed (opens only).
 // - opens: the reverse of all of that, every quest this one leads to.
-// - Positions: a spawn's world x/y on its map, put on the smallest zone (or dungeon floor) rectangle
-//   of UiMapAssignment holding it (mapX = (maxY - y) / (maxY - minY), mapY = (maxX - x) / (maxX -
-//   minX), then into the assignment's UiMin..UiMax). Rectangles of two zones overlap at their
-//   borders: the zone of the NPC's own quests wins, and the others go with the point as
+// - Positions: a spawn's world x/y on its map, put on a zone (or dungeon floor) rectangle of
+//   UiMapAssignment holding it (mapX = (maxY - y) / (maxY - minY), mapY = (maxX - x) / (maxX -
+//   minX), then into the assignment's UiMin..UiMax). Where rectangles overlap (a city's lies inside
+//   its zone's; the Barrens' holds all of Mulgore's and most of Durotar's), the map the client has
+//   there, as near as the data tells (bestBox: the maps EG Link recorded the NPC on and the positions
+//   players' games recorded nearby, the zones' explored areas on their maps (WorldMapOverlay), last
+//   the quests' zones); the other zones of about its size go with an NPC's or object's point as
 //   alternatives ("/"), which Data.lua checks with the client's own map (C_Map.GetMapInfoAtPosition).
+//   Each spawn on its own: a drop source's places are the same for every quest and item that uses it.
 // - Faction: the races' (only Alliance or only Horde), else the givers' side (FactionTemplate's
 //   groups, EG Link's "side"), when every giver is on the same one; else, with no NPC giver, the enders'.
 //   Forever's own quests with none of that (EG Link's raceMask is all bits for them): an NPC their text
@@ -107,6 +112,12 @@ const CLUSTER = 70; // spawns this close (thousandths of the map's width) are on
 const ASPECT = 1.5; // a zone map's width over its height
 const MAX_POINTS = 5; // spawns kept per NPC or object (a 1% grid apart)
 const SIMILAR = 4; // zones' rectangles at most this many times the other's size can be a place's alternative
+const SURE = 150; // yards: a position players' games recorded this close says a spawn's zone (bestBox)
+const NEAR = 400; // yards: ... this close, when the nearest of any other of the zones is RATIO times as far
+const RATIO = 1.5;
+const DEEP = 25; // yards: this far inside one zone's explored-area hit rectangle wins over recorded positions within NEAR
+const MAP_ART = [1002, 668]; // a zone map's art in pixels (WorldMapOverlay's offsets and hit rectangles are in them)
+const SAMPLE_CELL = 200; // yards: the cells recorded positions are looked up in
 const UNUSED = /\[UNUSED\]|<UNUSED>|UNUSED |<NYI>|\bNYI\b|<TXT>|\[PH\]|<CHANGE TO GOSSIP>|^ZZOLD|\(OLD\)|<TEST>|\bTEST\b|^Test |^REUSE|\[DEPRECATED\]|<DEPRECATED>|Deprecated/;
 const ZONE_TYPES = { 3: 0, 4: 1 }; // UiMap types a position goes on (zone, dungeon floor), in that order of preference
 const OBJECTIVE_KINDS = { monster: "k", gameObject: "o", item: "i" }; // EG Link's objective types kept (kill, object, item)
@@ -242,7 +253,28 @@ function worldMaps(t) {
     }
     return undefined;
   };
-  return { ui, boxes, continentBoxes, areas, instance, instanceArea, continentOf, uiOfArea };
+  // A zone map's explored-area images (WorldMapOverlay, by UiMapXMapArt): where on it the zone's own areas are,
+  // each image's bounds (x, y, w, h) and hit rectangle (l, r, t, b), in pixels of the map art (MAP_ART); city: a
+  // city's area drawn on its zone's map (Orgrimmar on Durotar's).
+  const cityAreas = new Set();
+  for (const r of t.UiMapAssignment) if (+r.AreaID && ui.get(+r.UiMapID) && ui.get(+r.UiMapID).type === 3 && ui.get(+r.UiMapID).city) cityAreas.add(+r.AreaID);
+  const inCity = (id) => {
+    for (let a = id, n = 0; a && n < 12; n++, a = areas.get(a) ? areas.get(a).parent : 0) if (cityAreas.has(a)) return true;
+    return false;
+  };
+  const overlays = new Map(); // uiMap -> [{ x, y, w, h, l, r, t, b, city }]
+  const artMaps = new Map();
+  for (const r of t.UiMapXMapArt || []) (artMaps.get(+r.UiMapArtID) || artMaps.set(+r.UiMapArtID, []).get(+r.UiMapArtID)).push(+r.UiMapID);
+  for (const r of t.WorldMapOverlay || []) {
+    for (const id of artMaps.get(+r.UiMapArtID) || []) {
+      (overlays.get(id) || overlays.set(id, []).get(id)).push({
+        x: +r.OffsetX, y: +r.OffsetY, w: +r.TextureWidth, h: +r.TextureHeight,
+        l: +r.HitRectLeft, r: +r.HitRectRight, t: +r.HitRectTop, b: +r.HitRectBottom,
+        city: [r.AreaID_0, r.AreaID_1, r.AreaID_2, r.AreaID_3].some((a) => inCity(+a)),
+      });
+    }
+  }
+  return { ui, boxes, continentBoxes, areas, instance, instanceArea, continentOf, uiOfArea, overlays };
 }
 
 // A point (0..1) on a rectangle's uiMap for world x, y.
@@ -252,23 +284,143 @@ function onBox(b, x, y) {
 }
 const inBox = (b, m, x, y, z) => b.map === m && x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY
   && (z === undefined || !(b.maxZ - b.minZ < 1e5) || (z >= b.minZ - 5 && z <= b.maxZ + 5));
-// b inside a (a rectangle of another map holding it whole: a city in its zone).
-const inside = (b, a) => b.map === a.map && b.minX >= a.minX && b.maxX <= a.maxX && b.minY >= a.minY && b.maxY <= a.maxY;
+// Where players' games put world positions: EG Link's positions (world x, y and the client's uiMap there, its
+// area's map), in cells of SAMPLE_CELL yards. nearest(m, x, y, uis, r): [[uiMap, yards]] for each of those
+// uiMaps with one within r yards, the nearest first.
+function sampleIndex(lists) {
+  const cells = new Map();
+  const key = (m, cx, cy) => `${m}:${cx}:${cy}`;
+  let count = 0;
+  for (const list of lists) {
+    for (const p of list || []) {
+      if (!Number.isFinite(p.worldX) || !Number.isFinite(p.worldY) || !Number.isInteger(p.instance) || !Number.isInteger(p.uiMap)) continue;
+      const k = key(p.instance, Math.floor(p.worldX / SAMPLE_CELL), Math.floor(p.worldY / SAMPLE_CELL));
+      (cells.get(k) || cells.set(k, []).get(k)).push([p.worldX, p.worldY, p.uiMap]);
+      count++;
+    }
+  }
+  const nearest = (m, x, y, uis, r) => {
+    const best = new Map();
+    const cx = Math.floor(x / SAMPLE_CELL), cy = Math.floor(y / SAMPLE_CELL), n = Math.ceil(r / SAMPLE_CELL);
+    for (let i = cx - n; i <= cx + n; i++) {
+      for (let j = cy - n; j <= cy + n; j++) {
+        for (const s of cells.get(key(m, i, j)) || []) {
+          if (!uis.has(s[2])) continue;
+          const d = Math.hypot(s[0] - x, s[1] - y);
+          if (d <= r && !(best.get(s[2]) <= d)) best.set(s[2], d);
+        }
+      }
+    }
+    // (the same distance: the smaller uiMap first, so the order of the samples doesn't matter)
+    return [...best].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  };
+  return { count, nearest };
+}
 
-// The places of a spawn: the best rectangle first, then the zones whose rectangles only overlap it
-// there (borders), [] where no zone has it. prefer: uiMaps to pick when they hold it (the NPC's
-// quests' zones, most quests first).
-function places(world, m, x, y, z, prefer) {
+// prefer as a Map(uiMap -> weight): a Map as it is, a list by its order (the first the most).
+function weights(prefer) {
+  if (prefer instanceof Map) return prefer;
+  const list = prefer || [];
+  return new Map(list.map((ui, i) => [ui, list.length - i]));
+}
+
+// How far (yards) world x, y is from a zone's explored-area images on its map (box: its rectangle): negative
+// inside one (as deep as it is in it), Infinity for a zone without any. hit: their hit rectangles instead;
+// noCity: not those of a city's area.
+function overlayDistance(world, box, x, y, hit, noCity) {
+  const [px, py] = onBox(box, x, y);
+  const X = px * MAP_ART[0], Y = py * MAP_ART[1];
+  const sx = (box.maxY - box.minY) / MAP_ART[0], sy = (box.maxX - box.minX) / MAP_ART[1]; // yards per pixel
+  let best = Infinity;
+  for (const o of world.overlays.get(box.ui) || []) {
+    if (noCity && o.city) continue;
+    const [l, r, t, b] = hit ? [o.l, o.r, o.t, o.b] : [o.x, o.x + o.w, o.y, o.y + o.h];
+    const dx = Math.max(l - X, 0, X - r) * sx, dy = Math.max(t - Y, 0, Y - b) * sy;
+    const d = dx || dy ? Math.hypot(dx, dy) : -Math.min((X - l) * sx, (r - X) * sx, (Y - t) * sy, (b - Y) * sy);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+// The client's map of a spawn among the rectangles holding it (hits, the smallest first, zones before dungeon
+// floors). The client takes the rectangle of the area the position is in (the terrain's; the smallest only
+// among the same area's), and the data has no areas, so it decides by what the data has of them:
+// - dungeon floors: the smallest (as the client: by height, then size), unless a preferred one holds it.
+// - a city's rectangle (it lies inside its zone's: Orgrimmar in Durotar, but holds some of the zone around
+//   the city: Skull Rock, Silverpine's coast west of the Undercity), the first that decides: the maps EG Link
+//   recorded this NPC or creature on (own) if exactly one of them; the nearest position players' games recorded
+//   within SURE yards; on its zone's explored-area images (WorldMapOverlay, not the city's own drawn on its
+//   zone's map): the zone (as below); else the city. On EG Link's positions in cities' rectangles (each NPC's
+//   own left out) each step is right for all it decides, the city alone for 87.5%.
+// - zones whose rectangles overlap (borders; Mulgore's and most of Durotar's lie inside the Barrens'), the
+//   first that decides: on the explored-area images (bounds) of exactly one of them; the nearest recorded
+//   position within SURE yards; own; DEEP yards inside the images' hit rectangles of exactly one; the nearest
+//   recorded position within NEAR yards when the nearest of any other of the zones is RATIO times as far (not
+//   across a river where only one bank was played: the Valley of Trials has no recorded positions, the
+//   Barrens' bank 400 yards off has); inside the hit rectangles of exactly one; the zone nearest its images
+//   and their hit rectangles (the two distances added, negative inside); for zones without images, the
+//   preferred one (the quests' zones, the most weight), then the nearest rectangle centre (relative to its
+//   size). On this data's spawns where rectangles overlap and a recorded position within 100 yards tells the
+//   zone: 99.9% right; 98.5% not using those within 100 yards, 96.9% not those within 600 (as where nobody
+//   played). The smallest rectangle would be right for 45%, the quests' zones (where they decide) for 85%:
+//   a quest's mobs aren't in its zone often enough for that to go first.
+function bestBox(world, hits, m, x, y, prefer, own) {
+  const first = hits[0];
+  const w = weights(prefer);
+  if (first.type !== 3) {
+    let best = first;
+    for (const b of hits) if (b.type === first.type && (w.get(b.ui) || 0) > (w.get(best.ui) || 0)) best = b;
+    return best;
+  }
+  // (one rectangle per zone: its smallest holding the point)
+  let zones = [];
+  for (const b of hits) if (b.type === 3 && !b.city && !zones.some((z) => z.ui === b.ui)) zones.push(b);
+  const only = (list) => (list.length === 1 ? list[0] : undefined);
+  const ownOne = (list) => (own && own.size ? only(list.filter((b) => own.has(b.ui))) : undefined);
+  const recorded = (list) => (world.samples ? world.samples.nearest(m, x, y, new Set(list.map((b) => b.ui)), RATIO * NEAR) : []);
+  const city = hits.find((b) => b.type === 3 && b.city);
+  if (city) {
+    if (!zones.length) return city;
+    const all = [city, ...zones];
+    const mine = ownOne(all);
+    if (mine) return mine;
+    const seen = recorded(all);
+    if (seen.length && seen[0][1] <= SURE) return all.find((b) => b.ui === seen[0][0]);
+    zones = zones.filter((b) => overlayDistance(world, b, x, y, true, true) <= 0);
+    if (!zones.length) return city;
+  }
+  if (zones.length === 1) return zones[0];
+  const image = zones.map((b) => [b, overlayDistance(world, b, x, y, false)]);
+  const onImage = only(image.filter((e) => e[1] <= 0));
+  if (onImage) return onImage[0];
+  const pick = (ui) => zones.find((b) => b.ui === ui);
+  const seen = recorded(zones);
+  if (seen.length && seen[0][1] <= SURE) return pick(seen[0][0]);
+  const mine = ownOne(zones);
+  if (mine) return mine;
+  const hit = zones.map((b, i) => [b, overlayDistance(world, b, x, y, true), image[i][1]]);
+  const onHit = only(hit.filter((e) => e[1] <= 0));
+  if (onHit && onHit[1] <= -DEEP) return onHit[0];
+  if (seen.length && seen[0][1] <= NEAR && (!seen[1] || seen[1][1] >= RATIO * seen[0][1])) return pick(seen[0][0]);
+  if (onHit) return onHit[0];
+  const near = hit.filter((e) => e[2] < Infinity).sort((a, b) => a[1] + a[2] - (b[1] + b[2]));
+  if (near.length) return near[0][0];
+  const top = Math.max(0, ...zones.map((b) => w.get(b.ui) || 0));
+  if (top > 0) zones = zones.filter((b) => (w.get(b.ui) || 0) === top);
+  const off = (b) => Math.hypot(((b.minX + b.maxX) / 2 - x) / (b.maxX - b.minX), ((b.minY + b.maxY) / 2 - y) / (b.maxY - b.minY));
+  return zones.reduce((a, b) => (off(b) < off(a) ? b : a));
+}
+
+// The places of a spawn: the best rectangle first (bestBox), then the zones of about its size whose
+// rectangles hold it too (borders: Data.lua asks the client's map which it is), [] where no zone has it.
+// prefer: uiMaps for overlaps nothing else decides (the quests' zones: a Map to weights, or a list, the
+// first the most); own: a Set of the uiMaps EG Link recorded this NPC, creature or object on.
+function places(world, m, x, y, z, prefer, own) {
   const hits = world.boxes.filter((b) => inBox(b, m, x, y, z));
   if (!hits.length) return [];
-  let best = hits[0];
-  for (const want of prefer || []) {
-    const hit = hits.find((b) => b.ui === want);
-    // (not a city's zone over the city)
-    if (hit && (hit === hits[0] || (hit.city === hits[0].city && !inside(hits[0], hit)))) { best = hit; break; }
-  }
+  const best = bestBox(world, hits, m, x, y, prefer, own);
   // Others: zones of about the same size whose rectangles overlap it here (a city and its zone aren't).
-  const others = hits.filter((b) => b !== best && b.type === best.type && b.city === best.city && b.ui !== best.ui && !inside(best, b) && !inside(b, best)
+  const others = hits.filter((b) => b !== best && b.type === best.type && b.city === best.city && b.ui !== best.ui
     && Math.max(b.size, best.size) < SIMILAR * Math.min(b.size, best.size));
   const seen = new Set([best.ui]);
   const out = [best];
@@ -627,7 +779,7 @@ async function main() {
   if (!build) throw new Error("could not determine the Forever build; pass it as an argument");
   console.log(`WoW: Forever ${build}`);
   const tables = ["UiMap", "UiMapAssignment", "AreaTable", "Map", "QuestSort", "FactionTemplate", "QuestV2",
-    "QuestLineXQuest", "ItemSparse", "QuestPOIBlob", "ChrRaces", "QuestXP"];
+    "QuestLineXQuest", "ItemSparse", "QuestPOIBlob", "ChrRaces", "QuestXP", "WorldMapOverlay", "UiMapXMapArt"];
   const t = {};
   for (const name of tables) t[name] = await table(name, build, o.cache);
   const eg = await eglink(build, o.eglink, o.cache);
@@ -635,6 +787,28 @@ async function main() {
   const sql = await readDump(o.dump, o.cache);
 
   const world = worldMaps(t);
+  // (every position EG Link has with its uiMap: NPCs, objects, those approached, creatures met, loot)
+  world.samples = sampleIndex([
+    ...["npcs", "objects", "approached"].flatMap((k) => Object.values(eg.npcs[k] || {}).map((r) => r.positions)),
+    ...Object.values(eg.creatures).map((r) => r.positions),
+    ...Object.values(eg.loot).map((r) => r.positions),
+  ]);
+  console.log(`positions players' games recorded (zones where rectangles overlap): ${world.samples.count}`);
+  // The zone maps EG Link recorded each NPC, creature and object on ("n123" -> Set(uiMap)).
+  const egMaps = new Map();
+  const egSaw = (key, list) => {
+    for (const p of list || []) {
+      const u = world.ui.get(p.uiMap);
+      if (u && u.type === 3) (egMaps.get(key) || egMaps.set(key, new Set()).get(key)).add(p.uiMap);
+    }
+  };
+  for (const [id, r] of Object.entries(eg.npcs.npcs || {})) egSaw("n" + id, r.positions);
+  for (const [id, r] of Object.entries(eg.npcs.objects || {})) egSaw("o" + id, r.positions);
+  for (const [id, r] of Object.entries(eg.creatures)) egSaw("n" + id, r.positions);
+  for (const [k, r] of Object.entries(eg.loot)) {
+    const m = k.match(/^(npc|object):(\d+)/);
+    if (m) egSaw((m[1] === "npc" ? "n" : "o") + m[2], r.positions);
+  }
   const races = raceModel(t.ChrRaces);
   console.log(`races: ${races.list.map((r) => `${r.name} (${r.id}, bit ${r.bit}, ${r.faction})`).join(", ")}`);
   const NEW = foreverIds("ns.FOREVER_QUEST_IDS");
@@ -802,7 +976,7 @@ async function main() {
   // --- the NPCs, objects and items in the data, with their places
   const used = new Set();
   for (const q of quests.values()) for (const k of q.starts.concat(q.ends)) used.add(k);
-  const preferOf = new Map(); // NPC -> its quests' zones, the most first
+  const preferOf = new Map(); // NPC -> Map(its quests' zones -> how many)
   for (const q of quests.values()) {
     if (!q.zone) continue;
     for (const k of q.starts.concat(q.ends)) {
@@ -823,7 +997,7 @@ async function main() {
       actor.name = tmpl ? (kind === "n" ? tmpl.Name : tmpl.name) : egr && egr.name;
       if (kind === "n") actor.side = tmpl ? sideOf(templates, tmpl.Faction) : undefined;
       if (!actor.side && egr && (egr.side === "Alliance" || egr.side === "Horde")) actor.side = egr.side;
-      const prefer = [...(preferOf.get(key) || new Map()).entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).map((e) => e[0]);
+      const prefer = preferOf.get(key) || new Map();
       const grid = new Set();
       const add = (list) => {
         if (actor.points.length >= MAX_POINTS) return;
@@ -835,7 +1009,7 @@ async function main() {
       };
       const sp = (spawns.get(key) || []).slice().sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
       for (const [m, x, y, z] of sp) {
-        const p = places(world, m, x, y, z, prefer);
+        const p = places(world, m, x, y, z, prefer, egMaps.get(key));
         if (p.length) add(p);
       }
       if (!actor.points.length && egr) {
@@ -969,10 +1143,23 @@ async function main() {
     for (const [item, m] of egDrops) for (const [key, [drops, windows]] of m) addDrop(item, key, windows > 0 ? Math.min(1, drops / windows) : 0);
     for (const item of egDrops.keys()) if (dropsOf.has(item)) egItems.add(item);
   }
-  // The sources' places: their spawns (EG Link's loot spots, its NPCs' places), in clusters.
+  // The sources' places: their spawns (EG Link's loot spots, its NPCs' places), in clusters. Where zones'
+  // rectangles overlap, the zones of every quest that uses the source (its items' quests, the quests to kill or
+  // use it) decide what nothing else does (bestBox): the same places whichever quest asks first.
+  const sourcePrefer = new Map(); // source key -> Map(zone -> how many items and quests of it)
+  const preferSource = (key, zone) => {
+    if (!zone) return;
+    const m = sourcePrefer.get(key) || sourcePrefer.set(key, new Map()).get(key);
+    m.set(zone, (m.get(zone) || 0) + 1);
+  };
+  for (const [item, m] of dropsOf) for (const zone of starterZones.get(item)) for (const key of m.keys()) preferSource(key, zone);
+  for (const q of quests.values()) {
+    for (const o of q.objectives) if (o.kind !== "i") preferSource((o.kind === "k" ? "n" : "o") + o.id, q.zone);
+  }
   const sources = new Map(); // key -> { name, points: [{ ui, x, y, r }], spawns }
-  const sourceOf = (key, prefer) => {
+  const sourceOf = (key) => {
     if (sources.has(key)) return sources.get(key);
+    const prefer = sourcePrefer.get(key);
     const kind = key[0], id = +key.slice(1);
     const tmpl = kind === "n" ? creatureT.get(id) : objectT.get(id);
     const egr = egNpc.get(key);
@@ -980,7 +1167,7 @@ async function main() {
       || (kind === "o" && eg.objects[id] && eg.objects[id].name) || undefined;
     let pts = [];
     for (const [m, x, y, z] of spawns.get(key) || []) {
-      const p = places(world, m, x, y, z, prefer);
+      const p = places(world, m, x, y, z, prefer, egMaps.get(key));
       if (p.length) pts.push(p[0]);
     }
     if (!pts.length) pts = egLootPoints.get(key) || [];
@@ -1007,7 +1194,7 @@ async function main() {
     const prefer = [...starterZones.get(item)].sort(byNumber);
     // (with places first, then those in its quests' zones, then the likeliest)
     const here = (s) => s.points.some((c) => prefer.includes(c.ui));
-    const list = [...m].map(([key, p]) => ({ key, p, s: sourceOf(key, prefer) }))
+    const list = [...m].map(([key, p]) => ({ key, p, s: sourceOf(key) }))
       .sort((a, b) => (b.s.spawns > 0) - (a.s.spawns > 0) || here(b.s) - here(a.s) || b.p - a.p || b.s.spawns - a.s.spawns || (a.key < b.key ? -1 : 1))
       .slice(0, MAX_SOURCES);
     itemDrops.set(item, list.map((d) => [d.key, d.p]));
@@ -1019,7 +1206,7 @@ async function main() {
     for (const o of q.objectives) {
       if (o.kind === "i") continue;
       const key = (o.kind === "k" ? "n" : "o") + o.id;
-      sourceOf(key, q.zone ? [q.zone] : []);
+      sourceOf(key);
       usedSources.add(key);
     }
   }
@@ -1030,13 +1217,13 @@ async function main() {
   // MIN_CHANCE or more, or a quarter of the likeliest one's chance; that stand somewhere, not summoned ones); none when
   // an object is among them (it can be gathered), it drops from very many
   // (MANY_SOURCES: cloth, herbs, a world drop's pages: from whatever is around) or rarely (made, bought).
-  const itemFight = (item, side, zone) => {
+  const itemFight = (item, side) => {
     const all = dropsOf.get(item);
     if (!all || all.size > MANY_SOURCES) return undefined;
     const best = Math.max(0, ...all.values());
     let likely = [...all].filter(([, p]) => p >= Math.min(best / 4, MIN_CHANCE));
     if (best < RARE_CHANCE || likely.some(([key]) => key[0] !== "n")) return undefined;
-    likely = likely.filter(([key]) => sourceOf(key, zone ? [zone] : []).spawned);
+    likely = likely.filter(([key]) => sourceOf(key).spawned);
     let easiest;
     for (const [key] of likely) {
       const lv = levelOfCreature(+key.slice(1), side);
@@ -1048,7 +1235,7 @@ async function main() {
   for (const q of quests.values()) {
     const fight = [];
     for (const o of q.objectives) {
-      const lv = o.kind === "k" ? levelOfCreature(o.id, q.faction) : o.kind === "i" && !o.provided ? itemFight(o.id, q.faction, q.zone) : undefined;
+      const lv = o.kind === "k" ? levelOfCreature(o.id, q.faction) : o.kind === "i" && !o.provided ? itemFight(o.id, q.faction) : undefined;
       if (lv) fight.push(lv);
     }
     q.mobs = mobLevelsOf(fight);
@@ -1332,4 +1519,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
-module.exports = { worldMaps, places, onBox, sideOf, raceModel, clusters };
+module.exports = { worldMaps, places, bestBox, sampleIndex, overlayDistance, onBox, sideOf, raceModel, clusters };
