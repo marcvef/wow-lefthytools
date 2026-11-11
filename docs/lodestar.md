@@ -36,7 +36,8 @@ load in doesn't matter for the table.
   `creature_`/`gameobject_`/`reference_loot_template` (where items that start quests or are collected
   for one drop), and `quest_template`'s objectives (`ReqCreatureOrGOId1-4`/`Count`, `ReqItemId1-4`/
   `Count`, `SrcItemId`) and rewards (`RewChoiceItemId1-6`/`Count`, `RewItemId1-4`/`Count`,
-  `RewOrReqMoney` above 0, `RewMoneyMaxLevel` for the experience).
+  `RewOrReqMoney` above 0, `RewMoneyMaxLevel` for the experience), and the game events (`game_event`,
+  `game_event_quest`, `game_event_creature`/`_gameobject`: the holidays' quests, who stands only then).
 - **Forever's new quests: EG Link** (`github.com/JIVESCORP/eg-link-output-wowf`, CC BY 4.0: "Data
   from Efficient Games (https://efficient.games), licensed under CC BY 4.0"): `quests.enUS`
   (title, levels, race mask, zone, `nextQuestId`, `startItemId`), `npcs` (who offers and takes each
@@ -45,7 +46,9 @@ load in doesn't matter for the table.
   NPC or object, and where), `creatures` (names, where players met them), `object_details` (objects'
   names), and for every quest it has seen (classic's too) its `objectives` (type, ID, amount, storage
   index), `rewards` (choices, items, money, XP difficulty and multiplier) and `turn_ins` (the money
-  players got). The commit used is in `source`.
+  players got, and their side). The quests' `objectivesText` and `description` (whom a quest is for) and
+  `creatures`' `reactions` (how a creature met each side) for Forever's quests without a side. The commit
+  used is in `source`.
 - **Forever's client tables** (wago.tools): UiMap, UiMapAssignment, AreaTable, Map, QuestSort,
   FactionTemplate, QuestV2, QuestLineXQuest, ItemSparse (StartQuestID, item names), QuestPOIBlob,
   ChrRaces (the playable races, their race-mask bits and sides), QuestXP (a quest's experience by its
@@ -96,8 +99,27 @@ file, and it credits Questie for quest data).
   none (all). EG Link's 64-bit masks (hex) keep the playable races' bits, then the same rule
   (Forever's own quests for Skyborne only, or Tauren and Windshaper, stay as recorded).
 - **Faction:** races only of one side; else, without races, when every NPC giver is on one side
-  (FactionTemplate's groups, EG Link's `side`). Classes are classic's bit mask (class ID c is bit
-  c - 1: Warrior 1, ..., Druid 11).
+  (FactionTemplate's groups, EG Link's `side`); else, with no NPC giver (an item, an object, none seen),
+  when the enders with a side are all on one (Owen Thadd's books in Undercity). **Forever's own quests**
+  with none of that (EG Link's `raceMask` is all bits for them: the server leaves it to the giver's side;
+  quest_scan's `factions` only says which clients saw the quest), no giver or ender on a side: (a) an NPC
+  their objectives text (else description) names, "for <Name>", "to <Name>", "with <Name>", "<Name>
+  at/in ...", found by its exact name among classic-db's creatures, EG Link's NPCs and its creatures seen
+  friendly by one side and hostile by the other, every one of that name on the same side, a kill
+  objective's creature never ("...for Foreman Oslow in Redridge": Alther's Mill, the Alliance's); (b) else
+  their zone when it's a side's own: the Alliance's Elwynn Forest, Westfall, Redridge Mountains, Duskwood,
+  Loch Modan, Dun Morogh, Teldrassil, Darkshore, Stormwind City, Ironforge, Darnassus, the Horde's
+  Durotar, Mulgore, Tirisfal Glades, Silverpine Forest, Orgrimmar, Thunder Bluff, Undercity (by UiMap
+  name; no contested zone). Never a side whose other side's players EG Link saw turning the quest in
+  (`turn_ins`: Eagle's Fist in Loch Modan, a treasure both sides find). Classic's quests keep classic-db's
+  word: a neutral giver in an Alliance zone gives to both (Captain Grayson in Westfall). Classes are
+  classic's bit mask (class ID c is bit c - 1: Warrior 1, ..., Druid 11).
+- **Events** (flag `e`): a holiday's quest sort (QuestSort's name: Seasonal, Lunar Festival, Midsummer,
+  Darkmoon Faire, Invasion, ...; classic-db's `ZoneOrSort`, EG Link's `categoryId`), a holiday's quest in
+  `game_event_quest`, or one whose every giver stands only while a holiday is on (`game_event_creature`
+  / `_gameobject`, the fishing contest's too); then what needs one of those, or is given by someone who
+  stands nowhere and gives one (Children's Week's orphans), when no giver stands outside it. A holiday:
+  a `game_event` with a `holiday`, linked to one, or named like one.
 - **Item drops:** for each item that starts a quest, every creature (`LootId`) and chest or fishing
   hole (gameobject type 3 or 25, `data1`) whose loot has it, through references, with its chance
   (the Bestiary's drop-data rules: groups, references rolled `maxcount` times; world loot isn't
@@ -143,7 +165,9 @@ objects, 3434 items (599 start quests; 1602 with drop sources, 45 of them from E
 sources of drops and objectives, 2070 with places); 3786 quests with objectives (5699, 2556 quests'
 from EG Link), 727 with a choice of rewards, 1266 with reward items, 1058 with money, 4016 with
 experience; 95 quests with Forever's levels instead of classic's, 12 that scale; 3372 quests with a
-race mask, 3010 of them with a Skyborne bit; 0.98 MB (0.63 MB before objectives and rewards).
+race mask, 3010 of them with a Skyborne bit; 3515 of one side (69 given one by the rules for quests
+without: 8 by their ender, 37 by an NPC their text names, 24 by their zone; 1728 left without races or a
+side), 232 event quests; 0.98 MB (0.63 MB before objectives and rewards).
 Forever's own quests' objectives mostly have no places (1064 of 1212: its new items' drops and
 creatures aren't in classic-db, and EG Link's loot has no quest items).
 
@@ -169,7 +193,7 @@ LefthyToolsQuestData = {
 x, y in thousandths, r (a cluster's radius) in thousandths of the map's width; `/` separates a
 place's alternatives; races a number (bit b = 2^b); quest IDs with `,`; flags: `A`/`H`
 faction, `r` repeatable, `n` new in Forever, `f` from Forever's data, `s` its level scales to the
-player; skill `line:value`, rep `faction:min`; starts and ends `n<NPC>`, `o<object>`, `i<item>`;
+player, `e` an event's (only while its holiday is on); skill `line:value`, rep `faction:min`; starts and ends `n<NPC>`, `o<object>`, `i<item>`;
 objectives `k<creature>`, `o<object>`, `i<item>` with `:count` when more than one and `p` for an
 item the giver hands over (`k6:10,i745p`); choice and items `item[:count]`; money in copper; xp the
 experience at the quest's level. The last five fields are read only by `Q.Objectives` and
@@ -188,8 +212,8 @@ read.
   never write into it):
   `{ id, title, level, minLevel, races, classes, faction, zone, zoneName, sort, dungeon, skill = { id,
   value }, rep = { faction, min }, pre, preAny, preActive, excl, opens, breadcrumbFor, repeatable,
-  starts, ends, source = "classic"|"forever"|"learned", new, scales }` (`scales`: its level is the
-  player's, `level` nil). The lists are always tables (maybe
+  starts, ends, source = "classic"|"forever"|"learned", new, scales, event }` (`scales`: its level is the
+  player's, `level` nil; `event`: only while its holiday is on). The lists are always tables (maybe
   empty). `starts`/`ends`: `{ kind = "npc"|"object"|"item", id, name, points = { { map, x, y } } }`,
   one table per NPC shared by all its quests. An item's (`kind = "item"`, no points) has `drops`:
   `{ { kind = "npc"|"object", id, name, chance (0..100), points = { { map, x, y, r } } } }`, the
@@ -291,10 +315,16 @@ read.
   progress and map; the order for the last position asked (1% steps).
 - `Q.InRange(id)`: within my levels, what the windows show unless asked for all levels: a quest in
   my log; else one I can take now by its levels and that's worth it: its `minLevel` at most my level,
-  not grey (`Q.IsTrivial`) and its level at most `Q.RANGE_RED` (4) above mine (not red). A level that
-  scales (-1, 0, `scales`) counts as mine; no level: its minimum level; nothing known (or my level
+  not grey (`Q.IsTrivial`) and its level at most `Q.RANGE_RED` (4) above mine (not red); never an event
+  quest (`Q.IsEvent`) that isn't in my log (its holiday may not be on: "All levels" shows them). A level
+  that scales (-1, 0, `scales`) counts as mine; no level: its minimum level; nothing known (or my level
   not known): in range. Levels only: what else stands in its way is `Q.Status`'s (a red quest is
-  still `"available"`). Quests coming up (a minimum level above mine) are out (`Q.RANGE_ABOVE` is gone).
+  still `"available"`, so is an event's). Quests coming up (a minimum level above mine) are out
+  (`Q.RANGE_ABOVE` is gone).
+- `Q.IsEvent(id)`: an event's quest (the data's flag `e`: a holiday's, the Darkmoon Faire's, ...).
+- `Q.ForMyLevel(id)`: "for your level" as every count says it: in my log (`"active"`), or `"available"`
+  and `Q.InRange`; not a quest that needs another first (`"locked"`, within my levels or not), one too
+  high, grey or red, nor an event's.
 - `Q.LevelColor(level[, questID])` → `{ r, g, b, hex = "ffrrggbb", key }` (shared, `Q.DIFFICULTY`):
   the game's quest difficulty colours against my level. With a quest ID the client's own answer
   first (`C_PlayerInfo.GetContentDifficultyQuestForPlayer`, `Enum.RelativeContentDifficulty`);
@@ -320,7 +350,7 @@ read.
   Learn.lua may define its own.
 
 Not checked: `RequiredCondition` (classic's conditions table), `MaxLevel`, maximum reputation,
-classic's seasonal events (Seasonal quests are listed but not marked as event-only).
+whether a holiday is on now (an event's quest is `"available"`, out of my levels unless in my log).
 
 ### Open questions (in game)
 
@@ -360,6 +390,10 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 The settings page: Open the small window, Open the quest browser (`Q.ToggleBrowser`, or a chat line
 when Browser.lua isn't there), the checkboxes under Window (with `autoHide` and `collapsed`), "In the
 game's quest UI" (`dialog`, `logBadges`), Tooltips (`tooltips`, `itemTooltips`), Friends and Learning.
+
+**The minimap button** (a star; click: the quest browser, right-click: the companion): its tooltip says
+"Elwynn Forest: 3 to pick up" once the data is loaded (a hover never loads it): `Q.Available` in my zone
+within my levels (`Q.InRange`: not grey, red or an event's).
 
 **Commands:** `/lodestar` opens or closes the small window (on "Now"), `/lodestar <name or ID>`
 shows a quest (a quest link works too), `/lodestar browse` the quest browser, `/lodestar settings`,
@@ -961,8 +995,8 @@ details (or its area's button) lights its areas (42%) and dims the others (7%).
 levels, in their colours; how far along is in the briefing), at its right how the map works ("Wheel: zoom ·
 drag: move · right-click a pin: map pin"); with none to take here: "Nothing for you to pick up here right
 now." and a button "Redridge Mountains has 9 for your level >" (`Q.SelectZone`): the zone whose level
-range is within 3 of mine with the most quests I can take now (`Q.Available`, else counted from the
-statuses), kept until a status changes.
+range is within 3 of mine with the most quests for my level (its quests in my log or to take now within
+my levels, as the level path counts them), kept until a status changes.
 
 A dungeon has no map: its Zone tab is its quest list (as the Quest list tab), the line under it says each
 quest's details show where it's given; its chains' cards are in its briefing.
@@ -971,8 +1005,9 @@ quest's details show where it's given; its chains' cards are in its briefing.
 
 **The briefing** (nothing picked; a scroll area of ours). A place's: its name (`GameFontNormalLarge`), "Level
 1-10 · Eastern Kingdoms" (a dungeon: "Dungeon"), "12 of 40 done" with a bar across, "6 for your level ·
-2 to pick up now" (its quests not done that are `Q.InRange`, and of them what I can take now; none:
-"Nothing for your level."); then, only when there are any, **Turn in now (N)** (my quests ready to turn in
+2 to pick up now" (its quests in my log or to take now within my levels, `Rule.ForMyLevel` as
+`Q.ForMyLevel`: not one that needs another first; and of them what I can take now; none: "Nothing for
+your level."); then, only when there are any, **Turn in now (N)** (my quests ready to turn in
 that are the place's, or whose turn-in or an objective's area is on its map: `C_QuestLog`'s quest log;
 each a row: the "?", "[12] Title" and its chain badge, "Turn in at <ender>" under it, its zone when that's
 another) and **In progress here (N)** (the rest of those: the first line of my progress not done yet, "3/10
@@ -1171,7 +1206,7 @@ Two checkboxes of ours (Buttons with the game's checkbox art), kept in the modul
   always; without `Q.InRange` everything), kept per status change. A chain's card is listed when one of its
   quests here not done yet is within my levels; what's left out is counted in a quiet line at the end of
   the list ("N more outside your levels · Show all levels", a click turns this on). "N for your level" in
-  the briefing counts `Q.InRange` whatever the filter. An opened chain and the search always show every
+  the briefing counts what's in my log or to take now within my levels whatever the filter. An opened chain and the search always show every
   level.
 - **Show quests not for you** (off): off, quests for another race, class, faction or a profession I don't
   have are left out everywhere (a skipped one isn't "not for you": it stays, with the done ones); on,
@@ -1312,8 +1347,12 @@ that matter now (those I'm on) are in My quests.
 
 **For my levels** is the engine's `Q.InRange(id)` (iteration 5's meaning: a quest in my log; else only
 what I can take now and is worth it: my level reached (`minLevel`), not grey for me, and its level at
-most `Q.RANGE_RED`, 4, above mine (red: far too hard); a level of -1 / 0 counts as mine). Quests
-"coming up" (my level too low) are out of it. Without `Q.InRange` everything counts as in range.
+most `Q.RANGE_RED`, 4, above mine (red: far too hard); a level of -1 / 0 counts as mine; never an event's
+quest not in my log). Quests "coming up" (my level too low) are out of it. Without `Q.InRange` everything
+counts as in range. **"N for your level"** (the level path, the zone's briefing, the suggestion under the
+map) counts only what I can take now within my levels or have in my log (`Q.ForMyLevel`): a quest that
+needs another first is within my levels but not for my level yet. An event's quest not in my log is counted
+apart (`event`: not in "you can take now", not shaded as quests to take).
 
 ### My quests
 
@@ -1380,7 +1419,8 @@ the data's, it is); the chip **All zones** at the top right shows every zone of 
 on top) from the zone's lowest to its highest level, shaded per level: done (all its quests done,
 green), quests to take (one I can take or have, amber), later (grey); a level without quests takes the
 shade before it, quests outside the zone's range count at its ends; a gold line at my level; at the
-right "7 for your level" (its quests `Q.InRange` not done), else "All done", else nothing. Sorted by that
+right "7 for your level" (its quests in my log, or `"available"` and `Q.InRange`: what I can take now
+within my levels; not one that needs another first, nor an event's), else "All done", else nothing. Sorted by that
 count, then the zones my level is in, then the nearest. On top: "Best next: Westfall, 7 quests for your
 level", or "Nothing for your level. Next up: Redridge Mountains, from level 15." No zone left: "No zone
 has quests for your level." and a button that shows all zones. The tooltip has the rest: levels, done,

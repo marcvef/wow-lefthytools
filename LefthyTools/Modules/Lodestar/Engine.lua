@@ -343,10 +343,18 @@ function Q.Needs(id)
 	return q and Gate(q) or nil
 end
 
+-- An event quest: only takeable while its holiday or event is on (Seasonal, Lunar Festival, the
+-- Darkmoon Faire, ...: the data's flag e).
+function Q.IsEvent(id)
+	local q = tonumber(id) and Q.Quest(id)
+	return q and q.event == true or false
+end
+
 -- Within my levels, what the windows show unless asked for all levels: a quest in my log, or one I can
 -- take now by its levels and that's worth it: its minimum level reached, not grey for me (Q.IsTrivial)
 -- and not red, at most RANGE_RED levels above mine (a level that scales to me counts as mine; no level
--- known: yes). What else stands in its way is Q.Status's.
+-- known: yes); never an event quest that isn't in my log (its holiday may not be on). What else stands
+-- in its way is Q.Status's.
 local RANGE_RED = 4
 Q.RANGE_RED = RANGE_RED
 function Q.InRange(id)
@@ -354,6 +362,7 @@ function Q.InRange(id)
 	local q = id and Q.Quest(id)
 	if not q then return false end
 	if Q.Status(id) == "active" then return true end
+	if q.event then return false end
 	local my = MyLevel()
 	if not my then return true end
 	local need = tonumber(q.minLevel)
@@ -361,6 +370,13 @@ function Q.InRange(id)
 	if Q.IsTrivial(id) then return false end
 	local level = LevelOf(q, my)
 	return not (level and level > my + RANGE_RED)
+end
+
+-- For my level, what the windows count as that: in my log, or one I can take now ("available") within my
+-- levels (Q.InRange). Not a quest that needs another first, one too high or an event's.
+function Q.ForMyLevel(id)
+	local s = Q.Status(id)
+	return s == "active" or (s == "available" and Q.InRange(id))
 end
 
 -- The best of several quests one of which is needed: one in my log, then one I can take, then

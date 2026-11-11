@@ -5,7 +5,8 @@
 -- right-click sets the map pin; "Continue your storylines": the chains I've started whose next step
 -- I can take now, at most 8, their "1/2" a badge too) and the level path
 -- (the zones with something for my levels or friends there, all of them with a toggle, as bars
--- across the levels, shaded per level, my level, sorted by what there is for my level, a click opens
+-- across the levels, shaded per level, my level, sorted by what there is for my level: in my log or
+-- to take now within my levels, not a quest that needs another first nor an event's; a click opens
 -- the zone). Registering with the window's registry once it's there (the module's enable), building
 -- on the registry's build(parent), the counts made a slice a frame and only again when the data or
 -- my progress changes, events only while a view is shown, moving, pools, no data, the controller.
@@ -84,6 +85,8 @@ local QUESTS_DATA = {
 	[1111] = Quest(1111, "Goretusk Liver Pie", 13, 10, WESTFALL, { pre = { 1110 }, starts = { SALDEAN } }),
 	[1120] = Quest(1120, "Poor Old Blanchy", 12, 10, WESTFALL, { starts = { SALDEAN }, ends = { SALDEAN } }),
 	[1121] = Quest(1121, "Keeper of the Flame", 18, 16, WESTFALL, { starts = { GRYAN } }),
+	-- (the Darkmoon Faire's: only while it's there, never for my level unless in my log)
+	[1130] = Quest(1130, "Carnival Jerkins", 12, 10, WESTFALL, { starts = { SALDEAN }, event = true }),
 	-- Redridge: a chain started whose next step is too high for me now.
 	[1200] = Quest(1200, "Encroaching Gnolls", 17, 15, REDRIDGE, { starts = { KAT } }),
 	[1201] = Quest(1201, "Assessing the Threat", 19, 16, REDRIDGE, { pre = { 1200 }, starts = { KAT } }),
@@ -124,7 +127,7 @@ Replace("InRange", function(id)
 	local q = Q.Quest(id)
 	if not q then return false end
 	if Q.Status(id) == "active" then return true end
-	if Q.IsTrivial(id) then return false end
+	if q.event or Q.IsTrivial(id) then return false end
 	local me = UnitLevel("player")
 	if q.minLevel and q.minLevel > me then return false end
 	local level = (q.level and q.level > 0) and q.level or me
@@ -441,7 +444,7 @@ do
 	Wait(0.6)
 	check(Rows(levelpath) == "Westfall, Darkshore, Elwynn Forest, Redridge Mountains",
 		"the zones of my side (not the Horde's) with something for my levels or a friend there, the most for my level first: " .. Rows(levelpath))
-	check(plain(levelpath.Head:GetText()) == "Best next: Westfall, 3 quests for your level", "the best next zone on top: " .. plain(levelpath.Head:GetText()))
+	check(plain(levelpath.Head:GetText()) == "Best next: Westfall, 2 quests for your level", "the best next zone on top: " .. plain(levelpath.Head:GetText()))
 	local row = ZoneRow(levelpath, WESTFALL)
 	local e = row.entry
 	local function runs(entry)
@@ -452,14 +455,18 @@ do
 	check(runs(e) == "9-12 done, 13-13 open, 14-18 later" or runs(e) == "9-11 done, 12-13 open, 14-18 later",
 		"Westfall's levels: done, open, later: " .. runs(e))
 	check(e.here and row.Here:IsShown() and plain(row.Name:GetText()) == "Westfall", "the zone I'm in: a faint band, only its name")
-	check(plain(row.Right:GetText()) == "3 for your level" and not row.Sub and not row.Band and not row.Dots,
+	local z = e.zone
+	check(z.near == 2 and z.active == 1 and z.locked == 2 and z.event == 1 and z.available == 1,
+		"for my level: the one in my log and the one I can take; not the two that need another first, nor the Darkmoon Faire's: "
+		.. tostring(z.near) .. " (" .. tostring(z.active) .. ", " .. tostring(z.available) .. ", " .. tostring(z.locked) .. ", " .. tostring(z.event) .. ")")
+	check(plain(row.Right:GetText()) == "2 for your level" and not row.Sub and not row.Band and not row.Dots,
 		"the row: its name, its bar, what's there for my level (not what's too high: no coming up); nothing else")
 	check(plain(ZoneRow(levelpath, REDRIDGE).Right:GetText()) == "", "nothing for my level (Bob is there): nothing at the right")
 	local me = levelpath.x0 + (12 - 1) * levelpath.per + levelpath.per / 2
 	check(math.abs(select(4, row.Me:GetPoint(1)) - me) < 0.01 and plain(levelpath.Axis.You:GetText()) == "You (12)", "a line at my level")
 	row._scripts.OnEnter(row)
-	check(TOOLTIP.title == "Westfall" and tipHas("3 for your level") and tipHas("1 you can take now") and tipHas("1 in your quest log")
-		and tipHas("3 of 8 done") and tipHas("Anna Brook level 13") and tipHas("You're here.") and tipHas("Click: open this zone"),
+	check(TOOLTIP.title == "Westfall" and tipHas("2 for your level") and tipHas("1 you can take now") and tipHas("1 in your quest log")
+		and tipHas("3 of 9 done") and tipHas("Anna Brook level 13") and tipHas("You're here.") and tipHas("Click: open this zone"),
 		"its tooltip: the rest (done, what I can take, in my log, friends there)")
 	row._scripts.OnLeave(row)
 	row:Click()
@@ -485,7 +492,7 @@ do
 	PLAYER_LEVEL = 18
 	Fire("PLAYER_LEVEL_UP", 18)
 	Wait(0.6)
-	check(Rows(levelpath) == "Westfall, Darkshore, Redridge Mountains, Elwynn Forest" and plain(levelpath.Axis.You:GetText()) == "You (18)",
+	check(Rows(levelpath) == "Westfall, Redridge Mountains, Darkshore, Elwynn Forest" and plain(levelpath.Axis.You:GetText()) == "You (18)",
 		"a level up: Redridge's quests are for my level now, my line moves: " .. Rows(levelpath))
 	check(plain(ZoneRow(levelpath, REDRIDGE).Right:GetText()) == "2 for your level", "Redridge: 2 now")
 	Log({})

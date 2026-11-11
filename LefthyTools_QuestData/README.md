@@ -28,7 +28,11 @@ Lodestar window opens) because it's under a different license from LefthyTools.
   experience by its level (QuestXP). The client has no table of quest objectives.
 
 Races: a quest open to every classic race of a side is open to every race of that side (Forever's
-Skyborne too).
+Skyborne too). A side: the races', else its givers' (else, with no one giving it, its enders'); a
+Forever quest with none of that gets the side of an NPC its text names ("for Foreman Oslow"), else of
+its zone when that's a side's own (Elwynn Forest, Durotar, ...), unless players of the other side were
+seen turning it in. Holidays' quests (Seasonal, Lunar Festival, Midsummer, the Darkmoon Faire, ...:
+their quest sort, classic-db's game events) are marked as events.
 
 How the chains are read (the tool's header has the details):
 

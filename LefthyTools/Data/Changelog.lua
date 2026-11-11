@@ -527,5 +527,8 @@ ns.CHANGELOG = {
 	{ id = 173, module = "lodestar",
 		en = { "Lodestar learns, friends share", "While you quest, Lodestar notes who gives and takes back the quests its data doesn't know, and what comes before them. Friends with LefthyTools pass it on, and see how far each of you got on a quest." },
 		de = { "Lodestar lernt, Freunde teilen", "Beim Questen merkt sich Lodestar, wer Quests vergibt und annimmt, die seine Daten nicht kennen, und was vor ihnen kommt. Freunde mit LefthyTools geben das weiter und sehen, wie weit ihr jeweils bei einer Quest seid." } },
+	{ id = 174, module = "lodestar",
+		en = { "Lodestar: only quests you can take", "The level path and the zones' \"7 for your level\" count only quests you can take now or have in your log: none of the other faction, none that need another quest first, no holiday quests outside their event. All levels still shows holiday quests." },
+		de = { "Lodestar: nur annehmbare Quests", "Der Levelpfad und das \"7 für dein Level\" der Zonen zählen nur Quests, die du jetzt annehmen kannst oder im Questlog hast: keine der anderen Fraktion, keine, die erst eine andere Quest brauchen, keine Feiertagsquests außerhalb ihres Events. Alle Level zeigt Feiertagsquests weiterhin." } },
 	-- New entries go here, at the end.
 }

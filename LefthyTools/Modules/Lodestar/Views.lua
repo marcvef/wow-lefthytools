@@ -439,7 +439,8 @@ function Census.Start()
 	Census.Wake()
 end
 
--- One quest of a zone: its status into the zone's counts and its level's; its chain noted.
+-- One quest of a zone: its status into the zone's counts and its level's; its chain noted. An event
+-- quest not in my log (only takeable while its holiday is on) isn't one I can take now: counted apart.
 function Census.Quest(w, z, id)
 	local q = Q.Quest(id)
 	if not q then
@@ -448,6 +449,9 @@ function Census.Quest(w, z, id)
 	if z then
 		local s = Q.Status(id)
 		if s and s ~= "other" then
+			if s == "available" and q.event then
+				s = "event"
+			end
 			z.total = z.total + 1
 			z[s] = (z[s] or 0) + 1
 			local lv = tonumber(q.level) or tonumber(q.minLevel) or 0
@@ -466,8 +470,8 @@ function Census.Quest(w, z, id)
 					b.open = b.open + 1
 				end
 			end
-			if s ~= "done" and V.InRange(id) then
-				z.near = z.near + 1 -- (for my levels: to do, in my log or neither grey nor far above me)
+			if s == "active" or (s == "available" and V.InRange(id)) then
+				z.near = z.near + 1 -- (for my level: in my log, or one I can take now that's neither grey nor red)
 			end
 		end
 	end

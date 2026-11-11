@@ -222,6 +222,7 @@ local function Parse(id, text)
 		breadcrumbFor = Num(f[15]),
 		faction = flags:find("A", 1, true) and "Alliance" or flags:find("H", 1, true) and "Horde" or nil,
 		repeatable = flags:find("r", 1, true) ~= nil, new = flags:find("n", 1, true) ~= nil, scales = flags:find("s", 1, true) ~= nil,
+		event = flags:find("e", 1, true) ~= nil,
 		source = flags:find("f", 1, true) and "forever" or "classic",
 		starts = Actors(f[19]), ends = Actors(f[20]),
 	}
@@ -248,6 +249,7 @@ local function Normalize(id, t)
 	q.source = q.source or "learned"
 	q.repeatable = q.repeatable == true
 	q.new = q.new == true
+	q.event = q.event == true
 	if not q.zoneName then
 		local zone = q.zone and zoneById and zoneById[q.zone]
 		q.zoneName = zone and zone.name or q.dungeon or q.sort

@@ -552,7 +552,8 @@ do
 		and plain(b.Sub:GetText()) == "Level 1-10 · Eastern Kingdoms" and plain(b.Count:GetText()) == "2 of 10 done" and b.BarBack:IsShown()
 		and math.abs(b.Bar.width - b.BarBack.width * 2 / 10) < 0.01,
 		"nothing picked: the zone's briefing on the right: its name, levels, continent, how far along with a bar")
-	check(plain(b.Line:GetText()) == "6 for your level · 2 to pick up now", "what's for my level here, what I can take now, got " .. plain(b.Line:GetText()))
+	check(plain(b.Line:GetText()) == "3 for your level · 2 to pick up now",
+		"what's for my level here (in my log, or to take now: not what needs another first), what I can take now, got " .. plain(b.Line:GetText()))
 	check(briefRows() == "103" and plain(b.rows[1].Text:GetText()) == "[3] Investigate Echo Ridge" and plain(b.rows[1].Sub:GetText()) == "In your quest log"
 		and b.rows[1].Icon.atlas == "SideInProgressquesticon", "in progress here: my quest of this zone, a line under it")
 	check(cardsOutline() == CHAIN1 .. " " .. SINGLES, "then the zone's chains as cards, then the quests without a chain, got " .. cardsOutline())
@@ -605,13 +606,13 @@ do
 	local westfallColor = chainCard("z:1436:101").Dot.vertex
 	check(westfallColor[1] == elwynnColor[1] and westfallColor[2] == elwynnColor[2] and westfallColor[3] == elwynnColor[3],
 		"a chain has its colour in every zone (its first quest's ID)")
-	local before = calls.Available
+	local kept = st.suggest
 	view.zones:Lay()
 	view.zp.Suggest:Click()
 	check(st.where == "z:1433" and plain(b.Title:GetText()) == "Redridge Mountains" and zoneRow("z:1433").Picked:IsShown(),
 		"a click: that zone")
 	zoneRow("z:1436"):Click()
-	check(calls.Available == before, "the zone to go to is kept (worked out again after a status change)")
+	check(st.suggest == kept, "the zone to go to is kept (worked out again after a status change)")
 	-- A dungeon: no map; its Zone tab is its quest list, its briefing on the right.
 	zoneRow("d:The Deadmines"):Click()
 	check(not view.zp:IsShown() and view.list.scroll:IsShown() and view.head:IsShown() and view.head.Title:GetText() == "The Deadmines"
