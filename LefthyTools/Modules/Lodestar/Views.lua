@@ -9,17 +9,21 @@ ns.Lodestar = Q
 -- OnHide }), registered when the registry is there: at load (Browser.lua comes before this file) or
 -- when the module is switched on; without it nothing happens.
 --   * My quests: my quest log, organised as quest log add-ons and guides do it: what's ready to turn
---     in (every zone) first, then by zone (mine first, the nearest first), by level or by storyline;
---     a line per quest: "[12] Title", its chain's "2/4", its first objective not done with its
---     progress ("3/10 Defias Bandit", how far) or "Ready to turn in", and where it's turned in. A
---     click opens it in the window (Q.OpenBrowser), a right-click sets the map pin where to go (the
---     turn-in, else the nearest objective area). Under it "Continue your storylines": the chains
---     I've started whose next step I can take now (Q.InRange), at most 8.
+--     in (every zone) first, then by zone (mine first), by level or by storyline, each group in the
+--     one order of quests (Q.Compare: by level; a storyline in its steps' order); a line per quest:
+--     "[12] Title" in its difficulty tier's colour (Q.Tier), its chain's "2/4", its first objective
+--     not done with its progress ("3/10 Defias Bandit", how far) or "Ready to turn in", and where
+--     it's turned in. A click shows it on the window's map (Q.OpenBrowser), a right-click opens its
+--     chain (Q.OpenChain; a controller: the "2/4" badge, a button of its own), Shift-click sets the
+--     map pin where to go (the turn-in, else the nearest objective area). Under it "Continue your
+--     storylines": the chains I've started whose next step I can take now (Q.InRange), in the one
+--     order of those steps (for my level first, hard ones after, marked), at most 8.
 --   * Level path ("Where to go next"): the zones with something for my levels (Q.InRange) or friends
 --     there (all zones with a toggle) as rows: the name, a bar across the levels 1-60 from its lowest
---     to its highest quest level, shaded per level (done, available, later), a line at my level, and
---     how many quests there are for my level; the rest in the row's tooltip. A click opens the zone
---     (Q.SelectZone).
+--     to its highest quest level, each level in the difficulty tier its quests have for me (green,
+--     yellow, orange, red; grey below; a thin line where all are done), a line at my level, and "7
+--     for your level · 2 hard"; the rest (counts by tier) in the row's tooltip. A click opens the
+--     zone (Q.SelectZone).
 -- What it costs: the counts (every zone's quests by status and level, every chain's) are made once
 -- per data and progress change (Q.dataGen, Q.progressGen, my level), a few hundred quests a frame
 -- (no hitch), only while a view is shown; the quest log is read when a view draws. Events only while
@@ -32,7 +36,7 @@ local K = {
 	TOP = 34, FOOT = 20, PAD = 8, GAP = 10, BAR = 24,
 	SLICE = 200,                -- quests counted per frame
 	BEYOND = 120,               -- px of rows laid beyond sight (the controller's next one)
-	ROW_H = 26, NAME_W = 200, RIGHT_W = 150, MAX_LEVEL = 60, -- level path
+	ROW_H = 26, NAME_W = 200, RIGHT_W = 190, MAX_LEVEL = 60, -- level path
 	REDRAW = 0.5,
 }
 
@@ -96,6 +100,77 @@ function V.InRange(id)
 		return true
 	end
 	return Q.InRange(id) == true
+end
+
+-- Difficulty for me (the engine's tiers: "trivial" grey, "easy" green, "fair" yellow, "difficult"
+-- orange, "impossible" red): Q.Tier (the quest's effective level, its mobs', a group quest one
+-- harder); without it Q.Difficulty, else fair.
+local TIERS = { "trivial", "easy", "fair", "difficult", "impossible" }
+local TIER_RGB = { trivial = { 0.5, 0.5, 0.5 }, easy = { 0.25, 0.75, 0.25 }, fair = { 1, 0.82, 0 }, difficult = { 1, 0.5, 0.25 },
+	impossible = { 1, 0.1, 0.1 } }
+local TIER_EN = { trivial = "Trivial", easy = "Easy", fair = "Fair", difficult = "Hard", impossible = "Too hard" }
+V.TIERS = TIERS
+
+function V.Tier(id)
+	local tier = Q.Tier and Q.Tier(id) or Q.Difficulty and Q.Difficulty(id)
+	return TIER_RGB[tier] and tier or "fair"
+end
+
+-- A tier's colour: r, g, b (Q.TierColor's table, { r, g, b } or { 1, 2, 3 }).
+function V.TierRGB(tier)
+	local c = Q.TierColor and Q.TierColor(tier)
+	if type(c) == "table" and tonumber(c.r or c[1]) then
+		return tonumber(c.r or c[1]), tonumber(c.g or c[2]) or 1, tonumber(c.b or c[3]) or 1
+	end
+	c = TIER_RGB[tier] or TIER_RGB.fair
+	return c[1], c[2], c[3]
+end
+
+function V.TierHex(tier)
+	return V.Hex({ V.TierRGB(tier) })
+end
+
+-- A tier's word (Lodestar.lua's Q.TIER_WORD: "Easy", "Hard", "Too hard", ...).
+function V.TierWord(tier)
+	local word = Q.TIER_WORD and Q.TIER_WORD[tier]
+	return type(word) == "string" and word or TIER_EN[tier] or tostring(tier)
+end
+
+-- "|cff......" of a quest's tier (Q.TierCode; else its level's colour).
+function V.TierCode(id, quest)
+	local code = Q.TierCode and id and Q.TierCode(id)
+	return type(code) == "string" and code ~= "" and code or Q.LevelCode(id, quest)
+end
+
+-- "[12] Title" in its tier's colour.
+function V.Title(id, quest)
+	quest = quest or Q.Quest(id)
+	local level = quest and tonumber(quest.level)
+	return V.TierCode(id, quest) .. ((level and level > 0) and ("[" .. level .. "] ") or "") .. Q.Title(id, quest) .. "|r"
+end
+
+-- For my level (Q.ForMyLevel: in my log, or one I can take now that's easy or fair) and hard (Q.IsHard:
+-- I can take it, within my levels, orange); without them: in my log or available within my levels,
+-- and none.
+function V.ForMyLevel(id)
+	if Q.ForMyLevel then
+		return Q.ForMyLevel(id) == true
+	end
+	local s = Q.Status(id)
+	return s == "active" or (s == "available" and V.InRange(id))
+end
+
+function V.IsHard(id)
+	return Q.IsHard ~= nil and Q.IsHard(id) == true
+end
+
+-- The one order of quests (Engine.lua's Q.Compare: ready, in my log, for my level, hard, ..., then by
+-- level and title); without it by ID.
+function V.Before(a, b)
+	if Q.Compare then
+		return Q.Compare(a, b) == true
+	end
+	return a < b
 end
 
 -- "[12]" or "[12-18]" in their difficulty colours.
@@ -421,7 +496,7 @@ function Census.Start()
 		local ids = Q.ZoneQuests(z.map)
 		local e = { map = z.map, name = Q.MapName(z.map) or z.name or ("#" .. tostring(z.map)), dataName = z.name, continent = z.continent,
 			minLevel = tonumber(z.minLevel) or 0, maxLevel = tonumber(z.maxLevel) or 0, count = #ids, total = 0, done = 0, active = 0,
-			available = 0, level = 0, locked = 0, near = 0, levels = {} }
+			available = 0, level = 0, locked = 0, near = 0, hard = 0, tiers = {}, levels = {} }
 		w.zones[#w.zones + 1] = e
 		w.byMap[z.map] = e
 		for _, name in ipairs({ e.name, z.name }) do
@@ -439,8 +514,9 @@ function Census.Start()
 	Census.Wake()
 end
 
--- One quest of a zone: its status into the zone's counts and its level's; its chain noted. An event
--- quest not in my log (only takeable while its holiday is on) isn't one I can take now: counted apart.
+-- One quest of a zone: its status into the zone's counts, its tier (not done ones) into the zone's
+-- and its level's; its chain noted. An event quest not in my log (only takeable while its holiday is
+-- on) isn't one I can take now: counted apart.
 function Census.Quest(w, z, id)
 	local q = Q.Quest(id)
 	if not q then
@@ -454,24 +530,30 @@ function Census.Quest(w, z, id)
 			end
 			z.total = z.total + 1
 			z[s] = (z[s] or 0) + 1
+			local tier = s ~= "done" and V.Tier(id) or nil
+			if tier then
+				z.tiers[tier] = (z.tiers[tier] or 0) + 1
+			end
 			local lv = tonumber(q.level) or tonumber(q.minLevel) or 0
 			if lv > 0 then
 				z.qmin = math.min(z.qmin or lv, lv)
 				z.qmax = math.max(z.qmax or lv, lv)
 				local b = z.levels[lv]
 				if not b then
-					b = { total = 0, done = 0, open = 0 }
+					b = { total = 0, done = 0, tiers = {} }
 					z.levels[lv] = b
 				end
 				b.total = b.total + 1
-				if s == "done" then
+				if tier then
+					b.tiers[tier] = (b.tiers[tier] or 0) + 1
+				else
 					b.done = b.done + 1
-				elseif s == "available" or s == "active" then
-					b.open = b.open + 1
 				end
 			end
-			if s == "active" or (s == "available" and V.InRange(id)) then
-				z.near = z.near + 1 -- (for my level: in my log, or one I can take now that's neither grey nor red)
+			if V.ForMyLevel(id) then
+				z.near = z.near + 1 -- (for my level: in my log, or one I can take now that's easy or fair)
+			elseif V.IsHard(id) then
+				z.hard = z.hard + 1 -- (one I can take now that's orange)
 			end
 		end
 	end
@@ -870,34 +952,20 @@ function C.Fill(e, ctx)
 		objective = nil
 	end
 	e.spot, e.spotObjective = spot, objective
-	e.far, e.dist = nil, nil
+	e.far = nil
 	if spot and spot.map == ctx.zone and ctx.x then
 		e.far = Q.TowardText(ctx.zone, ctx.x, ctx.y, spot.x, spot.y)
-		e.dist = ((spot.x - ctx.x) * 1.5) ^ 2 + (spot.y - ctx.y) ^ 2
 	end
 	e.chain, e.at = Q.ChainFor(e.id)
 	return e
 end
 
-local function ByLevel(a, b)
-	if a.level ~= b.level then
-		return a.level < b.level
+-- The one order (Q.Compare: ready, in my log, ..., then by level and title).
+local function ByCompare(a, b)
+	if a.id == b.id then
+		return false
 	end
-	if a.title ~= b.title then
-		return a.title < b.title
-	end
-	return a.id < b.id
-end
-
--- The nearest first (those without a distance after), then by level.
-local function ByNear(a, b)
-	if (a.dist ~= nil) ~= (b.dist ~= nil) then
-		return a.dist ~= nil
-	end
-	if a.dist and a.dist ~= b.dist then
-		return a.dist < b.dist
-	end
-	return ByLevel(a, b)
+	return V.Before(a.id, b.id)
 end
 
 -- How many steps of a chain I've done ("2/4": done of all for me).
@@ -911,9 +979,10 @@ local function ChainDone(chain)
 	return done
 end
 
--- The groups: { { key, title, note, here, list } }. Ready to turn in (every zone: mine first, the
--- nearest first) always first; then by zone (mine first, the nearest first; the others by their
--- lowest level), by level, or by storyline (its steps in order; the quests in none last).
+-- The groups: { { key, title, note, here, list } }. Ready to turn in (every zone) always first; then
+-- by zone (mine first, the others by their lowest level), by level, or by storyline (its steps in
+-- order; the quests in none last). Within a group the one order (Q.Compare: by level), a storyline's
+-- in its steps' order.
 function C.Groups(list, sort)
 	local ready, rest = {}, {}
 	for _, e in ipairs(list) do
@@ -923,18 +992,7 @@ function C.Groups(list, sort)
 			rest[#rest + 1] = e
 		end
 	end
-	table.sort(ready, function(a, b)
-		if a.here ~= b.here then
-			return a.here
-		end
-		if a.here then
-			return ByNear(a, b)
-		end
-		if a.zoneName ~= b.zoneName then
-			return a.zoneName < b.zoneName
-		end
-		return ByLevel(a, b)
-	end)
+	table.sort(ready, ByCompare)
 	local groups = {}
 	if ready[1] then
 		groups[1] = { key = "ready", title = L["Ready to turn in"], list = ready }
@@ -943,7 +1001,7 @@ function C.Groups(list, sort)
 		return groups
 	end
 	if sort == "level" then
-		table.sort(rest, ByLevel)
+		table.sort(rest, ByCompare)
 		groups[#groups + 1] = { key = "level", title = L["In progress"], list = rest }
 		return groups
 	end
@@ -971,13 +1029,13 @@ function C.Groups(list, sort)
 				if (a.at or 0) ~= (b.at or 0) then
 					return (a.at or 0) < (b.at or 0)
 				end
-				return ByLevel(a, b)
+				return ByCompare(a, b)
 			end)
 			if g.chain then
 				g.note = ChainDone(g.chain) .. "/" .. #g.chain
 			end
 		else
-			table.sort(g.list, g.here and ByNear or ByLevel)
+			table.sort(g.list, ByCompare)
 		end
 	end
 	table.sort(keyed, function(a, b)
@@ -999,7 +1057,8 @@ function C.Groups(list, sort)
 end
 
 -- The storylines I've started (a step done or in my log) whose next step I can take now (Q.InRange)
--- and isn't in my log: its giver in my zone first, then the lowest level; at most CONTINUE_MAX.
+-- and isn't in my log, in the one order of their next steps (Q.Compare: for my level, then hard, by
+-- level); at most CONTINUE_MAX.
 function C.Continue(data, ctx)
 	local out = {}
 	for _, c in ipairs(data and data.list or {}) do
@@ -1012,31 +1071,33 @@ function C.Continue(data, ctx)
 			end
 			local level = q and tonumber(q.level)
 			out[#out + 1] = { chain = c, id = c.take, giver = giver, point = point, here = point ~= nil and point.map == ctx.zone,
-				level = level and level > 0 and level or ctx.me, title = c.title or "?" }
+				level = level and level > 0 and level or ctx.me, title = c.title or "?", hard = V.IsHard(c.take) }
 		end
 	end
-	table.sort(out, function(a, b)
-		if a.here ~= b.here then
-			return a.here
-		end
-		if a.level ~= b.level then
-			return a.level < b.level
-		end
-		if a.title ~= b.title then
-			return a.title < b.title
-		end
-		return a.id < b.id
-	end)
+	table.sort(out, ByCompare)
 	for i = #out, CONTINUE_MAX + 1, -1 do
 		out[i] = nil
 	end
 	return out
 end
 
--- The game's map pin at a row's spot (Shift: its link in chat too).
-local function PinAt(point)
+-- The game's map pin at a row's spot (share: its link in chat too).
+local function PinAt(point, share)
 	if point and Q.Waypoint then
-		Q.Waypoint(point.map, point.x, point.y, IsShiftKeyDown and IsShiftKeyDown())
+		Q.Waypoint(point.map, point.x, point.y, share == true)
+	end
+end
+
+-- A quest row's clicks (as the big window's): a click shows it on the map (Q.OpenBrowser: its zone,
+-- picked, its objectives), a right-click opens its chain (Q.OpenChain; in no chain: as a click),
+-- Shift-click sets the game's map pin at its spot (Shift-right-click: its link in chat too).
+local function QuestClick(id, chained, point, button)
+	if IsShiftKeyDown and IsShiftKeyDown() then
+		PinAt(point, button == "RightButton")
+	elseif button == "RightButton" and chained then
+		V.OpenChain(id)
+	else
+		V.OpenQuest(id)
 	end
 end
 
@@ -1081,7 +1142,7 @@ function C.QuestEnter(self)
 		return
 	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetText(Q.LevelTitle(e.id, e.quest), 1, 1, 1)
+	GameTooltip:SetText(V.Title(e.id, e.quest), 1, 1, 1)
 	if e.ready then
 		GameTooltip:AddLine(L["Ready to turn in"], TONE.done[1], TONE.done[2], TONE.done[3])
 	else
@@ -1107,21 +1168,21 @@ function C.QuestEnter(self)
 	if e.ender then
 		GameTooltip:AddLine(L["Turn in: %s"]:format(EnderText(e)) .. (e.ready and e.far and (" · " .. e.far) or ""), 0.8, 0.8, 0.8, true)
 	end
-	GameTooltip:AddLine(L["Click: open it in the quest browser"], 0.5, 0.75, 1)
+	GameTooltip:AddLine(L["Click: show it on the map"], 0.5, 0.75, 1)
 	if e.chain then
-		GameTooltip:AddLine(L["Click %s: open the chain"]:format(e.at .. "/" .. #e.chain), 0.5, 0.75, 1)
+		GameTooltip:AddLine(L["Right-click (or %s): open the chain"]:format(e.at .. "/" .. #e.chain), 0.5, 0.75, 1)
 	end
 	if e.spot then
 		local where = e.spotObjective and (e.spotObjective.name or e.spotObjective.text) or (e.ender and e.ender.name) or ""
-		GameTooltip:AddLine(L["Right-click: map pin at %s"]:format(where), 0.5, 0.75, 1, true)
+		GameTooltip:AddLine(L["Shift-click: map pin at %s"]:format(where), 0.5, 0.75, 1, true)
 	end
 	GameTooltip:Show()
 end
 
 -- A quest of my log, one line in columns: its verb icon, "[12] Title", its chain's "2/4" (a badge: a
 -- click opens the chain), its first objective not done ("3/10 Defias Bandit", how far) or "Ready to
--- turn in", and at the right where it's turned in. A click opens it in the window; a right-click
--- sets the map pin where to go.
+-- turn in", and at the right where it's turned in. A click shows it on the window's map, a right-click
+-- opens its chain, Shift-click sets the map pin where to go.
 function C.NewQuest(parent, width)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(width, QUEST_H)
@@ -1158,11 +1219,7 @@ function C.NewQuest(parent, width)
 			return
 		end
 		V.Untip(self)
-		if button == "RightButton" then
-			PinAt(e.spot)
-		else
-			V.OpenQuest(e.id)
-		end
+		QuestClick(e.id, e.chain ~= nil, e.spot, button)
 	end)
 	return b
 end
@@ -1174,7 +1231,7 @@ function C.FillQuest(b, entry)
 	local titleW = math.floor(w * 0.38)
 	local todoW = math.floor(w * 0.3)
 	b.Title:SetWidth(titleW - 28)
-	b.Title:SetText(Q.LevelTitle(e.id, e.quest))
+	b.Title:SetText(V.Title(e.id, e.quest))
 	if e.chain then
 		V.SetBadge(b.Badge, e.id, e.at .. "/" .. #e.chain, Q.Title(e.chain[1]), L["Step %d of %d"]:format(e.at, #e.chain))
 	else
@@ -1234,15 +1291,18 @@ function C.NextEnter(self)
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 	GameTooltip:SetText(c.title or "?", 1, 0.82, 0)
 	GameTooltip:AddLine(L["%d of %d steps done"]:format(c.done, c.total), 1, 1, 1)
-	GameTooltip:AddLine(L["Next: %s"]:format(Q.LevelTitle(n.id)), 1, 1, 1, true)
+	GameTooltip:AddLine(L["Next: %s"]:format(V.Title(n.id)), 1, 1, 1, true)
+	if n.hard then
+		GameTooltip:AddLine(V.TierWord("difficult"), V.TierRGB("difficult"))
+	end
 	if n.giver then
 		local zone = n.point and Q.MapName(n.point.map)
 		GameTooltip:AddLine(L["From %s"]:format((n.giver.name or L["unknown"]) .. (zone and (", " .. zone) or "")), 0.8, 0.8, 0.8, true)
 	end
-	GameTooltip:AddLine(L["Click: open it in the quest browser"], 0.5, 0.75, 1)
-	GameTooltip:AddLine(L["Click %s: open the chain"]:format(c.done .. "/" .. c.total), 0.5, 0.75, 1)
+	GameTooltip:AddLine(L["Click: show it on the map"], 0.5, 0.75, 1)
+	GameTooltip:AddLine(L["Right-click (or %s): open the chain"]:format(c.done .. "/" .. c.total), 0.5, 0.75, 1)
 	if n.point then
-		GameTooltip:AddLine(L["Right-click: map pin at %s"]:format(n.giver and n.giver.name or ""), 0.5, 0.75, 1, true)
+		GameTooltip:AddLine(L["Shift-click: map pin at %s"]:format(n.giver and n.giver.name or ""), 0.5, 0.75, 1, true)
 	end
 	GameTooltip:Show()
 end
@@ -1271,11 +1331,7 @@ function C.NewNext(parent, width)
 			return
 		end
 		V.Untip(self)
-		if button == "RightButton" then
-			PinAt(n.point)
-		else
-			V.OpenQuest(n.id)
-		end
+		QuestClick(n.id, true, n.point, button)
 	end)
 	return b
 end
@@ -1284,7 +1340,10 @@ function C.FillNext(b, entry)
 	local n, w = entry.n, entry.inst.listW
 	b:SetWidth(w)
 	V.Art(b.Icon, "QuestNormal", T.available)
-	local title = Q.LevelTitle(n.id)
+	local title = V.Title(n.id)
+	if n.hard then -- (orange: after the ones for my level, marked)
+		title = title .. " " .. V.TierHex("difficult") .. "(" .. V.TierWord("difficult") .. ")|r"
+	end
 	local text
 	if n.giver then
 		local zone = n.point and Q.MapName(n.point.map) or "?"
@@ -1438,23 +1497,42 @@ end
 -- Level path: where to go next, zones as bars across the levels
 ---------------------------------------------------------------------------
 
-local SHADE = { done = TONE.done, open = TONE.available, later = { 0.42, 0.42, 0.42 } }
+local DONE_RGB = { 0.8, 0.8, 0.8 } -- a level all done: a thin light line (the tiers are full bands)
+local HARDER = { trivial = 1, easy = 2, fair = 3, difficult = 4, impossible = 5 }
 
 -- A zone of my side: enough of its quests are for me.
 function D.Mine(z)
 	return z.total > 0 and (z.total >= 5 or z.total * 4 >= z.count)
 end
 
--- How a level of a zone looks: done (all its quests), open (some I can take or have), later.
+-- How a level of a zone looks: "done" (all its quests), else the tier most of its quests not done
+-- have for me (as many: the harder).
 function D.Shade(b)
 	if not b or b.total == 0 then
 		return nil
 	elseif b.done >= b.total then
 		return "done"
-	elseif b.open > 0 then
-		return "open"
 	end
-	return "later"
+	local best, most = nil, 0
+	for tier, n in pairs(b.tiers) do
+		if n > most or (best and n == most and (HARDER[tier] or 0) > (HARDER[best] or 0)) then
+			best, most = tier, n
+		end
+	end
+	return best or "done"
+end
+
+-- A shade's colour: r, g, b.
+function D.RGB(shade)
+	if shade == "done" then
+		return DONE_RGB[1], DONE_RGB[2], DONE_RGB[3]
+	end
+	return V.TierRGB(shade)
+end
+
+-- A shade's word ("done", or the tier's).
+function D.Word(shade)
+	return shade == "done" and L["done"] or V.TierWord(shade)
 end
 
 -- The zone's levels as runs of one shade: { { from, to, shade } } (levels without quests join the
@@ -1466,10 +1544,13 @@ function D.Runs(z)
 		local at = math.max(lo, math.min(hi, lv))
 		local m = merged[at]
 		if not m then
-			m = { total = 0, done = 0, open = 0 }
+			m = { total = 0, done = 0, tiers = {} }
 			merged[at] = m
 		end
-		m.total, m.done, m.open = m.total + b.total, m.done + b.done, m.open + b.open
+		m.total, m.done = m.total + b.total, m.done + b.done
+		for tier, n in pairs(b.tiers) do
+			m.tiers[tier] = (m.tiers[tier] or 0) + n
+		end
 	end
 	local runs, cur = {}, nil
 	for lv = lo, hi do
@@ -1487,6 +1568,8 @@ function D.Runs(z)
 	return runs
 end
 
+-- The most for my level first, then the most hard ones, then the zones my level is in (the nearest),
+-- the lowest.
 function D.Sort(list, me)
 	local function away(z)
 		if me < z.minLevel then
@@ -1500,6 +1583,9 @@ function D.Sort(list, me)
 		if a.near ~= b.near then
 			return a.near > b.near
 		end
+		if a.hard ~= b.hard then
+			return a.hard > b.hard
+		end
 		local da, db = away(a), away(b)
 		if da ~= db then
 			return da < db
@@ -1509,6 +1595,18 @@ function D.Sort(list, me)
 		end
 		return a.map < b.map
 	end)
+end
+
+-- "7 for your level · 2 hard" (what's there), coloured; "" for nothing.
+function D.Counts(z)
+	local parts = {}
+	if z.near > 0 then
+		parts[1] = V.Hex(TONE.available) .. L["%d for your level"]:format(z.near) .. "|r"
+	end
+	if z.hard > 0 then
+		parts[#parts + 1] = V.TierHex("difficult") .. L["%d hard"]:format(z.hard) .. "|r"
+	end
+	return table.concat(parts, GREY .. " · |r")
 end
 
 -- Beacon friends where they are now (Battle.net's zone name) by zone: { [map] = { peer, ... } }.
@@ -1550,6 +1648,9 @@ function D.RowEnter(self)
 	if z.near > 0 then
 		GameTooltip:AddLine(L["%d for your level"]:format(z.near), TONE.available[1], TONE.available[2], TONE.available[3])
 	end
+	if z.hard > 0 then
+		GameTooltip:AddLine(L["%d hard"]:format(z.hard), V.TierRGB("difficult"))
+	end
 	if z.available > 0 then
 		GameTooltip:AddLine(L["%d you can take now"]:format(z.available), 0.85, 0.85, 0.85)
 	end
@@ -1560,11 +1661,23 @@ function D.RowEnter(self)
 	if later > 0 then
 		GameTooltip:AddLine(L["%d later (level too low, or another quest first)"]:format(later), 0.6, 0.6, 0.6, true)
 	end
+	-- What's left by difficulty for me (every quest not done: to take, in my log, later), the
+	-- easiest first, grey last.
+	local any = false
+	for i = 2, #TIERS + 1 do
+		local tier = TIERS[i] or TIERS[1]
+		local n = z.tiers[tier] or 0
+		if n > 0 then
+			if not any then
+				any = true
+				GameTooltip:AddLine(L["Left to do, by difficulty:"], 0.8, 0.8, 0.8)
+			end
+			GameTooltip:AddLine("  " .. L["%s: %d"]:format(V.TierWord(tier), n), V.TierRGB(tier))
+		end
+	end
 	for _, run in ipairs(e.runs) do
-		local c = SHADE[run[3]]
-		local word = run[3] == "done" and L["done"] or run[3] == "open" and L["quests to take"] or L["later"]
 		local span = run[1] == run[2] and tostring(run[1]) or (run[1] .. "-" .. run[2])
-		GameTooltip:AddLine(L["Level %s: %s"]:format(span, word), c[1], c[2], c[3])
+		GameTooltip:AddLine(L["Level %s: %s"]:format(span, D.Word(run[3])), D.RGB(run[3]))
 	end
 	for _, p in ipairs(e.friends or {}) do
 		GameTooltip:AddLine(LT.Window.ClassColorCode(p.classFile) .. tostring(p.name) .. "|r " .. GREY .. (p.level and L["level %d"]:format(p.level) or "")
@@ -1623,8 +1736,8 @@ function D.FillRow(b, e)
 	b:SetWidth(inst.listW)
 	b.Here:SetShown(e.here)
 	b.Name:SetText(z.name)
-	if z.near > 0 then
-		b.Right:SetText(V.Hex(TONE.available) .. L["%d for your level"]:format(z.near) .. "|r")
+	if z.near > 0 or z.hard > 0 then
+		b.Right:SetText(D.Counts(z))
 	elseif z.done >= z.total then
 		b.Right:SetText(V.Hex(TONE.done) .. L["All done"] .. "|r")
 	else
@@ -1643,9 +1756,9 @@ function D.FillRow(b, e)
 			t = b:CreateTexture(nil, "ARTWORK")
 			b.Runs[i] = t
 		end
-		local c = SHADE[run[3]]
-		t:SetColorTexture(c[1], c[2], c[3], run[3] == "later" and 0.7 or 0.9)
-		place(t, run[1], run[2], barH)
+		local r, g, bl = D.RGB(run[3])
+		t:SetColorTexture(r, g, bl, 0.9)
+		place(t, run[1], run[2], run[3] == "done" and 2 or barH)
 		t:Show()
 	end
 	for i = #e.runs + 1, #b.Runs do
@@ -1708,7 +1821,7 @@ function D.Fill(inst, data)
 	for _, z in ipairs(data.zones) do
 		if D.Mine(z) then
 			mine[#mine + 1] = z
-			if all or z.near > 0 or friends[z.map] then
+			if all or z.near > 0 or z.hard > 0 or friends[z.map] then
 				list[#list + 1] = z
 			end
 		end
@@ -1723,6 +1836,8 @@ function D.Fill(inst, data)
 	local best = list[1]
 	if best and best.near > 0 then
 		inst.Head:SetText(L["Best next: %s, %d quests for your level"]:format(GOLD .. best.name .. "|r", best.near))
+	elseif best and best.hard > 0 then
+		inst.Head:SetText(L["Only hard ones for your level: %s has %d."]:format(GOLD .. best.name .. "|r", best.hard))
 	else
 		local soon
 		for _, z in ipairs(mine) do
@@ -1766,8 +1881,15 @@ function D.Build(parent)
 	inst.Layout = function(self, w)
 		D.Layout(self, w)
 	end
-	inst.Legend:SetText(V.Hex(TONE.done) .. "|T" .. T.flat .. ":10:10|t " .. L["Done"] .. "|r   " .. V.Hex(TONE.available) .. "|T" .. T.flat .. ":10:10|t "
-		.. L["Quests to take"] .. "|r   |cff6b6b6b|T" .. T.flat .. ":10:10|t " .. L["Later"] .. "|r   " .. GOLD .. "| " .. L["Your level"] .. "|r")
+	-- The legend: each tier's colour and word, done (a thin line), my level's line.
+	local legend = {}
+	for i = 2, #TIERS do
+		legend[#legend + 1] = V.TierHex(TIERS[i]) .. "|T" .. T.flat .. ":10:10|t " .. V.TierWord(TIERS[i]) .. "|r"
+	end
+	legend[#legend + 1] = V.TierHex("trivial") .. "|T" .. T.flat .. ":10:10|t " .. V.TierWord("trivial") .. "|r"
+	legend[#legend + 1] = V.Hex(DONE_RGB) .. "|T" .. T.flat .. ":10:2|t " .. L["Done"] .. "|r"
+	legend[#legend + 1] = GOLD .. "| " .. L["Your level"] .. "|r"
+	inst.Legend:SetText(table.concat(legend, "   "))
 	inst.Draw = function(self)
 		V.Fit(self)
 		V.Draw(self, D.Fill)

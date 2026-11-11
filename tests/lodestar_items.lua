@@ -3,7 +3,9 @@
 -- question over the next frames (the real data: a few hundred quests a frame), learned quests on top;
 -- item tooltips: each quest with where it stands for me (in my log with my progress "3/8", ready to
 -- turn in, not taken yet: can take it / too low / needs one first, done, skipped), a starter's ("you
--- can start it", "already done: you can discard it", "from level 30"), at most four and "and N more",
+-- can start it", "already done: you can discard it", "from level 30"), those that need it first, in
+-- the one order (Q.Compare; round 6's contract gets stand-ins while it's missing), at most four and
+-- "and N more",
 -- "No quest needs it any more: you can discard it" / "Still needed for ..."; quests of my log the
 -- data doesn't have with the item, by the item's name (any language: a German one); GameTooltip and
 -- ItemRefTooltip only, kept per data, progress and quest log change (a hover is a lookup), nothing
@@ -31,6 +33,71 @@ local function PutBack(name)
 		Q[name] = replaced[name] or nil
 		replaced[name] = nil
 	end
+end
+
+-- The round's shared contract (docs/lodestar.md, Engine: difficulty tiers, "for your level", "hard"
+-- and the one order of quests), the data part's, built in parallel: while it's missing (no Q.Tier),
+-- stand-ins with its meaning (Q.InRange and Q.ForMyLevel then too: theirs before were the old
+-- meaning). Their own test fields: a quest's q.mobs = { lo, hi } (its objectives' mobs) and q.group.
+if not (Q.Tier and Q.Compare) then
+	local HARDER, KEYS = { trivial = 1, easy = 2, fair = 3, difficult = 4, impossible = 5 }, { "trivial", "easy", "fair", "difficult", "impossible" }
+	local RGB = { trivial = { 0.5, 0.5, 0.5 }, easy = { 0.25, 0.75, 0.25 }, fair = { 1, 0.82, 0 }, difficult = { 1, 0.5, 0.25 }, impossible = { 1, 0.1, 0.1 } }
+	Replace("TIER_WORD", { trivial = "Trivial", easy = "Easy", fair = "Fair", difficult = "Hard", impossible = "Too hard" })
+	Replace("Group", function(id) local q = Q.Quest(id) return q ~= nil and q.group == true end)
+	Replace("MobLevels", function(id) local q = Q.Quest(id) if q and q.mobs then return q.mobs[1], q.mobs[2] end end)
+	Replace("Tier", function(id)
+		local q = Q.Quest(id)
+		if not q then return nil end
+		local tier = Q.Difficulty(id) or "fair"
+		local _, hi = Q.MobLevels(id)
+		local mobs = hi and hi > (tonumber(q.level) or 0) and Q.LevelColor(hi).key
+		if mobs and HARDER[mobs] > HARDER[tier] then tier = mobs end
+		if Q.Group(id) then tier = KEYS[math.min(5, HARDER[tier] + 1)] end
+		return tier
+	end)
+	Replace("TierColor", function(tier) local c = RGB[tier] or RGB.fair return { r = c[1], g = c[2], b = c[3] } end)
+	Replace("TierCode", function(id)
+		local c = Q.TierColor(Q.Tier(id) or "fair")
+		return ("|cff%02x%02x%02x"):format(math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5))
+	end)
+	local function Level(q) -- (the effective level: its own, a scaling one mine, its mobs' if higher; nil: none)
+		local level = tonumber(q.level) or tonumber(q.minLevel)
+		if q.scales or (level and level <= 0) then level = UnitLevel("player") end
+		local _, hi = Q.MobLevels(q.id)
+		if hi and (not level or hi > level) then level = hi end
+		return level
+	end
+	Replace("InRange", function(id)
+		local q = Q.Quest(id)
+		if not q then return false end
+		if Q.Status(id) == "active" then return true end
+		if q.event or (tonumber(q.minLevel) or 0) > UnitLevel("player") or not Level(q) then return false end
+		local tier = Q.Tier(id)
+		return tier == "easy" or tier == "fair" or tier == "difficult"
+	end)
+	Replace("ForMyLevel", function(id)
+		local s = Q.Status(id)
+		return s == "active" or (s == "available" and Q.InRange(id) and (Q.Tier(id) == "easy" or Q.Tier(id) == "fair"))
+	end)
+	Replace("IsHard", function(id) return Q.Status(id) == "available" and Q.InRange(id) and Q.Tier(id) == "difficult" end)
+	local RANK = { active = 2, available = 5, level = 6, locked = 7, done = 8, other = 9 }
+	Replace("StatusRank", function(id)
+		local s = Q.Status(id) or "other"
+		if s == "active" and C_QuestLog.IsComplete(id) then return 1 end
+		if Q.ForMyLevel(id) then return s == "active" and 2 or 3 end
+		if Q.IsHard(id) then return 4 end
+		return RANK[s] or 9
+	end)
+	Replace("Compare", function(a, b)
+		local ra, rb = Q.StatusRank(a), Q.StatusRank(b)
+		if ra ~= rb then return ra < rb end
+		local qa, qb = Q.Quest(a), Q.Quest(b)
+		local la, lb = qa and Level(qa) or 1000, qb and Level(qb) or 1000
+		if la ~= lb then return la < lb end
+		local ta, tb = Q.Title(a):lower(), Q.Title(b):lower()
+		if ta ~= tb then return ta < tb end
+		return a < b
+	end)
 end
 
 -- The clock moves in frames and quarters of a second here (whole seconds in all at the end).
@@ -164,10 +231,11 @@ do
 	check(Joined(9904) == "Lodestar: starts the quest A Faded Note · already done: you can discard it",
 		"a starter done: discard it (one line), got " .. Joined(9904))
 	check(Joined(9905) == "Lodestar: starts the quest Sealed Orders · from level 30", "a starter for later: from which level, got " .. Joined(9905))
-	check(Joined(9906) == "Lodestar: for Wolf Pelts · not taken yet: you can take it | Lodestar: for Pelts for the Tanner · not taken yet: you can take it"
-		.. " | Lodestar: for More Pelts · not taken yet: needs another quest first | Lodestar: for Fine Pelts · not taken yet: from level 40"
-		.. " | Lodestar: and 1 more | Still needed for Wolf Pelts and 3 more",
-		"many quests: the ones that need it first, at most four, how many more, which still need it, got " .. Joined(9906))
+	check(Joined(9906) == "Lodestar: for Pelts for the Tanner · not taken yet: you can take it | Lodestar: for Wolf Pelts · not taken yet: you can take it"
+		.. " | Lodestar: for Fine Pelts · not taken yet: from level 40 | Lodestar: for More Pelts · not taken yet: needs another quest first"
+		.. " | Lodestar: and 1 more | Still needed for Pelts for the Tanner and 3 more",
+		"many quests: the ones that need it first, in the one order (to take: by level, then title; coming up; blocked), at most four, "
+		.. "how many more, which still need it, got " .. Joined(9906))
 	check(#Hover(2589) == 0, "an item of no quest: nothing")
 
 	-- Quests the data doesn't have with the item: my log's, by the item's name (the client's language).

@@ -592,21 +592,26 @@ what's secondary is in the lines' tooltips or behind a click.
   of what I can pick up on that map, and my arrow.
 - **Pick up next** (a heading with my zone and its count, `Q.ZoneCount`: "Elwynn Forest · 12 of 40
   done"), in two groups like Quest Herald's (each quest a row: icon, "[level] Title" in its difficulty
-  colour, a grey second line, how far and which way at the right):
-  - *In progress*: my other quests, ready ones first, then those turned in in this zone (at most 3):
-    "ready to turn in · <ender>" or "in your log · <ender>".
-  - *Available now*, only quests for my levels (`Q.InRange`: my level reached, not grey, not red):
-    follow-ups of the quest I just turned in (while the window was open) first, then `Q.Next()`'s
-    that I can take ("after <the quest it follows>"), then the zone's (`Q.AvailableIn`: the nearest
-    giver first), at most 3 with "N more here: the quest browser"; the second line: the giver (and
-    their zone when it's another) and its step in its chain. What Now leads to isn't listed again.
+  tier's colour, `Q.TierCode`, a grey second line, how far and which way at the right). Each group is in
+  the one order of quests, `Q.Compare` (round 6, the player asked for level order: ready first, then for
+  my level before hard ones, each by level, then title); how far the giver is stays on the line, it no
+  longer orders it.
+  - *In progress*: my other quests (at most 3): "ready to turn in · <ender>" or "in your log · <ender>".
+  - *Available now*, only quests for my levels (`Q.InRange`: my level reached, easy, fair or difficult):
+    follow-ups of the quest I just turned in (while the window was open), `Q.Next()`'s that I can take
+    ("after <the quest it follows>") and the zone's (`Q.AvailableIn`), all of them in the one order, the
+    first 3 shown, "N more here: the quest browser" for the rest; the second line: the giver (and their
+    zone when it's another) and its step in its chain. A hard one (`Q.IsHard`: orange) comes after the
+    ones for my level and its second line starts with "Hard" in orange (", mobs up to 23" when its
+    objectives' mobs, `Q.MobLevels`, are above its level), its tooltip too; its giver's marker on the
+    small map is the game's "!" on an orange ring. What Now leads to isn't listed again.
   None at all: "Nothing to pick up nearby. The quest browser has every zone." What's coming up later
   (level too low) or blocked (needs another first) isn't here: the big window has it.
 
   **How a line looks** (the guides' step lists: this now, then those): a verb icon first (`Q.Icon`,
   the game's own: `QuestTurnin` "?" for one ready to turn in, `SideInProgressquesticon` for one in
   progress, `QuestNormal` "!" to pick up, `QuestDaily` repeatable). The first line of Pick up next is
-  full size (`GameFontHighlight`, a 16 px icon, the title in its difficulty colour): what to do now;
+  full size (`GameFontHighlight`, a 16 px icon, the title in its tier's colour): what to do now;
   the rest are smaller (13 px) with only "[level]" in its colour and the title grey (`bebebe`). The
   second line of Available now also says what taking it closes ("closes <title>" in orange,
   `Q.Closes`: its exclusive quests, at most 2 named; the tooltip: "Taking it closes: ... Only one of
@@ -679,7 +684,7 @@ frames, no Blizzard menu, no panel opening.
 **Small map** (`Modules/Lodestar/MiniMap.lua`, also for the big window):
 `local m = Q.NewMiniMap(parent[, width, height])` (240 x 160 by default), `m.frame`,
 `m:Show(map, points[, name])` with `points = { { x, y, kind, label [, note, look, grey, chance,
-radius, group] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPlayer(on)`,
+radius, group, hard] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPlayer(on)`,
 `m:Zoom(factor[, x, y])`, `m:Light(group)`, `m:Markers()` (tests).
 
 - The zone's art and what you've explored of it (`LT.MapArt`: the art tiles of
@@ -691,7 +696,8 @@ radius, group] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPl
   drops. `look`: "available" (`QuestNormal`, yellow !), "repeatable" (`QuestDaily`), "trivial" (the !
   paler), "locked" (the ! grey), "turnin" (`QuestTurnin`), "repeatturnin" (`QuestRepeatableTurnin`),
   "progress" (`SideInProgressquesticon`); without `look` a start is "available", an end "turnin",
-  `grey` makes them "locked" / "progress". The atlas missing: the gossip window's icon. A drop: a
+  `grey` makes them "locked" / "progress"; `hard` (a hard quest's giver) makes the dark outline an orange
+  ring (`ff8040`, 95%), the icon stays the game's. The atlas missing: the gossip window's icon. A drop: a
   soft orange spot (`Spells\GenericGlow64` added) at least 34 px, as big as its `radius` (0..1 of the
   map's width, at most 140 px); the likeliest (`chance`) says "drops here (12%)" beside it. An
   objective's area (`kind` "area"): a soft gold circle the same way (70%, no dot), `group` the
@@ -713,16 +719,18 @@ radius, group] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:ShowPl
 
 **Tests** (`tests/lodestar_small.lua`): the module, settings and commands; difficulty colours;
 the lines' verb icons, the first full size and the rest grey, no "opens", exclusive quests closing each
-other, Available now only for my levels and at most three, nothing for later, one line (the button,
+other, Available now only for my levels and at most three in the one order (by level, then title), a hard
+one after them (orange, "Hard, mobs up to 22", its tooltip, its giver's orange ring on the small map),
+nothing for later, one line (the button,
 the line's click, the setting), hiding itself and coming back and staying closed when I closed it,
 Alt-click in the quest log (through the hook); the status words (skipped and by which, not for my
 class or side, a profession missing or too low, a reputation, the quest first; as a word after a
 name);
 Now (why that quest, its step and bar, objectives, turn-in, what it leads to in the title's
 tooltip, the steps folded and unfolded and kept, the map and its markers) and Pick up next (the two
-groups, nearest first with distance and direction, the zone's count);
+groups, by level with distance and direction, the zone's count);
 following super tracking, the quest log's hook and its setting, accepting and turning in (the
-follow-up first); a quest looked at ("« Back to", "Back to now", an item's drops and their map, too
+follow-up in the one order, saying what it follows); a quest looked at ("« Back to", "Back to now", an item's drops and their map, too
 low, done); the map pin from a giver's line and a marker (Shift: chat); friends' dots and their
 setting; an unknown quest, the data missing, the search, the browser command; the NPC tooltip lines
 (giver, turn-in, too low, done, kept, other frames, instance, setting, data not loaded); events only
@@ -731,7 +739,8 @@ without the data part's new calls; switched off; the small map alone (icons, one
 spot, the arrow, zoom, objective areas by radius and objective, lit and dimmed); Now's objective
 areas (not the done one's, not the turn-in; its line lights them, says where, pins the nearest).
 Data.lua's `Q.ChainStep`, `Q.Available`, `Q.LevelColor`, `Q.ZoneCount` and
-`Q.GiverQuests` get stand-ins only while they're missing, `Q.Objectives` while Now's areas are
+`Q.GiverQuests` get stand-ins only while they're missing, round 6's contract (`Q.Tier`, `Q.Compare` and
+the rest, as in the views' tests) while `Q.Tier` and `Q.Compare` are, `Q.Objectives` while Now's areas are
 checked; the mock's map pin API and the quest log's
 `QuestMapFrame_ShowQuestDetails` are made for it and put back at its end.
 
@@ -750,6 +759,11 @@ dialog's top:
 
 - **"Part 2 of 4 · <chain>"** (gold, `GameFontNormal`): the quest's place in `Q.ChainFor` and the
   chain's first quest's title (the client's when it knows it).
+- **The level line**: "Level 23 (from 18) · Hard, mobs up to 26 · 1,400 XP" in the quest's difficulty
+  tier's colour (`Q.TierCode`; a quest that scales "Your level"): "Hard" (orange) or "Too hard" (red) when
+  its tier (`Q.Tier`) is difficult or impossible, "mobs up to 26" when its objectives' mobs
+  (`Q.MobLevels`) are above its level, "a group quest" for one (`Q.Group`); a grey, green or yellow one
+  only its colour. Under the chain's heading, or under the title of a quest in no chain.
 - **The steps**, numbered, in a window of four: one before this one, this one, two after (fewer
   before it at the chain's start, more at its end), "... N before" and "... N more" for the rest;
   done ones ticked green, this one bold (`GameFontHighlight`) with an arrow, the rest grey; each a
@@ -769,8 +783,10 @@ dialog's top:
   it, `Q.OnFriendProgress`).
 - **Open in Lodestar** (a button at the bottom): `Q.OpenBrowser(id)`, else `Q.ShowQuest(id)`.
 
-The greeting lists each of the NPC's quests that's in a chain or leads on: "[12] Title" with its verb
-icon and "Part 2 of 4 · <chain>" (or "opens N") under it, a click opens it; no button. Nothing to tell
+The greeting lists each of the NPC's quests the data knows (at most 8), in the one order of quests
+(`Q.Compare`: ready, in my log, for my level, hard, the rest, each by level; not the NPC's order): "[12]
+Title" in its tier's colour with its verb icon and "Part 2 of 4 · <chain>" (or "opens N") under it, a
+hard one's line starting "Hard" (or "Too hard"), a click opens it; no button. Nothing to tell
 (no chain of two or more, nothing it leads to or closes, no lead-in, no friends): no panel at all.
 
 **Events and cost.** The five events (`QUEST_FINISHED` too) are listened to while Lodestar and the
@@ -817,7 +833,9 @@ hooked; no Blizzard template but the button's `UIPanelButtonTemplate`, no Backdr
 
 `Q.DialogView()` gives the tests the panel, its strings, the quest shown, the page and the labels.
 
-**Tests** (`tests/lodestar_dialog.lua`): nothing built before a dialog; the offered page drawn on the
+**Tests** (`tests/lodestar_dialog.lua`; round 6's contract as in the views' tests): nothing built before a
+dialog; the level line (three levels above me orange "Hard"; a grey one only its colour; too hard, its
+mobs higher, a group quest); the greeting in the one order with the hard one marked; the offered page drawn on the
 next frame, not in the event (heading, the steps' window with done ticked and this one bold and "... 2
 more", what it leads to when it isn't listed, a need that's a step listed not said again, what taking
 it closes, the button and a step's line opening Lodestar); a frame of ours on UIParent anchored beside
@@ -847,8 +865,10 @@ each quest of `Q.ItemQuests(item)` with my status (`Q.Status`):
   exclusive one taken), "· not for you";
 - an item that starts it: "Lodestar: starts the quest <title> · you can start it" / "· in your log" /
   "· from level 30" / "· needs another quest first" / "· already done: you can discard it";
-- the quests that still need it first (then starters, by status, by ID), at most 4, then "Lodestar: and
-  N more";
+- the quests that still need it first, then the rest, each by status (ready, in my log, to take, coming
+  up, blocked, done) and then in the one order of quests (`Q.Compare`: for my level, hard, ...; by level
+  and title; a quest of my log the data doesn't have after those it has, by its ID), at most 4, then
+  "Lodestar: and N more";
 - last: "No quest needs it any more: you can discard it" (green-grey) when none does (not under a
   single starter's line, which says it already), or "Still needed for <title> [and N more]" when only
   some do.
@@ -883,11 +903,11 @@ and each sort that keeps the order (an item moved, a quest done meanwhile); hidd
 top left corner is free on a quest item (Blizzard's junk coin and upgrade arrow are for grey items and
 gear). Nothing taints: a texture on the button isn't protected and no Blizzard code reads it.
 
-**Tests** (`tests/lodestar_items.lua`): the index (nil at the first question, made on the next frame;
+**Tests** (`tests/lodestar_items.lua`; round 6's contract as in the views' tests): the index (nil at the first question, made on the next frame;
 objectives, the giver's items, starters; an item of no quest; shared lists; a learned quest's item on
 top; the real data over 17 frames or more, Hogger's claw, Furlbrow's Deed); each tooltip line (in my
-log with progress, ready, done and skipped: discard, a starter's three, many quests: four and "and 1
-more", "Still needed for ..."); quests of my log by the item's name, a German one; kept until the log
+log with progress, ready, done and skipped: discard, a starter's three, many quests in the one order:
+four and "and 1 more", "Still needed for ..."); quests of my log by the item's name, a German one; kept until the log
 or progress changes; ItemRefTooltip, another tooltip, a secret ID, the setting; nothing before the data
 is loaded and no load; `Q.ItemDone`; the bags' mark (marked, not marked, moved with its item, the
 setting off).
@@ -1399,14 +1419,24 @@ card, filtered and sorted by what it's worth) of earlier builds are gone: the zo
 left shows each zone's progress, and the players didn't know what the storylines were for; the chains
 that matter now (those I'm on) are in My quests.
 
-**For my levels** is the engine's `Q.InRange(id)` (iteration 5's meaning: a quest in my log; else only
-what I can take now and is worth it: my level reached (`minLevel`), not grey for me, and its level at
-most `Q.RANGE_RED`, 4, above mine (red: far too hard); a level of -1 / 0 counts as mine; never an event's
-quest not in my log). Quests "coming up" (my level too low) are out of it. Without `Q.InRange` everything
-counts as in range. **"N for your level"** (the level path, the zone's briefing, the suggestion under the
-map) counts only what I can take now within my levels or have in my log (`Q.ForMyLevel`): a quest that
-needs another first is within my levels but not for my level yet. An event's quest not in my log is counted
-apart (`event`: not in "you can take now", not shaded as quests to take).
+**For my levels** is the engine's `Q.InRange(id)` (round 6: a quest in my log; else my level reached
+(`minLevel`), its difficulty tier (`Q.Tier`) easy, fair or difficult, not an event's, a level known).
+Quests "coming up" (my level too low) are out of it. Without `Q.InRange` everything counts as in range.
+**"N for your level · M hard"** (the level path, the zone's briefing, the suggestion under the map): N is
+`Q.ForMyLevel` (in my log, or one I can take now that's easy or fair), M apart `Q.IsHard` (one I can take
+now within my levels that's orange); a quest that needs another first is in neither yet. Without them: N is
+in my log or `"available"` and `Q.InRange`, M none. An event's quest not in my log is counted apart
+(`event`).
+
+**Difficulty and order** (round 6, the players' "the addon should treat those differently" and "I hate it
+when stuff is out of order"): every quest title is in its tier's colour (`Q.TierCode`: the engine's
+`Q.Tier`, the quest's effective level, its objectives' mobs' when higher, a group quest one harder; without
+it the level's colour, `Q.LevelCode`), "[12] Title" (`V.Title`). Every list of quests is in the one order
+`Q.Compare` (ready to turn in, in my log, for my level, hard, the rest; then by effective level, title, ID;
+without it by ID), a list that is a chain in its steps' order. Hard ones are marked with the tier's word
+("Hard", `Q.TIER_WORD`) beside the colour. `V.Tier`, `V.TierRGB` (`Q.TierColor`), `V.TierWord`,
+`V.ForMyLevel`, `V.IsHard` and `V.Before` guard the calls (Views.lua's fallbacks when the engine's are
+missing).
 
 ### My quests
 
@@ -1417,32 +1447,33 @@ per step):
 - On top: "12 quests in your log · 3 ready to turn in"; at the right **Sort:** Zone (the default),
   Level, Storyline (chips; kept: `views.mySort`, "zone" at first; the `show` and `sort` of the
   storylines before are left alone).
-- **Ready to turn in** first, whatever the sort: every zone's, mine first (the nearest turn-in first),
-  then by zone and level.
+- **Ready to turn in** first, whatever the sort: every zone's, in the one order (by level).
 - Then **by zone** (the quest's zone in the data, else its dungeon, else the quest log's heading
-  above it, else "Other quests"): my zone first ("you're here"), its quests the nearest first (the
-  distance to where I have to go, below), then the other zones by their lowest quest level, each zone's
-  quests by level. **By level**: one group "In progress", the lowest first. **By storyline**: a group per
-  chain (`Q.ChainFor`: its first quest's title and "1/5", the steps done of all for me), its quests in
-  step order; the quests in no chain last ("Not in a storyline").
+  above it, else "Other quests"): my zone first ("you're here"), then the other zones by their lowest
+  quest level. **By level**: one group "In progress". **By storyline**: a group per chain (`Q.ChainFor`:
+  its first quest's title and "1/5", the steps done of all for me), its quests in step order; the quests
+  in no chain last ("Not in a storyline"). Within every other group (ready ones too) the one order,
+  `Q.Compare` (by level, then title): no longer the nearest first, the distance stays on the line.
 - A group's heading: its name in gold, "(3)" and the rest in grey, a thin gold rule.
 - **A quest** (one line, 24 px, a Button): its verb icon (`QuestTurnin` when ready, else
-  `SideInProgressquesticon`), "[12] Title" (the level in its difficulty colour, `Q.LevelTitle`), its
+  `SideInProgressquesticon`), "[12] Title" (in its difficulty tier's colour, `Q.TierCode`), its
   chain's "2/4" (`Q.ChainFor`, in progress gold: a badge, below), its first objective not done with its progress
   ("2/10 Defias Looter", from `Q.LogObjectives`: the client's numbers and the name without its count),
   how far its area is when it's in my zone (" · 170 yd N"), or "Ready to turn in" in green; at the right
   the turn-in's icon and name, with its zone when it isn't the quest's own (or, ready, isn't mine), and
   how far when ready in my zone. Columns: the title 38% of the width, the badge 40 px, the objective
   30%, the turn-in the rest.
-- **Where I have to go** (for the order, the distance, the right-click): ready: the turn-in's spot
+- **Where I have to go** (for the distance and the map pin): ready: the turn-in's spot
   nearest me; else `Q.ObjectiveSpot` (the nearest area of an objective not done, `Q.Objectives`); else
   the turn-in.
 - Its tooltip: "[12] Title", ready or "In your quest log", its zone, "Step 2 of 5 · <chain>", every
   objective from the quest log (done ones ticked, grey; an item's "(from Oat Sack, 100%)": the data's
-  likeliest source), "Turn in: <name>, <zone>", "Click: open it in the quest browser", "Click 2/5: open
-  the chain" (with a badge), "Right-click: map pin at <the objective, or the turn-in's name>".
-- A click: `Q.OpenBrowser(id)` (its zone, the quest picked, its objectives on the map: the big window's).
-  A right-click: the game's map pin there (`Q.Waypoint`; Shift: its link in chat too).
+  likeliest source), "Turn in: <name>, <zone>", "Click: show it on the map", "Right-click (or 2/5): open
+  the chain" (in a chain), "Shift-click: map pin at <the objective, or the turn-in's name>".
+- **Clicks** (round 6, as the big window's quest rows: the players look at the map first): a click
+  `Q.OpenBrowser(id)` (its zone's map, the quest picked, its objectives on it: never the chain graph); a
+  right-click its chain (`Q.OpenChain`; a quest in no chain: as a click); Shift-click the game's map pin
+  there (`Q.Waypoint`; Shift-right-click: its link in chat too).
 - **Its badge** ("2/5", a Button of its own on the row, a faint gold pill lit when hovered; its tooltip
   the chain's name, "Step 2 of 5", "Click: open the chain"): a click opens the quest's chain in the big
   window, the quest picked, its card in sight (`Q.OpenChain(id)`; without it `Q.OpenBrowser`). The row's
@@ -1452,14 +1483,15 @@ per step):
 **Continue your storylines** (a heading, "started, the next step for your level" in grey): the chains I've
 started (a step done or in my log, not all done) whose next step I can take now: the first of the chain
 (in `Q.Chain`'s order) that's "available" and `Q.InRange` (so a step too high or one that needs the step
-in my log isn't listed). Its giver in my zone first, then the lowest level, then the chain's title; at
-most 8. A line: the `QuestNormal` "!", "<chain> - next: [13] <title>, <giver> (<zone>)" (the chain's name
-gold), "1/2" (its steps done) at the right, a badge as the quests' (its tooltip: the chain, "1 of 2 steps
-done", "Click: open the chain"; a click: `Q.OpenChain` on that step). Its tooltip: the chain, "1 of 2 steps
-done", "Next: ...", "From <giver>, <zone>", the clicks. A click: `Q.OpenBrowser` on that step; a
-right-click: the map pin at its giver (nearest me). It comes from the counts (below): while they're made, "Looking through your
-storylines..." (the log above shows at once); none: "No storyline you've started has a next step for
-your level now."
+in my log isn't listed). In the one order of those next steps (`Q.Compare`: for my level first, then hard
+ones, each by level); at most 8. A line: the `QuestNormal` "!", "<chain> - next: [13] <title>, <giver>
+(<zone>)" (the chain's name gold, the step in its tier's colour; a hard one "(Hard)" in orange after it),
+"1/2" (its steps done) at the right, a badge as the quests' (its tooltip: the chain, "1 of 2 steps done",
+"Click: open the chain"; a click: `Q.OpenChain` on that step). Its tooltip: the chain, "1 of 2 steps
+done", "Next: ...", "Hard" for a hard one, "From <giver>, <zone>", the clicks. A click: `Q.OpenBrowser`
+on that step; a right-click: `Q.OpenChain`; Shift-click: the map pin at its giver (nearest me). It comes
+from the counts (below): while they're made, "Looking through your storylines..." (the log above shows at
+once); none: "No storyline you've started has a next step for your level now."
 
 ### Level path ("where to go next")
 
@@ -1470,27 +1502,34 @@ module's `friends` setting, whose zone, Battle.net's `area` matched to the zone'
 the data's, it is); the chip **All zones** at the top right shows every zone of my side (kept:
 `views.allZones`). A row (26 px) has only: the name (a faint blue band for the zone I'm in,
 `Q.HereZone`), a bar across the levels 1-60 (more if a zone goes higher; ticks every ten and "You (12)"
-on top) from the zone's lowest to its highest level, shaded per level: done (all its quests done,
-green), quests to take (one I can take or have, amber), later (grey); a level without quests takes the
-shade before it, quests outside the zone's range count at its ends; a gold line at my level; at the
-right "7 for your level" (its quests in my log, or `"available"` and `Q.InRange`: what I can take now
-within my levels; not one that needs another first, nor an event's), else "All done", else nothing. Sorted by that
-count, then the zones my level is in, then the nearest. On top: "Best next: Westfall, 7 quests for your
-level", or "Nothing for your level. Next up: Redridge Mountains, from level 15." No zone left: "No zone
-has quests for your level." and a button that shows all zones. The tooltip has the rest: levels, done,
-for my level, what I can take now, in my log, later, each run of levels, friends there (name, level),
-"You're here.". A click: `Q.SelectZone`. The legend: done, quests to take, later, my level's line.
+on top) from the zone's lowest to its highest level, shaded per level: done (all its quests done:
+a thin light line, 2 px), else the difficulty tier most of that level's quests not done have for me
+(`Q.Tier`, as many: the harder): easy green, fair yellow, difficult orange, impossible red, trivial grey
+(round 6: the level path in the quest log's colours); a level without quests takes the shade before it,
+quests outside the zone's range count at its ends (their level is the quest's own; the tier is the
+effective one); a gold line at my level; at the right "7 for your level · 2 hard" (`Q.ForMyLevel`, and
+apart `Q.IsHard` in orange; not one that needs another first, nor an event's), else "All done", else
+nothing. Sorted by the first count, then the second, then the zones my level is in, then the nearest; a
+zone with only hard ones is listed too. On top: "Best next: Westfall, 7 quests for your level", "Only hard
+ones for your level: Redridge Mountains has 3.", or "Nothing for your level. Next up: Redridge Mountains,
+from level 15." No zone left: "No zone has quests for your level." and a button that shows all zones. The
+tooltip has the rest: levels, done, for my level, hard, what I can take now, in my log, later, "Left to do,
+by difficulty:" (each tier's count of the quests not done, the easiest first, grey last, in its colour),
+each run of levels with its tier's word ("Level 12-15: Fair"), friends there (name, level), "You're
+here.". A click: `Q.SelectZone`. The legend: each tier's colour and word, done's thin line, my level's
+line.
 
 ### What it costs
 
-The counts are made once and kept: every zone's quests by status (`Q.Status`), level and range
-(`Q.InRange`), every chain's (`Q.Chain`: done, in the log, available, levels, its next step I can take
+The counts are made once and kept: every zone's quests by status (`Q.Status`), level, tier (`Q.Tier`, each
+level's and the zone's), for my level and hard (`Q.ForMyLevel`, `Q.IsHard`), every chain's (`Q.Chain`: done, in the log, available, levels, its next step I can take
 within my levels), 200 quests a frame on a frame of ours that's shown only while counting
 (5257 quests, 3473 of them in chains: well under a second, no hitch), and only while a view is shown.
 They're for a data, progress and level (`Q.dataGen`, `Q.progressGen`, `UnitLevel`): made again when one
 changed (checked when a view shows or draws; `Q.Status(0)` first, so a quest taken while no view was
 shown is read), or after `QUEST_TURNED_IN`, `QUEST_ACCEPTED`, `QUEST_REMOVED`, `PLAYER_LEVEL_UP` or
-`Q.OnDataChanged`; the last counts stay drawn meanwhile. My quests reads the quest log (at most 25 quests:
+`Q.OnDataChanged`; the last counts stay drawn meanwhile. The sorts (`Q.Compare`: the log's 25, the
+storylines' next steps) run when a view draws (an event, a move, a click), never per frame. My quests reads the quest log (at most 25 quests:
 their objectives, `Q.Objectives` cached by the data part) when it draws, `QUEST_LOG_UPDATE` only draws
 again (it doesn't count). Events are registered only while a view is shown; they're noted and drawn half
 a second later (several: once; in a fight, where every kill updates the log, the same). While My quests
@@ -1503,19 +1542,28 @@ Hidden: no events, no OnUpdate.
 
 Our own frames only, nothing protected (it works in a fight), no Blizzard menu. Every quest and storyline
 row, its chain badge, zone row, chip (the level path's toggle too) and the empty state's button is a Button, so
-SmartNavigation reaches them (its focus runs OnEnter: the tooltips; a right-click is the map pin, the
-same as the window's "Map pin" for a controller); the group headings and notes are plain frames it
+SmartNavigation reaches them (its focus runs OnEnter: the tooltips). A controller has no right-click and no
+Shift: **its way to a chain is the row's "2/4" badge** (a Button of its own beside the title, the cursor
+stops on it; Continue's "1/2" too), and the map pin is the big window's "Map pin" in the quest's details
+(a click opens them); the group headings and notes are plain frames it
 skips; the lists are scroll frames (it scrolls them); nothing of Blizzard's is set on our frames.
 
 Tests: `tests/lodestar_views.lua` (the real Data.lua and Engine.lua through `Q.SetTestData`; the
 registry is a stand-in that records, the real one put back after; `Q.OpenBrowser`, `Q.OpenChain`,
 `Q.SelectZone` and `Q.Waypoint` record; `Q.Objectives` and `Q.InRange` are stand-ins with the contract's meaning, the data
-part's own tests check theirs): `Q.LogObjectives` (the name without its count in the game's and a German
+part's own tests check theirs; round 6's contract, `Q.Tier`, `Q.TierColor`, `Q.TierCode`, `Q.TIER_WORD`,
+`Q.Group`, `Q.MobLevels`, the new `Q.InRange` and `Q.ForMyLevel`, `Q.IsHard`, `Q.StatusRank` and
+`Q.Compare`, get stand-ins with the contract's meaning while `Q.Tier` and `Q.Compare` are missing, else the
+real ones run): `Q.LogObjectives` (the name without its count in the game's and a German
 client's format, the numbers from the text, the data's objective by kind and by name) and
 `Q.ObjectiveSpot`; My quests (the log at once while the storylines are counted, the groups and their
-order, a line's columns and tooltip, a click and right-click, the chain badges (theirs and the rows'
-tooltips, a click: `Q.OpenChain`), Continue and what it leaves out, the three
-sorts kept, the storylines' old settings, events, walking, turning in, an empty log); the level path;
+order (`Q.Compare` within each group), a line's columns and tooltip, a click (the map, never the chain),
+a right-click (the chain; in no chain: the map), Shift-click (the map pin), the chain badges (theirs and
+the rows' tooltips, a click: `Q.OpenChain`), Continue (a hard next step after the one for my level,
+orange, marked) and what it leaves out, the three sorts kept, the storylines' old settings, events,
+walking (the distance drawn again, the order kept), turning in, an empty log); the level path (the bands
+in the tiers' colours, done a thin line, "1 for your level · 1 hard", the tooltip's counts by tier, the
+order by both counts);
 hidden and shown again; a full log and 300 storylines with only the rows in sight; no data, the
 controller, a fight.
 

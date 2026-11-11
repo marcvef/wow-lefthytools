@@ -1,8 +1,9 @@
 -- Lodestar: the module (on by default, its settings, /lodestar and /lefthy lodestar, the best
 -- pick of a search), the companion (nothing loaded or listened to until it opens; Now: the quest
 -- I'm on and why, its chain and steps, objectives, turn-in, what's next; it follows super tracking,
--- the quest log's details, accepting and turning in; Pick up next: in progress, available now
--- nearest first with distance and direction, follow-ups first, coming up, blocked), a quest looked
+-- the quest log's details, accepting and turning in; Pick up next: in progress, available now in
+-- the one order (Q.Compare: by level) with distance and direction, follow-ups among them, a hard one
+-- after and marked, coming up, blocked), a quest looked
 -- at ("« Back to", "Back to now", the drops of an item that starts it, Requires), the game's map
 -- pin from a giver's line or a marker, NPC tooltip lines, events only while shown, its place and
 -- size, a fight, the controller, switched off; difficulty colours; the companion's lines (verb
@@ -12,6 +13,7 @@
 -- Data.lua and Engine.lua are in the build: the quests go in through Q.SetTestData. The calls the
 -- data part adds in parallel (Q.ChainStep, Q.Available, Q.LevelColor, Q.ZoneCount, Q.GiverQuests)
 -- get stand-ins here only while they're missing; with them gone it checks the window still works.
+-- Round 6's contract (Q.Tier, Q.Compare, Q.IsHard, ...) too, while Q.Tier and Q.Compare are missing.
 -- Q.Objectives (the data part's, iteration 5) is a stand-in while Now's objective areas are checked
 -- (Now's areas on the map instead of the turn-in, their lines lighting them; the map's areas alone).
 -- Whatever it replaces is put back at its end.
@@ -158,6 +160,71 @@ StandIn("GiverQuests", function(npc)
 	table.sort(ends)
 	return starts, ends
 end)
+
+-- The round's shared contract (docs/lodestar.md, Engine: difficulty tiers, "for your level", "hard"
+-- and the one order of quests), the data part's, built in parallel: while it's missing (no Q.Tier),
+-- stand-ins with its meaning (Q.InRange and Q.ForMyLevel then too: theirs before were the old
+-- meaning). Their own test fields: a quest's q.mobs = { lo, hi } (its objectives' mobs) and q.group.
+if not (Q.Tier and Q.Compare) then
+	local HARDER, KEYS = { trivial = 1, easy = 2, fair = 3, difficult = 4, impossible = 5 }, { "trivial", "easy", "fair", "difficult", "impossible" }
+	local RGB = { trivial = { 0.5, 0.5, 0.5 }, easy = { 0.25, 0.75, 0.25 }, fair = { 1, 0.82, 0 }, difficult = { 1, 0.5, 0.25 }, impossible = { 1, 0.1, 0.1 } }
+	Replace("TIER_WORD", { trivial = "Trivial", easy = "Easy", fair = "Fair", difficult = "Hard", impossible = "Too hard" })
+	Replace("Group", function(id) local q = Q.Quest(id) return q ~= nil and q.group == true end)
+	Replace("MobLevels", function(id) local q = Q.Quest(id) if q and q.mobs then return q.mobs[1], q.mobs[2] end end)
+	Replace("Tier", function(id)
+		local q = Q.Quest(id)
+		if not q then return nil end
+		local tier = Q.Difficulty(id) or "fair"
+		local _, hi = Q.MobLevels(id)
+		local mobs = hi and hi > (tonumber(q.level) or 0) and Q.LevelColor(hi).key
+		if mobs and HARDER[mobs] > HARDER[tier] then tier = mobs end
+		if Q.Group(id) then tier = KEYS[math.min(5, HARDER[tier] + 1)] end
+		return tier
+	end)
+	Replace("TierColor", function(tier) local c = RGB[tier] or RGB.fair return { r = c[1], g = c[2], b = c[3] } end)
+	Replace("TierCode", function(id)
+		local c = Q.TierColor(Q.Tier(id) or "fair")
+		return ("|cff%02x%02x%02x"):format(math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5))
+	end)
+	local function Level(q) -- (the effective level: its own, a scaling one mine, its mobs' if higher; nil: none)
+		local level = tonumber(q.level) or tonumber(q.minLevel)
+		if q.scales or (level and level <= 0) then level = UnitLevel("player") end
+		local _, hi = Q.MobLevels(q.id)
+		if hi and (not level or hi > level) then level = hi end
+		return level
+	end
+	Replace("InRange", function(id)
+		local q = Q.Quest(id)
+		if not q then return false end
+		if Q.Status(id) == "active" then return true end
+		if q.event or (tonumber(q.minLevel) or 0) > UnitLevel("player") or not Level(q) then return false end
+		local tier = Q.Tier(id)
+		return tier == "easy" or tier == "fair" or tier == "difficult"
+	end)
+	Replace("ForMyLevel", function(id)
+		local s = Q.Status(id)
+		return s == "active" or (s == "available" and Q.InRange(id) and (Q.Tier(id) == "easy" or Q.Tier(id) == "fair"))
+	end)
+	Replace("IsHard", function(id) return Q.Status(id) == "available" and Q.InRange(id) and Q.Tier(id) == "difficult" end)
+	local RANK = { active = 2, available = 5, level = 6, locked = 7, done = 8, other = 9 }
+	Replace("StatusRank", function(id)
+		local s = Q.Status(id) or "other"
+		if s == "active" and C_QuestLog.IsComplete(id) then return 1 end
+		if Q.ForMyLevel(id) then return s == "active" and 2 or 3 end
+		if Q.IsHard(id) then return 4 end
+		return RANK[s] or 9
+	end)
+	Replace("Compare", function(a, b)
+		local ra, rb = Q.StatusRank(a), Q.StatusRank(b)
+		if ra ~= rb then return ra < rb end
+		local qa, qb = Q.Quest(a), Q.Quest(b)
+		local la, lb = qa and Level(qa) or 1000, qb and Level(qb) or 1000
+		if la ~= lb then return la < lb end
+		local ta, tb = Q.Title(a):lower(), Q.Title(b):lower()
+		if ta ~= tb then return ta < tb end
+		return a < b
+	end)
+end
 
 -- Counts what's loaded and asked for from here on.
 local loads, asked = 0, 0
@@ -334,8 +401,8 @@ Advance(0.5)
 s = Small()
 local follow = RowIndex("[10] Westward Bound")
 local firstPick = RowIndex("[9] Far Away Farm")
-check(follow and Plain(s.rows[follow].Text:GetText()):find("after The Second Step", 1, true) and firstPick and follow < firstPick,
-	"turned in: what it opens comes first in Available now, saying what it follows")
+check(follow and Plain(s.rows[follow].Text:GetText()):find("after The Second Step", 1, true) and firstPick and firstPick < follow,
+	"turned in: what it opens is in Available now, in the one order (by level: the level 9 one first), saying what it follows")
 
 ---------------------------------------------------------------------------
 section("Lodestar: a quest looked at")
@@ -577,7 +644,7 @@ do
 	local function Giver(id, name, x) return { Npc(id, name, 1429, x, 0.5) } end
 	local LINES = {
 		[9206] = { id = 9206, title = "Mail Run", level = 18, zone = 1429, starts = Giver(930, "Postman Pat", 0.5), ends = Giver(930, "Postman Pat", 0.5) },
-		[9201] = { id = 9201, title = "Old Debts", level = 18, zone = 1429, starts = Giver(931, "Banker Lou", 0.52), ends = Giver(931, "Banker Lou", 0.52) },
+		[9201] = { id = 9201, title = "Old Debts", level = 17, zone = 1429, starts = Giver(931, "Banker Lou", 0.52), ends = Giver(931, "Banker Lou", 0.52) },
 		[9202] = { id = 9202, title = "Debts Paid", level = 19, zone = 1429, pre = { 9201 }, starts = Giver(931, "Banker Lou", 0.52), ends = {} },
 		[9203] = { id = 9203, title = "Debts Forgiven", level = 19, zone = 1429, pre = { 9201 }, starts = Giver(931, "Banker Lou", 0.52), ends = {} },
 		[9204] = { id = 9204, title = "Choose the Blade", level = 18, zone = 1429, excl = { 9205 }, starts = Giver(932, "Smith Ivy", 0.6), ends = {} },
@@ -585,6 +652,8 @@ do
 		[9207] = { id = 9207, title = "Later Work", level = 26, minLevel = 25, zone = 1429, starts = Giver(933, "Foreman Gus", 0.7), ends = {} },
 		[9208] = { id = 9208, title = "Low Chores", level = 5, zone = 1429, starts = Giver(934, "Old Nan", 0.51), ends = {} },
 		[9209] = { id = 9209, title = "Fourth Errand", level = 18, zone = 1429, starts = Giver(935, "Runner Tim", 0.65), ends = {} },
+		-- (three levels above me: hard, orange)
+		[9210] = { id = 9210, title = "Ogre Trouble", level = 21, minLevel = 18, zone = 1429, starts = Giver(936, "Scout Ray", 0.8), ends = {} },
 	}
 	local savedData = QUESTS_DATA
 	QUESTS_DATA = LINES -- (Log() reads the titles from it)
@@ -596,7 +665,7 @@ do
 	win:Hide()
 	slash("")
 	s = Small()
-	local mail, debts, blade = RowLast("[18] Mail Run"), RowWith("[18] Old Debts"), RowWith("[18] Choose the Blade")
+	local mail, debts, blade = RowLast("[18] Mail Run"), RowWith("[17] Old Debts"), RowWith("[18] Choose the Blade")
 	local turnin = RowWith("Turn-in: Postman Pat")
 	check(s.now == 9206 and mail and turnin and turnin.Text:GetText():find("|A:QuestTurnin:14:14|a", 1, true),
 		"now: the quest in my log, its turn-in line with the game's ? (ready)")
@@ -615,8 +684,36 @@ do
 		blade:GetScript("OnLeave")(blade)
 	end
 	check(not RowWith("[26] Later Work"), "one for later isn't there (the big window's)")
-	check(not RowWith("Low Chores") and not RowWith("Fourth Errand") and RowWith("1 more here: the quest browser"),
+	check(not RowWith("Low Chores") and not RowWith("Fourth Errand") and RowWith("2 more here: the quest browser"),
 		"available now: only for my levels (not a grey one, however near), at most three, then how many more")
+	check(RowIndex("[17] Old Debts") < RowIndex("[18] Choose the Blade") and RowIndex("[18] Choose the Blade") < RowIndex("[18] Choose the Shield")
+		and not RowWith("Ogre Trouble"), "in the one order: by level, then by title; the hard one after the three for my level")
+
+	-- Hard ones (orange: three or four levels above me): after the ones for my level, marked.
+	completed[9204], completed[9209] = true, true
+	local mobs = Q.MobLevels
+	Q.MobLevels = function(id) if id == 9210 then return 21, 22 end end
+	Progress()
+	Q.RedrawSmall(true)
+	s = Small()
+	local ogre = RowWith("Ogre Trouble")
+	check(RowIndex("[17] Old Debts") and ogre and RowIndex("[17] Old Debts") < RowIndex("Ogre Trouble")
+		and Plain(ogre.Text:GetText()):find("Hard, mobs up to 22 · Scout Ray", 1, true) and ogre.Text:GetText():find("|cffff8040Hard", 1, true)
+		and ogre.Text:GetText():find("|cffff8040[21]|r", 1, true),
+		"a hard one: after the one for my level, its level orange, marked \"Hard\" with its mobs' level: " .. Plain(ogre and ogre.Text:GetText() or ""))
+	ogre:GetScript("OnEnter")(ogre)
+	check(Has(TOOLTIP.lines, "Hard, mobs up to 22"), "... its tooltip says so")
+	ogre:GetScript("OnLeave")(ogre)
+	local ring
+	for _, mk in ipairs(s.map:Markers()) do
+		if mk.hard then ring = mk end
+	end
+	check(ring and ring.Shadow.vertex[1] == 1 and math.abs(ring.Shadow.vertex[2] - 0.5) < 0.01 and ring.Icon.atlas == "QuestNormal",
+		"on the small map: its giver the game's ! on an orange ring")
+	Q.MobLevels = mobs
+	completed[9204], completed[9209] = nil, nil
+	Progress()
+	Q.RedrawSmall(true)
 
 	-- One line: the title bar's button, the line, a click on it.
 	local height = win:GetHeight()
