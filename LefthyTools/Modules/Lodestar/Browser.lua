@@ -15,7 +15,13 @@ ns.Lodestar = Q
 -- the quest picked or opened last: one click each way), and on the right a pane that's never empty.
 -- Each surface shows what to do now and how far along; the rest is in tooltips. A quest's chain
 -- badge ("2/4") on the rows (the quest list, the right pane's) opens its chain, its card in sight
--- (Q.OpenChain does it for other files).
+-- (Q.OpenChain does it for other files). A quest's row (the quest list, the results, the right pane's
+-- rows and links, a chain card's next step): a click shows it on the Zone tab's map, picked; a
+-- right-click its chain (the controller: the badge, "Open the chain", the switch). "Current zone" beside
+-- the search: the place I'm in. The zones on the left alphabetical in each continent (the client's
+-- names). Every title's level in its tier's colour (Q.TierCode); "N for your level" apart from "M hard"
+-- (orange: listed after the ones that fit, marked, their pins ringed); every list of quests in
+-- Q.Compare's order (a chain's steps in the chain's).
 --   * The zone page: the zone's map, as large as the middle (3:2): its art, a pin per quest giver
 --     with how many quests it has (the game's icons: available "!", a low level one's, a grey "!" for
 --     later ones, "?" ready to turn in, a grey "?" still in progress, repeatable ones blue; where items
@@ -179,8 +185,10 @@ local state = {
 	infos = {},       -- chain -> how far along, what's next (Chains.Info)
 	spots = {},       -- place -> the zone map's pins and threads
 	why = {}, range = {}, -- quest -> why it isn't for me (Q.WhyOther), whether it's within my levels (Q.InRange)
+	tiers = {}, mine = {}, hard = {}, codes = {}, -- quest -> its tier (Q.Tier), for my level (Q.ForMyLevel), hard (Q.IsHard), its colour
 	suggest = nil,    -- a zone with quests for my level (ZonePage.Suggest), false: none
 	zones = nil, dungeons = nil, places = nil,
+	zoneOrder = nil, dungeonOrder = nil, -- the left's places: by continent, each alphabetical (the client's names)
 	asked = {}, waiting = {}, -- titles asked of the client (QUEST_DATA_LOAD_RESULT)
 	items = {},       -- items asked of the client (ITEM_DATA_LOAD_RESULT: a reward's quality, a name)
 	logKey = nil,     -- what the right pane showed of my quest log (QUEST_LOG_UPDATE: drawn again when it changed)
@@ -313,14 +321,27 @@ local function Rgb(a, b, c)
 end
 
 -- A quest's level in Blizzard's difficulty colours (as Forever's own quest log shows "[12] Title"):
--- Q.LevelColor (Data.lua: the game's answer where it has one), else the game's for a quest it knows,
--- else the level against mine;
--- repeatable ones blue.
+-- its tier's (Q.TierCode: its level or its mobs', a group quest one harder; kept until a status
+-- changes), else Q.LevelColor (the game's answer where it has one), else the game's for a quest it
+-- knows, else the level against mine; without a tier repeatable ones blue.
 local function LevelRgb(q)
 	local level = q and tonumber(q.level)
 	if not level or level <= 0 then
 		return 1, 1, 1
-	elseif q.repeatable then
+	end
+	local code = q.id and state.codes[q.id]
+	if code == nil and q.id and Q.TierCode then
+		local ok, c = pcall(Q.TierCode, q.id)
+		code = ok and type(c) == "string" and c or false
+		state.codes[q.id] = code
+	end
+	if code then
+		local r, g, b = Rgb(code)
+		if r then
+			return r, g, b
+		end
+	end
+	if q.repeatable then
 		return REPEATABLE[1], REPEATABLE[2], REPEATABLE[3]
 	end
 	if Q.LevelColor then
@@ -520,10 +541,225 @@ function Rule.InRange(id)
 	return yes
 end
 
--- For my level, as the counts say it: in my log, or one I can take now within my levels (not one that
--- needs another quest first, nor an event's: Q.InRange).
+-- How hard a quest is for me: "trivial" (grey), "easy" (green), "fair" (yellow), "difficult" (orange),
+-- "impossible" (red): Q.Tier (its level or its mobs', a group quest one harder), else Q.Difficulty;
+-- nil when neither knows. Kept until a status changes.
+function Rule.Tier(id)
+	local t = state.tiers[id]
+	if t == nil then
+		t = false
+		local fn = Q.Tier or Q.Difficulty
+		if id and fn then
+			local ok, r = pcall(fn, id)
+			t = ok and type(r) == "string" and r or false
+		end
+		state.tiers[id] = t
+	end
+	return t or nil
+end
+
+-- A tier's colour as r, g, b (Q.TierColor, else the game's difficulty colours) and as a code.
+Rule.TIER_RGB = { trivial = DIFFICULTY[0], easy = DIFFICULTY[1], fair = DIFFICULTY[2], difficult = DIFFICULTY[3], impossible = DIFFICULTY[4] }
+function Rule.TierRgb(tier)
+	if Q.TierColor then
+		local ok, a, b, c = pcall(Q.TierColor, tier)
+		local r, g, bb = Rgb(ok and a, b, c)
+		if r then
+			return r, g, bb
+		end
+	end
+	local d = Rule.TIER_RGB[tier] or DIFFICULTY[2]
+	return d[1], d[2], d[3]
+end
+
+-- A tier in a word (Q.TIER_WORD, the words every window uses); nil for one that needs none here.
+function Rule.TierWord(tier)
+	local word = type(Q.TIER_WORD) == "table" and Q.TIER_WORD[tier]
+	if type(word) == "string" then
+		return word
+	elseif tier == "difficult" then
+		return L["Hard"]
+	elseif tier == "impossible" then
+		return L["Too hard"]
+	end
+end
+
+-- What makes a quest harder than its level says, in words, in its tier's colour: "Hard · Group quest
+-- · Mobs up to level 26" (only what applies; nil: nothing to say: not hard, no group, no higher mobs).
+function Rule.TierNote(id)
+	local q = Quest(id)
+	if not q then
+		return nil
+	end
+	local tier = Rule.Tier(id)
+	local parts = {}
+	if tier == "difficult" or tier == "impossible" then
+		parts[1] = Rule.TierWord(tier)
+	end
+	if Q.Group then
+		local ok, group = pcall(Q.Group, id)
+		if ok and group == true then
+			parts[#parts + 1] = L["Group quest"]
+		end
+	end
+	if Q.MobLevels then
+		local ok, _, high = pcall(Q.MobLevels, id)
+		high = ok and tonumber(high)
+		if high and high > (tonumber(q.level) or 0) then
+			parts[#parts + 1] = L["Mobs up to level %d"]:format(high)
+		end
+	end
+	if not parts[1] then
+		return nil
+	end
+	return Hex(Rule.TierRgb(tier or "fair")) .. table.concat(parts, SEP) .. "|r"
+end
+
+-- One I could take but that's harder than my level (orange: Q.IsHard): listed after the ones that
+-- fit, marked. Without Q.IsHard: one I can take within my levels whose tier is "difficult".
+function Rule.IsHard(id, status)
+	local yes = state.hard[id]
+	if yes == nil then
+		if Q.IsHard then
+			local ok, r = pcall(Q.IsHard, id)
+			yes = ok and r == true
+		else
+			yes = (status or StatusOf(id)) == "available" and Rule.InRange(id) and Rule.Tier(id) == "difficult"
+		end
+		state.hard[id] = yes
+	end
+	return yes
+end
+
+-- For my level, as the counts say it ("N for your level"): in my log, or one I can take now whose
+-- tier is easy or fair (Q.ForMyLevel; not a hard one, not one that needs another quest first, nor an
+-- event's). Kept until a status changes.
 function Rule.ForMyLevel(id, status)
-	return status == "active" or (status == "available" and Rule.InRange(id))
+	local yes = state.mine[id]
+	if yes == nil then
+		status = status or StatusOf(id)
+		if Q.ForMyLevel then
+			local ok, r = pcall(Q.ForMyLevel, id)
+			yes = ok and r == true
+		else
+			yes = status == "active" or (status == "available" and Rule.InRange(id))
+		end
+		yes = yes and not (status == "available" and Rule.Tier(id) == "difficult") -- (hard ones apart, whatever the engine's age)
+		state.mine[id] = yes
+	end
+	return yes
+end
+
+-- "Hard" in orange and a gap, before what a row of a hard quest says at its right ("" otherwise).
+function Rule.HardMark(id, status)
+	if status ~= "available" or not Rule.IsHard(id, status) then
+		return ""
+	end
+	return Hex(Rule.TierRgb("difficult")) .. (Rule.TierWord("difficult") or "") .. "|r" .. GREY .. SEP .. "|r"
+end
+
+-- THE order of quests in every list (Q.Compare): what's ready to turn in, in my log, for my level, hard,
+-- other ones I could take, coming up, blocked, done, not for me; then the level (no level last), the
+-- title, the ID. Without Q.Compare the same here (Rule.Before). A list that IS a chain keeps its order.
+function Rule.Rank(id)
+	if Q.StatusRank then
+		local ok, r = pcall(Q.StatusRank, id)
+		if ok and type(r) == "number" then
+			return r
+		end
+	end
+	local s = StatusOf(id)
+	if s == "active" then
+		return IsReady(id) and 1 or 2
+	elseif s == "available" then
+		return Rule.ForMyLevel(id, s) and 3 or Rule.IsHard(id, s) and 4 or 5
+	end
+	return Rule.RANKS[s] or 9
+end
+Rule.RANKS = { level = 6, locked = 7, done = 8, other = 9 }
+
+-- Its level as the order counts it: the higher of its own and its mobs' (Q.MobLevels); none: last.
+function Rule.Level(id)
+	local q = Quest(id)
+	local level = q and tonumber(q.level)
+	if not level or level <= 0 then
+		return math.huge
+	end
+	if Q.MobLevels then
+		local ok, _, high = pcall(Q.MobLevels, id)
+		high = ok and tonumber(high)
+		if high and high > level then
+			level = high
+		end
+	end
+	return level
+end
+
+function Rule.Before(a, b)
+	if a == b then
+		return false
+	end
+	local ra, rb = Rule.Rank(a), Rule.Rank(b)
+	if ra ~= rb then
+		return ra < rb
+	end
+	local la, lb = Rule.Level(a), Rule.Level(b)
+	if la ~= lb then
+		return la < lb
+	end
+	local ta, tb = Rule.SortTitle(a), Rule.SortTitle(b)
+	if ta ~= tb then
+		return ta < tb
+	end
+	return (tonumber(a) or 0) < (tonumber(b) or 0)
+end
+
+-- A title as the order compares it: the client's, else the data's, lower case (nothing asked of the
+-- client for it: a sort mustn't send hundreds of requests).
+function Rule.SortTitle(id)
+	local q = Quest(id)
+	return (ClientTitle(id) or q and q.title or ""):lower()
+end
+
+function Rule.Native(a, b)
+	return Q.Compare(a, b) == true
+end
+
+-- Whether quest a goes before quest b (Q.Compare, else Rule.Before).
+function Rule.Compare(a, b)
+	if Q.Compare then
+		local ok, r = pcall(Q.Compare, a, b)
+		if ok then
+			return r == true
+		end
+	end
+	return Rule.Before(a, b)
+end
+
+-- A list of quest IDs in that order (sorted in place; Q.Compare failing: Rule.Before's).
+function Rule.Sort(list)
+	if list[2] and not (Q.Compare and pcall(table.sort, list, Rule.Native)) then
+		table.sort(list, Rule.Before)
+	end
+	return list
+end
+
+-- A copy of a list (the data's lists are shared: never sorted in place), in that order.
+function Rule.Sorted(list)
+	local out = {}
+	for i, id in ipairs(list or EMPTY) do
+		out[i] = id
+	end
+	return Rule.Sort(out)
+end
+
+-- A name as the left's order compares it: lower case, a German umlaut as its vowel ("Ödland" with
+-- the O's), ß as ss, an accent off.
+Rule.FOLD = { ["\195\164"] = "a", ["\195\132"] = "a", ["\195\182"] = "o", ["\195\150"] = "o", ["\195\188"] = "u", ["\195\156"] = "u",
+	["\195\159"] = "ss", ["\195\169"] = "e", ["\195\137"] = "e", ["\195\168"] = "e", ["\195\170"] = "e", ["\195\161"] = "a", ["\195\160"] = "a",
+	["\195\162"] = "a", ["\195\173"] = "i", ["\195\179"] = "o", ["\195\186"] = "u", ["\195\177"] = "n" }
+function Rule.SortKey(name)
+	return ((tostring(name or ""):gsub("\195[\128-\191]", Rule.FOLD)):lower())
 end
 
 -- Within my levels, as the zone page and the quest list show them unless all levels are asked for;
@@ -752,15 +988,43 @@ local function Lists()
 	state.zones = Q.Zones and Q.Zones() or {}
 	state.dungeons = Q.Dungeons and Q.Dungeons() or {}
 	state.places = {}
+	-- The left's order: the continents as Q.Zones gives them, the zones of each alphabetical by the
+	-- client's names (German too: "Ödland" with the O's), then the dungeons alphabetical.
+	local continents, byContinent = {}, {}
 	for _, z in ipairs(state.zones) do
 		local id = "z:" .. tostring(z.map)
-		state.places[id] = { id = id, kind = "zone", map = z.map, name = z.name or MapName(z.map) or "?", continent = z.continent,
+		local place = { id = id, kind = "zone", map = z.map, name = MapName(z.map) or z.name or "?", continent = z.continent,
 			minLevel = z.minLevel, maxLevel = z.maxLevel }
+		place.key = Rule.SortKey(place.name)
+		state.places[id] = place
+		local c = tostring(z.continent)
+		if not byContinent[c] then
+			byContinent[c] = {}
+			continents[#continents + 1] = c
+		end
+		table.insert(byContinent[c], place)
+	end
+	local function ByName(a, b)
+		if a.key ~= b.key then
+			return a.key < b.key
+		end
+		return a.id < b.id
+	end
+	state.zoneOrder, state.dungeonOrder = {}, {}
+	for _, c in ipairs(continents) do
+		table.sort(byContinent[c], ByName)
+		for _, place in ipairs(byContinent[c]) do
+			state.zoneOrder[#state.zoneOrder + 1] = place
+		end
 	end
 	for _, dungeon in ipairs(state.dungeons) do
 		local id = "d:" .. tostring(dungeon.name)
-		state.places[id] = { id = id, kind = "dungeon", name = dungeon.name, minLevel = dungeon.minLevel, maxLevel = dungeon.maxLevel }
+		local place = { id = id, kind = "dungeon", name = dungeon.name, minLevel = dungeon.minLevel, maxLevel = dungeon.maxLevel,
+			key = Rule.SortKey(dungeon.name) }
+		state.places[id] = place
+		state.dungeonOrder[#state.dungeonOrder + 1] = place
 	end
+	table.sort(state.dungeonOrder, ByName)
 end
 
 local function QuestsOf(place)
@@ -986,18 +1250,29 @@ local function PlaceFor(map)
 	end
 end
 
--- Where I am, or the first zone.
+-- The place I'm in (the "Current zone" button): a dungeon I'm in (by its name), else my map walked up
+-- from a city's floor or a cave to the zone the left lists (PlaceFor); nil: none of them.
+function Rule.Here()
+	if not state.places then
+		return nil
+	end
+	if GetInstanceInfo then
+		local ok, name, kind = pcall(GetInstanceInfo)
+		if ok and (kind == "party" or kind == "raid") and type(name) == "string" and not LT.IsSecret(name) and state.places["d:" .. name] then
+			return "d:" .. name
+		end
+	end
+	return PlaceFor(C_Map and LT.Value(C_Map.GetBestMapForUnit, "player"))
+end
+
+-- Where I am, or the first zone on the left.
 local function DefaultPlace()
 	local here = PlaceFor(C_Map and LT.Value(C_Map.GetBestMapForUnit, "player"))
 	if here then
 		return here
 	end
-	local first = state.zones[1] or nil
-	if first then
-		return "z:" .. tostring(first.map)
-	end
-	local dungeon = state.dungeons[1]
-	return dungeon and ("d:" .. tostring(dungeon.name)) or nil
+	local first = state.zoneOrder[1] or state.dungeonOrder[1]
+	return first and first.id or nil
 end
 
 -- Statuses changed (or the filters): what was laid out from them goes.
@@ -1007,12 +1282,16 @@ local function Restatus()
 	wipe(state.spots)
 	wipe(state.why)
 	wipe(state.range)
+	wipe(state.tiers)
+	wipe(state.mine)
+	wipe(state.hard)
+	wipe(state.codes)
 	state.suggest = nil
 end
 
 -- The data changed: everything worked out from it goes.
 local function Forget()
-	state.places, state.zones, state.dungeons = nil, nil, nil
+	state.places, state.zones, state.dungeons, state.zoneOrder, state.dungeonOrder = nil, nil, nil, nil, nil
 	wipe(state.trees)
 	wipe(state.counts)
 	Restatus()
@@ -1173,9 +1452,10 @@ local function Untip(self)
 	end
 end
 
--- A quest's tooltip: title, status, level, chain step, where it starts, what's next, friends, what a
--- click does (badge: the row's chain badge, "2/4", which opens the chain).
-local function QuestTip(owner, id, badge)
+-- A quest's tooltip: title, status, level (what makes it harder), chain step, where it starts, what's
+-- next, friends, what a click does (badge: the row's chain badge, "2/4", which opens the chain; row: a
+-- quest's row or link, whose click shows it on the map and right-click its chain; else a click picks it).
+local function QuestTip(owner, id, badge, row)
 	local q = Quest(id)
 	if not q then
 		return
@@ -1192,6 +1472,10 @@ local function QuestTip(owner, id, badge)
 	if q.level and q.level > 0 then
 		local r, g, b = LevelRgb(q)
 		GameTooltip:AddLine(L["Level %d"]:format(q.level), r, g, b)
+	end
+	local note = Rule.TierNote(id)
+	if note then
+		GameTooltip:AddLine(note, 1, 1, 1, true)
 	end
 	local zone = ZoneOf(q)
 	if zone then
@@ -1243,7 +1527,13 @@ local function QuestTip(owner, id, badge)
 		local fs = TONE[f.status] and f.status or "other"
 		GameTooltip:AddLine(LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r " .. HEX[fs] .. Word(fs) .. "|r")
 	end
-	GameTooltip:AddLine(L["Click: details"], 0.5, 0.75, 1)
+	if not row then
+		GameTooltip:AddLine(L["Click: details"], 0.5, 0.75, 1)
+	elseif Rule.Step(id) then
+		GameTooltip:AddLine(L["Click: show it on the map · Right-click: its chain"], 0.5, 0.75, 1)
+	else
+		GameTooltip:AddLine(L["Click: show it on the map"], 0.5, 0.75, 1)
+	end
 	if badge then
 		GameTooltip:AddLine(L["Click %s: open the chain"]:format(badge), 0.5, 0.75, 1)
 	end
@@ -1317,8 +1607,10 @@ end
 
 -- A chain's progress for me: done, total (not counting what isn't for me), visible (as the filters
 -- show), whether one of its quests here not done yet is within my levels, its levels, steps in other
--- zones, what's next (kind: "active" | "available" | "coming" | "done") and what that opens. Kept
--- until a status or the filters change.
+-- zones, what's next (kind: "active" | "available" | "coming" | "done") and what that opens. What's
+-- next: in my log first (the first of them in Q.Compare's order: ready to turn in first), else the one
+-- to take (the first in that order: one for my level before a hard one, the lowest level first), else
+-- what comes up first in the chain. Kept until a status or the filters change.
 function Chains.Info(group, place)
 	local info = state.infos[group.key]
 	if info then
@@ -1329,7 +1621,9 @@ function Chains.Info(group, place)
 	local first = {}
 	for _, id in ipairs(group.chain) do
 		local status = StatusOf(id)
-		first[status] = first[status] or id
+		if not first[status] or ((status == "active" or status == "available") and Rule.Compare(id, first[status])) then
+			first[status] = id
+		end
 		if Visible(id, status) then
 			info.visible = info.visible + 1
 		end
@@ -1340,7 +1634,7 @@ function Chains.Info(group, place)
 				info.done = info.done + 1
 			elseif here and Rule.InLevels(id, status) then
 				info.inLevels = true
-				info.open = info.open + (status == "available" and 1 or 0)
+				info.open = info.open + (status == "available" and Rule.ForMyLevel(id, status) and 1 or 0)
 			end
 			local q = Quest(id)
 			local level = q and tonumber(q.level)
@@ -1388,7 +1682,8 @@ function Chains.NextText(group, info)
 		local q = Quest(id)
 		local s = FirstStart(q)
 		local where = s and s.name or (q and ZoneOf(q))
-		return L["Next: %s"]:format(Title(id)) .. (where and (SEP .. where) or ""), id
+		local hard = Rule.IsHard(id, "available") and (SEP .. Hex(Rule.TierRgb("difficult")) .. (Rule.TierWord("difficult") or "") .. "|r") or ""
+		return L["Next: %s"]:format(Title(id)) .. (where and (SEP .. where) or "") .. hard, id
 	elseif info.kind == "coming" then
 		return L["Coming up: %s"]:format(Title(id)), id
 	elseif info.kind == "done" then
@@ -1748,11 +2043,11 @@ function Graph.Seg(out, x1, y1, x2, y2, tone, faint, e)
 	end
 end
 
--- The quests without a chain: cards in rows.
+-- The quests without a chain: cards in rows, in Q.Compare's order (no chain to keep the order of).
 function Graph.LaySingles(out, group, vis, top, viewW)
 	local perRow = math.max(1, math.floor((viewW - 2 * PAD + G.HGAP) / (G.W + G.HGAP)))
 	local n = 0
-	for _, id in ipairs(group.chain) do
+	for _, id in ipairs(Rule.Sorted(group.chain)) do
 		if vis[id] then
 			local col, row = n % perRow, math.floor(n / perRow)
 			n = n + 1
@@ -2280,6 +2575,7 @@ local LOOK = {
 }
 local OPEN = { ready = true, repeatturnin = true, available = true, daily = true, trivial = true, progress = true, level = true, locked = true }
 Map.GOLD = { 1, 0.82, 0 }  -- (the colour of a quest without a chain on the map)
+Map.HARD = DIFFICULTY[3]   -- (a hard quest's ring: the game's orange)
 Map.AREA = { lit = { 0.42, 1 }, normal = { 0.22, 0.75 }, dim = { 0.07, 0.25 }, done = { 0.07, 0.2 } } -- fill, glow
 
 -- The game's own map pin there (Q.Waypoint, Lodestar.lua; else C_Map's own here), a chat line saying so.
@@ -2696,20 +2992,14 @@ function Map.Show(m, map, spots, name, threads)
 			end
 		end
 	end
-	-- Each marker's quests, the one to do first first, how many of them are still to do, its chains.
-	local function Prio(spot)
-		return (LOOK[spot.look] or LOOK.other).prio
-	end
+	-- Each marker's quests, the one to do first first (by its look, then Q.Compare's order), how many of
+	-- them are still to do, its chains; a hard one's look (the first) gets an orange ring.
 	for i = 1, n do
 		local marker = m.markers[i]
 		if marker.spots[2] then
-			table.sort(marker.spots, function(a, b)
-				if Prio(a) ~= Prio(b) then
-					return Prio(a) < Prio(b)
-				end
-				return (a.quest or 0) < (b.quest or 0)
-			end)
+			Map.SortSpots(marker.spots)
 		end
+		marker.hard = marker.spots[1].hard == true and not marker.drop
 		local quests, seen, chains, open = {}, {}, {}, 0
 		for _, spot in ipairs(marker.spots) do
 			if spot.quest and not seen[spot.quest] then
@@ -2735,6 +3025,35 @@ function Map.Show(m, map, spots, name, threads)
 	Map.PlaceMe(m)
 end
 
+-- A marker's spots in order: the most urgent look first, then the quests in Q.Compare's order (an order
+-- that fails: by quest ID).
+function Map.Prio(spot)
+	return (LOOK[spot.look] or LOOK.other).prio
+end
+
+function Map.Before(a, b)
+	local pa, pb = Map.Prio(a), Map.Prio(b)
+	if pa ~= pb then
+		return pa < pb
+	elseif a.quest and b.quest and a.quest ~= b.quest then
+		return Rule.Compare(a.quest, b.quest)
+	end
+	return (a.quest or 0) < (b.quest or 0)
+end
+
+function Map.ById(a, b)
+	if Map.Prio(a) ~= Map.Prio(b) then
+		return Map.Prio(a) < Map.Prio(b)
+	end
+	return (a.quest or 0) < (b.quest or 0)
+end
+
+function Map.SortSpots(spots)
+	if not pcall(table.sort, spots, Map.Before) then
+		table.sort(spots, Map.ById)
+	end
+end
+
 function Map.Marker(m, i)
 	local marker = m.markers[i]
 	if not marker then
@@ -2746,6 +3065,12 @@ function Map.Marker(m, i)
 		marker.Ring:SetTexture(T.circle)
 		marker.Ring:SetVertexColor(1, 0.82, 0, 0.8)
 		marker.Ring:SetPoint("CENTER")
+		-- A hard quest's (orange: harder than my level): an orange ring around its dark disc.
+		marker.Edge = marker:CreateTexture(nil, "BACKGROUND", nil, 1)
+		marker.Edge:SetTexture(T.circle)
+		marker.Edge:SetVertexColor(Map.HARD[1], Map.HARD[2], Map.HARD[3], 0.95)
+		marker.Edge:SetPoint("CENTER")
+		marker.Edge:Hide()
 		marker.Back = marker:CreateTexture(nil, "BORDER")
 		marker.Back:SetTexture(T.circle)
 		marker.Back:SetVertexColor(0, 0, 0, 0.8)
@@ -2789,6 +3114,8 @@ function Map.Paint(marker)
 	end
 	marker.Back:SetShown(look.back == true or look.ring == true)
 	marker.Back:SetSize(size + (look.ring and 3 or 6), size + (look.ring and 3 or 6))
+	marker.Edge:SetShown(marker.hard == true and not look.circle)
+	marker.Edge:SetSize(size + 10, size + 10) -- (inside the gold ring of the quest picked)
 	local picked = false
 	for _, id in ipairs(marker.quests) do
 		picked = picked or (id ~= nil and id == state.picked)
@@ -3160,11 +3487,12 @@ function ZonePage.Spots(place)
 			local group = tree.groupOf[id]
 			local key = group and group.key
 			local look = ZonePage.Look(id, q, status)
+			local hard = status == "available" and Rule.IsHard(id, status) or nil -- (the game's icon, an orange ring)
 			local list = status == "active" and q.ends or q.starts
 			for _, s in ipairs(list or EMPTY) do
 				for _, p in ipairs(s.points or EMPTY) do
 					if p.map == map then
-						spots[#spots + 1] = { x = p.x, y = p.y, look = look, label = s.name, quest = id, status = status, chain = key }
+						spots[#spots + 1] = { x = p.x, y = p.y, look = look, label = s.name, quest = id, status = status, chain = key, hard = hard }
 					end
 				end
 				if status ~= "active" and s.kind == "item" then
@@ -3336,10 +3664,17 @@ function ZonePage.Keep(place)
 end
 
 -- What a pin is, in its tooltip (the legend there was): ready to turn in, in progress, low level,
--- repeatable, or the reason it can't be taken yet.
+-- repeatable, or the reason it can't be taken yet; a hard one says so (and why: its mobs, a group).
 function ZonePage.PinNote(spot)
 	local look = spot.look
-	if look == "ready" or look == "repeatturnin" then
+	if spot.hard then
+		local note = Rule.TierNote(spot.quest)
+		local plain = look == "daily" and L["repeatable"] or nil
+		if note then
+			return plain and (plain .. SEP .. note) or note
+		end
+		return plain
+	elseif look == "ready" or look == "repeatturnin" then
 		return L["ready to turn in"]
 	elseif look == "progress" then
 		return L["in progress"]
@@ -3376,24 +3711,28 @@ function ZonePage.Suggest(place)
 	return state.suggest or nil
 end
 
--- Under the map, one line: what of ready to turn in, in progress and available (within my levels as
--- the pins) there is (the briefing has how far along); with none to take here, a zone that has some;
--- else, at its right, how the map works.
+-- Under the map, one line: what's ready to turn in, "N for your level" (in my log, or to take now and
+-- not hard: Rule.ForMyLevel) and "M hard" (orange: Rule.IsHard), each only when there is some (the
+-- briefing has how far along); with none for my level to take here, a zone that has some; else, at
+-- its right, how the map works.
 function ZonePage.DrawSummary(place)
 	local zp = view.zp
-	local n = { active = 0, ready = 0, available = 0 }
+	local n = { ready = 0, mine = 0, hard = 0, available = 0 }
 	for _, id in ipairs(place and Structure(place).ids or EMPTY) do
 		local s = StatusOf(id)
-		if s == "active" then
-			local ready = IsReady(id)
-			n.active, n.ready = n.active + (ready and 0 or 1), n.ready + (ready and 1 or 0)
-		elseif s == "available" and Rule.InLevels(id, s) then
-			n.available = n.available + 1
+		if s == "active" and IsReady(id) then
+			n.ready = n.ready + 1
+		end
+		if Rule.ForMyLevel(id, s) then
+			n.mine = n.mine + 1
+			n.available = n.available + (s == "available" and 1 or 0)
+		elseif s == "available" and Rule.IsHard(id, s) then
+			n.hard = n.hard + 1
 		end
 	end
 	local parts = {}
-	for _, p in ipairs({ { n.ready, GOLD, L["%d ready to turn in"] }, { n.active, HEX.active, L["%d in progress"] },
-		{ n.available, HEX.available, L["%d available"] } }) do
+	for _, p in ipairs({ { n.ready, GOLD, L["%d ready to turn in"] }, { n.mine, HEX.available, L["%d for your level"] },
+		{ n.hard, Hex(Rule.TierRgb("difficult")), L["%d hard"] } }) do
 		if p[1] > 0 then
 			parts[#parts + 1] = p[2] .. p[3]:format(p[1]) .. "|r"
 		end
@@ -3437,6 +3776,7 @@ function ZonePage.Entries(place)
 		end
 	end
 	local chains = #entries + #done
+	ZonePage.SortCards(entries)
 	entries[#entries + 1] = single
 	if done[1] then
 		local key = place.id .. ":done"
@@ -3452,6 +3792,48 @@ function ZonePage.Entries(place)
 		entries[#entries + 1] = { more = true, key = place.id .. ":more", n = hidden }
 	end
 	return entries, chains
+end
+
+-- The chains' cards in order: those with a quest in my log first, then those whose next step is for my
+-- level, then those whose next step is hard, then the rest; the first three by their next steps
+-- (Q.Compare: the lowest level first), the rest by their lowest level here. (An order that fails: by
+-- that rank and the chains' order.) Never "Next: ..." before "In your log: ...".
+function ZonePage.CardRank(e)
+	local info = e.info
+	if info.kind == "active" then
+		return 1
+	elseif info.kind == "available" then
+		return Rule.ForMyLevel(info.next, "available") and 2 or Rule.IsHard(info.next, "available") and 3 or 4
+	end
+	return 4
+end
+
+function ZonePage.CardBefore(a, b)
+	local ra, rb = a.rank, b.rank
+	if ra ~= rb then
+		return ra < rb
+	elseif ra < 4 and a.info.next ~= b.info.next then
+		return Rule.Compare(a.info.next, b.info.next)
+	elseif a.group.low ~= b.group.low then
+		return a.group.low < b.group.low
+	end
+	return a.group.order < b.group.order
+end
+
+function ZonePage.ByRank(a, b)
+	if a.rank ~= b.rank then
+		return a.rank < b.rank
+	end
+	return a.group.order < b.group.order
+end
+
+function ZonePage.SortCards(entries)
+	for _, e in ipairs(entries) do
+		e.rank = ZonePage.CardRank(e)
+	end
+	if entries[2] and not pcall(table.sort, entries, ZonePage.CardBefore) then
+		table.sort(entries, ZonePage.ByRank)
+	end
 end
 
 -- The zone page: the map and the line under it (the chains' cards are in the briefing on the right).
@@ -3558,6 +3940,9 @@ local function ChainCardEnter(self)
 		GameTooltip:AddLine(LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r  " .. L["%d of %d"]:format(f.done, info.total), 1, 1, 1)
 	end
 	GameTooltip:AddLine(L["Click: open the chain"], 0.5, 0.75, 1)
+	if self.NextBtn and self.NextBtn:IsShown() then
+		GameTooltip:AddLine(L["Click the next step's line: show it on the map"], 0.5, 0.75, 1)
+	end
 	GameTooltip:Show()
 end
 
@@ -3612,6 +3997,32 @@ function ZonePage.NewCard(parent, width)
 	b.Next:SetPoint("RIGHT", -(Z.BAR + 20), 0)
 	b.Next:SetJustifyH("LEFT")
 	b.Next:SetWordWrap(false)
+	-- The next step's line is a quest's row of its own: a click shows it on the map, a right-click its
+	-- chain (the card's own click opens the chain: it's a chain, not a quest). Hovering it lights the
+	-- chain as the card does.
+	b.NextBtn = CreateFrame("Button", nil, b)
+	b.NextBtn:SetPoint("TOPLEFT", 24, -24)
+	b.NextBtn:SetPoint("RIGHT", -(Z.BAR + 16), 0)
+	b.NextBtn:SetHeight(18)
+	b.NextBtn:SetHighlightTexture(T.highlight, "ADD")
+	b.NextBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b.NextBtn:SetScript("OnEnter", function(self)
+		ChainCardEnter(b)
+		if self.quest then
+			QuestTip(self, self.quest, nil, true)
+		end
+	end)
+	b.NextBtn:SetScript("OnLeave", function(self)
+		ChainCardLeave(b)
+		Untip(self)
+	end)
+	b.NextBtn:SetScript("OnClick", function(self, button)
+		if self.quest then
+			Untip(self)
+			Side.Click(self.quest, button)
+		end
+	end)
+	b.NextBtn:Hide()
 	b.Parts = { b.Dot, b.Title, b.Count, b.BarBack, b.Next }
 	b.Dots = {}
 	for i = 1, SHOWN.dots do
@@ -3659,6 +4070,9 @@ function ZonePage.FillCard(b, e)
 	end
 	b.Line:SetShown(special)
 	b.Toggle:SetShown(e.fold == true)
+	local nextId = not special and not e.group.single and e.info.next or nil
+	b.NextBtn.quest = nextId
+	b.NextBtn:SetShown(nextId ~= nil)
 	if special then
 		b.Bg:SetShown(e.fold == true)
 		Edges(b, 0.3, 0.3, 0.3, e.fold and 1 or 0)
@@ -3758,8 +4172,9 @@ local function BucketLabel(status)
 end
 
 -- The groups, within my levels unless all are asked for: in progress, available now, coming up,
--- blocked, completed (folded; with the skipped ones), not for you (with its filter); then a line
--- saying how many the level filter left out.
+-- blocked, completed (folded; with the skipped ones), not for you (with its filter); each in Q.Compare's
+-- order (ready to turn in first; for my level, then the hard ones, then the rest; by level); then a
+-- line saying how many the level filter left out.
 function Overview.Entries(place)
 	local by, hidden = {}, 0
 	for _, id in ipairs(Structure(place).ids) do
@@ -3786,7 +4201,7 @@ function Overview.Entries(place)
 			local closed = state.folded[key] == true
 			entries[#entries + 1] = { header = true, key = key, label = BucketLabel(status), right = tostring(#list), closed = closed, status = status }
 			if not closed then
-				for _, id in ipairs(list) do
+				for _, id in ipairs(Rule.Sort(list)) do
 					entries[#entries + 1] = { quest = id, bucket = status }
 				end
 			end
@@ -3812,23 +4227,24 @@ end
 -- The left: zones and dungeons
 ---------------------------------------------------------------------------
 
+-- By continent (as Q.Zones gives them), each one's zones alphabetical (Lists), then the dungeons.
 local function ZoneEntries()
 	local entries, last = {}, nil
-	for _, z in ipairs(state.zones) do
-		local key = "c:" .. tostring(z.continent)
+	for _, place in ipairs(state.zoneOrder) do
+		local key = "c:" .. tostring(place.continent)
 		if key ~= last then
 			last = key
-			entries[#entries + 1] = { header = true, key = key, label = ContinentName(z.continent), closed = state.folded[key] == true }
+			entries[#entries + 1] = { header = true, key = key, label = ContinentName(place.continent), closed = state.folded[key] == true }
 		end
 		if not state.folded[key] then
-			entries[#entries + 1] = state.places["z:" .. tostring(z.map)]
+			entries[#entries + 1] = place
 		end
 	end
-	if state.dungeons[1] then
+	if state.dungeonOrder[1] then
 		entries[#entries + 1] = { header = true, key = "c:dungeons", label = L["Dungeons"], closed = state.folded["c:dungeons"] == true }
 		if not state.folded["c:dungeons"] then
-			for _, dungeon in ipairs(state.dungeons) do
-				entries[#entries + 1] = state.places["d:" .. tostring(dungeon.name)]
+			for _, place in ipairs(state.dungeonOrder) do
+				entries[#entries + 1] = place
 			end
 		end
 	end
@@ -4277,6 +4693,8 @@ local function DrawMiddle(keep, focus, noSide)
 		or L["dashed: lead-in · one of: any one is enough · orange: the way to a locked quest"])
 	view.Legend:SetShown((group ~= nil and not group.single) or dungeon) -- (a chain's lines; the statuses say their reason themselves)
 	view.Zoom:SetShown(group ~= nil)
+	view.Here:SetShown(v == nil) -- ("Current zone": on the zone-based pages, not on another file's view)
+	Make.PaintHere()
 	Views.Show(v)
 	Tabs.Paint()
 	Tabs.Switch()
@@ -4367,7 +4785,13 @@ local function FillListRow(row, e)
 	else
 		right = q and OverviewRight(e, q, status)
 	end
-	row.Right:SetText(right and (GREY .. right .. "|r") or "")
+	local hard = Rule.HardMark(id, status) -- (a hard one, after the ones that fit: "Hard · <giver>")
+	if hard ~= "" then
+		right = hard .. GREY .. (right or "") .. "|r"
+	elseif right then
+		right = GREY .. right .. "|r"
+	end
+	row.Right:SetText(right or "")
 	row.Picked:SetShown(id == state.picked)
 	-- Its chain's badge ("2/4": a click opens the chain), left of the right column.
 	local badgeW = Make.FillBadge(row.Badge, id)
@@ -4437,15 +4861,7 @@ function Brief.LogQuests(place)
 			Add(id)
 		end
 	end
-	local function ByLevel(a, b)
-		if LevelOf(a) ~= LevelOf(b) then
-			return LevelOf(a) < LevelOf(b)
-		end
-		return a < b
-	end
-	table.sort(ready, ByLevel)
-	table.sort(going, ByLevel)
-	return ready, going
+	return Rule.Sort(ready), Rule.Sort(going) -- (Q.Compare's order: the lowest level first)
 end
 
 -- A row of the briefing: the quest's icon, "[12] Title", a grey line under it (or at its right: one line).
@@ -4470,16 +4886,17 @@ function Brief.NewRow(parent, width)
 	b.Right:SetJustifyH("RIGHT")
 	b.Right:SetWordWrap(false)
 	b.Badge = Make.NewBadge(b)
+	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	b:SetScript("OnEnter", function(self)
 		if self.quest then
-			QuestTip(self, self.quest, Make.BadgeText(self.Badge))
+			QuestTip(self, self.quest, Make.BadgeText(self.Badge), true)
 		end
 	end)
 	b:SetScript("OnLeave", Untip)
-	b:SetScript("OnClick", function(self)
+	b:SetScript("OnClick", function(self, button)
 		if self.quest then
 			Untip(self)
-			Side.Go(self.quest)
+			Side.Click(self.quest, button)
 		end
 	end)
 	return b
@@ -4665,15 +5082,28 @@ function Brief.Zone(place, top)
 	Brief.Text(b.Sub, GREY .. table.concat(parts, SEP) .. "|r", 8)
 	local done, total = CountOf(place)
 	Brief.Bar(done, total, L["%d of %d done"]:format(done, total))
-	local mine, open = 0, 0
+	-- "6 for your level · 2 to pick up now · 1 hard" (in my log or to take now and not hard; of them what
+	-- I can take now; the hard ones apart, in orange).
+	local mine, open, hard = 0, 0, 0
 	for _, id in ipairs(Structure(place).ids) do
-		if Rule.ForMyLevel(id, StatusOf(id)) then
+		local s = StatusOf(id)
+		if Rule.ForMyLevel(id, s) then
 			mine = mine + 1
-			open = open + (StatusOf(id) == "available" and 1 or 0)
+			open = open + (s == "available" and 1 or 0)
+		elseif s == "available" and Rule.IsHard(id, s) then
+			hard = hard + 1
 		end
 	end
-	local line = mine > 0 and (HEX.available .. L["%d for your level"]:format(mine) .. "|r" .. GREY .. SEP .. "|r" .. L["%d to pick up now"]:format(open))
-		or (GREY .. L["Nothing for your level."] .. "|r")
+	local line = GREY .. L["Nothing for your level."] .. "|r"
+	if mine > 0 or hard > 0 then
+		line = HEX.available .. L["%d for your level"]:format(mine) .. "|r"
+		if open > 0 then
+			line = line .. GREY .. SEP .. "|r" .. L["%d to pick up now"]:format(open)
+		end
+		if hard > 0 then
+			line = line .. GREY .. SEP .. "|r" .. Hex(Rule.TierRgb("difficult")) .. L["%d hard"]:format(hard) .. "|r"
+		end
+	end
 	Brief.Text(b.Line, line, 10)
 	local ready, going = Brief.LogQuests(place)
 	if ready[1] then
@@ -4734,7 +5164,8 @@ function Brief.Chain(place, group, top)
 	Brief.Text(b.Line, (Chains.NextText(group, info)), 10)
 	Brief.Head(group.single and L["Quests"] or L["Steps"])
 	local n, shown = 0, 0
-	for _, id in ipairs(group.chain) do
+	-- (a chain's steps in its order; the quests without a chain in Q.Compare's)
+	for _, id in ipairs(group.single and Rule.Sorted(group.chain) or group.chain) do
 		local status = StatusOf(id)
 		if Visible(id, status) then
 			n = n + 1
@@ -4749,8 +5180,10 @@ function Brief.Chain(place, group, top)
 					right = Rule.Reason(id, status)
 				end
 				local c = TONE[status]
-				-- (its step: the badge at its right, "3/9")
-				Brief.Row(id, LevelTag(q) .. Hex(c[1], c[2], c[3]) .. Title(id) .. "|r", nil, right and (GREY .. right .. "|r") or nil)
+				local hard = Rule.HardMark(id, status)
+				-- (its step: the badge at its right, "3/9"; a hard one marked)
+				Brief.Row(id, LevelTag(q) .. Hex(c[1], c[2], c[3]) .. Title(id) .. "|r", nil,
+					(right or hard ~= "") and (hard .. GREY .. (right or "") .. "|r") or nil)
 			end
 		end
 	end
@@ -4909,6 +5342,10 @@ function Details.Summary(q, status)
 	local skipped = Rule.SkippedFor(q.id)
 	if skipped then
 		line = line .. GREY .. SEP .. skipped .. "|r"
+	end
+	local note = status ~= "done" and status ~= "other" and Rule.TierNote(q.id) -- (hard, a group quest, its mobs higher)
+	if note then
+		line = line .. GREY .. SEP .. "|r" .. note
 	end
 	local tags = {}
 	if q.new then
@@ -5511,7 +5948,7 @@ local function FillDetails(top)
 	y = Put(d.Req, req, y, 10)
 	local used = 0
 	y, used = Details.PutLinks(d.NeedsHead, d.NeedsMore, L["Needs first:"], Q.Missing and Q.Missing(id) or EMPTY, SHOWN.needs, y, used)
-	y, used = Details.PutLinks(d.LeadsHead, d.LeadsMore, L["Leads to:"], Q.Opens and Q.Opens(id) or EMPTY, SHOWN.leads, y, used)
+	y, used = Details.PutLinks(d.LeadsHead, d.LeadsMore, L["Leads to:"], Rule.Sorted(Q.Opens and Q.Opens(id)), SHOWN.leads, y, used) -- (Q.Compare's order)
 	for i = used + 1, #d.links do
 		d.links[i].quest = nil
 		d.links[i]:Hide()
@@ -5633,6 +6070,21 @@ local function SelectPlace(id)
 	DrawMiddle(false)
 end
 
+-- "Current zone": the place I'm in on the left (its continent opened, in sight), its page, nothing
+-- picked (the quest list stays the quest list, a view goes back to the Zone tab, a search stays).
+-- Nothing when I'm in none of them (its tooltip says so).
+function Side.GoHere()
+	local here = Rule.Here()
+	local place = here and state.places[here]
+	if not place then
+		Make.PaintHere()
+		return
+	end
+	state.folded[place.kind == "zone" and ("c:" .. tostring(place.continent)) or "c:dungeons"] = nil
+	SelectPlace(here)
+	DrawZones(true, here)
+end
+
 -- A quest anywhere: its zone (or dungeon) on the left, on the Zone tab its zone's map (a dungeon: its
 -- quest list; chain: its chain opened, its card in sight), the quest picked (the quest list stays the
 -- quest list).
@@ -5674,24 +6126,43 @@ function Graph.Jump(id)
 	Open(id, true, true)
 end
 
--- A quest clicked in the right pane (a row, a link, a step): picked where it's shown (the zone's map,
--- the chain's page, the quest list), else its place opened (an opened chain stays one).
-function Side.Go(id)
-	local place = CurrentPlace()
-	local mode = Mode()
-	local g = view.g
-	if place and Quest(id) then
-		local it = g.frame:IsShown() and g.layout and g.layout.byQuest[id]
-		if it then
-			Pick(id, true)
-			Graph.Reveal(it, G.W, G.H)
-			return
-		elseif (view.zp:IsShown() or (view.list.scroll:IsShown() and mode ~= "results")) and Structure(place).member[id] then
-			Pick(id, true)
-			return
-		end
+-- A quest's row or link clicked (the quest list, the search's results, the right pane's rows, steps
+-- and links, a chain card's next step): a click shows it on the map, a right-click its chain (the
+-- controller has no right-click: its "2/4" badge, the details' "Open the chain" and the switch's Chain).
+function Side.Click(id, button)
+	if button == "RightButton" then
+		Side.Chain(id)
+	else
+		Side.ShowOnMap(id)
 	end
-	Open(id, true, mode == "zone" and state.chain ~= nil)
+end
+
+-- The Zone tab's map with the quest picked (its pins, objectives, details), never its chain: the place
+-- shown when it lists it, else its zone (a dungeon: its list); the quest list, a chain's page, a view
+-- and the results (the search stays) give way to it. A chain left is kept for the switch.
+function Side.ShowOnMap(id)
+	if not Quest(id) then
+		return
+	end
+	local place = CurrentPlace()
+	if place and Mode() == "zone" and not state.chain and Structure(place).member[id] then
+		Pick(id, true) -- (on its map already: only picked, the map goes to it)
+		return
+	end
+	if state.chain then
+		state.lastChain = state.chain
+	end
+	state.tab, state.chain, state.path = "zone", nil, nil
+	Open(id, true, false)
+end
+
+-- Its chain (Side.ShowChain, as its badge does); a quest in no chain: shown on the map.
+function Side.Chain(id)
+	if Quest(id) and Rule.Step(id) then
+		Side.ShowChain(id)
+	else
+		Side.ShowOnMap(id)
+	end
 end
 
 -- The details' "Open the chain" button, the switch's Chain: a chain of the place shown (key; else the
@@ -5777,11 +6248,12 @@ end
 -- The search, and what comes later
 ---------------------------------------------------------------------------
 
+-- A quest ID first (that quest), then what Q.Search finds, in Q.Compare's order.
 local function Search(text)
 	local ids, seen = {}, {}
 	local n = tonumber(text)
 	if n and Quest(n) then
-		ids[1], seen[n] = n, true
+		seen[n] = true
 	end
 	if #text >= 2 and Q.Search then
 		for _, id in ipairs(Q.Search(text) or EMPTY) do
@@ -5790,6 +6262,10 @@ local function Search(text)
 				ids[#ids + 1] = id
 			end
 		end
+	end
+	Rule.Sort(ids)
+	if n and Quest(n) then
+		table.insert(ids, 1, n)
 	end
 	return ids
 end
@@ -5864,6 +6340,7 @@ local function RunDue(self)
 			Side.Draw()
 		end
 		Map.PlaceMe(view.zp.map) -- (another zone: my arrow comes or goes)
+		Make.PaintHere() -- (and "Current zone" may have one now)
 	end
 	if state.namesAt and now >= state.namesAt then
 		state.namesAt = nil
@@ -5995,7 +6472,7 @@ end
 function Make.ListTip(self)
 	local e = self.entry
 	if e and e.quest then
-		QuestTip(self, e.quest, Make.BadgeText(self.Badge))
+		QuestTip(self, e.quest, Make.BadgeText(self.Badge), true)
 	end
 end
 
@@ -6069,9 +6546,10 @@ function Make.NewListRow(parent, width)
 	row.Right:SetJustifyH("RIGHT")
 	row.Right:SetWordWrap(false)
 	row.Badge = Make.NewBadge(row)
+	row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	row:SetScript("OnEnter", Make.ListTip)
 	row:SetScript("OnLeave", Untip)
-	row:SetScript("OnClick", function(self)
+	row:SetScript("OnClick", function(self, button)
 		local e = self.entry
 		if not e then
 			return
@@ -6082,10 +6560,9 @@ function Make.NewListRow(parent, width)
 				state.folded[e.key] = not state.folded[e.key] -- (false: opened, the done ones too)
 				DrawMiddle(true)
 			end
-		elseif e.result then
-			Open(e.quest, true) -- (its zone's chains, inside the search)
 		else
-			Pick(e.quest, true)
+			Untip(self)
+			Side.Click(e.quest, button) -- (a result: inside the search)
 		end
 	end)
 	return row
@@ -6339,12 +6816,13 @@ function Make.BuildDetails(root, x, y, width, height)
 			local b = pool[i]
 			if not b then
 				b = Make.NewLink(d.Body, bodyW - 4)
-				b:SetScript("OnEnter", function(self) QuestTip(self, self.quest) end)
+				b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+				b:SetScript("OnEnter", function(self) QuestTip(self, self.quest, nil, true) end)
 				b:SetScript("OnLeave", Untip)
-				b:SetScript("OnClick", function(self)
+				b:SetScript("OnClick", function(self, button)
 					if self.quest then
 						Untip(self)
-						Side.Go(self.quest)
+						Side.Click(self.quest, button)
 					end
 				end)
 				pool[i] = b
@@ -6560,6 +7038,7 @@ function Make.BuildTop()
 	box:SetScript("OnTextChanged", Make.OnSearchTyped)
 	box:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 	box:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+	Make.BuildHere(box)
 	-- The filters, on the right.
 	view.filters = {
 		allLevels = Make.NewFilter(frame, "allLevels", L["All levels"], L["Also the quests far below or above your level. The search and an opened chain always show every level."]),
@@ -6571,7 +7050,60 @@ function Make.BuildTop()
 		b:SetPoint("TOPRIGHT", frame, "TOPRIGHT", x, -36)
 		x = x - b:GetWidth() - 12
 	end
-	view.Search = { label, box, view.filters.allLevels, view.filters.showOther }
+	view.Search = { label, box, view.filters.allLevels, view.filters.showOther, view.Here }
+end
+
+-- "Current zone" beside the search (on the Zone tab and the quest list, the results too): the place I'm
+-- in on the left (Rule.Here: a dungeon I'm in, else my map walked up from a city's floor or a cave),
+-- its page. A Button of ours (the controller reaches it); greyed while I'm in none of the left's places.
+function Make.BuildHere(box)
+	local b = CreateFrame("Button", nil, frame)
+	view.Here = b
+	b:SetPoint("LEFT", box, "RIGHT", 10, 0)
+	b:SetHeight(22)
+	b.Back = b:CreateTexture(nil, "BACKGROUND")
+	b.Back:SetAllPoints()
+	b.Back:SetColorTexture(0.12, 0.12, 0.12, 0.9)
+	NewEdges(b)
+	Edges(b, 1, 0.82, 0, 0.35)
+	b.Icon = b:CreateTexture(nil, "ARTWORK")
+	b.Icon:SetTexture(T.arrow)
+	b.Icon:SetSize(16, 16)
+	b.Icon:SetPoint("LEFT", 5, 0)
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	b.Text:SetPoint("LEFT", 24, 0)
+	b.Text:SetText(L["Current zone"])
+	b:SetWidth(b.Text:GetStringWidth() + 34)
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:SetScript("OnClick", function(self)
+		Untip(self)
+		Side.GoHere()
+	end)
+	b:SetScript("OnEnter", function(self)
+		local here = Rule.Here()
+		local place = here and state.places[here]
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:SetText(L["Current zone"], 1, 0.82, 0)
+		if place then
+			GameTooltip:AddLine(place.name, 1, 1, 1)
+			GameTooltip:AddLine(L["Click: show %s"]:format(place.name), 0.5, 0.75, 1)
+		else
+			GameTooltip:AddLine(L["You're in no zone with quests known."], 0.8, 0.8, 0.8, true)
+		end
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", Untip)
+end
+
+-- Its look: greyed while I'm in none of the left's places (looked at when the middle is drawn and
+-- after a zone change).
+function Make.PaintHere()
+	local b = view.Here
+	local here = Rule.Here()
+	b.here = here
+	b.Text:SetTextColor(here and 1 or 0.5, here and 1 or 0.5, here and 1 or 0.5)
+	b.Icon:SetDesaturated(here == nil)
+	b.Icon:SetAlpha(here and 1 or 0.5)
 end
 
 -- -, the zoom, +, Fit: a chain's (the zone map has its own on its strip).
