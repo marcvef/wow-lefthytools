@@ -126,3 +126,5 @@ Modules\Lodestar\Views.lua
 Modules\Lodestar\Dialog.lua
 Modules\Lodestar\Items.lua
 Modules\Lodestar\Learn.lua
+Modules\Lodestar\Route.lua
+Modules\Lodestar\Plan.lua

@@ -587,7 +587,7 @@ seconds after it (setting `tooltips` or `itemTooltips`; a second later the NPC i
 `Modules/Lodestar/Small.lua`: `Q.ToggleSmall()`, `Q.ShowQuest(id)`, `Q.RedrawSmall(now)` (a
 redraw 0.3 s later, several at once: one; `now`: at once; for other parts whose data changed, e.g.
 friends' progress arriving), `Q.IsSmallShown()`, `Q.SmallFollow(id)` (the quest log's hook),
-`Q.SmallFrame()` (tests).
+`Q.SmallFrame()` (tests: also `planMap`, `planMarks`, `planLines`).
 
 The companion: it follows what you're doing without being asked. Two modes: **Now** (what
 `/lodestar` opens) and **a quest looked at** (a click on any quest, `/lodestar <name>`,
@@ -595,6 +595,20 @@ The companion: it follows what you're doing without being asked. Two modes: **No
 
 **Now**, top down: only what to do now and how far along (the guides' "this now, then those");
 what's secondary is in the lines' tooltips or behind a click.
+
+- **Plan** (only while the plan, below, has a stop not done; without one the companion is as before): a
+  gold heading (with the next stop's zone when it isn't mine), **"Next (2/14): Pick up Wanted: Hogger at
+  Marshal Dughan"** (`Q.PlanNext`, `Q.PlanStopText`) with how far and which way when it's on my zone's map
+  (`Q.TowardText`), else that zone's name; a click shows the stop on the big window's map
+  (`Q.ShowOnMap(quest, spot)`; without it `Q.OpenBrowser`), Shift-click the game's map pin there (in chat
+  too). Beside it **Skip** (`Q.PlanSkip`: done for now, until the next /reload or logout; the next one
+  comes up). Under it the plan's **own small map** (a second `Q.NewMiniMap`, made the first time): the
+  next stop's zone with the next stops on it (up to five, the plan's numbers, the next one a gold disc,
+  the others dark with gold numbers) joined by a gold line in their order; a number is a Button (its
+  tooltip "4. Pick up ...", a click `Q.ShowOnMap` of that stop). The numbers and lines are a layer of ours
+  over the map's art (`m.Map`), laid again when the art is (its `OnSizeChanged`: zooming). Redrawn when
+  the plan changes (`Q.OnPlanChanged`) and with the companion's own redraws; it keeps the companion from
+  hiding itself (`autoHide`).
 
 - **Now** (a gold heading with why that quest, a rule under it): the quest I'm on is the last one I
   did something with while the window was open (accepted: `QUEST_ACCEPTED`; super-tracked:
@@ -769,7 +783,10 @@ setting; an unknown quest, the data missing, the search, the browser command; th
 while shown, moving; place and size kept and the setting off; a fight; buttons for the controller;
 without the data part's new calls; switched off; the small map alone (icons, one marker for one
 spot, the arrow, zoom, objective areas by radius and objective, lit and dimmed); Now's objective
-areas (not the done one's, not the turn-in; its line lights them, says where, pins the nearest).
+areas (not the done one's, not the turn-in; its line lights them, says where, pins the nearest); the plan
+(nothing without one, on top with how far, its own map with the stops numbered and joined where the art is,
+also zoomed, a click and a number on the map going to the big window's map, Shift-click the pin, Skip,
+another zone's stop, gone when cleared; `Q.ShowOnMap` records).
 Data.lua's `Q.ChainStep`, `Q.Available`, `Q.LevelColor`, `Q.ZoneCount` and
 `Q.GiverQuests` get stand-ins only while they're missing, round 6's contract (`Q.Tier`, `Q.Compare` and
 the rest, as in the views' tests) while `Q.Tier` and `Q.Compare` are, `Q.Objectives` while Now's areas are
@@ -1512,17 +1529,18 @@ a chain's steps; the clicks on rows, the next step's line and the cards).
 
 ## Views (Views.lua)
 
-Two more views of the big window, each a tab of its own: registered with the window's registry
+Three more views of the big window, each a tab of its own: registered with the window's registry
 (`Q.RegisterBrowserView(key, label, build)`; `build(parent)` gives `{ frame, Refresh, OnShow, OnHide }`)
 when it's there: at load (Browser.lua comes before this file in the TOC), else when the module is
 switched on (`Q.When("enable")`); without a registry nothing is registered and nothing breaks. Keys and
-tabs: `myquests` "My quests", `levelpath` "Level path" (a window that kept the tab `storylines` of the
+tabs, in this order: `myquests` "My quests", `plan` "Plan" (Plan, below), `levelpath` "Level path" (a window that kept the tab `storylines` of the
 builds before opens on the zone page: the window's own rule for a tab it doesn't know). A view is built
 by the window when its tab is first shown (`Q.BuildView(key, parent)` makes one; the tests use it),
 fills its parent, and lays itself out again when the parent's size changes. They jump with
-`Q.OpenBrowser(id)` (a quest: its zone, picked, its objectives on the map), `Q.OpenChain(id)` (a chain
-badge: the quest's chain, its card in sight; without it `Q.OpenBrowser`) and `Q.SelectZone(map)` (a
-zone; without it the zone's first quest).
+`Q.ShowDetails(id)` (round 7: the quest's details on the right, the tab staying; without it
+`Q.OpenBrowser`), `Q.ShowOnMap(id[, spot])` (the Zone tab's map with the quest, or that spot, in sight;
+without it `Q.OpenBrowser(id)`), `Q.OpenChain(id)` (a chain badge: the quest's chain, its card in sight;
+without it `Q.OpenBrowser`) and `Q.SelectZone(map)` (a zone; without it the zone's first quest).
 
 Each view: a bar on top (a headline and chips), the list on a darker panel (a scroll frame of ours; only
 the rows near sight exist, pooled, each kept on its entry while it stays near, so the controller's
@@ -1570,7 +1588,9 @@ per step):
   in no chain last ("Not in a storyline"). Within every other group (ready ones too) the one order,
   `Q.Compare` (by level, then title): no longer the nearest first, the distance stays on the line.
 - A group's heading: its name in gold, "(3)" and the rest in grey, a thin gold rule.
-- **A quest** (one line, 24 px, a Button): its verb icon (`QuestTurnin` when ready, else
+- **A quest** (one line, 24 px, a Button): at its left the plan's **"+"** (Plan.lua's `Q.NewPlanButton`, a
+  Button of its own: "Add to plan"; a check when it's in the plan, "In your plan", a click takes it out;
+  `Q.PlanToggle`), its verb icon (`QuestTurnin` when ready, else
   `SideInProgressquesticon`), "[12] Title" (in its difficulty tier's colour, `Q.TierCode`), its
   chain's "2/4" (`Q.ChainFor`, in progress gold: a badge, below), its first objective not done with its progress
   ("2/10 Defias Looter", from `Q.LogObjectives`: the client's numbers and the name without its count),
@@ -1583,12 +1603,15 @@ per step):
   the turn-in.
 - Its tooltip: "[12] Title", ready or "In your quest log", its zone, "Step 2 of 5 · <chain>", every
   objective from the quest log (done ones ticked, grey; an item's "(from Oat Sack, 100%)": the data's
-  likeliest source), "Turn in: <name>, <zone>", "Click: show it on the map", "Right-click (or 2/5): open
-  the chain" (in a chain), "Shift-click: map pin at <the objective, or the turn-in's name>".
-- **Clicks** (round 6, as the big window's quest rows: the players look at the map first): a click
-  `Q.OpenBrowser(id)` (its zone's map, the quest picked, its objectives on it: never the chain graph); a
-  right-click its chain (`Q.OpenChain`; a quest in no chain: as a click); Shift-click the game's map pin
-  there (`Q.Waypoint`; Shift-right-click: its link in chat too).
+  likeliest source), "Turn in: <name>, <zone>", "Click: its details", "Ctrl-click: show it on the map",
+  "Right-click (or 2/5): open the chain" (in a chain), "Shift-click: map pin at <the objective, or the
+  turn-in's name>".
+- **Clicks** (round 7, details first: the player asked for the quest's details with the small map before
+  the big map): a click `Q.ShowDetails(id)` (its details on the right, My quests staying in the middle);
+  Ctrl-click `Q.ShowOnMap(id)` (its zone's map, the quest picked and in sight: what a click did before;
+  the controller's way there is the details' "Show on map"); a right-click its chain (`Q.OpenChain`; a
+  quest in no chain: as a click); Shift-click the game's map pin there (`Q.Waypoint`; Shift-right-click:
+  its link in chat too). The plan changing (`Q.OnPlanChanged`) draws the views again (the "+" or check).
 - **Its badge** ("2/5", a Button of its own on the row, a faint gold pill lit when hovered; its tooltip
   the chain's name, "Step 2 of 5", "Click: open the chain"): a click opens the quest's chain in the big
   window, the quest picked, its card in sight (`Q.OpenChain(id)`; without it `Q.OpenBrowser`). The row's
@@ -1603,8 +1626,9 @@ ones, each by level); at most 8. A line: the `QuestNormal` "!", "<chain> - next:
 (<zone>)" (the chain's name gold, the step in its tier's colour; a hard one "(Hard)" in orange after it),
 "1/2" (its steps done) at the right, a badge as the quests' (its tooltip: the chain, "1 of 2 steps done",
 "Click: open the chain"; a click: `Q.OpenChain` on that step). Its tooltip: the chain, "1 of 2 steps
-done", "Next: ...", "Hard" for a hard one, "From <giver>, <zone>", the clicks. A click: `Q.OpenBrowser`
-on that step; a right-click: `Q.OpenChain`; Shift-click: the map pin at its giver (nearest me). It comes
+done", "Next: ...", "Hard" for a hard one, "From <giver>, <zone>", the clicks. The plan's "+" at its left
+(that step). A click: `Q.ShowDetails` of that step, Ctrl-click `Q.ShowOnMap`; a right-click:
+`Q.OpenChain`; Shift-click: the map pin at its giver (nearest me). It comes
 from the counts (below): while they're made, "Looking through your storylines..." (the log above shows at
 once); none: "No storyline you've started has a next step for your level now."
 
@@ -1656,7 +1680,8 @@ Hidden: no events, no OnUpdate.
 ### Controller and taint
 
 Our own frames only, nothing protected (it works in a fight), no Blizzard menu. Every quest and storyline
-row, its chain badge, zone row, chip (the level path's toggle too) and the empty state's button is a Button, so
+row, its chain badge, its plan "+", zone row, chip (the level path's toggle too, the plan's Suggest a route
+and Clear), the plan's up, down and remove and the empty state's button is a Button, so
 SmartNavigation reaches them (its focus runs OnEnter: the tooltips). A controller has no right-click and no
 Shift: **its way to a chain is the row's "2/4" badge** (a Button of its own beside the title, the cursor
 stops on it; Continue's "1/2" too), and the map pin is the big window's "Map pin" in the quest's details
@@ -1664,16 +1689,19 @@ stops on it; Continue's "1/2" too), and the map pin is the big window's "Map pin
 skips; the lists are scroll frames (it scrolls them); nothing of Blizzard's is set on our frames.
 
 Tests: `tests/lodestar_views.lua` (the real Data.lua and Engine.lua through `Q.SetTestData`; the
-registry is a stand-in that records, the real one put back after; `Q.OpenBrowser`, `Q.OpenChain`,
-`Q.SelectZone` and `Q.Waypoint` record; `Q.Objectives` and `Q.InRange` are stand-ins with the contract's meaning, the data
+registry is a stand-in that records, the real one put back after; `Q.OpenBrowser`, `Q.ShowDetails`,
+`Q.ShowOnMap` (the big window's part makes them in parallel), `Q.OpenChain`, `Q.SelectZone` and
+`Q.Waypoint` record; `Q.Objectives` and `Q.InRange` are stand-ins with the contract's meaning, the data
 part's own tests check theirs; round 6's contract, `Q.Tier`, `Q.TierColor`, `Q.TierCode`, `Q.TIER_WORD`,
 `Q.Group`, `Q.MobLevels`, the new `Q.InRange` and `Q.ForMyLevel`, `Q.IsHard`, `Q.StatusRank` and
 `Q.Compare`, get stand-ins with the contract's meaning while `Q.Tier` and `Q.Compare` are missing, else the
 real ones run): `Q.LogObjectives` (the name without its count in the game's and a German
 client's format, the numbers from the text, the data's objective by kind and by name) and
 `Q.ObjectiveSpot`; My quests (the log at once while the storylines are counted, the groups and their
-order (`Q.Compare` within each group), a line's columns and tooltip, a click (the map, never the chain),
-a right-click (the chain; in no chain: the map), Shift-click (the map pin), the chain badges (theirs and
+order (`Q.Compare` within each group), a line's columns and tooltip, a click (its details, never the chain;
+without `Q.ShowDetails` the map), Ctrl-click (the map), a right-click (the chain; in no chain: as a click),
+Shift-click (the map pin), the plan's "+" (a Button at the left, its tooltip, in and out, drawn again with the
+check), the chain badges (theirs and
 the rows' tooltips, a click: `Q.OpenChain`), Continue (a hard next step after the one for my level,
 orange, marked) and what it leaves out, the three sorts kept, the storylines' old settings, events,
 walking (the distance drawn again, the order kept), turning in, an empty log); the level path (the bands
@@ -1693,6 +1721,126 @@ controller, a fight.
   keeps "slain" and the data's objective is found by its name or place).
 - Whether SmartNavigation's second button is a right-click on our rows (else the map pin is the big
   window's "Map pin" button for a controller).
+
+## Plan (Plan.lua, the Plan tab in Views.lua)
+
+Round 7, the players' "plan mode": pick the quests you want to do, in the order you want, and Lodestar says
+"first go here, then there", with a shorter route only when you ask for it ("I don't want to present people
+with 'here is the best route for all the quests in your range'"). The "+" on a quest's row adds it at the
+end (the quest list, the search results, the right pane's rows and the details' title line in the big
+window, Browser.lua; My quests here; Alt-click on a map pin); the Plan tab orders it; the companion shows
+the next stop on top (Small window, Plan); the big window draws it on the zone map (`Q.PlanStops`,
+Browser.lua).
+
+### The data (Plan.lua)
+
+**Kept per character**, as the addon keeps other per-character choices (Beacon's chat tabs: by the GUID):
+`LefthyToolsDB.lodestar.plans[GUID] = { list = { questID, ... }, route = { keys, spots, before, after } }`
+(made with the first quest added; a broken one made sane once: only quest IDs, each once; without saved
+variables or a GUID: a plan for this session).
+
+- `Q.PlanList()` (the quests in order, a copy), `Q.PlanHas(id)`, `Q.PlanAdd(id)` (at the end; true when
+  added), `Q.PlanRemove(id)`, `Q.PlanToggle(id)` (returns whether it's in now), `Q.PlanMove(id, index)` (1
+  the first; beyond the ends: the end), `Q.PlanClear()`.
+- `Q.PlanRev()`: a number that changes whenever the plan or its stops change (compare it when you draw;
+  never poll it per frame). `Q.OnPlanChanged(fn)`: `fn()` on the next frame after an edit, a skip, a
+  route or a quest leaving it (several: once).
+- **A quest turned in leaves the plan** by itself (`QUEST_TURNED_IN`; a route in use stays), and one done
+  some other way (`Q.Status` "done", not a repeatable one) when the stops are made next.
+- `Q.PlanStops()` → **the stops**, in order: the route's when one is in use, else each quest's in the plan's
+  order. A stop: `{ quest, kind = "start" | "objective" | "end", index (an objective's place in
+  Q.Objectives), label ("Marshal Dughan", "Kill 10 x Kobold Vermin"), spots = { { map, x, y }, ... }, spot,
+  done, key ("7001:objective:1"), have, need (an objective's progress in my log) }`. A quest not taken: its
+  giver (`starts`' points; an item that starts it: where it drops, "Dusty Letter (drops from Defias
+  Pillager)"), each objective with an area (`Q.Objectives`' sources' points; not one the giver provides),
+  its turn-in (`ends`); taken (`"active"`): the giver done, each objective done as my quest log says
+  (`Q.LogObjectives`, matched to the data's), ready (`C_QuestLog.IsComplete`): all of them done. Done stops
+  stay in the list (so "Next (2/14)" counts the whole way); the windows don't draw them. A stop without any
+  spot is left out; a quest the data doesn't know has none (it stays listed). **The spot**: the route's
+  choice, else of its candidates the nearest to the stop before it (the first stop not done: to me;
+  `Q.RouteYards` when Route.lua has it, else on one map its width counted 1.5 times), else the first; the
+  label then that spot's person (a turn-in in two places: the nearer one). The spots are the data's own
+  point tables (shared: callers don't write into them).
+- `Q.PlanNext()` → the first stop not done and its place. `Q.PlanSkip(stop)`: done for now (until a
+  /reload or logout: kept in this session only), the next one comes up.
+- **A suggested route**: `Q.PlanSuggest()` asks Route.lua's `Q.SuggestRoute(stops, here)` (the stops in the
+  quest order, `here` my zone and spot, `Q.HereZone`), keeps its order (the stops' keys) and each stop's
+  chosen spot (`"1429:0.4200:0.6600"`) and its yards (`before`, `after`) in the saved plan; nil when it
+  can't (an error in it goes to the error handler; what was in use stays). The stops the route doesn't name
+  (done ones) come first. `Q.PlanUseOrder()`: back to the quest order. **Any edit** (add, remove, move)
+  drops the route back to the quest order and says so (`dropped`). `Q.PlanRouteInfo()` → `{ active,
+  before, after, saves, good (saves less than 50 yards or 5%: "Your order is already a good one"), dropped }`.
+- Words: `Q.PlanStopText(stop[, withQuest])` ("Pick up Wanted: Hogger at Marshal Dughan", "Kill 10 x Kobold
+  Vermin", "Turn in at Gryan Stoutmantle"; withQuest: "Turn in Wanted: Hogger at ...", "Kill ... · Wanted:
+  Hogger"), `Q.PlanBriefing()` → `{ title = "Your plan", lines = { "Next (2/14): ... · Elwynn Forest",
+  "Zones: Elwynn Forest, Westfall", "5 quests · 14 stops" } }` (for a briefing: the big window's right pane
+  can show it beside the Plan tab).
+- `Q.NewPlanButton(parent[, size])`: the "+" (a Button of ours, 16 px: `UI-PlusButton-Up`; in the plan the
+  check, `common-icon-checkmark`, else the ready check's; tooltip "Add to plan" / "In your plan", "Click:
+  remove it from your plan"); `b:SetQuest(id)` (nil: hidden); a click toggles it.
+
+**What it costs.** The stops are made when asked and kept until the plan, my quest log, the data or my
+progress changes (`Q.dataGen`, `Q.progressGen`, a count the events move); the rev moves only when they
+look different (keys, done, spots). `QUEST_TURNED_IN`, `QUEST_LOG_UPDATE`, `QUEST_ACCEPTED` and
+`QUEST_REMOVED` are listened to only while the plan has quests and Lodestar is on (from the first loading
+screen); the handlers only note them (a turn-in also takes the quest out). Nothing runs per frame; the data
+is never loaded for it (no stops until a window loaded it).
+
+### The Plan tab (Views.lua)
+
+After My quests. On top **"5 quests · 14 stops"** and at the right **Suggest a route** (only with
+Route.lua's `Q.SuggestRoute`; in use: **Back to my order**) and **Clear** (asks first, our own: "Clear your
+whole plan?" with **Clear it** and **Cancel** in the bar, not a Blizzard popup); under it one line: "Your
+order. Ctrl-click a quest to see it on the map.", "Suggested route · Saves about 1200 yards" (rounded to 50,
+from 1000 to 100) or "Your order is already a good one", "The plan changed: back to your order." (an edit
+dropped the route), "No route: there's nothing left to go to, or no place is known.".
+
+- **Your order** (no route in use): first the next stop as a row ("Next (2/14): Pick up ...", its zone, a
+  gold band), the zones it covers (`Q.PlanBriefing`), then a heading and the quests, numbered: "1." in gold,
+  "[12] Title" in its tier's colour, its chain's "2/4" (a badge: the chain), where it stands ("Pick up at
+  Marshal Dughan · Elwynn Forest", "3/10 Kobold Vermin", "Ready: turn in at Gryan Stoutmantle · Westfall",
+  "Your level is too low: from level 20", "Needs <the quest first>"), and at the right **up**, **down**
+  (dim at the ends) and **remove** ("Remove from plan"), Buttons (no dragging: the buttons are the
+  controller's way too). Its tooltip: the title, where it stands, its step, each of its stops (done ones
+  ticked), the clicks.
+- **A route in use**: its stops, numbered in the route's order ("Pick up X at Y", "Kill 10 x ... · [12]
+  Title", "Turn in at Z · [12] Title"), each with its zone at the right; the next one with an arrow and a
+  gold band, done ones ticked and grey.
+- **Clicks** (a quest or a stop): a click `Q.ShowDetails` (the details on the right with their small map,
+  the Plan tab staying), Ctrl-click `Q.ShowOnMap` (a stop: its spot), a right-click its chain, Shift-click
+  the game's map pin at its next stop (a stop: there).
+- Empty: "Your plan is empty. Add quests with the + beside them: in the Quest list, My quests and a quest's
+  details, or Alt-click a quest giver on the map."
+- The right pane is the window's (Browser.lua): the details of the quest picked; `Q.PlanBriefing()` is
+  there for its briefing of the plan.
+
+It doesn't use the views' counts (`noCensus`: shown alone, nothing is counted); it's drawn when shown, on
+the views' events and when the plan changes. Rows are pooled as the other views'.
+
+**Tests** (`tests/lodestar_plan.lua`, the real Data.lua and Engine.lua through `Q.SetTestData`;
+`Q.Objectives` a stand-in; `Q.ShowDetails`, `Q.ShowOnMap`, `Q.OpenChain`, `Q.Waypoint` record;
+`Q.SuggestRoute` stand-ins, `Q.RouteYards` none): the list (in order, each once, nonsense not, a copy, the
+callbacks once on the next frame, kept per character, another character's own, a broken saved plan made
+sane, toggle, move, remove); the stops (a quest not taken, an objective, a turn-in in two places: the
+nearer, an item's two areas, kept, in words; taken: the giver done, my progress; the rev the same when
+nothing changed and moving when an objective's done; ready; skipped; turned in: leaves, the callbacks; done
+meanwhile: leaves when the stops are made; an item that starts it; a quest the data doesn't know; the
+briefing); a route (none without Route.lua; asked with every stop and where I am; in use, what it saves, the
+order with the done ones first, the chosen spots kept and saved, made again the same; back to the order;
+an edit drops it and says so; a quest turned in keeps it; good already; none possible; an error reported);
+the "+" button; the events only with a plan and Lodestar on; the Plan tab (empty, nothing counted, drawn
+when the plan changes, the next stop, the zones, a quest's row and its status, why one can't be taken, up,
+down, remove, the clicks and the tooltip, Suggest a route only with Route.lua, the route's stops numbered
+with the next one marked, a stop's Ctrl-click with its spot, an edit dropping it, back to my order, Clear
+asking first, Cancel, the controller, hidden: nothing runs). The companion's part: `tests/lodestar_small.lua`.
+
+### Open questions (in game)
+
+- `common-icon-checkmark`, `UI-PlusButton-Up`, `UI-GroupLoot-Pass-Up` and the scroll bar's arrows as the
+  plan's buttons on Forever, and how the "+" reads beside a row's verb icon.
+- That `Line`s on a layer of ours over the companion's map art draw above the art and below the numbers.
+- That `UnitGUID("player")` answers at the first loading screen (else the plan's events wait for the next
+  edit).
 
 ## Learning and friends
 

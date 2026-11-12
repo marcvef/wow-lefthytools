@@ -827,6 +827,71 @@ do
 end
 
 ---------------------------------------------------------------------------
+section("Lodestar: the companion's plan")
+do
+	-- The plan (Plan.lua): on top while it has a stop not done, with its own map; Q.ShowOnMap (the big
+	-- window's part, in parallel) records.
+	local shownOnMap = {}
+	Replace("ShowOnMap", function(id, spot) shownOnMap[#shownOnMap + 1] = { id, spot } return true end)
+	Q.SetTestData(QUESTS_DATA, ZONES)
+	completed = {}
+	Log({ 9002 })
+	PLAYER_MAP, PLAYER_POS[1], PLAYER_POS[2], PLAYER_LEVEL = 1429, 0.5, 0.5, 8
+	Progress()
+	Q.PlanClear()
+	slash("")
+	local s = Small()
+	check(s.win:IsShown() and not Has(s.texts, "Plan") and s.planMap == nil and not RowWith("Next ("), "no plan: the companion as before")
+	Q.PlanAdd(9005)
+	Q.PlanAdd(9010)
+	Advance(0.5)
+	s = Small()
+	local nextRow = RowWith("Next (1/4): Pick up Fine Wolf Pelts at Tailor Ann")
+	check(Has(s.texts, "Plan") and nextRow and Plain(nextRow.Right:GetText()) == "right here" and RowIndex("Next (1/4)") < RowIndex("The Second Step"),
+		"a plan: on top, the next stop with how far and which way, before Now")
+	check(s.planMap and s.planMap.frame:IsShown() and s.planMap.map == 1429 and s.map.frame ~= s.planMap.frame, "its own small map: the next stop's zone")
+	local marks = s.planMarks
+	check(#marks == 4 and Plain(marks[1].Num:GetText()) == "1" and Plain(marks[4].Num:GetText()) == "4" and marks[1].Disc.vertex[3] == 0
+		and marks[2].Disc.vertex[1] < 0.5 and marks[1]._kind == "Button", "the next stops numbered on it, the next one gold (Buttons)")
+	local px = s.planMap.artW * 0.52
+	check(select(4, marks[3]:GetPoint(1)) == px and s.planLines[1]:IsShown() and s.planLines[3]:IsShown() and s.planLines[1].from[1] == select(4, marks[1]:GetPoint(1)),
+		"where they are, joined by a line in their order")
+	nextRow:Click()
+	check(shownOnMap[#shownOnMap][1] == 9005 and shownOnMap[#shownOnMap][2].x == 0.5, "a click: the stop on the big window's map (Q.ShowOnMap)")
+	marks[3]:Click()
+	check(shownOnMap[#shownOnMap][1] == 9010 and shownOnMap[#shownOnMap][2].x == 0.52, "a number clicked: that stop on the map")
+	marks[3]._scripts.OnEnter(marks[3])
+	check(Has(TOOLTIP.lines, "Click: show it on the map") and Plain(TOOLTIP.title) == "3. Pick up Kobold Candles at William Pestle", "its tooltip")
+	marks[3]._scripts.OnLeave(marks[3])
+	local pinsBefore = #pins
+	STATE.shift = true
+	nextRow:Click()
+	STATE.shift = false
+	check(#pins == pinsBefore + 1 and pins[#pins].uiMapID == 1429 and #links > 0, "Shift-click: the game's map pin there, in chat too")
+	RowWith("Skip"):Click()
+	check(RowWith("Next (2/4): Turn in Fine Wolf Pelts at Tailor Ann") and #Small().planMarks == 3, "Skip: done for now, the next one comes up")
+	-- Zoomed: the numbers go with the art.
+	local m = Small().planMap
+	m:Zoom(2)
+	check(select(4, Small().planMarks[2]:GetPoint(1)) == m.artW * 0.52, "zoomed: laid again where the art is")
+	-- Another zone's stop next: its zone named, no distance.
+	Q.PlanClear()
+	Q.PlanAdd(9003)
+	Advance(0.5)
+	nextRow = RowWith("Next (1/2): Pick up Westward Bound at Farmer Saldean")
+	check(nextRow and Plain(nextRow.Right:GetText()) == "Westfall" and Has(Small().texts, "Plan  Westfall") and Small().planMap.map == 1436,
+		"a stop in another zone: its name, its map")
+	-- Every stop done: the part goes; the plan cleared too.
+	Q.PlanClear()
+	Advance(0.5)
+	check(not Has(Small().texts, "Plan") and Small().planMap == nil and not m.frame:IsShown(), "no plan: gone, its map hidden")
+	Small().win:Hide()
+	Log({})
+	Progress()
+	PutBack("ShowOnMap")
+end
+
+---------------------------------------------------------------------------
 section("Lodestar: the small map")
 do
 	local m = Q.NewMiniMap(UIParent)

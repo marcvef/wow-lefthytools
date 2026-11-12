@@ -220,8 +220,10 @@ local function Progress() -- the engine reads my progress again (as after a load
 end
 
 -- The jumps into the window and the map pins, recorded.
-local opened, selected, pins, chained = {}, {}, {}, {}
+local opened, selected, pins, chained, details, onMap = {}, {}, {}, {}, {}, {}
 Replace("OpenBrowser", function(id) opened[#opened + 1] = id end)
+Replace("ShowDetails", function(id) details[#details + 1] = id return true end)
+Replace("ShowOnMap", function(id, spot) onMap[#onMap + 1] = { id, spot } return true end)
 Replace("OpenChain", function(id) chained[#chained + 1] = id return true end)
 Replace("SelectZone", function(map) selected[#selected + 1] = map end)
 Replace("Waypoint", function(map, x, y) pins[#pins + 1] = { map = map, x = x, y = y } return true end)
@@ -273,8 +275,8 @@ do
 	M:OnEnable()
 	local keys = {}
 	for _, r in ipairs(registry) do keys[#keys + 1] = r.key .. "=" .. r.label end
-	check(Q.ViewsState().registered and table.concat(keys, ", ") == "myquests=My quests, levelpath=Level path",
-		"the registry there: the two views registered once, on the module's enable, got " .. table.concat(keys, ", "))
+	check(Q.ViewsState().registered and table.concat(keys, ", ") == "myquests=My quests, plan=Plan, levelpath=Level path",
+		"the registry there: the three views registered once (the plan after My quests), on the module's enable, got " .. table.concat(keys, ", "))
 	check(Q.BuildView("storylines", UIParent) == nil and Q.BuildView("continents", UIParent) == nil, "the storylines' grid and the continents are gone")
 	check(census.starts == startsBefore, "nothing counted before a view is shown")
 end
@@ -286,7 +288,7 @@ local function BuildOn(index, w, h)
 	view.frame:Hide() -- (the registry shows a view when its tab is picked)
 	return view, parent
 end
-local mine, levelpath = BuildOn(1), BuildOn(2)
+local mine, levelpath = BuildOn(1), BuildOn(3)
 check(type(mine.frame) == "table" and type(mine.Refresh) == "function" and type(mine.OnShow) == "function"
 	and type(mine.OnHide) == "function" and mine.frame:GetParent() ~= nil, "build(parent): { frame, Refresh, OnShow, OnHide } in the parent")
 
@@ -379,11 +381,11 @@ do
 	row._scripts.OnEnter(row)
 	check(plain(TOOLTIP.title) == "[12] The Defias Brotherhood" and tipHas("In your quest log") and tipHas("Westfall")
 		and tipHas("Step 2 of 5 · The People's Militia") and tipHas("- Defias Looter slain: 2/10") and tipHas("Turn in: Gryan Stoutmantle")
-		and tipHas("Click: show it on the map") and tipHas("Right-click (or 2/5): open the chain") and tipHas("Shift-click: map pin at Defias Looter"),
+		and tipHas("Click: its details") and tipHas("Ctrl-click: show it on the map") and tipHas("Right-click (or 2/5): open the chain") and tipHas("Shift-click: map pin at Defias Looter"),
 		"its tooltip: status, zone, step, every objective, turn-in, what the clicks do (its badge too)")
 	row._scripts.OnLeave(row)
 	oats._scripts.OnEnter(oats)
-	check(not tipHas("open the chain") and tipHas("Click: show it on the map"), "a quest in no chain: no chain in its tooltip")
+	check(not tipHas("open the chain") and tipHas("Click: its details"), "a quest in no chain: no chain in its tooltip")
 	oats._scripts.OnLeave(oats)
 	-- Its chain badge: a button of its own, its tooltip, a click opens the chain (Q.OpenChain).
 	local badge = row.Badge
@@ -399,20 +401,49 @@ do
 	check(tipHas("- Handful of Oats: 3/8 (from Oat Sack, 100%)"), "an item's objective: where it comes from")
 	oats._scripts.OnLeave(oats)
 	local chainedBefore, pinsBefore = #chained, #pins
+	openedBefore = #opened
 	row:Click()
-	check(opened[#opened] == 1101 and #chained == chainedBefore and #pins == pinsBefore, "a click shows it on the window's map (Q.OpenBrowser), never the chain")
+	check(details[#details] == 1101 and #opened == openedBefore and #chained == chainedBefore and #pins == pinsBefore,
+		"a click shows its details on the right, the tab staying (Q.ShowDetails), never the chain")
+	STATE.ctrl = true
+	row:Click()
+	STATE.ctrl = false
+	check(onMap[#onMap] and onMap[#onMap][1] == 1101 and #details == 1 and #opened == openedBefore, "Ctrl-click: on the map (Q.ShowOnMap)")
+	do -- (without the window's new calls: the map, as before)
+		local d, m = Q.ShowDetails, Q.ShowOnMap
+		Q.ShowDetails, Q.ShowOnMap = nil, nil
+		row:Click()
+		check(opened[#opened] == 1101, "without Q.ShowDetails: Q.OpenBrowser")
+		Q.ShowDetails, Q.ShowOnMap = d, m
+	end
 	openedBefore = #opened
 	row:Click("RightButton")
 	check(chained[#chained] == 1101 and #chained == chainedBefore + 1 and #opened == openedBefore and #pins == pinsBefore,
 		"a right-click: its chain (Q.OpenChain)")
 	oats:Click("RightButton")
-	check(opened[#opened] == 1120 and #chained == chainedBefore + 1, "a quest in no chain: a right-click shows it as a click does")
+	check(details[#details] == 1120 and #chained == chainedBefore + 1, "a quest in no chain: a right-click shows it as a click does")
 	STATE.shift = true
 	row:Click()
 	check(pins[#pins] and pins[#pins].map == WESTFALL and pins[#pins].x == 0.45 and #chained == chainedBefore + 1, "Shift-click: the map pin at its objective's area")
 	ready:Click("RightButton")
 	STATE.shift = false
 	check(pins[#pins].map == ELWYNN and pins[#pins].x == 0.42, "a ready one: at its turn-in")
+	-- The plan's "+" at the left of each row (Plan.lua's button): add, the check, remove.
+	local plus = row.Plus
+	check(plus and plus._kind == "Button" and plus:IsShown() and plus:GetParent() == row and plus.quest == 1101 and not Q.PlanHas(1101)
+		and row.Title._points[1][2] > 28, "a + at the left of each row (a Button of its own), the title after it")
+	plus._scripts.OnEnter(plus)
+	check(TOOLTIP.title == "Add to plan" and tipHas("Click: add it to the end of your plan"), "its tooltip: Add to plan")
+	local detailsBefore = #details
+	plus:Click()
+	check(Q.PlanHas(1101) and plus.has and TOOLTIP.title == "In your plan" and tipHas("Click: remove it from your plan") and #details == detailsBefore,
+		"a click: in the plan, a check now (not the row's click)")
+	plus._scripts.OnLeave(plus)
+	local draws = mine.draws
+	Wait(0.1)
+	check(mine.draws > draws and RowOf(mine, "q1101").Plus.has and not RowOf(mine, "q1120").Plus.has, "the plan changed: drawn again, the check stays")
+	RowOf(mine, "q1101").Plus:Click()
+	check(not Q.PlanHas(1101) and not RowOf(mine, "q1101").Plus.has, "clicked again: out of the plan, a + again")
 	-- Continue your storylines.
 	local nxt = RowOf(mine, "n1111")
 	check(nxt and plain(nxt.Text:GetText()) == "Westfall Stew - next: [13] Goretusk Liver Pie, Farmer Saldean (Westfall)"
@@ -426,16 +457,17 @@ do
 		"not a chain whose next step is too high for me (Redridge), nor one whose next step needs the one in my log")
 	nxt._scripts.OnEnter(nxt)
 	check(TOOLTIP.title == "Westfall Stew" and tipHas("1 of 2 steps done") and tipHas("From Farmer Saldean, Westfall")
-		and tipHas("Click: show it on the map") and tipHas("Right-click (or 1/2): open the chain") and tipHas("Shift-click: map pin at Farmer Saldean"), "its tooltip")
+		and tipHas("Click: its details") and tipHas("Ctrl-click: show it on the map") and tipHas("Right-click (or 1/2): open the chain") and tipHas("Shift-click: map pin at Farmer Saldean"), "its tooltip")
 	nxt._scripts.OnLeave(nxt)
 	check(nxt.Badge._kind == "Button" and nxt.Badge:IsShown(), "its 1/2: a badge too")
+	check(nxt.Plus and nxt.Plus:IsShown() and nxt.Plus.quest == 1111, "its next step has a + too")
 	nxt.Badge._scripts.OnEnter(nxt.Badge)
 	check(TOOLTIP.title == "Westfall Stew" and tipHas("1 of 2 steps done") and TOOLTIP.lines[#TOOLTIP.lines] == "Click: open the chain", "its tooltip")
 	nxt.Badge._scripts.OnLeave(nxt.Badge)
 	nxt.Badge:Click()
 	check(chained[#chained] == 1111, "a click: the chain, its next step picked")
 	nxt:Click()
-	check(opened[#opened] == 1111, "a click shows its next step on the map")
+	check(details[#details] == 1111, "a click shows its next step's details")
 	nxt:Click("RightButton")
 	check(chained[#chained] == 1111 and #chained == chainedBefore + 3, "a right-click: the chain")
 	STATE.shift = true

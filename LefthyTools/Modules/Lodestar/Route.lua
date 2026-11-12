@@ -1,0 +1,3 @@
+-- Lodestar: a suggested route for the plan (Q.SuggestRoute, Q.RouteYards). A stand-in so the plan's
+-- tests load; the route's own part replaces it.
+local _, ns = ...
