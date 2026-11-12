@@ -560,5 +560,8 @@ ns.CHANGELOG = {
 	{ id = 184, module = "lodestar",
 		en = { "Lodestar: a slimmer companion with tabs", "The companion (/lodestar) is now a slim window like the Bestiary's, only as tall as what it shows, without a scroll bar. Small tabs along its top keep apart what doesn't belong together: Now (the quest you're on with its objectives, turn-in and map), Next (what to pick up nearby) and Plan (while you have one: your next stops with their own map). It remembers your tab. A long list ends in \"and N more\", which opens the big window; so does the star at its top." },
 		de = { "Lodestar: schlanker Begleiter mit Tabs", "Der Begleiter (/lodestar) ist jetzt ein schlankes Fenster wie das kleine Fenster des Bestiary, nur so hoch wie sein Inhalt, ohne Scrollleiste. Kleine Tabs oben trennen, was nicht zusammengehört: Jetzt (die Quest, an der du bist, mit Zielen, Abgabe und Karte), Als Nächstes (was du in der Nähe annehmen kannst) und Plan (wenn du einen hast: deine nächsten Stationen mit eigener Karte). Er merkt sich deinen Tab. Eine lange Liste endet mit \"und N weitere\", das öffnet das große Fenster; der Stern oben auch." } },
+	{ id = 185, module = "lodestar",
+		en = { "Lodestar: objective areas you can see", "The companion's small map fills each objective area in gold under its glow, as the big map does: on light ground the areas were all but invisible." },
+		de = { "Lodestar: sichtbare Zielgebiete", "Die kleine Karte des Begleiters füllt jedes Zielgebiet golden unter seinem Schein, wie die große Karte: auf hellem Boden waren die Gebiete kaum zu sehen." } },
 	-- New entries go here, at the end.
 }

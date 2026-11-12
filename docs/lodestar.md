@@ -774,9 +774,10 @@ radius, group, hard] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:
   ring (`ff8040`, 95%), the icon stays the game's. The atlas missing: the gossip window's icon. A drop: a
   soft orange spot (`Spells\GenericGlow64` added) at least 34 px, as big as its `radius` (0..1 of the
   map's width, at most 140 px); the likeliest (`chance`) says "drops here (12%)" beside it. An
-  objective's area (`kind` "area"): a soft gold circle the same way (70%, no dot), `group` the
-  objective it belongs to; `m:Light(group)` lights that objective's areas (full) and dims the others'
-  (20%), `m:Light()` puts them back (only alphas; kept when the map is laid again, gone with another
+  objective's area (`kind` "area"): a soft gold circle the same way (70%, no dot) over a plain gold
+  disc 0.7 of its size (`Fill`, 30%: the glow alone, drawn added, all but vanished on light ground),
+  `group` the objective it belongs to; `m:Light(group)` lights that objective's areas (full, the fill
+  45%) and dims the others' (20%, the fill 8%), `m:Light()` puts them back (only alphas; kept when the map is laid again, gone with another
   map).
 - Points within 8 px share one marker (drops only with drops, an objective's areas only with the
   same objective's), its tooltip naming each with what it is and its `note` (the quest, or the

@@ -1073,11 +1073,13 @@ do
 		{ x = 0.31, y = 0.3, kind = "area", group = 2, radius = 0.05, label = "Kobold Worker" },
 		{ x = 0.6, y = 0.6, kind = "area", group = 1, label = "Kobold Vermin" }, { x = 0.3, y = 0.3, kind = "start", label = "Giver" } })
 	list = m:Markers()
-	check(#list == 4 and list[1].kind == "area" and list[1].Glow:IsShown() and not list[1].Icon:IsShown() and not list[1].Dot:IsShown()
+	check(#list == 4 and list[1].kind == "area" and list[1].Glow:IsShown() and list[1].Fill:IsShown() and list[1].Fill.vertex[4] == 0.3
+		and not list[4].Fill:IsShown() and not list[1].Icon:IsShown() and not list[1].Dot:IsShown()
 		and list[1].size > list[2].size and list[3].size == 34 and list[1].Glow.vertex[2] > 0.7 and list[4].Icon:IsShown()
 		and list[4]:GetFrameLevel() > list[1]:GetFrameLevel(), "areas: soft gold circles by their radius, one per objective, a giver over them")
 	m:Light(1)
-	check(list[1].alpha == 1 and list[3].alpha == 1 and list[2].alpha < 0.5, "an objective lit: its areas, the other's dimmed")
+	check(list[1].alpha == 1 and list[3].alpha == 1 and list[2].alpha < 0.5 and list[1].Fill.vertex[4] == 0.45 and list[2].Fill.vertex[4] == 0.08,
+		"an objective lit: its areas (their fill too), the other's dimmed")
 	m:Show(1429, m.points)
 	check(list[2].alpha < 0.5, "laid again: still lit")
 	m:Light(nil)

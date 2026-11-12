@@ -58,6 +58,9 @@ local ARROW = "Interface\\Minimap\\MinimapArrow"
 local DROP_R, DROP_G, DROP_B = 1, 0.55, 0.12
 local AREA_R, AREA_G, AREA_B = 1, 0.82, 0.25 -- an objective's area (the quest log's gold)
 local AREA_ALPHA, AREA_DIM, AREA_LIT = 0.7, 0.2, 1
+-- An area's fill under its glow (as the big window's): a glow alone, drawn added, all but vanishes on
+-- light ground (Elwynn's fields, a desert); the fill reads on any.
+local FILL_ALPHA, FILL_DIM, FILL_LIT = 0.3, 0.08, 0.45
 local HARD_R, HARD_G, HARD_B = 1, 0.5, 0.25 -- a hard quest's ring (the game's orange difficulty)
 local KINDS = { start = L["Quest giver"], ["end"] = L["Turn-in"], drop = L["Drops here"], area = L["Objective area"] }
 
@@ -149,6 +152,10 @@ local function Marker(m, i)
 		marker.Glow:SetTexture(GLOW)
 		marker.Glow:SetBlendMode("ADD")
 		marker.Glow:SetVertexColor(DROP_R, DROP_G, DROP_B, 0.9)
+		marker.Fill = marker:CreateTexture(nil, "BORDER")
+		marker.Fill:SetPoint("CENTER")
+		marker.Fill:SetTexture(DOT)
+		marker.Fill:Hide()
 		marker.Dot = marker:CreateTexture(nil, "ARTWORK", nil, 2)
 		marker.Dot:SetPoint("CENTER")
 		marker.Dot:SetSize(7, 7)
@@ -177,8 +184,11 @@ local function Dress(m, marker, point)
 	marker.Icon:SetShown(not drop)
 	marker.Shadow:SetShown(not drop)
 	marker.look = not drop and LookOf(point) or nil
+	marker.Fill:SetShown(point.kind == "area")
 	if point.kind == "area" then
 		marker.Glow:SetVertexColor(AREA_R, AREA_G, AREA_B, AREA_ALPHA)
+		marker.Fill:SetSize(size * 0.7, size * 0.7) -- (the glow's bright middle)
+		marker.Fill:SetVertexColor(AREA_R, AREA_G, AREA_B, FILL_ALPHA)
 	elseif drop then
 		marker.Glow:SetVertexColor(DROP_R, DROP_G, DROP_B, 0.9)
 	end
@@ -497,6 +507,7 @@ function Widget:Light(group)
 		if marker.kind == "area" then
 			local alpha = group == nil and AREA_ALPHA or (marker.group == group and AREA_LIT or AREA_DIM)
 			marker.Glow:SetVertexColor(AREA_R, AREA_G, AREA_B, alpha)
+			marker.Fill:SetVertexColor(AREA_R, AREA_G, AREA_B, group == nil and FILL_ALPHA or (marker.group == group and FILL_LIT or FILL_DIM))
 			marker.alpha = alpha
 		end
 	end
