@@ -7,7 +7,7 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 --
 -- Opened on its own (/lodestar) it shows, top down, only what to do now and how far along (the
 -- rest is in the lines' tooltips or behind a click):
---   Plan (only while the plan, Plan.lua, has a stop not done): "Next (2/14): Pick up <quest> at
+--   Plan (only while the plan, Plan.lua, has a stop not done): "Stop 2 of 14: Pick up <quest> at
 --     <giver>" with how far and which way, Skip, and a small map of its own with the next stops
 --     numbered and joined by a line; a click shows the stop on the big window's map (Q.ShowOnMap).
 --   Now: the quest you're on (the last one you accepted, super-tracked or opened in the quest log;
@@ -41,7 +41,8 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 -- tracking, the tracker, level-ups and zone changes, and redraws a moment later; every 2 s it looks
 -- whether you've moved (the distances); the quest log's "show details" (Lodestar.lua's hook) hands
 -- it the quest you opened there. Hidden, it listens to nothing and nothing of it runs. A window of
--- ours (LT.Window.Create: Escape closes it, it counts as an open window for Mirage), movable and
+-- ours (LT.Window.Create, one that stays: like the Bestiary's small window, Escape doesn't close it
+-- and it doesn't count as an open window for Mirage; its X or /lodestar does), movable and
 -- resizable, where it is and its size kept (setting keepPlace). Built the first time it opens; the
 -- data loads then too (Q.Ready), never at login. Every line that does something is a button, so a
 -- controller's cursor reaches it.
@@ -1052,6 +1053,8 @@ function PL.MarkEnter(self)
 	GameTooltip:Show()
 end
 
+PL.KIND = { start = "Interface\\GossipFrame\\AvailableQuestIcon", ["end"] = "Interface\\GossipFrame\\ActiveQuestIcon" }
+
 function PL.Mark(i)
 	local mark = PL.marks[i]
 	if not mark then
@@ -1062,6 +1065,8 @@ function PL.Mark(i)
 		mark.Disc:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
 		mark.Num = mark:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 		mark.Num:SetPoint("CENTER", 0, 0)
+		mark.Kind = mark:CreateTexture(nil, "OVERLAY") -- (what it is, as on the big map: "!", "?", a dot)
+		mark.Kind:SetPoint("CENTER", mark, "TOPRIGHT", -1, -1)
 		mark:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
 		mark:SetScript("OnEnter", PL.MarkEnter)
 		mark:SetScript("OnLeave", RowLeave)
@@ -1092,6 +1097,9 @@ function PL.Lay()
 		mark:ClearAllPoints()
 		mark:SetPoint("CENTER", m.Map, "TOPLEFT", x, -y)
 		mark.Num:SetText(tostring(e.n))
+		local kind = PL.KIND[e.stop.kind]
+		mark.Kind:SetTexture(kind or "Interface\\CharacterFrame\\TempPortraitAlphaMask")
+		mark.Kind:SetSize(kind and 11 or 5, kind and 11 or 5)
 		if e.next then
 			mark.Disc:SetVertexColor(1, 0.82, 0, 1)
 			mark.Num:SetTextColor(0, 0, 0)
@@ -1144,7 +1152,7 @@ function PL.Hide()
 	end
 end
 
--- "Next (2/14): Pick up Wanted: Hogger at Marshal Dughan" with how far and which way (another zone:
+-- "Stop 2 of 14: Pick up Wanted: Hogger at Marshal Dughan" with how far and which way (another zone:
 -- its name), "Skip" beside it, and the plan's map: the next few stops on the next one's map,
 -- numbered, joined by a line. Nothing without a plan (or with every stop done).
 local function DrawPlan(y, ctx)
@@ -1168,7 +1176,7 @@ local function DrawPlan(y, ctx)
 	tip[#tip + 1] = zone
 	tip[#tip + 1] = L["Click: show it on the map"]
 	tip[#tip + 1] = L["Shift-click: map pin there, in chat too"]
-	local y1 = Row(y, { text = GOLD .. L["Next (%d/%d):"]:format(at, #stops) .. "|r " .. Q.PlanStopText(stop, true), right = right,
+	local y1 = Row(y, { text = GOLD .. L["Stop %d of %d:"]:format(at, #stops) .. "|r " .. Q.PlanStopText(stop, true), right = right,
 		w = width - skipW - 4, onClick = function()
 			if IsShiftKeyDown and IsShiftKeyDown() then
 				Q.Waypoint(spot.map, spot.x, spot.y, true)
@@ -1594,7 +1602,7 @@ local function Moved()
 end
 
 local function Build()
-	win = LT.Window.Create(NAME, "Lodestar", WIDTH, HEIGHT)
+	win = LT.Window.Create(NAME, "Lodestar", WIDTH, HEIGHT, true)
 	win:SetResizable(true)
 	win:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
 	win:SetScript("OnDragStop", function(self)

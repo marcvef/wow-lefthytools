@@ -625,7 +625,7 @@ function Q.PlanStopText(stop, withQuest)
 	return withQuest and (label .. " · " .. title) or label
 end
 
--- The plan in a few lines, for a briefing: { title, lines = { ... } } ("Next (2/14): ...", the zones it
+-- The plan in a few lines, for a briefing: { title, lines = { ... } } ("Stop 2 of 14: ...", the zones it
 -- covers, "5 quests · 14 stops"); nil without a plan.
 function Q.PlanBriefing()
 	local list = Q.PlanList()
@@ -637,7 +637,7 @@ function Q.PlanBriefing()
 	local stop, at = Q.PlanNext()
 	if stop then
 		local zone = Q.MapName(stop.spot.map)
-		lines[#lines + 1] = L["Next (%d/%d): %s"]:format(at, #stops, Q.PlanStopText(stop, true)) .. (zone and (" · " .. zone) or "")
+		lines[#lines + 1] = L["Stop %d of %d: %s"]:format(at, #stops, Q.PlanStopText(stop, true)) .. (zone and (" · " .. zone) or "")
 	elseif stops[1] then
 		lines[#lines + 1] = L["Every stop of your plan is done."]
 	end

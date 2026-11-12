@@ -599,7 +599,7 @@ The companion: it follows what you're doing without being asked. Two modes: **No
 what's secondary is in the lines' tooltips or behind a click.
 
 - **Plan** (only while the plan, below, has a stop not done; without one the companion is as before): a
-  gold heading (with the next stop's zone when it isn't mine), **"Next (2/14): Pick up Wanted: Hogger at
+  gold heading (with the next stop's zone when it isn't mine), **"Stop 2 of 14: Pick up Wanted: Hogger at
   Marshal Dughan"** (`Q.PlanNext`, `Q.PlanStopText`) with how far and which way when it's on my zone's map
   (`Q.TowardText`), else that zone's name; a click shows the stop on the big window's map
   (`Q.ShowOnMap(quest, spot)`; without it `Q.OpenBrowser`), Shift-click the game's map pin there (in chat
@@ -712,8 +712,9 @@ The data add-on missing: the window says so (run the updater, restart), nothing 
 data doesn't know: its title and that line. At the bottom: **Quest browser** (`Q.OpenBrowser` on the
 quest looked at or Now's, else `Q.ToggleBrowser()`; hidden without Browser.lua).
 
-**What it costs.** The window: `LT.Window.Create` (`LefthyToolsLodestarSmall`: Escape closes it, it
-counts as an open window for Mirage, the AFK screen and flights), DIALOG strata, raised when a quest
+**What it costs.** The window: `LT.Window.Create` with `stays` (`LefthyToolsLodestarSmall`: like the
+Bestiary's small window, Escape doesn't close it and it doesn't count as an open window for Mirage, the
+AFK screen and flights; its X, the binding or `/lodestar` close it), DIALOG strata, raised when a quest
 is shown. Movable, resizable by its corner grip (300-600 x 300-950); where it is and its size are
 saved on every drag and resize (`small`). The content is in a scroll area; its width and the map's
 follow the window's. Built the first time it opens; rows, texts and header rules are pooled. While
@@ -1875,7 +1876,7 @@ variables or a GUID: a plan for this session).
   Pillager)"), each objective with an area (`Q.Objectives`' sources' points; not one the giver provides),
   its turn-in (`ends`); taken (`"active"`): the giver done, each objective done as my quest log says
   (`Q.LogObjectives`, matched to the data's), ready (`C_QuestLog.IsComplete`): all of them done. Done stops
-  stay in the list (so "Next (2/14)" counts the whole way); the windows don't draw them. A stop without any
+  stay in the list (so "Stop 2 of 14" counts the whole way); the windows don't draw them. A stop without any
   spot is left out; a quest the data doesn't know has none (it stays listed). **The spot**: the route's
   choice, else of its candidates the nearest to the stop before it (the first stop not done: to me;
   `Q.RouteYards` when Route.lua has it, else on one map its width counted 1.5 times), else the first; the
@@ -1892,7 +1893,7 @@ variables or a GUID: a plan for this session).
   before, after, saves, good (saves less than 50 yards or 5%: "Your order is already a good one"), dropped }`.
 - Words: `Q.PlanStopText(stop[, withQuest])` ("Pick up Wanted: Hogger at Marshal Dughan", "Kill 10 x Kobold
   Vermin", "Turn in at Gryan Stoutmantle"; withQuest: "Turn in Wanted: Hogger at ...", "Kill ... · Wanted:
-  Hogger"), `Q.PlanBriefing()` → `{ title = "Your plan", lines = { "Next (2/14): ... · Elwynn Forest",
+  Hogger"), `Q.PlanBriefing()` → `{ title = "Your plan", lines = { "Stop 2 of 14: ... · Elwynn Forest",
   "Zones: Elwynn Forest, Westfall", "5 quests · 14 stops" } }` (for a briefing: the big window's right pane
   can show it beside the Plan tab).
 - `Q.NewPlanButton(parent[, size])`: the "+" (a Button of ours, 16 px: `UI-PlusButton-Up`; in the plan the
@@ -1915,7 +1916,7 @@ order: drag a quest to move it. Ctrl-click: see it on the map.", "Suggested rout
 from 1000 to 100) or "Your order is already a good one", "The plan changed: back to your order." (an edit
 dropped the route), "No route: there's nothing left to go to, or no place is known.".
 
-- **Your order** (no route in use): first the next stop as a row ("Next (2/14): Pick up ...", its zone, a
+- **Your order** (no route in use): first the next stop as a row ("Stop 2 of 14: Pick up ...", its zone, a
   gold band), the zones it covers (`Q.PlanBriefing`), then a heading and the quests, numbered: "1." in gold,
   "[12] Title" in its tier's colour, its chain's "2/4" (a badge: the chain), where it stands ("Pick up at
   Marshal Dughan · Elwynn Forest", "3/10 Kobold Vermin", "Ready: turn in at Gryan Stoutmantle · Westfall",

@@ -548,5 +548,8 @@ ns.CHANGELOG = {
 	{ id = 180, module = "lodestar",
 		en = { "Lodestar: your plan beside the map", "Plan above the big map's right pane lists every stop numbered as on the map, the done ones ticked: hover one to light it on the map, click to go there, drag a quest to reorder. Each number on the map shows what it is: ! pick up, ? turn in, a dot an objective, explained under the map." },
 		de = { "Lodestar: dein Plan neben der Karte", "Plan über der rechten Leiste der großen Karte listet jede Station, nummeriert wie auf der Karte, die erledigten abgehakt: Fahr über eine, um sie auf der Karte hervorzuheben, klick, um dorthin zu gehen, zieh eine Quest, um sie umzusortieren. Jede Zahl auf der Karte zeigt, was sie ist: ! annehmen, ? abgeben, ein Punkt ein Ziel, erklärt unter der Karte." } },
+	{ id = 181, module = "lodestar",
+		en = { "Lodestar: the companion stays open", "Escape no longer closes the companion, like the Bestiary's small window: its X or /lodestar does. Its plan part says which stop you're at (\"Stop 3 of 9\", as the Plan tab does), and the numbers on its small map show what they are: ! pick up, ? turn in, a dot an objective." },
+		de = { "Lodestar: Begleiter bleibt offen", "Escape schließt den Begleiter nicht mehr, wie das kleine Fenster des Bestiariums: sein X oder /lodestar schließt ihn. Sein Planteil sagt, bei welcher Station du bist (\"Station 3 von 9\", wie der Tab Plan), und die Zahlen auf seiner kleinen Karte zeigen, was sie sind: ! annehmen, ? abgeben, ein Punkt ein Ziel." } },
 	-- New entries go here, at the end.
 }

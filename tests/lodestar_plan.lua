@@ -255,7 +255,7 @@ do
 	Q.PlanRemove(4242)
 	-- The briefing.
 	local brief = Q.PlanBriefing()
-	check(brief and brief.title == "Your plan" and plain(brief.lines[1]) == "Next (2/5): Kill Hogger · Wanted: Hogger · Elwynn Forest"
+	check(brief and brief.title == "Your plan" and plain(brief.lines[1]) == "Stop 2 of 5: Kill Hogger · Wanted: Hogger · Elwynn Forest"
 		and brief.lines[2] == "Zones: Elwynn Forest, Westfall" and brief.lines[3] == "2 quests · 5 stops",
 		"the briefing: next, the zones, the counts: " .. table.concat(brief and brief.lines or {}, " | "))
 	Wait(0.1)
@@ -388,7 +388,7 @@ do
 	check(not view.Message:IsShown() and plain(view.Head:GetText()) == "4 quests · 9 stops", "the plan changed: drawn again, the counts on top: " .. plain(view.Head:GetText()))
 	check(Entries() == "next, brief2, hquests, q7001, q7004, q7006, q7005", "the next stop, the zones, then the quests in order: " .. Entries())
 	local nextRow = RowOf("next")
-	check(plain(nextRow.Text:GetText()) == "Next (1/9): Pick up Wanted: Hogger at Marshal Dughan" and plain(nextRow.Right:GetText()) == "Elwynn Forest"
+	check(plain(nextRow.Text:GetText()) == "Stop 1 of 9: Pick up Wanted: Hogger at Marshal Dughan" and plain(nextRow.Right:GetText()) == "Elwynn Forest"
 		and nextRow.Band:IsShown(), "the next stop: what to do, its zone: " .. plain(nextRow.Text:GetText()))
 	check(plain(RowOf("brief2").Text:GetText()) == "Zones: Elwynn Forest, Westfall", "the zones it covers")
 	local row = RowOf("q7001")

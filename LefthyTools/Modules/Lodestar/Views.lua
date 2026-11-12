@@ -2346,7 +2346,7 @@ function N.FillStop(b, e)
 		text = text .. GREY .. " · |r" .. (s.done and Q.Title(s.quest) or V.Title(s.quest))
 	end
 	if e.lead then
-		text = GOLD .. L["Next (%d/%d):"]:format(e.n, e.total) .. "|r " .. text
+		text = GOLD .. L["Stop %d of %d:"]:format(e.n, e.total) .. "|r " .. text
 	end
 	b.Text:SetText(s.done and (GREY .. text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "|r") or text)
 	b.Right:SetWidth(math.floor(w * 0.25))

@@ -297,8 +297,10 @@ local s = Small()
 check(s.win and s.win:IsShown() and loads > 0 and s.mode == "now", "/lodestar opens it on now, and the data loads now")
 local escapes = false
 for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsLodestarSmall" then escapes = true end end
-check(escapes and s.win:GetScript("OnUpdate") == nil and s.win.TitleContainer.TitleText:GetText() == "Lodestar",
-	"Escape closes it, no OnUpdate on it, its title is the module's name")
+local counted = false
+for _, name in ipairs(ns.MirageData.WINDOWS) do if name == "LefthyToolsLodestarSmall" then counted = true end end
+check(not escapes and not counted and s.win:GetScript("OnUpdate") == nil and s.win.TitleContainer.TitleText:GetText() == "Lodestar",
+	"Escape leaves it open and Mirage doesn't count it (like the Bestiary's small window), no OnUpdate on it, its title is the module's name")
 check(s.now == 9002 and Has(s.texts, "Now  in this zone"), "now: the quest of my log in this zone, and why: " .. tostring(s.now))
 check(RowWith("[6] The Second Step") and Has(s.texts, "Step 2 of 3 · A Fine Start") and s.win.Bar:IsShown(),
 	"its title with its level, its step in its chain and the bar")
@@ -841,13 +843,13 @@ do
 	Q.PlanClear()
 	slash("")
 	local s = Small()
-	check(s.win:IsShown() and not Has(s.texts, "Plan") and s.planMap == nil and not RowWith("Next ("), "no plan: the companion as before")
+	check(s.win:IsShown() and not Has(s.texts, "Plan") and s.planMap == nil and not RowWith("Stop 1 of"), "no plan: the companion as before")
 	Q.PlanAdd(9005)
 	Q.PlanAdd(9010)
 	Advance(0.5)
 	s = Small()
-	local nextRow = RowWith("Next (1/4): Pick up Fine Wolf Pelts at Tailor Ann")
-	check(Has(s.texts, "Plan") and nextRow and Plain(nextRow.Right:GetText()) == "right here" and RowIndex("Next (1/4)") < RowIndex("The Second Step"),
+	local nextRow = RowWith("Stop 1 of 4: Pick up Fine Wolf Pelts at Tailor Ann")
+	check(Has(s.texts, "Plan") and nextRow and Plain(nextRow.Right:GetText()) == "right here" and RowIndex("Stop 1 of 4") < RowIndex("The Second Step"),
 		"a plan: on top, the next stop with how far and which way, before Now")
 	check(s.planMap and s.planMap.frame:IsShown() and s.planMap.map == 1429 and s.map.frame ~= s.planMap.frame, "its own small map: the next stop's zone")
 	local marks = s.planMarks
@@ -861,7 +863,8 @@ do
 	marks[3]:Click()
 	check(shownOnMap[#shownOnMap][1] == 9010 and shownOnMap[#shownOnMap][2].x == 0.52, "a number clicked: that stop on the map")
 	marks[3]._scripts.OnEnter(marks[3])
-	check(Has(TOOLTIP.lines, "Click: show it on the map") and Plain(TOOLTIP.title) == "3. Pick up Kobold Candles at William Pestle", "its tooltip")
+	check(Has(TOOLTIP.lines, "Click: show it on the map") and Plain(TOOLTIP.title) == "3. Pick up Kobold Candles at William Pestle"
+		and marks[3].Kind.path == "Interface\\GossipFrame\\AvailableQuestIcon", "its tooltip, its kind on it (a pick-up: !)")
 	marks[3]._scripts.OnLeave(marks[3])
 	local pinsBefore = #pins
 	STATE.shift = true
@@ -869,7 +872,7 @@ do
 	STATE.shift = false
 	check(#pins == pinsBefore + 1 and pins[#pins].uiMapID == 1429 and #links > 0, "Shift-click: the game's map pin there, in chat too")
 	RowWith("Skip"):Click()
-	check(RowWith("Next (2/4): Turn in Fine Wolf Pelts at Tailor Ann") and #Small().planMarks == 3, "Skip: done for now, the next one comes up")
+	check(RowWith("Stop 2 of 4: Turn in Fine Wolf Pelts at Tailor Ann") and #Small().planMarks == 3, "Skip: done for now, the next one comes up")
 	-- Zoomed: the numbers go with the art.
 	local m = Small().planMap
 	m:Zoom(2)
@@ -878,7 +881,7 @@ do
 	Q.PlanClear()
 	Q.PlanAdd(9003)
 	Advance(0.5)
-	nextRow = RowWith("Next (1/2): Pick up Westward Bound at Farmer Saldean")
+	nextRow = RowWith("Stop 1 of 2: Pick up Westward Bound at Farmer Saldean")
 	check(nextRow and Plain(nextRow.Right:GetText()) == "Westfall" and Has(Small().texts, "Plan  Westfall") and Small().planMap.map == 1436,
 		"a stop in another zone: its name, its map")
 	-- Every stop done: the part goes; the plan cleared too.

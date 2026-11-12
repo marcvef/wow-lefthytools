@@ -52,7 +52,9 @@ function Window.OpenCount()
 	return count
 end
 
-function Window.Create(name, title, width, height)
+-- stays: a window that stays open beside the game (the Lodestar companion, like the Bestiary's small
+-- window): Escape doesn't close it and it doesn't count as using the interface.
+function Window.Create(name, title, width, height, stays)
 	local frame = CreateFrame("Frame", name, UIParent, "ButtonFrameTemplate")
 	if ButtonFrameTemplate_HidePortrait then
 		ButtonFrameTemplate_HidePortrait(frame)
@@ -70,8 +72,10 @@ function Window.Create(name, title, width, height)
 	if frame.SetTitle then
 		frame:SetTitle(title)
 	end
-	table.insert(UISpecialFrames, name) -- Escape closes it
-	Window.Register(name)
+	if not stays then
+		table.insert(UISpecialFrames, name) -- Escape closes it
+		Window.Register(name)
+	end
 	frame:Hide()
 	frame:HookScript("OnShow", function() LT.Trail("window " .. name) end)
 	frame:HookScript("OnHide", function() LT.Trail("window closed " .. name) end)
