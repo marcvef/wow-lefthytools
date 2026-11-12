@@ -946,9 +946,12 @@ setting off).
 
 ## Big window (Browser.lua)
 
-`Q.ToggleBrowser()` opens or closes it; `Q.OpenBrowser(id)` opens it on a quest (its zone or dungeon on
-the left, on the Zone tab its zone's map with the quest picked on it, a dungeon's quest list, its details
-on the right; true when it's open with the data); `Q.SelectZone(map)` opens it on a zone's page (a
+`Q.ToggleBrowser()` opens or closes it; `Q.OpenBrowser()` opens it as it was, `Q.OpenBrowser(id)` is
+`Q.ShowOnMap(id)`; `Q.ShowOnMap(id[, spot])` opens it on a quest (its zone or dungeon on the left, on the
+Zone tab its zone's map with the quest picked on it, found and pulsing, a dungeon's quest list, its details
+on the right; a spot `{ map, x, y[, r] }`: zoomed in to that spot; true when it's shown: **Finding a quest
+on the map**, below); `Q.ShowDetails(id)` opens it on the tab it shows with the quest picked, its details
+on the right (no other tab, the map not moved; true when shown); `Q.SelectZone(map)` opens it on a zone's page (a
 uiMapID, a city's floor or a cave counting as its zone, or a dungeon's name; nothing picked, its
 briefing on the right; false when there's no such place); `Q.OpenChain(id)` opens it on a quest's chain
 (the quest's zone on the Zone tab, the quest picked, its chain in the middle with its card in sight: what a
@@ -1048,18 +1051,25 @@ with quests known." and a click does nothing. Looked at when the middle is drawn
 
 **A quest's row clicked** (the quest list's and the search results' rows, the right pane's rows: Turn in
 now, In progress here, a chain's or the quests without a chain's steps; the details' steps around it,
-Needs first and Leads to; a chain card's "next" line): **a click shows it on the map**, a right-click its
-chain (`Side.Click`). A click: the Zone tab's map with the quest picked (its pins ringed, its objectives'
-areas and way, its details on the right), never the chain's page: on that map already only picked (the
-map goes to it), else as **going to a quest** (below) on the Zone tab, the chain's page left (kept for the
-switch's Chain), the quest list, a view or the results giving way (the search stays, "Back to the search
-results"); a dungeon's quest: its Zone tab, its list. A right-click: its chain, as its badge does
-(`Side.ShowChain`, `Q.OpenChain`'s way); a quest in no chain: the map. Their tooltips say "Click: show it on
-the map · Right-click: its chain" (in no chain: "Click: show it on the map"). The map's pins keep theirs
-(a click picks, a right-click or Shift-click the game's map pin), so do a chain's cards on its page (a click
-picks it there) and the stubs. **The controller has no right-click**: its ways to a chain are the "2/4"
-badge on every row of a chain's quest, the details' "Open the chain >" and the switch's Chain (and a
-chain's card in the briefing).
+Needs first and Leads to; a chain card's "next" line; `Side.Click`), round 7 (the players: "first the details
+in the pane with the small map, then a button for the big map"): **where the zone's map is in sight** (the
+Zone tab's map page) a click shows it on the map; **elsewhere** (the quest list, the search's results, a
+chain's page, another file's view) **its details come first**: the quest picked, its details on the right with
+the small map, the middle as it is (`Side.Details`); **Ctrl-click** shows it on the map there too (the
+controller: the details' **"Show on map"**). A right-click: its chain, as its badge does (`Side.ShowChain`,
+`Q.OpenChain`'s way); a quest in no chain: the map. Showing it on the map (`Side.ShowOnMap`): the Zone tab's
+map with the quest picked (its pins ringed, its objectives' areas and way, its details on the right), never
+the chain's page: on that map already only picked (found, below), else as **going to a quest** (below) on
+the Zone tab, the chain's page left (kept for the switch's Chain), the quest list, a view or the results
+giving way (the search stays, "Back to the search results"); a dungeon's quest: its Zone tab, its list.
+Their tooltips say "Click: details · Ctrl-click: show it on the map · Right-click: its chain" (in no chain:
+"Click: details · Ctrl-click: show it on the map"); on the map page "Click: show it on the map ·
+Right-click: its chain" (in no chain: "Click: show it on the map"). The map's pins keep theirs (a click
+picks, a right-click or Shift-click the game's map pin, Alt-click the plan: below), so do the stubs; a
+chain's cards on its page: a click picks it there (details, small map), Ctrl-click the map (their tooltip:
+"Click: details", "Ctrl-click: show it on the map"). **The controller has no right-click**: its ways to a
+chain are the "2/4" badge on every row of a chain's quest, the details' "Open the chain >" and the switch's
+Chain (and a chain's card in the briefing).
 
 A zone's pages show its quests (`Q.ZoneQuests`) and those given there but listed elsewhere
 (`Q.ZoneGiven(map)`: the Deadmines' quests at Sentinel Hill); its count stays its own quests'.
@@ -1105,8 +1115,8 @@ also "Then Chain above the map: its quest chain").
 - **Right-click or Shift-click**: the game's own map pin there (`Q.Waypoint`, a chat line says so).
 - **The wheel zooms where the cursor is** (x 1.35 a step, up to 8: the map's spot under the cursor stays
   under it), -, + zoom around the middle, Fit shows the whole zone; dragging moves it; a pin the
-  controller's cursor moves to out of sight brings the map to it, and so does a quest picked while
-  nothing of it (giver, turn-in, areas) is in sight (`Map.Follow`). Another zone starts whole.
+  controller's cursor moves to out of sight brings the map to it, and a quest picked is found on it
+  (**Finding a quest on the map**, below). Another zone starts whole.
 - **My arrow** (`Interface\Minimap\MinimapArrow`, turned by `GetPlayerFacing`) where I am when I'm on that
   map (`Q.PlayerAt`), moved ten times a second by an OnUpdate on a frame of the map that's shown only
   while I'm on it (off it, or in an instance: hidden, nothing runs; looked at again after
@@ -1218,12 +1228,14 @@ page), back to the briefing (nothing picked). Then in a scroll area, on the 8 px
   the "!", the ender with the "?" (grey until it's done); objects and items said so; an item: its icon,
   and its best drop under it ("Drops from Young Wolf (12%) · Elwynn Forest"; an object "In ... (x%)"). A
   line is a Button: its tooltip has the spot and the rest (the other drops, "Starts at" the other givers,
-  "Turn in at" the other enders, three each, "... and N more"), a click puts **a map pin** there.
+  "Turn in at" the other enders, three each, "... and N more"), a click puts **a map pin** there and finds
+  it on the map (round 7, below; so does an objective's line: its area).
 - The small map (the same widget as the zone page's, not zoomable), only when the zone page's map isn't in
   sight (a chain's page, the quest list, another tab, the search): for a quest in my log the map of its
   objectives (else its turn-in's), else its first giver's map (else a drop's, else the first ender's),
   with every giver, ender and drop area and the quest's own areas and way on it; a click on a pin puts the
-  map pin there.
+  map pin there; a pin hovered or clicked pulses. A giver's, turn-in's, drop's or objective's line clicked
+  shows that spot's map here (another zone's too) and pulses the spot.
 - **Rewards** (`Q.Rewards`): "Choose one of:" and its items, "You get:" (or "You also get:" after a
   choice) and its items: the game's icons (36 px, `C_Item.GetItemIconByID`), the count, a border in the
   quality's colour (`C_Item.GetItemQualityByID`, not for a common one; an item the client doesn't know yet
@@ -1245,7 +1257,10 @@ page), back to the briefing (nothing picked). Then in a scroll area, on the 8 px
 At the bottom, outside the scroll area: **Map pin** (the game's map pin where to go next: the turn-in when
 it's ready, in my log the first objective not done yet that has an area, else the turn-in; not taken yet
 its giver, an item's best drop; greyed without a spot; its tooltip says where) and **Companion** (the
-quest in the small window, `Q.ShowQuest`).
+quest in the small window, `Q.ShowQuest`). On top, right of the way back, **"Show on map"** (round 7, a
+Button with the map icon: the controller's Ctrl-click): the quest on the Zone tab's map, found and pulsing
+(`Side.ShowPicked`); after a giver's, turn-in's, drop's or objective's line was clicked, that spot instead,
+zoomed in (its tooltip says which). The title line has the plan's **"+"** at its right (below).
 
 ### A chain opened
 
@@ -1267,7 +1282,8 @@ is a bit dimmer and its line dashed, its tooltip says it isn't needed for what c
 closes (`excl`) and friends are in its tooltip. Not for me, or skipped: dimmed.
 The quest picked: a gold edge and glow. **The next step pulses once** (a gold glow in and out) when the
 chain is opened from its card, and is brought into sight. The right pane: the quest picked, else the
-chain's briefing (its steps).
+chain's briefing (its steps). A card clicked picks it there (its details, the small map), Ctrl-clicked:
+the quest on the zone's map (round 7).
 
 **Lines** (`CreateLine`, 2 px): down from a card, across the gap, down into the next; green when both are
 done, amber from a done, available or in-log one, grey otherwise (the lit ones on a higher sublevel). A
@@ -1348,8 +1364,9 @@ level, then the hard ones, then the rest; by level; a folded group isn't sorted)
 your levels · Show all levels" (a click turns the filter on). A row: the start's icon, "[12] title" (level
 in its tier's colour, title in its status's colour), at the right the giver (a hard one: "Hard · " before it, orange), or for a blocked, later or not-for-me one
 its reason ("Needs Investigate Echo Ridge", "Needs level 7", "Not for your faction"), left of it a quest of
-a chain's badge ("5/9": a click opens the chain on the Zone tab). A click elsewhere on the row shows the
-quest on the Zone tab's map, picked (a right-click: its chain).
+a chain's badge ("5/9": a click opens the chain on the Zone tab), at its left the plan's "+" (round 7). A
+click elsewhere on the row picks it: its details on the right with the small map, the list staying;
+Ctrl-click: the quest on the Zone tab's map, picked (a right-click: its chain).
 
 ### Views other files add
 
@@ -1368,14 +1385,16 @@ replaces its label and build (a view already built stays). Returns true when reg
 shows the briefing of the place shown (or the quest picked) beside it.
 
 `Q.ShowBrowserView(key)` opens the window (if it isn't) on that tab: "zone" (the zone's page), "overview"
-(the quest list) or a registered view's key; false for an unknown one. From a view, `Q.OpenBrowser(questID)`
-goes to the quest (its zone's map, picked) and `Q.SelectZone(map)` to a zone's page (both on the Zone
-tab).
+(the quest list) or a registered view's key; false for an unknown one. From a view, `Q.ShowDetails(questID)`
+picks the quest beside it (its details on the right, the view stays), `Q.ShowOnMap(questID[, spot])` (and
+`Q.OpenBrowser(questID)`, the same) goes to the quest (its zone's map, picked, found) and
+`Q.SelectZone(map)` to a zone's page (both on the Zone tab).
 
 ### Filters
 
-Two checkboxes of ours (Buttons with the game's checkbox art), kept in the module's settings
-(`browser = { allLevels, showOther, tab }`, made when first needed; a tab of the version before, "chains" or
+Two checkboxes of ours (Buttons with the game's checkbox art; a third, **Plan on map**, `planMap`, on by
+default, only with the plan: **The plan in the big window**, below), kept in the module's settings
+(`browser = { allLevels, showOther, planMap, tab }`, made when first needed; a tab of the version before, "chains" or
 "map", becomes "zone"; the earlier `hideDone` and `onlyAvailable` are just ignored):
 
 - **All levels** (off): off, the zone page (pins, threads, the line under the map) and the briefing (its
@@ -1398,20 +1417,21 @@ quest list). The search and the counts aren't filtered.
 
 ### Going to a quest, the search
 
-**Going to a quest** (a link, a search result, a stub, a chain badge, `Q.OpenBrowser(id)`, `Q.OpenChain(id)`): it stays in the place shown
+**Going to a quest** (a link Ctrl-clicked, a stub, a chain badge, `Q.ShowOnMap(id)` (`Q.OpenBrowser(id)`), `Q.OpenChain(id)`): it stays in the place shown
 if that place lists it (its own quests and those given there), else goes to the quest's zone if that
 zone lists it, else its dungeon, else its zone. Its continent unfolds, the left list scrolls to the place
 when it changed, and on the Zone tab its zone's map shows it picked (a dungeon: its list; a stub, a badge
-or a right-click: its chain opened there, its card in the middle); `Q.OpenBrowser(id)` keeps the quest list
-the quest list. A quest's row clicked goes to the Zone tab's map (above: **a quest's row clicked**). A click on a quest (a card, a
+or a right-click: its chain opened there, its card in the middle). A quest's row clicked shows its details
+first where the zone's map isn't in sight (above: **a quest's row clicked**). A click on a quest (a card, a
 row, a pin, a link) also shows it in the small window when that's open (`Q.IsSmallShown()`; without it
-this is skipped). A click on a place on the left shows its page with nothing picked (the quest list stays
+this is skipped; not for the calls of other files). A click on a place on the left shows its page with nothing picked (the quest list stays
 the quest list; a registered view goes back to Zone).
 
 **Search.** Typed into the box, searched 0.3 s after the last key: a quest ID finds that quest, two
 letters or more go to `Q.Search(text)` (titles, the client's too, and givers). The results replace the
-page (a list, each with its zone, in `Q.Compare`'s order, a quest's ID first). A click on a result shows it
-on its zone's map (above; a right-click: its chain), with "Back to the search
+page (a list, each with its zone, in `Q.Compare`'s order, a quest's ID first). A click on a result picks
+it (its details, the results stay); Ctrl-click shows it on its zone's map (above; a right-click: its
+chain), with "Back to the search
 results" in the tab bar; a click on a place or a tab does the same with that place. The search stays (the
 box keeps its text) until it's emptied (the box's X, or deleting it), which goes back to the place, the
 quest in the details in sight. One letter: "Type at least two letters." Closed before a search was due,
@@ -1420,6 +1440,58 @@ it runs when the window opens again.
 **No data.** `Q.Load()` (it loads `LefthyTools_QuestData` the first time) not true, or no `Q.Load`: the
 window says the data isn't there (missing or switched off in the AddOns list), without panes, search or
 filters.
+
+### Finding a quest on the map (round 7)
+
+The players: "it should also go to the place and highlight it ... sometimes I click on the quest and can't
+find where it actually is on the map." A quest picked on the Zone tab's map (a pin, a row, a link,
+`Q.ShowOnMap`; not `Q.ShowDetails`, which leaves the map as it is) is **found** (`ZonePage.Find`): its pins
+(giver, turn-in, an item's drops), its giver and turn-in where no pin of it is, and its objectives' areas
+(`Map.PickItems`) are brought into sight when they aren't all (`Map.Bring`: moved into the middle, zoomed
+**out** as far as they need, 24 px kept free; never zoomed in, so one pin never zooms) and **pulse**
+(`Map.Flash`): a gold glow and a ring of ours (18 `Line`s) around each pin, a brighter gold outline (a ring
+3 px outside) and a softer glow on each area, all on one frame of ours over the art and the areas, under the
+pins, whose alpha an `AnimationGroup` takes in and out three times (0.25 s in, 0.45 s each way, 0.9 s out:
+3 s) and which is hidden when it's done (`OnFinished`); the quest picked keeps its gold ring. At most 24
+things pulse; zoomed meanwhile, they're laid again; another map, the window closed: stopped.
+
+**A spot** (`Q.ShowOnMap(id, { map, x, y[, r] })`, a giver's, turn-in's, drop's or objective's line in the
+details, "Show on map" after one): its zone's page (`Map.PlaceOfSpot`: the zone of the left whose map it is,
+or the one above a city's floor or a cave, `C_Map.GetMapRectOnMap` walking up; on no zone's map: the quest
+as above), the quest picked, zoomed **in** to it (300%, `Map.FOCUS`; an area with `r` only as far as it
+fits), in the middle, pulsing; the spot is kept (`state.spot`) for "Show on map" until another quest is
+picked. With the zone's map not in sight the line's click leaves the middle as it is: the details' small
+map shows the spot's map (another zone's too: `Details.MapSpots`' force) and pulses it. A pin of the small
+map pulses when hovered or clicked.
+
+### The plan in the big window (round 7)
+
+The plan (Plan.lua: `Q.PlanHas`, `Q.PlanToggle`, `Q.PlanStops`, `Q.PlanRev`, `Q.PlanNext`; without them
+nothing of this shows):
+
+- **"+"** (`Make.NewPlus`, a Button of its own, 16 px, `UI-PlusButton-Up`; the check `common-icon-checkmark`
+  when the quest is in the plan) at the left of every quest's row of the quest list and the search's
+  results, of the right pane's rows (Turn in now, In progress here, a chain's Steps), on the details' title
+  line, and at the right of a pin's list's rows (a pin of several quests). Its tooltip: "Add to plan" / "In
+  your plan", the quest, what a click does. A click: `Q.PlanToggle` (only when the plan still is what the
+  button showed: changed elsewhere meanwhile, it's only drawn again), then what shows the plan is drawn
+  again. A pin of one quest: **Alt-click** adds it or takes it out (its tooltip says which). A quest's
+  tooltip says "In your plan".
+- **The plan on the map** (`Stops`): the zone page's map shows the plan's stops not done that are on it
+  (`Q.PlanStops`' `spot`, a city's floor or a cave moved onto its zone), each a numbered disc of ours (its
+  place in `Q.PlanStops`; a Button, up and left of the spot so the quest's own pin stays clickable), the
+  next one (`Q.PlanNext`) gold and larger, joined by a line in the plan's order (3 px, light blue, under the
+  pins); a stop in another zone: the line goes to the map's edge toward it (the world's coordinates,
+  `C_Map.GetWorldPosFromMapPos`; another continent: no line) and says "to Westfall (4)" there ("from
+  Westfall (3)" for the way back in). A disc's tooltip: "4. Pick up Wanted: Hogger · Marshal Dughan" ("Kill
+  10 x Kobold Vermin · Wanted: Hogger", "Turn in ... · <ender>"), "Next stop" for the next; a click picks
+  its quest and pulses the stop, a right-click puts the game's map pin there. Worked out (`Stops.For`) only
+  when `Q.PlanRev` or the map shown changes, laid again when the map is zoomed. **Plan on map** (a filter,
+  on by default, kept as `planMap`) switches it off.
+- **When the plan changed** (`Stops.Check`: `Q.PlanRev` against the one drawn last): after a "+" clicked,
+  with the quest log's updates (an objective done changes the stops), when the middle is drawn, and when
+  Plan.lua tells (`Q.OnPlanChanged(fn)`, if it has it: on the next frame): the rows' "+", the right pane, a
+  pin's list and the map's stops are drawn again; nothing is asked per frame.
 
 ### What it costs
 
@@ -1447,7 +1519,9 @@ placed again); the handlers only note it, the window redraws on the next frame (
 something is due), at most every 0.5 s for statuses, 0.2 s after titles and items. `Q.OnDataChanged`: open,
 everything worked out goes and it's drawn again on the next frame; closed, when it opens. Dragging (the
 canvas, the map) runs an OnUpdate only while the button is held; my arrow's only while I'm on the map
-shown. Closed: no events, no OnUpdate.
+shown. Closed: no events, no OnUpdate. Round 7: finding a quest is worked out once per click (its spots on
+the map, one zoom), the pulse is an `AnimationGroup` (nothing of ours per frame); the plan's stops on the map
+once per `Q.PlanRev` and map, its "+" read (`Q.PlanHas`) when a row is filled.
 
 ### Controller and taint
 
@@ -1465,7 +1539,9 @@ buttons in sight): their buttons are the panel's own, and a card or pin the curs
 (its middle outside, in gamepad mode or without the mouse over it) moves the view to it; -, + and Fit zoom
 the map. A right-click or Shift has no controller button: on a pin the details' Map pin does it; on a
 quest's row (its chain) the row's "2/4" badge, the details' "Open the chain >" and the switch's Chain do
-(and "Current zone", the chain cards' next-step lines are Buttons too). The canvas and the
+(and "Current zone", the chain cards' next-step lines are Buttons too). Ctrl-click (a quest on the map
+from a row elsewhere) has the details' "Show on map"; the plan's "+" (rows, details, a pin's list), its
+discs on the map and "Plan on map" are Buttons; Alt-click on a pin has its details' "+". The canvas and the
 map have no OnMouseDown/OnMouseUp (they'd be buttons to SmartNavigation), only the wheel and dragging.
 Nothing of Blizzard's (navigation flags, mixins, Backdrop) is set on our frames. A registered view's frames
 are its own file's: the same rules apply.
@@ -1488,7 +1564,16 @@ have sections of their own, and so do "Current zone" and the left's order (a cit
 nowhere, the quest list, a search, German names), how hard (the counts, the order, the marks, the pins'
 rings, the tooltips and details, red only with all levels) and the order everywhere (a zone of chains in my
 log, for my level, hard and coming up; what each card calls next; the quest list, the briefing, the search;
-a chain's steps; the clicks on rows, the next step's line and the cards).
+a chain's steps; the clicks on rows, the next step's line and the cards). Round 7: the plan's functions
+(Plan.lua's, made in parallel) are missing until its sections, then stand-ins of the shared contract
+(Plan.lua's put back at the end); sections for finding a quest (nothing moves when it's in sight, moved and
+zoomed out only as far as it needs, the pulse's rings and AnimationGroup, a spot zoomed in to, a large
+area, a city's floor, another zone, no zone; the details' lines on the map page and with the small map,
+"Show on map"), the details first (`Q.ShowDetails` on the quest list, the map, another file's view, closed;
+a chain's cards, Ctrl-click), the plan's "+" (none without it, the rows' room, tooltips, a click, the
+details', the briefing's, drawn again only on `Q.PlanRev`, a stale one, Alt-click, a pin's list) and the
+plan on the map (numbers, the next one, the lines, toward another zone and from it, tooltips, zoomed,
+clicks, a stop done, another zone's page, the toggle, without it).
 
 ### Open questions (in game)
 
@@ -1509,6 +1594,11 @@ a chain's steps; the clicks on rows, the next step's line and the cards).
   the server itself), and `C_Item.GetItemQualityByID` answers after `ITEM_DATA_LOAD_RESULT`.
 - Whether the quest log's objective lines (`C_QuestLog.GetQuestObjectives`) come in the data's order on a
   German client (the names there are German: matched by kind and order).
+- Round 7: that an `AnimationGroup` on the pulse's frame fades its `Line`s and textures together and
+  `OnFinished` runs (else it stays at alpha 0, shown); that `Spells\GenericGlow64` in gold reads around a
+  pin on every zone's art; that `C_Map.GetMapRectOnMap` gives a city's floor's place on its zone (Stormwind
+  on Elwynn Forest) and `C_Map.GetWorldPosFromMapPos` a sensible direction to the next zone for the plan's
+  line; that SmartNavigation reaches the "+" inside a row (a Button in a Button) and inside a pin's list.
 
 ## Views (Views.lua)
 

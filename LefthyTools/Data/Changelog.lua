@@ -536,5 +536,8 @@ ns.CHANGELOG = {
 	{ id = 176, module = "beacon",
 		en = { "Beacon: given away, no longer reserved", "A won item traded or mailed to someone other than its winner is no longer reserved for them: its \"Won by\" line and border go, also from the other copies of the same item (crafted items are all alike). Trades and mails to the winner are also noticed when the game empties the slots early." },
 		de = { "Beacon: weitergegeben, nicht reserviert", "Ein gewonnenes Item, das du jemand anderem als dem Gewinner handelst oder schickst, ist nicht mehr für ihn reserviert: Die Zeile \"Gewonnen von\" und der Rahmen verschwinden, auch bei anderen Exemplaren desselben Items (hergestellte Items sind alle gleich). Handel und Post an den Gewinner werden auch erkannt, wenn das Spiel die Plätze früh leert." } },
+	{ id = 177, module = "lodestar",
+		en = { "Lodestar: find it on the map", "Clicking a quest in a list shows its details with the small map first; Ctrl-click or \"Show on map\" opens the big map, where its pins and areas come into view and pulse. A giver, turn-in or objective clicked in the details zooms to that spot. A + beside each quest puts it in your plan, whose stops show numbered on the map." },
+		de = { "Lodestar: auf der Karte finden", "Ein Klick auf eine Quest in einer Liste zeigt zuerst ihre Details mit der kleinen Karte; Strg-Klick oder \"Auf der Karte zeigen\" öffnet die große Karte, wo ihre Punkte und Gebiete ins Bild kommen und pulsieren. Ein Klick auf Questgeber, Abgabe oder Ziel in den Details zoomt zu dieser Stelle. Ein + neben jeder Quest setzt sie auf deinen Plan, dessen Halte nummeriert auf der Karte stehen." } },
 	-- New entries go here, at the end.
 }

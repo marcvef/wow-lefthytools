@@ -262,6 +262,15 @@ for key, fn in pairs(stand) do
 	saved[key] = Q[key] or false
 	Q[key] = fn
 end
+-- Round 7's plan (Plan.lua makes it in parallel): missing until its sections (no "+" buttons, nothing of
+-- it on the map), then stand-ins of the shared contract there; Plan.lua's own put back at the end.
+local PLAN_KEYS = { "PlanList", "PlanHas", "PlanAdd", "PlanRemove", "PlanToggle", "PlanMove", "PlanClear", "PlanRev", "PlanStops", "PlanNext",
+	"OnPlanChanged" }
+local planSaved = {}
+for _, key in ipairs(PLAN_KEYS) do
+	planSaved[key] = Q[key] or false
+	Q[key] = nil
+end
 local M = LT:GetModule("lodestar")
 local browserSaved = M and M.db and M.db.browser
 if M and M.db then M.db.browser = nil end
@@ -782,7 +791,8 @@ do
 	-- Tooltips.
 	active._scripts.OnEnter(active)
 	check(TOOLTIP.shown and TOOLTIP.title == "Investigate Echo Ridge" and TOOLTIP.lines[1] == "In your quest log"
-		and TOOLTIP.lines[#TOOLTIP.lines] == "Click: details", "hovering: a tooltip")
+		and TOOLTIP.lines[#TOOLTIP.lines - 1] == "Click: details" and TOOLTIP.lines[#TOOLTIP.lines] == "Ctrl-click: show it on the map",
+		"hovering: a tooltip (a click: its details; Ctrl-click: the map)")
 	local tip = table.concat(TOOLTIP.lines, "|")
 	check(tip:find("Step 4 of 9 · Elwynn's Kobolds", 1, true) and tip:find("Then: Skirmish at Echo Ridge", 1, true), "with its step and what's next")
 	active._scripts.OnLeave(active)
@@ -795,10 +805,17 @@ do
 	check(TOOLTIP.title == "Westfall" and plain(TOOLTIP.lines[1]) == "In another zone: [10] The People's Militia"
 		and TOOLTIP.lines[#TOOLTIP.lines] == "Click: go there", "a stub's tooltip")
 	stub._scripts.OnLeave(stub)
-	-- A step's row clicked: the zone's map with it picked, never the chain's page; the switch goes back.
+	-- A step's row clicked: picked there (its details, the small map in them), the chain's page stays;
+	-- Ctrl-click: the zone's map with it picked, never the chain's page; the switch goes back.
 	br.rows[6]:Click()
+	check(st.picked == 105 and st.chain == CHAIN1 and view.g.frame:IsShown() and not view.zp:IsShown() and view.d.Panel:IsShown()
+		and view.d.map.frame:IsShown() and card(105).Glow:IsShown(), "a step clicked: its details with the small map, the chain's page stays, its card picked")
+	unpick()
+	STATE.ctrl = true
+	view.b.rows[6]:Click()
+	STATE.ctrl = false
 	check(st.picked == 105 and st.chain == nil and view.zp:IsShown() and not view.g.frame:IsShown() and st.lastChain == CHAIN1
-		and st.tab == "zone", "a step clicked: the zone's map with it picked (not the chain), the chain kept for the switch")
+		and st.tab == "zone", "Ctrl-click: the zone's map with it picked (not the chain), the chain kept for the switch")
 	view.switch.chain:Click()
 	unpick()
 	check(st.chain == CHAIN1 and view.g.frame:IsShown(), "the switch's Chain: back to it")
@@ -968,7 +985,7 @@ do
 		and m.areas[1].Fill.vertex[1] == color[1], "the small map: its objectives' areas in its chain's colour, a dot on each line that has one")
 	o2._scripts.OnEnter(o2)
 	local tip = plain(table.concat(TOOLTIP.lines, "|"))
-	check(tip == "Drops from Kobold Miner (32%) · Elwynn Forest|Drops from Old Chest (5%) · Westfall|Click: put a map pin there"
+	check(tip == "Drops from Kobold Miner (32%) · Elwynn Forest|Drops from Old Chest (5%) · Westfall|Click: map pin there, and find it on the map"
 		and m.areas[3].Fill.vertex[4] == 0.42 and m.areas[1].Fill.vertex[4] == 0.07, "hovering a line: where it drops (every source) and its area lit, the others dim, got " .. tip)
 	o2._scripts.OnLeave(o2)
 	check(m.areas[1].Fill.vertex[4] == 0.22 and m.areas[3].Fill.vertex[4] == 0.22, "left: all as before")
@@ -1008,7 +1025,7 @@ do
 		"who gives it and takes it back, where: a line each")
 	d.places[1]._scripts.OnEnter(d.places[1])
 	local tip1 = plain(table.concat(TOOLTIP.lines, "|"))
-	check(tip1 == "Elwynn Forest  42.0, 66.0|Starts at|Wanted Poster (an object) · Elwynn Forest|Click: put a map pin there",
+	check(tip1 == "Elwynn Forest  42.0, 66.0|Starts at|Wanted Poster (an object) · Elwynn Forest|Click: map pin there, and find it on the map",
 		"the other givers: in its tooltip, got " .. tip1)
 	d.places[1]._scripts.OnLeave(d.places[1])
 	check(plain(d.objectives[1].Text:GetText()) == "Use Wanted Poster" and not (d.objectives[2]:IsShown()), "an object to use")
@@ -1141,8 +1158,14 @@ do
 		"the dungeon's chain given here, it says where")
 	card(202):Click()
 	view.d.links[1]:Click()
+	check(st.where == "z:1436" and st.picked == 301 and st.chain == "z:1436:301" and view.g.frame:IsShown(),
+		"Needs first clicked on a chain's page: its details, the chain stays")
+	card(202):Click()
+	STATE.ctrl = true
+	view.d.links[1]:Click()
+	STATE.ctrl = false
 	check(st.where == "z:1436" and st.picked == 301 and st.chain == nil and view.zp:IsShown(),
-		"Needs first in a dungeon, given here, clicked: it stays, on this zone's map")
+		"Needs first in a dungeon, given here, Ctrl-clicked: it stays, on this zone's map")
 	zoneRow("d:The Deadmines"):Click()
 	check(st.where == "d:The Deadmines" and st.chain == nil and st.picked == nil and cardsOutline() == "d:The Deadmines:301",
 		"the dungeon: its page, its briefing (a place clicked: nothing picked)")
@@ -1206,8 +1229,21 @@ do
 	STATUS_OF[106], WHY[106] = "locked", nil
 	Q.ToggleBrowser(); Q.ToggleBrowser()
 	listRow(111):Click()
+	check(st.tab == "overview" and view.list.scroll:IsShown() and not view.zp:IsShown() and st.picked == 111
+		and plain(view.d.Title:GetText()) == "[9] Princess Must Die" and view.d.map.frame:IsShown() and view.d.map.map == ELWYNN
+		and listRow(111).Picked:IsShown(), "a row clicked: its details first (the small map in them), the quest list stays")
+	listRow(111)._scripts.OnEnter(listRow(111))
+	check(TOOLTIP.lines[#TOOLTIP.lines] == "Click: details · Ctrl-click: show it on the map", "its tooltip says so, got " .. tostring(TOOLTIP.lines[#TOOLTIP.lines]))
+	listRow(111)._scripts.OnLeave(listRow(111))
+	view.d.Show:Click()
+	check(st.tab == "zone" and view.zp:IsShown() and st.picked == 111 and marker("Remy").Ring:IsShown(),
+		"the details' Show on map (the controller's way): the Zone tab's map with it picked")
+	view.tabs.overview:Click()
+	STATE.ctrl = true
+	listRow(111):Click()
+	STATE.ctrl = false
 	check(st.tab == "zone" and view.zp:IsShown() and st.picked == 111 and plain(view.d.Title:GetText()) == "[9] Princess Must Die"
-		and marker("Remy").Ring:IsShown() and M.db.browser.tab == "zone", "a row clicked: the Zone tab's map with it picked (its pin ringed), its details")
+		and marker("Remy").Ring:IsShown() and M.db.browser.tab == "zone", "a row Ctrl-clicked: the Zone tab's map with it picked (its pin ringed), its details")
 	view.tabs.overview:Click()
 	listRow(104):Click("RightButton")
 	check(st.tab == "zone" and st.chain == CHAIN1 and st.picked == 104 and card(104).Glow:IsShown(), "a row right-clicked: its chain, the quest picked in it")
@@ -1306,7 +1342,9 @@ do
 	Q.ChainStep = function(id) local a, b = step(id); return a, b, a and string.rep("A very long chain name ", 12) end
 	view.Box:SetText("echo")
 	Wait(0.5)
+	STATE.ctrl = true
 	listRow(103):Click()
+	STATE.ctrl = false
 	check(view.Back:IsShown() and sw:IsShown() and sw._points[1][2] + sw:GetWidth() <= view.tabBar:GetWidth() - view.Back:GetWidth() - 8
 		and sw.chain.Text.width < #sw.chain.Text:GetText() * 6, "a long name is cut short: the switch keeps beside the way back to the results")
 	view.Clear:Click()
@@ -1322,10 +1360,11 @@ do
 		and row.Badge._points[1][2] == -168, "the quest list: a quest of a chain has its badge (its step, as the details count it), left of the giver; one in none hasn't")
 	check(row.Name._points[2][2] == -170 - row.Badge:GetWidth() - 6 and plainRow.Name._points[2][2] == -170, "the title leaves it room")
 	row._scripts.OnEnter(row)
-	check(TOOLTIP.lines[#TOOLTIP.lines - 1] == "Click: show it on the map · Right-click: its chain" and TOOLTIP.lines[#TOOLTIP.lines] == "Click 5/9: open the chain",
+	check(TOOLTIP.lines[#TOOLTIP.lines - 1] == "Click: details · Ctrl-click: show it on the map · Right-click: its chain"
+		and TOOLTIP.lines[#TOOLTIP.lines] == "Click 5/9: open the chain",
 		"the row's tooltip says what each click does, got " .. tostring(TOOLTIP.lines[#TOOLTIP.lines - 1]))
 	plainRow._scripts.OnEnter(plainRow)
-	check(TOOLTIP.lines[#TOOLTIP.lines] == "Click: show it on the map", "one in no chain: only the map")
+	check(TOOLTIP.lines[#TOOLTIP.lines] == "Click: details · Ctrl-click: show it on the map", "one in no chain: no chain")
 	plainRow._scripts.OnLeave(plainRow)
 	row._scripts.OnLeave(row)
 	row.Badge._scripts.OnEnter(row.Badge)
@@ -1333,7 +1372,11 @@ do
 		"the badge's own tooltip")
 	row.Badge._scripts.OnLeave(row.Badge)
 	plainRow:Click()
-	check(st.tab == "zone" and st.picked == 110 and view.zp:IsShown(), "a click on a row elsewhere: the map with it picked")
+	check(st.tab == "overview" and st.picked == 110 and view.d.Panel:IsShown(), "a click on a row elsewhere: its details")
+	STATE.ctrl = true
+	plainRow:Click()
+	STATE.ctrl = false
+	check(st.tab == "zone" and st.picked == 110 and view.zp:IsShown(), "Ctrl-click on a row elsewhere: the map with it picked")
 	view.tabs.overview:Click()
 	row = listRow(104)
 	row.Badge:Click()
@@ -1379,8 +1422,13 @@ do
 		"searched after a moment: the results replace the page, got " .. listOutline())
 	check(plain(listRow(105).Right:GetText()) == "Elwynn Forest", "a result says its zone")
 	listRow(105):Click()
+	check(not st.drilled and st.picked == 105 and listOutline() == "#Search results 103 105" and view.d.Panel:IsShown() and view.d.map.frame:IsShown()
+		and listRow(105).Picked:IsShown(), "a result clicked: its details (the small map), the results stay")
+	STATE.ctrl = true
+	listRow(105):Click()
+	STATE.ctrl = false
 	check(st.drilled and st.picked == 105 and st.chain == nil and view.Box:GetText() == "echo" and view.zp:IsShown() and view.Back:IsShown()
-		and marker("Deputy Willem").Ring:IsShown(), "a result clicked: its zone's map, picked on it, a way back, the search stays")
+		and marker("Deputy Willem").Ring:IsShown(), "a result Ctrl-clicked: its zone's map, picked on it, a way back, the search stays")
 	check(plain(view.Back.Text:GetText()) == "Back to the search results", "the way back says so")
 	view.Back:Click()
 	check(not st.drilled and listOutline() == "#Search results 103 105" and not view.Back:IsShown(), "back: the results")
@@ -1975,9 +2023,345 @@ do
 	check(st.where == "z:1429", "the zone gone: back to mine")
 end
 
+-- Round 7: a quest found on the map (moved, zoomed out as far as needed, pulsing), a spot asked for
+-- (zoomed in to it), the details first where the map isn't in sight, the plan's "+" buttons and the
+-- plan on the map (Plan.lua's Q.PlanHas, Q.PlanToggle, Q.PlanStops, Q.PlanRev, Q.PlanNext: stand-ins).
+local statusBefore = {}
+for id, s in pairs(STATUS_OF) do statusBefore[id] = s end
+local function inSight(m, x, y)
+	local sx, sy = m.ox + x * m.artW, m.oy + y * m.artH
+	return sx >= 0 and sx <= m.width and sy >= 0 and sy <= m.height
+end
+local function centred(m, x, y)
+	return math.abs(m.ox + x * m.artW - m.width / 2) < 1 and math.abs(m.oy + y * m.artH - m.height / 2) < 1
+end
+local function ringLines(f)
+	local n = 0
+	for _, l in ipairs(f.lines) do n = n + (l:IsShown() and 1 or 0) end
+	return n
+end
+
+section("Lodestar: the big window, finding a quest on the map (round 7)")
+do
+	STATUS_OF[101], STATUS_OF[102], STATUS_OF[103], STATUS_OF[104], STATUS_OF[105], STATUS_OF[110] = "done", "done", "active", "available", "locked", "available"
+	Q.HideBrowser()
+	Q.SelectZone(ELWYNN)
+	view.tabs.zone:Click()
+	unpick()
+	local m = view.zp.map
+	m.buttons.fit:Click()
+	-- The whole zone in sight: nothing moves; its pins and areas pulse.
+	local ox, oy, flashes = m.ox, m.oy, m.flashes or 0
+	check(Q.ShowOnMap(103) == true and st.picked == 103 and st.tab == "zone" and view.zp:IsShown(), "Q.ShowOnMap(id): the Zone tab's map, the quest picked")
+	local f = m.Flash
+	check(m.zoom == 1 and m.ox == ox and m.oy == oy, "all of it in sight already: the map stays")
+	check(f and f:IsShown() and f.Anim:IsPlaying() and m.flashes == flashes + 1 and f.rings == 4 and ringLines(f) == 4 * 18
+		and f:GetParent() == m.Map and f:GetFrameLevel() < marker("Deputy Willem"):GetFrameLevel(),
+		"its turn-in's pin and its three areas pulse: a glow and a ring of ours each, under the pins, got " .. tostring(f and f.rings))
+	local ring2 = f.lines[19] -- (the first area's ring: its radius, 3 px outside the area)
+	check(math.abs(ring2.from[1] - (0.4 * m.artW + 0.03 * m.artW + 3)) < 0.01 and math.abs(ring2.from[2] + 0.5 * m.artH) < 0.01
+		and f.glows[2].blend == "ADD", "an area's ring: its outline, brighter")
+	local alphas = {}
+	for _, a in ipairs(f.Anim.anims) do alphas[#alphas + 1] = a.from .. ">" .. a.to end
+	check(table.concat(alphas, " ") == "0>1 1>0.35 0.35>1 1>0.35 0.35>1 1>0" and f.Anim.final, "an AnimationGroup on the frame: in and out three times, then gone")
+	f.Anim:Finish()
+	check(not f:IsShown() and marker("Deputy Willem").Ring:IsShown(), "done: hidden, the quest picked keeps its gold ring")
+	-- Zoomed in on a corner: moved there, zoomed out only as far as it needs.
+	CURSOR.x, CURSOR.y = 4, -4
+	for _ = 1, 5 do m.frame._scripts.OnMouseWheel(m.frame, 1) end
+	local zoom = m.zoom
+	check(zoom > 4 and not inSight(m, 0.48, 0.42), "zoomed in on the corner")
+	Q.ShowOnMap(103)
+	check(m.zoom < zoom and m.zoom > 3 and inSight(m, 0.48, 0.42) and inSight(m, 0.37, 0.455) and inSight(m, 0.64, 0.61) and f:IsShown(),
+		"out of sight: its pin and its areas brought into sight, zoomed out only as far as they need, got " .. m.zoom)
+	m.buttons.fit:Click()
+	Q.ShowOnMap(110)
+	check(st.picked == 110 and m.zoom == 1 and f.rings == 2, "its pins (where its item drops, two) in sight: never zoomed in to them, got " .. tostring(st.picked) .. " " .. m.zoom .. " " .. tostring(f.rings))
+	-- A spot: zoomed in to it, in the middle.
+	check(Q.ShowOnMap(104, { map = ELWYNN, x = 0.45, y = 0.6 }) == true and st.picked == 104 and m.zoom == 3 and centred(m, 0.45, 0.6)
+		and f:IsShown() and f.rings == 1 and st.spot and st.spot.quest == 104, "a spot: zoomed in to it (300%), in the middle, pulsing")
+	Q.ShowOnMap(103, { map = ELWYNN, x = 0.6, y = 0.55, r = 0.2 })
+	check(math.abs(m.zoom - (674 - 48) / (2 * 0.2 * m.artW / m.zoom)) < 0.01 and centred(m, 0.6, 0.55), "a large area: only as far in as it fits, got " .. m.zoom)
+	Q.ShowOnMap(101, { map = 1453, x = 0.5, y = 0.5 })
+	check(st.where == "z:1429" and st.picked == 101 and m.zoom == 3 and centred(m, 0.2, 0.2), "a spot on a city's floor: on its zone's map")
+	Q.ShowOnMap(103, { map = WESTFALL, x = 0.5, y = 0.5 })
+	check(st.where == "z:1436" and st.picked == 103 and view.zp:IsShown() and m.map == WESTFALL and m.zoom == 3 and centred(m, 0.5, 0.5)
+		and zoneRow("z:1436").Picked:IsShown(), "a spot in another zone: that zone's page, the quest picked, zoomed in to it")
+	check(Q.ShowOnMap(104, { map = 999999, x = 0.5, y = 0.5 }) == true and st.where == "z:1429" and st.picked == 104,
+		"a spot on no zone's map: the quest on its map")
+	check(Q.ShowOnMap(424242) == false, "an unknown quest: false")
+	-- The details' lines on the zone's map page: the map pin (as before), and the map goes there.
+	local d = view.d
+	local pins = pinStubs()
+	m.buttons.fit:Click()
+	d.places[1]:Click()
+	check(#pins == 1 and pins[1].x == 0.42 and st.picked == 104 and m.zoom == 3 and centred(m, 0.42, 0.66) and f:IsShown() and f.rings == 1,
+		"its giver's line clicked: the game's map pin, and the map zoomed in to it, pulsing")
+	d.objectives[1]:Click()
+	check(#pins == 2 and pins[2].x == 0.47 and centred(m, 0.47, 0.58) and st.spot.r == 0.01, "an objective's line: its area")
+	pins.off()
+	-- Not in sight (the quest list): the small map in the details pulses it, "Show on map" goes there.
+	view.tabs.overview:Click()
+	unpick()
+	local ends = QUESTS_DATA[104].ends
+	QUESTS_DATA[104].ends = { { kind = "npc", id = 260, name = "Gryan Stoutmantle", points = { at(WESTFALL, 0.56, 0.47) } } }
+	listRow(104):Click()
+	check(st.tab == "overview" and st.picked == 104 and d.map.frame:IsShown() and d.map.map == ELWYNN and not view.zp:IsShown(),
+		"the quest list: its details, the small map of its giver's zone")
+	local small = d.map
+	local before = small.flashes or 0
+	pins = pinStubs()
+	d.places[1]:Click()
+	check(st.tab == "overview" and small.map == ELWYNN and small.Flash:IsShown() and small.flashes == before + 1 and #pins == 1
+		and small.flash[1].x == 0.42, "its giver clicked: the map pin, and the small map pulses it (the quest list stays)")
+	d.places[2]:Click()
+	check(st.tab == "overview" and small.map == WESTFALL and small.frame:IsShown() and small.Flash:IsShown() and small.flashes == before + 2
+		and small.flash[1].x == 0.56, "its turn-in in another zone: the small map shows that zone, pulsing there")
+	d.Show._scripts.OnEnter(d.Show)
+	check(d.Show._kind == "Button" and TOOLTIP.lines[1] == "The Zone tab's map, zoomed in to the place you picked in the details.", "Show on map says where it goes")
+	d.Show._scripts.OnLeave(d.Show)
+	d.Show:Click()
+	check(st.tab == "zone" and st.where == "z:1436" and st.picked == 104 and m.zoom == 3 and centred(m, 0.56, 0.47), "Show on map: there, on the Zone tab's map")
+	pins.off()
+	QUESTS_DATA[104].ends = ends
+	-- A pin of the small map: it pulses when hovered (and clicked).
+	Q.SelectZone(ELWYNN)
+	view.tabs.overview:Click()
+	listRow(104):Click()
+	local pin = small.markers[1]
+	before = small.flashes
+	pin._scripts.OnEnter(pin)
+	check(small.flashes == before + 1 and small.Flash:IsShown() and small.flash[1].x == pin.x, "a pin of the small map hovered: it pulses")
+	pin._scripts.OnLeave(pin)
+	Q.HideBrowser()
+	check(not small.Flash:IsShown() and not m.Flash:IsShown(), "the window closed: nothing pulses")
+	Q.SelectZone(ELWYNN)
+end
+
+section("Lodestar: the big window, details first (round 7)")
+do
+	local m, d = view.zp.map, view.d
+	view.tabs.overview:Click()
+	unpick()
+	check(Q.ShowDetails(103) == true and st.tab == "overview" and st.picked == 103 and d.Panel:IsShown() and d.map.frame:IsShown()
+		and view.list.scroll:IsShown(), "Q.ShowDetails(id): its details on the tab shown (the quest list stays), the small map in them")
+	view.tabs.zone:Click()
+	m.buttons.fit:Click()
+	m.buttons.plus:Click()
+	local ox, oy, zoom, flashes = m.ox, m.oy, m.zoom, m.flashes
+	check(Q.ShowDetails(104) == true and st.picked == 104 and m.zoom == zoom and m.ox == ox and m.oy == oy and m.flashes == flashes
+		and marker("Marshal Dughan").Ring:IsShown(), "on the zone's map: picked there, the map not moved, nothing pulsing")
+	Q.RegisterBrowserView("r7", "Round 7", function(parent) return { frame = CreateFrame("Frame", nil, parent) } end)
+	Q.ShowBrowserView("r7")
+	check(Q.ShowDetails(110) == true and st.tab == "r7" and st.picked == 110 and d.Panel:IsShown() and d.map.frame:IsShown(),
+		"from another file's view: its details beside it, the view stays")
+	check(Q.ShowDetails(424242) == false and Q.ShowDetails(nil) == false and st.picked == 110, "an unknown quest: false")
+	Q.HideBrowser()
+	check(Q.ShowDetails(103) == true and win:IsShown() and st.tab == "r7" and st.picked == 103, "closed: it opens on the tab it showed")
+	check(Q.OpenBrowser(104) == true and st.tab == "zone" and view.zp:IsShown() and st.picked == 104, "Q.OpenBrowser(id) is Q.ShowOnMap(id): the Zone tab's map")
+	registry.byKey.r7 = nil
+	view.tabs.r7:Hide()
+	view.tabs.r7 = nil
+	table.remove(registry.order)
+	registry.current = nil
+	-- A chain's card: a click picks it there (its details, the small map), Ctrl-click the map.
+	unpick()
+	openChain(CHAIN1)
+	card(104):Click()
+	check(st.chain == CHAIN1 and st.picked == 104 and view.g.frame:IsShown() and d.map.frame:IsShown(), "a chain's card clicked: picked there, the small map in its details")
+	STATE.ctrl = true
+	card(103):Click()
+	STATE.ctrl = false
+	check(st.chain == nil and st.picked == 103 and view.zp:IsShown() and st.lastChain == CHAIN1, "Ctrl-clicked: the zone's map with it")
+	-- The zone's map page: the briefing's rows show it on the map, their tooltips say so.
+	unpick()
+	local row
+	for _, r in ipairs(view.b.rows) do if r:IsShown() and r.quest == 103 then row = r end end
+	row._scripts.OnEnter(row)
+	check(TOOLTIP.lines[#TOOLTIP.lines - 1] == "Click: show it on the map · Right-click: its chain", "on the map page: a click shows it on the map")
+	row._scripts.OnLeave(row)
+	row:Click()
+	check(st.picked == 103 and view.zp:IsShown() and m.Flash:IsShown(), "clicked: picked on the map, pulsing")
+	unpick()
+end
+
+section("Lodestar: the big window, the plan's + (round 7)")
+do
+	view.tabs.overview:Click()
+	unpick()
+	local row = listRow(104)
+	check(not row.Plus:IsShown() and row.Name._points[1][2] == 24 and row.Icon.points[1][2] == 4, "without the plan (Plan.lua): no +")
+	-- The shared contract's plan (Plan.lua makes it): a list of quests, its rev.
+	local plan, rev, stops = {}, 0, {}
+	local function Has(id) for _, p in ipairs(plan) do if p == id then return true end end return false end
+	local toggles = 0
+	Q.PlanHas = Has
+	Q.PlanList = function() return plan end
+	Q.PlanToggle = function(id)
+		toggles = toggles + 1
+		if Has(id) then
+			for i, p in ipairs(plan) do if p == id then table.remove(plan, i) break end end
+		else
+			plan[#plan + 1] = id
+		end
+		rev = rev + 1
+	end
+	Q.PlanRev = function() return rev end
+	Q.PlanStops = function() return stops end
+	Q.PlanNext = function() for i, s in ipairs(stops) do if not s.done then return s, i end end end
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	row = listRow(104)
+	local p = row.Plus
+	check(p:IsShown() and p._kind == "Button" and p.Plus.shown and not p.Check.shown and row.Icon.points[1][2] == 22 and row.Name._points[1][2] == 42
+		and not listRow("z:1429:b:available").Plus:IsShown(), "the quest list: a + at the left of each quest's row (a Button), the icon and title after it; none on a heading")
+	p._scripts.OnEnter(p)
+	check(TOOLTIP.title == "Add to plan" and plain(TOOLTIP.lines[1]) == "[4] Brotherhood of Thieves", "its tooltip says it")
+	local fills = view.list.fills
+	p:Click()
+	check(plan[1] == 104 and toggles == 1 and listRow(104).Plus.Check.shown and not listRow(104).Plus.Plus.shown and view.list.fills > fills
+		and TOOLTIP.title == "In your plan" and TOOLTIP.lines[2] == "Click: remove from plan", "clicked: in the plan, the check instead of the +, drawn again (Q.PlanRev)")
+	p._scripts.OnLeave(p)
+	listRow(104)._scripts.OnEnter(listRow(104))
+	check(table.concat(TOOLTIP.lines, "|"):find("In your plan", 1, true), "the row's tooltip says so too")
+	listRow(104)._scripts.OnLeave(listRow(104))
+	-- The details' title line, the briefing's rows.
+	listRow(103):Click()
+	local d = view.d
+	check(d.Plan:IsShown() and d.Plan.Plus.shown and d.Title.width == d.bodyW - 44 - 18, "the details: a + on the title line")
+	d.Plan:Click()
+	check(plan[2] == 103 and d.Plan.Check.shown, "clicked: in the plan, a check")
+	d.Plan:Click()
+	check(not Has(103) and d.Plan.Plus.shown, "again: out of it")
+	unpick()
+	local briefRow
+	for _, r in ipairs(view.b.rows) do if r:IsShown() and r.quest == 103 then briefRow = r end end
+	check(briefRow and briefRow.Plus:IsShown() and briefRow.Text._points[1][2] == 26 + 18, "the briefing's rows: a + too")
+	-- Redrawn only when Q.PlanRev changes: a change elsewhere is drawn with the next quest log update.
+	fills = view.list.fills
+	Fire("QUEST_LOG_UPDATE")
+	Wait(1.1)
+	check(view.list.fills == fills, "nothing changed: the rows aren't drawn again")
+	plan[#plan + 1] = 110
+	rev = rev + 1
+	Fire("QUEST_LOG_UPDATE")
+	Wait(1.1)
+	check(listRow(110).Plus.Check.shown and view.list.fills > fills, "the plan changed elsewhere (Q.PlanRev): drawn again")
+	-- A + showing what's no longer so (changed elsewhere meanwhile): only drawn again.
+	table.remove(plan)
+	local stale = listRow(110).Plus
+	stale:Click()
+	check(not Has(110) and toggles == 3 and stale.Plus.shown, "a stale check clicked: nothing toggled, drawn as it is")
+	-- On the map: Alt-click a pin of one quest; a pin of several: its list's rows have the +.
+	view.tabs.zone:Click()
+	local wolf = marker("drops here (12%)")
+	wolf._scripts.OnEnter(wolf)
+	check(TOOLTIP.lines[#TOOLTIP.lines] == "Alt-click: add to plan", "a pin's tooltip: Alt-click adds it")
+	wolf._scripts.OnLeave(wolf)
+	STATE.alt = true
+	wolf:Click()
+	STATE.alt = false
+	check(Has(110) and st.picked == nil, "Alt-clicked: in the plan (nothing picked)")
+	wolf._scripts.OnEnter(wolf)
+	check(TOOLTIP.lines[#TOOLTIP.lines] == "Alt-click: remove from plan", "its tooltip now says so")
+	wolf._scripts.OnLeave(wolf)
+	local dughan = marker("Marshal Dughan")
+	dughan:Click()
+	local list = view.zp.map.chooser
+	check(list:IsShown() and list.rows[2].Plus and list.rows[2].Plus:IsShown() and list.rows[2].Plus.quest == 104 and list.rows[2].Plus.Check.shown
+		and list.rows[3].Plus.Plus.shown and not (list.rows[1].Plus and list.rows[1].Plus:IsShown()), "a pin of several quests: its list's rows have the + (a check: in the plan)")
+	list.rows[3].Plus:Click()
+	check(Has(101) and list:IsShown() and list.rows[3].Plus.Check.shown and st.picked == nil, "a + in the list: in the plan, the list stays")
+	list:Hide()
+	-- Without Q.PlanToggle: no buttons again.
+	Q.PlanToggle = nil
+	view.tabs.overview:Click()
+	check(not listRow(104).Plus:IsShown() and listRow(104).Name._points[1][2] == 24, "without Q.PlanToggle: none")
+	Q.PlanToggle = function(id) if Has(id) then for i, x in ipairs(plan) do if x == id then table.remove(plan, i) break end end else plan[#plan + 1] = id end rev = rev + 1 end
+	view.tabs.zone:Click()
+	-- The plan on the map: the stops at their spots, numbered, the next one gold, joined in order; a stop
+	-- in another zone: the line to the map's edge toward it.
+	local m = view.zp.map
+	local ELW = ELWYNN
+	stops[1] = { quest = 104, kind = "start", label = "Marshal Dughan", spot = at(ELW, 0.42, 0.66), done = true }
+	stops[2] = { quest = 104, kind = "objective", index = 1, label = "Use Wanted Poster", spot = at(ELW, 0.47, 0.58) }
+	stops[3] = { quest = 104, kind = "end", label = "Deputy Willem", spot = at(ELW, 0.48, 0.42) }
+	stops[4] = { quest = 201, kind = "start", label = "Gryan Stoutmantle", spot = at(WESTFALL, 0.5, 0.5) }
+	stops[5] = { quest = 103, kind = "objective", index = 1, label = "Kill 10 x Kobold Vermin", spot = at(ELW, 0.4, 0.5) }
+	rev = rev + 1
+	local plans = st.plans
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	check(view.filters.planMap:IsShown() and filters.planMap and st.plans == plans + 1, "the plan: worked out once when drawn; its toggle among the filters, on")
+	local function shownMarkers()
+		local out = {}
+		for _, b in ipairs(m.planMarkers or {}) do if b:IsShown() then out[#out + 1] = b.Num:GetText() end end
+		return table.concat(out, " ")
+	end
+	check(shownMarkers() == "2 3 5", "a marker per stop not done on this map, numbered in the plan's order, got " .. shownMarkers())
+	local first = m.planMarkers[1]
+	check(first._kind == "Button" and first.entry.next and first.Back.vertex[1] == 1 and first:GetWidth() == 22
+		and not m.planMarkers[2].entry.next and m.planMarkers[2]:GetWidth() == 18, "the next one: gold, larger")
+	check(math.abs(first._points[1][4] - (0.47 * m.artW - 12)) < 0.01 and math.abs(first._points[1][5] + (0.58 * m.artH - 12)) < 0.01,
+		"beside the spot (up and left of the quest's own pin there)")
+	local lines = {}
+	for _, l in ipairs(m.planLines) do if l:IsShown() then lines[#lines + 1] = l end end
+	check(#lines == 3 and math.abs(lines[1].from[1] - 0.47 * m.artW) < 0.01 and math.abs(lines[1].to[1] - 0.48 * m.artW) < 0.01,
+		"joined by a line in the plan's order: 2 to 3, then toward Westfall and back, got " .. #lines)
+	check(math.abs(lines[2].to[2] + 0.99 * m.artH) < 0.01 and lines[2].to[1] < 0.48 * m.artW and lines[2].thickness == 2,
+		"toward Westfall (south and west of Elwynn): to the map's bottom edge")
+	local labels = {}
+	for _, l in ipairs(m.planLabels) do if l:IsShown() then labels[#labels + 1] = l:GetText() end end
+	check(table.concat(labels, "|") == "to Westfall (4)|from Westfall (4)", "labelled at the edge, got " .. table.concat(labels, "|"))
+	first._scripts.OnEnter(first)
+	check(TOOLTIP.title == "2. Use Wanted Poster · Brotherhood of Thieves" and TOOLTIP.lines[1] == "Next stop", "its tooltip: the stop, the next one")
+	first._scripts.OnLeave(first)
+	m.planMarkers[2]._scripts.OnEnter(m.planMarkers[2])
+	check(TOOLTIP.title == "3. Turn in Brotherhood of Thieves · Deputy Willem", "a turn-in's")
+	m.planMarkers[2]._scripts.OnLeave(m.planMarkers[2])
+	-- Zoomed: laid again, not worked out again.
+	m.buttons.plus:Click()
+	check(st.plans == plans + 1 and math.abs(first._points[1][4] - (0.47 * m.artW - 12)) < 0.01, "zoomed: laid again where they are, not worked out again")
+	-- A click: its quest picked, the stop pulsing; a right-click: the game's map pin.
+	first:Click()
+	check(st.picked == 104 and m.Flash:IsShown() and m.flash[1].x == 0.47, "a marker clicked: its quest, the stop pulsing")
+	local pins = pinStubs()
+	first:Click("RightButton")
+	check(#pins == 1 and pins[1].x == 0.47, "right-clicked: the map pin there")
+	pins.off()
+	unpick()
+	-- The plan changed: worked out again (Q.PlanRev); a stop done: left out, the next one lit.
+	stops[2].done = true
+	rev = rev + 1
+	Fire("QUEST_LOG_UPDATE")
+	Wait(1.1)
+	check(st.plans == plans + 2 and shownMarkers() == "3 5" and m.planMarkers[1].entry.next, "a stop done: gone, the next one gold")
+	-- Another zone's page: its stop there, the lines toward Elwynn.
+	zoneRow("z:1436"):Click()
+	check(shownMarkers() == "4" and st.plans == plans + 3, "Westfall: its stop")
+	labels = {}
+	for _, l in ipairs(m.planLabels) do if l:IsShown() then labels[#labels + 1] = l:GetText() end end
+	check(table.concat(labels, "|") == "from Elwynn Forest (3)|to Elwynn Forest (5)", "and where the plan comes from and goes, got " .. table.concat(labels, "|"))
+	zoneRow("z:1429"):Click()
+	-- "Plan on map" off: nothing of it; on again: back, not worked out again.
+	view.filters.planMap:Click()
+	check(not filters.planMap and shownMarkers() == "" and M.db.browser.planMap == false, "Plan on map off: gone (kept in the settings)")
+	plans = st.plans
+	view.filters.planMap:Click()
+	check(filters.planMap and shownMarkers() == "3 5" and st.plans == plans, "on again: there")
+	-- Without the plan: nothing, no toggle.
+	Q.PlanStops = nil
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	check(shownMarkers() == "" and not view.filters.planMap:IsShown(), "without Q.PlanStops: nothing of it, no toggle")
+	for _, key in ipairs(PLAN_KEYS) do Q[key] = nil end
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	for id in pairs(STATUS_OF) do STATUS_OF[id] = statusBefore[id] end
+end
+
 -- Back as it was: the window closed, the real functions.
 Q.HideBrowser()
 for key, fn in pairs(saved) do
+	Q[key] = fn or nil
+end
+for key, fn in pairs(planSaved) do
 	Q[key] = fn or nil
 end
 if M and M.db then M.db.browser = browserSaved end

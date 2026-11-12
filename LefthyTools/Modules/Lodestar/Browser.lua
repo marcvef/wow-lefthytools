@@ -16,8 +16,13 @@ ns.Lodestar = Q
 -- Each surface shows what to do now and how far along; the rest is in tooltips. A quest's chain
 -- badge ("2/4") on the rows (the quest list, the right pane's) opens its chain, its card in sight
 -- (Q.OpenChain does it for other files). A quest's row (the quest list, the results, the right pane's
--- rows and links, a chain card's next step): a click shows it on the Zone tab's map, picked; a
--- right-click its chain (the controller: the badge, "Open the chain", the switch). "Current zone" beside
+-- rows and links, a chain card's next step): on the zone's map page a click shows it on the map; where
+-- the map isn't in sight its details come first (the small map in them, the middle staying), Ctrl-click
+-- the map (the controller: the details' "Show on map"); a right-click its chain (the controller: the
+-- badge, "Open the chain", the switch). A quest picked on the map is found: moved into sight (zoomed out
+-- as far as that needs) and pulsing (Q.ShowOnMap; a spot: zoomed in to it; Q.ShowDetails: only its
+-- details). The plan (Plan.lua): a "+" on every quest's row, the details' title line and a pin's list
+-- (Alt-click on a pin), its stops numbered on the zone's map, joined in order. "Current zone" beside
 -- the search: the place I'm in. The zones on the left alphabetical in each continent (the client's
 -- names). Every title's level in its tier's colour (Q.TierCode); "N for your level" apart from "M hard"
 -- (orange: listed after the ones that fit, marked, their pins ringed); every list of quests in
@@ -165,8 +170,9 @@ local REPEATABLE = { 0.1, 0.6, 1 }
 
 local frame, view
 -- By default only what's within my levels (Q.InRange) on the zone page and in the quest list; the
--- quests not for me (race, class, faction, a profession I don't have) left out everywhere.
-local filters = { allLevels = false, showOther = false }
+-- quests not for me (race, class, faction, a profession I don't have) left out everywhere. The plan
+-- (Plan.lua) on the zone's map by default.
+local filters = { allLevels = false, showOther = false, planMap = true }
 local state = {
 	where = nil,      -- the place shown: "z:<uiMapID>" or "d:<dungeon>"
 	picked = nil,     -- the quest in the details
@@ -192,6 +198,9 @@ local state = {
 	asked = {}, waiting = {}, -- titles asked of the client (QUEST_DATA_LOAD_RESULT)
 	items = {},       -- items asked of the client (ITEM_DATA_LOAD_RESULT: a reward's quality, a name)
 	logKey = nil,     -- what the right pane showed of my quest log (QUEST_LOG_UPDATE: drawn again when it changed)
+	spot = nil,       -- a place of the quest picked asked for in its details ({ quest, map, x, y, r }: "Show on map" goes there)
+	plan = nil,       -- the plan's stops on the zone page's map (Stops.For: kept while Q.PlanRev and the map stay)
+	planRev = nil, planAt = nil, plans = 0, -- the plan's Q.PlanRev drawn last; a change told (Q.OnPlanChanged); how often worked out
 	dataOld = false, statusOld = false, nextRefresh = 0, searchAt = nil, namesAt = nil, readyAt = nil, ready = nil,
 	listening = false,
 	draws = 0, trees_built = 0, layouts_built = 0, -- (for the tests)
@@ -200,8 +209,8 @@ local state = {
 local registry = { order = {}, byKey = {}, current = nil }
 local Graph, Map, Overview, Details, Chains, ZonePage, Views, Head, Tabs, Path, Make, Rule = {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
 -- The right pane (Side: the briefing or the details), its briefing (Brief: a zone's, a chain's), what a
--- quest asks (Task: its objectives, my progress on them, its rewards).
-local Side, Brief, Task = {}, {}, {}
+-- quest asks (Task: its objectives, my progress on them, its rewards), the plan on the zone's map (Stops).
+local Side, Brief, Task, Stops = {}, {}, {}, {}
 
 ---------------------------------------------------------------------------
 -- What's shown of a quest
@@ -1527,12 +1536,22 @@ local function QuestTip(owner, id, badge, row)
 		local fs = TONE[f.status] and f.status or "other"
 		GameTooltip:AddLine(LT.Window.ClassColorCode(f.classFile) .. (f.name or "?") .. "|r " .. HEX[fs] .. Word(fs) .. "|r")
 	end
+	if Side.InPlan(id) then
+		GameTooltip:AddLine(L["In your plan"], Stops.COLOR[1], Stops.COLOR[2], Stops.COLOR[3])
+	end
+	-- (a row on the zone's map page shows it on the map; elsewhere its details come first)
+	local onMap = view and view.zp:IsShown()
 	if not row then
 		GameTooltip:AddLine(L["Click: details"], 0.5, 0.75, 1)
-	elseif Rule.Step(id) then
+		GameTooltip:AddLine(L["Ctrl-click: show it on the map"], 0.5, 0.75, 1)
+	elseif onMap and Rule.Step(id) then
 		GameTooltip:AddLine(L["Click: show it on the map · Right-click: its chain"], 0.5, 0.75, 1)
-	else
+	elseif onMap then
 		GameTooltip:AddLine(L["Click: show it on the map"], 0.5, 0.75, 1)
+	elseif Rule.Step(id) then
+		GameTooltip:AddLine(L["Click: details · Ctrl-click: show it on the map · Right-click: its chain"], 0.5, 0.75, 1)
+	else
+		GameTooltip:AddLine(L["Click: details · Ctrl-click: show it on the map"], 0.5, 0.75, 1)
 	end
 	if badge then
 		GameTooltip:AddLine(L["Click %s: open the chain"]:format(badge), 0.5, 0.75, 1)
@@ -2449,6 +2468,9 @@ function Graph.NewCard(canvas)
 		if it and it.stub then
 			Untip(self)
 			Graph.Jump(it.quest)
+		elseif it and IsControlKeyDown and IsControlKeyDown() then
+			Untip(self)
+			Side.ShowOnMap(it.quest, true) -- (the controller's way: the details' "Show on map")
 		elseif it then
 			Graph.Pick(it.quest)
 		end
@@ -2643,9 +2665,14 @@ local function MarkerEnter(self)
 		end
 	end
 	GameTooltip:AddLine(m.onClick and L["Right-click or Shift-click: map pin"] or L["Click: put a map pin there"], 0.5, 0.75, 1)
+	if m.onClick and self.quests[1] and not self.quests[2] and Side.CanPlan() then -- (several: the list's rows have the +)
+		GameTooltip:AddLine(Side.InPlan(self.quests[1]) and L["Alt-click: remove from plan"] or L["Alt-click: add to plan"], 0.5, 0.75, 1)
+	end
 	GameTooltip:Show()
 	if m.onEnter then
 		m.onEnter(self)
+	elseif not m.zoomable then
+		Map.Flash(m, { { x = self.x, y = self.y, px = self:GetWidth() / 2 } }) -- (the details' small map: the pin pulses)
 	end
 end
 
@@ -2664,6 +2691,11 @@ local function MarkerClick(self, button)
 	Untip(self)
 	if button == "RightButton" or (IsShiftKeyDown and IsShiftKeyDown()) or not m.onClick then
 		Map.PinAt(m.map, self.x, self.y, self.spots[1] and self.spots[1].label)
+		if not m.zoomable then
+			Map.Flash(m, { { x = self.x, y = self.y, px = self:GetWidth() / 2 } })
+		end
+	elseif IsAltKeyDown and IsAltKeyDown() and self.quests[1] and not self.quests[2] and Side.CanPlan() then
+		Side.TogglePlan(self.quests[1]) -- (Alt-click: the plan; a pin of several: its list's +)
 	elseif self.quests[2] then
 		Map.Choose(m, self)
 	elseif self.quests[1] then
@@ -2704,6 +2736,25 @@ function Map.Choose(m, marker)
 		list:SetPoint("TOPLEFT", marker, "TOPRIGHT", 4, 0)
 	end
 	list:Open()
+	Map.ChooserPlus(m)
+end
+
+-- The list's quests each with a "+" at their right (a check when in the plan: Side.TogglePlan), a Button
+-- of ours on the list's row (the controller reaches it); none without the plan.
+function Map.ChooserPlus(m)
+	for _, row in ipairs(m.chooser and m.chooser.rows or EMPTY) do
+		local id = row:IsShown() and row.kind == "entry" and row.value or nil
+		if id and not row.Plus and Side.CanPlan() then
+			row.Plus = Make.NewPlus(row)
+			row.Plus:SetPoint("RIGHT", -2, 0)
+		end
+		if row.Plus then
+			local w = Make.FillPlus(row.Plus, id)
+			row.Text:ClearAllPoints()
+			row.Text:SetPoint("LEFT", 18, 0)
+			row.Text:SetPoint("RIGHT", -w, 0)
+		end
+	end
 end
 
 function Map.Choices(m)
@@ -2948,6 +2999,7 @@ function Map.Show(m, map, spots, name, threads)
 		if m.ZoomText then
 			m.ZoomText:SetText("")
 		end
+		Map.StopFlash(m) -- (another map: what pulsed isn't on it)
 	end
 	local width, height
 	if map then
@@ -3022,6 +3074,12 @@ function Map.Show(m, map, spots, name, threads)
 	m.shown = n
 	Map.DrawThreads(m, map and threads or nil, width, height)
 	Map.DrawPick(m, width, height)
+	if m.zoomable then
+		Stops.Draw(m) -- (the plan: worked out only when it or the map changed, laid again here)
+	end
+	if m.Flash and m.Flash:IsShown() then
+		Map.LayFlash(m) -- (zoomed while it pulses)
+	end
 	Map.PlaceMe(m)
 end
 
@@ -3437,6 +3495,537 @@ function Map.LightArea(m, objective)
 end
 
 ---------------------------------------------------------------------------
+-- Finding it on the map: a spot of another map (a city's floor, a cave) on its zone's, the zone page's
+-- map brought to what's asked (moved, zoomed out as far as that needs; one spot: zoomed in to it),
+-- and what's asked pulsing for a few seconds (an AnimationGroup on a frame of ours over the map's art:
+-- nothing of ours runs per frame)
+---------------------------------------------------------------------------
+
+Map.FOCUS = 3   -- one spot asked for: zoomed in this far (an area: as far as it still fits)
+Map.EDGE = 24   -- px kept free around what's brought into sight
+Map.RING = 18   -- the line segments of a pulsing ring
+Map.RINGS = 24  -- at most so many things pulse at once
+Map.PULSE = { { 0, 1, 0.25 }, { 1, 0.35, 0.45 }, { 0.35, 1, 0.45 }, { 1, 0.35, 0.45 }, { 0.35, 1, 0.45 }, { 1, 0, 0.9 } } -- alpha from, to, s
+
+-- A map's parent and (x, y) on it (a city's floor or a cave on its zone); nil when there's none or the
+-- game won't say (a continent's map is the top).
+function Map.Up(map, x, y)
+	local info = C_Map and LT.Value(C_Map.GetMapInfo, map)
+	local parent = type(info) == "table" and info.parentMapID
+	if type(parent) ~= "number" or parent == 0 or (info.mapType and info.mapType <= 2) or not C_Map.GetMapRectOnMap then
+		return nil
+	end
+	local ok, minX, maxX, minY, maxY = pcall(C_Map.GetMapRectOnMap, map, parent)
+	if ok and type(minX) == "number" and type(maxY) == "number" and not LT.IsSecret(minX) and not LT.IsSecret(maxY) then
+		return parent, minX + x * (maxX - minX), minY + y * (maxY - minY)
+	end
+end
+
+-- A spot ({ map, x, y }) on map: there itself, or from a city's floor or a cave on it. nil: not on it.
+function Map.OnMap(spot, map)
+	local m, x, y = spot.map, tonumber(spot.x), tonumber(spot.y)
+	for _ = 1, 4 do
+		if not (m and x and y) then
+			return nil
+		elseif m == map then
+			return x, y
+		end
+		m, x, y = Map.Up(m, x, y)
+	end
+end
+
+-- The zone page a spot is on (a zone of the left: its own map, or the one above a city's floor or a
+-- cave) and (x, y) on that zone's map. nil: none.
+function Map.PlaceOfSpot(spot)
+	Lists()
+	local m, x, y = spot.map, tonumber(spot.x), tonumber(spot.y)
+	for _ = 1, 4 do
+		if not (type(m) == "number" and x and y) then
+			return nil
+		elseif state.places["z:" .. m] then
+			return "z:" .. m, x, y
+		end
+		m, x, y = Map.Up(m, x, y)
+	end
+end
+
+-- A spot's place on the world (its continent, north, west); nil when the game won't say.
+function Map.World(map, x, y)
+	if not (C_Map and C_Map.GetWorldPosFromMapPos and CreateVector2D) then
+		return nil
+	end
+	local ok, continent, pos = pcall(C_Map.GetWorldPosFromMapPos, map, CreateVector2D(x, y))
+	if not ok or type(pos) ~= "table" or LT.IsSecret(pos) or LT.IsSecret(continent) then
+		return nil
+	end
+	local okXY, north, west = pcall(pos.GetXY, pos)
+	if okXY and type(north) == "number" and type(west) == "number" and not LT.IsSecret(north) and not LT.IsSecret(west) then
+		return continent, north, west
+	end
+end
+
+-- Where a spot of another map lies seen from map (0..1 on it, mostly outside): by the world's
+-- coordinates. nil: another continent, or the game won't say.
+function Map.Toward(map, spot)
+	local c, n, w = Map.World(spot.map, tonumber(spot.x) or 0.5, tonumber(spot.y) or 0.5)
+	local c0, n0, w0 = Map.World(map, 0, 0)
+	local c1, n1, w1 = Map.World(map, 1, 1)
+	if not (c and c0 and c1 and c == c0 and n1 ~= n0 and w1 ~= w0) then
+		return nil
+	end
+	return (w - w0) / (w1 - w0), (n - n0) / (n1 - n0)
+end
+
+-- Brought into sight on a zoomable map: items = { { x, y, r } } (0..1; r: an area's radius as a part
+-- of the map's width). A quest's: nothing moves while they're all in sight; else they're moved into
+-- the middle, zoomed out as far as they need (never in: one pin never zooms). focus (one spot): zoomed
+-- in to it (Map.FOCUS; an area only as far as it fits), in the middle. True when it moved.
+function Map.Bring(m, items, focus)
+	if not (m.zoomable and m.map and m.artW and items and items[1]) then
+		return false
+	end
+	local bw, bh = m.artW / m.zoom, m.artH / m.zoom -- (the art at 100%)
+	local x0, x1, y0, y1
+	for _, it in ipairs(items) do
+		local rx = tonumber(it.r) or 0
+		local ry = rx * bw / bh
+		x0, x1 = math.min(x0 or 1, it.x - rx), math.max(x1 or 0, it.x + rx)
+		y0, y1 = math.min(y0 or 1, it.y - ry), math.max(y1 or 0, it.y + ry)
+	end
+	local edge, zoom = Map.EDGE, m.zoom
+	if focus then
+		zoom = Map.FOCUS
+		local r = tonumber(items[1].r)
+		if r and r > 0 then
+			zoom = math.min(zoom, (math.min(m.width, m.height) - 2 * edge) / (2 * r * bw))
+		end
+	else
+		local function Seen(x, y)
+			local px, py = m.ox + x * m.artW, m.oy + y * m.artH
+			return px >= 6 and px <= m.width - 6 and py >= 6 and py <= m.height - 6
+		end
+		if Seen(x0, y0) and Seen(x1, y1) then
+			return false
+		end
+		zoom = math.min(m.zoom, (m.width - 2 * edge) / math.max(1, (x1 - x0) * bw), (m.height - 2 * edge) / math.max(1, (y1 - y0) * bh))
+	end
+	zoom = math.max(G.MAP_MIN, math.min(G.MAP_MAX, zoom))
+	Map.CloseChooser(m)
+	if math.abs(zoom - m.zoom) > 0.001 then
+		Map.SetZoom(m, zoom)
+	end
+	Map.Pan(m, m.width / 2 - (x0 + x1) / 2 * m.artW, m.height / 2 - (y0 + y1) / 2 * m.artH)
+	return true
+end
+
+-- What of a quest is on a map: its pins (giver, turn-in, an item's drops), its giver and turn-in where
+-- no pin of it is, its objectives' areas (Map.Bring's and Map.Flash's items).
+function Map.PickItems(m, id)
+	local items = {}
+	if not (id and m.map and m.artW) then
+		return items
+	end
+	for i = 1, m.shown do
+		local marker = m.markers[i]
+		for _, q in ipairs(marker.quests) do
+			if q == id then
+				items[#items + 1] = { x = marker.x, y = marker.y, px = marker:GetWidth() / 2, r = marker.drop and tonumber(marker.spots[1].r) or nil }
+				break
+			end
+		end
+	end
+	for kind = 1, 2 do
+		local b = m.ends[kind]
+		if b and b:IsShown() and b.spec then
+			items[#items + 1] = { x = b.spec.x, y = b.spec.y, px = 12 }
+		end
+	end
+	local pick = m.pick and m.pick.quest == id and m.pick.map == m.map and m.pick or nil
+	for _, a in ipairs(pick and pick.areas or EMPTY) do
+		items[#items + 1] = { x = a.x, y = a.y, r = tonumber(a.r) or 0.02 }
+	end
+	return items
+end
+
+-- The frame that pulses (over the art and the areas, under the pins): a gold glow and a ring of ours
+-- around each thing asked for, its alpha in and out three times, then hidden.
+function Map.NewFlash(m)
+	local f = CreateFrame("Frame", nil, m.Map)
+	f:SetAllPoints(m.Map)
+	f:SetFrameLevel(m.Map:GetFrameLevel() + 2)
+	f.glows, f.lines = {}, {}
+	f:Hide()
+	local g = f:CreateAnimationGroup()
+	for i, s in ipairs(Map.PULSE) do
+		local a = g:CreateAnimation("Alpha")
+		a:SetFromAlpha(s[1])
+		a:SetToAlpha(s[2])
+		a:SetDuration(s[3])
+		a:SetOrder(i)
+	end
+	g:SetToFinalAlpha(true)
+	g:SetScript("OnFinished", function()
+		f:Hide() -- (the quest picked keeps its gold ring)
+	end)
+	f.Anim = g
+	m.Flash = f
+	return f
+end
+
+-- items (Map.PickItems', or one spot: { x, y, r } or { x, y, px }) pulsing for three seconds.
+function Map.Flash(m, items)
+	if not (m.map and m.artW and items and items[1]) then
+		return
+	end
+	local f = m.Flash or Map.NewFlash(m)
+	m.flash = items
+	Map.LayFlash(m)
+	f.Anim:Stop()
+	f:Show()
+	f.Anim:Play()
+	m.flashes = (m.flashes or 0) + 1
+end
+
+function Map.StopFlash(m)
+	if m.Flash and m.Flash:IsShown() then
+		m.Flash.Anim:Stop()
+		m.Flash:Hide()
+	end
+end
+
+-- The glows and rings where the things pulsing are now (the map zoomed: laid again).
+function Map.LayFlash(m)
+	local f = m.Flash
+	local w, h = m.artW, m.artH
+	local nGlow, nLine = 0, 0
+	for i, it in ipairs(m.flash or EMPTY) do
+		if i > Map.RINGS then
+			break
+		end
+		local px, py = it.x * w, it.y * h
+		local area = tonumber(it.r) ~= nil
+		local radius = area and math.max(14, math.min(w * 0.25, it.r * w)) + 3 or (it.px or 12) + 7
+		nGlow = nGlow + 1
+		local glow = f.glows[nGlow]
+		if not glow then
+			glow = f:CreateTexture(nil, "ARTWORK")
+			glow:SetTexture(T.glow)
+			glow:SetBlendMode("ADD")
+			f.glows[nGlow] = glow
+		end
+		glow:SetVertexColor(1, 0.82, 0, area and 0.5 or 0.95)
+		glow:SetSize(radius * (area and 2.3 or 3), radius * (area and 2.3 or 3))
+		glow:ClearAllPoints()
+		glow:SetPoint("CENTER", m.Map, "TOPLEFT", px, -py)
+		glow:Show()
+		for k = 1, Map.RING do
+			local a1, a2 = (k - 1) * 2 * math.pi / Map.RING, k * 2 * math.pi / Map.RING
+			nLine = nLine + 1
+			local line = f.lines[nLine]
+			if not line then
+				line = f:CreateLine(nil, "OVERLAY")
+				line:SetThickness(2.5)
+				line:SetColorTexture(1, 0.88, 0.25, 1)
+				f.lines[nLine] = line
+			end
+			line:SetStartPoint("TOPLEFT", m.Map, px + radius * math.cos(a1), -(py + radius * math.sin(a1)))
+			line:SetEndPoint("TOPLEFT", m.Map, px + radius * math.cos(a2), -(py + radius * math.sin(a2)))
+			line:Show()
+		end
+	end
+	for i = nGlow + 1, #f.glows do
+		f.glows[i]:Hide()
+	end
+	for i = nLine + 1, #f.lines do
+		f.lines[i]:Hide()
+	end
+	f.rings = nGlow
+end
+
+---------------------------------------------------------------------------
+-- The plan on the zone page's map (Q.PlanStops, Plan.lua): its stops numbered (their place in the
+-- plan) at their spots, the next one lit, done ones left out, joined by a line in the plan's order;
+-- a stop in another zone: the line ends at the map's edge toward it, "to Westfall (4)". Worked out
+-- only when Q.PlanRev or the map shown changes, laid again when the map is zoomed. "Plan on map"
+-- (a filter, on by default) switches it off.
+---------------------------------------------------------------------------
+
+Stops.COLOR = { 0.35, 0.85, 1 }
+
+-- The plan's Q.PlanRev (it changes whenever the plan or its stops do); nil without it.
+function Stops.Rev()
+	if not Q.PlanRev then
+		return nil
+	end
+	local ok, rev = pcall(Q.PlanRev)
+	return ok and rev or nil
+end
+
+-- The plan's stops on this map (and the lines between them, the labels toward other zones); nil: none
+-- to show. Kept while Q.PlanRev and the map stay.
+function Stops.For(map)
+	if not (filters.planMap and map and Q.PlanStops) then
+		return nil
+	end
+	local rev = Stops.Rev()
+	local c = state.plan
+	if c and c.map == map and rev ~= nil and c.rev == rev then
+		return c.items[1] and c or nil
+	end
+	state.plans = state.plans + 1
+	local ok, stops = pcall(Q.PlanStops)
+	local nextAt
+	if Q.PlanNext then
+		local okNext, _, at = pcall(Q.PlanNext)
+		nextAt = okNext and tonumber(at) or nil
+	end
+	local live = {}
+	for i, stop in ipairs(ok and type(stops) == "table" and stops or EMPTY) do
+		local spot = type(stop) == "table" and not stop.done and (stop.spot or (type(stop.spots) == "table" and stop.spots[1]))
+		if type(spot) == "table" and spot.map then
+			nextAt = nextAt or i
+			local x, y = Map.OnMap(spot, map)
+			live[#live + 1] = { n = i, stop = stop, spot = spot, x = x, y = y, next = i == nextAt }
+		end
+	end
+	local items, segs, labels = {}, {}, {}
+	for k, e in ipairs(live) do
+		if e.x then
+			items[#items + 1] = e
+		end
+		local prev = live[k - 1]
+		if prev and prev.x and e.x then
+			segs[#segs + 1] = { prev.x, prev.y, e.x, e.y }
+		elseif prev and (prev.x or e.x) then
+			-- (one here, the other in another zone: toward it, to the map's edge, its zone and number there)
+			local here, there = prev.x and prev or e, prev.x and e or prev
+			local tx, ty = Map.Toward(map, there.spot)
+			local ex, ey = Stops.Edge(here.x, here.y, tx, ty)
+			local text = (here == prev and L["to %s (%d)"] or L["from %s (%d)"]):format(Stops.ZoneName(there.spot), there.n)
+			if ex then
+				segs[#segs + 1] = { here.x, here.y, ex, ey, out = true }
+			end
+			labels[#labels + 1] = { x = ex or here.x, y = ey or here.y, text = text, edge = ex ~= nil, from = here ~= prev }
+		end
+	end
+	state.plan = { map = map, rev = rev, items = items, segs = segs, labels = labels }
+	return items[1] and state.plan or nil
+end
+
+-- From (x, y) toward (tx, ty): where the line leaves the map (or reaches it, when it's on the map).
+function Stops.Edge(x, y, tx, ty)
+	if not (x and tx and ty) then
+		return nil
+	end
+	local dx, dy = tx - x, ty - y
+	if math.abs(dx) < 1e-6 and math.abs(dy) < 1e-6 then
+		return nil
+	end
+	local t = 1
+	if dx > 0 then
+		t = math.min(t, (0.99 - x) / dx)
+	elseif dx < 0 then
+		t = math.min(t, (0.01 - x) / dx)
+	end
+	if dy > 0 then
+		t = math.min(t, (0.99 - y) / dy)
+	elseif dy < 0 then
+		t = math.min(t, (0.01 - y) / dy)
+	end
+	t = math.max(0, t)
+	return x + dx * t, y + dy * t
+end
+
+-- The zone a spot is in (the left's name), else its map's name.
+function Stops.ZoneName(spot)
+	local id = Map.PlaceOfSpot(spot)
+	local place = id and state.places[id]
+	return place and place.name or MapName(spot.map) or "?"
+end
+
+-- What a stop is: "Pick up Wanted: Hogger · Marshal Dughan", "Kill 10 x Kobold Vermin · Wanted: Hogger",
+-- "Turn in Wanted: Hogger · Marshal Dughan".
+function Stops.Text(stop)
+	local title = Title(stop.quest)
+	local label = stop.label and stop.label ~= "" and stop.label or nil
+	if stop.kind == "start" then
+		return L["Pick up %s"]:format(title) .. (label and (SEP .. label) or "")
+	elseif stop.kind == "end" then
+		return L["Turn in %s"]:format(title) .. (label and (SEP .. label) or "")
+	end
+	return (label or "?") .. SEP .. title
+end
+
+-- A stop's marker: a numbered disc of ours (a Button: the controller reaches it), the next one gold.
+function Stops.Marker(m, i)
+	local b = m.planMarkers[i]
+	if not b then
+		b = CreateFrame("Button", nil, m.PlanTop)
+		b:SetSize(20, 20)
+		b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		b.Edge = b:CreateTexture(nil, "BACKGROUND")
+		b.Edge:SetTexture(T.circle)
+		b.Edge:SetPoint("CENTER")
+		b.Back = b:CreateTexture(nil, "BORDER")
+		b.Back:SetTexture(T.circle)
+		b.Back:SetPoint("CENTER")
+		b.Num = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		b.Num:SetPoint("CENTER", 0, 0)
+		b:SetHighlightTexture(T.highlight, "ADD")
+		b.owner = m
+		b:SetScript("OnEnter", Stops.Enter)
+		b:SetScript("OnLeave", Untip)
+		b:SetScript("OnClick", Stops.Click)
+		m.planMarkers[i] = b
+	end
+	return b
+end
+
+-- "4. Pick up Wanted: Hogger · Marshal Dughan", "Next stop" for the next, what a click does.
+function Stops.Enter(self)
+	local e = self.entry
+	if not e then
+		return
+	end
+	local m = self.owner
+	if GamepadCursor(self) then
+		Map.Reveal(m, e.x * m.artW, e.y * m.artH)
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(e.n .. ". " .. Stops.Text(e.stop), 1, 1, 1, 1, true)
+	if e.next then
+		GameTooltip:AddLine(L["Next stop"], 1, 0.82, 0)
+	end
+	GameTooltip:AddLine(L["Click: its quest · Right-click: map pin"], 0.5, 0.75, 1)
+	GameTooltip:Show()
+end
+
+-- A click: its quest picked (its details), the stop pulsing; a right-click: the game's map pin there.
+function Stops.Click(self, button)
+	local e = self.entry
+	if not e then
+		return
+	end
+	Untip(self)
+	local m = self.owner
+	if button == "RightButton" then
+		Map.PinAt(e.spot.map, e.spot.x, e.spot.y, Stops.Text(e.stop))
+		return
+	end
+	Side.Pick(e.stop.quest, true, "still")
+	Map.Flash(m, { { x = e.x, y = e.y, px = 12 } })
+end
+
+-- The plan laid on the zone page's map (Map.Show calls it): its markers at the stops' spots (beside the
+-- quest's own pin there, up and left), the lines between the spots, the labels toward other zones.
+function Stops.Draw(m)
+	local plan = m.map and Stops.For(m.map) or nil
+	if not m.PlanTop then
+		if not plan then
+			return
+		end
+		m.PlanLines = CreateFrame("Frame", nil, m.Map) -- (over the areas, under the pins)
+		m.PlanLines:SetAllPoints(m.Map)
+		m.PlanLines:SetFrameLevel(m.Map:GetFrameLevel() + 2)
+		m.PlanTop = CreateFrame("Frame", nil, m.Map) -- (over the pins, under my arrow)
+		m.PlanTop:SetAllPoints(m.Map)
+		m.PlanTop:SetFrameLevel(m.Map:GetFrameLevel() + 6)
+		m.planMarkers, m.planLines, m.planLabels = {}, {}, {}
+	end
+	local w, h = m.artW or m.width, m.artH or m.height
+	local c = Stops.COLOR
+	local nLine = 0
+	for _, s in ipairs(plan and plan.segs or EMPTY) do
+		nLine = nLine + 1
+		local line = m.planLines[nLine]
+		if not line then
+			line = m.PlanLines:CreateLine(nil, "OVERLAY")
+			m.planLines[nLine] = line
+		end
+		line:SetThickness(s.out and 2 or 3)
+		line:SetColorTexture(c[1], c[2], c[3], s.out and 0.6 or 0.9)
+		line:SetStartPoint("TOPLEFT", m.Map, s[1] * w, -s[2] * h)
+		line:SetEndPoint("TOPLEFT", m.Map, s[3] * w, -s[4] * h)
+		line:Show()
+	end
+	for i = nLine + 1, #m.planLines do
+		m.planLines[i]:Hide()
+	end
+	local n = 0
+	for _, e in ipairs(plan and plan.items or EMPTY) do
+		n = n + 1
+		local b = Stops.Marker(m, n)
+		b.entry = e
+		local size = e.next and 22 or 18
+		b:SetSize(size, size)
+		b.Back:SetSize(size, size)
+		b.Edge:SetSize(size + 4, size + 4)
+		if e.next then
+			b.Back:SetVertexColor(1, 0.82, 0, 1)
+			b.Edge:SetVertexColor(0.05, 0.05, 0.05, 0.9)
+			b.Num:SetTextColor(0, 0, 0)
+		else
+			b.Back:SetVertexColor(0.05, 0.05, 0.05, 0.9)
+			b.Edge:SetVertexColor(c[1], c[2], c[3], 1)
+			b.Num:SetTextColor(1, 1, 1)
+		end
+		b.Num:SetText(tostring(e.n))
+		b:ClearAllPoints()
+		b:SetPoint("CENTER", m.Map, "TOPLEFT", e.x * w - 12, -(e.y * h - 12))
+		b:Show()
+	end
+	for i = n + 1, #m.planMarkers do
+		local b = m.planMarkers[i]
+		b.entry = nil
+		Untip(b)
+		b:Hide()
+	end
+	local nLabel = 0
+	for _, l in ipairs(plan and plan.labels or EMPTY) do
+		nLabel = nLabel + 1
+		local fs = m.planLabels[nLabel]
+		if not fs then
+			fs = m.PlanTop:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+			m.planLabels[nLabel] = fs
+		end
+		fs:SetText(l.text)
+		fs:SetTextColor(c[1], c[2], c[3])
+		fs:ClearAllPoints()
+		-- (at the edge, moved inward so it reads; beside the marker when the way there isn't known)
+		local px = l.edge and math.max(60, math.min(w - 60, l.x * w)) or l.x * w + 16
+		local py = l.edge and math.max(12, math.min(h - 12, l.y * h)) + (l.from and 14 or 0) or l.y * h + 4
+		fs:SetPoint(l.edge and "CENTER" or "LEFT", m.Map, "TOPLEFT", px, -py)
+		fs:Show()
+	end
+	for i = nLabel + 1, #m.planLabels do
+		m.planLabels[i]:Hide()
+	end
+end
+
+-- The plan changed (Q.PlanRev; force: a "+" clicked): what shows it drawn again (the rows' "+", the
+-- details', a pin's list, the map's stops). False when it hadn't.
+function Stops.Check(force)
+	local rev = Stops.Rev()
+	if not view or (not force and (rev == nil or rev == state.planRev)) then
+		return false
+	end
+	state.planRev = rev
+	if view.list.scroll:IsShown() then
+		view.list:Lay()
+	end
+	Side.Draw()
+	local m = view.zp.map
+	if m.chooser and m.chooser:IsShown() then
+		m.chooser:Open()
+		Map.ChooserPlus(m)
+	end
+	if view.zp:IsShown() then
+		Stops.Draw(m)
+	end
+	return true
+end
+
+---------------------------------------------------------------------------
 -- The zone page: the map with its pins and threads, the chains' cards, what's here for me
 ---------------------------------------------------------------------------
 
@@ -3621,40 +4210,13 @@ function ZonePage.ShowPick(place)
 	Map.Repaint(m)
 end
 
--- Zoomed in, nothing of the quest picked in sight (its giver, turn-in, areas): the map centred on them.
-function Map.Follow(m)
-	local pick = m.pick
-	if not (pick and m.zoom > 1 and m.artW) then
-		return
-	end
-	local x0, x1, y0, y1
-	for _, s in ipairs({ pick.start or false, pick.finish or false }) do
-		if s then
-			x0, x1, y0, y1 = math.min(x0 or s.x, s.x), math.max(x1 or s.x, s.x), math.min(y0 or s.y, s.y), math.max(y1 or s.y, s.y)
-		end
-	end
-	for _, a in ipairs(pick.areas) do
-		x0, x1, y0, y1 = math.min(x0 or a.x, a.x), math.max(x1 or a.x, a.x), math.min(y0 or a.y, a.y), math.max(y1 or a.y, a.y)
-	end
-	if not x0 then
-		return
-	end
-	local function Seen(x, y)
-		local px, py = m.ox + x * m.artW, m.oy + y * m.artH
-		return px >= 0 and px <= m.width and py >= 0 and py <= m.height
-	end
-	for _, s in ipairs({ pick.start or false, pick.finish or false }) do
-		if s and Seen(s.x, s.y) then
-			return
-		end
-	end
-	for _, a in ipairs(pick.areas) do
-		if Seen(a.x, a.y) then
-			return
-		end
-	end
-	Map.CloseChooser(m)
-	Map.Pan(m, m.width / 2 - (x0 + x1) / 2 * m.artW, m.height / 2 - (y0 + y1) / 2 * m.artH)
+-- The quest picked found on the zone page's map: moved (and zoomed out) so all of it is in sight when
+-- it isn't (its pins, its giver and turn-in, its objectives' areas), and pulsing for a few seconds.
+function ZonePage.Find(id)
+	local m = view.zp.map
+	local items = Map.PickItems(m, id)
+	Map.Bring(m, items)
+	Map.Flash(m, items)
 end
 
 -- The thread shown while no card is hovered: the chain of the quest picked (none: no thread).
@@ -4674,6 +5236,8 @@ end
 -- pane is drawn by the caller (else it's drawn too).
 local function DrawMiddle(keep, focus, noSide)
 	state.draws = state.draws + 1
+	state.planRev = Stops.Rev() -- (everything drawn now shows the plan as it is)
+	view.filters.planMap:SetShown(Q.PlanStops ~= nil and view.Box:IsShown())
 	local mode = Mode()
 	local place = CurrentPlace()
 	local v = registry.byKey[mode]
@@ -4753,6 +5317,7 @@ local function FillListRow(row, e)
 	row.Icon:SetShown(not header and not e.more)
 	if header or e.more then
 		Make.FillBadge(row.Badge, nil)
+		Make.FillPlus(row.Plus, nil)
 	end
 	if e.more then -- (what the level filter left out; a click shows all levels)
 		row.Picked:Hide()
@@ -4777,6 +5342,10 @@ local function FillListRow(row, e)
 	local q = Quest(id)
 	local status = StatusOf(id)
 	StartIcon(row.Icon, q, status)
+	-- (its "+" at the left: the plan; the icon and the title after it)
+	local lx = Make.FillPlus(row.Plus, id)
+	row.Icon:ClearAllPoints()
+	row.Icon:SetPoint("LEFT", 4 + lx, 0)
 	local c = TONE[status]
 	row.Name:SetText(LevelTag(q) .. Hex(c[1], c[2], c[3]) .. Title(id) .. "|r")
 	local right
@@ -4798,7 +5367,7 @@ local function FillListRow(row, e)
 	row.Badge:ClearAllPoints()
 	row.Badge:SetPoint("RIGHT", right and -168 or -4, 0)
 	row.Name:ClearAllPoints()
-	row.Name:SetPoint("LEFT", 24, 0)
+	row.Name:SetPoint("LEFT", 24 + lx, 0)
 	row.Name:SetPoint("RIGHT", (right and -170 or -4) - badgeW, 0)
 end
 
@@ -4886,6 +5455,7 @@ function Brief.NewRow(parent, width)
 	b.Right:SetJustifyH("RIGHT")
 	b.Right:SetWordWrap(false)
 	b.Badge = Make.NewBadge(b)
+	b.Plus = Make.NewPlus(b)
 	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	b:SetScript("OnEnter", function(self)
 		if self.quest then
@@ -4925,22 +5495,26 @@ function Brief.FillRow(b, id, text, sub, right)
 	b.Right:SetText(right or "")
 	b.Right:SetShown(right ~= nil)
 	b:SetHeight(sub and 34 or 20)
+	-- (its "+" at the left: the plan; the icon and the text after it)
+	local lx = Make.FillPlus(b.Plus, id)
+	b.Plus:ClearAllPoints()
+	b.Plus:SetPoint(sub and "TOPLEFT" or "LEFT", 1, sub and -3 or 0)
 	b.Icon:ClearAllPoints()
-	b.Icon:SetPoint(sub and "TOPLEFT" or "LEFT", 2, sub and -2 or 0)
+	b.Icon:SetPoint(sub and "TOPLEFT" or "LEFT", 2 + lx, sub and -2 or 0)
 	b.Text:ClearAllPoints()
 	local badgeW = Make.FillBadge(b.Badge, id)
 	b.Badge:ClearAllPoints()
 	if sub then
 		b.Badge:SetPoint("TOPRIGHT", -4, -2)
-		b.Text:SetPoint("TOPLEFT", 26, -3)
+		b.Text:SetPoint("TOPLEFT", 26 + lx, -3)
 		b.Text:SetPoint("RIGHT", -4 - badgeW, 0)
 		b.Sub:ClearAllPoints()
-		b.Sub:SetPoint("TOPLEFT", 26, -19)
+		b.Sub:SetPoint("TOPLEFT", 26 + lx, -19)
 		b.Sub:SetPoint("RIGHT", -4, 0)
 	else
 		local rightW = right and (b.Right:GetStringWidth() + 12) or 4
 		b.Badge:SetPoint("RIGHT", -rightW, 0)
-		b.Text:SetPoint("LEFT", 26, 0)
+		b.Text:SetPoint("LEFT", 26 + lx, 0)
 		b.Text:SetPoint("RIGHT", -rightW - badgeW, 0)
 	end
 	b.Picked:SetShown(id == state.picked)
@@ -5046,6 +5620,7 @@ function Brief.End(top)
 	end
 	for i = b.nRows + 1, #b.rows do
 		b.rows[i].quest = nil
+		b.rows[i].Plus.quest = nil
 		b.rows[i]:Hide()
 	end
 	for i = b.nCards + 1, #b.cards do
@@ -5427,10 +6002,11 @@ function Details.WhereLine(q, which)
 end
 
 -- The small map: for a quest in my log the map of its objectives (else its turn-in's); else its first
--- giver's (else a drop's, else the first ender's); every giver, ender and drop spot on it.
-function Details.MapSpots(q, status)
-	local map
-	if status == "active" then
+-- giver's (else a drop's, else the first ender's); every giver, ender and drop spot on it. force: that
+-- map (a place of the quest asked for in the details: its spot's).
+function Details.MapSpots(q, status, force)
+	local map = force
+	if status == "active" and not map then
 		for _, o in ipairs(Task.List(q.id)) do
 			for _, s in ipairs(type(o.sources) == "table" and o.sources or EMPTY) do
 				local p = s.points and s.points[1]
@@ -5891,7 +6467,7 @@ function Details.PutBack()
 	local place = CurrentPlace()
 	local group = Mode() == "zone" and state.chain and place and Structure(place).byKey[state.chain] or nil
 	d.Back.Text:SetText(group and Chains.Name(group) or place and place.name or "")
-	d.Back:SetWidth(math.min(d.bodyW, d.Back.Text:GetStringWidth() + 28))
+	d.Back:SetWidth(math.min(d.bodyW - d.Show:GetWidth() - 8, d.Back.Text:GetStringWidth() + 28))
 end
 
 -- top: a new quest, shown from its top (else a refresh keeps the place). Its icon, title and status
@@ -5906,6 +6482,7 @@ local function FillDetails(top)
 	d.Body:SetShown(q ~= nil)
 	d.Small:SetShown(q ~= nil and Q.ShowQuest ~= nil)
 	d.Pin:SetShown(q ~= nil)
+	d.Show:SetShown(q ~= nil)
 	if not q then
 		for _, b in ipairs(d.links) do
 			b.quest = nil
@@ -5918,16 +6495,21 @@ local function FillDetails(top)
 	local status = StatusOf(id)
 	d.small = nil
 	if d.mapWanted then
-		local map, spots = Details.MapSpots(q, status)
+		local force = state.spot and state.spot.quest == id and state.spot.map or nil
+		local map, spots = Details.MapSpots(q, status, force)
 		local place = CurrentPlace()
 		if map and spots then
 			d.small = { map = map, spots = spots, pick = ZonePage.PickOn(map, id, place and Structure(place).groupOf[id]) }
 		end
-		if d.small and not (spots[1] or d.small.pick) then
+		if d.small and not (spots[1] or d.small.pick or force) then
 			d.small = nil
 		end
 	end
 	Details.PutBack()
+	-- Its "+" on the title line (the plan), "Show on map" on top.
+	local planW = Make.FillPlus(d.Plan, id)
+	d.Title:SetWidth(d.bodyW - 44 - planW)
+	d.Sub:SetWidth(d.bodyW - 44)
 	if status == "active" and IsReady(id) then
 		Art(d.Icon, "QuestTurnin", T.turnin)
 		d.Icon:SetDesaturated(false)
@@ -6019,10 +6601,14 @@ local function SmallOpen()
 end
 
 -- A quest into the right pane (nil: none, the briefing again); on the zone's map its pins ringed, its
--- objectives' areas and its way. user: a click, which the small window follows while it's open.
-local function Pick(id, user)
+-- objectives' areas and its way, all of it brought into sight and pulsing (how "still": the map stays
+-- as it is, nothing pulses). user: a click, which the small window follows while it's open.
+local function Pick(id, user, how)
 	local changed = id ~= state.picked
 	state.picked = id
+	if changed then
+		state.spot = nil -- (a place of the quest before asked for)
+	end
 	if view.g.frame:IsShown() then
 		local before = state.path
 		Path.Update()
@@ -6037,7 +6623,9 @@ local function Pick(id, user)
 	end
 	if view.zp:IsShown() then
 		ZonePage.ShowPick(CurrentPlace())
-		Map.Follow(view.zp.map) -- (zoomed in with nothing of it in sight: the map goes to it)
+		if id and how ~= "still" then
+			ZonePage.Find(id) -- (moved there when it isn't all in sight, pulsing)
+		end
 	end
 	Tabs.Switch() -- (the chain it offers is the quest's)
 	Side.Draw(changed)
@@ -6045,6 +6633,7 @@ local function Pick(id, user)
 		Q.ShowQuest(id)
 	end
 end
+Side.Pick = Pick -- (for what's defined before it: the plan's markers)
 
 function Graph.Pick(id)
 	Pick(id, true)
@@ -6127,33 +6716,117 @@ function Graph.Jump(id)
 end
 
 -- A quest's row or link clicked (the quest list, the search's results, the right pane's rows, steps
--- and links, a chain card's next step): a click shows it on the map, a right-click its chain (the
--- controller has no right-click: its "2/4" badge, the details' "Open the chain" and the switch's Chain).
+-- and links, a chain card's next step). Where the zone's map is in sight a click shows it on the map;
+-- elsewhere (the quest list, the results, a chain's page, a view) its details come first, the middle
+-- staying, and a Ctrl-click shows it on the map (the controller: the details' "Show on map"). A
+-- right-click: its chain (the controller: its "2/4" badge, the details' "Open the chain", the switch).
 function Side.Click(id, button)
 	if button == "RightButton" then
 		Side.Chain(id)
+	elseif view.zp:IsShown() or (IsControlKeyDown and IsControlKeyDown()) then
+		Side.ShowOnMap(id, true)
 	else
-		Side.ShowOnMap(id)
+		Side.Details(id)
+	end
+end
+
+-- Its details on the right (the small map in them), the middle as it is.
+function Side.Details(id)
+	if Quest(id) then
+		Pick(id, true, "still")
 	end
 end
 
 -- The Zone tab's map with the quest picked (its pins, objectives, details), never its chain: the place
 -- shown when it lists it, else its zone (a dungeon: its list); the quest list, a chain's page, a view
--- and the results (the search stays) give way to it. A chain left is kept for the switch.
-function Side.ShowOnMap(id)
+-- and the results (the search stays) give way to it. A chain left is kept for the switch. All of it
+-- brought into sight, pulsing. user: a click of ours (the small window follows it).
+function Side.ShowOnMap(id, user)
 	if not Quest(id) then
 		return
 	end
 	local place = CurrentPlace()
 	if place and Mode() == "zone" and not state.chain and Structure(place).member[id] then
-		Pick(id, true) -- (on its map already: only picked, the map goes to it)
+		Pick(id, user) -- (on its map already: only picked, the map goes to it)
 		return
 	end
 	if state.chain then
 		state.lastChain = state.chain
 	end
 	state.tab, state.chain, state.path = "zone", nil, nil
-	Open(id, true, false)
+	Open(id, user, false)
+end
+
+-- A spot ({ map, x, y, r }) of a quest on the Zone tab's map: its zone's page (the zone above a city's
+-- floor or a cave), the quest picked, zoomed in to the spot, pulsing. Not on any zone's map: the quest
+-- on the map. True when the spot shows.
+function Side.ShowSpot(id, spot, user)
+	if not (Quest(id) and type(spot) == "table") then
+		return false
+	end
+	local target, x, y = Map.PlaceOfSpot(spot)
+	if not target then
+		Side.ShowOnMap(id, user)
+		return false
+	end
+	if state.query ~= "" then
+		state.drilled = true
+	end
+	if state.chain then
+		state.lastChain = state.chain
+	end
+	local moved = target ~= state.where
+	local wasMap = view.zp:IsShown()
+	state.tab, state.chain, state.path = "zone", nil, nil
+	Save()
+	if moved then
+		state.where = target
+		state.folded["c:" .. tostring(state.places[target].continent)] = nil
+		DrawZones(true, target)
+	end
+	if moved or not wasMap then
+		DrawMiddle(not moved, nil, true)
+	end
+	Pick(id, user, "still")
+	local m = view.zp.map
+	local it = { x = x, y = y, r = tonumber(spot.r) }
+	Map.Bring(m, { it }, true)
+	Map.Flash(m, { it })
+	state.spot = { quest = id, map = spot.map, x = spot.x, y = spot.y, r = spot.r }
+	return true
+end
+
+-- A place in the details clicked (its giver, turn-in, a drop, an objective's area; the game's map pin is
+-- the caller's): the zone page's map goes there (Side.ShowSpot); with the zone's map not in sight the
+-- details' small map shows that spot's map and pulses it, and "Show on map" goes there.
+function Side.Spot(id, point, r)
+	if not (id and type(point) == "table" and point.map and tonumber(point.x) and tonumber(point.y)) then
+		return
+	end
+	if view.zp:IsShown() then
+		Side.ShowSpot(id, { map = point.map, x = point.x, y = point.y, r = r }, true)
+		return
+	end
+	state.spot = { quest = id, map = point.map, x = point.x, y = point.y, r = r }
+	Side.Draw()
+	local m = view.d.map
+	if m.frame:IsShown() and m.map == point.map then
+		Map.Flash(m, { { x = point.x, y = point.y, r = tonumber(r), px = 12 } })
+	end
+end
+
+-- The details' "Show on map": the place asked for in them last, else the quest.
+function Side.ShowPicked()
+	local id = state.picked
+	if not Quest(id) then
+		return
+	end
+	local spot = state.spot
+	if spot and spot.quest == id then
+		Side.ShowSpot(id, spot, true)
+	else
+		Side.ShowOnMap(id, true)
+	end
 end
 
 -- Its chain (Side.ShowChain, as its badge does); a quest in no chain: shown on the map.
@@ -6161,8 +6834,33 @@ function Side.Chain(id)
 	if Quest(id) and Rule.Step(id) then
 		Side.ShowChain(id)
 	else
-		Side.ShowOnMap(id)
+		Side.ShowOnMap(id, true)
 	end
+end
+
+-- The plan (Plan.lua): its "+" buttons only when it's there.
+function Side.CanPlan()
+	return Q.PlanToggle ~= nil and Q.PlanHas ~= nil
+end
+
+function Side.InPlan(id)
+	if not (id and Q.PlanHas) then
+		return false
+	end
+	local ok, has = pcall(Q.PlanHas, id)
+	return ok and has == true
+end
+
+-- A "+" (or the check) clicked: into the plan or out of it (as the button showed it: a plan changed
+-- elsewhere meanwhile is only drawn again), then what shows the plan drawn again (Stops.Check).
+function Side.TogglePlan(id, shown)
+	if not (id and Side.CanPlan()) then
+		return
+	end
+	if shown == nil or Side.InPlan(id) == shown then
+		pcall(Q.PlanToggle, id)
+	end
+	Stops.Check(true) -- (also a stale one: drawn as it is now)
 end
 
 -- The details' "Open the chain" button, the switch's Chain: a chain of the place shown (key; else the
@@ -6229,8 +6927,14 @@ end
 local function SetFilter(key, on)
 	filters[key] = on
 	Save()
-	Restatus()
 	view.filters[key].Tick:SetShown(on)
+	if key == "planMap" then
+		if view.zp:IsShown() then
+			Stops.Draw(view.zp.map) -- (only the plan on the map: nothing else changes)
+		end
+		return
+	end
+	Restatus()
 	DrawMiddle(true)
 end
 
@@ -6341,6 +7045,11 @@ local function RunDue(self)
 		end
 		Map.PlaceMe(view.zp.map) -- (another zone: my arrow comes or goes)
 		Make.PaintHere() -- (and "Current zone" may have one now)
+		Stops.Check() -- (an objective done: the plan's stops may have changed, Q.PlanRev says)
+	end
+	if state.planAt and now >= state.planAt then
+		state.planAt = nil
+		Stops.Check() -- (Q.OnPlanChanged: the plan changed elsewhere, the Plan tab, the companion)
 	end
 	if state.namesAt and now >= state.namesAt then
 		state.namesAt = nil
@@ -6352,7 +7061,7 @@ local function RunDue(self)
 		end
 		Side.Draw()
 	end
-	if not (state.searchAt or state.statusOld or state.namesAt or state.readyAt) then
+	if not (state.searchAt or state.statusOld or state.namesAt or state.readyAt or state.planAt) then
 		self:SetScript("OnUpdate", nil)
 	end
 end
@@ -6517,6 +7226,60 @@ function Make.FillBadge(b, id)
 	return b:GetWidth() + 6
 end
 
+-- A quest's "+" at the left of its row (and on the details' title line): a Button of its own (the
+-- controller reaches it), the check when it's in the plan; a click puts it in or takes it out
+-- (Side.TogglePlan). None without the plan (Q.PlanToggle, Q.PlanHas).
+function Make.NewPlus(parent)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(16, 16)
+	b.Plus = b:CreateTexture(nil, "ARTWORK")
+	b.Plus:SetAllPoints()
+	b.Plus:SetTexture(T.plus)
+	b.Check = b:CreateTexture(nil, "ARTWORK")
+	b.Check:SetAllPoints()
+	Art(b.Check, "common-icon-checkmark", T.check)
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:SetScript("OnEnter", Make.PlusTip)
+	b:SetScript("OnLeave", Untip)
+	b:SetScript("OnClick", function(self)
+		local id = self.quest
+		if id then
+			Side.TogglePlan(id, self.on)
+			if self:IsShown() and self.quest == id and GameTooltip:IsOwned(self) then
+				Make.PlusTip(self) -- (the tooltip says what it is now)
+			end
+		end
+	end)
+	b:Hide()
+	return b
+end
+
+-- A "+" for a quest (nil, or no plan: hidden); the room it takes (its width and a gap), 0 when hidden.
+function Make.FillPlus(b, id)
+	if not (id and Side.CanPlan()) then
+		b.quest = nil
+		b:Hide()
+		return 0
+	end
+	b.quest, b.on = id, Side.InPlan(id)
+	b.Plus:SetShown(not b.on)
+	b.Check:SetShown(b.on)
+	b:Show()
+	return b:GetWidth() + 2
+end
+
+function Make.PlusTip(self)
+	if not self.quest then
+		return
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(self.on and L["In your plan"] or L["Add to plan"], 1, 0.82, 0)
+	GameTooltip:AddLine(LevelTag(Quest(self.quest)) .. Title(self.quest), 1, 1, 1)
+	GameTooltip:AddLine(self.on and L["Click: remove from plan"] or L["The Plan tab keeps your quests in your order; the map shows its way."],
+		self.on and 0.5 or 0.8, self.on and 0.75 or 0.8, self.on and 1 or 0.8, true)
+	GameTooltip:Show()
+end
+
 -- What a row's tooltip names as its badge ("2/4"), nil without one.
 function Make.BadgeText(b)
 	return b and b:IsShown() and b.quest and b.label or nil
@@ -6546,6 +7309,8 @@ function Make.NewListRow(parent, width)
 	row.Right:SetJustifyH("RIGHT")
 	row.Right:SetWordWrap(false)
 	row.Badge = Make.NewBadge(row)
+	row.Plus = Make.NewPlus(row)
+	row.Plus:SetPoint("LEFT", 3, 0)
 	row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 	row:SetScript("OnEnter", Make.ListTip)
 	row:SetScript("OnLeave", Untip)
@@ -6599,7 +7364,7 @@ function Make.PlaceTip(self)
 		GameTooltip:AddLine(line, 0.9, 0.9, 0.9)
 	end
 	if self.point then
-		GameTooltip:AddLine(L["Click: put a map pin there"], 0.5, 0.75, 1)
+		GameTooltip:AddLine(L["Click: map pin there, and find it on the map"], 0.5, 0.75, 1)
 	end
 	GameTooltip:Show()
 end
@@ -6644,7 +7409,7 @@ function Make.ObjectiveEnter(self)
 		GameTooltip:AddLine(name .. (zone and (GREY .. SEP .. zone .. "|r") or ""), 0.85, 0.85, 0.85)
 	end
 	if Make.ObjectivePoint(self) then
-		GameTooltip:AddLine(L["Click: put a map pin there"], 0.5, 0.75, 1)
+		GameTooltip:AddLine(L["Click: map pin there, and find it on the map"], 0.5, 0.75, 1)
 	end
 	GameTooltip:Show()
 	Map.LightArea(view.zp.map, line.objective)
@@ -6668,7 +7433,7 @@ function Make.ObjectivePoint(self)
 	for i = 1, m.areasShown do
 		local spec = m.areas[i].spec
 		if spec.objective == line.objective then
-			return { map = m.map, x = spec.x, y = spec.y }
+			return { map = m.map, x = spec.x, y = spec.y, r = spec.r }
 		end
 	end
 	for _, s in ipairs(type(o.sources) == "table" and o.sources or EMPTY) do
@@ -6753,6 +7518,40 @@ function Make.BuildDetails(root, x, y, width, height)
 		GameTooltip:Show()
 	end)
 	d.Back:SetScript("OnLeave", Untip)
+	-- "Show on map", at its right: the quest on the Zone tab's map (a place asked for in the details
+	-- last: that place), found and pulsing. The controller's way for a Ctrl-click.
+	d.Show = CreateFrame("Button", nil, panel)
+	d.Show:SetHeight(22)
+	d.Show:SetPoint("TOPRIGHT", -4, 0)
+	d.Show.Back = d.Show:CreateTexture(nil, "BACKGROUND")
+	d.Show.Back:SetAllPoints()
+	d.Show.Back:SetColorTexture(1, 0.82, 0, 0.1)
+	NewEdges(d.Show)
+	Edges(d.Show, 1, 0.82, 0, 0.35)
+	d.Show.Icon = d.Show:CreateTexture(nil, "ARTWORK")
+	d.Show.Icon:SetTexture(T.map)
+	d.Show.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	d.Show.Icon:SetSize(16, 16)
+	d.Show.Icon:SetPoint("LEFT", 4, 0)
+	d.Show.Text = d.Show:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	d.Show.Text:SetPoint("LEFT", 24, 0)
+	d.Show.Text:SetText(L["Show on map"])
+	d.Show:SetWidth(d.Show.Text:GetStringWidth() + 32)
+	d.Show:SetHighlightTexture(T.highlight, "ADD")
+	d.Show:SetScript("OnClick", function(self)
+		Untip(self)
+		Side.ShowPicked()
+	end)
+	d.Show:SetScript("OnEnter", function(self)
+		local spot = state.spot and state.spot.quest == state.picked and state.spot
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:SetText(L["Show on map"], 1, 1, 1)
+		GameTooltip:AddLine(spot and L["The Zone tab's map, zoomed in to the place you picked in the details."]
+			or L["The Zone tab's map with this quest: all of it in sight, pulsing. Ctrl-click on a quest does it too."], 0.9, 0.9, 0.9, true)
+		GameTooltip:Show()
+	end)
+	d.Show:SetScript("OnLeave", Untip)
+	d.Show:Hide()
 	d.Scroll = CreateFrame("ScrollFrame", nil, panel, "UIPanelScrollFrameTemplate")
 	d.Scroll:SetPoint("TOPLEFT", 0, -28)
 	d.Scroll:SetSize(bodyW, height - 28 - 34)
@@ -6775,6 +7574,8 @@ function Make.BuildDetails(root, x, y, width, height)
 	d.Icon:SetPoint("TOPLEFT", 0, -2)
 	d.Title = Text("GameFontNormalLarge", bodyW - 44)
 	d.Sub = Text("GameFontHighlight", bodyW - 44)
+	d.Plan = Make.NewPlus(d.Body) -- (the plan: at the title line's right)
+	d.Plan:SetPoint("TOPRIGHT", d.Body, "TOPRIGHT", -4, -4)
 	d.Req = Text("GameFontHighlightSmall")
 	d.NeedsMore, d.LeadsMore = Text("GameFontHighlightSmall"), Text("GameFontHighlightSmall")
 	d.StepsBefore, d.StepsMore = Text("GameFontHighlightSmall"), Text("GameFontHighlightSmall")
@@ -6855,6 +7656,7 @@ function Make.BuildDetails(root, x, y, width, height)
 				local p = Make.ObjectivePoint(self)
 				if p then
 					Map.PinAt(p.map, p.x, p.y, self.line and self.line.text)
+					Side.Spot(self.quest, p, p.r) -- (and the map goes there, or the small one pulses it)
 				end
 			end)
 			d.objectives[i] = b
@@ -6885,6 +7687,7 @@ function Make.BuildDetails(root, x, y, width, height)
 		b:SetScript("OnClick", function(self)
 			if self.point then
 				Map.PinAt(self.point.map, self.point.x, self.point.y, self.name)
+				Side.Spot(state.picked, self.point, self.point.r) -- (and the map goes there, or the small one pulses it)
 			end
 		end)
 		d.places[i] = b
@@ -7043,9 +7846,11 @@ function Make.BuildTop()
 	view.filters = {
 		allLevels = Make.NewFilter(frame, "allLevels", L["All levels"], L["Also the quests far below or above your level. The search and an opened chain always show every level."]),
 		showOther = Make.NewFilter(frame, "showOther", L["Show quests not for you"], L["Also the quests for another race, class or faction (dimmed)."]),
+		planMap = Make.NewFilter(frame, "planMap", L["Plan on map"], L["Your plan's stops on the zone's map: numbered in your order, the next one gold, joined by a line."]),
 	}
+	view.filters.planMap:Hide() -- (only with the plan: Plan.lua)
 	local x = -16
-	for _, key in ipairs({ "showOther", "allLevels" }) do
+	for _, key in ipairs({ "showOther", "allLevels", "planMap" }) do
 		local b = view.filters[key]
 		b:SetPoint("TOPRIGHT", frame, "TOPRIGHT", x, -36)
 		x = x - b:GetWidth() - 12
@@ -7349,12 +8154,14 @@ function Make.OnHidden(self)
 		self:UnregisterEvent(event)
 	end
 	state.listening = false
-	state.searchAt, state.statusOld, state.namesAt, state.readyAt = nil, false, nil, nil
+	state.searchAt, state.statusOld, state.namesAt, state.readyAt, state.planAt = nil, false, nil, nil, nil
 	self:SetScript("OnUpdate", nil)
 	view.g.drag, view.zp.map.drag = nil, nil
 	view.g.frame:SetScript("OnUpdate", nil)
 	view.zp.map.frame:SetScript("OnUpdate", nil)
 	Map.CloseChooser(view.zp.map)
+	Map.StopFlash(view.zp.map)
+	Map.StopFlash(view.d.map)
 	view.Box:ClearFocus()
 	Views.Show(nil) -- (a view registered: its OnHide)
 	GameTooltip:Hide()
@@ -7445,6 +8252,14 @@ local function Build()
 	if Q.OnDataChanged then
 		Q.OnDataChanged(DataChanged)
 	end
+	if Q.OnPlanChanged then
+		Q.OnPlanChanged(function() -- (Plan.lua, if it tells: the plan changed elsewhere; drawn on the next frame)
+			if frame and frame:IsShown() then
+				state.planAt = state.planAt or GetTime()
+				Due()
+			end
+		end)
+	end
 	if Q.OnFriendProgress then
 		Q.OnFriendProgress(function() -- (QuestShare.lua: friends' answers came: redrawn)
 			if frame and frame:IsShown() then
@@ -7472,6 +8287,7 @@ local function Ready()
 	for _, part in ipairs(view.Search) do
 		part:SetShown(ok)
 	end
+	view.filters.planMap:SetShown(ok and Q.PlanStops ~= nil)
 	return ok
 end
 
@@ -7488,9 +8304,17 @@ local function Allowed()
 	return true
 end
 
--- Opens the big window, on a quest if one is given (its zone, its chain with its card in sight, its
--- details). True when it's open with the data.
+-- Opens the big window, on a quest if one is given (Q.ShowOnMap: its zone's map, the quest picked on it,
+-- its details). True when it's open with the data.
 function Q.OpenBrowser(id)
+	if id ~= nil then
+		return Q.ShowOnMap(id)
+	end
+	return Side.Window()
+end
+
+-- The big window open as it was (the tab, the place, the quest picked). True with the data.
+function Side.Window()
 	if not Allowed() then
 		return false
 	end
@@ -7513,9 +8337,7 @@ function Q.OpenBrowser(id)
 	if frame.Raise then
 		frame:Raise()
 	end
-	if ready and id then
-		Open(id)
-	elseif ready and not wasShown and state.where and not state.opened then
+	if ready and not wasShown and state.where and not state.opened then
 		state.opened = true
 		DrawZones(true, state.where) -- (the first time: the zone I'm in, in sight)
 	end
@@ -7545,6 +8367,37 @@ function Q.OpenChain(id)
 		return false
 	end
 	return Side.ShowChain(id)
+end
+
+-- Opens the big window on the Zone tab's map with the quest picked: its zone's page (the place shown when
+-- it lists it; a dungeon's: its list), the map moved and zoomed out so its pins and areas are in sight,
+-- pulsing, its details on the right. spot ({ map, x, y } 0..1 on that uiMap, r: an area's radius): that
+-- spot instead (its zone's page if it's another), zoomed in to it, pulsing. True when it's shown.
+function Q.ShowOnMap(id, spot)
+	id = tonumber(id)
+	if not Side.Window() then
+		return false
+	end
+	if not (id and Quest(id)) then
+		return false
+	end
+	if type(spot) == "table" and spot.map and tonumber(spot.x) and tonumber(spot.y) and Side.ShowSpot(id, spot, false) then
+		return true
+	end
+	Side.ShowOnMap(id, false)
+	return state.picked == id
+end
+
+-- Opens the big window (if it isn't) on the tab it shows, the quest picked, its details on the right
+-- (the small map in them where the zone's map isn't in sight). No other tab, the map not moved. True
+-- when shown.
+function Q.ShowDetails(id)
+	id = tonumber(id)
+	if not (id and Side.Window() and Quest(id)) then
+		return false
+	end
+	Pick(id, false, "still")
+	return true
 end
 
 function Q.ToggleBrowser()
