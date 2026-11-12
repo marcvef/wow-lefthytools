@@ -461,7 +461,7 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 
 | Key | Default | What |
 |---|---|---|
-| `keepPlace` | true | the small window opens where it was left, at its size; off: right of the middle, 340 x 580 |
+| `keepPlace` | true | the small window opens where it was left; off: right of the middle |
 | `followLog` | true | while the small window is open, a quest opened in the quest log (or clicked in the objective tracker) becomes its "Now" |
 | `tooltips` | true | "Lodestar: starts ..." lines in NPC tooltips (below); the data loads a few seconds after the loading screen for them |
 | `itemTooltips` | true | quest items: "Lodestar: for <quest> ..." in item tooltips, the sorted bags' mark (Quest items); the data loads for it as for `tooltips` |
@@ -469,11 +469,12 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 | `friends` | true | friends' progress in the windows (`Q.Friends`) |
 | `learn` | true | learning while playing (Learn.lua reads `M.db.learn`) |
 | `autoHide` | true | the companion hides itself when it has nothing to show, and comes back (Small window) |
-| `collapsed` | false | the companion is one line (its title bar's button does the same) |
+| `collapsed` | false | the companion is one line (the button left of its X does the same) |
 | `stepsOpen` | false | the companion's chain steps unfolded (its "Steps (7)" line; no checkbox) |
+| `smallTab` | "now" | the companion's tab: "now", "next" or "plan" (Plan without a plan shows Now; no checkbox; the quest log followed switches to Now) |
 | `dialog` | true | the panel beside the quest dialog (In the game's quest UI) |
 | `logBadges` | true | "2/4" on the quest log's lines, the chain in their tooltip, Alt-click to open one in Lodestar |
-| `small` | `{}` | the small window's `left`, `top`, `width`, `height` (always kept; used while `keepPlace` is on; one line doesn't change the height kept) |
+| `small` | `{}` | the small window's `left`, `top` (always kept; used while `keepPlace` is on; a `width`, `height` from before it fitted itself stays unused) |
 
 The settings page: Open the small window, Open the quest browser (`Q.ToggleBrowser`, or a chat line
 when Browser.lua isn't there), the checkboxes under Window (with `autoHide` and `collapsed`), "In the
@@ -589,37 +590,55 @@ seconds after it (setting `tooltips` or `itemTooltips`; a second later the NPC i
 `Modules/Lodestar/Small.lua`: `Q.ToggleSmall()`, `Q.ShowQuest(id)`, `Q.RedrawSmall(now)` (a
 redraw 0.3 s later, several at once: one; `now`: at once; for other parts whose data changed, e.g.
 friends' progress arriving), `Q.IsSmallShown()`, `Q.SmallFollow(id)` (the quest log's hook),
-`Q.SmallFrame()` (tests: also `planMap`, `planMarks`, `planLines`).
+`Q.SmallFrame()` (tests: also `planMap`, `planMarks`, `planLines`, `tabs` (the tabs' buttons by
+key), `tab` (the tab drawn; nil while a quest is looked at)).
 
-The companion: it follows what you're doing without being asked. Two modes: **Now** (what
-`/lodestar` opens) and **a quest looked at** (a click on any quest, `/lodestar <name>`,
-`Q.ShowQuest`, the big window's clicks).
+The companion: it follows what you're doing without being asked. A slim dark frame of its own, the
+Bestiary's small window's look (`LT.Window.Dress`, shared with the Bestiary: no title bar, no inset,
+no scroll bar), 260 px wide and as tall as what it shows. Along its top **small tabs** (our own
+Buttons: a word each, the one shown gold with a gold line under it, the others grey; tooltips say
+what each holds; a thin gold rule under the row): **Now**, **Next** and **Plan** (only while the
+plan has a stop not done). At the top right, right to left: a small X (`UIPanelCloseButtonNoScripts`,
+24 px, like the Bestiary's), **one line** (`QuestLog-icon-shrink` / `QuestLog-icon-Expand`, setting
+`collapsed`) and **the big window** (Lodestar's star, `Spell_Arcane_StarFire` as on the minimap:
+`Q.OpenBrowser` on the quest looked at or Now's, else `Q.ToggleBrowser()`; hidden without Browser.lua,
+the data, or in one line). The tab picked is kept (setting `smallTab`: "now", "next" or "plan"; Plan
+kept without a plan shows Now, and comes back with the next plan). Each tab fits without scrolling:
+its lists stop at a few lines with **"and N more"** (a Button: the big window, `Q.OpenBrowser` on the
+first left out; the plan's: the big window's Plan tab, `Q.ShowBrowserView("plan")`). Two modes: **a
+tab** (what `/lodestar` opens) and **a quest looked at** (a click on any quest, `/lodestar <name>`,
+`Q.ShowQuest`, the big window's clicks): it takes the tab's place, the tabs stay (none lit), a click
+on one goes back to its lines.
 
-**Now**, top down: only what to do now and how far along (the guides' "this now, then those");
-what's secondary is in the lines' tooltips or behind a click.
+Each tab shows only what to do now and how far along (the guides' "this now, then those"); what's
+secondary is in the lines' tooltips or behind a click.
 
-- **Plan** (only while the plan, below, has a stop not done; without one the companion is as before): a
-  gold heading (with the next stop's zone when it isn't mine), **"Stop 2 of 14: Pick up Wanted: Hogger at
-  Marshal Dughan"** (`Q.PlanNext`, `Q.PlanStopText`) with how far and which way when it's on my zone's map
-  (`Q.TowardText`), else that zone's name; a click shows the stop on the big window's map
-  (`Q.ShowOnMap(quest, spot)`; without it `Q.OpenBrowser`), Shift-click the game's map pin there (in chat
-  too). Beside it **Skip** (`Q.PlanSkip`: done for now, until the next /reload or logout; the next one
-  comes up). Under it the plan's **own small map** (a second `Q.NewMiniMap`, made the first time): the
-  next stop's zone with the next stops on it (up to five, the plan's numbers, the next one a gold disc,
-  the others dark with gold numbers) joined by a gold line in their order; a number is a Button (its
-  tooltip "4. Pick up ...", a click `Q.ShowOnMap` of that stop). The numbers and lines are a layer of ours
-  over the map's art (`m.Map`), laid again when the art is (its `OnSizeChanged`: zooming). Redrawn when
-  the plan changes (`Q.OnPlanChanged`) and with the companion's own redraws; it keeps the companion from
-  hiding itself (`autoHide`).
+- **Plan** (the tab only while the plan, below, has a stop not done): **"Stop 2 of 14: Pick up
+  Wanted: Hogger at Marshal Dughan"** (`Q.PlanNext`, `Q.PlanStopText`) with how far and which way when
+  it's on my zone's map (`Q.TowardText`), else that zone's name; a click shows the stop on the big
+  window's map (`Q.ShowOnMap(quest, spot)`; without it `Q.OpenBrowser`), Shift-click the game's map pin
+  there (in chat too). Beside it **Skip** (`Q.PlanSkip`: done for now, until the next /reload or
+  logout; the next one comes up). Under it the plan's **own small map** (a second `Q.NewMiniMap`, made
+  the first time): the next stop's zone with the next stops on it (up to five, the plan's numbers, the
+  next one a gold disc, the others dark with gold numbers) joined by a gold line in their order; a
+  number is a Button (its tooltip "4. Pick up ...", a click `Q.ShowOnMap` of that stop). The numbers and
+  lines are a layer of ours over the map's art (`m.Map`), laid again when the art is (its
+  `OnSizeChanged`: zooming). Under the map **the next stops** (up to four not done after it, any zone):
+  "4. Turn in ... at ..." numbered as on the map (the stop's index in `Q.PlanStops()`), what it is in
+  front (the gossip "!" to pick up, "?" to turn in, a dot for an objective, as on the map), how far
+  and which way (another zone: its name); a click as the first line's; then "and N more" (the big
+  window's Plan tab). Redrawn when the plan changes (`Q.OnPlanChanged`) and with the companion's own
+  redraws; it keeps the companion from hiding itself (`autoHide`).
 
-- **Now** (a gold heading with why that quest, a rule under it): the quest I'm on is the last one I
+- **Now** (the tab): the quest I'm on is the last one I
   did something with while the window was open (accepted: `QUEST_ACCEPTED`; super-tracked:
   `SUPER_TRACKING_CHANGED`; opened in the quest log: the hook, also while closed) while it's in my
   log; a quest super-tracked since I last looked counts as new; else the super-tracked quest, else
   the first on the tracker (`C_QuestLog.GetQuestIDForQuestWatchIndex`), else one of my log in this
-  zone (its zone or its turn-in here), else the first of my log; none: "No quest in your log. Pick
-  one up below." Then: "[18] Title" in its difficulty colour (large; a click shows everything about
-  it; its tooltip says what it leads to: "Leads to: [19] Title - giver, zone", `Q.Opens`, "+N more"),
+  zone (its zone or its turn-in here), else the first of my log; none: "No quest in your log: Next
+  has what to pick up." Then: "[18] Title" in its difficulty colour (large; why that quest at its
+  right, grey: "just accepted", "tracked", "opened in your quest log", "on your tracker", "in this
+  zone", "in your quest log"; a click shows everything about it; its tooltip says what it leads to: "Leads to: [19] Title - giver, zone", `Q.Opens`, "+N more"),
   "Step 3 of 7 · <first quest>" and a green bar (the chain is `Q.Chain` without the quests not for
   me), friends on one line only when there are any ("Friends: 2 of 5 done" with a dot in the class
   colour of each who did it; its tooltip names each with their status; setting `friends`), its
@@ -629,26 +648,27 @@ what's secondary is in the lines' tooltips or behind a click.
   (`C_QuestLog.IsComplete`), "Ready to turn in" instead, **Turn-in:** on one line (name, zone, how far
   and which way when it's in my zone; a click sets the map pin), and **"Steps (7)"**: a line (a plus or
   minus icon) that unfolds and folds the chain's steps, folded at first, kept in the setting
-  `stepsOpen`; unfolded, the steps around this one (from two before, at most 8, "... N before/more"):
+  `stepsOpen`; unfolded, the steps around this one (from two before, at most 6, "... N before/more"):
   done ones ticked in green, this one bold with an arrow, the rest numbered in grey; a click shows
   that step.
-- **The small map**: not ready, with areas known for its objectives not done (`Q.Objectives`' points,
+- **The small map** (Now's, under its lines): not ready, with areas known for its objectives not done (`Q.Objectives`' points,
   Questie's and pfQuest's objective areas): those areas as soft gold circles (each objective a group of
   its own), on my zone when one is there, else the nearest's zone, and no turn-in; else the turn-in's
   zone (my zone when the turn-in is in it, else the first turn-in's), else my zone: the turn-in ("?"
   yellow when ready, the in-progress icon when not). Then the turn-ins of my other quests and the givers
   of what I can pick up on that map, and my arrow.
-- **Pick up next** (a heading with my zone and its count, `Q.ZoneCount`: "Elwynn Forest · 12 of 40
-  done"), in two groups like Quest Herald's (each quest a row: icon, "[level] Title" in its difficulty
+- **Next** (the tab; "Pick up next": a grey line with my zone and its count, `Q.ZoneCount`:
+  "Elwynn Forest · 12 of 40 done"), in two groups like Quest Herald's (each quest a row: icon, "[level] Title" in its difficulty
   tier's colour, `Q.TierCode`, a grey second line, how far and which way at the right). Each group is in
   the one order of quests, `Q.Compare` (round 6, the player asked for level order: ready first, then for
   my level before hard ones, each by level, then title); how far the giver is stays on the line, it no
   longer orders it.
-  - *In progress*: my other quests (at most 3): "ready to turn in · <ender>" or "in your log · <ender>".
+  - *In progress*: my other quests (at most 3, then "and N more"): "ready to turn in · <ender>" or "in
+    your log · <ender>".
   - *Available now*, only quests for my levels (`Q.InRange`: my level reached, easy, fair or difficult):
     follow-ups of the quest I just turned in (while the window was open), `Q.Next()`'s that I can take
     ("after <the quest it follows>") and the zone's (`Q.AvailableIn`), all of them in the one order, the
-    first 3 shown, "N more here: the quest browser" for the rest; the second line: the giver (and their
+    first 3 shown, "and N more" for the rest; the second line: the giver (and their
     zone when it's another) and its step in its chain. A hard one (`Q.IsHard`: orange) comes after the
     ones for my level and its second line starts with "Hard" in orange (", mobs up to 23" when its
     objectives' mobs, `Q.MobLevels`, are above its level), its tooltip too; its giver's marker on the
@@ -658,13 +678,13 @@ what's secondary is in the lines' tooltips or behind a click.
 
   **How a line looks** (the guides' step lists: this now, then those): a verb icon first (`Q.Icon`,
   the game's own: `QuestTurnin` "?" for one ready to turn in, `SideInProgressquesticon` for one in
-  progress, `QuestNormal` "!" to pick up, `QuestDaily` repeatable). The first line of Pick up next is
+  progress, `QuestNormal` "!" to pick up, `QuestDaily` repeatable). The first line of Next is
   full size (`GameFontHighlight`, a 16 px icon, the title in its tier's colour): what to do now;
   the rest are smaller (13 px) with only "[level]" in its colour and the title grey (`bebebe`). The
   second line of Available now also says what taking it closes ("closes <title>" in orange,
   `Q.Closes`: its exclusive quests, at most 2 named; the tooltip: "Taking it closes: ... Only one of
-  them can be done."); what a quest opens isn't on the line. Section rules are the game's
-  `Options_HorizontalDivider` tinted gold (a gold line without the atlas). Done steps are ticked with
+  them can be done."); what a quest opens isn't on the line. Groups have small gold headings (no
+  section rules: the tab says what it is). Done steps are ticked with
   `UI-QuestTracker-Tracker-Check` in the research's green.
 
   **Status words say the real reason** (a quest looked at, its lists, the tooltips): a quest "other"
@@ -676,20 +696,19 @@ what's secondary is in the lines' tooltips or behind a click.
   English ones, as the big window's), by a quest "Needs <the first of `Q.Missing`>". After a quest's
   name the same with a small first letter ("needs Start"). The other statuses keep their words.
 
-**One line** (setting `collapsed`, or the button left of the close button in the title bar,
-`QuestLog-icon-shrink` / `QuestLog-icon-Expand`): the window shrinks to its title bar and a line
-(54 px high, its height fixed then; the scroll area, its inset, the grip and the bottom button hidden):
-the quest I'm on with its verb icon, "[18] Title · 3/7" (`Q.ChainFor`) and how far its turn-in is,
+**One line** (setting `collapsed`, or the button left of the X, `QuestLog-icon-shrink` /
+`QuestLog-icon-Expand`): the window shrinks to a line beside its X and that button (28 px high; the
+tabs, the lines and the big window's star hidden): the quest I'm on with its verb icon, "[18] Title · 3/7" (`Q.ChainFor`) and how far its turn-in is,
 else the first thing to pick up with how far its giver is, else "Nothing to pick up nearby."; a quest
-looked at: that quest. A click on the line (or the button again) shows the whole companion at the
-height kept in `small`. It follows the same events as the whole window.
+looked at: that quest. A click on the line (or the button again) shows the whole companion, as tall
+as its tab. It follows the same events as the whole window.
 
 **Hiding itself** (setting `autoHide`): when a redraw after an event finds nothing to show (no quest
-I'm on, nothing in Pick up next), the companion hides; while hidden like that it listens only to
+I'm on, nothing in Next, no stop of the plan: any tab's, not only the one shown), the companion hides; while hidden like that it listens only to
 `QUEST_ACCEPTED`, `SUPER_TRACKING_CHANGED`, `PLAYER_LEVEL_UP` and `ZONE_CHANGED_NEW_AREA` (rare), and
 0.3 s after one of them it opens again where it was if there's something now. Opened by me
-(`/lodestar`, a quest shown) it never hides itself in that draw: "Nothing to pick up nearby" stays.
-Closed by me (Escape, its X, `/lodestar`) it stays closed and listens to nothing. Switching the
+(`/lodestar`, a quest shown, a tab clicked) it never hides itself in that draw: "No quest in your
+log" / "Nothing to pick up nearby" stays. Closed by me (its X, `/lodestar`) it stays closed and listens to nothing. Switching the
 setting off while it's hidden brings it back.
 
 **A quest looked at**: at the top "« Back to now" or, after clicking from one quest to another,
@@ -698,26 +717,32 @@ Title", its step in its chain and bar, a grey line (level, zone, dungeon, repeat
 Forever), my status with its real reason ("Your level is too low: from level 30", "Ready to turn in",
 "Skipped" and under it "You took <title> instead", "Needs Friendly with Stormwind"), **Requires:** (what it needs
 first from other chains, by their names), **Needs first:** (`Q.Missing`, numbered, the one to do
-first at the top; at most 8, "and N more"), **Quest giver:** and **Turn-in:** (name, zone, how far;
+first at the top; at most 5, "and N more": the big window on it), **Quest giver:** and **Turn-in:** (name, zone, how far;
 an item or object says so, "+2 more"; not known: says so), for an item that starts it **Drops
 from:** "Defias Pillager (12%), ..." (the item's `drops`), the **small map** (the giver's zone, the
 turn-in's for a quest in my log, where the item drops for a quest that only an item starts, unless a
 line picked one; every giver, turn-in and drop spot on it, a person in several places: the spot on
-my map, else the first), **Leads to:** (`Q.Opens`), **"Steps (7)"** (folded or not as in Now) and
+my map, else the first), **Leads to:** (`Q.Opens`, at most 5 as Needs first), **"Steps (7)"** (folded or not as in Now) and
 **Friends:**. Each quest line is a button showing that quest (its tooltip: the title, the status and
 its reason, "Click: show this quest"); a giver's or turn-in's line puts its side on the map and sets the game's map pin at
 its spot nearest me (`Q.Waypoint`; Shift-click: its link in chat too).
 
 The data add-on missing: the window says so (run the updater, restart), nothing else. A quest the
-data doesn't know: its title and that line. At the bottom: **Quest browser** (`Q.OpenBrowser` on the
-quest looked at or Now's, else `Q.ToggleBrowser()`; hidden without Browser.lua).
+data doesn't know: its title and that line.
 
-**What it costs.** The window: `LT.Window.Create` with `stays` (`LefthyToolsLodestarSmall`: like the
-Bestiary's small window, Escape doesn't close it and it doesn't count as an open window for Mirage, the
-AFK screen and flights; its X, the binding or `/lodestar` close it), DIALOG strata, raised when a quest
-is shown. Movable, resizable by its corner grip (300-600 x 300-950); where it is and its size are
-saved on every drag and resize (`small`). The content is in a scroll area; its width and the map's
-follow the window's. Built the first time it opens; rows, texts and header rules are pooled. While
+**What it costs.** The window: a frame of our own (`LefthyToolsLodestarSmall`, `CreateFrame` on
+`UIParent`, not `LT.Window.Create`), like the Bestiary's small window: not in `UISpecialFrames`, so
+Escape doesn't close it, and not `LT.Window.Register`ed, so it doesn't count as an open window for
+Mirage, the AFK screen and flights; its X, the binding or `/lodestar` close it. MEDIUM strata with the
+game's panels (as the Bestiary's), toplevel and raised whenever it opens or shows a quest; opened
+while the big window (DIALOG) is open (`Q.BrowserShown`), DIALOG, so a quest clicked there shows above
+it (MEDIUM again the next time it opens without it). Movable by dragging (an empty spot of it), its
+top left corner saved on every drag (`small.left`, `small.top`; it grows down from there); at first
+(or with `keepPlace` off) its top left right of the screen's middle. No resizing: 260 px wide, as tall
+as the tab row (30 px), the tab's lines and an 8 px edge, at most 640 px (less on a small screen: its
+height less 60); the lines are in a plain frame that clips its children, so what doesn't fit is cut
+at its edge, never past it. A `small.width` / `small.height` kept from before it fitted itself stays
+unused. Built the first time it opens; rows and texts are pooled. While
 shown it listens to `QUEST_ACCEPTED`, `QUEST_TURNED_IN`, `QUEST_REMOVED`, `QUEST_LOG_UPDATE`,
 `QUEST_WATCH_LIST_CHANGED`, `SUPER_TRACKING_CHANGED`, `PLAYER_LEVEL_UP`, `ZONE_CHANGED`,
 `ZONE_CHANGED_INDOORS`, `ZONE_CHANGED_NEW_AREA` (and `Q.OnDataChanged`); the handlers note what
@@ -725,8 +750,8 @@ happened and redraw 0.3 s later. A child frame looks every 2 s whether I moved (
 another zone) and redraws then (the distances). Hidden: no events, no OnUpdate. Nothing protected:
 it opens and works in a fight.
 
-**Controller:** every line that does something, the map's markers, the bottom button and the grip
-are buttons of ours, so SmartNavigation's cursor reaches them (its focus runs OnEnter: the tooltips
+**Controller:** every line that does something, the map's markers, the tabs, the X and the two
+buttons beside it are buttons of ours, so SmartNavigation's cursor reaches them (its focus runs OnEnter: the tooltips
 show; its button clicks: a quest shows, a marker sets the pin). Nothing of Blizzard's is set on our
 frames, no Blizzard menu, no panel opening.
 
@@ -776,20 +801,26 @@ Alt-click in the quest log (through the hook); the status words (skipped and by 
 class or side, a profession missing or too low, a reputation, the quest first; as a word after a
 name);
 Now (why that quest, its step and bar, objectives, turn-in, what it leads to in the title's
-tooltip, the steps folded and unfolded and kept, the map and its markers) and Pick up next (the two
-groups, by level with distance and direction, the zone's count);
+tooltip, the steps folded and unfolded and kept, the map and its markers) and Next (the two
+groups, by level with distance and direction, the zone's count, "and N more" opening the big window);
+the frame (no title bar, inset, scroll frame or grip, 260 wide, MEDIUM, the small X; as tall as its
+lines, cut at a small screen's height; DIALOG and raised while the big window is open), the tabs
+(Now and Next, Plan only with a plan, lit, kept over a close, a click leaving a quest looked at; the
+quest log's hook switching to Now);
 following super tracking, the quest log's hook and its setting, accepting and turning in (the
 follow-up in the one order, saying what it follows); a quest looked at ("« Back to", "Back to now", an item's drops and their map, too
 low, done); the map pin from a giver's line and a marker (Shift: chat); friends' dots and their
 setting; an unknown quest, the data missing, the search, the browser command; the NPC tooltip lines
 (giver, turn-in, too low, done, kept, other frames, instance, setting, data not loaded); events only
-while shown, moving; place and size kept and the setting off; a fight; buttons for the controller;
+while shown, moving; its place kept (an old size kept harmless) and the setting off; a fight; buttons for the controller;
 without the data part's new calls; switched off; the small map alone (icons, one marker for one
 spot, the arrow, zoom, objective areas by radius and objective, lit and dimmed); Now's objective
 areas (not the done one's, not the turn-in; its line lights them, says where, pins the nearest); the plan
-(nothing without one, on top with how far, its own map with the stops numbered and joined where the art is,
-also zoomed, a click and a number on the map going to the big window's map, Shift-click the pin, Skip,
-another zone's stop, gone when cleared; `Q.ShowOnMap` records).
+(no Plan tab without one, its tab after Next with how far, its own map with the stops numbered and joined
+where the art is, also zoomed, the next stops listed under it (numbered, ! or ?, how far, a click), "and N
+more" opening the big window's Plan tab, a click and a number on the map going to the big window's map,
+Shift-click the pin, Skip, another zone's stop, the tab gone when cleared (Now shown, Plan kept and back
+with the next plan); `Q.ShowOnMap` and `Q.ShowBrowserView` record).
 Data.lua's `Q.ChainStep`, `Q.Available`, `Q.LevelColor`, `Q.ZoneCount` and
 `Q.GiverQuests` get stand-ins only while they're missing, round 6's contract (`Q.Tier`, `Q.Compare` and
 the rest, as in the views' tests) while `Q.Tier` and `Q.Compare` are, `Q.Objectives` while Now's areas are

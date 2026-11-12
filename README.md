@@ -562,11 +562,14 @@ you picked in an order with less walking (pick-ups before objectives before turn
 lead-in first) and says how much it saves; **Back to my order** undoes it. A quest leaves the plan
 when you turn it in.
 
-**The companion** follows what you do: your plan's next stop when you have one, the quest you're on with its step in its chain, its
-objectives and where they are on its small map, where to turn it in (how far and which way), and
-what to pick up next nearby, nearest first. A click on a quest shows everything about it; a click
-on a giver or a turn-in sets the game's map pin. It can shrink to one line, and hides itself when
-there's nothing to do.
+**The companion** follows what you do, in a slim window like the Bestiary's that's only as tall as
+what it shows, with small tabs along its top: **Now**, the quest you're on with its step in its
+chain, its objectives and where they are on its small map, and where to turn it in (how far and
+which way); **Next**, what to pick up next nearby, nearest first; and **Plan** while you have one,
+your next stops with their own map. It remembers the tab you picked, and a long list ends in "and N
+more", which opens the big window. A click on a quest shows everything about it; a click on a giver
+or a turn-in sets the game's map pin. It can shrink to one line, and hides itself when there's
+nothing to do.
 
 **In the game's quest windows.** Beside a quest's dialog a small panel shows its level, from which
 level and the XP it gives (the game only says so once you've accepted it), and in a chain which part

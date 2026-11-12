@@ -18,7 +18,7 @@ In `Modules/Bestiary/`, in the order they load (the TOC):
 | `Wishes.lua` | the wish list: `Bt.ToggleWish`, `Bt.WishKill`, `Bt.WishSources`, `/bestiary wishes` |
 | `Recording.lua` | counting kills and loot, skinning, the pace, where they died, the log (`/bestiary log`) |
 | `Format.lua` | how things are written: `Bt.Percent`, `Bt.Coins`, `Bt.Kind`, `Bt.LevelRange`, `Bt.KillsLine`, `Bt.PaceText`, `Bt.QuestLine`, ... |
-| `Cells.lua` | drops as cells (`Bt.Lay`), their tooltips and clicks, `Bt.ListDrops`, `Bt.Dress`; lines in item tooltips |
+| `Cells.lua` | drops as cells (`Bt.Lay`), their tooltips and clicks, `Bt.ListDrops`, `Bt.Dress` (`LT.Window.Dress`, Core/Window.lua: the Lodestar companion's look too); lines in item tooltips |
 | `Window.lua` | the window, the minimap button, `Bt.Redraw` |
 | `Card.lua` | the card beside the mouse |
 | `LedgerMap.lua` | the ledger's map of where you killed them (`Bt.NewKillMap`, `Bt.DrawKillMap`) |

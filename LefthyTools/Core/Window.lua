@@ -4,6 +4,8 @@ local LT = ns.LT
 -- LT.Window: the interface pieces every module builds with.
 --   * Windows (error report, what's new, Chronicle): Create, AddScroll, AddText, AddCopyBox,
 --     AddButton, and Register for windows built another way; OpenCount (how many are open).
+--     Dress: the slim dark look of the windows that stay beside the game (the Bestiary's, the
+--     Lodestar companion).
 --   * Lists of our own instead of Blizzard's menus (gamepad mode, see PopupList): PopupList,
 --     AddPicker (a dropdown), AnyPopupOpen and PopupOpenIn (Mirage keeps their group in view).
 --   * Round buttons on the minimap's edge: MinimapButton.
@@ -52,8 +54,9 @@ function Window.OpenCount()
 	return count
 end
 
--- stays: a window that stays open beside the game (the Lodestar companion, like the Bestiary's small
--- window): Escape doesn't close it and it doesn't count as using the interface.
+-- stays: a window that stays open beside the game: Escape doesn't close it and it doesn't count as
+-- using the interface. (The Bestiary's small window and the Lodestar companion are frames of their
+-- own, Window.Dress, without a title bar.)
 function Window.Create(name, title, width, height, stays)
 	local frame = CreateFrame("Frame", name, UIParent, "ButtonFrameTemplate")
 	if ButtonFrameTemplate_HidePortrait then
@@ -147,6 +150,28 @@ function Window.AddButton(frame, label, onClick, anchor)
 	button:SetPoint(unpack(anchor or { "BOTTOMRIGHT", frame, "BOTTOMRIGHT", -8, 3 }))
 	button:SetScript("OnClick", onClick)
 	return button
+end
+
+-- A frame of our own dressed as the windows that stay beside the game (the Bestiary's small window,
+-- its card and ledger, the Lodestar companion; like the fight stream's): dark, thin gold edges.
+function Window.Dress(frame)
+	local bg = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
+	bg:SetAllPoints()
+	bg:SetColorTexture(1, 1, 1, 1)
+	bg:SetGradient("VERTICAL", CreateColor(0.03, 0.04, 0.06, 0.94), CreateColor(0.07, 0.09, 0.12, 0.94))
+	for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+		local edge = frame:CreateTexture(nil, "BORDER")
+		edge:SetColorTexture(1, 0.82, 0.3, (side == "TOP" or side == "BOTTOM") and 0.4 or 0.2)
+		if side == "TOP" or side == "BOTTOM" then
+			edge:SetHeight(1)
+			edge:SetPoint(side .. "LEFT")
+			edge:SetPoint(side .. "RIGHT")
+		else
+			edge:SetWidth(1)
+			edge:SetPoint("TOP" .. side)
+			edge:SetPoint("BOTTOM" .. side)
+		end
+	end
 end
 
 ---------------------------------------------------------------------------
