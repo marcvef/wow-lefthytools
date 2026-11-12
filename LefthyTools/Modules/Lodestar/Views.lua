@@ -4,20 +4,24 @@ local L = ns.L
 local Q = ns.Lodestar or {}
 ns.Lodestar = Q
 
--- Two more views of the quest browser (docs/lodestar.md, Views), tabs of its window through its
+-- Three more views of the quest browser (docs/lodestar.md, Views), tabs of its window through its
 -- registry (Q.RegisterBrowserView(key, label, build): build(parent) gives { frame, Refresh, OnShow,
 -- OnHide }), registered when the registry is there: at load (Browser.lua comes before this file) or
 -- when the module is switched on; without it nothing happens.
 --   * My quests: my quest log, organised as quest log add-ons and guides do it: what's ready to turn
 --     in (every zone) first, then by zone (mine first), by level or by storyline, each group in the
 --     one order of quests (Q.Compare: by level; a storyline in its steps' order); a line per quest:
---     "[12] Title" in its difficulty tier's colour (Q.Tier), its chain's "2/4", its first objective
---     not done with its progress ("3/10 Defias Bandit", how far) or "Ready to turn in", and where
---     it's turned in. A click shows it on the window's map (Q.OpenBrowser), a right-click opens its
---     chain (Q.OpenChain; a controller: the "2/4" badge, a button of its own), Shift-click sets the
---     map pin where to go (the turn-in, else the nearest objective area). Under it "Continue your
+--     the plan's "+", "[12] Title" in its difficulty tier's colour (Q.Tier), its chain's "2/4", its
+--     first objective not done with its progress ("3/10 Defias Bandit", how far) or "Ready to turn
+--     in", and where it's turned in. A click shows its details on the right (Q.ShowDetails, the tab
+--     staying), Ctrl-click it on the window's map (Q.ShowOnMap), a right-click opens its chain
+--     (Q.OpenChain; a controller: the "2/4" badge, a button of its own), Shift-click sets the map pin
+--     where to go (the turn-in, else the nearest objective area). Under it "Continue your
 --     storylines": the chains I've started whose next step I can take now (Q.InRange), in the one
 --     order of those steps (for my level first, hard ones after, marked), at most 8.
+--   * Plan: the quests I picked (Plan.lua), numbered in my order with where each stands, up, down and
+--     remove; or, with a suggested route in use (Q.PlanSuggest), its stops numbered with the next one
+--     marked and what it saves. "Clear" asks first (in the bar, ours).
 --   * Level path ("Where to go next"): the zones with something for my levels (Q.InRange) or friends
 --     there (all zones with a toggle) as rows: the name, a bar across the levels 1-60 from its lowest
 --     to its highest quest level, each level in the difficulty tier its quests have for me (green,
@@ -203,6 +207,41 @@ function V.OpenQuest(id)
 	if id and Q.OpenBrowser then
 		Q.OpenBrowser(id)
 	end
+end
+
+-- A quest's details on the right, this tab staying (Q.ShowDetails; without it the map, Q.OpenBrowser).
+function V.ShowDetails(id)
+	if id and Q.ShowDetails then
+		Q.ShowDetails(id)
+	else
+		V.OpenQuest(id)
+	end
+end
+
+-- A quest on the Zone tab's map, picked and in sight (Q.ShowOnMap; spot: { map, x, y } that spot);
+-- without it Q.OpenBrowser.
+function V.ShowOnMap(id, spot)
+	if id and Q.ShowOnMap then
+		Q.ShowOnMap(id, spot)
+	else
+		V.OpenQuest(id)
+	end
+end
+
+-- The plan's "+" on a row (Plan.lua's Q.NewPlanButton; nil without it), at its left.
+function V.NewPlus(parent)
+	if not Q.NewPlanButton then
+		return nil
+	end
+	local plus = Q.NewPlanButton(parent, 16)
+	plus:SetPoint("LEFT", 4, 0)
+	return plus
+end
+
+-- The clicks' lines in a quest row's tooltip.
+function V.ClickLines()
+	GameTooltip:AddLine(L["Click: its details"], 0.5, 0.75, 1)
+	GameTooltip:AddLine(L["Ctrl-click: show it on the map"], 0.5, 0.75, 1)
 end
 
 -- A quest's chain in the window: its zone, the quest picked, the chain in the middle with its card in
@@ -657,11 +696,21 @@ function Census.Finish(w)
 	end
 end
 
+-- Whether a view shown needs the counts (the plan's doesn't).
+function Census.Needed()
+	for inst in pairs(Census.users) do
+		if not inst.noCensus then
+			return true
+		end
+	end
+	return false
+end
+
 -- Drawn again: counted again first when what they depend on changed (meanwhile the last counts).
 -- Every view shown (its OnShow came, maybe before its frame showed) is drawn.
 function Census.Redraw()
 	local key = Census.Key()
-	if Census.dirty or not Census.data or Census.data.key ~= key then
+	if Census.Needed() and (Census.dirty or not Census.data or Census.data.key ~= key) then
 		if Census.dirty or not Census.work then
 			Census.Start()
 		end
@@ -792,11 +841,25 @@ function V.Fit(inst)
 	return true
 end
 
+-- The plan changed (Plan.lua, loaded after this file: hooked when a view first shows): drawn again.
+function V.HookPlan()
+	if V.planHooked or not Q.OnPlanChanged then
+		return
+	end
+	V.planHooked = true
+	Q.OnPlanChanged(function()
+		if Census.AnyShown() then
+			Census.Due(0)
+		end
+	end)
+end
+
 function V.Show(inst)
 	if inst.active then
 		return
 	end
 	inst.active = true
+	V.HookPlan()
 	V.Fit(inst)
 	Census.users[inst] = true
 	Census.Listen(true)
@@ -845,6 +908,9 @@ end
 
 -- The footer's note: counting (how far), else nothing.
 function V.Status(inst)
+	if inst.noCensus then
+		return
+	end
 	if Census.work then
 		local pct = math.floor(Census.Progress() * 100 + 0.5)
 		inst.Note:SetText(L["Counting quests... %d%%"]:format(pct))
@@ -1088,18 +1154,22 @@ local function PinAt(point, share)
 	end
 end
 
--- A quest row's clicks (as the big window's): a click shows it on the map (Q.OpenBrowser: its zone,
--- picked, its objectives), a right-click opens its chain (Q.OpenChain; in no chain: as a click),
--- Shift-click sets the game's map pin at its spot (Shift-right-click: its link in chat too).
-local function QuestClick(id, chained, point, button)
+-- A quest row's clicks (as the big window's, round 7: details first): a click shows its details on
+-- the right, the tab staying (Q.ShowDetails), Ctrl-click shows it on the map (Q.ShowOnMap: its zone,
+-- picked, in sight; spot: that spot), a right-click opens its chain (Q.OpenChain; in no chain: as a
+-- click), Shift-click sets the game's map pin at its spot (Shift-right-click: its link in chat too).
+local function QuestClick(id, chained, point, button, spot)
 	if IsShiftKeyDown and IsShiftKeyDown() then
 		PinAt(point, button == "RightButton")
 	elseif button == "RightButton" and chained then
 		V.OpenChain(id)
+	elseif IsControlKeyDown and IsControlKeyDown() then
+		V.ShowOnMap(id, spot)
 	else
-		V.OpenQuest(id)
+		V.ShowDetails(id)
 	end
 end
+V.QuestClick = QuestClick
 
 -- A turn-in: "Gryan Stoutmantle" (in another zone: ", Westfall"; an object or item says so).
 local function EnderText(e)
@@ -1168,7 +1238,7 @@ function C.QuestEnter(self)
 	if e.ender then
 		GameTooltip:AddLine(L["Turn in: %s"]:format(EnderText(e)) .. (e.ready and e.far and (" · " .. e.far) or ""), 0.8, 0.8, 0.8, true)
 	end
-	GameTooltip:AddLine(L["Click: show it on the map"], 0.5, 0.75, 1)
+	V.ClickLines()
 	if e.chain then
 		GameTooltip:AddLine(L["Right-click (or %s): open the chain"]:format(e.at .. "/" .. #e.chain), 0.5, 0.75, 1)
 	end
@@ -1179,10 +1249,11 @@ function C.QuestEnter(self)
 	GameTooltip:Show()
 end
 
--- A quest of my log, one line in columns: its verb icon, "[12] Title", its chain's "2/4" (a badge: a
--- click opens the chain), its first objective not done ("3/10 Defias Bandit", how far) or "Ready to
--- turn in", and at the right where it's turned in. A click shows it on the window's map, a right-click
--- opens its chain, Shift-click sets the map pin where to go.
+-- A quest of my log, one line in columns: the plan's "+" (a check when it's in the plan), its verb
+-- icon, "[12] Title", its chain's "2/4" (a badge: a click opens the chain), its first objective not
+-- done ("3/10 Defias Bandit", how far) or "Ready to turn in", and at the right where it's turned in.
+-- A click shows its details (the tab stays), Ctrl-click it on the window's map, a right-click opens
+-- its chain, Shift-click sets the map pin where to go.
 function C.NewQuest(parent, width)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(width, QUEST_H)
@@ -1193,9 +1264,11 @@ function C.NewQuest(parent, width)
 	b.Line:SetPoint("BOTTOMRIGHT")
 	b.Line:SetHeight(1)
 	b.Line:SetColorTexture(1, 1, 1, 0.04)
+	b.Plus = V.NewPlus(b)
+	b.left = b.Plus and 18 or 0
 	b.Icon = b:CreateTexture(nil, "ARTWORK")
 	b.Icon:SetSize(16, 16)
-	b.Icon:SetPoint("LEFT", 6, 0)
+	b.Icon:SetPoint("LEFT", 6 + b.left, 0)
 	local function Column(font, justify)
 		local fs = b:CreateFontString(nil, "OVERLAY", font)
 		fs:SetJustifyH(justify or "LEFT")
@@ -1203,7 +1276,7 @@ function C.NewQuest(parent, width)
 		return fs
 	end
 	b.Title = Column("GameFontHighlight")
-	b.Title:SetPoint("LEFT", 28, 0)
+	b.Title:SetPoint("LEFT", 28 + b.left, 0)
 	b.Badge = V.NewBadge(b)
 	b.Badge:SetPoint("LEFT", b.Title, "RIGHT", 4, 0)
 	b.Todo = Column("GameFontHighlightSmall")
@@ -1228,9 +1301,12 @@ function C.FillQuest(b, entry)
 	local e, w = entry.e, entry.inst.listW
 	b:SetWidth(w)
 	V.Art(b.Icon, e.ready and "QuestTurnin" or "SideInProgressquesticon", e.ready and T.turnin or T.progress)
+	if b.Plus then
+		b.Plus:SetQuest(e.id)
+	end
 	local titleW = math.floor(w * 0.38)
 	local todoW = math.floor(w * 0.3)
-	b.Title:SetWidth(titleW - 28)
+	b.Title:SetWidth(titleW - 28 - b.left)
 	b.Title:SetText(V.Title(e.id, e.quest))
 	if e.chain then
 		V.SetBadge(b.Badge, e.id, e.at .. "/" .. #e.chain, Q.Title(e.chain[1]), L["Step %d of %d"]:format(e.at, #e.chain))
@@ -1299,7 +1375,7 @@ function C.NextEnter(self)
 		local zone = n.point and Q.MapName(n.point.map)
 		GameTooltip:AddLine(L["From %s"]:format((n.giver.name or L["unknown"]) .. (zone and (", " .. zone) or "")), 0.8, 0.8, 0.8, true)
 	end
-	GameTooltip:AddLine(L["Click: show it on the map"], 0.5, 0.75, 1)
+	V.ClickLines()
 	GameTooltip:AddLine(L["Right-click (or %s): open the chain"]:format(c.done .. "/" .. c.total), 0.5, 0.75, 1)
 	if n.point then
 		GameTooltip:AddLine(L["Shift-click: map pin at %s"]:format(n.giver and n.giver.name or ""), 0.5, 0.75, 1, true)
@@ -1314,11 +1390,13 @@ function C.NewNext(parent, width)
 	b:SetSize(width, QUEST_H)
 	b:SetHighlightTexture(T.highlight, "ADD")
 	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b.Plus = V.NewPlus(b)
+	b.left = b.Plus and 18 or 0
 	b.Icon = b:CreateTexture(nil, "ARTWORK")
 	b.Icon:SetSize(16, 16)
-	b.Icon:SetPoint("LEFT", 6, 0)
+	b.Icon:SetPoint("LEFT", 6 + b.left, 0)
 	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-	b.Text:SetPoint("LEFT", 28, 0)
+	b.Text:SetPoint("LEFT", 28 + b.left, 0)
 	b.Text:SetJustifyH("LEFT")
 	b.Text:SetWordWrap(false)
 	b.Badge = V.NewBadge(b)
@@ -1340,6 +1418,9 @@ function C.FillNext(b, entry)
 	local n, w = entry.n, entry.inst.listW
 	b:SetWidth(w)
 	V.Art(b.Icon, "QuestNormal", T.available)
+	if b.Plus then
+		b.Plus:SetQuest(n.id)
+	end
 	local title = V.Title(n.id)
 	if n.hard then -- (orange: after the ones for my level, marked)
 		title = title .. " " .. V.TierHex("difficult") .. "(" .. V.TierWord("difficult") .. ")|r"
@@ -1352,7 +1433,7 @@ function C.FillNext(b, entry)
 		text = L["%s - next: %s"]:format(GOLD .. n.title .. "|r", title)
 	end
 	V.SetBadge(b.Badge, n.id, n.chain.done .. "/" .. n.chain.total, n.title, L["%d of %d steps done"]:format(n.chain.done, n.chain.total))
-	b.Text:SetWidth(w - 28 - 60)
+	b.Text:SetWidth(w - 28 - b.left - 60)
 	b.Text:SetText(text)
 end
 
@@ -1898,11 +1979,415 @@ function D.Build(parent)
 end
 
 ---------------------------------------------------------------------------
+-- Plan: the quests I picked, in my order (Plan.lua), or a suggested route's stops
+---------------------------------------------------------------------------
+
+local N = {}
+local PLAN_H = 26
+
+-- "Marshal Dughan · Elwynn Forest": the first of some people (an item that starts it: its name).
+function N.Who(people)
+	local who = people and people[1]
+	if not who then
+		return L["unknown"]
+	end
+	local point = who.points and who.points[1]
+	if not point and who.kind == "item" and type(who.drops) == "table" and who.drops[1] then
+		point = who.drops[1].points and who.drops[1].points[1]
+	end
+	local zone = point and Q.MapName(point.map)
+	return (who.name or L["unknown"]) .. (zone and (" · " .. zone) or "")
+end
+
+-- Where a quest of the plan stands for me, in words: "Pick up at Marshal Dughan · Elwynn Forest", "3/10
+-- Kobold Vermin", "Ready: turn in at Gryan Stoutmantle · Westfall", or why it can't be taken yet.
+function N.Status(id, q)
+	if not q then
+		return GREY .. L["This quest isn't in the quest data."] .. "|r"
+	end
+	local s = Q.StatusOf(id)
+	if s == "active" then
+		if C_QuestLog and LT.Value(C_QuestLog.IsComplete, id) == true then
+			return V.Hex(TONE.done) .. L["Ready: turn in at %s"]:format(N.Who(q.ends)) .. "|r"
+		end
+		for _, o in ipairs(Q.LogObjectives(id)) do
+			if not o.done then
+				return (o.need and o.need > 0) and (tostring(o.have or 0) .. "/" .. o.need .. " " .. (o.name or o.text)) or o.text
+			end
+		end
+		return V.Hex(TONE.active) .. L["In your quest log"] .. "|r"
+	elseif s == "available" then
+		return L["Pick up at %s"]:format(N.Who(q.starts))
+	elseif s == "level" and tonumber(q.minLevel) then
+		return Q.StatusCode(s) .. L["Your level is too low: from level %d"]:format(q.minLevel) .. "|r"
+	elseif s == "locked" then
+		local missing = Q.Missing and Q.Missing(id) or {}
+		if missing[1] then
+			return Q.StatusCode(s) .. L["Needs %s"]:format(Q.Title(missing[1].id)) .. "|r"
+		end
+	end
+	return Q.StatusText(s)
+end
+
+-- The first stop not done of a quest (where Shift-click pins it).
+function N.NextOf(id)
+	for _, s in ipairs(Q.PlanStops and Q.PlanStops() or {}) do
+		if s.quest == id and not s.done then
+			return s
+		end
+	end
+end
+
+-- "1200", rounded to what a guess is worth.
+function N.Round(yards)
+	yards = tonumber(yards) or 0
+	local step = yards >= 1000 and 100 or 50
+	return math.floor(yards / step + 0.5) * step
+end
+
+-- A small icon Button of a quest's row (up, down, remove).
+function N.Tool(row, texture, tip, onClick)
+	local b = CreateFrame("Button", nil, row)
+	b:SetSize(18, 18)
+	b.Icon = b:CreateTexture(nil, "ARTWORK")
+	b.Icon:SetAllPoints()
+	b.Icon:SetTexture(texture)
+	b:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
+	b:SetScript("OnClick", function(self)
+		V.Untip(self)
+		local e = row.entry
+		if e and e.id then
+			onClick(e)
+		end
+	end)
+	b:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(tip, 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", V.Untip)
+	return b
+end
+
+function N.QuestEnter(self)
+	local e = self.entry
+	if not (e and e.id) then
+		return
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(V.Title(e.id, e.quest), 1, 1, 1)
+	GameTooltip:AddLine(N.Status(e.id, e.quest), 1, 1, 1, true)
+	local chain, at = Q.ChainFor(e.id)
+	if chain then
+		GameTooltip:AddLine(L["Step %d of %d · %s"]:format(at, #chain, Q.Title(chain[1])), 1, 0.82, 0, true)
+	end
+	for _, s in ipairs(Q.PlanStops()) do
+		if s.quest == e.id then
+			local zone = Q.MapName(s.spot.map)
+			GameTooltip:AddLine((s.done and (Q.Icon("done", 12) .. " ") or "- ") .. Q.PlanStopText(s) .. (zone and (" · " .. zone) or ""),
+				s.done and 0.55 or 0.85, s.done and 0.55 or 0.85, s.done and 0.55 or 0.85, true)
+		end
+	end
+	V.ClickLines()
+	if chain then
+		GameTooltip:AddLine(L["Right-click (or %s): open the chain"]:format(at .. "/" .. #chain), 0.5, 0.75, 1)
+	end
+	if e.next then
+		GameTooltip:AddLine(L["Shift-click: map pin at %s"]:format(e.next.label or ""), 0.5, 0.75, 1, true)
+	end
+	GameTooltip:Show()
+end
+
+-- A quest of the plan: its number, "[12] Title" in its tier's colour, its chain's "2/4", where it
+-- stands, and at the right up, down and remove (Buttons: the controller reaches them).
+function N.NewQuest(parent, width)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(width, PLAN_H)
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b.Line = b:CreateTexture(nil, "BACKGROUND")
+	b.Line:SetPoint("BOTTOMLEFT")
+	b.Line:SetPoint("BOTTOMRIGHT")
+	b.Line:SetHeight(1)
+	b.Line:SetColorTexture(1, 1, 1, 0.04)
+	b.Num = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	b.Num:SetPoint("LEFT", 4, 0)
+	b.Num:SetWidth(24)
+	b.Num:SetJustifyH("RIGHT")
+	b.Title = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	b.Title:SetPoint("LEFT", 34, 0)
+	b.Title:SetJustifyH("LEFT")
+	b.Title:SetWordWrap(false)
+	b.Badge = V.NewBadge(b)
+	b.Badge:SetPoint("LEFT", b.Title, "RIGHT", 4, 0)
+	b.Remove = N.Tool(b, "Interface\\Buttons\\UI-GroupLoot-Pass-Up", L["Remove from plan"], function(e) Q.PlanRemove(e.id) end)
+	b.Remove:SetPoint("RIGHT", -6, 0)
+	b.Down = N.Tool(b, "Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up", L["Move down"], function(e) Q.PlanMove(e.id, e.n + 1) end)
+	b.Down:SetPoint("RIGHT", b.Remove, "LEFT", -4, 0)
+	b.Up = N.Tool(b, "Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up", L["Move up"], function(e) Q.PlanMove(e.id, e.n - 1) end)
+	b.Up:SetPoint("RIGHT", b.Down, "LEFT", -2, 0)
+	b.Status = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	b.Status:SetPoint("LEFT", b.Badge, "RIGHT", 12, 0)
+	b.Status:SetPoint("RIGHT", b.Up, "LEFT", -8, 0)
+	b.Status:SetJustifyH("LEFT")
+	b.Status:SetWordWrap(false)
+	b.Status:SetTextColor(0.85, 0.85, 0.85)
+	b:SetScript("OnEnter", N.QuestEnter)
+	b:SetScript("OnLeave", V.Untip)
+	b:SetScript("OnClick", function(self, button)
+		local e = self.entry
+		if e and e.id then
+			V.Untip(self)
+			QuestClick(e.id, Q.ChainFor(e.id) ~= nil, e.next and e.next.spot, button)
+		end
+	end)
+	return b
+end
+
+function N.FillQuest(b, e)
+	local w = e.inst.listW
+	b:SetWidth(w)
+	e.quest = Q.Quest(e.id)
+	e.next = N.NextOf(e.id)
+	b.Num:SetText(GOLD .. e.n .. ".|r")
+	b.Title:SetWidth(math.floor(w * 0.38))
+	b.Title:SetText(e.quest and V.Title(e.id, e.quest) or Q.Title(e.id))
+	local chain, at = Q.ChainFor(e.id)
+	if chain then
+		V.SetBadge(b.Badge, e.id, at .. "/" .. #chain, Q.Title(chain[1]), L["Step %d of %d"]:format(at, #chain))
+	else
+		V.SetBadge(b.Badge, nil, nil)
+	end
+	b.Status:SetText(N.Status(e.id, e.quest))
+	b.Up:SetAlpha(e.n > 1 and 1 or 0.3)
+	b.Down:SetAlpha(e.n < e.count and 1 or 0.3)
+end
+
+function N.StopEnter(self)
+	local s = self.entry and self.entry.stop
+	if not s then
+		return
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(self.entry.n .. ". " .. Q.PlanStopText(s, true), 1, 1, 1, true)
+	local zone = Q.MapName(s.spot.map)
+	if zone then
+		GameTooltip:AddLine(zone, 0.8, 0.8, 0.8)
+	end
+	if s.done then
+		GameTooltip:AddLine(s.skipped and L["Skipped for now"] or L["Done"], 0.55, 0.55, 0.55)
+	elseif self.entry.isNext then
+		GameTooltip:AddLine(L["Next"], 1, 0.82, 0)
+	end
+	V.ClickLines()
+	GameTooltip:AddLine(L["Shift-click: map pin at %s"]:format(s.label or ""), 0.5, 0.75, 1, true)
+	GameTooltip:Show()
+end
+
+-- A stop of the plan: its number, "Pick up X at Y" / "Kill 10 x ..." / "Turn in at Z" (and the quest),
+-- its zone at the right; the next one marked, done ones ticked and grey. A click shows the quest's
+-- details, Ctrl-click the stop on the map, Shift-click sets the map pin there.
+function N.NewStop(parent, width)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(width, PLAN_H)
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b.Band = b:CreateTexture(nil, "BACKGROUND")
+	b.Band:SetAllPoints()
+	b.Band:SetColorTexture(1, 0.82, 0, 0.1)
+	b.Num = b:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	b.Num:SetPoint("LEFT", 4, 0)
+	b.Num:SetWidth(24)
+	b.Num:SetJustifyH("RIGHT")
+	b.Icon = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	b.Icon:SetPoint("LEFT", 32, 0)
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	b.Text:SetPoint("LEFT", 50, 0)
+	b.Text:SetJustifyH("LEFT")
+	b.Text:SetWordWrap(false)
+	b.Right = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	b.Right:SetPoint("RIGHT", -8, 0)
+	b.Right:SetJustifyH("RIGHT")
+	b.Right:SetWordWrap(false)
+	b:SetScript("OnEnter", N.StopEnter)
+	b:SetScript("OnLeave", V.Untip)
+	b:SetScript("OnClick", function(self, button)
+		local s = self.entry and self.entry.stop
+		if s then
+			V.Untip(self)
+			QuestClick(s.quest, Q.ChainFor(s.quest) ~= nil, s.spot, button, s.spot)
+		end
+	end)
+	return b
+end
+
+function N.FillStop(b, e)
+	local s, w = e.stop, e.inst.listW
+	b:SetWidth(w)
+	b.Band:SetShown(e.isNext == true)
+	b.Num:SetText((s.done and GREY or GOLD) .. e.n .. ".|r")
+	b.Icon:SetText(s.done and Q.Icon("done", 14) or e.isNext and Q.Icon("here", 14) or "")
+	local text = Q.PlanStopText(s)
+	if s.kind ~= "start" then
+		text = text .. GREY .. " · |r" .. (s.done and Q.Title(s.quest) or V.Title(s.quest))
+	end
+	if e.lead then
+		text = GOLD .. L["Next (%d/%d):"]:format(e.n, e.total) .. "|r " .. text
+	end
+	b.Text:SetText(s.done and (GREY .. text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "|r") or text)
+	b.Right:SetWidth(math.floor(w * 0.25))
+	b.Right:SetText(Q.MapName(s.spot.map) or "")
+	b.Text:SetWidth(w - 50 - math.floor(w * 0.25) - 16)
+end
+
+-- The head's second line: the route in use and what it saves, or that the plan changed and it went.
+function N.Note(inst, info)
+	if inst.failed then
+		return GREY .. L["No route: there's nothing left to go to, or no place is known."] .. "|r"
+	elseif info.active then
+		return GOLD .. L["Suggested route"] .. "|r" .. GREY .. " · |r"
+			.. (info.good and L["Your order is already a good one"] or V.Hex(TONE.done) .. L["Saves about %d yards"]:format(N.Round(info.saves)) .. "|r")
+	elseif info.dropped then
+		return Q.COLOR.closes .. L["The plan changed: back to your order."] .. "|r"
+	end
+	return GREY .. L["Your order. Ctrl-click a quest to see it on the map."] .. "|r"
+end
+
+-- The bar: "Suggest a route" (or "Back to my order") and "Clear"; asked first: "Clear your whole
+-- plan?" with "Clear it" and "Cancel".
+function N.Bar(inst, any)
+	local info = Q.PlanRouteInfo and Q.PlanRouteInfo() or {}
+	local asking = inst.asking and any
+	inst.asking = asking
+	V.SetChip(inst.RouteChip, info.active and L["Back to my order"] or L["Suggest a route"], info.active)
+	inst.RouteChip:SetShown(any and not asking and (info.active or Q.SuggestRoute ~= nil))
+	inst.ClearChip:SetShown(any and not asking)
+	inst.Ask:SetShown(asking == true)
+	inst.Yes:SetShown(asking == true)
+	inst.No:SetShown(asking == true)
+	inst.Sub:SetText(any and N.Note(inst, info) or "")
+	return info
+end
+
+function N.Draw(inst)
+	if inst.noData then
+		return
+	end
+	inst.draws = inst.draws + 1
+	local list = Q.PlanList and Q.PlanList() or {}
+	local stops = Q.PlanStops and Q.PlanStops() or {}
+	local info = N.Bar(inst, list[1] ~= nil)
+	inst.Head:SetText(list[1] and L["%d quests · %d stops"]:format(#list, #stops) or L["Plan"])
+	inst.rev = Q.PlanRev and Q.PlanRev()
+	local entries = {}
+	local function Add(kind, key, h, fields)
+		fields.kind, fields.key, fields.h, fields.inst = kind, key, h, inst
+		entries[#entries + 1] = fields
+	end
+	if not list[1] then
+		V.Say(inst, L["Your plan is empty. Add quests with the + beside them: in the Quest list, My quests and a quest's details, or Alt-click a quest giver on the map."])
+		inst.list:SetEntries(entries)
+		return
+	end
+	V.Say(inst, nil)
+	local _, at = Q.PlanNext()
+	if info.active then
+		for i, s in ipairs(stops) do
+			Add("stop", "s" .. s.key, PLAN_H, { stop = s, n = i, isNext = i == at })
+		end
+	else
+		local brief = Q.PlanBriefing and Q.PlanBriefing()
+		if at then
+			Add("stop", "next", PLAN_H, { stop = stops[at], n = at, total = #stops, isNext = true, lead = true })
+		end
+		for i = 1, brief and #brief.lines - 1 or 0 do -- (its last line, the counts, is the head)
+			if not (at and i == 1) then
+				Add("note", "brief" .. i, NOTE_H, { text = GREY .. brief.lines[i] .. "|r" })
+			end
+		end
+		Add("head", "hquests", HEAD_H, { text = L["Your order"], note = "(" .. #list .. ")" })
+		for i, id in ipairs(list) do
+			Add("quest", "q" .. id, PLAN_H, { id = id, n = i, count = #list })
+		end
+	end
+	inst.list:SetEntries(entries, true)
+end
+
+function N.Build(parent)
+	local inst = V.NewView(parent, "plan")
+	inst.noCensus, inst.ownList, inst.axis = true, true, 18
+	local f = inst.frame
+	inst.Head = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	inst.Head:SetPoint("TOPLEFT", K.PAD, -10)
+	inst.Head:SetJustifyH("LEFT")
+	inst.Head:SetWordWrap(false)
+	inst.Sub = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	inst.Sub:SetPoint("TOPLEFT", K.PAD, -K.TOP)
+	inst.Sub:SetPoint("RIGHT", f, "RIGHT", -K.PAD, 0)
+	inst.Sub:SetJustifyH("LEFT")
+	inst.Sub:SetWordWrap(false)
+	inst.RouteChip = V.NewChip(f, function()
+		if Q.PlanRouteInfo().active then
+			Q.PlanUseOrder()
+			inst.failed = nil
+		else
+			inst.failed = Q.PlanSuggest() == nil
+		end
+		inst:Draw()
+	end)
+	inst.RouteChip.tip = L["The shortest way through your plan's stops from where you are, each quest's start before its objectives before its turn-in. Any change to the plan goes back to your order."]
+	inst.ClearChip = V.NewChip(f, function()
+		inst.asking = true
+		inst:Draw()
+	end)
+	V.SetChip(inst.ClearChip, L["Clear"], false)
+	inst.ClearChip.tip = L["Removes every quest from your plan (it asks first)."]
+	inst.Ask = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	inst.Ask:SetText(L["Clear your whole plan?"])
+	inst.Yes = V.NewChip(f, function()
+		inst.asking, inst.failed = nil, nil
+		Q.PlanClear()
+		inst:Draw()
+	end)
+	V.SetChip(inst.Yes, L["Clear it"], true)
+	inst.No = V.NewChip(f, function()
+		inst.asking = nil
+		inst:Draw()
+	end)
+	V.SetChip(inst.No, L["Cancel"], false)
+	inst.list = V.NewList(f, {
+		quest = { new = N.NewQuest, fill = N.FillQuest },
+		stop = { new = N.NewStop, fill = N.FillStop },
+		head = { new = C.NewHead, fill = C.FillHead },
+		note = { new = C.NewNote, fill = C.FillNote },
+	})
+	inst.Layout = function(self)
+		self.ClearChip:ClearAllPoints()
+		self.ClearChip:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -K.PAD, -6)
+		self.RouteChip:ClearAllPoints()
+		self.RouteChip:SetPoint("RIGHT", self.ClearChip, "LEFT", -6, 0)
+		self.No:ClearAllPoints()
+		self.No:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -K.PAD, -6)
+		self.Yes:ClearAllPoints()
+		self.Yes:SetPoint("RIGHT", self.No, "LEFT", -6, 0)
+		self.Ask:ClearAllPoints()
+		self.Ask:SetPoint("RIGHT", self.Yes, "LEFT", -8, 0)
+		self.Head:SetPoint("RIGHT", self.RouteChip, "LEFT", -K.PAD, 0)
+	end
+	inst.Draw = function(self)
+		V.Fit(self)
+		N.Draw(self)
+	end
+	return inst
+end
+
+---------------------------------------------------------------------------
 -- Registering the views with the window
 ---------------------------------------------------------------------------
 
 local DEFS = {
 	{ key = "myquests", label = L["My quests"], build = C.Build },
+	{ key = "plan", label = L["Plan"], build = N.Build },
 	{ key = "levelpath", label = L["Level path"], build = D.Build },
 }
 local built = {}      -- key -> the view made (the last one)

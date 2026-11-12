@@ -7,6 +7,9 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 --
 -- Opened on its own (/lodestar) it shows, top down, only what to do now and how far along (the
 -- rest is in the lines' tooltips or behind a click):
+--   Plan (only while the plan, Plan.lua, has a stop not done): "Next (2/14): Pick up <quest> at
+--     <giver>" with how far and which way, Skip, and a small map of its own with the next stops
+--     numbered and joined by a line; a click shows the stop on the big window's map (Q.ShowOnMap).
 --   Now: the quest you're on (the last one you accepted, super-tracked or opened in the quest log;
 --     else the first on your tracker, else one of your log in this zone), "[18] Title" in its
 --     difficulty colour (its tooltip: what it leads to), "Step 3 of 7 · <chain>" and a bar, friends
@@ -1017,6 +1020,189 @@ local function DrawPick(y, ctx, lists)
 	return y, any
 end
 
+---------------------------------------------------------------------------
+-- The plan (Plan.lua): on top while it has a stop not done, where to go next and its own small map
+---------------------------------------------------------------------------
+
+-- The plan's map (a second small map, made the first time it's needed) and its stops numbered on a
+-- layer of ours over the art, joined by a line; laid again when the art is (its size changes with
+-- the zoom). Nothing runs for it but what MiniMap.lua runs for its own.
+local PL = { marks = {}, lines = {}, MAX = 5 }
+
+-- The quest's stop on the big window's map (Q.ShowOnMap; without it the quest, Q.OpenBrowser).
+function PL.ShowOnMap(stop)
+	if Q.ShowOnMap then
+		Q.ShowOnMap(stop.quest, stop.spot)
+	elseif Q.OpenBrowser then
+		Q.OpenBrowser(stop.quest)
+	end
+end
+
+function PL.MarkEnter(self)
+	local e = self.entry
+	if not e then
+		return
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+	GameTooltip:SetText(e.n .. ". " .. Q.PlanStopText(e.stop, true), 1, 1, 1, true)
+	if e.next then
+		GameTooltip:AddLine(L["Next"], 1, 0.82, 0)
+	end
+	GameTooltip:AddLine(L["Click: show it on the map"], 0.5, 0.75, 1)
+	GameTooltip:Show()
+end
+
+function PL.Mark(i)
+	local mark = PL.marks[i]
+	if not mark then
+		mark = CreateFrame("Button", nil, PL.layer)
+		mark:SetSize(18, 18)
+		mark.Disc = mark:CreateTexture(nil, "ARTWORK")
+		mark.Disc:SetAllPoints()
+		mark.Disc:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
+		mark.Num = mark:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		mark.Num:SetPoint("CENTER", 0, 0)
+		mark:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+		mark:SetScript("OnEnter", PL.MarkEnter)
+		mark:SetScript("OnLeave", RowLeave)
+		mark:SetScript("OnClick", function(self)
+			RowLeave(self)
+			if self.entry then
+				PL.ShowOnMap(self.entry.stop)
+			end
+		end)
+		PL.marks[i] = mark
+	end
+	return mark
+end
+
+-- The numbers and the line where the stops are on the art laid now.
+function PL.Lay()
+	local m = PL.map
+	if not (m and PL.layer) then
+		return
+	end
+	local w, h = m.artW, m.artH
+	local shown = PL.shown or {}
+	local px, py
+	for i, e in ipairs(shown) do
+		local mark = PL.Mark(i)
+		mark.entry = e
+		local x, y = e.stop.spot.x * w, e.stop.spot.y * h
+		mark:ClearAllPoints()
+		mark:SetPoint("CENTER", m.Map, "TOPLEFT", x, -y)
+		mark.Num:SetText(tostring(e.n))
+		if e.next then
+			mark.Disc:SetVertexColor(1, 0.82, 0, 1)
+			mark.Num:SetTextColor(0, 0, 0)
+		else
+			mark.Disc:SetVertexColor(0.1, 0.1, 0.1, 0.9)
+			mark.Num:SetTextColor(1, 0.82, 0)
+		end
+		mark:Show()
+		if px then
+			local line = PL.lines[i - 1]
+			if not line then
+				line = PL.layer:CreateLine(nil, "ARTWORK")
+				line:SetThickness(2)
+				line:SetColorTexture(1, 0.82, 0, 0.75)
+				PL.lines[i - 1] = line
+			end
+			line:SetStartPoint("TOPLEFT", m.Map, px, -py)
+			line:SetEndPoint("TOPLEFT", m.Map, x, -y)
+			line:Show()
+		end
+		px, py = x, y
+	end
+	for i = #shown + 1, #PL.marks do
+		RowLeave(PL.marks[i])
+		PL.marks[i]:Hide()
+	end
+	for i = math.max(1, #shown), #PL.lines do
+		PL.lines[i]:Hide()
+	end
+end
+
+function PL.Map()
+	if not PL.map then
+		local m = Q.NewMiniMap(content)
+		PL.map = m
+		PL.layer = CreateFrame("Frame", nil, m.Map)
+		PL.layer:SetAllPoints()
+		PL.layer:SetFrameLevel(m.Map:GetFrameLevel() + 5)
+		m.Map:HookScript("OnSizeChanged", PL.Lay)
+	end
+	return PL.map
+end
+
+function PL.Hide()
+	if PL.map then
+		for _, mark in ipairs(PL.marks) do
+			RowLeave(mark)
+		end
+		PL.map:Hide()
+	end
+end
+
+-- "Next (2/14): Pick up Wanted: Hogger at Marshal Dughan" with how far and which way (another zone:
+-- its name), "Skip" beside it, and the plan's map: the next few stops on the next one's map,
+-- numbered, joined by a line. Nothing without a plan (or with every stop done).
+local function DrawPlan(y, ctx)
+	local stop, at = nil, nil
+	if Q.PlanNext then
+		stop, at = Q.PlanNext()
+	end
+	if not stop then
+		return y
+	end
+	local stops = Q.PlanStops()
+	local spot = stop.spot
+	local zone = Q.MapName(spot.map)
+	y = Header(y, L["Plan"], spot.map ~= ctx.zone and zone or nil)
+	local right = zone
+	if ctx.zone and ctx.x and spot.map == ctx.zone then
+		right = Q.TowardText(ctx.zone, ctx.x, ctx.y, spot.x, spot.y)
+	end
+	local skipW = 44
+	local tip = { Q.PlanStopText(stop, true) }
+	tip[#tip + 1] = zone
+	tip[#tip + 1] = L["Click: show it on the map"]
+	tip[#tip + 1] = L["Shift-click: map pin there, in chat too"]
+	local y1 = Row(y, { text = GOLD .. L["Next (%d/%d):"]:format(at, #stops) .. "|r " .. Q.PlanStopText(stop, true), right = right,
+		w = width - skipW - 4, onClick = function()
+			if IsShiftKeyDown and IsShiftKeyDown() then
+				Q.Waypoint(spot.map, spot.x, spot.y, true)
+			else
+				PL.ShowOnMap(stop)
+			end
+		end, tooltip = tip })
+	local y2 = Row(y, { text = GREY .. L["Skip"] .. "|r", x = width - skipW, w = skipW, onClick = function()
+			Q.PlanSkip(stop)
+			Draw()
+		end, tooltip = { L["Skip"], L["Marks this stop done for now: the next one comes up (until you log out or reload)."] } })
+	y = math.max(y1, y2)
+	local m = PL.Map()
+	PL.used = true
+	local shown = {}
+	for i = at, #stops do
+		local s = stops[i]
+		if not s.done and s.spot.map == spot.map then
+			shown[#shown + 1] = { stop = s, n = i, next = i == at }
+			if #shown >= PL.MAX then
+				break
+			end
+		end
+	end
+	PL.shown = shown
+	local height = math.floor(width * 2 / 3 + 0.5)
+	m:SetSize(width, height)
+	m.frame:ClearAllPoints()
+	m.frame:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(y + GAP))
+	m:Show(spot.map, {})
+	PL.Lay()
+	return y + GAP + height + GAP
+end
+
 local function DrawCompanion(y)
 	local zone, x, py = Q.HereZone()
 	drawnAt = { zone, x, py }
@@ -1024,6 +1210,7 @@ local function DrawCompanion(y)
 	ctx.now, ctx.why = NowQuest(zone)
 	nowId = ctx.now
 	local lists = PickLists(ctx)
+	y = DrawPlan(y, ctx)
 	y = DrawNow(y, ctx)
 	ctx.map = ctx.map or zone
 	local points = {}
@@ -1042,6 +1229,9 @@ end
 
 -- Whether the companion has anything to show: a quest I'm on, or something to pick up nearby.
 local function Useful()
+	if Q.PlanNext and Q.PlanNext() then
+		return true
+	end
 	local zone, x, y = Q.HereZone()
 	local ctx = { zone = zone, x = x, y = y, points = {} }
 	ctx.now = NowQuest(zone)
@@ -1306,6 +1496,7 @@ Draw = function(opened)
 		return
 	end
 	rowsUsed, textsUsed, rulesUsed, mapUsed = 0, 0, 0, false
+	PL.used = false
 	win.Bar:Hide()
 	width = math.max(100, win:GetWidth() - SCROLL_SIDE)
 	content:SetWidth(width)
@@ -1334,6 +1525,9 @@ Draw = function(opened)
 	end
 	if not mapUsed then
 		map:Hide()
+	end
+	if not PL.used then
+		PL.Hide()
 	end
 	for i = rowsUsed + 1, #rows do
 		RowLeave(rows[i])
@@ -1543,10 +1737,16 @@ local function Build()
 			RowLeave(row)
 		end
 		map:Hide()
+		PL.Hide()
 	end)
 	win:SetScript("OnEvent", OnEvent)
 	if Q.OnDataChanged then
 		Q.OnDataChanged(function()
+			Q.RedrawSmall()
+		end)
+	end
+	if Q.OnPlanChanged then -- (the plan changed: added, moved, a stop skipped, a quest turned in)
+		Q.OnPlanChanged(function()
 			Q.RedrawSmall()
 		end)
 	end
@@ -1660,7 +1860,11 @@ function Q.SmallFrame()
 	for i = 1, textsUsed do
 		strings[#strings + 1] = texts[i]:GetText()
 	end
+	local marks = {}
+	for i = 1, #(PL.shown or {}) do
+		marks[i] = PL.marks[i]
+	end
 	return { win = win, map = map, rows = list, texts = strings, quest = mode == "quest" and shown or nil, now = nowId,
 		mode = mode, history = history, content = content, asleep = asleep, collapsed = collapsedNow,
-		line = win and win.Line }
+		line = win and win.Line, planMap = PL.used and PL.map or nil, planMarks = marks, planLines = PL.lines }
 end
