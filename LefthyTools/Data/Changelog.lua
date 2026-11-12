@@ -551,5 +551,8 @@ ns.CHANGELOG = {
 	{ id = 181, module = "lodestar",
 		en = { "Lodestar: the companion stays open", "Escape no longer closes the companion, like the Bestiary's small window: its X or /lodestar does. Its plan part says which stop you're at (\"Stop 3 of 9\", as the Plan tab does), and the numbers on its small map show what they are: ! pick up, ? turn in, a dot an objective." },
 		de = { "Lodestar: Begleiter bleibt offen", "Escape schließt den Begleiter nicht mehr, wie das kleine Fenster des Bestiariums: sein X oder /lodestar schließt ihn. Sein Planteil sagt, bei welcher Station du bist (\"Station 3 von 9\", wie der Tab Plan), und die Zahlen auf seiner kleinen Karte zeigen, was sie sind: ! annehmen, ? abgeben, ein Punkt ein Ziel." } },
+	{ id = 182, module = "lodestar",
+		en = { "Lodestar: the map's ! by difficulty", "On the big map every ! to pick up has its difficulty's colour, as the levels in the lists: green easy, yellow right for you, orange hard, red far too hard (grey ones were grey already). A yellow ! no longer hides a quest far above you." },
+		de = { "Lodestar: ! der Karte nach Schwierigkeit", "Auf der großen Karte hat jedes ! zum Annehmen die Farbe seiner Schwierigkeit, wie die Level in den Listen: grün leicht, gelb passend für dich, orange schwer, rot viel zu schwer (graue waren schon grau). Ein gelbes ! versteckt keine Quest mehr, die weit über dir liegt." } },
 	-- New entries go here, at the end.
 }

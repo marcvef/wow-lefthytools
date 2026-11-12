@@ -1114,8 +1114,11 @@ frame of ours. On a dark strip over its top: the zone's name and levels, and at 
 (Buttons of ours: the controller's way to zoom) with the zoom when it's above 100%. A pin per spot of a
 quest giver of the place's quests as the filters show them (within my levels by default; done ones too,
 as dim dots; `starts[].points` on that map), a quest in my log at its turn-in's (`ends`), in the game's
-own map icons on a dark disc: `QuestNormal` "!" (24 px) to pick up (a **hard** one, `Rule.IsHard`: the same
-icon with an orange ring around its disc, `marker.Edge`, when it's the pin's look), `QuestDaily` for a repeatable one,
+own map icons on a dark disc: `QuestNormal` "!" (24 px) to pick up, **in its difficulty's colour**
+(`marker.tier`, `Rule.Tier`: the icon desaturated and tinted with `Rule.TierRgb`, a little brighter: green
+easy, orange hard, red far too hard; right for me the game's own yellow, untouched), `QuestDaily` for a
+repeatable one (blue; a **hard** one, `Rule.IsHard`: an orange ring around its disc, `marker.Edge`, as its
+colour can't say it),
 `TrivialQuests` for one that's grey for me (`Q.IsTrivial`), `QuestTurnin` "?" when it's ready to turn in
 (`C_QuestLog.IsComplete`; `QuestRepeatableTurnin` for a repeatable one), the same "?" grey while it's in
 progress, a grey "!" (18 px) for one my level is too low for and a smaller, darker one for one that needs

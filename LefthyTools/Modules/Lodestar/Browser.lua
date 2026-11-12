@@ -25,7 +25,8 @@ ns.Lodestar = Q
 -- (Alt-click on a pin), its stops numbered on the zone's map, joined in order. "Current zone" beside
 -- the search: the place I'm in. The zones on the left alphabetical in each continent (the client's
 -- names). Every title's level in its tier's colour (Q.TierCode); "N for your level" apart from "M hard"
--- (orange: listed after the ones that fit, marked, their pins ringed); every list of quests in
+-- (orange: listed after the ones that fit, marked; on the map every "!" to pick up is in its
+-- difficulty's colour, a repeatable's blue one ringed in orange when hard); every list of quests in
 -- Q.Compare's order (a chain's steps in the chain's).
 --   * The zone page: the zone's map, as large as the middle (3:2): its art, a pin per quest giver
 --     with how many quests it has (the game's icons: available "!", a low level one's, a grey "!" for
@@ -3050,13 +3051,18 @@ function Map.Show(m, map, spots, name, threads)
 		end
 	end
 	-- Each marker's quests, the one to do first first (by its look, then Q.Compare's order), how many of
-	-- them are still to do, its chains; a hard one's look (the first) gets an orange ring.
+	-- them are still to do, its chains. A "!" to pick up (the first's look) in its difficulty's colour
+	-- (Rule.Tier: green easy, the game's yellow right for me, orange hard, red far too hard; a low one
+	-- has the game's grey "!" already); a hard one whose "!" keeps its own colour (a repeatable's blue)
+	-- gets an orange ring.
 	for i = 1, n do
 		local marker = m.markers[i]
 		if marker.spots[2] then
 			Map.SortSpots(marker.spots)
 		end
-		marker.hard = marker.spots[1].hard == true and not marker.drop
+		local first = marker.spots[1]
+		marker.tier = first.look == "available" and first.quest and Rule.Tier(first.quest) or nil
+		marker.hard = first.hard == true and not marker.drop and not marker.tier
 		local quests, seen, chains, open = {}, {}, {}, 0
 		for _, spot in ipairs(marker.spots) do
 			if spot.quest and not seen[spot.quest] then
@@ -3171,9 +3177,16 @@ function Map.Paint(marker)
 		marker.Icon:SetVertexColor(look.tint[1], look.tint[2], look.tint[3], look.alpha or 1)
 	else
 		Art(marker.Icon, look.atlas, look.file)
-		marker.Icon:SetDesaturated(look.desat == true)
-		local tint = look.tint
-		marker.Icon:SetVertexColor(tint and tint[1] or 1, tint and tint[2] or 1, tint and tint[3] or 1, 1)
+		local tier = marker.tier ~= "fair" and marker.tier or nil -- (right for me: the game's own yellow)
+		if tier then
+			local r, g, b = Rule.TierRgb(tier)
+			marker.Icon:SetDesaturated(true)
+			marker.Icon:SetVertexColor(math.min(1, r * 1.25), math.min(1, g * 1.25), math.min(1, b * 1.25), 1)
+		else
+			marker.Icon:SetDesaturated(look.desat == true)
+			local tint = look.tint
+			marker.Icon:SetVertexColor(tint and tint[1] or 1, tint and tint[2] or 1, tint and tint[3] or 1, 1)
+		end
 	end
 	marker.Back:SetShown(look.back == true or look.ring == true)
 	marker.Back:SetSize(size + (look.ring and 3 or 6), size + (look.ring and 3 or 6))

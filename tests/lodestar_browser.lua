@@ -1907,6 +1907,15 @@ do
 	-- Red (too hard) only with all levels, in red.
 	check(not marker("Remy"), "too hard (red): not by default")
 	view.filters.allLevels:Click()
+	-- On the map a "!" to pick up has its difficulty's colour (one I could take now far above me: red).
+	local statusRemy = STATUS_OF[111]
+	STATUS_OF[111] = "available"
+	again()
+	local remy = marker("Remy")
+	check(remy and remy.look == "available" and remy.tier == "impossible" and remy.Icon.desaturated and remy.Icon.vertex[1] == 1
+		and remy.Icon.vertex[2] < 0.2 and not remy.Edge:IsShown(), "on the map: its \"!\" in red, its difficulty's colour (no ring)")
+	STATUS_OF[111] = statusRemy
+	again()
 	view.tabs.overview:Click()
 	check(listRow(111) and listRow(111).Name:GetText():find(CodeOf("impossible") .. "[9]|r", 1, true), "with all levels: there, in red")
 	view.filters.allLevels:Click()
