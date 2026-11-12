@@ -551,7 +551,8 @@ levels with yours marked, the best one on top).
 
 **Your plan.** The **+** before a quest (in the quest list, My quests, the details, a chain's steps;
 Alt-click a pin) puts it on your plan, in the order you want to do them; the Plan tab lists them
-with what's next for each (pick up, objectives, turn in), to move up or down or take off. The big
+with what's next for each (pick up, objectives, turn in): drag them into the order you want, or take
+one off. Alt-click on a quest in any list adds it or takes it off, as on the map. The big
 map shows the plan's stops numbered and joined by a line, and the companion says where to go
 next, with distance and direction. If you like, **Suggest a route** puts the stops of the quests
 you picked in an order with less walking (pick-ups before objectives before turn-ins, a quest's

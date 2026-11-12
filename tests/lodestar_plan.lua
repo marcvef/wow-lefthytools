@@ -397,16 +397,43 @@ do
 		"a quest: its number, [11] Title, its chain's 1/3, where it stands")
 	check(plain(RowOf("q7006").Status:GetText()) == "Your level is too low: from level 20" and plain(RowOf("q7005").Status:GetText()) == "Needs Wanted: Hogger",
 		"why one can't be taken yet")
-	check(row.Up._kind == "Button" and row.Down._kind == "Button" and row.Remove._kind == "Button" and row.Up._alpha < 1 and RowOf("q7005").Down._alpha < 1,
-		"up, down and remove: Buttons (dim at the ends)")
-	-- Moving and removing.
-	RowOf("q7004").Up:Click()
+	check(row.Remove._kind == "Button" and row.Up == nil and row.Down == nil and row._dragButtons and row._dragButtons[1] == "LeftButton",
+		"remove: a Button; moved by dragging the row (no up and down)")
+	-- Moving: dragged (the cursor at a row's top, or near its bottom), and removing.
+	local scroll = view.list.scroll
+	scroll.GetTop = function() return 500 end
+	local function Drag(key, toKey, low)
+		local r = RowOf(key)
+		r._scripts.OnDragStart(r)
+		local e = RowOf(toKey).entry
+		CURSOR.y = 500 - (e.y + (low and e.h - 2 or 2) - scroll:GetVerticalScroll())
+		view.Dragger._scripts.OnUpdate(view.Dragger, 0)
+		return r
+	end
+	local r = Drag("q7004", "q7001")
+	check(view.Dragger:IsShown() and view.DropLine:IsShown() and r._alpha == 0.4 and select(5, view.DropLine:GetPoint(1)) == 1 - RowOf("q7001").entry.y,
+		"dragged: dim, the gold line where it would land")
+	r._scripts.OnDragStop(r)
 	Wait(0.1)
-	check(table.concat(Q.PlanList(), ",") == "7004,7001,7006,7005" and Entries():find("q7004, q7001", 1, true), "up: one place earlier")
-	RowOf("q7004").Down:Click()
+	check(table.concat(Q.PlanList(), ",") == "7004,7001,7006,7005" and Entries():find("q7004, q7001", 1, true) and not view.DropLine:IsShown()
+		and not view.Dragger:IsShown() and RowOf("q7004")._alpha == 1, "let go above the first: the first")
+	r = Drag("q7004", "q7005", true)
+	r._scripts.OnDragStop(r)
+	Wait(0.1)
+	check(table.concat(Q.PlanList(), ",") == "7001,7006,7005,7004", "below the last: the last")
+	r = Drag("q7004", "q7006")
+	view.Dragger:Hide()
+	check(table.concat(Q.PlanList(), ",") == "7001,7006,7005,7004" and not view.DropLine:IsShown() and r._alpha == 1, "given up (the view hidden): as it was")
+	r = Drag("q7004", "q7004", true)
+	r._scripts.OnDragStop(r)
+	check(table.concat(Q.PlanList(), ",") == "7001,7006,7005,7004", "let go where it was: no change")
+	r = Drag("q7004", "q7006")
+	r._scripts.OnDragStop(r)
+	Wait(0.1)
+	check(table.concat(Q.PlanList(), ",") == "7001,7004,7006,7005", "above another: before it")
 	RowOf("q7006").Remove:Click()
 	Wait(0.1)
-	check(table.concat(Q.PlanList(), ",") == "7001,7004,7005", "down, and removed")
+	check(table.concat(Q.PlanList(), ",") == "7001,7004,7005", "removed")
 	-- The clicks.
 	row = RowOf("q7001")
 	row:Click()
@@ -424,8 +451,16 @@ do
 	row._scripts.OnEnter(row)
 	check(plain(TOOLTIP.title) == "[11] Wanted: Hogger" and tipHas("Pick up at Marshal Dughan") and tipHas("Step 1 of 3")
 		and tipHas("- Pick up Wanted: Hogger at Marshal Dughan · Elwynn Forest") and tipHas("Click: its details")
-		and tipHas("Ctrl-click: show it on the map") and tipHas("Right-click (or 1/3): open the chain"), "its tooltip: where it stands, its stops, the clicks")
+		and tipHas("Ctrl-click: show it on the map") and tipHas("Right-click (or 1/3): open the chain") and tipHas("Alt-click: remove from plan")
+		and tipHas("Drag: move it in your order"), "its tooltip: where it stands, its stops, the clicks")
 	row._scripts.OnLeave(row)
+	STATE.alt = true
+	RowOf("q7005"):Click()
+	STATE.alt = false
+	Wait(0.1)
+	check(table.concat(Q.PlanList(), ",") == "7001,7004" and details[#details] ~= 7005, "Alt-click: out of the plan (as on the map's pins)")
+	Q.PlanAdd(7005)
+	Wait(0.1)
 	-- A route.
 	Replace("SuggestRoute", nil)
 	view:Refresh()

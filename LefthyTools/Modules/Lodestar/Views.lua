@@ -238,10 +238,13 @@ function V.NewPlus(parent)
 	return plus
 end
 
--- The clicks' lines in a quest row's tooltip.
-function V.ClickLines()
+-- The clicks' lines in a quest row's tooltip (id: also Alt-click's, with the plan).
+function V.ClickLines(id)
 	GameTooltip:AddLine(L["Click: its details"], 0.5, 0.75, 1)
 	GameTooltip:AddLine(L["Ctrl-click: show it on the map"], 0.5, 0.75, 1)
+	if id and Q.PlanHas and Q.PlanToggle then
+		GameTooltip:AddLine(Q.PlanHas(id) and L["Alt-click: remove from plan"] or L["Alt-click: add to plan"], 0.5, 0.75, 1)
+	end
 end
 
 -- A quest's chain in the window: its zone, the quest picked, the chain in the middle with its card in
@@ -1157,9 +1160,12 @@ end
 -- A quest row's clicks (as the big window's, round 7: details first): a click shows its details on
 -- the right, the tab staying (Q.ShowDetails), Ctrl-click shows it on the map (Q.ShowOnMap: its zone,
 -- picked, in sight; spot: that spot), a right-click opens its chain (Q.OpenChain; in no chain: as a
--- click), Shift-click sets the game's map pin at its spot (Shift-right-click: its link in chat too).
+-- click), Shift-click sets the game's map pin at its spot (Shift-right-click: its link in chat too),
+-- Alt-click puts it in the plan or takes it out (as Alt-click on a pin of the map).
 local function QuestClick(id, chained, point, button, spot)
-	if IsShiftKeyDown and IsShiftKeyDown() then
+	if IsAltKeyDown and IsAltKeyDown() and Q.PlanToggle then
+		Q.PlanToggle(id)
+	elseif IsShiftKeyDown and IsShiftKeyDown() then
 		PinAt(point, button == "RightButton")
 	elseif button == "RightButton" and chained then
 		V.OpenChain(id)
@@ -1238,7 +1244,7 @@ function C.QuestEnter(self)
 	if e.ender then
 		GameTooltip:AddLine(L["Turn in: %s"]:format(EnderText(e)) .. (e.ready and e.far and (" · " .. e.far) or ""), 0.8, 0.8, 0.8, true)
 	end
-	V.ClickLines()
+	V.ClickLines(e.id)
 	if e.chain then
 		GameTooltip:AddLine(L["Right-click (or %s): open the chain"]:format(e.at .. "/" .. #e.chain), 0.5, 0.75, 1)
 	end
@@ -1375,7 +1381,7 @@ function C.NextEnter(self)
 		local zone = n.point and Q.MapName(n.point.map)
 		GameTooltip:AddLine(L["From %s"]:format((n.giver.name or L["unknown"]) .. (zone and (", " .. zone) or "")), 0.8, 0.8, 0.8, true)
 	end
-	V.ClickLines()
+	V.ClickLines(n.id)
 	GameTooltip:AddLine(L["Right-click (or %s): open the chain"]:format(c.done .. "/" .. c.total), 0.5, 0.75, 1)
 	if n.point then
 		GameTooltip:AddLine(L["Shift-click: map pin at %s"]:format(n.giver and n.giver.name or ""), 0.5, 0.75, 1, true)
@@ -2045,7 +2051,7 @@ function N.Round(yards)
 	return math.floor(yards / step + 0.5) * step
 end
 
--- A small icon Button of a quest's row (up, down, remove).
+-- A small icon Button of a quest's row (remove).
 function N.Tool(row, texture, tip, onClick)
 	local b = CreateFrame("Button", nil, row)
 	b:SetSize(18, 18)
@@ -2088,23 +2094,136 @@ function N.QuestEnter(self)
 				s.done and 0.55 or 0.85, s.done and 0.55 or 0.85, s.done and 0.55 or 0.85, true)
 		end
 	end
-	V.ClickLines()
+	V.ClickLines(e.id)
 	if chain then
 		GameTooltip:AddLine(L["Right-click (or %s): open the chain"]:format(at .. "/" .. #chain), 0.5, 0.75, 1)
 	end
 	if e.next then
 		GameTooltip:AddLine(L["Shift-click: map pin at %s"]:format(e.next.label or ""), 0.5, 0.75, 1, true)
 	end
+	GameTooltip:AddLine(L["Drag: move it in your order"], 0.5, 0.75, 1)
 	GameTooltip:Show()
 end
 
--- A quest of the plan: its number, "[12] Title" in its tier's colour, its chain's "2/4", where it
--- stands, and at the right up, down and remove (Buttons: the controller reaches them).
+-- A quest of the plan dragged (the left button held on its row): a gold line between the rows where it
+-- would land as the cursor goes, the list scrolling near its top and bottom; let go: moved there
+-- (Q.PlanMove). Only my order's quests (a suggested route's stops: its order, not mine).
+N.DRAG_EDGE, N.DRAG_SPEED = 24, 300
+
+-- Where a quest dragged to y (the list's own, from its top) lands: its new place in my order, and the
+-- y of the line showing it.
+function N.DropAt(inst, y)
+	local quests = {}
+	for _, e in ipairs(inst.list.entries) do
+		if e.kind == "quest" then
+			quests[#quests + 1] = e
+		end
+	end
+	local before = #quests + 1
+	for i, e in ipairs(quests) do
+		if y < e.y + e.h / 2 then
+			before = i
+			break
+		end
+	end
+	local last = quests[#quests]
+	local lineY = quests[before] and quests[before].y or (last and (last.y + last.h) or 0)
+	local from = inst.drag and inst.drag.from or 0
+	return before > from and before - 1 or before, lineY
+end
+
+-- The line at a y of the list.
+function N.DragTo(inst, y)
+	local d = inst.drag
+	if not d then
+		return
+	end
+	d.to, d.lineY = N.DropAt(inst, y)
+	local line = inst.DropLine
+	line:ClearAllPoints()
+	line:SetPoint("TOPLEFT", inst.list.child, "TOPLEFT", 0, 1 - d.lineY)
+	line:SetWidth(inst.list.w)
+	line:Show()
+end
+
+-- Every frame of a drag: the cursor's y (from the list's top, scrolled), the list scrolled when it's
+-- near an edge; the button let go elsewhere (the row gone meanwhile): dropped there.
+function N.DragUpdate(inst, elapsed)
+	if IsMouseButtonDown and not IsMouseButtonDown("LeftButton") then
+		N.DragStop(inst, true)
+		return
+	end
+	local list, scroll = inst.list, inst.list.scroll
+	local _, cy = GetCursorPosition()
+	local top = scroll:GetTop()
+	if not (cy and top) then
+		return
+	end
+	local y = top - cy / scroll:GetEffectiveScale()
+	local offset = scroll:GetVerticalScroll() or 0
+	local step = y < N.DRAG_EDGE and -1 or y > list.h - N.DRAG_EDGE and 1 or 0
+	if step ~= 0 then
+		local want = math.max(0, math.min(offset + step * N.DRAG_SPEED * (elapsed or 0), list.total - list.h))
+		if want ~= offset then
+			scroll:SetVerticalScroll(want)
+			list:Lay(false, want)
+			offset = want
+		end
+	end
+	N.DragTo(inst, y + offset)
+end
+
+function N.DragStart(row)
+	local e = row.entry
+	local inst = e and e.inst
+	if not (e and e.id and inst and Q.PlanMove) or inst.drag then
+		return
+	end
+	V.Untip(row)
+	row.dragInst = inst
+	inst.drag = { id = e.id, from = e.n, to = e.n }
+	row:SetAlpha(0.4)
+	N.DragTo(inst, e.y + e.h / 2)
+	inst.Dragger:Show()
+end
+
+-- The drag over (drop: moved where the line was; else, the view hidden: as it was).
+function N.DragStop(inst, drop)
+	local d = inst and inst.drag
+	if not d then
+		return
+	end
+	inst.drag = nil
+	inst.Dragger:Hide()
+	inst.DropLine:Hide()
+	for _, row in pairs(inst.list.used) do
+		row:SetAlpha(1)
+	end
+	if drop and d.to ~= d.from and Q.PlanHas(d.id) then
+		Q.PlanMove(d.id, d.to)
+	end
+end
+
+-- A quest of the plan: a grip, its number, "[12] Title" in its tier's colour, its chain's "2/4", where
+-- it stands, and at the right remove (a Button: the controller reaches it). Dragged: moved in my order.
 function N.NewQuest(parent, width)
 	local b = CreateFrame("Button", nil, parent)
 	b:SetSize(width, PLAN_H)
 	b:SetHighlightTexture(T.highlight, "ADD")
 	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b:RegisterForDrag("LeftButton")
+	b:SetScript("OnDragStart", N.DragStart)
+	b:SetScript("OnDragStop", function(self)
+		N.DragStop(self.dragInst, true)
+	end)
+	b.Grip = {}
+	for i = 1, 3 do
+		local g = b:CreateTexture(nil, "ARTWORK")
+		g:SetSize(7, 1)
+		g:SetPoint("LEFT", 3, 4 - (i - 1) * 4)
+		g:SetColorTexture(1, 1, 1, 0.3)
+		b.Grip[i] = g
+	end
 	b.Line = b:CreateTexture(nil, "BACKGROUND")
 	b.Line:SetPoint("BOTTOMLEFT")
 	b.Line:SetPoint("BOTTOMRIGHT")
@@ -2122,13 +2241,9 @@ function N.NewQuest(parent, width)
 	b.Badge:SetPoint("LEFT", b.Title, "RIGHT", 4, 0)
 	b.Remove = N.Tool(b, "Interface\\Buttons\\UI-GroupLoot-Pass-Up", L["Remove from plan"], function(e) Q.PlanRemove(e.id) end)
 	b.Remove:SetPoint("RIGHT", -6, 0)
-	b.Down = N.Tool(b, "Interface\\Buttons\\UI-ScrollBar-ScrollDownButton-Up", L["Move down"], function(e) Q.PlanMove(e.id, e.n + 1) end)
-	b.Down:SetPoint("RIGHT", b.Remove, "LEFT", -4, 0)
-	b.Up = N.Tool(b, "Interface\\Buttons\\UI-ScrollBar-ScrollUpButton-Up", L["Move up"], function(e) Q.PlanMove(e.id, e.n - 1) end)
-	b.Up:SetPoint("RIGHT", b.Down, "LEFT", -2, 0)
 	b.Status = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	b.Status:SetPoint("LEFT", b.Badge, "RIGHT", 12, 0)
-	b.Status:SetPoint("RIGHT", b.Up, "LEFT", -8, 0)
+	b.Status:SetPoint("RIGHT", b.Remove, "LEFT", -8, 0)
 	b.Status:SetJustifyH("LEFT")
 	b.Status:SetWordWrap(false)
 	b.Status:SetTextColor(0.85, 0.85, 0.85)
@@ -2159,8 +2274,7 @@ function N.FillQuest(b, e)
 		V.SetBadge(b.Badge, nil, nil)
 	end
 	b.Status:SetText(N.Status(e.id, e.quest))
-	b.Up:SetAlpha(e.n > 1 and 1 or 0.3)
-	b.Down:SetAlpha(e.n < e.count and 1 or 0.3)
+	b:SetAlpha(e.inst.drag and e.inst.drag.id == e.id and 0.4 or 1)
 end
 
 function N.StopEnter(self)
@@ -2179,7 +2293,7 @@ function N.StopEnter(self)
 	elseif self.entry.isNext then
 		GameTooltip:AddLine(L["Next"], 1, 0.82, 0)
 	end
-	V.ClickLines()
+	V.ClickLines(s.quest)
 	GameTooltip:AddLine(L["Shift-click: map pin at %s"]:format(s.label or ""), 0.5, 0.75, 1, true)
 	GameTooltip:Show()
 end
@@ -2250,7 +2364,7 @@ function N.Note(inst, info)
 	elseif info.dropped then
 		return Q.COLOR.closes .. L["The plan changed: back to your order."] .. "|r"
 	end
-	return GREY .. L["Your order. Ctrl-click a quest to see it on the map."] .. "|r"
+	return GREY .. L["Your order: drag a quest to move it. Ctrl-click: see it on the map."] .. "|r"
 end
 
 -- The bar: "Suggest a route" (or "Back to my order") and "Clear"; asked first: "Clear your whole
@@ -2355,6 +2469,19 @@ function N.Build(parent)
 		inst:Draw()
 	end)
 	V.SetChip(inst.No, L["Cancel"], false)
+	inst.DropLine = f:CreateTexture(nil, "OVERLAY")
+	inst.DropLine:SetHeight(2)
+	inst.DropLine:SetColorTexture(1, 0.82, 0, 1)
+	inst.DropLine:Hide()
+	-- A drag's every frame (a child of the view: hidden with it, the drag given up).
+	inst.Dragger = CreateFrame("Frame", nil, f)
+	inst.Dragger:Hide()
+	inst.Dragger:SetScript("OnUpdate", function(_, elapsed)
+		N.DragUpdate(inst, elapsed)
+	end)
+	inst.Dragger:SetScript("OnHide", function()
+		N.DragStop(inst, false)
+	end)
 	inst.list = V.NewList(f, {
 		quest = { new = N.NewQuest, fill = N.FillQuest },
 		stop = { new = N.NewStop, fill = N.FillStop },

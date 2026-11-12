@@ -1556,6 +1556,9 @@ local function QuestTip(owner, id, badge, row)
 	if badge then
 		GameTooltip:AddLine(L["Click %s: open the chain"]:format(badge), 0.5, 0.75, 1)
 	end
+	if Side.CanPlan() then
+		GameTooltip:AddLine(Side.InPlan(id) and L["Alt-click: remove from plan"] or L["Alt-click: add to plan"], 0.5, 0.75, 1)
+	end
 	GameTooltip:Show()
 end
 
@@ -2465,7 +2468,9 @@ function Graph.NewCard(canvas)
 	b:SetScript("OnLeave", Untip)
 	b:SetScript("OnClick", function(self)
 		local it = self.item
-		if it and it.stub then
+		if it and IsAltKeyDown and IsAltKeyDown() and Side.CanPlan() then
+			Side.TogglePlan(it.quest) -- (Alt-click: the plan, as on the map's pins)
+		elseif it and it.stub then
 			Untip(self)
 			Graph.Jump(it.quest)
 		elseif it and IsControlKeyDown and IsControlKeyDown() then
@@ -6720,8 +6725,11 @@ end
 -- elsewhere (the quest list, the results, a chain's page, a view) its details come first, the middle
 -- staying, and a Ctrl-click shows it on the map (the controller: the details' "Show on map"). A
 -- right-click: its chain (the controller: its "2/4" badge, the details' "Open the chain", the switch).
+-- Alt-click: into the plan or out of it (as on the map's pins; the controller: the row's "+").
 function Side.Click(id, button)
-	if button == "RightButton" then
+	if IsAltKeyDown and IsAltKeyDown() and Side.CanPlan() then
+		Side.TogglePlan(id)
+	elseif button == "RightButton" then
 		Side.Chain(id)
 	elseif view.zp:IsShown() or (IsControlKeyDown and IsControlKeyDown()) then
 		Side.ShowOnMap(id, true)

@@ -2222,8 +2222,19 @@ do
 		and TOOLTIP.title == "In your plan" and TOOLTIP.lines[2] == "Click: remove from plan", "clicked: in the plan, the check instead of the +, drawn again (Q.PlanRev)")
 	p._scripts.OnLeave(p)
 	listRow(104)._scripts.OnEnter(listRow(104))
-	check(table.concat(TOOLTIP.lines, "|"):find("In your plan", 1, true), "the row's tooltip says so too")
+	check(table.concat(TOOLTIP.lines, "|"):find("In your plan", 1, true) and TOOLTIP.lines[#TOOLTIP.lines] == "Alt-click: remove from plan",
+		"the row's tooltip says so too, and that Alt-click takes it out")
 	listRow(104)._scripts.OnLeave(listRow(104))
+	-- Alt-click on a row: as on the map's pins.
+	local picked = st.picked
+	STATE.alt = true
+	listRow(104):Click()
+	STATE.alt = false
+	check(not Has(104) and st.picked == picked and listRow(104).Plus.Plus.shown, "Alt-click a row: out of the plan, nothing shown")
+	STATE.alt = true
+	listRow(104):Click()
+	STATE.alt = false
+	check(Has(104) and listRow(104).Plus.Check.shown, "again: in it")
 	-- The details' title line, the briefing's rows.
 	listRow(103):Click()
 	local d = view.d
@@ -2250,7 +2261,7 @@ do
 	table.remove(plan)
 	local stale = listRow(110).Plus
 	stale:Click()
-	check(not Has(110) and toggles == 3 and stale.Plus.shown, "a stale check clicked: nothing toggled, drawn as it is")
+	check(not Has(110) and toggles == 5 and stale.Plus.shown, "a stale check clicked: nothing toggled, drawn as it is")
 	-- On the map: Alt-click a pin of one quest; a pin of several: its list's rows have the +.
 	view.tabs.zone:Click()
 	local wolf = marker("drops here (12%)")

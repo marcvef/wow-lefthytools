@@ -1499,8 +1499,9 @@ nothing of this shows):
   line, and at the right of a pin's list's rows (a pin of several quests). Its tooltip: "Add to plan" / "In
   your plan", the quest, what a click does. A click: `Q.PlanToggle` (only when the plan still is what the
   button showed: changed elsewhere meanwhile, it's only drawn again), then what shows the plan is drawn
-  again. A pin of one quest: **Alt-click** adds it or takes it out (its tooltip says which). A quest's
-  tooltip says "In your plan".
+  again. A pin of one quest, and every quest's row (`Side.Click`: the quest list, the results, the
+  details' links and steps; a chain's cards): **Alt-click** adds it or takes it out (its tooltip says
+  which). A quest's tooltip says "In your plan".
 - **The plan on the map** (`Stops`): the zone page's map shows the plan's stops not done that are on it
   (`Q.PlanStops`' `spot`, a city's floor or a cave moved onto its zone), each a numbered disc of ours (its
   place in `Q.PlanStops`; a Button, up and left of the spot so the quest's own pin stays clickable), the
@@ -1888,7 +1889,7 @@ is never loaded for it (no stops until a window loaded it).
 After My quests. On top **"5 quests · 14 stops"** and at the right **Suggest a route** (only with
 Route.lua's `Q.SuggestRoute`; in use: **Back to my order**) and **Clear** (asks first, our own: "Clear your
 whole plan?" with **Clear it** and **Cancel** in the bar, not a Blizzard popup); under it one line: "Your
-order. Ctrl-click a quest to see it on the map.", "Suggested route · Saves about 1200 yards" (rounded to 50,
+order: drag a quest to move it. Ctrl-click: see it on the map.", "Suggested route · Saves about 1200 yards" (rounded to 50,
 from 1000 to 100) or "Your order is already a good one", "The plan changed: back to your order." (an edit
 dropped the route), "No route: there's nothing left to go to, or no place is known.".
 
@@ -1896,16 +1897,22 @@ dropped the route), "No route: there's nothing left to go to, or no place is kno
   gold band), the zones it covers (`Q.PlanBriefing`), then a heading and the quests, numbered: "1." in gold,
   "[12] Title" in its tier's colour, its chain's "2/4" (a badge: the chain), where it stands ("Pick up at
   Marshal Dughan · Elwynn Forest", "3/10 Kobold Vermin", "Ready: turn in at Gryan Stoutmantle · Westfall",
-  "Your level is too low: from level 20", "Needs <the quest first>"), and at the right **up**, **down**
-  (dim at the ends) and **remove** ("Remove from plan"), Buttons (no dragging: the buttons are the
-  controller's way too). Its tooltip: the title, where it stands, its step, each of its stops (done ones
-  ticked), the clicks.
+  "Your level is too low: from level 20", "Needs <the quest first>"), a grip at its left and at the right
+  **remove** ("Remove from plan", a Button). **Dragged** (the left button held, `RegisterForDrag`): the row
+  dims, a gold line between the rows shows where it would land (above the row whose middle the cursor is
+  above; below the last: the end), the list scrolls near its top and bottom (24 px, 300 px a second); let
+  go: `Q.PlanMove` there (where it was: nothing). The drag's every frame is `inst.Dragger`'s OnUpdate (a
+  child of the view: hidden, the drag is given up, nothing moved; the button let go elsewhere, the row
+  pooled away meanwhile: dropped). Only my order's quests drag (a route's stops are its order). Its
+  tooltip: the title, where it stands, its step, each of its stops (done ones ticked), the clicks
+  (Alt-click, Drag).
 - **A route in use**: its stops, numbered in the route's order ("Pick up X at Y", "Kill 10 x ... · [12]
   Title", "Turn in at Z · [12] Title"), each with its zone at the right; the next one with an arrow and a
   gold band, done ones ticked and grey.
 - **Clicks** (a quest or a stop): a click `Q.ShowDetails` (the details on the right with their small map,
   the Plan tab staying), Ctrl-click `Q.ShowOnMap` (a stop: its spot), a right-click its chain, Shift-click
-  the game's map pin at its next stop (a stop: there).
+  the game's map pin at its next stop (a stop: there), Alt-click `Q.PlanToggle` (out of the plan; the same
+  `QuestClick` as My quests', where it puts one in).
 - Empty: "Your plan is empty. Add quests with the + beside them: in the Quest list, My quests and a quest's
   details, or Alt-click a quest giver on the map."
 - The right pane is the window's (Browser.lua): the details of the quest picked; `Q.PlanBriefing()` is
@@ -1926,8 +1933,8 @@ briefing); a route (none without Route.lua; asked with every stop and where I am
 order with the done ones first, the chosen spots kept and saved, made again the same; back to the order;
 an edit drops it and says so; a quest turned in keeps it; good already; none possible; an error reported);
 the "+" button; the events only with a plan and Lodestar on; the Plan tab (empty, nothing counted, drawn
-when the plan changes, the next stop, the zones, a quest's row and its status, why one can't be taken, up,
-down, remove, the clicks and the tooltip, Suggest a route only with Route.lua, the route's stops numbered
+when the plan changes, the next stop, the zones, a quest's row and its status, why one can't be taken,
+dragged to the top, below the last, given up, let go where it was, above another, remove, Alt-click, the clicks and the tooltip, Suggest a route only with Route.lua, the route's stops numbered
 with the next one marked, a stop's Ctrl-click with its spot, an edit dropping it, back to my order, Clear
 asking first, Cancel, the controller, hidden: nothing runs). The companion's part: `tests/lodestar_small.lua`.
 
