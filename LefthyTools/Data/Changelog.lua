@@ -557,5 +557,8 @@ ns.CHANGELOG = {
 	{ id = 183, module = "chronicle",
 		en = { "Chronicle: friends by level", "The Friends page lists who's online and who isn't by level, the highest first, and by name where the level is the same. You're in Online now too, marked (you): a click opens your graphs." },
 		de = { "Chronicle: Freunde nach Level", "Die Seite Freunde listet, wer online ist und wer nicht, nach Level, das höchste zuerst, und bei gleichem Level nach Namen. Du stehst auch unter Online, markiert mit (du): ein Klick öffnet deine Graphen." } },
+	{ id = 184, module = "lodestar",
+		en = { "Lodestar: a slimmer companion with tabs", "The companion (/lodestar) is now a slim window like the Bestiary's, only as tall as what it shows, without a scroll bar. Small tabs along its top keep apart what doesn't belong together: Now (the quest you're on with its objectives, turn-in and map), Next (what to pick up nearby) and Plan (while you have one: your next stops with their own map). It remembers your tab. A long list ends in \"and N more\", which opens the big window; so does the star at its top." },
+		de = { "Lodestar: schlanker Begleiter mit Tabs", "Der Begleiter (/lodestar) ist jetzt ein schlankes Fenster wie das kleine Fenster des Bestiary, nur so hoch wie sein Inhalt, ohne Scrollleiste. Kleine Tabs oben trennen, was nicht zusammengehört: Jetzt (die Quest, an der du bist, mit Zielen, Abgabe und Karte), Als Nächstes (was du in der Nähe annehmen kannst) und Plan (wenn du einen hast: deine nächsten Stationen mit eigener Karte). Er merkt sich deinen Tab. Eine lange Liste endet mit \"und N weitere\", das öffnet das große Fenster; der Stern oben auch." } },
 	-- New entries go here, at the end.
 }

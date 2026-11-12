@@ -5,65 +5,76 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 
 -- The small window: the companion. It follows what you're doing without being asked.
 --
--- Opened on its own (/lodestar) it shows, top down, only what to do now and how far along (the
--- rest is in the lines' tooltips or behind a click):
---   Plan (only while the plan, Plan.lua, has a stop not done): "Stop 2 of 14: Pick up <quest> at
---     <giver>" with how far and which way, Skip, and a small map of its own with the next stops
---     numbered and joined by a line; a click shows the stop on the big window's map (Q.ShowOnMap).
+-- A slim dark frame of its own (the Bestiary's small window's look, LT.Window.Dress: no title bar,
+-- no scroll bar), as tall as what it shows. Along its top small tabs, each fitting without
+-- scrolling (the one picked kept: setting smallTab), and at the right the big window's star, one
+-- line and the X. Each tab shows only what to do now and how far along (the rest is in the lines'
+-- tooltips or behind a click):
 --   Now: the quest you're on (the last one you accepted, super-tracked or opened in the quest log;
 --     else the first on your tracker, else one of your log in this zone), "[18] Title" in its
---     difficulty colour (its tooltip: what it leads to), "Step 3 of 7 · <chain>" and a bar, friends
---     who did it (one line, only when there are any), its objectives or "Ready to turn in", where to
---     turn it in (one line, with how far and which way), and "Steps (7)": the chain's steps, folded
---     until clicked (setting stepsOpen keeps it).
---   The small map: not ready, the areas of its objectives not done (Q.Objectives; hovering an
---     objective's line lights its areas); else the turn-in's zone (else yours) with the turn-in; your
---     other quests' turn-ins and the givers of what you can pick up there, and your arrow.
---   Pick up next, in two groups of at most three, each in the one order of quests (Q.Compare: ready
---     first, then by level; for your level before hard ones): In progress (your other quests) and
---     Available now (for your levels, Q.InRange: follow-ups of what you just finished or have, and
---     this zone's quests, each with its giver, how far and which way; a hard one, orange, says so).
---     What's coming up later or blocked is the big window's. Titles are in their difficulty tier's
---     colour (Q.Tier: the quest's level, its mobs', a group quest one harder).
--- Each line of Pick up next has a verb icon (the game's own: ? to turn in, ! to pick up, in
--- progress, the grey ! of a low quest), the first line full size and the rest smaller with their
--- titles grey (the guides' "this now, then those"), and notes what taking a quest closes
--- (exclusive quests). The window can be one line (setting collapsed, the button in its title bar)
--- and hides itself when there's nothing to show (setting autoHide), coming back on its own when
--- there is. A status says its real reason: "Skipped" (you took another), "Not for your race",
--- "Needs Mining 75", "Needs Friendly with Stormwind", "Needs <the quest first>".
--- A click on a quest shows everything about it (its title, chain, status, what it needs first,
--- giver and turn-in, where its item drops, the map, what it leads to, friends); at the top then
--- "« Back to <the quest before>" and "Back to now". A click on a giver, turn-in or map marker sets
--- the game's own map pin there (Q.Waypoint), Shift-click puts it in the chat box too.
+--     difficulty colour (why that one at its right; its tooltip: what it leads to), "Step 3 of 7 ·
+--     <chain>" and a bar, friends who did it (one line, only when there are any), its objectives or
+--     "Ready to turn in", where to turn it in (one line, with how far and which way), "Steps (7)":
+--     the chain's steps, folded until clicked (setting stepsOpen keeps it), and the small map: not
+--     ready, the areas of its objectives not done (Q.Objectives; hovering an objective's line lights
+--     its areas); else the turn-in's zone (else yours) with the turn-in; your other quests'
+--     turn-ins and the givers of what you can pick up there, and your arrow.
+--   Next: what to pick up next, under your zone and its count, in two groups of at most three,
+--     each in the one order of quests (Q.Compare: ready first, then by level; for your level before
+--     hard ones): In progress (your other quests) and Available now (for your levels, Q.InRange:
+--     follow-ups of what you just finished or have, and this zone's quests, each with its giver, how
+--     far and which way; a hard one, orange, says so). What's coming up later or blocked is the big
+--     window's. Titles are in their difficulty tier's colour (Q.Tier: the quest's level, its mobs',
+--     a group quest one harder).
+--   Plan (only while the plan, Plan.lua, has a stop not done; remembered without one: Now): "Stop 2
+--     of 14: Pick up <quest> at <giver>" with how far and which way, Skip, a small map of its own
+--     with the next stops numbered and joined by a line (a click shows the stop on the big window's
+--     map, Q.ShowOnMap), and the next few stops under it, numbered as on the map, what each is (!, ?,
+--     a dot) and how far.
+-- A list cut short ends in "and N more": a click opens the big window.
+-- Each line of Next has a verb icon (the game's own: ? to turn in, ! to pick up, in progress, the
+-- grey ! of a low quest), the first line full size and the rest smaller with their titles grey (the
+-- guides' "this now, then those"), and notes what taking a quest closes (exclusive quests). The
+-- window can be one line (setting collapsed, the button left of its X) and hides itself when
+-- there's nothing to show (setting autoHide), coming back on its own when there is. A status says
+-- its real reason: "Skipped" (you took another), "Not for your race", "Needs Mining 75", "Needs
+-- Friendly with Stormwind", "Needs <the quest first>".
+-- A click on a quest shows everything about it in place of the tab (its title, chain, status, what
+-- it needs first, giver and turn-in, where its item drops, the map, what it leads to, friends; the
+-- tabs stay, none lit, a click on one goes back); at the top then "« Back to <the quest before>"
+-- and "Back to now". A click on a giver, turn-in or map marker sets the game's own map pin there
+-- (Q.Waypoint), Shift-click puts it in the chat box too.
 --
 -- While it's shown it listens to the quest log (accepted, turned in, abandoned, progress), super
 -- tracking, the tracker, level-ups and zone changes, and redraws a moment later; every 2 s it looks
 -- whether you've moved (the distances); the quest log's "show details" (Lodestar.lua's hook) hands
--- it the quest you opened there. Hidden, it listens to nothing and nothing of it runs. A window of
--- ours (LT.Window.Create, one that stays: like the Bestiary's small window, Escape doesn't close it
--- and it doesn't count as an open window for Mirage; its X or /lodestar does), movable and
--- resizable, where it is and its size kept (setting keepPlace). Built the first time it opens; the
--- data loads then too (Q.Ready), never at login. Every line that does something is a button, so a
--- controller's cursor reaches it.
+-- it the quest you opened there (on Now). Hidden, it listens to nothing and nothing of it runs. A
+-- frame of ours that stays (like the Bestiary's small window: not in UISpecialFrames, so Escape
+-- doesn't close it, and not LT.Window.Register'ed, so it doesn't count as an open window for
+-- Mirage; its X or /lodestar does), in the MEDIUM strata with the game's panels (DIALOG while the
+-- big window is open: a quest it hands over shows above it), movable, where it is kept (setting
+-- keepPlace); its size is its own. Built the first time it opens; the data loads then too
+-- (Q.Ready), never at login. Every line that does something, the tabs and the buttons at its top
+-- are buttons, so a controller's cursor reaches them.
 --   Q.ToggleSmall(), Q.ShowQuest(id), Q.RedrawSmall(now), Q.IsSmallShown(), Q.SmallFollow(id);
 --   Q.SmallFrame() for tests.
 
 local NAME = "LefthyToolsLodestarSmall"
-local WIDTH, HEIGHT = 340, 580
-local MIN_W, MIN_H, MAX_W, MAX_H = 300, 300, 600, 950
-local SCROLL_SIDE = 60 -- the scroll area's child is the window's width less this (LT.Window.AddScroll)
+local WIDTH = 260
+local PAD = 8            -- the frame's edges to its lines
+local TOP = 30           -- the tab row: the lines start under it
+local MAX_H = 640        -- the tallest it gets (less on a small screen); a tab's lines fit in it
 local GAP = 4
 local INDENT = 10
-local LIST_MAX = 8       -- lines of "Needs first" and "Leads to" (the rest: "and N more")
-local STEPS_MAX = 8      -- a chain's steps in sight (from two before this one)
+local LIST_MAX = 5       -- lines of "Needs first" and "Leads to" (the rest: "and N more")
+local STEPS_MAX = 6      -- a chain's steps in sight (from two before this one)
 local OBJECTIVES_MAX = 6
-local LOG_MAX, PICK_MAX = 3, 3 -- Pick up next: In progress, Available now
+local LOG_MAX, PICK_MAX = 3, 3 -- Next: In progress, Available now
 local HISTORY = 20       -- quests "back to" goes through
 local REDRAW_DELAY = 0.3
 local REDRAW_FIGHT = 1   -- s: in a fight (the quest log changes with every kill and loot)
 local MOVE_EVERY, MOVE_FAR = 2, 0.02 -- s between looks whether I moved; how far (of the map) is a move
-local COLLAPSED_H = 54   -- the window as one line: its title bar and the line
+local COLLAPSED_H = 28   -- the window as one line
 local CLOSES_MAX = 2     -- quests named in "closes ..."
 local C = Q.COLOR
 local GOLD, GREY, LIGHT, GREEN, CLOSES = C.gold, C.grey, C.light, C.done, C.closes
@@ -75,8 +86,8 @@ local WAKE_EVENTS = { "QUEST_ACCEPTED", "SUPER_TRACKING_CHANGED", "PLAYER_LEVEL_
 local WHY = { accepted = L["just accepted"], track = L["tracked"], log = L["opened in your quest log"],
 	watch = L["on your tracker"], zone = L["in this zone"], first = L["in your quest log"] }
 
-local win, content, scroll, map
-local mode = "now"       -- "now": the companion; "quest": a quest looked at
+local win, content, map
+local mode = "now"       -- "now": the companion (its tab); "quest": a quest looked at
 local shown              -- the quest looked at
 local history = {}       -- the quests looked at before it, the last one last
 local mapSide            -- "start" | "end" | "drop": whose map the small map shows (nil: by my status)
@@ -88,13 +99,19 @@ local drawnAt            -- { zone, x, y }: where I was when it was drawn
 local mapUsed = false
 local rows, rowsUsed = {}, 0
 local texts, textsUsed = {}, 0
-local rules, rulesUsed = {}, 0
 local soon = false
-local width = WIDTH - SCROLL_SIDE
-local picked = 0         -- rows of Pick up next drawn (the first is full size)
+local width = WIDTH - 2 * PAD -- the lines' (the window's size is its own: only its height follows them)
+local picked = 0         -- rows of Next drawn (the first is full size)
 local collapsedNow       -- whether the window is laid out as one line (nil: not laid out yet)
 local asleep = false     -- hidden by itself: comes back when there's something to show
 local selfHiding = false
+-- The tabs along the top: their order, words and tooltips; drawn: the tab whose lines are shown (nil:
+-- a quest looked at, or none yet).
+local TB = { ORDER = { "now", "next", "plan" }, drawn = nil,
+	LABEL = { now = L["Now"], next = L["Next"], plan = L["Plan"] },
+	TIP = { now = L["The quest you're on: its objectives, where to turn it in, its chain and its map."],
+		next = L["What to pick up next: your other quests and what you can take nearby, with how far."],
+		plan = L["Your plan's next stops, with how far, on a map of their own."] } }
 
 -- A verb icon and a space (Lodestar.lua's Q.Icon: the game's quest icons).
 local function I(kind, size)
@@ -163,6 +180,8 @@ local function DB()
 	return Q.module.db
 end
 
+-- Its top left corner (it grows down from there); a size kept from before it fitted itself
+-- (small.width, small.height) stays unused.
 local function SavePlace()
 	local left, top = win:GetLeft(), win:GetTop()
 	local saved = DB().small
@@ -170,32 +189,21 @@ local function SavePlace()
 		local ratio = win:GetEffectiveScale() / UIParent:GetEffectiveScale()
 		saved.left, saved.top = left * ratio, top * ratio
 	end
-	saved.width = math.floor(win:GetWidth() + 0.5)
-	if not collapsedNow then
-		saved.height = math.floor(win:GetHeight() + 0.5)
-	end
 end
 
-local function Clamp(v, low, high, default)
-	v = tonumber(v)
-	return v and math.max(low, math.min(high, v)) or default
-end
-
--- Where it was left (setting keepPlace), else right of the middle at its usual size.
+-- Where it was left (setting keepPlace), else right of the middle, its top above it.
 local function Place()
 	local saved = DB().small
 	win:ClearAllPoints()
 	if DB().keepPlace and tonumber(saved.left) and tonumber(saved.top) then
 		win:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", saved.left, saved.top)
-		win:SetSize(Clamp(saved.width, MIN_W, MAX_W, WIDTH), collapsedNow and COLLAPSED_H or Clamp(saved.height, MIN_H, MAX_H, HEIGHT))
 	else
-		win:SetPoint("CENTER", UIParent, "CENTER", 280, 40)
-		win:SetSize(WIDTH, collapsedNow and COLLAPSED_H or HEIGHT)
+		win:SetPoint("TOPLEFT", UIParent, "CENTER", 150, 280)
 	end
 end
 
 ---------------------------------------------------------------------------
--- Lines: font strings, clickable rows, header rules and the chain's bar, pooled
+-- Lines: font strings, clickable rows, "and N more" and the chain's bar, pooled
 ---------------------------------------------------------------------------
 
 local function Text(y, text, font, indent)
@@ -285,32 +293,32 @@ local function Row(y, o)
 	return y + height + 1
 end
 
--- A section's heading: gold, a grey note after it, a thin gold rule under it.
-local function Header(y, text, note)
-	y = Text(y + GAP, GOLD .. text .. "|r" .. (note and ("  " .. GREY .. note .. "|r") or ""), "GameFontNormal")
-	rulesUsed = rulesUsed + 1
-	local rule = rules[rulesUsed]
-	if not rule then
-		rule = content:CreateTexture(nil, "ARTWORK")
-		rule:SetHeight(1)
-		rules[rulesUsed] = rule
-	end
-	if C_Texture and C_Texture.GetAtlasInfo and LT.Value(C_Texture.GetAtlasInfo, "Options_HorizontalDivider") then
-		rule:SetAtlas("Options_HorizontalDivider")
-		rule:SetVertexColor(1, 0.82, 0, 0.6)
-	else
-		rule:SetColorTexture(1, 0.82, 0, 0.25)
-	end
-	rule:ClearAllPoints()
-	rule:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(y - 2))
-	rule:SetWidth(width)
-	rule:Show()
-	return y + 2
-end
-
--- A group's heading inside a section (smaller, gold).
+-- A group's heading inside a tab (smaller, gold).
 local function SubHeader(y, text)
 	return Text(y + 2, GOLD .. text .. "|r", "GameFontNormalSmall")
+end
+
+-- The big window: on a quest (Q.OpenBrowser: its zone's map, the quest picked), else as it was.
+function TB.Browse(id)
+	if Q.OpenBrowser then
+		Q.OpenBrowser(id)
+	elseif Q.ToggleBrowser then
+		Q.ToggleBrowser()
+	end
+end
+
+-- "and N more" under a list cut short: a click opens the big window (open; tooltip: what it shows
+-- there). Without the big window a grey line.
+local function More(y, n, open, tooltip)
+	if n <= 0 then
+		return y
+	end
+	local text = GREY .. L["and %d more"]:format(n) .. "|r"
+	if not (Q.OpenBrowser or Q.ToggleBrowser) then
+		return Text(y, text, "GameFontHighlightSmall", INDENT + 4)
+	end
+	return Row(y, { text = text, indent = INDENT, onClick = open, tooltip = tooltip
+		or { L["Quest browser"], L["Every zone's quest chains, with a search over all of them. Also /lodestar browse."] } })
 end
 
 -- The chain's bar: how far along it you are.
@@ -618,7 +626,8 @@ local function QuestRow(y, id, prefix, reason)
 	return Row(y, { text = text, onClick = Shows(id), tooltip = tooltip, indent = INDENT })
 end
 
-local function List(y, heading, list, numbered)
+-- A list of a quest looked at (of): a few lines, "and N more" opens the big window on it.
+local function List(y, heading, list, numbered, of)
 	if #list == 0 then
 		return y
 	end
@@ -628,10 +637,7 @@ local function List(y, heading, list, numbered)
 		local id = type(entry) == "table" and entry.id or entry
 		y = QuestRow(y, id, numbered and (i .. ". ") or "", type(entry) == "table" and entry.reason)
 	end
-	if #list > LIST_MAX then
-		y = Text(y, L["and %d more"]:format(#list - LIST_MAX), "GameFontDisableSmall", INDENT + 4)
-	end
-	return y
+	return More(y, #list - LIST_MAX, function() TB.Browse(of) end)
 end
 
 -- The small map at y with these points (nil map: none).
@@ -702,7 +708,7 @@ local function FriendsRow(y, id)
 end
 
 ---------------------------------------------------------------------------
--- The companion: Now, the map, Pick up next
+-- The companion's tabs: Now (and its map), Next
 ---------------------------------------------------------------------------
 
 -- Who gives a quest, how far, and what it follows or which step it is: its second line.
@@ -736,8 +742,8 @@ local function Follows(quest)
 	end
 end
 
--- The groups of "Pick up next": { log, now, more } of { id, follows } (more: what Available now
--- left out), each in the one order of quests (Q.Compare: ready first, then by level; for my level
+-- The groups of Next: { log, now, logMore, more } of { id, follows } (logMore, more: how many In
+-- progress and Available now left out; logNext, moreNext: the first of them), each in the one order of quests (Q.Compare: ready first, then by level; for my level
 -- before hard ones). In progress: my other quests. Available now only for my levels (Q.InRange):
 -- follow-ups of what I just turned in and of everything done or in my log (Q.Next), and this zone's
 -- (its givers' distance stays on each line). What's coming up later or blocked is the big window's.
@@ -746,7 +752,7 @@ local function PickLists(ctx)
 	for _, id in ipairs(ctx.now and Q.Opens and Q.Opens(ctx.now) or {}) do
 		seen[id] = true -- (what Now leads to: its tooltip says)
 	end
-	local lists = { log = {}, now = {}, more = 0 }
+	local lists = { log = {}, now = {}, logMore = 0, more = 0 }
 	local log = LogQuests()
 	table.sort(log, Before)
 	for _, id in ipairs(log) do
@@ -754,6 +760,9 @@ local function PickLists(ctx)
 			seen[id] = true
 			if #lists.log < LOG_MAX then
 				lists.log[#lists.log + 1] = { id = id }
+			else
+				lists.logMore = lists.logMore + 1
+				lists.logNext = lists.logNext or id
 			end
 		end
 	end
@@ -781,6 +790,7 @@ local function PickLists(ctx)
 			lists.now[i] = { id = id, follows = follows[id] }
 		else
 			lists.more = lists.more + 1
+			lists.moreNext = lists.moreNext or id
 		end
 	end
 	return lists
@@ -805,7 +815,7 @@ local function GreyTitle(id, quest)
 	return (level and level > 0 and (TierCode(id, quest) .. "[" .. level .. "]|r ") or "") .. LIGHT .. Q.Title(id, quest) .. "|r"
 end
 
--- A quest of "Pick up next": its verb icon, "[12] Title", how far; its giver, what it follows and
+-- A quest of Next: its verb icon, "[12] Title", how far; its giver, what it follows and
 -- what taking it closes under it. The first one drawn is full size, the rest smaller and grey.
 local function PickRow(y, entry, ctx, group)
 	local id = entry.id
@@ -900,14 +910,13 @@ function ObjectiveRow(y, i, o, ctx)
 	return y, spot.map
 end
 
--- Now: the quest I'm on (none: says so): its title (the tooltip: what it leads to), its step and
--- bar, friends, its objectives or "Ready to turn in", the turn-in, the steps folded. Notes the map
--- it wants and its markers in ctx.
+-- Now: the quest I'm on (none: says so): its title (why that one at its right; the tooltip: what it
+-- leads to), its step and bar, friends, its objectives or "Ready to turn in", the turn-in, the steps
+-- folded. Notes the map it wants and its markers in ctx.
 local function DrawNow(y, ctx)
 	local id = ctx.now
-	y = Header(y, L["Now"], id and WHY[ctx.why])
 	if not id then
-		return Text(y, L["No quest in your log. Pick one up below."], "GameFontDisableSmall", INDENT)
+		return Text(y + 2, L["No quest in your log: Next has what to pick up."], "GameFontDisableSmall", INDENT)
 	end
 	local quest = Q.Quest(id)
 	local tip = { Q.Title(id, quest) }
@@ -919,7 +928,7 @@ local function DrawNow(y, ctx)
 			.. (#opens > 1 and (" " .. L["(+%d more)"]:format(#opens - 1)) or ""))
 	end
 	tip[#tip + 1] = L["Click: everything about it"]
-	y = Row(y, { text = TierTitle(id, quest), font = "GameFontNormalLarge", onClick = Shows(id), tooltip = tip })
+	y = Row(y, { text = TierTitle(id, quest), font = "GameFontNormalLarge", right = WHY[ctx.why], onClick = Shows(id), tooltip = tip })
 	local chain, at = ChainOf(id)
 	if chain then
 		y = ChainLine(y, chain, at)
@@ -964,7 +973,7 @@ local function DrawNow(y, ctx)
 	return y
 end
 
--- The markers of "Pick up next" on the map shown: givers to pick up, my quests' turn-ins.
+-- The markers of Next on Now's map: givers to pick up, my quests' turn-ins.
 local function PickPoints(ctx, lists)
 	local function Add(people, kind, look, note, hard)
 		for _, who in ipairs(people or {}) do
@@ -988,14 +997,18 @@ local function PickPoints(ctx, lists)
 	end
 end
 
+-- Next: my zone and its count (grey), In progress and Available now, each cut short with "and N
+-- more" (the big window on the first left out).
 local function DrawPick(y, ctx, lists)
 	local count = ctx.zone and Q.ZoneCount and { pcall(Q.ZoneCount, ctx.zone) }
 	local note = ctx.zone and Q.MapName(ctx.zone)
 	if count and count[1] and tonumber(count[2]) and tonumber(count[3]) and count[3] > 0 then
 		note = (note and (note .. " · ") or "") .. L["%d of %d done"]:format(count[2], count[3])
 	end
-	y = Header(y, L["Pick up next"], note)
-	local groups = { { "log", L["In progress"] }, { "now", L["Available now"] } }
+	if note then
+		y = Text(y + 2, GREY .. note .. "|r", "GameFontHighlightSmall")
+	end
+	local groups = { { "log", L["In progress"], "logMore", "logNext" }, { "now", L["Available now"], "more", "moreNext" } }
 	local any = false
 	picked = 0
 	for _, group in ipairs(groups) do
@@ -1006,29 +1019,26 @@ local function DrawPick(y, ctx, lists)
 			for _, entry in ipairs(list) do
 				y = PickRow(y, entry, ctx, group[1])
 			end
-			if group[1] == "now" and lists.more > 0 and (Q.OpenBrowser or Q.ToggleBrowser) then
-				local nextId = list[1].id
-				y = Row(y, { text = GREY .. L["%d more here: the quest browser"]:format(lists.more) .. "|r", indent = INDENT,
-					onClick = function()
-						if Q.OpenBrowser then Q.OpenBrowser(nextId) else Q.ToggleBrowser() end
-					end, tooltip = { L["Quest browser"], L["Every zone's quest chains, with a search over all of them. Also /lodestar browse."] } })
-			end
+			local first = lists[group[4]]
+			y = More(y, lists[group[3]], function() TB.Browse(first) end)
 		end
 	end
 	if not any then
-		y = Text(y, L["Nothing to pick up nearby. The quest browser has every zone."], "GameFontDisableSmall", INDENT)
+		y = Text(y + 2, L["Nothing to pick up nearby. The quest browser has every zone."], "GameFontDisableSmall", INDENT)
 	end
-	return y, any
+	return y
 end
 
 ---------------------------------------------------------------------------
--- The plan (Plan.lua): on top while it has a stop not done, where to go next and its own small map
+-- The plan (Plan.lua): its tab while it has a stop not done, where to go next, its own small map and
+-- the next few stops
 ---------------------------------------------------------------------------
 
 -- The plan's map (a second small map, made the first time it's needed) and its stops numbered on a
 -- layer of ours over the art, joined by a line; laid again when the art is (its size changes with
--- the zoom). Nothing runs for it but what MiniMap.lua runs for its own.
-local PL = { marks = {}, lines = {}, MAX = 5 }
+-- the zoom). Nothing runs for it but what MiniMap.lua runs for its own. MAX: stops on the map; LIST:
+-- stops listed under it (the rest: "and N more", the big window's Plan tab).
+local PL = { marks = {}, lines = {}, MAX = 5, LIST = 4 }
 
 -- The quest's stop on the big window's map (Q.ShowOnMap; without it the quest, Q.OpenBrowser).
 function PL.ShowOnMap(stop)
@@ -1152,9 +1162,40 @@ function PL.Hide()
 	end
 end
 
--- "Stop 2 of 14: Pick up Wanted: Hogger at Marshal Dughan" with how far and which way (another zone:
--- its name), "Skip" beside it, and the plan's map: the next few stops on the next one's map,
--- numbered, joined by a line. Nothing without a plan (or with every stop done).
+-- How far and which way a stop is when it's on my map, else its zone's name.
+function PL.Where(stop, ctx)
+	local spot = stop.spot
+	if ctx.zone and ctx.x and spot.map == ctx.zone then
+		return Q.TowardText(ctx.zone, ctx.x, ctx.y, spot.x, spot.y)
+	end
+	return Q.MapName(spot.map)
+end
+
+-- A stop's line clicked: the stop on the big window's map; Shift: the game's map pin there, in chat too.
+function PL.Click(stop)
+	return function()
+		if IsShiftKeyDown and IsShiftKeyDown() then
+			Q.Waypoint(stop.spot.map, stop.spot.x, stop.spot.y, true)
+		else
+			PL.ShowOnMap(stop)
+		end
+	end
+end
+
+function PL.Tip(stop)
+	return { Q.PlanStopText(stop, true), Q.MapName(stop.spot.map), L["Click: show it on the map"], L["Shift-click: map pin there, in chat too"] }
+end
+
+-- What a stop is, as on the map: "!" to pick up, "?" to turn in, a dot for an objective.
+function PL.Icon(kind)
+	local file = PL.KIND[kind]
+	return file and ("|T" .. file .. ":12:12|t") or Dot(0.9, 0.9, 0.9)
+end
+
+-- The plan's tab: "Stop 2 of 14: Pick up Wanted: Hogger at Marshal Dughan" with how far and which
+-- way (another zone: its name), "Skip" beside it, the plan's map (the next few stops on the next
+-- one's map, numbered, joined by a line), and the next few stops after it, numbered as on the map,
+-- "and N more" (the big window's Plan tab). Nothing without a plan (or with every stop done).
 local function DrawPlan(y, ctx)
 	local stop, at = nil, nil
 	if Q.PlanNext then
@@ -1165,25 +1206,10 @@ local function DrawPlan(y, ctx)
 	end
 	local stops = Q.PlanStops()
 	local spot = stop.spot
-	local zone = Q.MapName(spot.map)
-	y = Header(y, L["Plan"], spot.map ~= ctx.zone and zone or nil)
-	local right = zone
-	if ctx.zone and ctx.x and spot.map == ctx.zone then
-		right = Q.TowardText(ctx.zone, ctx.x, ctx.y, spot.x, spot.y)
-	end
 	local skipW = 44
-	local tip = { Q.PlanStopText(stop, true) }
-	tip[#tip + 1] = zone
-	tip[#tip + 1] = L["Click: show it on the map"]
-	tip[#tip + 1] = L["Shift-click: map pin there, in chat too"]
-	local y1 = Row(y, { text = GOLD .. L["Stop %d of %d:"]:format(at, #stops) .. "|r " .. Q.PlanStopText(stop, true), right = right,
-		w = width - skipW - 4, onClick = function()
-			if IsShiftKeyDown and IsShiftKeyDown() then
-				Q.Waypoint(spot.map, spot.x, spot.y, true)
-			else
-				PL.ShowOnMap(stop)
-			end
-		end, tooltip = tip })
+	y = y + 2
+	local y1 = Row(y, { text = GOLD .. L["Stop %d of %d:"]:format(at, #stops) .. "|r " .. Q.PlanStopText(stop, true),
+		right = PL.Where(stop, ctx), w = width - skipW - 4, onClick = PL.Click(stop), tooltip = PL.Tip(stop) })
 	local y2 = Row(y, { text = GREY .. L["Skip"] .. "|r", x = width - skipW, w = skipW, onClick = function()
 			Q.PlanSkip(stop)
 			Draw()
@@ -1208,31 +1234,104 @@ local function DrawPlan(y, ctx)
 	m.frame:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(y + GAP))
 	m:Show(spot.map, {})
 	PL.Lay()
-	return y + GAP + height + GAP
+	y = y + GAP + height + GAP
+	local listed, more = 0, 0
+	for i = at + 1, #stops do
+		local s = stops[i]
+		if not s.done then
+			if listed < PL.LIST then
+				listed = listed + 1
+				y = Row(y, { text = PL.Icon(s.kind) .. " " .. LIGHT .. i .. ". " .. Q.PlanStopText(s, true) .. "|r", right = PL.Where(s, ctx),
+					onClick = PL.Click(s), tooltip = PL.Tip(s) })
+			else
+				more = more + 1
+			end
+		end
+	end
+	return More(y, more, function()
+		if not (Q.ShowBrowserView and Q.ShowBrowserView("plan")) then
+			TB.Browse()
+		end
+	end, { L["Your plan"], L["Every stop of your plan, numbered as on the map."] })
 end
 
-local function DrawCompanion(y)
+---------------------------------------------------------------------------
+-- The tabs
+---------------------------------------------------------------------------
+
+-- The tab to show: the one kept (setting smallTab); Plan without a stop to go to: Now (Plan stays
+-- kept, it comes back with the plan).
+function TB.Pick(planned)
+	local tab = DB().smallTab
+	if not TB.LABEL[tab] or (tab == "plan" and not planned) then
+		return "now"
+	end
+	return tab
+end
+
+-- The tabs left to right (Plan only with a plan), the one shown lit: gold with a gold line under
+-- it, the others grey (lit nil: none, a quest looked at).
+function TB.Lay(planned, lit)
+	local x = 0
+	for _, key in ipairs(TB.ORDER) do
+		local tab = win.Tabs.buttons[key]
+		local on = key ~= "plan" or planned
+		tab:SetShown(on)
+		if on then
+			tab:ClearAllPoints()
+			tab:SetPoint("TOPLEFT", win.Tabs, "TOPLEFT", x, 0)
+			x = x + tab:GetWidth() + 2
+			tab.lit = key == lit
+			tab.Line:SetShown(tab.lit)
+			if tab.lit then
+				tab.Text:SetTextColor(1, 0.82, 0)
+			else
+				tab.Text:SetTextColor(0.6, 0.6, 0.6)
+			end
+		end
+	end
+end
+
+-- A tab clicked: its lines (a quest looked at goes), kept for next time.
+function TB.Click(self)
+	RowLeave(self)
+	DB().smallTab = self.key
+	mode, shown, mapSide = "now", nil, nil
+	wipe(history)
+	Draw(true)
+end
+
+-- The tab's lines; returns where they end and whether there's anything to show at all (a quest I'm
+-- on, something to pick up, a stop of the plan: any tab's, for autoHide).
+function TB.Draw(y)
 	local zone, x, py = Q.HereZone()
 	drawnAt = { zone, x, py }
 	local ctx = { zone = zone, x = x, y = py, points = {} }
 	ctx.now, ctx.why = NowQuest(zone)
 	nowId = ctx.now
 	local lists = PickLists(ctx)
-	y = DrawPlan(y, ctx)
-	y = DrawNow(y, ctx)
-	ctx.map = ctx.map or zone
-	local points = {}
-	for _, p in ipairs(ctx.points) do
-		if p.map == ctx.map then
-			points[#points + 1] = p
+	local planned = Q.PlanNext ~= nil and Q.PlanNext() ~= nil
+	local tab = TB.Pick(planned)
+	TB.drawn = tab
+	TB.Lay(planned, tab)
+	if tab == "plan" then
+		y = DrawPlan(y, ctx)
+	elseif tab == "next" then
+		y = DrawPick(y, ctx, lists)
+	else
+		y = DrawNow(y, ctx)
+		ctx.map = ctx.map or zone
+		local points = {}
+		for _, p in ipairs(ctx.points) do
+			if p.map == ctx.map then
+				points[#points + 1] = p
+			end
 		end
+		ctx.points = points
+		PickPoints(ctx, lists)
+		y = PutMap(y, ctx.map, ctx.points)
 	end
-	ctx.points = points
-	PickPoints(ctx, lists)
-	y = PutMap(y, ctx.map, ctx.points)
-	local any
-	y, any = DrawPick(y, ctx, lists)
-	return y, ctx.now ~= nil or any
+	return y, planned or ctx.now ~= nil or #lists.log + #lists.now > 0
 end
 
 -- Whether the companion has anything to show: a quest I'm on, or something to pick up nearby.
@@ -1304,15 +1403,14 @@ local function BackTo()
 	local id = table.remove(history)
 	if id then
 		shown, mapSide = id, nil
-		scroll:SetVerticalScroll(0)
 		Draw()
 	end
 end
 
+-- Back to the tab it came from.
 local function ToNow()
 	mode, shown, mapSide = "now", nil, nil
 	wipe(history)
-	scroll:SetVerticalScroll(0)
 	Draw()
 end
 
@@ -1437,7 +1535,7 @@ local function DrawQuest(y, id)
 		y = Text(y, GREY .. why .. "|r", "GameFontHighlightSmall")
 	end
 	y = Requires(y, id, chain)
-	y = List(y, L["Needs first:"], Q.Missing and Q.Missing(id) or {}, true)
+	y = List(y, L["Needs first:"], Q.Missing and Q.Missing(id) or {}, true, id)
 	local starter = quest.starts and quest.starts[1]
 	y = PlaceRow(y + GAP, L["Quest giver:"], quest.starts, "start", ctx, I("available"))
 	if starter and starter.kind == "item" then
@@ -1445,7 +1543,7 @@ local function DrawQuest(y, id)
 	end
 	y = PlaceRow(y, L["Turn-in:"], quest.ends, "end", ctx, I("turnin"))
 	y = QuestMap(y, id, quest, status, ctx)
-	y = List(y, L["Leads to:"], Q.Opens and Q.Opens(id) or {}, false)
+	y = List(y, L["Leads to:"], Q.Opens and Q.Opens(id) or {}, false, id)
 	if chain then
 		y = Steps(y, chain, at)
 	end
@@ -1456,30 +1554,24 @@ end
 -- Drawing it all
 ---------------------------------------------------------------------------
 
--- One line or the whole window (setting collapsed): the scroll area, its inset, the grip and the
--- bottom button only in the whole one; one line can't be made taller.
+-- One line or the whole window (setting collapsed): the tabs and the lines only in the whole one, the
+-- line only in the other.
 local function Lay(collapsed)
 	if collapsedNow == collapsed then
 		return
 	end
 	collapsedNow = collapsed
-	scroll:SetShown(not collapsed)
-	if win.Inset then
-		win.Inset:SetShown(not collapsed)
-	end
-	win.Grip:SetShown(not collapsed)
+	content:SetShown(not collapsed)
+	win.Tabs:SetShown(not collapsed)
 	win.Line:SetShown(collapsed)
 	win.Collapse.Icon:SetAtlas(collapsed and "QuestLog-icon-Expand" or "QuestLog-icon-shrink")
-	if collapsed then
-		win:SetResizeBounds(MIN_W, COLLAPSED_H, MAX_W, COLLAPSED_H)
-		win:SetHeight(COLLAPSED_H)
-	else
-		win:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
-		local height = Clamp(DB().keepPlace and DB().small.height, MIN_H, MAX_H, HEIGHT)
-		if math.abs(win:GetHeight() - height) > 0.5 then
-			win:SetHeight(height)
-		end
-	end
+end
+
+-- The tallest it gets: MAX_H, less on a small screen (a tab's lines fit in it; whatever doesn't is
+-- cut at its bottom edge, never past it).
+function TB.MaxHeight()
+	local screen = tonumber(UIParent:GetHeight()) or 0
+	return screen > 300 and math.min(MAX_H, screen - 60) or MAX_H
 end
 
 -- Hidden by itself: nothing to show. It comes back (Wake) when a rare event brings something.
@@ -1503,29 +1595,30 @@ Draw = function(opened)
 	if not (win and win:IsShown()) then
 		return
 	end
-	rowsUsed, textsUsed, rulesUsed, mapUsed = 0, 0, 0, false
+	rowsUsed, textsUsed, mapUsed = 0, 0, false
 	PL.used = false
+	TB.drawn = nil
 	win.Bar:Hide()
-	width = math.max(100, win:GetWidth() - SCROLL_SIDE)
-	content:SetWidth(width)
 	local collapsed = DB().collapsed == true
 	Lay(collapsed)
-	local y, useful = 2, true
+	local y, useful = 0, true
 	local ready = Q.Ready()
 	if not ready then
 		nowId = nil
-		y = Text(y, L["The quest data isn't there. It's an add-on of its own, LefthyTools Quest Data, installed with LefthyTools: run the updater again, then restart the game."], "GameFontHighlight")
+		TB.Lay(false, nil)
+		y = Text(y + 2, L["The quest data isn't there. It's an add-on of its own, LefthyTools Quest Data, installed with LefthyTools: run the updater again, then restart the game."], "GameFontHighlight")
 		if collapsed then
 			win.Line.Text:SetText(GREY .. L["The quest data isn't there."] .. "|r")
 		end
 	elseif collapsed then
 		useful = DrawLine()
 	elseif mode == "quest" and shown then
-		y = DrawNav(y)
+		TB.Lay(Q.PlanNext ~= nil and Q.PlanNext() ~= nil, nil)
+		y = DrawNav(y + 2)
 		y = DrawQuest(y, shown)
 	else
 		mode = "now"
-		y, useful = DrawCompanion(y)
+		y, useful = TB.Draw(y)
 	end
 	if ready and not useful and opened ~= true and DB().autoHide and mode == "now" then
 		Sleep()
@@ -1544,10 +1637,15 @@ Draw = function(opened)
 	for i = textsUsed + 1, #texts do
 		texts[i]:Hide()
 	end
-	for i = rulesUsed + 1, #rules do
-		rules[i]:Hide()
+	-- As tall as its lines (one line: as the line), at most TB.MaxHeight().
+	local height = COLLAPSED_H
+	if not collapsed then
+		height = math.min(TOP + math.max(y, 12) + PAD, TB.MaxHeight())
+		content:SetHeight(height - TOP - PAD)
 	end
-	content:SetHeight(math.max(y, 10))
+	if math.abs(win:GetHeight() - height) > 0.5 then
+		win:SetHeight(height)
+	end
 	win.Browser:SetShown(not collapsed and ready and (Q.OpenBrowser ~= nil or Q.ToggleBrowser ~= nil))
 end
 
@@ -1601,16 +1699,92 @@ local function Moved()
 	end
 end
 
+-- The tabs (Buttons: the controller's cursor reaches them): a word each, the one shown gold with a
+-- gold line under it (TB.Lay places and lights them); a thin gold rule under the row.
+function TB.Build()
+	local bar = CreateFrame("Frame", nil, win)
+	bar:SetPoint("TOPLEFT", PAD - 4, -5)
+	bar:SetSize(WIDTH - 90, 20)
+	bar.buttons = {}
+	for _, key in ipairs(TB.ORDER) do
+		local tab = CreateFrame("Button", nil, bar)
+		tab.key = key
+		tab.Text = tab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		tab.Text:SetPoint("CENTER", 0, 1)
+		tab.Text:SetText(TB.LABEL[key])
+		tab:SetSize(math.ceil(tab.Text:GetStringWidth()) + 12, 20)
+		tab.Line = tab:CreateTexture(nil, "ARTWORK")
+		tab.Line:SetColorTexture(1, 0.82, 0, 0.9)
+		tab.Line:SetHeight(2)
+		tab.Line:SetPoint("BOTTOMLEFT", 4, 0)
+		tab.Line:SetPoint("BOTTOMRIGHT", -4, 0)
+		tab:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		tab:RegisterForClicks("LeftButtonUp")
+		tab:SetScript("OnClick", TB.Click)
+		tab:SetScript("OnEnter", RowEnter)
+		tab:SetScript("OnLeave", RowLeave)
+		tab.tooltip = { TB.LABEL[key], TB.TIP[key] }
+		bar.buttons[key] = tab
+	end
+	bar.Rule = bar:CreateTexture(nil, "ARTWORK")
+	bar.Rule:SetColorTexture(1, 0.82, 0.3, 0.25)
+	bar.Rule:SetHeight(1)
+	bar.Rule:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -(TOP - 4))
+	bar.Rule:SetPoint("TOPRIGHT", win, "TOPRIGHT", -PAD, -(TOP - 4))
+	win.Tabs = bar
+end
+
+-- A small icon button at the top right (the big window's star, one line), its tooltip from tip().
+function TB.Icon(anchor, onClick, tip)
+	local button = CreateFrame("Button", nil, win)
+	button:SetSize(16, 16)
+	button:SetPoint("RIGHT", anchor, "LEFT", -3, 0)
+	button.Icon = button:CreateTexture(nil, "ARTWORK")
+	button.Icon:SetAllPoints()
+	button:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+	button:SetScript("OnClick", function(self)
+		RowLeave(self)
+		onClick()
+	end)
+	button:SetScript("OnEnter", function(self)
+		local lines = tip()
+		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+		GameTooltip:SetText(lines[1], 1, 1, 1)
+		for i = 2, #lines do
+			GameTooltip:AddLine(lines[i], 0.8, 0.8, 0.8, true)
+		end
+		GameTooltip:Show()
+	end)
+	button:SetScript("OnLeave", RowLeave)
+	return button
+end
+
 local function Build()
-	win = LT.Window.Create(NAME, "Lodestar", WIDTH, HEIGHT, true)
-	win:SetResizable(true)
-	win:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
+	-- A frame of our own like the Bestiary's small window (not LT.Window.Create: no title bar, not in
+	-- UISpecialFrames, not Register'ed: Escape leaves it and Mirage doesn't count it).
+	win = CreateFrame("Frame", NAME, UIParent)
+	win:SetSize(WIDTH, 200)
+	win:SetFrameStrata("MEDIUM")
+	win:SetToplevel(true)
+	win:SetClampedToScreen(true)
+	win:EnableMouse(true)
+	win:SetMovable(true)
+	win:RegisterForDrag("LeftButton")
+	win:SetScript("OnDragStart", win.StartMoving)
 	win:SetScript("OnDragStop", function(self)
 		self:StopMovingOrSizing()
 		self:SetUserPlaced(false)
 		SavePlace()
 	end)
-	scroll, content = LT.Window.AddScroll(win)
+	win:Hide()
+	LT.Window.Dress(win)
+	win:HookScript("OnShow", function() LT.Trail("window " .. NAME) end)
+	win:HookScript("OnHide", function() LT.Trail("window closed " .. NAME) end)
+	-- The lines: under the tabs, as wide as the window less its edges, cut at its bottom edge.
+	content = CreateFrame("Frame", nil, win)
+	content:SetPoint("TOPLEFT", PAD, -TOP)
+	content:SetSize(width, 10)
+	content:SetClipsChildren(true)
 	map = Q.NewMiniMap(content)
 
 	-- The chain's bar (Bar): a dark track, a green fill.
@@ -1629,50 +1803,37 @@ local function Build()
 	bar:Hide()
 	win.Bar = bar
 
-	-- The corner to resize it by.
-	local grip = CreateFrame("Button", nil, win)
-	grip:SetSize(16, 16)
-	grip:SetPoint("BOTTOMRIGHT", -3, 3)
-	grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-	grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-	grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-	grip:SetScript("OnMouseDown", function() win:StartSizing("BOTTOMRIGHT") end)
-	grip:SetScript("OnMouseUp", function()
-		win:StopMovingOrSizing()
-		win:SetUserPlaced(false)
-		SavePlace()
-		Draw()
-	end)
-	win.Grip = grip
-	win:SetScript("OnSizeChanged", function() Q.RedrawSmall() end)
-
-	-- The title bar's button: one line or the whole window (setting collapsed).
-	local collapse = CreateFrame("Button", nil, win)
-	collapse:SetSize(20, 20)
-	if win.CloseButton then
-		collapse:SetPoint("RIGHT", win.CloseButton, "LEFT", -2, 0)
-	else
-		collapse:SetPoint("TOPRIGHT", -26, -2)
-	end
-	collapse.Icon = collapse:CreateTexture(nil, "ARTWORK")
-	collapse.Icon:SetAllPoints()
-	collapse.Icon:SetAtlas("QuestLog-icon-shrink")
-	collapse:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight", "ADD")
-	collapse:SetScript("OnClick", function()
+	-- At the top right: the X (closed by you: it stays closed), left of it one line or the whole window
+	-- (setting collapsed), left of that the big window (the quest looked at or Now's, Q.OpenBrowser;
+	-- else as it was).
+	win.Close = CreateFrame("Button", nil, win, "UIPanelCloseButtonNoScripts")
+	win.Close:SetSize(24, 24) -- (within the tab row, and the one line's height)
+	win.Close:SetPoint("TOPRIGHT", -2, -2)
+	win.Close:SetScript("OnClick", function() win:Hide() end)
+	win.Collapse = TB.Icon(win.Close, function()
 		LT:SetModuleSetting(Q.module, "collapsed", not DB().collapsed)
+	end, function()
+		return { DB().collapsed and L["The whole companion"] or L["One line"] }
 	end)
-	collapse:SetScript("OnEnter", function(self)
-		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-		GameTooltip:SetText(DB().collapsed and L["The whole companion"] or L["One line"], 1, 1, 1)
-		GameTooltip:Show()
+	win.Collapse.Icon:SetAtlas("QuestLog-icon-shrink")
+	win.Browser = TB.Icon(win.Collapse, function()
+		local id = mode == "quest" and shown or nowId
+		if Q.OpenBrowser and id then
+			Q.OpenBrowser(id)
+		elseif Q.ToggleBrowser then
+			Q.ToggleBrowser()
+		end
+	end, function()
+		return { L["Quest browser"], L["Every zone's quest chains, with a search over all of them. Also /lodestar browse."] }
 	end)
-	collapse:SetScript("OnLeave", RowLeave)
-	win.Collapse = collapse
+	win.Browser.Icon:SetTexture("Interface\\Icons\\Spell_Arcane_StarFire") -- (Lodestar's star, as on the minimap)
+	win.Browser.Icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	TB.Build()
 
-	-- The one line (collapsed): under the title bar, a click shows the whole companion.
+	-- The one line (collapsed): left of the buttons, a click shows the whole companion.
 	local line = CreateFrame("Button", nil, win)
-	line:SetPoint("TOPLEFT", win, "TOPLEFT", 10, -26)
-	line:SetPoint("TOPRIGHT", win, "TOPRIGHT", -10, -26)
+	line:SetPoint("TOPLEFT", win, "TOPLEFT", PAD, -4)
+	line:SetPoint("RIGHT", win.Collapse, "LEFT", -4, 0)
 	line:SetHeight(20)
 	line:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
 	line.Text = line:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -1707,16 +1868,6 @@ local function Build()
 		end)
 	end)
 	win.Sleeper = sleeper
-
-	win.Browser = LT.Window.AddButton(win, L["Quest browser"], function()
-		local id = mode == "quest" and shown or nowId
-		if Q.OpenBrowser and id then
-			Q.OpenBrowser(id)
-		elseif Q.ToggleBrowser then
-			Q.ToggleBrowser()
-		end
-	end, { "BOTTOMRIGHT", win, "BOTTOMRIGHT", -22, 3 })
-	win.Browser:SetWidth(120)
 
 	-- Whether I moved, every few seconds, only while it's shown (a child of it: hidden, it doesn't run).
 	local mover = CreateFrame("Frame", nil, win)
@@ -1766,9 +1917,10 @@ local function Open()
 		Place()
 		win:Show()
 	end
-	if win.Raise then
-		win:Raise()
-	end
+	-- With the game's panels (as the Bestiary's); while the big window (DIALOG) is open, above it: a
+	-- quest clicked there shows here, in sight. Raised among its strata either way.
+	win:SetFrameStrata(Q.BrowserShown and Q.BrowserShown() and "DIALOG" or "MEDIUM")
+	win:Raise()
 	Draw(true)
 end
 
@@ -1783,7 +1935,6 @@ Look = function(id)
 	end
 	if id ~= shown or mode ~= "quest" then
 		mapSide = nil
-		scroll:SetVerticalScroll(0)
 	end
 	mode, shown = id and "quest" or "now", id
 	Open()
@@ -1821,12 +1972,11 @@ function Q.ToggleSmall()
 	end
 	mode, shown, mapSide = "now", nil, nil
 	wipe(history)
-	scroll:SetVerticalScroll(0)
 	Open()
 end
 
 -- A quest opened in the quest log (Lodestar.lua's hook): it's what I'm on from now; shown, the
--- window goes to now and redraws a moment later (in its own code, not the quest log's).
+-- window goes to its Now tab and redraws a moment later (in its own code, not the quest log's).
 function Q.SmallFollow(id)
 	id = tonumber(id)
 	if not id then
@@ -1834,6 +1984,7 @@ function Q.SmallFollow(id)
 	end
 	Focus(id, "log")
 	if win and win:IsShown() then
+		DB().smallTab = "now"
 		mode, shown, mapSide = "now", nil, nil
 		wipe(history)
 		Q.RedrawSmall()
@@ -1858,7 +2009,7 @@ end)
 
 -- For tests: the window, its small map, the rows in use (clickable lines), the texts in use (their
 -- strings: the rows' first, then the other lines'), the quest looked at, the one "Now" shows, the
--- mode and the quests looked at before.
+-- mode and the quests looked at before, the tabs' buttons (by key) and the tab drawn.
 function Q.SmallFrame()
 	local list, strings = {}, {}
 	for i = 1, rowsUsed do
@@ -1874,5 +2025,6 @@ function Q.SmallFrame()
 	end
 	return { win = win, map = map, rows = list, texts = strings, quest = mode == "quest" and shown or nil, now = nowId,
 		mode = mode, history = history, content = content, asleep = asleep, collapsed = collapsedNow,
-		line = win and win.Line, planMap = PL.used and PL.map or nil, planMarks = marks, planLines = PL.lines }
+		line = win and win.Line, planMap = PL.used and PL.map or nil, planMarks = marks, planLines = PL.lines,
+		tabs = win and win.Tabs.buttons, tab = TB.drawn }
 end

@@ -298,28 +298,8 @@ end
 
 Bt.Lay = Lay
 
--- Dark, thin gold edges (like the fight stream's windows).
-local function Dress(frame)
-	local bg = frame:CreateTexture(nil, "BACKGROUND", nil, -8)
-	bg:SetAllPoints()
-	bg:SetColorTexture(1, 1, 1, 1)
-	bg:SetGradient("VERTICAL", CreateColor(0.03, 0.04, 0.06, 0.94), CreateColor(0.07, 0.09, 0.12, 0.94))
-	for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
-		local edge = frame:CreateTexture(nil, "BORDER")
-		edge:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], (side == "TOP" or side == "BOTTOM") and 0.4 or 0.2)
-		if side == "TOP" or side == "BOTTOM" then
-			edge:SetHeight(1)
-			edge:SetPoint(side .. "LEFT")
-			edge:SetPoint(side .. "RIGHT")
-		else
-			edge:SetWidth(1)
-			edge:SetPoint("TOP" .. side)
-			edge:SetPoint("BOTTOM" .. side)
-		end
-	end
-end
-
-Bt.Dress = Dress
+-- Dark, thin gold edges (LT.Window.Dress: the Lodestar companion's look too).
+Bt.Dress = ns.LT.Window.Dress
 
 ---------------------------------------------------------------------------
 -- Item tooltips: the mobs an item comes from likeliest (setting itemTooltip)

@@ -1154,8 +1154,8 @@ L["Open the quest browser"] = "Quest-Browser öffnen"
 L["Every zone's quest chains, with a search over all of them. Also /lodestar browse."] =
 	"Die Questreihen jeder Zone, mit einer Suche über alle. Auch /lodestar browse."
 L["The small window keeps its place"] = "Kleines Fenster merkt sich seinen Platz"
-L["The small window opens where you left it, at the size you gave it. Off: it opens at its usual place and size."] =
-	"Das kleine Fenster öffnet sich da, wo du es gelassen hast, in der Größe, die du ihm gegeben hast. Aus: Es öffnet sich an seinem üblichen Platz in normaler Größe."
+L["The small window opens where you left it. Off: it opens at its usual place."] =
+	"Das kleine Fenster öffnet sich da, wo du es gelassen hast. Aus: Es öffnet sich an seinem üblichen Platz."
 L["Friends' progress"] = "Fortschritt von Freunden"
 L["Which of your Beacon friends have done a quest, have it in their log or can take it. Needs Beacon, and friends with LefthyTools."] =
 	"Welche deiner Beacon-Freunde eine Quest schon erledigt haben, sie im Questlog haben oder sie annehmen können. Braucht Beacon und Freunde mit LefthyTools."
@@ -1244,14 +1244,19 @@ L["after %s"] = "nach %s"
 L["step %d of %d"] = "Schritt %d von %d"
 L["ready to turn in"] = "bereit zur Abgabe"
 L["Now"] = "Jetzt"
-L["No quest in your log. Pick one up below."] = "Keine Quest im Questlog. Nimm unten eine an."
+L["No quest in your log: Next has what to pick up."] = "Keine Quest im Questlog: „Als Nächstes“ zeigt, was du annehmen kannst."
+L["The quest you're on: its objectives, where to turn it in, its chain and its map."] =
+	"Die Quest, an der du bist: ihre Ziele, wo du sie abgibst, ihre Questreihe und ihre Karte."
+L["What to pick up next: your other quests and what you can take nearby, with how far."] =
+	"Was du als Nächstes annimmst: deine anderen Quests und was du in der Nähe annehmen kannst, mit Entfernung."
+L["Your plan's next stops, with how far, on a map of their own."] =
+	"Die nächsten Stationen deines Plans, mit Entfernung, auf einer eigenen Karte."
 L["Click: everything about it"] = "Klick: alles über sie"
 L["Pick up next"] = "Als Nächstes annehmen"
 L["In progress"] = "In Arbeit"
 L["Available now"] = "Jetzt verfügbar"
 L["Coming up"] = "Demnächst"
 L["Blocked"] = "Blockiert"
-L["%d more here: the quest browser"] = "%d weitere hier: im Quest-Browser"
 L["Nothing to pick up nearby. The quest browser has every zone."] = "In der Nähe gibt es nichts anzunehmen. Der Quest-Browser hat jede Zone."
 L["« Back to %s"] = "« Zurück zu %s"
 L["The quest you looked at before this one."] = "Die Quest, die du dir davor angesehen hast."
@@ -1364,8 +1369,8 @@ L["The small window hides when there's nothing to do"] = "Das kleine Fenster ble
 L["With no quest in your log and nothing to pick up nearby, the companion hides itself, and comes back when you take a quest or reach a zone with quests for you. Closed by you, it stays closed."] =
 	"Ohne Quest im Questlog und ohne etwas zum Annehmen in der Nähe blendet sich das kleine Fenster aus und kommt wieder, sobald du eine Quest annimmst oder in eine Zone mit Quests für dich kommst. Schließt du es selbst, bleibt es zu."
 L["The small window as one line"] = "Das kleine Fenster als eine Zeile"
-L["The companion shrinks to its title and one line: the quest you're on, its step and how far its turn-in is. The button in its title bar does the same."] =
-	"Das kleine Fenster schrumpft auf seinen Titel und eine Zeile: die Quest, an der du bist, ihr Schritt und wie weit es zur Abgabe ist. Der Button in seiner Titelleiste macht dasselbe."
+L["The companion shrinks to one line: the quest you're on, its step and how far its turn-in is. The button left of its X does the same."] =
+	"Das kleine Fenster schrumpft auf eine Zeile: die Quest, an der du bist, ihr Schritt und wie weit es zur Abgabe ist. Der Button links neben seinem X macht dasselbe."
 L["In the game's quest UI"] = "Im Quest-Interface des Spiels"
 L["Beside the quest dialog"] = "Neben dem Questfenster"
 L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Lodestar. Hidden when there's nothing to tell."] =

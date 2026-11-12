@@ -299,9 +299,28 @@ local escapes = false
 for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsLodestarSmall" then escapes = true end end
 local counted = false
 for _, name in ipairs(ns.MirageData.WINDOWS) do if name == "LefthyToolsLodestarSmall" then counted = true end end
-check(not escapes and not counted and s.win:GetScript("OnUpdate") == nil and s.win.TitleContainer.TitleText:GetText() == "Lodestar",
-	"Escape leaves it open and Mirage doesn't count it (like the Bestiary's small window), no OnUpdate on it, its title is the module's name")
-check(s.now == 9002 and Has(s.texts, "Now  in this zone"), "now: the quest of my log in this zone, and why: " .. tostring(s.now))
+check(not escapes and not counted and s.win:GetScript("OnUpdate") == nil, "Escape leaves it open and Mirage doesn't count it (like the Bestiary's small window), no OnUpdate on it")
+local scrolls = 0
+local function CountScrolls(f)
+	for _, child in ipairs(f._children or {}) do
+		if child._template and child._template:find("ScrollFrame", 1, true) then scrolls = scrolls + 1 end
+		CountScrolls(child)
+	end
+end
+CountScrolls(s.win)
+check(s.win._template == nil and s.win.TitleContainer == nil and s.win.Inset == nil and scrolls == 0 and s.win:GetWidth() == 260
+	and s.win:GetFrameStrata() == "MEDIUM" and s.win.Close._template == "UIPanelCloseButtonNoScripts" and s.win.Grip == nil,
+	"a slim frame of its own like the Bestiary's: no title bar, no inset, no scroll frame, no grip, 260 wide, MEDIUM, a small X")
+check(s.tabs and s.tabs.now:IsShown() and s.tabs.next:IsShown() and not s.tabs.plan:IsShown() and s.tab == "now" and M.db.smallTab == "now"
+	and s.tabs.now.lit and not s.tabs.next.lit and s.tabs.now.Line:IsShown() and not s.tabs.next.Line:IsShown()
+	and s.tabs.now._kind == "Button" and Plain(s.tabs.now.Text:GetText()) == "Now" and Plain(s.tabs.next.Text:GetText()) == "Next",
+	"tabs along the top: Now (lit, at first) and Next, buttons; no Plan without a plan")
+local nowTitle = RowWith("[6] The Second Step")
+check(s.now == 9002 and nowTitle and nowTitle.Right:GetText() == "in this zone", "now: the quest of my log in this zone, and why at its right: " .. tostring(s.now))
+check(not Has(s.texts, "In progress") and not Has(s.texts, "Available now") and not RowWith("[8] Kobold Candles"),
+	"Now has only the quest I'm on (what to pick up is Next's)")
+check(math.abs(s.win:GetHeight() - (30 + s.content:GetHeight() + 8)) < 0.01 and s.content:GetHeight() > 100 and s.content._clips == true,
+	"as tall as its lines (the tab row, the lines, the edge), cut at its edge: " .. s.win:GetHeight())
 check(RowWith("[6] The Second Step") and Has(s.texts, "Step 2 of 3 · A Fine Start") and s.win.Bar:IsShown(),
 	"its title with its level, its step in its chain and the bar")
 check(not Has(s.texts, "In your quest log") and Has(s.texts, "- Wolf Pelts: 2/5") and Has(s.texts, "Candles: 3/3"),
@@ -357,9 +376,16 @@ do
 	Q.RedrawSmall(true)
 end
 
-section("Lodestar: the companion (Pick up next)")
-check(Has(s.texts, "Pick up next  Elwynn Forest") and Has(s.texts, "In progress") and Has(s.texts, "Available now")
-	and not Has(s.texts, "Coming up") and not Has(s.texts, "Blocked"), "Pick up next: this zone, two groups (coming up and blocked are the big window's)")
+section("Lodestar: the companion (Next)")
+local nowHeight = Small().win:GetHeight()
+Small().tabs.next:Click()
+s = Small()
+check(s.tab == "next" and M.db.smallTab == "next" and s.tabs.next.lit and not s.tabs.now.lit and not RowWith("[6] The Second Step")
+	and not s.map.frame:IsShown(), "the Next tab: its lines instead of Now's (no map), kept")
+check(Has(s.texts, "Elwynn Forest") and Has(s.texts, "In progress") and Has(s.texts, "Available now")
+	and not Has(s.texts, "Coming up") and not Has(s.texts, "Blocked"), "Next: this zone, two groups (coming up and blocked are the big window's)")
+check(s.win:GetHeight() ~= nowHeight and math.abs(s.win:GetHeight() - (30 + s.content:GetHeight() + 8)) < 0.01,
+	"its height follows the tab's lines: " .. nowHeight .. " -> " .. s.win:GetHeight())
 local pelts = RowWith("[7] Fine Wolf Pelts")
 check(pelts and Plain(pelts.Text:GetText()):find("ready to turn in · Tailor Ann", 1, true) and pelts.Right:GetText() == "right here",
 	"in progress: my other quest, ready, its turn-in right here")
@@ -370,22 +396,29 @@ check(Plain(Small().rows[candles].Text:GetText()):find("William Pestle", 1, true
 check(not RowWith("[25] Later Wolves") and not RowWith("[8] Ann's Second Order") and not RowWith("[10] Westward Bound"),
 	"nothing for later or blocked, nor what now leads to")
 check(Has(s.texts, "Elwynn Forest · 1 of 7 done"), "the zone's count (Q.ZoneCount)")
+s.win:Hide()
+slash("")
+check(Small().tab == "next" and RowWith("[8] Kobold Candles"), "closed and opened again: the tab kept")
+Small().tabs.now:Click()
+check(Small().tab == "now" and M.db.smallTab == "now" and RowWith("[6] The Second Step"), "the Now tab again")
 
 -- It follows: super tracking, the quest log's details, accepting, turning in.
+local function Why() local row = Small().rows[1] return row and row.Right:GetText() end -- (Now's title: why that quest)
 SUPER_TRACKED = 9005
 Fire("SUPER_TRACKING_CHANGED")
 Advance(0.5)
 s = Small()
-check(s.now == 9005 and Has(s.texts, "Now  tracked") and Has(s.texts, "Ready to turn in"), "super-tracked: that's now, ready to turn in")
+check(s.now == 9005 and Why() == "tracked" and Has(s.texts, "Ready to turn in"), "super-tracked: that's now, ready to turn in")
 local markers = s.map:Markers()
 check(s.map.map == 1429 and markers[1].look == "turnin" and #markers == 2 and #markers[1].lines == 2,
 	"the map: my zone, its turn-in and the givers to pick up (one right next to it: in its marker)")
 Advance(0.2)
 check(s.map.Me:IsShown() and s.map.meX == 0.5, "my arrow on it")
 Q.HookQuestLog()
+Small().tabs.next:Click()
 QuestMapFrame_ShowQuestDetails(9002)
 Advance(0.5)
-check(Small().now == 9002 and Has(Small().texts, "opened in your quest log"), "a quest opened in the quest log: now")
+check(Small().now == 9002 and Small().tab == "now" and Why() == "opened in your quest log", "a quest opened in the quest log: now, on the Now tab")
 LT:SetModuleSetting(M, "followLog", false)
 QuestMapFrame_ShowQuestDetails(9005)
 Advance(0.5)
@@ -394,12 +427,13 @@ LT:SetModuleSetting(M, "followLog", true)
 Log({ 9002, { 9005, true }, 9010 })
 Fire("QUEST_ACCEPTED", 9010)
 Advance(0.5)
-check(Small().now == 9010 and Has(Small().texts, "just accepted"), "a quest accepted: now")
+check(Small().now == 9010 and Why() == "just accepted", "a quest accepted: now")
 Log({ { 9005, true }, 9010 })
 completed[9002] = true
 Fire("QUEST_TURNED_IN", 9002, 0, 0)
 Fire("QUEST_REMOVED", 9002)
 Advance(0.5)
+Small().tabs.next:Click()
 s = Small()
 local follow = RowIndex("[10] Westward Bound")
 local firstPick = RowIndex("[9] Far Away Farm")
@@ -411,6 +445,9 @@ section("Lodestar: a quest looked at")
 s.rows[follow]:Click()
 s = Small()
 check(s.mode == "quest" and s.quest == 9003 and RowWith("« Back to now") and #s.history == 0, "a click shows it, with « Back to now")
+check(s.tab == nil and s.tabs.now:IsShown() and s.tabs.next:IsShown() and not s.tabs.next.lit and not s.tabs.now.lit
+	and not RowWith("[9] Far Away Farm") and math.abs(s.win:GetHeight() - (30 + s.content:GetHeight() + 8)) < 0.01,
+	"in place of the tab's lines (the tabs stay, none lit), the window as tall as it")
 check(Has(s.texts, "[10] Westward Bound") and Has(s.texts, "Step 3 of 3 · A Fine Start") and RowWith("Turn-in: Old Chest (an object), Westfall"),
 	"its title, chain and turn-in")
 RowWith("Steps (3)"):Click()
@@ -420,7 +457,12 @@ check(s.quest == 9001 and RowWith("« Back to Westward Bound") and RowWith("Back
 RowWith("« Back to Westward Bound"):Click()
 check(Small().quest == 9003 and #Small().history == 0, "back: the one before")
 RowWith("« Back to now"):Click()
-check(Small().mode == "now" and Small().quest == nil, "back to now")
+check(Small().mode == "now" and Small().quest == nil and Small().tab == "next" and RowWith("[9] Far Away Farm"), "back to now: the tab it came from")
+RowWith("[9] Far Away Farm"):Click()
+check(Small().quest == 9011, "another quest looked at")
+Small().tabs.now:Click()
+check(Small().mode == "now" and Small().quest == nil and #Small().history == 0 and Small().tab == "now" and Small().tabs.now.lit,
+	"a tab clicked: the quest looked at goes, that tab's lines")
 
 slash("9006")
 s = Small()
@@ -570,29 +612,52 @@ s = Small()
 local win = s.win
 win:Hide()
 slash("9001")
-local _, _, _, x = win:GetPoint(1)
-check(win:GetWidth() == 340 and win:GetHeight() == 580 and x == 280, "at first: right of the middle, its usual size")
+local point, _, relative, x, y = win:GetPoint(1)
+check(point == "TOPLEFT" and relative == "CENTER" and x == 150 and y == 280 and win:GetWidth() == 260,
+	"at first: right of the middle, its top above it (it grows down), 260 wide")
+check(win._resizable ~= true and win._sizing == nil and Small().content:GetWidth() == 244 and Small().map.width == 244,
+	"no resizing: its lines and the small map as wide as it less its edges")
 win._dropAt = { left = 100, top = 600 }
 win:GetScript("OnDragStart")(win)
+check(win._moving == true, "dragging moves it")
 win:GetScript("OnDragStop")(win)
 check(M.db.small.left == 100 and M.db.small.top == 600, "dragged: where it is kept")
 win._dropAt = nil
-win.Grip:GetScript("OnMouseDown")(win.Grip)
-check(win._sizing == "BOTTOMRIGHT", "the corner resizes it")
-win._dropSize = { 420, 2000 }
-win.Grip:GetScript("OnMouseUp")(win.Grip)
-check(M.db.small.width == 420 and M.db.small.height == 950, "resized: its size kept (within its bounds)")
-check(Small().content:GetWidth() == 360 and Small().map.width == 360, "its lines and the small map follow its width")
+-- A size kept from before it fitted itself: left alone, unused.
+M.db.small.width, M.db.small.height = 420, 950
 win:Hide()
 slash("")
 local _, _, _, left, top = win:GetPoint(1)
-check(win:IsShown() and left == 100 and top == 600 and win:GetWidth() == 420, "opened again: where it was left, at its size")
+check(win:IsShown() and left == 100 and top == 600 and win:GetWidth() == 260 and win:GetHeight() < 950
+	and M.db.small.width == 420 and M.db.small.height == 950, "opened again: where it was left; an old size kept is harmless")
 win:Hide()
 LT:SetModuleSetting(M, "keepPlace", false)
 slash("")
 _, _, _, x = win:GetPoint(1)
-check(x == 280 and win:GetWidth() == 340, "the setting off: its usual place and size")
+check(x == 150 and win:GetWidth() == 260, "the setting off: its usual place")
 LT:SetModuleSetting(M, "keepPlace", true)
+-- A small screen: at most its height less a margin, the lines cut at its edge.
+do
+	local w, h = UIParent._width, UIParent._height
+	UIParent._width, UIParent._height = 1024, 400
+	slash("9006")
+	check(win:GetHeight() == 340 and Small().content:GetHeight() == 340 - 30 - 8 and Small().content._clips == true,
+		"a small screen: at most its height less 60, the lines clipped: " .. win:GetHeight())
+	UIParent._width, UIParent._height = w, h
+	Q.RedrawSmall(true)
+	check(win:GetHeight() > 340, "a big one again: as tall as its lines")
+end
+-- Strata: with the game's panels; above the big window while that's open (a quest it shows here).
+do
+	local raised = win._raised or 0
+	Replace("BrowserShown", function() return true end)
+	slash("9002")
+	check(win:GetFrameStrata() == "DIALOG" and (win._raised or 0) > raised, "the big window open: a quest shown comes above it, raised")
+	PutBack("BrowserShown")
+	win:Hide()
+	slash("")
+	check(win:GetFrameStrata() == "MEDIUM", "else MEDIUM, as the Bestiary's")
+end
 
 -- In a fight it opens and works the same (nothing protected).
 win:Hide()
@@ -607,10 +672,12 @@ slash("")
 local allButtons = #Small().rows > 0
 for _, r in ipairs(Small().rows) do allButtons = allButtons and r._kind == "Button" end
 for _, m in ipairs(Small().map:Markers()) do allButtons = allButtons and m._kind == "Button" end
-allButtons = allButtons and win.Browser._kind == "Button"
-check(allButtons, "rows, markers and the window's button are buttons (the controller's cursor reaches them)")
+for _, b in ipairs({ win.Browser, win.Collapse, win.Close, Small().tabs.now, Small().tabs.next, Small().tabs.plan }) do
+	allButtons = allButtons and b._kind == "Button"
+end
+check(allButtons, "rows, markers, the tabs and the buttons at its top are buttons (the controller's cursor reaches them)")
 local blizzard = false
-for _, f in ipairs({ win, win.Browser, Small().rows[1], Small().map.frame }) do
+for _, f in ipairs({ win, win.Browser, win.Collapse, Small().tabs.now, Small().rows[1], Small().map.frame }) do
 	for k in pairs(f) do
 		if type(k) == "string" and k:lower():find("smartnav", 1, true) then blizzard = true end
 	end
@@ -626,8 +693,11 @@ do
 	Progress()
 	Q.RedrawSmall(true)
 	s = Small()
-	check(s.now == 9002 and Has(s.texts, "Step 2 of 3 · A Fine Start") and RowWith("[8] Kobold Candles"),
+	local chained = s.now == 9002 and Has(s.texts, "Step 2 of 3 · A Fine Start")
+	s.tabs.next:Click()
+	check(chained and RowWith("[8] Kobold Candles"),
 		"without Q.ChainStep, Q.Available, Q.LevelColor: its chain from Q.Chain, the zone's quests, the level colours")
+	Small().tabs.now:Click()
 	for name, fn in pairs(saved) do Q[name] = fn end
 end
 
@@ -667,12 +737,14 @@ do
 	win:Hide()
 	slash("")
 	s = Small()
-	local mail, debts, blade = RowLast("[18] Mail Run"), RowWith("[17] Old Debts"), RowWith("[18] Choose the Blade")
-	local turnin = RowWith("Turn-in: Postman Pat")
+	local mail, turnin = RowWith("[18] Mail Run"), RowWith("Turn-in: Postman Pat")
 	check(s.now == 9206 and mail and turnin and turnin.Text:GetText():find("|A:QuestTurnin:14:14|a", 1, true),
 		"now: the quest in my log, its turn-in line with the game's ? (ready)")
+	s.tabs.next:Click()
+	s = Small()
+	local debts, blade = RowWith("[17] Old Debts"), RowWith("[18] Choose the Blade")
 	check(debts and debts.Text.font == "GameFontHighlight" and debts.Text:GetText():find("|A:QuestNormal:16:16|a", 1, true),
-		"the first line of Pick up next: full size, its verb icon (! to pick up)")
+		"the first line of Next: full size, its verb icon (! to pick up)")
 	check(blade and blade.Text.font == "GameFontHighlightSmall" and blade.Text:GetText():find("|A:QuestNormal:13:13|a", 1, true)
 		and blade.Text:GetText():find("|cffbebebeChoose the Blade|r", 1, true), "the rest smaller, their titles grey")
 	check(debts and not Plain(debts.Text:GetText()):find("opens", 1, true), "what a quest opens isn't on its line")
@@ -686,10 +758,21 @@ do
 		blade:GetScript("OnLeave")(blade)
 	end
 	check(not RowWith("[26] Later Work"), "one for later isn't there (the big window's)")
-	check(not RowWith("Low Chores") and not RowWith("Fourth Errand") and RowWith("2 more here: the quest browser"),
-		"available now: only for my levels (not a grey one, however near), at most three, then how many more")
+	check(not RowWith("Low Chores") and not RowWith("Fourth Errand") and RowWith("and 2 more"),
+		"available now: only for my levels (not a grey one, however near), at most three, then \"and 2 more\"")
 	check(RowIndex("[17] Old Debts") < RowIndex("[18] Choose the Blade") and RowIndex("[18] Choose the Blade") < RowIndex("[18] Choose the Shield")
 		and not RowWith("Ogre Trouble"), "in the one order: by level, then by title; the hard one after the three for my level")
+	do
+		local browsed = {}
+		Replace("OpenBrowser", function(id) browsed[#browsed + 1] = id or "none" end)
+		local more = RowWith("and 2 more")
+		more:GetScript("OnEnter")(more)
+		check(TOOLTIP.title == "Quest browser", "its tooltip: the quest browser")
+		more:GetScript("OnLeave")(more)
+		more:Click()
+		check(browsed[1] == 9209 or browsed[1] == 9210, "a click: the big window, on the first one left out: " .. tostring(browsed[1]))
+		PutBack("OpenBrowser")
+	end
 
 	-- Hard ones (orange: three or four levels above me): after the ones for my level, marked.
 	completed[9204], completed[9209] = true, true
@@ -706,6 +789,8 @@ do
 	ogre:GetScript("OnEnter")(ogre)
 	check(Has(TOOLTIP.lines, "Hard, mobs up to 22"), "... its tooltip says so")
 	ogre:GetScript("OnLeave")(ogre)
+	s.tabs.now:Click()
+	s = Small()
 	local ring
 	for _, mk in ipairs(s.map:Markers()) do
 		if mk.hard then ring = mk end
@@ -717,19 +802,23 @@ do
 	Progress()
 	Q.RedrawSmall(true)
 
-	-- One line: the title bar's button, the line, a click on it.
+	-- One line: the button left of the X, the line, a click on it.
 	local height = win:GetHeight()
+	win.Collapse:GetScript("OnEnter")(win.Collapse)
+	check(TOOLTIP.title == "One line", "its button's tooltip says what it does")
+	win.Collapse:GetScript("OnLeave")(win.Collapse)
 	win.Collapse:Click()
 	s = Small()
-	check(M.db.collapsed == true and s.collapsed and win:GetHeight() == 54 and s.line:IsShown() and not win.Grip:IsShown()
-		and not win.Browser:IsShown(), "one line: the window shrinks to its title bar and a line")
+	check(M.db.collapsed == true and s.collapsed and win:GetHeight() == 28 and s.line:IsShown() and not win.Tabs:IsShown()
+		and not s.content:IsShown() and not win.Browser:IsShown() and win.Close:IsShown() and win.Collapse:IsShown(),
+		"one line: the window shrinks to a line beside its buttons (no tabs, no lines)")
 	check(Plain(s.line.Text:GetText()):find("[18] Mail Run", 1, true) and s.line.Text:GetText():find("QuestTurnin", 1, true),
 		"the line: the quest I'm on with its verb icon")
 	s.line:Click()
-	check(M.db.collapsed == false and not Small().collapsed and win:GetHeight() == height and win.Grip:IsShown(),
-		"a click on it: the whole companion again, at its size")
+	check(M.db.collapsed == false and not Small().collapsed and win:GetHeight() == height and win.Tabs:IsShown() and Small().content:IsShown(),
+		"a click on it: the whole companion again, as tall as its tab")
 	LT:SetModuleSetting(M, "collapsed", true)
-	check(Small().collapsed and win:GetHeight() == 54, "the setting does the same")
+	check(Small().collapsed and win:GetHeight() == 28, "the setting does the same")
 	LT:SetModuleSetting(M, "collapsed", false)
 
 	-- Alt-click in the quest log: Lodestar (Dialog.lua's Q.LogAltClick, on the next frame).
@@ -764,7 +853,10 @@ do
 	Log({})
 	Progress()
 	slash("")
-	check(win:IsShown() and Has(Small().texts, "Nothing to pick up nearby"), "opened with nothing to show: it says so and stays")
+	check(win:IsShown() and Has(Small().texts, "No quest in your log: Next has what to pick up."), "opened with nothing to show: it says so and stays")
+	Small().tabs.next:Click()
+	check(win:IsShown() and Has(Small().texts, "Nothing to pick up nearby"), "... Next too")
+	Small().tabs.now:Click()
 	LT:SetModuleSetting(M, "autoHide", false)
 	Fire("QUEST_REMOVED", 9201)
 	Advance(0.5)
@@ -831,8 +923,8 @@ end
 ---------------------------------------------------------------------------
 section("Lodestar: the companion's plan")
 do
-	-- The plan (Plan.lua): on top while it has a stop not done, with its own map; Q.ShowOnMap (the big
-	-- window's part, in parallel) records.
+	-- The plan (Plan.lua): a tab of its own while it has a stop not done, with its own map and the next
+	-- stops; Q.ShowOnMap (the big window's part, in parallel) records.
 	local shownOnMap = {}
 	Replace("ShowOnMap", function(id, spot) shownOnMap[#shownOnMap + 1] = { id, spot } return true end)
 	Q.SetTestData(QUESTS_DATA, ZONES)
@@ -843,21 +935,37 @@ do
 	Q.PlanClear()
 	slash("")
 	local s = Small()
-	check(s.win:IsShown() and not Has(s.texts, "Plan") and s.planMap == nil and not RowWith("Stop 1 of"), "no plan: the companion as before")
+	check(s.win:IsShown() and not s.tabs.plan:IsShown() and s.planMap == nil and not RowWith("Stop 1 of"), "no plan: no Plan tab")
 	Q.PlanAdd(9005)
 	Q.PlanAdd(9010)
 	Advance(0.5)
 	s = Small()
+	check(s.tabs.plan:IsShown() and s.tab == "now" and not RowWith("Stop 1 of") and s.planMap == nil, "a plan: its tab comes, Now stays shown")
+	local _, _, _, nextX = s.tabs.next:GetPoint(1)
+	local _, _, _, planX = s.tabs.plan:GetPoint(1)
+	check(planX > nextX and Plain(s.tabs.plan.Text:GetText()) == "Plan", "Plan after Next")
+	s.tabs.plan:Click()
+	s = Small()
 	local nextRow = RowWith("Stop 1 of 4: Pick up Fine Wolf Pelts at Tailor Ann")
-	check(Has(s.texts, "Plan") and nextRow and Plain(nextRow.Right:GetText()) == "right here" and RowIndex("Stop 1 of 4") < RowIndex("The Second Step"),
-		"a plan: on top, the next stop with how far and which way, before Now")
-	check(s.planMap and s.planMap.frame:IsShown() and s.planMap.map == 1429 and s.map.frame ~= s.planMap.frame, "its own small map: the next stop's zone")
+	check(s.tab == "plan" and M.db.smallTab == "plan" and nextRow and Plain(nextRow.Right:GetText()) == "right here" and not RowWith("The Second Step")
+		and RowIndex("Stop 1 of 4") == 1, "the Plan tab: the next stop first, with how far and which way (Now's quest isn't here)")
+	check(s.planMap and s.planMap.frame:IsShown() and s.planMap.map == 1429 and s.map.frame ~= s.planMap.frame and not s.map.frame:IsShown(),
+		"its own small map: the next stop's zone (Now's map hidden)")
 	local marks = s.planMarks
 	check(#marks == 4 and Plain(marks[1].Num:GetText()) == "1" and Plain(marks[4].Num:GetText()) == "4" and marks[1].Disc.vertex[3] == 0
 		and marks[2].Disc.vertex[1] < 0.5 and marks[1]._kind == "Button", "the next stops numbered on it, the next one gold (Buttons)")
 	local px = s.planMap.artW * 0.52
 	check(select(4, marks[3]:GetPoint(1)) == px and s.planLines[1]:IsShown() and s.planLines[3]:IsShown() and s.planLines[1].from[1] == select(4, marks[1]:GetPoint(1)),
 		"where they are, joined by a line in their order")
+	-- The next stops listed under the map: numbered as on it, what each is, how far.
+	local second, third, fourth = RowWith("2. Turn in Fine Wolf Pelts at Tailor Ann"), RowWith("3. Pick up Kobold Candles at William Pestle"),
+		RowWith("4. Turn in Kobold Candles at Maybell")
+	check(second and third and fourth and RowIndex("2. Turn in") < RowIndex("3. Pick up") and RowIndex("3. Pick up") < RowIndex("4. Turn in")
+		and second.Text:GetText():find("ActiveQuestIcon", 1, true) and third.Text:GetText():find("AvailableQuestIcon", 1, true)
+		and Plain(third.Right:GetText()) == "30 yd NE" and not RowWith("and 1 more"), "the next stops under it: numbered as on the map, ? or !, how far")
+	third:Click()
+	check(shownOnMap[#shownOnMap][1] == 9010 and shownOnMap[#shownOnMap][2].x == 0.52, "a listed stop clicked: on the big window's map")
+	check(math.abs(s.win:GetHeight() - (30 + s.content:GetHeight() + 8)) < 0.01, "as tall as its lines")
 	nextRow:Click()
 	check(shownOnMap[#shownOnMap][1] == 9005 and shownOnMap[#shownOnMap][2].x == 0.5, "a click: the stop on the big window's map (Q.ShowOnMap)")
 	marks[3]:Click()
@@ -872,7 +980,8 @@ do
 	STATE.shift = false
 	check(#pins == pinsBefore + 1 and pins[#pins].uiMapID == 1429 and #links > 0, "Shift-click: the game's map pin there, in chat too")
 	RowWith("Skip"):Click()
-	check(RowWith("Stop 2 of 4: Turn in Fine Wolf Pelts at Tailor Ann") and #Small().planMarks == 3, "Skip: done for now, the next one comes up")
+	check(RowWith("Stop 2 of 4: Turn in Fine Wolf Pelts at Tailor Ann") and #Small().planMarks == 3 and not RowWith("2. Turn in"),
+		"Skip: done for now, the next one comes up")
 	-- Zoomed: the numbers go with the art.
 	local m = Small().planMap
 	m:Zoom(2)
@@ -882,12 +991,28 @@ do
 	Q.PlanAdd(9003)
 	Advance(0.5)
 	nextRow = RowWith("Stop 1 of 2: Pick up Westward Bound at Farmer Saldean")
-	check(nextRow and Plain(nextRow.Right:GetText()) == "Westfall" and Has(Small().texts, "Plan  Westfall") and Small().planMap.map == 1436,
-		"a stop in another zone: its name, its map")
-	-- Every stop done: the part goes; the plan cleared too.
+	check(nextRow and Plain(nextRow.Right:GetText()) == "Westfall" and Small().planMap.map == 1436, "a stop in another zone: its name, its map")
+	-- More stops than the list's lines: "and N more", the big window's Plan tab.
+	for _, id in ipairs({ 9005, 9010, 9011 }) do Q.PlanAdd(id) end
+	Advance(0.5)
+	check(RowWith("Stop 1 of 8") and RowWith("5. ") and not RowWith("6. ") and RowWith("and 3 more"), "four stops listed, then \"and 3 more\"")
+	local views = {}
+	Replace("ShowBrowserView", function(key) views[#views + 1] = key return true end)
+	RowWith("and 3 more"):Click()
+	check(views[1] == "plan", "a click: the big window's Plan tab")
+	PutBack("ShowBrowserView")
+	-- Every stop done: the tab goes (Now shows; Plan stays kept for the next plan); the plan cleared too.
 	Q.PlanClear()
 	Advance(0.5)
-	check(not Has(Small().texts, "Plan") and Small().planMap == nil and not m.frame:IsShown(), "no plan: gone, its map hidden")
+	s = Small()
+	check(not s.tabs.plan:IsShown() and s.tab == "now" and M.db.smallTab == "plan" and s.planMap == nil and not m.frame:IsShown()
+		and not RowWith("Stop 1 of"), "no plan: no Plan tab, Now shown, its map hidden")
+	Q.PlanAdd(9010)
+	Advance(0.5)
+	check(Small().tab == "plan" and RowWith("Stop 1 of 2"), "a plan again: the Plan tab kept comes back")
+	Q.PlanClear()
+	Advance(0.5)
+	Small().tabs.now:Click()
 	Small().win:Hide()
 	Log({})
 	Progress()

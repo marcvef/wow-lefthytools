@@ -40,7 +40,7 @@ local M = LT:NewModule("lodestar", {
 	title = "Lodestar",
 	description = L["Quest chains for every zone: what a quest needs first, where it starts and ends, what it leads to and which friends have done it. /lodestar opens the small window."],
 	defaults = {
-		keepPlace = true, -- the small window opens where it was left, at its size
+		keepPlace = true, -- the small window opens where it was left
 		followLog = true, -- the small window shows the quest opened in the quest log (or clicked in the tracker)
 		tooltips = true,  -- "Lodestar: starts ..." in NPC tooltips
 		itemTooltips = true, -- "Lodestar: for <quest> ..." in item tooltips, the sorted bags' mark (Items.lua)
@@ -48,11 +48,12 @@ local M = LT:NewModule("lodestar", {
 		friends = true,   -- friends' progress (Beacon friends with LefthyTools; Learn.lua and QuestShare.lua)
 		learn = true,     -- learning givers, turn-ins and prerequisites while playing (Learn.lua reads it)
 		autoHide = true,  -- the companion hides itself when there's nothing to show, and comes back
-		collapsed = false, -- the companion is one line (its title bar's button)
+		collapsed = false, -- the companion is one line (the button left of its X)
 		stepsOpen = false, -- the companion shows the chain's steps (its "Steps (7)" line folds and unfolds them)
+		smallTab = "now", -- the companion's tab: "now", "next" or "plan" (Plan without a plan: Now)
 		dialog = true,    -- a panel beside the quest dialog: the chain, its steps, what it leads to (Dialog.lua)
 		logBadges = true, -- "2/4" on the quest log's titles, the chain in their tooltip, Alt-click (Dialog.lua)
-		small = {},       -- the small window: left, top, width, height (Small.lua)
+		small = {},       -- the small window: left, top (Small.lua; width, height from before it fitted itself: unused)
 		minimapButton = true,
 		minimapAngle = 125, -- degrees, 0 = right, counter-clockwise: the upper left, above the Bestiary's
 	},
@@ -817,13 +818,13 @@ function M:BuildOptions(o)
 	o:Button(L["Open the quest browser"], L["Open"], OpenBrowser,
 		L["Every zone's quest chains, with a search over all of them. Also /lodestar browse."])
 	o:Checkbox("keepPlace", L["The small window keeps its place"],
-		L["The small window opens where you left it, at the size you gave it. Off: it opens at its usual place and size."])
+		L["The small window opens where you left it. Off: it opens at its usual place."])
 	o:Checkbox("followLog", L["Follow the quest log"],
 		L["While the small window is open, a quest you open in your quest log (or click in the objective tracker) becomes the one it shows as now."])
 	o:Checkbox("autoHide", L["The small window hides when there's nothing to do"],
 		L["With no quest in your log and nothing to pick up nearby, the companion hides itself, and comes back when you take a quest or reach a zone with quests for you. Closed by you, it stays closed."])
 	o:Checkbox("collapsed", L["The small window as one line"],
-		L["The companion shrinks to its title and one line: the quest you're on, its step and how far its turn-in is. The button in its title bar does the same."])
+		L["The companion shrinks to one line: the quest you're on, its step and how far its turn-in is. The button left of its X does the same."])
 	o:Header(L["In the game's quest UI"])
 	o:Checkbox("dialog", L["Beside the quest dialog"],
 		L["When an NPC offers you a quest, asks for it or rewards you, a panel beside the dialog shows its chain: which part this is, the steps around it, what it leads to, what taking it closes, friends who did it, and a button to open it in Lodestar. Hidden when there's nothing to tell."])
