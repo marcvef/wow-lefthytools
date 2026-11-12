@@ -464,6 +464,7 @@ so the order they load in doesn't matter for the table; `Q.module` is the module
 | `followLog` | true | while the small window is open, a quest opened in the quest log (or clicked in the objective tracker) becomes its "Now" |
 | `tooltips` | true | "Lodestar: starts ..." lines in NPC tooltips (below); the data loads a few seconds after the loading screen for them |
 | `itemTooltips` | true | quest items: "Lodestar: for <quest> ..." in item tooltips, the sorted bags' mark (Quest items); the data loads for it as for `tooltips` |
+| `itemTooltipsLow` | false | quest items' tooltips also list quests not taken yet that are grey for me (Quest items) |
 | `friends` | true | friends' progress in the windows (`Q.Friends`) |
 | `learn` | true | learning while playing (Learn.lua reads `M.db.learn`) |
 | `autoHide` | true | the companion hides itself when it has nothing to show, and comes back (Small window) |
@@ -897,13 +898,18 @@ each quest of `Q.ItemQuests(item)` with my status (`Q.Status`):
   exclusive one taken), "· not for you";
 - an item that starts it: "Lodestar: starts the quest <title> · you can start it" / "· in your log" /
   "· from level 30" / "· needs another quest first" / "· already done: you can discard it";
+- a quest not taken yet (I can take it, from level N, needs another first) has its level before its
+  title: "Lodestar: for [24] <title> · not taken yet: you can take it" (its own level, none for one that
+  scales); such a quest that's grey for me (`Q.Tier` "trivial") is left out unless `itemTooltipsLow`
+  is on (the lines' cache key has the setting);
 - the quests that still need it first, then the rest, each by status (ready, in my log, to take, coming
   up, blocked, done) and then in the one order of quests (`Q.Compare`: for my level, hard, ...; by level
   and title; a quest of my log the data doesn't have after those it has, by its ID), at most 4, then
   "Lodestar: and N more";
 - last: "No quest needs it any more: you can discard it" (green-grey) when none does (not under a
-  single starter's line, which says it already), or "Still needed for <title> [and N more]" when only
-  some do.
+  single starter's line, which says it already), "Only low-level quests need it: you can discard it"
+  when only left-out grey ones do, or "Still needed for <title> [and N more]" when only some do.
+  (`Q.ItemDone` and the bags' mark don't change with it: they count every quest.)
 
 A quest needs the item unless it's done or "other" (skipped, not for me); one it starts also not
 when it's in my log. Quests the data doesn't have with the item (Forever's own quests EG Link hasn't

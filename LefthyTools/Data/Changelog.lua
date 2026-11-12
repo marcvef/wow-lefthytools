@@ -536,5 +536,8 @@ ns.CHANGELOG = {
 	{ id = 176, module = "beacon",
 		en = { "Beacon: given away, no longer reserved", "A won item traded or mailed to someone other than its winner is no longer reserved for them: its \"Won by\" line and border go, also from the other copies of the same item (crafted items are all alike). Trades and mails to the winner are also noticed when the game empties the slots early." },
 		de = { "Beacon: weitergegeben, nicht reserviert", "Ein gewonnenes Item, das du jemand anderem als dem Gewinner handelst oder schickst, ist nicht mehr für ihn reserviert: Die Zeile \"Gewonnen von\" und der Rahmen verschwinden, auch bei anderen Exemplaren desselben Items (hergestellte Items sind alle gleich). Handel und Post an den Gewinner werden auch erkannt, wenn das Spiel die Plätze früh leert." } },
+	{ id = 177, module = "lodestar",
+		en = { "Lodestar: quest items with levels", "A quest item's tooltip says the level of a quest you haven't taken yet, and leaves out quests that are grey for you (an item only they need says you can discard it). Lodestar's settings can show them again." },
+		de = { "Lodestar: Questgegenstände mit Level", "Der Tooltip eines Questgegenstands nennt das Level einer Quest, die du noch nicht angenommen hast, und lässt Quests weg, die für dich grau sind (bei einem Item, das nur sie brauchen, steht, dass du es wegwerfen kannst). In Lodestars Einstellungen lassen sie sich wieder einblenden." } },
 	-- New entries go here, at the end.
 }

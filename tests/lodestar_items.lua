@@ -170,7 +170,7 @@ end
 
 local function Plain(text) return ((text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
 local function Ours(text)
-	return text:find("^Lodestar: ") or text:find("^No quest needs it") or text:find("^Still needed for")
+	return text:find("^Lodestar: ") or text:find("^No quest needs it") or text:find("^Still needed for") or text:find("^Only low%-level")
 end
 -- An item hovered (GameTooltip, as in the bags): Lodestar's lines.
 local function Hover(item)
@@ -227,16 +227,35 @@ do
 	check(Joined(9907) == "Lodestar: for Supply Run · ready to turn in", "ready to turn in (what the giver handed over), got " .. Joined(9907))
 	check(Joined(9902) == "Lodestar: for Old Errand · done | Lodestar: for Letter Two · skipped | No quest needs it any more: you can discard it",
 		"every quest done or skipped: you can discard it, got " .. Joined(9902))
-	check(Joined(9903) == "Lodestar: starts the quest The Torn Map · you can start it", "a starter: you can start it, got " .. Joined(9903))
+	check(Joined(9903) == "Lodestar: starts the quest [9] The Torn Map · you can start it", "a starter: you can start it, its level, got " .. Joined(9903))
 	check(Joined(9904) == "Lodestar: starts the quest A Faded Note · already done: you can discard it",
 		"a starter done: discard it (one line), got " .. Joined(9904))
-	check(Joined(9905) == "Lodestar: starts the quest Sealed Orders · from level 30", "a starter for later: from which level, got " .. Joined(9905))
-	check(Joined(9906) == "Lodestar: for Pelts for the Tanner · not taken yet: you can take it | Lodestar: for Wolf Pelts · not taken yet: you can take it"
-		.. " | Lodestar: for Fine Pelts · not taken yet: from level 40 | Lodestar: for More Pelts · not taken yet: needs another quest first"
+	check(Joined(9905) == "Lodestar: starts the quest [32] Sealed Orders · from level 30", "a starter for later: from which level, got " .. Joined(9905))
+	check(Joined(9906) == "Lodestar: for [9] Pelts for the Tanner · not taken yet: you can take it | Lodestar: for [9] Wolf Pelts · not taken yet: you can take it"
+		.. " | Lodestar: for [42] Fine Pelts · not taken yet: from level 40 | Lodestar: for [10] More Pelts · not taken yet: needs another quest first"
 		.. " | Lodestar: and 1 more | Still needed for Pelts for the Tanner and 3 more",
 		"many quests: the ones that need it first, in the one order (to take: by level, then title; coming up; blocked), at most four, "
 		.. "how many more, which still need it, got " .. Joined(9906))
 	check(#Hover(2589) == 0, "an item of no quest: nothing")
+
+	-- Quests not taken yet that are grey for me: left out unless the setting says otherwise.
+	local grey = { [9508] = true, [9510] = true, [9512] = true }
+	local tier = Q.Tier
+	Replace("Tier", function(id) return grey[id] and "trivial" or tier(id) end)
+	Progress()
+	check(M.db.itemTooltipsLow == false and REGISTERED_SETTINGS["LefthyTools_lodestar_itemTooltipsLow"], "low-level quests: off by default, a checkbox")
+	check(Joined(9906) == "Lodestar: for [42] Fine Pelts · not taken yet: from level 40 | Lodestar: for Old Pelts · done | Still needed for Fine Pelts",
+		"grey ones not taken yet: left out, got " .. Joined(9906))
+	grey[9511] = true
+	Progress()
+	check(Joined(9906) == "Lodestar: for Old Pelts · done | Only low-level quests need it: you can discard it",
+		"only grey ones still need it: you can discard it, got " .. Joined(9906))
+	LT:SetModuleSetting(M, "itemTooltipsLow", true)
+	check(select(2, Joined(9906):gsub("not taken yet", "")) == 4, "the setting on: all of them again, got " .. Joined(9906))
+	LT:SetModuleSetting(M, "itemTooltipsLow", false)
+	PutBack("Tier")
+	Progress()
+	Hover(9906); Hover(9902); Hover(9901) -- (made again for what comes next)
 
 	-- Quests the data doesn't have with the item: my log's, by the item's name (the client's language).
 	check(Joined(9908) == "Lodestar: for Shards of the Rift · in your log (2/5)", "a quest of my log the data doesn't know, got " .. Joined(9908))
@@ -306,7 +325,7 @@ do
 	local list = Q.ItemQuests(9911)
 	check(list and #list == 1 and list[1].id == 9520 and list[1].role == "starts" and #Q.ItemQuests(9906) == 5,
 		"a learned quest an item starts: there at once, the rest as it was")
-	check(Joined(9911) == "Lodestar: starts the quest Learned Errand · you can start it", "and in its tooltip, got " .. Joined(9911))
+	check(Joined(9911) == "Lodestar: starts the quest [9] Learned Errand · you can start it", "and in its tooltip, got " .. Joined(9911))
 end
 
 ---------------------------------------------------------------------------

@@ -44,6 +44,7 @@ local M = LT:NewModule("lodestar", {
 		followLog = true, -- the small window shows the quest opened in the quest log (or clicked in the tracker)
 		tooltips = true,  -- "Lodestar: starts ..." in NPC tooltips
 		itemTooltips = true, -- "Lodestar: for <quest> ..." in item tooltips, the sorted bags' mark (Items.lua)
+		itemTooltipsLow = false, -- ... also quests not taken yet that are grey for me (Items.lua)
 		friends = true,   -- friends' progress (Beacon friends with LefthyTools; Learn.lua and QuestShare.lua)
 		learn = true,     -- learning givers, turn-ins and prerequisites while playing (Learn.lua reads it)
 		autoHide = true,  -- the companion hides itself when there's nothing to show, and comes back
@@ -835,6 +836,8 @@ function M:BuildOptions(o)
 		L["Pointing at someone who starts a quest you can take, or takes back one in your log, adds a line: \"Lodestar: starts ...\" with its step in the chain. For this the quest data loads a few seconds after the loading screen, never in a fight."])
 	o:Checkbox("itemTooltips", L["Quest items in tooltips"],
 		L["An item's tooltip says which quest it's for and where that quest stands: in your log with your progress, not taken yet, or done. When no quest needs it any more, it says you can discard it, and the sorted bags mark it."])
+	o:Checkbox("itemTooltipsLow", L["Low-level quests in item tooltips"],
+		L["Quest items' tooltips also list quests you haven't taken that are grey for you (too low to be worth it). Off: they're left out, and an item only they need says you can discard it."])
 	o:Header(L["Friends"])
 	o:Checkbox("friends", L["Friends' progress"],
 		L["Which of your Beacon friends have done a quest, have it in their log or can take it. Needs Beacon, and friends with LefthyTools."])

@@ -581,6 +581,7 @@ works too), `/lodestar browse`, `/lodestar minimap`, `/lodestar settings`.
 | Chain steps in the quest log | on |
 | Quest lines in NPC tooltips | on |
 | Quest items in tooltips | on |
+| Low-level quests in item tooltips | off |
 | Friends' progress | on |
 | Learn while questing | on |
 

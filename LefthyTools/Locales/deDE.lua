@@ -1498,6 +1498,10 @@ L["not taken yet: needs another quest first"] = "noch nicht angenommen: braucht 
 L["No quest needs it any more: you can discard it"] = "Keine Quest braucht es mehr: Du kannst es wegwerfen"
 L["Still needed for %s"] = "Noch gebraucht für %s"
 L["Still needed for %s and %d more"] = "Noch gebraucht für %s und %d weitere"
+L["Only low-level quests need it: you can discard it"] = "Nur Quests mit niedrigem Level brauchen es: Du kannst es wegwerfen"
+L["Low-level quests in item tooltips"] = "Quests mit niedrigem Level in Item-Tooltips"
+L["Quest items' tooltips also list quests you haven't taken that are grey for you (too low to be worth it). Off: they're left out, and an item only they need says you can discard it."] =
+	"Tooltips von Questgegenständen nennen auch Quests, die du noch nicht angenommen hast und die für dich grau sind (zu niedrig, um sich zu lohnen). Aus: Sie werden weggelassen, und bei einem Item, das nur sie brauchen, steht, dass du es wegwerfen kannst."
 -- Lodestar: how hard a quest is for me (Q.TIER_WORD: Engine.lua's tiers)
 L["Trivial"] = "Trivial"
 L["Easy"] = "Leicht"

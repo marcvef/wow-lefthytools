@@ -10,8 +10,10 @@ local Q = ns.Lodestar or {}; ns.Lodestar = Q
 --     to turn in", "... · not taken yet: you can take it", "... · done"; for an item that starts one
 --     "Lodestar: starts the quest <quest> · you can start it" (or "already done: you can discard it");
 --     those that need it first, each in the one order of quests (Q.Compare), at most four, then "and N
---     more". Last, when no quest needs it any more: "No quest needs it any
---     more: you can discard it"; when only some do: "Still needed for <quest>". The data's (Data.lua's
+--     more". A quest not taken yet says its level ("[24] <quest>"); one grey for me (Q.Tier "trivial")
+--     and not taken yet is left out unless the setting itemTooltipsLow is on. Last, when no quest needs
+--     it any more: "No quest needs it any more: you can discard it"; when only such low ones do: "Only
+--     low-level quests need it: you can discard it"; when only some do: "Still needed for <quest>". The data's (Data.lua's
 --     Q.ItemQuests) and, for a quest the data doesn't know with it (Forever's own), the quest log: a
 --     quest of my log whose objective names the item (its name from the client, so any language).
 --   * Q.ItemDone(item): no quest needs it any more (each one done, skipped or not for me, and nothing
@@ -62,6 +64,24 @@ local function Key()
 		Q.Status(0)
 	end
 	return tostring(Q.dataGen) .. ":" .. tostring(Q.progressGen) .. ":" .. logGen .. ":" .. tostring(Q.itemGen)
+		.. ":" .. tostring(M and M.db and M.db.itemTooltipsLow)
+end
+
+-- Not taken yet: I can take it, or will once I'm higher or have done what comes first.
+local NOT_TAKEN = { available = true, level = true, locked = true }
+
+-- A quest not taken yet that's grey for me: left out of the lines unless itemTooltipsLow is on.
+local function Low(e)
+	return NOT_TAKEN[e.status] and e.known and not (M and M.db and M.db.itemTooltipsLow)
+		and Q.Tier and Q.Tier(e.id) == "trivial"
+end
+
+-- The quest's name on its line: "[24] Title" when it's not taken yet (worth knowing before taking it).
+local function Named(e)
+	local title = Q.Title(e.id)
+	local quest = NOT_TAKEN[e.status] and Q.Quest and Q.Quest(e.id)
+	local level = quest and not quest.scales and tonumber(quest.level)
+	return level and level > 0 and ("[%d] %s"):format(level, title) or title
 end
 
 -- The item's name from the client (its language), nil when it doesn't know it yet.
@@ -233,14 +253,19 @@ end
 
 -- The lines for an item: { { text, r, g, b } } (an empty list: none); nil: not ready yet.
 local function Build(item)
-	local list, complete = Entries(item)
-	if not list then
+	local all, complete = Entries(item)
+	if not all then
 		return nil
 	end
-	local out, needed = {}, {}
-	for _, e in ipairs(list) do
-		if e.needed then
-			needed[#needed + 1] = e
+	local list, out, needed, lowNeeded = {}, {}, {}, 0
+	for _, e in ipairs(all) do
+		if Low(e) then
+			lowNeeded = lowNeeded + (e.needed and 1 or 0)
+		else
+			list[#list + 1] = e
+			if e.needed then
+				needed[#needed + 1] = e
+			end
 		end
 	end
 	for i, e in ipairs(list) do
@@ -248,12 +273,14 @@ local function Build(item)
 			out[#out + 1] = { L["Lodestar: and %d more"]:format(#list - TIP_MAX), GREY[1], GREY[2], GREY[3] }
 			break
 		end
-		local title = Q.Title(e.id)
+		local title = Named(e)
 		local head = e.role == "starts" and L["Lodestar: starts the quest %s"]:format(title) or L["Lodestar: for %s"]:format(title)
 		local text, color = State(e.id, e.role, e.status, e.entry)
 		out[#out + 1] = { head .. " · " .. text, color[1], color[2], color[3] }
 	end
-	if #list > 0 and #needed == 0 and not (#list == 1 and list[1].role == "starts") then
+	if #needed == 0 and lowNeeded > 0 then
+		out[#out + 1] = { L["Only low-level quests need it: you can discard it"], DISCARD[1], DISCARD[2], DISCARD[3] }
+	elseif #list > 0 and #needed == 0 and not (#list == 1 and list[1].role == "starts") then
 		out[#out + 1] = { L["No quest needs it any more: you can discard it"], DISCARD[1], DISCARD[2], DISCARD[3] }
 	elseif #needed > 0 and #needed < #list then
 		local first = Q.Title(needed[1].id)
