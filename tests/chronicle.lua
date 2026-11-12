@@ -849,6 +849,17 @@ do
 	check(CDB.book[annaAcct].chars["Annalt-Realmy"] and not drawn("Annalt") and drawnTimes("Carl|r") - tags == 1
 		and drawnTimes("Carlbank|r") == 1 and tags == 2,
 		"a row per character, its BattleTag beside it: Anna is online, so her other character isn't under not online; Carl's two are, his BattleTag on each")
+	-- Me among them: online, marked (you); a click: my graphs.
+	local meRow
+	for i = 1, canvas.used.hover do
+		local f = canvas.pools.hover[i]
+		if f.lines and (f.lines[1] or ""):find("(you)", 1, true) then meRow = f end
+	end
+	check(drawn("(you)") and meRow and meRow.onClick and table.concat(meRow.lines, "\n"):find("Click: your graphs", 1, true),
+		"I'm in Online now too, marked (you)")
+	meRow._scripts.OnMouseUp(meRow, "LeftButton")
+	check(not win.Tabs.graphs:IsEnabled(), "a click on my row: my graphs")
+	CH.Open("friends")
 	-- Not online: the highest level first, then by name.
 	local rows = {}
 	for i = 1, canvas.used.hover do

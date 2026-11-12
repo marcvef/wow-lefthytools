@@ -222,7 +222,9 @@ the open one's button greyed out:
   icon and text; a row's hover shows all of it, a click opens their account's graphs through
   `Select` when it has any). A row per character, by its full name, its account's BattleTag in a
   column of its own. Both tables: the highest level first, then by name (A to Z, any case; no level
-  last; `ByLevel`). **Online now**: Beacon's friends (`B.FriendList`, `B.FriendStatus` in
+  last; `ByLevel`). **Online now**: me too (`MeRow`: the character I'm playing, "(you)", level and
+  progress, my BattleTag, zone - subzone, dead or fighting else the quest I follow; a click my graphs,
+  `Select("me")` going to Graphs from this page; not counted in the corner), and Beacon's friends (`B.FriendList`, `B.FriendStatus` in
   Alerts.lua): Name (class colour, <AFK>), Level (and progress), BattleTag (`C.PeerChar`: their
   account from Battle.net), Where (zone - subzone, distance), Doing (dead or fighting, else the
   quest they track, else "In your group"); the hover is `B.FriendLines` (the AFK screen's lines)

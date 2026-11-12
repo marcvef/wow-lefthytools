@@ -313,6 +313,50 @@ local function ByLevel(a, b)
 	return (a.key or "") < (b.key or "")
 end
 
+-- My own row among the friends online (the character I'm playing): its name marked "(you)", level
+-- and progress, my BattleTag, where I am, what I'm doing (dead, fighting, else the quest I follow); a
+-- click: my graphs.
+local function MeRow(characters, Tag, open)
+	local c
+	for _, char in ipairs(characters) do
+		if char.me and char.current then
+			c = char
+		end
+	end
+	if not c then
+		return nil
+	end
+	local level = UnitLevel("player")
+	level = (type(level) == "number" and level > 0) and level or c.level
+	local xp, xpMax = UnitXP and UnitXP("player"), UnitXPMax and UnitXPMax("player")
+	local levelText = level and ((xp and xpMax and xpMax > 0) and ("%d |cff999999(%d%%)|r"):format(level, math.floor(xp / xpMax * 100))
+		or tostring(level))
+	local zone, sub = GetRealZoneText and GetRealZoneText() or "", GetSubZoneText and GetSubZoneText() or ""
+	local where = "|cffaaaaaa" .. ((sub ~= "" and sub ~= zone) and (zone .. " - " .. sub) or (zone ~= "" and zone or "?")) .. "|r"
+	local doing
+	if UnitIsGhost and UnitIsGhost("player") then
+		doing = "|cffff4040" .. L["Ghost"] .. "|r"
+	elseif UnitIsDead and UnitIsDead("player") then
+		doing = "|cffff4040" .. L["Dead"] .. "|r"
+	elseif UnitAffectingCombat and UnitAffectingCombat("player") then
+		doing = "|cffff4040" .. L["In combat"] .. "|r"
+	else
+		local quest = C_SuperTrack and LT.Value(C_SuperTrack.GetSuperTrackedQuestID)
+		local title = type(quest) == "number" and quest > 0 and C_QuestLog and LT.Value(C_QuestLog.GetTitleForQuestID, quest)
+		doing = type(title) == "string" and title ~= "" and ("|cffffd200" .. L["Quest: %s"]:format(title) .. "|r") or nil
+	end
+	local name = Named(c.name, c.classFile, c.partial)
+	local tip = { name .. " |cff888888" .. L["(you)"] .. "|r" }
+	if level then
+		tip[#tip + 1] = L["Level %d"]:format(level)
+	end
+	tip[#tip + 1] = where
+	tip[#tip + 1] = doing
+	tip[#tip + 1] = "|cff80c0ff" .. L["Click: your graphs"] .. "|r"
+	return { cells = { name .. " |cff888888" .. L["(you)"] .. "|r", levelText or DASH, Tag(c.acct) or DASH, where, doing or DASH },
+		tip = tip, click = function() open("me") end, level = level, name = c.name or "", key = c.key }
+end
+
 local function FriendTables(open)
 	local accounts = {}
 	for _, account in ipairs(C.Accounts()) do
@@ -363,6 +407,10 @@ local function FriendTables(open)
 		online[#online + 1] = { cells = { status.name, status.level or DASH, Tag(acct) or DASH, status.where, status.doing or DASH },
 			tip = tip, click = click, level = tonumber(friend.peer.level or journalLevel[key]),
 			name = friend.peer.name or (status.name or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") }
+	end
+	local me = MeRow(characters, Tag, open)
+	if me then
+		online[#online + 1] = me
 	end
 	table.sort(online, ByLevel)
 
@@ -427,7 +475,7 @@ local function FriendTables(open)
 		return n > 0 and ("|cff999999" .. (n == 1 and one or many:format(n)) .. "|r") or nil
 	end
 	return {
-		{ title = L["Online now"], note = Counted(#online, L["1 friend"], L["%d friends"]), rows = online,
+		{ title = L["Online now"], note = Counted(#online - (me and 1 or 0), L["1 friend"], L["%d friends"]), rows = online,
 			columns = { { title = L["Name"], w = 0.2 }, { title = L["Level"], w = 0.1, right = true }, { title = L["BattleTag"], w = 0.14 },
 				{ title = L["Where"], w = 0.27 }, { title = L["Doing"], w = 0.29 } },
 			empty = B and L["No friends with LefthyTools online"] or L["Unknown (Beacon is off)"] },
@@ -659,7 +707,7 @@ local Refresh
 
 local function Select(key)
 	selectedKey = key
-	if IsFriend(key) then
+	if IsFriend(key) or (key == "me" and tab == "friends") then -- (my row on the Friends page: my graphs)
 		tab = "graphs"
 	end
 	Refresh()
