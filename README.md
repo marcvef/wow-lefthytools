@@ -529,7 +529,10 @@ you can or can't take it yet ("Needs Friendly with Darnassus", "Needs <the quest
 "Skipped: you took the other one"), its step in its chain with the steps around it, its objectives
 (with your progress when it's in your log; hover one to light where it is on the map), where it
 starts and ends, its rewards with the game's item tooltips, money and XP, what it needs first and
-what it leads to, and friends who did it. **Chain** above the map shows the quest's whole chain as
+what it leads to, and friends who did it. Picked on the map, the map brings the quest's pins and
+areas into sight and makes them pulse; a click on its giver, turn-in or an objective jumps there.
+In a list (the quest list, My quests, a chain's steps) a click shows its details with a small map
+first; **Show on map** (or Ctrl-click) opens it on the big map. **Chain** above the map shows the quest's whole chain as
 cards joined by lines: which steps come first, "one of" where any of several will do, lead-ins
 dashed, steps in other zones with a click to go there; pick a locked quest and the way to it lights
 up, across zones. Every "2/4" badge opens its chain too.
@@ -542,11 +545,20 @@ or giver, in every zone.
 More tabs: **Quest list** (the zone's quests by status: in progress, available, coming up, blocked,
 done), **My quests** (your quest log in order: ready to turn in first, then your zone's quests
 nearest first, each with its next objective and where to turn it in; sort by zone, level or chain;
-under it the chains you've started whose next step you can take now) and **Level path** (where to
-go next: the zones with quests for your level, each as a bar across its levels with yours marked,
-the best one on top).
+under it the chains you've started whose next step you can take now), **Plan** (below) and
+**Level path** (where to go next: the zones with quests for your level, each as a bar across its
+levels with yours marked, the best one on top).
 
-**The companion** follows what you do: the quest you're on with its step in its chain, its
+**Your plan.** The **+** before a quest (in the quest list, My quests, the details, a chain's steps;
+Alt-click a pin) puts it on your plan, in the order you want to do them; the Plan tab lists them
+with what's next for each (pick up, objectives, turn in), to move up or down or take off. The big
+map shows the plan's stops numbered and joined by a line, and the companion says where to go
+next, with distance and direction. If you like, **Suggest a route** puts the stops of the quests
+you picked in an order with less walking (pick-ups before objectives before turn-ins, a quest's
+lead-in first) and says how much it saves; **Back to my order** undoes it. A quest leaves the plan
+when you turn it in.
+
+**The companion** follows what you do: your plan's next stop when you have one, the quest you're on with its step in its chain, its
 objectives and where they are on its small map, where to turn it in (how far and which way), and
 what to pick up next nearby, nearest first. A click on a quest shows everything about it; a click
 on a giver or a turn-in sets the game's map pin. It can shrink to one line, and hides itself when

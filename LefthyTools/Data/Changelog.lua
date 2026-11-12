@@ -542,5 +542,8 @@ ns.CHANGELOG = {
 	{ id = 178, module = "lodestar",
 		en = { "Lodestar: plan your quests", "The + beside a quest puts it on your plan. The new Plan tab lists your quests in your order: move them up or down, or let Lodestar suggest a shorter route through their stops. The companion shows the next stop on top, with its own map and Skip. In My quests a click shows a quest's details, Ctrl-click shows it on the map." },
 		de = { "Lodestar: Quests planen", "Das + neben einer Quest setzt sie auf deinen Plan. Der neue Reiter Plan listet deine Quests in deiner Reihenfolge: Schieb sie hoch oder runter, oder lass Lodestar eine kürzere Route durch ihre Stationen vorschlagen. Der Begleiter zeigt oben die nächste Station, mit eigener Karte und Überspringen. In Meine Quests zeigt ein Klick die Details einer Quest, Strg-Klick zeigt sie auf der Karte." } },
+	{ id = 179, module = "lodestar",
+		en = { "Lodestar: find it on the map", "Clicking a quest in a list shows its details with the small map first; Ctrl-click or \"Show on map\" opens the big map, where its pins and areas come into view and pulse. A giver, turn-in or objective clicked in the details zooms to that spot. A + beside each quest puts it in your plan, whose stops show numbered on the map." },
+		de = { "Lodestar: auf der Karte finden", "Ein Klick auf eine Quest in einer Liste zeigt zuerst ihre Details mit der kleinen Karte; Strg-Klick oder \"Auf der Karte zeigen\" öffnet die große Karte, wo ihre Punkte und Gebiete ins Bild kommen und pulsieren. Ein Klick auf Questgeber, Abgabe oder Ziel in den Details zoomt zu dieser Stelle. Ein + neben jeder Quest setzt sie auf deinen Plan, dessen Halte nummeriert auf der Karte stehen." } },
 	-- New entries go here, at the end.
 }
