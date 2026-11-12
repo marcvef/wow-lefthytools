@@ -18,6 +18,7 @@ and takes it and where, and where each quest stands for you and your friends.
 | `Modules/Lodestar/Dialog.lua` | in the game's quest UI: the panel beside the quest dialog, chain steps on the quest log's lines, Alt-click there |
 | `Modules/Lodestar/Items.lua` | quest items: item tooltips (which quest it's for, where that stands, whether to discard it), `Q.ItemDone` and the sorted bags' mark |
 | `Modules/Beacon/QuestShare.lua` | friends' progress and learned records over Beacon (`B2;q…`, from 0.7.0-70) |
+| `Modules/Lodestar/Route.lua` | a suggested route for the plan's stops (only when asked), yards between two spots |
 
 Every Lodestar file starts with `local Q = ns.Lodestar or {}; ns.Lodestar = Q`, so the order they
 load in doesn't matter for the table.
@@ -1798,3 +1799,51 @@ Merged with `Q.MergeLearned` (from the asked friend only), and so fed into `Q.Ad
 Nothing of it in a fight (`LT.InFight`): friends' messages wait (300 at most; a request for
 records that lost one isn't counted complete), one request per friend waits, nothing is sent.
 Older builds get nothing (their `V2`; before it's known, nothing either).
+
+## Route (Route.lua)
+
+A shorter order for the plan's stops, only when the player asks for it ("Suggest a route" on the
+Plan tab): never a route over every quest in range. Pure logic: no frames, no events, no saved data.
+
+- `Q.SuggestRoute(stops, here)` -> `{ order = { stop, ... }, before = yards, after = yards }` or nil.
+  `stops`: `Q.PlanStops()`'s (`{ quest, kind = "start"|"objective"|"end", index, label, spots = {
+  { map, x, y }, ... }, spot, done }`); `here`: `{ map, x, y }` of the player, or nil (the route
+  then starts wherever it's shortest). `order` holds the same stop tables, each with `.spot` set to
+  the spot chosen of its `spots`; done stops and stops without a spot are left out. `before`: the
+  given order's yards (each stop's own `.spot`, else its spot nearest the stop before), `after`: the
+  route's, from `here` when given, whole yards. nil when no stop is left (or no table).
+- `Q.RouteYards(a, b)` -> the yards between two spots (`{ map, x, y }`, 0..1 on that map) as the
+  route counts them, and true as a second value for another continent; nil without both.
+
+**What's kept:** a quest's start before its objectives (in any order) before its end; a quest in my
+log has no start (its objectives, then its end). A quest that needs another one of the plan
+(`Q.Missing`: `"done"` and `"any"`) starts after that one's end (its start when it has no end stop);
+one that needs another in the log (`"log"`, `preActive`) starts after that one's start and before
+its end. Without `Q.Missing` (no engine), the quest's own `pre`, `preAny` and `preActive`. When the
+needs make a loop (bad data) they're all left out; each quest's own order always stays.
+
+**Travel:** straight-line yards in world coordinates (`C_Map.GetWorldPosFromMapPos`, as `Q.Toward`
+counts them); another continent a fixed 10000 yards (a boat, a zeppelin or a portal, and the wait).
+A map the game gives no world position for (an instance's): its own size (`C_Map.GetMapWorldSize`,
+else 3000 x 2000 yards) on the same map, a fixed 5000 yards to any other. Flight paths aren't
+counted: `Data/FlightPaths.lua` has the paths' lengths between taxi nodes but not where the flight
+masters stand, and which ones I know is only seen at a flight master's map.
+
+**How:** precedence-feasible nearest neighbour from `here` (each stop's spot nearest the last;
+ties: the plan's order), or the given order when it keeps the constraints and is as short (a good
+order stays as it is); then rounds of local improvement: 2-opt (a stretch reversed, only when no
+constraint lies inside it) and or-opt (one to three stops moved elsewhere, within the window their
+constraints leave, tried right after one of the head's 8 nearest stops, right before one of the
+tail's, or first), each move saving at least half a yard; between rounds each stop's spot is
+picked best for the order (a Viterbi pass over the candidates: exact for that order), until a
+round saves nothing (8 rounds at most). The yards between two places are counted once per call; the
+table of yards between the stops is made again only for stops whose spot changed. Deterministic (no randomness, ties by
+the plan's order). 80 stops with 1-3 spots each take about 75 ms in the tests' Lua VM (fengari,
+several times slower than the game's): about 10 ms in game, once per click. More than 200 stops:
+nearest neighbour and the spots only.
+
+**Tests** (`tests/lodestar_route.lua`): the yards (world, continent, maps without positions);
+nothing to do; a zig-zag order fixed (3100 -> 900 yards) and a good order kept; the constraints
+(a far giver first, a needed quest's end before the start, `"log"`, a loop in the needs); the spot
+by the route chosen; another continent visited once; done stops dropped; the same answer twice;
+80 stops in time with every constraint kept.
