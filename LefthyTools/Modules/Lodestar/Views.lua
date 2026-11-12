@@ -2283,7 +2283,7 @@ function N.StopEnter(self)
 		return
 	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetText(self.entry.n .. ". " .. Q.PlanStopText(s, true), 1, 1, 1, true)
+	GameTooltip:SetText(self.entry.n .. ". " .. Q.PlanStopText(s, true), 1, 1, 1, 1, true)
 	local zone = Q.MapName(s.spot.map)
 	if zone then
 		GameTooltip:AddLine(zone, 0.8, 0.8, 0.8)

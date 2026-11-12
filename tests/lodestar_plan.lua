@@ -486,6 +486,10 @@ do
 	local first = RowOf("s7005:start:0")
 	check(plain(first.Num:GetText()) == "1." and first.Band:IsShown() and plain(first.Text:GetText()) == "Pick up Hogger's Lair at Marshal Dughan",
 		"numbered, the next one marked")
+	first._scripts.OnEnter(first)
+	check(plain(TOOLTIP.title) == "1. Pick up Hogger's Lair at Marshal Dughan" and tipHas("Next") and tipHas("Alt-click: remove from plan"),
+		"a stop's tooltip: what it is, the next one, the clicks")
+	first._scripts.OnLeave(first)
 	local turnin = RowOf("s7004:end:0")
 	check(plain(turnin.Text:GetText()) == "Turn in at Gryan Stoutmantle · [12] A Dusty Letter" and plain(turnin.Right:GetText()) == "Westfall",
 		"a turn-in: where, which quest, its zone")

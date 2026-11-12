@@ -1044,7 +1044,7 @@ function PL.MarkEnter(self)
 		return
 	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-	GameTooltip:SetText(e.n .. ". " .. Q.PlanStopText(e.stop, true), 1, 1, 1, true)
+	GameTooltip:SetText(e.n .. ". " .. Q.PlanStopText(e.stop, true), 1, 1, 1, 1, true)
 	if e.next then
 		GameTooltip:AddLine(L["Next"], 1, 0.82, 0)
 	end

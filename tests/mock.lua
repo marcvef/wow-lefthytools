@@ -1564,7 +1564,12 @@ end
 TOOLTIP = { lines = {} }
 GameTooltip = {
 	SetOwner = function(_, owner) TOOLTIP = { lines = {}, owner = owner } end,
-	SetText = function(_, text, r, g, b) TOOLTIP.title, TOOLTIP.color = text, { r, g, b } end,
+	SetText = function(_, text, r, g, b, a) -- (like the game: the colour and alpha numbers or nothing; wrap after alpha)
+		for i, v in ipairs({ r or 0, g or 0, b or 0, a or 0 }) do
+			if type(v) ~= "number" then error("bad argument #" .. (i + 1) .. " to 'SetText'", 2) end
+		end
+		TOOLTIP.title, TOOLTIP.color = text, { r, g, b }
+	end,
 	AddLine = function(_, text) TOOLTIP.lines[#TOOLTIP.lines + 1] = text end,
 	AddDoubleLine = function(_, left, right) TOOLTIP.lines[#TOOLTIP.lines + 1] = left .. "  " .. right end,
 	Show = function() TOOLTIP.shown = true end,
