@@ -22,8 +22,10 @@ button that puts it back to its default; each module's page can be reset at its 
 Settings an update adds say **New** until you've opened their page. Settings are the same for all
 your characters.
 
-- **LefthyTools** (overview): a switch for each module, and an **Info** section with your
-  version, whether a newer one is out, and LefthyTools errors. LefthyTools can't go online
+- **LefthyTools** (overview): a switch for each module, **General** with *Combine minimap buttons*
+  (on: one LefthyTools button on the minimap's edge, a click lists the modules' buttons with their
+  names, right-click opens the settings; off: each module's button on the edge as before), and an
+  **Info** section with your version, whether a newer one is out, and LefthyTools errors. LefthyTools can't go online
   itself, so it knows about updates from Battle.net friends who run it (Beacon).
 - One page per module below it, e.g. **LefthyTools → Mirage**.
 

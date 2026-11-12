@@ -436,7 +436,7 @@ local function UpdateButton()
 	local show = M.enabled and M.db.minimapButton and Minimap ~= nil
 	if show and not button then
 		button = LT.Window.MinimapButton("LefthyToolsBestiaryMinimapButton", { icon = BUTTON_ICON, db = M.db,
-			angleKey = "minimapAngle", angle = 150, onClick = ButtonOnClick, onEnter = ButtonOnEnter })
+			angleKey = "minimapAngle", angle = 150, label = "Bestiary", onClick = ButtonOnClick, onEnter = ButtonOnEnter })
 		-- The window is open: a small gold dot.
 		button.Open = button:CreateTexture(nil, "OVERLAY", nil, 2)
 		button.Open:SetSize(7, 7)

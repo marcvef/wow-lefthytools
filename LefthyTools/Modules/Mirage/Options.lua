@@ -58,7 +58,7 @@ function M:UpdateButton()
 	local show = self.enabled and self.db.minimapButton and Minimap ~= nil
 	if show and not button then
 		button = LT.Window.MinimapButton("LefthyToolsMirageMinimapButton", { icon = ICON, db = self.db,
-			angleKey = "minimapAngle", angle = 185, onClick = ButtonOnClick, onEnter = ButtonOnEnter })
+			angleKey = "minimapAngle", angle = 185, label = "Mirage", onClick = ButtonOnClick, onEnter = ButtonOnEnter })
 		button.Pause = button:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmallOutline")
 		button.Pause:SetPoint("CENTER", button.Icon, "CENTER", 0, 0)
 		button.Pause:SetText("II")

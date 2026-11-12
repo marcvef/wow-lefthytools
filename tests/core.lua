@@ -410,4 +410,59 @@ do -- Which client this is (LT.WhichWorld): the release starts fresh, also from 
 	check(not LT.BeforeLaunch("2030-05-09"), "nor when it isn't known which client this is")
 	LT.world, LT.LAUNCH_DAY = was, launch
 end
+section("minimap buttons combined")
+do
+	-- (helpers.lua switches it off for the modules' own tests; on by default)
+	local Dock = LT.Window.Dock
+	local setting = REGISTERED_SETTINGS["LefthyTools_minimapCombined"]
+	check(setting and setting.default == true and HEADERS and table.concat(HEADERS, "|"):find("General", 1, true), "a setting in the overview's General, on by default")
+	setting:SetValue(true)
+	local shown = {}
+	for _, b in ipairs(Dock.buttons) do
+		if b:IsShown() then shown[#shown + 1] = b end
+	end
+	local main, list = Dock.main, Dock.list
+	check(#shown >= 1 and main and main:IsShown() and not list:IsShown(), "one LefthyTools button on the edge, its list closed, got " .. #shown .. " buttons")
+	local allIn = true
+	for _, b in ipairs(shown) do
+		allIn = allIn and b.docked and b:GetParent() ~= Minimap and b:GetParent():GetParent() == list and b._dragButtons and #b._dragButtons == 0
+	end
+	check(allIn, "the modules' buttons in its list, not dragged along the edge there")
+	main:Click()
+	local labels = {}
+	for _, row in ipairs(Dock.rows) do
+		if row:IsShown() then labels[#labels + 1] = row.Text:GetText() end
+	end
+	local sorted = #labels == #shown
+	for i = 2, #labels do sorted = sorted and labels[i - 1] <= labels[i] end
+	check(list:IsShown() and sorted and LT.Window.PopupOpenIn(Minimap), "a click: the list, a row per button by name (Mirage keeps the minimap in view), got " .. table.concat(labels, ", "))
+	-- A row: a click on it is a click on its button; hovering it its tooltip.
+	local row, b = Dock.rows[1], Dock.rows[1].button
+	local clickWas, got = b:GetScript("OnClick"), nil
+	b:SetScript("OnClick", function(_, mouseButton) got = mouseButton end)
+	row:Click("RightButton")
+	check(got == "RightButton" and list:IsShown(), "a row clicked: its button's click (right-click too), the list stays open")
+	b:SetScript("OnClick", clickWas)
+	-- A module hiding its button: not in the list; back: there again.
+	b:Hide()
+	local n = 0
+	for _, r in ipairs(Dock.rows) do if r:IsShown() then n = n + 1 end end
+	check(n == #shown - 1, "a module hiding its button: gone from the list")
+	b:Show()
+	b:Place()
+	n = 0
+	for _, r in ipairs(Dock.rows) do if r:IsShown() then n = n + 1 end end
+	check(n == #shown and b.docked, "shown again: back in it")
+	-- A click elsewhere closes the list.
+	list:GetScript("OnEvent")(list, "GLOBAL_MOUSE_DOWN")
+	check(not list:IsShown(), "a click elsewhere: closed")
+	-- Off: every button back on the edge, the LefthyTools button gone.
+	setting:SetValue(false)
+	local back = true
+	for _, x in ipairs(shown) do
+		back = back and not x.docked and x:GetParent() == Minimap and x._dragButtons[1] == "LeftButton"
+	end
+	check(back and not main:IsShown(), "off: each on the edge again, draggable, no LefthyTools button")
+end
+
 if LefthyToolsSettingsFrame then LefthyToolsSettingsFrame:Hide() end -- (mirage.lua watches the interface fade)

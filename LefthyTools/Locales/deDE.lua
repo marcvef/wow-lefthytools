@@ -51,6 +51,10 @@ L["What's new in LefthyTools"] = "Neu in LefthyTools"
 L["All changes"] = "Alle Änderungen"
 L["You have LefthyTools %s."] = "Du hast LefthyTools %s."
 L["General"] = "Allgemein"
+L["Click: your minimap buttons"] = "Klick: deine Minimap-Buttons"
+L["Drag: move it along the edge"] = "Ziehen: am Rand verschieben"
+L["Combine minimap buttons"] = "Minimap-Buttons zusammenfassen"
+L["One LefthyTools button on the minimap's edge instead of one per module: a click opens a list with the modules' buttons. Off: each module's button on the edge as before."] = "Ein LefthyTools-Button am Rand der Minimap statt einem pro Modul: ein Klick öffnet eine Liste mit den Buttons der Module. Aus: der Button jedes Moduls wie bisher am Rand."
 
 -- How long ago something was (Core: Chronicle, the Bestiary's ledger)
 L["just now"] = "gerade eben"

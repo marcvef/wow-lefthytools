@@ -374,7 +374,15 @@ second (UTC), worked out once, so it's cheap for every record.
   map route alone); `LT.CreatureOf(guid)` (a creature's ID from its GUID); versions (`LT.ParseVersion`, `LT.CompareVersions`). UI building blocks
   are in `Core/Window.lua` (`LT.Window`), with `LT.Window.OpenCount()`: how many windows are open
   (Blizzard's panels, the bags, Mirage's window lists with ours), for Mirage, the AFK screen and
-  flights.
+  flights. `LT.Window.MinimapButton(name, options)` makes a module's button on the minimap's edge
+  (`options.label`: its name); with `LT.db.minimapCombined` (on by default, the overview's
+  **General**) `LT.Window.Dock` moves every such button into the list of one LefthyTools button
+  (`LefthyToolsMinimapButton`, its angle `LT.db.minimapAngle`): rows of the module's own button and
+  its name (a click on the row is the button's click, hovering it its tooltip), by name, only the
+  buttons the modules show (their own settings), no LefthyTools button when none is; the list is
+  an open list for `Window.PopupOpenIn` (Mirage keeps the minimap in view) and closes on a click
+  elsewhere. A docked button's `Place()` lays the list again instead; off, each goes back on the
+  edge, draggable. The tests run the modules with it off (helpers.lua), core.lua checks the list.
 
 ## Settings window
 

@@ -312,6 +312,17 @@ local function BuildOverview(page)
 		m.enabledSetting = setting
 	end
 
+	Options.headers[#Options.headers + 1] = L["General"]
+	Row({ kind = "header", name = L["General"] })
+	local combineTip = L["One LefthyTools button on the minimap's edge instead of one per module: a click opens a list with the modules' buttons. Off: each module's button on the edge as before."]
+	local combine = NewSetting("LefthyTools_minimapCombined", L["Combine minimap buttons"], combineTip,
+		function() return LT.db.minimapCombined ~= false end, function(value) LT.db.minimapCombined = value end)
+	combine.default = true
+	combine:SetValueChangedCallback(function()
+		LT.Window.Dock.Lay()
+	end)
+	Row({ kind = "checkbox", name = L["Combine minimap buttons"], tooltip = combineTip, setting = combine })
+
 	Options.headers[#Options.headers + 1] = L["Info"]
 	Row({ kind = "header", name = L["Info"] })
 	Row({ kind = "info", name = L["Version"],

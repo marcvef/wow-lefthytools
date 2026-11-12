@@ -1,5 +1,6 @@
 local _, ns = ...
 local LT = ns.LT
+local L = ns.L
 
 -- LT.Window: the interface pieces every module builds with.
 --   * Windows (error report, what's new, Chronicle): Create, AddScroll, AddText, AddCopyBox,
@@ -354,8 +355,9 @@ end
 -- A round button on the minimap's edge in the usual addon look (tracking border, dark background,
 -- an icon), a child of the Minimap (it hides and fades with it). Dragging moves it along the edge;
 -- the angle (degrees, 0 = right, counter-clockwise) is kept in db[angleKey]. options = { icon,
--- db, angleKey, angle (default), onClick(self, mouseButton), onEnter(self) }. An OnUpdate runs
--- only while dragging. button:Place() puts it where its angle says (square minimaps: on the edge).
+-- db, angleKey, angle (default), label (its name in the combined list), onClick(self, mouseButton),
+-- onEnter(self) }. An OnUpdate runs only while dragging. button:Place() puts it where its angle says
+-- (square minimaps: on the edge; combined: in the LefthyTools button's list, Dock).
 local atan2 = math.atan2 or math.atan -- WoW's Lua 5.1 / the tests' Lua 5.3
 
 function Window.MinimapButton(name, options)
@@ -380,7 +382,12 @@ function Window.MinimapButton(name, options)
 	border:SetSize(53, 53)
 	border:SetPoint("TOPLEFT")
 
+	button.label = options.label
 	function button:Place()
+		if not options.main and Window.Dock.On() then
+			Window.Dock.Lay() -- (combined: in the LefthyTools button's list)
+			return
+		end
 		local angle = math.rad(options.db[options.angleKey] or options.angle or 210)
 		local x, y = math.cos(angle), math.sin(angle)
 		if GetMinimapShape and GetMinimapShape() == "SQUARE" then
@@ -424,7 +431,218 @@ function Window.MinimapButton(name, options)
 	end
 	button:SetScript("OnDragStop", StopDrag)
 	button:SetScript("OnHide", StopDrag) -- hidden mid-drag (Mirage, the minimap key): no OnDragStop may come
+	if not options.main then
+		Window.Dock.Add(button)
+	end
 	return button
+end
+
+---------------------------------------------------------------------------
+-- Minimap buttons combined (LT.db.minimapCombined, on by default; the settings' overview): one
+-- LefthyTools button on the minimap's edge, a click opens a small list beside it with every module's
+-- button and its name: the module's own button, moved into the list (its clicks, tooltip and dots as
+-- they are; a click on its name is a click on it). Off: each on the edge where it was. A module still
+-- decides whether its button is there (its own setting): one it hides isn't in the list either; none
+-- left: no LefthyTools button. While the list is open it counts as an open list (Window.PopupOpenIn:
+-- Mirage keeps the minimap in view). A click anywhere else closes it (GLOBAL_MOUSE_DOWN, only while
+-- open).
+---------------------------------------------------------------------------
+
+local Dock = { buttons = {}, rows = {} }
+Window.Dock = Dock
+local DOCK_ROW, DOCK_W = 32, 150
+
+function Dock.On()
+	return LT.db ~= nil and LT.db.minimapCombined ~= false
+end
+
+-- The LefthyTools button and its list, made the first time they're needed.
+function Dock.Main()
+	if Dock.main then
+		return Dock.main
+	end
+	local main = Window.MinimapButton("LefthyToolsMinimapButton", { icon = "Interface\\Icons\\INV_Misc_Wrench_01", db = LT.db,
+		angleKey = "minimapAngle", angle = 200, main = true,
+		onClick = function(_, mouseButton)
+			if mouseButton == "RightButton" then
+				Dock.list:Hide()
+				LT:OpenSettings()
+			elseif Dock.list:IsShown() then
+				Dock.list:Hide()
+			else
+				Dock.list:Show()
+			end
+		end,
+		onEnter = function(self)
+			if Dock.list:IsShown() then
+				return
+			end
+			GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+			GameTooltip:SetText("LefthyTools", 1, 0.82, 0)
+			GameTooltip:AddLine(L["Click: your minimap buttons"], 0.5, 0.75, 1)
+			GameTooltip:AddLine(L["Right-click: settings"], 0.5, 0.75, 1)
+			GameTooltip:AddLine(L["Drag: move it along the edge"], 0.5, 0.75, 1)
+			GameTooltip:Show()
+		end })
+	local list = CreateFrame("Frame", nil, main)
+	list:SetFrameStrata("HIGH")
+	list:SetWidth(DOCK_W)
+	list:EnableMouse(true)
+	list:Hide()
+	Window.Dress(list)
+	list:SetScript("OnShow", function(self)
+		self:RegisterEvent("GLOBAL_MOUSE_DOWN")
+		openLists[self] = true
+		Dock.Lay() -- (a button a module showed or hid while the list was closed)
+		Dock.Place()
+	end)
+	list:SetScript("OnHide", function(self)
+		self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
+		openLists[self] = nil
+	end)
+	list:SetScript("OnEvent", function(self)
+		if self:IsMouseOver() or main:IsMouseOver() then
+			return
+		end
+		for open in pairs(openLists) do
+			if open ~= self and open:IsMouseOver() then
+				return -- (a button's own list, the fight stream's: a click in it)
+			end
+		end
+		self:Hide()
+	end)
+	Dock.main, Dock.list = main, list
+	return main
+end
+
+-- The list beside the LefthyTools button, toward the screen's middle.
+function Dock.Place()
+	local main, list = Dock.main, Dock.list
+	local x = main:GetCenter()
+	local right = x and UIParent:GetWidth() and x > UIParent:GetWidth() / 2
+	list:ClearAllPoints()
+	if right then
+		list:SetPoint("TOPRIGHT", main, "BOTTOMLEFT", 8, 4)
+	else
+		list:SetPoint("TOPLEFT", main, "BOTTOMRIGHT", -8, 4)
+	end
+end
+
+-- A row of the list: the module's button at its left, its name; the row is a Button (the controller
+-- reaches it), a click on it a click on the button, hovering it the button's tooltip.
+function Dock.Row(i)
+	local row = Dock.rows[i]
+	if not row then
+		row = CreateFrame("Button", nil, Dock.list)
+		row:SetSize(DOCK_W - 8, DOCK_ROW)
+		row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		row.Text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+		row.Text:SetPoint("LEFT", 36, 0)
+		row.Text:SetPoint("RIGHT", -4, 0)
+		row.Text:SetJustifyH("LEFT")
+		row:SetScript("OnClick", function(self, mouseButton)
+			local b = self.button
+			local click = b and b:GetScript("OnClick")
+			if click then
+				click(b, mouseButton)
+			end
+		end)
+		row:SetScript("OnEnter", function(self)
+			local enter = self.button and self.button:GetScript("OnEnter")
+			if enter then
+				enter(self.button)
+			end
+		end)
+		row:SetScript("OnLeave", function(self)
+			local leave = self.button and self.button:GetScript("OnLeave")
+			if leave then
+				leave(self.button)
+			end
+		end)
+		Dock.rows[i] = row
+	end
+	return row
+end
+
+-- The buttons the modules want (shown), by name, into the list's rows; the LefthyTools button there
+-- when any is. Off: every button back on the edge.
+function Dock.Lay()
+	if Dock.laying then
+		return
+	end
+	Dock.laying = true
+	if not Dock.On() then
+		for _, b in ipairs(Dock.buttons) do
+			if b.docked then
+				b.docked = nil
+				b:SetParent(Minimap)
+				b:SetFrameStrata("MEDIUM")
+				b:SetFrameLevel(8)
+				b:RegisterForDrag("LeftButton")
+				b:Place()
+			end
+		end
+		if Dock.main then
+			Dock.list:Hide()
+			Dock.main:Hide()
+		end
+		Dock.laying = nil
+		return
+	end
+	Dock.Main()
+	local wanted = {}
+	for _, b in ipairs(Dock.buttons) do
+		if b:IsShown() then
+			wanted[#wanted + 1] = b
+		end
+	end
+	table.sort(wanted, function(a, b) return (a.label or "") < (b.label or "") end)
+	for i, b in ipairs(wanted) do
+		local row = Dock.Row(i)
+		row.button = b
+		row.Text:SetText(b.label or "")
+		row:ClearAllPoints()
+		row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * DOCK_ROW)
+		row:Show()
+		b.docked = true
+		b:SetParent(row)
+		b:SetFrameStrata("HIGH")
+		b:SetFrameLevel(row:GetFrameLevel() + 2)
+		b:RegisterForDrag() -- (in the list: not dragged along the edge)
+		b:ClearAllPoints()
+		b:SetPoint("LEFT", row, "LEFT", 0, 0)
+	end
+	for i = #wanted + 1, #Dock.rows do
+		Dock.rows[i].button = nil
+		Dock.rows[i]:Hide()
+	end
+	Dock.list:SetHeight(#wanted * DOCK_ROW + 8)
+	Dock.main:SetShown(wanted[1] ~= nil)
+	if wanted[1] then
+		Dock.main:Place()
+	else
+		Dock.list:Hide()
+	end
+	Dock.laying = nil
+end
+
+-- A module's button made (Window.MinimapButton): listed, and in the list when combined.
+function Dock.Add(button)
+	Dock.buttons[#Dock.buttons + 1] = button
+	button:HookScript("OnShow", function()
+		if Dock.On() then
+			Dock.Lay()
+		end
+	end)
+	button:HookScript("OnHide", function(self)
+		if Dock.On() and self.docked and not self:IsShown() then -- (its own hide, not the list's)
+			Dock.Lay()
+		end
+	end)
+	if Dock.On() then
+		Dock.Lay()
+	end
 end
 
 ---------------------------------------------------------------------------

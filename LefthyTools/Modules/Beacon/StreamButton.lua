@@ -114,7 +114,7 @@ end
 
 local function Create()
 	button = LT.Window.MinimapButton("LefthyToolsStreamMinimapButton", { icon = ICON, db = M.db,
-		angleKey = "streamButtonAngle", angle = 235, onClick = OnClick, onEnter = OnEnter })
+		angleKey = "streamButtonAngle", angle = 235, label = L["Fight stream"], onClick = OnClick, onEnter = OnEnter })
 	button.Live = button:CreateTexture(nil, "OVERLAY", nil, 2)
 	button.Live:SetSize(8, 8)
 	button.Live:SetPoint("TOPRIGHT", -5, -4)

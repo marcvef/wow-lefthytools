@@ -563,5 +563,8 @@ ns.CHANGELOG = {
 	{ id = 185, module = "lodestar",
 		en = { "Lodestar: objective areas you can see", "The companion's small map fills each objective area in gold under its glow, as the big map does: on light ground the areas were all but invisible." },
 		de = { "Lodestar: sichtbare Zielgebiete", "Die kleine Karte des Begleiters füllt jedes Zielgebiet golden unter seinem Schein, wie die große Karte: auf hellem Boden waren die Gebiete kaum zu sehen." } },
+	{ id = 186, module = "general",
+		en = { "One minimap button for LefthyTools", "The modules' minimap buttons are combined into one LefthyTools button: a click opens a list with each module's button and its name (they work as before), right-click opens the settings. Settings, General: Combine minimap buttons (on by default) puts them back on the edge one by one." },
+		de = { "Ein Minimap-Button für LefthyTools", "Die Minimap-Buttons der Module sind in einem LefthyTools-Button zusammengefasst: ein Klick öffnet eine Liste mit dem Button jedes Moduls und seinem Namen (sie funktionieren wie bisher), Rechtsklick öffnet die Einstellungen. Einstellungen, Allgemein: Minimap-Buttons zusammenfassen (standardmäßig an) stellt sie wieder einzeln an den Rand." } },
 	-- New entries go here, at the end.
 }

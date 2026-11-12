@@ -41,7 +41,7 @@ function C.UpdateMinimapButton()
 	local show = M.enabled and M.db.minimapButton and Minimap ~= nil
 	if show and not button then
 		button = LT.Window.MinimapButton("LefthyToolsChronicleMinimapButton", { icon = ICON, db = M.db,
-			angleKey = "minimapAngle", angle = 210, onClick = OnClick, onEnter = OnEnter })
+			angleKey = "minimapAngle", angle = 210, label = "Chronicle", onClick = OnClick, onEnter = OnEnter })
 		-- New from friends since the journal was last open: a small blue dot.
 		button.New = button:CreateTexture(nil, "OVERLAY", nil, 2)
 		button.New:SetSize(8, 8)

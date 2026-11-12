@@ -782,7 +782,7 @@ local function UpdateMinimapButton()
 	local show = M.enabled and M.db and M.db.minimapButton and Minimap ~= nil
 	if show and not minimapButton then
 		minimapButton = LT.Window.MinimapButton("LefthyToolsLodestarMinimapButton", { icon = MINIMAP_ICON, db = M.db,
-			angleKey = "minimapAngle", angle = 125, onClick = MinimapClick, onEnter = MinimapEnter })
+			angleKey = "minimapAngle", angle = 125, label = "Lodestar", onClick = MinimapClick, onEnter = MinimapEnter })
 	end
 	if minimapButton then
 		minimapButton:SetShown(show and true or false)

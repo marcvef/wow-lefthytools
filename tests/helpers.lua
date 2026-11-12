@@ -22,6 +22,7 @@ for _, file in ipairs(SOURCES) do
 	chunk("LefthyTools", ns)
 end
 Fire("ADDON_LOADED", "LefthyTools")
+LefthyTools.db.minimapCombined = false -- (the modules' tests check their own buttons on the edge; core.lua the combined list)
 Fire("PLAYER_LOGIN")
 Fire("PLAYER_ENTERING_WORLD", true, false)
 Advance(0.3) -- let the debounced rebuild run
