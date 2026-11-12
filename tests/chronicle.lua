@@ -849,6 +849,21 @@ do
 	check(CDB.book[annaAcct].chars["Annalt-Realmy"] and not drawn("Annalt") and drawnTimes("Carl|r") - tags == 1
 		and drawnTimes("Carlbank|r") == 1 and tags == 2,
 		"a row per character, its BattleTag beside it: Anna is online, so her other character isn't under not online; Carl's two are, his BattleTag on each")
+	-- Not online: the highest level first, then by name.
+	local rows = {}
+	for i = 1, canvas.used.hover do
+		local f = canvas.pools.hover[i]
+		local level = f.lines and table.concat(f.lines, "\n"):match("\nLevel (%d+)")
+		if level and f.lines[1] then
+			rows[#rows + 1] = { level = tonumber(level), name = f.lines[1]:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):lower() }
+		end
+	end
+	local ordered = #rows >= 2
+	for i = 2, #rows do
+		local a, b = rows[i - 1], rows[i]
+		ordered = ordered and (a.level > b.level or (a.level == b.level and a.name <= b.name))
+	end
+	check(ordered, "not online: the highest level first, then by name, got " .. #rows .. " rows")
 	CDB.book[annaAcct].chars["Annalt-Realmy"] = nil
 	local carlRow, annaRow
 	for i = 1, canvas.used.hover do

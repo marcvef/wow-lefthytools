@@ -554,5 +554,8 @@ ns.CHANGELOG = {
 	{ id = 182, module = "lodestar",
 		en = { "Lodestar: the map's ! by difficulty", "On the big map every ! to pick up has its difficulty's colour, as the levels in the lists: green easy, yellow right for you, orange hard, red far too hard (grey ones were grey already). A yellow ! no longer hides a quest far above you." },
 		de = { "Lodestar: ! der Karte nach Schwierigkeit", "Auf der großen Karte hat jedes ! zum Annehmen die Farbe seiner Schwierigkeit, wie die Level in den Listen: grün leicht, gelb passend für dich, orange schwer, rot viel zu schwer (graue waren schon grau). Ein gelbes ! versteckt keine Quest mehr, die weit über dir liegt." } },
+	{ id = 183, module = "chronicle",
+		en = { "Chronicle: friends by level", "The Friends page lists who's online and who isn't by level, the highest first, and by name where the level is the same." },
+		de = { "Chronicle: Freunde nach Level", "Die Seite Freunde listet, wer online ist und wer nicht, nach Level, das höchste zuerst, und bei gleichem Level nach Namen." } },
 	-- New entries go here, at the end.
 }

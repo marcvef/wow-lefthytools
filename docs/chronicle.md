@@ -221,14 +221,14 @@ the open one's button greyed out:
   header row, a row per entry with faint alternate stripes; a cell is text, cut to its width, or an
   icon and text; a row's hover shows all of it, a click opens their account's graphs through
   `Select` when it has any). A row per character, by its full name, its account's BattleTag in a
-  column of its own. **Online now**: Beacon's friends (`B.FriendList`, `B.FriendStatus` in
+  column of its own. Both tables: the highest level first, then by name (A to Z, any case; no level
+  last; `ByLevel`). **Online now**: Beacon's friends (`B.FriendList`, `B.FriendStatus` in
   Alerts.lua): Name (class colour, <AFK>), Level (and progress), BattleTag (`C.PeerChar`: their
   account from Battle.net), Where (zone - subzone, distance), Doing (dead or fighting, else the
   quest they track, else "In your group"); the hover is `B.FriendLines` (the AFK screen's lines)
   plus the BattleTag and that character's latest highlight. Beacon off or nobody online: a line
   says so. **Not online**: a row per friend's character (`C.Characters()`) whose account has none
-  online (someone playing one character isn't listed again with the others), most recently played
-  first: Name, Level, BattleTag, Last played ("3 h ago"), This week (its time played in 7 days),
+  online (someone playing one character isn't listed again with the others): Name, Level, BattleTag, Last played ("3 h ago"), This week (its time played in 7 days),
   Latest news (icon, text, how long ago); the hover adds the realm, the account's characters with
   their levels (up to three on one line; more one per line, the most played first, at most 10 and
   "... and N more": one line of them made the tooltip very wide) and the highlight's date. The corners count friends online and characters not

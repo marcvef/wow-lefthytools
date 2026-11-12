@@ -300,6 +300,19 @@ local function LatestCell(f)
 		Icon(e) .. " " .. text .. "  |cff888888" .. date(L["%Y-%m-%d"], f.t) .. "|r"
 end
 
+-- Both tables' order: the highest level first, then by name (A to Z, any case); no level last.
+local function ByLevel(a, b)
+	local la, lb = tonumber(a.level) or -1, tonumber(b.level) or -1
+	if la ~= lb then
+		return la > lb
+	end
+	local na, nb = (a.name or ""):lower(), (b.name or ""):lower()
+	if na ~= nb then
+		return na < nb
+	end
+	return (a.key or "") < (b.key or "")
+end
+
 local function FriendTables(open)
 	local accounts = {}
 	for _, account in ipairs(C.Accounts()) do
@@ -348,8 +361,10 @@ local function FriendTables(open)
 			tip[#tip + 1] = "|cff80c0ff" .. L["Click: their graphs"] .. "|r"
 		end
 		online[#online + 1] = { cells = { status.name, status.level or DASH, Tag(acct) or DASH, status.where, status.doing or DASH },
-			tip = tip, click = click }
+			tip = tip, click = click, level = tonumber(friend.peer.level or journalLevel[key]),
+			name = friend.peer.name or (status.name or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") }
 	end
+	table.sort(online, ByLevel)
 
 	-- Not online.
 	local away = {}
@@ -358,7 +373,7 @@ local function FriendTables(open)
 			away[#away + 1] = c
 		end
 	end
-	table.sort(away, function(a, b) return (a.last or 0) > (b.last or 0) or ((a.last or 0) == (b.last or 0) and a.key < b.key) end)
+	table.sort(away, ByLevel)
 	local awayRows = {}
 	for _, c in ipairs(away) do
 		local week = C.Sum(c, "played", 7)
