@@ -2358,6 +2358,76 @@ do
 	plans = st.plans
 	view.filters.planMap:Click()
 	check(filters.planMap and shownMarkers() == "3 5" and st.plans == plans, "on again: there")
+	-- What the numbers are: each marker says its kind ("?" a turn-in, a dot an objective), the line under
+	-- the map says what they are.
+	check(m.planMarkers[1].Kind.path == "Interface\\GossipFrame\\ActiveQuestIcon" and m.planMarkers[2].Kind.path == "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+		and plain(view.zp.Hint:GetText()):find("^Teal numbers: your plan"), "a marker's kind on it, the line under the map says what they are")
+	-- The plan on the right: the switch over the pane, every stop numbered as on the map (done ones ticked).
+	for i = #plan, 1, -1 do plan[i] = nil end
+	plan[1], plan[2], plan[3] = 104, 201, 103
+	rev = rev + 1
+	Q.PlanMove = function(id, to)
+		for i, x in ipairs(plan) do if x == id then table.remove(plan, i) break end end
+		table.insert(plan, math.min(to, #plan + 1), id)
+		rev = rev + 1
+		return true
+	end
+	Fire("QUEST_LOG_UPDATE")
+	Wait(1.1)
+	local sw, p = view.sideSwitch, view.p
+	check(sw:IsShown() and sw.info.on and not sw.plan.on and plain(sw.plan.Count:GetText()) == "3 to go" and not p.Scroll:IsShown(),
+		"the switch over the right pane: Plan, its stops to go")
+	sw.plan:Click()
+	check(st.side == "plan" and sw.plan.on and p.Scroll:IsShown() and not view.b.Scroll:IsShown() and not view.d.Panel:IsShown(), "clicked: the plan on the right")
+	local function nums()
+		local out = {}
+		for _, r in ipairs(p.stops) do if r:IsShown() then out[#out + 1] = plain(r.Num:GetText()) end end
+		return table.concat(out, " ")
+	end
+	check(nums() == "1. 2. 3. 4. 5." and plain(p.quests[1].Text:GetText()):find("^1%. %[%d+%] Brotherhood of Thieves") and p.quests[3]:IsShown()
+		and plain(p.Sub:GetText()) == "3 quests · 5 stops · 3 to go", "every stop numbered as on the map, under its quest, got " .. nums())
+	local done, nextRow = p.stops[1], p.stops[3]
+	check(done.Kind.path == "Interface\\RaidFrame\\ReadyCheck-Ready" and plain(done.Text:GetText()):find("Marshal Dughan") and not done.Band:IsShown()
+		and nextRow.Band:IsShown() and nextRow.Kind.path == "Interface\\GossipFrame\\ActiveQuestIcon" and p.stops[4].Kind.path == "Interface\\GossipFrame\\AvailableQuestIcon",
+		"done ones ticked, the next one on a band, each with its kind")
+	-- Hovering a stop lights its number on the map; a click goes there, the pane stays.
+	nextRow._scripts.OnEnter(nextRow)
+	check(m.planMarkers[1]._lit and not m.planMarkers[2]._lit and TOOLTIP.title == "3. Turn in Brotherhood of Thieves · Deputy Willem"
+		and table.concat(TOOLTIP.lines, "|"):find("Click: there on the map", 1, true), "hovered: its number on the map lit, its tooltip")
+	nextRow._scripts.OnLeave(nextRow)
+	check(not m.planMarkers[1]._lit, "left: not lit")
+	done._scripts.OnEnter(done)
+	check(table.concat(TOOLTIP.lines, "|"):find("Done: not on the map anymore", 1, true), "a done one says why it isn't on the map")
+	done._scripts.OnLeave(done)
+	nextRow:Click()
+	check(st.picked == 104 and st.side == "plan" and p.Scroll:IsShown() and st.planLit == stops[3] and nextRow.Band:IsShown() and m.Flash:IsShown(),
+		"clicked: there on the map, its quest picked, the pane stays, the stop lit")
+	m.planMarkers[2]:Click()
+	check(st.picked == 103 and st.side == "plan" and st.planLit == stops[5], "a number on the map clicked: the pane stays, that stop lit")
+	STATE.ctrl = true
+	p.stops[4]:Click()
+	STATE.ctrl = false
+	check(st.picked == 201 and st.side == nil and view.d.Panel:IsShown() and not p.Scroll:IsShown() and sw.info.on and plain(sw.info.Text:GetText()) == "Quest",
+		"Ctrl-click: its quest's details, the switch on Quest")
+	sw.plan:Click()
+	-- A quest's row dragged: moved in my order.
+	p.Scroll.GetTop = function() return 500 end
+	local row3 = p.quests[3]
+	row3._scripts.OnDragStart(row3)
+	CURSOR.y = 500 - (p.quests[1].entry.y + 2)
+	p.Dragger._scripts.OnUpdate(p.Dragger, 0)
+	check(p.DropLine:IsShown() and row3._alpha == 0.4, "dragged: dim, the line where it lands")
+	row3._scripts.OnDragStop(row3)
+	check(table.concat(plan, ",") == "103,104,201" and not p.DropLine:IsShown() and plain(p.quests[1].Text:GetText()):find("^1%. %[%d+%] ") and p.quests[1].entry.id == 103,
+		"let go at the top: first in my order, drawn again: " .. table.concat(plan, ","))
+	-- A quest picked elsewhere (a pin on the map): its details again.
+	local pin = marker("Marshal Dughan")
+	pin:Click()
+	if view.zp.map.chooser then view.zp.map.chooser:Hide() end
+	marker("drops here (12%)"):Click()
+	check(st.side == nil and view.d.Panel:IsShown() and not p.Scroll:IsShown(), "a quest picked on the map: its details again")
+	unpick()
+	Q.PlanMove = nil
 	-- Without the plan: nothing, no toggle.
 	Q.PlanStops = nil
 	Q.ToggleBrowser(); Q.ToggleBrowser()

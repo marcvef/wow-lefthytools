@@ -201,6 +201,8 @@ function FrameMethods:SetSpellByID(id) self._spellID, self._hyperlink = id, nil 
 function FrameMethods:NumLines() return self._numLines or 1 end
 function FrameMethods:RegisterForClicks(...) self._clicks = { ... } end
 function FrameMethods:SetHighlightTexture(t) self._highlight = t end
+function FrameMethods:LockHighlight() self._lit = true end
+function FrameMethods:UnlockHighlight() self._lit = false end
 function FrameMethods:SetNormalTexture(t) self._normal = t end
 function FrameMethods:SetPushedTexture(t) self._pushed = t end
 function FrameMethods:SetDisabledTexture(t) self._disabled = t end

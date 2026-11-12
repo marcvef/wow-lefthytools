@@ -545,5 +545,8 @@ ns.CHANGELOG = {
 	{ id = 179, module = "lodestar",
 		en = { "Lodestar: find it on the map", "Clicking a quest in a list shows its details with the small map first; Ctrl-click or \"Show on map\" opens the big map, where its pins and areas come into view and pulse. A giver, turn-in or objective clicked in the details zooms to that spot. A + beside each quest puts it in your plan, whose stops show numbered on the map." },
 		de = { "Lodestar: auf der Karte finden", "Ein Klick auf eine Quest in einer Liste zeigt zuerst ihre Details mit der kleinen Karte; Strg-Klick oder \"Auf der Karte zeigen\" öffnet die große Karte, wo ihre Punkte und Gebiete ins Bild kommen und pulsieren. Ein Klick auf Questgeber, Abgabe oder Ziel in den Details zoomt zu dieser Stelle. Ein + neben jeder Quest setzt sie auf deinen Plan, dessen Halte nummeriert auf der Karte stehen." } },
+	{ id = 180, module = "lodestar",
+		en = { "Lodestar: your plan beside the map", "Plan above the big map's right pane lists every stop numbered as on the map, the done ones ticked: hover one to light it on the map, click to go there, drag a quest to reorder. Each number on the map shows what it is: ! pick up, ? turn in, a dot an objective, explained under the map." },
+		de = { "Lodestar: dein Plan neben der Karte", "Plan über der rechten Leiste der großen Karte listet jede Station, nummeriert wie auf der Karte, die erledigten abgehakt: Fahr über eine, um sie auf der Karte hervorzuheben, klick, um dorthin zu gehen, zieh eine Quest, um sie umzusortieren. Jede Zahl auf der Karte zeigt, was sie ist: ! annehmen, ? abgeben, ein Punkt ein Ziel, erklärt unter der Karte." } },
 	-- New entries go here, at the end.
 }

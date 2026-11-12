@@ -1512,7 +1512,26 @@ nothing of this shows):
   10 x Kobold Vermin · Wanted: Hogger", "Turn in ... · <ender>"), "Next stop" for the next; a click picks
   its quest and pulses the stop, a right-click puts the game's map pin there. Worked out (`Stops.For`) only
   when `Q.PlanRev` or the map shown changes, laid again when the map is zoomed. **Plan on map** (a filter,
-  on by default, kept as `planMap`) switches it off.
+  on by default, kept as `planMap`) switches it off. Each disc has its stop's kind at its top right
+  (`Stops.SetKind`: the game's "!" a pick-up, "?" a turn-in, a small white dot an objective), and the line
+  under the map (`zp.Hint`) says what they are while any is on it ("Teal numbers: your plan (gold: next) ·
+  ! pick up · ? turn in · dot: objective"). The numbers stay the stops' places in `Q.PlanStops`, done
+  ones counted: the map's first number can be 3 (the pane on the right shows the 1 and 2, ticked).
+- **The plan on the right** (`Stops.BuildSwitch`, `Stops.BuildPane`): over the right pane a switch of
+  two halves (`Make.NewHalf`'s look): **Quest** (nothing picked: the place's name; the details or the
+  briefing) | **Plan** with "3 to go"; only with the plan (`Q.PlanStops`). The pane is 26 px lower for
+  it. `state.side = "plan"` shows the plan instead: "Your plan", "3 quests · 7 stops · 4 to go" (a route
+  in use: "· Suggested route"), what the numbers are, the chips **Suggest a route** / **Back to my
+  order** (as the Plan tab's) and **Plan tab** (the middle's), then in my order each quest's row (a grip,
+  "1. [12] Title", remove at its right; dragged: `Q.PlanMove`, a gold line where it lands, the pane
+  scrolling near its edges; a click its details, Ctrl-click the map, a right-click its chain, Alt-click
+  out of the plan) with its stops under it, or with a route in use its stops in the route's order. A
+  stop's row: its kind (done: ticked), its number as on the map, what it is (`Q.PlanStopText`), its
+  zone; the next one on a gold band. Hovering it lights its disc on the map (`LockHighlight`, one pulse);
+  a click goes there (`Side.ShowSpot` with `how = "plan"`: the pane stays, the stop lit), Ctrl-click its
+  quest's details, a right-click or Shift-click the map pin, Alt-click its quest out of the plan. A disc
+  on the map clicked while the plan shows: it stays, that stop lit. Any other pick (a pin, a row, the
+  quest list) gives way to its details (`Pick` clears `state.side` unless `how` is "plan").
 - **When the plan changed** (`Stops.Check`: `Q.PlanRev` against the one drawn last): after a "+" clicked,
   with the quest log's updates (an objective done changes the stops), when the middle is drawn, and when
   Plan.lua tells (`Q.OnPlanChanged(fn)`, if it has it: on the next frame): the rows' "+", the right pane, a
@@ -1598,7 +1617,10 @@ area, a city's floor, another zone, no zone; the details' lines on the map page 
 a chain's cards, Ctrl-click), the plan's "+" (none without it, the rows' room, tooltips, a click, the
 details', the briefing's, drawn again only on `Q.PlanRev`, a stale one, Alt-click, a pin's list) and the
 plan on the map (numbers, the next one, the lines, toward another zone and from it, tooltips, zoomed,
-clicks, a stop done, another zone's page, the toggle, without it).
+clicks, a stop done, another zone's page, the toggle, the kinds, the line under the map, without it) and
+on the right (the switch and its count, every stop numbered with the done ones ticked, the next one, the
+kinds, hovering lights the disc, a click there with the pane staying, a disc clicked, Ctrl-click the
+details, a quest dragged, a pick elsewhere giving way).
 
 ### Open questions (in game)
 

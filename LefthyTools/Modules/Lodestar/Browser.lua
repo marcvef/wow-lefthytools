@@ -3876,6 +3876,8 @@ function Stops.Marker(m, i)
 		b.Back:SetPoint("CENTER")
 		b.Num = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 		b.Num:SetPoint("CENTER", 0, 0)
+		b.Kind = b:CreateTexture(nil, "OVERLAY") -- (what it is: "!", "?", a dot)
+		b.Kind:SetPoint("CENTER", b, "TOPRIGHT", -1, -1)
 		b:SetHighlightTexture(T.highlight, "ADD")
 		b.owner = m
 		b:SetScript("OnEnter", Stops.Enter)
@@ -3901,6 +3903,7 @@ function Stops.Enter(self)
 	if e.next then
 		GameTooltip:AddLine(L["Next stop"], 1, 0.82, 0)
 	end
+	GameTooltip:AddLine(L["The Plan on the right lists every stop, done ones too."], 0.8, 0.8, 0.8, true)
 	GameTooltip:AddLine(L["Click: its quest · Right-click: map pin"], 0.5, 0.75, 1)
 	GameTooltip:Show()
 end
@@ -3917,7 +3920,10 @@ function Stops.Click(self, button)
 		Map.PinAt(e.spot.map, e.spot.x, e.spot.y, Stops.Text(e.stop))
 		return
 	end
-	Side.Pick(e.stop.quest, true, "still")
+	if state.side == "plan" then -- (the plan on the right stays, this stop lit there)
+		state.planLit = e.stop
+	end
+	Side.Pick(e.stop.quest, true, state.side == "plan" and "plan" or "still")
 	Map.Flash(m, { { x = e.x, y = e.y, px = 12 } })
 end
 
@@ -3975,6 +3981,7 @@ function Stops.Draw(m)
 			b.Num:SetTextColor(1, 1, 1)
 		end
 		b.Num:SetText(tostring(e.n))
+		Stops.SetKind(b.Kind, e.stop.kind, 12)
 		b:ClearAllPoints()
 		b:SetPoint("CENTER", m.Map, "TOPLEFT", e.x * w - 12, -(e.y * h - 12))
 		b:Show()
@@ -4005,6 +4012,10 @@ function Stops.Draw(m)
 	for i = nLabel + 1, #m.planLabels do
 		m.planLabels[i]:Hide()
 	end
+	if m == view.zp.map then -- (the line under the map: what the numbers are)
+		view.zp.Hint:SetText(n > 0 and L["Teal numbers: your plan (gold: next) · ! pick up · ? turn in · dot: objective"]
+			or L["Wheel: zoom · drag: move · right-click a pin: map pin"])
+	end
 end
 
 -- The plan changed (Q.PlanRev; force: a "+" clicked): what shows it drawn again (the rows' "+", the
@@ -4028,6 +4039,592 @@ function Stops.Check(force)
 		Stops.Draw(m)
 	end
 	return true
+end
+
+---------------------------------------------------------------------------
+-- The plan in the right pane: a switch "Quest | Plan" over it, the plan's every stop numbered as on
+-- the map (the done ones too, ticked: why the map's first number may be 3), each quest's stops under
+-- it in my order (a quest's row dragged: moved in it) or a suggested route's stops in its order.
+-- Hovering a stop lights its number on the map, a click goes there (the pane stays).
+---------------------------------------------------------------------------
+
+Stops.KIND = { start = T.available, ["end"] = T.turnin }
+Stops.TOP, Stops.ROW_H, Stops.QUEST_H = 26, 20, 24
+Stops.DRAG_EDGE, Stops.DRAG_SPEED = 24, 300
+
+-- A stop's kind, on its number and its row: "!" pick up, "?" turn in, a small white dot an objective.
+function Stops.SetKind(tex, kind, size)
+	local file = Stops.KIND[kind]
+	tex:SetTexture(file or T.circle)
+	tex:SetVertexColor(1, 1, 1, 1)
+	tex:SetSize(file and size or math.floor(size / 2), file and size or math.floor(size / 2))
+end
+
+-- The plan's stops (nil without the plan), where the next one is, how many are left.
+function Stops.All()
+	if not Q.PlanStops then
+		return nil
+	end
+	local ok, stops = pcall(Q.PlanStops)
+	stops = ok and type(stops) == "table" and stops or EMPTY
+	local at, left = nil, 0
+	for i, s in ipairs(stops) do
+		if not s.done then
+			at, left = at or i, left + 1
+		end
+	end
+	return stops, at, left
+end
+
+-- A stop's spot (the chosen one, else its first).
+function Stops.SpotOf(stop)
+	return type(stop) == "table" and (stop.spot or (type(stop.spots) == "table" and stop.spots[1])) or nil
+end
+
+-- What a stop is, in its quest's group ("Pick up at Marshal Dughan"), else with its quest.
+function Stops.Words(stop, grouped)
+	if grouped and Q.PlanStopText then
+		local ok, text = pcall(Q.PlanStopText, stop)
+		if ok and type(text) == "string" then
+			return text
+		end
+	end
+	return Stops.Text(stop)
+end
+
+-- A small button of ours (the route, the Plan tab): a faint gold back, its text.
+function Stops.NewChip(parent, onClick)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetHeight(20)
+	b.Back = b:CreateTexture(nil, "BACKGROUND")
+	b.Back:SetAllPoints()
+	b.Back:SetColorTexture(1, 0.82, 0, 0.12)
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	b.Text:SetPoint("CENTER", 0, 0)
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b:SetScript("OnClick", function(self)
+		Untip(self)
+		onClick(self)
+	end)
+	b:SetScript("OnEnter", function(self)
+		if self.tip then
+			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+			GameTooltip:SetText(self.Text:GetText() or "", 1, 0.82, 0)
+			GameTooltip:AddLine(self.tip, 1, 1, 1, true)
+			GameTooltip:Show()
+		end
+	end)
+	b:SetScript("OnLeave", Untip)
+	return b
+end
+
+function Stops.SetChip(b, text, tip)
+	b.Text:SetText(text)
+	b.tip = tip
+	b:SetWidth(math.floor(b.Text:GetStringWidth() + 16))
+end
+
+-- The switch over the right pane: "Quest" (nothing picked: the place's name; its briefing) | "Plan"
+-- and its stops to go; the one shown lit. Only with the plan.
+function Stops.BuildSwitch(root, x, y, w)
+	local sw = CreateFrame("Frame", nil, root)
+	sw:SetPoint("TOPLEFT", x, -y)
+	sw:SetSize(w - BAR_W, Stops.TOP - 4)
+	view.sideSwitch = sw
+	sw.info, sw.plan = Make.NewHalf(sw, "info"), Make.NewHalf(sw, "plan")
+	for _, b in ipairs({ sw.info, sw.plan }) do
+		b:SetSize(math.floor((w - BAR_W) / 2), Stops.TOP - 4)
+		b:SetScript("OnEnter", Stops.SwitchEnter)
+		b:SetScript("OnClick", Stops.SwitchClick)
+	end
+	sw.info:SetPoint("TOPLEFT")
+	sw.plan:SetPoint("TOPLEFT", sw.info, "TOPRIGHT", 0, 0)
+	sw.info.Text:SetWidth(math.floor((w - BAR_W) / 2) - 16)
+	sw.plan.Count = sw.plan:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	sw.plan.Count:SetPoint("RIGHT", -10, 1)
+	sw.plan.Count:SetJustifyH("RIGHT")
+	NewEdges(sw)
+	Edges(sw, 1, 0.82, 0, 0.35)
+	sw:Hide()
+end
+
+function Stops.PaintSwitch()
+	local sw = view.sideSwitch
+	local _, _, left = Stops.All()
+	sw:SetShown(left ~= nil)
+	if left == nil then
+		state.side = nil
+		return
+	end
+	local place = CurrentPlace()
+	sw.info.Text:SetText(Quest(state.picked) and L["Quest"] or (place and place.name) or L["Overview"])
+	sw.plan.Text:SetText(L["Plan"])
+	sw.plan.Count:SetText(left > 0 and L["%d to go"]:format(left) or "")
+	Tabs.PaintHalf(sw.info, state.side ~= "plan", false)
+	Tabs.PaintHalf(sw.plan, state.side == "plan", false)
+end
+
+function Stops.SwitchEnter(self)
+	if not self.on then
+		self.Hover:Show()
+	end
+	GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+	if self.key == "plan" then
+		GameTooltip:SetText(L["Your plan"], 1, 0.82, 0)
+		GameTooltip:AddLine(L["Every stop of your plan, numbered as on the map."], 1, 1, 1, true)
+	else
+		GameTooltip:SetText(self.Text:GetText() or "", 1, 0.82, 0)
+		GameTooltip:AddLine(Quest(state.picked) and L["The quest's details."] or L["What's here for you."], 1, 1, 1, true)
+	end
+	GameTooltip:AddLine(self.on and L["Shown now"] or L["Click: show it"], 0.5, 0.75, 1)
+	GameTooltip:Show()
+end
+
+function Stops.SwitchClick(self)
+	if self.on then
+		return
+	end
+	Untip(self)
+	self.Hover:Hide()
+	state.side = self.key == "plan" and "plan" or nil
+	Side.Draw(true)
+	if state.side == "plan" then
+		view.p.Scroll:SetVerticalScroll(0)
+	end
+end
+
+-- The pane: its title, the counts, what the numbers are, the route's chip and the Plan tab's, then the
+-- stops (a scroll frame of ours, the rows pooled).
+function Stops.BuildPane(root, x, y, width, height)
+	local p = { stops = {}, quests = {}, w = width - BAR_W, height = height, y = 0 }
+	view.p = p
+	p.Scroll = CreateFrame("ScrollFrame", nil, root, "UIPanelScrollFrameTemplate")
+	p.Scroll:SetPoint("TOPLEFT", x, -y)
+	p.Scroll:SetSize(p.w, height)
+	p.Body = CreateFrame("Frame", nil, p.Scroll)
+	p.Body:SetSize(p.w, 1)
+	p.Scroll:SetScrollChild(p.Body)
+	local function Text(font)
+		local fs = p.Body:CreateFontString(nil, "OVERLAY", font)
+		fs:SetWidth(p.w - 4)
+		fs:SetJustifyH("LEFT")
+		fs:SetJustifyV("TOP")
+		fs:SetSpacing(2)
+		return fs
+	end
+	p.Title, p.Sub, p.Note = Text("GameFontNormalLarge"), Text("GameFontHighlightSmall"), Text("GameFontDisableSmall")
+	p.Title:SetText(L["Your plan"])
+	p.Route = Stops.NewChip(p.Body, function()
+		local info = Q.PlanRouteInfo and Q.PlanRouteInfo() or EMPTY
+		if info.active then
+			Q.PlanUseOrder()
+		elseif Q.PlanSuggest then
+			Q.PlanSuggest()
+		end
+		Stops.Check(true)
+	end)
+	p.Edit = Stops.NewChip(p.Body, function()
+		Tabs.Set("plan")
+	end)
+	Stops.SetChip(p.Edit, L["Plan tab"], L["The Plan tab in the middle: your order, the route, Clear."])
+	p.DropLine = p.Body:CreateTexture(nil, "OVERLAY")
+	p.DropLine:SetHeight(2)
+	p.DropLine:SetColorTexture(1, 0.82, 0, 1)
+	p.DropLine:Hide()
+	p.Dragger = CreateFrame("Frame", nil, p.Scroll) -- (a drag's every frame; hidden with the pane: given up)
+	p.Dragger:Hide()
+	p.Dragger:SetScript("OnUpdate", function(_, elapsed)
+		Stops.DragUpdate(elapsed)
+	end)
+	p.Dragger:SetScript("OnHide", function()
+		Stops.DragStop(false)
+	end)
+	p.Scroll:Hide()
+end
+
+-- A stop's row: its kind ("!", "?", a dot; done: ticked), its number as on the map, what it is, its
+-- zone at the right; the next one on a gold band, the one asked for last lit.
+function Stops.NewStopRow(parent, width)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(width, Stops.ROW_H)
+	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b.Band = b:CreateTexture(nil, "BACKGROUND")
+	b.Band:SetAllPoints()
+	b.Kind = b:CreateTexture(nil, "ARTWORK")
+	b.Kind:SetPoint("CENTER", b, "LEFT", 22, 0)
+	b.Num = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	b.Num:SetPoint("LEFT", 30, 0)
+	b.Num:SetWidth(24)
+	b.Num:SetJustifyH("RIGHT")
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	b.Text:SetPoint("LEFT", 58, 0)
+	b.Text:SetJustifyH("LEFT")
+	b.Text:SetWordWrap(false)
+	b.Right = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+	b.Right:SetPoint("RIGHT", -4, 0)
+	b.Right:SetJustifyH("RIGHT")
+	b.Right:SetWordWrap(false)
+	b:SetScript("OnEnter", Stops.RowEnter)
+	b:SetScript("OnLeave", Stops.RowLeave)
+	b:SetScript("OnClick", Stops.RowClick)
+	return b
+end
+
+function Stops.FillStopRow(b, e)
+	local s = e.stop
+	b.entry = e
+	if s.done then
+		b.Kind:SetTexture(T.check)
+		b.Kind:SetVertexColor(1, 1, 1, 0.6)
+		b.Kind:SetSize(12, 12)
+	else
+		Stops.SetKind(b.Kind, s.kind, 14)
+	end
+	b.Num:SetText((s.done and GREY or GOLD) .. e.n .. ".|r")
+	local text = Stops.Words(s, e.grouped)
+	b.Text:SetText(s.done and (GREY .. text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") .. "|r") or text)
+	local spot = Stops.SpotOf(s)
+	b.Right:SetText(spot and Stops.ZoneName(spot) or "")
+	b.Right:SetWidth(math.floor(b:GetWidth() * 0.3))
+	b.Text:SetWidth(b:GetWidth() - 58 - math.floor(b:GetWidth() * 0.3) - 10)
+	local lit = state.planLit == s
+	b.Band:SetColorTexture(1, 0.82, 0, lit and 0.25 or 0.1)
+	b.Band:SetShown(lit or e.next == true)
+end
+
+function Stops.RowEnter(self)
+	local e = self.entry
+	if not e then
+		return
+	end
+	local s = e.stop
+	local spot = Stops.SpotOf(s)
+	GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+	GameTooltip:SetText(e.n .. ". " .. Stops.Text(s), 1, 1, 1, 1, true)
+	if spot then
+		GameTooltip:AddLine(Stops.ZoneName(spot), 0.8, 0.8, 0.8)
+	end
+	if s.done then
+		GameTooltip:AddLine(s.skipped and L["Skipped for now"] or L["Done: not on the map anymore"], 0.55, 0.55, 0.55)
+	elseif e.next then
+		GameTooltip:AddLine(L["Next stop"], 1, 0.82, 0)
+	end
+	GameTooltip:AddLine(L["Click: there on the map"], 0.5, 0.75, 1)
+	GameTooltip:AddLine(L["Ctrl-click: its quest's details"], 0.5, 0.75, 1)
+	GameTooltip:AddLine(L["Right-click or Shift-click: map pin"], 0.5, 0.75, 1)
+	GameTooltip:Show()
+	Stops.Light(s)
+end
+
+function Stops.RowLeave(self)
+	Untip(self)
+	Stops.Light(nil)
+end
+
+-- A click: there on the zone page's map (the pane stays, the stop lit); Ctrl-click: its quest's
+-- details; a right-click or Shift-click: the game's map pin; Alt-click: its quest out of the plan.
+function Stops.RowClick(self, button)
+	local s = self.entry and self.entry.stop
+	if not s then
+		return
+	end
+	Untip(self)
+	local spot = Stops.SpotOf(s)
+	if IsAltKeyDown and IsAltKeyDown() then
+		Side.TogglePlan(s.quest)
+	elseif spot and (button == "RightButton" or (IsShiftKeyDown and IsShiftKeyDown())) then
+		Map.PinAt(spot.map, spot.x, spot.y, Stops.Text(s))
+	elseif IsControlKeyDown and IsControlKeyDown() then
+		Side.Details(s.quest)
+	elseif spot then
+		state.planLit = s
+		if not Side.ShowSpot(s.quest, spot, true, "plan") then
+			Side.Draw()
+		end
+	end
+end
+
+-- A stop's number on the zone page's map lit (nil: none), pulsing once.
+function Stops.Light(stop)
+	local m = view.zp.map
+	if not (view.zp:IsShown() and m.planMarkers) then
+		return
+	end
+	for _, b in ipairs(m.planMarkers) do
+		if stop and b:IsShown() and b.entry and b.entry.stop == stop then
+			b:LockHighlight()
+			Map.Flash(m, { { x = b.entry.x, y = b.entry.y, px = 14 } })
+		else
+			b:UnlockHighlight()
+		end
+	end
+end
+
+-- A quest's row (my order): a grip, its number in my order, "[12] Title", remove at its right.
+-- Dragged: moved in my order. A click: its details; Ctrl-click: on the map; a right-click: its chain;
+-- Alt-click: out of the plan.
+function Stops.NewQuestRow(parent, width)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(width, Stops.QUEST_H)
+	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b:RegisterForDrag("LeftButton")
+	b:SetHighlightTexture(T.highlight, "ADD")
+	b.Back = b:CreateTexture(nil, "BACKGROUND")
+	b.Back:SetAllPoints()
+	b.Back:SetColorTexture(1, 1, 1, 0.05)
+	b.Grip = {}
+	for i = 1, 3 do
+		local g = b:CreateTexture(nil, "ARTWORK")
+		g:SetSize(7, 1)
+		g:SetPoint("LEFT", 3, 4 - (i - 1) * 4)
+		g:SetColorTexture(1, 1, 1, 0.3)
+		b.Grip[i] = g
+	end
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+	b.Text:SetPoint("LEFT", 14, 0)
+	b.Text:SetPoint("RIGHT", -26, 0)
+	b.Text:SetJustifyH("LEFT")
+	b.Text:SetWordWrap(false)
+	b.Remove = CreateFrame("Button", nil, b)
+	b.Remove:SetSize(16, 16)
+	b.Remove:SetPoint("RIGHT", -4, 0)
+	b.Remove.Icon = b.Remove:CreateTexture(nil, "ARTWORK")
+	b.Remove.Icon:SetAllPoints()
+	b.Remove.Icon:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
+	b.Remove:SetHighlightTexture(T.highlight, "ADD")
+	b.Remove:SetScript("OnClick", function(self)
+		Untip(self)
+		local id = b.entry and b.entry.id
+		if id then
+			Side.TogglePlan(id, true)
+		end
+	end)
+	b.Remove:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip:SetText(L["Remove from plan"], 1, 1, 1)
+		GameTooltip:Show()
+	end)
+	b.Remove:SetScript("OnLeave", Untip)
+	b:SetScript("OnEnter", function(self)
+		local e = self.entry
+		if e then
+			QuestTip(self, e.id, nil, true)
+			GameTooltip:AddLine(L["Drag: move it in your order"], 0.5, 0.75, 1)
+			GameTooltip:Show()
+		end
+	end)
+	b:SetScript("OnLeave", Untip)
+	b:SetScript("OnClick", function(self, button)
+		local id = self.entry and self.entry.id
+		if id then
+			Untip(self)
+			Side.Click(id, button)
+		end
+	end)
+	b:SetScript("OnDragStart", Stops.DragStart)
+	b:SetScript("OnDragStop", function()
+		Stops.DragStop(true)
+	end)
+	return b
+end
+
+function Stops.FillQuestRow(b, e)
+	b.entry = e
+	local q = Quest(e.id)
+	b.Text:SetText(GOLD .. e.n .. ".|r " .. (q and (LevelTag(q) .. Title(e.id)) or Title(e.id)))
+	b:SetAlpha(Stops.drag and Stops.drag.id == e.id and 0.4 or 1)
+end
+
+-- Lays a row of a pool at the pane's y.
+function Stops.Put(pool, n, new, fill, e, h)
+	local p = view.p
+	local row = pool[n]
+	if not row then
+		row = new(p.Body, p.w - 4)
+		pool[n] = row
+	end
+	fill(row, e)
+	row:ClearAllPoints()
+	row:SetPoint("TOPLEFT", 0, -p.y)
+	row:Show()
+	e.y, e.h = p.y, h
+	p.y = p.y + h + 1
+	return row
+end
+
+function Stops.PutText(fs, text, gap)
+	local p = view.p
+	fs:SetShown(text ~= nil and text ~= "")
+	if not fs:IsShown() then
+		return
+	end
+	fs:SetText(text)
+	fs:ClearAllPoints()
+	fs:SetPoint("TOPLEFT", 0, -p.y)
+	p.y = p.y + fs:GetStringHeight() + (gap or 4)
+end
+
+-- The pane drawn (top: scrolled to its top).
+function Stops.DrawPane(top)
+	local p = view.p
+	local stops, at, left = Stops.All()
+	stops = stops or EMPTY
+	local list = Q.PlanList and Q.PlanList() or EMPTY
+	local info = Q.PlanRouteInfo and Q.PlanRouteInfo() or EMPTY
+	p.y = 0
+	Stops.PutText(p.Title, L["Your plan"], 2)
+	if not list[1] then
+		Stops.PutText(p.Sub, L["Your plan is empty. Add quests with the + beside them, or Alt-click a quest or a quest giver on the map."], 8)
+		Stops.PutText(p.Note, nil)
+	else
+		Stops.PutText(p.Sub, L["%d quests · %d stops · %d to go"]:format(#list, #stops, left or 0)
+			.. (info.active and (SEP .. GOLD .. L["Suggested route"] .. "|r") or ""), 4)
+		Stops.PutText(p.Note, L["Numbered as on the map: ! pick up, ? turn in, a dot an objective. Done stops are ticked here and gone from the map, so its first number can be higher than 1."], 6)
+	end
+	-- (the chips: the route, the Plan tab)
+	local canRoute = list[1] ~= nil and (info.active or (Q.PlanSuggest ~= nil and Q.SuggestRoute ~= nil))
+	p.Route:SetShown(canRoute == true)
+	if canRoute then
+		Stops.SetChip(p.Route, info.active and L["Back to my order"] or L["Suggest a route"],
+			L["The shortest way through your plan's stops from where you are, each quest's start before its objectives before its turn-in. Any change to the plan goes back to your order."])
+		p.Route:ClearAllPoints()
+		p.Route:SetPoint("TOPLEFT", 0, -p.y)
+	end
+	p.Edit:SetShown(list[1] ~= nil and registry.byKey.plan ~= nil or false)
+	p.Edit:ClearAllPoints()
+	if canRoute then
+		p.Edit:SetPoint("LEFT", p.Route, "RIGHT", 6, 0)
+	else
+		p.Edit:SetPoint("TOPLEFT", 0, -p.y)
+	end
+	if canRoute or p.Edit:IsShown() then
+		p.y = p.y + 28
+	end
+	local nStop, nQuest = 0, 0
+	local function Stop(s, i, grouped)
+		nStop = nStop + 1
+		Stops.Put(p.stops, nStop, Stops.NewStopRow, Stops.FillStopRow, { stop = s, n = i, next = i == at, grouped = grouped }, Stops.ROW_H)
+	end
+	p.order = {}
+	if info.active then
+		for i, s in ipairs(stops) do
+			Stop(s, i, false)
+		end
+	else
+		local byQuest = {}
+		for i, s in ipairs(stops) do
+			byQuest[s.quest] = byQuest[s.quest] or {}
+			table.insert(byQuest[s.quest], i)
+		end
+		for k, id in ipairs(list) do
+			nQuest = nQuest + 1
+			local e = { id = id, n = k }
+			Stops.Put(p.quests, nQuest, Stops.NewQuestRow, Stops.FillQuestRow, e, Stops.QUEST_H)
+			p.order[#p.order + 1] = e
+			for _, i in ipairs(byQuest[id] or EMPTY) do
+				Stop(stops[i], i, true)
+			end
+			e.bottom = p.y
+			p.y = p.y + 4
+		end
+	end
+	for i = nStop + 1, #p.stops do
+		p.stops[i].entry = nil
+		p.stops[i]:Hide()
+	end
+	for i = nQuest + 1, #p.quests do
+		p.quests[i].entry = nil
+		p.quests[i]:Hide()
+	end
+	p.Body:SetHeight(math.max(1, p.y))
+	local most = math.max(0, p.y - p.height)
+	p.Scroll:SetVerticalScroll(top and 0 or math.min(p.Scroll:GetVerticalScroll() or 0, most))
+end
+
+-- A quest's row dragged: a gold line where it would land (between the quests), the pane scrolling near
+-- its top and bottom; let go: moved there in my order (Q.PlanMove).
+function Stops.DropAt(y)
+	local order = view.p.order or EMPTY
+	local before = #order + 1
+	for i, e in ipairs(order) do
+		if y < e.y + e.h / 2 then
+			before = i
+			break
+		end
+	end
+	local last = order[#order]
+	local lineY = order[before] and order[before].y - 2 or (last and last.bottom or 0)
+	local from = Stops.drag and Stops.drag.from or 0
+	return before > from and before - 1 or before, lineY
+end
+
+function Stops.DragTo(y)
+	local d = Stops.drag
+	if not d then
+		return
+	end
+	d.to, d.lineY = Stops.DropAt(y)
+	local p = view.p
+	p.DropLine:ClearAllPoints()
+	p.DropLine:SetPoint("TOPLEFT", p.Body, "TOPLEFT", 0, 1 - d.lineY)
+	p.DropLine:SetWidth(p.w - 4)
+	p.DropLine:Show()
+end
+
+function Stops.DragStart(row)
+	local e = row.entry
+	if not (e and e.id and Q.PlanMove) or Stops.drag or (Q.PlanRouteInfo and Q.PlanRouteInfo().active) then
+		return
+	end
+	Untip(row)
+	Stops.drag = { id = e.id, from = e.n, to = e.n }
+	row:SetAlpha(0.4)
+	Stops.DragTo(e.y + e.h / 2)
+	view.p.Dragger:Show()
+end
+
+function Stops.DragUpdate(elapsed)
+	if IsMouseButtonDown and not IsMouseButtonDown("LeftButton") then
+		Stops.DragStop(true)
+		return
+	end
+	local p = view.p
+	local _, cy = GetCursorPosition()
+	local top = p.Scroll:GetTop()
+	if not (cy and top) then
+		return
+	end
+	local y = top - cy / p.Scroll:GetEffectiveScale()
+	local offset = p.Scroll:GetVerticalScroll() or 0
+	local step = y < Stops.DRAG_EDGE and -1 or y > p.height - Stops.DRAG_EDGE and 1 or 0
+	if step ~= 0 then
+		local want = math.max(0, math.min(offset + step * Stops.DRAG_SPEED * (elapsed or 0), p.y - p.height))
+		if want ~= offset then
+			p.Scroll:SetVerticalScroll(want)
+			offset = want
+		end
+	end
+	Stops.DragTo(y + offset)
+end
+
+-- The drag over (drop: moved where the line was; given up: as it was).
+function Stops.DragStop(drop)
+	local d = Stops.drag
+	if not d then
+		return
+	end
+	Stops.drag = nil
+	local p = view.p
+	p.Dragger:Hide()
+	p.DropLine:Hide()
+	for _, row in ipairs(p.quests) do
+		row:SetAlpha(1)
+	end
+	if drop and d.to ~= d.from and Side.InPlan(d.id) then
+		pcall(Q.PlanMove, d.id, d.to)
+		Stops.Check(true)
+	end
 end
 
 ---------------------------------------------------------------------------
@@ -6561,9 +7158,15 @@ end
 -- top: from its top.
 function Side.Draw(top)
 	local q = Quest(state.picked)
-	view.d.Panel:SetShown(q ~= nil)
-	view.b.Scroll:SetShown(q == nil)
-	if q then
+	Stops.PaintSwitch()
+	local plan = state.side == "plan"
+	view.d.Panel:SetShown(q ~= nil and not plan)
+	view.b.Scroll:SetShown(q == nil and not plan)
+	view.p.Scroll:SetShown(plan)
+	if plan then
+		view.d.map.frame:Hide()
+		Stops.DrawPane(false) -- (the plan stays where it's scrolled to)
+	elseif q then
 		FillDetails(top)
 	else
 		view.d.map.pick = nil
@@ -6611,6 +7214,9 @@ end
 local function Pick(id, user, how)
 	local changed = id ~= state.picked
 	state.picked = id
+	if how ~= "plan" then
+		state.side, state.planLit = nil, nil -- (a quest picked: its details; from the plan: it stays)
+	end
 	if changed then
 		state.spot = nil -- (a place of the quest before asked for)
 	end
@@ -6628,7 +7234,7 @@ local function Pick(id, user, how)
 	end
 	if view.zp:IsShown() then
 		ZonePage.ShowPick(CurrentPlace())
-		if id and how ~= "still" then
+		if id and how ~= "still" and how ~= "plan" then
 			ZonePage.Find(id) -- (moved there when it isn't all in sight, pulsing)
 		end
 	end
@@ -6768,7 +7374,7 @@ end
 -- A spot ({ map, x, y, r }) of a quest on the Zone tab's map: its zone's page (the zone above a city's
 -- floor or a cave), the quest picked, zoomed in to the spot, pulsing. Not on any zone's map: the quest
 -- on the map. True when the spot shows.
-function Side.ShowSpot(id, spot, user)
+function Side.ShowSpot(id, spot, user, how)
 	if not (Quest(id) and type(spot) == "table") then
 		return false
 	end
@@ -6795,7 +7401,7 @@ function Side.ShowSpot(id, spot, user)
 	if moved or not wasMap then
 		DrawMiddle(not moved, nil, true)
 	end
-	Pick(id, user, "still")
+	Pick(id, user, how or "still")
 	local m = view.zp.map
 	local it = { x = x, y = y, r = tonumber(spot.r) }
 	Map.Bring(m, { it }, true)
@@ -8242,8 +8848,11 @@ local function Build()
 		split:SetPoint("TOPLEFT", x, -PAD)
 		split:SetHeight(paneH)
 	end
-	Make.BuildDetails(root, detailX, PAD, DETAILS_W, paneH)
-	Make.BuildBrief(root, detailX, PAD, DETAILS_W, paneH)
+	-- (the right pane under its switch "Quest | Plan")
+	Stops.BuildSwitch(root, detailX, PAD, DETAILS_W)
+	Make.BuildDetails(root, detailX, PAD + Stops.TOP, DETAILS_W, paneH - Stops.TOP)
+	Make.BuildBrief(root, detailX, PAD + Stops.TOP, DETAILS_W, paneH - Stops.TOP)
+	Stops.BuildPane(root, detailX, PAD + Stops.TOP, DETAILS_W, paneH - Stops.TOP)
 	view.Empty = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	view.Empty:SetPoint("CENTER", frame.Inset, "CENTER", 0, 20)
 	view.Empty:SetWidth(WIDTH - 200)
