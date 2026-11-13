@@ -2640,6 +2640,9 @@ end
 -- click does. The zone page also lights the marker's chains (onEnter).
 local function MarkerEnter(self)
 	local m = self.owner
+	if self.drop and self.look == "done" then
+		Map.DropRing(self, true)
+	end
 	if m.zoomable and GamepadCursor(self) then
 		Map.Reveal(m, self.px, self.py)
 	end
@@ -2690,6 +2693,9 @@ end
 
 local function MarkerLeave(self)
 	Untip(self)
+	if self.drop and self.look == "done" then
+		Map.DropRing(self, false) -- (a done quest's drop: its ring only while hovered)
+	end
 	local m = self.owner
 	if m.onLeave then
 		m.onLeave(self)
@@ -3031,7 +3037,7 @@ function Map.Show(m, map, spots, name, threads)
 		local x, y = tonumber(spot.x), tonumber(spot.y)
 		if x and y and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
 			local px, py = x * width, y * height
-			local drop = spot.look == "drop"
+			local drop = spot.drop == true or spot.look == "drop"
 			local near
 			for i = 1, n do
 				local marker = m.markers[i]
@@ -3169,11 +3175,13 @@ function Map.Marker(m, i)
 	return marker
 end
 
--- A marker's look: solid and clear (a dark disc under the "!" and "?"), done and not-for-me dim dots,
--- drop areas soft circles; a gold ring when it has the quest picked; how many it has to do.
+-- A marker's look: solid and clear (a dark disc under the "!" and "?"), done and not-for-me dim dots;
+-- where an item that starts a quest drops: its quest's own pin (the "!" in its difficulty's colour,
+-- done: the dim dot) with the item's icon at its corner, its area a thin light ring (done: only while
+-- hovered, it drops once); a gold ring when it has the quest picked; how many it has to do.
 function Map.Paint(marker)
 	local look = LOOK[marker.look] or LOOK.other
-	local size = look.circle and marker.area and math.max(look.size, math.min(160, marker.area)) or look.size
+	local size = marker.look == "drop" and marker.area and math.max(look.size, math.min(160, marker.area)) or look.size
 	marker:SetSize(math.max(size, 14), math.max(size, 14))
 	marker.Icon:SetSize(size, size)
 	if look.circle then
@@ -3208,7 +3216,59 @@ function Map.Paint(marker)
 	marker.Badge:SetText(badge and tostring(marker.open) or "")
 	marker.Badge:SetShown(badge)
 	marker.BadgeBack:SetShown(badge)
+	local item = marker.drop and marker.look ~= "drop" and not look.circle and marker.spots[1].item
+	local icon = item and C_Item and LT.Value(C_Item.GetItemIconByID, item)
+	if icon and not marker.Item then
+		marker.Item = marker:CreateTexture(nil, "OVERLAY", nil, 1)
+		marker.Item:SetSize(13, 13)
+		marker.Item:SetPoint("CENTER", marker, "BOTTOMRIGHT", -2, 3)
+		marker.Item:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+	end
+	if marker.Item then
+		marker.Item:SetTexture(icon or nil)
+		marker.Item:SetShown(icon ~= nil)
+	end
+	Map.DropRing(marker, marker.drop and marker.look ~= "drop" and marker.look ~= "done")
 	marker:SetAlpha(1)
+end
+
+-- Where an item that starts a quest drops: a thin ring around its pin as big as its area, light on a
+-- dark edge (it reads on any ground), lines of ours on the map's areas layer. show false: hidden.
+Map.RING_DROP = 32 -- its segments
+function Map.DropRing(marker, show)
+	local m = marker.owner
+	local lines = marker.dropRing
+	if not show then
+		for _, l in ipairs(lines or EMPTY) do
+			l:Hide()
+		end
+		return
+	end
+	if not lines then
+		lines = {}
+		for i = 1, Map.RING_DROP * 2 do
+			local l = m.Areas:CreateLine(nil, i <= Map.RING_DROP and "ARTWORK" or "OVERLAY")
+			l:SetThickness(i <= Map.RING_DROP and 3.5 or 1.5)
+			if i <= Map.RING_DROP then
+				l:SetColorTexture(0, 0, 0, 0.55)
+			else
+				l:SetColorTexture(1, 0.95, 0.85, 0.85)
+			end
+			lines[i] = l
+		end
+		marker.dropRing = lines
+	end
+	local r = math.max(17, math.min(80, (marker.area or 34) / 2)) -- (no area known: the old circle's size)
+	for i = 1, Map.RING_DROP do
+		local a1, a2 = (i - 1) / Map.RING_DROP * 2 * math.pi, i / Map.RING_DROP * 2 * math.pi
+		local x1, y1 = marker.px + math.cos(a1) * r, marker.py + math.sin(a1) * r
+		local x2, y2 = marker.px + math.cos(a2) * r, marker.py + math.sin(a2) * r
+		for _, l in ipairs({ lines[i], lines[i + Map.RING_DROP] }) do
+			l:SetStartPoint("TOPLEFT", m.Map, x1, -y1)
+			l:SetEndPoint("TOPLEFT", m.Map, x2, -y2)
+			l:Show()
+		end
+	end
 end
 
 -- The markers' rings again (another quest picked).
@@ -4719,8 +4779,8 @@ function ZonePage.Spots(place)
 					for _, d in ipairs(s.drops or EMPTY) do
 						for _, p in ipairs(d.points or EMPTY) do
 							if p.map == map then
-								spots[#spots + 1] = { x = p.x, y = p.y, r = p.r, look = "drop", label = L["%s drops here (%s%%)"]:format(s.name or "?", Chance(d.chance)),
-									quest = id, status = status, chain = key, note = d.name }
+								spots[#spots + 1] = { x = p.x, y = p.y, r = p.r, look = look, drop = true, item = s.id,
+									label = L["%s drops here (%s%%)"]:format(s.name or "?", Chance(d.chance)), quest = id, status = status, chain = key, note = d.name }
 							end
 						end
 					end
@@ -6674,8 +6734,8 @@ function Details.MapSpots(q, status, force)
 			for _, d in ipairs(k == 1 and s.drops or EMPTY) do
 				for _, p in ipairs(d.points or EMPTY) do
 					if p.map == map then
-						spots[#spots + 1] = { x = p.x, y = p.y, r = p.r, look = "drop", label = L["%s drops here (%s%%)"]:format(s.name or "?", Chance(d.chance)),
-							note = d.name }
+						spots[#spots + 1] = { x = p.x, y = p.y, r = p.r, look = "start", drop = true, item = s.id,
+							label = L["%s drops here (%s%%)"]:format(s.name or "?", Chance(d.chance)), note = d.name }
 					end
 				end
 			end

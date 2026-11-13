@@ -480,8 +480,22 @@ do
 	check(willem and willem.look == "progress" and willem.Icon.atlas == "QuestTurnin" and willem.Icon.desaturated == true
 		and willem.Badge:IsShown() and willem.Badge:GetText() == "2" and willem.BadgeBack:IsShown(),
 		"a turn-in of a quest still in progress: a grey ?, and a count: two quests to do there")
-	check(wolf and wolf.look == "drop" and wolf.Icon.path == "Interface\\CharacterFrame\\TempPortraitAlphaMask" and not wolf.Badge:IsShown(),
-		"where an item drops: a soft circle")
+	check(wolf and wolf.drop and wolf.look ~= "drop" and wolf.Icon.path ~= "Interface\\CharacterFrame\\TempPortraitAlphaMask" and not wolf.Badge:IsShown()
+		and wolf.dropRing and wolf.dropRing[1]:IsShown() and wolf.dropRing[33]:IsShown() and wolf.dropRing[33].thickness == 1.5,
+		"where an item that starts a quest drops: its quest's own pin, its area a thin light ring on a dark edge")
+	-- Its quest done: the dim dot, the ring only while hovered (it drops once).
+	local fangWas = STATUS_OF[110]
+	STATUS_OF[110] = "done"
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	wolf = marker("drops here (12%)")
+	check(wolf and wolf.look == "done" and not wolf.dropRing[1]:IsShown(), "its quest done: a dim dot, no ring")
+	wolf._scripts.OnEnter(wolf)
+	check(wolf.dropRing[1]:IsShown(), "hovered: its ring")
+	wolf._scripts.OnLeave(wolf)
+	check(not wolf.dropRing[1]:IsShown(), "left: gone")
+	STATUS_OF[110] = fangWas
+	Q.ToggleBrowser(); Q.ToggleBrowser()
+	wolf = marker("drops here (12%)")
 	check(not view.zp.Legend, "no legend under the map")
 	-- My arrow: where I am, the way I face, moved while I'm on this map (else nothing runs).
 	FACING = 1.5
@@ -1119,7 +1133,7 @@ do
 	d.places[1]._scripts.OnEnter(d.places[1])
 	check(plain(table.concat(TOOLTIP.lines, "|")):find("Drops from Timber Wolf (0.5%) · Elwynn Forest", 1, true), "the other drops: in its tooltip")
 	d.places[1]._scripts.OnLeave(d.places[1])
-	check(m.frame:IsShown() and m.map == ELWYNN and m.shown == 2 and m.markers[1].look == "drop", "the small map: where it drops")
+	check(m.frame:IsShown() and m.map == ELWYNN and m.shown == 2 and m.markers[1].drop and m.markers[1].look == "start", "the small map: where it drops (the giver's pin)")
 	check(plain(card(110).Info:GetText()) == "Wolf Fang" and card(110).Icon.path == "Interface\\Icons\\INV_Misc_Bag_10", "its card: the item")
 	d.places[1]:Click()
 	check(pins[5] and pins[5].x == 0.3, "a drop's line: a pin there")

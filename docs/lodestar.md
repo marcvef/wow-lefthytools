@@ -1166,7 +1166,11 @@ colour can't say it),
 (`C_QuestLog.IsComplete`; `QuestRepeatableTurnin` for a repeatable one), the same "?" grey while it's in
 progress, a grey "!" (18 px) for one my level is too low for and a smaller, darker one for one that needs
 another first, dim dots for done and not-for-me ones; where an item that starts a quest drops
-(`starts[].drops[].points`) a soft gold circle ("Wolf Fang drops here (12%)", sized by the point's `r`).
+(`starts[].drops[].points`, `spot.drop`) its quest's own pin as a giver's (the "!" in its difficulty's
+colour; done: the dim dot) with the item's icon at its corner, and its area a thin ring as big as the
+point's `r` (`Map.DropRing`: 32 segments, light on a dark edge so it reads on any ground; none known:
+34 px); its quest done, the ring only while the dot is hovered (it drops once). "Wolf Fang drops here
+(12%)" in its tooltip.
 Spots within 8 px are one pin (drop areas only with drop areas): its look the most urgent one's, **a
 count badge** (the quests still to do there, from two), its tooltip the giver and each quest in its
 status's colour with what the pin is ("[4] Brotherhood of Thieves · repeatable": ready to turn in, in

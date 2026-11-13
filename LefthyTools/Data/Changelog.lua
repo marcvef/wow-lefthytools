@@ -578,5 +578,8 @@ ns.CHANGELOG = {
 	{ id = 190, module = "lodestar",
 		en = { "Lodestar: the game's own quest areas", "For a quest in your log, the big map and the companion draw its areas the way the world map does: the game's exact shapes, scaling with the zoom. Other quests' areas stay circles, now in the same blue." },
 		de = { "Lodestar: die Questgebiete des Spiels", "Für eine Quest in deinem Log zeichnen die große Karte und der Begleiter ihre Gebiete wie die Weltkarte: die genauen Formen des Spiels, die mit dem Zoom skalieren. Die Gebiete anderer Quests bleiben Kreise, jetzt im selben Blau." } },
+	{ id = 191, module = "lodestar",
+		en = { "Lodestar: where a quest item drops", "Where an item that starts a quest drops, the big map shows the quest's own ! (in its difficulty's colour) with the item's icon, and a thin light ring for the area instead of a big yellow disc. Once you've done the quest, only a dim dot is left; hover it for the ring." },
+		de = { "Lodestar: wo ein Questgegenstand droppt", "Wo ein Gegenstand droppt, der eine Quest startet, zeigt die große Karte das ! der Quest (in der Farbe ihrer Schwierigkeit) mit dem Symbol des Gegenstands und einen dünnen hellen Ring für das Gebiet statt einer großen gelben Scheibe. Hast du die Quest erledigt, bleibt nur ein blasser Punkt; fahr darüber für den Ring." } },
 	-- New entries go here, at the end.
 }
