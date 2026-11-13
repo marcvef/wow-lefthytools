@@ -2247,6 +2247,15 @@ do
 	-- The details' title line, the briefing's rows.
 	listRow(103):Click()
 	local d = view.d
+	-- Wowhead: its link to copy (a small window of ours, the link selected).
+	check(d.Web:IsShown() and d.Web:IsEnabled(), "the details: a Wowhead button")
+	d.Web:Click()
+	local link = LefthyToolsLinkFrame
+	check(link and link:IsShown() and link.Box:GetText() == "https://www.wowhead.com/classic/quest=103" and link.Box._highlighted and link.Box._focus,
+		"clicked: the link to copy, selected, got " .. tostring(link and link.Box:GetText()))
+	link.Box:GetScript("OnEscapePressed")(link.Box)
+	check(not link:IsShown(), "Escape: closed")
+	check(Q.WowheadURL(103, { new = true }) == nil, "none for a quest new in WoW: Forever")
 	check(d.Plan:IsShown() and d.Plan.Plus.shown and d.Title.width == d.bodyW - 44 - 18, "the details: a + on the title line")
 	d.Plan:Click()
 	check(plan[2] == 103 and d.Plan.Check.shown, "clicked: in the plan, a check")

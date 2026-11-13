@@ -1547,6 +1547,10 @@ local function DrawQuest(y, id)
 	if chain then
 		y = Steps(y, chain, at)
 	end
+	if Q.WowheadURL and Q.WowheadURL(id, quest) then -- (its Wowhead page: a link to copy)
+		y = Row(y + 2, { text = GREY .. L["Wowhead link"] .. "|r", tooltip = { "Wowhead", L["This quest's Wowhead page: a link to copy into your browser."] },
+			onClick = function() Q.ShowWowhead(id) end })
+	end
 	return FriendsRow(y + GAP, id)
 end
 

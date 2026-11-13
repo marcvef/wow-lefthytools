@@ -425,6 +425,10 @@ read.
   across zones, the first one to do first. `reason`: `"done"` (must be completed), `"any"` (one of
   several: the best one, in the log, then available, then for me, the lowest level), `"log"` (must
   be in the quest log).
+- `Q.WowheadURL(id)`: its Classic Wowhead page (the client's language: `de/` for a German one; nil
+  for one new in WoW: Forever), `Q.ShowWowhead(id)` shows it to copy (`LT.Window.ShowLink`: a small
+  window of ours, the link selected; Ctrl+C or Escape closes it): the details' **Wowhead** button
+  (beside Map pin and Companion; greyed for a Forever quest) and the companion's quest view's last line.
 - `Q.PartOf(id)`: a quest that's a **part** of another (The Warsong Reports' three updates, The Green
   Hills of Stranglethorn's chapters, Field Duty's papers: 16 in the data): taken only while the other
   is in my log (`preActive`) and giving an item the other asks for (`Q.Rewards` against its

@@ -221,6 +221,28 @@ function Q.LevelCode(id, quest, level)
 	return c and Hex(c[1], c[2], c[3]) or "|cffffffff"
 end
 
+-- A quest on Wowhead (Classic's; a German client: its German pages); nil for one that's new in WoW:
+-- Forever (Wowhead doesn't have it).
+local WOWHEAD = { deDE = "de/", frFR = "fr/", esES = "es/", esMX = "es/", ruRU = "ru/", ptBR = "pt/", itIT = "it/", koKR = "ko/", zhCN = "cn/", zhTW = "tw/" }
+function Q.WowheadURL(id, quest)
+	id = tonumber(id)
+	quest = quest or (id and Q.Quest and Q.Quest(id))
+	if not id or (quest and (quest.new or quest.source == "forever")) then
+		return nil
+	end
+	return ("https://www.wowhead.com/classic/%squest=%d"):format(WOWHEAD[ns.LOCALE] or "", id)
+end
+
+-- The window with a quest's Wowhead link to copy (LT.Window.ShowLink); false when it has none.
+function Q.ShowWowhead(id)
+	local url = Q.WowheadURL(id)
+	if not url then
+		return false
+	end
+	LT.Window.ShowLink(L["%s on Wowhead"]:format(Q.Title(id)), url)
+	return true
+end
+
 -- "[12] Title" in its difficulty colour, as the game's quest log writes it (no level: the title).
 function Q.LevelTitle(id, quest)
 	quest = quest or (Q.Quest and Q.Quest(id))

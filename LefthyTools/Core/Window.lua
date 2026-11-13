@@ -153,6 +153,64 @@ function Window.AddButton(frame, label, onClick, anchor)
 	return button
 end
 
+-- A link to copy (an addon can't open a web page): a small window of ours in the middle of the
+-- screen, its title, the link in a box, selected, ready for Ctrl+C; Ctrl+C or Escape closes it. One
+-- for all, made the first time.
+local linkFrame
+function Window.ShowLink(title, url)
+	if not linkFrame then
+		local f = CreateFrame("Frame", "LefthyToolsLinkFrame", UIParent)
+		f:SetSize(420, 86)
+		f:SetPoint("CENTER", 0, 180)
+		f:SetFrameStrata("FULLSCREEN_DIALOG")
+		f:EnableMouse(true)
+		f:SetMovable(true)
+		f:RegisterForDrag("LeftButton")
+		f:SetScript("OnDragStart", f.StartMoving)
+		f:SetScript("OnDragStop", f.StopMovingOrSizing)
+		f:SetClampedToScreen(true)
+		Window.Dress(f)
+		f.Title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+		f.Title:SetPoint("TOPLEFT", 12, -10)
+		f.Title:SetPoint("RIGHT", -32, 0)
+		f.Title:SetJustifyH("LEFT")
+		f.Title:SetWordWrap(false)
+		f.Close = CreateFrame("Button", nil, f, "UIPanelCloseButtonNoScripts")
+		f.Close:SetPoint("TOPRIGHT", -2, -2)
+		f.Close:SetScript("OnClick", function() f:Hide() end)
+		f.Box = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+		f.Box:SetPoint("TOPLEFT", 18, -32)
+		f.Box:SetPoint("RIGHT", -14, 0)
+		f.Box:SetHeight(22)
+		f.Box:SetAutoFocus(false)
+		f.Box:SetScript("OnEscapePressed", function() f:Hide() end)
+		f.Box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+		f.Box:SetScript("OnTextChanged", function(self, userInput)
+			if userInput and self.url then
+				self:SetText(self.url) -- (read-only)
+				self:HighlightText()
+			end
+		end)
+		f.Box:SetScript("OnKeyUp", function(_, key)
+			if key == "C" and IsControlKeyDown and IsControlKeyDown() then
+				f:Hide() -- (copied)
+			end
+		end)
+		f.Hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+		f.Hint:SetPoint("BOTTOMLEFT", 12, 10)
+		f.Hint:SetText(L["Ctrl+C: copy it, then paste it in your browser · Escape: close"])
+		f:Hide()
+		linkFrame = f
+	end
+	linkFrame.Title:SetText(title or "")
+	linkFrame.Box.url = url
+	linkFrame.Box:SetText(url or "")
+	linkFrame:Show()
+	linkFrame.Box:SetFocus()
+	linkFrame.Box:HighlightText()
+	return linkFrame
+end
+
 -- A frame of our own dressed as the windows that stay beside the game (the Bestiary's small window,
 -- its card and ledger, the Lodestar companion; like the fight stream's): dark, thin gold edges.
 function Window.Dress(frame)

@@ -572,5 +572,8 @@ ns.CHANGELOG = {
 	{ id = 188, module = "lodestar",
 		en = { "Lodestar: a quest's parts aren't a chain", "Quests you take while another is in your log and that give an item it needs (The Warsong Reports' three updates, the Green Hills of Stranglethorn's chapters) are no longer shown as steps after it: its objectives say which quest gives each item." },
 		de = { "Lodestar: Teile einer Quest", "Quests, die du annimmst, während eine andere in deinem Log ist, und die einen Gegenstand für sie geben (die drei Berichte von Die Kriegshymnenberichte, die Kapitel von Die grünen Hügel des Schlingendorntals), erscheinen nicht mehr als Schritte danach: ihre Ziele sagen, welche Quest jeden Gegenstand gibt." } },
+	{ id = 189, module = "lodestar",
+		en = { "Lodestar: Wowhead links", "A quest's details have a Wowhead button (and the companion's quest view a line): its Wowhead page as a link, selected, ready to copy with Ctrl+C into your browser. Not for quests new in WoW: Forever." },
+		de = { "Lodestar: Wowhead-Links", "Die Details einer Quest haben einen Wowhead-Button (und die Questansicht des Begleiters eine Zeile): ihre Wowhead-Seite als Link, markiert, bereit zum Kopieren mit Strg+C in deinen Browser. Nicht für Quests, die neu in WoW: Forever sind." } },
 	-- New entries go here, at the end.
 }

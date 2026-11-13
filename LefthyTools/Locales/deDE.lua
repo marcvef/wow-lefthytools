@@ -837,6 +837,11 @@ L["Everyone with a journal is online, or no friend's journal has come yet."] =
 L["Click: their graphs"] = "Klick: ihre Graphen"
 L["Click: your graphs"] = "Klick: deine Graphen"
 L["from the quest %s"] = "aus der Quest %s"
+L["Ctrl+C: copy it, then paste it in your browser · Escape: close"] = "Strg+C: kopieren, dann im Browser einfügen · Escape: schließen"
+L["%s on Wowhead"] = "%s auf Wowhead"
+L["This quest's Wowhead page: a link to copy into your browser."] = "Die Wowhead-Seite dieser Quest: ein Link zum Kopieren in deinen Browser."
+L["New in WoW: Forever: Wowhead doesn't have it."] = "Neu in WoW: Forever: Wowhead hat sie nicht."
+L["Wowhead link"] = "Wowhead-Link"
 L["Surname not known yet: it shows once you log in on the character."] =
 	"Nachname noch unbekannt: Er erscheint, sobald du dich mit dem Charakter einloggst."
 L["Surname not known yet: it shows once %s plays the character while you're online, or with an up-to-date LefthyTools."] =
