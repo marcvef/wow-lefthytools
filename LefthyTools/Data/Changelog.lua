@@ -569,5 +569,8 @@ ns.CHANGELOG = {
 	{ id = 187, module = "lodestar",
 		en = { "Lodestar: quest levels on quest givers", "Pointing at a quest giver, the Lodestar lines show each quest's level with its title, in its difficulty colour: \"starts [17] Raptor Horns\"." },
 		de = { "Lodestar: Questlevel bei Questgebern", "Zeigst du auf einen Questgeber, nennen die Lodestar-Zeilen das Level jeder Quest mit ihrem Titel, in der Farbe ihrer Schwierigkeit: \"vergibt [17] Raptorhörner\"." } },
+	{ id = 188, module = "lodestar",
+		en = { "Lodestar: a quest's parts aren't a chain", "Quests you take while another is in your log and that give an item it needs (The Warsong Reports' three updates, the Green Hills of Stranglethorn's chapters) are no longer shown as steps after it: its objectives say which quest gives each item." },
+		de = { "Lodestar: Teile einer Quest", "Quests, die du annimmst, während eine andere in deinem Log ist, und die einen Gegenstand für sie geben (die drei Berichte von Die Kriegshymnenberichte, die Kapitel von Die grünen Hügel des Schlingendorntals), erscheinen nicht mehr als Schritte danach: ihre Ziele sagen, welche Quest jeden Gegenstand gibt." } },
 	-- New entries go here, at the end.
 }

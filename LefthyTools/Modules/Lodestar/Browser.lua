@@ -925,8 +925,13 @@ function Task.Text(o)
 	return count > 1 and L["Use %d x %s"]:format(count, name) or L["Use %s"]:format(name)
 end
 
--- Where an item comes from: its likeliest source, "from Young Wolf, 32%".
-function Task.From(o)
+-- Where an item comes from: its likeliest source, "from Young Wolf, 32%"; one a part of the quest
+-- gives (id: the quest's; Q.PartGiving): "from the quest [21] Warsong Scout Update".
+function Task.From(o, id)
+	local part = o.kind == "item" and id and Q.PartGiving and Q.PartGiving(id, o.id)
+	if part then
+		return L["from the quest %s"]:format(LevelTag(Quest(part)) .. Title(part))
+	end
 	local s = o.kind == "item" and type(o.sources) == "table" and o.sources[1]
 	if not s then
 		return nil
@@ -6879,11 +6884,11 @@ function Details.PutObjectives(q, y)
 		for _, p in ipairs(progress) do
 			local o = p.objective and list[p.objective]
 			lines[#lines + 1] = { text = p.text ~= "" and p.text or (o and Task.Text(o)) or "?", done = p.done, objective = p.objective,
-				from = o and Task.From(o) }
+				from = o and Task.From(o, q.id) }
 		end
 	else
 		for i, o in ipairs(list) do
-			lines[#lines + 1] = { text = Task.Text(o), objective = i, from = Task.From(o) }
+			lines[#lines + 1] = { text = Task.Text(o), objective = i, from = Task.From(o, q.id) }
 		end
 	end
 	y = PutHead(d.ObjHead, lines[1] and L["Objectives"] or nil, y)

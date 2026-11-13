@@ -425,7 +425,13 @@ read.
   across zones, the first one to do first. `reason`: `"done"` (must be completed), `"any"` (one of
   several: the best one, in the log, then available, then for me, the lowest level), `"log"` (must
   be in the quest log).
-- `Q.Opens(id)`: what it leads to. `Q.Chain(id)`: every quest connected to it (needs, opens,
+- `Q.PartOf(id)`: a quest that's a **part** of another (The Warsong Reports' three updates, The Green
+  Hills of Stranglethorn's chapters, Field Duty's papers: 16 in the data): taken only while the other
+  is in my log (`preActive`) and giving an item the other asks for (`Q.Rewards` against its
+  `Q.Objectives`); its main quest's ID. `Q.Parts(id)` a quest's parts, `Q.PartGiving(id, item)` the
+  part that gives an objective's item (the details say "from the quest [21] Warsong Scout Update").
+  A part isn't a step after its main quest: not in `Q.Opens`, not linked in `Q.Chain`.
+- `Q.Opens(id)`: what it leads to (its parts left out). `Q.Chain(id)`: every quest connected to it (needs, opens,
   exclusive ones, breadcrumbs; at most 400), each after what it needs, the lowest level first where
   there's a choice (a loop in the data: the lowest of the rest next); kept per data change, one list
   for all quests of a chain.

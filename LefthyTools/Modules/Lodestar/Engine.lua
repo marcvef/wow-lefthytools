@@ -450,19 +450,106 @@ function Q.Missing(id, who)
 	return out
 end
 
--- The quests this one leads to (shared, never written by callers).
+-- ---------------------------------------------------------------- a quest's parts
+
+-- A quest that's a part of another (The Warsong Reports' three updates, The Green Hills of
+-- Stranglethorn's chapters, Field Duty's papers): taken only while the other is in my log (preActive),
+-- it gives an item the other asks for. Not a step after it in a chain, nor what it leads to: done
+-- while it's in my log. Its main quest's ID, nil for any other; kept per data generation.
+local partOf, partsOf, opensOf, partKey = {}, {}, {}, nil
+local function PartsFresh()
+	if partKey ~= Q.dataGen then partOf, partsOf, opensOf, partKey = {}, {}, {}, Q.dataGen end
+end
+
+-- The items a quest gives (all of them and the ones to choose), as a set; nil: none known.
+local function Gives(id)
+	local r = Q.Rewards and Q.Rewards(id)
+	if type(r) ~= "table" then return nil end
+	local set
+	for _, k in ipairs({ "items", "choice" }) do
+		for _, it in ipairs(type(r[k]) == "table" and r[k] or {}) do
+			if it.id then
+				set = set or {}
+				set[it.id] = true
+			end
+		end
+	end
+	return set
+end
+
+function Q.PartOf(id)
+	id = tonumber(id)
+	local q = id and Q.Quest(id)
+	local main = q and q.preActive
+	if not (main and Q.Quest(main)) then return nil end
+	PartsFresh()
+	local r = partOf[id]
+	if r == nil then
+		r = false
+		local gives = Gives(id)
+		for _, o in ipairs(gives and Q.Objectives and Q.Objectives(main) or {}) do
+			if o.kind == "item" and gives[o.id] then r = main end
+		end
+		partOf[id] = r
+	end
+	return r or nil
+end
+
+-- A quest's parts (Q.PartOf), in the data's order (shared, never written by callers).
+function Q.Parts(id)
+	id = tonumber(id)
+	local q = id and Q.Quest(id)
+	if not q then return {} end
+	PartsFresh()
+	local list = partsOf[id]
+	if not list then
+		list = {}
+		for _, o in ipairs(q.opens) do
+			if Q.PartOf(o) == id then list[#list + 1] = o end
+		end
+		partsOf[id] = list
+	end
+	return list
+end
+
+-- The part of a quest that gives this item (an objective's), nil: none.
+function Q.PartGiving(id, item)
+	for _, part in ipairs(Q.Parts(id)) do
+		local gives = Gives(part)
+		if gives and gives[item] then return part end
+	end
+end
+
+-- The quests this one leads to, its parts left out (shared, never written by callers).
 function Q.Opens(id)
 	local q = Q.Quest(id)
-	return q and q.opens or {}
+	if not q then return {} end
+	local parts = Q.Parts(q.id)
+	if #parts == 0 then return q.opens end
+	local list = opensOf[q.id]
+	if not list then
+		list = {}
+		for _, o in ipairs(q.opens) do
+			if Q.PartOf(o) ~= q.id then list[#list + 1] = o end
+		end
+		opensOf[q.id] = list
+	end
+	return list
+end
+
+-- What a quest needs in my log, when that's not its main quest (a part isn't after it in a chain).
+local function LogBefore(q)
+	return q.preActive and Q.PartOf(q.id) == nil and q.preActive or nil
 end
 
 -- The neighbours of a quest in its chain: what it needs, leads to, closes.
 local function Neighbours(q)
 	local list = {}
-	for _, k in ipairs({ "pre", "preAny", "opens", "excl" }) do
+	for _, k in ipairs({ "pre", "preAny", "excl" }) do
 		for _, other in ipairs(q[k] or {}) do list[#list + 1] = other end
 	end
-	if q.preActive then list[#list + 1] = q.preActive end
+	for _, other in ipairs(Q.Opens(q.id)) do list[#list + 1] = other end
+	if LogBefore(q) then list[#list + 1] = q.preActive end
 	if q.breadcrumbFor then list[#list + 1] = q.breadcrumbFor end
 	return list
 end
@@ -500,8 +587,8 @@ function Q.Chain(id)
 		local mq = Q.Quest(m)
 		for _, p in ipairs(mq.pre) do edge(p, m) end
 		for _, p in ipairs(mq.preAny) do edge(p, m) end
-		if mq.preActive then edge(mq.preActive, m) end
-		for _, o in ipairs(mq.opens) do edge(m, o) end
+		if LogBefore(mq) then edge(mq.preActive, m) end
+		for _, o in ipairs(Q.Opens(m)) do edge(m, o) end
 	end
 	local function level(m)
 		local mq = Q.Quest(m)
@@ -553,8 +640,8 @@ function Q.ChainStep(id)
 			local mq = Q.Quest(m)
 			for _, p in ipairs(mq.pre) do edge(p, m) end
 			for _, p in ipairs(mq.preAny) do edge(p, m) end
-			if mq.preActive then edge(mq.preActive, m) end
-			for _, o in ipairs(mq.opens) do edge(m, o) end
+			if LogBefore(mq) then edge(mq.preActive, m) end
+			for _, o in ipairs(Q.Opens(m)) do edge(m, o) end
 		end
 		-- (in the chain's order everything before a quest is placed first; a loop's back edge is left out)
 		for _, m in ipairs(chain) do

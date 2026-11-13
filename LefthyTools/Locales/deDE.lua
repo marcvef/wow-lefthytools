@@ -836,6 +836,7 @@ L["Everyone with a journal is online, or no friend's journal has come yet."] =
 	"Alle mit Tagebuch sind online, oder es ist noch kein Tagebuch eines Freundes angekommen."
 L["Click: their graphs"] = "Klick: ihre Graphen"
 L["Click: your graphs"] = "Klick: deine Graphen"
+L["from the quest %s"] = "aus der Quest %s"
 L["Surname not known yet: it shows once you log in on the character."] =
 	"Nachname noch unbekannt: Er erscheint, sobald du dich mit dem Charakter einloggst."
 L["Surname not known yet: it shows once %s plays the character while you're online, or with an up-to-date LefthyTools."] =

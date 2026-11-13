@@ -916,4 +916,22 @@ do
 	Fire("QUEST_LOG_UPDATE")
 end
 
+-- A quest's parts: quests taken only while it's in my log that give an item it asks for (The Warsong
+-- Reports' updates): not steps after it in its chain, nor what it leads to; its objective says which.
+do
+	Q.SetTestData({
+		{ id = 201, title = "The Reports", level = 19, zone = 1429, objectives = { { kind = "item", id = 9001, count = 1 }, { kind = "item", id = 9002, count = 1 } } },
+		{ id = 202, title = "Runner Update", level = 19, zone = 1429, preActive = 201, repeatable = true, rewards = { items = { { id = 9001, count = 1 } }, choice = {} } },
+		{ id = 203, title = "Scout Update", level = 21, zone = 1429, preActive = 201, repeatable = true, rewards = { items = { { id = 9002, count = 1 } }, choice = {} } },
+		{ id = 204, title = "Then This", level = 20, zone = 1429, pre = { 201 } },
+		{ id = 205, title = "Needs It Running", level = 20, zone = 1429, preActive = 201, rewards = { items = { { id = 7777, count = 1 } }, choice = {} } },
+	}, { { map = 1429, name = "Elwynn Forest", continent = 1415 } })
+	check(Q.PartOf(202) == 201 and Q.PartOf(203) == 201 and Q.PartOf(205) == nil and Q.PartOf(204) == nil,
+		"a part: needs it in my log and gives an item it asks for; another quest needing it in my log isn't one")
+	check(table.concat(Q.Parts(201), ",") == "202,203" and table.concat(Q.Opens(201), ",") == "204,205",
+		"its parts; what it leads to: the rest, got " .. table.concat(Q.Opens(201), ","))
+	check(table.concat(Q.Chain(201), ",") == "201,204,205" and table.concat(Q.Chain(202), ",") == "202" and Q.PartGiving(201, 9002) == 203
+		and Q.PartGiving(201, 1234) == nil, "not in its chain (each on its own); which part gives an item")
+end
+
 QUESTS, PLAYER_LEVEL, PLAYER_MAP = savedQuests, savedLevel, savedMap
