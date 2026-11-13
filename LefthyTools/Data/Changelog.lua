@@ -566,5 +566,8 @@ ns.CHANGELOG = {
 	{ id = 186, module = "general",
 		en = { "One minimap button for LefthyTools", "The modules' minimap buttons are combined into one LefthyTools button: a click opens a list with each module's button and its name (they work as before), right-click opens the settings. Settings, General: Combine minimap buttons (on by default) puts them back on the edge one by one." },
 		de = { "Ein Minimap-Button für LefthyTools", "Die Minimap-Buttons der Module sind in einem LefthyTools-Button zusammengefasst: ein Klick öffnet eine Liste mit dem Button jedes Moduls und seinem Namen (sie funktionieren wie bisher), Rechtsklick öffnet die Einstellungen. Einstellungen, Allgemein: Minimap-Buttons zusammenfassen (standardmäßig an) stellt sie wieder einzeln an den Rand." } },
+	{ id = 187, module = "lodestar",
+		en = { "Lodestar: quest levels on quest givers", "Pointing at a quest giver, the Lodestar lines show each quest's level with its title, in its difficulty colour: \"starts [17] Raptor Horns\"." },
+		de = { "Lodestar: Questlevel bei Questgebern", "Zeigst du auf einen Questgeber, nennen die Lodestar-Zeilen das Level jeder Quest mit ihrem Titel, in der Farbe ihrer Schwierigkeit: \"vergibt [17] Raptorhörner\"." } },
 	-- New entries go here, at the end.
 }

@@ -556,8 +556,9 @@ several match, chat says how many and which is shown.
 Chronicle's "Craftable by" and Questie's: `GameTooltip` only (not forbidden), the primary data block
 only (an appended one isn't the unit pointed at), nothing in an instance (the data is secret there),
 nothing for a secret GUID; the NPC from `data.guid` (`LT.CreatureOf`). Lines: "Lodestar: ends
-<title>" for a quest in my log it takes back, "Lodestar: starts <title> (step 2 of 5)" for one I can
-take, "Lodestar: starts <title> at level 12" in grey for one my level is too low for, at most 4,
+[12] <title>" for a quest in my log it takes back, "Lodestar: starts [12] <title> (step 2 of 5)" for
+one I can take, "Lodestar: starts [14] <title> at level 12" in grey for one my level is too low for
+(the level and title in the quest's difficulty colour, `Q.LevelTitle`), at most 4,
 then "and N more". An NPC's lines are made the first time and kept until `Q.dataGen`,
 `Q.progressGen` or the quest log's size changes: a hover is a table lookup. A hover never loads the
 data: with the setting on, it loads once, 5 s after the first loading screen (or after the module

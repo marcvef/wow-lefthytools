@@ -892,7 +892,8 @@ function M:OnSlashCommand(msg)
 end
 
 ---------------------------------------------------------------------------
--- NPC tooltips: "Lodestar: starts <title> (step 2 of 5)"
+-- NPC tooltips: "Lodestar: starts [17] <title> (step 2 of 5)", the quest's level and title in its
+-- difficulty colour (Q.LevelTitle, as the quest log writes it)
 ---------------------------------------------------------------------------
 
 -- A post-call on the game's unit tooltips (TooltipDataProcessor, as Chronicle's "Craftable by"),
@@ -961,16 +962,16 @@ local function TipLines(npc)
 	end
 	for _, id in ipairs(ends or {}) do
 		if Q.StatusOf(id) == "active" then
-			Add(END_ICON .. L["Lodestar: ends %s"]:format(Q.Title(id)), 1, 0.82, 0)
+			Add(END_ICON .. L["Lodestar: ends %s"]:format(Q.LevelTitle(id)), 1, 0.82, 0)
 		end
 	end
 	for _, id in ipairs(starts or {}) do
 		local status = Q.StatusOf(id)
 		local quest = Q.Quest(id)
 		if status == "available" then
-			Add(START_ICON .. L["Lodestar: starts %s"]:format(Q.Title(id, quest)) .. StepText(id), 1, 0.82, 0)
+			Add(START_ICON .. L["Lodestar: starts %s"]:format(Q.LevelTitle(id, quest)) .. StepText(id), 1, 0.82, 0)
 		elseif status == "level" and quest and tonumber(quest.minLevel) then
-			Add(START_ICON .. L["Lodestar: starts %s at level %d"]:format(Q.Title(id, quest), quest.minLevel), 0.6, 0.6, 0.6)
+			Add(START_ICON .. L["Lodestar: starts %s at level %d"]:format(Q.LevelTitle(id, quest), quest.minLevel), 0.6, 0.6, 0.6)
 		end
 	end
 	if more > 0 then

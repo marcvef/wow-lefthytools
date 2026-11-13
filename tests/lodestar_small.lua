@@ -559,10 +559,12 @@ do
 		return TOOLTIP.lines
 	end
 	check(call ~= nil, "a post-call on unit tooltips")
-	check(Has(Hover(902), "Lodestar: starts Westward Bound (step 3 of 3)"), "a giver: the quest I can take there, its step")
-	check(Has(Hover(906), "Lodestar: ends Kobold Candles"), "a turn-in of a quest in my log")
-	check(Has(Hover(908), "Lodestar: starts Later Wolves at level 22"), "a quest for later: from which level")
-	check(Has(Hover(904), "Lodestar: starts Far Too Hard at level 30") and #Hover(900) == 0 and #Hover(901) == 0,
+	local westward = Has(Hover(902), "Lodestar: starts [10] Westward Bound (step 3 of 3)")
+	check(westward and westward:find(Q.LevelCode(9003) .. "[10] Westward Bound|r", 1, true),
+		"a giver: the quest I can take there, its level and title in its difficulty colour, its step")
+	check(Has(Hover(906), "Lodestar: ends [8] Kobold Candles"), "a turn-in of a quest in my log")
+	check(Has(Hover(908), "Lodestar: starts [25] Later Wolves at level 22"), "a quest for later: from which level")
+	check(Has(Hover(904), "Lodestar: starts [32] Far Too Hard at level 30") and #Hover(900) == 0 and #Hover(901) == 0,
 		"too high a level: from which; done: nothing")
 	local asks = giverAsks
 	Hover(902)
