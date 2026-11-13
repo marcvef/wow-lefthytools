@@ -531,7 +531,7 @@ do
 	list.rows[2]:Click()
 	check(st.picked == 104 and not list:IsShown() and dughan.Ring:IsShown() and plain(view.d.Title:GetText()) == "[4] Brotherhood of Thieves"
 		and view.d.Panel:IsShown() and not view.b.Scroll:IsShown(), "a quest of the list clicked: picked, its pin ringed, its details on the right")
-	-- The quest picked on the map: its objectives' areas in its chain's colour, its turn-in, the way between.
+	-- The quest picked on the map: its objectives' areas (blue, as the game's), its turn-in, the way between.
 	local color = m.lines[1].color
 	check(m.lines[1]:IsShown() and m.lines[2]:IsShown(), "its chain picked: its thread shows")
 	local done = m.lines[1].done and m.lines[1] or m.lines[2]
@@ -540,8 +540,8 @@ do
 		"a done step's thread fainter; both fainter while the quest's own way shows, got " .. done.color[4] .. ", " .. open.color[4])
 	local a = m.areas[1]
 	check(m.areasShown == 1 and a.spec.objective == 1 and a.spec.label == "Use Wanted Poster" and a.Fill:IsShown() and a.Glow.blend == "ADD"
-		and a.Fill.vertex[1] == color[1] and a.Fill.vertex[2] == color[2] and a.Fill.vertex[4] == 0.22 and a.Button._kind == "Button",
-		"its objective's area: a soft circle in its chain's colour, a button at its middle")
+		and a.Fill.vertex[1] == 0.35 and a.Fill.vertex[3] == 1 and a.Fill.vertex[4] == 0.22 and a.Button._kind == "Button",
+		"its objective's area: a soft blue circle (as the game's quest areas), a button at its middle")
 	local finish = m.ends[2]
 	check(finish and finish:IsShown() and finish.spec.label == "Deputy Willem" and finish.Icon.atlas == "QuestTurnin" and finish.Icon.desaturated == true
 		and not (m.ends[1] and m.ends[1]:IsShown()), "its turn-in, where no pin of it is (a grey ?: not done yet); its giver has its own pin")
@@ -981,8 +981,8 @@ do
 		and o2:GetHeight() > o1:GetHeight() and o1._kind == "Button", "its objectives: each a line, where the item drops under it")
 	local m = d.map
 	local color = m.pick and m.pick.color
-	check(m.frame:IsShown() and m.pick and m.pick.quest == 103 and m.areasShown == 3 and o1.Dot:IsShown() and o1.Dot.vertex[1] == color[1]
-		and m.areas[1].Fill.vertex[1] == color[1], "the small map: its objectives' areas in its chain's colour, a dot on each line that has one")
+	check(m.frame:IsShown() and m.pick and m.pick.quest == 103 and m.areasShown == 3 and o1.Dot:IsShown() and o1.Dot.vertex[3] == 1
+		and m.areas[1].Fill.vertex[3] == 1 and color, "the small map: its objectives' areas in blue, a dot on each line that has one")
 	o2._scripts.OnEnter(o2)
 	local tip = plain(table.concat(TOOLTIP.lines, "|"))
 	check(tip == "Drops from Kobold Miner (32%) · Elwynn Forest|Drops from Old Chest (5%) · Westfall|Click: map pin there, and find it on the map"
@@ -1187,7 +1187,26 @@ do
 	check(not (m.ends[1] and m.ends[1]:IsShown()) and not m.ends[2]:IsShown() and m.routeShown > 0,
 		"no giver known, its turn-in has its pin: the way from its objectives to it")
 	local o1 = view.d.objectives[1]
-	check(o1.Dot:IsShown() and o1.Dot.vertex[1] == m.pick.color[1], "the details' objectives: a dot in the map's colour")
+	check(o1.Dot:IsShown() and o1.Dot.vertex[1] == 0.35 and o1.Dot.vertex[3] == 1, "the details' objectives: a dot in the areas' blue")
+	-- In my log, the game knowing its areas on this map: the game's own shape (a QuestPOIFrame over the
+	-- map's art) instead of the circles, drawn again when zoomed; the buttons at their middles stay.
+	local statusWas, questsWas, onMapWas = STATUS_OF[103], QUESTS, QUESTS_ON_MAP[1429]
+	QUESTS_ON_MAP[1429] = { { 103, 0.5, 0.5 } }
+	STATUS_OF[103] = "active"
+	QUESTS = { { id = 103, title = "Investigate Echo Ridge", objectives = {} } }
+	Fire("QUEST_LOG_UPDATE")
+	Wait(1.1)
+	Q.ShowOnMap(103)
+	check(m.Blob and m.Blob:IsShown() and m.Blob.mapID == 1429 and m.Blob.blobs[1] == 103 and m.blob and not m.areas[1].Fill:IsShown()
+		and not m.areas[1].Glow:IsShown() and m.areas[1].Button:IsShown(), "in my log: the game's own shape of its areas, no circles (their buttons stay)")
+	m.Blob.blobs = {}
+	m.buttons.plus:Click()
+	check(m.Blob.blobs[1] == 103, "zoomed: drawn again (it fills the map's art)")
+	QUESTS_ON_MAP[1429], STATUS_OF[103], QUESTS = onMapWas, statusWas, questsWas
+	Fire("QUEST_LOG_UPDATE")
+	Wait(1.1)
+	Q.ShowOnMap(103)
+	check(not m.Blob:IsShown() and m.areas[1].Fill:IsShown(), "not in my log: the circles again")
 	o1._scripts.OnEnter(o1)
 	check(m.areas[1].Fill.vertex[4] == 0.42 and m.areas[2].Fill.vertex[4] == 0.42 and m.areas[3].Fill.vertex[4] == 0.07,
 		"an objective's line hovered: its areas lit on the zone's map, the others dim")

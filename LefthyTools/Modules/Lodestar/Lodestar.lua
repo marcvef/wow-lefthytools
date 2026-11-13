@@ -221,6 +221,62 @@ function Q.LevelCode(id, quest, level)
 	return c and Hex(c[1], c[2], c[3]) or "|cffffffff"
 end
 
+-- The game's own quest areas: the shapes the world map draws for a quest in the log (a QuestPOIFrame,
+-- like Blizzard's QuestBlobPinMixin and Misc Tweaks' continent maps): exact, filling the frame they're
+-- in, so they scale with a map's zoom. The game has them only for quests in my log, on the maps it
+-- lists them for (C_QuestLog.GetQuestsOnMap: asked when a map is drawn, never per frame; not kept,
+-- as the game may learn a quest's areas a moment after it's accepted); every other area stays our
+-- circle, in the same blue (Q.AREA_BLUE).
+Q.AREA_BLUE = { 0.35, 0.62, 1 }
+
+function Q.HasBlob(questID, mapID)
+	if not (questID and mapID and C_QuestLog and C_QuestLog.GetQuestsOnMap) then
+		return false
+	end
+	local list = LT.Value(C_QuestLog.GetQuestsOnMap, mapID)
+	for _, info in ipairs(type(list) == "table" and list or {}) do
+		if type(info) == "table" and info.questID == questID then
+			return true
+		end
+	end
+	return false
+end
+
+-- A frame of the engine's for them, over the whole of parent (a map's art), hidden; nil when the
+-- client can't make one.
+function Q.NewBlob(parent)
+	local ok, f = pcall(CreateFrame, "QuestPOIFrame", nil, parent)
+	if not (ok and f) then
+		return nil
+	end
+	f:SetFillTexture("Interface\\WorldMap\\UI-QuestBlob-Inside")
+	f:SetBorderTexture("Interface\\WorldMap\\UI-QuestBlob-Outside")
+	f:SetFillAlpha(128)
+	f:SetBorderAlpha(192)
+	f:SetBorderScalar(1.0)
+	f:EnableMouse(false)
+	f:SetAllPoints(parent)
+	f:Hide()
+	return f
+end
+
+-- f draws that quest's area on mapID (drawn again each time: after a zoom too); none known there or
+-- no quest: hidden. True when it draws one.
+function Q.DrawBlob(f, mapID, questID)
+	if not f then
+		return false
+	end
+	if not (questID and Q.HasBlob(questID, mapID)) then
+		f:Hide()
+		return false
+	end
+	f:Show()
+	f:SetMapID(mapID)
+	f:DrawNone()
+	f:DrawBlob(questID, true)
+	return true
+end
+
 -- A quest on Wowhead (Classic's; a German client: its German pages); nil for one that's new in WoW:
 -- Forever (Wowhead doesn't have it).
 local WOWHEAD = { deDE = "de/", frFR = "fr/", esES = "es/", esMX = "es/", ruRU = "ru/", ptBR = "pt/", itIT = "it/", koKR = "ko/", zhCN = "cn/", zhTW = "tw/" }

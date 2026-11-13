@@ -641,7 +641,7 @@ local function List(y, heading, list, numbered, of)
 end
 
 -- The small map at y with these points (nil map: none).
-local function PutMap(y, mapID, points)
+local function PutMap(y, mapID, points, blobQuest)
 	if not mapID then
 		return y
 	end
@@ -650,7 +650,7 @@ local function PutMap(y, mapID, points)
 	map:SetSize(width, height)
 	map.frame:ClearAllPoints()
 	map.frame:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -(y + GAP))
-	map:Show(mapID, points)
+	map:Show(mapID, points, nil, nil, blobQuest) -- (a quest in my log: the game's own shape of its areas)
 	return y + GAP + height + GAP
 end
 
@@ -1329,7 +1329,7 @@ function TB.Draw(y)
 		end
 		ctx.points = points
 		PickPoints(ctx, lists)
-		y = PutMap(y, ctx.map, ctx.points)
+		y = PutMap(y, ctx.map, ctx.points, ctx.now)
 	end
 	return y, planned or ctx.now ~= nil or #lists.log + #lists.now > 0
 end
@@ -1476,7 +1476,7 @@ local function QuestMap(y, id, quest, status, ctx)
 			end
 		end
 	end
-	return PutMap(y, mapID, points)
+	return PutMap(y, mapID, points, status == "active" and id or nil)
 end
 
 -- "Requires: <chain>": what it needs first from other chains.

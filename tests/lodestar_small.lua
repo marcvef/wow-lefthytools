@@ -359,6 +359,15 @@ do
 	end
 	check(s.map.map == 1429 and #areas == 1 and areas[1].lines[1][1] == "Young Wolf" and areas[1].group == 1 and areas[1].Glow:IsShown()
 		and areas[1].size > 34 and not turnin, "not ready: the open objective's area in my zone (not the done one's, not the turn-in)")
+	-- The game knowing its areas on this map: its own shape (a QuestPOIFrame over the map's art), the
+	-- circles' markers without their look.
+	QUESTS_ON_MAP[1429] = { { s.now, 0.5, 0.5 } }
+	Q.RedrawSmall(true)
+	check(s.map.Blob and s.map.Blob:IsShown() and s.map.Blob.blobs[1] == s.now and s.map.Blob.mapID == 1429 and not areas[1].Glow:IsShown()
+		and areas[1]:IsShown(), "the game's own shape of its areas instead of the circle")
+	QUESTS_ON_MAP[1429] = nil
+	Q.RedrawSmall(true)
+	check(not s.map.Blob:IsShown() and areas[1].Glow:IsShown(), "not known: the circle again")
 	local pelts = RowWith("- Wolf Pelts: 2/5")
 	check(pelts and pelts.Right:GetText() and pelts.Right:GetText() ~= "" and not RowWith("Candles: 3/3"),
 		"its line: a button with how far (the done one stays a line)")
@@ -1077,8 +1086,9 @@ do
 	list = m:Markers()
 	check(#list == 4 and list[1].kind == "area" and list[1].Glow:IsShown() and list[1].Fill:IsShown() and list[1].Fill.vertex[4] == 0.3
 		and not list[4].Fill:IsShown() and not list[1].Icon:IsShown() and not list[1].Dot:IsShown()
-		and list[1].size > list[2].size and list[3].size == 34 and list[1].Glow.vertex[2] > 0.7 and list[4].Icon:IsShown()
-		and list[4]:GetFrameLevel() > list[1]:GetFrameLevel(), "areas: soft gold circles by their radius, one per objective, a giver over them")
+		and list[1].size > list[2].size and list[3].size == 34 and list[1].Glow.vertex[3] == 1 and list[4].Icon:IsShown()
+		and list[4]:GetFrameLevel() > list[1]:GetFrameLevel() and list[1].Fill.vertex[3] == 1,
+		"areas: soft blue circles (as the game's quest areas) by their radius, one per objective, a giver over them")
 	m:Light(1)
 	check(list[1].alpha == 1 and list[3].alpha == 1 and list[2].alpha < 0.5 and list[1].Fill.vertex[4] == 0.45 and list[2].Fill.vertex[4] == 0.08,
 		"an objective lit: its areas (their fill too), the other's dimmed")

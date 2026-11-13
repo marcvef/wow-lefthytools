@@ -56,7 +56,7 @@ local GLOW = "Spells\\GenericGlow64" -- (soft and round, black around it: drawn 
 local DOT = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local ARROW = "Interface\\Minimap\\MinimapArrow"
 local DROP_R, DROP_G, DROP_B = 1, 0.55, 0.12
-local AREA_R, AREA_G, AREA_B = 1, 0.82, 0.25 -- an objective's area (the quest log's gold)
+local AREA_R, AREA_G, AREA_B = 0.35, 0.62, 1 -- an objective's area (blue, as the game's quest areas: Q.AREA_BLUE)
 local AREA_ALPHA, AREA_DIM, AREA_LIT = 0.7, 0.2, 1
 -- An area's fill under its glow (as the big window's): a glow alone, drawn added, all but vanishes on
 -- light ground (Elwynn's fields, a desert); the fill reads on any.
@@ -402,7 +402,7 @@ function Widget:Zoom(factor, bx, by)
 	self.zoom = factor
 	self.cx = mx - (bx - self.width / 2) / (self.artW * ratio)
 	self.cy = my - (by - self.height / 2) / (self.artH * ratio)
-	self:Show(self.map, self.points, self.name, true)
+	self:Show(self.map, self.points, self.name, true, self.blobQuest)
 	Hint(self)
 end
 
@@ -457,7 +457,9 @@ end
 -- The map's art (as large as fits the box, its own shape, times the zoom) and the markers on it.
 -- map nil: the box says there's no map; a map without art: the markers on the dark box, the
 -- zone's name over it. Another map than before shows the whole zone.
-function Widget:Show(map, points, name, keepZoom)
+-- blobQuest: a quest in my log whose own area the game knows on this map (Q.DrawBlob): its shape
+-- instead of our circles (their markers stay for their tooltips and clicks, without their look).
+function Widget:Show(map, points, name, keepZoom, blobQuest)
 	if map ~= self.map and not keepZoom then
 		self.zoom, self.cx, self.cy, self.lit = 1, 0.5, 0.5, nil
 		Hint(self)
@@ -491,6 +493,19 @@ function Widget:Show(map, points, name, keepZoom)
 	end
 	self.used = math.max(n, self.used)
 	self.shown = n
+	self.blobQuest = blobQuest
+	self.Blob = self.Blob or (blobQuest and Q.NewBlob and Q.NewBlob(self.Map)) or nil
+	self.blob = self.Blob ~= nil and map ~= nil and Q.DrawBlob(self.Blob, map, blobQuest)
+	if self.Blob then
+		self.Blob:SetFrameLevel(self.Map:GetFrameLevel() + 1)
+	end
+	for i = 1, n do
+		local marker = self.markers[i]
+		if marker.kind == "area" then
+			marker.Glow:SetShown(not self.blob)
+			marker.Fill:SetShown(not self.blob)
+		end
+	end
 	PlaceLabel(self, best)
 	PlacePlayer(self)
 	if self.lit ~= nil then

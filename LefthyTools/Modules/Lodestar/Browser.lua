@@ -2610,6 +2610,7 @@ local OPEN = { ready = true, repeatturnin = true, available = true, daily = true
 Map.GOLD = { 1, 0.82, 0 }  -- (the colour of a quest without a chain on the map)
 Map.HARD = DIFFICULTY[3]   -- (a hard quest's ring: the game's orange)
 Map.AREA = { lit = { 0.42, 1 }, normal = { 0.22, 0.75 }, dim = { 0.07, 0.25 }, done = { 0.07, 0.2 } } -- fill, glow
+Map.AREA_C = Q.AREA_BLUE or { 0.35, 0.62, 1 } -- (blue, as the game's own quest areas)
 
 -- The game's own map pin there (Q.Waypoint, Lodestar.lua; else C_Map's own here), a chat line saying so.
 -- Nothing of the world map is touched.
@@ -3415,10 +3416,20 @@ function Map.PinnedAt(m, id, px, py)
 end
 
 -- The quest picked: its areas, its giver and turn-in where no pin of it is, the way between them
--- (dashed, in its chain's colour: giver -> objectives -> turn-in).
+-- (dashed, in its chain's colour: giver -> objectives -> turn-in). Its areas: for a quest in my log
+-- the game's own shape where the game knows it (Q.DrawBlob, drawn again with every zoom: it fills
+-- the map's art), else our circles, blue as the game's; the small buttons at their middles stay.
 function Map.DrawPick(m, width, height)
 	local pick = m.map and m.pick and m.pick.map == m.map and m.pick or nil
 	local c = pick and pick.color or Map.GOLD
+	if pick and not m.Blob and Q.NewBlob and StatusOf(pick.quest) == "active" then
+		m.Blob = Q.NewBlob(m.Map)
+		if m.Blob then
+			m.Blob:SetFrameLevel(m.Map:GetFrameLevel() + 1) -- (over the art, under the areas' buttons)
+		end
+	end
+	local blob = m.Blob ~= nil and Q.DrawBlob(m.Blob, m.map, pick and StatusOf(pick.quest) == "active" and pick.quest or nil)
+	m.blob = blob
 	local n = 0
 	for _, spec in ipairs(pick and pick.areas or EMPTY) do
 		if n >= SHOWN.areas then
@@ -3434,11 +3445,11 @@ function Map.DrawPick(m, width, height)
 		for _, t in ipairs({ a.Fill, a.Glow }) do
 			t:ClearAllPoints()
 			t:SetPoint("CENTER", m.Map, "TOPLEFT", px, -py)
-			t:Show()
+			t:SetShown(not blob)
 		end
 		a.Button:ClearAllPoints()
 		a.Button:SetPoint("CENTER", m.Map, "TOPLEFT", px, -py)
-		a.Button.Dot:SetVertexColor(c[1], c[2], c[3], 1)
+		a.Button.Dot:SetVertexColor(Map.AREA_C[1], Map.AREA_C[2], Map.AREA_C[3], 1)
 		a.Button.Dot:SetShown(not spec.done)
 		a.Button.Check:SetShown(spec.done == true)
 		a.Button:Show()
@@ -3506,7 +3517,7 @@ end
 -- A done objective's areas stay faint.
 function Map.LightArea(m, objective)
 	m.litArea = objective
-	local c = m.pick and m.pick.color or Map.GOLD
+	local c = Map.AREA_C
 	for i = 1, m.areasShown do
 		local a = m.areas[i]
 		local spec = a.spec
@@ -6866,7 +6877,7 @@ function Details.AreaColor(objective)
 	end
 	for _, a in ipairs(pick.areas) do
 		if a.objective == objective then
-			return pick.color
+			return Map.AREA_C
 		end
 	end
 end

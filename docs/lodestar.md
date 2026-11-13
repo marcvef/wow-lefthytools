@@ -785,7 +785,7 @@ radius, group, hard] } }` (0..1 on that map), `m:SetSize(w, h)`, `m:Hide()`, `m:
   ring (`ff8040`, 95%), the icon stays the game's. The atlas missing: the gossip window's icon. A drop: a
   soft orange spot (`Spells\GenericGlow64` added) at least 34 px, as big as its `radius` (0..1 of the
   map's width, at most 140 px); the likeliest (`chance`) says "drops here (12%)" beside it. An
-  objective's area (`kind` "area"): a soft gold circle the same way (70%, no dot) over a plain gold
+  objective's area (`kind` "area"): a soft blue circle (the game's quest areas' blue) the same way (70%, no dot) over a plain blue
   disc 0.7 of its size (`Fill`, 30%: the glow alone, drawn added, all but vanished on light ground),
   `group` the objective it belongs to; `m:Light(group)` lights that objective's areas (full, the fill
   45%) and dims the others' (20%, the fill 8%), `m:Light()` puts them back (only alphas; kept when the map is laid again, gone with another
@@ -1201,8 +1201,12 @@ pooled `Line`s under the pins. A thread shows only while its chain's card or one
 
 **The quest picked on the map** (`ZonePage.PickOn`, `Map.SetPick`): its pin ringed in gold; its
 **objectives' areas** (`Q.Objectives`' points on this map: a kill's spawn clusters, where an item drops,
-an object's spots) as soft circles in its chain's colour (a flat disc at 22% and an added glow around
-it, `Spells\GenericGlow64`, sized by the point's `r`, at least 28 px), each with a small button at its
+an object's spots) as soft blue circles, the game's quest areas' blue (`Map.AREA_C`, `Q.AREA_BLUE`: a
+flat disc at 22% and an added glow around it, `Spells\GenericGlow64`, sized by the point's `r`, at
+least 28 px); a quest **in my log** whose areas the game knows on this map (`Q.HasBlob`:
+`C_QuestLog.GetQuestsOnMap`) gets **the game's own shape** instead (`Q.NewBlob`, `Q.DrawBlob`: a
+`QuestPOIFrame` over the whole map art, set up as Blizzard's quest blob pin, drawn again with every
+lay, so it scales with the zoom; `m.blob`), the circles hidden. Each area has a small button at its
 middle (its tooltip: the objective, where it drops; a click: the game's map pin there); an objective my
 quest log says is done stays faint, ticked; its **giver and turn-in** where no pin of it is (a ringed "!"
 or "?", grey while it isn't done); and **its way**: a dashed line in its colour from the giver to each

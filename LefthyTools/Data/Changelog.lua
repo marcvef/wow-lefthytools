@@ -575,5 +575,8 @@ ns.CHANGELOG = {
 	{ id = 189, module = "lodestar",
 		en = { "Lodestar: Wowhead links", "A quest's details have a Wowhead button (and the companion's quest view a line): its Wowhead page as a link, selected, ready to copy with Ctrl+C into your browser. Not for quests new in WoW: Forever." },
 		de = { "Lodestar: Wowhead-Links", "Die Details einer Quest haben einen Wowhead-Button (und die Questansicht des Begleiters eine Zeile): ihre Wowhead-Seite als Link, markiert, bereit zum Kopieren mit Strg+C in deinen Browser. Nicht für Quests, die neu in WoW: Forever sind." } },
+	{ id = 190, module = "lodestar",
+		en = { "Lodestar: the game's own quest areas", "For a quest in your log, the big map and the companion draw its areas the way the world map does: the game's exact shapes, scaling with the zoom. Other quests' areas stay circles, now in the same blue." },
+		de = { "Lodestar: die Questgebiete des Spiels", "Für eine Quest in deinem Log zeichnen die große Karte und der Begleiter ihre Gebiete wie die Weltkarte: die genauen Formen des Spiels, die mit dem Zoom skalieren. Die Gebiete anderer Quests bleiben Kreise, jetzt im selben Blau." } },
 	-- New entries go here, at the end.
 }
