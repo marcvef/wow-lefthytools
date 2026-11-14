@@ -728,13 +728,19 @@ local function QuestMarks(groups)
 	end
 end
 
--- Our count font strings (on the overlay, over the buttons), made as needed.
-local countPool = {}
-local function Pool(i)
-	local fs = countPool[i]
+-- Our count on a button: a font string of ours on the button itself, over its icon (one on the bag's
+-- overlay was drawn under the item buttons, so a combined item showed no count at all), made once.
+local countOf, countPool = {}, {}
+local function Pool(button)
+	local fs = countOf[button]
 	if not fs then
-		fs = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
-		countPool[i] = fs
+		fs = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+		fs:SetDrawLayer("OVERLAY", 7)
+		fs:SetJustifyH("RIGHT")
+		fs:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3)
+		fs.button = button
+		countOf[button] = fs
+		countPool[#countPool + 1] = fs
 		ammoCounts[fs] = true
 	end
 	return fs
@@ -757,10 +763,7 @@ local function AmmoCounts(groups)
 		for _, e in ipairs(s ~= EMPTY and group or {}) do
 			if e.total and (e.ammoFree and e.total > 1 or (e.stacks or 1) > 1) then
 				n = n + 1
-				local fs = Pool(n)
-				fs:ClearAllPoints()
-				fs:SetPoint("BOTTOMRIGHT", e.button, "BOTTOMRIGHT", -3, 3)
-				fs.button = e.button
+				local fs = Pool(e.button)
 				fs:SetText(e.total)
 				fs:Show()
 				local count = e.button.Count

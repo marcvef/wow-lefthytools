@@ -395,6 +395,8 @@ function FrameMethods:CreateMaskTexture()
 end
 function FrameMethods:CreateFontString()
 	local fs = {}
+	local owner = self
+	function fs:GetParent() return owner end
 	function fs:SetAllPoints() end
 	function fs:SetPoint(...) self._points = self._points or {}; self._points[#self._points + 1] = { ... } end
 	function fs:ClearAllPoints() self._points = {} end
@@ -405,6 +407,7 @@ function FrameMethods:CreateFontString()
 	function fs:SetTextColor(r, g, b) self.color = { r, g, b } end
 	function fs:SetVertexColor(r, g, b, a) self.vertex = { r, g, b, a } end
 	function fs:SetJustifyH(j) self.justifyH = j end
+	function fs:SetDrawLayer(layer, sub) self.layer, self.subLevel = layer, sub end
 	function fs:SetJustifyV(j) self.justifyV = j end
 	function fs:SetSpacing() end
 	function fs:SetWordWrap() end
