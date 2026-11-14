@@ -80,6 +80,8 @@ local freeCount = 0   -- free slots in the last layout (one of them shown, unles
 local tucked = {}     -- Blizzard's buttons we hid (the other bags' buttons, the other free slots)
 local countText       -- the free slots' count on the one shown
 local bagsToggle      -- the "Bags" header: a button that folds the bag buttons' row away and back
+local stacksSwitch    -- "Combine stacks" at the first header's right end (mouse and keyboard)
+local placedStacks    -- gamepadBagStacks as last laid out
 local peeking = false -- the row open while the controller's cursor is up there (not kept)
 local retargetFrom, retargetTo -- an item used up while another window had the cursor: where it goes on
 local REAGENT_BAG = (Enum and Enum.BagIndex and Enum.BagIndex.ReagentBag) or 5
@@ -448,6 +450,51 @@ local function Toggle(frame)
 	return bagsToggle
 end
 
+-- "Combine stacks": a small checkbox at the right end of the first section's header, with mouse and
+-- keyboard (to pick or split one stack: off, every stack its own button). Not with the controller: its
+-- A only takes an item or a bag button (see the "Bags" header); there the setting's checkbox. The choice
+-- goes through the setting (its checkbox follows); laid out again on the next frame.
+local function StacksSwitch(frame)
+	if not stacksSwitch then
+		local s = CreateFrame("Button", nil, frame)
+		s.Box = s:CreateTexture(nil, "ARTWORK")
+		s.Box:SetSize(16, 16)
+		s.Box:SetPoint("RIGHT", 2, 0)
+		s.Box:SetTexture("Interface\\Buttons\\UI-CheckBox-Up")
+		s.Check = s:CreateTexture(nil, "OVERLAY")
+		s.Check:SetAllPoints(s.Box)
+		s.Check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+		s.Text = s:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		s.Text:SetPoint("RIGHT", s.Box, "LEFT", -1, 0)
+		s.Text:SetText(L["Combine stacks"])
+		s:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+		s:SetScript("OnClick", function()
+			local tweaks = LT:GetModule("tweaks")
+			if tweaks and tweaks.db then
+				LT:SetModuleSetting(tweaks, "gamepadBagStacks", not Setting("gamepadBagStacks", true))
+			end
+		end)
+		s:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_TOP")
+			GameTooltip:SetText(L["Combine stacks"], 1, 1, 1)
+			GameTooltip:AddLine(L["On: one button per item with the whole of it. Off: every stack its own button, to pick or split one."],
+				nil, nil, nil, true)
+			GameTooltip:Show()
+		end)
+		s:SetScript("OnLeave", function(self)
+			if GameTooltip:IsOwned(self) then
+				GameTooltip:Hide()
+			end
+		end)
+		stacksSwitch = s
+	end
+	stacksSwitch:SetParent(frame)
+	stacksSwitch:SetFrameLevel(frame:GetFrameLevel() + 4)
+	stacksSwitch.Check:SetShown(Setting("gamepadBagStacks", true) == true)
+	stacksSwitch:SetSize(stacksSwitch.Text:GetStringWidth() + 20, HEADER)
+	return stacksSwitch
+end
+
 -- The cursor went down out of the row (or the header) into the items: folded again, if it was only
 -- open for the cursor. SmartNavigation runs the callback after moving (each callback keeps its own
 -- taint), registered once per button.
@@ -804,6 +851,7 @@ local function Place(frame, groups, strip)
 	local cols = Columns()
 	placedColumns, placedCount = cols, freeCount
 	placedAllFree = Setting("gamepadBagAllFree", false)
+	placedStacks = Setting("gamepadBagStacks", true)
 	contentWidth = cols * w + (cols - 1) * SPACING + (frame.GetPaddingWidth and frame:GetPaddingWidth() or 15)
 	local pad, open = PadUI(), #strip > 0
 	local base = pad and HEADER + (open and h + STRIP_GAP or SECTION_GAP) or 0 -- (the "Bags" header, the row when open)
@@ -851,6 +899,7 @@ local function Place(frame, groups, strip)
 	overlay:Show()
 	wipe(order); wipe(laidOut); wipe(starts)
 	local top, shown = base, 0
+	local switch = not pad and StacksSwitch(frame)
 	for s, group in ipairs(groups) do
 		if group[1] then
 			shown = shown + 1
@@ -861,7 +910,14 @@ local function Place(frame, groups, strip)
 			hd.text:Show()
 			hd.line:ClearAllPoints()
 			hd.line:SetPoint("LEFT", hd.text, "RIGHT", 5, 0)
-			hd.line:SetWidth(math.max(1, gridWidth - hd.text:GetStringWidth() - 8))
+			local room = 0
+			if switch and shown == 1 then -- (the switch at this header's right end)
+				switch:ClearAllPoints()
+				switch:SetPoint("BOTTOMRIGHT", rel, relPoint, left + gridWidth, ay + height - top - HEADER)
+				switch:Show()
+				room = switch:GetWidth() + 6
+			end
+			hd.line:SetWidth(math.max(1, gridWidth - hd.text:GetStringWidth() - 8 - room))
 			hd.line:Show()
 			top = top + HEADER
 			for i, e in ipairs(group) do
@@ -882,6 +938,9 @@ local function Place(frame, groups, strip)
 		end
 	end
 	HideHeaders(shown + 1)
+	if stacksSwitch and not (switch and shown > 0) then
+		stacksSwitch:Hide()
+	end
 	countText = countText or overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
 	local free = groups.tucked and groups[EMPTY][1]
 	if free and freeCount > 1 then
@@ -926,6 +985,9 @@ local function Unapply()
 	end
 	if bagsToggle then
 		bagsToggle:Hide()
+	end
+	if stacksSwitch then
+		stacksSwitch:Hide()
 	end
 end
 
@@ -1288,15 +1350,16 @@ function ns.GamepadBagsColumns()
 	local frame = Bag()
 	if Active() and hooked and frame and frame:IsShown() and applied
 		and (placedColumns ~= Columns() or (stripped.all ~= nil and stripped.all ~= RowOpen())
-			or (placedAllFree ~= nil and placedAllFree ~= Setting("gamepadBagAllFree", false))) then
+			or (placedAllFree ~= nil and placedAllFree ~= Setting("gamepadBagAllFree", false))
+			or (placedStacks ~= nil and placedStacks ~= Setting("gamepadBagStacks", true))) then
 		dirty = true
 		driver:Show()
 	end
 end
 
--- For the tests: the "Bags" header's button.
+-- For the tests: the "Bags" header's button, the "Combine stacks" switch.
 function ns.GamepadBagsToggle()
-	return bagsToggle
+	return bagsToggle, stacksSwitch
 end
 
 -- For the tests: whether ours is shown, the item buttons in its order, the bag buttons' row, the

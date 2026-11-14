@@ -214,7 +214,8 @@ do
 	st = State()
 	local freeHeader = st.headers[#st.headers] or ""
 	local free = tonumber(freeHeader:match("^Free slots %((%d+)%)$"))
-	local toggle = ns.GamepadBagsToggle()
+	local toggle, padSwitch = ns.GamepadBagsToggle()
+	check(not (padSwitch and padSwitch:IsShown()), "with the controller no \"Combine stacks\" on the bag (its A can't press it)")
 	check(#st.strip == 0 and not GamepadBagBar.BagButtonArray[1]:IsShown() and not GamepadBagBar.BagButtonArray[2]:IsShown()
 		and toggle and toggle:IsShown() and toggle.Text:GetText() == "Bags (5)",
 		"the bag buttons' row folded away under its header, got " .. tostring(toggle and toggle.Text:GetText()))
@@ -372,11 +373,22 @@ do
 	st = State()
 	check(Slot(0, 15):IsShown() and Order(State().order):find("0:15", 1, true) and tostring((CountOn(Slot(0, 15)))) == "20",
 		"a stack sold: the next one comes up, the whole of what's left: " .. tostring((CountOn(Slot(0, 15)))))
+	-- "Combine stacks" on the bag (mouse and keyboard): at the first header's right end, ticked; a click
+	-- turns it off (the setting too), another back on.
+	local _, switch = ns.GamepadBagsToggle()
+	check(switch and switch:IsShown() and switch.Check:IsShown() and switch.Text:GetText() == "Combine stacks",
+		"mouse and keyboard: a \"Combine stacks\" checkbox on the bag, ticked")
+	switch._scripts.OnClick(switch, "LeftButton")
+	Wait(1)
+	check(M.db.gamepadBagStacks == false and not switch.Check:IsShown() and switch:IsShown(), "a click: off, the setting too (unticked)")
+	check(Slot(0, 15):IsShown() and Slot(0, 16):IsShown() and Order(State().order):find("0:15 0:16", 1, true) ~= nil
+		and Slot(1, 8):IsShown() and not (State().counts[1] and State().counts[1]:IsShown()), "off: every stack its own button, no counts of ours")
+	switch._scripts.OnClick(switch, "LeftButton")
+	Wait(1)
+	check(M.db.gamepadBagStacks == true and switch.Check:IsShown() and not Slot(0, 16):IsShown(), "another click: combined again")
 	M.db.gamepadBagStacks = false
 	bag:UpdateItems()
 	Wait(1)
-	check(Slot(0, 15):IsShown() and Slot(0, 16):IsShown() and Order(State().order):find("0:15 0:16", 1, true) ~= nil
-		and Slot(1, 8):IsShown() and not (State().counts[1] and State().counts[1]:IsShown()), "off: every stack its own button, no counts of ours")
 	BAGS[0][15], BAGS[0][16], BAGS[1][7], BAGS[1][8], BAG_FAMILY[1] = nil, nil, nil, nil, nil
 	BAG_STACKS = {}
 	T("mouseBags"):SetValue(false)

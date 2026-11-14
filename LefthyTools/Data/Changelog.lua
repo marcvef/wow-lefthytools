@@ -596,5 +596,8 @@ ns.CHANGELOG = {
 	{ id = 196, module = "bestiary",
 		en = { "Bestiary: new minimap button clicks", "Click: the ledger. Right-click: the small window. Ctrl-click: the settings. Shift-click still switches the drops next to the mouse." },
 		de = { "Bestiary: neue Klicks am Minimap-Button", "Klick: das Verzeichnis. Rechtsklick: das kleine Fenster. Strg-Klick: die Einstellungen. Shift-Klick schaltet weiter die Drops neben der Maus." } },
+	{ id = 197, module = "tweaks",
+		en = { "Sorted bags: Combine stacks on the bag", "A small Combine stacks checkbox at the top right of the sorted bag (mouse and keyboard): untick it to see every stack, to pick or split one." },
+		de = { "Sortierte Taschen: Stapel-Schalter", "Ein kleines Kästchen Stapel zusammenfassen oben rechts in der sortierten Tasche (Maus und Tastatur): abwählen, um jeden Stapel zu sehen und einen zu nehmen oder zu teilen." } },
 	-- New entries go here, at the end.
 }

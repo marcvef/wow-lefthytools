@@ -96,6 +96,9 @@ per item (`e.key`: its link, else its ID), the biggest stack (the first after so
 the free slots (`groups.stackTucked`). A click still takes that one stack (Blizzard's button: sell, bank, trade,
 split); the next comes up on the next layout. Its tooltip adds "In your bags: 200 (10 stacks)" (the `SetBagItem`
 post-hook). A copy Beacon reserved for a friend (its `LefthyToolsReserved` border shown) keeps its own button.
+With mouse and keyboard a small "Combine stacks" checkbox sits at the right end of the first section's
+header (`StacksSwitch`): it switches the setting (to pick or split one stack), laid out again on the next frame
+(`placedStacks`, `ns.GamepadBagsColumns`). Not with the controller: its A only takes an item or a bag button.
 The counts are set again when the order stays but a stack grew. **Ammo** (projectiles) has its own section after the
 consumables, combined the same way; the free slots of the ammo bags (a quiver or ammo pouch:
 `C_Container.GetContainerNumFreeSlots`' family has bit 1 or 2) are one button at its end with how many, not among
