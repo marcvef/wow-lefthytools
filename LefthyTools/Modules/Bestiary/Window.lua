@@ -339,7 +339,7 @@ function Bt.TargetChanged()
 	end
 end
 
--- The ledger's buttons (the window's book, Ctrl-click on the minimap's): open on the mob shown, or
+-- The ledger's buttons (the window's book, a click on the minimap's): open on the mob shown, or
 -- close it when it's open.
 function Bt.LedgerButton()
 	local ledger = Bt.Ledger and Bt.Ledger()
@@ -410,25 +410,27 @@ local function ButtonOnEnter(self)
 		count, kills = count + 1, kills + mob.kills
 	end
 	GameTooltip:AddLine(L["%d kinds of mobs, %d kills"]:format(count, kills), 1, 1, 1)
-	GameTooltip:AddLine(L["Click: open or close the window"], 0.8, 0.8, 0.8)
+	GameTooltip:AddLine(L["Click: open or close the ledger"], 0.8, 0.8, 0.8)
+	GameTooltip:AddLine(L["Right-click: open or close the small window"], 0.8, 0.8, 0.8)
 	GameTooltip:AddLine((M.db.hoverCard and L["Shift-click: drops next to the mouse off"] or L["Shift-click: drops next to the mouse on"]),
 		0.8, 0.8, 0.8)
-	GameTooltip:AddLine(L["Ctrl-click: the ledger"], 0.8, 0.8, 0.8)
-	GameTooltip:AddLine(L["Right-click: settings"], 0.8, 0.8, 0.8)
+	GameTooltip:AddLine(L["Ctrl-click: settings"], 0.8, 0.8, 0.8)
 	GameTooltip:AddLine(L["Drag: move it along the minimap"], 0.8, 0.8, 0.8)
 	GameTooltip:Show()
 end
 
+-- Click: the ledger (the big window); right-click: the small window; Shift: the card next to the
+-- mouse; Ctrl: the settings.
 local function ButtonOnClick(_, mouseButton)
-	if mouseButton == "RightButton" then
+	if IsControlKeyDown() then
 		LT:OpenSettings(M)
 	elseif IsShiftKeyDown() then
 		LT:SetModuleSetting(M, "hoverCard", not M.db.hoverCard)
 		M:Print(M.db.hoverCard and "drops next to the mouse: on." or "drops next to the mouse: off.")
-	elseif IsControlKeyDown() then
-		Bt.LedgerButton()
-	else
+	elseif mouseButton == "RightButton" then
 		Bt.Toggle()
+	else
+		Bt.LedgerButton()
 	end
 end
 

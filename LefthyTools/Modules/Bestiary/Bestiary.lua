@@ -530,11 +530,11 @@ end
 function M:BuildOptions(o)
 	o:Header(L["Window"])
 	o:Button(L["Open the Bestiary"], L["Open"], function() Bt.Toggle() end,
-		L["Your target's drops: each item, how many you got and its drop chance. It stays open (Escape doesn't close it) and follows your target. Also /bestiary."])
+		L["Your target's drops: each item, how many you got and its drop chance. It stays open (Escape doesn't close it) and follows your target. Also right-click on the minimap button, or /bestiary."])
 	o:Checkbox("minimapButton", L["Minimap button"],
-		L["A button on the edge of the minimap: click opens or closes the Bestiary, right-click these settings. Drag it to move it."])
+		L["A button on the edge of the minimap: click opens or closes the ledger, right-click the small window, Ctrl-click these settings. Drag it to move it."])
 	o:Button(L["Open the ledger"], L["Open"], function() Bt.ToggleLedger() end,
-		L["Every mob you've killed, with its statistics and drops; search mobs and items. Also Ctrl-click on the minimap button, or /bestiary ledger."])
+		L["Every mob you've killed, with its statistics and drops; search mobs and items. Also a click on the minimap button, or /bestiary ledger."])
 	o:Header(L["Drops"])
 	o:Checkbox("hoverCard", L["Drops next to the mouse"],
 		L["Hovering an enemy you've killed before shows its likeliest drops beside the mouse. Shift-click on the minimap button switches it on or off."])

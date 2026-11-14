@@ -593,5 +593,8 @@ ns.CHANGELOG = {
 	{ id = 195, module = "lodestar",
 		en = { "Lodestar: complete dungeon quests", "Many dungeon quests were missing from their dungeon or listed under the zone outside. Uldaman, Gnomeregan, Razorfen Kraul and the Stockade now have their own lists, Zul'Farrak and Zul'Gurub are complete. A quest you do in a dungeon but get elsewhere (Rituals of Power, Onyxia's head) is listed with the dungeon too. Back in Desolace: Test Your Theory." },
 		de = { "Lodestar: vollständige Dungeonquests", "Viele Dungeonquests fehlten in ihrem Dungeon oder standen unter der Zone davor. Uldaman, Gnomeregan, Kral der Klingenhauer und Das Verlies haben jetzt eigene Listen, Zul'Farrak und Zul'Gurub sind vollständig. Eine Quest, die du in einem Dungeon erledigst, aber anderswo annimmst (z. B. mit Onyxias Kopf), steht jetzt auch beim Dungeon. Wieder da: eine fehlende Quest in Desolace." } },
+	{ id = 196, module = "bestiary",
+		en = { "Bestiary: new minimap button clicks", "Click: the ledger. Right-click: the small window. Ctrl-click: the settings. Shift-click still switches the drops next to the mouse." },
+		de = { "Bestiary: neue Klicks am Minimap-Button", "Klick: das Verzeichnis. Rechtsklick: das kleine Fenster. Strg-Klick: die Einstellungen. Shift-Klick schaltet weiter die Drops neben der Maus." } },
 	-- New entries go here, at the end.
 }

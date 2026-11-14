@@ -860,17 +860,17 @@ L["What the mobs you kill drop: a window for your target with each drop, how man
 	"Was die Mobs droppen, die du tötest: ein Fenster für dein Ziel mit jedem Drop, wie viele du bekommen hast und der Dropchance, aus deinen eigenen Kills. Für alle deine Charaktere, nur auf deinem Computer."
 L["Window"] = "Fenster"
 L["Open the Bestiary"] = "Bestiary öffnen"
-L["Your target's drops: each item, how many you got and its drop chance. It stays open (Escape doesn't close it) and follows your target. Also /bestiary."] =
-	"Die Drops deines Ziels: jedes Item, wie viele du bekommen hast und seine Dropchance. Es bleibt offen (Escape schließt es nicht) und folgt deinem Ziel. Auch /bestiary."
-L["A button on the edge of the minimap: click opens or closes the Bestiary, right-click these settings. Drag it to move it."] =
-	"Ein Button am Rand der Minimap: Klick öffnet oder schließt das Bestiary, Rechtsklick diese Einstellungen. Zum Verschieben ziehen."
+L["Your target's drops: each item, how many you got and its drop chance. It stays open (Escape doesn't close it) and follows your target. Also right-click on the minimap button, or /bestiary."] =
+	"Die Drops deines Ziels: jedes Item, wie viele du bekommen hast und seine Dropchance. Es bleibt offen (Escape schließt es nicht) und folgt deinem Ziel. Auch Rechtsklick auf den Minimap-Button oder /bestiary."
+L["A button on the edge of the minimap: click opens or closes the ledger, right-click the small window, Ctrl-click these settings. Drag it to move it."] =
+	"Ein Button am Rand der Minimap: Klick öffnet oder schließt das Verzeichnis, Rechtsklick das kleine Fenster, Strg-Klick diese Einstellungen. Zum Verschieben ziehen."
 L["Drops"] = "Drops"
 L["Drops next to the mouse"] = "Drops neben der Maus"
 L["Hovering an enemy you've killed before shows its likeliest drops beside the mouse. Shift-click on the minimap button switches it on or off."] =
 	"Fährst du über einen Gegner, den du schon getötet hast, stehen seine wahrscheinlichsten Drops neben der Maus. Shift-Klick auf den Minimap-Button schaltet es an oder aus."
 L["Open the ledger"] = "Verzeichnis öffnen"
-L["Every mob you've killed, with its statistics and drops; search mobs and items. Also Ctrl-click on the minimap button, or /bestiary ledger."] =
-	"Jeder Mob, den du getötet hast, mit Statistiken und Drops; Suche nach Mobs und Items. Auch Strg-Klick auf den Minimap-Button oder /bestiary ledger."
+L["Every mob you've killed, with its statistics and drops; search mobs and items. Also a click on the minimap button, or /bestiary ledger."] =
+	"Jeder Mob, den du getötet hast, mit Statistiken und Drops; Suche nach Mobs und Items. Auch Klick auf den Minimap-Button oder /bestiary ledger."
 L["Drop chances in item tooltips"] = "Dropchancen in Item-Tooltips"
 L["An item's tooltip (in your bags, in chat, anywhere) lists the three mobs it comes from likeliest, with the chance; a pelt marks skinning."] =
 	"Der Tooltip eines Items (in deinen Taschen, im Chat, überall) zeigt die drei Mobs, von denen es am wahrscheinlichsten kommt, mit der Chance; ein Fell steht für Kürschnern."
@@ -882,7 +882,6 @@ L["Every mob you've killed, its statistics and drops; search mobs and items."] =
 	"Jeder Mob, den du getötet hast, seine Statistiken und Drops; Suche nach Mobs und Items."
 L["Shift-click: drops next to the mouse off"] = "Shift-Klick: Drops neben der Maus aus"
 L["Shift-click: drops next to the mouse on"] = "Shift-Klick: Drops neben der Maus an"
-L["Ctrl-click: the ledger"] = "Strg-Klick: das Verzeichnis"
 L["kill"] = "Kill"
 L["kills"] = "Kills"
 L["%s each, %s in all"] = "%s pro Kill, %s insgesamt"
@@ -925,7 +924,9 @@ L["Only grey items so far."] = "Bisher nur graue Items."
 L["Nothing dropped yet."] = "Noch nichts gedroppt."
 L["In a group: kills aren't counted (the loot is shared)."] = "In einer Gruppe: Kills zählen nicht (der Loot wird geteilt)."
 L["%d kinds of mobs, %d kills"] = "%d Arten von Mobs, %d Kills"
-L["Click: open or close the window"] = "Klick: Fenster öffnen oder schließen"
+L["Click: open or close the ledger"] = "Klick: Verzeichnis öffnen oder schließen"
+L["Right-click: open or close the small window"] = "Rechtsklick: kleines Fenster öffnen oder schließen"
+L["Ctrl-click: settings"] = "Strg-Klick: Einstellungen"
 L["Compare with a drop database"] = "Mit einer Drop-Datenbank vergleichen"
 L["Beside your own numbers, what a classic world database (CMaNGOS) says each mob can drop: its chance on each of your drops, and what you haven't had yet, faded. Beacon's fight stream takes mobs' health from it too. WoW: Forever may differ. It's an add-on of its own, LefthyTools Drop Data, installed with LefthyTools; /bestiary data says whether it's there."] =
 	"Neben deinen eigenen Zahlen, was laut einer Classic-Weltdatenbank (CMaNGOS) jeder Mob droppen kann: ihre Chance bei jedem deiner Drops, und verblasst, was du noch nicht hattest. Der Kampf-Stream von Beacon nimmt auch das Leben der Mobs daraus. WoW: Forever kann abweichen. Es ist ein eigenes Addon, LefthyTools Drop Data, das mit LefthyTools installiert wird; /bestiary data sagt, ob es da ist."

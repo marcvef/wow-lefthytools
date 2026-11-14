@@ -368,7 +368,7 @@ ledger)". Not on the window's own drop tooltips (they show the numbers already: 
 ## The ledger (Ledger.lua)
 
 `LefthyToolsBestiaryLedger`, 986 x 580, same look; Escape closes it (it's for looking things up),
-registered with `LT.Window.Register`. Opened by the window's book, Ctrl-click on the minimap button,
+registered with `LT.Window.Register`. Opened by the window's book, a click on the minimap button,
 the settings or `/bestiary ledger [search]`. Its size fits a 1366 x 768 screen at the default UI
 scale (UIParent 768 high) with room around it, and it's clamped to the screen. Columns: the list
 (282), the picked mob's details (320), its map (330), its drops under both (the details and the
@@ -448,8 +448,8 @@ map wide).
 ## Minimap button and settings
 
 `LT.Window.MinimapButton` (a loot bag, angle `minimapAngle`, 150: upper left), a gold dot while the
-window is open; click toggles the window, Shift-click switches the card beside the mouse (a chat
-line says which), Ctrl-click opens or closes the ledger, right-click opens the settings; its tooltip
+window is open; click opens or closes the ledger (the big window), right-click toggles the small window,
+Shift-click switches the card beside the mouse (a chat line says which), Ctrl-click opens the settings; its tooltip
 says how many kinds and kills are known and all of that. Settings: open the window, open the
 ledger, minimap button (on), drops beside the mouse (off), hidden in combat (on), drop chances in
 item tooltips (on), grey

@@ -399,7 +399,7 @@ once a second, so it costs nothing you'd notice.
 
 ## Bestiary
 
-What the mobs you kill drop. Click the loot bag on the minimap's edge (or type `/bestiary`) for a
+What the mobs you kill drop. Right-click the loot bag on the minimap's edge (or type `/bestiary`) for a
 small window that follows your target: its portrait, name and level (the levels you've seen of its
 kind, "Level 9–10"), how many of it you killed and the coin each brought, and every item it
 dropped: the icon, how many you got in its corner and the drop chance under it. Hover a drop for the item's tooltip with the numbers, Shift-click to
@@ -411,7 +411,7 @@ mob someone else tagged first), and only once their corpse is looted or the game
 and chests don't count as a mob's drops; **skinning** is kept apart, per skinning, and marked with
 Skinning's pelt icon. All your characters add to the same database; it stays on your computer.
 
-**The ledger** (the book in the window, Ctrl-click on the minimap button, or `/bestiary ledger`)
+**The ledger** (the book in the window, a click on the minimap button, or `/bestiary ledger`)
 lists every mob you've killed: kills, levels, its best drops at a glance, sortable. Pick one for
 its turning model, kills, coin each and in all, first and last kill, and all its drops. The search
 finds mobs and items with just some of their letters in order ("dfbnd" for Defias Bandit, "milk"
@@ -458,8 +458,8 @@ drops and how many kills since you pinned it, click to search for it. When it fi
 quiet chat line says after how many kills (and how many you'd have expected), and it comes off the
 list. `/bestiary wishes` lists them.
 
-Minimap button: click for the window, **Shift-click** to switch the drops next to the mouse on
-or off, Ctrl-click for the ledger, right-click for the settings. `/bestiary log` shows what was
+Minimap button: click for the ledger, right-click for the small window, **Shift-click** to switch
+the drops next to the mouse on or off, Ctrl-click for the settings. `/bestiary log` shows what was
 made of your last loot windows (to see why something wasn't counted).
 
 | Setting | Default |

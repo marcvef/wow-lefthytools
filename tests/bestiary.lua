@@ -19,10 +19,12 @@ do
 		"on by default: a minimap button; no window yet; the card next to the mouse off")
 	button._scripts.OnEnter(button)
 	check(TOOLTIP.title == "Bestiary" and tipFind("0 kinds of mobs, 0 kills"), "the button's tooltip: how much it knows")
-	button._scripts.OnClick(button, "LeftButton")
+	check(tipFind("Click: open or close the ledger") and tipFind("Right-click: open or close the small window") and tipFind("Ctrl-click: settings"),
+		"the tooltip: click the ledger, right-click the small window, Ctrl-click the settings")
+	button._scripts.OnClick(button, "RightButton")
 	win = Bt.Frames()
 	check(win and win:IsShown() and win.Name:GetText() == "Bestiary" and win.Note:GetText() == "Target a mob to see what it drops."
-		and button.Open:IsShown(), "a click opens the window: target a mob (a gold dot on the button)")
+		and button.Open:IsShown(), "a right-click opens the small window: target a mob (a gold dot on the button)")
 	local escapes = false
 	for _, name in ipairs(UISpecialFrames) do if name == "LefthyToolsBestiaryFrame" then escapes = true end end
 	check(not escapes, "Escape doesn't close it")
@@ -237,7 +239,7 @@ do
 	cells[1]._scripts.OnEnter(cells[1])
 	check(not tipFind("drop chance (kills)"), "the window's own drop: its numbers, not the list again")
 	cells[1]._scripts.OnLeave(cells[1])
-	-- The minimap button: Shift-click switches the card next to the mouse, Ctrl-click the ledger.
+	-- The minimap button: Shift-click switches the card next to the mouse, a click the ledger.
 	STATE.shift = true
 	button._scripts.OnClick(button, "LeftButton")
 	STATE.shift = false
@@ -246,14 +248,12 @@ do
 	button._scripts.OnClick(button, "LeftButton")
 	STATE.shift = false
 	check(LefthyToolsDB.settings.bestiary.hoverCard == false, "again: off")
-	STATE.ctrl = true
 	button._scripts.OnClick(button, "LeftButton")
-	STATE.ctrl = false
 	local ledger, entries, picked = Bt.Ledger()
 	-- The ledger: every mob, the most kills first; the window's mob picked.
 	check(ledger and ledger:IsShown() and picked == 116 and #entries == 2 and ledger.rows[1].Name:GetText():find("Defias Bandit", 1, true)
 		and ledger.rows[1].Kills:GetText() == "4" and ledger.Pane.Name:GetText() == "Defias Bandit" and ledger.Pane.Model._creature == 116,
-		"Ctrl-click: the ledger, every mob (the most kills first), the window's mob picked: its model and name")
+		"a click: the ledger, every mob (the most kills first), the window's mob picked: its model and name")
 	check(ledger.Summary:GetText() == "2 mobs  ·  7 kills  ·  5 items  ·  12s 34c coin, 1s 76c per kill" and ledger.rows[1].icons[1]:IsShown(),
 		"at the top: all it knows, the coin per kill over all kills; a row's best drops as tiny icons")
 	local escapes = false
