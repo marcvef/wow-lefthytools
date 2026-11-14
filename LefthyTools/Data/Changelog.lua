@@ -587,5 +587,8 @@ ns.CHANGELOG = {
 	{ id = 193, module = "tweaks",
 		en = { "Sorted bags: stacks combined, ammo", "Each item is one button with all of it (ten stacks of Linen Cloth: one button saying 200); selling and banking still take one stack at a time. Ammo has its own section, with your quiver's free slots on one button. The reagent bag is always included, also when you open only the backpack. Option: Sorted bags: stacks combined." },
 		de = { "Sortierte Taschen: Stapel, Munition", "Jeder Gegenstand ist ein Button mit seiner ganzen Menge (zehn Stapel Leinenstoff: ein Button mit 200); Verkaufen und Bank nehmen weiter einen Stapel nach dem anderen. Munition hat einen eigenen Bereich, die freien Plätze deines Köchers auf einem Button. Die Reagenzientasche ist immer dabei, auch wenn du nur den Rucksack öffnest. Option: Sortierte Taschen: Stapel zusammengefasst." } },
+	{ id = 194, module = "lodestar",
+		en = { "Lodestar: Test of Lore and its chain", "The Horde chain Test of Faith, Endurance, Strength and Test of Lore up to Final Passage was missing from the quest data (its titles looked like test quests): it's all there now." },
+		de = { "Lodestar: Test of Lore und seine Reihe", "Die Horde-Questreihe Test of Faith, Endurance, Strength und Test of Lore bis Final Passage fehlte in den Questdaten (ihre Titel sahen wie Testquests aus): jetzt ist sie vollständig." } },
 	-- New entries go here, at the end.
 }
