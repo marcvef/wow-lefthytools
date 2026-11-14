@@ -457,6 +457,8 @@ end
 local function StacksSwitch(frame)
 	if not stacksSwitch then
 		local s = CreateFrame("Button", nil, frame)
+		s:EnableMouse(true)
+		s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		s.Box = s:CreateTexture(nil, "ARTWORK")
 		s.Box:SetSize(16, 16)
 		s.Box:SetPoint("RIGHT", 2, 0)
@@ -489,7 +491,8 @@ local function StacksSwitch(frame)
 		stacksSwitch = s
 	end
 	stacksSwitch:SetParent(frame)
-	stacksSwitch:SetFrameLevel(frame:GetFrameLevel() + 4)
+	-- Well above the bag's own parts: at frame + 4 it got no clicks in game (something of the bag's lay over it).
+	stacksSwitch:SetFrameLevel(frame:GetFrameLevel() + 20)
 	stacksSwitch.Check:SetShown(Setting("gamepadBagStacks", true) == true)
 	stacksSwitch:SetSize(stacksSwitch.Text:GetStringWidth() + 20, HEADER)
 	return stacksSwitch
