@@ -80,6 +80,10 @@
 //   it or Forever changed it (creatureLevels). Not triggers or friends of the quest's side.
 // - Group (flag g): quest type elite (1), dungeon (81) or raid (62): EG Link's questInfoId for the quests it
 //   has (Forever's server's), else classic-db's Type.
+// - Dungeons (raids, battlegrounds): ZoneOrSort's area on an instance's map, an instance's own area
+//   (Map.AreaTableID), or its entrance (a zone's subzone of the instance's name: classic-db's Uldaman, Gnomeregan,
+//   Razorfen Kraul, Zul'Farrak, Zul'Gurub); else where the quest is done: every objective's target in one
+//   instance, else (none known elsewhere) a giver, ender or starting item only there. Such a quest has no zone.
 // - Who starts and ends what (npcQuests, objectQuests) and the quests given in a zone that are
 //   listed elsewhere (a dungeon's, a city's): for tooltips and "what's here" without reading all.
 // - Left out: quests the client doesn't know (not in QuestV2, unless repeatable: those have no
@@ -118,7 +122,8 @@ const RATIO = 1.5;
 const DEEP = 25; // yards: this far inside one zone's explored-area hit rectangle wins over recorded positions within NEAR
 const MAP_ART = [1002, 668]; // a zone map's art in pixels (WorldMapOverlay's offsets and hit rectangles are in them)
 const SAMPLE_CELL = 200; // yards: the cells recorded positions are looked up in
-const UNUSED = /\[UNUSED\]|<UNUSED>|UNUSED |<NYI>|\bNYI\b|<TXT>|\[PH\]|<CHANGE TO GOSSIP>|^ZZOLD|\(OLD\)|<TEST>|\bTEST\b|^Test (?!of )|^REUSE|\[DEPRECATED\]|<DEPRECATED>|Deprecated/;
+// Unused quests' titles (test ones: "Test Kill Quest", "Hunter test quest"; not Test of Lore or Test Your Theory).
+const UNUSED = /\[UNUSED\]|<UNUSED>|UNUSED |<NYI>|\bNYI\b|<TXT>|\[PH\]|<CHANGE TO GOSSIP>|^ZZOLD|\(OLD\)|<TEST>|\bTEST\b|\b[Tt]est (?:[Kk]ill )?[Qq]uest\b|^REUSE|\[DEPRECATED\]|<DEPRECATED>|Deprecated/;
 const ZONE_TYPES = { 3: 0, 4: 1 }; // UiMap types a position goes on (zone, dungeon floor), in that order of preference
 const OBJECTIVE_KINDS = { monster: "k", gameObject: "o", item: "i" }; // EG Link's objective types kept (kill, object, item)
 const XP_UNKNOWN = new Set([41, 62, 81]); // quest types (PvP, raid, dungeon) whose XP Forever multiplies: no classic formula
@@ -242,8 +247,23 @@ function worldMaps(t) {
   boxes.sort((a, b) => ZONE_TYPES[a.type] - ZONE_TYPES[b.type] || a.size - b.size || a.ui - b.ui);
   const areas = new Map(t.AreaTable.map((r) => [+r.ID, { id: +r.ID, name: r.AreaName_lang, parent: +r.ParentAreaID, map: +r.ContinentID }]));
   const instance = new Map(t.Map.map((r) => [+r.ID, { name: r.MapName_lang, type: +r.InstanceType }]));
-  // An instance's own area (Blackrock Depths' area is on Eastern Kingdoms' map in AreaTable).
-  const instanceArea = new Map(t.Map.filter((r) => +r.AreaTableID).map((r) => [+r.AreaTableID, instance.get(+r.ID)]));
+  // An instance's own area (Blackrock Depths' area is on Eastern Kingdoms' map in AreaTable): only a dungeon's,
+  // raid's or battleground's row (the Stockade's area is also an unused world map's, <unused>StormwindPrison).
+  const isInstance = (id) => instance.has(id) && instance.get(id).type >= 1 && instance.get(id).type <= 3;
+  const instanceArea = new Map(t.Map.filter((r) => +r.AreaTableID && isInstance(+r.ID)).map((r) => [+r.AreaTableID, instance.get(+r.ID)]));
+  // A zone's subzone named as an instance (its map's name or own area's) is the entrance, which classic-db sorts
+  // the instance's quests under: Uldaman in the Badlands, Gnomeregan in Dun Morogh, Razorfen Kraul in the Barrens,
+  // Zul'Farrak in Tanaris, Zul'Gurub in Stranglethorn.
+  const named = new Map();
+  for (const r of [...t.Map].sort((a, b) => +a.ID - +b.ID)) {
+    if (!isInstance(+r.ID)) continue;
+    const own = areas.get(+r.AreaTableID);
+    for (const name of [r.MapName_lang, own && own.name]) if (name && !named.has(name)) named.set(name, instance.get(+r.ID));
+  }
+  const entrances = new Set();
+  for (const a of [...areas.values()].sort((x, y) => x.id - y.id)) {
+    if (a.parent && !isInstance(a.map) && !instanceArea.has(a.id) && named.has(a.name)) { instanceArea.set(a.id, named.get(a.name)); entrances.add(a.id); }
+  }
   // An area's uiMap (itself or a parent area's), or nil.
   const uiOfArea = (id) => {
     for (let a = id, n = 0; a && n < 12; n++) {
@@ -274,7 +294,7 @@ function worldMaps(t) {
       });
     }
   }
-  return { ui, boxes, continentBoxes, areas, instance, instanceArea, continentOf, uiOfArea, overlays };
+  return { ui, boxes, continentBoxes, areas, instance, instanceArea, entrances, continentOf, uiOfArea, overlays };
 }
 
 // A point (0..1) on a rectangle's uiMap for world x, y.
@@ -963,6 +983,8 @@ async function main() {
       const inst = world.instanceArea.get(zs) || (area && world.instance.get(area.map));
       if (inst && inst.type >= 1 && inst.type <= 3) {
         q.dungeon = inst.name;
+        // (an entrance's zone still tells where the quest's NPCs, items and mobs are likelier: near)
+        if (world.entrances.has(zs)) q.near = world.uiOfArea(zs);
       } else {
         q.zone = world.uiOfArea(zs);
         if (!q.zone && area) q.zoneName = area.name;
@@ -978,10 +1000,11 @@ async function main() {
   for (const q of quests.values()) for (const k of q.starts.concat(q.ends)) used.add(k);
   const preferOf = new Map(); // NPC -> Map(its quests' zones -> how many)
   for (const q of quests.values()) {
-    if (!q.zone) continue;
+    const zone = q.zone || q.near;
+    if (!zone) continue;
     for (const k of q.starts.concat(q.ends)) {
       if (!preferOf.has(k)) preferOf.set(k, new Map());
-      preferOf.get(k).set(q.zone, (preferOf.get(k).get(q.zone) || 0) + 1);
+      preferOf.get(k).set(zone, (preferOf.get(k).get(zone) || 0) + 1);
     }
   }
   const actors = new Map(); // key -> { name, points: [[[ui, x, y], alternatives...]], side }
@@ -1075,13 +1098,13 @@ async function main() {
   };
   let starterItems = 0;
   for (const q of quests.values()) {
-    for (const k of q.starts) if (k[0] === "i") addItemZone(+k.slice(1), q.zone);
+    for (const k of q.starts) if (k[0] === "i") addItemZone(+k.slice(1), q.zone || q.near);
   }
   starterItems = starterZones.size;
   for (const q of quests.values()) {
     for (const o of q.objectives) {
       if (o.kind !== "i") continue;
-      addItemZone(o.id, q.zone);
+      addItemZone(o.id, q.zone || q.near);
       if (!actors.has("i" + o.id)) actors.set("i" + o.id, { name: itemName.get(o.id), points: [] });
     }
   }
@@ -1154,7 +1177,7 @@ async function main() {
   };
   for (const [item, m] of dropsOf) for (const zone of starterZones.get(item)) for (const key of m.keys()) preferSource(key, zone);
   for (const q of quests.values()) {
-    for (const o of q.objectives) if (o.kind !== "i") preferSource((o.kind === "k" ? "n" : "o") + o.id, q.zone);
+    for (const o of q.objectives) if (o.kind !== "i") preferSource((o.kind === "k" ? "n" : "o") + o.id, q.zone || q.near);
   }
   const sources = new Map(); // key -> { name, points: [{ ui, x, y, r }], spawns }
   const sourceOf = (key) => {
@@ -1341,6 +1364,46 @@ async function main() {
 
   // --- event quests: only takeable while their holiday is on (flag e)
   markEvents(quests, eg, sql, sortName, creatures);
+
+  // --- dungeons by where a quest is done: classic-db sorts many a dungeon's quests under their giver's zone,
+  // city or class (Rituals of Power under Mage, The Unsent Letter that VanCleef drops under Stormwind, Haze of
+  // Evil under Un'Goro). One whose every objective's target (a creature to kill, an object to use, every source
+  // of an item to collect) stands only in one dungeon, raid or battleground (classic-db's spawns), else (none of
+  // them known elsewhere) whose givers, enders or starting items stand only in one, is that place's: Victory for
+  // the Horde (Onyxia's head starts it), the Lunar Festival's elders in dungeons. Its zone goes (its giver's zone
+  // lists it as given there, as the sorted ones). An item to buy, skin or fish is no place's.
+  const anywhere = new Set();
+  for (const name of ["npc_vendor", "npc_vendor_template", "skinning_loot_template", "fishing_loot_template"]) for (const r of rows(sql, name)) anywhere.add(r.item);
+  const instanceOf = (key) => { // the instance's name, null: elsewhere too, undefined: no spawns
+    const maps = uniq((spawns.get(key) || []).map((s) => s[0]));
+    if (!maps.length) return undefined;
+    const inst = maps.length === 1 && world.instance.get(maps[0]);
+    return inst && inst.type >= 1 && inst.type <= 3 ? inst.name : null;
+  };
+  // (one place of a list: null when any is elsewhere or two differ, undefined when none is known)
+  const oneOf = (list) => (list.includes(null) || uniq(list.filter(Boolean)).length > 1 ? null : list.find(Boolean));
+  const placeOf = (k) => {
+    if (k[0] !== "i") return instanceOf(k);
+    const item = +k.slice(1);
+    if (anywhere.has(item)) return null;
+    return dropsOf.has(item) ? oneOf([...dropsOf.get(item).keys()].sort().map(instanceOf)) : undefined;
+  };
+  const byPlace = { objectives: 0, actors: 0 };
+  for (const q of [...quests.values()].sort((a, b) => a.id - b.id)) {
+    if (q.dungeon) continue;
+    const goals = q.objectives.filter((o) => !o.provided).map((o) => placeOf((o.kind === "k" ? "n" : o.kind) + o.id));
+    let d = goals.length && !goals.includes(undefined) ? oneOf(goals) : undefined;
+    if (d) byPlace.objectives++;
+    else if (!goals.includes(null)) {
+      const at = uniq(q.starts.concat(q.ends).map(placeOf).filter(Boolean));
+      if (at.length === 1) { d = at[0]; byPlace.actors++; }
+    }
+    if (!d) continue;
+    q.dungeon = d;
+    q.zone = undefined;
+    q.zoneName = undefined;
+  }
+  console.log(`dungeons by where a quest is done: ${byPlace.objectives} by their objectives, ${byPlace.actors} by their givers or enders`);
 
   // --- names, zones, dungeons
   const names = new Set();

@@ -83,11 +83,27 @@ file, and it credits Questie for quest data).
   lines (QuestLineXQuest, by `OrderIndex`) give the same where nothing else does. Last, a quest
   with nothing else whose `before` (three characters or more) has exactly one new quest of the same
   zone that isn't before another of them: that one.
-- **Zones:** `ZoneOrSort` above 0 is an area: a dungeon, raid or battleground (the instance's own
-  area, `Map.AreaTableID`, or an area on an instance map) gives `dungeon`; otherwise the area's
+- **Zones:** `ZoneOrSort` above 0 is an area: a dungeon, raid or battleground gives `dungeon` (the
+  instance's own area, `Map.AreaTableID` of an instance's row only: the Stockade's area is also the
+  unused world map `<unused>StormwindPrison`'s; an area on an instance map; or the instance's
+  **entrance**, a zone's subzone named like the instance's map or own area, which classic-db sorts
+  its quests under: Uldaman in the Badlands, Gnomeregan in Dun Morogh, Razorfen Kraul in the Barrens,
+  Zul'Farrak in Tanaris, Zul'Gurub in Stranglethorn, Alterac Valley in the Alterac Mountains; the
+  entrance's zone still says where its NPCs and items are likelier, as before); otherwise the area's
   uiMap (UiMapAssignment by area, else its parent areas'). Below 0 it's a QuestSort (class,
   profession, Seasonal, Camping, ...): `sort`, and the zone is the first giver's. Forever's quests:
   EG Link's area or category, QuestPOIBlob's map, the giver's zone.
+- **Dungeons by where a quest is done:** classic-db sorts many dungeon quests under their giver's
+  zone, city or class (Rituals of Power under Mage, Haze of Evil under Un'Goro). A quest without a
+  dungeon whose every objective's target (a creature to kill, an object to use, every source of an
+  item to collect, by classic-db's spawns) stands only in one dungeon, raid or battleground is its
+  (16: Rituals of Power, Power in Uldaman, The Molten Core, the Sunken Temple's class quests, ...);
+  else, with none of them known to stand elsewhere, one whose givers, enders or starting items stand
+  only in one (16: Victory for the Horde, started by Onyxia's head; Dire Maul's Enchanted Thorium
+  Platemail books; the Lunar Festival's elders in dungeons). An item to buy, skin or fish
+  (`npc_vendor`, `skinning_`/`fishing_loot_template`) is no place's (Rugged Leather for the
+  Ahn'Qiraj war isn't Dire Maul's). Such a quest loses its zone (its giver's zone lists it as given
+  there, as the sorted ones), keeps its sort.
 - **Places:** each spawn's world x/y on a zone (or dungeon floor, by height) rectangle of
   UiMapAssignment holding it: `mapX = (maxY - y) / (maxY - minY)`, `mapY = (maxX - x) / (maxX -
   minX)`, then into the assignment's `UiMin`..`UiMax` (Marshal Dughan comes out at 42.1, 65.9, as in
@@ -209,22 +225,32 @@ file, and it credits Questie for quest data).
   `objectQuests`), and per zone the quests given there (a giver's first place) that are listed
   elsewhere: a dungeon's quests at its town, another zone's.
 - **Left out:** classic quests the Forever client doesn't have (not in QuestV2, unless repeatable;
-  137, mostly Naxxramas' tier quests), unused ones by title, quests nobody gives or takes; Forever's
-  test quests; later classic content (IDs 10000+) no one was seen offered.
+  137: Naxxramas' tier quests, the Ahn'Qiraj war's signets and Silithus' pre-war quests, the Lunar
+  Festival's item quests, a few old class quests such as Call of Water 1103; EG Link has none of them,
+  not as a quest, an NPC's offer or take, a prerequisite record or a turn-in, so QuestV2 is right
+  there), unused ones by title (test ones too: "Test Kill Quest"; not Test of Lore or Forever's Test
+  Your Theory in Desolace, which the old `^Test ` rule dropped), quests nobody gives or takes (68:
+  battleground marks and Alterac Valley's turn-ins without a giver in classic-db; EG Link knows no
+  giver or ender for them either); Forever's test quests; later classic content (IDs 10000+) no one was
+  seen offered.
 
-Numbers (Forever 1.60.1.70862, EG Link 9fcae73): 5257 quests (4031 classic, 1226 Forever's), 3473
-of them in 784 chains, 4312 with a giver on the map or an item; of the 1817 new quests 1213 are in
-it, 415 with chain info, 492 with a giver, 808 with a zone; 49 zones (Deadwind Pass had only a
-Duskwood quest, by a giver put on the wrong map), 35 dungeons, 1667 NPCs (789 places with
-alternatives), 239 objects, 3434 items (599 start quests; 1602 with drop sources, 45 of them from EG
-Link; 2834 sources of drops and objectives, 2074 with places); 3786 quests with objectives (5699, 2556 quests'
-from EG Link), 727 with a choice of rewards, 1266 with reward items, 1058 with money, 4016 with
-experience; 95 quests with Forever's levels instead of classic's, 12 that scale; 3372 quests with a
-race mask, 3010 of them with a Skyborne bit; 3515 of one side (69 given one by the rules for quests
-without: 8 by their ender, 37 by an NPC their text names, 24 by their zone; 1728 left without races or a
-side), 232 event quests; 1259 quests with mob levels (229 of them above the quest's own level: 49 by 1,
-62 by 2, 118 by 3 or more, mostly raids' bosses at 63), 991 for a group; 0.99 MB (1,037,581 bytes; 1,037,544 before
-places by the zones' areas; 0.98 MB,
+Numbers (Forever 1.60.1.70888, EG Link 9fcae73): 5267 quests (4040 classic, 1227 Forever's), 3484
+of them in 785 chains, 4322 with a giver on the map or an item; of the 1817 new quests 1214 are in
+it, 416 with chain info, 493 with a giver, 809 with a zone; 49 zones (Deadwind Pass had only a
+Duskwood quest, by a giver put on the wrong map), 39 dungeons (Uldaman 31, Gnomeregan 27, Razorfen
+Kraul 6 and the Stockade 6 were missing; Zul'Gurub 48 to 86, Zul'Farrak 2 to 13, Sunken Temple 10
+to 16, Blackrock Spire 37 to 43), 1668 NPCs (790 places with
+alternatives), 239 objects, 3440 items (600 start quests; 1606 with drop sources, 45 of them from EG
+Link; 2839 sources of drops and objectives, 2076 with places); 3791 quests with objectives (5705, 2561 quests'
+from EG Link), 728 with a choice of rewards, 1266 with reward items, 1058 with money, 4026 with
+experience; 101 quests with Forever's levels instead of classic's, 12 that scale; 3381 quests with a
+race mask, 3019 of them with a Skyborne bit; 3524 of one side (69 given one by the rules for quests
+without: 8 by their ender, 37 by an NPC their text names, 24 by their zone; 1729 left without races or a
+side), 232 event quests; 1260 quests with mob levels (229 of them above the quest's own level: 49 by 1,
+62 by 2, 118 by 3 or more, mostly raids' bosses at 63), 993 for a group; 421 without a zone or dungeon
+(Forever's Craftsman's Writs 149, Camping 94, class quests without a giver in the data, classic's Special
+sort, the Deeprun Tram's two); 0.99 MB (1,039,553 bytes; 1,039,056 before the dungeon rules; 1,037,544
+before places by the zones' areas (1.60.1.70862); 0.98 MB,
 1,029,989, before mob levels and the group flag; 0.63 MB before objectives and rewards).
 Forever's own quests' objectives mostly have no places (1064 of 1212: its new items' drops and
 creatures aren't in classic-db, and EG Link's loot has no quest items).

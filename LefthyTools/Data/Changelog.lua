@@ -590,5 +590,8 @@ ns.CHANGELOG = {
 	{ id = 194, module = "lodestar",
 		en = { "Lodestar: Test of Lore and its chain", "The Horde chain Test of Faith, Endurance, Strength and Test of Lore up to Final Passage was missing from the quest data (its titles looked like test quests): it's all there now." },
 		de = { "Lodestar: Test of Lore und seine Reihe", "Die Horde-Questreihe Test of Faith, Endurance, Strength und Test of Lore bis Final Passage fehlte in den Questdaten (ihre Titel sahen wie Testquests aus): jetzt ist sie vollständig." } },
+	{ id = 195, module = "lodestar",
+		en = { "Lodestar: complete dungeon quests", "Many dungeon quests were missing from their dungeon or listed under the zone outside. Uldaman, Gnomeregan, Razorfen Kraul and the Stockade now have their own lists, Zul'Farrak and Zul'Gurub are complete. A quest you do in a dungeon but get elsewhere (Rituals of Power, Onyxia's head) is listed with the dungeon too. Back in Desolace: Test Your Theory." },
+		de = { "Lodestar: vollständige Dungeonquests", "Viele Dungeonquests fehlten in ihrem Dungeon oder standen unter der Zone davor. Uldaman, Gnomeregan, Kral der Klingenhauer und Das Verlies haben jetzt eigene Listen, Zul'Farrak und Zul'Gurub sind vollständig. Eine Quest, die du in einem Dungeon erledigst, aber anderswo annimmst (z. B. mit Onyxias Kopf), steht jetzt auch beim Dungeon. Wieder da: eine fehlende Quest in Desolace." } },
 	-- New entries go here, at the end.
 }
