@@ -1947,6 +1947,9 @@ do
 	local remy = marker("Remy")
 	check(remy and remy.look == "available" and remy.tier == "impossible" and remy.Icon.desaturated and remy.Icon.vertex[1] == 1
 		and remy.Icon.vertex[2] < 0.2 and not remy.Edge:IsShown(), "on the map: its \"!\" in red, its difficulty's colour (no ring)")
+	view.filters.allLevels:Click()
+	check(not filters.allLevels and marker("Remy"), "one I can take now far above me: there without all levels too (as the game offers it)")
+	view.filters.allLevels:Click()
 	STATUS_OF[111] = statusRemy
 	again()
 	view.tabs.overview:Click()

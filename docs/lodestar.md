@@ -1035,7 +1035,9 @@ pfQuest's colour per quest and its spawn areas, Questie's map highlight and obje
 zoom where the cursor is, Blizzard's map icons and story headers), built from our own frames. Each
 surface shows at a glance what to do now and how far along (Guidelime's and BtWQuests' "this now, then
 those"); the rest is in tooltips or behind a click. By default it shows what's within my levels (the
-filters, below).
+filters, below), and every quest I can take now far above me too (red: `Rule.InLevels`, as the game
+offers it; its red "!" and level say how hard; not an event's out of season); grey ones and those my
+level is too low for wait for all levels.
 
 **Status words** (`Rule.Reason`) always say the real reason, everywhere (tooltips, the quest list, the
 details, the pins): "Completed", "In your quest log" ("Ready to turn in" in the details when it's done),

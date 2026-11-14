@@ -773,10 +773,16 @@ function Rule.SortKey(name)
 end
 
 -- Within my levels, as the zone page and the quest list show them unless all levels are asked for;
--- done and skipped ones always are.
+-- done and skipped ones always are, and so is one I can take now far above me (red, as the game offers
+-- it too: its "!" and its level say how hard; an event's only in its season, Q.InRange). Grey ones and
+-- those my level is too low for wait for all levels.
 function Rule.InLevels(id, status)
 	if filters.allLevels or status == "done" or Rule.Skipped(id, status) then
 		return true
+	end
+	if status == "available" and Rule.Tier(id) == "impossible" then
+		local q = Quest(id)
+		return not (q and q.event)
 	end
 	return Rule.InRange(id)
 end

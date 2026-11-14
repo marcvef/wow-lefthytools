@@ -581,5 +581,8 @@ ns.CHANGELOG = {
 	{ id = 191, module = "lodestar",
 		en = { "Lodestar: where a quest item drops", "Where an item that starts a quest drops, the big map shows the quest's own ! (in its difficulty's colour) with the item's icon, and a thin light ring for the area instead of a big yellow disc. Once you've done the quest, only a dim dot is left; hover it for the ring." },
 		de = { "Lodestar: wo ein Questgegenstand droppt", "Wo ein Gegenstand droppt, der eine Quest startet, zeigt die große Karte das ! der Quest (in der Farbe ihrer Schwierigkeit) mit dem Symbol des Gegenstands und einen dünnen hellen Ring für das Gebiet statt einer großen gelben Scheibe. Hast du die Quest erledigt, bleibt nur ein blasser Punkt; fahr darüber für den Ring." } },
+	{ id = 192, module = "lodestar",
+		en = { "Lodestar: quests far above you", "The big window's map and quest list show every quest you can take now, also one far above your level (red): its red ! and level say how hard. Grey ones and those you're too low for still wait for All levels." },
+		de = { "Lodestar: Quests weit über dir", "Karte und Questliste des großen Fensters zeigen jede Quest, die du jetzt annehmen kannst, auch eine weit über deinem Level (rot): ihr rotes ! und ihr Level sagen, wie schwer sie ist. Graue und solche, für die du zu niedrig bist, warten weiter auf Alle Level." } },
 	-- New entries go here, at the end.
 }
