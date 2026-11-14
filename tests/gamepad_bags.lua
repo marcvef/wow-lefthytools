@@ -15,8 +15,9 @@ do
 	check(M.db.gamepadBags == true and T("gamepadBags"), "on by default, with a checkbox")
 	check(M.db.gamepadBagButtons == false and M.db.gamepadBagAllFree == false and T("gamepadBagButtons") and T("gamepadBagAllFree"),
 		"by default the backpack's button alone and one free slot for all, each with a checkbox")
-	-- Every bag button and free slot for the checks below (the defaults are checked further down).
-	M.db.gamepadBagButtons, M.db.gamepadBagAllFree = true, true
+	check(M.db.gamepadBagStacks == true and T("gamepadBagStacks"), "stacks combined by default, with a checkbox")
+	-- Every bag button, free slot and stack for the checks below (the defaults are checked further down).
+	M.db.gamepadBagButtons, M.db.gamepadBagAllFree, M.db.gamepadBagStacks = true, true, false
 
 	-- Two bags: the mock's 16 slots of the backpack and 8 of bag 1.
 	local made = {}
@@ -38,7 +39,7 @@ do
 		[9002] = { name = "Bronze Helm", quality = 2, classID = 4, equipLoc = "INVTYPE_HEAD", level = 25 },
 		[9003] = { name = "Fine Cloak", quality = 3, classID = 4, equipLoc = "INVTYPE_CLOAK", level = 15 },
 		[9004] = { name = "Healing Potion", quality = 1, classID = 0 },
-		[9005] = { name = "Arrows", quality = 1, classID = 6, equipLoc = "INVTYPE_AMMO" },
+		[9005] = { name = "Antidote", quality = 1, classID = 0 }, -- (ammo: its own section, checked below)
 		[9006] = { name = "Copper Ore", quality = 1, classID = 7 },
 		[9007] = { name = "Kobold Candle", quality = 1, classID = 15 },
 		[9008] = { name = "Torn Pelt", quality = 0, classID = 15 },
@@ -276,9 +277,13 @@ do
 		"the reagent bag's items in ours (its window open for Blizzard, unseen and unclickable): " .. Order(st.order))
 	ContainerFrame6:Hide()
 	Wait(1)
+	check(reagent:GetParent() == bag and ContainerFrame6:IsShown() and OPENED_BAGS[#OPENED_BAGS] == 5,
+		"its window closed while ours is open: ours opens it again (the reagents always with the rest)")
+	ContainerFrame6:Hide()
+	Wait(1)
 	check(reagent:GetParent() == ContainerFrame6 and ContainerFrame6:GetAlpha() == 1 and ContainerFrame6:IsMouseEnabled()
 		and ContainerFrame6.CloseButton:IsMouseEnabled() and not Order(State().order):find("5:", 1, true),
-		"its window closed: its buttons back, the window as it was")
+		"closed again: its buttons back, the window as it was (opened once per opening, not again)")
 	ContainerFrame6:Show()
 	Wait(1)
 	check(reagent:GetParent() == bag, "open again: in ours again")
@@ -310,6 +315,70 @@ do
 	OpenBags()
 	Wait(1)
 	check(ContainerFrame6:IsShown() and reagent:GetParent() == bag, "closed and opened again at once: the reagent bag stays in ours")
+	-- The backpack opened alone (not all bags): ours opens the reagent bag's window itself.
+	CloseBags()
+	Wait(1)
+	check(not ContainerFrame6:IsShown(), "closed: the reagent window too")
+	OpenBags()
+	Wait(1)
+	check(ContainerFrame6:IsShown() and ContainerFrame6:GetAlpha() == 0 and reagent:GetParent() == bag and Order(State().order):find("5:1", 1, true),
+		"the backpack opened alone: the reagent bag's items in ours all the same")
+	-- Stacks combined (the default): one button per item with the whole of it, the other stacks tucked;
+	-- a stack used up: the next one comes up. Ammo: its own section, the quiver's free slots one with how many.
+	M.db.gamepadBagStacks = true
+	ITEMS[9020] = { name = "Linen Cloth", quality = 1, classID = 7 }
+	ITEMS[9021] = { name = "Rough Arrow", quality = 1, classID = 6, equipLoc = "INVTYPE_AMMO" }
+	BAGS[0][14], BAGS[0][15], BAGS[0][16] = 9020, 9020, 9020
+	BAG_STACKS["0:14"], BAG_STACKS["0:15"], BAG_STACKS["0:16"] = 20, 15, 5
+	BAGS[1][7], BAGS[1][8] = 9021, 9021
+	BAG_STACKS["1:7"], BAG_STACKS["1:8"] = 200, 140
+	BAG_FAMILY[1] = 1 -- (bag 1 a quiver)
+	CloseBags()
+	Wait(1)
+	OpenBags()
+	Wait(1)
+	st = State()
+	local cloth, arrows = Slot(0, 14), Slot(1, 7)
+	local function CountOn(b)
+		for _, fs in ipairs(st.counts or {}) do
+			if fs.button == b and fs:IsShown() then return fs:GetText() end
+		end
+	end
+	check(Order(st.order):find("0:14", 1, true) and not Order(st.order):find("0:15", 1, true) and not Slot(0, 15):IsShown()
+		and tostring((CountOn(cloth))) == "40", "ten stacks of cloth: one button saying how many in all (20 + 15 + 5), the rest tucked: " .. tostring((CountOn(cloth))))
+	GameTooltip:SetOwner(cloth, "ANCHOR_NONE")
+	GameTooltip:SetBagItem(0, 14)
+	check(table.concat(TOOLTIP.lines, "|"):find("In your bags: 40 (3 stacks)", 1, true), "its tooltip: the whole and how many stacks")
+	GameTooltip:Hide()
+	-- A copy reserved for a friend (Beacon's border on it): a button of its own, the border in sight.
+	local border = Slot(0, 16):CreateTexture()
+	Slot(0, 16).LefthyToolsReserved = border
+	border:Show()
+	bag:UpdateItems()
+	Wait(1)
+	st = State()
+	check(Slot(0, 16):IsShown() and Order(st.order):find("0:16", 1, true) and tostring((CountOn(cloth))) == "35",
+		"a reserved copy: its own button, not in the whole of the others (20 + 15): " .. tostring((CountOn(cloth))))
+	border:Hide()
+	Slot(0, 16).LefthyToolsReserved = nil
+	bag:UpdateItems()
+	Wait(1)
+	st = State()
+	check(table.concat(st.headers, ", "):find("Consumables, Ammo, Trade goods", 1, true) and tostring((CountOn(arrows))) == "340"
+		and not Slot(1, 8):IsShown(), "ammo: its own section after the consumables, the whole of it (200 + 140): " .. table.concat(st.headers, ", "))
+	BAGS[0][14] = nil
+	bag:UpdateItems()
+	Wait(1)
+	st = State()
+	check(Slot(0, 15):IsShown() and Order(State().order):find("0:15", 1, true) and tostring((CountOn(Slot(0, 15)))) == "20",
+		"a stack sold: the next one comes up, the whole of what's left: " .. tostring((CountOn(Slot(0, 15)))))
+	M.db.gamepadBagStacks = false
+	bag:UpdateItems()
+	Wait(1)
+	check(Slot(0, 15):IsShown() and Slot(0, 16):IsShown() and Order(State().order):find("0:15 0:16", 1, true) ~= nil
+		and Slot(1, 8):IsShown() and not (State().counts[1] and State().counts[1]:IsShown()), "off: every stack its own button, no counts of ours")
+	BAGS[0][15], BAGS[0][16], BAGS[1][7], BAGS[1][8], BAG_FAMILY[1] = nil, nil, nil, nil, nil
+	BAG_STACKS = {}
 	T("mouseBags"):SetValue(false)
 	Wait(1)
 	-- Off: Blizzard's bag as it is.

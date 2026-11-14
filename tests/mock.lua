@@ -1630,7 +1630,14 @@ C_Container = {
 	GetContainerItemLink = function(bag, slot) local id = BAGS[bag] and BAGS[bag][slot]; return id and ItemLink(id) end,
 	GetContainerItemInfo = function(bag, slot)
 		local id = BAGS[bag] and BAGS[bag][slot]
-		return id and { itemID = id, hyperlink = ItemLink(id), isBound = BOUND[slot] == true } or nil
+		return id and { itemID = id, hyperlink = ItemLink(id), isBound = BOUND[slot] == true,
+			stackCount = BAG_STACKS[bag .. ":" .. slot] } or nil
+	end,
+	-- BAG_FAMILY[bag]: its family bits (1 a quiver, 2 an ammo pouch); free slots as BAGS says
+	GetContainerNumFreeSlots = function(bag)
+		local used = 0
+		for _ in pairs(BAGS[bag] or {}) do used = used + 1 end
+		return BAGS[bag] and (36 - used) or 0, BAG_FAMILY[bag] or 0
 	end,
 	UseContainerItem = function(bag, slot) SOLD[#SOLD + 1] = BAGS[bag][slot]; BAGS[bag][slot] = nil end,
 	PickupContainerItem = function(bag, slot) PICKED_UP[#PICKED_UP + 1] = BAGS[bag][slot] end,
@@ -1643,6 +1650,7 @@ C_Container = {
 	end,
 }
 QUEST_BAG_ITEMS = {}
+BAG_STACKS, BAG_FAMILY = {}, {} -- (a slot's stack, "bag:slot"; a bag's family)
 C_Item.GetDetailedItemLevelInfo = function(link) -- (ITEMS[id].level)
 	local id = tonumber(tostring(link):match("item:(%d+)"))
 	return id and ITEMS[id] and ITEMS[id].level
@@ -1688,6 +1696,12 @@ function ContainerFrameUtil_GetShownFrameForID(id)
 	if ContainerFrameCombinedBags:IsShown() then return ContainerFrameCombinedBags end
 end
 function ContainerFrameCombinedBags:UpdateItems() end -- Blizzard's own drawing: nothing to do here
+-- OpenBag(id): the reagent bag's own window (mouse and keyboard: the combined bag holds bags 0 to 4).
+OPENED_BAGS = {}
+function OpenBag(id)
+	OPENED_BAGS[#OPENED_BAGS + 1] = id
+	if id == 5 then ContainerFrame6:Show() end
+end
 
 -- The combined bag's layout (ContainerFrame.lua): ten columns of 37 px buttons 5 px apart, laid out
 -- from the bottom right (BOTTOMRIGHT at the money frame's TOPRIGHT, 0, 4) to the top left. With the

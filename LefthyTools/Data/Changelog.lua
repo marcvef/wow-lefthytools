@@ -584,5 +584,8 @@ ns.CHANGELOG = {
 	{ id = 192, module = "lodestar",
 		en = { "Lodestar: quests far above you", "The big window's map and quest list show every quest you can take now, also one far above your level (red): its red ! and level say how hard. Grey ones and those you're too low for still wait for All levels." },
 		de = { "Lodestar: Quests weit über dir", "Karte und Questliste des großen Fensters zeigen jede Quest, die du jetzt annehmen kannst, auch eine weit über deinem Level (rot): ihr rotes ! und ihr Level sagen, wie schwer sie ist. Graue und solche, für die du zu niedrig bist, warten weiter auf Alle Level." } },
+	{ id = 193, module = "tweaks",
+		en = { "Sorted bags: stacks combined, ammo", "Each item is one button with all of it (ten stacks of Linen Cloth: one button saying 200); selling and banking still take one stack at a time. Ammo has its own section, with your quiver's free slots on one button. The reagent bag is always included, also when you open only the backpack. Option: Sorted bags: stacks combined." },
+		de = { "Sortierte Taschen: Stapel, Munition", "Jeder Gegenstand ist ein Button mit seiner ganzen Menge (zehn Stapel Leinenstoff: ein Button mit 200); Verkaufen und Bank nehmen weiter einen Stapel nach dem anderen. Munition hat einen eigenen Bereich, die freien Plätze deines Köchers auf einem Button. Die Reagenzientasche ist immer dabei, auch wenn du nur den Rucksack öffnest. Option: Sortierte Taschen: Stapel zusammengefasst." } },
 	-- New entries go here, at the end.
 }

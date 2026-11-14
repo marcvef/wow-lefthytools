@@ -21,6 +21,7 @@ local M = LT:NewModule("tweaks", {
 		gamepadBagColumns = 10, -- ... with this many items side by side (Blizzard's grid has 10)
 		gamepadBagButtons = false, -- ... the bag buttons' row open under the "Bags" header (else folded)
 		gamepadBagAllFree = false, -- ... every free slot (else one, with how many)
+		gamepadBagStacks = true, -- ... one button per item with its stacks combined (else every stack)
 		gamepadSymbols = "default", -- "default" | "xbox" | "playstation": the controller's button symbols
 		padSymbolConfigs = {}, -- "vendor:product" -> true: controllers whose symbols this set (to undo it)
 		bagPositions = {},     -- key ("combined" / "bag<id>") -> { left, top } in UIParent units
@@ -417,6 +418,8 @@ function M:BuildOptions(o)
 		L["The sorted controller bags show every bag's button in a row under their \"Bags\" header, to change a bag. Off, the row is folded away and opens while the controller's cursor is on the header or the row; a click on the header opens and folds it for good."])
 	o:Checkbox("gamepadBagAllFree", L["Sorted bags: every free slot"],
 		L["The sorted bags show each free slot. Off, one stands for all and says how many there are."])
+	o:Checkbox("gamepadBagStacks", L["Sorted bags: stacks combined"],
+		L["One button per item with the whole of it (ten stacks of Linen Cloth: one button saying 200). Selling, banking and trading still take one stack at a time; the next one comes up. Off: every stack has its own button."])
 	o:Checkbox("movableLootRolls", L["Movable loot rolls"],
 		L["Drag the loot roll window (Need / Greed) to move it. It comes up there from then on. /lefthy tweaks resetloot puts it back."])
 	o:Header(L["Quests"])

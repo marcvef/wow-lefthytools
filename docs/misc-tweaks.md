@@ -86,7 +86,20 @@ Switched off there, Blizzard's grid comes back at once (`UpdateItemLayout`). The
 with mouse and keyboard (the combined bag holds bags 0 to `ENDING_BAG_INDEX`, 4 then; a global we leave alone): its
 item buttons are reparented into ours (`Adopt`) and sorted with the rest, its window stays open for Blizzard (so it
 keeps updating them) but at alpha 0 with its mouse off, close button and portrait too (`Hush`). They go back
-(`GiveBack`, its own `UpdateItemLayout`) when ours goes or that window closes.
+(`GiveBack`, its own `UpdateItemLayout`) when ours goes or that window closes. When that window isn't open (the
+backpack opened alone, not all bags) ours opens it itself (`OpenBag(5)`, once per opening: `reagentAsked`, never
+in a fight, only when the reagent bag has slots), so the reagents are always among the rest.
+
+**Stacks combined** (`gamepadBagStacks`, on by default; with mouse and keyboard and with a controller): one button
+per item (`e.key`: its link, else its ID), the biggest stack (the first after sorting), with the whole of it on it
+(our own count over Blizzard's, which goes to alpha 0 under it: `AmmoCounts`), the other stacks tucked away like
+the free slots (`groups.stackTucked`). A click still takes that one stack (Blizzard's button: sell, bank, trade,
+split); the next comes up on the next layout. Its tooltip adds "In your bags: 200 (10 stacks)" (the `SetBagItem`
+post-hook). A copy Beacon reserved for a friend (its `LefthyToolsReserved` border shown) keeps its own button.
+The counts are set again when the order stays but a stack grew. **Ammo** (projectiles) has its own section after the
+consumables, combined the same way; the free slots of the ammo bags (a quiver or ammo pouch:
+`C_Container.GetContainerNumFreeSlots`' family has bit 1 or 2) are one button at its end with how many, not among
+the bags' free slots (every one with `gamepadBagAllFree`).
 
 By default the bag buttons' row is folded away under a "Bags (5)" header: our own button on the bag, so the
 controller lands on it too. The cursor landing there (`FocusEnter` runs its OnEnter) opens the row for as long
@@ -113,7 +126,7 @@ and keyboard nothing changes.
 them; they still open their bag menu, collapse their bag, and the shoulder buttons still jump between
 them: Blizzard's `Gamepad_SetCursorToBag`). Below it the items in sections, each with a small gold header
 and a line: Gear (weapons and armour that are worn: `GetItemInfoInstant`'s class 2 or 4 with an
-`equipLoc`, not bags, quivers or ammo), Consumables (class 0 and projectiles), Trade goods (trade goods,
+`equipLoc`, not bags, quivers or ammo), Consumables (class 0), Ammo (projectiles), Trade goods (trade goods,
 reagents, gems, enhancements), Quest items (`C_Container.GetContainerItemQuestInfo`, or the quest class;
 one no quest needs any more has a small dim red x in its top left corner: Lodestar's `Q.ItemMarked`,
 lodestar.md Quest items), Other, Junk (grey quality, gear too), then the free slots (by bag and slot; slots of an unsecured account

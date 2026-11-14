@@ -7,7 +7,16 @@ local LT = ns.LT
 -- sit on the main bar there), the navigation (SmartNavigation) and the tooltip beside the bag. There
 -- the reagent bag has a window of its own (the combined bag holds bags 0 to 4 then; with a controller
 -- all): its item buttons come into ours, and its window stays open for Blizzard (so it keeps them
--- up to date) but can't be seen or clicked. Given back whenever ours goes or that window closes.
+-- up to date) but can't be seen or clicked. Ours opens that window itself when it isn't (the backpack
+-- opened alone: OpenBag, once per opening, never in a fight), so the reagents are always there. Given
+-- back whenever ours goes or that window closes.
+--
+-- Stacks combined (Misc Tweaks' gamepadBagStacks, on by default): one button per item, its count the
+-- whole of it in the bags (the biggest stack shown, the others tucked away like the free slots). A click
+-- still takes that one stack (sell, bank, trade, split: Blizzard's button), the next comes up after.
+-- Ammo has a section of its own, after the consumables, with one free slot of the ammo bags (quiver,
+-- ammo pouch: a bag whose family is arrows or bullets) saying how many they have; those free slots
+-- aren't among the bags' (unless every free slot is wanted, gamepadBagAllFree).
 --
 -- With the controller UI the combined bag puts each bag's button (GamepadBagBar) into its item grid,
 -- in front of that bag's slots: one long grid of bags and items. This places the same buttons anew,
@@ -33,17 +42,20 @@ local LT = ns.LT
 local SECTIONS = {
 	{ key = "gear", title = L["Gear"] },
 	{ key = "consumables", title = L["Consumables"] },
+	{ key = "ammo", title = L["Ammo"] },
 	{ key = "trade", title = L["Trade goods"] },
 	{ key = "quest", title = L["Quest items"] },
 	{ key = "other", title = L["Other"] },
 	{ key = "junk", title = L["Junk"] },
 	{ key = "empty", title = L["Free slots"] },
 }
-local GEAR, CONSUMABLES, TRADE, QUEST, OTHER, JUNK, EMPTY = 1, 2, 3, 4, 5, 6, 7
+local GEAR, CONSUMABLES, AMMO, TRADE, QUEST, OTHER, JUNK, EMPTY = 1, 2, 3, 4, 5, 6, 7, 8
+local AMMO_FAMILY = 1 + 2 -- a bag's family bits for arrows (quiver) and bullets (ammo pouch)
 
 local CLASS = (Enum and Enum.ItemClass) or {}
 local WEAPON, ARMOR, QUEST_CLASS = CLASS.Weapon or 2, CLASS.Armor or 4, CLASS.Questitem or 12
-local USED_UP = { [CLASS.Consumable or 0] = true, [CLASS.Projectile or 6] = true }
+local USED_UP = { [CLASS.Consumable or 0] = true }
+local PROJECTILE = CLASS.Projectile or 6
 local MATERIALS = { [CLASS.Tradegoods or 7] = true, [CLASS.Reagent or 5] = true, [CLASS.Gem or 3] = true,
 	[CLASS.ItemEnhancement or 8] = true }
 local NOT_WORN = { INVTYPE_NON_EQUIP = true, INVTYPE_NON_EQUIP_IGNORE = true, INVTYPE_BAG = true,
@@ -105,6 +117,10 @@ local function RowOpen()
 end
 local dirty, navPending = false, false
 local closeReagent = false -- ours closed: the reagent bag's unseen window closes on the next frame
+local reagentAsked = false -- ours opened the reagent bag's window this opening (once)
+local ammoCounts = {} -- our count font strings (an item's whole, the ammo bags' free slots) -> true
+local combined = {}   -- a button standing for more stacks -> { total, stacks } (its tooltip says so)
+local hiddenCounts = {} -- Blizzard's stack counts we made unseen under ours -> true
 local driver = CreateFrame("Frame")
 driver:Hide()
 local watch = CreateFrame("Frame")
@@ -191,6 +207,19 @@ local function SlotOrder(bag, slot)
 	return bag * 1000 + slot
 end
 
+-- A quiver or ammo pouch (its family arrows or bullets); kept per sort (ammoBags).
+local ammoBags = {}
+local function AmmoBag(bag)
+	local yes = ammoBags[bag]
+	if yes == nil then
+		local ok, _, family = pcall(C_Container.GetContainerNumFreeSlots, bag)
+		family = ok and tonumber(family) or 0
+		yes = family % (AMMO_FAMILY + 1) ~= 0 -- (bit 1 arrows, bit 2 bullets)
+		ammoBags[bag] = yes
+	end
+	return yes
+end
+
 local function Classify(button)
 	local bag, slot = button:GetBagID(), button:GetID()
 	local e = { button = button, section = EMPTY, quality = -1, level = 0, name = "", count = 0, order = SlotOrder(bag, slot) }
@@ -201,7 +230,16 @@ local function Classify(button)
 	local info = C_Container.GetContainerItemInfo(bag, slot)
 	local id = info and info.itemID
 	if not LT.Readable(id) then
+		if AmmoBag(bag) then
+			e.section, e.ammoFree = AMMO, true -- (a free slot of a quiver or ammo pouch: with the ammo)
+		end
 		return e
+	end
+	e.id = id
+	e.key = LT.Readable(info.hyperlink) and info.hyperlink or id -- (the same item: one button with stacks combined)
+	local reserved = button.LefthyToolsReserved -- (Beacon's border on a copy reserved for a friend: kept apart)
+	if reserved and reserved:IsShown() then
+		e.key = tostring(e.key) .. ":reserved:" .. e.order
 	end
 	local link = LT.Readable(info.hyperlink) and info.hyperlink or nil
 	local quality = LT.Readable(info.quality) and info.quality or LT.Value(C_Item.GetItemQualityByID, id) or 1
@@ -221,6 +259,8 @@ local function Classify(button)
 	elseif (classID == WEAPON or classID == ARMOR) and type(equipLoc) == "string" and equipLoc ~= "" and not NOT_WORN[equipLoc] then
 		e.section = GEAR
 		e.level = (link and C_Item.GetDetailedItemLevelInfo and tonumber(LT.Value(C_Item.GetDetailedItemLevelInfo, link))) or 0
+	elseif classID == PROJECTILE then
+		e.section = AMMO
 	elseif USED_UP[classID] then
 		e.section = CONSUMABLES
 	elseif MATERIALS[classID] then
@@ -262,6 +302,7 @@ end
 -- The sections' items, sorted: groups[section] = { entry, ... }. Only the slots Blizzard lays out
 -- (a bag collapsed in its menu keeps its slots hidden).
 local function Sort(frame)
+	wipe(ammoBags)
 	local groups = {}
 	for i = 1, #SECTIONS do
 		groups[i] = {}
@@ -283,6 +324,43 @@ local function Sort(frame)
 	end
 	for i = 1, #SECTIONS do
 		table.sort(groups[i], Before)
+	end
+	-- Stacks combined: one button per item (its biggest stack: the first after sorting) with the whole
+	-- of it, the others tucked; the ammo bags' free slots one with how many (at the ammo's end).
+	local combine, allFree = Setting("gamepadBagStacks", true), Setting("gamepadBagAllFree", false)
+	groups.stackTucked = {}
+	for s = 1, #SECTIONS do
+		if s ~= EMPTY then
+			local kept, kinds, free = {}, {}, nil
+			for _, e in ipairs(groups[s]) do
+				if e.ammoFree and not allFree then
+					if free then
+						free.total = free.total + 1
+						table.insert(groups.stackTucked, e.button)
+					else
+						free, e.total = e, 1
+					end
+				elseif combine and e.key and not e.ammoFree then
+					local first = kinds[e.key]
+					if first then
+						first.total, first.stacks = first.total + e.count, first.stacks + 1
+						table.insert(groups.stackTucked, e.button)
+					else
+						kinds[e.key], e.total, e.stacks = e, e.count, 1
+						kept[#kept + 1] = e
+					end
+				elseif not e.ammoFree then
+					kept[#kept + 1] = e
+				end
+			end
+			for _, e in ipairs(groups[s]) do
+				if e.ammoFree and allFree then
+					kept[#kept + 1] = e -- (every free slot wanted: the ammo bags' each, at the end)
+				end
+			end
+			kept[#kept + 1] = free
+			groups[s] = kept
+		end
 	end
 	-- One free slot for all (the first in the bags' order, where loot goes first), unless all are wanted.
 	local empty = groups[EMPTY]
@@ -650,6 +728,54 @@ local function QuestMarks(groups)
 	end
 end
 
+-- Our count font strings (on the overlay, over the buttons), made as needed.
+local countPool = {}
+local function Pool(i)
+	local fs = countPool[i]
+	if not fs then
+		fs = overlay:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+		countPool[i] = fs
+		ammoCounts[fs] = true
+	end
+	return fs
+end
+
+-- The combined counts: an item's whole on its button where it has more stacks (Blizzard's stack count
+-- unseen under ours: its alpha, which Blizzard's updates leave), the ammo bags' free slots on theirs.
+-- groups nil: none, Blizzard's counts as they were.
+local function AmmoCounts(groups)
+	for fs in pairs(ammoCounts) do
+		fs:Hide()
+	end
+	for count in pairs(hiddenCounts) do
+		count:SetAlpha(1)
+		hiddenCounts[count] = nil
+	end
+	wipe(combined)
+	local n = 0
+	for s, group in ipairs(groups or {}) do
+		for _, e in ipairs(s ~= EMPTY and group or {}) do
+			if e.total and (e.ammoFree and e.total > 1 or (e.stacks or 1) > 1) then
+				n = n + 1
+				local fs = Pool(n)
+				fs:ClearAllPoints()
+				fs:SetPoint("BOTTOMRIGHT", e.button, "BOTTOMRIGHT", -3, 3)
+				fs.button = e.button
+				fs:SetText(e.total)
+				fs:Show()
+				local count = e.button.Count
+				if count and count.SetAlpha and not e.ammoFree then
+					count:SetAlpha(0)
+					hiddenCounts[count] = true
+				end
+				if not e.ammoFree then
+					combined[e.button] = { total = e.total, stacks = e.stacks }
+				end
+			end
+		end
+	end
+end
+
 -- Everything anchored like Blizzard's grid (BOTTOMRIGHT at its first item's anchor, the money frame),
 -- worked out from the top: `top` is how far an element's top is below the content's top.
 local function Place(frame, groups, strip)
@@ -664,6 +790,7 @@ local function Place(frame, groups, strip)
 	local keep = {}
 	Tuck(strip.tucked, keep)
 	Tuck(groups.tucked, keep)
+	Tuck(groups.stackTucked, keep)
 	Untuck(keep) -- (the ones wanted again: shown)
 	if groups.reagents then
 		Adopt(frame, groups.reagents)
@@ -762,6 +889,7 @@ local function Place(frame, groups, strip)
 	else
 		countText:Hide()
 	end
+	AmmoCounts(groups)
 	SetBagWidth(frame, contentWidth)
 	SetBagHeight(frame, OurHeight(frame, h))
 	QuestMarks(groups)
@@ -788,6 +916,7 @@ local function Unapply()
 	wipe(order); wipe(laidOut); wipe(starts); wipe(stripped)
 	Untuck() -- (Blizzard's layout has them all)
 	GiveBack()
+	AmmoCounts(nil)
 	QuestMarks(nil)
 	if overlay then
 		overlay:Hide()
@@ -839,10 +968,15 @@ end
 -- The selected item's tooltip beside the bag (the side with room), not over the other items. Blizzard
 -- sets it up on selecting (OnEnter) and every refresh; this runs after each SetBagItem.
 local function PlaceTooltip(tooltip)
+	local owner = applied and tooltip.GetOwner and tooltip:GetOwner()
+	local c = owner and combined[owner]
+	if c then -- (stacks combined: this stack's tooltip, and the whole)
+		tooltip:AddLine(L["In your bags: %d (%d stacks)"]:format(c.total, c.stacks), 0.6, 0.8, 1)
+		tooltip:Show()
+	end
 	if not applied or not PadUI() then -- (with the mouse it follows the mouse, as ever)
 		return
 	end
-	local owner = tooltip.GetOwner and tooltip:GetOwner()
 	local frame = Bag()
 	if not (owner and laidOut[owner] and frame:IsShown()) then
 		return
@@ -917,11 +1051,17 @@ local function Relayout()
 		watch:RegisterEvent("PLAYER_REGEN_ENABLED")
 		return
 	end
+	if not reagentAsked and not PadUI() and wantedMouse and not ReagentWindow(frame) and OpenBag
+		and (tonumber(LT.Value(C_Container.GetContainerNumSlots, REAGENT_BAG)) or 0) > 0 then
+		reagentAsked = true -- (once per opening: its window showing lays ours out again, OnWindowShown)
+		pcall(OpenBag, REAGENT_BAG)
+	end
 	local groups = Sort(frame)
 	if applied and SameLayout(groups) and placedColumns == Columns() and placedCount == freeCount
 		and (groups.reagents ~= nil) == (next(adopted) ~= nil)
 		and stripped.all == RowOpen() and placedAllFree == Setting("gamepadBagAllFree", false) then
 		QuestMarks(groups) -- (the same order: a quest done meanwhile still marks its item)
+		AmmoCounts(groups) -- (... and a stack that grew or shrank its whole)
 		return
 	end
 	-- The item the cursor is on, or (another window has it: a clam opened, its loot window) the one
@@ -1003,6 +1143,7 @@ end
 -- The bag closed: our jumps go (a bag opened in a fight gets Blizzard's layout, which they don't fit).
 local function OnBagHidden()
 	peeking = false -- (opened for the cursor: folded at the next opening)
+	reagentAsked = false
 	retargetFrom, retargetTo = nil, nil
 	if next(hushed) then
 		closeReagent = true
@@ -1169,5 +1310,5 @@ function ns.GamepadBagsState()
 			marked[button] = mark
 		end
 	end
-	return { applied = applied, order = order, strip = stripped, headers = shown, marked = marked }
+	return { applied = applied, order = order, strip = stripped, headers = shown, marked = marked, counts = countPool }
 end
