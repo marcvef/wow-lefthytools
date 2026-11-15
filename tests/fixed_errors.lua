@@ -39,6 +39,14 @@ do
 		and BB.FixedFor(report("0.7.0-38-ga809fad", "ADDON_ACTION_BLOCKED: UNKNOWN()()", ""))
 		and not BB.FixedFor(report("0.7.0-62-gabcdef0", "ADDON_ACTION_BLOCKED: UNKNOWN()()", "")),
 		"a blocked call in fights (the fight stream's range checks): should be fixed in 0.7.0-62")
+	local bagUse = "[C]: ?\n[C]: in function 'UseContainerItem'\nState: combat no controller UI no instance no"
+	local bag = BB.FixedFor(report("0.7.0-155-g245e2fd", "ADDON_ACTION_FORBIDDEN: UNKNOWN()()", bagUse))
+	local bagFight = BB.FixedFor(report("0.7.0-60-gabcdef0", "ADDON_ACTION_BLOCKED: UNKNOWN()()", bagUse))
+	check(bag and bag.fixed == "0.7.0-157-g548035e" and not bag.sure
+		and bagFight and bagFight.fixed == "0.7.0-157-g548035e"
+		and not BB.FixedFor(report("0.7.0-157-g548035e", "ADDON_ACTION_FORBIDDEN: UNKNOWN()()", bagUse))
+		and not BB.FixedFor(report("0.7.0-155-g245e2fd", "ADDON_ACTION_FORBIDDEN: UNKNOWN()()", "State: combat no")),
+		"a blocked right-click on a bag item (UseContainerItem): should be fixed in 0.7.0-157, ahead of the fight entry")
 	check(select(3, BB.FixedFor(report(old, "ADDON_ACTION_FORBIDDEN: IsUserOAuthed()()", panel, "deDE"))) == "de",
 		"a German client's report: the German line")
 	check(not BB.FixedFor(report(old, "ADDON_ACTION_FORBIDDEN: SetPreferredGamepadInteractTarget()()", ""))

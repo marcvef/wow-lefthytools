@@ -275,6 +275,13 @@ end)
 -- happened); fixed: the first build without it (LT.CompareVersions); sure false: the fix should
 -- help, but no one has proven it in game yet ("should be fixed"); en/de: what it was, for the friend.
 B.FIXED_ERRORS = {
+	-- 548035e: the sorted bag opened and closed the reagent bag's window from our code (OpenBag, CloseBag),
+	-- which left Blizzard's bag setup tainted; a right-click to use an item was then refused. Before the
+	-- generic fight entry below, so older builds' reports of it name this fix.
+	{ pattern = "ADDON_ACTION_FORBIDDEN: UNKNOWN()", also = "UseContainerItem", fixed = "0.7.0-157-g548035e",
+		en = "a blocked right-click on an item in the bag", de = "ein blockierter Rechtsklick auf ein Item in der Tasche" },
+	{ pattern = "ADDON_ACTION_BLOCKED: UNKNOWN()", also = "UseContainerItem", fixed = "0.7.0-157-g548035e",
+		en = "a blocked right-click on an item in the bag", de = "ein blockierter Rechtsklick auf ein Item in der Tasche" },
 	-- df90faf: the settings left Blizzard's panel, whose reused rows our pages left tainted.
 	{ pattern = "ADDON_ACTION_FORBIDDEN: IsUserOAuthed()", fixed = "0.7.0-34-gdf90faf", sure = true,
 		en = "a blocked action in Blizzard's settings panel", de = "eine blockierte Aktion in Blizzards Einstellungen" },
