@@ -602,5 +602,8 @@ ns.CHANGELOG = {
 	{ id = 198, module = "beacon",
 		en = { "Fight streams at the left edge", "A friend's fight stream (on a flight, too) opens at the left edge of the screen, centred from top to bottom, no longer in the top left corner under overlays such as Discord's." },
 		de = { "Kampfstreams am linken Rand", "Der Kampfstream eines Freundes (auch auf Flügen) öffnet am linken Bildschirmrand, vertikal zentriert, nicht mehr oben links unter Overlays wie dem von Discord." } },
+	{ id = 199, module = "tweaks",
+		en = { "Sorted bags: item use no longer blocked", "Right-clicking an item in the bag could be blocked by the game after the reagent bag's window had opened with the bag; that window now opens and closes only as Blizzard's bags do." },
+		de = { "Sortierte Taschen: kein Blockieren mehr", "Ein Rechtsklick auf ein Item in der Tasche konnte vom Spiel blockiert werden, nachdem das Fenster der Reagenzientasche mit der Tasche aufgegangen war; das Fenster öffnet und schließt sich jetzt nur noch wie bei Blizzards Taschen." } },
 	-- New entries go here, at the end.
 }

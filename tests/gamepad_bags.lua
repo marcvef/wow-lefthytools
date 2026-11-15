@@ -267,7 +267,8 @@ do
 	GameTooltip:SetOwner(Slot(1, 1), "ANCHOR_NONE")
 	GameTooltip:SetBagItem(1, 1)
 	check(TOOLTIP.points == nil, "its tooltip where Blizzard puts it (it follows the mouse)")
-	-- The reagent bag's own window (mouse and keyboard): its items come into ours, the window unseen.
+	-- The reagent bag's own window (mouse and keyboard): while Blizzard has it open, its items come into
+	-- ours, the window unseen. Only Blizzard opens and closes it (its bag code run from ours taints the bags).
 	BAGS[5] = { [1] = 9006, [3] = 9004 }
 	ContainerFrame6:Show()
 	Wait(1)
@@ -276,27 +277,24 @@ do
 	check(reagent:GetParent() == bag and Order(st.order):find("5:1", 1, true) and ContainerFrame6:IsShown()
 		and ContainerFrame6:GetAlpha() == 0 and not ContainerFrame6:IsMouseEnabled() and not ContainerFrame6.CloseButton:IsMouseEnabled(),
 		"the reagent bag's items in ours (its window open for Blizzard, unseen and unclickable): " .. Order(st.order))
+	local opened = #OPENED_BAGS
 	ContainerFrame6:Hide()
 	Wait(1)
-	check(reagent:GetParent() == bag and ContainerFrame6:IsShown() and OPENED_BAGS[#OPENED_BAGS] == 5,
-		"its window closed while ours is open: ours opens it again (the reagents always with the rest)")
-	ContainerFrame6:Hide()
-	Wait(1)
-	check(reagent:GetParent() == ContainerFrame6 and ContainerFrame6:GetAlpha() == 1 and ContainerFrame6:IsMouseEnabled()
-		and ContainerFrame6.CloseButton:IsMouseEnabled() and not Order(State().order):find("5:", 1, true),
-		"closed again: its buttons back, the window as it was (opened once per opening, not again)")
+	check(reagent:GetParent() == ContainerFrame6 and not ContainerFrame6:IsShown() and #OPENED_BAGS == opened
+		and ContainerFrame6:GetAlpha() == 1 and ContainerFrame6:IsMouseEnabled() and ContainerFrame6.CloseButton:IsMouseEnabled()
+		and not Order(State().order):find("5:", 1, true),
+		"its window closed while ours is open: its buttons back, the window as it was, not opened again by ours")
 	ContainerFrame6:Show()
 	Wait(1)
 	check(reagent:GetParent() == bag, "open again: in ours again")
 	CloseBags() -- (the bag's close button: only the combined bag closes)
-	check(ContainerFrame6:IsShown() and ContainerFrame6:GetAlpha() == 0, "ours closed: the reagent window not at once (see below)")
+	check(ContainerFrame6:IsShown() and ContainerFrame6:GetAlpha() == 1 and ContainerFrame6:IsMouseEnabled()
+		and reagent:GetParent() == ContainerFrame6, "ours closed: the reagent window given back at once and seen again, as Blizzard left it")
 	Wait(1)
-	check(not ContainerFrame6:IsShown() and reagent:GetParent() == ContainerFrame6 and ContainerFrame6:GetAlpha() == 1,
-		"... but on the next frame: the unseen reagent window closes with it (else it stays open, counted as an open bag)")
+	check(ContainerFrame6:IsShown(), "... and not closed by ours (never left open unseen either)")
 	OpenBags()
-	ContainerFrame6:Show()
 	Wait(1)
-	check(reagent:GetParent() == bag, "both open again: in ours")
+	check(reagent:GetParent() == bag and ContainerFrame6:GetAlpha() == 0, "ours opened with it still open: in ours again, unseen")
 	-- The "open all bags" key (Blizzard's ToggleAllBags): the backpack closes first, then each other bag
 	-- open is counted as it's closed; fewer counted than there are bags, it opens them all again.
 	CloseBags()
@@ -316,14 +314,19 @@ do
 	OpenBags()
 	Wait(1)
 	check(ContainerFrame6:IsShown() and reagent:GetParent() == bag, "closed and opened again at once: the reagent bag stays in ours")
-	-- The backpack opened alone (not all bags): ours opens the reagent bag's window itself.
+	-- The backpack opened alone (not all bags): the reagent window stays closed, ours doesn't open it.
 	CloseBags()
+	ContainerFrame6:Hide() -- (Blizzard closes it: Escape, the open-all-bags key)
 	Wait(1)
-	check(not ContainerFrame6:IsShown(), "closed: the reagent window too")
+	opened = #OPENED_BAGS
 	OpenBags()
 	Wait(1)
-	check(ContainerFrame6:IsShown() and ContainerFrame6:GetAlpha() == 0 and reagent:GetParent() == bag and Order(State().order):find("5:1", 1, true),
-		"the backpack opened alone: the reagent bag's items in ours all the same")
+	check(not ContainerFrame6:IsShown() and #OPENED_BAGS == opened and not Order(State().order):find("5:", 1, true),
+		"the backpack opened alone: the reagent window stays closed (only Blizzard opens bag windows)")
+	ContainerFrame6:Show() -- (the open-all-bags key, a vendor, the bank: Blizzard opens it)
+	Wait(1)
+	check(ContainerFrame6:GetAlpha() == 0 and reagent:GetParent() == bag and Order(State().order):find("5:1", 1, true),
+		"Blizzard opens it: the reagent bag's items in ours")
 	-- Stacks combined (the default): one button per item with the whole of it, the other stacks tucked;
 	-- a stack used up: the next one comes up. Ammo: its own section, the quiver's free slots one with how many.
 	M.db.gamepadBagStacks = true
@@ -467,4 +470,26 @@ do
 	QUEST_BAG_ITEMS[9007] = nil
 	BAGS = bagsBefore
 	Advance(math.ceil(waited) - waited) -- (whole seconds, so the files after this one keep their phase)
+end
+
+-- Taint: Blizzard's bag code run from ours (opening, closing or laying out a bag window) runs as ours,
+-- and what it writes (ContainerFrameSettingsManager's state, the item buttons it makes) taints every
+-- later bag opening: a right-click on an item was then refused (ADDON_ACTION_FORBIDDEN on
+-- UseContainerItem). No file of ours may call it; only Blizzard opens, closes and lays out its bags.
+section("Bags: Blizzard's bag code never run from ours (taint)")
+do
+	local banned = {
+		"OpenBag", "CloseBag", "ToggleBag", "OpenAllBags", "CloseAllBags", "ToggleAllBags", "OpenBackpack",
+		"CloseBackpack", "ToggleBackpack", "ContainerFrame_GenerateFrame",
+	}
+	local found = {}
+	for _, file in ipairs(SOURCES) do
+		local code = file.src:gsub("%-%-[^\n]*", "") -- (comments may name them)
+		for _, name in ipairs(banned) do
+			if code:find("%f[%w_]" .. name .. "%f[^%w_]") then
+				found[#found + 1] = file.name .. ": " .. name
+			end
+		end
+	end
+	check(#found == 0, "no file of ours opens or closes a bag window: " .. table.concat(found, ", "))
 end

@@ -83,12 +83,28 @@ With mouse and keyboard (`mouseBags`, on by default; `Active()` asks the one for
 is in) the same sections, columns and folded free slots, without the "Bags" header and its row (the bag
 buttons sit on the main bar), without SmartNavigation's jumps and with the tooltip where Blizzard puts it.
 Switched off there, Blizzard's grid comes back at once (`UpdateItemLayout`). The reagent bag has its own window
-with mouse and keyboard (the combined bag holds bags 0 to `ENDING_BAG_INDEX`, 4 then; a global we leave alone): its
-item buttons are reparented into ours (`Adopt`) and sorted with the rest, its window stays open for Blizzard (so it
-keeps updating them) but at alpha 0 with its mouse off, close button and portrait too (`Hush`). They go back
-(`GiveBack`, its own `UpdateItemLayout`) when ours goes or that window closes. When that window isn't open (the
-backpack opened alone, not all bags) ours opens it itself (`OpenBag(5)`, once per opening: `reagentAsked`, never
-in a fight, only when the reagent bag has slots), so the reagents are always among the rest.
+with mouse and keyboard (the combined bag holds bags 0 to `ENDING_BAG_INDEX`, 4 then; a global we leave alone).
+While Blizzard has it open (the open-all-bags key, a vendor, the bank, the mailbox, the auction house, the reagent
+bag's slot button), its item buttons are reparented into ours (`Adopt`) and sorted with the rest, its window stays
+open for Blizzard (so it keeps updating them) but at alpha 0 with its mouse off, close button and portrait too
+(`Hush`). They go back (`GiveBack`, its own `UpdateItemLayout`) when ours goes or that window closes; ours closing
+(its close button, the bag key) gives them back at once and the window is seen again, open as Blizzard left it,
+never open unseen (it counted as an open bag then: a flight's film never paused, Mirage stayed up). The
+open-all-bags key and Escape close it as Blizzard does. The backpack opened alone: no reagents in ours.
+
+**Taint: only Blizzard opens, closes and hides a bag window.** Ours opened the reagent window itself when it
+wasn't open (`OpenBag(5)`) and closed it after ours (`CloseBag(5)`, else its `Hide()`). From addon code those run
+Blizzard's bag code as ours: `ContainerFrame_GenerateFrame` → `ContainerFrameSettingsManager:CheckBagSetup()` writes
+`bagSetupDirty` (and `MarkBagsShownDirty` / `GetBagsShown` its `bagsShown`), the window's item pool makes or
+initialises item buttons, `ContainerFrame_OnShow` / `OnHide` and `UpdateContainerFrameAnchors` run tainted. Every
+later bag opening (the bag key, a vendor's or the bank's `OpenAllBags`) reads `bagSetupDirty` first, so the rest of
+it ran tainted as well and wrote it tainted again (it stays so until a bag is changed or the interface reloaded):
+item buttons made then (the reagent window's the first time it opens, more slots) carry our taint in their own
+methods (`GetBagID`), and `ContainerFrameItemButton_OnClick`'s right-click calls `self:GetBagID()` just before
+`C_Container.UseContainerItem`: "ADDON_ACTION_FORBIDDEN ... UseContainerItem" out of a fight, `ADDON_ACTION_BLOCKED`
+in one, on items in the combined bag (the reagent window's buttons sit there, reparented). `tests/gamepad_bags.lua`
+fails if any file of ours names `OpenBag`, `CloseBag`, `ToggleBag`, `OpenAllBags`, `CloseAllBags`, `ToggleAllBags`,
+`OpenBackpack`, `CloseBackpack`, `ToggleBackpack` or `ContainerFrame_GenerateFrame` in code.
 
 **Stacks combined** (`gamepadBagStacks`, on by default; with mouse and keyboard and with a controller): one button
 per item (`e.key`: its link, else its ID), the biggest stack (the first after sorting), with the whole of it on it

@@ -6,10 +6,15 @@ local LT = ns.LT
 -- With mouse and keyboard the same sections, without the "Bags" header and its row (the bag buttons
 -- sit on the main bar there), the navigation (SmartNavigation) and the tooltip beside the bag. There
 -- the reagent bag has a window of its own (the combined bag holds bags 0 to 4 then; with a controller
--- all): its item buttons come into ours, and its window stays open for Blizzard (so it keeps them
--- up to date) but can't be seen or clicked. Ours opens that window itself when it isn't (the backpack
--- opened alone: OpenBag, once per opening, never in a fight), so the reagents are always there. Given
--- back whenever ours goes or that window closes.
+-- all): while Blizzard has it open, its item buttons come into ours, and its window stays open for
+-- Blizzard (so it keeps them up to date) but can't be seen or clicked. Given back whenever ours goes
+-- (the window then shows as Blizzard's own, as it would without us) or that window closes.
+--
+-- Taint: nothing here opens, closes or hides a bag window (OpenBag, CloseBag, a window's Hide). Run
+-- from addon code those run Blizzard's bag code as ours: ContainerFrame_GenerateFrame writes
+-- ContainerFrameSettingsManager.bagSetupDirty, which every later bag opening reads first, so the rest
+-- of that opening ran tainted too, item buttons made then included; a right-click on such a button
+-- (UseContainerItem) was then refused ("ADDON_ACTION_FORBIDDEN"). Only Blizzard opens and closes them.
 --
 -- Stacks combined (Misc Tweaks' gamepadBagStacks, on by default): one button per item, its count the
 -- whole of it in the bags (the biggest stack shown, the others tucked away like the free slots). A click
@@ -118,8 +123,6 @@ local function RowOpen()
 	return Setting("gamepadBagButtons", false) == true or peeking
 end
 local dirty, navPending = false, false
-local closeReagent = false -- ours closed: the reagent bag's unseen window closes on the next frame
-local reagentAsked = false -- ours opened the reagent bag's window this opening (once)
 local ammoCounts = {} -- our count font strings (an item's whole, the ammo bags' free slots) -> true
 local combined = {}   -- a button standing for more stacks -> { total, stacks } (its tooltip says so)
 local hiddenCounts = {} -- Blizzard's stack counts we made unseen under ours -> true
@@ -1119,11 +1122,6 @@ local function Relayout()
 		watch:RegisterEvent("PLAYER_REGEN_ENABLED")
 		return
 	end
-	if not reagentAsked and not PadUI() and wantedMouse and not ReagentWindow(frame) and OpenBag
-		and (tonumber(LT.Value(C_Container.GetContainerNumSlots, REAGENT_BAG)) or 0) > 0 then
-		reagentAsked = true -- (once per opening: its window showing lays ours out again, OnWindowShown)
-		pcall(OpenBag, REAGENT_BAG)
-	end
 	local groups = Sort(frame)
 	if applied and SameLayout(groups) and placedColumns == Columns() and placedCount == freeCount
 		and (groups.reagents ~= nil) == (next(adopted) ~= nil)
@@ -1177,45 +1175,17 @@ local function OnSelect(_, button)
 	end
 end
 
--- The reagent bag's window, kept open unseen for its items in ours, closes with ours (closing the
--- bag with its close button leaves the other windows open): else it stayed open, unseen, and counted
--- as an open bag for good (a flight's film never paused for the bag then, Mirage kept up). On the
--- next frame, not while ours hides: Blizzard's ToggleAllBags (the "open all bags" key) closes the
--- backpack first and then counts the other bags it closes; one we'd closed in between went uncounted,
--- so it took the bags for not all open and opened them all again (the key never closed them). It has
--- closed that window itself by now; ours opened again meanwhile: it stays ours.
-local function CloseReagentWindow()
-	local frame = Bag()
-	if frame and frame:IsShown() then
-		return
-	end
-	local windows = {}
-	for window in pairs(hushed) do
-		windows[#windows + 1] = window
-	end
-	if windows[1] then
-		GiveBack()
-		for _, window in ipairs(windows) do
-			if window:IsShown() then
-				if CloseBag then
-					pcall(CloseBag, REAGENT_BAG)
-				end
-				if window:IsShown() then
-					window:Hide()
-				end
-			end
-		end
-	end
-end
-
 -- The bag closed: our jumps go (a bag opened in a fight gets Blizzard's layout, which they don't fit).
+-- The reagent bag's window, unseen while its items are in ours, is given back at once and seen again
+-- (closing the bag with its close button or the bag key leaves it open, as Blizzard's own bag does):
+-- never left open unseen, where it counted as an open bag for good (a flight's film never paused for
+-- the bag then, Mirage kept up). Not closed by us (Blizzard's bag code from addon code: see the top);
+-- the "open all bags" key and Escape close it themselves, and the key still counts it as open.
 local function OnBagHidden()
 	peeking = false -- (opened for the cursor: folded at the next opening)
-	reagentAsked = false
 	retargetFrom, retargetTo = nil, nil
-	if next(hushed) then
-		closeReagent = true
-		driver:Show()
+	if next(adopted) or next(hushed) then
+		GiveBack()
 	end
 	wipe(wantUp); wipe(wantDown)
 	ApplyJumps(false)
@@ -1226,10 +1196,6 @@ end
 
 driver:SetScript("OnUpdate", function(self)
 	self:Hide()
-	if closeReagent then
-		closeReagent = false
-		CloseReagentWindow()
-	end
 	if dirty then
 		dirty = false
 		Relayout()
