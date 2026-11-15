@@ -108,10 +108,11 @@ local jumped = {}     -- buttons that have a jump of ours
 local bagButtons = {} -- the bag buttons ever in our row (their up is Blizzard's)
 local hooked, hookedCallback = false, nil
 -- Quest items no quest needs any more (Lodestar's Q.ItemMarked: every quest it's for done or skipped,
--- nothing it starts left to take): a small dim red x in the button's top left corner, a texture of
--- ours on Blizzard's item button (as Beacon's reserved border), only in the quest items section.
+-- nothing it starts left to take): a small dim red x in the button's top left corner, on our frame over
+-- Blizzard's item button (Deco), only in the quest items section.
 local QUEST_MARK = "Interface\\RaidFrame\\ReadyCheck-NotReady"
 local questMarks = setmetatable({}, { __mode = "k" }) -- item button -> our mark on it
+local decos = setmetatable({}, { __mode = "k" })      -- item button -> our frame over it
 
 -- A Misc Tweaks setting (the bag buttons, the free slots, the columns).
 local function Setting(key, default)
@@ -799,6 +800,21 @@ local function ButtonSize(groups, strip)
 	return b and b:GetWidth() or 37, b and b:GetHeight() or 37
 end
 
+-- Our frame over an item button, made once: our count and quest mark are drawn on it, above the
+-- button's icon and count, and nothing of ours is made on or written into Blizzard's button itself.
+-- Made without a parent and then put on the button (see Toggle); it shows and hides with the button.
+local function Deco(button)
+	local deco = decos[button]
+	if not deco then
+		deco = CreateFrame("Frame")
+		deco:SetParent(button)
+		deco:SetAllPoints(button)
+		decos[button] = deco
+	end
+	deco:SetFrameLevel(button:GetFrameLevel() + 2)
+	return deco
+end
+
 -- The marks on the quest items section's items no quest needs any more; every other button's hidden.
 local function QuestMarks(groups)
 	local want = {}
@@ -815,7 +831,7 @@ local function QuestMarks(groups)
 	for button in pairs(want) do
 		local mark = questMarks[button]
 		if not mark then
-			mark = button:CreateTexture(nil, "OVERLAY", nil, 7)
+			mark = Deco(button):CreateTexture(nil, "OVERLAY", nil, 7)
 			mark:SetTexture(QUEST_MARK)
 			mark:SetSize(14, 14)
 			mark:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
@@ -826,13 +842,13 @@ local function QuestMarks(groups)
 	end
 end
 
--- Our count on a button: a font string of ours on the button itself, over its icon (one on the bag's
+-- Our count on a button: a font string on our frame over it (Deco), over its icon (one on the bag's
 -- overlay was drawn under the item buttons, so a combined item showed no count at all), made once.
 local countOf, countPool = {}, {}
 local function Pool(button)
 	local fs = countOf[button]
 	if not fs then
-		fs = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+		fs = Deco(button):CreateFontString(nil, "OVERLAY", "NumberFontNormal")
 		fs:SetDrawLayer("OVERLAY", 7)
 		fs:SetJustifyH("RIGHT")
 		fs:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -3, 3)

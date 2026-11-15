@@ -1022,12 +1022,13 @@ on (false otherwise).
 
 **The sorted bags** (Misc Tweaks' `gamepadBags`/`mouseBags`, GamepadBags.lua): an item of the quest
 items section with `Q.ItemMarked` gets a small dim red x (`Interface\RaidFrame\ReadyCheck-NotReady`,
-14 px, 75%) in its top left corner, a texture of ours on Blizzard's item button (as Beacon's reserved
-border, kept in a table of ours, nothing written into the button), at `OVERLAY` 7. Only there: a trade
+14 px, 75%) in its top left corner, a texture on our frame over Blizzard's item button (`Deco`: made
+without a parent, then put on the button, two levels above it; kept in a table of ours, nothing made on or
+written into the button; our combined stack counts sit on it too), at `OVERLAY` 7. Only there: a trade
 good that was some done quest's objective (Linen Cloth) is still worth keeping. Set with each layout
 and each sort that keeps the order (an item moved, a quest done meanwhile); hidden when ours goes. The
 top left corner is free on a quest item (Blizzard's junk coin and upgrade arrow are for grey items and
-gear). Nothing taints: a texture on the button isn't protected and no Blizzard code reads it.
+gear). Nothing taints: our frame isn't protected and no Blizzard code reads it.
 
 **Tests** (`tests/lodestar_items.lua`; round 6's contract as in the views' tests): the index (nil at the first question, made on the next frame;
 objectives, the giver's items, starters; an item of no quest; shared lists; a learned quest's item on

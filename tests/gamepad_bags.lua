@@ -350,7 +350,10 @@ do
 	local cloth, arrows = Slot(0, 14), Slot(1, 7)
 	local function CountOn(b)
 		for _, fs in ipairs(st.counts or {}) do
-			if fs.button == b and fs:GetParent() == b and fs:IsShown() then return fs:GetText() end -- (on the button: over its icon)
+			if fs.button == b and fs:GetParent():GetParent() == b and fs:GetParent():GetFrameLevel() > b:GetFrameLevel()
+				and fs:IsShown() then
+				return fs:GetText() -- (on our frame over the button: over its icon)
+			end
 		end
 	end
 	check(Order(st.order):find("0:14", 1, true) and not Order(st.order):find("0:15", 1, true) and not Slot(0, 15):IsShown()

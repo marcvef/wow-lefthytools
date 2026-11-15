@@ -108,7 +108,9 @@ fails if any file of ours names `OpenBag`, `CloseBag`, `ToggleBag`, `OpenAllBags
 
 **Stacks combined** (`gamepadBagStacks`, on by default; with mouse and keyboard and with a controller): one button
 per item (`e.key`: its link, else its ID), the biggest stack (the first after sorting), with the whole of it on it
-(our own count over Blizzard's, which goes to alpha 0 under it: `AmmoCounts`), the other stacks tucked away like
+(our own count over Blizzard's, which goes to alpha 0 under it: `AmmoCounts`; ours is a font string on our frame
+over the button, `Deco`, made without a parent and then put on the button two levels above it, never a region
+made on Blizzard's button), the other stacks tucked away like
 the free slots (`groups.stackTucked`; `Tuck` hides none whose stack split window is open, `hasStackSplit == 1`:
 its `OnHide` calls `StackSplitFrame:Hide()`, whose `OnHide` (`RunBinding`, the owner's `hasStackSplit`) would run
 as ours; it's tucked on a later layout). A click still takes that one stack (Blizzard's button: sell, bank, trade,
