@@ -287,9 +287,14 @@ do
 	ContainerFrame6:Show()
 	Wait(1)
 	check(reagent:GetParent() == bag, "open again: in ours again")
+	local layouts = REAGENT_LAYOUTS
 	CloseBags() -- (the bag's close button: only the combined bag closes)
 	check(ContainerFrame6:IsShown() and ContainerFrame6:GetAlpha() == 1 and ContainerFrame6:IsMouseEnabled()
 		and reagent:GetParent() == ContainerFrame6, "ours closed: the reagent window given back at once and seen again, as Blizzard left it")
+	local point, relTo, _, rx, ry = reagent:GetPoint(1)
+	check(point == "TOPLEFT" and relTo == ContainerFrame6 and rx == 8 and ry == -40 and reagent:GetNumPoints() == 1
+		and REAGENT_LAYOUTS == layouts,
+		"its buttons where Blizzard laid them out, put back with plain anchors (not Blizzard's UpdateItemLayout run from ours)")
 	Wait(1)
 	check(ContainerFrame6:IsShown(), "... and not closed by ours (never left open unseen either)")
 	OpenBags()
@@ -482,6 +487,7 @@ do
 		"OpenBag", "CloseBag", "ToggleBag", "OpenAllBags", "CloseAllBags", "ToggleAllBags", "OpenBackpack",
 		"CloseBackpack", "ToggleBackpack", "ContainerFrame_GenerateFrame",
 	}
+	local methods = { "UpdateItemLayout" } -- (Blizzard's methods that write: hooked, never called)
 	local found = {}
 	for _, file in ipairs(SOURCES) do
 		local code = file.src:gsub("%-%-[^\n]*", "") -- (comments may name them)
@@ -490,6 +496,11 @@ do
 				found[#found + 1] = file.name .. ": " .. name
 			end
 		end
+		for _, name in ipairs(methods) do
+			if code:find("[:%.]" .. name .. "%s*%(") then
+				found[#found + 1] = file.name .. ": " .. name .. "()"
+			end
+		end
 	end
-	check(#found == 0, "no file of ours opens or closes a bag window: " .. table.concat(found, ", "))
+	check(#found == 0, "no file of ours opens, closes or lays out a bag window: " .. table.concat(found, ", "))
 end

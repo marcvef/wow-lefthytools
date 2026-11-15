@@ -1681,9 +1681,12 @@ ContainerFrame6.buttons = {}
 function ContainerFrame6:GetBagID() return 5 end
 function ContainerFrame6:IsCombinedBagContainer() return false end
 function ContainerFrame6:EnumerateValidItems() return ipairs(self.buttons) end
+REAGENT_LAYOUTS = 0 -- (how often Blizzard laid the window out)
 function ContainerFrame6:UpdateItemLayout()
+	REAGENT_LAYOUTS = REAGENT_LAYOUTS + 1
 	for i, b in ipairs(self.buttons) do b:ClearAllPoints(); b:SetPoint("TOPLEFT", self, "TOPLEFT", 8 + (i - 1) * 42, -40) end
 end
+ContainerFrame6:SetScript("OnShow", function(self) self:UpdateItemLayout() end) -- (Blizzard lays it out as it opens)
 ContainerFrame6.CloseButton = CreateFrame("Button", nil, ContainerFrame6)
 ContainerFrame6.CloseButton:EnableMouse(true)
 ContainerFrame6:EnableMouse(true)

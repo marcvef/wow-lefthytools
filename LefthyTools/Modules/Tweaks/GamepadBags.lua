@@ -93,6 +93,11 @@ local REAGENT_BAG = (Enum and Enum.BagIndex and Enum.BagIndex.ReagentBag) or 5
 local adopted = {}    -- the reagent bag's item buttons in ours -> the window they belong to
 local hushed = {}     -- that window (and its clickable parts) we made unseen -> how they were
 local folding = {}    -- buttons with our "down out of the row: fold" callback (SmartNavigation's)
+-- Where Blizzard put each button we move (its last layout; for the reagent bag's, their window's): ours
+-- lets go by anchoring them there again with plain widget calls, never by calling Blizzard's
+-- UpdateItemLayout (a Blizzard method run from addon code runs as ours).
+local home = setmetatable({}, { __mode = "k" }) -- button -> { point, relativeTo, relativePoint, x, y, level }
+local moved = {}      -- buttons ours placed since Blizzard's last layout
 local placedColumns   -- the columns of the last layout
 local placedCount     -- the free slots' count in the last layout
 local placedAllFree   -- whether that layout had every free slot
@@ -548,8 +553,42 @@ local function Hush(window, on)
 	end
 end
 
+-- Where Blizzard has a button now (its first point; level: its frame level too), and back there.
+local function Remember(b, level)
+	local spot = b:GetNumPoints() > 0 and { b:GetPoint(1) } or {}
+	spot.level = level and b:GetFrameLevel() or nil
+	home[b] = spot
+end
+
+local function GoHome(b)
+	local spot = home[b]
+	if not spot or (InCombatLockdown() and b:IsProtected()) then
+		return
+	end
+	if spot[1] then
+		b:ClearAllPoints()
+		b:SetPoint(spot[1], spot[2], spot[3], spot[4], spot[5])
+	end
+	if spot.level then
+		b:SetFrameLevel(spot.level)
+	end
+end
+
+-- Blizzard has just laid the bag out (our post-hook): every button where it is now is Blizzard's.
+local function RememberLayout(frame, strip)
+	wipe(moved)
+	for _, b in frame:EnumerateValidItems() do
+		Remember(b)
+	end
+	for _, list in ipairs({ strip, strip.tucked or {} }) do
+		for _, b in ipairs(list) do
+			Remember(b)
+		end
+	end
+end
+
 -- The reagent bag's buttons into ours (laid out with the rest), or all given back to their window,
--- which lays them out again (its own Blizzard layout).
+-- where Blizzard had them (their place and level as it left them, our anchors undone).
 local function Adopt(frame, window)
 	if not window then
 		return
@@ -560,6 +599,9 @@ local function Adopt(frame, window)
 		break
 	end
 	for _, b in window:EnumerateValidItems() do
+		if not adopted[b] then
+			Remember(b, true)
+		end
 		adopted[b] = window
 		if b:GetParent() ~= frame then
 			b:SetParent(frame)
@@ -576,7 +618,8 @@ local function GiveBack()
 	for b, window in pairs(adopted) do
 		if not (InCombatLockdown() and b:IsProtected()) then
 			b:SetParent(window)
-			adopted[b] = nil
+			GoHome(b) -- (its grid again, as Blizzard laid it out)
+			adopted[b], moved[b] = nil, nil
 			windows[window] = true
 		end
 	end
@@ -585,9 +628,6 @@ local function GiveBack()
 	end
 	for window in pairs(windows) do
 		Hush(window, false)
-		if window:IsShown() and window.UpdateItemLayout then
-			window:UpdateItemLayout() -- (its grid again)
-		end
 	end
 end
 
@@ -871,6 +911,7 @@ local function Place(frame, groups, strip)
 	height = height - SECTION_GAP
 	contentHeight, buttonHeight = height, h
 	local function Put(button, col, top)
+		moved[button] = true
 		button:ClearAllPoints()
 		button:SetPoint("BOTTOMRIGHT", rel, relPoint, ax - (cols - col) * (w + SPACING), ay + height - top - h)
 	end
@@ -971,13 +1012,27 @@ local function Place(frame, groups, strip)
 	return true
 end
 
--- Ours gone (off, mouse and keyboard, or Blizzard laid the bag out in a fight): the headers hidden.
--- Blizzard's next layout puts its own back (with mouse and keyboard and in a fight it already has).
+-- Ours gone (off, or Blizzard laid the bag out in a fight): the headers hidden, every button we moved
+-- back where Blizzard's last layout had it, the bag Blizzard's size (its own CalculateWidth and
+-- CalculateHeight: they only read). Right after Blizzard's layout nothing has moved since.
 local function Unapply()
 	local frame = applied and Bag()
-	if frame and frame.CalculateWidth and not (InCombatLockdown() and frame:IsProtected()) then
-		SetBagWidth(frame, frame:CalculateWidth()) -- (Blizzard's columns again)
+	if frame and not (InCombatLockdown() and frame:IsProtected()) then
+		if frame.CalculateWidth then
+			SetBagWidth(frame, frame:CalculateWidth()) -- (Blizzard's columns again)
+		end
+		if frame.CalculateHeight then
+			SetBagHeight(frame, frame:CalculateHeight())
+		end
 	end
+	if frame then
+		for b in pairs(moved) do
+			if not adopted[b] then
+				GoHome(b)
+			end
+		end
+	end
+	wipe(moved)
 	applied = false
 	wipe(wantUp); wipe(wantDown)
 	ApplyJumps(false)
@@ -1073,6 +1128,7 @@ end
 -- Blizzard's layout of the bag (opening it, a bag collapsed, a bag changed, ...): ours after it.
 local function OnItemLayout(frame)
 	HookPanelCallback(frame)
+	RememberLayout(frame, StripButtons())
 	if not Wanted(frame) then
 		Unapply()
 		return
@@ -1302,14 +1358,8 @@ function ns.ApplyMouseBags(on)
 		dirty = true
 		driver:Show()
 	else
-		if frame.CalculateHeight then
-			SetBagHeight(frame, frame:CalculateHeight()) -- (Blizzard's own, before ours lets go)
-		end
-		Unapply()
+		Unapply() -- (Blizzard's grid back now, not at the next opening)
 		dirty = false
-		if frame.UpdateItemLayout then
-			frame:UpdateItemLayout() -- (Blizzard's grid back now, not at the next opening)
-		end
 	end
 end
 
