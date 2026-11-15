@@ -1111,18 +1111,29 @@ local function HookPanelCallback(frame)
 	end
 end
 
--- The selected item's tooltip beside the bag (the side with room), not over the other items. Blizzard
--- sets it up on selecting (OnEnter) and every refresh; this runs after each SetBagItem.
-local function PlaceTooltip(tooltip)
-	local owner = applied and tooltip.GetOwner and tooltip:GetOwner()
+-- Stacks combined: this stack's tooltip says the whole too. A TooltipDataProcessor post-call (as
+-- Beacon's, Lodestar's and Chronicle's lines): Blizzard runs it before it sizes and shows the tooltip.
+-- Not AddLine and Show from our SetBagItem hook: GameTooltip:Show() from ours ran the tooltip's own
+-- show code as ours.
+local function CombinedLine(tooltip)
+	local owner = applied and tooltip == GameTooltip and tooltip.GetOwner and tooltip:GetOwner()
 	local c = owner and combined[owner]
-	if c then -- (stacks combined: this stack's tooltip, and the whole)
+	if c then
 		tooltip:AddLine(L["In your bags: %d (%d stacks)"]:format(c.total, c.stacks), 0.6, 0.8, 1)
-		tooltip:Show()
 	end
+end
+
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
+	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, CombinedLine)
+end
+
+-- The selected item's tooltip beside the bag (the side with room), not over the other items. Blizzard
+-- sets it up on selecting (OnEnter) and every refresh; this runs after each SetBagItem (anchors only).
+local function PlaceTooltip(tooltip)
 	if not applied or not PadUI() then -- (with the mouse it follows the mouse, as ever)
 		return
 	end
+	local owner = tooltip.GetOwner and tooltip:GetOwner()
 	local frame = Bag()
 	if not (owner and laidOut[owner] and frame:IsShown()) then
 		return

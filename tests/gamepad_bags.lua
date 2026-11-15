@@ -376,8 +376,12 @@ do
 	check(not Slot(0, 15):IsShown(), "the split done: tucked on the next layout")
 	st = State()
 	GameTooltip:SetOwner(cloth, "ANCHOR_NONE")
+	local shows, show = 0, GameTooltip.Show
+	GameTooltip.Show = function(...) shows = shows + 1; return show(...) end
 	GameTooltip:SetBagItem(0, 14)
-	check(table.concat(TOOLTIP.lines, "|"):find("In your bags: 40 (3 stacks)", 1, true), "its tooltip: the whole and how many stacks")
+	GameTooltip.Show = show
+	check(table.concat(TOOLTIP.lines, "|"):find("In your bags: 40 (3 stacks)", 1, true) and shows == 0,
+		"its tooltip: the whole and how many stacks (a post-call; no GameTooltip:Show() from ours)")
 	GameTooltip:Hide()
 	-- A copy reserved for a friend (Beacon's border on it): a button of its own, the border in sight.
 	local reservedSlot = ns.BeaconReservedSlot
