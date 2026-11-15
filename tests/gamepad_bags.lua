@@ -520,4 +520,16 @@ do
 		end
 	end
 	check(#found == 0, "no file of ours opens, closes or lays out a bag window: " .. table.concat(found, ", "))
+	-- Our frames on the bag and its buttons are made without a parent and then put there: SmartNavigation
+	-- hooks CreateFrame and rebuilds the button list of the panel a frame is made on, in the caller's code.
+	local parented = {}
+	for _, file in ipairs(SOURCES) do
+		if file.name == "Modules/Tweaks/GamepadBags.lua" then
+			local code = file.src:gsub("%-%-[^\n]*", "")
+			for call in code:gmatch('CreateFrame%(%s*"%w+"%s*,[^)]*%)') do
+				parented[#parented + 1] = call
+			end
+		end
+	end
+	check(#parented == 0, "the sorted bags' frames made without a parent: " .. table.concat(parented, ", "))
 end

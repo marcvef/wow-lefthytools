@@ -160,7 +160,9 @@ gamepad mode keeps room for `NUM_CONTAINER_FRAMES` more buttons) taken out and o
 `UpdateContainerFrameAnchors` runs right after Blizzard's layout, so it places and scales the bag with it.
 The headers are font strings on a frame of ours made without a parent and then put on the bag:
 SmartNavigation hooks `CreateFrame` and refreshes the panel a frame is made on (from addon code that's
-refused in combat). They aren't buttons, so the cursor never stops on them.
+refused in combat, and it runs as ours). They aren't buttons, so the cursor never stops on them. The "Bags"
+header and the "Combine stacks" checkbox are made the same way (they were made on the bag);
+`tests/gamepad_bags.lua` fails on a `CreateFrame` with a parent in the file.
 
 **When it runs.** Post-hooks only (`hooksecurefunc` on the bag frame's methods; Blizzard calls them as
 `self:...`): `UpdateItemLayout` (opening the bag, a bag collapsed, a bag changed, gamepad mode switched:

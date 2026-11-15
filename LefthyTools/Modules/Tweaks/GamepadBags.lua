@@ -422,9 +422,11 @@ end
 
 -- The "Bags" header: a button on the bag (so the controller can land on it), folding the row away or
 -- back. The choice goes through the setting (its checkbox follows); laid out again on the next frame.
+-- Made without a parent and then put on the bag, like every frame of ours here: SmartNavigation hooks
+-- CreateFrame and rebuilds the button list of the panel a frame is made on, in the caller's code.
 local function Toggle(frame)
 	if not bagsToggle then
-		bagsToggle = CreateFrame("Button", nil, frame)
+		bagsToggle = CreateFrame("Button")
 		bagsToggle.Sign = bagsToggle:CreateTexture(nil, "ARTWORK")
 		bagsToggle.Sign:SetSize(12, 12)
 		bagsToggle.Sign:SetPoint("LEFT", 1, 0)
@@ -464,7 +466,7 @@ end
 -- goes through the setting (its checkbox follows); laid out again on the next frame.
 local function StacksSwitch(frame)
 	if not stacksSwitch then
-		local s = CreateFrame("Button", nil, frame)
+		local s = CreateFrame("Button") -- (no parent: see Toggle)
 		s:EnableMouse(true)
 		s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 		s.Box = s:CreateTexture(nil, "ARTWORK")
