@@ -306,11 +306,17 @@ end
 ---------------------------------------------------------------------------
 
 local hookedBags, marked = {}, {} -- bag frames hooked; item buttons showing the border
+-- Our frames over Blizzard's item buttons: nothing of ours is written into a Blizzard button's table
+-- (a field there is read by Blizzard's own code as ours: taint). Made without a parent and then put on
+-- the button (SmartNavigation looks at frames made on a panel), keyed here by the button.
+local borders = setmetatable({}, { __mode = "k" }) -- item button -> our frame with the border
+local guards = setmetatable({}, { __mode = "k" })  -- item button -> our guard over it (at a vendor)
+local slotOf = setmetatable({}, { __mode = "k" })  -- our guard -> the item button it guards
 
 -- The guard's clicks: right-click asks first. Without pass-through (see Guard) it also does what
 -- the slot would: left-click and drag pick the item up, hovering shows its tooltip.
 local function GuardOnClick(guard, mouseButton)
-	local button = guard:GetParent()
+	local button = slotOf[guard]
 	local bag, slot = button:GetBagID(), button:GetID()
 	if mouseButton == "LeftButton" then
 		C_Container.PickupContainerItem(bag, slot)
@@ -333,12 +339,12 @@ local function GuardOnClick(guard, mouseButton)
 end
 
 local function GuardOnDragStart(guard)
-	local button = guard:GetParent()
+	local button = slotOf[guard]
 	C_Container.PickupContainerItem(button:GetBagID(), button:GetID())
 end
 
 local function GuardOnEnter(guard)
-	local button = guard:GetParent()
+	local button = slotOf[guard]
 	GameTooltip:SetOwner(guard, "ANCHOR_RIGHT")
 	GameTooltip:SetBagItem(button:GetBagID(), button:GetID())
 	GameTooltip:Show()
@@ -352,12 +358,13 @@ end
 
 -- Made out of combat only: pass-through and motion propagation can't be set in combat.
 local function Guard(button)
-	local guard = button.LefthyToolsSellGuard
+	local guard = guards[button]
 	if guard or InCombatLockdown() then
 		return guard
 	end
-	guard = CreateFrame("Button", nil, button)
-	guard:SetAllPoints()
+	guard = CreateFrame("Button")
+	guard:SetParent(button)
+	guard:SetAllPoints(button)
 	guard:SetFrameLevel(button:GetFrameLevel() + 10)
 	guard:RegisterForClicks("RightButtonUp")
 	-- Left clicks (pick up, drag) and hovering reach the slot underneath.
@@ -373,31 +380,47 @@ local function Guard(button)
 		guard:SetScript("OnLeave", GuardOnLeave)
 	end
 	guard:SetScript("OnClick", GuardOnClick)
-	button.LefthyToolsSellGuard = guard
+	guards[button], slotOf[guard] = guard, button
 	return guard
 end
 
+-- The border: a frame of ours over the button (above its icon and count), the texture on it.
 local function Border(button)
-	local border = button.LefthyToolsReserved
+	local border = borders[button]
 	if not border then
-		border = button:CreateTexture(nil, "OVERLAY", nil, 6)
-		border:SetTexture(BORDER)
-		border:SetBlendMode("ADD")
-		border:SetVertexColor(LINE_R, LINE_G, LINE_B, 1)
-		border:SetPoint("CENTER")
+		border = CreateFrame("Frame")
+		border:SetParent(button)
+		border:SetAllPoints(button)
+		border:SetFrameLevel(button:GetFrameLevel() + 2)
+		local glow = border:CreateTexture(nil, "OVERLAY", nil, 6)
+		glow:SetTexture(BORDER)
+		glow:SetBlendMode("ADD")
+		glow:SetVertexColor(LINE_R, LINE_G, LINE_B, 1)
+		glow:SetPoint("CENTER", border, "CENTER")
 		local size = (button:GetWidth() > 0 and button:GetWidth() or 37) * 1.8
-		border:SetSize(size, size)
-		button.LefthyToolsReserved = border
+		glow:SetSize(size, size)
+		borders[button] = border
 	end
 	return border
 end
 
 local function Unmark(button)
 	marked[button] = nil
-	button.LefthyToolsReserved:Hide()
-	if button.LefthyToolsSellGuard then
-		button.LefthyToolsSellGuard:Hide()
+	borders[button]:Hide()
+	if guards[button] then
+		guards[button]:Hide()
 	end
+end
+
+-- For Misc Tweaks' sorted bags (a reserved copy keeps a button of its own) and the tests: the border
+-- and the guard over an item button, if made.
+function ns.BeaconBagMarks(button)
+	return borders[button], guards[button]
+end
+
+function ns.BeaconReservedSlot(button)
+	local border = borders[button]
+	return marked[button] == true and border ~= nil and border:IsShown()
 end
 
 -- Post-hook on a bag frame's UpdateItems, and after changes to the list or the vendor.
@@ -412,7 +435,7 @@ local function MarkBag(frame)
 		if itemID and EntryForSlot(bag, slot, itemID) then
 			Border(button):Show()
 			marked[button] = true
-			local guard = merchantOpen and Guard(button) or button.LefthyToolsSellGuard
+			local guard = merchantOpen and Guard(button) or guards[button]
 			if guard then
 				guard:SetShown(merchantOpen)
 			end

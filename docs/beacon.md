@@ -485,7 +485,13 @@ nothing is owed, and post-calls run before the tooltip is sized, so no `Show()` 
   so hooking `ContainerFrameMixin` wouldn't reach them) walks `EnumerateValidItems` and puts an
   orange glow (`UI-ActionButton-Border`, ADD blend) on reserved slots. It returns right away while
   nothing is reserved or marked. List changes and the vendor opening or closing redraw open bags on
-  the next frame.
+  the next frame. The glow is a texture on a frame of ours over the slot (made without a parent, then
+  put on Blizzard's item button two levels above it), and the vendor's guard below is ours too; both
+  are kept in tables of ours keyed by the button (`borders`, `guards`, weak). Nothing is made on or
+  written into Blizzard's button: they were fields on it (`LefthyToolsReserved`, `LefthyToolsSellGuard`),
+  and a field of ours in a Blizzard table is read by Blizzard's code as ours (taint). Misc Tweaks' sorted
+  bags ask `ns.BeaconReservedSlot(button)` (a reserved copy keeps its own button); the tests
+  `ns.BeaconBagMarks(button)` (border, guard).
 - **Vendor question:** right-clicking a bag item at a vendor sells it inside Blizzard's own click
   handler (`C_Container.UseContainerItem`), which can't be stopped from outside. So while a vendor
   is open, an invisible button sits over each reserved slot: `SetPassThroughButtons("LeftButton")`

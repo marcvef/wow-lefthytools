@@ -248,8 +248,7 @@ local function Classify(button)
 	end
 	e.id = id
 	e.key = LT.Readable(info.hyperlink) and info.hyperlink or id -- (the same item: one button with stacks combined)
-	local reserved = button.LefthyToolsReserved -- (Beacon's border on a copy reserved for a friend: kept apart)
-	if reserved and reserved:IsShown() then
+	if ns.BeaconReservedSlot and ns.BeaconReservedSlot(button) then -- (Beacon's border on a copy reserved for a friend: kept apart)
 		e.key = tostring(e.key) .. ":reserved:" .. e.order
 	end
 	local link = LT.Readable(info.hyperlink) and info.hyperlink or nil

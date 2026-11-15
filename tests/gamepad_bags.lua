@@ -380,16 +380,14 @@ do
 	check(table.concat(TOOLTIP.lines, "|"):find("In your bags: 40 (3 stacks)", 1, true), "its tooltip: the whole and how many stacks")
 	GameTooltip:Hide()
 	-- A copy reserved for a friend (Beacon's border on it): a button of its own, the border in sight.
-	local border = Slot(0, 16):CreateTexture()
-	Slot(0, 16).LefthyToolsReserved = border
-	border:Show()
+	local reservedSlot = ns.BeaconReservedSlot
+	ns.BeaconReservedSlot = function(b) return b == Slot(0, 16) end -- (what Beacon answers for it)
 	bag:UpdateItems()
 	Wait(1)
 	st = State()
 	check(Slot(0, 16):IsShown() and Order(st.order):find("0:16", 1, true) and tostring((CountOn(cloth))) == "35",
 		"a reserved copy: its own button, not in the whole of the others (20 + 15): " .. tostring((CountOn(cloth))))
-	border:Hide()
-	Slot(0, 16).LefthyToolsReserved = nil
+	ns.BeaconReservedSlot = reservedSlot
 	bag:UpdateItems()
 	Wait(1)
 	st = State()
@@ -535,4 +533,18 @@ do
 		end
 	end
 	check(#parented == 0, "the sorted bags' frames made without a parent: " .. table.concat(parented, ", "))
+	-- Nothing of ours written into Blizzard's item buttons (a field of ours there is read by Blizzard's
+	-- code as ours): our frames over them are kept in tables of ours.
+	local written = {}
+	for _, file in ipairs(SOURCES) do
+		if file.name == "Modules/Tweaks/GamepadBags.lua" or file.name == "Modules/Beacon/Handover.lua" then
+			local code = file.src:gsub("%-%-[^\n]*", "")
+			for _, name in ipairs({ "button", "b", "itemButton" }) do
+				for field in code:gmatch("%f[%w_]" .. name .. "%.([%a_][%w_]*)%s*=[^=]") do
+					written[#written + 1] = file.name .. ": " .. name .. "." .. field
+				end
+			end
+		end
+	end
+	check(#written == 0, "no field of ours on Blizzard's item buttons: " .. table.concat(written, ", "))
 end

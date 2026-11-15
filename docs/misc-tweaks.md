@@ -115,7 +115,7 @@ the free slots (`groups.stackTucked`; `Tuck` hides none whose stack split window
 its `OnHide` calls `StackSplitFrame:Hide()`, whose `OnHide` (`RunBinding`, the owner's `hasStackSplit`) would run
 as ours; it's tucked on a later layout). A click still takes that one stack (Blizzard's button: sell, bank, trade,
 split); the next comes up on the next layout. Its tooltip adds "In your bags: 200 (10 stacks)" (the `SetBagItem`
-post-hook). A copy Beacon reserved for a friend (its `LefthyToolsReserved` border shown) keeps its own button.
+post-hook). A copy Beacon reserved for a friend (its border shown: `ns.BeaconReservedSlot`) keeps its own button.
 With mouse and keyboard a small "Combine stacks" checkbox sits at the right end of the first section's
 header (`StacksSwitch`): it switches the setting (to pick or split one stack), laid out again on the next frame
 (`placedStacks`, `ns.GamepadBagsColumns`). Not with the controller: its A only takes an item or a bag button.

@@ -12,6 +12,9 @@ local BB = ns.Beacon
 local BDB = LefthyToolsDB.settings.beacon
 local function B(id) return REGISTERED_SETTINGS["LefthyTools_beacon_" .. id] end
 local function last(list) return list[#list] end
+-- Beacon's border and vendor guard over a bag slot (frames of its own, nothing written into the slot).
+local function Border(button) return (ns.BeaconBagMarks(button)) end
+local function SellGuard(button) return select(2, ns.BeaconBagMarks(button)) end
 check(Beacon and Beacon.enabled, "beacon module registered and enabled at login")
 check(LT:GetModule("beacon").category and LT:GetModule("beacon").category.module == LT:GetModule("beacon"),
 	"Beacon has its own sub-page under LefthyTools")
@@ -1854,13 +1857,13 @@ do
 	OpenBags()
 	Advance(0.1)
 	local bagButtons = ContainerFrameCombinedBags.buttons
-	check(bagButtons[3].LefthyToolsReserved and bagButtons[3].LefthyToolsReserved:IsShown() and not bagButtons[5].LefthyToolsReserved
-		and not bagButtons[3].LefthyToolsSellGuard, "a reserved item's bag slot gets a border, other slots don't")
+	check(Border(bagButtons[3]) and Border(bagButtons[3]):IsShown() and not Border(bagButtons[5])
+		and not SellGuard(bagButtons[3]), "a reserved item's bag slot gets a border, other slots don't")
 	Fire("MERCHANT_SHOW")
 	Advance(0.1)
-	local guard = bagButtons[3].LefthyToolsSellGuard
+	local guard = SellGuard(bagButtons[3])
 	check(guard and guard:IsShown() and guard._passThrough[1] == "LeftButton" and guard._propagateMotion == true
-		and not bagButtons[5].LefthyToolsSellGuard, "at a vendor: a guard over the slot, left-clicks and hovering pass through")
+		and not SellGuard(bagButtons[5]), "at a vendor: a guard over the slot, left-clicks and hovering pass through")
 	local soundsBefore = #SOUNDS
 	guard:Click("RightButton")
 	local dlg = LefthyToolsSellReservedDialog
@@ -1890,17 +1893,17 @@ do
 	pmark = #PRINTED + 1
 	dlg.Sell:Click()
 	Advance(0.1)
-	check(SOLD[#SOLD] == 1179 and #owed == 0 and not bagButtons[3].LefthyToolsReserved:IsShown() and not guard:IsShown()
+	check(SOLD[#SOLD] == 1179 and #owed == 0 and not Border(bagButtons[3]):IsShown() and not guard:IsShown()
 		and printedSince(pmark):find("no longer reserved", 1, true), "Sell anyway: sold, no longer reserved, border and guard gone")
 	-- Two copies, one of them reserved: only that one has a border and asks.
 	BAGS[0][8], BAGS[0][9] = 1155, 1155
 	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Anna", "Player-1-11", "Item-0-8")
 	Advance(0.1)
-	check(bagButtons[8].LefthyToolsReserved:IsShown() and bagButtons[8].LefthyToolsSellGuard:IsShown()
-		and not (bagButtons[9].LefthyToolsReserved and bagButtons[9].LefthyToolsReserved:IsShown())
-		and not (bagButtons[9].LefthyToolsSellGuard and bagButtons[9].LefthyToolsSellGuard:IsShown()),
+	check(Border(bagButtons[8]):IsShown() and SellGuard(bagButtons[8]):IsShown()
+		and not (Border(bagButtons[9]) and Border(bagButtons[9]):IsShown())
+		and not (SellGuard(bagButtons[9]) and SellGuard(bagButtons[9]):IsShown()),
 		"two copies, one reserved: only that one has a border and asks")
-	bagButtons[8].LefthyToolsSellGuard:Click("RightButton")
+	SellGuard(bagButtons[8]):Click("RightButton")
 	dlg.Sell:Click()
 	Advance(0.1)
 	check(SOLD[#SOLD] == 1155 and BAGS[0][8] == nil and #owed == 0, "Sell anyway on it: sold, reservation over")
@@ -1908,14 +1911,14 @@ do
 	BAGS[0][8] = 1155
 	BB.AddHandover("1155::::::::20:::::", ItemLink(1155), "Bob", "Player-1-12")
 	Advance(0.1)
-	check(bagButtons[8].LefthyToolsReserved:IsShown() and bagButtons[9].LefthyToolsReserved:IsShown(), "any copy reserved: both have a border")
+	check(Border(bagButtons[8]):IsShown() and Border(bagButtons[9]):IsShown(), "any copy reserved: both have a border")
 	pmark = #PRINTED + 1
-	bagButtons[8].LefthyToolsSellGuard:Click("RightButton")
+	SellGuard(bagButtons[8]):Click("RightButton")
 	dlg.Sell:Click()
 	Advance(0.1)
 	check(BAGS[0][8] == nil and #owed == 1 and printedSince(pmark):find("another one is still reserved for Bob", 1, true),
 		"selling one of two: the other is still reserved")
-	bagButtons[9].LefthyToolsSellGuard:Click("RightButton")
+	SellGuard(bagButtons[9]):Click("RightButton")
 	dlg.Sell:Click()
 	Advance(0.1)
 	check(BAGS[0][9] == nil and #owed == 0, "selling the last one: reservation over")
@@ -1953,7 +1956,7 @@ do
 	STATE.combat = true
 	Fire("MERCHANT_SHOW")
 	Advance(0.1)
-	check(not bagButtons[7].LefthyToolsSellGuard and #BLOCKED == blocked and bagButtons[7].LefthyToolsReserved:IsShown(),
+	check(not SellGuard(bagButtons[7]) and #BLOCKED == blocked and Border(bagButtons[7]):IsShown(),
 		"in combat: the border, but no guard (nothing blocked)")
 	STATE.combat = false
 	Fire("MERCHANT_CLOSED")
@@ -2568,7 +2571,7 @@ OpenBags()
 Fire("MERCHANT_SHOW")
 Advance(0.1)
 local reservedButton = ContainerFrameCombinedBags.buttons[3]
-check(reservedButton.LefthyToolsReserved:IsShown() and reservedButton.LefthyToolsSellGuard:IsShown(), "a reserved item at a vendor, Beacon on")
+check(Border(reservedButton):IsShown() and SellGuard(reservedButton):IsShown(), "a reserved item at a vendor, Beacon on")
 mark = #GAMEDATA + 1
 MOCK_SEND_RESULT = 3 -- the server is throttling right now
 lefthy("disable beacon")
@@ -2582,7 +2585,7 @@ OpenWorldMap(1429)
 check(#mapPins("beaconDot") == 0 and #mapPins("beaconPing") == 0 and next(BB.GetMinimapPins()) == nil,
 	"and removes the dots from both maps")
 WorldMapFrame:Hide()
-check(not reservedButton.LefthyToolsReserved:IsShown() and not reservedButton.LefthyToolsSellGuard:IsShown(),
+check(not Border(reservedButton):IsShown() and not SellGuard(reservedButton):IsShown(),
 	"and the reserved item's border and vendor question")
 pmark = #PRINTED + 1
 TRADE_PARTNER, PARTY.NPC = "Bob", { guid = "Player-1-12" }
@@ -2628,7 +2631,7 @@ end
 lefthy("enable beacon")
 Advance(0.15)
 check(#MAP_WRITES == 0, "on again: still nothing written into the world map")
-check(reservedButton.LefthyToolsReserved:IsShown() and reservedButton.LefthyToolsSellGuard:IsShown(),
+check(Border(reservedButton):IsShown() and SellGuard(reservedButton):IsShown(),
 	"and the reserved item's border and vendor question")
 Fire("MERCHANT_CLOSED")
 wipe(owedList)
