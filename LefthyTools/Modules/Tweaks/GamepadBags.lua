@@ -641,10 +641,13 @@ local function Untuck(keep)
 	end
 end
 
+-- Not a button whose stack split window is open (Shift-click): its OnHide closes that window
+-- (StackSplitFrame:Hide()), and run from ours StackSplitFrame's OnHide (RunBinding, its owner's
+-- hasStackSplit) would run as ours. It's tucked on a later layout, once the split is done.
 local function Tuck(list, keep)
 	for _, b in ipairs(list or {}) do
 		keep[b] = true
-		if b:IsShown() then
+		if b:IsShown() and b.hasStackSplit ~= 1 then
 			b:Hide() -- (again, if Blizzard showed it since)
 		end
 		tucked[b] = true

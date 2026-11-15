@@ -109,7 +109,9 @@ fails if any file of ours names `OpenBag`, `CloseBag`, `ToggleBag`, `OpenAllBags
 **Stacks combined** (`gamepadBagStacks`, on by default; with mouse and keyboard and with a controller): one button
 per item (`e.key`: its link, else its ID), the biggest stack (the first after sorting), with the whole of it on it
 (our own count over Blizzard's, which goes to alpha 0 under it: `AmmoCounts`), the other stacks tucked away like
-the free slots (`groups.stackTucked`). A click still takes that one stack (Blizzard's button: sell, bank, trade,
+the free slots (`groups.stackTucked`; `Tuck` hides none whose stack split window is open, `hasStackSplit == 1`:
+its `OnHide` calls `StackSplitFrame:Hide()`, whose `OnHide` (`RunBinding`, the owner's `hasStackSplit`) would run
+as ours; it's tucked on a later layout). A click still takes that one stack (Blizzard's button: sell, bank, trade,
 split); the next comes up on the next layout. Its tooltip adds "In your bags: 200 (10 stacks)" (the `SetBagItem`
 post-hook). A copy Beacon reserved for a friend (its `LefthyToolsReserved` border shown) keeps its own button.
 With mouse and keyboard a small "Combine stacks" checkbox sits at the right end of the first section's

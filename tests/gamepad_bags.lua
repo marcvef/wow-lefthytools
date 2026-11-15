@@ -355,6 +355,23 @@ do
 	end
 	check(Order(st.order):find("0:14", 1, true) and not Order(st.order):find("0:15", 1, true) and not Slot(0, 15):IsShown()
 		and tostring((CountOn(cloth))) == "40", "ten stacks of cloth: one button saying how many in all (20 + 15 + 5), the rest tucked: " .. tostring((CountOn(cloth))))
+	-- A stack with its split window open (Shift-click) isn't hidden by ours: its OnHide would close
+	-- that window, and StackSplitFrame's OnHide would run as ours.
+	Slot(0, 15).hasStackSplit = 1 -- (what Blizzard's StackSplitFrame sets on its owner)
+	Slot(0, 15):Show()
+	BAG_STACKS["0:15"] = 16
+	CloseBags()
+	OpenBags()
+	Wait(1)
+	check(Slot(0, 15):IsShown() and not Order(State().order):find("0:15", 1, true),
+		"a tucked stack with its split window open: left shown (its OnHide not run from ours)")
+	Slot(0, 15).hasStackSplit = 0
+	BAG_STACKS["0:15"] = 15
+	CloseBags()
+	OpenBags()
+	Wait(1)
+	check(not Slot(0, 15):IsShown(), "the split done: tucked on the next layout")
+	st = State()
 	GameTooltip:SetOwner(cloth, "ANCHOR_NONE")
 	GameTooltip:SetBagItem(0, 14)
 	check(table.concat(TOOLTIP.lines, "|"):find("In your bags: 40 (3 stacks)", 1, true), "its tooltip: the whole and how many stacks")
