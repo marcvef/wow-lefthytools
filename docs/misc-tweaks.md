@@ -33,6 +33,13 @@ Positions are stored per bag key (`combined` / `bag<id>`) as TOPLEFT in UIParent
 (`GetLeft() * GetScale()`), because Blizzard rescales bags. `SetUserPlaced(false)` keeps the
 client layout cache out of it. Moving is skipped in combat if the frame is protected.
 
+Switched off, or `/lefthy tweaks resetbags`: each shown bag goes back where Blizzard's last
+`UpdateContainerFrameAnchors()` put it (the post-hook notes each bag's first point before moving it,
+`blizzardSpot`; plain `ClearAllPoints` / `SetPoint`). It used to call `UpdateContainerFrameAnchors()`
+itself: run from addon code it runs as ours and writes `ContainerFrameSettingsManager.bagsShown`
+(`GetBagsShown`), which Blizzard's later bag code reads (taint). `tests/gamepad_bags.lua` fails on a
+call to it (or to a bag's `UpdateSearchBox`) in any file of ours.
+
 A gamepad sort button was tried and dropped: controller mode already has "Clean Up Bags" in the
 backpack's menu (`Gamepad_SetupMenuOptions`), and `ContainerFrameMixin:UpdateSearchBox()` hides
 `BagItemAutoSortButton` in gamepad mode, where `GamepadBagBar` covers its spot.
@@ -67,14 +74,16 @@ function isn't called any more; `ContainerFrames()`: the combined bags and every
 `ContainerFrameN`) show the button on the backpack or the combined bags, at the left end of the search row: where
 the search box starts (Blizzard's TOPLEFT point, "x - 4, y + 3"), the search box moved right by 32 px
 and made as much narrower (its width and place as Blizzard set them are told apart from ours,
-`lefthyWidth` and `lefthyX`, so repeated updates don't shrink it again, and opening the bags
+`ourWidth` and `ourX`, locals of Bags.lua, not fields on Blizzard's search box, so repeated updates don't shrink it again, and opening the bags
 without Blizzard placing it again, after Alt+Z for one, doesn't move it twice). Blizzard's old spot (TOPRIGHT -9, -34) collides with something of
 Forever's frame art. If the search box isn't anchored that way: left of it; without one: TOPLEFT
 38, -34. Above the frame. Blizzard's click handler is untouched
 (`C_Container.SortBags`). A client without `BagItemAutoSortButton` gets ours
 (`LefthyToolsBagSortButton`: the `bags-button-autosort-up` atlas, the sorting sound,
 `C_Container.SortBags`). Off: the search box's width and place back (also with the bags closed),
-`UpdateSearchBox` again (as Blizzard has it), ours hidden and taken off the bag. The key
+Blizzard's button hidden (as Blizzard has it since 70291; its next `UpdateSearchBox` decides again), ours
+hidden and taken off the bag. Not `UpdateSearchBox` from ours: it writes the search box's `anchorBag` and
+calls `SmartNavigation:RefreshButtonGroups` as ours (taint). The key
 still says gamepad (it began there).
 
 ## gamepadBags: the bags with a controller (GamepadBags.lua)

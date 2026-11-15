@@ -505,12 +505,13 @@ do
 		"OpenBag", "CloseBag", "ToggleBag", "OpenAllBags", "CloseAllBags", "ToggleAllBags", "OpenBackpack",
 		"CloseBackpack", "ToggleBackpack", "ContainerFrame_GenerateFrame",
 	}
-	local methods = { "UpdateItemLayout" } -- (Blizzard's methods that write: hooked, never called)
+	local methods = { "UpdateItemLayout", "UpdateSearchBox" } -- (Blizzard's methods that write: hooked, never called)
+	banned[#banned + 1] = "UpdateContainerFrameAnchors%s*%(" -- (hooked by name, never called)
 	local found = {}
 	for _, file in ipairs(SOURCES) do
 		local code = file.src:gsub("%-%-[^\n]*", "") -- (comments may name them)
 		for _, name in ipairs(banned) do
-			if code:find("%f[%w_]" .. name .. "%f[^%w_]") then
+			if code:find("%f[%w_]" .. name .. (name:find("%(", 1, true) and "" or "%f[^%w_]")) then
 				found[#found + 1] = file.name .. ": " .. name
 			end
 		end

@@ -12,6 +12,11 @@ local M = ns.LT:GetModule("tweaks")
 local bagsHooked = false
 local hookedBagFrames = {}
 local dragging
+-- Where Blizzard's UpdateContainerFrameAnchors put each bag (our post-hook notes it before moving one):
+-- switched off or reset, a bag goes back there with plain widget calls. Never calling that function
+-- from ours: it runs as ours then and writes ContainerFrameSettingsManager's list of shown bags
+-- (GetBagsShown), which Blizzard's later bag code reads (taint).
+local blizzardSpot = setmetatable({}, { __mode = "k" }) -- bag frame -> { point, relativeTo, relativePoint, x, y }
 
 local function BagsActive()
 	return M.enabled and M.db.movableBags
@@ -62,6 +67,11 @@ local function ApplySavedPosition(frame)
 end
 
 local function OnBagsAnchored()
+	for _, frame in ipairs(ContainerFrames()) do
+		if frame:IsShown() and frame:GetNumPoints() > 0 then
+			blizzardSpot[frame] = { frame:GetPoint(1) }
+		end
+	end
 	if not BagsActive() then
 		return
 	end
@@ -126,6 +136,17 @@ local function HookBagFrame(frame)
 	end
 end
 
+-- The shown bags back where Blizzard last put them (moving one closes no menu, writes nothing of Blizzard's).
+local function BlizzardSpots()
+	for _, frame in ipairs(ContainerFrames()) do
+		local spot = blizzardSpot[frame]
+		if spot and frame:IsShown() and CanMove(frame) then
+			frame:ClearAllPoints()
+			frame:SetPoint(spot[1], spot[2], spot[3], spot[4], spot[5])
+		end
+	end
+end
+
 -- Called by Tweaks.lua when the switch changes (on the next frame, never in a callback).
 function ns.ApplyMovableBags(on)
 	if on then
@@ -137,17 +158,14 @@ function ns.ApplyMovableBags(on)
 			HookBagFrame(frame)
 		end
 		OnBagsAnchored()
-	elseif not InCombatLockdown() and type(UpdateContainerFrameAnchors) == "function" then
-		-- Back to Blizzard's default spots; saved positions are kept for next time.
-		UpdateContainerFrameAnchors()
+	else
+		BlizzardSpots() -- (back to Blizzard's spots; saved positions are kept for next time)
 	end
 end
 
 function M:ResetBagPositions()
 	wipe(self.db.bagPositions)
-	if not InCombatLockdown() and type(UpdateContainerFrameAnchors) == "function" then
-		UpdateContainerFrameAnchors()
-	end
+	BlizzardSpots()
 end
 
 -- The bags' clean-up button. Since Forever 1.60.1.70291 Blizzard's (BagItemAutoSortButton) no
@@ -200,11 +218,14 @@ local function SortButton()
 end
 
 local SORT_ROOM = 32 -- the search box moves this far right (and gets as much narrower) for the button
+-- The search box's width and x as we set them (told apart from Blizzard's): kept here, not as fields on
+-- Blizzard's search box (its table is Blizzard's: a field of ours there is taint).
+local ourWidth, ourX
 
 -- The search box's width as Blizzard set it (we narrow it; Blizzard may set it again on an update).
 local function SearchWidth(search)
 	local width = search:GetWidth()
-	if search.lefthyWidth and math.abs(width - search.lefthyWidth) < 0.5 then
+	if ourWidth and math.abs(width - ourWidth) < 0.5 then
 		return width + SORT_ROOM -- (still ours)
 	end
 	return width
@@ -237,14 +258,14 @@ local function ShowSortButton(frame)
 		end
 		if point == "TOPLEFT" and relative == frame and relativePoint == "TOPLEFT" then
 			local width = SearchWidth(search)
-			if search.lefthyX and math.abs(x - search.lefthyX) < 0.5 then
+			if ourX and math.abs(x - ourX) < 0.5 then
 				x = x - SORT_ROOM -- (still where we put it, Blizzard didn't place it again: not moved twice)
 			end
 			search:ClearAllPoints()
 			search:SetPoint("TOPLEFT", frame, "TOPLEFT", x + SORT_ROOM, y)
-			search.lefthyX = x + SORT_ROOM
-			search.lefthyWidth = math.max(40, width - SORT_ROOM)
-			search:SetWidth(search.lefthyWidth)
+			ourX = x + SORT_ROOM
+			ourWidth = math.max(40, width - SORT_ROOM)
+			search:SetWidth(ourWidth)
 			button:SetPoint("TOPLEFT", frame, "TOPLEFT", x - 4, y + 3)
 		elseif search and search:IsShown() and search:GetParent() == frame then
 			button:SetPoint("RIGHT", search, "LEFT", -6, 0)
@@ -260,18 +281,18 @@ end
 -- Blizzard may not place it again when they open).
 function RestoreSearchBox()
 	local search = BagItemSearchBox
-	if not (search and search.lefthyWidth) then
+	if not (search and ourWidth) then
 		return
 	end
 	search:SetWidth(SearchWidth(search))
-	if search.lefthyX and search:GetNumPoints() == 1 then
+	if ourX and search:GetNumPoints() == 1 then
 		local point, relative, relativePoint, x, y = search:GetPoint(1)
-		if point == "TOPLEFT" and math.abs(x - search.lefthyX) < 0.5 then
+		if point == "TOPLEFT" and math.abs(x - ourX) < 0.5 then
 			search:ClearAllPoints()
 			search:SetPoint(point, relative, relativePoint, x - SORT_ROOM, y)
 		end
 	end
-	search.lefthyWidth, search.lefthyX = nil, nil
+	ourWidth, ourX = nil, nil
 end
 
 function ns.ApplyGamepadBagSort(on)
@@ -288,9 +309,13 @@ function ns.ApplyGamepadBagSort(on)
 		end
 		if on then
 			ShowSortButton(frame)
-		elseif frame:IsShown() and frame.UpdateSearchBox then
-			frame:UpdateSearchBox() -- off: as Blizzard has it
 		end
+	end
+	-- Off: Blizzard's button hidden as Blizzard has it since 70291 (its next UpdateSearchBox decides
+	-- again). Never that method from ours: it writes the search box's anchorBag and refreshes
+	-- SmartNavigation as ours (taint).
+	if not on and BagItemAutoSortButton then
+		BagItemAutoSortButton:Hide()
 	end
 	if not on and ownSortButton then
 		ownSortButton:Hide()
