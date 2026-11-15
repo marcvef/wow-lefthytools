@@ -1066,8 +1066,8 @@ flight like any LefthyTools window. Friends' windows (`LefthyToolsStreamFriend1.
 have no parent (scaled with UIParent's scale themselves, and again when it changes:
 `UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED` for the game's window or resolution, listened to while one
 is open; 0.2 s after the first of a burst, kept where they are in UIParent's units, as yours is),
-`FULLSCREEN_DIALOG` strata, so they float above a flight's film without pausing it; they open side by side from the top left (the first free
-place), several at once. Escape or the X closes any. Frames are kept for reuse.
+`FULLSCREEN_DIALOG` strata, so they float above a flight's film without pausing it; they open side by side from the left edge, centred from top to
+bottom (the first free place; the top left has overlays such as Discord's), several at once. Escape or the X closes any. Frames are kept for reuse.
 
 **Between friends** (StreamNet.lua), kind `O` (older builds ignore it):
 

@@ -599,5 +599,8 @@ ns.CHANGELOG = {
 	{ id = 197, module = "tweaks",
 		en = { "Sorted bags: Combine stacks on the bag", "A small Combine stacks checkbox at the top right of the sorted bag (mouse and keyboard): untick it to see every stack, to pick or split one." },
 		de = { "Sortierte Taschen: Stapel-Schalter", "Ein kleines Kästchen Stapel zusammenfassen oben rechts in der sortierten Tasche (Maus und Tastatur): abwählen, um jeden Stapel zu sehen und einen zu nehmen oder zu teilen." } },
+	{ id = 198, module = "beacon",
+		en = { "Fight streams at the left edge", "A friend's fight stream (on a flight, too) opens at the left edge of the screen, centred from top to bottom, no longer in the top left corner under overlays such as Discord's." },
+		de = { "Kampfstreams am linken Rand", "Der Kampfstream eines Freundes (auch auf Flügen) öffnet am linken Bildschirmrand, vertikal zentriert, nicht mehr oben links unter Overlays wie dem von Discord." } },
 	-- New entries go here, at the end.
 }

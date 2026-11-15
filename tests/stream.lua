@@ -783,7 +783,8 @@ do
 	check(fwin and fwin:IsShown() and S.IsWatching(11) and sentTo(11, mark, "O2;w;1")[1],
 		"/lefthy stream watch anna: her window opens, and she's told I watch")
 	check(fwin._strata == "FULLSCREEN_DIALOG" and math.abs(fwin._scale - 0.55) < 0.001 and fwin._points[1][1] == "TOPLEFT"
-		and fwin._points[1][4] < 40, "small, at the top left, above everything (also a flight's film)")
+		and fwin._points[1][4] < 40 and math.abs(fwin._points[1][5] * 0.55 - (UIParent:GetHeight() + 432 * 0.55) / 2) < 0.5,
+		"small, at the left edge and centred from top to bottom (the top left has overlays), above everything (also a flight's film)")
 	check(fwin.Status:GetText() == "Waiting for Anna Brook's stream...", "nothing from her yet: waiting")
 	-- Her frames: mob names first (once), then what's around her twice a second.
 	anna("O2;n;1;16;Defias Pillager")

@@ -971,7 +971,8 @@ function S.OpenFriend(id, origin)
 	end
 	view.key, view.id, view.kind, view.origin = id, id, "friend", origin
 	view.picture = { mobs = {}, recent = {}, moments = {}, name = S.FriendName(id) }
-	-- Side by side from the top left: the first place no other friend's window has.
+	-- Side by side from the left edge, centred from top to bottom (the top left has overlays, Discord's):
+	-- the first place no other friend's window has.
 	local taken = {}
 	for _, other in pairs(views) do
 		if other.kind == "friend" and other.open then
@@ -984,7 +985,7 @@ function S.OpenFriend(id, origin)
 	end
 	views[id] = view
 	ApplyScale(view, UserScale("friend"))
-	PlaceAt(view, 12 + view.slot * (WIDTH * view.scale + 6), UIParent:GetHeight() - 8)
+	PlaceAt(view, 12 + view.slot * (WIDTH * view.scale + 6), (UIParent:GetHeight() + HEIGHT * view.scale) / 2)
 	view.win.Live.Text:SetText(L["LIVE"])
 	view.win.Hint:Hide()
 	Start(view)
