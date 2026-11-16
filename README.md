@@ -612,23 +612,28 @@ gets no number at all, never a made-up one.
 **The window** (Lodestar's slim style): the list on the left, the details on the right, and a line
 across the top with your goal: "Mount: 34g of 100g · ~3g/h · at this rate at level 44".
 
-- **Ideas**, best first: mobs to farm that suit you (hostile to your side, a level you kill quickly,
-  enough of them; never a guard, a civilian or a faction you'd lose reputation with), with coin,
-  drops and skinning per kill and kills per hour (your own pace where you've fought them); herbs,
-  ore and fishing at your skill; picking pockets for rogues; quests that pay (and which reward vendors
-  best); your recipes that make a profit; professions worth learning. Each idea shows why it's
-  there, what to do, the working, the items with their prices, and a small map of where
-  ("Show on map" opens it in Lodestar).
+- **Ideas**: only what's **worth your time**: what brings more than playing normally (half again
+  your own gold per hour played, from Chronicle; until it knows that, 10s an hour per level) and whose
+  money rests on solid prices (coin, vendors, or auction house prices steady for 3 days or more).
+  Most of the time that's nothing, and it says so: "Nothing worth extra time right now: playing
+  normally pays as well." Looked at for you: mobs that suit you (hostile to your side, a level you
+  kill quickly; never a guard, a civilian or a faction you'd lose reputation with), herbs, ore and
+  fishing at your skill, picking pockets for rogues, your recipes that make a profit, professions
+  worth learning, auction house deals. An idea shows why it's worth it, what to do, the working, the
+  items with their prices, the main item's **price graph** (its lowest price each day of the last
+  two weeks on your auction house: steady or jumping around), and a small map of where ("Show on
+  map" opens it in Lodestar). Bags items show their price graph too.
 - **Bags**: each item, whether a vendor or the auction house pays more for it, and what they'd
   fetch in all. Quest items you still need and gear you might wear are kept apart.
 - **Market**: auction house deals from your last scan: items listed below their usual price that
   sell often, below what a vendor pays, vendor items in limited stock that sell for more, and (for
   enchanters) greens worth more disenchanted. Each counts one item: a scan knows only the cheapest
   listing's price.
-- **The goal**: the riding skill and mount you're saving for, what you have, what your bags would
-  add, your gold per hour played (from Chronicle) and when you'd have it. The cost is what the riding
-  trainer shows you (with your reputation discount) once you've opened their window; until then a
-  guide figure, said so.
+- **The goal**: **your own** (click the line, type the gold and a name, Set; or `/whypoor goal 150
+  Swift ram`), else the riding skill and mount you're saving for: what you have, what your bags
+  would add, your gold per hour played (from Chronicle) and when you'd have it. The mount's cost is
+  what the riding trainer shows you (with your reputation discount) once you've opened their window;
+  until then a guide figure, said so. `/whypoor goal clear` goes back to the mount.
 
 **Prices**: the auction house is scanned whole when you open it (the game allows that every 15
 minutes; setting *Scan the whole auction house when it opens*), a little each frame so nothing stutters. The

@@ -137,7 +137,7 @@ function P.Vendor(item) return FIX[item] and FIX[item][2] end
 function P.Get(item)
 	local f = FIX[item] and FIX[item][3]
 	if not f then return nil end
-	return { low = f.low, qty = f.qty, seen = NOW - (f.age or 600), value = f.value, days = 7, sells = f.sells, perDay = f.perDay,
+	return { low = f.low, qty = f.qty, seen = NOW - (f.age or 600), value = f.value, days = f.days or 7, sells = f.sells, perDay = f.perDay,
 		confidence = f.confidence, unstable = f.unstable, friend = f.friend }
 end
 function P.AHSale(item, n)
@@ -321,7 +321,7 @@ local function run(budget)
 		frames = frames + 1
 	until (not X.job and not X.pending) or frames > (budget or 3000)
 	Advance(1 / 60) -- (the watchers, then hidden)
-	return I.Get()
+	return I.All() -- (every idea worked out; the list shown is those worth your time: its own section)
 end
 local function find(list, key)
 	for _, idea in ipairs(list) do if idea.key == key then return idea end end
@@ -628,7 +628,7 @@ check(X.lastStart == started and told == 0 and I.Revision() == rev and not X.fra
 -- frame after.
 FIX[4306][3].low = 200
 priceRev = priceRev + 1
-check(select(2, I.Get()) == true and #I.Get() > 0, "a price changed: the last list still there and ready until a run works (the window shows it)")
+check(select(2, I.Get()) == true and #I.All() > 0, "a price changed: the last list still there and ready until a run works (the window shows it)")
 local mobsOn, statuses = calls.MobsOn, calls.Status
 X.UNITS = 5
 I.Request()
@@ -667,7 +667,7 @@ check(calls.MobsOn == mobsOn, "the zones' mobs not looked at again for a price (
 check(calls.Status - statuses <= 4, "which quests are open: kept (only the open ones' status asked again)")
 check(I.Revision() == rev + 1 and told == 0, "the list changed: a new revision, the watchers not yet")
 Advance(1 / 60)
-check(told == 1 and find(I.Get(), "flip:4306").once == 380 - 200, "the watchers on the frame after, the new numbers")
+check(told == 1 and find(I.All(), "flip:4306").once == 380 - 200, "the watchers on the frame after, the new numbers")
 Advance(0.1)
 check(not X.frame:IsShown(), "nothing runs idle")
 -- A price changes while a run works: when it's done, the next run comes by itself (after the gap), no request
@@ -729,6 +729,55 @@ Advance(2) -- (the failed hook rests a second)
 list = run()
 check(find(list, "grind:6") ~= nil, "it works again once the part does")
 check(select(2, I.Progress()) == false, "and the failure is forgotten")
+
+---------------------------------------------------------------------------
+-- Worth your time: what the shown list keeps
+---------------------------------------------------------------------------
+
+section("whypoor_methods: worth your time")
+do
+	local YOUNG = 90008
+	FIX[YOUNG] = { "New Thing", 10, { value = 2000, low = 1900, qty = 5, perDay = 5, sells = 0.9, confidence = "high", days = 1 } }
+	local realGoal, rate = W.Goal, nil
+	W.Goal = { Rate = function() return rate end }
+	local bar = X.Bar({ level = 30 })
+	check(bar.hour == 30000 and bar.once == 15000 and bar.how == "level", "no pace of your own: the bar by level (30: 3g an hour, 1g 50s once)")
+	rate = 40000
+	bar = X.Bar({ level = 30 })
+	check(bar.hour == 60000 and bar.how == "rate", "your own 4g an hour played: the bar half again that (6g)")
+	rate = nil
+	local function Idea(key, kind, perHour, once, items)
+		return { key = key, kind = kind, perHour = perHour, once = once, items = items or {}, why = {}, how = {}, warnings = {},
+			numbers = {}, confidence = "medium", basis = "prices" }
+	end
+	local ideas = {
+		Idea("grind:a", "grind", 50000, nil, { { item = 2589, n = 600, each = 57, source = "ah" } }),
+		Idea("grind:b", "grind", 20000, nil, { { item = 2589, n = 100, each = 57, source = "ah" } }),
+		Idea("grind:c", "grind", 60000, nil, { { item = YOUNG, n = 25, each = 1900, source = "ah" } }),
+		Idea("grind:d", "grind", 40000, nil, { { item = 750, n = 10, each = 0, source = "vendor" } }),
+		Idea("quest:e", "quest", nil, 100000),
+		Idea("flip:f", "flip", nil, 20000, { { item = 4306, n = 1, each = 250, source = "ah" } }),
+		Idea("craft:g", "craft", nil, 5000, { { item = 1251, n = 1, each = 110, source = "ah" } }),
+	}
+	local kept, hidden = X.Worth({ level = 30, ideas = ideas })
+	local keys = {}
+	for _, idea in ipairs(kept) do keys[#keys + 1] = idea.key end
+	check(table.concat(keys, ",") == "grind:a,grind:d,flip:f", "kept: what beats the bar on solid prices, got " .. table.concat(keys, ","))
+	check(ideas[1].star == 2589 and ideas[1].why[1]:find("3g", 1, true) and ideas[1].why[2]:find("Linen Cloth", 1, true),
+		"its main item (for the price graph) and why it's worth it: " .. tostring(ideas[1].why[1]))
+	check(ideas[4].star == nil, "money from coin and vendors: solid, no item to graph")
+	check(hidden.n == 4 and hidden.young == 1 and hidden.bar.hour == 30000, "left out: below the bar, a price only a day old (said), a quest, a small craft")
+	-- After a run: the shown list is the part of every idea worked out that's worth it.
+	local all, shown = run(), I.Get()
+	local inAll = {}
+	for _, idea in ipairs(all) do inAll[idea.key] = true end
+	local subset = true
+	for _, idea in ipairs(shown) do subset = subset and inAll[idea.key] == true end
+	check(subset and #shown <= #all and type(I.Hidden()) == "table" and I.Hidden().n == #all - #shown,
+		"the window's list: those worth it, the rest counted (" .. #shown .. " of " .. #all .. ")")
+	W.Goal = realGoal
+	FIX[YOUNG] = nil
+end
 
 ---------------------------------------------------------------------------
 -- Put back

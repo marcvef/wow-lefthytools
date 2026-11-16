@@ -623,5 +623,8 @@ ns.CHANGELOG = {
 	{ id = 205, module = "whypoor",
 		en = { "WhyPoor?: no tooltip line, no bag coins", "WhyPoor? no longer adds a line to item tooltips or a coin to items in the sorted bags: everything is in its window." },
 		de = { "WhyPoor?: keine Tooltip-Zeile, Münzen", "WhyPoor? fügt keine Zeile mehr zu Item-Tooltips hinzu und keine Münze mehr zu Items in den sortierten Taschen: alles ist in seinem Fenster." } },
+	{ id = 206, module = "whypoor",
+		en = { "WhyPoor?: only what's worth it, graphs", "Ideas lists only what brings more than playing normally and rests on steady prices; most of the time that's nothing, and it says so. Items show their price over the last two weeks. Set your own money goal: click the goal line, or /whypoor goal 150 Swift ram." },
+		de = { "WhyPoor?: nur was sich lohnt, Graphen", "Ideen zeigt nur, was mehr bringt als normales Spielen und auf stabilen Preisen beruht; meistens ist das nichts, und das steht dann da. Items zeigen ihren Preis der letzten zwei Wochen. Setz dein eigenes Geldziel: Klick auf die Zielzeile oder /whypoor goal 150 Schneller Widder." } },
 	-- New entries go here, at the end.
 }

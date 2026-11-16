@@ -180,6 +180,7 @@ end
 local function Help()
 	M:Print("/whypoor - open or close the window: ideas for making money")
 	M:Print("/whypoor ideas | crafting | bags | market | goal - the window on that page")
+	M:Print("/whypoor goal <gold> [name] - your own money goal (/whypoor goal clear: the mount again)")
 	M:Print("/whypoor minimap - show or hide the minimap button")
 	M:Print("/whypoor settings - WhyPoor?'s settings")
 end
@@ -197,6 +198,21 @@ function M:OnSlashCommand(msg)
 		self:Print("minimap button " .. (self.db.minimapButton and "on." or "off."))
 	elseif not self.enabled then
 		LT.Print("WhyPoor? is switched off (/lefthy enable whypoor).")
+	elseif cmd:match("^goal%s+") then
+		local rest = strtrim(msg or ""):sub(5):gsub("^%s+", "")
+		local gold, name = rest:match("^([%d%.,]+)%s*[gG]?%s*(.*)$")
+		gold = gold and tonumber((gold:gsub(",", ".")))
+		if rest:lower() == "clear" then
+			W.Goal.SetCustom(nil)
+			self:Print("your own goal cleared.")
+		elseif gold and gold > 0 then
+			W.Goal.SetCustom(gold * 10000, name)
+			self:Print(("goal: %s, %s."):format(name ~= "" and name or "your goal", W.Money(gold * 10000)))
+		else
+			Help()
+			return
+		end
+		W.Window.Open("goal")
 	elseif cmd == "" then
 		W.Window.Toggle()
 	elseif TABS[cmd] then

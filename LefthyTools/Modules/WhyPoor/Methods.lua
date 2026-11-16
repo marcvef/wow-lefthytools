@@ -58,6 +58,13 @@ X.LIMITED_MIN = 100
 X.DE_MARGIN = 0.15
 X.DE_MAX = 5             -- greens bought to disenchant, counted at most this many of one
 -- How many of each kind are kept
+-- Worth your time (X.Worth): only what beats playing normally and rests on solid prices is listed.
+X.WORTH_RATE = 1.5       -- times your own gold per hour played (Chronicle) an hourly idea must bring
+X.WORTH_FLOOR = 1000     -- copper per hour per level while your own rate isn't known (level 30: 3g an hour)
+X.WORTH_ONCE = 500       -- copper per level a one-off must bring (level 30: 1g 50s)
+X.WORTH_DAYS = 3         -- days of an item's auction house prices before its price counts as solid
+X.WORTH_SOLID = 0.8      -- this much of an idea's money must rest on solid prices (coin, vendors, steady AH)
+X.NOT_LISTED = { quest = true, sell = true } -- (quests are playing normally; the bags have their tab)
 X.KEEP = { grind = 6, gather = 3, fish = 2, pickpocket = 3, quest = 8, craft = 5, flip = 6, vendorflip = 5,
 	limited = 5, disenchant = 4, sell = 1, learn = 4 }
 
@@ -389,6 +396,16 @@ end
 
 function I.Revision()
 	return X.rev
+end
+
+-- Every idea worked out, worth it or not (for the tests and a look behind the list).
+function I.All()
+	return X.all or {}
+end
+
+-- What the list leaves out: { n, young (only because a price is too new), bar = { hour, once, how } } or nil.
+function I.Hidden()
+	return X.hidden
 end
 
 -- Where the work is: { step, steps } while a run goes on (nil when none), and whether the last run failed (its
@@ -1499,6 +1516,74 @@ function X.Signature(list)
 	return table.concat(parts, "\n")
 end
 
+-- An item's auction house price is solid: steady, not of low confidence, X.WORTH_DAYS days or more.
+function X.Solid(item)
+	local info = X.Call(W.Prices, "Get", item)
+	return type(info) == "table" and info.value ~= nil and not info.unstable and info.confidence ~= "low"
+		and (info.days or 0) >= X.WORTH_DAYS, info
+end
+
+-- The bar an idea must reach: { hour, once } in copper, and what the hour's rests on ("rate": 1.5 times
+-- your own gold per hour played, else "level").
+function X.Bar(job)
+	local level = job.level or 1
+	local hour, how = level * X.WORTH_FLOOR, "level"
+	local G = W.Goal
+	local rate = G and G.Rate and G.Rate()
+	if type(rate) == "number" and rate > 0 and rate * X.WORTH_RATE > hour then
+		hour, how = rate * X.WORTH_RATE, "rate"
+	end
+	return { hour = hour, once = level * X.WORTH_ONCE, how = how }
+end
+
+-- Which ideas are worth your time: an hourly one bringing at least the bar's hour, a one-off at least its
+-- once, either with at least X.WORTH_SOLID of its money on solid prices (coin and vendors are; an auction
+-- house price is when steady for X.WORTH_DAYS days); never quests (playing normally) nor selling the bags
+-- (their tab). Each kept one gets its main auction house item (star: its price graph in the details) and a
+-- line saying why it's worth it. Returns the kept ones and what was left out: { n, young (left out only
+-- because a price is too new), bar }.
+function X.Worth(job)
+	local bar = X.Bar(job)
+	local kept, hidden = {}, { n = 0, young = 0, bar = bar }
+	for _, idea in ipairs(job.ideas) do
+		local money = idea.perHour or idea.once
+		local enough = idea.perHour and idea.perHour >= bar.hour or idea.once and idea.once >= bar.once
+		local loose, young, star, starWorth, starInfo = 0, false, nil, 0, nil
+		for _, it in ipairs(idea.items or NONE) do
+			if it.source == "ah" then
+				local solid, info = X.Solid(it.item)
+				local worth = (it.n or 1) * (it.each or 0)
+				if solid then
+					if worth > starWorth then
+						star, starWorth, starInfo = it.item, worth, info
+					end
+				else
+					loose = loose + worth
+					young = young or (type(info) == "table" and (info.days or 0) < X.WORTH_DAYS)
+				end
+			end
+		end
+		local solidEnough = money and money > 0 and (money - loose) / money >= X.WORTH_SOLID
+		if X.NOT_LISTED[idea.kind] or not (money and enough and solidEnough) then
+			hidden.n = hidden.n + 1
+			if money and enough and not solidEnough and young then
+				hidden.young = hidden.young + 1
+			end
+		else
+			if star then
+				idea.star = star
+				table.insert(idea.why, 1, L["%s sells steadily for about %s on your auction house (%d days of prices)"]:format(
+					X.ItemName(star), X.Money(starInfo.value), starInfo.days or 0))
+			end
+			table.insert(idea.why, 1, idea.perHour
+				and L["Brings more than playing normally: at least %s an hour"]:format(X.Money(bar.hour))
+				or L["Worth it: at least %s"]:format(X.Money(bar.once)))
+			kept[#kept + 1] = idea
+		end
+	end
+	return kept, hidden
+end
+
 function X.PhaseFinish(job)
 	for _, idea in ipairs(job.ideas) do
 		if idea.oldest and job.now - idea.oldest > X.Stale() then
@@ -1509,8 +1594,11 @@ function X.PhaseFinish(job)
 			table.insert(idea.why, 1, L["In your zone"])
 		end
 	end
-	local list = X.Rank(job.ideas)
-	local signature = X.Signature(list)
+	local all = X.Rank(job.ideas)
+	local worth, hidden = X.Worth({ ideas = all, level = job.level, ctx = job.ctx })
+	local list = worth
+	X.all, X.hidden = all, hidden
+	local signature = X.Signature(all) .. "|" .. #list .. ":" .. hidden.n .. ":" .. hidden.young .. ":" .. math.floor(hidden.bar.hour)
 	X.lastKey = job.key
 	if X.Key() ~= job.key then
 		X.pending = true -- (something it rests on changed while it ran: worked out again, after the gap)

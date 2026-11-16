@@ -1235,6 +1235,27 @@ end
 ---------------------------------------------------------------------------
 
 -- A table's keys (one pass, no work per key): what's gone over across frames, as others may add keys meanwhile.
+-- An item's history on this realm's and faction's auction house, for a graph: { { day, low, qty }, ... } the
+-- oldest first (each day's lowest buyout for one and how many were listed then; days without a scan are
+-- missing), up to DAYS days; then the robust value and whether it jumps around. Empty: never scanned.
+function P.History(item)
+	local key = P.HomeKey()
+	local e = key and P.Entry(key, item)
+	if not e then
+		return {}
+	end
+	local today = P.Today()
+	local list = {}
+	for _, d in ipairs(e.days or {}) do
+		if d[1] > today - DAYS and d[2] and d[2] > 0 then
+			list[#list + 1] = { day = d[1], low = d[2], qty = d[3] or 0 }
+		end
+	end
+	table.sort(list, function(a, b) return a.day < b.day end)
+	local value = P.Value(e.days, today)
+	return list, value, P.Unstable(e.days, today)
+end
+
 -- Every item with data on this realm's and faction's auction house (mine or a friend's), for the ideas'
 -- market pass: a new list each call; nil before the saved table is there.
 function P.Items()

@@ -142,7 +142,7 @@ do
 	Changed(list, true)
 	check(state.draws == draws, "I.Watch: not drawn at once")
 	Step()
-	check(state.draws == draws + 1 and not view.Message:IsShown() and view.Head:GetText() == "3 ideas, best first",
+	check(state.draws == draws + 1 and not view.Message:IsShown() and view.Head:GetText() == "3 worth your time",
 		"drawn on the next frame: the list")
 	local rows = view.list.rows
 	check(rows[1]:IsShown() and rows[1].Title:GetText() == "Kobolds in Fargodeep Mine" and rows[1].Money:GetText() == "~3g 20s/h",
@@ -221,8 +221,8 @@ do
 	Step()
 	check(view.Message:IsShown() and view.Message:GetText() == "No deals in the auction house's prices right now.", "no deals: says so")
 	view.tabs.ideas:Click()
-	check(view.Message:GetText() == "No ideas for you right now. Kill, gather or open the auction house: WhyPoor? learns from what you do.",
-		"no ideas: says so")
+	check(view.Message:GetText():find("Nothing worth extra time right now: playing normally pays as well.", 1, true) ~= nil,
+		"nothing worth it: says so, honestly")
 	Changed(list, true)
 	Step()
 
@@ -385,6 +385,56 @@ do
 	check(all:find("Costs 90g: the riding trainer's price, seen 1 min ago.", 1, true) and all:find("You have 95g", 1, true)
 		and all:find("You have enough: off to the riding trainer!", 1, true) and all:find("From Chronicle", 1, true),
 		"its details: the cost and where it's from, what you have: " .. all)
+	-- Your own goal: the fields under the details, Set and Clear.
+	check(D.inputs and D.inputs.Amount:IsShown() and D.inputs.Name:IsShown(), "the details end with the fields for your own goal")
+	D.inputs.Amount:SetText("150")
+	D.inputs.Name:SetText("Swift ram")
+	local set
+	for _, b in ipairs(D.buttons) do if b:IsShown() and Plain(b:GetText()) == "Set" then set = b end end
+	set:Click()
+	G.Forget()
+	g = G.Current()
+	check(g and g.custom and g.name == "Swift ram" and g.cost == 1500000 and g.costBasis == "yours", "Set: your goal, 150g, its name")
+	check(W.Window.GoalLine():find("^Swift ram: 95g of 150g") ~= nil, "the strip shows it: " .. tostring(W.Window.GoalLine()))
+	texts = {}
+	for _, fs in ipairs(D.texts) do if fs:IsShown() then texts[#texts + 1] = Plain(fs:GetText()) end end
+	all = table.concat(texts, "\n")
+	check(all:find("Your own goal: 150g", 1, true) and all:find("Change your goal", 1, true) and not all:find("riding trainer", 1, true),
+		"its details: your own goal, nothing about riding: " .. all)
+	local clear
+	for _, b in ipairs(D.buttons) do if b:IsShown() and Plain(b:GetText()) == "Clear" then clear = b end end
+	check(clear ~= nil, "Clear, now there's one")
+	clear:Click()
+	G.Forget()
+	check(G.Custom() == nil and G.Current().key == "riding40", "cleared: the mount again")
+	SlashCmdList.LEFTHYTOOLS_WHYPOOR("goal 2,5 New bags")
+	G.Forget()
+	check(G.Custom() and G.Custom().cost == 25000 and G.Current().name == "New bags", "/whypoor goal 2,5 New bags: 2g 50s")
+	SlashCmdList.LEFTHYTOOLS_WHYPOOR("goal clear")
+	G.Forget()
+	check(G.Custom() == nil, "/whypoor goal clear")
+	-- The price graph: a bar a day.
+	local realHistory = W.Prices.History
+	local today = math.floor(time() / 86400)
+	W.Prices.History = function()
+		return { { day = today - 3, low = 1000 }, { day = today - 2, low = 1200 }, { day = today, low = 1100 } }, 1100, false
+	end
+	D.Begin()
+	D.Graph(9301)
+	D.End()
+	local bars = 0
+	for _, bar in ipairs(D.graph.bars) do if bar:IsShown() then bars = bars + 1 end end
+	texts = {}
+	for _, fs in ipairs(D.texts) do if fs:IsShown() then texts[#texts + 1] = Plain(fs:GetText()) end end
+	all = table.concat(texts, "\n")
+	check(D.graph:IsShown() and bars == 3 and all:find("3 days: lowest 10s, highest 12s, usually 11s · steady", 1, true),
+		"the graph: a bar for each day with a price, what it says: " .. all)
+	W.Prices.History = function() return { { day = today, low = 1100 } }, 1100, false end
+	D.Begin()
+	D.Graph(9301)
+	D.End()
+	check(not D.graph:IsShown(), "one day: no graph yet, says so")
+	W.Prices.History = realHistory
 	W.Window.View():Hide()
 	C.Char, C.Session = realChar, realSession
 	GetNumTrainerServices, GetTrainerServiceInfo, GetTrainerServiceCost = nil, nil, nil

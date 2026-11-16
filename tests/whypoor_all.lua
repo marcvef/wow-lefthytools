@@ -44,6 +44,9 @@ while not ready and frames < 20000 do
 	frames = frames + 1
 	list, ready = I.Get()
 end
+local shownCount = #list
+list = I.All() -- (every idea worked out; the window shows those worth your time)
+check(ready and shownCount <= #list and type(I.Hidden()) == "table", "the list shown is part of them: " .. shownCount .. " of " .. #list)
 check(ready and #list > 0, "the ideas come: " .. #list .. " after " .. frames .. " frames")
 check(#ERRORS == errorsBefore, "without an error")
 check(loaded.LefthyTools_MoneyData and loaded.LefthyTools_DropData, "both data add-ons loaded when needed")

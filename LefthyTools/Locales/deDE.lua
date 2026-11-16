@@ -1674,6 +1674,10 @@ L["Its reagents would sell for %s: more than what it makes."] = "Seine Reagenzie
 
 
 -- WhyPoor?: the ideas (Context.lua, Methods.lua)
+L["%s sells steadily for about %s on your auction house (%d days of prices)"] =
+	"%s verkauft sich stabil für etwa %s in deinem Auktionshaus (%d Tage Preise)"
+L["Brings more than playing normally: at least %s an hour"] = "Bringt mehr als normales Spielen: mindestens %s pro Stunde"
+L["Worth it: at least %s"] = "Lohnt sich: mindestens %s"
 
 L["Prices from %s"] = "Preise von %s"
 L["%d items have no price yet: counted as nothing"] = "%d Items haben noch keinen Preis: als nichts gezählt"
@@ -1775,6 +1779,7 @@ L["In your zone"] = "In deinem Gebiet"
 L["At the highest level quests may pay more instead of experience: not counted"] = "Auf dem Höchstlevel zahlen Quests vielleicht mehr statt EP: nicht mitgezählt"
 
 -- WhyPoor?: the goal (Goal.lua)
+L["Your goal"] = "Dein Ziel"
 
 L["Mount"] = "Mount"
 L["Epic mount"] = "Episches Mount"
@@ -1791,6 +1796,27 @@ L["jumps around"] = "schwankt stark"
 
 
 -- WhyPoor?: the window (Window.lua)
+L["Price on your auction house"] = "Preis in deinem Auktionshaus"
+L["One day of prices so far: a few more days show whether it's steady."] =
+	"Bisher ein Tag Preise: ein paar Tage mehr zeigen, ob er stabil ist."
+L["No prices yet: open the auction house."] = "Noch keine Preise: öffne das Auktionshaus."
+L["%d days: lowest %s, highest %s, usually %s"] = "%d Tage: niedrigster %s, höchster %s, meist %s"
+L["steady"] = "stabil"
+L["Set"] = "Setzen"
+L["Set your own goal"] = "Eigenes Ziel setzen"
+L["Your own goal: %s"] = "Dein eigenes Ziel: %s"
+L["Change your goal"] = "Ziel ändern"
+L["Nothing worth extra time right now: playing normally pays as well. Keep playing; open the auction house now and then."] =
+	"Gerade lohnt sich nichts extra: normales Spielen bringt genauso viel. Spiel einfach weiter; öffne ab und zu das Auktionshaus."
+L["The bar: %s an hour, half again what you earn playing (Chronicle)."] =
+	"Die Latte: %s pro Stunde, anderthalbmal so viel wie du beim Spielen verdienst (Chronicle)."
+L["The bar: %s an hour (your level; your own pace counts once Chronicle has a few hours)."] =
+	"Die Latte: %s pro Stunde (nach deinem Level; dein eigenes Tempo zählt, sobald Chronicle ein paar Stunden hat)."
+L["%d more may count once their auction house prices are a few days old."] =
+	"%d weitere können zählen, sobald ihre Auktionshaus-Preise ein paar Tage alt sind."
+L["%d worth your time"] = "%d lohnen sich"
+L["No money goal: click to set one"] = "Kein Geldziel: klicken, um eins zu setzen"
+L["Click: how it's worked out, or set your own goal"] = "Klick: wie es ausgerechnet wird, oder eigenes Ziel setzen"
 L["Asking the auction house for all its listings..."] = "Frage das Auktionshaus nach allen Angeboten..."
 L["Keeping the auction house's prices..."] = "Speichere die Preise des Auktionshauses..."
 L["Reading the auction house: %d%%"] = "Lese das Auktionshaus: %d %%"
@@ -1878,11 +1904,7 @@ L["No auction house prices yet: open the auction house"] = "Noch keine Auktionsh
 L["Working them out..."] = "Wird ausgerechnet ..."
 L["No deals in the auction house's prices right now."] = "Gerade keine Deals in den Auktionshauspreisen."
 L["Open the auction house: its prices show the deals."] = "Öffne das Auktionshaus: seine Preise zeigen die Deals."
-L["%d ideas, best first"] = "%d Ideen, die besten zuerst"
-L["No ideas for you right now. Kill, gather or open the auction house: WhyPoor? learns from what you do."] = "Gerade keine Ideen für dich. Kill was, sammle oder öffne das Auktionshaus: WhyPoor? lernt aus dem, was du tust."
-L["No money goal right now"] = "Gerade kein Sparziel"
 L["Ideas"] = "Ideen"
 L["Market"] = "Markt"
-L["Click: how it's worked out"] = "Klick: wie es ausgerechnet wird"
 
 

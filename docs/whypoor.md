@@ -84,6 +84,8 @@ P.Deposit(item, n)    -- the deposit for n: the game's when the auction house is
                       -- said for this item before (2nd "seen"); nil: unknown (no rule of its own)
 P.IsOpen()            -- the auction house is open
 P.LastScan()          -- when this realm's last full scan was
+P.History(item)       -- its days on this auction house for a graph: { { day, low, qty }, ... } oldest first, the value,
+                      -- unstable
 P.Items()             -- every item with auction house data on this realm and faction (mine or a friend's): a new
                       -- sorted list of item IDs (the ideas' market pass goes over it)
 P.Revision()          -- goes up when any price changed (for caches)
@@ -175,6 +177,8 @@ I.Request()     -- (re)work them out for W.Context() if anything they rest on ch
                 -- professions, place, recipes, your kills): on a driver a few ms a frame, never at once
 I.Watch(fn)     -- fn() runs (on the next frame) whenever I.Get()'s list changed; the window redraws then
 I.Revision()
+I.All()         -- every idea worked out, worth it or not (I.Get's list is those worth your time: X.Worth)
+I.Hidden()      -- what I.Get leaves out: { n, young (only because a price is too new), bar = { hour, once, how } }
 -- an idea:
 { key,              -- stable ("grind:1234", "gather:herb:1439", "craft:3275", "sell:bags", ...)
   kind,             -- "grind" | "gather" | "fish" | "pickpocket" | "quest" | "craft" | "flip" | "vendorflip"
@@ -454,6 +458,16 @@ known price adds nothing, and `reagentsSaleComplete` is false: it's at least tha
 driver spreads it over frames. A list where an item's data hadn't come yet is worked out again 5 s later.
 
 ### The ideas
+
+**Worth your time** (`X.Worth`, on every run before publishing): `I.Get()` lists only what beats playing
+normally; everything else is in `I.All()` and counted in `I.Hidden()`. The bar (`X.Bar`): an hourly idea brings
+at least 1.5 times your own gold per hour played (Goal's `G.Rate`, Chronicle) or, while that isn't known or is
+lower, level x 10s an hour; a one-off at least level x 5s. And at least 80% of its money rests on solid prices:
+coin and vendor prices are; an auction house price is when it's steady, not of low confidence and 3 days old or
+more (`X.Solid`). Quests (playing normally) and selling the bags (their tab) are never listed. A kept idea gets
+its main solid auction house item (`idea.star`: the price graph in its details) and two lines first in its why
+(the bar it beats, the item's steady price). Nothing kept: the window says so honestly and why (the bar; how many
+ideas only miss because a price is too new). The revision moves when any idea changes (`X.Signature` of all).
 
 `Context.lua` (`W.Context()`, its rules in `W.ContextParts`) and `Methods.lua` (`W.Ideas` = `I`, its parts
 in `I.parts` for the tests). Every number below is a named constant at the top of Methods.lua.
@@ -756,7 +770,10 @@ item data or `P.Revision()` change (the events only bump a counter).
 **Nothing outside the window** (no extra data on items): no tooltip line and no mark on the bags (both were there in
 builds 0.7.0-191 to -193 and went; Misc Tweaks' sorted bags have no corner-mark API any more).
 
-**The goal** (Goal.lua): one goal at a time, by the spells known: no riding (Apprentice Riding 33388, the
+**Your own goal** first (`G.SetCustom(copper, name)`, `G.Custom()`; kept per character in `goal[guid].custom =
+{ cost, name }`): set with the fields at the end of the goal's details (gold and a name, Set, Clear) or `/whypoor
+goal <gold> [name]` (`1,5` or `1.5`; `clear`); its basis "yours", no level, spell or mounts.
+**The goal** (Goal.lua) else: one goal at a time, by the spells known: no riding (Apprentice Riding 33388, the
 old racial riding spells 824, 825, 826, 828, 10861, 10906, 10907, 18995, or Forever's Galestrider Riding
 1285849, all in Forever's riding skill line 762) is "Mount" (level 40, spell 33388); else, without
 Journeyman Riding (33391), "Epic mount" (level 60). Paladins and Warlocks get none (`G.Why()` "class"),

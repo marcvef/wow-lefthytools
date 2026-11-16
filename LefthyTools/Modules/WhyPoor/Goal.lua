@@ -7,7 +7,8 @@ ns.WhyPoor = W
 -- The money goal (the mount): what it costs, what you have, when you'll have it (W.Goal).
 -- docs/whypoor.md has the contract and where each number comes from.
 --
--- The goals, one at a time, by what this character knows (its spells):
+-- Your own goal first (G.SetCustom: an amount and a name you give it, kept per character; /whypoor goal), else
+-- the goals, one at a time, by what this character knows (its spells):
 --   * no riding yet: "Mount", Apprentice Riding (spell 33388, Forever's riding skill line 762; level 40);
 --   * Apprentice but not Journeyman Riding (33391; level 60): "Epic mount".
 --   Paladins and Warlocks get none (their mounts come from class quests).
@@ -46,7 +47,7 @@ local function Num(v)
 end
 
 -- This character's saved goal data: { costs = { [spell] = { cost, seen } }, mounts = { [item] = { price, seen,
--- quality } } }; nil before the saved variables.
+-- quality } }, custom = { cost (copper), name } (your own goal) }; nil before the saved variables.
 function G.Mine()
 	local db = W.DB and W.DB()
 	local guid = LT.Value(UnitGUID, "player")
@@ -241,6 +242,33 @@ end
 -- The goal
 ---------------------------------------------------------------------------
 
+-- Your own goal: an amount (copper, more than nothing) and a name (nil: "Your goal"); nil or 0 clears it.
+-- True when it's kept.
+function G.SetCustom(copper, name)
+	local mine = G.Mine()
+	if not mine then
+		return false
+	end
+	copper = Num(copper)
+	if copper and copper > 0 then
+		name = type(name) == "string" and strtrim(name) or ""
+		mine.custom = { cost = math.floor(copper + 0.5), name = name ~= "" and LT.CutUTF8(name, 40) or nil }
+	else
+		mine.custom = nil
+	end
+	G.Forget()
+	return true
+end
+
+-- Your own goal: { cost, name } or nil.
+function G.Custom()
+	local mine = G.Mine()
+	local custom = mine and mine.custom
+	if type(custom) == "table" and Num(custom.cost) and custom.cost > 0 then
+		return custom
+	end
+end
+
 -- Why there's no goal: "class" (Paladins, Warlocks), "done" (Journeyman Riding known), nil (there is one).
 function G.Why()
 	local _, class = UnitClass("player")
@@ -255,6 +283,10 @@ end
 
 -- The goal now, before the numbers: { key, name, level, spell } or nil.
 function G.Next()
+	local custom = G.Custom()
+	if custom then
+		return { key = "custom", name = custom.name or L["Your goal"], custom = true, cost = custom.cost }
+	end
 	if G.Why() then
 		return nil
 	end
@@ -280,8 +312,10 @@ function G.Current()
 		return nil
 	end
 	local mine = G.Mine() or { costs = {}, mounts = {} }
-	local seen = mine.costs[goal.spell]
-	if type(seen) == "table" and Num(seen.cost) then
+	local seen = goal.spell and mine.costs[goal.spell]
+	if goal.custom then
+		goal.costBasis = "yours" -- (what you set)
+	elseif type(seen) == "table" and Num(seen.cost) then
 		goal.cost, goal.seen, goal.costBasis = seen.cost, seen.seen, "forever"
 	else
 		goal.cost, goal.about, goal.costBasis = G.ABOUT[goal.spell], true, "estimate"
@@ -300,7 +334,7 @@ function G.Current()
 	goal.basis = goal.costBasis
 	goal.mounts = {}
 	local quality = goal.spell == G.JOURNEYMAN and 4 or 3
-	for item, m in pairs(mine.mounts) do
+	for item, m in pairs(goal.custom and {} or mine.mounts) do
 		if type(m) == "table" and Num(m.price) and (m.quality == nil or m.quality == quality) then
 			goal.mounts[#goal.mounts + 1] = { item = item, price = m.price, seen = m.seen, quality = m.quality }
 		end

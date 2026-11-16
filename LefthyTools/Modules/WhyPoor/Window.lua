@@ -392,6 +392,15 @@ Wn.D = D
 
 function D.Begin()
 	D.y, D.n, D.ni, D.nb = 4, 0, 0, 0
+	if D.graph then
+		D.graph:Hide()
+	end
+	if D.inputs then
+		D.inputs.Amount:Hide()
+		D.inputs.Name:Hide()
+		D.inputs.AmountLabel:Hide()
+		D.inputs.NameLabel:Hide()
+	end
 	if D.map then
 		D.map:Hide()
 	end
@@ -474,6 +483,78 @@ function D.Item(item, n, right, enter, data)
 	b:Show()
 	D.y = D.y + C.ITEM_H + 1
 	return b
+end
+
+-- An item's price history on this auction house (P.History): a bar a day for its lowest buyout, the last 14
+-- days (a day without a scan: no bar), the usual price as a line, and under it the lowest, the highest and
+-- whether it's steady. Fewer than two days: says how many there are so far.
+D.GRAPH_H, D.GRAPH_DAYS = 56, 14
+function D.Graph(item)
+	local P = W.Prices
+	if not (P and P.History and Num(item)) then
+		return
+	end
+	local list, value, unstable = P.History(item)
+	D.Head(L["Price on your auction house"])
+	if #list < 2 then
+		D.Text(GREY .. (#list == 1 and L["One day of prices so far: a few more days show whether it's steady."]
+			or L["No prices yet: open the auction house."]) .. "|r", "small", 4)
+		return
+	end
+	local g = D.graph
+	if not g then
+		g = CreateFrame("Frame", nil, D.child)
+		g.Back = g:CreateTexture(nil, "BACKGROUND")
+		g.Back:SetAllPoints()
+		g.Back:SetColorTexture(1, 1, 1, 0.04)
+		g.bars = {}
+		g.Usual = g:CreateTexture(nil, "OVERLAY")
+		g.Usual:SetHeight(1)
+		g.Usual:SetColorTexture(1, 0.82, 0, 0.8)
+		D.graph = g
+	end
+	local width = D.width - 8
+	g:SetSize(width, D.GRAPH_H)
+	g:ClearAllPoints()
+	g:SetPoint("TOPLEFT", 4, -D.y)
+	g:Show()
+	local low, high = math.huge, 0
+	for _, d in ipairs(list) do
+		low, high = math.min(low, d.low), math.max(high, d.low)
+	end
+	local floor = low * 0.8 -- (the bars start a little below the lowest: differences show)
+	local span = math.max(1, high - floor)
+	local last = list[#list].day
+	local step = width / D.GRAPH_DAYS
+	for i = 1, D.GRAPH_DAYS do
+		local bar = g.bars[i]
+		if not bar then
+			bar = g:CreateTexture(nil, "ARTWORK")
+			g.bars[i] = bar
+		end
+		bar:Hide()
+	end
+	for _, d in ipairs(list) do
+		local slot = D.GRAPH_DAYS - (last - d.day)
+		local bar = slot >= 1 and g.bars[slot]
+		if bar then
+			local h = math.max(2, (d.low - floor) / span * (D.GRAPH_H - 4))
+			bar:ClearAllPoints()
+			bar:SetPoint("BOTTOMLEFT", (slot - 1) * step + 1, 0)
+			bar:SetSize(math.max(2, step - 2), h)
+			bar:SetColorTexture(unstable and 1 or 0.4, unstable and 0.5 or 0.75, unstable and 0.3 or 1, 0.85)
+			bar:Show()
+		end
+	end
+	g.Usual:SetShown(Num(value) ~= nil)
+	if Num(value) then
+		g.Usual:ClearAllPoints()
+		g.Usual:SetPoint("BOTTOMLEFT", 0, math.max(1, (value - floor) / span * (D.GRAPH_H - 4)))
+		g.Usual:SetWidth(width)
+	end
+	D.y = D.y + D.GRAPH_H + 3
+	D.Text(L["%d days: lowest %s, highest %s, usually %s"]:format(#list, Money(low), Money(high), Money(value))
+		.. SEP .. (unstable and (ORANGE .. L["jumps around"] .. "|r") or L["steady"]), "small", 4)
 end
 
 -- A place on the small map ({ map, name, points = { { x, y, r } } }) and "Show on map".
@@ -611,6 +692,9 @@ function D.Idea(idea)
 			end
 		end
 	end
+	if idea.star then
+		D.Graph(idea.star)
+	end
 	D.Place(idea.place)
 end
 
@@ -662,6 +746,74 @@ function D.Bag(e)
 		D.Text(GREY .. L["Not known yet"] .. "|r", "text", 4)
 	end
 	D.Item(e.item, e.count, nil)
+	if not e.bound then
+		D.Graph(e.item)
+	end
+end
+
+-- Your own goal's fields: an amount in gold and a name, then Set (and Clear when there is one).
+function D.GoalInputs()
+	local G = W.Goal
+	if not D.inputs then
+		local i = {}
+		i.AmountLabel = D.child:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		i.AmountLabel:SetText(L["Gold"])
+		i.Amount = CreateFrame("EditBox", nil, D.child, "InputBoxTemplate")
+		i.Amount:SetSize(60, 20)
+		i.Amount:SetAutoFocus(false)
+		i.Amount:SetMaxLetters(7)
+		i.NameLabel = D.child:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		i.NameLabel:SetText(L["Name"])
+		i.Name = CreateFrame("EditBox", nil, D.child, "InputBoxTemplate")
+		i.Name:SetSize(150, 20)
+		i.Name:SetAutoFocus(false)
+		i.Name:SetMaxLetters(40)
+		for _, box in ipairs({ i.Amount, i.Name }) do
+			box:SetScript("OnEscapePressed", box.ClearFocus)
+			box:SetScript("OnEnterPressed", function() D.SetGoal() end)
+		end
+		D.inputs = i
+	end
+	local i = D.inputs
+	local custom = G and G.Custom and G.Custom()
+	i.Amount:SetText(custom and tostring(math.floor(custom.cost / 10000 + 0.5)) or "")
+	i.Name:SetText(custom and custom.name or "")
+	i.AmountLabel:ClearAllPoints()
+	i.AmountLabel:SetPoint("TOPLEFT", 8, -D.y - 4)
+	i.Amount:ClearAllPoints()
+	i.Amount:SetPoint("LEFT", i.AmountLabel, "RIGHT", 10, 0)
+	i.NameLabel:ClearAllPoints()
+	i.NameLabel:SetPoint("LEFT", i.Amount, "RIGHT", 10, 0)
+	i.Name:ClearAllPoints()
+	i.Name:SetPoint("LEFT", i.NameLabel, "RIGHT", 10, 0)
+	for _, part in ipairs({ i.AmountLabel, i.Amount, i.NameLabel, i.Name }) do
+		part:Show()
+	end
+	D.y = D.y + 26
+	D.Button(L["Set"], D.SetGoal, true, 80)
+	if custom then
+		D.Button(L["Clear"], function()
+			G.SetCustom(nil)
+			Wn.state.goal = true
+			Wn.Draw()
+		end, true, 80, true)
+	end
+end
+
+-- What's in the fields, kept as your goal (gold; "1,5" or "1.5" both work).
+function D.SetGoal()
+	local i, G = D.inputs, W.Goal
+	if not (i and G and G.SetCustom) then
+		return
+	end
+	local gold = tonumber(((i.Amount:GetText() or ""):gsub(",", ".")))
+	i.Amount:ClearFocus()
+	i.Name:ClearFocus()
+	if gold and gold > 0 then
+		G.SetCustom(gold * 10000, i.Name:GetText())
+	end
+	Wn.state.goal = true
+	Wn.Draw()
 end
 
 function D.Goal()
@@ -673,17 +825,21 @@ function D.Goal()
 		D.Text(why == "class" and L["Paladins and Warlocks get their mounts from class quests, so there's no riding to save for here."]
 			or why == "done" and L["You have Journeyman Riding: no mount to save for."]
 			or L["No goal right now."], "text", 0, 2)
+		D.Head(L["Set your own goal"])
+		D.GoalInputs()
 		return
 	end
-	D.Text(g.name .. GREY .. " (" .. L["level %d"]:format(g.level) .. ")|r", "text", 0, 2)
-	if g.about then
+	D.Text(g.name .. (g.level and (GREY .. " (" .. L["level %d"]:format(g.level) .. ")|r") or ""), "text", 0, 2)
+	if g.custom then
+		D.Text(L["Your own goal: %s"]:format(Money(g.cost)), "text")
+	elseif g.about then
 		D.Text(L["Costs about %s: what guides say for WoW: Forever (10%% less at Honored with your home city). Talk to a riding trainer and WhyPoor? takes the real price."]:format(Money(g.cost)), "text")
 	else
 		D.Text(L["Costs %s: the riding trainer's price, seen %s ago."]:format(Money(g.cost), W.Age(g.seen) or "?"), "text")
 	end
 	if g.spell == G.APPRENTICE then
 		D.Text(GREY .. L["Guides say the first mount comes with Apprentice Riding; more mounts cost 20g each at your race's vendor (Forever's item data, before discounts)."] .. "|r", "small")
-	else
+	elseif g.spell == G.JOURNEYMAN then
 		D.Text(GREY .. L["An epic mount costs 200g at your race's vendor (Forever's item data, before discounts), if it doesn't come with Journeyman Riding."] .. "|r", "small")
 	end
 	D.Head(L["Where you are"])
@@ -721,6 +877,8 @@ function D.Goal()
 			D.Item(m.item, 1, Money(m.price) .. " " .. GREY .. (W.Age(m.seen) or "") .. "|r")
 		end
 	end
+	D.Head(g.custom and L["Change your goal"] or L["Set your own goal"])
+	D.GoalInputs()
 end
 
 ---------------------------------------------------------------------------
@@ -758,6 +916,21 @@ function Wn.WorkLine()
 	elseif failed then
 		return ORANGE .. L["Working them out failed: /lefthy errors shows why"] .. "|r"
 	end
+end
+
+-- The Ideas tab without an idea: an honest answer, and why.
+function Wn.NothingWorth()
+	local I = W.Ideas
+	local hidden = I and I.Hidden and I.Hidden()
+	local lines = { L["Nothing worth extra time right now: playing normally pays as well. Keep playing; open the auction house now and then."] }
+	if type(hidden) == "table" and hidden.bar then
+		lines[#lines + 1] = (hidden.bar.how == "rate" and L["The bar: %s an hour, half again what you earn playing (Chronicle)."]
+			or L["The bar: %s an hour (your level; your own pace counts once Chronicle has a few hours)."]):format(Money(hidden.bar.hour))
+		if (hidden.young or 0) > 0 then
+			lines[#lines + 1] = L["%d more may count once their auction house prices are a few days old."]:format(hidden.young)
+		end
+	end
+	return table.concat(lines, "\n\n")
 end
 
 -- The list's entries for the tab, the line above it, the message when it's empty.
@@ -806,11 +979,10 @@ function Wn.Entries(tab)
 		return deals, head, empty
 	end
 	local work = Wn.WorkLine()
-	local head = ready and L["%d ideas, best first"]:format(#list)
-		or #list > 0 and work and L["%d ideas, best first"]:format(#list) .. " · " .. work
+	local head = ready and L["%d worth your time"]:format(#list)
+		or #list > 0 and work and L["%d worth your time"]:format(#list) .. " · " .. work
 		or work or L["Working them out..."]
-	local empty = not ready and (work or L["Working them out..."])
-		or L["No ideas for you right now. Kill, gather or open the auction house: WhyPoor? learns from what you do."]
+	local empty = not ready and (work or L["Working them out..."]) or Wn.NothingWorth()
 	return list, head, empty
 end
 
@@ -859,7 +1031,7 @@ function Wn.Draw()
 		tab.Text:SetTextColor(on and 1 or 0.75, on and 0.82 or 0.75, on and 0 or 0.75)
 	end
 	local line = Wn.GoalLine()
-	view.Strip.Text:SetText(line or GREY .. L["No money goal right now"] .. "|r")
+	view.Strip.Text:SetText(line or GREY .. L["No money goal: click to set one"] .. "|r")
 	local entries, head, empty = Wn.Entries(state.tab)
 	view.entries = entries
 	local T = Wn.EXTRA[state.tab]
@@ -1013,7 +1185,7 @@ function Wn.Build()
 	strip:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 		GameTooltip:SetText(L["Your money goal"], 1, 0.82, 0)
-		GameTooltip:AddLine(L["Click: how it's worked out"], 0.8, 0.8, 0.8)
+		GameTooltip:AddLine(L["Click: how it's worked out, or set your own goal"], 0.8, 0.8, 0.8)
 		GameTooltip:Show()
 	end)
 	strip:SetScript("OnLeave", Untip)
