@@ -222,7 +222,7 @@ end
 -- Which files the game loads for LefthyTools (the TOC's files and saved variables), as a short
 -- hash; npm test checks it against the TOC. The game reads the TOC only at startup, so an update
 -- that changes it needs a restart, any other a /reload. Friends send theirs with their version.
-LT.FILES = "88a4fb2a"
+LT.FILES = "446c8e39"
 
 -- The newest LefthyTools build seen from a friend (Beacon), if newer than ours, and its FILES
 -- (nil if that friend's build doesn't send them). Addons can't go online, so friends are the
@@ -631,7 +631,7 @@ function LT.BeforeLaunch(day)
 	return type(day) == "string" and day < LT.LAUNCH_DAY
 end
 
-local SAVED = { "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB", "LefthyToolsEchoesDB" } -- the TOC's SavedVariables
+local SAVED = { "LefthyToolsDB", "LefthyToolsChronicleDB", "LefthyToolsBestiaryDB", "LefthyToolsEchoesDB", "LefthyToolsWhyPoorDB" } -- the TOC's SavedVariables
 
 -- At load, before anything reads them. On the release, each table the beta wrote goes (one that says
 -- so, or says nothing: written before the stamps, so on the beta), as if LefthyTools had never been

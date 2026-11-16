@@ -3,7 +3,7 @@
 ## Notes: Small interface tools for WoW: Forever: Mirage (fades the interface when idle), Misc Tweaks, Beacon (friends on your map), Chronicle (your journal), Bestiary (what mobs drop), Echoes (records your journey for a replay) and Lodestar (quest chains).
 ## Author: lefthy
 ## Version: 0.7.0
-## SavedVariables: LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB, LefthyToolsEchoesDB
+## SavedVariables: LefthyToolsDB, LefthyToolsChronicleDB, LefthyToolsBestiaryDB, LefthyToolsEchoesDB, LefthyToolsWhyPoorDB
 ## IconTexture: Interface\Icons\INV_Misc_Wrench_01
 ## AddonCompartmentFunc: LefthyTools_OnAddonCompartmentClick
 
@@ -128,3 +128,14 @@ Modules\Lodestar\Items.lua
 Modules\Lodestar\Learn.lua
 Modules\Lodestar\Route.lua
 Modules\Lodestar\Plan.lua
+
+Modules\WhyPoor\WhyPoor.lua
+Modules\WhyPoor\Prices.lua
+Modules\WhyPoor\Share.lua
+Modules\WhyPoor\Data.lua
+Modules\WhyPoor\Crafts.lua
+Modules\WhyPoor\Context.lua
+Modules\WhyPoor\Methods.lua
+Modules\WhyPoor\Goal.lua
+Modules\WhyPoor\Bags.lua
+Modules\WhyPoor\Window.lua

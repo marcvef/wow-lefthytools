@@ -1624,3 +1624,37 @@ L["Turn in %s"] = "%s abgeben"
 L["to %s (%d)"] = "nach %s (%d)"
 L["from %s (%d)"] = "von %s (%d)"
 L["Click: its quest · Right-click: map pin"] = "Klick: seine Quest · Rechtsklick: Kartenmarkierung"
+
+-- WhyPoor?: module, settings and slash command (WhyPoor.lua)
+
+L["Ideas for making money with this character: what is worth doing at your level, class, professions and place, and roughly how much it brings, from your own kills, the auction house's prices and the classic world database. Informational only."] =
+	"Ideen zum Geldverdienen mit diesem Charakter: was sich bei deinem Level, deiner Klasse, deinen Berufen und deinem Ort lohnt und ungefähr wie viel es bringt, aus deinen eigenen Kills, den Preisen im Auktionshaus und der klassischen Weltdatenbank. Nur zur Info."
+
+
+-- WhyPoor?: prices (Prices.lua, Share.lua)
+
+
+
+-- WhyPoor?: the money data (Data.lua)
+
+
+
+-- WhyPoor?: crafting (Crafts.lua, Margins)
+
+
+
+-- WhyPoor?: the ideas (Context.lua, Methods.lua)
+
+
+
+-- WhyPoor?: the goal (Goal.lua)
+
+
+
+-- WhyPoor?: bags and tooltips (Bags.lua)
+
+
+
+-- WhyPoor?: the window (Window.lua)
+
+
