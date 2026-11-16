@@ -387,11 +387,25 @@ do
 		"its details: the cost and where it's from, what you have: " .. all)
 	-- Your own goal: the fields under the details, Set and Clear.
 	check(D.inputs and D.inputs.Amount:IsShown() and D.inputs.Name:IsShown(), "the details end with the fields for your own goal")
-	D.inputs.Amount:SetText("150")
-	D.inputs.Name:SetText("Swift ram")
-	local set
-	for _, b in ipairs(D.buttons) do if b:IsShown() and Plain(b:GetText()) == "Set" then set = b end end
-	set:Click()
+	local function Type(box, text) -- (as a player types: the box's text, then its OnTextChanged as typed input)
+		box:SetText(text)
+		box._scripts.OnTextChanged(box, true)
+	end
+	local function SetButton()
+		for _, b in ipairs(D.buttons) do if b:IsShown() and Plain(b:GetText()) == "Set" then return b end end
+	end
+	Type(D.inputs.Amount, "abc")
+	SetButton():Click()
+	texts = {}
+	for _, fs in ipairs(D.texts) do if fs:IsShown() then texts[#texts + 1] = Plain(fs:GetText()) end end
+	check(G.Custom() == nil and table.concat(texts, "\n"):find("Type the gold as a number, like 150.", 1, true), "not a number: nothing kept, and it says so")
+	Type(D.inputs.Amount, "150g")
+	Type(D.inputs.Name, "Swift ram")
+	W.Window.Draw() -- (the window redraws while you type: every 10 s, or when money or bags change)
+	check(D.inputs.Amount:GetText() == "150g" and D.inputs.Name:GetText() == "Swift ram", "a redraw keeps what's typed")
+	local printed = #PRINTED
+	SetButton():Click()
+	check(#PRINTED > printed and PRINTED[#PRINTED]:find("goal set: Swift ram, 150g", 1, true), "Set: said in chat")
 	G.Forget()
 	g = G.Current()
 	check(g and g.custom and g.name == "Swift ram" and g.cost == 1500000 and g.costBasis == "yours", "Set: your goal, 150g, its name")

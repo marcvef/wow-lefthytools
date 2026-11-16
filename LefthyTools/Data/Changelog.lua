@@ -629,5 +629,8 @@ ns.CHANGELOG = {
 	{ id = 207, module = "echoes",
 		en = { "Echoes: a window for collectors", "/lefthy echoes window (or Show in Echoes' settings) lists each friend's collected pages, which still need a /reload to reach the exporter, and what's still coming." },
 		de = { "Echoes: Fenster fürs Sammeln", "/lefthy echoes window (oder Anzeigen in den Echoes-Einstellungen) zeigt die gesammelten Seiten jedes Freundes, welche noch einen /reload brauchen, um zum Exporter zu kommen, und was noch kommt." } },
+	{ id = 208, module = "whypoor",
+		en = { "WhyPoor?: setting your goal works", "The goal's Set button kept nothing: the window's redraws emptied the fields while you typed. What you type stays now, \"150g\" works too, and chat says when it's set." },
+		de = { "WhyPoor?: Ziel setzen geht", "Der Setzen-Button des Ziels speicherte nichts: das Fenster leerte beim Neuzeichnen die Felder, während du tippst. Was du tippst, bleibt jetzt, \"150g\" geht auch, und der Chat sagt, wenn es gesetzt ist." } },
 	-- New entries go here, at the end.
 }

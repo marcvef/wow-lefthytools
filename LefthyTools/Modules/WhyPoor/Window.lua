@@ -771,13 +771,20 @@ function D.GoalInputs()
 		for _, box in ipairs({ i.Amount, i.Name }) do
 			box:SetScript("OnEscapePressed", box.ClearFocus)
 			box:SetScript("OnEnterPressed", function() D.SetGoal() end)
+			box:SetScript("OnTextChanged", function(_, byUser)
+				if byUser then
+					i.typed = true -- (what's typed stays through the window's redraws until Set or Clear)
+				end
+			end)
 		end
 		D.inputs = i
 	end
 	local i = D.inputs
 	local custom = G and G.Custom and G.Custom()
-	i.Amount:SetText(custom and tostring(math.floor(custom.cost / 10000 + 0.5)) or "")
-	i.Name:SetText(custom and custom.name or "")
+	if not i.typed then
+		i.Amount:SetText(custom and tostring(math.floor(custom.cost / 10000 + 0.5)) or "")
+		i.Name:SetText(custom and custom.name or "")
+	end
 	i.AmountLabel:ClearAllPoints()
 	i.AmountLabel:SetPoint("TOPLEFT", 8, -D.y - 4)
 	i.Amount:ClearAllPoints()
@@ -794,9 +801,14 @@ function D.GoalInputs()
 	if custom then
 		D.Button(L["Clear"], function()
 			G.SetCustom(nil)
+			i.typed, i.problem = false, nil
+			LT.Print("WhyPoor?: your own goal cleared.")
 			Wn.state.goal = true
 			Wn.Draw()
 		end, true, 80, true)
+	end
+	if i.problem then
+		D.Text(ORANGE .. i.problem .. "|r", "small", 4)
 	end
 end
 
@@ -806,11 +818,19 @@ function D.SetGoal()
 	if not (i and G and G.SetCustom) then
 		return
 	end
-	local gold = tonumber(((i.Amount:GetText() or ""):gsub(",", ".")))
+	-- "150", "150g", "1,5", " 2.5 g": the number in it, in gold.
+	local text = (i.Amount:GetText() or ""):gsub(",", "."):gsub("[^%d%.]", "")
+	local gold = tonumber(text)
 	i.Amount:ClearFocus()
 	i.Name:ClearFocus()
-	if gold and gold > 0 then
-		G.SetCustom(gold * 10000, i.Name:GetText())
+	if gold and gold > 0 and G.SetCustom(gold * 10000, i.Name:GetText()) then
+		i.typed, i.problem = false, nil
+		local name = strtrim(i.Name:GetText() or "")
+		LT.Print(("WhyPoor?: goal set: %s, %s."):format(name ~= "" and name or "your goal", W.Money(gold * 10000)))
+	elseif gold and gold > 0 then
+		i.problem = L["The goal couldn't be kept yet: try again in a moment."]
+	else
+		i.problem = L["Type the gold as a number, like 150."]
 	end
 	Wn.state.goal = true
 	Wn.Draw()
