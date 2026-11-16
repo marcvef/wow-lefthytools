@@ -632,5 +632,8 @@ ns.CHANGELOG = {
 	{ id = 208, module = "whypoor",
 		en = { "WhyPoor?: setting your goal works", "The goal's Set button kept nothing: the window's redraws emptied the fields while you typed. What you type stays now, \"150g\" works too, and chat says when it's set." },
 		de = { "WhyPoor?: Ziel setzen geht", "Der Setzen-Button des Ziels speicherte nichts: das Fenster leerte beim Neuzeichnen die Felder, während du tippst. Was du tippst, bleibt jetzt, \"150g\" geht auch, und der Chat sagt, wenn es gesetzt ist." } },
+	{ id = 209, module = "whypoor",
+		en = { "WhyPoor?: the goal works again", "The goal (your own with /whypoor goal, riding or a mount) didn't load in the game and /whypoor goal gave an error; it loads now." },
+		de = { "WhyPoor?: das Ziel geht wieder", "Das Ziel (dein eigenes mit /whypoor goal, Reiten oder ein Mount) wurde im Spiel nicht geladen und /whypoor goal gab einen Fehler; jetzt lädt es." } },
 	-- New entries go here, at the end.
 }

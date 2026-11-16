@@ -142,7 +142,7 @@ end
 
 G.events = CreateFrame("Frame")
 for _, event in ipairs({ "TRAINER_SHOW", "TRAINER_UPDATE", "MERCHANT_SHOW", "MERCHANT_UPDATE", "PLAYER_MONEY",
-		"LEARNED_SPELL_IN_TAB", "SPELLS_CHANGED", "PLAYER_LEVEL_UP" }) do
+		"LEARNED_SPELL_IN_SKILL_LINE", "SPELLS_CHANGED", "PLAYER_LEVEL_UP" }) do -- (Forever has no LEARNED_SPELL_IN_TAB)
 	G.events:RegisterEvent(event)
 end
 G.events:SetScript("OnEvent", function(_, event)

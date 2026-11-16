@@ -89,7 +89,15 @@ local FrameMethods = {}
 FrameMethods.__index = FrameMethods
 function FrameMethods:SetScript(k, fn) self._scripts[k] = fn; if k == "OnUpdate" and fn then Updated(self) end end
 function FrameMethods:GetScript(k) return self._scripts[k] end
-function FrameMethods:RegisterEvent(e) eventFrames[e] = eventFrames[e] or {}; eventFrames[e][self] = true end
+-- Events the game doesn't have: registering one is an error there, and the rest of that file never loads
+-- (Forever's Mainline-based client dropped them; classic addons still use them).
+local UNKNOWN_EVENTS = { LEARNED_SPELL_IN_TAB = true }
+function FrameMethods:RegisterEvent(e)
+	if UNKNOWN_EVENTS[e] then
+		error("Attempt to register unknown event \"" .. e .. "\"", 2)
+	end
+	eventFrames[e] = eventFrames[e] or {}; eventFrames[e][self] = true
+end
 function FrameMethods:RegisterUnitEvent(e, ...) self._units[e] = { ... }; self:RegisterEvent(e) end
 function FrameMethods:UnregisterEvent(e) if eventFrames[e] then eventFrames[e][self] = nil end end
 function FrameMethods:UnregisterAllEvents() for _, set in pairs(eventFrames) do set[self] = nil end end
