@@ -427,7 +427,7 @@ do
 	SlashCmdList.LEFTHYTOOLS_WHYPOOR("goal clear")
 	G.Forget()
 	check(G.Custom() == nil, "/whypoor goal clear")
-	-- The bar: the line above the Ideas list opens its details; your own, Set and Automatic.
+	-- The bar: in the goal's details under your goal's fields (the line above the Ideas list opens them too).
 	local barChanged = 0
 	W.Ideas.Bar, W.Ideas.BarChanged = saved.Ideas.Bar, function() barChanged = barChanged + 1 end
 	local _, wstate, view = W.Window.View()
@@ -441,16 +441,19 @@ do
 		return table.concat(t, "\n")
 	end
 	all = Shown()
-	check(wstate.bar and all:find("The bar: ", 1, true) and all:find("half an hour's worth", 1, true) and D.barInputs.Amount:IsShown()
-		and not D.inputs.Amount:IsShown(), "its details: what it is, where it's from, the field: " .. all)
+	check(wstate.goal and all:find("The bar for ideas", 1, true) and all:find("The bar: ", 1, true) and all:find("half an hour's worth", 1, true)
+		and D.barInputs.Amount:IsShown() and D.inputs.Amount:IsShown(), "the goal's details, the bar with its field under your goal's: " .. all)
+	local function SetBar()
+		for _, b in ipairs(D.buttons) do if b:IsShown() and b.onClick == D.SetBar then return b end end
+	end
 	Type(D.barInputs.Amount, "lots")
-	SetButton():Click()
+	SetBar():Click()
 	check(G.OwnBar() == nil and Shown():find("Type the gold as a number, like 1.5.", 1, true), "not a number: nothing kept, said so")
 	Type(D.barInputs.Amount, "1,5")
 	W.Window.Draw()
 	check(D.barInputs.Amount:GetText() == "1,5", "a redraw keeps what's typed")
 	printed = #PRINTED
-	SetButton():Click()
+	SetBar():Click()
 	all = Shown()
 	check(G.OwnBar() == 15000 and barChanged == 1 and PRINTED[#PRINTED]:find("bar set: 1g 50s an hour", 1, true)
 		and all:find("The bar: 1g 50s an hour, your own.", 1, true) and D.barInputs.Amount:GetText() == "1.5",
@@ -461,11 +464,11 @@ do
 	auto:Click()
 	check(G.OwnBar() == nil and barChanged == 2, "Automatic: back to the automatic bar")
 	SlashCmdList.LEFTHYTOOLS_WHYPOOR("bar 2g")
-	check(G.OwnBar() == 20000 and barChanged == 3 and wstate.bar, "/whypoor bar 2g: 2g an hour, its details shown")
+	check(G.OwnBar() == 20000 and barChanged == 3 and wstate.goal, "/whypoor bar 2g: 2g an hour, the goal's details shown")
 	SlashCmdList.LEFTHYTOOLS_WHYPOOR("bar auto")
 	check(G.OwnBar() == nil, "/whypoor bar auto")
 	view.tabs.bags:Click()
-	check(not wstate.bar and not view.HeadButton:IsShown(), "another tab: no bar")
+	check(not view.HeadButton:IsShown(), "another tab: the line above its list isn't the bar's")
 	W.Ideas.Bar, W.Ideas.BarChanged = nil, nil
 	-- The price graph: a bar a day.
 	local realHistory = W.Prices.History

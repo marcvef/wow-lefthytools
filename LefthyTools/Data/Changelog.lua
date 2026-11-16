@@ -636,7 +636,7 @@ ns.CHANGELOG = {
 		en = { "WhyPoor?: the goal works again", "The goal (your own with /whypoor goal, riding or a mount) didn't load in the game and /whypoor goal gave an error; it loads now." },
 		de = { "WhyPoor?: das Ziel geht wieder", "Das Ziel (dein eigenes mit /whypoor goal, Reiten oder ein Mount) wurde im Spiel nicht geladen und /whypoor goal gab einen Fehler; jetzt lädt es." } },
 	{ id = 210, module = "whypoor",
-		en = { "WhyPoor?: set your own bar", "Ideas lists what brings at least the bar an hour. Click the line above the list to see where it comes from and set your own (or /whypoor bar 1.5). The automatic bar now follows what you earn playing (Chronicle), not your level, once that's known." },
-		de = { "WhyPoor?: eigene Latte setzen", "Ideen zeigt, was mindestens die Latte pro Stunde bringt. Klick auf die Zeile über der Liste: woher sie kommt, und deine eigene setzen (oder /whypoor bar 1.5). Die automatische Latte folgt jetzt dem, was du beim Spielen verdienst (Chronicle), nicht deinem Level, sobald das bekannt ist." } },
+		en = { "WhyPoor?: set your own bar", "Ideas lists what brings at least the bar an hour. Click the goal line: under your money goal you see where the bar comes from and set your own (or /whypoor bar 1.5). The automatic bar now follows what you earn playing (Chronicle), not your level, once that's known." },
+		de = { "WhyPoor?: eigene Latte setzen", "Ideen zeigt, was mindestens die Latte pro Stunde bringt. Klick auf die Zielzeile: unter deinem Geldziel siehst du, woher sie kommt, und setzt deine eigene (oder /whypoor bar 1.5). Die automatische Latte folgt jetzt dem, was du beim Spielen verdienst (Chronicle), nicht deinem Level, sobald das bekannt ist." } },
 	-- New entries go here, at the end.
 }

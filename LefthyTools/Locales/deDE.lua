@@ -1870,13 +1870,11 @@ L["The bar: %s an hour, by your level (Chronicle doesn't know what you earn play
 	"Die Latte: %s pro Stunde, nach deinem Level (Chronicle weiß noch nicht, was du beim Spielen verdienst)."
 L["Click to change it."] = "Klicken, um sie zu ändern."
 L["bar %s an hour"] = "Latte %s/Std."
-L["The bar"] = "Die Latte"
+L["The bar for ideas"] = "Die Latte für Ideen"
 L["Ideas lists only what brings at least this, so it's worth more than playing normally."] =
 	"Ideen zeigt nur, was mindestens so viel bringt, also mehr als normales Spielen."
 L["A one-off (a flip, a craft) must bring half an hour's worth: %s."] =
 	"Etwas Einmaliges (ein Flip, ein Craft) muss eine halbe Stunde wert sein: %s."
-L["Change your bar"] = "Latte ändern"
-L["Set your own bar"] = "Eigene Latte setzen"
 L["Gold an hour"] = "Gold pro Stunde"
 L["Automatic"] = "Automatisch"
 L["Or type /whypoor bar 1.5 (/whypoor bar auto: back to automatic)."] =
@@ -1890,7 +1888,8 @@ L["%d more may count once their auction house prices are a few days old."] =
 	"%d weitere können zählen, sobald ihre Auktionshaus-Preise ein paar Tage alt sind."
 L["%d worth your time"] = "%d lohnen sich"
 L["No money goal: click to set one"] = "Kein Geldziel: klicken, um eins zu setzen"
-L["Click: how it's worked out, or set your own goal"] = "Klick: wie es ausgerechnet wird, oder eigenes Ziel setzen"
+L["Click: how it's worked out; set your own goal or the bar for ideas"] =
+	"Klick: wie es ausgerechnet wird; eigenes Ziel oder die Latte für Ideen setzen"
 L["Asking the auction house for all its listings..."] = "Frage das Auktionshaus nach allen Angeboten..."
 L["Keeping the auction house's prices..."] = "Speichere die Preise des Auktionshauses..."
 L["Reading the auction house: %d%%"] = "Lese das Auktionshaus: %d %%"

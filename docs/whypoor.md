@@ -463,9 +463,9 @@ driver spreads it over frames. A list where an item's data hadn't come yet is wo
 
 **Worth your time** (`X.Worth`, on every run before publishing): `I.Get()` lists only what beats playing
 normally; everything else is in `I.All()` and counted in `I.Hidden()`. The bar (`X.Bar`, `I.Bar()` now): an hourly
-idea brings at least your own bar (`G.SetBar(copper)` / `G.OwnBar()`, per character in `goal[guid].bar`; set in the
-bar's details, opened by clicking the line above the Ideas list or its message, or `/whypoor bar <gold>`, `auto`
-back); else 1.5 times your own gold per hour played (Goal's `G.Rate`, Chronicle), at least level x 2s an hour
+idea brings at least your own bar (`G.SetBar(copper)` / `G.OwnBar()`, per character in `goal[guid].bar`; set at the end
+of the goal's details, under your own goal's fields (also opened by clicking the line above the Ideas list or its
+message), or `/whypoor bar <gold>`, `auto` back); else 1.5 times your own gold per hour played (Goal's `G.Rate`, Chronicle), at least level x 2s an hour
 (`least`); else, while that isn't known or your gold went down (`spent`), level x 10s an hour. A one-off brings half
 an hour of the bar. A changed bar works the ideas out again (`I.BarChanged`). And at least 80% of its money rests on solid prices:
 coin and vendor prices are; an auction house price is when it's steady, not of low confidence and 3 days old or

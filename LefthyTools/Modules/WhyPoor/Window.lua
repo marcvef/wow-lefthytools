@@ -67,7 +67,7 @@ Wn.ICONS = {
 	sell = "Interface\\Icons\\INV_Misc_Bag_10", learn = "Interface\\Icons\\INV_Misc_Book_09",
 	saving = "Interface\\Icons\\INV_Misc_Coin_02",
 }
-Wn.state = { tab = "ideas", sel = {}, goal = false, bar = false, old = true, due = false, draws = 0, requests = 0 }
+Wn.state = { tab = "ideas", sel = {}, goal = false, old = true, due = false, draws = 0, requests = 0 }
 
 local function Num(v)
 	return type(v) == "number" and not LT.IsSecret(v) and v or nil
@@ -369,7 +369,7 @@ function Wn.FillRow(row, e)
 			end
 		end
 	end
-	row.Sel:SetShown(not state.goal and not state.bar and state.sel[state.tab] == Wn.Key(e))
+	row.Sel:SetShown(not state.goal and state.sel[state.tab] == Wn.Key(e))
 end
 
 -- An entry's key in its list (the pick stays on it when the list changes).
@@ -851,6 +851,7 @@ function D.Goal()
 			or L["No goal right now."], "text", 0, 2)
 		D.Head(L["Set your own goal"])
 		D.GoalInputs()
+		D.Bar()
 		return
 	end
 	D.Text(g.name .. (g.level and (GREY .. " (" .. L["level %d"]:format(g.level) .. ")|r") or ""), "text", 0, 2)
@@ -903,6 +904,7 @@ function D.Goal()
 	end
 	D.Head(g.custom and L["Change your goal"] or L["Set your own goal"])
 	D.GoalInputs()
+	D.Bar()
 end
 
 -- The bar's line: what it is and where it comes from.
@@ -920,18 +922,17 @@ function Wn.BarLine(bar)
 	return L["The bar: %s an hour, by your level (Chronicle doesn't know what you earn playing yet)."]:format(money)
 end
 
--- The bar's details: what it is, and your own.
+-- The bar, at the end of the goal's details (under your own goal's fields): what it is, and your own.
 function D.Bar()
 	local I = W.Ideas
 	local bar = I and I.Bar and I.Bar()
-	D.Text(L["The bar"], "title")
-	D.Text(L["Ideas lists only what brings at least this, so it's worth more than playing normally."], "text", 0, 2)
 	if type(bar) ~= "table" then
 		return
 	end
-	D.Text(Wn.BarLine(bar), "text", 0, 4)
-	D.Text(L["A one-off (a flip, a craft) must bring half an hour's worth: %s."]:format(Money(bar.once)), "text")
-	D.Head(bar.how == "own" and L["Change your bar"] or L["Set your own bar"])
+	D.Head(L["The bar for ideas"])
+	D.Text(L["Ideas lists only what brings at least this, so it's worth more than playing normally."], "small", 4)
+	D.Text(Wn.BarLine(bar), "text", 4)
+	D.Text(L["A one-off (a flip, a craft) must bring half an hour's worth: %s."]:format(Money(bar.once)), "small", 4)
 	local i = D.barInputs
 	if not i then
 		i = {}
@@ -1005,10 +1006,10 @@ function D.BarChanged()
 	Wn.Draw()
 end
 
--- The bar's details on the right (the line above the Ideas list, its message).
+-- The goal's details on the right, where the bar is set too (the line above the Ideas list, its message).
 function Wn.ShowBar()
 	local state = Wn.state
-	state.goal, state.bar = false, true
+	state.goal = true
 	if Wn.view then
 		Wn.view.list:Lay()
 		Wn.DrawDetails()
@@ -1127,12 +1128,6 @@ function Wn.DrawDetails()
 	local state, view = Wn.state, Wn.view
 	D.Begin()
 	local e
-	if state.bar and not state.goal and state.tab == "ideas" then
-		D.Bar()
-		D.End()
-		view.Strip.Sel:SetShown(false)
-		return
-	end
 	if not state.goal then
 		local key = state.sel[state.tab]
 		for _, entry in ipairs(view.entries or {}) do
@@ -1210,7 +1205,7 @@ end
 
 function Wn.Pick(e)
 	local state = Wn.state
-	state.goal, state.bar = false, false
+	state.goal = false
 	state.sel[state.tab] = Wn.Key(e)
 	Wn.view.list:Lay()
 	Wn.DrawDetails()
@@ -1219,7 +1214,7 @@ end
 function Wn.SetTab(tab)
 	local state = Wn.state
 	state.tab = tab
-	state.goal, state.bar = false, false
+	state.goal = false
 	Settings().tab = tab
 	Wn.Request()
 	Wn.Draw()
@@ -1323,14 +1318,14 @@ function Wn.Build()
 	strip:SetHighlightTexture(HIGHLIGHT, "ADD")
 	strip:SetScript("OnClick", function(self)
 		Untip(self)
-		Wn.state.goal, Wn.state.bar = true, false
+		Wn.state.goal = true
 		view.list:Lay()
 		Wn.DrawDetails()
 	end)
 	strip:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 		GameTooltip:SetText(L["Your money goal"], 1, 0.82, 0)
-		GameTooltip:AddLine(L["Click: how it's worked out, or set your own goal"], 0.8, 0.8, 0.8)
+		GameTooltip:AddLine(L["Click: how it's worked out; set your own goal or the bar for ideas"], 0.8, 0.8, 0.8)
 		GameTooltip:Show()
 	end)
 	strip:SetScript("OnLeave", Untip)
@@ -1360,7 +1355,7 @@ function Wn.Build()
 		end)
 		b:SetScript("OnEnter", function(self)
 			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-			GameTooltip:SetText(L["The bar"], 1, 0.82, 0)
+			GameTooltip:SetText(L["The bar for ideas"], 1, 0.82, 0)
 			GameTooltip:AddLine(L["Click: what an idea must bring to be listed, or set your own"], 0.8, 0.8, 0.8)
 			GameTooltip:Show()
 		end)
@@ -1496,12 +1491,8 @@ function Wn.Open(tab)
 	if not Wn.frame then
 		Wn.Build()
 	end
-	Wn.state.bar = false
-	if tab == "goal" then
+	if tab == "goal" or tab == "bar" then
 		Wn.state.goal = true
-	elseif tab == "bar" then
-		Wn.state.tab, Wn.state.goal, Wn.state.bar = "ideas", false, true
-		Settings().tab = "ideas"
 	elseif Wn.IsTab(tab) then
 		Wn.state.tab, Wn.state.goal = tab, false
 		Settings().tab = tab
