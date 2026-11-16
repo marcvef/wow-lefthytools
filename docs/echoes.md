@@ -3,7 +3,8 @@
 A recorder: the way you travel and what happens on it (level-ups, quests, kills, loot, deaths and
 more), written as lines of text and cut into pages that are kept in `LefthyToolsEchoesDB`, for a
 program outside the game (an exporter) to read. Friends' clients can carry pages to whoever
-collects them, through Beacon. Nothing shows in game.
+collects them, through Beacon. Nothing shows in game but the admin window (`/lefthy echoes window`:
+what a collector has of each friend and what's still coming).
 
 ## Overview
 
@@ -34,6 +35,7 @@ Files, in `Modules/Echoes/`, in the order they load (the TOC):
 | `Store.lua` | the closed pages (`E.Store`: packing, what's kept, the API for the delivery), range strings (`E.Ranges`), the exporter's receipt, `/lefthy echoes` (`E.Command`, `E.OnStatus`) |
 | `Pages.lua` | the open page: starting, joining, closing, going on after a `/reload`; my account (`E.MyAccount`) and character (`E.Character`) |
 | `Delivery.lua` | pages from friends to the collector through Beacon (`E.Delivery`): the `B2;e...` messages, pulling, relaying, collecting, what's safe, the budget, the probe (Delivery, below) |
+| `Admin.lua` | the admin window (`E.Admin`, `/lefthy echoes window`): what Store.lua and Delivery.lua keep, as a table (The admin window, below) |
 
 What the files share (`E`):
 
@@ -871,6 +873,42 @@ only note `safeTo` and `latest` as they come and go, one comparison each). The p
 - `E.OnStatus(fn)`: `fn(add)` while the status prints; `add(text)` prints one more line.
 - `E.Command(word, fn, help)`: `/lefthy echoes <word> ...` runs `fn(rest)`; `help` is its line in the
   list that anything else prints.
+
+### The admin window (Admin.lua)
+
+`/lefthy echoes window` (again: closed), or **Show** next to *Collected recordings* in Echoes'
+settings, opens `LefthyToolsEchoesAdminFrame` (`LT.Window.Create`: movable, Escape closes it, it
+counts as an open window). It shows what `/lefthy echoes` prints for a collector, as a table, and
+what's still coming. Unlike the chat lines it's localized (`L[...]`, like LefthyTools' other
+windows); `Echoes` stays Echoes.
+
+- **Summary lines:** collecting on or off, the inbox against its 8 MB cap (full: nothing is pulled
+  and friends send no early pages; over 4 MB: run the exporter); friends with Echoes online, pages
+  being fetched, being served and waiting (or why nothing passes: not recording, Beacon off, the
+  BattleTag not known); the traffic (`D.Status`'s counters) and a pause after a throttle; the
+  exporter's receipt (`LefthyToolsEchoesReceipt.at`, when it was written, and its `upto` for my
+  store: the latest arrival it had read; none read this session: said so while collecting); a hint:
+  "12 pages arrived this session, not on disk yet: /reload or log out to hand them to the
+  exporter." (inbox pages of this session, provisional ones too), else, collecting, how many pages
+  friends online offer and how many are being fetched, or that nothing waits.
+- **The table:** my own pages first ("You (this computer)": kept and exported, the newest one's end,
+  on disk, not on disk yet, sent only early), then a row per friend's store, by name (two stores of
+  one name: the store after it; my account's other computers as "You (<store>)"; stores whose newest
+  page is over 30 days old last, in grey). Columns: name, online (a friend with Echoes online whose
+  own store it is), pages (numbers collected, exported or provisional, and the gaps between them),
+  up to (the newest page's start), exported, on disk, needs /reload (arrived this session, not
+  provisional), early (provisional), offered (pages friends online offer of it, from a disk or early,
+  that I hold in no way: not in the inbox, provisional or not, exported or relayed; the ones being
+  fetched among them), coming (pages asked for now and whole ones waiting to be kept, with the share
+  of bytes got of the ones under way), last page (when the last inbox page came, `a`). A store
+  friends offer that I have nothing of yet gets a row too. A line at the bottom explains the
+  columns: nothing needs hovering, so it reads the same with a controller (the scroll bar's buttons
+  move a long list).
+- **Costs:** built the first time it opens; refreshed when it opens and then once a second by its
+  own `OnUpdate`, which runs only while it's shown: closed, nothing runs. A refresh reads what's kept
+  (`E.Store.Collected`, `MineCounts`, `Inbox`, `ReceiptInfo`; `E.Delivery.Stores`, `Traffic`): counts
+  over the inbox's pages and a few unions of range lists, nothing unpacked or hashed. Rows are
+  pooled frames.
 
 ## Delivery
 

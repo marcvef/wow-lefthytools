@@ -5,7 +5,8 @@ local L = ns.L
 -- Echoes: records the way you travel and what happens on it (level-ups, quests, kills, loot, deaths
 -- and more) as lines of text, cut into pages kept in LefthyToolsEchoesDB, for a program outside the
 -- game to read. Friends' clients can carry pages to whoever collects them (through Beacon). Nothing
--- shows in game. The module's switch is the recording's: off, nothing is recorded or sent.
+-- shows in game but the admin window (Admin.lua). The module's switch is the recording's: off,
+-- nothing is recorded or sent.
 --
 -- This file: the module, its settings, the saved table, Echoes' own event frame (E.On), its one
 -- driver (E.OnTick, every 0.25 s while recording), recording starting and stopping (E.When). The
@@ -18,6 +19,7 @@ local L = ns.L
 --                 receipt, /lefthy echoes
 --   Pages.lua     the open page: starting, joining, closing, going on after a /reload
 --   Delivery.lua  pages from friends to the collector through Beacon (the relay and collect settings)
+--   Admin.lua     the admin window: what a collector has of each friend, what's still coming
 --
 -- Never lags the client: event handlers only note things, the tick's subscribers do the rest and
 -- each throttles itself; nothing runs while it doesn't record. Its own event frame keeps it
@@ -215,4 +217,6 @@ function M:BuildOptions(o)
 	o:Header(L["Friends"])
 	o:Checkbox("relay", L["Relay friends' recordings"],
 		L["Keeps your Battle.net friends' recordings for a while and passes them on to whoever collects them, also when the two are never online at the same time. Needs Beacon; nothing is sent in combat."])
+	o:Button(L["Collected recordings"], L["Show"], function() E.Admin.Show() end,
+		L["What you've collected of each friend's recording, where it is (exported, on disk, waiting for a /reload) and what's still coming. Also /lefthy echoes window."])
 end

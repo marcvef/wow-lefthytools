@@ -3962,3 +3962,126 @@ do
 		"not collecting: an ea is ignored")
 	Stop(c)
 end
+
+section("Echoes' admin window: what a collector has, and what's still coming")
+do
+	-- The window (Admin.lua) reads what Store.lua and Delivery.lua keep: a row per friend's store
+	-- (counted like /lefthy echoes), what friends online offer that I don't have, what's being
+	-- fetched (with its progress), the exporter's receipt; once a second while open, nothing while
+	-- it's closed.
+	local c = Start(DORA, { friends = { ANNA, BOB, CEDRIC }, fake = true, collect = true })
+	local E, Store, Admin = c.E, c.E.Store, c.E.Admin
+	local function Plain(text)
+		return (tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+	end
+	local stores = 0
+	local realStores = c.D.Stores
+	c.D.Stores = function(...)
+		stores = stores + 1
+		return realStores(...)
+	end
+	Pass(c, 5)
+	check(Admin.refreshes == 0 and stores == 0 and c.env.LefthyToolsEchoesAdminFrame == nil, "nothing made or worked out before it opens")
+
+	-- Anna: 1-10 exported; 11-12 on disk (an earlier session's), 13-14 this session, 15 early
+	-- (provisional), 16 provisional and taken aside by the receipt.
+	E.data.exported[ANNA.key] = "1-10"
+	for n = 11, 15 do
+		local pg = TheirPage(c, n, 480)
+		check(Store.Put(ANNA.acct, ANNA.store, n, { t = pg.t, h = pg.h, m = "z", z = pg.z }, "inbox", n == 15), "(page " .. n .. " kept)")
+	end
+	E.data.inbox[ANNA.key][11].s = E.data.session - 1
+	E.data.inbox[ANNA.key][12].s = E.data.session - 1
+	E.data.provisional = { [ANNA.key] = { [16] = "1a2b3c4d" } }
+	Touched(c)
+	-- Anna online offers 11-12 and 17-20 from her disk (not the numbers I hold provisionally: she'd be
+	-- asked for those as a check) and 21 early; Bob (a relay) offers Cedric's 1-3.
+	MeetAll(c, { ANNA, BOB }, "rs")
+	Say(c, ANNA, "B2;es;" .. ANNA.key .. ":11-12,17-20")
+	Say(c, ANNA, "B2;ea;" .. ANNA.key .. ":21")
+	Say(c, BOB, "B2;es;" .. CEDRIC.key .. ":1-3")
+	Pass(c, 2)
+	check(c.D.inflight[ANNA.key .. ".17"] and c.D.inflight[CEDRIC.key .. ".1"], "(page 17 asked of Anna, Cedric's 1 of Bob)")
+	local p17 = TheirPage(c, 17, 960)
+	SendPage(c, ANNA, ANNA, p17, 4, 0, 240)
+	Pass(c, 0.5)
+	local receipt = { v = 1, at = E.Now() - 3600, done = {}, upto = { [E.data.store] = E.Now() - 3700 } }
+	c.env.LefthyToolsEchoesReceipt = receipt
+
+	-- The accessors: copies and counts.
+	local mineRow
+	for _, row in ipairs(Store.Collected()) do
+		if row.key == ANNA.key then mineRow = row end
+	end
+	check(mineRow and mineRow.exported == 10 and mineRow.disk == 2 and mineRow.fresh == 2 and mineRow.early == 2 and mineRow.session == 3
+		and mineRow.name == "Anna" and mineRow.arrived and #mineRow.all == 1 and mineRow.all[1][1] == 1 and mineRow.all[1][2] == 16,
+		"E.Store.Collected: Anna's store counted as the status counts it")
+	local st = c.D.Stores()
+	local a, ced = st[ANNA.key], st[CEDRIC.key]
+	check(a and a.online == "Anna Brook" and a.relay and not a.collect and a.offered == 5 and a.coming == 1 and a.have == 240 and a.len == 960,
+		"E.Delivery.Stores: Anna online, 17-21 offered that I don't have (21 early), 17 coming, 240 of 960 bytes")
+	check(ced and not ced.online and ced.offered == 3 and ced.coming == 1 and ced.len == 0, "Cedric's store: offered by Bob, 1 coming")
+	a.offered = 99
+	check(c.D.Stores()[ANNA.key].offered == 5 and c.D.Traffic().friends == 2 and c.D.Traffic().coming == 2, "new tables each time; the traffic's counts")
+
+	-- Opened with the command: built and drawn at once.
+	E.module:OnSlashCommand("window")
+	local frame = c.env.LefthyToolsEchoesAdminFrame
+	check(frame and frame:IsShown() and Admin.refreshes == 1 and frame.TitleContainer.TitleText:GetText() == "Echoes: collected recordings",
+		"/lefthy echoes window opens it, drawn at once")
+	local byName = {}
+	for _, row in ipairs(frame.shown) do
+		byName[Plain(row.name)] = row
+	end
+	local anna, you, cedric = byName["Anna"], byName["You (this computer)"], byName[CEDRIC.acct]
+	check(Plain(frame.shown[1].name) == "You (this computer)" and you and byName["Bob"], "my own pages first, then a row per friend's store")
+	check(anna and Plain(anna.online) == "online" and anna.pages == "16" and anna.exported == "10" and anna.disk == "2" and Plain(anna.fresh) == "2"
+		and anna.early == "2" and Plain(anna.offered) == "5" and Plain(anna.coming) == "1 (25%)" and anna.arrived == "just now",
+		"Anna's row: online, 16 pages, 10 exported, 2 on disk, 2 need a /reload, 2 early, 5 offered, 1 coming at 25%, got "
+		.. (anna and (anna.pages .. " " .. Plain(anna.coming)) or "none"))
+	check(cedric and Plain(cedric.online) == "-" and Plain(cedric.pages) == "-" and Plain(cedric.offered) == "3" and Plain(cedric.coming) == "1",
+		"a store I have nothing of yet, offered by a relay: its row")
+	local lines = {}
+	for i, line in ipairs(frame.Lines) do lines[i] = Plain(line:GetText()) end
+	check(lines[1]:find("^Collecting: on%. Inbox: [%d.]+ KB of 8%.0 MB%.$"), "the summary: collecting, the inbox against its cap, got " .. lines[1])
+	check(lines[2] == "Friends with Echoes online: 2. Pages being fetched: 2. Serving: 0, 0 waiting.", "the summary: friends and fetching, got " .. lines[2])
+	check(lines[3]:find("^Traffic: %d+ messages sent, %d+ received, %d+ pages got"), "the summary: the traffic, got " .. lines[3])
+	check(lines[4] == ("Exporter's receipt: written %s; it had read the pages that arrived up to %s."):format(c.env.date("%H:%M", receipt.at),
+		c.env.date("%H:%M", receipt.upto[E.data.store])), "the summary: the exporter's receipt, got " .. lines[4])
+	check(lines[5] == "3 pages arrived this session, not on disk yet: /reload or log out to hand them to the exporter.",
+		"the hint: pages waiting only for a /reload, got " .. lines[5])
+
+	-- Once a second while open.
+	local n0 = Admin.refreshes
+	Pass(c, 0.5)
+	check(Admin.refreshes == n0, "not again within a second")
+	Pass(c, 4.6)
+	check(Admin.refreshes >= n0 + 4 and Admin.refreshes <= n0 + 5, "about once a second, got " .. (Admin.refreshes - n0) .. " in 5 s")
+	-- Page 17 comes whole: the row follows.
+	SendPage(c, ANNA, ANNA, p17, 4, 240)
+	Pass(c, 2.2)
+	anna = nil
+	for _, row in ipairs(frame.shown) do
+		if Plain(row.name) == "Anna" then anna = row end
+	end
+	check(anna and anna.pages == "17" and Plain(anna.fresh) == "3" and E.data.inbox[ANNA.key][17], "page 17 came: 17 pages, 3 need a /reload")
+	check(Plain(frame.Lines[5]:GetText()):find("^4 pages arrived this session"), "the hint counts it")
+
+	-- Closed: nothing runs.
+	frame:Hide()
+	local closed, calls = Admin.refreshes, stores
+	Pass(c, 10)
+	check(Admin.refreshes == closed and stores == calls, "closed: nothing is worked out")
+	E.module:OnSlashCommand("window")
+	check(frame:IsShown() and Admin.refreshes == closed + 1, "opened again: drawn at once")
+	E.module:OnSlashCommand("window")
+	check(not frame:IsShown(), "the command again closes it")
+	-- Not collecting: it says so.
+	E.module.db.collect = false
+	Admin.Show()
+	check(Plain(frame.Lines[1]:GetText()):find("^Collecting: off%.") and Plain(frame.Lines[5]:GetText()):find("^4 pages arrived"),
+		"not collecting: said so; what arrived still needs a /reload")
+	frame:Hide()
+	c.D.Stores = realStores
+	Stop(c)
+end

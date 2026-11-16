@@ -626,5 +626,8 @@ ns.CHANGELOG = {
 	{ id = 206, module = "whypoor",
 		en = { "WhyPoor?: only what's worth it, graphs", "Ideas lists only what brings more than playing normally and rests on steady prices; most of the time that's nothing, and it says so. Items show their price over the last two weeks. Set your own money goal: click the goal line, or /whypoor goal 150 Swift ram." },
 		de = { "WhyPoor?: nur was sich lohnt, Graphen", "Ideen zeigt nur, was mehr bringt als normales Spielen und auf stabilen Preisen beruht; meistens ist das nichts, und das steht dann da. Items zeigen ihren Preis der letzten zwei Wochen. Setz dein eigenes Geldziel: Klick auf die Zielzeile oder /whypoor goal 150 Schneller Widder." } },
+	{ id = 207, module = "echoes",
+		en = { "Echoes: a window for collectors", "/lefthy echoes window (or Show in Echoes' settings) lists each friend's collected pages, which still need a /reload to reach the exporter, and what's still coming." },
+		de = { "Echoes: Fenster fürs Sammeln", "/lefthy echoes window (oder Anzeigen in den Echoes-Einstellungen) zeigt die gesammelten Seiten jedes Freundes, welche noch einen /reload brauchen, um zum Exporter zu kommen, und was noch kommt." } },
 	-- New entries go here, at the end.
 }

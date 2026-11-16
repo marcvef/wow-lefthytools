@@ -1000,6 +1000,55 @@ L["Relay friends' recordings"] = "Aufzeichnungen von Freunden weitergeben"
 L["Keeps your Battle.net friends' recordings for a while and passes them on to whoever collects them, also when the two are never online at the same time. Needs Beacon; nothing is sent in combat."] =
 	"Hebt die Aufzeichnungen deiner Battle.net-Freunde eine Weile auf und gibt sie an den weiter, der sie sammelt, auch wenn die beiden nie gleichzeitig online sind. Braucht Beacon; im Kampf wird nichts gesendet."
 
+-- Echoes: the admin window (Admin.lua)
+L["Collected recordings"] = "Gesammelte Aufzeichnungen"
+L["What you've collected of each friend's recording, where it is (exported, on disk, waiting for a /reload) and what's still coming. Also /lefthy echoes window."] =
+	"Was du von der Aufzeichnung jedes Freundes gesammelt hast, wo sie liegt (exportiert, gespeichert, wartet auf einen /reload) und was noch kommt. Auch /lefthy echoes window."
+L["Echoes: collected recordings"] = "Echoes: gesammelte Aufzeichnungen"
+L["Friend"] = "Freund"
+L["Online"] = "Online"
+L["Pages"] = "Seiten"
+L["Up to"] = "Bis"
+L["Exported"] = "Exportiert"
+L["On disk"] = "Gespeichert"
+L["Needs /reload"] = "Braucht /reload"
+L["Early"] = "Früh"
+L["Offered"] = "Angeboten"
+L["Coming"] = "Kommt"
+L["Last page"] = "Letzte Seite"
+L["%m/%d %H:%M"] = "%d.%m. %H:%M"
+L["You (this computer)"] = "Du (dieser Computer)"
+L["You (%s)"] = "Du (%s)"
+L["%d (gaps: %d)"] = "%d (Lücken: %d)"
+L["%d (%d%%)"] = "%d (%d %%)"
+L["online"] = "online"
+L["Collecting: on. Inbox: %s of %s."] = "Sammeln: an. Inbox: %s von %s."
+L["Full: no more pages are fetched and friends send none early, until the exporter has run."] =
+	"Voll: Bis der Exporter gelaufen ist, werden keine Seiten mehr geholt und Freunde schicken keine früh."
+L["Over 4 MB: run the exporter."] = "Über 4 MB: starte den Exporter."
+L["Collecting: off. Friends' recordings don't come here (/lefthy echoes collect on, only where the exporter runs)."] =
+	"Sammeln: aus. Aufzeichnungen von Freunden kommen nicht hierher (/lefthy echoes collect on, nur wo der Exporter läuft)."
+L["Friends with Echoes online: %d. Pages being fetched: %d. Serving: %d, %d waiting."] =
+	"Freunde mit Echoes online: %d. Seiten, die gerade geholt werden: %d. Ich sende: %d, %d warten."
+L["Not passing pages on: needs Echoes recording, Beacon on and your BattleTag known."] =
+	"Keine Seiten unterwegs: Echoes muss aufzeichnen, Beacon an sein und dein BattleTag bekannt sein."
+L["Traffic: %d messages sent, %d received, %d pages got, %s served, %d failed their hash."] =
+	"Traffic: %d Nachrichten gesendet, %d empfangen, %d Seiten bekommen, %s verschickt, %d mit falschem Hash."
+L["Paused for %d s: the server asked Beacon to slow down."] = "Pause für %d s: Der Server hat Beacon gebremst."
+L["Exporter's receipt: written %s; it had read the pages that arrived up to %s."] =
+	"Quittung des Exporters: geschrieben %s; er hatte die Seiten gelesen, die bis %s angekommen sind."
+L["Exporter's receipt: written %s."] = "Quittung des Exporters: geschrieben %s."
+L["No exporter's receipt read this session (it's read once, after a login or /reload)."] =
+	"In dieser Session keine Quittung des Exporters gelesen (sie wird einmal gelesen, nach dem Login oder einem /reload)."
+L["%d pages arrived this session, not on disk yet: /reload or log out to hand them to the exporter."] =
+	"%d Seiten sind in dieser Session angekommen und noch nicht gespeichert: /reload oder ausloggen, damit der Exporter sie bekommt."
+L["More is on its way: friends online offer %d pages you don't have, %d being fetched."] =
+	"Es kommt noch mehr: Freunde online bieten %d Seiten an, die du nicht hast, %d werden gerade geholt."
+L["Nothing waits for a /reload, and friends online offer nothing you don't have."] =
+	"Nichts wartet auf einen /reload, und Freunde online bieten nichts an, was du nicht hast."
+L["Needs /reload: arrived this session; the exporter sees them after a /reload or logout. Early: sent before the friend's game saved them, kept until a copy from their disk confirms them. Offered: friends online have them, you don't yet. Coming: being fetched now."] =
+	"Braucht /reload: in dieser Session angekommen; der Exporter sieht sie nach einem /reload oder Logout. Früh: geschickt, bevor das Spiel des Freundes sie gespeichert hat, und behalten, bis eine Kopie von seiner Festplatte sie bestätigt. Angeboten: Freunde online haben sie, du noch nicht. Kommt: wird gerade geholt."
+
 -- Chronicle: the Professions tab
 L["Professions"] = "Berufe"
 L["Everyone"] = "Alle"

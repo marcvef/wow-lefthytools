@@ -140,6 +140,13 @@ LT.Errors.Show()
 check(LefthyToolsErrorsFrame.TitleContainer.TitleText:GetText() == "LefthyTools-Fehler", "error window in German")
 LefthyToolsErrorsFrame:Hide()
 
+ns.Echoes.Admin.Show()
+local admin = LefthyToolsEchoesAdminFrame
+check(admin and admin:IsShown() and admin.TitleContainer.TitleText:GetText() == "Echoes: gesammelte Aufzeichnungen"
+	and admin.Header.pages:GetText():find("Seiten", 1, true) and admin.Lines[1]:GetText():find("^Sammeln: aus%.")
+	and admin.shown[1].name:find("Du (dieser Computer)", 1, true), "Echoes' admin window in German (Echoes untranslated)")
+admin:Hide()
+
 SlashCmdList.LEFTHYTOOLS_MIRAGE("status")
 check(#ns.L_MISSING == 0 and next(ns.L_MISSING) == nil, "chat commands don't look up settings texts")
 check(ns.Chronicle.Distance(1500) == "1,4 km" and ns.Chronicle.Distance(1500, true) == "1.4 km",

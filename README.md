@@ -10,7 +10,7 @@ module you can switch on or off.
 | [Beacon](#beacon) | Battle.net friends who also use LefthyTools see each other on the world map and minimap, with status and level-up messages, without needing a group |
 | [Chronicle](#chronicle) | A journal for each character that writes itself: level-ups, deaths, dungeons, bosses, rares, loot, mounts and milestones, lots of statistics, and what your friends did, also while you weren't online, with all of you compared in graphs and leaderboards |
 | [Bestiary](#bestiary) | What the mobs you kill drop: a window that follows your target with each drop, how many you got and its drop chance, from your own kills |
-| [Echoes](#echoes) | Records where you go and what happens on the way, for a replay of the whole group on a map website. Records only, shows nothing in game |
+| [Echoes](#echoes) | Records where you go and what happens on the way, for a replay of the whole group on a map website. Records only; in game just a collector's window of what arrived |
 | [Lodestar](#lodestar) | Quest chains for every zone: what's for your level, where quests start, where their objectives are and where to turn them in, the whole chain a quest is part of, your quest log sorted, the level and XP of a quest before you accept it, which quest an item in your bags is for, and how far your friends got |
 | [WhyPoor?](#whypoor) | Ideas for making money with the character you play: what's worth doing at your level, class, professions and place (mobs to farm, herbs and ore, fishing, quests that pay, crafts, auction house deals), what your bags would fetch and when you'll afford your mount. Informational only |
 
@@ -466,7 +466,8 @@ made of your last loot windows (to see why something wasn't counted).
 
 Records your journey for a replay outside the game: a website that shows the world map with every
 friend's character as a dot moving along the way they went, on one shared clock, with what
-happened where. Echoes only records; nothing of it shows in game.
+happened where. Echoes only records; nothing of it shows in game (only the collector's window,
+below).
 
 **What it records:** your path (on foot, mounted, swimming, on a flight path, on a boat, as a
 ghost), hearthstones, portals and summons, zones, level-ups, quests accepted, handed in and
@@ -492,6 +493,16 @@ matches it. The collector's own program turns them into the website; that part i
 to which time) and what still waits to get there; for a collector, each friend's pages it has and
 how far they're confirmed. Switched off, Echoes does nothing at all: it records nothing and sends
 nothing, and pages you already have wait until it's on again.
+
+`/lefthy echoes window` (or **Show** next to *Collected recordings* in Echoes' settings) opens the
+same as a window, kept up to date every second while it's open: a row for your own pages and one per
+friend, whether they're online with Echoes, how many pages you have and up to when (and gaps), how
+many the exporter has, how many are saved and how many arrived this session (the exporter sees those
+only after a `/reload` or logout: the window says so), how many came early, and what's still coming:
+pages friends online offer that you don't have, and the ones being fetched right now with their
+progress. Above the table: collecting and the inbox's size against its 8 MB cap, the traffic and any
+pause, and when the exporter last wrote its receipt. Every cell is plain text, so it works the same
+with a controller.
 
 | Setting | Default |
 |---|---|

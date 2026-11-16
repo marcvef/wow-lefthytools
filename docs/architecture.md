@@ -115,6 +115,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Echoes/Store.lua         the closed pages: packing, what's kept, the API for the delivery, the exporter's receipt, /lefthy echoes
   Modules/Echoes/Pages.lua         the open page: starting, joining, closing, going on after a /reload
   Modules/Echoes/Delivery.lua      pages from friends to the collector through Beacon: messages, pulling, relaying, what's safe, the budget
+  Modules/Echoes/Admin.lua         the admin window (/lefthy echoes window): what a collector has of each friend, what's still coming
   Modules/Lodestar/Data.lua       Lodestar's quest data (LefthyTools_QuestData, loaded when a window opens): quests, zones, search, learned data
   Modules/Lodestar/Engine.lua     Lodestar's engine: a quest's status for me or a friend, what's missing, its chain, what's next
   Modules/Lodestar/Learn.lua     Lodestar's learning: givers, enders, prerequisites while playing (LefthyToolsDB.lodestar.learned)
