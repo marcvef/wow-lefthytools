@@ -51,7 +51,6 @@ local M = LT:NewModule("chronicle", {
 		relay = true,         -- Sync.lua: pass on friends' journals to other friends
 		shareRecipes = true,  -- Recipes.lua: friends see my professions and recipes (also needs share)
 		craftTooltip = true,  -- CraftedBy.lua: who can craft an item, in its tooltip
-		margins = true,       -- Margins.lua: crafting margins from auction house and vendor prices
 		catchUp = true,       -- Recap.lua: "while you were away" after logging in
 		weeklyRecap = true,   -- Recap.lua: last week's leaderboard in chat, once a week
 		friendsChat = true,
@@ -791,9 +790,6 @@ function M:OnEnable()
 	if C.RecipesEnable then
 		C.RecipesEnable() -- Recipes.lua
 	end
-	if C.MarginsEnable then
-		C.MarginsEnable() -- Margins.lua
-	end
 end
 
 function M:OnDisable()
@@ -805,9 +801,6 @@ function M:OnDisable()
 	end
 	if C.RecipesDisable then
 		C.RecipesDisable()
-	end
-	if C.MarginsDisable then
-		C.MarginsDisable()
 	end
 	if C.window then
 		C.window:Hide()
@@ -822,9 +815,6 @@ function M:OnSettingChanged()
 	end
 	if C.RecipesSettingChanged then
 		C.RecipesSettingChanged() -- Recipes.lua: the same, and sharing them at all
-	end
-	if C.MarginsSettingChanged then
-		C.MarginsSettingChanged() -- Margins.lua: crafting margins on or off
 	end
 end
 
@@ -1019,8 +1009,6 @@ function M:BuildOptions(o)
 		L["Your timeline, your statistics and your friends' news. Also /chronicle or a key binding."])
 	o:Checkbox("craftTooltip", L["Who can craft it, in item tooltips"],
 		L["An item's tooltip says which of your characters and friends know a recipe for it, best skill first, from the journal's Professions tab. Hold Shift for its reagents."])
-	o:Checkbox("margins", L["Crafting margins"],
-		L["What your recipes cost to make and bring, and gold per hour, from auction house and vendor prices: a Margins button on your profession window and on the auction house, and /chronicle margins. Prices are scanned only while the auction house is open, and stay on this computer."])
 	o:Checkbox("minimapButton", L["Minimap button"],
 		L["A button on the edge of the minimap: click opens the journal, right-click these settings. Drag it to move it."])
 end
@@ -1033,9 +1021,10 @@ function M:OnSlashCommand(msg)
 		self:Print(C.SessionLine(true) or "no session yet.")
 	elseif cmd == "settings" or cmd == "options" then
 		LT:OpenSettings(self)
-	elseif cmd == "margins" then
-		if C.ToggleMargins then
-			C.ToggleMargins()
+	elseif cmd == "margins" then -- (crafting margins went to WhyPoor?: its Crafting tab)
+		local Wn = ns.WhyPoor and ns.WhyPoor.Window
+		if Wn then
+			Wn.Open("crafting")
 		end
 	elseif cmd == "minimap" then
 		LT:SetModuleSetting(self, "minimapButton", not self.db.minimapButton)

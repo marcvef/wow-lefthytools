@@ -94,8 +94,6 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Chronicle/Compare.lua    the Compare page: everyone in every graph, leaderboard, hall of fame
   Modules/Chronicle/Professions.lua  the Professions tab: everyone's professions and recipes (C.Recipes' data)
   Modules/Chronicle/CraftedBy.lua  "Craftable by" in item tooltips (C.Recipes' data)
-  Modules/Chronicle/Margins.lua    crafting margins: AH and vendor prices, scanning the auction house, the numbers (C.Margins)
-  Modules/Chronicle/MarginsWindow.lua  the margins window, the Margins buttons on the profession window and the auction house
   Modules/Chronicle/Window.lua     the journal window (timeline, statistics, graphs, friends, professions)
   Modules/Chronicle/MinimapButton.lua  the book button on the minimap's edge
   Modules/Bestiary/Bestiary.lua    Bestiary: the module, shared helpers, reading records (LefthyToolsBestiaryDB), /bestiary
@@ -121,8 +119,9 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Lodestar/Engine.lua     Lodestar's engine: a quest's status for me or a friend, what's missing, its chain, what's next
   Modules/Lodestar/Learn.lua     Lodestar's learning: givers, enders, prerequisites while playing (LefthyToolsDB.lodestar.learned)
   Modules/WhyPoor/                WhyPoor?: money ideas for the character (docs/whypoor.md has every file): the module,
-                                  the auction house price engine (also Margins'), friends' prices, the money data's reader,
-                                  crafting costs, who I am, the ideas, the goal, the bags, the window
+                                  the auction house price engine, friends' prices, the money data's reader, crafting
+                                  costs, the crafting margins (Margins.lua, the Crafting tab), who I am, the ideas, the
+                                  goal, the bags, the window
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 LefthyTools_QuestData/       Lodestar's quest chains, givers and places (CMaNGOS Classic DB, EG Link's Forever data), an add-on of its own (load on demand), GPL v3

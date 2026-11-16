@@ -4,7 +4,8 @@ local L = ns.L
 local W = ns.WhyPoor or {}
 ns.WhyPoor = W
 
--- Your bags: each item's best way to sell, the tooltip line, the coin in the sorted bags (W.Bags).
+-- Your bags: each item's best way to sell, for the window's Bags tab and the ideas (W.Bags). Nothing in item
+-- tooltips and nothing on the bags themselves (the user's wish: no extra data there).
 -- docs/whypoor.md has the contract.
 --
 --   * W.Bags.List(): every item in the bags (0 to the reagent bag; not the bank), stacks of one item added
@@ -15,21 +16,10 @@ ns.WhyPoor = W
 --     (you can use it and its item level isn't below what you wear there). The total: what the items
 --     without a reason would fetch, each its better way. Worked out when asked, kept until the bags,
 --     your gear, your quests or the prices (P.Revision) change.
---   * The tooltip line (setting tooltip): one line, for items in your bags and at the auction house only
---     (the game's tooltip data says which: its getter GetBagItem for bags 0 to 5; else the tooltip's owner
---     is a bag's item button, or within the auction house's window while it's open): "WhyPoor?: AH 1g 20s
---     (2 h, sells well) · vendor 30s", per one, the better way white and the other grey, an old price
---     (over P.STALE) grey, an unsure one with "~", a friend's with their name. Nothing known: no line. Kept
---     per item until the prices change or the minute turns (the age).
---   * The coin (setting bagCoins): Misc Tweaks' sorted bags put a small gold coin in the top right corner
---     of items worth more at the auction house (ns.GamepadBagsMark; a lookup per item, from List()).
 
 local B = {}
 W.Bags = B
 
-local GREY, WHITE, GOLD = "|cff888888", "|cffffffff", "|cffffd200"
-local COIN = "Interface\\MoneyFrame\\UI-GoldIcon"
-local SELLS_WELL, SELLS_SLOWLY = 0.6, 0.25
 -- Where gear goes: the inventory slots of an equip location (the weaker one counts where there are two).
 local SLOTS = {
 	INVTYPE_HEAD = { 1 }, INVTYPE_NECK = { 2 }, INVTYPE_SHOULDER = { 3 }, INVTYPE_BODY = { 4 }, INVTYPE_CHEST = { 5 },
@@ -41,8 +31,7 @@ local SLOTS = {
 }
 
 B.rev = 0               -- goes up when the bags, gear or quests change
-B.cache = nil           -- { key, list, total, coins }
-B.lines, B.linesKey = {}, nil
+B.cache = nil           -- { key, list, total }
 
 local function Num(v)
 	return type(v) == "number" and not LT.IsSecret(v) and v or nil
@@ -50,11 +39,6 @@ end
 
 local function P()
 	return W.Prices
-end
-
-local function On(key)
-	local m = W.module
-	return m and m.enabled and m.db and m.db[key] and true or false
 end
 
 -- The last bag that's yours to carry (the reagent bag), as the client counts them.
@@ -183,18 +167,15 @@ function B.Scan()
 			end
 		end
 	end
-	local total, coins = 0, {}
+	local total = 0
 	for _, e in ipairs(list) do
 		B.Price(e)
 		if e.value and not e.keep then
 			total = total + e.value
 		end
-		if e.best == "ah" and not e.keep and not e.bound then
-			coins[e.item] = true
-		end
 	end
 	table.sort(list, ByValue)
-	return list, total, coins
+	return list, total
 end
 
 local function Key()
@@ -205,8 +186,8 @@ end
 function B.Cached()
 	local key = Key()
 	if not (B.cache and B.cache.key == key) then
-		local list, total, coins = B.Scan()
-		B.cache = { key = key, list = list, total = total, coins = coins }
+		local list, total = B.Scan()
+		B.cache = { key = key, list = list, total = total }
 	end
 	return B.cache
 end
@@ -223,177 +204,8 @@ function B.Total()
 end
 
 ---------------------------------------------------------------------------
--- The coin in the sorted bags
----------------------------------------------------------------------------
-
-function B.Coin(item, bag, slot)
-	if not On("bagCoins") then
-		return false
-	end
-	if bag and slot then
-		local info = LT.Value(C_Container.GetContainerItemInfo, bag, slot)
-		if type(info) == "table" and info.isBound == true then
-			return false
-		end
-	end
-	return B.Cached().coins[item] == true
-end
-
-if ns.GamepadBagsMark then
-	ns.GamepadBagsMark("whypoor", { texture = COIN, size = 12, point = "TOPRIGHT", x = -2, y = -2, test = B.Coin })
-end
-
----------------------------------------------------------------------------
--- The tooltip line
----------------------------------------------------------------------------
-
--- Where an item tooltip is: "bags" (and the bag, slot) or "ah"; nil: elsewhere.
-function B.Where(tooltip)
-	local last = B.LastBag()
-	local info = tooltip.GetProcessingTooltipInfo and tooltip:GetProcessingTooltipInfo()
-	if type(info) == "table" and info.getterName then
-		if info.getterName == "GetBagItem" and type(info.getterArgs) == "table" then
-			local bag, slot = Num(info.getterArgs[1]), Num(info.getterArgs[2])
-			if bag and bag >= 0 and bag <= last then
-				return "bags", bag, slot
-			end
-			return nil -- (the bank's)
-		end
-	end
-	local owner = tooltip.GetOwner and tooltip:GetOwner()
-	if type(owner) ~= "table" then
-		return nil
-	end
-	if type(owner.GetBagID) == "function" and type(owner.GetID) == "function" then
-		local ok, bag = pcall(owner.GetBagID, owner)
-		bag = ok and Num(bag)
-		if bag and bag >= 0 and bag <= last then
-			return "bags", bag, Num(owner:GetID())
-		end
-	end
-	local ah = _G.AuctionHouseFrame
-	if type(ah) == "table" and ah.IsShown and ah:IsShown() then
-		local f = owner
-		for _ = 1, 15 do
-			if f == ah then
-				return "ah"
-			end
-			f = f.GetParent and f:GetParent()
-			if type(f) ~= "table" then
-				break
-			end
-		end
-	end
-	return nil
-end
-
--- "sells well", "sells slowly", nil.
-local function Sells(price)
-	local sells = price and Num(price.sells)
-	if not sells then
-		return nil
-	end
-	return sells >= SELLS_WELL and L["sells well"] or sells <= SELLS_SLOWLY and L["sells slowly"] or nil
-end
-
--- The line for one of the item (bound: no auction house; many: a stack, so it says "each"); nil: nothing
--- known.
-function B.Line(item, bound, many)
-	local prices = P()
-	if not prices then
-		return nil
-	end
-	local vendor = prices.Vendor and Num(prices.Vendor(item))
-	local ahPart
-	if not bound then
-		local price = prices.Get and prices.Get(item)
-		local _, unit
-		if prices.AHSale then
-			_, unit = prices.AHSale(item, 1)
-			unit = Num(unit)
-		end
-		if type(price) == "table" and unit then
-			local notes = {}
-			notes[#notes + 1] = W.Age(price.seen)
-			if price.friend then
-				notes[#notes + 1] = tostring(price.friend)
-			end
-			if price.unstable then
-				notes[#notes + 1] = L["jumps around"]
-			else
-				notes[#notes + 1] = Sells(price)
-			end
-			local sure = price.confidence == "high" and not price.unstable
-			ahPart = { text = L["AH %s"]:format((sure and "" or "~") .. W.Money(unit)) .. (#notes > 0 and (" (" .. table.concat(notes, ", ") .. ")") or ""),
-				old = not (Num(price.seen) and time() - price.seen <= (prices.STALE or 10800)) }
-		end
-	end
-	local vendorPart = vendor and (vendor > 0 and L["vendor %s"]:format(W.Money(vendor)) or L["no vendor"]) or nil
-	if not ahPart and not (vendor and vendor > 0) then
-		return nil
-	end
-	local best = (not bound and prices.Best) and prices.Best(item, 1) or "vendor"
-	local parts = {}
-	if ahPart then
-		parts[#parts + 1] = ((best == "ah" and not ahPart.old) and WHITE or GREY) .. ahPart.text .. "|r"
-	end
-	if vendorPart then
-		parts[#parts + 1] = (best == "vendor" and WHITE or GREY) .. vendorPart .. "|r"
-	end
-	return GOLD .. "WhyPoor?:|r " .. table.concat(parts, GREY .. " · |r") .. (many and (GREY .. " " .. L["(each)"] .. "|r") or "")
-end
-
-function B.OnItemTooltip(tooltip, info)
-	if tooltip ~= GameTooltip or not On("tooltip") then
-		return
-	end
-	local item = info and Num(info.id)
-	if not item then
-		return
-	end
-	local where, bag, slot = B.Where(tooltip)
-	if not where then
-		return
-	end
-	local bound, many = false, false
-	if where == "bags" and bag and slot then
-		local slotInfo = LT.Value(C_Container.GetContainerItemInfo, bag, slot)
-		bound = type(slotInfo) == "table" and slotInfo.isBound == true
-		many = type(slotInfo) == "table" and (Num(slotInfo.stackCount) or 1) > 1
-	end
-	local key = Key() .. ":" .. math.floor(time() / 60)
-	if key ~= B.linesKey then
-		B.linesKey = key
-		wipe(B.lines)
-	end
-	local lineKey = item .. (bound and ":b" or "") .. (many and ":n" or "")
-	local line = B.lines[lineKey]
-	if line == nil then
-		line = B.Line(item, bound, many) or false
-		B.lines[lineKey] = line
-	end
-	if line then
-		tooltip:AddLine(line, 1, 1, 1)
-	end
-end
-
-if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and Enum and Enum.TooltipDataType then
-	TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, info)
-		LT.Guard("WhyPoor.tooltip", B.OnItemTooltip, tooltip, info)
-	end)
-end
-
----------------------------------------------------------------------------
 -- What changes it (events only note)
 ---------------------------------------------------------------------------
-
-function B.SettingsChanged()
-	wipe(B.lines)
-	B.linesKey = nil
-	if ns.GamepadBagsRefresh then
-		ns.GamepadBagsRefresh()
-	end
-end
 
 B.events = CreateFrame("Frame")
 for _, event in ipairs({ "BAG_UPDATE_DELAYED", "PLAYER_EQUIPMENT_CHANGED", "QUEST_ACCEPTED", "QUEST_REMOVED",

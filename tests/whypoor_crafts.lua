@@ -3,7 +3,7 @@
 -- several recipes for one item, the transmute circle, the depth, yields (a share of a craft, "may vary"), the bags
 -- (sale value, partly, each used once, crafting cheaper than what's in them), vendor reagents, unknown prices (no
 -- number), the verdict, the prices' age and basis, this character's recipes (Cr.Mine over
--- calls, cached), the margins window's crafted reagents.
+-- calls, cached), the Crafting tab's crafted reagents.
 -- Needs: margins.lua
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
@@ -253,23 +253,29 @@ fakeRev = fakeRev + 1
 again = Cr.Mine(1000)
 check(again ~= list, "the prices changed: worked out again")
 
-section("Crafts: the margins window")
+section("Crafts: the Crafting tab's details")
 Wait(1)
-C.OpenMargins(VEST_SPELL)
-local frame = C.marginsFrame
-local d = frame.view.detail
+W.Crafting.OpenOn(VEST_SPELL)
+local frame, _, _, D = W.Window.View()
 Wait(1)
-local line = d.subs[1]
-check(line:IsShown() and plain(line.Text:GetText()) == "craft it: 1 Bolt of Linen Cloth from 2 Linen Cloth, 1.5 s",
-	"the bolt's line: crafted, from what, how long; got " .. plain(line.Text:GetText()))
-check(not d.subs[2]:IsShown(), "the thread is bought: no line")
-check(plain(d.rows[1].Price:GetText()):find("Craft", 1, true), "its source: Craft")
-check(plain(d.Values:GetText()):find("(1.5 s crafting reagents)", 1, true), "the time says what the sub-craft takes")
-check(plain(d.Notes:GetText()):find("Reagents you can make count as crafted", 1, true), "and a note says so")
-d.rows[1]:GetScript("OnEnter")(d.rows[1])
+local lines, items = {}, {}
+for _, fs in ipairs(D.texts) do
+	if fs:IsShown() then lines[#lines + 1] = plain(fs:GetText()) end
+end
+for _, b in ipairs(D.items) do
+	if b:IsShown() then items[#items + 1] = b end
+end
+local all = table.concat(lines, "\n")
+check(all:find("craft it: 1 Bolt of Linen Cloth from 2 Linen Cloth, 1.5 s", 1, true), "the bolt's line: crafted, from what, how long; got " .. all)
+local _, crafted = all:gsub("craft it:", "")
+check(crafted == 1, "the thread is bought: no line of its own")
+check(items[1] and plain(items[1].Right:GetText()):find("Craft", 1, true), "its source: Craft")
+check(all:find("(1.5 s crafting reagents)", 1, true), "the time says what the sub-craft takes")
+check(all:find("Reagents you can make count as crafted", 1, true), "and a note says so")
+items[1]:GetScript("OnEnter")(items[1])
 local shown = table.concat(TOOLTIP.lines, "\n")
 check(shown:find("The cheapest way:", 1, true) and shown:find("Linen Cloth x2", 1, true), "the hover has the way down to the linen")
-d.rows[1]:GetScript("OnLeave")(d.rows[1])
+items[1]:GetScript("OnLeave")(items[1])
 frame:Hide()
 
 -- (put back what this file changed)

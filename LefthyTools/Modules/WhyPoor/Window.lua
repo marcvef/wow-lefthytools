@@ -41,6 +41,22 @@ local HIGHLIGHT = "Interface\\QuestFrame\\UI-QuestTitleHighlight"
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 Wn.TABS = { "ideas", "bags", "market" }
+Wn.LABELS = { ideas = L["Ideas"], bags = L["Bags"], market = L["Market"] }
+-- Tabs other files add (Wn.AddTab, before the window is built): T = { Entries() -> entries, head, empty;
+-- Fill(row, e); Key(e); Enter(row, e) (the row's tooltip); Details(e); Controls(view, shown) (its own controls
+-- on the line above the list), headWidth (that line's width while it's shown) }.
+Wn.EXTRA = {}
+
+function Wn.AddTab(key, label, T)
+	Wn.TABS[#Wn.TABS + 1] = key
+	Wn.LABELS[key] = label
+	Wn.EXTRA[key] = T
+end
+
+-- A tab's key is one of the window's (a page to open on).
+function Wn.IsTab(key)
+	return Wn.LABELS[key] ~= nil
+end
 Wn.MARKET = { flip = true, vendorflip = true, limited = true, disenchant = true }
 Wn.ICONS = {
 	grind = "Interface\\Icons\\Ability_DualWield", gather = "Interface\\Icons\\Trade_Herbalism",
@@ -251,6 +267,11 @@ function Wn.RowEnter(self)
 	if not e then
 		return
 	end
+	local T = Wn.EXTRA[Wn.state.tab]
+	if T then
+		T.Enter(self, e)
+		return
+	end
 	GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 	if Wn.state.tab == "bags" then
 		if e.link and GameTooltip.SetHyperlink then
@@ -314,7 +335,10 @@ local DOT_COLORS = { high = { 3, 0.3, 0.85, 0.3 }, medium = { 2, 1, 0.82, 0 }, l
 
 function Wn.FillRow(row, e)
 	local state = Wn.state
-	if state.tab == "bags" then
+	local T = Wn.EXTRA[state.tab]
+	if T then
+		T.Fill(row, e)
+	elseif state.tab == "bags" then
 		row.Icon:SetTexture(Wn.ItemIcon(e.item))
 		row.Title:SetText(Wn.ItemName(e.item) .. (e.count > 1 and (GREY .. " x" .. e.count .. "|r") or ""))
 		if e.best then
@@ -350,7 +374,10 @@ end
 
 -- An entry's key in its list (the pick stays on it when the list changes).
 function Wn.Key(e)
-	if Wn.state.tab == "bags" then
+	local T = Wn.EXTRA[Wn.state.tab]
+	if T then
+		return T.Key(e)
+	elseif Wn.state.tab == "bags" then
 		return e.item .. (e.bound and ":b" or "")
 	end
 	return e.key
@@ -364,7 +391,7 @@ local D = { texts = {}, items = {}, y = 0, n = 0, ni = 0 }
 Wn.D = D
 
 function D.Begin()
-	D.y, D.n, D.ni = 4, 0, 0
+	D.y, D.n, D.ni, D.nb = 4, 0, 0, 0
 	if D.map then
 		D.map:Hide()
 	end
@@ -412,8 +439,9 @@ function D.ItemEnter(self)
 	GameTooltip:Show()
 end
 
--- An item's row: its icon and name (x n), at its right what's said of it.
-function D.Item(item, n, right)
+-- An item's row: its icon and name (x n), at its right what's said of it; enter: its own tooltip (else the
+-- item's), data: kept on the row for it (row.data).
+function D.Item(item, n, right, enter, data)
 	D.ni = D.ni + 1
 	local b = D.items[D.ni]
 	if not b then
@@ -435,7 +463,8 @@ function D.Item(item, n, right)
 		b:SetScript("OnLeave", Untip)
 		D.items[D.ni] = b
 	end
-	b.item = item
+	b.item, b.data = item, data
+	b:SetScript("OnEnter", enter or D.ItemEnter)
 	b:ClearAllPoints()
 	b:SetPoint("TOPLEFT", 4, -D.y)
 	b:SetWidth(D.width - 8)
@@ -482,7 +511,43 @@ function D.Place(place)
 	end
 end
 
+-- A button in the details (pooled): its label, what a click does, whether it can be clicked; two may share a
+-- line (second = true: right of the one before).
+D.buttons = {}
+function D.Button(label, onClick, enabled, width, second)
+	D.nb = D.nb + 1
+	local b = D.buttons[D.nb]
+	if not b then
+		b = CreateFrame("Button", nil, D.child, "UIPanelButtonTemplate")
+		b:SetHeight(20)
+		b:SetScript("OnClick", function(self)
+			if self.onClick then
+				self.onClick()
+			end
+		end)
+		D.buttons[D.nb] = b
+	end
+	b:SetText(label)
+	b:SetWidth(width or 120)
+	b.onClick = onClick
+	b:SetEnabled(enabled ~= false)
+	b:ClearAllPoints()
+	local before = second and D.buttons[D.nb - 1]
+	if before then
+		b:SetPoint("LEFT", before, "RIGHT", 6, 0)
+	else
+		b:SetPoint("TOPLEFT", 4, -D.y)
+		D.y = D.y + 24
+	end
+	b:Show()
+	return b
+end
+
 function D.End()
+	for i = D.nb + 1, #D.buttons do
+		D.buttons[i]:Hide()
+		D.buttons[i].onClick = nil
+	end
 	for i = D.n + 1, #D.texts do
 		D.texts[i]:Hide()
 	end
@@ -698,7 +763,10 @@ end
 -- The list's entries for the tab, the line above it, the message when it's empty.
 function Wn.Entries(tab)
 	local P, I = W.Prices, W.Ideas
-	if tab == "bags" then
+	local T = Wn.EXTRA[tab]
+	if T then
+		return T.Entries()
+	elseif tab == "bags" then
 		if not (W.Bags and W.Bags.List) then
 			return {}, "", L["Nothing in your bags to sell."]
 		end
@@ -758,11 +826,19 @@ function Wn.DrawDetails()
 				break
 			end
 		end
+		local T = Wn.EXTRA[state.tab]
+		if not e and key ~= nil and T and T.Find then
+			e = T.Find(key) -- (picked but not listed yet: its list is still being worked out)
+		end
 	end
-	if e and state.tab == "bags" then
+	if e and Wn.EXTRA[state.tab] then
+		Wn.EXTRA[state.tab].Details(e)
+	elseif e and state.tab == "bags" then
 		D.Bag(e)
 	elseif e then
 		D.Idea(e)
+	elseif not state.goal and Wn.EXTRA[state.tab] and Wn.EXTRA[state.tab].Overview then
+		Wn.EXTRA[state.tab].Overview()
 	else
 		D.Goal()
 	end
@@ -786,6 +862,13 @@ function Wn.Draw()
 	view.Strip.Text:SetText(line or GREY .. L["No money goal right now"] .. "|r")
 	local entries, head, empty = Wn.Entries(state.tab)
 	view.entries = entries
+	local T = Wn.EXTRA[state.tab]
+	view.Head:SetWidth(T and T.headWidth or (C.LIST_W - 8))
+	for key, other in pairs(Wn.EXTRA) do
+		if other.Controls then
+			other.Controls(view, key == state.tab)
+		end
+	end
 	view.Head:SetText(head or "")
 	view.Message:SetText(empty or "")
 	view.Message:SetShown(#entries == 0)
@@ -821,6 +904,7 @@ function Wn.SetTab(tab)
 	state.tab = tab
 	state.goal = false
 	Settings().tab = tab
+	Wn.Request()
 	Wn.Draw()
 end
 
@@ -886,9 +970,8 @@ function Wn.Build()
 	title:SetPoint("TOPLEFT", 10, -7)
 	title:SetText("WhyPoor?")
 	local x = 10 + title:GetStringWidth() + 14
-	local labels = { ideas = L["Ideas"], bags = L["Bags"], market = L["Market"] }
 	for _, key in ipairs(Wn.TABS) do
-		local tab = Wn.NewTab(f, key, labels[key])
+		local tab = Wn.NewTab(f, key, Wn.LABELS[key])
 		tab:SetPoint("TOPLEFT", x, -3)
 		x = x + tab:GetWidth() + 4
 		view.tabs[key] = tab
@@ -1027,7 +1110,7 @@ function Wn.Build()
 	else
 		f:SetPoint("CENTER")
 	end
-	if s.tab == "ideas" or s.tab == "bags" or s.tab == "market" then
+	if Wn.IsTab(s.tab) then
 		Wn.state.tab = s.tab
 	end
 end
@@ -1048,13 +1131,15 @@ function Wn.IdeasChanged()
 	end
 end
 
+-- The ideas asked for: only on the tabs that show them (Ideas, Market); the others never make them work.
 function Wn.Request()
 	local I = W.Ideas
 	if I and I.Watch and Wn.watched ~= I then
 		Wn.watched = I -- (once per W.Ideas)
 		I.Watch(Wn.IdeasChanged)
 	end
-	if I and I.Request then
+	local tab = Wn.state.tab
+	if I and I.Request and (tab == "ideas" or tab == "market") then
 		Wn.state.requests = Wn.state.requests + 1
 		LT.Guard("WhyPoor.request", I.Request)
 	end
@@ -1064,7 +1149,7 @@ end
 -- What the others call
 ---------------------------------------------------------------------------
 
--- Opens the window, on a tab ("ideas", "bags", "market") or the goal ("goal"; nil: as it was).
+-- Opens the window, on a tab ("ideas", "bags", "market", "crafting") or the goal ("goal"; nil: as it was).
 function Wn.Open(tab)
 	local m = W.module
 	if m and not m.enabled then
@@ -1076,7 +1161,7 @@ function Wn.Open(tab)
 	end
 	if tab == "goal" then
 		Wn.state.goal = true
-	elseif tab == "ideas" or tab == "bags" or tab == "market" then
+	elseif Wn.IsTab(tab) then
 		Wn.state.tab, Wn.state.goal = tab, false
 		Settings().tab = tab
 	end
@@ -1117,8 +1202,8 @@ function Wn.SettingsChanged()
 	end
 end
 
--- The "WhyPoor?" button on the auction house's window, left of Margins' (Chronicle's MarginsWindow.lua),
--- made the first time the auction house opens (on the next frame: Blizzard's window is there then).
+-- The "WhyPoor?" button on the auction house's window, at its top right left of the close button, made the
+-- first time the auction house opens (on the next frame: Blizzard's window is there then).
 function Wn.HookAuctionHouse()
 	local ah = _G.AuctionHouseFrame
 	if Wn.ahButton or type(ah) ~= "table" then
@@ -1127,14 +1212,14 @@ function Wn.HookAuctionHouse()
 	local b = CreateFrame("Button", nil, ah, "UIPanelButtonTemplate")
 	b:SetSize(80, 20)
 	b:SetText("WhyPoor?")
-	b:SetPoint("TOPRIGHT", ah, "TOPRIGHT", -110, -1)
+	b:SetPoint("TOPRIGHT", ah, "TOPRIGHT", -26, -1)
 	b:SetScript("OnClick", function()
 		Wn.Open("market")
 	end)
 	b:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
 		GameTooltip:AddLine("WhyPoor?")
-		GameTooltip:AddLine(L["The deals in the auction house's prices, and your bags' best sales."], 1, 1, 1, true)
+		GameTooltip:AddLine(L["The deals in the auction house's prices, your recipes' margins and your bags' best sales."], 1, 1, 1, true)
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", Untip)

@@ -617,5 +617,11 @@ ns.CHANGELOG = {
 	{ id = 203, module = "whypoor",
 		en = { "WhyPoor?: scans, shows its progress", "Opening the auction house now scans it whole (every 15 minutes at most; a setting), and the line above the list says what's going on: reading the auction house, working out the ideas (step 7 of 11). The ideas no longer stayed on \"Working them out...\" when prices changed meanwhile." },
 		de = { "WhyPoor?: scannt, zeigt Fortschritt", "Beim Öffnen wird das Auktionshaus jetzt komplett gescannt (höchstens alle 15 Minuten; eine Einstellung), und die Zeile über der Liste sagt, was gerade passiert: Auktionshaus lesen, Ideen ausrechnen (Schritt 7 von 11). Die Ideen bleiben nicht mehr bei \"Wird ausgerechnet...\" hängen, wenn sich Preise inzwischen ändern." } },
+	{ id = 204, module = "whypoor",
+		en = { "Margins moved to WhyPoor?", "Crafting margins are WhyPoor?'s Crafting tab now: your recipes by gold per hour or profit, one profession or all, each with its reagents and numbers. The Margins button on the profession window opens it; /chronicle margins too. Restart the game after updating." },
+		de = { "Margins jetzt in WhyPoor?", "Die Herstellungsmargen sind jetzt WhyPoor?s Herstellen-Tab: deine Rezepte nach Gold pro Stunde oder Gewinn, ein Beruf oder alle, jeweils mit Reagenzien und Zahlen. Der Margins-Button am Berufsfenster öffnet ihn, /chronicle margins auch. Nach dem Update das Spiel neu starten." } },
+	{ id = 205, module = "whypoor",
+		en = { "WhyPoor?: no tooltip line, no bag coins", "WhyPoor? no longer adds a line to item tooltips or a coin to items in the sorted bags: everything is in its window." },
+		de = { "WhyPoor?: keine Tooltip-Zeile, Münzen", "WhyPoor? fügt keine Zeile mehr zu Item-Tooltips hinzu und keine Münze mehr zu Items in den sortierten Taschen: alles ist in seinem Fenster." } },
 	-- New entries go here, at the end.
 }

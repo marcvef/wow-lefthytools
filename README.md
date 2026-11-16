@@ -365,18 +365,7 @@ version they have), or once they play it with an up-to-date LefthyTools.
   links) says who of your characters and friends knows a recipe for it, with their profession and
   skill, best first: "Craftable by: Anna (Tailoring 152), ... +2 more". Hold Shift for the recipe's
   reagents.
-- **Crafting margins:** what your recipes cost to make and bring, and gold per hour. A **Margins**
-  button on your profession window shows the recipe's numbers; with the auction house open it checks
-  its prices there first (a few searches, a moment). On the auction house, **Margins** opens the list
-  of all your recipes, best first (by gold per hour or profit per craft), and **Scan all my recipes**
-  fetches every price at once (the game allows that every 15 minutes; else item by item, and a scan
-  you stop goes on where it was). A reagent costs the cheaper of the auction house and a vendor:
-  threads, flux, vials, dyes and spices come from vendors, at what a merchant asked you (learned
-  whenever you open one) or at the usual price. Revenue: a vendor's price (certain) and the auction
-  house's lowest buyout less its 5% cut (the deposit isn't counted); profit uses the better one. Time
-  is the craft's cast plus half a second. Your bags say how many crafts they cover; prices older than
-  3 hours are greyed. Prices are kept per realm and faction on your computer; nothing is sent.
-  `/chronicle margins` opens the list.
+- **Crafting margins** are WhyPoor?'s **Crafting** tab now (see WhyPoor?); `/chronicle margins` opens it.
 - **While you were away:** a minute after you log in, a chat line per friend with what they did
   since you last played. Once a week, **last week's leaderboard** in chat.
 - `/chronicle session` prints this session in one line; the AFK screen shows it too.
@@ -394,7 +383,6 @@ once a second, so it costs nothing you'd notice.
 | While you were away | on |
 | Weekly recap | on |
 | Who can craft it, in item tooltips | on |
-| Crafting margins | on |
 
 ---
 
@@ -650,13 +638,14 @@ usual price; prices that jump around are marked unstable and left out of the ide
 friends on the same realm and side share their scans with you (and you yours), so one visit to the
 auction house helps everyone. Chronicle's crafting margins use the same prices.
 
-**Crafting**: a recipe's cost takes the cheapest way to get each reagent: the auction house, a
+**Crafting** (the tab; it was Chronicle's crafting margins): your characters' recipes on this realm with what they
+cost, bring and make per hour, by gold per hour or profit per craft, one profession or all; a recipe's details show
+each reagent and where it comes from, "Check AH" and "Show in my profession window"; "Scan all my recipes" when
+nothing is picked. A **Margins** button on your profession window opens it on that recipe. A recipe's cost takes the cheapest way to get each reagent: the auction house, a
 vendor, your bags, or crafting it yourself (a bolt of cloth from your linen, a miner's bars from
 ore), several steps deep. "Sell the reagents" says when selling them brings more than crafting.
 
-**Outside the window**, only where it decides something: one line in the tooltip of items in your
-bags and at the auction house ("WhyPoor?: AH 1g 20s (2 h, sells well) · vendor 30s"), and a small
-coin in the corner of items in the sorted bags that are worth more at the auction house.
+**Nothing outside the window**: no lines in item tooltips, no marks on your bags.
 
 Its money data (where mobs, herbs and ore are, fishing, pickpocketing, disenchanting, vendors with
 limited stock) comes as an add-on of its own, `LefthyTools_MoneyData`, from a classic world
@@ -665,12 +654,11 @@ database, and loads only when first needed.
 | Setting | Default |
 |---|---|
 | Minimap button | on |
-| A line in item tooltips | on |
-| Coins in the sorted bags | on |
+| Margins button on the profession window | on |
 | Scan the whole auction house when it opens | on |
 | Share auction house prices with friends | on |
 
-`/whypoor` opens or closes the window; `/whypoor ideas`, `bags`, `market` or `goal` opens that
+`/whypoor` opens or closes the window; `/whypoor ideas`, `crafting`, `bags`, `market` or `goal` opens that
 page; `/whypoor minimap` shows or hides the button.
 
 ## Mirage

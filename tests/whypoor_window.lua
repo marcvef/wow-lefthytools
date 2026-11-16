@@ -65,8 +65,8 @@ QUEST_BAG_ITEMS[9303] = 7001
 section("WhyPoor?: the module, its settings, its commands, the minimap button")
 do
 	local function T(key) return REGISTERED_SETTINGS["LefthyTools_whypoor_" .. key] end
-	check(M and M.enabled and M.db.tooltip == true and M.db.bagCoins == true and M.db.minimapButton == true, "on, with its defaults")
-	check(T("minimapButton") and T("tooltip") and T("bagCoins") and T("sharePrices"), "a checkbox for each setting")
+	check(M and M.enabled and M.db.minimapButton == true and M.db.craftButton == true and M.db.autoScan == true, "on, with its defaults")
+	check(T("minimapButton") and T("craftButton") and T("autoScan") and T("sharePrices"), "a checkbox for each setting")
 	check(SETTINGS_BUTTONS["Open WhyPoor?"] ~= nil, "an Open button on its page")
 	check(W.Money(1234567) == "123g" and W.Money(12345) == "1g 23s" and W.Money(345) == "3s 45c" and W.Money(7) == "7c"
 		and W.Money(-12345) == "-1g 23s" and W.Money(nil) == nil, "money in short")
@@ -255,10 +255,16 @@ do
 	Changed(list, true)
 	Advance(25)
 	check(ideas.requests == requests and state.draws == draws and state.old, "closed: no requests, no drawing (only noted)")
-	W.Window.Open()
-	check(state.draws == draws + 1 and ideas.requests == requests + 1, "opened again: drawn and asked")
+	W.Window.Open("ideas")
+	check(state.draws == draws + 1 and ideas.requests == requests + 1, "opened again on the ideas: drawn and asked")
 	Advance(10.5)
 	check(ideas.requests == requests + 2, "while open: asked again every 10 s")
+	W.Window.SetTab("bags")
+	requests = ideas.requests
+	Advance(10.5)
+	check(ideas.requests == requests, "on the Bags tab: the ideas aren't asked for (only Ideas and Market show them)")
+	W.Window.SetTab("ideas")
+	check(ideas.requests == requests + 1, "back on the ideas: asked at once")
 	frame:Hide()
 
 	-- The auction house's button.
@@ -280,115 +286,12 @@ do
 end
 
 ---------------------------------------------------------------------------
-section("WhyPoor?: the tooltip line, only in the bags and at the auction house")
+section("WhyPoor?: nothing in item tooltips, nothing on the bags")
 do
-	local function Lines()
-		local n, line = 0, nil
-		for _, l in ipairs(TOOLTIP.lines) do if Plain(l):find("^WhyPoor%?:") then n, line = n + 1, Plain(l) end end
-		return n, line
-	end
-	local slot = CreateFrame("Button", nil, UIParent)
-	function slot:GetBagID() return 0 end
-	slot:SetID(1)
-	GameTooltip:SetOwner(slot)
-	GameTooltip:SetBagItem(0, 1)
-	local n, line = Lines()
-	check(n == 1 and line == "WhyPoor?: AH 12s (2 h, sells well) · vendor 3s (each)", "a stack in the bags: one line, per one: " .. tostring(line))
-	slot:SetID(2)
-	GameTooltip:SetOwner(slot)
-	GameTooltip:SetBagItem(0, 2)
-	n, line = Lines()
-	check(n == 1 and line == "WhyPoor?: vendor 25s", "soulbound: the vendor only: " .. tostring(line))
-	slot:SetID(4)
-	GameTooltip:SetOwner(slot)
-	GameTooltip:SetBagItem(0, 4)
-	n, line = Lines()
-	check(line == "WhyPoor?: AH ~90c (2 h, sells slowly) · vendor 1s 50c", "unsure: ~, sells slowly: " .. tostring(line))
-	-- The bank (the game's tooltip data says so), elsewhere: nothing.
-	GameTooltip.GetProcessingTooltipInfo = function() return { getterName = "GetBagItem", getterArgs = { 6, 1 } } end
-	slot:SetID(1)
-	GameTooltip:SetOwner(slot)
-	GameTooltip:SetBagItem(0, 1)
-	check(Lines() == 0, "the bank: no line")
-	GameTooltip.GetProcessingTooltipInfo = function() return { getterName = "GetBagItem", getterArgs = { 0, 1 } } end
-	GameTooltip:SetOwner(UIParent)
-	GameTooltip:SetHyperlink("item:9301")
-	check(Lines() == 1, "the game's data: a bag item")
-	GameTooltip.GetProcessingTooltipInfo = nil
-	GameTooltip:SetOwner(UIParent)
-	GameTooltip:SetHyperlink("item:9301")
-	check(Lines() == 0, "anywhere else (a chat link, a vendor, loot): no line")
-	-- The auction house.
-	local ah = CreateFrame("Frame", "AuctionHouseFrame", UIParent)
-	local row = CreateFrame("Button", nil, CreateFrame("Frame", nil, ah))
-	GameTooltip:SetOwner(row)
-	GameTooltip:SetHyperlink("item:9301")
-	n, line = Lines()
-	check(n == 1 and line == "WhyPoor?: AH 12s (2 h, sells well) · vendor 3s", "at the auction house: the line")
-	ah:Hide()
-	GameTooltip:SetOwner(row)
-	GameTooltip:SetHyperlink("item:9301")
-	check(Lines() == 0, "its window closed: none")
-	_G.AuctionHouseFrame = saved.AH
-	-- Old prices, a friend's.
-	prices.data[9301].seen, prices.data[9301].friend = now - 5 * 3600, "Anna"
-	prices.rev = prices.rev + 1
-	slot:SetID(1)
-	GameTooltip:SetOwner(slot)
-	GameTooltip:SetBagItem(0, 1)
-	n, line = Lines()
-	local raw
-	for _, l in ipairs(TOOLTIP.lines) do if Plain(l):find("^WhyPoor") then raw = l end end
-	check(line == "WhyPoor?: AH 12s (5 h, Anna, sells well) · vendor 3s (each)" and raw:find("|cff888888AH", 1, true),
-		"a friend's old price: their name, the age, greyed: " .. tostring(line))
-	prices.data[9301].seen, prices.data[9301].friend = now - 7200, nil
-	prices.rev = prices.rev + 1
-	LT:SetModuleSetting(M, "tooltip", false)
-	Step()
-	GameTooltip:SetOwner(slot)
-	GameTooltip:SetBagItem(0, 1)
-	check(Lines() == 0, "the setting off: none")
-	LT:SetModuleSetting(M, "tooltip", true)
-	Step()
+	check(W.Bags.Line == nil and W.Bags.Coin == nil and M.db.tooltip == nil and M.db.bagCoins == nil,
+		"no tooltip line and no coin in the sorted bags (no settings for them either)")
 end
 
----------------------------------------------------------------------------
-section("WhyPoor?: the coin in the sorted bags")
-do
-	local tweaks = LT:GetModule("tweaks")
-	check(tweaks.db.mouseBags == true, "(the sorted bags with mouse and keyboard)")
-	local function Button(slot)
-		for _, b in ipairs(ContainerFrameCombinedBags.buttons) do
-			if b:GetBagID() == 0 and b:GetID() == slot then return b end
-		end
-	end
-	check(W.Bags.Coin(9301, 0, 1) and not W.Bags.Coin(9302, 0, 2) and not W.Bags.Coin(9304, 0, 4), "worth more at the auction house: a coin")
-	OpenBags()
-	Step()
-	local st = ns.GamepadBagsState()
-	local coins = st.corners and st.corners.whypoor or {}
-	check(st.applied and coins[Button(1)] and not coins[Button(2)] and not coins[Button(3)] and not coins[Button(4)],
-		"the coin on the linen only")
-	local coin = coins[Button(1)]
-	local point, rel
-	if coin then point, rel = coin:GetPoint(1) end
-	check(coin and coin.path == "Interface\\MoneyFrame\\UI-GoldIcon" and point == "TOPRIGHT" and rel == Button(1), "a gold coin, top right")
-	check(not (st.marked and st.marked[Button(1)]), "the quest mark not touched")
-	LT:SetModuleSetting(M, "bagCoins", false)
-	Step()
-	Step()
-	st = ns.GamepadBagsState()
-	check(not (st.corners and st.corners.whypoor), "the setting off: gone")
-	LT:SetModuleSetting(M, "bagCoins", true)
-	Step()
-	Step()
-	st = ns.GamepadBagsState()
-	check(st.corners and st.corners.whypoor and st.corners.whypoor[Button(1)], "on again: back")
-	CloseBags()
-	Step()
-end
-
----------------------------------------------------------------------------
 section("WhyPoor?: the goal")
 do
 	local G = W.Goal

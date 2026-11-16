@@ -89,8 +89,6 @@ Modules\Chronicle\Canvas.lua
 Modules\Chronicle\Graphs.lua
 Modules\Chronicle\Compare.lua
 Modules\Chronicle\Professions.lua
-Modules\Chronicle\Margins.lua
-Modules\Chronicle\MarginsWindow.lua
 Modules\Chronicle\CraftedBy.lua
 Modules\Chronicle\Window.lua
 Modules\Chronicle\MinimapButton.lua
@@ -134,8 +132,10 @@ Modules\WhyPoor\Prices.lua
 Modules\WhyPoor\Share.lua
 Modules\WhyPoor\Data.lua
 Modules\WhyPoor\Crafts.lua
+Modules\WhyPoor\Margins.lua
 Modules\WhyPoor\Context.lua
 Modules\WhyPoor\Methods.lua
 Modules\WhyPoor\Goal.lua
 Modules\WhyPoor\Bags.lua
 Modules\WhyPoor\Window.lua
+Modules\WhyPoor\Crafting.lua

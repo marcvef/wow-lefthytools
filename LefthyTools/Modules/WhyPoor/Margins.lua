@@ -1,59 +1,40 @@
 local _, ns = ...
 local LT = ns.LT
-local C = ns.Chronicle
-local M = C.module
+local W = ns.WhyPoor or {}
+ns.WhyPoor = W
+local C = ns.Chronicle -- (its record of my characters' recipes, C.Recipes)
 
--- Crafting margins (setting margins): what one of my recipes costs to make, what it brings, and gold per
--- hour, from auction house and vendor prices. The window and the buttons on Blizzard's profession window
--- and auction house are MarginsWindow.lua's; this file picks what to scan and works the numbers out
--- (C.Margins, Mg).
+-- Crafting margins (W.Margins, Mg; the Crafting tab of the window is Crafting.lua's): which of my characters'
+-- recipes to show and work out, and what to scan for them. Part of WhyPoor? (it was Chronicle's until build
+-- 0.7.0-193; its setting went with it: it's on while WhyPoor? is).
 --
--- Prices come from WhyPoor?'s price engine (Modules/WhyPoor/Prices.lua, W.Prices; docs/whypoor.md): it keeps
--- every auction house price per realm and faction, merchants' prices and the scans; it runs while this
--- setting or the WhyPoor? module is on. Mg.AHPrice, Mg.VendorPrice and Mg.SellPrice read it, Mg.ScanRecipe and
--- Mg.ScanAll ask it to scan. (Margins' own saved prices, LefthyToolsDB.margins, went over to it once.)
--- A vendor-sold reagent no merchant has shown yet costs what Data/Recipes.lua's vendor list says.
---
--- The numbers of a recipe (Mg.Recipe):
---   a reagent's price is the cheaper of the AH (lowest buyout for one) and a vendor; reagents in my bags
---   count at that price too (what they'd sell for), and how many crafts they cover is said apart;
---   cost = the reagents' prices times how many it needs;
---   revenue: at a vendor its sell price times how many a craft makes (a range: the data's middle); on the AH
---   the lowest buyout for one times as many, less the AH's 5% cut (the deposit isn't counted);
---   profit = the better revenue minus the cost (vendor and AH each also have their own);
---   time per craft = the spell's cast time plus OVERHEAD; gold per hour = profit / time.
+-- Prices come from the price engine (Prices.lua, W.Prices; docs/whypoor.md): Mg.AHPrice, Mg.VendorPrice and
+-- Mg.SellPrice read it, Mg.ScanRecipe and Mg.ScanAll ask it to scan. A recipe's numbers are the crafting part's
+-- (Crafts.lua, Cr.Recipe): each reagent the cheapest way (the auction house, a vendor, crafting it yourself,
+-- the bags), revenue at a vendor and on the auction house after its cut, profit, time with the sub-crafts,
+-- gold per hour.
 --
 -- Scanning, only with the auction house open, never in a fight (the engine's rules): one recipe (its product and
 -- the reagents no vendor sells) item by item; everything with a full scan (ReplicateItems: the whole auction
 -- house) when the game allows one again, else item by item like a recipe, skipping prices fresher than FRESH
 -- (so a scan that was stopped goes on where it was).
 
-local AH_CUT = 0.05
-local OVERHEAD = 0.5          -- seconds a craft takes beyond its cast (the button, the next cast)
-local DEFAULT_CAST = 3        -- seconds, when the spell's cast time can't be read
 local STALE = 3 * 3600        -- prices older than this are shown greyed
 local FRESH = 30 * 60         -- a full scan by items skips prices younger than this
-local FEW = 5                 -- fewer listed than for this many crafts: "few on the AH"
 
 local Mg = {}
-C.Margins = Mg
+W.Margins = Mg
 
-local issecret = LT.IsSecret
 local mine, mineRev   -- Mg.MyRecipes, of that R.Revision
-local casts = {}      -- spell -> seconds
 
-local function Number(v)
-	return type(v) == "number" and not issecret(v) and v or nil
-end
-
--- The price engine (WhyPoor?'s Prices.lua loads after this file).
+-- The price engine (Prices.lua, loaded before this file).
 local function Prices()
-	return ns.WhyPoor and ns.WhyPoor.Prices
+	return W.Prices
 end
 
 function Mg.Enabled()
 	local P = Prices()
-	return M.enabled and M.db.margins and P ~= nil and P.running == true
+	return W.module ~= nil and W.module.enabled and P ~= nil and P.running == true
 end
 
 function Mg.IsAHOpen()
@@ -85,32 +66,6 @@ function Mg.SellPrice(item)
 	return P and P.Vendor(item) or nil
 end
 
--- Seconds a cast takes (and whether the game said so).
-function Mg.CastTime(spell)
-	local known = casts[spell]
-	if not known then
-		local info = LT.Value(C_Spell.GetSpellInfo, spell)
-		local ms = type(info) == "table" and Number(info.castTime)
-		if ms and ms >= 0 then
-			known = ms / 1000
-			casts[spell] = known
-		end
-	end
-	return known or DEFAULT_CAST, known ~= nil
-end
-
-local function InBags(item)
-	local ok, n = pcall(C_Item.GetItemCount, item)
-	return ok and Number(n) or 0
-end
-
-local function Older(a, b)
-	if not a then
-		return b
-	end
-	return b and math.min(a, b) or a
-end
-
 -- A recipe's numbers, worked out by WhyPoor?'s crafting part (Modules/WhyPoor/Crafts.lua, Cr.Recipe): each reagent
 -- the cheapest way, also crafted by who makes it (that character's recipes; nil: the character I play) where that's
 -- cheaper, the sub-crafts' casts counted in its time. { spell, line, recipe, who, reagents = { { item, n, unit,
@@ -119,7 +74,7 @@ end
 -- ahProfit, best ("vendor", "ah"), profit, cast, castKnown, subSeconds, subCastKnown, seconds, perHour, oldest (the
 -- oldest AH price it uses), few, crafted, waiting (an item's data hasn't come), verdict, reason, why }.
 local function Compute(recipe, line, who)
-	return ns.WhyPoor.Crafts.Recipe(recipe.spell, { recipe = recipe, line = line, crafter = who })
+	return W.Crafts.Recipe(recipe.spell, { recipe = recipe, line = line, crafter = who })
 end
 
 ---------------------------------------------------------------------------
@@ -169,7 +124,10 @@ end
 -- One recipe's numbers (any recipe of the data; who made it from my list when it's there).
 function Mg.Recipe(spell)
 	local R = C.Recipes
-	local recipe, line = R and R.RecipeOf(spell)
+	local recipe, line
+	if R then
+		recipe, line = R.RecipeOf(spell) -- (both: "R and R.RecipeOf()" would keep only the first)
+	end
 	if not (recipe and Prices() and Prices().running) then
 		return nil
 	end
@@ -318,36 +276,7 @@ function Mg.Status()
 	return status
 end
 
----------------------------------------------------------------------------
--- Switching
----------------------------------------------------------------------------
-
-local function Engine()
-	local P = Prices()
-	if P then
-		P.levelHint = Mg.LevelHint
-		P.Refresh() -- (it runs while this setting or WhyPoor? is on)
-	end
-end
-
--- Chronicle's OnEnable, OnDisable and OnSettingChanged.
-function C.MarginsEnable()
-	Engine()
-	if C.MarginsUIChanged then
-		C.MarginsUIChanged()
-	end
-end
-
-function C.MarginsDisable()
-	Engine()
-	if C.MarginsUIChanged then
-		C.MarginsUIChanged()
-	end
-end
-
-function C.MarginsSettingChanged()
-	Engine()
-	if C.MarginsUIChanged then
-		C.MarginsUIChanged()
-	end
+-- Gear the game gives no item level for is searched by its recipe's (the engine asks).
+if Prices() then
+	Prices().levelHint = Mg.LevelHint
 end

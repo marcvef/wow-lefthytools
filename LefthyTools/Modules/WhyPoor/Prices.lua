@@ -1418,14 +1418,10 @@ P.EVENTS = { "AUCTION_HOUSE_SHOW", "AUCTION_HOUSE_CLOSED", "COMMODITY_SEARCH_RES
 	"REPLICATE_ITEM_LIST_UPDATE", "MERCHANT_SHOW", "MERCHANT_UPDATE", "OWNED_AUCTIONS_UPDATED", "AUCTION_HOUSE_AUCTION_CREATED",
 	"AUCTION_HOUSE_SHOW_FORMATTED_NOTIFICATION", "AUCTION_CANCELED" }
 
--- Whether something wants the engine: WhyPoor? on, Chronicle's margins on, or P.Want's.
+-- Whether something wants the engine: WhyPoor? on (its Crafting tab is the crafting margins), or P.Want's.
 function P.Wanted()
 	local wp = W.module
 	if wp and wp.enabled then
-		return true
-	end
-	local chronicle = LT:GetModule("chronicle")
-	if chronicle and chronicle.enabled and type(chronicle.db) == "table" and chronicle.db.margins then
 		return true
 	end
 	return next(P.wants) ~= nil

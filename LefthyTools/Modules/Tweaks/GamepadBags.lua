@@ -113,10 +113,6 @@ local hooked, hookedCallback = false, nil
 local QUEST_MARK = "Interface\\RaidFrame\\ReadyCheck-NotReady"
 local questMarks = setmetatable({}, { __mode = "k" }) -- item button -> our mark on it
 local decos = setmetatable({}, { __mode = "k" })      -- item button -> our frame over it
--- Corner marks other modules put on items (WhyPoor?'s coin on what sells better at the auction house):
--- ns.GamepadBagsMark(key, mark), drawn like the quest mark, on our frame over Blizzard's button, after
--- each layout (Corner.Lay).
-local Corner = { marks = {}, shown = setmetatable({}, { __mode = "k" }) } -- key -> mark; item button -> { [key] = texture }
 
 -- A Misc Tweaks setting (the bag buttons, the free slots, the columns).
 local function Setting(key, default)
@@ -250,7 +246,7 @@ local function Classify(button)
 		end
 		return e
 	end
-	e.id, e.bag, e.slot = id, bag, slot
+	e.id = id
 	e.key = LT.Readable(info.hyperlink) and info.hyperlink or id -- (the same item: one button with stacks combined)
 	if ns.BeaconReservedSlot and ns.BeaconReservedSlot(button) then -- (Beacon's border on a copy reserved for a friend: kept apart)
 		e.key = tostring(e.key) .. ":reserved:" .. e.order
@@ -845,48 +841,6 @@ local function QuestMarks(groups)
 	end
 end
 
--- The other modules' corner marks (ns.GamepadBagsMark): each item asked of each mark (mark.test(itemID,
--- bag, slot): a lookup, it runs per item at every layout), the free slots never; nil: every one hidden.
-function Corner.Lay(groups)
-	local want = {}
-	if groups and next(Corner.marks) then
-		for s = 1, EMPTY - 1 do
-			for _, e in ipairs(groups[s] or {}) do
-				if e.id then
-					for key, mark in pairs(Corner.marks) do
-						local ok, yes = pcall(mark.test, e.id, e.bag, e.slot)
-						if ok and yes then
-							want[e.button] = want[e.button] or {}
-							want[e.button][key] = mark
-						end
-					end
-				end
-			end
-		end
-	end
-	for button, list in pairs(Corner.shown) do
-		for key, texture in pairs(list) do
-			texture:SetShown(want[button] ~= nil and want[button][key] ~= nil)
-		end
-	end
-	for button, keys in pairs(want) do
-		local list = Corner.shown[button] or {}
-		Corner.shown[button] = list
-		for key, mark in pairs(keys) do
-			local texture = list[key]
-			if not texture then
-				texture = Deco(button):CreateTexture(nil, "OVERLAY", nil, 7)
-				texture:SetTexture(mark.texture)
-				texture:SetSize(mark.size or 12, mark.size or 12)
-				texture:SetPoint(mark.point or "TOPRIGHT", button, mark.point or "TOPRIGHT", mark.x or -2, mark.y or -2)
-				texture:SetAlpha(mark.alpha or 0.9)
-				list[key] = texture
-			end
-			texture:Show()
-		end
-	end
-end
-
 -- Our count on a button: a font string on our frame over it (Deco), over its icon (one on the bag's
 -- overlay was drawn under the item buttons, so a combined item showed no count at all), made once.
 local countOf, countPool = {}, {}
@@ -1068,7 +1022,6 @@ local function Place(frame, groups, strip)
 	SetBagWidth(frame, contentWidth)
 	SetBagHeight(frame, OurHeight(frame, h))
 	QuestMarks(groups)
-	Corner.Lay(groups)
 	applied = true
 	if pad then
 		PlanJumps(rows)
@@ -1108,7 +1061,6 @@ local function Unapply()
 	GiveBack()
 	AmmoCounts(nil)
 	QuestMarks(nil)
-	Corner.Lay(nil)
 	if overlay then
 		overlay:Hide()
 	end
@@ -1262,7 +1214,6 @@ local function Relayout()
 		and (groups.reagents ~= nil) == (next(adopted) ~= nil)
 		and stripped.all == RowOpen() and placedAllFree == Setting("gamepadBagAllFree", false) then
 		QuestMarks(groups) -- (the same order: a quest done meanwhile still marks its item)
-		Corner.Lay(groups) -- (... and the other modules' marks as they are now)
 		AmmoCounts(groups) -- (... and a stack that grew or shrank its whole)
 		return
 	end
@@ -1456,27 +1407,6 @@ function ns.GamepadBagsColumns()
 	end
 end
 
--- A corner mark of another module on the sorted bags' items: mark = { texture, test = function(itemID,
--- bag, slot) -> true where it goes (a quick lookup: it runs for every item at every layout), size (12),
--- point ("TOPRIGHT"; the quest mark has the top left, the count the bottom right), x, y, alpha };
--- nil takes it away. ns.GamepadBagsRefresh(): the marks' answers changed, they're asked again on the
--- next frame (only while our layout is shown; else at the next one).
-function ns.GamepadBagsMark(key, mark)
-	if type(key) ~= "string" or (mark ~= nil and not (type(mark) == "table" and type(mark.test) == "function")) then
-		return false
-	end
-	Corner.marks[key] = mark
-	ns.GamepadBagsRefresh()
-	return true
-end
-
-function ns.GamepadBagsRefresh()
-	if applied then
-		dirty = true
-		driver:Show()
-	end
-end
-
 -- For the tests: the "Bags" header's button, the "Combine stacks" switch.
 function ns.GamepadBagsToggle()
 	return bagsToggle, stacksSwitch
@@ -1496,14 +1426,5 @@ function ns.GamepadBagsState()
 			marked[button] = mark
 		end
 	end
-	local corners = {}
-	for button, list in pairs(Corner.shown) do
-		for key, texture in pairs(list) do
-			if texture:IsShown() then
-				corners[key] = corners[key] or {}
-				corners[key][button] = texture
-			end
-		end
-	end
-	return { applied = applied, order = order, strip = stripped, headers = shown, marked = marked, counts = countPool, corners = corners }
+	return { applied = applied, order = order, strip = stripped, headers = shown, marked = marked, counts = countPool }
 end

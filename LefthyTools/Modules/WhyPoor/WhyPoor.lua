@@ -22,10 +22,9 @@ local M = LT:NewModule("whypoor", {
 	defaults = {
 		minimapButton = true,
 		minimapAngle = 120,   -- degrees, 0 = right, counter-clockwise
-		tooltip = true,       -- one line in item tooltips (bags, auction house): vendor or auction house
-		bagCoins = true,      -- a tiny coin on items in the sorted bags worth more at the auction house
 		sharePrices = true,   -- share auction house prices with friends (Beacon) and use theirs
 		autoScan = true,      -- the whole auction house scanned when it opens (when the game allows one again)
+		craftButton = true,   -- a "Margins" button on the profession window (Crafting.lua)
 		window = {},          -- shown, left, top, tab (Window.lua)
 	},
 })
@@ -138,13 +137,13 @@ end
 -- The module's calls
 ---------------------------------------------------------------------------
 
--- The parts that care (Bags.lua: the tooltip's lines and the coins; Window.lua: closed when off).
+-- The parts that care (Window.lua: closed when off; Crafting.lua: the profession window's button).
 function W.Changed()
-	if W.Bags and W.Bags.SettingsChanged then
-		LT.Guard("WhyPoor.bags", W.Bags.SettingsChanged)
-	end
 	if W.Window and W.Window.SettingsChanged then
 		LT.Guard("WhyPoor.window", W.Window.SettingsChanged)
+	end
+	if W.Crafting and W.Crafting.SettingsChanged then
+		LT.Guard("WhyPoor.crafting", W.Crafting.SettingsChanged)
 	end
 	W.UpdateMinimapButton()
 end
@@ -167,11 +166,9 @@ function M:BuildOptions(o)
 		L["Ideas for making money with this character, your bags' best sales and the auction house's deals, in one window. Also /whypoor."])
 	o:Checkbox("minimapButton", L["Minimap button"],
 		L["A button on the edge of the minimap: click opens the window, right-click your bags. Drag it to move it."])
-	o:Header(L["Bags and tooltips"])
-	o:Checkbox("tooltip", L["A line in item tooltips"],
-		L["Items in your bags and at the auction house get one line: what the auction house pays for one (with how old that price is and how well it sells) and what a vendor pays. Nothing elsewhere."])
-	o:Checkbox("bagCoins", L["Coins in the sorted bags"],
-		L["In Misc Tweaks' sorted bags, a small coin in the corner of items worth more at the auction house than at a vendor."])
+	o:Header(L["Crafting"])
+	o:Checkbox("craftButton", L["Margins button on the profession window"],
+		L["A Margins button on your profession window: what the recipe shown costs and brings in the Crafting tab, and with the auction house open its prices are checked there."])
 	o:Header(L["Auction house"])
 	o:Checkbox("autoScan", L["Scan the whole auction house when it opens"],
 		L["Opening the auction house reads all its listings at once, a little each frame, when the game allows that again (every 15 minutes). The prices give the Market tab's deals and the ideas' auction house prices. Off: only Margins' scan button scans."])
@@ -182,12 +179,12 @@ end
 
 local function Help()
 	M:Print("/whypoor - open or close the window: ideas for making money")
-	M:Print("/whypoor ideas | bags | market | goal - the window on that page")
+	M:Print("/whypoor ideas | crafting | bags | market | goal - the window on that page")
 	M:Print("/whypoor minimap - show or hide the minimap button")
 	M:Print("/whypoor settings - WhyPoor?'s settings")
 end
 
-local TABS = { ideas = "ideas", bags = "bags", market = "market", goal = "goal" }
+local TABS = { ideas = "ideas", bags = "bags", market = "market", goal = "goal", crafting = "crafting", margins = "crafting" }
 
 function M:OnSlashCommand(msg)
 	local cmd = strtrim(msg or ""):lower()

@@ -21,7 +21,7 @@ anything wrong.
 | `Context.lua` | who I am now | `W.Context()` |
 | `Methods.lua` | the ideas: each way of making money worked out and ranked | `W.Ideas` = `I` |
 | `Goal.lua` | the money goal (the mount) | `W.Goal` = `G` |
-| `Bags.lua` | each bag item's best sale, the tooltip line, the coin in the sorted bags | `W.Bags` |
+| `Bags.lua` | each bag item's best sale (the Bags tab, the ideas) | `W.Bags` |
 | `Window.lua` | the window (Lodestar's style): Ideas, Bags, Market, the goal's strip | `W.Window` |
 
 Data add-on: `LefthyTools_MoneyData/` (GPL v3 like its source, CMaNGOS Classic DB, as
@@ -587,10 +587,123 @@ the data's min and max (CMaNGOS's loot code does); classic's skinning rule on Fo
 skill per zone; the estimates (20 s between kills, 35 s a fight, 15 nodes and 120 catches an hour) against
 real play; quest money at level 60.
 
+### Crafting margins (Margins.lua, the Crafting tab: Crafting.lua)
+
+Chronicle's until build 0.7.0-193, now WhyPoor?'s (`W.Margins`, `Mg`): no setting of its own (it's on while WhyPoor?
+is; Chronicle's old `margins` stays unused in its saved table), no window of its own: the window's **Crafting** tab
+(`W.Crafting`, `Cf`, added with `Wn.AddTab`: its own entries, rows, details, the overview when nothing is picked and
+its controls on the line above the list: the profession picker, "By gold/h" / "By profit"). Its list is worked out
+a few recipes a frame only while the tab shows (`Cf.driver`). The overview has "Scan all my recipes" (`Mg.ScanAll`;
+"Go on (N left)" after a stop, "Stop" while it runs). The details: who makes it, each reagent the cheapest way
+(`D.Item` with the whole way in its hover; a crafted one's "craft it: ..." line), the numbers, notes, "Check AH"
+(`Mg.ScanRecipe`) and "Show in my profession window". The profession window's **Margins** button (setting
+`craftButton`, on) opens the tab on its recipe (`Cf.OpenOn`) and checks it at an open auction house; the auction
+house has only WhyPoor?'s button. `/chronicle margins` and `/whypoor crafting` open the tab. The window asks for
+the ideas only on the Ideas and Market tabs (Crafting and Bags never make them work). What follows is the
+section as it was in chronicle.md; the window it names is the tab now.
+
+#### As it was
+
+Setting `margins` (on): what my recipes cost to make and bring, and gold per hour, from auction house and
+vendor prices. `Margins.lua` (`C.Margins`, `Mg`) picks what to scan and works the numbers out; the prices and
+the scans are WhyPoor?'s price engine's (`Modules/WhyPoor/Prices.lua`, `W.Prices`; whypoor.md, Prices), which
+runs while this setting or the WhyPoor? module is on. `MarginsWindow.lua` is the window and the buttons.
+Margins itself sends nothing; WhyPoor?'s own setting shares prices with friends (whypoor.md, Friends' prices).
+
+**The client.** WoW: Forever has retail's profession window (`Blizzard_Professions`, `ProfessionsFrame`,
+with Camelot overrides; the recipe shown is `ProfessionsFrame.CraftingPage.SchematicForm:GetRecipeInfo()`)
+and retail's auction house (`Blizzard_AuctionHouseUI`, `AuctionHouseFrame`, its TOC allows camelot through
+a `[Game]` file): `C_AuctionHouse` with `SendSearchQuery` (100 a minute, its documentation says),
+`ReplicateItems` (the whole auction house) and `IsThrottledMessageSystemReady`, not classic's
+`QueryAuctionItems`. None of the query functions is marked `HasRestrictions` (only buying, bidding and
+posting are), so they're called from our driver, not only from a click. Search results: a commodity's rows
+have a price for one (`unitPrice`); an item's an auction's `buyoutAmount` for its whole `quantity` (what
+`PlaceBid` is given), so one is the buyout divided by the quantity; replicate rows (0-based indexes) have a
+stack's `buyoutPrice` and `count`. Merchants: `GetMerchantNumItems`, `GetMerchantItemID`,
+`C_MerchantFrame.GetItemInfo(i)` (`price` for `stackCount`, `hasExtendedCost`).
+
+**Prices** (the engine's, `LefthyToolsWhyPoorDB.prices`): `Mg.AHPrice(item)` is `{ p, q, t }` of this realm's and
+faction's auction house (the last scan's lowest for one, nil when none is listed; how many; when), `Mg.VendorPrice`
+what a merchant asked for one (every item a merchant showed, for gold only), else `Data/Recipes.lua`'s `vendor`
+(a hand list of Classic's trade-goods reagents, priced from ItemSparse: Recipe data, below), `Mg.SellPrice` what
+a vendor pays. The engine keeps every item it saw (14 days); Margins' own saved prices (`LefthyToolsDB.margins`)
+went over to it once and are gone.
+
+**My recipes** (`Mg.MyRecipes`, kept per `R.Revision`): what my characters on this realm know (`R.People`'s
+`mine`, the record's `realm`) that makes an item; a recipe two of them know goes by the one I play, else the
+best skill. `Mg.Items`: every reagent and product of them (kept) and those the auction house is asked for
+(the products and the reagents no vendor sells: threads and the like aren't searched).
+
+**The numbers** (`Mg.Recipe(spell)`, `Mg.Compute(entry)`), worked out by WhyPoor?'s crafting part
+(`Modules/WhyPoor/Crafts.lua`, `Cr.Recipe`; docs/whypoor.md, Crafting, has the rules in full):
+
+- a reagent's price: the cheapest way to get it: the AH's (lowest buyout for one, any age), a vendor's (wins a tie),
+  or **crafting it** with a recipe the crafter knows (the character the recipe goes by, all its professions; none
+  of mine knows the recipe: the character I play), its own reagents worked out the same way, up to 4 crafts deep,
+  no circles. None: the recipe has no cost and no profit ("missing a price"). Reagents in my bags count at that
+  price too (they could be sold instead); `covers` says how many crafts the bags hold. A reagent bought on the AH
+  (also below a crafted one) with fewer listed than for 5 crafts is "few";
+- cost: the reagents' prices times how many it needs (a crafted one: its reagents' share, n / what a craft makes);
+- revenue: at a vendor `C_Item.GetItemInfo`'s sell price times how many a craft makes (the data's `count`,
+  the middle of a range when it varies: "~" in the details); on the AH its price for one times as many, less the 5%
+  cut (`P.AHSale` once W.Prices has it; the deposit isn't counted by Margins' own, and the details say so). Both,
+  and their profits, are shown;
+- profit: the better revenue minus the cost (`best`: vendor on a tie, it's certain);
+- time per craft: the spell's `castTime` (`C_Spell.GetSpellInfo`) plus `OVERHEAD` (0.5 s), plus the same for each
+  sub-craft of a crafted reagent (`subSeconds`); unknown: 3 s, and the details say so; gold per hour: profit × 3600
+  / time;
+- `oldest`: the oldest AH price used (the reagents bought there, also below crafted ones, the product when it's sold
+  there);
+- `verdict`: "craft", "sell reagents" (the reagents sell for more than the product), "no", or nil (not known).
+
+The details show a crafted reagent's source as Craft, with a line under it ("craft it: 1 Bolt of Linen Cloth from 2
+Linen Cloth, 1.5 s": the recipe's own numbers and a craft's time; lines that don't fit are left to the hover), the
+time spent on sub-crafts beside the time, the whole way down in the reagent's hover, and notes for crafted
+reagents, a sub-craft's unknown cast time, a varying yield and "its reagents would sell for more".
+
+**Scanning** is the engine's (whypoor.md, Prices: only with the auction house open, never in a fight, its
+pacing and reading); Margins says what:
+
+- One recipe (`Mg.ScanRecipe`: the profession window's button, the details' Check AH): its product, then
+  its reagents no vendor sells, item by item (`P.ScanItems`, before what a scan by items has left; during a full
+  scan nothing, the full scan has them). Gear without an item level from the game is searched with its
+  recipe's (`P.levelHint` = `Mg.LevelHint`).
+- Everything (`Mg.ScanAll`, "Scan all my recipes"): a full scan (`P.ScanFull`, every item of the auction house)
+  once the last was 15 minutes ago; too soon, no answer in 30 s or nothing in it: by items, the wanted ones
+  without a price younger than 30 minutes (`FRESH`), so a scan that stopped goes on where it was (the button
+  says "Go on (N left)").
+- The auction house closing ends a scan by items; Stop (`Mg.Cancel`) too. `Mg.Status` is the engine's
+  (`P.Status`) with what's left of my recipes' items.
+
+**The window** (`LefthyToolsMarginsFrame`, `C.OpenMargins(spell, nextTo)`, `C.ToggleMargins`; `/chronicle
+margins`): its own (`LT.Window`), not a page of the journal: it belongs with the auction house and my own
+profession window, and opens next to them (right of the window it was opened from, if there's room). On
+top a profession to pick (`AddPicker`), the sort (gold per hour, profit per craft) and the scan button with
+its state in the bottom bar. Left the list (`C.NewList`, Professions.lua's pool): every recipe of mine with
+a profit, a skill-up dot (the character's skill), name, profit, gold per hour, where it sells best, the
+prices' age; older than 3 hours (`STALE`) greyed; how many have no price yet. A click shows the details on
+the right: the crafter, each reagent (source, its cost, a hover with vendor and AH prices, how many listed,
+in the bags), cost, both revenues with their profits, profit, time, gold per hour, the bags, the age, notes
+(few on the AH, open the auction house, the deposit, an unknown cast time), Check AH and Show in my
+profession window (`C.OpenInMyProfessionWindow`, Professions.lua's). While shown it looks at the scan every
+0.25 s and works the list out again a few recipes a frame (2 ms): at once when prices or recipes changed,
+at most every 2 s during a scan or for items' data and the bags (`GET_ITEM_INFO_RECEIVED`,
+`BAG_UPDATE_DELAYED`, listened to only while it's shown). Hidden: nothing.
+
+**The buttons.** "Margins" on the profession window's recipe (a child of the `SchematicForm`, at its top
+right corner; shown for a recipe that makes an item; the form's `Init` is post-hooked to update it, on the
+next frame) opens the window on it and checks it at an open auction house. The recipe's ID is the data's
+spell; Forever's copies under other IDs go by the name of one of mine. "Margins" on the auction house (a
+child of `AuctionHouseFrame`, its top right, left of the close button) opens the window. Both are made after
+`ADDON_LOADED` of Blizzard's add-on, on the next frame; children of Blizzard's frames so the controller's
+navigation (it collects the panel's descendants) reaches them, at corners where they don't stand between
+Blizzard's buttons. Not verified in game yet: whether the profession window and the auction house can be
+open together (both are UI panels), and that the corners are free.
+
 ### The window, bags, tooltip and goal
 
-**The module** (WhyPoor.lua): the settings page (Window: Open, Minimap button; Bags and tooltips:
-`tooltip`, `bagCoins`; Friends: `sharePrices`), `/whypoor` (open or close; `ideas`, `bags`, `market`,
+**The module** (WhyPoor.lua): the settings page (Window: Open, Minimap button; Crafting: `craftButton`; Auction
+house: `autoScan`; Friends: `sharePrices`), `/whypoor` (open or close; `ideas`, `crafting`, `bags`, `market`,
 `goal`: the window there; `minimap`, `settings`, `help`) and `/lefthy whypoor ...` (the same), the minimap
 button `LefthyToolsWhyPoorMinimapButton` (a coin; `LT.Window.MinimapButton`, so it joins the combined
 LefthyTools button; click: the window, right-click: Bags; its tooltip: the goal's line). `W.Money(copper)`
@@ -640,23 +753,8 @@ client has it) whose item level isn't below the weaker of what you wear in its s
 an empty slot: kept). The total adds up the items without a reason. Kept until the bags, your gear, quests,
 item data or `P.Revision()` change (the events only bump a counter).
 
-**The tooltip line** (`tooltip`): a TooltipDataProcessor post-call on item tooltips, `GameTooltip` only.
-Where it is: the game's tooltip data (`GetProcessingTooltipInfo()`) with the getter `GetBagItem` and a bag
-0..5 (another bag is the bank's: nothing); else the owner's `GetBagID()` 0..5; else an owner inside
-`AuctionHouseFrame` while it's shown. Nowhere else (chat links, vendors, loot, quest rewards). One line,
-for one item: "WhyPoor?: AH 12s (2 h, Anna, sells well) · vendor 3s (each)". The AH part is the unit price
-`P.AHSale` assumes, "~" unless its confidence is high and it's stable, then the age, the friend, "sells
-well" (`sells` >= 0.6), "sells slowly" (<= 0.25) or "jumps around" (unstable); then "vendor 3s" or "no
-vendor"; the better way (`P.Best(item, 1)`) white, the other and an old AH price (`P.STALE`) grey; "(each)"
-for a stack. Bound: the vendor part only. Nothing known: no line. Lines are kept per item, bound and stack
-until `P.Revision()` or the bags change or the minute turns.
-
-**The coin** (`bagCoins`): Misc Tweaks' sorted bags (GamepadBags.lua) have a small API for corner marks:
-`ns.GamepadBagsMark(key, { texture, test(itemID, bag, slot), size, point, x, y, alpha })` (nil removes it)
-and `ns.GamepadBagsRefresh()` (asked again on the next frame); the marks are drawn on its frame over
-Blizzard's button after each layout, like its quest mark (`ns.GamepadBagsState().corners[key][button]` for
-the tests). WhyPoor?'s is the gold coin (`Interface\MoneyFrame\UI-GoldIcon`, 12 px, top right) on items
-whose best is the auction house, not kept and not bound (`W.Bags.Coin`: a lookup in `List()`'s result).
+**Nothing outside the window** (the user's wish): no tooltip line and no mark on the bags (both were there in
+builds 0.7.0-191 to -193 and went; Misc Tweaks' sorted bags have no corner-mark API any more).
 
 **The goal** (Goal.lua): one goal at a time, by the spells known: no riding (Apprentice Riding 33388, the
 old racial riding spells 824, 825, 826, 828, 10861, 10906, 10907, 18995, or Forever's Galestrider Riding

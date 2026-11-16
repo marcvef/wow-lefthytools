@@ -1,15 +1,18 @@
--- Chronicle's crafting margins (Margins.lua, MarginsWindow.lua): my recipes from C.Recipes' real scan and
--- data, vendor prices (the data's, a merchant's), checking one recipe at the auction house (what's asked, the
--- pacing, the throttle, no answer, a fight), the numbers, a full scan (ReplicateItems read over frames, only
--- what my recipes use kept, by items when it was too soon, going on after a stop), the window (the list, its
--- order, stale prices, the details, the scan button), the buttons on the profession window and the auction
--- house, the auction house closing mid-scan, nothing running idle, the setting, pruning, secret values.
+-- WhyPoor?'s crafting margins (Margins.lua, the Crafting tab: Crafting.lua): my recipes from Chronicle's real
+-- recipe scan and data, vendor prices (the data's, a merchant's), checking one recipe at the auction house (what's
+-- asked, the pacing, the throttle, no answer, a fight), the numbers, a full scan (ReplicateItems read over frames,
+-- every item kept, by items when it was too soon, going on after a stop), the Crafting tab (the list, its order,
+-- the profession, stale prices, the details, the overview's scan button), the button on the profession window,
+-- none of Margins' own on the auction house any more, the auction house closing mid-scan, nothing running idle,
+-- WhyPoor? off, the button's setting, secret values.
 -- Needs: no other file (it plays its own character's professions).
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
 local C = ns.Chronicle
-local Mg = C.Margins
-local M = LT:GetModule("chronicle")
+local W = ns.WhyPoor
+local Mg = W.Margins
+local M = LT:GetModule("whypoor")
+local Cf = W.Crafting
 local P = ns.WhyPoor.Prices -- (the price engine Margins reads: WhyPoor?'s Prices.lua)
 local spent = 0 -- seconds this file lets pass (a whole number at its end)
 local function Wait(seconds)
@@ -174,39 +177,63 @@ Mg.Cancel()
 local status = Mg.Status()
 check(not status.running and status.left == 2 and status.items == 3, "stopped: two left, got " .. tostring(status.left))
 
-section("Margins: the window")
-C.OpenMargins(BOLT)
-local frame = C.marginsFrame
-local view = frame and frame.view
-check(frame and frame:IsShown(), "opens")
-Wait(1)
-local entries = view and view.list.entries or {}
+section("Margins: the Crafting tab")
+local Wn = W.Window
+local function details()
+	local _, _, _, D = Wn.View()
+	local out = {}
+	for _, fs in ipairs(D.texts) do
+		if fs:IsShown() then out[#out + 1] = plain(fs:GetText()) end
+	end
+	return table.concat(out, "\n"), D
+end
+check(Cf.OpenOn(BOLT), "opens on a recipe")
+local frame, state, view = Wn.View()
+check(frame:IsShown() and state.tab == "crafting", "the window, on the Crafting tab")
+local _, D0 = details()
+check(D0.buttons[1] and plain(D0.buttons[1]:GetText()) == "Checking...", "the auction house open: the recipe's prices checked there at once (its button says so)")
+Wait(3)
+local entries = view.list.entries or {}
 check(#entries == 2 and entries[1].spell == BOLT and entries[2].spell == VEST, "my recipes, by gold per hour")
-check(plain(view.Scan:GetText()) == "Go on (2 left)" and view.Scan:IsEnabled(), "the scan button goes on where it stopped")
-check(view.detail:IsShown() and plain(view.detail.Name:GetText()):find("Bolt of Linen Cloth", 1, true), "the recipe it opened on")
-check(plain(view.detail.Values:GetText()):find("22c", 1, true), "its cost in the details, got " .. plain(view.detail.Values:GetText()))
-check(plain(view.detail.Labels:GetText()):find("Gold per hour", 1, true), "and gold per hour")
-view.Sort:Click()
-check(view.list.entries[1].spell == BOLT and plain(view.Sort:GetText()) == "Sort: profit per craft", "by profit per craft")
+local text, D = details()
+check(text:find("Bolt of Linen Cloth", 1, true), "the recipe it opened on")
+check(text:find("Cost per craft: 24c", 1, true), "its cost in the details (the linen just checked: 12c, my own 11c left out), got " .. text)
+check(text:find("Gold per hour", 1, true) and D.buttons[1]:IsShown() and plain(D.buttons[1]:GetText()) == "Check AH", "gold per hour; Check AH")
+check(Cf.picker:IsShown() and Cf.sort:IsShown() and plain(view.Head:GetText()) == "2 recipes", "its controls on the line above the list")
+state.sel.crafting = nil
+Wn.Draw()
+text = details()
+check(text:find("Crafting margins", 1, true) and plain(D.buttons[1]:GetText()) == "Scan all my recipes" and D.buttons[1]:IsEnabled(),
+	"nothing picked: the overview with the scan button (the rest checked by now: a new scan, not going on)")
+Cf.sort:Click()
+Wait(0.1)
+check(view.list.entries[1].spell == BOLT and plain(Cf.sort:GetText()) == "By profit", "by profit per craft")
 local row = view.list.rows[1]
-check(row and row:GetAlpha() == 1, "fresh prices: not greyed")
+check(row and not row.Money:GetText():find("|cff888888", 1, true), "fresh prices: not greyed")
 Age(4 * 3600)
 Fire("BAG_UPDATE_DELAYED")
-Wait(1)
-check(view.list.rows[1]:GetAlpha() == 1, "the bags changed: worked out again, but not at once again")
-Wait(2)
+Wait(3)
 row = view.list.rows[1]
-check(row and row:GetAlpha() < 1, "prices older than 3 hours: greyed")
+check(row and row.Money:GetText():find("|cff888888", 1, true), "prices older than 3 hours: greyed")
 view.list.rows[2]:Click()
-check(plain(view.detail.Name:GetText()):find("Brown Linen Vest", 1, true), "a click shows another recipe")
+text = details()
+check(text:find("Brown Linen Vest", 1, true) and text:find("craft it: 1 Bolt of Linen Cloth from 2 Linen Cloth", 1, true),
+	"a click shows another recipe, its crafted bolt's line")
 Fire("AUCTION_HOUSE_CLOSED")
 Wait(1)
-check(not view.Scan:IsEnabled() and view.Status:GetText() == "Open the auction house to scan.", "the auction house closed: no scan")
-check(not view.detail.Check:IsEnabled() and plain(view.detail.Notes:GetText()):find("Open the auction house", 1, true),
-	"the details say to open it")
+text = details()
+check(not D.buttons[1]:IsEnabled() and text:find("Open the auction house to update the prices.", 1, true), "the auction house closed: no check, the details say to open it")
+state.sel.crafting = nil
+Wn.Draw()
+text = details()
+check(not D.buttons[1]:IsEnabled() and text:find("Open the auction house to scan.", 1, true), "and the overview")
+Cf.filter = 171 -- (Alchemy: none of mine)
+Wn.Draw()
+check(#view.list.entries == 0, "a profession picked: only its recipes")
+Cf.filter = nil
 frame:Hide()
 
-section("Margins: on the profession window and the auction house")
+section("Margins: on the profession window")
 local shownRecipe = BOLT
 local professions = CreateFrame("Frame", "ProfessionsFrame", UIParent)
 professions.CraftingPage = CreateFrame("Frame", nil, professions)
@@ -221,7 +248,8 @@ check(button and button:GetText() == "Margins" and button:IsShown(), "a Margins 
 Fire("AUCTION_HOUSE_SHOW")
 before = #AH_SEARCHES
 button:Click()
-check(frame:IsShown() and plain(view.detail.Name:GetText()):find("Bolt of Linen Cloth", 1, true), "it opens the window on that recipe")
+text = details()
+check(frame:IsShown() and state.tab == "crafting" and text:find("Bolt of Linen Cloth", 1, true), "it opens the Crafting tab on that recipe")
 Wait(2)
 check(#AH_SEARCHES == before + 2, "and checks it at the open auction house")
 shownRecipe = 7418 -- (an enchant: it makes no item)
@@ -236,11 +264,11 @@ frame:Hide()
 local ah = CreateFrame("Frame", "AuctionHouseFrame", UIParent)
 Fire("ADDON_LOADED", "Blizzard_AuctionHouseUI")
 Wait(1)
-local ahButton = select(1, ah:GetChildren())
-check(ahButton and ahButton:IsShown() and ahButton:GetText() == "Margins", "and one on the auction house")
-ahButton:Click()
-check(frame:IsShown(), "it opens the window")
-frame:Hide()
+local margins = false
+for _, child in ipairs({ ah:GetChildren() }) do
+	if child.GetText and child:GetText() == "Margins" then margins = true end
+end
+check(not margins, "no Margins button of its own on the auction house any more (WhyPoor?'s opens the window)")
 
 section("Margins: the auction house closing, idle")
 Age(3600)
@@ -251,16 +279,17 @@ Fire("AUCTION_HOUSE_CLOSED")
 Wait(1)
 check(not Mg.Status().running and not Mg.Busy(), "the auction house closed: it stops, nothing runs")
 
-section("Margins: the setting, pruning, secrets")
-LT:SetModuleSetting(M, "margins", false)
+section("Margins: WhyPoor? off, the button's setting, secrets")
+LT:SetModuleSetting(M, "craftButton", false)
 Wait(1)
-check(not Mg.Enabled() and not button:IsShown() and not ahButton:IsShown(), "off: no buttons")
-MERCHANT = { { THREAD, 60, 5 } }
-Fire("MERCHANT_SHOW")
+check(not button:IsShown(), "the setting off: no button")
+LT:SetModuleSetting(M, "craftButton", true)
 Wait(1)
-check(Mg.VendorPrice(THREAD) == 12, "off, with WhyPoor? on: the engine still takes a merchant's prices")
-MERCHANT = {}
-LT:SetModuleSetting(M, "margins", true)
+check(button:IsShown(), "on: back")
+LT:SetModuleEnabled("whypoor", false)
+Wait(1)
+check(not Mg.Enabled() and not button:IsShown(), "WhyPoor? off: no margins, no button")
+LT:SetModuleEnabled("whypoor", true)
 Wait(1)
 check(Mg.Enabled() and button:IsShown(), "on again")
 Fire("AUCTION_HOUSE_SHOW")

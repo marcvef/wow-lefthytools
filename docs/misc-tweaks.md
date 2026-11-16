@@ -163,9 +163,7 @@ and a line: Gear (weapons and armour that are worn: `GetItemInfoInstant`'s class
 `equipLoc`, not bags, quivers or ammo), Consumables (class 0), Ammo (projectiles), Trade goods (trade goods,
 reagents, gems, enhancements), Quest items (`C_Container.GetContainerItemQuestInfo`, or the quest class;
 one no quest needs any more has a small dim red x in its top left corner: Lodestar's `Q.ItemMarked`,
-lodestar.md Quest items; other modules put marks of their own in a corner with `ns.GamepadBagsMark(key, { texture,
-test(itemID, bag, slot), size, point, x, y, alpha })`, nil taking it away, and `ns.GamepadBagsRefresh()` when their
-answers changed: WhyPoor?'s coin, top right, on items worth more at the auction house), Other, Junk (grey quality, gear too), then the free slots (by bag and slot; slots of an unsecured account
+lodestar.md Quest items), Other, Junk (grey quality, gear too), then the free slots (by bag and slot; slots of an unsecured account
 last). In a section: best quality first, then item level (gear, `C_Item.GetDetailedItemLevelInfo`), the
 name (from the link), the bigger stack, the bag's order. A bag collapsed in its menu (`isCollapsed`) keeps
 its slots out, as Blizzard does. Everything is anchored like Blizzard's grid (`BOTTOMRIGHT` at
