@@ -638,5 +638,8 @@ ns.CHANGELOG = {
 	{ id = 210, module = "whypoor",
 		en = { "WhyPoor?: set your own bar", "Ideas lists what brings at least the bar an hour. Click the goal line: under your money goal you see where the bar comes from and set your own (or /whypoor bar 1.5). The automatic bar now follows what you earn playing (Chronicle), not your level, once that's known." },
 		de = { "WhyPoor?: eigene Latte setzen", "Ideen zeigt, was mindestens die Latte pro Stunde bringt. Klick auf die Zielzeile: unter deinem Geldziel siehst du, woher sie kommt, und setzt deine eigene (oder /whypoor bar 1.5). Die automatische Latte folgt jetzt dem, was du beim Spielen verdienst (Chronicle), nicht deinem Level, sobald das bekannt ist." } },
+	{ id = 211, module = "whypoor",
+		en = { "WhyPoor?: Stocks, a watch list", "A new tab: search any item the auction house has shown, add it to your watch list, and see its lowest price day by day and how it changed in a week. /whypoor stocks" },
+		de = { "WhyPoor?: Stocks, eine Watchlist", "Ein neuer Tab: such ein Item, das das Auktionshaus gezeigt hat, setz es auf deine Watchlist und sieh seinen niedrigsten Preis Tag für Tag und wie er sich in einer Woche verändert hat. /whypoor stocks" } },
 	-- New entries go here, at the end.
 }
