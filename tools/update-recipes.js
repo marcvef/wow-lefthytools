@@ -7,7 +7,8 @@
 // SkillLine and TradeSkillCategory (names, in English and German, the lines' icons, the child lines).
 // A recipe is a spell of a crafting line with reagents, so the lines' own ranks ("Leatherworking",
 // "Armorsmith") and the recipes the client no longer has reagents for are left out; the gathering
-// lines have no recipes here, though Mining's smelting would count as such.
+// lines have no recipes here, except Mining's smelting (ore to bars), kept apart in `smelting` (same
+// format) so the Professions tab stays the crafting lines': WhyPoor?'s crafting costs read it.
 //
 // What the rows mean:
 // - A spell can be under a line twice (rows the same): one is kept. Under two lines (Synthetic Gordok
@@ -31,6 +32,7 @@ const { table, options } = require("./wago");
 
 const ORDER = [171, 164, 333, 202, 165, 197, 185, 129]; // crafting, in the tab's order
 const GATHERING = [182, 186, 393, 356]; // Herbalism, Mining, Skinning, Fishing
+const MINING = 186; // its smelting spells: `smelting`
 const CREATE_ITEM = "24"; // SpellEffect.Effect
 const REAGENTS = 8; // Reagent_0..7, ReagentCount_0..7
 // Reagents Classic's trade-goods vendors sell. Forever's own new reagents aren't here: nothing tells
@@ -90,7 +92,7 @@ async function main() {
   const recipes = {}, seen = new Set(), usedCategories = new Set();
   for (const a of abilities) {
     const id = +a.SkillLine;
-    if (!ORDER.includes(id) || seen.has(`${id}:${a.Spell}`)) continue;
+    if (!(ORDER.includes(id) || id === MINING) || seen.has(`${id}:${a.Spell}`)) continue;
     seen.add(`${id}:${a.Spell}`);
     const needs = reagents(reagentsOf[a.Spell]);
     if (!needs) continue;
@@ -98,7 +100,7 @@ async function main() {
     const it = create && item[create.EffectItemType];
     const cat = +a.TradeSkillCategoryID || "";
     if (cat && !category[cat]) throw new Error(`no category ${cat} (spell ${a.Spell}) in ${build}`);
-    if (cat) usedCategories.add(cat);
+    if (cat && id !== MINING) usedCategories.add(cat); // (the Professions tab's categories)
     (recipes[id] = recipes[id] || []).push({ spell: +a.Spell, text: [
       a.Spell,
       create ? create.EffectItemType : "",
@@ -115,7 +117,7 @@ async function main() {
 
   // Every reagent some recipe uses, and what a vendor asks for one of them.
   const used = new Set();
-  for (const id of ORDER) {
+  for (const id of ORDER.concat([MINING])) {
     for (const r of recipes[id] || []) for (const m of r.text.split(":")[9].matchAll(/(\d+)\*/g)) used.add(+m[1]);
   }
   const unitPrice = (id) => {
@@ -135,6 +137,7 @@ async function main() {
     "-- and OverallQualityID (empty when ItemSparse doesn't have it), the skill where it turns yellow and grey",
     "-- (0: no such skill), its category (empty when none). names, categories: { English, German }. vendor[item]:",
     "-- what a trade-goods vendor asks for one of a reagent, in copper (a hand list of items, VENDOR in the tool).",
+    "-- smelting: Mining's smelting recipes (ore to bars), the same format, apart from the crafting lines.",
     "ns.RecipeData = {",
     `\tbuild = ${lua(build)},`,
     `\torder = { ${ORDER.join(", ")} },`,
@@ -157,12 +160,14 @@ async function main() {
     "\trecipes = {",
     ...ORDER.map((id) => `\t\t[${id}] = "${(recipes[id] || []).sort((a, b) => a.spell - b.spell).map((r) => r.text).join(";")}",`),
     "\t},",
+    `\tsmelting = "${(recipes[MINING] || []).sort((a, b) => a.spell - b.spell).map((r) => r.text).join(";")}",`,
     "}",
     "",
   ];
   const target = path.join(__dirname, "..", "LefthyTools", "Data", "Recipes.lua");
   fs.writeFileSync(target, out.join("\r\n"));
   for (const id of ORDER) console.log(`  ${line[id].DisplayName_lang}: ${(recipes[id] || []).length}`);
+  console.log(`  smelting: ${(recipes[MINING] || []).length}`);
   const count = ORDER.reduce((sum, id) => sum + (recipes[id] || []).length, 0);
   console.log(`${count} recipes, ${usedCategories.size} categories, ${fs.statSync(target).size} bytes -> ${path.relative(process.cwd(), target)}`);
 }

@@ -786,7 +786,9 @@ few recipes that have none.
 Everything a character could know is in it, not only what's on Forever today: about 290 recipes in
 the client's "SEASON OF DISCOVERY" categories (spell IDs above 60000) look like leftovers no one can
 learn, and about 930 more above 60000 in ordinary categories look like Forever's own. Nothing depends
-on telling them apart: the tab only shows what a character knows. Mining's smelting isn't in it.
+on telling them apart: the tab only shows what a character knows. Mining's smelting (ore to bars, 18
+spells) is kept apart in `smelting`, the same format: not a Professions tab line (its categories aren't in
+`categories`), read by WhyPoor?'s crafting costs, so a miner's bars can come from their own ore.
 
 `vendor[item]` is what a trade-goods vendor asks for one of a reagent (copper), for the crafting margins
 until a merchant has shown it: the client has no table of what vendors sell, so the items are a hand list
