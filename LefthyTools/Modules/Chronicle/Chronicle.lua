@@ -925,7 +925,7 @@ function C.QualityText(name, quality)
 	return hex and ("|c" .. hex .. name .. "|r") or name
 end
 
--- "1h 12m", "3d 4h" (German "3T 4h": Tage, the user's pick), "45s"; english: for chat lines, which
+-- "1h 12m", "3d 4h" (German "3T 4h": Tage), "45s"; english: for chat lines, which
 -- stay English.
 function C.Duration(seconds, english)
 	seconds = math.floor((seconds or 0) + 0.5)

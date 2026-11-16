@@ -117,7 +117,7 @@ end
 -- A character whose full name isn't known yet (its journal came from an older build, which only
 -- ever sent the first name, and Battle.net hasn't shown it online since; or an alt of mine not
 -- played since this build) is shown by its first name with a muted mark, never as if that were all
--- of it (the user: "In forever you have to have two"), and a hover or a line under the list says
+-- of it ("In forever you have to have two"), and a hover or a line under the list says
 -- when the rest comes.
 
 -- "Anna" of "Anna Brook" or "Anna-Realm"; whether a name is "Anna Brook", not "Anna" (Core's LT.Names).

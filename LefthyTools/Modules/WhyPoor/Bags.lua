@@ -5,7 +5,7 @@ local W = ns.WhyPoor or {}
 ns.WhyPoor = W
 
 -- Your bags: each item's best way to sell, for the window's Bags tab and the ideas (W.Bags). Nothing in item
--- tooltips and nothing on the bags themselves (the user's wish: no extra data there).
+-- tooltips and nothing on the bags themselves (no extra data there: everything is in the window).
 -- docs/whypoor.md has the contract.
 --
 --   * W.Bags.List(): every item in the bags (0 to the reagent bag; not the bank), stacks of one item added

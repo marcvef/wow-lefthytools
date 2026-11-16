@@ -753,7 +753,7 @@ client has it) whose item level isn't below the weaker of what you wear in its s
 an empty slot: kept). The total adds up the items without a reason. Kept until the bags, your gear, quests,
 item data or `P.Revision()` change (the events only bump a counter).
 
-**Nothing outside the window** (the user's wish): no tooltip line and no mark on the bags (both were there in
+**Nothing outside the window** (no extra data on items): no tooltip line and no mark on the bags (both were there in
 builds 0.7.0-191 to -193 and went; Misc Tweaks' sorted bags have no corner-mark API any more).
 
 **The goal** (Goal.lua): one goal at a time, by the spells known: no riding (Apprentice Riding 33388, the
