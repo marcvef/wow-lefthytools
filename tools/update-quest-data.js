@@ -1582,4 +1582,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
-module.exports = { worldMaps, places, bestBox, sampleIndex, overlayDistance, onBox, sideOf, raceModel, clusters };
+module.exports = { worldMaps, places, bestBox, sampleIndex, overlayDistance, onBox, sideOf, raceModel, clusters, cached, readDump, eglink };

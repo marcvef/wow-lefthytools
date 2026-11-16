@@ -40,8 +40,9 @@ param(
 	$KnownFlavors = @('_forever_', '_classic_beta_')
 	$Legacy = @('Mirage') # addons that are now part of LefthyTools; left installed they'd run twice
 	# Add-ons that come with it, each a folder of its own next to LefthyTools in the repo: the drop
-	# database and the quest data (GPL v3 like their source, so apart from the BSD-licensed rest).
-	$Companions = @('LefthyTools_DropData', 'LefthyTools_QuestData')
+	# database, the quest data and the money data (GPL v3 like their source, so apart from the
+	# BSD-licensed rest).
+	$Companions = @('LefthyTools_DropData', 'LefthyTools_QuestData', 'LefthyTools_MoneyData')
 	$Remembered = Join-Path $env:LOCALAPPDATA 'LefthyTools\game-folder.txt'
 
 	# Any game folder (also just an Interface folder): what -GameDir may name when it isn't recognised.
