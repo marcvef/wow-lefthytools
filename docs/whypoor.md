@@ -101,21 +101,33 @@ Cr.Mine()              -- this character's recipes worked out, best gold per hou
 ### Money data (`W.Data`, Data.lua; the add-on's format in its README)
 
 ```lua
-Dt.Load()               -- true when LefthyTools_MoneyData is loaded (loads it the first time)
+Dt.Load()               -- true when LefthyTools_MoneyData is loaded (loads it the first time; the others load it too)
 Dt.Mob(creature)        -- { name, rank ("normal","elite","rare","rareelite","boss"), type ("Humanoid","Beast",...),
-                        --   skin = "leather"|"herb"|"ore"|nil, reactA, reactH ("hostile","neutral","friendly"),
-                        --   respawn (seconds), instance (true: in a dungeon or raid) } or nil
+                        --   skin = "leather"|"herb"|"ore"|nil, reactA, reactH ("hostile","neutral","friendly": to a new
+                        --   character of that side; nil unknown), respawn (seconds), instance (true: only in a dungeon or
+                        --   raid), civilian, rep (its faction's ID when it reacts by reputation: killing it costs
+                        --   standing; never suggest one that isn't hostile), seenA/seenH (that reaction is what players
+                        --   saw on Forever), basis = "classic" } or nil
                         -- (drops, coin, levels, health: the drop data's, Bt.Known(creature))
-Dt.Spots(creature)      -- { { map = uiMapID, x, y, r, n }, ... }: where it spawns, in clusters (x, y 0..1 on that map,
-                        -- r its radius 0..1 of the map's width, n spawns); nil: nowhere outdoors known
+Dt.Spots(creature)      -- { { map = uiMapID, x, y, r, n, up }, ... }: where it spawns, in clusters (x, y 0..1 on that map,
+                        -- r its radius 0..1 of the map's width, n spawn points, up about how many are up at once:
+                        -- pools); nil: nowhere outdoors known
 Dt.MobsOn(map)          -- creature IDs that spawn on that zone map
-Dt.Nodes(map)           -- gathering nodes on a zone map: { { object, kind = "herb"|"ore"|"chest"|"other", skill (needed),
-                        --   loot = { { item, chance, min, max } }, spots = { clusters }, n }, ... }
-Dt.Fishing(map)         -- { skill (needed to fish there without getaways), loot = { { item, chance } } } or nil
+Dt.Nodes(map)           -- gathering nodes on a zone map: { { object, name, kind = "herb"|"ore"|"chest"|"fish" (a school),
+                        --   skill (needed: Herbalism, Mining, a locked chest's Lockpicking, 0 anyone; a school: the
+                        --   zone's fishing), respawn, uses = { min, max } (times one node can be looted),
+                        --   loot = { { item, chance, min, max } }, spots = { { x, y, r, n, up } }, n, up, basis }, ... }
+Dt.Object(object)       -- one of those objects: { name, kind, skill, respawn, uses, loot } or nil
+Dt.Fishing(map)         -- { skill (to fish there without getaways: base + 95), low (the least that catches anything),
+                        --   base, loot = { { item, chance, min, max } }, areas = { { area, name, skill, low, base, loot } }
+                        --   (subzones that differ), basis } or nil
 Dt.Pickpocket(creature) -- { { item, chance, min, max } } or nil
-Dt.Disenchant(item)     -- { skill, results = { { item, chance, min, max } } } or nil
-Dt.Limited(item)        -- vendors selling it in limited stock: { { npc, name, map, x, y, stock, restock, price } } or nil
-Dt.LimitedItems()       -- every item some vendor sells in limited stock
+Dt.Disenchant(item)     -- { skill (Enchanting), results = { { item, chance, min, max } }, basis } or nil
+Dt.Limited(item)        -- vendors selling it in limited stock: { { npc, name, map, x, y, reactA, reactH, stock,
+                        --   restock (seconds), price (copper for count items), count, basis ("forever"|"classic") } } or nil
+Dt.LimitedItems()       -- every item some vendor sells in limited stock (sorted)
+Dt.IsLoaded(), Dt.Problem() (why it isn't there: "MISSING", ...), Dt.Info() ({ source, build })
+-- loot entries may carry event = true (only while a game event is on) or side = "Alliance"|"Horde" (only for it)
 ```
 
 ### Context (`W.Context()`, Context.lua)
@@ -172,7 +184,46 @@ W.Bags.List() -- { { item, count, best, value, vendor, ah, keep (a reason not to
 
 ### The money data
 
-(to be written by the data part)
+`LefthyTools_MoneyData` (GPL v3, made by `tools/update-money-data.js`; its README has every field's
+source and rule) holds what the drop data doesn't: the creatures worth farming with their reactions and
+spawns, gathering nodes per zone map, fishing per zone, pickpocketing, disenchanting and limited vendor
+stock. About 0.7 MB; its tables stay strings.
+
+- **Loading.** `Data.lua` loads it with `C_AddOns.LoadAddOn` the first time any accessor is asked (never
+  at login; asked once: a missing or disabled add-on gives `Dt.Problem()`, the game's reason; one loaded
+  meanwhile by someone else is taken). Each entry is read when first asked and kept (`Dt.cache`, per
+  table); nothing walks the whole data but `Dt.LimitedItems()` (once, ~300 items) and `Dt.Fishing`'s
+  subzones (once per map, ~80 rows). `Dt.Use(data)` is the tests' hook.
+- **What rests on what.** Everything is classic-db's (`basis = "classic"`), except: zone maps and
+  positions (Forever's client tables, the quest data's placement rules), gathering skills (Forever's
+  `Lock` table), which items can be disenchanted and the skill (Forever's `ItemDisenchantLoot`, item
+  quality, level and flags), prices with `basis = "forever"` (Forever's ItemSparse), and reactions with
+  `seenA` / `seenH` (what players' games saw on Forever, EG Link). Respawn times, loot chances, pools
+  and fishing rules are classic's: Forever may differ.
+- **Reactions.** Worked out as the client does (faction templates, or by reputation from a new
+  character's standing, every race and class of the side, the friendliest when they differ); where
+  players saw a creature of a faction without reputation react one way, that wins (4 creatures in this
+  build: the Mesa Buzzards are hostile to the Horde on Forever). EG Link agrees with the worked-out
+  reaction for 674 creatures. A creature of a faction with reputation (`rep`) costs standing: such a creature is
+  in the data only when it's hostile to one side, and the ideas must not suggest killing one that isn't
+  hostile to the player's side (a city's guards are hostile to the other side, and dangerous).
+- **Counts.** A cluster's `n` is spawn points, `up` how many are up at once (classic's pools: herbs and
+  veins are pooled, Elwynn Forest has 81 Silverleaf spawn points, about 12 up). For an estimate of nodes
+  or mobs per hour, `up` is the number to use.
+- **Fishing.** CMaNGOS' rule: skill ≥ base catches with (skill − base + 5)%, sure from base + 95.
+- **Disenchanting.** Forever's client asks no Enchanting skill beyond knowing it (SkillRequired 0 in
+  every row); Forever made some classic white items green, which can be disenchanted there.
+- **Left out** (each counted when the tool runs): critters, totems, triggers, unattackable and unused
+  creatures, ones with nothing to loot, ones only at events or in battlegrounds, ones friendly to both
+  sides; loot of quests and scripts, items the client doesn't know; Forever's own creatures and items
+  that classic-db doesn't have.
+- **Checks.** The tool checks samples before it writes (Peacebloom and Silverleaf Herbalism 1,
+  Mageroyal 50, Briarthorn 70, Copper 1, Tin 65, Silver 75, Iron 125, Mithril 175; Stormwind and
+  Ironforge guards friendly to the Alliance and hostile to the Horde, Orgrimmar Grunts and Undercity
+  Guardians the other way round; Booty Bay's bruisers left out; Elwynn's and Stranglethorn's fishing;
+  disenchanting results; a limited pattern at its vendor), and `tests/whypoor_data.lua` reads every entry
+  of the real file into the contract's shapes and checks the same facts through `W.Data`, plus a small
+  fixture through every accessor.
 
 ### Crafting
 
