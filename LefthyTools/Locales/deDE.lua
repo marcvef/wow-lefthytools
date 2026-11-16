@@ -1626,6 +1626,9 @@ L["from %s (%d)"] = "von %s (%d)"
 L["Click: its quest · Right-click: map pin"] = "Klick: seine Quest · Rechtsklick: Kartenmarkierung"
 
 -- WhyPoor?: module, settings and slash command (WhyPoor.lua)
+L["Scan the whole auction house when it opens"] = "Ganzes Auktionshaus beim Öffnen scannen"
+L["Opening the auction house reads all its listings at once, a little each frame, when the game allows that again (every 15 minutes). The prices give the Market tab's deals and the ideas' auction house prices. Off: only Margins' scan button scans."] =
+	"Beim Öffnen des Auktionshauses werden alle Angebote auf einmal gelesen, ein bisschen pro Frame, wenn das Spiel es wieder erlaubt (alle 15 Minuten). Die Preise liefern die Deals im Markt-Tab und die Auktionshaus-Preise der Ideen. Aus: nur der Scan-Button von Margins scannt."
 
 L["Ideas for making money with this character: what is worth doing at your level, class, professions and place, and roughly how much it brings, from your own kills, the auction house's prices and the classic world database. Informational only."] =
 	"Ideen zum Geldverdienen mit diesem Charakter: was sich bei deinem Level, deiner Klasse, deinen Berufen und deinem Ort lohnt und ungefähr wie viel es bringt, aus deinen eigenen Kills, den Preisen im Auktionshaus und der klassischen Weltdatenbank. Nur zur Info."
@@ -1796,6 +1799,13 @@ L["(each)"] = "(pro Stück)"
 
 
 -- WhyPoor?: the window (Window.lua)
+L["Asking the auction house for all its listings..."] = "Frage das Auktionshaus nach allen Angeboten..."
+L["Keeping the auction house's prices..."] = "Speichere die Preise des Auktionshauses..."
+L["Reading the auction house: %d%%"] = "Lese das Auktionshaus: %d %%"
+L["Checking prices: %d of %d"] = "Prüfe Preise: %d von %d"
+L["Working them out: step %d of %d"] = "Wird ausgerechnet: Schritt %d von %d"
+L["Working them out failed: /lefthy errors shows why"] = "Ausrechnen fehlgeschlagen: /lefthy errors zeigt warum"
+L["The auction house is open · next whole scan in %d min"] = "Auktionshaus offen · nächster kompletter Scan in %d Min."
 
 L["your own kills, loot and sales"] = "deinen eigenen Kills, deinem Loot und deinen Verkäufen"
 L["the auction house's prices"] = "den Preisen im Auktionshaus"

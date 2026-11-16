@@ -25,6 +25,7 @@ local M = LT:NewModule("whypoor", {
 		tooltip = true,       -- one line in item tooltips (bags, auction house): vendor or auction house
 		bagCoins = true,      -- a tiny coin on items in the sorted bags worth more at the auction house
 		sharePrices = true,   -- share auction house prices with friends (Beacon) and use theirs
+		autoScan = true,      -- the whole auction house scanned when it opens (when the game allows one again)
 		window = {},          -- shown, left, top, tab (Window.lua)
 	},
 })
@@ -171,6 +172,9 @@ function M:BuildOptions(o)
 		L["Items in your bags and at the auction house get one line: what the auction house pays for one (with how old that price is and how well it sells) and what a vendor pays. Nothing elsewhere."])
 	o:Checkbox("bagCoins", L["Coins in the sorted bags"],
 		L["In Misc Tweaks' sorted bags, a small coin in the corner of items worth more at the auction house than at a vendor."])
+	o:Header(L["Auction house"])
+	o:Checkbox("autoScan", L["Scan the whole auction house when it opens"],
+		L["Opening the auction house reads all its listings at once, a little each frame, when the game allows that again (every 15 minutes). The prices give the Market tab's deals and the ideas' auction house prices. Off: only Margins' scan button scans."])
 	o:Header(L["Friends"])
 	o:Checkbox("sharePrices", L["Share auction house prices with friends"],
 		L["Your auction house prices go to your Beacon friends with LefthyTools, and theirs come to you, marked as theirs. Needs Beacon."])

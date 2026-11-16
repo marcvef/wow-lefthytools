@@ -662,6 +662,39 @@ end
 -- Drawing
 ---------------------------------------------------------------------------
 
+-- What's being worked on, for the line above the list: the auction house scan (asking, reading, keeping), the
+-- ideas' run (step of steps), a run that failed. nil: nothing.
+function Wn.ScanLine()
+	local P = W.Prices
+	local s = P and P.Status and P.Status()
+	if type(s) ~= "table" or not s.running then
+		return nil
+	end
+	if s.kind == "replicate" then
+		if s.waiting then
+			return L["Asking the auction house for all its listings..."]
+		elseif s.committing then
+			return L["Keeping the auction house's prices..."]
+		end
+		local total = Num(s.total) or 0
+		return L["Reading the auction house: %d%%"]:format(total > 0 and math.floor((Num(s.done) or 0) * 100 / total) or 0)
+	end
+	return L["Checking prices: %d of %d"]:format(Num(s.done) or 0, Num(s.total) or 0)
+end
+
+function Wn.WorkLine()
+	local I = W.Ideas
+	if not (I and I.Progress) then
+		return nil
+	end
+	local p, failed = I.Progress()
+	if type(p) == "table" then
+		return L["Working them out: step %d of %d"]:format(p.step, p.steps)
+	elseif failed then
+		return ORANGE .. L["Working them out failed: /lefthy errors shows why"] .. "|r"
+	end
+end
+
 -- The list's entries for the tab, the line above it, the message when it's empty.
 function Wn.Entries(tab)
 	local P, I = W.Prices, W.Ideas
@@ -685,20 +718,30 @@ function Wn.Entries(tab)
 			end
 		end
 		local last = P and P.LastScan and Num(P.LastScan())
-		local head
-		if P and P.IsOpen and P.IsOpen() then
-			head = L["The auction house is open"]
-		elseif last then
+		local head = Wn.ScanLine() or Wn.WorkLine() -- (what's going on first)
+		if head == nil and P and P.IsOpen and P.IsOpen() then
+			local s = P.Status and P.Status()
+			local nextFull = type(s) == "table" and Num(s.nextFull)
+			if nextFull and nextFull > time() then
+				head = L["The auction house is open · next whole scan in %d min"]:format(math.ceil((nextFull - time()) / 60))
+			else
+				head = L["The auction house is open"]
+			end
+		elseif head == nil and last then
 			head = (Wn.Stale(last) and ORANGE or "") .. L["Auction house prices from %s ago"]:format(W.Age(last)) .. "|r"
-		else
+		elseif head == nil then
 			head = ORANGE .. L["No auction house prices yet: open the auction house"] .. "|r"
 		end
-		local empty = not ready and L["Working them out..."] or last and L["No deals in the auction house's prices right now."]
+		local empty = not ready and (Wn.WorkLine() or L["Working them out..."])
+			or last and L["No deals in the auction house's prices right now."]
 			or L["Open the auction house: its prices show the deals."]
 		return deals, head, empty
 	end
-	local head = ready and L["%d ideas, best first"]:format(#list) or L["Working them out..."]
-	local empty = not ready and L["Working them out..."]
+	local work = Wn.WorkLine()
+	local head = ready and L["%d ideas, best first"]:format(#list)
+		or #list > 0 and work and L["%d ideas, best first"]:format(#list) .. " · " .. work
+		or work or L["Working them out..."]
+	local empty = not ready and (work or L["Working them out..."])
 		or L["No ideas for you right now. Kill, gather or open the auction house: WhyPoor? learns from what you do."]
 	return list, head, empty
 end
@@ -749,6 +792,20 @@ function Wn.Draw()
 	view.list:SetEntries(entries, state.shownTab == state.tab)
 	state.shownTab = state.tab
 	Wn.DrawDetails()
+end
+
+-- Only the line above the list and the message (what's worked on changed); the list when its count changed.
+function Wn.DrawStatus()
+	local view = Wn.view
+	if not view then
+		return
+	end
+	local entries, head, empty = Wn.Entries(Wn.state.tab)
+	view.Head:SetText(head or "")
+	view.Message:SetText(empty or "")
+	if #entries ~= #(view.entries or {}) then
+		Wn.state.due = true
+	end
 end
 
 function Wn.Pick(e)
@@ -920,7 +977,7 @@ function Wn.Build()
 
 	-- While shown: what changed drawn on the next frame, I.Request every TICK seconds.
 	local ticker = CreateFrame("Frame", nil, f)
-	local wait = C.TICK
+	local wait, busyWait = C.TICK, 0.5
 	ticker:SetScript("OnUpdate", function(_, elapsed)
 		wait = wait - elapsed
 		if wait <= 0 then
@@ -929,6 +986,19 @@ function Wn.Build()
 			Wn.state.due = true
 			if W.Goal and W.Goal.Forget then
 				W.Goal.Forget()
+			end
+		end
+		-- What's being worked on (the scan, the ideas' run): looked at twice a second, the line above the list
+		-- (and the message) drawn again when it changed.
+		busyWait = busyWait - elapsed
+		if busyWait <= 0 then
+			busyWait = 0.5
+			local work = (Wn.ScanLine() or "") .. "|" .. (Wn.WorkLine() or "")
+			if work ~= Wn.state.work then
+				Wn.state.work = work
+				if not Wn.state.due then
+					LT.Guard("WhyPoor.status", Wn.DrawStatus)
+				end
 			end
 		end
 		if Wn.state.due then

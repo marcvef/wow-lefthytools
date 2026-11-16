@@ -397,6 +397,41 @@ WP.db.sharePrices = true
 check(#sentTo(16, 1, "B2;w") == 0, "the older build got nothing all along")
 Wait(1)
 
+section("WhyPoor? prices: a whole scan when the auction house opens")
+local WPdb = LT:GetModule("whypoor").db
+check(WPdb.autoScan == true, "on by default")
+DB().replicated = time() - 1000
+AH_REPLICATE_NONE = false
+local asked = AH_REPLICATES
+Fire("AUCTION_HOUSE_SHOW")
+Wait(0.1)
+check(AH_REPLICATES == asked + 1 and P.Status().running and P.Status().kind == "replicate", "opened: the whole auction house asked for at once")
+check(P.Status().waiting == true, "its status: waiting for the answer")
+local readingSeen = false
+for _ = 1, 600 do
+	Wait(1 / 60)
+	local st = P.Status()
+	if st.running and not st.waiting and not st.committing and (st.total or 0) > 0 then readingSeen = true end
+	if not st.running then break end
+end
+check(not P.Status().running and readingSeen, "read (its status says how far), then done")
+Fire("AUCTION_HOUSE_CLOSED")
+Wait(0.1)
+asked = AH_REPLICATES
+Fire("AUCTION_HOUSE_SHOW")
+Wait(0.5)
+check(AH_REPLICATES == asked and not P.Status().running and P.Status().nextFull > time(), "opened again within 15 minutes: not asked, the next one's time known")
+Fire("AUCTION_HOUSE_CLOSED")
+Wait(0.1)
+WPdb.autoScan = false
+DB().replicated = time() - 1000
+Fire("AUCTION_HOUSE_SHOW")
+Wait(0.5)
+check(AH_REPLICATES == asked and not P.Status().running, "the setting off: opening scans nothing")
+Fire("AUCTION_HOUSE_CLOSED")
+Wait(0.1)
+WPdb.autoScan = true
+
 section("WhyPoor? prices: pruning, idle")
 Put(7050, time() - 15 * DAY, 10, 1, {})
 Items()[7051] = "broken"

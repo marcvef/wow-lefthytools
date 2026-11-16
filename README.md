@@ -643,7 +643,9 @@ across the top with your goal: "Mount: 34g of 100g · ~3g/h · at this rate at l
   guide figure, said so.
 
 **Prices**: the auction house is scanned whole when you open it (the game allows that every 15
-minutes), a little each frame so nothing stutters. Two weeks of each item's lowest price give its
+minutes; setting *Scan the whole auction house when it opens*), a little each frame so nothing stutters. The
+line above the list says what's going on ("Reading the auction house: 45%", "Working them out: step 7 of 11")
+and when the next whole scan can be. Two weeks of each item's lowest price give its
 usual price; prices that jump around are marked unstable and left out of the ideas. Your Beacon
 friends on the same realm and side share their scans with you (and you yours), so one visit to the
 auction house helps everyone. Chronicle's crafting margins use the same prices.
@@ -665,6 +667,7 @@ database, and loads only when first needed.
 | Minimap button | on |
 | A line in item tooltips | on |
 | Coins in the sorted bags | on |
+| Scan the whole auction house when it opens | on |
 | Share auction house prices with friends | on |
 
 `/whypoor` opens or closes the window; `/whypoor ideas`, `bags`, `market` or `goal` opens that

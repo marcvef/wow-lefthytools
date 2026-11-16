@@ -614,5 +614,8 @@ ns.CHANGELOG = {
 	{ id = 202, module = "chronicle",
 		en = { "Margins: one price scan for all", "The auction house scan now keeps every item with two weeks of history (WhyPoor? uses it too), and friends on your realm and side share their scans when both have this build." },
 		de = { "Margen: ein Preisscan für alles", "Der Auktionshaus-Scan behält jetzt jedes Item mit zwei Wochen Verlauf (auch für WhyPoor?), und Freunde auf deinem Realm und deiner Seite teilen ihre Scans, wenn beide diesen Build haben." } },
+	{ id = 203, module = "whypoor",
+		en = { "WhyPoor?: scans, shows its progress", "Opening the auction house now scans it whole (every 15 minutes at most; a setting), and the line above the list says what's going on: reading the auction house, working out the ideas (step 7 of 11). The ideas no longer stayed on \"Working them out...\" when prices changed meanwhile." },
+		de = { "WhyPoor?: scannt, zeigt Fortschritt", "Beim Öffnen wird das Auktionshaus jetzt komplett gescannt (höchstens alle 15 Minuten; eine Einstellung), und die Zeile über der Liste sagt, was gerade passiert: Auktionshaus lesen, Ideen ausrechnen (Schritt 7 von 11). Die Ideen bleiben nicht mehr bei \"Wird ausgerechnet...\" hängen, wenn sich Preise inzwischen ändern." } },
 	-- New entries go here, at the end.
 }

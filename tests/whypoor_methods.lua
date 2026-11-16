@@ -628,7 +628,7 @@ check(X.lastStart == started and told == 0 and I.Revision() == rev and not X.fra
 -- frame after.
 FIX[4306][3].low = 200
 priceRev = priceRev + 1
-check(select(2, I.Get()) == false, "a price changed: not up to date")
+check(select(2, I.Get()) == true and #I.Get() > 0, "a price changed: the last list still there and ready until a run works (the window shows it)")
 local mobsOn, statuses = calls.MobsOn, calls.Status
 X.UNITS = 5
 I.Request()
@@ -651,6 +651,8 @@ for _ = 1, 400 do
 	if X.job then break end
 end
 check(waited and X.job ~= nil and X.lastStart ~= started, "the next run waits the gap (hidden meanwhile), then starts")
+local p0 = I.Progress()
+check(type(p0) == "table" and p0.step >= 1 and p0.steps == #X.PHASES and p0.step <= p0.steps, "while it runs: its step of the steps")
 local frames, maxUnits, lastUnits = 0, 0, X.job and X.job.units or 0
 while X.job do
 	Advance(1 / 60)
@@ -668,6 +670,20 @@ Advance(1 / 60)
 check(told == 1 and find(I.Get(), "flip:4306").once == 380 - 200, "the watchers on the frame after, the new numbers")
 Advance(0.1)
 check(not X.frame:IsShown(), "nothing runs idle")
+-- A price changes while a run works: when it's done, the next run comes by itself (after the gap), no request
+-- needed; meanwhile the list is there and ready.
+priceRev = priceRev + 1
+Advance(6)
+I.Request()
+Advance(1 / 60)
+check(X.job ~= nil and select(2, I.Get()) == false, "a run works: not ready meanwhile")
+priceRev = priceRev + 1
+local frames2 = 0
+while X.job and frames2 < 2000 do Advance(1 / 60); frames2 = frames2 + 1 end
+check(X.job == nil and X.pending and select(2, I.Get()) == true and X.lastKey ~= X.Key(), "done, but a price changed meanwhile: ready, and another run due")
+frames2 = 0
+while (X.pending or X.job) and frames2 < 2000 do Advance(1 / 60); frames2 = frames2 + 1 end
+check(X.lastKey == X.Key() and not X.frame:IsShown(), "that run came by itself (no request), up to date, then idle")
 X.UNITS = 30
 -- The budget: with a clock, a frame's units stop at 3 ms.
 local clock = 0
@@ -706,11 +722,13 @@ X.lastStart = nil
 I.Request()
 Advance(0.5)
 check(#errors == 1 and errors[1]:find("broken spots", 1, true) and X.job == nil and not X.frame:IsShown(), "an error: reported once, the run dropped, hidden")
+check(I.Progress() == nil and select(2, I.Progress()) == true, "its progress: no run, the last one failed (the window says so)")
 stop()
 Dt.Spots = function(cr) return SPOTS[cr] end
 Advance(2) -- (the failed hook rests a second)
 list = run()
 check(find(list, "grind:6") ~= nil, "it works again once the part does")
+check(select(2, I.Progress()) == false, "and the failure is forgotten")
 
 ---------------------------------------------------------------------------
 -- Put back

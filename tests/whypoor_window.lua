@@ -193,6 +193,29 @@ do
 	prices.open = true
 	W.Window.Draw()
 	check(view.Head:GetText() == "The auction house is open", "the auction house open: says so")
+	-- What's being worked on, above the list (and drawn again twice a second meanwhile).
+	local status = { running = true, kind = "replicate", waiting = true, done = 0, total = 0 }
+	W.Prices.Status = function() return status end
+	W.Window.Draw()
+	check(view.Head:GetText() == "Asking the auction house for all its listings...", "a whole scan asked for: says so")
+	status.waiting, status.done, status.total = false, 50, 200
+	Advance(0.6)
+	check(view.Head:GetText() == "Reading the auction house: 25%", "reading it: how far, drawn again by itself, got " .. tostring(view.Head:GetText()))
+	status.committing = true
+	Advance(0.6)
+	check(view.Head:GetText() == "Keeping the auction house's prices...", "keeping the prices")
+	status.running = false
+	status.nextFull = time() + 14 * 60 + 5
+	W.Ideas.Progress = function() return { step = 7, steps = 11 }, false end
+	Advance(0.6)
+	check(view.Head:GetText() == "Working them out: step 7 of 11", "then the ideas: their step, got " .. tostring(view.Head:GetText()))
+	W.Ideas.Progress = function() return nil, true end
+	Advance(0.6)
+	check(Plain(view.Head:GetText()) == "Working them out failed: /lefthy errors shows why", "a run that failed: says so, and where to look")
+	W.Ideas.Progress = function() return nil, false end
+	Advance(0.6)
+	check(view.Head:GetText() == "The auction house is open · next whole scan in 15 min", "nothing worked on: when the next whole scan can be, got " .. tostring(view.Head:GetText()))
+	W.Prices.Status, W.Ideas.Progress = nil, nil
 	prices.open = false
 	Changed({}, true)
 	Step()

@@ -671,6 +671,15 @@ function P.Tick()
 	elseif scan and not P.ahOpen and not scan.committing then
 		P.Finish(scan)
 	end
+	-- The auction house opened: a whole scan when the game allows one again (WhyPoor? on, its setting autoScan;
+	-- Margins alone scans when asked, as it always did).
+	if P.autoScan and not fight and not P.scan then
+		P.autoScan = false
+		local m = W.module
+		if P.ahOpen and m and m.enabled and type(m.db) == "table" and m.db.autoScan ~= false then
+			P.ScanFull()
+		end
+	end
 	if P.ownedAsk and P.ahOpen and not fight and not (P.scan and P.scan.inflight) then
 		P.AskOwned(now)
 	end
@@ -690,7 +699,7 @@ end)
 
 -- Whether the driver has work.
 function P.Busy()
-	return (P.scan or P.merchantDue or P.houseDue or P.ownedDue or P.notes[1] or P.job
+	return (P.scan or P.merchantDue or P.houseDue or P.ownedDue or P.notes[1] or P.job or P.autoScan
 		or (P.ownedAsk and P.ahOpen)) and true or false
 end
 
@@ -1046,6 +1055,7 @@ function P.Status()
 	local scan = P.scan
 	if scan then
 		s.running, s.kind, s.done, s.total, s.spell = true, scan.kind, scan.done, scan.total, scan.spell
+		s.waiting, s.committing = scan.waiting == true, scan.committing == true
 	end
 	s.nextFull = select(2, P.CanReplicate())
 	return s
@@ -1365,7 +1375,7 @@ P.events = CreateFrame("Frame")
 P.events:SetScript("OnEvent", function(_, event, a, b, c)
 	local scan = P.scan
 	if event == "AUCTION_HOUSE_SHOW" then
-		P.ahOpen, P.houseDue = true, true
+		P.ahOpen, P.houseDue, P.autoScan = true, true, true
 		P.Changed()
 		P.Wake()
 	elseif event == "AUCTION_HOUSE_CLOSED" then

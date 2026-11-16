@@ -382,11 +382,23 @@ function X.Key()
 end
 
 function I.Get()
-	return X.list, not X.job and not X.pending and X.lastKey ~= nil and X.lastKey == X.Key()
+	-- (ready: a run has finished and none is working now; what it rests on may have changed since, then the next
+	-- run is on its way by itself: PhaseFinish)
+	return X.list, not X.job and X.lastKey ~= nil
 end
 
 function I.Revision()
 	return X.rev
+end
+
+-- Where the work is: { step, steps } while a run goes on (nil when none), and whether the last run failed (its
+-- error went to the error catcher: /lefthy errors).
+function I.Progress()
+	local job = X.job
+	if job then
+		return { step = math.min(job.at, #X.PHASES), steps = #X.PHASES }, X.failed == true
+	end
+	return nil, X.failed == true
 end
 
 function I.Watch(fn)
@@ -471,7 +483,7 @@ function X.Tick()
 	end
 	if X.job then
 		if not LT.Guard("WhyPoor ideas", X.Work) then
-			X.job = nil -- (it failed, or rests after failing: the next request starts again)
+			X.job, X.failed = nil, true -- (it failed, or rests after failing: the next request starts again)
 		end
 	end
 	if not (X.job or X.pending or X.notify) then
@@ -500,7 +512,7 @@ function X.Work()
 	while X.job == job do
 		local phase = X.PHASES[job.at]
 		if not phase then
-			X.job = nil
+			X.job, X.failed = nil, false
 			return true
 		end
 		if X[phase](job) then
@@ -1500,6 +1512,9 @@ function X.PhaseFinish(job)
 	local list = X.Rank(job.ideas)
 	local signature = X.Signature(list)
 	X.lastKey = job.key
+	if X.Key() ~= job.key then
+		X.pending = true -- (something it rests on changed while it ran: worked out again, after the gap)
+	end
 	if signature ~= X.signature then
 		X.list, X.signature = list, signature
 		X.rev = X.rev + 1

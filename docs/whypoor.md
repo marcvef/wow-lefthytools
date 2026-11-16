@@ -168,7 +168,9 @@ Dt.IsLoaded(), Dt.Problem() (why it isn't there: "MISSING", ...), Dt.Info() ({ s
 ### Ideas (`W.Ideas`, Methods.lua)
 
 ```lua
-I.Get()         -- the ideas worked out last, ranked (a list, maybe empty), and whether they're up to date
+I.Get()         -- the ideas worked out last, ranked (a list, maybe empty), and ready: a run finished and none is
+                -- working now (what they rest on may have changed since: then the next run comes by itself)
+I.Progress()    -- { step, steps } while a run works (nil when none), and whether the last run failed
 I.Request()     -- (re)work them out for W.Context() if anything they rest on changed (prices, data, level,
                 -- professions, place, recipes, your kills): on a driver a few ms a frame, never at once
 I.Watch(fn)     -- fn() runs (on the next frame) whenever I.Get()'s list changed; the window redraws then
@@ -247,6 +249,10 @@ while there's nothing to do):
   (`numOwnerItems`, `containsOwnerItem`), and the listed quantity; no rows: none listed; no answer in 3 s: the
   price stays. Gear is searched with its item level (`GetDetailedItemLevelInfo`, else `P.levelHint`: Margins'
   recipe's). Margins' recipe checks and its fallback use this.
+- **On opening** (`AUCTION_HOUSE_SHOW` sets `P.autoScan`; the driver's next tick, never in a fight): a whole scan
+  (`P.ScanFull()`) when WhyPoor? is on, its setting `autoScan` (on) and the game allows one again; Margins alone
+  scans only when its button asks, as before. `P.Status()` says what's going on (`running`, `kind`, `waiting`
+  for the game's answer, `done` of `total` rows read, `committing` while it's kept, `nextFull`): the window's line.
 - Everything (`P.ScanFull`): `ReplicateItems` when the last one was 15 minutes ago or more (the game's limit,
   saved), then `REPLICATE_ITEM_LIST_UPDATE`, then every row read in a coroutine 2 ms a frame (a look at the
   clock every 50 rows): `GetReplicateItemInfo(i)` (0-based) gives a stack's `count` and `buyoutPrice` (for the

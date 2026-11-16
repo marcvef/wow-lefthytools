@@ -30,6 +30,9 @@ local function plain(text)
 end
 
 local BOLT, LINEN, THREAD, VEST, BANDAGE = 2963, 2589, 2320, 2385, 3275 -- spells; LINEN, THREAD also items
+local whypoorDB = LT:GetModule("whypoor").db
+local autoScanWas = whypoorDB.autoScan
+whypoorDB.autoScan = false -- (this file scans when Margins asks; WhyPoor?'s scan on opening: whypoor_prices.lua)
 local BOLT_ITEM, VEST_ITEM = 2996, 2568
 local REALM = "Realmy-Alliance"
 ITEMS[BOLT_ITEM] = { name = "Bolt of Linen Cloth", quality = 1, price = 40 }
@@ -269,6 +272,7 @@ Fire("AUCTION_HOUSE_CLOSED")
 Wait(1)
 
 -- (put back what this file changed)
+whypoorDB.autoScan = autoScanWas
 ProfessionsFrame, AuctionHouseFrame = nil, nil
 professions:Hide()
 ah:Hide()
