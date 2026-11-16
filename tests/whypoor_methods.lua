@@ -738,14 +738,26 @@ section("whypoor_methods: worth your time")
 do
 	local YOUNG = 90008
 	FIX[YOUNG] = { "New Thing", 10, { value = 2000, low = 1900, qty = 5, perDay = 5, sells = 0.9, confidence = "high", days = 1 } }
-	local realGoal, rate = W.Goal, nil
-	W.Goal = { Rate = function() return rate end }
+	local realGoal, rate, own = W.Goal, nil, nil
+	W.Goal = { Rate = function() return rate end, OwnBar = function() return own end }
 	local bar = X.Bar({ level = 30 })
 	check(bar.hour == 30000 and bar.once == 15000 and bar.how == "level", "no pace of your own: the bar by level (30: 3g an hour, 1g 50s once)")
 	rate = 40000
 	bar = X.Bar({ level = 30 })
-	check(bar.hour == 60000 and bar.how == "rate", "your own 4g an hour played: the bar half again that (6g)")
-	rate = nil
+	check(bar.hour == 60000 and bar.once == 30000 and bar.how == "rate", "your own 4g an hour played: the bar half again that (6g; 3g once)")
+	rate = 5000
+	bar = X.Bar({ level = 30 })
+	check(bar.hour == 7500 and bar.how == "rate" and bar.rate == 5000, "50s an hour played: the bar 75s, below the level's 3g (your own pace wins)")
+	rate = 1000
+	bar = X.Bar({ level = 30 })
+	check(bar.hour == 6000 and bar.how == "least", "10s an hour played: the bar at least 2s a level (60s)")
+	rate = -2000
+	bar = X.Bar({ level = 30 })
+	check(bar.hour == 30000 and bar.how == "spent", "your gold went down: by level, said so")
+	own = 20000
+	bar = X.Bar({ level = 30 })
+	check(bar.hour == 20000 and bar.once == 10000 and bar.how == "own", "your own bar wins: 2g an hour, 1g once")
+	rate, own = nil, nil
 	local function Idea(key, kind, perHour, once, items)
 		return { key = key, kind = kind, perHour = perHour, once = once, items = items or {}, why = {}, how = {}, warnings = {},
 			numbers = {}, confidence = "medium", basis = "prices" }

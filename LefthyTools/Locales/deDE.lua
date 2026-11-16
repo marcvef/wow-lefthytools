@@ -1859,10 +1859,33 @@ L["Your own goal: %s"] = "Dein eigenes Ziel: %s"
 L["Change your goal"] = "Ziel ändern"
 L["Nothing worth extra time right now: playing normally pays as well. Keep playing; open the auction house now and then."] =
 	"Gerade lohnt sich nichts extra: normales Spielen bringt genauso viel. Spiel einfach weiter; öffne ab und zu das Auktionshaus."
-L["The bar: %s an hour, half again what you earn playing (Chronicle)."] =
-	"Die Latte: %s pro Stunde, anderthalbmal so viel wie du beim Spielen verdienst (Chronicle)."
-L["The bar: %s an hour (your level; your own pace counts once Chronicle has a few hours)."] =
-	"Die Latte: %s pro Stunde (nach deinem Level; dein eigenes Tempo zählt, sobald Chronicle ein paar Stunden hat)."
+L["The bar: %s an hour, your own."] = "Die Latte: %s pro Stunde, deine eigene."
+L["The bar: %s an hour, half again the %s you earn an hour playing (Chronicle)."] =
+	"Die Latte: %s pro Stunde, anderthalbmal die %s, die du pro Stunde beim Spielen verdienst (Chronicle)."
+L["The bar: %s an hour, the least for your level (you earn %s an hour playing, Chronicle)."] =
+	"Die Latte: %s pro Stunde, das Minimum für dein Level (du verdienst %s pro Stunde beim Spielen, Chronicle)."
+L["The bar: %s an hour, by your level (your gold went down lately, Chronicle)."] =
+	"Die Latte: %s pro Stunde, nach deinem Level (dein Gold ist zuletzt weniger geworden, Chronicle)."
+L["The bar: %s an hour, by your level (Chronicle doesn't know what you earn playing yet)."] =
+	"Die Latte: %s pro Stunde, nach deinem Level (Chronicle weiß noch nicht, was du beim Spielen verdienst)."
+L["Click to change it."] = "Klicken, um sie zu ändern."
+L["bar %s an hour"] = "Latte %s/Std."
+L["The bar"] = "Die Latte"
+L["Ideas lists only what brings at least this, so it's worth more than playing normally."] =
+	"Ideen zeigt nur, was mindestens so viel bringt, also mehr als normales Spielen."
+L["A one-off (a flip, a craft) must bring half an hour's worth: %s."] =
+	"Etwas Einmaliges (ein Flip, ein Craft) muss eine halbe Stunde wert sein: %s."
+L["Change your bar"] = "Latte ändern"
+L["Set your own bar"] = "Eigene Latte setzen"
+L["Gold an hour"] = "Gold pro Stunde"
+L["Automatic"] = "Automatisch"
+L["Or type /whypoor bar 1.5 (/whypoor bar auto: back to automatic)."] =
+	"Oder tippe /whypoor bar 1.5 (/whypoor bar auto: wieder automatisch)."
+L["The bar couldn't be kept yet: try again in a moment."] =
+	"Die Latte konnte noch nicht gespeichert werden: versuch es gleich nochmal."
+L["Type the gold as a number, like 1.5."] = "Gib das Gold als Zahl ein, z. B. 1.5."
+L["Click: what an idea must bring to be listed, or set your own"] =
+	"Klick: was eine Idee bringen muss, um gezeigt zu werden, oder eigene setzen"
 L["%d more may count once their auction house prices are a few days old."] =
 	"%d weitere können zählen, sobald ihre Auktionshaus-Preise ein paar Tage alt sind."
 L["%d worth your time"] = "%d lohnen sich"

@@ -67,7 +67,7 @@ Wn.ICONS = {
 	sell = "Interface\\Icons\\INV_Misc_Bag_10", learn = "Interface\\Icons\\INV_Misc_Book_09",
 	saving = "Interface\\Icons\\INV_Misc_Coin_02",
 }
-Wn.state = { tab = "ideas", sel = {}, goal = false, old = true, due = false, draws = 0, requests = 0 }
+Wn.state = { tab = "ideas", sel = {}, goal = false, bar = false, old = true, due = false, draws = 0, requests = 0 }
 
 local function Num(v)
 	return type(v) == "number" and not LT.IsSecret(v) and v or nil
@@ -369,7 +369,7 @@ function Wn.FillRow(row, e)
 			end
 		end
 	end
-	row.Sel:SetShown(not state.goal and state.sel[state.tab] == Wn.Key(e))
+	row.Sel:SetShown(not state.goal and not state.bar and state.sel[state.tab] == Wn.Key(e))
 end
 
 -- An entry's key in its list (the pick stays on it when the list changes).
@@ -400,6 +400,10 @@ function D.Begin()
 		D.inputs.Name:Hide()
 		D.inputs.AmountLabel:Hide()
 		D.inputs.NameLabel:Hide()
+	end
+	if D.barInputs then
+		D.barInputs.Amount:Hide()
+		D.barInputs.Label:Hide()
 	end
 	if D.map then
 		D.map:Hide()
@@ -901,6 +905,116 @@ function D.Goal()
 	D.GoalInputs()
 end
 
+-- The bar's line: what it is and where it comes from.
+function Wn.BarLine(bar)
+	local money = Money(bar.hour)
+	if bar.how == "own" then
+		return L["The bar: %s an hour, your own."]:format(money)
+	elseif bar.how == "rate" then
+		return L["The bar: %s an hour, half again the %s you earn an hour playing (Chronicle)."]:format(money, Money(bar.rate))
+	elseif bar.how == "least" then
+		return L["The bar: %s an hour, the least for your level (you earn %s an hour playing, Chronicle)."]:format(money, Money(bar.rate))
+	elseif bar.how == "spent" then
+		return L["The bar: %s an hour, by your level (your gold went down lately, Chronicle)."]:format(money)
+	end
+	return L["The bar: %s an hour, by your level (Chronicle doesn't know what you earn playing yet)."]:format(money)
+end
+
+-- The bar's details: what it is, and your own.
+function D.Bar()
+	local I = W.Ideas
+	local bar = I and I.Bar and I.Bar()
+	D.Text(L["The bar"], "title")
+	D.Text(L["Ideas lists only what brings at least this, so it's worth more than playing normally."], "text", 0, 2)
+	if type(bar) ~= "table" then
+		return
+	end
+	D.Text(Wn.BarLine(bar), "text", 0, 4)
+	D.Text(L["A one-off (a flip, a craft) must bring half an hour's worth: %s."]:format(Money(bar.once)), "text")
+	D.Head(bar.how == "own" and L["Change your bar"] or L["Set your own bar"])
+	local i = D.barInputs
+	if not i then
+		i = {}
+		i.Label = D.child:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		i.Label:SetText(L["Gold an hour"])
+		i.Amount = CreateFrame("EditBox", nil, D.child, "InputBoxTemplate")
+		i.Amount:SetSize(60, 20)
+		i.Amount:SetAutoFocus(false)
+		i.Amount:SetMaxLetters(7)
+		i.Amount:SetScript("OnEscapePressed", i.Amount.ClearFocus)
+		i.Amount:SetScript("OnEnterPressed", function() D.SetBar() end)
+		i.Amount:SetScript("OnTextChanged", function(_, byUser)
+			if byUser then
+				i.typed = true -- (what's typed stays through the window's redraws until Set or Clear)
+			end
+		end)
+		D.barInputs = i
+	end
+	if not i.typed then
+		i.Amount:SetText(bar.how == "own" and (("%.2f"):format(bar.hour / 10000):gsub("%.?0+$", "")) or "")
+	end
+	i.Label:ClearAllPoints()
+	i.Label:SetPoint("TOPLEFT", 8, -D.y - 4)
+	i.Amount:ClearAllPoints()
+	i.Amount:SetPoint("LEFT", i.Label, "RIGHT", 10, 0)
+	i.Label:Show()
+	i.Amount:Show()
+	D.y = D.y + 26
+	D.Button(L["Set"], D.SetBar, true, 80)
+	if bar.how == "own" then
+		D.Button(L["Automatic"], function()
+			W.Goal.SetBar(nil)
+			i.typed, i.problem = false, nil
+			LT.Print("WhyPoor?: the bar is automatic again.")
+			D.BarChanged()
+		end, true, 100, true)
+	end
+	if i.problem then
+		D.Text(ORANGE .. i.problem .. "|r", "small", 4)
+	end
+	D.Text(L["Or type /whypoor bar 1.5 (/whypoor bar auto: back to automatic)."], "small", 0, 4)
+end
+
+-- What's in the bar's field, kept as your own bar (gold an hour; "1,5", "1.5g" work).
+function D.SetBar()
+	local i, G = D.barInputs, W.Goal
+	if not (i and G and G.SetBar) then
+		return
+	end
+	local gold = tonumber(((i.Amount:GetText() or ""):gsub(",", "."):gsub("[^%d%.]", "")))
+	i.Amount:ClearFocus()
+	if gold and gold > 0 and G.SetBar(gold * 10000) then
+		i.typed, i.problem = false, nil
+		LT.Print(("WhyPoor?: bar set: %s an hour."):format(W.Money(gold * 10000)))
+		D.BarChanged()
+		return
+	elseif gold and gold > 0 then
+		i.problem = L["The bar couldn't be kept yet: try again in a moment."]
+	else
+		i.problem = L["Type the gold as a number, like 1.5."]
+	end
+	Wn.Draw()
+end
+
+-- The bar changed: the ideas worked out again, the window drawn.
+function D.BarChanged()
+	local I = W.Ideas
+	if I and I.BarChanged then
+		I.BarChanged()
+	end
+	Wn.Draw()
+end
+
+-- The bar's details on the right (the line above the Ideas list, its message).
+function Wn.ShowBar()
+	local state = Wn.state
+	state.goal, state.bar = false, true
+	if Wn.view then
+		Wn.view.list:Lay()
+		Wn.DrawDetails()
+	end
+end
+
 ---------------------------------------------------------------------------
 -- Drawing
 ---------------------------------------------------------------------------
@@ -943,12 +1057,12 @@ function Wn.NothingWorth()
 	local I = W.Ideas
 	local hidden = I and I.Hidden and I.Hidden()
 	local lines = { L["Nothing worth extra time right now: playing normally pays as well. Keep playing; open the auction house now and then."] }
-	if type(hidden) == "table" and hidden.bar then
-		lines[#lines + 1] = (hidden.bar.how == "rate" and L["The bar: %s an hour, half again what you earn playing (Chronicle)."]
-			or L["The bar: %s an hour (your level; your own pace counts once Chronicle has a few hours)."]):format(Money(hidden.bar.hour))
-		if (hidden.young or 0) > 0 then
-			lines[#lines + 1] = L["%d more may count once their auction house prices are a few days old."]:format(hidden.young)
-		end
+	local bar = I and I.Bar and I.Bar()
+	if type(bar) == "table" then
+		lines[#lines + 1] = Wn.BarLine(bar) .. " " .. L["Click to change it."]
+	end
+	if type(hidden) == "table" and (hidden.young or 0) > 0 then
+		lines[#lines + 1] = L["%d more may count once their auction house prices are a few days old."]:format(hidden.young)
 	end
 	return table.concat(lines, "\n\n")
 end
@@ -999,8 +1113,11 @@ function Wn.Entries(tab)
 		return deals, head, empty
 	end
 	local work = Wn.WorkLine()
-	local head = ready and L["%d worth your time"]:format(#list)
-		or #list > 0 and work and L["%d worth your time"]:format(#list) .. " · " .. work
+	local bar = I.Bar and I.Bar()
+	local worth = L["%d worth your time"]:format(#list)
+		.. (type(bar) == "table" and (SEP .. L["bar %s an hour"]:format(Money(bar.hour))) or "")
+	local head = ready and worth
+		or #list > 0 and work and worth .. SEP .. work
 		or work or L["Working them out..."]
 	local empty = not ready and (work or L["Working them out..."]) or Wn.NothingWorth()
 	return list, head, empty
@@ -1010,6 +1127,12 @@ function Wn.DrawDetails()
 	local state, view = Wn.state, Wn.view
 	D.Begin()
 	local e
+	if state.bar and not state.goal and state.tab == "ideas" then
+		D.Bar()
+		D.End()
+		view.Strip.Sel:SetShown(false)
+		return
+	end
 	if not state.goal then
 		local key = state.sel[state.tab]
 		for _, entry in ipairs(view.entries or {}) do
@@ -1064,6 +1187,8 @@ function Wn.Draw()
 	view.Head:SetText(head or "")
 	view.Message:SetText(empty or "")
 	view.Message:SetShown(#entries == 0)
+	view.HeadButton:SetShown(state.tab == "ideas")
+	view.MessageButton:SetShown(state.tab == "ideas" and #entries == 0)
 	view.list:SetEntries(entries, state.shownTab == state.tab)
 	state.shownTab = state.tab
 	Wn.DrawDetails()
@@ -1085,7 +1210,7 @@ end
 
 function Wn.Pick(e)
 	local state = Wn.state
-	state.goal = false
+	state.goal, state.bar = false, false
 	state.sel[state.tab] = Wn.Key(e)
 	Wn.view.list:Lay()
 	Wn.DrawDetails()
@@ -1094,7 +1219,7 @@ end
 function Wn.SetTab(tab)
 	local state = Wn.state
 	state.tab = tab
-	state.goal = false
+	state.goal, state.bar = false, false
 	Settings().tab = tab
 	Wn.Request()
 	Wn.Draw()
@@ -1198,7 +1323,7 @@ function Wn.Build()
 	strip:SetHighlightTexture(HIGHLIGHT, "ADD")
 	strip:SetScript("OnClick", function(self)
 		Untip(self)
-		Wn.state.goal = true
+		Wn.state.goal, Wn.state.bar = true, false
 		view.list:Lay()
 		Wn.DrawDetails()
 	end)
@@ -1225,6 +1350,26 @@ function Wn.Build()
 	view.Message:SetWidth(C.LIST_W - C.BAR_W - 20)
 	view.Message:SetJustifyH("LEFT")
 	view.Message:Hide()
+	-- On the Ideas tab the line above the list and its message open the bar's details (Wn.ShowBar).
+	local function BarButton(over)
+		local b = CreateFrame("Button", nil, f)
+		b:SetAllPoints(over)
+		b:SetScript("OnClick", function(self)
+			Untip(self)
+			Wn.ShowBar()
+		end)
+		b:SetScript("OnEnter", function(self)
+			GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+			GameTooltip:SetText(L["The bar"], 1, 0.82, 0)
+			GameTooltip:AddLine(L["Click: what an idea must bring to be listed, or set your own"], 0.8, 0.8, 0.8)
+			GameTooltip:Show()
+		end)
+		b:SetScript("OnLeave", Untip)
+		b:Hide()
+		return b
+	end
+	view.HeadButton = BarButton(view.Head)
+	view.MessageButton = BarButton(view.Message)
 	local split = f:CreateTexture(nil, "ARTWORK")
 	split:SetColorTexture(1, 0.82, 0, 0.2)
 	split:SetWidth(1)
@@ -1351,8 +1496,12 @@ function Wn.Open(tab)
 	if not Wn.frame then
 		Wn.Build()
 	end
+	Wn.state.bar = false
 	if tab == "goal" then
 		Wn.state.goal = true
+	elseif tab == "bar" then
+		Wn.state.tab, Wn.state.goal, Wn.state.bar = "ideas", false, true
+		Settings().tab = "ideas"
 	elseif Wn.IsTab(tab) then
 		Wn.state.tab, Wn.state.goal = tab, false
 		Settings().tab = tab

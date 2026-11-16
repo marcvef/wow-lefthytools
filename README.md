@@ -623,8 +623,9 @@ gets no number at all, never a made-up one.
 **The window** (Lodestar's slim style): the list on the left, the details on the right, and a line
 across the top with your goal: "Mount: 34g of 100g · ~3g/h · at this rate at level 44".
 
-- **Ideas**: only what's **worth your time**: what brings more than playing normally (half again
-  your own gold per hour played, from Chronicle; until it knows that, 10s an hour per level) and whose
+- **Ideas**: only what's **worth your time**: what brings more than playing normally (the bar: half
+  again your own gold per hour played, from Chronicle; until it knows that, 10s an hour per level; or
+  your own: click the line above the list, or `/whypoor bar 1.5`) and whose
   money rests on solid prices (coin, vendors, or auction house prices steady for 3 days or more).
   Most of the time that's nothing, and it says so: "Nothing worth extra time right now: playing
   normally pays as well." Looked at for you: mobs that suit you (hostile to your side, a level you

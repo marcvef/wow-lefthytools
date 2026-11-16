@@ -269,6 +269,25 @@ function G.Custom()
 	end
 end
 
+-- Your own bar for the ideas (Methods' X.Bar): copper an hour an idea must bring to be listed, kept per
+-- character; nil or 0 goes back to the automatic one. True when it's kept.
+function G.SetBar(copper)
+	local mine = G.Mine()
+	if not mine then
+		return false
+	end
+	copper = Num(copper)
+	mine.bar = copper and copper > 0 and math.floor(copper + 0.5) or nil
+	return true
+end
+
+-- Your own bar: copper an hour, or nil.
+function G.OwnBar()
+	local mine = G.Mine()
+	local bar = mine and Num(mine.bar)
+	return bar and bar > 0 and bar or nil
+end
+
 -- Why there's no goal: "class" (Paladins, Warlocks), "done" (Journeyman Riding known), nil (there is one).
 function G.Why()
 	local _, class = UnitClass("player")

@@ -181,6 +181,7 @@ local function Help()
 	M:Print("/whypoor - open or close the window: ideas for making money")
 	M:Print("/whypoor ideas | crafting | bags | market | goal - the window on that page")
 	M:Print("/whypoor goal <gold> [name] - your own money goal (/whypoor goal clear: the mount again)")
+	M:Print("/whypoor bar <gold> - list only ideas bringing this an hour (/whypoor bar auto: automatic again)")
 	M:Print("/whypoor minimap - show or hide the minimap button")
 	M:Print("/whypoor settings - WhyPoor?'s settings")
 end
@@ -213,6 +214,23 @@ function M:OnSlashCommand(msg)
 			return
 		end
 		W.Window.Open("goal")
+	elseif cmd == "bar" or cmd:match("^bar%s+") then
+		local rest = strtrim(cmd:sub(4))
+		local gold = tonumber((rest:gsub(",", "."):gsub("[^%d%.]", "")))
+		if rest == "auto" or rest == "clear" then
+			W.Goal.SetBar(nil)
+			self:Print("the bar is automatic again.")
+		elseif gold and gold > 0 then
+			W.Goal.SetBar(gold * 10000)
+			self:Print(("bar set: %s an hour."):format(W.Money(gold * 10000)))
+		elseif rest ~= "" then
+			Help()
+			return
+		end
+		if rest ~= "" and W.Ideas and W.Ideas.BarChanged then
+			W.Ideas.BarChanged()
+		end
+		W.Window.Open("bar")
 	elseif cmd == "" then
 		W.Window.Toggle()
 	elseif TABS[cmd] then

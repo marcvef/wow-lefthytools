@@ -59,9 +59,11 @@ X.DE_MARGIN = 0.15
 X.DE_MAX = 5             -- greens bought to disenchant, counted at most this many of one
 -- How many of each kind are kept
 -- Worth your time (X.Worth): only what beats playing normally and rests on solid prices is listed.
+-- The bar (X.Bar): your own (G.OwnBar, /whypoor bar), else half again your own gold per hour played, else by level.
 X.WORTH_RATE = 1.5       -- times your own gold per hour played (Chronicle) an hourly idea must bring
+X.WORTH_LEAST = 200      -- copper per hour per level that bar is at least (level 30: 60s an hour)
 X.WORTH_FLOOR = 1000     -- copper per hour per level while your own rate isn't known (level 30: 3g an hour)
-X.WORTH_ONCE = 500       -- copper per level a one-off must bring (level 30: 1g 50s)
+X.WORTH_ONCE = 0.5       -- hours of the bar a one-off must bring (level 30's 3g an hour: 1g 50s)
 X.WORTH_DAYS = 3         -- days of an item's auction house prices before its price counts as solid
 X.WORTH_SOLID = 0.8      -- this much of an idea's money must rest on solid prices (coin, vendors, steady AH)
 X.NOT_LISTED = { quest = true, sell = true } -- (quests are playing normally; the bags have their tab)
@@ -406,6 +408,17 @@ end
 -- What the list leaves out: { n, young (only because a price is too new), bar = { hour, once, how } } or nil.
 function I.Hidden()
 	return X.hidden
+end
+
+-- The bar now (X.Bar at your level): the window shows it as it is, before the next run uses it.
+function I.Bar()
+	return X.Bar({ level = Value(UnitLevel, "player") or 1 })
+end
+
+-- Your own bar changed (G.SetBar): the ideas are worked out again.
+function I.BarChanged()
+	X.minor = X.minor + 1
+	I.Request()
 end
 
 -- Where the work is: { step, steps } while a run goes on (nil when none), and whether the last run failed (its
@@ -1525,15 +1538,27 @@ end
 
 -- The bar an idea must reach: { hour, once } in copper, and what the hour's rests on ("rate": 1.5 times
 -- your own gold per hour played, else "level").
+-- The bar an idea must reach to be listed: { hour (copper an hour), once (a one-off), how, rate }. how: "own" (you
+-- set it), "rate" (half again your own gold per hour played, Chronicle), "least" (that's below X.WORTH_LEAST a
+-- level: that), "spent" (your gold went down lately: by level), "level" (no rate yet: by level).
 function X.Bar(job)
 	local level = job.level or 1
-	local hour, how = level * X.WORTH_FLOOR, "level"
 	local G = W.Goal
+	local own = G and G.OwnBar and G.OwnBar()
 	local rate = G and G.Rate and G.Rate()
-	if type(rate) == "number" and rate > 0 and rate * X.WORTH_RATE > hour then
+	rate = type(rate) == "number" and rate or nil
+	local hour, how
+	if type(own) == "number" and own > 0 then
+		hour, how = own, "own"
+	elseif rate and rate > 0 then
 		hour, how = rate * X.WORTH_RATE, "rate"
+		if hour < level * X.WORTH_LEAST then
+			hour, how = level * X.WORTH_LEAST, "least"
+		end
+	else
+		hour, how = level * X.WORTH_FLOOR, rate and "spent" or "level"
 	end
-	return { hour = hour, once = level * X.WORTH_ONCE, how = how }
+	return { hour = hour, once = hour * X.WORTH_ONCE, how = how, rate = rate }
 end
 
 -- Which ideas are worth your time: an hourly one bringing at least the bar's hour, a one-off at least its
