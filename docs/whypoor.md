@@ -79,6 +79,8 @@ P.Best(item, n)       -- the better way to sell n: "vendor" | "ah" | nil (neithe
 P.Deposit(item, n)    -- the deposit for n (the game's when the auction house is open, else the rule), nil: unknown
 P.IsOpen()            -- the auction house is open
 P.LastScan()          -- when this realm's last full scan was
+P.Items()             -- every item with auction house data on this realm and faction: a list of item IDs (the
+                      -- ideas' flips go over it; shared, never written by callers)
 P.Revision()          -- goes up when any price changed (for caches)
 P.AH_CUT, P.STALE
 ```
@@ -116,6 +118,7 @@ Dt.Pickpocket(creature) -- { { item, chance, min, max } } or nil
 Dt.Disenchant(item)     -- { skill, results = { { item, chance, min, max } } } or nil
 Dt.Limited(item)        -- vendors selling it in limited stock: { { npc, name, map, x, y, stock, restock, price } } or nil
 Dt.LimitedItems()       -- every item some vendor sells in limited stock
+-- (every chance in these lists is 0..1, as Bt.Known's: the ideas read them so)
 ```
 
 ### Context (`W.Context()`, Context.lua)
@@ -124,7 +127,8 @@ Dt.LimitedItems()       -- every item some vendor sells in limited stock
 { level, class (classFile), race (raceFile), faction ("Alliance"|"Horde"), gold (copper), map (uiMapID now),
   professions = { [skillLine] = rank }, -- gathering and crafting, Fishing, First Aid, Cooking, Lockpicking
   recipes = { [spell] = true },         -- this character's known recipes (Chronicle's record)
-  canSkin, canHerb, canMine, canFish, canPick (rogue), canDisenchant, ... }
+  canSkin, canHerb, canMine, canFish, canPick (rogue), canDisenchant,
+  group (how many in my group, 1 alone), grouped, primaries (primary professions), freePrimary (fewer than two) }
 ```
 
 ### Ideas (`W.Ideas`, Methods.lua)
@@ -144,12 +148,13 @@ I.Revision()
   confidence,       -- "high" | "medium" | "low"
   basis,            -- the weakest basis it rests on (see Rules)
   why, how,         -- lists of localized lines: why it's here, what to do
-  numbers,          -- lines of the working ({ label, value, basis })
-  items,            -- { { item, n, each, source ("ah","vendor","drop",...), age } }
+  numbers,          -- lines of the working ({ label, value (text, "~" when not sure), basis, copper (money's) })
+  items,            -- { { item, n (an hour for per-hour ideas, else how many), each, source ("ah","vendor","drop",...), age } }
   place,            -- { map, name, points = { { x, y, r } } } or nil (shown on a small map; "Show on map")
   needs,            -- what it needs that you don't have ("Skinning 1", "level 24")
   warnings,         -- lines ("prices 5 h old", "classic data: Forever may differ")
-  oldest }          -- the oldest price used
+  oldest,           -- the oldest price used
+  missing }         -- items it needs a price for (then it has neither perHour nor once: listed, not ranked)
 ```
 
 ### Goal (`W.Goal`, Goal.lua) and Bags (`W.Bags`, Bags.lua)
@@ -180,7 +185,132 @@ W.Bags.List() -- { { item, count, best, value, vendor, ah, keep (a reason not to
 
 ### The ideas
 
-(to be written by the ideas part)
+`Context.lua` (`W.Context()`, its rules in `W.ContextParts`) and `Methods.lua` (`W.Ideas` = `I`, its parts
+in `I.parts` for the tests). Every number below is a named constant at the top of Methods.lua.
+
+**Who I am** (`W.Context()`, read from the game when asked, nothing kept): level, class and race files,
+side, gold, the zone (`C_Map.GetBestMapForUnit`, a cave or city floor taken up to its zone), professions
+(`C_SkillInfo.GetSkillLineInfoByID` for the money-making lines, Lockpicking too; without an answer the game's
+`GetProfessions` list, a child line counted as its base), known recipes (Chronicle's record of this
+character: `R.People`), the group (`GetNumGroupMembers`, else `IsInGroup`), how many primary professions
+(two at most: Herbalism, Mining, Skinning and the six crafts) and so whether one is free; `canPick`:
+Pick Pocket known (`C_SpellBook.IsSpellKnown(921)`), a rogue of level 4 or more when the game doesn't say.
+A secret value is left out.
+
+**The bases.** Each idea's `basis` is the weakest of what its number rests on, strongest first:
+`yours`, `forever`, `prices`, `classic`, `estimate`. A vendor's sell price is the client's own fact
+(`P.Vendor`): its number line says `forever`, but it doesn't weaken an idea (so your own kills valued at
+vendor prices stay `yours`); an auction house price makes it `prices` (with its confidence and age). The
+fixed rest between kills (below) doesn't weaken it either: it's said as its own number line (`estimate`)
+and keeps every grinding idea at medium confidence or lower. Confidence starts high and only goes down:
+classic data medium, an estimated pace low, a price's own confidence, a price older than `P.STALE` one
+step (and a warning with the oldest price's age), a friend's price said, an item without any price one step
+and a warning. A part worth less than 5% of an idea doesn't weigh on it. Numbers that rest on classic data
+or estimates are written with "~" and two digits.
+
+**No price, no number.** An item's worth is the better of a vendor (`P.Vendor`) and the auction house
+(`P.AHSale(item, 1)`: after the cut and the deposit lost), the auction house only with a robust `value`
+that isn't `unstable` or of low confidence. An item with neither counts as nothing and is said; when such
+items make up a quarter or more of an idea's chances (or a craft's reagents aren't all priced, `complete
+== false`), the idea gets `missing` (those items) and no `perHour`/`once`: listed after the others, not
+ranked.
+
+**Grind** (`grind:<creature>`), from `Dt.MobsOn` of the zone maps in `X.ZONES` (outdoor zones, no
+capitals; a zone is looked at only when its quest levels, from Lodestar's data, come within 8 levels of
+the window):
+
+- *Which mobs*: not in an instance; hostile to your side (`reactA`/`reactH`), or neutral and a beast (a
+  neutral humanoid may be a town's); not a critter, totem, pet or gas cloud; rank `normal` (`elite` only in
+  a group, and then only with your own pace on it: a group's speed isn't guessed; never rares or bosses);
+  its levels (the classic database's `health` range, else the Bestiary's) within the **window**: from one
+  above classic's grey level (Lodestar's rule: such mobs still give experience) to one above yours (from
+  two above, classic mobs miss you less, hit harder and resist more, so an even fight's pace no longer
+  holds). Level 5: 1-6, 25: 19-26, 45: 36-46, 60: 52-61. At least 8 spawns on the map (`Dt.Spots`); the
+  map where most of it spawns is its place (its three biggest clusters).
+- *Worth per kill*: with 30 kills of your own (the Bestiary), yours: coin over kills, each item's count over
+  kills, quest items (the database's flag) and greens or better the database doesn't list for that mob
+  (world drops) left out. Else the classic database's (`Bt.Known`): the middle of its coin range (the drop
+  data's `g=min-max`), each drop's chance once (the data has no stack sizes: said), quest items left out;
+  world drops aren't in it (said on every grinding idea). Skinning when you have the line the corpse needs
+  (`Dt.Mob().skin`: leather Skinning, herb Herbalism, ore Mining) and your skill reaches its highest level
+  (classic's rule: below 100 skill (level - 10) x 10, from 100 on level x 5; skill 150 skins level 30, 300
+  level 60): yours with 10 skinnings, else the database's chances.
+- *Kills per hour* = 3600 / (fight + 20 s between kills + 2 s when skinning). The fight: your own pace on
+  that mob (`Bt.Pace`, 5 timed kills at least, at your level or up to 3 below: you've only got stronger;
+  the Bestiary is account-wide, so another character's counts); else its health at its middle level
+  over your damage per second (the health of the mobs you killed at those levels over the time they took,
+  10 timed kills at least: an estimate, said); else 35 s (an estimate on the slow side, said). Capped by the
+  spawns: spawns x 3600 / respawn (said when it caps).
+- In a group: said (loot shared, kills faster: the numbers are for playing alone).
+
+**Pickpocket** (`pickpocket:<creature>`, rogues who can): a grinding mob's `Dt.Pickpocket` loot (chance x
+the middle of its count), as many pockets an hour as its kills. Coin from pockets isn't counted (no rule
+in the data for it: said).
+
+**Learn** (`learn:<line>`), only with a free primary slot: Skinning, from the grinding mob whose skins add
+the most an hour (kills slowed by the skinning), `needs` the skill its level takes; Herbalism or Mining,
+from the zone whose nodes are worth the most at any skill, `needs` the highest node skill counted. One
+idea per line, the best one.
+
+**Gather** (`gather:herb|ore:<map>`) and **fish** (`fish:<map>`), only in zones whose quests start at
+most two levels above yours (safe enough) and with the money data loaded: a node's worth is its loot's
+chance x the middle of its count x the item's worth (a vein mined more than once isn't counted), averaged
+over the zone's nodes at your skill weighted by how many there are, 20 nodes at least. Nothing measures
+nodes an hour, so per hour uses 15 nodes (an estimate, low confidence, said). Fishing only where your
+skill is at least the zone's (`Dt.Fishing().skill`: no getaways), 120 catches an hour (an estimate, said).
+
+**Quest** (`quest:<id>`, once): Lodestar's quests open to you (`Q.Status` available or active, `Q.InRange`),
+from every zone's list, with `Q.Rewards`: the money, the reward choice worth the most, and every reward
+item; the basis `forever` for Forever's own quests, else `classic` (the money may be EG Link's, the data
+doesn't say which). The place is the giver's (the ender's for one in your log); a group quest is said; at
+level 60 it's said that a quest's money for its experience isn't counted. Needs Lodestar switched on: its
+data add-on is loaded (`Q.Load`) on the first run, as Lodestar's own windows do. Which quests are open is
+kept while Lodestar's data, your progress and level stay.
+
+**Craft** (`craft:<spell>`, once): `Cr.Mine()`'s entries with `verdict == "craft"` and a profit (read:
+`spell`, `item` (else `recipe.item`), `profit` (a craft's), `complete`, `basis`, `oldest`): the profit times
+how many sell a day (`P.Get(item).perDay`, at least one); unknown: one, low confidence, said. Crafting's
+real limit is how many sell, so it's not per hour.
+
+**The market** (once, only listings from a scan younger than `P.STALE`, each said to maybe be gone):
+**flip** (`flip:<item>`): an item that isn't unstable or low confidence, sells (`sells` 0.5 or more, one a
+day or more), whose `P.AHSale` brings at least 1s and 15% more than the lowest listing; `P.AHSale`'s 2nd
+answer (the unit price it assumes) must be above that listing. How many: those listed, at most a day's
+sales. **Vendorflip** (`vendorflip:<item>`): listings at least 20c below what a vendor pays.
+**Disenchant** (`disenchant:<item>`, enchanters): a listing below what disenchanting it gives at your skill
+(`Dt.Disenchant`: each result's chance x the middle of its count x its auction house worth, every result
+priced there), at least 1s and 15% more, five at most; and `disenchant:bags`: what in your bags
+(`W.Bags.List()`, not kept) is worth more disenchanted than its sale (`value` / `count`).
+**Limited** (`limited:<item>`): `Dt.Limited` vendors not hostile to your side (`Dt.Mob(npc)`), the vendor's
+price (a merchant's seen price, `P.VendorBuy`'s 2nd answer, wins), at least 1s and 15% under its
+auction house sale; how many: the stock, at most a day's sales; its place the vendor's.
+
+**Sell** (`sell:bags`, once): `W.Bags.List()`'s total and its five most valuable entries (an entry's
+`value` taken as the whole stack's).
+
+**Ranking.** Ideas with `perHour` first, by perHour x 1 (high), 0.75 (medium) or 0.5 (low); then the
+once-ideas the same way; then those that need a price. At most 6 grind, 3 gather, 2 fish, 3 pickpocket,
+8 quest, 5 craft, 6 flip, 5 vendorflip, 5 limited, 4 disenchant, 4 learn, 1 sell. `idea.rank`, `score`
+and `group` (1, 2, 3) say where it stands. An idea whose place is in your zone says so first in `why`.
+
+**The driver.** Nothing runs before the first `I.Request()`; then its events (level, skills, zone, group,
+spells learned; bags and item names apart) and the Bestiary's changes only count. A request shows a
+driver frame; on the next frame it compares the key of what the list rests on (those counts, `P.Revision`,
+Chronicle's recipes, Lodestar's data and progress) with the published list's: nothing changed, it hides
+again. Else a run starts (one that only prices or bags moved waits until 5 s after the last start, with
+one timer, hidden meanwhile; a level, a skill, the zone or the group start it at once). A run is phases of
+units (a Bestiary record, a zone's mob, a zone, a quest, an auction house item), as many a frame as fit in
+3 ms (`debugprofilestop`; 30 where there's none), through `LT.Guard`: an error is reported once and drops
+the run. The grinding candidates (the zone scan) are kept while your level, side, group, the money data
+and the number of kinds in the Bestiary stay. When the run's list differs from the last (keys, numbers,
+confidence, basis, texts, warnings), `I.Revision()` goes up and `I.Watch` callbacks run on the next frame;
+then the frame hides. The window calls `I.Request()` when it opens and whenever it redraws or refreshes
+while it shows the ideas: it costs nothing when nothing changed.
+
+Open questions (in game, and data not verifiable here): whether every kill drops coin uniformly between
+the data's min and max (CMaNGOS's loot code does); classic's skinning rule on Forever; Forever's fishing
+skill per zone; the estimates (20 s between kills, 35 s a fight, 15 nodes and 120 catches an hour) against
+real play; quest money at level 60.
 
 ### The window, bags, tooltip and goal
 
