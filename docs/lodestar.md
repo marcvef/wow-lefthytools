@@ -1046,7 +1046,10 @@ setting off).
 Zone tab its zone's map with the quest picked on it, found and pulsing, a dungeon's quest list, its details
 on the right; a spot `{ map, x, y[, r] }`: zoomed in to that spot; true when it's shown: **Finding a quest
 on the map**, below); `Q.ShowDetails(id)` opens it on the tab it shows with the quest picked, its details
-on the right (no other tab, the map not moved; true when shown); `Q.SelectZone(map)` opens it on a zone's page (a
+on the right (no other tab, the map not moved; true when shown); `Q.ShowPlace(map, points)` opens it on another
+module's place, no quest (WhyPoor?'s farming spots: its zone's page on the Zone tab, the map moved and zoomed to the
+points `{ { x, y, r } }`, pulsing three seconds; points on another zone page than the first's left out; true when
+shown); `Q.SelectZone(map)` opens it on a zone's page (a
 uiMapID, a city's floor or a cave counting as its zone, or a dungeon's name; nothing picked, its
 briefing on the right; false when there's no such place); `Q.OpenChain(id)` opens it on a quest's chain
 (the quest's zone on the Zone tab, the quest picked, its chain in the middle with its card in sight: what a

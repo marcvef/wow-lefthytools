@@ -27,6 +27,12 @@ C_AddOns.LoadAddOn = function(name)
 end
 Dt.db, Dt.tried, Dt.why, Dt.cache = nil, false, nil, {}
 LefthyToolsMoneyData = nil
+-- (the Bestiary's tests leave a small drop database of their own: the Bestiary reads it again, loading the real one)
+local bestiary = LT:GetModule("bestiary")
+local dropDataWas = LefthyToolsDropData
+LefthyToolsDropData = nil
+LT:SetModuleSetting(bestiary, "dropData", false)
+LT:SetModuleSetting(bestiary, "dropData", true)
 
 local errorsBefore = #ERRORS
 
@@ -93,4 +99,6 @@ frame:Hide()
 
 C_AddOns.LoadAddOn = loader
 Dt.db, Dt.tried, Dt.why, Dt.cache = nil, false, nil, {}
-LefthyToolsMoneyData, LefthyToolsDropData = nil, nil
+LefthyToolsMoneyData, LefthyToolsDropData = nil, dropDataWas
+LT:SetModuleSetting(bestiary, "dropData", false)
+LT:SetModuleSetting(bestiary, "dropData", true)

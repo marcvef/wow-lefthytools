@@ -12,6 +12,7 @@ module you can switch on or off.
 | [Bestiary](#bestiary) | What the mobs you kill drop: a window that follows your target with each drop, how many you got and its drop chance, from your own kills |
 | [Echoes](#echoes) | Records where you go and what happens on the way, for a replay of the whole group on a map website. Records only, shows nothing in game |
 | [Lodestar](#lodestar) | Quest chains for every zone: what's for your level, where quests start, where their objectives are and where to turn them in, the whole chain a quest is part of, your quest log sorted, the level and XP of a quest before you accept it, which quest an item in your bags is for, and how far your friends got |
+| [WhyPoor?](#whypoor) | Ideas for making money with the character you play: what's worth doing at your level, class, professions and place (mobs to farm, herbs and ore, fishing, quests that pay, crafts, auction house deals), what your bags would fetch and when you'll afford your mount. Informational only |
 
 ## Settings
 
@@ -97,7 +98,7 @@ says so in chat. Your data on the beta stays as it is.
 
 The installer also installs `LefthyTools_DropData` next to it (the Bestiary's drop database, also
 mobs' health for the fight stream, an add-on of its own), `LefthyTools_QuestData` (Lodestar's quest
-chains, another one) and removes the old standalone `Mirage`
+chains, another one), `LefthyTools_MoneyData` (WhyPoor?'s money data, a third) and removes the old standalone `Mirage`
 addon, which is now part of LefthyTools. How it works inside (for developers): see
 [docs/](docs/architecture.md).
 
@@ -608,6 +609,67 @@ works too), `/lodestar browse`, `/lodestar minimap`, `/lodestar settings`.
 
 ---
 
+## WhyPoor?
+
+Ideas for making money with the character you play, at its level, class, professions and place, and
+roughly how much each brings. Open it with the coin on the minimap's edge (or `/whypoor`). It's
+**informational only**: it never buys, sells or posts anything; auction house addons do that.
+
+**Every number says what it rests on**: your own kills and sales, the auction house's prices (with
+how old they are), WoW: Forever's own data, or the classic world database ("Classic data: Forever
+may differ"). Your own numbers win over the database's. What isn't sure is written with "~" and
+said why ("You haven't fought it: kills per hour are a careful guess"); without a price an idea
+gets no number at all, never a made-up one.
+
+**The window** (Lodestar's slim style): the list on the left, the details on the right, and a line
+across the top with your goal: "Mount: 34g of 100g · ~3g/h · at this rate at level 44".
+
+- **Ideas**, best first: mobs to farm that suit you (hostile to your side, a level you kill quickly,
+  enough of them; never a guard, a civilian or a faction you'd lose reputation with), with coin,
+  drops and skinning per kill and kills per hour (your own pace where you've fought them); herbs,
+  ore and fishing at your skill; picking pockets for rogues; quests that pay (and which reward vendors
+  best); your recipes that make a profit; professions worth learning. Each idea shows why it's
+  there, what to do, the working, the items with their prices, and a small map of where
+  ("Show on map" opens it in Lodestar).
+- **Bags**: each item, whether a vendor or the auction house pays more for it, and what they'd
+  fetch in all. Quest items you still need and gear you might wear are kept apart.
+- **Market**: auction house deals from your last scan: items listed below their usual price that
+  sell often, below what a vendor pays, vendor items in limited stock that sell for more, and (for
+  enchanters) greens worth more disenchanted. Each counts one item: a scan knows only the cheapest
+  listing's price.
+- **The goal**: the riding skill and mount you're saving for, what you have, what your bags would
+  add, your gold per hour played (from Chronicle) and when you'd have it. The cost is what the riding
+  trainer shows you (with your reputation discount) once you've opened their window; until then a
+  guide figure, said so.
+
+**Prices**: the auction house is scanned whole when you open it (the game allows that every 15
+minutes), a little each frame so nothing stutters. Two weeks of each item's lowest price give its
+usual price; prices that jump around are marked unstable and left out of the ideas. Your Beacon
+friends on the same realm and side share their scans with you (and you yours), so one visit to the
+auction house helps everyone. Chronicle's crafting margins use the same prices.
+
+**Crafting**: a recipe's cost takes the cheapest way to get each reagent: the auction house, a
+vendor, your bags, or crafting it yourself (a bolt of cloth from your linen, a miner's bars from
+ore), several steps deep. "Sell the reagents" says when selling them brings more than crafting.
+
+**Outside the window**, only where it decides something: one line in the tooltip of items in your
+bags and at the auction house ("WhyPoor?: AH 1g 20s (2 h, sells well) · vendor 30s"), and a small
+coin in the corner of items in the sorted bags that are worth more at the auction house.
+
+Its money data (where mobs, herbs and ore are, fishing, pickpocketing, disenchanting, vendors with
+limited stock) comes as an add-on of its own, `LefthyTools_MoneyData`, from a classic world
+database, and loads only when first needed.
+
+| Setting | Default |
+|---|---|
+| Minimap button | on |
+| A line in item tooltips | on |
+| Coins in the sorted bags | on |
+| Share auction house prices with friends | on |
+
+`/whypoor` opens or closes the window; `/whypoor ideas`, `bags`, `market` or `goal` opens that
+page; `/whypoor minimap` shows or hides the button.
+
 ## Mirage
 
 Fades the interface away when you're out of combat and not using it, and brings it
@@ -724,5 +786,9 @@ add-on, [LefthyTools_QuestData](LefthyTools_QuestData/), is generated from CMaNG
 Link's WoW: Forever data (Data from [Efficient Games](https://efficient.games), licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)) and is under the GPL v3 too
 ([its LICENSE.md](LefthyTools_QuestData/LICENSE.md) and [COPYRIGHT.md](LefthyTools_QuestData/COPYRIGHT.md));
-it's rebuilt with `node tools/update-quest-data.js` ([its README](LefthyTools_QuestData/README.md)).
+it's rebuilt with `node tools/update-quest-data.js` ([its README](LefthyTools_QuestData/README.md)). The
+money data add-on, [LefthyTools_MoneyData](LefthyTools_MoneyData/), is generated from CMaNGOS Classic DB (and
+EG Link's WoW: Forever data, as above) and is under the GPL v3 too ([its LICENSE.md](LefthyTools_MoneyData/LICENSE.md)
+and [COPYRIGHT.md](LefthyTools_MoneyData/COPYRIGHT.md)); it's rebuilt with `node tools/update-money-data.js`
+([its README](LefthyTools_MoneyData/README.md)).
 World of Warcraft content and names belong to Blizzard.

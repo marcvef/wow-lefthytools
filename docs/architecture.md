@@ -11,7 +11,7 @@ in the [README](../README.md); this file covers how the code is organised.
 ```
 LefthyTools/                 the addon (copied or junctioned into Interface\AddOns)
   LefthyTools.toc            Interface 16001, SavedVariables LefthyToolsDB, LefthyToolsChronicleDB,
-                             LefthyToolsBestiaryDB, LefthyToolsEchoesDB; every file in load order
+                             LefthyToolsBestiaryDB, LefthyToolsEchoesDB, LefthyToolsWhyPoorDB; every file in load order
   Bindings.xml               LEFTHYTOOLS_MIRAGE_TOGGLE, LEFTHYTOOLS_MIRAGE_PEEK (hold),
                              LEFTHYTOOLS_CHRONICLE_TOGGLE
   Core/Locale.lua            ns.L localization table (English keys, falls back to English)
@@ -120,10 +120,15 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Lodestar/Data.lua       Lodestar's quest data (LefthyTools_QuestData, loaded when a window opens): quests, zones, search, learned data
   Modules/Lodestar/Engine.lua     Lodestar's engine: a quest's status for me or a friend, what's missing, its chain, what's next
   Modules/Lodestar/Learn.lua     Lodestar's learning: givers, enders, prerequisites while playing (LefthyToolsDB.lodestar.learned)
+  Modules/WhyPoor/                WhyPoor?: money ideas for the character (docs/whypoor.md has every file): the module,
+                                  the auction house price engine (also Margins'), friends' prices, the money data's reader,
+                                  crafting costs, who I am, the ideas, the goal, the bags, the window
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 LefthyTools_QuestData/       Lodestar's quest chains, givers and places (CMaNGOS Classic DB, EG Link's Forever data), an add-on of its own (load on demand), GPL v3
   QuestData.lua              generated (tools/update-quest-data.js); LICENSE.md, COPYRIGHT.md, README.md
+LefthyTools_MoneyData/       WhyPoor?'s money data: farmable mobs and their spawns, gathering nodes, fishing, pickpocketing, disenchanting, limited vendor stock (CMaNGOS Classic DB), an add-on of its own (load on demand), GPL v3
+  MoneyData.lua              generated (tools/update-money-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
 tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
@@ -135,6 +140,7 @@ tools/update-recipes.js          regenerates Data/Recipes.lua from wago.tools (n
 tools/wago.js                    shared by the five node tools above: latest Forever build, tables (CSV, --cache, a locale), arguments
 tools/update-drop-data.js    regenerates LefthyTools_DropData/Drops.lua from a classic world DB dump (node)
 tools/update-quest-data.js   regenerates LefthyTools_QuestData/QuestData.lua: the classic dump, EG Link, Forever's client tables (node)
+tools/update-money-data.js   regenerates LefthyTools_MoneyData/MoneyData.lua (the classic dump, Forever's client tables, the quest tool's placing) (node)
 tools/build-installer.js     builds Update-LefthyTools.cmd from install.ps1 (npm run build-installer)
 install.ps1                  installer/updater: players (download from GitHub) and devs (checkout, -Link)
 Update-LefthyTools.cmd       players' one-file installer: batch header + install.ps1 (generated)
@@ -203,7 +209,7 @@ Update-LefthyTools.cmd       players' one-file installer: batch header + install
   what was left out is listed ("Not searched: ..."). The registry's WoW path isn't used (on some
   PCs it belongs to another launcher). In each folder it replaces `Interface\AddOns\LefthyTools`
   (settings live in `WTF`, untouched) and the add-ons that come with it (`$Companions`: folders
-  next to `LefthyTools/` in the repo, `LefthyTools_DropData` and `LefthyTools_QuestData`; checked the same way, not stamped
+  next to `LefthyTools/` in the repo, `LefthyTools_DropData`, `LefthyTools_QuestData` and `LefthyTools_MoneyData`; checked the same way, not stamped
   with a version; a new one means "restart the game"), removes the old standalone `Mirage` addon,
   and skips the install if that exact version is already there and nothing is missing (`-Force`
   reinstalls). "/reload" or "restart the game" is said once at the end, a restart if any folder

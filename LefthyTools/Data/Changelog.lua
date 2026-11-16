@@ -605,5 +605,14 @@ ns.CHANGELOG = {
 	{ id = 199, module = "tweaks",
 		en = { "Sorted bags: item use no longer blocked", "Right-clicking an item in the bag could be blocked by the game after the reagent bag's window had opened with the bag; that window now opens and closes only as Blizzard's bags do." },
 		de = { "Sortierte Taschen: kein Blockieren mehr", "Ein Rechtsklick auf ein Item in der Tasche konnte vom Spiel blockiert werden, nachdem das Fenster der Reagenzientasche mit der Tasche aufgegangen war; das Fenster öffnet und schließt sich jetzt nur noch wie bei Blizzards Taschen." } },
+	{ id = 200, module = "whypoor",
+		en = { "New: WhyPoor?", "Ideas for making money with the character you play: mobs to farm that suit your level and side, herbs, ore and fishing at your skill, quests that pay, profitable crafts and auction house deals, each with how much it brings and what that rests on. Plus what your bags would fetch and when you'll afford your mount. The coin on the minimap or /whypoor." },
+		de = { "Neu: WhyPoor?", "Ideen zum Geldverdienen mit deinem Charakter: Mobs zum Farmen passend zu Level und Seite, Kräuter, Erz und Angeln nach deinem Skill, Quests mit Gold, Rezepte mit Gewinn und Deals im Auktionshaus, jeweils mit wie viel es bringt und worauf das beruht. Dazu was deine Taschen bringen und wann du dein Mount bezahlen kannst. Die Münze an der Minimap oder /whypoor." } },
+	{ id = 201, module = "chronicle",
+		en = { "Margins: reagents you can craft", "A recipe's cost now takes the cheapest way to get each reagent, also crafting it yourself (a bolt from your linen, a miner's bars from ore), several steps deep. The margins window shows each crafted reagent and the time it takes." },
+		de = { "Margen: Reagenzien selbst herstellen", "Die Kosten eines Rezepts nehmen jetzt den günstigsten Weg zu jedem Reagenz, auch selbst herstellen (ein Ballen aus deinem Leinen, die Barren eines Bergbauers aus Erz), mehrere Schritte tief. Das Margen-Fenster zeigt jedes hergestellte Reagenz und wie lange es dauert." } },
+	{ id = 202, module = "chronicle",
+		en = { "Margins: one price scan for all", "The auction house scan now keeps every item with two weeks of history (WhyPoor? uses it too), and friends on your realm and side share their scans when both have this build." },
+		de = { "Margen: ein Preisscan für alles", "Der Auktionshaus-Scan behält jetzt jedes Item mit zwei Wochen Verlauf (auch für WhyPoor?), und Freunde auf deinem Realm und deiner Seite teilen ihre Scans, wenn beide diesen Build haben." } },
 	-- New entries go here, at the end.
 }
