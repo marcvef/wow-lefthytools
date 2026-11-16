@@ -61,26 +61,34 @@ All money in copper, times as `time()`, per hour as copper per hour of play.
 P.Vendor(item)        -- what a vendor pays for one (copper; 0: vendors don't buy it), nil while the client doesn't know it yet (asked for)
 P.VendorBuy(item)     -- what a vendor asks for one: seen at a merchant, else Data/Recipes.lua's list; nil: not sold by vendors we know; 2nd: seen
 P.Get(item)           -- nil: never seen on the auction house of this realm and faction; else {
-                      --   low,    -- the lowest buyout for one at the last scan that covered it (nil: none listed then)
+                      --   low,    -- the lowest buyout for one at the last scan that covered it, whole copper (nil: none
+                      --           -- listed then; 0: under half a copper each); my own listings left out
                       --   qty,    -- how many were listed then
                       --   seen,   -- when that was (time())
                       --   value,  -- the robust price: a time-weighted median of each day's lowest (up to 14 days); nil: too little
                       --   days,   -- how many days that rests on
-                      --   sells,  -- 0..1: how likely a listing near value sells (from scans: listings gone before they could
-                      --           -- expire, quantity going down; and my own sold/expired auctions); nil: not known
-                      --   perDay, -- about how many sell a day; nil: not known
+                      --   sells,  -- 0..1: how many of my own auctions of it sold, of those that sold or expired (the game's
+                      --           -- notifications; 3 at least, any price); nil: not known
+                      --   perDay, -- about how many leave the auction house a day before they could expire: bought OR taken
+                      --           -- back (scans can't tell them apart), from full scans of one session; nil: not known
                       --   confidence, -- "high", "medium", "low" (few days, thin or unstable market, old)
                       --   unstable,   -- true: prices jump around too much to rank on
                       --   friend,     -- the friend's name when the newest data is theirs
                       -- }
 P.AHSale(item, n)     -- what selling n on the auction house is expected to bring, after the 5% cut and the
-                      -- deposit lost on what doesn't sell: copper, or nil (no price); 2nd: the unit price it assumes
+                      -- deposit lost on what doesn't sell: copper, or nil (no price); 2nd: the unit price it assumes;
+                      -- 3rd: the sell chance used (nil: not known, so it's what n bring IF they sell, no deposit lost);
+                      -- 4th: the deposit counted (nil: none)
 P.Best(item, n)       -- the better way to sell n: "vendor" | "ah" | nil (neither known), the copper, and the reason key
-P.Deposit(item, n)    -- the deposit for n (the game's when the auction house is open, else the rule), nil: unknown
+P.Deposit(item, n)    -- the deposit for n: the game's when the auction house is open (2nd "game"), else what the game
+                      -- said for this item before (2nd "seen"); nil: unknown (no rule of its own)
 P.IsOpen()            -- the auction house is open
 P.LastScan()          -- when this realm's last full scan was
 P.Revision()          -- goes up when any price changed (for caches)
 P.AH_CUT, P.STALE
+-- Also (Margins and tests): P.AHPrice(item) ({ p, q, t }: Margins' old shape), P.ScanItems(items, { front, spell }),
+-- P.ScanFull(fallback), P.Status(), P.Cancel(), P.Busy(), P.Refresh(), P.levelHint (a function: gear's item level),
+-- P.Decode / P.Encode (an item's saved text), P.Today()
 ```
 
 ### Crafts (`W.Crafts`, Crafts.lua)
@@ -164,11 +172,135 @@ W.Bags.List() -- { { item, count, best, value, vendor, ah, keep (a reason not to
 
 ### Prices
 
-(to be written by the prices part)
+`Prices.lua` (`W.Prices`, `P`) is the suite's one auction house engine: Chronicle's Margins reads its prices
+from it and asks it to scan (chronicle.md, Crafting margins). It runs while WhyPoor? or Chronicle's `margins`
+setting is on (`P.Refresh`, looked at again after every module switch through a post-hook on
+`LT:ApplyModuleState`, and by Margins' own switches); off, no event is registered and nothing runs.
+
+**Saved** (`LefthyToolsWhyPoorDB.prices`, account-wide), kept small: an item's history is one string, numbers
+in base 36 (`P.B36`, `tonumber(s, 36)`), since the game writes every array element of a saved table on a
+line of its own.
+
+- `houses["<realm>-<faction>"]`: each auction house its own. `items[item] = "<seen>,<low>,<qty>;<day>,<low>,<qty>;..."`:
+  the last scan that covered it (low empty: none listed), then the lowest for one and how many of each day
+  (`day` = `time() / 86400`, newest first, 14 at most); `flow[item]` (listings gone early, below),
+  `own[item]` (my auctions sold and expired, per day), `friends[item]` (Friends' prices), `scan` (the last
+  full scan read), `friendScan` (the newest friend's data taken).
+- `replicated`: when ReplicateItems was last asked (one for all houses: the game's limit isn't documented as
+  per realm, so the safe reading).
+- `vendor[item]`: what a merchant asked for one, in gold only (`C_MerchantFrame.GetItemInfo`'s `price` for
+  `stackCount`, not `hasExtendedCost`), every item a merchant's window showed, any realm. It's the price this
+  character was asked: a reputation discount is in it.
+- `posted[auctionID]`, `deposit[item]`: below. `imported`: Margins' old prices taken over.
+
+**Margins' old prices** (`LefthyToolsDB.margins`: `ah[house][item] = { p, q, t }`, `vendor`, `replicated`) are
+taken over once when the engine first starts (each price as its scan and as a day of history), then
+`LefthyToolsDB.margins` goes.
+
+**Which auction house.** My faction's, `"<realm>-<faction>"`; opened in Stranglethorn Vale, Tanaris or
+Winterspring (classic uiMapIDs 1434, 1446, 1452, also as a parent of the map I'm on), where classic's three
+neutral auction houses are (Booty Bay, Gadgetzan, Everlook), it's `"<realm>-Neutral"` (looked at on the
+frame after `AUCTION_HOUSE_SHOW`, and at once by a scan). Neutral prices are kept apart and not used by
+`P.Get` (whose cut there is unknown, below).
+
+**Scanning**, only with the auction house open, never in a fight (`LT.InFight`), on the driver frame (hidden
+while there's nothing to do):
+
+- Item by item (`P.ScanItems`): `C_AuctionHouse.SendSearchQuery(itemKey, price ascending, true)` one at a time,
+  0.65 s apart (the game takes 100 a minute) and only when `IsThrottledMessageSystemReady` isn't false; the
+  answer read 0.2 s after its event: the first 50 rows' lowest for one, my own auctions left out
+  (`numOwnerItems`, `containsOwnerItem`), and the listed quantity; no rows: none listed; no answer in 3 s: the
+  price stays. Gear is searched with its item level (`GetDetailedItemLevelInfo`, else `P.levelHint`: Margins'
+  recipe's). Margins' recipe checks and its fallback use this.
+- Everything (`P.ScanFull`): `ReplicateItems` when the last one was 15 minutes ago or more (the game's limit,
+  saved), then `REPLICATE_ITEM_LIST_UPDATE`, then every row read in a coroutine 2 ms a frame (a look at the
+  clock every 50 rows): `GetReplicateItemInfo(i)` (0-based) gives a stack's `count` and `buyoutPrice` (for the
+  whole stack), the `owner` and the `itemID`; rows without a buyout (bids only) aren't counted; my own
+  (`owner` is my name) count in how many are listed, not in the lowest. Then it's kept, also in slices: every
+  item in it, and every item known here that wasn't (none listed); an item not seen for 14 days goes. The
+  auction house closing while the rows are read drops the scan; once they're read it's kept. No answer in 30 s
+  or no rows: the caller's fallback items, searched one by one.
+- A price for one is rounded to whole copper (0: under half a copper each).
+
+**History and judgement** (`P.Get`):
+
+- `value`: the time-weighted median of the daily lows of the last 14 days, each day weighing
+  `0.5 ^ (age in days / 7)` (aux's way of judging a price: the daily minimum buyout, a weighted median; the
+  weights are ours). One day is enough for a value; `days` says how many it rests on, `confidence` how sure.
+- `unstable`: with three or more days, the median distance of the lows from their median is more than half
+  of it; with two, one is more than three times the other.
+- `confidence`: `"high"` with 4+ days, not unstable, the last scan at most 3 hours old (`P.STALE`) and 3+
+  listed; `"medium"` with 2+ days, not unstable, at most a day old; else `"low"`. A friend's data is never high.
+- `perDay` (bought **or** taken back: a scan can't tell them apart): two full scans of the same house in one
+  session, 15 minutes to 48 hours apart, are compared. A listing (`count`, `buyoutPrice`, `owner`) of the first
+  whose time left (`GetReplicateItemTimeLeft`'s band) was at least the time between the scans (the band's
+  shortest time, `GetTimeLeftBandInfo`) couldn't have expired; if it's missing from the second, it left early.
+  What a named seller lists anew of the item counts against what they had leave (relisting, undercutting), so
+  only the rest is gone. Per day the gone quantity and the seconds watched add up (`flow`); `perDay` = gone x
+  86400 / seconds once at least 2 hours were watched. The listings of the last full scan are kept in memory
+  only (100,000 at most), so it needs two full scans in one session. A buyer taking part of an anonymous
+  listing counts it all as gone.
+- `sells` (my own auctions, any price): the game's `AUCTION_HOUSE_SHOW_FORMATTED_NOTIFICATION`
+  (`AuctionSold` 4, `AuctionExpired` 5, the item's name, maybe the auction's ID): Blizzard_Game routes it on
+  every client of the Mainline family (Forever's too) to the "A buyer has been found..." / "...has expired"
+  chat line, so it comes anywhere, not only at the auction house. Matched by the ID to `posted` (my auctions as
+  `GetOwnedAuctionInfo` listed them: item, quantity, house; asked for with `QueryOwnedAuctions` after
+  `AUCTION_HOUSE_AUCTION_CREATED`, and read on every `OWNED_AUCTIONS_UPDATED`), else by the name to the oldest
+  such auction, else by the name to the item (`C_Item.GetItemInfo(name)`, an item the client knows). An owned
+  auction listed as `Sold` counts too; each auction once; `AUCTION_CANCELED` ones never. `sells` = sold / (sold
+  + expired) over 14 days, from 3 outcomes on. Posted auctions are forgotten after 3 days. Mail subjects and
+  chat lines aren't read (the notification is the typed source).
+
+**Selling** (`P.AHSale`): the unit price is the lower of the last scan's lowest and the value (the value alone
+when none is listed). With `sells` and the deposit known: `sells x n x unit x 0.95 - (1 - sells) x deposit`
+(the deposit comes back when it sells); else `n x unit x 0.95`, and the third result (nil) says it assumed a
+sale. `P.Best`: the vendor's `n x sell price` (`C_Item.GetItemInfo`'s 11th) against that: `vendor-more` (a tie
+too: certain money), `ah-more`, `vendor-only`, `ah-only`, `ah-unstable` (vendor), `no-price`.
+
+**The deposit** (`P.Deposit`): open, the game's: `CalculateItemDeposit(location, duration, n)` for an item in my
+bags that isn't a commodity (`GetItemCommodityStatus`), else `CalculateCommodityDeposit(item, duration, n)`;
+the duration is the one last picked in the auction house (its CVar `auctionHouseDurationDropdown`, as Blizzard's
+sell frame reads it; 1 when unset), rounded up to silver when `SupportsCopperValues()` is false (as the sell
+frame shows it). The game's answer for one and for n is kept per item and duration; closed, that one for the
+same n, or scaled when the game's deposit for n was exactly n times the one for one. No rule of our own:
+otherwise nil.
+
+**Pruning**: when the engine starts, a job over frames drops items and friends' prices not seen for 14 days,
+days older than 14 in `flow` and `own`, posted auctions older than 3 days, broken entries, and houses with
+nothing left. It goes over copies of the keys and never alongside a scan.
+
+**Open questions** (not verified in game): the cut at a neutral auction house (classic's 15%? `P.AH_CUT` is
+5%, so neutral prices are kept apart); whether `GetReplicateItemInfo` gives `owner` on Forever (without it,
+relisting isn't recognised); whether a replicate row's `buyoutPrice` is the stack's on Forever as on retail
+(Margins assumed it); whether the notifications carry the auction's ID; whether `ReplicateItems`' 15 minutes
+are per account or per realm; random-suffix gear ("of the Monkey") shares one item ID, so its lowest is the
+lowest of any suffix.
 
 ### Friends' prices
 
-(to be written by the prices part)
+`Share.lua` (`W.Share`): auction house prices between friends over Beacon's B family, WhyPoor?'s letter `w`
+(docs/beacon.md has the words). Only to builds from `PRICES_SINCE` on (their `V2`; older builds ignore an
+unknown B word anyway, so nothing breaks), only while WhyPoor? is on with `sharePrices` (both ways: off, nothing
+goes out and nothing is taken) and Beacon is on. Beacon takes at most 300 a minute from one friend; its tick
+hands them to `B.TickPrices`, at most 25 a tick, nothing in a fight.
+
+- **Same realm and faction only.** An auction house is named by `LT.Hash32("<realm>-<faction>")`. My offer
+  (`wo`) says only that hash and how old my last full scan is; a friend asks (`wq`) only for their own house's
+  hash, and I answer only a request for mine. Battle.net's realm field isn't used (its level was wrong on
+  Forever: forever-platform.md). Ages, not times, go over the wire: two computers' clocks differ.
+- **When.** After my full scan of my faction's house, an offer to every friend who reads them, at most every 10
+  minutes per friend, and once to a friend first seen. A friend is asked when their scan is more than 10
+  minutes newer than my newest data (my scan or the last friend's), one friend at a time (the newest), each at
+  most every 30 minutes; a request without a message for 2 minutes is given up. A request is answered at most
+  every 30 minutes per friend, one friend at a time.
+- **What.** Only my own prices (never a friend's passed on): per item value, the last scan's lowest, how many
+  were listed, the days the value rests on and whether it's unstable, at most 2000 items (those listed at my
+  last scan first), packed into messages of 250 bytes at most, each saying how old its oldest entry is. 4
+  messages a second at most, at low priority, only while fewer than 8 wait in Beacon's queues.
+- **Taking.** Only from the friend asked, only for my house; an entry is kept only when it's newer than my own
+  data of the item and than what a friend gave before, marked with the friend's name and when it came. `P.Get`
+  shows the newer of mine and a friend's (with `friend`, confidence never high); my own `sells` and `perDay`
+  stay mine. Broken entries are dropped; they go after 14 days like mine.
 
 ### The money data
 
