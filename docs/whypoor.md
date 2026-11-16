@@ -23,10 +23,12 @@ anything wrong.
 | `Goal.lua` | the money goal (the mount) | `W.Goal` = `G` |
 | `Bags.lua` | each bag item's best sale (the Bags tab, the ideas) | `W.Bags` |
 | `Window.lua` | the window (Lodestar's style): Ideas, Bags, Market, the goal's strip | `W.Window` |
+| `Crafting.lua` | the window's Crafting tab (the crafting margins), the profession window's Margins button | `W.Crafting` = `Cf` |
+| `Stocks.lua` | the window's Stocks tab: a watch list of items, a search, each item's price over time | `W.Stocks` = `St` |
 
 Data add-on: `LefthyTools_MoneyData/` (GPL v3 like its source, CMaNGOS Classic DB, as
 LefthyTools_DropData and LefthyTools_QuestData), made by `tools/update-money-data.js`; the installer
-copies it as a companion. Saved: `LefthyToolsWhyPoorDB` (account-wide; `prices`, `goal`, `ui`).
+copies it as a companion. Saved: `LefthyToolsWhyPoorDB` (account-wide; `prices`, `goal`, `ui`, `watch`).
 
 ## Rules for every part
 
@@ -719,10 +721,37 @@ navigation (it collects the panel's descendants) reaches them, at corners where 
 Blizzard's buttons. Not verified in game yet: whether the profession window and the auction house can be
 open together (both are UI panels), and that the corners are free.
 
+### Stocks (the Stocks tab: Stocks.lua)
+
+The window's **Stocks** tab (`W.Stocks`, `St`, added with `Wn.AddTab` after Crafting; `/whypoor stocks`): a watch
+list of items and their price on this realm's and faction's auction house over time. Informational only.
+- *The watch list*: `LefthyToolsWhyPoorDB.watch`, account-wide, item IDs in the order added (`St.Watch`,
+  `St.Unwatch`, `St.Watched`). A row: icon, name, the latest daily low (`P.History`'s last day; grey when it's
+  older than yesterday) and the change since a week ago ("+12% vs. 7 days ago", green up, red down: against the
+  latest day at least 7 days before the last, else the oldest day known; one day: "One day of prices so far").
+  The line above the list: "N watched"; empty: "Search for an item above and add it to watch its price."
+- *The search*: a box on the line above the list (`T.Controls`, its hint "Search an item"; Escape empties it).
+  While it has text the list is the items of the auction house's prices (`P.Items()`: mine and friends') whose
+  name has it, any case (Lua's `lower`: an accented capital doesn't match its small letter); names starting with
+  it first, then the others, each by name, 50 at most ("50 of 230 found"). An item link or `#1234` in it is that
+  item at once. A result already watched says "watched".
+- *The details*: the name, the last scan's lowest and how many were listed (`P.Get`), the price graph
+  (`D.Graph`: 14 days of daily lows) and "Add to watch list" / "Remove from watch list". A removed item's details
+  stay (with Add) until another is picked. Nothing picked: what the tab is.
+- *What it costs*: nothing while the tab isn't shown. Rows work out their numbers only in sight. A search starts
+  0.2 s after the last key and goes over the items on a frame of its own (`St.driver`, hidden when done or when the
+  window closes; a search left then goes on when the tab shows again), at most 2 ms (`St.BUDGET_MS`, the clock
+  looked at every 50 items) and 2000 items (`St.PER_FRAME`) a frame. Item names are kept lowercased (`St.lower`)
+  after the first search, so the next ones only compare strings; a name the client doesn't have yet is asked for
+  (50 per search at most) and looked at again by the next search. `P.Items()` is fetched again only when the
+  prices changed (`P.Revision()`).
+- Pruning stays as it is: an item not seen on the auction house for 14 days loses its history (Prices.lua) but
+  stays on the watch list ("No prices yet").
+
 ### The window, bags, tooltip and goal
 
 **The module** (WhyPoor.lua): the settings page (Window: Open, Minimap button; Crafting: `craftButton`; Auction
-house: `autoScan`; Friends: `sharePrices`), `/whypoor` (open or close; `ideas`, `crafting`, `bags`, `market`,
+house: `autoScan`; Friends: `sharePrices`), `/whypoor` (open or close; `ideas`, `crafting`, `stocks`, `bags`, `market`,
 `goal`: the window there; `minimap`, `settings`, `help`) and `/lefthy whypoor ...` (the same), the minimap
 button `LefthyToolsWhyPoorMinimapButton` (a coin; `LT.Window.MinimapButton`, so it joins the combined
 LefthyTools button; click: the window, right-click: Bags; its tooltip: the goal's line). `W.Money(copper)`

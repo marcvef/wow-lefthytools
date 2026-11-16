@@ -122,7 +122,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/WhyPoor/                WhyPoor?: money ideas for the character (docs/whypoor.md has every file): the module,
                                   the auction house price engine, friends' prices, the money data's reader, crafting
                                   costs, the crafting margins (Margins.lua, the Crafting tab), who I am, the ideas, the
-                                  goal, the bags, the window
+                                  goal, the bags, the window, the Stocks tab (a watch list of prices)
 LefthyTools_DropData/        the Bestiary's classic drop database (and mobs' health, for the fight stream), an add-on of its own (load on demand), GPL v3
   Drops.lua                  generated (tools/update-drop-data.js); LICENSE.md, COPYRIGHT.md, README.md
 LefthyTools_QuestData/       Lodestar's quest chains, givers and places (CMaNGOS Classic DB, EG Link's Forever data), an add-on of its own (load on demand), GPL v3
