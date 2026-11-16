@@ -144,7 +144,7 @@ I.Revision()
   confidence,       -- "high" | "medium" | "low"
   basis,            -- the weakest basis it rests on (see Rules)
   why, how,         -- lists of localized lines: why it's here, what to do
-  numbers,          -- lines of the working ({ label, value, basis })
+  numbers,          -- lines of the working ({ label, value, basis }; value: a text, shown as given)
   items,            -- { { item, n, each, source ("ah","vendor","drop",...), age } }
   place,            -- { map, name, points = { { x, y, r } } } or nil (shown on a small map; "Show on map")
   needs,            -- what it needs that you don't have ("Skinning 1", "level 24")
@@ -156,8 +156,12 @@ I.Revision()
 
 ```lua
 G.Current()   -- { name, cost, have, bags (what the bags would fetch), rate (copper per hour played, Chronicle),
-              --   eta (hours), etaLevel, basis } or nil
-W.Bags.List() -- { { item, count, best, value, vendor, ah, keep (a reason not to sell) } }, total
+              --   eta (hours), etaLevel, basis } or nil; also key, level, spell, about (the cost isn't the
+              --   game's), seen, played/how/xp (what the rate rests on), mounts (seen at vendors)
+G.Why()       -- why there's no goal: "class", "done", nil
+W.Bags.List() -- { { item, count, best, value, vendor, ah, keep (a reason not to sell) } }, total (entries also:
+              -- bound, unit (the AH price for one), price (P.Get's), quality, link); W.Bags.Total()
+W.Money(c), W.Age(t) -- "1g 20s", "2 h" (WhyPoor.lua, for every part)
 ```
 
 ## Parts
@@ -184,4 +188,107 @@ W.Bags.List() -- { { item, count, best, value, vendor, ah, keep (a reason not to
 
 ### The window, bags, tooltip and goal
 
-(to be written by the window part)
+**The module** (WhyPoor.lua): the settings page (Window: Open, Minimap button; Bags and tooltips:
+`tooltip`, `bagCoins`; Friends: `sharePrices`), `/whypoor` (open or close; `ideas`, `bags`, `market`,
+`goal`: the window there; `minimap`, `settings`, `help`) and `/lefthy whypoor ...` (the same), the minimap
+button `LefthyToolsWhyPoorMinimapButton` (a coin; `LT.Window.MinimapButton`, so it joins the combined
+LefthyTools button; click: the window, right-click: Bags; its tooltip: the goal's line). `W.Money(copper)`
+("1g 20s", "35s 2c", "8c"; whole gold from 100g on and without a zero part: "34g", "3s") and `W.Age(t)`
+("5 min", "2 h", "3 d") are there for every part.
+
+**The window** (Window.lua, `W.Window`: `Open(tab)`, `Toggle()`, `Shown()`, `GoalLine()`, `View()` for the
+tests): `LefthyToolsWhyPoorFrame`, 780 x 480 (scaled down on a small screen), a frame of our own dressed
+like Lodestar's companion (`LT.Window.Dress`): "WhyPoor?", the tabs Ideas | Bags | Market and the X in one
+26 px row; the goal's strip under it (one line; a click shows the goal's details); a line about the list,
+the list (300 px; rows of two lines: icon, title, money at the right; what it rests on and the idea's `sub`,
+three dots for its confidence) and the details on the right (scrolling; never empty: nothing picked, the
+goal). In UISpecialFrames (Escape) and `LT.Window.Register`ed, DIALOG strata, like Lodestar's big window;
+its place and tab are kept (`db.window.left`, `top`, `tab`).
+- *Ideas*: `I.Get()` as it comes (its order). Money: `~3g 20s/h` or `12g once`; "~" unless the confidence
+  is high and the basis isn't `estimate` or `classic`; grey when `oldest` is older than `P.STALE`; "needs a
+  price" without a number. Details: title, `sub`, money, "Confidence: ... · rests on: ..." (the basis in
+  words), needs (red), warnings (orange), Why, How, The working (`label: value (basis)`; the value shown as
+  Methods wrote it), Items (icon, name x n, `each`, where from, age: orange when old), the place on
+  Lodestar's small map (`Q.NewMiniMap`; each point an area of radius `r`) and "Show on map" (`Q.ShowPlace`).
+- *Market*: the ideas of kind flip, vendorflip, limited, disenchant; its line: the auction house open, else
+  the last scan's age (orange when stale), else "No auction house prices yet: open the auction house".
+- *Bags*: `W.Bags.List()`, best first; the line: what the bags would fetch. Details: both ways, the price's
+  age, friend, how well it sells (percent), confidence, unstable, the vendor's (or "Vendors don't buy it"),
+  the reason to keep.
+- Empty and loading: a message in the list ("Working them out...", no ideas, no deals, nothing to sell).
+- Costs: built at the first opening. While shown: `I.Request()` when it opens and every 10 s (a child
+  frame's OnUpdate); `PLAYER_MONEY`, `BAG_UPDATE_DELAYED` and the auction house's show and close noted and
+  drawn on the next frame; `I.Watch` (registered at the first request, once per `W.Ideas`) drawn on the
+  next frame. The list lays only the rows in sight (Lodestar's pattern). Hidden: no events, no OnUpdate,
+  `I.Watch` only notes. Tabs, rows, the strip, item rows, the map's markers and the buttons are plain
+  Buttons (the controller's cursor).
+- A "WhyPoor?" button (80 x 20) on the auction house's window, 110 px from its top right (left of
+  Margins'), made the first time the auction house opens (`AUCTION_HOUSE_SHOW`, on the next frame): the
+  window on Market.
+
+**Lodestar's big map** (`Q.ShowPlace(map, points)`, Browser.lua): opens the big window on the zone page
+of the first point (city floors and caves: their zone, `Map.PlaceOfSpot`), the map brought to the points
+(one: zoomed in to it), pulsing for three seconds, no quest picked. False without points or the quest data.
+
+**Bags** (Bags.lua): `List()` reads bags 0 to `NUM_TOTAL_EQUIPPED_BAG_SLOTS` (the reagent bag; never the
+bank), one entry per item (bound and unbound copies apart), `count` added up. Unbound: `ah` =
+`P.AHSale(item, count)`, `best, value` = `P.Best(item, count)`. Bound: no auction house, the vendor's.
+Reasons to keep: a quest item whose quest is in your log; any other quest item unless Lodestar's
+`Q.ItemMarked` says no quest needs it; soulbound gear you can use (`C_PlayerInfo.CanUseItem` where the
+client has it) whose item level isn't below the weaker of what you wear in its slot(s) (an unknown level or
+an empty slot: kept). The total adds up the items without a reason. Kept until the bags, your gear, quests,
+item data or `P.Revision()` change (the events only bump a counter).
+
+**The tooltip line** (`tooltip`): a TooltipDataProcessor post-call on item tooltips, `GameTooltip` only.
+Where it is: the game's tooltip data (`GetProcessingTooltipInfo()`) with the getter `GetBagItem` and a bag
+0..5 (another bag is the bank's: nothing); else the owner's `GetBagID()` 0..5; else an owner inside
+`AuctionHouseFrame` while it's shown. Nowhere else (chat links, vendors, loot, quest rewards). One line,
+for one item: "WhyPoor?: AH 12s (2 h, Anna, sells well) · vendor 3s (each)". The AH part is the unit price
+`P.AHSale` assumes, "~" unless its confidence is high and it's stable, then the age, the friend, "sells
+well" (`sells` >= 0.6), "sells slowly" (<= 0.25) or "jumps around" (unstable); then "vendor 3s" or "no
+vendor"; the better way (`P.Best(item, 1)`) white, the other and an old AH price (`P.STALE`) grey; "(each)"
+for a stack. Bound: the vendor part only. Nothing known: no line. Lines are kept per item, bound and stack
+until `P.Revision()` or the bags change or the minute turns.
+
+**The coin** (`bagCoins`): Misc Tweaks' sorted bags (GamepadBags.lua) have a small API for corner marks:
+`ns.GamepadBagsMark(key, { texture, test(itemID, bag, slot), size, point, x, y, alpha })` (nil removes it)
+and `ns.GamepadBagsRefresh()` (asked again on the next frame); the marks are drawn on its frame over
+Blizzard's button after each layout, like its quest mark (`ns.GamepadBagsState().corners[key][button]` for
+the tests). WhyPoor?'s is the gold coin (`Interface\MoneyFrame\UI-GoldIcon`, 12 px, top right) on items
+whose best is the auction house, not kept and not bound (`W.Bags.Coin`: a lookup in `List()`'s result).
+
+**The goal** (Goal.lua): one goal at a time, by the spells known: no riding (Apprentice Riding 33388, the
+old racial riding spells 824, 825, 826, 828, 10861, 10906, 10907, 18995, or Forever's Galestrider Riding
+1285849, all in Forever's riding skill line 762) is "Mount" (level 40, spell 33388); else, without
+Journeyman Riding (33391), "Epic mount" (level 60). Paladins and Warlocks get none (`G.Why()` "class"),
+Journeyman known neither ("done").
+- *The cost*, best first: what a riding trainer's window showed for that spell (`TRAINER_SHOW` and
+  `TRAINER_UPDATE` noted, read on the next frame: `GetTrainerServiceInfo(i)`'s name equal to the spell's
+  name from `C_Spell.GetSpellInfo`, `GetTrainerServiceCost(i)`), with its reputation discount already in,
+  kept per character (`db.goal[GUID].costs[spell] = { cost, seen }`), basis `forever`; else about what
+  guides say for WoW: Forever (100g for Apprentice Riding with the first mount, 1000g for Journeyman;
+  method.gg, November 2026): `about`, basis `estimate`, and the details ask you to visit a trainer.
+  Mount vendors' prices (`MERCHANT_SHOW`/`UPDATE`: item class 15, subclass 5, for gold) are kept too
+  (`mounts[item] = { price, seen, quality }`) and listed in the details (rare ones for the mount, epic
+  ones for the epic mount). Forever's item data (ItemSparse, build 1.60.1.70938) has 20g for the level-40
+  mounts and 200g for the epic ones before discounts, which the details say.
+- *The rate* (`G.Rate()`): Chronicle's days (`daily[day].played`, `.gold`: whole gold at the day's end,
+  `.xp`): from today back, each day with the day before it, at most 7, while they have both; the net change
+  is the gold now (`GetMoney()`) less the gold at the end of the day before the first (+0.5g: the middle
+  of that whole gold), over their time played; it needs 3 hours of play. Else this session's
+  (`C.Session()`: money and XP over time played, at least 20 minutes). Else none (and none with Chronicle
+  off).
+- *When* (`eta`): what's left over the rate, in hours played, only while the rate is above 0. *The level
+  then* (`etaLevel`): the XP per hour of the same span through the classic XP table (CMaNGOS
+  `player_xp_for_level`, levels 1-59), only while that table's number for your level is the game's
+  `UnitXPMax`; rested XP isn't counted; at most the level cap (`GetMaxPlayerLevel`, else 60).
+- The strip: "Mount: 34g of ~100g · ~7g 83s/h · at this rate at level 34" (or "at this rate in 8 h
+  played" without a level; "you have enough"; "not growing lately"); the details: the cost and where it's
+  from, what mounts cost, what you have and what the bags would fetch, what's still to go, the rate and
+  how much play it rests on. `G.Current()` is kept a second (and forgotten on money, bag, spell, level,
+  trainer and merchant changes).
+
+Not verified in game yet: the riding trainer's service names on Forever (matched by the spell's name),
+whether Paladins and Warlocks skip the riding costs, whether the first mount comes with Apprentice Riding,
+`GetProcessingTooltipInfo` on Forever's bag tooltips (else the owner check does it), and whether the
+auction house's result rows (the tooltips' owners) are inside `AuctionHouseFrame`.
