@@ -79,101 +79,52 @@ local function Recipes()
 	return ns.Chronicle and ns.Chronicle.Recipes
 end
 
-local function Margins()
-	return ns.Chronicle and ns.Chronicle.Margins
-end
-
-local function PricesPart()
-	local P = W.Prices
-	return type(P) == "table" and type(P.Get) == "function" and P or nil
-end
-
 ---------------------------------------------------------------------------
--- Prices (W.Prices, else Margins' own)
+-- Prices (W.Prices, Prices.lua: loaded before this file; Margins reads the same)
 ---------------------------------------------------------------------------
 
 -- The auction house's lowest buyout for one at the last scan that covered it (nil: none listed then, or never seen),
 -- how many were listed, when, whether it was ever seen there, and the friend whose data it is.
 function Cr.AHBuy(item)
-	local P = PricesPart()
-	local e
-	if P then
-		e = P.Get(item)
-		if type(e) == "table" then
-			return Number(e.low), Number(e.qty), Number(e.seen), true, type(e.friend) == "string" and e.friend or nil
-		end
-		return nil, nil, nil, false
-	end
-	local Mg = Margins()
-	e = Mg and Mg.AHPrice and Mg.AHPrice(item)
+	local e = W.Prices.Get(item)
 	if type(e) == "table" then
-		return Number(e.p), Number(e.q), Number(e.t), true
+		return Number(e.low), Number(e.qty), Number(e.seen), true, type(e.friend) == "string" and e.friend or nil
 	end
 	return nil, nil, nil, false
 end
 
 -- What a vendor asks for one (nil: not sold by vendors we know) and whether a merchant was seen asking it.
 function Cr.VendorBuy(item)
-	local P = PricesPart()
-	local p, seen
-	if P and P.VendorBuy then
-		p, seen = P.VendorBuy(item)
-	else
-		local Mg = Margins()
-		if Mg and Mg.VendorPrice then
-			p, seen = Mg.VendorPrice(item)
-		end
-	end
+	local p, seen = W.Prices.VendorBuy(item)
 	return Number(p), seen == true
 end
 
 -- What a vendor pays for one (0: vendors don't buy it), nil while the client doesn't know the item yet.
 function Cr.VendorSell(item)
-	local P = PricesPart()
-	if P and P.Vendor then
-		return Number(P.Vendor(item))
-	end
-	local Mg = Margins()
-	return Mg and Mg.SellPrice and Number(Mg.SellPrice(item)) or nil
+	return Number(W.Prices.Vendor(item))
 end
 
--- What selling n on the auction house brings (after the cut; P.AHSale also counts the deposit lost on what doesn't
--- sell), nil: no price; and the price for one it assumes.
+-- What selling n on the auction house brings (P.AHSale: after the cut and the deposit lost on what doesn't sell),
+-- nil: no price; and the price for one it assumes.
 function Cr.AHSale(item, n)
-	local P = PricesPart()
-	if P and P.AHSale then
-		local copper, unit = P.AHSale(item, n)
-		return Number(copper), Number(unit)
-	end
-	local unit = Cr.AHBuy(item)
-	if unit then
-		return unit * n * (1 - AH_CUT), unit
-	end
+	local copper, unit = W.Prices.AHSale(item, n)
+	return Number(copper), Number(unit)
 end
 
--- What n would sell for, the better way: copper, "ah" or "vendor", when the AH price is from, its basis, the friend
--- whose price it is, and atLeast (true: the AH's price isn't known, so it may fetch more there). nil: not known.
+-- What n would sell for, the better way (P.Best): copper, "ah" or "vendor", when the AH price is from, its basis,
+-- the friend whose price it is, and atLeast (true: the AH's price isn't known, so it may fetch more there). nil:
+-- not known.
 function Cr.SaleValue(item, n)
-	local P = PricesPart()
 	local sale = Cr.AHSale(item, n)
 	local _, _, seen, _, friend = Cr.AHBuy(item)
-	if P and P.Best then
-		local way, copper = P.Best(item, n)
-		copper = Number(copper)
-		if way == "ah" and copper then
-			return copper, "ah", seen, "prices", friend
-		elseif way == "vendor" and copper and (copper > 0 or sale) then
-			return copper, "vendor", nil, "forever", nil, sale == nil
-		end
-		return nil
+	local way, copper = W.Prices.Best(item, n)
+	copper = Number(copper)
+	if way == "ah" and copper then
+		return copper, "ah", seen, "prices", friend
+	elseif way == "vendor" and copper and (copper > 0 or sale) then
+		return copper, "vendor", nil, "forever", nil, sale == nil
 	end
-	local vendor = Cr.VendorSell(item)
-	local v = vendor and vendor * n or nil
-	if sale and not (v and v >= sale) then
-		return sale, "ah", seen, "prices", friend
-	elseif v and (v > 0 or sale) then
-		return v, "vendor", nil, "forever", nil, sale == nil
-	end
+	return nil
 end
 
 -- How many the bags hold.
@@ -198,14 +149,8 @@ end
 
 -- The prices' and the recipes' revision together (for caches).
 function Cr.Revision()
-	local P = PricesPart()
 	local R = Recipes()
-	local prices = P and P.Revision and Number(P.Revision())
-	if not prices then
-		local Mg = Margins()
-		prices = Mg and Mg.Revision and Number(Mg.Revision()) or 0
-	end
-	return prices .. ":" .. (R and R.Revision() or 0)
+	return (Number(W.Prices.Revision()) or 0) .. ":" .. (R and R.Revision() or 0)
 end
 
 ---------------------------------------------------------------------------

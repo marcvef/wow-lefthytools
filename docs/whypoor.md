@@ -425,8 +425,7 @@ Arcanite) aren't known, so gold per hour assumes a recipe can be cast again at o
 reagent `Cr.Cost(reagent, n)` without the bags (numbers that hold for every craft; `covers` says how many crafts the
 bags' reagents hold); revenue at a vendor (`P.Vendor` times what a craft makes) and on the AH (`P.AHSale`: after the
 cut, and P's deposit rule); profit the better one minus the cost; time its cast plus 0.5 s plus the sub-crafts'
-(`subSeconds`); gold per hour profit / time. While W.Prices isn't there it reads Margins' own prices (`Mg.AHPrice`,
-`Mg.VendorPrice`, `Mg.SellPrice`; the AH revenue is then the lowest buyout less 5%).
+(`subSeconds`); gold per hour profit / time.
 
 **The verdict:** `reagentsSale` is what the recipe's reagents would sell for instead (`P.Best` each; one without a
 known price adds nothing, and `reagentsSaleComplete` is false: it's at least that much).
@@ -439,7 +438,7 @@ known price adds nothing, and `reagentsSaleComplete` is false: it's at least tha
 - nil (`price`): a price is missing, or a loss at a vendor for a product never priced on the AH.
 
 **This character's recipes** (`Cr.Mine`): the recipes the character I play knows that make an item, each
-`Cr.Recipe`, best gold per hour first. Kept until `Cr.Revision()` moves (`P.Revision()`, else Margins' revision, and
+`Cr.Recipe`, best gold per hour first. Kept until `Cr.Revision()` moves (`P.Revision()` and
 `R.Revision()`); worked out at most 2 ms a call (a recipe at a time), going on at the next call, so the ideas'
 driver spreads it over frames. A list where an item's data hadn't come yet is worked out again 5 s later.
 

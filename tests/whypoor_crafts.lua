@@ -2,7 +2,7 @@
 -- Chains (cloth, bolt, shirt; bar, bolts, bomb; ore and bar: Mining's smelting), cheaper to buy than to craft,
 -- several recipes for one item, the transmute circle, the depth, yields (a share of a craft, "may vary"), the bags
 -- (sale value, partly, each used once, crafting cheaper than what's in them), vendor reagents, unknown prices (no
--- number), the verdict, the prices' age and basis, Margins' fallback prices, this character's recipes (Cr.Mine over
+-- number), the verdict, the prices' age and basis, this character's recipes (Cr.Mine over
 -- calls, cached), the margins window's crafted reagents.
 -- Needs: margins.lua
 local suite = ...
@@ -51,6 +51,7 @@ function fake.Best(item, n)
 	if v then return "vendor", v end
 end
 function fake.Revision() return fakeRev end
+setmetatable(fake, { __index = realPrices }) -- (the rest, and whether the engine runs: the real one's)
 W.Prices = fake
 
 local casts = { [BOLT] = 1000, [SHIRT_SPELL] = 2000, [BOLTS_SPELL] = 2000 }
@@ -201,17 +202,6 @@ AH[SHIRT] = nil
 VSELL[SHIRT] = nil
 r = Cr.Recipe(SHIRT_SPELL, { who = tailor })
 check(r and r.waiting and r.vendorRevenue == nil, "the client doesn't have the item yet: waiting")
-
-section("Crafts: Margins' own prices when W.Prices isn't there")
-W.Prices = nil
-local Mg = C.Margins
-local realm = LefthyToolsDB.margins.ah[next(LefthyToolsDB.margins.ah)] or {}
-local savedLinen = realm[LINEN]
-realm[LINEN] = { p = 7, q = 40, t = time() }
-check(Cr.AHBuy(LINEN) == 7 and select(2, Cr.AHBuy(LINEN)) == 40, "the AH's price from Margins")
-check(Cr.VendorBuy(THREAD) == Mg.VendorPrice(THREAD), "the vendor's from Margins")
-realm[LINEN] = savedLinen
-W.Prices = fake
 
 section("Crafts: this character's recipes")
 ITEMS[BOLT_ITEM] = { name = "Bolt of Linen Cloth", quality = 1, price = 40 }
