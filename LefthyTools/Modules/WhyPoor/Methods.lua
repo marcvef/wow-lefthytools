@@ -602,7 +602,8 @@ function X.PhasePace(job)
 	return false
 end
 
--- Whether a kind could be ground: not in an instance, hostile to you (or a neutral beast), a fighting
+-- Whether a kind could be ground: not in an instance, hostile to you (or a neutral beast; never a civilian, nor one
+-- of a reputation's faction that isn't hostile: killing it costs standing), a fighting
 -- type, normal (an elite only in a group), its levels within your window. The kind's levels.
 function X.Fit(job, creature)
 	local Dt, Bt = W.Data, ns.Bestiary
@@ -611,6 +612,8 @@ function X.Fit(job, creature)
 	local ctx = job.ctx
 	local react = ctx.faction == "Horde" and mob.reactH or mob.reactA
 	if not (react == "hostile" or (react == "neutral" and mob.type == "Beast")) or not ctx.faction then return nil end
+	if mob.civilian then return nil end -- (an enemy town's civilians: a dishonorable kill)
+	if mob.rep and react ~= "hostile" then return nil end -- (a reputation's creature: only when it attacks you anyway)
 	if X.FIGHT_TYPES[mob.type] == false then return nil end
 	if not (mob.rank == "normal" or (mob.rank == "elite" and ctx.grouped)) then return nil end
 	local known = Bt and Bt.Known and Bt.Known(creature)

@@ -171,6 +171,8 @@ local MOBS_ = {
 	[1] = M("Kobold Brute", "elite", "Humanoid", "hostile", "hostile"),
 	[100] = M("Stormwind Guard", "normal", "Humanoid", "friendly", "hostile"),
 	[101] = M("Grey Deer", "normal", "Beast", "neutral", "neutral"),
+	[108] = M("Horde Peon", "normal", "Humanoid", "hostile", "friendly", { civilian = true }),
+	[109] = M("Timbermaw Bear", "normal", "Beast", "neutral", "neutral", { rep = 576 }),
 	[102] = M("Farmer", "normal", "Humanoid", "neutral", "neutral"),
 	[103] = M("Mother Fang", "rare", "Beast", "hostile", "hostile"),
 	[104] = M("Rabbit", "normal", "Critter", "hostile", "hostile"),
@@ -199,6 +201,8 @@ local KNOWN = {
 	[1] = { items = { [2589] = { 0.5, 1, false } }, skins = {}, coin = { 10, 20 }, health = { 3, 3, 200, 200 } },
 	[100] = { items = {}, skins = {}, coin = { 1, 4 }, health = { 2, 2, 50, 50 } },
 	[101] = { items = { [7073] = { 0.5, 0, false } }, skins = {}, health = { 2, 2, 50, 50 } },
+	[108] = { items = {}, skins = {}, coin = { 5, 9 }, health = { 2, 2, 50, 50 } },
+	[109] = { items = { [7073] = { 0.5, 0, false } }, skins = {}, health = { 2, 2, 50, 50 } },
 	[102] = { items = {}, skins = {}, coin = { 5, 9 }, health = { 2, 2, 50, 50 } },
 	[103] = { items = {}, skins = {}, coin = { 50, 90 }, health = { 4, 4, 90, 90 } },
 	[104] = { items = {}, skins = {}, health = { 1, 1, 8, 8 } },
@@ -220,14 +224,14 @@ local KNOWN = {
 local function S(map, x, y, n) return { map = map, x = x, y = y, r = 0.05, n = n } end
 local SPOTS = {
 	[299] = { S(1429, 0.4, 0.6, 8), S(1429, 0.6, 0.7, 4) }, [6] = { S(1429, 0.4, 0.8, 20) }, [1] = { S(1429, 0.5, 0.5, 10) },
-	[100] = { S(1429, 0.3, 0.3, 10) }, [101] = { S(1429, 0.5, 0.2, 10) }, [102] = { S(1429, 0.4, 0.4, 10) }, [103] = { S(1429, 0.1, 0.1, 10) },
+	[100] = { S(1429, 0.3, 0.3, 10) }, [101] = { S(1429, 0.5, 0.2, 10) }, [108] = { S(1429, 0.45, 0.25, 10) }, [109] = { S(1429, 0.55, 0.25, 10) }, [102] = { S(1429, 0.4, 0.4, 10) }, [103] = { S(1429, 0.1, 0.1, 10) },
 	[104] = { S(1429, 0.2, 0.2, 30) }, [105] = { S(1429, 0.2, 0.9, 10) }, [106] = { S(1429, 0.8, 0.8, 3) }, [107] = { S(1429, 0.9, 0.5, 10) },
 	[565] = { S(1431, 0.3, 0.5, 15), S(1429, 0.9, 0.9, 2) }, [910] = { S(1431, 0.2, 0.7, 12) }, [920] = { S(1431, 0.7, 0.3, 20) },
 	[930] = { S(1431, 0.8, 0.3, 20) }, [5419] = { S(1446, 0.5, 0.5, 30) }, [5615] = { S(1446, 0.6, 0.4, 25) },
 	[5600] = { S(1446, 0.7, 0.7, 25) }, [8521] = { S(1423, 0.5, 0.5, 20) }, [8522] = { S(1423, 0.6, 0.5, 12) },
 	[8596] = { S(1423, 0.4, 0.4, 25) }, [8597] = { S(1423, 0.3, 0.3, 25) },
 }
-local ON = { [1429] = { 299, 6, 1, 100, 101, 102, 103, 104, 105, 106, 107, 565 }, [1431] = { 565, 910, 920, 930 },
+local ON = { [1429] = { 299, 6, 1, 100, 101, 108, 109, 102, 103, 104, 105, 106, 107, 565 }, [1431] = { 565, 910, 920, 930 },
 	[1446] = { 5419, 5615, 5600, 900 }, [1423] = { 8521, 8522, 8596, 8597 } }
 local NODES = {
 	[1431] = { { object = 1733, kind = "ore", skill = 65, n = 25, loot = { { item = 2771, chance = 1, min = 1, max = 2 } }, spots = { S(1431, 0.5, 0.5, 25) } },
@@ -383,6 +387,8 @@ check(wolf and not num(wolf, L["Skinning per kill"]), "no skinning without Skinn
 check(find(list, "grind:1") == nil, "an elite alone: no")
 check(find(list, "grind:100") == nil, "a friendly guard: no")
 check(find(list, "grind:101") ~= nil, "a neutral beast: yes")
+check(find(list, "grind:108") == nil, "an enemy town's civilian: no (a dishonorable kill)")
+check(find(list, "grind:109") == nil, "a neutral beast of a reputation's faction: no (it costs standing)")
 check(find(list, "grind:102") == nil, "a neutral humanoid (a town's): no")
 check(find(list, "grind:103") == nil and find(list, "grind:104") == nil and find(list, "grind:105") == nil,
 	"a rare, a critter, one in an instance: no")
