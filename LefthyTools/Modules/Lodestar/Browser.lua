@@ -9130,6 +9130,49 @@ function Q.ShowDetails(id)
 	return true
 end
 
+-- Opens the big window on a place of another module's (WhyPoor?'s farming spot, no quest): its zone's page
+-- on the Zone tab, the map moved and zoomed to points ({ { x, y, r } }, 0..1 on that uiMap; r: an area's
+-- radius as a part of the map's width; one point: zoomed in to it), pulsing for three seconds. Points on
+-- another zone page than the first's are left out. True when it's shown.
+function Q.ShowPlace(map, points)
+	if not (type(points) == "table" and points[1] and Side.Window()) then
+		return false
+	end
+	local target, items
+	for _, p in ipairs(points) do
+		local t, x, y = Map.PlaceOfSpot({ map = map, x = p.x, y = p.y })
+		if t and (target == nil or t == target) then
+			target, items = t, items or {}
+			items[#items + 1] = { x = x, y = y, r = tonumber(p.r) }
+		end
+	end
+	if not target then
+		return false
+	end
+	if state.query ~= "" then
+		state.drilled = true
+	end
+	if state.chain then
+		state.lastChain = state.chain
+	end
+	local moved = target ~= state.where
+	local wasMap = view.zp:IsShown()
+	state.tab, state.chain, state.path = "zone", nil, nil
+	Save()
+	if moved then
+		state.where = target
+		state.folded["c:" .. tostring(state.places[target].continent)] = nil
+		DrawZones(true, target)
+	end
+	if moved or not wasMap then
+		DrawMiddle(not moved, nil, true)
+	end
+	local m = view.zp.map
+	Map.Bring(m, items, #items == 1)
+	Map.Flash(m, items)
+	return true
+end
+
 function Q.ToggleBrowser()
 	if frame and frame:IsShown() then
 		frame:Hide()
