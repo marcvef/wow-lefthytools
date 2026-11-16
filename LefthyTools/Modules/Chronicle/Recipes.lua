@@ -160,6 +160,28 @@ function R.Parse(line)
 	return list
 end
 
+-- Mining's smelting (the data's `smelting`, the same format; not a line of the Professions tab): its
+-- recipes, parsed once, each also known to R.RecipeOf (line 186, Mining).
+local SMELTING_LINE = 186
+local smelting
+function R.Smelting()
+	if smelting then
+		return smelting
+	end
+	local d = Data()
+	smelting = {}
+	for entry in (d and type(d.smelting) == "string" and d.smelting or ""):gmatch("[^;]+") do
+		local recipe = ReadRecipe(entry)
+		if recipe then
+			smelting[#smelting + 1] = recipe
+			if not bySpell[recipe.spell] then
+				bySpell[recipe.spell], lineOf[recipe.spell] = recipe, SMELTING_LINE
+			end
+		end
+	end
+	return smelting
+end
+
 -- A recipe and its line; its line is parsed if that hasn't happened yet (nil: no line has it).
 function R.RecipeOf(spell)
 	local d = Data()
@@ -172,6 +194,9 @@ function R.RecipeOf(spell)
 				end
 			end
 		end
+	end
+	if not bySpell[spell] and not smelting then
+		R.Smelting()
 	end
 	return bySpell[spell], lineOf[spell]
 end

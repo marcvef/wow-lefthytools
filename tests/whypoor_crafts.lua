@@ -1,5 +1,5 @@
 -- WhyPoor?: the cheapest way to get an item and what a recipe brings, crafting the reagents yourself (Crafts.lua), and Margins using it.
--- Chains (cloth, bolt, shirt; bar, bolts, bomb; ore and bar: smelting isn't recipe data), cheaper to buy than to craft,
+-- Chains (cloth, bolt, shirt; bar, bolts, bomb; ore and bar: Mining's smelting), cheaper to buy than to craft,
 -- several recipes for one item, the transmute circle, the depth, yields (a share of a craft, "may vary"), the bags
 -- (sale value, partly, each used once, crafting cheaper than what's in them), vendor reagents, unknown prices (no
 -- number), the verdict, the prices' age and basis, Margins' fallback prices, this character's recipes (Cr.Mine over
@@ -107,11 +107,13 @@ check(c == nil, "none listed and no recipe: no way")
 
 section("Crafts: bar, bolts, bomb; ore and bar")
 AH[BAR], AH[ORE], AH[STONE] = { 50, 100 }, { 5, 100 }, { 3, 100 }
-local engineer = { [BOLTS_SPELL] = true, [POWDER_SPELL] = true, [BOMB_SPELL] = true, [SMELT] = true }
+local engineer = { [BOLTS_SPELL] = true, [POWDER_SPELL] = true, [BOMB_SPELL] = true }
 c = Cr.Cost(BOLTS, 1, { who = engineer })
 check(c and c.how == "craft" and c.parts[1].how == "ah" and c.parts[1].item == BAR and c.total == 50,
-	"bolts from a bar bought: smelting isn't in the recipe data, so the ore isn't counted")
-check(C.Recipes.RecipeOf(SMELT) == nil, "(Smelt Copper isn't a recipe of the data)")
+	"bolts from a bar bought: no smelting known, so the ore isn't counted")
+c = Cr.Cost(BOLTS, 1, { who = { [BOLTS_SPELL] = true, [SMELT] = true } })
+check(c and c.parts[1].how == "craft" and c.parts[1].recipe.spell == SMELT and c.parts[1].parts[1].item == ORE and c.total == 5,
+	"an engineer who mines: the bar smelted from its ore (5c, not 50c)")
 c = Cr.Cost(BOMB, 2, { who = engineer })
 check(c and c.how == "craft" and c.crafts == 1 and c.total == 116 and c.unit == 58, "two bombs: one craft (it makes two), 116c")
 check(c and c.mayVary == true, "a craft making several: it may vary (the data has the middle)")
@@ -224,6 +226,22 @@ local mine = Cr.KnownOf(Cr.MyId())
 check(mine[BOLT] and mine[VEST_SPELL] and mine[SHIRT_SPELL], "what the character I play knows (Chronicle's record)")
 c = Cr.Cost(SHIRT, 1)
 check(c and c.parts[1].how == "craft", "by default its recipes craft the bolt")
+-- Mining's smelting: not in Chronicle's record, asked of the game for the character I play.
+AH[ORE], AH[BAR] = { 8, 50 }, { 30, 50 }
+c = Cr.Cost(BAR, 1)
+check(c and c.how == "ah" and not mine[SMELT], "no smelting known: the bar is bought (30c)")
+KNOWN_SPELLS[SMELT] = true
+local withSmelt = Cr.KnownOf(Cr.MyId())
+check(withSmelt[SMELT] and withSmelt[BOLT] and Cr.KnownOf(Cr.MyId()) == withSmelt, "Smelt Copper known: with the crafting recipes, one set while nothing changes")
+c = Cr.Cost(BAR, 1)
+check(c and c.how == "craft" and c.recipe.spell == SMELT and c.total == 8 and c.parts[1].how == "ah",
+	"a miner smelts the bar from its ore (8c) instead of buying it (30c), got " .. tostring(c and c.how))
+local smeltRecipe = C.Recipes.RecipeOf(SMELT)
+check(smeltRecipe and smeltRecipe.item == BAR and smeltRecipe.reagents[1].item == ORE and select(2, C.Recipes.RecipeOf(SMELT)) == 186,
+	"Chronicle's recipes know the smelting recipe (Mining's line)")
+KNOWN_SPELLS[SMELT] = nil
+AH[ORE], AH[BAR] = nil, nil
+check(Cr.KnownOf(Cr.MyId())[SMELT] == nil, "forgotten again: not counted")
 fakeRev = fakeRev + 1
 local fakeMs = 0
 local clock = debugprofilestop

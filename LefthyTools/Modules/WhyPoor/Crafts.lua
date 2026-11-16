@@ -43,7 +43,7 @@ Cr.OVERHEAD, Cr.DEFAULT_CAST, Cr.DEPTH, Cr.FEW, Cr.AH_CUT = OVERHEAD, DEFAULT_CA
 
 local issecret = LT.IsSecret
 local casts = {}   -- spell -> seconds
-local known        -- { rev, byId = { [id] = { [spell] = true } } }
+local known        -- { rev, byId = { [id] = { [spell] = true } }, mine = { key, set } }
 local makers = setmetatable({}, { __mode = "k" }) -- a known set -> { rev, byItem = { [item] = { { recipe, line }, ... } } }
 local mine         -- Cr.Mine's last list: { key, list, at, waiting }
 local work         -- Cr.Mine's list being worked out: { key, todo, i, out, waiting }
@@ -218,8 +218,57 @@ function Cr.MyId()
 	return "me:" .. tostring(C and C.CurrentKey and C.CurrentKey())
 end
 
--- Every recipe a character (R.People's id) knows, of all its professions: { [spell] = true }.
+-- The smelting spells I know (Mining's: Chronicle records only the crafting lines, so they're asked of
+-- the game, for the character I play only): a sorted list.
+function Cr.MySmelting()
+	local R = Recipes()
+	local out = {}
+	for _, recipe in ipairs(R and R.Smelting and R.Smelting() or EMPTY) do
+		local id, has = recipe.spell, false
+		if C_SpellBook and C_SpellBook.IsSpellKnown then
+			local ok, yes = pcall(C_SpellBook.IsSpellKnown, id)
+			has = ok and yes == true
+		end
+		if not has and IsPlayerSpell then
+			local ok, yes = pcall(IsPlayerSpell, id)
+			has = ok and yes == true
+		end
+		if has then
+			out[#out + 1] = id
+		end
+	end
+	return out
+end
+
+-- Every recipe a character (R.People's id) knows, of all its professions: { [spell] = true }. The character I
+-- play: with the smelting spells I know (one set per what's known, so a newly learnt one counts).
 function Cr.KnownOf(id)
+	local set = Cr.KnownOfLines(id)
+	if id ~= Cr.MyId() then
+		return set
+	end
+	local smelt = Cr.MySmelting()
+	if not (smelt[1] and known) then
+		return set
+	end
+	local key = table.concat(smelt, ",")
+	local had = known.mine
+	if had and had.key == key and had.base == set then
+		return had.set
+	end
+	local with = {}
+	for spell in pairs(set) do
+		with[spell] = true
+	end
+	for _, spell in ipairs(smelt) do
+		with[spell] = true
+	end
+	known.mine = { key = key, base = set, set = with }
+	return with
+end
+
+-- Of the crafting lines (Chronicle's record of a character's recipes).
+function Cr.KnownOfLines(id)
 	local R = Recipes()
 	local data = ns.RecipeData
 	if not (R and data) then

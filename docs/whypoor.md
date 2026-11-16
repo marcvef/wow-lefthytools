@@ -277,8 +277,12 @@ friend's AH price says so (`friend`).
 craft makes a varying number (Heavy Dynamite: 3 for 1 to 5), and the data doesn't say which ones vary (104 recipes
 make more than one). So an answer with a craft making several has `mayVary`, and the margins window says "~".
 
-**Not counted**, said here so nothing pretends otherwise: Mining's smelting isn't recipe data (the data has the
-crafting professions only), so a bar is always bought, never smelted from ore; recipe cooldowns (transmutes like
+**Smelting**: Mining's smelting recipes are the recipe data's `smelting` (not a Professions tab line;
+`R.Smelting()`, and `R.RecipeOf` knows them as line 186). Chronicle records only the crafting lines, so the ones the
+character I play knows are asked of the game (`Cr.MySmelting`: `C_SpellBook.IsSpellKnown`, else `IsPlayerSpell`) and
+added to its set (`Cr.KnownOf`, one set per what's known); an alt's smelting isn't known, so its bars are bought.
+
+**Not counted**, said here so nothing pretends otherwise: recipe cooldowns (transmutes like
 Arcanite) aren't known, so gold per hour assumes a recipe can be cast again at once; time spent buying isn't counted.
 
 **A recipe** (`Cr.Recipe`): every field Margins' window and tests use (Margins.lua's `Compute` lists them); each
