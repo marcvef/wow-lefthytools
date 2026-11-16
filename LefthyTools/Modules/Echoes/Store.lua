@@ -1522,6 +1522,30 @@ local function Span(list)
 	return ("%d-%d with %d gaps"):format(list[1][1], list[#list][2], #list - 1)
 end
 
+-- My own pages still kept (each one waits to reach a collector), counted: { count, oldest (the
+-- oldest one's start), newest (when the newest one ended, else its start), packing (waiting to be
+-- packed), later (not on disk yet: offered from the next session on), early (went only early: on
+-- disk or not, not confirmed yet) }.
+local function MineCounts(data)
+	local c = { count = 0, packing = 0, later = 0, early = 0 }
+	for n, page in pairs(data.mine) do
+		if PageNumber(n) and type(page) == "table" then
+			c.count = c.count + 1
+			if type(page.t) == "number" and (not c.oldest or page.t < c.oldest) then
+				c.oldest = page.t
+			end
+			local ended = type(page.e) == "number" and page.e or page.t
+			if type(ended) == "number" and (not c.newest or ended > c.newest) then
+				c.newest = ended
+			end
+			c.packing = c.packing + (page.q and 1 or 0)
+			c.later = c.later + (OnDisk(page) and 0 or 1)
+			c.early = c.early + (page.o == 2 and 1 or 0)
+		end
+	end
+	return c
+end
+
 -- My own pages: how far my recording is safe at a collector (safeTo), what still waits to reach
 -- one (and what of it went early), and what's kept of it.
 local function MineStatus(data)
@@ -1531,18 +1555,8 @@ local function MineStatus(data)
 	else
 		Line("no page of yours has reached a collector yet.")
 	end
-	local count, oldest, packing, later, early = 0, nil, 0, 0, 0
-	for n, page in pairs(data.mine) do
-		if PageNumber(n) then
-			count = count + 1
-			if type(page.t) == "number" and (not oldest or page.t < oldest) then
-				oldest = page.t
-			end
-			packing = packing + (page.q and 1 or 0)
-			later = later + (OnDisk(page) and 0 or 1)
-			early = early + (page.o == 2 and 1 or 0) -- (only early: on disk or not, not confirmed yet)
-		end
-	end
+	local c = MineCounts(data)
+	local count, oldest, packing, later, early = c.count, c.oldest, c.packing, c.later, c.early
 	if count == 0 then
 		Line("none of your pages waits to reach a collector.")
 	else
@@ -1558,11 +1572,16 @@ local function MineStatus(data)
 	end
 end
 
--- A collector's lines, one per friend's store with anything collected, exported or provisional (my
--- own account's other computers too; not this one's: the lines above): how many pages, up to when
--- (the newest one's start: latest, or the inbox), and how far they're confirmed. The 10 whose newest
--- page is newest, sorted by name; stores whose newest page is over 30 days old left out.
-local function FriendsStatus(data)
+-- What a collector has of each friend's store (anything collected, exported or provisional; my own
+-- account's other computers too, not this one's: MineCounts), counted one way for the status and
+-- the admin window. A row per store, new tables each time: { key, acct, store, name (names; nil if
+-- not known), yours (my own account's other computer), all (the numbers, a parsed list), exported
+-- (numbers in exported), disk (inbox, not provisional, an earlier session's), fresh (this session's,
+-- not provisional: on disk after a logout or /reload), early (provisional: in the inbox with p, or in
+-- provisional without an inbox page of that number), session (inbox pages that came this session,
+-- provisional ones too), newest (the newest page's start: latest, or an inbox page from before it),
+-- arrived (when the last inbox page came; nil: none there), old (the newest page over 30 days old) }.
+local function Collected(data)
 	local own, now = Store.Own(), E.Now()
 	local names = type(data.names) == "table" and data.names or {}
 	local latest = type(data.latest) == "table" and data.latest or {}
@@ -1573,7 +1592,7 @@ local function FriendsStatus(data)
 			keys[key] = true
 		end
 	end
-	local rows, old = {}, 0
+	local rows = {}
 	for key in pairs(keys) do
 		local acct, store
 		if type(key) == "string" then
@@ -1587,19 +1606,25 @@ local function FriendsStatus(data)
 			end
 			local newest = type(latest[key]) == "table" and type(latest[key].t) == "number" and latest[key].t or nil
 			local inbox = type(data.inbox[key]) == "table" and data.inbox[key] or {}
-			local row = { key = key, acct = acct, store = store, exported = Numbers(exported), disk = 0, fresh = 0, early = 0 }
+			local row = { key = key, acct = acct, store = store, exported = Numbers(exported), disk = 0, fresh = 0, early = 0, session = 0,
+				yours = acct == data.acct, name = type(names[key]) == "string" and names[key] or nil }
 			for n, page in pairs(inbox) do
 				if PageNumber(n) and type(page) == "table" then
 					all[#all + 1] = { n, n }
+					local thisSession = not (type(page.s) == "number" and page.s < data.session)
 					if Pending(page) then
 						row.early = row.early + 1
-					elseif type(page.s) == "number" and page.s < data.session then
-						row.disk = row.disk + 1
-					else
+					elseif thisSession then
 						row.fresh = row.fresh + 1
+					else
+						row.disk = row.disk + 1
 					end
+					row.session = row.session + (thisSession and 1 or 0)
 					if type(page.t) == "number" and (not newest or page.t > newest) then
 						newest = page.t -- (one that came before latest was kept)
+					end
+					if type(page.a) == "number" and (not row.arrived or page.a > row.arrived) then
+						row.arrived = page.a
 					end
 				end
 			end
@@ -1611,15 +1636,27 @@ local function FriendsStatus(data)
 				end
 			end
 			row.all, row.newest = Merge(all), newest
-			if not row.all[1] then
-				row = nil
-			elseif newest and now - newest > SHOWN_AGE then
-				old, row = old + 1, nil
-			end
-			if row then
-				row.name = acct == data.acct and "you (" .. store .. ")" or type(names[key]) == "string" and names[key] or acct
+			if row.all[1] then
+				row.old = newest ~= nil and now - newest > SHOWN_AGE
 				rows[#rows + 1] = row
 			end
+		end
+	end
+	return rows
+end
+
+-- A collector's lines, one per friend's store with anything collected, exported or provisional (my
+-- own account's other computers too; not this one's: the lines above): how many pages, up to when
+-- (the newest one's start: latest, or the inbox), and how far they're confirmed. The 10 whose newest
+-- page is newest, sorted by name; stores whose newest page is over 30 days old left out.
+local function FriendsStatus(data)
+	local rows, old = {}, 0
+	for _, row in ipairs(Collected(data)) do
+		if row.old then
+			old = old + 1
+		else
+			row.name = row.yours and "you (" .. row.store .. ")" or row.name or row.acct
+			rows[#rows + 1] = row
 		end
 	end
 	table.sort(rows, function(a, b)
@@ -1665,6 +1702,58 @@ local function FriendsStatus(data)
 	if old > 0 then
 		Line(("  (%d older not shown: nothing from them in 30 days.)"):format(old))
 	end
+end
+
+---------------------------------------------------------------------------
+-- For the admin window (Admin.lua): read only, new tables each call, worked out from what's kept
+-- (nothing is unpacked or hashed)
+---------------------------------------------------------------------------
+
+-- What a collector has of each friend's store: Collected's rows (old ones too).
+function Store.Collected()
+	return E.data and Collected(E.data) or {}
+end
+
+-- My own pages, counted as the status counts them (MineCounts), with what's kept of them and what
+-- the exporter has from this computer: { count, oldest, newest, packing, later, early, exported
+-- (numbers of my own key in exported), bytes, cap, moved (this session), safeTo ({ n, e }; nil: none
+-- yet) }.
+function Store.MineCounts()
+	local data = E.data
+	if not data then
+		return { count = 0, packing = 0, later = 0, early = 0, exported = 0, bytes = 0, cap = MINE_CAP, moved = 0 }
+	end
+	Counted()
+	local c = MineCounts(data)
+	local own = Store.Own()
+	local exported = own and data.exported[own]
+	c.exported = Numbers(Ranges.Parse(type(exported) == "string" and exported or ""))
+	c.bytes, c.cap, c.moved = bytes.mine, MINE_CAP, moved
+	local to = data.safeTo
+	if type(to) == "table" and type(to.n) == "number" and type(to.e) == "number" then
+		c.safeTo = { n = to.n, e = to.e }
+	end
+	return c
+end
+
+-- The collector's inbox: its bytes, the 4 MB note and the 8 MB cap (full: nothing is pulled, and no
+-- early pages: InboxFull).
+function Store.Inbox()
+	Counted()
+	return bytes.inbox, INBOX_NOTE, INBOX_FULL
+end
+
+-- The exporter's receipt as the game loaded it (once a session, collecting: Receipt): { at (when the
+-- exporter wrote it), upto (the latest arrival of my saved file it had read), read (this session) };
+-- nil: none loaded.
+function Store.ReceiptInfo()
+	local receipt = _G.LefthyToolsEchoesReceipt
+	if type(receipt) ~= "table" or not E.data then
+		return nil
+	end
+	local upto = type(receipt.upto) == "table" and receipt.upto[E.data.store] or nil
+	return { at = type(receipt.at) == "number" and receipt.at or nil, upto = type(upto) == "number" and upto or nil,
+		read = receiptSession == E.data.session }
 end
 
 local function Status()

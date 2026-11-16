@@ -2857,6 +2857,96 @@ end
 -- Status and the probe (for /lefthy echoes status | probe <friend>)
 ---------------------------------------------------------------------------
 
+-- For the admin window (Admin.lua): read only, new tables and counts, never Delivery's own tables.
+-- Worked out on each call (the window asks once a second while it's open, nothing while it's
+-- closed): a walk over the friends online and the pages on their way, a few unions of what's kept.
+--
+-- Per store: { [key] = { online (a friend with Echoes online whose own store this is: their name),
+-- collect, relay, early (what that friend does), offered (pages friends online offer, from a disk or
+-- early, that I hold in no way: not in my inbox, provisional or not, exported or relayed; those being
+-- fetched too), coming (pages asked for now), have, len (bytes of those got, and their lengths, as
+-- far as their starts came), waiting (whole, waiting to be kept), from (who sends one of them) } }.
+-- My own key isn't in it (friends' copies of my pages).
+function D.Stores()
+	local out = {}
+	local beacon = Beacon()
+	local mine = MyKey()
+	local function Of(key)
+		local s = out[key]
+		if not s then
+			s = { offered = 0, coming = 0, have = 0, len = 0, waiting = 0 }
+			out[key] = s
+		end
+		return s
+	end
+	if not beacon then
+		return out
+	end
+	local offers = {}
+	for id, peer in pairs(peers) do
+		local online = beacon.peers[id]
+		if peer.verified and online then
+			if peer.key and peer.key ~= mine then
+				local s = Of(peer.key)
+				s.online, s.collect, s.relay, s.early = online.name or ("#" .. id), peer.collect == true, peer.relay == true, TakesEarly(id)
+			end
+			for _, held in ipairs({ peer.holdings, peer.earlyHoldings }) do
+				for key, list in pairs(held or NONE) do
+					if key ~= mine then
+						offers[key] = offers[key] and Ranges.Union(offers[key], list) or list
+					end
+				end
+			end
+		end
+	end
+	for key, list in pairs(offers) do
+		local had = Ranges.Union(Ranges.Union(Have("inbox", key), Have("provisional", key)), Ranges.Union(Exported(key), Have("carry", key)))
+		local count = 0
+		for _, r in ipairs(Ranges.Minus(list, had)) do
+			count = count + r[2] - r[1] + 1
+		end
+		Of(key).offered = count
+	end
+	for pageId, r in pairs(inflight) do
+		local s = Of(r.key)
+		local part = partials[pageId]
+		s.coming = s.coming + 1
+		if part and not part.done then
+			s.have, s.len = s.have + part.have, s.len + part.len
+		end
+		local from = beacon.peers[r.from]
+		s.from = s.from or (from and from.name) or nil
+	end
+	for _, part in pairs(partials) do
+		if part.done then
+			local s = Of(part.key)
+			s.waiting = s.waiting + 1
+		end
+	end
+	return out
+end
+
+-- Delivery as a whole: { running (recording, Beacon on, my BattleTag known), friends (with Echoes
+-- online), coming (pages asked for now), serving, queued (requests waiting to be served), sent,
+-- received, pages, served (bytes), badHash, rejected, paused (seconds left of a pause after a
+-- throttle; 0: none), lastPause (how long the last one was; nil: none yet), earlyTaker }.
+function D.Traffic()
+	local beacon = Beacon()
+	local module = LT:GetModule("beacon")
+	local t = { running = E.recording == true and module ~= nil and module.enabled == true and MyKey() ~= nil, friends = 0,
+		coming = InFlight(), serving = #active, queued = #serves, paused = math.max(0, pausedUntil - GetTime()),
+		lastPause = backoff, earlyTaker = D.EarlyTaker() }
+	for k, v in pairs(stats) do
+		t[k] = v
+	end
+	for id, peer in pairs(peers) do
+		if peer.verified and beacon and beacon.peers[id] then
+			t.friends = t.friends + 1
+		end
+	end
+	return t
+end
+
 -- Delivery's lines for a status (chat, English).
 function D.Status()
 	local now = GetTime()

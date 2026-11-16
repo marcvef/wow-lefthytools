@@ -816,6 +816,10 @@ strings in it are the kept ones.
 | `E.Store.InboxFull()` | 8 MB collected: stop pulling |
 | `E.Store.Bytes(where[, acct, store])` | bytes kept (carry with acct and store: that author's) |
 | `E.Store.Trim()`, `E.Store.Recount()`, `E.Store.Pack(text)` | the cap now; the sizes counted anew; packing (`m`, `z`) |
+| `E.Store.Collected()` | for the admin window: a row per friend's store a collector has anything of, counted as `/lefthy echoes` counts them (below), old ones too: `{ key, acct, store, name, yours, all, exported, disk, fresh, early, session, newest, arrived, old }`; new tables each call |
+| `E.Store.MineCounts()` | for the admin window: my own pages as the status counts them (`count`, `oldest`, `newest`, `packing`, `later`, `early`), the numbers of my key in `exported`, `bytes`, `cap`, `moved`, `safeTo` (a copy) |
+| `E.Store.Inbox()` | the inbox's bytes, the 4 MB note and the 8 MB cap |
+| `E.Store.ReceiptInfo()` | the exporter's receipt as the game loaded it: `{ at, upto (my store's), read (this session) }`, nil if none |
 
 `E.Ranges` (strings like `"1-56,58"`: ascending, merged, from 1 to 999,999,999; never spelled out
 number by number): `Parse(ranges)` (a list `{ { 1, 56 }, { 58, 58 } }`; bad parts skipped),
@@ -861,7 +865,8 @@ binary search).
 
 Times are the realm's clock as this computer shows it: "21:30" today, "Nov 1 21:30" another day,
 with ", 3 days ago" when it's more than a day ago. All of it is worked out on the command (the pages
-only note `safeTo` and `latest` as they come and go, one comparison each). Other files add to it:
+only note `safeTo` and `latest` as they come and go, one comparison each). The per-store counts are
+`E.Store.Collected()`'s, the same the admin window shows. Other files add to it:
 
 - `E.OnStatus(fn)`: `fn(add)` while the status prints; `add(text)` prints one more line.
 - `E.Command(word, fn, help)`: `/lefthy echoes <word> ...` runs `fn(rest)`; `help` is its line in the
@@ -1140,6 +1145,18 @@ once (the backoff above).
 takes early pages, relays) and what they offer; "your pages go to Cedric Vale early (10-minute pages
 while a collector is online)." while one who takes them early is online (`D.EarlyTaker()`); pages
 coming and served, traffic, a pause after a throttle.
+
+For the admin window (read only: new tables and counts, never Delivery's own tables; worked out on
+each call):
+
+- `D.Stores()`: per store (`"acct.store"`, not my own), `{ online (the name of a friend with Echoes
+  online whose own store it is), collect, relay, early, offered, coming, have, len, waiting, from }`:
+  what friends online offer (`es`, `ea`) that I hold in no way (inbox, provisional, exported, relay
+  cache), the pages asked for now (`inflight`) with the bytes got and their lengths (`partials`, as
+  far as their starts came), whole ones waiting to be kept, and who sends one.
+- `D.Traffic()`: `{ running, friends, coming, serving, queued, paused (seconds left), lastPause,
+  earlyTaker }` and `D.Status`'s counters (`sent`, `received`, `pages`, `served`, `badHash`,
+  `rejected`).
 
 ### Check on launch day (delivery)
 
