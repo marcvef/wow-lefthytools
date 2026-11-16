@@ -532,9 +532,10 @@ data add-on is loaded (`Q.Load`) on the first run, as Lodestar's own windows do.
 kept while Lodestar's data, your progress and level stay.
 
 **Craft** (`craft:<spell>`, once): `Cr.Mine()`'s entries with `verdict == "craft"` and a profit (read:
-`spell`, `item` (else `recipe.item`), `profit` (a craft's), `complete`, `basis`, `oldest`): the profit times
-how many sell a day (`P.Get(item).perDay`, at least one); unknown: one, low confidence, said. Crafting's
-real limit is how many sell, so it's not per hour.
+`spell`, `item` (else `recipe.item`), `profit` (a craft's), `complete`, `basis`, `oldest`; asked again each unit
+while `Cr.Mine` says it isn't done): the profit of one craft, said so. How many the auction house takes isn't
+known (`perDay` counts listings bought or taken back early, so it's shown, never multiplied in); without it, low
+confidence. Crafting's real limit is how many sell, so it's not per hour.
 
 **The market** (once, only listings from a scan younger than `P.STALE`, each said to maybe be gone):
 **flip** (`flip:<item>`): an item that isn't unstable or low confidence, whose listings go early at least once

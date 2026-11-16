@@ -1334,32 +1334,39 @@ function X.PhaseLimited(job)
 	return false
 end
 
--- Your recipes that pay (Cr.Mine: verdict "craft"): the profit of a craft times how many sell a day.
+-- Your recipes that pay (Cr.Mine: verdict "craft"): the profit of one craft (how many the market takes isn't
+-- known: listings going early may be taken back, so it's shown, not multiplied). Cr.Mine works a few ms a call:
+-- this phase asks again on the next unit until its list is done.
 function X.PhaseCraft(job)
 	local Cr = W.Crafts
-	local ok, list = pcall(X.Call, Cr, "Mine")
+	local ok, list, done = pcall(X.Call, Cr, "Mine")
 	if not ok then geterrorhandler()(list) end
+	if ok and type(list) == "table" and done == false then
+		return false
+	end
 	for i, e in ipairs(ok and type(list) == "table" and list or NONE) do
 		if i > 20 then break end
 		if type(e) == "table" and e.verdict == "craft" and (e.profit or 0) > 0 and e.spell then
 			local product = e.item or (e.recipe and e.recipe.item)
 			local info = product and X.Call(W.Prices, "Get", product)
 			local perDay = type(info) == "table" and info.perDay or nil
-			local n = perDay and math.max(1, math.floor(perDay)) or 1
+			local n = 1
 			local idea = X.New("craft", "craft:" .. e.spell)
 			local name = product and X.ItemName(product) or (e.name or ("#" .. e.spell))
 			idea.title = L["Craft %s"]:format(name)
-			idea.sub = perDay and L["About %s sell a day"]:format(X.Count(perDay, true)) or L["How many sell is not known"]
+			idea.sub = perDay and L["Listings gone early a day: about %s"]:format(X.Count(perDay, true)) or L["How many sell is not known"]
 			X.Num(idea, L["Profit each"], e.profit, e.basis or "prices", true)
-			X.Num(idea, L["How many"], n, perDay and "prices" or "estimate")
+			if perDay then
+				X.Num(idea, L["Listings gone early a day"], perDay, "prices")
+			end
 			idea.once = e.profit * n
+			idea.why[#idea.why + 1] = L["Counted for one craft: how many the auction house takes isn't known"]
 			idea.spell, idea.oldest = e.spell, e.oldest
 			X.Basis(idea, e.basis or "prices")
 			if type(info) == "table" and info.confidence then X.Conf(idea, info.confidence) end
 			if e.oldest and job.now - e.oldest > X.Stale() then X.LessSure(idea) end
 			if not perDay then
 				X.Conf(idea, "low")
-				X.Warn(idea, L["How many sell is not known: one counted"])
 			end
 			if e.complete == false then
 				idea.once, idea.missing = nil, { product }

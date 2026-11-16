@@ -298,7 +298,8 @@ local CRAFTS = {
 	{ spell = 3, item = 4306, profit = 500, verdict = "craft", complete = false },
 	{ spell = 4, item = 90100, profit = 80, verdict = "craft", complete = true, basis = "prices" },
 }
-local Cr = { Mine = function() return CRAFTS end }
+local mineCalls = 0
+local Cr = { Mine = function() mineCalls = mineCalls + 1; if mineCalls == 1 then return {}, false end return CRAFTS, true end } -- (the first call: not done yet)
 local BAGS = { { item = 2589, count = 10, best = "ah", value = 570 }, { item = GREEN, count = 1, best = "vendor", value = 100 },
 	{ item = 750, count = 3, best = nil, value = 0, keep = "quest" } }
 local Bags = { List = function() return BAGS, 670 end }
@@ -440,14 +441,17 @@ local limited = find(list, "limited:" .. LIMITED)
 -- 3000 less the cut is 2850 against 1000 at the vendor: 1850 each, 3 in stock.
 check(limited and limited.once == 1850 * 3 and limited.place.map == 1446 and limited.basis == "classic", "limited stock: profit times the stock")
 local craft = find(list, "craft:3275")
-check(craft and craft.once == 50 * 12 and craft.basis == "prices", "a recipe that pays: its profit times how many sell a day")
+check(craft and craft.once == 50 and craft.basis == "prices", "a recipe that pays: the profit of one craft (how many sell isn't multiplied in)")
 check(find(list, "craft:2") == nil, "a recipe whose verdict isn't craft: no")
 local incomplete = find(list, "craft:3")
 check(incomplete and incomplete.once == nil and incomplete.perHour == nil and incomplete.missing and incomplete.group == 3,
 	"a recipe without every price: flagged, not ranked")
 local unknown = find(list, "craft:4")
-check(unknown and unknown.once == 80 and unknown.confidence == "low" and warned(unknown, L["How many sell is not known: one counted"]),
-	"how many sell isn't known: one, low")
+local saidOne = false
+for _, line in ipairs(unknown and unknown.why or {}) do
+	if line == L["Counted for one craft: how many the auction house takes isn't known"] then saidOne = true end
+end
+check(unknown and unknown.once == 80 and unknown.confidence == "low" and saidOne, "nothing known of its market: one craft, low, and said")
 local sell = find(list, "sell:bags")
 check(sell and sell.once == 670 and sell.basis == "prices" and #sell.items == 2 and sell.items[1].item == 2589, "what the bags would fetch")
 check(find(list, "disenchant:bags") == nil, "not an enchanter: nothing to disenchant")
