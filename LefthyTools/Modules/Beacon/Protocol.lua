@@ -65,7 +65,7 @@ local B = ns.Beacon
 --                       an account's records, p/d/n a profile, day or highlight, e that's all
 --   B2;<module><word>;<...>
 --                       other modules' messages, a family: the word's first letter is the module's
---                       (e: Echoes, Echoes/Delivery.lua has its words; c: Chronicle's recipes; q: Lodestar), at most
+--                       (e: Echoes, Echoes/Delivery.lua has its words; c: Chronicle's recipes; q: Lodestar; w: WhyPoor?), at most
 --                       255 bytes like all. Only to friends whose build reads them (Delivery.lua says
 --                       how it knows)
 --   B2;co;<acct>,<u>/...
@@ -101,6 +101,13 @@ local B = ns.Beacon
 --                       Lodestar (QuestShare.lua), only to builds from its LODESTAR_SINCE on: what of
 --                       these quests have you done (d done, r ready, a in the log, n none), and the learned
 --                       quest records passed on (what I hold, send me yours after since, one record, that's all)
+--   B2;wo;<house>;<age>
+--   B2;wq;<house>
+--   B2;wp;<house>;<age>;<item>:<value>:<low>:<qty>:<days>:<unstable>,...
+--   B2;we;<house>;<count>
+--                       WhyPoor?'s prices (WhyPoor/Share.lua), only to builds from its PRICES_SINCE on: my last
+--                       full scan of this auction house (house: a hash of realm and faction) was age seconds ago,
+--                       send me yours, prices (base 36), that's all
 --   Q2                  module switched off: forget me
 --
 -- Builds that don't know a message kind ignore it (Parse returns nil, before the sender counts as

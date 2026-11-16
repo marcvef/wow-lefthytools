@@ -30,12 +30,12 @@ They share state through `ns.Beacon` (`B`): `B.peers` (`gameAccountID -> peer`),
 (`B.Queue`, `B.QueueToPeers`, `B.QueueLatest`, `B.QueueLow`, ...), and hooks
 the later files set, which Beacon.lua calls when they're there (`if B.X then B.X() end`): on the
 driver tick through `LT.Guard` (`B.UpdateCalls`, `B.UpdatePings`, `B.TickReports`, `B.StreamHealthTick`,
-`B.RefreshMaps`, `B.UpdateMinimap`, `B.TickQuests`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
+`B.RefreshMaps`, `B.UpdateMinimap`, `B.TickQuests`, `B.TickPrices`), for a friend's message (`B.ShowDing`, `B.ShowDeath`,
 `B.ReceivePing`, `B.ReceiveItem`, `B.ReceiveChat`, `B.ReceiveReportPart`, `B.ReceiveStream`,
-`B.ReceiveJournal`, `B.ReceiveEchoes`, `B.ReceiveLodestar`, `B.ReceiveProbe`), with an answer (`B.CollectorMessage`,
+`B.ReceiveJournal`, `B.ReceiveEchoes`, `B.ReceiveLodestar`, `B.ReceivePrices`, `B.ReceiveProbe`), with an answer (`B.CollectorMessage`,
 `B.StreamHello`, `B.JournalHello`, `B.EchoesAnswer`), for a friend gone (`B.StreamForget`,
-`B.JournalForget`, `B.EchoesForget`, `B.QuestForget`, `B.RemovePing`), and on switching (`B.Attach` / `B.Detach`,
-`B.StreamStart` / `B.StreamStop`, `B.JournalStop`, `B.EchoesStop`, `B.QuestStop`, `B.OnSettingChanged`).
+`B.JournalForget`, `B.EchoesForget`, `B.QuestForget`, `B.PricesForget`, `B.RemovePing`), and on switching (`B.Attach` / `B.Detach`,
+`B.StreamStart` / `B.StreamStop`, `B.JournalStop`, `B.EchoesStop`, `B.QuestStop`, `B.PricesStop`, `B.OnSettingChanged`).
 Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.listeners` (`B.Notify`).
 `Chat.lua`, `Reports.lua` and `Stream.lua` add their own `/lefthy` words (`announce`, `report`,
 `reports`, `stream`) with `LT:AddCommand` (architecture.md); they answer while Beacon is off too.
@@ -78,7 +78,9 @@ Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.l
   character's professions, `B2;cr;<acct>;<char>;<line>;<v>;<k>;<of>;<text>` part k of a list,
   `B2;ce;<acct>;<u>;<count>` that's all; only to builds from `RECIPES_SINCE` on, at most 700 a minute from one
   friend), `q` Lodestar (QuestShare.lua, below: `qp` / `qs` friends' progress, `qo` / `qq` / `qr` / `qe` learned
-  quest data; only to builds from `LODESTAR_SINCE` on, at most 300 a minute from one friend), `b` Beacon's own (`B2;bl` my level, below; `bf;<build>;<1|0>;<what>` the error you reported is fixed in
+  quest data; only to builds from `LODESTAR_SINCE` on, at most 300 a minute from one friend), `w` WhyPoor?'s
+  prices (WhyPoor/Share.lua, below: `wo` / `wq` / `wp` / `we`; only to builds from `PRICES_SINCE` on, at most 300 a
+  minute from one friend), `b` Beacon's own (`B2;bl` my level, below; `bf;<build>;<1|0>;<what>` the error you reported is fixed in
   that build, see "Error reports", only to builds from `FIXED_SINCE` on; LTC's `bo`/`bq`/`bm` missed lines and `bw`/`ba` who's in,
   only to builds from Chat.lua's `LTC_SINCE` on: a call counts as a chat line, the rest at most 80 a minute from one
   friend; see LTC), `Q2` switched off. A build that doesn't
@@ -1171,6 +1173,27 @@ nothing in a fight (`LT.InFight`).
   than 8 messages wait in all of Beacon's queues.
 - `B2;qe;<epoch>;<upto>;<count>` that's all: you hold mine up to `upto` if `count` records came (at most
   100 an answer; the rest is asked for at once).
+
+## WhyPoor?'s prices (WhyPoor/Share.lua)
+
+WhyPoor?'s words in the B family, letter `w` (what's shared and why: [whypoor.md](whypoor.md), "Friends'
+prices"). Only to friends whose build is from `PRICES_SINCE` on, by their `V2` (`S.Reads(peer)`: a build that
+doesn't say, or one without its commit count, counts as older and gets nothing; older builds also ignore an
+unknown `w` word), and only while WhyPoor? with its `sharePrices` setting and Beacon are on. Beacon.lua takes at
+most 300 of them a minute from one friend (`PRICES_LIMIT`) and hands them to `B.ReceivePrices`, which only notes
+them; `B.TickPrices` (Beacon's tick, through `LT.Guard`) does the rest, at most 25 a tick, nothing in a fight.
+`<house>` is `LT.Hash32("<realm>-<faction>")`; ages are seconds (the clocks of two computers differ).
+
+- `B2;wo;<house>;<age>` my last full scan of that auction house was age seconds ago. Low priority, after my full
+  scan and to a friend first seen, at most every 10 minutes per friend.
+- `B2;wq;<house>` send me your prices (only for the asker's own house; I answer only for mine). Normal queue;
+  one friend asked at a time, each at most every 30 minutes, and only when their scan is more than 10 minutes
+  newer than my newest data.
+- `B2;wp;<house>;<age>;<item>:<value>:<low>:<qty>:<days>:<unstable>,...` prices (base 36; value or low empty:
+  none; unstable `1` or empty; age: the oldest entry's), within 250 bytes. Low priority, 4 a second at most,
+  only while fewer than 8 messages wait in Beacon's queues, at most 2000 items an answer; a friend's request
+  answered at most every 30 minutes.
+- `B2;we;<house>;<count>` that's all.
 
 ## Open questions (check in game)
 
