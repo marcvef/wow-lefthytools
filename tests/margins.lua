@@ -10,10 +10,20 @@ local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
 local C = ns.Chronicle
 local Mg = C.Margins
 local M = LT:GetModule("chronicle")
+local P = ns.WhyPoor.Prices -- (the price engine Margins reads: WhyPoor?'s Prices.lua)
 local spent = 0 -- seconds this file lets pass (a whole number at its end)
 local function Wait(seconds)
 	Advance(seconds)
 	spent = spent + seconds
+end
+-- The engine's prices of this realm and faction, made older by that many seconds.
+local function Age(seconds)
+	local items = ns.WhyPoor.DB().prices.houses["Realmy-Alliance"].items
+	for item, text in pairs(items) do
+		local e = P.Decode(text)
+		e.seen = e.seen - seconds
+		items[item] = P.Encode(e)
+	end -- (no revision: as if time had passed)
 end
 local function plain(text)
 	return ((text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
@@ -52,7 +62,7 @@ Fire("MERCHANT_SHOW")
 Wait(1) -- (the data's reagents first, a line a frame)
 local p, seen = Mg.VendorPrice(THREAD)
 check(p == 8 and seen, "coarse thread at what this merchant asks for one, got " .. tostring(p))
-check(LefthyToolsDB.margins.vendor[6948] == nil, "not a reagent: not kept")
+check(select(2, Mg.VendorPrice(6948)) == true, "not a reagent: kept too (the engine keeps every merchant's prices)")
 check(select(2, Mg.VendorPrice(2321)) == false, "bought with something else than gold: not taken")
 check(not Mg.Busy(), "nothing left to do: the driver hides")
 MERCHANT = {}
@@ -73,7 +83,7 @@ local linen = Mg.AHPrice(LINEN)
 check(linen and linen.p == 12 and linen.q == 23 and time() - linen.t <= 2, "a commodity: the cheapest not of mine, how many listed, when")
 local bolt = Mg.AHPrice(BOLT_ITEM)
 check(bolt and bolt.p == 100, "items: an auction's buyout for one, got " .. tostring(bolt and bolt.p))
-check(LefthyToolsDB.margins.ah[REALM][LINEN] ~= nil, "kept for this realm and faction")
+check(ns.WhyPoor.DB().prices.houses[REALM].items[LINEN] ~= nil, "kept for this realm and faction (the engine's)")
 r = Mg.Recipe(BOLT)
 check(r.complete and r.cost == 24 and r.reagents[1].source == "ah", "cost: two linen at the AH's price")
 check(r.vendorRevenue == 40 and r.vendorProfit == 16, "sold to a vendor: 40c, 16c profit")
@@ -144,16 +154,16 @@ debugprofilestop = nil
 check(not Mg.Status().running, "done")
 check(readingFrames >= 3, "its answer read over several frames (304 rows, 2 ms a frame), got " .. readingFrames)
 check(#AH_SEARCHES == before, "no searches meanwhile")
-local saved = LefthyToolsDB.margins.ah[REALM]
-check(saved[999999] == nil, "only what my recipes use is kept")
-check(saved[VEST_ITEM] and saved[VEST_ITEM].p == nil and saved[VEST_ITEM].q == 0, "not in the auction house: none listed")
-check(saved[LINEN].p == 11 and saved[LINEN].q == 23 and saved[THREAD].q == 0, "the cheapest for one, every listing counted")
-check(time() - LefthyToolsDB.margins.replicated[REALM] <= 3, "when, for the game's limit")
+check(P.AHPrice(999999) ~= nil, "every item is kept (the engine's prices are WhyPoor?'s too)")
+local vestAH, linenAH = Mg.AHPrice(VEST_ITEM), Mg.AHPrice(LINEN)
+check(vestAH and vestAH.p == nil and vestAH.q == 0, "not in the auction house: none listed")
+check(linenAH.p == 11 and linenAH.q == 23 and Mg.AHPrice(THREAD) == nil, "the cheapest for one, every listing counted; never listed: no price")
+check(time() - ns.WhyPoor.DB().prices.replicated <= 3, "when, for the game's limit")
 
 check(Mg.ScanAll() and AH_REPLICATES == 1, "again too soon: no second full request")
 Wait(1)
 check(not Mg.Status().running and #AH_SEARCHES == before, "every price is fresh: nothing to ask")
-for _, e in pairs(saved) do e.t = e.t - 3600 end
+Age(3600)
 Mg.ScanAll()
 check(Mg.Status().kind == "search" and Mg.Status().total == 3, "an hour later, by items: the products and the linen")
 Wait(1)
@@ -177,7 +187,7 @@ view.Sort:Click()
 check(view.list.entries[1].spell == BOLT and plain(view.Sort:GetText()) == "Sort: profit per craft", "by profit per craft")
 local row = view.list.rows[1]
 check(row and row:GetAlpha() == 1, "fresh prices: not greyed")
-for _, e in pairs(saved) do e.t = e.t - 4 * 3600 end
+Age(4 * 3600)
 Fire("BAG_UPDATE_DELAYED")
 Wait(1)
 check(view.list.rows[1]:GetAlpha() == 1, "the bags changed: worked out again, but not at once again")
@@ -230,7 +240,7 @@ check(frame:IsShown(), "it opens the window")
 frame:Hide()
 
 section("Margins: the auction house closing, idle")
-for _, e in pairs(saved) do e.t = e.t - 3600 end
+Age(3600)
 Mg.ScanAll()
 check(Mg.Status().running, "a scan")
 Wait(1)
@@ -245,16 +255,11 @@ check(not Mg.Enabled() and not button:IsShown() and not ahButton:IsShown(), "off
 MERCHANT = { { THREAD, 60, 5 } }
 Fire("MERCHANT_SHOW")
 Wait(1)
-check(LefthyToolsDB.margins.vendor[THREAD].p == 8, "off: no merchant's prices taken")
+check(Mg.VendorPrice(THREAD) == 12, "off, with WhyPoor? on: the engine still takes a merchant's prices")
 MERCHANT = {}
-LefthyToolsDB.margins.ah[REALM][LINEN].t = time() - 15 * 86400
-LefthyToolsDB.margins.ah[REALM][12345] = "broken"
-LefthyToolsDB.margins.ah["Other-Horde"] = { [LINEN] = { p = 5, q = 1, t = time() - 20 * 86400 } }
 LT:SetModuleSetting(M, "margins", true)
 Wait(1)
 check(Mg.Enabled() and button:IsShown(), "on again")
-check(LefthyToolsDB.margins.ah[REALM][LINEN] == nil and LefthyToolsDB.margins.ah[REALM][12345] == nil, "older than 14 days, or broken: gone")
-check(LefthyToolsDB.margins.ah["Other-Horde"] == nil, "a realm with nothing left: gone")
 Fire("AUCTION_HOUSE_SHOW")
 AH_LISTINGS[LINEN] = { { SECRET, 5 } }
 Mg.ScanRecipe(BOLT)

@@ -370,8 +370,10 @@ surname learned without a list changing shows at the next change (the line is ke
 ## Crafting margins (Margins.lua, MarginsWindow.lua)
 
 Setting `margins` (on): what my recipes cost to make and bring, and gold per hour, from auction house and
-vendor prices. `Margins.lua` (`C.Margins`, `Mg`) keeps the prices, scans and works the numbers out;
-`MarginsWindow.lua` is the window and the buttons. All local: no Beacon message, nothing shared.
+vendor prices. `Margins.lua` (`C.Margins`, `Mg`) picks what to scan and works the numbers out; the prices and
+the scans are WhyPoor?'s price engine's (`Modules/WhyPoor/Prices.lua`, `W.Prices`; whypoor.md, Prices), which
+runs while this setting or the WhyPoor? module is on. `MarginsWindow.lua` is the window and the buttons.
+Margins itself sends nothing; WhyPoor?'s own setting shares prices with friends (whypoor.md, Friends' prices).
 
 **The client.** WoW: Forever has retail's profession window (`Blizzard_Professions`, `ProfessionsFrame`,
 with Camelot overrides; the recipe shown is `ProfessionsFrame.CraftingPage.SchematicForm:GetRecipeInfo()`)
@@ -385,14 +387,12 @@ have a price for one (`unitPrice`); an item's an auction's `buyoutAmount` for it
 stack's `buyoutPrice` and `count`. Merchants: `GetMerchantNumItems`, `GetMerchantItemID`,
 `C_MerchantFrame.GetItemInfo(i)` (`price` for `stackCount`, `hasExtendedCost`).
 
-**Prices** (`LefthyToolsDB.margins`, account-wide): `ah["<realm>-<faction>"][item] = { p, q, t }` (the
-lowest buyout for one, nil when none is listed; how many; when), `vendor[item] = { p, t }` (what a merchant
-asked for one; any realm), `replicated["<realm>-<faction>"]` (the last full scan). Each realm and faction has
-an auction house of its own. Only the items of my recipes are kept (a full scan drops the rest of this realm's),
-and a price older than 14 days goes (`KEEP`, when it starts). A merchant's window is read on the next frames
-(`MERCHANT_SHOW`, `MERCHANT_UPDATE`): its reagents (every reagent of the data: a set built a line a frame the
-first time), for gold only. A vendor-sold reagent no merchant has shown costs what `Data/Recipes.lua`'s
-`vendor` says (a hand list of Classic's trade-goods reagents, priced from ItemSparse: Recipe data, below).
+**Prices** (the engine's, `LefthyToolsWhyPoorDB.prices`): `Mg.AHPrice(item)` is `{ p, q, t }` of this realm's and
+faction's auction house (the last scan's lowest for one, nil when none is listed; how many; when), `Mg.VendorPrice`
+what a merchant asked for one (every item a merchant showed, for gold only), else `Data/Recipes.lua`'s `vendor`
+(a hand list of Classic's trade-goods reagents, priced from ItemSparse: Recipe data, below), `Mg.SellPrice` what
+a vendor pays. The engine keeps every item it saw (14 days); Margins' own saved prices (`LefthyToolsDB.margins`)
+went over to it once and are gone.
 
 **My recipes** (`Mg.MyRecipes`, kept per `R.Revision`): what my characters on this realm know (`R.People`'s
 `mine`, the record's `realm`) that makes an item; a recipe two of them know goes by the one I play, else the
@@ -426,24 +426,19 @@ Linen Cloth, 1.5 s": the recipe's own numbers and a craft's time; lines that don
 time spent on sub-crafts beside the time, the whole way down in the reagent's hover, and notes for crafted
 reagents, a sub-craft's unknown cast time, a varying yield and "its reagents would sell for more".
 
-**Scanning**, only with the auction house open (`AUCTION_HOUSE_SHOW`/`CLOSED`), never in a fight
-(`LT.InFight`): a driver frame, shown only while there's work.
+**Scanning** is the engine's (whypoor.md, Prices: only with the auction house open, never in a fight, its
+pacing and reading); Margins says what:
 
 - One recipe (`Mg.ScanRecipe`: the profession window's button, the details' Check AH): its product, then
-  its reagents no vendor sells; during a scan by items they go first. One search at a time
-  (`SendSearchQuery(itemKey, price ascending, true)`), at least 0.65 s apart (`QUERY_GAP`) and only when
-  `IsThrottledMessageSystemReady` isn't false. Gear's key has its item level
-  (`C_Item.GetDetailedItemLevelInfo`, else the data's), the rest none. Its answer
-  (`COMMODITY_SEARCH_RESULTS_UPDATED`, `ITEM_SEARCH_RESULTS_UPDATED`) is read 0.2 s later (`SETTLE`): the
-  first 50 rows' lowest price for one, my own auctions left out, and the listed quantity; no rows: none
-  listed. No answer in 3 s (`QUERY_WAIT`): the price it had stays (rows still there are an older search's).
-- Everything (`Mg.ScanAll`, "Scan all my recipes"): `ReplicateItems` once the last was 15 minutes ago
-  (`REPLICATE_GAP`, saved: the game's limit); `REPLICATE_ITEM_LIST_UPDATE`, then the rows read 2 ms a frame
-  (`READ_MS`, a look at the clock every 50 rows), only the kept items counted (the lowest for one, all
-  listed); one not in it is none listed. Too soon, no answer in 30 s or nothing in it: by items, the wanted
-  ones without a price younger than 30 minutes (`FRESH`), so a scan that stopped goes on where it was
-  (the button says "Go on (N left)").
-- The auction house closing ends a scan; Stop (`Mg.Cancel`) too.
+  its reagents no vendor sells, item by item (`P.ScanItems`, before what a scan by items has left; during a full
+  scan nothing, the full scan has them). Gear without an item level from the game is searched with its
+  recipe's (`P.levelHint` = `Mg.LevelHint`).
+- Everything (`Mg.ScanAll`, "Scan all my recipes"): a full scan (`P.ScanFull`, every item of the auction house)
+  once the last was 15 minutes ago; too soon, no answer in 30 s or nothing in it: by items, the wanted ones
+  without a price younger than 30 minutes (`FRESH`), so a scan that stopped goes on where it was (the button
+  says "Go on (N left)").
+- The auction house closing ends a scan by items; Stop (`Mg.Cancel`) too. `Mg.Status` is the engine's
+  (`P.Status`) with what's left of my recipes' items.
 
 **The window** (`LefthyToolsMarginsFrame`, `C.OpenMargins(spell, nextTo)`, `C.ToggleMargins`; `/chronicle
 margins`): its own (`LT.Window`), not a page of the journal: it belongs with the auction house and my own
