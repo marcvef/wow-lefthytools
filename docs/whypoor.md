@@ -130,7 +130,10 @@ Dt.LimitedItems()       -- every item some vendor sells in limited stock
 ### Ideas (`W.Ideas`, Methods.lua)
 
 ```lua
-I.Collect(ctx)  -- every idea for ctx, ranked; cached by revision (prices, data, level, professions)
+I.Get()         -- the ideas worked out last, ranked (a list, maybe empty), and whether they're up to date
+I.Request()     -- (re)work them out for W.Context() if anything they rest on changed (prices, data, level,
+                -- professions, place, recipes, your kills): on a driver a few ms a frame, never at once
+I.Watch(fn)     -- fn() runs (on the next frame) whenever I.Get()'s list changed; the window redraws then
 I.Revision()
 -- an idea:
 { key,              -- stable ("grind:1234", "gather:herb:1439", "craft:3275", "sell:bags", ...)
