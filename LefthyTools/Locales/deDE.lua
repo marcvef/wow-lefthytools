@@ -1641,6 +1641,18 @@ L["Ideas for making money with this character: what is worth doing at your level
 
 -- WhyPoor?: crafting (Crafts.lua, Margins)
 
+L["Its reagents sell for more than what it makes."] = "Seine Reagenzien bringen beim Verkauf mehr als das, was es herstellt."
+L["A price it needs is missing."] = "Ein Preis, den es braucht, fehlt."
+L["It brings more than its reagents cost."] = "Es bringt mehr, als seine Reagenzien kosten."
+L["It brings less than its reagents cost."] = "Es bringt weniger, als seine Reagenzien kosten."
+L["Craft"] = "Herstellen"
+L["The cheapest way:"] = "Der günstigste Weg:"
+L["craft it: %s from %s, %s"] = "selbst herstellen: %s aus %s, %s"
+L["(%s crafting reagents)"] = "(davon %s für Reagenzien)"
+L["A reagent's cast time isn't known: 3 s counted."] = "Die Herstellzeit eines Reagenz ist unbekannt: 3 s gerechnet."
+L["Reagents you can make count as crafted where that's cheaper."] = "Reagenzien, die du selbst herstellen kannst, zählen als hergestellt, wo das günstiger ist."
+L["~ What a craft makes can vary: the data's middle is counted."] = "~ Wie viel eine Herstellung ergibt, kann schwanken: Die Mitte aus den Daten wird gerechnet."
+L["Its reagents would sell for %s: more than what it makes."] = "Seine Reagenzien brächten beim Verkauf %s: mehr als das, was es herstellt."
 
 
 -- WhyPoor?: the ideas (Context.lua, Methods.lua)

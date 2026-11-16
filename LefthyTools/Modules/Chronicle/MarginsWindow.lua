@@ -22,6 +22,8 @@ local INSET_X, INSET_Y = 4, 60        -- where ButtonFrameTemplate's Inset is
 local LIST_W, BAR_W = 440, 24
 local LIST_Y = 22                     -- under the column titles
 local ROW_H, REAGENT_H, REAGENTS = 20, 18, 8
+local SUB_H = 14                      -- a crafted reagent's line under it ("craft it: ...")
+local SUBS_ROOM = REAGENTS * REAGENT_H + 2 * SUB_H -- the reagents' lines' room; sub-lines that don't fit: in the hover
 local DETAIL_X = INSET_X + LIST_W + BAR_W + 16
 local DETAIL_W = W - DETAIL_X - 14
 local TICK = 0.25
@@ -240,6 +242,53 @@ end
 -- The details
 ---------------------------------------------------------------------------
 
+local function Crafts()
+	return ns.WhyPoor.Crafts
+end
+
+-- A count: whole, or with one decimal (a share of a craft: what a craft makes beyond it goes into the next one).
+local function Count(n)
+	local whole = math.floor(n + 0.5)
+	if math.abs(n - whole) < 0.01 then
+		return tostring(whole)
+	end
+	return LT.Decimal(("%.1f"):format(n))
+end
+
+-- Where a step of Cr.Cost's answer comes from.
+local function WayText(c)
+	if not (c and c.how) then
+		return RED .. L["no price"] .. "|r"
+	elseif c.how == "ah" then
+		return (c.few and RED or "") .. L["AH"] .. "|r"
+	elseif c.how == "vendor" then
+		return L["Vendor"]
+	elseif c.how == "craft" then
+		return (c.complete and "" or RED) .. L["Craft"] .. "|r"
+	end
+	return L["Bags"]
+end
+
+-- The craft of an answer (also the rest of one partly from the bags), nil: bought.
+local function CraftOf(c)
+	if c and c.how == "craft" then
+		return c
+	end
+	return c and c.rest and c.rest.how == "craft" and c.rest or nil
+end
+
+-- "craft it: 1 Bolt of Linen Cloth from 2 Linen Cloth, 1.5 s": the recipe's own numbers, a craft's time ("~": what
+-- a craft makes can vary, the data has the middle).
+local function CraftLine(c)
+	local recipe, yield = c.recipe.data, c.recipe.yield
+	local parts = {}
+	for _, need in ipairs(recipe.reagents) do
+		parts[#parts + 1] = ("%d %s"):format(need.n, ItemName(need.item) or "...")
+	end
+	local made = (yield > 1 and "~" or "") .. yield .. " " .. (ItemName(c.item) or "...")
+	return L["craft it: %s from %s, %s"]:format(made, table.concat(parts, ", "), Seconds(Crafts().CastTime(recipe.spell) + Crafts().OVERHEAD))
+end
+
 local function ReagentTip(row)
 	local g = row.reagent
 	if not g then
@@ -249,23 +298,25 @@ local function ReagentTip(row)
 	if not pcall(GameTooltip.SetHyperlink, GameTooltip, ("item:%d"):format(g.item)) then
 		GameTooltip:AddLine(ItemName(g.item) or ("#" .. g.item))
 	end
-	local vendor = Mg().VendorPrice(g.item)
-	local ah = Mg().AHPrice(g.item)
+	local Cr = Crafts()
+	local vendor = Cr.VendorBuy(g.item)
+	local ah, q, t, scanned = Cr.AHBuy(g.item)
 	GameTooltip:AddLine(" ")
 	GameTooltip:AddDoubleLine(L["Vendor"], vendor and Short(vendor) or "-", 1, 0.82, 0, 1, 1, 1)
-	GameTooltip:AddDoubleLine(L["AH"], ah and ah.p and L["%s (%d listed, %s)"]:format(Short(ah.p), ah.q or 0, LT.Ago(ah.t))
-		or ah and L["none listed (%s)"]:format(LT.Ago(ah.t)) or L["not scanned"], 1, 0.82, 0, 1, 1, 1)
+	GameTooltip:AddDoubleLine(L["AH"], ah and L["%s (%d listed, %s)"]:format(Short(ah), q or 0, LT.Ago(t))
+		or scanned and t and L["none listed (%s)"]:format(LT.Ago(t)) or scanned and L["none listed"] or L["not scanned"],
+		1, 0.82, 0, 1, 1, 1)
 	GameTooltip:AddDoubleLine(L["In your bags"], tostring(g.have), 1, 0.82, 0, 1, 1, 1)
-	GameTooltip:Show()
-end
-
-local function SourceText(g)
-	if g.source == "ah" then
-		return (g.few and RED or "") .. L["AH"] .. "|r"
-	elseif g.source == "vendor" then
-		return L["Vendor"]
+	if CraftOf(g.cost) then
+		GameTooltip:AddLine(" ")
+		GameTooltip:AddLine(L["The cheapest way:"], 1, 0.82, 0)
+		Cr.Walk(g.cost, function(step, level)
+			local left = ("   "):rep(level) .. ("%s x%s"):format(ItemName(step.item) or ("#" .. step.item), Count(step.n))
+			local right = WayText(step) .. "  " .. (step.complete and step.total and Short(step.total) or "-")
+			GameTooltip:AddDoubleLine(left, right, 1, 1, 1, 1, 1, 1)
+		end)
 	end
-	return RED .. L["no price"] .. "|r"
+	GameTooltip:Show()
 end
 
 local function Fill()
@@ -282,18 +333,32 @@ local function Fill()
 	local who = r.who
 	d.Who:SetText(who and L["%s, %s %d"]:format(LT.Window.ClassColorCode(who.classFile) .. (who.name or "?") .. "|r",
 		ProfessionName(r.line), who.skill or 0) or ProfessionName(r.line))
+	local y, used = -46, #r.reagents * REAGENT_H
 	for i = 1, REAGENTS do
-		local row, g = d.rows[i], r.reagents[i]
-		row.reagent = g
+		local row, line, g = d.rows[i], d.subs[i], r.reagents[i]
+		local craft = g and CraftOf(g.cost)
+		local showLine = craft ~= nil and used + SUB_H <= SUBS_ROOM
+		row.reagent, line.reagent = g, g
 		row:SetShown(g ~= nil)
+		line:SetShown(showLine)
 		if g then
+			row:ClearAllPoints()
+			row:SetPoint("TOPLEFT", 0, y)
+			y = y - REAGENT_H
 			row.Icon:SetTexture(ItemIcon(g.item))
 			row.Name:SetText(("%s x%d"):format(ItemName(g.item) or "...", g.n))
-			row.Price:SetText(SourceText(g) .. "  " .. (g.unit and Short(g.unit * g.n) or "-"))
+			row.Price:SetText(WayText(g.cost) .. "  " .. (g.unit and Short(g.unit * g.n) or "-"))
+		end
+		if showLine then
+			used = used + SUB_H
+			line:ClearAllPoints()
+			line:SetPoint("TOPLEFT", 0, y)
+			y = y - SUB_H
+			line.Text:SetText(GREY .. CraftLine(craft) .. "|r")
 		end
 	end
 	d.Numbers:ClearAllPoints()
-	d.Numbers:SetPoint("TOPLEFT", d, "TOPLEFT", 0, -46 - #r.reagents * REAGENT_H - 8)
+	d.Numbers:SetPoint("TOPLEFT", d, "TOPLEFT", 0, y - 8)
 	local labels, values = {}, {}
 	local function Line(label, value)
 		labels[#labels + 1], values[#values + 1] = label, value
@@ -304,7 +369,8 @@ local function Fill()
 	Line(L["On the AH, after the 5% cut"], r.ahRevenue and (Short(r.ahRevenue) .. "  " .. Profit(r.ahProfit))
 		or GREY .. (r.ahScanned and L["none listed"] or L["not scanned"]) .. "|r")
 	Line(L["Profit per craft"], r.profit and (Profit(r.profit) .. " " .. GREY .. "(" .. (r.best == "ah" and L["AH"] or L["Vendor"]) .. ")|r") or "-")
-	Line(L["Time per craft"], Seconds(r.seconds))
+	Line(L["Time per craft"], Seconds(r.seconds) .. (r.subSeconds > 0
+		and (" " .. GREY .. L["(%s crafting reagents)"]:format(Seconds(r.subSeconds)) .. "|r") or ""))
 	Line(L["Gold per hour"], Profit(r.perHour))
 	Line(L["Your bags"], L["enough for %d crafts"]:format(r.covers))
 	Line(L["Prices"], r.oldest and LT.Ago(r.oldest) or L["vendor prices only"])
@@ -312,11 +378,14 @@ local function Fill()
 	d.Values:SetText(table.concat(values, "\n"))
 	local notes = {}
 	if r.few then
-		local few = {}
+		local few, named = {}, {}
 		for _, g in ipairs(r.reagents) do
-			if g.few then
-				few[#few + 1] = ItemName(g.item) or ("#" .. g.item)
-			end
+			Crafts().Walk(g.cost, function(step)
+				if step.how == "ah" and step.few and not named[step.item] then
+					named[step.item] = true
+					few[#few + 1] = ItemName(step.item) or ("#" .. step.item)
+				end
+			end)
 		end
 		notes[#notes + 1] = RED .. L["Few on the AH: %s"]:format(table.concat(few, ", ")) .. "|r"
 	end
@@ -328,6 +397,18 @@ local function Fill()
 	end
 	if not r.castKnown then
 		notes[#notes + 1] = L["Its cast time isn't known: 3 s counted."]
+	end
+	if not r.subCastKnown then
+		notes[#notes + 1] = L["A reagent's cast time isn't known: 3 s counted."]
+	end
+	if r.crafted then
+		notes[#notes + 1] = L["Reagents you can make count as crafted where that's cheaper."]
+	end
+	if r.mayVary then
+		notes[#notes + 1] = L["~ What a craft makes can vary: the data's middle is counted."]
+	end
+	if r.verdict == "sell reagents" then
+		notes[#notes + 1] = GREEN .. L["Its reagents would sell for %s: more than what it makes."]:format(Short(r.reagentsSale)) .. "|r"
 	end
 	d.Notes:SetText(GREY .. table.concat(notes, "\n") .. "|r")
 	local status = Mg().Status()
@@ -351,7 +432,7 @@ local function BuildDetail(parent)
 	d.Who:SetPoint("TOPLEFT", 42, -22)
 	d.Who:SetWidth(DETAIL_W - 42)
 	d.Who:SetJustifyH("LEFT")
-	d.rows = {}
+	d.rows, d.subs = {}, {}
 	for i = 1, REAGENTS do
 		local row = CreateFrame("Button", nil, d)
 		row:SetSize(DETAIL_W, REAGENT_H)
@@ -374,6 +455,17 @@ local function BuildDetail(parent)
 			end
 		end)
 		d.rows[i] = row
+		local line = CreateFrame("Button", nil, d)
+		line:SetSize(DETAIL_W, SUB_H)
+		line.Text = line:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+		line.Text:SetPoint("LEFT", 20, 0)
+		line.Text:SetWidth(DETAIL_W - 20)
+		line.Text:SetJustifyH("LEFT")
+		line.Text:SetWordWrap(false)
+		line:SetScript("OnEnter", ReagentTip)
+		line:SetScript("OnLeave", row:GetScript("OnLeave"))
+		line:Hide()
+		d.subs[i] = line
 	end
 	d.Numbers = CreateFrame("Frame", nil, d)
 	d.Numbers:SetSize(DETAIL_W, 130)

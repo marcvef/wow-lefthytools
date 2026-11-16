@@ -87,15 +87,29 @@ P.AH_CUT, P.STALE
 
 ```lua
 Cr.Cost(item, n, opts) -- the cheapest way to get n: {
-                       --   total, unit, how = "ah" | "vendor" | "craft" | "bags" | "mixed",
-                       --   recipe = { spell, line } (how == "craft"), parts = { the same for each reagent },
-                       --   complete (every part priced), oldest (oldest price used), basis
-                       -- } or nil (no way known). opts: { who = the crafter's known spells (default: this
-                       -- character's), bags = true (what's in the bags counts at what it would sell for),
-                       -- depth = 4 (crafted reagents at most this deep; no loops) }
+                       --   item, n, total, unit, how = "ah" | "vendor" | "craft" | "bags" | "mixed",
+                       --   recipe = { spell, line, yield, data } (how == "craft"), crafts (n / yield: may be a
+                       --   fraction), parts = { the same for each reagent; one without any way: { item, n,
+                       --   complete = false } }, bags = { n, total, way } and rest (the rest's answer) for "bags"/
+                       --   "mixed", complete (every part priced; false: total isn't a cost), oldest (oldest AH price
+                       --   used), basis (the weakest), friend, seconds (the casts of it and below; 0: bought),
+                       --   castKnown, few (an AH-bought part has fewer listed than for 5), q, mayVary (a craft
+                       --   making several: the data's count is the middle of a range when it varies)
+                       -- } or nil (no way known). opts: { who = the crafter's known spells { [spell] = true }, or
+                       -- crafter = an R.People entry (that character's recipes of every profession; default: this
+                       -- character's), bags = true (what's in the bags counts at what it would sell for; default
+                       -- off), depth = 4 (crafted reagents at most this deep; no loops) }
 Cr.Recipe(spell, opts) -- a recipe's numbers like Margins' Compute (cost from Cr.Cost, revenue vendor/AH via
-                       -- P.AHSale), plus verdict: "craft" | "sell reagents" | "no" and the reason
-Cr.Mine()              -- this character's recipes worked out, best gold per hour first (for Methods)
+                       -- P.AHSale), plus verdict: "craft" | "sell reagents" | "no" | nil (not known: a price
+                       -- missing), reason ("profit", "reagents", "loss", "price") and why (its localized line).
+                       -- opts: Cost's, and recipe, line (when the caller has them); r.who = opts.crafter
+Cr.Mine(ms)            -- this character's recipes worked out (Cr.Recipe each), best gold per hour first, those
+                       -- without a number last; and done: works ms (default 2) a call and goes on at the next
+                       -- call; until done it answers the last list (empty the first time) and false. Cached by
+                       -- Cr.Revision() (a list waiting for items' data: again 5 s later)
+Cr.Revision()          -- the prices' and the recipes' revisions together
+Cr.Walk(cost, fn)      -- fn(step, level) for an answer and every step below it
+Cr.AHBuy, Cr.VendorBuy, Cr.VendorSell, Cr.AHSale, Cr.SaleValue, Cr.CastTime, Cr.KnownOf(id), Cr.MyId()
 ```
 
 ### Money data (`W.Data`, Data.lua; the add-on's format in its README)
@@ -176,7 +190,67 @@ W.Bags.List() -- { { item, count, best, value, vendor, ah, keep (a reason not to
 
 ### Crafting
 
-(to be written by the crafting part)
+`Crafts.lua` (`W.Crafts`, `Cr`): the cheapest way to get an item, crafting it (and its reagents) yourself included,
+and what a recipe brings. Chronicle's margins work their numbers out with it (`Margins.lua`'s `Compute` is
+`Cr.Recipe`), so the margins window shows crafted reagents too. Pure arithmetic over prices and recipe data: it keeps
+no saved state, runs on no event and no frame of its own.
+
+**The ways to get n of an item** (`Cr.Cost`):
+
+- **ah**: the lowest buyout for one at the last scan that covered it (`P.Get(item).low`), times n. Never seen, or
+  none listed at that scan: no AH price. Fewer listed than for 5 times n: `few` (the price for more is higher).
+- **vendor**: what a vendor asks for one (`P.VendorBuy`: seen at a merchant, else Data/Recipes.lua's list of
+  trade-goods reagents: threads, vials, flux, dyes, spices), times n. On a tie with the AH the vendor wins (it's
+  certain). Basis `yours` when a merchant was seen asking it, else `forever` (the client's ItemSparse price).
+- **craft**: every recipe the crafter knows that makes the item (`R.RecipeOf` over its known spells, of all its
+  professions, Chronicle's record: `R.People` by the character's id). n / what a craft makes crafts, a fraction when
+  it doesn't divide (what's left over goes into the next craft: the steady state of crafting again and again, which
+  is what profit per craft and gold per hour mean). Its reagents are worked out the same way, at most `depth` (4)
+  crafts deep, and never through an item already being worked out above it (the data has circles: Alchemy's
+  elemental transmutes, Earth to Water to Air to Fire to Earth; and Goblin Mortar from a Goblin Mortar). Its time:
+  each craft's cast (`C_Spell.GetSpellInfo`'s `castTime`, else 3 s and `castKnown` false) plus 0.5 s, of it and of
+  every craft below it. An item made by several recipes: the cheapest.
+- **bags** (only with `bags = true`): what the bags hold (`C_Item.GetItemCount`), at what it would sell for
+  (`P.Best`: what you give up by using it). Only when that sale value is known (an item never seen on the auction
+  house that vendors pay nothing for, or whose AH price isn't known, isn't counted from the bags) and when it's
+  cheaper than the other ways (a bolt that sells for 95c isn't used when crafting one costs 20c). Partly in the
+  bags: the rest another way (`mixed`). Each item in the bags is used once in one answer (a bar wanted by the recipe
+  and by its bolts counts once).
+
+The cheapest among the ways with every price known wins; a way missing a price only when there's no other
+(`complete` false: `total` is then only what's known, never a cost to show). No price and no recipe: nil.
+`oldest` is the oldest AH price used, `basis` the weakest of what it rests on (`yours` > `forever` > `prices`), a
+friend's AH price says so (`friend`).
+
+**Yields.** Data/Recipes.lua's `count` is the "create item" effect's base points, the middle of the range when the
+craft makes a varying number (Heavy Dynamite: 3 for 1 to 5), and the data doesn't say which ones vary (104 recipes
+make more than one). So an answer with a craft making several has `mayVary`, and the margins window says "~".
+
+**Not counted**, said here so nothing pretends otherwise: Mining's smelting isn't recipe data (the data has the
+crafting professions only), so a bar is always bought, never smelted from ore; recipe cooldowns (transmutes like
+Arcanite) aren't known, so gold per hour assumes a recipe can be cast again at once; time spent buying isn't counted.
+
+**A recipe** (`Cr.Recipe`): every field Margins' window and tests use (Margins.lua's `Compute` lists them); each
+reagent `Cr.Cost(reagent, n)` without the bags (numbers that hold for every craft; `covers` says how many crafts the
+bags' reagents hold); revenue at a vendor (`P.Vendor` times what a craft makes) and on the AH (`P.AHSale`: after the
+cut, and P's deposit rule); profit the better one minus the cost; time its cast plus 0.5 s plus the sub-crafts'
+(`subSeconds`); gold per hour profit / time. While W.Prices isn't there it reads Margins' own prices (`Mg.AHPrice`,
+`Mg.VendorPrice`, `Mg.SellPrice`; the AH revenue is then the lowest buyout less 5%).
+
+**The verdict:** `reagentsSale` is what the recipe's reagents would sell for instead (`P.Best` each; one without a
+known price adds nothing, and `reagentsSaleComplete` is false: it's at least that much).
+
+- "sell reagents" (`reagents`): they sell for more than what the craft makes sells for, the better of vendor and
+  AH. Comparing the two is enough, as getting the reagents costs the same either way. Needs the product's AH price
+  (else it might fetch more there); holds even with a reagent's price missing (that would only add).
+- "craft" (`profit`): a profit, every price known.
+- "no" (`loss`): no profit, with the product's AH price known.
+- nil (`price`): a price is missing, or a loss at a vendor for a product never priced on the AH.
+
+**This character's recipes** (`Cr.Mine`): the recipes the character I play knows that make an item, each
+`Cr.Recipe`, best gold per hour first. Kept until `Cr.Revision()` moves (`P.Revision()`, else Margins' revision, and
+`R.Revision()`); worked out at most 2 ms a call (a recipe at a time), going on at the next call, so the ideas'
+driver spreads it over frames. A list where an item's data hadn't come yet is worked out again 5 s later.
 
 ### The ideas
 
