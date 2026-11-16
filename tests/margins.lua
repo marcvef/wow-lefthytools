@@ -91,9 +91,11 @@ check(AH_SEARCHES[before + 1] and AH_SEARCHES[before + 1].level == 8, "gear is s
 local vest = Mg.AHPrice(VEST_ITEM)
 check(vest and vest.p == nil and vest.q == 0, "none listed: said so, with when")
 r = Mg.Recipe(VEST)
-check(r.complete and r.cost == 108 and r.reagents[2].source == "vendor" and r.reagents[2].unit == 8, "the bolt from the AH, the thread from the merchant")
-check(r.best == "vendor" and r.profit == -58 and r.ahRevenue == nil, "a loss, at a vendor (nothing on the AH)")
-check(not r.castKnown and r.seconds == 3.5, "a cast time the game doesn't say: 3 s")
+check(r.complete and r.cost == 32 and r.reagents[2].source == "vendor" and r.reagents[2].unit == 8, "the thread from the merchant")
+check(r.reagents[1].source == "craft" and r.reagents[1].unit == 24 and r.reagents[1].cost.recipe.spell == BOLT and r.crafted,
+	"the bolt crafted from two linen (24c), cheaper than the AH's 100c")
+check(r.best == "vendor" and r.profit == 18 and r.ahRevenue == nil, "a profit at a vendor (nothing on the AH)")
+check(not r.castKnown and r.cast == 3 and r.subSeconds == 1.5 and r.seconds == 5, "a cast time the game doesn't say: 3 s; the bolt's cast counts too")
 
 section("Margins: no answer, the throttle, a fight")
 local linenAt = Mg.AHPrice(LINEN).t

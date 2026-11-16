@@ -399,19 +399,32 @@ first time), for gold only. A vendor-sold reagent no merchant has shown costs wh
 best skill. `Mg.Items`: every reagent and product of them (kept) and those the auction house is asked for
 (the products and the reagents no vendor sells: threads and the like aren't searched).
 
-**The numbers** (`Mg.Recipe(spell)`, `Mg.Compute(entry)`):
+**The numbers** (`Mg.Recipe(spell)`, `Mg.Compute(entry)`), worked out by WhyPoor?'s crafting part
+(`Modules/WhyPoor/Crafts.lua`, `Cr.Recipe`; docs/whypoor.md, Crafting, has the rules in full):
 
-- a reagent's price: the cheaper of the AH's (any age) and a vendor's; none: the recipe has no cost and no
-  profit ("missing a price"). Reagents in my bags count at that price too (they could be sold instead);
-  `covers` says how many crafts the bags hold. An AH reagent with fewer listed than for 5 crafts is "few";
-- cost: the reagents' prices times how many it needs;
+- a reagent's price: the cheapest way to get it: the AH's (lowest buyout for one, any age), a vendor's (wins a tie),
+  or **crafting it** with a recipe the crafter knows (the character the recipe goes by, all its professions; none
+  of mine knows the recipe: the character I play), its own reagents worked out the same way, up to 4 crafts deep,
+  no circles. None: the recipe has no cost and no profit ("missing a price"). Reagents in my bags count at that
+  price too (they could be sold instead); `covers` says how many crafts the bags hold. A reagent bought on the AH
+  (also below a crafted one) with fewer listed than for 5 crafts is "few";
+- cost: the reagents' prices times how many it needs (a crafted one: its reagents' share, n / what a craft makes);
 - revenue: at a vendor `C_Item.GetItemInfo`'s sell price times how many a craft makes (the data's `count`,
-  the middle of a range); on the AH its lowest buyout for one times as many, less the 5% cut (`AH_CUT`; the
-  deposit isn't counted, and the details say so). Both, and their profits, are shown;
+  the middle of a range when it varies: "~" in the details); on the AH its price for one times as many, less the 5%
+  cut (`P.AHSale` once W.Prices has it; the deposit isn't counted by Margins' own, and the details say so). Both,
+  and their profits, are shown;
 - profit: the better revenue minus the cost (`best`: vendor on a tie, it's certain);
-- time per craft: the spell's `castTime` (`C_Spell.GetSpellInfo`) plus `OVERHEAD` (0.5 s); unknown: 3 s,
-  and the details say so; gold per hour: profit × 3600 / time;
-- `oldest`: the oldest AH price used (the reagents bought there, the product when it's sold there).
+- time per craft: the spell's `castTime` (`C_Spell.GetSpellInfo`) plus `OVERHEAD` (0.5 s), plus the same for each
+  sub-craft of a crafted reagent (`subSeconds`); unknown: 3 s, and the details say so; gold per hour: profit × 3600
+  / time;
+- `oldest`: the oldest AH price used (the reagents bought there, also below crafted ones, the product when it's sold
+  there);
+- `verdict`: "craft", "sell reagents" (the reagents sell for more than the product), "no", or nil (not known).
+
+The details show a crafted reagent's source as Craft, with a line under it ("craft it: 1 Bolt of Linen Cloth from 2
+Linen Cloth, 1.5 s": the recipe's own numbers and a craft's time; lines that don't fit are left to the hover), the
+time spent on sub-crafts beside the time, the whole way down in the reagent's hover, and notes for crafted
+reagents, a sub-craft's unknown cast time, a varying yield and "its reagents would sell for more".
 
 **Scanning**, only with the auction house open (`AUCTION_HOUSE_SHOW`/`CLOSED`), never in a fight
 (`LT.InFight`): a driver frame, shown only while there's work.

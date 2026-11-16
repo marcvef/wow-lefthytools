@@ -164,59 +164,15 @@ local function Older(a, b)
 	return b and math.min(a, b) or a
 end
 
--- A recipe's numbers (the file's head says what they are): { spell, line, recipe, who, reagents = { { item, n,
--- unit, source ("ah", "vendor" or nil: no price), have, q, t, few }, ... }, cost, complete, covers, yield,
--- vendorEach, vendorRevenue, vendorProfit, ahEach, ahQty, ahScanned, ahRevenue, ahProfit, best ("vendor",
--- "ah"), profit, seconds, castKnown, perHour, oldest (the oldest AH price it uses), few, waiting (an item's
--- data hasn't come) }.
+-- A recipe's numbers, worked out by WhyPoor?'s crafting part (Modules/WhyPoor/Crafts.lua, Cr.Recipe): each reagent
+-- the cheapest way, also crafted by who makes it (that character's recipes; nil: the character I play) where that's
+-- cheaper, the sub-crafts' casts counted in its time. { spell, line, recipe, who, reagents = { { item, n, unit,
+-- source ("ah", "vendor", "craft" or nil: no price), cost (Cr.Cost's answer), have, q, t, scanned, few }, ... }, cost,
+-- complete, covers, yield, mayVary, vendorEach, vendorRevenue, vendorProfit, ahEach, ahQty, ahScanned, ahRevenue,
+-- ahProfit, best ("vendor", "ah"), profit, cast, castKnown, subSeconds, subCastKnown, seconds, perHour, oldest (the
+-- oldest AH price it uses), few, crafted, waiting (an item's data hasn't come), verdict, reason, why }.
 local function Compute(recipe, line, who)
-	local r = { spell = recipe.spell, line = line, recipe = recipe, who = who, reagents = {}, cost = 0, complete = true }
-	local covers = math.huge
-	for i, need in ipairs(recipe.reagents or {}) do
-		local vendor = Mg.VendorPrice(need.item)
-		local e = Mg.AHPrice(need.item)
-		local ah = e and e.p
-		local row = { item = need.item, n = need.n, have = InBags(need.item), q = e and e.q, t = e and e.t, scanned = e ~= nil }
-		if vendor and not (ah and ah < vendor) then
-			row.unit, row.source = vendor, "vendor"
-		elseif ah then
-			row.unit, row.source = ah, "ah"
-			r.oldest = Older(r.oldest, e.t)
-			if (e.q or 0) < need.n * FEW then
-				row.few, r.few = true, true
-			end
-		end
-		if row.unit then
-			r.cost = r.cost + row.unit * need.n
-		else
-			r.complete = false
-		end
-		covers = math.min(covers, math.floor(row.have / math.max(1, need.n)))
-		r.reagents[i] = row
-	end
-	r.covers = covers == math.huge and 0 or covers
-	r.yield = (recipe.count or 0) > 0 and recipe.count or 1
-	local sell = recipe.item and Mg.SellPrice(recipe.item)
-	r.waiting = recipe.item ~= nil and sell == nil
-	r.vendorEach = sell
-	r.vendorRevenue = sell and sell > 0 and sell * r.yield or nil
-	local e = recipe.item and Mg.AHPrice(recipe.item)
-	r.ahEach, r.ahQty, r.ahScanned, r.ahT = e and e.p, e and e.q, e ~= nil, e and e.t
-	r.ahRevenue = r.ahEach and r.ahEach * r.yield * (1 - AH_CUT) or nil
-	if r.complete then
-		r.vendorProfit = r.vendorRevenue and r.vendorRevenue - r.cost
-		r.ahProfit = r.ahRevenue and r.ahRevenue - r.cost
-	end
-	if r.ahProfit and not (r.vendorProfit and r.vendorProfit >= r.ahProfit) then
-		r.best, r.profit = "ah", r.ahProfit
-		r.oldest = Older(r.oldest, r.ahT)
-	elseif r.vendorProfit then
-		r.best, r.profit = "vendor", r.vendorProfit
-	end
-	local cast, known = Mg.CastTime(recipe.spell)
-	r.seconds, r.castKnown = cast + OVERHEAD, known
-	r.perHour = r.profit and r.profit * 3600 / r.seconds
-	return r
+	return ns.WhyPoor.Crafts.Recipe(recipe.spell, { recipe = recipe, line = line, crafter = who })
 end
 
 ---------------------------------------------------------------------------
