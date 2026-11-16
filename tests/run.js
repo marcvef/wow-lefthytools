@@ -10,6 +10,16 @@ const path = require("path");
 const { spawn } = require("child_process");
 const { lua, lauxlib, lualib, to_luastring } = require("fengari");
 
+// Room enough: echoes_net.lua runs whole clients side by side (the addon loaded into each), which takes
+// more than Node's default heap (about 4 GB) can hold: under it, garbage collection thrashed and a test
+// measured against the clock failed now and then. Below 8 GB the run starts itself again with that much.
+const HEAP_MB = 8192;
+if (require("v8").getHeapStatistics().heap_size_limit < (HEAP_MB - 512) * 1024 * 1024) {
+  const child = spawn(process.execPath, [`--max-old-space-size=${HEAP_MB}`, __filename, ...process.argv.slice(2)], { stdio: "inherit" });
+  child.on("exit", (code) => process.exit(code === null ? 1 : code));
+  return;
+}
+
 // A suite of its own in a process of its own: the German and release suites run beside the English
 // one (below, "Side suites"). `node tests/run.js --side <job.json>` runs the scripts the job names in
 // one Lua state, with the sources the main run read at its start; what it prints goes to its stdout

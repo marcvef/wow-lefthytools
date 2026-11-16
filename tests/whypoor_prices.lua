@@ -142,6 +142,9 @@ debugprofilestop = nil
 check(not P.Status().running and reading >= 3, "read over several frames, got " .. reading)
 check(P.Get(ORE).low == 7 and P.Get(ORE).qty == 60, "an item no one asked for: kept")
 check(P.Get(999999).low == 101 and P.Get(999999).qty == 300, "every item, the cheapest for one")
+local items, inItems = P.Items(), {}
+for i, item in ipairs(items) do inItems[item] = true; assert(i == 1 or items[i - 1] < item) end
+check(inItems[ORE] and inItems[999999] and inItems[7020] and not inItems[7011], "P.Items: every item this auction house has data of, sorted")
 check(P.Get(7020).low == nil and P.Get(7020).qty == 0 and P.Get(7020).value == 500, "known but not in it: none listed, its history stays")
 check(time() - P.LastScan() <= 3, "the last full scan")
 local can, at = P.CanReplicate()

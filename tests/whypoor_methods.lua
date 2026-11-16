@@ -425,14 +425,16 @@ check(list[1].perHour ~= nil and list[#list].perHour == nil, "a per hour idea fi
 
 section("whypoor_methods: market")
 local silk = find(list, "flip:4306")
--- Silk Cloth: 250 now, sells for 380 after the cut: 130 each, 6 listed (20 sell a day).
-check(silk and silk.once == 130 * 6 and silk.basis == "prices" and silk.confidence == "medium", "a flip: profit times how many")
+-- Silk Cloth: 250 now, usually 400: 380 after the cut, 130 each; counted for one (only the cheapest listing's price
+-- is known), the deposit not known: said.
+check(silk and silk.once == 130 and silk.basis == "prices" and silk.confidence == "medium", "a flip: the profit of one, got " .. tostring(silk and silk.once))
+check(silk and warned(silk, L["The deposit lost if it doesn't sell isn't counted"]), "a flip without the deposit: says so")
 check(silk and warned(silk, L["The cheap listing may be gone since the scan"]) and silk.oldest == NOW - 600, "a flip's warning and age")
 check(find(list, "flip:2589") == nil, "Linen at 55 against 57: no flip")
 check(find(list, "flip:" .. UNSTABLE) == nil and find(list, "flip:" .. LOWCONF) == nil and find(list, "flip:" .. STALEITEM) == nil,
 	"never on unstable, low-confidence or old prices")
 local wool = find(list, "vendorflip:2592")
-check(wool and wool.once == (33 - 10) * 4, "a vendor flip: listings below what a vendor pays")
+check(wool and wool.once == 33 - 10, "a vendor flip: the cheapest listing below what a vendor pays, counted for one")
 check(find(list, "disenchant:" .. GREEN2) == nil, "not an enchanter: no greens to disenchant")
 local limited = find(list, "limited:" .. LIMITED)
 -- 3000 less the cut is 2850 against 1000 at the vendor: 1850 each, 3 in stock.
@@ -653,7 +655,7 @@ check(calls.MobsOn == mobsOn, "the zones' mobs not looked at again for a price (
 check(calls.Status - statuses <= 4, "which quests are open: kept (only the open ones' status asked again)")
 check(I.Revision() == rev + 1 and told == 0, "the list changed: a new revision, the watchers not yet")
 Advance(1 / 60)
-check(told == 1 and find(I.Get(), "flip:4306").once == (380 - 200) * 6, "the watchers on the frame after, the new numbers")
+check(told == 1 and find(I.Get(), "flip:4306").once == 380 - 200, "the watchers on the frame after, the new numbers")
 Advance(0.1)
 check(not X.frame:IsShown(), "nothing runs idle")
 X.UNITS = 30

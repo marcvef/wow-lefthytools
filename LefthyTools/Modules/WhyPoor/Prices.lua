@@ -1225,6 +1225,27 @@ end
 ---------------------------------------------------------------------------
 
 -- A table's keys (one pass, no work per key): what's gone over across frames, as others may add keys meanwhile.
+-- Every item with data on this realm's and faction's auction house (mine or a friend's), for the ideas'
+-- market pass: a new list each call; nil before the saved table is there.
+function P.Items()
+	local key = P.HomeKey()
+	local h = key and P.House(key)
+	if not h then
+		return nil
+	end
+	local out, seen = {}, {}
+	for _, list in ipairs({ h.items, h.friends }) do
+		for item in pairs(list) do
+			if type(item) == "number" and not seen[item] then
+				seen[item] = true
+				out[#out + 1] = item
+			end
+		end
+	end
+	table.sort(out)
+	return out
+end
+
 function P.Keys(list)
 	local keys = {}
 	for k in pairs(list) do

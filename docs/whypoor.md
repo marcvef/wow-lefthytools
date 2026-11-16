@@ -84,8 +84,8 @@ P.Deposit(item, n)    -- the deposit for n: the game's when the auction house is
                       -- said for this item before (2nd "seen"); nil: unknown (no rule of its own)
 P.IsOpen()            -- the auction house is open
 P.LastScan()          -- when this realm's last full scan was
-P.Items()             -- every item with auction house data on this realm and faction: a list of item IDs (the
-                      -- ideas' flips go over it; shared, never written by callers)
+P.Items()             -- every item with auction house data on this realm and faction (mine or a friend's): a new
+                      -- sorted list of item IDs (the ideas' market pass goes over it)
 P.Revision()          -- goes up when any price changed (for caches)
 P.AH_CUT, P.STALE
 -- Also (Margins and tests): P.AHPrice(item) ({ p, q, t }: Margins' old shape), P.ScanItems(items, { front, spell }),
@@ -537,13 +537,17 @@ how many sell a day (`P.Get(item).perDay`, at least one); unknown: one, low conf
 real limit is how many sell, so it's not per hour.
 
 **The market** (once, only listings from a scan younger than `P.STALE`, each said to maybe be gone):
-**flip** (`flip:<item>`): an item that isn't unstable or low confidence, sells (`sells` 0.5 or more, one a
-day or more), whose `P.AHSale` brings at least 1s and 15% more than the lowest listing; `P.AHSale`'s 2nd
-answer (the unit price it assumes) must be above that listing. How many: those listed, at most a day's
-sales. **Vendorflip** (`vendorflip:<item>`): listings at least 20c below what a vendor pays.
+**flip** (`flip:<item>`): an item that isn't unstable or low confidence, whose listings go early at least once
+a day (`perDay`: bought or taken back, from scans) and, when it's known (my own auctions), sells 0.5 or more;
+bought at the lowest listing, listed again at its `value` (what its lowest listing usually is) less the 5% cut,
+and the deposit lost on what doesn't sell only when both `sells` and `P.Deposit` are known (else a warning
+says it isn't counted); at least 1s and 15% more than it costs. **Every market idea counts one item**: a scan
+keeps only the cheapest listing's price, not how many are listed at it (the rest may cost more), and the
+reason says so. **Vendorflip** (`vendorflip:<item>`): the cheapest listing at least 20c below what a vendor
+pays.
 **Disenchant** (`disenchant:<item>`, enchanters): a listing below what disenchanting it gives at your skill
 (`Dt.Disenchant`: each result's chance x the middle of its count x its auction house worth, every result
-priced there), at least 1s and 15% more, five at most; and `disenchant:bags`: what in your bags
+priced there), at least 1s and 15% more, one; and `disenchant:bags`: what in your bags
 (`W.Bags.List()`, not kept) is worth more disenchanted than its sale (`value` / `count`).
 **Limited** (`limited:<item>`): `Dt.Limited` vendors not hostile to your side (`Dt.Mob(npc)`), the vendor's
 price (a merchant's seen price, `P.VendorBuy`'s 2nd answer, wins), at least 1s and 15% under its

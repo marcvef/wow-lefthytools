@@ -1168,26 +1168,39 @@ function X.PhaseMarket(job)
 	return false
 end
 
+-- A flip: bought at the cheapest listing, listed again at its usual price (the robust value: what its lowest
+-- listing usually is), after the cut; the deposit lost on what doesn't sell only when how likely it sells is
+-- known (my own auctions), else said. Only items whose listings go often (perDay: bought or taken back early,
+-- from scans) and, when it's known, that sell likely. One each: only the cheapest listing's price is known,
+-- not how many are listed at it.
 function X.Flip(job, item, info)
-	if not info.value or info.unstable or info.confidence == "low" or (info.sells or 0) < X.FLIP_SELLS
-		or (info.perDay or 0) < 1 then
+	if not info.value or info.unstable or info.confidence == "low" or (info.perDay or 0) < 1
+		or (info.sells and info.sells < X.FLIP_SELLS) then
 		return
 	end
-	local sale, unit = X.Call(W.Prices, "AHSale", item, 1)
-	if not sale or (unit and unit <= info.low) then return end
+	local P = W.Prices
+	local sale = info.value * (1 - (P.AH_CUT or 0.05))
+	local deposit = X.Call(P, "Deposit", item, 1)
+	local depositCounted = info.sells ~= nil and deposit ~= nil
+	if depositCounted then
+		sale = info.sells * sale - (1 - info.sells) * deposit
+	end
 	local profit = sale - info.low
 	if profit < X.FLIP_MIN or profit < info.low * X.FLIP_MARGIN then return end
-	local n = math.max(1, math.min(info.qty or 1, math.floor(info.perDay)))
+	local n = 1
 	local idea = X.New("flip", "flip:" .. item)
 	idea.title = L["Buy and resell %s"]:format(X.ItemName(item))
-	idea.sub = L["%s each now, sells for about %s"]:format(X.Money(info.low), X.Money(unit or info.value))
+	idea.sub = L["%s each now, sells for about %s"]:format(X.Money(info.low), X.Money(info.value))
 	X.Num(idea, L["Buy at"], info.low, "prices", true)
 	X.Num(idea, L["Sells for (after the cut)"], sale, "prices", true)
 	X.Num(idea, L["Profit each"], profit, "prices", true)
-	X.Num(idea, L["How many"], n, "prices")
-	X.Num(idea, L["Sold a day"], info.perDay, "prices")
+	X.Num(idea, L["Listings gone early a day"], info.perDay, "prices")
 	idea.once = profit * n
 	idea.items[1] = { item = item, n = n, each = info.low, source = "ah", age = info.seen }
+	idea.why[#idea.why + 1] = L["Counted for one: only the cheapest listing's price is known, not how many are at it"]
+	if not depositCounted then
+		X.Warn(idea, L["The deposit lost if it doesn't sell isn't counted"])
+	end
 	X.Basis(idea, "prices")
 	X.Conf(idea, info.confidence)
 	X.LessSure(idea) -- (the listing may be gone, and selling takes time)
@@ -1201,14 +1214,14 @@ end
 function X.VendorFlip(job, item, info)
 	local vendor = X.Call(W.Prices, "Vendor", item)
 	if not vendor or vendor - info.low < X.VENDOR_MIN then return end
-	local n = info.qty or 1
+	local n = 1 -- (only the cheapest listing's price is known, not how many are at it)
 	local idea = X.New("vendorflip", "vendorflip:" .. item)
 	idea.title = L["Buy %s and sell it to a vendor"]:format(X.ItemName(item))
 	idea.sub = L["%s each now, a vendor pays %s"]:format(X.Money(info.low), X.Money(vendor))
 	X.Num(idea, L["Buy at"], info.low, "prices", true)
 	X.Num(idea, L["A vendor pays"], vendor, "forever", true)
-	X.Num(idea, L["How many"], n, "prices")
 	idea.once = (vendor - info.low) * n
+	idea.why[#idea.why + 1] = L["Counted for one: only the cheapest listing's price is known, not how many are at it"]
 	idea.items[1] = { item = item, n = n, each = info.low, source = "ah", age = info.seen }
 	X.Basis(idea, "prices")
 	idea.oldest = info.seen
@@ -1241,15 +1254,15 @@ function X.DisenchantBuy(job, item, info)
 	if not worth then return end
 	local profit = worth - info.low
 	if profit < X.FLIP_MIN or profit < info.low * X.DE_MARGIN then return end
-	local n = math.min(info.qty or 1, X.DE_MAX)
+	local n = 1 -- (only the cheapest listing's price is known, not how many are at it)
 	local idea = X.New("disenchant", "disenchant:" .. item)
 	idea.title = L["Buy %s to disenchant"]:format(X.ItemName(item))
 	idea.sub = L["%s each now, disenchanted about %s"]:format(X.Money(info.low), X.Money(worth))
 	X.Num(idea, L["Buy at"], info.low, "prices", true)
 	X.Num(idea, L["Disenchanted"], worth, "classic", true)
 	X.Num(idea, L["Profit each"], profit, "classic", true)
-	X.Num(idea, L["How many"], n, "prices")
 	idea.once = profit * n
+	idea.why[#idea.why + 1] = L["Counted for one: only the cheapest listing's price is known, not how many are at it"]
 	X.Basis(idea, "classic")
 	X.Conf(idea, "medium")
 	X.Settle(idea, parts, worth)
