@@ -28,7 +28,7 @@ ns.WhyPoor = W
 local S = {}
 W.Share = S
 
-local PRICES_SINCE = "0.7.0-168-g0000000" -- the first build that reads these (LT.CompareVersions)
+local PRICES_SINCE = "0.7.0-190-g0000000" -- the first build that reads these (LT.CompareVersions)
 
 local VERSION = B.VERSION
 local OFFER_GAP = 600       -- an offer to one friend at most this often
