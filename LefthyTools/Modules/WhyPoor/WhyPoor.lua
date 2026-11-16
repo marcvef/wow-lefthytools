@@ -11,6 +11,7 @@ local L = ns.L
 --   prices = { ... }   Prices.lua: auction house prices, per realm and faction, with their history
 --   goal = { ... }     Goal.lua: the money goal (the mount), per character
 --   ui = { ... }       Window.lua: the window's place, tab and list state
+--   watch = { ... }    Stocks.lua: the watch list, item IDs in the order added
 --
 -- This file: the module, its settings page, /whypoor and /lefthy whypoor, the minimap button (it joins
 -- the combined LefthyTools button by itself, Core/Window.lua's Dock), and the few text helpers the
@@ -41,7 +42,7 @@ end
 LT.onLoad[#LT.onLoad + 1] = function()
 	LefthyToolsWhyPoorDB = type(LefthyToolsWhyPoorDB) == "table" and LefthyToolsWhyPoorDB or {}
 	W.db = LefthyToolsWhyPoorDB
-	for _, key in ipairs({ "prices", "goal", "ui" }) do
+	for _, key in ipairs({ "prices", "goal", "ui", "watch" }) do
 		W.db[key] = type(W.db[key]) == "table" and W.db[key] or {}
 	end
 end
@@ -179,13 +180,14 @@ end
 
 local function Help()
 	M:Print("/whypoor - open or close the window: ideas for making money")
-	M:Print("/whypoor ideas | crafting | bags | market | goal - the window on that page")
+	M:Print("/whypoor ideas | crafting | stocks | bags | market | goal - the window on that page")
 	M:Print("/whypoor goal <gold> [name] - your own money goal (/whypoor goal clear: the mount again)")
 	M:Print("/whypoor minimap - show or hide the minimap button")
 	M:Print("/whypoor settings - WhyPoor?'s settings")
 end
 
-local TABS = { ideas = "ideas", bags = "bags", market = "market", goal = "goal", crafting = "crafting", margins = "crafting" }
+local TABS = { ideas = "ideas", bags = "bags", market = "market", goal = "goal", crafting = "crafting", margins = "crafting",
+	stocks = "stocks" }
 
 function M:OnSlashCommand(msg)
 	local cmd = strtrim(msg or ""):lower()

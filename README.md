@@ -661,6 +661,9 @@ nothing is picked. A **Margins** button on your profession window opens it on th
 vendor, your bags, or crafting it yourself (a bolt of cloth from your linen, a miner's bars from
 ore), several steps deep. "Sell the reagents" says when selling them brings more than crafting.
 
+**Stocks** (the tab): your watch list of items with each one's latest lowest price on your auction house and how
+it changed in a week. Search an item above the list, click it for its price graph and add it to the list.
+
 **Nothing outside the window**: no lines in item tooltips, no marks on your bags.
 
 Its money data (where mobs, herbs and ore are, fishing, pickpocketing, disenchanting, vendors with
@@ -674,7 +677,7 @@ database, and loads only when first needed.
 | Scan the whole auction house when it opens | on |
 | Share auction house prices with friends | on |
 
-`/whypoor` opens or closes the window; `/whypoor ideas`, `crafting`, `bags`, `market` or `goal` opens that
+`/whypoor` opens or closes the window; `/whypoor ideas`, `crafting`, `stocks`, `bags`, `market` or `goal` opens that
 page; `/whypoor minimap` shows or hides the button.
 
 ## Mirage
