@@ -671,5 +671,11 @@ ns.CHANGELOG = {
 	{ id = 221, module = "whypoor",
 		en = { "WhyPoor?: will it sell?", "Market deals say whether the item sells (sales a day, days of supply, the week's price) in their row and details, with the item's stock chart." },
 		de = { "WhyPoor?: Verkauft es sich?", "Markt-Deals zeigen, ob sich das Item verkauft (Verkäufe pro Tag, Tage Vorrat, der Preis der Woche), in der Zeile und den Details, mit dem Chart des Items." } },
+	{ id = 222, module = "whypoor",
+		en = { "WhyPoor?: Highlights", "The dashboard has a Highlights page (/whypoor highlights): what's skyrocketing, falling, scarce now, flooded or below its usual price on your auction house over 1, 7 or 14 days, without the noise (cheap, few listed or jumpy items left out)." },
+		de = { "WhyPoor?: Highlights", "Das Dashboard hat eine Highlights-Seite (/whypoor highlights): was in deinem Auktionshaus über 1, 7 oder 14 Tage stark steigt, fällt, gerade knapp ist, im Überfluss da ist oder unter seinem üblichen Preis liegt, ohne Rauschen (billige, kaum angebotene oder stark schwankende Items bleiben weg)." } },
+	{ id = 223, module = "whypoor",
+		en = { "WhyPoor?: days of supply", "How many days the listings on the auction house would last at the estimated sales: in the big chart, the Stocks rows and Highlights. The sales estimate now also works for items you don't watch." },
+		de = { "WhyPoor?: Tage Vorrat", "Wie viele Tage die Angebote im Auktionshaus bei den geschätzten Verkäufen reichen: im großen Chart, in den Stocks-Zeilen und in Highlights. Die Verkaufsschätzung klappt jetzt auch für Items, die du nicht beobachtest." } },
 	-- New entries go here, at the end.
 }
