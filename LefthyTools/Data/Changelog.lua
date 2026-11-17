@@ -683,5 +683,8 @@ ns.CHANGELOG = {
 	{ id = 225, module = "whypoor",
 		en = { "WhyPoor?: friends fill your charts", "Friends on your auction house with this build send their scans of the items on your watch list, so your charts fill in when you weren't at the auction house (their points say from whom). Part of \"Share auction house prices with friends\"." },
 		de = { "WhyPoor?: Freunde füllen deine Charts", "Freunde in deinem Auktionshaus mit diesem Build schicken ihre Scans der Items auf deiner Watchlist, damit deine Charts sich füllen, wenn du nicht im Auktionshaus warst (ihre Punkte sagen, von wem). Teil von \"Auktionshauspreise mit Freunden teilen\"." } },
+	{ id = 226, module = "general",
+		en = { "A Commands page in the settings", "The settings' last page lists every useful slash command by module, the diagnostics too (Beacon's status, Echoes' pages, the Bestiary's log...): each button shows the command and runs it; one that needs a name or an item opens the chat box with it." },
+		de = { "Eine Befehle-Seite in den Einstellungen", "Die letzte Seite der Einstellungen listet alle nützlichen Slash-Befehle nach Modul, auch die Diagnosen (Beacons Status, die Seiten von Echoes, das Log des Bestiary...): jeder Button zeigt den Befehl und führt ihn aus; einer, der einen Namen oder ein Item braucht, öffnet die Chat-Box damit." } },
 	-- New entries go here, at the end.
 }

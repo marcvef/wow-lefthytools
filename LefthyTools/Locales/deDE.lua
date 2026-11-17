@@ -2303,4 +2303,104 @@ L["last scan that day from %s"] = "letzter Scan des Tages von %s"
 L["days last scanned by friends: %d"] = "Tage, zuletzt von Freunden gescannt: %d"
 L["friends' scans: %d"] = "Scans von Freunden: %d"
 
-
+-- The Commands page (Core/Options.lua)
+L["The installed version"] =
+	"Die installierte Version"
+L["LefthyTools' errors, ready to copy"] =
+	"Fehler von LefthyTools, zum Kopieren"
+L["Error reports friends sent you"] =
+	"Fehlerberichte, die Freunde dir geschickt haben"
+L["Send an error report: what happened"] =
+	"Fehlerbericht senden: was passiert ist"
+L["Every module, on or off"] =
+	"Alle Module, an oder aus"
+L["Friends with LefthyTools, message traffic"] =
+	"Freunde mit LefthyTools, Nachrichtenverkehr"
+L["Ping where you stand"] =
+	"Pingen, wo du stehst"
+L["Take your ping back"] =
+	"Deinen Ping zurücknehmen"
+L["Items you offered still to hand over"] =
+	"Angebotene Items, die noch zu übergeben sind"
+L["Try your level-up message"] =
+	"Deine Level-up-Nachricht ausprobieren"
+L["The level-up sounds"] =
+	"Die Level-up-Sounds"
+L["Show an item to friends"] =
+	"Freunden ein Item zeigen"
+L["Ask who's in (e.g. a dungeon)"] =
+	"Fragen, wer dabei ist (z. B. ein Dungeon)"
+L["Your own fight stream"] =
+	"Dein eigener Kampf-Stream"
+L["The stream window with a made-up fight"] =
+	"Das Stream-Fenster mit einem erfundenen Kampf"
+L["Watch a friend's fight: their name"] =
+	"Den Kampf eines Freundes ansehen: sein Name"
+L["Stop watching fights"] =
+	"Kämpfe nicht mehr ansehen"
+L["Test: what the game tells about mobs"] =
+	"Test: was das Spiel über Mobs verrät"
+L["The last stream tests, to copy"] =
+	"Die letzten Stream-Tests, zum Kopieren"
+L["What's recorded and kept, in numbers"] =
+	"Was aufgezeichnet und behalten wird, in Zahlen"
+L["Friends' recordings: pages you have and what's coming"] =
+	"Aufzeichnungen von Freunden: Seiten, die du hast, und was noch kommt"
+L["Collect friends' recordings on this computer"] =
+	"Aufzeichnungen von Freunden auf diesem PC sammeln"
+L["Stop collecting friends' recordings"] =
+	"Aufzeichnungen von Freunden nicht mehr sammeln"
+L["Message sizes that get through to a friend"] =
+	"Nachrichtengrößen, die bei einem Freund ankommen"
+L["The last loot windows and kills"] =
+	"Die letzten Loot-Fenster und Kills"
+L["Is the drop database there?"] =
+	"Ist die Drop-Datenbank da?"
+L["Every mob you've killed"] =
+	"Jeder Mob, den du getötet hast"
+L["Your wish list"] =
+	"Deine Wunschliste"
+L["Open or close the journal"] =
+	"Das Tagebuch öffnen oder schließen"
+L["This session in one line"] =
+	"Diese Session in einer Zeile"
+L["Open or close the small window"] =
+	"Das kleine Fenster öffnen oder schließen"
+L["The quest browser"] =
+	"Der Quest-Browser"
+L["What keeps the interface visible"] =
+	"Was das Interface sichtbar hält"
+L["Every element and how it fades"] =
+	"Jedes Element und wie es ausblendet"
+L["Pause or resume fading"] =
+	"Ausblenden pausieren oder fortsetzen"
+L["Every tweak, on or off"] =
+	"Alle Tweaks, an oder aus"
+L["Bags back to Blizzard's spot"] =
+	"Taschen zurück an Blizzards Platz"
+L["Loot rolls back to Blizzard's spot"] =
+	"Loot-Würfe zurück an Blizzards Platz"
+L["Preview the combo point dots"] =
+	"Vorschau der Combopunkte"
+L["Examples of who has aggro"] =
+	"Beispiele, wer Aggro hat"
+L["Open or close the window"] =
+	"Das Fenster öffnen oder schließen"
+L["Your price dashboard"] =
+	"Dein Preis-Dashboard"
+L["Prices skyrocketing, falling, scarce"] =
+	"Preise, die steigen, fallen, knapp sind"
+L["Your price alerts"] =
+	"Deine Preisalarme"
+L["An item's chart: its link or #ID"] =
+	"Der Chart eines Items: sein Link oder #ID"
+L["Your own money goal: gold and a name"] =
+	"Dein eigenes Geldziel: Gold und ein Name"
+L["The ideas' bar: gold an hour"] =
+	"Die Latte der Ideen: Gold pro Stunde"
+L["Commands"] =
+	"Befehle"
+L["Click: runs it. The answer comes in the chat."] =
+	"Klick: führt ihn aus. Die Antwort kommt im Chat."
+L["Click: opens the chat box with it; type the rest and press Enter."] =
+	"Klick: öffnet die Chat-Box damit; tipp den Rest und drück Enter."

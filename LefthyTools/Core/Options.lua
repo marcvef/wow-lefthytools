@@ -466,6 +466,150 @@ local function AddBlizzardPage()
 	Settings.RegisterAddOnCategory(Options.blizzardCategory)
 end
 
+---------------------------------------------------------------------------
+-- The Commands page: every useful slash command, so nobody has to remember them. A row: what it does, a button
+-- with the command itself; a click runs it (Options.RunCommand: its slash handler, the answer in the chat), one
+-- that needs something typed after it ("...") opens the chat box with it (Options.TypeCommand). The test
+-- (settings_window.lua) checks every command still has a handler.
+---------------------------------------------------------------------------
+
+Options.COMMANDS = {
+	{ section = "LefthyTools", commands = {
+		{ "/lefthy version", L["The installed version"] },
+		{ "/lefthy errors", L["LefthyTools' errors, ready to copy"] },
+		{ "/lefthy reports", L["Error reports friends sent you"] },
+		{ "/lefthy report", L["Send an error report: what happened"], type = true },
+		{ "/lefthy modules", L["Every module, on or off"] },
+	} },
+	{ section = "Beacon", commands = {
+		{ "/lefthy beacon status", L["Friends with LefthyTools, message traffic"] },
+		{ "/lefthy beacon ping", L["Ping where you stand"] },
+		{ "/lefthy beacon ping clear", L["Take your ping back"] },
+		{ "/lefthy beacon handover", L["Items you offered still to hand over"] },
+		{ "/lefthy beacon ding test", L["Try your level-up message"] },
+		{ "/lefthy beacon sound", L["The level-up sounds"] },
+		{ "/lefthy beacon show", L["Show an item to friends"], type = true },
+		{ "/ltc who", L["Ask who's in (e.g. a dungeon)"], type = true },
+		{ "/lefthy stream me", L["Your own fight stream"] },
+		{ "/lefthy stream preview", L["The stream window with a made-up fight"] },
+		{ "/lefthy stream watch", L["Watch a friend's fight: their name"], type = true },
+		{ "/lefthy stream stop", L["Stop watching fights"] },
+		{ "/lefthy stream test", L["Test: what the game tells about mobs"] },
+		{ "/lefthy stream results", L["The last stream tests, to copy"] },
+	} },
+	{ section = "Echoes", commands = {
+		{ "/lefthy echoes status", L["What's recorded and kept, in numbers"] },
+		{ "/lefthy echoes window", L["Friends' recordings: pages you have and what's coming"] },
+		{ "/lefthy echoes collect on", L["Collect friends' recordings on this computer"] },
+		{ "/lefthy echoes collect off", L["Stop collecting friends' recordings"] },
+		{ "/lefthy echoes probe", L["Message sizes that get through to a friend"], type = true },
+	} },
+	{ section = "Bestiary", commands = {
+		{ "/bestiary log", L["The last loot windows and kills"] },
+		{ "/bestiary data", L["Is the drop database there?"] },
+		{ "/bestiary ledger", L["Every mob you've killed"] },
+		{ "/bestiary wishes", L["Your wish list"] },
+	} },
+	{ section = "Chronicle", commands = {
+		{ "/chronicle", L["Open or close the journal"] },
+		{ "/chronicle session", L["This session in one line"] },
+	} },
+	{ section = "Lodestar", commands = {
+		{ "/lodestar", L["Open or close the small window"] },
+		{ "/lodestar browse", L["The quest browser"] },
+	} },
+	{ section = "Mirage", commands = {
+		{ "/mirage status", L["What keeps the interface visible"] },
+		{ "/mirage groups", L["Every element and how it fades"] },
+		{ "/mirage pause", L["Pause or resume fading"] },
+	} },
+	{ section = "Misc Tweaks", commands = {
+		{ "/lefthy tweaks status", L["Every tweak, on or off"] },
+		{ "/levelup", L["Show the level-up window"] },
+		{ "/lefthy tweaks resetbags", L["Bags back to Blizzard's spot"] },
+		{ "/lefthy tweaks resetloot", L["Loot rolls back to Blizzard's spot"] },
+		{ "/lefthy tweaks combopos", L["Preview the combo point dots"] },
+		{ "/lefthy tweaks aggrotest", L["Examples of who has aggro"] },
+		{ "/lefthy tweaks rolecheck", L["Start a role check"] },
+	} },
+	{ section = "WhyPoor?", commands = {
+		{ "/whypoor", L["Open or close the window"] },
+		{ "/whypoor dashboard", L["Your price dashboard"] },
+		{ "/whypoor highlights", L["Prices skyrocketing, falling, scarce"] },
+		{ "/whypoor alerts", L["Your price alerts"] },
+		{ "/whypoor chart", L["An item's chart: its link or #ID"], type = true },
+		{ "/whypoor goal", L["Your own money goal: gold and a name"], type = true },
+		{ "/whypoor bar", L["The ideas' bar: gold an hour"], type = true },
+	} },
+}
+
+-- The handler of a slash command's first word ("/lefthy"): the function in SlashCmdList, nil if none.
+function Options.CommandHandler(text)
+	local word = type(text) == "string" and text:match("^(/%S+)")
+	if not word then
+		return nil
+	end
+	word = word:lower()
+	for key, fn in pairs(SlashCmdList) do
+		for i = 1, 9 do
+			local slash = _G["SLASH_" .. key .. i]
+			if type(slash) ~= "string" then
+				break
+			end
+			if slash:lower() == word then
+				return fn
+			end
+		end
+	end
+end
+
+-- Runs a command as if typed: true when it had a handler.
+function Options.RunCommand(text)
+	local fn = Options.CommandHandler(text)
+	if not fn then
+		return false
+	end
+	LT.Trail("commands page " .. (text:match("^(%S+%s*%S*)") or text))
+	fn((text:match("^/%S+%s*(.-)$") or ""))
+	return true
+end
+
+-- Opens the chat box with the command and a space, for the rest to be typed.
+function Options.TypeCommand(text)
+	local open = (ChatFrameUtil and ChatFrameUtil.OpenChat) or ChatFrame_OpenChat
+	if type(open) == "function" then
+		pcall(open, text .. " ")
+		return true
+	end
+	return false
+end
+
+local function BuildCommands(page)
+	local function Row(row)
+		row.page = page
+		page.rows[#page.rows + 1] = row
+		return row
+	end
+	for _, group in ipairs(Options.COMMANDS) do
+		Options.headers[#Options.headers + 1] = group.section
+		Row({ kind = "header", name = group.section })
+		for _, c in ipairs(group.commands) do
+			local text, typed = c[1], c.type
+			local row = Row({ kind = "button", name = c[2], text = text .. (typed and " ..." or ""), command = text,
+				tooltip = text .. (typed and " ...\n\n" .. L["Click: opens the chat box with it; type the rest and press Enter."]
+					or "\n\n" .. L["Click: runs it. The answer comes in the chat."]),
+				onClick = function()
+					if typed then
+						Options.TypeCommand(text)
+					else
+						Options.RunCommand(text)
+					end
+				end })
+			Options.buttons[text] = row
+		end
+	end
+end
+
 function ns.SetupOptions()
 	LT.category = NewPage(L["Overview"])
 	BuildOverview(LT.category)
@@ -474,6 +618,8 @@ function ns.SetupOptions()
 			BuildModulePage(m)
 		end
 	end
+	Options.commandsPage = NewPage(L["Commands"])
+	BuildCommands(Options.commandsPage)
 	Options.FindNew()
 	AddBlizzardPage()
 end
@@ -499,6 +645,12 @@ end
 
 local commands = {}  -- word -> run(rest)
 local helpLines = {} -- { word, line }, in the order /lefthy lists them
+
+-- Whether "/lefthy <word>" means something: a registered word or a module (the Commands page's test).
+function Options.KnownWord(word)
+	word = type(word) == "string" and word:lower() or ""
+	return commands[word] ~= nil or LT:GetModule(word) ~= nil
+end
 
 -- "/lefthy <word> ..." runs run(rest), rest being what follows the word, as typed. help is its line
 -- in /lefthy's list (nil: not listed, e.g. another word for the same thing), right after the line of

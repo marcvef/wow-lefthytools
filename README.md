@@ -21,7 +21,9 @@ in **Options → AddOns → LefthyTools**. LefthyTools has its own settings wind
 settings; it also opens in a fight and in gamepad mode. A setting you changed has a gold dot and a
 button that puts it back to its default; each module's page can be reset at its foot (it asks first).
 Settings an update adds say **New** until you've opened their page. Settings are the same for all
-your characters.
+your characters. The last page, **Commands**, lists every useful slash command by module (the
+diagnostics too: Beacon's status, Echoes' pages, the Bestiary's log...): each button shows the
+command and runs it; one that needs a name or an item ("...") opens the chat box with it.
 
 - **LefthyTools** (overview): a switch for each module, **General** with *Combine minimap buttons*
   (on: one LefthyTools button on the minimap's edge, a click lists the modules' buttons with their

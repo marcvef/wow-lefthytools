@@ -143,7 +143,7 @@ do
 	GAMEPAD_STATE.ui = false
 	win:Hide()
 	win:Show()
-	check(#Options.pages == 1 + #(function() local m = {}; for _, x in ipairs(LT.modules) do if type(x.BuildOptions) == "function" then m[#m + 1] = x end end return m end)(), "a page per module, and the overview")
+	check(#Options.pages == 2 + #(function() local m = {}; for _, x in ipairs(LT.modules) do if type(x.BuildOptions) == "function" then m[#m + 1] = x end end return m end)(), "a page per module, the overview and the Commands")
 	win:Hide()
 
 	-- Blizzard's list only leads here.
@@ -372,5 +372,36 @@ do
 	end
 	check(newRows == 0 and all == count, "no saved list yet: everything counts as seen, no flood of tags")
 	check(LefthyToolsDB.settings.beacon == db and LefthyToolsDB.settings.mirage == mirage.db, "settings are still the same saved tables")
+end
+section("the settings window: the Commands page")
+do
+	local page = Options.commandsPage
+	check(page and page.name == "Commands" and Options.pages[#Options.pages] == page, "a Commands page, last in the list")
+	local buttons, bad = 0, {}
+	for _, row in ipairs(page.rows) do
+		if row.kind == "button" then
+			buttons = buttons + 1
+			local cmd = row.command
+			local word = cmd:match("^/lefthy%s+(%S+)")
+			if not Options.CommandHandler(cmd) or (word and not Options.KnownWord(word)) then
+				bad[#bad + 1] = cmd
+			end
+		end
+	end
+	check(buttons >= 40 and #bad == 0, "every command on it has a handler (" .. buttons .. " commands): " .. table.concat(bad, ", "))
+	local version = Options.buttons["/lefthy version"]
+	check(version and version.text == "/lefthy version" and version.name == "The installed version"
+		and version.tooltip:find("runs it", 1, true), "a row: what it does, the button the command itself, the tooltip how")
+	local printed = #PRINTED
+	version.onClick()
+	check(#PRINTED > printed and PRINTED[#PRINTED]:find("version " .. LT.version, 1, true), "a click runs it: the answer in the chat")
+	local opened
+	local realUtil = ChatFrameUtil
+	ChatFrameUtil = { OpenChat = function(text) opened = text end }
+	local chart = Options.buttons["/whypoor chart"]
+	chart.onClick()
+	check(chart.text == "/whypoor chart ..." and opened == "/whypoor chart ", "one that needs something typed: the chat box opens with it")
+	ChatFrameUtil = realUtil
+	check(Options.RunCommand("/nosuchcommand") == false and Options.KnownWord("nosuchword") == false, "no handler: nothing run")
 end
 Advance(0.1) -- (this file advances 11.9 s; whole seconds for the suites after it)
