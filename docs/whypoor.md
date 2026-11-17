@@ -88,13 +88,23 @@ P.IsOpen()            -- the auction house is open
 P.LastScan()          -- when this realm's last full scan was
 P.History(item)       -- its days on this auction house for a graph: { { day, low, qty }, ... } oldest first, the value,
                       -- unstable
+P.Series(item, from, to) -- its prices between two times (time(); nil: no bound) on this realm's and faction's auction
+                      -- house, oldest first: points = { { t, price (the lowest for one then), qty (how many listed),
+                      -- open, high, low, close (day points only: the day's first, highest, lowest, last scan's price
+                      -- for one) }, ... }, and res: "scan" (every scan's own point: from lies at or after the watched
+                      -- item's oldest kept scan point) or "day" (one a day; t = the day's last scan, else its noon;
+                      -- price = the day's low). A new list each call
+P.SeriesSpan(item)    -- the first and last point's time known of it here (nil, nil: none), and whether its history is
+                      -- kept long (it's on the watch list)
 P.Items()             -- every item with auction house data on this realm and faction (mine or a friend's): a new
                       -- sorted list of item IDs (the ideas' market pass goes over it)
 P.Revision()          -- goes up when any price changed (for caches)
 P.AH_CUT, P.STALE
 -- Also (Margins and tests): P.AHPrice(item) ({ p, q, t }: Margins' old shape), P.ScanItems(items, { front, spell }),
 -- P.ScanFull(fallback), P.Status(), P.Cancel(), P.Busy(), P.Refresh(), P.levelHint (a function: gear's item level),
--- P.Decode / P.Encode (an item's saved text), P.Today()
+-- P.Decode / P.Encode (an item's saved text), P.Today(), P.WatchSet() (the watch list as a set), P.Record(h, item, t,
+-- low, qty), P.DecodeScans / P.DecodeDaily / P.ScanText / P.DayText (the long history's texts), P.SCAN_KEEP,
+-- P.SCAN_MAX, P.SCAN_MERGE, P.LONG_DAYS, P.UNWATCH_KEEP
 ```
 
 ### Crafts (`W.Crafts`, Crafts.lua)
@@ -230,7 +240,8 @@ line of its own.
   the last scan that covered it (low empty: none listed), then the lowest for one and how many of each day
   (`day` = `time() / 86400`, newest first, 14 at most); `flow[item]` (listings gone early, below),
   `own[item]` (my auctions sold and expired, per day), `friends[item]` (Friends' prices), `scan` (the last
-  full scan read), `friendScan` (the newest friend's data taken).
+  full scan read), `friendScan` (the newest friend's data taken); for watched items `scans`, `daily` and
+  `unwatched` (Long history, below).
 - `replicated`: when ReplicateItems was last asked (one for all houses: the game's limit isn't documented as
   per realm, so the safe reading).
 - `vendor[item]`: what a merchant asked for one, in gold only (`C_MerchantFrame.GetItemInfo`'s `price` for
@@ -314,9 +325,44 @@ frame shows it). The game's answer for one and for n is kept per item and durati
 same n, or scaled when the game's deposit for n was exactly n times the one for one. No rule of our own:
 otherwise nil.
 
+**Long history of watched items** (for the Stocks tab's chart): the items on the watch list
+(`LefthyToolsWhyPoorDB.watch`, account-wide, Stocks.lua's `St.List()`) keep more than the 14 daily lows, per house:
+
+- `scans[item] = "<t>,<low>,<qty>;..."`: every scan's lowest for one and how many were listed, newest first, 31
+  days (`P.SCAN_KEEP`) and 3000 points (`P.SCAN_MAX`) at most; a point within 5 minutes (`P.SCAN_MERGE`) of the
+  newest replaces it (a search right after a full scan is the same look). About 15 bytes a point.
+- `daily[item] = "<day>,<open>,<high>,<low>,<close>,<qty>,<at>;..."`: a point a day, newest first, 3 years
+  (`P.LONG_DAYS`, 1098 days): the day's first, highest, lowest and last scan's price for one (open, high and close
+  left empty when they're the low: a quiet day is short), the last scan's count and its seconds into the day
+  (`at`; empty: not known). About 15 to 30 bytes a day.
+- `unwatched[item] = t`: when it left the watch list.
+
+*Recording* (`P.Record`): a full scan's commit and every single search (`P.Store`) record a watched item's price;
+none listed records nothing. Stocks.lua changes the list without telling, so `P.WatchSet()` builds the set from
+it anew (the list is short): once per commit, then a set lookup per item, so a full scan costs nothing more per
+item; once per search. Only each text's first entry is read and rewritten, the same work however long the
+history; a price older than the newest point is left out (they come in time order).
+
+*Watching* (seen by `P.WatchSet`, called by the commit, searches, `P.Series`, `P.SeriesSpan` and pruning): an item
+that came onto the list loses its `unwatched` mark, and its `daily` starts from its items entry's daily lows
+(open = high = low = close = that low, `at` known for the day of its last scan) in each house that has none yet.
+One that left is marked; its long history stays 14 days (`P.UNWATCH_KEEP`, so adding it back loses nothing),
+then pruning drops it. One that left while the engine was off is marked when pruning next starts.
+
+*Reading* (`P.Series(item, from, to)`, this realm's and faction's house): `"scan"` when `from` lies at or after the
+item's oldest kept scan point (the whole span is kept scan by scan): those points between `from` and `to`. Else
+`"day"`: the long daily history, plus the items entry's daily lows for days it hasn't (an unwatched item has only
+those: its 14 daily lows), each with `t` = the day's last scan when known, else the day's noon (UTC days, as
+`P.Today`); price = the day's low; between `from` and `to` by `t`. `P.SeriesSpan`: the first and last of all
+those points (scan and day) and whether the item is watched. Decoded texts are kept while they stay the same
+(`P.long`). The rest of the engine (`P.Get`, `P.Value`, `P.History`, Share) reads only `items`, as before.
+
 **Pruning**: when the engine starts, a job over frames drops items and friends' prices not seen for 14 days,
 days older than 14 in `flow` and `own`, posted auctions older than 3 days, broken entries, and houses with
-nothing left. It goes over copies of the keys and never alongside a scan.
+nothing left. It goes over copies of the keys and never alongside a scan. Watched items' long history
+(`P.PruneLong`) stays whether or not they were on the auction house lately (their `items` entry may go after 14
+days unseen, the long history doesn't): scan points older than 31 days or beyond the newest 3000 go, days older
+than 3 years go; an item off the watch list for more than 14 days loses it all.
 
 **Open questions** (not verified in game): the cut at a neutral auction house (classic's 15%? `P.AH_CUT` is
 5%, so neutral prices are kept apart); whether `GetReplicateItemInfo` gives `owner` on Forever (without it,

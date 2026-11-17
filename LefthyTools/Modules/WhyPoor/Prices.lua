@@ -17,12 +17,22 @@ ns.WhyPoor = W
 --                                          scans of one session (gone: how many; span: the seconds watched)
 --     own[item] = "<day>,<sold>,<expired>;..."  my own auctions of it that sold or expired
 --     friends[item] = "<seen>,<value>,<low>,<qty>,<days>,<unstable>,<at>;<name>"  a friend's (Share.lua)
+--     scans[item] = "<t>,<low>,<qty>;..."   a watched item's every scan (newest first, SCAN_KEEP, SCAN_MAX; one
+--                                          within SCAN_MERGE of the newest replaces it; none listed: no point)
+--     daily[item] = "<day>,<open>,<high>,<low>,<close>,<qty>,<at>;..."   a watched item's days (newest first,
+--                                          LONG_DAYS): the first, highest, lowest and last scan's price for one
+--                                          (open, high, close empty: the same as low), the last scan's count and
+--                                          its seconds into the day (empty: not known); seeded from items' days
+--     unwatched[item] = t                  when it left the watch list: scans and daily go UNWATCH_KEEP later
 --   }
 --   replicated = t                         the last ReplicateItems asked (the game answers one every 15 min)
 --   vendor[item] = copper                  what a merchant asked for one (any realm; seen in its window)
 --   posted[auctionID] = "<item>,<qty>,<t>,<house>[,d]"  my auctions, to tell what sold (d: counted or gone)
 --   deposit[item] = "<dur>,<d1>,<n>,<dn>"  the game's deposit for one and for n (duration index dur)
 --   imported = true                        Margins' old prices (LefthyToolsDB.margins) taken over once
+--
+-- Watched items: LefthyToolsWhyPoorDB.watch (Stocks.lua's list), looked at once per full scan's commit and per
+-- search (P.WatchSet), a set lookup per item. P.Series and P.SeriesSpan read the long history for a chart.
 --
 -- Events only note; a driver frame does the work a few ms a frame and is hidden while there's none. The
 -- engine runs while WhyPoor? or Chronicle's margins setting is on (P.Refresh), nothing at all otherwise.
@@ -51,8 +61,15 @@ local POSTED_KEEP = 3 * DAY    -- my auctions watched this long (48 h at most, t
 local OWN_MIN = 3              -- sells from my own auctions once this many sold or expired
 local NEUTRAL = { [1434] = true, [1446] = true, [1452] = true } -- Stranglethorn, Tanaris, Winterspring (classic
                                -- uiMapIDs): the neutral auction houses of Booty Bay, Gadgetzan and Everlook
+local SCAN_KEEP = 31 * DAY     -- watched items: every scan's point kept this long
+local SCAN_MAX = 3000          -- and this many at most (the newest)
+local SCAN_MERGE = 5 * 60      -- a point this soon after the newest replaces it (the same look, twice)
+local LONG_DAYS = 3 * 366      -- watched items: a point a day kept this many days
+local UNWATCH_KEEP = 14 * DAY  -- an item off the watch list keeps its long history this long (added back: still there)
+local NOON = DAY / 2           -- a day's point when only the day is known
 
 P.AH_CUT, P.STALE, P.KEEP, P.DAYS = AH_CUT, STALE, KEEP, DAYS
+P.SCAN_KEEP, P.SCAN_MAX, P.SCAN_MERGE, P.LONG_DAYS, P.UNWATCH_KEEP = SCAN_KEEP, SCAN_MAX, SCAN_MERGE, LONG_DAYS, UNWATCH_KEEP
 P.REPLICATE_GAP, P.READ_MS = REPLICATE_GAP, READ_MS
 
 local issecret = LT.IsSecret
@@ -64,6 +81,7 @@ P.running = false
 P.ahOpen = false
 P.lastSend = -math.huge
 P.decoded = {}      -- [house key] = { [item] = { text, entry } }
+P.long = {}         -- [house key] = { [item] = { scans text, daily text, scans, days } } (P.LongEntry)
 P.asked = {}        -- items whose data was asked for
 P.notes = {}        -- auction notifications waiting for the driver
 P.wants = {}        -- who wants the engine besides the two modules (P.Want)
@@ -206,7 +224,7 @@ function P.House(key)
 		h = {}
 		saved.houses[key] = h
 	end
-	for _, k in ipairs({ "items", "flow", "own", "friends" }) do
+	for _, k in ipairs({ "items", "flow", "own", "friends", "scans", "daily", "unwatched" }) do
 		h[k] = type(h[k]) == "table" and h[k] or {}
 	end
 	return h
@@ -291,7 +309,11 @@ function P.Store(key, item, low, qty, t)
 	if not h then
 		return
 	end
-	h.items[item] = P.Merge(P.Decode(h.items[item]), t or time(), Whole(low), qty)
+	t, low = t or time(), Whole(low)
+	if P.WatchSet()[item] then
+		P.Record(h, item, t, low, qty)
+	end
+	h.items[item] = P.Merge(P.Decode(h.items[item]), t, low, qty)
 	P.Changed()
 end
 
@@ -972,8 +994,13 @@ function P.Commit(scan, found, sigs)
 		return
 	end
 	local items, k = h.items, 0
+	local watch = P.WatchSet() -- (once: a set lookup per item)
 	for item, f in pairs(found) do
-		items[item] = P.Merge(P.Decode(items[item]), t, Whole(f.p), f.q)
+		local low = Whole(f.p)
+		if watch[item] then
+			P.Record(h, item, t, low, f.q)
+		end
+		items[item] = P.Merge(P.Decode(items[item]), t, low, f.q)
 		k = k + 1
 		if k % STEP == 0 then
 			P.Yield()
@@ -1256,6 +1283,239 @@ function P.History(item)
 	return list, value, P.Unstable(e.days, today)
 end
 
+---------------------------------------------------------------------------
+-- Long history of watched items (the series)
+---------------------------------------------------------------------------
+
+function P.ScanText(t, low, qty)
+	return P.B36(t) .. "," .. P.B36(low) .. "," .. P.B36(qty or 0)
+end
+
+-- A day's entry: { day, open, high, low, close, qty, at (seconds into the day; nil: not known) }.
+function P.DayEntry(part)
+	local a, b, c, d, e, f, g = (part or ""):match("^(%w+),(%w*),(%w*),(%w+),(%w*),(%w*),(%w*)$")
+	local day, low = N36(a), N36(d)
+	if not (day and low) then
+		return nil
+	end
+	return { day, N36(b) or low, N36(c) or low, low, N36(e) or low, N36(f) or 0, N36(g) }
+end
+
+function P.DayText(d)
+	local low = d[4]
+	local function Or(v)
+		return v and v ~= low and P.B36(v) or ""
+	end
+	return table.concat({ P.B36(d[1]), Or(d[2]), Or(d[3]), P.B36(low), Or(d[5]), P.B36(d[6] or 0),
+		d[7] and P.B36(d[7]) or "" }, ",")
+end
+
+-- scans[item]'s points: { { t, low, qty }, ... } newest first (broken ones left out).
+function P.DecodeScans(text)
+	local list = {}
+	if type(text) == "string" then
+		for part in text:gmatch("[^;]+") do
+			local a, b, c = part:match("^(%w+),(%w+),(%w*)$")
+			if N36(a) and N36(b) then
+				list[#list + 1] = { N36(a), N36(b), N36(c) or 0 }
+			end
+		end
+	end
+	return list
+end
+
+-- daily[item]'s days: P.DayEntry's, newest first (broken ones left out).
+function P.DecodeDaily(text)
+	local list = {}
+	if type(text) == "string" then
+		for part in text:gmatch("[^;]+") do
+			list[#list + 1] = P.DayEntry(part)
+		end
+	end
+	return list
+end
+
+-- An items entry's daily lows as day entries (open = high = low = close), newest first; the day of its last scan
+-- knows when that was.
+function P.ItemDays(e)
+	local list = {}
+	local seenDay = e.seen and P.Today(e.seen)
+	for _, d in ipairs(e.days or {}) do
+		list[#list + 1] = { d[1], d[2], d[2], d[2], d[2], d[3] or 0, d[1] == seenDay and e.seen - d[1] * DAY or nil }
+	end
+	table.sort(list, function(a, b) return a[1] > b[1] end)
+	return list
+end
+
+-- An item just watched: its daily history starts from the daily lows its items entry has.
+function P.Seed(h, item)
+	local e = P.Decode(h.items[item])
+	if not e then
+		return
+	end
+	local parts = {}
+	for i, d in ipairs(P.ItemDays(e)) do
+		parts[i] = P.DayText(d)
+	end
+	h.daily[item] = parts[1] and table.concat(parts, ";") or nil
+end
+
+-- The watched items (LefthyToolsWhyPoorDB.watch, Stocks.lua's list) as a set, built anew each call (the list is
+-- short; Stocks.lua changes it without telling). Compared with the last call's: an item that came onto it loses
+-- its unwatched mark and gets its daily history seeded in each house that has none yet; one that left is marked
+-- (P.PruneLong drops its long history UNWATCH_KEEP later).
+function P.WatchSet()
+	local db = W.DB and W.DB()
+	local set = {}
+	for _, item in ipairs(db and type(db.watch) == "table" and db.watch or {}) do
+		if type(item) == "number" then
+			set[item] = true
+		end
+	end
+	local before = P.watchSet
+	P.watchSet = set
+	local saved = P.Saved()
+	if not (saved and type(saved.houses) == "table") then
+		return set
+	end
+	for item in pairs(set) do
+		if not (before and before[item]) then
+			for _, key in ipairs(P.Keys(saved.houses)) do
+				local h = P.House(key)
+				h.unwatched[item] = nil
+				if not h.daily[item] and h.items[item] then
+					P.Seed(h, item)
+				end
+			end
+		end
+	end
+	for item in pairs(before or {}) do
+		if not set[item] then
+			for _, key in ipairs(P.Keys(saved.houses)) do
+				local h = P.House(key)
+				if (h.daily[item] or h.scans[item]) and not h.unwatched[item] then
+					h.unwatched[item] = time()
+				end
+			end
+		end
+	end
+	return set
+end
+
+-- A watched item's price at t in a house (low nil: none listed, nothing kept): a scan point (replacing the newest
+-- within SCAN_MERGE) and today's day (open, high, low, close, qty, when). Only each text's first entry is read and
+-- rewritten: the same work however long the history. Older than the newest: left out (they come in time order).
+function P.Record(h, item, t, low, qty)
+	if not low then
+		return
+	end
+	qty = qty or 0
+	if not h.daily[item] then
+		P.Seed(h, item)
+	end
+	local text = h.scans[item]
+	local point = P.ScanText(t, low, qty)
+	local first, rest = (text or ""):match("^([^;]*)(.*)$")
+	local t0 = N36(first:match("^(%w+),"))
+	if not t0 then
+		h.scans[item] = point
+	elseif t - t0 < SCAN_MERGE and t >= t0 then
+		h.scans[item] = point .. rest
+	elseif t > t0 then
+		h.scans[item] = point .. ";" .. text
+	end
+	local today = P.Today(t)
+	text = h.daily[item]
+	first, rest = (text or ""):match("^([^;]*)(.*)$")
+	local d = P.DayEntry(first)
+	if not d then
+		h.daily[item] = P.DayText({ today, low, low, low, low, qty, t - today * DAY })
+	elseif d[1] == today and (not d[7] or t - today * DAY >= d[7]) then
+		d[3], d[4], d[5], d[6], d[7] = math.max(d[3], low), math.min(d[4], low), low, qty, t - today * DAY
+		h.daily[item] = P.DayText(d) .. rest
+	elseif d[1] < today then
+		h.daily[item] = P.DayText({ today, low, low, low, low, qty, t - today * DAY }) .. ";" .. text
+	end
+end
+
+-- An item's long history in a house, decoded (kept while its texts stay the same): scans, days (newest first).
+function P.LongEntry(key, item)
+	local saved = P.Saved()
+	local h = saved and type(saved.houses) == "table" and saved.houses[key]
+	local s = type(h) == "table" and type(h.scans) == "table" and h.scans[item] or nil
+	local d = type(h) == "table" and type(h.daily) == "table" and h.daily[item] or nil
+	if not (s or d) then
+		return nil, nil
+	end
+	local cache = P.long[key]
+	if not cache then
+		cache = {}
+		P.long[key] = cache
+	end
+	local c = cache[item]
+	if not (c and c[1] == s and c[2] == d) then
+		c = { s, d, P.DecodeScans(s), P.DecodeDaily(d) }
+		cache[item] = c
+	end
+	return c[3], c[4]
+end
+
+-- The contract's P.Series: an item's prices between from and to (time(); nil: no bound) on this realm's and
+-- faction's auction house, oldest first: { { t, price, qty, open, high, low, close }, ... }, and "scan" (every
+-- scan's point: the whole span lies within the watched item's kept scan points, from its oldest on) or "day"
+-- (a point a day: the long daily history, the items entry's daily lows for days it hasn't; price = the day's
+-- low; t = the day's last scan, else its noon). A new list each call.
+function P.Series(item, from, to)
+	from, to = tonumber(from) or -math.huge, tonumber(to) or math.huge
+	local points = {}
+	local key = P.HomeKey()
+	if type(item) ~= "number" or not key then
+		return points, "day"
+	end
+	P.WatchSet() -- (seeds an item just watched)
+	local scans, days = P.LongEntry(key, item)
+	local oldest = scans and scans[#scans]
+	if oldest and from >= oldest[1] then
+		for i = #scans, 1, -1 do
+			local s = scans[i]
+			if s[1] >= from and s[1] <= to then
+				points[#points + 1] = { t = s[1], price = s[2], qty = s[3] }
+			end
+		end
+		return points, "scan"
+	end
+	local byDay = {}
+	for _, d in ipairs(days or {}) do
+		byDay[d[1]] = byDay[d[1]] or d
+	end
+	local e = P.Entry(key, item)
+	for _, d in ipairs(e and P.ItemDays(e) or {}) do
+		byDay[d[1]] = byDay[d[1]] or d
+	end
+	for day, d in pairs(byDay) do
+		local t = day * DAY + (d[7] or NOON)
+		if t >= from and t <= to then
+			points[#points + 1] = { t = t, price = d[4], qty = d[6], open = d[2], high = d[3], low = d[4], close = d[5] }
+		end
+	end
+	table.sort(points, function(a, b) return a.t < b.t end)
+	return points, "day"
+end
+
+-- The contract's P.SeriesSpan: the first and last point's time known of an item here (nil, nil: none) and whether
+-- its history is kept long (it's watched).
+function P.SeriesSpan(item)
+	local long = P.WatchSet()[item] == true
+	local days = P.Series(item)
+	local first, last = days[1] and days[1].t, days[#days] and days[#days].t
+	local key = P.HomeKey()
+	local scans = key and type(item) == "number" and P.LongEntry(key, item)
+	if scans and scans[1] then
+		first, last = math.min(first or math.huge, scans[#scans][1]), math.max(last or -math.huge, scans[1][1])
+	end
+	return first, last, long
+end
+
 -- Every item with data on this realm's and faction's auction house (mine or a friend's), for the ideas'
 -- market pass: a new list each call; nil before the saved table is there.
 function P.Items()
@@ -1299,12 +1559,28 @@ function P.PruneJob()
 	local function Seen(text)
 		return type(text) == "string" and N36(text:match("^(%w+),")) or nil
 	end
+	local watch = P.WatchSet()
 	for _, key in ipairs(P.Keys(saved.houses)) do
 		local h = saved.houses[key]
 		if type(h) ~= "table" then
 			saved.houses[key] = nil
 		else
 			P.House(key)
+			for _, item in ipairs(P.Keys(h.unwatched)) do
+				if not (h.daily[item] or h.scans[item]) or not Number(h.unwatched[item]) then
+					h.unwatched[item] = nil -- (nothing left, or broken: looked at again below)
+				end
+			end
+			local long = P.Keys(h.daily)
+			for item in pairs(h.scans) do
+				if not h.daily[item] then
+					long[#long + 1] = item
+				end
+			end
+			for _, item in ipairs(long) do
+				P.PruneLong(h, item, watch, now)
+				Tick()
+			end
 			for _, list in ipairs({ h.items, h.friends }) do
 				for _, item in ipairs(P.Keys(list)) do
 					local seen = Seen(list[item])
@@ -1322,7 +1598,7 @@ function P.PruneJob()
 					Tick()
 				end
 			end
-			if not (next(h.items) or next(h.friends) or next(h.own) or next(h.flow) or h.scan) then
+			if not (next(h.items) or next(h.friends) or next(h.own) or next(h.flow) or next(h.daily) or next(h.scans) or h.scan) then
 				saved.houses[key] = nil
 			end
 		end
@@ -1339,8 +1615,54 @@ function P.PruneJob()
 			saved.vendor[item] = nil
 		end
 	end
-	P.decoded = {}
+	P.decoded, P.long = {}, {}
 	P.Changed()
+end
+
+-- A watched item's long history in a house at the start: kept while watched; off the watch list, marked and dropped
+-- UNWATCH_KEEP later; scan points older than SCAN_KEEP (or beyond SCAN_MAX) and days older than LONG_DAYS go.
+function P.PruneLong(h, item, watch, now)
+	if watch[item] then
+		h.unwatched[item] = nil
+	elseif not h.unwatched[item] then
+		h.unwatched[item] = now -- (it left the list while the engine was off)
+	elseif now - h.unwatched[item] > UNWATCH_KEEP then
+		h.scans[item], h.daily[item], h.unwatched[item] = nil, nil, nil
+		return
+	end
+	local scans, cut = P.DecodeScans(h.scans[item]), now - SCAN_KEEP
+	local n = #scans
+	while n > 0 and (scans[n][1] < cut or n > SCAN_MAX) do
+		scans[n], n = nil, n - 1
+	end
+	if n == 0 then
+		h.scans[item] = nil
+	elseif n < select(2, (h.scans[item] or ""):gsub(";", "")) + 1 then
+		local parts = {}
+		for i, s in ipairs(scans) do
+			parts[i] = P.ScanText(s[1], s[2], s[3])
+		end
+		h.scans[item] = table.concat(parts, ";")
+	end
+	P.Yield()
+	local days, first = P.DecodeDaily(h.daily[item]), P.Today(now) - LONG_DAYS
+	n = #days
+	while n > 0 and days[n][1] <= first do
+		days[n], n = nil, n - 1
+	end
+	if n == 0 then
+		h.daily[item] = nil
+	elseif n < select(2, (h.daily[item] or ""):gsub(";", "")) + 1 then
+		local parts = {}
+		for i, d in ipairs(days) do
+			parts[i] = P.DayText(d)
+		end
+		h.daily[item] = table.concat(parts, ";")
+	end
+	if not (h.scans[item] or h.daily[item]) then
+		h.unwatched[item] = nil
+	end
+	P.Yield()
 end
 
 ---------------------------------------------------------------------------
@@ -1479,7 +1801,7 @@ function P.Stop()
 	P.events:UnregisterAllEvents()
 	P.running = false
 	P.scan, P.job, P.merchantDue, P.houseDue, P.ownedDue, P.ownedAsk, P.ahOpen = nil, nil, false, false, false, false, false
-	P.notes, P.last, P.decoded = {}, nil, {}
+	P.notes, P.last, P.decoded, P.long = {}, nil, {}, {}
 	P.driver:Hide()
 	P.Changed()
 end
