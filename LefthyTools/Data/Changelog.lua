@@ -641,5 +641,11 @@ ns.CHANGELOG = {
 	{ id = 211, module = "whypoor",
 		en = { "WhyPoor?: Stocks, a watch list", "A new tab: search any item the auction house has shown, add it to your watch list, and see its lowest price day by day and how it changed in a week. /whypoor stocks" },
 		de = { "WhyPoor?: Stocks, eine Watchlist", "Ein neuer Tab: such ein Item, das das Auktionshaus gezeigt hat, setz es auf deine Watchlist und sieh seinen niedrigsten Preis Tag für Tag und wie er sich in einer Woche verändert hat. /whypoor stocks" } },
+	{ id = 212, module = "whypoor",
+		en = { "WhyPoor?: crafting break-even prices", "A recipe's details on the Crafting tab show what its reagents may cost together, and under each reagent the most you can pay for it without the craft losing money: green while it's cheaper now, red when it's over." },
+		de = { "WhyPoor?: Kostendeckende Preise", "Die Details eines Rezepts im Crafting-Tab zeigen, was seine Reagenzien zusammen kosten dürfen, und unter jedem Reagenz das Meiste, was du dafür zahlen kannst, ohne Verlust zu machen: grün, solange es gerade günstiger ist, rot, wenn es drüber liegt." } },
+	{ id = 213, module = "whypoor",
+		en = { "WhyPoor?: Check all my recipes", "Every recipe's details on the Crafting tab have a \"Check all my recipes\" button next to \"Check AH\": all your recipes' prices at once, at the auction house." },
+		de = { "WhyPoor?: Alle Rezepte prüfen", "Die Details jedes Rezepts im Crafting-Tab haben neben \"AH prüfen\" einen Button \"Alle meine Rezepte prüfen\": die Preise aller deiner Rezepte auf einmal, im Auktionshaus." } },
 	-- New entries go here, at the end.
 }

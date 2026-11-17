@@ -446,6 +446,12 @@ bags' reagents hold); revenue at a vendor (`P.Vendor` times what a craft makes) 
 cut, and P's deposit rule); profit the better one minus the cost; time its cast plus 0.5 s plus the sub-crafts'
 (`subSeconds`); gold per hour profit / time.
 
+**Break even** (complete recipes with a revenue): `breakEven` = the better revenue (AH after the cut, or vendor):
+what all reagents may cost together; each reagent's `maxUnit` = floor((breakEven - the other reagents' cost now) /
+its count): the most one may cost for the craft not to lose money. The details show "Break even: reagents up to X
+per craft" and under each reagent not from a vendor "buy up to X each" (green while its price now is within it,
+red over it; "a loss even if it were free" at 0 or less), and a note. The AH's deposit isn't counted (said).
+
 **The verdict:** `reagentsSale` is what the recipe's reagents would sell for instead (`P.Best` each; one without a
 known price adds nothing, and `reagentsSaleComplete` is false: it's at least that much).
 
@@ -614,7 +620,7 @@ Chronicle's until build 0.7.0-193, now WhyPoor?'s (`W.Margins`, `Mg`): no settin
 is; Chronicle's old `margins` stays unused in its saved table), no window of its own: the window's **Crafting** tab
 (`W.Crafting`, `Cf`, added with `Wn.AddTab`: its own entries, rows, details, the overview when nothing is picked and
 its controls on the line above the list: the profession picker, "By gold/h" / "By profit"). Its list is worked out
-a few recipes a frame only while the tab shows (`Cf.driver`). The overview has "Scan all my recipes" (`Mg.ScanAll`;
+a few recipes a frame only while the tab shows (`Cf.driver`). The overview has "Check all my recipes" (`Mg.ScanAll`;
 "Go on (N left)" after a stop, "Stop" while it runs). The details: who makes it, each reagent the cheapest way
 (`D.Item` with the whole way in its hover; a crafted one's "craft it: ..." line), the numbers, notes, "Check AH"
 (`Mg.ScanRecipe`) and "Show in my profession window". The profession window's **Margins** button (setting
@@ -689,7 +695,7 @@ pacing and reading); Margins says what:
   its reagents no vendor sells, item by item (`P.ScanItems`, before what a scan by items has left; during a full
   scan nothing, the full scan has them). Gear without an item level from the game is searched with its
   recipe's (`P.levelHint` = `Mg.LevelHint`).
-- Everything (`Mg.ScanAll`, "Scan all my recipes"): a full scan (`P.ScanFull`, every item of the auction house)
+- Everything (`Mg.ScanAll`, "Check all my recipes"): a full scan (`P.ScanFull`, every item of the auction house)
   once the last was 15 minutes ago; too soon, no answer in 30 s or nothing in it: by items, the wanted ones
   without a price younger than 30 minutes (`FRESH`), so a scan that stopped goes on where it was (the button
   says "Go on (N left)").

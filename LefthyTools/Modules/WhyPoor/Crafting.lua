@@ -11,7 +11,7 @@ local C = ns.Chronicle -- (C.QualityText, C.OpenInMyProfessionWindow)
 -- professions or one (the controls on the line above the list). A recipe's details: who makes it, its reagents and
 -- the cheapest way to each (crafted ones with their own line, the whole way in the hover), cost, both revenues,
 -- profit, time, gold per hour, how many crafts the bags cover, the prices' age, notes; "Check AH" and "Show in my
--- profession window". Nothing picked: the overview, with "Scan all my recipes" (item by item when the game
+-- profession window", "Check all my recipes". Nothing picked: the overview, with "Check all my recipes" (item by item when the game
 -- doesn't allow a whole scan again; a stopped one goes on where it was).
 -- A "Margins" button on Blizzard's profession window (setting craftButton) opens the tab on the recipe shown and
 -- checks its prices at an open auction house: our own frame, a child of the schematic form, post-hooked (its Init),
@@ -372,10 +372,25 @@ function Cf.Notes(r)
 	if r.mayVary then
 		notes[#notes + 1] = L["~ What a craft makes can vary: the data's middle is counted."]
 	end
+	if r.breakEven then
+		notes[#notes + 1] = L["Buy up to: the most a reagent may cost, the others at today's prices, for the craft not to lose money."]
+	end
 	if r.verdict == "sell reagents" then
 		notes[#notes + 1] = GREEN .. L["Its reagents would sell for %s: more than what it makes."]:format(W.Money(r.reagentsSale)) .. "|r"
 	end
 	return notes
+end
+
+-- A reagent's "buy up to 45s each" (Cr.Recipe's maxUnit: the most one may cost, the others at their prices now, for
+-- the craft not to lose money): green while its price now is within it, red over it; nil for a vendor's reagent
+-- (its price is fixed) or without one.
+function Cf.BuyUpTo(g)
+	if not (g.maxUnit and g.unit) or (g.cost and g.cost.how == "vendor") then
+		return nil
+	elseif g.maxUnit <= 0 then
+		return RED .. L["a loss even if it were free"] .. "|r"
+	end
+	return (g.unit <= g.maxUnit and GREEN or RED) .. L["buy up to %s each"]:format(W.Money(g.maxUnit)) .. "|r"
 end
 
 function T.Details(e)
@@ -391,6 +406,10 @@ function T.Details(e)
 		if craft then
 			D.Text(GREY .. Cf.CraftLine(craft) .. "|r", "small", 20)
 		end
+		local most = Cf.BuyUpTo(g)
+		if most then
+			D.Text(most, "small", 20)
+		end
 	end
 	D.Head(L["The numbers"])
 	local function Line(label, value)
@@ -401,6 +420,9 @@ function T.Details(e)
 		or GREY .. L["vendors don't buy it"] .. "|r")
 	Line(L["On the AH, after the 5% cut"], r.ahRevenue and (W.Money(r.ahRevenue) .. "  " .. Cf.Profit(r.ahProfit))
 		or GREY .. (r.ahScanned and L["none listed"] or L["not scanned"]) .. "|r")
+	if r.breakEven then
+		Line(L["Break even"], L["reagents up to %s per craft"]:format(W.Money(r.breakEven)))
+	end
 	Line(L["Profit per craft"], r.profit and (Cf.Profit(r.profit) .. " " .. GREY .. "(" .. (r.best == "ah" and L["AH"] or L["Vendor"]) .. ")|r") or "-")
 	Line(L["Time per craft"], Cf.Seconds(r.seconds) .. ((r.subSeconds or 0) > 0
 		and (" " .. GREY .. L["(%s crafting reagents)"]:format(Cf.Seconds(r.subSeconds)) .. "|r") or ""))
@@ -422,14 +444,36 @@ function T.Details(e)
 			Wn.state.due = true
 		end
 	end, status.open and not (status.running and status.kind == "replicate"), 110)
+	Cf.AllButton(true, 160)
 	if LT.Value(C_SpellBook.IsSpellKnown, r.spell) == true and C and C.OpenInMyProfessionWindow then
 		D.Button(L["Show in my profession window"], function()
 			C.OpenInMyProfessionWindow(r.spell)
-		end, true, 200, true)
+		end, true, 200)
 	end
 end
 
--- Nothing picked: what the list is, the scan, "Scan all my recipes".
+-- "Check all my recipes" (Mg.ScanAll: a full scan when the game allows one, else item by item), "Stop" while it
+-- runs, "Go on (n left)" after a stop; only with the auction house open. Second: on the row of the button before.
+function Cf.AllButton(second, width)
+	local status = Mg().Status()
+	local label
+	if status.running and not status.spell then -- (a scan of everything; one recipe's check is its own button's)
+		label = L["Stop"]
+	else
+		local resume = status.left and status.items and status.left > 0 and status.left < status.items
+		label = resume and L["Go on (%d left)"]:format(status.left) or L["Check all my recipes"]
+	end
+	return D.Button(label, function()
+		if Mg().Status().running then
+			Mg().Cancel()
+		else
+			Mg().ScanAll()
+		end
+		Wn.state.due = true
+	end, status.running or status.open, width or 180, second)
+end
+
+-- Nothing picked: what the list is, the scan, "Check all my recipes".
 function T.Overview()
 	D.Text(L["Crafting margins"], "title")
 	D.Text(L["What your recipes cost to make and bring, and gold per hour, at the auction house's and vendors' prices. Reagents you can make count as crafted where that's cheaper. Click a recipe for its numbers."], "text", 0, 2)
@@ -447,21 +491,7 @@ function T.Overview()
 		D.Text(L["Last whole scan: %s ago"]:format(W.Age(last)), "small", 4)
 	end
 	D.y = D.y + 4
-	local label
-	if status.running then
-		label = L["Stop"]
-	else
-		local resume = status.left and status.items and status.left > 0 and status.left < status.items
-		label = resume and L["Go on (%d left)"]:format(status.left) or L["Scan all my recipes"]
-	end
-	D.Button(label, function()
-		if Mg().Status().running then
-			Mg().Cancel()
-		else
-			Mg().ScanAll()
-		end
-		Wn.state.due = true
-	end, status.running or status.open, 180)
+	Cf.AllButton(false, 180)
 end
 
 ---------------------------------------------------------------------------

@@ -199,11 +199,13 @@ local text, D = details()
 check(text:find("Bolt of Linen Cloth", 1, true), "the recipe it opened on")
 check(text:find("Cost per craft: 24c", 1, true), "its cost in the details (the linen just checked: 12c, my own 11c left out), got " .. text)
 check(text:find("Gold per hour", 1, true) and D.buttons[1]:IsShown() and plain(D.buttons[1]:GetText()) == "Check AH", "gold per hour; Check AH")
+check(D.buttons[2]:IsShown() and plain(D.buttons[2]:GetText()) == "Check all my recipes" and D.buttons[2]:IsEnabled(),
+	"and next to it, in every recipe's details: Check all my recipes")
 check(Cf.picker:IsShown() and Cf.sort:IsShown() and plain(view.Head:GetText()) == "2 recipes", "its controls on the line above the list")
 state.sel.crafting = nil
 Wn.Draw()
 text = details()
-check(text:find("Crafting margins", 1, true) and plain(D.buttons[1]:GetText()) == "Scan all my recipes" and D.buttons[1]:IsEnabled(),
+check(text:find("Crafting margins", 1, true) and plain(D.buttons[1]:GetText()) == "Check all my recipes" and D.buttons[1]:IsEnabled(),
 	"nothing picked: the overview with the scan button (the rest checked by now: a new scan, not going on)")
 Cf.sort:Click()
 Wait(0.1)

@@ -524,7 +524,7 @@ installer from GitHub instead.
       reagent row: Vendor). At the auction house: open your profession window there (does the auction
       house stay open?), click Margins: "Checking...", a second or two, then AH prices with "just now";
       compare a reagent's price with what the auction house shows for one. The auction house's own
-      Margins button opens the list; Scan all my recipes: "Asking the auction house for everything...",
+      Margins button opens the list; Check all my recipes: "Asking the auction house for everything...",
       then "Reading the auction house: N of M" without a hitch in the frame rate, then the list, best
       first; Sort switches. Scan again at once: item by item ("Scanning: N of M items"); Stop, then "Go on
       (N left)". Close the auction house mid-scan: it stops. A recipe whose product sells better on the AH

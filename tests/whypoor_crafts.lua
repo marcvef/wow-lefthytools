@@ -176,6 +176,15 @@ r = Cr.Recipe(SHIRT_SPELL, { who = tailor })
 check(r and r.complete and r.cost == 55 and near(r.ahRevenue, 190) and near(r.profit, 135) and r.best == "ah", "the shirt: 55c, 190c on the AH")
 check(r and r.verdict == "craft" and r.reason == "profit" and r.why ~= nil, "craft it")
 check(r and near(r.perHour, 135 * 3600 / 4), "gold per hour over both casts")
+do
+	local ok, parts = r.breakEven ~= nil and near(r.breakEven, 190), {}
+	for _, g in ipairs(r.reagents) do
+		local others = r.cost - g.unit * g.n
+		ok = ok and g.maxUnit == math.floor((190 - others) / g.n + 1e-9) and g.maxUnit >= g.unit
+		parts[#parts + 1] = ("%s: %s each (now %s)"):format(g.item, tostring(g.maxUnit), tostring(g.unit))
+	end
+	check(ok, "break even: all reagents up to 190c a craft; each one's most, the others at their prices: " .. table.concat(parts, ", "))
+end
 AH[VEST], VSELL[VEST], VSELL[THREAD], VSELL[BOLT_ITEM] = { 60, 10 }, 50, 2, 40
 r = Cr.Recipe(VEST_SPELL, { who = tailor })
 check(r and r.reagents[1].source == "craft" and r.cost == 30 and near(r.profit, 27), "the vest: a profit (57c on the AH for 30c)")
@@ -188,6 +197,8 @@ check(r and r.verdict == "sell reagents", "the shirt for 28.5c: its bolt alone s
 AH[BOLT_ITEM], VSELL[BOLT_ITEM] = { 15, 20 }, 10
 r = Cr.Recipe(SHIRT_SPELL, { who = tailor })
 check(r and r.cost == 50 and near(r.profit, -21.5) and r.verdict == "no" and r.reason == "loss", "bolts at 15c: a loss, don't")
+check(r and r.reagents[1].maxUnit < r.reagents[1].unit and W.Crafting.BuyUpTo(r.reagents[1]):find("|cffff4040", 1, true),
+	"a loss: the bolt's price is over its most, said in red")
 AH[SHIRT] = nil
 r = Cr.Recipe(SHIRT_SPELL, { who = tailor })
 check(r and r.profit == -40 and r.verdict == nil and r.reason == "price", "never on the AH: a vendor loss, but no verdict (the AH may pay more)")
@@ -271,6 +282,8 @@ local _, crafted = all:gsub("craft it:", "")
 check(crafted == 1, "the thread is bought: no line of its own")
 check(items[1] and plain(items[1].Right:GetText()):find("Craft", 1, true), "its source: Craft")
 check(all:find("(1.5 s crafting reagents)", 1, true), "the time says what the sub-craft takes")
+check(all:find("Break even: reagents up to", 1, true) and all:find("buy up to ", 1, true) and all:find("Buy up to: the most a reagent may cost", 1, true),
+	"break even in the numbers, buy up to under the reagents, a note: " .. all)
 check(all:find("Reagents you can make count as crafted", 1, true), "and a note says so")
 items[1]:GetScript("OnEnter")(items[1])
 local shown = table.concat(TOOLTIP.lines, "\n")

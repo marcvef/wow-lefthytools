@@ -545,6 +545,18 @@ function Cr.Recipe(spell, opts)
 		r.best, r.profit = "vendor", r.vendorProfit
 		r.basis = Cr.Weaker(r.basis, "forever")
 	end
+	-- Break even: what the craft brings at best (the auction house's after its cut, or a vendor's) is what all its
+	-- reagents may cost together (breakEven); each reagent's maxUnit is the most one may cost, the others at their
+	-- prices now (whole copper, rounded down: at that price it doesn't lose money).
+	local revenue = (r.ahRevenue or r.vendorRevenue) and math.max(r.ahRevenue or 0, r.vendorRevenue or 0)
+	if r.complete and revenue then
+		r.breakEven = revenue
+		for _, row in ipairs(r.reagents) do
+			if row.unit and row.n > 0 then
+				row.maxUnit = math.floor((revenue - (r.cost - row.unit * row.n)) / row.n + 1e-9)
+			end
+		end
+	end
 	local cast, castKnown = Cr.CastTime(recipe.spell)
 	r.cast, r.castKnown = cast, castKnown
 	r.seconds = cast + OVERHEAD + r.subSeconds

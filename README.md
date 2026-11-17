@@ -657,10 +657,13 @@ auction house helps everyone. Chronicle's crafting margins use the same prices.
 
 **Crafting** (the tab; it was Chronicle's crafting margins): your characters' recipes on this realm with what they
 cost, bring and make per hour, by gold per hour or profit per craft, one profession or all; a recipe's details show
-each reagent and where it comes from, "Check AH" and "Show in my profession window"; "Scan all my recipes" when
-nothing is picked. A **Margins** button on your profession window opens it on that recipe. A recipe's cost takes the cheapest way to get each reagent: the auction house, a
+each reagent and where it comes from, "Check AH", **"Check all my recipes"** (every recipe's prices at once) and
+"Show in my profession window"; the same "Check all my recipes" when nothing is picked. A **Margins** button on your profession window opens it on that recipe. A recipe's cost takes the cheapest way to get each reagent: the auction house, a
 vendor, your bags, or crafting it yourself (a bolt of cloth from your linen, a miner's bars from
 ore), several steps deep. "Sell the reagents" says when selling them brings more than crafting.
+**Break even**: what the reagents may cost together, and under each reagent "buy up to X each": the most
+you can pay for it (the others at today's prices) without the craft losing money; green while it's
+cheaper now, red when it's over.
 
 **Stocks** (the tab): your watch list of items with each one's latest lowest price on your auction house and how
 it changed in a week. Search an item above the list, click it for its price graph and add it to the list.
