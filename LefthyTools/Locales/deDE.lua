@@ -1681,7 +1681,8 @@ L["Open WhyPoor?"] = "WhyPoor? öffnen"
 L["Ideas for making money with this character, your bags' best sales and the auction house's deals, in one window. Also /whypoor."] = "Ideen zum Geldverdienen mit diesem Charakter, die besten Verkäufe aus deinen Taschen und die Deals im Auktionshaus, in einem Fenster. Auch /whypoor."
 L["A button on the edge of the minimap: click opens the window, right-click your bags. Drag it to move it."] = "Ein Button am Rand der Minimap: Klick öffnet das Fenster, Rechtsklick deine Taschen. Ziehen verschiebt ihn."
 L["Share auction house prices with friends"] = "Auktionshauspreise mit Freunden teilen"
-L["Your auction house prices go to your Beacon friends with LefthyTools, and theirs come to you, marked as theirs. Needs Beacon."] = "Deine Auktionshauspreise gehen an deine Beacon-Freunde mit LefthyTools, und ihre kommen zu dir, als ihre markiert. Braucht Beacon."
+L["Your auction house prices go to your Beacon friends with LefthyTools, and theirs come to you, marked as theirs. Friends on your auction house also send you their scans of the items on your watch list (and you yours of theirs), so your charts fill in the hours you weren't there. Needs Beacon."] =
+	"Deine Auktionshauspreise gehen an deine Beacon-Freunde mit LefthyTools, und ihre kommen zu dir, als ihre markiert. Freunde auf deinem Auktionshaus schicken dir auch ihre Scans der Items auf deiner Watchlist (und du ihnen deine von ihren), so füllen deine Charts die Stunden, in denen du nicht da warst. Braucht Beacon."
 L["%ds"] = "%ds"
 
 
@@ -2169,5 +2170,10 @@ L["Search an item: name, link or #id"] = "Item suchen: Name, Link oder #ID"
 L["still reading names..."] = "Namen werden noch gelesen..."
 L["Your watch list: each item's lowest price on your auction house, day by day, and how it changed in a week. Search an item above the list and add it."] =
 	"Deine Watchlist: der niedrigste Preis jedes Items in deinem Auktionshaus, Tag für Tag, und wie er sich in einer Woche verändert hat. Such über der Liste nach einem Item und füg es hinzu."
+
+-- WhyPoor?: friends' scans of watched items (Share.lua, Chart.lua)
+L["last scan that day from %s"] = "letzter Scan des Tages von %s"
+L["days last scanned by friends: %d"] = "Tage, zuletzt von Freunden gescannt: %d"
+L["friends' scans: %d"] = "Scans von Freunden: %d"
 
 

@@ -186,7 +186,7 @@ function Ch.Check(p)
 	if type(p) ~= "table" or not Num(p.t) or not Num(p.price) or p.price < 0 then
 		return nil
 	end
-	local out = { t = p.t, price = p.price, qty = Num(p.qty) or 0 }
+	local out = { t = p.t, price = p.price, qty = Num(p.qty) or 0, from = type(p.from) == "string" and p.from or nil }
 	if Num(p.open) and Num(p.high) and Num(p.low) and Num(p.close) then
 		out.open, out.high, out.low, out.close = p.open, p.high, p.low, p.close
 	end
@@ -749,9 +749,10 @@ function Wd:Draw()
 	if #pts <= Ch.DOTS then
 		for _, p in ipairs(pts) do
 			local dot = self:Get("dot")
-			local size = self.mini and 3 or 4
+			local size = (self.mini and 3 or 4) + (p.from and 1 or 0)
+			local c = p.from and Ch.FRIEND or color -- (a friend's scan: a bigger blue dot)
 			dot:SetSize(size, size)
-			dot:SetColorTexture(color[1], color[2], color[3], 1)
+			dot:SetColorTexture(c[1], c[2], c[3], 1)
 			dot:ClearAllPoints()
 			dot:SetPoint("CENTER", self.plot, "BOTTOMLEFT", self:X(p.t), self:Y(p.price))
 		end
@@ -1237,14 +1238,21 @@ function Ch.Pair(left, right, color)
 	GameTooltip:AddDoubleLine(left, right, 0.75, 0.75, 0.75, c[1], c[2], c[3])
 end
 
--- A point's tooltip: when, the price for one, how many were listed; a day's open, high, low, close and its
--- change from the day before.
+Ch.FRIEND = { 0.4, 0.75, 1 } -- a friend's scan's dot and tooltip line
+
+-- A point's tooltip: when, the price for one, how many were listed, whose scan when a friend's; a day's open, high,
+-- low, close and its change from the day before.
 function Ch.PointTip(w, i)
 	local p, prev = w.points[i], w.points[i - 1]
 	Ch.TipAt(w, w:X(p.t))
 	GameTooltip:SetText(Ch.When(p.t, w.res), 1, 1, 1)
 	Ch.Pair(w.res == "day" and L["Lowest price that day"] or L["Lowest price for one"], Money(p.price))
 	Ch.Pair(L["Listed"], (p.qty or 0) > 0 and tostring(math.floor(p.qty)) or L["not known"])
+	if p.from then
+		local c = Ch.FRIEND
+		GameTooltip:AddLine(w.res == "day" and L["last scan that day from %s"]:format(p.from) or L["from %s"]:format(p.from),
+			c[1], c[2], c[3])
+	end
 	local day = math.floor(p.t / DAY)
 	for _, d in ipairs(w.extra and w.extra.sold or {}) do
 		if d.day == day then
@@ -1740,6 +1748,13 @@ function Ch.Draw()
 	end
 	if get.friend then
 		info[#info + 1] = L["from %s"]:format(tostring(get.friend))
+	end
+	local friends = 0
+	for _, p in ipairs(points) do
+		friends = friends + (p.from and 1 or 0)
+	end
+	if friends > 0 then
+		info[#info + 1] = res == "day" and L["days last scanned by friends: %d"]:format(friends) or L["friends' scans: %d"]:format(friends)
 	end
 	local listed = Ch.ListedChange(points)
 	local sells = Ch.SellsText(perDay)

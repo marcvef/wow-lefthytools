@@ -179,7 +179,7 @@ function M:BuildOptions(o)
 		L["Opening the auction house reads all its listings at once, a little each frame, when the game allows that again (every 15 minutes). The prices give the Market tab's deals and the ideas' auction house prices. Off: only Margins' scan button scans."])
 	o:Header(L["Friends"])
 	o:Checkbox("sharePrices", L["Share auction house prices with friends"],
-		L["Your auction house prices go to your Beacon friends with LefthyTools, and theirs come to you, marked as theirs. Needs Beacon."])
+		L["Your auction house prices go to your Beacon friends with LefthyTools, and theirs come to you, marked as theirs. Friends on your auction house also send you their scans of the items on your watch list (and you yours of theirs), so your charts fill in the hours you weren't there. Needs Beacon."])
 end
 
 local function Help()
