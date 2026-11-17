@@ -143,3 +143,4 @@ Modules\WhyPoor\Chart.lua
 Modules\WhyPoor\Highlights.lua
 Modules\WhyPoor\Crafting.lua
 Modules\WhyPoor\Stocks.lua
+Modules\WhyPoor\Alerts.lua
