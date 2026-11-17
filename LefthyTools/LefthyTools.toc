@@ -139,5 +139,6 @@ Modules\WhyPoor\Methods.lua
 Modules\WhyPoor\Goal.lua
 Modules\WhyPoor\Bags.lua
 Modules\WhyPoor\Window.lua
+Modules\WhyPoor\Chart.lua
 Modules\WhyPoor\Crafting.lua
 Modules\WhyPoor\Stocks.lua

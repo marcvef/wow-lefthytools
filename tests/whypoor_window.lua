@@ -470,8 +470,9 @@ do
 	view.tabs.bags:Click()
 	check(not view.HeadButton:IsShown(), "another tab: the line above its list isn't the bar's")
 	W.Ideas.Bar, W.Ideas.BarChanged = nil, nil
-	-- The price graph: a bar a day.
-	local realHistory = W.Prices.History
+	-- The price graph: a small line chart (W.Chart's widget) of P.History's days (P.Series stood aside: the fallback).
+	local realHistory, realSeries, realSpan = W.Prices.History, W.Prices.Series, W.Prices.SeriesSpan
+	W.Prices.Series, W.Prices.SeriesSpan = nil, nil
 	local today = math.floor(time() / 86400)
 	W.Prices.History = function()
 		return { { day = today - 3, low = 1000 }, { day = today - 2, low = 1200 }, { day = today, low = 1100 } }, 1100, false
@@ -479,18 +480,24 @@ do
 	D.Begin()
 	D.Graph(9301)
 	D.End()
-	local bars = 0
-	for _, bar in ipairs(D.graph.bars) do if bar:IsShown() then bars = bars + 1 end end
+	local chart = D.chart
 	texts = {}
 	for _, fs in ipairs(D.texts) do if fs:IsShown() then texts[#texts + 1] = Plain(fs:GetText()) end end
 	all = table.concat(texts, "\n")
-	check(D.graph:IsShown() and bars == 3 and all:find("3 days: lowest 10s, highest 12s, usually 11s · steady", 1, true),
-		"the graph: a bar for each day with a price, what it says: " .. all)
+	check(D.graph:IsShown() and chart.mini and #chart.points == 3 and chart:Count("line") == 2 and chart:Count("dot") == 3
+		and chart:Count("fill") > 0 and all:find("3 days: lowest 10s, highest 12s, usually 11s · steady", 1, true),
+		"the graph: a line through each day's price, a dot each, the area under it; what it says: " .. all)
+	check(chart:Count("corner") == 2 and Plain(chart.pools.corner.list[1]:GetText()) == "12s" and chart:Count("level") == 1,
+		"its lowest and highest price, the usual price as a line")
+	chart.plot:Click("LeftButton")
+	check(W.Chart.Shown() and W.Chart.View() and select(2, W.Chart.View()).item == 9301, "a click: the big chart")
+	W.Chart.View():Hide()
 	W.Prices.History = function() return { { day = today, low = 1100 } }, 1100, false end
 	D.Begin()
 	D.Graph(9301)
 	D.End()
 	check(not D.graph:IsShown(), "one day: no graph yet, says so")
+	W.Prices.Series, W.Prices.SeriesSpan = realSeries, realSpan
 	W.Prices.History = realHistory
 	W.Window.View():Hide()
 	C.Char, C.Session = realChar, realSession

@@ -632,8 +632,8 @@ across the top with your goal: "Mount: 34g of 100g · ~3g/h · at this rate at l
   kill quickly; never a guard, a civilian or a faction you'd lose reputation with), herbs, ore and
   fishing at your skill, picking pockets for rogues, your recipes that make a profit, professions
   worth learning, auction house deals. An idea shows why it's worth it, what to do, the working, the
-  items with their prices, the main item's **price graph** (its lowest price each day of the last
-  two weeks on your auction house: steady or jumping around), and a small map of where ("Show on
+  items with their prices, the main item's **price graph** (its price on your auction house over
+  the last month: hover a point for its price, click it for the big chart), and a small map of where ("Show on
   map" opens it in Lodestar). Bags items show their price graph too.
 - **Bags**: each item, whether a vendor or the auction house pays more for it, and what they'd
   fetch in all. Quest items you still need and gear you might wear are kept apart.
@@ -665,6 +665,19 @@ ore), several steps deep. "Sell the reagents" says when selling them brings more
 **Stocks** (the tab): your watch list of items with each one's latest lowest price on your auction house and how
 it changed in a week. Search an item above the list, click it for its price graph and add it to the list.
 
+**Charts**, like a stock app's: `/whypoor chart` with an item's link or `#ID`, or a click on any price graph,
+opens an item's **big chart**: its price now, the change over the range in a green or red box, when it was last
+scanned, + Watch, the ranges 1D 5D 1M 6M YTD 1Y Max (greyed until there are prices that far back) and a line chart
+with the area under it, money and time on its axes, a dotted previous close (1D), the usual price as a gold line,
+how many were listed as faint bars and, for daily points, each day's low-to-high band (the toggles above the
+chart). Hover the chart for a point's time, price, quantity listed and a day's open, high, low and close; drag
+across it to see the change between two points and zoom in there (right-click goes back). Under it: open, high,
+low, listed now, the usual price, steady or not, the highest and lowest known and how many days of prices there
+are (hover each for what it means). The window moves, resizes from its corner and remembers both.
+`/whypoor dashboard` opens your **price dashboard**: a tile per item you pick (Edit: type a name, shift-click a
+link or `#ID`, or add all your watched items; move and remove tiles), each with its price, its change and a small
+chart over one range for all; a click opens the big chart.
+
 **Nothing outside the window**: no lines in item tooltips, no marks on your bags.
 
 Its money data (where mobs, herbs and ore are, fishing, pickpocketing, disenchanting, vendors with
@@ -679,7 +692,8 @@ database, and loads only when first needed.
 | Share auction house prices with friends | on |
 
 `/whypoor` opens or closes the window; `/whypoor ideas`, `crafting`, `stocks`, `bags`, `market` or `goal` opens that
-page; `/whypoor minimap` shows or hides the button.
+page; `/whypoor chart <item link or #ID>` an item's big chart; `/whypoor dashboard` the price dashboard; `/whypoor
+minimap` shows or hides the button.
 
 ## Mirage
 

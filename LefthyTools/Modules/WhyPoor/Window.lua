@@ -489,76 +489,54 @@ function D.Item(item, n, right, enter, data)
 	return b
 end
 
--- An item's price history on this auction house (P.History): a bar a day for its lowest buyout, the last 14
--- days (a day without a scan: no bar), the usual price as a line, and under it the lowest, the highest and
--- whether it's steady. Fewer than two days: says how many there are so far.
-D.GRAPH_H, D.GRAPH_DAYS = 56, 14
+-- An item's price on this auction house as a small chart (W.Chart's widget): its line over the last GRAPH_DAYS days
+-- (from its first price in them), green up, red down, the usual price as a gold line, the lowest and highest at the
+-- right, the first and last day below; a hover shows each point, a click opens the big chart (W.Chart.Open). Under it
+-- the daily lows' lowest, highest, the usual price and whether it's steady. Fewer than two prices: says so.
+D.GRAPH_H, D.GRAPH_DAYS = 72, 30
 function D.Graph(item)
-	local P = W.Prices
+	local P, Ch = W.Prices, W.Chart
 	if not (P and P.History and Num(item)) then
 		return
 	end
 	local list, value, unstable = P.History(item)
+	local get = P.Get and P.Get(item)
+	value = Num(value) or (type(get) == "table" and Num(get.value)) or nil
 	D.Head(L["Price on your auction house"])
-	if #list < 2 then
-		D.Text(GREY .. (#list == 1 and L["One day of prices so far: a few more days show whether it's steady."]
+	local now = time()
+	local points, res = {}, "day"
+	if Ch then
+		points, res = Ch.Points(item, now - D.GRAPH_DAYS * 86400, now)
+	end
+	if #points < 2 then
+		D.Text(GREY .. ((#points == 1 or #list == 1) and L["One day of prices so far: a few more days show whether it's steady."]
 			or L["No prices yet: open the auction house."]) .. "|r", "small", 4)
 		return
 	end
-	local g = D.graph
-	if not g then
-		g = CreateFrame("Frame", nil, D.child)
-		g.Back = g:CreateTexture(nil, "BACKGROUND")
-		g.Back:SetAllPoints()
-		g.Back:SetColorTexture(1, 1, 1, 0.04)
-		g.bars = {}
-		g.Usual = g:CreateTexture(nil, "OVERLAY")
-		g.Usual:SetHeight(1)
-		g.Usual:SetColorTexture(1, 0.82, 0, 0.8)
-		D.graph = g
+	local w = D.chart
+	if not w then
+		w = Ch.NewWidget(D.child, { mini = true, onClick = function(self) Ch.Open(self.item) end })
+		w.pools.dot = { list = {}, n = 0 }
+		D.chart, D.graph = w, w.frame
+		D.graph.bars = w.pools.dot.list -- (a dot per price while there are few: the Stocks tab's tests count them)
 	end
-	local width = D.width - 8
-	g:SetSize(width, D.GRAPH_H)
-	g:ClearAllPoints()
-	g:SetPoint("TOPLEFT", 4, -D.y)
-	g:Show()
-	local low, high = math.huge, 0
-	for _, d in ipairs(list) do
-		low, high = math.min(low, d.low), math.max(high, d.low)
-	end
-	local floor = low * 0.8 -- (the bars start a little below the lowest: differences show)
-	local span = math.max(1, high - floor)
-	local last = list[#list].day
-	local step = width / D.GRAPH_DAYS
-	for i = 1, D.GRAPH_DAYS do
-		local bar = g.bars[i]
-		if not bar then
-			bar = g:CreateTexture(nil, "ARTWORK")
-			g.bars[i] = bar
-		end
-		bar:Hide()
-	end
-	for _, d in ipairs(list) do
-		local slot = D.GRAPH_DAYS - (last - d.day)
-		local bar = slot >= 1 and g.bars[slot]
-		if bar then
-			local h = math.max(2, (d.low - floor) / span * (D.GRAPH_H - 4))
-			bar:ClearAllPoints()
-			bar:SetPoint("BOTTOMLEFT", (slot - 1) * step + 1, 0)
-			bar:SetSize(math.max(2, step - 2), h)
-			bar:SetColorTexture(unstable and 1 or 0.4, unstable and 0.5 or 0.75, unstable and 0.3 or 1, 0.85)
-			bar:Show()
-		end
-	end
-	g.Usual:SetShown(Num(value) ~= nil)
-	if Num(value) then
-		g.Usual:ClearAllPoints()
-		g.Usual:SetPoint("BOTTOMLEFT", 0, math.max(1, (value - floor) / span * (D.GRAPH_H - 4)))
-		g.Usual:SetWidth(width)
-	end
+	w.item = item
+	w.frame:ClearAllPoints()
+	w.frame:SetPoint("TOPLEFT", 4, -D.y)
+	w.frame:Show()
+	w:SetSize(D.width - 8, D.GRAPH_H)
+	local from = points[1].t - math.max(60, (now - points[1].t) * 0.03)
+	w:SetSeries(points, from, now, res, { usual = Num(value), empty = "" })
 	D.y = D.y + D.GRAPH_H + 3
-	D.Text(L["%d days: lowest %s, highest %s, usually %s"]:format(#list, Money(low), Money(high), Money(value))
-		.. SEP .. (unstable and (ORANGE .. L["jumps around"] .. "|r") or L["steady"]), "small", 4)
+	if #list > 0 then
+		local low, high = math.huge, 0
+		for _, d in ipairs(list) do
+			low, high = math.min(low, d.low), math.max(high, d.low)
+		end
+		D.Text(L["%d days: lowest %s, highest %s, usually %s"]:format(#list, Money(low), Money(high), Money(value))
+			.. SEP .. (unstable and (ORANGE .. L["jumps around"] .. "|r") or L["steady"]), "small", 4)
+	end
+	D.Text(GREY .. L["Click the graph: the big chart, with longer ranges."] .. "|r", "small", 4)
 end
 
 -- A place on the small map ({ map, name, points = { { x, y, r } } }) and "Show on map".
