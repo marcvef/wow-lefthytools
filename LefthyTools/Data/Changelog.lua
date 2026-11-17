@@ -656,5 +656,8 @@ ns.CHANGELOG = {
 	{ id = 216, module = "whypoor",
 		en = { "WhyPoor?: search suggestions", "The Stocks search suggests items as you type, with icon and price: Up/Down and Enter or Tab pick one." },
 		de = { "WhyPoor?: Suchvorschläge", "Die Stocks-Suche schlägt beim Tippen Items vor, mit Icon und Preis: Hoch/Runter und Enter oder Tab wählen eins." } },
+	{ id = 217, module = "whypoor",
+		en = { "WhyPoor?: volume in the charts", "Every price chart shows how many were listed as bars in a panel under the price (orange where fewer than before), and \"listed 120 -> 40 (-67%)\" next to the price change: a rising price from fewer listings shows as such." },
+		de = { "WhyPoor?: Volumen in den Charts", "Jeder Preischart zeigt, wie viele angeboten waren, als Balken unter dem Preis (orange, wo weniger als davor), und \"angeboten 120 -> 40 (-67%)\" neben der Preisänderung: ein Preis, der wegen weniger Angeboten steigt, ist so zu erkennen." } },
 	-- New entries go here, at the end.
 }

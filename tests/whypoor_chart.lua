@@ -298,8 +298,26 @@ check(state.zoom == nil and state.range == "5D", "a range: not zoomed any more")
 w.plot._scripts.OnLeave(w.plot)
 -- Toggles.
 frame.Toggles.volume:Click()
-check(W.DB().ui.chart.volume == false and w:Count("vol") == 0, "Listed off: no bars, kept")
+check(W.DB().ui.chart.volume == false and w:Count("vol") == 0 and w.vh == 0, "Listed off: no bars, the price uses the whole height, kept")
 frame.Toggles.volume:Click()
+do -- The volume panel: under the price, its title and scale, how many changed over the range.
+	local most = 0
+	for _, p in ipairs(w.ds) do most = math.max(most, p.qty or 0) end
+	local title = w.pools.vtitle and w.pools.vtitle.list[1]
+	local lowest = math.huge
+	for _, p in ipairs(w.points) do lowest = math.min(lowest, w:Y(p.price)) end
+	check(w.vh > 0 and w:Count("vol") > 0 and title and title:IsShown() and Plain(title:GetText()) == "Listed" and lowest >= w.base,
+		"Listed on: bars in a panel of their own, titled, the price line above it")
+	local scale = false
+	for _, fs in ipairs(w.pools.ylab.list) do scale = scale or (fs:IsShown() and fs:GetText() == tostring(math.floor(most + 0.5))) end
+	check(scale, "the panel's scale: the most listed in sight (" .. most .. ")")
+	local listed = Ch.ListedChange(w.points)
+	check(listed ~= nil and Plain(frame.Info:GetText()):find(listed, 1, true) ~= nil,
+		"the header says how many were listed at the start and now: " .. Plain(frame.Info:GetText()))
+	check(Ch.ListedChange(nil, { qty = 120 }, { qty = 40 }) == "listed 120 -> 40 (-67%)"
+		and Ch.ListedChange(nil, { qty = 10 }, { qty = 15 }) == "listed 10 -> 15 (+50%)" and Ch.ListedChange({ { qty = 0 } }) == nil,
+		"the listed change: counts and percent; none without counts")
+end
 frame.Toggles.usual:Click()
 check(w:Count("note") == 0 and w:Count("dash") == 0, "Usual off: no gold line")
 frame.Toggles.usual:Click()
@@ -308,7 +326,7 @@ frame.Toggles.band:Click()
 check(not frame.Toggles.band.off and w:Count("band") > 0 and w:Count("fill") == 0, "High/low on daily points: the band instead of the area")
 frame.Toggles.band:Click()
 Enter(frame.Toggles.volume)
-check(TOOLTIP.title == "Listed" and Lines():find("faint bars", 1, true), "a toggle's tooltip")
+check(TOOLTIP.title == "Listed" and Lines():find("panel under the price", 1, true), "a toggle's tooltip")
 -- Segments bounded, gaps.
 Ch.Open(GRAIN)
 check(state.range == "1D" and #w.points == 2000 and w:Count("line") <= 200 and w:Count("fill") <= 200 and w:Count("dot") == 0

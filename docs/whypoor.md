@@ -876,7 +876,13 @@ else 1M, 5D or 1D, else Max.
 - *Levels*: the previous close (1D) as a dotted line labelled "Previous close 2s 10c"; the usual price (`P.Get().value`,
   toggle *Usual*) as a dotted gold line labelled "Usual"; a small chart draws the usual price as a thin gold line. A level
   far outside the prices (under half the lowest, over twice the highest) isn't drawn, so it doesn't flatten the line.
-- *Listed* (toggle): how many were listed at each point as faint bars along the bottom fifth.
+- *Listed* (toggle, on by default; also on the dashboard's tiles and the details' small graph): how many were listed
+  at each point, as bars in a panel of their own under the price (`Wd:VolumeRoom`: about a quarter of the big chart's
+  height, a thin strip on small ones; only with counts and room; the price area starts above it at `self.base`).
+  A bar is orange where fewer were listed than at the point before (scarcer), blue otherwise; the big chart has the
+  panel's title, its scale (0 and the most in sight) and a line above it. `Ch.ListedChange(points[, a, b])`: "listed
+  120 -> 40 (-67%)", the first and last point with a count (or two points): in the big chart's info line (and a
+  drag's), the Listed cell's tooltip, a tile's tooltip and under the small graph. A day's count is its last scan's.
 - *Axes* (big chart): grid lines at round money steps (1, 2 or 5 times a power of ten, 2 to 6 lines by the height) with
   their labels on the right (the plot narrows to the widest label; a label closer than 13 px to the one below is left
   out) and the y axis' title "Lowest price for one"; time labels below with faint vertical lines (`Ch.Ticks`: hours for

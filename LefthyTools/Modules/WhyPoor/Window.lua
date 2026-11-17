@@ -493,7 +493,7 @@ end
 -- (from its first price in them), green up, red down, the usual price as a gold line, the lowest and highest at the
 -- right, the first and last day below; a hover shows each point, a click opens the big chart (W.Chart.Open). Under it
 -- the daily lows' lowest, highest, the usual price and whether it's steady. Fewer than two prices: says so.
-D.GRAPH_H, D.GRAPH_DAYS = 72, 30
+D.GRAPH_H, D.GRAPH_DAYS = 92, 30
 function D.Graph(item)
 	local P, Ch = W.Prices, W.Chart
 	if not (P and P.History and Num(item)) then
@@ -526,7 +526,7 @@ function D.Graph(item)
 	w.frame:Show()
 	w:SetSize(D.width - 8, D.GRAPH_H)
 	local from = points[1].t - math.max(60, (now - points[1].t) * 0.03)
-	w:SetSeries(points, from, now, res, { usual = Num(value), empty = "" })
+	w:SetSeries(points, from, now, res, { usual = Num(value), empty = "", volume = true })
 	D.y = D.y + D.GRAPH_H + 3
 	if #list > 0 then
 		local low, high = math.huge, 0
@@ -535,6 +535,10 @@ function D.Graph(item)
 		end
 		D.Text(L["%d days: lowest %s, highest %s, usually %s"]:format(#list, Money(low), Money(high), Money(value))
 			.. SEP .. (unstable and (ORANGE .. L["jumps around"] .. "|r") or L["steady"]), "small", 4)
+	end
+	local listed = Ch.ListedChange and Ch.ListedChange(points)
+	if listed then
+		D.Text(L["Bars below: how many were listed. %s"]:format(listed), "small", 4)
 	end
 	D.Text(GREY .. L["Click the graph: the big chart, with longer ranges."] .. "|r", "small", 4)
 end

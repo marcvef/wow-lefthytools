@@ -7,7 +7,7 @@ ns.WhyPoor = W
 -- WhyPoor?'s price charts (W.Chart, Ch), like a stock app's: docs/whypoor.md, Chart.
 --   * The widget (Ch.NewWidget): an item's price on your auction house over a span of time as a line with the
 --     area under it filled, green when the span went up, red when down, grey when flat; a dotted previous close
---     (1D), the usual price as a gold line, how many were listed as faint bars along the bottom, each day's
+--     (1D), the usual price as a gold line, how many were listed in a panel under the price, each day's
 --     low-high band (daily points); grid lines with money labels, time labels suited to the span and both axes'
 --     titles. Hover: a crosshair on the nearest point and a tooltip (time, price, listed, the day's open, high,
 --     low, close and change); dragging selects a span (its change, high and low) and zooms to it on release;
@@ -129,6 +129,27 @@ end
 
 function Ch.Hex(c)
 	return ("|cff%02x%02x%02x"):format(math.floor(c[1] * 255), math.floor(c[2] * 255), math.floor(c[3] * 255))
+end
+
+-- How many were listed at the first and the last point with a count (or between two points): "listed 120 -> 40
+-- (-67%)", so a price going up can be told from fewer being offered. nil: no counts.
+function Ch.ListedChange(points, a, b)
+	if not (a and b) then
+		for _, p in ipairs(points or {}) do
+			if (p.qty or 0) > 0 then
+				a = a or p
+				b = p
+			end
+		end
+	end
+	local x, y = a and Num(a.qty), b and Num(b.qty)
+	if not (x and y and x > 0 and y > 0) then
+		return nil
+	end
+	x, y = math.floor(x + 0.5), math.floor(y + 0.5)
+	local pct = (y - x) / x * 100
+	pct = pct >= 0 and math.floor(pct + 0.5) or -math.floor(-pct + 0.5)
+	return L["listed %d -> %d (%s%d%%)"]:format(x, y, pct > 0 and "+" or "", pct), x, y
 end
 
 ---------------------------------------------------------------------------
@@ -545,7 +566,7 @@ function Wd:Get(kind)
 			o = plot:CreateLine(nil, "ARTWORK")
 		elseif kind == "ylab" or kind == "xlab" then
 			o = self.frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-		elseif kind == "note" or kind == "corner" then
+		elseif kind == "note" or kind == "corner" or kind == "vtitle" then
 			o = plot:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 		else
 			local layer = (kind == "fill" or kind == "band" or kind == "vol" or kind == "grid" or kind == "vgrid") and "BORDER"
@@ -588,7 +609,31 @@ function Wd:X(t)
 end
 
 function Wd:Y(v)
-	return (v - self.lo) / math.max(1e-9, self.hi - self.lo) * self.ph
+	local base = self.base or 0
+	return base + (v - self.lo) / math.max(1e-9, self.hi - self.lo) * (self.ph - base)
+end
+
+-- The volume panel at the bottom of the plot (how many were listed): its height self.vh, the price area from
+-- self.base up. Only with counts and room enough (a small chart's thin, the big one's about a quarter).
+function Wd:VolumeRoom(pts)
+	self.vh, self.base = 0, 0
+	if not self.extra.volume then
+		return
+	end
+	local most = 0
+	for _, p in ipairs(pts) do
+		most = math.max(most, p.qty or 0)
+	end
+	if most <= 0 or self.ph < (self.mini and 36 or 80) then
+		return
+	end
+	if self.mini then
+		self.vh = math.floor(math.max(8, math.min(20, self.ph * 0.24)))
+		self.base = self.vh + 3
+	else
+		self.vh = math.floor(math.max(26, math.min(90, self.ph * 0.24)))
+		self.base = self.vh + 10
+	end
 end
 
 -- What it shows: points (Ch.Points'), the span, the resolution and extra = { prev (the previous close), usual
@@ -625,7 +670,7 @@ function Wd:Bounds()
 		return
 	end
 	local _, bottom = self:Margins()
-	local count = math.max(2, math.min(6, math.floor((self.height - 16 - bottom) / 36)))
+	local count = math.max(2, math.min(6, math.floor((self.height - 16 - bottom - (self.base or 0)) / 36)))
 	local step = Ch.NiceStep(math.max(hi - lo, hi * 0.02, 1), count)
 	self.lo = math.max(0, math.floor(lo / step) * step)
 	self.hi = math.ceil(hi / step) * step
@@ -652,6 +697,7 @@ function Wd:Draw()
 		self:Finish()
 		return
 	end
+	self:VolumeRoom(pts)
 	self:Bounds()
 	if not self.mini then
 		self:Grid()
@@ -663,7 +709,7 @@ function Wd:Draw()
 	local ds = Ch.Downsample(pts, self.from, self.to, math.max(2, math.min(self.opts.maxSeg or Ch.MAX_SEG, math.floor(self.pw / 2) + 1)))
 	self.ds = ds
 	self.gap = math.max((self.to - self.from) / 8, self.res == "day" and 2.5 * DAY or 18 * 3600)
-	if ex.volume and not self.mini then
+	if self.vh > 0 then
 		self:Volume(ds)
 	end
 	if ex.band and self.res == "day" and pts[1].low then
@@ -843,7 +889,7 @@ function Wd:Columns(ds, kind)
 				top = self:Y((a.high or a.price) + ((b.high or b.price) - (a.high or a.price)) * f)
 				bottom = self:Y((a.low or a.price) + ((b.low or b.price) - (a.low or a.price)) * f)
 			else
-				top, bottom = self:Y(a.price + (b.price - a.price) * f), 0
+				top, bottom = self:Y(a.price + (b.price - a.price) * f), self.base or 0
 			end
 			if top - bottom >= 0.5 then
 				local tex = self:Get(kind)
@@ -861,7 +907,9 @@ function Wd:Columns(ds, kind)
 	end
 end
 
--- How many were listed: faint bars along the bottom fifth, one per (thinned) point.
+-- How many were listed: bars in the volume panel at the bottom (self.vh), one per (thinned) point, from none to
+-- the most in sight; a bar is brighter where fewer were listed than at the point before (scarcer), and the big
+-- chart has the panel's title, its scale (the most) and a line above it.
 function Wd:Volume(ds)
 	local most = 0
 	for _, p in ipairs(ds) do
@@ -870,16 +918,42 @@ function Wd:Volume(ds)
 	if most <= 0 then
 		return
 	end
-	local width = math.max(1, math.min(6, self.pw / math.max(1, #ds) * 0.6))
+	self.mostListed = most
+	local width = math.max(1, math.min(8, self.pw / math.max(1, #ds) * 0.7))
+	local before
 	for _, p in ipairs(ds) do
-		if (p.qty or 0) > 0 then
+		local q = p.qty or 0
+		if q > 0 then
 			local bar = self:Get("vol")
-			bar:SetColorTexture(0.6, 0.7, 0.9, 0.22)
+			local fewer = before and q < before
+			bar:SetColorTexture(fewer and 0.95 or 0.55, fewer and 0.7 or 0.68, fewer and 0.35 or 0.95, self.mini and 0.6 or 0.7)
 			bar:ClearAllPoints()
 			bar:SetPoint("BOTTOM", self.plot, "BOTTOMLEFT", self:X(p.t), 0)
-			bar:SetSize(width, math.max(1, p.qty / most * self.ph * 0.2))
+			bar:SetSize(width, math.max(1, q / most * self.vh))
+			before = q
 		end
 	end
+	if self.mini then
+		return
+	end
+	local line = self:Get("grid")
+	line:SetColorTexture(1, 1, 1, 0.12)
+	line:ClearAllPoints()
+	line:SetPoint("BOTTOMLEFT", self.plot, "BOTTOMLEFT", 0, self.vh + 4)
+	line:SetSize(self.pw, 1)
+	local top = self:Get("ylab")
+	top:SetText(tostring(math.floor(most + 0.5)))
+	top:ClearAllPoints()
+	top:SetPoint("LEFT", self.plot, "BOTTOMRIGHT", 6, self.vh)
+	local zero = self:Get("ylab")
+	zero:SetText("0")
+	zero:ClearAllPoints()
+	zero:SetPoint("LEFT", self.plot, "BOTTOMRIGHT", 6, 4)
+	local title = self:Get("vtitle")
+	title:SetText(L["Listed"])
+	title:SetTextColor(0.6, 0.7, 0.95)
+	title:ClearAllPoints()
+	title:SetPoint("TOPLEFT", self.plot, "BOTTOMLEFT", 4, self.vh + 2)
 end
 
 -- A dotted level across the plot (the previous close, the usual price).
@@ -1326,7 +1400,7 @@ Ch.STATS = {
 -- The toggles right of the range buttons: what they add to the chart (kept in ui.chart).
 Ch.TOGGLES = {
 	{ key = "usual", label = L["Usual"], default = true, tip = L["The usual price as a dotted gold line."] },
-	{ key = "volume", label = L["Listed"], default = true, tip = L["How many were listed at each point, as faint bars along the bottom."] },
+	{ key = "volume", label = L["Listed"], default = true, tip = L["How many were listed at each point: the bars in the panel under the price (orange where fewer than before: scarcer). A price going up while fewer are listed is scarcity, not demand."] },
 	{ key = "band", label = L["High/low"], default = false, tip = L["Daily points: a band from each day's lowest to its highest scan, instead of the area under the line."] },
 }
 
@@ -1584,7 +1658,12 @@ function Ch.Draw()
 	if get.friend then
 		info[#info + 1] = L["from %s"]:format(tostring(get.friend))
 	end
-	Ch.view = { current = current, base = base, span = span, info = table.concat(info, SEP), res = res, first = points[1] }
+	local listed = Ch.ListedChange(points)
+	if listed then
+		table.insert(info, 2, listed)
+	end
+	Ch.view = { current = current, base = base, span = span, info = table.concat(info, SEP), res = res, first = points[1],
+		listed = listed }
 	Ch.Header()
 	if Ch.widget.hoverI then
 		Ch.Header(Ch.widget.points[Ch.widget.hoverI])
@@ -1652,7 +1731,10 @@ function Ch.Header(point, a, b)
 		f.Over:SetText(v.span or "")
 		v.changeTip = text and (L["From %s to %s: %s"]:format(Money(from), Money(to), text) .. "\n" .. (v.span or "")) or nil
 	end
-	if point then
+	if a and b then
+		local listed = Ch.ListedChange(nil, a, b)
+		f.Info:SetText(listed or v.info or "")
+	elseif point then
 		local parts = { Ch.When(point.t, v.res), Money(point.price) }
 		if (point.qty or 0) > 0 then
 			parts[#parts + 1] = L["%d listed"]:format(math.floor(point.qty))
@@ -1699,7 +1781,11 @@ function Ch.Stats(points, get, all)
 	Set("high", hi and Money(hi))
 	Set("low", lo and Money(lo))
 	local listed = Num(get.qty) and (get.low and tostring(math.floor(get.qty)) or L["none listed"])
-	Set("listed", listed, Num(get.seen) and L["Last scan %s"]:format(LT.Ago(get.seen)))
+	local how = Num(get.seen) and L["Last scan %s"]:format(LT.Ago(get.seen))
+	if Ch.view.listed then
+		how = (how and (how .. "\n") or "") .. L["In this range: %s"]:format(Ch.view.listed)
+	end
+	Set("listed", listed, how)
 	Set("usual", Num(get.value) and Money(get.value), Num(get.days) and L["From %d days of prices"]:format(math.floor(get.days)))
 	Set("steady", Num(get.value) and (get.unstable and (ORANGE .. L["jumps around"] .. "|r") or L["steady"]))
 	Set("known", all.high and (Money(all.high) .. " / " .. Money(all.low)))
@@ -2241,9 +2327,13 @@ function Ds.FillTile(t, item, range, now)
 	local text, color = Ch.Change(Ch.Base(points, prev), points[1] and current)
 	t.Change:SetText(text and (Ch.Hex(color) .. text .. "|r") or "")
 	t.tipLine = text and (text .. " " .. Ch.OVER[range]) or nil
+	local listed = Ch.ListedChange(points)
+	if listed then
+		t.tipLine = (t.tipLine and (t.tipLine .. "\n") or "") .. listed
+	end
 	t.widget:SetSize(t:GetWidth() - 12, Ds.C.TILE_H - 50)
 	local empty = first and L["No prices in this range."] or L["No prices yet: open the auction house."]
-	t.widget:SetSeries(points, from, now, res, { prev = prev, empty = empty })
+	t.widget:SetSeries(points, from, now, res, { prev = prev, empty = empty, volume = true })
 end
 
 -- Opens the dashboard (edit mode when it's empty). False: switched off.

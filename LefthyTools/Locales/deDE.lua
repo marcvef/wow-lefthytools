@@ -1987,6 +1987,9 @@ L["Ideas"] = "Ideen"
 L["Market"] = "Markt"
 
 -- WhyPoor?: the chart (Chart.lua)
+L["listed %d -> %d (%s%d%%)"] = "angeboten %d -> %d (%s%d%%)"
+L["In this range: %s"] = "In diesem Zeitraum: %s"
+L["Bars below: how many were listed. %s"] = "Balken unten: wie viele angeboten waren. %s"
 L["1D"] = "1T"
 L["5D"] = "5T"
 L["1M"] = "1M"
@@ -2074,8 +2077,8 @@ L["Days of data"] = "Tage mit Daten"
 L["On how many days a scan saw it, and since when. Watched items keep their prices longest."] =
 	"An wie vielen Tagen ein Scan es gesehen hat, und seit wann. Items auf der Watchlist behalten ihre Preise am längsten."
 L["The usual price as a dotted gold line."] = "Der übliche Preis als gepunktete goldene Linie."
-L["How many were listed at each point, as faint bars along the bottom."] =
-	"Wie viele an jedem Punkt im Angebot waren, als blasse Balken am unteren Rand."
+L["How many were listed at each point: the bars in the panel under the price (orange where fewer than before: scarcer). A price going up while fewer are listed is scarcity, not demand."] =
+	"Wie viele an jedem Punkt angeboten waren: die Balken im Feld unter dem Preis (orange, wo weniger als davor: knapper). Steigt der Preis, während weniger angeboten werden, ist das Knappheit, keine Nachfrage."
 L["High/low"] = "Hoch/Tief"
 L["Daily points: a band from each day's lowest to its highest scan, instead of the area under the line."] =
 	"Tagespunkte: ein Band vom niedrigsten bis zum höchsten Scan jedes Tages statt der Fläche unter der Linie."
