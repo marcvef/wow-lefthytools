@@ -1995,7 +1995,8 @@ L["No prices yet"] = "Noch keine Preise"
 L["watched"] = "auf der Watchlist"
 L["Add to watch list"] = "Zur Watchlist hinzufügen"
 L["Remove from watch list"] = "Von der Watchlist entfernen"
-L["Search an item"] = "Item suchen"
+L["Search an item: name, link or #id"] = "Item suchen: Name, Link oder #ID"
+L["still reading names..."] = "Namen werden noch gelesen..."
 L["Your watch list: each item's lowest price on your auction house, day by day, and how it changed in a week. Search an item above the list and add it."] =
 	"Deine Watchlist: der niedrigste Preis jedes Items in deinem Auktionshaus, Tag für Tag, und wie er sich in einer Woche verändert hat. Such über der Liste nach einem Item und füg es hinzu."
 

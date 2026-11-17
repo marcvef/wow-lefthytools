@@ -663,7 +663,10 @@ vendor, your bags, or crafting it yourself (a bolt of cloth from your linen, a m
 ore), several steps deep. "Sell the reagents" says when selling them brings more than crafting.
 
 **Stocks** (the tab): your watch list of items with each one's latest lowest price on your auction house and how
-it changed in a week. Search an item above the list, click it for its price graph and add it to the list.
+it changed in a week. Search an item above the list (a name, an item link or `#id`): suggestions drop down as you
+type, with each item's icon, quality colour and lowest price, names starting with what you typed first; Up/Down and
+Enter or Tab pick one (or click it), Escape closes them, Enter alone lists every match. A pick shows the item's
+price graph; add it to the list from there.
 
 **Nothing outside the window**: no lines in item tooltips, no marks on your bags.
 

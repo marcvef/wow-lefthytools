@@ -1,7 +1,11 @@
 -- WhyPoor?'s Stocks tab (Stocks.lua): the watch list (saved, its order, add and remove), the search (any case, names
 -- starting with it first, an item link, over frames, nothing while the window is closed), each row's latest daily
 -- low and its change since a week ago, the details (the graph, the buttons), /whypoor stocks, the tab's box only on
--- its tab, German. On the real price engine: a few items' daily lows stored for this auction house, taken out again.
+-- its tab, German. The suggestions: from one letter, the order (the name's start, a word's start, anywhere; watched,
+-- priced, shorter), the typed part marked, the keyboard (Up/Down/Enter/Tab/Escape), a click picks and shows the
+-- details, closing (focus, a click elsewhere, the tab, the window), names awaited and in on GET_ITEM_INFO_RECEIVED,
+-- the name index over many frames within the budget for 20000 items and a keystroke's bounded work. On the real
+-- price engine: a few items' daily lows stored for this auction house, taken out again.
 -- Needs: no other file.
 local suite = ...
 local check, section, ns, LT = suite.check, suite.section, suite.ns, suite.LT
@@ -135,6 +139,276 @@ W.Window.Open("stocks")
 Advance(1)
 check(St.search == nil and Items() == "9503", "opened again: it goes on")
 St.PER_FRAME = 2000
+
+-- The autocomplete: the dropdown under the box as you type, from the name index.
+section("WhyPoor?: the Stocks tab's suggestions")
+local function Settle(max)
+	local n = 0
+	while (St.Busy() or St.search) and n < (max or 3000) do Step() n = n + 1 end
+	return n
+end
+check(St.index and St.index.started and not St.index.lists, "the name index: made when the tab first showed")
+check(box.Hint:GetText() == "Search an item: name, link or #id", "the empty box's hint")
+ITEMS[9901] = { name = "Zorbweave Cloth", quality = 1 }
+ITEMS[9902] = { name = "Bolt of Zorbweave", quality = 2 }
+ITEMS[9903] = { name = "Ultrazorb Gem", quality = 3 }
+ITEMS[9904] = { name = "Zorb", quality = 1 }        -- (in the bags only: no price)
+ITEMS[9905] = { name = "Zorbling Ring", quality = 2 } -- (watched)
+for _, s in ipairs({ { 9901, 300 }, { 9902, 900 }, { 9903, 5000 }, { 9905, 12345 } }) do
+	P.Store(key, s[1], s[2], 3, now)
+end
+BAGS[0][30] = 9904
+St.Watch(9905)
+Type(box, "")
+Advance(St.REFRESH + 0.1)
+St.Wake()
+Settle()
+check(St.index.has[9904] and St.index.priced[9901] and not St.index.priced[9904] and St.index.has[9905],
+	"the prices changed: the new items, the bags' and the watch list's in the index")
+local drop = St.drop
+local function Sugg()
+	local out = {}
+	for i, c in ipairs(St.sugg) do out[i] = c.item end
+	return table.concat(out, ",")
+end
+local function Shown()
+	local n = 0
+	for _, r in ipairs(drop.rows) do if r:IsShown() then n = n + 1 end end
+	return n
+end
+
+-- One letter: suggestions at once; the order.
+Type(box, "z")
+check(drop:IsShown() and Shown() >= 4 and Shown() <= St.MAX and Plain(drop.rows[1].Name:GetText()):sub(1, 1) == "Z",
+	"one letter: the dropdown at once: " .. Sugg())
+local function Ordered(want)
+	Type(box, "zorb")
+	return Sugg() == want
+end
+check(Ordered("9905,9901,9904,9902"), "the names starting with it (watched, priced, shorter first), then a word starting with it: " .. Sugg())
+check(St.work <= 2 * (St.SCAN + 20) + St.FRESH_MAX, "a keystroke looks at a bounded number of names: " .. St.work)
+local rows = drop.rows
+check(rows[2].Name:GetText() == "|cffffffff|r|cffffd200Zorb|r|cffffffffweave Cloth|r", "the typed part marked, the rest in its quality colour: " .. rows[2].Name:GetText())
+check(rows[4].Name:GetText() == "|cff1eff00Bolt of |r|cffffd200Zorb|r|cff1eff00weave|r", "a word's start: marked there: " .. rows[4].Name:GetText())
+check(Plain(rows[1].Right:GetText()) == "watched  " .. Plain(W.Money(12345)) and Plain(rows[3].Right:GetText()) == "-"
+	and rows[1].Icon.path == 1000 + 9905, "each row: its icon, its lowest price, watched; no price: -")
+Advance(St.SEARCH_GAP + 0.1)
+Settle()
+Step()
+check(Sugg() == "9905,9901,9904,9902,9903" and rows[5].Name:GetText() == "|cff0070ddUltra|r|cffffd200zorb|r|cff0070dd Gem|r",
+	"after the full search: the names that have it anywhere, last: " .. Sugg())
+check(Items() == "9904,9905,9901,9902,9903", "the list: the full results, by the same kinds of match: " .. Items())
+-- The same from the sorted keys (not the names come since the last sort).
+St.FRESH_MAX = 1
+St.Wake()
+Settle()
+check(St.index.sortedItems == #St.index.items, "sorted in")
+check(Ordered("9905,9901,9904,9902,9903"), "the same order from the sorted keys (binary search): " .. Sugg())
+St.FRESH_MAX = 200
+
+-- The keyboard.
+local function Key(script, arg) box._scripts[script](box, arg) end
+Key("OnArrowPressed", "DOWN")
+check(St.hl == 1 and rows[1].Sel:IsShown() and not rows[2].Sel:IsShown(), "Down: the first marked")
+Key("OnArrowPressed", "DOWN")
+Key("OnArrowPressed", "DOWN")
+Key("OnArrowPressed", "UP")
+check(St.hl == 2 and rows[2].Sel:IsShown(), "Down, Down, Up: the second")
+Key("OnArrowPressed", "UP")
+Key("OnArrowPressed", "UP")
+check(St.hl == nil, "Up from the first: none marked")
+Key("OnArrowPressed", "DOWN")
+Key("OnArrowPressed", "DOWN")
+box:SetFocus()
+Key("OnEnterPressed")
+Step()
+check(not drop:IsShown() and box:GetText() == "Zorbweave Cloth" and state.sel.stocks == 9901 and not box:HasFocus(),
+	"Enter: the marked one picked, its name in the box, selected")
+check(Texts():find("Zorbweave Cloth", 1, true) and Button("Add to watch list") ~= nil, "its details: its name, Add")
+Settle()
+Step()
+check(Items():find("9901", 1, true) and state.sel.stocks == 9901, "the list: the search for its name, it selected: " .. Items())
+Type(box, "zorb")
+Key("OnTabPressed")
+check(state.sel.stocks == 9905 and box:GetText() == "Zorbling Ring" and not drop:IsShown(), "Tab, none marked: the first picked")
+Type(box, "zorb")
+Key("OnArrowPressed", "DOWN")
+Key("OnArrowPressed", "DOWN")
+Key("OnArrowPressed", "DOWN")
+Key("OnTabPressed")
+check(state.sel.stocks == 9904, "Tab: the marked one")
+Type(box, "zorb")
+box:SetFocus()
+Key("OnEscapePressed")
+check(not drop:IsShown() and box:GetText() == "zorb" and box:HasFocus(), "Escape: the dropdown closed, the text kept")
+Key("OnEscapePressed")
+check(box:GetText() == "" and not box:HasFocus(), "a second Escape: the box empty")
+Type(box, "zorb")
+Key("OnEnterPressed")
+check(not drop:IsShown() and St.search and St.search.at <= GetTime(), "Enter, none marked: closed, the full search at once")
+Step()
+Settle()
+Step()
+check(Items() == "9904,9905,9901,9902,9903" and Plain(view.Head:GetText()) == "5 found", "the full results: " .. Items())
+Key("OnArrowPressed", "DOWN")
+check(drop:IsShown(), "Down in the box: the dropdown again")
+
+-- The mouse.
+Type(box, "zorb")
+rows[4]:Click()
+Step()
+check(state.sel.stocks == 9902 and box:GetText() == "Bolt of Zorbweave" and not drop:IsShown()
+	and Texts():find("Bolt of Zorbweave", 1, true), "a click on a suggestion: it picked, its details")
+Type(box, "zorb")
+rows[3]._scripts.OnEnter(rows[3])
+check(St.hl == 3 and rows[3].Sel:IsShown(), "the mouse on a row marks it")
+
+-- Closing: the focus gone (a moment later; not while the mouse is on it), a click elsewhere, the tab, the window.
+box:SetFocus()
+box:ClearFocus()
+Key("OnEditFocusLost")
+drop._mouse = true
+Advance(St.CLOSE_DELAY + 0.05)
+check(drop:IsShown(), "the focus gone with the mouse on the dropdown (a click on its way): still open")
+drop._mouse = false
+Advance(St.CLOSE_DELAY + 0.05)
+check(not drop:IsShown(), "then closed")
+Key("OnEditFocusGained")
+check(drop:IsShown(), "the focus back with text: open again")
+drop._mouse = true
+Fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+check(drop:IsShown(), "a click on it: open")
+drop._mouse = false
+Fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+check(not drop:IsShown(), "a click elsewhere: closed")
+Type(box, "zorb")
+view.tabs.bags:Click()
+check(not drop:IsShown(), "another tab: closed")
+view.tabs.stocks:Click()
+Type(box, "zorb")
+frame:Hide()
+check(not drop:IsShown(), "the window closed: closed")
+W.Window.Open("stocks")
+Step()
+
+-- Above the rest, within the window.
+Type(box, "filler")
+check(Shown() == St.MAX and drop:GetFrameStrata() == "FULLSCREEN_DIALOG" and drop:GetFrameLevel() > frame:GetFrameLevel(),
+	"at most " .. St.MAX .. " rows; above the window's frames")
+check(drop:GetPoint(1) == "TOPLEFT" and select(2, drop:GetPoint(1)) == box and 8 + 4 + St.tab.headWidth + 8 - 6 + drop:GetWidth() <= frame:GetWidth()
+	and 26 + 20 + 6 + 18 + 4 + drop:GetHeight() <= frame:GetHeight(), "under the box, within the window")
+Type(box, "#9902")
+check(Sugg() == "9902" and Plain(rows[1].Name:GetText()) == "Bolt of Zorbweave", "#id: that item")
+
+-- Names the client doesn't have: asked for, in batches, and in when they come.
+local requested = {}
+local requestWas = C_Item.RequestLoadItemDataByID
+C_Item.RequestLoadItemDataByID = function(id) requested[#requested + 1] = id end
+ITEMS[9910] = { name = "Zorbmoss", quality = 1 }
+ITEMS[9911] = { name = "Zorbgone", quality = 1 }
+MOCK_ITEM_UNCACHED = { [9910] = true, [9911] = true }
+P.Store(key, 9910, 70, 1, now)
+P.Store(key, 9911, 71, 1, now)
+Type(box, "")
+Advance(St.REFRESH + 0.1)
+St.Wake()
+Step()
+Step()
+check(St.index.waiting[9910] and St.index.waiting[9911] and table.concat(requested, ","):find("9910,9911", 1, true)
+	and St.listening, "names not known: awaited, asked for, GET_ITEM_INFO_RECEIVED listened to: " .. table.concat(requested, ","))
+Type(box, "zorbm")
+check(Sugg() == "" and not drop:IsShown() and St.wanted, "not there yet: nothing shown, still wanted")
+view.tabs.bags:Click()
+Step()
+check(not St.listening and not St.indexer:IsShown(), "another tab: not listened to, the index waits")
+view.tabs.stocks:Click()
+Step()
+check(St.listening, "back: listened to again")
+Type(box, "zorbm")
+MOCK_ITEM_UNCACHED = nil
+Fire("GET_ITEM_INFO_RECEIVED", 9910, true)
+Step()
+check(St.index.has[9910] and not St.index.waiting[9910] and Sugg() == "9910", "a name came: in the index, suggested at once: " .. Sugg())
+local waits = St.index.waitCount
+Fire("GET_ITEM_INFO_RECEIVED", 9911, false)
+Step()
+check(not St.index.waiting[9911] and St.index.waitCount == waits - 1 and St.listening == (waits > 1),
+	"an item that doesn't exist (success false): not awaited any more")
+local left = {} -- (items earlier files left without a name: they don't exist either)
+for item in pairs(St.index.waiting) do left[#left + 1] = item end
+for _, item in ipairs(left) do Fire("GET_ITEM_INFO_RECEIVED", item, false) end
+Step()
+check(St.index.waitCount == 0 and not St.listening, "none awaited: not listened to")
+C_Item.RequestLoadItemDataByID = requestWas
+
+-- A big auction house: the index over many frames within the budget; a keystroke bounded.
+do
+	local BIG, big = 20000, {}
+	local A = ("a"):byte()
+	local function Code(i)
+		local s = ""
+		for _ = 1, 4 do s = string.char(A + i % 26) .. s; i = math.floor(i / 26) end
+		return s
+	end
+	for i = 1, BIG do
+		local id = 300000 + i
+		ITEMS[id] = { name = "Bulk " .. Code(i), quality = 1 }
+		big[i] = id
+	end
+	local itemsWas = P.Items
+	P.Items = function() return big end
+	P.Changed()
+	Type(box, "")
+	St.index, St.items = nil, nil
+	St.Wake()
+	-- A clock that goes on 0.5 ms a look: the budget ends a frame's work before INDEX_PER_FRAME.
+	local ms = 0
+	debugprofilestop = function() ms = ms + 0.5 return ms end
+	Step()
+	local budgeted = St.units
+	debugprofilestop = nil
+	check(budgeted > 0 and budgeted < St.INDEX_PER_FRAME, "the clock past BUDGET_MS: the frame's work stops: " .. tostring(budgeted))
+	Type(box, "bulk")
+	check(drop:IsShown() and drop.Status:IsShown() and Plain(drop.Status:GetText()) == "still reading names..." and Shown() > 0,
+		"while it's read: suggestions from what's there, \"still reading names...\"")
+	Type(box, "")
+	local frames, most = 0, 0
+	while St.Busy() and frames < 5000 do
+		Step()
+		frames = frames + 1
+		most = math.max(most, St.units or 0)
+	end
+	check(not St.Busy() and St.index.sortedItems >= BIG and frames >= 20 and most <= St.INDEX_PER_FRAME
+		and not St.indexer:IsShown(), ("%d names indexed over %d frames, at most %d a frame; then its frame hidden"):format(#St.index.items, frames, most))
+	Type(box, "b")
+	check(Shown() == St.MAX and St.work <= 2 * (St.SCAN + 20) + St.FRESH_MAX and not drop.Status:IsShown(),
+		"one letter over 20000 names: " .. St.MAX .. " suggestions, " .. St.work .. " looked at")
+	Type(box, "bulk aab")
+	local ok = #St.sugg == St.MAX
+	for _, c in ipairs(St.sugg) do ok = ok and ITEMS[c.item].name:lower():find("bulk aab", 1, true) == 1 end
+	check(ok and St.work <= 2 * (St.SCAN + 20) + St.FRESH_MAX, "two words: the names starting with them: " .. Sugg())
+	Type(box, "aab")
+	ok = #St.sugg == St.MAX
+	for _, c in ipairs(St.sugg) do ok = ok and c.tier == 2 end
+	check(ok and St.work <= 2 * (St.SCAN + 20) + St.FRESH_MAX, "a later word's start, from the sorted keys: " .. St.work .. " looked at")
+	Type(box, "")
+	P.Items = itemsWas
+	for i = 1, BIG do ITEMS[300000 + i] = nil end
+	St.index, St.items = nil, nil
+	P.Changed()
+	Step()
+end
+
+-- Put back.
+do
+	local h = P.House(key)
+	for _, item in ipairs({ 9901, 9902, 9903, 9904, 9905, 9910, 9911 }) do
+		h.items[item], ITEMS[item] = nil, nil
+	end
+	BAGS[0][30] = nil
+	St.Unwatch(9905)
+	P.Changed()
+end
 
 -- German: the same placeholders, the name of nothing translated.
 do
