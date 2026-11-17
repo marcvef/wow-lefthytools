@@ -677,5 +677,11 @@ ns.CHANGELOG = {
 	{ id = 223, module = "whypoor",
 		en = { "WhyPoor?: days of supply", "How many days the listings on the auction house would last at the estimated sales: in the big chart, the Stocks rows and Highlights. The sales estimate now also works for items you don't watch." },
 		de = { "WhyPoor?: Tage Vorrat", "Wie viele Tage die Angebote im Auktionshaus bei den geschätzten Verkäufen reichen: im großen Chart, in den Stocks-Zeilen und in Highlights. Die Verkaufsschätzung klappt jetzt auch für Items, die du nicht beobachtest." } },
+	{ id = 224, module = "whypoor",
+		en = { "WhyPoor?: price alerts", "After your auction house scans, one line in chat when a watched item moved 30% or more in a day (a setting) or crossed your own price: set \"Below\", \"Above\" or a move in a watched item's details on the Stocks tab. /whypoor alerts lists them." },
+		de = { "WhyPoor?: Preisalarme", "Nach deinen Auktionshaus-Scans eine Zeile im Chat, wenn sich ein beobachtetes Item an einem Tag um 30% oder mehr bewegt hat (eine Einstellung) oder deinen eigenen Preis überschritten hat: \"Unter\", \"Über\" oder eine Bewegung in den Details eines Items im Stocks-Tab setzen. /whypoor alerts listet sie." } },
+	{ id = 225, module = "whypoor",
+		en = { "WhyPoor?: friends fill your charts", "Friends on your auction house with this build send their scans of the items on your watch list, so your charts fill in when you weren't at the auction house (their points say from whom). Part of \"Share auction house prices with friends\"." },
+		de = { "WhyPoor?: Freunde füllen deine Charts", "Freunde in deinem Auktionshaus mit diesem Build schicken ihre Scans der Items auf deiner Watchlist, damit deine Charts sich füllen, wenn du nicht im Auktionshaus warst (ihre Punkte sagen, von wem). Teil von \"Auktionshauspreise mit Freunden teilen\"." } },
 	-- New entries go here, at the end.
 }
