@@ -24,7 +24,7 @@ anything wrong.
 | `Bags.lua` | each bag item's best sale (the Bags tab, the ideas) | `W.Bags` |
 | `Window.lua` | the window (Lodestar's style): Ideas, Bags, Market, the goal's strip | `W.Window` |
 | `Crafting.lua` | the window's Crafting tab (the crafting margins), the profession window's Margins button | `W.Crafting` = `Cf` |
-| `Stocks.lua` | the window's Stocks tab: a watch list of items, a search, each item's price over time | `W.Stocks` = `St` |
+| `Stocks.lua` | the window's Stocks tab: a watch list of items, a search with instant suggestions (a name index), each item's price over time | `W.Stocks` = `St` |
 
 Data add-on: `LefthyTools_MoneyData/` (GPL v3 like its source, CMaNGOS Classic DB, as
 LefthyTools_DropData and LefthyTools_QuestData), made by `tools/update-money-data.js`; the installer
@@ -782,21 +782,62 @@ list of items and their price on this realm's and faction's auction house over t
   older than yesterday) and the change since a week ago ("+12% vs. 7 days ago", green up, red down: against the
   latest day at least 7 days before the last, else the oldest day known; one day: "One day of prices so far").
   The line above the list: "N watched"; empty: "Search for an item above and add it to watch its price."
-- *The search*: a box on the line above the list (`T.Controls`, its hint "Search an item"; Escape empties it).
-  While it has text the list is the items of the auction house's prices (`P.Items()`: mine and friends') whose
-  name has it, any case (Lua's `lower`: an accented capital doesn't match its small letter); names starting with
-  it first, then the others, each by name, 50 at most ("50 of 230 found"). An item link or `#1234` in it is that
-  item at once. A result already watched says "watched".
+- *The search*: a box on the line above the list (`T.Controls`, its hint "Search an item: name, link or #id"),
+  like a stock app's ticker search.
+  - *Suggestions* (`St.Type`, `St.Suggest`): from the first letter, a dropdown under the box (`St.drop`), up to 8
+    rows (`St.MAX`): the item's icon, its name in its quality colour with the typed part in gold (`St.Marked`),
+    its lowest price now (`P.Get(item).low`, "-" without one; worked out again only when `P.Revision()` changed)
+    and "watched" if it's on the watch list. The order: names starting with the text, then names with a later word
+    starting with it ("lin": "Bolt of Linen Cloth"; words end at spaces and `-()/:,."`), then names that have it
+    anywhere; within each (`St.Better`): watched first, then those with a price on your auction house (in
+    `P.Items()`; a bag item without one after), then the shorter name, then A-Z. The first two kinds come at once
+    from the name index (below); "anywhere" ones come from the full search once it's done (0.2 s after the last
+    key), added at the end. An item link or `#1234`: that item. While the index isn't complete the dropdown
+    suggests from what's there and says "still reading names..." in grey at its bottom.
+  - *Keyboard*: Up/Down move the mark (Down from none: the first, past the last: the first again; Up from the
+    first: none), Enter or Tab picks the marked one; Tab with none marked picks the first; Enter with none marked
+    closes the dropdown and runs the full search at once (the list: every match). Escape closes the dropdown, a
+    second Escape empties the box (and leaves it). Down in the box with text opens the dropdown again, so does
+    the focus coming back. The mouse: a row marks it on hover, a click picks it.
+  - *A pick* (`St.Pick`): the box shows its name (the list: the full search for that name, at once), the item is
+    selected (`Wn.Pick`): its details on the right with the graph and Add/Remove; the box loses the focus.
+  - *Closing*: the focus leaving (`St.CLOSE_DELAY` = 0.2 s later, so a click on a row lands first; not while the
+    mouse is on it), a click elsewhere (`GLOBAL_MOUSE_DOWN`, listened to only while it's open, as our popup
+    lists), another tab, the window hiding. It sits in the `FULLSCREEN_DIALOG` strata (our popup lists') above
+    the window's frames, anchored under the box: 300 px wide from the box's left and at most 8 rows plus a status
+    line high, so it stays within the window.
+  - *The full results*: typing and waiting 0.2 s (or Enter with nothing marked) makes the list every item whose
+    name has the text, any case (`St.Lower`: Lua's `lower` plus the accented capitals Ä Ö Ü É...): names starting
+    with it first, then those with a word starting with it, then the others, each by name, 50 at most ("50 of 230
+    found"). It goes over the name index's items once the index has looked at its lists (else over `P.Items()`,
+    asking for unknown names as before). An item link or `#1234` in it is that item at once. A result already
+    watched says "watched".
+- *The name index* (`St.index`, `St.Wake`, `St.IndexStep`): made when the tab first shows, from `P.Items()`, the
+  bags' items and the watch list, each name lowercased (kept in `St.lower`). Its keys: `"\2" .. name .. "\1" ..
+  item` for a name's start and `"\3" .. the name from a later word on .. "\1" .. item` for each later word, sorted
+  once (Lua's own string `<`): a keystroke is two binary searches and at most 40 keys after each (`St.SCAN`), plus
+  the names that came since the last sort (at most 200, `St.FRESH_MAX`, looked at one by one); the work per
+  keystroke is bounded whatever the number of items (`St.work`). The sort goes a slice at a time: runs of 64
+  (`St.RUN`) sorted by `table.sort`, then merged two by two (`St.SortStep`); it runs again once 200 names came
+  since the last one. Looked at again when the prices changed (`P.Revision()`), at most every 10 s (`St.REFRESH`):
+  only items not in it yet are added (one that leaves the prices stays suggestible). Names the client doesn't have
+  (`C_Item.IsItemDataCachedByID` false, else `GetItemInfo` nil) are asked for 50 at a time every second
+  (`C_Item.RequestLoadItemDataByID`, `St.ASK_BATCH`, `St.ASK_GAP`), and added when `GET_ITEM_INFO_RECEIVED` brings
+  them (success false: the item doesn't exist, not awaited any more); the dropdown is worked out again then.
 - *The details*: the name, the last scan's lowest and how many were listed (`P.Get`), the price graph
   (`D.Graph`: 14 days of daily lows) and "Add to watch list" / "Remove from watch list". A removed item's details
   stay (with Add) until another is picked. Nothing picked: what the tab is.
-- *What it costs*: nothing while the tab isn't shown. Rows work out their numbers only in sight. A search starts
-  0.2 s after the last key and goes over the items on a frame of its own (`St.driver`, hidden when done or when the
-  window closes; a search left then goes on when the tab shows again), at most 2 ms (`St.BUDGET_MS`, the clock
-  looked at every 50 items) and 2000 items (`St.PER_FRAME`) a frame. Item names are kept lowercased (`St.lower`)
-  after the first search, so the next ones only compare strings; a name the client doesn't have yet is asked for
-  (50 per search at most) and looked at again by the next search. `P.Items()` is fetched again only when the
-  prices changed (`P.Revision()`).
+- *What it costs*: nothing until the tab first shows, nothing while it isn't shown. Rows work out their numbers
+  only in sight. The index works on a frame of its own (`St.indexer`, hidden when it has nothing to do, when
+  another tab shows or the window closes; it goes on when the tab shows again), at most 2 ms (`St.BUDGET_MS`, the
+  clock looked at every slice of 50 items or 200 keys) and 4000 units (`St.INDEX_PER_FRAME`: an item 4, a key placed
+  1) a frame: about 20 frames to read 20000 names and 120 to sort their 40000 keys. `GET_ITEM_INFO_RECEIVED` is
+  listened to only while names are awaited and the tab shows. A keystroke: the bounded lookups above and 8 rows
+  drawn. A search starts 0.2 s after the last key and goes over the items on a frame of its own (`St.driver`,
+  hidden when done or when the window closes; a search left then goes on when the tab shows again), at most 2 ms
+  and 2000 items (`St.PER_FRAME`) a frame; names are compared lowercased (`St.lower`), so it only compares
+  strings. `P.Items()` is fetched again only when the prices changed (`P.Revision()`). Memory: the index keeps two
+  arrays of keys (about three strings per name).
 - Pruning stays as it is: an item not seen on the auction house for 14 days loses its history (Prices.lua) but
   stays on the watch list ("No prices yet").
 
