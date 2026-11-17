@@ -1517,6 +1517,13 @@ function Ch.Build()
 		GameTooltip:Show()
 	end)
 	item:SetScript("OnLeave", Untip)
+	item:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	item:SetScript("OnClick", function(self, button)
+		local Ia = W.ItemActions
+		if Ia and Ch.state.item then
+			Ia.Click(self, Ch.state.item, button)
+		end
+	end)
 	f.Item = item
 	f.Watch = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
 	f.Watch:SetSize(100, 20)
@@ -2046,6 +2053,9 @@ function Ds.Build()
 	end)
 	Ch.SetTip(box, function() return L["Add an item"], L["Type its name (as on your auction house), shift-click it into the box, or type #ID; then Enter or Add."] end)
 	f.Box = box
+	if W.ItemActions then
+		W.ItemActions.AcceptLinks(box, function(item) Ds.AddItem(item) end)
+	end
 	f.Add = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
 	f.Add:SetSize(60, 20)
 	f.Add:SetPoint("LEFT", box, "RIGHT", 6, 0)
@@ -2292,8 +2302,17 @@ function Ds.Tile(i)
 	t.Price:SetPoint("TOPLEFT", 6, -26)
 	t.Change = t:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 	t.Change:SetPoint("LEFT", t.Price, "RIGHT", 8, 0)
-	t:SetScript("OnClick", function(self)
-		Ch.Open(self.item)
+	t:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	t:SetScript("OnClick", function(self, button)
+		local Ia = W.ItemActions
+		if button ~= "LeftButton" or (IsModifiedClick and IsModifiedClick()) then
+			if Ia and Ia.Click(self, self.item, button) then
+				return
+			end
+		end
+		if button == "LeftButton" then
+			Ch.Open(self.item)
+		end
 	end)
 	Ch.SetTip(t, function(self)
 		return W.Window.ItemName(self.item), self.tipLine, L["Click: the big chart"]

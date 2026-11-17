@@ -301,6 +301,154 @@ do
 		"no tooltip line and no coin in the sorted bags (no settings for them either)")
 end
 
+section("WhyPoor?: an item's right-click menu, copying, the auction house's search, shift-click")
+do
+	local Ia = W.ItemActions
+	local menu
+	local realMenu = MenuUtil
+	MenuUtil = { CreateContextMenu = function(owner, gen)
+		menu = { owner = owner, title = nil, buttons = {} }
+		local root = {
+			CreateTitle = function(_, t) menu.title = t end,
+			CreateButton = function(_, t, fn) menu.buttons[#menu.buttons + 1] = { text = t, fn = fn } end,
+		}
+		gen(owner, root)
+	end }
+	local function Pick(text)
+		for _, b in ipairs(menu and menu.buttons or {}) do if b.text == text then return b.fn end end
+	end
+	local function Names()
+		local t = {}
+		for _, b in ipairs(menu.buttons) do t[#t + 1] = b.text end
+		return table.concat(t, ", ")
+	end
+	W.Window.Open("bags")
+	local _, state, view, D = W.Window.View()
+	local row
+	for _, r in ipairs(view.list.rows) do if r:IsShown() and r.entry and r.entry.item == 9301 then row = r end end
+	local selWas = state.sel.bags
+	row._scripts.OnClick(row, "RightButton")
+	check(menu and menu.title == "Bolt of Linen" and Names() == "Copy name, Add to watch list, Big chart, Add to dashboard"
+		and state.sel.bags == selWas, "right-click on a row: its item's menu (no AH open: no search), the row not picked: " .. (menu and Names() or "none"))
+	Pick("Copy name")()
+	local f = Ia.copy
+	check(f and f:IsShown() and f.Box:GetText() == "Bolt of Linen" and f.Box:HasFocus() and f.Box._highlighted,
+		"Copy name: a box with the name selected, ready for Ctrl+C")
+	f.Box:SetText("Bolt of Linenx")
+	f.Box._scripts.OnTextChanged(f.Box, true)
+	check(f.Box:GetText() == "Bolt of Linen", "typing doesn't change it")
+	f.Box._scripts.OnEscapePressed(f.Box)
+	check(not f:IsShown(), "Escape closes it")
+	-- With the auction house open: Search on the AH.
+	local searched, started
+	AuctionHouseFrame = CreateFrame("Frame")
+	AuctionHouseFrame:Show()
+	AuctionHouseFrame.SetSearchText = function(_, t) searched = t return true end
+	AuctionHouseFrame.SearchBar = { StartSearch = function() started = true end }
+	row._scripts.OnClick(row, "RightButton")
+	check(Names():find("Search on the AH", 1, true) ~= nil, "the auction house open: Search on the AH")
+	Pick("Search on the AH")()
+	check(searched == "Bolt of Linen" and started, "its search box gets the name and searches")
+	Pick("Add to watch list")()
+	check(W.Stocks.Watched(9301) ~= nil and PRINTED[#PRINTED]:find("is on your watch list", 1, true), "Add to watch list: on it, said")
+	row._scripts.OnClick(row, "RightButton")
+	check(Names():find("Remove from watch list", 1, true) ~= nil, "watched: Remove from watch list")
+	Pick("Remove from watch list")()
+	check(W.Stocks.Watched(9301) == nil, "removed")
+	-- The details' item rows take right-clicks too.
+	row._scripts.OnClick(row, "LeftButton")
+	local item
+	for _, b in ipairs(D.items) do if b:IsShown() and b.item == 9301 then item = b end end
+	menu = nil
+	if item then item._scripts.OnClick(item, "RightButton") end
+	check(menu and menu.title == "Bolt of Linen", "a details' item row: the same menu")
+	-- Shift-click: Blizzard's (a link into the chat, the auction house's search box).
+	local handled
+	local realHandle = HandleModifiedItemClick
+	HandleModifiedItemClick = function(link) handled = link return true end
+	STATE.shift = true
+	row._scripts.OnClick(row, "LeftButton")
+	STATE.shift = false
+	HandleModifiedItemClick = realHandle
+	check(handled == "item:9301" or (type(handled) == "string" and handled:find("item:9301", 1, true)), "shift-click: Blizzard's link handling")
+	-- A shift-clicked item into a WhyPoor? box with the focus.
+	local got
+	local box = CreateFrame("EditBox")
+	Ia.AcceptLinks(box, function(id) got = id end)
+	Ia.hooked = false
+	local realUtil = ChatFrameUtil
+	ChatFrameUtil = { InsertLink = function() return false end }
+	Ia.Hook()
+	box:Show()
+	box:SetFocus()
+	ChatFrameUtil.InsertLink("|cffffffff|Hitem:9302::::::::|h[Bound Helm]|h|r")
+	check(got == 9302, "a link shift-clicked while a WhyPoor? box has the focus: that box takes the item")
+	got = nil
+	box:ClearFocus()
+	Advance(1)
+	ChatFrameUtil.InsertLink("|cffffffff|Hitem:9302::::::::|h[Bound Helm]|h|r")
+	check(got == nil, "without the focus: nothing")
+	ChatFrameUtil = realUtil
+	table.remove(Ia.boxes)
+	AuctionHouseFrame:Hide()
+	AuctionHouseFrame = nil
+	MenuUtil = realMenu
+	W.Window.View():Hide()
+end
+
+section("WhyPoor?: will it sell (the Market tab's deals)")
+do
+	local Wn = W.Window
+	local today = math.floor(time() / 86400)
+	local sold, hist = {}, {}
+	W.Prices.SoldSeries = function(item) return {}, sold[item] end
+	W.Prices.History = function(item) return hist[item] or {}, nil, false end
+	local function Days(item, lows)
+		local t = {}
+		for i, low in ipairs(lows) do t[i] = { day = today - #lows + i, low = low, qty = 10 } end
+		hist[item] = t
+	end
+	local ITEM = 9305
+	prices.data[ITEM] = { low = 1000, qty = 40, value = 1000, seen = time(), days = 8 }
+	local function Fresh() prices.rev = prices.rev + 1 return Wn.WillSell(ITEM) end
+	check(Fresh().verdict == "unknown" and Wn.SellShort(Fresh()) == nil, "no sales estimate: not known, no words on the row")
+	sold[ITEM] = 20
+	Days(ITEM, { 1000, 1000, 1010, 990, 1000, 1000, 1000, 1000 })
+	local r = Fresh()
+	check(r.verdict == "good" and r.supply == 2 and math.abs(r.trend) < 0.05 and Plain(Wn.SellShort(r)) == "sells ~20/day",
+		"20 a day, 40 listed: 2 days of supply, steady: sells well")
+	sold[ITEM] = 5
+	check(Fresh().verdict == "plenty" and Plain(Wn.SellShort(Fresh())) == "plenty listed", "5 a day, 40 listed: 8 days: plenty")
+	sold[ITEM] = 0.4
+	r = Fresh()
+	check(r.verdict == "slow" and Plain(Wn.SellShort(r)) == "slow ~0.4/day", "under one a day: slow")
+	sold[ITEM] = 20
+	Days(ITEM, { 1400, 1300, 1250, 1200, 1100, 1050, 1000, 1000 })
+	r = Fresh()
+	check(r.verdict == "plenty" and r.trend < -0.15 and r.days == 7 and Plain(Wn.SellShort(r)) == "falling", "selling, but the price fell 29% in 7 days: falling")
+	-- A deal's details: "Will it sell?" with its stock chart; its row says it in a few words.
+	local idea = { key = "flip:" .. ITEM, kind = "flip", title = "Buy and resell Gray Ram", sub = "", basis = "prices", confidence = "medium",
+		why = {}, how = {}, numbers = {}, warnings = {}, items = { { item = ITEM, n = 1, each = 1000, source = "ah" } }, once = 500 }
+	check(Wn.SellItem(idea) == ITEM and Wn.RowItem(idea) == ITEM, "the item it sells, the item a right-click means")
+	local de = { key = "disenchant:9302", kind = "disenchant", items = { { item = 9301, n = 2 } } }
+	check(Wn.RowItem(de) == 9302 and Wn.SellItem(de) == 9301, "a disenchant: the green to buy (right-click), what it gives (will it sell)")
+	W.Window.Open("market")
+	local _, _, _, D = W.Window.View()
+	D.Begin()
+	D.Idea(idea)
+	D.End()
+	local texts = {}
+	for _, fs in ipairs(D.texts) do if fs:IsShown() then texts[#texts + 1] = Plain(fs:GetText()) end end
+	local all = table.concat(texts, "\n")
+	check(all:find("Will it sell?", 1, true) and all:find("Its price is falling", 1, true) and all:find("Sells ~20 a day (est.), 40 listed: ~2 days of supply", 1, true)
+		and all:find("Price down 29% in 7 days", 1, true) and all:find("Price on your auction house", 1, true),
+		"its details: the verdict, sales and supply, the week's price, the chart: " .. all)
+	W.Prices.SoldSeries, W.Prices.History = nil, nil
+	prices.data[ITEM] = nil
+	prices.rev = prices.rev + 1
+	W.Window.View():Hide()
+end
+
 section("WhyPoor?: the goal")
 do
 	local G = W.Goal

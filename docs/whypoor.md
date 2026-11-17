@@ -951,6 +951,27 @@ textures, a GameTooltip anchored inside the chart, `SetResizeBounds` on Forever'
 
 ### The window, bags, tooltip and goal
 
+**Item actions** (`W.ItemActions` = `Ia`, Window.lua): `Ia.Click(owner, item, button)` for every item in the
+windows (list rows through `Wn.RowItem(e)`: a bag's or watched item, a recipe's product, a deal's item from its key
+(a disenchant: the green to buy), else the idea's star or first item; the details' item rows; the big chart's item;
+the dashboard's tiles). Right-click: `Ia.Menu` (MenuUtil's context menu; without it, the copy box): Copy name
+(`Ia.Copy`: a box over everything with the name selected, Ctrl+C then it closes, Escape/Enter/focus lost close it,
+typing doesn't change it), Search on the AH while `AuctionHouseFrame` shows (`Ia.SearchAH`: its `SetSearchText`, the
+Buy page first when needed, then `SearchBar:StartSearch`), Add to / Remove from watch list, Big chart, Add to
+dashboard. A modified click: `HandleModifiedItemClick` (chat link, the auction house's search box, dressing room).
+`Ia.AcceptLinks(box, onItem)`: a box that takes shift-clicked items while it has the focus (a post-hook on
+`ChatFrameUtil.InsertLink` and `ChatEdit_InsertLink`, the same link once): the Stocks search (`St.Pick`) and the
+dashboard's add box (`Ds.AddItem`).
+
+**Will it sell?** (Window.lua): `Wn.SellItem(idea)`: what a deal sells on the auction house (a flip's, vendor flip's
+or limited item's own; a disenchant's most worth result). `Wn.WillSell(item)` (kept per item until `P.Revision`
+moves): `perDay` (P.SoldSeries over 14 days), `listed` (P.Get), `supply` = listed / perDay, `trend` (P.History:
+the last daily low against the latest one at least 7 days before it, else the oldest; 2 days apart at least),
+`unstable`; the verdict: unknown (no sales estimate), slow (under 1 a day or over 14 days of supply), plenty (over 5
+days, or the price down 15% or more), else good. A deal's details show `D.WillSell` (the verdict, sales and supply,
+the week's price, jumps around, its stock chart: `D.Graph`) after its warnings; its row's sub line starts with
+`Wn.SellShort` (green, orange or red; nothing while unknown).
+
 **The module** (WhyPoor.lua): the settings page (Window: Open, Minimap button; Crafting: `craftButton`; Auction
 house: `autoScan`; Friends: `sharePrices`), `/whypoor` (open or close; `ideas`, `crafting`, `stocks`, `bags`, `market`,
 `goal`: the window there; `minimap`, `settings`, `help`) and `/lefthy whypoor ...` (the same), the minimap

@@ -320,9 +320,16 @@ function Wn.NewRow(parent, width)
 	b.Sub:SetPoint("RIGHT", -28, 0)
 	b.Sub:SetJustifyH("LEFT")
 	b.Sub:SetWordWrap(false)
-	b:SetScript("OnClick", function(self)
+	b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+	b:SetScript("OnClick", function(self, button)
 		Untip(self)
-		if self.entry then
+		if self.entry and (button == "RightButton" or (IsModifiedClick and IsModifiedClick())) then
+			local item, Ia = Wn.RowItem(self.entry), W.ItemActions
+			if item and Ia and Ia.Click(self, item, button) then
+				return
+			end
+		end
+		if self.entry and button ~= "RightButton" then
 			Wn.Pick(self.entry)
 		end
 	end)
@@ -358,7 +365,9 @@ function Wn.FillRow(row, e)
 		row.Title:SetText(e.title or "")
 		row.Money:SetText(Wn.IdeaMoney(e))
 		local basis = Wn.Basis(e.basis)
-		row.Sub:SetText(e.sub and e.sub ~= "" and (basis ~= "" and (basis .. SEP .. e.sub) or e.sub) or basis)
+		local sub = e.sub and e.sub ~= "" and (basis ~= "" and (basis .. SEP .. e.sub) or e.sub) or basis
+		local sells = Wn.MARKET[e.kind] and Wn.SellShort(Wn.WillSell(Wn.SellItem(e)))
+		row.Sub:SetText(sells and (sells .. SEP .. sub) or sub)
 		local look = DOT_COLORS[e.confidence]
 		for i, dot in ipairs(row.Dots) do
 			dot:Show()
@@ -454,6 +463,227 @@ end
 
 -- An item's row: its icon and name (x n), at its right what's said of it; enter: its own tooltip (else the
 -- item's), data: kept on the row for it (row.data).
+---------------------------------------------------------------------------
+-- Item actions (W.ItemActions, Ia): what an item does on a right-click or a shift-click anywhere in WhyPoor?'s
+-- windows (list rows, the details' items, the charts, the dashboard's tiles).
+--   Right-click: a menu (Blizzard's MenuUtil): Copy name (a box with the name selected: Ctrl+C), Search on the AH
+--   (the auction house open: its search box gets the name and searches), Add to / Remove from watch list, Big
+--   chart, Add to dashboard.
+--   Shift-click and the other modified clicks: Blizzard's own (HandleModifiedItemClick: a link into the chat, the
+--   name into the auction house's search box while it's open, Ctrl: the dressing room).
+-- A shift-clicked item (from here or the bags) also goes into a WhyPoor? box that has the focus and takes items
+-- (Ia.AcceptLinks: the Stocks search, the dashboard's add box): a post-hook on ChatFrameUtil.InsertLink.
+---------------------------------------------------------------------------
+
+local Ia = { boxes = {} }
+W.ItemActions = Ia
+
+function Ia.Link(item)
+	local ok, _, link = pcall(C_Item.GetItemInfo, ("item:%d"):format(item))
+	if ok and type(link) == "string" and not LT.IsSecret(link) then
+		return link
+	end
+	return ("item:%d"):format(item)
+end
+
+function Ia.Name(item)
+	local ok, name = pcall(C_Item.GetItemInfo, ("item:%d"):format(item))
+	if ok and type(name) == "string" and not LT.IsSecret(name) then
+		return name
+	end
+end
+
+-- A click on an item: true when it was handled here (right or modified), else the caller does its own.
+function Ia.Click(owner, item, button)
+	item = Num(item)
+	if not item then
+		return false
+	end
+	if button == "RightButton" then
+		Ia.Menu(owner, item)
+		return true
+	elseif IsModifiedClick and IsModifiedClick() and HandleModifiedItemClick then
+		HandleModifiedItemClick(Ia.Link(item))
+		return true
+	end
+	return false
+end
+
+function Ia.AHOpen()
+	local ah = _G.AuctionHouseFrame
+	return ah ~= nil and ah:IsShown()
+end
+
+-- The auction house's search box gets the name and searches (its Buy page; switched to it when on another).
+function Ia.SearchAH(item)
+	local ah, name = _G.AuctionHouseFrame, Ia.Name(item)
+	if not (ah and ah:IsShown() and name and ah.SetSearchText) then
+		return false
+	end
+	local ok, set = pcall(ah.SetSearchText, ah, name)
+	if not (ok and set) and ah.SetDisplayMode and _G.AuctionHouseFrameDisplayMode then
+		pcall(ah.SetDisplayMode, ah, AuctionHouseFrameDisplayMode.Buy)
+		ok, set = pcall(ah.SetSearchText, ah, name)
+	end
+	if ok and set and ah.SearchBar and ah.SearchBar.StartSearch then
+		pcall(ah.SearchBar.StartSearch, ah.SearchBar)
+		return true
+	end
+	return false
+end
+
+-- The menu: the item's name, then what can be done with it.
+function Ia.Menu(owner, item)
+	if not (MenuUtil and MenuUtil.CreateContextMenu) then
+		Ia.Copy(item) -- (no menus in this client: the copy box, the most asked)
+		return
+	end
+	local St, Ch = W.Stocks, W.Chart
+	MenuUtil.CreateContextMenu(owner, function(_, root)
+		root:CreateTitle(Ia.Name(item) or ("#" .. item))
+		root:CreateButton(L["Copy name"], function() Ia.Copy(item) end)
+		if Ia.AHOpen() then
+			root:CreateButton(L["Search on the AH"], function() Ia.SearchAH(item) end)
+		end
+		if St and St.Watched then
+			if St.Watched(item) then
+				root:CreateButton(L["Remove from watch list"], function() St.Unwatch(item) end)
+			else
+				root:CreateButton(L["Add to watch list"], function()
+					St.Watch(item)
+					LT.Print(L["WhyPoor?: %s is on your watch list (Stocks)."]:format(Ia.Link(item)))
+				end)
+			end
+		end
+		if Ch and Ch.Open then
+			root:CreateButton(L["Big chart"], function() Ch.Open(item) end)
+		end
+		local Ds = Ch and Ch.dash
+		if Ds and Ds.AddItem then
+			root:CreateButton(L["Add to dashboard"], function()
+				if Ds.AddItem(item) then
+					LT.Print(L["WhyPoor?: %s is on your dashboard."]:format(Ia.Link(item)))
+				end
+			end)
+		end
+	end)
+end
+
+-- The copy box: the name selected in a small box over everything; Ctrl+C copies it (the game can't write to the
+-- clipboard itself), then it closes; Escape or Enter closes it too.
+function Ia.Copy(item)
+	local name = Ia.Name(item)
+	if not name then
+		return
+	end
+	local f = Ia.copy
+	if not f then
+		f = CreateFrame("Frame", "LefthyToolsWhyPoorCopy", UIParent)
+		f:SetSize(300, 64)
+		f:SetPoint("CENTER", 0, 120)
+		f:SetFrameStrata("FULLSCREEN_DIALOG")
+		f:SetToplevel(true)
+		f:EnableMouse(true)
+		LT.Window.Dress(f)
+		f.Title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+		f.Title:SetPoint("TOPLEFT", 10, -8)
+		f.Title:SetText(L["Ctrl+C copies the name, then paste it in the auction house"])
+		local box = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+		box:SetSize(270, 20)
+		box:SetPoint("TOPLEFT", 16, -28)
+		box:SetAutoFocus(false)
+		box:SetScript("OnEscapePressed", function() f:Hide() end)
+		box:SetScript("OnEnterPressed", function() f:Hide() end)
+		box:SetScript("OnTextChanged", function(self, byUser)
+			if byUser then
+				self:SetText(f.name or "") -- (the name stays as it is: only copying here)
+				self:HighlightText()
+			end
+		end)
+		box:SetScript("OnKeyDown", function(_, key)
+			if key == "C" and IsControlKeyDown() then
+				C_Timer.After(0, function() f:Hide() end) -- (after the copy went through)
+			end
+		end)
+		box:SetScript("OnEditFocusLost", function() f:Hide() end)
+		f.Box = box
+		f.Hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+		f.Hint:SetPoint("TOPLEFT", 10, -50)
+		f:SetHeight(66)
+		table.insert(UISpecialFrames, "LefthyToolsWhyPoorCopy")
+		Ia.copy = f
+	end
+	f.name = name
+	f.Hint:SetText(Ia.AHOpen() and L["Or right-click it again: Search on the AH."] or "")
+	f:Show()
+	f.Box:SetText(name)
+	f.Box:SetFocus()
+	f.Box:HighlightText()
+end
+
+-- A box that takes items: onItem(item, link) when one is shift-clicked while it has the focus.
+function Ia.AcceptLinks(box, onItem)
+	Ia.boxes[#Ia.boxes + 1] = { box = box, onItem = onItem }
+	Ia.Hook()
+end
+
+function Ia.Inserted(text)
+	if type(text) ~= "string" or LT.IsSecret(text) then
+		return
+	end
+	local now = GetTime()
+	if Ia.lastText == text and Ia.lastAt == now then
+		return -- (the same link through both hooked names in one go)
+	end
+	Ia.lastText, Ia.lastAt = text, now
+	local item = tonumber(text:match("|Hitem:(%d+)") or text:match("^item:(%d+)") or "")
+	if not item then
+		return
+	end
+	for _, b in ipairs(Ia.boxes) do
+		if b.box:IsVisible() and b.box:HasFocus() then
+			b.onItem(item, text)
+			return
+		end
+	end
+end
+
+function Ia.Hook()
+	if Ia.hooked then
+		return
+	end
+	Ia.hooked = true
+	if type(ChatFrameUtil) == "table" and type(ChatFrameUtil.InsertLink) == "function" then
+		hooksecurefunc(ChatFrameUtil, "InsertLink", Ia.Inserted)
+	end
+	if type(ChatEdit_InsertLink) == "function" then
+		hooksecurefunc("ChatEdit_InsertLink", Ia.Inserted)
+	end
+end
+
+-- The item a list row stands for (right-clicks on rows): a bag's or a watched item, a recipe's product, an
+-- idea's main item.
+function Wn.RowItem(e)
+	if type(e) ~= "table" then
+		return nil
+	end
+	local keyed = Wn.MARKET[e.kind] and type(e.key) == "string" and tonumber(e.key:match("^%a+:(%d+)$") or "")
+	if keyed then
+		return keyed -- (a deal's item: the one to buy)
+	elseif Num(e.item) then
+		return e.item
+	elseif type(e.recipe) == "table" and Num(e.recipe.item) then
+		return e.recipe.item
+	elseif Num(e.star) then
+		return e.star
+	end
+	for _, it in ipairs(type(e.items) == "table" and e.items or {}) do
+		if type(it) == "table" and Num(it.item) then
+			return it.item
+		end
+	end
+end
+
 -- How many, for the eye: whole numbers as they are ("x7"); a worked-out count rounded ("x~64", "x~2.5", "x~0.3").
 -- perHour: an idea's count an hour ("~64 an hour"), shown even under one (a rare drop).
 function Wn.CountText(n, perHour)
@@ -496,6 +726,12 @@ function D.Item(item, n, right, enter, data, perHour)
 		b.Text:SetWordWrap(false)
 		b:SetScript("OnEnter", D.ItemEnter)
 		b:SetScript("OnLeave", Untip)
+		b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+		b:SetScript("OnClick", function(self, button)
+			if self.item and W.ItemActions then
+				W.ItemActions.Click(self, self.item, button)
+			end
+		end)
 		D.items[D.ni] = b
 	end
 	b.item, b.data = item, data
@@ -656,6 +892,135 @@ function D.End()
 	D.child:SetHeight(math.max(1, D.y + 4))
 end
 
+---------------------------------------------------------------------------
+-- Will it sell? (a deal's details, the Market tab's rows): the item it sells on the auction house, its estimated
+-- sales a day (P.SoldSeries over the last 14 days), how many are listed, the days of supply that makes, its price
+-- over the last week (P.History's daily lows), whether it jumps around; a verdict from them.
+---------------------------------------------------------------------------
+
+Wn.SELL_SLOW, Wn.SELL_PLENTY, Wn.SELL_FALL, Wn.SELL_RISE = 14, 5, -0.15, 0.25
+local GREEN = "|cff40c040"
+
+-- The item a deal sells on the auction house: a flip's, a vendor flip's or a limited item's own; what a
+-- disenchant gives (its most worth). nil: none.
+function Wn.SellItem(idea)
+	if type(idea) ~= "table" or not Wn.MARKET[idea.kind] then
+		return nil
+	end
+	if idea.kind ~= "disenchant" then
+		return Wn.RowItem(idea)
+	end
+	for _, it in ipairs(type(idea.items) == "table" and idea.items or {}) do
+		if type(it) == "table" and Num(it.item) then
+			return it.item
+		end
+	end
+end
+
+-- { verdict = "good" | "plenty" | "slow" | "unknown", perDay, listed, supply (days), trend (the change over about
+-- a week, -0.2 = 20% down), days (how many days the trend spans), unstable }. Kept per item until the prices change.
+function Wn.WillSell(item)
+	local P = W.Prices
+	if not (P and Num(item)) then
+		return nil
+	end
+	local rev = P.Revision and P.Revision() or 0
+	Wn.sellCache = Wn.sellRev == rev and Wn.sellCache or {}
+	Wn.sellRev = rev
+	if Wn.sellCache[item] then
+		return Wn.sellCache[item]
+	end
+	local now = time()
+	local r = { verdict = "unknown" }
+	if P.SoldSeries then
+		local _, perDay = P.SoldSeries(item, now - 14 * 86400, now)
+		r.perDay = Num(perDay)
+	end
+	local get = P.Get and P.Get(item)
+	if type(get) == "table" then
+		r.listed = get.low and Num(get.qty) or 0
+		r.unstable = get.unstable == true
+	end
+	local list = P.History and P.History(item) or {}
+	local last = list[#list]
+	if last and #list >= 2 then
+		local ref = list[1]
+		for _, d in ipairs(list) do
+			if d.day <= last.day - 7 then
+				ref = d
+			end
+		end
+		if last.day - ref.day >= 2 and (ref.low or 0) > 0 then
+			r.trend, r.days = (last.low - ref.low) / ref.low, last.day - ref.day
+		end
+	end
+	if r.perDay and r.listed then
+		r.supply = r.perDay > 0 and r.listed / r.perDay or math.huge
+		if r.perDay < 1 or r.supply > Wn.SELL_SLOW then
+			r.verdict = "slow"
+		elseif r.supply > Wn.SELL_PLENTY or (r.trend and r.trend <= Wn.SELL_FALL) then
+			r.verdict = "plenty"
+		else
+			r.verdict = "good"
+		end
+	end
+	Wn.sellCache[item] = r
+	return r
+end
+
+local function PerDay(n)
+	if n >= 10 then
+		return "~" .. math.floor(n + 0.5)
+	end
+	return "~" .. LT.Decimal(("%.1f"):format(n))
+end
+
+-- A row's few words: "sells ~25/day" (green), "plenty listed" (orange), "slow ~0.4/day" (red); nil: not known.
+function Wn.SellShort(r)
+	if not r or r.verdict == "unknown" then
+		return nil
+	elseif r.verdict == "good" then
+		return GREEN .. L["sells %s/day"]:format(PerDay(r.perDay)) .. "|r"
+	elseif r.verdict == "plenty" then
+		return ORANGE .. (r.trend and r.trend <= Wn.SELL_FALL and L["falling"] or L["plenty listed"]) .. "|r"
+	end
+	return RED .. L["slow %s/day"]:format(PerDay(r.perDay)) .. "|r"
+end
+
+-- The details' "Will it sell?": the verdict, then what it rests on.
+function D.WillSell(item)
+	local r = Wn.WillSell(item)
+	if not r then
+		return
+	end
+	D.Head(L["Will it sell?"] .. "  " .. GREY .. Wn.ItemName(item) .. "|r")
+	if r.verdict == "unknown" then
+		D.Text(GREY .. L["Not known yet: a sales estimate needs two whole scans in one visit to the auction house (about 15 minutes apart)."] .. "|r", "text", 4)
+	elseif r.verdict == "good" then
+		D.Text(GREEN .. L["Sells well."] .. "|r", "text", 4)
+	elseif r.verdict == "plenty" then
+		D.Text(ORANGE .. ((r.trend and r.trend <= Wn.SELL_FALL) and L["Its price is falling: it may be cheaper by the time yours sells."]
+			or L["Plenty on the auction house: expect to wait or undercut."]) .. "|r", "text", 4)
+	else
+		D.Text(RED .. L["Slow: it may take a long time to sell, and the deposit is lost if it doesn't."] .. "|r", "text", 4)
+	end
+	if r.perDay then
+		local supply = r.supply == math.huge and L["none sell"] or L["~%d days of supply"]:format(math.max(1, math.floor(r.supply + 0.5)))
+		D.Text(L["Sells %s a day (est.), %d listed: %s"]:format(PerDay(r.perDay), r.listed or 0, supply), "text", 4)
+	end
+	if r.trend then
+		local pct = math.floor(math.abs(r.trend) * 100 + 0.5)
+		local line = r.trend >= Wn.SELL_RISE and (GREEN .. L["Price up %d%% in %d days"]:format(pct, r.days) .. "|r")
+			or r.trend <= Wn.SELL_FALL and (RED .. L["Price down %d%% in %d days"]:format(pct, r.days) .. "|r")
+			or L["Price steady over %d days (%s%d%%)"]:format(r.days, r.trend >= 0 and "+" or "-", pct)
+		D.Text(line, "text", 4)
+	end
+	if r.unstable then
+		D.Text(ORANGE .. L["Its price jumps around."] .. "|r", "text", 4)
+	end
+	D.Graph(item)
+end
+
 function D.Idea(idea)
 	D.Text(idea.title, "title")
 	D.Text(idea.sub, "small")
@@ -668,6 +1033,10 @@ function D.Idea(idea)
 	end
 	for _, line in ipairs(type(idea.warnings) == "table" and idea.warnings or {}) do
 		D.Text(ORANGE .. tostring(line) .. "|r", "text")
+	end
+	local selling = Wn.SellItem(idea)
+	if selling then
+		D.WillSell(selling) -- (with its stock chart: whether it's worth it shows there)
 	end
 	if type(idea.why) == "table" and idea.why[1] then
 		D.Head(L["Why"])
@@ -709,8 +1078,11 @@ function D.Idea(idea)
 			end
 		end
 	end
-	if idea.star then
+	if idea.star and idea.star ~= selling then
 		D.Graph(idea.star)
+	end
+	if type(idea.items) == "table" and idea.items[1] then
+		D.Text(GREY .. L["Right-click an item: copy its name, search the auction house, watch it."] .. "|r", "small", 4)
 	end
 	D.Place(idea.place)
 end

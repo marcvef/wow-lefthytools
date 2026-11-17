@@ -640,7 +640,15 @@ across the top with your goal: "Mount: 34g of 100g · ~3g/h · at this rate at l
 - **Market**: auction house deals from your last scan: items listed below their usual price that
   sell often, below what a vendor pays, vendor items in limited stock that sell for more, and (for
   enchanters) greens worth more disenchanted. Each counts one item: a scan knows only the cheapest
-  listing's price.
+  listing's price. **Will it sell?**: each deal's row says it in a few words ("sells ~20/day",
+  "plenty listed", "falling", "slow ~0.4/day"), and its details show the verdict, the estimated sales a
+  day, how many are listed and the days of supply that makes, the price over the last week, and the
+  item's stock chart.
+- **Items, anywhere in the window and the charts**: **right-click** for Copy name (a box with the name
+  selected: Ctrl+C, then paste it in the auction house), Search on the AH (while it's open), Add to /
+  Remove from watch list, Big chart, Add to dashboard. **Shift-click** does what it does on a bag item
+  (a link in the chat, the name in the auction house's search box), and puts an item into the Stocks
+  search or the dashboard's add box while one has the focus (from your bags too).
 - **The goal**: **your own** (click the line, type the gold and a name, Set; or `/whypoor goal 150
   Swift ram`), else the riding skill and mount you're saving for: what you have, what your bags
   would add, your gold per hour played (from Chronicle) and when you'd have it. The mount's cost is

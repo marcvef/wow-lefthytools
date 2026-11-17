@@ -1121,6 +1121,9 @@ function T.Controls(view, shown)
 			end
 		end)
 		St.box = box
+		if W.ItemActions then
+			W.ItemActions.AcceptLinks(box, function(item) St.Pick(item) end)
+		end
 		St.NewDrop(box)
 	end
 	St.box:SetShown(shown)

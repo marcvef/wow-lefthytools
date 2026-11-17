@@ -665,5 +665,11 @@ ns.CHANGELOG = {
 	{ id = 219, module = "whypoor",
 		en = { "WhyPoor?: item counts rounded", "An idea's items say how many an hour, rounded (\"~64 an hour\"), instead of a long number." },
 		de = { "WhyPoor?: Anzahlen gerundet", "Die Items einer Idee zeigen gerundet, wie viele pro Stunde (\"~64 pro Stunde\"), statt einer langen Zahl." } },
+	{ id = 220, module = "whypoor",
+		en = { "WhyPoor?: right-click any item", "Right-click an item anywhere in WhyPoor?: copy its name (Ctrl+C, then paste it in the auction house), search it on the AH, add it to your watch list, its big chart, add it to the dashboard. Shift-click works as on a bag item, and puts items into the Stocks search." },
+		de = { "WhyPoor?: Rechtsklick auf Items", "Rechtsklick auf ein Item überall in WhyPoor?: Namen kopieren (Strg+C, dann im Auktionshaus einfügen), im AH suchen, auf die Watchlist, großer Chart, zum Dashboard. Shift-Klick wirkt wie bei einem Taschen-Item und setzt Items in die Stocks-Suche." } },
+	{ id = 221, module = "whypoor",
+		en = { "WhyPoor?: will it sell?", "Market deals say whether the item sells (sales a day, days of supply, the week's price) in their row and details, with the item's stock chart." },
+		de = { "WhyPoor?: Verkauft es sich?", "Markt-Deals zeigen, ob sich das Item verkauft (Verkäufe pro Tag, Tage Vorrat, der Preis der Woche), in der Zeile und den Details, mit dem Chart des Items." } },
 	-- New entries go here, at the end.
 }
