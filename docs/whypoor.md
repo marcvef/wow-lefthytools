@@ -23,7 +23,8 @@ anything wrong.
 | `Goal.lua` | the money goal (the mount) | `W.Goal` = `G` |
 | `Bags.lua` | each bag item's best sale (the Bags tab, the ideas) | `W.Bags` |
 | `Window.lua` | the window (Lodestar's style): Ideas, Bags, Market, the goal's strip | `W.Window` |
-| `Chart.lua` | the price charts: the chart widget (also the details' small graph, `D.Graph`), the big chart window, the dashboard | `W.Chart` = `Ch` |
+| `Chart.lua` | the price charts: the chart widget (also the details' small graph, `D.Graph`), the big chart window, the dashboard; days of supply (`Ch.Supply`) | `W.Chart` = `Ch` |
+| `Highlights.lua` | the dashboard's Highlights page: items skyrocketing, falling, scarce, flooded or under their usual price | `W.Highlights` = `Hl` |
 | `Crafting.lua` | the window's Crafting tab (the crafting margins), the profession window's Margins button | `W.Crafting` = `Cf` |
 | `Stocks.lua` | the window's Stocks tab: a watch list of items, a search with instant suggestions (a name index), each item's price over time | `W.Stocks` = `St` |
 
@@ -100,7 +101,8 @@ P.SeriesSpan(item)    -- the first and last point's time known of it here (nil, 
                       -- kept long (it's on the watch list)
 P.SoldSeries(item, from, to) -- estimated sales a day: { { t (noon), day, gone, span, perDay } } oldest first, the
                       -- days touching from..to watched an hour or more (flow's 14 days, a watched item's sold for 3
-                      -- years); then over them: perDay (nil under 2 hours watched in all), gone, span
+                      -- years; an unwatched item, without a sold text, its flow alone); then over them: perDay (nil
+                      -- under 2 hours watched in all), gone, span
 P.Items()             -- every item with auction house data on this realm and faction (mine or a friend's): a new
                       -- sorted list of item IDs (the ideas' market pass goes over it)
 P.Revision()          -- goes up when any price changed (for caches)
@@ -790,7 +792,8 @@ list of items and their price on this realm's and faction's auction house over t
 - *The watch list*: `LefthyToolsWhyPoorDB.watch`, account-wide, item IDs in the order added (`St.Watch`,
   `St.Unwatch`, `St.Watched`). A row: icon, name, the latest daily low (`P.History`'s last day; grey when it's
   older than yesterday) and the change since a week ago ("+12% vs. 7 days ago", green up, red down: against the
-  latest day at least 7 days before the last, else the oldest day known; one day: "One day of prices so far").
+  latest day at least 7 days before the last, else the oldest day known; one day: "One day of prices so far"),
+  then its days of supply when known ("· ~4 days of supply": Charts, days of supply).
   The line above the list: "N watched"; empty: "Search for an item above and add it to watch its price."
 - *The search*: a box on the line above the list (`T.Controls`, its hint "Search an item: name, link or #id"),
   like a stock app's ticker search.
@@ -924,11 +927,24 @@ hovered point: when, price, listed, open/high/low/close), "+ Watch" / "Watching"
 the toggles Usual, Listed, High/low (`ui.chart.usual`, `volume`, `band`; High/low only for daily points); the chart;
 a grid of numbers, each with a tooltip saying what it means and where it comes from: Open (the range's first price),
 High, Low (the range's), Listed now (the last scan's count), Usual (`value`, from how many days), Steady? (`unstable`),
-Known high / low (everything known), Days of data (since when).
+Known high / low (everything known), Days of data (since when), Days of supply (below); three rows of three.
 
-**The dashboard** (`Ch.OpenDashboard()`, `/whypoor dashboard`; the Stocks tab gets a button for it):
-`LefthyToolsWhyPoorDashboard`, the same kind of window (`ui.dashboard`: `items`, `range`, `w`, `h`, `left`, `top`). One
-range for all tiles (its buttons on the title row). Tiles of 132 px in 1 to 4 columns by the width (220 px each at
+**Days of supply** (`Ch.Supply(item)`: days, listed, sales a day; `Ch.SupplyText`, `Ch.SupplyLine`): how many days the
+listings on the auction house would last at the estimated sales: the last scan's count (`P.Get().qty`; 0 when none was
+listed) divided by `P.SoldSeries(item, now - 14 days, now)`'s perDay (`Ch.SUPPLY_DAYS`; the same estimate as "sold a
+day", over a fixed two weeks so it doesn't move with the range shown). Only with a sales estimate (perDay not nil: two
+whole scans in one session, 2 hours watched in all) and a scan's count; else "not known". Words: "~4 days", "~1 day",
+"under a day", "none listed" (0), "none sold lately" (an estimate of 0 a day). Under 2 is scarce, over 14 flooded (its
+tooltip). Shown in the big chart's numbers (its tooltip: "40 listed now, sells ~10 a day (est.)"), in its info line after
+"sells ~25 a day (est.)" ("~4 days of supply"), in a Stocks row's sub line after the change and in the highlights' rows
+(the last three only as a number of days: not for none listed or none sold).
+
+**The dashboard** (`Ch.OpenDashboard(page)`, `/whypoor dashboard`; the Stocks tab gets a button for it):
+`LefthyToolsWhyPoorDashboard`, the same kind of window (`ui.dashboard`: `items`, `range`, `page`, `hlSpan`, `hlSection`,
+`hlMin`, `w`, `h`, `left`, `top`; at least 560 x 300). Two pages, flat tabs at the start of the title row (`Ds.Page`,
+`Ds.SetPage`, kept in `page`; `Ch.OpenDashboard(page)` opens on "charts" or "highlights", nil: the one kept):
+**My charts** (the tiles, below) and **Highlights** (below; the tiles' range buttons, Edit and the add controls hide).
+One range for all tiles (its buttons on the title row after the tabs). Tiles of 132 px in 1 to 4 columns by the width (220 px each at
 least), scrolling: the item's icon and name, the price now, the change over the range (coloured), a small chart with
 its own hover tooltip; a click on a tile or its chart opens the big chart; the tile's tooltip says the change over the
 range. Edit (Done) shows a box (a name, a shift-clicked link or `#ID`; Enter or Add), "Add all watched" (the Stocks
@@ -937,6 +953,52 @@ tile < > (move) and x (remove); every control has a tooltip. Empty: a message an
 name is looked up as the game knows it (`C_Item.GetItemInfo(name)`), else over the auction house's items
 (`P.Items()`, names kept lowercased) a slice a frame (2 ms, 2000 items at most): the exact name, else the first
 starting with it, else the first having it.
+
+**The highlights** (Highlights.lua, `W.Highlights`, `Hl`; the dashboard's Highlights page, `/whypoor highlights`): items
+of this realm's and faction's auction house worth a look now, in five sections (flat buttons under the title row, each
+with how many fit; the picked one kept in `hlSection`), each a ranked list of `Hl.ROWS` (10) at most:
+- *Skyrocketing* / *Falling*: the biggest price rise / drop (10% at least, `Hl.MOVE`) between two daily lows: the newest
+  day's and that of the day picked back (the span: 1, 7 or 14 days, `hlSpan`, buttons on the title row; 7 at first):
+  the newest day with a price 1-2 days before the newest (1 day), 6-9 (7 days), 10-13 (14 days: Prices keeps 14 daily
+  lows, so the oldest there is). No such day: not in these lists.
+- *Scarce now*: listed now at most half of what that day had (`Hl.SCARCE_DROP`; then 10 at least, `Hl.SCARCE_FROM`),
+  the newest day's low at least 95% of that day's (`Hl.HELD`: held or rose). Ranked by how much fewer.
+- *Flooded*: listed now at least twice its usual count (`Hl.FLOOD`; usual: the median count of its other days, 5 at
+  least, `Hl.FLOOD_USUAL`). Not by span.
+- *Below usual*: the last scan's lowest at most 75% of the usual price (`Hl.BELOW`, P.Get's `value`). Not by span.
+
+*Noise left out* (all sections): a usual price under the min price (a button on the title row: 10c, 1s (the default),
+10s, 1g, `Hl.MINS`, kept in `hlMin`; click higher, right-click lower), fewer than 5 listed now (`Hl.MIN_LISTED`; scarce:
+the count then counts), under 3 days of prices in the 14 (`Hl.MIN_DAYS`), and what `P.Confidence` calls low: prices that
+jump around (`P.Unstable`) or a last scan more than a day old. None listed at the last scan: left out. Ties (whole
+percents) go to the bigger worth (usual price x listed now), then the lower ID.
+
+*A row*: icon, name in its quality's colour, the change in the right column (rise/fall: absolute and % in green/red,
+`Ch.Change`; scarce: "70% fewer listed" orange; flooded: "4.0x as many listed" blue; below: "33% under usual" green),
+the price under it (the newest day's low; below usual and flooded: the last scan's lowest), a sub line (rise, fall,
+scarce: "listed 100 -> 30 (-70%)" from that day to now; flooded: "listed 40 (usually 10)"; below: "12 listed"; then
+"sells ~25/day" and "~4 days of supply" when known), and a sparkline of its 14 daily lows (a Line per day, 13 at most,
+72 x 20, from a list 440 px wide on). The sparkline isn't the chart widget: its corner labels and its own hover would
+crowd a 20 px line, and the big chart is a click away. Hover: the item's tooltip, then the lowest on both days and the
+change, the lowest now and its age, the usual price, listed, sold a day, days of supply, "Click: the big chart" (and
+"Right-click: more" with the item actions). Click: `W.Chart.Open`; right-click or shift-click: `W.ItemActions.Click`
+when it's there. Above the list: what the section lists (with the span) and, at the right, "Working it out: 45%" while
+it runs, else how many items had steady prices.
+
+*Empty*: no items: "No prices yet: open the auction house."; none with 3 days: "Open the auction house a few days in a
+row: highlights need 3 days of prices."; none a day old at most: "Your prices are more than a day old: open the auction
+house for fresh highlights."; a section with none: its own line ("No price rose 10% or more in 7 days.") and the filters.
+
+*Working it out* (`Hl.Start`, `Hl.Step`, `Hl.Look`): the house's item keys taken at once (`P.Keys` of its `items`: not
+`P.Items()`, which also sorts and adds friends' items, which have no daily lows), then each item's `P.Entry` (Prices'
+decoded entries, kept while their text stays; the ideas' market pass fills them anyway), `P.Value`, `P.Unstable` and
+`P.Confidence` as `P.Get` does (cheap checks first: days, age, the highest low against the min price, counts), on the
+dashboard's ticker while the page shows, at most 2 ms (`Hl.C.BUDGET_MS`, the clock looked at every 50 items) and 1000
+items (`Hl.C.PER_FRAME`) a frame: 20000 items take 20 frames or more. One pass answers every span (picking one is only a
+draw). The answer is kept with its key (`P.Revision()`, the min price, the hour); a new one starts when the page shows
+without one, the min price changed, or the key changed and the last is 30 s old (`Hl.C.REFRESH`: a scan changes the
+revision often); the old answer stays shown meanwhile. Only the rows drawn ask for their sales and days of supply
+(`Ch.Supply`: `P.Get`, `P.SoldSeries`). Not shown (the other page, the window closed): nothing runs.
 
 **What it costs.** A chart is drawn only when what it shows changed: the item, the range or zoom, a toggle, the size
 (laid out on the next frame, at most every 0.1 s while being resized), `P.Revision()` or the minute (a window's ticker

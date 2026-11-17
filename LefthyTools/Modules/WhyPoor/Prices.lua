@@ -1398,7 +1398,7 @@ function P.SoldSeries(item, from, to)
 		return out, nil, 0, 0
 	end
 	local byDay = {}
-	for _, text in ipairs({ h.sold[item], h.flow[item] }) do
+	for _, text in ipairs({ h.sold[item] or "", h.flow[item] or "" }) do -- (no sold text: still the flow's)
 		for entry in (text or ""):gmatch("[^;]+") do
 			local d, a, b = entry:match("^(%w+),(%w+),(%w+)$")
 			d, a, b = N36(d), N36(a), N36(b)

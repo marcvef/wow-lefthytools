@@ -16,9 +16,10 @@ ns.WhyPoor = W
 --   * The big chart (Ch.Open(item), /whypoor chart): its own window: the item, its latest price big, the change
 --     over the range (a red or green box), when it was last scanned, + Watch, the ranges 1D 5D 1M 6M YTD 1Y Max
 --     (greyed without prices that far back), the chart and a grid of numbers (open, high, low, listed now, usual,
---     steady, all known high and low, days of data).
---   * The dashboard (Ch.OpenDashboard(), /whypoor dashboard): a window of tiles, a small chart each, over one
---     range for all; Edit adds (a name, a link, #id; or every watched item), removes and moves them.
+--     steady, all known high and low, days of data, days of supply).
+--   * The dashboard (Ch.OpenDashboard(), /whypoor dashboard): a window of two pages: My charts, tiles of a small
+--     chart each over one range for all (Edit adds: a name, a link, #id, or every watched item; removes and moves
+--     them), and Highlights (Highlights.lua, /whypoor highlights): items rising, falling, scarce, flooded or cheap.
 -- Data: P.Series / P.SeriesSpan (Prices.lua), else P.History's daily lows. Both windows are movable, resizable
 -- (the corner grip), closed by Escape, their place, size and choices kept in LefthyToolsWhyPoorDB.ui.
 -- What it costs: a chart is drawn only when what it shows changed (item, range, size, P.Revision, a toggle), from
@@ -175,6 +176,62 @@ end
 -- "sells ~25 a day (est.)": over a range; nil without an estimate.
 function Ch.SellsText(perDay)
 	return Num(perDay) and L["sells %s a day (est.)"]:format(Ch.PerDay(perDay)) or nil
+end
+
+-- Days of supply: how many days the listings now would last at the estimated sales (listed now / sold a day,
+-- P.SoldSeries over the last SUPPLY_DAYS). nil without a sales estimate or a scan's count; 0: none listed;
+-- math.huge: none sold. Then how many were listed (the last scan's, P.Get) and the sales a day (nil: not known).
+Ch.SUPPLY_DAYS = 14
+function Ch.Supply(item)
+	local P = W.Prices
+	item = Num(item)
+	if not (item and P and P.Get and P.SoldSeries) then
+		return nil
+	end
+	local get = P.Get(item)
+	if type(get) ~= "table" or not Num(get.qty) or not Num(get.seen) then
+		return nil
+	end
+	local listed = get.low ~= nil and math.max(0, math.floor(get.qty + 0.5)) or 0
+	local now = time()
+	local _, perDay = P.SoldSeries(item, now - Ch.SUPPLY_DAYS * DAY, now)
+	perDay = Num(perDay)
+	if not perDay then
+		return nil, listed, nil
+	elseif listed == 0 then
+		return 0, 0, perDay
+	elseif perDay <= 0 then
+		return math.huge, listed, perDay
+	end
+	return listed / perDay, listed, perDay
+end
+
+-- Days of supply in words: "~4 days", "~1 day", "under a day", "none listed", "none sold lately"; nil: not known.
+function Ch.SupplyText(days)
+	days = Num(days)
+	if not days then
+		return nil
+	elseif days == 0 then
+		return L["none listed"]
+	elseif days == math.huge then
+		return L["none sold lately"]
+	end
+	local n = math.floor(days + 0.5)
+	if n < 1 then
+		return L["under a day"]
+	elseif n == 1 then
+		return L["~1 day"]
+	end
+	return L["~%d days"]:format(n)
+end
+
+-- "~4 days of supply" for a line; nil when not known, none listed or none sold.
+function Ch.SupplyLine(days)
+	days = Num(days)
+	if not days or days == 0 or days == math.huge then
+		return nil
+	end
+	return L["%s of supply"]:format(Ch.SupplyText(days))
 end
 
 ---------------------------------------------------------------------------
@@ -1407,6 +1464,32 @@ function Ch.Ticker(f, onTick)
 	return ticker
 end
 
+-- A flat button (the picked one underlined: Ch.PaintFlat), as wide as its text; onClick(self).
+function Ch.FlatButton(parent, text, onClick)
+	local b = CreateFrame("Button", nil, parent)
+	b.Back = b:CreateTexture(nil, "BACKGROUND")
+	b.Back:SetAllPoints()
+	b.Line = b:CreateTexture(nil, "ARTWORK")
+	b.Line:SetPoint("BOTTOMLEFT")
+	b.Line:SetPoint("BOTTOMRIGHT")
+	b.Line:SetHeight(2)
+	b.Line:SetColorTexture(1, 0.82, 0, 1)
+	b.Text = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	b.Text:SetPoint("CENTER", 0, 1)
+	b.Text:SetText(text)
+	b:SetSize(math.floor((b.Text:GetStringWidth() or 40) + 16), 20)
+	b:SetHighlightTexture(HIGHLIGHT, "ADD")
+	b:SetScript("OnClick", onClick)
+	return b
+end
+
+function Ch.PaintFlat(b, on)
+	b.on = on and true or false
+	b.Line:SetShown(b.on)
+	b.Back:SetColorTexture(1, 0.82, 0, on and 0.16 or 0.04)
+	b.Text:SetTextColor(on and 1 or 0.8, on and 0.82 or 0.8, on and 0 or 0.8)
+end
+
 -- The range buttons (flat, the picked one underlined); onPick(range). Returns the row's buttons by range.
 function Ch.RangeButtons(parent, onPick)
 	local buttons = {}
@@ -1459,7 +1542,7 @@ end
 ---------------------------------------------------------------------------
 
 Ch.NAME = "LefthyToolsWhyPoorChart"
-Ch.C = { W = 760, H = 520, MIN_W = 540, MIN_H = 400, PAD = 10, CHART_Y = 118, CELL_H = 18, ROWS = 2, COLS = 4 }
+Ch.C = { W = 760, H = 520, MIN_W = 540, MIN_H = 400, PAD = 10, CHART_Y = 118, CELL_H = 18, ROWS = 3, COLS = 3 }
 Ch.state = { draws = 0, due = false }
 
 -- The numbers under the chart: their label, what they mean (the tooltip).
@@ -1472,6 +1555,7 @@ Ch.STATS = {
 	{ key = "steady", label = L["Steady?"], tip = L["Steady or jumps around: whether the daily lowest prices of the last 14 days stray far from their median. Ideas don't rank on prices that jump around."] },
 	{ key = "known", label = L["Known high / low"], tip = L["The highest and the lowest price of everything known about it on your auction house."] },
 	{ key = "days", label = L["Days of data"], tip = L["On how many days a scan saw it, and since when. Watched items keep their prices longest."] },
+	{ key = "supply", label = L["Days of supply"], tip = L["How many days the listings on the auction house would last at the estimated sales (listed now divided by sold a day over the last 14 days). Under 2: scarce; over 14: flooded. Not known without a sales estimate: that needs two of your whole scans in one session."] },
 }
 
 -- The toggles right of the range buttons: what they add to the chart (kept in ui.chart).
@@ -1743,6 +1827,11 @@ function Ch.Draw()
 	end
 	local listed = Ch.ListedChange(points)
 	local sells = Ch.SellsText(perDay)
+	local supply, supplyListed, supplyPerDay = Ch.Supply(s.item)
+	local supplyLine = Ch.SupplyLine(supply)
+	if supplyLine then
+		table.insert(info, 2, supplyLine)
+	end
 	if sells then
 		table.insert(info, 2, sells)
 	end
@@ -1750,7 +1839,7 @@ function Ch.Draw()
 		table.insert(info, 2, listed)
 	end
 	Ch.view = { current = current, base = base, span = span, info = table.concat(info, SEP), res = res, first = points[1],
-		listed = listed }
+		listed = listed, supply = supply, supplyListed = supplyListed, supplyPerDay = supplyPerDay }
 	Ch.Header()
 	if Ch.widget.hoverI then
 		Ch.Header(Ch.widget.points[Ch.widget.hoverI])
@@ -1877,6 +1966,9 @@ function Ch.Stats(points, get, all)
 	Set("steady", Num(get.value) and (get.unstable and (ORANGE .. L["jumps around"] .. "|r") or L["steady"]))
 	Set("known", all.high and (Money(all.high) .. " / " .. Money(all.low)))
 	Set("days", all.first and tostring(all.days) or nil, all.first and L["Since %s"]:format(Ch.When(all.first, "day")))
+	local v = Ch.view
+	Set("supply", Ch.SupplyText(v.supply) or L["not known"], Num(v.supplyPerDay)
+		and L["%d listed now, sells %s a day (est.)"]:format(v.supplyListed or 0, Ch.PerDay(v.supplyPerDay)) or nil)
 end
 
 function Ch.PickRange(range)
@@ -1968,7 +2060,7 @@ end
 local Ds = { due = false, draws = 0, tiles = {} }
 Ch.dash = Ds
 Ds.NAME = "LefthyToolsWhyPoorDashboard"
-Ds.C = { W = 780, H = 520, MIN_W = 360, MIN_H = 300, PAD = 10, TOP = 34, EDIT = 30, TILE_W = 220, TILE_H = 132, GAP = 8,
+Ds.C = { W = 780, H = 520, MIN_W = 560, MIN_H = 300, PAD = 10, TOP = 34, EDIT = 30, TILE_W = 220, TILE_H = 132, GAP = 8,
 	COLS = 4, BAR = 22, BUDGET_MS = 2, PER_FRAME = 2000, PER_TICK = 8 }
 
 function Ds.UI()
@@ -1997,18 +2089,43 @@ function Ds.Range()
 	return Ch.LABELS[r] and r or "1M"
 end
 
+-- The page shown: "charts" (My charts, the tiles) or "highlights" (Highlights.lua); kept in ui.dashboard.page.
+Ds.PAGES = { { key = "charts", label = L["My charts"] }, { key = "highlights", label = L["Highlights"] } }
+function Ds.Page()
+	return (Ds.UI().page == "highlights" and W.Highlights) and "highlights" or "charts"
+end
+
+function Ds.SetPage(page)
+	Ds.UI().page = page == "highlights" and "highlights" or "charts"
+	Ds.Draw()
+end
+
 function Ds.Build()
 	local C = Ds.C
 	local f = Ch.NewWindow(Ds.NAME, "dashboard", C.W, C.H, C.MIN_W, C.MIN_H)
 	Ds.frame = f
-	local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-	title:SetPoint("TOPLEFT", C.PAD, -9)
-	title:SetText(L["Price dashboard"])
+	-- The pages' tabs, then the range buttons (My charts) or the highlights' spans on the title row.
+	f.Tabs = {}
+	local x = C.PAD
+	for _, page in ipairs(Ds.PAGES) do
+		local b = Ch.FlatButton(f, page.label, function() Ds.SetPage(page.key) end)
+		b.page = page.key
+		b:SetPoint("TOPLEFT", x, -5)
+		x = x + b:GetWidth() + 3
+		Ch.SetTip(b, function()
+			if page.key == "highlights" then
+				return L["Highlights"], L["Items of your auction house worth a look now: prices skyrocketing or falling, scarce or flooded, or under their usual price."]
+			end
+			return L["Price dashboard"], L["Your charts: the items you picked, a small chart each."]
+		end)
+		f.Tabs[#f.Tabs + 1] = b
+	end
+	x = x + 13
+	f.tabsRight = x
 	f.Ranges = Ch.RangeButtons(f, function(r)
 		Ds.UI().range = r
 		Ds.Draw()
 	end)
-	local x = C.PAD + (title:GetStringWidth() or 100) + 16
 	for _, b in ipairs(f.Ranges) do
 		b:SetPoint("TOPLEFT", x, -5)
 		x = x + b:GetWidth() + 3
@@ -2095,6 +2212,9 @@ function Ds.Tick(elapsed)
 	end
 	if Ds.fill then
 		Ds.FillSome()
+	end
+	if Ds.Page() == "highlights" then
+		W.Highlights.Tick(elapsed)
 	end
 	if Ds.wait <= 0 then
 		Ds.wait = 1
@@ -2325,6 +2445,26 @@ function Ds.Draw()
 		return
 	end
 	Ds.due, Ds.draws, Ds.key = false, Ds.draws + 1, Ds.Key()
+	-- The page: My charts or Highlights.
+	local charts = Ds.Page() == "charts"
+	for _, b in ipairs(f.Tabs) do
+		Ch.PaintFlat(b, (b.page == "charts") == charts)
+	end
+	for _, b in ipairs(f.Ranges) do
+		b:SetShown(charts)
+	end
+	f.Edit:SetShown(charts)
+	f.Scroll:SetShown(charts)
+	if W.Highlights then
+		W.Highlights.Page(f, not charts)
+	end
+	if not charts then
+		for _, o in ipairs({ f.Box, f.Add, f.AddWatched, f.Status, f.Message }) do
+			o:Hide()
+		end
+		Ds.fill = nil
+		return
+	end
 	local items = Ds.Items()
 	local range = Ds.Range()
 	local now = time()
@@ -2426,13 +2566,17 @@ function Ds.FillTile(t, item, range, now)
 	t.widget:SetSeries(points, from, now, res, { prev = prev, empty = empty, volume = true, sold = sold })
 end
 
--- Opens the dashboard (edit mode when it's empty). False: switched off.
-function Ds.Open()
+-- Opens the dashboard (edit mode when it's empty) on a page ("charts" | "highlights"; nil: the one kept). False:
+-- switched off.
+function Ds.Open(page)
 	if not Ch.Enabled() then
 		return false
 	end
 	if not Ds.frame then
 		Ds.Build()
+	end
+	if page then
+		Ds.UI().page = page == "highlights" and "highlights" or "charts"
 	end
 	Ds.frame:Show()
 	if Ds.frame.Raise then
@@ -2443,8 +2587,8 @@ function Ds.Open()
 	return true
 end
 
-function Ch.OpenDashboard()
-	return Ds.Open()
+function Ch.OpenDashboard(page)
+	return Ds.Open(page)
 end
 
 -- Switched off: both windows closed.
