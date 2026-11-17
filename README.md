@@ -689,13 +689,20 @@ with the area under it, money and time on its axes, a dotted previous close (1D)
 "listed 120 -> 40 (-67%)" next to the price change, so a price going up from scarcity shows; and, for daily points,
 each day's low-to-high band (the toggles above the chart); and **sold a day** (an estimate from listings that
 went before they could expire between two of your whole scans) as a gold line in the same panel, with "sells ~25 a
-day (est.)" next to it: supply and demand side by side. The dashboard's tiles and the small graphs show both too. Hover the chart for a point's time, price, quantity listed and a day's open, high, low and close; drag
+day (est.)" and **days of supply** (how long the listings would last at that rate: "~4 days of supply"; under 2 is
+scarce, over 14 flooded) next to it: supply and demand side by side. The dashboard's tiles and the small graphs show both too. Hover the chart for a point's time, price, quantity listed and a day's open, high, low and close; drag
 across it to see the change between two points and zoom in there (right-click goes back). Under it: open, high,
-low, listed now, the usual price, steady or not, the highest and lowest known and how many days of prices there
-are (hover each for what it means). The window moves, resizes from its corner and remembers both.
+low, listed now, the usual price, steady or not, the highest and lowest known, how many days of prices there
+are and the days of supply (hover each for what it means). The window moves, resizes from its corner and remembers both.
 `/whypoor dashboard` opens your **price dashboard**: a tile per item you pick (Edit: type a name, shift-click a
 link or `#ID`, or add all your watched items; move and remove tiles), each with its price, its change and a small
-chart over one range for all; a click opens the big chart.
+chart over one range for all; a click opens the big chart. Its **Highlights** tab (or `/whypoor highlights`) lists
+what's worth a look on your auction house now: prices **skyrocketing** or **falling** (over 1, 7 or 14 days),
+items **scarce now** (far fewer listed, the price held), **flooded** (twice the usual count listed) and **below their
+usual price**, ten each, with the change, the price, how many are listed, sold a day, days of supply and a sparkline;
+a click opens the big chart. Noise is left out: cheap items (under the min price you pick, 1s at first), fewer than
+5 listed, under 3 days of prices, prices that jump around or are more than a day old. A Stocks row shows its days of
+supply too.
 
 **Nothing outside the window**: no lines in item tooltips, no marks on your bags.
 
@@ -712,7 +719,7 @@ database, and loads only when first needed.
 
 `/whypoor` opens or closes the window; `/whypoor ideas`, `crafting`, `stocks`, `bags`, `market` or `goal` opens that
 page; `/whypoor chart <item link or #ID>` an item's big chart; `/whypoor dashboard` the price dashboard; `/whypoor
-minimap` shows or hides the button.
+highlights` its highlights; `/whypoor minimap` shows or hides the button.
 
 ## Mirage
 

@@ -988,6 +988,11 @@ function T.Fill(row, e)
 	local old = e.day and p and p.Today and e.day < p.Today() - 1 -- (not seen today or yesterday)
 	row.Money:SetText(e.low and ((old and GREY or "") .. W.Money(e.low) .. (old and "|r" or "")) or (GREY .. "-|r"))
 	local sub = St.ChangeText(e) or (#e.days == 1 and L["One day of prices so far"]) or L["No prices yet"]
+	local Ch = W.Chart
+	local supply = Ch and Ch.Supply and Ch.SupplyLine(Ch.Supply(e.item)) -- ("~4 days of supply": with a sales estimate)
+	if supply then
+		sub = sub .. SEP .. supply
+	end
 	if St.query ~= "" and St.Watched(e.item) then
 		sub = sub .. SEP .. L["watched"]
 	end

@@ -2197,4 +2197,64 @@ L["still reading names..."] = "Namen werden noch gelesen..."
 L["Your watch list: each item's lowest price on your auction house, day by day, and how it changed in a week. Search an item above the list and add it."] =
 	"Deine Watchlist: der niedrigste Preis jedes Items in deinem Auktionshaus, Tag für Tag, und wie er sich in einer Woche verändert hat. Such über der Liste nach einem Item und füg es hinzu."
 
-
+-- WhyPoor?: highlights and days of supply (Highlights.lua, Chart.lua)
+L["My charts"] = "Meine Charts"
+L["Highlights"] = "Highlights"
+L["Items of your auction house worth a look now: prices skyrocketing or falling, scarce or flooded, or under their usual price."] =
+	"Items deines Auktionshauses, die jetzt einen Blick wert sind: Preise, die stark steigen oder fallen, knappe oder überschwemmte Items oder welche unter ihrem üblichen Preis."
+L["Your charts: the items you picked, a small chart each."] = "Deine Charts: die Items deiner Wahl, je ein kleiner Chart."
+L["Days of supply"] = "Vorrat in Tagen"
+L["How many days the listings on the auction house would last at the estimated sales (listed now divided by sold a day over the last 14 days). Under 2: scarce; over 14: flooded. Not known without a sales estimate: that needs two of your whole scans in one session."] =
+	"Wie viele Tage die Angebote im Auktionshaus bei den geschätzten Verkäufen reichen würden (jetzt im Angebot geteilt durch verkauft pro Tag über die letzten 14 Tage). Unter 2: knapp; über 14: überschwemmt. Ohne Verkaufsschätzung nicht bekannt: dafür braucht es zwei deiner kompletten Scans in einer Sitzung."
+L["%d listed now, sells %s a day (est.)"] = "%d jetzt im Angebot, verkauft sich %s pro Tag (geschätzt)"
+L["none sold lately"] = "zuletzt nichts verkauft"
+L["under a day"] = "unter einem Tag"
+L["~1 day"] = "~1 Tag"
+L["~%d days"] = "~%d Tage"
+L["%s of supply"] = "Vorrat: %s"
+L["1 day"] = "1 Tag"
+L["7 days"] = "7 Tage"
+L["14 days"] = "14 Tage"
+L["Skyrocketing"] = "Steigt stark"
+L["Falling"] = "Fällt"
+L["Scarce now"] = "Jetzt knapp"
+L["Flooded"] = "Überschwemmt"
+L["Below usual"] = "Unter üblich"
+L["The biggest price rises in %s (each day's lowest price)."] = "Die größten Preisanstiege in %s (der niedrigste Preis jedes Tages)."
+L["The biggest price drops in %s (each day's lowest price)."] = "Die größten Preisstürze in %s (der niedrigste Preis jedes Tages)."
+L["Half as many listed or fewer than %s ago, while the price held or rose."] =
+	"Halb so viele im Angebot oder weniger als %s zuvor, während der Preis hielt oder stieg."
+L["Twice its usual count listed or more: the price usually follows."] =
+	"Doppelt so viele im Angebot wie üblich oder mehr: der Preis folgt meist."
+L["The lowest price now %d%% or more under its usual price: a buying chance."] =
+	"Der niedrigste Preis jetzt %d%% oder mehr unter seinem üblichen Preis: eine Kaufgelegenheit."
+L["Open the auction house a few days in a row: highlights need 3 days of prices."] =
+	"Öffne das Auktionshaus ein paar Tage hintereinander: Highlights brauchen 3 Tage Preise."
+L["Your prices are more than a day old: open the auction house for fresh highlights."] =
+	"Deine Preise sind älter als ein Tag: öffne das Auktionshaus für frische Highlights."
+L["No price rose %d%% or more in %s."] = "Kein Preis stieg um %d%% oder mehr in %s."
+L["No price fell %d%% or more in %s."] = "Kein Preis fiel um %d%% oder mehr in %s."
+L["Nothing got scarce in %s."] = "Nichts wurde knapp in %s."
+L["Nothing is flooded right now."] = "Gerade ist nichts überschwemmt."
+L["Nothing is listed well under its usual price right now."] = "Gerade ist nichts deutlich unter seinem üblichen Preis im Angebot."
+L["Left out: fewer than %d listed, under %d days of prices, prices that jump around or are more than a day old."] =
+	"Weggelassen: weniger als %d im Angebot, unter %d Tagen Preise, Preise, die stark schwanken oder älter als ein Tag sind."
+L["Working it out: %d%%"] = "Wird berechnet: %d%%"
+L["%d items with steady prices"] = "%d Items mit stabilen Preisen"
+L["Skyrocketing, Falling and Scarce now compare the newest day's prices with those this long before."] =
+	"Steigt stark, Fällt und Jetzt knapp vergleichen die Preise des neuesten Tages mit denen so lange davor."
+L["Min price"] = "Mindestpreis"
+L["Min price: %s"] = "Mindestpreis: %s"
+L["Only items whose usual price is at least this much: cheaper ones are mostly noise."] =
+	"Nur Items, deren üblicher Preis mindestens so hoch ist: billigere sind meist Rauschen."
+L["Only items with a usual price of %s or more."] = "Nur Items mit einem üblichen Preis ab %s."
+L["Click: higher; right-click: lower"] = "Klick: höher; Rechtsklick: niedriger"
+L["%d%% fewer listed"] = "%d%% weniger im Angebot"
+L["%sx as many listed"] = "%sx so viele im Angebot"
+L["%d%% under usual"] = "%d%% unter üblich"
+L["listed %d (usually %d)"] = "angeboten %d (üblich %d)"
+L["sells %s/day"] = "verkauft %s/Tag"
+L["Lowest on %s"] = "Niedrigster am %s"
+L["Lowest now"] = "Niedrigster jetzt"
+L["(est.)"] = "(geschätzt)"
+L["Right-click: more"] = "Rechtsklick: mehr"

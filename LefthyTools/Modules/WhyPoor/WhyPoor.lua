@@ -187,6 +187,7 @@ local function Help()
 	M:Print("/whypoor ideas | crafting | stocks | bags | market | goal - the window on that page")
 	M:Print("/whypoor chart <item link or #id> - the item's price chart")
 	M:Print("/whypoor dashboard - your price dashboard: charts of the items you pick")
+	M:Print("/whypoor highlights - the dashboard's highlights: prices skyrocketing or falling, scarce, flooded, cheap")
 	M:Print("/whypoor goal <gold> [name] - your own money goal (/whypoor goal clear: the mount again)")
 	M:Print("/whypoor bar <gold> - list only ideas bringing this an hour (/whypoor bar auto: automatic again)")
 	M:Print("/whypoor minimap - show or hide the minimap button")
@@ -253,7 +254,9 @@ function M:OnSlashCommand(msg)
 			self:Print("/whypoor chart <item link or #id> (shift-click an item into the chat box), or a name your game knows.")
 		end
 	elseif cmd == "dashboard" then
-		W.Chart.OpenDashboard()
+		W.Chart.OpenDashboard("charts")
+	elseif cmd == "highlights" then
+		W.Chart.OpenDashboard("highlights")
 	elseif cmd == "" then
 		W.Window.Toggle()
 	elseif TABS[cmd] then
