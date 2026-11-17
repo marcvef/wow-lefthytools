@@ -1048,6 +1048,7 @@ function T.Details(e)
 		end, not on, 170)
 		D.Button(L["Dashboard"], function() Ch.OpenDashboard() end, true, 110, true)
 	end
+	if W.Alerts and W.Alerts.Details then W.Alerts.Details(item) end -- (price alerts: Alerts.lua)
 end
 
 -- Nothing picked: what the tab is.

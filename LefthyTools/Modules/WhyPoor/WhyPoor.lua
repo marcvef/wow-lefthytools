@@ -13,6 +13,7 @@ local L = ns.L
 --   ui = { ... }       Chart.lua: the big chart's and the dashboard's place, size and choices (chart,
 --                      dashboard = { items, range, ... })
 --   watch = { ... }    Stocks.lua: the watch list, item IDs in the order added
+--   alerts = { ... }   Alerts.lua: price alerts, per item ({ below, above, move }); alertsFired: what was told
 --
 -- This file: the module, its settings page, /whypoor and /lefthy whypoor, the minimap button (it joins
 -- the combined LefthyTools button by itself, Core/Window.lua's Dock), and the few text helpers the
@@ -27,6 +28,9 @@ local M = LT:NewModule("whypoor", {
 		sharePrices = true,   -- share auction house prices with friends (Beacon) and use theirs
 		autoScan = true,      -- the whole auction house scanned when it opens (when the game allows one again)
 		craftButton = true,   -- a "Margins" button on the profession window (Crafting.lua)
+		moveAlerts = true,    -- price alerts: a line in chat when a watched item moved movePct or more in a day (Alerts.lua)
+		movePct = 30,
+		alertSound = false,   -- a short sound with the alerts' line
 		window = {},          -- shown, left, top, tab (Window.lua)
 	},
 })
@@ -180,6 +184,13 @@ function M:BuildOptions(o)
 	o:Header(L["Friends"])
 	o:Checkbox("sharePrices", L["Share auction house prices with friends"],
 		L["Your auction house prices go to your Beacon friends with LefthyTools, and theirs come to you, marked as theirs. Needs Beacon."])
+	o:Header(L["Price alerts"])
+	o:CheckboxSlider("moveAlerts", L["Tell me about big moves of watched items"],
+		L["After your auction house scans, one line in chat when a watched item's lowest price moved this much or more since the day before (once a day each way). Your own alerts (under or over a price) are set in the Stocks tab's details. Also /whypoor alerts on or off."],
+		"movePct", L["Move of at least"], L["How much a watched item's price has to move in a day to be told."], 10, 100, 5,
+		function(value) return ("%d%%"):format(value) end)
+	o:Checkbox("alertSound", L["A sound with price alerts"],
+		L["A short coin sound when the price alerts' line comes."])
 end
 
 local function Help()
@@ -187,6 +198,7 @@ local function Help()
 	M:Print("/whypoor ideas | crafting | stocks | bags | market | goal - the window on that page")
 	M:Print("/whypoor chart <item link or #id> - the item's price chart")
 	M:Print("/whypoor dashboard - your price dashboard: charts of the items you pick")
+	M:Print("/whypoor alerts [on | off] - your price alerts (on or off: big moves of watched items)")
 	M:Print("/whypoor goal <gold> [name] - your own money goal (/whypoor goal clear: the mount again)")
 	M:Print("/whypoor bar <gold> - list only ideas bringing this an hour (/whypoor bar auto: automatic again)")
 	M:Print("/whypoor minimap - show or hide the minimap button")
@@ -254,6 +266,8 @@ function M:OnSlashCommand(msg)
 		end
 	elseif cmd == "dashboard" then
 		W.Chart.OpenDashboard()
+	elseif (cmd == "alerts" or cmd:match("^alerts%s")) and W.Alerts then
+		W.Alerts.Slash(cmd:sub(7))
 	elseif cmd == "" then
 		W.Window.Toggle()
 	elseif TABS[cmd] then

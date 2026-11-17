@@ -673,6 +673,14 @@ Enter or Tab pick one (or click it), Escape closes them, Enter alone lists every
 price graph; add it to the list from there, open its **Big chart**, or **Add to dashboard**. With nothing picked,
 the **Dashboard** button opens the dashboard.
 
+**Price alerts** for your watched items: after each of your auction house scans, one line in chat with what crossed a
+line, the items as links: "WhyPoor?: [Copper Bar] 14s 80c (under your 15s) · [Linen Cloth] 1s 20c (+42% today)". No
+pop-ups. Set an item's own in its Stocks details (**Below**, **Above** a price for one, like `15s`, `2g 50s` or `1.5`;
+**Moves over** a percent in a day), Set or Clear. Without any of your own, a watched item's price moving 30% or more
+since the day before is told (setting *Tell me about big moves of watched items*; `/whypoor alerts off` switches it
+off). Each is told once: again only after the price went back, a move once a day each way; in a fight the line waits
+for its end. `/whypoor alerts` lists them.
+
 **Charts**, like a stock app's: `/whypoor chart` with an item's link or `#ID`, or a click on any price graph,
 opens an item's **big chart**: its price now, the change over the range in a green or red box, when it was last
 scanned, + Watch, the ranges 1D 5D 1M 6M YTD 1Y Max (greyed until there are prices that far back) and a line chart
@@ -701,10 +709,13 @@ database, and loads only when first needed.
 | Margins button on the profession window | on |
 | Scan the whole auction house when it opens | on |
 | Share auction house prices with friends | on |
+| Tell me about big moves of watched items (price alerts) | on, 30% |
+| A sound with price alerts | off |
 
 `/whypoor` opens or closes the window; `/whypoor ideas`, `crafting`, `stocks`, `bags`, `market` or `goal` opens that
-page; `/whypoor chart <item link or #ID>` an item's big chart; `/whypoor dashboard` the price dashboard; `/whypoor
-minimap` shows or hides the button.
+page; `/whypoor chart <item link or #ID>` an item's big chart; `/whypoor dashboard` the price dashboard; `/whypoor alerts`
+your price alerts (`/whypoor alerts on` or `off`: big moves of watched items); `/whypoor minimap` shows or hides the
+button.
 
 ## Mirage
 

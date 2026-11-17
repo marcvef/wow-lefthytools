@@ -851,6 +851,7 @@ function P.Finish(scan)
 		P.scan = nil
 	end
 	P.Changed()
+	if W.Alerts and W.Alerts.Scanned then LT.Guard("W.Alerts.Scanned", W.Alerts.Scanned, scan) end -- (Alerts.lua)
 end
 
 function P.Cancel()

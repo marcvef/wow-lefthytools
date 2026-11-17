@@ -26,11 +26,12 @@ anything wrong.
 | `Chart.lua` | the price charts: the chart widget (also the details' small graph, `D.Graph`), the big chart window, the dashboard | `W.Chart` = `Ch` |
 | `Crafting.lua` | the window's Crafting tab (the crafting margins), the profession window's Margins button | `W.Crafting` = `Cf` |
 | `Stocks.lua` | the window's Stocks tab: a watch list of items, a search with instant suggestions (a name index), each item's price over time | `W.Stocks` = `St` |
+| `Alerts.lua` | price alerts for watched items: one line in chat after your scans (under or over a price, a big move in a day); set in the Stocks tab's details | `W.Alerts` = `A` |
 
 Data add-on: `LefthyTools_MoneyData/` (GPL v3 like its source, CMaNGOS Classic DB, as
 LefthyTools_DropData and LefthyTools_QuestData), made by `tools/update-money-data.js`; the installer
 copies it as a companion. Saved: `LefthyToolsWhyPoorDB` (account-wide; `prices`, `goal`, `ui` (the charts' windows and
-the dashboard: `ui.chart`, `ui.dashboard`), `watch`).
+the dashboard: `ui.chart`, `ui.dashboard`), `watch`, `alerts` and `alertsFired` (price alerts: Alerts.lua)).
 
 ## Rules for every part
 
@@ -850,6 +851,51 @@ list of items and their price on this realm's and faction's auction house over t
   arrays of keys (about three strings per name).
 - Pruning: a watched item keeps its long history (`scans`, `daily`: see Prices) even when it isn't seen on the
   auction house for 14 days; only its 14-day entry goes. An item off the watch list keeps it 14 days more.
+
+### Price alerts (Alerts.lua)
+
+`W.Alerts` (`A`): after each of your own auction house scans, **one line in chat** for everything on the watch list
+that crossed a line: `WhyPoor?: [Copper Bar] 14s 80c (under your 15s) · [Linen Cloth] 1s 20c (+42% today)`. No
+pop-ups, nothing in tooltips or bags; informational only.
+- *The rules*: an item's own (`LefthyToolsWhyPoorDB.alerts[item] = { below = copper, above = copper, move = percent }`,
+  account-wide; `A.Set`, `A.Clear`, `A.Get`, `A.Has`) and the module's setting **Tell me about big moves of watched
+  items** (`moveAlerts`, on, with `movePct` 30%: every watched item; an item's own move wins). The setting's move
+  needs at least 10c of change (`A.MOVE_MIN`: not 1c to 2c); an item's own move doesn't. Only items on the watch list
+  are looked at: an unwatched item's rules stay, paused (`/whypoor alerts` says so), and work again once it's back.
+- *What's compared*: the house's own scan (`P.Entry(house, item)`: its last scan's lowest buyout for one; never a
+  friend's price), only when its saved text changed since the last look (`A.seen`, per house: two scans in one second
+  count, the same price again doesn't) and its scan is at most 15 minutes old (`A.FRESH`). Under: `low < below`; over: `low > above` (strictly: "under 15s" is never 15s). A move: against the
+  latest earlier day's **close** within 7 days (`A.REF_DAYS`; the watched item's `daily` history, only its first
+  entries read), else that day's lowest from the house's 14 days; at least `pct` either way, rounded to whole percent
+  in the line ("+42% today", green up, red down).
+- *Once per crossing*: under (over) is told once, then again only after the price went back over (under) the line by
+  5% (`A.MARGIN`); a move once a day each way (up and down apart). What was told is kept per house and item
+  (`LefthyToolsWhyPoorDB.alertsFired[house][item] = { b, a, up = day, down = day }`), so a /reload or the next session
+  doesn't say it again; setting or clearing an item's rules forgets it (new lines are told when crossed).
+- *The line*: one per scan with every item that crossed, each `link price (reasons)`, the reasons joined by ", " (an
+  item under its line and down 40%: both in its part); the items as links (a click shows the item, shift-click puts
+  it in chat); at most 10 (`A.MOST`), then "and N more". In a fight it waits for the fight's end
+  (`PLAYER_REGEN_ENABLED`, listened to only while a line waits; `LT.InFight`, so a stuck combat flag doesn't hold it
+  forever: the next scan's line takes it along). The setting **A sound with price alerts** (`alertSound`, off): a
+  short coin sound (`SOUNDKIT.LOOT_WINDOW_COIN_SOUND`) with the line.
+- *When*: Prices.lua's `P.Finish` (a full scan kept, or a search item by item done) calls `A.Scanned(scan)` (one
+  guarded line); it only notes the house. Not at login: only after scans.
+- *What it costs*: nothing idle. After a scan a frame of its own (`A.frame`) goes over the watch list, 25 items a
+  frame (`A.PER_FRAME`; each: the engine's cached decode and the first entries of its daily text), then hides.
+- *Setting them* (`A.Details`, from Stocks.lua's `T.Details`, one guarded line at its end): the details of a watched
+  item end with **Price alerts**: what's set now ("Now: under 15s, over 2g, moves of 30% or more (all watched
+  items)."), the fields **Below** [ ] **Above** [ ] **Moves over** [ ] %, **Set** (Enter in a field too) and **Clear**
+  (only when it has rules of its own). Prices for one, typed as for the goal: "1.5" or "1,5" (gold), "150g", "15s",
+  "80c" (German "80k"), "2g 50s" (`A.ParseMoney`); a percent "30", "30%", "12,5" (`A.ParsePct`). An empty field: no
+  such rule; all empty: cleared. Wrong input says so in orange under the buttons and keeps nothing: "Type a price like
+  15s, 2g 50s or 1.5 (gold).", "Type the move in percent, like 30.", "Below has to be under Above.", "Type a price or
+  a percent first." What's typed stays through the window's redraws until Set or Clear (or another item). Set and
+  Clear say so in chat. An unwatched item: "Add it to your watch list for price alerts in chat after your scans." The
+  fields are hidden at every details' start (`D.Begin`, wrapped once by Alerts.lua: no Window.lua change).
+- `/whypoor alerts`: the setting's move, then each item's alerts (as links, unwatched ones "not watched: paused");
+  `/whypoor alerts on` / `off`: the setting.
+- Not done: a mark on the Stocks rows of items with alerts (it needs Stocks.lua's `T.Fill`; `A.Has(item)` is there for
+  it).
 
 ### Charts (Chart.lua)
 
