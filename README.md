@@ -651,7 +651,8 @@ across the top with your goal: "Mount: 34g of 100g · ~3g/h · at this rate at l
 minutes; setting *Scan the whole auction house when it opens*), a little each frame so nothing stutters. The
 line above the list says what's going on ("Reading the auction house: 45%", "Working them out: step 7 of 11")
 and when the next whole scan can be. Two weeks of each item's lowest price give its
-usual price; prices that jump around are marked unstable and left out of the ideas. Your Beacon
+usual price; prices that jump around are marked unstable and left out of the ideas. Items on your Stocks watch
+list keep more: every scan's price for a month and each day's open, high, low and close for three years. Your Beacon
 friends on the same realm and side share their scans with you (and you yours), so one visit to the
 auction house helps everyone. Chronicle's crafting margins use the same prices.
 
