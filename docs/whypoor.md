@@ -838,8 +838,8 @@ list of items and their price on this realm's and faction's auction house over t
   and 2000 items (`St.PER_FRAME`) a frame; names are compared lowercased (`St.lower`), so it only compares
   strings. `P.Items()` is fetched again only when the prices changed (`P.Revision()`). Memory: the index keeps two
   arrays of keys (about three strings per name).
-- Pruning stays as it is: an item not seen on the auction house for 14 days loses its history (Prices.lua) but
-  stays on the watch list ("No prices yet").
+- Pruning: a watched item keeps its long history (`scans`, `daily`: see Prices) even when it isn't seen on the
+  auction house for 14 days; only its 14-day entry goes. An item off the watch list keeps it 14 days more.
 
 ### The window, bags, tooltip and goal
 
