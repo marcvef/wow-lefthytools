@@ -2134,6 +2134,12 @@ L["No prices in this range."] = "Keine Preise in diesem Zeitraum."
 L["Click the graph: the big chart, with longer ranges."] = "Klick auf die Grafik: der große Chart, mit längeren Zeiträumen."
 
 -- WhyPoor?: stocks (Stocks.lua)
+L["Dashboard"] = "Dashboard"
+L["Big chart"] = "Großer Chart"
+L["Add to dashboard"] = "Zum Dashboard"
+L["On the dashboard"] = "Im Dashboard"
+L["The dashboard: charts of the items you pick, side by side (Edit to set it up)."] =
+	"Das Dashboard: Charts der Items deiner Wahl, nebeneinander (Bearbeiten, um es einzurichten)."
 L["Stocks"] = "Stocks"
 L["%d watched"] = "%d auf der Watchlist"
 L["Search for an item above and add it to watch its price."] =

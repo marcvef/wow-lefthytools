@@ -779,6 +779,8 @@ open together (both are UI panels), and that the corners are free.
 
 The window's **Stocks** tab (`W.Stocks`, `St`, added with `Wn.AddTab` after Crafting; `/whypoor stocks`): a watch
 list of items and their price on this realm's and faction's auction house over time. Informational only.
+- *To the charts*: an item's details have "Big chart" (`W.Chart.Open`) and "Add to dashboard" (`Ch.dash.AddItem`;
+  "On the dashboard", greyed, once it's there) with "Dashboard" (`Ch.OpenDashboard`); the overview has "Dashboard".
 - *The watch list*: `LefthyToolsWhyPoorDB.watch`, account-wide, item IDs in the order added (`St.Watch`,
   `St.Unwatch`, `St.Watched`). A row: icon, name, the latest daily low (`P.History`'s last day; grey when it's
   older than yesterday) and the change since a week ago ("+12% vs. 7 days ago", green up, red down: against the

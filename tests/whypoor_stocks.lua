@@ -113,6 +113,28 @@ Button("Remove from watch list"):Click()
 Step()
 check(Items() == "9503" and W.DB().watch[1] == 9503 and #W.DB().watch == 1, "removed")
 check(Texts():find("Stockwood Plank", 1, true) and Button("Add to watch list") ~= nil, "its details stay, with Add (undo)")
+do -- The big chart and the dashboard from its details.
+	local Ch = W.Chart
+	local dashWas = Ch.dash.UI().items
+	Ch.dash.UI().items = {}
+	check(Button("Big chart") ~= nil and Button("Add to dashboard") ~= nil and Button("Dashboard") ~= nil, "Big chart, Add to dashboard, Dashboard")
+	Button("Big chart"):Click()
+	check(Ch.frame ~= nil and Ch.frame:IsShown(), "Big chart: its window")
+	Ch.PickRange("1M")
+	Ch.Draw()
+	local points = P.Series(9501, time() - 31 * 86400, time())
+	check(#points >= 2 and Ch.widget:Count("line") >= 1, "on the real price history (P.Series: " .. #points .. " points): a line drawn, "
+		.. Ch.widget:Count("line") .. " segments")
+	Ch.frame:Hide()
+	Button("Add to dashboard"):Click()
+	Step()
+	check(Ch.dash.UI().items[1] == 9501 and Button("On the dashboard") ~= nil and not Button("On the dashboard"):IsEnabled(),
+		"added to the dashboard; the button says so")
+	Button("Dashboard"):Click()
+	check(Ch.dash.frame ~= nil and Ch.dash.frame:IsShown(), "Dashboard: its window")
+	Ch.dash.frame:Hide()
+	Ch.dash.UI().items = dashWas
+end
 
 -- An item link; the box only on its tab.
 Type(box, ItemLink(9502))

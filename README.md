@@ -670,7 +670,8 @@ cheaper now, red when it's over.
 it changed in a week. Search an item above the list (a name, an item link or `#id`): suggestions drop down as you
 type, with each item's icon, quality colour and lowest price, names starting with what you typed first; Up/Down and
 Enter or Tab pick one (or click it), Escape closes them, Enter alone lists every match. A pick shows the item's
-price graph; add it to the list from there.
+price graph; add it to the list from there, open its **Big chart**, or **Add to dashboard**. With nothing picked,
+the **Dashboard** button opens the dashboard.
 
 **Charts**, like a stock app's: `/whypoor chart` with an item's link or `#ID`, or a click on any price graph,
 opens an item's **big chart**: its price now, the change over the range in a green or red box, when it was last

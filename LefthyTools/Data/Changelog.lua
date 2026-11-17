@@ -647,5 +647,14 @@ ns.CHANGELOG = {
 	{ id = 213, module = "whypoor",
 		en = { "WhyPoor?: Check all my recipes", "Every recipe's details on the Crafting tab have a \"Check all my recipes\" button next to \"Check AH\": all your recipes' prices at once, at the auction house." },
 		de = { "WhyPoor?: Alle Rezepte prüfen", "Die Details jedes Rezepts im Crafting-Tab haben neben \"AH prüfen\" einen Button \"Alle meine Rezepte prüfen\": die Preise aller deiner Rezepte auf einmal, im Auktionshaus." } },
+	{ id = 214, module = "whypoor",
+		en = { "WhyPoor?: stock charts", "Click any price graph (or Big chart on the Stocks tab, or /whypoor chart) for an item's big chart: ranges 1D to Max, a line with its area, axes, hover for each point, drag to see the change between two points and zoom in. Watched items keep every scan for a month and a point a day for years." },
+		de = { "WhyPoor?: Aktien-Charts", "Klick auf einen Preisgraphen (oder Großer Chart im Stocks-Tab, oder /whypoor chart) für den großen Chart eines Items: Zeiträume 1D bis Max, eine Linie mit Fläche, Achsen, Hover für jeden Punkt, ziehen für die Änderung zwischen zwei Punkten und Zoom. Items auf der Watchlist behalten jeden Scan einen Monat und einen Punkt pro Tag über Jahre." } },
+	{ id = 215, module = "whypoor",
+		en = { "WhyPoor?: a dashboard of charts", "Charts of the items you pick, side by side: Dashboard on the Stocks tab or /whypoor dashboard; Edit adds, moves and removes them, one range for all." },
+		de = { "WhyPoor?: ein Dashboard mit Charts", "Charts der Items deiner Wahl nebeneinander: Dashboard im Stocks-Tab oder /whypoor dashboard; Bearbeiten fügt hinzu, verschiebt und entfernt, ein Zeitraum für alle." } },
+	{ id = 216, module = "whypoor",
+		en = { "WhyPoor?: search suggestions", "The Stocks search suggests items as you type, with icon and price: Up/Down and Enter or Tab pick one." },
+		de = { "WhyPoor?: Suchvorschläge", "Die Stocks-Suche schlägt beim Tippen Items vor, mit Icon und Preis: Hoch/Runter und Enter oder Tab wählen eins." } },
 	-- New entries go here, at the end.
 }

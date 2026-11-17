@@ -1031,12 +1031,34 @@ function T.Details(e)
 	else
 		D.Button(L["Add to watch list"], function() St.Watch(item) end, true, 170)
 	end
+	local Ch = W.Chart
+	if Ch and Ch.Open then
+		D.Button(L["Big chart"], function() Ch.Open(item) end, true, 110, true)
+	end
+	local Ds = Ch and Ch.dash
+	if Ds and Ds.Items and Ds.AddItem then
+		local on = false
+		for _, id in ipairs(Ds.Items()) do
+			on = on or id == item
+		end
+		D.Button(on and L["On the dashboard"] or L["Add to dashboard"], function()
+			if Ds.AddItem(item) then
+				Wn.state.due = true
+			end
+		end, not on, 170)
+		D.Button(L["Dashboard"], function() Ch.OpenDashboard() end, true, 110, true)
+	end
 end
 
 -- Nothing picked: what the tab is.
 function T.Overview()
 	D.Text(L["Stocks"], "title")
 	D.Text(L["Your watch list: each item's lowest price on your auction house, day by day, and how it changed in a week. Search an item above the list and add it."], "text", 0, 2)
+	local Ch = W.Chart
+	if Ch and Ch.OpenDashboard then
+		D.Text(L["The dashboard: charts of the items you pick, side by side (Edit to set it up)."], "text", 0, 6)
+		D.Button(L["Dashboard"], function() Ch.OpenDashboard() end, true, 140)
+	end
 end
 
 -- The search box on the line above the list: as you type, the dropdown; Up/Down mark a suggestion, Enter or Tab
