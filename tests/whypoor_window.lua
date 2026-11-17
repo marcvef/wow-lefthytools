@@ -167,7 +167,7 @@ do
 		and all:find("Needs: Skinning 1", 1, true) and all:find("Prices 2 h old", 1, true), "its details: title, confidence, needs, warnings")
 	check(all:find("\nWhy\n- You killed 120 of them", 1, true) and all:find("\nHow\n- Kill them and loot them", 1, true)
 		and all:find("Kills per hour: 85 (yours)", 1, true), "why, how, the working with what each rests on")
-	check(D.items[1]:IsShown() and Plain(D.items[1].Text:GetText()) == "Bolt of Linen x3"
+	check(D.items[1]:IsShown() and Plain(D.items[1].Text:GetText()) == "Bolt of Linen ~3 an hour"
 		and Plain(D.items[1].Right:GetText()) == "12s AH 2 h", "its items: price, where, age")
 	check(rows[1].Sel:IsShown() and not view.Strip.Sel:IsShown(), "the row picked is lit")
 	check(D.map ~= nil, "Lodestar's small map is there")
@@ -286,6 +286,15 @@ do
 end
 
 ---------------------------------------------------------------------------
+section("WhyPoor?: item counts, rounded")
+do
+	local Ct = W.Window.CountText
+	check(Ct(7) == "x7" and Ct(1) == nil and Ct(64.143558118497) == "x~64" and Ct(2.46) == "x~2.5",
+		"whole counts as they are, worked-out ones rounded, one not said")
+	check(Ct(64.143558118497, true) == "~64 an hour" and Ct(0.31, true) == "~0.3 an hour" and Ct(3, true) == "~3 an hour"
+		and Ct(0, true) == nil, "an idea's counts an hour: rounded, said an hour, even under one")
+end
+
 section("WhyPoor?: nothing in item tooltips, nothing on the bags")
 do
 	check(W.Bags.Line == nil and W.Bags.Coin == nil and M.db.tooltip == nil and M.db.bagCoins == nil,

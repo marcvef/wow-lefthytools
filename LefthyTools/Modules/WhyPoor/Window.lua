@@ -454,7 +454,29 @@ end
 
 -- An item's row: its icon and name (x n), at its right what's said of it; enter: its own tooltip (else the
 -- item's), data: kept on the row for it (row.data).
-function D.Item(item, n, right, enter, data)
+-- How many, for the eye: whole numbers as they are ("x7"); a worked-out count rounded ("x~64", "x~2.5", "x~0.3").
+-- perHour: an idea's count an hour ("~64 an hour"), shown even under one (a rare drop).
+function Wn.CountText(n, perHour)
+	n = Num(n)
+	if not n or (not perHour and n <= 1) or n <= 0 then
+		return nil
+	end
+	local whole = math.floor(n + 0.5)
+	local text
+	if math.abs(n - whole) < 0.01 and not perHour then
+		text = "x" .. whole
+	elseif n >= 10 or math.abs(n - whole) < 0.05 then
+		text = "~" .. whole
+	else
+		text = "~" .. LT.Decimal(("%.1f"):format(n))
+	end
+	if perHour then
+		return L["%s an hour"]:format(text)
+	end
+	return text:sub(1, 1) == "~" and ("x" .. text) or text
+end
+
+function D.Item(item, n, right, enter, data, perHour)
 	D.ni = D.ni + 1
 	local b = D.items[D.ni]
 	if not b then
@@ -482,7 +504,8 @@ function D.Item(item, n, right, enter, data)
 	b:SetPoint("TOPLEFT", 4, -D.y)
 	b:SetWidth(D.width - 8)
 	b.Icon:SetTexture(Wn.ItemIcon(item))
-	b.Text:SetText(Wn.ItemName(item) .. ((Num(n) and n > 1) and (GREY .. " x" .. n .. "|r") or ""))
+	local count = Wn.CountText(n, perHour)
+	b.Text:SetText(Wn.ItemName(item) .. (count and (GREY .. " " .. count .. "|r") or ""))
 	b.Right:SetText(right or "")
 	b:Show()
 	D.y = D.y + C.ITEM_H + 1
@@ -682,7 +705,7 @@ function D.Idea(idea)
 					local age = W.Age(it.age)
 					right = right .. " " .. (Wn.Stale(it.age) and ORANGE or GREY) .. age .. "|r"
 				end
-				D.Item(it.item, it.n, right)
+				D.Item(it.item, it.n, right, nil, nil, Num(idea.perHour) ~= nil)
 			end
 		end
 	end

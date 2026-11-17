@@ -662,5 +662,8 @@ ns.CHANGELOG = {
 	{ id = 218, module = "whypoor",
 		en = { "WhyPoor?: sold a day in the charts", "The charts' volume panel also has a gold line: how many sell a day, estimated from listings that went before they could expire between two of your whole scans, with \"sells ~25 a day (est.)\" next to it. Watched items keep it for years." },
 		de = { "WhyPoor?: Verkäufe pro Tag in Charts", "Das Volumen-Feld der Charts hat auch eine goldene Linie: wie viele sich pro Tag verkaufen, geschätzt aus Angeboten, die zwischen zwei deiner kompletten Scans verschwanden, bevor sie ablaufen konnten, mit \"verkauft sich ~25 pro Tag (geschätzt)\" daneben. Items auf der Watchlist behalten das über Jahre." } },
+	{ id = 219, module = "whypoor",
+		en = { "WhyPoor?: item counts rounded", "An idea's items say how many an hour, rounded (\"~64 an hour\"), instead of a long number." },
+		de = { "WhyPoor?: Anzahlen gerundet", "Die Items einer Idee zeigen gerundet, wie viele pro Stunde (\"~64 pro Stunde\"), statt einer langen Zahl." } },
 	-- New entries go here, at the end.
 }
