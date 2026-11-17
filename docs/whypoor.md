@@ -23,12 +23,14 @@ anything wrong.
 | `Goal.lua` | the money goal (the mount) | `W.Goal` = `G` |
 | `Bags.lua` | each bag item's best sale (the Bags tab, the ideas) | `W.Bags` |
 | `Window.lua` | the window (Lodestar's style): Ideas, Bags, Market, the goal's strip | `W.Window` |
+| `Chart.lua` | the price charts: the chart widget (also the details' small graph, `D.Graph`), the big chart window, the dashboard | `W.Chart` = `Ch` |
 | `Crafting.lua` | the window's Crafting tab (the crafting margins), the profession window's Margins button | `W.Crafting` = `Cf` |
 | `Stocks.lua` | the window's Stocks tab: a watch list of items, a search with instant suggestions (a name index), each item's price over time | `W.Stocks` = `St` |
 
 Data add-on: `LefthyTools_MoneyData/` (GPL v3 like its source, CMaNGOS Classic DB, as
 LefthyTools_DropData and LefthyTools_QuestData), made by `tools/update-money-data.js`; the installer
-copies it as a companion. Saved: `LefthyToolsWhyPoorDB` (account-wide; `prices`, `goal`, `ui`, `watch`).
+copies it as a companion. Saved: `LefthyToolsWhyPoorDB` (account-wide; `prices`, `goal`, `ui` (the charts' windows and
+the dashboard: `ui.chart`, `ui.dashboard`), `watch`).
 
 ## Rules for every part
 
@@ -840,6 +842,92 @@ list of items and their price on this realm's and faction's auction house over t
   arrays of keys (about three strings per name).
 - Pruning: a watched item keeps its long history (`scans`, `daily`: see Prices) even when it isn't seen on the
   auction house for 14 days; only its 14-day entry goes. An item off the watch list keeps it 14 days more.
+
+### Charts (Chart.lua)
+
+`W.Chart` (`Ch`): an item's price on this realm's and faction's auction house drawn like a stock app's chart, in three
+places: the details' small graph (`D.Graph`: the Ideas' main item, Bags, the Stocks tab), the big chart window and the
+dashboard. Informational only.
+
+**Data.** `P.Series(item, from, to)` and `P.SeriesSpan(item)` (Prices.lua; points `{ t, price, qty, open, high, low,
+close }`, resolution `"scan"` or `"day"`); without them `P.History`'s daily lows as day points (at the day's noon, the
+newest at its last scan; no open/high/low/close). Every point is checked (numbers, not secret) and sorted.
+`Ch.PrevClose(item, from)`: the last scan in the two days before (a short span is scan by scan), else the last day's close
+in the two weeks before. `Ch.All(item)`: everything known (its high, low, days with a price, the latest point), kept
+while `P.Revision()` and the minute stay.
+
+**Ranges** 1D (24 hours), 5D, 1M (30 days), 6M (182 days), YTD (from 1 January, local time), 1Y (365 days), Max (from
+the first price). A range is available when it shows more than the next shorter one: 1D and Max whenever anything is
+known, the others when there are prices before the start of the range that starts next after theirs; the others are
+greyed ("No prices that far back yet"). The range shown at opening: the one kept (`ui.chart.range`) when available,
+else 1M, 5D or 1D, else Max.
+
+**The widget** (`Ch.NewWidget(parent, opts)`, `w:SetSize`, `w:SetSeries(points, from, to, res, extra)`):
+
+- *The line*: a Line object per segment; the points are thinned to the width first (`Ch.Downsample`: at most `MAX_SEG`
+  200, a tile 60; each of n/2 slices of the span keeps its lowest and highest point, the first and last always, so peaks
+  stay). A segment across a gap (longer than an eighth of the span and than 18 hours for scans, 2.5 days for days) is
+  drawn faint and gets no fill: it isn't known what happened there. Green when the span went up (from the previous close
+  on 1D, else the first point), red when down, grey when flat. A dot on each point while there are 30 or fewer.
+- *The area under it*: columns about 3 px wide (200 at most), each up to the line's height there, a vertical gradient.
+  Or, with *High/low* on and daily points, each day's low-to-high band instead.
+- *Levels*: the previous close (1D) as a dotted line labelled "Previous close 2s 10c"; the usual price (`P.Get().value`,
+  toggle *Usual*) as a dotted gold line labelled "Usual"; a small chart draws the usual price as a thin gold line. A level
+  far outside the prices (under half the lowest, over twice the highest) isn't drawn, so it doesn't flatten the line.
+- *Listed* (toggle): how many were listed at each point as faint bars along the bottom fifth.
+- *Axes* (big chart): grid lines at round money steps (1, 2 or 5 times a power of ten, 2 to 6 lines by the height) with
+  their labels on the right (the plot narrows to the widest label; a label closer than 13 px to the one below is left
+  out) and the y axis' title "Lowest price for one"; time labels below with faint vertical lines (`Ch.Ticks`: hours for
+  up to two days, weekdays up to 8 days, dates up to ~2.5 months, months beyond, January as the year; as many as fit 70 px
+  apart, none overlapping) and the x axis' title (Time of day, Day, Month). A small chart: the range's highest and lowest
+  price at its right, its first day and "now" below (when it's big enough).
+- *Hover*: a crosshair and a dot on the nearest point (only when the nearest point changes: `Ch.Nearest`, a binary
+  search, every point, not the thinned ones) and a GameTooltip inside the chart beside the crosshair: when (with the time
+  for scans), the price for one (a day's lowest), how many were listed, a day's open, high, low and close and its change
+  from the day before; the hints (drag, right-click; a small chart's "Click: the big chart"). The big chart's header
+  follows.
+- *Drag* (big chart): from one point to another the span is shaded and the tooltip (and the header) shows its change
+  (absolute and %, coloured), high and low; released after 4 px or more on two different points, the chart zooms to that
+  span (a custom range: no range button lit, "Reset zoom" shown); right-click, Reset zoom or a range goes back.
+- Messages: no points ("No prices yet: open the auction house." / "No prices in this range: pick a longer one."); one
+  scan known at all ("One scan so far: 7s 77c on Tue 3 Nov, 14:05. Each visit to the auction house adds a point."); one
+  point in the range.
+
+**The big chart** (`Ch.Open(item)`, `/whypoor chart <link | #id | a name the game knows>`, a click on any small chart or
+tile): `LefthyToolsWhyPoorChart`, 760 x 520 (at least 540 x 400), dressed like the window (`LT.Window.Dress`), DIALOG
+strata, movable, resizable by the corner grip, Escape closes it, `LT.Window.Register`ed; its size and place in
+`ui.chart` (`w`, `h`, `left`, `top`). The header: the item's icon and name (its tooltip), the price now big (the last
+scan's lowest, `P.Get().low`; a zoomed span's last price), the change over the range in a red or green box with an arrow
+(its tooltip: from what to what, over which range), the range in words, a line with "last scan 12 min ago" (or the
+hovered point: when, price, listed, open/high/low/close), "+ Watch" / "Watching" (`W.Stocks.Watch`, `Unwatch`,
+`Watched`; tooltips say what watching keeps). Under it the range buttons (tooltips "Last 24 hours", ...), Reset zoom,
+the toggles Usual, Listed, High/low (`ui.chart.usual`, `volume`, `band`; High/low only for daily points); the chart;
+a grid of numbers, each with a tooltip saying what it means and where it comes from: Open (the range's first price),
+High, Low (the range's), Listed now (the last scan's count), Usual (`value`, from how many days), Steady? (`unstable`),
+Known high / low (everything known), Days of data (since when).
+
+**The dashboard** (`Ch.OpenDashboard()`, `/whypoor dashboard`; the Stocks tab gets a button for it):
+`LefthyToolsWhyPoorDashboard`, the same kind of window (`ui.dashboard`: `items`, `range`, `w`, `h`, `left`, `top`). One
+range for all tiles (its buttons on the title row). Tiles of 132 px in 1 to 4 columns by the width (220 px each at
+least), scrolling: the item's icon and name, the price now, the change over the range (coloured), a small chart with
+its own hover tooltip; a click on a tile or its chart opens the big chart; the tile's tooltip says the change over the
+range. Edit (Done) shows a box (a name, a shift-clicked link or `#ID`; Enter or Add), "Add all watched" (the Stocks
+tab's watch list, `W.Stocks.List()`) and what happened ("Added: ...", "Already on the dashboard", not found), and on each
+tile < > (move) and x (remove); every control has a tooltip. Empty: a message and the add controls. At most 40 tiles. A
+name is looked up as the game knows it (`C_Item.GetItemInfo(name)`), else over the auction house's items
+(`P.Items()`, names kept lowercased) a slice a frame (2 ms, 2000 items at most): the exact name, else the first
+starting with it, else the first having it.
+
+**What it costs.** A chart is drawn only when what it shows changed: the item, the range or zoom, a toggle, the size
+(laid out on the next frame, at most every 0.1 s while being resized), `P.Revision()` or the minute (a window's ticker
+looks every second; the dashboard every five minutes); hovering moves only the crosshair and the tooltip. Lines and
+textures come from pools per widget; a widget holds at most ~200 segments, 200 columns, 200 bars, 120 dashes, 30 dots
+and ~20 labels. The dashboard lays its tiles out at once and draws 8 tiles' charts a frame. A window's ticker is a child
+frame's OnUpdate and an item's data event is registered only while it shows: closed, nothing runs. Switched off
+(`W.Changed`), both windows close.
+
+Not verified in game yet: how the lines and the gradient columns look at Forever's UI scales, the corner grip's
+textures, a GameTooltip anchored inside the chart, `SetResizeBounds` on Forever's client (it's used only when there).
 
 ### The window, bags, tooltip and goal
 

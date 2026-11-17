@@ -10,7 +10,8 @@ local L = ns.L
 -- Its own saved table (LefthyToolsWhyPoorDB, account-wide; Core/Core.lua stamps its world):
 --   prices = { ... }   Prices.lua: auction house prices, per realm and faction, with their history
 --   goal = { ... }     Goal.lua: the money goal (the mount), per character
---   ui = { ... }       Window.lua: the window's place, tab and list state
+--   ui = { ... }       Chart.lua: the big chart's and the dashboard's place, size and choices (chart,
+--                      dashboard = { items, range, ... })
 --   watch = { ... }    Stocks.lua: the watch list, item IDs in the order added
 --
 -- This file: the module, its settings page, /whypoor and /lefthy whypoor, the minimap button (it joins
@@ -146,6 +147,9 @@ function W.Changed()
 	if W.Crafting and W.Crafting.SettingsChanged then
 		LT.Guard("WhyPoor.crafting", W.Crafting.SettingsChanged)
 	end
+	if W.Chart and W.Chart.SettingsChanged then
+		LT.Guard("WhyPoor.chart", W.Chart.SettingsChanged)
+	end
 	W.UpdateMinimapButton()
 end
 
@@ -181,6 +185,8 @@ end
 local function Help()
 	M:Print("/whypoor - open or close the window: ideas for making money")
 	M:Print("/whypoor ideas | crafting | stocks | bags | market | goal - the window on that page")
+	M:Print("/whypoor chart <item link or #id> - the item's price chart")
+	M:Print("/whypoor dashboard - your price dashboard: charts of the items you pick")
 	M:Print("/whypoor goal <gold> [name] - your own money goal (/whypoor goal clear: the mount again)")
 	M:Print("/whypoor bar <gold> - list only ideas bringing this an hour (/whypoor bar auto: automatic again)")
 	M:Print("/whypoor minimap - show or hide the minimap button")
@@ -233,6 +239,21 @@ function M:OnSlashCommand(msg)
 			W.Ideas.BarChanged()
 		end
 		W.Window.Open("bar")
+	elseif cmd == "chart" or cmd:match("^chart%s+") then
+		local rest = strtrim(strtrim(msg or ""):sub(6))
+		local Ch = W.Chart
+		local item = Ch and Ch.ParseItem(rest)
+		if not item and rest ~= "" then
+			local ok, _, link = pcall(C_Item.GetItemInfo, rest)
+			item = ok and Ch and Ch.ParseItem(link) or nil
+		end
+		if item then
+			Ch.Open(item)
+		else
+			self:Print("/whypoor chart <item link or #id> (shift-click an item into the chat box), or a name your game knows.")
+		end
+	elseif cmd == "dashboard" then
+		W.Chart.OpenDashboard()
 	elseif cmd == "" then
 		W.Window.Toggle()
 	elseif TABS[cmd] then
