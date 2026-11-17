@@ -23,7 +23,9 @@ ns.WhyPoor = W
 --                                          LONG_DAYS): the first, highest, lowest and last scan's price for one
 --                                          (open, high, close empty: the same as low), the last scan's count and
 --                                          its seconds into the day (empty: not known); seeded from items' days
---     unwatched[item] = t                  when it left the watch list: scans and daily go UNWATCH_KEEP later
+--     sold[item] = "<day>,<gone>,<span>;..."   a watched item's flow days kept LONG_DAYS (as flow, newest first;
+--                                          seeded from flow when it's watched): its estimated sales over time
+--     unwatched[item] = t                  when it left the watch list: scans, daily and sold go UNWATCH_KEEP later
 --   }
 --   replicated = t                         the last ReplicateItems asked (the game answers one every 15 min)
 --   vendor[item] = copper                  what a merchant asked for one (any realm; seen in its window)
@@ -56,6 +58,7 @@ local STEP = 50                -- rows or items between two looks at the clock
 local SEARCH_ROWS = 50         -- an item's search rows looked at for the lowest price for one
 local FLOW_GAP_MAX = 48 * 3600 -- two full scans further apart than this aren't compared
 local FLOW_SPAN_MIN = 2 * 3600 -- perDay only once listings were watched this long in all
+local SOLD_DAY_MIN = 3600      -- a day's own sales estimate only once its listings were watched this long
 local SIGS_MAX = 100000        -- listings remembered for the next full scan's compare at most
 local POSTED_KEEP = 3 * DAY    -- my auctions watched this long (48 h at most, then the mail)
 local OWN_MIN = 3              -- sells from my own auctions once this many sold or expired
@@ -224,7 +227,7 @@ function P.House(key)
 		h = {}
 		saved.houses[key] = h
 	end
-	for _, k in ipairs({ "items", "flow", "own", "friends", "scans", "daily", "unwatched" }) do
+	for _, k in ipairs({ "items", "flow", "own", "friends", "scans", "daily", "sold", "unwatched" }) do
 		h[k] = type(h[k]) == "table" and h[k] or {}
 	end
 	return h
@@ -1068,6 +1071,9 @@ function P.CompareScans(h, last, sigs, t)
 				gone = gone + (owner == "" and q or math.max(0, q - (newBy[owner] or 0)))
 			end
 			h.flow[item] = P.AddDays(h.flow[item], today, gone, gap)
+			if P.watchSet and P.watchSet[item] then
+				h.sold[item] = P.AddSold(h.sold[item], today, gone, gap)
+			end
 		end
 		k = k + 1
 		if k % STEP == 0 then
@@ -1358,6 +1364,57 @@ function P.Seed(h, item)
 		parts[i] = P.DayText(d)
 	end
 	h.daily[item] = parts[1] and table.concat(parts, ";") or nil
+	if not h.sold[item] and h.flow[item] then
+		h.sold[item] = h.flow[item] -- (its estimated sales so far: the same format)
+	end
+end
+
+-- A day's gone and span added to a newest-first "<day>,<gone>,<span>;..." text (sold): only its first entry is
+-- read and rewritten, the same work however long the history. A day older than its newest: left out.
+function P.AddSold(text, today, gone, span)
+	gone, span = math.max(0, math.floor((gone or 0) + 0.5)), math.max(0, math.floor((span or 0) + 0.5))
+	local first, rest = (text or ""):match("^([^;]*)(.*)$")
+	local d, a, b = first:match("^(%w+),(%w+),(%w+)$")
+	d, a, b = N36(d), N36(a), N36(b)
+	if d and a and b and d == today then
+		return P.B36(today) .. "," .. P.B36(a + gone) .. "," .. P.B36(b + span) .. rest
+	elseif d and d > today then
+		return text
+	end
+	local entry = P.B36(today) .. "," .. P.B36(gone) .. "," .. P.B36(span)
+	return (text and text ~= "") and (entry .. ";" .. text) or entry
+end
+
+-- An item's estimated sales a day here: listings gone before they could expire over the time they were watched
+-- (flow's 14 days; a watched item's sold for longer). Oldest first: { { t (the day's noon), day, gone, span,
+-- perDay } } for the days touching from..to whose listings were watched SOLD_DAY_MIN or more; then over those
+-- days: perDay (nil: watched less than FLOW_SPAN_MIN in all), gone, span.
+function P.SoldSeries(item, from, to)
+	from, to = tonumber(from) or -math.huge, tonumber(to) or math.huge
+	local out, gone, span = {}, 0, 0
+	local key = P.HomeKey()
+	local h = key and type(item) == "number" and P.House(key)
+	if not h then
+		return out, nil, 0, 0
+	end
+	local byDay = {}
+	for _, text in ipairs({ h.sold[item], h.flow[item] }) do
+		for entry in (text or ""):gmatch("[^;]+") do
+			local d, a, b = entry:match("^(%w+),(%w+),(%w+)$")
+			d, a, b = N36(d), N36(a), N36(b)
+			if d and a and b and not byDay[d] then
+				byDay[d] = { a, b }
+			end
+		end
+	end
+	for day, e in pairs(byDay) do
+		if (day + 1) * DAY > from and day * DAY <= to and e[2] >= SOLD_DAY_MIN then
+			out[#out + 1] = { t = day * DAY + NOON, day = day, gone = e[1], span = e[2], perDay = e[1] * DAY / e[2] }
+			gone, span = gone + e[1], span + e[2]
+		end
+	end
+	table.sort(out, function(a, b) return a.t < b.t end)
+	return out, span >= FLOW_SPAN_MIN and gone * DAY / span or nil, gone, span
 end
 
 -- The watched items (LefthyToolsWhyPoorDB.watch, Stocks.lua's list) as a set, built anew each call (the list is
@@ -1385,6 +1442,8 @@ function P.WatchSet()
 				h.unwatched[item] = nil
 				if not h.daily[item] and h.items[item] then
 					P.Seed(h, item)
+				elseif not h.sold[item] and h.flow[item] then
+					h.sold[item] = h.flow[item]
 				end
 			end
 		end
@@ -1393,7 +1452,7 @@ function P.WatchSet()
 		if not set[item] then
 			for _, key in ipairs(P.Keys(saved.houses)) do
 				local h = P.House(key)
-				if (h.daily[item] or h.scans[item]) and not h.unwatched[item] then
+				if (h.daily[item] or h.scans[item] or h.sold[item]) and not h.unwatched[item] then
 					h.unwatched[item] = time()
 				end
 			end
@@ -1567,13 +1626,18 @@ function P.PruneJob()
 		else
 			P.House(key)
 			for _, item in ipairs(P.Keys(h.unwatched)) do
-				if not (h.daily[item] or h.scans[item]) or not Number(h.unwatched[item]) then
+				if not (h.daily[item] or h.scans[item] or h.sold[item]) or not Number(h.unwatched[item]) then
 					h.unwatched[item] = nil -- (nothing left, or broken: looked at again below)
 				end
 			end
 			local long = P.Keys(h.daily)
 			for item in pairs(h.scans) do
 				if not h.daily[item] then
+					long[#long + 1] = item
+				end
+			end
+			for item in pairs(h.sold) do
+				if not (h.daily[item] or h.scans[item]) then
 					long[#long + 1] = item
 				end
 			end
@@ -1627,7 +1691,7 @@ function P.PruneLong(h, item, watch, now)
 	elseif not h.unwatched[item] then
 		h.unwatched[item] = now -- (it left the list while the engine was off)
 	elseif now - h.unwatched[item] > UNWATCH_KEEP then
-		h.scans[item], h.daily[item], h.unwatched[item] = nil, nil, nil
+		h.scans[item], h.daily[item], h.sold[item], h.unwatched[item] = nil, nil, nil, nil
 		return
 	end
 	local scans, cut = P.DecodeScans(h.scans[item]), now - SCAN_KEEP
@@ -1659,7 +1723,15 @@ function P.PruneLong(h, item, watch, now)
 		end
 		h.daily[item] = table.concat(parts, ";")
 	end
-	if not (h.scans[item] or h.daily[item]) then
+	local sold, kept = h.sold[item], {}
+	for entry in (sold or ""):gmatch("[^;]+") do
+		local d = N36(entry:match("^(%w+),%w+,%w+$"))
+		if d and d > first then
+			kept[#kept + 1] = entry
+		end
+	end
+	h.sold[item] = kept[1] and table.concat(kept, ";") or nil
+	if not (h.scans[item] or h.daily[item] or h.sold[item]) then
 		h.unwatched[item] = nil
 	end
 	P.Yield()

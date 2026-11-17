@@ -659,5 +659,8 @@ ns.CHANGELOG = {
 	{ id = 217, module = "whypoor",
 		en = { "WhyPoor?: volume in the charts", "Every price chart shows how many were listed as bars in a panel under the price (orange where fewer than before), and \"listed 120 -> 40 (-67%)\" next to the price change: a rising price from fewer listings shows as such." },
 		de = { "WhyPoor?: Volumen in den Charts", "Jeder Preischart zeigt, wie viele angeboten waren, als Balken unter dem Preis (orange, wo weniger als davor), und \"angeboten 120 -> 40 (-67%)\" neben der Preisänderung: ein Preis, der wegen weniger Angeboten steigt, ist so zu erkennen." } },
+	{ id = 218, module = "whypoor",
+		en = { "WhyPoor?: sold a day in the charts", "The charts' volume panel also has a gold line: how many sell a day, estimated from listings that went before they could expire between two of your whole scans, with \"sells ~25 a day (est.)\" next to it. Watched items keep it for years." },
+		de = { "WhyPoor?: Verkäufe pro Tag in Charts", "Das Volumen-Feld der Charts hat auch eine goldene Linie: wie viele sich pro Tag verkaufen, geschätzt aus Angeboten, die zwischen zwei deiner kompletten Scans verschwanden, bevor sie ablaufen konnten, mit \"verkauft sich ~25 pro Tag (geschätzt)\" daneben. Items auf der Watchlist behalten das über Jahre." } },
 	-- New entries go here, at the end.
 }

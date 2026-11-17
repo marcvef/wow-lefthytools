@@ -679,8 +679,9 @@ scanned, + Watch, the ranges 1D 5D 1M 6M YTD 1Y Max (greyed until there are pric
 with the area under it, money and time on its axes, a dotted previous close (1D), the usual price as a gold line,
 **volume**: how many were listed, as bars in a panel under the price (orange where fewer than before), with
 "listed 120 -> 40 (-67%)" next to the price change, so a price going up from scarcity shows; and, for daily points,
-each day's low-to-high band (the toggles above the chart). The dashboard's tiles and the small graphs show the
-volume too. Hover the chart for a point's time, price, quantity listed and a day's open, high, low and close; drag
+each day's low-to-high band (the toggles above the chart); and **sold a day** (an estimate from listings that
+went before they could expire between two of your whole scans) as a gold line in the same panel, with "sells ~25 a
+day (est.)" next to it: supply and demand side by side. The dashboard's tiles and the small graphs show both too. Hover the chart for a point's time, price, quantity listed and a day's open, high, low and close; drag
 across it to see the change between two points and zoom in there (right-click goes back). Under it: open, high,
 low, listed now, the usual price, steady or not, the highest and lowest known and how many days of prices there
 are (hover each for what it means). The window moves, resizes from its corner and remembers both.

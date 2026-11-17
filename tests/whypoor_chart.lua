@@ -318,6 +318,39 @@ do -- The volume panel: under the price, its title and scale, how many changed o
 		and Ch.ListedChange(nil, { qty = 10 }, { qty = 15 }) == "listed 10 -> 15 (+50%)" and Ch.ListedChange({ { qty = 0 } }) == nil,
 		"the listed change: counts and percent; none without counts")
 end
+do -- Sold a day (estimated): a gold step line in the volume panel, its title, the header, a point's tooltip.
+	local realSold = P.SoldSeries
+	local today = math.floor(time() / DAY)
+	local days = {}
+	for d = today - 4, today do
+		days[#days + 1] = { t = d * DAY + DAY / 2, day = d, gone = 10 + (today - d), span = 4 * 3600, perDay = (10 + (today - d)) * 6 }
+	end
+	P.SoldSeries = function(item, from, to)
+		local out = {}
+		for _, d in ipairs(days) do if (d.day + 1) * DAY > from and d.day * DAY <= to then out[#out + 1] = d end end
+		return out, 72, 0, 0
+	end
+	Ch.Draw()
+	local title = w.pools.vtitle.list[1]
+	check(w:Count("sline") >= 5 and Plain(title:GetText()) == "Listed (bars) · sold a day, est. (line)",
+		"sold a day: a step a day as a line in the panel, the title says which is which (" .. w:Count("sline") .. " lines)")
+	check(Plain(frame.Info:GetText()):find("sells ~72 a day (est.)", 1, true) ~= nil, "the header: sells ~72 a day: " .. Plain(frame.Info:GetText()))
+	local p = w.points[#w.points]
+	w:HoverAt(w:X(p.t))
+	local want
+	for _, d in ipairs(days) do if d.day == math.floor(p.t / DAY) then want = Ch.PerDay(d.perDay) end end
+	check(want and Lines():find("Sold that day (est.)  " .. want, 1, true), "a point's tooltip: that day's estimate")
+	w.plot._scripts.OnLeave(w.plot)
+	frame.Toggles.sold:Click()
+	check(w:Count("sline") == 0 and not Plain(frame.Info:GetText()):find("sells", 1, true) and W.DB().ui.chart.sold == false,
+		"Sold a day off: no line, kept")
+	frame.Toggles.sold:Click()
+	Enter(frame.Toggles.sold)
+	check(TOOLTIP.title == "Sold a day" and Lines():find("Cancelled ones count too", 1, true), "its tooltip says what it is, and that it's an estimate")
+	check(Ch.PerDay(240) == "~240" and Ch.PerDay(2.46) == "~2.5" and Ch.SellsText(nil) == nil, "how a count a day reads")
+	P.SoldSeries = realSold
+	Ch.Draw()
+end
 frame.Toggles.usual:Click()
 check(w:Count("note") == 0 and w:Count("dash") == 0, "Usual off: no gold line")
 frame.Toggles.usual:Click()

@@ -98,6 +98,9 @@ P.Series(item, from, to) -- its prices between two times (time(); nil: no bound)
                       -- price = the day's low). A new list each call
 P.SeriesSpan(item)    -- the first and last point's time known of it here (nil, nil: none), and whether its history is
                       -- kept long (it's on the watch list)
+P.SoldSeries(item, from, to) -- estimated sales a day: { { t (noon), day, gone, span, perDay } } oldest first, the
+                      -- days touching from..to watched an hour or more (flow's 14 days, a watched item's sold for 3
+                      -- years); then over them: perDay (nil under 2 hours watched in all), gone, span
 P.Items()             -- every item with auction house data on this realm and faction (mine or a friend's): a new
                       -- sorted list of item IDs (the ideas' market pass goes over it)
 P.Revision()          -- goes up when any price changed (for caches)
@@ -337,6 +340,9 @@ otherwise nil.
   (`P.LONG_DAYS`, 1098 days): the day's first, highest, lowest and last scan's price for one (open, high and close
   left empty when they're the low: a quiet day is short), the last scan's count and its seconds into the day
   (`at`; empty: not known). About 15 to 30 bytes a day.
+- `sold[item] = "<day>,<gone>,<span>;..."`: a watched item's flow days (the same format, newest first), kept
+  LONG_DAYS like `daily`, seeded from `flow` when it's watched, recorded with the flow on each compare of two whole
+  scans (`P.AddSold`: only the first entry read and rewritten), pruned and dropped with the rest of its history.
 - `unwatched[item] = t`: when it left the watch list.
 
 *Recording* (`P.Record`): a full scan's commit and every single search (`P.Store`) record a watched item's price;
@@ -883,6 +889,12 @@ else 1M, 5D or 1D, else Max.
   panel's title, its scale (0 and the most in sight) and a line above it. `Ch.ListedChange(points[, a, b])`: "listed
   120 -> 40 (-67%)", the first and last point with a count (or two points): in the big chart's info line (and a
   drag's), the Listed cell's tooltip, a tile's tooltip and under the small graph. A day's count is its last scan's.
+- *Sold a day* (toggle, on by default; also on tiles and the small graph): estimated sales a day as a gold step line
+  in the volume panel, on its scale (`Wd:SoldLine`; days grouped when more than the width holds, their sums over
+  their watched time). From `P.SoldSeries`: listings gone before they could expire between two whole scans of a
+  session, over the seconds they were watched (cancelled ones count too: an estimate, said in the toggle's
+  tooltip). "sells ~25 a day (est.)" over the range in the info line, a tile's tooltip and under the small graph;
+  a point's tooltip has its day's estimate.
 - *Axes* (big chart): grid lines at round money steps (1, 2 or 5 times a power of ten, 2 to 6 lines by the height) with
   their labels on the right (the plot narrows to the widest label; a label closer than 13 px to the one below is left
   out) and the y axis' title "Lowest price for one"; time labels below with faint vertical lines (`Ch.Ticks`: hours for

@@ -1989,7 +1989,14 @@ L["Market"] = "Markt"
 -- WhyPoor?: the chart (Chart.lua)
 L["listed %d -> %d (%s%d%%)"] = "angeboten %d -> %d (%s%d%%)"
 L["In this range: %s"] = "In diesem Zeitraum: %s"
-L["Bars below: how many were listed. %s"] = "Balken unten: wie viele angeboten waren. %s"
+L["Bars below: how many were listed; the gold line: sold a day (est.). %s"] =
+	"Balken unten: wie viele angeboten waren; die goldene Linie: verkauft pro Tag (geschätzt). %s"
+L["sells %s a day (est.)"] = "verkauft sich %s pro Tag (geschätzt)"
+L["Listed (bars) · sold a day, est. (line)"] = "Angeboten (Balken) · verkauft pro Tag, geschätzt (Linie)"
+L["Sold a day"] = "Verkauft/Tag"
+L["Sold that day (est.)"] = "An dem Tag verkauft (geschätzt)"
+L["Estimated sales a day, as a gold line in the panel under the price: listings that went before they could expire, over the time they were watched between two of your whole scans. Cancelled ones count too, so it's an estimate."] =
+	"Geschätzte Verkäufe pro Tag, als goldene Linie im Feld unter dem Preis: Angebote, die verschwanden, bevor sie ablaufen konnten, über die Zeit, in der sie zwischen zwei deiner kompletten Scans beobachtet wurden. Abgebrochene zählen mit, also eine Schätzung."
 L["1D"] = "1T"
 L["5D"] = "5T"
 L["1M"] = "1M"

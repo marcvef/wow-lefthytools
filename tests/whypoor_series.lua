@@ -198,12 +198,63 @@ Watch(B)
 first, last, long = P.SeriesSpan(B)
 check(long and H().unwatched[B] == nil and H().daily[B] ~= nil and H().scans[B] ~= nil, "back on the list in time: its history kept, the mark gone")
 
+section("WhyPoor? prices: sold a day (estimated), kept long for watched items")
+do
+	local today = P.Today(time())
+	local s = P.AddSold(nil, today - 1, 4, 3600)
+	s = P.AddSold(s, today - 1, 2, 1800)
+	check(s == P.B36(today - 1) .. "," .. P.B36(6) .. "," .. P.B36(5400), "a day's gone and watched time add up: " .. s)
+	s = P.AddSold(s, today, 10, 7200)
+	check(s:match("^(%w+),") == P.B36(today) and select(2, s:gsub(";", "")) == 1, "a new day goes first")
+	check(P.AddSold(s, today - 3, 1, 100) == s, "an older day than the newest: left out")
+	-- Two whole scans an hour apart: listings gone before they could expire (the flow), for every item; a watched
+	-- one's kept long too.
+	local band = 99
+	P.bands = P.bands or {}
+	local bandWas = P.bands[band]
+	P.bands[band] = 48 * 3600
+	Unwatch(G)
+	Watch(G)
+	P.WatchSet()
+	H().flow[G], H().sold[G], H().flow[E], H().sold[E] = nil, nil, nil, nil
+	local t = time()
+	local last = { t = t - 3600, cnt = { [G] = { ["5/100/"] = 3 }, [E] = { ["5/100/"] = 3 } }, bnd = { [G] = { ["5/100/"] = band }, [E] = { ["5/100/"] = band } } }
+	local sigs = { cnt = { [G] = { ["5/100/"] = 1 }, [E] = { ["5/100/"] = 1 } } }
+	P.CompareScans(H(), last, sigs, t)
+	check(H().flow[G] ~= nil and H().sold[G] == H().flow[G] and H().flow[E] ~= nil and H().sold[E] == nil,
+		"10 gone in an hour: the flow for both, kept long only for the watched one")
+	local list, perDay, gone, span = P.SoldSeries(G, t - DAY, t)
+	check(#list == 1 and list[1].gone == 10 and list[1].span == 3600 and list[1].perDay == 240 and perDay == nil and gone == 10,
+		"its day: 10 in an hour watched, ~240 a day; over the range too little watched for an estimate (under 2 hours)")
+	-- An older day only in sold (flow forgets after 14 days): still there; a day watched under an hour: left out.
+	H().sold[G] = H().sold[G] .. ";" .. P.B36(today - 40) .. "," .. P.B36(30) .. "," .. P.B36(3 * 3600) .. ";"
+		.. P.B36(today - 41) .. "," .. P.B36(5) .. "," .. P.B36(600)
+	list, perDay = P.SoldSeries(G, (today - 45) * DAY, t)
+	check(#list == 2 and list[1].day == today - 40 and list[1].perDay == 240 and perDay and math.abs(perDay - 40 * DAY / (4 * 3600)) < 1e-6,
+		"40 days back from the long store; under an hour watched left out; over the range: 40 in 4 hours, ~240 a day")
+	check(#P.SoldSeries(G, (today - 2) * DAY, t) == 1, "between from and to only")
+	-- Watching an item seeds its sold from its flow.
+	H().flow[F], H().sold[F] = P.AddSold(nil, today - 2, 7, 7200), nil
+	Watch(F)
+	P.WatchSet()
+	check(H().sold[F] == H().flow[F], "watched: its sold seeded from its flow")
+	-- Pruning: days older than 3 years go; an unwatched item's sold goes with the rest of its history.
+	H().sold[G] = H().sold[G] .. ";" .. P.B36(today - P.LONG_DAYS - 5) .. ",1,e10"
+	Unwatch(F)
+	P.WatchSet()
+	H().unwatched[F] = time() - 15 * DAY
+	P.PruneLong(H(), G, P.WatchSet(), time())
+	P.PruneLong(H(), F, P.WatchSet(), time())
+	check(select(2, H().sold[G]:gsub(";", "")) == 2 and H().sold[F] == nil, "pruned: older than 3 years, and an item off the list 15 days")
+	P.bands[band] = bandWas
+end
+
 -- (put back what this file changed)
 W.DB().watch = watchWas
 P.WatchSet()
 for _, item in ipairs(MINE) do
 	ITEMS[item] = nil
-	for _, list in ipairs({ "items", "scans", "daily", "unwatched" }) do H()[list][item] = nil end
+	for _, list in ipairs({ "items", "scans", "daily", "sold", "flow", "unwatched" }) do H()[list][item] = nil end
 end
 AH_LISTINGS, AH_COMMODITY = {}, {}
 Advance(math.ceil(spent - 1e-6) - spent) -- (a whole number of seconds in all)

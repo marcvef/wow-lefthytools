@@ -152,6 +152,31 @@ function Ch.ListedChange(points, a, b)
 	return L["listed %d -> %d (%s%d%%)"]:format(x, y, pct > 0 and "+" or "", pct), x, y
 end
 
+-- Estimated sales a day (P.SoldSeries: listings gone before they could expire, over the time they were watched):
+-- the days touching from..to (oldest first) and over them all a day (nil: too little watched). Empty without it.
+function Ch.Sold(item, from, to)
+	local P = W.Prices
+	if not (P and P.SoldSeries and Num(item)) then
+		return {}, nil
+	end
+	local days, perDay = P.SoldSeries(item, from, to)
+	return type(days) == "table" and days or {}, Num(perDay)
+end
+
+-- A count a day for the eye: "~25", "~2.5", "~0.3".
+function Ch.PerDay(n)
+	n = Num(n) or 0
+	if n >= 10 then
+		return "~" .. math.floor(n + 0.5)
+	end
+	return "~" .. LT.Decimal(("%.1f"):format(n))
+end
+
+-- "sells ~25 a day (est.)": over a range; nil without an estimate.
+function Ch.SellsText(perDay)
+	return Num(perDay) and L["sells %s a day (est.)"]:format(Ch.PerDay(perDay)) or nil
+end
+
 ---------------------------------------------------------------------------
 -- Data: P.Series / P.SeriesSpan, else P.History's daily lows
 ---------------------------------------------------------------------------
@@ -562,7 +587,7 @@ function Wd:Get(kind)
 	local o = pool.list[pool.n]
 	if not o then
 		local plot = self.plot
-		if kind == "line" then
+		if kind == "line" or kind == "sline" then
 			o = plot:CreateLine(nil, "ARTWORK")
 		elseif kind == "ylab" or kind == "xlab" then
 			o = self.frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -623,6 +648,9 @@ function Wd:VolumeRoom(pts)
 	local most = 0
 	for _, p in ipairs(pts) do
 		most = math.max(most, p.qty or 0)
+	end
+	for _, d in ipairs(self.extra.sold or {}) do
+		most = math.max(most, d.perDay or 0)
 	end
 	if most <= 0 or self.ph < (self.mini and 36 or 80) then
 		return
@@ -915,6 +943,10 @@ function Wd:Volume(ds)
 	for _, p in ipairs(ds) do
 		most = math.max(most, p.qty or 0)
 	end
+	local sold = self.extra.sold or {}
+	for _, d in ipairs(sold) do
+		most = math.max(most, d.perDay or 0)
+	end
 	if most <= 0 then
 		return
 	end
@@ -933,6 +965,7 @@ function Wd:Volume(ds)
 			before = q
 		end
 	end
+	self:SoldLine(sold, most)
 	if self.mini then
 		return
 	end
@@ -950,10 +983,48 @@ function Wd:Volume(ds)
 	zero:ClearAllPoints()
 	zero:SetPoint("LEFT", self.plot, "BOTTOMRIGHT", 6, 4)
 	local title = self:Get("vtitle")
-	title:SetText(L["Listed"])
+	title:SetText(sold[1] and L["Listed (bars) · sold a day, est. (line)"] or L["Listed"])
 	title:SetTextColor(0.6, 0.7, 0.95)
 	title:ClearAllPoints()
 	title:SetPoint("TOPLEFT", self.plot, "BOTTOMLEFT", 4, self.vh + 2)
+end
+
+-- Estimated sales a day as a gold step line in the volume panel, on its scale (most): a step a day (days grouped
+-- when there are more than the width holds, their sums over their watched time), joined where days follow on.
+function Wd:SoldLine(sold, most)
+	if not sold[1] then
+		return
+	end
+	local cap = math.max(4, math.floor(self.pw / 4))
+	local size = math.max(1, math.ceil(#sold / cap))
+	local steps = {}
+	for i = 1, #sold, size do
+		local gone, span, a, b = 0, 0, sold[i], sold[math.min(#sold, i + size - 1)]
+		for k = i, math.min(#sold, i + size - 1) do
+			gone, span = gone + sold[k].gone, span + sold[k].span
+		end
+		steps[#steps + 1] = { from = a.day * DAY, to = (b.day + 1) * DAY, perDay = span > 0 and gone * DAY / span or 0 }
+	end
+	local last
+	for _, s in ipairs(steps) do
+		local x1, x2 = self:X(math.max(self.from, s.from)), self:X(math.min(self.to, s.to))
+		local y = math.max(1, s.perDay / most * self.vh)
+		if x2 - x1 >= 1 then
+			local line = self:Get("sline")
+			line:SetColorTexture(1, 0.85, 0.3, 0.95)
+			line:SetThickness(self.mini and 1.5 or 2)
+			line:SetStartPoint("BOTTOMLEFT", self.plot, x1, y)
+			line:SetEndPoint("BOTTOMLEFT", self.plot, x2, y)
+			if last and last.to == s.from and math.abs(last.y - y) >= 1 then
+				local up = self:Get("sline")
+				up:SetColorTexture(1, 0.85, 0.3, 0.95)
+				up:SetThickness(self.mini and 1.5 or 2)
+				up:SetStartPoint("BOTTOMLEFT", self.plot, x1, last.y)
+				up:SetEndPoint("BOTTOMLEFT", self.plot, x1, y)
+			end
+			last = { to = s.to, y = y }
+		end
+	end
 end
 
 -- A dotted level across the plot (the previous close, the usual price).
@@ -1174,6 +1245,12 @@ function Ch.PointTip(w, i)
 	GameTooltip:SetText(Ch.When(p.t, w.res), 1, 1, 1)
 	Ch.Pair(w.res == "day" and L["Lowest price that day"] or L["Lowest price for one"], Money(p.price))
 	Ch.Pair(L["Listed"], (p.qty or 0) > 0 and tostring(math.floor(p.qty)) or L["not known"])
+	local day = math.floor(p.t / DAY)
+	for _, d in ipairs(w.extra and w.extra.sold or {}) do
+		if d.day == day then
+			Ch.Pair(L["Sold that day (est.)"], Ch.PerDay(d.perDay))
+		end
+	end
 	if p.open then
 		Ch.Pair(L["Open price"], Money(p.open))
 		Ch.Pair(L["High"], Money(p.high))
@@ -1401,6 +1478,7 @@ Ch.STATS = {
 Ch.TOGGLES = {
 	{ key = "usual", label = L["Usual"], default = true, tip = L["The usual price as a dotted gold line."] },
 	{ key = "volume", label = L["Listed"], default = true, tip = L["How many were listed at each point: the bars in the panel under the price (orange where fewer than before: scarcer). A price going up while fewer are listed is scarcity, not demand."] },
+	{ key = "sold", label = L["Sold a day"], default = true, tip = L["Estimated sales a day, as a gold line in the panel under the price: listings that went before they could expire, over the time they were watched between two of your whole scans. Cancelled ones count too, so it's an estimate."] },
 	{ key = "band", label = L["High/low"], default = false, tip = L["Daily points: a band from each day's lowest to its highest scan, instead of the area under the line."] },
 }
 
@@ -1639,8 +1717,13 @@ function Ch.Draw()
 	elseif #points == 1 then
 		note = L["Only one price in this range: a longer one shows more."]
 	end
+	local sold, perDay = {}, nil
+	if Ch.Toggle("sold") then
+		sold, perDay = Ch.Sold(s.item, from, to)
+	end
 	Ch.widget:SetSeries(points, from, to, res, { prev = prev, usual = Ch.Toggle("usual") and Num(get.value) or nil,
-		volume = Ch.Toggle("volume"), band = band, empty = empty, note = note, zoomed = s.zoom ~= nil })
+		volume = Ch.Toggle("volume") or sold[1] ~= nil, sold = sold, band = band, empty = empty, note = note,
+		zoomed = s.zoom ~= nil })
 	-- The header.
 	local Wn = W.Window
 	f.Item.Icon:SetTexture(Wn.ItemIcon(s.item))
@@ -1659,6 +1742,10 @@ function Ch.Draw()
 		info[#info + 1] = L["from %s"]:format(tostring(get.friend))
 	end
 	local listed = Ch.ListedChange(points)
+	local sells = Ch.SellsText(perDay)
+	if sells then
+		table.insert(info, 2, sells)
+	end
 	if listed then
 		table.insert(info, 2, listed)
 	end
@@ -2328,12 +2415,15 @@ function Ds.FillTile(t, item, range, now)
 	t.Change:SetText(text and (Ch.Hex(color) .. text .. "|r") or "")
 	t.tipLine = text and (text .. " " .. Ch.OVER[range]) or nil
 	local listed = Ch.ListedChange(points)
-	if listed then
-		t.tipLine = (t.tipLine and (t.tipLine .. "\n") or "") .. listed
+	local sold, perDay = Ch.Sold(item, from, now)
+	for _, line in ipairs({ listed or false, Ch.SellsText(perDay) or false }) do
+		if line then
+			t.tipLine = (t.tipLine and (t.tipLine .. "\n") or "") .. line
+		end
 	end
 	t.widget:SetSize(t:GetWidth() - 12, Ds.C.TILE_H - 50)
 	local empty = first and L["No prices in this range."] or L["No prices yet: open the auction house."]
-	t.widget:SetSeries(points, from, now, res, { prev = prev, empty = empty, volume = true })
+	t.widget:SetSeries(points, from, now, res, { prev = prev, empty = empty, volume = true, sold = sold })
 end
 
 -- Opens the dashboard (edit mode when it's empty). False: switched off.

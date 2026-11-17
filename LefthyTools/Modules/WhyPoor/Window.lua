@@ -526,7 +526,11 @@ function D.Graph(item)
 	w.frame:Show()
 	w:SetSize(D.width - 8, D.GRAPH_H)
 	local from = points[1].t - math.max(60, (now - points[1].t) * 0.03)
-	w:SetSeries(points, from, now, res, { usual = Num(value), empty = "", volume = true })
+	local sold, perDay = {}, nil
+	if Ch.Sold then
+		sold, perDay = Ch.Sold(item, from, now)
+	end
+	w:SetSeries(points, from, now, res, { usual = Num(value), empty = "", volume = true, sold = sold })
 	D.y = D.y + D.GRAPH_H + 3
 	if #list > 0 then
 		local low, high = math.huge, 0
@@ -537,8 +541,12 @@ function D.Graph(item)
 			.. SEP .. (unstable and (ORANGE .. L["jumps around"] .. "|r") or L["steady"]), "small", 4)
 	end
 	local listed = Ch.ListedChange and Ch.ListedChange(points)
-	if listed then
-		D.Text(L["Bars below: how many were listed. %s"]:format(listed), "small", 4)
+	local sells = Ch.SellsText and Ch.SellsText(perDay)
+	if listed or sells then
+		local parts = {}
+		parts[#parts + 1] = listed
+		parts[#parts + 1] = sells
+		D.Text(L["Bars below: how many were listed; the gold line: sold a day (est.). %s"]:format(table.concat(parts, SEP)), "small", 4)
 	end
 	D.Text(GREY .. L["Click the graph: the big chart, with longer ranges."] .. "|r", "small", 4)
 end
