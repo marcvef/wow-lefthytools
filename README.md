@@ -662,7 +662,8 @@ and when the next whole scan can be. Two weeks of each item's lowest price give 
 usual price; prices that jump around are marked unstable and left out of the ideas. Items on your Stocks watch
 list keep more: every scan's price for a month and each day's open, high, low and close for three years. Your Beacon
 friends on the same realm and side share their scans with you (and you yours), so one visit to the
-auction house helps everyone. Chronicle's crafting margins use the same prices.
+auction house helps everyone; their scans of the items you watch also go into your charts (marked as theirs), so
+the hours you weren't there are filled in. Chronicle's crafting margins use the same prices.
 
 **Crafting** (the tab; it was Chronicle's crafting margins): your characters' recipes on this realm with what they
 cost, bring and make per hour, by gold per hour or profit per craft, one profession or all; a recipe's details show

@@ -97,13 +97,15 @@ P.Series(item, from, to) -- its prices between two times (time(); nil: no bound)
                       -- open, high, low, close (day points only: the day's first, highest, lowest, last scan's price
                       -- for one) }, ... }, and res: "scan" (every scan's own point: from lies at or after the watched
                       -- item's oldest kept scan point) or "day" (one a day; t = the day's last scan, else its noon;
-                      -- price = the day's low). A new list each call
+                      -- price = the day's low). from: a friend's name on their scan's point, or on a day whose last
+                      -- scan was theirs (Friends' scans of watched items). A new list each call
 P.SeriesSpan(item)    -- the first and last point's time known of it here (nil, nil: none), and whether its history is
                       -- kept long (it's on the watch list)
-P.SoldSeries(item, from, to) -- estimated sales a day: { { t (noon), day, gone, span, perDay } } oldest first, the
-                      -- days touching from..to watched an hour or more (flow's 14 days, a watched item's sold for 3
-                      -- years; an unwatched item, without a sold text, its flow alone); then over them: perDay (nil
-                      -- under 2 hours watched in all), gone, span
+P.SoldSeries(item, from, to) -- estimated sales a day: { { t (noon), day, gone, span, perDay, friend } } oldest first,
+                      -- the days touching from..to watched an hour or more (flow's 14 days, a watched item's sold for 3
+                      -- years; an unwatched item, without a sold text, its flow alone; a day a friend watched longer:
+                      -- theirs, friend = true); then over them: perDay (nil under
+                      -- 2 hours watched in all), gone, span
 P.Items()             -- every item with auction house data on this realm and faction (mine or a friend's): a new
                       -- sorted list of item IDs (the ideas' market pass goes over it)
 P.Revision()          -- goes up when any price changed (for caches)
@@ -111,8 +113,9 @@ P.AH_CUT, P.STALE
 -- Also (Margins and tests): P.AHPrice(item) ({ p, q, t }: Margins' old shape), P.ScanItems(items, { front, spell }),
 -- P.ScanFull(fallback), P.Status(), P.Cancel(), P.Busy(), P.Refresh(), P.levelHint (a function: gear's item level),
 -- P.Decode / P.Encode (an item's saved text), P.Today(), P.WatchSet() (the watch list as a set), P.Record(h, item, t,
--- low, qty), P.DecodeScans / P.DecodeDaily / P.ScanText / P.DayText (the long history's texts), P.SCAN_KEEP,
--- P.SCAN_MAX, P.SCAN_MERGE, P.LONG_DAYS, P.UNWATCH_KEEP
+-- low, qty[, who]), P.RecordFriend(h, item, t, low, qty, who, gone, span), P.Who(h, name) / P.WhoName(h, i),
+-- P.AddPoint / P.AddDay / P.AddFriendSold, P.DecodeScans / P.DecodeDaily / P.ScanText / P.DayText (the long
+-- history's texts), P.SCAN_KEEP, P.SCAN_MAX, P.SCAN_MERGE, P.LONG_DAYS, P.UNWATCH_KEEP, P.FRIEND_GAP, P.WHO_MAX
 ```
 
 ### Crafts (`W.Crafts`, Crafts.lua)
@@ -248,8 +251,8 @@ line of its own.
   the last scan that covered it (low empty: none listed), then the lowest for one and how many of each day
   (`day` = `time() / 86400`, newest first, 14 at most); `flow[item]` (listings gone early, below),
   `own[item]` (my auctions sold and expired, per day), `friends[item]` (Friends' prices), `scan` (the last
-  full scan read), `friendScan` (the newest friend's data taken); for watched items `scans`, `daily` and
-  `unwatched` (Long history, below).
+  full scan read), `friendScan` (the newest friend's data taken); for watched items `scans`, `daily`, `sold`,
+  `friendSold`, `who` and `unwatched` (Long history, below).
 - `replicated`: when ReplicateItems was last asked (one for all houses: the game's limit isn't documented as
   per realm, so the safe reading).
 - `vendor[item]`: what a merchant asked for one, in gold only (`C_MerchantFrame.GetItemInfo`'s `price` for
@@ -336,13 +339,19 @@ otherwise nil.
 **Long history of watched items** (for the Stocks tab's chart): the items on the watch list
 (`LefthyToolsWhyPoorDB.watch`, account-wide, Stocks.lua's `St.List()`) keep more than the 14 daily lows, per house:
 
-- `scans[item] = "<t>,<low>,<qty>;..."`: every scan's lowest for one and how many were listed, newest first, 31
+- `scans[item] = "<t>,<low>,<qty>[,<who>];..."`: every scan's lowest for one and how many were listed, newest first, 31
   days (`P.SCAN_KEEP`) and 3000 points (`P.SCAN_MAX`) at most; a point within 5 minutes (`P.SCAN_MERGE`) of the
-  newest replaces it (a search right after a full scan is the same look). About 15 bytes a point.
-- `daily[item] = "<day>,<open>,<high>,<low>,<close>,<qty>,<at>;..."`: a point a day, newest first, 3 years
+  newest replaces it (a search right after a full scan is the same look). About 15 bytes a point. `who` (base 36,
+  an index into `who`): a friend's scan (Friends' scans of watched items, below); none: mine, so every text saved
+  before it is read as mine, unchanged.
+- `daily[item] = "<day>,<open>,<high>,<low>,<close>,<qty>,<at>[,<who>];..."`: a point a day, newest first, 3 years
   (`P.LONG_DAYS`, 1098 days): the day's first, highest, lowest and last scan's price for one (open, high and close
   left empty when they're the low: a quiet day is short), the last scan's count and its seconds into the day
-  (`at`; empty: not known). About 15 to 30 bytes a day.
+  (`at`; empty: not known). About 15 to 30 bytes a day. `who`: the day's last scan was that friend's (none: mine).
+- `friendSold[item] = "<day>,<gone>,<span>;..."`: friends' flow of a watched item, a day each (the whole day as the
+  friend told it, newest first), kept LONG_DAYS like `sold`: per day the report watched longest.
+- `who = { name, ... }`: the friends whose scans `scans` and `daily` hold (their character name as Beacon has it),
+  200 at most (`P.WHO_MAX`; a new friend beyond that: their points aren't kept); never renumbered.
 - `sold[item] = "<day>,<gone>,<span>;..."`: a watched item's flow days (the same format, newest first), kept
   LONG_DAYS like `daily`, seeded from `flow` when it's watched, recorded with the flow on each compare of two whole
   scans (`P.AddSold`: only the first entry read and rewritten), pruned and dropped with the rest of its history.
@@ -352,7 +361,14 @@ otherwise nil.
 none listed records nothing. Stocks.lua changes the list without telling, so `P.WatchSet()` builds the set from
 it anew (the list is short): once per commit, then a set lookup per item, so a full scan costs nothing more per
 item; once per search. Only each text's first entry is read and rewritten, the same work however long the
-history; a price older than the newest point is left out (they come in time order).
+history; a price older than my newest point is left out (they come in time order). A friend's point (Friends'
+scans of watched items) is put in its place by time (`P.AddPoint`, walking only the points newer than it: theirs
+are hours old at most): never over one of mine (at the same time or within 15 minutes, `P.FRIEND_GAP`, of any other
+point it's left out: theirs fill the hours no one else watched; their own point told again replaces theirs), and
+one of mine within 5 minutes of a friend's replaces it. The point's day merges both (`P.AddDay`): the high and low
+over every scan, the close, count and `at` of the day's newest scan (a friend's only when newer than the day's
+last, never at the same time as mine) and whose it was; the open stays the day's first known. A friend's point
+that's left out leaves the day alone too, so the day and the scans agree.
 
 *Watching* (seen by `P.WatchSet`, called by the commit, searches, `P.Series`, `P.SeriesSpan` and pruning): an item
 that came onto the list loses its `unwatched` mark, and its `daily` starts from its items entry's daily lows
@@ -366,7 +382,13 @@ item's oldest kept scan point (the whole span is kept scan by scan): those point
 those: its 14 daily lows), each with `t` = the day's last scan when known, else the day's noon (UTC days, as
 `P.Today`); price = the day's low; between `from` and `to` by `t`. `P.SeriesSpan`: the first and last of all
 those points (scan and day) and whether the item is watched. Decoded texts are kept while they stay the same
-(`P.long`). The rest of the engine (`P.Get`, `P.Value`, `P.History`, Share) reads only `items`, as before.
+(`P.long`). A friend's point (or a day whose last scan was theirs) has `from` = their name. The rest of the engine
+(`P.Get`, `P.Value`, `P.History`, Share) reads only `items`, as before.
+
+*Sold, with friends* (`P.SoldSeries`): a day takes my numbers (`sold`, then `flow`) or the friends' (`friendSold`),
+whichever was watched longer, never both added up: two players' scans see the same listings go, so adding would
+count the same sale twice. A friend tells their whole day each time (not what changed), so a later report of the
+same day just replaces theirs when it watched longer (`P.AddFriendSold`).
 
 **Pruning**: when the engine starts, a job over frames drops items and friends' prices not seen for 14 days,
 days older than 14 in `flow` and `own`, posted auctions older than 3 days, broken entries, and houses with
@@ -407,6 +429,33 @@ hands them to `B.TickPrices`, at most 25 a tick, nothing in a fight.
   data of the item and than what a friend gave before, marked with the friend's name and when it came. `P.Get`
   shows the newer of mine and a friend's (with `friend`, confidence never high); my own `sells` and `perDay`
   stay mine. Broken entries are dropped; they go after 14 days like mine.
+
+#### Friends' scans of watched items
+
+One player scans only while at the auction house; friends together cover much more of the day. So each player's
+watched items (Stocks' watch list) get the scans of friends on the same auction house into their long history,
+marked as theirs. The same switch (`sharePrices`, its tooltip says so), only to builds from `POINTS_SINCE` on (their
+`V2`; older builds ignore the unknown words), the same house rule (`LT.Hash32("<realm>-<faction>")`). Words `ww` and
+`wf` (docs/beacon.md).
+
+- **Subscribing.** My watch list (the first 40 that fit in a message, `WATCH_MAX`) goes to every friend whose build
+  reads it, once when first seen and again when the list changes, at most every minute per friend; `1` in it asks
+  for theirs (I have none yet), answered unless mine went the last 30 seconds (the two crossed). Theirs is kept in
+  memory only (their next login sends it again), taken at most every 20 seconds; another house's isn't kept. Off or
+  forgotten (gone 65 s, Beacon off): their list goes, and when it's on again lists are sent and asked for anew.
+- **Sending.** After each full scan of mine (its commit) every item they watch, after my searches of their items
+  those (once no search is running, 20 seconds at most), and my latest at once when their list comes: from my
+  `items` entry (the last scan that covered it, at most 6 hours old, `POINT_AGE`): the price for one (empty: none
+  listed), how many, and my flow of that day (gone, span: from `flow`, which every item has; empty: none),
+  newest first, one age a message plus each entry's seconds older. At most every minute per friend (`POINTS_GAP`),
+  at low priority, never in a fight. 20 items with flow: 2 messages (248 and 206 bytes in the test). Only my own
+  data, never a friend's passed on (`items` and `flow` are mine alone).
+- **Taking.** Only for my house, only items I watch (others skipped), each message checked whole first (a broken
+  entry, half a flow, an age over 6 hours or more than 20 entries drop it all), at most 20 messages in 10 minutes
+  from one friend; then `P.RecordFriend` (Long history: never over mine, gaps filled, days merged, flow kept per day
+  where they watched longer) under their name. Events only note; Beacon's tick handles them, at most 2 ms a tick.
+- **Shown.** The chart's point tooltip says "from <name>" (a day: "last scan that day from <name>"), their dots are
+  a bit bigger and blue, and the big chart's info line counts them ("friends' scans: 3").
 
 ### The money data
 
@@ -907,8 +956,9 @@ places: the details' small graph (`D.Graph`: the Ideas' main item, Bags, the Sto
 dashboard. Informational only.
 
 **Data.** `P.Series(item, from, to)` and `P.SeriesSpan(item)` (Prices.lua; points `{ t, price, qty, open, high, low,
-close }`, resolution `"scan"` or `"day"`); without them `P.History`'s daily lows as day points (at the day's noon, the
-newest at its last scan; no open/high/low/close). Every point is checked (numbers, not secret) and sorted.
+close }`, resolution `"scan"` or `"day"`; `from`: a friend's scan, their name); without them `P.History`'s daily lows as
+day points (at the day's noon, the newest at its last scan; no open/high/low/close). Every point is checked (numbers,
+not secret) and sorted.
 `Ch.PrevClose(item, from)`: the last scan in the two days before (a short span is scan by scan), else the last day's close
 in the two weeks before. `Ch.All(item)`: everything known (its high, low, days with a price, the latest point), kept
 while `P.Revision()` and the minute stay.
@@ -925,7 +975,8 @@ else 1M, 5D or 1D, else Max.
   200, a tile 60; each of n/2 slices of the span keeps its lowest and highest point, the first and last always, so peaks
   stay). A segment across a gap (longer than an eighth of the span and than 18 hours for scans, 2.5 days for days) is
   drawn faint and gets no fill: it isn't known what happened there. Green when the span went up (from the previous close
-  on 1D, else the first point), red when down, grey when flat. A dot on each point while there are 30 or fewer.
+  on 1D, else the first point), red when down, grey when flat. A dot on each point while there are 30 or fewer (a
+  friend's scan: a bigger blue one, `Ch.FRIEND`).
 - *The area under it*: columns about 3 px wide (200 at most), each up to the line's height there, a vertical gradient.
   Or, with *High/low* on and daily points, each day's low-to-high band instead.
 - *Levels*: the previous close (1D) as a dotted line labelled "Previous close 2s 10c"; the usual price (`P.Get().value`,
@@ -952,8 +1003,9 @@ else 1M, 5D or 1D, else Max.
   price at its right, its first day and "now" below (when it's big enough).
 - *Hover*: a crosshair and a dot on the nearest point (only when the nearest point changes: `Ch.Nearest`, a binary
   search, every point, not the thinned ones) and a GameTooltip inside the chart beside the crosshair: when (with the time
-  for scans), the price for one (a day's lowest), how many were listed, a day's open, high, low and close and its change
-  from the day before; the hints (drag, right-click; a small chart's "Click: the big chart"). The big chart's header
+  for scans), the price for one (a day's lowest), how many were listed, "from <friend>" on a friend's scan ("last scan
+  that day from <friend>" on such a day; the big chart's info line counts them: "friends' scans: 3", by day "days last
+  scanned by friends: 3"), a day's open, high, low and close and its change from the day before; the hints (drag, right-click; a small chart's "Click: the big chart"). The big chart's header
   follows.
 - *Drag* (big chart): from one point to another the span is shaded and the tooltip (and the header) shows its change
   (absolute and %, coloured), high and low; released after 4 px or more on two different points, the chart zooms to that

@@ -17,15 +17,23 @@ ns.WhyPoor = W
 --                                          scans of one session (gone: how many; span: the seconds watched)
 --     own[item] = "<day>,<sold>,<expired>;..."  my own auctions of it that sold or expired
 --     friends[item] = "<seen>,<value>,<low>,<qty>,<days>,<unstable>,<at>;<name>"  a friend's (Share.lua)
---     scans[item] = "<t>,<low>,<qty>;..."   a watched item's every scan (newest first, SCAN_KEEP, SCAN_MAX; one
---                                          within SCAN_MERGE of the newest replaces it; none listed: no point)
---     daily[item] = "<day>,<open>,<high>,<low>,<close>,<qty>,<at>;..."   a watched item's days (newest first,
---                                          LONG_DAYS): the first, highest, lowest and last scan's price for one
---                                          (open, high, close empty: the same as low), the last scan's count and
---                                          its seconds into the day (empty: not known); seeded from items' days
+--     scans[item] = "<t>,<low>,<qty>[,<who>];..."   a watched item's every scan (newest first, SCAN_KEEP, SCAN_MAX;
+--                                          one within SCAN_MERGE of the newest replaces it; none listed: no point);
+--                                          who: a friend's scan (Share.lua's points; base 36, an index into who),
+--                                          none: mine (so older texts are all mine). P.AddPoint has the rules.
+--     daily[item] = "<day>,<open>,<high>,<low>,<close>,<qty>,<at>[,<who>];..."   a watched item's days (newest
+--                                          first, LONG_DAYS): the first, highest, lowest and last scan's price for
+--                                          one (open, high, close empty: the same as low), the last scan's count
+--                                          and its seconds into the day (empty: not known); seeded from items'
+--                                          days; mine and friends' scans merged (P.AddDay); who: the day's last
+--                                          scan was that friend's
 --     sold[item] = "<day>,<gone>,<span>;..."   a watched item's flow days kept LONG_DAYS (as flow, newest first;
 --                                          seeded from flow when it's watched): its estimated sales over time
---     unwatched[item] = t                  when it left the watch list: scans, daily and sold go UNWATCH_KEEP later
+--     friendSold[item] = "<day>,<gone>,<span>;..."   friends' flow of a watched item (their whole day as they
+--                                          told it, newest first, LONG_DAYS): each day the one watched longest
+--     who = { name, ... }                  the friends whose scans scans and daily hold (WHO_MAX; never renumbered)
+--     unwatched[item] = t                  when it left the watch list: scans, daily, sold and friendSold go
+--                                          UNWATCH_KEEP later
 --   }
 --   replicated = t                         the last ReplicateItems asked (the game answers one every 15 min)
 --   vendor[item] = copper                  what a merchant asked for one (any realm; seen in its window)
@@ -70,9 +78,12 @@ local SCAN_MERGE = 5 * 60      -- a point this soon after the newest replaces it
 local LONG_DAYS = 3 * 366      -- watched items: a point a day kept this many days
 local UNWATCH_KEEP = 14 * DAY  -- an item off the watch list keeps its long history this long (added back: still there)
 local NOON = DAY / 2           -- a day's point when only the day is known
+local FRIEND_GAP = 15 * 60     -- a friend's scan point this close to another point: left out (theirs fill the gaps)
+local WHO_MAX = 200            -- friends' names a house keeps for their points
 
 P.AH_CUT, P.STALE, P.KEEP, P.DAYS = AH_CUT, STALE, KEEP, DAYS
 P.SCAN_KEEP, P.SCAN_MAX, P.SCAN_MERGE, P.LONG_DAYS, P.UNWATCH_KEEP = SCAN_KEEP, SCAN_MAX, SCAN_MERGE, LONG_DAYS, UNWATCH_KEEP
+P.FRIEND_GAP, P.WHO_MAX = FRIEND_GAP, WHO_MAX
 P.REPLICATE_GAP, P.READ_MS = REPLICATE_GAP, READ_MS
 
 local issecret = LT.IsSecret
@@ -227,7 +238,7 @@ function P.House(key)
 		h = {}
 		saved.houses[key] = h
 	end
-	for _, k in ipairs({ "items", "flow", "own", "friends", "scans", "daily", "sold", "unwatched" }) do
+	for _, k in ipairs({ "items", "flow", "own", "friends", "scans", "daily", "sold", "friendSold", "unwatched", "who" }) do
 		h[k] = type(h[k]) == "table" and h[k] or {}
 	end
 	return h
@@ -315,6 +326,9 @@ function P.Store(key, item, low, qty, t)
 	t, low = t or time(), Whole(low)
 	if P.WatchSet()[item] then
 		P.Record(h, item, t, low, qty)
+		if W.Share and W.Share.Searched then
+			LT.Guard("W.Share.Searched", W.Share.Searched, key, item)
+		end
 	end
 	h.items[item] = P.Merge(P.Decode(h.items[item]), t, low, qty)
 	P.Changed()
@@ -1294,18 +1308,20 @@ end
 -- Long history of watched items (the series)
 ---------------------------------------------------------------------------
 
-function P.ScanText(t, low, qty)
-	return P.B36(t) .. "," .. P.B36(low) .. "," .. P.B36(qty or 0)
+-- A scan point's text (who: a friend's, see the file's head; nil: mine).
+function P.ScanText(t, low, qty, who)
+	return P.B36(t) .. "," .. P.B36(low) .. "," .. P.B36(qty or 0) .. (who and ("," .. P.B36(who)) or "")
 end
 
--- A day's entry: { day, open, high, low, close, qty, at (seconds into the day; nil: not known) }.
+-- A day's entry: { day, open, high, low, close, qty, at (seconds into the day; nil: not known), who (the day's
+-- last scan was this friend's; nil: mine) }.
 function P.DayEntry(part)
-	local a, b, c, d, e, f, g = (part or ""):match("^(%w+),(%w*),(%w*),(%w+),(%w*),(%w*),(%w*)$")
+	local a, b, c, d, e, f, g, w = (part or ""):match("^(%w+),(%w*),(%w*),(%w+),(%w*),(%w*),(%w*),?(%w*)$")
 	local day, low = N36(a), N36(d)
 	if not (day and low) then
 		return nil
 	end
-	return { day, N36(b) or low, N36(c) or low, low, N36(e) or low, N36(f) or 0, N36(g) }
+	return { day, N36(b) or low, N36(c) or low, low, N36(e) or low, N36(f) or 0, N36(g), N36(w) }
 end
 
 function P.DayText(d)
@@ -1314,17 +1330,17 @@ function P.DayText(d)
 		return v and v ~= low and P.B36(v) or ""
 	end
 	return table.concat({ P.B36(d[1]), Or(d[2]), Or(d[3]), P.B36(low), Or(d[5]), P.B36(d[6] or 0),
-		d[7] and P.B36(d[7]) or "" }, ",")
+		d[7] and P.B36(d[7]) or "" }, ",") .. (d[8] and ("," .. P.B36(d[8])) or "")
 end
 
--- scans[item]'s points: { { t, low, qty }, ... } newest first (broken ones left out).
+-- scans[item]'s points: { { t, low, qty, who (nil: mine) }, ... } newest first (broken ones left out).
 function P.DecodeScans(text)
 	local list = {}
 	if type(text) == "string" then
 		for part in text:gmatch("[^;]+") do
-			local a, b, c = part:match("^(%w+),(%w+),(%w*)$")
+			local a, b, c, w = part:match("^(%w+),(%w+),(%w*),?(%w*)$")
 			if N36(a) and N36(b) then
-				list[#list + 1] = { N36(a), N36(b), N36(c) or 0 }
+				list[#list + 1] = { N36(a), N36(b), N36(c) or 0, N36(w) }
 			end
 		end
 	end
@@ -1388,8 +1404,10 @@ end
 
 -- An item's estimated sales a day here: listings gone before they could expire over the time they were watched
 -- (flow's 14 days; a watched item's sold for longer). Oldest first: { { t (the day's noon), day, gone, span,
--- perDay } } for the days touching from..to whose listings were watched SOLD_DAY_MIN or more; then over those
--- days: perDay (nil: watched less than FLOW_SPAN_MIN in all), gone, span.
+-- perDay, friend (true: a friend's numbers) } } for the days touching from..to whose listings were watched
+-- SOLD_DAY_MIN or more; then over those days: perDay (nil: watched less than FLOW_SPAN_MIN in all), gone, span.
+-- A day a friend watched longer than I did takes their numbers instead of mine (friendSold): never both added,
+-- as their scans and mine see the same listings.
 function P.SoldSeries(item, from, to)
 	from, to = tonumber(from) or -math.huge, tonumber(to) or math.huge
 	local out, gone, span = {}, 0, 0
@@ -1408,9 +1426,17 @@ function P.SoldSeries(item, from, to)
 			end
 		end
 	end
+	for entry in (h.friendSold[item] or ""):gmatch("[^;]+") do
+		local d, a, b = entry:match("^(%w+),(%w+),(%w+)$")
+		d, a, b = N36(d), N36(a), N36(b)
+		if d and a and b and (not byDay[d] or byDay[d][2] < b) then
+			byDay[d] = { a, b, true }
+		end
+	end
 	for day, e in pairs(byDay) do
 		if (day + 1) * DAY > from and day * DAY <= to and e[2] >= SOLD_DAY_MIN then
-			out[#out + 1] = { t = day * DAY + NOON, day = day, gone = e[1], span = e[2], perDay = e[1] * DAY / e[2] }
+			out[#out + 1] = { t = day * DAY + NOON, day = day, gone = e[1], span = e[2], perDay = e[1] * DAY / e[2],
+				friend = e[3] }
 			gone, span = gone + e[1], span + e[2]
 		end
 	end
@@ -1453,7 +1479,7 @@ function P.WatchSet()
 		if not set[item] then
 			for _, key in ipairs(P.Keys(saved.houses)) do
 				local h = P.House(key)
-				if (h.daily[item] or h.scans[item] or h.sold[item]) and not h.unwatched[item] then
+				if (h.daily[item] or h.scans[item] or h.sold[item] or h.friendSold[item]) and not h.unwatched[item] then
 					h.unwatched[item] = time()
 				end
 			end
@@ -1462,40 +1488,161 @@ function P.WatchSet()
 	return set
 end
 
--- A watched item's price at t in a house (low nil: none listed, nothing kept): a scan point (replacing the newest
--- within SCAN_MERGE) and today's day (open, high, low, close, qty, when). Only each text's first entry is read and
--- rewritten: the same work however long the history. Older than the newest: left out (they come in time order).
-function P.Record(h, item, t, low, qty)
+-- A watched item's price at t in a house (low nil: none listed, nothing kept; who: a friend's scan, an index into
+-- the house's who, see P.Who; nil: mine): a scan point (P.AddPoint) and, if it went in, its day (P.AddDay). Mine
+-- come in time order and land at the texts' heads: the same work however long the history. Gives whether it went in.
+function P.Record(h, item, t, low, qty, who)
 	if not low then
-		return
+		return false
 	end
 	qty = qty or 0
 	if not h.daily[item] then
 		P.Seed(h, item)
 	end
-	local text = h.scans[item]
-	local point = P.ScanText(t, low, qty)
-	local first, rest = (text or ""):match("^([^;]*)(.*)$")
-	local t0 = N36(first:match("^(%w+),"))
-	if not t0 then
-		h.scans[item] = point
-	elseif t - t0 < SCAN_MERGE and t >= t0 then
-		h.scans[item] = point .. rest
-	elseif t > t0 then
-		h.scans[item] = point .. ";" .. text
+	local text, kept = P.AddPoint(h.scans[item], t, low, qty, who)
+	if not kept then
+		return false
 	end
-	local today = P.Today(t)
-	text = h.daily[item]
-	first, rest = (text or ""):match("^([^;]*)(.*)$")
-	local d = P.DayEntry(first)
-	if not d then
-		h.daily[item] = P.DayText({ today, low, low, low, low, qty, t - today * DAY })
-	elseif d[1] == today and (not d[7] or t - today * DAY >= d[7]) then
-		d[3], d[4], d[5], d[6], d[7] = math.max(d[3], low), math.min(d[4], low), low, qty, t - today * DAY
-		h.daily[item] = P.DayText(d) .. rest
-	elseif d[1] < today then
-		h.daily[item] = P.DayText({ today, low, low, low, low, qty, t - today * DAY }) .. ";" .. text
+	h.scans[item] = text
+	h.daily[item] = P.AddDay(h.daily[item], t, low, qty, who)
+	return true
+end
+
+-- Puts a point into a newest-first scans text in its place by time, walking only the points newer than it (mine
+-- are the newest; a friend's are hours old at most). Mine: one of mine or a friend's within SCAN_MERGE before it is
+-- replaced (the same look twice), a friend's within SCAN_MERGE after it goes (mine win at the same time), and one
+-- older than a point of mine is left out (they come in time order). A friend's: left out within FRIEND_GAP of
+-- another point, mine or anyone's (theirs fill the hours no one else watched), except that it replaces that
+-- friend's own older one. Gives the text and whether the point went in.
+function P.AddPoint(text, t, low, qty, who)
+	local point = P.ScanText(t, low, qty, who)
+	if type(text) ~= "string" or text == "" then
+		return point, true
 	end
+	local pos, n = 1, #text
+	local n1, n2, nt, o1, o2, ot, ow -- the nearest newer point (start, end, time), the nearest older or as old
+	while pos <= n do
+		local s, e = text:find("[^;]+", pos)
+		if not s then
+			break
+		end
+		local a, w = text:sub(s, e):match("^(%w+),%w+,%w*,?(%w*)$")
+		local et = N36(a)
+		if et and et <= t then
+			o1, o2, ot, ow = s, e, et, N36(w)
+			break
+		elseif et then
+			if not who and w == "" then
+				return text, false
+			end
+			n1, n2, nt = s, e, et
+		end
+		pos = e + 2
+	end
+	local dropNewer, dropOlder = false, false
+	if who then
+		if (nt and nt - t < FRIEND_GAP) or (ot and t - ot < FRIEND_GAP and ow ~= who) then
+			return text, false
+		end
+		dropOlder = ot ~= nil and t - ot < FRIEND_GAP
+	else
+		dropNewer = nt ~= nil and nt - t < SCAN_MERGE
+		dropOlder = ot ~= nil and t - ot < SCAN_MERGE
+	end
+	local from = dropNewer and n1 or o1
+	local to = dropOlder and o2 or (dropNewer and n2 or nil)
+	if to then
+		return text:sub(1, from - 1) .. point .. text:sub(to + 1), true
+	elseif o1 then
+		return text:sub(1, o1 - 1) .. point .. ";" .. text:sub(o1), true
+	end
+	return text .. ";" .. point, true
+end
+
+-- A scan's price merged into its day in a newest-first daily text (made in its place when missing): the high and
+-- low over every scan, mine and friends'; the close, count and time of the day's newest scan (a friend's only when
+-- it's newer than the day's last, never at the same time as mine), and whose that was. The open stays the day's
+-- first known. Walks only the days newer than it.
+function P.AddDay(text, t, low, qty, who)
+	local day = P.Today(t)
+	local at = t - day * DAY
+	local new = { day, low, low, low, low, qty, at, who }
+	if type(text) ~= "string" or text == "" then
+		return P.DayText(new)
+	end
+	local pos, n = 1, #text
+	while pos <= n do
+		local s, e = text:find("[^;]+", pos)
+		if not s then
+			break
+		end
+		local d = P.DayEntry(text:sub(s, e))
+		if d and d[1] == day then
+			d[3], d[4] = math.max(d[3], low), math.min(d[4], low)
+			if not d[7] or at > d[7] or (at == d[7] and not who) then
+				d[5], d[6], d[7], d[8] = low, qty, at, who
+			end
+			return text:sub(1, s - 1) .. P.DayText(d) .. text:sub(e + 1)
+		elseif d and d[1] < day then
+			return text:sub(1, s - 1) .. P.DayText(new) .. ";" .. text:sub(s)
+		end
+		pos = e + 2
+	end
+	return text .. ";" .. P.DayText(new)
+end
+
+-- A friend's whole day of flow (gone, span) in a newest-first friendSold text: kept when that day has none yet or
+-- one watched for less time (the same friend's day told again later, or a friend who watched longer); never added
+-- up, as two friends' scans see the same listings.
+function P.AddFriendSold(text, day, gone, span)
+	local entry = P.B36(day) .. "," .. P.B36(gone) .. "," .. P.B36(span)
+	if type(text) ~= "string" or text == "" then
+		return entry
+	end
+	local pos, n = 1, #text
+	while pos <= n do
+		local s, e = text:find("[^;]+", pos)
+		if not s then
+			break
+		end
+		local d, b = text:sub(s, e):match("^(%w+),%w+,(%w+)$")
+		d, b = N36(d), N36(b)
+		if d and d == day then
+			return b < span and (text:sub(1, s - 1) .. entry .. text:sub(e + 1)) or text
+		elseif d and d < day then
+			return text:sub(1, s - 1) .. entry .. ";" .. text:sub(s)
+		end
+		pos = e + 2
+	end
+	return text .. ";" .. entry
+end
+
+-- A friend's scan of a watched item (Share.lua's points): their flow that day (gone, span; nil: none), then the
+-- point and its day. Gives whether the point went in.
+function P.RecordFriend(h, item, t, low, qty, who, gone, span)
+	if gone and span and span > 0 then
+		h.friendSold[item] = P.AddFriendSold(h.friendSold[item], P.Today(t), gone, span)
+	end
+	return P.Record(h, item, t, low, qty, who)
+end
+
+-- A friend's index in a house's who (added when new; nil: the list is full) and an index's name.
+function P.Who(h, name)
+	for i, n in ipairs(h.who) do
+		if n == name then
+			return i
+		end
+	end
+	if #h.who >= WHO_MAX then
+		return nil
+	end
+	h.who[#h.who + 1] = name
+	return #h.who
+end
+
+function P.WhoName(h, i)
+	local name = i and type(h) == "table" and type(h.who) == "table" and h.who[i]
+	return type(name) == "string" and name or nil
 end
 
 -- An item's long history in a house, decoded (kept while its texts stay the same): scans, days (newest first).
@@ -1524,7 +1671,8 @@ end
 -- faction's auction house, oldest first: { { t, price, qty, open, high, low, close }, ... }, and "scan" (every
 -- scan's point: the whole span lies within the watched item's kept scan points, from its oldest on) or "day"
 -- (a point a day: the long daily history, the items entry's daily lows for days it hasn't; price = the day's
--- low; t = the day's last scan, else its noon). A new list each call.
+-- low; t = the day's last scan, else its noon). A friend's scan point, or a day whose last scan was a friend's,
+-- has from = their name. A new list each call.
 function P.Series(item, from, to)
 	from, to = tonumber(from) or -math.huge, tonumber(to) or math.huge
 	local points = {}
@@ -1534,12 +1682,14 @@ function P.Series(item, from, to)
 	end
 	P.WatchSet() -- (seeds an item just watched)
 	local scans, days = P.LongEntry(key, item)
+	local saved = P.Saved()
+	local h = saved and type(saved.houses) == "table" and saved.houses[key] or nil
 	local oldest = scans and scans[#scans]
 	if oldest and from >= oldest[1] then
 		for i = #scans, 1, -1 do
 			local s = scans[i]
 			if s[1] >= from and s[1] <= to then
-				points[#points + 1] = { t = s[1], price = s[2], qty = s[3] }
+				points[#points + 1] = { t = s[1], price = s[2], qty = s[3], from = P.WhoName(h, s[4]) }
 			end
 		end
 		return points, "scan"
@@ -1555,7 +1705,8 @@ function P.Series(item, from, to)
 	for day, d in pairs(byDay) do
 		local t = day * DAY + (d[7] or NOON)
 		if t >= from and t <= to then
-			points[#points + 1] = { t = t, price = d[4], qty = d[6], open = d[2], high = d[3], low = d[4], close = d[5] }
+			points[#points + 1] = { t = t, price = d[4], qty = d[6], open = d[2], high = d[3], low = d[4], close = d[5],
+				from = P.WhoName(h, d[8]) }
 		end
 	end
 	table.sort(points, function(a, b) return a.t < b.t end)
@@ -1627,7 +1778,7 @@ function P.PruneJob()
 		else
 			P.House(key)
 			for _, item in ipairs(P.Keys(h.unwatched)) do
-				if not (h.daily[item] or h.scans[item] or h.sold[item]) or not Number(h.unwatched[item]) then
+				if not (h.daily[item] or h.scans[item] or h.sold[item] or h.friendSold[item]) or not Number(h.unwatched[item]) then
 					h.unwatched[item] = nil -- (nothing left, or broken: looked at again below)
 				end
 			end
@@ -1639,6 +1790,11 @@ function P.PruneJob()
 			end
 			for item in pairs(h.sold) do
 				if not (h.daily[item] or h.scans[item]) then
+					long[#long + 1] = item
+				end
+			end
+			for item in pairs(h.friendSold) do
+				if not (h.daily[item] or h.scans[item] or h.sold[item]) then
 					long[#long + 1] = item
 				end
 			end
@@ -1692,7 +1848,7 @@ function P.PruneLong(h, item, watch, now)
 	elseif not h.unwatched[item] then
 		h.unwatched[item] = now -- (it left the list while the engine was off)
 	elseif now - h.unwatched[item] > UNWATCH_KEEP then
-		h.scans[item], h.daily[item], h.sold[item], h.unwatched[item] = nil, nil, nil, nil
+		h.scans[item], h.daily[item], h.sold[item], h.friendSold[item], h.unwatched[item] = nil, nil, nil, nil, nil
 		return
 	end
 	local scans, cut = P.DecodeScans(h.scans[item]), now - SCAN_KEEP
@@ -1705,7 +1861,7 @@ function P.PruneLong(h, item, watch, now)
 	elseif n < select(2, (h.scans[item] or ""):gsub(";", "")) + 1 then
 		local parts = {}
 		for i, s in ipairs(scans) do
-			parts[i] = P.ScanText(s[1], s[2], s[3])
+			parts[i] = P.ScanText(s[1], s[2], s[3], s[4])
 		end
 		h.scans[item] = table.concat(parts, ";")
 	end
@@ -1724,15 +1880,17 @@ function P.PruneLong(h, item, watch, now)
 		end
 		h.daily[item] = table.concat(parts, ";")
 	end
-	local sold, kept = h.sold[item], {}
-	for entry in (sold or ""):gmatch("[^;]+") do
-		local d = N36(entry:match("^(%w+),%w+,%w+$"))
-		if d and d > first then
-			kept[#kept + 1] = entry
+	for _, list in ipairs({ h.sold, h.friendSold }) do
+		local kept = {}
+		for entry in (list[item] or ""):gmatch("[^;]+") do
+			local d = N36(entry:match("^(%w+),%w+,%w+$"))
+			if d and d > first then
+				kept[#kept + 1] = entry
+			end
 		end
+		list[item] = kept[1] and table.concat(kept, ";") or nil
 	end
-	h.sold[item] = kept[1] and table.concat(kept, ";") or nil
-	if not (h.scans[item] or h.daily[item] or h.sold[item]) then
+	if not (h.scans[item] or h.daily[item] or h.sold[item] or h.friendSold[item]) then
 		h.unwatched[item] = nil
 	end
 	P.Yield()

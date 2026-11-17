@@ -79,7 +79,8 @@ Other modules (Chronicle, Misc Tweaks, Echoes) use the same `B` fields, and `B.l
   `B2;ce;<acct>;<u>;<count>` that's all; only to builds from `RECIPES_SINCE` on, at most 700 a minute from one
   friend), `q` Lodestar (QuestShare.lua, below: `qp` / `qs` friends' progress, `qo` / `qq` / `qr` / `qe` learned
   quest data; only to builds from `LODESTAR_SINCE` on, at most 300 a minute from one friend), `w` WhyPoor?'s
-  prices (WhyPoor/Share.lua, below: `wo` / `wq` / `wp` / `we`; only to builds from `PRICES_SINCE` on, at most 300 a
+  prices (WhyPoor/Share.lua, below: `wo` / `wq` / `wp` / `we`, and `ww` / `wf` friends' scans of watched items from
+  `POINTS_SINCE` on; only to builds from `PRICES_SINCE` on, at most 300 a
   minute from one friend), `b` Beacon's own (`B2;bl` my level, below; `bf;<build>;<1|0>;<what>` the error you reported is fixed in
   that build, see "Error reports", only to builds from `FIXED_SINCE` on; LTC's `bo`/`bq`/`bm` missed lines and `bw`/`ba` who's in,
   only to builds from Chat.lua's `LTC_SINCE` on: a call counts as a chat line, the rest at most 80 a minute from one
@@ -1194,6 +1195,22 @@ them; `B.TickPrices` (Beacon's tick, through `LT.Guard`) does the rest, at most 
   only while fewer than 8 messages wait in Beacon's queues, at most 2000 items an answer; a friend's request
   answered at most every 30 minutes.
 - `B2;we;<house>;<count>` that's all.
+
+Friends' scans of watched items (whypoor.md, "Friends' scans of watched items"): only to builds from `POINTS_SINCE`
+on (`S.ReadsPoints(peer)`; a build between `PRICES_SINCE` and it gets the words above only), the same setting and
+house rule; Beacon's 300 a minute covers them too.
+
+- `B2;ww;<house>;<ask>;<item>,...` the items I watch (base 36, the first 40 of my list that fit; none: empty);
+  `ask` `1`: I have none of yours, send me yours (answered unless mine went the last 30 s). Low priority, to a
+  friend first seen and when my list changes, at most every minute per friend; taken at most every 20 s. 20 items:
+  95 bytes.
+- `B2;wf;<house>;<age>;<item>:<low>:<qty>:<gone>:<span>:<older>,...` my own data of items they watch (base 36):
+  the price for one at my scan (empty: none listed), how many were listed, my flow that day so far (gone, span;
+  both empty: none), the entry's scan `older` seconds before the message's `age` (empty: 0). After my full scans,
+  after my searches of their items and when their list comes; data at most 6 hours old, at most every minute per
+  friend, low priority, within 250 bytes (20 entries at most; 20 items with flow make 2 messages, 248 and 206
+  bytes). Taken only for my house and items I watch; a broken entry, half a flow, an age over 6 hours or more than
+  20 entries drop the whole message; at most 20 from one friend in 10 minutes.
 
 ## Open questions (check in game)
 

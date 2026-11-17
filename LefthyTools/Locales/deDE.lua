@@ -1681,7 +1681,8 @@ L["Open WhyPoor?"] = "WhyPoor? öffnen"
 L["Ideas for making money with this character, your bags' best sales and the auction house's deals, in one window. Also /whypoor."] = "Ideen zum Geldverdienen mit diesem Charakter, die besten Verkäufe aus deinen Taschen und die Deals im Auktionshaus, in einem Fenster. Auch /whypoor."
 L["A button on the edge of the minimap: click opens the window, right-click your bags. Drag it to move it."] = "Ein Button am Rand der Minimap: Klick öffnet das Fenster, Rechtsklick deine Taschen. Ziehen verschiebt ihn."
 L["Share auction house prices with friends"] = "Auktionshauspreise mit Freunden teilen"
-L["Your auction house prices go to your Beacon friends with LefthyTools, and theirs come to you, marked as theirs. Needs Beacon."] = "Deine Auktionshauspreise gehen an deine Beacon-Freunde mit LefthyTools, und ihre kommen zu dir, als ihre markiert. Braucht Beacon."
+L["Your auction house prices go to your Beacon friends with LefthyTools, and theirs come to you, marked as theirs. Friends on your auction house also send you their scans of the items on your watch list (and you yours of theirs), so your charts fill in the hours you weren't there. Needs Beacon."] =
+	"Deine Auktionshauspreise gehen an deine Beacon-Freunde mit LefthyTools, und ihre kommen zu dir, als ihre markiert. Freunde auf deinem Auktionshaus schicken dir auch ihre Scans der Items auf deiner Watchlist (und du ihnen deine von ihren), so füllen deine Charts die Stunden, in denen du nicht da warst. Braucht Beacon."
 L["%ds"] = "%ds"
 
 
@@ -2297,3 +2298,9 @@ L["Type the move in percent, like 30."] = "Gib die Bewegung in Prozent ein, z. B
 L["Below has to be under Above."] = "Unter muss kleiner sein als Über."
 L["Type a price or a percent first."] = "Gib zuerst einen Preis oder einen Prozentwert ein."
 L["The alerts couldn't be kept yet: try again in a moment."] = "Die Alarme konnten noch nicht gespeichert werden: versuch es gleich noch mal."
+-- WhyPoor?: friends' scans of watched items (Share.lua, Chart.lua)
+L["last scan that day from %s"] = "letzter Scan des Tages von %s"
+L["days last scanned by friends: %d"] = "Tage, zuletzt von Freunden gescannt: %d"
+L["friends' scans: %d"] = "Scans von Freunden: %d"
+
+
