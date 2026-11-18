@@ -24,6 +24,7 @@ Core\SettingsWindow.lua
 Data\Changelog.lua
 Data\ForeverQuests.lua
 Data\FlightPaths.lua
+Data\FlightPoints.lua
 Data\ClassSpells.lua
 Data\SpellSchools.lua
 Data\MinimapTiles.lua
@@ -51,6 +52,7 @@ Modules\Tweaks\Flight.lua
 Modules\Tweaks\LevelUp.lua
 Modules\Tweaks\LevelUpWindow.lua
 Modules\Tweaks\QuestMap.lua
+Modules\Tweaks\FlightPoints.lua
 
 Modules\Beacon\Beacon.lua
 Modules\Beacon\Protocol.lua

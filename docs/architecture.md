@@ -48,9 +48,11 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Modules/Tweaks/LevelUp.lua  level-up window (a tweak): what a level brings (stat gains, trainer spells, talents, class quests), when it shows
   Modules/Tweaks/LevelUpWindow.lua  the level-up window itself: drawing, count-ups, pin, arrows
   Modules/Tweaks/QuestMap.lua  quests on continent and world maps: icons and areas (Core/MapOverlay.lua)
+  Modules/Tweaks/FlightPoints.lua  flight points not discovered yet, on zone and continent maps (Core/MapOverlay.lua)
   Data/Changelog.lua         what's new: one entry per player-visible change, English and German
   Data/ForeverQuests.lua     generated list of those quests (tools/update-forever-quests.ps1)
   Data/FlightPaths.lua       generated length of every flight path (tools/update-flight-paths.ps1)
+  Data/FlightPoints.lua      generated flight points a character can discover: where, whose (the same tool)
   Data/ClassSpells.lua       generated trainer spells per class and level (tools/update-class-spells.js)
   Data/SpellSchools.lua      generated magic school of the class spells (tools/update-spell-schools.js)
   Data/MinimapTiles.lua      generated minimap tile file IDs (tools/update-minimap-tiles.js)
@@ -131,7 +133,7 @@ LefthyTools_MoneyData/       WhyPoor?'s money data: farmable mobs and their spaw
   MoneyData.lua              generated (tools/update-money-data.js); LICENSE.md, COPYRIGHT.md, README.md
 tests/                       fengari (Lua VM in JS) harness, see testing.md
 tools/update-forever-quests.ps1  regenerates Data/ForeverQuests.lua from wago.tools
-tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua from wago.tools
+tools/update-flight-paths.ps1    regenerates Data/FlightPaths.lua and Data/FlightPoints.lua from wago.tools
 tools/update-class-spells.js     regenerates Data/ClassSpells.lua from wago.tools (node)
 tools/update-spell-schools.js    regenerates Data/SpellSchools.lua from wago.tools (node)
 tools/update-minimap-tiles.js    regenerates Data/MinimapTiles.lua from wago.tools (node)

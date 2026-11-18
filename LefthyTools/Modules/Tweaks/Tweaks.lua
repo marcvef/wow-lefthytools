@@ -43,6 +43,8 @@ local M = LT:NewModule("tweaks", {
 		levelUp = true,        -- LevelUp.lua
 		levelUps = {},         -- "Name-Realm" -> the last level-up's gains (the preview shows them)
 		cinematicFlights = true, -- Flight.lua
+		flightPointMap = true, -- FlightPoints.lua: flight points not discovered yet, on the world map
+		flightPointsKnown = {}, -- "Name-Realm" -> { nodes = { [nodeID] = true }, checked = { [continent] = true } }
 		flightFriends = true,  -- Beacon friends in the top bar
 		flightHide = "all",    -- "all": the whole interface | "chosen": the elements in flightGroups
 		flightGroups = (function() -- Mirage's groups (Groups.lua), all hidden until unticked
@@ -228,6 +230,8 @@ local TWEAKS = {
 		apply = function(on) ns.ApplyLevelUp(on) end }, -- LevelUp.lua
 	{ key = "cinematicFlights", command = "flights", label = "Cinematic flights",
 		apply = function(on) ns.ApplyCinematicFlights(on) end }, -- Flight.lua
+	{ key = "flightPointMap", command = "flightpoints", label = "Undiscovered flight points on the map",
+		apply = function(on) ns.ApplyFlightPointMap(on) end }, -- FlightPoints.lua
 }
 
 ---------------------------------------------------------------------------
@@ -450,6 +454,8 @@ function M:BuildOptions(o)
 	o:Checkbox("afkSpin", L["Circle the camera"],
 		L["The camera slowly circles your character while the AFK screen is up."])
 	o:Header(L["Flights"])
+	o:Checkbox("flightPointMap", L["Undiscovered flight points on the map"],
+		L["Flight points you haven't discovered yet show on zone and continent maps as a flight master icon, so you can find them; hover one for its name. Only your faction's. LefthyTools learns which ones you know whenever you talk to a flight master: until you've done that once on a continent, the ones it can't be sure about show faded."])
 	o:Checkbox("cinematicFlights", L["Cinematic flights"],
 		L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. The bottom bar shows the time left to landing, and whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."])
 	o:Checkbox("flightFriends", L["Friends in the top bar"],
@@ -512,7 +518,7 @@ function M:OnSlashCommand(msg)
 		end
 		self:Print("/lefthy tweaks - open settings")
 		self:Print("/lefthy tweaks status - list tweaks")
-		self:Print("/lefthy tweaks statustext | bags | bagsort | padbags | mousebags | lootrolls | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights [on|off] - switch a tweak")
+		self:Print("/lefthy tweaks statustext | bags | bagsort | padbags | mousebags | lootrolls | quests | newquests | combo | combocolors | aggro | retailframes | questmap | afk | levelup | flights | flightpoints [on|off] - switch a tweak")
 		self:Print("/levelup (or /lefthy tweaks levelup test) - show the level-up window for your current level")
 		self:Print("/lefthy tweaks resetbags - move all bags back to Blizzard's spot")
 		self:Print("/lefthy tweaks resetloot - move the loot roll window back to Blizzard's spot")
