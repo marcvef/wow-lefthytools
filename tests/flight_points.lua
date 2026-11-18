@@ -56,17 +56,19 @@ do
 		and TOOLTIP.lines[3] and TOOLTIP.lines[3]:find("You may know it already", 1, true), "hover: its name, what it is, why it's faded")
 	pins[4]._scripts.OnLeave(pins[4])
 
-	-- The flight master's map: what's on it is known, and the continent is sure from now on.
+	-- The flight master's map: what it shows is known (where you are, where you can fly), and the
+	-- continent is sure from now on. An unreachable one (Blizzard's flight map hides those) isn't learned.
 	TAXI_MAP_NODES = {
 		{ nodeID = 2, name = "Stormwind, Elwynn", state = 0, slotIndex = 1, position = CreateVector2D(0.5, 0.5) },
+		{ nodeID = 4, name = "Sentinel Hill, Westfall", state = 2, slotIndex = 2, position = CreateVector2D(0.4, 0.6) },
 	}
 	Fire("TAXIMAP_OPENED", 1)
 	Advance(0.05)
 	pins = Shown()
 	check(Count(pins) == 2 and not pins[2] and pins[4] and pins[79] and near(pins[4]:GetAlpha(), 1),
-		"after the flight master: the known one is gone, the others sure (not faded), got " .. Count(pins))
+		"after the flight master: the known one is gone, the others (the unreachable one too) sure, not faded, got " .. Count(pins))
 	local mine = TDB.flightPointsKnown["Lefthy-Realmy"]
-	check(mine and mine.nodes[2] and mine.checked[0] and not mine.checked[1], "kept for this character, per continent")
+	check(mine and mine.nodes[2] and not mine.nodes[4] and mine.checked[0] and not mine.checked[1], "kept for this character, per continent")
 	pins[4]._scripts.OnEnter(pins[4])
 	check(TOOLTIP.title == "Sentinel Hill, Westfall" and #TOOLTIP.lines == 2, "sure: no 'may know it' line")
 	pins[4]._scripts.OnLeave(pins[4])
@@ -75,28 +77,28 @@ do
 	check(pins[5] and pins[4] and pins[79] and not pins[2] and near(pins[5].mapX, 0.75) and near(pins[5].mapY, 0.75),
 		"the continent map: its points too")
 
-	-- Kalimdor, never seen at a flight master: the game's own map data decides where it tells.
+	-- Kalimdor, never seen at a flight master: faded, whatever the game's map data says (in game it
+	-- called points never visited known); its names are used (the client's language).
 	OpenWorldMap(1414)
 	pins = Shown()
 	check(pins[26] and near(pins[26]:GetAlpha(), 0.55), "another continent, nothing known: faded")
 	local said = {}
 	C_TaxiMap.GetTaxiNodesForMap = function(mapID) return mapID == 1414 and said or {} end
+	C_TaxiMap.ShouldMapShowTaxiNodes = function() return true end
 	said[1] = { nodeID = 26, name = "Auberdine, Dunkelküste", isUndiscovered = false, faction = 2, position = CreateVector2D(0.5, 0.5) }
 	OpenWorldMap(1414)
-	check(not Shown()[26], "the game says it's known: not shown")
-	said[1].isUndiscovered = true
-	said[2] = { nodeID = 999, name = "New Camp", isUndiscovered = true, faction = 2, position = CreateVector2D(0.1, 0.2) }
-	said[3] = { nodeID = 998, name = "Horde Camp", isUndiscovered = true, faction = 1, position = CreateVector2D(0.3, 0.3) }
-	OpenWorldMap(1414)
 	pins = Shown()
-	check(pins[26] and near(pins[26]:GetAlpha(), 1) and pins[999] and near(pins[999].mapX, 0.1) and not pins[998],
-		"the game says undiscovered: sure; one the data doesn't have shows at the game's spot (not the Horde's)")
+	check(pins[26] and near(pins[26]:GetAlpha(), 0.55), "the game says it's known, Blizzard's map says it shows them: still shown, faded")
 	pins[26]._scripts.OnEnter(pins[26])
-	check(TOOLTIP.title == "Auberdine, Dunkelküste", "the game's name (the client's language) when it tells")
+	check(TOOLTIP.title == "Auberdine, Dunkelküste", "the game's name when it tells")
 	pins[26]._scripts.OnLeave(pins[26])
-	C_TaxiMap.ShouldMapShowTaxiNodes = function() return true end
-	OpenWorldMap(1414)
-	check(Count(Shown()) == 0, "where Blizzard's map draws flight points itself, the undiscovered ones it knows are left to it")
+	local printed = #PRINTED
+	lefthy("tweaks flightinfo")
+	local info = table.concat(PRINTED, "\n", printed + 1)
+	check(info:find("flight points on Kalimdor (1414): 1 of yours (A), 0 not discovered, 1 not sure yet", 1, true)
+		and info:find("this character knows 1; flight master maps seen on continent(s): 0.", 1, true)
+		and info:find("1 listed (0 undiscovered, 1 known); Blizzard's map shows flight points here: true.", 1, true),
+		"/lefthy tweaks flightinfo: the open map's points, the record, what the game says, got " .. info)
 	C_TaxiMap.ShouldMapShowTaxiNodes = nil
 
 	-- The world map: none.

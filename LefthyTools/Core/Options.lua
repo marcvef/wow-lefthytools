@@ -531,6 +531,7 @@ Options.COMMANDS = {
 		{ "/lefthy tweaks combopos", L["Preview the combo point dots"] },
 		{ "/lefthy tweaks aggrotest", L["Examples of who has aggro"] },
 		{ "/lefthy tweaks rolecheck", L["Start a role check"] },
+		{ "/lefthy tweaks flightinfo", L["Flight points on the map: which ones you know"] },
 	} },
 	{ section = "WhyPoor?", commands = {
 		{ "/whypoor", L["Open or close the window"] },

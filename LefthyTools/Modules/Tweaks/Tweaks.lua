@@ -494,6 +494,10 @@ function M:OnSlashCommand(msg)
 		end
 	elseif cmd == "levelup" and arg == "test" then
 		ns.LevelUp.Preview()
+	elseif cmd == "flightinfo" then
+		for _, line in ipairs(ns.FlightPoints.Info()) do -- FlightPoints.lua
+			self:Print(line)
+		end
 	elseif cmd == "status" then
 		for _, tweak in ipairs(TWEAKS) do
 			self:Print(string.format("  %s%s|r (%s)", active[tweak.key] and "|cff80ff80" or "|cffff8080",
@@ -525,5 +529,6 @@ function M:OnSlashCommand(msg)
 		self:Print("/lefthy tweaks combopos - preview the combo point dots on nameplates (no mob needed)")
 		self:Print("/lefthy tweaks aggrotest - examples of who has aggro on the enemy nameplates you see")
 		self:Print("/lefthy tweaks rolecheck - start a role check (group leader or assistant)")
+		self:Print("/lefthy tweaks flightinfo - flight points on the open map (or where you are): which you know, what the game says")
 	end
 end

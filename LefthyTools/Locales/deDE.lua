@@ -2416,3 +2416,5 @@ L["Talk to its flight master to discover it."] =
 	"Sprich mit seinem Flugmeister, um ihn zu entdecken."
 L["You may know it already: after you talk to any flight master on this continent, only the ones you haven't discovered show."] =
 	"Vielleicht kennst du ihn schon: Sobald du mit einem Flugmeister auf diesem Kontinent gesprochen hast, erscheinen nur noch die, die du nicht entdeckt hast."
+L["Flight points on the map: which ones you know"] =
+	"Flugpunkte auf der Karte: welche du kennst"

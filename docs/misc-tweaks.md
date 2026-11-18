@@ -757,16 +757,19 @@ flight point you haven't discovered yet", "Talk to its flight master to discover
   table: the nodes with a `CharacterBitNumber` (discoverable; not the old `zzOLD` ones), their continent and world
   position (`Pos_0` north, `Pos_1` west), who flies from them (`MountCreatureID_0` Horde, `_1` Alliance), the
   English name. Carried onto the shown map with `C_Map.GetMapPosFromWorldPos` (kept per map: maps don't move).
-- **Which ones you know:** the flight master's map lists them: at `TAXIMAP_OPENED` (a new flight point opens it
-  too) every node of `C_TaxiMap.GetAllTaxiNodes(GetTaxiMapID())` is known, and the continents of those nodes are
-  sure from then on. Kept per character: `flightPointsKnown["Name-Realm"] = { nodes = { [nodeID] = true },
+- **Which ones you know:** the flight master's map shows them: at `TAXIMAP_OPENED` (a new flight point opens it
+  too) the nodes of `C_TaxiMap.GetAllTaxiNodes(GetTaxiMapID())` in state Current or Reachable are known, and the
+  continents of those nodes are sure from then on. Unreachable ones aren't learned: Blizzard's flight map hides
+  them (FM_FlightPathDataProvider), so they may be ones you don't know (a known one cut off from your network shows
+  as not discovered then). Kept per character: `flightPointsKnown["Name-Realm"] = { nodes = { [nodeID] = true },
   checked = { [continent] = true } }`.
-- **A continent not seen at a flight master yet:** the game's own map data decides where it tells
-  (`C_TaxiMap.GetTaxiNodesForMap(mapID)`'s `isUndiscovered`: false is known, true is sure); otherwise the point
-  shows at 55% alpha and its tooltip says you may know it already. The game's name (the client's language) is
-  used when it gives one. A node it calls undiscovered that the data doesn't have (a newer patch) shows at the
-  game's spot, by its `faction`. Where Blizzard's map draws flight points itself
-  (`C_TaxiMap.ShouldMapShowTaxiNodes`), the undiscovered ones it knows are left to it.
+- **A continent not seen at a flight master yet:** every point shows at 55% alpha, its tooltip saying you may know
+  it already. The game's own map data (`C_TaxiMap.GetTaxiNodesForMap(mapID)`) only gives the names (the client's
+  language): the first build trusted its `isUndiscovered` and left points to Blizzard's map where
+  `C_TaxiMap.ShouldMapShowTaxiNodes` said it shows them, and in game Kalimdor then had none, Feralas, Un'Goro and
+  Silithus never visited. `/lefthy tweaks flightinfo` prints, for the open map (else where you are): your points,
+  not discovered, not sure, what this character knows, the continents seen, and what the game's data and
+  `ShouldMapShowTaxiNodes` say.
 - **Frames:** our own on the map's canvas (Core/MapOverlay.lua), hover only (`SetMouseMotionEnabled`, no click
   script): clicks go to the map; the controller's map cursor shows the tooltip on the overlay's own.
 - **Cost:** nothing while the map is closed (only `TAXIMAP_OPENED` is listened to, and handled on the next
