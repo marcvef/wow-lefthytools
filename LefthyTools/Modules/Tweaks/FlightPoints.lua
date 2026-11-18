@@ -6,8 +6,8 @@ local Overlay = LT.MapOverlay
 local view = Overlay.view
 
 -- Flight points you haven't discovered yet, on the world map (the flightPointMap tweak): a flight
--- master icon on zone and continent maps where one stands, so you can find it. Only your faction's
--- (and the ones both fly from).
+-- master icon on zone maps where one stands, so you can find it. Only your faction's (and the ones
+-- both fly from). Not on continent or world maps: only while looking at the zone.
 --
 -- Where they stand: Data/FlightPoints.lua (the client's TaxiNodes table: the nodes a character can
 -- discover, their world position; tools/update-flight-paths.ps1), carried onto the shown map with
@@ -17,11 +17,12 @@ local view = Overlay.view
 -- TAXIMAP_OPENED, which a new flight point opens too): the node you're at (Current) and the ones
 -- you can fly to (Reachable). Unreachable ones are left out: Blizzard's flight map hides them, so
 -- they may be ones you don't know. Kept per character in M.db.flightPointsKnown["Name-Realm"] =
--- { nodes = { [nodeID] = true }, checked = { [continent] = true } }: a continent whose flight map
--- was seen is sure. On one not seen yet every point shows faded and its tooltip says why. The
--- game's own map data (C_TaxiMap.GetTaxiNodesForMap) only gives the names in the client's
--- language: in game its isUndiscovered hid points never visited (seen on Kalimdor), so it isn't
--- trusted. /lefthy tweaks flightinfo says what it and the record tell, for the shown map.
+-- { nodes = { [nodeID] = true }, checked = { [continent] = true } }. Only a continent whose flight
+-- map was seen shows anything: before that nobody knows which ones you have (showing all of them,
+-- faded, put up ones already discovered). The game's own map data (C_TaxiMap.GetTaxiNodesForMap)
+-- only gives the names in the client's language: in game its isUndiscovered hid points never
+-- visited (seen on Kalimdor), so it isn't trusted. /lefthy tweaks flightinfo says what it and the
+-- record tell, for the shown map.
 --
 -- Drawn on frames of our own over the map (Core/MapOverlay.lua), hover only: clicks go to the map.
 -- Cost: nothing while the map is closed; a draw when it opens or shows another map.
@@ -30,7 +31,6 @@ local MAP_TYPE = Enum.UIMapType or { Cosmic = 0, World = 1, Continent = 2, Zone 
 local SIDE = { Alliance = "A", Horde = "H" }
 local ICON_ATLAS, ICON_FILE = "FlightMaster", "Interface\\Minimap\\Tracking\\FlightMaster"
 local ICON_SIZE = 18
-local FADED = 0.55 -- a point that may already be known
 
 local active = false
 local pins = { n = 0 } -- the i-th point of a draw is always the i-th frame
@@ -100,10 +100,10 @@ end
 -- What the shown map gets
 ---------------------------------------------------------------------------
 
--- Zone and continent maps: the world map would be crowded, dungeons have none.
+-- Zone maps only: not continents or the world, dungeons have none.
 local function ShowsOn(mapID)
 	local info = C_Map.GetMapInfo(mapID)
-	return info and (info.mapType == MAP_TYPE.Zone or info.mapType == MAP_TYPE.Continent) or false
+	return info and info.mapType == MAP_TYPE.Zone or false
 end
 
 -- Every flight point on a map, with its spot (0-1), kept.
@@ -153,12 +153,13 @@ local function BlizzardShows(mapID)
 	return ok and shows
 end
 
--- A point: "missing" (not discovered), "maybe" (its continent's flight map not seen yet) or nil (known).
+-- A point: "missing" (not discovered), "unsure" (its continent's flight map not seen yet: not shown) or
+-- nil (known).
 local function Status(spot, mine)
 	if mine.nodes[spot.id] then
 		return nil
 	end
-	return mine.checked[spot.continent] and "missing" or "maybe"
+	return mine.checked[spot.continent] and "missing" or "unsure"
 end
 
 -- The points to draw on a map: { spot, status, gameName }.
@@ -171,10 +172,9 @@ function FlightPoints.OnMap(mapID)
 	local mine, game = Mine(), FromGame(mapID)
 	for _, spot in ipairs(Spots(mapID)) do
 		if spot.side == "" or spot.side == side then
-			local status = Status(spot, mine)
-			if status then
+			if Status(spot, mine) == "missing" then
 				local said = game[spot.id]
-				list[#list + 1] = { spot = spot, status = status, gameName = said and LT.Readable(said.name) and said.name or nil }
+				list[#list + 1] = { spot = spot, gameName = said and LT.Readable(said.name) and said.name or nil }
 			end
 		end
 	end
@@ -191,7 +191,7 @@ function FlightPoints.Info(mapID)
 	local out = {}
 	local side = SIDE[UnitFactionGroup("player") or ""] or "?"
 	local mine = Mine()
-	local yours, missing, maybe = 0, 0, 0
+	local yours, missing, unsure = 0, 0, 0
 	local game = FromGame(mapID)
 	local listed, saysNew, saysKnown = 0, 0, 0
 	for _, said in pairs(game) do
@@ -210,8 +210,8 @@ function FlightPoints.Info(mapID)
 			if status == "missing" then
 				missing = missing + 1
 				missingNames[#missingNames + 1] = spot.name
-			elseif status == "maybe" then
-				maybe = maybe + 1
+			elseif status == "unsure" then
+				unsure = unsure + 1
 			end
 		end
 	end
@@ -223,8 +223,11 @@ function FlightPoints.Info(mapID)
 		continents[#continents + 1] = tostring(continent)
 	end
 	table.sort(continents)
-	out[#out + 1] = ("flight points on %s (%d): %d of yours (%s), %d not discovered, %d not sure yet (no flight master seen there)."):format(
-		info.name or "?", mapID, yours, side, missing, maybe)
+	out[#out + 1] = ("flight points on %s (%d): %d of yours (%s), %d not discovered, %d hidden until you talk to a flight master on this continent."):format(
+		info.name or "?", mapID, yours, side, missing, unsure)
+	if not ShowsOn(mapID) then
+		out[#out + 1] = "  (markers show on zone maps only)"
+	end
 	out[#out + 1] = ("  this character knows %d; flight master maps seen on continent(s): %s."):format(known,
 		#continents > 0 and table.concat(continents, ", ") or "none yet")
 	local shows = BlizzardShows(mapID)
@@ -249,9 +252,6 @@ local function ShowTooltip(f, tip)
 	tip:SetText(point.gameName or point.spot.name)
 	tip:AddLine(L["A flight point you haven't discovered yet"], 1, 0.82, 0)
 	tip:AddLine(L["Talk to its flight master to discover it."], 1, 1, 1, true)
-	if point.status == "maybe" then
-		tip:AddLine(L["You may know it already: after you talk to any flight master on this continent, only the ones you haven't discovered show."], 0.75, 0.75, 0.75, true)
-	end
 	tip:Show()
 end
 
@@ -317,7 +317,6 @@ Draw = function()
 		n = n + 1
 		pins[n] = f
 		f.point = point
-		f:SetAlpha(point.status == "maybe" and FADED or 1)
 		f:SetFrameLevel(Overlay.Level("PIN_FRAME_LEVEL_FLIGHT_POINT", n))
 		Overlay.Place(f, point.spot.x, point.spot.y, 1.0, 1.2)
 	end

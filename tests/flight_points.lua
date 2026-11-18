@@ -13,7 +13,9 @@ do
 	WorldMapFrame:Hide()
 	MAP_VIEW.scale, MAP_VIEW.zoom, MAP_VIEW.pinScale = 1, 0, 1
 	-- Elwynn Forest (1429) is north 0-1000, west 0-1000 on continent 0; the Eastern Kingdoms (1415) are
-	-- 2000 to -2000; Kalimdor (1414) the same on continent 1.
+	-- 2000 to -2000; Kalimdor (1414) the same on continent 1, and a zone there (9001) too.
+	MAPS[9001], MAP_NAMES[9001], MAP_TYPES[9001], MAP_PARENTS[9001] =
+		{ continent = 1, top = 2000, left = 2000, width = 4000, height = 4000 }, "Darkshore", 3, 1414
 	ns.FLIGHT_POINTS = {
 		[2] = { 0, 500, 500, "A", "Stormwind, Elwynn" },
 		[4] = { 0, 250, 750, "A", "Sentinel Hill, Westfall" },
@@ -21,6 +23,7 @@ do
 		[10] = { 0, 300, 300, "H", "The Sepulcher, Silverpine Forest" },
 		[79] = { 0, 800, 200, "", "Marshal's Refuge, Un'Goro Crater" },
 		[26] = { 1, 0, 0, "A", "Auberdine, Darkshore" },
+		[27] = { 1, 1000, 1000, "A", "Rut'theran Village, Teldrassil" },
 	}
 	FP.Forget()
 	TDB.flightPointsKnown = {}
@@ -40,21 +43,18 @@ do
 		for _ in pairs(t) do n = n + 1 end
 		return n
 	end
+	local function Info()
+		local printed = #PRINTED
+		lefthy("tweaks flightinfo")
+		return table.concat(PRINTED, "\n", printed + 1)
+	end
 
-	-- A character who never talked to a flight master with LefthyTools: every one of theirs, faded.
+	-- A character who never talked to a flight master with LefthyTools: nobody knows which ones they have.
 	OpenWorldMap(1429)
-	local pins = Shown()
-	check(Count(pins) == 3 and pins[2] and pins[4] and pins[79] and not pins[10] and not pins[5] and not pins[26],
-		"Elwynn: the Alliance's and both factions' points on it, not the Horde's or another map's, got " .. Count(pins))
-	check(pins[4] and near(pins[4].mapX, 0.25) and near(pins[4].mapY, 0.75) and pins[4]:GetParent() == WorldMapFrame:GetCanvas(),
-		"at the flight master's spot, on the map's canvas")
-	check(pins[4] and near(pins[4]:GetAlpha(), 0.55) and pins[2] and near(pins[2]:GetAlpha(), 0.55), "not sure yet: faded")
-	check(#MAP_WRITES == 0 and #MAP_PARENTED == 0 and pins[4]._motion == true and not pins[4]:IsMouseClickEnabled()
-		and not pins[4]._scripts.OnMouseDown and not pins[4]._scripts.OnClick, "nothing written into the map; hover only, clicks go to the map")
-	pins[4]._scripts.OnEnter(pins[4])
-	check(TOOLTIP.shown and TOOLTIP.title == "Sentinel Hill, Westfall" and TOOLTIP.lines[1] == "A flight point you haven't discovered yet"
-		and TOOLTIP.lines[3] and TOOLTIP.lines[3]:find("You may know it already", 1, true), "hover: its name, what it is, why it's faded")
-	pins[4]._scripts.OnLeave(pins[4])
+	check(Count(Shown()) == 0, "before any flight master: none (they may be discovered already)")
+	local info = Info()
+	check(info:find("flight points on Elwynn Forest (1429): 3 of yours (A), 0 not discovered, 3 hidden until you talk to a flight master on this continent.", 1, true)
+		and info:find("flight master maps seen on continent(s): none yet.", 1, true), "/lefthy tweaks flightinfo says why, got " .. info)
 
 	-- The flight master's map: what it shows is known (where you are, where you can fly), and the
 	-- continent is sure from now on. An unreachable one (Blizzard's flight map hides those) isn't learned.
@@ -64,46 +64,49 @@ do
 	}
 	Fire("TAXIMAP_OPENED", 1)
 	Advance(0.05)
-	pins = Shown()
-	check(Count(pins) == 2 and not pins[2] and pins[4] and pins[79] and near(pins[4]:GetAlpha(), 1),
-		"after the flight master: the known one is gone, the others (the unreachable one too) sure, not faded, got " .. Count(pins))
+	local pins = Shown()
+	check(Count(pins) == 2 and not pins[2] and pins[4] and pins[79] and not pins[10] and not pins[5] and not pins[26],
+		"after the flight master: the ones not discovered (the unreachable one too), not the known one, the Horde's or another map's, got " .. Count(pins))
+	check(pins[4] and near(pins[4].mapX, 0.25) and near(pins[4].mapY, 0.75) and pins[4]:GetParent() == WorldMapFrame:GetCanvas()
+		and near(pins[4]:GetAlpha(), 1), "at the flight master's spot, on the map's canvas")
+	check(#MAP_WRITES == 0 and #MAP_PARENTED == 0 and pins[4]._motion == true and not pins[4]:IsMouseClickEnabled()
+		and not pins[4]._scripts.OnMouseDown and not pins[4]._scripts.OnClick, "nothing written into the map; hover only, clicks go to the map")
 	local mine = TDB.flightPointsKnown["Lefthy-Realmy"]
 	check(mine and mine.nodes[2] and not mine.nodes[4] and mine.checked[0] and not mine.checked[1], "kept for this character, per continent")
 	pins[4]._scripts.OnEnter(pins[4])
-	check(TOOLTIP.title == "Sentinel Hill, Westfall" and #TOOLTIP.lines == 2, "sure: no 'may know it' line")
+	check(TOOLTIP.shown and TOOLTIP.title == "Sentinel Hill, Westfall" and TOOLTIP.lines[1] == "A flight point you haven't discovered yet"
+		and TOOLTIP.lines[2] == "Talk to its flight master to discover it." and #TOOLTIP.lines == 2, "hover: its name, what it is")
 	pins[4]._scripts.OnLeave(pins[4])
-	OpenWorldMap(1415)
-	pins = Shown()
-	check(pins[5] and pins[4] and pins[79] and not pins[2] and near(pins[5].mapX, 0.75) and near(pins[5].mapY, 0.75),
-		"the continent map: its points too")
+	info = Info()
+	check(info:find("3 of yours (A), 2 not discovered, 0 hidden", 1, true) and info:find("not discovered: Sentinel Hill, Westfall; Marshal's Refuge, Un'Goro Crater", 1, true),
+		"flightinfo: the ones not discovered by name, got " .. info)
 
-	-- Kalimdor, never seen at a flight master: faded, whatever the game's map data says (in game it
-	-- called points never visited known); its names are used (the client's language).
-	OpenWorldMap(1414)
-	pins = Shown()
-	check(pins[26] and near(pins[26]:GetAlpha(), 0.55), "another continent, nothing known: faded")
+	-- Continent and world maps: none.
+	OpenWorldMap(1415)
+	check(Count(Shown()) == 0 and Info():find("(markers show on zone maps only)", 1, true), "a continent map: none, only zones")
+	OpenWorldMap(947)
+	check(Count(Shown()) == 0, "the world map: none")
+
+	-- Kalimdor, never seen at a flight master: none, whatever the game's map data says (in game it called
+	-- points never visited known); once seen, its names are used (the client's language).
 	local said = {}
-	C_TaxiMap.GetTaxiNodesForMap = function(mapID) return mapID == 1414 and said or {} end
+	C_TaxiMap.GetTaxiNodesForMap = function(mapID) return mapID == 9001 and said or {} end
 	C_TaxiMap.ShouldMapShowTaxiNodes = function() return true end
-	said[1] = { nodeID = 26, name = "Auberdine, Dunkelküste", isUndiscovered = false, faction = 2, position = CreateVector2D(0.5, 0.5) }
-	OpenWorldMap(1414)
+	said[1] = { nodeID = 26, name = "Auberdine, Dunkelküste", isUndiscovered = true, faction = 2, position = CreateVector2D(0.5, 0.5) }
+	OpenWorldMap(9001)
+	check(Count(Shown()) == 0, "a continent not seen at a flight master: none, even where the game says undiscovered")
+	info = Info()
+	check(info:find("1 listed (1 undiscovered, 0 known); Blizzard's map shows flight points here: true.", 1, true),
+		"flightinfo: what the game says, got " .. info)
+	TAXI_MAP_NODES = { { nodeID = 27, name = "Rut'theran Village, Teldrassil", state = 0, slotIndex = 1, position = CreateVector2D(0.5, 0.5) } }
+	Fire("TAXIMAP_OPENED", 1)
+	Advance(0.05)
 	pins = Shown()
-	check(pins[26] and near(pins[26]:GetAlpha(), 0.55), "the game says it's known, Blizzard's map says it shows them: still shown, faded")
+	check(pins[26] and near(pins[26].mapX, 0.5) and mine.checked[1], "after a flight master there: its points not discovered, drawn on the open map")
 	pins[26]._scripts.OnEnter(pins[26])
 	check(TOOLTIP.title == "Auberdine, Dunkelküste", "the game's name when it tells")
 	pins[26]._scripts.OnLeave(pins[26])
-	local printed = #PRINTED
-	lefthy("tweaks flightinfo")
-	local info = table.concat(PRINTED, "\n", printed + 1)
-	check(info:find("flight points on Kalimdor (1414): 1 of yours (A), 0 not discovered, 1 not sure yet", 1, true)
-		and info:find("this character knows 1; flight master maps seen on continent(s): 0.", 1, true)
-		and info:find("1 listed (0 undiscovered, 1 known); Blizzard's map shows flight points here: true.", 1, true),
-		"/lefthy tweaks flightinfo: the open map's points, the record, what the game says, got " .. info)
-	C_TaxiMap.ShouldMapShowTaxiNodes = nil
-
-	-- The world map: none.
-	OpenWorldMap(947)
-	check(Count(Shown()) == 0, "the world map: none (too crowded)")
+	C_TaxiMap.ShouldMapShowTaxiNodes, C_TaxiMap.GetTaxiNodesForMap = nil, nil
 
 	-- Closed: nothing listens but the flight master's map; switched off: nothing at all.
 	WorldMapFrame:Hide()
@@ -123,6 +126,7 @@ do
 	WorldMapFrame:Hide()
 
 	ns.FLIGHT_POINTS, C_TaxiMap, TAXI_MAP_NODES = realPoints, realTaxi, realNodes
+	MAPS[9001], MAP_NAMES[9001], MAP_TYPES[9001], MAP_PARENTS[9001] = nil, nil, nil, nil
 	FP.Forget()
 	TDB.flightPointsKnown = {}
 end

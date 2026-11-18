@@ -687,7 +687,7 @@ ns.CHANGELOG = {
 		en = { "A Commands page in the settings", "The settings' last page lists every useful slash command by module, the diagnostics too (Beacon's status, Echoes' pages, the Bestiary's log...): each button shows the command and runs it; one that needs a name or an item opens the chat box with it." },
 		de = { "Eine Befehle-Seite in den Einstellungen", "Die letzte Seite der Einstellungen listet alle nützlichen Slash-Befehle nach Modul, auch die Diagnosen (Beacons Status, die Seiten von Echoes, das Log des Bestiary...): jeder Button zeigt den Befehl und führt ihn aus; einer, der einen Namen oder ein Item braucht, öffnet die Chat-Box damit." } },
 	{ id = 227, module = "tweaks",
-		en = { "Undiscovered flight points on the map", "Flight points you haven't found yet show on zone and continent maps as a flight master icon (only your faction's): hover one for its name, talk to its flight master to discover it." },
-		de = { "Unentdeckte Flugpunkte auf der Karte", "Flugpunkte, die du noch nicht gefunden hast, erscheinen auf Zonen- und Kontinentkarten als Flugmeister-Symbol (nur die deiner Fraktion): Maus darüber für den Namen, sprich mit dem Flugmeister, um ihn zu entdecken." } },
+		en = { "Undiscovered flight points on the map", "Flight points you haven't found yet show on zone maps as a flight master icon (only your faction's): hover one for its name. They show on a continent once you've talked to any flight master there." },
+		de = { "Unentdeckte Flugpunkte auf der Karte", "Flugpunkte, die du noch nicht gefunden hast, erscheinen auf Zonenkarten als Flugmeister-Symbol (nur die deiner Fraktion): Maus darüber für den Namen. Auf einem Kontinent erscheinen sie, sobald du dort mit einem Flugmeister gesprochen hast." } },
 	-- New entries go here, at the end.
 }

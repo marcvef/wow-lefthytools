@@ -455,7 +455,7 @@ function M:BuildOptions(o)
 		L["The camera slowly circles your character while the AFK screen is up."])
 	o:Header(L["Flights"])
 	o:Checkbox("flightPointMap", L["Undiscovered flight points on the map"],
-		L["Flight points you haven't discovered yet show on zone and continent maps as a flight master icon, so you can find them; hover one for its name. Only your faction's. LefthyTools learns which ones you know whenever you talk to a flight master: until you've done that once on a continent, the ones it can't be sure about show faded."])
+		L["Flight points you haven't discovered yet show on zone maps as a flight master icon, so you can find them; hover one for its name. Only your faction's. LefthyTools learns which ones you know whenever you talk to a flight master: on each continent they show once you've done that there."])
 	o:Checkbox("cinematicFlights", L["Cinematic flights"],
 		L["On a flight path the interface fades out, black bars slide in like in a film, and a title card names your destination and every zone you fly into. The bottom bar shows the time left to landing, and whispers and party chat show as subtitles. Opening a window or typing in chat pauses it until you're done; landing brings everything back."])
 	o:Checkbox("flightFriends", L["Friends in the top bar"],

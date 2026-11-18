@@ -2408,13 +2408,11 @@ L["Click: opens the chat box with it; type the rest and press Enter."] =
 -- Undiscovered flight points on the map (Modules/Tweaks/FlightPoints.lua)
 L["Undiscovered flight points on the map"] =
 	"Unentdeckte Flugpunkte auf der Karte"
-L["Flight points you haven't discovered yet show on zone and continent maps as a flight master icon, so you can find them; hover one for its name. Only your faction's. LefthyTools learns which ones you know whenever you talk to a flight master: until you've done that once on a continent, the ones it can't be sure about show faded."] =
-	"Flugpunkte, die du noch nicht entdeckt hast, erscheinen auf Zonen- und Kontinentkarten als Flugmeister-Symbol, damit du sie findest; fahr mit der Maus darüber für den Namen. Nur die deiner Fraktion. LefthyTools merkt sich, welche du kennst, sobald du mit einem Flugmeister sprichst: Bis du das einmal auf einem Kontinent getan hast, erscheinen die, bei denen es nicht sicher ist, blasser."
+L["Flight points you haven't discovered yet show on zone maps as a flight master icon, so you can find them; hover one for its name. Only your faction's. LefthyTools learns which ones you know whenever you talk to a flight master: on each continent they show once you've done that there."] =
+	"Flugpunkte, die du noch nicht entdeckt hast, erscheinen auf Zonenkarten als Flugmeister-Symbol, damit du sie findest; fahr mit der Maus darüber für den Namen. Nur die deiner Fraktion. LefthyTools merkt sich, welche du kennst, sobald du mit einem Flugmeister sprichst: Auf jedem Kontinent erscheinen sie, sobald du das dort einmal getan hast."
 L["A flight point you haven't discovered yet"] =
 	"Ein Flugpunkt, den du noch nicht entdeckt hast"
 L["Talk to its flight master to discover it."] =
 	"Sprich mit seinem Flugmeister, um ihn zu entdecken."
-L["You may know it already: after you talk to any flight master on this continent, only the ones you haven't discovered show."] =
-	"Vielleicht kennst du ihn schon: Sobald du mit einem Flugmeister auf diesem Kontinent gesprochen hast, erscheinen nur noch die, die du nicht entdeckt hast."
 L["Flight points on the map: which ones you know"] =
 	"Flugpunkte auf der Karte: welche du kennst"
