@@ -689,5 +689,8 @@ ns.CHANGELOG = {
 	{ id = 227, module = "tweaks",
 		en = { "Flight points on zone maps", "Your faction's flight points show on zone maps: plain if you have it, on a gold glow if you haven't discovered it yet. Hover one for its name. Talk to any flight master once so LefthyTools knows which ones you have." },
 		de = { "Flugpunkte auf Zonenkarten", "Die Flugpunkte deiner Fraktion erscheinen auf Zonenkarten: normal, wenn du ihn hast, mit goldenem Schein, wenn du ihn noch nicht entdeckt hast. Maus darüber für den Namen. Sprich einmal mit einem Flugmeister, damit LefthyTools weiß, welche du hast." } },
+	{ id = 228, module = "general",
+		en = { "/lefthy perf: why the game stutters", "If the game stutters, type /lefthy perf while it happens: it measures for 10 seconds (every addon's share, memory, events, what LefthyTools was doing) and shows a log. Its Send button sends it to friends who collect reports." },
+		de = { "/lefthy perf: warum das Spiel ruckelt", "Wenn das Spiel ruckelt, tipp /lefthy perf, während es passiert: es misst 10 Sekunden lang (den Anteil jedes Addons, Speicher, Events, was LefthyTools gerade tat) und zeigt ein Log. Sein Senden-Button schickt es an Freunde, die Berichte sammeln." } },
 	-- New entries go here, at the end.
 }

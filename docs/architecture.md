@@ -29,6 +29,7 @@ LefthyTools/                 the addon (copied or junctioned into Interface\AddO
   Core/Errors.lua            error catcher: our Lua errors kept in LefthyToolsDB.errors, /lefthy errors
   Core/WhatsNew.lua          what's-new window after an update, /lefthy news (entries: Data/Changelog.lua)
   Core/Options.lua           the settings' data (overview + one page per module), option builder, /lefthy
+  Core/Perf.lua              /lefthy perf: what slows the game, measured while it happens, a log to copy or send
   Core/SettingsWindow.lua    the settings window: pages, search, a row for each kind of setting
   Modules/Mirage/Groups.lua  frame names per group, window list, chat events (edit to add frames)
   Modules/Mirage/Mirage.lua  engine: frame adoption + alpha hooks, visibility, fading, events
@@ -269,6 +270,32 @@ newest first) in a read-only edit box to copy; `/lefthy errors clear` (or the wi
 empties it; the overview's Info section shows the count, with a Show button that opens the report
 while there is one (info rows take an optional `button = { text, onClick, shown }`). Core parts that aren't modules hook in through `LT.onLoad` (saved
 variables ready) and `LT.onLogin`.
+
+## What slows the game (Core/Perf.lua)
+
+`/lefthy perf [seconds]` (10 by default, 3 to 60; `show`, `send`, `stop`) measures while the stutter happens and
+writes a plain-text log (a copy window like the errors', kept in `LefthyToolsDB.perfLogs`, the last 5):
+
+- **Frames:** count, average and worst frame time, frames over 50 / 100 / 250 ms.
+- **Every addon's time** from the game's own profiler, `C_AddOnProfiler` (on Forever, always on, no `/reload`
+  or `scriptProfile`): each addon's `RecentAverageTime` (the last 60 frames) read once a second, averaged and
+  its worst second; its `CountTimeOver10Ms` / `CountTimeOver50Ms` before and after (its stutters while
+  measuring); all addons each frame (`GetOverallMetric(LastTime)`), the whole game's average
+  (`GetApplicationMetric`). Blizzard's own addons are counted too.
+- **Memory:** the Lua heap each second (`collectgarbage("count")`) and every addon's before and after
+  (`UpdateAddOnMemoryUsage`, twice only: it takes a few ms with many addons): who makes garbage.
+- **Events:** a frame of ours with `RegisterAllEvents` while measuring counts each event (names only).
+- **LefthyTools inside:** `LT.Guard` times every guarded hook while `LT.MeasureGuards(fn)` is set (nil the
+  rest of the time: one local looked at per call), with the hooks it calls; only the outermost ones add up to
+  LefthyTools' guarded time. Handlers that don't go through `LT.Guard` show only in the profiler's total.
+- **State:** `LT.PerfState(name, fn)` lines (Beacon's queues, WhyPoor?'s scan, jobs, index, windows, sharing),
+  asked at the start and the end only.
+- **Each second** on its own line (fps, worst frame, addons' time a frame, the three slowest addons, hooks,
+  Lua memory, events and the most frequent one).
+
+`/lefthy perf send` sends it like `/lefthy report` (Beacon's `B.SendReportText(kind, text, more)`): in pieces of
+whole lines (2700 bytes, at most 3: Beacon's 16 parts a report), the each-second lines last, so they're what's
+cut. Nothing runs until asked; while measuring, one OnUpdate, one profiler call a frame and one per addon a second.
 
 ## What's new (Core/WhatsNew.lua, Data/Changelog.lua)
 

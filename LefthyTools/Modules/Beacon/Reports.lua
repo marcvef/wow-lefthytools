@@ -256,6 +256,21 @@ function B.ReportCommand(text)
 	end
 end
 
+-- Another kind of report (LT.Perf's log, a piece of it): kept and sent like a hand-written one, its first
+-- line "<kind>: " and the sender's side. more: further pieces follow (kept only; the last sends them all).
+function B.SendReportText(kind, text, more)
+	Keep(kind .. ": " .. Context() .. "\n" .. tostring(text or ""))
+	if more then
+		return
+	elseif not M.enabled then
+		M:Print("report kept: it goes out once Beacon is on (/lefthy enable beacon) and a friend who collects reports is online.")
+	elseif #Collectors() == 0 then
+		M:Print("report kept: it goes out when a friend who collects error reports is online.")
+	else
+		Flush()
+	end
+end
+
 table.insert(LT.Errors.listeners, function(entry)
 	errorsIn[#errorsIn + 1] = entry
 end)

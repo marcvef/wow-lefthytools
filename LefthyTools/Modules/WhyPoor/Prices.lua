@@ -2054,3 +2054,18 @@ end)
 LT.onLogin[#LT.onLogin + 1] = function()
 	C_Timer.After(0, P.Refresh) -- (the modules start right after onLogin)
 end
+
+-- /lefthy perf: what the engine is doing.
+LT.PerfState("WhyPoor prices", function()
+	if not P.running then
+		return "off"
+	end
+	local s = P.scan
+	local scan = "none"
+	if s then
+		scan = ("%s %s/%s%s"):format(tostring(s.kind), tostring(s.done or 0), tostring(s.total or "?"),
+			s.committing and " (keeping it)" or s.waiting and " (waiting for the game)" or "")
+	end
+	return ("auction house %s, scan %s, job %s, driver %s, notes %d, revision %d"):format(P.ahOpen and "open" or "closed",
+		scan, P.job and "running" or "none", P.driver:IsShown() and "running" or "idle", #P.notes, P.rev or 0)
+end)

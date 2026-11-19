@@ -1141,3 +1141,17 @@ function T.Controls(view, shown)
 end
 
 Wn.AddTab("stocks", L["Stocks"], T)
+
+-- /lefthy perf: the name index and the search.
+LT.PerfState("WhyPoor stocks", function()
+	local X = St.index
+	local index = "not made"
+	if X then
+		index = ("%d names, %d keys sorted, %d awaited, asked %d of %d%s%s%s"):format(#X.items, X.sortedKeys or 0,
+			X.waitCount or 0, (X.ask or 1) - 1, #X.wait, X.lists and ", reading lists" or "", X.sort and ", sorting" or "",
+			X.paused and ", paused" or "")
+	end
+	return ("tab %s, index %s, indexer %s%s, search %s, %d watched"):format(St.Showing() and "shown" or "hidden", index,
+		St.indexer:IsShown() and "running" or "idle", St.listening and " (listening for names)" or "",
+		St.search and "running" or "none", #St.List())
+end)

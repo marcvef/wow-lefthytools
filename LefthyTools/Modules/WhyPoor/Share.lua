@@ -730,3 +730,11 @@ function B.PricesStop()
 	S.inHead, S.inTail = 1, 0
 	S.serving, S.pending, S.anyDue, S.anyPoints = nil, nil, false, false
 end
+
+-- /lefthy perf: friends' prices coming and going.
+LT.PerfState("WhyPoor sharing", function()
+	local serving = S.serving
+	return ("incoming %d, serving %s, asking %s"):format(math.max(0, (S.inTail or 0) - (S.inHead or 1) + 1),
+		serving and ("%d sent (pass %d)"):format(serving.sent or 0, serving.pass or 1) or "nobody",
+		S.pending and ("a friend (%d messages so far)"):format(S.pending.n or 0) or "nobody")
+end)

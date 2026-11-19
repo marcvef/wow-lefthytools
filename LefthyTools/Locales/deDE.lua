@@ -2312,6 +2312,17 @@ L["Error reports friends sent you"] =
 	"Fehlerberichte, die Freunde dir geschickt haben"
 L["Send an error report: what happened"] =
 	"Fehlerbericht senden: was passiert ist"
+L["The game stutters? Measure what slows it (10 s), a log to send"] =
+	"Das Spiel ruckelt? Messen, was es bremst (10 s), ein Log zum Senden"
+-- What slows the game (Core/Perf.lua)
+L["LefthyTools performance"] =
+	"LefthyTools-Performance"
+L["What slowed the game while measuring. Send it with the button (friends who collect reports get it), or click into the text, press Ctrl+A and Ctrl+C and send it to whoever gave you LefthyTools."] =
+	"Was das Spiel beim Messen gebremst hat. Schick es mit dem Button (Freunde, die Berichte sammeln, bekommen es), oder klick in den Text, drück Strg+A und Strg+C und schick es dem, von dem du LefthyTools hast."
+L["Send"] =
+	"Senden"
+L["Measure again"] =
+	"Nochmal messen"
 L["Every module, on or off"] =
 	"Alle Module, an oder aus"
 L["Friends with LefthyTools, message traffic"] =

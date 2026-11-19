@@ -24,6 +24,10 @@ Facts verified against client builds 1.60.1.70009 and 1.60.1.70170.
   (`wow_classic_beta`, `WowB.exe`). The installer finds either by `.build.info` (docs/architecture.md),
   and LefthyTools tells them apart in game with `IsBetaBuild()` / `IsTestBuild()` /
   `IsPublicTestClient()` (`LT.WhichWorld`).
+- **Addon profiler:** `C_AddOnProfiler` (retail's) is there in 1.60.1.70938: `GetAddOnMetric(name, metric)`,
+  `GetOverallMetric`, `GetApplicationMetric`, `Enum.AddOnProfilerMetric` (`RecentAverageTime` = the last 60
+  frames, `LastTime`, `CountTimeOver50Ms`...), always on, no `scriptProfile` or `/reload`. `/lefthy perf`
+  (Core/Perf.lua) uses it. `UpdateAddOnMemoryUsage` / `GetAddOnMemoryUsage` and `Frame:RegisterAllEvents` too.
 - `WOW_PROJECT_ID == 1` (the retail value). Libraries that branch on Classic project IDs
   misdetect it.
 - **Secret values:** `UnitHealth`, `UnitHealthMax`, `UnitHealthPercent` and `UnitHealthMissing`

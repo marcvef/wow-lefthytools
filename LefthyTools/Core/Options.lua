@@ -479,6 +479,7 @@ Options.COMMANDS = {
 		{ "/lefthy errors", L["LefthyTools' errors, ready to copy"] },
 		{ "/lefthy reports", L["Error reports friends sent you"] },
 		{ "/lefthy report", L["Send an error report: what happened"], type = true },
+		{ "/lefthy perf", L["The game stutters? Measure what slows it (10 s), a log to send"] },
 		{ "/lefthy modules", L["Every module, on or off"] },
 	} },
 	{ section = "Beacon", commands = {

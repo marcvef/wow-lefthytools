@@ -284,6 +284,7 @@ do -- /lefthy's list: Core's words and the ones modules add (LT:AddCommand), eac
 		"/lefthy errors [clear] - LefthyTools' own errors, ready to copy",
 		"/lefthy report <what happened> - send a report to friends who collect them (Beacon)",
 		"/lefthy reports - the reports your friends sent you",
+		"/lefthy perf [seconds|show|send|stop] - what slows the game: measured while it happens, a log to copy or send",
 		"/lefthy news - what's new in LefthyTools",
 		"/lefthy announce <text> (or /la) - a line in the middle of your Beacon friends' screens (/ltc or /l <text>: LTC, LefthyTools chat)",
 		"/lefthy stream watch <name> | stop | me | preview - a Beacon friend's fight, live (more: /lefthy stream)",

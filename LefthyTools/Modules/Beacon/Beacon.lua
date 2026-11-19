@@ -1225,3 +1225,16 @@ function B.PrintStatus()
 	M:Print(string.format("traffic: %d sent, %d received in %.0f min (%.1f / %.1f per minute), throttled %d time(s).",
 		stats.sent, stats.received, minutes, stats.sent / minutes, stats.received / minutes, stats.throttled))
 end
+
+-- /lefthy perf: Beacon's queues and traffic.
+LT.PerfState("Beacon", function()
+	if not M.enabled then
+		return "off"
+	end
+	local peers = 0
+	for _ in pairs(M:GetPeers()) do
+		peers = peers + 1
+	end
+	return ("%d friends with LefthyTools, waiting to go: %d, bulk %d; %d sent, %d received, throttled %d time(s) this session"):format(
+		peers, #outbox, #lowOutbox, stats.sent, stats.received, stats.throttled)
+end)

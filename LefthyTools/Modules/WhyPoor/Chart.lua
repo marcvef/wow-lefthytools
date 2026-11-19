@@ -2642,3 +2642,18 @@ end
 function Ch.View()
 	return Ch.frame, Ch.state, Ch.widget, Ds
 end
+
+-- /lefthy perf: the windows and the highlights.
+LT.PerfState("WhyPoor windows", function()
+	local Wn, Hl = W.Window, W.Highlights
+	local parts = {}
+	parts[#parts + 1] = "window " .. ((Wn and Wn.Shown and Wn.Shown()) and ("shown (" .. tostring(Wn.state.tab) .. ", "
+		.. tostring(Wn.state.draws) .. " draws)") or "hidden")
+	parts[#parts + 1] = "big chart " .. ((Ch.frame and Ch.frame:IsShown()) and ("shown (item " .. tostring(Ch.state.item)
+		.. ", " .. tostring(Ch.state.draws) .. " draws)") or "hidden")
+	parts[#parts + 1] = "dashboard " .. ((Ds.frame and Ds.frame:IsShown()) and ("shown (" .. tostring(Ds.Page()) .. ", "
+		.. #Ds.Items() .. " tiles, " .. tostring(Ds.draws) .. " draws)") or "hidden")
+	local job = Hl and Hl.job
+	parts[#parts + 1] = "highlights " .. (job and ("working (%d of %d)"):format(job.i or 0, job.list and #job.list or 0) or "idle")
+	return table.concat(parts, ", ")
+end)

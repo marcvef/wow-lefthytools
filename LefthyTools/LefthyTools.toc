@@ -18,6 +18,7 @@ Core\MapOverlay.lua
 Core\Errors.lua
 Core\WhatsNew.lua
 Core\Options.lua
+Core\Perf.lua
 Core\SettingsWindow.lua
 
 # Data

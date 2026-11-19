@@ -38,12 +38,18 @@ command and runs it; one that needs a name or an item ("...") opens the chat box
 /lefthy enable | disable <module>  switch a module, e.g. /lefthy disable mirage
 /lefthy <module> ...               module commands, e.g. /lefthy mirage status
 /lefthy errors [clear]             LefthyTools' own errors, ready to copy
+/lefthy perf [seconds]             the game stutters? measures what slows it (10 s), a log to copy or send
 /lefthy news                       what's new (also opens by itself once after an update)
 ```
 
 **If something breaks:** LefthyTools keeps its own Lua errors, also across sessions and with
 Blizzard's error display off, and says so once in chat. Type `/lefthy errors`, click into the
 text, press Ctrl+A and Ctrl+C, and send it to whoever gave you LefthyTools.
+
+**If the game stutters:** type `/lefthy perf` while it happens and carry on for 10 seconds. A window
+then shows what took the time: frames, every addon's share (the game's own profiler), memory,
+events and what LefthyTools was doing. Send it with its button (friends who collect reports get
+it) or copy it the same way.
 
 Key bindings are under Options → Keybindings → AddOns → LefthyTools.
 

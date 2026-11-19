@@ -222,7 +222,7 @@ end
 -- Which files the game loads for LefthyTools (the TOC's files and saved variables), as a short
 -- hash; npm test checks it against the TOC. The game reads the TOC only at startup, so an update
 -- that changes it needs a restart, any other a /reload. Friends send theirs with their version.
-LT.FILES = "bbde9869"
+LT.FILES = "bc273cad"
 
 -- The newest LefthyTools build seen from a friend (Beacon), if newer than ours, and its FILES
 -- (nil if that friend's build doesn't send them). Addons can't go online, so friends are the
@@ -481,6 +481,32 @@ local function Finish(guard, outer, ok, ...)
 	guard.resting = GetTime() + guard.rest
 end
 
+-- While /lefthy perf measures (Perf.lua): measure(name, ms, outermost) after each hook; nil otherwise,
+-- so a hook costs nothing more then.
+local measure
+
+local function Now()
+	local ok, ms = pcall(debugprofilestop)
+	return ok and type(ms) == "number" and ms or nil
+end
+
+local function Measured(m, name, started, outermost, ...)
+	local now = started and Now()
+	if now then
+		m(name, now - started, outermost)
+	end
+	return ...
+end
+
+-- Perf.lua's: fn(name, ms, outermost) for every guarded hook from now on; nil stops it.
+function LT.MeasureGuards(fn)
+	measure = fn
+end
+
+function LT.MeasuringGuards()
+	return measure ~= nil
+end
+
 -- Calls the hook fn(...), name being what it's known by (e.g. "B.UpdatePings"). Returns true and
 -- what fn returned if it ran and worked; nothing if it failed, rests, or fn is nil (a file not
 -- loaded). An error goes to the error handler, and so to the error catcher (Errors.lua), once per
@@ -503,6 +529,11 @@ function LT.Guard(name, fn, ...)
 	end
 	local outer = guarded
 	guarded = guard
+	local m = measure
+	if m then
+		local started = Now()
+		return Measured(m, name, started, outer == nil, Finish(guard, outer, xpcall(fn, Report, ...)))
+	end
 	return Finish(guard, outer, xpcall(fn, Report, ...))
 end
 

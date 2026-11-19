@@ -1635,3 +1635,12 @@ function X.PhaseFinish(job)
 	end
 	return true
 end
+
+-- /lefthy perf: the ideas' run.
+LT.PerfState("WhyPoor ideas", function()
+	local job = X.job
+	local run = job and ("running (%s, %d frames, %d units)"):format(tostring(X.PHASES[job.at] or "?"), job.frames or 0,
+		job.units or 0) or "idle"
+	return ("%s%s%s, driver %s"):format(run, X.pending and ", asked again" or "", X.waiting and ", waiting to start" or "",
+		(X.frame and X.frame:IsShown()) and "running" or "idle")
+end)
