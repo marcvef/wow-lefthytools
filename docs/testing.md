@@ -95,7 +95,7 @@ from where the one before left time, Beacon's friends, saved variables and open 
 | `whypoor_alerts.lua` | WhyPoor?'s price alerts (Alerts.lua) on the real price engine: what's typed (gold, `2g 50s`, `1,5`, `80k`, percent; not a price), the setting's defaults and rows, one line after a scan with every crossing (links, reasons), once per crossing and again only past the 5% margin, a move once a day each way against the day before's close, the setting's move not for a few copper, an item's own move winning, the setting off and `/whypoor alerts on`/`off`, held in a fight until it ends, the sound, the module off, 25 items a frame and nothing idle, the hook in `P.Finish` (a search, a full scan), `/whypoor alerts`, the Stocks tab's details (fields, Set, Enter, Clear, wrong input, typed text through redraws, an unwatched item, hidden on another tab), German placeholders | - |
 | `whypoor_stocks.lua` | WhyPoor?'s Stocks tab (Stocks.lua) on the real price engine: `/whypoor stocks`, the empty watch list, the search (any case, names starting with it first, an item link, a slice a frame over many items, waiting while the window is closed), a row's latest daily low and its change since a week ago, the details (the graph, Add, Remove), the saved watch list and its order, the box only on its tab, German | - |
 | `whypoor_friendpoints.lua` | WhyPoor?'s friends' scans of watched items (Share.lua's `ww` / `wf`, Prices.lua's `P.RecordFriend`, Chart.lua's point tooltip): my watch list to friends (first seen, changed, at most a minute, the ask answered), their list (another house, too soon), my points after a full scan and after searches only of the items they watch, theirs recorded marked (an hour old: its own point; near mine: left out; unwatched items skipped; P.Series' `from`; their flow as the sold estimate), the merging rules (never over mine, gaps filled, their own told twice, mine replacing theirs, in place by time; the day's high, low, close, count and whose; sold: the longer watch, never added up), old saved texts loading and pruning keeping the marks, broken, half, too old, too many and over-255-byte messages dropped whole, the rate limit, nothing in a fight, a 20-item list in two messages within 250 bytes, the older build getting nothing, the setting, the chart (tooltip, dot, info line, a day's tooltip) | - |
-| `flight_points.lua` | Misc Tweaks: undiscovered flight points on the map (a fresh character: none until a flight master; zone maps only; the flight master's map: known ones gone, an unreachable one not learned, the continent sure, kept per character; the continent map; the game's map data not trusted, its names used; `/lefthy tweaks flightinfo`; not on the world map; off: nothing drawn or learned), and Data/FlightPoints.lua well formed | - |
+| `flight_points.lua` | Misc Tweaks: flight points on zone maps (a fresh character: all faded, not the other faction's; zone maps only; the flight master's map: the ones you have plain, the others with a glow, an unreachable one not learned, kept per character; the game's data compared there: wrong, not used; right, the other continent from it; its names; `/lefthy tweaks flightinfo`; off: nothing drawn or learned), and Data/FlightPoints.lua well formed | - |
 
 Each file begins with what it tests and a `-- Needs:` line: the files that must run before it
 (`-- Needs: beacon.lua, ...`, which run.js reads) or `no other file`, and why. What's left:
@@ -251,11 +251,11 @@ installer from GitHub instead.
    blocked". `/afk`, then `/reload`: the camera doesn't keep circling. While AFK, a Beacon friend
    shows or offers an item, writes in LTC or announces something: each is listed under
    "While you were away"; after an offer, a click brings back its Need / Pass buttons.
-   Undiscovered flight points (Misc Tweaks): talk to a flight master, then open the map on a zone of
-   that continent: a flight master icon with a gold glow where a flight point of yours (or a neutral
-   one) stands that you haven't found; hover one: its name. Before that flight master: none. Discover a
-   new one: its icon goes. The other faction's never show; continent and world maps have none.
-   `/lefthy tweaks flightinfo` with the map open: your points, the ones not discovered, what the game says.
+   Flight points on zone maps (Misc Tweaks): open a zone map: a flight master icon at each flight point of your
+   faction, faded until you've talked to a flight master; talk to one (anywhere): the ones you have plain, the
+   others on a gold glow, on both continents if the game's data matched (`/lefthy tweaks flightinfo` says so);
+   hover one: its name and whether you have it. Discover a new one: its glow goes. The other faction's never
+   show; continent and world maps have none.
    Cinematic flights (Misc Tweaks): take a flight path: the interface fades out, black bars come
    in (the top one lists your Beacon friends, a line each: level, zone, fighting or their quest;
    with three or more, they take turns every 8 s), "Next stop / <place> / <zone>" appears, the bottom bar says "Landing in about m:ss". Each zone

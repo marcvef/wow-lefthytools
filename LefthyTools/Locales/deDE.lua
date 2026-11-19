@@ -2405,14 +2405,18 @@ L["Click: runs it. The answer comes in the chat."] =
 L["Click: opens the chat box with it; type the rest and press Enter."] =
 	"Klick: öffnet die Chat-Box damit; tipp den Rest und drück Enter."
 
--- Undiscovered flight points on the map (Modules/Tweaks/FlightPoints.lua)
-L["Undiscovered flight points on the map"] =
-	"Unentdeckte Flugpunkte auf der Karte"
-L["Flight points you haven't discovered yet show on zone maps as a flight master icon, so you can find them; hover one for its name. Only your faction's. LefthyTools learns which ones you know whenever you talk to a flight master: on each continent they show once you've done that there."] =
-	"Flugpunkte, die du noch nicht entdeckt hast, erscheinen auf Zonenkarten als Flugmeister-Symbol, damit du sie findest; fahr mit der Maus darüber für den Namen. Nur die deiner Fraktion. LefthyTools merkt sich, welche du kennst, sobald du mit einem Flugmeister sprichst: Auf jedem Kontinent erscheinen sie, sobald du das dort einmal getan hast."
+-- Flight points on zone maps (Modules/Tweaks/FlightPoints.lua)
+L["Flight points on zone maps"] =
+	"Flugpunkte auf Zonenkarten"
+L["Your faction's flight points show on zone maps as a flight master icon: plain if you have it, on a gold glow if you haven't discovered it yet, faded while that isn't known; hover one for its name. LefthyTools learns which ones you have when you talk to any flight master."] =
+	"Die Flugpunkte deiner Fraktion erscheinen auf Zonenkarten als Flugmeister-Symbol: normal, wenn du ihn hast, mit goldenem Schein, wenn du ihn noch nicht entdeckt hast, blasser, solange das nicht bekannt ist; fahr mit der Maus darüber für den Namen. LefthyTools merkt sich, welche du hast, sobald du mit einem Flugmeister sprichst."
 L["A flight point you haven't discovered yet"] =
 	"Ein Flugpunkt, den du noch nicht entdeckt hast"
 L["Talk to its flight master to discover it."] =
 	"Sprich mit seinem Flugmeister, um ihn zu entdecken."
+L["You have this flight point."] =
+	"Diesen Flugpunkt hast du."
+L["Not known yet whether you have it: talk to any flight master once."] =
+	"Noch nicht bekannt, ob du ihn hast: sprich einmal mit einem Flugmeister."
 L["Flight points on the map: which ones you know"] =
 	"Flugpunkte auf der Karte: welche du kennst"

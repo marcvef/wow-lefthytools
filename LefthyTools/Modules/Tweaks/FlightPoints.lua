@@ -5,9 +5,10 @@ local M = LT:GetModule("tweaks")
 local Overlay = LT.MapOverlay
 local view = Overlay.view
 
--- Flight points you haven't discovered yet, on the world map (the flightPointMap tweak): a flight
--- master icon on zone maps where one stands, so you can find it. Only your faction's (and the ones
--- both fly from). Not on continent or world maps: only while looking at the zone.
+-- Flight points on zone maps (the flightPointMap tweak): a flight master icon where each of your
+-- faction's (and the ones both fly from) stands, saying whether you have it: plain if you do, on a
+-- gold glow if you don't, faded while that isn't known yet (no flight master seen). Not on continent
+-- or world maps: only while looking at the zone.
 --
 -- Where they stand: Data/FlightPoints.lua (the client's TaxiNodes table: the nodes a character can
 -- discover, their world position; tools/update-flight-paths.ps1), carried onto the shown map with
@@ -17,12 +18,16 @@ local view = Overlay.view
 -- TAXIMAP_OPENED, which a new flight point opens too): the node you're at (Current) and the ones
 -- you can fly to (Reachable). Unreachable ones are left out: Blizzard's flight map hides them, so
 -- they may be ones you don't know. Kept per character in M.db.flightPointsKnown["Name-Realm"] =
--- { nodes = { [nodeID] = true }, checked = { [continent] = true } }. Only a continent whose flight
--- map was seen shows anything: before that nobody knows which ones you have (showing all of them,
--- faded, put up ones already discovered). The game's own map data (C_TaxiMap.GetTaxiNodesForMap)
--- only gives the names in the client's language: in game its isUndiscovered hid points never
--- visited (seen on Kalimdor), so it isn't trusted. /lefthy tweaks flightinfo says what it and the
--- record tell, for the shown map.
+-- { nodes = { [nodeID] = true }, checked = { [continent] = true } }. On a continent not checked yet a
+-- point not known to be yours is "unsure" (faded): nobody knows whether you have it.
+--
+-- The other continent from the same visit: the game's own map data (C_TaxiMap.GetTaxiNodesForMap's
+-- isUndiscovered, on each continent's map and its zones) is checked against the flight master's map
+-- right then (Calibrate): the ones it shows must be "known", the ones it doesn't list "undiscovered".
+-- Only if it all matches (3 points at least, none wrong) is the game's data used, for both continents.
+-- It isn't trusted otherwise: in game, before any flight master, it hid points never visited (seen on
+-- Kalimdor). The last check is kept in M.db.flightPointsCheck. Its names (the client's language) are
+-- used on the markers. /lefthy tweaks flightinfo says what the record and the game tell.
 --
 -- Drawn on frames of our own over the map (Core/MapOverlay.lua), hover only: clicks go to the map.
 -- Cost: nothing while the map is closed; a draw when it opens or shows another map.
@@ -31,6 +36,7 @@ local MAP_TYPE = Enum.UIMapType or { Cosmic = 0, World = 1, Continent = 2, Zone 
 local SIDE = { Alliance = "A", Horde = "H" }
 local ICON_ATLAS, ICON_FILE = "FlightMaster", "Interface\\Minimap\\Tracking\\FlightMaster"
 local ICON_SIZE = 18
+local UNSURE_ALPHA = 0.55 -- not known yet whether you have it
 
 local active = false
 local pins = { n = 0 } -- the i-th point of a draw is always the i-th frame
@@ -63,8 +69,9 @@ end
 local Draw -- (below)
 
 -- The flight master's map is open: the nodes it shows are known (where you are, where you can fly),
--- and their continent is sure from now on.
+-- and their continent is sure from now on; the game's map data, if it matches, does the other one.
 local STATE = Enum.FlightPathState or { Current = 0, Reachable = 1, Unreachable = 2 }
+local Calibrate -- (below)
 function FlightPoints.Learn()
 	local mapID = GetTaxiMapID and GetTaxiMapID()
 	if not (mapID and C_TaxiMap and C_TaxiMap.GetAllTaxiNodes) then
@@ -75,10 +82,15 @@ function FlightPoints.Learn()
 		return 0
 	end
 	local mine, data, learned = Mine(), ns.FLIGHT_POINTS or {}, 0
+	local listed, continent = {}, nil -- nodeID -> its state on the flight master's map; this continent
 	for _, node in ipairs(nodes) do
 		local id = type(node) == "table" and node.nodeID
 		local shown = type(node) == "table" and (node.state == STATE.Current or node.state == STATE.Reachable)
+		if type(id) == "number" and LT.Readable(id) and LT.Readable(node.state) then
+			listed[id] = node.state
+		end
 		if shown and type(id) == "number" and LT.Readable(id) then
+			continent = continent or (data[id] and data[id][1])
 			if not mine.nodes[id] then
 				mine.nodes[id] = true
 				learned = learned + 1
@@ -89,6 +101,9 @@ function FlightPoints.Learn()
 				learned = learned + 1
 			end
 		end
+	end
+	if continent then
+		learned = learned + Calibrate(continent, listed, mine)
 	end
 	if learned > 0 and view.shown then
 		Draw()
@@ -153,11 +168,88 @@ local function BlizzardShows(mapID)
 	return ok and shows
 end
 
--- A point: "missing" (not discovered), "unsure" (its continent's flight map not seen yet: not shown) or
--- nil (known).
+-- The continents' maps (the Eastern Kingdoms, Kalimdor), where the game's map data is asked.
+local CONTINENT_MAP = { [0] = 1415, [1] = 1414 }
+
+-- What the game's map data says of a continent's flight points: nodeID -> isUndiscovered (true or
+-- false), from the continent's map and its zones' (only at a flight master: about 20 small calls).
+local function GameSays(continent)
+	local says = {}
+	local top = CONTINENT_MAP[continent]
+	if not (top and C_TaxiMap and C_TaxiMap.GetTaxiNodesForMap) then
+		return says
+	end
+	local maps = { top }
+	if C_Map.GetMapChildrenInfo then
+		local ok, children = pcall(C_Map.GetMapChildrenInfo, top, MAP_TYPE.Zone, true)
+		if ok and type(children) == "table" then
+			for _, child in ipairs(children) do
+				if type(child) == "table" and type(child.mapID) == "number" then
+					maps[#maps + 1] = child.mapID
+				end
+			end
+		end
+	end
+	for _, mapID in ipairs(maps) do
+		for id, node in pairs(FromGame(mapID)) do
+			if says[id] == nil and type(node.isUndiscovered) == "boolean" and LT.Readable(node.isUndiscovered) then
+				says[id] = node.isUndiscovered
+			end
+		end
+	end
+	return says
+end
+
+-- At a flight master: does the game's map data agree with its map (what it shows is known, what it
+-- doesn't list isn't)? Then it says which ones you know on both continents. Returns how much it taught.
+Calibrate = function(continent, listed, mine)
+	local data, side = ns.FLIGHT_POINTS or {}, SIDE[UnitFactionGroup("player") or ""]
+	local says = GameSays(continent)
+	local agree, disagree = 0, 0
+	for id, p in pairs(data) do
+		if p[1] == continent and (p[4] == "" or p[4] == side) and says[id] ~= nil then
+			local state = listed[id]
+			if state == STATE.Current or state == STATE.Reachable then
+				if says[id] == false then agree = agree + 1 else disagree = disagree + 1 end
+			elseif state == nil then
+				if says[id] == true then agree = agree + 1 else disagree = disagree + 1 end
+			end
+		end
+	end
+	local check = { at = time(), continent = continent, agree = agree, disagree = disagree, trusted = disagree == 0 and agree >= 3 }
+	M.db.flightPointsCheck = check
+	if not check.trusted then
+		return 0
+	end
+	local learned = 0
+	for c in pairs(CONTINENT_MAP) do
+		local said = c == continent and says or GameSays(c)
+		local known, told = 0, 0
+		for id, undiscovered in pairs(said) do
+			if data[id] and data[id][1] == c then
+				told = told + 1
+				if undiscovered == false then
+					known = known + 1
+					if not mine.nodes[id] then
+						mine.nodes[id] = true
+						learned = learned + 1
+					end
+				end
+			end
+		end
+		check["continent" .. c] = told .. " told, " .. known .. " known"
+		if told > 0 and not mine.checked[c] then
+			mine.checked[c] = true
+			learned = learned + 1
+		end
+	end
+	return learned
+end
+
+-- A point: "known", "missing" (not discovered) or "unsure" (not known: its continent not checked yet).
 local function Status(spot, mine)
 	if mine.nodes[spot.id] then
-		return nil
+		return "known"
 	end
 	return mine.checked[spot.continent] and "missing" or "unsure"
 end
@@ -172,10 +264,9 @@ function FlightPoints.OnMap(mapID)
 	local mine, game = Mine(), FromGame(mapID)
 	for _, spot in ipairs(Spots(mapID)) do
 		if spot.side == "" or spot.side == side then
-			if Status(spot, mine) == "missing" then
-				local said = game[spot.id]
-				list[#list + 1] = { spot = spot, gameName = said and LT.Readable(said.name) and said.name or nil }
-			end
+			local said = game[spot.id]
+			list[#list + 1] = { spot = spot, status = Status(spot, mine),
+				gameName = said and LT.Readable(said.name) and said.name or nil }
 		end
 	end
 	return list
@@ -191,7 +282,7 @@ function FlightPoints.Info(mapID)
 	local out = {}
 	local side = SIDE[UnitFactionGroup("player") or ""] or "?"
 	local mine = Mine()
-	local yours, missing, unsure = 0, 0, 0
+	local yours, have, missing, unsure = 0, 0, 0, 0
 	local game = FromGame(mapID)
 	local listed, saysNew, saysKnown = 0, 0, 0
 	for _, said in pairs(game) do
@@ -212,6 +303,8 @@ function FlightPoints.Info(mapID)
 				missingNames[#missingNames + 1] = spot.name
 			elseif status == "unsure" then
 				unsure = unsure + 1
+			else
+				have = have + 1
 			end
 		end
 	end
@@ -223,13 +316,18 @@ function FlightPoints.Info(mapID)
 		continents[#continents + 1] = tostring(continent)
 	end
 	table.sort(continents)
-	out[#out + 1] = ("flight points on %s (%d): %d of yours (%s), %d not discovered, %d hidden until you talk to a flight master on this continent."):format(
-		info.name or "?", mapID, yours, side, missing, unsure)
+	out[#out + 1] = ("flight points on %s (%d): %d of yours (%s): %d you have, %d not discovered, %d not known yet (talk to a flight master)."):format(
+		info.name or "?", mapID, yours, side, have, missing, unsure)
 	if not ShowsOn(mapID) then
 		out[#out + 1] = "  (markers show on zone maps only)"
 	end
 	out[#out + 1] = ("  this character knows %d; flight master maps seen on continent(s): %s."):format(known,
 		#continents > 0 and table.concat(continents, ", ") or "none yet")
+	local last = M.db.flightPointsCheck
+	if type(last) == "table" and last.agree then
+		out[#out + 1] = ("  the game's data at the last flight master (continent %s): %d right, %d wrong: %s."):format(
+			tostring(last.continent), last.agree, last.disagree or 0, last.trusted and "used for both continents" or "not used")
+	end
 	local shows = BlizzardShows(mapID)
 	out[#out + 1] = ("  the game's map data: %d listed (%d undiscovered, %d known); Blizzard's map shows flight points here: %s."):format(
 		listed, saysNew, saysKnown, tostring(shows))
@@ -250,8 +348,14 @@ local function ShowTooltip(f, tip)
 	end
 	tip:SetOwner(f, "ANCHOR_RIGHT")
 	tip:SetText(point.gameName or point.spot.name)
-	tip:AddLine(L["A flight point you haven't discovered yet"], 1, 0.82, 0)
-	tip:AddLine(L["Talk to its flight master to discover it."], 1, 1, 1, true)
+	if point.status == "known" then
+		tip:AddLine(L["You have this flight point."], 0.3, 1, 0.3)
+	elseif point.status == "missing" then
+		tip:AddLine(L["A flight point you haven't discovered yet"], 1, 0.82, 0)
+		tip:AddLine(L["Talk to its flight master to discover it."], 1, 1, 1, true)
+	else
+		tip:AddLine(L["Not known yet whether you have it: talk to any flight master once."], 0.75, 0.75, 0.75, true)
+	end
 	tip:Show()
 end
 
@@ -317,6 +421,8 @@ Draw = function()
 		n = n + 1
 		pins[n] = f
 		f.point = point
+		f.Glow:SetShown(point.status == "missing")
+		f:SetAlpha(point.status == "unsure" and UNSURE_ALPHA or 1)
 		f:SetFrameLevel(Overlay.Level("PIN_FRAME_LEVEL_FLIGHT_POINT", n))
 		Overlay.Place(f, point.spot.x, point.spot.y, 1.0, 1.2)
 	end
